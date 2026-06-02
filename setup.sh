@@ -160,6 +160,14 @@ refresh_runtime_path() {
     hash -r 2>/dev/null || true
 }
 
+# Test seam: `DOTFILES_SETUP_SOURCE_ONLY=1 source setup.sh` loads the helper
+# functions (phase, refresh_runtime_path) without running the install phases, so
+# tests can exercise refresh_runtime_path in isolation. Unset in normal runs.
+if [[ -n "${DOTFILES_SETUP_SOURCE_ONLY:-}" ]]; then
+    # shellcheck disable=SC2317  # the exit is reached only when executed, not sourced
+    return 0 2>/dev/null || exit 0
+fi
+
 # ---- Phase 1: dependencies ---------------------------------------------------
 if [[ "$SKIP_DEPS" -eq 0 ]]; then
     phase "Phase 1/4: install dependencies"
