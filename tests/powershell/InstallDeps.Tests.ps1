@@ -104,7 +104,8 @@ Describe "install-deps.ps1" {
         Mock -CommandName Get-Command -MockWith { return $null } -ParameterFilter { $Name -eq 'scoop' }
         Mock -CommandName Test-IsElevated -MockWith { return $true }
 
-        $output = & { Install-Scoop } | Out-String
+        # Capture the Write-Host (information) stream, not the boolean return value.
+        $output = & { Install-Scoop } 6>&1 | Out-String
 
         $output | Should -Match '-RunAsAdmin'
     }

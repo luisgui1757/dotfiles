@@ -205,8 +205,8 @@ function Test-DevModeOn {
     } catch { return $false }
 }
 
-# Test seam: `$env:DOTFILES_BOOTSTRAP_SOURCE_ONLY = '1'; . .\bootstrap.ps1`
-# loads the functions above WITHOUT running the symlink phase, so tests can
+# Test seam: setting the env var DOTFILES_BOOTSTRAP_SOURCE_ONLY and dot-sourcing
+# this file loads the functions above WITHOUT running the symlink phase, so tests can
 # exercise New-SymbolicLinkItem / New-NativeSymLink in isolation. Unset in
 # normal runs, so this is skipped.
 if ($env:DOTFILES_BOOTSTRAP_SOURCE_ONLY) { return }
