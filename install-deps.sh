@@ -19,6 +19,12 @@ NVIM_LINUX_X86_64_SHA256="31cf85945cb600d96cdf69f88bc68bec814acbff50863c5546adef
 NVIM_LINUX_ARM64_SHA256="f697d4e4582b6e4b5c3c26e76e06ce26efa08ba1768e03fd2733fcc422bb0490"
 HACK_NERD_FONT_VERSION="v3.4.0"
 HACK_NERD_FONT_SHA256="8ca33a60c791392d872b80d26c42f2bfa914a480f9eb2d7516d9f84373c36897"
+# Ghostty on Ubuntu: we pin + SHA-256 verify the mkasberg/ghostty-ubuntu
+# installer SCRIPT (one version + one checksum, like the Neovim / Hack pins).
+# The script itself fetches the matching .deb from the same project's GitHub
+# release assets over HTTPS at run time. Bump the version + SHA together.
+GHOSTTY_UBUNTU_VERSION="1.3.1-0-ppa2"
+GHOSTTY_UBUNTU_INSTALL_SHA256="7517776f6d862ec523e627840af4806e13385302f653ae9f7a86aa6d5af1cae5"
 for arg in "$@"; do
     case "$arg" in
         --all|-y)   YES_ALL=1 ;;
@@ -61,6 +67,80 @@ binaries_for() {
     esac
 }
 is_wsl() { grep -qiE 'microsoft|wsl' /proc/version 2>/dev/null; }
+can_show_gui() { [[ -n "${DISPLAY:-}" || -n "${WAYLAND_DISPLAY:-}" ]]; }
+is_ubuntu() {
+    local id=""
+    if [[ -r /etc/os-release ]]; then
+        id="$(awk -F= '$1=="ID"{gsub(/"/, "", $2); print $2; exit}' /etc/os-release 2>/dev/null || true)"
+    fi
+    [[ "$id" == "ubuntu" ]]
+}
+
+native_linux_pm() {
+    [[ "$(uname -s)" == "Linux" ]] || { echo unknown; return; }
+    if   have apt-get; then echo apt
+    elif have dnf;     then echo dnf
+    elif have pacman;  then echo pacman
+    elif have zypper;  then echo zypper
+    elif have apk;     then echo apk
+    else echo unknown
+    fi
+}
+
+homebrew_bin() {
+    if have brew; then command -v brew; return 0; fi
+    local candidate
+    for candidate in /opt/homebrew/bin/brew /usr/local/bin/brew /home/linuxbrew/.linuxbrew/bin/brew "$HOME/.linuxbrew/bin/brew"; do
+        if [[ -x "$candidate" ]]; then printf '%s\n' "$candidate"; return 0; fi
+    done
+    return 1
+}
+
+enable_homebrew_for_current_shell() {
+    local brew_bin
+    brew_bin="$(homebrew_bin)" || return 1
+    eval "$("$brew_bin" shellenv)"
+    hash -r 2>/dev/null || true
+}
+
+persist_homebrew_shellenv() {
+    local brew_bin brew_prefix marker block rc wrote=0
+    local rcs
+    brew_bin="$(homebrew_bin)" || return 0
+    brew_prefix="${brew_bin%/bin/brew}"
+    marker="# >>> dotfiles: Homebrew shellenv >>>"
+    block="$(cat <<EOF
+$marker
+if [ -x "$brew_prefix/bin/brew" ]; then
+    eval "\$($brew_prefix/bin/brew shellenv)"
+fi
+# <<< dotfiles: Homebrew shellenv <<<
+EOF
+)"
+
+    rcs=("$HOME/.zshrc.local")
+    if [[ "$(uname -s)" == "Linux" ]]; then
+        rcs+=("$HOME/.bashrc")
+    fi
+
+    for rc in "${rcs[@]}"; do
+        if [[ -f "$rc" ]] && grep -qF "$marker" "$rc"; then
+            continue
+        fi
+        if [[ "$DRY_RUN" -eq 1 ]]; then
+            echo "  would: append Homebrew shellenv to $rc"
+        else
+            mkdir -p "$(dirname "$rc")"
+            {
+                printf '\n%s\n' "$block"
+            } >> "$rc"
+            wrote=1
+        fi
+    done
+    if [[ "$wrote" -eq 1 ]]; then
+        printf "  set       %-26s persisted shellenv for future shells\n" "homebrew PATH"
+    fi
+}
 
 require_downloader() {
     if [[ "$(uname -s)" == "Darwin" ]]; then
@@ -121,7 +201,7 @@ maybe_sudo() {
 
 # ---- OS / package-manager detection ------------------------------------------
 detect_pm() {
-    if have brew; then echo brew; return; fi
+    if homebrew_bin >/dev/null 2>&1; then echo brew; return; fi
     if [[ "$(uname -s)" == "Darwin" ]]; then echo brew_missing; return; fi
     if [[ "$(uname -s)" == "Linux" ]]; then
         if   have apt-get; then echo apt
@@ -143,7 +223,7 @@ maybe_install_brew() {
     if [[ "$(uname -s)" == "Darwin" ]]; then
         kind="required (no other package manager on macOS)"
     else
-        kind="recommended (unlocks taplo / hyperfine / ghostty etc. that apt does not carry)"
+        kind="recommended (unlocks taplo / hyperfine / newer CLI tools that apt may not carry)"
     fi
     echo "Homebrew is not installed. $kind."
     if ask "Install Homebrew via the official installer?"; then
@@ -152,11 +232,10 @@ maybe_install_brew() {
             return 1
         fi
         /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" || return 1
-        # Plumb brew into THIS shell so subsequent installs use it.
-        if   [[ -x /opt/homebrew/bin/brew ]]; then eval "$(/opt/homebrew/bin/brew shellenv)"
-        elif [[ -x /usr/local/bin/brew    ]]; then eval "$(/usr/local/bin/brew shellenv)"
-        elif [[ -x /home/linuxbrew/.linuxbrew/bin/brew ]]; then eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-        fi
+        # Plumb brew into THIS shell so subsequent installs use it, then make
+        # future zsh/bash sessions find it without manual Homebrew "Next steps".
+        enable_homebrew_for_current_shell || true
+        persist_homebrew_shellenv
         return 0
     fi
     return 1
@@ -591,6 +670,85 @@ pm_install() {
     return $rc
 }
 
+native_linux_pm_install() {
+    local native_pm="$1"; shift
+    local pkgs=("$@")
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        echo "  would: $native_pm install ${pkgs[*]}"; return 0
+    fi
+    case "$native_pm" in
+        apt)    maybe_sudo apt-get update -qq && maybe_sudo apt-get install -y "${pkgs[@]}" ;;
+        dnf)    maybe_sudo dnf install -y "${pkgs[@]}" ;;
+        pacman) maybe_sudo pacman -S --noconfirm --needed "${pkgs[@]}" ;;
+        zypper) maybe_sudo zypper install -y "${pkgs[@]}" ;;
+        apk)    maybe_sudo apk add "${pkgs[@]}" ;;
+        *)      return 1 ;;
+    esac
+}
+
+have_c_compiler() {
+    local compiler
+    for compiler in cc gcc clang zig cl; do
+        if have "$compiler"; then return 0; fi
+    done
+    return 1
+}
+
+install_c_toolchain_linux() {
+    [[ "$(uname -s)" == "Linux" ]] || return 0
+    if have_c_compiler; then
+        printf "  ok        %-26s already installed\n" "C compiler"
+        return
+    fi
+
+    local native_pm
+    native_pm="$(native_linux_pm)"
+    case "$native_pm" in
+        apt)
+            if ask "Install C compiler toolchain (build-essential)?"; then
+                native_linux_pm_install apt build-essential || echo "  WARN: C compiler install failed; continuing"
+            fi
+            ;;
+        dnf)
+            if ask "Install C compiler toolchain (gcc gcc-c++ make)?"; then
+                native_linux_pm_install dnf gcc gcc-c++ make || echo "  WARN: C compiler install failed; continuing"
+            fi
+            ;;
+        pacman)
+            if ask "Install C compiler toolchain (base-devel)?"; then
+                native_linux_pm_install pacman base-devel || echo "  WARN: C compiler install failed; continuing"
+            fi
+            ;;
+        zypper)
+            if ask "Install C compiler toolchain (gcc gcc-c++ make)?"; then
+                native_linux_pm_install zypper gcc gcc-c++ make || echo "  WARN: C compiler install failed; continuing"
+            fi
+            ;;
+        apk)
+            if ask "Install C compiler toolchain (build-base)?"; then
+                native_linux_pm_install apk build-base || echo "  WARN: C compiler install failed; continuing"
+            fi
+            ;;
+        *)
+            printf "  manual    %-26s install cc/gcc/clang; plugin builds need a compiler\n" "C compiler"
+            ;;
+    esac
+}
+
+install_devilspie2_linux() {
+    have devilspie2 && return 0
+    local native_pm
+    native_pm="$(native_linux_pm)"
+    case "$native_pm" in
+        apt|dnf|pacman|zypper|apk)
+            native_linux_pm_install "$native_pm" devilspie2
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
 # install <check-binary> [purpose-string]
 # Looks up package name from PKG_TABLE for current PM. Skips if installed.
 # Uses binaries_for() so distro-specific aliases (fd -> fdfind on apt) count
@@ -662,6 +820,14 @@ install_nerd_font() {
         return
     fi
     require_downloader || return 1
+    if ! have_any unzip bsdtar; then
+        echo "  need      unzip missing; installing extractor for Hack Nerd Font"
+        install unzip "extract Hack Nerd Font archive"
+        if [[ "$DRY_RUN" -ne 1 ]] && ! have_any unzip bsdtar; then
+            echo "  FAIL: need 'unzip' or 'bsdtar' to extract the font archive"
+            return 1
+        fi
+    fi
     local url
     url="https://github.com/ryanoasis/nerd-fonts/releases/download/${HACK_NERD_FONT_VERSION}/Hack.zip"
     if [[ "$DRY_RUN" -eq 1 ]]; then
@@ -684,11 +850,8 @@ install_nerd_font() {
     mkdir -p "$font_dir"
     if have unzip; then
         unzip -oq "$tmp/Hack.zip" -d "$font_dir"
-    elif have bsdtar; then
-        bsdtar -xf "$tmp/Hack.zip" -C "$font_dir"
     else
-        echo "  FAIL: need 'unzip' or 'bsdtar' to extract the font archive"
-        rm -rf "$tmp"; return 1
+        bsdtar -xf "$tmp/Hack.zip" -C "$font_dir"
     fi
     rm -rf "$tmp"
     if have fc-cache; then
@@ -697,21 +860,54 @@ install_nerd_font() {
     printf "  installed %-26s -> %s\n" "Hack Nerd Font" "$font_dir"
 }
 
-# Ghostty: try brew HEAD if Linuxbrew, else snap, else build instructions.
+# Download, SHA-256 verify, and run the pinned ghostty-ubuntu installer. We
+# verify the installer SCRIPT before executing it (unlike a bare `curl | bash`),
+# so an upstream change at the pinned tag fails closed instead of running blind.
+# Caller must have already passed require_downloader (curl is used below).
+run_ghostty_ubuntu_installer() {
+    local url="$1" tmp script rc=0
+    tmp="$(mktemp -d)"
+    script="$tmp/ghostty-ubuntu-install.sh"
+    if ! curl -fsSL -o "$script" "$url"; then
+        echo "  FAIL: could not download ghostty installer"
+        rm -rf "$tmp"; return 1
+    fi
+    if ! verify_sha256 "$script" "$GHOSTTY_UBUNTU_INSTALL_SHA256"; then
+        echo "  FAIL: checksum mismatch for ghostty install.sh (pinned $GHOSTTY_UBUNTU_VERSION)"
+        echo "        upstream changed; review it, then bump GHOSTTY_UBUNTU_VERSION + SHA together"
+        rm -rf "$tmp"; return 1
+    fi
+    /bin/bash "$script" || rc=$?
+    rm -rf "$tmp"
+    return "$rc"
+}
+
+# Ghostty: Linux packaging varies. Homebrew's Ghostty formula is macOS-only,
+# so Linux/WSL should prefer distro/community packages or manual install guidance.
 install_ghostty_linux() {
+    local ubuntu_url
+    ubuntu_url="https://raw.githubusercontent.com/mkasberg/ghostty-ubuntu/${GHOSTTY_UBUNTU_VERSION}/install.sh"
     if have ghostty; then
         printf "  ok        %-26s already installed\n" "ghostty"
         return
     fi
-    if [[ "$PM" == "brew" ]]; then
-        if ask "Install ghostty (HEAD build from brew)?"; then
-            if [[ "$DRY_RUN" -eq 1 ]]; then
-                echo "  would: brew install --HEAD ghostty"
-            else
-                brew install --HEAD ghostty || echo "  WARN: brew HEAD build failed; build from source instead"
-            fi
-        fi
+    if is_wsl && ! can_show_gui; then
+        printf "  skipped   %-26s WSL GUI display not detected; enable WSLg or use a Windows host terminal\n" "ghostty"
         return
+    fi
+    [[ "$PM" == "brew" ]] && printf "  skipped   %-26s Homebrew formula is macOS-only on Linux\n" "ghostty via brew"
+    if is_ubuntu; then
+        if ask "Install ghostty via Ubuntu .deb installer (mkasberg/ghostty-ubuntu, pinned $GHOSTTY_UBUNTU_VERSION)?"; then
+            if [[ "$DRY_RUN" -eq 1 ]]; then
+                echo "  would: curl -fsSL $ubuntu_url"
+                echo "         verify sha256 $GHOSTTY_UBUNTU_INSTALL_SHA256"
+                echo "         bash install.sh   (fetches + apt-installs the matching .deb)"
+            else
+                require_downloader || return 1
+                run_ghostty_ubuntu_installer "$ubuntu_url" || echo "  WARN: Ubuntu ghostty installer failed"
+            fi
+            return
+        fi
     fi
     if have snap; then
         if ask "Install ghostty via snap (community package)?"; then
@@ -724,6 +920,7 @@ install_ghostty_linux() {
         fi
     fi
     echo "  manual    ghostty has no native $PM package. Options:"
+    echo "              - ubuntu:  curl -fsSL $ubuntu_url | bash   (pinned $GHOSTTY_UBUNTU_VERSION)"
     echo "              - snap:    sudo snap install ghostty --classic"
     echo "              - flatpak: search 'ghostty' on flathub"
     echo "              - source:  https://ghostty.org/docs/install/build"
@@ -732,7 +929,15 @@ install_ghostty_linux() {
 # VS Code: brew cask on macOS; snap, then flatpak, then a manual hint on Linux.
 install_vscode() {
     if have code; then
-        printf "  ok        %-26s already installed\n" "vscode"
+        if is_wsl; then
+            printf "  ok        %-26s code CLI available (Windows VS Code / Remote WSL)\n" "vscode"
+        else
+            printf "  ok        %-26s already installed\n" "vscode"
+        fi
+        return
+    fi
+    if is_wsl && ! can_show_gui; then
+        printf "  manual    %-26s install VS Code on Windows, or enable WSLg for Linux GUI apps\n" "vscode"
         return
     fi
     if [[ "$(uname -s)" == "Darwin" ]] && [[ "$PM" == "brew" ]]; then
@@ -817,7 +1022,7 @@ setup_ghostty_maximize() {
         echo "         write $cfg/autostart/devilspie2.desktop, and start devilspie2"
         return 0
     fi
-    have devilspie2 || pm_install devilspie2 || echo "  WARN: devilspie2 install failed; install it via your package manager"
+    install_devilspie2_linux || echo "  WARN: devilspie2 install failed; install it via your package manager"
     mkdir -p "$cfg/devilspie2" "$cfg/autostart"
     ln -sfn "$rule" "$cfg/devilspie2/ghostty-maximize.lua"
     cat > "$cfg/autostart/devilspie2.desktop" <<'EOF'
@@ -857,6 +1062,10 @@ if [[ -n "${INSTALL_DEPS_SOURCE_ONLY:-}" ]]; then
 fi
 
 PM="$(detect_pm)"
+if [[ "$PM" == "brew" ]]; then
+    enable_homebrew_for_current_shell || true
+    persist_homebrew_shellenv
+fi
 OS_LABEL="$(uname -s)"
 if is_wsl; then OS_LABEL="WSL ($OS_LABEL)"; fi
 
@@ -905,6 +1114,7 @@ else
     install nvim "Neovim 0.11+, the editor"
 fi
 install make "needed for some plugin builds (notably LuaSnip jsregexp)"
+install_c_toolchain_linux
 install rg "ripgrep, powers Telescope live_grep"
 install fd "fd, powers Telescope find_files"
 install fzf "fuzzy finder: Ctrl-R history, Ctrl-T files, Alt-C cd (zsh wiring in shells/zshrc)"

@@ -1,14 +1,14 @@
 # Dotfiles — cross-platform terminal & editor setup
 
-| Tool             | macOS                                             | Linux / WSL                     | Windows                                                       |
-|------------------|---------------------------------------------------|---------------------------------|---------------------------------------------------------------|
-| **Neovim**       | `~/.config/nvim` → `nvim/`                        | `~/.config/nvim` → `nvim/`      | `%LOCALAPPDATA%\nvim` → `nvim\`                               |
-| **Starship**     | `~/.config/starship.toml` → `starship/starship.toml` | same                       | `%USERPROFILE%\.config\starship.toml` → `starship\starship.toml` |
-| **zsh**          | `~/.zshrc` → `shells/zshrc`                       | same                            | n/a                                                           |
-| **PowerShell**   | `$PROFILE` → `shells/powershell_profile.ps1` (via pwsh, optional) | same       | `$PROFILE` → `shells\powershell_profile.ps1`                  |
-| **tmux**         | `~/.tmux.conf` → `tmux/tmux.conf`                 | same                            | `%USERPROFILE%\.tmux.conf` → `tmux\tmux.conf` (read by **psmux** — native Windows tmux); also via WSL |
-| **Ghostty**      | `~/Library/Application Support/com.mitchellh.ghostty/config` → `ghostty/config` | `~/.config/ghostty/config` → `ghostty/config` | n/a (Ghostty not on Windows yet) |
-| **Windows Terminal** | n/a                                           | n/a                             | merge `windows-terminal/settings.fragment.jsonc` (see that dir's README)  |
+| Tool             | macOS                                             | Linux                           | WSL                                                           | Windows                                                       |
+|------------------|---------------------------------------------------|---------------------------------|---------------------------------------------------------------|---------------------------------------------------------------|
+| **Neovim**       | `~/.config/nvim` → `nvim/`                        | `~/.config/nvim` → `nvim/`      | same                                                          | `%LOCALAPPDATA%\nvim` → `nvim\`                               |
+| **Starship**     | `~/.config/starship.toml` → `starship/starship.toml` | same                       | same                                                          | `%USERPROFILE%\.config\starship.toml` → `starship\starship.toml` |
+| **zsh**          | `~/.zshrc` → `shells/zshrc`                       | same                            | same                                                          | n/a                                                           |
+| **PowerShell**   | `$PROFILE` → `shells/powershell_profile.ps1` (via pwsh, optional) | same       | same                                                          | `$PROFILE` → `shells\powershell_profile.ps1`                  |
+| **tmux**         | `~/.tmux.conf` → `tmux/tmux.conf`                 | same                            | same                                                          | `%USERPROFILE%\.tmux.conf` → `tmux\tmux.conf` (read by **psmux** — native Windows tmux); also via WSL |
+| **Ghostty**      | `~/Library/Application Support/com.mitchellh.ghostty/config` → `ghostty/config` | `~/.config/ghostty/config` → `ghostty/config` | same when using WSLg / X11 GUI apps                           | n/a (Ghostty not on Windows yet) |
+| **Windows Terminal** | n/a                                           | n/a                             | merge on Windows host (optional)                              | merge `windows-terminal/settings.fragment.jsonc` (see that dir's README)  |
 
 ## Install
 
@@ -96,8 +96,12 @@ first, which avoids distro packages that lag below this config's Neovim 0.11+
 floor.
 
 On macOS, Phase 1 installs Ghostty through `brew install --cask ghostty` when
-selected. Linux keeps the Linux-specific brew HEAD / snap / manual install
-paths because Ghostty is not packaged uniformly there.
+selected. Linux and GUI-capable WSL keep Linux-specific install paths: Ubuntu
+uses the `.deb` installer listed in Ghostty's docs, snap is used where
+available, and Homebrew's Ghostty formula is macOS-only. VS Code is
+also still optional on WSL: use Windows VS Code + `code .` for Remote - WSL, or
+a Linux GUI build when WSLg / X11 is available. Rosé Pine setup follows whatever
+`code` CLI is on PATH.
 
 Phase 1 also **prompts for your notes / Obsidian vault path** and persists it as
 `export NOTES_VAULT=…` in `~/.zshrc.local` (gitignored, sourced by `zshrc`), so
@@ -239,6 +243,7 @@ make test                       # verify the new state
 |---|---|---|
 | `<leader>X` keymaps fire `\X` instead of `<Space>X` | mapleader set after lazy.setup somehow | restore the order in `nvim/init.lua` — leader **before** `require("lazy").setup` |
 | Formatter runs twice or shows two BufWritePre autocmds | someone added a second handler outside conform.nvim | `:lua print(#vim.api.nvim_get_autocmds({event="BufWritePre"}))` should be 1; if not, find the second autocmd and delete it |
+| Lazy/Mason says `No C compiler found` | WSL/Linux has `make` but no `cc`/`gcc`/`clang`; some plugin builds compile native code | re-run `./setup.sh --skip-bootstrap` to install the Linux compiler toolchain, or on Ubuntu run `sudo apt-get update && sudo apt-get install -y build-essential`, then `./setup.sh --skip-deps --skip-bootstrap` |
 | Clipboard not crossing host on WSL | `win32yank.exe` not on PATH | install win32yank via scoop on Windows side, ensure WSL PATH picks it up |
 | Starship prompt slow | a disabled language got re-enabled | check `starship/starship.toml` — only `c, go, nodejs, rust, python, conda` should be enabled |
 | Starship shows only the last few folders (or a leading `…/`) | the `[directory]` module was truncating the path | `starship/starship.toml` sets `truncation_length = 0` + `truncate_to_repo = false` for the full path; raise the length or set `truncate_to_repo = true` to shorten again |
@@ -251,5 +256,5 @@ make test                       # verify the new state
 | Ghostty doesn't load the config | wrong path | the install path is `~/Library/Application Support/com.mitchellh.ghostty/config` on macOS, `~/.config/ghostty/config` on Linux. `bootstrap.sh` handles this |
 | Windows Terminal lost a profile after merge | WT auto-rewrites — pre-merge backup is at `<settings.json>.bak.<timestamp>` | restore the profile list from the backup |
 | `bootstrap.ps1` errors "cannot create symbolic links" | Developer Mode off and not elevated | `bootstrap.ps1` now reports your *elevated* + *Developer Mode* state and the fix: enable Developer Mode (Settings → Privacy & security → For developers — no admin, recommended) **then** `.\setup.ps1 -SkipDeps`; OR run just `.\bootstrap.ps1` from an elevated PowerShell. Don't elevate the whole `setup.ps1` — scoop refuses to run as admin |
-| Ghostty won't open maximized on Linux/GNOME | `maximize = true` is a hint the WM may ignore (GNOME Mutter often does) | on **X11**, `install-deps` offers a devilspie2 setup that enforces it (rule + autostart, keyed on `com.mitchellh.ghostty`); the manual steps are in `linux/devilspie2/ghostty-maximize.lua`. Wayland needs a GNOME Shell extension instead |
+| Ghostty won't open maximized on Linux/GNOME | `maximize = true` is a hint the WM may ignore (GNOME Mutter often does) | on **X11**, `install-deps` offers a devilspie2 setup through the native Linux package manager, even when Linuxbrew is the main CLI manager; the rule is keyed on `com.mitchellh.ghostty`. Wayland needs a GNOME Shell extension instead |
 | `install-deps.ps1`: winget `No package found matching input criteria` (exit `-1978335212`) | winget source/catalog flakiness | install-deps now **prefers scoop** and falls back across managers per tool — accept the scoop bootstrap when offered (`irm get.scoop.sh \| iex`) and re-run; scoop carries every CLI tool here |
