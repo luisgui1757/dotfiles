@@ -22,12 +22,14 @@ env:
   CARGO_BINSTALL_INSTALLER_SHA256: d3a93702160e0ec03e2a4e996855db1f01adee801fb84a43add24e0877ef8eae
   NVIM_LINUX_VERSION: v0.12.2
   NVIM_LINUX_X86_64_SHA256: 31cf85945cb600d96cdf69f88bc68bec814acbff50863c5546adef3a1bcef260
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
 
 jobs:
   ubuntu:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
+      # Tag is intentional so Dependabot can update it; pin the resolved SHA after a green run if desired.
       - uses: actions/checkout@v6
       - name: Dogfood install-deps dry run
         run: |
@@ -50,7 +52,7 @@ jobs:
           printf '%s  %s\n' "$CARGO_BINSTALL_INSTALLER_SHA256" /tmp/cargo-binstall.sh | sha256sum -c -
           bash /tmp/cargo-binstall.sh
           "$HOME/.cargo/bin/cargo-binstall" -y taplo-cli hyperfine
-          python3 -m pip install --user --break-system-packages yamllint editorconfig-checker
+          python3 -m pip install --user --break-system-packages --disable-pip-version-check yamllint editorconfig-checker
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           export PATH="$HOME/.local/bin:$PATH"
 
@@ -103,6 +105,7 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 25
     steps:
+      # Tag is intentional so Dependabot can update it; pin the resolved SHA after a green run if desired.
       - uses: actions/checkout@v6
       - name: Dogfood install-deps dry run
         run: |
@@ -125,6 +128,7 @@ jobs:
     runs-on: windows-2025
     timeout-minutes: 25
     steps:
+      # Tag is intentional so Dependabot can update it; pin the resolved SHA after a green run if desired.
       - uses: actions/checkout@v6
       - name: Dogfood install-deps dry run
         shell: pwsh
@@ -143,6 +147,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $PSNativeCommandUseErrorActionPreference = $true
+          $WarningPreference = 'Stop'
           if (Get-PSRepository -Name PSGallery -ErrorAction SilentlyContinue) {
             Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
           }
@@ -179,4 +184,5 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
           .\test.ps1

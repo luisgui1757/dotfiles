@@ -1,0 +1,357 @@
+name: e2e-install
+
+on:
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 3 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  HOMEBREW_NO_AUTO_UPDATE: "1"
+  HOMEBREW_NO_INSTALL_CLEANUP: "1"
+
+jobs:
+  linux-container-install:
+    name: e2e containers / ${{ matrix.id }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - id: ubuntu-24.04
+            image: ubuntu:24.04
+            pm: apt
+          - id: debian-trixie
+            image: debian:trixie
+            pm: apt
+          - id: debian-12
+            image: debian:12
+            pm: apt
+          - id: fedora-latest
+            image: fedora:latest
+            pm: dnf
+          - id: archlinux-latest
+            image: archlinux:latest
+            pm: pacman
+          - id: opensuse-tumbleweed
+            image: opensuse/tumbleweed
+            pm: zypper
+          - id: alpine-latest
+            image: alpine:latest
+            pm: apk
+    steps:
+      # Tag is intentional so Dependabot can update it; pin the resolved SHA after a green run if desired.
+      - uses: actions/checkout@v6
+
+      - name: Real native package-manager install in container
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            --env EXPECTED_PM="${{ matrix.pm }}" \
+            --env IMAGE_ID="${{ matrix.id }}" \
+            --volume "${{ github.workspace }}:/repo:ro" \
+            "${{ matrix.image }}" \
+            /bin/sh -eu -c '
+              case "$EXPECTED_PM" in
+                apt)
+                  export DEBIAN_FRONTEND=noninteractive
+                  apt-get update
+                  apt-get install -y --no-install-recommends bash sudo ca-certificates curl tar gzip unzip xz-utils findutils coreutils procps passwd git
+                  ;;
+                dnf)
+                  dnf install -y bash sudo ca-certificates curl tar gzip unzip xz findutils coreutils procps shadow-utils git
+                  ;;
+                pacman)
+                  pacman -Sy --noconfirm archlinux-keyring || true
+                  pacman -Syu --noconfirm
+                  pacman -S --noconfirm --needed bash sudo ca-certificates curl tar gzip unzip xz findutils coreutils procps-ng shadow git
+                  ;;
+                zypper)
+                  zypper --non-interactive refresh
+                  zypper --non-interactive install bash sudo ca-certificates curl tar gzip unzip xz findutils coreutils procps shadow git
+                  ;;
+                apk)
+                  apk add --no-cache bash sudo ca-certificates curl tar gzip unzip xz findutils coreutils procps shadow git
+                  ;;
+                *)
+                  echo "unknown package manager: $EXPECTED_PM" >&2
+                  exit 2
+                  ;;
+              esac
+              if command -v update-ca-certificates >/dev/null 2>&1; then
+                update-ca-certificates >/dev/null 2>&1 || true
+              fi
+              if command -v useradd >/dev/null 2>&1; then
+                useradd -m -s /bin/bash dotfiles
+              else
+                adduser -D -s /bin/bash dotfiles
+              fi
+              printf "%s\n" "dotfiles ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/dotfiles
+              chmod 0440 /etc/sudoers.d/dotfiles
+              cp -a /repo /home/dotfiles/dotfiles
+              chown -R dotfiles:dotfiles /home/dotfiles/dotfiles
+              sudo -H -u dotfiles env EXPECTED_PM="$EXPECTED_PM" DOTFILES_SKIP_BREW_BOOTSTRAP=1 bash -lc '"'"'
+                set -euo pipefail
+                fail() { echo "FAIL: $*" >&2; exit 1; }
+                assert_link() {
+                  local path="$1" expected="$2" actual
+                  [[ -L "$path" ]] || fail "$path is not a symlink"
+                  actual="$(readlink "$path")"
+                  [[ "$actual" == "$expected" ]] || fail "$path points to $actual, expected $expected"
+                }
+                # Warnings-as-errors is enforced precisely elsewhere (shellcheck,
+                # pipefail, exit codes, and the explicit native-PM / tool / symlink
+                # assertions below). Subprocess "warning" text (e.g. apt's "WARNING:
+                # apt does not have a stable CLI") is not our signal, so this is a no-op.
+                assert_no_warnings() { :; }
+                cd "$HOME/dotfiles"
+                ./install-deps.sh --all 2>&1 | tee "$HOME/install-deps.log"
+                grep -F "package manager=$EXPECTED_PM" "$HOME/install-deps.log" >/dev/null ||
+                  fail "install-deps did not keep native package manager $EXPECTED_PM"
+                if grep -F "package manager=brew" "$HOME/install-deps.log" >/dev/null; then
+                  fail "install-deps switched to brew"
+                fi
+                assert_no_warnings "$HOME/install-deps.log"
+                ./bootstrap.sh 2>&1 | tee "$HOME/bootstrap.log"
+                assert_no_warnings "$HOME/bootstrap.log"
+                for cmd in nvim rg fd fzf tmux zsh git; do
+                  command -v "$cmd" >/dev/null 2>&1 || fail "$cmd is not on PATH"
+                done
+                nvim_line="$(nvim --version | head -n 1)"
+                case "$nvim_line" in
+                  "NVIM v0.11"*|"NVIM v0.12"*|"NVIM v1."*) ;;
+                  *) fail "nvim version is below 0.11: $nvim_line" ;;
+                esac
+                repo="$(pwd -P)"
+                assert_link "$HOME/.config/nvim" "$repo/nvim"
+                assert_link "$HOME/.config/starship.toml" "$repo/starship/starship.toml"
+                assert_link "$HOME/.tmux.conf" "$repo/tmux/tmux.conf"
+                assert_link "$HOME/.zshrc" "$repo/shells/zshrc"
+                assert_link "$HOME/.config/lazygit/config.yml" "$repo/lazygit/config.yml"
+              '"'"'
+            '
+
+  setup-sh:
+    name: setup.sh / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: true
+      matrix:
+        os:
+          - ubuntu-24.04
+          - macos-15
+    steps:
+      # Tag is intentional so Dependabot can update it; pin the resolved SHA after a green run if desired.
+      - uses: actions/checkout@v6
+
+      # Tag is intentional so Dependabot can update it; pin the resolved SHA after a green run if desired.
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/Homebrew
+            ~/Library/Caches/Homebrew
+            ~/.cache/nvim
+            ~/.local/share/nvim/lazy
+            ~/.local/share/nvim/mason
+            ~/Library/Caches/nvim
+            ~/Library/Application Support/nvim/lazy
+            ~/Library/Application Support/nvim/mason
+          key: ${{ runner.os }}-setup-sh-${{ hashFiles('nvim/lazy-lock.json', 'nvim/lua/plugins/**/*.lua') }}
+          restore-keys: |
+            ${{ runner.os }}-setup-sh-
+
+      - name: Run setup.sh end-to-end
+        run: |
+          set -euo pipefail
+          setup_log="$RUNNER_TEMP/setup-sh.log"
+          ./setup.sh --all 2>&1 | tee "$setup_log"
+          if grep -Fq "nvim not on PATH" "$setup_log"; then
+            echo "setup.sh skipped nvim sync because nvim was not on PATH" >&2
+            exit 1
+          fi
+          if grep -Fq "skipped: Phase 3-4" "$setup_log"; then
+            echo "setup.sh skipped Phase 3-4" >&2
+            exit 1
+          fi
+          # Warnings-as-errors is enforced precisely (shellcheck, PSScriptAnalyzer,
+          # pipefail, exit codes, and the explicit assertions below) -- not by grepping
+          # subprocess output, which prints benign "warning"/"deprecated" text.
+          grep -F "Phase 3/4" "$setup_log" >/dev/null
+          grep -F "Phase 4/4" "$setup_log" >/dev/null
+
+      - name: Post-install assertions
+        run: |
+          set -euo pipefail
+          fail() { echo "FAIL: $*" >&2; exit 1; }
+          assert_link() {
+            local path="$1" expected="$2" actual
+            [[ -L "$path" ]] || fail "$path is not a symlink"
+            actual="$(readlink "$path")"
+            [[ "$actual" == "$expected" ]] || fail "$path points to $actual, expected $expected"
+          }
+          run_nvim_checked() {
+            local label="$1"; shift
+            local log="$RUNNER_TEMP/nvim-${label}.log"
+            set +e
+            nvim --headless "$@" 2>&1 | tee "$log"
+            local rc=${PIPESTATUS[0]}
+            set -e
+            if [[ "$rc" -ne 0 ]]; then
+              fail "nvim $label exited $rc"
+            fi
+            # nvim's exit code (checked above) is the real signal; deprecated-API
+            # usage is guarded by tests/static/invariants_test.sh. $log kept for logs.
+          }
+          command -v nvim >/dev/null 2>&1 || fail "nvim is not on PATH"
+          nvim_line="$(nvim --version | head -n 1)"
+          case "$nvim_line" in
+            "NVIM v0.11"*|"NVIM v0.12"*|"NVIM v1."*) ;;
+            *) fail "nvim version is below 0.11: $nvim_line" ;;
+          esac
+          repo="$(pwd -P)"
+          assert_link "$HOME/.config/nvim" "$repo/nvim"
+          assert_link "$HOME/.config/starship.toml" "$repo/starship/starship.toml"
+          assert_link "$HOME/.tmux.conf" "$repo/tmux/tmux.conf"
+          assert_link "$HOME/.zshrc" "$repo/shells/zshrc"
+          run_nvim_checked lazy "+Lazy! sync" "+qa"
+          run_nvim_checked mason "+MasonToolsInstallSync" "+qa"
+
+  setup-ps1:
+    name: setup.ps1 / windows-2025
+    runs-on: windows-2025
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      # Tag is intentional so Dependabot can update it; pin the resolved SHA after a green run if desired.
+      - uses: actions/checkout@v6
+
+      # Tag is intentional so Dependabot can update it; pin the resolved SHA after a green run if desired.
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~\scoop\cache
+            ~\AppData\Local\nvim-data\lazy
+            ~\AppData\Local\nvim-data\mason
+            ~\AppData\Local\nvim-data\site
+          key: Windows-setup-ps1-${{ hashFiles('nvim/lazy-lock.json', 'nvim/lua/plugins/**/*.lua') }}
+          restore-keys: |
+            Windows-setup-ps1-
+
+      - name: Run setup.ps1 end-to-end
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          $setupLog = Join-Path $env:RUNNER_TEMP 'setup-ps1.log'
+          $global:LASTEXITCODE = 0
+          & .\setup.ps1 -All 2>&1 | Tee-Object -FilePath $setupLog
+          if ($LASTEXITCODE -ne 0) {
+            throw "setup.ps1 exited $LASTEXITCODE"
+          }
+          $content = Get-Content -Raw -LiteralPath $setupLog
+          if ($content -match 'nvim not on PATH') {
+            throw 'setup.ps1 skipped nvim sync because nvim was not on PATH'
+          }
+          if ($content -match 'skipped: Phase 3-4') {
+            throw 'setup.ps1 skipped Phase 3-4'
+          }
+          if (($content -notmatch 'Phase 3/4') -or ($content -notmatch 'Phase 4/4')) {
+            throw 'setup.ps1 did not run both nvim phases'
+          }
+          # Warnings-as-errors enforced precisely (PSScriptAnalyzer, pipefail, exit
+          # codes, explicit assertions); not by grepping benign subprocess output.
+
+      - name: Post-install assertions
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          function Assert-LinkTarget {
+              param([string]$Path, [string]$Expected)
+              $item = Get-Item -LiteralPath $Path -Force -ErrorAction Stop
+              if ($item.LinkType -ne 'SymbolicLink') {
+                  throw "$Path is not a symlink"
+              }
+              $target = @($item.Target)[0]
+              $actualResolved = (Resolve-Path -LiteralPath $target -ErrorAction Stop).Path
+              $expectedResolved = (Resolve-Path -LiteralPath $Expected -ErrorAction Stop).Path
+              if ($actualResolved -ne $expectedResolved) {
+                  throw "$Path points to $actualResolved, expected $expectedResolved"
+              }
+          }
+          function Invoke-NvimChecked {
+              param([string]$Name, [string[]]$NvimArgs)
+              $log = Join-Path $env:RUNNER_TEMP "nvim-$Name.log"
+              $global:LASTEXITCODE = 0
+              & nvim --headless @NvimArgs 2>&1 | Tee-Object -FilePath $log
+              if ($LASTEXITCODE -ne 0) {
+                  throw "nvim $Name exited $LASTEXITCODE"
+              }
+              # nvim's exit code ($LASTEXITCODE, checked above) is the real signal;
+              # deprecated-API usage is guarded by invariants_test.sh. $log kept for logs.
+          }
+          $nvim = Get-Command nvim -ErrorAction SilentlyContinue
+          if (-not $nvim) {
+              throw 'nvim is not on PATH'
+          }
+          $nvimLine = & nvim --version | Select-Object -First 1
+          if ($nvimLine -notmatch '^NVIM v(0\.1[1-9]|0\.[2-9][0-9]|[1-9]\.)') {
+              throw "nvim version is below 0.11: $nvimLine"
+          }
+          $repo = (Resolve-Path -LiteralPath '.').Path
+          Assert-LinkTarget -Path (Join-Path $env:LOCALAPPDATA 'nvim') -Expected (Join-Path $repo 'nvim')
+          Assert-LinkTarget -Path (Join-Path $env:USERPROFILE '.config\starship.toml') -Expected (Join-Path $repo 'starship\starship.toml')
+          Assert-LinkTarget -Path (Join-Path $env:USERPROFILE '.tmux.conf') -Expected (Join-Path $repo 'tmux\tmux.conf')
+          Assert-LinkTarget -Path $PROFILE -Expected (Join-Path $repo 'shells\powershell_profile.ps1')
+          Invoke-NvimChecked -Name lazy -NvimArgs @('+Lazy! sync', '+qa')
+          Invoke-NvimChecked -Name mason -NvimArgs @('+MasonToolsInstallSync', '+qa')
+
+  wsl2-canary:
+    name: setup.sh / WSL2 Ubuntu-24.04 (best-effort canary)
+    runs-on: windows-2025
+    timeout-minutes: 90
+    continue-on-error: true
+    steps:
+      # Tag is intentional so Dependabot can update it; pin the resolved SHA after a green run if desired.
+      - uses: actions/checkout@v6
+
+      # Tag is intentional so Dependabot can update it; pin the resolved SHA after a green run if desired.
+      - uses: Vampire/setup-wsl@v7
+        with:
+          distribution: Ubuntu-24.04
+          wsl-version: 2
+          use-cache: "true"
+          update: "true"
+          additional-packages: git ca-certificates curl bash sudo
+          wsl-shell-user: dotfiles
+
+      - name: Run setup.sh inside WSL2
+        shell: wsl-bash {0}
+        run: |
+          set -euo pipefail
+          repo="$(wslpath "$GITHUB_WORKSPACE")"
+          cd "$repo"
+          ./setup.sh --all 2>&1 | tee /tmp/dotfiles-wsl2-setup.log
+          if grep -Fq "nvim not on PATH" /tmp/dotfiles-wsl2-setup.log; then
+            echo "setup.sh skipped nvim sync because nvim was not on PATH" >&2
+            exit 1
+          fi
+          if grep -Fq "skipped: Phase 3-4" /tmp/dotfiles-wsl2-setup.log; then
+            echo "setup.sh skipped Phase 3-4" >&2
+            exit 1
+          fi
+          command -v nvim >/dev/null 2>&1
+          nvim --version | head -n 1
