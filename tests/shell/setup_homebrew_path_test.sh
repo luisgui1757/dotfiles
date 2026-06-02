@@ -4,7 +4,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 TMP_ROOT="$REPO_ROOT/tests/.cache/setup-homebrew-path-test"
 rm -rf "$TMP_ROOT"
-mkdir -p "$TMP_ROOT/home/.linuxbrew/bin"
+mkdir -p "$TMP_ROOT/home/.linuxbrew/bin" "$TMP_ROOT/brewbin"
 trap 'rm -rf "$TMP_ROOT"' EXIT
 
 cp "$REPO_ROOT/setup.sh" "$TMP_ROOT/setup.sh"
@@ -15,15 +15,18 @@ set -euo pipefail
 printf '%s\n' "$@" > "$(cd "$(dirname "$0")" && pwd -P)/deps.args"
 EOF
 
-cat > "$TMP_ROOT/home/.linuxbrew/bin/brew" <<'EOF'
+# Fake brew is placed ON PATH (in its own dir, NOT the prefix bin). setup.sh's
+# refresh_runtime_path checks `command -v brew` first, so this shadows any real
+# Homebrew on the host (e.g. /opt/homebrew on macOS runners) and keeps the test
+# hermetic. The fake nvim lives in the prefix bin, which is NOT on PATH until the
+# refresh evals this brew's shellenv -- so the test still exercises that refresh.
+cat > "$TMP_ROOT/brewbin/brew" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 if [[ "${1:-}" == "shellenv" ]]; then
     cat <<BREWENV
 export HOMEBREW_PREFIX="$HOME/.linuxbrew";
-export HOMEBREW_CELLAR="$HOME/.linuxbrew/Cellar";
-export HOMEBREW_REPOSITORY="$HOME/.linuxbrew/Homebrew";
-export PATH="$HOME/.linuxbrew/bin:$HOME/.linuxbrew/sbin:\$PATH";
+export PATH="$HOME/.linuxbrew/bin:\$PATH";
 BREWENV
 fi
 EOF
@@ -34,9 +37,9 @@ set -euo pipefail
 printf '%s\n' "$*" >> "$SETUP_TEST_ROOT/nvim.log"
 EOF
 
-chmod +x "$TMP_ROOT/home/.linuxbrew/bin/brew" "$TMP_ROOT/home/.linuxbrew/bin/nvim"
+chmod +x "$TMP_ROOT/brewbin/brew" "$TMP_ROOT/home/.linuxbrew/bin/nvim"
 
-output="$(HOME="$TMP_ROOT/home" SETUP_TEST_ROOT="$TMP_ROOT" PATH="/usr/bin:/bin" bash "$TMP_ROOT/setup.sh" --skip-bootstrap </dev/null)"
+output="$(HOME="$TMP_ROOT/home" SETUP_TEST_ROOT="$TMP_ROOT" PATH="$TMP_ROOT/brewbin:/usr/bin:/bin" bash "$TMP_ROOT/setup.sh" --skip-bootstrap </dev/null)"
 
 [[ "$output" == *"Phase 3/4: sync Neovim plugins"* ]]
 [[ "$output" == *"Phase 4/4: install LSP servers + formatters"* ]]
