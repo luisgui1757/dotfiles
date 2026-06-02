@@ -263,7 +263,16 @@ save only**. The next plain `:w` formats normally. Implemented in
   verifies the pinned Neovim Linux tarballs and Hack Nerd Font zip before
   extraction; `install-deps.ps1` verifies the pinned Hack.zip before registering
   fonts. The Ubuntu CI job also pins and verifies its direct GitHub downloads.
-  Update the version and checksum constants together.
+  This extends to the **Ubuntu Ghostty installer**: `install_ghostty_linux`
+  pins `mkasberg/ghostty-ubuntu`'s `install.sh` to `GHOSTTY_UBUNTU_VERSION` and
+  SHA-256 verifies the script (`GHOSTTY_UBUNTU_INSTALL_SHA256`) before running
+  it (`run_ghostty_ubuntu_installer`) — NOT a bare `curl … | bash` of `HEAD`.
+  The pinned script still fetches the matching `.deb` from that project's GitHub
+  release assets over HTTPS at run time (per-codename×arch, so the `.deb` itself
+  is not individually pinned — same trust model as the Homebrew installer).
+  A checksum mismatch fails closed (falls through to the manual hint).
+  Update the version and checksum constants together. Guarded by
+  `tests/shell/wsl_gui_tools_test.sh`.
 - **Both installers open with an "install EVERYTHING?" prompt.** Interactive
   runs that didn't pass `--all`/`-All` get one upfront question; answering yes
   flips `YES_ALL`/`$All` so the rest runs with no per-item prompts. Skipped when
@@ -365,7 +374,12 @@ for local accounts.
 then return …` before the main install sections in `install-deps.sh` exists ONLY
 so shell tests can `source` the installer function defs (without running any
 installs) and exercise them against stubbed seams. Unset in normal runs, so it's
-skipped.
+skipped. Two sibling seams exist for the same reason: `bootstrap.sh`'s
+`DOTFILES_FORCE_OS` (lets the bats suite drive the `wsl` link branch on a Linux
+runner) and `bootstrap.ps1`'s `DOTFILES_BOOTSTRAP_SOURCE_ONLY` (dot-source the
+functions — e.g. `New-SymbolicLinkItem` / `New-NativeSymLink` — without running
+the symlink phase, so `tests/bootstrap/ps1_test.ps1` can force the native
+CreateSymbolicLink fallback). Both are unset in normal runs.
 
 ## Things that look weird but are intentional
 

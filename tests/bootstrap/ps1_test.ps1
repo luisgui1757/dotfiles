@@ -98,6 +98,52 @@ Describe "bootstrap.ps1" {
         & $script:Bootstrap -DryRun | Out-Null
         Test-Path (Join-Path $env:LOCALAPPDATA 'nvim') | Should -Be $false
     }
+
+    It "Windows PowerShell 5.1 can link a profile under Documents" -Skip:(-not (Get-Command powershell.exe -ErrorAction SilentlyContinue)) {
+        $probeScript = Join-Path ([System.IO.Path]::GetTempPath()) ("bs-ps5-profile-" + [System.Guid]::NewGuid() + ".ps1")
+        $repoLiteral = $script:RepoRoot.Replace("'", "''")
+
+        @"
+`$ErrorActionPreference = 'Stop'
+`$repo = '$repoLiteral'
+`$fakeHome = Join-Path ([System.IO.Path]::GetTempPath()) ('bs-native-' + [System.Guid]::NewGuid())
+`$fakeLocal = Join-Path `$fakeHome 'AppData\Local'
+`$fakeRoaming = Join-Path `$fakeHome 'AppData\Roaming'
+`$docs = [Environment]::GetFolderPath('MyDocuments')
+`$profileDir = Join-Path `$docs 'WindowsPowerShell'
+`$probeProfile = Join-Path `$profileDir ('codex-bootstrap-profile-probe-' + [System.Guid]::NewGuid() + '.ps1')
+
+try {
+    New-Item -ItemType Directory -Force -Path `$fakeLocal,`$fakeRoaming,`$profileDir | Out-Null
+    `$env:USERPROFILE = `$fakeHome
+    `$env:LOCALAPPDATA = `$fakeLocal
+    `$env:APPDATA = `$fakeRoaming
+    `$PROFILE = `$probeProfile
+
+    & (Join-Path `$repo 'bootstrap.ps1') | Out-Null
+
+    `$item = Get-Item -LiteralPath `$probeProfile -Force
+    if (`$item.LinkType -ne 'SymbolicLink') {
+        throw "profile probe was not a symlink: `$(`$item.LinkType)"
+    }
+
+    `$target = @(`$item.Target)[0]
+    if (`$target -notmatch 'shells\\powershell_profile\.ps1$') {
+        throw "profile probe pointed at unexpected target: `$target"
+    }
+} finally {
+    Remove-Item -LiteralPath `$probeProfile -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath `$fakeHome -Recurse -Force -ErrorAction SilentlyContinue
+}
+"@ | Set-Content -LiteralPath $probeScript -Encoding UTF8
+
+        try {
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $probeScript
+            $LASTEXITCODE | Should -Be 0
+        } finally {
+            Remove-Item -LiteralPath $probeScript -Force -ErrorAction SilentlyContinue
+        }
+    }
 }
 
 Describe "bootstrap.ps1 -MergeWindowsTerminal" {
@@ -252,5 +298,80 @@ Describe "bootstrap.ps1 -MergeWindowsTerminal" {
         ($merged.actions | Where-Object { $_.command -eq 'userOnly' }).keys | Should -Be 'ctrl+u'
         ($merged.actions | Where-Object { $_.keys -eq 'ctrl+shift+f' }).command | Should -Be 'find'
         ($merged.actions | Where-Object { $_.keys -eq 'ctrl+t' }).command.action | Should -Be 'newTab'
+    }
+}
+
+# The native CreateSymbolicLink fallback only exists on Windows; on non-Windows
+# pwsh the P/Invoke would throw at call time, so skip the whole block there.
+Describe "bootstrap.ps1 native symlink fallback" -Skip:($env:OS -ne 'Windows_NT') {
+
+    BeforeAll {
+        # Load the functions without running the symlink phase (test seam).
+        $env:DOTFILES_BOOTSTRAP_SOURCE_ONLY = '1'
+        try { . $script:Bootstrap } finally {
+            Remove-Item Env:DOTFILES_BOOTSTRAP_SOURCE_ONLY -ErrorAction SilentlyContinue
+        }
+    }
+
+    It "New-NativeSymLink links a file via the kernel32 API" {
+        $dir = Join-Path ([System.IO.Path]::GetTempPath()) ("bs-native-file-" + [System.Guid]::NewGuid())
+        New-Item -ItemType Directory -Force -Path $dir | Out-Null
+        try {
+            $target = Join-Path $dir 'target.txt'
+            Set-Content -LiteralPath $target -Value 'hi' -Encoding UTF8
+            $link = Join-Path $dir 'link.txt'
+
+            New-NativeSymLink -Source $target -Destination $link
+
+            (Get-Item -LiteralPath $link -Force).LinkType | Should -Be 'SymbolicLink'
+            Get-Content -LiteralPath $link | Should -Be 'hi'
+        } finally {
+            Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $dir
+        }
+    }
+
+    It "New-NativeSymLink links a directory (sets the directory flag)" {
+        $dir = Join-Path ([System.IO.Path]::GetTempPath()) ("bs-native-dir-" + [System.Guid]::NewGuid())
+        New-Item -ItemType Directory -Force -Path (Join-Path $dir 'src') | Out-Null
+        try {
+            $target = Join-Path $dir 'src'
+            $link = Join-Path $dir 'link'
+
+            New-NativeSymLink -Source $target -Destination $link
+
+            $item = Get-Item -LiteralPath $link -Force
+            $item.LinkType | Should -Be 'SymbolicLink'
+            $item.PSIsContainer | Should -BeTrue
+        } finally {
+            Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $dir
+        }
+    }
+
+    It "New-SymbolicLinkItem falls back to the native API when New-Item fails" {
+        $dir = Join-Path ([System.IO.Path]::GetTempPath()) ("bs-fallback-" + [System.Guid]::NewGuid())
+        New-Item -ItemType Directory -Force -Path $dir | Out-Null
+        try {
+            $target = Join-Path $dir 'target.txt'
+            Set-Content -LiteralPath $target -Value 'fallback' -Encoding UTF8
+            $link = Join-Path $dir 'link.txt'
+
+            # Shadow New-Item so the primary path throws like Windows PowerShell
+            # 5.1 does for profile links under Documents -- the link can then
+            # only appear via the native CreateSymbolicLink branch.
+            $script:PrimaryAttempted = $false
+            function New-Item {
+                $script:PrimaryAttempted = $true
+                throw 'simulated New-Item SymbolicLink failure'
+            }
+
+            New-SymbolicLinkItem -Source $target -Destination $link
+
+            $script:PrimaryAttempted | Should -BeTrue
+            (Get-Item -LiteralPath $link -Force).LinkType | Should -Be 'SymbolicLink'
+            Get-Content -LiteralPath $link | Should -Be 'fallback'
+        } finally {
+            Remove-Item function:New-Item -ErrorAction SilentlyContinue
+            Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $dir
+        }
     }
 }

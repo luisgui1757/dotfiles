@@ -27,6 +27,70 @@ function Get-UniqueBackupPath {
 
 function Write-Step { param([string]$msg) Write-Host "  $msg" }
 
+function New-NativeSymLink {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] [string]$Source,
+        [Parameter(Mandatory)] [string]$Destination
+    )
+
+    if (-not ('DotfilesSymbolicLink' -as [type])) {
+        Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+
+public static class DotfilesSymbolicLink {
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    public static extern bool CreateSymbolicLink(
+        string lpSymlinkFileName,
+        string lpTargetFileName,
+        int dwFlags
+    );
+}
+"@
+    }
+
+    $sourceItem = Get-Item -LiteralPath $Source -Force -ErrorAction Stop
+    # 0x2 permits unprivileged symlink creation when Developer Mode is enabled.
+    $flags = 0x2
+    if ($sourceItem.PSIsContainer) { $flags = $flags -bor 0x1 }
+
+    $ok = [DotfilesSymbolicLink]::CreateSymbolicLink($Destination, $Source, $flags)
+    if (-not $ok) {
+        $code = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
+        throw (New-Object ComponentModel.Win32Exception($code))
+    }
+}
+
+function New-SymbolicLinkItem {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] [string]$Source,
+        [Parameter(Mandatory)] [string]$Destination
+    )
+
+    try {
+        New-Item -ItemType SymbolicLink -Path $Destination -Target $Source -ErrorAction Stop | Out-Null
+    } catch {
+        $newItemError = $_
+        if ($env:OS -ne 'Windows_NT') { throw }
+
+        # Windows PowerShell 5.1 / cmd mklink can throw a misleading "file not
+        # found" for profile links under Documents even when both paths exist.
+        try {
+            New-NativeSymLink -Source $Source -Destination $Destination
+        } catch {
+            throw @"
+failed to create symlink:
+  destination: $Destination
+  source:      $Source
+  New-Item:    $($newItemError.Exception.Message)
+  native API:  $($_.Exception.Message)
+"@
+        }
+    }
+}
+
 function New-SymLink {
     [CmdletBinding()]
     param(
@@ -66,7 +130,7 @@ function New-SymLink {
                 return
             }
             Move-Item -LiteralPath $Destination -Destination $backup -Force
-            New-Item -ItemType SymbolicLink -Path $Destination -Target $Source | Out-Null
+            New-SymbolicLinkItem -Source $Source -Destination $Destination
             Write-Step "relinked $Destination -> $Source  (prior symlink -> $backup)"
             return
         }
@@ -99,7 +163,7 @@ function New-SymLink {
             }
             throw
         }
-        New-Item -ItemType SymbolicLink -Path $Destination -Target $Source | Out-Null
+        New-SymbolicLinkItem -Source $Source -Destination $Destination
         Write-Step "backed up $Destination -> $backup; linked -> $Source"
         return
     }
@@ -108,7 +172,7 @@ function New-SymLink {
         Write-Step "link     $Destination -> $Source"
         return
     }
-    New-Item -ItemType SymbolicLink -Path $Destination -Target $Source | Out-Null
+    New-SymbolicLinkItem -Source $Source -Destination $Destination
     Write-Step "linked   $Destination -> $Source"
 }
 
@@ -117,7 +181,7 @@ function Test-CanCreateSymlinks {
         $tmp = Join-Path $env:TEMP "symlink-probe-$([guid]::NewGuid())"
         $target = Join-Path $env:TEMP "symlink-probe-target-$([guid]::NewGuid())"
         New-Item -ItemType File -Path $target -Force | Out-Null
-        New-Item -ItemType SymbolicLink -Path $tmp -Target $target -ErrorAction Stop | Out-Null
+        New-SymbolicLinkItem -Source $target -Destination $tmp
         Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
         Remove-Item -LiteralPath $target -Force -ErrorAction SilentlyContinue
         return $true
@@ -140,6 +204,12 @@ function Test-DevModeOn {
         return (((Get-ItemProperty -Path $k -Name AllowDevelopmentWithoutDevLicense -ErrorAction Stop).AllowDevelopmentWithoutDevLicense) -eq 1)
     } catch { return $false }
 }
+
+# Test seam: `$env:DOTFILES_BOOTSTRAP_SOURCE_ONLY = '1'; . .\bootstrap.ps1`
+# loads the functions above WITHOUT running the symlink phase, so tests can
+# exercise New-SymbolicLinkItem / New-NativeSymLink in isolation. Unset in
+# normal runs, so this is skipped.
+if ($env:DOTFILES_BOOTSTRAP_SOURCE_ONLY) { return }
 
 Write-Host "bootstrap.ps1: repo=$RepoRoot dry-run=$DryRun"
 Write-Host

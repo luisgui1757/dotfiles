@@ -98,6 +98,21 @@ run_bootstrap() {
     [ ! -e "$FAKE_HOME/.config/lazygit/config.yml" ]
 }
 
+@test "WSL branch links ghostty config and re-running is idempotent" {
+    run env HOME="$FAKE_HOME" DOTFILES_FORCE_OS=wsl bash "$REPO_ROOT/bootstrap.sh"
+    [ "$status" -eq 0 ]
+    [ -L "$FAKE_HOME/.config/ghostty/config" ]
+    [ "$(readlink "$FAKE_HOME/.config/ghostty/config")" = "$REPO_ROOT/ghostty/config" ]
+
+    # Second run must be a no-op: link unchanged, no stray backups.
+    run env HOME="$FAKE_HOME" DOTFILES_FORCE_OS=wsl bash "$REPO_ROOT/bootstrap.sh"
+    [ "$status" -eq 0 ]
+    [ -L "$FAKE_HOME/.config/ghostty/config" ]
+    [ "$(readlink "$FAKE_HOME/.config/ghostty/config")" = "$REPO_ROOT/ghostty/config" ]
+    bak_count=$(find "$FAKE_HOME" -name "*.bak.*" 2>/dev/null | wc -l | tr -d ' ')
+    [ "$bak_count" = "0" ]
+}
+
 @test "missing git still symlinks configs" {
     # Build a sandbox PATH without git but with the basics (ln, readlink, etc.)
     sandbox=$(mktemp -d)

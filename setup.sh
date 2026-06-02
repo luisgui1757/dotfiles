@@ -135,6 +135,28 @@ phase() {
     echo "================================================================"
 }
 
+refresh_runtime_path() {
+    local brew_bin dir
+
+    for brew_bin in "$(command -v brew 2>/dev/null || true)" \
+        /opt/homebrew/bin/brew \
+        /usr/local/bin/brew \
+        "$HOME/.linuxbrew/bin/brew" \
+        /home/linuxbrew/.linuxbrew/bin/brew; do
+        if [[ -n "$brew_bin" && -x "$brew_bin" ]]; then
+            eval "$("$brew_bin" shellenv)"
+            break
+        fi
+    done
+
+    dir=/usr/local/bin
+    if [[ -d "$dir" && ":$PATH:" != *":$dir:"* ]]; then
+        PATH="$PATH:$dir"
+    fi
+    export PATH
+    hash -r 2>/dev/null || true
+}
+
 # ---- Phase 1: dependencies ---------------------------------------------------
 if [[ "$SKIP_DEPS" -eq 0 ]]; then
     phase "Phase 1/4: install dependencies"
@@ -143,6 +165,7 @@ else
     echo
     echo "skipped: Phase 1 (deps) via --skip-deps"
 fi
+refresh_runtime_path
 
 # ---- Phase 2: symlink configs ------------------------------------------------
 if [[ "$SKIP_BOOTSTRAP" -eq 0 ]]; then
@@ -199,8 +222,18 @@ echo "==  setup.sh: done"
 echo "================================================================"
 echo
 echo "Repo:    $SCRIPT_DIR"
-echo "Try it:  nvim  (then <Space>fg for live grep, :wnf to save w/o format)"
-echo "Tests:   make test"
+if [[ "$DRY_RUN" -eq 0 ]]; then
+    echo
+    echo "IMPORTANT: open a NEW terminal before using the tools. This shell predates"
+    echo "           the install, so brew/nvim on PATH and the login-shell switch to"
+    echo "           zsh only take effect in newly started shells."
+    if command -v brew >/dev/null 2>&1; then
+        echo "           (to use them in THIS shell now: eval \"\$($(command -v brew) shellenv)\")"
+    fi
+fi
+echo
+echo "Try it (new shell):  nvim   (<Space>fg live grep, :wnf save w/o format)"
+echo "Tests:               make test"
 echo
 if [[ "$DRY_RUN" -eq 1 ]]; then
     echo "(dry run -- nothing was actually installed or changed)"

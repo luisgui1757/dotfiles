@@ -32,7 +32,10 @@ unique_backup() {
 }
 
 # ---- OS detection ------------------------------------------------------------
+# DOTFILES_FORCE_OS is a test seam: it lets the suite exercise the wsl branch on
+# a Linux CI runner. Unset in normal runs, so real detection is used.
 detect_os() {
+    if [[ -n "${DOTFILES_FORCE_OS:-}" ]]; then echo "$DOTFILES_FORCE_OS"; return; fi
     case "$(uname -s)" in
         Darwin)
             echo macos ;;
@@ -204,7 +207,7 @@ case "$OS" in
         link "${REPO_ROOT}/ghostty/config" "${HOME}/.config/ghostty/config"
         ;;
     wsl)
-        # No Ghostty on WSL today; nothing extra to link.
+        link "${REPO_ROOT}/ghostty/config" "${HOME}/.config/ghostty/config"
         echo "  note      WSL detected; Windows Terminal fragment must be merged manually"
         echo "            see windows-terminal/README.md"
         ;;
