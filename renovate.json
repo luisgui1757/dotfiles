@@ -1,0 +1,69 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Renovate updates pinned version/ref constants only. SHA-256 constants intentionally fail closed until a human recomputes and reviews them.",
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Neovim Linux x86_64 tarball version. The adjacent SHA-256 must be recomputed manually after Renovate bumps this.",
+      "managerFilePatterns": ["/^install-deps\\.sh$/"],
+      "matchStrings": [
+        "NVIM_LINUX_VERSION=\"(?<currentValue>v[^\"]+)\"\\s+NVIM_LINUX_X86_64_SHA256=\"(?<currentDigest>[a-f0-9]{64})\""
+      ],
+      "depNameTemplate": "neovim/neovim",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "description": "Neovim Linux arm64 tarball version. The adjacent SHA-256 must be recomputed manually after Renovate bumps this.",
+      "managerFilePatterns": ["/^install-deps\\.sh$/"],
+      "matchStrings": [
+        "NVIM_LINUX_VERSION=\"(?<currentValue>v[^\"]+)\"(?:.|\\n)*?NVIM_LINUX_ARM64_SHA256=\"(?<currentDigest>[a-f0-9]{64})\""
+      ],
+      "depNameTemplate": "neovim/neovim",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "description": "Hack Nerd Font archive version. The SHA-256 must be recomputed manually after Renovate bumps this.",
+      "managerFilePatterns": ["/^install-deps\\.sh$/"],
+      "matchStrings": [
+        "HACK_NERD_FONT_VERSION=\"(?<currentValue>v[^\"]+)\"\\s+HACK_NERD_FONT_SHA256=\"(?<currentDigest>[a-f0-9]{64})\""
+      ],
+      "depNameTemplate": "ryanoasis/nerd-fonts",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "description": "Ubuntu Ghostty installer version. The installer SHA-256 must be recomputed manually after Renovate bumps this.",
+      "managerFilePatterns": ["/^install-deps\\.sh$/"],
+      "matchStrings": [
+        "GHOSTTY_UBUNTU_VERSION=\"(?<currentValue>[^\"]+)\"\\s+GHOSTTY_UBUNTU_INSTALL_SHA256=\"(?<currentDigest>[a-f0-9]{64})\""
+      ],
+      "depNameTemplate": "mkasberg/ghostty-ubuntu",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "loose"
+    },
+    {
+      "customType": "regex",
+      "description": "cargo-binstall installer script commit pinned to the current main branch digest.",
+      "managerFilePatterns": ["/^\\.github/workflows/test\\.yml$/"],
+      "matchStrings": [
+        "CARGO_BINSTALL_COMMIT:\\s*(?<currentDigest>[a-f0-9]{40})"
+      ],
+      "currentValueTemplate": "main",
+      "depNameTemplate": "cargo-bins/cargo-binstall",
+      "packageNameTemplate": "https://github.com/cargo-bins/cargo-binstall",
+      "datasourceTemplate": "git-refs"
+    }
+  ],
+  "packageRules": [
+    {
+      "matchManagers": ["custom.regex"],
+      "groupName": "pinned installer constants",
+      "addLabels": ["dependencies", "pinned-downloads"]
+    }
+  ]
+}

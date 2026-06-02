@@ -1,0 +1,41 @@
+# Synced by the Probot Settings app: https://probot.github.io/apps/settings/
+# Alternative one-shot path: scripts/apply-repo-safeguards.sh
+
+repository:
+  allow_merge_commit: false
+  allow_squash_merge: false
+  allow_rebase_merge: true
+  delete_branch_on_merge: true
+  enable_automated_security_fixes: true
+  enable_vulnerability_alerts: true
+
+branches:
+  - name: main
+    protection:
+      required_status_checks:
+        strict: true
+        contexts:
+          - ubuntu
+          - macos
+          - windows
+          - e2e containers / ubuntu-24.04
+          - e2e containers / debian-trixie
+          - e2e containers / debian-12
+          - e2e containers / fedora-latest
+          - e2e containers / archlinux-latest
+          - e2e containers / opensuse-tumbleweed
+          - e2e containers / alpine-latest
+          - setup.sh / ubuntu-24.04
+          - setup.sh / macos-15
+          - setup.ps1 / windows-2025
+      enforce_admins: true
+      # Solo-maintainer repo: requiring approvals would lock the owner out (you
+      # cannot approve your own PR, and enforce_admins is true). The merge gate is
+      # the required status checks above + enforce_admins. Re-enable when you add
+      # collaborators.
+      required_pull_request_reviews: null
+      required_linear_history: true
+      required_conversation_resolution: true
+      restrictions: null
+      allow_force_pushes: false
+      allow_deletions: false
