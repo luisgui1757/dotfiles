@@ -213,11 +213,15 @@ PSScriptAnalyzer runs at `Warning,Error`, yamllint/parser checks are part of
 
 `e2e-install.yml` is the required real-install gate:
 
-- `e2e containers / ...` runs Linux distro containers on an Ubuntu runner with
-  `DOTFILES_SKIP_BREW_BOOTSTRAP=1`, creates a non-root user, runs real
-  `install-deps.sh --all`, then `bootstrap.sh`, and asserts native PM selection,
-  tool presence, Neovim >= 0.11, warning-free logs, and symlinks pointing into
-  the repo.
+- `e2e containers / ubuntu-24.04` runs an `ubuntu:24.04` container on an Ubuntu
+  runner with `DOTFILES_SKIP_BREW_BOOTSTRAP=1`, creates a non-root user, runs
+  real `install-deps.sh --all` (native `apt`, no Linuxbrew), then `bootstrap.sh`,
+  and asserts tool presence, Neovim >= 0.11, and symlinks pointing into the repo.
+  Scope is intentionally **Ubuntu only** (the supported Linux/WSL2 target):
+  `install-deps.sh` still handles dnf/pacman/zypper/apk and the shared
+  `tests/ci/container-e2e.sh` keeps those PM cases, but exercising rolling/niche
+  distros in CI added flakiness (Tumbleweed mirror metadata) without matching
+  real usage. Re-add matrix entries in `e2e-install.yml` to broaden it.
 - `setup.sh / ubuntu-24.04`, `setup.sh / macos-15`, and
   `setup.ps1 / windows-2025` run the real public setup entry points and then
   rerun Lazy/Mason headless sync. They explicitly fail if setup prints

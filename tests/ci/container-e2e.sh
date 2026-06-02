@@ -88,8 +88,16 @@ case "$EXPECTED_PM" in
             findutils coreutils procps-ng shadow git
         ;;
     zypper)
-        zypper --non-interactive refresh
-        zypper --non-interactive install \
+        # openSUSE Tumbleweed is rolling; mirror metadata is occasionally stale
+        # ("Failed to retrieve new repository metadata"). Retry refresh a few
+        # times and auto-import repo keys; a successful refresh also primes the
+        # metadata cache that install-deps' later zypper calls reuse.
+        n=0
+        while [ "$n" -lt 4 ]; do
+            if zypper --non-interactive --gpg-auto-import-keys refresh; then break; fi
+            n=$((n + 1)); echo "zypper refresh failed (attempt $n/4); retrying in 5s"; sleep 5
+        done
+        zypper --non-interactive --gpg-auto-import-keys install \
             bash sudo ca-certificates curl tar gzip unzip xz \
             findutils coreutils procps shadow git
         ;;
