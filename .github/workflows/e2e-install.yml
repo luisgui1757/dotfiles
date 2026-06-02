@@ -27,20 +27,15 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 75
     strategy:
-      fail-fast: false
       matrix:
         include:
-          # Ubuntu only -- the supported Linux / WSL2 target. install-deps.sh still
-          # handles dnf/pacman/zypper/apk, but exercising rolling/niche distros in CI
-          # added flakiness (e.g. Tumbleweed mirror metadata) without matching real
-          # usage. The shared container-e2e.sh keeps those PM cases, so re-add matrix
-          # entries here if that ever changes.
+          # Ubuntu only -- the supported Linux / WSL2 target. Re-adding a distro
+          # means adding a matrix entry here and its root prep in container-e2e.sh.
           - id: ubuntu-24.04
             image: ubuntu:24.04
             pm: apt
     steps:
-      # Tag is intentional so Dependabot can update it; pin the resolved SHA after a green run if desired.
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Real native package-manager install in container
         run: |
@@ -51,24 +46,22 @@ jobs:
             --env EXPECTED_PM="${{ matrix.pm }}" \
             --volume "${{ github.workspace }}:/repo:ro" \
             "${{ matrix.image }}" \
-            /bin/sh /repo/tests/ci/container-e2e.sh
+            bash /repo/tests/ci/container-e2e.sh
 
   setup-sh:
     name: setup.sh / ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90
     strategy:
-      fail-fast: false   # surface every distro/OS result independently (no cancel-cascade)
+      fail-fast: false   # surface both OS results independently
       matrix:
         os:
           - ubuntu-24.04
           - macos-15
     steps:
-      # Tag is intentional so Dependabot can update it; pin the resolved SHA after a green run if desired.
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
-      # Tag is intentional so Dependabot can update it; pin the resolved SHA after a green run if desired.
-      - uses: actions/cache@v4
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
             ~/.cache/Homebrew
@@ -88,29 +81,27 @@ jobs:
           set -euo pipefail
           setup_log="$RUNNER_TEMP/setup-sh.log"
           ./setup.sh --all 2>&1 | tee "$setup_log"
-          if grep -Fq "nvim not on PATH" "$setup_log"; then
-            echo "setup.sh skipped nvim sync because nvim was not on PATH" >&2
-            exit 1
-          fi
           if grep -Fq "skipped: Phase 3-4" "$setup_log"; then
             echo "setup.sh skipped Phase 3-4" >&2
             exit 1
           fi
+          if grep -Eq '^[[:space:]]*FAIL:' "$setup_log"; then
+            echo "setup.sh emitted a FAIL marker" >&2
+            exit 1
+          fi
           # Warnings-as-errors is enforced precisely (shellcheck, PSScriptAnalyzer,
-          # pipefail, exit codes, and the explicit assertions below) -- not by grepping
-          # subprocess output, which prints benign "warning"/"deprecated" text.
+          # pipefail, exit codes, FAIL markers, and the explicit assertions below).
           grep -F "Phase 3/4" "$setup_log" >/dev/null
           grep -F "Phase 4/4" "$setup_log" >/dev/null
 
       - name: Post-install assertions
         run: |
           set -euo pipefail
-          # Mirror a fresh login shell: load Homebrew + ~/.local/bin so the tools
+          # Mirror a fresh login shell: load Homebrew so the tools
           # setup.sh installed resolve (this separate CI step does not inherit them).
           for p in /opt/homebrew /usr/local /home/linuxbrew/.linuxbrew "$HOME/.linuxbrew"; do
             [ -x "$p/bin/brew" ] && eval "$("$p/bin/brew" shellenv)" && break
           done
-          [ -d "$HOME/.local/bin" ] && PATH="$HOME/.local/bin:$PATH" && export PATH
           fail() { echo "FAIL: $*" >&2; exit 1; }
           assert_link() {
             local path="$1" expected="$2" actual
@@ -131,6 +122,18 @@ jobs:
             # nvim's exit code (checked above) is the real signal; deprecated-API
             # usage is guarded by tests/static/invariants_test.sh. $log kept for logs.
           }
+          assert_mason_tool() {
+            local tool="$1"; shift
+            local dir name
+            for dir in "$HOME/.local/share/nvim/mason/bin" "$HOME/Library/Application Support/nvim/mason/bin"; do
+              for name in "$@"; do
+                if [[ -f "$dir/$name" ]]; then
+                  return 0
+                fi
+              done
+            done
+            fail "Mason did not install $tool into an expected mason/bin directory"
+          }
           command -v nvim >/dev/null 2>&1 || fail "nvim is not on PATH"
           nvim_line="$(nvim --version | head -n 1)"
           case "$nvim_line" in
@@ -144,6 +147,8 @@ jobs:
           assert_link "$HOME/.zshrc" "$repo/shells/zshrc"
           run_nvim_checked lazy "+Lazy! sync" "+qa"
           run_nvim_checked mason "+MasonToolsInstallSync" "+qa"
+          assert_mason_tool "lua-language-server" lua-language-server lua-language-server.cmd lua-language-server.exe
+          assert_mason_tool "stylua" stylua stylua.cmd stylua.exe
 
   setup-ps1:
     name: setup.ps1 / windows-2025
@@ -153,11 +158,9 @@ jobs:
       run:
         shell: pwsh
     steps:
-      # Tag is intentional so Dependabot can update it; pin the resolved SHA after a green run if desired.
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
-      # Tag is intentional so Dependabot can update it; pin the resolved SHA after a green run if desired.
-      - uses: actions/cache@v4
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
             ~\scoop\cache
@@ -181,17 +184,17 @@ jobs:
             throw "setup.ps1 exited $LASTEXITCODE"
           }
           $content = Get-Content -Raw -LiteralPath $setupLog
-          if ($content -match 'nvim not on PATH') {
-            throw 'setup.ps1 skipped nvim sync because nvim was not on PATH'
-          }
           if ($content -match 'skipped: Phase 3-4') {
             throw 'setup.ps1 skipped Phase 3-4'
+          }
+          if ($content -match '(?m)^\s*FAIL:') {
+            throw 'setup.ps1 emitted a FAIL marker'
           }
           if (($content -notmatch 'Phase 3/4') -or ($content -notmatch 'Phase 4/4')) {
             throw 'setup.ps1 did not run both nvim phases'
           }
-          # Warnings-as-errors enforced precisely (PSScriptAnalyzer, pipefail, exit
-          # codes, explicit assertions); not by grepping benign subprocess output.
+          # Warnings-as-errors enforced precisely through PSScriptAnalyzer, exit
+          # codes, FAIL markers, and explicit assertions.
 
       - name: Post-install assertions
         run: |
@@ -231,6 +234,16 @@ jobs:
               # nvim's exit code ($LASTEXITCODE, checked above) is the real signal;
               # deprecated-API usage is guarded by invariants_test.sh. $log kept for logs.
           }
+          function Assert-MasonTool {
+              param([string]$Name, [string[]]$FileNames)
+              $masonBin = Join-Path $env:LOCALAPPDATA 'nvim-data\mason\bin'
+              foreach ($fileName in $FileNames) {
+                  if (Test-Path -LiteralPath (Join-Path $masonBin $fileName)) {
+                      return
+                  }
+              }
+              throw "Mason did not install $Name into $masonBin"
+          }
           $nvim = Get-Command nvim -ErrorAction SilentlyContinue
           if (-not $nvim) {
               throw 'nvim is not on PATH'
@@ -246,6 +259,8 @@ jobs:
           Assert-LinkTarget -Path $PROFILE -Expected (Join-Path $repo 'shells\powershell_profile.ps1')
           Invoke-NvimChecked -Name lazy -NvimArgs @('+Lazy! sync', '+qa')
           Invoke-NvimChecked -Name mason -NvimArgs @('+MasonToolsInstallSync', '+qa')
+          Assert-MasonTool -Name 'lua-language-server' -FileNames @('lua-language-server.cmd', 'lua-language-server.exe', 'lua-language-server')
+          Assert-MasonTool -Name 'stylua' -FileNames @('stylua.cmd', 'stylua.exe', 'stylua')
 
   wsl2-canary:
     name: setup.sh / WSL2 Ubuntu-24.04 (best-effort canary)
@@ -253,11 +268,9 @@ jobs:
     timeout-minutes: 90
     continue-on-error: true
     steps:
-      # Tag is intentional so Dependabot can update it; pin the resolved SHA after a green run if desired.
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
-      # Tag is intentional so Dependabot can update it; pin the resolved SHA after a green run if desired.
-      - uses: Vampire/setup-wsl@v7
+      - uses: Vampire/setup-wsl@d1da7f2c0322a5ee4f24975344f67fc0f5baf364 # v7
         with:
           distribution: Ubuntu-24.04
           wsl-version: 2
@@ -273,12 +286,12 @@ jobs:
           repo="$(wslpath "$GITHUB_WORKSPACE")"
           cd "$repo"
           ./setup.sh --all 2>&1 | tee /tmp/dotfiles-wsl2-setup.log
-          if grep -Fq "nvim not on PATH" /tmp/dotfiles-wsl2-setup.log; then
-            echo "setup.sh skipped nvim sync because nvim was not on PATH" >&2
-            exit 1
-          fi
           if grep -Fq "skipped: Phase 3-4" /tmp/dotfiles-wsl2-setup.log; then
             echo "setup.sh skipped Phase 3-4" >&2
+            exit 1
+          fi
+          if grep -Eq '^[[:space:]]*FAIL:' /tmp/dotfiles-wsl2-setup.log; then
+            echo "setup.sh emitted a FAIL marker" >&2
             exit 1
           fi
           command -v nvim >/dev/null 2>&1

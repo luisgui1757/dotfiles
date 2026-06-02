@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Applies rebase-only merges, branch cleanup, required checks, no required
+# reviews for a solo maintainer, enforced admins, linear history, conversation
+# resolution, no force pushes, no branch deletions, and best-effort security extras.
 set -euo pipefail
 
 usage() {
@@ -9,7 +12,8 @@ Applies the same repository safeguards declared in .github/settings.yml:
   - rebase-only PR merges
   - delete branches on merge
   - main branch protection with required CI/e2e checks
-  - PR review, stale-review dismissal, linear history, conversation resolution
+  - no required reviews for a solo maintainer; checks plus enforce_admins gate merges
+  - linear history and conversation resolution
   - no force pushes and no branch deletions
   - best-effort GitHub security extras where the plan supports them
 

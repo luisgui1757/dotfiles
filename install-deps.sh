@@ -69,11 +69,16 @@ binaries_for() {
 is_wsl() { grep -qiE 'microsoft|wsl' /proc/version 2>/dev/null; }
 can_show_gui() { [[ -n "${DISPLAY:-}" || -n "${WAYLAND_DISPLAY:-}" ]]; }
 is_ubuntu() {
-    local id=""
+    local id="" id_like=""
     if [[ -r /etc/os-release ]]; then
         id="$(awk -F= '$1=="ID"{gsub(/"/, "", $2); print $2; exit}' /etc/os-release 2>/dev/null || true)"
+        id_like="$(awk -F= '$1=="ID_LIKE"{gsub(/"/, "", $2); print $2; exit}' /etc/os-release 2>/dev/null || true)"
     fi
-    [[ "$id" == "ubuntu" ]]
+    [[ "$id" == "ubuntu" ]] && return 0
+    case " $id_like " in
+        *" ubuntu "*|*" debian "*) return 0 ;;
+        *) return 1 ;;
+    esac
 }
 
 native_linux_pm() {
@@ -704,6 +709,18 @@ native_linux_pm_install() {
     esac
 }
 
+unique_backup_path() {
+    local path="$1" base i
+    base="$path.bak.$(date +%Y%m%d-%H%M%S)"
+    if [[ ! -e "$base" ]]; then
+        printf '%s\n' "$base"
+        return 0
+    fi
+    i=1
+    while [[ -e "$base.$i" ]]; do i=$((i + 1)); done
+    printf '%s\n' "$base.$i"
+}
+
 have_c_compiler() {
     local compiler
     for compiler in cc gcc clang zig cl; do
@@ -792,12 +809,29 @@ install() {
         # Post-install fix for fd-find on apt (binary lands as 'fdfind',
         # not 'fd'). Telescope's find_files uses fd by default.
         if [[ "$tool" == "fd" ]] && [[ "$PM" == "apt" ]] && ! have fd && have fdfind; then
+            local fd_link fdfind_bin fd_target fd_backup
+            fd_link="$HOME/.local/bin/fd"
+            fdfind_bin="$(command -v fdfind)"
             if [[ "$DRY_RUN" -eq 1 ]]; then
-                echo "  would:    link ~/.local/bin/fd -> $(command -v fdfind)"
+                echo "  would:    link ~/.local/bin/fd -> $fdfind_bin"
                 return
             fi
             mkdir -p "$HOME/.local/bin"
-            ln -sfn "$(command -v fdfind)" "$HOME/.local/bin/fd"
+            if [[ -L "$fd_link" ]]; then
+                fd_target="$(readlink "$fd_link" || true)"
+                if [[ "$fd_target" != "$fdfind_bin" ]]; then
+                    fd_backup="$(unique_backup_path "$fd_link")"
+                    mv "$fd_link" "$fd_backup"
+                    printf "  backup    %-26s %s\n" "fd" "$fd_backup"
+                fi
+            elif [[ -e "$fd_link" ]]; then
+                fd_backup="$(unique_backup_path "$fd_link")"
+                mv "$fd_link" "$fd_backup"
+                printf "  backup    %-26s %s\n" "fd" "$fd_backup"
+            fi
+            if [[ ! -L "$fd_link" ]]; then
+                ln -s "$fdfind_bin" "$fd_link"
+            fi
             if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
                 PATH="$HOME/.local/bin:$PATH"
                 export PATH
@@ -931,7 +965,9 @@ install_ghostty_linux() {
                 echo "         bash install.sh   (fetches + apt-installs the matching .deb)"
             else
                 require_downloader || return 1
-                run_ghostty_ubuntu_installer "$ubuntu_url" || echo "  WARN: Ubuntu ghostty installer failed"
+                if ! run_ghostty_ubuntu_installer "$ubuntu_url"; then
+                    echo "  WARN: Ubuntu ghostty installer failed; continuing"
+                fi
             fi
             return
         fi
@@ -947,7 +983,8 @@ install_ghostty_linux() {
         fi
     fi
     echo "  manual    ghostty has no native $PM package. Options:"
-    echo "              - ubuntu:  curl -fsSL $ubuntu_url | bash   (pinned $GHOSTTY_UBUNTU_VERSION)"
+    echo "              - ubuntu:  re-run this script for the verified pinned installer"
+    echo "              - manual:  curl -fsSL $ubuntu_url | bash   (unverified fallback, pinned $GHOSTTY_UBUNTU_VERSION)"
     echo "              - snap:    sudo snap install ghostty --classic"
     echo "              - flatpak: search 'ghostty' on flathub"
     echo "              - source:  https://ghostty.org/docs/install/build"

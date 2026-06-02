@@ -145,18 +145,17 @@ Pull requests are meant to be gated by two workflows:
   nonzero, PSScriptAnalyzer runs at `Warning,Error`, and YAML parsing/linting is
   part of `make test-static`.
 - `.github/workflows/e2e-install.yml` is the real install guarantee. It runs
-  native package-manager installs in Linux containers for Ubuntu 24.04, Debian
-  trixie, Debian 12, Fedora, Arch, openSUSE Tumbleweed, and Alpine with
-  `DOTFILES_SKIP_BREW_BOOTSTRAP=1`, then runs `bootstrap.sh` and asserts the
-  expected tools and symlinks. It also runs full `./setup.sh --all` on
-  `ubuntu-24.04` and `macos-15`, and full `.\setup.ps1 -All` on `windows-2025`.
-  Those jobs fail if setup prints `nvim not on PATH`, skips Phase 3-4, installs
-  Neovim below 0.11, or if Lazy/Mason headless sync exits nonzero or emits
-  warning/deprecation text.
+  one Ubuntu 24.04 container with `DOTFILES_SKIP_BREW_BOOTSTRAP=1`, then runs
+  `bootstrap.sh` and asserts the expected tools and symlinks. It also runs full
+  `./setup.sh --all` on `ubuntu-24.04` and `macos-15`, and full
+  `.\setup.ps1 -All` on `windows-2025`. Those jobs fail if setup skips Phase
+  3-4, emits a precise `FAIL:` marker, installs Neovim below 0.11, if Lazy/Mason
+  headless sync exits nonzero, or if expected Mason-installed binaries are
+  missing. They do not blanket-fail on benign warning/deprecation text.
 
 WSL2 is split deliberately. Hosted GitHub runners do not provide a reliable
 required nested-virtualization WSL2 gate. The required proxy is the Linux
-container matrix plus the existing `DOTFILES_FORCE_OS=wsl` bootstrap coverage in
+Ubuntu container plus the existing `DOTFILES_FORCE_OS=wsl` bootstrap coverage in
 CI. A separate `setup.sh / WSL2 Ubuntu-24.04 (best-effort canary)` job uses
 `Vampire/setup-wsl@v7`, but it is marked `continue-on-error` and should not be
 added to the required status checks unless the owner accepts that flake risk.
@@ -166,10 +165,11 @@ Settings app and mirrored by `scripts/apply-repo-safeguards.sh` for a one-shot
 `gh api` path. The intended main-branch policy is:
 
 - only rebase-and-merge is allowed; merge commits and squash merges are disabled;
-- required status checks include `ubuntu`, `macos`, `windows`, all required e2e
-  container jobs, and the three full setup jobs;
-- PR review is required with stale review dismissal, admins are enforced,
-  conversation resolution and linear history are required, and force pushes /
+- required status checks include `ubuntu`, `macos`, `windows`, the required e2e
+  container job, and the three full setup jobs;
+- no PR reviews are required for the solo maintainer; the merge gate is required
+  status checks plus enforced admins;
+- conversation resolution and linear history are required, and force pushes /
   branch deletion are blocked;
 - branches are deleted after merge; Dependabot updates GitHub Actions weekly.
 
@@ -186,9 +186,10 @@ protection may reference check names GitHub has not seen yet.
 
 Renovate is configured for pinned downloader constants, but it cannot recompute
 the SHA-256 values for Neovim tarballs, Hack Nerd Font, or the Ubuntu Ghostty
-installer. That is intentional fail-closed behavior: a Renovate PR may bump the
-version/ref, then CI fails checksum verification until a human recomputes and
-reviews the adjacent SHA constants.
+installer. The `github-releases` datasource has no digest resolver for these
+archives, so a Renovate PR may bump the version/ref while leaving the SHA stale;
+CI then fails checksum verification until a human recomputes and reviews the
+adjacent SHA constants.
 
 ## Repo layout
 

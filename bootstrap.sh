@@ -207,6 +207,7 @@ case "$OS" in
         link "${REPO_ROOT}/ghostty/config" "${HOME}/.config/ghostty/config"
         ;;
     wsl)
+        # Keep this config link ready; install-deps gates the actual Ghostty install on a GUI.
         link "${REPO_ROOT}/ghostty/config" "${HOME}/.config/ghostty/config"
         echo "  note      WSL detected; Windows Terminal fragment must be merged manually"
         echo "            see windows-terminal/README.md"
