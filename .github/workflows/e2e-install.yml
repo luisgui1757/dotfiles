@@ -27,30 +27,17 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 75
     strategy:
-      fail-fast: false   # surface every distro/OS result independently (no cancel-cascade)
+      fail-fast: false
       matrix:
         include:
+          # Ubuntu only -- the supported Linux / WSL2 target. install-deps.sh still
+          # handles dnf/pacman/zypper/apk, but exercising rolling/niche distros in CI
+          # added flakiness (e.g. Tumbleweed mirror metadata) without matching real
+          # usage. The shared container-e2e.sh keeps those PM cases, so re-add matrix
+          # entries here if that ever changes.
           - id: ubuntu-24.04
             image: ubuntu:24.04
             pm: apt
-          - id: debian-trixie
-            image: debian:trixie
-            pm: apt
-          - id: debian-12
-            image: debian:12
-            pm: apt
-          - id: fedora-latest
-            image: fedora:latest
-            pm: dnf
-          - id: archlinux-latest
-            image: archlinux:latest
-            pm: pacman
-          - id: opensuse-tumbleweed
-            image: opensuse/tumbleweed
-            pm: zypper
-          - id: alpine-latest
-            image: alpine:latest
-            pm: apk
     steps:
       # Tag is intentional so Dependabot can update it; pin the resolved SHA after a green run if desired.
       - uses: actions/checkout@v6

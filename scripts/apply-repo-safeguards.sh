@@ -77,12 +77,6 @@ gh_api_json PUT "repos/$repo/branches/main/protection" <<'JSON'
       "macos",
       "windows",
       "e2e containers / ubuntu-24.04",
-      "e2e containers / debian-trixie",
-      "e2e containers / debian-12",
-      "e2e containers / fedora-latest",
-      "e2e containers / archlinux-latest",
-      "e2e containers / opensuse-tumbleweed",
-      "e2e containers / alpine-latest",
       "setup.sh / ubuntu-24.04",
       "setup.sh / macos-15",
       "setup.ps1 / windows-2025"
