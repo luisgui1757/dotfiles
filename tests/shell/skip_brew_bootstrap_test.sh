@@ -21,6 +21,11 @@ have() {
     esac
 }
 
+# CI runners ship Homebrew at a standard prefix, which homebrew_bin would find via
+# its filesystem probe (independent of `have brew`); stub it so detect_pm exercises
+# the native-PM path instead of short-circuiting to brew.
+homebrew_bin() { return 1; }
+
 ask() {
     fail "maybe_install_brew prompted despite DOTFILES_SKIP_BREW_BOOTSTRAP=1"
 }

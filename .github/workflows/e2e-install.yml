@@ -118,6 +118,12 @@ jobs:
       - name: Post-install assertions
         run: |
           set -euo pipefail
+          # Mirror a fresh login shell: load Homebrew + ~/.local/bin so the tools
+          # setup.sh installed resolve (this separate CI step does not inherit them).
+          for p in /opt/homebrew /usr/local /home/linuxbrew/.linuxbrew "$HOME/.linuxbrew"; do
+            [ -x "$p/bin/brew" ] && eval "$("$p/bin/brew" shellenv)" && break
+          done
+          [ -d "$HOME/.local/bin" ] && PATH="$HOME/.local/bin:$PATH" && export PATH
           fail() { echo "FAIL: $*" >&2; exit 1; }
           assert_link() {
             local path="$1" expected="$2" actual
@@ -202,6 +208,16 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $PSNativeCommandUseErrorActionPreference = $true
+          # Mirror a fresh shell: re-derive PATH from the registry + scoop shims so
+          # the tools setup.ps1 installed resolve in this separate CI step.
+          $scoopRoot = if ($env:SCOOP) { $env:SCOOP } else { Join-Path $env:USERPROFILE 'scoop' }
+          $pathParts = @(Join-Path $scoopRoot 'shims')
+          foreach ($scope in 'Machine', 'User') {
+            $p = [Environment]::GetEnvironmentVariable('PATH', $scope)
+            if ($p) { $pathParts += ($p -split ';') }
+          }
+          $pathParts += ($env:PATH -split ';')
+          $env:PATH = ($pathParts | Where-Object { $_ } | Select-Object -Unique) -join ';'
           function Assert-LinkTarget {
               param([string]$Path, [string]$Expected)
               $item = Get-Item -LiteralPath $Path -Force -ErrorAction Stop

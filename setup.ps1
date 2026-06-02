@@ -118,6 +118,24 @@ if (-not $SkipDeps) {
     Write-Host "skipped: Phase 1 (deps) via -SkipDeps"
 }
 
+# Phase 1 may install nvim/tools via scoop/winget/choco into locations not yet on
+# this process PATH (a child installer cannot mutate our PATH, and persistent PATH
+# edits only reach NEW shells). Re-derive PATH so Phase 3-4 can find nvim -- the
+# Windows analog of refresh_runtime_path in setup.sh.
+function Update-RuntimePath {
+    $parts = @()
+    $scoopRoot = if ($env:SCOOP) { $env:SCOOP } else { Join-Path $env:USERPROFILE 'scoop' }
+    $parts += (Join-Path $scoopRoot 'shims')
+    foreach ($scope in 'Machine', 'User') {
+        $p = [Environment]::GetEnvironmentVariable('PATH', $scope)
+        if ($p) { $parts += ($p -split ';') }
+    }
+    $parts += ($env:PATH -split ';')
+    $seen = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+    $env:PATH = ($parts | Where-Object { $_ -and $seen.Add($_) }) -join ';'
+}
+Update-RuntimePath
+
 # ---- Phase 2: symlink configs ------------------------------------------------
 if (-not $SkipBootstrap) {
     Phase "Phase 2/4: symlink configs into place"
