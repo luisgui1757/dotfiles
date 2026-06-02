@@ -99,6 +99,16 @@ Describe "install-deps.ps1" {
         Should -Invoke -CommandName Read-Host -Times 0 -Exactly
     }
 
+    It "uses the documented elevated Scoop bootstrap path in dry run" {
+        . $script:ImportInstallDepsForTest -DryRun
+        Mock -CommandName Get-Command -MockWith { return $null } -ParameterFilter { $Name -eq 'scoop' }
+        Mock -CommandName Test-IsElevated -MockWith { return $true }
+
+        $output = & { Install-Scoop } | Out-String
+
+        $output | Should -Match '-RunAsAdmin'
+    }
+
     It "uses winget when winget is the only installed manager" {
         . $script:ImportInstallDepsForTest
         $Pm = 'winget'
