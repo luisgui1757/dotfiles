@@ -264,6 +264,12 @@ jobs:
 
   wsl2-canary:
     name: setup.sh / WSL2 Ubuntu-24.04 (best-effort canary)
+    # Best-effort only: run on the nightly schedule + manual dispatch, never on PRs.
+    # Hosted runners cannot give a reliable WSL2 gate, so running it on PRs only
+    # produces a perpetual red (non-required) check. Off PRs = clean PR status while
+    # keeping the nightly signal. continue-on-error keeps a flaky nightly from
+    # marking the whole scheduled run failed.
+    if: github.event_name != 'pull_request'
     runs-on: windows-2025
     timeout-minutes: 90
     continue-on-error: true
