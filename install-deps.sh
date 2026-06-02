@@ -219,6 +219,10 @@ detect_pm() {
 # ---- Homebrew bootstrap ------------------------------------------------------
 maybe_install_brew() {
     if have brew; then return 0; fi
+    if [[ "$(uname -s)" == "Linux" && "${DOTFILES_SKIP_BREW_BOOTSTRAP:-}" == "1" ]]; then
+        echo "Homebrew bootstrap skipped by DOTFILES_SKIP_BREW_BOOTSTRAP=1; keeping native Linux package manager."
+        return 1
+    fi
     local kind
     if [[ "$(uname -s)" == "Darwin" ]]; then
         kind="required (no other package manager on macOS)"
@@ -517,6 +521,20 @@ install_nvim_linux() {
         printf "  ok        %-26s already installed\n" "nvim"
         return
     fi
+    if [[ "$(native_linux_pm)" == "apk" ]]; then
+        if ! ask "Install nvim via apk (native Alpine package)?"; then
+            printf "  skipped   %-26s\n" "nvim"
+            return
+        fi
+        native_linux_pm_install apk neovim || {
+            echo "  WARN: nvim install failed; continuing"
+            return
+        }
+        if have nvim; then
+            printf "  installed %-26s via apk\n" "nvim"
+        fi
+        return
+    fi
     local machine arch asset url install_dir expected tmp tarball
     machine="$(uname -m)"
     case "$machine" in
@@ -771,12 +789,21 @@ install() {
     if ask "Install $tool${purpose:+ ($purpose)}?"; then
         # shellcheck disable=SC2086  # $pkg may carry cask flags on brew
         pm_install $pkg || echo "  WARN: $tool install failed; continuing"
-        # Post-install hint for fd-find on apt (binary lands as 'fdfind',
+        # Post-install fix for fd-find on apt (binary lands as 'fdfind',
         # not 'fd'). Telescope's find_files uses fd by default.
         if [[ "$tool" == "fd" ]] && [[ "$PM" == "apt" ]] && ! have fd && have fdfind; then
-            echo "  note      apt installed fd as 'fdfind'. Telescope expects 'fd'."
-            echo "            One-time alias:  mkdir -p ~/.local/bin && ln -sfn \"\$(command -v fdfind)\" ~/.local/bin/fd"
-            echo "            and ensure ~/.local/bin is on PATH."
+            if [[ "$DRY_RUN" -eq 1 ]]; then
+                echo "  would:    link ~/.local/bin/fd -> $(command -v fdfind)"
+                return
+            fi
+            mkdir -p "$HOME/.local/bin"
+            ln -sfn "$(command -v fdfind)" "$HOME/.local/bin/fd"
+            if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
+                PATH="$HOME/.local/bin:$PATH"
+                export PATH
+                hash -r 2>/dev/null || true
+            fi
+            printf "  set       %-26s ~/.local/bin/fd -> fdfind\n" "fd"
         fi
     else
         printf "  skipped   %-26s\n" "$tool"

@@ -29,20 +29,59 @@ function Get-AvailablePM {
     return $null
 }
 
+function Test-IsElevated {
+    try {
+        $id = [Security.Principal.WindowsIdentity]::GetCurrent()
+        return ([Security.Principal.WindowsPrincipal]$id).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+    } catch {
+        return $false
+    }
+}
+
+function Add-ScoopToPathForCurrentProcess {
+    $scoopRoot = if ($env:SCOOP) { $env:SCOOP } else { Join-Path $env:USERPROFILE 'scoop' }
+    $shimDir = Join-Path $scoopRoot 'shims'
+    if ((Test-Path -LiteralPath $shimDir) -and (($env:PATH -split ';') -notcontains $shimDir)) {
+        $env:PATH = "$shimDir;$env:PATH"
+    }
+}
+
 function Install-Scoop {
     if (Get-Command scoop -ErrorAction SilentlyContinue) { return $true }
     Write-Host "Scoop is not installed. It is a userspace package manager that"
     Write-Host "carries tools missing from winget/choco (taplo, win32yank, etc.)."
     if (-not (Ask "Install Scoop via the official one-liner?")) { return $false }
     if ($DryRun) {
-        Write-Host "  would: irm get.scoop.sh | iex"
+        if (Test-IsElevated) {
+            Write-Host "  would: download get.scoop.sh, then run install.ps1 -RunAsAdmin"
+        } else {
+            Write-Host "  would: irm get.scoop.sh | iex"
+        }
         return $false
     }
     try {
         # The official scoop bootstrap. RemoteSigned policy is needed for the
         # script; we set it for the current process only.
         Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process -Force
-        Invoke-Expression (Invoke-RestMethod -Uri 'https://get.scoop.sh')
+        if (Test-IsElevated) {
+            # GitHub Windows runners are elevated. Scoop blocks elevated
+            # bootstrap by default, so use the installer documented opt-in
+            # instead of trying to de-elevate the CI process.
+            $installer = Join-Path $env:TEMP "scoop-install-$([guid]::NewGuid()).ps1"
+            Invoke-WebRequest -Uri 'https://get.scoop.sh' -OutFile $installer -UseBasicParsing -ErrorAction Stop
+            & $installer -RunAsAdmin
+            $rc = $LASTEXITCODE
+            Remove-Item -LiteralPath $installer -Force -ErrorAction SilentlyContinue
+            if ($rc -ne 0) {
+                throw "Scoop installer exited $rc"
+            }
+        } else {
+            Invoke-Expression (Invoke-RestMethod -Uri 'https://get.scoop.sh' -ErrorAction Stop)
+            if ($LASTEXITCODE -ne 0) {
+                throw "Scoop installer exited $LASTEXITCODE"
+            }
+        }
+        Add-ScoopToPathForCurrentProcess
         # Add the standard extras bucket so we get things like win32yank.
         scoop bucket add extras 2>$null | Out-Null
         scoop bucket add nerd-fonts 2>$null | Out-Null
