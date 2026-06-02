@@ -58,90 +58,13 @@ jobs:
       - name: Real native package-manager install in container
         run: |
           set -euo pipefail
+          # The in-container logic lives in tests/ci/container-e2e.sh (a committed
+          # file) instead of inline YAML, to avoid fragile nested shell quoting.
           docker run --rm \
             --env EXPECTED_PM="${{ matrix.pm }}" \
-            --env IMAGE_ID="${{ matrix.id }}" \
             --volume "${{ github.workspace }}:/repo:ro" \
             "${{ matrix.image }}" \
-            /bin/sh -eu -c '
-              case "$EXPECTED_PM" in
-                apt)
-                  export DEBIAN_FRONTEND=noninteractive
-                  apt-get update
-                  apt-get install -y --no-install-recommends bash sudo ca-certificates curl tar gzip unzip xz-utils findutils coreutils procps passwd git
-                  ;;
-                dnf)
-                  dnf install -y bash sudo ca-certificates curl tar gzip unzip xz findutils coreutils procps shadow-utils git
-                  ;;
-                pacman)
-                  pacman -Sy --noconfirm archlinux-keyring || true
-                  pacman -Syu --noconfirm
-                  pacman -S --noconfirm --needed bash sudo ca-certificates curl tar gzip unzip xz findutils coreutils procps-ng shadow git
-                  ;;
-                zypper)
-                  zypper --non-interactive refresh
-                  zypper --non-interactive install bash sudo ca-certificates curl tar gzip unzip xz findutils coreutils procps shadow git
-                  ;;
-                apk)
-                  apk add --no-cache bash sudo ca-certificates curl tar gzip unzip xz findutils coreutils procps shadow git
-                  ;;
-                *)
-                  echo "unknown package manager: $EXPECTED_PM" >&2
-                  exit 2
-                  ;;
-              esac
-              if command -v update-ca-certificates >/dev/null 2>&1; then
-                update-ca-certificates >/dev/null 2>&1 || true
-              fi
-              if command -v useradd >/dev/null 2>&1; then
-                useradd -m -s /bin/bash dotfiles
-              else
-                adduser -D -s /bin/bash dotfiles
-              fi
-              printf "%s\n" "dotfiles ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/dotfiles
-              chmod 0440 /etc/sudoers.d/dotfiles
-              cp -a /repo /home/dotfiles/dotfiles
-              chown -R dotfiles:dotfiles /home/dotfiles/dotfiles
-              sudo -H -u dotfiles env EXPECTED_PM="$EXPECTED_PM" DOTFILES_SKIP_BREW_BOOTSTRAP=1 bash -lc '"'"'
-                set -euo pipefail
-                fail() { echo "FAIL: $*" >&2; exit 1; }
-                assert_link() {
-                  local path="$1" expected="$2" actual
-                  [[ -L "$path" ]] || fail "$path is not a symlink"
-                  actual="$(readlink "$path")"
-                  [[ "$actual" == "$expected" ]] || fail "$path points to $actual, expected $expected"
-                }
-                # Warnings-as-errors is enforced precisely elsewhere (shellcheck,
-                # pipefail, exit codes, and the explicit native-PM / tool / symlink
-                # assertions below). Subprocess "warning" text (e.g. apt's "WARNING:
-                # apt does not have a stable CLI") is not our signal, so this is a no-op.
-                assert_no_warnings() { :; }
-                cd "$HOME/dotfiles"
-                ./install-deps.sh --all 2>&1 | tee "$HOME/install-deps.log"
-                grep -F "package manager=$EXPECTED_PM" "$HOME/install-deps.log" >/dev/null ||
-                  fail "install-deps did not keep native package manager $EXPECTED_PM"
-                if grep -F "package manager=brew" "$HOME/install-deps.log" >/dev/null; then
-                  fail "install-deps switched to brew"
-                fi
-                assert_no_warnings "$HOME/install-deps.log"
-                ./bootstrap.sh 2>&1 | tee "$HOME/bootstrap.log"
-                assert_no_warnings "$HOME/bootstrap.log"
-                for cmd in nvim rg fd fzf tmux zsh git; do
-                  command -v "$cmd" >/dev/null 2>&1 || fail "$cmd is not on PATH"
-                done
-                nvim_line="$(nvim --version | head -n 1)"
-                case "$nvim_line" in
-                  "NVIM v0.11"*|"NVIM v0.12"*|"NVIM v1."*) ;;
-                  *) fail "nvim version is below 0.11: $nvim_line" ;;
-                esac
-                repo="$(pwd -P)"
-                assert_link "$HOME/.config/nvim" "$repo/nvim"
-                assert_link "$HOME/.config/starship.toml" "$repo/starship/starship.toml"
-                assert_link "$HOME/.tmux.conf" "$repo/tmux/tmux.conf"
-                assert_link "$HOME/.zshrc" "$repo/shells/zshrc"
-                assert_link "$HOME/.config/lazygit/config.yml" "$repo/lazygit/config.yml"
-              '"'"'
-            '
+            /bin/sh /repo/tests/ci/container-e2e.sh
 
   setup-sh:
     name: setup.sh / ${{ matrix.os }}
