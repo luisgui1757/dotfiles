@@ -70,16 +70,9 @@ function Install-Scoop {
             $installer = Join-Path $env:TEMP "scoop-install-$([guid]::NewGuid()).ps1"
             Invoke-WebRequest -Uri 'https://get.scoop.sh' -OutFile $installer -UseBasicParsing -ErrorAction Stop
             & $installer -RunAsAdmin
-            $rc = $LASTEXITCODE
             Remove-Item -LiteralPath $installer -Force -ErrorAction SilentlyContinue
-            if ($rc -ne 0) {
-                throw "Scoop installer exited $rc"
-            }
         } else {
             Invoke-Expression (Invoke-RestMethod -Uri 'https://get.scoop.sh' -ErrorAction Stop)
-            if ($LASTEXITCODE -ne 0) {
-                throw "Scoop installer exited $LASTEXITCODE"
-            }
         }
         Add-ScoopToPathForCurrentProcess
         # Add the standard extras bucket so we get things like win32yank.

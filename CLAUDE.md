@@ -217,33 +217,32 @@ PSScriptAnalyzer runs at `Warning,Error`, yamllint/parser checks are part of
   runner with `DOTFILES_SKIP_BREW_BOOTSTRAP=1`, creates a non-root user, runs
   real `install-deps.sh --all` (native `apt`, no Linuxbrew), then `bootstrap.sh`,
   and asserts tool presence, Neovim >= 0.11, and symlinks pointing into the repo.
-  Scope is intentionally **Ubuntu only** (the supported Linux/WSL2 target):
-  `install-deps.sh` still handles dnf/pacman/zypper/apk and the shared
-  `tests/ci/container-e2e.sh` keeps those PM cases, but exercising rolling/niche
-  distros in CI added flakiness (Tumbleweed mirror metadata) without matching
-  real usage. Re-add matrix entries in `e2e-install.yml` to broaden it.
+  Scope is intentionally **Ubuntu only** (the supported Linux/WSL2 target).
+  Re-adding another distro requires both a matrix entry in `e2e-install.yml` and
+  a matching root-prep branch in `tests/ci/container-e2e.sh`.
 - `setup.sh / ubuntu-24.04`, `setup.sh / macos-15`, and
   `setup.ps1 / windows-2025` run the real public setup entry points and then
-  rerun Lazy/Mason headless sync. They explicitly fail if setup prints
-  `nvim not on PATH` or skips Phase 3-4.
+  rerun Lazy/Mason headless sync. They explicitly fail if setup skips Phase 3-4,
+  emits a `FAIL:` marker, or Mason did not install expected tools.
 - `setup.sh / WSL2 Ubuntu-24.04 (best-effort canary)` uses
   `Vampire/setup-wsl@v7`, but hosted runners cannot provide a reliably required
   nested-virtualization WSL2 gate. Keep this job non-required unless the owner
   intentionally accepts that flake risk. The required WSL proxy is the Linux
-  container matrix plus the existing `DOTFILES_FORCE_OS=wsl` bats coverage.
+  Ubuntu container plus the existing `DOTFILES_FORCE_OS=wsl` bats coverage.
 
 Main-branch safeguards live in `.github/settings.yml` for the Probot Settings
 app and in `scripts/apply-repo-safeguards.sh` for owners who prefer an
 authenticated `gh api` one-shot. Both paths set rebase-only merges, delete
-branches on merge, required checks, one approving PR review with stale-review
-dismissal, enforced admins, linear history, conversation resolution, and no
-force pushes or branch deletions. Do not add the WSL2 canary to required checks
-unless asked.
+branches on merge, required checks, no required reviews for a solo maintainer,
+enforced admins, linear history, conversation resolution, and no force pushes or
+branch deletions. The merge gate is required status checks plus `enforce_admins`;
+do not add the WSL2 canary to required checks unless asked.
 
 `renovate.json` custom managers can bump pinned version/ref constants, but they
-cannot recompute SHA-256 values. That is intentional fail-closed behavior:
-after a Renovate bump, a human must recompute/review the adjacent checksum(s) or
-CI checksum verification must fail.
+cannot recompute SHA-256 values. The `github-releases` datasource has no digest
+resolver for these archives, so after a Renovate bump the adjacent checksum(s)
+stay stale until a human recomputes/reviews them; CI checksum verification must
+fail in the meantime.
 
 ## :WNF (Write Without Formatting)
 
@@ -294,9 +293,9 @@ save only**. The next plain `:w` formats normally. Implemented in
 - **`DOTFILES_SKIP_BREW_BOOTSTRAP=1` is a CI/native-PM test knob.** On Linux,
   when no `brew` is already installed, this prevents `install-deps.sh --all`
   from bootstrapping Linuxbrew and keeps the detected native package manager
-  (`apt`, `dnf`, `pacman`, `zypper`, or `apk`). It is used by the distro
-  container e2e matrix so those jobs actually exercise native package-manager
-  paths. Do not set it for normal macOS setup; macOS still needs Homebrew.
+  (`apt` in the current Ubuntu container gate). It is used by container e2e so
+  that job actually exercises the native package-manager path. Do not set it for
+  normal macOS setup; macOS still needs Homebrew.
 - **Apt `fd-find` is shimmed to `fd`.** Debian/Ubuntu package the command as
   `fdfind`, but Telescope expects `fd`. After installing `fd-find`,
   `install-deps.sh` idempotently links `~/.local/bin/fd` to `fdfind` and adds
@@ -331,11 +330,13 @@ save only**. The next plain `:w` formats normally. Implemented in
   The pinned script still fetches the matching `.deb` from that project's GitHub
   release assets over HTTPS at run time (per-codename×arch, so the `.deb` itself
   is not individually pinned — same trust model as the Homebrew installer).
-  A checksum mismatch fails closed (falls through to the manual hint).
+  A checksum mismatch fails closed: the installer is not run, a `FAIL:` marker
+  is emitted, and setup continues for real users while CI fails on the marker.
   Update the version and checksum constants together. Guarded by
-  `tests/shell/wsl_gui_tools_test.sh`. Renovate can open version/ref bumps for
-  these constants, but it cannot recompute the SHA-256 values; leave CI red
-  until a human has reviewed the download and updated the checksum.
+  `tests/shell/ghostty_install_fail_test.sh` and `tests/shell/wsl_gui_tools_test.sh`.
+  Renovate can open version/ref bumps for these constants, but it cannot
+  recompute the SHA-256 values; leave CI red until a human has reviewed the
+  download and updated the checksum.
 - **Both installers open with an "install EVERYTHING?" prompt.** Interactive
   runs that didn't pass `--all`/`-All` get one upfront question; answering yes
   flips `YES_ALL`/`$All` so the rest runs with no per-item prompts. Skipped when

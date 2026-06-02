@@ -1,46 +1,59 @@
-#!/bin/sh
-# Container end-to-end check for the Linux distro matrix in
+#!/usr/bin/env bash
+# Container end-to-end check for the Ubuntu container gate in
 # .github/workflows/e2e-install.yml. Lives in a file (not inline YAML) to avoid
-# fragile nested shell quoting. POSIX sh so it runs under dash/ash/bash alike.
+# fragile nested shell quoting.
 #
 # Two modes:
 #   (no args)   root: install prereqs for $EXPECTED_PM, create an unprivileged
 #               user, copy the read-only /repo mount, then re-exec as that user.
 #   --as-user   run the REAL install-deps.sh --all (native PM, no brew) +
 #               bootstrap.sh, then assert the result.
-set -eu
+set -euo pipefail
 
 EXPECTED_PM="${EXPECTED_PM:?EXPECTED_PM must be set}"
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
 
-assert_link() {
-    # assert_link <path> <expected-target>
-    [ -L "$1" ] || fail "$1 is not a symlink"
-    _actual="$(readlink "$1")"
-    [ "$_actual" = "$2" ] || fail "$1 points to $_actual, expected $2"
+run_and_capture() {
+    local label="$1" log="$2" rc
+    shift 2
+    set +e
+    "$@" 2>&1 | tee "$log"
+    rc=${PIPESTATUS[0]}
+    set -e
+    if [[ "$rc" -ne 0 ]]; then
+        fail "$label exited $rc"
+    fi
+    if grep -Eq '^[[:space:]]*FAIL:' "$log"; then
+        fail "$label emitted a FAIL marker"
+    fi
 }
 
-if [ "${1:-}" = "--as-user" ]; then
+assert_link() {
+    # assert_link <path> <expected-target>
+    [[ -L "$1" ]] || fail "$1 is not a symlink"
+    _actual="$(readlink "$1")"
+    [[ "$_actual" == "$2" ]] || fail "$1 points to $_actual, expected $2"
+}
+
+if [[ "${1:-}" == "--as-user" ]]; then
     cd "$HOME/dotfiles" || fail "repo copy missing at $HOME/dotfiles"
 
-    ./install-deps.sh --all 2>&1 | tee "$HOME/install-deps.log"
+    run_and_capture "install-deps.sh" "$HOME/install-deps.log" ./install-deps.sh --all
     grep -F "package manager=$EXPECTED_PM" "$HOME/install-deps.log" >/dev/null \
         || fail "install-deps did not keep native package manager $EXPECTED_PM"
     if grep -F "package manager=brew" "$HOME/install-deps.log" >/dev/null; then
         fail "install-deps switched to brew (native PM expected)"
     fi
 
-    ./bootstrap.sh 2>&1 | tee "$HOME/bootstrap.log"
+    run_and_capture "bootstrap.sh" "$HOME/bootstrap.log" ./bootstrap.sh
 
     # install_nvim_linux symlinks nvim into /usr/local/bin, and apt's fd-find is
-    # symlinked to ~/.local/bin/fd. A real login shell has both on PATH (system
-    # default + zshrc); minimal containers (notably openSUSE) omit /usr/local/bin
-    # from a non-login sh, so add both before the tool checks.
+    # symlinked to ~/.local/bin/fd. A real login shell has both on PATH.
     for d in /usr/local/bin "$HOME/.local/bin"; do
         case ":$PATH:" in
             *":$d:"*) ;;
-            *) [ -d "$d" ] && PATH="$d:$PATH" ;;
+            *) [[ -d "$d" ]] && PATH="$d:$PATH" ;;
         esac
     done
     export PATH
@@ -75,39 +88,8 @@ case "$EXPECTED_PM" in
             bash sudo ca-certificates curl tar gzip unzip xz-utils \
             findutils coreutils procps passwd git
         ;;
-    dnf)
-        dnf install -y \
-            bash sudo ca-certificates curl tar gzip unzip xz \
-            findutils coreutils procps shadow-utils git
-        ;;
-    pacman)
-        pacman -Sy --noconfirm archlinux-keyring || true
-        pacman -Syu --noconfirm
-        pacman -S --noconfirm --needed \
-            bash sudo ca-certificates curl tar gzip unzip xz \
-            findutils coreutils procps-ng shadow git
-        ;;
-    zypper)
-        # openSUSE Tumbleweed is rolling; mirror metadata is occasionally stale
-        # ("Failed to retrieve new repository metadata"). Retry refresh a few
-        # times and auto-import repo keys; a successful refresh also primes the
-        # metadata cache that install-deps' later zypper calls reuse.
-        n=0
-        while [ "$n" -lt 4 ]; do
-            if zypper --non-interactive --gpg-auto-import-keys refresh; then break; fi
-            n=$((n + 1)); echo "zypper refresh failed (attempt $n/4); retrying in 5s"; sleep 5
-        done
-        zypper --non-interactive --gpg-auto-import-keys install \
-            bash sudo ca-certificates curl tar gzip unzip xz \
-            findutils coreutils procps shadow git
-        ;;
-    apk)
-        apk add --no-cache \
-            bash sudo ca-certificates curl tar gzip unzip xz \
-            findutils coreutils procps shadow git
-        ;;
     *)
-        fail "unknown package manager: $EXPECTED_PM"
+        fail "unknown package manager: $EXPECTED_PM; add a matrix entry and root prep branch together"
         ;;
 esac
 
@@ -130,4 +112,4 @@ chown -R dotfiles:dotfiles /home/dotfiles/dotfiles
 exec sudo -H -u dotfiles env \
     DOTFILES_SKIP_BREW_BOOTSTRAP=1 \
     EXPECTED_PM="$EXPECTED_PM" \
-    sh "/home/dotfiles/dotfiles/tests/ci/container-e2e.sh" --as-user
+    bash "/home/dotfiles/dotfiles/tests/ci/container-e2e.sh" --as-user

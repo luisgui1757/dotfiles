@@ -32,6 +32,28 @@ $ErrorActionPreference = 'Stop'
 $RepoUrl     = 'https://github.com/luisgui1757/dotfiles.git'
 $DefaultDest = Join-Path $env:USERPROFILE 'dotfiles'
 
+# Rebuild PATH from registry values plus Scoop shims, then de-duplicate.
+# This differs from setup.sh, which evaluates brew shellenv and appends Unix bin dirs.
+function Update-RuntimePath {
+    $parts = @()
+    $scoopRoot = if ($env:SCOOP) { $env:SCOOP } else { Join-Path $env:USERPROFILE 'scoop' }
+    $shimDir = Join-Path $scoopRoot 'shims'
+    if (Test-Path -LiteralPath $shimDir) {
+        $parts += $shimDir
+    }
+    foreach ($scope in 'Machine', 'User') {
+        $p = [Environment]::GetEnvironmentVariable('PATH', $scope)
+        if ($p) { $parts += ($p -split ';') }
+    }
+    $parts += ($env:PATH -split ';')
+    $seen = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+    $env:PATH = ($parts | Where-Object { $_ -and $seen.Add($_) }) -join ';'
+}
+
+# Test seam: set DOTFILES_SETUP_PS1_SOURCE_ONLY and dot-source this file to load
+# helper functions without running install, bootstrap, or Neovim sync phases.
+if ($env:DOTFILES_SETUP_PS1_SOURCE_ONLY) { return }
+
 $inputRedirected = $false
 $outputRedirected = $false
 try { $inputRedirected = [Console]::IsInputRedirected } catch { $inputRedirected = $true }
@@ -118,28 +140,17 @@ if (-not $SkipDeps) {
     Write-Host "skipped: Phase 1 (deps) via -SkipDeps"
 }
 
-# Phase 1 may install nvim/tools via scoop/winget/choco into locations not yet on
-# this process PATH (a child installer cannot mutate our PATH, and persistent PATH
-# edits only reach NEW shells). Re-derive PATH so Phase 3-4 can find nvim -- the
-# Windows analog of refresh_runtime_path in setup.sh.
-function Update-RuntimePath {
-    $parts = @()
-    $scoopRoot = if ($env:SCOOP) { $env:SCOOP } else { Join-Path $env:USERPROFILE 'scoop' }
-    $parts += (Join-Path $scoopRoot 'shims')
-    foreach ($scope in 'Machine', 'User') {
-        $p = [Environment]::GetEnvironmentVariable('PATH', $scope)
-        if ($p) { $parts += ($p -split ';') }
-    }
-    $parts += ($env:PATH -split ';')
-    $seen = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
-    $env:PATH = ($parts | Where-Object { $_ -and $seen.Add($_) }) -join ';'
+# Phase 1 may install nvim and tools into locations not yet on this process PATH.
+# A child installer cannot mutate our PATH, and persistent PATH edits only reach
+# new shells. Re-derive PATH so Phase 3-4 can find nvim.
+if (-not $DryRun) {
+    Update-RuntimePath
 }
-Update-RuntimePath
 
 # ---- Phase 2: symlink configs ------------------------------------------------
 if (-not $SkipBootstrap) {
     Phase "Phase 2/4: symlink configs into place"
-    $global:LASTEXITCODE = 0   # reset so a stale code from Phase 1 can't false-trip
+    $global:LASTEXITCODE = 0   # reset so a stale code from Phase 1 cannot false-trip
     & (Join-Path $ScriptDir 'bootstrap.ps1') @bootstrapArgs
     if ($LASTEXITCODE -ne 0) {
         # bootstrap already printed the actionable fix (Dev Mode / elevation).

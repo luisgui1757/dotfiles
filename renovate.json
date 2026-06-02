@@ -1,6 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "description": "Renovate updates pinned version/ref constants only. SHA-256 constants intentionally fail closed until a human recomputes and reviews them.",
+  "description": "Renovate updates pinned version/ref constants only. The github-releases datasource has no digest resolver for these archives, so version bumps leave adjacent SHA-256 constants stale and CI checksum verification fails until a human reviews them.",
   "customManagers": [
     {
       "customType": "regex",
@@ -26,10 +26,21 @@
     },
     {
       "customType": "regex",
-      "description": "Hack Nerd Font archive version. The SHA-256 must be recomputed manually after Renovate bumps this.",
+      "description": "Hack Nerd Font archive version for Unix. The SHA-256 must be recomputed manually after Renovate bumps this.",
       "managerFilePatterns": ["/^install-deps\\.sh$/"],
       "matchStrings": [
         "HACK_NERD_FONT_VERSION=\"(?<currentValue>v[^\"]+)\"\\s+HACK_NERD_FONT_SHA256=\"(?<currentDigest>[a-f0-9]{64})\""
+      ],
+      "depNameTemplate": "ryanoasis/nerd-fonts",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "description": "Hack Nerd Font archive version for Windows. The SHA-256 must be recomputed manually after Renovate bumps this.",
+      "managerFilePatterns": ["/^install-deps\\.ps1$/"],
+      "matchStrings": [
+        "\\$HackNerdFontVersion\\s*=\\s*'(?<currentValue>v[^']+)'\\s+\\$HackNerdFontSha256\\s*=\\s*'(?<currentDigest>[a-f0-9]{64})'"
       ],
       "depNameTemplate": "ryanoasis/nerd-fonts",
       "datasourceTemplate": "github-releases",

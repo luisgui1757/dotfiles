@@ -58,6 +58,10 @@ have() {
     command -v "$1" >/dev/null 2>&1
 }
 
+native_linux_pm() {
+    printf '%s\n' "apt"
+}
+
 maybe_sudo() {
     printf '%s\n' "$*" >> "$TMP_ROOT/sudo.log"
     case "$1" in

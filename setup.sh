@@ -138,6 +138,8 @@ phase() {
 refresh_runtime_path() {
     local brew_bin dir
 
+    [[ "$DRY_RUN" -eq 1 ]] && return 0
+
     for brew_bin in "$(command -v brew 2>/dev/null || true)" \
         /opt/homebrew/bin/brew \
         /usr/local/bin/brew \
@@ -149,10 +151,11 @@ refresh_runtime_path() {
         fi
     done
 
-    dir=/usr/local/bin
-    if [[ -d "$dir" && ":$PATH:" != *":$dir:"* ]]; then
-        PATH="$PATH:$dir"
-    fi
+    for dir in /usr/local/bin "$HOME/.local/bin"; do
+        if [[ -d "$dir" && ":$PATH:" != *":$dir:"* ]]; then
+            PATH="$PATH:$dir"
+        fi
+    done
     export PATH
     hash -r 2>/dev/null || true
 }
