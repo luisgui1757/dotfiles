@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 75
     strategy:
-      fail-fast: true
+      fail-fast: false   # surface every distro/OS result independently (no cancel-cascade)
       matrix:
         include:
           - id: ubuntu-24.04
@@ -71,7 +71,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90
     strategy:
-      fail-fast: true
+      fail-fast: false   # surface every distro/OS result independently (no cancel-cascade)
       matrix:
         os:
           - ubuntu-24.04
@@ -187,7 +187,9 @@ jobs:
           $PSNativeCommandUseErrorActionPreference = $true
           $setupLog = Join-Path $env:RUNNER_TEMP 'setup-ps1.log'
           $global:LASTEXITCODE = 0
-          & .\setup.ps1 -All 2>&1 | Tee-Object -FilePath $setupLog
+          # *>&1 (not 2>&1): setup.ps1 prints its "Phase N/4" headers via Write-Host
+          # (the Information stream), which 2>&1 would not capture for the greps below.
+          & .\setup.ps1 -All *>&1 | Tee-Object -FilePath $setupLog
           if ($LASTEXITCODE -ne 0) {
             throw "setup.ps1 exited $LASTEXITCODE"
           }
