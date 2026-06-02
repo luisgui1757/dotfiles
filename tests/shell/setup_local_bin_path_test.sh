@@ -2,56 +2,35 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
-TMP_ROOT="$REPO_ROOT/tests/.cache/setup-local-bin-path-test"
-rm -rf "$TMP_ROOT"
-mkdir -p "$TMP_ROOT/home/.local/bin" "$TMP_ROOT/brewbin"
-trap 'rm -rf "$TMP_ROOT"' EXIT
+fail() { echo "FAIL: $1" >&2; exit 1; }
 
-cp "$REPO_ROOT/setup.sh" "$TMP_ROOT/setup.sh"
-: > "$TMP_ROOT/bootstrap.sh"
-cat > "$TMP_ROOT/install-deps.sh" <<'EOF'
-#!/usr/bin/env bash
-set -euo pipefail
-cat > "$HOME/.local/bin/nvim" <<'NVIM'
-#!/usr/bin/env bash
-set -euo pipefail
-printf '%s\n' "$*" >> "$SETUP_TEST_ROOT/nvim.log"
-NVIM
-chmod +x "$HOME/.local/bin/nvim"
-EOF
-chmod +x "$TMP_ROOT/install-deps.sh"
+WORK="$(mktemp -d)"
+trap 'rm -rf "$WORK"' EXIT
+export HOME="$WORK/home"
+mkdir -p "$HOME/.local/bin"
 
-# Fake brew placed ON PATH so refresh_runtime_path's `command -v brew` finds it
-# FIRST and evals its (no-op) shellenv, shadowing any real Homebrew on the host
-# (e.g. /opt/homebrew on macOS runners, /home/linuxbrew on Ubuntu). With the real
-# brew shadowed, the refresh falls through to appending ~/.local/bin -- where the
-# fake nvim lives -- which is exactly what this test verifies. The brew stub also
-# records that its shellenv ran (brew.log) so the dry-run case can assert it did NOT.
-cat > "$TMP_ROOT/brewbin/brew" <<'EOF'
-#!/usr/bin/env bash
-set -euo pipefail
-if [[ "${1:-}" == "shellenv" ]]; then
-    printf 'ran\n' > "$SETUP_TEST_ROOT/brew.log"
-fi
-EOF
-chmod +x "$TMP_ROOT/brewbin/brew"
+# Load setup.sh's helper functions without running the install/bootstrap/sync
+# phases. Unit-testing refresh_runtime_path directly avoids the nvim-precedence
+# fragility of a full setup.sh run (a real nvim in /usr/local/bin on a CI runner
+# would shadow a stub in ~/.local/bin, since the refresh APPENDS ~/.local/bin).
+DOTFILES_SETUP_SOURCE_ONLY=1 source "$REPO_ROOT/setup.sh"
 
-output="$(HOME="$TMP_ROOT/home" SETUP_TEST_ROOT="$TMP_ROOT" PATH="$TMP_ROOT/brewbin:/usr/bin:/bin" bash "$TMP_ROOT/setup.sh" --skip-bootstrap </dev/null)"
+# F7: a normal refresh must put ~/.local/bin on PATH, so install-deps' fd-find
+# symlink (~/.local/bin/fd on apt) resolves for Phase 3-4 and fresh shells.
+DRY_RUN=0
+PATH="/usr/bin:/bin"
+refresh_runtime_path
+case ":$PATH:" in
+    *":$HOME/.local/bin:"*) ;;
+    *) fail "refresh_runtime_path did not add ~/.local/bin to PATH" ;;
+esac
 
-[[ "$output" == *"Phase 3/4: sync Neovim plugins"* ]]
-[[ "$output" == *"Phase 4/4: install LSP servers + formatters"* ]]
-[[ "$output" != *"nvim not on PATH yet"* ]]
-grep -F -- "--headless +Lazy! sync +qa" "$TMP_ROOT/nvim.log" >/dev/null
-grep -F -- "--headless +MasonToolsInstallSync +qa" "$TMP_ROOT/nvim.log" >/dev/null
-
-rm -f "$TMP_ROOT/nvim.log" "$TMP_ROOT/brew.log"
-
-output="$(HOME="$TMP_ROOT/home" SETUP_TEST_ROOT="$TMP_ROOT" PATH="$TMP_ROOT/brewbin:/usr/bin:/bin" bash "$TMP_ROOT/setup.sh" --dry-run --all </dev/null)"
-
-[[ "$output" == *"skipped: Phase 3-4 (nvim plugins) in --dry-run mode"* ]]
-if [[ -e "$TMP_ROOT/brew.log" ]]; then
-    echo "FAIL: setup.sh refreshed Homebrew PATH during dry-run" >&2
-    exit 1
-fi
+# F9: under --dry-run the refresh must be a no-op (the dry-run contract promises
+# nothing is changed -- no PATH mutation, no brew shellenv eval, no hash -r).
+DRY_RUN=1
+PATH="/usr/bin:/bin"
+before="$PATH"
+refresh_runtime_path
+[[ "$PATH" == "$before" ]] || fail "refresh_runtime_path mutated PATH during --dry-run"
 
 echo "OK"
