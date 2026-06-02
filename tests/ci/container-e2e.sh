@@ -33,6 +33,10 @@ if [ "${1:-}" = "--as-user" ]; then
 
     ./bootstrap.sh 2>&1 | tee "$HOME/bootstrap.log"
 
+    # install-deps symlinks fd-find -> ~/.local/bin/fd on apt; a real login shell
+    # has ~/.local/bin on PATH via zshrc, so mirror that before the tool checks.
+    if [ -d "$HOME/.local/bin" ]; then PATH="$HOME/.local/bin:$PATH"; export PATH; fi
+
     for cmd in nvim rg fd fzf tmux zsh git; do
         command -v "$cmd" >/dev/null 2>&1 || fail "$cmd is not on PATH"
     done
