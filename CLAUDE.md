@@ -204,6 +204,43 @@ When adding a new spec:
 - Shell tests: drop a `*_test.sh` under `tests/shell/` (or other dir). It's
   picked up by the dir's `run_all.sh` automatically.
 
+## CI / repository safeguards
+
+`test.yml` remains the fast cross-platform suite. Warnings are treated as
+failures where the tools expose them cleanly: shellcheck exits nonzero,
+PSScriptAnalyzer runs at `Warning,Error`, yamllint/parser checks are part of
+`make test-static`, and Windows CI treats missing test dependencies as fatal.
+
+`e2e-install.yml` is the required real-install gate:
+
+- `e2e containers / ...` runs Linux distro containers on an Ubuntu runner with
+  `DOTFILES_SKIP_BREW_BOOTSTRAP=1`, creates a non-root user, runs real
+  `install-deps.sh --all`, then `bootstrap.sh`, and asserts native PM selection,
+  tool presence, Neovim >= 0.11, warning-free logs, and symlinks pointing into
+  the repo.
+- `setup.sh / ubuntu-24.04`, `setup.sh / macos-15`, and
+  `setup.ps1 / windows-2025` run the real public setup entry points and then
+  rerun Lazy/Mason headless sync. They explicitly fail if setup prints
+  `nvim not on PATH` or skips Phase 3-4.
+- `setup.sh / WSL2 Ubuntu-24.04 (best-effort canary)` uses
+  `Vampire/setup-wsl@v7`, but hosted runners cannot provide a reliably required
+  nested-virtualization WSL2 gate. Keep this job non-required unless the owner
+  intentionally accepts that flake risk. The required WSL proxy is the Linux
+  container matrix plus the existing `DOTFILES_FORCE_OS=wsl` bats coverage.
+
+Main-branch safeguards live in `.github/settings.yml` for the Probot Settings
+app and in `scripts/apply-repo-safeguards.sh` for owners who prefer an
+authenticated `gh api` one-shot. Both paths set rebase-only merges, delete
+branches on merge, required checks, one approving PR review with stale-review
+dismissal, enforced admins, linear history, conversation resolution, and no
+force pushes or branch deletions. Do not add the WSL2 canary to required checks
+unless asked.
+
+`renovate.json` custom managers can bump pinned version/ref constants, but they
+cannot recompute SHA-256 values. That is intentional fail-closed behavior:
+after a Renovate bump, a human must recompute/review the adjacent checksum(s) or
+CI checksum verification must fail.
+
 ## :WNF (Write Without Formatting)
 
 The buffer-local feature you can rely on. `:WNF<CR>` (or lower-case
@@ -243,6 +280,26 @@ save only**. The next plain `:w` formats normally. Implemented in
   tries each until one succeeds — so a winget `No package found` (exit
   `-1978335212`) no longer dead-ends a tool. scoop carries every CLI tool in
   the `$Catalog`.
+- **Windows CI uses Scoop's documented elevated bootstrap.** GitHub-hosted
+  `windows-2025` runners are elevated, and Scoop blocks elevated install by
+  default. `Install-Scoop` detects elevation and runs the official installer
+  with `-RunAsAdmin`, then adds the Scoop `shims` dir to the current process
+  PATH so the rest of `install-deps.ps1` can immediately use `scoop`. Local
+  setup still recommends Developer Mode plus a normal PowerShell; do not
+  elevate the whole local setup unless you intentionally want the admin path.
+- **`DOTFILES_SKIP_BREW_BOOTSTRAP=1` is a CI/native-PM test knob.** On Linux,
+  when no `brew` is already installed, this prevents `install-deps.sh --all`
+  from bootstrapping Linuxbrew and keeps the detected native package manager
+  (`apt`, `dnf`, `pacman`, `zypper`, or `apk`). It is used by the distro
+  container e2e matrix so those jobs actually exercise native package-manager
+  paths. Do not set it for normal macOS setup; macOS still needs Homebrew.
+- **Apt `fd-find` is shimmed to `fd`.** Debian/Ubuntu package the command as
+  `fdfind`, but Telescope expects `fd`. After installing `fd-find`,
+  `install-deps.sh` idempotently links `~/.local/bin/fd` to `fdfind` and adds
+  that directory to the current PATH.
+- **Alpine installs Neovim through `apk`.** The official Neovim Linux tarball
+  targets glibc systems, so Alpine uses its native `neovim` package instead;
+  e2e still enforces the repo's Neovim >= 0.11 floor.
 - **`install-deps.sh` prompts for the notes/Obsidian vault** and persists
   `export NOTES_VAULT=…` to `~/.zshrc.local` (sourced by `zshrc`, read by
   `util/notes_path.lua`). The prompt is tty-gated (skipped under `--all` /
@@ -262,7 +319,7 @@ save only**. The next plain `:w` formats normally. Implemented in
 - **Direct GitHub downloads are pinned and SHA-256 verified.** `install-deps.sh`
   verifies the pinned Neovim Linux tarballs and Hack Nerd Font zip before
   extraction; `install-deps.ps1` verifies the pinned Hack.zip before registering
-  fonts. The Ubuntu CI job also pins and verifies its direct GitHub downloads.
+  fonts. The CI workflows also pin and verify their direct GitHub downloads.
   This extends to the **Ubuntu Ghostty installer**: `install_ghostty_linux`
   pins `mkasberg/ghostty-ubuntu`'s `install.sh` to `GHOSTTY_UBUNTU_VERSION` and
   SHA-256 verifies the script (`GHOSTTY_UBUNTU_INSTALL_SHA256`) before running
@@ -272,7 +329,9 @@ save only**. The next plain `:w` formats normally. Implemented in
   is not individually pinned — same trust model as the Homebrew installer).
   A checksum mismatch fails closed (falls through to the manual hint).
   Update the version and checksum constants together. Guarded by
-  `tests/shell/wsl_gui_tools_test.sh`.
+  `tests/shell/wsl_gui_tools_test.sh`. Renovate can open version/ref bumps for
+  these constants, but it cannot recompute the SHA-256 values; leave CI red
+  until a human has reviewed the download and updated the checksum.
 - **Both installers open with an "install EVERYTHING?" prompt.** Interactive
   runs that didn't pass `--all`/`-All` get one upfront question; answering yes
   flips `YES_ALL`/`$All` so the rest runs with no per-item prompts. Skipped when

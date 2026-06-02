@@ -135,6 +135,61 @@ when their dependency tool is missing on the current machine. In CI, missing
 Windows test dependencies are fatal so the workflow cannot go green by silently
 skipping the actual checks.
 
+## CI merge gate and repository safeguards
+
+Pull requests are meant to be gated by two workflows:
+
+- `.github/workflows/test.yml` runs the existing static, shell, bootstrap,
+  tmux, starship, Neovim, and Windows Pester/PSScriptAnalyzer suites. Warnings
+  are treated as failures where the tools expose them cleanly: shellcheck exits
+  nonzero, PSScriptAnalyzer runs at `Warning,Error`, and YAML parsing/linting is
+  part of `make test-static`.
+- `.github/workflows/e2e-install.yml` is the real install guarantee. It runs
+  native package-manager installs in Linux containers for Ubuntu 24.04, Debian
+  trixie, Debian 12, Fedora, Arch, openSUSE Tumbleweed, and Alpine with
+  `DOTFILES_SKIP_BREW_BOOTSTRAP=1`, then runs `bootstrap.sh` and asserts the
+  expected tools and symlinks. It also runs full `./setup.sh --all` on
+  `ubuntu-24.04` and `macos-15`, and full `.\setup.ps1 -All` on `windows-2025`.
+  Those jobs fail if setup prints `nvim not on PATH`, skips Phase 3-4, installs
+  Neovim below 0.11, or if Lazy/Mason headless sync exits nonzero or emits
+  warning/deprecation text.
+
+WSL2 is split deliberately. Hosted GitHub runners do not provide a reliable
+required nested-virtualization WSL2 gate. The required proxy is the Linux
+container matrix plus the existing `DOTFILES_FORCE_OS=wsl` bootstrap coverage in
+CI. A separate `setup.sh / WSL2 Ubuntu-24.04 (best-effort canary)` job uses
+`Vampire/setup-wsl@v7`, but it is marked `continue-on-error` and should not be
+added to the required status checks unless the owner accepts that flake risk.
+
+Repository safeguards are declared in `.github/settings.yml` for the Probot
+Settings app and mirrored by `scripts/apply-repo-safeguards.sh` for a one-shot
+`gh api` path. The intended main-branch policy is:
+
+- only rebase-and-merge is allowed; merge commits and squash merges are disabled;
+- required status checks include `ubuntu`, `macos`, `windows`, all required e2e
+  container jobs, and the three full setup jobs;
+- PR review is required with stale review dismissal, admins are enforced,
+  conversation resolution and linear history are required, and force pushes /
+  branch deletion are blocked;
+- branches are deleted after merge; Dependabot updates GitHub Actions weekly.
+
+Manual owner step: either install the Probot Settings app so `.github/settings.yml`
+is continuously applied after it lands on `main`, or run:
+
+```bash
+scripts/apply-repo-safeguards.sh luisgui1757/dotfiles
+```
+
+with an authenticated `gh` that has repository admin permission. Do this only
+after the required checks have appeared at least once on GitHub, otherwise branch
+protection may reference check names GitHub has not seen yet.
+
+Renovate is configured for pinned downloader constants, but it cannot recompute
+the SHA-256 values for Neovim tarballs, Hack Nerd Font, or the Ubuntu Ghostty
+installer. That is intentional fail-closed behavior: a Renovate PR may bump the
+version/ref, then CI fails checksum verification until a human recomputes and
+reviews the adjacent SHA constants.
+
 ## Repo layout
 
 ```
@@ -189,6 +244,13 @@ skipping the actual checks.
 - **Windows Terminal settings.json is NOT symlinked** because WT auto-rewrites
   it. Only the user-owned keys live in `settings.fragment.jsonc`; the install
   script merges them in.
+- **Windows CI installs Scoop through its documented elevated path.** GitHub
+  Windows runners are elevated, and Scoop blocks elevated bootstrap by default.
+  `install-deps.ps1` detects elevation and runs the official installer with
+  `-RunAsAdmin`, then refreshes the current-process Scoop shims path so later
+  installs can use `scoop` immediately. Bootstrap symlink creation still works
+  through the elevated/native CreateSymbolicLink path. For local machines,
+  Developer Mode plus a normal PowerShell remains the recommended setup path.
 
 See `CLAUDE.md` for the coding-agent operational guide (invariants, common
 workflows, conventions).
