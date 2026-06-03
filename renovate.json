@@ -36,7 +36,7 @@
       "description": "Neovim Linux x86_64 tarball version. The adjacent SHA-256 must be recomputed manually after Renovate bumps this.",
       "managerFilePatterns": ["/^install-deps\\.sh$/"],
       "matchStrings": [
-        "NVIM_LINUX_VERSION=\"(?<currentValue>v[^\"]+)\"\\s+NVIM_LINUX_X86_64_SHA256=\"(?<currentDigest>[a-f0-9]{64})\""
+        "NVIM_LINUX_VERSION=\"(?<currentValue>v[^\"]+)\"\\s+NVIM_LINUX_X86_64_SHA256=\"[a-f0-9]{64}\""
       ],
       "depNameTemplate": "neovim/neovim",
       "datasourceTemplate": "github-releases",
@@ -47,7 +47,7 @@
       "description": "Neovim Linux arm64 tarball version. The adjacent SHA-256 must be recomputed manually after Renovate bumps this.",
       "managerFilePatterns": ["/^install-deps\\.sh$/"],
       "matchStrings": [
-        "NVIM_LINUX_VERSION=\"(?<currentValue>v[^\"]+)\"(?:.|\\n)*?NVIM_LINUX_ARM64_SHA256=\"(?<currentDigest>[a-f0-9]{64})\""
+        "NVIM_LINUX_VERSION=\"(?<currentValue>v[^\"]+)\"(?:.|\\n)*?NVIM_LINUX_ARM64_SHA256=\"[a-f0-9]{64}\""
       ],
       "depNameTemplate": "neovim/neovim",
       "datasourceTemplate": "github-releases",
@@ -58,7 +58,7 @@
       "description": "Neovim Linux x86_64 tarball version in CI. The adjacent SHA-256 must be recomputed manually after Renovate bumps this.",
       "managerFilePatterns": ["/^\\.github/workflows/test\\.yml$/"],
       "matchStrings": [
-        "NVIM_LINUX_VERSION:\\s*(?<currentValue>v[^\\s]+)\\s+NVIM_LINUX_X86_64_SHA256:\\s*(?<currentDigest>[a-f0-9]{64})"
+        "NVIM_LINUX_VERSION:\\s*(?<currentValue>v[^\\s]+)\\s+NVIM_LINUX_X86_64_SHA256:\\s*[a-f0-9]{64}"
       ],
       "depNameTemplate": "neovim/neovim",
       "datasourceTemplate": "github-releases",
@@ -69,7 +69,7 @@
       "description": "Hack Nerd Font archive version for Unix. The SHA-256 must be recomputed manually after Renovate bumps this.",
       "managerFilePatterns": ["/^install-deps\\.sh$/"],
       "matchStrings": [
-        "HACK_NERD_FONT_VERSION=\"(?<currentValue>v[^\"]+)\"\\s+HACK_NERD_FONT_SHA256=\"(?<currentDigest>[a-f0-9]{64})\""
+        "HACK_NERD_FONT_VERSION=\"(?<currentValue>v[^\"]+)\"\\s+HACK_NERD_FONT_SHA256=\"[a-f0-9]{64}\""
       ],
       "depNameTemplate": "ryanoasis/nerd-fonts",
       "datasourceTemplate": "github-releases",
@@ -80,7 +80,7 @@
       "description": "Hack Nerd Font archive version for Windows. The SHA-256 must be recomputed manually after Renovate bumps this.",
       "managerFilePatterns": ["/^install-deps\\.ps1$/"],
       "matchStrings": [
-        "\\$HackNerdFontVersion\\s*=\\s*'(?<currentValue>v[^']+)'\\s+\\$HackNerdFontSha256\\s*=\\s*'(?<currentDigest>[a-f0-9]{64})'"
+        "\\$HackNerdFontVersion\\s*=\\s*'(?<currentValue>v[^']+)'\\s+\\$HackNerdFontSha256\\s*=\\s*'[a-f0-9]{64}'"
       ],
       "depNameTemplate": "ryanoasis/nerd-fonts",
       "datasourceTemplate": "github-releases",
@@ -91,7 +91,7 @@
       "description": "Ubuntu Ghostty installer version. The installer SHA-256 must be recomputed manually after Renovate bumps this.",
       "managerFilePatterns": ["/^install-deps\\.sh$/"],
       "matchStrings": [
-        "GHOSTTY_UBUNTU_VERSION=\"(?<currentValue>[^\"]+)\"\\s+GHOSTTY_UBUNTU_INSTALL_SHA256=\"(?<currentDigest>[a-f0-9]{64})\""
+        "GHOSTTY_UBUNTU_VERSION=\"(?<currentValue>[^\"]+)\"\\s+GHOSTTY_UBUNTU_INSTALL_SHA256=\"[a-f0-9]{64}\""
       ],
       "depNameTemplate": "mkasberg/ghostty-ubuntu",
       "datasourceTemplate": "github-releases",

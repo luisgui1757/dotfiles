@@ -198,9 +198,11 @@ update PRs are intentionally not configured. Renovate cannot recompute the
 SHA-256 values for Neovim tarballs, Hack Nerd Font, the Ubuntu Ghostty installer,
 or the CI `cargo-binstall` installer script. The `github-releases` datasource
 has no digest resolver for those archives, and the `git-refs` datasource only
-bumps the cargo-binstall commit. A Renovate PR may therefore bump the version/ref
-while leaving the adjacent SHA stale; CI then fails checksum verification until
-a human recomputes and reviews the SHA constants.
+bumps the cargo-binstall commit. Direct-download SHA-256 constants are therefore
+matched only as context in `renovate.json`, not captured as Renovate
+`currentDigest` values. A Renovate PR may bump the version/ref while leaving the
+adjacent SHA stale; CI then fails checksum verification until a human recomputes
+and reviews the SHA constants.
 
 ## Repo layout
 
