@@ -163,7 +163,7 @@ WSL2 is split deliberately. Hosted GitHub runners do not provide a reliable
 required nested-virtualization WSL2 gate. The required proxy is the Linux
 Ubuntu container plus the existing `DOTFILES_FORCE_OS=wsl` bootstrap coverage in
 CI. A separate `setup.sh / WSL2 Ubuntu-24.04 (best-effort canary)` job uses
-`Vampire/setup-wsl@v7`, but it is marked `continue-on-error` and should not be
+`Vampire/setup-wsl@v7.0.0`, but it is marked `continue-on-error` and should not be
 added to the required status checks unless the owner accepts that flake risk.
 
 Repository safeguards are declared in `.github/settings.yml` for the Probot
