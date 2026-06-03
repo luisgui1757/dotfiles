@@ -102,6 +102,16 @@ else
     echo "ok  : Windows CI uses test.ps1"
 fi
 
+if [[ ! -f AGENTS.md ]] || ! grep -q 'CLAUDE.md' AGENTS.md; then
+    echo "FAIL: AGENTS.md must stay a thin pointer to CLAUDE.md"
+    fail=1
+elif [[ "$(wc -l < AGENTS.md | tr -d ' ')" -gt 25 ]]; then
+    echo "FAIL: AGENTS.md must stay thin; keep the canonical guide in CLAUDE.md"
+    fail=1
+else
+    echo "ok  : AGENTS.md points to the canonical CLAUDE.md guide"
+fi
+
 if grep -q 'sequential[[:space:]]*=[[:space:]]*true' tests/nvim/run.ps1 .github/workflows/test.yml 2>/dev/null; then
     echo "FAIL: Windows nvim test path must not use Plenary sequential mode"
     fail=1

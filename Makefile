@@ -2,7 +2,7 @@
 # current OS; sub-targets skip themselves with a clear message when the
 # tool they depend on isn't installed.
 
-.PHONY: test test-nvim test-shell test-starship test-tmux test-ghostty test-bootstrap test-static lint setup setup-dryrun install dryrun deps deps-dryrun help
+.PHONY: test test-nvim test-shell test-starship test-tmux test-ghostty test-bootstrap test-static validate-renovate lint setup setup-dryrun install dryrun deps deps-dryrun help
 
 REPO := $(shell pwd)
 
@@ -18,6 +18,7 @@ help:
 	@echo "  test-ghostty    — +validate-config + scheme grep (mac only)"
 	@echo "  test-bootstrap  — bats coverage of bootstrap.sh idempotency"
 	@echo "  test-static     — json/toml/yaml lint, editorconfig, invariants"
+	@echo "  validate-renovate — schema-check renovate.json under Node 24"
 	@echo "  lint            — shellcheck everything"
 	@echo
 	@echo "Maintainer phase targets:"
@@ -68,6 +69,9 @@ test-bootstrap:
 
 test-static:
 	@bash tests/static/run_all.sh
+
+validate-renovate:
+	@bash scripts/validate-renovate.sh
 
 lint:
 	@bash tests/shell/lint.sh
