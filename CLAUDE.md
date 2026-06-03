@@ -4,6 +4,11 @@ This file is the on-ramp. If you're a future coding-agent session, read this
 **before** touching anything. If you're me six months from now and forgot how
 the install script works, read this too.
 
+> **Single source of truth.** This file is canonical. `AGENTS.md` at the repo
+> root is a thin pointer here so non-Claude agents discover it; do not copy this
+> content there because two real guide files would drift. Claude Code auto-loads
+> this file, and other agents reach it through `AGENTS.md`.
+
 ## What this repo is
 
 Cross-platform dotfiles: Neovim (lazy.nvim), Starship, Ghostty, Windows
@@ -44,7 +49,8 @@ not ship synced agent preference folders.
 ├── .editorconfig          formatting rules every editor + agent respects
 ├── stylua.toml            Lua formatter style (Spaces / width 2); conform reads it
 ├── README.md              the human-facing install matrix
-└── CLAUDE.md              tracked coding-agent guide
+├── AGENTS.md              standard agent entry point, points here
+└── CLAUDE.md              canonical tracked coding-agent guide
 ```
 
 Local agent state directories such as `.claude/` are **not** part of the synced
@@ -238,11 +244,31 @@ enforced admins, linear history, conversation resolution, and no force pushes or
 branch deletions. The merge gate is required status checks plus `enforce_admins`;
 do not add the WSL2 canary to required checks unless asked.
 
-`renovate.json` custom managers can bump pinned version/ref constants, but they
-cannot recompute SHA-256 values. The `github-releases` datasource has no digest
-resolver for these archives, so after a Renovate bump the adjacent checksum(s)
-stay stale until a human recomputes/reviews them; CI checksum verification must
-fail in the meantime.
+`renovate.json` owns GitHub Actions version updates and repo-pinned version/ref
+constants. Dependabot version-update PRs are intentionally disabled; GitHub
+native Dependabot security alerts and automated security fixes stay enabled by
+`.github/settings.yml`. Renovate custom managers can bump pinned version/ref
+constants, but they cannot recompute SHA-256 values. The `github-releases`
+datasource has no digest resolver for these archives, and the `git-refs`
+datasource only bumps the cargo-binstall commit, so after a Renovate bump the
+adjacent checksum(s) stay stale until a human recomputes/reviews them; CI
+checksum verification must fail in the meantime.
+
+Validate `renovate.json` locally with Renovate's own schema validator, not just
+`jq`: `make validate-renovate`. That target runs Renovate under Node 24 because
+Renovate's `engines.node` supports the Node 24 LTS line; running the validator
+directly under an unsupported odd/current host Node such as 25.x emits
+`EBADENGINE`. Do not silence that warning with npm config. Switch runtimes or use
+the repo target, which shells into Node 24 before running:
+
+```bash
+npx --yes --package node@24.11.0 -- bash -c \
+  'npm exec --yes --package renovate@latest -- renovate-config-validator --strict renovate.json'
+```
+
+`tests/static/json_lint.sh` only checks JSON syntax. The Renovate validator
+checks schema, and the first live Dependency Dashboard/PR should still be used
+to confirm the custom regex managers match the intended files.
 
 ## :WNF (Write Without Formatting)
 
@@ -334,9 +360,10 @@ save only**. The next plain `:w` formats normally. Implemented in
   is emitted, and setup continues for real users while CI fails on the marker.
   Update the version and checksum constants together. Guarded by
   `tests/shell/ghostty_install_fail_test.sh` and `tests/shell/wsl_gui_tools_test.sh`.
-  Renovate can open version/ref bumps for these constants, but it cannot
-  recompute the SHA-256 values; leave CI red until a human has reviewed the
-  download and updated the checksum.
+  Renovate can open version/ref bumps for these constants and for the CI
+  cargo-binstall installer commit, but it cannot recompute the adjacent SHA-256
+  values; leave CI red until a human has reviewed the download and updated the
+  checksum.
 - **Both installers open with an "install EVERYTHING?" prompt.** Interactive
   runs that didn't pass `--all`/`-All` get one upfront question; answering yes
   flips `YES_ALL`/`$All` so the rest runs with no per-item prompts. Skipped when

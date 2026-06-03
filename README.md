@@ -119,10 +119,11 @@ Use the same top-level test command that CI uses for your OS:
 
 ```bash
 # mac / linux / wsl
-make help           # list targets
-make test           # run everything that can run on this OS
-make test-bootstrap # bats coverage of the installer
-make lint           # shellcheck everything
+make help               # list targets
+make test               # run everything that can run on this OS
+make test-bootstrap     # bats coverage of the installer
+make validate-renovate  # schema-check renovate.json under Renovate's Node 24
+make lint               # shellcheck everything
 ```
 
 ```powershell
@@ -171,7 +172,8 @@ Settings app and mirrored by `scripts/apply-repo-safeguards.sh` for a one-shot
   status checks plus enforced admins;
 - conversation resolution and linear history are required, and force pushes /
   branch deletion are blocked;
-- branches are deleted after merge; Dependabot updates GitHub Actions weekly.
+- branches are deleted after merge; Renovate updates GitHub Actions and
+  repo-pinned version/ref constants weekly.
 
 Manual owner step: either install the Probot Settings app so `.github/settings.yml`
 is continuously applied after it lands on `main`, or run:
@@ -184,12 +186,16 @@ with an authenticated `gh` that has repository admin permission. Do this only
 after the required checks have appeared at least once on GitHub, otherwise branch
 protection may reference check names GitHub has not seen yet.
 
-Renovate is configured for pinned downloader constants, but it cannot recompute
-the SHA-256 values for Neovim tarballs, Hack Nerd Font, or the Ubuntu Ghostty
-installer. The `github-releases` datasource has no digest resolver for these
-archives, so a Renovate PR may bump the version/ref while leaving the SHA stale;
-CI then fails checksum verification until a human recomputes and reviews the
-adjacent SHA constants.
+Renovate is the version-update bot for GitHub Actions and repo-pinned
+version/ref constants. GitHub-native Dependabot security alerts and automated
+security fixes stay enabled through `.github/settings.yml`; Dependabot version
+update PRs are intentionally not configured. Renovate cannot recompute the
+SHA-256 values for Neovim tarballs, Hack Nerd Font, the Ubuntu Ghostty installer,
+or the CI `cargo-binstall` installer script. The `github-releases` datasource
+has no digest resolver for those archives, and the `git-refs` datasource only
+bumps the cargo-binstall commit. A Renovate PR may therefore bump the version/ref
+while leaving the adjacent SHA stale; CI then fails checksum verification until
+a human recomputes and reviews the SHA constants.
 
 ## Repo layout
 
@@ -209,8 +215,10 @@ adjacent SHA constants.
 ├── bootstrap.ps1          # setup phase: Windows symlinks
 ├── test.ps1               # Windows test entry point
 ├── Makefile               # Unix test/setup conveniences
+├── AGENTS.md              # standard agent entry point, points to CLAUDE.md
+├── CLAUDE.md              # canonical coding-agent operational guide
 ├── .editorconfig          # cross-IDE formatting rules
-└── README.md
+└── README.md              # human-facing install and usage guide
 ```
 
 ## Key design decisions (and why)
@@ -253,8 +261,10 @@ adjacent SHA constants.
   through the elevated/native CreateSymbolicLink path. For local machines,
   Developer Mode plus a normal PowerShell remains the recommended setup path.
 
-See `CLAUDE.md` for the coding-agent operational guide (invariants, common
-workflows, conventions).
+See `AGENTS.md` for the standard coding-agent entry point. `CLAUDE.md` remains
+the canonical operational guide because Claude Code auto-loads it; `AGENTS.md`
+points there so other agents reach the same instructions without duplicating
+content.
 
 ## Daily workflows
 
@@ -273,7 +283,7 @@ Lazy auto-discovers it. Default to lazy-loading (`event` / `cmd` / `keys` /
 
 ### Adding an LSP server / formatter / treesitter parser
 
-See `CLAUDE.md` → "Common workflows". Three small edits each: the plugin
+See `CLAUDE.md` -> "Common workflows". Three small edits each: the plugin
 spec, the Mason ensure_installed list, and the corresponding test under
 `tests/nvim/spec/`.
 
