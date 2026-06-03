@@ -236,7 +236,7 @@ PSScriptAnalyzer runs at `Warning,Error`, yamllint/parser checks are part of
   rerun Lazy/Mason headless sync. They explicitly fail if setup skips Phase 3-4,
   emits a `FAIL:` marker, or Mason did not install expected tools.
 - `setup.sh / WSL2 Ubuntu-24.04 (best-effort canary)` uses
-  `Vampire/setup-wsl@v7`, but hosted runners cannot provide a reliably required
+  `Vampire/setup-wsl@v7.0.0`, but hosted runners cannot provide a reliably required
   nested-virtualization WSL2 gate. Keep this job non-required unless the owner
   intentionally accepts that flake risk. The required WSL proxy is the Linux
   Ubuntu container plus the existing `DOTFILES_FORCE_OS=wsl` bats coverage.
