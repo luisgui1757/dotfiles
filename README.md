@@ -315,6 +315,10 @@ nvim --headless "+Lazy! sync" +qa     # match plugin commits
 make test                       # verify the new state
 ```
 
+## License
+
+MIT. See `LICENSE`.
+
 ## Troubleshooting
 
 | Symptom | Likely cause | Fix |
