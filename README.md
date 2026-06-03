@@ -131,6 +131,11 @@ make lint               # shellcheck everything
 .\test.ps1          # PSScriptAnalyzer + Pester + Nvim plenary busted
 ```
 
+Windows runs each Neovim Plenary spec file directly through `plenary.busted`;
+do not switch it back to `PlenaryBustedDirectory`, whose parent harness can
+false-fail after successful child specs under PowerShell native-command error
+promotion.
+
 Sub-targets skip themselves with a `skipped: <tool> not installed` message
 when their dependency tool is missing on the current machine. In CI, missing
 Windows test dependencies are fatal so the workflow cannot go green by silently

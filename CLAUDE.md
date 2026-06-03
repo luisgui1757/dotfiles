@@ -197,6 +197,11 @@ On Windows, use the same entry point as CI:
 .\test.ps1          # PSScriptAnalyzer + Pester + Nvim plenary busted
 ```
 
+On Windows, `tests/nvim/run.ps1` intentionally executes each `*_spec.lua`
+directly through `plenary.busted`. Do not use `PlenaryBustedDirectory` there:
+its parent process can false-fail after all child specs passed when PowerShell
+native-command error promotion is enabled.
+
 Sub-targets **skip gracefully** when their tool isn't installed
 (`yamllint`/`editorconfig-checker`/`hyperfine`/`bats`/`ghostty`). The
 ubuntu/macos/windows CI matrix in `.github/workflows/test.yml` installs
