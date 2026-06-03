@@ -119,6 +119,14 @@ else
     echo "ok  : Windows nvim test path avoids Plenary sequential mode"
 fi
 
+if grep -q 'PlenaryBustedDirectory' tests/nvim/run.ps1 2>/dev/null \
+    || ! grep -q "plenary.busted" tests/nvim/run.ps1 2>/dev/null; then
+    echo "FAIL: Windows nvim test path must run specs directly through plenary.busted"
+    fail=1
+else
+    echo "ok  : Windows nvim test path uses direct plenary.busted specs"
+fi
+
 markdown_renderers=$(grep -nE "headlines\\.nvim|markview\\.nvim" nvim/lua/plugins/*.lua 2>/dev/null || true)
 if [[ -n "$markdown_renderers" ]]; then
     echo "FAIL: markdown rendering must stay owned by render-markdown.nvim:"
