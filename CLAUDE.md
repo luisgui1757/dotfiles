@@ -257,7 +257,10 @@ constants, but they cannot recompute SHA-256 values. The `github-releases`
 datasource has no digest resolver for these archives, and the `git-refs`
 datasource only bumps the cargo-binstall commit, so after a Renovate bump the
 adjacent checksum(s) stay stale until a human recomputes/reviews them; CI
-checksum verification must fail in the meantime.
+checksum verification must fail in the meantime. Do not model direct-download
+SHA-256 constants as Renovate `currentDigest` captures; in Renovate terms those
+are not datasource digests. Only the cargo-binstall git commit is captured as a
+digest.
 
 Validate `renovate.json` locally with Renovate's own schema validator, not just
 `jq`: `make validate-renovate`. That target runs Renovate under Node 24 because
@@ -368,7 +371,9 @@ save only**. The next plain `:w` formats normally. Implemented in
   Renovate can open version/ref bumps for these constants and for the CI
   cargo-binstall installer commit, but it cannot recompute the adjacent SHA-256
   values; leave CI red until a human has reviewed the download and updated the
-  checksum.
+  checksum. In `renovate.json`, direct-download SHA-256 values must be matched
+  as context only, not named `currentDigest`, otherwise Renovate will schedule
+  same-version digest updates for checksums it cannot actually resolve.
 - **Both installers open with an "install EVERYTHING?" prompt.** Interactive
   runs that didn't pass `--all`/`-All` get one upfront question; answering yes
   flips `YES_ALL`/`$All` so the rest runs with no per-item prompts. Skipped when
