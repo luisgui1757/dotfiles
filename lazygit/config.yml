@@ -1,6 +1,7 @@
 # lazygit config -- cross-platform, symlinked into:
-#   macOS / Linux:  ~/.config/lazygit/config.yml
-#   Windows:        %LOCALAPPDATA%\lazygit\config.yml
+#   macOS:   ~/Library/Application Support/lazygit/config.yml
+#   Linux:   ~/.config/lazygit/config.yml
+#   Windows: %LOCALAPPDATA%\lazygit\config.yml
 #
 # Windows path was %APPDATA% in earlier commits; lazygit v0.58 actually
 # reads from %LOCALAPPDATA% (verified via `lazygit --print-config-dir`).

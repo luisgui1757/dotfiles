@@ -222,24 +222,34 @@ failures where the tools expose them cleanly: shellcheck exits nonzero,
 PSScriptAnalyzer runs at `Warning,Error`, yamllint/parser checks are part of
 `make test-static`, and Windows CI treats missing test dependencies as fatal.
 
-`e2e-install.yml` is the required real-install gate:
+`e2e-install.yml` is the required real-install gate. The jobs cover different
+install paths, not symmetric container platforms:
 
 - `e2e containers / ubuntu-24.04` runs an `ubuntu:24.04` container on an Ubuntu
   runner with `DOTFILES_SKIP_BREW_BOOTSTRAP=1`, creates a non-root user, runs
   real `install-deps.sh --all` (native `apt`, no Linuxbrew), then `bootstrap.sh`,
   and asserts tool presence, Neovim >= 0.11, and symlinks pointing into the repo.
-  Scope is intentionally **Ubuntu only** (the supported Linux/WSL2 target).
+  This is intentionally **not** a devcontainer. It stays because hosted Ubuntu
+  has Linuxbrew available, so the container is the only automated proof of the
+  clean-image native `apt` path: pinned Neovim tarball install, `fd-find` ->
+  `fd` shim, Ubuntu Ghostty installer path, and apt fallbacks. Scope is
+  intentionally **Ubuntu only** (the supported Linux/WSL2 proxy target).
   Re-adding another distro requires both a matrix entry in `e2e-install.yml` and
   a matching root-prep branch in `tests/ci/container-e2e.sh`.
 - `setup.sh / ubuntu-24.04`, `setup.sh / macos-15`, and
   `setup.ps1 / windows-2025` run the real public setup entry points and then
   rerun Lazy/Mason headless sync. They explicitly fail if setup skips Phase 3-4,
   emits a `FAIL:` marker, or Mason did not install expected tools.
+- There is no macOS/Windows container analog to add for symmetry. Docker cannot
+  model macOS, and Windows containers do not model the real desktop/user-profile
+  install surface: Scoop/winget/choco, Developer Mode symlink behavior, font
+  registration, and terminal profiles. Hosted macOS/Windows runners are the
+  accepted representative fixtures for those OSes.
 - `setup.sh / WSL2 Ubuntu-24.04 (best-effort canary)` uses
-  `Vampire/setup-wsl@v7.0.0`, but hosted runners cannot provide a reliably required
-  nested-virtualization WSL2 gate. Keep this job non-required unless the owner
-  intentionally accepts that flake risk. The required WSL proxy is the Linux
-  Ubuntu container plus the existing `DOTFILES_FORCE_OS=wsl` bats coverage.
+  `Vampire/setup-wsl@v7.0.0`, but hosted runners cannot provide a reliably
+  required nested-virtualization WSL2 gate. Keep this job non-required unless
+  the owner intentionally accepts that flake risk. The required WSL proxy is the
+  Linux Ubuntu container plus the existing `DOTFILES_FORCE_OS=wsl` bats coverage.
 
 Main-branch safeguards live in `.github/settings.yml` for the Probot Settings
 app and in `scripts/apply-repo-safeguards.sh` for owners who prefer an
@@ -311,6 +321,11 @@ save only**. The next plain `:w` formats normally. Implemented in
   Terminal — WT rewrites that file on launch. Use
   `.\bootstrap.ps1 -MergeWindowsTerminal` to merge the user-owned keys in;
   it backs up the pre-merge `settings.json` first.
+- **lazygit config paths are OS-specific.** On macOS, lazygit v0.58 reports
+  `~/Library/Application Support/lazygit` from `lazygit --print-config-dir`;
+  on Linux/WSL it uses `~/.config/lazygit`; on Windows it uses
+  `%LOCALAPPDATA%\lazygit`. Keep `bootstrap.sh`, `bootstrap.ps1`, README, and
+  tests aligned with those real read paths.
 - **`install-deps.ps1` prefers scoop, then falls back across managers
   per tool.** `Install-One` builds an ordered candidate list (scoop → primary →
   winget → choco) of managers that are installed AND carry the package, and
@@ -476,11 +491,12 @@ then return …` before the main install sections in `install-deps.sh` exists ON
 so shell tests can `source` the installer function defs (without running any
 installs) and exercise them against stubbed seams. Unset in normal runs, so it's
 skipped. Two sibling seams exist for the same reason: `bootstrap.sh`'s
-`DOTFILES_FORCE_OS` (lets the bats suite drive the `wsl` link branch on a Linux
-runner) and `bootstrap.ps1`'s `DOTFILES_BOOTSTRAP_SOURCE_ONLY` (dot-source the
-functions — e.g. `New-SymbolicLinkItem` / `New-NativeSymLink` — without running
-the symlink phase, so `tests/bootstrap/ps1_test.ps1` can force the native
-CreateSymbolicLink fallback). Both are unset in normal runs.
+`DOTFILES_FORCE_OS` (lets the bats suite drive `macos`, `linux`, and `wsl` link
+branches regardless of the host runner) and `bootstrap.ps1`'s
+`DOTFILES_BOOTSTRAP_SOURCE_ONLY` (dot-source the functions — e.g.
+`New-SymbolicLinkItem` / `New-NativeSymLink` — without running the symlink phase,
+so `tests/bootstrap/ps1_test.ps1` can force the native CreateSymbolicLink
+fallback). Both are unset in normal runs.
 
 ## Things that look weird but are intentional
 

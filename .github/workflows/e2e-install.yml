@@ -29,6 +29,16 @@ jobs:
     strategy:
       matrix:
         include:
+          # Why a container AND a hosted setup.sh/ubuntu job? They prove
+          # different install paths. The hosted ubuntu-24.04 runner has
+          # Linuxbrew available, so setup.sh can take the brew branch. This
+          # clean-image job is the only required proof of the native apt path:
+          # non-root user, no Linuxbrew bootstrap, pinned Neovim tarball,
+          # fd-find -> fd shim, Ubuntu Ghostty path, and apt fallbacks.
+          # It is a fresh-install fixture, not a devcontainer. There is no
+          # macOS/Windows analog to add for symmetry: Docker cannot model
+          # macOS, and Windows containers do not model the real
+          # Scoop/winget/Developer-Mode desktop install surface.
           # Ubuntu only -- the supported Linux / WSL2 target. Re-adding a distro
           # means adding a matrix entry here and its root prep in container-e2e.sh.
           - id: ubuntu-24.04
