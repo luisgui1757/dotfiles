@@ -16,18 +16,33 @@ run_bootstrap() {
     HOME="$FAKE_HOME" bash "$REPO_ROOT/bootstrap.sh" "$@"
 }
 
+assert_link_target() {
+    [ -L "$1" ]
+    [ "$(readlink "$1")" = "$2" ]
+}
+
+assert_lazygit_link_for_current_os() {
+    case "$(uname -s)" in
+        Darwin)
+            assert_link_target "$FAKE_HOME/Library/Application Support/lazygit/config.yml" \
+                "$REPO_ROOT/lazygit/config.yml"
+            ;;
+        *)
+            assert_link_target "$FAKE_HOME/.config/lazygit/config.yml" \
+                "$REPO_ROOT/lazygit/config.yml"
+            ;;
+    esac
+}
+
 @test "fresh install creates the expected symlinks" {
     run run_bootstrap
     [ "$status" -eq 0 ]
-    [ -L "$FAKE_HOME/.config/nvim" ]
-    [ "$(readlink "$FAKE_HOME/.config/nvim")" = "$REPO_ROOT/nvim" ]
-    [ -L "$FAKE_HOME/.config/starship.toml" ]
-    [ "$(readlink "$FAKE_HOME/.config/starship.toml")" = "$REPO_ROOT/starship/starship.toml" ]
+    assert_link_target "$FAKE_HOME/.config/nvim" "$REPO_ROOT/nvim"
+    assert_link_target "$FAKE_HOME/.config/starship.toml" "$REPO_ROOT/starship/starship.toml"
     [ -L "$FAKE_HOME/.tmux.conf" ]
     [ -L "$FAKE_HOME/.zshrc" ]
     # lazygit config -- carries the J/K move-commit binding.
-    [ -L "$FAKE_HOME/.config/lazygit/config.yml" ]
-    [ "$(readlink "$FAKE_HOME/.config/lazygit/config.yml")" = "$REPO_ROOT/lazygit/config.yml" ]
+    assert_lazygit_link_for_current_os
 }
 
 @test "re-running is a no-op (idempotent)" {
@@ -96,19 +111,36 @@ run_bootstrap() {
     [ ! -e "$FAKE_HOME/.tmux.conf" ]
     [ ! -e "$FAKE_HOME/.zshrc" ]
     [ ! -e "$FAKE_HOME/.config/lazygit/config.yml" ]
+    [ ! -e "$FAKE_HOME/Library/Application Support/lazygit/config.yml" ]
+}
+
+@test "macOS branch links lazygit where lazygit actually reads it" {
+    run env HOME="$FAKE_HOME" DOTFILES_FORCE_OS=macos bash "$REPO_ROOT/bootstrap.sh"
+    [ "$status" -eq 0 ]
+    assert_link_target "$FAKE_HOME/Library/Application Support/lazygit/config.yml" \
+        "$REPO_ROOT/lazygit/config.yml"
+    assert_link_target "$FAKE_HOME/Library/Application Support/com.mitchellh.ghostty/config" \
+        "$REPO_ROOT/ghostty/config"
+}
+
+@test "Linux branch keeps lazygit on the XDG config path" {
+    run env HOME="$FAKE_HOME" DOTFILES_FORCE_OS=linux bash "$REPO_ROOT/bootstrap.sh"
+    [ "$status" -eq 0 ]
+    assert_link_target "$FAKE_HOME/.config/lazygit/config.yml" \
+        "$REPO_ROOT/lazygit/config.yml"
 }
 
 @test "WSL branch links ghostty config and re-running is idempotent" {
     run env HOME="$FAKE_HOME" DOTFILES_FORCE_OS=wsl bash "$REPO_ROOT/bootstrap.sh"
     [ "$status" -eq 0 ]
-    [ -L "$FAKE_HOME/.config/ghostty/config" ]
-    [ "$(readlink "$FAKE_HOME/.config/ghostty/config")" = "$REPO_ROOT/ghostty/config" ]
+    assert_link_target "$FAKE_HOME/.config/ghostty/config" "$REPO_ROOT/ghostty/config"
+    assert_link_target "$FAKE_HOME/.config/lazygit/config.yml" "$REPO_ROOT/lazygit/config.yml"
 
     # Second run must be a no-op: link unchanged, no stray backups.
     run env HOME="$FAKE_HOME" DOTFILES_FORCE_OS=wsl bash "$REPO_ROOT/bootstrap.sh"
     [ "$status" -eq 0 ]
-    [ -L "$FAKE_HOME/.config/ghostty/config" ]
-    [ "$(readlink "$FAKE_HOME/.config/ghostty/config")" = "$REPO_ROOT/ghostty/config" ]
+    assert_link_target "$FAKE_HOME/.config/ghostty/config" "$REPO_ROOT/ghostty/config"
+    assert_link_target "$FAKE_HOME/.config/lazygit/config.yml" "$REPO_ROOT/lazygit/config.yml"
     bak_count=$(find "$FAKE_HOME" -name "*.bak.*" 2>/dev/null | wc -l | tr -d ' ')
     [ "$bak_count" = "0" ]
 }

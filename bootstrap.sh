@@ -32,8 +32,9 @@ unique_backup() {
 }
 
 # ---- OS detection ------------------------------------------------------------
-# DOTFILES_FORCE_OS is a test seam: it lets the suite exercise the wsl branch on
-# a Linux CI runner. Unset in normal runs, so real detection is used.
+# DOTFILES_FORCE_OS is a test seam: it lets the suite exercise macos/linux/wsl
+# link branches regardless of the host runner. Unset in normal runs, so real
+# detection is used.
 detect_os() {
     if [[ -n "${DOTFILES_FORCE_OS:-}" ]]; then echo "$DOTFILES_FORCE_OS"; return; fi
     case "$(uname -s)" in
@@ -192,27 +193,30 @@ link "${REPO_ROOT}/nvim"                "${NVIM_DEST}"
 link "${REPO_ROOT}/starship/starship.toml" "${HOME}/.config/starship.toml"
 link "${REPO_ROOT}/tmux/tmux.conf"      "${HOME}/.tmux.conf"
 link "${REPO_ROOT}/shells/zshrc"        "${HOME}/.zshrc"
-# lazygit config -- XDG path on macOS/Linux. Uses F8/F7 for lazygit
-# move-commit bindings; the Ctrl+J/K psmux rescue lives only in the
-# Windows-only tmux.windows.conf overlay.
-link "${REPO_ROOT}/lazygit/config.yml" "${HOME}/.config/lazygit/config.yml"
 
 # ---- OS-specific links -------------------------------------------------------
 case "$OS" in
     macos)
         link "${REPO_ROOT}/ghostty/config" \
              "${HOME}/Library/Application Support/com.mitchellh.ghostty/config"
+        # lazygit on macOS reads from Application Support by default
+        # (`lazygit --print-config-dir`), not ~/.config/lazygit.
+        link "${REPO_ROOT}/lazygit/config.yml" \
+             "${HOME}/Library/Application Support/lazygit/config.yml"
         ;;
     linux)
         link "${REPO_ROOT}/ghostty/config" "${HOME}/.config/ghostty/config"
+        link "${REPO_ROOT}/lazygit/config.yml" "${HOME}/.config/lazygit/config.yml"
         ;;
     wsl)
         # Keep this config link ready; install-deps gates the actual Ghostty install on a GUI.
         link "${REPO_ROOT}/ghostty/config" "${HOME}/.config/ghostty/config"
+        link "${REPO_ROOT}/lazygit/config.yml" "${HOME}/.config/lazygit/config.yml"
         echo "  note      WSL detected; Windows Terminal fragment must be merged manually"
         echo "            see windows-terminal/README.md"
         ;;
     *)
+        link "${REPO_ROOT}/lazygit/config.yml" "${HOME}/.config/lazygit/config.yml"
         echo "  warn      unknown OS; skipping terminal-specific links" >&2
         ;;
 esac

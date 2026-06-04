@@ -284,7 +284,7 @@ New-SymLink -Source (Join-Path $RepoRoot 'shells\powershell_profile.ps1') -Desti
 # lazygit config -- %LOCALAPPDATA%\lazygit\config.yml on Windows. lazygit
 # v0.58 reads its config from %LOCALAPPDATA%\lazygit, NOT %APPDATA%\lazygit
 # (verified via `lazygit --print-config-dir`). The config binds move-commit
-# to F8/F7; tmux.windows.conf translates psmux C-j/C-k to those F-keys.
+# to uppercase J/K so the chord survives psmux and bare terminals.
 $lazygitDir = Join-Path $env:LOCALAPPDATA 'lazygit'
 New-SymLink -Source (Join-Path $RepoRoot 'lazygit\config.yml') -Destination (Join-Path $lazygitDir 'config.yml')
 

@@ -1,43 +1,29 @@
-# Dotfiles — cross-platform terminal & editor setup
+# Dotfiles
 
-| Tool             | macOS                                             | Linux                           | WSL                                                           | Windows                                                       |
-|------------------|---------------------------------------------------|---------------------------------|---------------------------------------------------------------|---------------------------------------------------------------|
-| **Neovim**       | `~/.config/nvim` → `nvim/`                        | `~/.config/nvim` → `nvim/`      | same                                                          | `%LOCALAPPDATA%\nvim` → `nvim\`                               |
-| **Starship**     | `~/.config/starship.toml` → `starship/starship.toml` | same                       | same                                                          | `%USERPROFILE%\.config\starship.toml` → `starship\starship.toml` |
-| **zsh**          | `~/.zshrc` → `shells/zshrc`                       | same                            | same                                                          | n/a                                                           |
-| **PowerShell**   | `$PROFILE` → `shells/powershell_profile.ps1` (via pwsh, optional) | same       | same                                                          | `$PROFILE` → `shells\powershell_profile.ps1`                  |
-| **tmux**         | `~/.tmux.conf` → `tmux/tmux.conf`                 | same                            | same                                                          | `%USERPROFILE%\.tmux.conf` → `tmux\tmux.conf` (read by **psmux** — native Windows tmux); also via WSL |
-| **Ghostty**      | `~/Library/Application Support/com.mitchellh.ghostty/config` → `ghostty/config` | `~/.config/ghostty/config` → `ghostty/config` | same when using WSLg / X11 GUI apps                           | n/a (Ghostty not on Windows yet) |
-| **Windows Terminal** | n/a                                           | n/a                             | merge on Windows host (optional)                              | merge `windows-terminal/settings.fragment.jsonc` (see that dir's README)  |
+Cross-platform terminal and editor setup for macOS, Linux, WSL, and Windows.
+The repo owns the daily shell/editor stack: Neovim, tmux/psmux, Starship, zsh,
+PowerShell, Ghostty, lazygit, Windows Terminal theming, plugin sync, and LSP /
+formatter provisioning.
 
-## Install
+The public interface is intentionally small:
 
-> **TL;DR — the one public install command is `setup`.** Run `setup.sh`
-> (macOS / Linux / WSL) or `setup.ps1` (Windows). That's it. It installs
-> dependencies, symlinks every config, and syncs Neovim plugins + LSP.
-
-`setup` is a thin orchestrator over four idempotent phases:
-
-```
-setup ─► install-deps   (phase 1: install packages)
-      ─► bootstrap       (phase 2: symlink configs into place)
-      ─► nvim +Lazy! sync                (phase 3: plugins)
-      ─► nvim +MasonToolsInstallSync     (phase 4: LSP servers + formatters)
+```text
+run setup -> install dependencies -> link configs -> sync Neovim plugins -> sync Mason tools
 ```
 
-The phase scripts exist so `setup` can stay simple and maintainers can debug a
-single phase. They are not separate public install paths. For a fresh machine,
-or for a coworker trying this repo cold, run `setup`.
+The lower-level scripts exist for debugging those phases. For a fresh machine,
+or for a coworker trying this setup cold, run `setup`.
 
-### One-shot, from scratch (recommended)
+## Quick Start
 
-No checkout needed. `setup.{sh,ps1}` clones the repo to `~/dotfiles`
-(or `%USERPROFILE%\dotfiles` on Windows). **Git is the only hard prerequisite
-for remote bootstrap** because setup needs it to clone the repo; every other
-repo-managed dependency is installed by `setup`. It symlinks every config and
-finishes with `:Lazy! sync` +
-`:MasonToolsInstallSync` so LSP servers and formatters are downloaded
-before nvim even opens.
+No checkout is required. `setup.{sh,ps1}` clones the repo to `~/dotfiles`
+or `%USERPROFILE%\dotfiles`, installs repo-managed dependencies, links every
+config, then runs `:Lazy! sync` and `:MasonToolsInstallSync` before the first
+interactive Neovim launch.
+
+Git is the only hard prerequisite for remote bootstrap because setup needs it to
+clone this repo. If Git is missing, the setup scripts print the first install
+command for the platform package manager.
 
 ```bash
 # mac / linux / wsl
@@ -51,10 +37,22 @@ iwr https://raw.githubusercontent.com/luisgui1757/dotfiles/main/setup.ps1 -OutFi
 .\setup.ps1 -All
 ```
 
-If Developer Mode is unavailable AND you cannot enable it, run just
-`.\bootstrap.ps1` from an elevated PowerShell, then return to a normal shell for
-`.\setup.ps1 -SkipDeps -SkipBootstrap`. Do NOT elevate the whole `setup.ps1`
-run -- scoop refuses admin.
+On Windows, prefer Developer Mode plus a normal PowerShell. If Developer Mode is
+unavailable and you cannot enable it, run just `.\bootstrap.ps1` from an
+elevated PowerShell, then return to a normal shell for
+`.\setup.ps1 -SkipDeps -SkipBootstrap`. Do not elevate the whole `setup.ps1`
+run; Scoop refuses admin installs.
+
+## What Setup Does
+
+`setup` is a four-phase, idempotent orchestrator:
+
+```text
+setup -> install-deps                 phase 1: packages and optional tools
+      -> bootstrap                    phase 2: symlink or merge configs
+      -> nvim "+Lazy! sync" +qa       phase 3: plugins
+      -> nvim "+MasonToolsInstallSync" +qa  phase 4: LSP servers and formatters
+```
 
 Pass `--all` / `-All` for explicit non-interactive installs (Y to every prompt).
 When setup detects redirected stdin/stdout and neither all nor dry-run was
@@ -64,7 +62,10 @@ requested, it defaults to all and prints `note: no TTY detected; running with
 to pull the lot in one go, or `n` to choose per tool.
 Add `--dry-run` / `-DryRun` to preview every step without touching disk.
 
-### From an existing checkout
+Every script is safe to rerun. Pre-existing non-symlink targets are backed up to
+`<target>.bak.<timestamp>` with collision-proof suffixes (`.1`, `.2`, ...).
+
+### Existing Checkout
 
 ```bash
 ./setup.sh                       # Y/n per dep, end-to-end
@@ -80,38 +81,41 @@ make setup                       # same as ./setup.sh, via the Makefile
 .\setup.ps1 -MergeWindowsTerminal     # also apply the WT rose-pine fragment
 ```
 
-Phase 1 (`install-deps.sh`) also offers to make **zsh your login shell**
-(`chsh`) — installing the package alone doesn't, so without this step tmux and
-new terminals on Linux keep launching bash and never source the symlinked
-`~/.zshrc`. It's consent-gated (auto-yes under `--all`), idempotent, and
-no-ops on macOS (already zsh). The change takes effect after the next login.
-On **domain / AD / LDAP** machines the account isn't in `/etc/passwd`, so
-`chsh` can't help — there it instead offers to re-exec interactive bash into
-zsh from `~/.bashrc` (reversible).
+### Managed Configs
 
-On Linux without Homebrew, Phase 1 installs Neovim from a pinned official
-GitHub release tarball into `/opt/nvim-linux-<arch>` (`x86_64` or `arm64`) and
-symlinks `/usr/local/bin/nvim`. The installer verifies the tarball SHA-256
-first, which avoids distro packages that lag below this config's Neovim 0.11+
-floor.
+| Tool | macOS | Linux / WSL | Windows |
+|---|---|---|---|
+| Neovim | `~/.config/nvim` -> `nvim/` | `~/.config/nvim` -> `nvim/` | `%LOCALAPPDATA%\nvim` -> `nvim\` |
+| Starship | `~/.config/starship.toml` -> `starship/starship.toml` | same | `%USERPROFILE%\.config\starship.toml` -> `starship\starship.toml` |
+| zsh | `~/.zshrc` -> `shells/zshrc` | same | n/a |
+| PowerShell | `$PROFILE` -> `shells/powershell_profile.ps1` when `pwsh` is installed | same | `$PROFILE` -> `shells\powershell_profile.ps1` |
+| tmux / psmux | `~/.tmux.conf` -> `tmux/tmux.conf` | same | `%USERPROFILE%\.tmux.conf` -> `tmux\tmux.conf` for psmux; WSL uses the Unix path |
+| Ghostty | `~/Library/Application Support/com.mitchellh.ghostty/config` -> `ghostty/config` | `~/.config/ghostty/config` -> `ghostty/config` when GUI-capable | n/a |
+| lazygit | `~/Library/Application Support/lazygit/config.yml` -> `lazygit/config.yml` | `~/.config/lazygit/config.yml` -> `lazygit/config.yml` | `%LOCALAPPDATA%\lazygit\config.yml` -> `lazygit\config.yml` |
+| Windows Terminal | n/a | n/a | merge `windows-terminal/settings.fragment.jsonc`; see [windows-terminal/README.md](windows-terminal/README.md) |
 
-On macOS, Phase 1 installs Ghostty through `brew install --cask ghostty` when
-selected. Linux and GUI-capable WSL keep Linux-specific install paths: Ubuntu
-uses the `.deb` installer listed in Ghostty's docs, snap is used where
-available, and Homebrew's Ghostty formula is macOS-only. VS Code is
-also still optional on WSL: use Windows VS Code + `code .` for Remote - WSL, or
-a Linux GUI build when WSLg / X11 is available. Rosé Pine setup follows whatever
-`code` CLI is on PATH.
+### Platform Notes
 
-Phase 1 also **prompts for your notes / Obsidian vault path** and persists it as
-`export NOTES_VAULT=…` in `~/.zshrc.local` (gitignored, sourced by `zshrc`), so
-obsidian.nvim opens that vault. Blank answer = an OS-appropriate default. The
-prompt is skipped under `--all` / non-interactive runs — set `NOTES_VAULT`
-yourself there.
-
-Every script is idempotent — re-running is a no-op when everything is
-already in place. Pre-existing non-symlink targets are backed up to
-`<target>.bak.<timestamp>` (collision-proof: `.1`, `.2`, … if reused).
+- Linux setup can make zsh your login shell. Installing the package alone is
+  not enough: tmux and new terminals keep launching bash until `chsh` or the
+  domain-account fallback is accepted. The prompt is consent-gated and auto-yes
+  under `--all`.
+- Linux without Homebrew gets Neovim from a pinned official GitHub release
+  tarball installed into `/opt/nvim-linux-<arch>` and symlinked to
+  `/usr/local/bin/nvim`. The tarball SHA-256 is verified before extraction.
+- macOS installs Ghostty through `brew install --cask ghostty` when selected.
+  Linux and GUI-capable WSL use Linux-specific Ghostty paths; the Homebrew
+  Ghostty formula is macOS-only.
+- VS Code is optional. On WSL, use Windows VS Code plus `code .` for Remote -
+  WSL, or use a Linux GUI build when WSLg / X11 is available. Rosé Pine setup
+  follows whatever `code` CLI is on PATH.
+- Notes / Obsidian support writes `export NOTES_VAULT=...` to
+  `~/.zshrc.local` (gitignored, sourced by `zshrc`). Non-interactive runs skip
+  the prompt, so set `NOTES_VAULT` yourself there.
+- macOS installs before this README may have an unused
+  `~/.config/lazygit/config.yml` symlink. It is harmless; current bootstrap
+  links the path lazygit actually reads:
+  `~/Library/Application Support/lazygit/config.yml`.
 
 ## Test
 
@@ -141,30 +145,46 @@ when their dependency tool is missing on the current machine. In CI, missing
 Windows test dependencies are fatal so the workflow cannot go green by silently
 skipping the actual checks.
 
-## CI merge gate and repository safeguards
+## CI Merge Gate
 
 Pull requests are meant to be gated by two workflows:
 
 - `.github/workflows/test.yml` runs the existing static, shell, bootstrap,
   tmux, starship, Neovim, and Windows Pester/PSScriptAnalyzer suites. Warnings
   are treated as failures where the tools expose them cleanly: shellcheck exits
-  nonzero, PSScriptAnalyzer runs at `Warning,Error`, and YAML parsing/linting is
-  part of `make test-static`.
-- `.github/workflows/e2e-install.yml` is the real install guarantee. It runs
-  one Ubuntu 24.04 container with `DOTFILES_SKIP_BREW_BOOTSTRAP=1`, then runs
-  `bootstrap.sh` and asserts the expected tools and symlinks. It also runs full
-  `./setup.sh --all` on `ubuntu-24.04` and `macos-15`, and full
-  `.\setup.ps1 -All` on `windows-2025`. Those jobs fail if setup skips Phase
-  3-4, emits a precise `FAIL:` marker, installs Neovim below 0.11, if Lazy/Mason
-  headless sync exits nonzero, or if expected Mason-installed binaries are
-  missing. They do not blanket-fail on benign warning/deprecation text.
+  nonzero, PSScriptAnalyzer runs at `Warning,Error`, and YAML parsing/linting
+  is part of `make test-static`.
+- `.github/workflows/e2e-install.yml` is the real install guarantee. It proves
+  the public setup paths on fresh hosted runners and keeps one clean Ubuntu
+  container for the native `apt` branch.
 
-WSL2 is split deliberately. Hosted GitHub runners do not provide a reliable
-required nested-virtualization WSL2 gate. The required proxy is the Linux
-Ubuntu container plus the existing `DOTFILES_FORCE_OS=wsl` bootstrap coverage in
-CI. A separate `setup.sh / WSL2 Ubuntu-24.04 (best-effort canary)` job uses
-`Vampire/setup-wsl@v7.0.0`, but it is marked `continue-on-error` and should not be
-added to the required status checks unless the owner accepts that flake risk.
+The e2e jobs cover different install paths, not symmetric container platforms:
+
+| Check | What it proves |
+|---|---|
+| `e2e containers / ubuntu-24.04` | Clean `ubuntu:24.04`, non-root user, native `apt`, no Linuxbrew (`DOTFILES_SKIP_BREW_BOOTSTRAP=1`), then `install-deps.sh --all`, `bootstrap.sh`, tool assertions, Neovim >= 0.11, and symlink assertions. |
+| `setup.sh / ubuntu-24.04` | Full Unix setup on the hosted Ubuntu runner. This runner has Linuxbrew available, so it proves the Linuxbrew path that users may hit. |
+| `setup.sh / macos-15` | Full macOS setup through the real macOS hosted runner and Homebrew path. Docker cannot model macOS. |
+| `setup.ps1 / windows-2025` | Full Windows setup through the real Windows hosted runner, including Scoop/winget/choco behavior, PowerShell, symlinks, and Neovim sync. Windows containers do not model the desktop/user-profile setup well. |
+| `setup.sh / WSL2 Ubuntu-24.04 (best-effort canary)` | Non-required WSL smoke signal. Hosted runners cannot provide reliable nested virtualization, so this is intentionally best-effort. |
+
+The Ubuntu container is intentionally **not** a devcontainer. It stays because
+the hosted Ubuntu runner can take the Linuxbrew path, while the container is the
+only automated proof of the clean-image native `apt` path: the pinned Neovim
+tarball install, `fd-find` -> `fd` shim, Ubuntu Ghostty installer path, and apt
+fallback behavior. There is no matching macOS or Windows container to add for
+symmetry. That asymmetry is accepted: hosted macOS and Windows runners are the
+closest representative fixtures for those operating systems, while the required
+WSL proxy is the Ubuntu container plus the `DOTFILES_FORCE_OS=wsl` bootstrap
+coverage. Do not add the WSL2 canary to required checks unless the owner
+explicitly accepts the flake risk.
+
+These e2e jobs fail if setup skips Phase 3-4, emits a precise `FAIL:` marker,
+installs Neovim below 0.11, Lazy/Mason headless sync exits nonzero, or expected
+Mason-installed binaries are missing. They do not blanket-fail on benign
+warning/deprecation text.
+
+## Repository Safeguards
 
 Repository safeguards are declared in `.github/settings.yml` for the Probot
 Settings app and mirrored by `scripts/apply-repo-safeguards.sh` for a one-shot
