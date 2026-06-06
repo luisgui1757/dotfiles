@@ -110,6 +110,22 @@ Describe "install-deps.ps1" {
         $output | Should -Match '-RunAsAdmin'
     }
 
+    It "adds required buckets when Scoop already exists" {
+        . $script:ImportInstallDepsForTest
+        $script:ScoopArgs = @()
+        Mock -CommandName Get-Command -MockWith {
+            return [pscustomobject]@{ Name = 'scoop'; Source = 'scoop' }
+        } -ParameterFilter { $Name -eq 'scoop' }
+        Mock -CommandName scoop -MockWith {
+            $script:ScoopArgs += ($args -join ' ')
+        }
+
+        Install-Scoop | Should -BeTrue
+
+        $script:ScoopArgs | Should -Contain 'bucket add extras'
+        $script:ScoopArgs | Should -Contain 'bucket add nerd-fonts'
+    }
+
     It "uses winget when winget is the only installed manager" {
         . $script:ImportInstallDepsForTest
         $Pm = 'winget'
@@ -206,5 +222,15 @@ Describe "install-deps.ps1" {
         $BinaryName['lazygit'] | Should -Be 'lazygit'
         $Catalog['lazygit'].scoop | Should -Be 'lazygit'
         $Catalog['lazygit'].winget | Should -Be 'JesseDuffield.lazygit'
+    }
+
+    It "registers Windows Terminal in the Windows package catalog" {
+        . $script:ImportInstallDepsForTest
+
+        $Catalog.ContainsKey('wt') | Should -BeTrue
+        $BinaryName['wt'] | Should -Be 'wt'
+        $Catalog['wt'].scoop | Should -Be 'extras/windows-terminal'
+        $Catalog['wt'].winget | Should -Be 'Microsoft.WindowsTerminal'
+        $Catalog['wt'].choco | Should -Be 'microsoft-windows-terminal'
     }
 }

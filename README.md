@@ -87,7 +87,7 @@ make setup                       # same as ./setup.sh, via the Makefile
 .\setup.ps1
 .\setup.ps1 -All
 .\setup.ps1 -DryRun
-.\setup.ps1 -MergeWindowsTerminal     # also apply the WT rose-pine fragment
+.\setup.ps1 -MergeWindowsTerminal     # install deps, then apply the WT fragment
 ```
 
 ### Managed Configs
@@ -101,7 +101,7 @@ make setup                       # same as ./setup.sh, via the Makefile
 | tmux / psmux | `~/.tmux.conf` -> `tmux/tmux.conf` | same | `%USERPROFILE%\.tmux.conf` -> `tmux\tmux.conf` for psmux; WSL uses the Unix path |
 | Ghostty | `~/Library/Application Support/com.mitchellh.ghostty/config` -> `ghostty/config` | native Linux links `~/.config/ghostty/config`; WSL links it only with `--experimental-wsl-gui` | n/a |
 | lazygit | `~/Library/Application Support/lazygit/config.yml` -> `lazygit/config.yml` | `~/.config/lazygit/config.yml` -> `lazygit/config.yml` | `%LOCALAPPDATA%\lazygit\config.yml` -> `lazygit\config.yml` |
-| Windows Terminal | n/a | n/a | merge `windows-terminal/settings.fragment.jsonc`; see [windows-terminal/README.md](windows-terminal/README.md) |
+| Windows Terminal | n/a | n/a | app installed by `setup.ps1`; `-MergeWindowsTerminal` merges `windows-terminal/settings.fragment.jsonc`; see [windows-terminal/README.md](windows-terminal/README.md) |
 
 ### Platform Notes
 
@@ -328,6 +328,10 @@ the adjacent constant.
 - **WSL is split-host by default.** Windows Terminal renders fonts and window UI
   on the Windows side; WSL installs the Linux CLI/editor stack. Linux Ghostty
   and Linux fontconfig fonts in WSL require `--experimental-wsl-gui`.
+- **Windows Terminal is a Windows dependency, not just a config target.**
+  `install-deps.ps1` installs `wt` through the normal Scoop-first catalog:
+  `extras/windows-terminal` -> `Microsoft.WindowsTerminal` -> `microsoft-windows-terminal`.
+  `-MergeWindowsTerminal` then merges the repo-owned visual/keybinding fragment.
 - **Windows Terminal settings.json is NOT symlinked** because WT auto-rewrites
   it. Only the user-owned keys live in `settings.fragment.jsonc`; the install
   script merges them in.
@@ -335,9 +339,11 @@ the adjacent constant.
   Windows runners are elevated, and Scoop blocks elevated bootstrap by default.
   `install-deps.ps1` detects elevation and runs the official installer with
   `-RunAsAdmin`, then refreshes the current-process Scoop shims path so later
-  installs can use `scoop` immediately. Bootstrap symlink creation still works
-  through the elevated/native CreateSymbolicLink path. For local machines,
-  Developer Mode plus a normal PowerShell remains the recommended setup path.
+  installs can use `scoop` immediately. Existing Scoop installs also get the
+  `extras` and `nerd-fonts` buckets normalized before catalog installs.
+  Bootstrap symlink creation still works through the elevated/native
+  CreateSymbolicLink path. For local machines, Developer Mode plus a normal
+  PowerShell remains the recommended setup path.
 
 See `AGENTS.md` for the standard coding-agent entry point. `CLAUDE.md` remains
 the canonical operational guide because Claude Code auto-loads it; `AGENTS.md`
@@ -412,4 +418,4 @@ MIT. See `LICENSE`.
 | Windows Terminal lost a profile after merge | WT auto-rewrites — pre-merge backup is at `<settings.json>.bak.<timestamp>` | restore the profile list from the backup |
 | `bootstrap.ps1` errors "cannot create symbolic links" | Developer Mode off and not elevated | `bootstrap.ps1` now reports your *elevated* + *Developer Mode* state and the fix: enable Developer Mode (Settings → Privacy & security → For developers — no admin, recommended) **then** `.\setup.ps1 -SkipDeps`; OR run just `.\bootstrap.ps1` from an elevated PowerShell. Don't elevate the whole `setup.ps1` — scoop refuses to run as admin |
 | Ghostty won't open maximized on Linux/GNOME | `maximize = true` is a hint the WM may ignore (GNOME Mutter often does) | on **X11**, `install-deps` offers a devilspie2 setup through the native Linux package manager, even when Linuxbrew is the main CLI manager; the rule is keyed on `com.mitchellh.ghostty`. Wayland needs a GNOME Shell extension instead |
-| `install-deps.ps1`: winget `No package found matching input criteria` (exit `-1978335212`) | winget source/catalog flakiness | install-deps now **prefers scoop** and falls back across managers per tool — accept the scoop bootstrap when offered (`irm get.scoop.sh \| iex`) and re-run; scoop carries every CLI tool here |
+| `install-deps.ps1`: winget `No package found matching input criteria` (exit `-1978335212`) | winget source/catalog flakiness | install-deps now **prefers scoop** and falls back across managers per tool — accept the scoop bootstrap when offered (`irm get.scoop.sh \| iex`) and re-run; scoop carries the cataloged CLI/terminal tools here |
