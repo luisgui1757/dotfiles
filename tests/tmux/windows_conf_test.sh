@@ -25,6 +25,10 @@ reject_line '^bind-key[[:space:]]+-n[[:space:]]+C-j[[:space:]]+send-keys[[:space
     'tmux.windows.conf must not translate C-j for lazygit'
 reject_line '^bind-key[[:space:]]+-n[[:space:]]+C-k[[:space:]]+send-keys[[:space:]]+F7$' \
     'tmux.windows.conf must not translate C-k for lazygit'
+reject_line '^(bind|bind-key)[[:space:]]+H[[:space:]]+' \
+    'tmux.windows.conf must not override prefix+H window-swap'
+reject_line '^(bind|bind-key)[[:space:]]+L[[:space:]]+' \
+    'tmux.windows.conf must not override prefix+L window-swap'
 
 require_line '^set[[:space:]]+-g[[:space:]]+default-shell[[:space:]]+pwsh$' \
     'tmux.windows.conf must set psmux default-shell to pwsh'

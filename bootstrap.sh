@@ -6,18 +6,25 @@
 # Usage:
 #   ./bootstrap.sh           # install / re-install symlinks
 #   ./bootstrap.sh --dry-run # print planned actions, change nothing
+#   ./bootstrap.sh --experimental-wsl-gui
+#                            # WSL opt-in: link Linux Ghostty config
 
 set -euo pipefail
 
 DRY_RUN=0
+EXPERIMENTAL_WSL_GUI="${DOTFILES_EXPERIMENTAL_WSL_GUI:-0}"
 for arg in "$@"; do
     case "$arg" in
         --dry-run) DRY_RUN=1 ;;
+        --experimental-wsl-gui)
+            EXPERIMENTAL_WSL_GUI=1
+            export DOTFILES_EXPERIMENTAL_WSL_GUI=1 ;;
         -h|--help)
             sed -n '2,12p' "$0"; exit 0 ;;
         *) echo "Unknown arg: $arg" >&2; exit 2 ;;
     esac
 done
+[[ "$EXPERIMENTAL_WSL_GUI" == "1" ]] || EXPERIMENTAL_WSL_GUI=0
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 
@@ -64,6 +71,9 @@ require_cmd ln
 require_cmd readlink
 
 echo "bootstrap: OS=$OS repo=$REPO_ROOT dry-run=$DRY_RUN"
+if [[ "$OS" == "wsl" ]]; then
+    echo "bootstrap: experimental-wsl-gui=$EXPERIMENTAL_WSL_GUI"
+fi
 echo
 
 # ---- Link primitives ---------------------------------------------------------
@@ -192,6 +202,7 @@ fi
 link "${REPO_ROOT}/nvim"                "${NVIM_DEST}"
 link "${REPO_ROOT}/starship/starship.toml" "${HOME}/.config/starship.toml"
 link "${REPO_ROOT}/tmux/tmux.conf"      "${HOME}/.tmux.conf"
+link "${REPO_ROOT}/shells/zshenv"       "${HOME}/.zshenv"
 link "${REPO_ROOT}/shells/zshrc"        "${HOME}/.zshrc"
 
 # ---- OS-specific links -------------------------------------------------------
@@ -209,11 +220,15 @@ case "$OS" in
         link "${REPO_ROOT}/lazygit/config.yml" "${HOME}/.config/lazygit/config.yml"
         ;;
     wsl)
-        # Keep this config link ready; install-deps gates the actual Ghostty install on a GUI.
-        link "${REPO_ROOT}/ghostty/config" "${HOME}/.config/ghostty/config"
+        if [[ "$EXPERIMENTAL_WSL_GUI" -eq 1 ]]; then
+            link "${REPO_ROOT}/ghostty/config" "${HOME}/.config/ghostty/config"
+        else
+            echo "  skipped   ${HOME}/.config/ghostty/config (WSL uses Windows Terminal by default)"
+            echo "            pass --experimental-wsl-gui to link Linux Ghostty config"
+        fi
         link "${REPO_ROOT}/lazygit/config.yml" "${HOME}/.config/lazygit/config.yml"
-        echo "  note      WSL detected; Windows Terminal fragment must be merged manually"
-        echo "            see windows-terminal/README.md"
+        echo "  note      WSL detected; merge Windows Terminal on the Windows host"
+        echo "            run: .\\setup.ps1 -All -MergeWindowsTerminal"
         ;;
     *)
         link "${REPO_ROOT}/lazygit/config.yml" "${HOME}/.config/lazygit/config.yml"

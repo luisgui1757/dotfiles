@@ -57,4 +57,33 @@ if [[ "$prefix" != "C-b" ]]; then
     exit 1
 fi
 echo "  prefix = $prefix"
+
+keys="$(tmux -L "$sock_name" list-keys -T prefix)"
+if ! printf '%s\n' "$keys" | grep -Eq 'bind-key.*[[:space:]]h[[:space:]]+select-pane[[:space:]]+-L'; then
+    echo "FAIL: prefix+h must keep pane-focus-left"
+    exit 1
+fi
+if ! printf '%s\n' "$keys" | grep -Eq 'bind-key.*[[:space:]]l[[:space:]]+select-pane[[:space:]]+-R'; then
+    echo "FAIL: prefix+l must keep pane-focus-right"
+    exit 1
+fi
+if ! printf '%s\n' "$keys" | grep -Eq 'bind-key.*[[:space:]]H[[:space:]].*swap-window[[:space:]]+-t[[:space:]]+-1'; then
+    echo "FAIL: prefix+H must swap the current window left"
+    exit 1
+fi
+if ! printf '%s\n' "$keys" | grep -Eq 'bind-key.*[[:space:]]L[[:space:]].*swap-window[[:space:]]+-t[[:space:]]+\+1'; then
+    echo "FAIL: prefix+L must swap the current window right"
+    exit 1
+fi
+
+tmux -L "$sock_name" rename-window -t "$session_name:1" one
+tmux -L "$sock_name" new-window -d -t "$session_name:" -n two 'sleep 30'
+tmux -L "$sock_name" select-window -t "$session_name:2"
+tmux -L "$sock_name" swap-window -t -1
+order="$(tmux -L "$sock_name" list-windows -F '#{window_index}:#{window_name}' | tr '\n' ' ')"
+if [[ "$order" != *"1:two 2:one"* ]]; then
+    echo "FAIL: tmux relative swap-window did not move the current window left: $order"
+    exit 1
+fi
+
 echo "OK"

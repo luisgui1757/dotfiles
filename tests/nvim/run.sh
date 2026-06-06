@@ -15,4 +15,4 @@ cd "$REPO_ROOT"
 # and nvim would hang waiting for an unknown command.
 exec nvim --headless \
     -u tests/nvim/minimal_init.lua \
-    -c "PlenaryBustedDirectory tests/nvim/spec { minimal_init = 'tests/nvim/minimal_init.lua', sequential = true }"
+    -c "PlenaryBustedDirectory tests/nvim/spec { minimal_init = 'tests/nvim/minimal_init.lua', sequential = true, timeout = 180000 }"

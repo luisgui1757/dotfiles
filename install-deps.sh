@@ -9,14 +9,24 @@
 #   ./install-deps.sh           prompt Y/n for each tool
 #   ./install-deps.sh --all     skip prompts, install everything
 #   ./install-deps.sh --dry-run print what would be installed without acting
+#   ./install-deps.sh --experimental-wsl-gui
+#                              WSL opt-in: Linux Ghostty + Linux fontconfig fonts
 
 set -euo pipefail
 
 YES_ALL=0
 DRY_RUN=0
+EXPERIMENTAL_WSL_GUI="${DOTFILES_EXPERIMENTAL_WSL_GUI:-0}"
 NVIM_LINUX_VERSION="v0.12.2"
 NVIM_LINUX_X86_64_SHA256="31cf85945cb600d96cdf69f88bc68bec814acbff50863c5546adef3a1bcef260"
 NVIM_LINUX_ARM64_SHA256="f697d4e4582b6e4b5c3c26e76e06ce26efa08ba1768e03fd2733fcc422bb0490"
+LAZYGIT_LINUX_VERSION="v0.62.2"
+LAZYGIT_LINUX_X86_64_SHA256="8b9a4c2d0969cbea92b45c956dd2a44e1ba76900c9df49f1c60984045ce77984"
+LAZYGIT_LINUX_ARM64_SHA256="9ab63dd75a7e9711c4c68a37d77f4334b8099a5d6a3f8fbe8f4e2768b159c9e9"
+ZSH_AUTOCOMPLETE_VERSION="25.03.19"
+ZSH_AUTOCOMPLETE_COMMIT="a76f26ae25528e76ee53df98ad38fbacdf89fd2e"
+ZSH_AUTOSUGGESTIONS_VERSION="v0.7.1"
+ZSH_AUTOSUGGESTIONS_COMMIT="e52ee8ca55bcc56a17c828767a3f98f22a68d4eb"
 HACK_NERD_FONT_VERSION="v3.4.0"
 HACK_NERD_FONT_SHA256="8ca33a60c791392d872b80d26c42f2bfa914a480f9eb2d7516d9f84373c36897"
 # Ghostty on Ubuntu: we pin + SHA-256 verify the mkasberg/ghostty-ubuntu
@@ -29,11 +39,15 @@ for arg in "$@"; do
     case "$arg" in
         --all|-y)   YES_ALL=1 ;;
         --dry-run)  DRY_RUN=1 ;;
+        --experimental-wsl-gui)
+                    EXPERIMENTAL_WSL_GUI=1
+                    export DOTFILES_EXPERIMENTAL_WSL_GUI=1 ;;
         -h|--help)
-            sed -n '2,12p' "$0"; exit 0 ;;
+            sed -n '2,14p' "$0"; exit 0 ;;
         *) echo "Unknown arg: $arg" >&2; exit 2 ;;
     esac
 done
+[[ "$EXPERIMENTAL_WSL_GUI" == "1" ]] || EXPERIMENTAL_WSL_GUI=0
 
 # ---- Bash 3.2-safe helpers ---------------------------------------------------
 have() { command -v "$1" >/dev/null 2>&1; }
@@ -68,6 +82,7 @@ binaries_for() {
 }
 is_wsl() { grep -qiE 'microsoft|wsl' /proc/version 2>/dev/null; }
 can_show_gui() { [[ -n "${DISPLAY:-}" || -n "${WAYLAND_DISPLAY:-}" ]]; }
+wsl_gui_opt_in() { [[ "${EXPERIMENTAL_WSL_GUI:-0}" == "1" ]]; }
 is_ubuntu() {
     local id="" id_like=""
     if [[ -r /etc/os-release ]]; then
@@ -606,6 +621,210 @@ install_nvim_linux() {
     printf "  installed %-26s -> %s/bin/nvim\n" "nvim" "$install_dir"
 }
 
+install_lazygit_linux() {
+    if have lazygit; then
+        printf "  ok        %-26s already installed\n" "lazygit"
+        return
+    fi
+
+    local machine arch expected version_no_v asset url tmp tarball install_target
+    machine="$(uname -m)"
+    case "$machine" in
+        x86_64|amd64)
+            arch="x86_64"
+            expected="$LAZYGIT_LINUX_X86_64_SHA256"
+            ;;
+        aarch64|arm64)
+            arch="arm64"
+            expected="$LAZYGIT_LINUX_ARM64_SHA256"
+            ;;
+        *)
+            printf "  manual    %-26s unsupported Linux arch: %s\n" "lazygit" "$machine"
+            echo "            install from https://github.com/jesseduffield/lazygit/releases"
+            return
+            ;;
+    esac
+
+    version_no_v="${LAZYGIT_LINUX_VERSION#v}"
+    asset="lazygit_${version_no_v}_linux_${arch}.tar.gz"
+    url="https://github.com/jesseduffield/lazygit/releases/download/${LAZYGIT_LINUX_VERSION}/${asset}"
+
+    if ! ask "Install lazygit (pinned GitHub release ${LAZYGIT_LINUX_VERSION}, Linux ${arch})?"; then
+        printf "  skipped   %-26s\n" "lazygit"
+        return
+    fi
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        echo "  would: curl -fsSL $url -o /tmp/$asset"
+        echo "         verify sha256 $expected"
+        echo "         install lazygit -> /usr/local/bin/lazygit"
+        echo "         fallback -> \$HOME/.local/bin/lazygit when sudo is unavailable"
+        return
+    fi
+    require_downloader || return 1
+    if ! have tar; then
+        echo "  need      tar missing; installing extractor for lazygit"
+        install tar "extract lazygit release archive"
+        if ! have tar; then
+            echo "  FAIL: need tar to extract $asset"
+            return 1
+        fi
+    fi
+
+    tmp="$(mktemp -d)"
+    tarball="$tmp/$asset"
+    if ! curl -fsSL "$url" -o "$tarball"; then
+        echo "  FAIL: lazygit download failed from $url"
+        rm -rf "$tmp"
+        return 1
+    fi
+    if ! verify_sha256 "$tarball" "$expected"; then
+        echo "  FAIL: checksum mismatch for $asset"
+        rm -rf "$tmp"
+        return 1
+    fi
+    if ! tar -xzf "$tarball" -C "$tmp" lazygit; then
+        echo "  FAIL: could not extract lazygit from $asset"
+        rm -rf "$tmp"
+        return 1
+    fi
+
+    if [[ "$(id -u 2>/dev/null || echo 0)" -eq 0 ]] || have sudo; then
+        if maybe_sudo mkdir -p /usr/local/bin &&
+            maybe_sudo cp "$tmp/lazygit" /usr/local/bin/lazygit &&
+            maybe_sudo chmod 0755 /usr/local/bin/lazygit; then
+            rm -rf "$tmp"
+            printf "  installed %-26s -> /usr/local/bin/lazygit\n" "lazygit"
+            return
+        fi
+        echo "  WARN: could not install lazygit to /usr/local/bin; trying user-local bin"
+    fi
+
+    install_target="$HOME/.local/bin/lazygit"
+    mkdir -p "$HOME/.local/bin"
+    cp "$tmp/lazygit" "$install_target"
+    chmod 0755 "$install_target"
+    rm -rf "$tmp"
+    if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
+        PATH="$HOME/.local/bin:$PATH"
+        export PATH
+        hash -r 2>/dev/null || true
+    fi
+    printf "  installed %-26s -> %s\n" "lazygit" "$install_target"
+}
+
+install_lazygit() {
+    if [[ "$PM" == "brew" ]]; then
+        install lazygit "terminal git UI"
+    elif [[ "$(uname -s)" == "Linux" ]]; then
+        install_lazygit_linux
+    else
+        install lazygit "terminal git UI"
+    fi
+}
+
+zsh_plugin_root() {
+    printf '%s\n' "${XDG_DATA_HOME:-$HOME/.local/share}/dotfiles/zsh-plugins"
+}
+
+zsh_plugin_ok() {
+    local target="$1" expected_commit="$2" plugin_file="$3" current
+    [[ -d "$target/.git" ]] || return 1
+    [[ -r "$target/$plugin_file" ]] || return 1
+    current="$(git -C "$target" rev-parse HEAD 2>/dev/null || true)"
+    [[ "$current" == "$expected_commit" ]]
+}
+
+install_zsh_plugin_repo() {
+    local name="$1" repo="$2" ref="$3" expected_commit="$4" plugin_file="$5"
+    local root target backup current
+    root="$(zsh_plugin_root)"
+    target="$root/$name"
+
+    if zsh_plugin_ok "$target" "$expected_commit" "$plugin_file"; then
+        printf "  ok        %-26s %s\n" "$name" "$ref"
+        return 0
+    fi
+
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        echo "  would: git clone --depth 1 --branch $ref $repo $target"
+        echo "         verify git commit $expected_commit"
+        return 0
+    fi
+    if ! have git; then
+        printf "  manual    %-26s git is required for pinned plugin install\n" "$name"
+        return 1
+    fi
+
+    mkdir -p "$root"
+    if [[ -e "$target" && ! -d "$target/.git" ]]; then
+        backup="$(unique_backup_path "$target")"
+        mv "$target" "$backup"
+        printf "  backup    %-26s %s\n" "$name" "$backup"
+    fi
+
+    if [[ ! -d "$target/.git" ]]; then
+        git clone --depth 1 --branch "$ref" "$repo" "$target" >/dev/null 2>&1 || {
+            printf "  WARN: could not clone %-18s from %s\n" "$name" "$repo"
+            return 1
+        }
+    else
+        if git -C "$target" remote get-url origin >/dev/null 2>&1; then
+            git -C "$target" remote set-url origin "$repo"
+        else
+            git -C "$target" remote add origin "$repo"
+        fi
+        git -C "$target" fetch --depth 1 origin "refs/tags/$ref:refs/tags/$ref" >/dev/null 2>&1 || {
+            printf "  WARN: could not fetch %-18s tag %s\n" "$name" "$ref"
+            return 1
+        }
+        git -C "$target" checkout --force "$expected_commit" >/dev/null 2>&1 || {
+            printf "  WARN: could not checkout %-18s commit %s\n" "$name" "$expected_commit"
+            return 1
+        }
+    fi
+
+    current="$(git -C "$target" rev-parse HEAD 2>/dev/null || true)"
+    if [[ "$current" != "$expected_commit" ]]; then
+        printf "  FAIL: %-26s got commit %s, expected %s\n" "$name" "${current:-unknown}" "$expected_commit"
+        return 1
+    fi
+    if [[ ! -r "$target/$plugin_file" ]]; then
+        printf "  FAIL: %-26s missing %s\n" "$name" "$plugin_file"
+        return 1
+    fi
+    printf "  installed %-26s %s\n" "$name" "$ref"
+}
+
+install_zsh_plugins() {
+    local root autocomplete_dir autosuggestions_dir
+    root="$(zsh_plugin_root)"
+    autocomplete_dir="$root/zsh-autocomplete"
+    autosuggestions_dir="$root/zsh-autosuggestions"
+
+    if zsh_plugin_ok "$autocomplete_dir" "$ZSH_AUTOCOMPLETE_COMMIT" "zsh-autocomplete.plugin.zsh" &&
+        zsh_plugin_ok "$autosuggestions_dir" "$ZSH_AUTOSUGGESTIONS_COMMIT" "zsh-autosuggestions.zsh"; then
+        printf "  ok        %-26s pinned refs already installed\n" "zsh plugins"
+        return 0
+    fi
+    if ! ask "Install zsh-autocomplete + zsh-autosuggestions (repo-managed pinned refs)?"; then
+        printf "  skipped   %-26s\n" "zsh plugins"
+        return 0
+    fi
+
+    install_zsh_plugin_repo \
+        "zsh-autocomplete" \
+        "https://github.com/marlonrichert/zsh-autocomplete.git" \
+        "$ZSH_AUTOCOMPLETE_VERSION" \
+        "$ZSH_AUTOCOMPLETE_COMMIT" \
+        "zsh-autocomplete.plugin.zsh" || true
+    install_zsh_plugin_repo \
+        "zsh-autosuggestions" \
+        "https://github.com/zsh-users/zsh-autosuggestions.git" \
+        "$ZSH_AUTOSUGGESTIONS_VERSION" \
+        "$ZSH_AUTOSUGGESTIONS_COMMIT" \
+        "zsh-autosuggestions.zsh" || true
+}
+
 install_ghostty_macos() {
     if have ghostty; then
         printf "  ok        %-26s already installed\n" "ghostty"
@@ -636,6 +855,7 @@ make|make|make|make|make|make|make
 rg|ripgrep|ripgrep|ripgrep|ripgrep|ripgrep|ripgrep
 fd|fd|fd-find|fd-find|fd|fd|fd
 fzf|fzf|fzf|fzf|fzf|fzf|fzf
+lazygit|lazygit|||||
 starship|starship||||||
 tmux|tmux|tmux|tmux|tmux|tmux|tmux
 zsh|zsh|zsh|zsh|zsh|zsh|zsh
@@ -651,6 +871,7 @@ editorconfig-checker|editorconfig-checker|||editorconfig-checker||
 xclip||xclip|xclip|xclip|xclip|xclip
 wl-copy||wl-clipboard|wl-clipboard|wl-clipboard|wl-clipboard|wl-clipboard
 unzip|unzip|unzip|unzip|unzip|unzip|unzip
+tar|gnu-tar|tar|tar|tar|tar|tar
 fc-cache|fontconfig|fontconfig|fontconfig|fontconfig|fontconfig|fontconfig
 EOF
 )
@@ -952,8 +1173,15 @@ install_ghostty_linux() {
         printf "  ok        %-26s already installed\n" "ghostty"
         return
     fi
+    if is_wsl && ! wsl_gui_opt_in; then
+        printf "  skipped   %-26s WSL uses Windows Terminal by default\n" "ghostty"
+        echo "            Linux Ghostty in WSL is experimental: re-run with --experimental-wsl-gui"
+        echo "            Windows host setup: .\\setup.ps1 -All -MergeWindowsTerminal"
+        return
+    fi
     if is_wsl && ! can_show_gui; then
-        printf "  skipped   %-26s WSL GUI display not detected; enable WSLg or use a Windows host terminal\n" "ghostty"
+        printf "  skipped   %-26s WSL GUI display not detected\n" "ghostty"
+        echo "            --experimental-wsl-gui needs WSLg/X11/Wayland to be available"
         return
     fi
     [[ "$PM" == "brew" ]] && printf "  skipped   %-26s Homebrew formula is macOS-only on Linux\n" "ghostty via brew"
@@ -1068,6 +1296,7 @@ configure_vscode_rose_pine() {
 # repo rule and enables it at login. Manual equivalent is in the rule's header.
 setup_ghostty_maximize() {
     [[ "$(uname -s)" == "Linux" ]] || return 0
+    if is_wsl && ! wsl_gui_opt_in; then return 0; fi
     have ghostty || return 0
     if [[ "${XDG_SESSION_TYPE:-}" == "wayland" ]]; then
         printf "  skipped   %-26s Wayland session; devilspie2 is X11-only (needs a GNOME extension)\n" "ghostty maximize"
@@ -1149,7 +1378,7 @@ if [[ "$PM" == "unknown" ]]; then
     exit 1
 fi
 
-echo "install-deps: OS=$OS_LABEL  package manager=$PM  dry-run=$DRY_RUN  yes-all=$YES_ALL"
+echo "install-deps: OS=$OS_LABEL  package manager=$PM  dry-run=$DRY_RUN  yes-all=$YES_ALL  experimental-wsl-gui=$EXPERIMENTAL_WSL_GUI"
 echo
 
 # One-shot "install everything" vs the per-item prompts. Skipped when --all was
@@ -1182,6 +1411,7 @@ install_c_toolchain_linux
 install rg "ripgrep, powers Telescope live_grep"
 install fd "fd, powers Telescope find_files"
 install fzf "fuzzy finder: Ctrl-R history, Ctrl-T files, Alt-C cd (zsh wiring in shells/zshrc)"
+install_lazygit
 
 section "prompt"
 if [[ "$PM" == "brew" ]]; then
@@ -1193,6 +1423,7 @@ fi
 section "terminal multiplexer + shell"
 install tmux
 install zsh
+install_zsh_plugins
 set_default_shell_zsh   # make zsh the login shell so tmux/terminals launch it
 
 section "terminals (optional)"
@@ -1208,8 +1439,14 @@ install_vscode
 configure_vscode_rose_pine
 
 section "fonts"
-install fc-cache "font config (needed to install Hack Nerd Font on Linux)"
-install_nerd_font
+if is_wsl && ! wsl_gui_opt_in; then
+    printf "  skipped   %-26s WSL renders through the Windows host terminal by default\n" "Hack Nerd Font"
+    echo "            Run Windows setup with -MergeWindowsTerminal so Windows Terminal uses Hack Nerd Font."
+    echo "            Linux fontconfig install is experimental: ./setup.sh --experimental-wsl-gui"
+else
+    install fc-cache "font config (needed to install Hack Nerd Font on Linux)"
+    install_nerd_font
+fi
 
 section "language tooling (for LSP / formatter back-ends)"
 install python3 "needed by pyright"

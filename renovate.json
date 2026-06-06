@@ -99,6 +99,50 @@
     },
     {
       "customType": "regex",
+      "description": "lazygit Linux release version. Adjacent Linux asset SHA-256 values must be recomputed manually after Renovate bumps this.",
+      "managerFilePatterns": ["/^install-deps\\.sh$/"],
+      "matchStrings": [
+        "LAZYGIT_LINUX_VERSION=\"(?<currentValue>v[^\"]+)\"\\s+LAZYGIT_LINUX_X86_64_SHA256=\"[a-f0-9]{64}\""
+      ],
+      "depNameTemplate": "jesseduffield/lazygit",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "description": "lazygit Linux arm64 release version. Adjacent Linux asset SHA-256 values must be recomputed manually after Renovate bumps this.",
+      "managerFilePatterns": ["/^install-deps\\.sh$/"],
+      "matchStrings": [
+        "LAZYGIT_LINUX_VERSION=\"(?<currentValue>v[^\"]+)\"(?:.|\\n)*?LAZYGIT_LINUX_ARM64_SHA256=\"[a-f0-9]{64}\""
+      ],
+      "depNameTemplate": "jesseduffield/lazygit",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "description": "zsh-autocomplete pinned tag. The adjacent commit SHA must be reviewed manually after Renovate bumps this.",
+      "managerFilePatterns": ["/^install-deps\\.sh$/"],
+      "matchStrings": [
+        "ZSH_AUTOCOMPLETE_VERSION=\"(?<currentValue>[^\"]+)\"\\s+ZSH_AUTOCOMPLETE_COMMIT=\"[a-f0-9]{40}\""
+      ],
+      "depNameTemplate": "marlonrichert/zsh-autocomplete",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "loose"
+    },
+    {
+      "customType": "regex",
+      "description": "zsh-autosuggestions pinned tag. The adjacent commit SHA must be reviewed manually after Renovate bumps this.",
+      "managerFilePatterns": ["/^install-deps\\.sh$/"],
+      "matchStrings": [
+        "ZSH_AUTOSUGGESTIONS_VERSION=\"(?<currentValue>v[^\"]+)\"\\s+ZSH_AUTOSUGGESTIONS_COMMIT=\"[a-f0-9]{40}\""
+      ],
+      "depNameTemplate": "zsh-users/zsh-autosuggestions",
+      "datasourceTemplate": "github-tags",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
       "description": "cargo-binstall installer script commit pinned to the current main branch digest. The adjacent installer script SHA-256 must be recomputed manually after Renovate bumps this.",
       "managerFilePatterns": ["/^\\.github/workflows/test\\.yml$/"],
       "matchStrings": [
@@ -122,6 +166,13 @@
       "groupName": "github actions",
       "addLabels": ["github-actions"],
       "pinDigests": true,
+      "automerge": false
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "matchDatasources": ["github-runners"],
+      "groupName": "github runner images",
+      "addLabels": ["github-runners"],
       "automerge": false
     }
   ]

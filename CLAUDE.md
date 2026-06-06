@@ -12,8 +12,8 @@ the install script works, read this too.
 ## What this repo is
 
 Cross-platform dotfiles: Neovim (lazy.nvim), Starship, Ghostty, Windows
-Terminal, tmux, zshrc, PowerShell profile, lazygit. Public installs go through
-`setup.sh` (macOS / Linux / WSL) or `setup.ps1` (Windows), which install
+Terminal, tmux, zshenv/zshrc, PowerShell profile, lazygit. Public installs go
+through `setup.sh` (macOS / Linux / WSL) or `setup.ps1` (Windows), which install
 dependencies, symlink configs, and sync Neovim plugins + Mason tools. The
 underlying bootstrap scripts are **location-independent** (they resolve
 `$REPO_ROOT` / `$RepoRoot` from their own path), so the repo can live anywhere —
@@ -33,12 +33,13 @@ not ship synced agent preference folders.
 ~/dotfiles/
 ├── nvim/                  Neovim — init.lua, lua/{vim-options,util,plugins}
 ├── starship/              starship.toml (Rose Pine palette)
-├── shells/                zshrc + powershell_profile.ps1
+├── shells/                zshenv + zshrc + powershell_profile.ps1
 ├── tmux/                  tmux.conf (Rose Pine, vi-mode, OSC52 clipboard)
 ├── ghostty/               config (Rose Pine, Hack Nerd, tuned for tmux)
 ├── windows-terminal/      settings.fragment.jsonc + merge README
 ├── lazygit/               config.yml (J/K move-commit binding)
 ├── tests/                 automated tests, grouped by tool
+├── tests/wsl/             manual WSL split-host e2e check
 ├── .github/workflows/     CI matrix: ubuntu / macos / windows
 ├── setup.sh               public macOS/Linux/WSL setup entry point
 ├── setup.ps1              public Windows setup entry point
@@ -99,6 +100,19 @@ that violates one of these, fix it instead of disabling the test.
 12. **No `vim.lsp.set_log_level(...)`.** Deprecated in nvim 0.11; use the module
     form `vim.lsp.log.set_level(...)` (see `lsp-config.lua`). Guarded by
     `invariants_test.sh`.
+13. **zsh plugin order is intentional.** `zsh-autocomplete` must be sourced
+    before local `compinit`; when autocomplete loads, `zshrc` must skip the
+    repo's manual `compinit` block. `zsh-autosuggestions` loads after completion
+    setup. Keep `shells/zshenv` minimal and keep `skip_global_compinit=1` there.
+14. **WSL is split-host by default.** Windows Terminal, Hack Nerd Font, and
+    `win32yank` are Windows-host responsibilities. WSL installs the Linux CLI
+    stack. Linux Ghostty and Linux fontconfig fonts in WSL require
+    `--experimental-wsl-gui`; do not make them the default path again.
+15. **tmux uppercase `H`/`L` are window swaps.** Lowercase `h`/`l` stay pane
+    focus bindings. Do not replace them with arrow-key bindings unless the
+    terminal/psmux behavior has been revalidated.
+16. **DAP UI stays lazy.** `nvim-dap-ui` must keep `lazy = true`; otherwise the
+    full debug UI and `nvim-nio` load during startup and blow the startup budget.
 
 ## Common workflows
 
@@ -189,6 +203,7 @@ make test            # run everything that can run on this OS
 make test-nvim       # plenary busted suite
 make test-bootstrap  # bats coverage of bootstrap.sh idempotency
 make lint            # shellcheck across all .sh
+./tests/wsl/e2e.sh   # manual WSL split-host validation from inside WSL
 ```
 
 On Windows, use the same entry point as CI:
@@ -201,6 +216,12 @@ On Windows, `tests/nvim/run.ps1` intentionally executes each `*_spec.lua`
 directly through `plenary.busted`. Do not use `PlenaryBustedDirectory` there:
 its parent process can false-fail after all child specs passed when PowerShell
 native-command error promotion is enabled.
+
+On Unix, `tests/nvim/run.sh` uses `PlenaryBustedDirectory` with an explicit
+`timeout = 180000`. Keep that value explicit: `startup_spec.lua` prewarms a real
+production init under isolated XDG dirs, and Plenary's default 50s timeout can
+SIGTERM the child before the startup-budget assertion reports the actual
+problem.
 
 Sub-targets **skip gracefully** when their tool isn't installed
 (`yamllint`/`editorconfig-checker`/`hyperfine`/`bats`/`ghostty`). The
@@ -228,12 +249,14 @@ install paths, not symmetric container platforms:
 - `e2e containers / ubuntu-24.04` runs an `ubuntu:24.04` container on an Ubuntu
   runner with `DOTFILES_SKIP_BREW_BOOTSTRAP=1`, creates a non-root user, runs
   real `install-deps.sh --all` (native `apt`, no Linuxbrew), then `bootstrap.sh`,
-  and asserts tool presence, Neovim >= 0.11, and symlinks pointing into the repo.
+  and asserts tool presence, Neovim >= 0.11, lazygit, zsh plugin files, and
+  symlinks pointing into the repo.
   This is intentionally **not** a devcontainer. It stays because hosted Ubuntu
   has Linuxbrew available, so the container is the only automated proof of the
-  clean-image native `apt` path: pinned Neovim tarball install, `fd-find` ->
-  `fd` shim, Ubuntu Ghostty installer path, and apt fallbacks. Scope is
-  intentionally **Ubuntu only** (the supported Linux/WSL2 proxy target).
+  clean-image native `apt` path: pinned Neovim tarball install, pinned lazygit
+  release install, zsh plugin install, `fd-find` -> `fd` shim, and apt
+  fallbacks. Scope is intentionally **Ubuntu only** (the supported Linux/WSL2
+  proxy target).
   Re-adding another distro requires both a matrix entry in `e2e-install.yml` and
   a matching root-prep branch in `tests/ci/container-e2e.sh`.
 - `setup.sh / ubuntu-24.04`, `setup.sh / macos-15`, and
@@ -250,6 +273,8 @@ install paths, not symmetric container platforms:
   required nested-virtualization WSL2 gate. Keep this job non-required unless
   the owner intentionally accepts that flake risk. The required WSL proxy is the
   Linux Ubuntu container plus the existing `DOTFILES_FORCE_OS=wsl` bats coverage.
+  Full WSL host/guest validation is manual: run `./tests/wsl/e2e.sh` from inside
+  WSL after running `.\setup.ps1 -All -MergeWindowsTerminal` on Windows.
 
 Main-branch safeguards live in `.github/settings.yml` for the Probot Settings
 app and in `scripts/apply-repo-safeguards.sh` for owners who prefer an
@@ -262,15 +287,21 @@ do not add the WSL2 canary to required checks unless asked.
 `renovate.json` owns GitHub Actions version updates and repo-pinned version/ref
 constants. Dependabot version-update PRs are intentionally disabled; GitHub
 native Dependabot security alerts and automated security fixes stay enabled by
-`.github/settings.yml`. Renovate custom managers can bump pinned version/ref
-constants, but they cannot recompute SHA-256 values. The `github-releases`
-datasource has no digest resolver for these archives, and the `git-refs`
-datasource only bumps the cargo-binstall commit, so after a Renovate bump the
-adjacent checksum(s) stay stale until a human recomputes/reviews them; CI
-checksum verification must fail in the meantime. Do not model direct-download
-SHA-256 constants as Renovate `currentDigest` captures; in Renovate terms those
-are not datasource digests. Only the cargo-binstall git commit is captured as a
-digest.
+`.github/settings.yml`. Runner-image updates (`ubuntu-*`, `macos-*`,
+`windows-*`) are still detected by the GitHub Actions manager, but they are
+split into the `github runner images` group and labeled `github-runners` because
+they change the CI platform contract and should be reviewed separately from
+ordinary Action bumps.
+
+Renovate custom managers can bump pinned version/ref constants, but they cannot
+recompute SHA-256 values or verify tag commit IDs. The `github-releases`
+datasource has no digest resolver for direct-download archives, and zsh plugin
+tags are intentionally paired with adjacent expected commits. After a Renovate
+bump, adjacent checksum/commit constants stay stale until a human
+recomputes/reviews them; CI verification must fail in the meantime. Do not model
+direct-download SHA-256 constants as Renovate `currentDigest` captures; in
+Renovate terms those are not datasource digests. Only the cargo-binstall git
+commit is captured as a digest.
 
 Validate `renovate.json` locally with Renovate's own schema validator, not just
 `jq`: `make validate-renovate`. That target runs Renovate under Node 24 because
@@ -314,6 +345,11 @@ save only**. The next plain `:w` formats normally. Implemented in
 - Broken symlinks are treated as wrong symlinks: bootstrap backs up the link
   itself and replaces it with the repo target, so reruns recover stale moved
   targets idempotently.
+- `bootstrap.sh` links both `~/.zshenv` and `~/.zshrc`. Keep `.zshenv`
+  minimal; it exists only to set `skip_global_compinit=1` before zsh startup.
+- On WSL, `bootstrap.sh` skips `~/.config/ghostty/config` unless
+  `--experimental-wsl-gui` or `DOTFILES_EXPERIMENTAL_WSL_GUI=1` is set. Default
+  WSL terminal/font config lives on the Windows host via Windows Terminal.
 - `bootstrap.sh --dry-run` and `bootstrap.ps1 -DryRun` print the planned
   actions without touching disk. The Windows DryRun does not require
   Developer Mode — it downgrades the symlink-permission probe to a warning.
@@ -326,6 +362,9 @@ save only**. The next plain `:w` formats normally. Implemented in
   on Linux/WSL it uses `~/.config/lazygit`; on Windows it uses
   `%LOCALAPPDATA%\lazygit`. Keep `bootstrap.sh`, `bootstrap.ps1`, README, and
   tests aligned with those real read paths.
+- **lazygit binary install paths differ by OS.** Homebrew owns macOS/Linuxbrew,
+  Windows setup installs it through Scoop/winget/choco, and native Linux/WSL
+  without brew uses a pinned GitHub release tarball with SHA-256 verification.
 - **`install-deps.ps1` prefers scoop, then falls back across managers
   per tool.** `Install-One` builds an ordered candidate list (scoop → primary →
   winget → choco) of managers that are installed AND carry the package, and
@@ -369,9 +408,10 @@ save only**. The next plain `:w` formats normally. Implemented in
   escape (or `[char]0xE9`) so that file stays pure ASCII (invariant), while the
   sh side uses the literal é.
 - **Direct GitHub downloads are pinned and SHA-256 verified.** `install-deps.sh`
-  verifies the pinned Neovim Linux tarballs and Hack Nerd Font zip before
-  extraction; `install-deps.ps1` verifies the pinned Hack.zip before registering
-  fonts. The CI workflows also pin and verify their direct GitHub downloads.
+  verifies the pinned Neovim Linux tarballs, lazygit Linux tarballs, and Hack
+  Nerd Font zip before extraction; `install-deps.ps1` verifies the pinned
+  Hack.zip before registering fonts. The CI workflows also pin and verify their
+  direct GitHub downloads.
   This extends to the **Ubuntu Ghostty installer**: `install_ghostty_linux`
   pins `mkasberg/ghostty-ubuntu`'s `install.sh` to `GHOSTTY_UBUNTU_VERSION` and
   SHA-256 verifies the script (`GHOSTTY_UBUNTU_INSTALL_SHA256`) before running
@@ -381,14 +421,18 @@ save only**. The next plain `:w` formats normally. Implemented in
   is not individually pinned — same trust model as the Homebrew installer).
   A checksum mismatch fails closed: the installer is not run, a `FAIL:` marker
   is emitted, and setup continues for real users while CI fails on the marker.
-  Update the version and checksum constants together. Guarded by
-  `tests/shell/ghostty_install_fail_test.sh` and `tests/shell/wsl_gui_tools_test.sh`.
+  Update the version and checksum constants together. zsh plugin refs are also
+  pinned by tag plus expected commit; update both after reviewing a Renovate tag
+  bump. Guarded by `tests/shell/ghostty_install_fail_test.sh`,
+  `tests/shell/wsl_gui_tools_test.sh`, `tests/shell/lazygit_install_test.sh`, and
+  `tests/shell/zsh_plugins_test.sh`.
   Renovate can open version/ref bumps for these constants and for the CI
-  cargo-binstall installer commit, but it cannot recompute the adjacent SHA-256
-  values; leave CI red until a human has reviewed the download and updated the
-  checksum. In `renovate.json`, direct-download SHA-256 values must be matched
-  as context only, not named `currentDigest`, otherwise Renovate will schedule
-  same-version digest updates for checksums it cannot actually resolve.
+  cargo-binstall installer commit, but it cannot recompute adjacent SHA-256
+  values or verify tag commit IDs; leave CI red until a human has reviewed the
+  download/ref and updated the adjacent constant. In `renovate.json`,
+  direct-download SHA-256 values must be matched as context only, not named
+  `currentDigest`, otherwise Renovate will schedule same-version digest updates
+  for checksums it cannot actually resolve.
 - **Both installers open with an "install EVERYTHING?" prompt.** Interactive
   runs that didn't pass `--all`/`-All` get one upfront question; answering yes
   flips `YES_ALL`/`$All` so the rest runs with no per-item prompts. Skipped when

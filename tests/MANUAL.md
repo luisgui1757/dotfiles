@@ -45,5 +45,12 @@ significant change to the relevant area.
       `.\bootstrap.ps1 -MergeWindowsTerminal`,
       new pwsh tab shows the rose-pine starship prompt; new WT tab has
       the rose-pine scheme; `nvim` works.
-- [ ] **Fresh WSL Ubuntu**: clone, `./setup.sh`, `nvim` works;
-      clipboard from WSL → Windows works via `win32yank.exe`.
+- [ ] **Fresh WSL Ubuntu**: on Windows first run
+      `.\setup.ps1 -All -MergeWindowsTerminal`, then inside WSL run
+      `./setup.sh --all` and `./tests/wsl/e2e.sh`. Confirm the script passes:
+      Windows Terminal uses Hack Nerd Font, `win32yank` is reachable, lazygit is
+      installed on both sides, zsh plugins are installed in WSL, nvim starts,
+      tmux starts, and clipboard from WSL -> Windows round-trips.
+- [ ] **WSL experimental GUI opt-in only**: if testing Linux Ghostty under WSLg /
+      X11, run `./setup.sh --experimental-wsl-gui`; otherwise confirm
+      `~/.config/ghostty/config` is not linked by default in WSL.

@@ -37,6 +37,14 @@ iwr https://raw.githubusercontent.com/luisgui1757/dotfiles/main/setup.ps1 -OutFi
 .\setup.ps1 -All
 ```
 
+For WSL, treat setup as split-host: run `.\setup.ps1 -All
+-MergeWindowsTerminal` on Windows so Windows Terminal, Hack Nerd Font, lazygit,
+and `win32yank` are installed on the rendering host, then run `./setup.sh
+--all` inside WSL for the Linux CLI/editor stack. Linux Ghostty and Linux
+fontconfig fonts inside WSL are intentionally outside the happy path; opt in
+with `./setup.sh --experimental-wsl-gui` only when you explicitly want a WSLg /
+X11 GUI-terminal experiment.
+
 On Windows, prefer Developer Mode plus a normal PowerShell. If Developer Mode is
 unavailable and you cannot enable it, run just `.\bootstrap.ps1` from an
 elevated PowerShell, then return to a normal shell for
@@ -71,6 +79,7 @@ Every script is safe to rerun. Pre-existing non-symlink targets are backed up to
 ./setup.sh                       # Y/n per dep, end-to-end
 ./setup.sh --all                 # non-interactive
 ./setup.sh --dry-run             # preview
+./setup.sh --experimental-wsl-gui # WSL-only opt-in for Linux GUI terminal bits
 make setup                       # same as ./setup.sh, via the Makefile
 ```
 
@@ -87,10 +96,10 @@ make setup                       # same as ./setup.sh, via the Makefile
 |---|---|---|---|
 | Neovim | `~/.config/nvim` -> `nvim/` | `~/.config/nvim` -> `nvim/` | `%LOCALAPPDATA%\nvim` -> `nvim\` |
 | Starship | `~/.config/starship.toml` -> `starship/starship.toml` | same | `%USERPROFILE%\.config\starship.toml` -> `starship\starship.toml` |
-| zsh | `~/.zshrc` -> `shells/zshrc` | same | n/a |
+| zsh | `~/.zshenv` -> `shells/zshenv`; `~/.zshrc` -> `shells/zshrc` | same | n/a |
 | PowerShell | `$PROFILE` -> `shells/powershell_profile.ps1` when `pwsh` is installed | same | `$PROFILE` -> `shells\powershell_profile.ps1` |
 | tmux / psmux | `~/.tmux.conf` -> `tmux/tmux.conf` | same | `%USERPROFILE%\.tmux.conf` -> `tmux\tmux.conf` for psmux; WSL uses the Unix path |
-| Ghostty | `~/Library/Application Support/com.mitchellh.ghostty/config` -> `ghostty/config` | `~/.config/ghostty/config` -> `ghostty/config` when GUI-capable | n/a |
+| Ghostty | `~/Library/Application Support/com.mitchellh.ghostty/config` -> `ghostty/config` | native Linux links `~/.config/ghostty/config`; WSL links it only with `--experimental-wsl-gui` | n/a |
 | lazygit | `~/Library/Application Support/lazygit/config.yml` -> `lazygit/config.yml` | `~/.config/lazygit/config.yml` -> `lazygit/config.yml` | `%LOCALAPPDATA%\lazygit\config.yml` -> `lazygit\config.yml` |
 | Windows Terminal | n/a | n/a | merge `windows-terminal/settings.fragment.jsonc`; see [windows-terminal/README.md](windows-terminal/README.md) |
 
@@ -100,12 +109,27 @@ make setup                       # same as ./setup.sh, via the Makefile
   not enough: tmux and new terminals keep launching bash until `chsh` or the
   domain-account fallback is accepted. The prompt is consent-gated and auto-yes
   under `--all`.
+- zsh plugins are installed by Unix setup as repo-managed pinned git checkouts:
+  `zsh-autocomplete` and `zsh-autosuggestions` live under
+  `${XDG_DATA_HOME:-$HOME/.local/share}/dotfiles/zsh-plugins`. `zshrc` sources
+  those copies first and falls back to Homebrew/system paths only when the
+  managed copy is missing. `zsh-autocomplete` loads before local `compinit`;
+  `zsh-autosuggestions` loads after completion setup.
 - Linux without Homebrew gets Neovim from a pinned official GitHub release
   tarball installed into `/opt/nvim-linux-<arch>` and symlinked to
   `/usr/local/bin/nvim`. The tarball SHA-256 is verified before extraction.
+- macOS and Linuxbrew install lazygit through Homebrew (`brew install lazygit`).
+  Native Linux/WSL without Homebrew gets lazygit from a pinned GitHub release
+  tarball with SHA-256 verification. Setup installs it to
+  `/usr/local/bin/lazygit`, or falls back to `~/.local/bin/lazygit` when sudo is
+  unavailable.
 - macOS installs Ghostty through `brew install --cask ghostty` when selected.
-  Linux and GUI-capable WSL use Linux-specific Ghostty paths; the Homebrew
-  Ghostty formula is macOS-only.
+  Native Linux uses Linux-specific Ghostty paths. WSL defaults to Windows
+  Terminal on the Windows host; Linux Ghostty in WSL requires
+  `--experimental-wsl-gui`.
+- WSL fonts are host-rendered in the supported path. Install and merge Windows
+  Terminal from Windows (`.\setup.ps1 -All -MergeWindowsTerminal`); the WSL
+  Linux fontconfig install is only for `--experimental-wsl-gui`.
 - VS Code is optional. On WSL, use Windows VS Code plus `code .` for Remote -
   WSL, or use a Linux GUI build when WSLg / X11 is available. Rosé Pine setup
   follows whatever `code` CLI is on PATH.
@@ -128,6 +152,7 @@ make test               # run everything that can run on this OS
 make test-bootstrap     # bats coverage of the installer
 make validate-renovate  # schema-check renovate.json under Renovate's Node 24
 make lint               # shellcheck everything
+./tests/wsl/e2e.sh      # manual WSL split-host validation from inside WSL
 ```
 
 ```powershell
@@ -139,6 +164,10 @@ Windows runs each Neovim Plenary spec file directly through `plenary.busted`;
 do not switch it back to `PlenaryBustedDirectory`, whose parent harness can
 false-fail after successful child specs under PowerShell native-command error
 promotion.
+
+Unix runs Neovim specs through `PlenaryBustedDirectory` with an explicit timeout
+so the startup-budget spec reports its own assertion instead of being killed by
+Plenary's default timeout.
 
 Sub-targets skip themselves with a `skipped: <tool> not installed` message
 when their dependency tool is missing on the current machine. In CI, missing
@@ -162,7 +191,7 @@ The e2e jobs cover different install paths, not symmetric container platforms:
 
 | Check | What it proves |
 |---|---|
-| `e2e containers / ubuntu-24.04` | Clean `ubuntu:24.04`, non-root user, native `apt`, no Linuxbrew (`DOTFILES_SKIP_BREW_BOOTSTRAP=1`), then `install-deps.sh --all`, `bootstrap.sh`, tool assertions, Neovim >= 0.11, and symlink assertions. |
+| `e2e containers / ubuntu-24.04` | Clean `ubuntu:24.04`, non-root user, native `apt`, no Linuxbrew (`DOTFILES_SKIP_BREW_BOOTSTRAP=1`), then `install-deps.sh --all`, `bootstrap.sh`, tool assertions, Neovim >= 0.11, lazygit, zsh plugin files, and symlink assertions. |
 | `setup.sh / ubuntu-24.04` | Full Unix setup on the hosted Ubuntu runner. This runner has Linuxbrew available, so it proves the Linuxbrew path that users may hit. |
 | `setup.sh / macos-15` | Full macOS setup through the real macOS hosted runner and Homebrew path. Docker cannot model macOS. |
 | `setup.ps1 / windows-2025` | Full Windows setup through the real Windows hosted runner, including Scoop/winget/choco behavior, PowerShell, symlinks, and Neovim sync. Windows containers do not model the desktop/user-profile setup well. |
@@ -171,13 +200,13 @@ The e2e jobs cover different install paths, not symmetric container platforms:
 The Ubuntu container is intentionally **not** a devcontainer. It stays because
 the hosted Ubuntu runner can take the Linuxbrew path, while the container is the
 only automated proof of the clean-image native `apt` path: the pinned Neovim
-tarball install, `fd-find` -> `fd` shim, Ubuntu Ghostty installer path, and apt
-fallback behavior. There is no matching macOS or Windows container to add for
-symmetry. That asymmetry is accepted: hosted macOS and Windows runners are the
-closest representative fixtures for those operating systems, while the required
-WSL proxy is the Ubuntu container plus the `DOTFILES_FORCE_OS=wsl` bootstrap
-coverage. Do not add the WSL2 canary to required checks unless the owner
-explicitly accepts the flake risk.
+tarball install, pinned lazygit release install, zsh plugin install, `fd-find`
+-> `fd` shim, and apt fallback behavior. There is no matching macOS or Windows
+container to add for symmetry. That asymmetry is accepted: hosted macOS and
+Windows runners are the closest representative fixtures for those operating
+systems, while the required WSL proxy is the Ubuntu container plus the
+`DOTFILES_FORCE_OS=wsl` bootstrap coverage. Do not add the WSL2 canary to
+required checks unless the owner explicitly accepts the flake risk.
 
 These e2e jobs fail if setup skips Phase 3-4, emits a precise `FAIL:` marker,
 installs Neovim below 0.11, Lazy/Mason headless sync exits nonzero, or expected
@@ -214,15 +243,26 @@ protection may reference check names GitHub has not seen yet.
 Renovate is the version-update bot for GitHub Actions and repo-pinned
 version/ref constants. GitHub-native Dependabot security alerts and automated
 security fixes stay enabled through `.github/settings.yml`; Dependabot version
-update PRs are intentionally not configured. Renovate cannot recompute the
-SHA-256 values for Neovim tarballs, Hack Nerd Font, the Ubuntu Ghostty installer,
-or the CI `cargo-binstall` installer script. The `github-releases` datasource
-has no digest resolver for those archives, and the `git-refs` datasource only
-bumps the cargo-binstall commit. Direct-download SHA-256 constants are therefore
-matched only as context in `renovate.json`, not captured as Renovate
-`currentDigest` values. A Renovate PR may bump the version/ref while leaving the
-adjacent SHA stale; CI then fails checksum verification until a human recomputes
-and reviews the SHA constants.
+update PRs are intentionally not configured.
+
+| Surface | Renovate policy | Reason |
+|---|---|---|
+| GitHub Actions | Managed, digest-pinned, labeled `github-actions` | Actions are repo-owned CI inputs with stable Renovate support. |
+| GitHub runner images | Managed, labeled `github-runners`, reviewed separately | `ubuntu-*`, `macos-*`, and `windows-*` bumps can change the supported CI platform, so they should not be mixed with ordinary Action bumps. |
+| Repo-pinned installer versions/refs | Managed, labeled `pinned-downloads`, never automerged | Neovim Linux tarballs, lazygit Linux tarballs, Hack Nerd Font, Ubuntu Ghostty, zsh plugin refs, and the CI `cargo-binstall` commit are explicit repo pins. |
+| Adjacent SHA-256 / commit constants | Not managed; matched only as regex context | Renovate can bump the version/ref but cannot recompute archive/script hashes or verify tag commit IDs. CI must fail until a human recomputes and reviews them. |
+| Package-manager catalogs | Not managed | Brew, apt, dnf, pacman, zypper, apk, Scoop, winget, and choco entries are package names/IDs, not repo version pins. Let the package manager resolve current versions. |
+| Neovim plugin and Mason tools | Not managed | `lazy-lock.json` is refreshed with Lazy and tested as editor behavior; Mason intentionally has no machine-pinned lockfile. |
+
+Direct-download SHA-256 values for Neovim tarballs, lazygit tarballs, Hack Nerd
+Font, the Ubuntu Ghostty installer, and the CI `cargo-binstall` installer script
+are intentionally human-reviewed. zsh plugin tag commits are also human-reviewed
+because the installer verifies the checked-out commit after cloning the bumped
+tag. Do not capture direct-download SHA constants as Renovate `currentDigest`
+values: that creates noisy/unresolvable digest updates instead of a trustworthy
+checksum review. A Renovate PR may bump the version/ref while leaving the
+adjacent SHA or commit stale; CI then fails verification until a human reviews
+the adjacent constant.
 
 ## Repo layout
 
@@ -230,11 +270,12 @@ and reviews the SHA constants.
 .
 ├── nvim/                  # Neovim — init.lua, lua/{vim-options,util,plugins}
 ├── starship/              # starship.toml (Rose Pine)
-├── shells/                # zshrc + powershell_profile.ps1
+├── shells/                # zshenv + zshrc + powershell_profile.ps1
 ├── tmux/                  # tmux.conf (Rose Pine, vi-mode, true-color)
 ├── ghostty/               # config (Rose Pine, Hack Nerd, Ghostty-tuned)
 ├── windows-terminal/      # settings.fragment.jsonc + merge README
 ├── tests/                 # automated test tree
+├── tests/wsl/             # manual WSL split-host e2e check
 ├── .github/workflows/     # CI matrix (ubuntu, macos, windows)
 ├── setup.sh               # public macOS/Linux/WSL entry point
 ├── setup.ps1              # public Windows entry point
@@ -270,6 +311,10 @@ and reviews the SHA constants.
   prompt.
 - **Zsh starship init is precompiled** (mirroring the PowerShell profile
   approach) — re-generated only when `starship.toml` is newer than the cache.
+- **zsh plugin installs are repo-managed pins.** `zsh-autocomplete` and
+  `zsh-autosuggestions` are installed during Unix setup, sourced from XDG data
+  before package-manager fallbacks, and verified against tag commit IDs so a
+  Renovate ref bump still gets human review.
 - **fzf wired into zsh by default** — `Ctrl-R` fuzzy history, `Ctrl-T` file
   picker, `Alt-C` fuzzy cd. It *complements* zsh-autosuggestions (inline
   ghosting), it doesn't replace it. Guarded by `command -v fzf` so a machine
@@ -277,6 +322,12 @@ and reviews the SHA constants.
   for older distro builds.
 - **No `bindkey '\e' kill-whole-line`** — that shadowed the entire Meta
   prefix and silently broke Alt-h/j/k/l window nav in nvim.
+- **tmux window swaps use uppercase Vim directions.** `prefix+H` swaps the
+  current window left and `prefix+L` swaps it right. Lowercase `h/l` remain pane
+  focus bindings, and arrow keys are left alone for terminal/psmux reliability.
+- **WSL is split-host by default.** Windows Terminal renders fonts and window UI
+  on the Windows side; WSL installs the Linux CLI/editor stack. Linux Ghostty
+  and Linux fontconfig fonts in WSL require `--experimental-wsl-gui`.
 - **Windows Terminal settings.json is NOT symlinked** because WT auto-rewrites
   it. Only the user-owned keys live in `settings.fragment.jsonc`; the install
   script merges them in.
@@ -357,7 +408,7 @@ MIT. See `LICENSE`.
 | `chsh` fails with `user '<name>' does not exist in /etc/passwd` | you log in via a **domain** account (AD/LDAP/SSSD) that isn't in local `/etc/passwd`, so `chsh` can't touch it | re-run `./setup.sh` — it detects this and offers to re-exec interactive bash into zsh via `~/.bashrc` instead. The "proper" fix is admin-side: set the directory `loginShell` / SSSD `default_shell` |
 | Move commits in lazygit, including inside psmux | Ctrl+J collides with Enter on the wire, and psmux v3.3.4 does not relay Windows Terminal's Win32-input-mode modifier data into panes | use uppercase `J` / `K`. `%LOCALAPPDATA%\lazygit\config.yml` binds commits-panel moveDownCommit / moveUpCommit to printable J/K, so no psmux root bind is needed. In the commits panel, use PgUp/PgDn or Ctrl-U/Ctrl-D to scroll the diff |
 | Ghostty doesn't open maximized | `window-save-state = always` restored an old geometry over `maximize` (macOS only) | `ghostty/config` uses `window-save-state = default` (not `always`) with `maximize = true`; `always` lets the saved size win |
-| Ghostty doesn't load the config | wrong path | the install path is `~/Library/Application Support/com.mitchellh.ghostty/config` on macOS, `~/.config/ghostty/config` on Linux. `bootstrap.sh` handles this |
+| Ghostty doesn't load the config | wrong path, or WSL default skip | the install path is `~/Library/Application Support/com.mitchellh.ghostty/config` on macOS and `~/.config/ghostty/config` on native Linux. WSL only links Linux Ghostty config after `./setup.sh --experimental-wsl-gui`; otherwise use Windows Terminal |
 | Windows Terminal lost a profile after merge | WT auto-rewrites — pre-merge backup is at `<settings.json>.bak.<timestamp>` | restore the profile list from the backup |
 | `bootstrap.ps1` errors "cannot create symbolic links" | Developer Mode off and not elevated | `bootstrap.ps1` now reports your *elevated* + *Developer Mode* state and the fix: enable Developer Mode (Settings → Privacy & security → For developers — no admin, recommended) **then** `.\setup.ps1 -SkipDeps`; OR run just `.\bootstrap.ps1` from an elevated PowerShell. Don't elevate the whole `setup.ps1` — scoop refuses to run as admin |
 | Ghostty won't open maximized on Linux/GNOME | `maximize = true` is a hint the WM may ignore (GNOME Mutter often does) | on **X11**, `install-deps` offers a devilspie2 setup through the native Linux package manager, even when Linuxbrew is the main CLI manager; the rule is keyed on `com.mitchellh.ghostty`. Wayland needs a GNOME Shell extension instead |
