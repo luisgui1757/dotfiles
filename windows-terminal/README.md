@@ -28,6 +28,20 @@ What's intentionally **not** in the fragment: anything WT auto-generates
 (`profiles.list[]`, `defaultProfile` GUID, the per-machine VS / Ubuntu / Azure
 entries).
 
+## Install
+
+`setup.ps1` installs Windows Terminal as the `wt` dependency through the same
+Scoop-first Windows catalog as the rest of the toolchain:
+
+```powershell
+scoop install extras/windows-terminal
+# fallback: winget install --id Microsoft.WindowsTerminal -e
+# fallback: choco install microsoft-windows-terminal
+```
+
+The settings merge below is separate because Windows Terminal creates and
+rewrites its own `settings.json`.
+
 ## Merge
 
 ```powershell

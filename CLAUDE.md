@@ -108,10 +108,14 @@ that violates one of these, fix it instead of disabling the test.
     `win32yank` are Windows-host responsibilities. WSL installs the Linux CLI
     stack. Linux Ghostty and Linux fontconfig fonts in WSL require
     `--experimental-wsl-gui`; do not make them the default path again.
-15. **tmux uppercase `H`/`L` are window swaps.** Lowercase `h`/`l` stay pane
+15. **Windows Terminal is installed by Windows setup.** Keep `wt` in the
+    `install-deps.ps1` Scoop-first catalog (`extras/windows-terminal` ->
+    `Microsoft.WindowsTerminal` -> `microsoft-windows-terminal`). The app
+    install and `-MergeWindowsTerminal` settings merge are separate steps.
+16. **tmux uppercase `H`/`L` are window swaps.** Lowercase `h`/`l` stay pane
     focus bindings. Do not replace them with arrow-key bindings unless the
     terminal/psmux behavior has been revalidated.
-16. **DAP UI stays lazy.** `nvim-dap-ui` must keep `lazy = true`; otherwise the
+17. **DAP UI stays lazy.** `nvim-dap-ui` must keep `lazy = true`; otherwise the
     full debug UI and `nvim-nio` load during startup and blow the startup budget.
 
 ## Common workflows
@@ -369,15 +373,18 @@ save only**. The next plain `:w` formats normally. Implemented in
   per tool.** `Install-One` builds an ordered candidate list (scoop → primary →
   winget → choco) of managers that are installed AND carry the package, and
   tries each until one succeeds — so a winget `No package found` (exit
-  `-1978335212`) no longer dead-ends a tool. scoop carries every CLI tool in
-  the `$Catalog`.
+  `-1978335212`) no longer dead-ends a tool. scoop carries the cataloged
+  CLI/terminal tools, including Windows Terminal as `wt`
+  (`extras/windows-terminal`).
 - **Windows CI uses Scoop's documented elevated bootstrap.** GitHub-hosted
   `windows-2025` runners are elevated, and Scoop blocks elevated install by
   default. `Install-Scoop` detects elevation and runs the official installer
   with `-RunAsAdmin`, then adds the Scoop `shims` dir to the current process
-  PATH so the rest of `install-deps.ps1` can immediately use `scoop`. Local
-  setup still recommends Developer Mode plus a normal PowerShell; do not
-  elevate the whole local setup unless you intentionally want the admin path.
+  PATH so the rest of `install-deps.ps1` can immediately use `scoop`.
+  `Install-Scoop` also ensures the `extras` and `nerd-fonts` buckets whenever
+  Scoop exists, including pre-existing user installs. Local setup still
+  recommends Developer Mode plus a normal PowerShell; do not elevate the whole
+  local setup unless you intentionally want the admin path.
 - **`DOTFILES_SKIP_BREW_BOOTSTRAP=1` is a CI/native-PM test knob.** On Linux,
   when no `brew` is already installed, this prevents `install-deps.sh --all`
   from bootstrapping Linuxbrew and keeps the detected native package manager

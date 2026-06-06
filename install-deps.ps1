@@ -4,6 +4,7 @@
 # winget "No package found matching input criteria" source errors), then falls
 # back to winget, then chocolatey -- if one manager fails for a tool, the next
 # is tried automatically. Offers to bootstrap scoop when missing.
+# Ensures the Scoop extras and nerd-fonts buckets when Scoop is available.
 # Prints manual-install hints only when no manager carries the package.
 #
 # Usage:
@@ -46,8 +47,18 @@ function Add-ScoopToPathForCurrentProcess {
     }
 }
 
+function Ensure-ScoopBuckets {
+    if (-not (Get-Command scoop -ErrorAction SilentlyContinue)) { return }
+    if ($DryRun) { return }
+    scoop bucket add extras 2>$null | Out-Null
+    scoop bucket add nerd-fonts 2>$null | Out-Null
+}
+
 function Install-Scoop {
-    if (Get-Command scoop -ErrorAction SilentlyContinue) { return $true }
+    if (Get-Command scoop -ErrorAction SilentlyContinue) {
+        Ensure-ScoopBuckets
+        return $true
+    }
     Write-Host "Scoop is not installed. It is a userspace package manager that"
     Write-Host "carries tools missing from winget/choco (taplo, win32yank, etc.)."
     if (-not (Ask "Install Scoop via the official one-liner?")) { return $false }
@@ -75,9 +86,8 @@ function Install-Scoop {
             Invoke-Expression (Invoke-RestMethod -Uri 'https://get.scoop.sh' -ErrorAction Stop)
         }
         Add-ScoopToPathForCurrentProcess
-        # Add the standard extras bucket so we get things like win32yank.
-        scoop bucket add extras 2>$null | Out-Null
-        scoop bucket add nerd-fonts 2>$null | Out-Null
+        # Add the standard buckets so existing catalog entries resolve.
+        Ensure-ScoopBuckets
         return [bool](Get-Command scoop -ErrorAction SilentlyContinue)
     } catch {
         Write-Warning ("Scoop install failed: " + $_.Exception.Message)
@@ -108,6 +118,7 @@ $Catalog = @{
     rg                   = @{ winget = 'BurntSushi.ripgrep.MSVC';          choco = 'ripgrep';              scoop = 'ripgrep'              ; purpose = 'Telescope live_grep backend' }
     fd                   = @{ winget = 'sharkdp.fd';                       choco = 'fd';                   scoop = 'fd'                   ; purpose = 'Telescope find_files backend' }
     lazygit              = @{ winget = 'JesseDuffield.lazygit';            choco = 'lazygit';              scoop = 'lazygit'              ; purpose = 'terminal git UI' }
+    wt                   = @{ winget = 'Microsoft.WindowsTerminal';        choco = 'microsoft-windows-terminal'; scoop = 'extras/windows-terminal'; purpose = 'Windows Terminal host for PowerShell and WSL' }
     make                 = @{ winget = 'GnuWin32.Make';                    choco = 'make';                 scoop = 'make'                 ; purpose = 'plugin builds (LuaSnip jsregexp)' }
     pwsh                 = @{ winget = 'Microsoft.PowerShell';             choco = 'powershell-core';      scoop = 'pwsh'                 ; purpose = 'modern PowerShell 7' }
     'win32yank'          = @{ winget = '';                                 choco = 'win32yank';            scoop = 'win32yank'            ; purpose = 'clipboard bridge for WSL nvim' }
@@ -126,6 +137,7 @@ $BinaryName = @{
     rg          = 'rg'
     fd          = 'fd'
     lazygit     = 'lazygit'
+    wt          = 'wt'
     nvim        = 'nvim'
     pwsh        = 'pwsh'
     'win32yank' = 'win32yank'
@@ -444,6 +456,9 @@ Install-One lazygit
 
 Section "prompt"
 Install-One starship
+
+Section "terminal host"
+Install-One wt
 
 Section "terminal multiplexer (psmux: tmux for native Windows, optional)"
 Install-Psmux
