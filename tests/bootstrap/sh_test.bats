@@ -40,6 +40,7 @@ assert_lazygit_link_for_current_os() {
     assert_link_target "$FAKE_HOME/.config/nvim" "$REPO_ROOT/nvim"
     assert_link_target "$FAKE_HOME/.config/starship.toml" "$REPO_ROOT/starship/starship.toml"
     [ -L "$FAKE_HOME/.tmux.conf" ]
+    assert_link_target "$FAKE_HOME/.zshenv" "$REPO_ROOT/shells/zshenv"
     [ -L "$FAKE_HOME/.zshrc" ]
     # lazygit config -- carries the J/K move-commit binding.
     assert_lazygit_link_for_current_os
@@ -109,6 +110,7 @@ assert_lazygit_link_for_current_os() {
     [ "$status" -eq 0 ]
     [ ! -e "$FAKE_HOME/.config/nvim" ]
     [ ! -e "$FAKE_HOME/.tmux.conf" ]
+    [ ! -e "$FAKE_HOME/.zshenv" ]
     [ ! -e "$FAKE_HOME/.zshrc" ]
     [ ! -e "$FAKE_HOME/.config/lazygit/config.yml" ]
     [ ! -e "$FAKE_HOME/Library/Application Support/lazygit/config.yml" ]
@@ -130,19 +132,26 @@ assert_lazygit_link_for_current_os() {
         "$REPO_ROOT/lazygit/config.yml"
 }
 
-@test "WSL branch links ghostty config and re-running is idempotent" {
+@test "WSL branch skips ghostty config by default and re-running is idempotent" {
     run env HOME="$FAKE_HOME" DOTFILES_FORCE_OS=wsl bash "$REPO_ROOT/bootstrap.sh"
     [ "$status" -eq 0 ]
-    assert_link_target "$FAKE_HOME/.config/ghostty/config" "$REPO_ROOT/ghostty/config"
+    [ ! -e "$FAKE_HOME/.config/ghostty/config" ]
     assert_link_target "$FAKE_HOME/.config/lazygit/config.yml" "$REPO_ROOT/lazygit/config.yml"
 
     # Second run must be a no-op: link unchanged, no stray backups.
     run env HOME="$FAKE_HOME" DOTFILES_FORCE_OS=wsl bash "$REPO_ROOT/bootstrap.sh"
     [ "$status" -eq 0 ]
-    assert_link_target "$FAKE_HOME/.config/ghostty/config" "$REPO_ROOT/ghostty/config"
+    [ ! -e "$FAKE_HOME/.config/ghostty/config" ]
     assert_link_target "$FAKE_HOME/.config/lazygit/config.yml" "$REPO_ROOT/lazygit/config.yml"
     bak_count=$(find "$FAKE_HOME" -name "*.bak.*" 2>/dev/null | wc -l | tr -d ' ')
     [ "$bak_count" = "0" ]
+}
+
+@test "WSL experimental GUI branch links ghostty config" {
+    run env HOME="$FAKE_HOME" DOTFILES_FORCE_OS=wsl bash "$REPO_ROOT/bootstrap.sh" --experimental-wsl-gui
+    [ "$status" -eq 0 ]
+    assert_link_target "$FAKE_HOME/.config/ghostty/config" "$REPO_ROOT/ghostty/config"
+    assert_link_target "$FAKE_HOME/.config/lazygit/config.yml" "$REPO_ROOT/lazygit/config.yml"
 }
 
 @test "missing git still symlinks configs" {

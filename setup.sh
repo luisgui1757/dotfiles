@@ -8,6 +8,8 @@
 #   ./setup.sh --skip-deps         already have nvim/starship; just bootstrap+sync
 #   ./setup.sh --skip-bootstrap    already symlinked; just sync plugins+LSP
 #   ./setup.sh --skip-nvim         skip nvim plugin + Mason sync
+#   ./setup.sh --experimental-wsl-gui
+#                                  WSL opt-in: install/link Linux GUI terminal bits
 #
 # Remote usage (no checkout yet):
 #   curl -fsSL https://raw.githubusercontent.com/luisgui1757/dotfiles/main/setup.sh | bash -s -- --all
@@ -27,6 +29,7 @@ SKIP_DEPS=0
 SKIP_BOOTSTRAP=0
 SKIP_NVIM=0
 BEST_EFFORT=0
+EXPERIMENTAL_WSL_GUI=0
 usage() {
     cat <<'EOF'
 setup.sh -- one-shot end-to-end install for macOS / Linux / WSL.
@@ -38,6 +41,8 @@ Local usage:
   ./setup.sh --skip-deps         already installed; just bootstrap + sync
   ./setup.sh --skip-bootstrap    already symlinked; just sync plugins + LSP
   ./setup.sh --skip-nvim         skip nvim plugin + Mason sync
+  ./setup.sh --experimental-wsl-gui
+                                WSL opt-in: install/link Linux Ghostty + Linux fonts
 
 Remote usage:
   curl -fsSL https://raw.githubusercontent.com/luisgui1757/dotfiles/main/setup.sh | bash -s -- --all
@@ -52,10 +57,15 @@ for arg in "$@"; do
         --skip-bootstrap) SKIP_BOOTSTRAP=1 ;;
         --skip-nvim)      SKIP_NVIM=1 ;;
         --best-effort)    BEST_EFFORT=1 ;;
+        --experimental-wsl-gui)
+                          EXPERIMENTAL_WSL_GUI=1 ;;
         -h|--help)        usage; exit 0 ;;
         *) echo "Unknown arg: $arg" >&2; exit 2 ;;
     esac
 done
+if [[ "$EXPERIMENTAL_WSL_GUI" -eq 1 ]]; then
+    export DOTFILES_EXPERIMENTAL_WSL_GUI=1
+fi
 if [[ "$ALL" -eq 0 && "$DRY_RUN" -eq 0 && ! -t 0 ]]; then
     ALL=1
     echo "note: no TTY detected; running with --all"
@@ -124,9 +134,11 @@ fi
 DEPS_FLAGS=()
 [[ "$ALL" -eq 1 ]]      && DEPS_FLAGS+=(--all)
 [[ "$DRY_RUN" -eq 1 ]]  && DEPS_FLAGS+=(--dry-run)
+[[ "$EXPERIMENTAL_WSL_GUI" -eq 1 ]] && DEPS_FLAGS+=(--experimental-wsl-gui)
 
 BOOTSTRAP_FLAGS=()
 [[ "$DRY_RUN" -eq 1 ]]  && BOOTSTRAP_FLAGS+=(--dry-run)
+[[ "$EXPERIMENTAL_WSL_GUI" -eq 1 ]] && BOOTSTRAP_FLAGS+=(--experimental-wsl-gui)
 
 phase() {
     echo

@@ -50,25 +50,50 @@ SAVEHIST=50000
 setopt SHARE_HISTORY HIST_IGNORE_DUPS HIST_IGNORE_ALL_DUPS HIST_REDUCE_BLANKS \
        HIST_IGNORE_SPACE HIST_VERIFY EXTENDED_HISTORY
 
-# ---- Completion (cached compinit; rebuild at most once per day) --------------
-autoload -Uz compinit
-mkdir -p "${HOME}/.cache"
-_zcompdump="${HOME}/.cache/zcompdump-${ZSH_VERSION}"
-if [[ -n "$_zcompdump"(#qN.mh+24) ]]; then
-  compinit -d "$_zcompdump"
-else
-  compinit -C -d "$_zcompdump"
-fi
-unset _zcompdump
-
-# ---- Homebrew zsh plugins (optional; quietly skip if absent) -----------------
-if [[ -n "${HOMEBREW_PREFIX:-}" ]]; then
-  for plugin in \
-      "$HOMEBREW_PREFIX/share/zsh-autosuggestions/zsh-autosuggestions.zsh" \
-      "$HOMEBREW_PREFIX/share/zsh-autocomplete/zsh-autocomplete.plugin.zsh"; do
-    [[ -r "$plugin" ]] && source "$plugin"
+# ---- zsh plugins -------------------------------------------------------------
+# setup.sh installs repo-managed pinned plugins under XDG data. Runtime uses
+# those first, then falls back to package-manager paths if a machine has not
+# run the installer yet. Source exactly one readable path per plugin.
+_dotfiles_source_first_readable() {
+  local plugin
+  for plugin in "$@"; do
+    if [[ -r "$plugin" ]]; then
+      source "$plugin"
+      return 0
+    fi
   done
+  return 1
+}
+
+_dotfiles_zsh_plugin_root="${XDG_DATA_HOME:-$HOME/.local/share}/dotfiles/zsh-plugins"
+_dotfiles_autocomplete_loaded=0
+if _dotfiles_source_first_readable \
+    "$_dotfiles_zsh_plugin_root/zsh-autocomplete/zsh-autocomplete.plugin.zsh" \
+    "${HOMEBREW_PREFIX:-}/share/zsh-autocomplete/zsh-autocomplete.plugin.zsh" \
+    "/usr/share/zsh-autocomplete/zsh-autocomplete.plugin.zsh"; then
+  _dotfiles_autocomplete_loaded=1
 fi
+
+# ---- Completion (cached compinit fallback; autocomplete manages its own) -----
+if [[ "$_dotfiles_autocomplete_loaded" -ne 1 ]]; then
+  autoload -Uz compinit
+  mkdir -p "${HOME}/.cache"
+  _zcompdump="${HOME}/.cache/zcompdump-${ZSH_VERSION}"
+  if [[ -n "$_zcompdump"(#qN.mh+24) ]]; then
+    compinit -d "$_zcompdump"
+  else
+    compinit -C -d "$_zcompdump"
+  fi
+  unset _zcompdump
+fi
+
+_dotfiles_source_first_readable \
+  "$_dotfiles_zsh_plugin_root/zsh-autosuggestions/zsh-autosuggestions.zsh" \
+  "${HOMEBREW_PREFIX:-}/share/zsh-autosuggestions/zsh-autosuggestions.zsh" \
+  "/usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
+
+unset _dotfiles_autocomplete_loaded _dotfiles_zsh_plugin_root
+unfunction _dotfiles_source_first_readable 2>/dev/null || true
 
 # ---- Starship init (precompiled, like the PowerShell profile) ---------------
 # Re-generate when the toml is newer than the cached init script, so config

@@ -58,7 +58,7 @@ if [[ "${1:-}" == "--as-user" ]]; then
     done
     export PATH
 
-    for cmd in nvim rg fd fzf tmux zsh git; do
+    for cmd in nvim rg fd fzf tmux zsh git lazygit; do
         command -v "$cmd" >/dev/null 2>&1 || fail "$cmd is not on PATH"
     done
 
@@ -72,8 +72,15 @@ if [[ "${1:-}" == "--as-user" ]]; then
     assert_link "$HOME/.config/nvim" "$repo/nvim"
     assert_link "$HOME/.config/starship.toml" "$repo/starship/starship.toml"
     assert_link "$HOME/.tmux.conf" "$repo/tmux/tmux.conf"
+    assert_link "$HOME/.zshenv" "$repo/shells/zshenv"
     assert_link "$HOME/.zshrc" "$repo/shells/zshrc"
     assert_link "$HOME/.config/lazygit/config.yml" "$repo/lazygit/config.yml"
+
+    plugin_root="${XDG_DATA_HOME:-$HOME/.local/share}/dotfiles/zsh-plugins"
+    [[ -r "$plugin_root/zsh-autocomplete/zsh-autocomplete.plugin.zsh" ]] \
+        || fail "zsh-autocomplete plugin file missing"
+    [[ -r "$plugin_root/zsh-autosuggestions/zsh-autosuggestions.zsh" ]] \
+        || fail "zsh-autosuggestions plugin file missing"
 
     echo "OK: $EXPECTED_PM container e2e passed"
     exit 0

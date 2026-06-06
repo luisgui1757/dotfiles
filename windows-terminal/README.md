@@ -38,3 +38,8 @@ entries).
 `settings.json.bak.<timestamp>`, initializes missing `profiles` containers, and
 preserves custom `actions`, `schemes`, and `themes`, while entries with the same
 key or name are replaced by the repo fragment.
+
+For WSL, this is the supported terminal/font path: run
+`.\setup.ps1 -All -MergeWindowsTerminal` on Windows, then `./setup.sh --all`
+inside WSL. The WSL setup intentionally skips Linux Ghostty and Linux fontconfig
+fonts unless `./setup.sh --experimental-wsl-gui` is used.

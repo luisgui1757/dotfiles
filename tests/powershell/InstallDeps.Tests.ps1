@@ -198,4 +198,13 @@ Describe "install-deps.ps1" {
         $script:InstallFailures[0].Pkg | Should -Be 'git'
         $script:InstallFailures[0].ExitCode | Should -Be 13
     }
+
+    It "registers lazygit in the Windows package catalog" {
+        . $script:ImportInstallDepsForTest
+
+        $Catalog.ContainsKey('lazygit') | Should -BeTrue
+        $BinaryName['lazygit'] | Should -Be 'lazygit'
+        $Catalog['lazygit'].scoop | Should -Be 'lazygit'
+        $Catalog['lazygit'].winget | Should -Be 'JesseDuffield.lazygit'
+    }
 }
