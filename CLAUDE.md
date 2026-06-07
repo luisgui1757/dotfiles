@@ -119,10 +119,12 @@ that violates one of these, fix it instead of disabling the test.
     terminal/psmux behavior has been revalidated.
 17. **DAP UI stays lazy.** `nvim-dap-ui` must keep `lazy = true`; otherwise the
     full debug UI and `nvim-nio` load during startup and blow the startup budget.
-18. **Main-branch CI is non-bypassable.** Keep required status checks in
-    `.github/rulesets/main-integrity.json` with no bypass actors. Owner bypass
-    belongs only in `.github/rulesets/main-review.json` and only with
-    `bypass_mode = pull_request`. Do not collapse the two rulesets into one.
+18. **Main-branch CI is non-bypassable and owner-only.** Keep required status
+    checks in `.github/rulesets/main-integrity.json` with no bypass actors.
+    Owner review bypass belongs only in `.github/rulesets/main-review.json`;
+    owner update bypass belongs only in
+    `.github/rulesets/main-owner-updates.json`. Both bypasses must use
+    `bypass_mode = pull_request`. Do not collapse these rulesets into one.
 
 ## Common workflows
 
@@ -289,7 +291,7 @@ install paths, not symmetric container platforms:
 Main-branch safeguards are canonical in `.github/rulesets/` and applied live by
 `scripts/apply-repo-safeguards.sh`. `.github/settings.yml` is only the classic
 branch-protection fallback for the Probot Settings app; it cannot model the
-required split where owner bypass applies to review rules but not CI.
+required split where owner bypass applies to review/update rules but not CI.
 
 - `Protect main: integrity` has no bypass actors. It requires pull requests,
   strict required checks, current `main`, squash-only merges, linear history, no
@@ -297,6 +299,9 @@ required split where owner bypass applies to review rules but not CI.
 - `Protect main: review` has the only bypass actor: `luisgui1757` with
   `bypass_mode = pull_request`. It requires one approval, CODEOWNER review,
   stale-review dismissal, last-push approval, and resolved review threads.
+- `Protect main: owner updates` has the only update bypass actor:
+  `luisgui1757` with `bypass_mode = pull_request`. It prevents automation from
+  updating `main`, even when it can push branches and open PRs.
 - Repository settings are squash-only. Merge commits and rebase merges are
   disabled, squash merges are enabled, branches are deleted after merge, and
   repo-level auto-merge stays disabled.
@@ -305,7 +310,7 @@ GitHub does not let pull request authors approve their own pull requests. Owner
 authored PRs can use the owner review bypass, but they still cannot bypass the
 integrity ruleset's required checks. Repository deletion is outside branch
 protection for a personal repo; routine agents should use least-privilege
-credentials, not admin or `delete_repo` capable tokens.
+credentials, not owner-account, admin, or `delete_repo` capable tokens.
 
 Run `scripts/apply-repo-safeguards.sh luisgui1757/dotfiles` after changing the
 rulesets, then verify the live posture with the commands in
