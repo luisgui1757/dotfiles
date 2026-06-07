@@ -1,20 +1,19 @@
 #!/usr/bin/env bash
-# Applies rebase-only merges, branch cleanup, required checks, no required
-# reviews for a solo maintainer, enforced admins, linear history, conversation
-# resolution, no force pushes, no branch deletions, and best-effort security extras.
+# Applies the public-repo safeguards documented in docs/security/branch-protection.md.
 set -euo pipefail
 
 usage() {
     cat <<'EOF'
 apply-repo-safeguards.sh [owner/repo]
 
-Applies the same repository safeguards declared in .github/settings.yml:
-  - rebase-only PR merges
+Applies the repository safeguard posture:
+  - squash-only PR merges
   - delete branches on merge
-  - main branch protection with required CI/e2e checks
-  - no required reviews for a solo maintainer; checks plus enforce_admins gate merges
-  - linear history and conversation resolution
-  - no force pushes and no branch deletions
+  - auto-merge disabled
+  - two active main-branch rulesets:
+      * Protect main: integrity (no bypass; required PR, strict CI, no delete/force)
+      * Protect main: review (owner-only pull-request bypass for review rules)
+  - classic main branch protection fallback with required CI checks
   - best-effort GitHub security extras where the plan supports them
 
 Requires an authenticated GitHub CLI with repository admin permission:
@@ -43,6 +42,17 @@ if [[ "$repo" != */* ]]; then
     exit 2
 fi
 
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+integrity_ruleset="$repo_root/.github/rulesets/main-integrity.json"
+review_ruleset="$repo_root/.github/rulesets/main-review.json"
+
+for f in "$integrity_ruleset" "$review_ruleset"; do
+    if [[ ! -f "$f" ]]; then
+        echo "FAIL: missing ruleset file: $f" >&2
+        exit 3
+    fi
+done
+
 gh_api() {
     local method="$1" path="$2"
     shift 2
@@ -56,6 +66,12 @@ gh_api_json() {
     gh api -X "$method" "$path" --input -
 }
 
+gh_api_json_file() {
+    local method="$1" path="$2" file="$3"
+    echo "+ gh api -X $method $path --input $file"
+    gh api -X "$method" "$path" --input "$file"
+}
+
 try_gh_api() {
     local desc="$1"
     shift
@@ -64,15 +80,44 @@ try_gh_api() {
     fi
 }
 
+ruleset_id_by_name() {
+    local name="$1"
+    gh api "repos/$repo/rulesets?includes_parents=false" \
+        --jq ".[] | select(.name == \"$name\") | .id" \
+        | head -n 1
+}
+
+upsert_ruleset() {
+    local name="$1" file="$2" id
+    id="$(ruleset_id_by_name "$name")"
+    if [[ -n "$id" ]]; then
+        gh_api_json_file PUT "repos/$repo/rulesets/$id" "$file" >/dev/null
+    else
+        gh_api_json_file POST "repos/$repo/rulesets" "$file" >/dev/null
+    fi
+}
+
+require_live_value() {
+    local desc="$1" actual="$2" expected="$3"
+    if [[ "$actual" != "$expected" ]]; then
+        echo "FAIL: $desc is '$actual', expected '$expected'" >&2
+        exit 4
+    fi
+}
+
 echo "Applying repository safeguards to $repo"
 
 gh_api PATCH "repos/$repo" \
     -F allow_merge_commit=false \
-    -F allow_squash_merge=false \
-    -F allow_rebase_merge=true \
-    -F delete_branch_on_merge=true
+    -F allow_squash_merge=true \
+    -F allow_rebase_merge=false \
+    -F allow_auto_merge=false \
+    -F delete_branch_on_merge=true >/dev/null
 
-gh_api_json PUT "repos/$repo/branches/main/protection" <<'JSON'
+upsert_ruleset "Protect main: integrity" "$integrity_ruleset"
+upsert_ruleset "Protect main: review" "$review_ruleset"
+
+gh_api_json PUT "repos/$repo/branches/main/protection" <<'JSON' >/dev/null
 {
   "required_status_checks": {
     "strict": true,
@@ -114,4 +159,27 @@ try_gh_api "secret scanning and push protection" \
 }
 JSON
 
-echo "Repository safeguards applied. Re-run safely any time."
+repo_settings="$(gh api "repos/$repo" \
+    --jq '[.allow_merge_commit, .allow_squash_merge, .allow_rebase_merge, .allow_auto_merge, .delete_branch_on_merge] | @tsv')"
+IFS=$'\t' read -r merge_allowed squash_allowed rebase_allowed auto_merge_allowed delete_branch_on_merge <<<"$repo_settings"
+require_live_value "allow_merge_commit" "$merge_allowed" "false"
+require_live_value "allow_squash_merge" "$squash_allowed" "true"
+require_live_value "allow_rebase_merge" "$rebase_allowed" "false"
+require_live_value "allow_auto_merge" "$auto_merge_allowed" "false"
+require_live_value "delete_branch_on_merge" "$delete_branch_on_merge" "true"
+
+integrity_id="$(ruleset_id_by_name "Protect main: integrity")"
+review_id="$(ruleset_id_by_name "Protect main: review")"
+if [[ -z "$integrity_id" || -z "$review_id" ]]; then
+    echo "FAIL: expected rulesets were not found after apply" >&2
+    exit 5
+fi
+
+integrity_bypass_count="$(gh api "repos/$repo/rulesets/$integrity_id" --jq '.bypass_actors | length')"
+require_live_value "integrity bypass actor count" "$integrity_bypass_count" "0"
+
+review_bypass="$(gh api "repos/$repo/rulesets/$review_id" \
+    --jq '.bypass_actors[] | "\(.actor_type):\(.actor_id):\(.bypass_mode)"')"
+require_live_value "review bypass actor" "$review_bypass" "User:139752288:pull_request"
+
+echo "Repository safeguards applied and verified. Re-run safely any time."

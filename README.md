@@ -215,30 +215,35 @@ warning/deprecation text.
 
 ## Repository Safeguards
 
-Repository safeguards are declared in `.github/settings.yml` for the Probot
-Settings app and mirrored by `scripts/apply-repo-safeguards.sh` for a one-shot
-`gh api` path. The intended main-branch policy is:
+The canonical main-branch safeguards are the two checked-in repository rulesets
+under `.github/rulesets/`, applied live with
+`scripts/apply-repo-safeguards.sh`. `.github/settings.yml` remains a classic
+branch-protection fallback for the Probot Settings app, but it cannot model the
+key policy split: owner review bypass is allowed, CI bypass is not.
 
-- only rebase-and-merge is allowed; merge commits and squash merges are disabled;
-- required status checks include `ubuntu`, `macos`, `windows`, the required e2e
-  container job, and the three full setup jobs;
-- no PR reviews are required for the solo maintainer; the merge gate is required
-  status checks plus enforced admins;
-- conversation resolution and linear history are required, and force pushes /
-  branch deletion are blocked;
-- branches are deleted after merge; Renovate updates GitHub Actions and
-  repo-pinned version/ref constants weekly.
+| Layer | Bypass actors | What it protects |
+|---|---:|---|
+| `Protect main: integrity` | none | Requires pull requests, strict required checks, current `main`, squash-only merges, linear history, no branch deletion, and no non-fast-forward updates. |
+| `Protect main: review` | `luisgui1757` on pull requests only | Requires one approval, CODEOWNER review, stale-review dismissal, last-push approval, and resolved review threads without allowing CI bypass. |
+| Classic branch protection fallback | none | Keeps required checks, enforced admins, conversation resolution, linear history, no force pushes, and no branch deletion if rulesets are not applied. |
 
-Manual owner step: either install the Probot Settings app so `.github/settings.yml`
-is continuously applied after it lands on `main`, or run:
+Repository settings are squash-only: merge commits and rebase merges are
+disabled, squash merges are enabled, branches are deleted after merge, and
+repo-level auto-merge stays disabled. GitHub does not let pull request authors
+approve their own PRs; owner-authored PRs use the owner review bypass, but only
+after the non-bypass integrity layer has passed.
+
+Manual owner step:
 
 ```bash
 scripts/apply-repo-safeguards.sh luisgui1757/dotfiles
 ```
 
-with an authenticated `gh` that has repository admin permission. Do this only
-after the required checks have appeared at least once on GitHub, otherwise branch
-protection may reference check names GitHub has not seen yet.
+with an authenticated `gh` that has repository admin permission. Do this after
+the required checks have appeared at least once on GitHub, otherwise protection
+may reference check names GitHub has not seen yet. See
+[docs/security/branch-protection.md](docs/security/branch-protection.md) for
+the live verification commands and deletion-risk note.
 
 Renovate is the version-update bot for GitHub Actions and repo-pinned
 version/ref constants. GitHub-native Dependabot security alerts and automated
@@ -277,6 +282,8 @@ the adjacent constant.
 ├── tests/                 # automated test tree
 ├── tests/wsl/             # manual WSL split-host e2e check
 ├── .github/workflows/     # CI matrix (ubuntu, macos, windows)
+├── .github/rulesets/      # checked-in GitHub ruleset payloads for main
+├── docs/security/         # branch-protection runbook
 ├── setup.sh               # public macOS/Linux/WSL entry point
 ├── setup.ps1              # public Windows entry point
 ├── bootstrap.sh           # setup phase: Unix symlinks

@@ -41,6 +41,8 @@ not ship synced agent preference folders.
 ├── tests/                 automated tests, grouped by tool
 ├── tests/wsl/             manual WSL split-host e2e check
 ├── .github/workflows/     CI matrix: ubuntu / macos / windows
+├── .github/rulesets/      checked-in GitHub ruleset payloads for main
+├── docs/security/         branch-protection runbook
 ├── setup.sh               public macOS/Linux/WSL setup entry point
 ├── setup.ps1              public Windows setup entry point
 ├── bootstrap.sh           setup phase: Unix symlinks (idempotent)
@@ -117,6 +119,10 @@ that violates one of these, fix it instead of disabling the test.
     terminal/psmux behavior has been revalidated.
 17. **DAP UI stays lazy.** `nvim-dap-ui` must keep `lazy = true`; otherwise the
     full debug UI and `nvim-nio` load during startup and blow the startup budget.
+18. **Main-branch CI is non-bypassable.** Keep required status checks in
+    `.github/rulesets/main-integrity.json` with no bypass actors. Owner bypass
+    belongs only in `.github/rulesets/main-review.json` and only with
+    `bypass_mode = pull_request`. Do not collapse the two rulesets into one.
 
 ## Common workflows
 
@@ -280,13 +286,31 @@ install paths, not symmetric container platforms:
   Full WSL host/guest validation is manual: run `./tests/wsl/e2e.sh` from inside
   WSL after running `.\setup.ps1 -All -MergeWindowsTerminal` on Windows.
 
-Main-branch safeguards live in `.github/settings.yml` for the Probot Settings
-app and in `scripts/apply-repo-safeguards.sh` for owners who prefer an
-authenticated `gh api` one-shot. Both paths set rebase-only merges, delete
-branches on merge, required checks, no required reviews for a solo maintainer,
-enforced admins, linear history, conversation resolution, and no force pushes or
-branch deletions. The merge gate is required status checks plus `enforce_admins`;
-do not add the WSL2 canary to required checks unless asked.
+Main-branch safeguards are canonical in `.github/rulesets/` and applied live by
+`scripts/apply-repo-safeguards.sh`. `.github/settings.yml` is only the classic
+branch-protection fallback for the Probot Settings app; it cannot model the
+required split where owner bypass applies to review rules but not CI.
+
+- `Protect main: integrity` has no bypass actors. It requires pull requests,
+  strict required checks, current `main`, squash-only merges, linear history, no
+  branch deletion, and no non-fast-forward updates.
+- `Protect main: review` has the only bypass actor: `luisgui1757` with
+  `bypass_mode = pull_request`. It requires one approval, CODEOWNER review,
+  stale-review dismissal, last-push approval, and resolved review threads.
+- Repository settings are squash-only. Merge commits and rebase merges are
+  disabled, squash merges are enabled, branches are deleted after merge, and
+  repo-level auto-merge stays disabled.
+
+GitHub does not let pull request authors approve their own pull requests. Owner
+authored PRs can use the owner review bypass, but they still cannot bypass the
+integrity ruleset's required checks. Repository deletion is outside branch
+protection for a personal repo; routine agents should use least-privilege
+credentials, not admin or `delete_repo` capable tokens.
+
+Run `scripts/apply-repo-safeguards.sh luisgui1757/dotfiles` after changing the
+rulesets, then verify the live posture with the commands in
+`docs/security/branch-protection.md`. Do not add the WSL2 canary to required
+checks unless asked.
 
 `renovate.json` owns GitHub Actions version updates and repo-pinned version/ref
 constants. Dependabot version-update PRs are intentionally disabled; GitHub

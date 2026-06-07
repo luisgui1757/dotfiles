@@ -1,0 +1,71 @@
+{
+  "name": "Protect main: integrity",
+  "target": "branch",
+  "enforcement": "active",
+  "bypass_actors": [],
+  "conditions": {
+    "ref_name": {
+      "include": ["refs/heads/main"],
+      "exclude": []
+    }
+  },
+  "rules": [
+    {
+      "type": "pull_request",
+      "parameters": {
+        "required_approving_review_count": 0,
+        "dismiss_stale_reviews_on_push": false,
+        "require_code_owner_review": false,
+        "require_last_push_approval": false,
+        "required_review_thread_resolution": false,
+        "allowed_merge_methods": ["squash"]
+      }
+    },
+    {
+      "type": "required_status_checks",
+      "parameters": {
+        "do_not_enforce_on_create": false,
+        "strict_required_status_checks_policy": true,
+        "required_status_checks": [
+          {
+            "context": "ubuntu",
+            "integration_id": 15368
+          },
+          {
+            "context": "macos",
+            "integration_id": 15368
+          },
+          {
+            "context": "windows",
+            "integration_id": 15368
+          },
+          {
+            "context": "e2e containers / ubuntu-24.04",
+            "integration_id": 15368
+          },
+          {
+            "context": "setup.sh / ubuntu-24.04",
+            "integration_id": 15368
+          },
+          {
+            "context": "setup.sh / macos-15",
+            "integration_id": 15368
+          },
+          {
+            "context": "setup.ps1 / windows-2025",
+            "integration_id": 15368
+          }
+        ]
+      }
+    },
+    {
+      "type": "required_linear_history"
+    },
+    {
+      "type": "deletion"
+    },
+    {
+      "type": "non_fast_forward"
+    }
+  ]
+}
