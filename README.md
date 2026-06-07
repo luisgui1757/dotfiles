@@ -215,16 +215,18 @@ warning/deprecation text.
 
 ## Repository Safeguards
 
-The canonical main-branch safeguards are the two checked-in repository rulesets
+The canonical main-branch safeguards are the three checked-in repository rulesets
 under `.github/rulesets/`, applied live with
 `scripts/apply-repo-safeguards.sh`. `.github/settings.yml` remains a classic
 branch-protection fallback for the Probot Settings app, but it cannot model the
-key policy split: owner review bypass is allowed, CI bypass is not.
+key policy split: owner review bypass is allowed, CI bypass is not, and only the
+owner may update `main`.
 
 | Layer | Bypass actors | What it protects |
 |---|---:|---|
 | `Protect main: integrity` | none | Requires pull requests, strict required checks, current `main`, squash-only merges, linear history, no branch deletion, and no non-fast-forward updates. |
 | `Protect main: review` | `luisgui1757` on pull requests only | Requires one approval, CODEOWNER review, stale-review dismissal, last-push approval, and resolved review threads without allowing CI bypass. |
+| `Protect main: owner updates` | `luisgui1757` on pull requests only | Allows only the owner to update `main`; automation can open PRs but cannot merge them. |
 | Classic branch protection fallback | none | Keeps required checks, enforced admins, conversation resolution, linear history, no force pushes, and no branch deletion if rulesets are not applied. |
 
 Repository settings are squash-only: merge commits and rebase merges are
@@ -232,6 +234,10 @@ disabled, squash merges are enabled, branches are deleted after merge, and
 repo-level auto-merge stays disabled. GitHub does not let pull request authors
 approve their own PRs; owner-authored PRs use the owner review bypass, but only
 after the non-bypass integrity layer has passed.
+
+Automation must not run as the owner account. Use a separate GitHub App or bot
+identity with branch/PR write access and no repository administration
+permission; otherwise GitHub sees the action as `luisgui1757`.
 
 Manual owner step:
 

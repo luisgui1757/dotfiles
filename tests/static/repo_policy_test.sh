@@ -38,8 +38,9 @@ def pull_request_rule(ruleset):
 
 integrity = load_json(".github/rulesets/main-integrity.json")
 review = load_json(".github/rulesets/main-review.json")
+owner_updates = load_json(".github/rulesets/main-owner-updates.json")
 
-for ruleset in (integrity, review):
+for ruleset in (integrity, review, owner_updates):
     if ruleset.get("target") != "branch":
         fail(f"{ruleset['name']} must target branches")
     if ruleset.get("enforcement") != "active":
@@ -57,6 +58,8 @@ expected_bypass = [
 ]
 if review_bypass != expected_bypass:
     fail("review ruleset must have only the owner pull_request bypass")
+if owner_updates.get("bypass_actors", []) != expected_bypass:
+    fail("owner-updates ruleset must have only the owner pull_request bypass")
 
 integrity_rules = rule_types(integrity)
 for required in ("pull_request", "required_status_checks", "required_linear_history", "deletion", "non_fast_forward"):
@@ -64,6 +67,8 @@ for required in ("pull_request", "required_status_checks", "required_linear_hist
         fail(f"integrity ruleset is missing {required}")
 if "required_status_checks" in rule_types(review):
     fail("review ruleset must not contain required_status_checks")
+if rule_types(owner_updates) != {"update"}:
+    fail("owner-updates ruleset must contain only the update rule")
 
 integrity_pr = pull_request_rule(integrity)
 review_pr = pull_request_rule(review)
@@ -84,6 +89,10 @@ for key, expected in review_expectations.items():
         fail(f"review ruleset {key} must be {expected}")
 if review_pr.get("allowed_merge_methods") != ["squash"]:
     fail("review ruleset must stay squash-only")
+
+owner_update_rule = owner_updates["rules"][0]
+if owner_update_rule != {"type": "update"}:
+    fail("owner-updates ruleset must use GitHub's canonical update rule without fetch-and-merge parameters")
 
 renovate = load_json("renovate.json")
 if renovate.get("automerge") is not False:
@@ -121,8 +130,10 @@ for snippet in (
     "-F allow_auto_merge=false",
     'upsert_ruleset "Protect main: integrity"',
     'upsert_ruleset "Protect main: review"',
+    'upsert_ruleset "Protect main: owner updates"',
     'require_live_value "integrity bypass actor count" "$integrity_bypass_count" "0"',
     'require_live_value "review bypass actor" "$review_bypass" "User:139752288:pull_request"',
+    'require_live_value "owner-updates bypass actor" "$owner_updates_bypass" "User:139752288:pull_request"',
 ):
     if snippet not in script_text:
         fail(f"apply-repo-safeguards.sh missing {snippet}")

@@ -10,9 +10,10 @@ Applies the repository safeguard posture:
   - squash-only PR merges
   - delete branches on merge
   - auto-merge disabled
-  - two active main-branch rulesets:
+  - three active main-branch rulesets:
       * Protect main: integrity (no bypass; required PR, strict CI, no delete/force)
       * Protect main: review (owner-only pull-request bypass for review rules)
+      * Protect main: owner updates (only owner can update main through PRs)
   - classic main branch protection fallback with required CI checks
   - best-effort GitHub security extras where the plan supports them
 
@@ -45,8 +46,9 @@ fi
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 integrity_ruleset="$repo_root/.github/rulesets/main-integrity.json"
 review_ruleset="$repo_root/.github/rulesets/main-review.json"
+owner_updates_ruleset="$repo_root/.github/rulesets/main-owner-updates.json"
 
-for f in "$integrity_ruleset" "$review_ruleset"; do
+for f in "$integrity_ruleset" "$review_ruleset" "$owner_updates_ruleset"; do
     if [[ ! -f "$f" ]]; then
         echo "FAIL: missing ruleset file: $f" >&2
         exit 3
@@ -116,6 +118,7 @@ gh_api PATCH "repos/$repo" \
 
 upsert_ruleset "Protect main: integrity" "$integrity_ruleset"
 upsert_ruleset "Protect main: review" "$review_ruleset"
+upsert_ruleset "Protect main: owner updates" "$owner_updates_ruleset"
 
 gh_api_json PUT "repos/$repo/branches/main/protection" <<'JSON' >/dev/null
 {
@@ -170,7 +173,8 @@ require_live_value "delete_branch_on_merge" "$delete_branch_on_merge" "true"
 
 integrity_id="$(ruleset_id_by_name "Protect main: integrity")"
 review_id="$(ruleset_id_by_name "Protect main: review")"
-if [[ -z "$integrity_id" || -z "$review_id" ]]; then
+owner_updates_id="$(ruleset_id_by_name "Protect main: owner updates")"
+if [[ -z "$integrity_id" || -z "$review_id" || -z "$owner_updates_id" ]]; then
     echo "FAIL: expected rulesets were not found after apply" >&2
     exit 5
 fi
@@ -181,5 +185,13 @@ require_live_value "integrity bypass actor count" "$integrity_bypass_count" "0"
 review_bypass="$(gh api "repos/$repo/rulesets/$review_id" \
     --jq '.bypass_actors[] | "\(.actor_type):\(.actor_id):\(.bypass_mode)"')"
 require_live_value "review bypass actor" "$review_bypass" "User:139752288:pull_request"
+
+owner_updates_bypass="$(gh api "repos/$repo/rulesets/$owner_updates_id" \
+    --jq '.bypass_actors[] | "\(.actor_type):\(.actor_id):\(.bypass_mode)"')"
+require_live_value "owner-updates bypass actor" "$owner_updates_bypass" "User:139752288:pull_request"
+
+owner_updates_rule="$(gh api "repos/$repo/rulesets/$owner_updates_id" \
+    --jq '.rules[] | select(.type == "update") | (.parameters.update_allows_fetch_and_merge // false)')"
+require_live_value "owner-updates fetch-and-merge exception" "$owner_updates_rule" "false"
 
 echo "Repository safeguards applied and verified. Re-run safely any time."
