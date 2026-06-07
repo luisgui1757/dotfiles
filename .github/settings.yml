@@ -3,8 +3,8 @@
 
 repository:
   allow_merge_commit: false
-  allow_squash_merge: false
-  allow_rebase_merge: true
+  allow_squash_merge: true
+  allow_rebase_merge: false
   delete_branch_on_merge: true
   enable_automated_security_fixes: true
   enable_vulnerability_alerts: true
@@ -23,10 +23,10 @@ branches:
           - setup.sh / macos-15
           - setup.ps1 / windows-2025
       enforce_admins: true
-      # Solo-maintainer repo: requiring approvals would lock the owner out (you
-      # cannot approve your own PR, and enforce_admins is true). The merge gate is
-      # the required status checks above + enforce_admins. Re-enable when you add
-      # collaborators.
+      # The split repository rulesets in .github/rulesets are canonical. Classic
+      # branch protection stays as a fallback, but it cannot model "owner may
+      # bypass review while nobody may bypass CI", so do not add required reviews
+      # here.
       required_pull_request_reviews: null
       required_linear_history: true
       required_conversation_resolution: true

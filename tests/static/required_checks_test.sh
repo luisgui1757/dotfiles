@@ -10,6 +10,7 @@ trap 'rm -rf "$tmp"' EXIT
 expected="$tmp/expected.txt"
 settings="$tmp/settings.txt"
 safeguards="$tmp/safeguards.txt"
+ruleset="$tmp/ruleset.txt"
 
 {
   awk '
@@ -69,6 +70,19 @@ awk '
   }
 ' scripts/apply-repo-safeguards.sh > "$safeguards"
 
+python3 - <<'PY' > "$ruleset"
+import json
+
+with open(".github/rulesets/main-integrity.json", encoding="utf-8") as fh:
+    data = json.load(fh)
+
+for rule in data["rules"]:
+    if rule["type"] == "required_status_checks":
+        for check in rule["parameters"]["required_status_checks"]:
+            print(check["context"])
+        break
+PY
+
 if ! diff -u "$expected" "$settings"; then
     echo "FAIL: .github/settings.yml required checks are out of sync" >&2
     exit 1
@@ -76,6 +90,11 @@ fi
 
 if ! diff -u "$expected" "$safeguards"; then
     echo "FAIL: scripts/apply-repo-safeguards.sh required checks are out of sync" >&2
+    exit 1
+fi
+
+if ! diff -u "$expected" "$ruleset"; then
+    echo "FAIL: .github/rulesets/main-integrity.json required checks are out of sync" >&2
     exit 1
 fi
 
