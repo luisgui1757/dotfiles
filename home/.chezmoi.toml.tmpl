@@ -1,0 +1,10 @@
+{{- $os := .chezmoi.os -}}
+{{- /* top-level `mode` FIRST — before [data] — or it becomes data.mode and is ignored. */ -}}
+{{- if eq $os "windows" }}
+mode = "file"      # no symlink privilege / Developer-Mode needed
+{{- else }}
+mode = "symlink"   # live-edit
+{{- end }}
+
+[data]
+    targetOS = {{ .chezmoi.os | quote }}     # the ONE place production templates read the OS; tests override it

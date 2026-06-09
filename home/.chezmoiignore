@@ -1,0 +1,12 @@
+{{- if ne .targetOS "windows" }}
+.tmux.windows.conf
+{{- end }}
+{{- if ne .targetOS "darwin" }}
+Library/Application Support/lazygit/config.yml
+{{- end }}
+{{- if ne .targetOS "linux" }}
+.config/lazygit/config.yml
+{{- end }}
+{{- if ne .targetOS "windows" }}
+AppData/Local/lazygit/config.yml
+{{- end }}

@@ -350,6 +350,10 @@ AppData/Local/lazygit/config.yml
 
 ### DC-1 Acceptance (maps `ROADMAP.md:407-423`)
 
+Status note (2026-06-09): DC-1 source files landed in this checkout; macOS sandbox apply/verify and
+second-apply no-op were validated, with `.chezmoiignore` branch proof rendered for Windows and Linux.
+Real Windows apply semantics remain manual; DC-2/DC-3/DC-6 are untouched.
+
 - [ ] `chez apply` (sandbox) lands `~/.tmux.conf` on macOS/Linux/Windows; `~/.tmux.windows.conf` only
       on Windows.
 - [ ] lazygit config lands at the correct per-OS absolute path; bodies byte-identical (one source).
