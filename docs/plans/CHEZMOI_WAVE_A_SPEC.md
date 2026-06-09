@@ -431,6 +431,9 @@ psmux needs an ordered bucket-add **before** install, so it can't be a flat pack
 `:372-375` are intentionally dropped — chezmoi scripts are non-interactive, matching the old "no-TTY
 → --all" behavior, `setup.sh:69-73`). **Each PM call is guarded by `Get-Command` so a missing
 manager falls through instead of throwing** (`$ErrorActionPreference='Stop'` would otherwise abort).
+The psmux bucket-add is hardened via `Add-ScoopBucketSafe` (idempotent + non-interactive, mirroring
+`install-deps.ps1`) because the chezmoi run-script is non-interactive and `Stop`-strict — an
+un-hardened clone credential prompt would hang `chez apply` with no answerable console.
 
 ```powershell
 # home/.chezmoiscripts/run_once_after_10-install-psmux.ps1.tmpl
@@ -438,13 +441,38 @@ manager falls through instead of throwing** (`$ErrorActionPreference='Stop'` wou
 $ErrorActionPreference = 'Stop'
 function Test-Tool($n) { [bool](Get-Command $n -ErrorAction SilentlyContinue) }
 
+# Idempotent, non-interactive scoop bucket add. NEVER throws (Stop-safe);
+# GIT_TERMINAL_PROMPT/GCM_INTERACTIVE off so a clone auth challenge fails fast
+# instead of hanging chez apply, and we verify the bucket populated
+# (ScoopInstaller/Scoop#5482). Mirrors install-deps.ps1 Add-ScoopBucketSafe.
+function Add-ScoopBucketSafe($Name, $Url) {
+  $root = if ($env:SCOOP) { $env:SCOOP } else { Join-Path $env:USERPROFILE 'scoop' }
+  $dir  = Join-Path (Join-Path $root 'buckets') $Name
+  $ok   = { (Test-Path -LiteralPath $dir) -and (@(Get-ChildItem -LiteralPath $dir -Force -ErrorAction SilentlyContinue).Count -gt 0) }
+  if (& $ok) { return $true }
+  $op = $env:GIT_TERMINAL_PROMPT; $og = $env:GCM_INTERACTIVE
+  $env:GIT_TERMINAL_PROMPT = '0'; $env:GCM_INTERACTIVE = '0'
+  try {
+    foreach ($i in 1..2) {
+      if ([string]::IsNullOrEmpty($Url)) { scoop bucket add $Name 2>&1 | Out-Null }
+      else { scoop bucket add $Name $Url 2>&1 | Out-Null }
+      if (& $ok) { return $true }
+      if (Test-Path -LiteralPath $dir) { Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue }
+      scoop bucket rm $Name 2>&1 | Out-Null
+    }
+    Write-Warning "scoop bucket add $Name did not populate a usable bucket; recover with 'scoop bucket rm $Name' then re-run"
+    return $false
+  } finally { $env:GIT_TERMINAL_PROMPT = $op; $env:GCM_INTERACTIVE = $og }
+}
+
 if (Test-Tool 'psmux') { Write-Host 'ok        psmux already installed'; return }
 
-# 1) scoop (custom bucket first) — install-deps.ps1:377-382
+# 1) scoop (custom bucket first) — install-deps.ps1:376-384
 if (Test-Tool 'scoop') {
-  scoop bucket add psmux https://github.com/psmux/scoop-psmux 2>$null | Out-Null
-  scoop install psmux
-  if ($LASTEXITCODE -eq 0 -and (Test-Tool 'psmux')) { Write-Host 'installed psmux via scoop'; return }
+  if (Add-ScoopBucketSafe 'psmux' 'https://github.com/psmux/scoop-psmux') {
+    scoop install psmux
+    if ($LASTEXITCODE -eq 0 -and (Test-Tool 'psmux')) { Write-Host 'installed psmux via scoop'; return }
+  }
   Write-Warning 'scoop install of psmux failed; trying winget...'
 }
 # 2) winget — install-deps.ps1:386-390
@@ -460,7 +488,6 @@ if (Test-Tool 'choco') {
 }
 Write-Warning 'psmux install failed via scoop/winget/choco.'
 exit 1   # required survivor: fail so run_once_ records NO success and retries next apply
-         # (matches install-deps.ps1:401,495). Precondition: >=1 of scoop/winget/choco present.
 {{- end -}}
 ```
 

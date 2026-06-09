@@ -411,9 +411,14 @@ save only**. The next plain `:w` formats normally. Implemented in
   with `-RunAsAdmin`, then adds the Scoop `shims` dir to the current process
   PATH so the rest of `install-deps.ps1` can immediately use `scoop`.
   `Install-Scoop` also ensures the `extras` and `nerd-fonts` buckets whenever
-  Scoop exists, including pre-existing user installs. Local setup still
-  recommends Developer Mode plus a normal PowerShell; do not elevate the whole
-  local setup unless you intentionally want the admin path.
+  Scoop exists, including pre-existing user installs. Every bucket add routes
+  through `Add-ScoopBucketSafe`: idempotent; non-interactive via
+  `GIT_TERMINAL_PROMPT=0` + `GCM_INTERACTIVE=0`; and verified populated so
+  Scoop#5482's registered-but-empty bucket state does not masquerade as
+  success. All `scoop bucket add` calls in `install-deps.ps1` must go through
+  `Add-ScoopBucketSafe` (guarded by `tests/static/repo_policy_test.sh`). Local
+  setup still recommends Developer Mode plus a normal PowerShell; do not
+  elevate the whole local setup unless you intentionally want the admin path.
 - **`DOTFILES_SKIP_BREW_BOOTSTRAP=1` is a CI/native-PM test knob.** On Linux,
   when no `brew` is already installed, this prevents `install-deps.sh --all`
   from bootstrapping Linuxbrew and keeps the detected native package manager
@@ -498,8 +503,8 @@ save only**. The next plain `:w` formats normally. Implemented in
   `~/.tmux.conf` link). If the Unix-shaped `if-shell` clipboard block ever
   chokes under ConPTY on a given machine, guard that block rather than fork the
   config. Install-Psmux is NOT in the `$Catalog` because scoop needs a custom
-  bucket (`scoop bucket add psmux …`) — the helper does that, then falls back
-  to winget / choco.
+  psmux bucket URL; it passes that URL through `Add-ScoopBucketSafe`, then
+  falls through to winget / choco if the bucket clone or scoop install fails.
 - **psmux + PSReadLine: Windows-only overlay, two settings.** psmux's default
   shell is **cmd**, not pwsh — which is the *real* reason "history prediction"
   and `MenuComplete` looked broken inside panes: PSReadLine was never loaded.

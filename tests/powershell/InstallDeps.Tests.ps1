@@ -116,6 +116,7 @@ Describe "install-deps.ps1" {
         Mock -CommandName Get-Command -MockWith {
             return [pscustomobject]@{ Name = 'scoop'; Source = 'scoop' }
         } -ParameterFilter { $Name -eq 'scoop' }
+        Mock -CommandName Test-Path -MockWith { return $false }
         Mock -CommandName scoop -MockWith {
             $script:ScoopArgs += ($args -join ' ')
         }
@@ -124,6 +125,113 @@ Describe "install-deps.ps1" {
 
         $script:ScoopArgs | Should -Contain 'bucket add extras'
         $script:ScoopArgs | Should -Contain 'bucket add nerd-fonts'
+    }
+
+    It "skips scoop bucket add when the psmux bucket already exists" {
+        . $script:ImportInstallDepsForTest
+        $script:ScoopArgs = @()
+        Mock -CommandName Test-Path -MockWith { return $true }
+        Mock -CommandName Get-ChildItem -MockWith { return @([pscustomobject]@{ Name = 'manifest.json' }) }
+        Mock -CommandName scoop -MockWith {
+            $script:ScoopArgs += ($args -join ' ')
+        }
+
+        Add-ScoopBucketSafe -Name 'psmux' -Url 'https://github.com/psmux/scoop-psmux' | Should -BeTrue
+
+        ($script:ScoopArgs | Where-Object { $_ -like 'bucket add*' }).Count | Should -Be 0
+    }
+
+    It "sets GIT_TERMINAL_PROMPT and GCM_INTERACTIVE to 0 during the add and restores them after" {
+        . $script:ImportInstallDepsForTest
+        $originalPrompt = $env:GIT_TERMINAL_PROMPT
+        $originalGcm = $env:GCM_INTERACTIVE
+        $script:BucketPopulated = $false
+        $script:CapturedGitEnv = @()
+        Mock -CommandName Test-Path -MockWith { return $script:BucketPopulated }
+        Mock -CommandName Get-ChildItem -MockWith {
+            if ($script:BucketPopulated) {
+                return @([pscustomobject]@{ Name = 'bucket.json' })
+            }
+            return @()
+        }
+        Mock -CommandName scoop -MockWith {
+            if (($args -join ' ') -like 'bucket add*') {
+                $script:CapturedGitEnv += [pscustomobject]@{
+                    Prompt = $env:GIT_TERMINAL_PROMPT
+                    Gcm = $env:GCM_INTERACTIVE
+                }
+                $script:BucketPopulated = $true
+            }
+        }
+
+        try {
+            $env:GIT_TERMINAL_PROMPT = 'original-prompt'
+            $env:GCM_INTERACTIVE = 'original-gcm'
+
+            Add-ScoopBucketSafe -Name 'psmux' -Url 'https://github.com/psmux/scoop-psmux' | Should -BeTrue
+
+            $script:CapturedGitEnv[-1].Prompt | Should -Be '0'
+            $script:CapturedGitEnv[-1].Gcm | Should -Be '0'
+            $env:GIT_TERMINAL_PROMPT | Should -Be 'original-prompt'
+            $env:GCM_INTERACTIVE | Should -Be 'original-gcm'
+
+            Remove-Item Env:GIT_TERMINAL_PROMPT -ErrorAction SilentlyContinue
+            Remove-Item Env:GCM_INTERACTIVE -ErrorAction SilentlyContinue
+            $script:BucketPopulated = $false
+            $script:CapturedGitEnv = @()
+
+            Add-ScoopBucketSafe -Name 'psmux' -Url 'https://github.com/psmux/scoop-psmux' | Should -BeTrue
+
+            $script:CapturedGitEnv[-1].Prompt | Should -Be '0'
+            $script:CapturedGitEnv[-1].Gcm | Should -Be '0'
+            ($null -eq $env:GIT_TERMINAL_PROMPT) | Should -BeTrue
+            ($null -eq $env:GCM_INTERACTIVE) | Should -BeTrue
+        } finally {
+            if ($null -eq $originalPrompt) {
+                Remove-Item Env:GIT_TERMINAL_PROMPT -ErrorAction SilentlyContinue
+            } else {
+                $env:GIT_TERMINAL_PROMPT = $originalPrompt
+            }
+            if ($null -eq $originalGcm) {
+                Remove-Item Env:GCM_INTERACTIVE -ErrorAction SilentlyContinue
+            } else {
+                $env:GCM_INTERACTIVE = $originalGcm
+            }
+        }
+    }
+
+    It "returns false and falls through to winget when the bucket never populates" {
+        . $script:ImportInstallDepsForTest
+        $script:ScoopArgs = @()
+        $script:WingetArgs = @()
+        $script:PsmuxInstalled = $false
+        Mock -CommandName Test-Path -MockWith { return $false }
+        Mock -CommandName Get-Command -MockWith {
+            param([string]$Name)
+            if ($Name -in @('scoop', 'winget')) {
+                return [pscustomobject]@{ Name = $Name; Source = $Name }
+            }
+            return $null
+        }
+        Mock -CommandName Test-Tool -MockWith { return $script:PsmuxInstalled } -ParameterFilter { $name -eq 'psmux' }
+        Mock -CommandName scoop -MockWith {
+            $script:ScoopArgs += ($args -join ' ')
+            $global:LASTEXITCODE = 1
+        }
+        Mock -CommandName winget -MockWith {
+            $script:WingetArgs += ($args -join ' ')
+            $global:LASTEXITCODE = 0
+            $script:PsmuxInstalled = $true
+        }
+
+        Add-ScoopBucketSafe -Name 'psmux' -Url 'https://github.com/psmux/scoop-psmux' | Should -BeFalse
+        $script:ScoopArgs | Should -Contain 'bucket rm psmux'
+
+        $script:ScoopArgs = @()
+        Install-Psmux
+
+        $script:ScoopArgs | Should -Contain 'bucket rm psmux'
+        $script:WingetArgs | Should -Contain 'install psmux --accept-source-agreements --accept-package-agreements --silent'
     }
 
     It "uses winget when winget is the only installed manager" {

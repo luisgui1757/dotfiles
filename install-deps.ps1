@@ -47,11 +47,71 @@ function Add-ScoopToPathForCurrentProcess {
     }
 }
 
+function Add-ScoopBucketSafe {
+    # Idempotent, non-interactive `scoop bucket add`. Returns $true if the bucket
+    # is present AND populated afterward, $false otherwise. NEVER throws, so a
+    # failed clone falls through to the next package manager instead of hanging
+    # or aborting (matters under $ErrorActionPreference='Stop' too -- the chezmoi
+    # run-script port relies on this).
+    #
+    # Hardens two real, sporadic failures of `scoop bucket add` (it git-clones):
+    #   1) git / Git Credential Manager prompting (or popping a browser) over a
+    #      non-interactive console (psmux / SSH / setup.ps1 / chez apply) -> a
+    #      credential challenge would otherwise HANG the whole run and eventually
+    #      surface as "authentication failed". GIT_TERMINAL_PROMPT=0 +
+    #      GCM_INTERACTIVE=0 make git/GCM FAIL FAST instead.
+    #   2) ScoopInstaller/Scoop#5482 / #5814: `scoop bucket add` reports success
+    #      even when the underlying clone fails, leaving an EMPTY bucket. We verify
+    #      the bucket dir is non-empty and purge a half-clone so retry is clean.
+    #
+    # When $Url is empty, fall back to the bare `scoop bucket add <name>` form so
+    # scoop's known-bucket table resolves the canonical URL (extras / nerd-fonts).
+    param(
+        [Parameter(Mandatory)][string]$Name,
+        [string]$Url = ''
+    )
+    $scoopRoot = if ($env:SCOOP) { $env:SCOOP } else { Join-Path $env:USERPROFILE 'scoop' }
+    $bucketDir = Join-Path (Join-Path $scoopRoot 'buckets') $Name
+    $populated = {
+        (Test-Path -LiteralPath $bucketDir) -and
+        (@(Get-ChildItem -LiteralPath $bucketDir -Force -ErrorAction SilentlyContinue).Count -gt 0)
+    }
+
+    if (& $populated) { return $true }   # already added + populated: skip the clone
+
+    $oldPrompt = $env:GIT_TERMINAL_PROMPT
+    $oldGcm = $env:GCM_INTERACTIVE
+    $env:GIT_TERMINAL_PROMPT = '0'   # git: no terminal prompt -> fail instead of block
+    $env:GCM_INTERACTIVE = '0'       # GCM: never prompt / open a browser -> fail fast
+    try {
+        foreach ($attempt in 1..2) {
+            # 2>&1 keeps the diagnostic (NOT 2>$null) so a real failure is visible.
+            if ([string]::IsNullOrEmpty($Url)) {
+                scoop bucket add $Name 2>&1 | Out-Null
+            } else {
+                scoop bucket add $Name $Url 2>&1 | Out-Null
+            }
+            if (& $populated) { return $true }
+            # Purge a half-cloned / empty bucket so the next attempt starts clean
+            # (Scoop#5482: a registered-but-empty bucket otherwise blocks re-add).
+            if (Test-Path -LiteralPath $bucketDir) {
+                Remove-Item -LiteralPath $bucketDir -Recurse -Force -ErrorAction SilentlyContinue
+            }
+            scoop bucket rm $Name 2>&1 | Out-Null
+        }
+        Write-Warning ("scoop bucket add {0} did not populate a usable bucket; recover with 'scoop bucket rm {0}' then re-run" -f $Name)
+        return $false
+    } finally {
+        $env:GIT_TERMINAL_PROMPT = $oldPrompt
+        $env:GCM_INTERACTIVE = $oldGcm
+    }
+}
+
 function Ensure-ScoopBuckets {
     if (-not (Get-Command scoop -ErrorAction SilentlyContinue)) { return }
     if ($DryRun) { return }
-    scoop bucket add extras 2>$null | Out-Null
-    scoop bucket add nerd-fonts 2>$null | Out-Null
+    Add-ScoopBucketSafe -Name 'extras' | Out-Null
+    Add-ScoopBucketSafe -Name 'nerd-fonts' | Out-Null
 }
 
 function Install-Scoop {
@@ -258,7 +318,7 @@ function Install-HackNerdFont {
             Write-Host "  would: scoop install nerd-fonts/Hack-NF"
             return
         }
-        scoop bucket add nerd-fonts 2>$null | Out-Null
+        Add-ScoopBucketSafe -Name 'nerd-fonts' | Out-Null
         scoop install nerd-fonts/Hack-NF
         if ($LASTEXITCODE -eq 0) {
             Write-Host ("  installed {0,-26} via scoop" -f "Hack Nerd Font")
@@ -370,17 +430,20 @@ function Install-Psmux {
         return
     }
     if ($DryRun) {
-        Write-Host "  would: scoop bucket add psmux https://github.com/psmux/scoop-psmux; scoop install psmux  (fallback: winget / choco)"
+        Write-Host "  would: Add-ScoopBucketSafe psmux; scoop install psmux  (fallback: winget / choco)"
         return
     }
     if (Get-Command scoop -ErrorAction SilentlyContinue) {
-        scoop bucket add psmux https://github.com/psmux/scoop-psmux 2>$null | Out-Null
-        scoop install psmux
-        if ($LASTEXITCODE -eq 0 -and (Test-Tool 'psmux')) {
-            Write-Host ("  installed {0,-26} via scoop" -f "psmux")
-            return
+        if (Add-ScoopBucketSafe -Name 'psmux' -Url 'https://github.com/psmux/scoop-psmux') {
+            scoop install psmux
+            if ($LASTEXITCODE -eq 0 -and (Test-Tool 'psmux')) {
+                Write-Host ("  installed {0,-26} via scoop" -f "psmux")
+                return
+            }
+            Write-Warning "scoop install of psmux failed; trying winget..."
+        } else {
+            Write-Warning "scoop bucket add psmux failed (clone auth/network); trying winget..."
         }
-        Write-Warning "scoop install of psmux failed; trying winget..."
     }
     if (Get-Command winget -ErrorAction SilentlyContinue) {
         winget install psmux --accept-source-agreements --accept-package-agreements --silent
