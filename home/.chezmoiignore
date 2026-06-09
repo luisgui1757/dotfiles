@@ -16,8 +16,7 @@ Documents
 .config/nvim
 {{- end }}
 {{- if ne .targetOS "darwin" }}
-Library/Application Support/lazygit
-Library/Application Support/com.mitchellh.ghostty
+Library
 {{- end }}
 {{- if ne .targetOS "linux" }}
 .config/lazygit
