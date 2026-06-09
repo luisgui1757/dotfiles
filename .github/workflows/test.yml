@@ -250,7 +250,10 @@ jobs:
 
   chezmoi-parity-windows:
     runs-on: windows-2025
-    timeout-minutes: 25
+    # Heaviest job: a full chezmoi apply + the full legacy bootstrap.ps1 + the WT
+    # deep-compare. Borderline at 25 on a slow runner (one cancellation), so give
+    # headroom.
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
       - name: Install chezmoi
