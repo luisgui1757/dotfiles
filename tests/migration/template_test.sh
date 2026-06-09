@@ -57,13 +57,15 @@ assert_lazygit_gate() {
 
     case "$os" in
         darwin)
-            expected_path="Library/Application Support/lazygit/config.yml"
+            # dir-level marker: macOS lazygit lives under Library/Application Support
+            expected_path="Library/Application Support/lazygit"
             ;;
         linux)
-            expected_path=".config/lazygit/config.yml"
+            expected_path=".config/lazygit"
             ;;
         windows)
-            expected_path="AppData/Local/lazygit/config.yml"
+            # Windows lazygit + WT both live under AppData (one ignore marker)
+            expected_path="AppData"
             ;;
         *)
             fail "unsupported OS fixture: $os"
@@ -73,9 +75,9 @@ assert_lazygit_gate() {
     active_count=0
     active_path=""
     for path in \
-        "Library/Application Support/lazygit/config.yml" \
-        ".config/lazygit/config.yml" \
-        "AppData/Local/lazygit/config.yml"
+        "Library/Application Support/lazygit" \
+        ".config/lazygit" \
+        "AppData"
     do
         if ! is_ignored "$path" "$rendered_ignore"; then
             active_count=$((active_count + 1))

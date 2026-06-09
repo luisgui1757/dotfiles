@@ -1,15 +1,14 @@
+{{- /* Per-OS gating. Ignore the DIRECTORIES (not just the leaf files) on the
+       wrong OS, otherwise chezmoi still creates the empty parent dirs (e.g.
+       ~/.config/lazygit or ~/AppData on macOS), diverging from the legacy path.
+       AppData is one ignore covering BOTH Windows targets (lazygit + WT). */ -}}
 {{- if ne .targetOS "windows" }}
 .tmux.windows.conf
+AppData
 {{- end }}
 {{- if ne .targetOS "darwin" }}
-Library/Application Support/lazygit/config.yml
+Library/Application Support/lazygit
 {{- end }}
 {{- if ne .targetOS "linux" }}
-.config/lazygit/config.yml
-{{- end }}
-{{- if ne .targetOS "windows" }}
-AppData/Local/lazygit/config.yml
-{{- end }}
-{{- if ne .targetOS "windows" }}
-AppData/Local/Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/LocalState/settings.json
+.config/lazygit
 {{- end }}
