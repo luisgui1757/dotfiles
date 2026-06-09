@@ -181,11 +181,11 @@ skipping the actual checks.
 
 Pull requests are meant to be gated by two workflows:
 
-- `.github/workflows/test.yml` runs the existing static, shell, bootstrap,
-  tmux, starship, Neovim, and Windows Pester/PSScriptAnalyzer suites. Warnings
-  are treated as failures where the tools expose them cleanly: shellcheck exits
-  nonzero, PSScriptAnalyzer runs at `Warning,Error`, and YAML parsing/linting
-  is part of `make test-static`.
+- `.github/workflows/test.yml` runs the static, shell, bootstrap, tmux,
+  starship, Neovim, Windows Pester/PSScriptAnalyzer, and `chezmoi-parity`
+  suites. Warnings are treated as failures where the tools expose them cleanly:
+  shellcheck exits nonzero, PSScriptAnalyzer runs at `Warning,Error`, and YAML
+  parsing/linting is part of `make test-static`.
 - `.github/workflows/e2e-install.yml` is the real install guarantee. It proves
   the public setup paths on fresh hosted runners and keeps one clean Ubuntu
   container for the native `apt` branch.
@@ -290,7 +290,7 @@ the adjacent constant.
 ├── windows-terminal/      # settings.fragment.jsonc + merge README
 ├── tests/                 # automated test tree
 ├── tests/wsl/             # manual WSL split-host e2e check
-├── .github/workflows/     # CI matrix (ubuntu, macos, windows)
+├── .github/workflows/     # CI matrix + chezmoi parity
 ├── .github/rulesets/      # checked-in GitHub ruleset payloads for main
 ├── docs/security/         # branch-protection runbook
 ├── setup.sh               # public macOS/Linux/WSL entry point

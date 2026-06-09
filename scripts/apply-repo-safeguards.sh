@@ -128,6 +128,7 @@ gh_api_json PUT "repos/$repo/branches/main/protection" <<'JSON' >/dev/null
       "ubuntu",
       "macos",
       "windows",
+      "chezmoi-parity",
       "e2e containers / ubuntu-24.04",
       "setup.sh / ubuntu-24.04",
       "setup.sh / macos-15",

@@ -20,6 +20,7 @@ defaults:
 env:
   CARGO_BINSTALL_COMMIT: f8810ffa11196f23afb38e6fb64716fbf814ad8f
   CARGO_BINSTALL_INSTALLER_SHA256: d3a93702160e0ec03e2a4e996855db1f01adee801fb84a43add24e0877ef8eae
+  CHEZMOI_VERSION: v2.70.5
   NVIM_LINUX_VERSION: v0.12.2
   NVIM_LINUX_X86_64_SHA256: 31cf85945cb600d96cdf69f88bc68bec814acbff50863c5546adef3a1bcef260
   PIP_DISABLE_PIP_VERSION_CHECK: "1"
@@ -183,3 +184,25 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $PSNativeCommandUseErrorActionPreference = $true
           .\test.ps1
+
+  chezmoi-parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - name: Install deps
+        run: |
+          set -euxo pipefail
+          sudo apt-get update
+          sudo apt-get install -y ca-certificates curl git python3
+          sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin" "$CHEZMOI_VERSION"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/chezmoi" --version
+      - name: Template tests
+        run: |
+          set -euo pipefail
+          PATH="$HOME/.local/bin:$PATH" bash tests/migration/template_test.sh
+      - name: Parity gate
+        run: |
+          set -euo pipefail
+          PATH="$HOME/.local/bin:$PATH" bash tests/migration/parity_gate.sh

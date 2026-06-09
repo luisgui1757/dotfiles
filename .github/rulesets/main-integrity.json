@@ -40,6 +40,10 @@
             "integration_id": 15368
           },
           {
+            "context": "chezmoi-parity",
+            "integration_id": 15368
+          },
+          {
             "context": "e2e containers / ubuntu-24.04",
             "integration_id": 15368
           },

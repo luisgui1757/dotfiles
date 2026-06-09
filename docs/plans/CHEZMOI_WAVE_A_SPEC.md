@@ -628,11 +628,13 @@ HOME_OLD="$(mktemp -d)"
 # no devilspie2, no fonts). Intersection-scoping (Step 3) ignores any non-pilot links it makes.
 env HOME="$HOME_OLD" "$REPO_ROOT/bootstrap.sh"
 # zsh plugins ONLY — source install-deps.sh and call the single function (avoids the full installer).
-# YES_ALL=1 is REQUIRED: install_zsh_plugins gates on ask() (install-deps.sh:809), which auto-accepts
-# only when YES_ALL=1 or DRY_RUN=1 (install-deps.sh:199-207); without it a non-interactive gate skips
-# the plugins and P3/P4 then false-FAIL.
-env HOME="$HOME_OLD" INSTALL_DEPS_SOURCE_ONLY=1 YES_ALL=1 bash -c \
-  'source "'"$REPO_ROOT"'/install-deps.sh"; install_zsh_plugins'   # install-deps.sh:737-826
+# YES_ALL=1 is REQUIRED: install_zsh_plugins gates on ask() (install-deps.sh:199-207), which
+# auto-accepts only when YES_ALL=1 or DRY_RUN=1; without it a non-interactive gate skips the plugins
+# and P3/P4 false-FAIL. CRITICAL: set YES_ALL=1 *AFTER* the source, not as an env var — install-deps.sh
+# initializes YES_ALL=0 at the top (install-deps.sh:17) at source time, which clobbers an env-passed
+# value. (Verified by running parity_gate.sh: the env form skips the plugins.)
+env HOME="$HOME_OLD" INSTALL_DEPS_SOURCE_ONLY=1 bash -c \
+  'source "'"$REPO_ROOT"'/install-deps.sh"; YES_ALL=1; install_zsh_plugins'   # install-deps.sh zsh slice
 ```
 
 > This deliberately does NOT run `install-deps.sh --all` / `setup.sh` — so no fonts, login-shell,
@@ -765,6 +767,16 @@ tests survive unchanged — `tests/nvim/spec/*`,
       consecutive runs** (N fixed in the decision gate) before any old script is considered for
       retirement (retirement = Wave C).
 - [ ] The Windows-only checks (psmux, WT value-level deep-compare) pass on **one manual Windows run**.
+
+Status note (2026-06-09): DC-6 harness and CI wiring landed in this checkout:
+`tests/migration/template_test.sh`, `tests/migration/parity_gate.sh`, the
+`chezmoi-parity` job, and required-check sync. Local macOS validation covered
+the template tests, required-check sync, YAML lint, shellcheck on the new
+migration scripts, and parse-only parity-gate validation. The offline
+`make -C . test-static` attempt was not green because local `taplo 0.10.0`
+panicked in `toml_lint.sh`; the edited YAML and required-check sync were
+green. The live networked `parity_gate.sh` run remains separate because P3/P4
+clone external zsh-plugin repos.
 
 ---
 

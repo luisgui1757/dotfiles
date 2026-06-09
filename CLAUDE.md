@@ -40,7 +40,7 @@ not ship synced agent preference folders.
 ├── lazygit/               config.yml (J/K move-commit binding)
 ├── tests/                 automated tests, grouped by tool
 ├── tests/wsl/             manual WSL split-host e2e check
-├── .github/workflows/     CI matrix: ubuntu / macos / windows
+├── .github/workflows/     CI matrix + chezmoi parity
 ├── .github/rulesets/      checked-in GitHub ruleset payloads for main
 ├── docs/security/         branch-protection runbook
 ├── setup.sh               public macOS/Linux/WSL setup entry point
@@ -242,8 +242,9 @@ problem.
 Sub-targets **skip gracefully** when their tool isn't installed
 (`yamllint`/`editorconfig-checker`/`hyperfine`/`bats`/`ghostty`). The
 ubuntu/macos/windows CI matrix in `.github/workflows/test.yml` installs
-everything, and `test.ps1` treats missing Windows test dependencies as fatal
-under CI, so anything passing locally + CI is genuinely cross-platform.
+everything, `chezmoi-parity` installs pinned chezmoi for the Wave A migration
+gate, and `test.ps1` treats missing Windows test dependencies as fatal under
+CI, so anything passing locally + CI is genuinely cross-platform.
 
 When adding a new spec:
 - Plenary specs: drop a `*_spec.lua` under `tests/nvim/spec/`. Use plenary
@@ -254,10 +255,11 @@ When adding a new spec:
 
 ## CI / repository safeguards
 
-`test.yml` remains the fast cross-platform suite. Warnings are treated as
-failures where the tools expose them cleanly: shellcheck exits nonzero,
-PSScriptAnalyzer runs at `Warning,Error`, yamllint/parser checks are part of
-`make test-static`, and Windows CI treats missing test dependencies as fatal.
+`test.yml` remains the fast cross-platform suite and now also owns the
+`chezmoi-parity` migration gate. Warnings are treated as failures where the
+tools expose them cleanly: shellcheck exits nonzero, PSScriptAnalyzer runs at
+`Warning,Error`, yamllint/parser checks are part of `make test-static`, and
+Windows CI treats missing test dependencies as fatal.
 
 `e2e-install.yml` is the required real-install gate. The jobs cover different
 install paths, not symmetric container platforms:
