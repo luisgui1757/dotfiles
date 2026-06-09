@@ -1,1 +1,6 @@
-{{ .chezmoi.sourceDir }}/../nvim
+{{- /* Windows: clean, backslash, no-`..` absolute path. Windows readlink returns
+       backslashes and may resolve `..`, so the POSIX `{{ .chezmoi.sourceDir }}/../nvim`
+       form never round-trips and chezmoi reports drift-on-every-apply (it then
+       prompts and hangs a non-interactive apply). See docs/MIGRATION_STATUS.md and
+       tests/migration/windows_apply_test.ps1. */ -}}
+{{ .chezmoi.sourceDir | replace "\\" "/" | dir | replace "/" "\\" }}\nvim

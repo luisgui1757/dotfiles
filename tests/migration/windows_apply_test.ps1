@@ -114,7 +114,13 @@ function Invoke-CheckedNative {
 
 function Invoke-Chezmoi {
     param([Parameter(Mandatory)] [string[]]$Arguments)
-    Invoke-CheckedNative -FilePath $script:Chezmoi -Arguments (@('--source', $script:SourceDir) + $Arguments)
+    # --no-tty + --force: CI has no interactive tty, so any chezmoi prompt
+    # ("X has changed since chezmoi last wrote it? diff/overwrite/skip/quit")
+    # would block forever (observed: a 40-minute hang on the nvim dir-symlink).
+    # --force makes every change without prompting; --no-tty refuses to grab a
+    # TTY. verify ignores both (it makes no changes), so it stays a strict
+    # oracle: if the nvim symlink ever fails to round-trip, verify still fails.
+    Invoke-CheckedNative -FilePath $script:Chezmoi -Arguments (@('--source', $script:SourceDir, '--no-tty', '--force') + $Arguments)
 }
 
 function Get-ArrayValue {

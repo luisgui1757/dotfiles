@@ -59,7 +59,16 @@ JSONC-fragile.
 - [ ] Windows `nvim` is a directory symlink and therefore still needs Developer
       Mode or elevation. This is not a regression: `bootstrap.ps1` already
       symlinks it. The no-Developer-Mode win applies to simple single-file
-      configs copied by `mode = "file"`.
+      configs copied by `mode = "file"`. The Windows
+      `home/AppData/Local/symlink_nvim.tmpl` target renders a clean, backslash,
+      no-`..` absolute path (`{{ .chezmoi.sourceDir | ... | dir | ... }}\nvim`),
+      not the POSIX `{{ .chezmoi.sourceDir }}/../nvim`. Windows `readlink`
+      returns backslashes and may resolve `..`, so the forward-slash/`..` form
+      never round-trips: chezmoi then reports the symlink as drift-on-every-apply
+      and prompts (`...has changed since chezmoi last wrote it?`), which hangs a
+      non-interactive `chezmoi apply`. The clean backslash form matches what
+      Windows returns, so `verify` stays clean; `windows_apply_test.ps1` also
+      runs chezmoi with `--no-tty --force` so CI can never block on that prompt.
 - [ ] `XDG_DATA_HOME` is not modeled for externals. Chezmoi installs zsh plugins
       to the fixed `.local/share` path, and the verifier checks that same fixed
       path; an XDG-aware managed root is Wave B.
