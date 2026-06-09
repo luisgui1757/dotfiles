@@ -1,0 +1,110 @@
+// Windows Terminal — user-owned fragment.
+//
+// DO NOT symlink this directly over the full settings.json — Windows Terminal
+// auto-regenerates that file with discovered profiles, and a hard symlink
+// would either be overwritten or block discovery.
+//
+// Instead: merge these keys into your real settings.json at
+//   %LOCALAPPDATA%\Packages\Microsoft.WindowsTerminal_*\LocalState\settings.json
+// (See windows-terminal/README.md for the recommended merge procedure.)
+//
+// The fragment intentionally contains ONLY user-authored keys:
+//   - actions (keybindings)
+//   - defaults (font, color scheme)
+//   - copyFormatting / copyOnSelect / initialRows / windowingBehavior
+//   - the Rose Pine color scheme
+//   - the Rose Pine theme
+//   - useAcrylicInTabRow
+//
+// It does NOT contain the auto-generated `profiles.list[]` entries (those
+// vary per machine: PowerShell GUIDs, WSL distros, Azure Cloud Shell, etc.).
+{
+    "$schema": "https://aka.ms/terminal-profiles-schema",
+
+    "copyFormatting": "none",
+    "copyOnSelect": false,
+    "firstWindowPreference": "persistedWindowLayout",
+    "initialRows": 50,
+    "theme": "rose-pine",
+    "useAcrylicInTabRow": true,
+    "windowingBehavior": "useAnyExisting",
+
+    "actions": [
+        { "command": { "action": "copy", "singleLine": false }, "keys": "ctrl+c" },
+        { "command": "paste", "keys": "ctrl+v" },
+        { "command": "find", "keys": "ctrl+shift+f" },
+        { "command": { "action": "splitPane", "split": "auto", "splitMode": "duplicate" }, "keys": "alt+shift+d" },
+        { "command": { "action": "closeTab" }, "keys": "ctrl+shift+w" },
+        { "command": { "action": "newTab" }, "keys": "ctrl+t" },
+        { "command": { "action": "nextTab" }, "keys": "ctrl+tab" },
+        { "command": { "action": "nextTab" }, "keys": "ctrl+right" },
+        { "command": { "action": "prevTab" }, "keys": "ctrl+shift+tab" },
+        { "command": { "action": "prevTab" }, "keys": "ctrl+left" },
+        { "command": { "action": "splitPane", "split": "up" }, "keys": "ctrl+shift+up" },
+        { "command": { "action": "splitPane", "split": "down" }, "keys": "ctrl+shift+down" },
+        { "command": { "action": "splitPane", "split": "right" }, "keys": "ctrl+shift+right" },
+        { "command": { "action": "splitPane", "split": "left" }, "keys": "ctrl+shift+left" },
+        { "command": "closePane", "keys": "ctrl+alt+w" }
+    ],
+
+    "profiles": {
+        "defaults": {
+            "colorScheme": "rose-pine",
+            "font": { "face": "Hack Nerd Font", "size": 12 },
+            "opacity": 95,
+            "useAcrylic": false,
+            "padding": "6, 6, 6, 6",
+            "antialiasingMode": "grayscale",
+            "scrollbarState": "hidden"
+        }
+    },
+
+    "schemes": [
+        {
+            "name": "rose-pine",
+            "background": "#191724",
+            "foreground": "#e0def4",
+            "cursorColor": "#555169",
+            "selectionBackground": "#2a2837",
+            "black":         "#26233a",
+            "red":           "#eb6f92",
+            "green":         "#31748f",
+            "yellow":        "#f6c177",
+            "blue":          "#9ccfd8",
+            "purple":        "#c4a7e7",
+            "cyan":          "#ebbcba",
+            "white":         "#e0def4",
+            "brightBlack":   "#6e6a86",
+            "brightRed":     "#eb6f92",
+            "brightGreen":   "#31748f",
+            "brightYellow":  "#f6c177",
+            "brightBlue":    "#9ccfd8",
+            "brightPurple":  "#c4a7e7",
+            "brightCyan":    "#ebbcba",
+            "brightWhite":   "#e0def4"
+        }
+    ],
+
+    "themes": [
+        {
+            "name": "rose-pine",
+            "tab": {
+                "background": "#191724ff",
+                "iconStyle": "default",
+                "showCloseButton": "always",
+                "unfocusedBackground": null
+            },
+            "tabRow": {
+                "background": "#26233aff",
+                "unfocusedBackground": "#908caaff"
+            },
+            "window": {
+                "applicationTheme": "dark",
+                "experimental.rainbowFrame": false,
+                "frame": null,
+                "unfocusedFrame": null,
+                "useMica": false
+            }
+        }
+    ]
+}

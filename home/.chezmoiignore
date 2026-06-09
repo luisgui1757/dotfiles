@@ -10,3 +10,6 @@ Library/Application Support/lazygit/config.yml
 {{- if ne .targetOS "windows" }}
 AppData/Local/lazygit/config.yml
 {{- end }}
+{{- if ne .targetOS "windows" }}
+AppData/Local/Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/LocalState/settings.json
+{{- end }}

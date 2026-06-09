@@ -594,6 +594,11 @@ $cur | ConvertTo-Json -Depth 100               # stdout becomes the new settings
 
 ### DC-3 Acceptance (maps `ROADMAP.md:485-487`)
 
+Implementation status in this checkout (2026-06-09): DC-3 source files have been built and POSIX
+render-gating is validated from macOS with fixture `.chezmoidata.yaml` values. Live Windows apply
+remains manual per resolved decision #6, and the WT merge JSON logic is still queued for the separate
+`pwsh`-on-macOS exercise.
+
 - [ ] On Windows, `chez apply` installs psmux (scoop→winget→choco fallback) and merges the WT
       fragment into a live `settings.json` **without dropping** pre-existing profiles/keys.
 - [ ] The merged `settings.json` contains exactly the managed key set — 7 globals, 15 keybindings,
