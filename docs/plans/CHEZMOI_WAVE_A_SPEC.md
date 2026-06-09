@@ -81,7 +81,7 @@ README/CLAUDE.md rewrite.
 3. **The WT merge stays a full read-modify-write merge** (a `modify_` script), NOT a Fragment
    Extension (it can't set globals/`profiles.defaults`/15 keybindings — grounded
    `settings.fragment.jsonc:24-109`, merge logic `bootstrap.ps1:307-466`).
-4. **The pilot external pins to upstream tags, AND a required `run_onchange_` asserts the exact
+4. **The pilot external pins to upstream tags, AND a required `run_after_` asserts the exact
    commit** (DC-2). chezmoi `.chezmoiexternal` git-repo has no native exact-commit pin, and the
    pilot's whole point is fidelity, so the commit-equality assert (the old installer's
    `install-deps.sh:786-790` semantics) is promoted into the gate, not logged as a residual.
@@ -394,27 +394,35 @@ Pins from `install-deps.sh:26-29`; URLs `:816,:822`; install path = `zsh_plugin_
 {{- end }}
 ```
 
-### Step 2 — Required commit-assert `home/.chezmoiscripts/run_after_20-verify-zsh-plugin-pins.sh.tmpl`
+### Step 2 — Required commit-assert `home/.chezmoiscripts/run_onchange_after_20-verify-zsh-plugin-pins.sh.tmpl`
 
 chezmoi pins by ref, not by asserting a commit (Verified mechanics §4). The old installer **fails**
 on commit mismatch (`install-deps.sh:786-790`). To keep that fidelity (resolved decision #4), assert
-the exact pinned commits after the externals are fetched. `run_after_` runs after files/externals
-(Verified mechanics §8); the embedded hash forces a re-run when the pins change.
+the exact pinned commits after the externals are fetched. `run_onchange_after_` runs after
+files/externals (Verified mechanics §8), so the assert observes the fetched checkout; and because the
+pinned commits are embedded in the script body, a pin change rewrites the script and re-fires the
+assert, while an unchanged re-`apply` is a true no-op (DC-6 acceptance) — the resolved-decision #4
+intent. (A bare `run_after_` would re-run every apply and break the no-op.)
 
 ```sh
-# home/.chezmoiscripts/run_after_20-verify-zsh-plugin-pins.sh.tmpl
+# home/.chezmoiscripts/run_onchange_after_20-verify-zsh-plugin-pins.sh.tmpl
 {{- if ne .targetOS "windows" -}}
 #!/usr/bin/env bash
-# {{ "install-deps.sh:26-29 pins" }} — re-run trigger; bump when the pins below change.
 set -euo pipefail
+
 root="${XDG_DATA_HOME:-$HOME/.local/share}/dotfiles/zsh-plugins"
-# Bash 3.2-safe (stock macOS has no associative arrays — the repo keeps install-deps.sh:4 compatible).
+
+# Bash 3.2-safe: no associative arrays, no mapfile, no namerefs.
 for pair in \
-  "zsh-autocomplete a76f26ae25528e76ee53df98ad38fbacdf89fd2e" \
-  "zsh-autosuggestions e52ee8ca55bcc56a17c828767a3f98f22a68d4eb"; do   # install-deps.sh:27,29
-  name="${pair%% *}"; want="${pair##* }"
-  got="$(git -C "$root/$name" rev-parse HEAD)"
-  [ "$got" = "$want" ] || { echo "FAIL: $name HEAD $got != pinned $want" >&2; exit 1; }
+    "zsh-autocomplete a76f26ae25528e76ee53df98ad38fbacdf89fd2e" \
+    "zsh-autosuggestions e52ee8ca55bcc56a17c828767a3f98f22a68d4eb"; do
+    name="${pair%% *}"
+    want="${pair##* }"
+    got="$(git -C "$root/$name" rev-parse HEAD 2>/dev/null || true)"
+    if [[ "$got" != "$want" ]]; then
+        echo "FAIL: $name HEAD ${got:-unknown} != pinned $want" >&2
+        exit 1
+    fi
 done
 {{- end -}}
 ```
@@ -429,6 +437,11 @@ done
       commit-assert script passes (`git rev-parse HEAD` equals the pinned commit on each).
 - [ ] The `shells/zshrc` loader lines (`zshrc:68`) still resolve (path unchanged).
 - [ ] On Windows both the external block and the assert script are skipped; `chez verify` clean.
+
+2026-06-09 implementation note: the two source files exist in `home/`, render empty for Windows via
+`execute-template`, render parseable POSIX TOML/script bodies with the current `install-deps.sh` pins,
+and pass offline parse validation. Live external clone plus commit-assert execution is intentionally
+deferred to networked validation.
 
 ---
 
