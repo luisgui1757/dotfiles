@@ -51,8 +51,8 @@ function Add-ScoopBucketSafe {
     # Idempotent, non-interactive `scoop bucket add`. Returns $true if the bucket
     # is present AND populated afterward, $false otherwise. NEVER throws, so a
     # failed clone falls through to the next package manager instead of hanging
-    # or aborting (matters under $ErrorActionPreference='Stop' too -- the chezmoi
-    # run-script port relies on this).
+    # or aborting (matters under a Stop-strict ErrorActionPreference too -- the
+    # chezmoi run-script port relies on this).
     #
     # Hardens two real, sporadic failures of `scoop bucket add` (it git-clones):
     #   1) git / Git Credential Manager prompting (or popping a browser) over a
@@ -65,7 +65,7 @@ function Add-ScoopBucketSafe {
     #      the bucket dir is non-empty and purge a half-clone so retry is clean.
     #
     # When $Url is empty, fall back to the bare `scoop bucket add <name>` form so
-    # scoop's known-bucket table resolves the canonical URL (extras / nerd-fonts).
+    # the scoop known-bucket table resolves the canonical URL (extras / nerd-fonts).
     param(
         [Parameter(Mandatory)][string]$Name,
         [string]$Url = ''
@@ -292,7 +292,7 @@ function Install-One {
 # scoop pins to the installed version until `scoop update <pkg>`. This is the
 # explicit, consent-gated, idempotent "keep latest" step for ONE tool. We do NOT
 # run `scoop update *` -- that would upgrade every scoop tool (taplo, win32yank,
-# nerd-fonts, ...) outside the caller's intent and break the "run twice = no-op"
+# nerd-fonts, ...) beyond what the caller asked for and break the "run twice = no-op"
 # contract. Safe to call when the tool is absent (the install path owns that) and
 # when the tool was installed by another manager (the scoop list guard no-ops).
 function Update-ScoopTool {
@@ -583,8 +583,8 @@ Install-HackNerdFont
 
 Section "Ghostty terminal (manual step on Windows)"
 Write-Host "  manual    Ghostty does not have a Windows build yet."
-Write-Host "            Use Windows Terminal (.\bootstrap.ps1 -MergeWindowsTerminal applies"
-Write-Host "            the rose-pine fragment) or WezTerm for now."
+Write-Host "            Use Windows Terminal (setup/bootstrap apply the rose-pine"
+Write-Host "            fragment by default) or WezTerm for now."
 
 Write-Host ""
 if ($script:InstallFailures.Count -gt 0) {

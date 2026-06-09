@@ -111,9 +111,12 @@ $null = $MergeWindowsTerminal  # reference the alias so PSScriptAnalyzer doesn't
 if ($SkipWindowsTerminalMerge) { $bootstrapArgs['SkipWindowsTerminalMerge'] = $true }
 ```
 
-> The `$null = $MergeWindowsTerminal` line is load-bearing: with the old `if ($MergeWindowsTerminal)`
-> forward removed, the alias parameter is otherwise unreferenced and PSScriptAnalyzer (CI runs at
-> `Warning,Error`) flags `PSReviewUnusedParameter`, turning the Windows lane red.
+> The `$null = $MergeWindowsTerminal` line is **defensive, not a CI gate**: with the old
+> `if ($MergeWindowsTerminal)` forward removed, the alias parameter is otherwise unreferenced. This
+> repo's CI does **not** run PSScriptAnalyzer over `setup.ps1`/`bootstrap.ps1` (the only PSSA scans are
+> `test.ps1` + `Profile.Tests.ps1`, both targeting `shells/powershell_profile.ps1`), so an unused
+> parameter here would NOT fail CI. Keep the `$null =` consumption anyway for editor/IDE lint hygiene
+> and in case the analyzer scope is ever broadened — just don't justify it with a false CI claim.
 
 **4. `bootstrap.ps1:10-14` — param block.** Replace exactly:
 
@@ -172,8 +175,11 @@ All new tests go in `tests/bootstrap/ps1_test.ps1`, reusing the existing `Descri
 - [ ] **Missing settings.json: warn-and-skip, no throw, no fabrication.** In a profile that does **not**
       seed `$script:WTSettings`, run `{ & $script:Bootstrap } | Should -Not -Throw` and assert
       `Test-Path $script:WTSettings | Should -BeFalse` (the `:300-301` warn path holds under default-on).
-- [ ] **Static lint:** `setup.ps1` and `bootstrap.ps1` pass PSScriptAnalyzer at `Warning,Error` — the
-      `$null = $MergeWindowsTerminal` references suppress `PSReviewUnusedParameter`.
+- [ ] **Static lint (local/manual only — NOT a CI gate):** if you run PSScriptAnalyzer over `setup.ps1`
+      / `bootstrap.ps1` locally, the `$null = $MergeWindowsTerminal` references keep it clean of
+      `PSReviewUnusedParameter`. Note this repo's CI does **not** analyze these two files (the only
+      `Invoke-ScriptAnalyzer` calls target `shells/powershell_profile.ps1`), so this is editor hygiene,
+      not an automated gate.
 
 **CI reach — be honest.** Run `.\test.ps1` (PSScriptAnalyzer + Pester) on Windows. **The seeded Pester
 tests are the only automated proof of the live merge.** The hosted `windows-2025` e2e runner installs

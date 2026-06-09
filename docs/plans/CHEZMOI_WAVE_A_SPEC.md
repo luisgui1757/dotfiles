@@ -103,8 +103,10 @@ relocates config, state, and the template's home), ideally inside a container.
 - **Windows parity-harness prerequisite (DC-3):** `pwsh` must already be on `PATH` (installed by the
   legacy `install-deps.ps1` `$Catalog` `pwsh`/scoop row and modern-shell `Install-One pwsh` call)
   **before** `chezmoi apply` runs any `.ps1.tmpl` run-script, because the default `.ps1` interpreter
-  is `pwsh -NoLogo -File`. On a Windows-PowerShell-5.1-only host, install pwsh first or override
-  `[interpreters.ps1] command = "powershell"`. No new chezmoi package step lands in Wave A; the
+  is `pwsh -NoLogo -File`. On a Windows-PowerShell-5.1-only host, install pwsh first or override with
+  the FULL form `[interpreters.ps1] command = "powershell" args = ["-NoLogo", "-File"]` (the `args`
+  are required — without them chezmoi invokes `powershell <scriptpath>` with the path as a positional
+  command token, which does NOT reproduce `pwsh -NoLogo -File`; see §9). No new chezmoi package step lands in Wave A; the
   `$Catalog` to `.chezmoidata` pwsh row stays Wave B.
 
 ```sh
