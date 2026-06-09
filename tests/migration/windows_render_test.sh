@@ -22,18 +22,19 @@ fi
 PSMUX_TMPL="$SRC/.chezmoiscripts/run_once_after_10-install-psmux.ps1.tmpl"
 WT_TMPL="$SRC/AppData/Local/Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/LocalState/modify_settings.json.ps1.tmpl"
 
-fixture="$(mktemp -d)"
 work="$(mktemp -d)"
-trap 'rm -rf "$fixture" "$work"' EXIT
+trap 'rm -rf "$work"' EXIT
 
-mkdir -p "$fixture/.chezmoitemplates/windows-terminal"
-cp "$SRC/.chezmoitemplates/windows-terminal/settings.fragment.jsonc" \
-   "$fixture/.chezmoitemplates/windows-terminal/"
-printf 'targetOS: windows\n' > "$fixture/.chezmoidata.yaml"
-
-# 1) Render both Windows-only templates for targetOS=windows.
-chezmoi --source "$fixture" execute-template < "$PSMUX_TMPL" > "$work/install-psmux.ps1"
-chezmoi --source "$fixture" execute-template < "$WT_TMPL"   > "$work/modify-settings.ps1"
+# 1) Render both Windows-only templates for targetOS=windows. Inject the OS with
+#    --override-data (the documented data-override flag) against the real home/
+#    source, so the WT modify_ resolves its `template "windows-terminal/..."` from
+#    home/.chezmoitemplates. (A hand-built fixture source proved environment-
+#    sensitive in CI; --override-data is the deterministic mechanism.)
+render_windows() {
+    chezmoi --source "$SRC" execute-template --override-data '{"targetOS":"windows"}' < "$1"
+}
+render_windows "$PSMUX_TMPL" > "$work/install-psmux.ps1"
+render_windows "$WT_TMPL"    > "$work/modify-settings.ps1"
 [[ -s "$work/install-psmux.ps1" ]]   || fail "psmux template rendered empty for targetOS=windows"
 [[ -s "$work/modify-settings.ps1" ]] || fail "WT modify template rendered empty for targetOS=windows"
 pass "Windows templates render non-empty for targetOS=windows"
