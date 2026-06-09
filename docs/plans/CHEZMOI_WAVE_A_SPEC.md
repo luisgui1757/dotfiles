@@ -100,6 +100,13 @@ alone does NOT sandbox — chezmoi still reads its config/state from the real `~
 real environment. The only correct sandbox is to **set `HOME`** for the chezmoi invocation (which
 relocates config, state, and the template's home), ideally inside a container.
 
+- **Windows parity-harness prerequisite (DC-3):** `pwsh` must already be on `PATH` (installed by the
+  legacy `install-deps.ps1` `$Catalog` `pwsh`/scoop row and modern-shell `Install-One pwsh` call)
+  **before** `chezmoi apply` runs any `.ps1.tmpl` run-script, because the default `.ps1` interpreter
+  is `pwsh -NoLogo -File`. On a Windows-PowerShell-5.1-only host, install pwsh first or override
+  `[interpreters.ps1] command = "powershell"`. No new chezmoi package step lands in Wave A; the
+  `$Catalog` to `.chezmoidata` pwsh row stays Wave B.
+
 ```sh
 # --- Step 0a: install a pinned chezmoi (min v2.52.0 — supports .chezmoiexternal clone.args,
 #     modify_ scripts, the `template` action, execute-template --init). ---

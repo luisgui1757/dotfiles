@@ -341,4 +341,45 @@ Describe "install-deps.ps1" {
         $Catalog['wt'].winget | Should -Be 'Microsoft.WindowsTerminal'
         $Catalog['wt'].choco | Should -Be 'microsoft-windows-terminal'
     }
+
+    It "registers PowerShell 7 (pwsh) in the Windows package catalog" {
+        . $script:ImportInstallDepsForTest
+
+        $Catalog.ContainsKey('pwsh') | Should -BeTrue
+        $BinaryName['pwsh'] | Should -Be 'pwsh'
+        $Catalog['pwsh'].scoop | Should -Be 'pwsh'
+        $Catalog['pwsh'].winget | Should -Be 'Microsoft.PowerShell'
+        $Catalog['pwsh'].choco | Should -Be 'powershell-core'
+    }
+
+    It "dry-runs a scoped PowerShell scoop update without blanket updates" {
+        . $script:ImportInstallDepsForTest -DryRun
+        $script:ScoopArgs = @()
+
+        Mock -CommandName Read-Host -MockWith { throw "Read-Host must not run under -DryRun" }
+        Mock -CommandName Get-Command -MockWith {
+            param([string]$Name)
+            if ($Name -eq 'scoop') {
+                return [pscustomobject]@{ Name = $Name; Source = $Name }
+            }
+            return $null
+        }
+        Mock -CommandName Test-Tool -MockWith { return $true } -ParameterFilter { $name -eq 'pwsh' }
+        Mock -CommandName scoop -MockWith {
+            $script:ScoopArgs += ($args -join ' ')
+            if (($args -join ' ') -eq 'list pwsh') {
+                return 'pwsh 7.5.0'
+            }
+        }
+
+        $output = & { Update-ScoopTool pwsh } 6>&1 | Out-String
+
+        $wouldUpdatePwsh = @($output -split "`r?`n" | Where-Object {
+                $_ -match '^\s*would:\s+scoop update;\s+scoop update pwsh\s*$'
+            })
+        $wouldUpdatePwsh.Count | Should -Be 1
+        $output | Should -Not -Match 'scoop update \*'
+        $script:ScoopArgs | Should -Contain 'list pwsh'
+        ($script:ScoopArgs | Where-Object { $_ -like 'update*' }).Count | Should -Be 0
+    }
 }

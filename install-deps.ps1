@@ -288,6 +288,37 @@ function Install-One {
     }
 }
 
+# ---- Optional: keep a single scoop tool current ------------------------------
+# scoop pins to the installed version until `scoop update <pkg>`. This is the
+# explicit, consent-gated, idempotent "keep latest" step for ONE tool. We do NOT
+# run `scoop update *` -- that would upgrade every scoop tool (taplo, win32yank,
+# nerd-fonts, ...) outside the caller's intent and break the "run twice = no-op"
+# contract. Safe to call when the tool is absent (the install path owns that) and
+# when the tool was installed by another manager (the scoop list guard no-ops).
+function Update-ScoopTool {
+    param([string]$tool)
+    if (-not (Get-Command scoop -ErrorAction SilentlyContinue)) { return }
+    if (-not (Test-Tool $tool)) { return }   # not installed yet -> install path owns it
+    $pkg = $Catalog[$tool].scoop
+    if (-not $pkg) { return }
+    # Only update if scoop actually manages this tool (avoids warning on a
+    # winget/choco-installed pwsh that Install-One picked when scoop was absent).
+    $managed = (scoop list $pkg 2>$null | Select-String -SimpleMatch $pkg)
+    if (-not $managed) { return }
+    if (-not (Ask "Update ${tool} to the latest scoop version?")) { return }
+    if ($DryRun) {
+        Write-Host ("  would:    scoop update; scoop update {0}" -f $pkg)
+        return
+    }
+    scoop update | Out-Null               # refresh manifests only
+    scoop update $pkg
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host ("  updated   {0,-26} via scoop" -f $tool)
+    } else {
+        Write-Warning ("  scoop update of {0} failed (exit {1})" -f $pkg, $LASTEXITCODE)
+    }
+}
+
 # Track failures across the run so we can warn loudly at the end instead of
 # pretending success.
 $script:InstallFailures = @()
@@ -528,6 +559,7 @@ Install-Psmux
 
 Section "modern shell (optional, you can stay on Windows PowerShell 5.1)"
 Install-One pwsh
+Update-ScoopTool pwsh
 
 Section "language tooling (for LSP / formatter back-ends)"
 Install-One python

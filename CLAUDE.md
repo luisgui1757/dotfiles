@@ -405,6 +405,9 @@ save only**. The next plain `:w` formats normally. Implemented in
   `-1978335212`) no longer dead-ends a tool. scoop carries the cataloged
   CLI/terminal tools, including Windows Terminal as `wt`
   (`extras/windows-terminal`).
+- **`Update-ScoopTool` is the only scoop update path.** It is intentionally
+  single-package and consent-gated for the PowerShell 7 keep-latest path; never
+  replace it with `scoop update *` or another blanket scoop upgrade.
 - **Windows CI uses Scoop's documented elevated bootstrap.** GitHub-hosted
   `windows-2025` runners are elevated, and Scoop blocks elevated install by
   default. `Install-Scoop` detects elevation and runs the official installer
