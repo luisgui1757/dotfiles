@@ -33,11 +33,10 @@ There are two distinct streams, and **they are not independent at the seam**:
   retired (retirement is Wave C). The pilot deliberately keeps the old scripts running beside chezmoi
   (`CHEZMOI_WAVE_A_SPEC.md` Resolved decision #2).
 
-The seam: **W1 and W3 fix behavior that the chezmoi pilot directly ports** (the WT merge in DC-3 Step 2,
-the psmux installer in DC-3 Step 1). If Stream A changes the old path but Stream B's spec is not updated
-in lockstep, the parity gate either fails or — worse, for psmux, whose buggy line is *already copied into
-the spec* — "passes" by matching buggy behavior on both sides, **blessing the bug**. So the streams must
-be sequenced, not run blind.
+The seam: **W1 fixed behavior that the chezmoi pilot directly ports** (the WT merge in DC-3). W3 stays
+in `install-deps.ps1`; the current branch removed the planned psmux chezmoi installer so the parity gate
+does not bless provisioning behavior. If Stream A changes old-path config behavior, Stream B's spec must
+still update in lockstep so the parity gate compares correct behavior on both sides.
 
 ---
 
@@ -80,9 +79,9 @@ all three deltas, so DC-6 is meaningful from its first green run.
 | # | Task | Depends on | Lands in | Branch / PR | CI gate | Parallel-safe? |
 |---|------|------------|----------|-------------|---------|----------------|
 | **W1** | WT Rose Pine → default-on merge | — | `setup.ps1`, `bootstrap.ps1`, `tests/bootstrap/ps1_test.ps1`, `CLAUDE.md` (inv 15), `README.md`, `windows-terminal/README.md`, `PLAN.md`, `tests/MANUAL.md` **+** `CHEZMOI_WAVE_A_SPEC.md` (DC-3 Step 2, DC-6 Step 4) | `fix/wt-rosepine-default` | `.\test.ps1` (windows-2025) | ✅ (touches setup/bootstrap, **not** `install-deps.ps1`) |
-| **W3** | psmux auth hardening (`Add-ScoopBucketSafe`) | — | `install-deps.ps1`, `tests/static/repo_policy_test.sh`, `tests/powershell/InstallDeps.Tests.ps1`, `CLAUDE.md` **+** `CHEZMOI_WAVE_A_SPEC.md` (DC-3 Step 1) | `fix/psmux-bucket-auth` | static (`repo_policy_test.sh`, `ps1_parse.sh`) **+** `.\test.ps1` | ⚠️ shares `install-deps.ps1` with W2 |
+| **W3** | psmux auth hardening (`Add-ScoopBucketSafe`) | — | `install-deps.ps1`, `tests/static/repo_policy_test.sh`, `tests/powershell/InstallDeps.Tests.ps1`, `CLAUDE.md` **+** `CHEZMOI_WAVE_A_SPEC.md` ownership note | `fix/psmux-bucket-auth` | static (`repo_policy_test.sh`, `ps1_parse.sh`) **+** `.\test.ps1` | ⚠️ shares `install-deps.ps1` with W2 |
 | **W2** | pwsh keep-latest (`Update-ScoopTool`) + catalog guard | — | `install-deps.ps1`, `tests/powershell/InstallDeps.Tests.ps1`, `PLAN.md`, `CLAUDE.md` **+** `CHEZMOI_WAVE_A_SPEC.md` (Step 0) | `fix/pwsh-keep-latest` | `.\test.ps1` | ⚠️ shares `install-deps.ps1` with W3 |
-| **W4** | chezmoi migration (DC-1…DC-6) | **W1 + W3 spec deltas merged**; pwsh present (W2 runtime) | `home/` tree, `tests/migration/`, `chezmoi-parity*` CI jobs (+ required-check sync files) | `chezmoi-pilot` | `chezmoi-parity`, `chezmoi-parity-macos`, `chezmoi-parity-windows` + manual psmux real apply | executed last |
+| **W4** | chezmoi migration (DC-1…DC-6) | **W1 + W3 ownership deltas merged**; pwsh present (W2 runtime) | `home/` tree, `tests/migration/`, `chezmoi-parity*` CI jobs (+ required-check sync files) | `chezmoi-pilot` | `chezmoi-parity`, `chezmoi-parity-macos`, `chezmoi-parity-windows` | executed last |
 
 **W2/W3 collision:** both edit `install-deps.ps1`. Do **W3 then W2** (W3 inserts `Add-ScoopBucketSafe`
 near the top + edits `Install-Psmux`; W2 inserts `Update-ScoopTool` after `Install-One` + adds a call at
@@ -122,7 +121,7 @@ code fix.
 | **W1** | DC-3 Step 2 preamble | Note the **legacy** `bootstrap.ps1` merge is now also default-on, so the chezmoi `modify_` default-on behavior is **parity**, not divergence. | Keeps the rationale honest; no behavior change. |
 | **W1** | DC-6 Step 4 (WT parity probe) | OLD-side command becomes `bootstrap.ps1` with **no switch** (`-MergeWindowsTerminal` now a back-compat alias). | Otherwise the parity harness invokes a no-longer-needed switch / wrong default. |
 | **W2** | Step 0 (Prerequisites) | Add a bullet: `pwsh` must be on PATH (legacy `install-deps.ps1:123,467`) before any `.ps1.tmpl` runs, since the default interpreter is `pwsh -NoLogo -File`. | The pilot's DC-3 `.ps1` scripts assume pwsh exists. |
-| **W3** | DC-3 Step 1 (psmux run-script) | Port `Add-ScoopBucketSafe`; replace the bare `scoop bucket add psmux … 2>$null`. | The spec already copied the buggy line under `$ErrorActionPreference='Stop'`; parity would bless the bug. |
+| **W3** | DC-3 ownership note | State that psmux install stays in `install-deps.ps1`; no chezmoi psmux run-script. | Prevents the migration spec from treating package installation as config-layer work. |
 
 ### Does pwsh-via-scoop need pulling forward into the pilot? — **No.**
 

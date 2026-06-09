@@ -77,6 +77,15 @@ powershell profile|config-file|||shells/powershell_profile.ps1|home/Documents/Po
 EOF
 }
 
+# label|canonical repo source|chezmoi source copy
+# Shared template-only sources with no POSIX host target belong here, not in the
+# per-OS apply manifest above.
+single_source_entries() {
+    cat <<'EOF'
+windows-terminal fragment|windows-terminal/settings.fragment.jsonc|home/.chezmoitemplates/windows-terminal/settings.fragment.jsonc
+EOF
+}
+
 target_rel_for_host() {
     local darwin_rel="$1" linux_rel="$2"
 
@@ -191,24 +200,33 @@ assert_plugin_pair() {
     pass "$label: HEAD matches ($old_head)"
 }
 
+assert_single_source_pair() {
+    local label="$1" repo_rel="$2" home_rel="$3" repo_path home_path repo_sha home_sha
+
+    repo_path="$REPO_ROOT/$repo_rel"
+    home_path="$REPO_ROOT/$home_rel"
+    [[ -f "$repo_path" ]] || fail "$label: missing canonical repo source $repo_path"
+    [[ -f "$home_path" ]] || fail "$label: missing chezmoi source copy $home_path"
+
+    repo_sha="$(sha "$repo_path")"
+    home_sha="$(sha "$home_path")"
+    [[ "$repo_sha" == "$home_sha" ]] || \
+        fail "$label: single-source SHA mismatch repo=$repo_sha home=$home_sha"
+    pass "$label: single-source SHA matches"
+}
+
 assert_single_sources() {
-    local label entry_type darwin_rel linux_rel repo_rel home_rel repo_path home_path repo_sha home_sha
+    local label entry_type darwin_rel linux_rel repo_rel home_rel
 
     while IFS='|' read -r label entry_type darwin_rel linux_rel repo_rel home_rel; do
         [[ "$entry_type" != "nvim" ]] || continue
         [[ -n "$home_rel" ]] || continue
-
-        repo_path="$REPO_ROOT/$repo_rel"
-        home_path="$REPO_ROOT/$home_rel"
-        [[ -f "$repo_path" ]] || fail "$label: missing canonical repo source $repo_path"
-        [[ -f "$home_path" ]] || fail "$label: missing chezmoi source copy $home_path"
-
-        repo_sha="$(sha "$repo_path")"
-        home_sha="$(sha "$home_path")"
-        [[ "$repo_sha" == "$home_sha" ]] || \
-            fail "$label: single-source SHA mismatch repo=$repo_sha home=$home_sha"
-        pass "$label: single-source SHA matches"
+        assert_single_source_pair "$label" "$repo_rel" "$home_rel"
     done < <(manifest_entries)
+
+    while IFS='|' read -r label repo_rel home_rel; do
+        assert_single_source_pair "$label" "$repo_rel" "$home_rel"
+    done < <(single_source_entries)
 }
 
 assert_manifest_for_host() {

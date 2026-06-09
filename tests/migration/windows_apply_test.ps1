@@ -593,11 +593,11 @@ function Invoke-Part1 {
         Invoke-WithSandboxEnv -Sandbox $sandbox -Script {
             $settingsPath = Write-BaselineWtSettings -Sandbox $sandbox
             Invoke-Chezmoi -Arguments @('init')
-            Invoke-Chezmoi -Arguments @('apply', '--exclude', 'scripts')
+            Invoke-Chezmoi -Arguments @('apply')
             Assert-Part1Files -Sandbox $sandbox
             Assert-Part1WtMerge -SettingsPath $settingsPath
-            Invoke-Chezmoi -Arguments @('apply', '--exclude', 'scripts')
-            Invoke-Chezmoi -Arguments @('verify', '--exclude', 'scripts')
+            Invoke-Chezmoi -Arguments @('apply')
+            Invoke-Chezmoi -Arguments @('verify')
         }
         Pass 'part 1 real apply smoke passed'
     } finally {
@@ -627,7 +627,7 @@ function Invoke-Part2 {
 
         Invoke-WithSandboxEnv -Sandbox $chezmoiSandbox -Script {
             Invoke-Chezmoi -Arguments @('init')
-            Invoke-Chezmoi -Arguments @('apply', '--exclude', 'scripts')
+            Invoke-Chezmoi -Arguments @('apply')
         }
 
         $legacy = Read-JsonFile -Path $legacySettings

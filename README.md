@@ -136,6 +136,12 @@ directory symlink, and Windows Terminal remains a merge.
 | lazygit | `~/Library/Application Support/lazygit/config.yml` -> `lazygit/config.yml` | `~/.config/lazygit/config.yml` -> `lazygit/config.yml` | `%LOCALAPPDATA%\lazygit\config.yml` -> `lazygit\config.yml` |
 | Windows Terminal | n/a | n/a | app installed by `setup.ps1`; bootstrap merges `windows-terminal/settings.fragment.jsonc` by default; opt out with `-SkipWindowsTerminalMerge`; see [windows-terminal/README.md](windows-terminal/README.md) |
 
+Chezmoi manages the Windows PowerShell 7 profile path
+`Documents\PowerShell\Microsoft.PowerShell_profile.ps1`. The Windows
+PowerShell 5.1 profile path (`Documents\WindowsPowerShell\...`) and POSIX pwsh
+profile are bootstrap/provisioning-adjacent, because they depend on the host
+shell and whether `pwsh` is installed.
+
 ### Platform Notes
 
 - Linux setup can make zsh your login shell. Installing the package alone is

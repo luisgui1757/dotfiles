@@ -153,8 +153,11 @@ for i, line in enumerate(install_deps.splitlines(), start=1):
         fail(f"install-deps.ps1:{i} uses a bare 'scoop bucket add'; route it through Add-ScoopBucketSafe")
 
 chezmoi_wave_a = pathlib.Path("docs/plans/CHEZMOI_WAVE_A_SPEC.md").read_text(encoding="utf-8")
-if "Add-ScoopBucketSafe" not in chezmoi_wave_a:
-    fail("docs/plans/CHEZMOI_WAVE_A_SPEC.md must port Add-ScoopBucketSafe for psmux")
+if not re.search(r"psmux install was removed\s+from\s+the chezmoi scope", chezmoi_wave_a):
+    fail("docs/plans/CHEZMOI_WAVE_A_SPEC.md must document psmux as install-deps scope, not a chezmoi run-script")
+removed_psmux_script = "run_once_after_10" + "-install-psmux"
+if removed_psmux_script in chezmoi_wave_a:
+    fail("docs/plans/CHEZMOI_WAVE_A_SPEC.md must not reference the removed psmux chezmoi run-script")
 if re.search(r"(?m)^\s*scoop bucket add psmux\b.*2>\$null", chezmoi_wave_a):
     fail("docs/plans/CHEZMOI_WAVE_A_SPEC.md must not contain the old bare 'scoop bucket add psmux ... 2>$null'")
 

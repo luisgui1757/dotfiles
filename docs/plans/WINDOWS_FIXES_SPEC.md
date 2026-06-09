@@ -11,7 +11,7 @@ The three items:
 |----|------|--------------|
 | **W1** | Windows Terminal Rose Pine | The fragment already *has* Rose Pine; the merge that applies it is opt-in (`-MergeWindowsTerminal`), so a default install never themes WT. |
 | **W2** | PowerShell via scoop (keep latest) | `pwsh` is *already* scoop-first in `$Catalog`; the missing half is **"keep latest"** (no `scoop update`) plus a missing catalog regression guard. |
-| **W3** | psmux sporadic "auth failed" | `scoop bucket add psmux <github>` git-clones with interactive credential prompts enabled and exit-code blind, so it sporadically hangs/fails; the chezmoi port inherits the same line. |
+| **W3** | psmux sporadic "auth failed" | `scoop bucket add psmux <github>` git-clones with interactive credential prompts enabled and exit-code blind, so it sporadically hangs/fails. Current branch status: psmux install stays in `install-deps.ps1`; the planned chezmoi installer port was removed. |
 
 ## How to use this spec (Codex 5.5 xhigh)
 
@@ -412,17 +412,17 @@ one un-hardened line — `scoop bucket add psmux https://github.com/psmux/scoop-
    error; and `2>$null` suppresses the diagnostic so the user never learns why.
 
 The same un-hardened pattern repeats at `install-deps.ps1:53-54` (`Ensure-ScoopBuckets`: extras/
-nerd-fonts) and `install-deps.ps1:261` (Hack Nerd Font path), and the identical line is **already ported
-into the chezmoi run-script** (`CHEZMOI_WAVE_A_SPEC.md` DC-3 Step 1), so the parity gate would encode the
-bug verbatim. Net root cause: the bucket-add is interactive-prompt-capable, non-idempotent, exit-code
-blind, and stderr-suppressed.
+nerd-fonts) and `install-deps.ps1:261` (Hack Nerd Font path). At planning time, the same line was also
+headed for a chezmoi psmux installer, but current branch ownership keeps psmux installation in
+`install-deps.ps1`. Net root cause: the bucket-add is interactive-prompt-capable, non-idempotent,
+exit-code blind, and stderr-suppressed.
 
 ### Fix
 
 One shared helper makes every `scoop bucket add` idempotent, non-interactive (fail-fast, not hang),
 exit-code-aware, and clean-fall-through. It uses only native commands + `-ErrorAction SilentlyContinue`
-and **never throws**, so it is safe under both the legacy `$ErrorActionPreference='Continue'`
-(`install-deps.ps1:21`) and the chezmoi run-script's `$ErrorActionPreference='Stop'`.
+and **never throws**, so it is safe under the legacy `$ErrorActionPreference='Continue'`
+(`install-deps.ps1:21`).
 
 **Edit 1 — `install-deps.ps1`: insert the helper after `Add-ScoopToPathForCurrentProcess` (after line
 48, before `Ensure-ScoopBuckets` at line 50).** Paste verbatim:
@@ -593,8 +593,8 @@ Also update the `$DryRun` preview at `install-deps.ps1:373` so it no longer adve
       psmux` resolves.
 - [ ] **MANUAL idempotency:** run `.\install-deps.ps1` twice — the second run does **no** `scoop bucket
       add` (the helper returns `$true` early).
-- [ ] **PARITY:** the DC-3 Step 1 code block in `CHEZMOI_WAVE_A_SPEC.md` contains `Add-ScoopBucketSafe`,
-      has no bare `2>$null` bucket-add, and still ends with the `exit 1` survivor.
+- [ ] **PARITY:** `CHEZMOI_WAVE_A_SPEC.md` documents that psmux install remains in
+      `install-deps.ps1` and is not a chezmoi run-script.
 
 ### Docs to update
 
@@ -608,77 +608,11 @@ Also update the `$DryRun` preview at `install-deps.ps1:373` so it no longer adve
 
 ### chezmoi delta
 
-Touches **DC-3 → Step 1** (`run_once_after_10-install-psmux.ps1.tmpl`). The ported run-script carries the
-identical bug and runs under the stricter `$ErrorActionPreference='Stop'`, so the fix **must** land in
-both places in the same change or the parity gate encodes the bug. The helper never throws → Stop-safe.
-
-**Replace the DC-3 Step 1 code block** with the hardened version below — define `Add-ScoopBucketSafe`
-at the top and swap the bare `scoop bucket add psmux … 2>$null | Out-Null` for `if (Add-ScoopBucketSafe
-'psmux' '…') { scoop install psmux; … }`. The `$ErrorActionPreference='Stop'`, `Test-Tool`, winget/choco
-fallback, and `exit 1` survivor stay unchanged:
-
-```powershell
-# home/.chezmoiscripts/run_once_after_10-install-psmux.ps1.tmpl
-{{- if eq .targetOS "windows" -}}
-$ErrorActionPreference = 'Stop'
-function Test-Tool($n) { [bool](Get-Command $n -ErrorAction SilentlyContinue) }
-
-# Idempotent, non-interactive scoop bucket add. NEVER throws (Stop-safe);
-# GIT_TERMINAL_PROMPT/GCM_INTERACTIVE off so a clone auth challenge fails fast
-# instead of hanging chez apply, and we verify the bucket populated
-# (ScoopInstaller/Scoop#5482). Mirrors install-deps.ps1 Add-ScoopBucketSafe.
-function Add-ScoopBucketSafe($Name, $Url) {
-  $root = if ($env:SCOOP) { $env:SCOOP } else { Join-Path $env:USERPROFILE 'scoop' }
-  $dir  = Join-Path (Join-Path $root 'buckets') $Name
-  $ok   = { (Test-Path -LiteralPath $dir) -and (@(Get-ChildItem -LiteralPath $dir -Force -ErrorAction SilentlyContinue).Count -gt 0) }
-  if (& $ok) { return $true }
-  $op = $env:GIT_TERMINAL_PROMPT; $og = $env:GCM_INTERACTIVE
-  $env:GIT_TERMINAL_PROMPT = '0'; $env:GCM_INTERACTIVE = '0'
-  try {
-    foreach ($i in 1..2) {
-      if ([string]::IsNullOrEmpty($Url)) { scoop bucket add $Name 2>&1 | Out-Null }
-      else { scoop bucket add $Name $Url 2>&1 | Out-Null }
-      if (& $ok) { return $true }
-      if (Test-Path -LiteralPath $dir) { Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue }
-      scoop bucket rm $Name 2>&1 | Out-Null
-    }
-    Write-Warning "scoop bucket add $Name did not populate a usable bucket; recover with 'scoop bucket rm $Name' then re-run"
-    return $false
-  } finally { $env:GIT_TERMINAL_PROMPT = $op; $env:GCM_INTERACTIVE = $og }
-}
-
-if (Test-Tool 'psmux') { Write-Host 'ok        psmux already installed'; return }
-
-# 1) scoop (custom bucket first) — install-deps.ps1:376-384
-if (Test-Tool 'scoop') {
-  if (Add-ScoopBucketSafe 'psmux' 'https://github.com/psmux/scoop-psmux') {
-    scoop install psmux
-    if ($LASTEXITCODE -eq 0 -and (Test-Tool 'psmux')) { Write-Host 'installed psmux via scoop'; return }
-  }
-  Write-Warning 'scoop install of psmux failed; trying winget...'
-}
-# 2) winget — install-deps.ps1:386-390
-if (Test-Tool 'winget') {
-  winget install psmux --accept-source-agreements --accept-package-agreements --silent
-  if ($LASTEXITCODE -eq 0 -and (Test-Tool 'psmux')) { Write-Host 'installed psmux via winget'; return }
-  Write-Warning 'winget install of psmux failed; trying choco...'
-}
-# 3) choco — install-deps.ps1:394-398
-if (Test-Tool 'choco') {
-  choco install psmux -y
-  if ($LASTEXITCODE -eq 0 -and (Test-Tool 'psmux')) { Write-Host 'installed psmux via choco'; return }
-}
-Write-Warning 'psmux install failed via scoop/winget/choco.'
-exit 1   # required survivor: fail so run_once_ records NO success and retries next apply
-{{- end -}}
-```
-
-Also add one sentence to the DC-3 Step 1 prose: the psmux bucket-add is hardened via `Add-ScoopBucketSafe`
-(idempotent + non-interactive, mirroring `install-deps.ps1`) **because** the chezmoi run-script is
-non-interactive and `Stop`-strict — an un-hardened clone credential prompt would hang `chez apply` with
-no answerable console. **Ordering:** this is a legacy-installer correctness fix and may land before the
-chezmoi migration mechanics, but the spec edit must land in the **same change** — if the legacy installer
-is hardened and the spec is not, the Wave-A port reintroduces the bug and the parity gate blesses it.
+Current branch status: no psmux installer belongs in chezmoi. The Wave A spec
+now says psmux install remains in `install-deps.ps1` and chezmoi owns only the
+config files psmux reads (`.tmux.conf` and `.tmux.windows.conf`). The historical
+instruction to port `Add-ScoopBucketSafe` into a chezmoi psmux run-script is
+superseded by that ownership decision.
 
 ---
 
@@ -700,4 +634,4 @@ make test-static                        # full static gate
 |-----|----------------------------------|----------------|
 | W1 | DC-3 Step 2 preamble; DC-6 Step 4 parity probe | Note legacy merge is now default-on (parity); OLD-side probe runs `bootstrap.ps1` with no switch. |
 | W2 | Step 0 Prerequisites | Add pwsh-on-PATH prerequisite bullet (pilot's `.ps1` interpreter). No install ported (Wave B). |
-| W3 | DC-3 Step 1 code block + prose | Port `Add-ScoopBucketSafe`; replace bare `scoop bucket add psmux … 2>$null`. |
+| W3 | DC-3 ownership note | State that psmux install stays in `install-deps.ps1`; no chezmoi psmux run-script. |

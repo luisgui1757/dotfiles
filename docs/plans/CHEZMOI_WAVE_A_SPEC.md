@@ -63,7 +63,7 @@ DC-6 and `docs/MIGRATION_STATUS.md`.
 | **tmux single-source** (`tmux.conf` → `~/.tmux.conf` everywhere) + **Windows overlay** (`tmux.windows.conf`, ignored off-Windows) | trivial-config case + `.chezmoiignore` per-OS gating | DC-1 |
 | **Path-divergent symlink: lazygit** (one source file → 3 different absolute paths per OS, live-edit on POSIX) | the single hardest config-layer mechanic | DC-1 |
 | **One external: the two zsh plugins** as pinned `.chezmoiexternal` git-repos | the externals mechanism + its pin limits | DC-2 |
-| **psmux install** (`run_once_after_`, the bucket-add→scoop→winget→choco chain) | imperative per-OS survivor with ordered fallback | DC-3 |
+| **psmux install** | REMOVED from chezmoi scope; stays in `install-deps.ps1` provisioning via `Install-Psmux` and `Add-ScoopBucketSafe` | DC-3 |
 | **Windows Terminal `settings.json` merge** (`modify_` read-modify-write) | the JSON-merge mechanic; why a WT *fragment* can't replace it | DC-3 |
 | **The parity gate** (old slices vs chezmoi, intersection-scoped, content-normalized + probes) | the keystone — nothing retires until it is green | DC-6 |
 | **Hermetic per-OS template unit tests** (`execute-template` on an injected OS var) | host-independent branch coverage | DC-6 |
@@ -107,8 +107,8 @@ layer into the DC-6 manifest and added the README/CLAUDE status rewrite.
 6. **The automated CI parity gate now has Ubuntu, macOS, and Windows arms for the migration.** Ubuntu
    remains the networked POSIX baseline for externals; macOS runs the same template/parity/oracle
    scripts on `macos-26`; Windows runs a sandboxed copy-mode + WT merge parity e2e
-   (`tests/migration/windows_apply_test.ps1`) with `--exclude scripts`. The psmux installer side
-   effect remains manual in Wave A because the Windows CI apply intentionally excludes scripts.
+   (`tests/migration/windows_apply_test.ps1`) with a full apply. The psmux install was removed from
+   the chezmoi scope and remains in `install-deps.ps1` per the full-migration owner decision.
 
 ---
 
@@ -122,8 +122,8 @@ relocates config, state, and the template's home), ideally inside a container.
 
 - **Windows parity-harness prerequisite (DC-3):** `pwsh` must already be on `PATH` (installed by the
   legacy `install-deps.ps1` `$Catalog` `pwsh`/scoop row and modern-shell `Install-One pwsh` call)
-  **before** `chezmoi apply` runs any `.ps1.tmpl` run-script, because the default `.ps1` interpreter
-  is `pwsh -NoLogo -File`. On a Windows-PowerShell-5.1-only host, install pwsh first or override with
+  **before** `chezmoi apply` processes the Windows `.ps1.tmpl` modify script, because the default
+  `.ps1` interpreter is `pwsh -NoLogo -File`. On a Windows-PowerShell-5.1-only host, install pwsh first or override with
   the FULL form `[interpreters.ps1] command = "powershell" args = ["-NoLogo", "-File"]` (the `args`
   are required — without them chezmoi invokes `powershell <scriptpath>` with the path as a positional
   command token, which does NOT reproduce `pwsh -NoLogo -File`; see §9). No new chezmoi package step lands in Wave A; the
@@ -245,14 +245,13 @@ home/                                   # = $SRC (chezmoi sourceDir)
   .chezmoiexternal.toml.tmpl             # DC-2
   .chezmoitemplates/
     lazygit/config.yml                   # Step 4: the ONE real lazygit file
-    windows-terminal/settings.fragment.jsonc   # DC-3 Step 2: the WT fragment
+    windows-terminal/settings.fragment.jsonc   # DC-3 Step 1: the WT fragment
   dot_tmux.conf                          # Step 3
   dot_tmux.windows.conf                  # Step 3 (Windows-gated)
   dot_config/lazygit/symlink_config.yml.tmpl                 # Step 4 (Linux/WSL)
   Library/Application Support/lazygit/symlink_config.yml.tmpl # Step 4 (macOS)
   AppData/Local/lazygit/config.yml.tmpl                      # Step 4 (Windows copy)
-  .chezmoiscripts/run_once_after_10-install-psmux.ps1.tmpl   # DC-3 Step 1
-  AppData/Local/Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/LocalState/modify_settings.json.ps1.tmpl  # DC-3 Step 2
+  AppData/Local/Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/LocalState/modify_settings.json.ps1.tmpl  # DC-3 Step 1
 ```
 
 Smoke-test the sandbox plumbing once the files exist: `chez init && chez apply --dry-run --verbose`
@@ -378,7 +377,7 @@ seed scope. The manifest now covers nvim as a directory symlink, Starship,
 zshenv/zshrc, Ghostty, lazygit, tmux, `tmux.windows.conf`, the Windows
 PowerShell profile copy, and the Windows Terminal merge. Windows copy-mode and
 WT merge semantics are covered by `tests/migration/windows_apply_test.ps1`;
-psmux script execution remains a manual real-apply caveat.
+psmux installation is deliberately not a chezmoi responsibility.
 
 - [ ] `chez apply` (sandbox) lands `~/.tmux.conf` on macOS/Linux/Windows; `~/.tmux.windows.conf` only
       on Windows.
@@ -440,7 +439,8 @@ running it against a corrupted checkout.
 #!/usr/bin/env bash
 set -euo pipefail
 
-root="${XDG_DATA_HOME:-$HOME/.local/share}/dotfiles/zsh-plugins"
+# Externals use this fixed managed root; an XDG-aware root is Wave B.
+root="$HOME/.local/share/dotfiles/zsh-plugins"
 
 # Bash 3.2-safe: no associative arrays, no mapfile, no namerefs.
 for pair in \
@@ -475,80 +475,16 @@ deferred to networked validation.
 
 ---
 
-## DC-3 — Run-scripts: psmux install + the Windows Terminal merge
+## DC-3 — Windows Terminal merge; psmux stays provisioning
 
-Maps `ROADMAP.md:455-487`. Two imperative survivors. The WT merge and Windows copy-mode apply are
-now covered by the Windows CI parity arm; the psmux installer itself remains manual in Wave A because
-the CI e2e uses `chezmoi apply --exclude scripts`.
+Maps `ROADMAP.md:455-487`. The full-migration owner decision is
+`chezmoi=dotfiles, install-deps=provisioning`, so psmux install was removed
+from the chezmoi scope and stays in `install-deps.ps1` (`Install-Psmux` with
+the hardened `Add-ScoopBucketSafe` path). Chezmoi keeps the psmux-readable
+config (`.tmux.conf` plus `.tmux.windows.conf`) and the Windows Terminal
+`modify_` merge, which are config-layer work.
 
-### Step 1 — psmux: `home/.chezmoiscripts/run_once_after_10-install-psmux.ps1.tmpl`
-
-psmux needs an ordered bucket-add **before** install, so it can't be a flat package entry
-(`install-deps.ps1:359-402`). Ported from `install-deps.ps1:376-399` (the Ask gate `:368` and DryRun
-`:372-375` are intentionally dropped — chezmoi scripts are non-interactive, matching the old "no-TTY
-→ --all" behavior, `setup.sh:69-73`). **Each PM call is guarded by `Get-Command` so a missing
-manager falls through instead of throwing** (`$ErrorActionPreference='Stop'` would otherwise abort).
-The psmux bucket-add is hardened via `Add-ScoopBucketSafe` (idempotent + non-interactive, mirroring
-`install-deps.ps1`) because the chezmoi run-script is non-interactive and `Stop`-strict — an
-un-hardened clone credential prompt would hang `chez apply` with no answerable console.
-
-```powershell
-# home/.chezmoiscripts/run_once_after_10-install-psmux.ps1.tmpl
-{{- if eq .targetOS "windows" -}}
-$ErrorActionPreference = 'Stop'
-function Test-Tool($n) { [bool](Get-Command $n -ErrorAction SilentlyContinue) }
-
-# Idempotent, non-interactive scoop bucket add. NEVER throws (Stop-safe);
-# GIT_TERMINAL_PROMPT/GCM_INTERACTIVE off so a clone auth challenge fails fast
-# instead of hanging chez apply, and we verify the bucket populated
-# (ScoopInstaller/Scoop#5482). Mirrors install-deps.ps1 Add-ScoopBucketSafe.
-function Add-ScoopBucketSafe($Name, $Url) {
-  $root = if ($env:SCOOP) { $env:SCOOP } else { Join-Path $env:USERPROFILE 'scoop' }
-  $dir  = Join-Path (Join-Path $root 'buckets') $Name
-  $ok   = { (Test-Path -LiteralPath $dir) -and (@(Get-ChildItem -LiteralPath $dir -Force -ErrorAction SilentlyContinue).Count -gt 0) }
-  if (& $ok) { return $true }
-  $op = $env:GIT_TERMINAL_PROMPT; $og = $env:GCM_INTERACTIVE
-  $env:GIT_TERMINAL_PROMPT = '0'; $env:GCM_INTERACTIVE = '0'
-  try {
-    foreach ($i in 1..2) {
-      if ([string]::IsNullOrEmpty($Url)) { scoop bucket add $Name 2>&1 | Out-Null }
-      else { scoop bucket add $Name $Url 2>&1 | Out-Null }
-      if (& $ok) { return $true }
-      if (Test-Path -LiteralPath $dir) { Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue }
-      scoop bucket rm $Name 2>&1 | Out-Null
-    }
-    Write-Warning "scoop bucket add $Name did not populate a usable bucket; recover with 'scoop bucket rm $Name' then re-run"
-    return $false
-  } finally { $env:GIT_TERMINAL_PROMPT = $op; $env:GCM_INTERACTIVE = $og }
-}
-
-if (Test-Tool 'psmux') { Write-Host 'ok        psmux already installed'; return }
-
-# 1) scoop (custom bucket first) — install-deps.ps1:376-384
-if (Test-Tool 'scoop') {
-  if (Add-ScoopBucketSafe 'psmux' 'https://github.com/psmux/scoop-psmux') {
-    scoop install psmux
-    if ($LASTEXITCODE -eq 0 -and (Test-Tool 'psmux')) { Write-Host 'installed psmux via scoop'; return }
-  }
-  Write-Warning 'scoop install of psmux failed; trying winget...'
-}
-# 2) winget — install-deps.ps1:386-390
-if (Test-Tool 'winget') {
-  winget install psmux --accept-source-agreements --accept-package-agreements --silent
-  if ($LASTEXITCODE -eq 0 -and (Test-Tool 'psmux')) { Write-Host 'installed psmux via winget'; return }
-  Write-Warning 'winget install of psmux failed; trying choco...'
-}
-# 3) choco — install-deps.ps1:394-398
-if (Test-Tool 'choco') {
-  choco install psmux -y
-  if ($LASTEXITCODE -eq 0 -and (Test-Tool 'psmux')) { Write-Host 'installed psmux via choco'; return }
-}
-Write-Warning 'psmux install failed via scoop/winget/choco.'
-exit 1   # required survivor: fail so run_once_ records NO success and retries next apply
-{{- end -}}
-```
-
-### Step 2 — Windows Terminal: `modify_settings.json.ps1.tmpl` (the merge)
+### Step 1 — Windows Terminal: `modify_settings.json.ps1.tmpl` (the merge)
 
 The WT `settings.json` is **app-owned** (the user/app writes profiles, `defaultProfile`, …); we
 merge our keys without clobbering theirs — the `modify_` contract (Verified mechanics §9). A Fragment
@@ -626,16 +562,15 @@ $cur | ConvertTo-Json -Depth 100               # stdout becomes the new settings
 ### DC-3 Acceptance (maps `ROADMAP.md:485-487`)
 
 Implementation status in this checkout (2026-06-09): DC-3 source files have been built and POSIX
-render-gating is validated from macOS with fixture `.chezmoidata.yaml` values. Live Windows apply
-remains manual per resolved decision #6, and the WT merge JSON logic is still queued for the separate
-`pwsh`-on-macOS exercise.
+render-gating is validated from macOS with fixture `.chezmoidata.yaml` values. Current Windows CI runs a
+full apply for copy-mode and WT merge parity. psmux install is deliberately outside chezmoi scope.
 
-- [ ] On Windows, `chez apply` installs psmux (scoop→winget→choco fallback) and merges the WT
-      fragment into a live `settings.json` **without dropping** pre-existing profiles/keys.
+- [ ] On Windows, `chez apply` merges the WT fragment into a live `settings.json`
+      **without dropping** pre-existing profiles/keys.
 - [ ] The merged `settings.json` contains exactly the managed key set — 7 globals, 15 keybindings,
       `profiles.defaults`, and the named rose-pine scheme+theme — and **not** a stray `$schema`
       (compare the merged KEY SET, not a raw diff against the fragment).
-- [ ] Re-running `chez apply` is a no-op (stable modify output; psmux content-hash unchanged).
+- [ ] Re-running `chez apply` is a no-op (stable modify output).
 - [ ] On POSIX both are skipped (`.chezmoiignore`); `chez verify` clean.
 
 ---
@@ -734,14 +669,13 @@ example, no `~/AppData`, no POSIX-wrong Ghostty/lazygit path, and no `~/Document
 
 `verify` checks target state only (Verified mechanics §12). The pilot's only POSIX side effect is the
 plugin checkouts, already covered by the HEAD-commit assert in Step 3. **The Windows-only checks do
-not run on the Ubuntu arm.** The Windows CI arm now covers copy-mode apply and WT merge parity with
-scripts excluded; psmux install remains a manual side-effect probe:
+not run on the Ubuntu arm.** The Windows CI arm now covers full apply, copy-mode
+content, and WT merge parity. psmux installation is not a migration probe
+because it remains `install-deps.ps1` provisioning:
 
-- **psmux (Windows, manual):** after `chez apply` on a Windows sandbox, `Get-Command psmux` resolves;
-  `psmux` launches reading `~/.tmux.conf`.
 - **WT merge (Windows CI) — value-level, not key-presence:** in a throwaway Windows profile with
   `USERPROFILE`/`LOCALAPPDATA`/`APPDATA` pointed at the sandbox (so the old `%LOCALAPPDATA%` path and the
-  new `~/AppData/Local` path are the same file — see DC-3 Step 2), seed an identical baseline
+  new `~/AppData/Local` path are the same file — see DC-3 Step 1), seed an identical baseline
   `settings.json` (e.g. WT's default + one user profile) into two sandboxes; in one run the OLD
   `bootstrap.ps1` with no switch (`-MergeWindowsTerminal` is accepted as a back-compat alias), in the
   other `chez apply`; then **deep-compare the two resulting JSONs** (normalize: sort keys/arrays
@@ -754,7 +688,7 @@ scripts excluded; psmux install remains a manual side-effect probe:
   whether it fell back, and falls back to the scoped legacy WT merge only if the runner cannot complete
   the symlink phase.
 
-- **Windows config content parity (CI):** the Windows arm applies with scripts excluded, then checks
+- **Windows config content parity (CI):** the Windows arm applies without excluding scripts, then checks
   `.tmux.conf`, `.tmux.windows.conf`, lazygit, Starship, and the PowerShell profile as real copy-mode
   files whose SHA-256 matches the canonical repo source. `AppData/Local/nvim` is intentionally a
   directory symlink to repo `nvim/`, and the test verifies both the link target and `init.lua` content.
@@ -825,8 +759,7 @@ real `chezmoi apply` and the commit-corruption case deepens the cloned zsh-autoc
       exact-commit equality for P3/P4; the single-source equality assert) on the Ubuntu arm for **N
       consecutive runs** (N fixed in the decision gate) before any old script is considered for
       retirement (retirement = Wave C).
-- [ ] The Windows CI arm passes copy-mode apply and WT value-level deep-compare; psmux install passes
-      on **one manual Windows run**.
+- [ ] The Windows CI arm passes full apply, copy-mode content checks, and WT value-level deep-compare.
 
 Status note (2026-06-09): DC-6 harness and CI wiring landed in this checkout:
 `tests/migration/template_test.sh`, `tests/migration/parity_gate.sh`,
@@ -843,7 +776,7 @@ separate because P3/P4 clone external zsh-plugin repos.
 2026-06-09 CI expansion note: `test.yml` now also has `chezmoi-parity-macos`
 (`macos-26`, running template/parity/oracle scripts) and `chezmoi-parity-windows`
 (`windows-2025`, running `tests/migration/windows_apply_test.ps1`). The Windows
-script seeds a throwaway profile, applies chezmoi with `--exclude scripts`, asserts
+script seeds a throwaway profile, applies chezmoi without excluding scripts, asserts
 Windows copy-mode and WT merge preservation, then deep-compares the managed WT
 subset against the legacy merge path. The required-check contexts were added to
 `.github/settings.yml`, `scripts/apply-repo-safeguards.sh`, and
@@ -863,8 +796,8 @@ After the pilot is green, the owner judges (the point of Wave A — `ROADMAP.md:
 4. **Pin fidelity:** is the tag-pin + commit-assert combo acceptable, or do you want exact-commit
    externals natively (a stronger chezmoi feature/version)?
 5. **Green bar (the quantitative gate):** retirement (Wave C) is authorized only after **N = 10
-   consecutive green Ubuntu parity runs + green macOS/Windows CI parity arms + 1 manual psmux Windows
-   pass**, where "green" = {dereferenced content parity, type-per-model, externals exact-commit
+   consecutive green Ubuntu parity runs + green macOS/Windows CI parity arms**,
+   where "green" = {dereferenced content parity, type-per-model, externals exact-commit
    equality, WT structural deep-compare, single-source equality}. Until that bar is met, the old
    scripts stay.
 
@@ -880,12 +813,12 @@ Only if 1–4 clear and the bar in 5 is achievable does Wave B begin.
       per-OS path; POSIX symlinks (live-edit) / Windows copies; verify clean; re-apply no-op.
 - [ ] **DC-2** both zsh plugins cloned to the unchanged path; the commit-assert passes; skipped on
       Windows.
-- [ ] **DC-3** psmux installed via the guarded scoop→winget→choco chain; WT `settings.json` merged
-      (managed subset only, no `$schema`) without clobbering user keys; both no-op on re-apply; both
-      skipped on POSIX.
+- [ ] **DC-3** psmux install remains in `install-deps.ps1`; WT `settings.json` merged
+      (managed subset only, no `$schema`) without clobbering user keys; re-apply is stable and the
+      merge is skipped on POSIX.
 - [ ] **DC-6** template tests pass on one host; the manifest-driven parity gate is green for N Ubuntu
-      runs + CI macOS + CI Windows WT/copy-mode/content coverage + 1 manual psmux Windows pass (the
-      decision-gate bar); surviving config-level tests still pass.
+      runs + CI macOS + CI Windows WT/copy-mode/content coverage (the decision-gate bar); surviving
+      config-level tests still pass.
 - [ ] **No old script deleted** (Wave A is additive; retirement is Wave C).
 - [ ] Docs: `docs/MIGRATION_STATUS.md`; the dotfiles `ROADMAP.md`/issue updated
       if Wave C retirement planning changes.
@@ -903,7 +836,7 @@ Only if 1–4 clear and the bar in 5 is achievable does Wave B begin.
 | devilspie2 daemon + autostart | `install-deps.sh:1297-1334` | managed `.lua` + `.desktop`; pkg-install + daemon-start in a Linux/X11-gated `run_once_` |
 | VSCode `workbench.colorTheme` merge | `install-deps.ps1:313-357` | `modify_` (beware the JSONC `catch` no-op `:331-333`) |
 | DC-4 secrets/private tier (`~/.zshrc.local`, `NOTES_VAULT`, brew shellenv) | `install-deps.sh:126-163` | `.chezmoi.toml.tmpl` prompts + `age`/password-manager (owner opt-in) |
-| DC-5 distro matrix (dnf/pacman/apk/zypper) + deeper Windows CI parity | `container-e2e.sh:90-101` (apt-only) | matrix entry + root-prep arm + required-checks sync, per distro; Windows runner already covers copy-mode + WT merge, but psmux install remains manual/script-side-effect scope |
+| DC-5 distro matrix (dnf/pacman/apk/zypper) + deeper Windows CI parity | `container-e2e.sh:90-101` (apt-only) | matrix entry + root-prep arm + required-checks sync, per distro; Windows runner already covers copy-mode + WT merge while psmux install stays in `install-deps.ps1` |
 | Edge cases to re-encode in run-scripts | `install-deps.sh:200-220,481-484`; `setup.sh:69-73` | `maybe_sudo`, domain accounts, `--best-effort`, no-TTY→all, dry-run |
 
 ## Appendix B — Pi CLI (and any TypeScript-based CLI tool) as a future add-on
@@ -937,7 +870,7 @@ rule. It does **not** threaten the chezmoi approach. (Sources: npm `@mariozechne
   the real home (Step 0).
 - **`.ps1` default interpreter is `pwsh -NoLogo -File`** — no custom `[interpreters]` block (a block
   ending in `-Command` would make scripts no-op).
-- **`.chezmoitemplates/` is read via the `template` action**, not `include` (DC-3 Step 2 / DC-1 Step 4).
+- **`.chezmoitemplates/` is read via the `template` action**, not `include` (DC-3 Step 1 / DC-1 Step 4).
 - **No `.Data` namespace** — `.chezmoidata`/`[data]` vars are `{{ .x }}` at root.
 - **`symlink_*.tmpl` body = link target, not the managed path** — path-divergent files need one
   `symlink_` entry per OS path + a templated `.chezmoiignore` (DC-1 Step 4).
@@ -951,7 +884,7 @@ rule. It does **not** threaten the chezmoi approach. (Sources: npm `@mariozechne
 - **The parity gate is manifest-scoped** to the full migrated config set, runs only the pilot slices of
   the old path, excludes directory rows, compares type + dereferenced content/perms (never
   symlink-node mode) + nvim realpath/tree parity + copied-source byte equality, and has separate
-  Ubuntu, macOS, and Windows CI arms; psmux install remains manual.
+  Ubuntu, macOS, and Windows CI arms; psmux install stays in `install-deps.ps1`.
 
 ---
 

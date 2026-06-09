@@ -1,7 +1,7 @@
 {{- $os := .chezmoi.os -}}
 {{- /* top-level `mode` FIRST — before [data] — or it becomes data.mode and is ignored. */ -}}
 {{- if eq $os "windows" }}
-mode = "file"      # no symlink privilege / Developer-Mode needed
+mode = "file"      # simple single-file configs need no symlink privilege; nvim dir-symlink still does (see MIGRATION_STATUS)
 {{- else }}
 mode = "symlink"   # live-edit
 {{- end }}

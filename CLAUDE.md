@@ -420,12 +420,14 @@ save only**. The next plain `:w` formats normally. Implemented in
 - **The chezmoi tree in `home/` owns the config layer, not provisioning.** The
   rule is `chezmoi=dotfiles, install-deps=provisioning`: do not port package
   installs, pinned binary/font installers, login-shell mutation, devilspie2, VS
-  Code, or distro package-manager policy into chezmoi run-scripts. The existing
-  psmux run-script is a bounded migration survivor that still needs one manual
-  real-apply check; do not use it as precedent for moving general provisioning.
+  Code, psmux installation, or distro package-manager policy into chezmoi
+  run-scripts. psmux stays in `install-deps.ps1` via `Install-Psmux` and the
+  hardened `Add-ScoopBucketSafe` path; chezmoi only owns the psmux-readable
+  config files (`.tmux.conf` and `.tmux.windows.conf`).
   `home/.chezmoi.toml.tmpl` is the mode switch: POSIX uses `mode = "symlink"`
   for live-edit behavior, Windows uses `mode = "file"` for simple single-file
-  configs. Same-path config files use managed source copies; path-divergent
+  configs, but Windows `nvim` remains a directory symlink and still needs
+  Developer Mode or elevation. Same-path config files use managed source copies; path-divergent
   lazygit and Ghostty configs use `.chezmoitemplates/**` plus POSIX
   `symlink_*.tmpl` wrappers and Windows rendered `.tmpl` copies where
   applicable. Windows Terminal is a `modify_` read-modify-write merge, not a
@@ -440,9 +442,15 @@ save only**. The next plain `:w` formats normally. Implemented in
   config files should not be deleted by chezmoi. `home/.chezmoiignore` must gate
   whole wrong-OS directories to avoid empty parent dirs. The Windows PowerShell
   7 profile path is managed at
-  `Documents/PowerShell/Microsoft.PowerShell_profile.ps1`; POSIX PowerShell
-  profile management remains outside the static chezmoi source tree during
-  coexistence. The migration oracle is `tests/migration/parity_gate.sh` +
+  `Documents/PowerShell/Microsoft.PowerShell_profile.ps1`; the Windows
+  PowerShell 5.1 profile path under `Documents/WindowsPowerShell/` is out of
+  scope because this repo is pwsh-first. POSIX pwsh profile management remains
+  outside the static chezmoi source tree because `bootstrap.sh` links
+  `~/.config/powershell/Microsoft.PowerShell_profile.ps1` only when `pwsh` is
+  installed. `bootstrap.ps1` writes to `$PROFILE`, which differs by host shell.
+  WSL is not parity-supported in the pilot: chezmoi sees WSL as Linux and would
+  create `~/.config/ghostty/config`, while `bootstrap.sh` skips that path unless
+  `--experimental-wsl-gui` is set; WSL-aware gating is Wave B. The migration oracle is `tests/migration/parity_gate.sh` +
   `tests/migration/oracle_test.sh` + `tests/migration/windows_apply_test.ps1`;
   it enforces manifest-driven parity, nvim dir-symlink realpath/content parity,
   single-source byte equality, wrong-OS absence, zsh exact-pin failure behavior,

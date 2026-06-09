@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Render the Windows-only chezmoi .ps1.tmpl scripts for targetOS=windows, parse
-# them with PowerShell, and exercise the WT modify_ filter. Closes the coverage
-# gap where tests/static/ps1_parse.sh only globs *.ps1 (never .ps1.tmpl), so a
-# Windows template could be syntactically broken while the POSIX parity arm stays
-# green. Skips gracefully when pwsh is absent (matches the repo's tool policy);
-# the chezmoi-parity CI job runs on ubuntu-latest, which ships pwsh.
+# Render the remaining Windows .ps1.tmpl template for targetOS=windows, parse it
+# with PowerShell, and exercise the WT modify_ filter. Closes the coverage gap
+# where tests/static/ps1_parse.sh only globs *.ps1 (never .ps1.tmpl), so the WT
+# template could be syntactically broken while the POSIX parity arm stays green.
+# Skips gracefully when pwsh is absent (matches the repo's tool policy); the
+# chezmoi-parity CI job runs on ubuntu-latest, which ships pwsh.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
@@ -19,27 +19,24 @@ if ! command -v pwsh >/dev/null 2>&1; then
     exit 0
 fi
 
-PSMUX_TMPL="$SRC/.chezmoiscripts/run_once_after_10-install-psmux.ps1.tmpl"
 WT_TMPL="$SRC/AppData/Local/Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/LocalState/modify_settings.json.ps1.tmpl"
 
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
-# 1) Render both Windows-only templates for targetOS=windows. Inject the OS with
-#    --override-data (the documented data-override flag) against the real home/
-#    source, so the WT modify_ resolves its `template "windows-terminal/..."` from
-#    home/.chezmoitemplates. (A hand-built fixture source proved environment-
-#    sensitive in CI; --override-data is the deterministic mechanism.)
+# 1) Render the Windows-only WT modify_ template for targetOS=windows. Inject the
+#    OS with --override-data (the documented data-override flag) against the real
+#    home/ source, so the WT modify_ resolves its `template "windows-terminal/..."`
+#    from home/.chezmoitemplates. (A hand-built fixture source proved
+#    environment-sensitive in CI; --override-data is the deterministic mechanism.)
 render_windows() {
     chezmoi --source "$SRC" execute-template --override-data '{"targetOS":"windows"}' < "$1"
 }
-render_windows "$PSMUX_TMPL" > "$work/install-psmux.ps1"
-render_windows "$WT_TMPL"    > "$work/modify-settings.ps1"
-[[ -s "$work/install-psmux.ps1" ]]   || fail "psmux template rendered empty for targetOS=windows"
+render_windows "$WT_TMPL" > "$work/modify-settings.ps1"
 [[ -s "$work/modify-settings.ps1" ]] || fail "WT modify template rendered empty for targetOS=windows"
-pass "Windows templates render non-empty for targetOS=windows"
+pass "Windows WT modify_ template renders non-empty for targetOS=windows"
 
-# 2) Parse both rendered scripts with PowerShell (catches .ps1.tmpl breakage).
+# 2) Parse the rendered script with PowerShell (catches .ps1.tmpl breakage).
 cat > "$work/parse.ps1" <<'PS'
 param([string[]]$Files)
 $failed = $false
@@ -55,9 +52,9 @@ foreach ($f in $Files) {
 if ($failed) { exit 1 }
 PS
 pwsh -NoLogo -NoProfile -File "$work/parse.ps1" \
-    "$work/install-psmux.ps1" "$work/modify-settings.ps1" \
+    "$work/modify-settings.ps1" \
     || fail "rendered Windows .ps1.tmpl failed PowerShell parse"
-pass "rendered Windows .ps1.tmpl parse cleanly under PowerShell"
+pass "rendered Windows WT modify_ template parses cleanly under PowerShell"
 
 # 3) WT modify_ filter: a seeded settings.json gains the managed keys AND keeps
 #    the user's keys.

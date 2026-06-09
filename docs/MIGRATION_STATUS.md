@@ -21,7 +21,7 @@ current plan names N = 10) plus manual owner signoff.
 | tmux | `tmux/tmux.conf`; `home/dot_tmux.conf` | POSIX: `~/.tmux.conf`; Windows: `%USERPROFILE%\.tmux.conf` | POSIX symlink via `mode = "symlink"`; Windows copy via `mode = "file"`. |
 | tmux Windows overlay | `tmux/tmux.windows.conf`; `home/dot_tmux.windows.conf` | Windows: `%USERPROFILE%\.tmux.windows.conf`; POSIX: ignored | Windows copy only; `tmux.conf` sources it with `source-file -q`. |
 | Windows Terminal | `windows-terminal/settings.fragment.jsonc`; `home/.chezmoitemplates/windows-terminal/settings.fragment.jsonc` | Windows: `%LOCALAPPDATA%\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json` | `modify_settings.json.ps1.tmpl` read-modify-write merge. |
-| PowerShell profile | `shells/powershell_profile.ps1`; `home/Documents/PowerShell/Microsoft.PowerShell_profile.ps1` | Windows: `%USERPROFILE%\Documents\PowerShell\Microsoft.PowerShell_profile.ps1`; POSIX pwsh profile remains legacy bootstrap scope during coexistence | Windows copy via `mode = "file"`. |
+| PowerShell profile | `shells/powershell_profile.ps1`; `home/Documents/PowerShell/Microsoft.PowerShell_profile.ps1` | Windows PS7: `%USERPROFILE%\Documents\PowerShell\Microsoft.PowerShell_profile.ps1`; Windows PowerShell 5.1 and POSIX pwsh profile paths stay out of chezmoi scope | Windows PS7 profile copy via `mode = "file"`. |
 | zsh plugins | `home/.chezmoiexternal.toml.tmpl`; `home/.chezmoiscripts/run_onchange_after_20-verify-zsh-plugin-pins.sh.tmpl` | POSIX: `~/.local/share/dotfiles/zsh-plugins/{zsh-autocomplete,zsh-autosuggestions}`; Windows: ignored | Pinned `.chezmoiexternal` git repos plus `run_onchange_` exact-commit assertion. |
 
 The migration oracle is manifest-driven:
@@ -36,6 +36,8 @@ top-level sources instead.
 Provisioning stays in `install-deps`, not chezmoi run-scripts:
 
 - package installs from Unix `PKG_TABLE` and Windows `$Catalog`
+- psmux installation on Windows, including the hardened `Add-ScoopBucketSafe`
+  bucket-add path in `install-deps.ps1`
 - the 5 pinned binary/font installers: Neovim Linux, lazygit Linux, Hack Nerd
   Font, Ubuntu Ghostty, and win32yank
 - the zsh login-shell switch and domain-account fallback
@@ -54,18 +56,28 @@ JSONC-fragile.
 
 ## Owner sign-off / known caveats
 
-- [ ] psmux real install still needs one manual Windows `chez apply` check. The
-      Windows e2e uses `apply --exclude scripts`, so it proves copy-mode and WT
-      merge behavior, not the psmux installer side effect.
 - [ ] Windows `nvim` is a directory symlink and therefore still needs Developer
       Mode or elevation. This is not a regression: `bootstrap.ps1` already
       symlinks it. The no-Developer-Mode win applies to simple single-file
       configs copied by `mode = "file"`.
 - [ ] `XDG_DATA_HOME` is not modeled for externals. Chezmoi installs zsh plugins
-      to the fixed `.local/share` path, and the parity gate unsets
-      `XDG_DATA_HOME`; an XDG-aware managed root is future work.
+      to the fixed `.local/share` path, and the verifier checks that same fixed
+      path; an XDG-aware managed root is Wave B.
+- [ ] The Windows PowerShell profile managed by chezmoi is the PowerShell 7 path
+      (`Documents\PowerShell\Microsoft.PowerShell_profile.ps1`). The Windows
+      PowerShell 5.1 path (`Documents\WindowsPowerShell\...`) is intentionally
+      out of scope because the repo is pwsh-first. `bootstrap.ps1` still writes
+      to `$PROFILE`, which differs by host shell.
+- [ ] The POSIX pwsh profile
+      (`~/.config/powershell/Microsoft.PowerShell_profile.ps1`) is intentionally
+      not migrated. `bootstrap.sh` links it only when `pwsh` is present, so it is
+      install-gated and provisioning-adjacent, like VS Code.
 - [ ] Windows Terminal Preview and redirected `%LOCALAPPDATA%` remain Wave B.
-- [ ] WSL Ghostty opt-in remains out of scope.
+- [ ] WSL is not parity-supported in the pilot. Chezmoi models WSL as
+      `.chezmoi.os = linux` and cannot distinguish it from native Linux, so on
+      WSL it would create `~/.config/ghostty/config` even though `bootstrap.sh`
+      skips that path by default. This is a known harmless divergence; WSL-aware
+      gating is Wave B.
 - [ ] zsh exact-pin checks re-assert when the pin script changes, not on manual
       checkout drift. `refreshPeriod = "0"` means there is no automatic drift.
 - [ ] No secrets or `age` tier has been started.
