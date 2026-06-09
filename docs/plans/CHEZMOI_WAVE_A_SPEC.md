@@ -113,7 +113,10 @@ relocates config, state, and the template's home), ideally inside a container.
 # --- Step 0a: install a pinned chezmoi (min v2.52.0 — supports .chezmoiexternal clone.args,
 #     modify_ scripts, the `template` action, execute-template --init). ---
 CHEZMOI_VERSION=v2.52.0          # pin; bump deliberately
-sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin" "$CHEZMOI_VERSION"
+# NOTE: pin the version with `-t <tag>`. A bare trailing arg is treated by the
+# get.chezmoi.io installer as a chezmoi command to run after install (it would
+# fail with: chezmoi: unknown command "v2.52.0").
+sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin" -t "$CHEZMOI_VERSION"
 chezmoi --version                # verify before proceeding
 
 # --- Step 0b: the repo root and the sandbox HOME (define ONCE; used everywhere below). ---

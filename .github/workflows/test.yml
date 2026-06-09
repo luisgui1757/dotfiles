@@ -195,7 +195,9 @@ jobs:
           set -euxo pipefail
           sudo apt-get update
           sudo apt-get install -y ca-certificates curl git python3
-          sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin" "$CHEZMOI_VERSION"
+          # -t pins the tag (+ SHA-256 verifies the release); a bare positional
+          # would be treated as a chezmoi command to run after install.
+          sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin" -t "$CHEZMOI_VERSION"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           "$HOME/.local/bin/chezmoi" --version
       - name: Template tests
