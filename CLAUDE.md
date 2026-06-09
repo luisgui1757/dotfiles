@@ -23,6 +23,12 @@ Do NOT put the repo at `~/.config/nvim/` — the installer creates that path as 
 symlink **pointing into** the repo, so a repo there would self-overlap (the
 self-link guard refuses this).
 
+The `home/` tree is the coexisting chezmoi source tree for the full config
+layer. It is canonical for chezmoi, but old `setup` / `bootstrap` still runs
+until Wave C retirement. During coexistence, top-level config files and their
+`home/` copies/templates must stay byte-identical where the parity manifest says
+so; update both in the same change.
+
 Agent settings are intentionally **NOT** synced through this repo. Keep local
 agent preferences in the agent's per-machine state directory; this repo does
 not ship synced agent preference folders.
@@ -38,7 +44,7 @@ not ship synced agent preference folders.
 ├── ghostty/               config (Rose Pine, Hack Nerd, tuned for tmux)
 ├── windows-terminal/      settings.fragment.jsonc + merge README
 ├── lazygit/               config.yml (J/K move-commit binding)
-├── home/                  chezmoi source tree (config-only migration pilot)
+├── home/                  chezmoi source tree for the coexisting config layer
 ├── tests/                 automated tests, grouped by tool
 ├── tests/wsl/             manual WSL split-host e2e check
 ├── .github/workflows/     CI matrix + chezmoi parity
@@ -243,9 +249,13 @@ problem.
 Sub-targets **skip gracefully** when their tool isn't installed
 (`yamllint`/`editorconfig-checker`/`hyperfine`/`bats`/`ghostty`). The
 ubuntu/macos/windows CI matrix in `.github/workflows/test.yml` installs
-everything, `chezmoi-parity` installs pinned chezmoi for the Wave A migration
-gate, and `test.ps1` treats missing Windows test dependencies as fatal under
+everything, `chezmoi-parity`, `chezmoi-parity-macos`, and
+`chezmoi-parity-windows` install pinned chezmoi for the config-layer migration
+oracle, and `test.ps1` treats missing Windows test dependencies as fatal under
 CI, so anything passing locally + CI is genuinely cross-platform.
+Static repo walkers intentionally exclude `home/` managed copies; those copies
+are validated by `tests/migration/parity_gate.sh` against the canonical
+top-level sources instead of being re-linted as independent source.
 `tests/static/toml_lint.sh` uses `taplo` when it is healthy, but if local macOS
 `taplo` panics with the known system-configuration null-object crash it falls
 back to Python `tomllib`; ordinary `taplo` lint errors still fail.
@@ -407,26 +417,36 @@ save only**. The next plain `:w` formats normally. Implemented in
   on Linux/WSL it uses `~/.config/lazygit`; on Windows it uses
   `%LOCALAPPDATA%\lazygit`. Keep `bootstrap.sh`, `bootstrap.ps1`, README, and
   tests aligned with those real read paths.
-- **The chezmoi pilot in `home/` is config-only.** Do not add package installs,
-  binary downloads, font installs, login-shell mutation, or other provisioning
-  side effects there. `home/.chezmoi.toml.tmpl` is the mode switch:
-  POSIX uses `mode = "symlink"` for live-edit behavior, Windows uses
-  `mode = "file"` so Developer Mode is not required. Same-path config files
-  use direct source copies; path-divergent lazygit and Ghostty configs use
-  `.chezmoitemplates/**` plus POSIX `symlink_*.tmpl` wrappers and Windows
-  rendered `.tmpl` copies where applicable. The nvim tree is intentionally NOT
+- **The chezmoi tree in `home/` owns the config layer, not provisioning.** The
+  rule is `chezmoi=dotfiles, install-deps=provisioning`: do not port package
+  installs, pinned binary/font installers, login-shell mutation, devilspie2, VS
+  Code, or distro package-manager policy into chezmoi run-scripts. The existing
+  psmux run-script is a bounded migration survivor that still needs one manual
+  real-apply check; do not use it as precedent for moving general provisioning.
+  `home/.chezmoi.toml.tmpl` is the mode switch: POSIX uses `mode = "symlink"`
+  for live-edit behavior, Windows uses `mode = "file"` for simple single-file
+  configs. Same-path config files use managed source copies; path-divergent
+  lazygit and Ghostty configs use `.chezmoitemplates/**` plus POSIX
+  `symlink_*.tmpl` wrappers and Windows rendered `.tmpl` copies where
+  applicable. Windows Terminal is a `modify_` read-modify-write merge, not a
+  symlink or fragment-only replacement. The nvim tree is intentionally NOT
   copied under `home/`: POSIX `home/dot_config/symlink_nvim.tmpl` and Windows
   `home/AppData/Local/symlink_nvim.tmpl` both point at
   `{{ .chezmoi.sourceDir }}/../nvim`, so legacy and chezmoi targets resolve to
-  the repo top-level `nvim/` directory. Do not use `exact_` for nvim; app
-  runtime state lives outside `.config/nvim`, but user/plugin-added config
-  files should not be deleted by chezmoi. `home/.chezmoiignore` must gate whole
-  wrong-OS directories to avoid empty parent dirs. The Windows PowerShell 7
-  profile path is managed at
+  the repo top-level `nvim/` directory. Windows nvim is therefore still a
+  directory symlink and still needs Developer Mode or elevation; the
+  no-Developer-Mode win applies to simple copied files. Do not use `exact_` for
+  nvim; app runtime state lives outside `.config/nvim`, but user/plugin-added
+  config files should not be deleted by chezmoi. `home/.chezmoiignore` must gate
+  whole wrong-OS directories to avoid empty parent dirs. The Windows PowerShell
+  7 profile path is managed at
   `Documents/PowerShell/Microsoft.PowerShell_profile.ps1`; POSIX PowerShell
-  profile management remains outside the static chezmoi source tree. Static
-  repo walkers skip `home/` managed copies; the migration parity gate enforces
-  byte-identical single-source copies against the canonical top-level configs.
+  profile management remains outside the static chezmoi source tree during
+  coexistence. The migration oracle is `tests/migration/parity_gate.sh` +
+  `tests/migration/oracle_test.sh` + `tests/migration/windows_apply_test.ps1`;
+  it enforces manifest-driven parity, nvim dir-symlink realpath/content parity,
+  single-source byte equality, wrong-OS absence, zsh exact-pin failure behavior,
+  and Windows copy-mode + WT merge parity.
 - **lazygit binary install paths differ by OS.** Homebrew owns macOS/Linuxbrew,
   Windows setup installs it through Scoop/winget/choco, and native Linux/WSL
   without brew uses a pinned GitHub release tarball with SHA-256 verification.

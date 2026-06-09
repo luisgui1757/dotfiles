@@ -4,11 +4,17 @@ _The single entry point for executing the current dotfiles work. It sequences **
 points at the two detailed specs. Read this first, then execute the specs it references in the order
 below._
 
+2026-06-09 current-branch status: this was the pre-implementation sequencing
+plan. On `chezmoi-pilot`, W1-W4 have landed and W4 grew from a pilot into the
+full config-layer migration. Treat the ordering notes below as execution
+history; use `docs/MIGRATION_STATUS.md` for current owner-facing migration
+status and sign-off caveats.
+
 | Spec | Covers | Status |
 |------|--------|--------|
-| **this file** | objective, sequencing, dependencies, commit strategy, pre-flight | orchestration |
-| `docs/plans/WINDOWS_FIXES_SPEC.md` | **W1** WT Rose Pine, **W2** pwsh keep-latest, **W3** psmux auth | execution-ready |
-| `docs/plans/CHEZMOI_WAVE_A_SPEC.md` | **W4** chezmoi Wave A pilot migration (DC-1…DC-6) | execution-ready |
+| **this file** | objective, sequencing, dependencies, commit strategy, pre-flight | historical orchestration |
+| `docs/plans/WINDOWS_FIXES_SPEC.md` | **W1** WT Rose Pine, **W2** pwsh keep-latest, **W3** psmux auth | landed; historical spec |
+| `docs/plans/CHEZMOI_WAVE_A_SPEC.md` | **W4** chezmoi migration (DC-1…DC-6) | landed and expanded to full config layer |
 
 Grounded against `luisgui1757/dotfiles` HEAD **`96d85ee`** (the same commit the chezmoi spec was grounded
 against). All `file:line` anchors in the referenced specs are at that HEAD.
@@ -49,10 +55,11 @@ Why this order and not the reverse:
    chezmoi port reproduces the bug and the gate green-lights it. The only sound state is **both sides
    carry the fix** — which is achieved by editing the legacy code and the spec delta together.
 
-2. **The spec is free to edit; the migration is not yet executed.** Stream B's `home/` source tree does
-   **not exist yet** — `CHEZMOI_WAVE_A_SPEC.md` is markdown describing what Codex will build. Updating a
-   spec delta now costs one markdown edit; updating it after the port is built costs a code change plus a
-   re-run of the gate. Edit the spec while it is still paper.
+2. **Historical note:** at planning time, Stream B's `home/` source tree did
+   **not exist yet** and `CHEZMOI_WAVE_A_SPEC.md` was markdown describing what
+   Codex would build. On `chezmoi-pilot`, `home/` exists and the migration gate
+   is checked in; future changes must update docs, source copies/templates, and
+   parity manifest assertions together.
 
 3. **Stream A is low-risk and unblocks confidence.** W1–W3 are bounded, testable on the existing CI, and
    independently valuable regardless of whether the chezmoi migration ever ships. They should not wait
@@ -75,7 +82,7 @@ all three deltas, so DC-6 is meaningful from its first green run.
 | **W1** | WT Rose Pine → default-on merge | — | `setup.ps1`, `bootstrap.ps1`, `tests/bootstrap/ps1_test.ps1`, `CLAUDE.md` (inv 15), `README.md`, `windows-terminal/README.md`, `PLAN.md`, `tests/MANUAL.md` **+** `CHEZMOI_WAVE_A_SPEC.md` (DC-3 Step 2, DC-6 Step 4) | `fix/wt-rosepine-default` | `.\test.ps1` (windows-2025) | ✅ (touches setup/bootstrap, **not** `install-deps.ps1`) |
 | **W3** | psmux auth hardening (`Add-ScoopBucketSafe`) | — | `install-deps.ps1`, `tests/static/repo_policy_test.sh`, `tests/powershell/InstallDeps.Tests.ps1`, `CLAUDE.md` **+** `CHEZMOI_WAVE_A_SPEC.md` (DC-3 Step 1) | `fix/psmux-bucket-auth` | static (`repo_policy_test.sh`, `ps1_parse.sh`) **+** `.\test.ps1` | ⚠️ shares `install-deps.ps1` with W2 |
 | **W2** | pwsh keep-latest (`Update-ScoopTool`) + catalog guard | — | `install-deps.ps1`, `tests/powershell/InstallDeps.Tests.ps1`, `PLAN.md`, `CLAUDE.md` **+** `CHEZMOI_WAVE_A_SPEC.md` (Step 0) | `fix/pwsh-keep-latest` | `.\test.ps1` | ⚠️ shares `install-deps.ps1` with W3 |
-| **W4** | chezmoi Wave A pilot (DC-1…DC-6) | **W1 + W3 spec deltas merged**; pwsh present (W2 runtime) | new `home/` tree, `tests/migration/`, new `chezmoi-parity` CI job (+ 3 sync files) | `chezmoi-pilot` (PR-4…N, per DC) | new `chezmoi-parity` (Ubuntu) + manual Windows/macOS | ❌ must be last |
+| **W4** | chezmoi migration (DC-1…DC-6) | **W1 + W3 spec deltas merged**; pwsh present (W2 runtime) | `home/` tree, `tests/migration/`, `chezmoi-parity*` CI jobs (+ required-check sync files) | `chezmoi-pilot` | `chezmoi-parity`, `chezmoi-parity-macos`, `chezmoi-parity-windows` + manual psmux real apply | executed last |
 
 **W2/W3 collision:** both edit `install-deps.ps1`. Do **W3 then W2** (W3 inserts `Add-ScoopBucketSafe`
 near the top + edits `Install-Psmux`; W2 inserts `Update-ScoopTool` after `Install-One` + adds a call at
@@ -142,12 +149,12 @@ install row stays **Wave B** (Appendix A). **Do not port a pwsh install run-scri
   on W3 and re-resolve W2's `:467`/`:229` anchors.
 - **Each Stream-A commit edits both the code AND its `CHEZMOI_WAVE_A_SPEC.md` delta** (rollup table
   above) — never split the code fix from its spec delta.
-- **W4 = the migration**, opened only after W1+W3 (and their spec deltas) merge. Break it into per-DC
-  commits exactly as `CHEZMOI_WAVE_A_SPEC.md` structures them (DC-1 source tree, DC-2 externals, DC-3 run
-  scripts, DC-6 parity gate + CI). The new `chezmoi-parity` required-status context must be mirrored in
-  all three sync files in the same commit (`.github/settings.yml`, `scripts/apply-repo-safeguards.sh`,
-  `.github/rulesets/main-integrity.json`) — see `CHEZMOI_WAVE_A_SPEC.md` DC-6 Step 6 and CLAUDE.md
-  invariant 18 / `required_checks_test.sh`.
+- **W4 = the migration** (historical). It landed after W1+W3 and now includes
+  the `home/` tree, migration tests, and `chezmoi-parity*` CI jobs. Required
+  check names are checked into `.github/settings.yml`,
+  `scripts/apply-repo-safeguards.sh`, and
+  `.github/rulesets/main-integrity.json`; making them live remains the owner
+  `scripts/apply-repo-safeguards.sh` action.
 - **Branch protection reality (CLAUDE.md / `docs/security/branch-protection.md`):** `main` is owner-only,
   squash-only, with non-bypassable required checks. Routine agent work uses least-privilege credentials;
   do not assume admin/`delete_repo`. Each PR needs the owner's review bypass to merge.

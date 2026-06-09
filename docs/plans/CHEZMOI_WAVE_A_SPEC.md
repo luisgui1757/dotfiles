@@ -6,6 +6,16 @@ turns **Wave A** (the pilot + its parity gate) into something Codex 5.5 xhigh ca
 literally, grounded line-by-line in the real `luisgui1757/dotfiles` tree and in chezmoi's
 documented semantics._
 
+2026-06-09 current-branch status: this document is now partly historical. The
+branch grew from the original Wave A pilot into a full config-layer migration:
+`home/` covers nvim, Starship, zshenv/zshrc, Ghostty, lazygit, tmux,
+`tmux.windows.conf`, Windows Terminal merge, the Windows PowerShell profile, and
+the two pinned zsh plugin externals. Use
+`docs/MIGRATION_STATUS.md` as the current owner-facing status. The original
+pilot steps remain useful implementation history, but any "pilot only" wording
+below is superseded by the manifest-driven full migrated config set described
+in DC-6 status notes.
+
 ---
 
 ## How to use this spec (Codex 5.5 xhigh)
@@ -21,9 +31,10 @@ documented semantics._
   in the working tree, STOP and report the drift.
 - Where a value must be obtained at runtime (a base digest, a commit SHA), the step says so with the
   command to get it. Never write a placeholder as if it were real.
-- **Scope discipline:** this is the **pilot**, not the full migration. Do exactly the slices in
-  "Scope". The parity gate (DC-6) is **intersection-scoped** to the pilot paths — do not let it
-  drift into a full-install diff.
+- **Scope discipline:** this was written as a pilot spec. On the current branch,
+  the config layer has expanded beyond the original seed slices; keep the
+  current scope grounded in `docs/MIGRATION_STATUS.md` and the DC-6 manifest,
+  not in stale pilot allow-list assumptions.
 
 ## Where this runs — CRITICAL
 
@@ -32,16 +43,20 @@ the Meridian roadmap (owner request) so the two 2026-06-08 plans live together; 
 product scope and should relocate to a dotfiles `ROADMAP.md`/issue when convenient.
 
 - Operate on a checkout of `luisgui1757/dotfiles` on a feature branch (e.g. `chezmoi-pilot`).
-- Build the chezmoi **source directory** as a new top-level dir **`home/`** in that repo. The
-  existing `setup.sh` / `bootstrap.sh` / `install-deps.*` stay **untouched and working** for the
-  whole pilot — the parity gate (DC-6) runs the relevant *slices* of the old path beside chezmoi and
-  compares them, so they MUST coexist. Nothing in the old install path is deleted in Wave A (that is
-  Wave C, after N green parity runs).
+- Historical instruction: build the chezmoi **source directory** as a new top-level dir **`home/`** in
+  that repo. On the current branch, `home/` already exists. The existing `setup.sh` / `bootstrap.sh` /
+  `install-deps.*` stay **untouched and working** until Wave C — the parity gate (DC-6) runs the
+  relevant config slices of the old path beside chezmoi and compares them, so they MUST coexist.
+  Nothing in the old install path is deleted in Wave A (that is Wave C, after N green parity runs).
 
-## Scope — Wave A pilot only
+## Original Scope — Wave A seed pilot
 
 The pilot exercises the *mechanically hard* parts on a minimal slice so the owner can feel the
 ergonomics before the 16–24-day Wave B (`ROADMAP.md:583-608`). Exactly these slices:
+
+Current status note: the table below is the original seed scope. The checked-in
+branch has expanded beyond it into the full config-layer manifest described in
+DC-6 and `docs/MIGRATION_STATUS.md`.
 
 | Slice | What it proves | DC |
 |---|---|---|
@@ -53,10 +68,12 @@ ergonomics before the 16–24-day Wave B (`ROADMAP.md:583-608`). Exactly these s
 | **The parity gate** (old slices vs chezmoi, intersection-scoped, content-normalized + probes) | the keystone — nothing retires until it is green | DC-6 |
 | **Hermetic per-OS template unit tests** (`execute-template` on an injected OS var) | host-independent branch coverage | DC-6 |
 
-**Out of scope (Wave B, catalogued in Appendix A):** the other ~22 configs, the full
-`PKG_TABLE`/`$Catalog` → `.chezmoidata` merge, the 5 non-plugin pinned binaries, the zsh login-shell
-switch, devilspie2, the VSCode theme merge, the DC-4 secrets tier, the DC-5 distro matrix, and the
-README/CLAUDE.md rewrite.
+**Original out of scope (Wave B, catalogued in Appendix A):** the full
+`PKG_TABLE`/`$Catalog` -> `.chezmoidata` merge, the 5 non-plugin pinned
+binaries/fonts, the zsh login-shell switch, devilspie2, the VSCode theme merge,
+the DC-4 secrets tier, and the DC-5 distro matrix remain provisioning/secrets
+scope. The current branch has since pulled the rest of the dotfiles config
+layer into the DC-6 manifest and added the README/CLAUDE status rewrite.
 
 ## Verification status
 
@@ -81,12 +98,13 @@ README/CLAUDE.md rewrite.
 3. **The WT merge stays a full read-modify-write merge** (a `modify_` script), NOT a Fragment
    Extension (it can't set globals/`profiles.defaults`/15 keybindings — grounded
    `settings.fragment.jsonc:24-109`, merge logic `bootstrap.ps1:307-466`).
-4. **The pilot external pins to upstream tags, AND a required `run_after_` asserts the exact
+4. **The zsh external pins to upstream tags, AND a required `run_onchange_after_` asserts the exact
    commit** (DC-2). chezmoi `.chezmoiexternal` git-repo has no native exact-commit pin, and the
-   pilot's whole point is fidelity, so the commit-equality assert (the old installer's
-   `install-deps.sh:786-790` semantics) is promoted into the gate, not logged as a residual.
+   migration's whole point is fidelity, so the commit-equality assert (the old installer's
+   `install-deps.sh:786-790` semantics) is promoted into the gate, not logged as a residual. It uses
+   `run_onchange_` so pin changes re-assert while ordinary apply/verify remains clean.
 5. **Source dir = `home/` inside the dotfiles repo.** Old+new coexist; CI drives both.
-6. **The automated CI parity gate now has Ubuntu, macOS, and Windows arms for the pilot.** Ubuntu
+6. **The automated CI parity gate now has Ubuntu, macOS, and Windows arms for the migration.** Ubuntu
    remains the networked POSIX baseline for externals; macOS runs the same template/parity/oracle
    scripts on `macos-26`; Windows runs a sandboxed copy-mode + WT merge parity e2e
    (`tests/migration/windows_apply_test.ps1`) with `--exclude scripts`. The psmux installer side
@@ -355,9 +373,12 @@ AppData/Local/lazygit/config.yml
 
 ### DC-1 Acceptance (maps `ROADMAP.md:407-423`)
 
-Status note (2026-06-09): DC-1 source files landed in this checkout; macOS sandbox apply/verify and
-second-apply no-op were validated, with `.chezmoiignore` branch proof rendered for Windows and Linux.
-Real Windows apply semantics remain manual; DC-2/DC-3/DC-6 are untouched.
+Status note (2026-06-09): DC-1 source files landed and were expanded beyond the
+seed scope. The manifest now covers nvim as a directory symlink, Starship,
+zshenv/zshrc, Ghostty, lazygit, tmux, `tmux.windows.conf`, the Windows
+PowerShell profile copy, and the Windows Terminal merge. Windows copy-mode and
+WT merge semantics are covered by `tests/migration/windows_apply_test.ps1`;
+psmux script execution remains a manual real-apply caveat.
 
 - [ ] `chez apply` (sandbox) lands `~/.tmux.conf` on macOS/Linux/Windows; `~/.tmux.windows.conf` only
       on Windows.
@@ -625,7 +646,7 @@ Maps `ROADMAP.md:540-582`. **Nothing in the old install path is deleted until th
 runs (DC-6 decision-gate item).** The gate is manifest-scoped to the full migrated config set — it is
 NOT a raw union of two full installs (a full `setup.sh --all` would produce package, font, login-shell,
 daemon, and other side effects that the pilot legitimately does not manage, false-FAILing the gate).
-It runs the **pilot slices only** of the old path and compares only the manifest rows.
+It runs only the relevant config slices of the old path and compares only the manifest rows.
 
 ### Step 1 — Run the pilot slices of the OLD path (no full install, no out-of-scope footprint)
 
@@ -866,8 +887,8 @@ Only if 1–4 clear and the bar in 5 is achievable does Wave B begin.
       runs + CI macOS + CI Windows WT/copy-mode/content coverage + 1 manual psmux Windows pass (the
       decision-gate bar); surviving config-level tests still pass.
 - [ ] **No old script deleted** (Wave A is additive; retirement is Wave C).
-- [ ] Docs: a short `home/README.md`; the dotfiles `ROADMAP.md`/issue updated (this plan relocated out
-      of Meridian per its Open-items note).
+- [ ] Docs: `docs/MIGRATION_STATUS.md`; the dotfiles `ROADMAP.md`/issue updated
+      if Wave C retirement planning changes.
 
 ---
 
@@ -875,7 +896,7 @@ Only if 1–4 clear and the bar in 5 is achievable does Wave B begin.
 
 | Deferred item | Grounding | chezmoi disposition |
 |---|---|---|
-| Remaining config expansion beyond Wave A | `bootstrap.sh`, `bootstrap.ps1`, future app configs | Wave A now covers tmux, lazygit, nvim dir-symlink, starship, zshenv, zshrc, Ghostty, Windows tmux overlay, and PowerShell profile single-source checks. Future rows should add manifest entries and matching single-source assertions in the same change. |
+| Future config additions beyond the current config-layer set | `bootstrap.sh`, `bootstrap.ps1`, future app configs | The current branch covers tmux, lazygit, nvim dir-symlink, Starship, zshenv, zshrc, Ghostty, Windows tmux overlay, Windows Terminal merge, PowerShell profile, and zsh plugin externals. Future rows should add manifest entries and matching single-source assertions in the same change. |
 | Full `PKG_TABLE` (7 cols) + `$Catalog` (3 cols) → `.chezmoidata` | `install-deps.sh:851-895`, `install-deps.ps1:114-132` | one `.chezmoidata.yaml`; Unix picks one column, Windows iterates the `$order` fallback chain (`:179`) |
 | 5 binary/font installers (nvim-linux `v0.12.2`, lazygit-linux `v0.62.2`, Hack Nerd Font `v3.4.0`, ghostty-ubuntu `1.3.1-0-ppa2`, win32yank) | `install-deps.sh:20-37,539-1219` | `.chezmoiexternal` **+ run-script** (fc-cache/`/opt`/apt/`chmod` side effects) |
 | zsh login-shell switch (chsh / `/etc/shells` / domain `~/.bashrc` exec-zsh) | `install-deps.sh:418-443,398-416` | `run_once_` preserving `is_local_account` + `maybe_sudo` branching |
@@ -939,7 +960,7 @@ _Provenance: 2026-06-09 chezmoi Wave A pilot spec (owner-requested), branch
 `luisgui1757/dotfiles` @ `96d85ee` (configs, unix + windows installers, WT fragment, tests/CI) and a
 web-verified chezmoi-mechanics pass against chezmoi.io. **Adversarially reviewed by a 4-lens red-team
 (2026-06-09):** grounding came back clean; correctness/executability/parity findings folded in — the
-parity gate was reworked from a raw union diff into an intersection-scoped gate (pilot slices only,
+parity gate was reworked from a raw union diff into an intersection-scoped gate (old-path config slices only,
 dereferenced content/perms, exact-commit externals, value-level WT deep-compare; now expanded from
 Ubuntu-only/manual Windows to Ubuntu + macOS + Windows CI arms), the `[interpreters]` block removed,
 the WT fragment switched from `include` to the `template` action, the sandbox switched to
@@ -955,5 +976,7 @@ breaks Bash 3.2/macOS, psmux not failing loud, WT scoped explicitly to stable + 
 `USERPROFILE`/`LOCALAPPDATA`/`APPDATA`, a "replace tests" contradiction (now "added alongside; retire
 in Wave C"), and `sha()`/macOS-acceptance hardening. Codex's claim that empty-rendered OS-gated
 scripts still run was **partially refuted** (chezmoi documents skipping whitespace-only scripts — now
-cited in §8). Scope = Wave A pilot only; Wave B is catalogued (Appendix A) but not specced. Companion
-to `ROADMAP.md` DC-1…DC-6 and `docs/plans/CONTAINERIZATION_WAVE_A_SPEC.md`._
+cited in §8). Original scope was Wave A pilot only; the current branch has
+expanded that to the full config layer while keeping provisioning and secrets in
+Wave B / install-deps. Companion to `ROADMAP.md` DC-1…DC-6 and
+`docs/plans/CONTAINERIZATION_WAVE_A_SPEC.md`._

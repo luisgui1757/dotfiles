@@ -14,6 +14,12 @@ run setup -> install dependencies -> link configs -> sync Neovim plugins -> sync
 The lower-level scripts exist for debugging those phases. For a fresh machine,
 or for a coworker trying this setup cold, run `setup`.
 
+The legacy setup path and the chezmoi migration now coexist. `setup.sh`,
+`setup.ps1`, `bootstrap.*`, and `install-deps.*` remain supported; chezmoi can
+also manage the config layer from `home/`. See
+[docs/MIGRATION_STATUS.md](docs/MIGRATION_STATUS.md) for the owner-facing split:
+chezmoi owns dotfiles, while `install-deps` still owns provisioning.
+
 ## Quick Start
 
 No checkout is required. `setup.{sh,ps1}` clones the repo to `~/dotfiles`
@@ -93,7 +99,31 @@ make setup                       # same as ./setup.sh, via the Makefile
 .\setup.ps1 -MergeWindowsTerminal     # accepted no-op alias; WT merge is default-on
 ```
 
+### chezmoi (config layer)
+
+From an existing checkout, chezmoi can apply the config layer directly from
+`home/`:
+
+```bash
+chezmoi --source "$PWD/home" init
+chezmoi --source "$PWD/home" apply
+```
+
+```powershell
+chezmoi --source "$PWD\home" init
+chezmoi --source "$PWD\home" apply
+```
+
+This manages dotfiles config only. Run `install-deps.sh` or `install-deps.ps1`
+for packages, pinned binaries/fonts, shell adoption, VS Code, devilspie2, and
+other provisioning.
+
 ### Managed Configs
+
+The table below is the config layer managed by the legacy bootstrap path and,
+for the migrated targets, by chezmoi. Mechanisms differ: POSIX chezmoi uses
+symlinks for single files, Windows chezmoi copies single files, Neovim remains a
+directory symlink, and Windows Terminal remains a merge.
 
 | Tool | macOS | Linux / WSL | Windows |
 |---|---|---|---|
@@ -288,7 +318,7 @@ the adjacent constant.
 ├── tmux/                  # tmux.conf (Rose Pine, vi-mode, true-color)
 ├── ghostty/               # config (Rose Pine, Hack Nerd, Ghostty-tuned)
 ├── windows-terminal/      # settings.fragment.jsonc + merge README
-├── home/                  # chezmoi source tree for the config-only migration
+├── home/                  # chezmoi source tree for the config layer
 ├── tests/                 # automated test tree
 ├── tests/wsl/             # manual WSL split-host e2e check
 ├── .github/workflows/     # CI matrix + chezmoi parity
@@ -310,6 +340,11 @@ the adjacent constant.
 
 - **One source of truth via symlinks.** Edits in the repo are live everywhere
   without manual copy-paste; `bootstrap.{sh,ps1}` are idempotent.
+- **chezmoi is the config-layer path, not the provisioning path.** The
+  `home/` source tree coexists with the legacy setup scripts while the parity
+  gate proves equivalence. Do not move package installs, binary/font installers,
+  login-shell changes, VS Code, devilspie2, or distro-manager policy out of
+  `install-deps`.
 - **Rose Pine everywhere it can render.** Nvim, lualine, starship, tmux,
   ghostty, Windows Terminal, PSReadLine — same palette across the stack. VS Code
   joins optionally: `install-deps` offers VS Code, and if `code` is detected it
