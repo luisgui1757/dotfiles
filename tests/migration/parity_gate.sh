@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Determinism: the legacy install_zsh_plugins slice honors ${XDG_DATA_HOME:-...},
+# while the chezmoi externals install to a fixed ~/.local/share path. Unset
+# XDG_DATA_HOME so BOTH sides resolve to $HOME/.local/share and P3/P4 is an
+# apples-to-apples comparison. (An XDG_DATA_HOME-aware managed root is Wave B.)
+unset XDG_DATA_HOME
+
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 SRC="$REPO_ROOT/home"
 

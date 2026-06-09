@@ -208,3 +208,10 @@ jobs:
         run: |
           set -euo pipefail
           PATH="$HOME/.local/bin:$PATH" bash tests/migration/parity_gate.sh
+      - name: Windows template render/parse/merge (pwsh)
+        run: |
+          set -euo pipefail
+          # ubuntu-latest ships pwsh, so this exercises the Windows-only
+          # .ps1.tmpl scripts (render + parse + WT merge) that ps1_parse.sh
+          # cannot see; the test self-skips if pwsh is ever absent.
+          PATH="$HOME/.local/bin:$PATH" bash tests/migration/windows_render_test.sh

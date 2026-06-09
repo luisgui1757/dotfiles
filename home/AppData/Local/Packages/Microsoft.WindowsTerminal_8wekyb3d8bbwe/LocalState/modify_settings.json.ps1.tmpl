@@ -12,11 +12,15 @@ function Strip-Jsonc {
     return (($jsonc -split "`n" | Where-Object { $_ -notmatch "^\s*//" }) -join "`n")
 }
 
-$current = if ([string]::IsNullOrWhiteSpace($currentJson)) {
-    [pscustomobject]@{}
-} else {
-    (Strip-Jsonc $currentJson) | ConvertFrom-Json
+if ([string]::IsNullOrWhiteSpace($currentJson)) {
+    # Parity with the default-on bootstrap.ps1 merge (W1): when Windows Terminal
+    # has never launched, settings.json does not exist and chezmoi passes empty
+    # stdin. Emit NOTHING so chezmoi leaves the target absent -- do NOT fabricate
+    # a settings.json (the legacy path warn-and-skips here, bootstrap.ps1:300-301,
+    # and WT would overwrite a hand-made file on first launch anyway).
+    return
 }
+$current = (Strip-Jsonc $currentJson) | ConvertFrom-Json
 $fragment = (Strip-Jsonc $fragmentJson) | ConvertFrom-Json
 
 # Defensive: initialize containers that a damaged or minimal settings.json might
