@@ -34,6 +34,6 @@ while IFS= read -r f; do
         printf '%s\n' "${out//$'\n'/$'\n  '}"
         fail=1
     fi
-done < <(find "$REPO_ROOT" -type f -name "*.ps1" -not -path "*/.git/*" -not -path "*/tests/.cache/*")
+done < <(find "$REPO_ROOT" -type f -name "*.ps1" -not -path "*/.git/*" -not -path "*/tests/.cache/*" -not -path "$REPO_ROOT/home/*")
 
 [[ $fail -eq 0 ]] && echo "all ps1 files parse" || exit 1

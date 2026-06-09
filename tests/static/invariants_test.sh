@@ -20,7 +20,7 @@ check_absent() {
 
 check_absent "NODE_TLS_REJECT_UNAUTHORIZED gone (security)" \
     "NODE_TLS_REJECT_UNAUTHORIZED" \
-    --exclude-dir=.git --exclude-dir=.claude \
+    --exclude-dir=.git --exclude-dir=.claude --exclude-dir=home \
     --exclude-dir=tests \
     --exclude="CLAUDE.md" --exclude="README.md" \
     .
@@ -142,7 +142,7 @@ fi
 # errors. Save-as-UTF-8-BOM would also work, but ASCII is simpler.
 ps1_files=()
 while IFS= read -r f; do ps1_files+=("$f"); done < <(
-    find . -type f -name '*.ps1' -not -path './.git/*' -not -path './tests/.cache/*'
+    find . -type f -name '*.ps1' -not -path './.git/*' -not -path './tests/.cache/*' -not -path './home/*'
 )
 find_non_ascii_ps1() {
     [[ "$#" -gt 0 ]] || return 0

@@ -1,0 +1,52 @@
+# Ghostty configuration — Rose Pine, tmux-friendly, Hack Nerd Font.
+# Install path:
+#   macOS  → ~/Library/Application Support/com.mitchellh.ghostty/config
+#   Linux  → ~/.config/ghostty/config
+# (bootstrap.sh symlinks this file to the right location.)
+
+# ---- Theme -------------------------------------------------------------------
+theme = dark:Rose Pine,light:Rose Pine Dawn
+
+# ---- Font --------------------------------------------------------------------
+font-family = Hack Nerd Font
+font-size = 13
+font-feature = +liga
+font-feature = +calt
+
+# ---- Window ------------------------------------------------------------------
+# Mild translucency only — heavy blur compounds compositing cost when running
+# tmux with frequent redraws. If you want full opacity, set both to 1.0 / 0.
+background-opacity = 0.95
+background-blur-radius = 15
+window-padding-x = 6
+window-padding-y = 6
+window-padding-balance = true
+# Open maximized on every platform. window-save-state stays `default` (NOT
+# `always`): on macOS `always` restores the last window geometry AFTER
+# `maximize` applies and overrides it, so the window wouldn't reliably open
+# maximized. `default` only restores on an OS-driven reopen, so normal launches
+# stay maximized while macOS session restore still works. (No-op on Linux/GTK.)
+maximize = true
+window-save-state = default
+macos-titlebar-style = tabs
+macos-option-as-alt = true
+
+# ---- Cursor / mouse ----------------------------------------------------------
+cursor-style = block
+cursor-style-blink = false
+mouse-hide-while-typing = true
+copy-on-select = clipboard
+
+# ---- Shell integration -------------------------------------------------------
+shell-integration = detect
+shell-integration-features = cursor,sudo,title
+
+# ---- Scrollback / clipboard --------------------------------------------------
+scrollback-limit = 50000
+clipboard-read = ask
+clipboard-write = allow
+clipboard-paste-protection = true
+
+# ---- Keybindings -------------------------------------------------------------
+# Avoid clashing with tmux prefix (C-Space) and nvim Alt-h/j/k/l window nav.
+keybind = global:cmd+grave_accent=toggle_quick_terminal

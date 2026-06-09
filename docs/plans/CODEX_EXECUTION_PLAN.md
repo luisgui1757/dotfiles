@@ -43,7 +43,7 @@ be sequenced, not run blind.
 Why this order and not the reverse:
 
 1. **The parity gate is an oracle, not a test.** DC-6 compares OLD-path output vs NEW-path output on the
-   pilot allow-list and asserts equality (`CHEZMOI_WAVE_A_SPEC.md` DC-6 Step 3). Its value is entirely
+   manifest-scoped migrated config set and asserts equality (`CHEZMOI_WAVE_A_SPEC.md` DC-6 Step 3). Its value is entirely
    that both sides are *correct*. Fixing only one side breaks the equality; fixing neither (status quo)
    leaves both buggy; fixing the old side while the spec still encodes the old bug means the future
    chezmoi port reproduces the bug and the gate green-lights it. The only sound state is **both sides

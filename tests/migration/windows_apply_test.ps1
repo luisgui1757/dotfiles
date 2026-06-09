@@ -125,6 +125,67 @@ function Get-ArrayValue {
     return @($Value)
 }
 
+function Get-SingleItemTarget {
+    param([Parameter(Mandatory)] $Item)
+    $target = $Item.Target
+    if ($target -is [array]) {
+        return $target[0]
+    }
+    return $target
+}
+
+function Get-CanonicalPath {
+    param([Parameter(Mandatory)] [string]$Path)
+    return (Resolve-Path -LiteralPath $Path -ErrorAction Stop).Path
+}
+
+function Assert-FileContentMatches {
+    param(
+        [Parameter(Mandatory)] [string]$ActualPath,
+        [Parameter(Mandatory)] [string]$ExpectedPath,
+        [Parameter(Mandatory)] [string]$Label
+    )
+
+    Assert-Condition (Test-Path -LiteralPath $ActualPath -PathType Leaf) "$Label was not created"
+    Assert-Condition (Test-Path -LiteralPath $ExpectedPath -PathType Leaf) "$Label expected source is missing: $ExpectedPath"
+    $actualHash = (Get-FileHash -LiteralPath $ActualPath -Algorithm SHA256).Hash
+    $expectedHash = (Get-FileHash -LiteralPath $ExpectedPath -Algorithm SHA256).Hash
+    Assert-Condition ($actualHash -eq $expectedHash) "$Label content mismatch actual=$actualHash expected=$expectedHash"
+}
+
+function Assert-CopyModeFileMatches {
+    param(
+        [Parameter(Mandatory)] [string]$ActualPath,
+        [Parameter(Mandatory)] [string]$ExpectedPath,
+        [Parameter(Mandatory)] [string]$Label
+    )
+
+    Assert-FileContentMatches -ActualPath $ActualPath -ExpectedPath $ExpectedPath -Label $Label
+    $item = Get-Item -LiteralPath $ActualPath -Force
+    $linkType = if ($item.PSObject.Properties.Name -contains 'LinkType') { $item.LinkType } else { $null }
+    Assert-Condition ($linkType -ne 'SymbolicLink') "$Label is a symlink; expected Windows copy mode"
+}
+
+function Assert-NvimSymlinkMatchesRepo {
+    param([Parameter(Mandatory)] [string]$Sandbox)
+
+    $nvimPath = Join-Path $Sandbox 'AppData\Local\nvim'
+    Assert-Condition (Test-Path -LiteralPath $nvimPath -PathType Container) 'nvim directory was not created under AppData\Local'
+    $nvimItem = Get-Item -LiteralPath $nvimPath -Force
+    Assert-Condition ($nvimItem.LinkType -eq 'SymbolicLink') 'nvim is not a symlink; expected Windows dir-symlink mode'
+
+    $target = Get-SingleItemTarget -Item $nvimItem
+    Assert-Condition ([string]::IsNullOrWhiteSpace($target) -eq $false) 'nvim symlink has no target'
+    $resolvedTarget = Get-CanonicalPath -Path $target
+    $repoNvim = Get-CanonicalPath -Path (Join-Path $script:RepoRoot 'nvim')
+    Assert-Condition ($resolvedTarget -eq $repoNvim) "nvim symlink target mismatch actual=$resolvedTarget expected=$repoNvim"
+
+    Assert-FileContentMatches `
+        -ActualPath (Join-Path $nvimPath 'init.lua') `
+        -ExpectedPath (Join-Path $script:RepoRoot 'nvim\init.lua') `
+        -Label 'nvim init.lua'
+}
+
 function New-BaselineWtSettings {
     return [ordered]@{
         defaultProfile = $script:UserProfileGuid
@@ -202,6 +263,46 @@ function Assert-WtUserSeedSurvived {
     Assert-Condition ($actions.Count -gt 0) "$Label dropped the seeded user action"
 }
 
+function Read-WtFragment {
+    $fragmentPath = Join-Path $script:RepoRoot 'windows-terminal\settings.fragment.jsonc'
+    return ((Strip-Jsonc (Get-Content -Raw -LiteralPath $fragmentPath)) | ConvertFrom-Json)
+}
+
+function Get-WTActionKeysFromItems {
+    param($Items)
+
+    $keys = @()
+    foreach ($item in (Get-ArrayValue $Items)) {
+        $keys += @(Get-WTActionKeySet $item)
+    }
+    return @($keys | Sort-Object -Unique)
+}
+
+function Assert-StringSetEqual {
+    param(
+        [Parameter(Mandatory)] [string[]]$Actual,
+        [Parameter(Mandatory)] [string[]]$Expected,
+        [Parameter(Mandatory)] [string]$Label
+    )
+
+    $actualText = (@($Actual | Sort-Object -Unique) -join ',')
+    $expectedText = (@($Expected | Sort-Object -Unique) -join ',')
+    Assert-Condition ($actualText -eq $expectedText) "$Label mismatch actual=[$actualText] expected=[$expectedText]"
+}
+
+function Assert-WtManagedActionKeySet {
+    param(
+        [Parameter(Mandatory)] $Settings,
+        [Parameter(Mandatory)] [string]$Label
+    )
+
+    $fragment = Read-WtFragment
+    $expectedKeys = @(Get-WTActionKeysFromItems $fragment.actions)
+    $actualKeys = @(Get-WTActionKeysFromItems $Settings.actions)
+    $actualManagedKeys = @($actualKeys | Where-Object { $expectedKeys -contains $_ })
+    Assert-StringSetEqual -Actual $actualManagedKeys -Expected $expectedKeys -Label "$Label managed WT action key set"
+}
+
 function Assert-Part1WtMerge {
     param([Parameter(Mandatory)] [string]$SettingsPath)
 
@@ -211,6 +312,7 @@ function Assert-Part1WtMerge {
     Get-NamedItem -Items $settings.schemes -Name 'rose-pine' -Label 'WT rose-pine scheme' | Out-Null
     Get-NamedItem -Items $settings.themes -Name 'rose-pine' -Label 'WT rose-pine theme' | Out-Null
     Assert-Condition (@(Get-ArrayValue $settings.actions).Count -ge 15) 'WT managed actions count is below 15'
+    Assert-WtManagedActionKeySet -Settings $settings -Label 'chezmoi WT merge'
     Assert-WtUserSeedSurvived -Settings $settings -Label 'chezmoi WT merge'
     Assert-Condition (-not ($settings.PSObject.Properties.Name -contains '$schema')) 'WT merge fabricated a top-level $schema'
 }
@@ -218,14 +320,27 @@ function Assert-Part1WtMerge {
 function Assert-Part1Files {
     param([Parameter(Mandatory)] [string]$Sandbox)
 
-    $tmuxPath = Join-Path $Sandbox '.tmux.conf'
-    Assert-Condition (Test-Path -LiteralPath $tmuxPath -PathType Leaf) '~/.tmux.conf was not created'
-    $tmuxItem = Get-Item -LiteralPath $tmuxPath -Force
-    $linkType = if ($tmuxItem.PSObject.Properties.Name -contains 'LinkType') { $tmuxItem.LinkType } else { $null }
-    Assert-Condition ($linkType -ne 'SymbolicLink') '~/.tmux.conf is a symlink; expected Windows copy mode'
-
-    $lazygitPath = Join-Path $Sandbox 'AppData\Local\lazygit\config.yml'
-    Assert-Condition (Test-Path -LiteralPath $lazygitPath -PathType Leaf) 'lazygit config was not created under AppData\Local'
+    Assert-CopyModeFileMatches `
+        -ActualPath (Join-Path $Sandbox '.tmux.conf') `
+        -ExpectedPath (Join-Path $script:RepoRoot 'tmux\tmux.conf') `
+        -Label '~/.tmux.conf'
+    Assert-CopyModeFileMatches `
+        -ActualPath (Join-Path $Sandbox '.tmux.windows.conf') `
+        -ExpectedPath (Join-Path $script:RepoRoot 'tmux\tmux.windows.conf') `
+        -Label '~/.tmux.windows.conf'
+    Assert-CopyModeFileMatches `
+        -ActualPath (Join-Path $Sandbox 'AppData\Local\lazygit\config.yml') `
+        -ExpectedPath (Join-Path $script:RepoRoot 'lazygit\config.yml') `
+        -Label 'lazygit config'
+    Assert-CopyModeFileMatches `
+        -ActualPath (Join-Path $Sandbox '.config\starship.toml') `
+        -ExpectedPath (Join-Path $script:RepoRoot 'starship\starship.toml') `
+        -Label 'starship config'
+    Assert-CopyModeFileMatches `
+        -ActualPath (Join-Path $Sandbox 'Documents\PowerShell\Microsoft.PowerShell_profile.ps1') `
+        -ExpectedPath (Join-Path $script:RepoRoot 'shells\powershell_profile.ps1') `
+        -Label 'PowerShell profile'
+    Assert-NvimSymlinkMatchesRepo -Sandbox $Sandbox
 }
 
 function Set-OrAdd-Property {
@@ -493,6 +608,7 @@ function Invoke-Part1 {
 function Invoke-Part2 {
     $legacySandbox = New-TestSandbox -Name 'legacy'
     $chezmoiSandbox = New-TestSandbox -Name 'chezmoi'
+    $script:LegacyBootstrapFallbackUsed = $false
     try {
         $legacySettings = Write-BaselineWtSettings -Sandbox $legacySandbox
         $chezmoiSettings = Write-BaselineWtSettings -Sandbox $chezmoiSandbox
@@ -503,6 +619,7 @@ function Invoke-Part2 {
                 Pass 'legacy bootstrap.ps1 path completed for WT parity fixture'
             } catch {
                 Write-Host "INFO: legacy bootstrap.ps1 path did not complete; using scoped WT merge fallback: $($_.Exception.Message)"
+                $script:LegacyBootstrapFallbackUsed = $true
                 Invoke-LegacyWindowsTerminalMergeOnly -SettingsPath $legacySettings
                 Pass 'legacy WT merge-only fallback completed'
             }
@@ -518,6 +635,13 @@ function Invoke-Part2 {
         Assert-WtManagedSubsetDeepEqual -Legacy $legacy -Chezmoi $chezmoi
         Assert-WtUserSeedSurvived -Settings $legacy -Label 'legacy WT merge'
         Assert-WtUserSeedSurvived -Settings $chezmoi -Label 'chezmoi WT merge'
+        Assert-WtManagedActionKeySet -Settings $legacy -Label 'legacy WT merge'
+        Assert-WtManagedActionKeySet -Settings $chezmoi -Label 'chezmoi WT merge'
+        if ($script:LegacyBootstrapFallbackUsed) {
+            Pass 'part 2 legacy-bootstrap fallback was used'
+        } else {
+            Pass 'part 2 legacy-bootstrap fallback was not used'
+        }
         Pass 'part 2 WT managed subset deep-compare passed'
     } finally {
         Remove-TestSandbox -Sandbox $legacySandbox

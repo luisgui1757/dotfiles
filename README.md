@@ -288,6 +288,7 @@ the adjacent constant.
 ├── tmux/                  # tmux.conf (Rose Pine, vi-mode, true-color)
 ├── ghostty/               # config (Rose Pine, Hack Nerd, Ghostty-tuned)
 ├── windows-terminal/      # settings.fragment.jsonc + merge README
+├── home/                  # chezmoi source tree for the config-only migration
 ├── tests/                 # automated test tree
 ├── tests/wsl/             # manual WSL split-host e2e check
 ├── .github/workflows/     # CI matrix + chezmoi parity

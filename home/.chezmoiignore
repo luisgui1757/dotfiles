@@ -1,14 +1,25 @@
 {{- /* Per-OS gating. Ignore the DIRECTORIES (not just the leaf files) on the
        wrong OS, otherwise chezmoi still creates the empty parent dirs (e.g.
-       ~/.config/lazygit or ~/AppData on macOS), diverging from the legacy path.
-       AppData is one ignore covering BOTH Windows targets (lazygit + WT). */ -}}
+       ~/.config/lazygit, ~/AppData, or ~/Documents on macOS), diverging from
+       the legacy path. AppData is one ignore covering all Windows LocalAppData
+       targets (nvim + lazygit + WT). Ghostty's legacy WSL opt-in is still out
+       of scope for the chezmoi pilot; this gate only models the darwin/linux
+       split available through .chezmoi.os. */ -}}
 {{- if ne .targetOS "windows" }}
 .tmux.windows.conf
 AppData
+Documents
+{{- end }}
+{{- if eq .targetOS "windows" }}
+.zshenv
+.zshrc
+.config/nvim
 {{- end }}
 {{- if ne .targetOS "darwin" }}
 Library/Application Support/lazygit
+Library/Application Support/com.mitchellh.ghostty
 {{- end }}
 {{- if ne .targetOS "linux" }}
 .config/lazygit
+.config/ghostty
 {{- end }}

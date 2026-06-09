@@ -38,6 +38,7 @@ not ship synced agent preference folders.
 ├── ghostty/               config (Rose Pine, Hack Nerd, tuned for tmux)
 ├── windows-terminal/      settings.fragment.jsonc + merge README
 ├── lazygit/               config.yml (J/K move-commit binding)
+├── home/                  chezmoi source tree (config-only migration pilot)
 ├── tests/                 automated tests, grouped by tool
 ├── tests/wsl/             manual WSL split-host e2e check
 ├── .github/workflows/     CI matrix + chezmoi parity
@@ -245,6 +246,9 @@ ubuntu/macos/windows CI matrix in `.github/workflows/test.yml` installs
 everything, `chezmoi-parity` installs pinned chezmoi for the Wave A migration
 gate, and `test.ps1` treats missing Windows test dependencies as fatal under
 CI, so anything passing locally + CI is genuinely cross-platform.
+`tests/static/toml_lint.sh` uses `taplo` when it is healthy, but if local macOS
+`taplo` panics with the known system-configuration null-object crash it falls
+back to Python `tomllib`; ordinary `taplo` lint errors still fail.
 
 When adding a new spec:
 - Plenary specs: drop a `*_spec.lua` under `tests/nvim/spec/`. Use plenary
@@ -403,6 +407,26 @@ save only**. The next plain `:w` formats normally. Implemented in
   on Linux/WSL it uses `~/.config/lazygit`; on Windows it uses
   `%LOCALAPPDATA%\lazygit`. Keep `bootstrap.sh`, `bootstrap.ps1`, README, and
   tests aligned with those real read paths.
+- **The chezmoi pilot in `home/` is config-only.** Do not add package installs,
+  binary downloads, font installs, login-shell mutation, or other provisioning
+  side effects there. `home/.chezmoi.toml.tmpl` is the mode switch:
+  POSIX uses `mode = "symlink"` for live-edit behavior, Windows uses
+  `mode = "file"` so Developer Mode is not required. Same-path config files
+  use direct source copies; path-divergent lazygit and Ghostty configs use
+  `.chezmoitemplates/**` plus POSIX `symlink_*.tmpl` wrappers and Windows
+  rendered `.tmpl` copies where applicable. The nvim tree is intentionally NOT
+  copied under `home/`: POSIX `home/dot_config/symlink_nvim.tmpl` and Windows
+  `home/AppData/Local/symlink_nvim.tmpl` both point at
+  `{{ .chezmoi.sourceDir }}/../nvim`, so legacy and chezmoi targets resolve to
+  the repo top-level `nvim/` directory. Do not use `exact_` for nvim; app
+  runtime state lives outside `.config/nvim`, but user/plugin-added config
+  files should not be deleted by chezmoi. `home/.chezmoiignore` must gate whole
+  wrong-OS directories to avoid empty parent dirs. The Windows PowerShell 7
+  profile path is managed at
+  `Documents/PowerShell/Microsoft.PowerShell_profile.ps1`; POSIX PowerShell
+  profile management remains outside the static chezmoi source tree. Static
+  repo walkers skip `home/` managed copies; the migration parity gate enforces
+  byte-identical single-source copies against the canonical top-level configs.
 - **lazygit binary install paths differ by OS.** Homebrew owns macOS/Linuxbrew,
   Windows setup installs it through Scoop/winget/choco, and native Linux/WSL
   without brew uses a pinned GitHub release tarball with SHA-256 verification.

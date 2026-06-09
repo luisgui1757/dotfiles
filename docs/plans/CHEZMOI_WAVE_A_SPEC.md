@@ -332,8 +332,7 @@ fragment via the `template` action, so still single-source — Verified mechanic
 
 Gate each entry to its OS in `home/.chezmoiignore` (append; target-relative paths). **WSL is reported
 as `os=linux`** by chezmoi, so the `linux` clause covers it — there is **no `wsl` value of `.targetOS`
-in the pilot** (the real wsl distinction, needed only for ghostty/devilspie2, arrives in Wave B with
-its own funnel logic):
+in the pilot**. WSL-specific Ghostty opt-in behavior and devilspie2 still need Wave-B funnel logic.
 
 ```
 {{- if ne .targetOS "darwin" }}
@@ -351,7 +350,8 @@ AppData/Local/lazygit/config.yml
   `…/home/.chezmoitemplates/lazygit/config.yml`; editing through it edits the source clone → `git diff`
   shows it; `chez apply` is a no-op (the symlink body is unchanged).
 - **ghostty is the identical pattern** (macOS `~/Library/Application Support/com.mitchellh.ghostty/config`
-  vs Linux `~/.config/ghostty/config`, `bootstrap.sh:211-219`; no Windows target) — Wave B.
+  vs Linux `~/.config/ghostty/config`, grounded in `bootstrap.sh`; no Windows target) and is now part
+  of the Wave A manifest.
 
 ### DC-1 Acceptance (maps `ROADMAP.md:407-423`)
 
@@ -403,11 +403,15 @@ Pins from `install-deps.sh:26-29`; URLs `:816,:822`; install path = `zsh_plugin_
 
 chezmoi pins by ref, not by asserting a commit (Verified mechanics §4). The old installer **fails**
 on commit mismatch (`install-deps.sh:786-790`). To keep that fidelity (resolved decision #4), assert
-the exact pinned commits after the externals are fetched. `run_onchange_after_` runs after
-files/externals (Verified mechanics §8), so the assert observes the fetched checkout; and because the
-pinned commits are embedded in the script body, a pin change rewrites the script and re-fires the
-assert, while an unchanged re-`apply` is a true no-op (DC-6 acceptance) — the resolved-decision #4
-intent. (A bare `run_after_` would re-run every apply and break the no-op.)
+the exact pinned commits after the externals are fetched. Use `run_onchange_after_` (it re-fires when
+the embedded pins change), NOT a bare `run_after_`: a `run_after_` re-runs on EVERY apply, which makes
+`chezmoi verify` perpetually report a pending change — verify-clean is the more valuable invariant, and
+the parity gate asserts it. The externals are `refreshPeriod = "0"` (never auto-refetched), so a
+checkout cannot drift on its own; the pin is asserted on first apply and on every pin change. (Manual
+`git checkout` tampering inside a plugin dir without a pin change is out of scope — `chezmoi verify`
+does not inspect external commit HEADs either way.) This keeps re-apply a true no-op AND verify clean.
+The oracle test (`tests/migration/oracle_test.sh`) still proves the assert FIRES by rendering and
+running it against a corrupted checkout.
 
 ```sh
 # home/.chezmoiscripts/run_onchange_after_20-verify-zsh-plugin-pins.sh.tmpl
@@ -618,11 +622,10 @@ remains manual per resolved decision #6, and the WT merge JSON logic is still qu
 ## DC-6 — The parity gate (the keystone) + hermetic template tests
 
 Maps `ROADMAP.md:540-582`. **Nothing in the old install path is deleted until this is green for N
-runs (DC-6 decision-gate item).** The gate is **intersection-scoped to the pilot's leaf target
-paths** — it is NOT a raw union of two full installs (a full `setup.sh --all` would produce dozens of
-deferred-config paths and devilspie2/font/package side effects that the pilot legitimately does not
-manage, false-FAILing the gate). It runs the **pilot slices only** of the old path and compares
-**only the pilot allow-list**.
+runs (DC-6 decision-gate item).** The gate is manifest-scoped to the full migrated config set — it is
+NOT a raw union of two full installs (a full `setup.sh --all` would produce package, font, login-shell,
+daemon, and other side effects that the pilot legitimately does not manage, false-FAILing the gate).
+It runs the **pilot slices only** of the old path and compares only the manifest rows.
 
 ### Step 1 — Run the pilot slices of the OLD path (no full install, no out-of-scope footprint)
 
@@ -645,7 +648,7 @@ env HOME="$HOME_OLD" INSTALL_DEPS_SOURCE_ONLY=1 bash -c \
 
 > This deliberately does NOT run `install-deps.sh --all` / `setup.sh` — so no fonts, login-shell,
 > devilspie2, packages, or other Wave-B footprint is produced. The gate therefore needs **no giant
-> ignore-list**; it only ever looks at the pilot allow-list (Step 3).
+> ignore-list**; it only ever looks at the manifest rows (Step 3).
 
 ### Step 2 — Apply chezmoi into a separate sandbox
 
@@ -655,37 +658,40 @@ env HOME="$HOME_NEW" chezmoi --source "$SRC" init
 env HOME="$HOME_NEW" chezmoi --source "$SRC" apply
 ```
 
-### Step 3 — The intersection-scoped comparison (the gate)
+### Step 3 — The manifest-scoped comparison (the gate)
 
-The **pilot allow-list** (the only paths the gate inspects):
-
-```
-P1  ~/.tmux.conf
-P2  ~/.config/lazygit/config.yml                 # Linux target
-P3  ~/.local/share/dotfiles/zsh-plugins/zsh-autocomplete       (git checkout)
-P4  ~/.local/share/dotfiles/zsh-plugins/zsh-autosuggestions    (git checkout)
-```
-
-For each allow-list path, assert (and **nothing else** — no recursive `find`, no directory rows, no
-raw `find -type d` bookkeeping, which the review showed false-FAILs on intermediate dirs):
+The gate is now manifest-driven, not a two-path allow-list. `tests/migration/parity_gate.sh` defines
+one row manifest with: label, type, darwin target, linux target, canonical repo source, and the
+`home/` source copy when one exists. The manifest covers every config migrated in Wave A:
 
 ```
-for p in {P1,P2}:                                  # the two managed config files
+tmux.conf, tmux.windows.conf, lazygit config, nvim, starship, zshenv, zshrc,
+ghostty config, powershell profile
+```
+
+Rows with empty POSIX targets are Windows-only for applied-state parity but still participate in the
+single-source copy assertion. The host OS selects only the darwin/linux target column for OLD-vs-NEW
+applied parity.
+
+For each active manifest row on the host OS:
+
+```
+for config-file rows:
     assert exists(HOME_OLD/p) and exists(HOME_NEW/p)
-    # TYPE per chezmoi model, asserted SEPARATELY (do NOT compare raw link targets:
-    #   old -> repo file, new -> sourceDir file; they legitimately differ):
-    assert is_symlink(HOME_OLD/p) and is_symlink(HOME_NEW/p)        # POSIX/Ubuntu arm
-    # BYTE parity via DEREFERENCED content (safe: type already asserted):
+    assert both sides are symlinks on POSIX
     assert sha(deref(HOME_OLD/p)) == sha(deref(HOME_NEW/p))
-    # PERMISSION parity of the RESOLVED content (NOT the link node, which carries no info):
     assert mode(deref(HOME_OLD/p)) == mode(deref(HOME_NEW/p))
 
-for d in {P3,P4}:                                  # the two plugin checkouts
-    assert git_head(HOME_OLD/d) == git_head(HOME_NEW/d)            # exact-commit equality (DC-2)
-    # (no file-by-file diff of the checkout — the commit hash IS the content identity)
+for the nvim row:
+    assert both sides are directory symlinks
+    assert both dereference to realpath(REPO_ROOT/nvim)
+    assert diff -r of the dereferenced trees is empty
 
-# Single-source assertion (DC-1 Step 4 obligation):
-assert sha(REPO_ROOT/lazygit/config.yml) == sha(SRC/.chezmoitemplates/lazygit/config.yml)
+for every non-nvim row with a home source copy:
+    assert sha(REPO_ROOT/source) == sha(REPO_ROOT/home/source-copy)
+
+for P3/P4:
+    assert git_head(HOME_OLD/plugin) == git_head(HOME_NEW/plugin)
 ```
 
 Portable helpers (the gate runs in the Ubuntu container — GNU coreutils — but these keep a manual
@@ -698,9 +704,10 @@ mode() { if stat -c '%a' "$1" >/dev/null 2>&1; then stat -c '%a' "$1"; else stat
 deref(){ if readlink -f "$1" >/dev/null 2>&1; then readlink -f "$1"; else python3 -c 'import os,sys;print(os.path.realpath(sys.argv[1]))' "$1"; fi; }
 ```
 
-The gate **FAILS** on any allow-list path that is missing on one side, differs in dereferenced
-content/permissions, or (plugins) differs in HEAD commit. It cannot be fooled by deferred configs
-(not in the allow-list) or by directory bookkeeping (excluded).
+The gate **FAILS** on any active manifest path that is missing on one side, has the wrong type,
+differs in dereferenced content/permissions, resolves `nvim` anywhere other than repo `nvim/`, or
+(plugins) differs in HEAD commit. After apply it also asserts wrong-OS directories are absent (for
+example, no `~/AppData`, no POSIX-wrong Ghostty/lazygit path, and no `~/Documents` on darwin/linux).
 
 ### Step 4 — Non-file probes (POSIX arm) — what `chez verify` cannot see
 
@@ -718,11 +725,18 @@ scripts excluded; psmux install remains a manual side-effect probe:
   `bootstrap.ps1` with no switch (`-MergeWindowsTerminal` is accepted as a back-compat alias), in the
   other `chez apply`; then **deep-compare the two resulting JSONs** (normalize: sort keys/arrays
   canonically) and assert structural equality of the managed subset (7 globals + all 15 keybindings +
-  `profiles.defaults` + named scheme/theme) AND that the user's seeded profile/`defaultProfile`
-  survived in both. (Key *presence* alone is insufficient — a merge that dropped 12 keybindings or
-  clobbered `defaultProfile` would still have `.actions`.) Implemented in
-  `tests/migration/windows_apply_test.ps1`, which first tries the real `bootstrap.ps1` path and falls
-  back to the scoped legacy WT merge only if the runner cannot complete the symlink phase.
+  `profiles.defaults` + named scheme/theme), assert the exact managed action-key set from
+  `windows-terminal/settings.fragment.jsonc`, and assert that the user's seeded
+  profile/`defaultProfile` survived in both. (Key *presence* or count alone is insufficient — a merge
+  that dropped keybindings or clobbered `defaultProfile` could still have `.actions`.) Implemented in
+  `tests/migration/windows_apply_test.ps1`, which first tries the real `bootstrap.ps1` path, reports
+  whether it fell back, and falls back to the scoped legacy WT merge only if the runner cannot complete
+  the symlink phase.
+
+- **Windows config content parity (CI):** the Windows arm applies with scripts excluded, then checks
+  `.tmux.conf`, `.tmux.windows.conf`, lazygit, Starship, and the PowerShell profile as real copy-mode
+  files whose SHA-256 matches the canonical repo source. `AppData/Local/nvim` is intentionally a
+  directory symlink to repo `nvim/`, and the test verifies both the link target and `init.lua` content.
 
 ### Step 5 — Hermetic per-OS template unit tests (runnable on ANY host)
 
@@ -796,16 +810,14 @@ real `chezmoi apply` and the commit-corruption case deepens the cloned zsh-autoc
 Status note (2026-06-09): DC-6 harness and CI wiring landed in this checkout:
 `tests/migration/template_test.sh`, `tests/migration/parity_gate.sh`,
 `tests/migration/windows_render_test.sh`, `tests/migration/oracle_test.sh`, the
-`chezmoi-parity` job, and required-check sync. `parity_gate.sh` now also asserts
-second-apply idempotency, `chezmoi verify`, and no `error` rows from
-`chezmoi doctor` on the NEW side after P1-P4 plus the single-source check. Local
-macOS validation covered the template tests, required-check sync, YAML lint,
-shellcheck on the migration scripts, render-only validation of the zsh
-commit-assert template, and parse-only parity/oracle validation. An earlier offline
-`make -C . test-static` attempt was not green because local `taplo 0.10.0`
-panicked in `toml_lint.sh`; the edited YAML and required-check sync were green.
-The live networked `parity_gate.sh` and `oracle_test.sh` runs remain separate
-because P3/P4 clone external zsh-plugin repos.
+`chezmoi-parity` job, and required-check sync. `parity_gate.sh` is manifest-driven for the full
+migrated config set, asserts second-apply idempotency, `chezmoi verify`, no `error` rows from
+`chezmoi doctor`, single-source byte equality for every copied config, and wrong-OS applied-state
+absence. `windows_apply_test.ps1` checks Windows copy-mode content, nvim dir-symlink content, exact WT
+managed action keys, and reports whether the Part-2 legacy-bootstrap fallback was used. Static repo
+walkers exclude `home/` managed copies; those copies are validated by the parity gate, while canonical
+top-level configs remain linted. The live networked `parity_gate.sh` and `oracle_test.sh` runs remain
+separate because P3/P4 clone external zsh-plugin repos.
 
 2026-06-09 CI expansion note: `test.yml` now also has `chezmoi-parity-macos`
 (`macos-26`, running template/parity/oracle scripts) and `chezmoi-parity-windows`
@@ -825,8 +837,8 @@ After the pilot is green, the owner judges (the point of Wave A — `ROADMAP.md:
 1. **Ergonomics:** does the copy-vs-symlink split + the `.chezmoitemplates`-anchored path-divergent
    symlink feel maintainable, or is it more ceremony than `bootstrap.sh link()`?
 2. **Go-template verbosity:** readable at the scale of 28 configs?
-3. **Parity-gate cost:** the gate is a **migration oracle**, not a test — worth building out for the
-   full set, or is the two-script status quo fine?
+3. **Parity-gate cost:** the gate is a **migration oracle**, not a test — is the manifest-driven full
+   migrated config set worth maintaining, or is the two-script status quo fine?
 4. **Pin fidelity:** is the tag-pin + commit-assert combo acceptable, or do you want exact-commit
    externals natively (a stronger chezmoi feature/version)?
 5. **Green bar (the quantitative gate):** retirement (Wave C) is authorized only after **N = 10
@@ -850,8 +862,8 @@ Only if 1–4 clear and the bar in 5 is achievable does Wave B begin.
 - [ ] **DC-3** psmux installed via the guarded scoop→winget→choco chain; WT `settings.json` merged
       (managed subset only, no `$schema`) without clobbering user keys; both no-op on re-apply; both
       skipped on POSIX.
-- [ ] **DC-6** template tests pass on one host; the intersection parity gate is green for N Ubuntu
-      runs + CI macOS + CI Windows WT/copy-mode coverage + 1 manual psmux Windows pass (the
+- [ ] **DC-6** template tests pass on one host; the manifest-driven parity gate is green for N Ubuntu
+      runs + CI macOS + CI Windows WT/copy-mode/content coverage + 1 manual psmux Windows pass (the
       decision-gate bar); surviving config-level tests still pass.
 - [ ] **No old script deleted** (Wave A is additive; retirement is Wave C).
 - [ ] Docs: a short `home/README.md`; the dotfiles `ROADMAP.md`/issue updated (this plan relocated out
@@ -863,7 +875,7 @@ Only if 1–4 clear and the bar in 5 is achievable does Wave B begin.
 
 | Deferred item | Grounding | chezmoi disposition |
 |---|---|---|
-| Other ~22 configs (zshrc/zshenv, starship, nvim 18 files + `lazy-lock.json`, powershell profile, ghostty) | `bootstrap.sh:202-249`, `bootstrap.ps1:275-289` | `dot_*`/`dot_config/*`; nvim verbatim; ghostty = lazygit pattern |
+| Remaining config expansion beyond Wave A | `bootstrap.sh`, `bootstrap.ps1`, future app configs | Wave A now covers tmux, lazygit, nvim dir-symlink, starship, zshenv, zshrc, Ghostty, Windows tmux overlay, and PowerShell profile single-source checks. Future rows should add manifest entries and matching single-source assertions in the same change. |
 | Full `PKG_TABLE` (7 cols) + `$Catalog` (3 cols) → `.chezmoidata` | `install-deps.sh:851-895`, `install-deps.ps1:114-132` | one `.chezmoidata.yaml`; Unix picks one column, Windows iterates the `$order` fallback chain (`:179`) |
 | 5 binary/font installers (nvim-linux `v0.12.2`, lazygit-linux `v0.62.2`, Hack Nerd Font `v3.4.0`, ghostty-ubuntu `1.3.1-0-ppa2`, win32yank) | `install-deps.sh:20-37,539-1219` | `.chezmoiexternal` **+ run-script** (fc-cache/`/opt`/apt/`chmod` side effects) |
 | zsh login-shell switch (chsh / `/etc/shells` / domain `~/.bashrc` exec-zsh) | `install-deps.sh:418-443,398-416` | `run_once_` preserving `is_local_account` + `maybe_sudo` branching |
@@ -915,9 +927,10 @@ rule. It does **not** threaten the chezmoi approach. (Sources: npm `@mariozechne
   managed subset, NOT key-presence (DC-6 Step 4). `$schema` is not propagated.
 - **`execute-template` can't spoof `.chezmoi.os`** — tests render against a fixture `.chezmoidata`
   (DC-6 Step 5).
-- **The parity gate is intersection-scoped** to the pilot allow-list, runs only the pilot slices of
-  the old path, excludes directory rows, compares dereferenced content/perms (never symlink-node
-  mode), and has separate Ubuntu, macOS, and Windows CI arms; psmux install remains manual.
+- **The parity gate is manifest-scoped** to the full migrated config set, runs only the pilot slices of
+  the old path, excludes directory rows, compares type + dereferenced content/perms (never
+  symlink-node mode) + nvim realpath/tree parity + copied-source byte equality, and has separate
+  Ubuntu, macOS, and Windows CI arms; psmux install remains manual.
 
 ---
 
