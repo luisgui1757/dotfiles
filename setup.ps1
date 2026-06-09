@@ -7,7 +7,8 @@
 #   .\setup.ps1 -SkipDeps        already have nvim/starship; just bootstrap+sync
 #   .\setup.ps1 -SkipBootstrap   already symlinked; just sync plugins+LSP
 #   .\setup.ps1 -SkipNvim        skip nvim plugin + Mason sync
-#   .\setup.ps1 -MergeWindowsTerminal     also merge the WT rose-pine fragment
+#   .\setup.ps1 -SkipWindowsTerminalMerge   bootstrap+sync but leave WT settings.json untouched
+#   .\setup.ps1 -MergeWindowsTerminal        (no-op alias; the WT rose-pine merge is now default-on)
 #
 # Remote usage (no checkout yet):
 #   iwr https://raw.githubusercontent.com/luisgui1757/dotfiles/main/setup.ps1 -OutFile setup.ps1
@@ -23,7 +24,8 @@ param(
     [switch]$SkipDeps,
     [switch]$SkipBootstrap,
     [switch]$SkipNvim,
-    [switch]$MergeWindowsTerminal,
+    [switch]$MergeWindowsTerminal,   # back-compat no-op: WT merge is now default-on
+    [switch]$SkipWindowsTerminalMerge,
     [switch]$BestEffort
 )
 
@@ -120,8 +122,11 @@ if ($All)    { $depsArgs['All']    = $true }
 if ($DryRun) { $depsArgs['DryRun'] = $true }
 
 $bootstrapArgs = @{}
-if ($DryRun)               { $bootstrapArgs['DryRun']               = $true }
-if ($MergeWindowsTerminal) { $bootstrapArgs['MergeWindowsTerminal'] = $true }
+if ($DryRun)                   { $bootstrapArgs['DryRun']                   = $true }
+# WT settings merge is now a DEFAULT bootstrap step (opt-out, not opt-in).
+# -MergeWindowsTerminal is retained as a harmless no-op alias for back-compat.
+$null = $MergeWindowsTerminal  # reference the alias so PSScriptAnalyzer doesn't flag it unused
+if ($SkipWindowsTerminalMerge) { $bootstrapArgs['SkipWindowsTerminalMerge'] = $true }
 
 function Phase {
     param([string]$title)

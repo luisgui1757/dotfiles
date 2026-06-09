@@ -41,12 +41,11 @@ significant change to the relevant area.
 
 - [ ] **New Mac**: `git clone`, `./setup.sh`, `exec zsh`, `nvim` opens
       and `:checkhealth` is clean except for optional system tools.
-- [ ] **Fresh Windows**: clone, `.\setup.ps1`, optionally
-      `.\bootstrap.ps1 -MergeWindowsTerminal`,
+- [ ] **Fresh Windows**: clone, `.\setup.ps1`,
       new pwsh tab shows the rose-pine starship prompt; new WT tab has
-      the rose-pine scheme; `nvim` works.
+      the rose-pine scheme when WT already has `settings.json`; `nvim` works.
 - [ ] **Fresh WSL Ubuntu**: on Windows first run
-      `.\setup.ps1 -All -MergeWindowsTerminal`, then inside WSL run
+      `.\setup.ps1 -All`, then inside WSL run
       `./setup.sh --all` and `./tests/wsl/e2e.sh`. Confirm the script passes:
       Windows Terminal uses Hack Nerd Font, `win32yank` is reachable, lazygit is
       installed on both sides, zsh plugins are installed in WSL, nvim starts,

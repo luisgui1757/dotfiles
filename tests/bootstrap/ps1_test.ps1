@@ -146,14 +146,14 @@ try {
     }
 }
 
-Describe "bootstrap.ps1 -MergeWindowsTerminal" {
+Describe "bootstrap.ps1 WT merge" {
 
     BeforeEach {
         $script:FakeHome = Join-Path ([System.IO.Path]::GetTempPath()) ("bs-wt-" + [System.Guid]::NewGuid())
         $script:FakeLocalAppData = Join-Path $script:FakeHome "AppData/Local"
         # LOCALAPPDATA -- bootstrap.ps1 always runs the link block, which
         # symlinks lazygit\config.yml under %LOCALAPPDATA%. Confine that to FakeHome
-        # so -MergeWindowsTerminal runs do not pollute the real user profile.
+        # so WT merge runs do not pollute the real user profile.
         $script:FakeAppData = Join-Path $script:FakeHome "AppData/Roaming"
         $script:WTPackageDir = Join-Path $script:FakeLocalAppData "Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/LocalState"
         New-Item -ItemType Directory -Force -Path $script:WTPackageDir | Out-Null
@@ -166,6 +166,40 @@ Describe "bootstrap.ps1 -MergeWindowsTerminal" {
 
     AfterEach {
         Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $script:FakeHome
+    }
+
+    It "merges rose-pine by default with no WT switch" {
+        '{"profiles":{"defaults":{},"list":[]},"actions":[],"schemes":[],"themes":[]}' |
+            Set-Content -LiteralPath $script:WTSettings -Encoding UTF8
+
+        & $script:Bootstrap | Out-Null
+
+        $merged = Get-Content -Raw -LiteralPath $script:WTSettings | ConvertFrom-Json
+        $merged.theme | Should -Be 'rose-pine'
+        ($merged.schemes | Where-Object { $_.name -eq 'rose-pine' }) | Should -Not -BeNullOrEmpty
+        ($merged.themes | Where-Object { $_.name -eq 'rose-pine' }) | Should -Not -BeNullOrEmpty
+        $merged.profiles.defaults.colorScheme | Should -Be 'rose-pine'
+    }
+
+    It "-SkipWindowsTerminalMerge leaves settings.json byte-identical without a backup" {
+        '{"profiles":{"defaults":{},"list":[]},"actions":[],"schemes":[],"themes":[]}' |
+            Set-Content -LiteralPath $script:WTSettings -Encoding UTF8
+        $before = (Get-FileHash -LiteralPath $script:WTSettings).Hash
+
+        & $script:Bootstrap -SkipWindowsTerminalMerge | Out-Null
+
+        (Get-FileHash -LiteralPath $script:WTSettings).Hash | Should -Be $before
+        $bak = Get-ChildItem -Path $script:WTPackageDir -Filter "settings.json.bak.*" -ErrorAction SilentlyContinue
+        $bak | Should -BeNullOrEmpty
+    }
+
+    It "warns and skips without fabricating settings.json when WT has not launched" {
+        $script:WarningOutput = $null
+
+        { $script:WarningOutput = & $script:Bootstrap 3>&1 } | Should -Not -Throw
+
+        ($script:WarningOutput | Out-String) | Should -Match 'Windows Terminal settings\.json not found; skipping merge\.'
+        Test-Path -LiteralPath $script:WTSettings | Should -BeFalse
     }
 
     It "preserves the user's discovered profile list" {
@@ -201,7 +235,7 @@ Describe "bootstrap.ps1 -MergeWindowsTerminal" {
         $bak | Should -Not -BeNullOrEmpty
     }
 
-    It "applies the rose-pine theme and scheme from the fragment" {
+    It "still merges when the legacy -MergeWindowsTerminal alias is passed" {
         '{"profiles":{"defaults":{},"list":[]},"actions":[],"schemes":[],"themes":[]}' |
             Set-Content -LiteralPath $script:WTSettings -Encoding UTF8
 
@@ -211,6 +245,7 @@ Describe "bootstrap.ps1 -MergeWindowsTerminal" {
         $merged.theme | Should -Be 'rose-pine'
         ($merged.schemes | Where-Object { $_.name -eq 'rose-pine' }) | Should -Not -BeNullOrEmpty
         ($merged.themes | Where-Object { $_.name -eq 'rose-pine' }) | Should -Not -BeNullOrEmpty
+        $merged.profiles.defaults.colorScheme | Should -Be 'rose-pine'
     }
 
     It "tolerates a settings.json missing the profiles object" {

@@ -37,10 +37,12 @@ iwr https://raw.githubusercontent.com/luisgui1757/dotfiles/main/setup.ps1 -OutFi
 .\setup.ps1 -All
 ```
 
-For WSL, treat setup as split-host: run `.\setup.ps1 -All
--MergeWindowsTerminal` on Windows so Windows Terminal, Hack Nerd Font, lazygit,
-and `win32yank` are installed on the rendering host, then run `./setup.sh
---all` inside WSL for the Linux CLI/editor stack. Linux Ghostty and Linux
+For WSL, treat setup as split-host: run `.\setup.ps1 -All` on Windows so
+Windows Terminal, Hack Nerd Font, lazygit, and `win32yank` are installed on the
+rendering host, then run `./setup.sh --all` inside WSL for the Linux CLI/editor
+stack. Windows Terminal settings merge runs by default after WT has created
+`settings.json`; pass `-SkipWindowsTerminalMerge` only when you want setup to
+leave WT settings untouched. Linux Ghostty and Linux
 fontconfig fonts inside WSL are intentionally outside the happy path; opt in
 with `./setup.sh --experimental-wsl-gui` only when you explicitly want a WSLg /
 X11 GUI-terminal experiment.
@@ -87,7 +89,8 @@ make setup                       # same as ./setup.sh, via the Makefile
 .\setup.ps1
 .\setup.ps1 -All
 .\setup.ps1 -DryRun
-.\setup.ps1 -MergeWindowsTerminal     # install deps, then apply the WT fragment
+.\setup.ps1 -SkipWindowsTerminalMerge # leave WT settings.json untouched
+.\setup.ps1 -MergeWindowsTerminal     # accepted no-op alias; WT merge is default-on
 ```
 
 ### Managed Configs
@@ -101,7 +104,7 @@ make setup                       # same as ./setup.sh, via the Makefile
 | tmux / psmux | `~/.tmux.conf` -> `tmux/tmux.conf` | same | `%USERPROFILE%\.tmux.conf` -> `tmux\tmux.conf` for psmux; WSL uses the Unix path |
 | Ghostty | `~/Library/Application Support/com.mitchellh.ghostty/config` -> `ghostty/config` | native Linux links `~/.config/ghostty/config`; WSL links it only with `--experimental-wsl-gui` | n/a |
 | lazygit | `~/Library/Application Support/lazygit/config.yml` -> `lazygit/config.yml` | `~/.config/lazygit/config.yml` -> `lazygit/config.yml` | `%LOCALAPPDATA%\lazygit\config.yml` -> `lazygit\config.yml` |
-| Windows Terminal | n/a | n/a | app installed by `setup.ps1`; `-MergeWindowsTerminal` merges `windows-terminal/settings.fragment.jsonc`; see [windows-terminal/README.md](windows-terminal/README.md) |
+| Windows Terminal | n/a | n/a | app installed by `setup.ps1`; bootstrap merges `windows-terminal/settings.fragment.jsonc` by default; opt out with `-SkipWindowsTerminalMerge`; see [windows-terminal/README.md](windows-terminal/README.md) |
 
 ### Platform Notes
 
@@ -128,7 +131,7 @@ make setup                       # same as ./setup.sh, via the Makefile
   Terminal on the Windows host; Linux Ghostty in WSL requires
   `--experimental-wsl-gui`.
 - WSL fonts are host-rendered in the supported path. Install and merge Windows
-  Terminal from Windows (`.\setup.ps1 -All -MergeWindowsTerminal`); the WSL
+  Terminal from Windows (`.\setup.ps1 -All`; the merge is default-on); the WSL
   Linux fontconfig install is only for `--experimental-wsl-gui`.
 - VS Code is optional. On WSL, use Windows VS Code plus `code .` for Remote -
   WSL, or use a Linux GUI build when WSLg / X11 is available. Rosé Pine setup
@@ -344,10 +347,13 @@ the adjacent constant.
 - **Windows Terminal is a Windows dependency, not just a config target.**
   `install-deps.ps1` installs `wt` through the normal Scoop-first catalog:
   `extras/windows-terminal` -> `Microsoft.WindowsTerminal` -> `microsoft-windows-terminal`.
-  `-MergeWindowsTerminal` then merges the repo-owned visual/keybinding fragment.
+  `bootstrap.ps1` then merges the repo-owned visual/keybinding fragment by
+  default; pass `-SkipWindowsTerminalMerge` to opt out. `-MergeWindowsTerminal`
+  remains accepted as a no-op alias for older commands.
 - **Windows Terminal settings.json is NOT symlinked** because WT auto-rewrites
   it. Only the user-owned keys live in `settings.fragment.jsonc`; the install
-  script merges them in.
+  script merges them in by name, backs up the pre-merge file, and resets a
+  hand-edited `theme` back to `rose-pine` on every run unless you opt out.
 - **Windows CI installs Scoop through its documented elevated path.** GitHub
   Windows runners are elevated, and Scoop blocks elevated bootstrap by default.
   `install-deps.ps1` detects elevation and runs the official installer with

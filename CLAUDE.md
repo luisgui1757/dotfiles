@@ -113,7 +113,11 @@ that violates one of these, fix it instead of disabling the test.
 15. **Windows Terminal is installed by Windows setup.** Keep `wt` in the
     `install-deps.ps1` Scoop-first catalog (`extras/windows-terminal` ->
     `Microsoft.WindowsTerminal` -> `microsoft-windows-terminal`). The app
-    install and `-MergeWindowsTerminal` settings merge are separate steps.
+    install and settings merge are separate code paths (`install-deps.ps1` vs
+    `bootstrap.ps1`), but bootstrap runs the merge by default. Opt out with
+    `-SkipWindowsTerminalMerge`; `-MergeWindowsTerminal` is a retained no-op
+    alias. If `settings.json` is absent because WT has not launched yet, the
+    merge warns and skips so default-on setup does not break an unlaunched WT.
 16. **tmux uppercase `H`/`L` are window swaps.** Lowercase `h`/`l` stay pane
     focus bindings. Do not replace them with arrow-key bindings unless the
     terminal/psmux behavior has been revalidated.
@@ -286,7 +290,8 @@ install paths, not symmetric container platforms:
   the owner intentionally accepts that flake risk. The required WSL proxy is the
   Linux Ubuntu container plus the existing `DOTFILES_FORCE_OS=wsl` bats coverage.
   Full WSL host/guest validation is manual: run `./tests/wsl/e2e.sh` from inside
-  WSL after running `.\setup.ps1 -All -MergeWindowsTerminal` on Windows.
+  WSL after running `.\setup.ps1 -All` on Windows. The Windows Terminal settings
+  merge is default-on when `settings.json` already exists.
 
 Main-branch safeguards are canonical in `.github/rulesets/` and applied live by
 `scripts/apply-repo-safeguards.sh`. `.github/settings.yml` is only the classic
@@ -387,9 +392,10 @@ save only**. The next plain `:w` formats normally. Implemented in
   actions without touching disk. The Windows DryRun does not require
   Developer Mode — it downgrades the symlink-permission probe to a warning.
 - The Windows installer does NOT symlink `settings.json` for Windows
-  Terminal — WT rewrites that file on launch. Use
-  `.\bootstrap.ps1 -MergeWindowsTerminal` to merge the user-owned keys in;
-  it backs up the pre-merge `settings.json` first.
+  Terminal — WT rewrites that file on launch. `bootstrap.ps1` merges the
+  user-owned keys by default and backs up the pre-merge `settings.json` first;
+  pass `-SkipWindowsTerminalMerge` to leave it untouched. The legacy
+  `-MergeWindowsTerminal` switch remains accepted as a no-op alias.
 - **lazygit config paths are OS-specific.** On macOS, lazygit v0.58 reports
   `~/Library/Application Support/lazygit` from `lazygit --print-config-dir`;
   on Linux/WSL it uses `~/.config/lazygit`; on Windows it uses

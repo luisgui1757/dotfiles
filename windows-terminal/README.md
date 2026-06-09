@@ -4,7 +4,7 @@ Windows Terminal **rewrites** its `settings.json` on every launch with discovere
 profiles (PowerShell GUIDs, WSL distros, Azure Cloud Shell, Visual Studio shells,
 etc.). A hard symlink either loses those entries or gets clobbered. So instead of
 symlinking the file, we keep **only the user-owned keys** in
-`settings.fragment.jsonc` and merge them in on each new machine.
+`settings.fragment.jsonc` and merge them during bootstrap.
 
 ## Path
 
@@ -45,15 +45,22 @@ rewrites its own `settings.json`.
 ## Merge
 
 ```powershell
-.\bootstrap.ps1 -MergeWindowsTerminal
+.\bootstrap.ps1
 ```
+
+`bootstrap.ps1` merges the fragment by default. Pass
+`-SkipWindowsTerminalMerge` to leave `settings.json` byte-identical; the legacy
+`-MergeWindowsTerminal` switch is still accepted as a no-op alias for older
+commands.
 
 `bootstrap.ps1` backs up the pre-merge `settings.json` as
 `settings.json.bak.<timestamp>`, initializes missing `profiles` containers, and
 preserves custom `actions`, `schemes`, and `themes`, while entries with the same
-key or name are replaced by the repo fragment.
+key or name are replaced by the repo fragment. A hand-edited top-level `theme`
+is reset to `rose-pine` on every run. If WT has not launched yet and
+`settings.json` is absent, bootstrap warns and skips without fabricating one.
 
 For WSL, this is the supported terminal/font path: run
-`.\setup.ps1 -All -MergeWindowsTerminal` on Windows, then `./setup.sh --all`
-inside WSL. The WSL setup intentionally skips Linux Ghostty and Linux fontconfig
-fonts unless `./setup.sh --experimental-wsl-gui` is used.
+`.\setup.ps1 -All` on Windows, then `./setup.sh --all` inside WSL. The WSL setup
+intentionally skips Linux Ghostty and Linux fontconfig fonts unless
+`./setup.sh --experimental-wsl-gui` is used.

@@ -506,6 +506,10 @@ Extension **cannot** do this (it can't set the 7 globals + `profiles.defaults` +
 `settings.fragment.jsonc:24-109`, merge logic `bootstrap.ps1:307-466`). Stable Store-WT path is static
 (`Microsoft.WindowsTerminal_8wekyb3d8bbwe` — `bootstrap.ps1:296`).
 
+The legacy `bootstrap.ps1` merge is now also default-on, so the chezmoi
+`modify_` default-on behavior is intentional parity rather than a new
+divergence.
+
 > **Wave A scopes to the stable Store WT only.** The old code also handles WT **Preview**
 > (`Microsoft.WindowsTerminalPreview_8wekyb3d8bbwe`) and discovers the path via `%LOCALAPPDATA%`
 > (`bootstrap.ps1:295-299`); Preview and a redirected `%LOCALAPPDATA%` are **Wave B**. Because the
@@ -679,11 +683,12 @@ the pilot (resolved decision #6) and gated in Wave B:
   `USERPROFILE`/`LOCALAPPDATA`/`APPDATA` pointed at the sandbox (so the old `%LOCALAPPDATA%` path and the
   new `~/AppData/Local` path are the same file — see DC-3 Step 2), seed an identical baseline
   `settings.json` (e.g. WT's default + one user profile) into two sandboxes; in one run the OLD
-  `bootstrap.ps1 -MergeWindowsTerminal`, in the other `chez apply`; then **deep-compare the two
-  resulting JSONs** (normalize: sort keys/arrays canonically) and assert structural equality of the
-  managed subset (7 globals + all 15 keybindings + `profiles.defaults` + named scheme/theme) AND that
-  the user's seeded profile/`defaultProfile` survived in both. (Key *presence* alone is insufficient —
-  a merge that dropped 12 keybindings or clobbered `defaultProfile` would still have `.actions`.)
+  `bootstrap.ps1` with no switch (`-MergeWindowsTerminal` is accepted as a back-compat alias), in the
+  other `chez apply`; then **deep-compare the two resulting JSONs** (normalize: sort keys/arrays
+  canonically) and assert structural equality of the managed subset (7 globals + all 15 keybindings +
+  `profiles.defaults` + named scheme/theme) AND that the user's seeded profile/`defaultProfile`
+  survived in both. (Key *presence* alone is insufficient — a merge that dropped 12 keybindings or
+  clobbered `defaultProfile` would still have `.actions`.)
 
 ### Step 5 — Hermetic per-OS template unit tests (runnable on ANY host)
 

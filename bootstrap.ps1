@@ -5,12 +5,14 @@
 # Usage:
 #   .\bootstrap.ps1
 #   .\bootstrap.ps1 -DryRun
-#   .\bootstrap.ps1 -MergeWindowsTerminal     # also merge WT settings fragment
+#   .\bootstrap.ps1 -SkipWindowsTerminalMerge # leave WT settings.json untouched
+#   .\bootstrap.ps1 -MergeWindowsTerminal     # no-op alias; WT merge is default-on
 
 [CmdletBinding()]
 param(
     [switch]$DryRun,
-    [switch]$MergeWindowsTerminal
+    [switch]$MergeWindowsTerminal,        # back-compat no-op alias; merge is default-on
+    [switch]$SkipWindowsTerminalMerge
 )
 
 $ErrorActionPreference = 'Stop'
@@ -290,8 +292,12 @@ New-SymLink -Source (Join-Path $RepoRoot 'lazygit\config.yml') -Destination (Joi
 
 # Optional: WSL Ubuntu access -- symlinks inside WSL handled by bootstrap.sh.
 
-# ---- Optional WT fragment merge ----------------------------------------------
-if ($MergeWindowsTerminal) {
+# ---- WT fragment merge --------------------------------------------------------
+# WT settings merge: DEFAULT-ON. Skips itself safely when settings.json does not
+# exist yet (WT never launched) -- see the not-found warn below. Opt out with
+# -SkipWindowsTerminalMerge. -MergeWindowsTerminal is a retained no-op alias.
+$null = $MergeWindowsTerminal   # referenced so the back-compat switch is not flagged unused
+if (-not $SkipWindowsTerminalMerge) {
     $wtSettingsCandidates = @(
         "$env:LOCALAPPDATA\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json",
         "$env:LOCALAPPDATA\Packages\Microsoft.WindowsTerminalPreview_8wekyb3d8bbwe\LocalState\settings.json"
