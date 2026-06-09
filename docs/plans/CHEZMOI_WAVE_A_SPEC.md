@@ -86,9 +86,11 @@ README/CLAUDE.md rewrite.
    pilot's whole point is fidelity, so the commit-equality assert (the old installer's
    `install-deps.sh:786-790` semantics) is promoted into the gate, not logged as a residual.
 5. **Source dir = `home/` inside the dotfiles repo.** Old+new coexist; CI drives both.
-6. **The automated CI parity gate is POSIX/Ubuntu-only for the pilot.** Windows-only deliverables
-   (WT merge, psmux, copy-vs-symlink type) are verified **manually** in Wave A and gated in CI in
-   Wave B (the existing `container-e2e.sh` is apt-only — `:90-101`).
+6. **The automated CI parity gate now has Ubuntu, macOS, and Windows arms for the pilot.** Ubuntu
+   remains the networked POSIX baseline for externals; macOS runs the same template/parity/oracle
+   scripts on `macos-26`; Windows runs a sandboxed copy-mode + WT merge parity e2e
+   (`tests/migration/windows_apply_test.ps1`) with `--exclude scripts`. The psmux installer side
+   effect remains manual in Wave A because the Windows CI apply intentionally excludes scripts.
 
 ---
 
@@ -450,8 +452,9 @@ deferred to networked validation.
 
 ## DC-3 — Run-scripts: psmux install + the Windows Terminal merge
 
-Maps `ROADMAP.md:455-487`. Two imperative survivors (Windows-only; verified manually in the pilot —
-resolved decision #6).
+Maps `ROADMAP.md:455-487`. Two imperative survivors. The WT merge and Windows copy-mode apply are
+now covered by the Windows CI parity arm; the psmux installer itself remains manual in Wave A because
+the CI e2e uses `chezmoi apply --exclude scripts`.
 
 ### Step 1 — psmux: `home/.chezmoiscripts/run_once_after_10-install-psmux.ps1.tmpl`
 
@@ -535,8 +538,8 @@ divergence.
 > **Wave A scopes to the stable Store WT only.** The old code also handles WT **Preview**
 > (`Microsoft.WindowsTerminalPreview_8wekyb3d8bbwe`) and discovers the path via `%LOCALAPPDATA%`
 > (`bootstrap.ps1:295-299`); Preview and a redirected `%LOCALAPPDATA%` are **Wave B**. Because the
-> managed target is a fixed `~/AppData/Local/...` path, the manual Windows parity harness (DC-6 Step 4)
-> must run in a throwaway Windows profile with `USERPROFILE`/`LOCALAPPDATA`/`APPDATA` pointed at the
+> managed target is a fixed `~/AppData/Local/...` path, the Windows parity harness (DC-6 Step 4)
+> runs in a throwaway Windows profile with `USERPROFILE`/`LOCALAPPDATA`/`APPDATA` pointed at the
 > sandbox, or the old (`%LOCALAPPDATA%`) and new (`~/AppData/Local`) sides write different files.
 
 The fragment lives in `.chezmoitemplates/` and is embedded via the **`template` action** (Verified
@@ -702,13 +705,13 @@ content/permissions, or (plugins) differs in HEAD commit. It cannot be fooled by
 ### Step 4 — Non-file probes (POSIX arm) — what `chez verify` cannot see
 
 `verify` checks target state only (Verified mechanics §12). The pilot's only POSIX side effect is the
-plugin checkouts, already covered by the HEAD-commit assert in Step 3. **The Windows-only side
-effects (psmux install, WT merge) do NOT run on the Ubuntu arm** — they are verified **manually** for
-the pilot (resolved decision #6) and gated in Wave B:
+plugin checkouts, already covered by the HEAD-commit assert in Step 3. **The Windows-only checks do
+not run on the Ubuntu arm.** The Windows CI arm now covers copy-mode apply and WT merge parity with
+scripts excluded; psmux install remains a manual side-effect probe:
 
 - **psmux (Windows, manual):** after `chez apply` on a Windows sandbox, `Get-Command psmux` resolves;
   `psmux` launches reading `~/.tmux.conf`.
-- **WT merge (Windows, manual) — value-level, not key-presence:** in a throwaway Windows profile with
+- **WT merge (Windows CI) — value-level, not key-presence:** in a throwaway Windows profile with
   `USERPROFILE`/`LOCALAPPDATA`/`APPDATA` pointed at the sandbox (so the old `%LOCALAPPDATA%` path and the
   new `~/AppData/Local` path are the same file — see DC-3 Step 2), seed an identical baseline
   `settings.json` (e.g. WT's default + one user profile) into two sandboxes; in one run the OLD
@@ -717,7 +720,9 @@ the pilot (resolved decision #6) and gated in Wave B:
   canonically) and assert structural equality of the managed subset (7 globals + all 15 keybindings +
   `profiles.defaults` + named scheme/theme) AND that the user's seeded profile/`defaultProfile`
   survived in both. (Key *presence* alone is insufficient — a merge that dropped 12 keybindings or
-  clobbered `defaultProfile` would still have `.actions`.)
+  clobbered `defaultProfile` would still have `.actions`.) Implemented in
+  `tests/migration/windows_apply_test.ps1`, which first tries the real `bootstrap.ps1` path and falls
+  back to the scoped legacy WT merge only if the runner cannot complete the symlink phase.
 
 ### Step 5 — Hermetic per-OS template unit tests (runnable on ANY host)
 
@@ -746,18 +751,32 @@ tests survive unchanged — `tests/nvim/spec/*`,
 `tests/starship/*` (incl. the 150 ms CI perf budget `perf_test.sh:18-19`), `tests/tmux/*`,
 `tests/ghostty/*` test the *applied* config.
 
+### Step 5b — Negative oracle tests (prove the guards can fail)
+
+`tests/migration/oracle_test.sh` runs two POSIX-only destructive checks in separate sandbox homes:
+
+- corrupt `zsh-autocomplete` to a different real commit, re-render the
+  `run_onchange_after_20-verify-zsh-plugin-pins.sh.tmpl` commit assert, and require the
+  `FAIL: zsh-autocomplete HEAD ...` line plus a nonzero exit;
+- replace the managed `~/.tmux.conf` symlink with divergent regular-file content and require
+  `chezmoi verify` to exit nonzero.
+
+This stays in the existing `chezmoi-parity` job. It needs network because each sandbox performs a
+real `chezmoi apply` and the commit-corruption case deepens the cloned zsh-autocomplete checkout.
+
 ### Step 6 — CI wiring (reuse, don't rewrite)
 
 - The existing container E2E hard-fails on any non-apt PM (`container-e2e.sh:90-101`), so the pilot
   parity gate runs on the **existing `apt`/Ubuntu** entry only; distro-matrix widening is Wave B/DC-5
   (each distro needs a matrix entry **and** a root-prep arm **and** a `required_checks_test.sh`
   update — `e2e-install.yml:43`, `required_checks_test.sh:27`). Do not attempt it in Wave A.
-- **Add (don't rename) a CI job.** Put the gate in a new `test.yml` job named `chezmoi-parity`. Its
-  required-status context is the **bare job name `chezmoi-parity`** (`required_checks_test.sh:16-48`
-  extracts `test.yml` job contexts as the bare key; only `e2e-install.yml` matrix jobs get
-  `<group> / <id>` prefixes). Mirror the exact string `chezmoi-parity` in all three sync files in the
-  SAME commit: `.github/settings.yml`, `scripts/apply-repo-safeguards.sh`, `.github/rulesets/main-integrity.json`
-  — else `required_checks_test.sh` (and branch protection) breaks.
+- **Add (don't rename) CI jobs.** The original gate is `test.yml` job `chezmoi-parity`; the macOS arm
+  is `chezmoi-parity-macos`; the Windows arm is `chezmoi-parity-windows`. Their required-status
+  contexts are the **bare job names** (`required_checks_test.sh:16-48` extracts `test.yml` job
+  contexts as bare keys; only `e2e-install.yml` matrix jobs get `<group> / <id>` prefixes). Mirror the
+  exact strings in all three sync files in the SAME commit: `.github/settings.yml`,
+  `scripts/apply-repo-safeguards.sh`, `.github/rulesets/main-integrity.json` — else
+  `required_checks_test.sh` (and branch protection) breaks.
 - Leave `tests/static/invariants_test.sh:98` (the `.\test.ps1` Windows-entrypoint invariant) intact —
   the pilot adds, not replaces.
 
@@ -765,21 +784,37 @@ tests survive unchanged — `tests/nvim/spec/*`,
 
 - [ ] Step-5 template tests pass on a single host for all three OS values (tmux + lazygit branches).
 - [ ] A second `chez apply` is a no-op; `chez verify` + `chez doctor` clean.
+- [ ] Negative oracle tests prove the zsh exact-commit assert and `chez verify` drift guard fail when
+      deliberately corrupted.
 - [ ] The Step-3 intersection gate passes (dereferenced content + resolved-permission parity for P1/P2;
       exact-commit equality for P3/P4; the single-source equality assert) on the Ubuntu arm for **N
       consecutive runs** (N fixed in the decision gate) before any old script is considered for
       retirement (retirement = Wave C).
-- [ ] The Windows-only checks (psmux, WT value-level deep-compare) pass on **one manual Windows run**.
+- [ ] The Windows CI arm passes copy-mode apply and WT value-level deep-compare; psmux install passes
+      on **one manual Windows run**.
 
 Status note (2026-06-09): DC-6 harness and CI wiring landed in this checkout:
-`tests/migration/template_test.sh`, `tests/migration/parity_gate.sh`, the
-`chezmoi-parity` job, and required-check sync. Local macOS validation covered
-the template tests, required-check sync, YAML lint, shellcheck on the new
-migration scripts, and parse-only parity-gate validation. The offline
+`tests/migration/template_test.sh`, `tests/migration/parity_gate.sh`,
+`tests/migration/windows_render_test.sh`, `tests/migration/oracle_test.sh`, the
+`chezmoi-parity` job, and required-check sync. `parity_gate.sh` now also asserts
+second-apply idempotency, `chezmoi verify`, and no `error` rows from
+`chezmoi doctor` on the NEW side after P1-P4 plus the single-source check. Local
+macOS validation covered the template tests, required-check sync, YAML lint,
+shellcheck on the migration scripts, render-only validation of the zsh
+commit-assert template, and parse-only parity/oracle validation. An earlier offline
 `make -C . test-static` attempt was not green because local `taplo 0.10.0`
-panicked in `toml_lint.sh`; the edited YAML and required-check sync were
-green. The live networked `parity_gate.sh` run remains separate because P3/P4
-clone external zsh-plugin repos.
+panicked in `toml_lint.sh`; the edited YAML and required-check sync were green.
+The live networked `parity_gate.sh` and `oracle_test.sh` runs remain separate
+because P3/P4 clone external zsh-plugin repos.
+
+2026-06-09 CI expansion note: `test.yml` now also has `chezmoi-parity-macos`
+(`macos-26`, running template/parity/oracle scripts) and `chezmoi-parity-windows`
+(`windows-2025`, running `tests/migration/windows_apply_test.ps1`). The Windows
+script seeds a throwaway profile, applies chezmoi with `--exclude scripts`, asserts
+Windows copy-mode and WT merge preservation, then deep-compares the managed WT
+subset against the legacy merge path. The required-check contexts were added to
+`.github/settings.yml`, `scripts/apply-repo-safeguards.sh`, and
+`.github/rulesets/main-integrity.json` in the same change.
 
 ---
 
@@ -795,9 +830,10 @@ After the pilot is green, the owner judges (the point of Wave A — `ROADMAP.md:
 4. **Pin fidelity:** is the tag-pin + commit-assert combo acceptable, or do you want exact-commit
    externals natively (a stronger chezmoi feature/version)?
 5. **Green bar (the quantitative gate):** retirement (Wave C) is authorized only after **N = 10
-   consecutive green Ubuntu parity runs + 1 manual Windows pass + 1 manual macOS pass**, where
-   "green" = {dereferenced content parity, type-per-model, externals exact-commit equality, WT
-   structural deep-compare, single-source equality}. Until that bar is met, the old scripts stay.
+   consecutive green Ubuntu parity runs + green macOS/Windows CI parity arms + 1 manual psmux Windows
+   pass**, where "green" = {dereferenced content parity, type-per-model, externals exact-commit
+   equality, WT structural deep-compare, single-source equality}. Until that bar is met, the old
+   scripts stay.
 
 Only if 1–4 clear and the bar in 5 is achievable does Wave B begin.
 
@@ -815,8 +851,8 @@ Only if 1–4 clear and the bar in 5 is achievable does Wave B begin.
       (managed subset only, no `$schema`) without clobbering user keys; both no-op on re-apply; both
       skipped on POSIX.
 - [ ] **DC-6** template tests pass on one host; the intersection parity gate is green for N Ubuntu
-      runs + 1 manual Windows + 1 manual macOS (the decision-gate bar); surviving config-level tests
-      still pass.
+      runs + CI macOS + CI Windows WT/copy-mode coverage + 1 manual psmux Windows pass (the
+      decision-gate bar); surviving config-level tests still pass.
 - [ ] **No old script deleted** (Wave A is additive; retirement is Wave C).
 - [ ] Docs: a short `home/README.md`; the dotfiles `ROADMAP.md`/issue updated (this plan relocated out
       of Meridian per its Open-items note).
@@ -834,7 +870,7 @@ Only if 1–4 clear and the bar in 5 is achievable does Wave B begin.
 | devilspie2 daemon + autostart | `install-deps.sh:1297-1334` | managed `.lua` + `.desktop`; pkg-install + daemon-start in a Linux/X11-gated `run_once_` |
 | VSCode `workbench.colorTheme` merge | `install-deps.ps1:313-357` | `modify_` (beware the JSONC `catch` no-op `:331-333`) |
 | DC-4 secrets/private tier (`~/.zshrc.local`, `NOTES_VAULT`, brew shellenv) | `install-deps.sh:126-163` | `.chezmoi.toml.tmpl` prompts + `age`/password-manager (owner opt-in) |
-| DC-5 distro matrix (dnf/pacman/apk/zypper) + a Windows CI parity arm | `container-e2e.sh:90-101` (apt-only) | matrix entry + root-prep arm + required-checks sync, per distro; a Windows runner for the WT/psmux gate |
+| DC-5 distro matrix (dnf/pacman/apk/zypper) + deeper Windows CI parity | `container-e2e.sh:90-101` (apt-only) | matrix entry + root-prep arm + required-checks sync, per distro; Windows runner already covers copy-mode + WT merge, but psmux install remains manual/script-side-effect scope |
 | Edge cases to re-encode in run-scripts | `install-deps.sh:200-220,481-484`; `setup.sh:69-73` | `maybe_sudo`, domain accounts, `--best-effort`, no-TTY→all, dry-run |
 
 ## Appendix B — Pi CLI (and any TypeScript-based CLI tool) as a future add-on
@@ -881,7 +917,7 @@ rule. It does **not** threaten the chezmoi approach. (Sources: npm `@mariozechne
   (DC-6 Step 5).
 - **The parity gate is intersection-scoped** to the pilot allow-list, runs only the pilot slices of
   the old path, excludes directory rows, compares dereferenced content/perms (never symlink-node
-  mode), and is Ubuntu-only with Windows verified manually (DC-6).
+  mode), and has separate Ubuntu, macOS, and Windows CI arms; psmux install remains manual.
 
 ---
 
@@ -891,10 +927,11 @@ _Provenance: 2026-06-09 chezmoi Wave A pilot spec (owner-requested), branch
 web-verified chezmoi-mechanics pass against chezmoi.io. **Adversarially reviewed by a 4-lens red-team
 (2026-06-09):** grounding came back clean; correctness/executability/parity findings folded in — the
 parity gate was reworked from a raw union diff into an intersection-scoped gate (pilot slices only,
-dereferenced content/perms, exact-commit externals, value-level WT deep-compare, Ubuntu-only +
-manual Windows), the `[interpreters]` block removed, the WT fragment switched from `include` to the
-`template` action, the sandbox switched to `HOME`-based, and a Step 0 chezmoi-install prerequisite
-added. **Then reviewed by Codex 5.5 (xhigh), 2026-06-09** (read-only, against the same grounded
+dereferenced content/perms, exact-commit externals, value-level WT deep-compare; now expanded from
+Ubuntu-only/manual Windows to Ubuntu + macOS + Windows CI arms), the `[interpreters]` block removed,
+the WT fragment switched from `include` to the `template` action, the sandbox switched to
+`HOME`-based, and a Step 0 chezmoi-install prerequisite added. **Then reviewed by Codex 5.5 (xhigh),
+2026-06-09** (read-only, against the same grounded
 clone + chezmoi.io): it confirmed the prior fixes held (lazygit design, `modify_` target-name, WT
 grounding, zsh pins all "tried to break but could not") and found 9 NET-NEW issues, all folded in —
 a TOML bug (`mode` written under `[data]` parsed as `data.mode`, silently disabling POSIX symlinks),

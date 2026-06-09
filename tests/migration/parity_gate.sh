@@ -160,3 +160,34 @@ template_lazygit_sha="$(sha "$SRC/.chezmoitemplates/lazygit/config.yml")"
 [[ "$repo_lazygit_sha" == "$template_lazygit_sha" ]] || \
     fail "single-source lazygit SHA mismatch repo=$repo_lazygit_sha template=$template_lazygit_sha"
 pass "single-source lazygit SHA matches"
+
+second_apply_output=""
+if ! second_apply_output="$(env HOME="$HOME_NEW" chezmoi --source "$SRC" apply 2>&1)"; then
+    printf '%s\n' "$second_apply_output" >&2
+    fail "new path second chezmoi apply exited nonzero"
+fi
+if [[ -n "${second_apply_output//[[:space:]]/}" ]]; then
+    echo "Second chezmoi apply output:" >&2
+    printf '%s\n' "$second_apply_output" >&2
+    fail "new path second chezmoi apply produced output"
+fi
+pass "new path second chezmoi apply is idempotent"
+
+env HOME="$HOME_NEW" chezmoi --source "$SRC" verify || \
+    fail "new path chezmoi verify failed"
+pass "new path chezmoi verify clean"
+
+doctor_output=""
+doctor_rc=0
+doctor_output="$(env HOME="$HOME_NEW" chezmoi --source "$SRC" doctor 2>&1)" || doctor_rc=$?
+if grep -Eq '^[[:space:]]*error([[:space:]:]|$)' <<<"$doctor_output"; then
+    echo "chezmoi doctor output:" >&2
+    printf '%s\n' "$doctor_output" >&2
+    fail "new path chezmoi doctor reported error-level results"
+fi
+if [[ "$doctor_rc" -ne 0 ]]; then
+    echo "chezmoi doctor output:" >&2
+    printf '%s\n' "$doctor_output" >&2
+    fail "new path chezmoi doctor exited $doctor_rc without a leading error row"
+fi
+pass "new path chezmoi doctor has no error-level results"

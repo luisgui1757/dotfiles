@@ -215,3 +215,69 @@ jobs:
           # .ps1.tmpl scripts (render + parse + WT merge) that ps1_parse.sh
           # cannot see; the test self-skips if pwsh is ever absent.
           PATH="$HOME/.local/bin:$PATH" bash tests/migration/windows_render_test.sh
+      - name: Oracle (negative) tests
+        run: |
+          set -euo pipefail
+          PATH="$HOME/.local/bin:$PATH" bash tests/migration/oracle_test.sh
+
+  chezmoi-parity-macos:
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - name: Install chezmoi
+        run: |
+          set -euxo pipefail
+          command -v python3
+          command -v git
+          # -t pins the tag (+ SHA-256 verifies the release); a bare positional
+          # would be treated as a chezmoi command to run after install.
+          sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin" -t "$CHEZMOI_VERSION"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/chezmoi" --version
+      - name: Template tests
+        run: |
+          set -euo pipefail
+          PATH="$HOME/.local/bin:$PATH" bash tests/migration/template_test.sh
+      - name: Parity gate
+        run: |
+          set -euo pipefail
+          PATH="$HOME/.local/bin:$PATH" bash tests/migration/parity_gate.sh
+      - name: Oracle (negative) tests
+        run: |
+          set -euo pipefail
+          PATH="$HOME/.local/bin:$PATH" bash tests/migration/oracle_test.sh
+
+  chezmoi-parity-windows:
+    runs-on: windows-2025
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - name: Install chezmoi
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (Get-Variable -Name PSNativeCommandUseErrorActionPreference -ErrorAction SilentlyContinue) {
+            $PSNativeCommandUseErrorActionPreference = $true
+          }
+
+          $bin = Join-Path $env:USERPROFILE 'bin'
+          New-Item -ItemType Directory -Force -Path $bin | Out-Null
+          $installScript = Invoke-RestMethod -UseBasicParsing 'https://get.chezmoi.io/ps1'
+          & ([scriptblock]::Create($installScript)) -b $bin -t $env:CHEZMOI_VERSION
+
+          Add-Content -Path $env:GITHUB_PATH -Value $bin
+          $env:PATH = "$bin;$env:PATH"
+          $version = (& (Join-Path $bin 'chezmoi.exe') --version) -join "`n"
+          Write-Host $version
+          if ($version -notmatch [regex]::Escape($env:CHEZMOI_VERSION)) {
+            throw "chezmoi version output does not include $env:CHEZMOI_VERSION"
+          }
+      - name: Windows chezmoi apply parity
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (Get-Variable -Name PSNativeCommandUseErrorActionPreference -ErrorAction SilentlyContinue) {
+            $PSNativeCommandUseErrorActionPreference = $true
+          }
+          .\tests\migration\windows_apply_test.ps1

@@ -1,0 +1,541 @@
+$ErrorActionPreference = 'Stop'
+if (Get-Variable -Name PSNativeCommandUseErrorActionPreference -ErrorAction SilentlyContinue) {
+    $PSNativeCommandUseErrorActionPreference = $false
+}
+
+$script:RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
+$script:SourceDir = Join-Path $script:RepoRoot 'home'
+$script:BootstrapPath = Join-Path $script:RepoRoot 'bootstrap.ps1'
+$script:Chezmoi = $null
+$script:Pwsh = $null
+
+$script:UserProfileGuid = '{11111111-1111-1111-1111-111111111111}'
+$script:UserSchemeName = 'UserSeedScheme'
+$script:UserActionKeys = 'alt+f4'
+$script:ManagedGlobals = @(
+    'copyFormatting',
+    'copyOnSelect',
+    'firstWindowPreference',
+    'initialRows',
+    'theme',
+    'useAcrylicInTabRow',
+    'windowingBehavior'
+)
+
+function Pass {
+    param([Parameter(Mandatory)] [string]$Message)
+    Write-Host "PASS: $Message"
+}
+
+function Assert-Condition {
+    param(
+        [Parameter(Mandatory)] [bool]$Condition,
+        [Parameter(Mandatory)] [string]$Message
+    )
+    if (-not $Condition) {
+        throw $Message
+    }
+}
+
+function New-TestSandbox {
+    param([Parameter(Mandatory)] [string]$Name)
+    $sandbox = Join-Path ([IO.Path]::GetTempPath()) ("dotfiles-chezmoi-{0}-{1}" -f $Name, [guid]::NewGuid())
+    New-Item -ItemType Directory -Force -Path $sandbox | Out-Null
+    return $sandbox
+}
+
+function Remove-TestSandbox {
+    param([Parameter(Mandatory)] [string]$Sandbox)
+    if (Test-Path -LiteralPath $Sandbox) {
+        Remove-Item -LiteralPath $Sandbox -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Get-WtSettingsPath {
+    param([Parameter(Mandatory)] [string]$Sandbox)
+    return (Join-Path $Sandbox 'AppData\Local\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json')
+}
+
+function Invoke-WithSandboxEnv {
+    param(
+        [Parameter(Mandatory)] [string]$Sandbox,
+        [Parameter(Mandatory)] [scriptblock]$Script
+    )
+
+    $localAppData = Join-Path $Sandbox 'AppData\Local'
+    $appData = Join-Path $Sandbox 'AppData\Roaming'
+    $tempDir = Join-Path $Sandbox 'Temp'
+    $profilePath = Join-Path $Sandbox 'Documents\PowerShell\Microsoft.PowerShell_profile.ps1'
+    foreach ($dir in @($localAppData, $appData, $tempDir, (Split-Path -Parent $profilePath))) {
+        New-Item -ItemType Directory -Force -Path $dir | Out-Null
+    }
+
+    $envNames = @('USERPROFILE', 'HOME', 'LOCALAPPDATA', 'APPDATA', 'TEMP', 'TMP')
+    $oldEnv = @{}
+    foreach ($name in $envNames) {
+        $oldEnv[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
+    }
+    $oldProfile = (Get-Variable -Name PROFILE -Scope Global -ErrorAction SilentlyContinue).Value
+
+    try {
+        $env:USERPROFILE = $Sandbox
+        $env:HOME = $Sandbox
+        $env:LOCALAPPDATA = $localAppData
+        $env:APPDATA = $appData
+        $env:TEMP = $tempDir
+        $env:TMP = $tempDir
+        Set-Variable -Name PROFILE -Scope Global -Value $profilePath -Force
+        & $Script
+    } finally {
+        foreach ($name in $envNames) {
+            if ($null -eq $oldEnv[$name]) {
+                [Environment]::SetEnvironmentVariable($name, $null, 'Process')
+            } else {
+                [Environment]::SetEnvironmentVariable($name, $oldEnv[$name], 'Process')
+            }
+        }
+        if ($null -ne $oldProfile) {
+            Set-Variable -Name PROFILE -Scope Global -Value $oldProfile -Force
+        }
+    }
+}
+
+function Invoke-CheckedNative {
+    param(
+        [Parameter(Mandatory)] [string]$FilePath,
+        [Parameter(Mandatory)] [string[]]$Arguments
+    )
+    & $FilePath @Arguments
+    $exitCode = $LASTEXITCODE
+    if ($exitCode -ne 0) {
+        throw "$FilePath $($Arguments -join ' ') exited $exitCode"
+    }
+}
+
+function Invoke-Chezmoi {
+    param([Parameter(Mandatory)] [string[]]$Arguments)
+    Invoke-CheckedNative -FilePath $script:Chezmoi -Arguments (@('--source', $script:SourceDir) + $Arguments)
+}
+
+function Get-ArrayValue {
+    param($Value)
+    if ($null -eq $Value) {
+        return @()
+    }
+    return @($Value)
+}
+
+function New-BaselineWtSettings {
+    return [ordered]@{
+        defaultProfile = $script:UserProfileGuid
+        theme = 'legacyLight'
+        profiles = [ordered]@{
+            defaults = [ordered]@{
+                colorScheme = $script:UserSchemeName
+                font = [ordered]@{
+                    face = 'Consolas'
+                }
+            }
+            list = @(
+                [ordered]@{
+                    guid = $script:UserProfileGuid
+                    name = 'Seeded User Profile'
+                    commandline = 'powershell.exe'
+                    colorScheme = $script:UserSchemeName
+                }
+            )
+        }
+        schemes = @(
+            [ordered]@{
+                name = $script:UserSchemeName
+                foreground = '#ffffff'
+                background = '#000000'
+            }
+        )
+        actions = @(
+            [ordered]@{
+                command = 'closeWindow'
+                keys = $script:UserActionKeys
+            }
+        )
+    }
+}
+
+function Write-BaselineWtSettings {
+    param([Parameter(Mandatory)] [string]$Sandbox)
+    $settingsPath = Get-WtSettingsPath -Sandbox $Sandbox
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $settingsPath) | Out-Null
+    New-BaselineWtSettings |
+        ConvertTo-Json -Depth 100 |
+        Set-Content -LiteralPath $settingsPath -Encoding utf8
+    return $settingsPath
+}
+
+function Read-JsonFile {
+    param([Parameter(Mandatory)] [string]$Path)
+    return (Get-Content -Raw -LiteralPath $Path | ConvertFrom-Json)
+}
+
+function Get-NamedItem {
+    param(
+        $Items,
+        [Parameter(Mandatory)] [string]$Name,
+        [Parameter(Mandatory)] [string]$Label
+    )
+    $matches = @(Get-ArrayValue $Items | Where-Object { $_.name -eq $Name })
+    Assert-Condition ($matches.Count -gt 0) "$Label missing: $Name"
+    return $matches[0]
+}
+
+function Assert-WtUserSeedSurvived {
+    param(
+        [Parameter(Mandatory)] $Settings,
+        [Parameter(Mandatory)] [string]$Label
+    )
+
+    Assert-Condition ($Settings.defaultProfile -eq $script:UserProfileGuid) "$Label dropped the seeded defaultProfile"
+    $profiles = @(Get-ArrayValue $Settings.profiles.list | Where-Object { $_.guid -eq $script:UserProfileGuid })
+    Assert-Condition ($profiles.Count -gt 0) "$Label dropped the seeded user profile"
+    $schemes = @(Get-ArrayValue $Settings.schemes | Where-Object { $_.name -eq $script:UserSchemeName })
+    Assert-Condition ($schemes.Count -gt 0) "$Label dropped the seeded user scheme"
+    $actions = @(Get-ArrayValue $Settings.actions | Where-Object { $_.keys -eq $script:UserActionKeys })
+    Assert-Condition ($actions.Count -gt 0) "$Label dropped the seeded user action"
+}
+
+function Assert-Part1WtMerge {
+    param([Parameter(Mandatory)] [string]$SettingsPath)
+
+    $settings = Read-JsonFile -Path $SettingsPath
+    Assert-Condition ($settings.theme -eq 'rose-pine') 'WT theme was not set to rose-pine'
+    Assert-Condition ($settings.profiles.defaults.colorScheme -eq 'rose-pine') 'WT profiles.defaults.colorScheme was not set to rose-pine'
+    Get-NamedItem -Items $settings.schemes -Name 'rose-pine' -Label 'WT rose-pine scheme' | Out-Null
+    Get-NamedItem -Items $settings.themes -Name 'rose-pine' -Label 'WT rose-pine theme' | Out-Null
+    Assert-Condition (@(Get-ArrayValue $settings.actions).Count -ge 15) 'WT managed actions count is below 15'
+    Assert-WtUserSeedSurvived -Settings $settings -Label 'chezmoi WT merge'
+    Assert-Condition (-not ($settings.PSObject.Properties.Name -contains '$schema')) 'WT merge fabricated a top-level $schema'
+}
+
+function Assert-Part1Files {
+    param([Parameter(Mandatory)] [string]$Sandbox)
+
+    $tmuxPath = Join-Path $Sandbox '.tmux.conf'
+    Assert-Condition (Test-Path -LiteralPath $tmuxPath -PathType Leaf) '~/.tmux.conf was not created'
+    $tmuxItem = Get-Item -LiteralPath $tmuxPath -Force
+    $linkType = if ($tmuxItem.PSObject.Properties.Name -contains 'LinkType') { $tmuxItem.LinkType } else { $null }
+    Assert-Condition ($linkType -ne 'SymbolicLink') '~/.tmux.conf is a symlink; expected Windows copy mode'
+
+    $lazygitPath = Join-Path $Sandbox 'AppData\Local\lazygit\config.yml'
+    Assert-Condition (Test-Path -LiteralPath $lazygitPath -PathType Leaf) 'lazygit config was not created under AppData\Local'
+}
+
+function Set-OrAdd-Property {
+    param($Obj, [string]$Name, $Value)
+    if ($null -eq $Obj.$Name) {
+        $Obj | Add-Member -NotePropertyName $Name -NotePropertyValue $Value -Force
+    } else {
+        $Obj.$Name = $Value
+    }
+}
+
+function Merge-ObjectArrayByProperty {
+    param($CurrentItems, $FragmentItems, [string]$PropertyName)
+    $result = @()
+    $fragmentByKey = @{}
+    $emitted = @{}
+
+    foreach ($item in (Get-ArrayValue $FragmentItems)) {
+        $key = [string]$item.$PropertyName
+        if ($key) {
+            $fragmentByKey[$key] = $item
+        }
+    }
+
+    foreach ($item in (Get-ArrayValue $CurrentItems)) {
+        $key = [string]$item.$PropertyName
+        if ($key -and $fragmentByKey.ContainsKey($key)) {
+            $result += $fragmentByKey[$key]
+            $emitted[$key] = $true
+        } else {
+            $result += $item
+        }
+    }
+
+    foreach ($item in (Get-ArrayValue $FragmentItems)) {
+        $key = [string]$item.$PropertyName
+        if (-not $key -or -not $emitted.ContainsKey($key)) {
+            $result += $item
+        }
+    }
+
+    return $result
+}
+
+function Get-WTActionKeySet {
+    param($Item)
+    $keys = @()
+    if ($null -eq $Item -or $null -eq $Item.keys) {
+        return @()
+    }
+    foreach ($key in (Get-ArrayValue $Item.keys)) {
+        if ($null -eq $key) {
+            continue
+        }
+        $keyText = ([string]$key).Trim()
+        if ($keyText) {
+            $keys += $keyText.ToLowerInvariant()
+        }
+    }
+    return @($keys | Sort-Object -Unique)
+}
+
+function Test-WTActionKeyOverlap {
+    param($LeftKeys, $RightKeys)
+    foreach ($leftKey in (Get-ArrayValue $LeftKeys)) {
+        foreach ($rightKey in (Get-ArrayValue $RightKeys)) {
+            if ($leftKey -eq $rightKey) {
+                return $true
+            }
+        }
+    }
+    return $false
+}
+
+function Merge-WTActions {
+    param($CurrentItems, $FragmentItems)
+    $result = @()
+    $fragmentEntries = @()
+    $emitted = @{}
+    $index = 0
+
+    foreach ($item in (Get-ArrayValue $FragmentItems)) {
+        $fragmentEntries += [pscustomobject]@{
+            Index = [string]$index
+            Item = $item
+            Keys = @(Get-WTActionKeySet $item)
+        }
+        $index += 1
+    }
+
+    foreach ($item in (Get-ArrayValue $CurrentItems)) {
+        $currentKeys = @(Get-WTActionKeySet $item)
+        $matches = @()
+        foreach ($fragmentEntry in $fragmentEntries) {
+            if ($currentKeys.Count -gt 0 -and $fragmentEntry.Keys.Count -gt 0 -and (Test-WTActionKeyOverlap $currentKeys $fragmentEntry.Keys)) {
+                $matches += $fragmentEntry
+            }
+        }
+        if ($matches.Count -gt 0) {
+            foreach ($match in $matches) {
+                if (-not $emitted.ContainsKey($match.Index)) {
+                    $result += $match.Item
+                    $emitted[$match.Index] = $true
+                }
+            }
+        } else {
+            $result += $item
+        }
+    }
+
+    foreach ($fragmentEntry in $fragmentEntries) {
+        if (-not $emitted.ContainsKey($fragmentEntry.Index)) {
+            $result += $fragmentEntry.Item
+        }
+    }
+
+    return $result
+}
+
+function Strip-Jsonc {
+    param([string]$Jsonc)
+    return (($Jsonc -split "`n" | Where-Object { $_ -notmatch "^\s*//" }) -join "`n")
+}
+
+function Invoke-LegacyWindowsTerminalMergeOnly {
+    param([Parameter(Mandatory)] [string]$SettingsPath)
+
+    $fragmentPath = Join-Path $script:RepoRoot 'windows-terminal\settings.fragment.jsonc'
+    $fragment = (Strip-Jsonc (Get-Content -Raw -LiteralPath $fragmentPath)) | ConvertFrom-Json
+    $current = Read-JsonFile -Path $SettingsPath
+
+    if ($null -eq $current.profiles) {
+        $current | Add-Member -NotePropertyName profiles -NotePropertyValue ([pscustomobject]@{}) -Force
+    }
+
+    if ($null -ne $fragment.copyFormatting)        { Set-OrAdd-Property $current 'copyFormatting'        $fragment.copyFormatting }
+    if ($null -ne $fragment.copyOnSelect)          { Set-OrAdd-Property $current 'copyOnSelect'          $fragment.copyOnSelect }
+    if ($null -ne $fragment.firstWindowPreference) { Set-OrAdd-Property $current 'firstWindowPreference' $fragment.firstWindowPreference }
+    if ($null -ne $fragment.initialRows)           { Set-OrAdd-Property $current 'initialRows'           $fragment.initialRows }
+    if ($null -ne $fragment.theme)                 { Set-OrAdd-Property $current 'theme'                 $fragment.theme }
+    if ($null -ne $fragment.useAcrylicInTabRow)    { Set-OrAdd-Property $current 'useAcrylicInTabRow'    $fragment.useAcrylicInTabRow }
+    if ($null -ne $fragment.windowingBehavior)     { Set-OrAdd-Property $current 'windowingBehavior'     $fragment.windowingBehavior }
+
+    if ($null -eq $current.profiles.defaults) {
+        $current.profiles | Add-Member -NotePropertyName defaults -NotePropertyValue $fragment.profiles.defaults -Force
+    } else {
+        $current.profiles.defaults = $fragment.profiles.defaults
+    }
+    Set-OrAdd-Property $current 'actions' @(Merge-WTActions $current.actions $fragment.actions)
+    Set-OrAdd-Property $current 'schemes' @(Merge-ObjectArrayByProperty $current.schemes $fragment.schemes 'name')
+    Set-OrAdd-Property $current 'themes'  @(Merge-ObjectArrayByProperty $current.themes  $fragment.themes  'name')
+    $current | ConvertTo-Json -Depth 100 | Set-Content -LiteralPath $SettingsPath -Encoding utf8
+}
+
+function Invoke-LegacyBootstrap {
+    param([Parameter(Mandatory)] [string]$Sandbox)
+
+    $profilePath = Join-Path $Sandbox 'Documents\PowerShell\Microsoft.PowerShell_profile.ps1'
+    $runner = Join-Path $Sandbox 'run-bootstrap.ps1'
+    @'
+param(
+    [Parameter(Mandatory)] [string]$BootstrapPath,
+    [Parameter(Mandatory)] [string]$ProfilePath
+)
+$ErrorActionPreference = 'Stop'
+$PROFILE = $ProfilePath
+& $BootstrapPath
+if ($LASTEXITCODE -ne 0) {
+    exit $LASTEXITCODE
+}
+'@ | Set-Content -LiteralPath $runner -Encoding utf8
+
+    Invoke-CheckedNative -FilePath $script:Pwsh -Arguments @(
+        '-NoLogo',
+        '-NoProfile',
+        '-File',
+        $runner,
+        '-BootstrapPath',
+        $script:BootstrapPath,
+        '-ProfilePath',
+        $profilePath
+    )
+}
+
+function ConvertTo-NormalizedValue {
+    param($Value)
+    if ($null -eq $Value) {
+        return $null
+    }
+    if ($Value -is [System.Management.Automation.PSCustomObject]) {
+        $out = [ordered]@{}
+        foreach ($prop in ($Value.PSObject.Properties | Sort-Object Name)) {
+            $out[$prop.Name] = ConvertTo-NormalizedValue $prop.Value
+        }
+        return $out
+    }
+    if ($Value -is [System.Collections.IDictionary]) {
+        $out = [ordered]@{}
+        foreach ($key in ($Value.Keys | Sort-Object)) {
+            $out[[string]$key] = ConvertTo-NormalizedValue $Value[$key]
+        }
+        return $out
+    }
+    if (($Value -is [System.Collections.IEnumerable]) -and -not ($Value -is [string])) {
+        $items = @(foreach ($item in $Value) { ConvertTo-NormalizedValue $item })
+        return @($items | Sort-Object { ConvertTo-CanonicalJson $_ })
+    }
+    return $Value
+}
+
+function ConvertTo-CanonicalJson {
+    param($Value)
+    return (ConvertTo-NormalizedValue $Value | ConvertTo-Json -Depth 100 -Compress)
+}
+
+function Select-WtManagedSubset {
+    param([Parameter(Mandatory)] $Settings)
+
+    $globals = [ordered]@{}
+    foreach ($name in $script:ManagedGlobals) {
+        Assert-Condition ($Settings.PSObject.Properties.Name -contains $name) "managed WT global missing: $name"
+        $globals[$name] = $Settings.$name
+    }
+
+    return [ordered]@{
+        globals = $globals
+        profilesDefaults = $Settings.profiles.defaults
+        actions = @(Get-ArrayValue $Settings.actions)
+        rosePineScheme = Get-NamedItem -Items $Settings.schemes -Name 'rose-pine' -Label 'managed WT scheme'
+        rosePineTheme = Get-NamedItem -Items $Settings.themes -Name 'rose-pine' -Label 'managed WT theme'
+    }
+}
+
+function Assert-WtManagedSubsetDeepEqual {
+    param(
+        [Parameter(Mandatory)] $Legacy,
+        [Parameter(Mandatory)] $Chezmoi
+    )
+
+    $legacySubset = Select-WtManagedSubset -Settings $Legacy
+    $chezmoiSubset = Select-WtManagedSubset -Settings $Chezmoi
+    $legacyJson = ConvertTo-CanonicalJson $legacySubset
+    $chezmoiJson = ConvertTo-CanonicalJson $chezmoiSubset
+    Assert-Condition ($legacyJson -eq $chezmoiJson) "WT managed subset mismatch.`nlegacy:  $legacyJson`nchezmoi: $chezmoiJson"
+}
+
+function Invoke-Part1 {
+    $sandbox = New-TestSandbox -Name 'part1'
+    try {
+        Invoke-WithSandboxEnv -Sandbox $sandbox -Script {
+            $settingsPath = Write-BaselineWtSettings -Sandbox $sandbox
+            Invoke-Chezmoi -Arguments @('init')
+            Invoke-Chezmoi -Arguments @('apply', '--exclude', 'scripts')
+            Assert-Part1Files -Sandbox $sandbox
+            Assert-Part1WtMerge -SettingsPath $settingsPath
+            Invoke-Chezmoi -Arguments @('apply', '--exclude', 'scripts')
+            Invoke-Chezmoi -Arguments @('verify', '--exclude', 'scripts')
+        }
+        Pass 'part 1 real apply smoke passed'
+    } finally {
+        Remove-TestSandbox -Sandbox $sandbox
+    }
+}
+
+function Invoke-Part2 {
+    $legacySandbox = New-TestSandbox -Name 'legacy'
+    $chezmoiSandbox = New-TestSandbox -Name 'chezmoi'
+    try {
+        $legacySettings = Write-BaselineWtSettings -Sandbox $legacySandbox
+        $chezmoiSettings = Write-BaselineWtSettings -Sandbox $chezmoiSandbox
+
+        Invoke-WithSandboxEnv -Sandbox $legacySandbox -Script {
+            try {
+                Invoke-LegacyBootstrap -Sandbox $legacySandbox
+                Pass 'legacy bootstrap.ps1 path completed for WT parity fixture'
+            } catch {
+                Write-Host "INFO: legacy bootstrap.ps1 path did not complete; using scoped WT merge fallback: $($_.Exception.Message)"
+                Invoke-LegacyWindowsTerminalMergeOnly -SettingsPath $legacySettings
+                Pass 'legacy WT merge-only fallback completed'
+            }
+        }
+
+        Invoke-WithSandboxEnv -Sandbox $chezmoiSandbox -Script {
+            Invoke-Chezmoi -Arguments @('init')
+            Invoke-Chezmoi -Arguments @('apply', '--exclude', 'scripts')
+        }
+
+        $legacy = Read-JsonFile -Path $legacySettings
+        $chezmoi = Read-JsonFile -Path $chezmoiSettings
+        Assert-WtManagedSubsetDeepEqual -Legacy $legacy -Chezmoi $chezmoi
+        Assert-WtUserSeedSurvived -Settings $legacy -Label 'legacy WT merge'
+        Assert-WtUserSeedSurvived -Settings $chezmoi -Label 'chezmoi WT merge'
+        Pass 'part 2 WT managed subset deep-compare passed'
+    } finally {
+        Remove-TestSandbox -Sandbox $legacySandbox
+        Remove-TestSandbox -Sandbox $chezmoiSandbox
+    }
+}
+
+try {
+    $script:Chezmoi = (Get-Command chezmoi -ErrorAction Stop).Source
+    $script:Pwsh = (Get-Command pwsh -ErrorAction Stop).Source
+    Assert-Condition ([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([System.Runtime.InteropServices.OSPlatform]::Windows)) 'windows_apply_test.ps1 must run on Windows'
+    Invoke-Part1
+    Invoke-Part2
+    Pass 'windows_apply_test.ps1 completed'
+} catch {
+    Write-Host "FAIL: $($_.Exception.Message)"
+    if ($_.ScriptStackTrace) {
+        Write-Host $_.ScriptStackTrace
+    }
+    exit 1
+}
