@@ -516,14 +516,18 @@ save only**. The next plain `:w` formats normally. Implemented in
 - **`install-deps` can install VS Code + the Rose Pine theme.** Both installers
   offer VS Code (macOS brew cask; Linux snap/flatpak/manual; Windows
   winget/scoop/choco). Then, **only if `code` is detected**, they install the
-  `mvllow.rose-pine` extension and set `workbench.colorTheme` to "Rosé Pine".
+  `mvllow.rose-pine` extension, set `workbench.colorTheme` to "Rosé Pine", and
+  set `editor.fontFamily` plus `terminal.integrated.fontFamily` to
+  `'Hack Nerd Font', Consolas, monospace`.
   The theme setter (`set_vscode_theme` in sh, tested by `vscode_theme_test.sh`;
-  `Set-VSCodeTheme` in ps1) only merges into *clean* JSON (jq /
-  `ConvertFrom-Json`) — VS Code settings are usually JSONC with comments, so it
-  leaves those untouched rather than clobbering them. The theme value must keep
-  its accented é to match the extension's label; the ps1 emits it as a `\u` JSON
-  escape (or `[char]0xE9`) so that file stays pure ASCII (invariant), while the
-  sh side uses the literal é.
+  `Set-VSCodeTheme` in ps1, tested by `InstallDeps.Tests.ps1`) uses jq /
+  `ConvertFrom-Json` for strict JSON and a comment-aware scanner for JSONC. The
+  JSONC fallback edits only top-level keys, ignores comments/strings and nested
+  objects, preserves the dominant line ending, and creates
+  `settings.json.bak.<timestamp>` before writing. The theme value must keep its
+  accented é to match the extension's label; the ps1 builds it with
+  `[char]0xE9` so that file stays pure ASCII (invariant), while the sh side uses
+  the literal é.
 - **Direct GitHub downloads are pinned and SHA-256 verified.** `install-deps.sh`
   verifies the pinned Neovim Linux tarballs, lazygit Linux tarballs, and Hack
   Nerd Font zip before extraction; `install-deps.ps1` verifies the pinned
@@ -767,6 +771,19 @@ host OS or shell would otherwise hide a branch from CI.
   become a bare space** — an earlier encoding pass stripped three of these to
   U+0020, which rendered `~/Downloads`, `~/Music`, `~/Pictures` as a blank `~/`.
   The same `directory_test.sh` guards against whitespace-only values.
+- **Language/branch module symbols are starship DEFAULTS, glyph-verified against
+  Hack Nerd Font.** The same bare-space stripping bug had also emptied the
+  `git_branch` / `c` / `golang` / `rust` / `python` symbols (and left `nodejs` on
+  an MDI glyph). They are restored to starship's default dev-icons (U+E0A0 branch,
+  U+E61E c, U+E627 go, U+E718 node, U+E7A8 rust, U+E606 python) — every codepoint
+  CONFIRMED present in `HackNerdFont-Regular.ttf` via `fontTools` (load the cmap,
+  test membership; that is the authoritative no-tofu check, NOT eyeballing). The
+  ONE starship default NOT in Hack Nerd Font is `conda` `🅒` (U+1F152, an emoji),
+  kept as the documented default (renders via the terminal emoji fallback). The
+  `git_status` `✓` (U+2713) / `✘` (U+2718) are also outside the font but are
+  common BMP symbols every terminal renders via fallback (unlike PUA nerd
+  glyphs), so they stay. Re-audit after any symbol change by loading the font
+  cmap with fontTools and asserting each non-ASCII codepoint is a member.
 - **tmux colors track the canonical rose-pine/tmux theme.** Source:
   <https://github.com/rose-pine/tmux>, main variant. Role-based styles
   carry the colors. Map: status-style `fg=pine,bg=base`; window-status

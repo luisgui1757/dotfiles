@@ -56,7 +56,7 @@ symbol = " "
 [git_branch]
 format = "[](fg:overlay)[ $symbol $branch ]($style)[](fg:overlay) "
 style = "bg:overlay fg:foam"
-symbol = ""
+symbol = ""
 
 [git_status]
 disabled = false
@@ -92,31 +92,31 @@ style_user = "bg:overlay fg:iris"
 style = "bg:overlay fg:pine"
 format = " [](fg:overlay)[ $symbol$version ]($style)[](fg:overlay)"
 disabled = false
-symbol = " "
+symbol = " "
 
 [golang]
 style = "bg:overlay fg:pine"
 format = " [](fg:overlay)[ $symbol$version ]($style)[](fg:overlay)"
 disabled = false
-symbol = " "
+symbol = " "
 
 [nodejs]
 style = "bg:overlay fg:pine"
 format = " [](fg:overlay)[ $symbol$version ]($style)[](fg:overlay)"
 disabled = false
-symbol = "󰎙 "
+symbol = " "
 
 [rust]
 style = "bg:overlay fg:pine"
 format = " [](fg:overlay)[ $symbol$version ]($style)[](fg:overlay)"
 disabled = false
-symbol = " "
+symbol = " "
 
 [python]
 style = "bg:overlay fg:pine"
 format = " [](fg:overlay)[ $symbol$version ]($style)[](fg:overlay)"
 disabled = false
-symbol = ' '
+symbol = " "
 
 [conda]
 style = "bg:overlay fg:pine"
