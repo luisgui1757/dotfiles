@@ -586,7 +586,7 @@ Install-HackNerdFont
 
 Section "Ghostty terminal (manual step on Windows)"
 Write-Host "  manual    Ghostty does not have a Windows build yet."
-Write-Host "            Use Windows Terminal (setup/bootstrap apply the rose-pine"
+Write-Host "            Use Windows Terminal (setup applies the rose-pine"
 Write-Host "            fragment by default) or WezTerm for now."
 
 Write-Host ""

@@ -1,7 +1,7 @@
 {{- $os := .chezmoi.os -}}
 {{- /* WSL looks like linux to .chezmoi.os; detect it from the kernel osrelease
        (e.g. "...-microsoft-standard-WSL2") so WSL-host-owned configs (ghostty)
-       can be gated, matching the legacy bootstrap.sh default-skip on WSL. */ -}}
+       can be gated by default on WSL. */ -}}
 {{- $isWsl := false -}}
 {{- if eq $os "linux" -}}
 {{-   $osr := dig "kernel" "osrelease" "" .chezmoi | lower -}}

@@ -77,8 +77,8 @@ printf '%s' "$seeded" | pwsh -NoLogo -NoProfile -File "$work/modify-settings.ps1
     || fail "WT modify_ merge did not preserve user keys + apply managed keys"
 pass "WT modify_ merges managed keys and preserves user data (no \$schema propagated)"
 
-# 4) Parity regression: empty stdin (WT never launched) must emit NOTHING so
-#    chezmoi does not fabricate a settings.json (matches bootstrap.ps1 warn-skip).
+# 4) Empty stdin (WT never launched) must emit NOTHING so chezmoi does not
+#    fabricate a settings.json.
 empty_out="$(printf '' | pwsh -NoLogo -NoProfile -File "$work/modify-settings.ps1")" \
     || fail "WT modify_ errored on empty stdin"
 if [[ -n "${empty_out//[[:space:]]/}" ]]; then

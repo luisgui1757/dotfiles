@@ -4,6 +4,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 
 WIN_CONF="$REPO_ROOT/tmux/tmux.windows.conf"
+HOME_WIN_CONF="$REPO_ROOT/home/dot_tmux.windows.conf"
 
 require_line() {
     local pattern=$1 message=$2
@@ -41,13 +42,18 @@ require_line '^set[[:space:]]+-g[[:space:]]+pwsh-mouse-selection[[:space:]]+off$
 require_line '^set[[:space:]]+-g[[:space:]]+scroll-enter-copy-mode[[:space:]]+on$' \
     'tmux.windows.conf must keep wheel-scroll copy-mode'
 
-if ! grep -Eq "tmux\\\\tmux\.windows\.conf" "$REPO_ROOT/bootstrap.ps1"; then
-    echo "FAIL: bootstrap.ps1 must symlink tmux.windows.conf on Windows"
+if [[ ! -f "$HOME_WIN_CONF" ]]; then
+    echo "FAIL: home/dot_tmux.windows.conf must manage the psmux overlay on Windows"
     exit 1
 fi
 
-if grep -Eq 'tmux[\\/]tmux\.windows\.conf|\.tmux\.windows\.conf' "$REPO_ROOT/bootstrap.sh"; then
-    echo "FAIL: bootstrap.sh must not symlink tmux.windows.conf on Unix/WSL"
+if ! cmp -s "$WIN_CONF" "$HOME_WIN_CONF"; then
+    echo "FAIL: home/dot_tmux.windows.conf must match tmux/tmux.windows.conf"
+    exit 1
+fi
+
+if ! grep -Fx '.tmux.windows.conf' "$REPO_ROOT/home/.chezmoiignore" >/dev/null; then
+    echo "FAIL: home/.chezmoiignore must ignore .tmux.windows.conf off Windows"
     exit 1
 fi
 

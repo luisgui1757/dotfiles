@@ -14,8 +14,7 @@ run setup -> install programs -> link configs -> sync Neovim plugins -> sync Mas
 For a fresh machine, run `setup`. The split is deliberate:
 `install-deps` installs programs and optional tooling; chezmoi owns the
 dotfiles/config layer in `home/`. The full setup scripts now apply configs
-through chezmoi; `bootstrap.*` remains on disk during the migration window for
-legacy direct use and tests.
+through chezmoi.
 
 ## Quick Start
 
@@ -24,7 +23,7 @@ or `%USERPROFILE%\dotfiles`, installs repo-managed dependencies, links every
 config, then runs `:Lazy! sync` and `:MasonToolsInstallSync` before the first
 interactive Neovim launch.
 
-Git is the only hard prerequisite for remote bootstrap because setup needs it to
+Git is the only hard prerequisite for remote setup because setup needs it to
 clone this repo. If Git is missing, the setup scripts print the first install
 command for the platform package manager.
 
@@ -161,15 +160,14 @@ directory target remains a symlink even though single-file configs are copies.
 The table below is the config layer. Full setup and config-only applies use the
 chezmoi source under `home/`. Mechanisms differ: POSIX chezmoi uses symlinks for
 single files, Windows chezmoi copies single files, Neovim remains a directory
-symlink, and Windows Terminal remains a merge. Legacy `bootstrap.*` still exists
-during migration but is no longer called by setup.
+symlink, and Windows Terminal remains a merge.
 
 | Tool | macOS | Linux / WSL | Windows |
 |---|---|---|---|
 | Neovim | `~/.config/nvim` -> `nvim/` | `~/.config/nvim` -> `nvim/` | `%LOCALAPPDATA%\nvim` -> `nvim\` |
 | Starship | `~/.config/starship.toml` -> `starship/starship.toml` | same | `%USERPROFILE%\.config\starship.toml` -> `starship\starship.toml` |
 | zsh | `~/.zshenv` -> `shells/zshenv`; `~/.zshrc` -> `shells/zshrc` | same | n/a |
-| PowerShell | `$PROFILE` -> `shells/powershell_profile.ps1` when `pwsh` is installed | same | `$PROFILE` -> `shells\powershell_profile.ps1` |
+| PowerShell | n/a | n/a | `Documents\PowerShell\Microsoft.PowerShell_profile.ps1` -> `shells\powershell_profile.ps1` |
 | tmux / psmux | `~/.tmux.conf` -> `tmux/tmux.conf` | same | `%USERPROFILE%\.tmux.conf` -> `tmux\tmux.conf` for psmux; WSL uses the Unix path |
 | Ghostty | `~/Library/Application Support/com.mitchellh.ghostty/config` -> `ghostty/config` | native Linux links `~/.config/ghostty/config`; WSL links it only with `--experimental-wsl-gui` | n/a |
 | lazygit | `~/Library/Application Support/lazygit/config.yml` -> `lazygit/config.yml` | `~/.config/lazygit/config.yml` -> `lazygit/config.yml` | `%LOCALAPPDATA%\lazygit\config.yml` -> `lazygit\config.yml` |
@@ -178,8 +176,8 @@ during migration but is no longer called by setup.
 Chezmoi manages the Windows PowerShell 7 profile path
 `Documents\PowerShell\Microsoft.PowerShell_profile.ps1`. The Windows
 PowerShell 5.1 profile path (`Documents\WindowsPowerShell\...`) and POSIX pwsh
-profile are bootstrap/provisioning-adjacent, because they depend on the host
-shell and whether `pwsh` is installed.
+profile are host/provisioning-adjacent, because they depend on the host shell
+and whether `pwsh` is installed.
 
 ### Platform Notes
 
@@ -218,8 +216,8 @@ shell and whether `pwsh` is installed.
   `~/.zshrc.local` (gitignored, sourced by `zshrc`). Non-interactive runs skip
   the prompt, so set `NOTES_VAULT` yourself there.
 - macOS installs before this README may have an unused
-  `~/.config/lazygit/config.yml` symlink. It is harmless; current bootstrap
-  links the path lazygit actually reads:
+  `~/.config/lazygit/config.yml` symlink. It is harmless; current setup paths
+  manage the location lazygit actually reads:
   `~/Library/Application Support/lazygit/config.yml`.
 
 ## Test
@@ -230,7 +228,6 @@ Use the same top-level test command that CI uses for your OS:
 # mac / linux / wsl
 make help               # list targets
 make test               # run everything that can run on this OS
-make test-bootstrap     # bats coverage of the installer
 make validate-renovate  # schema-check renovate.json under Renovate's Node 24
 make lint               # shellcheck everything
 ./tests/wsl/e2e.sh      # manual WSL split-host validation from inside WSL
@@ -259,7 +256,7 @@ skipping the actual checks.
 
 Pull requests are meant to be gated by two workflows:
 
-- `.github/workflows/test.yml` runs the static, shell, bootstrap, tmux,
+- `.github/workflows/test.yml` runs the static, shell, tmux,
   starship, Neovim, Windows Pester/PSScriptAnalyzer, and `chezmoi-parity`
   suites. Warnings are treated as failures where the tools expose them cleanly:
   shellcheck exits nonzero, PSScriptAnalyzer runs at `Warning,Error`, and YAML
@@ -272,7 +269,7 @@ The e2e jobs cover different install paths, not symmetric container platforms:
 
 | Check | What it proves |
 |---|---|
-| `e2e containers / ubuntu-24.04` | Clean `ubuntu:24.04`, non-root user, native `apt`, no Linuxbrew (`DOTFILES_SKIP_BREW_BOOTSTRAP=1`), then `install-deps.sh --all`, `bootstrap.sh`, tool assertions, Neovim >= 0.11, lazygit, zsh plugin files, and symlink assertions. |
+| `e2e containers / ubuntu-24.04` | Clean `ubuntu:24.04`, non-root user, native `apt`, no Linuxbrew (`DOTFILES_SKIP_BREW_BOOTSTRAP=1`), then `install-deps.sh --all`, chezmoi config apply, tool assertions, Neovim >= 0.11, lazygit, zsh plugin files, config content assertions, and nvim directory realpath assertion. |
 | `setup.sh / ubuntu-24.04` | Full Unix setup on the hosted Ubuntu runner. This runner has Linuxbrew available, so it proves the Linuxbrew path that users may hit. |
 | `setup.sh / macos-15` | Full macOS setup through the real macOS hosted runner and Homebrew path. Docker cannot model macOS. |
 | `setup.ps1 / windows-2025` | Full Windows setup through the real Windows hosted runner, including Scoop/winget/choco behavior, PowerShell, symlinks, and Neovim sync. Windows containers do not model the desktop/user-profile setup well. |
@@ -286,7 +283,7 @@ tarball install, pinned lazygit release install, zsh plugin install, `fd-find`
 container to add for symmetry. That asymmetry is accepted: hosted macOS and
 Windows runners are the closest representative fixtures for those operating
 systems, while the required WSL proxy is the Ubuntu container plus the
-`DOTFILES_FORCE_OS=wsl` bootstrap coverage. Do not add the WSL2 canary to
+WSL config-template coverage. Do not add the WSL2 canary to
 required checks unless the owner explicitly accepts the flake risk.
 
 These e2e jobs fail if setup skips Phase 3-4, emits a precise `FAIL:` marker,
@@ -374,8 +371,6 @@ the adjacent constant.
 ├── docs/security/         # branch-protection runbook
 ├── setup.sh               # public macOS/Linux/WSL entry point
 ├── setup.ps1              # public Windows entry point
-├── bootstrap.sh           # setup phase: Unix symlinks
-├── bootstrap.ps1          # setup phase: Windows symlinks
 ├── test.ps1               # Windows test entry point
 ├── Makefile               # Unix test/setup conveniences
 ├── AGENTS.md              # standard agent entry point, points to CLAUDE.md
@@ -386,13 +381,12 @@ the adjacent constant.
 
 ## Key design decisions (and why)
 
-- **One source of truth via symlinks.** Edits in the repo are live everywhere
-  without manual copy-paste; `bootstrap.{sh,ps1}` are idempotent.
-- **chezmoi is the config-layer path, not the provisioning path.** The
-  `home/` source tree coexists with the legacy setup scripts while the parity
-  gate proves equivalence. Do not move package installs, binary/font installers,
-  login-shell changes, VS Code, devilspie2, or distro-manager policy out of
-  `install-deps`.
+- **One source of truth through chezmoi-managed configs.** POSIX uses symlinks
+  for live-edit behavior, Windows copies simple files, and nvim remains a
+  directory symlink into repo `nvim/`.
+- **chezmoi is the config-layer path, not the provisioning path.** Do not move
+  package installs, binary/font installers, login-shell changes, VS Code,
+  devilspie2, or distro-manager policy out of `install-deps`.
 - **Rose Pine everywhere it can render.** Nvim, lualine, starship, tmux,
   ghostty, Windows Terminal, PSReadLine — same palette across the stack. VS Code
   joins optionally: `install-deps` offers VS Code, and if `code` is detected it
@@ -444,7 +438,7 @@ the adjacent constant.
   `-RunAsAdmin`, then refreshes the current-process Scoop shims path so later
   installs can use `scoop` immediately. Existing Scoop installs also get the
   `extras` and `nerd-fonts` buckets normalized before catalog installs.
-  Bootstrap symlink creation still works through the elevated/native
+  Chezmoi's Windows nvim directory symlink still uses the elevated/native
   CreateSymbolicLink path. For local machines, Developer Mode plus a normal
   PowerShell remains the recommended setup path.
 

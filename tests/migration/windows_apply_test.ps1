@@ -5,9 +5,7 @@ if (Get-Variable -Name PSNativeCommandUseErrorActionPreference -ErrorAction Sile
 
 $script:RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $script:SourceDir = Join-Path $script:RepoRoot 'home'
-$script:BootstrapPath = Join-Path $script:RepoRoot 'bootstrap.ps1'
 $script:Chezmoi = $null
-$script:Pwsh = $null
 
 $script:UserProfileGuid = '{11111111-1111-1111-1111-111111111111}'
 $script:UserSchemeName = 'UserSeedScheme'
@@ -484,7 +482,7 @@ function Strip-Jsonc {
     return (($Jsonc -split "`n" | Where-Object { $_ -notmatch "^\s*//" }) -join "`n")
 }
 
-function Invoke-LegacyWindowsTerminalMergeOnly {
+function Invoke-ExpectedWindowsTerminalMergeOnly {
     param([Parameter(Mandatory)] [string]$SettingsPath)
 
     $fragmentPath = Join-Path $script:RepoRoot 'windows-terminal\settings.fragment.jsonc'
@@ -512,36 +510,6 @@ function Invoke-LegacyWindowsTerminalMergeOnly {
     Set-OrAdd-Property $current 'schemes' @(Merge-ObjectArrayByProperty $current.schemes $fragment.schemes 'name')
     Set-OrAdd-Property $current 'themes'  @(Merge-ObjectArrayByProperty $current.themes  $fragment.themes  'name')
     $current | ConvertTo-Json -Depth 100 | Set-Content -LiteralPath $SettingsPath -Encoding utf8
-}
-
-function Invoke-LegacyBootstrap {
-    param([Parameter(Mandatory)] [string]$Sandbox)
-
-    $profilePath = Join-Path $Sandbox 'Documents\PowerShell\Microsoft.PowerShell_profile.ps1'
-    $runner = Join-Path $Sandbox 'run-bootstrap.ps1'
-    @'
-param(
-    [Parameter(Mandatory)] [string]$BootstrapPath,
-    [Parameter(Mandatory)] [string]$ProfilePath
-)
-$ErrorActionPreference = 'Stop'
-$PROFILE = $ProfilePath
-& $BootstrapPath
-if ($LASTEXITCODE -ne 0) {
-    exit $LASTEXITCODE
-}
-'@ | Set-Content -LiteralPath $runner -Encoding utf8
-
-    Invoke-CheckedNative -FilePath $script:Pwsh -Arguments @(
-        '-NoLogo',
-        '-NoProfile',
-        '-File',
-        $runner,
-        '-BootstrapPath',
-        $script:BootstrapPath,
-        '-ProfilePath',
-        $profilePath
-    )
 }
 
 function ConvertTo-NormalizedValue {
@@ -595,15 +563,15 @@ function Select-WtManagedSubset {
 
 function Assert-WtManagedSubsetDeepEqual {
     param(
-        [Parameter(Mandatory)] $Legacy,
+        [Parameter(Mandatory)] $Expected,
         [Parameter(Mandatory)] $Chezmoi
     )
 
-    $legacySubset = Select-WtManagedSubset -Settings $Legacy
+    $expectedSubset = Select-WtManagedSubset -Settings $Expected
     $chezmoiSubset = Select-WtManagedSubset -Settings $Chezmoi
-    $legacyJson = ConvertTo-CanonicalJson $legacySubset
+    $expectedJson = ConvertTo-CanonicalJson $expectedSubset
     $chezmoiJson = ConvertTo-CanonicalJson $chezmoiSubset
-    Assert-Condition ($legacyJson -eq $chezmoiJson) "WT managed subset mismatch.`nlegacy:  $legacyJson`nchezmoi: $chezmoiJson"
+    Assert-Condition ($expectedJson -eq $chezmoiJson) "WT managed subset mismatch.`nexpected: $expectedJson`nchezmoi:  $chezmoiJson"
 }
 
 function Invoke-Part1 {
@@ -626,23 +594,15 @@ function Invoke-Part1 {
 }
 
 function Invoke-Part2 {
-    $legacySandbox = New-TestSandbox -Name 'legacy'
+    $expectedSandbox = New-TestSandbox -Name 'expected'
     $chezmoiSandbox = New-TestSandbox -Name 'chezmoi'
-    $script:LegacyBootstrapFallbackUsed = $false
     try {
-        $legacySettings = Write-BaselineWtSettings -Sandbox $legacySandbox
+        $expectedSettings = Write-BaselineWtSettings -Sandbox $expectedSandbox
         $chezmoiSettings = Write-BaselineWtSettings -Sandbox $chezmoiSandbox
 
-        Invoke-WithSandboxEnv -Sandbox $legacySandbox -Script {
-            try {
-                Invoke-LegacyBootstrap -Sandbox $legacySandbox
-                Pass 'legacy bootstrap.ps1 path completed for WT parity fixture'
-            } catch {
-                Write-Host "INFO: legacy bootstrap.ps1 path did not complete; using scoped WT merge fallback: $($_.Exception.Message)"
-                $script:LegacyBootstrapFallbackUsed = $true
-                Invoke-LegacyWindowsTerminalMergeOnly -SettingsPath $legacySettings
-                Pass 'legacy WT merge-only fallback completed'
-            }
+        Invoke-WithSandboxEnv -Sandbox $expectedSandbox -Script {
+            Invoke-ExpectedWindowsTerminalMergeOnly -SettingsPath $expectedSettings
+            Pass 'expected WT merge fixture completed'
         }
 
         Invoke-WithSandboxEnv -Sandbox $chezmoiSandbox -Script {
@@ -650,28 +610,22 @@ function Invoke-Part2 {
             Invoke-Chezmoi -Arguments @('apply')
         }
 
-        $legacy = Read-JsonFile -Path $legacySettings
+        $expected = Read-JsonFile -Path $expectedSettings
         $chezmoi = Read-JsonFile -Path $chezmoiSettings
-        Assert-WtManagedSubsetDeepEqual -Legacy $legacy -Chezmoi $chezmoi
-        Assert-WtUserSeedSurvived -Settings $legacy -Label 'legacy WT merge'
+        Assert-WtManagedSubsetDeepEqual -Expected $expected -Chezmoi $chezmoi
+        Assert-WtUserSeedSurvived -Settings $expected -Label 'expected WT merge'
         Assert-WtUserSeedSurvived -Settings $chezmoi -Label 'chezmoi WT merge'
-        Assert-WtManagedActionKeySet -Settings $legacy -Label 'legacy WT merge'
+        Assert-WtManagedActionKeySet -Settings $expected -Label 'expected WT merge'
         Assert-WtManagedActionKeySet -Settings $chezmoi -Label 'chezmoi WT merge'
-        if ($script:LegacyBootstrapFallbackUsed) {
-            Pass 'part 2 legacy-bootstrap fallback was used'
-        } else {
-            Pass 'part 2 legacy-bootstrap fallback was not used'
-        }
         Pass 'part 2 WT managed subset deep-compare passed'
     } finally {
-        Remove-TestSandbox -Sandbox $legacySandbox
+        Remove-TestSandbox -Sandbox $expectedSandbox
         Remove-TestSandbox -Sandbox $chezmoiSandbox
     }
 }
 
 try {
     $script:Chezmoi = (Get-Command chezmoi -ErrorAction Stop).Source
-    $script:Pwsh = (Get-Command pwsh -ErrorAction Stop).Source
     Assert-Condition ([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([System.Runtime.InteropServices.OSPlatform]::Windows)) 'windows_apply_test.ps1 must run on Windows'
     Invoke-Part1
     Invoke-Part2

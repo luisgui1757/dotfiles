@@ -46,7 +46,7 @@ rendered="$(mktemp -d)"
 trap 'rm -rf "$fixture" "$rendered"' EXIT
 
 # linux-wsl injects targetOS=linux + isWsl=true to prove ghostty is gated on WSL
-# (Windows-host terminal) while lazygit stays managed -- matching legacy bootstrap.
+# (Windows-host terminal) while lazygit stays managed.
 # linux-wsl-gui flips experimentalWslGui=true, matching setup.sh
 # --experimental-wsl-gui's per-run chezmoi data override.
 for case_name in darwin linux linux-wsl linux-wsl-gui windows; do

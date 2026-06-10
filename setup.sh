@@ -97,7 +97,7 @@ if [[ -z "$SCRIPT_DIR" ]] || [[ ! -d "$SCRIPT_DIR/home" ]]; then
         if [[ "$(uname -s)" == "Darwin" ]]; then
             git_hint="brew install git"
         fi
-        echo "setup.sh: git is the only prerequisite for remote bootstrap, and it is required to clone the repo." >&2
+        echo "setup.sh: git is the only prerequisite for remote setup, and it is required to clone the repo." >&2
         echo "setup.sh: install git first: $git_hint" >&2
         exit 1
     fi

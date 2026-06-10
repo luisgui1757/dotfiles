@@ -15,19 +15,16 @@ Cross-platform dotfiles: Neovim (lazy.nvim), Starship, Ghostty, Windows
 Terminal, tmux, zshenv/zshrc, PowerShell profile, lazygit. Public installs go
 through `setup.sh` (macOS / Linux / WSL) or `setup.ps1` (Windows), which install
 dependencies, apply the chezmoi config layer, and sync Neovim plugins + Mason
-tools. The legacy bootstrap scripts are **location-independent** (they resolve
-`$REPO_ROOT` / `$RepoRoot` from their own path), so the repo can live anywhere —
-`~/dotfiles/`, `~/Documents/dotfiles/`, etc. The remote-clone default in
-`setup.{sh,ps1}` is `~/dotfiles/`, but an in-place clone elsewhere works too.
-Do NOT put the repo at `~/.config/nvim/` — the installer creates that path as a
-symlink **pointing into** the repo, so a repo there would self-overlap (the
-self-link guard refuses this).
+tools. The repo can live anywhere — `~/dotfiles/`, `~/Documents/dotfiles/`,
+etc. The remote-clone default in `setup.{sh,ps1}` is `~/dotfiles/`, but an
+in-place clone elsewhere works too. Do NOT put the repo at `~/.config/nvim/` —
+the installer creates that path as a symlink **pointing into** the repo, so a
+repo there would self-overlap (the self-link guard refuses this).
 
 The `home/` tree is the chezmoi source tree for the full config layer. `setup.*`
-now uses it in Phase 2; `bootstrap.*` remains on disk until the explicit Wave C
-deletion stage. During coexistence, top-level config files and their
-`home/` copies/templates must stay byte-identical where the parity manifest says
-so; update both in the same change.
+uses it in Phase 2. Top-level config files and their `home/` copies/templates
+must stay byte-identical where the parity manifest says so; update both in the
+same change.
 
 Agent settings are intentionally **NOT** synced through this repo. Keep local
 agent preferences in the agent's per-machine state directory; this repo does
@@ -44,7 +41,7 @@ not ship synced agent preference folders.
 ├── ghostty/               config (Rose Pine, Hack Nerd, tuned for tmux)
 ├── windows-terminal/      settings.fragment.jsonc + merge README
 ├── lazygit/               config.yml (J/K move-commit binding)
-├── home/                  chezmoi source tree for the coexisting config layer
+├── home/                  chezmoi source tree for the config layer
 ├── tests/                 automated tests, grouped by tool
 ├── tests/wsl/             manual WSL split-host e2e check
 ├── .github/workflows/     CI matrix + chezmoi parity
@@ -52,8 +49,6 @@ not ship synced agent preference folders.
 ├── docs/security/         branch-protection runbook
 ├── setup.sh               public macOS/Linux/WSL setup entry point
 ├── setup.ps1              public Windows setup entry point
-├── bootstrap.sh           setup phase: Unix symlinks (idempotent)
-├── bootstrap.ps1          setup phase: Windows symlinks (idempotent)
 ├── test.ps1               Windows test entry point
 ├── Makefile               Unix `make setup`, `make test`, `make lint`
 ├── .editorconfig          formatting rules every editor + agent respects
@@ -225,7 +220,6 @@ ensures the named tools exist on each machine.
 make help            # list all sub-targets
 make test            # run everything that can run on this OS
 make test-nvim       # plenary busted suite
-make test-bootstrap  # bats coverage of bootstrap.sh idempotency
 make lint            # shellcheck across all .sh
 ./tests/wsl/e2e.sh   # manual WSL split-host validation from inside WSL
 ```
@@ -252,8 +246,9 @@ Sub-targets **skip gracefully** when their tool isn't installed
 ubuntu/macos/windows CI matrix in `.github/workflows/test.yml` installs
 everything, `chezmoi-parity`, `chezmoi-parity-macos`, and
 `chezmoi-parity-windows` install pinned chezmoi for the config-layer migration
-oracle, and `test.ps1` treats missing Windows test dependencies as fatal under
-CI, so anything passing locally + CI is genuinely cross-platform.
+oracle (`template_test.sh`, canonical-only `parity_gate.sh`, Windows apply, and
+round-trip uninstall), and `test.ps1` treats missing Windows test dependencies
+as fatal under CI, so anything passing locally + CI is genuinely cross-platform.
 Static repo walkers intentionally exclude `home/` managed copies; those copies
 are validated by `tests/migration/parity_gate.sh` against the canonical
 top-level sources instead of being re-linted as independent source.
@@ -281,9 +276,10 @@ install paths, not symmetric container platforms:
 
 - `e2e containers / ubuntu-24.04` runs an `ubuntu:24.04` container on an Ubuntu
   runner with `DOTFILES_SKIP_BREW_BOOTSTRAP=1`, creates a non-root user, runs
-  real `install-deps.sh --all` (native `apt`, no Linuxbrew), then `bootstrap.sh`,
-  and asserts tool presence, Neovim >= 0.11, lazygit, zsh plugin files, and
-  symlinks pointing into the repo.
+  real `install-deps.sh --all` (native `apt`, no Linuxbrew), then applies
+  configs with chezmoi and asserts tool presence, Neovim >= 0.11, lazygit, zsh
+  plugin files, config content matching the repo sources, and the Neovim
+  directory resolving into repo `nvim/`.
   This is intentionally **not** a devcontainer. It stays because hosted Ubuntu
   has Linuxbrew available, so the container is the only automated proof of the
   clean-image native `apt` path: pinned Neovim tarball install, pinned lazygit
@@ -384,52 +380,31 @@ save only**. The next plain `:w` formats normally. Implemented in
 `nvim/lua/plugins/conform.lua`'s `format_on_save` callback and cleared by a
 `BufWritePost` autocmd.
 
-## Bootstrap details (don't reinvent these)
+## Config apply (chezmoi, via setup Phase 2)
 
-- `setup.sh` and `setup.ps1` now call chezmoi for Phase 2 instead of
-  `bootstrap.*`. They run `chezmoi init`, back up pre-existing managed
+- `setup.sh` and `setup.ps1` run `chezmoi init`, back up pre-existing managed
   file/symlink targets to `<target>.bak.<timestamp>` only when the target is not
   already exact chezmoi state, a repo-owned symlink, or byte-identical content,
   then run `chezmoi --no-tty --force apply`. `--skip-bootstrap` remains a
   back-compat alias for `--skip-config` / `-SkipConfig`.
-- `setup.ps1` preserves bootstrap's symlink-privilege pre-flight before
-  chezmoi apply because the Windows Neovim target is still a directory symlink:
-  dry-run warns and skips the probe; real runs print elevated/Developer Mode
-  state plus the Developer Mode or elevated-config-step fix before attempting
-  apply.
-- Both installers are **idempotent** — running twice produces zero diffs.
-  Tested by `tests/bootstrap/sh_test.bats` (and `ps1_test.ps1` on Windows).
-- `bootstrap.sh` does not require git; it only creates symlinks. `setup.sh`
-  owns cloning and pull/update behavior before the chezmoi config phase runs.
+- `setup.ps1` runs a symlink-privilege pre-flight before chezmoi apply because
+  the Windows Neovim target is still a directory symlink: dry-run warns and
+  skips the probe; real runs print elevated/Developer Mode state plus the
+  Developer Mode or elevated-config-step fix before attempting apply.
 - Remote `setup.{sh,ps1}` has exactly one hard prerequisite: `git`, because the
   remote path must clone this repo before it can install everything else. The
   missing-git errors name the canonical first install command (`brew install
   git`, `apt install git`, or `winget install Git.Git`).
-- Pre-existing non-symlink targets are backed up to
-  `<target>.bak.<timestamp>` (with `.1`, `.2`, … suffixes if a collision
-  exists). Backups are never overwritten. New symlinks are staged as
-  `<target>.new` and then renamed into place.
-- Broken symlinks are treated as wrong symlinks: bootstrap backs up the link
-  itself and replaces it with the repo target, so reruns recover stale moved
-  targets idempotently.
-- `bootstrap.sh` links both `~/.zshenv` and `~/.zshrc`. Keep `.zshenv`
-  minimal; it exists only to set `skip_global_compinit=1` before zsh startup.
-- On WSL, `bootstrap.sh` skips `~/.config/ghostty/config` unless
-  `--experimental-wsl-gui` or `DOTFILES_EXPERIMENTAL_WSL_GUI=1` is set. Default
-  WSL terminal/font config lives on the Windows host via Windows Terminal.
-- `bootstrap.sh --dry-run` and `bootstrap.ps1 -DryRun` print the planned
-  actions without touching disk. The Windows DryRun does not require
-  Developer Mode — it downgrades the symlink-permission probe to a warning.
-- The Windows installer does NOT symlink `settings.json` for Windows
-  Terminal — WT rewrites that file on launch. `bootstrap.ps1` merges the
+- The Windows installer does NOT symlink `settings.json` for Windows Terminal:
+  WT rewrites that file on launch. Chezmoi's `modify_` entry merges the
   user-owned keys by default and backs up the pre-merge `settings.json` first;
   pass `-SkipWindowsTerminalMerge` to leave it untouched. The legacy
   `-MergeWindowsTerminal` switch remains accepted as a no-op alias.
 - **lazygit config paths are OS-specific.** On macOS, lazygit v0.58 reports
   `~/Library/Application Support/lazygit` from `lazygit --print-config-dir`;
   on Linux/WSL it uses `~/.config/lazygit`; on Windows it uses
-  `%LOCALAPPDATA%\lazygit`. Keep `bootstrap.sh`, `bootstrap.ps1`, README, and
-  tests aligned with those real read paths.
+  `%LOCALAPPDATA%\lazygit`. Keep the chezmoi templates, README, and tests
+  aligned with those real read paths.
 - **The chezmoi tree in `home/` owns the config layer, not provisioning.** The
   rule is `chezmoi=dotfiles, install-deps=provisioning`: do not port package
   installs, pinned binary/font installers, login-shell mutation, devilspie2, VS
@@ -447,8 +422,8 @@ save only**. The next plain `:w` formats normally. Implemented in
   symlink or fragment-only replacement. The nvim tree is intentionally NOT
   copied under `home/`: POSIX `home/dot_config/symlink_nvim.tmpl` and Windows
   `home/AppData/Local/symlink_nvim.tmpl` both point at
-  `{{ .chezmoi.sourceDir }}/../nvim`, so legacy and chezmoi targets resolve to
-  the repo top-level `nvim/` directory. Windows nvim is therefore still a
+  `{{ .chezmoi.sourceDir }}/../nvim`, so managed targets resolve to the repo
+  top-level `nvim/` directory. Windows nvim is therefore still a
   directory symlink and still needs Developer Mode or elevation; the
   no-Developer-Mode win applies to simple copied files. Do not use `exact_` for
   nvim; app runtime state lives outside `.config/nvim`, but user/plugin-added
@@ -458,14 +433,13 @@ save only**. The next plain `:w` formats normally. Implemented in
   `Documents/PowerShell/Microsoft.PowerShell_profile.ps1`; the Windows
   PowerShell 5.1 profile path under `Documents/WindowsPowerShell/` is out of
   scope because this repo is pwsh-first. POSIX pwsh profile management remains
-  outside the static chezmoi source tree because `bootstrap.sh` links
-  `~/.config/powershell/Microsoft.PowerShell_profile.ps1` only when `pwsh` is
-  installed. `bootstrap.ps1` writes to `$PROFILE`, which differs by host shell.
-  WSL is gated through `home/.chezmoi.toml.tmpl`'s `isWsl` data value:
+  outside the static chezmoi source tree because it depends on which host shell
+  and `$PROFILE` path are available after `pwsh` is installed. WSL is gated
+  through `home/.chezmoi.toml.tmpl`'s `isWsl` data value:
   `.chezmoiignore` skips Linux Ghostty on WSL unless setup passes the per-run
   `experimentalWslGui` data override for `--experimental-wsl-gui`. The migration oracle is `tests/migration/parity_gate.sh` +
   `tests/migration/oracle_test.sh` + `tests/migration/windows_apply_test.ps1`;
-  it enforces manifest-driven parity, nvim dir-symlink realpath/content parity,
+  it enforces canonical repo-source parity, nvim dir-symlink realpath/content parity,
   single-source byte equality, wrong-OS absence, zsh exact-pin failure behavior,
   and Windows copy-mode + WT merge parity.
 - **`install-deps` provisions chezmoi itself.** Unix setup installs `chezmoi`
@@ -570,7 +544,7 @@ save only**. The next plain `:w` formats normally. Implemented in
   `--all`/`--dry-run` was passed or there's no tty (so `curl|bash` and the CI
   `--dry-run --all` dogfood don't hang).
 - **Windows symlink pre-flight reports WHY symlinks fail and how to fix it.**
-  `setup.ps1` ports bootstrap's probe before chezmoi apply. When the probe
+  `setup.ps1` probes symlink capability before chezmoi apply. When the probe
   fails it prints your *elevated* (admin) and *Developer Mode* state, then the
   two fixes (Developer Mode, no admin, recommended; or an elevated config-only
   setup step), and `exit 1` via `Write-Host` (not `Write-Error`, so no stack
@@ -584,14 +558,14 @@ save only**. The next plain `:w` formats normally. Implemented in
   devilspie2, symlinks `linux/devilspie2/ghostty-maximize.lua` (keyed on WM_CLASS
   `com.mitchellh.ghostty`) into `~/.config/devilspie2/`, and writes a
   `~/.config/autostart/devilspie2.desktop`. It lives in install-deps (installs a
-  package + runs a daemon), NOT bootstrap (pure-symlink); Wayland needs a GNOME
+  package + runs a daemon), NOT the chezmoi config layer; Wayland needs a GNOME
   Shell extension instead. Guarded by `tests/shell/devilspie2_test.sh`.
 - **psmux is the Windows tmux** (`install-deps.ps1` → `Install-Psmux`). Picked
   because it **reads `~/.tmux.conf`** and speaks the tmux command language, so
   Windows reuses the *same* `tmux/tmux.conf` we maintain for Unix — one source
-  of truth, Rose Pine carries over, no parallel config. `bootstrap.ps1` symlinks
-  `tmux\tmux.conf` to `%USERPROFILE%\.tmux.conf` (mirrors the Unix
-  `~/.tmux.conf` link). If the Unix-shaped `if-shell` clipboard block ever
+  of truth, Rose Pine carries over, no parallel config. Chezmoi manages
+  `%USERPROFILE%\.tmux.conf` from `tmux\tmux.conf` (mirrors the Unix
+  `~/.tmux.conf` target). If the Unix-shaped `if-shell` clipboard block ever
   chokes under ConPTY on a given machine, guard that block rather than fork the
   config. Install-Psmux is NOT in the `$Catalog` because scoop needs a custom
   psmux bucket URL; it passes that URL through `Add-ScoopBucketSafe`, then
@@ -599,8 +573,8 @@ save only**. The next plain `:w` formats normally. Implemented in
 - **psmux + PSReadLine: Windows-only overlay, two settings.** psmux's default
   shell is **cmd**, not pwsh — which is the *real* reason "history prediction"
   and `MenuComplete` looked broken inside panes: PSReadLine was never loaded.
-  The fix is a Windows-only overlay `tmux/tmux.windows.conf`, symlinked to
-  `~/.tmux.windows.conf` by `bootstrap.ps1` and pulled in by the main
+  The fix is a Windows-only overlay `tmux/tmux.windows.conf`, managed as
+  `~/.tmux.windows.conf` by chezmoi on Windows and pulled in by the main
   `tmux/tmux.conf` via `source-file -q` (silent no-op on Unix where it does not
   exist). The overlay sets:
   (1) `default-shell pwsh` — so fresh psmux panes spawn PowerShell 7, which
@@ -609,9 +583,8 @@ save only**. The next plain `:w` formats normally. Implemented in
   `None` during pane init (psmux issue #150 — fresh panes ignore the profile's
   `HistoryAndPlugin`). With this on, the profile's ListView prediction +
   `Tab=MenuComplete` survive into psmux panes.
-  `bootstrap.ps1` warns but continues when `pwsh` is missing, because the
-  overlay is still the correct symlink and `install-deps.ps1` owns installing
-  PowerShell 7.
+  `install-deps.ps1` owns installing PowerShell 7; the overlay intentionally
+  assumes `pwsh` is present after setup.
   Diagnose inside a pane with `(Get-Process -Id $PID).Name` (expect `pwsh`).
   Do NOT add `set -g default-shell` to the main `tmux.conf` — `pwsh` does not
   exist on Unix; keep Windows-specific tmux settings in the overlay.
@@ -646,7 +619,7 @@ and tmux / new terminals never source the symlinked `~/.zshrc` (this is the
   as root / via sudo / via plain PAM, whichever is available. Takes effect on the
   next login.
 
-It lives in `install-deps.sh`, NOT `bootstrap.sh` (which stays pure-symlink), and
+It lives in `install-deps.sh`, NOT the chezmoi config layer, and
 NOT `tmux.conf` (a tmux-only `default-command` would paper over the symptom while
 bare TTYs and SSH sessions stayed bash).
 
@@ -666,13 +639,8 @@ for local accounts.
 then return …` before the main install sections in `install-deps.sh` exists ONLY
 so shell tests can `source` the installer function defs (without running any
 installs) and exercise them against stubbed seams. Unset in normal runs, so it's
-skipped. Two sibling seams exist for the same reason: `bootstrap.sh`'s
-`DOTFILES_FORCE_OS` (lets the bats suite drive `macos`, `linux`, and `wsl` link
-branches regardless of the host runner) and `bootstrap.ps1`'s
-`DOTFILES_BOOTSTRAP_SOURCE_ONLY` (dot-source the functions — e.g.
-`New-SymbolicLinkItem` / `New-NativeSymLink` — without running the symlink phase,
-so `tests/bootstrap/ps1_test.ps1` can force the native CreateSymbolicLink
-fallback). Both are unset in normal runs.
+skipped. Keep similar explicit test seams in setup/config code only when the
+host OS or shell would otherwise hide a branch from CI.
 
 ## Things that look weird but are intentional
 
@@ -787,15 +755,15 @@ fallback). Both are unset in normal runs.
   `space`. Both pieces are required: editorconfig controls nvim's buffer
   behavior while editing; stylua.toml controls what gets written back.
   Guarded by `invariants_test.sh` ("no tab-indented .lua").
-- **lazygit move-commit uses uppercase J / K, and the config must symlink into
+- **lazygit move-commit uses uppercase J / K, and the config must be managed at
   `%LOCALAPPDATA%\lazygit\`.** Two separate gotchas wrapped together:
   1. **Config path:** lazygit v0.58 reads its config from
      `%LOCALAPPDATA%\lazygit\config.yml` (verified via `lazygit
-     --print-config-dir`), NOT `%APPDATA%\lazygit\config.yml`. An earlier
-     bootstrap.ps1 symlinked into `%APPDATA%` -- the file existed but
+     --print-config-dir`), NOT `%APPDATA%\lazygit\config.yml`. Earlier
+     Windows config wiring targeted `%APPDATA%` -- the file existed but
      lazygit never loaded it, so EVERY custom binding looked dead.
-     Bootstrap now targets LocalAppData. Asserted by
-     `tests/bootstrap/ps1_test.ps1`.
+     Chezmoi now targets LocalAppData. Asserted by
+     `tests/migration/windows_apply_test.ps1`.
   2. **Binding:** `lazygit/config.yml` binds
      `keybinding.commits.moveDownCommit` / `moveUpCommit` to uppercase
      `J` / `K`. We intentionally do NOT use Ctrl+J / Ctrl+K: Ctrl+J is

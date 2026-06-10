@@ -4,8 +4,8 @@
        the legacy path. AppData is one ignore covering all Windows LocalAppData
        targets (nvim + lazygit + WT). On WSL (.isWsl, from kernel.osrelease)
        ghostty is also ignored unless .experimentalWslGui is true -- the terminal
-       is a Windows-host responsibility by default, matching the legacy
-       bootstrap.sh default-skip; lazygit stays managed on WSL. */ -}}
+       is a Windows-host responsibility by default; lazygit stays managed on
+       WSL. */ -}}
 {{- if ne .targetOS "windows" }}
 .tmux.windows.conf
 AppData

@@ -67,7 +67,7 @@ Invoke-Step 'Pester' {
         return
     }
     Import-Module Pester -MinimumVersion 5.0.0 -Force
-    $result = Invoke-Pester -Path tests/powershell, tests/bootstrap -Output Detailed -PassThru
+    $result = Invoke-Pester -Path tests/powershell -Output Detailed -PassThru
     if ($result.FailedCount -gt 0) {
         throw "Pester reported $($result.FailedCount) failed test(s)."
     }

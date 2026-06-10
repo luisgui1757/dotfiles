@@ -2,7 +2,7 @@
 # Install path:
 #   macOS  → ~/Library/Application Support/com.mitchellh.ghostty/config
 #   Linux  → ~/.config/ghostty/config
-# (bootstrap.sh symlinks this file to the right location.)
+# (chezmoi manages this file at the OS-specific path.)
 
 # ---- Theme -------------------------------------------------------------------
 theme = dark:Rose Pine,light:Rose Pine Dawn
