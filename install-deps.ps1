@@ -402,29 +402,362 @@ function Install-HackNerdFont {
 }
 
 # ---- VS Code Rose Pine theme -------------------------------------------------
-# Set "workbench.colorTheme" to Rose Pine in %APPDATA%\Code\User\settings.json.
-# The theme label has an accented e; we write it as the JSON escape \u00e9 (this
-# file must stay pure ASCII) or build it with [char]0xE9 for the merge path.
+# Set Rose Pine plus Hack Nerd Font settings in VS Code user settings.
+# The theme label has an accented e. Build it with [char]0xE9 at runtime so
+# this file stays pure ASCII for Windows PowerShell 5.1.
+function Get-VSCodeSettingsSpec {
+    $theme = "Ros$([char]0xE9) Pine"
+    $font = "'Hack Nerd Font', Consolas, monospace"
+    return @(
+        [pscustomobject]@{ Key = 'workbench.colorTheme'; Value = $theme },
+        [pscustomobject]@{ Key = 'editor.fontFamily'; Value = $font },
+        [pscustomobject]@{ Key = 'terminal.integrated.fontFamily'; Value = $font }
+    )
+}
+
+function ConvertTo-JsonStringLiteral {
+    param([Parameter(Mandatory)][string]$Value)
+    return '"' + $Value.Replace('\', '\\').Replace('"', '\"') + '"'
+}
+
+function Test-JsonCWhitespaceChar {
+    param([Parameter(Mandatory)][char]$Char)
+    return (
+        $Char -eq [char]32 -or
+        $Char -eq [char]9 -or
+        $Char -eq [char]10 -or
+        $Char -eq [char]13
+    )
+}
+
+function Get-JsonCTriviaEnd {
+    param(
+        [Parameter(Mandatory)][string]$Text,
+        [Parameter(Mandatory)][int]$Index
+    )
+    $length = $Text.Length
+    while ($Index -lt $length) {
+        $char = $Text[$Index]
+        if (Test-JsonCWhitespaceChar -Char $char) {
+            $Index++
+            continue
+        }
+        if (($char -eq [char]47) -and (($Index + 1) -lt $length)) {
+            $next = $Text[$Index + 1]
+            if ($next -eq [char]47) {
+                $Index += 2
+                while (($Index -lt $length) -and ($Text[$Index] -ne [char]10)) {
+                    $Index++
+                }
+                continue
+            }
+            if ($next -eq [char]42) {
+                $Index += 2
+                while (
+                    (($Index + 1) -lt $length) -and
+                    -not (($Text[$Index] -eq [char]42) -and ($Text[$Index + 1] -eq [char]47))
+                ) {
+                    $Index++
+                }
+                if (($Index + 1) -lt $length) {
+                    $Index += 2
+                }
+                continue
+            }
+        }
+        break
+    }
+    return $Index
+}
+
+function Find-JsonCStringEnd {
+    param(
+        [Parameter(Mandatory)][string]$Text,
+        [Parameter(Mandatory)][int]$Start
+    )
+    $escaped = $false
+    for ($i = $Start + 1; $i -lt $Text.Length; $i++) {
+        $char = $Text[$i]
+        if ($escaped) {
+            $escaped = $false
+            continue
+        }
+        if ($char -eq [char]92) {
+            $escaped = $true
+            continue
+        }
+        if ($char -eq [char]34) {
+            return $i
+        }
+    }
+    return -1
+}
+
+function Find-JsonCValueEnd {
+    param(
+        [Parameter(Mandatory)][string]$Text,
+        [Parameter(Mandatory)][int]$Start
+    )
+    $pos = Get-JsonCTriviaEnd -Text $Text -Index $Start
+    if ($pos -ge $Text.Length) {
+        return -1
+    }
+    $char = $Text[$pos]
+    if ($char -eq [char]34) {
+        return Find-JsonCStringEnd -Text $Text -Start $pos
+    }
+    if (($char -eq [char]123) -or ($char -eq [char]91)) {
+        $curlyDepth = 0
+        $squareDepth = 0
+        $i = $pos
+        while ($i -lt $Text.Length) {
+            $char = $Text[$i]
+            if (($char -eq [char]47) -and (($i + 1) -lt $Text.Length)) {
+                $next = $Text[$i + 1]
+                if ($next -eq [char]47) {
+                    $i += 2
+                    while (($i -lt $Text.Length) -and ($Text[$i] -ne [char]10)) {
+                        $i++
+                    }
+                    continue
+                }
+                if ($next -eq [char]42) {
+                    $i += 2
+                    while (
+                        (($i + 1) -lt $Text.Length) -and
+                        -not (($Text[$i] -eq [char]42) -and ($Text[$i + 1] -eq [char]47))
+                    ) {
+                        $i++
+                    }
+                    if (($i + 1) -lt $Text.Length) {
+                        $i += 2
+                    }
+                    continue
+                }
+            }
+            if ($char -eq [char]34) {
+                $end = Find-JsonCStringEnd -Text $Text -Start $i
+                if ($end -lt 0) {
+                    return -1
+                }
+                $i = $end + 1
+                continue
+            }
+            if ($char -eq [char]123) {
+                $curlyDepth++
+            } elseif ($char -eq [char]125) {
+                $curlyDepth--
+                if (($curlyDepth -eq 0) -and ($squareDepth -eq 0)) {
+                    return $i
+                }
+            } elseif ($char -eq [char]91) {
+                $squareDepth++
+            } elseif ($char -eq [char]93) {
+                $squareDepth--
+                if (($curlyDepth -eq 0) -and ($squareDepth -eq 0)) {
+                    return $i
+                }
+            }
+            $i++
+        }
+        return -1
+    }
+    $endIndex = $pos
+    for ($i = $pos; $i -lt $Text.Length; $i++) {
+        $char = $Text[$i]
+        if (($char -eq [char]44) -or ($char -eq [char]125)) {
+            break
+        }
+        if (($char -eq [char]47) -and (($i + 1) -lt $Text.Length)) {
+            $next = $Text[$i + 1]
+            if (($next -eq [char]47) -or ($next -eq [char]42)) {
+                break
+            }
+        }
+        $endIndex = $i
+    }
+    while (($endIndex -ge $pos) -and (Test-JsonCWhitespaceChar -Char $Text[$endIndex])) {
+        $endIndex--
+    }
+    return $endIndex
+}
+
+function Get-DominantLineEnding {
+    param([Parameter(Mandatory)][string]$Text)
+    $crlf = [regex]::Matches($Text, "`r`n").Count
+    $lf = [regex]::Matches($Text, "`n").Count - $crlf
+    if ($crlf -gt $lf) {
+        return "`r`n"
+    }
+    return "`n"
+}
+
+function Update-VSCodeJsonCSettings {
+    param([Parameter(Mandatory)][string]$Text)
+    $specs = @(Get-VSCodeSettingsSpec)
+    $seen = @{}
+    $replacements = @()
+    $rootIndex = -1
+    $curlyDepth = 0
+    $squareDepth = 0
+    $i = 0
+    while ($i -lt $Text.Length) {
+        $char = $Text[$i]
+        if (($char -eq [char]47) -and (($i + 1) -lt $Text.Length)) {
+            $next = $Text[$i + 1]
+            if ($next -eq [char]47) {
+                $i += 2
+                while (($i -lt $Text.Length) -and ($Text[$i] -ne [char]10)) {
+                    $i++
+                }
+                continue
+            }
+            if ($next -eq [char]42) {
+                $i += 2
+                while (
+                    (($i + 1) -lt $Text.Length) -and
+                    -not (($Text[$i] -eq [char]42) -and ($Text[$i + 1] -eq [char]47))
+                ) {
+                    $i++
+                }
+                if (($i + 1) -lt $Text.Length) {
+                    $i += 2
+                }
+                continue
+            }
+        }
+        if ($char -eq [char]34) {
+            $end = Find-JsonCStringEnd -Text $Text -Start $i
+            if ($end -lt 0) {
+                throw "Invalid JSONC string"
+            }
+            if (($curlyDepth -eq 1) -and ($squareDepth -eq 0)) {
+                $after = Get-JsonCTriviaEnd -Text $Text -Index ($end + 1)
+                if (($after -lt $Text.Length) -and ($Text[$after] -eq [char]58)) {
+                    $key = $Text.Substring($i + 1, $end - $i - 1)
+                    foreach ($spec in $specs) {
+                        if ($key -eq $spec.Key) {
+                            $valueStart = Get-JsonCTriviaEnd -Text $Text -Index ($after + 1)
+                            $valueEnd = Find-JsonCValueEnd -Text $Text -Start $valueStart
+                            if ($valueEnd -lt 0) {
+                                throw "Invalid JSONC value"
+                            }
+                            $seen[$spec.Key] = $true
+                            $replacements += [pscustomobject]@{
+                                Start = $valueStart
+                                End = $valueEnd
+                                Value = (ConvertTo-JsonStringLiteral -Value $spec.Value)
+                            }
+                        }
+                    }
+                }
+            }
+            $i = $end + 1
+            continue
+        }
+        if ($char -eq [char]123) {
+            $curlyDepth++
+            if ($rootIndex -lt 0) {
+                $rootIndex = $i
+            }
+        } elseif ($char -eq [char]125) {
+            $curlyDepth--
+            if ($curlyDepth -lt 0) {
+                $curlyDepth = 0
+            }
+        } elseif ($char -eq [char]91) {
+            $squareDepth++
+        } elseif (($char -eq [char]93) -and ($squareDepth -gt 0)) {
+            $squareDepth--
+        }
+        $i++
+    }
+    if ($rootIndex -lt 0) {
+        throw "Root object not found"
+    }
+    foreach ($replacement in @($replacements | Sort-Object -Property Start -Descending)) {
+        $prefix = if ($replacement.Start -gt 0) { $Text.Substring(0, $replacement.Start) } else { '' }
+        $suffixIndex = $replacement.End + 1
+        $suffix = if ($suffixIndex -lt $Text.Length) { $Text.Substring($suffixIndex) } else { '' }
+        $Text = $prefix + $replacement.Value + $suffix
+    }
+    $missing = @()
+    foreach ($spec in $specs) {
+        if (-not $seen.ContainsKey($spec.Key)) {
+            $missing += $spec
+        }
+    }
+    if ($missing.Count -gt 0) {
+        $lineEnding = Get-DominantLineEnding -Text $Text
+        $first = Get-JsonCTriviaEnd -Text $Text -Index ($rootIndex + 1)
+        $hasExisting = (($first -lt $Text.Length) -and ($Text[$first] -ne [char]125))
+        $insertAt = $rootIndex + 1
+        if (
+            (($insertAt + 1) -lt $Text.Length) -and
+            ($Text[$insertAt] -eq [char]13) -and
+            ($Text[$insertAt + 1] -eq [char]10)
+        ) {
+            $insertAt += 2
+        } elseif (($insertAt -lt $Text.Length) -and ($Text[$insertAt] -eq [char]10)) {
+            $insertAt++
+        }
+        $lines = @()
+        for ($m = 0; $m -lt $missing.Count; $m++) {
+            $line = '  "' + $missing[$m].Key + '": ' + (ConvertTo-JsonStringLiteral -Value $missing[$m].Value)
+            if ($hasExisting -or ($m -lt ($missing.Count - 1))) {
+                $line += ','
+            }
+            $lines += $line
+        }
+        $block = $lineEnding + ($lines -join $lineEnding) + $lineEnding
+        $Text = $Text.Substring(0, $rootIndex + 1) + $block + $Text.Substring($insertAt)
+    }
+    return $Text
+}
+
 function Set-VSCodeTheme {
-    $settings = Join-Path $env:APPDATA "Code\User\settings.json"
-    $dir = Split-Path -Parent $settings
+    param([string]$SettingsPath)
+    if ([string]::IsNullOrWhiteSpace($SettingsPath)) {
+        $SettingsPath = Join-Path $env:APPDATA "Code\User\settings.json"
+    }
+    $dir = Split-Path -Parent $SettingsPath
     if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Force -Path $dir | Out-Null }
     $utf8 = [System.Text.UTF8Encoding]::new($false)   # no BOM
 
-    $raw = if (Test-Path -LiteralPath $settings) { Get-Content -Raw -LiteralPath $settings -ErrorAction SilentlyContinue } else { $null }
+    $raw = if (Test-Path -LiteralPath $SettingsPath) { Get-Content -Raw -LiteralPath $SettingsPath -ErrorAction SilentlyContinue } else { $null }
     if ([string]::IsNullOrWhiteSpace($raw)) {
-        $json = "{`r`n  ""workbench.colorTheme"": ""Ros\u00e9 Pine""`r`n}`r`n"
-        [System.IO.File]::WriteAllText($settings, $json, $utf8)
-        Write-Host ("  set       {0,-26} workbench.colorTheme (new settings.json)" -f "rose-pine (vscode)")
+        $specs = @(Get-VSCodeSettingsSpec)
+        $lines = @()
+        for ($i = 0; $i -lt $specs.Count; $i++) {
+            $comma = if ($i -lt ($specs.Count - 1)) { ',' } else { '' }
+            $lines += ('  "' + $specs[$i].Key + '": ' + (ConvertTo-JsonStringLiteral -Value $specs[$i].Value) + $comma)
+        }
+        $json = "{`r`n" + ($lines -join "`r`n") + "`r`n}`r`n"
+        [System.IO.File]::WriteAllText($SettingsPath, $json, $utf8)
+        Write-Host ("  set       {0,-26} theme and fonts (new settings.json)" -f "rose-pine (vscode)")
         return
     }
     try {
         $obj = $raw | ConvertFrom-Json -ErrorAction Stop
-        $obj | Add-Member -NotePropertyName 'workbench.colorTheme' -NotePropertyValue ("Ros$([char]0xE9) Pine") -Force
-        [System.IO.File]::WriteAllText($settings, ($obj | ConvertTo-Json -Depth 100), $utf8)
-        Write-Host ("  set       {0,-26} workbench.colorTheme (merged)" -f "rose-pine (vscode)")
+        if ($null -eq $obj -or $obj -is [System.Array]) {
+            throw "settings.json root must be an object"
+        }
+        foreach ($spec in @(Get-VSCodeSettingsSpec)) {
+            $obj | Add-Member -NotePropertyName $spec.Key -NotePropertyValue $spec.Value -Force
+        }
+        [System.IO.File]::WriteAllText($SettingsPath, ($obj | ConvertTo-Json -Depth 100), $utf8)
+        Write-Host ("  set       {0,-26} theme and fonts (merged)" -f "rose-pine (vscode)")
     } catch {
-        Write-Host ("  note      set workbench.colorTheme to ""Rose Pine"" in $settings (left untouched: comments/invalid JSON)")
+        $timestamp = Get-Date -Format 'yyyyMMddHHmmssfff'
+        $backup = "$SettingsPath.bak.$timestamp"
+        Copy-Item -LiteralPath $SettingsPath -Destination $backup -Force
+        try {
+            $updated = Update-VSCodeJsonCSettings -Text $raw
+            [System.IO.File]::WriteAllText($SettingsPath, $updated, $utf8)
+            Write-Host ("  set       {0,-26} theme and fonts (jsonc edit; backup: {1})" -f "rose-pine (vscode)", $backup)
+        } catch {
+            Write-Warning ("Could not edit VS Code settings in {0}; backup: {1}" -f $SettingsPath, $backup)
+        }
     }
 }
 
@@ -439,7 +772,7 @@ function Install-VSCodeRosePine {
         return
     }
     if ($DryRun) {
-        Write-Host "  would:    code --install-extension mvllow.rose-pine; set workbench.colorTheme = Rose Pine"
+        Write-Host "  would:    code --install-extension mvllow.rose-pine; set VS Code theme and font settings"
         return
     }
     code --install-extension mvllow.rose-pine 2>$null | Out-Null

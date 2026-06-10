@@ -506,34 +506,334 @@ vscode_settings_path() {
     fi
 }
 
-# Set "workbench.colorTheme":"Rosé Pine" in a VS Code settings.json. The value
-# is a literal é (UTF-8) — it must match the theme label contributed by the
-# mvllow.rose-pine extension exactly. Handles:
-#   - absent/empty  -> write a fresh minimal settings.json
-#   - valid JSON    -> jq-merge the key (preserves existing settings)
-#   - JSONC/no jq   -> leave the file untouched and print an instruction
-#                      (VS Code settings are usually JSONC; never clobber them)
+# Set the VS Code Rose Pine theme plus Hack Nerd Font settings. The theme value
+# is a literal é (UTF-8) because it must match the mvllow.rose-pine label.
+write_vscode_jsonc_settings() {
+    local settings="$1" tmp="$2"
+    local theme="Rosé Pine"
+    local font="'Hack Nerd Font', Consolas, monospace"
+    local cr_count lf_count bare_lf_count use_crlf cr_char lf_char
+    cr_char=$'\r'
+    lf_char=$'\n'
+    cr_count="$(LC_ALL=C tr -cd "$cr_char" < "$settings" | wc -c | tr -d ' ')"
+    lf_count="$(LC_ALL=C tr -cd "$lf_char" < "$settings" | wc -c | tr -d ' ')"
+    bare_lf_count=$((lf_count - cr_count))
+    use_crlf=0
+    if (( cr_count > bare_lf_count )); then
+        use_crlf=1
+    fi
+    awk -v theme="$theme" -v font="$font" -v use_crlf="$use_crlf" '
+function json_quote(s, out) {
+    out = s
+    gsub(/\\/, "\\\\", out)
+    gsub(/"/, "\\\"", out)
+    return "\"" out "\""
+}
+function is_ws(c) {
+    return c == " " || c == "\t" || c == "\r" || c == "\n"
+}
+function skip_trivia(pos, c, n) {
+    while (pos <= len) {
+        c = substr(text, pos, 1)
+        if (is_ws(c)) {
+            pos++
+            continue
+        }
+        if (c == "/" && pos < len) {
+            n = substr(text, pos + 1, 1)
+            if (n == "/") {
+                pos += 2
+                while (pos <= len && substr(text, pos, 1) != "\n") {
+                    pos++
+                }
+                continue
+            }
+            if (n == "*") {
+                pos += 2
+                while (pos < len && !(substr(text, pos, 1) == "*" && substr(text, pos + 1, 1) == "/")) {
+                    pos++
+                }
+                if (pos < len) {
+                    pos += 2
+                }
+                continue
+            }
+        }
+        break
+    }
+    return pos
+}
+function scan_string_end(pos, i, c, escaped) {
+    escaped = 0
+    for (i = pos + 1; i <= len; i++) {
+        c = substr(text, i, 1)
+        if (escaped) {
+            escaped = 0
+            continue
+        }
+        if (c == "\\") {
+            escaped = 1
+            continue
+        }
+        if (c == "\"") {
+            return i
+        }
+    }
+    return 0
+}
+function find_value_end(pos, i, c, n, end, curly, square) {
+    pos = skip_trivia(pos)
+    if (pos > len) {
+        return 0
+    }
+    c = substr(text, pos, 1)
+    if (c == "\"") {
+        return scan_string_end(pos)
+    }
+    if (c == "{" || c == "[") {
+        curly = 0
+        square = 0
+        i = pos
+        while (i <= len) {
+            c = substr(text, i, 1)
+            if (c == "/" && i < len) {
+                n = substr(text, i + 1, 1)
+                if (n == "/") {
+                    i += 2
+                    while (i <= len && substr(text, i, 1) != "\n") {
+                        i++
+                    }
+                    continue
+                }
+                if (n == "*") {
+                    i += 2
+                    while (i < len && !(substr(text, i, 1) == "*" && substr(text, i + 1, 1) == "/")) {
+                        i++
+                    }
+                    if (i < len) {
+                        i += 2
+                    }
+                    continue
+                }
+            }
+            if (c == "\"") {
+                i = scan_string_end(i)
+                if (i == 0) {
+                    return 0
+                }
+            } else if (c == "{") {
+                curly++
+            } else if (c == "}") {
+                curly--
+                if (curly == 0 && square == 0) {
+                    return i
+                }
+            } else if (c == "[") {
+                square++
+            } else if (c == "]") {
+                square--
+                if (curly == 0 && square == 0) {
+                    return i
+                }
+            }
+            i++
+        }
+        return 0
+    }
+    end = pos
+    for (i = pos; i <= len; i++) {
+        c = substr(text, i, 1)
+        if (c == "," || c == "}") {
+            break
+        }
+        if (c == "/" && i < len) {
+            n = substr(text, i + 1, 1)
+            if (n == "/" || n == "*") {
+                break
+            }
+        }
+        end = i
+    }
+    while (end >= pos && is_ws(substr(text, end, 1))) {
+        end--
+    }
+    return end
+}
+{
+    lines[++line_count] = $0
+}
+END {
+    keys[1] = "workbench.colorTheme"
+    keys[2] = "editor.fontFamily"
+    keys[3] = "terminal.integrated.fontFamily"
+    values[1] = json_quote(theme)
+    values[2] = json_quote(font)
+    values[3] = json_quote(font)
+    eol = use_crlf ? "\r\n" : "\n"
+
+    for (i = 1; i <= line_count; i++) {
+        line = lines[i]
+        sub(/\r$/, "", line)
+        text = text line eol
+    }
+    len = length(text)
+    root = 0
+    curly = 0
+    square = 0
+    i = 1
+    while (i <= len) {
+        c = substr(text, i, 1)
+        if (c == "/" && i < len) {
+            n = substr(text, i + 1, 1)
+            if (n == "/") {
+                i += 2
+                while (i <= len && substr(text, i, 1) != "\n") {
+                    i++
+                }
+                continue
+            }
+            if (n == "*") {
+                i += 2
+                while (i < len && !(substr(text, i, 1) == "*" && substr(text, i + 1, 1) == "/")) {
+                    i++
+                }
+                if (i < len) {
+                    i += 2
+                }
+                continue
+            }
+        }
+        if (c == "\"") {
+            end = scan_string_end(i)
+            if (end == 0) {
+                exit 2
+            }
+            if (curly == 1 && square == 0) {
+                after = skip_trivia(end + 1)
+                if (after <= len && substr(text, after, 1) == ":") {
+                    key = substr(text, i + 1, end - i - 1)
+                    for (k = 1; k <= 3; k++) {
+                        if (key == keys[k]) {
+                            vstart = skip_trivia(after + 1)
+                            vend = find_value_end(vstart)
+                            if (vend == 0) {
+                                exit 2
+                            }
+                            seen[k] = 1
+                            rep_count++
+                            rep_start[rep_count] = vstart
+                            rep_end[rep_count] = vend
+                            rep_value[rep_count] = values[k]
+                        }
+                    }
+                }
+            }
+            i = end + 1
+            continue
+        }
+        if (c == "{") {
+            curly++
+            if (root == 0) {
+                root = i
+            }
+        } else if (c == "}") {
+            curly--
+            if (curly < 0) {
+                curly = 0
+            }
+        } else if (c == "[") {
+            square++
+        } else if (c == "]" && square > 0) {
+            square--
+        }
+        i++
+    }
+    if (root == 0) {
+        exit 2
+    }
+    for (r = rep_count; r >= 1; r--) {
+        text = substr(text, 1, rep_start[r] - 1) rep_value[r] substr(text, rep_end[r] + 1)
+    }
+    len = length(text)
+    missing_count = 0
+    for (k = 1; k <= 3; k++) {
+        if (!seen[k]) {
+            missing_count++
+            missing_keys[missing_count] = keys[k]
+            missing_values[missing_count] = values[k]
+        }
+    }
+    if (missing_count > 0) {
+        first = skip_trivia(root + 1)
+        has_existing = first <= len && substr(text, first, 1) != "}"
+        insert_at = root + 1
+        if (substr(text, insert_at, 2) == "\r\n") {
+            insert_at += 2
+        } else if (substr(text, insert_at, 1) == "\n") {
+            insert_at++
+        }
+        block = eol
+        for (m = 1; m <= missing_count; m++) {
+            line = "  \"" missing_keys[m] "\": " missing_values[m]
+            if (has_existing || m < missing_count) {
+                line = line ","
+            }
+            block = block line eol
+        }
+        text = substr(text, 1, root) block substr(text, insert_at)
+    }
+    printf "%s", text
+}
+' "$settings" > "$tmp"
+}
+
+# Handles:
+#   - absent/empty -> write a fresh minimal settings.json
+#   - valid JSON -> jq-merge the top-level settings
+#   - JSONC -> comment-aware top-level edit with a timestamped backup
 set_vscode_theme() {
     local settings="${1:-}"
+    local theme="Rosé Pine"
+    local font="'Hack Nerd Font', Consolas, monospace"
     [[ -n "$settings" ]] || settings="$(vscode_settings_path)"
     mkdir -p "$(dirname "$settings")" 2>/dev/null || true
     if [[ ! -s "$settings" ]]; then
-        printf '{\n  "workbench.colorTheme": "Rosé Pine"\n}\n' > "$settings"
-        printf "  set       %-26s workbench.colorTheme (new settings.json)\n" "rose-pine (vscode)"
+        printf '{\n  "workbench.colorTheme": "%s",\n  "editor.fontFamily": "%s",\n  "terminal.integrated.fontFamily": "%s"\n}\n' \
+            "$theme" "$font" "$font" > "$settings"
+        printf "  set       %-26s theme and fonts (new settings.json)\n" "rose-pine (vscode)"
         return 0
     fi
     if have jq && jq -e . "$settings" >/dev/null 2>&1; then
         local tmp; tmp="$(mktemp)"
-        if jq '. + {"workbench.colorTheme":"Rosé Pine"}' "$settings" > "$tmp"; then
+        if jq --arg theme "$theme" --arg font "$font" \
+            '. + {
+                "workbench.colorTheme": $theme,
+                "editor.fontFamily": $font,
+                "terminal.integrated.fontFamily": $font
+            }' "$settings" > "$tmp"; then
             mv "$tmp" "$settings"
-            printf "  set       %-26s workbench.colorTheme (merged)\n" "rose-pine (vscode)"
+            printf "  set       %-26s theme and fonts (merged)\n" "rose-pine (vscode)"
         else
             rm -f "$tmp"
-            echo "  WARN: could not merge theme into $settings"
+            echo "  WARN: could not merge VS Code settings into $settings"
         fi
         return 0
     fi
-    echo "  note      set workbench.colorTheme to \"Rose Pine\" in $settings (left untouched: comments / no jq)"
+    local backup timestamp
+    timestamp="$(date +%Y%m%d%H%M%S)"
+    backup="$settings.bak.$timestamp"
+    while [[ -e "$backup" ]]; do
+        backup="$settings.bak.$timestamp.$RANDOM"
+    done
+    cp "$settings" "$backup"
+    local tmp; tmp="$(mktemp)"
+    if write_vscode_jsonc_settings "$settings" "$tmp"; then
+        mv "$tmp" "$settings"
+        printf "  set       %-26s theme and fonts (jsonc edit; backup: %s)\n" "rose-pine (vscode)" "$backup"
+    else
+        rm -f "$tmp"
+        echo "  WARN: could not edit VS Code settings in $settings (backup: $backup)"
+    fi
     return 0
 }
 
@@ -1318,7 +1618,7 @@ configure_vscode_rose_pine() {
         return
     fi
     if [[ "$DRY_RUN" -eq 1 ]]; then
-        echo "  would: code --install-extension mvllow.rose-pine; set workbench.colorTheme = Rose Pine"
+        echo "  would: code --install-extension mvllow.rose-pine; set VS Code theme and font settings"
         return
     fi
     if code --install-extension mvllow.rose-pine >/dev/null 2>&1; then

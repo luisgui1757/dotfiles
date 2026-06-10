@@ -393,3 +393,144 @@ Describe "install-deps.ps1" {
         ($script:ScoopArgs | Where-Object { $_ -like 'update*' }).Count | Should -Be 0
     }
 }
+
+Describe "Set-VSCodeTheme" {
+    BeforeAll {
+        . $script:ImportInstallDepsForTest
+        $script:ExpectedTheme = "Ros$([char]0xE9) Pine"
+        $script:ExpectedFont = "'Hack Nerd Font', Consolas, monospace"
+        $script:Utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+        $script:VSCodeThemeTempDirs = @()
+
+        function New-SettingsPath {
+            $dir = Join-Path ([System.IO.Path]::GetTempPath()) ([System.Guid]::NewGuid().ToString('N'))
+            New-Item -ItemType Directory -Force -Path $dir | Out-Null
+            $script:VSCodeThemeTempDirs += $dir
+            return (Join-Path $dir 'settings.json')
+        }
+
+        function Write-TestSettings {
+            param(
+                [Parameter(Mandatory)][string]$Path,
+                [Parameter(Mandatory)][string]$Text
+            )
+            $dir = Split-Path -Parent $Path
+            if (-not (Test-Path -LiteralPath $dir)) {
+                New-Item -ItemType Directory -Force -Path $dir | Out-Null
+            }
+            [System.IO.File]::WriteAllText($Path, $Text, $script:Utf8NoBom)
+        }
+
+        function Read-TestSettings {
+            param([Parameter(Mandatory)][string]$Path)
+            return [System.IO.File]::ReadAllText($Path)
+        }
+
+        function Read-StrictSettings {
+            param([Parameter(Mandatory)][string]$Path)
+            return (Read-TestSettings -Path $Path | ConvertFrom-Json)
+        }
+
+        function Get-LiveThemeKeyCount {
+            param([Parameter(Mandatory)][string]$Text)
+            return [regex]::Matches($Text, '(?m)^  "workbench\.colorTheme"\s*:').Count
+        }
+
+        function Test-AllVSCodeSettingsText {
+            param([Parameter(Mandatory)][string]$Text)
+            $escapedTheme = [regex]::Escape($script:ExpectedTheme)
+            $escapedFont = [regex]::Escape($script:ExpectedFont)
+            $Text | Should -Match ('"workbench\.colorTheme"\s*:\s*"' + $escapedTheme + '"')
+            $Text | Should -Match ('"editor\.fontFamily"\s*:\s*"' + $escapedFont + '"')
+            $Text | Should -Match ('"terminal\.integrated\.fontFamily"\s*:\s*"' + $escapedFont + '"')
+        }
+    }
+
+    AfterAll {
+        foreach ($dir in $script:VSCodeThemeTempDirs) {
+            Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    It "creates a fresh settings file with theme and font keys" {
+        $settingsPath = New-SettingsPath
+
+        Set-VSCodeTheme -SettingsPath $settingsPath
+
+        $settings = Read-StrictSettings -Path $settingsPath
+        $settings.'workbench.colorTheme' | Should -Be $script:ExpectedTheme
+        $settings.'editor.fontFamily' | Should -Be $script:ExpectedFont
+        $settings.'terminal.integrated.fontFamily' | Should -Be $script:ExpectedFont
+    }
+
+    It "merges strict JSON while preserving existing keys" {
+        $settingsPath = New-SettingsPath
+        Write-TestSettings -Path $settingsPath -Text "{`n  `"editor.fontSize`": 14`n}`n"
+
+        Set-VSCodeTheme -SettingsPath $settingsPath
+
+        $settings = Read-StrictSettings -Path $settingsPath
+        $settings.'editor.fontSize' | Should -Be 14
+        $settings.'workbench.colorTheme' | Should -Be $script:ExpectedTheme
+        $settings.'editor.fontFamily' | Should -Be $script:ExpectedFont
+        $settings.'terminal.integrated.fontFamily' | Should -Be $script:ExpectedFont
+    }
+
+    It "edits JSONC comments in place, preserves CRLF, and stays idempotent" {
+        $settingsPath = New-SettingsPath
+        Write-TestSettings -Path $settingsPath -Text "// header comment`r`n{`r`n  `"editor.fontSize`": 14, // inline`r`n}`r`n"
+
+        Set-VSCodeTheme -SettingsPath $settingsPath
+        $updated = Read-TestSettings -Path $settingsPath
+
+        $updated | Should -Match '// header comment'
+        $updated | Should -Match '// inline'
+        $updated | Should -Match '"editor\.fontSize"\s*:\s*14'
+        $updated.Contains("`r`n") | Should -BeTrue
+        Test-AllVSCodeSettingsText -Text $updated
+        (Get-LiveThemeKeyCount -Text $updated) | Should -Be 1
+        @(Get-ChildItem -LiteralPath (Split-Path -Parent $settingsPath) -Filter 'settings.json.bak.*').Count | Should -Be 1
+
+        Set-VSCodeTheme -SettingsPath $settingsPath
+        $updatedAgain = Read-TestSettings -Path $settingsPath
+        (Get-LiveThemeKeyCount -Text $updatedAgain) | Should -Be 1
+    }
+
+    It "replaces an existing JSONC top-level theme without duplicating it" {
+        $settingsPath = New-SettingsPath
+        Write-TestSettings -Path $settingsPath -Text "{`n  // keep this comment`n  `"workbench.colorTheme`": `"Old`",`n  `"editor.fontSize`": 14`n}`n"
+
+        Set-VSCodeTheme -SettingsPath $settingsPath
+        $updated = Read-TestSettings -Path $settingsPath
+
+        (Get-LiveThemeKeyCount -Text $updated) | Should -Be 1
+        $updated | Should -Not -Match '"workbench\.colorTheme"\s*:\s*"Old"'
+        $updated | Should -Match '// keep this comment'
+        Test-AllVSCodeSettingsText -Text $updated
+    }
+
+    It "ignores commented-out keys and string value mentions" {
+        $settingsPath = New-SettingsPath
+        Write-TestSettings -Path $settingsPath -Text "{`n  // `"workbench.colorTheme`": `"x`"`n  `"notes`": `"workbench.colorTheme inside a string value`",`n  `"editor.fontSize`": 14`n}`n"
+
+        Set-VSCodeTheme -SettingsPath $settingsPath
+        $updated = Read-TestSettings -Path $settingsPath
+
+        $updated | Should -Match '// "workbench\.colorTheme": "x"'
+        $updated | Should -Match '"notes"\s*:\s*"workbench\.colorTheme inside a string value"'
+        (Get-LiveThemeKeyCount -Text $updated) | Should -Be 1
+        Test-AllVSCodeSettingsText -Text $updated
+    }
+
+    It "leaves nested matching keys unchanged" {
+        $settingsPath = New-SettingsPath
+        Write-TestSettings -Path $settingsPath -Text "{`n  // force JSONC fallback`n  `"nested`": {`n    `"workbench.colorTheme`": `"Nested Old`"`n  }`n}`n"
+
+        Set-VSCodeTheme -SettingsPath $settingsPath
+        $updated = Read-TestSettings -Path $settingsPath
+
+        $updated | Should -Match '"workbench\.colorTheme"\s*:\s*"Nested Old"'
+        (Get-LiveThemeKeyCount -Text $updated) | Should -Be 1
+        Test-AllVSCodeSettingsText -Text $updated
+    }
+}

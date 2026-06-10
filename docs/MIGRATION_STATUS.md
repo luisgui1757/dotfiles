@@ -44,7 +44,7 @@ Provisioning stays in `install-deps`, not chezmoi run-scripts:
 - the zsh login-shell switch and domain-account fallback
 - devilspie2 package install, daemon rule, and autostart entry
 - VS Code install, `mvllow.rose-pine` extension install, and
-  `workbench.colorTheme` merge
+  VS Code user settings merge
 - the distro/package-manager matrix and manager fallback policy
 - no-TTY auto-all, best-effort continuation, and dry-run installer semantics
 
@@ -52,8 +52,8 @@ Rationale: re-owning this duplicates the best-tested, highest-risk part of the
 repo for little operational gain.
 
 The canonical split is `chezmoi=dotfiles, install-deps=provisioning`. VS Code
-theme setup stays provisioning-adjacent because it is app-install-gated and
-JSONC-fragile.
+theme/font setup stays provisioning-adjacent because it is app-install-gated and
+depends on the `code` CLI being available.
 
 ## Uninstall
 

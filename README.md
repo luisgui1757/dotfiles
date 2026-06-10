@@ -391,8 +391,9 @@ the adjacent constant.
 - **Rose Pine everywhere it can render.** Nvim, lualine, starship, tmux,
   ghostty, Windows Terminal, PSReadLine — same palette across the stack. VS Code
   joins optionally: `install-deps` offers VS Code, and if `code` is detected it
-  installs the `mvllow.rose-pine` theme and sets `workbench.colorTheme` (existing
-  JSONC settings are left untouched).
+  installs the `mvllow.rose-pine` theme, sets `workbench.colorTheme`, and sets
+  VS Code editor/terminal font families to Hack Nerd Font fallbacks. Existing
+  JSONC settings are edited in place with comments preserved and a backup first.
 - **conform.nvim is the only format-on-save handler.** Replacing the
   prior LSP-attach autocmd + null-ls duo eliminates a real race condition
   with different timeouts. `:WNF` (or `:wnf`) skips formatting for one save.
