@@ -263,7 +263,10 @@ function Test-ExternalDirty {
     try {
         & $git.Source -C $Dir rev-parse --git-dir *> $null
         if ($LASTEXITCODE -ne 0) { return $true }
-        $status = (& $git.Source -C $Dir status --porcelain 2>$null | Out-String)
+        # --ignored so a user file matching the plugin .gitignore (a cache or
+        # build artifact git treats as ignored) still counts as dirty and is
+        # kept; plain --porcelain omits ignored files.
+        $status = (& $git.Source -C $Dir status --porcelain --ignored 2>$null | Out-String)
         return (-not [string]::IsNullOrWhiteSpace($status))
     } catch {
         return $true
@@ -327,3 +330,8 @@ try {
     Write-Host "FAIL: $($_.Exception.Message)"
     exit 1
 }
+
+# Explicit success exit: internal `chezmoi verify` probes leave $LASTEXITCODE=1
+# when a target is user-modified/unmanaged, so without this the script would
+# inherit that nonzero code on an otherwise-successful run.
+exit 0

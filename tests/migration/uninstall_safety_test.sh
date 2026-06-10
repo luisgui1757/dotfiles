@@ -21,7 +21,10 @@ HOME="$(mktemp -d)"
 export HOME
 trap 'rm -rf "$HOME"' EXIT
 
-apply() { chezmoi --source "$SRC" --no-tty --force apply >/dev/null 2>&1; }
+# --refresh-externals on every apply: chezmoi caches externals (refreshPeriod=0)
+# and will NOT re-create one a prior scenario removed, so later scenarios that
+# need the externals back must force a re-fetch.
+apply() { chezmoi --source "$SRC" --no-tty --force --refresh-externals apply >/dev/null 2>&1; }
 
 chezmoi --source "$SRC" init
 apply
@@ -57,5 +60,17 @@ ln -sfn "$REPO_ROOT/home/this-target-does-not-exist" "$HOME/.zshrc"
 "$REPO_ROOT/uninstall.sh" --all --keep-externals >/dev/null 2>&1 || fail "uninstall (scenario C) failed"
 [[ ! -L "$HOME/.zshrc" ]] || fail "broken repo-pointing symlink was not removed"
 pass "broken repo-pointing symlink removed"
+
+# Scenario D: a git-IGNORED user file inside an otherwise clean external is kept.
+# Plain `git status --porcelain` would not report it; the dirty check uses
+# --ignored, so the external is treated as dirty and preserved under --all.
+apply
+ext2="$HOME/.local/share/dotfiles/zsh-plugins/zsh-autosuggestions"
+[[ -d "$ext2" ]] || fail "external missing for scenario D: $ext2"
+printf 'my-cache\n' > "$ext2/.git/info/exclude"
+printf 'user cache data\n' > "$ext2/my-cache"
+"$REPO_ROOT/uninstall.sh" --all >/dev/null 2>&1 || fail "uninstall (scenario D) failed"
+[[ -f "$ext2/my-cache" ]] || fail "git-ignored user file in a clean external was deleted (data loss)"
+pass "git-ignored file in external preserved"
 
 pass "uninstall_safety_test.sh completed"

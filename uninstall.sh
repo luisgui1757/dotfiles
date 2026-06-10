@@ -267,7 +267,10 @@ external_is_dirty() {
     local dir="$1"
     have git || return 0
     git -C "$dir" rev-parse --git-dir >/dev/null 2>&1 || return 0
-    [[ -n "$(git -C "$dir" status --porcelain 2>/dev/null)" ]]
+    # --ignored so a user file that matches the plugin's .gitignore (a cache or
+    # build artifact git treats as ignored) still counts as dirty and is kept,
+    # not silently removed -- plain --porcelain omits ignored files.
+    [[ -n "$(git -C "$dir" status --porcelain --ignored 2>/dev/null)" ]]
 }
 
 remove_externals() {
