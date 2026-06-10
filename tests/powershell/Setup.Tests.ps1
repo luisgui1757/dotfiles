@@ -105,10 +105,6 @@ Describe "setup.ps1 Windows Terminal backup" {
     }
 
     It "copies the pre-merge settings.json without moving it" {
-        # Backup-WindowsTerminalSettings names the backup using the script-scope
-        # $Timestamp (set to the real time at dot-source); pin it so the expected
-        # backup path is deterministic.
-        Set-Variable -Name Timestamp -Scope Script -Value '20000101-000000'
         $settings = Get-WindowsTerminalSettingsPath
         New-Item -ItemType Directory -Force -Path (Split-Path -Parent $settings) | Out-Null
         $preMerge = '{"profiles":{"defaults":{},"list":[]},"actions":[]}'
@@ -116,11 +112,13 @@ Describe "setup.ps1 Windows Terminal backup" {
 
         Backup-WindowsTerminalSettings
 
-        $backup = "$settings.bak.20000101-000000"
-        Test-Path -LiteralPath $settings -PathType Leaf | Should -BeTrue
-        Test-Path -LiteralPath $backup -PathType Leaf | Should -BeTrue
+        # The backup name uses the runtime $Timestamp; match by pattern rather
+        # than a fixed value (Pester scoping makes pinning $Timestamp unreliable).
+        $backups = @(Get-ChildItem -LiteralPath (Split-Path -Parent $settings) -Filter 'settings.json.bak.*' -ErrorAction SilentlyContinue)
+        Test-Path -LiteralPath $settings -PathType Leaf | Should -BeTrue   # original intact (copy, not move)
+        $backups.Count | Should -BeGreaterThan 0                            # a backup was created
         [System.IO.File]::ReadAllText($settings) | Should -Be $preMerge
-        [System.IO.File]::ReadAllText($backup) | Should -Be $preMerge
+        [System.IO.File]::ReadAllText($backups[0].FullName) | Should -Be $preMerge
     }
 
     It "does not create a backup when Windows Terminal merge is skipped" {
