@@ -11,7 +11,7 @@
 // The fragment intentionally contains ONLY user-authored keys:
 //   - actions (keybindings)
 //   - defaults (font, color scheme)
-//   - copyFormatting / copyOnSelect / initialRows / windowingBehavior
+//   - copyFormatting / copyOnSelect / initialRows / windowingBehavior / launchMode
 //   - the Rose Pine color scheme
 //   - the Rose Pine theme
 //   - useAcrylicInTabRow
@@ -25,6 +25,7 @@
     "copyOnSelect": false,
     "firstWindowPreference": "persistedWindowLayout",
     "initialRows": 50,
+    "launchMode": "maximized",
     "theme": "rose-pine",
     "useAcrylicInTabRow": true,
     "windowingBehavior": "useAnyExisting",
@@ -55,7 +56,7 @@
             "useAcrylic": false,
             "padding": "6, 6, 6, 6",
             "antialiasingMode": "grayscale",
-            "scrollbarState": "hidden"
+            "scrollbarState": "visible"
         }
     },
 

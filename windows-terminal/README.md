@@ -18,11 +18,12 @@ symlinking the file, we keep **only the user-owned keys** in
 
 - `actions` — keybindings.
 - `profiles.defaults` — font (Hack Nerd Font 12), Rose Pine color scheme,
-  acrylic off, padding, antialiasing.
+  acrylic off, padding, antialiasing, `scrollbarState: visible`.
 - `schemes[rose-pine]` — the color scheme definition.
 - `themes[rose-pine]` — the tab/window theme.
 - Top-level: `copyFormatting`, `copyOnSelect`, `initialRows`,
-  `useAcrylicInTabRow`, `windowingBehavior`, `firstWindowPreference`.
+  `useAcrylicInTabRow`, `windowingBehavior`, `firstWindowPreference`,
+  `launchMode` (`maximized` — opens maximized, not fullscreen).
 
 What's intentionally **not** in the fragment: anything WT auto-generates
 (`profiles.list[]`, `defaultProfile` GUID, the per-machine VS / Ubuntu / Azure

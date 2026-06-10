@@ -15,6 +15,7 @@ $script:ManagedGlobals = @(
     'copyOnSelect',
     'firstWindowPreference',
     'initialRows',
+    'launchMode',
     'theme',
     'useAcrylicInTabRow',
     'windowingBehavior'
@@ -503,6 +504,7 @@ function Invoke-ExpectedWindowsTerminalMergeOnly {
     if ($null -ne $fragment.copyOnSelect)          { Set-OrAdd-Property $current 'copyOnSelect'          $fragment.copyOnSelect }
     if ($null -ne $fragment.firstWindowPreference) { Set-OrAdd-Property $current 'firstWindowPreference' $fragment.firstWindowPreference }
     if ($null -ne $fragment.initialRows)           { Set-OrAdd-Property $current 'initialRows'           $fragment.initialRows }
+    if ($null -ne $fragment.launchMode)            { Set-OrAdd-Property $current 'launchMode'            $fragment.launchMode }
     if ($null -ne $fragment.theme)                 { Set-OrAdd-Property $current 'theme'                 $fragment.theme }
     if ($null -ne $fragment.useAcrylicInTabRow)    { Set-OrAdd-Property $current 'useAcrylicInTabRow'    $fragment.useAcrylicInTabRow }
     if ($null -ne $fragment.windowingBehavior)     { Set-OrAdd-Property $current 'windowingBehavior'     $fragment.windowingBehavior }

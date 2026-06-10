@@ -423,7 +423,15 @@ save only**. The next plain `:w` formats normally. Implemented in
   lazygit and Ghostty configs use `.chezmoitemplates/**` plus POSIX
   `symlink_*.tmpl` wrappers and Windows rendered `.tmpl` copies where
   applicable. Windows Terminal is a `modify_` read-modify-write merge, not a
-  symlink or fragment-only replacement. The nvim tree is intentionally NOT
+  symlink or fragment-only replacement. WT opens **maximized** (`launchMode`,
+  not fullscreen) with a **visible** scrollbar (`scrollbarState` in
+  `profiles.defaults`). Adding a new top-level scalar fragment key requires FOUR
+  edits in lockstep or the `windows_apply_test.ps1` deep-compare fails: the
+  fragment (+ its `home/.chezmoitemplates` mirror),
+  `modify_settings.json.ps1.tmpl`, the test mirror
+  `Invoke-ExpectedWindowsTerminalMergeOnly`, and `$script:ManagedGlobals`.
+  `profiles.defaults` is replaced wholesale, so keys inside it (e.g.
+  `scrollbarState`) need no merge-template change. The nvim tree is intentionally NOT
   copied under `home/`: POSIX `home/dot_config/symlink_nvim.tmpl` and Windows
   `home/AppData/Local/symlink_nvim.tmpl` both point at
   `{{ .chezmoi.sourceDir }}/../nvim`, so managed targets resolve to the repo
