@@ -455,6 +455,20 @@ save only**. The next plain `:w` formats normally. Implemented in
   it enforces manifest-driven parity, nvim dir-symlink realpath/content parity,
   single-source byte equality, wrong-OS absence, zsh exact-pin failure behavior,
   and Windows copy-mode + WT merge parity.
+- **`install-deps` provisions chezmoi itself.** Unix setup installs `chezmoi`
+  with Homebrew when brew is the selected manager; native Linux without brew
+  uses the pinned `CHEZMOI_VERSION` release through the same trusted
+  `get.chezmoi.io` installer form as CI, into `~/.local/bin`. Windows setup
+  installs `chezmoi` through the normal Scoop-first `$Catalog` fallback chain
+  (`scoop` -> `winget` -> `choco`). This keeps `make chezmoi` usable after full
+  setup without moving any config application into `setup.*` yet.
+- **`uninstall.sh` / `uninstall.ps1` are greenfield teardown tools, not purge.**
+  They enumerate targets with `chezmoi --source <repo>/home managed --path-style
+  absolute`, remove only repo-owned symlinks or byte-identical Windows
+  copy-mode files, restore newest bootstrap-style `<target>.bak.<timestamp>`
+  backups by default, and leave chezmoi's own config/state alone. Windows
+  Terminal `settings.json` is never deleted because the merge is idempotent but
+  not invertible; use the printed backup path for manual restore if needed.
 - **lazygit binary install paths differ by OS.** Homebrew owns macOS/Linuxbrew,
   Windows setup installs it through Scoop/winget/choco, and native Linux/WSL
   without brew uses a pinned GitHub release tarball with SHA-256 verification.

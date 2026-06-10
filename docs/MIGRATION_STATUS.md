@@ -54,43 +54,79 @@ The canonical split is `chezmoi=dotfiles, install-deps=provisioning`. VS Code
 theme setup stays provisioning-adjacent because it is app-install-gated and
 JSONC-fragile.
 
+## Uninstall
+
+`uninstall.sh` and `uninstall.ps1` are safe teardown tools for greenfield
+testing on a machine that already has the config layer applied. They enumerate
+the layer with `chezmoi --source <repo>/home managed --path-style absolute`,
+then remove only targets they can prove are repo-owned:
+
+- POSIX and Windows symlinks are removed only when their resolved target points
+  inside this checkout (`home/` or the canonical repo tree such as `nvim/`).
+- Windows copy-mode files are removed only when `chezmoi --source <repo>/home
+  verify <target>` confirms they still match the managed state (byte-exact via
+  chezmoi's own logic, with none of the stdout-redirect encoding/CRLF pitfalls a
+  `cat`-and-hash comparison would hit on Windows). User-modified files warn and
+  stay in place.
+- Bootstrap-style backups named `<target>.bak.<timestamp>` are restored after
+  a target is removed. Pass `--no-restore-backups` / `-NoRestoreBackups` to
+  skip restoration.
+- The zsh plugin externals under
+  `~/.local/share/dotfiles/zsh-plugins/{zsh-autocomplete,zsh-autosuggestions}`
+  are removed unless `--keep-externals` / `-KeepExternals` is passed. The
+  scripts warn because those directories are git checkouts and may contain
+  local changes.
+- Windows Terminal `settings.json` is never deleted. The merge is idempotent
+  but not invertible, so the scripts warn and print the newest matching backup
+  path when present.
+
+Both scripts support dry-run and non-interactive flags:
+`--dry-run --all --keep-externals --no-restore-backups` on POSIX, and
+`-DryRun -All -KeepExternals -NoRestoreBackups` on Windows.
+
 ## Owner sign-off / known caveats
 
-- [ ] Windows `nvim` is a directory symlink and therefore still needs Developer
-      Mode or elevation. This is not a regression: `bootstrap.ps1` already
-      symlinks it. The no-Developer-Mode win applies to simple single-file
-      configs copied by `mode = "file"`. The Windows
-      `home/AppData/Local/symlink_nvim.tmpl` target renders a clean, backslash,
-      no-`..` absolute path (`{{ .chezmoi.sourceDir | ... | dir | ... }}\nvim`),
-      not the POSIX `{{ .chezmoi.sourceDir }}/../nvim`. Windows `readlink`
-      returns backslashes and may resolve `..`, so the forward-slash/`..` form
-      never round-trips: chezmoi then reports the symlink as drift-on-every-apply
-      and prompts (`...has changed since chezmoi last wrote it?`), which hangs a
-      non-interactive `chezmoi apply`. The clean backslash form matches what
-      Windows returns, so `verify` stays clean; `windows_apply_test.ps1` also
-      runs chezmoi with `--no-tty --force` so CI can never block on that prompt.
+### Resolved
+
+- [x] Windows `nvim` directory-symlink round-trip is fixed in commit `eed6690`.
+      The Windows template renders a clean, backslash, no-`..` absolute path
+      into repo `nvim/`, so `chezmoi verify` no longer reports perpetual drift.
+      It still needs Developer Mode or elevation because it is a directory
+      symlink, matching `bootstrap.ps1`.
+- [x] The migration ruleset payloads are checked in. The three
+      `chezmoi-parity*` contexts are listed in the repository safeguard files;
+      applying them live is still an owner action.
+- [x] Completed execution/spec plan docs are archived in `docs/archive/`.
+      `docs/MIGRATION_STATUS.md` is the living migration status document.
+
+### Open
+
+- [ ] N-green-runs counter for Wave C: `0 / 10` consecutive green Ubuntu parity
+      runs recorded here. Wave C bootstrap retirement stays blocked until this
+      counter is complete and macOS/Windows parity arms are green.
+- [ ] Making `chezmoi-parity`, `chezmoi-parity-macos`, and
+      `chezmoi-parity-windows` live required checks remains an owner action via
+      `scripts/apply-repo-safeguards.sh`.
 - [ ] `XDG_DATA_HOME` is not modeled for externals. Chezmoi installs zsh plugins
-      to the fixed `.local/share` path, and the verifier checks that same fixed
-      path; an XDG-aware managed root is Wave B.
-- [ ] The Windows PowerShell profile managed by chezmoi is the PowerShell 7 path
-      (`Documents\PowerShell\Microsoft.PowerShell_profile.ps1`). The Windows
-      PowerShell 5.1 path (`Documents\WindowsPowerShell\...`) is intentionally
+      to fixed `.local/share`, and the verifier checks that same fixed path; an
+      XDG-aware managed root is Wave B.
+- [ ] No secrets or `age` tier has been started.
+- [ ] Wave C bootstrap/setup retirement is not authorized. `setup.*` still uses
+      `bootstrap.*`; full chezmoi-native setup remains a planned next step.
+- [ ] The Windows PowerShell profile managed by chezmoi is the PowerShell 7
+      path (`Documents\PowerShell\Microsoft.PowerShell_profile.ps1`). The
+      Windows PowerShell 5.1 path (`Documents\WindowsPowerShell\...`) remains
       out of scope because the repo is pwsh-first. `bootstrap.ps1` still writes
       to `$PROFILE`, which differs by host shell.
 - [ ] The POSIX pwsh profile
       (`~/.config/powershell/Microsoft.PowerShell_profile.ps1`) is intentionally
-      not migrated. `bootstrap.sh` links it only when `pwsh` is present, so it is
-      install-gated and provisioning-adjacent, like VS Code.
+      not migrated. `bootstrap.sh` links it only when `pwsh` is present, so it
+      is install-gated and provisioning-adjacent, like VS Code.
 - [ ] Windows Terminal Preview and redirected `%LOCALAPPDATA%` remain Wave B.
 - [ ] WSL is not parity-supported in the pilot. Chezmoi models WSL as
       `.chezmoi.os = linux` and cannot distinguish it from native Linux, so on
       WSL it would create `~/.config/ghostty/config` even though `bootstrap.sh`
-      skips that path by default. This is a known harmless divergence; WSL-aware
-      gating is Wave B.
+      skips that path by default. This is a known harmless divergence;
+      WSL-aware gating is Wave B.
 - [ ] zsh exact-pin checks re-assert when the pin script changes, not on manual
       checkout drift. `refreshPeriod = "0"` means there is no automatic drift.
-- [ ] No secrets or `age` tier has been started.
-- [ ] Making `chezmoi-parity`, `chezmoi-parity-macos`, and
-      `chezmoi-parity-windows` live required checks is an owner action via
-      `scripts/apply-repo-safeguards.sh`; the checked-in ruleset payload already
-      lists them.

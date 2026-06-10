@@ -332,6 +332,16 @@ Describe "install-deps.ps1" {
         $Catalog['lazygit'].winget | Should -Be 'JesseDuffield.lazygit'
     }
 
+    It "registers chezmoi in the Windows package catalog" {
+        . $script:ImportInstallDepsForTest
+
+        $Catalog.ContainsKey('chezmoi') | Should -BeTrue
+        $BinaryName['chezmoi'] | Should -Be 'chezmoi'
+        $Catalog['chezmoi'].scoop | Should -Be 'chezmoi'
+        $Catalog['chezmoi'].winget | Should -Be 'twpayne.chezmoi'
+        $Catalog['chezmoi'].choco | Should -Be 'chezmoi'
+    }
+
     It "registers Windows Terminal in the Windows package catalog" {
         . $script:ImportInstallDepsForTest
 

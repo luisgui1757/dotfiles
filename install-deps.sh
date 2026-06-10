@@ -20,6 +20,7 @@ EXPERIMENTAL_WSL_GUI="${DOTFILES_EXPERIMENTAL_WSL_GUI:-0}"
 NVIM_LINUX_VERSION="v0.12.2"
 NVIM_LINUX_X86_64_SHA256="31cf85945cb600d96cdf69f88bc68bec814acbff50863c5546adef3a1bcef260"
 NVIM_LINUX_ARM64_SHA256="f697d4e4582b6e4b5c3c26e76e06ce26efa08ba1768e03fd2733fcc422bb0490"
+CHEZMOI_VERSION="v2.70.5"
 LAZYGIT_LINUX_VERSION="v0.62.2"
 LAZYGIT_LINUX_X86_64_SHA256="8b9a4c2d0969cbea92b45c956dd2a44e1ba76900c9df49f1c60984045ce77984"
 LAZYGIT_LINUX_ARM64_SHA256="9ab63dd75a7e9711c4c68a37d77f4334b8099a5d6a3f8fbe8f4e2768b159c9e9"
@@ -722,6 +723,45 @@ install_lazygit() {
     fi
 }
 
+install_chezmoi() {
+    if have chezmoi; then
+        printf "  ok        %-26s already installed\n" "chezmoi"
+        return
+    fi
+
+    if [[ "$PM" == "brew" ]]; then
+        install chezmoi "dotfiles config manager"
+        return
+    fi
+
+    if [[ "$(uname -s)" != "Linux" ]]; then
+        install chezmoi "dotfiles config manager"
+        return
+    fi
+
+    if ! ask "Install chezmoi (dotfiles config manager, pinned ${CHEZMOI_VERSION})?"; then
+        printf "  skipped   %-26s\n" "chezmoi"
+        return
+    fi
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        echo "  would: sh -c \"\$(curl -fsLS get.chezmoi.io)\" -- -b \"\$HOME/.local/bin\" -t \"$CHEZMOI_VERSION\""
+        return
+    fi
+
+    require_downloader || return 1
+    mkdir -p "$HOME/.local/bin"
+    if sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin" -t "$CHEZMOI_VERSION"; then
+        if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
+            PATH="$HOME/.local/bin:$PATH"
+            export PATH
+            hash -r 2>/dev/null || true
+        fi
+        printf "  installed %-26s %s -> %s\n" "chezmoi" "$CHEZMOI_VERSION" "$HOME/.local/bin/chezmoi"
+    else
+        echo "  WARN: chezmoi install failed; continuing"
+    fi
+}
+
 zsh_plugin_root() {
     printf '%s\n' "${XDG_DATA_HOME:-$HOME/.local/share}/dotfiles/zsh-plugins"
 }
@@ -855,6 +895,7 @@ make|make|make|make|make|make|make
 rg|ripgrep|ripgrep|ripgrep|ripgrep|ripgrep|ripgrep
 fd|fd|fd-find|fd-find|fd|fd|fd
 fzf|fzf|fzf|fzf|fzf|fzf|fzf
+chezmoi|chezmoi|||||
 lazygit|lazygit|||||
 starship|starship||||||
 tmux|tmux|tmux|tmux|tmux|tmux|tmux
@@ -1411,6 +1452,7 @@ install_c_toolchain_linux
 install rg "ripgrep, powers Telescope live_grep"
 install fd "fd, powers Telescope find_files"
 install fzf "fuzzy finder: Ctrl-R history, Ctrl-T files, Alt-C cd (zsh wiring in shells/zshrc)"
+install_chezmoi
 install_lazygit
 
 section "prompt"

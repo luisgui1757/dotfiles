@@ -123,6 +123,19 @@ function Invoke-Chezmoi {
     Invoke-CheckedNative -FilePath $script:Chezmoi -Arguments (@('--source', $script:SourceDir, '--no-tty', '--force') + $Arguments)
 }
 
+function Invoke-ChezmoiReapply {
+    param([Parameter(Mandatory)] [string[]]$Arguments)
+    # Idempotency / second-apply check: --no-tty but deliberately NO --force. The
+    # first apply uses --force (a pre-existing seeded target may legitimately need
+    # an overwrite); the re-apply must be a clean no-op. Without --force, an
+    # unexpected prompt aborts non-interactively (nonzero exit) instead of being
+    # silently overwritten -> a prompt-on-reapply regression fails the test fast
+    # rather than being masked. This is the strict idempotency oracle the Unix
+    # parity gate already has (it captures second-apply output and fails on
+    # non-empty); this keeps the Windows arm honest too.
+    Invoke-CheckedNative -FilePath $script:Chezmoi -Arguments (@('--source', $script:SourceDir, '--no-tty') + $Arguments)
+}
+
 function Get-ArrayValue {
     param($Value)
     if ($null -eq $Value) {
@@ -602,7 +615,8 @@ function Invoke-Part1 {
             Invoke-Chezmoi -Arguments @('apply')
             Assert-Part1Files -Sandbox $sandbox
             Assert-Part1WtMerge -SettingsPath $settingsPath
-            Invoke-Chezmoi -Arguments @('apply')
+            # Second apply must be a prompt-free no-op (NO --force; see wrapper).
+            Invoke-ChezmoiReapply -Arguments @('apply')
             Invoke-Chezmoi -Arguments @('verify')
         }
         Pass 'part 1 real apply smoke passed'

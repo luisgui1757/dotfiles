@@ -2,7 +2,7 @@
 # current OS; sub-targets skip themselves with a clear message when the
 # tool they depend on isn't installed.
 
-.PHONY: test test-nvim test-shell test-starship test-tmux test-ghostty test-bootstrap test-static validate-renovate lint setup setup-dryrun install dryrun deps deps-dryrun help
+.PHONY: test test-nvim test-shell test-starship test-tmux test-ghostty test-bootstrap test-static validate-renovate lint setup setup-dryrun install dryrun deps deps-dryrun chezmoi chezmoi-diff help
 
 REPO := $(shell pwd)
 
@@ -26,6 +26,10 @@ help:
 	@echo "  deps-dryrun     — preview phase 1"
 	@echo "  install         — phase 2 only: symlink configs"
 	@echo "  dryrun          — preview phase 2"
+	@echo
+	@echo "chezmoi (config layer):"
+	@echo "  chezmoi         — apply the config layer with chezmoi (config only, no deps)"
+	@echo "  chezmoi-diff    — preview what chezmoi would change (dry run)"
 
 setup:
 	@bash setup.sh
@@ -44,6 +48,14 @@ install:
 
 dryrun:
 	@bash bootstrap.sh --dry-run
+
+# Config-only re-apply via chezmoi (the migrated config layer; no provisioning).
+# Source tree is home/; .chezmoiroot lets remote `chezmoi init --apply` find it too.
+chezmoi:
+	@chezmoi --source $(REPO)/home apply
+
+chezmoi-diff:
+	@chezmoi --source $(REPO)/home diff
 
 test: test-static lint test-nvim test-shell test-starship test-tmux test-ghostty test-bootstrap
 	@echo

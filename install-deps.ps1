@@ -177,6 +177,7 @@ $Catalog = @{
     starship             = @{ winget = 'Starship.Starship';                choco = 'starship';             scoop = 'starship'             ; purpose = 'cross-shell prompt' }
     rg                   = @{ winget = 'BurntSushi.ripgrep.MSVC';          choco = 'ripgrep';              scoop = 'ripgrep'              ; purpose = 'Telescope live_grep backend' }
     fd                   = @{ winget = 'sharkdp.fd';                       choco = 'fd';                   scoop = 'fd'                   ; purpose = 'Telescope find_files backend' }
+    chezmoi              = @{ winget = 'twpayne.chezmoi';                  choco = 'chezmoi';              scoop = 'chezmoi'              ; purpose = 'dotfiles config manager' }
     lazygit              = @{ winget = 'JesseDuffield.lazygit';            choco = 'lazygit';              scoop = 'lazygit'              ; purpose = 'terminal git UI' }
     wt                   = @{ winget = 'Microsoft.WindowsTerminal';        choco = 'microsoft-windows-terminal'; scoop = 'extras/windows-terminal'; purpose = 'Windows Terminal host for PowerShell and WSL' }
     make                 = @{ winget = 'GnuWin32.Make';                    choco = 'make';                 scoop = 'make'                 ; purpose = 'plugin builds (LuaSnip jsregexp)' }
@@ -196,6 +197,7 @@ $Catalog = @{
 $BinaryName = @{
     rg          = 'rg'
     fd          = 'fd'
+    chezmoi     = 'chezmoi'
     lazygit     = 'lazygit'
     wt          = 'wt'
     nvim        = 'nvim'
@@ -546,6 +548,7 @@ Install-One nvim
 Install-One make
 Install-One rg
 Install-One fd
+Install-One chezmoi
 Install-One lazygit
 
 Section "prompt"

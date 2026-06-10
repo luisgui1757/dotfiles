@@ -208,6 +208,10 @@ jobs:
         run: |
           set -euo pipefail
           PATH="$HOME/.local/bin:$PATH" bash tests/migration/parity_gate.sh
+      - name: Greenfield round-trip uninstall
+        run: |
+          set -euo pipefail
+          PATH="$HOME/.local/bin:$PATH" bash tests/migration/greenfield_roundtrip.sh
       - name: Windows template render/parse/merge (pwsh)
         run: |
           set -euo pipefail
@@ -243,6 +247,10 @@ jobs:
         run: |
           set -euo pipefail
           PATH="$HOME/.local/bin:$PATH" bash tests/migration/parity_gate.sh
+      - name: Greenfield round-trip uninstall
+        run: |
+          set -euo pipefail
+          PATH="$HOME/.local/bin:$PATH" bash tests/migration/greenfield_roundtrip.sh
       - name: Oracle (negative) tests
         run: |
           set -euo pipefail
@@ -284,3 +292,11 @@ jobs:
             $PSNativeCommandUseErrorActionPreference = $true
           }
           .\tests\migration\windows_apply_test.ps1
+      - name: Windows greenfield round-trip uninstall
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (Get-Variable -Name PSNativeCommandUseErrorActionPreference -ErrorAction SilentlyContinue) {
+            $PSNativeCommandUseErrorActionPreference = $true
+          }
+          .\tests\migration\windows_roundtrip_test.ps1

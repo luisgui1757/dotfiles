@@ -8,17 +8,14 @@ formatter provisioning.
 The public interface is intentionally small:
 
 ```text
-run setup -> install dependencies -> link configs -> sync Neovim plugins -> sync Mason tools
+run setup -> install programs -> link configs -> sync Neovim plugins -> sync Mason tools
 ```
 
-The lower-level scripts exist for debugging those phases. For a fresh machine,
-or for a coworker trying this setup cold, run `setup`.
-
-The legacy setup path and the chezmoi migration now coexist. `setup.sh`,
-`setup.ps1`, `bootstrap.*`, and `install-deps.*` remain supported; chezmoi can
-also manage the config layer from `home/`. See
-[docs/MIGRATION_STATUS.md](docs/MIGRATION_STATUS.md) for the owner-facing split:
-chezmoi owns dotfiles, while `install-deps` still owns provisioning.
+For a fresh machine, run `setup`. The split is deliberate:
+`install-deps` installs programs and optional tooling; chezmoi owns the
+dotfiles/config layer in `home/`. Today the full setup scripts still apply
+configs through `bootstrap.*`; a fully chezmoi-native setup path is a planned
+next step, not current behavior.
 
 ## Quick Start
 
@@ -59,28 +56,6 @@ elevated PowerShell, then return to a normal shell for
 `.\setup.ps1 -SkipDeps -SkipBootstrap`. Do not elevate the whole `setup.ps1`
 run; Scoop refuses admin installs.
 
-## What Setup Does
-
-`setup` is a four-phase, idempotent orchestrator:
-
-```text
-setup -> install-deps                 phase 1: packages and optional tools
-      -> bootstrap                    phase 2: symlink or merge configs
-      -> nvim "+Lazy! sync" +qa       phase 3: plugins
-      -> nvim "+MasonToolsInstallSync" +qa  phase 4: LSP servers and formatters
-```
-
-Pass `--all` / `-All` for explicit non-interactive installs (Y to every prompt).
-When setup detects redirected stdin/stdout and neither all nor dry-run was
-requested, it defaults to all and prints `note: no TTY detected; running with
---all` (or `-All`). An interactive run (no all flag) still opens with a single
-**"install EVERYTHING without further prompts? [Y/n]"** question — answer `Y`
-to pull the lot in one go, or `n` to choose per tool.
-Add `--dry-run` / `-DryRun` to preview every step without touching disk.
-
-Every script is safe to rerun. Pre-existing non-symlink targets are backed up to
-`<target>.bak.<timestamp>` with collision-proof suffixes (`.1`, `.2`, ...).
-
 ### Existing Checkout
 
 ```bash
@@ -99,31 +74,88 @@ make setup                       # same as ./setup.sh, via the Makefile
 .\setup.ps1 -MergeWindowsTerminal     # accepted no-op alias; WT merge is default-on
 ```
 
-### chezmoi (config layer)
+### Config Layer (chezmoi)
 
-From an existing checkout, chezmoi can apply the config layer directly from
-`home/`:
+Chezmoi is the config-only path. It manages dotfiles from `home/`; it does not
+install programs, fonts, VS Code, psmux, login shells, or other provisioning
+steps. Run `install-deps.sh` / `install-deps.ps1` or full `setup` for those.
+
+The remote one-liner works because `.chezmoiroot` points chezmoi at `home/`:
 
 ```bash
-chezmoi --source "$PWD/home" init
-chezmoi --source "$PWD/home" apply
+chezmoi init --apply luisgui1757/dotfiles
+```
+
+From an existing checkout, initialize once so `home/.chezmoi.toml.tmpl` writes
+the local OS data, then re-apply or preview the config layer:
+
+```bash
+chezmoi --source ./home init
+make chezmoi
+make chezmoi-diff
+```
+
+or:
+
+```bash
+chezmoi --source ./home apply
+chezmoi --source ./home diff
+```
+
+### Uninstall
+
+Use the uninstall scripts to remove the chezmoi-managed config layer from a
+machine before greenfield testing:
+
+```bash
+./uninstall.sh --all
+./uninstall.sh --dry-run
+./uninstall.sh --keep-externals
+./uninstall.sh --no-restore-backups
 ```
 
 ```powershell
-chezmoi --source "$PWD\home" init
-chezmoi --source "$PWD\home" apply
+.\uninstall.ps1 -All
+.\uninstall.ps1 -DryRun
+.\uninstall.ps1 -KeepExternals
+.\uninstall.ps1 -NoRestoreBackups
 ```
 
-This manages dotfiles config only. Run `install-deps.sh` or `install-deps.ps1`
-for packages, pinned binaries/fonts, shell adoption, VS Code, devilspie2, and
-other provisioning.
+They remove only repo-owned symlinks or byte-identical Windows copies, restore
+the newest `<target>.bak.<timestamp>` backup by default, and leave chezmoi's own
+state/config alone. Windows Terminal `settings.json` is never deleted: the merge
+is idempotent but not invertible, so restore manually from the printed backup if
+you want to undo it.
+
+## What Setup Does
+
+`setup` is a four-phase, idempotent orchestrator:
+
+```text
+setup -> install-deps                 phase 1: programs and optional tools
+      -> bootstrap                    phase 2: symlink or merge configs
+      -> nvim "+Lazy! sync" +qa       phase 3: plugins
+      -> nvim "+MasonToolsInstallSync" +qa  phase 4: LSP servers and formatters
+```
+
+Pass `--all` / `-All` for explicit non-interactive installs (Y to every prompt).
+When setup detects redirected stdin/stdout and neither all nor dry-run was
+requested, it defaults to all and prints `note: no TTY detected; running with
+--all` (or `-All`). An interactive run (no all flag) still opens with a single
+**"install EVERYTHING without further prompts? [Y/n]"** question — answer `Y`
+to pull the lot in one go, or `n` to choose per tool.
+Add `--dry-run` / `-DryRun` to preview every step without touching disk.
+
+Every script is safe to rerun. Pre-existing non-symlink targets are backed up to
+`<target>.bak.<timestamp>` with collision-proof suffixes (`.1`, `.2`, ...).
 
 ### Managed Configs
 
-The table below is the config layer managed by the legacy bootstrap path and,
-for the migrated targets, by chezmoi. Mechanisms differ: POSIX chezmoi uses
-symlinks for single files, Windows chezmoi copies single files, Neovim remains a
-directory symlink, and Windows Terminal remains a merge.
+The table below is the config layer. Full setup applies it today through
+`bootstrap.*`; chezmoi owns the migrated source under `home/` for config-only
+apply. Mechanisms differ: POSIX chezmoi uses symlinks for single files, Windows
+chezmoi copies single files, Neovim remains a directory symlink, and Windows
+Terminal remains a merge.
 
 | Tool | macOS | Linux / WSL | Windows |
 |---|---|---|---|
@@ -148,6 +180,9 @@ shell and whether `pwsh` is installed.
   not enough: tmux and new terminals keep launching bash until `chsh` or the
   domain-account fallback is accepted. The prompt is consent-gated and auto-yes
   under `--all`.
+- `install-deps` provisions chezmoi itself: Homebrew on macOS/Linuxbrew,
+  pinned `get.chezmoi.io` release on native Linux without brew, and the
+  Scoop-first catalog on Windows.
 - zsh plugins are installed by Unix setup as repo-managed pinned git checkouts:
   `zsh-autocomplete` and `zsh-autosuggestions` live under
   `${XDG_DATA_HOME:-$HOME/.local/share}/dotfiles/zsh-plugins`. `zshrc` sources
