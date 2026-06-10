@@ -51,6 +51,7 @@ deref() {
 manifest_entries() {
     cat <<'EOF'
 tmux.conf|config-file|.tmux.conf|.tmux.conf|tmux/tmux.conf|home/dot_tmux.conf
+tmux.posix.conf|config-file|.tmux.posix.conf|.tmux.posix.conf|tmux/tmux.posix.conf|home/dot_tmux.posix.conf
 tmux.windows.conf|config-file|||tmux/tmux.windows.conf|home/dot_tmux.windows.conf
 lazygit config|config-file|Library/Application Support/lazygit/config.yml|.config/lazygit/config.yml|lazygit/config.yml|home/.chezmoitemplates/lazygit/config.yml
 nvim|nvim|.config/nvim|.config/nvim|nvim|

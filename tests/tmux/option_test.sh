@@ -11,8 +11,17 @@ fi
 session_name="dotfiles-opt-$$"
 sock_name="dotfiles-opt-$$"
 
+# Hermetic HOME so the baseline check below is real: tmux.conf does
+# `source-file -q "~/.tmux.posix.conf"`, and if the runner already has that
+# overlay deployed in its real HOME, the POSIX probes would rebind copy-mode `y`
+# and mask the OSC52 baseline we are asserting. An empty temp HOME guarantees the
+# overlay is absent; we source it explicitly later for the pbcopy assertion.
+isolated_home="$(mktemp -d)"
+export HOME="$isolated_home"
+
 cleanup() {
     tmux -L "$sock_name" kill-server >/dev/null 2>&1 || true
+    rm -rf "$isolated_home"
 }
 trap cleanup EXIT
 
@@ -84,6 +93,34 @@ order="$(tmux -L "$sock_name" list-windows -F '#{window_index}:#{window_name}' |
 if [[ "$order" != *"1:two 2:one"* ]]; then
     echo "FAIL: tmux relative swap-window did not move the current window left: $order"
     exit 1
+fi
+
+# Copy-mode `y` baseline. The session above booted with `-f tmux/tmux.conf`,
+# whose `source-file -q "~/.tmux.posix.conf"` is a no-op under the isolated HOME
+# (the overlay is absent). So only the psmux-safe OSC52 baseline applies: `y`
+# must be bound to a BARE `copy-pipe-and-cancel` with NO pipe command after it.
+# The `$` anchor is load-bearing -- a probe rebind appends a pipe argument
+# (e.g. `... copy-pipe-and-cancel pbcopy`), and without the anchor this assertion
+# would pass even when the overlay had leaked in and masked the baseline.
+copy_keys="$(tmux -L "$sock_name" list-keys -T copy-mode-vi)"
+if ! printf '%s\n' "$copy_keys" | grep -Eq 'copy-mode-vi[[:space:]]+y[[:space:]]+send(-keys)?[[:space:]]+-X[[:space:]]+copy-pipe-and-cancel[[:space:]]*$'; then
+    echo "FAIL: copy-mode-vi y must be a BARE OSC52 copy-pipe-and-cancel (no pipe command)"
+    printf '%s\n' "$copy_keys" | grep -E 'copy-mode-vi[[:space:]]+y[[:space:]]' || true
+    exit 1
+fi
+echo "  copy-mode-vi y baseline bound (bare OSC52, no shell probe)"
+
+# Sourcing the POSIX overlay re-binds `y` to the platform's native clipboard CLI.
+# On macOS that is pbcopy; assert it there (Linux CI has no single guaranteed
+# CLI installed). This proves the extracted if-shell probes still work on POSIX.
+tmux -L "$sock_name" source-file "$REPO_ROOT/tmux/tmux.posix.conf"
+if [[ "$(uname -s)" == "Darwin" ]]; then
+    overlay_keys="$(tmux -L "$sock_name" list-keys -T copy-mode-vi)"
+    if ! printf '%s\n' "$overlay_keys" | grep -Eq 'copy-mode-vi[[:space:]]+y[[:space:]]+send.*copy-pipe-and-cancel.*pbcopy'; then
+        echo "FAIL: tmux.posix.conf overlay must rebind copy-mode-vi y to pbcopy on macOS"
+        exit 1
+    fi
+    echo "  tmux.posix.conf overlay rebinds y -> pbcopy on macOS"
 fi
 
 echo "OK"

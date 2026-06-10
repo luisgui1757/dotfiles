@@ -153,6 +153,8 @@ try {
 
             Assert-CopyModeFilePresent -Path (Join-Path $sandbox '.tmux.conf')
             Assert-CopyModeFilePresent -Path (Join-Path $sandbox '.tmux.windows.conf')
+            Assert-Condition (-not (Test-Path -LiteralPath (Join-Path $sandbox '.tmux.posix.conf'))) `
+                '~/.tmux.posix.conf must NOT be deployed on Windows (psmux config-load freeze boundary)'
             Assert-CopyModeFilePresent -Path (Join-Path $sandbox '.config\starship.toml')
             Assert-CopyModeFilePresent -Path (Join-Path $sandbox 'Documents\PowerShell\Microsoft.PowerShell_profile.ps1')
             Assert-NvimSymlinkPresent -Sandbox $sandbox

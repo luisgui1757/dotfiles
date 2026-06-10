@@ -50,6 +50,17 @@ check_absent "bare-Esc kill-whole-line bindkey gone (Meta prefix shadow)" \
     --exclude-dir=.git --exclude-dir=tests \
     shells/
 
+# psmux freeze guard. The native-clipboard probes use `if-shell`, which spawns a
+# shell at config-LOAD time; under psmux/ConPTY on Windows that shell never
+# returns and hangs the whole config load. Those probes live ONLY in the
+# POSIX-only tmux.posix.conf overlay (sourced via `source-file -q`, absent on
+# Windows). The cross-platform tmux.conf -- and its byte-identical chezmoi mirror
+# -- must contain NO command-position `if-shell`. tmux.posix.conf legitimately
+# does, so it is deliberately NOT in this check's file set.
+check_absent "no load-time if-shell in cross-platform tmux.conf (psmux freeze guard)" \
+    "^[[:space:]]*if-shell" \
+    tmux/tmux.conf home/dot_tmux.conf
+
 # Lazy-load discipline: only rose-pine should be lazy=false
 nonlazy=$(grep -lE "lazy[[:space:]]*=[[:space:]]*false" nvim/lua/plugins/*.lua 2>/dev/null | grep -v rose-pine.lua || true)
 if [[ -n "$nonlazy" ]]; then

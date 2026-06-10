@@ -67,6 +67,7 @@ managed_rels_for_host() {
         Darwin)
             cat <<'EOF'
 .tmux.conf
+.tmux.posix.conf
 .config/nvim
 .config/starship.toml
 .zshenv
@@ -78,6 +79,7 @@ EOF
         Linux)
             cat <<'EOF'
 .tmux.conf
+.tmux.posix.conf
 .config/ghostty/config
 .config/lazygit/config.yml
 .config/nvim

@@ -345,6 +345,12 @@ function Assert-Part1Files {
         -ActualPath (Join-Path $Sandbox '.tmux.windows.conf') `
         -ExpectedPath (Join-Path $script:RepoRoot 'tmux\tmux.windows.conf') `
         -Label '~/.tmux.windows.conf'
+    # psmux freeze boundary: the POSIX-only clipboard overlay carries the
+    # `if-shell` probes that hang psmux at config-load time. It MUST NOT be
+    # deployed on Windows (home/.chezmoiignore ignores it). Assert its absence so
+    # a regression in the ignore rule can never silently reintroduce the freeze.
+    Assert-Condition (-not (Test-Path -LiteralPath (Join-Path $Sandbox '.tmux.posix.conf'))) `
+        '~/.tmux.posix.conf must NOT be deployed on Windows (psmux config-load freeze boundary)'
     Assert-CopyModeFileMatches `
         -ActualPath (Join-Path $Sandbox 'AppData\Local\lazygit\config.yml') `
         -ExpectedPath (Join-Path $script:RepoRoot 'lazygit\config.yml') `

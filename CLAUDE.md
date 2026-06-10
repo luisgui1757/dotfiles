@@ -567,11 +567,38 @@ save only**. The next plain `:w` formats normally. Implemented in
   Windows reuses the *same* `tmux/tmux.conf` we maintain for Unix — one source
   of truth, Rose Pine carries over, no parallel config. Chezmoi manages
   `%USERPROFILE%\.tmux.conf` from `tmux\tmux.conf` (mirrors the Unix
-  `~/.tmux.conf` target). If the Unix-shaped `if-shell` clipboard block ever
-  chokes under ConPTY on a given machine, guard that block rather than fork the
-  config. Install-Psmux is NOT in the `$Catalog` because scoop needs a custom
+  `~/.tmux.conf` target). Install-Psmux is NOT in the `$Catalog` because scoop needs a custom
   psmux bucket URL; it passes that URL through `Add-ScoopBucketSafe`, then
   falls through to winget / choco if the bucket clone or scoop install fails.
+- **The clipboard `if-shell` probes are POSIX-ONLY (`tmux/tmux.posix.conf`) —
+  they FREEZE psmux.** `if-shell 'command -v pbcopy …'` spawns a shell at
+  config-**load** time. Under psmux/ConPTY on Windows that shell never returns:
+  the pane initializes but never finishes rendering, the orphaned probe shells
+  pin CPU, and a `conhost.exe` leaks per session (plus an "auth failed, retry
+  works" stale-server artifact). So the five native-CLI probes
+  (pbcopy→wl-copy→xclip→xsel→win32yank) live in a **POSIX-only overlay**
+  `tmux/tmux.posix.conf`, managed as `~/.tmux.posix.conf` by chezmoi on Unix/WSL
+  and **ignored on Windows** in `home/.chezmoiignore` (mirror of how
+  `.tmux.windows.conf` is ignored off-Windows). The cross-platform
+  `tmux/tmux.conf` keeps only a psmux-safe OSC52 baseline
+  (`bind -T copy-mode-vi y send -X copy-pipe-and-cancel`, no shell) and
+  `source-file -q "~/.tmux.posix.conf"` — a silent no-op on Windows where the
+  file is absent (same proven mechanism as the Windows overlay source). On POSIX
+  the overlay re-binds `y` to the native CLI when one exists. This is the
+  canonical "guard the block, don't fork the config" fix. **Invariant:** the
+  cross-platform `tmux/tmux.conf` (and its `home/dot_tmux.conf` mirror) must
+  contain NO command-position `if-shell` — guarded by `invariants_test.sh`
+  ("psmux freeze guard") and `tests/tmux/option_test.sh` (baseline binds with no
+  shell probe; the overlay rebinds `y`→pbcopy on macOS), plus a Windows apply
+  absence assertion (`tests/migration/windows_apply_test.ps1` +
+  `windows_roundtrip_test.ps1`: `~/.tmux.posix.conf` must NOT exist on Windows).
+  Native-Windows copy-mode `y` is rebound to built-in `clip.exe` in
+  `tmux/tmux.windows.conf` (runs at copy time, not load time — psmux-safe — and
+  does not depend on unverified OSC52-through-ConPTY). One-time cleanup on an
+  already-broken Windows box (orphaned servers/conhost + any stale overlay from
+  prior loads):
+  `Remove-Item -LiteralPath "$HOME\.tmux.posix.conf" -Force -ErrorAction SilentlyContinue; taskkill /F /T /IM psmux.exe`
+  then reopen the terminal.
 - **psmux + PSReadLine: Windows-only overlay, two settings.** psmux's default
   shell is **cmd**, not pwsh — which is the *real* reason "history prediction"
   and `MenuComplete` looked broken inside panes: PSReadLine was never loaded.
