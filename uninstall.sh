@@ -264,13 +264,15 @@ external_is_dirty() {
     # uncommitted/staged change or untracked file as user work to preserve. If
     # git is unavailable or the path is not a git repo, cleanliness cannot be
     # verified, so err on the safe side and treat it as dirty.
-    local dir="$1"
+    local dir="$1" status
     have git || return 0
     git -C "$dir" rev-parse --git-dir >/dev/null 2>&1 || return 0
     # --ignored so a user file that matches the plugin's .gitignore (a cache or
     # build artifact git treats as ignored) still counts as dirty and is kept,
-    # not silently removed -- plain --porcelain omits ignored files.
-    [[ -n "$(git -C "$dir" status --porcelain --ignored 2>/dev/null)" ]]
+    # not silently removed -- plain --porcelain omits ignored files. If the
+    # status query itself fails, cleanliness is unknown -> treat as dirty.
+    status="$(git -C "$dir" status --porcelain --ignored 2>/dev/null)" || return 0
+    [[ -n "$status" ]]
 }
 
 remove_externals() {

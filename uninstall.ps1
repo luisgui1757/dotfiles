@@ -267,6 +267,8 @@ function Test-ExternalDirty {
         # build artifact git treats as ignored) still counts as dirty and is
         # kept; plain --porcelain omits ignored files.
         $status = (& $git.Source -C $Dir status --porcelain --ignored 2>$null | Out-String)
+        # If the status query itself fails, cleanliness is unknown -> dirty.
+        if ($LASTEXITCODE -ne 0) { return $true }
         return (-not [string]::IsNullOrWhiteSpace($status))
     } catch {
         return $true
