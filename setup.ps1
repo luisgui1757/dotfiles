@@ -439,6 +439,12 @@ function New-ChezmoiDryRunConfig {
 
 function Invoke-ChezmoiApplyPhase {
     if (-not (Get-Command chezmoi -ErrorAction SilentlyContinue)) {
+        if ($DryRun) {
+            # The dogfood dry-run runs BEFORE Phase 1 installs chezmoi; preview
+            # rather than fail (a real run has chezmoi on PATH after Phase 1).
+            Write-Step "would    chezmoi (installed in Phase 1) backs up divergent configs, then 'chezmoi apply'"
+            return
+        }
         Write-Host "  FAIL: chezmoi is not on PATH after Phase 1" -ForegroundColor Red
         Write-Host "        Re-run without -SkipDeps, or install chezmoi first." -ForegroundColor Yellow
         exit 1

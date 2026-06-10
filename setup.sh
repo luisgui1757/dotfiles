@@ -319,12 +319,17 @@ refresh_runtime_path
 if [[ "$SKIP_BOOTSTRAP" -eq 0 ]]; then
     phase "Phase 2/4: apply configs with chezmoi"
     if ! command -v chezmoi >/dev/null 2>&1; then
-        echo "  FAIL: chezmoi is not on PATH after Phase 1"
-        echo "        Re-run without --skip-deps, or install chezmoi first."
-        exit 1
-    fi
-
-    if [[ "$DRY_RUN" -eq 1 ]]; then
+        if [[ "$DRY_RUN" -eq 1 ]]; then
+            # The dogfood dry-run runs BEFORE Phase 1 installs chezmoi; preview
+            # rather than fail (a real run has chezmoi on PATH after Phase 1).
+            echo "  would: chezmoi (installed in Phase 1) backs up any divergent"
+            echo "         pre-existing config, then 'chezmoi apply' the config layer"
+        else
+            echo "  FAIL: chezmoi is not on PATH after Phase 1"
+            echo "        Re-run without --skip-deps, or install chezmoi first."
+            exit 1
+        fi
+    elif [[ "$DRY_RUN" -eq 1 ]]; then
         CHEZMOI_DRY_CONFIG="$(mktemp)"
         render_chezmoi_config_template "$CHEZMOI_DRY_CONFIG"
         CHEZMOI_CONFIG_ARGS=(--config "$CHEZMOI_DRY_CONFIG" --config-format toml)
