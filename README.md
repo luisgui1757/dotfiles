@@ -56,6 +56,36 @@ elevated PowerShell with `.\setup.ps1 -SkipDeps -SkipNvim`, then return to a
 normal shell for `.\setup.ps1 -SkipDeps -SkipConfig`. Do not elevate the whole
 dependency-install run; Scoop refuses admin installs.
 
+### Upgrading from a pre-chezmoi install
+
+If you already ran an older (pre-chezmoi) version, just re-run setup — it now
+applies the config layer through chezmoi and is backwards-safe:
+
+```bash
+git -C ~/dotfiles pull        # or %USERPROFILE%\dotfiles on Windows
+./setup.sh --all              # macOS / Linux / WSL
+```
+
+```powershell
+.\setup.ps1 -All              # Windows
+```
+
+Setup installs chezmoi if missing, then **backs up any pre-chezmoi config that
+differs** to `<file>.bak.<timestamp>` before chezmoi writes the managed version
+(a pre-existing file or symlink whose content already matches is left as-is — no
+junk backup). Windows Terminal `settings.json` is backed up and merged in place;
+VS Code `settings.json` is edited in place with your comments preserved. Nothing
+is deleted. On Windows, if you ran an older psmux that froze on the previous
+`tmux.conf`, clear orphaned processes once after upgrading:
+
+```powershell
+Remove-Item -LiteralPath "$HOME\.tmux.posix.conf" -Force -ErrorAction SilentlyContinue
+taskkill /F /T /IM psmux.exe   # then reopen Windows Terminal
+```
+
+Restart Windows Terminal and VS Code afterward so the fonts/theme/launch mode
+apply.
+
 ### Existing Checkout
 
 ```bash
