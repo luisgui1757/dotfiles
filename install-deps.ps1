@@ -715,6 +715,32 @@ function Update-VSCodeJsonCSettings {
     return $Text
 }
 
+# String-aware detector for JSONC comments. PowerShell 7 ConvertFrom-Json
+# TOLERATES // and /* */ comments (Windows PowerShell 5.1 and jq do not), so the
+# strict-JSON fast path below would silently reformat a commented settings.json
+# and DELETE the user comments. Gate the fast path on this returning false: only
+# a // or /* outside a string counts (a "https://" inside a string value does
+# not). Mirrors the comment handling in Update-VSCodeJsonCSettings.
+function Test-JsonTextHasComment {
+    param([Parameter(Mandatory)][string]$Text)
+    $i = 0
+    while ($i -lt $Text.Length) {
+        $c = $Text[$i]
+        if ($c -eq [char]34) {
+            $end = Find-JsonCStringEnd -Text $Text -Start $i
+            if ($end -lt 0) { return $true }
+            $i = $end + 1
+            continue
+        }
+        if (($c -eq [char]47) -and (($i + 1) -lt $Text.Length)) {
+            $n = $Text[$i + 1]
+            if (($n -eq [char]47) -or ($n -eq [char]42)) { return $true }
+        }
+        $i++
+    }
+    return $false
+}
+
 function Set-VSCodeTheme {
     param([string]$SettingsPath)
     if ([string]::IsNullOrWhiteSpace($SettingsPath)) {
@@ -737,27 +763,34 @@ function Set-VSCodeTheme {
         Write-Host ("  set       {0,-26} theme and fonts (new settings.json)" -f "rose-pine (vscode)")
         return
     }
-    try {
-        $obj = $raw | ConvertFrom-Json -ErrorAction Stop
-        if ($null -eq $obj -or $obj -is [System.Array]) {
-            throw "settings.json root must be an object"
-        }
-        foreach ($spec in @(Get-VSCodeSettingsSpec)) {
-            $obj | Add-Member -NotePropertyName $spec.Key -NotePropertyValue $spec.Value -Force
-        }
-        [System.IO.File]::WriteAllText($SettingsPath, ($obj | ConvertTo-Json -Depth 100), $utf8)
-        Write-Host ("  set       {0,-26} theme and fonts (merged)" -f "rose-pine (vscode)")
-    } catch {
-        $timestamp = Get-Date -Format 'yyyyMMddHHmmssfff'
-        $backup = "$SettingsPath.bak.$timestamp"
-        Copy-Item -LiteralPath $SettingsPath -Destination $backup -Force
+    # Strict-JSON fast path ONLY when there are no comments. With comments present
+    # we must use the comment-preserving JSONC editor even on PowerShell 7 (whose
+    # ConvertFrom-Json would otherwise accept and silently strip them).
+    if (-not (Test-JsonTextHasComment -Text $raw)) {
         try {
-            $updated = Update-VSCodeJsonCSettings -Text $raw
-            [System.IO.File]::WriteAllText($SettingsPath, $updated, $utf8)
-            Write-Host ("  set       {0,-26} theme and fonts (jsonc edit; backup: {1})" -f "rose-pine (vscode)", $backup)
+            $obj = $raw | ConvertFrom-Json -ErrorAction Stop
+            if ($null -eq $obj -or $obj -is [System.Array]) {
+                throw "settings.json root must be an object"
+            }
+            foreach ($spec in @(Get-VSCodeSettingsSpec)) {
+                $obj | Add-Member -NotePropertyName $spec.Key -NotePropertyValue $spec.Value -Force
+            }
+            [System.IO.File]::WriteAllText($SettingsPath, ($obj | ConvertTo-Json -Depth 100), $utf8)
+            Write-Host ("  set       {0,-26} theme and fonts (merged)" -f "rose-pine (vscode)")
+            return
         } catch {
-            Write-Warning ("Could not edit VS Code settings in {0}; backup: {1}" -f $SettingsPath, $backup)
+            # Not strict JSON (e.g. trailing commas) -- fall through to the JSONC editor.
         }
+    }
+    $timestamp = Get-Date -Format 'yyyyMMddHHmmssfff'
+    $backup = "$SettingsPath.bak.$timestamp"
+    Copy-Item -LiteralPath $SettingsPath -Destination $backup -Force
+    try {
+        $updated = Update-VSCodeJsonCSettings -Text $raw
+        [System.IO.File]::WriteAllText($SettingsPath, $updated, $utf8)
+        Write-Host ("  set       {0,-26} theme and fonts (jsonc edit; backup: {1})" -f "rose-pine (vscode)", $backup)
+    } catch {
+        Write-Warning ("Could not edit VS Code settings in {0}; backup: {1}" -f $SettingsPath, $backup)
     }
 }
 
