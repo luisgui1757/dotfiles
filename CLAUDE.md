@@ -309,6 +309,9 @@ install paths, not symmetric container platforms:
   WSL after running `.\setup.ps1 -All` on Windows. The Windows Terminal settings
   merge is default-on when `settings.json` already exists.
 
+Local clean-machine harnesses live in `tests/greenfield/README.md`; keep them
+manual VM/Sandbox tools and do not add them to the headless CI matrix.
+
 Main-branch safeguards are canonical in `.github/rulesets/` and applied live by
 `scripts/apply-repo-safeguards.sh`. `.github/settings.yml` is only the classic
 branch-protection fallback for the Probot Settings app; it cannot model the

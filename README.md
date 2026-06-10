@@ -262,6 +262,7 @@ make test               # run everything that can run on this OS
 make validate-renovate  # schema-check renovate.json under Renovate's Node 24
 make lint               # shellcheck everything
 ./tests/wsl/e2e.sh      # manual WSL split-host validation from inside WSL
+./tests/greenfield/docker-greenfield.sh # local clean Ubuntu container e2e
 ```
 
 ```powershell
@@ -282,6 +283,12 @@ Sub-targets skip themselves with a `skipped: <tool> not installed` message
 when their dependency tool is missing on the current machine. In CI, missing
 Windows test dependencies are fatal so the workflow cannot go green by silently
 skipping the actual checks.
+
+For local clean-machine validation, see
+[`tests/greenfield/README.md`](tests/greenfield/README.md). It wraps the
+existing Ubuntu container e2e path, adds Windows Sandbox and throwaway WSL
+launchers, documents macOS fresh-user/VM options, and includes the shared
+post-install validators plus the manual desktop visual checklist.
 
 ## CI Merge Gate
 
@@ -396,6 +403,7 @@ the adjacent constant.
 ├── windows-terminal/      # settings.fragment.jsonc + merge README
 ├── home/                  # chezmoi source tree for the config layer
 ├── tests/                 # automated test tree
+├── tests/greenfield/      # local clean-machine harnesses and validators
 ├── tests/wsl/             # manual WSL split-host e2e check
 ├── .github/workflows/     # CI matrix + chezmoi parity
 ├── .github/rulesets/      # checked-in GitHub ruleset payloads for main
