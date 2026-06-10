@@ -382,6 +382,16 @@ function Stop-NvimSelfLinkIfNeeded {
     if (-not $env:LOCALAPPDATA) { return }
 
     $nvimTarget = Join-Path $env:LOCALAPPDATA 'nvim'
+    $targetItem = Get-Item -LiteralPath $nvimTarget -Force -ErrorAction SilentlyContinue
+    if (-not $targetItem) { return }
+    # An existing SYMLINK/Junction is the normal already-installed case: it points
+    # into the repo, so its resolved value equals <repo>\nvim, but the target
+    # LOCATION is not the repo. chezmoi safely replaces it -- do NOT refuse. Only
+    # a REAL directory AT the target that resolves to the repo root or <repo>\nvim
+    # is a genuine self-overlap (the repo lives there).
+    $linkType = if ($targetItem.PSObject.Properties.Name -contains 'LinkType') { $targetItem.LinkType } else { $null }
+    if ($linkType -eq 'SymbolicLink' -or $linkType -eq 'Junction') { return }
+
     $targetReal = Get-RealExistingPath $nvimTarget
     if (-not $targetReal) { return }
 

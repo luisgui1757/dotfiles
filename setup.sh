@@ -184,6 +184,12 @@ refuse_nvim_self_link_if_needed() {
     local nvim_target="$HOME/.config/nvim" target_real repo_real repo_nvim_real
 
     [[ -e "$nvim_target" || -L "$nvim_target" ]] || return 0
+    # An existing SYMLINK is the normal already-installed case: it points into
+    # the repo, so its dereferenced value equals <repo>/nvim, but the target
+    # LOCATION is not the repo. chezmoi safely replaces it -- do NOT refuse.
+    # Only a REAL (non-symlink) directory AT the target that resolves to the repo
+    # root or <repo>/nvim is a genuine self-overlap (the repo lives there).
+    [[ -L "$nvim_target" ]] && return 0
 
     target_real="$(realpath_or_self "$nvim_target")"
     repo_real="$(realpath_or_self "$SCRIPT_DIR")"

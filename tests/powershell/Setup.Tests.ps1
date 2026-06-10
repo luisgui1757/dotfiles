@@ -105,6 +105,10 @@ Describe "setup.ps1 Windows Terminal backup" {
     }
 
     It "copies the pre-merge settings.json without moving it" {
+        # Backup-WindowsTerminalSettings names the backup using the script-scope
+        # $Timestamp (set to the real time at dot-source); pin it so the expected
+        # backup path is deterministic.
+        Set-Variable -Name Timestamp -Scope Script -Value '20000101-000000'
         $settings = Get-WindowsTerminalSettingsPath
         New-Item -ItemType Directory -Force -Path (Split-Path -Parent $settings) | Out-Null
         $preMerge = '{"profiles":{"defaults":{},"list":[]},"actions":[]}'
