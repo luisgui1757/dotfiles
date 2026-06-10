@@ -179,7 +179,10 @@ try {
             Assert-Condition (Test-Path -LiteralPath "$wtSettings.bak.20000101-000000") 'WT settings backup should remain available'
             Pass 'managed entries removed, backup restored, WT left intact'
 
-            $secondOutput = & $script:UninstallPath -All 2>&1 | Out-String
+            # *>&1 (not 2>&1): uninstall.ps1 prints "nothing to remove" via
+            # Write-Host (information stream 6); 2>&1 only merges the error stream,
+            # so the no-op marker would not be captured.
+            $secondOutput = & $script:UninstallPath -All *>&1 | Out-String
             if ($LASTEXITCODE -ne 0) { throw "second uninstall.ps1 exited $LASTEXITCODE" }
             Assert-Condition ($secondOutput -match 'nothing to remove') 'second uninstall did not report no-op'
             Assert-FileContent -Path $tmuxPath -Expected $preseed -Label 'restored .tmux.conf after second run'
