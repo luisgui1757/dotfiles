@@ -118,6 +118,11 @@ file skipped, broken repo-symlink still cleaned) is covered by
       pre-merge backup, tightened setup's self-link and backup-match guards, and
       made the POSIX parity gate prove config-file targets are symlinks, not
       only content-equivalent files.
+- [x] Windows setup now matches the POSIX backup-match logic for copy-mode
+      targets: `setup.ps1` captures `chezmoi cat` bytes to a temp file, keeps
+      the symlink-reference path branch, and byte-compares ordinary managed
+      files against the captured content before deciding to create a
+      `<target>.bak.<timestamp>` backup.
 
 ### Open
 

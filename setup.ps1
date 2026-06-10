@@ -317,6 +317,41 @@ function Test-FileBytesEqual {
     return $true
 }
 
+function ConvertTo-NativeArgument {
+    param([string]$Value)
+
+    if ($null -eq $Value) { $Value = '' }
+    if ($Value.Length -gt 0 -and $Value -notmatch '[\s"]') { return $Value }
+
+    $builder = New-Object System.Text.StringBuilder
+    $backslashes = 0
+    [void]$builder.Append('"')
+    foreach ($char in $Value.ToCharArray()) {
+        if ($char -eq '\') {
+            $backslashes++
+            continue
+        }
+        if ($char -eq '"') {
+            if ($backslashes -gt 0) {
+                [void]$builder.Append(('\' * ($backslashes * 2)))
+                $backslashes = 0
+            }
+            [void]$builder.Append('\"')
+            continue
+        }
+        if ($backslashes -gt 0) {
+            [void]$builder.Append(('\' * $backslashes))
+            $backslashes = 0
+        }
+        [void]$builder.Append($char)
+    }
+    if ($backslashes -gt 0) {
+        [void]$builder.Append(('\' * ($backslashes * 2)))
+    }
+    [void]$builder.Append('"')
+    return $builder.ToString()
+}
+
 function Test-DirectoryContentEqual {
     param(
         [Parameter(Mandatory)] [string]$Left,
@@ -346,16 +381,59 @@ function Test-DirectoryContentEqual {
 function Test-TargetContentMatchesChezmoi {
     param([Parameter(Mandatory)] [string]$Target)
     $global:LASTEXITCODE = 0
-    $baseArgs = $script:ChezmoiBaseArgs
-    $configArgs = $script:ChezmoiConfigArgs
-    $catOutput = & chezmoi @baseArgs @configArgs cat $Target 2> $null
-    if ($LASTEXITCODE -ne 0) { return $false }
-    $expectedPath = (@($catOutput) -join [Environment]::NewLine).Trim()
-    if (-not $expectedPath -or -not (Test-Path -LiteralPath $expectedPath)) { return $false }
-    if (Test-Path -LiteralPath $expectedPath -PathType Container) {
-        return (Test-DirectoryContentEqual $Target $expectedPath)
+    $expectedFile = [IO.Path]::GetTempFileName()
+    $process = $null
+    try {
+        $arguments = @()
+        if ($script:ChezmoiBaseArgs) { $arguments += @($script:ChezmoiBaseArgs) }
+        if ($script:ChezmoiConfigArgs) { $arguments += @($script:ChezmoiConfigArgs) }
+        $arguments += @('cat', $Target)
+
+        $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+        $startInfo.FileName = 'chezmoi'
+        $startInfo.UseShellExecute = $false
+        $startInfo.RedirectStandardOutput = $true
+        $startInfo.RedirectStandardError = $true
+        $startInfo.CreateNoWindow = $true
+        $startInfo.Arguments = (@($arguments) | ForEach-Object { ConvertTo-NativeArgument $_ }) -join ' '
+
+        $process = New-Object System.Diagnostics.Process
+        $process.StartInfo = $startInfo
+        if (-not $process.Start()) { return $false }
+
+        $stderrTask = $process.StandardError.ReadToEndAsync()
+        $outputStream = [IO.File]::Open($expectedFile, [IO.FileMode]::Create, [IO.FileAccess]::Write, [IO.FileShare]::Read)
+        try {
+            $process.StandardOutput.BaseStream.CopyTo($outputStream)
+        } finally {
+            $outputStream.Dispose()
+        }
+        $process.WaitForExit()
+        $stderrTask.Wait()
+        $global:LASTEXITCODE = $process.ExitCode
+        if ($process.ExitCode -ne 0) { return $false }
+
+        $expectedPath = ([IO.File]::ReadAllText($expectedFile)).Trim()
+        if ($expectedPath -and (Test-Path -LiteralPath $expectedPath)) {
+            if (Test-Path -LiteralPath $expectedPath -PathType Container) {
+                return (Test-DirectoryContentEqual $Target $expectedPath)
+            }
+            if (Test-Path -LiteralPath $expectedPath -PathType Leaf) {
+                return (Test-FileBytesEqual $Target $expectedPath)
+            }
+            return $false
+        }
+
+        if (Test-Path -LiteralPath $Target -PathType Leaf) {
+            return (Test-FileBytesEqual $Target $expectedFile)
+        }
+        return $false
+    } catch {
+        return $false
+    } finally {
+        if ($process) { $process.Dispose() }
+        Remove-Item -LiteralPath $expectedFile -Force -ErrorAction SilentlyContinue
     }
-    return (Test-FileBytesEqual $Target $expectedPath)
 }
 
 function Test-TargetAlreadyMatches {

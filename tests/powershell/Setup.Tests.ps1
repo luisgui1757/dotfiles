@@ -17,6 +17,65 @@ BeforeAll {
     }
 }
 
+$script:ChezmoiCommandForContentTests = Get-Command chezmoi -ErrorAction SilentlyContinue
+
+Describe "setup.ps1 Test-TargetContentMatchesChezmoi copy-mode" -Skip:(-not $script:ChezmoiCommandForContentTests) {
+    BeforeAll {
+        $script:OldUserProfileForContentTest = $env:USERPROFILE
+        $script:ContentTestRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("setup-content-" + [System.Guid]::NewGuid())
+        $script:ContentTestSource = Join-Path $script:ContentTestRoot 'source'
+        $script:ContentTestDest = Join-Path $script:ContentTestRoot 'dest'
+        $script:ContentTestProfile = Join-Path $script:ContentTestRoot 'profile'
+        New-Item -ItemType Directory -Force -Path $script:ContentTestSource, $script:ContentTestDest, $script:ContentTestProfile | Out-Null
+        $env:USERPROFILE = $script:ContentTestProfile
+
+        . $script:ImportSetupForTest
+
+        $script:ContentTestConfig = Join-Path $script:ContentTestRoot 'chezmoi.toml'
+        [System.IO.File]::WriteAllText($script:ContentTestConfig, '', [System.Text.UTF8Encoding]::new($false))
+        $script:ContentTestState = Join-Path $script:ContentTestRoot 'chezmoi-state.boltdb'
+        $script:ChezmoiBaseArgs = @(
+            '--source', $script:ContentTestSource,
+            '--destination', $script:ContentTestDest,
+            '--persistent-state', $script:ContentTestState
+        )
+        $script:ChezmoiConfigArgs = @('--config', $script:ContentTestConfig, '--config-format', 'toml')
+        $script:ProbeBytes = [byte[]](0x70, 0x72, 0x6f, 0x62, 0x65, 0x0d, 0x0a, 0x63, 0x6f, 0x70, 0x79, 0x0a)
+        [System.IO.File]::WriteAllBytes((Join-Path $script:ContentTestSource 'dot_probe'), $script:ProbeBytes)
+
+        $baseArgs = $script:ChezmoiBaseArgs
+        $configArgs = $script:ChezmoiConfigArgs
+        & chezmoi @baseArgs @configArgs --no-tty --force apply
+        if ($LASTEXITCODE -ne 0) {
+            throw "chezmoi apply failed for setup.ps1 content-match test"
+        }
+        $script:ProbeTarget = Join-Path $script:ContentTestDest '.probe'
+    }
+
+    BeforeEach {
+        [System.IO.File]::WriteAllBytes($script:ProbeTarget, $script:ProbeBytes)
+    }
+
+    AfterAll {
+        if ($null -eq $script:OldUserProfileForContentTest) {
+            Remove-Item Env:USERPROFILE -ErrorAction SilentlyContinue
+        } else {
+            $env:USERPROFILE = $script:OldUserProfileForContentTest
+        }
+        Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $script:ContentTestRoot
+    }
+
+    It "returns true when a copy-mode target matches chezmoi cat bytes" {
+        Test-TargetContentMatchesChezmoi $script:ProbeTarget | Should -BeTrue
+    }
+
+    It "returns false when a copy-mode target differs from chezmoi cat bytes" {
+        [System.IO.File]::WriteAllBytes($script:ProbeTarget, [byte[]](0x64, 0x69, 0x66, 0x66, 0x0a))
+
+        Test-TargetContentMatchesChezmoi $script:ProbeTarget | Should -BeFalse
+    }
+}
+
 Describe "setup.ps1 Update-RuntimePath" {
     BeforeEach {
         $script:OldPath = $env:PATH
