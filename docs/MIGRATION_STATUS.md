@@ -73,16 +73,21 @@ then remove only targets they can prove are repo-owned:
   skip restoration.
 - The zsh plugin externals under
   `~/.local/share/dotfiles/zsh-plugins/{zsh-autocomplete,zsh-autosuggestions}`
-  are removed unless `--keep-externals` / `-KeepExternals` is passed. The
-  scripts warn because those directories are git checkouts and may contain
-  local changes.
+  are removed unless `--keep-externals` / `-KeepExternals` is passed. A checkout
+  with uncommitted/untracked changes (or one whose cleanliness cannot be
+  verified) is kept even under `--all`; pass `--force-externals` /
+  `-ForceExternals` to remove it anyway. This protects in-place edits to the
+  vendored plugin clones from being lost.
 - Windows Terminal `settings.json` is never deleted. The merge is idempotent
   but not invertible, so the scripts warn and print the newest matching backup
   path when present.
 
 Both scripts support dry-run and non-interactive flags:
-`--dry-run --all --keep-externals --no-restore-backups` on POSIX, and
-`-DryRun -All -KeepExternals -NoRestoreBackups` on Windows.
+`--dry-run --all --keep-externals --no-restore-backups --force-externals` on
+POSIX, and `-DryRun -All -KeepExternals -NoRestoreBackups -ForceExternals` on
+Windows. Adversarial safety (dirty external preserved, user-replaced managed
+file skipped, broken repo-symlink still cleaned) is covered by
+`tests/migration/uninstall_safety_test.sh`.
 
 ## Owner sign-off / known caveats
 

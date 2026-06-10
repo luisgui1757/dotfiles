@@ -8,7 +8,8 @@ param(
     [switch]$DryRun,
     [switch]$All,
     [switch]$KeepExternals,
-    [switch]$NoRestoreBackups
+    [switch]$NoRestoreBackups,
+    [switch]$ForceExternals
 )
 
 $ErrorActionPreference = 'Stop'
@@ -84,20 +85,20 @@ function Get-NewestBackup {
     $parent = Split-Path -Parent $Target
     $leaf = Split-Path -Leaf $Target
     if (-not (Test-Path -LiteralPath $parent)) { return $null }
-    $matches = @(Get-ChildItem -LiteralPath $parent -Force -ErrorAction SilentlyContinue |
+    $backups = @(Get-ChildItem -LiteralPath $parent -Force -ErrorAction SilentlyContinue |
         Where-Object { $_.Name -like "$leaf.bak.*" } |
         Sort-Object LastWriteTimeUtc -Descending)
-    if ($matches.Count -eq 0) { return $null }
-    return $matches[0].FullName
+    if ($backups.Count -eq 0) { return $null }
+    return $backups[0].FullName
 }
 
 function Add-ParentDirs {
     param([Parameter(Mandatory)] [string]$Path)
-    $home = (Resolve-CanonicalPath -Path $env:USERPROFILE).TrimEnd('\', '/')
+    $userHome = (Resolve-CanonicalPath -Path $env:USERPROFILE).TrimEnd('\', '/')
     $dir = Split-Path -Parent $Path
     while (-not [string]::IsNullOrWhiteSpace($dir)) {
         $canonical = (Resolve-CanonicalPath -Path $dir).TrimEnd('\', '/')
-        if ($canonical -eq $home) { break }
+        if ($canonical -eq $userHome) { break }
         $script:DirCandidates.Add($dir)
         $next = Split-Path -Parent $dir
         if ($next -eq $dir) { break }
@@ -251,6 +252,24 @@ function Remove-EmptyDirs {
     }
 }
 
+function Test-ExternalDirty {
+    # A pinned chezmoi external is a clean detached-HEAD clone. Treat any
+    # uncommitted/staged change or untracked file as user work to preserve. If
+    # git is unavailable or the path is not a git repo, cleanliness cannot be
+    # verified, so err on the safe side and treat it as dirty.
+    param([Parameter(Mandatory)] [string]$Dir)
+    $git = Get-Command git -ErrorAction SilentlyContinue
+    if (-not $git) { return $true }
+    try {
+        & $git.Source -C $Dir rev-parse --git-dir *> $null
+        if ($LASTEXITCODE -ne 0) { return $true }
+        $status = (& $git.Source -C $Dir status --porcelain 2>$null | Out-String)
+        return (-not [string]::IsNullOrWhiteSpace($status))
+    } catch {
+        return $true
+    }
+}
+
 function Remove-Externals {
     if ($KeepExternals) {
         Write-Host "  kept      zsh plugin externals (-KeepExternals)"
@@ -264,7 +283,11 @@ function Remove-Externals {
     foreach ($name in @('zsh-autocomplete', 'zsh-autosuggestions')) {
         $dir = Join-Path $root $name
         if (-not (Test-TargetExists -Path $dir)) { continue }
-        Write-SafeWarning "removing external checkout $dir; it may hold local changes"
+        if ((-not $ForceExternals) -and (Test-ExternalDirty -Dir $dir)) {
+            Write-SafeWarning "keeping ${dir}: uncommitted or unverifiable changes (use -ForceExternals to remove)"
+            $script:Skipped++
+            continue
+        }
         if ($DryRun) {
             Write-Host "  would: remove external $dir"
         } else {

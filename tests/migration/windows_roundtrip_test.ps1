@@ -158,12 +158,20 @@ try {
             Assert-NvimSymlinkPresent -Sandbox $sandbox
             Pass 'managed Windows entries present after apply'
 
+            # Adversarial: a USER-MODIFIED copy must be preserved. uninstall.ps1
+            # removes a Windows copy only when `chezmoi verify` says it still
+            # matches managed state; edit one so verify reports drift -> skip.
+            $tmuxWin = Join-Path $sandbox '.tmux.windows.conf'
+            Add-Content -LiteralPath $tmuxWin -Value '# user local edit'
+            $tmuxWinExpected = Get-Content -Raw -LiteralPath $tmuxWin
+
             & $script:UninstallPath -All
             if ($LASTEXITCODE -ne 0) { throw "uninstall.ps1 exited $LASTEXITCODE" }
             Pass 'uninstall.ps1 -All completed'
 
             Assert-FileContent -Path $tmuxPath -Expected $preseed -Label 'restored .tmux.conf'
-            Assert-Condition (-not (Test-Path -LiteralPath (Join-Path $sandbox '.tmux.windows.conf'))) '.tmux.windows.conf was not removed'
+            Assert-Condition (Test-Path -LiteralPath $tmuxWin) 'user-modified .tmux.windows.conf was deleted (data loss)'
+            Assert-Condition ((Get-Content -Raw -LiteralPath $tmuxWin) -eq $tmuxWinExpected) 'user-modified .tmux.windows.conf content changed'
             Assert-Condition (-not (Test-Path -LiteralPath (Join-Path $sandbox '.config\starship.toml'))) 'starship copy was not removed'
             Assert-Condition (-not (Test-Path -LiteralPath (Join-Path $sandbox 'Documents\PowerShell\Microsoft.PowerShell_profile.ps1'))) 'PowerShell profile copy was not removed'
             Assert-Condition (-not (Test-Path -LiteralPath (Join-Path $sandbox 'AppData\Local\nvim'))) 'nvim symlink was not removed'

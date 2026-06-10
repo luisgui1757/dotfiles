@@ -11,19 +11,23 @@ DRY_RUN=0
 ALL=0
 KEEP_EXTERNALS=0
 RESTORE_BACKUPS=1
+FORCE_EXTERNALS=0
 
 usage() {
     sed -n '2,22p' "$0"
     cat <<'EOF'
 
 Usage:
-  ./uninstall.sh [--dry-run] [--all] [--keep-externals] [--no-restore-backups]
+  ./uninstall.sh [--dry-run] [--all] [--keep-externals]
+                 [--no-restore-backups] [--force-externals]
 
 Flags:
   --dry-run              print the plan, touch nothing
   --all                  non-interactive; accept each removal category
   --keep-externals       keep zsh plugin git checkouts
   --no-restore-backups   do not restore <target>.bak.<timestamp> backups
+  --force-externals      remove zsh plugin checkouts even with uncommitted
+                         changes (default: keep a dirty/unverifiable checkout)
 EOF
 }
 
@@ -33,6 +37,7 @@ for arg in "$@"; do
         --all|-y) ALL=1 ;;
         --keep-externals) KEEP_EXTERNALS=1 ;;
         --no-restore-backups) RESTORE_BACKUPS=0 ;;
+        --force-externals) FORCE_EXTERNALS=1 ;;
         -h|--help) usage; exit 0 ;;
         *) echo "Unknown arg: $arg" >&2; exit 2 ;;
     esac
@@ -72,11 +77,24 @@ realpath_or_self() {
     fi
 }
 
-is_under_repo() {
-    local path_real repo_real
-    path_real="$(realpath_or_self "$1")"
+# Decide repo-ownership of a symlink from its LINK TEXT (readlink), not by
+# realpath-resolving the link itself. realpath on a BROKEN symlink (its repo
+# target was removed) fails and falls back to the link's own path in $HOME,
+# wrongly classifying a repo-owned-but-broken link as "outside repo" and leaving
+# it behind. Resolving the text (absolute, or relative to the link's directory)
+# and normalizing it without requiring the target to exist fixes that.
+link_points_into_repo() {
+    local link="$1" dest="$2" abs repo_real
+    [[ -n "$dest" ]] || return 1
+    case "$dest" in
+        /*) abs="$dest" ;;
+        *)  abs="$(dirname "$link")/$dest" ;;
+    esac
+    if have python3; then
+        abs="$(python3 -c 'import os,sys; print(os.path.normpath(sys.argv[1]))' "$abs" 2>/dev/null || printf '%s' "$abs")"
+    fi
     repo_real="$(realpath_or_self "$REPO_ROOT")"
-    case "$path_real/" in
+    case "$abs/" in
         "$repo_real"/*) return 0 ;;
         *) return 1 ;;
     esac
@@ -204,7 +222,7 @@ remove_managed_target() {
 
     if [[ -L "$target" ]]; then
         link_target="$(readlink "$target" || true)"
-        if is_under_repo "$target"; then
+        if link_points_into_repo "$target" "$link_target"; then
             if [[ "$DRY_RUN" -eq 1 ]]; then
                 echo "  would: remove symlink $target -> $link_target"
             else
@@ -241,6 +259,17 @@ remove_empty_dirs() {
     done < <(awk '{ print length($0) "\t" $0 }' "$DIR_CANDIDATES_FILE" | sort -rn | cut -f2- | awk '!seen[$0]++')
 }
 
+external_is_dirty() {
+    # A pinned chezmoi external is a clean detached-HEAD clone. Treat any
+    # uncommitted/staged change or untracked file as user work to preserve. If
+    # git is unavailable or the path is not a git repo, cleanliness cannot be
+    # verified, so err on the safe side and treat it as dirty.
+    local dir="$1"
+    have git || return 0
+    git -C "$dir" rev-parse --git-dir >/dev/null 2>&1 || return 0
+    [[ -n "$(git -C "$dir" status --porcelain 2>/dev/null)" ]]
+}
+
 remove_externals() {
     local root name dir
     [[ "$KEEP_EXTERNALS" -eq 0 ]] || {
@@ -256,7 +285,11 @@ remove_externals() {
     for name in zsh-autocomplete zsh-autosuggestions; do
         dir="$root/$name"
         target_exists "$dir" || continue
-        warn "removing external checkout $dir; it may hold local changes"
+        if [[ "$FORCE_EXTERNALS" -ne 1 ]] && external_is_dirty "$dir"; then
+            warn "keeping $dir: uncommitted or unverifiable changes (use --force-externals to remove)"
+            skipped=$((skipped + 1))
+            continue
+        fi
         if [[ "$DRY_RUN" -eq 1 ]]; then
             echo "  would: remove external $dir"
         else
