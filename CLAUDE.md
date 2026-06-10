@@ -14,8 +14,8 @@ the install script works, read this too.
 Cross-platform dotfiles: Neovim (lazy.nvim), Starship, Ghostty, Windows
 Terminal, tmux, zshenv/zshrc, PowerShell profile, lazygit. Public installs go
 through `setup.sh` (macOS / Linux / WSL) or `setup.ps1` (Windows), which install
-dependencies, symlink configs, and sync Neovim plugins + Mason tools. The
-underlying bootstrap scripts are **location-independent** (they resolve
+dependencies, apply the chezmoi config layer, and sync Neovim plugins + Mason
+tools. The legacy bootstrap scripts are **location-independent** (they resolve
 `$REPO_ROOT` / `$RepoRoot` from their own path), so the repo can live anywhere —
 `~/dotfiles/`, `~/Documents/dotfiles/`, etc. The remote-clone default in
 `setup.{sh,ps1}` is `~/dotfiles/`, but an in-place clone elsewhere works too.
@@ -23,9 +23,9 @@ Do NOT put the repo at `~/.config/nvim/` — the installer creates that path as 
 symlink **pointing into** the repo, so a repo there would self-overlap (the
 self-link guard refuses this).
 
-The `home/` tree is the coexisting chezmoi source tree for the full config
-layer. It is canonical for chezmoi, but old `setup` / `bootstrap` still runs
-until Wave C retirement. During coexistence, top-level config files and their
+The `home/` tree is the chezmoi source tree for the full config layer. `setup.*`
+now uses it in Phase 2; `bootstrap.*` remains on disk until the explicit Wave C
+deletion stage. During coexistence, top-level config files and their
 `home/` copies/templates must stay byte-identical where the parity manifest says
 so; update both in the same change.
 
@@ -121,10 +121,11 @@ that violates one of these, fix it instead of disabling the test.
     `install-deps.ps1` Scoop-first catalog (`extras/windows-terminal` ->
     `Microsoft.WindowsTerminal` -> `microsoft-windows-terminal`). The app
     install and settings merge are separate code paths (`install-deps.ps1` vs
-    `bootstrap.ps1`), but bootstrap runs the merge by default. Opt out with
-    `-SkipWindowsTerminalMerge`; `-MergeWindowsTerminal` is a retained no-op
-    alias. If `settings.json` is absent because WT has not launched yet, the
-    merge warns and skips so default-on setup does not break an unlaunched WT.
+    chezmoi's `modify_` entry), and setup runs the merge by default. Opt out
+    with `-SkipWindowsTerminalMerge`; `-MergeWindowsTerminal` is a retained
+    no-op alias. If `settings.json` is absent because WT has not launched yet,
+    the merge warns and skips so default-on setup does not break an unlaunched
+    WT.
 16. **tmux uppercase `H`/`L` are window swaps.** Lowercase `h`/`l` stay pane
     focus bindings. Do not replace them with arrow-key bindings unless the
     terminal/psmux behavior has been revalidated.
@@ -292,9 +293,10 @@ install paths, not symmetric container platforms:
   Re-adding another distro requires both a matrix entry in `e2e-install.yml` and
   a matching root-prep branch in `tests/ci/container-e2e.sh`.
 - `setup.sh / ubuntu-24.04`, `setup.sh / macos-15`, and
-  `setup.ps1 / windows-2025` run the real public setup entry points and then
-  rerun Lazy/Mason headless sync. They explicitly fail if setup skips Phase 3-4,
-  emits a `FAIL:` marker, or Mason did not install expected tools.
+  `setup.ps1 / windows-2025` run the real public setup entry points, apply
+  configs through chezmoi in Phase 2, and then rerun Lazy/Mason headless sync.
+  They explicitly fail if setup skips Phase 3-4, emits a `FAIL:` marker, or
+  Mason did not install expected tools.
 - There is no macOS/Windows container analog to add for symmetry. Docker cannot
   model macOS, and Windows containers do not model the real desktop/user-profile
   install surface: Scoop/winget/choco, Developer Mode symlink behavior, font
@@ -384,10 +386,21 @@ save only**. The next plain `:w` formats normally. Implemented in
 
 ## Bootstrap details (don't reinvent these)
 
+- `setup.sh` and `setup.ps1` now call chezmoi for Phase 2 instead of
+  `bootstrap.*`. They run `chezmoi init`, back up pre-existing managed
+  file/symlink targets to `<target>.bak.<timestamp>` only when the target is not
+  already exact chezmoi state, a repo-owned symlink, or byte-identical content,
+  then run `chezmoi --no-tty --force apply`. `--skip-bootstrap` remains a
+  back-compat alias for `--skip-config` / `-SkipConfig`.
+- `setup.ps1` preserves bootstrap's symlink-privilege pre-flight before
+  chezmoi apply because the Windows Neovim target is still a directory symlink:
+  dry-run warns and skips the probe; real runs print elevated/Developer Mode
+  state plus the Developer Mode or elevated-config-step fix before attempting
+  apply.
 - Both installers are **idempotent** — running twice produces zero diffs.
   Tested by `tests/bootstrap/sh_test.bats` (and `ps1_test.ps1` on Windows).
 - `bootstrap.sh` does not require git; it only creates symlinks. `setup.sh`
-  owns cloning and pull/update behavior before bootstrap runs.
+  owns cloning and pull/update behavior before the chezmoi config phase runs.
 - Remote `setup.{sh,ps1}` has exactly one hard prerequisite: `git`, because the
   remote path must clone this repo before it can install everything else. The
   missing-git errors name the canonical first install command (`brew install
@@ -448,9 +461,9 @@ save only**. The next plain `:w` formats normally. Implemented in
   outside the static chezmoi source tree because `bootstrap.sh` links
   `~/.config/powershell/Microsoft.PowerShell_profile.ps1` only when `pwsh` is
   installed. `bootstrap.ps1` writes to `$PROFILE`, which differs by host shell.
-  WSL is not parity-supported in the pilot: chezmoi sees WSL as Linux and would
-  create `~/.config/ghostty/config`, while `bootstrap.sh` skips that path unless
-  `--experimental-wsl-gui` is set; WSL-aware gating is Wave B. The migration oracle is `tests/migration/parity_gate.sh` +
+  WSL is gated through `home/.chezmoi.toml.tmpl`'s `isWsl` data value:
+  `.chezmoiignore` skips Linux Ghostty on WSL unless setup passes the per-run
+  `experimentalWslGui` data override for `--experimental-wsl-gui`. The migration oracle is `tests/migration/parity_gate.sh` +
   `tests/migration/oracle_test.sh` + `tests/migration/windows_apply_test.ps1`;
   it enforces manifest-driven parity, nvim dir-symlink realpath/content parity,
   single-source byte equality, wrong-OS absence, zsh exact-pin failure behavior,
@@ -461,7 +474,7 @@ save only**. The next plain `:w` formats normally. Implemented in
   `get.chezmoi.io` installer form as CI, into `~/.local/bin`. Windows setup
   installs `chezmoi` through the normal Scoop-first `$Catalog` fallback chain
   (`scoop` -> `winget` -> `choco`). This keeps `make chezmoi` usable after full
-  setup without moving any config application into `setup.*` yet.
+  setup before the Phase 2 chezmoi apply.
 - **`uninstall.sh` / `uninstall.ps1` are greenfield teardown tools, not purge.**
   They enumerate targets with `chezmoi --source <repo>/home managed --path-style
   absolute`, remove only repo-owned symlinks or byte-identical Windows
@@ -556,13 +569,14 @@ save only**. The next plain `:w` formats normally. Implemented in
   flips `YES_ALL`/`$All` so the rest runs with no per-item prompts. Skipped when
   `--all`/`--dry-run` was passed or there's no tty (so `curl|bash` and the CI
   `--dry-run --all` dogfood don't hang).
-- **`bootstrap.ps1` reports WHY symlinks fail and how to fix it.** When the
-  symlink probe fails it prints your *elevated* (admin) and *Developer Mode*
-  state, then the two fixes (Developer Mode — no admin, recommended — or an
-  elevated shell), and `exit 1` via `Write-Host` (not `Write-Error`, so no stack
-  trace). `setup.ps1` resets `$LASTEXITCODE` before Phase 2 and stops if
-  bootstrap fails, so nvim sync never runs against un-symlinked configs. Note:
-  don't elevate the whole `setup.ps1` — scoop refuses to run as admin.
+- **Windows symlink pre-flight reports WHY symlinks fail and how to fix it.**
+  `setup.ps1` ports bootstrap's probe before chezmoi apply. When the probe
+  fails it prints your *elevated* (admin) and *Developer Mode* state, then the
+  two fixes (Developer Mode, no admin, recommended; or an elevated config-only
+  setup step), and `exit 1` via `Write-Host` (not `Write-Error`, so no stack
+  trace). This keeps nvim sync from running against unapplied configs. Note:
+  don't elevate the dependency-install run because Scoop refuses to run as
+  admin.
 - **Forcing Ghostty maximize on Linux is WM-side, not config.** `maximize = true`
   is only a hint the compositor may ignore — confirmed on **GNOME 46 / X11**,
   where Mutter does NOT honor it. `install-deps.sh`'s `setup_ghostty_maximize`

@@ -13,9 +13,9 @@ run setup -> install programs -> link configs -> sync Neovim plugins -> sync Mas
 
 For a fresh machine, run `setup`. The split is deliberate:
 `install-deps` installs programs and optional tooling; chezmoi owns the
-dotfiles/config layer in `home/`. Today the full setup scripts still apply
-configs through `bootstrap.*`; a fully chezmoi-native setup path is a planned
-next step, not current behavior.
+dotfiles/config layer in `home/`. The full setup scripts now apply configs
+through chezmoi; `bootstrap.*` remains on disk during the migration window for
+legacy direct use and tests.
 
 ## Quick Start
 
@@ -51,10 +51,10 @@ with `./setup.sh --experimental-wsl-gui` only when you explicitly want a WSLg /
 X11 GUI-terminal experiment.
 
 On Windows, prefer Developer Mode plus a normal PowerShell. If Developer Mode is
-unavailable and you cannot enable it, run just `.\bootstrap.ps1` from an
-elevated PowerShell, then return to a normal shell for
-`.\setup.ps1 -SkipDeps -SkipBootstrap`. Do not elevate the whole `setup.ps1`
-run; Scoop refuses admin installs.
+unavailable and you cannot enable it, run just the config phase from an
+elevated PowerShell with `.\setup.ps1 -SkipDeps -SkipNvim`, then return to a
+normal shell for `.\setup.ps1 -SkipDeps -SkipConfig`. Do not elevate the whole
+dependency-install run; Scoop refuses admin installs.
 
 ### Existing Checkout
 
@@ -63,6 +63,7 @@ run; Scoop refuses admin installs.
 ./setup.sh --all                 # non-interactive
 ./setup.sh --dry-run             # preview
 ./setup.sh --experimental-wsl-gui # WSL-only opt-in for Linux GUI terminal bits
+./setup.sh --skip-config         # skip chezmoi config apply
 make setup                       # same as ./setup.sh, via the Makefile
 ```
 
@@ -70,6 +71,7 @@ make setup                       # same as ./setup.sh, via the Makefile
 .\setup.ps1
 .\setup.ps1 -All
 .\setup.ps1 -DryRun
+.\setup.ps1 -SkipConfig
 .\setup.ps1 -SkipWindowsTerminalMerge # leave WT settings.json untouched
 .\setup.ps1 -MergeWindowsTerminal     # accepted no-op alias; WT merge is default-on
 ```
@@ -133,7 +135,7 @@ you want to undo it.
 
 ```text
 setup -> install-deps                 phase 1: programs and optional tools
-      -> bootstrap                    phase 2: symlink or merge configs
+      -> chezmoi apply                phase 2: config layer with pre-apply backups
       -> nvim "+Lazy! sync" +qa       phase 3: plugins
       -> nvim "+MasonToolsInstallSync" +qa  phase 4: LSP servers and formatters
 ```
@@ -148,14 +150,19 @@ Add `--dry-run` / `-DryRun` to preview every step without touching disk.
 
 Every script is safe to rerun. Pre-existing non-symlink targets are backed up to
 `<target>.bak.<timestamp>` with collision-proof suffixes (`.1`, `.2`, ...).
+Before setup lets `chezmoi --force apply` replace an existing managed target, it
+backs up only targets that are not already correct: exact chezmoi state,
+repo-owned symlinks, and byte-identical content are left alone. On Windows,
+setup still checks Developer Mode/elevation before applying because the Neovim
+directory target remains a symlink even though single-file configs are copies.
 
 ### Managed Configs
 
-The table below is the config layer. Full setup applies it today through
-`bootstrap.*`; chezmoi owns the migrated source under `home/` for config-only
-apply. Mechanisms differ: POSIX chezmoi uses symlinks for single files, Windows
-chezmoi copies single files, Neovim remains a directory symlink, and Windows
-Terminal remains a merge.
+The table below is the config layer. Full setup and config-only applies use the
+chezmoi source under `home/`. Mechanisms differ: POSIX chezmoi uses symlinks for
+single files, Windows chezmoi copies single files, Neovim remains a directory
+symlink, and Windows Terminal remains a merge. Legacy `bootstrap.*` still exists
+during migration but is no longer called by setup.
 
 | Tool | macOS | Linux / WSL | Windows |
 |---|---|---|---|
@@ -166,7 +173,7 @@ Terminal remains a merge.
 | tmux / psmux | `~/.tmux.conf` -> `tmux/tmux.conf` | same | `%USERPROFILE%\.tmux.conf` -> `tmux\tmux.conf` for psmux; WSL uses the Unix path |
 | Ghostty | `~/Library/Application Support/com.mitchellh.ghostty/config` -> `ghostty/config` | native Linux links `~/.config/ghostty/config`; WSL links it only with `--experimental-wsl-gui` | n/a |
 | lazygit | `~/Library/Application Support/lazygit/config.yml` -> `lazygit/config.yml` | `~/.config/lazygit/config.yml` -> `lazygit/config.yml` | `%LOCALAPPDATA%\lazygit\config.yml` -> `lazygit\config.yml` |
-| Windows Terminal | n/a | n/a | app installed by `setup.ps1`; bootstrap merges `windows-terminal/settings.fragment.jsonc` by default; opt out with `-SkipWindowsTerminalMerge`; see [windows-terminal/README.md](windows-terminal/README.md) |
+| Windows Terminal | n/a | n/a | app installed by `setup.ps1`; chezmoi merges `windows-terminal/settings.fragment.jsonc` by default; opt out with `-SkipWindowsTerminalMerge`; see [windows-terminal/README.md](windows-terminal/README.md) |
 
 Chezmoi manages the Windows PowerShell 7 profile path
 `Documents\PowerShell\Microsoft.PowerShell_profile.ps1`. The Windows
@@ -424,9 +431,9 @@ the adjacent constant.
 - **Windows Terminal is a Windows dependency, not just a config target.**
   `install-deps.ps1` installs `wt` through the normal Scoop-first catalog:
   `extras/windows-terminal` -> `Microsoft.WindowsTerminal` -> `microsoft-windows-terminal`.
-  `bootstrap.ps1` then merges the repo-owned visual/keybinding fragment by
-  default; pass `-SkipWindowsTerminalMerge` to opt out. `-MergeWindowsTerminal`
-  remains accepted as a no-op alias for older commands.
+  setup's chezmoi phase then merges the repo-owned visual/keybinding fragment
+  by default; pass `-SkipWindowsTerminalMerge` to opt out.
+  `-MergeWindowsTerminal` remains accepted as a no-op alias for older commands.
 - **Windows Terminal settings.json is NOT symlinked** because WT auto-rewrites
   it. Only the user-owned keys live in `settings.fragment.jsonc`; the install
   script merges them in by name, backs up the pre-merge file, and resets a
@@ -500,7 +507,7 @@ MIT. See `LICENSE`.
 |---|---|---|
 | `<leader>X` keymaps fire `\X` instead of `<Space>X` | mapleader set after lazy.setup somehow | restore the order in `nvim/init.lua` — leader **before** `require("lazy").setup` |
 | Formatter runs twice or shows two BufWritePre autocmds | someone added a second handler outside conform.nvim | `:lua print(#vim.api.nvim_get_autocmds({event="BufWritePre"}))` should be 1; if not, find the second autocmd and delete it |
-| Lazy/Mason says `No C compiler found` | WSL/Linux has `make` but no `cc`/`gcc`/`clang`; some plugin builds compile native code | re-run `./setup.sh --skip-bootstrap` to install the Linux compiler toolchain, or on Ubuntu run `sudo apt-get update && sudo apt-get install -y build-essential`, then `./setup.sh --skip-deps --skip-bootstrap` |
+| Lazy/Mason says `No C compiler found` | WSL/Linux has `make` but no `cc`/`gcc`/`clang`; some plugin builds compile native code | re-run `./setup.sh --skip-config` to install the Linux compiler toolchain, or on Ubuntu run `sudo apt-get update && sudo apt-get install -y build-essential`, then `./setup.sh --skip-deps --skip-config` |
 | Clipboard not crossing host on WSL | `win32yank.exe` not on PATH | install win32yank via scoop on Windows side, ensure WSL PATH picks it up |
 | Starship prompt slow | a disabled language got re-enabled | check `starship/starship.toml` — only `c, go, nodejs, rust, python, conda` should be enabled |
 | Starship shows only the last few folders (or a leading `…/`) | the `[directory]` module was truncating the path | `starship/starship.toml` sets `truncation_length = 0` + `truncate_to_repo = false` for the full path; raise the length or set `truncate_to_repo = true` to shorten again |
@@ -512,6 +519,6 @@ MIT. See `LICENSE`.
 | Ghostty doesn't open maximized | `window-save-state = always` restored an old geometry over `maximize` (macOS only) | `ghostty/config` uses `window-save-state = default` (not `always`) with `maximize = true`; `always` lets the saved size win |
 | Ghostty doesn't load the config | wrong path, or WSL default skip | the install path is `~/Library/Application Support/com.mitchellh.ghostty/config` on macOS and `~/.config/ghostty/config` on native Linux. WSL only links Linux Ghostty config after `./setup.sh --experimental-wsl-gui`; otherwise use Windows Terminal |
 | Windows Terminal lost a profile after merge | WT auto-rewrites — pre-merge backup is at `<settings.json>.bak.<timestamp>` | restore the profile list from the backup |
-| `bootstrap.ps1` errors "cannot create symbolic links" | Developer Mode off and not elevated | `bootstrap.ps1` now reports your *elevated* + *Developer Mode* state and the fix: enable Developer Mode (Settings → Privacy & security → For developers — no admin, recommended) **then** `.\setup.ps1 -SkipDeps`; OR run just `.\bootstrap.ps1` from an elevated PowerShell. Don't elevate the whole `setup.ps1` — scoop refuses to run as admin |
+| `setup.ps1` errors "cannot create symbolic links" | Developer Mode off and not elevated | `setup.ps1` reports your *elevated* + *Developer Mode* state before chezmoi apply. Enable Developer Mode (Settings -> Privacy & security -> For developers, no admin, recommended) **then** `.\setup.ps1 -SkipDeps`; OR run just the config phase elevated with `.\setup.ps1 -SkipDeps -SkipNvim`, then return to a normal shell for `.\setup.ps1 -SkipDeps -SkipConfig`. Don't elevate the dependency-install run because Scoop refuses admin installs |
 | Ghostty won't open maximized on Linux/GNOME | `maximize = true` is a hint the WM may ignore (GNOME Mutter often does) | on **X11**, `install-deps` offers a devilspie2 setup through the native Linux package manager, even when Linuxbrew is the main CLI manager; the rule is keyed on `com.mitchellh.ghostty`. Wayland needs a GNOME Shell extension instead |
 | `install-deps.ps1`: winget `No package found matching input criteria` (exit `-1978335212`) | winget source/catalog flakiness | install-deps now **prefers scoop** and falls back across managers per tool — accept the scoop bootstrap when offered (`irm get.scoop.sh \| iex`) and re-run; scoop carries the cataloged CLI/terminal tools here |

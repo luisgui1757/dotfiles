@@ -168,6 +168,44 @@ assert_nvim_pair() {
     pass "$label: dereferenced nvim tree diff is empty"
 }
 
+assert_config_file_canonical() {
+    local label="$1" rel_path="$2" repo_rel="$3" new_path repo_path new_real new_sha repo_sha
+
+    new_path="$HOME_NEW/$rel_path"
+    repo_path="$REPO_ROOT/$repo_rel"
+
+    [[ -e "$new_path" ]] || fail "$label: missing new path $new_path"
+    [[ -f "$repo_path" ]] || fail "$label: missing canonical repo source $repo_path"
+
+    new_real="$(deref "$new_path")"
+    [[ -f "$new_real" ]] || fail "$label: new target does not dereference to a file: $new_real"
+
+    new_sha="$(sha "$new_real")"
+    repo_sha="$(sha "$repo_path")"
+    [[ "$new_sha" == "$repo_sha" ]] || fail "$label: canonical SHA mismatch new=$new_sha repo=$repo_sha"
+    pass "$label: dereferenced content matches canonical source"
+}
+
+assert_nvim_canonical() {
+    local label="$1" rel_path="$2" repo_rel="$3" new_path new_real expected_real diff_output
+
+    new_path="$HOME_NEW/$rel_path"
+    expected_real="$(deref "$REPO_ROOT/$repo_rel")"
+
+    [[ -e "$new_path" ]] || fail "$label: missing new path $new_path"
+    [[ -L "$new_path" ]] || fail "$label: new path is not a directory symlink: $new_path"
+
+    new_real="$(deref "$new_path")"
+    [[ "$new_real" == "$expected_real" ]] || fail "$label: new symlink resolves to $new_real, expected $expected_real"
+    pass "$label: new side dereferences to repo nvim ($expected_real)"
+
+    if ! diff_output="$(diff -r "$new_real" "$expected_real" 2>&1)"; then
+        printf '%s\n' "$diff_output" >&2
+        fail "$label: dereferenced nvim tree differs from canonical source"
+    fi
+    pass "$label: dereferenced nvim tree matches canonical source"
+}
+
 assert_manifest_pair() {
     local label="$1" entry_type="$2" rel_path="$3"
 
@@ -177,6 +215,22 @@ assert_manifest_pair() {
             ;;
         nvim)
             assert_nvim_pair "$label" "$rel_path"
+            ;;
+        *)
+            fail "$label: unknown manifest type $entry_type"
+            ;;
+    esac
+}
+
+assert_manifest_canonical() {
+    local label="$1" entry_type="$2" rel_path="$3" repo_rel="$4"
+
+    case "$entry_type" in
+        config-file)
+            assert_config_file_canonical "$label" "$rel_path" "$repo_rel"
+            ;;
+        nvim)
+            assert_nvim_canonical "$label" "$rel_path" "$repo_rel"
             ;;
         *)
             fail "$label: unknown manifest type $entry_type"
@@ -242,6 +296,19 @@ assert_manifest_for_host() {
     done < <(manifest_entries)
 }
 
+assert_manifest_canonical_for_host() {
+    local label entry_type darwin_rel linux_rel repo_rel home_rel rel_path
+
+    while IFS='|' read -r label entry_type darwin_rel linux_rel repo_rel home_rel; do
+        rel_path="$(target_rel_for_host "$darwin_rel" "$linux_rel")"
+        if [[ -z "$rel_path" ]]; then
+            pass "$label: skipped on $target_os"
+            continue
+        fi
+        assert_manifest_canonical "$label" "$entry_type" "$rel_path" "$repo_rel"
+    done < <(manifest_entries)
+}
+
 assert_absent_path() {
     local label="$1" rel_path="$2" path
 
@@ -290,37 +357,53 @@ case "$(uname -s)" in
 esac
 pass "detected parity host OS: $target_os"
 
-HOME_OLD="$(mktemp -d)"
+PARITY_CANONICAL_ONLY="${PARITY_CANONICAL_ONLY:-0}"
+HOME_OLD=""
 HOME_NEW="$(mktemp -d)"
-trap 'rm -rf "$HOME_OLD" "$HOME_NEW"' EXIT
+cleanup() {
+    if [[ -n "${HOME_OLD:-}" ]]; then
+        rm -rf "$HOME_OLD"
+    fi
+    rm -rf "$HOME_NEW"
+}
+trap cleanup EXIT
 
-env HOME="$HOME_OLD" "$REPO_ROOT/bootstrap.sh"
-pass "old path bootstrap slice applied"
+if [[ "$PARITY_CANONICAL_ONLY" == "1" ]]; then
+    pass "canonical-only mode enabled; skipping old path bootstrap fixture"
+else
+    HOME_OLD="$(mktemp -d)"
+    env HOME="$HOME_OLD" "$REPO_ROOT/bootstrap.sh"
+    pass "old path bootstrap slice applied"
 
-# Interpolate REPO_ROOT into the command string so install-deps.sh is sourced
-# with EMPTY positional args. Its top-level arg parser (install-deps.sh:38-47)
-# runs on `$@` BEFORE the INSTALL_DEPS_SOURCE_ONLY seam, so a stray "$REPO_ROOT"
-# passed as $1 would be rejected as "Unknown arg" and exit 2.
-# Set YES_ALL=1 AFTER sourcing: install-deps.sh:17 initializes YES_ALL=0 at
-# source time, which clobbers an env-passed YES_ALL=1. Without the auto-accept,
-# install_zsh_plugins' ask() gate (install-deps.sh:199-207) skips the install on
-# a non-interactive stdin and P3/P4 false-FAIL.
-env HOME="$HOME_OLD" INSTALL_DEPS_SOURCE_ONLY=1 bash -c \
-    'source "'"$REPO_ROOT"'/install-deps.sh"; YES_ALL=1; install_zsh_plugins'
-pass "old path zsh plugin slice applied"
+    # Interpolate REPO_ROOT into the command string so install-deps.sh is sourced
+    # with EMPTY positional args. Its top-level arg parser (install-deps.sh:38-47)
+    # runs on `$@` BEFORE the INSTALL_DEPS_SOURCE_ONLY seam, so a stray "$REPO_ROOT"
+    # passed as $1 would be rejected as "Unknown arg" and exit 2.
+    # Set YES_ALL=1 AFTER sourcing: install-deps.sh:17 initializes YES_ALL=0 at
+    # source time, which clobbers an env-passed YES_ALL=1. Without the auto-accept,
+    # install_zsh_plugins' ask() gate (install-deps.sh:199-207) skips the install on
+    # a non-interactive stdin and P3/P4 false-FAIL.
+    env HOME="$HOME_OLD" INSTALL_DEPS_SOURCE_ONLY=1 bash -c \
+        'source "'"$REPO_ROOT"'/install-deps.sh"; YES_ALL=1; install_zsh_plugins'
+    pass "old path zsh plugin slice applied"
+fi
 
 env HOME="$HOME_NEW" chezmoi --source "$SRC" init
 env HOME="$HOME_NEW" chezmoi --source "$SRC" apply
 pass "new path chezmoi apply completed"
 
-assert_manifest_for_host
+if [[ "$PARITY_CANONICAL_ONLY" == "1" ]]; then
+    assert_manifest_canonical_for_host
+else
+    assert_manifest_for_host
 
-assert_plugin_pair \
-    "P3 zsh-autocomplete" \
-    ".local/share/dotfiles/zsh-plugins/zsh-autocomplete"
-assert_plugin_pair \
-    "P4 zsh-autosuggestions" \
-    ".local/share/dotfiles/zsh-plugins/zsh-autosuggestions"
+    assert_plugin_pair \
+        "P3 zsh-autocomplete" \
+        ".local/share/dotfiles/zsh-plugins/zsh-autocomplete"
+    assert_plugin_pair \
+        "P4 zsh-autosuggestions" \
+        ".local/share/dotfiles/zsh-plugins/zsh-autosuggestions"
+fi
 
 assert_single_sources
 assert_wrong_os_absent

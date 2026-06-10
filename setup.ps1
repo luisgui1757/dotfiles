@@ -1,13 +1,14 @@
 # setup.ps1 -- one-shot end-to-end install for Windows.
 #
 # Local usage (from a checked-out copy):
-#   .\setup.ps1                  interactive: Y/n per dep, then symlink + sync
+#   .\setup.ps1                  interactive: Y/n per dep, then config + sync
 #   .\setup.ps1 -All             non-interactive: install everything missing
 #   .\setup.ps1 -DryRun          preview every step
-#   .\setup.ps1 -SkipDeps        already have nvim/starship; just bootstrap+sync
-#   .\setup.ps1 -SkipBootstrap   already symlinked; just sync plugins+LSP
+#   .\setup.ps1 -SkipDeps        already have nvim/starship; just config+sync
+#   .\setup.ps1 -SkipBootstrap   back-compat alias: skip config apply
+#   .\setup.ps1 -SkipConfig      already configured; just sync plugins+LSP
 #   .\setup.ps1 -SkipNvim        skip nvim plugin + Mason sync
-#   .\setup.ps1 -SkipWindowsTerminalMerge   bootstrap+sync but leave WT settings.json untouched
+#   .\setup.ps1 -SkipWindowsTerminalMerge   config+sync but leave WT settings.json untouched
 #   .\setup.ps1 -MergeWindowsTerminal        (no-op alias; the WT rose-pine merge is now default-on)
 #
 # Remote usage (no checkout yet):
@@ -23,6 +24,7 @@ param(
     [switch]$DryRun,
     [switch]$SkipDeps,
     [switch]$SkipBootstrap,
+    [switch]$SkipConfig,
     [switch]$SkipNvim,
     [switch]$MergeWindowsTerminal,   # back-compat no-op: WT merge is now default-on
     [switch]$SkipWindowsTerminalMerge,
@@ -53,7 +55,7 @@ function Update-RuntimePath {
 }
 
 # Test seam: set DOTFILES_SETUP_PS1_SOURCE_ONLY and dot-source this file to load
-# helper functions without running install, bootstrap, or Neovim sync phases.
+# helper functions without running install, config, or Neovim sync phases.
 if ($env:DOTFILES_SETUP_PS1_SOURCE_ONLY) { return }
 
 $inputRedirected = $false
@@ -73,7 +75,7 @@ $ScriptDir = $null
 if ($PSCommandPath -and (Test-Path -LiteralPath $PSCommandPath)) {
     $ScriptDir = Split-Path -Parent $PSCommandPath
 }
-if (-not $ScriptDir -or -not (Test-Path (Join-Path $ScriptDir 'bootstrap.ps1'))) {
+if (-not $ScriptDir -or -not (Test-Path (Join-Path $ScriptDir 'home'))) {
     $dest = if ($env:DOTFILES_DEST) { $env:DOTFILES_DEST } else { $DefaultDest }
     # DryRun honor: announce what we would clone and exit BEFORE any git op.
     if ($DryRun) {
@@ -83,7 +85,7 @@ if (-not $ScriptDir -or -not (Test-Path (Join-Path $ScriptDir 'bootstrap.ps1')))
         exit 0
     }
     if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
-        Write-Error "setup.ps1: git is the only prerequisite for remote bootstrap, and it is required to clone the repo. Install git first: winget install Git.Git"
+        Write-Error "setup.ps1: git is the only prerequisite for remote setup, and it is required to clone the repo. Install git first: winget install Git.Git"
         exit 1
     }
     if (Test-Path (Join-Path $dest '.git')) {
@@ -106,7 +108,7 @@ $nvimTarget = Join-Path $env:LOCALAPPDATA 'nvim'
 if ((Resolve-Path $ScriptDir).Path -eq (Resolve-Path $nvimTarget -ErrorAction SilentlyContinue).Path) {
     Write-Error @"
 setup.ps1: the repo lives at $ScriptDir, which is the same path that
-bootstrap.ps1 would symlink to itself. Move the repo elsewhere first
+setup.ps1 would configure as the Neovim target. Move the repo elsewhere first
 (e.g. %USERPROFILE%\dotfiles) and re-run setup.ps1.
 "@
     exit 1
@@ -121,12 +123,14 @@ $depsArgs = @{}
 if ($All)    { $depsArgs['All']    = $true }
 if ($DryRun) { $depsArgs['DryRun'] = $true }
 
-$bootstrapArgs = @{}
-if ($DryRun)                   { $bootstrapArgs['DryRun']                   = $true }
-# WT settings merge is now a DEFAULT bootstrap step (opt-out, not opt-in).
+# WT settings merge is now a DEFAULT config step (opt-out, not opt-in).
 # -MergeWindowsTerminal is retained as a harmless no-op alias for back-compat.
 $null = $MergeWindowsTerminal  # reference the alias so PSScriptAnalyzer doesn't flag it unused
-if ($SkipWindowsTerminalMerge) { $bootstrapArgs['SkipWindowsTerminalMerge'] = $true }
+
+$HomeSource = Join-Path $ScriptDir 'home'
+$script:ChezmoiBaseArgs = @('--source', $HomeSource)
+$script:ChezmoiConfigArgs = @()
+$Timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 
 function Phase {
     param([string]$title)
@@ -134,6 +138,357 @@ function Phase {
     Write-Host "================================================================"
     Write-Host "==  $title"
     Write-Host "================================================================"
+}
+
+function Write-Step {
+    param([string]$Message)
+    Write-Host "  $Message"
+}
+
+function Get-UniqueBackupPath {
+    param([Parameter(Mandatory)] [string]$Base)
+    if (-not (Test-Path -LiteralPath $Base)) { return $Base }
+    $i = 1
+    while (Test-Path -LiteralPath "$Base.$i") { $i++ }
+    return "$Base.$i"
+}
+
+function New-NativeSymLink {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] [string]$Source,
+        [Parameter(Mandatory)] [string]$Destination
+    )
+
+    if (-not ('DotfilesSetupSymbolicLink' -as [type])) {
+        Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+
+public static class DotfilesSetupSymbolicLink {
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    public static extern bool CreateSymbolicLink(
+        string lpSymlinkFileName,
+        string lpTargetFileName,
+        int dwFlags
+    );
+}
+"@
+    }
+
+    $sourceItem = Get-Item -LiteralPath $Source -Force -ErrorAction Stop
+    $flags = 0x2
+    if ($sourceItem.PSIsContainer) { $flags = $flags -bor 0x1 }
+
+    $ok = [DotfilesSetupSymbolicLink]::CreateSymbolicLink($Destination, $Source, $flags)
+    if (-not $ok) {
+        $code = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
+        throw (New-Object ComponentModel.Win32Exception($code))
+    }
+}
+
+function New-SymbolicLinkItem {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] [string]$Source,
+        [Parameter(Mandatory)] [string]$Destination
+    )
+
+    try {
+        New-Item -ItemType SymbolicLink -Path $Destination -Target $Source -ErrorAction Stop | Out-Null
+    } catch {
+        $newItemError = $_
+        if ($env:OS -ne 'Windows_NT') { throw }
+        try {
+            New-NativeSymLink -Source $Source -Destination $Destination
+        } catch {
+            throw @"
+failed to create symlink:
+  destination: $Destination
+  source:      $Source
+  New-Item:    $($newItemError.Exception.Message)
+  native API:  $($_.Exception.Message)
+"@
+        }
+    }
+}
+
+function Test-CanCreateSymlinks {
+    try {
+        $tmp = Join-Path $env:TEMP "symlink-probe-$([guid]::NewGuid())"
+        $target = Join-Path $env:TEMP "symlink-probe-target-$([guid]::NewGuid())"
+        New-Item -ItemType File -Path $target -Force | Out-Null
+        New-SymbolicLinkItem -Source $target -Destination $tmp
+        Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $target -Force -ErrorAction SilentlyContinue
+        return $true
+    } catch {
+        return $false
+    }
+}
+
+function Test-IsElevated {
+    try {
+        $id = [Security.Principal.WindowsIdentity]::GetCurrent()
+        return ([Security.Principal.WindowsPrincipal]$id).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+    } catch { return $false }
+}
+
+function Test-DevModeOn {
+    try {
+        $k = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock'
+        return (((Get-ItemProperty -Path $k -Name AllowDevelopmentWithoutDevLicense -ErrorAction Stop).AllowDevelopmentWithoutDevLicense) -eq 1)
+    } catch { return $false }
+}
+
+function Invoke-ChezmoiOrExit {
+    param(
+        [Parameter(Mandatory)] [string]$Label,
+        [Parameter(Mandatory)] [string[]]$Arguments
+    )
+    $global:LASTEXITCODE = 0
+    $baseArgs = $script:ChezmoiBaseArgs
+    $configArgs = $script:ChezmoiConfigArgs
+    & chezmoi @baseArgs @configArgs @Arguments
+    $rc = $LASTEXITCODE
+    if ($rc -ne 0) {
+        Write-Host ("  FAIL: $Label exited $rc") -ForegroundColor Red
+        exit $rc
+    }
+}
+
+function Invoke-ChezmoiOutput {
+    param([Parameter(Mandatory)] [string[]]$Arguments)
+    $global:LASTEXITCODE = 0
+    $baseArgs = $script:ChezmoiBaseArgs
+    $configArgs = $script:ChezmoiConfigArgs
+    $output = & chezmoi @baseArgs @configArgs @Arguments
+    $rc = $LASTEXITCODE
+    if ($rc -ne 0) {
+        throw "chezmoi $($Arguments -join ' ') exited $rc"
+    }
+    return @($output)
+}
+
+function Test-ChezmoiVerify {
+    param([Parameter(Mandatory)] [string]$Target)
+    $global:LASTEXITCODE = 0
+    $baseArgs = $script:ChezmoiBaseArgs
+    $configArgs = $script:ChezmoiConfigArgs
+    & chezmoi @baseArgs @configArgs verify $Target > $null 2> $null
+    return ($LASTEXITCODE -eq 0)
+}
+
+function Get-FullPathSafe {
+    param([Parameter(Mandatory)] [string]$Path)
+    try {
+        return [IO.Path]::GetFullPath($Path)
+    } catch {
+        return $Path
+    }
+}
+
+function Test-PathInsideRepo {
+    param([Parameter(Mandatory)] [string]$Path)
+    $repo = (Get-FullPathSafe $ScriptDir).TrimEnd('\', '/')
+    $full = (Get-FullPathSafe $Path).TrimEnd('\', '/')
+    return $full.Equals($repo, [StringComparison]::OrdinalIgnoreCase) -or
+        $full.StartsWith("$repo\", [StringComparison]::OrdinalIgnoreCase) -or
+        $full.StartsWith("$repo/", [StringComparison]::OrdinalIgnoreCase)
+}
+
+function Test-SymlinkResolvesIntoRepo {
+    param([Parameter(Mandatory)] [string]$Target)
+    $item = Get-Item -LiteralPath $Target -Force -ErrorAction SilentlyContinue
+    if ($null -eq $item -or $item.LinkType -ne 'SymbolicLink') { return $false }
+    $linkTarget = @($item.Target)[0]
+    if (-not $linkTarget) { return $false }
+    if (-not [IO.Path]::IsPathRooted($linkTarget)) {
+        $linkTarget = Join-Path (Split-Path -Parent $Target) $linkTarget
+    }
+    $resolved = Resolve-Path -LiteralPath $linkTarget -ErrorAction SilentlyContinue
+    if (-not $resolved) { return $false }
+    return (Test-PathInsideRepo $resolved.Path)
+}
+
+function Test-FileBytesEqual {
+    param(
+        [Parameter(Mandatory)] [string]$Left,
+        [Parameter(Mandatory)] [string]$Right
+    )
+    if (-not (Test-Path -LiteralPath $Left -PathType Leaf) -or -not (Test-Path -LiteralPath $Right -PathType Leaf)) {
+        return $false
+    }
+    $leftBytes = [IO.File]::ReadAllBytes($Left)
+    $rightBytes = [IO.File]::ReadAllBytes($Right)
+    if ($leftBytes.Length -ne $rightBytes.Length) { return $false }
+    for ($i = 0; $i -lt $leftBytes.Length; $i++) {
+        if ($leftBytes[$i] -ne $rightBytes[$i]) { return $false }
+    }
+    return $true
+}
+
+function Test-DirectoryContentEqual {
+    param(
+        [Parameter(Mandatory)] [string]$Left,
+        [Parameter(Mandatory)] [string]$Right
+    )
+    if (-not (Test-Path -LiteralPath $Left -PathType Container) -or -not (Test-Path -LiteralPath $Right -PathType Container)) {
+        return $false
+    }
+    $leftRoot = (Resolve-Path -LiteralPath $Left).Path.TrimEnd('\', '/')
+    $rightRoot = (Resolve-Path -LiteralPath $Right).Path.TrimEnd('\', '/')
+    $leftFiles = @(Get-ChildItem -LiteralPath $leftRoot -File -Recurse -Force | ForEach-Object {
+        $_.FullName.Substring($leftRoot.Length).TrimStart('\', '/')
+    } | Sort-Object)
+    $rightFiles = @(Get-ChildItem -LiteralPath $rightRoot -File -Recurse -Force | ForEach-Object {
+        $_.FullName.Substring($rightRoot.Length).TrimStart('\', '/')
+    } | Sort-Object)
+    if ($leftFiles.Count -ne $rightFiles.Count) { return $false }
+    for ($i = 0; $i -lt $leftFiles.Count; $i++) {
+        if ($leftFiles[$i] -ne $rightFiles[$i]) { return $false }
+        if (-not (Test-FileBytesEqual (Join-Path $leftRoot $leftFiles[$i]) (Join-Path $rightRoot $rightFiles[$i]))) {
+            return $false
+        }
+    }
+    return $true
+}
+
+function Test-TargetContentMatchesChezmoi {
+    param([Parameter(Mandatory)] [string]$Target)
+    $global:LASTEXITCODE = 0
+    $baseArgs = $script:ChezmoiBaseArgs
+    $configArgs = $script:ChezmoiConfigArgs
+    $catOutput = & chezmoi @baseArgs @configArgs cat $Target 2> $null
+    if ($LASTEXITCODE -ne 0) { return $false }
+    $expectedPath = (@($catOutput) -join [Environment]::NewLine).Trim()
+    if (-not $expectedPath -or -not (Test-Path -LiteralPath $expectedPath)) { return $false }
+    if (Test-Path -LiteralPath $expectedPath -PathType Container) {
+        return (Test-DirectoryContentEqual $Target $expectedPath)
+    }
+    return (Test-FileBytesEqual $Target $expectedPath)
+}
+
+function Test-TargetAlreadyMatches {
+    param([Parameter(Mandatory)] [string]$Target)
+    return (Test-ChezmoiVerify $Target) -or
+        (Test-SymlinkResolvesIntoRepo $Target) -or
+        (Test-TargetContentMatchesChezmoi $Target)
+}
+
+function Get-WindowsTerminalSettingsPath {
+    return (Join-Path $env:LOCALAPPDATA 'Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json')
+}
+
+function Test-SamePath {
+    param(
+        [Parameter(Mandatory)] [string]$Left,
+        [Parameter(Mandatory)] [string]$Right
+    )
+    $leftFull = (Get-FullPathSafe $Left).TrimEnd('\', '/')
+    $rightFull = (Get-FullPathSafe $Right).TrimEnd('\', '/')
+    return $leftFull.Equals($rightFull, [StringComparison]::OrdinalIgnoreCase)
+}
+
+function Get-ManagedConfigTargets {
+    param([switch]$ExcludeWindowsTerminal)
+    $wtSettings = Get-WindowsTerminalSettingsPath
+    $targets = @(Invoke-ChezmoiOutput @('managed', '--path-style', 'absolute', '--include', 'files,symlinks'))
+    if ($ExcludeWindowsTerminal) {
+        $targets = @($targets | Where-Object { -not (Test-SamePath $_ $wtSettings) })
+    }
+    return $targets
+}
+
+function Backup-PreexistingManagedTargets {
+    $targets = @(Get-ManagedConfigTargets -ExcludeWindowsTerminal)
+    if ($targets.Count -eq 0) {
+        Write-Step "backup   no managed file/symlink targets found"
+        return
+    }
+
+    foreach ($target in $targets) {
+        $item = Get-Item -LiteralPath $target -Force -ErrorAction SilentlyContinue
+        if ($null -eq $item) { continue }
+        if (Test-TargetAlreadyMatches $target) {
+            Write-Step "ok       $target"
+            continue
+        }
+
+        $backup = Get-UniqueBackupPath "$target.bak.$Timestamp"
+        if ($DryRun) {
+            Write-Step "backup   $target -> $backup; then chezmoi apply"
+        } else {
+            Move-Item -LiteralPath $target -Destination $backup -Force
+            Write-Step "backed up $target -> $backup"
+        }
+    }
+}
+
+function New-ChezmoiDryRunConfig {
+    $tmp = New-TemporaryFile
+    $templatePath = Join-Path $HomeSource '.chezmoi.toml.tmpl'
+    $baseArgs = $script:ChezmoiBaseArgs
+    $rendered = Get-Content -Raw -LiteralPath $templatePath | & chezmoi @baseArgs execute-template --init
+    if ($LASTEXITCODE -ne 0) {
+        throw "chezmoi execute-template --init failed while preparing dry-run config"
+    }
+    Set-Content -LiteralPath $tmp.FullName -Value $rendered -Encoding UTF8
+    return $tmp.FullName
+}
+
+function Invoke-ChezmoiApplyPhase {
+    if (-not (Get-Command chezmoi -ErrorAction SilentlyContinue)) {
+        Write-Host "  FAIL: chezmoi is not on PATH after Phase 1" -ForegroundColor Red
+        Write-Host "        Re-run without -SkipDeps, or install chezmoi first." -ForegroundColor Yellow
+        exit 1
+    }
+
+    if ($DryRun) {
+        Write-Warning "DryRun: skipping symlink-privilege probe"
+        $dryRunConfig = New-ChezmoiDryRunConfig
+        $script:ChezmoiConfigArgs = @('--config', $dryRunConfig, '--config-format', 'toml')
+        try {
+            Backup-PreexistingManagedTargets
+            $applyArgs = @('--dry-run', '--verbose', 'apply')
+            if ($SkipWindowsTerminalMerge) {
+                Write-Step "skip     Windows Terminal settings merge via -SkipWindowsTerminalMerge"
+                $applyArgs += @(Get-ManagedConfigTargets -ExcludeWindowsTerminal)
+            }
+            Invoke-ChezmoiOrExit -Label 'chezmoi dry-run apply' -Arguments $applyArgs
+        } finally {
+            Remove-Item -LiteralPath $dryRunConfig -Force -ErrorAction SilentlyContinue
+            $script:ChezmoiConfigArgs = @()
+        }
+        return
+    }
+
+    if (-not (Test-CanCreateSymlinks)) {
+        $elevated = if (Test-IsElevated) { 'yes' } else { 'no' }
+        $devmode  = if (Test-DevModeOn)  { 'on' }  else { 'off' }
+        Write-Host ""
+        Write-Host "setup.ps1: cannot create symbolic links here." -ForegroundColor Red
+        Write-Host "  elevated (admin): $elevated    Developer Mode: $devmode"
+        Write-Host ""
+        Write-Host "  Fix EITHER way (Developer Mode recommended -- no admin, and keeps" -ForegroundColor Yellow
+        Write-Host "  scoop/nvim working unprivileged):" -ForegroundColor Yellow
+        Write-Host "    1) Enable Developer Mode: Settings -> Privacy & security -> For"
+        Write-Host "       developers -> Developer Mode = On.  Then:  .\setup.ps1 -SkipDeps"
+        Write-Host "    2) OR run just this config step elevated (admin PowerShell):"
+        Write-Host "       .\setup.ps1 -SkipDeps -SkipNvim"
+        Write-Host "       then back in a normal shell:  .\setup.ps1 -SkipDeps -SkipConfig"
+        Write-Host ""
+        exit 1
+    }
+
+    Invoke-ChezmoiOrExit -Label 'chezmoi init' -Arguments @('init')
+    Backup-PreexistingManagedTargets
+    $realApplyArgs = @('--no-tty', '--force', 'apply')
+    if ($SkipWindowsTerminalMerge) {
+        Write-Step "skip     Windows Terminal settings merge via -SkipWindowsTerminalMerge"
+        $realApplyArgs += @(Get-ManagedConfigTargets -ExcludeWindowsTerminal)
+    }
+    Invoke-ChezmoiOrExit -Label 'chezmoi apply' -Arguments $realApplyArgs
 }
 
 # ---- Phase 1: dependencies ---------------------------------------------------
@@ -152,21 +507,14 @@ if (-not $DryRun) {
     Update-RuntimePath
 }
 
-# ---- Phase 2: symlink configs ------------------------------------------------
-if (-not $SkipBootstrap) {
-    Phase "Phase 2/4: symlink configs into place"
+# ---- Phase 2: apply configs --------------------------------------------------
+if (-not ($SkipBootstrap -or $SkipConfig)) {
+    Phase "Phase 2/4: apply configs with chezmoi"
     $global:LASTEXITCODE = 0   # reset so a stale code from Phase 1 cannot false-trip
-    & (Join-Path $ScriptDir 'bootstrap.ps1') @bootstrapArgs
-    if ($LASTEXITCODE -ne 0) {
-        # bootstrap already printed the actionable fix (Dev Mode / elevation).
-        # Stop here rather than running nvim sync against un-symlinked configs.
-        Write-Host ""
-        Write-Host "setup.ps1: stopping -- Phase 2 (bootstrap) failed; see the fix above." -ForegroundColor Red
-        exit $LASTEXITCODE
-    }
+    Invoke-ChezmoiApplyPhase
 } else {
     Write-Host ""
-    Write-Host "skipped: Phase 2 (bootstrap) via -SkipBootstrap"
+    Write-Host "skipped: Phase 2 (config) via -SkipBootstrap/-SkipConfig"
 }
 
 # ---- Phases 3 + 4: nvim sync -------------------------------------------------
@@ -204,7 +552,7 @@ if (-not $SkipNvim -and -not $DryRun) {
         Write-Host ""
         Write-Host "skipped: Phase 3-4 (nvim plugins) -- nvim not on PATH yet."
         Write-Host "         Open a new shell so PATH refreshes, then run:"
-        Write-Host "             .\setup.ps1 -SkipDeps -SkipBootstrap"
+        Write-Host "             .\setup.ps1 -SkipDeps -SkipConfig"
     }
 } elseif ($DryRun) {
     Write-Host ""

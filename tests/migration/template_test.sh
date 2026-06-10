@@ -35,6 +35,7 @@ expected_for() {
         darwin)    printf '%s\n' ".config/ghostty" ".config/lazygit" ".tmux.windows.conf" "AppData" "Documents" ;;
         linux)     printf '%s\n' ".tmux.windows.conf" "AppData" "Documents" "Library" ;;
         linux-wsl) printf '%s\n' ".config/ghostty" ".tmux.windows.conf" "AppData" "Documents" "Library" ;;
+        linux-wsl-gui) printf '%s\n' ".tmux.windows.conf" "AppData" "Documents" "Library" ;;
         windows)   printf '%s\n' ".config/ghostty" ".config/lazygit" ".config/nvim" ".zshenv" ".zshrc" "Library" ;;
         *)         fail "unsupported OS fixture: $1" ;;
     esac
@@ -46,12 +47,15 @@ trap 'rm -rf "$fixture" "$rendered"' EXIT
 
 # linux-wsl injects targetOS=linux + isWsl=true to prove ghostty is gated on WSL
 # (Windows-host terminal) while lazygit stays managed -- matching legacy bootstrap.
-for case_name in darwin linux linux-wsl windows; do
+# linux-wsl-gui flips experimentalWslGui=true, matching setup.sh
+# --experimental-wsl-gui's per-run chezmoi data override.
+for case_name in darwin linux linux-wsl linux-wsl-gui windows; do
     case "$case_name" in
-        linux-wsl) os=linux; iswsl=true ;;
-        *)         os="$case_name"; iswsl=false ;;
+        linux-wsl)     os=linux; iswsl=true; experimental=false ;;
+        linux-wsl-gui) os=linux; iswsl=true; experimental=true ;;
+        *)             os="$case_name"; iswsl=false; experimental=false ;;
     esac
-    printf 'targetOS: %s\nisWsl: %s\n' "$os" "$iswsl" > "$fixture/.chezmoidata.yaml"
+    printf 'targetOS: %s\nisWsl: %s\nexperimentalWslGui: %s\n' "$os" "$iswsl" "$experimental" > "$fixture/.chezmoidata.yaml"
     rendered_ignore="$rendered/.chezmoiignore.$case_name"
     chezmoi --source "$fixture" execute-template < "$IGNORE_TEMPLATE" > "$rendered_ignore"
 

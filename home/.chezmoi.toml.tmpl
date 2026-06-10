@@ -17,3 +17,4 @@ mode = "symlink"   # live-edit
 [data]
     targetOS = {{ .chezmoi.os | quote }}     # the ONE place production templates read the OS; tests override it
     isWsl = {{ $isWsl }}                      # WSL detected via kernel.osrelease; gates WSL-host-owned configs (tests override it)
+    experimentalWslGui = {{ get . "experimentalWslGui" | default false }} # setup.sh --experimental-wsl-gui overrides this per run

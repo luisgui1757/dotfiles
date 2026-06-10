@@ -2,13 +2,14 @@
 
 ## chezmoi owns (config layer)
 
-`home/` is the active chezmoi source tree for the dotfiles config layer. It
-coexists with the legacy `setup` / `bootstrap` path while the migration proves
-itself, so the same logical config must stay single-source: when a top-level
-config has a managed copy or template under `home/`, update both in the same
-change and let the parity gate prove byte equality. Wave C, which deletes the
-old scripts and duplicate source copies, is gated on N green parity runs (the
-current plan names N = 10) plus manual owner signoff.
+`home/` is the active chezmoi source tree for the dotfiles config layer. It now
+backs the public `setup.sh` / `setup.ps1` Phase 2 config apply while coexisting
+with legacy direct `bootstrap.*` entry points until the deletion stage. The same
+logical config must stay single-source: when a top-level config has a managed
+copy or template under `home/`, update both in the same change and let the
+parity gate prove byte equality. Wave C, which deletes the old scripts and
+duplicate source copies, is gated on N green parity runs (the current plan names
+N = 10) plus manual owner signoff.
 
 | Config | Source file(s) | Per-OS target(s) | Chezmoi mechanism |
 |---|---|---|---|
@@ -104,6 +105,16 @@ file skipped, broken repo-symlink still cleaned) is covered by
 - [x] Completed execution/spec plan docs are archived in `docs/archive/`.
       `docs/MIGRATION_STATUS.md` is the living migration status document.
 
+### In Progress
+
+- [ ] Wave C stage 3 moved public `setup.sh` / `setup.ps1` Phase 2 to chezmoi.
+      Setup now initializes chezmoi, backs up pre-existing divergent managed
+      targets before forced apply, preserves `--skip-bootstrap` /
+      `-SkipBootstrap` as aliases for the new config skip, and keeps the
+      Windows Developer Mode/elevation pre-flight before apply. Deleting
+      `bootstrap.*`, `tests/bootstrap`, and `make test-bootstrap` is still
+      Stage 4 and remains unauthorized here.
+
 ### Open
 
 - [ ] N-green-runs counter for Wave C: `0 / 10` consecutive green Ubuntu parity
@@ -116,8 +127,9 @@ file skipped, broken repo-symlink still cleaned) is covered by
       to fixed `.local/share`, and the verifier checks that same fixed path; an
       XDG-aware managed root is Wave B.
 - [ ] No secrets or `age` tier has been started.
-- [ ] Wave C bootstrap/setup retirement is not authorized. `setup.*` still uses
-      `bootstrap.*`; full chezmoi-native setup remains a planned next step.
+- [ ] Wave C bootstrap deletion is not authorized. `setup.*` uses chezmoi as of
+      stage 3, but `bootstrap.*` remains on disk for direct legacy use and tests
+      until stage 4.
 - [ ] The Windows PowerShell profile managed by chezmoi is the PowerShell 7
       path (`Documents\PowerShell\Microsoft.PowerShell_profile.ps1`). The
       Windows PowerShell 5.1 path (`Documents\WindowsPowerShell\...`) remains
@@ -128,10 +140,10 @@ file skipped, broken repo-symlink still cleaned) is covered by
       not migrated. `bootstrap.sh` links it only when `pwsh` is present, so it
       is install-gated and provisioning-adjacent, like VS Code.
 - [ ] Windows Terminal Preview and redirected `%LOCALAPPDATA%` remain Wave B.
-- [ ] WSL is not parity-supported in the pilot. Chezmoi models WSL as
-      `.chezmoi.os = linux` and cannot distinguish it from native Linux, so on
-      WSL it would create `~/.config/ghostty/config` even though `bootstrap.sh`
-      skips that path by default. This is a known harmless divergence;
-      WSL-aware gating is Wave B.
+- [ ] Full WSL parity is still not a required automated gate, but chezmoi now
+      models WSL through the generated `isWsl` data value and skips Linux
+      Ghostty by default. `setup.sh --experimental-wsl-gui` passes the
+      `experimentalWslGui` data override so WSL Ghostty is managed only on the
+      explicit GUI-terminal opt-in path.
 - [ ] zsh exact-pin checks re-assert when the pin script changes, not on manual
       checkout drift. `refreshPeriod = "0"` means there is no automatic drift.
