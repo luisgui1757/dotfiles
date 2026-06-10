@@ -115,24 +115,6 @@ fi
 
 cd "$SCRIPT_DIR"
 
-# ---- Self-link guard ---------------------------------------------------------
-# If the repo lives at one of the config targets we will later create,
-# chezmoi would point the target at itself. Detect and refuse.
-NVIM_TARGET="$HOME/.config/nvim"
-if [[ "$SCRIPT_DIR" == "$NVIM_TARGET" ]]; then
-    cat >&2 <<EOF
-setup.sh: the repo is currently at $SCRIPT_DIR, which is the same path
-that setup.sh would configure as the Neovim target.
-
-Move the repo elsewhere first (e.g. ~/dotfiles), then re-run setup.sh:
-
-    mv "$SCRIPT_DIR" "$HOME/dotfiles"
-    cd "$HOME/dotfiles"
-    ./setup.sh
-EOF
-    exit 1
-fi
-
 # ---- Forward flags to sub-scripts --------------------------------------------
 DEPS_FLAGS=()
 [[ "$ALL" -eq 1 ]]      && DEPS_FLAGS+=(--all)
@@ -198,12 +180,30 @@ realpath_or_self() {
     fi
 }
 
-path_is_inside_repo() {
-    local path="$1"
-    case "$path" in
-        "$SCRIPT_DIR"|"$SCRIPT_DIR"/*) return 0 ;;
-        *) return 1 ;;
-    esac
+refuse_nvim_self_link_if_needed() {
+    local nvim_target="$HOME/.config/nvim" target_real repo_real repo_nvim_real
+
+    [[ -e "$nvim_target" || -L "$nvim_target" ]] || return 0
+
+    target_real="$(realpath_or_self "$nvim_target")"
+    repo_real="$(realpath_or_self "$SCRIPT_DIR")"
+    repo_nvim_real="$(realpath_or_self "$SCRIPT_DIR/nvim")"
+
+    if [[ "$target_real" != "$repo_real" && "$target_real" != "$repo_nvim_real" ]]; then
+        return 0
+    fi
+
+    cat >&2 <<EOF
+setup.sh: the repo is currently at $SCRIPT_DIR, which overlaps the path
+that setup.sh would configure as the Neovim target.
+
+Move the repo elsewhere first (e.g. ~/dotfiles), then re-run setup.sh:
+
+    mv "$SCRIPT_DIR" "$HOME/dotfiles"
+    cd "$HOME/dotfiles"
+    ./setup.sh
+EOF
+    exit 1
 }
 
 run_chezmoi() {
@@ -218,13 +218,6 @@ render_chezmoi_config_template() {
     chezmoi "${CHEZMOI_BASE_ARGS[@]}" \
         ${CHEZMOI_DATA_ARGS[@]+"${CHEZMOI_DATA_ARGS[@]}"} \
         execute-template --init < "$CHEZMOI_SOURCE/.chezmoi.toml.tmpl" > "$output"
-}
-
-target_symlink_resolves_into_repo() {
-    local target="$1" resolved
-    [[ -L "$target" ]] || return 1
-    resolved="$(realpath_or_self "$target")"
-    path_is_inside_repo "$resolved"
 }
 
 target_content_matches_chezmoi() {
@@ -263,7 +256,6 @@ target_content_matches_chezmoi() {
 target_already_matches() {
     local target="$1"
     run_chezmoi verify "$target" >/dev/null 2>&1 ||
-        target_symlink_resolves_into_repo "$target" ||
         target_content_matches_chezmoi "$target"
 }
 
@@ -300,6 +292,9 @@ backup_preexisting_managed_targets() {
 # Test seam: `DOTFILES_SETUP_SOURCE_ONLY=1 source setup.sh` loads the helper
 # functions (phase, refresh_runtime_path) without running the install phases, so
 # tests can exercise refresh_runtime_path in isolation. Unset in normal runs.
+if [[ -z "${DOTFILES_SETUP_SOURCE_ONLY:-}" ]]; then
+    refuse_nvim_self_link_if_needed
+fi
 if [[ -n "${DOTFILES_SETUP_SOURCE_ONLY:-}" ]]; then
     # shellcheck disable=SC2317  # the exit is reached only when executed, not sourced
     return 0 2>/dev/null || exit 0

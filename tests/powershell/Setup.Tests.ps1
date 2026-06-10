@@ -30,7 +30,11 @@ Describe "setup.ps1 Update-RuntimePath" {
 
     AfterEach {
         $env:PATH = $script:OldPath
-        $env:USERPROFILE = $script:OldUserProfile
+        if ($null -eq $script:OldUserProfile) {
+            Remove-Item Env:USERPROFILE -ErrorAction SilentlyContinue
+        } else {
+            $env:USERPROFILE = $script:OldUserProfile
+        }
         if ($null -eq $script:OldScoop) {
             Remove-Item Env:SCOOP -ErrorAction SilentlyContinue
         } else {
@@ -68,5 +72,61 @@ Describe "setup.ps1 Update-RuntimePath" {
         $parts = $env:PATH -split ';'
         @($parts | Where-Object { $_ -eq $missingShim }).Count | Should -Be 0
         @($parts | Where-Object { $_ -eq $fakeOne }).Count | Should -Be 1
+    }
+}
+
+Describe "setup.ps1 Windows Terminal backup" {
+    BeforeEach {
+        $script:OldLocalAppData = $env:LOCALAPPDATA
+        $script:OldUserProfile = $env:USERPROFILE
+        $script:FakeHome = Join-Path ([System.IO.Path]::GetTempPath()) ("setup-wt-" + [System.Guid]::NewGuid())
+        $script:FakeLocalAppData = Join-Path $script:FakeHome 'AppData\Local'
+        New-Item -ItemType Directory -Force -Path $script:FakeLocalAppData | Out-Null
+        $env:USERPROFILE = $script:FakeHome
+        $env:LOCALAPPDATA = $script:FakeLocalAppData
+        . $script:ImportSetupForTest
+        Set-Variable -Name Timestamp -Scope Script -Value '20000101-000000'
+        Set-Variable -Name DryRun -Scope Script -Value $false
+        Set-Variable -Name SkipWindowsTerminalMerge -Scope Script -Value $false
+    }
+
+    AfterEach {
+        if ($null -eq $script:OldUserProfile) {
+            Remove-Item Env:USERPROFILE -ErrorAction SilentlyContinue
+        } else {
+            $env:USERPROFILE = $script:OldUserProfile
+        }
+        if ($null -eq $script:OldLocalAppData) {
+            Remove-Item Env:LOCALAPPDATA -ErrorAction SilentlyContinue
+        } else {
+            $env:LOCALAPPDATA = $script:OldLocalAppData
+        }
+        Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $script:FakeHome
+    }
+
+    It "copies the pre-merge settings.json without moving it" {
+        $settings = Get-WindowsTerminalSettingsPath
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $settings) | Out-Null
+        $preMerge = '{"profiles":{"defaults":{},"list":[]},"actions":[]}'
+        [System.IO.File]::WriteAllText($settings, $preMerge, [System.Text.UTF8Encoding]::new($false))
+
+        Backup-WindowsTerminalSettings
+
+        $backup = "$settings.bak.20000101-000000"
+        Test-Path -LiteralPath $settings -PathType Leaf | Should -BeTrue
+        Test-Path -LiteralPath $backup -PathType Leaf | Should -BeTrue
+        [System.IO.File]::ReadAllText($settings) | Should -Be $preMerge
+        [System.IO.File]::ReadAllText($backup) | Should -Be $preMerge
+    }
+
+    It "does not create a backup when Windows Terminal merge is skipped" {
+        Set-Variable -Name SkipWindowsTerminalMerge -Scope Script -Value $true
+        $settings = Get-WindowsTerminalSettingsPath
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $settings) | Out-Null
+        [System.IO.File]::WriteAllText($settings, '{"profiles":{}}', [System.Text.UTF8Encoding]::new($false))
+
+        Backup-WindowsTerminalSettings
+
+        Test-Path -LiteralPath "$settings.bak.20000101-000000" | Should -BeFalse
     }
 }

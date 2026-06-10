@@ -54,10 +54,6 @@ function Update-RuntimePath {
     $env:PATH = ($parts | Where-Object { $_ -and $seen.Add($_) }) -join ';'
 }
 
-# Test seam: set DOTFILES_SETUP_PS1_SOURCE_ONLY and dot-source this file to load
-# helper functions without running install, config, or Neovim sync phases.
-if ($env:DOTFILES_SETUP_PS1_SOURCE_ONLY) { return }
-
 $inputRedirected = $false
 $outputRedirected = $false
 try { $inputRedirected = [Console]::IsInputRedirected } catch { $inputRedirected = $true }
@@ -102,17 +98,6 @@ if (-not $ScriptDir -or -not (Test-Path (Join-Path $ScriptDir 'home'))) {
 }
 
 Set-Location $ScriptDir
-
-# ---- Self-link guard ---------------------------------------------------------
-$nvimTarget = Join-Path $env:LOCALAPPDATA 'nvim'
-if ((Resolve-Path $ScriptDir).Path -eq (Resolve-Path $nvimTarget -ErrorAction SilentlyContinue).Path) {
-    Write-Error @"
-setup.ps1: the repo lives at $ScriptDir, which is the same path that
-setup.ps1 would configure as the Neovim target. Move the repo elsewhere first
-(e.g. %USERPROFILE%\dotfiles) and re-run setup.ps1.
-"@
-    exit 1
-}
 
 # ---- Forward flags to sub-scripts --------------------------------------------
 # Hashtable splatting (not array) so switches bind by NAME. Array splatting
@@ -288,27 +273,31 @@ function Get-FullPathSafe {
     }
 }
 
-function Test-PathInsideRepo {
+function Get-RealExistingPath {
     param([Parameter(Mandatory)] [string]$Path)
-    $repo = (Get-FullPathSafe $ScriptDir).TrimEnd('\', '/')
-    $full = (Get-FullPathSafe $Path).TrimEnd('\', '/')
-    return $full.Equals($repo, [StringComparison]::OrdinalIgnoreCase) -or
-        $full.StartsWith("$repo\", [StringComparison]::OrdinalIgnoreCase) -or
-        $full.StartsWith("$repo/", [StringComparison]::OrdinalIgnoreCase)
-}
 
-function Test-SymlinkResolvesIntoRepo {
-    param([Parameter(Mandatory)] [string]$Target)
-    $item = Get-Item -LiteralPath $Target -Force -ErrorAction SilentlyContinue
-    if ($null -eq $item -or $item.LinkType -ne 'SymbolicLink') { return $false }
-    $linkTarget = @($item.Target)[0]
-    if (-not $linkTarget) { return $false }
-    if (-not [IO.Path]::IsPathRooted($linkTarget)) {
-        $linkTarget = Join-Path (Split-Path -Parent $Target) $linkTarget
+    $item = Get-Item -LiteralPath $Path -Force -ErrorAction SilentlyContinue
+    if ($null -eq $item) { return $null }
+
+    $linkType = if ($item.PSObject.Properties.Name -contains 'LinkType') { $item.LinkType } else { $null }
+    if ($linkType -eq 'SymbolicLink') {
+        $linkTarget = @($item.Target)[0]
+        if ($linkTarget) {
+            if (-not [IO.Path]::IsPathRooted($linkTarget)) {
+                $linkTarget = Join-Path (Split-Path -Parent $Path) $linkTarget
+            }
+            $resolvedTarget = Resolve-Path -LiteralPath $linkTarget -ErrorAction SilentlyContinue
+            if ($resolvedTarget) {
+                return (Get-FullPathSafe -Path (@($resolvedTarget)[0].Path))
+            }
+        }
     }
-    $resolved = Resolve-Path -LiteralPath $linkTarget -ErrorAction SilentlyContinue
-    if (-not $resolved) { return $false }
-    return (Test-PathInsideRepo $resolved.Path)
+
+    $resolved = Resolve-Path -LiteralPath $Path -ErrorAction SilentlyContinue
+    if ($resolved) {
+        return (Get-FullPathSafe -Path (@($resolved)[0].Path))
+    }
+    return (Get-FullPathSafe $Path)
 }
 
 function Test-FileBytesEqual {
@@ -372,7 +361,6 @@ function Test-TargetContentMatchesChezmoi {
 function Test-TargetAlreadyMatches {
     param([Parameter(Mandatory)] [string]$Target)
     return (Test-ChezmoiVerify $Target) -or
-        (Test-SymlinkResolvesIntoRepo $Target) -or
         (Test-TargetContentMatchesChezmoi $Target)
 }
 
@@ -390,6 +378,28 @@ function Test-SamePath {
     return $leftFull.Equals($rightFull, [StringComparison]::OrdinalIgnoreCase)
 }
 
+function Stop-NvimSelfLinkIfNeeded {
+    if (-not $env:LOCALAPPDATA) { return }
+
+    $nvimTarget = Join-Path $env:LOCALAPPDATA 'nvim'
+    $targetReal = Get-RealExistingPath $nvimTarget
+    if (-not $targetReal) { return }
+
+    $repoReal = Get-RealExistingPath $ScriptDir
+    $repoNvimReal = Get-RealExistingPath (Join-Path $ScriptDir 'nvim')
+    if ((-not $repoReal -or -not (Test-SamePath $targetReal $repoReal)) -and
+        (-not $repoNvimReal -or -not (Test-SamePath $targetReal $repoNvimReal))) {
+        return
+    }
+
+    Write-Error @"
+setup.ps1: the repo lives at $ScriptDir, which overlaps the path that
+setup.ps1 would configure as the Neovim target. Move the repo elsewhere first
+(e.g. %USERPROFILE%\dotfiles) and re-run setup.ps1.
+"@
+    exit 1
+}
+
 function Get-ManagedConfigTargets {
     param([switch]$ExcludeWindowsTerminal)
     $wtSettings = Get-WindowsTerminalSettingsPath
@@ -398,6 +408,21 @@ function Get-ManagedConfigTargets {
         $targets = @($targets | Where-Object { -not (Test-SamePath $_ $wtSettings) })
     }
     return $targets
+}
+
+function Backup-WindowsTerminalSettings {
+    if ($SkipWindowsTerminalMerge) { return }
+
+    $settings = Get-WindowsTerminalSettingsPath
+    if (-not (Test-Path -LiteralPath $settings -PathType Leaf)) { return }
+
+    $backup = Get-UniqueBackupPath "$settings.bak.$Timestamp"
+    if ($DryRun) {
+        Write-Step "backup   $settings -> $backup; then Windows Terminal merge"
+    } else {
+        Copy-Item -LiteralPath $settings -Destination $backup -Force
+        Write-Step "backed up $settings -> $backup"
+    }
 }
 
 function Backup-PreexistingManagedTargets {
@@ -455,6 +480,7 @@ function Invoke-ChezmoiApplyPhase {
         $dryRunConfig = New-ChezmoiDryRunConfig
         $script:ChezmoiConfigArgs = @('--config', $dryRunConfig, '--config-format', 'toml')
         try {
+            Backup-WindowsTerminalSettings
             Backup-PreexistingManagedTargets
             $applyArgs = @('--dry-run', '--verbose', 'apply')
             if ($SkipWindowsTerminalMerge) {
@@ -488,6 +514,7 @@ function Invoke-ChezmoiApplyPhase {
     }
 
     Invoke-ChezmoiOrExit -Label 'chezmoi init' -Arguments @('init')
+    Backup-WindowsTerminalSettings
     Backup-PreexistingManagedTargets
     $realApplyArgs = @('--no-tty', '--force', 'apply')
     if ($SkipWindowsTerminalMerge) {
@@ -496,6 +523,12 @@ function Invoke-ChezmoiApplyPhase {
     }
     Invoke-ChezmoiOrExit -Label 'chezmoi apply' -Arguments $realApplyArgs
 }
+
+# Test seam: set DOTFILES_SETUP_PS1_SOURCE_ONLY and dot-source this file to load
+# helper functions without running install, config, or Neovim sync phases.
+if ($env:DOTFILES_SETUP_PS1_SOURCE_ONLY) { return }
+
+Stop-NvimSelfLinkIfNeeded
 
 # ---- Phase 1: dependencies ---------------------------------------------------
 if (-not $SkipDeps) {

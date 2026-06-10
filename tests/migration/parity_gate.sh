@@ -35,15 +35,6 @@ sha() {
     fi
 }
 
-mode() {
-    local path="$1"
-    if stat -c '%a' "$path" >/dev/null 2>&1; then
-        stat -c '%a' "$path"
-    else
-        stat -f '%Lp' "$path"
-    fi
-}
-
 deref() {
     local path="$1"
     if readlink -f "$path" >/dev/null 2>&1; then
@@ -103,6 +94,7 @@ assert_config_file_canonical() {
     repo_path="$REPO_ROOT/$repo_rel"
 
     [[ -e "$new_path" ]] || fail "$label: missing new path $new_path"
+    [[ -L "$new_path" ]] || fail "$label: new target is not a symlink: $new_path"
     [[ -f "$repo_path" ]] || fail "$label: missing canonical repo source $repo_path"
 
     new_real="$(deref "$new_path")"

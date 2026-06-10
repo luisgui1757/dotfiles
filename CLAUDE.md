@@ -384,9 +384,9 @@ save only**. The next plain `:w` formats normally. Implemented in
 
 - `setup.sh` and `setup.ps1` run `chezmoi init`, back up pre-existing managed
   file/symlink targets to `<target>.bak.<timestamp>` only when the target is not
-  already exact chezmoi state, a repo-owned symlink, or byte-identical content,
-  then run `chezmoi --no-tty --force apply`. `--skip-bootstrap` remains a
-  back-compat alias for `--skip-config` / `-SkipConfig`.
+  already exact chezmoi state or content-equivalent to the chezmoi target, then
+  run `chezmoi --no-tty --force apply`. `--skip-bootstrap` remains a back-compat
+  alias for `--skip-config` / `-SkipConfig`.
 - `setup.ps1` runs a symlink-privilege pre-flight before chezmoi apply because
   the Windows Neovim target is still a directory symlink: dry-run warns and
   skips the probe; real runs print elevated/Developer Mode state plus the
@@ -396,10 +396,12 @@ save only**. The next plain `:w` formats normally. Implemented in
   missing-git errors name the canonical first install command (`brew install
   git`, `apt install git`, or `winget install Git.Git`).
 - The Windows installer does NOT symlink `settings.json` for Windows Terminal:
-  WT rewrites that file on launch. Chezmoi's `modify_` entry merges the
-  user-owned keys by default and backs up the pre-merge `settings.json` first;
-  pass `-SkipWindowsTerminalMerge` to leave it untouched. The legacy
-  `-MergeWindowsTerminal` switch remains accepted as a no-op alias.
+  WT rewrites that file on launch. `setup.ps1` Phase 2 copies an existing
+  pre-merge file to `settings.json.bak.<timestamp>` before running chezmoi apply,
+  unless `-SkipWindowsTerminalMerge` is passed. Chezmoi's `modify_` entry then
+  merges the user-owned keys by default; a bare `chezmoi apply` performs the
+  merge but does not create setup's backup. The legacy `-MergeWindowsTerminal`
+  switch remains accepted as a no-op alias.
 - **lazygit config paths are OS-specific.** On macOS, lazygit v0.58 reports
   `~/Library/Application Support/lazygit` from `lazygit --print-config-dir`;
   on Linux/WSL it uses `~/.config/lazygit`; on Windows it uses

@@ -53,12 +53,14 @@ rewrites its own `settings.json`.
 `-MergeWindowsTerminal` switch is still accepted on `setup.ps1` as a no-op
 alias for older commands.
 
-The setup config phase backs up the pre-merge `settings.json` as
-`settings.json.bak.<timestamp>`, initializes missing `profiles` containers, and
-preserves custom `actions`, `schemes`, and `themes`, while entries with the same
-key or name are replaced by the repo fragment. A hand-edited top-level `theme`
-is reset to `rose-pine` on every run. If WT has not launched yet and
-`settings.json` is absent, chezmoi leaves it absent instead of fabricating one.
+The setup config phase backs up an existing pre-merge `settings.json` as
+`settings.json.bak.<timestamp>` before `chezmoi apply`. The chezmoi `modify_`
+merge then initializes missing `profiles` containers and preserves custom
+`actions`, `schemes`, and `themes`, while entries with the same key or name are
+replaced by the repo fragment. A hand-edited top-level `theme` is reset to
+`rose-pine` on every run. A bare `chezmoi apply` runs that merge but does not
+create setup's backup. If WT has not launched yet and `settings.json` is absent,
+chezmoi leaves it absent instead of fabricating one.
 
 For WSL, this is the supported terminal/font path: run
 `.\setup.ps1 -All` on Windows, then `./setup.sh --all` inside WSL. The WSL setup

@@ -43,8 +43,9 @@ For WSL, treat setup as split-host: run `.\setup.ps1 -All` on Windows so
 Windows Terminal, Hack Nerd Font, lazygit, and `win32yank` are installed on the
 rendering host, then run `./setup.sh --all` inside WSL for the Linux CLI/editor
 stack. Windows Terminal settings merge runs by default after WT has created
-`settings.json`; pass `-SkipWindowsTerminalMerge` only when you want setup to
-leave WT settings untouched. Linux Ghostty and Linux
+`settings.json`, and setup backs up the pre-merge file first; pass
+`-SkipWindowsTerminalMerge` only when you want setup to leave WT settings
+untouched. Linux Ghostty and Linux
 fontconfig fonts inside WSL are intentionally outside the happy path; opt in
 with `./setup.sh --experimental-wsl-gui` only when you explicitly want a WSLg /
 X11 GUI-terminal experiment.
@@ -150,10 +151,10 @@ Add `--dry-run` / `-DryRun` to preview every step without touching disk.
 Every script is safe to rerun. Pre-existing non-symlink targets are backed up to
 `<target>.bak.<timestamp>` with collision-proof suffixes (`.1`, `.2`, ...).
 Before setup lets `chezmoi --force apply` replace an existing managed target, it
-backs up only targets that are not already correct: exact chezmoi state,
-repo-owned symlinks, and byte-identical content are left alone. On Windows,
-setup still checks Developer Mode/elevation before applying because the Neovim
-directory target remains a symlink even though single-file configs are copies.
+backs up only targets that are not already correct: exact chezmoi state and
+content-equivalent targets are left alone. On Windows, setup still checks
+Developer Mode/elevation before applying because the Neovim directory target
+remains a symlink even though single-file configs are copies.
 
 ### Managed Configs
 
@@ -171,7 +172,7 @@ symlink, and Windows Terminal remains a merge.
 | tmux / psmux | `~/.tmux.conf` -> `tmux/tmux.conf` | same | `%USERPROFILE%\.tmux.conf` -> `tmux\tmux.conf` for psmux; WSL uses the Unix path |
 | Ghostty | `~/Library/Application Support/com.mitchellh.ghostty/config` -> `ghostty/config` | native Linux links `~/.config/ghostty/config`; WSL links it only with `--experimental-wsl-gui` | n/a |
 | lazygit | `~/Library/Application Support/lazygit/config.yml` -> `lazygit/config.yml` | `~/.config/lazygit/config.yml` -> `lazygit/config.yml` | `%LOCALAPPDATA%\lazygit\config.yml` -> `lazygit\config.yml` |
-| Windows Terminal | n/a | n/a | app installed by `setup.ps1`; chezmoi merges `windows-terminal/settings.fragment.jsonc` by default; opt out with `-SkipWindowsTerminalMerge`; see [windows-terminal/README.md](windows-terminal/README.md) |
+| Windows Terminal | n/a | n/a | app installed by `setup.ps1`; setup backs up existing `settings.json`, then chezmoi merges `windows-terminal/settings.fragment.jsonc` by default; opt out with `-SkipWindowsTerminalMerge`; see [windows-terminal/README.md](windows-terminal/README.md) |
 
 Chezmoi manages the Windows PowerShell 7 profile path
 `Documents\PowerShell\Microsoft.PowerShell_profile.ps1`. The Windows
@@ -430,8 +431,11 @@ the adjacent constant.
   `-MergeWindowsTerminal` remains accepted as a no-op alias for older commands.
 - **Windows Terminal settings.json is NOT symlinked** because WT auto-rewrites
   it. Only the user-owned keys live in `settings.fragment.jsonc`; the install
-  script merges them in by name, backs up the pre-merge file, and resets a
-  hand-edited `theme` back to `rose-pine` on every run unless you opt out.
+  script's config phase backs up an existing pre-merge file to
+  `settings.json.bak.<timestamp>`, then the chezmoi `modify_` merge updates keys
+  by name and resets a hand-edited `theme` back to `rose-pine` on every run
+  unless you opt out. A bare `chezmoi apply` runs the merge but does not create
+  setup's backup.
 - **Windows CI installs Scoop through its documented elevated path.** GitHub
   Windows runners are elevated, and Scoop blocks elevated bootstrap by default.
   `install-deps.ps1` detects elevation and runs the official installer with
