@@ -193,7 +193,9 @@ Surfaces that consume these: nvim (rose-pine plugin defaults), lualine
 (theme="rose-pine"), starship.toml (`[palettes.rose-pine]`), tmux.conf (hex
 literals in status/borders), ghostty/config (`theme = dark:Rose Pine,...`),
 windows-terminal/settings.fragment.jsonc (`schemes` + `themes`),
-shells/powershell_profile.ps1 (PSReadLine `-Colors`).
+shells/powershell_profile.ps1 (PSReadLine `-Colors` for syntax, the
+version-gated prediction colors, and `$PSStyle.FileInfo.Directory` for `ls`
+directory color).
 
 ### Refresh the lazy lockfile after adding plugins
 
@@ -629,6 +631,28 @@ save only**. The next plain `:w` formats normally. Implemented in
   parameter exists, PSReadLine ≥ 2.3.4). Microsoft + psmux #150 both point at
   `OnIdle` as the right hook. Drop it once a psmux release fixes the residual
   race upstream (no PR yet; track issue #150 / #165).
+- **Prediction colors are version-gated and isolated from the syntax `-Colors`.**
+  The ListView prediction (the inline + dropdown history suggestions — our
+  "fzf-like" history UI) defaulted to a near-background grey that is invisible on
+  Rose Pine. The fix sets `InlinePrediction` (`#908caa`, PSReadLine ≥ 2.1.0) and
+  `ListPrediction` (`#ebbcba`) / `ListPredictionSelected` (`#f6c177`) (≥ 2.2.0).
+  These are applied in SEPARATE `Set-PSReadLineOption -Colors` calls, NOT folded
+  into the main syntax hashtable: an unknown color key throws and would drop the
+  WHOLE hashtable, so on an old PSReadLine the syntax colors must not depend on a
+  prediction key existing. Do NOT set `ListPredictionTooltip`.
+- **fzf is unified across shells via PSFzf.** `install-deps.ps1` installs `fzf`
+  (catalog: winget `junegunn.fzf` / choco / scoop) and `Install-PSFzf` installs
+  the PSFzf module from PSGallery (NOT in `$Catalog` — it is a module, not a
+  binary; bootstraps the NuGet provider first so `Install-Module` never blocks on
+  a prompt in CI). The profile wires Ctrl+R (fuzzy history, intentionally
+  overriding PSReadLine's reverse-search for POSIX parity with zsh), Ctrl+T
+  (file) and Alt+C (cd) ONLY when both the PSFzf module and the `fzf` binary are
+  present. The zsh side already used `fzf`; this brings Windows to parity.
+- **`ls`/`Get-ChildItem` directories are gold via `$PSStyle.FileInfo.Directory`.**
+  The default directory color (bright blue) is unreadable on Rose Pine dark.
+  Guarded by `if ($PSStyle)` (absent on Windows PowerShell 5.1 and pwsh < 7.2);
+  uses `$PSStyle.Foreground.FromRgb(0xf6c177)` so the source carries no raw ANSI
+  escape byte (keeps the `.ps1` pure-ASCII invariant).
 
 ## Login shell: zsh adoption (install-deps.sh)
 

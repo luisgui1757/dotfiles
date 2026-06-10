@@ -131,6 +131,26 @@ if (Get-Module -ListAvailable PSReadLine) {
         }
     } catch { Write-Verbose $_.Exception.Message }
 
+    # Prediction colors. The ListView prediction (the inline + dropdown
+    # suggestions, our "fzf-like" history UI) defaults to a near-background grey
+    # that is invisible on Rose Pine, so paint it explicitly. These keys landed
+    # in separate PSReadLine versions -- InlinePrediction in 2.1.0, ListPrediction
+    # + ListPredictionSelected in 2.2.0 -- and an unknown color key throws and
+    # would drop the WHOLE -Colors hashtable. So they are applied here, version-
+    # gated and isolated from the syntax colors above. ListPredictionTooltip is
+    # left at its default.
+    if ($psrl -and $psrl.Version -ge [Version]'2.1.0') {
+        try { Set-PSReadLineOption -Colors @{ InlinePrediction = '#908caa' } -ErrorAction Stop } catch { Write-Verbose $_.Exception.Message }
+    }
+    if ($psrl -and $psrl.Version -ge [Version]'2.2.0') {
+        try {
+            Set-PSReadLineOption -Colors @{
+                ListPrediction         = '#ebbcba'
+                ListPredictionSelected = '#f6c177'
+            } -ErrorAction Stop
+        } catch { Write-Verbose $_.Exception.Message }
+    }
+
     try { Set-PSReadLineKeyHandler -Key Tab -Function MenuComplete -ErrorAction Stop } catch { Write-Verbose $_.Exception.Message }
     try { Set-PSReadLineKeyHandler -Key UpArrow -Function HistorySearchBackward -ErrorAction Stop } catch { Write-Verbose $_.Exception.Message }
     try { Set-PSReadLineKeyHandler -Key DownArrow -Function HistorySearchForward -ErrorAction Stop } catch { Write-Verbose $_.Exception.Message }
@@ -160,4 +180,29 @@ if (Get-Module -ListAvailable PSReadLine) {
             Set-PSReadLineKeyHandler -Key Tab -Function MenuComplete -ErrorAction SilentlyContinue
         }
     }
+}
+
+# ---- PSFzf: fuzzy history / file / directory pickers -------------------------
+# Unifies the shell fuzzy UX on fzf (the same tool the zsh side uses), wired
+# only when BOTH the PSFzf module and the fzf binary are present so a machine
+# without fzf keeps a working profile. Ctrl+R intentionally OVERRIDES the
+# PSReadLine reverse-history search with the fzf fuzzy picker (POSIX parity --
+# the zsh side binds the same chord). Ctrl+T = fuzzy file insert, Alt+C = fuzzy
+# cd. install-deps installs fzf + PSFzf.
+if ((Get-Module -ListAvailable PSFzf) -and (Get-Command fzf -ErrorAction SilentlyContinue)) {
+    try {
+        Import-Module PSFzf -ErrorAction Stop
+        Set-PsFzfOption -PSReadlineChordProvider 'Ctrl+t' `
+            -PSReadlineChordReverseHistory 'Ctrl+r' `
+            -PSReadlineChordSetLocation 'Alt+c' -ErrorAction Stop
+    } catch { Write-Verbose $_.Exception.Message }
+}
+
+# ---- Directory listing color -------------------------------------------------
+# PowerShell 7.2+ colorizes Get-ChildItem/ls via $PSStyle. The default directory
+# color (bright blue) is unreadable on the Rose Pine dark background, so paint
+# directories gold. $PSStyle is absent on Windows PowerShell 5.1 and pwsh < 7.2,
+# hence the guard; FromRgb keeps the source free of raw ANSI escape bytes.
+if ($PSStyle) {
+    try { $PSStyle.FileInfo.Directory = $PSStyle.Foreground.FromRgb(0xf6c177) } catch { Write-Verbose $_.Exception.Message }
 }

@@ -177,6 +177,7 @@ $Catalog = @{
     starship             = @{ winget = 'Starship.Starship';                choco = 'starship';             scoop = 'starship'             ; purpose = 'cross-shell prompt' }
     rg                   = @{ winget = 'BurntSushi.ripgrep.MSVC';          choco = 'ripgrep';              scoop = 'ripgrep'              ; purpose = 'Telescope live_grep backend' }
     fd                   = @{ winget = 'sharkdp.fd';                       choco = 'fd';                   scoop = 'fd'                   ; purpose = 'Telescope find_files backend' }
+    fzf                  = @{ winget = 'junegunn.fzf';                     choco = 'fzf';                  scoop = 'fzf'                  ; purpose = 'fuzzy finder (PSFzf history/file/dir pickers)' }
     chezmoi              = @{ winget = 'twpayne.chezmoi';                  choco = 'chezmoi';              scoop = 'chezmoi'              ; purpose = 'dotfiles config manager' }
     lazygit              = @{ winget = 'JesseDuffield.lazygit';            choco = 'lazygit';              scoop = 'lazygit'              ; purpose = 'terminal git UI' }
     wt                   = @{ winget = 'Microsoft.WindowsTerminal';        choco = 'microsoft-windows-terminal'; scoop = 'extras/windows-terminal'; purpose = 'Windows Terminal host for PowerShell and WSL' }
@@ -197,6 +198,7 @@ $Catalog = @{
 $BinaryName = @{
     rg          = 'rg'
     fd          = 'fd'
+    fzf         = 'fzf'
     chezmoi     = 'chezmoi'
     lazygit     = 'lazygit'
     wt          = 'wt'
@@ -497,6 +499,40 @@ function Install-Psmux {
     $script:InstallFailures += [pscustomobject]@{ Tool='psmux'; Pm='scoop/winget/choco'; Pkg='psmux'; ExitCode=$LASTEXITCODE }
 }
 
+# PSFzf is a PowerShell module (PSGallery), not a package-manager binary, so it
+# installs via Install-Module rather than the $Catalog. It wires fzf into
+# PSReadLine (Ctrl+R / Ctrl+T / Alt+C); the profile activates those bindings only
+# when both PSFzf and the fzf binary are present. Not pinned -- matches the rest
+# of the provisioning layer.
+function Install-PSFzf {
+    if (Get-Module -ListAvailable -Name PSFzf) {
+        Write-Host ("  ok        {0,-26} already installed" -f "PSFzf")
+        return
+    }
+    if (-not (Ask "Install PSFzf (fzf fuzzy pickers for PSReadLine)?")) {
+        Write-Host ("  skipped   {0,-26}" -f "PSFzf")
+        return
+    }
+    if ($DryRun) {
+        Write-Host "  would: Install-Module PSFzf -Scope CurrentUser -Repository PSGallery -Force"
+        return
+    }
+    try {
+        # Non-interactive bootstrap: ensure the NuGet provider so Install-Module
+        # never blocks on a Y/N prompt in CI. -Force suppresses the
+        # untrusted-repository prompt for PSGallery.
+        try { $null = Get-PackageProvider -Name NuGet -ForceBootstrap -ErrorAction Stop } catch { Write-Verbose $_.Exception.Message }
+        Install-Module -Name PSFzf -Scope CurrentUser -Repository PSGallery -Force -AllowClobber -ErrorAction Stop
+        if (Get-Module -ListAvailable -Name PSFzf) {
+            Write-Host ("  installed {0,-26} via PSGallery" -f "PSFzf")
+            return
+        }
+    } catch {
+        Write-Warning ("PSFzf install failed: " + $_.Exception.Message)
+    }
+    $script:InstallFailures += [pscustomobject]@{ Tool='PSFzf'; Pm='PSGallery'; Pkg='PSFzf'; ExitCode=$LASTEXITCODE }
+}
+
 if ($env:INSTALL_DEPS_PS1_SOURCE_ONLY) { return }
 
 $Pm = Get-AvailablePM
@@ -548,6 +584,7 @@ Install-One nvim
 Install-One make
 Install-One rg
 Install-One fd
+Install-One fzf
 Install-One chezmoi
 Install-One lazygit
 
@@ -563,6 +600,7 @@ Install-Psmux
 Section "modern shell (optional, you can stay on Windows PowerShell 5.1)"
 Install-One pwsh
 Update-ScoopTool pwsh
+Install-PSFzf
 
 Section "language tooling (for LSP / formatter back-ends)"
 Install-One python
