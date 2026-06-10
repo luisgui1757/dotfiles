@@ -2,9 +2,10 @@
        wrong OS, otherwise chezmoi still creates the empty parent dirs (e.g.
        ~/.config/lazygit, ~/AppData, or ~/Documents on macOS), diverging from
        the legacy path. AppData is one ignore covering all Windows LocalAppData
-       targets (nvim + lazygit + WT). Ghostty's legacy WSL opt-in is still out
-       of scope for the chezmoi pilot; this gate only models the darwin/linux
-       split available through .chezmoi.os. */ -}}
+       targets (nvim + lazygit + WT). On WSL (.isWsl, from kernel.osrelease)
+       ghostty is also ignored -- the terminal is a Windows-host responsibility,
+       matching the legacy bootstrap.sh default-skip; lazygit stays managed on
+       WSL. */ -}}
 {{- if ne .targetOS "windows" }}
 .tmux.windows.conf
 AppData
@@ -20,5 +21,7 @@ Library
 {{- end }}
 {{- if ne .targetOS "linux" }}
 .config/lazygit
+.config/ghostty
+{{- else if .isWsl }}
 .config/ghostty
 {{- end }}

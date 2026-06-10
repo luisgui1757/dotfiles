@@ -1,4 +1,12 @@
 {{- $os := .chezmoi.os -}}
+{{- /* WSL looks like linux to .chezmoi.os; detect it from the kernel osrelease
+       (e.g. "...-microsoft-standard-WSL2") so WSL-host-owned configs (ghostty)
+       can be gated, matching the legacy bootstrap.sh default-skip on WSL. */ -}}
+{{- $isWsl := false -}}
+{{- if eq $os "linux" -}}
+{{-   $osr := dig "kernel" "osrelease" "" .chezmoi | lower -}}
+{{-   if or (contains "microsoft" $osr) (contains "wsl" $osr) -}}{{- $isWsl = true -}}{{- end -}}
+{{- end -}}
 {{- /* top-level `mode` FIRST — before [data] — or it becomes data.mode and is ignored. */ -}}
 {{- if eq $os "windows" }}
 mode = "file"      # simple single-file configs need no symlink privilege; nvim dir-symlink still does (see MIGRATION_STATUS)
@@ -8,3 +16,4 @@ mode = "symlink"   # live-edit
 
 [data]
     targetOS = {{ .chezmoi.os | quote }}     # the ONE place production templates read the OS; tests override it
+    isWsl = {{ $isWsl }}                      # WSL detected via kernel.osrelease; gates WSL-host-owned configs (tests override it)
