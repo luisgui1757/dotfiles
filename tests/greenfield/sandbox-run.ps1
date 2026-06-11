@@ -1,7 +1,10 @@
 [CmdletBinding()]
 param(
     [string]$MappedRepo = 'C:\Users\WDAGUtilityAccount\Desktop\dotfiles-repo',
-    [string]$WorkRepo = ''
+    [string]$WorkRepo = '',
+    # When the repo is already at $WorkRepo (e.g. sandbox-bootstrap.ps1 downloaded
+    # it), skip the mapped-folder copy and use it in place.
+    [switch]$SkipCopy
 )
 
 $ErrorActionPreference = 'Stop'
@@ -109,13 +112,19 @@ $logDir = Join-Path $env:USERPROFILE 'Desktop\dotfiles-greenfield-logs'
 New-Item -ItemType Directory -Path $logDir -Force | Out-Null
 $setupLog = Join-Path $logDir 'setup-ps1.log'
 
-if (-not (Test-Path -LiteralPath $MappedRepo)) {
-    Stop-Greenfield "mapped repo is missing: $MappedRepo"
+if ($SkipCopy) {
+    if (-not (Test-Path -LiteralPath (Join-Path $WorkRepo 'setup.ps1'))) {
+        Stop-Greenfield "repo not found at $WorkRepo (SkipCopy was set)"
+    }
+    Write-Host "greenfield sandbox: using repo already at $WorkRepo"
+} else {
+    if (-not (Test-Path -LiteralPath $MappedRepo)) {
+        Stop-Greenfield "mapped repo is missing: $MappedRepo"
+    }
+    Write-Host "greenfield sandbox: copying read-only repo to $WorkRepo"
+    Invoke-Robocopy -Source $MappedRepo -Destination $WorkRepo
+    Clear-ReadOnlyAttributes -Path $WorkRepo
 }
-
-Write-Host "greenfield sandbox: copying read-only repo to $WorkRepo"
-Invoke-Robocopy -Source $MappedRepo -Destination $WorkRepo
-Clear-ReadOnlyAttributes -Path $WorkRepo
 
 Write-Host "greenfield sandbox: preparing host (Developer Mode + Defender speedup)"
 Initialize-SandboxHost

@@ -7,14 +7,11 @@
        makes the sandbox fail to start.
   <MemoryInMB>16384</MemoryInMB>
   -->
-  <MappedFolders>
-    <MappedFolder>
-      <HostFolder>..\..</HostFolder>
-      <SandboxFolder>C:\Users\WDAGUtilityAccount\Desktop\dotfiles-repo</SandboxFolder>
-      <ReadOnly>true</ReadOnly>
-    </MappedFolder>
-  </MappedFolders>
+  <!-- Self-contained: no mapped folder. The logon command downloads the repo and
+       runs the greenfield flow, so double-clicking this .wsb works from anywhere
+       (a mapped HostFolder needed Win11 22H2+ AND the repo cloned at the right
+       spot). To test a different branch, change the ref in the URL below. -->
   <LogonCommand>
-    <Command>powershell.exe -NoExit -NoProfile -ExecutionPolicy Bypass -File "C:\Users\WDAGUtilityAccount\Desktop\dotfiles-repo\tests\greenfield\sandbox-run.ps1"</Command>
+    <Command>powershell.exe -NoExit -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; iex (irm 'https://raw.githubusercontent.com/luisgui1757/dotfiles/chezmoi-pilot/tests/greenfield/sandbox-bootstrap.ps1')"</Command>
   </LogonCommand>
 </Configuration>

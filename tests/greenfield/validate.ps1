@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [string]$Repo = '',
-    [string]$Home = '',
+    [string]$HomeOverride = '',
     [switch]$ConfigOnly
 )
 
@@ -186,8 +186,8 @@ if (-not $Repo) {
 }
 $Repo = (Resolve-Path -LiteralPath $Repo -ErrorAction Stop).Path
 
-if ($Home) {
-    $resolvedHome = (Resolve-Path -LiteralPath $Home -ErrorAction Stop).Path
+if ($HomeOverride) {
+    $resolvedHome = (Resolve-Path -LiteralPath $HomeOverride -ErrorAction Stop).Path
     $env:USERPROFILE = $resolvedHome
     $env:HOME = $resolvedHome
     $env:LOCALAPPDATA = Join-Path $resolvedHome 'AppData\Local'

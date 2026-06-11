@@ -22,27 +22,25 @@ What is automated vs manual:
 
 ### Windows Sandbox
 
-The `.wsb` does spin-up + install + automated validation for you. From the repo
-checkout (on the `chezmoi-pilot` branch) in a normal PowerShell:
+The `.wsb` is **self-contained** -- it does spin-up + download + install +
+automated validation for you, and works from anywhere (no need to clone the repo
+or be on a specific Windows build first). Just **double-click
+`tests\greenfield\windows-sandbox.wsb`** (or from a PowerShell on the host:
+`explorer <path>\windows-sandbox.wsb`).
 
-```powershell
-explorer .\tests\greenfield\windows-sandbox.wsb
-```
-
-The Sandbox boots clean, copies the repo to `%USERPROFILE%\dotfiles`, **enables
-Developer Mode for you** (one UAC prompt -- click **Yes**), runs `setup.ps1
--All`, then `validate.ps1`. Watch the auto-opened PowerShell window for `PASS:`
-lines and a final summary; logs are on the sandbox desktop.
+The Sandbox boots clean, its logon command **downloads the repo** to
+`%USERPROFILE%\dotfiles`, **enables Developer Mode + reduces Defender scanning
+for you** (one UAC prompt -- click **Yes**), runs `setup.ps1 -All`, then
+`validate.ps1`. Watch the auto-opened PowerShell window for `PASS:` lines and a
+final summary; logs are on the sandbox desktop.
 
 That single UAC prompt is the ONLY thing you click. You do NOT need to open
 Settings. (Background: the Neovim config is a symlink, which Windows only allows
 with Developer Mode on; the script flips that one registry key elevated, then
 runs setup non-elevated so Scoop still works.)
 
-Note: the `.wsb` maps the repo with a RELATIVE path that needs Windows 11 22H2+.
-If the Sandbox fails to launch with a mapped-folder error, edit
-`tests\greenfield\windows-sandbox.wsb` and replace `..\..` with the absolute path
-to your repo.
+To test a different branch, change the ref in the `.wsb` logon-command URL
+(it points at `chezmoi-pilot`). For more RAM, see "Speeding up the Sandbox" below.
 
 Then do Part 3 inside the sandbox (it is a full Windows desktop: open Windows
 Terminal, VS Code, psmux).

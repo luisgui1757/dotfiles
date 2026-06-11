@@ -207,6 +207,24 @@ else
     echo "ok  : no apostrophes in .ps1 comments"
 fi
 
+# $Home is a READ-ONLY automatic variable. Assigning to it -- including declaring
+# a param named $Home -- PARSES fine but CRASHES at runtime ("Cannot overwrite
+# variable Home because it is read-only or constant"). It bit validate.ps1
+# (a `[string]$Home` param) and only surfaced on a real Windows run. Use
+# $HomeOverride / $userHome / $env:USERPROFILE instead. This flags an assignment
+# (`$Home =`) or a typed param (`[string]$Home`); reading $Home is fine.
+# ($matches is a DIFFERENT trap -- it is writable but gets clobbered by -match,
+# a correctness issue, not a crash -- so it is not banned here.)
+ps1_home_assign=$(grep -nEi '\$home[[:space:]]*=|\]\$home\b' "${ps1_files[@]}" 2>/dev/null || true)
+if [[ -n "$ps1_home_assign" ]]; then
+    echo "FAIL: assignment to read-only \$Home crashes PowerShell at runtime:"
+    # shellcheck disable=SC2001  # sed is clearer than ${//} for line-prefixing
+    echo "$ps1_home_assign" | sed 's/^/  /'
+    fail=1
+else
+    echo "ok  : no assignment to read-only \$Home in .ps1"
+fi
+
 # Lua indentation: spaces only. stylua.toml at repo root declares Spaces+2;
 # .editorconfig [*.lua] declares space+2. If a .lua file starts a line with
 # a TAB, either stylua was bypassed (someone wrote without format-on-save)
