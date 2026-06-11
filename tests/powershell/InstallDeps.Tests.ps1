@@ -597,12 +597,14 @@ Describe "install-deps.ps1" {
             [pscustomobject]@{ Tool = 'git'; Kind = 'tool'; Binary = 'git'; Module = '' },
             [pscustomobject]@{ Tool = 'fd'; Kind = 'tool'; Binary = 'fd'; Module = '' }
         )
-        $output = & {
+        # Out-String emits CRLF on Windows; strip CR so the (?m) row-end
+        # anchors ([ \t]*$) match -- in .NET regex $ does not match before a bare \r.
+        $output = (& {
             Invoke-InstallDepsUpdateMode -SpecList $specList -PresenceTester {
                 param([string]$Tool)
                 return ($Tool -eq 'git')
             } -IsDryRun $true
-        } 6>&1 | Out-String
+        } 6>&1 | Out-String) -replace "`r", ''
 
         $output | Should -Match '(?m)^\s*would:\s+scoop update[ \t]*$'
         $output | Should -Match '(?m)^\s*would:\s+scoop update git[ \t]*$'

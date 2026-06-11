@@ -195,7 +195,9 @@ Describe "setup.ps1 update mode" {
             throw "nvim lookup must not run during dry-run update mode"
         }
 
-        $output = & {
+        # Out-String emits CRLF on Windows; strip CR so the (?m) line-end
+        # anchor ([ \t]*$) matches -- in .NET regex $ does not match before a bare \r.
+        $output = (& {
             Invoke-SetupUpdateMode `
                 -Root $root `
                 -DependencyArgs @{} `
@@ -203,7 +205,7 @@ Describe "setup.ps1 update mode" {
                 -DependencyRunner $depsRunner `
                 -CommandTester $commandTester `
                 -NvimRunner $nvimRunner
-        } 6>&1 | Out-String
+        } 6>&1 | Out-String) -replace "`r", ''
 
         $script:SetupUpdateDepsArgs['Update'] | Should -BeTrue
         $script:SetupUpdateDepsArgs['DryRun'] | Should -BeTrue

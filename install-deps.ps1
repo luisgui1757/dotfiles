@@ -543,10 +543,14 @@ function Update-ScoopTool {
         [switch]$NoPrompt,
         [switch]$SkipManifestRefresh,
         [switch]$ReportSkip,
+        [switch]$AssumePresent,
         [bool]$IsDryRun = $DryRun
     )
     if (-not (Get-Command scoop -ErrorAction SilentlyContinue)) { return }
-    if (-not (Test-Tool $tool)) {
+    # -AssumePresent: the caller (update mode) already determined presence via its
+    # own tester, so skip the redundant Test-Tool recheck. Without it the two
+    # checks can disagree (e.g. a mocked tester vs the real Get-Command).
+    if ((-not $AssumePresent) -and (-not (Test-Tool $tool))) {
         if ($ReportSkip) { Write-Host ("  skipped   {0,-26} not installed" -f $tool) }
         return
     }
@@ -1276,7 +1280,7 @@ function Invoke-InstallDepsUpdateMode {
             Write-Host ("  skipped   {0,-26} not installed" -f $tool)
             continue
         }
-        Update-ScoopTool -tool $tool -NoPrompt -SkipManifestRefresh -ReportSkip -IsDryRun $IsDryRun
+        Update-ScoopTool -tool $tool -NoPrompt -SkipManifestRefresh -ReportSkip -AssumePresent -IsDryRun $IsDryRun
     }
 
     Write-Host ""
