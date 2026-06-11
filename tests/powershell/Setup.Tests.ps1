@@ -214,25 +214,25 @@ Describe "setup.ps1 Windows Terminal backup" {
     }
 
     It "does not mirror unpackaged Windows Terminal settings during dry run" {
-        Set-Variable -Name DryRun -Scope Script -Value $true
         $settings = Get-WindowsTerminalSettingsPath
         $unpackaged = Get-WindowsTerminalUnpackagedSettingsPath
         New-Item -ItemType Directory -Force -Path (Split-Path -Parent $settings) | Out-Null
         [System.IO.File]::WriteAllText($settings, '{"theme":"rose-pine"}', [System.Text.UTF8Encoding]::new($false))
 
-        Copy-WindowsTerminalSettingsForUnpackaged
+        # Inject the switch directly -- Set-Variable -Scope Script does not reach
+        # the dot-sourced function reliably.
+        Copy-WindowsTerminalSettingsForUnpackaged -IsDryRun $true
 
         Test-Path -LiteralPath $unpackaged -PathType Leaf | Should -BeFalse
     }
 
     It "does not mirror unpackaged Windows Terminal settings when the merge is skipped" {
-        Set-Variable -Name SkipWindowsTerminalMerge -Scope Script -Value $true
         $settings = Get-WindowsTerminalSettingsPath
         $unpackaged = Get-WindowsTerminalUnpackagedSettingsPath
         New-Item -ItemType Directory -Force -Path (Split-Path -Parent $settings) | Out-Null
         [System.IO.File]::WriteAllText($settings, '{"theme":"rose-pine"}', [System.Text.UTF8Encoding]::new($false))
 
-        Copy-WindowsTerminalSettingsForUnpackaged
+        Copy-WindowsTerminalSettingsForUnpackaged -IsSkipMerge $true
 
         Test-Path -LiteralPath $unpackaged -PathType Leaf | Should -BeFalse
     }

@@ -451,7 +451,14 @@ function Get-WindowsTerminalUnpackagedSettingsPath {
 }
 
 function Copy-WindowsTerminalSettingsForUnpackaged {
-    if ($DryRun -or $SkipWindowsTerminalMerge) { return }
+    # Params default to the script switches but are overridable so tests can drive
+    # the dry-run / skip paths directly -- Pester `Set-Variable -Scope Script` does
+    # NOT reliably override how a dot-sourced function reads a script variable.
+    param(
+        [bool]$IsDryRun = $DryRun,
+        [bool]$IsSkipMerge = $SkipWindowsTerminalMerge
+    )
+    if ($IsDryRun -or $IsSkipMerge) { return }
 
     $packagedSettings = Get-WindowsTerminalSettingsPath
     if (-not (Test-Path -LiteralPath $packagedSettings -PathType Leaf)) { return }
