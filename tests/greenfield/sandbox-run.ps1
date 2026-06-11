@@ -118,6 +118,17 @@ Enable-DeveloperMode
 Write-Host "greenfield sandbox: running setup.ps1 -All"
 Invoke-SetupAndCheck -Repo $WorkRepo -Log $setupLog
 
+# Windows Terminal is an MSIX package and the Sandbox cannot register MSIX, so
+# the package-manager install in setup fails here. Install the portable build so
+# the WT visual checks (maximized, scrollbar, fonts) are testable. Best-effort --
+# a failure here must not fail the whole greenfield run.
+Write-Host "greenfield sandbox: ensuring Windows Terminal (portable build)"
+try {
+    & (Join-Path $WorkRepo 'tests\greenfield\install-wt-portable.ps1')
+} catch {
+    Write-Host "greenfield sandbox: portable Windows Terminal install failed (continuing): $($_.Exception.Message)" -ForegroundColor Yellow
+}
+
 Write-Host "greenfield sandbox: running shared validator"
 & (Join-Path $WorkRepo 'tests\greenfield\validate.ps1') -Repo $WorkRepo
 if ($LASTEXITCODE -ne 0) {

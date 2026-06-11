@@ -203,6 +203,15 @@ proves.
 
 ### Windows Terminal (Windows only)
 
+In a real install WT comes from scoop/winget/choco. In **Windows Sandbox** those
+fail (WT is an MSIX package and Sandbox cannot register MSIX), so install the
+**portable** build instead -- the `.wsb` path does this for you; on the manual
+path run it yourself:
+
+```powershell
+.\tests\greenfield\install-wt-portable.ps1 -Launch
+```
+
 | Run | Expect | Proves |
 |-----|--------|--------|
 | launch Windows Terminal fresh | opens **maximized** (NOT fullscreen) | `launchMode: maximized` |
