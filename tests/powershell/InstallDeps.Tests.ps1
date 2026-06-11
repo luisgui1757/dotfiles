@@ -127,6 +127,32 @@ Describe "install-deps.ps1" {
         $script:ScoopArgs | Should -Contain 'bucket add nerd-fonts'
     }
 
+    It "installs git before adding scoop buckets when git is absent" {
+        # Regression: scoop bucket add clones with git. On a truly fresh machine
+        # (Windows Sandbox) git is not installed yet, so the bucket adds failed
+        # with "Git is required for buckets". git must be installed (from main,
+        # which needs no git) BEFORE the bucket adds.
+        . $script:ImportInstallDepsForTest
+        $script:ScoopArgs = @()
+        Mock -CommandName Get-Command -MockWith {
+            return [pscustomobject]@{ Name = 'scoop'; Source = 'scoop' }
+        } -ParameterFilter { $Name -eq 'scoop' }
+        Mock -CommandName Get-Command -MockWith { return $null } -ParameterFilter { $Name -eq 'git' }
+        Mock -CommandName Test-Path -MockWith { return $false }
+        Mock -CommandName Add-ScoopToPathForCurrentProcess -MockWith { }
+        Mock -CommandName scoop -MockWith {
+            $script:ScoopArgs += ($args -join ' ')
+        }
+
+        Install-Scoop | Should -BeTrue
+
+        $script:ScoopArgs | Should -Contain 'install git'
+        $gitIndex = [array]::IndexOf($script:ScoopArgs, 'install git')
+        $extrasIndex = [array]::IndexOf($script:ScoopArgs, 'bucket add extras')
+        $gitIndex | Should -BeGreaterOrEqual 0
+        $gitIndex | Should -BeLessThan $extrasIndex
+    }
+
     It "skips scoop bucket add when the psmux bucket already exists" {
         . $script:ImportInstallDepsForTest
         $script:ScoopArgs = @()

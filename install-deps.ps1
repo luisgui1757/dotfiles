@@ -110,6 +110,21 @@ function Add-ScoopBucketSafe {
 function Ensure-ScoopBuckets {
     if (-not (Get-Command scoop -ErrorAction SilentlyContinue)) { return }
     if ($DryRun) { return }
+    # `scoop bucket add` clones the bucket repo with git, so git MUST exist first.
+    # On a truly fresh machine (Windows Sandbox, clean install) git is not present
+    # yet at this point, and the extras/nerd-fonts adds fail with "Git is required
+    # for buckets". Install git from the main bucket first -- main ships with scoop
+    # and needs no git -- before adding the other buckets. (CI runners come with
+    # git preinstalled, which hid this on every hosted job.)
+    if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+        Write-Host "  scoop: installing git first (required to clone buckets)"
+        try {
+            scoop install git
+            Add-ScoopToPathForCurrentProcess
+        } catch {
+            Write-Warning ("scoop install git failed; bucket adds may fail: " + $_.Exception.Message)
+        }
+    }
     Add-ScoopBucketSafe -Name 'extras' | Out-Null
     Add-ScoopBucketSafe -Name 'nerd-fonts' | Out-Null
 }

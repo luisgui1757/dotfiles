@@ -498,6 +498,14 @@ save only**. The next plain `:w` formats normally. Implemented in
   `Add-ScoopBucketSafe` (guarded by `tests/static/repo_policy_test.sh`). Local
   setup still recommends Developer Mode plus a normal PowerShell; do not
   elevate the whole local setup unless you intentionally want the admin path.
+  **`Ensure-ScoopBuckets` installs `git` (from the bucket-less `main` bucket)
+  BEFORE adding `extras`/`nerd-fonts`.** `scoop bucket add` git-clones the bucket
+  repo, so on a truly fresh machine (Windows Sandbox / clean install) the adds
+  fail with "Git is required for buckets" because git is not installed yet at
+  that point. CI runners ship git preinstalled, which hid this on every hosted
+  job -- it only surfaced in a real greenfield Sandbox run. Guarded by the
+  "installs git before adding scoop buckets when git is absent" Pester test in
+  `InstallDeps.Tests.ps1`.
 - **`DOTFILES_SKIP_BREW_BOOTSTRAP=1` is a CI/native-PM test knob.** On Linux,
   when no `brew` is already installed, this prevents `install-deps.sh --all`
   from bootstrapping Linuxbrew and keeps the detected native package manager
