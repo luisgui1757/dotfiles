@@ -11,6 +11,10 @@ interactive desktop or local virtualization and can hang or fail headless. The
 shared validators here are factored so `.github/workflows/e2e-install.yml` could
 call them later, but this change intentionally does not rewire CI.
 
+For a literal copy-paste step-by-step (spin up Windows Sandbox / a `tart`
+macOS or Linux VM, install, then a per-tool "run this, expect that" checklist),
+see [RUNBOOK.md](RUNBOOK.md).
+
 ## Shared validators
 
 Run the validators after a real setup:
