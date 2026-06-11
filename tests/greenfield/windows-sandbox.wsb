@@ -1,6 +1,12 @@
 <Configuration>
   <VGpu>Enable</VGpu>
   <Networking>Enable</Networking>
+  <!-- Speed: on a high-RAM host, uncomment and bump this so the sandbox can
+       cache the install I/O (e.g. 16384 = 16 GB, 32768 = 32 GB). Leave it
+       commented on a low-RAM host, because requesting more RAM than the host has
+       makes the sandbox fail to start.
+  <MemoryInMB>16384</MemoryInMB>
+  -->
   <MappedFolders>
     <MappedFolder>
       <HostFolder>..\..</HostFolder>

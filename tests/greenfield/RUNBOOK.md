@@ -78,6 +78,28 @@ Caveat: the admin path is fine because the sandbox is throwaway. On your REAL
 machine prefer Developer Mode + a normal (non-admin) PowerShell, so Scoop is
 owned by your user rather than admin.
 
+#### Speeding up the Sandbox
+
+Installs feel slow mostly because Windows Defender scans every file Scoop
+extracts, and the sandbox boots with little RAM. The sandbox is NOT CPU-limited
+(it uses all host cores), so the wins are:
+
+1. **More RAM** (host side, before launch): edit `windows-sandbox.wsb` and
+   uncomment/raise `<MemoryInMB>` to e.g. `16384` (16 GB) or `32768` (32 GB) on a
+   high-RAM host. The `.wsb` ships it commented so it never breaks a low-RAM host.
+2. **Turn off Defender real-time scanning** (the single biggest install speedup).
+   The `.wsb` path does this for you (one UAC prompt). On the MANUAL admin path,
+   run this BEFORE the install block:
+
+   ```powershell
+   Set-MpPreference -DisableRealtimeMonitoring $true -ErrorAction SilentlyContinue
+   Add-MpPreference -ExclusionPath "$env:USERPROFILE\scoop","$env:USERPROFILE\dotfiles","$env:TEMP","$env:LOCALAPPDATA" -ErrorAction SilentlyContinue
+   ```
+
+Slow DOWNLOADS in the sandbox are usually the large one-time payloads (pwsh is
+~111 MB, python ~29 MB) plus Defender scanning the stream -- step 2 helps those
+too. The host network is shared as-is, so this is not a dotfiles issue.
+
 ### tart macOS VM
 
 ```bash
