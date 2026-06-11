@@ -473,6 +473,13 @@ save only**. The next plain `:w` formats normally. Implemented in
   install prompt.** The table is display-only: it uses the same presence checks
   as the installer, best-effort `--version` probes, and still leaves all actual
   install/skip decisions to the existing per-tool functions.
+- **A C compiler is installed so LuaSnip can build `jsregexp`.** Without one,
+  the nvim Lazy build prints "No C compiler found" and `jsregexp` is skipped
+  (LuaSnip still works, minus JS-regex snippet transforms). POSIX installs the
+  native toolchain (`build-essential` / `gcc` / `base-devel`), only if none of
+  `cc`/`gcc`/`clang`/`zig`/`cl` is already present. On Windows a clean machine
+  has none, so `install-deps.ps1` carries **`zig`** in `$Catalog` (LuaSnip
+  detects `zig cc`); it is skipped if already installed like any other tool.
 - **`uninstall.sh` / `uninstall.ps1` are greenfield teardown tools, not purge.**
   They enumerate targets with `chezmoi --source <repo>/home managed --path-style
   absolute`, remove only repo-owned symlinks or byte-identical Windows

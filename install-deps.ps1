@@ -254,6 +254,7 @@ $Catalog = @{
     'win32yank'          = @{ winget = '';                                 choco = 'win32yank';            scoop = 'win32yank'            ; purpose = 'clipboard bridge for WSL nvim' }
     node                 = @{ winget = 'OpenJS.NodeJS.LTS';                choco = 'nodejs-lts';           scoop = 'nodejs-lts'           ; purpose = 'prettier + JS tooling' }
     python               = @{ winget = 'Python.Python.3.12';               choco = 'python';               scoop = 'python'               ; purpose = 'pyright + tooling' }
+    zig                  = @{ winget = 'zig.zig';                          choco = 'zig';                  scoop = 'zig'                  ; purpose = 'C compiler for the LuaSnip jsregexp build' }
     jq                   = @{ winget = 'jqlang.jq';                        choco = 'jq';                   scoop = 'jq'                   ; purpose = 'general-purpose JSON CLI' }
     shellcheck           = @{ winget = 'koalaman.shellcheck';              choco = 'shellcheck';           scoop = 'shellcheck'           ; purpose = 'shell-script linter' }
     hyperfine            = @{ winget = 'sharkdp.hyperfine';                choco = 'hyperfine';            scoop = 'hyperfine'            ; purpose = 'starship perf benchmark' }
@@ -278,6 +279,7 @@ $BinaryName = @{
     make        = 'make'
     node        = 'node'
     python      = 'python'
+    zig         = 'zig'
     jq          = 'jq'
     shellcheck  = 'shellcheck'
     hyperfine   = 'hyperfine'
@@ -307,6 +309,7 @@ function Get-InstallDependencySpec {
         'pwsh',
         'python',
         'node',
+        'zig',
         'win32yank',
         'jq',
         'shellcheck',
@@ -1283,6 +1286,7 @@ Install-PSFzf
 Section "language tooling (for LSP / formatter back-ends)"
 Install-One python
 Install-One node
+Install-One zig
 
 Section "WSL clipboard bridge (skip if you don't use WSL nvim)"
 Install-One win32yank
