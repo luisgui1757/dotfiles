@@ -21,6 +21,8 @@ param(
 $ErrorActionPreference = 'Continue'
 $HackNerdFontVersion = 'v3.4.0'
 $HackNerdFontSha256 = '8ca33a60c791392d872b80d26c42f2bfa914a480f9eb2d7516d9f84373c36897'
+$WindowsTerminalVersion = 'v1.24.11321.0'
+$WindowsTerminalX64Sha256 = '7caef554147e5498ed1becdca73cdedb79fbc81f89032e46ae9b095c53433812'
 
 # ---- Package-manager detection + scoop bootstrap -----------------------------
 function Get-AvailablePM {
@@ -184,6 +186,43 @@ function Test-FileSha256 {
     return ((Get-FileHash $Path -Algorithm SHA256).Hash.ToLowerInvariant() -eq $Expected.ToLowerInvariant())
 }
 
+function Normalize-PathListEntry {
+    param([string]$Value)
+    if ([string]::IsNullOrWhiteSpace($Value)) { return '' }
+    return $Value.Trim().TrimEnd([char[]]@([char]92, [char]47))
+}
+
+function Test-PathListContains {
+    param([string]$PathValue, [string]$Directory)
+    if ([string]::IsNullOrEmpty($PathValue)) { return $false }
+    $needle = Normalize-PathListEntry $Directory
+    if (-not $needle) { return $false }
+    foreach ($part in ($PathValue -split ';')) {
+        if ((Normalize-PathListEntry $part).Equals($needle, [StringComparison]::OrdinalIgnoreCase)) {
+            return $true
+        }
+    }
+    return $false
+}
+
+function Add-DirectoryToUserPath {
+    param([Parameter(Mandatory)][string]$Directory)
+    $full = [IO.Path]::GetFullPath($Directory)
+    if (-not (Test-Path -LiteralPath $full -PathType Container)) {
+        throw "PATH directory does not exist: $full"
+    }
+
+    if (-not (Test-PathListContains -PathValue $env:PATH -Directory $full)) {
+        $env:PATH = "$full;$env:PATH"
+    }
+
+    $userPath = [Environment]::GetEnvironmentVariable('PATH', 'User')
+    if (-not (Test-PathListContains -PathValue $userPath -Directory $full)) {
+        $newUserPath = if ([string]::IsNullOrWhiteSpace($userPath)) { $full } else { "$userPath;$full" }
+        [Environment]::SetEnvironmentVariable('PATH', $newUserPath, 'User')
+    }
+}
+
 # ---- Per-tool: package id per PM. Empty string means "not available there". --
 # Keys are the command name we check via Get-Command.
 $Catalog = @{
@@ -239,7 +278,7 @@ function Test-Tool {
 }
 
 function Install-One {
-    param([string]$tool)
+    param([string]$tool, [switch]$SkipPrompt, [switch]$NoRecordFailure)
     if (Test-Tool $tool) {
         Write-Host ("  ok        {0,-26} already installed" -f $tool)
         return
@@ -272,7 +311,7 @@ function Install-One {
     $first = $candidates[0]
     $purpose = $entry.purpose
     $promptText = if ($purpose) { "Install ${tool} via $($first.pm) (${purpose})?" } else { "Install ${tool} via $($first.pm)?" }
-    if (-not (Ask $promptText)) {
+    if ((-not $SkipPrompt) -and (-not (Ask $promptText))) {
         Write-Host ("  skipped   {0,-26}" -f $tool)
         return
     }
@@ -303,7 +342,9 @@ function Install-One {
     if (-not $installed) {
         # Track failures so we can summarize at the end instead of faking success.
         $tried = ($candidates | ForEach-Object { $_.pm }) -join '/'
-        $script:InstallFailures += [pscustomobject]@{ Tool = $tool; Pm = $tried; Pkg = $first.pkg; ExitCode = $LASTEXITCODE }
+        if (-not $NoRecordFailure) {
+            $script:InstallFailures += [pscustomobject]@{ Tool = $tool; Pm = $tried; Pkg = $first.pkg; ExitCode = $LASTEXITCODE }
+        }
     }
 }
 
@@ -832,6 +873,71 @@ function Install-VSCodeRosePine {
     Set-VSCodeTheme
 }
 
+# ---- Windows Terminal: managers first, pinned portable zip fallback ----------
+function Install-WindowsTerminal {
+    if (Test-Tool 'wt') {
+        Write-Host ("  ok        {0,-26} already installed" -f "wt")
+        return
+    }
+    if (-not (Ask "Install wt (Windows Terminal host for PowerShell and WSL)?")) {
+        Write-Host ("  skipped   {0,-26}" -f "wt")
+        return
+    }
+
+    $assetVersion = $WindowsTerminalVersion -replace '^v', ''
+    $zipName = "Microsoft.WindowsTerminal_${assetVersion}_x64.zip"
+    $zipUrl = "https://github.com/microsoft/terminal/releases/download/$WindowsTerminalVersion/$zipName"
+
+    if ($DryRun) {
+        Write-Host "  would:    scoop install extras/windows-terminal   (fallback: winget / choco / pinned portable zip $WindowsTerminalVersion)"
+        Write-Host "  would:    download $zipName, verify sha256, extract under LOCALAPPDATA\\Programs\\WindowsTerminal, add to User PATH"
+        return
+    }
+
+    Install-One wt -SkipPrompt -NoRecordFailure
+    if (Test-Tool 'wt') { return }
+
+    $tmp = $null
+    try {
+        $tmp = New-Item -ItemType Directory -Force -Path (Join-Path ([IO.Path]::GetTempPath()) "wt-portable-$([guid]::NewGuid())")
+        $zip = Join-Path $tmp.FullName $zipName
+        $extractRoot = Join-Path $tmp.FullName 'extract'
+        Invoke-WebRequest -Uri $zipUrl -OutFile $zip -UseBasicParsing -ErrorAction Stop
+        if (-not (Test-FileSha256 -Path $zip -Expected $WindowsTerminalX64Sha256)) {
+            Write-Host "  FAIL: checksum mismatch for $zipName" -ForegroundColor Red
+            $script:InstallFailures += [pscustomobject]@{ Tool='wt'; Pm='portable'; Pkg=$zipName; ExitCode='sha256' }
+            return
+        }
+
+        Expand-Archive -Path $zip -DestinationPath $extractRoot -Force
+        $wtExe = @(Get-ChildItem -Path $extractRoot -Filter 'wt.exe' -File -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1)
+        if ($wtExe.Count -eq 0) {
+            throw "portable archive did not contain wt.exe"
+        }
+
+        $installRoot = Join-Path $env:LOCALAPPDATA 'Programs\WindowsTerminal'
+        if (Test-Path -LiteralPath $installRoot) {
+            Remove-Item -LiteralPath $installRoot -Recurse -Force
+        }
+        New-Item -ItemType Directory -Force -Path $installRoot | Out-Null
+        Copy-Item -Path (Join-Path $wtExe[0].DirectoryName '*') -Destination $installRoot -Recurse -Force
+        Add-DirectoryToUserPath -Directory $installRoot
+
+        if (Test-Tool 'wt') {
+            Write-Host ("  installed {0,-26} portable {1}" -f "wt", $WindowsTerminalVersion)
+            return
+        }
+        throw "portable wt.exe installed but wt is not on PATH"
+    } catch {
+        Write-Warning ("Windows Terminal portable install failed: " + $_.Exception.Message)
+        $script:InstallFailures += [pscustomobject]@{ Tool='wt'; Pm='portable'; Pkg=$zipName; ExitCode=$LASTEXITCODE }
+    } finally {
+        if ($tmp) {
+            Remove-Item -LiteralPath $tmp.FullName -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
 # ---- psmux: native Windows tmux (reads our existing tmux/tmux.conf) ---------
 # Symmetrical with the Unix tmux story. scoop is preferred (one custom bucket,
 # then a normal install); falls back to winget then choco. Not in the catalog
@@ -973,7 +1079,7 @@ Section "prompt"
 Install-One starship
 
 Section "terminal host"
-Install-One wt
+Install-WindowsTerminal
 
 Section "terminal multiplexer (psmux: tmux for native Windows, optional)"
 Install-Psmux

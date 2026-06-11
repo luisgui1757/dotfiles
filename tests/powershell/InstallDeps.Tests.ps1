@@ -376,6 +376,91 @@ Describe "install-deps.ps1" {
         $Catalog['wt'].scoop | Should -Be 'extras/windows-terminal'
         $Catalog['wt'].winget | Should -Be 'Microsoft.WindowsTerminal'
         $Catalog['wt'].choco | Should -Be 'microsoft-windows-terminal'
+        $WindowsTerminalVersion | Should -Be 'v1.24.11321.0'
+        $WindowsTerminalX64Sha256 | Should -Be '7caef554147e5498ed1becdca73cdedb79fbc81f89032e46ae9b095c53433812'
+    }
+
+    It "dry-runs Windows Terminal managers plus the pinned portable fallback" {
+        . $script:ImportInstallDepsForTest -DryRun
+        Mock -CommandName Read-Host -MockWith { throw "Read-Host must not run under -DryRun" }
+        Mock -CommandName Test-Tool -MockWith { return $false } -ParameterFilter { $name -eq 'wt' }
+
+        $output = & { Install-WindowsTerminal } 6>&1 | Out-String
+
+        $output | Should -Match 'extras/windows-terminal'
+        $output | Should -Match 'pinned portable zip v1\.24\.11321\.0'
+        $output | Should -Match 'Microsoft\.WindowsTerminal_1\.24\.11321\.0_x64\.zip'
+        Should -Invoke -CommandName Read-Host -Times 0 -Exactly
+    }
+
+    It "fails closed when the Windows Terminal portable checksum mismatches" {
+        . $script:ImportInstallDepsForTest
+        Mock -CommandName Test-Tool -MockWith { return $false } -ParameterFilter { $name -eq 'wt' }
+        Mock -CommandName Install-One -MockWith { }
+        Mock -CommandName Invoke-WebRequest -MockWith {
+            param($Uri, $OutFile)
+            [System.IO.File]::WriteAllText($OutFile, 'bad-zip')
+        }
+        Mock -CommandName Test-FileSha256 -MockWith { return $false }
+        Mock -CommandName Expand-Archive -MockWith { throw "must not extract" }
+
+        $output = & { Install-WindowsTerminal } 6>&1 | Out-String
+
+        $output | Should -Match 'FAIL: checksum mismatch for Microsoft\.WindowsTerminal_1\.24\.11321\.0_x64\.zip'
+        $script:InstallFailures.Count | Should -Be 1
+        $script:InstallFailures[0].Tool | Should -Be 'wt'
+        $script:InstallFailures[0].Pm | Should -Be 'portable'
+        $script:InstallFailures[0].ExitCode | Should -Be 'sha256'
+        Should -Invoke -CommandName Expand-Archive -Times 0 -Exactly
+    }
+
+    It "installs the Windows Terminal portable fallback after managers fail" {
+        . $script:ImportInstallDepsForTest
+        $oldLocalAppData = $env:LOCALAPPDATA
+        $script:WtInstalled = $false
+        $script:AddedWtPath = $null
+        $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("wt-portable-test-" + [System.Guid]::NewGuid())
+        try {
+            New-Item -ItemType Directory -Force -Path $tempRoot | Out-Null
+            $env:LOCALAPPDATA = $tempRoot
+            Mock -CommandName Test-Tool -MockWith { return $script:WtInstalled } -ParameterFilter { $name -eq 'wt' }
+            Mock -CommandName Install-One -MockWith { }
+            Mock -CommandName Invoke-WebRequest -MockWith {
+                param($Uri, $OutFile)
+                [System.IO.File]::WriteAllText($OutFile, 'good-zip')
+            }
+            Mock -CommandName Test-FileSha256 -MockWith { return $true }
+            Mock -CommandName Expand-Archive -MockWith {
+                param($Path, $DestinationPath)
+                $portableDir = Join-Path $DestinationPath 'terminal-1.24.11321.0'
+                New-Item -ItemType Directory -Force -Path $portableDir | Out-Null
+                [System.IO.File]::WriteAllText((Join-Path $portableDir 'wt.exe'), 'exe')
+                [System.IO.File]::WriteAllText((Join-Path $portableDir 'WindowsTerminal.exe'), 'exe')
+            }
+            Mock -CommandName Add-DirectoryToUserPath -MockWith {
+                param($Directory)
+                $script:AddedWtPath = $Directory
+                $script:WtInstalled = $true
+            }
+
+            $output = & { Install-WindowsTerminal } 6>&1 | Out-String
+
+            $installRoot = Join-Path $tempRoot 'Programs\WindowsTerminal'
+            Test-Path -LiteralPath (Join-Path $installRoot 'wt.exe') -PathType Leaf | Should -BeTrue
+            $script:AddedWtPath | Should -Be $installRoot
+            $script:InstallFailures.Count | Should -Be 0
+            $output | Should -Match 'installed\s+wt\s+portable v1\.24\.11321\.0'
+            Should -Invoke -CommandName Install-One -Times 1 -Exactly -ParameterFilter {
+                $tool -eq 'wt' -and $SkipPrompt -and $NoRecordFailure
+            }
+        } finally {
+            if ($null -eq $oldLocalAppData) {
+                Remove-Item Env:LOCALAPPDATA -ErrorAction SilentlyContinue
+            } else {
+                $env:LOCALAPPDATA = $oldLocalAppData
+            }
+            Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
+        }
     }
 
     It "registers PowerShell 7 (pwsh) in the Windows package catalog" {

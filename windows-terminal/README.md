@@ -8,11 +8,19 @@ symlinking the file, we keep **only the user-owned keys** in
 
 ## Path
 
+Packaged Store/MSIX Windows Terminal:
+
 ```
 %LOCALAPPDATA%\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json
 ```
 
 (For the WT Preview the package is `Microsoft.WindowsTerminalPreview_8wekyb3d8bbwe`.)
+
+Portable unpackaged Windows Terminal:
+
+```
+%LOCALAPPDATA%\Microsoft\Windows Terminal\settings.json
+```
 
 ## What's in the fragment
 
@@ -40,6 +48,12 @@ scoop install extras/windows-terminal
 # fallback: choco install microsoft-windows-terminal
 ```
 
+Those package-manager installs are MSIX-backed. If they fail to register WT or
+do not put `wt` on PATH, `install-deps.ps1` falls back to the pinned portable
+GitHub release zip (`v1.24.11321.0`, x64), verifies its SHA-256 before
+extracting, installs it under `%LOCALAPPDATA%\Programs\WindowsTerminal`, and
+adds that folder to the current process PATH plus the persistent User PATH.
+
 The settings merge below is separate because Windows Terminal creates and
 rewrites its own `settings.json`.
 
@@ -62,6 +76,11 @@ replaced by the repo fragment. A hand-edited top-level `theme` is reset to
 `rose-pine` on every run. A bare `chezmoi apply` runs that merge but does not
 create setup's backup. If WT has not launched yet and `settings.json` is absent,
 chezmoi leaves it absent instead of fabricating one.
+
+After a real non-dry-run setup apply, setup best-effort copies the merged MSIX
+settings file to the portable unpackaged path so the portable fallback gets the
+same Rose Pine, launch, scrollbar, font, and keybinding settings. The copy is
+skipped with `-SkipWindowsTerminalMerge` and never fails setup.
 
 For WSL, this is the supported terminal/font path: run
 `.\setup.ps1 -All` on Windows, then `./setup.sh --all` inside WSL. The WSL setup

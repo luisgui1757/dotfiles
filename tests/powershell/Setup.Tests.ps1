@@ -190,4 +190,50 @@ Describe "setup.ps1 Windows Terminal backup" {
 
         Test-Path -LiteralPath "$settings.bak.20000101-000000" | Should -BeFalse
     }
+
+    It "mirrors packaged Windows Terminal settings to the unpackaged path" {
+        $settings = Get-WindowsTerminalSettingsPath
+        $unpackaged = Get-WindowsTerminalUnpackagedSettingsPath
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $settings) | Out-Null
+        $merged = '{"theme":"rose-pine","profiles":{"defaults":{"scrollbarState":"visible"}}}'
+        [System.IO.File]::WriteAllText($settings, $merged, [System.Text.UTF8Encoding]::new($false))
+
+        Copy-WindowsTerminalSettingsForUnpackaged
+
+        Test-Path -LiteralPath $unpackaged -PathType Leaf | Should -BeTrue
+        [System.IO.File]::ReadAllText($unpackaged) | Should -Be $merged
+    }
+
+    It "keeps setup best effort when the unpackaged Windows Terminal mirror fails" {
+        $settings = Get-WindowsTerminalSettingsPath
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $settings) | Out-Null
+        [System.IO.File]::WriteAllText($settings, '{"theme":"rose-pine"}', [System.Text.UTF8Encoding]::new($false))
+        Mock -CommandName Copy-Item -MockWith { throw "copy failed" }
+
+        { Copy-WindowsTerminalSettingsForUnpackaged } | Should -Not -Throw
+    }
+
+    It "does not mirror unpackaged Windows Terminal settings during dry run" {
+        Set-Variable -Name DryRun -Scope Script -Value $true
+        $settings = Get-WindowsTerminalSettingsPath
+        $unpackaged = Get-WindowsTerminalUnpackagedSettingsPath
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $settings) | Out-Null
+        [System.IO.File]::WriteAllText($settings, '{"theme":"rose-pine"}', [System.Text.UTF8Encoding]::new($false))
+
+        Copy-WindowsTerminalSettingsForUnpackaged
+
+        Test-Path -LiteralPath $unpackaged -PathType Leaf | Should -BeFalse
+    }
+
+    It "does not mirror unpackaged Windows Terminal settings when the merge is skipped" {
+        Set-Variable -Name SkipWindowsTerminalMerge -Scope Script -Value $true
+        $settings = Get-WindowsTerminalSettingsPath
+        $unpackaged = Get-WindowsTerminalUnpackagedSettingsPath
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $settings) | Out-Null
+        [System.IO.File]::WriteAllText($settings, '{"theme":"rose-pine"}', [System.Text.UTF8Encoding]::new($false))
+
+        Copy-WindowsTerminalSettingsForUnpackaged
+
+        Test-Path -LiteralPath $unpackaged -PathType Leaf | Should -BeFalse
+    }
 }

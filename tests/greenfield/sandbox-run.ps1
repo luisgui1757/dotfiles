@@ -118,10 +118,9 @@ Enable-DeveloperMode
 Write-Host "greenfield sandbox: running setup.ps1 -All"
 Invoke-SetupAndCheck -Repo $WorkRepo -Log $setupLog
 
-# Windows Terminal is an MSIX package and the Sandbox cannot register MSIX, so
-# the package-manager install in setup fails here. Install the portable build so
-# the WT visual checks (maximized, scrollbar, fonts) are testable. Best-effort --
-# a failure here must not fail the whole greenfield run.
+# Windows Terminal package-manager installs are MSIX-backed, and Sandbox cannot
+# register MSIX. install-deps.ps1 now falls back to pinned portable WT; keep this
+# idempotent helper as a best-effort safety net for the visual checks.
 Write-Host "greenfield sandbox: ensuring Windows Terminal (portable build)"
 try {
     & (Join-Path $WorkRepo 'tests\greenfield\install-wt-portable.ps1')

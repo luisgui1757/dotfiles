@@ -446,6 +446,29 @@ function Get-WindowsTerminalSettingsPath {
     return (Join-Path $env:LOCALAPPDATA 'Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json')
 }
 
+function Get-WindowsTerminalUnpackagedSettingsPath {
+    return (Join-Path $env:LOCALAPPDATA 'Microsoft\Windows Terminal\settings.json')
+}
+
+function Copy-WindowsTerminalSettingsForUnpackaged {
+    if ($DryRun -or $SkipWindowsTerminalMerge) { return }
+
+    $packagedSettings = Get-WindowsTerminalSettingsPath
+    if (-not (Test-Path -LiteralPath $packagedSettings -PathType Leaf)) { return }
+
+    $unpackagedSettings = Get-WindowsTerminalUnpackagedSettingsPath
+    try {
+        $unpackagedDir = Split-Path -Parent $unpackagedSettings
+        if (-not (Test-Path -LiteralPath $unpackagedDir -PathType Container)) {
+            New-Item -ItemType Directory -Force -Path $unpackagedDir | Out-Null
+        }
+        Copy-Item -LiteralPath $packagedSettings -Destination $unpackagedSettings -Force -ErrorAction Stop
+        Write-Step "mirrored Windows Terminal settings to unpackaged path"
+    } catch {
+        Write-Warning ("Could not mirror Windows Terminal settings to unpackaged path: " + $_.Exception.Message)
+    }
+}
+
 function Test-SamePath {
     param(
         [Parameter(Mandatory)] [string]$Left,
@@ -610,6 +633,7 @@ function Invoke-ChezmoiApplyPhase {
         $realApplyArgs += @(Get-ManagedConfigTargets -ExcludeWindowsTerminal)
     }
     Invoke-ChezmoiOrExit -Label 'chezmoi apply' -Arguments $realApplyArgs
+    Copy-WindowsTerminalSettingsForUnpackaged
 }
 
 # Test seam: set DOTFILES_SETUP_PS1_SOURCE_ONLY and dot-source this file to load

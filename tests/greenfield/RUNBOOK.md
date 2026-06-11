@@ -203,10 +203,11 @@ proves.
 
 ### Windows Terminal (Windows only)
 
-In a real install WT comes from scoop/winget/choco. In **Windows Sandbox** those
-fail (WT is an MSIX package and Sandbox cannot register MSIX), so install the
-**portable** build instead -- the `.wsb` path does this for you; on the manual
-path run it yourself:
+WT first tries scoop/winget/choco. In **Windows Sandbox** those MSIX-backed
+installs fail because Sandbox cannot register MSIX, so `install-deps.ps1`
+falls back to the pinned portable build. The `.wsb` path also keeps the
+idempotent portable helper as a safety net; on the manual path you can re-run it
+yourself:
 
 ```powershell
 .\tests\greenfield\install-wt-portable.ps1 -Launch

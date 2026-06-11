@@ -114,13 +114,15 @@ that violates one of these, fix it instead of disabling the test.
     `--experimental-wsl-gui`; do not make them the default path again.
 15. **Windows Terminal is installed by Windows setup.** Keep `wt` in the
     `install-deps.ps1` Scoop-first catalog (`extras/windows-terminal` ->
-    `Microsoft.WindowsTerminal` -> `microsoft-windows-terminal`). The app
-    install and settings merge are separate code paths (`install-deps.ps1` vs
-    chezmoi's `modify_` entry), and setup runs the merge by default. Opt out
-    with `-SkipWindowsTerminalMerge`; `-MergeWindowsTerminal` is a retained
-    no-op alias. If `settings.json` is absent because WT has not launched yet,
-    the merge warns and skips so default-on setup does not break an unlaunched
-    WT.
+    `Microsoft.WindowsTerminal` -> `microsoft-windows-terminal`). If those
+    MSIX-backed installs do not put `wt` on PATH, `Install-WindowsTerminal`
+    falls back to the pinned portable GitHub release zip and verifies SHA-256
+    before extraction. The app install and settings merge are separate code
+    paths (`install-deps.ps1` vs chezmoi's `modify_` entry), and setup runs the
+    merge by default. Opt out with `-SkipWindowsTerminalMerge`;
+    `-MergeWindowsTerminal` is a retained no-op alias. If `settings.json` is
+    absent because WT has not launched yet, the merge warns and skips so
+    default-on setup does not break an unlaunched WT.
 16. **tmux uppercase `H`/`L` are window swaps.** Lowercase `h`/`l` stay pane
     focus bindings. Do not replace them with arrow-key bindings unless the
     terminal/psmux behavior has been revalidated.
@@ -405,8 +407,11 @@ save only**. The next plain `:w` formats normally. Implemented in
   pre-merge file to `settings.json.bak.<timestamp>` before running chezmoi apply,
   unless `-SkipWindowsTerminalMerge` is passed. Chezmoi's `modify_` entry then
   merges the user-owned keys by default; a bare `chezmoi apply` performs the
-  merge but does not create setup's backup. The legacy `-MergeWindowsTerminal`
-  switch remains accepted as a no-op alias.
+  merge but does not create setup's backup. After a real non-dry-run apply,
+  setup also best-effort copies the merged MSIX settings file to the unpackaged
+  portable-WT path `%LOCALAPPDATA%\Microsoft\Windows Terminal\settings.json`,
+  unless `-SkipWindowsTerminalMerge` is passed. Store WT ignores that mirror.
+  The legacy `-MergeWindowsTerminal` switch remains accepted as a no-op alias.
 - **lazygit config paths are OS-specific.** On macOS, lazygit v0.58 reports
   `~/Library/Application Support/lazygit` from `lazygit --print-config-dir`;
   on Linux/WSL it uses `~/.config/lazygit`; on Windows it uses
@@ -480,7 +485,13 @@ save only**. The next plain `:w` formats normally. Implemented in
   tries each until one succeeds — so a winget `No package found` (exit
   `-1978335212`) no longer dead-ends a tool. scoop carries the cataloged
   CLI/terminal tools, including Windows Terminal as `wt`
-  (`extras/windows-terminal`).
+  (`extras/windows-terminal`). Windows Terminal is special-cased through
+  `Install-WindowsTerminal`: it reuses the catalog manager chain first, then
+  falls back to the pinned portable `microsoft/terminal` zip when MSIX-backed
+  manager installs fail to register `wt`, such as in Windows Sandbox or
+  MSIX-restricted hosts. The portable fallback is SHA-256 verified before
+  extraction and adds `%LOCALAPPDATA%\Programs\WindowsTerminal` to both the
+  current process PATH and persistent User PATH.
 - **`Update-ScoopTool` is the only scoop update path.** It is intentionally
   single-package and consent-gated for the PowerShell 7 keep-latest path; never
   replace it with `scoop update *` or another blanket scoop upgrade.
@@ -542,8 +553,9 @@ save only**. The next plain `:w` formats normally. Implemented in
 - **Direct GitHub downloads are pinned and SHA-256 verified.** `install-deps.sh`
   verifies the pinned Neovim Linux tarballs, lazygit Linux tarballs, and Hack
   Nerd Font zip before extraction; `install-deps.ps1` verifies the pinned
-  Hack.zip before registering fonts. The CI workflows also pin and verify their
-  direct GitHub downloads.
+  Hack.zip before registering fonts and the pinned Windows Terminal portable
+  zip before extracting the fallback install. The CI workflows also pin and
+  verify their direct GitHub downloads.
   This extends to the **Ubuntu Ghostty installer**: `install_ghostty_linux`
   pins `mkasberg/ghostty-ubuntu`'s `install.sh` to `GHOSTTY_UBUNTU_VERSION` and
   SHA-256 verifies the script (`GHOSTTY_UBUNTU_INSTALL_SHA256`) before running

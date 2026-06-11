@@ -79,7 +79,9 @@ sandbox desktop.
 
 Windows Sandbox starts with no winget and no Scoop. That is intentional: it
 exercises the real Scoop-first bootstrap path. The `setup.ps1` Scoop path does
-not require admin.
+not require admin. Windows Terminal still cannot be registered as MSIX in
+Sandbox, so the real installer falls back to pinned portable WT; the greenfield
+portable helper remains as an idempotent safety net.
 
 Two Sandbox gotchas:
 
