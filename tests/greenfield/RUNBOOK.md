@@ -47,6 +47,37 @@ to your repo.
 Then do Part 3 inside the sandbox (it is a full Windows desktop: open Windows
 Terminal, VS Code, psmux).
 
+#### Manual alternative (no `.wsb`)
+
+If you would rather drive it by hand -- open Windows Sandbox yourself, then an
+**admin** PowerShell inside it, and run:
+
+```powershell
+# 1. PS 5.1 in the Sandbox defaults to old TLS; force 1.2 and allow scripts.
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+Set-ExecutionPolicy -Scope Process Bypass -Force
+
+# 2. Get the chezmoi-pilot branch as a ZIP (no git needed yet) and unpack it.
+$zip = "$env:TEMP\dotfiles.zip"
+Invoke-WebRequest https://github.com/luisgui1757/dotfiles/archive/refs/heads/chezmoi-pilot.zip -OutFile $zip
+Expand-Archive $zip "$env:TEMP\df" -Force
+Move-Item "$env:TEMP\df\dotfiles-chezmoi-pilot" "$env:USERPROFILE\dotfiles" -Force
+Set-Location "$env:USERPROFILE\dotfiles"
+
+# 3. Install + apply everything. Admin is fine HERE (disposable sandbox): the
+#    same path the elevated windows-2025 CI runner uses -- Install-Scoop detects
+#    elevation and bootstraps Scoop with -RunAsAdmin, and the elevated token
+#    creates the Neovim symlink so you do NOT need Developer Mode.
+.\setup.ps1 -All
+
+# 4. Auto-check the install, then do the Part 3 visual checklist.
+.\tests\greenfield\validate.ps1
+```
+
+Caveat: the admin path is fine because the sandbox is throwaway. On your REAL
+machine prefer Developer Mode + a normal (non-admin) PowerShell, so Scoop is
+owned by your user rather than admin.
+
 ### tart macOS VM
 
 ```bash
