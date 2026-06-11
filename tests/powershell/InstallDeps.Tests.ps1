@@ -120,8 +120,10 @@ Describe "install-deps.ps1" {
             })
         $table = (Format-InstallDependencyTable -Rows $rows) -join "`n"
 
-        $table | Should -Match '(?m)^present-tool\s+present\s+present-tool 1\.2\.3\s+skip$'
-        $table | Should -Match '(?m)^missing-tool\s+missing\s+-\s+install$'
+        # The table pads columns, so rows end with trailing spaces -- allow them
+        # (the shell test uses the same skip[[:space:]]*$ tolerance).
+        $table | Should -Match '(?m)^present-tool\s+present\s+present-tool 1\.2\.3\s+skip[ \t]*$'
+        $table | Should -Match '(?m)^missing-tool\s+missing\s+-\s+install[ \t]*$'
         $table | Should -Match '1 present, 1 missing'
         Should -Invoke -CommandName scoop -Times 0 -Exactly
         Should -Invoke -CommandName winget -Times 0 -Exactly
