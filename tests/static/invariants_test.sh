@@ -215,6 +215,7 @@ fi
 # (`$Home =`) or a typed param (`[string]$Home`); reading $Home is fine.
 # ($matches is a DIFFERENT trap -- it is writable but gets clobbered by -match,
 # a correctness issue, not a crash -- so it is not banned here.)
+# shellcheck disable=SC2016  # literal $home in the grep regex, not a shell expansion
 ps1_home_assign=$(grep -nEi '\$home[[:space:]]*=|\]\$home\b' "${ps1_files[@]}" 2>/dev/null || true)
 if [[ -n "$ps1_home_assign" ]]; then
     echo "FAIL: assignment to read-only \$Home crashes PowerShell at runtime:"
