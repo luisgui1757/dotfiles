@@ -29,20 +29,20 @@ checkout (on the `chezmoi-pilot` branch) in a normal PowerShell:
 explorer .\tests\greenfield\windows-sandbox.wsb
 ```
 
-The Sandbox boots clean, copies the repo to `%USERPROFILE%\dotfiles`, runs
-`setup.ps1 -All`, then `validate.ps1`. Watch the auto-opened PowerShell window
-for `PASS:` lines and a final summary; logs are on the sandbox desktop.
+The Sandbox boots clean, copies the repo to `%USERPROFILE%\dotfiles`, **enables
+Developer Mode for you** (one UAC prompt -- click **Yes**), runs `setup.ps1
+-All`, then `validate.ps1`. Watch the auto-opened PowerShell window for `PASS:`
+lines and a final summary; logs are on the sandbox desktop.
 
-Two Sandbox gotchas (see this dir's README): the Neovim symlink needs Developer
-Mode (Settings -> Privacy & security -> For developers), and the relative
-`HostFolder` needs Windows 11 22H2+. Enable Developer Mode in the sandbox, then
-re-run inside it:
+That single UAC prompt is the ONLY thing you click. You do NOT need to open
+Settings. (Background: the Neovim config is a symlink, which Windows only allows
+with Developer Mode on; the script flips that one registry key elevated, then
+runs setup non-elevated so Scoop still works.)
 
-```powershell
-cd $env:USERPROFILE\dotfiles
-.\setup.ps1 -SkipDeps          # re-apply config now that Dev Mode is on
-.\tests\greenfield\validate.ps1
-```
+Note: the `.wsb` maps the repo with a RELATIVE path that needs Windows 11 22H2+.
+If the Sandbox fails to launch with a mapped-folder error, edit
+`tests\greenfield\windows-sandbox.wsb` and replace `..\..` with the absolute path
+to your repo.
 
 Then do Part 3 inside the sandbox (it is a full Windows desktop: open Windows
 Terminal, VS Code, psmux).

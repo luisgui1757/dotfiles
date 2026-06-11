@@ -33,6 +33,44 @@ function Clear-ReadOnlyAttributes {
     }
 }
 
+function Test-IsElevated {
+    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $principal = New-Object Security.Principal.WindowsPrincipal($identity)
+    return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+
+function Enable-DeveloperMode {
+    # The Neovim config is a directory symlink. Windows needs Developer Mode (or
+    # an elevated token) to create one, and a fresh Sandbox has it OFF. Set the
+    # policy key so chezmoi can create the symlink WITHOUT elevating the whole
+    # setup -- Scoop refuses to run elevated, so we cannot just elevate setup.ps1.
+    # Writing HKLM needs elevation, so self-elevate ONLY for this one key (one UAC
+    # prompt), then setup.ps1 runs normally non-elevated.
+    $key = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock'
+    $name = 'AllowDevelopmentWithoutDevLicense'
+    $current = $null
+    try { $current = (Get-ItemProperty -Path $key -Name $name -ErrorAction Stop).$name } catch { $current = $null }
+    if ($current -eq 1) {
+        Write-Host "greenfield sandbox: Developer Mode already enabled"
+        return
+    }
+    Write-Host "greenfield sandbox: enabling Developer Mode (approve the one UAC prompt)..."
+    if (Test-IsElevated) {
+        New-Item -Path $key -Force | Out-Null
+        New-ItemProperty -Path $key -Name $name -PropertyType DWord -Value 1 -Force | Out-Null
+    } else {
+        $inner = "New-Item -Path '$key' -Force | Out-Null; New-ItemProperty -Path '$key' -Name '$name' -PropertyType DWord -Value 1 -Force | Out-Null"
+        $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($inner))
+        Start-Process -FilePath 'powershell.exe' -Verb RunAs -Wait -ArgumentList '-NoProfile', '-EncodedCommand', $encoded
+    }
+    $check = $null
+    try { $check = (Get-ItemProperty -Path $key -Name $name -ErrorAction Stop).$name } catch { $check = $null }
+    if ($check -ne 1) {
+        Stop-Greenfield "could not enable Developer Mode. Enable it manually (Settings -> Privacy & security -> For developers), then re-run: .\setup.ps1 -SkipDeps"
+    }
+    Write-Host "greenfield sandbox: Developer Mode enabled"
+}
+
 function Invoke-SetupAndCheck {
     param([string]$Repo, [string]$Log)
     Push-Location $Repo
@@ -73,6 +111,9 @@ if (-not (Test-Path -LiteralPath $MappedRepo)) {
 Write-Host "greenfield sandbox: copying read-only repo to $WorkRepo"
 Invoke-Robocopy -Source $MappedRepo -Destination $WorkRepo
 Clear-ReadOnlyAttributes -Path $WorkRepo
+
+Write-Host "greenfield sandbox: ensuring Developer Mode for the Neovim symlink"
+Enable-DeveloperMode
 
 Write-Host "greenfield sandbox: running setup.ps1 -All"
 Invoke-SetupAndCheck -Repo $WorkRepo -Log $setupLog

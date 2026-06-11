@@ -87,11 +87,12 @@ Two Sandbox gotchas:
   Windows 11 22H2 and newer. On older builds the sandbox fails to launch with a
   mapped-folder error; fix it by editing `windows-sandbox.wsb` and replacing
   `..\..` with the absolute path to your repo checkout.
-- The Sandbox has Developer Mode OFF, so the Neovim directory symlink needs
-  elevation. `setup.ps1` reports this; enable Developer Mode in the sandbox
-  (Settings -> Privacy & security -> For developers) or run the config phase
-  from an elevated prompt, then re-run `validate.ps1`. The single-file copied
-  configs do not need it.
+- The Sandbox has Developer Mode OFF, which the Neovim directory symlink needs.
+  `sandbox-run.ps1` now enables it for you (self-elevates ONLY for that one
+  registry key -- approve the single UAC prompt -- then runs `setup.ps1`
+  non-elevated so Scoop still works). You do not touch Settings. If you decline
+  the prompt, enable Developer Mode manually (Settings -> Privacy & security ->
+  For developers) and re-run `cd $env:USERPROFILE\dotfiles; .\setup.ps1 -SkipDeps`.
 
 Fallbacks:
 
