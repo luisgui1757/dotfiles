@@ -265,6 +265,7 @@ $Catalog = @{
 # Some Catalog keys (e.g. "rg") map to a different actual binary on Windows
 # than on Unix. Provide a name -> binary mapping for Get-Command checks.
 $BinaryName = @{
+    scoop       = 'scoop'
     rg          = 'rg'
     fd          = 'fd'
     fzf         = 'fzf'
@@ -295,6 +296,7 @@ function Test-Tool {
 
 function Get-InstallDependencySpec {
     $toolOrder = @(
+        'scoop',
         'git',
         'nvim',
         'make',
@@ -319,7 +321,7 @@ function Get-InstallDependencySpec {
     )
     $emitted = @{}
     foreach ($tool in $toolOrder) {
-        if (($tool -eq 'psmux') -or $Catalog.ContainsKey($tool)) {
+        if (($tool -eq 'scoop') -or ($tool -eq 'psmux') -or $Catalog.ContainsKey($tool)) {
             $emitted[$tool] = $true
             [pscustomobject]@{
                 Tool = $tool
@@ -1213,30 +1215,9 @@ if ($env:INSTALL_DEPS_PS1_SOURCE_ONLY) { return }
 
 $Pm = Get-AvailablePM
 
-# If no package manager at all, try scoop first (no admin required).
-if (-not $Pm) {
-    Write-Warning "No package manager detected (winget / choco / scoop)."
-    if (Install-Scoop) { $Pm = Get-AvailablePM }
-}
-
-# Even when winget/choco are available, scoop unlocks extras
-# (taplo, win32yank, nerd-fonts bucket). Offer it as a complement.
-if ($Pm -and -not (Get-Command scoop -ErrorAction SilentlyContinue)) {
-    Write-Host ""
-    Write-Host "Detected $Pm. Scoop is also recommended -- it carries taplo,"
-    Write-Host "win32yank, and the nerd-fonts bucket that $Pm does not have."
-    Install-Scoop | Out-Null
-}
-
 Write-Host ""
 Write-Host ("install-deps: primary PM=$Pm  scoop=" + [bool](Get-Command scoop -ErrorAction SilentlyContinue) + "  dry-run=$DryRun  yes-all=$All")
 Write-Host ""
-
-if (-not $Pm) {
-    Write-Warning "No supported package manager available. Install winget from the"
-    Write-Warning "Microsoft Store ('App Installer'), or accept the Scoop offer above."
-    exit 1
-}
 
 $dependencyScan = @(Get-InstallDependencyScan)
 Show-InstallDependencyTable -Rows $dependencyScan
@@ -1254,6 +1235,28 @@ if (Test-InstallPromptAvailable) {
         Write-Host "  -> installing everything; no further prompts"
     }
     Write-Host ""
+}
+
+# If no package manager at all, try scoop first (no admin required).
+if (-not $Pm) {
+    Write-Warning "No package manager detected (winget / choco / scoop)."
+    if (Install-Scoop) { $Pm = Get-AvailablePM }
+}
+
+# Even when winget/choco are available, scoop unlocks extras
+# (taplo, win32yank, nerd-fonts bucket). Offer it as a complement.
+if ($Pm -and -not (Get-Command scoop -ErrorAction SilentlyContinue)) {
+    Write-Host ""
+    Write-Host "Detected $Pm. Scoop is also recommended -- it carries taplo,"
+    Write-Host "win32yank, and the nerd-fonts bucket that $Pm does not have."
+    Install-Scoop | Out-Null
+    $Pm = Get-AvailablePM
+}
+
+if (-not $Pm) {
+    Write-Warning "No supported package manager available. Install winget from the"
+    Write-Warning "Microsoft Store ('App Installer'), or accept the Scoop offer above."
+    exit 1
 }
 
 function Section { param([string]$title) Write-Host ""; Write-Host "== $title ==" }

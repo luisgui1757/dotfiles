@@ -222,10 +222,11 @@ and whether `pwsh` is installed.
 - `install-deps` provisions chezmoi itself: Homebrew on macOS/Linuxbrew,
   pinned `get.chezmoi.io` release on native Linux without brew, and the
   Scoop-first catalog on Windows.
-- `install-deps` prints a dependency pre-flight table before the one-shot
-  install prompt, showing present/missing tools, best-effort versions, and the
-  resulting skip/install action. The table is informational; the existing
-  per-tool install logic still decides what actually runs.
+- `install-deps` prints a dependency pre-flight table before package-manager
+  bootstrap and before the one-shot install prompt, showing the package manager
+  itself, present/missing tools, best-effort versions, and the resulting
+  skip/install action. The table is informational; the existing per-tool install
+  logic still decides what actually runs.
 - zsh plugins are installed by Unix setup as repo-managed pinned git checkouts:
   `zsh-autocomplete` and `zsh-autosuggestions` live under
   `${XDG_DATA_HOME:-$HOME/.local/share}/dotfiles/zsh-plugins`. `zshrc` sources

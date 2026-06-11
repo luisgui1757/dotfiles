@@ -469,10 +469,13 @@ save only**. The next plain `:w` formats normally. Implemented in
   installs `chezmoi` through the normal Scoop-first `$Catalog` fallback chain
   (`scoop` -> `winget` -> `choco`). This keeps `make chezmoi` usable after full
   setup before the Phase 2 chezmoi apply.
-- **`install-deps` shows a scan-first dependency table before the one-shot
-  install prompt.** The table is display-only: it uses the same presence checks
-  as the installer, best-effort `--version` probes, and still leaves all actual
-  install/skip decisions to the existing per-tool functions.
+- **`install-deps` shows a true pre-bootstrap dependency table before the
+  one-shot install prompt.** Package-manager detection runs first, but Scoop /
+  Homebrew bootstrap runs only after the table and prompt. The table includes a
+  package-manager row (`scoop` on Windows, detected POSIX manager on Unix),
+  uses the same presence checks as the installer, best-effort `--version`
+  probes, and still leaves all actual install/skip decisions to the existing
+  per-tool functions.
 - **A C compiler is installed so LuaSnip can build `jsregexp`.** Without one,
   the nvim Lazy build prints "No C compiler found" and `jsregexp` is skipped
   (LuaSnip still works, minus JS-regex snippet transforms). POSIX installs the

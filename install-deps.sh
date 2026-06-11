@@ -1688,6 +1688,17 @@ check_wsl_clipboard() {
     echo "            automatically once installed via scoop)."
 }
 
+install_dependency_pm_scan_item() {
+    local pm_tool=""
+    case "${PM:-unknown}" in
+        brew|brew_missing) pm_tool="brew" ;;
+        apt|dnf|pacman|zypper|apk) pm_tool="$PM" ;;
+    esac
+    if [[ -n "$pm_tool" ]]; then
+        printf '%s\n' "${pm_tool}|command|${pm_tool}"
+    fi
+}
+
 install_dependency_scan_items() {
     printf '%s\n' \
         "git|command|git" \
@@ -1714,7 +1725,7 @@ install_dependency_scan_items() {
         "yamllint|command|yamllint" \
         "editorconfig-checker|command|editorconfig-checker"
 
-    if [[ "$(uname -s)" == "Darwin" && "$PM" == "brew" ]]; then
+    if [[ "$(uname -s)" == "Darwin" && ( "$PM" == "brew" || "$PM" == "brew_missing" ) ]]; then
         printf '%s\n' "ghostty|command|ghostty"
     elif [[ "$(uname -s)" == "Linux" ]]; then
         if ! is_wsl || wsl_gui_opt_in; then
@@ -1804,11 +1815,15 @@ install_scan_version() {
 }
 
 scan_install_dependencies() {
-    local spec_source tool kind version_bin status version action
+    local spec_source pm_item tool kind version_bin status version action
     if [[ -n "${INSTALL_DEPS_SCAN_ITEMS:-}" ]]; then
         spec_source="$INSTALL_DEPS_SCAN_ITEMS"
     else
         spec_source="$(install_dependency_scan_items)"
+    fi
+    pm_item="$(install_dependency_pm_scan_item)"
+    if [[ -n "$pm_item" ]]; then
+        spec_source="$(printf '%s\n%s\n' "$pm_item" "$spec_source")"
     fi
     while IFS='|' read -r tool kind version_bin; do
         [[ -n "$tool" ]] || continue
@@ -1855,28 +1870,8 @@ if [[ -n "${INSTALL_DEPS_SOURCE_ONLY:-}" ]]; then
 fi
 
 PM="$(detect_pm)"
-if [[ "$PM" == "brew" ]]; then
-    enable_homebrew_for_current_shell || true
-    persist_homebrew_shellenv
-fi
 OS_LABEL="$(uname -s)"
 if is_wsl; then OS_LABEL="WSL ($OS_LABEL)"; fi
-
-# Bootstrap brew if asked. Re-detect after.
-if [[ "$PM" == "brew_missing" ]]; then
-    if maybe_install_brew; then PM="$(detect_pm)"
-    else PM="unknown"; fi
-elif [[ "$PM" != "brew" && "$(uname -s)" == "Linux" ]]; then
-    echo "Detected $PM as the system package manager."
-    if maybe_install_brew; then PM="$(detect_pm)"; fi
-fi
-
-if [[ "$PM" == "unknown" ]]; then
-    echo "install-deps: no supported package manager found." >&2
-    echo "  Supported: brew (mac/Linux), apt (Debian/Ubuntu), dnf (Fedora)," >&2
-    echo "             pacman (Arch), zypper (openSUSE), apk (Alpine)." >&2
-    exit 1
-fi
 
 echo "install-deps: OS=$OS_LABEL  package manager=$PM  dry-run=$DRY_RUN  yes-all=$YES_ALL  experimental-wsl-gui=$EXPERIMENTAL_WSL_GUI"
 echo
@@ -1896,6 +1891,30 @@ if [[ "$YES_ALL" -ne 1 && "$DRY_RUN" -ne 1 && -t 0 ]]; then
     fi
     unset _all_ans
     echo
+fi
+
+# Bootstrap brew only after the pre-flight table and one-shot prompt. Re-detect
+# after bootstrap so the per-tool installers see the manager that now exists.
+if [[ "$PM" == "brew" ]]; then
+    enable_homebrew_for_current_shell || true
+    persist_homebrew_shellenv
+elif [[ "$PM" == "brew_missing" ]]; then
+    if maybe_install_brew; then PM="$(detect_pm)"
+    else PM="unknown"; fi
+elif [[ "$(uname -s)" == "Linux" ]]; then
+    echo "Detected $PM as the system package manager."
+    if maybe_install_brew; then PM="$(detect_pm)"; fi
+fi
+
+if [[ "$PM" == "brew" ]]; then
+    enable_homebrew_for_current_shell || true
+fi
+
+if [[ "$PM" == "unknown" ]]; then
+    echo "install-deps: no supported package manager found." >&2
+    echo "  Supported: brew (mac/Linux), apt (Debian/Ubuntu), dnf (Fedora)," >&2
+    echo "             pacman (Arch), zypper (openSUSE), apk (Alpine)." >&2
+    exit 1
 fi
 
 # ---- Sections ----------------------------------------------------------------

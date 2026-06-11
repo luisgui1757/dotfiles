@@ -101,11 +101,17 @@ Describe "install-deps.ps1" {
 
     It "formats present and missing dependency table rows without installing" {
         . $script:ImportInstallDepsForTest
+        $defaultSpec = @(Get-InstallDependencySpec)
+        $defaultSpec[0].Tool | Should -Be 'scoop'
+        @($defaultSpec | Where-Object { $_.Tool -eq 'scoop' }).Count | Should -Be 1
+
         $specList = @(
+            [pscustomobject]@{ Tool = 'scoop'; Kind = 'tool'; Binary = 'scoop'; Module = '' },
             [pscustomobject]@{ Tool = 'present-tool'; Kind = 'tool'; Binary = 'present-tool'; Module = '' },
             [pscustomobject]@{ Tool = 'missing-tool'; Kind = 'tool'; Binary = 'missing-tool'; Module = '' }
         )
 
+        Mock -CommandName Install-Scoop -MockWith { throw "table scan must not bootstrap scoop" }
         Mock -CommandName scoop -MockWith { throw "table scan must not run scoop" }
         Mock -CommandName winget -MockWith { throw "table scan must not run winget" }
         Mock -CommandName choco -MockWith { throw "table scan must not run choco" }
@@ -122,9 +128,11 @@ Describe "install-deps.ps1" {
 
         # The table pads columns, so rows end with trailing spaces -- allow them
         # (the shell test uses the same skip[[:space:]]*$ tolerance).
+        $table | Should -Match '(?m)^scoop\s+missing\s+-\s+install[ \t]*$'
         $table | Should -Match '(?m)^present-tool\s+present\s+present-tool 1\.2\.3\s+skip[ \t]*$'
         $table | Should -Match '(?m)^missing-tool\s+missing\s+-\s+install[ \t]*$'
-        $table | Should -Match '1 present, 1 missing'
+        $table | Should -Match '1 present, 2 missing'
+        Should -Invoke -CommandName Install-Scoop -Times 0 -Exactly
         Should -Invoke -CommandName scoop -Times 0 -Exactly
         Should -Invoke -CommandName winget -Times 0 -Exactly
         Should -Invoke -CommandName choco -Times 0 -Exactly
