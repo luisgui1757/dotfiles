@@ -50,4 +50,21 @@ if (($userPath -split ';') -notcontains $wtDir) {
 }
 
 Write-Host "windows-terminal: portable build installed at $wtDir"
+
+# The portable (unpackaged) build reads settings from
+# %LOCALAPPDATA%\Microsoft\Windows Terminal\, NOT the MSIX
+# Packages\...\LocalState\ path that chezmoi merged our fragment into. Copy the
+# managed settings across so the portable build actually shows the maximized /
+# scrollbar / Rose Pine / Hack Nerd Font customizations. Run setup first so the
+# managed file exists.
+$managed = Join-Path $env:LOCALAPPDATA 'Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json'
+$portableSettingsDir = Join-Path $env:LOCALAPPDATA 'Microsoft\Windows Terminal'
+if (Test-Path -LiteralPath $managed) {
+    New-Item -ItemType Directory -Path $portableSettingsDir -Force | Out-Null
+    Copy-Item -LiteralPath $managed -Destination (Join-Path $portableSettingsDir 'settings.json') -Force
+    Write-Host "windows-terminal: applied managed settings to the portable build"
+} else {
+    Write-Host "windows-terminal: managed settings not found (run setup.ps1 first); portable build will use defaults"
+}
+
 if ($Launch) { Start-Process $wtExe.FullName }
