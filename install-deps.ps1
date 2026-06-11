@@ -8,7 +8,7 @@
 # Prints manual-install hints only when no manager carries the package.
 #
 # Usage:
-#   .\install-deps.ps1            prompt Y/n for each tool
+#   .\install-deps.ps1            show a dependency table, then prompt once
 #   .\install-deps.ps1 -All       skip prompts, install everything
 #   .\install-deps.ps1 -DryRun    print what would be installed without acting
 
@@ -143,30 +143,33 @@ function Install-Scoop {
         if (Test-IsElevated) {
             Write-Host "  would: download get.scoop.sh, then run install.ps1 -RunAsAdmin"
         } else {
-            Write-Host "  would: irm get.scoop.sh | iex"
+            Write-Host "  would: download get.scoop.sh, then run install.ps1"
         }
         return $false
     }
     try {
         # The official scoop bootstrap. RemoteSigned policy is needed for the
-        # script; we set it for the current process only.
+        # script; it is set for the current process only.
         Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process -Force
+        $installer = Join-Path $env:TEMP "scoop-install-$([guid]::NewGuid()).ps1"
+        Invoke-WebRequest -Uri 'https://get.scoop.sh' -OutFile $installer -UseBasicParsing -ErrorAction Stop
         if (Test-IsElevated) {
             # GitHub Windows runners are elevated. Scoop blocks elevated
             # bootstrap by default, so use the installer documented opt-in
             # instead of trying to de-elevate the CI process.
-            $installer = Join-Path $env:TEMP "scoop-install-$([guid]::NewGuid()).ps1"
-            Invoke-WebRequest -Uri 'https://get.scoop.sh' -OutFile $installer -UseBasicParsing -ErrorAction Stop
             & $installer -RunAsAdmin
-            Remove-Item -LiteralPath $installer -Force -ErrorAction SilentlyContinue
         } else {
-            Invoke-Expression (Invoke-RestMethod -Uri 'https://get.scoop.sh' -ErrorAction Stop)
+            & $installer
         }
+        Remove-Item -LiteralPath $installer -Force -ErrorAction SilentlyContinue
         Add-ScoopToPathForCurrentProcess
         # Add the standard buckets so existing catalog entries resolve.
         Ensure-ScoopBuckets
         return [bool](Get-Command scoop -ErrorAction SilentlyContinue)
     } catch {
+        if ($installer) {
+            Remove-Item -LiteralPath $installer -Force -ErrorAction SilentlyContinue
+        }
         Write-Warning ("Scoop install failed: " + $_.Exception.Message)
         return $false
     }
@@ -179,6 +182,17 @@ function Ask {
     $resp = Read-Host "  $prompt [Y/n]"
     if ([string]::IsNullOrWhiteSpace($resp)) { return $true }
     return ($resp -match '^[Yy]')
+}
+
+function Test-InstallPromptAvailable {
+    if ($All -or $DryRun) { return $false }
+    if (-not [Environment]::UserInteractive) { return $false }
+    try {
+        if ([Console]::IsInputRedirected) { return $false }
+    } catch {
+        return $false
+    }
+    return $true
 }
 
 function Test-FileSha256 {
@@ -275,6 +289,167 @@ $BinaryName = @{
 function Test-Tool {
     param([string]$name)
     return [bool](Get-Command $BinaryName[$name] -ErrorAction SilentlyContinue)
+}
+
+function Get-InstallDependencySpec {
+    $toolOrder = @(
+        'git',
+        'nvim',
+        'make',
+        'rg',
+        'fd',
+        'fzf',
+        'chezmoi',
+        'lazygit',
+        'starship',
+        'wt',
+        'psmux',
+        'pwsh',
+        'python',
+        'node',
+        'win32yank',
+        'jq',
+        'shellcheck',
+        'hyperfine',
+        'taplo',
+        'code'
+    )
+    $emitted = @{}
+    foreach ($tool in $toolOrder) {
+        if (($tool -eq 'psmux') -or $Catalog.ContainsKey($tool)) {
+            $emitted[$tool] = $true
+            [pscustomobject]@{
+                Tool = $tool
+                Kind = 'tool'
+                Binary = $BinaryName[$tool]
+                Module = ''
+            }
+        }
+    }
+    foreach ($tool in ($Catalog.Keys | Sort-Object)) {
+        if (-not $emitted.ContainsKey($tool)) {
+            [pscustomobject]@{
+                Tool = $tool
+                Kind = 'tool'
+                Binary = $BinaryName[$tool]
+                Module = ''
+            }
+        }
+    }
+    [pscustomobject]@{ Tool = 'PSFzf'; Kind = 'module'; Binary = ''; Module = 'PSFzf' }
+    [pscustomobject]@{ Tool = 'Hack Nerd Font'; Kind = 'font'; Binary = ''; Module = '' }
+}
+
+function Get-CommandVersionString {
+    param([string]$CommandName)
+    if ([string]::IsNullOrWhiteSpace($CommandName)) { return '-' }
+    if (-not (Get-Command -Name $CommandName -ErrorAction SilentlyContinue)) { return '-' }
+    try {
+        $lines = @(& $CommandName --version 2>$null)
+        foreach ($line in $lines) {
+            $text = [string]$line
+            if (-not [string]::IsNullOrWhiteSpace($text)) {
+                return $text.Trim()
+            }
+        }
+    } catch {
+        return '-'
+    }
+    return '-'
+}
+
+function Get-ModuleVersionString {
+    param([string]$Name)
+    $module = Get-Module -ListAvailable -Name $Name |
+        Sort-Object -Property Version -Descending |
+        Select-Object -First 1
+    if ($module) { return $module.Version.ToString() }
+    return '-'
+}
+
+function Test-InstallDependencyPresent {
+    param([Parameter(Mandatory)]$Spec)
+    switch ($Spec.Kind) {
+        'tool' { return (Test-Tool $Spec.Tool) }
+        'module' { return [bool](Get-Module -ListAvailable -Name $Spec.Module) }
+        'font' { return (Test-HackNerdFontInstalled) }
+        default { return $false }
+    }
+}
+
+function Get-InstallDependencyVersion {
+    param([Parameter(Mandatory)]$Spec)
+    switch ($Spec.Kind) {
+        'tool' { return (Get-CommandVersionString -CommandName $Spec.Binary) }
+        'module' { return (Get-ModuleVersionString -Name $Spec.Module) }
+        default { return '-' }
+    }
+}
+
+function Get-InstallDependencyScan {
+    param(
+        [object[]]$SpecList,
+        [scriptblock]$PresenceTester,
+        [scriptblock]$VersionGetter
+    )
+    if ($null -eq $SpecList) {
+        $SpecList = @(Get-InstallDependencySpec)
+    }
+    foreach ($spec in $SpecList) {
+        $present = if ($PresenceTester) {
+            [bool](& $PresenceTester $spec)
+        } else {
+            Test-InstallDependencyPresent -Spec $spec
+        }
+        $version = '-'
+        $status = 'missing'
+        $action = 'install'
+        if ($present) {
+            $status = 'present'
+            $action = 'skip'
+            $version = if ($VersionGetter) {
+                [string](& $VersionGetter $spec)
+            } else {
+                Get-InstallDependencyVersion -Spec $spec
+            }
+            if ([string]::IsNullOrWhiteSpace($version)) {
+                $version = '-'
+            }
+        }
+        [pscustomobject]@{
+            Tool = $spec.Tool
+            Status = $status
+            Version = $version
+            Action = $action
+        }
+    }
+}
+
+function Format-InstallDependencyTable {
+    param([Parameter(Mandatory)][object[]]$Rows)
+    $lines = [System.Collections.Generic.List[string]]::new()
+    $lines.Add('Dependency pre-flight:')
+    $lines.Add(('{0,-22} {1,-8} {2,-34} {3,-7}' -f 'Tool', 'Status', 'Version', 'Action'))
+    $lines.Add(('{0,-22} {1,-8} {2,-34} {3,-7}' -f '----------------------', '--------', '----------------------------------', '-------'))
+    $present = 0
+    $missing = 0
+    foreach ($row in $Rows) {
+        $lines.Add(('{0,-22} {1,-8} {2,-34} {3,-7}' -f $row.Tool, $row.Status, $row.Version, $row.Action))
+        if ($row.Status -eq 'present') {
+            $present++
+        } else {
+            $missing++
+        }
+    }
+    $lines.Add(('{0} present, {1} missing' -f $present, $missing))
+    return $lines.ToArray()
+}
+
+function Show-InstallDependencyTable {
+    param([Parameter(Mandatory)][object[]]$Rows)
+    foreach ($line in (Format-InstallDependencyTable -Rows $Rows)) {
+        Write-Host $line
+    }
 }
 
 function Install-One {
@@ -384,18 +559,29 @@ function Update-ScoopTool {
 $script:InstallFailures = @()
 
 # ---- Hack Nerd Font: prefer scoop bucket, fall back to direct download+register
-function Install-HackNerdFont {
-    # Already installed?
+function Get-HackNerdFontInstallScope {
     $userFonts = "$env:LOCALAPPDATA\Microsoft\Windows\Fonts"
     $sysFonts = "$env:WINDIR\Fonts"
     if ((Test-Path $userFonts -PathType Container) -and
         (Get-ChildItem -Path $userFonts -Filter "Hack*Nerd*" -ErrorAction SilentlyContinue)) {
-        Write-Host ("  ok        {0,-26} already installed (user)" -f "Hack Nerd Font")
-        return
+        return 'user'
     }
     if ((Test-Path $sysFonts -PathType Container) -and
         (Get-ChildItem -Path $sysFonts -Filter "Hack*Nerd*" -ErrorAction SilentlyContinue)) {
-        Write-Host ("  ok        {0,-26} already installed (system)" -f "Hack Nerd Font")
+        return 'system'
+    }
+    return ''
+}
+
+function Test-HackNerdFontInstalled {
+    return -not [string]::IsNullOrEmpty((Get-HackNerdFontInstallScope))
+}
+
+function Install-HackNerdFont {
+    # Already installed?
+    $fontScope = Get-HackNerdFontInstallScope
+    if ($fontScope) {
+        Write-Host ("  ok        {0,-26} already installed ({1})" -f "Hack Nerd Font", $fontScope)
         return
     }
     if (-not (Ask "Install Hack Nerd Font?")) {
@@ -952,12 +1138,12 @@ function Install-Psmux {
         return
     }
     if ($DryRun) {
-        Write-Host "  would: Add-ScoopBucketSafe psmux; scoop install psmux  (fallback: winget / choco)"
+        Write-Host "  would: Add-ScoopBucketSafe psmux; scoop install psmux/psmux  (fallback: winget / choco)"
         return
     }
     if (Get-Command scoop -ErrorAction SilentlyContinue) {
         if (Add-ScoopBucketSafe -Name 'psmux' -Url 'https://github.com/psmux/scoop-psmux') {
-            scoop install psmux
+            scoop install psmux/psmux
             if ($LASTEXITCODE -eq 0 -and (Test-Tool 'psmux')) {
                 Write-Host ("  installed {0,-26} via scoop" -f "psmux")
                 return
@@ -1049,10 +1235,15 @@ if (-not $Pm) {
     exit 1
 }
 
+$dependencyScan = @(Get-InstallDependencyScan)
+Show-InstallDependencyTable -Rows $dependencyScan
+Write-Host ""
+$missingDependencyCount = @($dependencyScan | Where-Object { $_.Status -eq 'missing' }).Count
+
 # One-shot "install everything" vs per-item prompts. Skipped when -All / -DryRun
 # was passed or the session is non-interactive. Enter / Y == everything.
-if ((-not $All) -and (-not $DryRun) -and [Environment]::UserInteractive) {
-    $resp = Read-Host "Install EVERYTHING without further prompts? [Y/n]  (n = choose per tool)"
+if (Test-InstallPromptAvailable) {
+    $resp = Read-Host "Install the $missingDependencyCount missing tools listed above without further prompts? [Y/n]  (n = choose per tool)"
     if ($resp -match '^[Nn]') {
         Write-Host "  -> per-item prompts"
     } else {

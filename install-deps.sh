@@ -1688,6 +1688,165 @@ check_wsl_clipboard() {
     echo "            automatically once installed via scoop)."
 }
 
+install_dependency_scan_items() {
+    printf '%s\n' \
+        "git|command|git" \
+        "nvim|command|nvim" \
+        "make|command|make" \
+        "C compiler|compiler|" \
+        "rg|command|rg" \
+        "fd|command|" \
+        "fzf|command|fzf" \
+        "chezmoi|command|chezmoi" \
+        "lazygit|command|lazygit" \
+        "starship|command|starship" \
+        "tmux|command|tmux" \
+        "zsh|command|zsh" \
+        "zsh plugins|zsh-plugins|" \
+        "code|command|code" \
+        "python3|command|python3" \
+        "node|command|node" \
+        "shellcheck|command|shellcheck" \
+        "jq|command|jq" \
+        "bats|command|bats" \
+        "hyperfine|command|hyperfine" \
+        "taplo|command|taplo" \
+        "yamllint|command|yamllint" \
+        "editorconfig-checker|command|editorconfig-checker"
+
+    if [[ "$(uname -s)" == "Darwin" && "$PM" == "brew" ]]; then
+        printf '%s\n' "ghostty|command|ghostty"
+    elif [[ "$(uname -s)" == "Linux" ]]; then
+        if ! is_wsl || wsl_gui_opt_in; then
+            printf '%s\n' "ghostty|command|ghostty"
+        fi
+    fi
+
+    if ! is_wsl || wsl_gui_opt_in; then
+        printf '%s\n' "fc-cache|command|fc-cache" "Hack Nerd Font|font|"
+    fi
+
+    if is_wsl; then
+        printf '%s\n' "win32yank.exe|command|win32yank.exe"
+    elif [[ "$(uname -s)" == "Linux" ]]; then
+        printf '%s\n' "xclip|command|xclip" "wl-copy|command|wl-copy"
+    fi
+}
+
+install_scan_present() {
+    local tool="$1" kind="$2" bins
+    case "$kind" in
+        command)
+            bins="$(binaries_for "$tool")"
+            # shellcheck disable=SC2086  # $bins is intentional word-splitting
+            have_any $bins
+            ;;
+        compiler)
+            have_c_compiler
+            ;;
+        font)
+            fc-list 2>/dev/null | grep -qi "hack.*nerd"
+            ;;
+        zsh-plugins)
+            local root autocomplete_dir autosuggestions_dir
+            root="$(zsh_plugin_root)"
+            autocomplete_dir="$root/zsh-autocomplete"
+            autosuggestions_dir="$root/zsh-autosuggestions"
+            zsh_plugin_ok "$autocomplete_dir" "$ZSH_AUTOCOMPLETE_COMMIT" "zsh-autocomplete.plugin.zsh" &&
+                zsh_plugin_ok "$autosuggestions_dir" "$ZSH_AUTOSUGGESTIONS_COMMIT" "zsh-autosuggestions.zsh"
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+install_scan_version() {
+    local tool="$1" kind="$2" version_bin="${3:-}" bins candidate first_line
+    case "$kind" in
+        font)
+            printf '%s\n' "-"
+            return
+            ;;
+        zsh-plugins)
+            printf '%s\n' "$ZSH_AUTOCOMPLETE_VERSION/$ZSH_AUTOSUGGESTIONS_VERSION"
+            return
+            ;;
+        compiler)
+            for candidate in cc gcc clang zig cl; do
+                if have "$candidate"; then
+                    version_bin="$candidate"
+                    break
+                fi
+            done
+            ;;
+        command)
+            if [[ -z "$version_bin" ]]; then
+                bins="$(binaries_for "$tool")"
+                for candidate in $bins; do
+                    if have "$candidate"; then
+                        version_bin="$candidate"
+                        break
+                    fi
+                done
+            fi
+            ;;
+    esac
+    if [[ -z "$version_bin" ]] || ! have "$version_bin"; then
+        printf '%s\n' "-"
+        return
+    fi
+    first_line="$("$version_bin" --version 2>/dev/null | sed -n '1p' || true)"
+    if [[ -z "$first_line" ]]; then
+        first_line="-"
+    fi
+    printf '%s\n' "$first_line"
+}
+
+scan_install_dependencies() {
+    local spec_source tool kind version_bin status version action
+    if [[ -n "${INSTALL_DEPS_SCAN_ITEMS:-}" ]]; then
+        spec_source="$INSTALL_DEPS_SCAN_ITEMS"
+    else
+        spec_source="$(install_dependency_scan_items)"
+    fi
+    while IFS='|' read -r tool kind version_bin; do
+        [[ -n "$tool" ]] || continue
+        status="missing"
+        version="-"
+        action="install"
+        if install_scan_present "$tool" "$kind"; then
+            status="present"
+            version="$(install_scan_version "$tool" "$kind" "$version_bin")"
+            action="skip"
+        fi
+        printf '%s|%s|%s|%s\n' "$tool" "$status" "$version" "$action"
+    done <<EOF
+$spec_source
+EOF
+}
+
+print_install_dependency_table() {
+    local rows tool status version action present=0 missing=0
+    rows="$(scan_install_dependencies)"
+    echo "Dependency pre-flight:"
+    printf "%-22s %-8s %-34s %-7s\n" "Tool" "Status" "Version" "Action"
+    printf "%-22s %-8s %-34s %-7s\n" "----------------------" "--------" "----------------------------------" "-------"
+    while IFS='|' read -r tool status version action; do
+        [[ -n "$tool" ]] || continue
+        printf "%-22s %-8s %-34s %-7s\n" "$tool" "$status" "$version" "$action"
+        if [[ "$status" == "present" ]]; then
+            present=$((present + 1))
+        else
+            missing=$((missing + 1))
+        fi
+    done <<EOF
+$rows
+EOF
+    INSTALL_SCAN_MISSING=$missing
+    printf "%s present, %s missing\n" "$present" "$missing"
+}
+
 # Test seam: `INSTALL_DEPS_SOURCE_ONLY=1 source install-deps.sh` defines the
 # installer functions WITHOUT running any package installs.
 if [[ -n "${INSTALL_DEPS_SOURCE_ONLY:-}" ]]; then
@@ -1721,12 +1880,14 @@ fi
 
 echo "install-deps: OS=$OS_LABEL  package manager=$PM  dry-run=$DRY_RUN  yes-all=$YES_ALL  experimental-wsl-gui=$EXPERIMENTAL_WSL_GUI"
 echo
+print_install_dependency_table
+echo
 
 # One-shot "install everything" vs the per-item prompts. Skipped when --all was
 # already passed, and when there's no tty to read from (e.g. curl | bash).
 # Enter / Y == everything (recommended); n == choose per tool.
 if [[ "$YES_ALL" -ne 1 && "$DRY_RUN" -ne 1 && -t 0 ]]; then
-    printf "Install EVERYTHING without further prompts? [Y/n]  (n = choose per tool) "
+    printf "Install the %s missing tools listed above without further prompts? [Y/n]  (n = choose per tool) " "$INSTALL_SCAN_MISSING"
     if IFS= read -r _all_ans && [[ "$_all_ans" =~ ^[Nn] ]]; then
         echo "  -> per-item prompts"
     else

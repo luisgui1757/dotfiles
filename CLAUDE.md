@@ -469,6 +469,10 @@ save only**. The next plain `:w` formats normally. Implemented in
   installs `chezmoi` through the normal Scoop-first `$Catalog` fallback chain
   (`scoop` -> `winget` -> `choco`). This keeps `make chezmoi` usable after full
   setup before the Phase 2 chezmoi apply.
+- **`install-deps` shows a scan-first dependency table before the one-shot
+  install prompt.** The table is display-only: it uses the same presence checks
+  as the installer, best-effort `--version` probes, and still leaves all actual
+  install/skip decisions to the existing per-tool functions.
 - **`uninstall.sh` / `uninstall.ps1` are greenfield teardown tools, not purge.**
   They enumerate targets with `chezmoi --source <repo>/home managed --path-style
   absolute`, remove only repo-owned symlinks or byte-identical Windows
@@ -605,8 +609,10 @@ save only**. The next plain `:w` formats normally. Implemented in
   of truth, Rose Pine carries over, no parallel config. Chezmoi manages
   `%USERPROFILE%\.tmux.conf` from `tmux\tmux.conf` (mirrors the Unix
   `~/.tmux.conf` target). Install-Psmux is NOT in the `$Catalog` because scoop needs a custom
-  psmux bucket URL; it passes that URL through `Add-ScoopBucketSafe`, then
-  falls through to winget / choco if the bucket clone or scoop install fails.
+  psmux bucket URL; it passes that URL through `Add-ScoopBucketSafe`, installs
+  the explicit `psmux/psmux` manifest to avoid ambiguous Scoop bucket matches,
+  then falls through to winget / choco if the bucket clone or scoop install
+  fails.
 - **The clipboard `if-shell` probes are POSIX-ONLY (`tmux/tmux.posix.conf`) —
   they FREEZE psmux.** `if-shell 'command -v pbcopy …'` spawns a shell at
   config-**load** time. Under psmux/ConPTY on Windows that shell never returns:

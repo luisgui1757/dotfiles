@@ -222,6 +222,10 @@ and whether `pwsh` is installed.
 - `install-deps` provisions chezmoi itself: Homebrew on macOS/Linuxbrew,
   pinned `get.chezmoi.io` release on native Linux without brew, and the
   Scoop-first catalog on Windows.
+- `install-deps` prints a dependency pre-flight table before the one-shot
+  install prompt, showing present/missing tools, best-effort versions, and the
+  resulting skip/install action. The table is informational; the existing
+  per-tool install logic still decides what actually runs.
 - zsh plugins are installed by Unix setup as repo-managed pinned git checkouts:
   `zsh-autocomplete` and `zsh-autosuggestions` live under
   `${XDG_DATA_HOME:-$HOME/.local/share}/dotfiles/zsh-plugins`. `zshrc` sources
@@ -566,4 +570,4 @@ MIT. See `LICENSE`.
 | Windows Terminal lost a profile after merge | WT auto-rewrites — pre-merge backup is at `<settings.json>.bak.<timestamp>` | restore the profile list from the backup |
 | `setup.ps1` errors "cannot create symbolic links" | Developer Mode off and not elevated | `setup.ps1` reports your *elevated* + *Developer Mode* state before chezmoi apply. Enable Developer Mode (Settings -> Privacy & security -> For developers, no admin, recommended) **then** `.\setup.ps1 -SkipDeps`; OR run just the config phase elevated with `.\setup.ps1 -SkipDeps -SkipNvim`, then return to a normal shell for `.\setup.ps1 -SkipDeps -SkipConfig`. Don't elevate the dependency-install run because Scoop refuses admin installs |
 | Ghostty won't open maximized on Linux/GNOME | `maximize = true` is a hint the WM may ignore (GNOME Mutter often does) | on **X11**, `install-deps` offers a devilspie2 setup through the native Linux package manager, even when Linuxbrew is the main CLI manager; the rule is keyed on `com.mitchellh.ghostty`. Wayland needs a GNOME Shell extension instead |
-| `install-deps.ps1`: winget `No package found matching input criteria` (exit `-1978335212`) | winget source/catalog flakiness | install-deps now **prefers scoop** and falls back across managers per tool — accept the scoop bootstrap when offered (`irm get.scoop.sh \| iex`) and re-run; scoop carries the cataloged CLI/terminal tools here |
+| `install-deps.ps1`: winget `No package found matching input criteria` (exit `-1978335212`) | winget source/catalog flakiness | install-deps now **prefers scoop** and falls back across managers per tool -- accept the scoop bootstrap when offered and re-run; scoop carries the cataloged CLI/terminal tools here |

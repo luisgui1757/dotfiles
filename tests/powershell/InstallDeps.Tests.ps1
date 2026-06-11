@@ -99,6 +99,35 @@ Describe "install-deps.ps1" {
         Should -Invoke -CommandName Read-Host -Times 0 -Exactly
     }
 
+    It "formats present and missing dependency table rows without installing" {
+        . $script:ImportInstallDepsForTest
+        $specList = @(
+            [pscustomobject]@{ Tool = 'present-tool'; Kind = 'tool'; Binary = 'present-tool'; Module = '' },
+            [pscustomobject]@{ Tool = 'missing-tool'; Kind = 'tool'; Binary = 'missing-tool'; Module = '' }
+        )
+
+        Mock -CommandName scoop -MockWith { throw "table scan must not run scoop" }
+        Mock -CommandName winget -MockWith { throw "table scan must not run winget" }
+        Mock -CommandName choco -MockWith { throw "table scan must not run choco" }
+
+        $rows = @(Get-InstallDependencyScan -SpecList $specList -PresenceTester {
+                param($Spec)
+                return ($Spec.Tool -eq 'present-tool')
+            } -VersionGetter {
+                param($Spec)
+                if ($Spec.Tool -eq 'present-tool') { return 'present-tool 1.2.3' }
+                return '-'
+            })
+        $table = (Format-InstallDependencyTable -Rows $rows) -join "`n"
+
+        $table | Should -Match '(?m)^present-tool\s+present\s+present-tool 1\.2\.3\s+skip$'
+        $table | Should -Match '(?m)^missing-tool\s+missing\s+-\s+install$'
+        $table | Should -Match '1 present, 1 missing'
+        Should -Invoke -CommandName scoop -Times 0 -Exactly
+        Should -Invoke -CommandName winget -Times 0 -Exactly
+        Should -Invoke -CommandName choco -Times 0 -Exactly
+    }
+
     It "uses the documented elevated Scoop bootstrap path in dry run" {
         . $script:ImportInstallDepsForTest -DryRun
         Mock -CommandName Get-Command -MockWith { return $null } -ParameterFilter { $Name -eq 'scoop' }
@@ -258,6 +287,35 @@ Describe "install-deps.ps1" {
 
         $script:ScoopArgs | Should -Contain 'bucket rm psmux'
         $script:WingetArgs | Should -Contain 'install psmux --accept-source-agreements --accept-package-agreements --silent'
+    }
+
+    It "installs psmux from the explicit Scoop bucket manifest" {
+        . $script:ImportInstallDepsForTest
+        $script:ScoopArgs = @()
+        $script:PsmuxInstalled = $false
+        Mock -CommandName Get-Command -MockWith {
+            param([string]$Name)
+            if ($Name -eq 'scoop') {
+                return [pscustomobject]@{ Name = $Name; Source = $Name }
+            }
+            return $null
+        }
+        Mock -CommandName Test-Tool -MockWith { return $script:PsmuxInstalled } -ParameterFilter { $name -eq 'psmux' }
+        Mock -CommandName Add-ScoopBucketSafe -MockWith { return $true } -ParameterFilter {
+            $Name -eq 'psmux' -and $Url -eq 'https://github.com/psmux/scoop-psmux'
+        }
+        Mock -CommandName scoop -MockWith {
+            $script:ScoopArgs += ($args -join ' ')
+            $global:LASTEXITCODE = 0
+            if (($args -join ' ') -eq 'install psmux/psmux') {
+                $script:PsmuxInstalled = $true
+            }
+        }
+
+        Install-Psmux
+
+        $script:ScoopArgs | Should -Contain 'install psmux/psmux'
+        $script:InstallFailures.Count | Should -Be 0
     }
 
     It "uses winget when winget is the only installed manager" {
