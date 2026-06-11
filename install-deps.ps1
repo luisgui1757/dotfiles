@@ -10,11 +10,13 @@
 # Usage:
 #   .\install-deps.ps1            show a dependency table, then prompt once
 #   .\install-deps.ps1 -All       skip prompts, install everything
+#   .\install-deps.ps1 -Update    update only present Scoop-managed catalog tools
 #   .\install-deps.ps1 -DryRun    print what would be installed without acting
 
 [CmdletBinding()]
 param(
     [switch]$All,
+    [switch]$Update,
     [switch]$DryRun
 )
 
@@ -536,21 +538,43 @@ function Install-One {
 # contract. Safe to call when the tool is absent (the install path owns that) and
 # when the tool was installed by another manager (the scoop list guard no-ops).
 function Update-ScoopTool {
-    param([string]$tool)
+    param(
+        [string]$tool,
+        [switch]$NoPrompt,
+        [switch]$SkipManifestRefresh,
+        [switch]$ReportSkip,
+        [bool]$IsDryRun = $DryRun
+    )
     if (-not (Get-Command scoop -ErrorAction SilentlyContinue)) { return }
-    if (-not (Test-Tool $tool)) { return }   # not installed yet -> install path owns it
-    $pkg = $Catalog[$tool].scoop
-    if (-not $pkg) { return }
-    # Only update if scoop actually manages this tool (avoids warning on a
-    # winget/choco-installed pwsh that Install-One picked when scoop was absent).
-    $managed = (scoop list $pkg 2>$null | Select-String -SimpleMatch $pkg)
-    if (-not $managed) { return }
-    if (-not (Ask "Update ${tool} to the latest scoop version?")) { return }
-    if ($DryRun) {
-        Write-Host ("  would:    scoop update; scoop update {0}" -f $pkg)
+    if (-not (Test-Tool $tool)) {
+        if ($ReportSkip) { Write-Host ("  skipped   {0,-26} not installed" -f $tool) }
         return
     }
-    scoop update | Out-Null               # refresh manifests only
+    $pkg = $Catalog[$tool].scoop
+    if (-not $pkg) {
+        if ($ReportSkip) { Write-Host ("  skipped   {0,-26} no scoop package in catalog" -f $tool) }
+        return
+    }
+    # Only update if scoop actually manages this tool (avoids warning on a
+    # winget/choco-installed pwsh that Install-One picked when scoop was absent).
+    $scoopListName = @($pkg -split '/')[-1]
+    $managed = (scoop list $scoopListName 2>$null | Select-String -SimpleMatch $scoopListName)
+    if (-not $managed) {
+        if ($ReportSkip) { Write-Host ("  skipped   {0,-26} present, but Scoop does not manage {1}" -f $tool, $pkg) }
+        return
+    }
+    if ((-not $NoPrompt) -and (-not (Ask "Update ${tool} to the latest scoop version?"))) { return }
+    if ($IsDryRun) {
+        if ($SkipManifestRefresh) {
+            Write-Host ("  would:    scoop update {0}" -f $pkg)
+        } else {
+            Write-Host ("  would:    scoop update; scoop update {0}" -f $pkg)
+        }
+        return
+    }
+    if (-not $SkipManifestRefresh) {
+        scoop update | Out-Null
+    }
     scoop update $pkg
     if ($LASTEXITCODE -eq 0) {
         Write-Host ("  updated   {0,-26} via scoop" -f $tool)
@@ -1211,9 +1235,62 @@ function Install-PSFzf {
     $script:InstallFailures += [pscustomobject]@{ Tool='PSFzf'; Pm='PSGallery'; Pkg='PSFzf'; ExitCode=$LASTEXITCODE }
 }
 
+function Get-CatalogUpdateSpec {
+    param([object[]]$SpecList = @(Get-InstallDependencySpec))
+    $seen = @{}
+    foreach ($spec in $SpecList) {
+        if ($Catalog.ContainsKey($spec.Tool) -and -not $seen.ContainsKey($spec.Tool)) {
+            $seen[$spec.Tool] = $true
+            $spec
+        }
+    }
+}
+
+function Invoke-InstallDepsUpdateMode {
+    param(
+        [object[]]$SpecList = @(Get-InstallDependencySpec),
+        [scriptblock]$PresenceTester,
+        [bool]$IsDryRun = $DryRun
+    )
+
+    Write-Host ("install-deps: update mode  scoop=" + [bool](Get-Command scoop -ErrorAction SilentlyContinue) + "  dry-run=$IsDryRun")
+    Write-Host "note: winget/choco-installed tools update via their own managers."
+    Write-Host ""
+
+    if (-not (Get-Command scoop -ErrorAction SilentlyContinue)) {
+        Write-Host "  skipped   scoop update              Scoop is not installed"
+    } elseif ($IsDryRun) {
+        Write-Host "  would:    scoop update"
+    } else {
+        scoop update | Out-Null
+    }
+
+    foreach ($spec in (Get-CatalogUpdateSpec -SpecList $SpecList)) {
+        $tool = $spec.Tool
+        $present = if ($PresenceTester) {
+            [bool](& $PresenceTester $tool)
+        } else {
+            Test-Tool $tool
+        }
+        if (-not $present) {
+            Write-Host ("  skipped   {0,-26} not installed" -f $tool)
+            continue
+        }
+        Update-ScoopTool -tool $tool -NoPrompt -SkipManifestRefresh -ReportSkip -IsDryRun $IsDryRun
+    }
+
+    Write-Host ""
+    Write-Host "note: pinned binaries (Neovim/lazygit Linux tarballs, Hack Nerd Font, Windows Terminal portable), PSFzf, plugins, and configs update via git pull and re-running setup."
+}
+
 if ($env:INSTALL_DEPS_PS1_SOURCE_ONLY) { return }
 
 $Pm = Get-AvailablePM
+
+if ($Update) {
+    Invoke-InstallDepsUpdateMode -IsDryRun $DryRun
+    exit 0
+}
 
 Write-Host ""
 Write-Host ("install-deps: primary PM=$Pm  scoop=" + [bool](Get-Command scoop -ErrorAction SilentlyContinue) + "  dry-run=$DryRun  yes-all=$All")

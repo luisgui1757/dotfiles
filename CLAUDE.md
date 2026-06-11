@@ -476,6 +476,17 @@ save only**. The next plain `:w` formats normally. Implemented in
   uses the same presence checks as the installer, best-effort `--version`
   probes, and still leaves all actual install/skip decisions to the existing
   per-tool functions.
+- **`--update` is a scoped drift-edge refresh, not a repo update.**
+  `setup.sh --update` / `setup.ps1 -Update` run only `install-deps --update`
+  and `nvim --headless +MasonToolsUpdate +qa`. They skip git pull, chezmoi
+  apply, Lazy sync, and Lazy update. `install-deps --update` updates only
+  present catalog tools through scoped per-package manager commands
+  (`brew upgrade <formula>`, native Linux package upgrade commands, or
+  `scoop update <pkg>` after one manifest refresh). It must not run blanket
+  upgrades such as `brew upgrade`, `apt upgrade`, or `scoop update *`, and it
+  must not touch pinned direct downloads, PSFzf, `lazy-lock.json`, or configs.
+  On native Linux, `nvim` and `lazygit` are pinned direct-download binaries and
+  stay out of the update path.
 - **A C compiler is installed so LuaSnip can build `jsregexp`.** Without one,
   the nvim Lazy build prints "No C compiler found" and `jsregexp` is skipped
   (LuaSnip still works, minus JS-regex snippet transforms). POSIX installs the

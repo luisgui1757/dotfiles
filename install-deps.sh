@@ -8,6 +8,7 @@
 # Usage:
 #   ./install-deps.sh           prompt Y/n for each tool
 #   ./install-deps.sh --all     skip prompts, install everything
+#   ./install-deps.sh --update  update only present package-manager tools
 #   ./install-deps.sh --dry-run print what would be installed without acting
 #   ./install-deps.sh --experimental-wsl-gui
 #                              WSL opt-in: Linux Ghostty + Linux fontconfig fonts
@@ -16,6 +17,7 @@ set -euo pipefail
 
 YES_ALL=0
 DRY_RUN=0
+UPDATE_ONLY=0
 EXPERIMENTAL_WSL_GUI="${DOTFILES_EXPERIMENTAL_WSL_GUI:-0}"
 NVIM_LINUX_VERSION="v0.12.2"
 NVIM_LINUX_X86_64_SHA256="31cf85945cb600d96cdf69f88bc68bec814acbff50863c5546adef3a1bcef260"
@@ -40,6 +42,7 @@ for arg in "$@"; do
     case "$arg" in
         --all|-y)   YES_ALL=1 ;;
         --dry-run)  DRY_RUN=1 ;;
+        --update)   UPDATE_ONLY=1 ;;
         --experimental-wsl-gui)
                     EXPERIMENTAL_WSL_GUI=1
                     export DOTFILES_EXPERIMENTAL_WSL_GUI=1 ;;
@@ -106,6 +109,22 @@ native_linux_pm() {
     elif have apk;     then echo apk
     else echo unknown
     fi
+}
+
+detect_update_pm() {
+    case "$(uname -s)" in
+        Darwin)
+            if homebrew_bin >/dev/null 2>&1; then echo brew
+            else echo brew_missing
+            fi
+            ;;
+        Linux)
+            native_linux_pm
+            ;;
+        *)
+            echo unknown
+            ;;
+    esac
 }
 
 homebrew_bin() {
@@ -1271,6 +1290,147 @@ native_linux_pm_install() {
     esac
 }
 
+catalog_tools() {
+    if [[ -n "${INSTALL_DEPS_UPDATE_TOOLS:-}" ]]; then
+        printf '%s\n' "$INSTALL_DEPS_UPDATE_TOOLS"
+        return
+    fi
+    printf '%s\n' "$PKG_TABLE" | awk -F'|' 'NF { print $1 }'
+}
+
+update_tool_present() {
+    local tool="$1" bins
+    bins="$(binaries_for "$tool")"
+    # shellcheck disable=SC2086  # $bins is intentional word-splitting
+    have_any $bins
+}
+
+pm_pkg_installed() {
+    local pm="$1" pkg="$2" pkg_name
+    pkg_name="${pkg##*/}"
+    case "$pm" in
+        brew)
+            brew list --formula "$pkg_name" >/dev/null 2>&1
+            ;;
+        apt)
+            dpkg-query -W -f='${Status}' "$pkg" 2>/dev/null | grep -q 'install ok installed'
+            ;;
+        dnf|zypper)
+            rpm -q "$pkg" >/dev/null 2>&1
+            ;;
+        pacman)
+            pacman -Q "$pkg" >/dev/null 2>&1
+            ;;
+        apk)
+            apk info -e "$pkg" >/dev/null 2>&1
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+pm_update() {
+    local tool="$1" pkg="$2"
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        case "$PM" in
+            brew)   printf "  would update %-26s via brew: brew upgrade %s\n" "$tool" "$pkg" ;;
+            apt)    printf "  would update %-26s via apt: apt-get install --only-upgrade %s\n" "$tool" "$pkg" ;;
+            dnf)    printf "  would update %-26s via dnf: dnf upgrade %s\n" "$tool" "$pkg" ;;
+            pacman) printf "  would update %-26s via pacman: pacman -S %s\n" "$tool" "$pkg" ;;
+            zypper) printf "  would update %-26s via zypper: zypper update %s\n" "$tool" "$pkg" ;;
+            apk)    printf "  would update %-26s via apk: apk upgrade %s\n" "$tool" "$pkg" ;;
+        esac
+        return 0
+    fi
+    case "$PM" in
+        brew)   brew upgrade "$pkg" ;;
+        apt)    maybe_sudo apt-get update -qq && maybe_sudo apt-get install -y --only-upgrade "$pkg" ;;
+        dnf)    maybe_sudo dnf upgrade -y "$pkg" ;;
+        pacman) maybe_sudo pacman -S --noconfirm "$pkg" ;;
+        zypper) maybe_sudo zypper update -y "$pkg" ;;
+        apk)    maybe_sudo apk upgrade "$pkg" ;;
+    esac
+    local rc=$?
+    if [[ "$rc" -eq 0 ]]; then
+        printf "  updated   %-26s via %s\n" "$tool" "$PM"
+    else
+        printf "  WARN: %s update of %s returned %s\n" "$PM" "$pkg" "$rc" >&2
+    fi
+    return "$rc"
+}
+
+is_pinned_direct_update_tool() {
+    local tool="$1"
+    [[ "$(uname -s)" == "Linux" ]] || return 1
+    case "$tool" in
+        nvim|lazygit) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+update_catalog_tool() {
+    local tool="$1" pkg
+    [[ -n "$tool" ]] || return 0
+
+    if is_pinned_direct_update_tool "$tool"; then
+        printf "  skipped   %-26s pinned Linux direct download; update via git pull + setup\n" "$tool"
+        return 0
+    fi
+
+    if ! update_tool_present "$tool"; then
+        printf "  skipped   %-26s not installed\n" "$tool"
+        return 0
+    fi
+
+    pkg="$(pkg_for "$tool")"
+    if [[ -z "$pkg" ]]; then
+        printf "  skipped   %-26s no %s package in catalog\n" "$tool" "$PM"
+        return 0
+    fi
+
+    if ! pm_pkg_installed "$PM" "$pkg"; then
+        printf "  skipped   %-26s present, but %s does not manage %s\n" "$tool" "$PM" "$pkg"
+        return 0
+    fi
+
+    pm_update "$tool" "$pkg" || true
+}
+
+update_catalog_tools() {
+    local tool
+    while IFS= read -r tool; do
+        [[ -n "$tool" ]] || continue
+        update_catalog_tool "$tool"
+    done <<EOF
+$(catalog_tools)
+EOF
+}
+
+run_update_mode() {
+    PM="$(detect_update_pm)"
+    OS_LABEL="$(uname -s)"
+    if is_wsl; then OS_LABEL="WSL ($OS_LABEL)"; fi
+    echo "install-deps: update mode OS=$OS_LABEL  package manager=$PM  dry-run=$DRY_RUN"
+    echo
+
+    if [[ "$PM" == "brew_missing" ]]; then
+        echo "install-deps: Homebrew is not installed; update mode will not bootstrap it." >&2
+        return 1
+    fi
+    if [[ "$PM" == "unknown" ]]; then
+        echo "install-deps: no supported package manager found for update mode." >&2
+        return 1
+    fi
+    if [[ "$PM" == "brew" ]]; then
+        enable_homebrew_for_current_shell || true
+    fi
+
+    update_catalog_tools
+    echo
+    echo "note: pinned binaries (Neovim/lazygit Linux tarballs, Hack Nerd Font, Windows Terminal portable), PSFzf, plugins, and configs update via git pull and re-running setup."
+}
+
 unique_backup_path() {
     local path="$1" base i
     base="$path.bak.$(date +%Y%m%d-%H%M%S)"
@@ -1867,6 +2027,11 @@ EOF
 if [[ -n "${INSTALL_DEPS_SOURCE_ONLY:-}" ]]; then
     # shellcheck disable=SC2317  # the exit is reached only when executed, not sourced
     return 0 2>/dev/null || exit 0
+fi
+
+if [[ "$UPDATE_ONLY" -eq 1 ]]; then
+    run_update_mode
+    exit $?
 fi
 
 PM="$(detect_pm)"

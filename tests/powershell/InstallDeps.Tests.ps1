@@ -571,6 +571,49 @@ Describe "install-deps.ps1" {
         $script:ScoopArgs | Should -Contain 'list pwsh'
         ($script:ScoopArgs | Where-Object { $_ -like 'update*' }).Count | Should -Be 0
     }
+
+    It "dry-runs catalog update for present Scoop tools and skips absent tools" {
+        . $script:ImportInstallDepsForTest
+        $script:ScoopArgs = @()
+
+        Mock -CommandName Get-Command -MockWith {
+            param([string]$Name)
+            if ($Name -eq 'scoop') {
+                return [pscustomobject]@{ Name = $Name; Source = $Name }
+            }
+            return $null
+        }
+        Mock -CommandName scoop -MockWith {
+            $script:ScoopArgs += ($args -join ' ')
+            if (($args -join ' ') -eq 'list git') {
+                return 'git 2.50.0'
+            }
+        }
+        Mock -CommandName Install-WindowsTerminal -MockWith { throw "Windows Terminal installer must not run in update mode" }
+        Mock -CommandName Install-HackNerdFont -MockWith { throw "font installer must not run in update mode" }
+        Mock -CommandName Install-PSFzf -MockWith { throw "PSFzf installer must not run in update mode" }
+
+        $specList = @(
+            [pscustomobject]@{ Tool = 'git'; Kind = 'tool'; Binary = 'git'; Module = '' },
+            [pscustomobject]@{ Tool = 'fd'; Kind = 'tool'; Binary = 'fd'; Module = '' }
+        )
+        $output = & {
+            Invoke-InstallDepsUpdateMode -SpecList $specList -PresenceTester {
+                param([string]$Tool)
+                return ($Tool -eq 'git')
+            } -IsDryRun $true
+        } 6>&1 | Out-String
+
+        $output | Should -Match '(?m)^\s*would:\s+scoop update[ \t]*$'
+        $output | Should -Match '(?m)^\s*would:\s+scoop update git[ \t]*$'
+        $output | Should -Match '(?m)^\s*skipped\s+fd\s+not installed[ \t]*$'
+        $output | Should -Not -Match 'scoop install|winget install|choco install|Install-Module|Hack\.zip'
+        $script:ScoopArgs | Should -Contain 'list git'
+        ($script:ScoopArgs | Where-Object { $_ -like 'update*' }).Count | Should -Be 0
+        Should -Invoke -CommandName Install-WindowsTerminal -Times 0 -Exactly
+        Should -Invoke -CommandName Install-HackNerdFont -Times 0 -Exactly
+        Should -Invoke -CommandName Install-PSFzf -Times 0 -Exactly
+    }
 }
 
 Describe "Set-VSCodeTheme" {

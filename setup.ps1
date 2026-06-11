@@ -3,6 +3,7 @@
 # Local usage (from a checked-out copy):
 #   .\setup.ps1                  interactive: Y/n per dep, then config + sync
 #   .\setup.ps1 -All             non-interactive: install everything missing
+#   .\setup.ps1 -Update          update package-manager tools + Mason only
 #   .\setup.ps1 -DryRun          preview every step
 #   .\setup.ps1 -SkipDeps        already have nvim/starship; just config+sync
 #   .\setup.ps1 -SkipBootstrap   back-compat alias: skip config apply
@@ -21,6 +22,7 @@
 [CmdletBinding()]
 param(
     [switch]$All,
+    [switch]$Update,
     [switch]$DryRun,
     [switch]$SkipDeps,
     [switch]$SkipBootstrap,
@@ -73,6 +75,16 @@ if ($PSCommandPath -and (Test-Path -LiteralPath $PSCommandPath)) {
 }
 if (-not $ScriptDir -or -not (Test-Path (Join-Path $ScriptDir 'home'))) {
     $dest = if ($env:DOTFILES_DEST) { $env:DOTFILES_DEST } else { $DefaultDest }
+    if ($Update) {
+        $existingSetup = Join-Path $dest 'setup.ps1'
+        if ((Test-Path -LiteralPath $existingSetup -PathType Leaf) -and (Test-Path -LiteralPath (Join-Path $dest 'home') -PathType Container)) {
+            Write-Host "setup.ps1 -Update: using existing checkout at $dest without git pull."
+            & $existingSetup @PSBoundParameters
+            exit $LASTEXITCODE
+        }
+        Write-Error "setup.ps1 -Update needs an existing checkout at $dest; it does not clone or pull."
+        exit 1
+    }
     # DryRun honor: announce what we would clone and exit BEFORE any git op.
     if ($DryRun) {
         Write-Host "setup.ps1 (remote, dry-run): would clone $RepoUrl -> $dest"
@@ -106,6 +118,7 @@ Set-Location $ScriptDir
 # invoked install-deps.ps1 with -All in CI.
 $depsArgs = @{}
 if ($All)    { $depsArgs['All']    = $true }
+if ($Update) { $depsArgs['Update'] = $true }
 if ($DryRun) { $depsArgs['DryRun'] = $true }
 
 # WT settings merge is now a DEFAULT config step (opt-out, not opt-in).
@@ -643,11 +656,107 @@ function Invoke-ChezmoiApplyPhase {
     Copy-WindowsTerminalSettingsForUnpackaged
 }
 
+function Invoke-NvimCommandOrFail {
+    param(
+        [string]$Label,
+        [scriptblock]$Block,
+        [bool]$IsBestEffort = $BestEffort
+    )
+    & $Block
+    $rc = $LASTEXITCODE
+    if ($rc -ne 0) {
+        if ($IsBestEffort) {
+            Write-Warning ("  $Label exited $rc (continuing because -BestEffort is set)")
+            return
+        }
+        Write-Host ("  FAIL: $Label exited $rc") -ForegroundColor Red
+        Write-Host  "        Re-run with -BestEffort to continue past plugin/LSP failures." -ForegroundColor Yellow
+        exit $rc
+    }
+}
+
+function Invoke-SetupUpdateMode {
+    param(
+        [string]$Root = $ScriptDir,
+        [hashtable]$DependencyArgs = $depsArgs,
+        [bool]$IsDryRun = $DryRun,
+        [bool]$SkipDependencyPhase = $SkipDeps,
+        [bool]$SkipNvimPhase = $SkipNvim,
+        [bool]$IsBestEffort = $BestEffort,
+        [scriptblock]$DependencyRunner,
+        [scriptblock]$CommandTester,
+        [scriptblock]$NvimRunner
+    )
+
+    if (-not $DependencyRunner) {
+        $DependencyRunner = {
+            param([string]$Path, [hashtable]$Arguments)
+            & $Path @Arguments
+        }
+    }
+    if (-not $CommandTester) {
+        $CommandTester = {
+            param([string]$Name)
+            return [bool](Get-Command $Name -ErrorAction SilentlyContinue)
+        }
+    }
+    if (-not $NvimRunner) {
+        $NvimRunner = {
+            & nvim --headless "+MasonToolsUpdate" "+qa"
+        }
+    }
+
+    if (-not $SkipDependencyPhase) {
+        Phase "Update 1/2: update package-manager tools"
+        $argsForDeps = @{}
+        foreach ($key in $DependencyArgs.Keys) {
+            $argsForDeps[$key] = $DependencyArgs[$key]
+        }
+        $argsForDeps['Update'] = $true
+        if ($IsDryRun) { $argsForDeps['DryRun'] = $true }
+        & $DependencyRunner (Join-Path $Root 'install-deps.ps1') $argsForDeps
+    } else {
+        Write-Host ""
+        Write-Host "skipped: update dependency phase via -SkipDeps"
+    }
+
+    if (-not $IsDryRun) {
+        Update-RuntimePath
+    }
+
+    if (-not $SkipNvimPhase) {
+        Phase "Update 2/2: update Mason LSP servers + formatters"
+        if ($IsDryRun) {
+            Write-Host "  would: nvim --headless +MasonToolsUpdate +qa"
+        } elseif (& $CommandTester 'nvim') {
+            Invoke-NvimCommandOrFail -Label "Mason update" -IsBestEffort $IsBestEffort -Block $NvimRunner
+        } else {
+            Write-Host "  skipped   Mason update: nvim not on PATH"
+        }
+    } else {
+        Write-Host ""
+        Write-Host "skipped: Mason update via -SkipNvim"
+    }
+
+    Write-Host ""
+    Write-Host 'Plugins (lazy-lock.json), pinned binaries, and configs update via `git pull` then re-run setup; `:Lazy update` re-pins plugins (a repo change).'
+    Write-Host ""
+    Write-Host "================================================================"
+    Write-Host "==  setup.ps1: update done"
+    Write-Host "================================================================"
+    if ($IsDryRun) { Write-Host "(dry run -- nothing was actually installed or changed)" }
+}
+
 # Test seam: set DOTFILES_SETUP_PS1_SOURCE_ONLY and dot-source this file to load
 # helper functions without running install, config, or Neovim sync phases.
 if ($env:DOTFILES_SETUP_PS1_SOURCE_ONLY) { return }
 
 Stop-NvimSelfLinkIfNeeded
+
+if ($Update) {
+    Invoke-SetupUpdateMode
+    exit 0
+}
 
 # ---- Phase 1: dependencies ---------------------------------------------------
 if (-not $SkipDeps) {
@@ -680,32 +789,14 @@ if (-not ($SkipBootstrap -or $SkipConfig)) {
 # Lazy + Mason failures are FATAL by default. Pass -BestEffort to downgrade
 # them to warnings (useful for offline / proxy-restricted environments where
 # you accept a partial install and will run :Lazy / :Mason interactively).
-function Invoke-OrFail {
-    param([string]$Label, [scriptblock]$Block)
-    & $Block
-    $rc = $LASTEXITCODE
-    if ($rc -ne 0) {
-        if ($BestEffort) {
-            Write-Warning ("  $Label exited $rc (continuing because -BestEffort is set)")
-            return
-        }
-        # NOTE: ErrorActionPreference = Stop (set at the top of this file)
-        # makes Write-Error THROW before any line after it executes. Use
-        # Write-Host to print the failure context, then exit with the real rc.
-        Write-Host ("  FAIL: $Label exited $rc") -ForegroundColor Red
-        Write-Host  "        Re-run with -BestEffort to continue past plugin/LSP failures." -ForegroundColor Yellow
-        exit $rc
-    }
-}
-
 if (-not $SkipNvim -and -not $DryRun) {
     if (Get-Command nvim -ErrorAction SilentlyContinue) {
         Phase "Phase 3/4: sync Neovim plugins (lazy.nvim)"
-        Invoke-OrFail "Lazy sync" { & nvim --headless "+Lazy! sync" "+qa" }
+        Invoke-NvimCommandOrFail "Lazy sync" { & nvim --headless "+Lazy! sync" "+qa" }
 
         Phase "Phase 4/4: install LSP servers + formatters (Mason)"
         Write-Host "  this can take 3-8 minutes on a fresh Windows machine."
-        Invoke-OrFail "Mason install" { & nvim --headless "+MasonToolsInstallSync" "+qa" }
+        Invoke-NvimCommandOrFail "Mason install" { & nvim --headless "+MasonToolsInstallSync" "+qa" }
     } else {
         Write-Host ""
         Write-Host "skipped: Phase 3-4 (nvim plugins) -- nvim not on PATH yet."

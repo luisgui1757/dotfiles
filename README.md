@@ -16,6 +16,12 @@ For a fresh machine, run `setup`. The split is deliberate:
 dotfiles/config layer in `home/`. The full setup scripts now apply configs
 through chezmoi.
 
+Updates are deliberately two-track. The reproducible core is pinned in git:
+Neovim plugins (`nvim/lazy-lock.json`), SHA-256-verified direct downloads,
+and configs. Update that track with `git pull` and then re-run setup. The
+drift-tolerant edge is package-manager CLI tools plus Mason LSPs; refresh only
+that edge with `./setup.sh --update` or `.\setup.ps1 -Update`.
+
 ## Quick Start
 
 No checkout is required. `setup.{sh,ps1}` clones the repo to `~/dotfiles`
@@ -94,6 +100,7 @@ apply.
 ```bash
 ./setup.sh                       # Y/n per dep, end-to-end
 ./setup.sh --all                 # non-interactive
+./setup.sh --update              # update PM tools + Mason, no git/config/Lazy
 ./setup.sh --dry-run             # preview
 ./setup.sh --experimental-wsl-gui # WSL-only opt-in for Linux GUI terminal bits
 ./setup.sh --skip-config         # skip chezmoi config apply
@@ -103,6 +110,7 @@ make setup                       # same as ./setup.sh, via the Makefile
 ```powershell
 .\setup.ps1
 .\setup.ps1 -All
+.\setup.ps1 -Update
 .\setup.ps1 -DryRun
 .\setup.ps1 -SkipConfig
 .\setup.ps1 -SkipWindowsTerminalMerge # leave WT settings.json untouched
@@ -180,6 +188,11 @@ requested, it defaults to all and prints `note: no TTY detected; running with
 **"install EVERYTHING without further prompts? [Y/n]"** question — answer `Y`
 to pull the lot in one go, or `n` to choose per tool.
 Add `--dry-run` / `-DryRun` to preview every step without touching disk.
+Pass `--update` / `-Update` from an existing checkout to run only the
+drift-edge refresh: scoped package-manager updates for present catalog tools,
+then `nvim --headless +MasonToolsUpdate +qa`. It deliberately skips `git pull`,
+`chezmoi apply`, `:Lazy sync`, and `:Lazy update`; the last one changes
+`lazy-lock.json` and is therefore a repo update, not a machine refresh.
 
 Every script is safe to rerun. Pre-existing non-symlink targets are backed up to
 `<target>.bak.<timestamp>` with collision-proof suffixes (`.1`, `.2`, ...).

@@ -134,6 +134,85 @@ Describe "setup.ps1 Update-RuntimePath" {
     }
 }
 
+Describe "setup.ps1 update mode" {
+    BeforeEach {
+        . $script:ImportSetupForTest
+        $script:SetupUpdateDepsPath = ''
+        $script:SetupUpdateDepsArgs = @{}
+        $script:SetupUpdateNvimRan = $false
+        $script:SetupUpdateRuntimeRefreshed = $false
+        Mock -CommandName Update-RuntimePath -MockWith { $script:SetupUpdateRuntimeRefreshed = $true }
+        Mock -CommandName Invoke-ChezmoiApplyPhase -MockWith { throw "chezmoi apply must not run in update mode" }
+    }
+
+    It "runs install-deps Update and MasonToolsUpdate only" {
+        $root = Join-Path ([System.IO.Path]::GetTempPath()) 'setup-update-root'
+        $depsRunner = {
+            param([string]$Path, [hashtable]$Arguments)
+            $script:SetupUpdateDepsPath = $Path
+            $script:SetupUpdateDepsArgs = $Arguments
+        }
+        $commandTester = {
+            param([string]$Name)
+            return ($Name -eq 'nvim')
+        }
+        $nvimRunner = {
+            $script:SetupUpdateNvimRan = $true
+            $global:LASTEXITCODE = 0
+        }
+
+        $output = & {
+            Invoke-SetupUpdateMode `
+                -Root $root `
+                -DependencyArgs @{} `
+                -DependencyRunner $depsRunner `
+                -CommandTester $commandTester `
+                -NvimRunner $nvimRunner
+        } 6>&1 | Out-String
+
+        $script:SetupUpdateDepsPath | Should -Be (Join-Path $root 'install-deps.ps1')
+        $script:SetupUpdateDepsArgs['Update'] | Should -BeTrue
+        $script:SetupUpdateNvimRan | Should -BeTrue
+        $script:SetupUpdateRuntimeRefreshed | Should -BeTrue
+        $output | Should -Match 'Update 1/2'
+        $output | Should -Match 'Update 2/2'
+        $output | Should -Match 'Plugins \(lazy-lock\.json\), pinned binaries, and configs update via `git pull` then re-run setup'
+        $output | Should -Not -Match 'chezmoi|Lazy sync|MasonToolsInstallSync'
+        Should -Invoke -CommandName Invoke-ChezmoiApplyPhase -Times 0 -Exactly
+    }
+
+    It "dry-runs Mason update without invoking nvim" {
+        $root = Join-Path ([System.IO.Path]::GetTempPath()) 'setup-update-root'
+        $depsRunner = {
+            param([string]$Path, [hashtable]$Arguments)
+            $script:SetupUpdateDepsPath = $Path
+            $script:SetupUpdateDepsArgs = $Arguments
+        }
+        $nvimRunner = {
+            throw "nvim must not run during dry-run update mode"
+        }
+        $commandTester = {
+            throw "nvim lookup must not run during dry-run update mode"
+        }
+
+        $output = & {
+            Invoke-SetupUpdateMode `
+                -Root $root `
+                -DependencyArgs @{} `
+                -IsDryRun $true `
+                -DependencyRunner $depsRunner `
+                -CommandTester $commandTester `
+                -NvimRunner $nvimRunner
+        } 6>&1 | Out-String
+
+        $script:SetupUpdateDepsArgs['Update'] | Should -BeTrue
+        $script:SetupUpdateDepsArgs['DryRun'] | Should -BeTrue
+        $script:SetupUpdateRuntimeRefreshed | Should -BeFalse
+        $output | Should -Match '(?m)^\s*would:\s+nvim --headless \+MasonToolsUpdate \+qa[ \t]*$'
+        Should -Invoke -CommandName Invoke-ChezmoiApplyPhase -Times 0 -Exactly
+    }
+}
+
 Describe "setup.ps1 Windows Terminal backup" {
     BeforeEach {
         $script:OldLocalAppData = $env:LOCALAPPDATA

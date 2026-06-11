@@ -4,6 +4,7 @@
 # Local usage (from a checked-out copy):
 #   ./setup.sh                     interactive: Y/n per dep, then config + sync
 #   ./setup.sh --all               non-interactive: install everything missing
+#   ./setup.sh --update            update package-manager tools + Mason only
 #   ./setup.sh --dry-run           preview every step
 #   ./setup.sh --skip-deps         already have nvim/starship; just config+sync
 #   ./setup.sh --skip-bootstrap    back-compat alias: skip config apply
@@ -26,6 +27,7 @@ DEFAULT_DEST="$HOME/dotfiles"
 
 ALL=0
 DRY_RUN=0
+UPDATE_MODE=0
 SKIP_DEPS=0
 SKIP_BOOTSTRAP=0
 SKIP_NVIM=0
@@ -38,6 +40,7 @@ setup.sh -- one-shot end-to-end install for macOS / Linux / WSL.
 Local usage:
   ./setup.sh                     interactive: one prompt, then end-to-end
   ./setup.sh --all               non-interactive: install everything missing
+  ./setup.sh --update            update package-manager tools + Mason only
   ./setup.sh --dry-run           preview every step
   ./setup.sh --skip-deps         already installed; just config + sync
   ./setup.sh --skip-bootstrap    back-compat alias: skip config apply
@@ -55,6 +58,7 @@ for arg in "$@"; do
     case "$arg" in
         --all|-y)         ALL=1 ;;
         --dry-run)        DRY_RUN=1 ;;
+        --update)         UPDATE_MODE=1 ;;
         --skip-deps)      SKIP_DEPS=1 ;;
         --skip-bootstrap|--skip-config)
                           SKIP_BOOTSTRAP=1 ;;
@@ -85,6 +89,14 @@ if [[ -n "${BASH_SOURCE[0]:-}" ]] && [[ -f "${BASH_SOURCE[0]:-}" ]]; then
 fi
 if [[ -z "$SCRIPT_DIR" ]] || [[ ! -d "$SCRIPT_DIR/home" ]]; then
     DEST="${DOTFILES_DEST:-$DEFAULT_DEST}"
+    if [[ "$UPDATE_MODE" -eq 1 ]]; then
+        if [[ -f "$DEST/setup.sh" && -d "$DEST/home" ]]; then
+            echo "setup.sh --update: using existing checkout at $DEST without git pull."
+            exec bash "$DEST/setup.sh" "$@"
+        fi
+        echo "setup.sh --update needs an existing checkout at $DEST; it does not clone or pull." >&2
+        exit 1
+    fi
     # DryRun honor: announce what we'd clone and exit BEFORE any git op.
     if [[ "$DRY_RUN" -eq 1 ]]; then
         echo "setup.sh (remote, dry-run): would clone $REPO_URL -> $DEST"
@@ -118,6 +130,7 @@ cd "$SCRIPT_DIR"
 # ---- Forward flags to sub-scripts --------------------------------------------
 DEPS_FLAGS=()
 [[ "$ALL" -eq 1 ]]      && DEPS_FLAGS+=(--all)
+[[ "$UPDATE_MODE" -eq 1 ]] && DEPS_FLAGS+=(--update)
 [[ "$DRY_RUN" -eq 1 ]]  && DEPS_FLAGS+=(--dry-run)
 [[ "$EXPERIMENTAL_WSL_GUI" -eq 1 ]] && DEPS_FLAGS+=(--experimental-wsl-gui)
 
@@ -295,6 +308,55 @@ backup_preexisting_managed_targets() {
     done <<<"$managed_output"
 }
 
+run_or_fail() {
+    local label="$1"; shift
+    if "$@"; then return 0; fi
+    local rc=$?
+    if [[ "$BEST_EFFORT" -eq 1 ]]; then
+        echo "  WARN: $label exited $rc (continuing because --best-effort is set)"
+        return 0
+    fi
+    echo "  FAIL: $label exited $rc"
+    echo "        To continue past plugin/LSP failures, re-run with --best-effort."
+    exit "$rc"
+}
+
+run_update_mode() {
+    if [[ "$SKIP_DEPS" -eq 0 ]]; then
+        phase "Update 1/2: update package-manager tools"
+        bash "$SCRIPT_DIR/install-deps.sh" ${DEPS_FLAGS[@]+"${DEPS_FLAGS[@]}"}
+    else
+        echo
+        echo "skipped: update dependency phase via --skip-deps"
+    fi
+
+    refresh_runtime_path
+
+    if [[ "$SKIP_NVIM" -eq 0 ]]; then
+        phase "Update 2/2: update Mason LSP servers + formatters"
+        if [[ "$DRY_RUN" -eq 1 ]]; then
+            echo "  would: nvim --headless +MasonToolsUpdate +qa"
+        elif command -v nvim >/dev/null 2>&1; then
+            run_or_fail "Mason update" nvim --headless "+MasonToolsUpdate" "+qa"
+        else
+            echo "  skipped   Mason update: nvim not on PATH"
+        fi
+    else
+        echo
+        echo "skipped: Mason update via --skip-nvim"
+    fi
+
+    echo
+    echo "Plugins (lazy-lock.json), pinned binaries, and configs update via \`git pull\` then re-run setup; \`:Lazy update\` re-pins plugins (a repo change)."
+    echo
+    echo "================================================================"
+    echo "==  setup.sh: update done"
+    echo "================================================================"
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        echo "(dry run -- nothing was actually installed or changed)"
+    fi
+}
+
 # Test seam: `DOTFILES_SETUP_SOURCE_ONLY=1 source setup.sh` loads the helper
 # functions (phase, refresh_runtime_path) without running the install phases, so
 # tests can exercise refresh_runtime_path in isolation. Unset in normal runs.
@@ -304,6 +366,11 @@ fi
 if [[ -n "${DOTFILES_SETUP_SOURCE_ONLY:-}" ]]; then
     # shellcheck disable=SC2317  # the exit is reached only when executed, not sourced
     return 0 2>/dev/null || exit 0
+fi
+
+if [[ "$UPDATE_MODE" -eq 1 ]]; then
+    run_update_mode
+    exit 0
 fi
 
 # ---- Phase 1: dependencies ---------------------------------------------------
@@ -353,19 +420,6 @@ fi
 #
 # By default, Lazy + Mason failures are FATAL — they leave the user with a
 # bare nvim config and no LSP. Pass --best-effort to downgrade to warnings.
-run_or_fail() {
-    local label="$1"; shift
-    if "$@"; then return 0; fi
-    local rc=$?
-    if [[ "$BEST_EFFORT" -eq 1 ]]; then
-        echo "  WARN: $label exited $rc (continuing because --best-effort is set)"
-        return 0
-    fi
-    echo "  FAIL: $label exited $rc"
-    echo "        To continue past plugin/LSP failures, re-run with --best-effort."
-    exit "$rc"
-}
-
 if [[ "$SKIP_NVIM" -eq 0 ]] && [[ "$DRY_RUN" -eq 0 ]]; then
     if command -v nvim >/dev/null 2>&1; then
         phase "Phase 3/4: sync Neovim plugins (lazy.nvim)"
