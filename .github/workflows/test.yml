@@ -51,7 +51,10 @@ jobs:
           curl -fsSL "https://raw.githubusercontent.com/cargo-bins/cargo-binstall/${CARGO_BINSTALL_COMMIT}/install-from-binstall-release.sh" -o /tmp/cargo-binstall.sh
           printf '%s  %s\n' "$CARGO_BINSTALL_INSTALLER_SHA256" /tmp/cargo-binstall.sh | sha256sum -c -
           bash /tmp/cargo-binstall.sh
-          "$HOME/.cargo/bin/cargo-binstall" -y taplo-cli hyperfine
+          # taplo-cli 0.10.0 has no cargo-binstall prebuilt (quickinstall 404) and
+          # fails to source-build on the current runner Rust (time-crate E0119), so
+          # pin 0.9.3, which has a quickinstall prebuilt and installs without compiling.
+          "$HOME/.cargo/bin/cargo-binstall" -y taplo-cli@0.9.3 hyperfine
           python3 -m pip install --user --break-system-packages --disable-pip-version-check yamllint editorconfig-checker
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           export PATH="$HOME/.local/bin:$PATH"
