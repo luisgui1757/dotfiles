@@ -4,6 +4,11 @@
 > validated. Written 2026-06-12 by Claude (Opus 4.8), root-cause confirmed by
 > Codex 5.5 xhigh (read-only). This exists so the work can be picked up
 > autonomously from a fresh session (Windows first, then macOS).
+>
+> **Implementation status, 2026-06-12:** local code now implements the portable
+> WT seed/merge path, psmux RGB overlay, Hack.zip FAIL marker, font-change
+> notification, tests, and docs. Keep this handoff file until the Windows
+> Sandbox runtime pass validates the behavior.
 
 ## How to use this doc
 
@@ -170,8 +175,9 @@ path still holds). See `tests/powershell/Setup.Tests.ps1`.
 
 ### Fix 4 — docs + tests (doc-discipline)
 
-The docs currently **claim the unpackaged mirror always happens**, but the code
-only mirrors when the packaged file exists. Correct:
+The docs originally **claimed the unpackaged mirror always happened**, but the
+pre-fix code only mirrored when the packaged file existed. The implementation
+must keep these corrected:
 - `README.md` (~`:51-55`, ~`:221`)
 - `windows-terminal/README.md` (~`:80-83`)
 - `CLAUDE.md` (~`:405-413`)
@@ -287,4 +293,4 @@ piece that makes Sandbox a real autonomous test loop.
 - `tests/greenfield/install-wt-portable.ps1` — ~54-68 (copies existing packaged only)
 - `tmux/tmux.conf` — truecolor overrides ~4-8; status bar ~87-98
 - `tmux/tmux.windows.conf` — psmux overlay (no RGB handling today)
-- Docs claiming the mirror always happens: `README.md` ~51-55/221, `windows-terminal/README.md` ~80-83, `CLAUDE.md` ~405-413
+- Docs that originally claimed the mirror always happened: `README.md` ~51-55/221, `windows-terminal/README.md` ~80-83, `CLAUDE.md` ~405-413

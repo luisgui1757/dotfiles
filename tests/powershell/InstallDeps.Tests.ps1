@@ -482,6 +482,41 @@ Describe "install-deps.ps1" {
         Should -Invoke -CommandName Expand-Archive -Times 0 -Exactly
     }
 
+    It "fails closed when the Hack Nerd Font direct checksum mismatches" {
+        . $script:ImportInstallDepsForTest
+        $oldTemp = $env:TEMP
+        $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("hack-nf-test-" + [System.Guid]::NewGuid())
+        try {
+            New-Item -ItemType Directory -Force -Path $tempRoot | Out-Null
+            $env:TEMP = $tempRoot
+            Mock -CommandName Get-HackNerdFontInstallScope -MockWith { return '' }
+            Mock -CommandName Get-Command -MockWith { return $null } -ParameterFilter { $Name -eq 'scoop' }
+            Mock -CommandName Invoke-WebRequest -MockWith {
+                param($Uri, $OutFile)
+                [System.IO.File]::WriteAllText($OutFile, 'bad-zip')
+            }
+            Mock -CommandName Test-FileSha256 -MockWith { return $false }
+            Mock -CommandName Expand-Archive -MockWith { throw "must not extract" }
+
+            $output = & { Install-HackNerdFont } 6>&1 | Out-String
+
+            $output | Should -Match 'FAIL: checksum mismatch for Hack\.zip'
+            $script:InstallFailures.Count | Should -Be 1
+            $script:InstallFailures[0].Tool | Should -Be 'Hack Nerd Font'
+            $script:InstallFailures[0].Pm | Should -Be 'direct'
+            $script:InstallFailures[0].Pkg | Should -Be 'Hack.zip'
+            $script:InstallFailures[0].ExitCode | Should -Be 'sha256'
+            Should -Invoke -CommandName Expand-Archive -Times 0 -Exactly
+        } finally {
+            if ($null -eq $oldTemp) {
+                Remove-Item Env:TEMP -ErrorAction SilentlyContinue
+            } else {
+                $env:TEMP = $oldTemp
+            }
+            Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
     It "installs the Windows Terminal portable fallback after managers fail" {
         . $script:ImportInstallDepsForTest
         $oldLocalAppData = $env:LOCALAPPDATA

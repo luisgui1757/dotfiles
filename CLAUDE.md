@@ -120,9 +120,12 @@ that violates one of these, fix it instead of disabling the test.
     before extraction. The app install and settings merge are separate code
     paths (`install-deps.ps1` vs chezmoi's `modify_` entry), and setup runs the
     merge by default. Opt out with `-SkipWindowsTerminalMerge`;
-    `-MergeWindowsTerminal` is a retained no-op alias. If `settings.json` is
-    absent because WT has not launched yet, the merge warns and skips so
-    default-on setup does not break an unlaunched WT.
+    `-MergeWindowsTerminal` is a retained no-op alias. The packaged `modify_`
+    target still emits nothing on blank stdin so a bare `chezmoi apply` does not
+    fabricate Store WT settings, but setup also handles portable WT after apply:
+    it mirrors the packaged file when present, or seeds/merges the unpackaged
+    path from `windows-terminal/settings.fragment.jsonc` when packaged settings
+    are absent and portable WT is detected.
 16. **tmux uppercase `H`/`L` are window swaps.** Lowercase `h`/`l` stay pane
     focus bindings. Do not replace them with arrow-key bindings unless the
     terminal/psmux behavior has been revalidated.
@@ -308,8 +311,10 @@ install paths, not symmetric container platforms:
   the owner intentionally accepts that flake risk. The required WSL proxy is the
   Linux Ubuntu container plus the existing `DOTFILES_FORCE_OS=wsl` bats coverage.
   Full WSL host/guest validation is manual: run `./tests/wsl/e2e.sh` from inside
-  WSL after running `.\setup.ps1 -All` on Windows. The Windows Terminal settings
-  merge is default-on when `settings.json` already exists.
+  WSL after running `.\setup.ps1 -All` on Windows. Windows Terminal settings
+  handling is default-on: packaged WT is merged when its settings file exists,
+  and portable WT is seeded or merged at the unpackaged path when the packaged
+  file is absent.
 
 Local clean-machine harnesses live in `tests/greenfield/README.md`; keep them
 manual VM/Sandbox tools and do not add them to the headless CI matrix.
@@ -409,8 +414,12 @@ save only**. The next plain `:w` formats normally. Implemented in
   merges the user-owned keys by default; a bare `chezmoi apply` performs the
   merge but does not create setup's backup. After a real non-dry-run apply,
   setup also best-effort copies the merged MSIX settings file to the unpackaged
-  portable-WT path `%LOCALAPPDATA%\Microsoft\Windows Terminal\settings.json`,
-  unless `-SkipWindowsTerminalMerge` is passed. Store WT ignores that mirror.
+  portable-WT path `%LOCALAPPDATA%\Microsoft\Windows Terminal\settings.json`.
+  If the MSIX settings file is absent but portable WT is detected, setup seeds
+  or merges that unpackaged file directly from
+  `windows-terminal/settings.fragment.jsonc`. Both portable paths are skipped
+  when `-SkipWindowsTerminalMerge` is passed. Store WT ignores the unpackaged
+  file.
   The legacy `-MergeWindowsTerminal` switch remains accepted as a no-op alias.
 - **lazygit config paths are OS-specific.** On macOS, lazygit v0.58 reports
   `~/Library/Application Support/lazygit` from `lazygit --print-config-dir`;
@@ -436,7 +445,7 @@ save only**. The next plain `:w` formats normally. Implemented in
   `profiles.defaults`). Adding a new top-level scalar fragment key requires FOUR
   edits in lockstep or the `windows_apply_test.ps1` deep-compare fails: the
   fragment (+ its `home/.chezmoitemplates` mirror),
-  `modify_settings.json.ps1.tmpl`, the test mirror
+  `home/.chezmoitemplates/windows-terminal/merge-settings.ps1`, the test mirror
   `Invoke-ExpectedWindowsTerminalMergeOnly`, and `$script:ManagedGlobals`.
   `profiles.defaults` is replaced wholesale, so keys inside it (e.g.
   `scrollbarState`) need no merge-template change. The nvim tree is intentionally NOT
@@ -579,8 +588,11 @@ save only**. The next plain `:w` formats normally. Implemented in
   verifies the pinned Neovim Linux tarballs, lazygit Linux tarballs, and Hack
   Nerd Font zip before extraction; `install-deps.ps1` verifies the pinned
   Hack.zip before registering fonts and the pinned Windows Terminal portable
-  zip before extracting the fallback install. The CI workflows also pin and
-  verify their direct GitHub downloads.
+  zip before extracting the fallback install. A Hack.zip checksum mismatch
+  records a `FAIL:` install marker and does not extract. A successful Windows
+  font install broadcasts `WM_FONTCHANGE` best-effort so Windows Terminal can
+  re-enumerate fonts without making setup depend on that notification. The CI
+  workflows also pin and verify their direct GitHub downloads.
   This extends to the **Ubuntu Ghostty installer**: `install_ghostty_linux`
   pins `mkasberg/ghostty-ubuntu`'s `install.sh` to `GHOSTTY_UBUNTU_VERSION` and
   SHA-256 verifies the script (`GHOSTTY_UBUNTU_INSTALL_SHA256`) before running

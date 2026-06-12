@@ -48,11 +48,13 @@ iwr https://raw.githubusercontent.com/luisgui1757/dotfiles/main/setup.ps1 -OutFi
 For WSL, treat setup as split-host: run `.\setup.ps1 -All` on Windows so
 Windows Terminal, Hack Nerd Font, lazygit, and `win32yank` are installed on the
 rendering host, then run `./setup.sh --all` inside WSL for the Linux CLI/editor
-stack. Windows Terminal settings merge runs by default after WT has created
-`settings.json`, and setup backs up the pre-merge file first. If Scoop, winget,
-and choco cannot register the MSIX app, setup falls back to a pinned
+stack. Windows Terminal settings handling runs by default, and setup backs up
+the pre-merge packaged file first when it exists. If Scoop, winget, and choco
+cannot register the MSIX app, setup falls back to a pinned
 SHA-256-verified portable WT zip. Portable WT reads the unpackaged settings
-path, so setup mirrors the merged settings there after a real config apply; pass
+path, so after a real config apply setup either mirrors the merged packaged
+settings there or, when packaged WT is absent, seeds/merges that unpackaged file
+from `windows-terminal/settings.fragment.jsonc`; pass
 `-SkipWindowsTerminalMerge` only when you want setup to leave WT settings
 untouched. Linux Ghostty and Linux
 fontconfig fonts inside WSL are intentionally outside the happy path; opt in
@@ -218,7 +220,7 @@ symlink, and Windows Terminal remains a merge.
 | tmux / psmux | `~/.tmux.conf` -> `tmux/tmux.conf`; `~/.tmux.posix.conf` -> `tmux/tmux.posix.conf` (POSIX clipboard overlay) | same | `%USERPROFILE%\.tmux.conf` -> `tmux\tmux.conf` for psmux; the POSIX clipboard overlay is **excluded** on Windows (its `if-shell` probes hang psmux); WSL uses the Unix path |
 | Ghostty | `~/Library/Application Support/com.mitchellh.ghostty/config` -> `ghostty/config` | native Linux links `~/.config/ghostty/config`; WSL links it only with `--experimental-wsl-gui` | n/a |
 | lazygit | `~/Library/Application Support/lazygit/config.yml` -> `lazygit/config.yml` | `~/.config/lazygit/config.yml` -> `lazygit/config.yml` | `%LOCALAPPDATA%\lazygit\config.yml` -> `lazygit\config.yml` |
-| Windows Terminal | n/a | n/a | app installed by `setup.ps1` through Scoop/winget/choco, with a SHA-256-verified portable zip fallback; setup backs up existing `settings.json`, then chezmoi merges `windows-terminal/settings.fragment.jsonc` by default and mirrors it to the unpackaged WT path; opt out with `-SkipWindowsTerminalMerge`; see [windows-terminal/README.md](windows-terminal/README.md) |
+| Windows Terminal | n/a | n/a | app installed by `setup.ps1` through Scoop/winget/choco, with a SHA-256-verified portable zip fallback; setup backs up existing packaged `settings.json`, then chezmoi merges `windows-terminal/settings.fragment.jsonc` by default; after apply, setup mirrors packaged settings to the unpackaged WT path or seeds/merges that path from the fragment when packaged WT is absent; opt out with `-SkipWindowsTerminalMerge`; see [windows-terminal/README.md](windows-terminal/README.md) |
 
 Chezmoi manages the Windows PowerShell 7 profile path
 `Documents\PowerShell\Microsoft.PowerShell_profile.ps1`. The Windows
@@ -499,8 +501,11 @@ stale; CI then fails verification until a human reviews the adjacent constant.
   by name and resets a hand-edited `theme` back to `rose-pine` on every run
   unless you opt out. After a real setup apply, the merged MSIX settings file is
   best-effort copied to `%LOCALAPPDATA%\Microsoft\Windows Terminal\settings.json`
-  for portable WT. A bare `chezmoi apply` runs the merge but does not create
-  setup's backup or the portable settings mirror.
+  for portable WT; if the MSIX settings file is absent but portable WT is
+  detected, setup seeds or merges that unpackaged file directly from the
+  fragment so Rose Pine and Hack Nerd Font are present before first launch. A
+  bare `chezmoi apply` runs the packaged merge but does not create setup's
+  backup or the portable seed/mirror.
 - **Windows CI installs Scoop through its documented elevated path.** GitHub
   Windows runners are elevated, and Scoop blocks elevated bootstrap by default.
   `install-deps.ps1` detects elevation and runs the official installer with

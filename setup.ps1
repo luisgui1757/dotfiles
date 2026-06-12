@@ -463,29 +463,145 @@ function Get-WindowsTerminalUnpackagedSettingsPath {
     return (Join-Path $env:LOCALAPPDATA 'Microsoft\Windows Terminal\settings.json')
 }
 
+function Get-WindowsTerminalSettingsFragmentPath {
+    return (Join-Path $ScriptDir 'windows-terminal\settings.fragment.jsonc')
+}
+
+function Get-WindowsTerminalMergeHelperPath {
+    return (Join-Path $ScriptDir 'home\.chezmoitemplates\windows-terminal\merge-settings.ps1')
+}
+
+function Import-WindowsTerminalMergeHelper {
+    $helper = Get-WindowsTerminalMergeHelperPath
+    if (-not (Test-Path -LiteralPath $helper -PathType Leaf)) {
+        throw "Windows Terminal merge helper is missing: $helper"
+    }
+    . $helper
+}
+
+function Test-WindowsTerminalUnpackagedPresent {
+    if (-not $env:LOCALAPPDATA) {
+        return $false
+    }
+
+    $unpackagedSettings = Get-WindowsTerminalUnpackagedSettingsPath
+    $unpackagedDir = Split-Path -Parent $unpackagedSettings
+    if (Test-Path -LiteralPath $unpackagedDir -PathType Container) {
+        return $true
+    }
+
+    $portableRoot = Join-Path $env:LOCALAPPDATA 'Programs\WindowsTerminal'
+    foreach ($candidate in @(
+            (Join-Path $portableRoot 'wt.exe'),
+            (Join-Path $portableRoot 'WindowsTerminal.exe')
+        )) {
+        if (Test-Path -LiteralPath $candidate -PathType Leaf) {
+            return $true
+        }
+    }
+
+    $wtCommand = Get-Command wt -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($wtCommand) {
+        $wtPath = if ($wtCommand.PSObject.Properties.Name -contains 'Source') { $wtCommand.Source } else { $wtCommand.Path }
+        if ($wtPath -and (Test-Path -LiteralPath $wtPath -PathType Leaf)) {
+            $wtDir = Split-Path -Parent $wtPath
+            $fullWtDir = [System.IO.Path]::GetFullPath($wtDir).TrimEnd([char[]]@([char]92, [char]47))
+            $fullPortableRoot = [System.IO.Path]::GetFullPath($portableRoot).TrimEnd([char[]]@([char]92, [char]47))
+            if ($fullWtDir.StartsWith($fullPortableRoot, [StringComparison]::OrdinalIgnoreCase)) {
+                return $true
+            }
+            if (Test-Path -LiteralPath (Join-Path $wtDir 'WindowsTerminal.exe') -PathType Leaf) {
+                return $true
+            }
+        }
+    }
+
+    return $false
+}
+
+function Write-WindowsTerminalSettingsJson {
+    param(
+        [Parameter(Mandatory)] [string]$SettingsPath,
+        [Parameter(Mandatory)] [string]$Json
+    )
+    $settingsDir = Split-Path -Parent $SettingsPath
+    if (-not (Test-Path -LiteralPath $settingsDir -PathType Container)) {
+        New-Item -ItemType Directory -Force -Path $settingsDir | Out-Null
+    }
+    [System.IO.File]::WriteAllText($SettingsPath, $Json, [System.Text.UTF8Encoding]::new($false))
+}
+
+function Merge-WindowsTerminalFragmentFile {
+    param(
+        [Parameter(Mandatory)] [string]$SettingsPath,
+        [Parameter(Mandatory)] [string]$FragmentPath
+    )
+
+    Import-WindowsTerminalMergeHelper
+    $fragmentJson = [System.IO.File]::ReadAllText($FragmentPath)
+    $fragment = ConvertFrom-WindowsTerminalJsonc -Jsonc $fragmentJson
+    if (Test-Path -LiteralPath $SettingsPath -PathType Leaf) {
+        $currentJson = [System.IO.File]::ReadAllText($SettingsPath)
+        $current = ConvertFrom-WindowsTerminalJsonc -Jsonc $currentJson
+        $merged = Merge-WindowsTerminalSettingsObject -Current $current -Fragment $fragment
+        return ($merged | ConvertTo-Json -Depth 100)
+    }
+    return ($fragment | ConvertTo-Json -Depth 100)
+}
+
 function Copy-WindowsTerminalSettingsForUnpackaged {
     # Params default to the script switches but are overridable so tests can drive
     # the dry-run / skip paths directly -- Pester `Set-Variable -Scope Script` does
     # NOT reliably override how a dot-sourced function reads a script variable.
     param(
         [bool]$IsDryRun = $DryRun,
-        [bool]$IsSkipMerge = $SkipWindowsTerminalMerge
+        [bool]$IsSkipMerge = $SkipWindowsTerminalMerge,
+        [bool]$IsPortablePresent = (Test-WindowsTerminalUnpackagedPresent)
     )
-    if ($IsDryRun -or $IsSkipMerge) { return }
+    if ($IsSkipMerge) { return }
 
     $packagedSettings = Get-WindowsTerminalSettingsPath
-    if (-not (Test-Path -LiteralPath $packagedSettings -PathType Leaf)) { return }
-
     $unpackagedSettings = Get-WindowsTerminalUnpackagedSettingsPath
-    try {
-        $unpackagedDir = Split-Path -Parent $unpackagedSettings
-        if (-not (Test-Path -LiteralPath $unpackagedDir -PathType Container)) {
-            New-Item -ItemType Directory -Force -Path $unpackagedDir | Out-Null
+
+    if (Test-Path -LiteralPath $packagedSettings -PathType Leaf) {
+        if ($IsDryRun) {
+            Write-Step "would    mirror Windows Terminal settings to unpackaged path"
+            return
         }
-        Copy-Item -LiteralPath $packagedSettings -Destination $unpackagedSettings -Force -ErrorAction Stop
-        Write-Step "mirrored Windows Terminal settings to unpackaged path"
+        try {
+            $unpackagedDir = Split-Path -Parent $unpackagedSettings
+            if (-not (Test-Path -LiteralPath $unpackagedDir -PathType Container)) {
+                New-Item -ItemType Directory -Force -Path $unpackagedDir | Out-Null
+            }
+            Copy-Item -LiteralPath $packagedSettings -Destination $unpackagedSettings -Force -ErrorAction Stop
+            Write-Step "mirrored Windows Terminal settings to unpackaged path"
+        } catch {
+            Write-Warning ("Could not mirror Windows Terminal settings to unpackaged path: " + $_.Exception.Message)
+        }
+        return
+    }
+
+    if (-not $IsPortablePresent) { return }
+
+    try {
+        $fragmentPath = Get-WindowsTerminalSettingsFragmentPath
+        if (-not (Test-Path -LiteralPath $fragmentPath -PathType Leaf)) {
+            throw "Windows Terminal settings fragment is missing: $fragmentPath"
+        }
+        $action = if (Test-Path -LiteralPath $unpackagedSettings -PathType Leaf) { 'merge' } else { 'seed' }
+        if ($IsDryRun) {
+            Write-Step ("would    {0} Windows Terminal unpackaged settings from fragment" -f $action)
+            return
+        }
+        $json = Merge-WindowsTerminalFragmentFile -SettingsPath $unpackagedSettings -FragmentPath $fragmentPath
+        Write-WindowsTerminalSettingsJson -SettingsPath $unpackagedSettings -Json $json
+        if ($action -eq 'seed') {
+            Write-Step "seeded Windows Terminal unpackaged settings from fragment"
+        } else {
+            Write-Step "merged Windows Terminal unpackaged settings from fragment"
+        }
     } catch {
-        Write-Warning ("Could not mirror Windows Terminal settings to unpackaged path: " + $_.Exception.Message)
+        Write-Warning ("Could not seed or merge Windows Terminal unpackaged settings: " + $_.Exception.Message)
     }
 }
 
@@ -619,6 +735,7 @@ function Invoke-ChezmoiApplyPhase {
                 $applyArgs += @(Get-ManagedConfigTargets -ExcludeWindowsTerminal)
             }
             Invoke-ChezmoiOrExit -Label 'chezmoi dry-run apply' -Arguments $applyArgs
+            Copy-WindowsTerminalSettingsForUnpackaged -IsDryRun $true
         } finally {
             Remove-Item -LiteralPath $dryRunConfig -Force -ErrorAction SilentlyContinue
             $script:ChezmoiConfigArgs = @()

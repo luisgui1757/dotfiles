@@ -154,6 +154,7 @@ fi
 ps1_files=()
 while IFS= read -r f; do ps1_files+=("$f"); done < <(
     find . -type f -name '*.ps1' -not -path './.git/*' -not -path './tests/.cache/*' -not -path './home/*'
+    find ./home/.chezmoitemplates -type f -name '*.ps1' 2>/dev/null
 )
 find_non_ascii_ps1() {
     [[ "$#" -gt 0 ]] || return 0

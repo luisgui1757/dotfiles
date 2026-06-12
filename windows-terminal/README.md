@@ -68,18 +68,23 @@ rewrites its own `settings.json`.
 `-MergeWindowsTerminal` switch is still accepted on `setup.ps1` as a no-op
 alias for older commands.
 
-The setup config phase backs up an existing pre-merge `settings.json` as
-`settings.json.bak.<timestamp>` before `chezmoi apply`. The chezmoi `modify_`
-merge then initializes missing `profiles` containers and preserves custom
-`actions`, `schemes`, and `themes`, while entries with the same key or name are
-replaced by the repo fragment. A hand-edited top-level `theme` is reset to
-`rose-pine` on every run. A bare `chezmoi apply` runs that merge but does not
-create setup's backup. If WT has not launched yet and `settings.json` is absent,
-chezmoi leaves it absent instead of fabricating one.
+The setup config phase backs up an existing packaged pre-merge `settings.json`
+as `settings.json.bak.<timestamp>` before `chezmoi apply`. The chezmoi
+`modify_` merge then initializes missing `profiles` containers and preserves
+custom `actions`, `schemes`, and `themes`, while entries with the same key or
+name are replaced by the repo fragment. A hand-edited top-level `theme` is reset
+to `rose-pine` on every run. A bare `chezmoi apply` runs that packaged merge
+but does not create setup's backup. If packaged WT has not launched yet and
+`settings.json` is absent, the packaged `modify_` target leaves it absent
+instead of fabricating one.
 
-After a real non-dry-run setup apply, setup best-effort copies the merged MSIX
-settings file to the portable unpackaged path so the portable fallback gets the
-same Rose Pine, launch, scrollbar, font, and keybinding settings. The copy is
+After a real non-dry-run setup apply, setup handles the portable unpackaged path
+too. If the packaged settings file exists, setup best-effort copies the merged
+MSIX file to `%LOCALAPPDATA%\Microsoft\Windows Terminal\settings.json`. If the
+packaged file is absent but portable WT is detected, setup seeds a missing
+unpackaged settings file from the fragment or merges the fragment into an
+existing unpackaged file. That gives the portable fallback the same Rose Pine,
+launch, scrollbar, font, and keybinding settings. All portable handling is
 skipped with `-SkipWindowsTerminalMerge` and never fails setup.
 
 For WSL, this is the supported terminal/font path: run

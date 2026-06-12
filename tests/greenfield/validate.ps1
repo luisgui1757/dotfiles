@@ -180,6 +180,58 @@ function Assert-ChezmoiVerify {
     }
 }
 
+function Test-WindowsTerminalPresent {
+    if (Get-Command wt -ErrorAction SilentlyContinue) {
+        return $true
+    }
+    $portableRoot = Join-Path $env:LOCALAPPDATA 'Programs\WindowsTerminal'
+    foreach ($candidate in @(
+            (Join-Path $portableRoot 'wt.exe'),
+            (Join-Path $portableRoot 'WindowsTerminal.exe')
+        )) {
+        if (Test-Path -LiteralPath $candidate -PathType Leaf) {
+            return $true
+        }
+    }
+    $packagedSettings = Join-Path $env:LOCALAPPDATA 'Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json'
+    $unpackagedSettings = Join-Path $env:LOCALAPPDATA 'Microsoft\Windows Terminal\settings.json'
+    return (Test-Path -LiteralPath $packagedSettings -PathType Leaf) -or
+        (Test-Path -LiteralPath $unpackagedSettings -PathType Leaf)
+}
+
+function Read-JsoncFile {
+    param([Parameter(Mandatory)] [string]$Path)
+    $raw = Get-Content -Raw -LiteralPath $Path
+    $json = (($raw -split "`n" | Where-Object { $_ -notmatch "^\s*//" }) -join "`n")
+    return ($json | ConvertFrom-Json)
+}
+
+function Assert-WindowsTerminalPortableSettings {
+    $settingsPath = Join-Path $env:LOCALAPPDATA 'Microsoft\Windows Terminal\settings.json'
+    if (-not (Test-Path -LiteralPath $settingsPath -PathType Leaf)) {
+        if (Test-WindowsTerminalPresent) {
+            Add-Fail "portable Windows Terminal settings.json is missing"
+        } else {
+            Add-Skip "portable Windows Terminal settings skipped because WT is not present"
+        }
+        return
+    }
+
+    try {
+        $settings = Read-JsoncFile -Path $settingsPath
+        $hasRosePine = ($settings.theme -eq 'rose-pine') -and
+            ($settings.profiles.defaults.colorScheme -eq 'rose-pine')
+        $hasHackFont = ($settings.profiles.defaults.font.face -eq 'Hack Nerd Font')
+        if ($hasRosePine -and $hasHackFont) {
+            Add-Pass "portable Windows Terminal settings contain rose-pine and Hack Nerd Font"
+        } else {
+            Add-Fail "portable Windows Terminal settings missing rose-pine or Hack Nerd Font"
+        }
+    } catch {
+        Add-Fail ("portable Windows Terminal settings could not be parsed: " + $_.Exception.Message)
+    }
+}
+
 if (-not $Repo) {
     $scriptDir = Split-Path -Parent $PSCommandPath
     $Repo = Join-Path $scriptDir '..\..'
@@ -219,6 +271,7 @@ Assert-ContentEqual -Path (Join-Path $env:USERPROFILE '.tmux.conf') -Expected (J
 Assert-ContentEqual -Path (Join-Path $env:USERPROFILE '.tmux.windows.conf') -Expected (Join-Path $Repo 'tmux\tmux.windows.conf')
 Assert-ContentEqual -Path (Join-Path $env:USERPROFILE 'Documents\PowerShell\Microsoft.PowerShell_profile.ps1') -Expected (Join-Path $Repo 'shells\powershell_profile.ps1')
 Assert-ContentEqual -Path (Join-Path $env:LOCALAPPDATA 'lazygit\config.yml') -Expected (Join-Path $Repo 'lazygit\config.yml')
+Assert-WindowsTerminalPortableSettings
 
 Assert-ChezmoiVerify
 Invoke-NvimChecked -Name lazy -NvimArgs @('+Lazy! sync', '+qa')

@@ -610,6 +610,44 @@ function Test-HackNerdFontInstalled {
     return -not [string]::IsNullOrEmpty((Get-HackNerdFontInstallScope))
 }
 
+function Send-FontChangeNotification {
+    try {
+        $typeName = 'DotfilesFontChange.NativeMethods'
+        if (-not ([System.Management.Automation.PSTypeName]$typeName).Type) {
+            Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+
+namespace DotfilesFontChange {
+    public static class NativeMethods {
+        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+        public static extern IntPtr SendMessageTimeout(
+            IntPtr hWnd,
+            uint Msg,
+            UIntPtr wParam,
+            IntPtr lParam,
+            uint fuFlags,
+            uint uTimeout,
+            out UIntPtr lpdwResult);
+    }
+}
+"@
+        }
+        $result = [UIntPtr]::Zero
+        [DotfilesFontChange.NativeMethods]::SendMessageTimeout(
+            [IntPtr]0xffff,
+            0x001D,
+            [UIntPtr]::Zero,
+            [IntPtr]::Zero,
+            0x0002,
+            1000,
+            [ref]$result) | Out-Null
+        Write-Host "             notified Windows that fonts changed"
+    } catch {
+        Write-Warning ("Could not broadcast WM_FONTCHANGE: " + $_.Exception.Message)
+    }
+}
+
 function Install-HackNerdFont {
     # Already installed?
     $fontScope = Get-HackNerdFontInstallScope
@@ -632,6 +670,7 @@ function Install-HackNerdFont {
         scoop install nerd-fonts/Hack-NF
         if ($LASTEXITCODE -eq 0) {
             Write-Host ("  installed {0,-26} via scoop" -f "Hack Nerd Font")
+            Send-FontChangeNotification
             return
         }
         Write-Warning "scoop install failed; falling back to direct download."
@@ -642,12 +681,15 @@ function Install-HackNerdFont {
         Write-Host "  would: download nerd-fonts/$HackNerdFontVersion/Hack.zip, verify sha256, extract, register in HKCU\\Fonts"
         return
     }
+    $tmp = $null
     try {
         $tmp = New-Item -ItemType Directory -Force -Path (Join-Path $env:TEMP "hack-nf-$([guid]::NewGuid())")
         $zip = Join-Path $tmp.FullName "Hack.zip"
         Invoke-WebRequest -Uri "https://github.com/ryanoasis/nerd-fonts/releases/download/$HackNerdFontVersion/Hack.zip" -OutFile $zip -UseBasicParsing
         if (-not (Test-FileSha256 -Path $zip -Expected $HackNerdFontSha256)) {
-            throw "Hack.zip SHA256 verification failed"
+            Write-Host "  FAIL: checksum mismatch for Hack.zip" -ForegroundColor Red
+            $script:InstallFailures += [pscustomobject]@{ Tool = 'Hack Nerd Font'; Pm = 'direct'; Pkg = 'Hack.zip'; ExitCode = 'sha256' }
+            return
         }
         Expand-Archive -Path $zip -DestinationPath $tmp.FullName -Force
 
@@ -667,12 +709,16 @@ function Install-HackNerdFont {
                 -Value $destPath -PropertyType String -Force | Out-Null
             $installedCount++
         }
-        Remove-Item -Recurse -Force $tmp.FullName
         Write-Host ("  installed {0,-26} {1} font files registered in HKCU" -f "Hack Nerd Font", $installedCount)
+        Send-FontChangeNotification
         Write-Host "             (you may need to restart your terminal to see them)"
     } catch {
         Write-Warning ("Hack Nerd Font install failed: " + $_.Exception.Message)
         Write-Host  "  manual    download Hack.zip from nerd-fonts releases and install via the Fonts control panel."
+    } finally {
+        if ($tmp) {
+            Remove-Item -Recurse -Force $tmp.FullName -ErrorAction SilentlyContinue
+        }
     }
 }
 

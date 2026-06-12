@@ -3,10 +3,12 @@ BeforeAll {
     $script:Setup = Join-Path $script:RepoRoot "setup.ps1"
 
     $script:ImportSetupForTest = {
+        param([hashtable]$Parameters = @{ All = $true })
+
         $oldSourceOnly = $env:DOTFILES_SETUP_PS1_SOURCE_ONLY
         try {
             $env:DOTFILES_SETUP_PS1_SOURCE_ONLY = '1'
-            . $script:Setup -All
+            . $script:Setup @Parameters
         } finally {
             if ($null -eq $oldSourceOnly) {
                 Remove-Item Env:DOTFILES_SETUP_PS1_SOURCE_ONLY -ErrorAction SilentlyContinue
@@ -225,9 +227,6 @@ Describe "setup.ps1 Windows Terminal backup" {
         $env:USERPROFILE = $script:FakeHome
         $env:LOCALAPPDATA = $script:FakeLocalAppData
         . $script:ImportSetupForTest
-        Set-Variable -Name Timestamp -Scope Script -Value '20000101-000000'
-        Set-Variable -Name DryRun -Scope Script -Value $false
-        Set-Variable -Name SkipWindowsTerminalMerge -Scope Script -Value $false
     }
 
     AfterEach {
@@ -262,14 +261,15 @@ Describe "setup.ps1 Windows Terminal backup" {
     }
 
     It "does not create a backup when Windows Terminal merge is skipped" {
-        Set-Variable -Name SkipWindowsTerminalMerge -Scope Script -Value $true
+        . $script:ImportSetupForTest -Parameters @{ All = $true; SkipWindowsTerminalMerge = $true }
         $settings = Get-WindowsTerminalSettingsPath
         New-Item -ItemType Directory -Force -Path (Split-Path -Parent $settings) | Out-Null
         [System.IO.File]::WriteAllText($settings, '{"profiles":{}}', [System.Text.UTF8Encoding]::new($false))
 
         Backup-WindowsTerminalSettings
 
-        Test-Path -LiteralPath "$settings.bak.20000101-000000" | Should -BeFalse
+        $backups = @(Get-ChildItem -LiteralPath (Split-Path -Parent $settings) -Filter 'settings.json.bak.*' -ErrorAction SilentlyContinue)
+        $backups.Count | Should -Be 0
     }
 
     It "mirrors packaged Windows Terminal settings to the unpackaged path" {
@@ -283,6 +283,42 @@ Describe "setup.ps1 Windows Terminal backup" {
 
         Test-Path -LiteralPath $unpackaged -PathType Leaf | Should -BeTrue
         [System.IO.File]::ReadAllText($unpackaged) | Should -Be $merged
+    }
+
+    It "seeds unpackaged Windows Terminal settings from the fragment when packaged settings are absent" {
+        $settings = Get-WindowsTerminalSettingsPath
+        $unpackaged = Get-WindowsTerminalUnpackagedSettingsPath
+
+        Test-Path -LiteralPath $settings -PathType Leaf | Should -BeFalse
+        Copy-WindowsTerminalSettingsForUnpackaged -IsPortablePresent $true
+
+        Test-Path -LiteralPath $unpackaged -PathType Leaf | Should -BeTrue
+        $written = [System.IO.File]::ReadAllText($unpackaged) | ConvertFrom-Json
+        $written.theme | Should -Be 'rose-pine'
+        $written.profiles.defaults.colorScheme | Should -Be 'rose-pine'
+        $written.profiles.defaults.font.face | Should -Be 'Hack Nerd Font'
+        @($written.schemes | Where-Object { $_.name -eq 'rose-pine' }).Count | Should -Be 1
+        @($written.themes | Where-Object { $_.name -eq 'rose-pine' }).Count | Should -Be 1
+    }
+
+    It "merges unpackaged Windows Terminal settings from the fragment and preserves user keys" {
+        $unpackaged = Get-WindowsTerminalUnpackagedSettingsPath
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $unpackaged) | Out-Null
+        $minimal = '{"defaultProfile":"{user}","profiles":{"defaults":{"font":{"face":"Consolas"}},"list":[{"guid":"{user}","name":"Keep"}]},"schemes":[{"name":"KeepScheme"}],"actions":[{"command":"closeWindow","keys":"alt+f4"}]}'
+        [System.IO.File]::WriteAllText($unpackaged, $minimal, [System.Text.UTF8Encoding]::new($false))
+
+        Copy-WindowsTerminalSettingsForUnpackaged -IsPortablePresent $true
+
+        $written = [System.IO.File]::ReadAllText($unpackaged) | ConvertFrom-Json
+        $written.defaultProfile | Should -Be '{user}'
+        @($written.profiles.list | Where-Object { $_.guid -eq '{user}' }).Count | Should -Be 1
+        @($written.schemes | Where-Object { $_.name -eq 'KeepScheme' }).Count | Should -Be 1
+        @($written.actions | Where-Object { $_.keys -eq 'alt+f4' }).Count | Should -Be 1
+        $written.theme | Should -Be 'rose-pine'
+        $written.profiles.defaults.colorScheme | Should -Be 'rose-pine'
+        $written.profiles.defaults.font.face | Should -Be 'Hack Nerd Font'
+        @($written.schemes | Where-Object { $_.name -eq 'rose-pine' }).Count | Should -Be 1
+        @($written.themes | Where-Object { $_.name -eq 'rose-pine' }).Count | Should -Be 1
     }
 
     It "keeps setup best effort when the unpackaged Windows Terminal mirror fails" {
@@ -303,6 +339,14 @@ Describe "setup.ps1 Windows Terminal backup" {
         # Inject the switch directly -- Set-Variable -Scope Script does not reach
         # the dot-sourced function reliably.
         Copy-WindowsTerminalSettingsForUnpackaged -IsDryRun $true
+
+        Test-Path -LiteralPath $unpackaged -PathType Leaf | Should -BeFalse
+    }
+
+    It "does not seed unpackaged Windows Terminal settings during dry run" {
+        $unpackaged = Get-WindowsTerminalUnpackagedSettingsPath
+
+        Copy-WindowsTerminalSettingsForUnpackaged -IsDryRun $true -IsPortablePresent $true
 
         Test-Path -LiteralPath $unpackaged -PathType Leaf | Should -BeFalse
     }
