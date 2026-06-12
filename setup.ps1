@@ -471,14 +471,6 @@ function Get-WindowsTerminalMergeHelperPath {
     return (Join-Path $ScriptDir 'home\.chezmoitemplates\windows-terminal\merge-settings.ps1')
 }
 
-function Import-WindowsTerminalMergeHelper {
-    $helper = Get-WindowsTerminalMergeHelperPath
-    if (-not (Test-Path -LiteralPath $helper -PathType Leaf)) {
-        throw "Windows Terminal merge helper is missing: $helper"
-    }
-    . $helper
-}
-
 function Test-WindowsTerminalUnpackagedPresent {
     if (-not $env:LOCALAPPDATA) {
         return $false
@@ -537,7 +529,14 @@ function Merge-WindowsTerminalFragmentFile {
         [Parameter(Mandatory)] [string]$FragmentPath
     )
 
-    Import-WindowsTerminalMergeHelper
+    # Dot-source the shared merge helper INTO this function scope. Dot-sourcing it
+    # inside a separate helper function would load these functions into THAT scope
+    # and lose them on return, leaving the merge functions undefined here.
+    $helper = Get-WindowsTerminalMergeHelperPath
+    if (-not (Test-Path -LiteralPath $helper -PathType Leaf)) {
+        throw "Windows Terminal merge helper is missing: $helper"
+    }
+    . $helper
     $fragmentJson = [System.IO.File]::ReadAllText($FragmentPath)
     $fragment = ConvertFrom-WindowsTerminalJsonc -Jsonc $fragmentJson
     if (Test-Path -LiteralPath $SettingsPath -PathType Leaf) {
