@@ -71,30 +71,27 @@ Run from the repo on Windows:
 explorer .\tests\greenfield\windows-sandbox.wsb
 ```
 
-Double-clicking `windows-sandbox.wsb` is equivalent. The `.wsb` maps the repo
-read-only into the sandbox and runs `sandbox-run.ps1` at logon. The script copies
-the repo to `%USERPROFILE%\dotfiles`, runs `setup.ps1 -All`, rejects nonzero
-exit codes and `FAIL:` markers, runs `validate.ps1`, and leaves logs on the
-sandbox desktop.
+Double-clicking `windows-sandbox.wsb` is equivalent, and the `.wsb` is
+**self-contained** -- it works from anywhere without cloning the repo first. Its
+`LogonCommand` downloads the repo via `sandbox-bootstrap.ps1`, enables Developer
+Mode and reduces Defender scanning for you (one UAC prompt -- click **Yes**),
+runs `setup.ps1 -All`, rejects nonzero exit codes and `FAIL:` markers, runs
+`validate.ps1`, and leaves logs on the sandbox desktop. That single UAC prompt is
+the only thing you click.
 
 Windows Sandbox starts with no winget and no Scoop. That is intentional: it
 exercises the real Scoop-first bootstrap path. The `setup.ps1` Scoop path does
 not require admin. Windows Terminal still cannot be registered as MSIX in
-Sandbox, so the real installer falls back to pinned portable WT; the greenfield
-portable helper remains as an idempotent safety net.
+Sandbox, so the real installer falls back to pinned portable WT, and `setup.ps1`
+seeds or merges the Rose Pine + Hack Nerd Font settings into the portable
+(unpackaged) WT settings path; the greenfield portable helper remains as an
+idempotent safety net.
 
-Two Sandbox gotchas:
-
-- The `.wsb` uses a RELATIVE `HostFolder` (`..\..`), which only resolves on
-  Windows 11 22H2 and newer. On older builds the sandbox fails to launch with a
-  mapped-folder error; fix it by editing `windows-sandbox.wsb` and replacing
-  `..\..` with the absolute path to your repo checkout.
-- The Sandbox has Developer Mode OFF, which the Neovim directory symlink needs.
-  `sandbox-run.ps1` now enables it for you (self-elevates ONLY for that one
-  registry key -- approve the single UAC prompt -- then runs `setup.ps1`
-  non-elevated so Scoop still works). You do not touch Settings. If you decline
-  the prompt, enable Developer Mode manually (Settings -> Privacy & security ->
-  For developers) and re-run `cd $env:USERPROFILE\dotfiles; .\setup.ps1 -SkipDeps`.
+To test a different branch, change the ref in the `windows-sandbox.wsb`
+`LogonCommand` URL (it points at `chezmoi-pilot`). The Neovim directory symlink
+needs Developer Mode, which the bootstrap enables via that one UAC prompt; if you
+decline it, enable Developer Mode manually (Settings -> Privacy & security -> For
+developers) and re-run `cd $env:USERPROFILE\dotfiles; .\setup.ps1 -SkipDeps`.
 
 Fallbacks:
 
