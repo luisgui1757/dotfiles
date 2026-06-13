@@ -230,7 +230,7 @@ Describe "setup.ps1 VS developer environment" {
         $script:EnteredVsPath = ''
 
         $result = Enter-VsDeveloperEnvironment `
-            -IsWindows:$true `
+            -OnWindows:$true `
             -InstallationPathResolver { return 'C:\VS' } `
             -ModulePathTester {
                 param([string]$Path)
@@ -283,7 +283,7 @@ Describe "setup.ps1 VS developer environment" {
     It "emits a FAIL marker when a present VC toolset cannot import DevShell" {
         $output = & {
             Enter-VsDeveloperEnvironment `
-                -IsWindows:$true `
+                -OnWindows:$true `
                 -InstallationPathResolver { return 'C:\VS' } `
                 -ModulePathTester { return $false }
         } 6>&1 | Out-String

@@ -88,7 +88,10 @@ function Get-VsBuildToolsInstallationPath {
 
 function Enter-VsDeveloperEnvironment {
     param(
-        [bool]$IsWindows = ($env:OS -eq 'Windows_NT'),
+        # NOTE: do NOT name this $IsWindows -- that is a read-only automatic
+        # variable in PowerShell 7, so a param of that name fails to bind with
+        # "Cannot overwrite variable IsWindows because it is read-only".
+        [bool]$OnWindows = ($env:OS -eq 'Windows_NT'),
         [scriptblock]$InstallationPathResolver = { Get-VsBuildToolsInstallationPath },
         [scriptblock]$ModulePathTester = { param([string]$Path) Test-Path -LiteralPath $Path -PathType Leaf },
         [scriptblock]$ModuleImporter = { param([string]$Path) Import-Module $Path -ErrorAction Stop },
@@ -98,7 +101,7 @@ function Enter-VsDeveloperEnvironment {
         }
     )
 
-    if (-not $IsWindows) { return $false }
+    if (-not $OnWindows) { return $false }
 
     $vsPath = [string](& $InstallationPathResolver)
     if ([string]::IsNullOrWhiteSpace($vsPath)) {
