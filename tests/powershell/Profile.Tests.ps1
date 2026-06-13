@@ -50,9 +50,18 @@ Describe "PowerShell profile" {
         $hostNameIndex | Should -BeGreaterThan $userInteractiveIndex
     }
 
-    It "writes the starship init cache with UTF8 encoding" {
+    It "writes the starship init cache with UTF8 no-BOM encoding" {
         $src = Get-Content -Raw -LiteralPath $script:Profile
-        $src | Should -Match 'Set-Content[^|]*-Encoding\s+UTF8'
+        $src | Should -Match 'function Publish-StarshipInitScript'
+        $src | Should -Match '\[System\.Text\.UTF8Encoding\]::new\(\$false\)'
+    }
+
+    It "publishes the starship init cache atomically from a temp file" {
+        $src = Get-Content -Raw -LiteralPath $script:Profile
+        $src | Should -Match '"\{0\}\.\{1\}\.\{2\}\.tmp"\s+-f\s+\$initLeaf,\s+\$PID'
+        $src | Should -Match 'Move-Item\s+-LiteralPath\s+\$tempPath\s+-Destination\s+\$InitPath\s+-Force'
+        $src | Should -Match 'function Import-StarshipInitScriptWithRetry'
+        $src | Should -Match 'Start-Sleep\s+-Milliseconds\s+\$DelayMilliseconds'
     }
 
     It "configures PSReadLine with Rose Pine colors" {
@@ -60,5 +69,8 @@ Describe "PowerShell profile" {
         $src | Should -Match 'PredictionViewStyle\s+ListView'
         $src | Should -Match '#c4a7e7'   # iris
         $src | Should -Match '#f6c177'   # gold
+        $src | Should -Match 'RosePineSelectionColor'
+        $src | Should -Match '\[38;2;224;222;244;48;2;38;35;58m'
+        $src | Should -Match 'Set-PSReadLineOption\s+-Colors\s+@\{\s*Selection\s*=\s*\$script:RosePineSelectionColor'
     }
 }

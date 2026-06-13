@@ -59,6 +59,7 @@ pass "rendered Windows WT modify_ template parses cleanly under PowerShell"
 # 3) WT modify_ filter: a seeded settings.json gains the managed keys AND keeps
 #    the user's keys.
 cat > "$work/assert-merge.ps1" <<'PS'
+$managedPwshProfileGuid = '{8a0e8c9b-2b4c-5842-ac1b-29cd17efc89b}'
 $m = [Console]::In.ReadToEnd() | ConvertFrom-Json
 if ($m.theme -ne 'rose-pine') { throw 'managed theme not applied' }
 if ($m.profiles.defaults.colorScheme -ne 'rose-pine') { throw 'managed colorScheme not applied' }
@@ -67,6 +68,7 @@ if (-not ($m.themes  | Where-Object { $_.name -eq 'rose-pine' })) { throw 'rose-
 if (@($m.actions).Count -lt 15) { throw 'managed keybindings missing' }
 if ($m.defaultProfile -ne '{u}') { throw 'user defaultProfile dropped' }
 if (-not ($m.profiles.list | Where-Object { $_.guid -eq '{u}' })) { throw 'user profile dropped' }
+if (-not ($m.profiles.list | Where-Object { $_.guid -eq $managedPwshProfileGuid -and $_.commandline -eq 'pwsh.exe' })) { throw 'managed PowerShell 7 profile missing' }
 if (-not ($m.schemes | Where-Object { $_.name -eq 'MyScheme' })) { throw 'user scheme dropped' }
 if (-not ($m.actions | Where-Object { $_.keys -eq 'alt+f4' })) { throw 'user action dropped' }
 if ($m.PSObject.Properties.Name -contains '$schema') { throw 'fragment $schema propagated' }
@@ -77,7 +79,23 @@ printf '%s' "$seeded" | pwsh -NoLogo -NoProfile -File "$work/modify-settings.ps1
     || fail "WT modify_ merge did not preserve user keys + apply managed keys"
 pass "WT modify_ merges managed keys and preserves user data (no \$schema propagated)"
 
-# 4) Empty stdin (WT never launched) must emit NOTHING so chezmoi does not
+# 4) WT modify_ promotes the built-in Windows PowerShell default to the managed
+#    PowerShell 7 profile, without deleting the built-in profile.
+cat > "$work/assert-pwsh-default.ps1" <<'PS'
+$managedPwshProfileGuid = '{8a0e8c9b-2b4c-5842-ac1b-29cd17efc89b}'
+$legacyWindowsPowerShellGuid = '{61c54bbd-c2c6-5271-96e7-009a87ff44bf}'
+$m = [Console]::In.ReadToEnd() | ConvertFrom-Json
+if ($m.defaultProfile -ne $managedPwshProfileGuid) { throw 'managed PowerShell 7 defaultProfile not applied' }
+if (-not ($m.profiles.list | Where-Object { $_.guid -eq $managedPwshProfileGuid -and $_.commandline -eq 'pwsh.exe' })) { throw 'managed PowerShell 7 profile missing' }
+if (-not ($m.profiles.list | Where-Object { $_.guid -eq $legacyWindowsPowerShellGuid })) { throw 'legacy Windows PowerShell profile dropped' }
+PS
+legacy_seed='{"defaultProfile":"{61c54bbd-c2c6-5271-96e7-009a87ff44bf}","profiles":{"defaults":{},"list":[{"guid":"{61c54bbd-c2c6-5271-96e7-009a87ff44bf}","name":"Windows PowerShell","commandline":"powershell.exe"}]},"schemes":[],"actions":[]}'
+printf '%s' "$legacy_seed" | pwsh -NoLogo -NoProfile -File "$work/modify-settings.ps1" \
+    | pwsh -NoLogo -NoProfile -File "$work/assert-pwsh-default.ps1" \
+    || fail "WT modify_ did not promote the legacy Windows PowerShell default"
+pass "WT modify_ promotes the legacy default to managed PowerShell 7"
+
+# 5) Empty stdin (WT never launched) must emit NOTHING so chezmoi does not
 #    fabricate a settings.json.
 empty_out="$(printf '' | pwsh -NoLogo -NoProfile -File "$work/modify-settings.ps1")" \
     || fail "WT modify_ errored on empty stdin"

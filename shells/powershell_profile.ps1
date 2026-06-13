@@ -50,6 +50,52 @@ $script:StarshipConfigPath = if ($env:STARSHIP_CONFIG) {
 }
 
 # ---- Precompile Starship init (idempotent; regenerates when toml is newer) ---
+function Test-StarshipInitRegenerationNeeded {
+    [CmdletBinding()]
+    param(
+        [string]$InitPath = $script:StarshipInitPath,
+        [string]$ConfigPath = $script:StarshipConfigPath
+    )
+
+    if (-not (Test-Path -LiteralPath $InitPath)) {
+        return $true
+    }
+    if (Test-Path -LiteralPath $ConfigPath) {
+        $initTime = (Get-Item -LiteralPath $InitPath).LastWriteTime
+        $configTime = (Get-Item -LiteralPath $ConfigPath).LastWriteTime
+        if ($configTime -gt $initTime) { return $true }
+    }
+    return $false
+}
+
+function Publish-StarshipInitScript {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] [string]$InitPath,
+        [Parameter(Mandatory)] [string]$Content
+    )
+
+    $initDir = Split-Path -Parent $InitPath
+    if (-not (Test-Path -LiteralPath $initDir -PathType Container)) {
+        New-Item -ItemType Directory -Force -Path $initDir | Out-Null
+    }
+
+    $initLeaf = Split-Path -Leaf $InitPath
+    $tempPath = Join-Path $initDir ("{0}.{1}.{2}.tmp" -f $initLeaf, $PID, [guid]::NewGuid().ToString('N'))
+    try {
+        [System.IO.File]::WriteAllText($tempPath, $Content, [System.Text.UTF8Encoding]::new($false))
+        Move-Item -LiteralPath $tempPath -Destination $InitPath -Force -ErrorAction Stop
+        return $true
+    } catch {
+        Write-Verbose $_.Exception.Message
+        Remove-Item -LiteralPath $tempPath -Force -ErrorAction SilentlyContinue
+        if (Test-Path -LiteralPath $InitPath -PathType Leaf) {
+            return $false
+        }
+        throw
+    }
+}
+
 function Confirm-StarshipInitScript {
     [CmdletBinding()]
     param(
@@ -57,25 +103,45 @@ function Confirm-StarshipInitScript {
         [string]$ConfigPath = $script:StarshipConfigPath
     )
 
-    $regenerate = -not (Test-Path -LiteralPath $InitPath)
-    if (-not $regenerate -and (Test-Path -LiteralPath $ConfigPath)) {
-        $initTime = (Get-Item -LiteralPath $InitPath).LastWriteTime
-        $configTime = (Get-Item -LiteralPath $ConfigPath).LastWriteTime
-        if ($configTime -gt $initTime) { $regenerate = $true }
-    }
-
-    if ($regenerate) {
+    if (Test-StarshipInitRegenerationNeeded -InitPath $InitPath -ConfigPath $ConfigPath) {
         Write-Verbose 'Generating precompiled Starship init script...'
-        $init = & starship init powershell --print-full-init
-        # Force UTF-8 (no BOM) so unicode glyphs survive on Windows PowerShell 5.
-        Set-Content -LiteralPath $InitPath -Value $init -Encoding UTF8
+        $init = (& starship init powershell --print-full-init) -join [Environment]::NewLine
+        $published = Publish-StarshipInitScript -InitPath $InitPath -Content $init
+        if (-not $published -and -not (Test-Path -LiteralPath $InitPath -PathType Leaf)) {
+            throw "Starship init cache could not be published"
+        }
+    }
+}
+
+function Import-StarshipInitScriptWithRetry {
+    [CmdletBinding()]
+    param(
+        [string]$InitPath = $script:StarshipInitPath,
+        [int]$Attempts = 4,
+        [int]$DelayMilliseconds = 50
+    )
+
+    $lastError = $null
+    for ($attempt = 1; $attempt -le $Attempts; $attempt += 1) {
+        try {
+            . $InitPath
+            return
+        } catch {
+            $lastError = $_
+            if ($attempt -lt $Attempts) {
+                Start-Sleep -Milliseconds $DelayMilliseconds
+            }
+        }
+    }
+    if ($lastError) {
+        throw $lastError
     }
 }
 
 if (Get-Command starship -ErrorAction SilentlyContinue) {
     try {
         Confirm-StarshipInitScript
-        . $script:StarshipInitPath
+        Import-StarshipInitScriptWithRetry
     } catch {
         # Cached starship init may be stale or corrupt from an interrupted
         # write. Nuke it and rebuild once; if it still fails, give up silently
@@ -84,7 +150,7 @@ if (Get-Command starship -ErrorAction SilentlyContinue) {
         Remove-Item -LiteralPath $script:StarshipInitPath -Force -ErrorAction SilentlyContinue
         try {
             Confirm-StarshipInitScript
-            . $script:StarshipInitPath
+            Import-StarshipInitScriptWithRetry
         } catch {
             Write-Warning ("Starship init still failing: " + $_.Exception.Message)
         }
@@ -113,6 +179,8 @@ if (Get-Module -ListAvailable PSReadLine) {
         try { Set-PSReadLineOption -PredictionSource History -ErrorAction Stop } catch { Write-Verbose $_.Exception.Message }
     }
 
+    $script:RosePineSelectionColor = "$([char]0x1b)[38;2;224;222;244;48;2;38;35;58m"
+
     try {
         Set-PSReadLineOption -Colors @{
             Command            = '#c4a7e7'
@@ -125,11 +193,15 @@ if (Get-Module -ListAvailable PSReadLine) {
             Comment            = '#6e6a86'
             Keyword            = '#c4a7e7'
             Error              = '#eb6f92'
-            Selection          = '#26233a'
             ContinuationPrompt = '#6e6a86'
             Default            = '#e0def4'
         }
     } catch { Write-Verbose $_.Exception.Message }
+
+    # MenuComplete uses Selection for the highlighted row. Use Rose Pine text on
+    # overlay as one ANSI SGR sequence; keep it separate so invalid SGR support
+    # cannot drop the syntax color table above.
+    try { Set-PSReadLineOption -Colors @{ Selection = $script:RosePineSelectionColor } -ErrorAction Stop } catch { Write-Verbose $_.Exception.Message }
 
     # Prediction colors. The ListView prediction (the inline + dropdown
     # suggestions, our "fzf-like" history UI) defaults to a near-background grey

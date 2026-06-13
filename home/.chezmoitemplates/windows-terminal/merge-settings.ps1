@@ -65,6 +65,33 @@ function Merge-WindowsTerminalObjectArrayByProperty {
     return $result
 }
 
+function Test-WindowsTerminalDefaultProfileShouldChange {
+    param($CurrentValue, [string]$ManagedValue)
+    if ([string]::IsNullOrWhiteSpace([string]$ManagedValue)) {
+        return $false
+    }
+    if ([string]::IsNullOrWhiteSpace([string]$CurrentValue)) {
+        return $true
+    }
+
+    $currentText = ([string]$CurrentValue).Trim()
+    if ($currentText.Equals($ManagedValue, [StringComparison]::OrdinalIgnoreCase)) {
+        return $false
+    }
+
+    $legacyWindowsPowerShellDefaults = @(
+        '{61c54bbd-c2c6-5271-96e7-009a87ff44bf}',
+        'Windows PowerShell'
+    )
+    foreach ($legacyDefault in $legacyWindowsPowerShellDefaults) {
+        if ($currentText.Equals($legacyDefault, [StringComparison]::OrdinalIgnoreCase)) {
+            return $true
+        }
+    }
+
+    return $false
+}
+
 function Get-WindowsTerminalActionKeySet {
     param($Item)
     $keys = @()
@@ -159,11 +186,18 @@ function Merge-WindowsTerminalSettingsObject {
     if ($null -ne $Fragment.theme)                 { Set-WindowsTerminalProperty $Current "theme"                 $Fragment.theme }
     if ($null -ne $Fragment.useAcrylicInTabRow)    { Set-WindowsTerminalProperty $Current "useAcrylicInTabRow"    $Fragment.useAcrylicInTabRow }
     if ($null -ne $Fragment.windowingBehavior)     { Set-WindowsTerminalProperty $Current "windowingBehavior"     $Fragment.windowingBehavior }
+    if ($null -ne $Fragment.defaultProfile -and
+        (Test-WindowsTerminalDefaultProfileShouldChange -CurrentValue $Current.defaultProfile -ManagedValue $Fragment.defaultProfile)) {
+        Set-WindowsTerminalProperty $Current "defaultProfile" $Fragment.defaultProfile
+    }
 
     if ($null -eq $Current.profiles.defaults) {
         $Current.profiles | Add-Member -NotePropertyName defaults -NotePropertyValue $Fragment.profiles.defaults -Force
     } else {
         $Current.profiles.defaults = $Fragment.profiles.defaults
+    }
+    if ($null -ne $Fragment.profiles.list) {
+        Set-WindowsTerminalProperty $Current.profiles "list" @(Merge-WindowsTerminalObjectArrayByProperty $Current.profiles.list $Fragment.profiles.list "guid")
     }
 
     Set-WindowsTerminalProperty $Current "actions" @(Merge-WindowsTerminalActions $Current.actions $Fragment.actions)

@@ -8,6 +8,8 @@ $script:SourceDir = Join-Path $script:RepoRoot 'home'
 $script:Chezmoi = $null
 
 $script:UserProfileGuid = '{11111111-1111-1111-1111-111111111111}'
+$script:ManagedPwshProfileGuid = '{8a0e8c9b-2b4c-5842-ac1b-29cd17efc89b}'
+$script:LegacyWindowsPowerShellProfileGuid = '{61c54bbd-c2c6-5271-96e7-009a87ff44bf}'
 $script:UserSchemeName = 'UserSeedScheme'
 $script:UserActionKeys = 'alt+f4'
 $script:ManagedGlobals = @(
@@ -281,6 +283,18 @@ function Assert-WtUserSeedSurvived {
     Assert-Condition ($actions.Count -gt 0) "$Label dropped the seeded user action"
 }
 
+function Assert-WtManagedPwshProfilePresent {
+    param(
+        [Parameter(Mandatory)] $Settings,
+        [Parameter(Mandatory)] [string]$Label
+    )
+
+    $profiles = @(Get-ArrayValue $Settings.profiles.list | Where-Object { $_.guid -eq $script:ManagedPwshProfileGuid })
+    Assert-Condition ($profiles.Count -eq 1) "$Label missing managed PowerShell 7 profile"
+    Assert-Condition ($profiles[0].name -eq 'PowerShell 7') "$Label managed PowerShell 7 profile name mismatch"
+    Assert-Condition ($profiles[0].commandline -eq 'pwsh.exe') "$Label managed PowerShell 7 commandline mismatch"
+}
+
 function Read-WtFragment {
     $fragmentPath = Join-Path $script:RepoRoot 'windows-terminal\settings.fragment.jsonc'
     return ((Strip-Jsonc (Get-Content -Raw -LiteralPath $fragmentPath)) | ConvertFrom-Json)
@@ -327,6 +341,7 @@ function Assert-Part1WtMerge {
     $settings = Read-JsonFile -Path $SettingsPath
     Assert-Condition ($settings.theme -eq 'rose-pine') 'WT theme was not set to rose-pine'
     Assert-Condition ($settings.profiles.defaults.colorScheme -eq 'rose-pine') 'WT profiles.defaults.colorScheme was not set to rose-pine'
+    Assert-WtManagedPwshProfilePresent -Settings $settings -Label 'WT merge'
     Get-NamedItem -Items $settings.schemes -Name 'rose-pine' -Label 'WT rose-pine scheme' | Out-Null
     Get-NamedItem -Items $settings.themes -Name 'rose-pine' -Label 'WT rose-pine theme' | Out-Null
     Assert-Condition (@(Get-ArrayValue $settings.actions).Count -ge 15) 'WT managed actions count is below 15'
@@ -489,6 +504,29 @@ function Strip-Jsonc {
     return (($Jsonc -split "`n" | Where-Object { $_ -notmatch "^\s*//" }) -join "`n")
 }
 
+function Test-WtDefaultProfileShouldChange {
+    param($CurrentValue, [string]$ManagedValue)
+    if ([string]::IsNullOrWhiteSpace([string]$ManagedValue)) {
+        return $false
+    }
+    if ([string]::IsNullOrWhiteSpace([string]$CurrentValue)) {
+        return $true
+    }
+
+    $currentText = ([string]$CurrentValue).Trim()
+    if ($currentText.Equals($ManagedValue, [StringComparison]::OrdinalIgnoreCase)) {
+        return $false
+    }
+
+    foreach ($legacyDefault in @($script:LegacyWindowsPowerShellProfileGuid, 'Windows PowerShell')) {
+        if ($currentText.Equals($legacyDefault, [StringComparison]::OrdinalIgnoreCase)) {
+            return $true
+        }
+    }
+
+    return $false
+}
+
 function Invoke-ExpectedWindowsTerminalMergeOnly {
     param([Parameter(Mandatory)] [string]$SettingsPath)
 
@@ -508,11 +546,18 @@ function Invoke-ExpectedWindowsTerminalMergeOnly {
     if ($null -ne $fragment.theme)                 { Set-OrAdd-Property $current 'theme'                 $fragment.theme }
     if ($null -ne $fragment.useAcrylicInTabRow)    { Set-OrAdd-Property $current 'useAcrylicInTabRow'    $fragment.useAcrylicInTabRow }
     if ($null -ne $fragment.windowingBehavior)     { Set-OrAdd-Property $current 'windowingBehavior'     $fragment.windowingBehavior }
+    if ($null -ne $fragment.defaultProfile -and
+        (Test-WtDefaultProfileShouldChange -CurrentValue $current.defaultProfile -ManagedValue $fragment.defaultProfile)) {
+        Set-OrAdd-Property $current 'defaultProfile' $fragment.defaultProfile
+    }
 
     if ($null -eq $current.profiles.defaults) {
         $current.profiles | Add-Member -NotePropertyName defaults -NotePropertyValue $fragment.profiles.defaults -Force
     } else {
         $current.profiles.defaults = $fragment.profiles.defaults
+    }
+    if ($null -ne $fragment.profiles.list) {
+        Set-OrAdd-Property $current.profiles 'list' @(Merge-ObjectArrayByProperty $current.profiles.list $fragment.profiles.list 'guid')
     }
     Set-OrAdd-Property $current 'actions' @(Merge-WTActions $current.actions $fragment.actions)
     Set-OrAdd-Property $current 'schemes' @(Merge-ObjectArrayByProperty $current.schemes $fragment.schemes 'name')
@@ -563,6 +608,7 @@ function Select-WtManagedSubset {
     return [ordered]@{
         globals = $globals
         profilesDefaults = $Settings.profiles.defaults
+        managedPwshProfile = Get-NamedItem -Items $Settings.profiles.list -Name 'PowerShell 7' -Label 'managed WT PowerShell 7 profile'
         actions = @(Get-ArrayValue $Settings.actions)
         rosePineScheme = Get-NamedItem -Items $Settings.schemes -Name 'rose-pine' -Label 'managed WT scheme'
         rosePineTheme = Get-NamedItem -Items $Settings.themes -Name 'rose-pine' -Label 'managed WT theme'
@@ -623,6 +669,8 @@ function Invoke-Part2 {
         Assert-WtManagedSubsetDeepEqual -Expected $expected -Chezmoi $chezmoi
         Assert-WtUserSeedSurvived -Settings $expected -Label 'expected WT merge'
         Assert-WtUserSeedSurvived -Settings $chezmoi -Label 'chezmoi WT merge'
+        Assert-WtManagedPwshProfilePresent -Settings $expected -Label 'expected WT merge'
+        Assert-WtManagedPwshProfilePresent -Settings $chezmoi -Label 'chezmoi WT merge'
         Assert-WtManagedActionKeySet -Settings $expected -Label 'expected WT merge'
         Assert-WtManagedActionKeySet -Settings $chezmoi -Label 'chezmoi WT merge'
         Pass 'part 2 WT managed subset deep-compare passed'

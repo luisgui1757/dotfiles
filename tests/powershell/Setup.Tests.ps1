@@ -1,6 +1,8 @@
 BeforeAll {
     $script:RepoRoot = (Resolve-Path "$PSScriptRoot/../..").Path
     $script:Setup = Join-Path $script:RepoRoot "setup.ps1"
+    $script:ManagedPwshProfileGuid = '{8a0e8c9b-2b4c-5842-ac1b-29cd17efc89b}'
+    $script:LegacyWindowsPowerShellProfileGuid = '{61c54bbd-c2c6-5271-96e7-009a87ff44bf}'
 
     $script:ImportSetupForTest = {
         param([hashtable]$Parameters = @{ All = $true })
@@ -297,8 +299,29 @@ Describe "setup.ps1 Windows Terminal backup" {
         $written.theme | Should -Be 'rose-pine'
         $written.profiles.defaults.colorScheme | Should -Be 'rose-pine'
         $written.profiles.defaults.font.face | Should -Be 'Hack Nerd Font'
+        $written.defaultProfile | Should -Be $script:ManagedPwshProfileGuid
+        $pwshProfile = @($written.profiles.list | Where-Object { $_.guid -eq $script:ManagedPwshProfileGuid })
+        $pwshProfile.Count | Should -Be 1
+        $pwshProfile[0].commandline | Should -Be 'pwsh.exe'
         @($written.schemes | Where-Object { $_.name -eq 'rose-pine' }).Count | Should -Be 1
         @($written.themes | Where-Object { $_.name -eq 'rose-pine' }).Count | Should -Be 1
+    }
+
+    It "promotes the legacy Windows PowerShell default to the managed PowerShell 7 profile" {
+        $unpackaged = Get-WindowsTerminalUnpackagedSettingsPath
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $unpackaged) | Out-Null
+        $minimal = '{"defaultProfile":"{61c54bbd-c2c6-5271-96e7-009a87ff44bf}","profiles":{"defaults":{},"list":[{"guid":"{61c54bbd-c2c6-5271-96e7-009a87ff44bf}","name":"Windows PowerShell","commandline":"powershell.exe"}]},"schemes":[],"actions":[]}'
+        [System.IO.File]::WriteAllText($unpackaged, $minimal, [System.Text.UTF8Encoding]::new($false))
+
+        Copy-WindowsTerminalSettingsForUnpackaged -IsPortablePresent $true
+
+        $written = [System.IO.File]::ReadAllText($unpackaged) | ConvertFrom-Json
+        $written.defaultProfile | Should -Be $script:ManagedPwshProfileGuid
+        @($written.profiles.list | Where-Object { $_.guid -eq $script:LegacyWindowsPowerShellProfileGuid }).Count | Should -Be 1
+        $pwshProfile = @($written.profiles.list | Where-Object { $_.guid -eq $script:ManagedPwshProfileGuid })
+        $pwshProfile.Count | Should -Be 1
+        $pwshProfile[0].name | Should -Be 'PowerShell 7'
+        $pwshProfile[0].commandline | Should -Be 'pwsh.exe'
     }
 
     It "merges unpackaged Windows Terminal settings from the fragment and preserves user keys" {
@@ -312,6 +335,7 @@ Describe "setup.ps1 Windows Terminal backup" {
         $written = [System.IO.File]::ReadAllText($unpackaged) | ConvertFrom-Json
         $written.defaultProfile | Should -Be '{user}'
         @($written.profiles.list | Where-Object { $_.guid -eq '{user}' }).Count | Should -Be 1
+        @($written.profiles.list | Where-Object { $_.guid -eq $script:ManagedPwshProfileGuid }).Count | Should -Be 1
         @($written.schemes | Where-Object { $_.name -eq 'KeepScheme' }).Count | Should -Be 1
         @($written.actions | Where-Object { $_.keys -eq 'alt+f4' }).Count | Should -Be 1
         $written.theme | Should -Be 'rose-pine'

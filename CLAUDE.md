@@ -125,7 +125,9 @@ that violates one of these, fix it instead of disabling the test.
     fabricate Store WT settings, but setup also handles portable WT after apply:
     it mirrors the packaged file when present, or seeds/merges the unpackaged
     path from `windows-terminal/settings.fragment.jsonc` when packaged settings
-    are absent and portable WT is detected.
+    are absent and portable WT is detected. The merge adds a fixed PowerShell 7
+    profile (`pwsh.exe`) and promotes an empty or built-in Windows PowerShell 5.1
+    `defaultProfile` to that profile; a custom user default is preserved.
 16. **tmux uppercase `H`/`L` are window swaps.** Lowercase `h`/`l` stay pane
     focus bindings. Do not replace them with arrow-key bindings unless the
     terminal/psmux behavior has been revalidated.
@@ -205,8 +207,8 @@ Surfaces that consume these: nvim (rose-pine plugin defaults), lualine
 (theme="rose-pine"), starship.toml (`[palettes.rose-pine]`), tmux.conf (hex
 literals in status/borders), ghostty/config (`theme = dark:Rose Pine,...`),
 windows-terminal/settings.fragment.jsonc (`schemes` + `themes`),
-shells/powershell_profile.ps1 (PSReadLine `-Colors` for syntax, the
-version-gated prediction colors, and `$PSStyle.FileInfo.Directory` for `ls`
+shells/powershell_profile.ps1 (PSReadLine `-Colors` for syntax, `Selection`,
+the version-gated prediction colors, and `$PSStyle.FileInfo.Directory` for `ls`
 directory color).
 
 ### Refresh the lazy lockfile after adding plugins
@@ -426,7 +428,11 @@ save only**. The next plain `:w` formats normally. Implemented in
   or merges that unpackaged file directly from
   `windows-terminal/settings.fragment.jsonc`. Both portable paths are skipped
   when `-SkipWindowsTerminalMerge` is passed. Store WT ignores the unpackaged
-  file.
+  file. The managed WT profile is an explicit fixed-GUID `pwsh.exe` profile
+  named `PowerShell 7`; do not rely on WT's dynamic PowerShell 7 profile GUID
+  being present. Do not backport the theme/profile to Windows PowerShell 5.1:
+  this repo installs/configures PS7 and 5.1 lacks the PSReadLine ListView and
+  `$PSStyle` behavior used by the managed profile.
   The legacy `-MergeWindowsTerminal` switch remains accepted as a no-op alias.
 - **lazygit config paths are OS-specific.** On macOS, lazygit v0.58 reports
   `~/Library/Application Support/lazygit` from `lazygit --print-config-dir`;
@@ -449,13 +455,18 @@ save only**. The next plain `:w` formats normally. Implemented in
   applicable. Windows Terminal is a `modify_` read-modify-write merge, not a
   symlink or fragment-only replacement. WT opens **maximized** (`launchMode`,
   not fullscreen) with a **visible** scrollbar (`scrollbarState` in
-  `profiles.defaults`). Adding a new top-level scalar fragment key requires FOUR
-  edits in lockstep or the `windows_apply_test.ps1` deep-compare fails: the
-  fragment (+ its `home/.chezmoitemplates` mirror),
+  `profiles.defaults`) and defaults to the fixed `PowerShell 7` profile only
+  when `defaultProfile` is empty or still the built-in Windows PowerShell 5.1
+  default; a custom default is left alone. Adding a new unconditional top-level
+  scalar fragment key requires FOUR edits in lockstep or the
+  `windows_apply_test.ps1` deep-compare fails: the fragment (+ its
+  `home/.chezmoitemplates` mirror),
   `home/.chezmoitemplates/windows-terminal/merge-settings.ps1`, the test mirror
   `Invoke-ExpectedWindowsTerminalMergeOnly`, and `$script:ManagedGlobals`.
-  `profiles.defaults` is replaced wholesale, so keys inside it (e.g.
-  `scrollbarState`) need no merge-template change. The nvim tree is intentionally NOT
+  Conditional keys like `defaultProfile` need the same helper/test mirror but are
+  intentionally excluded from `$script:ManagedGlobals`. `profiles.defaults` is
+  replaced wholesale, so keys inside it (e.g. `scrollbarState`) need no
+  merge-template change. The nvim tree is intentionally NOT
   copied under `home/`: POSIX `home/dot_config/symlink_nvim.tmpl` and Windows
   `home/AppData/Local/symlink_nvim.tmpl` both point at
   `{{ .chezmoi.sourceDir }}/../nvim`, so managed targets resolve to the repo
@@ -682,7 +693,7 @@ save only**. The next plain `:w` formats normally. Implemented in
   prior loads):
   `Remove-Item -LiteralPath "$HOME\.tmux.posix.conf" -Force -ErrorAction SilentlyContinue; taskkill /F /T /IM psmux.exe`
   then reopen the terminal.
-- **psmux + PSReadLine: Windows-only overlay, two settings.** psmux's default
+- **psmux + PSReadLine: Windows-only overlay, three settings.** psmux's default
   shell is **cmd**, not pwsh — which is the *real* reason "history prediction"
   and `MenuComplete` looked broken inside panes: PSReadLine was never loaded.
   The fix is a Windows-only overlay `tmux/tmux.windows.conf`, managed as
@@ -691,7 +702,12 @@ save only**. The next plain `:w` formats normally. Implemented in
   exist). The overlay sets:
   (1) `default-shell pwsh` — so fresh psmux panes spawn PowerShell 7, which
   loads PSReadLine + the profile.
-  (2) `allow-predictions on` — psmux otherwise resets `PredictionSource` to
+  (2) `status-style "fg=#c4a7e7,bg=#191724"` — psmux stores
+  `window-status-style` and ignores inline inactive-window `#[fg=...]`, but it
+  does render base `status-style`; setting iris-on-base in the Windows overlay
+  gives inactive psmux cells the same upstream inactive color real tmux gets
+  from `window-status-style` in `tmux.conf`.
+  (3) `allow-predictions on` — psmux otherwise resets `PredictionSource` to
   `None` during pane init (psmux issue #150 — fresh panes ignore the profile's
   `HistoryAndPlugin`). With this on, the profile's ListView prediction +
   `Tab=MenuComplete` survive into psmux panes.
@@ -720,7 +736,20 @@ save only**. The next plain `:w` formats normally. Implemented in
   These are applied in SEPARATE `Set-PSReadLineOption -Colors` calls, NOT folded
   into the main syntax hashtable: an unknown color key throws and would drop the
   WHOLE hashtable, so on an old PSReadLine the syntax colors must not depend on a
-  prediction key existing. Do NOT set `ListPredictionTooltip`.
+  prediction key existing. `Selection` is also isolated because MenuComplete uses
+  it for the selected row; it must be the full ANSI SGR sequence for Rose Pine
+  `text #e0def4` on `overlay #26233a`, not a bare dark background. Do NOT set
+  `ListPredictionTooltip`.
+- **PowerShell Starship init is cached without `Invoke-Expression`, and cache
+  publication is atomic.** `Confirm-StarshipInitScript` still writes
+  `%LOCALAPPDATA%\starship.ps1` (or the cross-platform cache dir) and dot-sources
+  it because `Invoke-Expression (& starship init powershell)` is banned. When the
+  cache is missing or older than `starship.toml`, `Publish-StarshipInitScript`
+  writes UTF-8 no-BOM to a same-directory `starship.ps1.<pid>.<guid>.tmp`, then
+  `Move-Item -Force`s it into place. If another shell wins the race and the move
+  fails, the profile falls back to the existing cache instead of warning.
+  `Import-StarshipInitScriptWithRetry` tolerates a short read lock while another
+  tab is publishing.
 - **fzf is unified across shells via PSFzf.** `install-deps.ps1` installs `fzf`
   (catalog: winget `junegunn.fzf` / choco / scoop) and `Install-PSFzf` installs
   the PSFzf module from PSGallery (NOT in `$Catalog` — it is a module, not a
@@ -873,9 +902,11 @@ host OS or shell would otherwise hide a branch from CI.
   `setw -g window-status-style "fg=#c4a7e7,bg=#191724"` (iris on base). The
   earlier `setw -gu` fallback to `status-style` (pine on base) was only 3.4:1 --
   illegible, worst under psmux; iris is 8.4:1. Because psmux does NOT render
-  `window-status-style` for window cells, the iris is ALSO inlined in
-  `window-status-format` inside the Windows overlay `tmux.windows.conf` (guarded
-  by `tests/tmux/windows_conf_test.sh`).
+  `window-status-style` for window cells and owner testing showed inline inactive
+  fg did not stick under psmux either, the Windows overlay instead sets
+  `status-style "fg=#c4a7e7,bg=#191724"` so inactive cells inherit iris there.
+  Real tmux keeps the canonical `window-status-style` path in `tmux.conf`;
+  `tmux.windows.conf` is guarded by `tests/tmux/windows_conf_test.sh`.
   Status-left (iris-bold session + muted
   separator) and status-right (foam date + gold time) are our own
   customizations, palette-consistent. History/rejected attempts worth not
