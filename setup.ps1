@@ -778,6 +778,11 @@ function Invoke-NvimCommandOrFail {
         [scriptblock]$Block,
         [bool]$IsBestEffort = $BestEffort
     )
+    # PowerShell 7.4+ defaults PSNativeCommandUseErrorActionPreference to true, which turns
+    # nvim/Mason stderr (e.g. clang-format installing) or a non-zero exit into a terminating
+    # NativeCommandError before we can inspect LASTEXITCODE. We do our own exit-code check
+    # below, so disable that promotion here (function-local; reverts on return).
+    $PSNativeCommandUseErrorActionPreference = $false
     & $Block
     $rc = $LASTEXITCODE
     if ($rc -ne 0) {

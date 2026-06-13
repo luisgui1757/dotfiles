@@ -129,6 +129,10 @@ function Invoke-NvimChecked {
     }
     $log = Join-Path ([IO.Path]::GetTempPath()) "dotfiles-greenfield-nvim-$Name.log"
     $global:LASTEXITCODE = 0
+    # PowerShell 7.4+ promotes a non-zero native-command exit into a terminating
+    # NativeCommandError when PSNativeCommandUseErrorActionPreference is true; we read
+    # LASTEXITCODE ourselves below, so disable that here (function-local).
+    $PSNativeCommandUseErrorActionPreference = $false
     & nvim --headless @NvimArgs 2>&1 | Tee-Object -FilePath $log
     $rc = $LASTEXITCODE
     if ($rc -eq 0) {
