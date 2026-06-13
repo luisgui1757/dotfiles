@@ -12,7 +12,8 @@ significant change to the relevant area.
       system theme flips.
 - [ ] **Windows Terminal**: rose-pine scheme applied; tabs use the
       configured theme; acrylic OFF on the body, ON in the tab row.
-- [ ] **Tmux status bar**: rose-pine colors, prefix is `C-b`,
+- [ ] **Tmux status bar**: rose-pine colors, inactive windows readable (iris)
+      and the active window gold-bold, prefix is `C-b`,
       `prefix r` reloads the conf and shows the "reloaded" message.
 - [ ] **Starship prompt**: shows username pill, dir pill, git branch pill,
       git status icons (untracked/modified/staged), trailing time pill.

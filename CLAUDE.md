@@ -849,7 +849,7 @@ host OS or shell would otherwise hide a branch from CI.
 - **tmux colors track the canonical rose-pine/tmux theme.** Source:
   <https://github.com/rose-pine/tmux>, main variant. Role-based styles
   carry the colors. Map: status-style `fg=pine,bg=base`; window-status
-  **UNSET** (inactive cells inherit from status-style);
+  `fg=iris,bg=base` (upstream inactive color, explicit -- legible);
   window-status-current `fg=gold,bold`;
   window-status-activity `fg=base,bg=rose`; pane-border `fg=hl_high #524f67`
   / pane-active-border `fg=gold`; message `fg=muted,bg=base`;
@@ -862,10 +862,13 @@ host OS or shell would otherwise hide a branch from CI.
   in both real tmux and psmux. Active windows use gold with bold weight because
   the foreground-only canonical theme was too subtle in dark terminals; bold is
   the smallest divergence that fixes legibility without breaking the palette.
-  Inactive cells deliberately use `setw -gu window-status-style` (unset) so
-  they fall through to `status-style` (pine on base) -- one source of
-  truth, no duplicate fg/bg, and any future status-style tweak (e.g.
-  transparency) ripples through cleanly.
+  Inactive cells use the upstream rose-pine/tmux color via
+  `setw -g window-status-style "fg=#c4a7e7,bg=#191724"` (iris on base). The
+  earlier `setw -gu` fallback to `status-style` (pine on base) was only 3.4:1 --
+  illegible, worst under psmux; iris is 8.4:1. Because psmux does NOT render
+  `window-status-style` for window cells, the iris is ALSO inlined in
+  `window-status-format` inside the Windows overlay `tmux.windows.conf` (guarded
+  by `tests/tmux/windows_conf_test.sh`).
   Status-left (iris-bold session + muted
   separator) and status-right (foam date + gold time) are our own
   customizations, palette-consistent. History/rejected attempts worth not
@@ -876,8 +879,11 @@ host OS or shell would otherwise hide a branch from CI.
   (4) iris inactive + gold-bold ON `bg=overlay #26233a` active block
   (commit 9cf13f8) -- added a bold + bg-block on top of canonical, user
   preferred plain canonical so the embellishment was reverted;
-  (5) explicit inactive `fg=iris` (commit ee0d6c9) -- user wanted active
-  to be the only styled cell, inactive should fall back to status-style;
+  (5) `setw -gu window-status-style` (inactive falls back to `status-style`
+  pine on base) -- 3.4:1, illegible (worst under psmux, which does not even
+  render the inherited style); this is exactly why inactive is now set
+  explicitly to the upstream iris. A prior "inactive unstyled" preference
+  (commit ee0d6c9) lost to legibility;
   (6) relying on `window-status-current-style` alone (commits ee0d6c9 /
   d642a31) -- psmux v3.3.4 stores the option but does NOT apply it when
   rendering window cells. Only `#[fg=...]` INLINED in
