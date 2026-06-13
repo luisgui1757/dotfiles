@@ -255,6 +255,7 @@ $Catalog = @{
     pwsh                 = @{ winget = 'Microsoft.PowerShell';             choco = 'powershell-core';      scoop = 'pwsh'                 ; purpose = 'modern PowerShell 7' }
     'win32yank'          = @{ winget = '';                                 choco = 'win32yank';            scoop = 'win32yank'            ; purpose = 'clipboard bridge for WSL nvim' }
     node                 = @{ winget = 'OpenJS.NodeJS.LTS';                choco = 'nodejs-lts';           scoop = 'nodejs-lts'           ; purpose = 'prettier + JS tooling' }
+    'tree-sitter'        = @{                                               scoop = 'tree-sitter'           ; purpose = 'nvim-treesitter main: parser generate/build CLI' }
     python               = @{ winget = 'Python.Python.3.12';               choco = 'python';               scoop = 'python'               ; purpose = 'pyright + tooling' }
     zig                  = @{ winget = 'zig.zig';                          choco = 'zig';                  scoop = 'zig'                  ; purpose = 'C compiler for the LuaSnip jsregexp build' }
     jq                   = @{ winget = 'jqlang.jq';                        choco = 'jq';                   scoop = 'jq'                   ; purpose = 'general-purpose JSON CLI' }
@@ -281,6 +282,7 @@ $BinaryName = @{
     git         = 'git'
     make        = 'make'
     node        = 'node'
+    'tree-sitter' = 'tree-sitter'
     python      = 'python'
     zig         = 'zig'
     jq          = 'jq'
@@ -313,6 +315,7 @@ function Get-InstallDependencySpec {
         'pwsh',
         'python',
         'node',
+        'tree-sitter',
         'zig',
         'win32yank',
         'jq',
@@ -1251,6 +1254,120 @@ function Install-Psmux {
     $script:InstallFailures += [pscustomobject]@{ Tool='psmux'; Pm='scoop/winget/choco'; Pkg='psmux'; ExitCode=$LASTEXITCODE }
 }
 
+function Install-TreeSitterCli {
+    if (Test-Tool 'tree-sitter') {
+        Write-Host ("  ok        {0,-26} already installed" -f "tree-sitter")
+        return
+    }
+    if (-not (Ask "Install tree-sitter CLI (nvim-treesitter main parser builds)?")) {
+        Write-Host ("  skipped   {0,-26}" -f "tree-sitter")
+        return
+    }
+    if ($DryRun) {
+        Write-Host "  would:    scoop install tree-sitter"
+        Write-Host "  would:    npm install -g tree-sitter-cli   (fallback if package managers do not provide tree-sitter)"
+        return
+    }
+
+    Install-One 'tree-sitter' -SkipPrompt -NoRecordFailure
+    if (Test-Tool 'tree-sitter') { return }
+
+    if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
+        Write-Warning "npm is not on PATH; cannot use npm tree-sitter-cli fallback"
+        $script:InstallFailures += [pscustomobject]@{ Tool='tree-sitter'; Pm='scoop/npm'; Pkg='tree-sitter-cli'; ExitCode='npm-missing' }
+        return
+    }
+
+    npm install -g tree-sitter-cli
+    if ($LASTEXITCODE -eq 0 -and (Test-Tool 'tree-sitter')) {
+        Write-Host ("  installed {0,-26} via npm" -f "tree-sitter")
+        return
+    }
+
+    Write-Warning "npm install of tree-sitter-cli failed or tree-sitter is still not on PATH"
+    $script:InstallFailures += [pscustomobject]@{ Tool='tree-sitter'; Pm='scoop/npm'; Pkg='tree-sitter-cli'; ExitCode=$LASTEXITCODE }
+}
+
+function Get-VsWherePath {
+    $programFilesX86 = ${env:ProgramFiles(x86)}
+    if ([string]::IsNullOrWhiteSpace($programFilesX86)) { return '' }
+    return (Join-Path $programFilesX86 'Microsoft Visual Studio\Installer\vswhere.exe')
+}
+
+function Get-VsBuildToolsInstallationPath {
+    param([string]$VsWherePath = (Get-VsWherePath))
+
+    if ([string]::IsNullOrWhiteSpace($VsWherePath)) { return '' }
+    if (-not (Test-Path -LiteralPath $VsWherePath -PathType Leaf)) { return '' }
+
+    try {
+        $result = @(& $VsWherePath `
+                -products * `
+                -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+                -property installationPath 2>$null)
+        if ($LASTEXITCODE -ne 0) { return '' }
+        foreach ($line in $result) {
+            $path = ([string]$line).Trim()
+            if (-not [string]::IsNullOrWhiteSpace($path)) {
+                return $path
+            }
+        }
+    } catch {
+        return ''
+    }
+    return ''
+}
+
+function Install-VsBuildTools {
+    $existingPath = Get-VsBuildToolsInstallationPath
+    if (-not [string]::IsNullOrWhiteSpace($existingPath)) {
+        Write-Host ("  ok        {0,-26} VC toolset at {1}" -f "VS Build Tools", $existingPath)
+        return
+    }
+
+    $wingetId = 'Microsoft.VisualStudio.2022.BuildTools'
+    $override = '--quiet --wait --norestart --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended'
+    if ($DryRun) {
+        Write-Host "  would:    winget install --id $wingetId -e --accept-package-agreements --accept-source-agreements --override `"$override`""
+        Write-Host "  would:    choco install -y visualstudio2022buildtools; choco install -y visualstudio2022-workload-vctools"
+        return
+    }
+
+    Write-Host "  note      VS Build Tools is a multi-GB install; this can take a while."
+    try {
+        if (Get-Command winget -ErrorAction SilentlyContinue) {
+            winget install --id $wingetId -e --accept-package-agreements --accept-source-agreements --override $override
+            if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace((Get-VsBuildToolsInstallationPath))) {
+                Write-Host ("  installed {0,-26} via winget" -f "VS Build Tools")
+                return
+            }
+            Write-Warning "winget VS Build Tools install did not leave a detected VC toolset; trying choco..."
+        }
+
+        if (Get-Command choco -ErrorAction SilentlyContinue) {
+            choco install -y visualstudio2022buildtools
+            $buildToolsExit = $LASTEXITCODE
+            choco install -y visualstudio2022-workload-vctools
+            $workloadExit = $LASTEXITCODE
+            if ($buildToolsExit -eq 0 -and $workloadExit -eq 0 -and -not [string]::IsNullOrWhiteSpace((Get-VsBuildToolsInstallationPath))) {
+                Write-Host ("  installed {0,-26} via choco" -f "VS Build Tools")
+                return
+            }
+        }
+    } catch {
+        Write-Warning ("VS Build Tools install raised an exception: " + $_.Exception.Message)
+    }
+
+    Write-Host "  FAIL: VS Build Tools install failed or VC toolset was not detected" -ForegroundColor Red
+}
+
+function Install-VsBuildToolsWhenAll {
+    param([bool]$IsAll = $All)
+    if ($IsAll) {
+        Install-VsBuildTools
+    }
+}
+
 # PSFzf is a PowerShell module (PSGallery), not a package-manager binary, so it
 # installs via Install-Module rather than the $Catalog. It wires fzf into
 # PSReadLine (Ctrl+R / Ctrl+T / Alt+C); the profile activates those bindings only
@@ -1330,7 +1447,7 @@ function Invoke-InstallDepsUpdateMode {
     }
 
     Write-Host ""
-    Write-Host "note: pinned binaries (Neovim/lazygit Linux tarballs, Hack Nerd Font, Windows Terminal portable), PSFzf, plugins, and configs update via git pull and re-running setup."
+    Write-Host "note: pinned binaries (Neovim/lazygit/tree-sitter Linux archives, Hack Nerd Font, Windows Terminal portable), PSFzf, plugins, and configs update via git pull and re-running setup."
 }
 
 if ($env:INSTALL_DEPS_PS1_SOURCE_ONLY) { return }
@@ -1416,7 +1533,9 @@ Install-PSFzf
 Section "language tooling (for LSP / formatter back-ends)"
 Install-One python
 Install-One node
+Install-TreeSitterCli
 Install-One zig
+Install-VsBuildToolsWhenAll
 
 Section "WSL clipboard bridge (skip if you don't use WSL nvim)"
 Install-One win32yank

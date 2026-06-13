@@ -3,7 +3,8 @@
 Cross-platform terminal and editor setup for macOS, Linux, WSL, and Windows.
 The repo owns the daily shell/editor stack: Neovim, tmux/psmux, Starship, zsh,
 PowerShell, Ghostty, lazygit, Windows Terminal theming, plugin sync, and LSP /
-formatter provisioning.
+formatter provisioning. It also provisions the `tree-sitter` CLI needed by
+`nvim-treesitter` main parser builds.
 
 The public interface is intentionally small:
 
@@ -237,6 +238,10 @@ and whether `pwsh` is installed.
 - `install-deps` provisions chezmoi itself: Homebrew on macOS/Linuxbrew,
   pinned `get.chezmoi.io` release on native Linux without brew, and the
   Scoop-first catalog on Windows.
+- `install-deps` provisions the `tree-sitter` CLI for `nvim-treesitter` main:
+  Homebrew on macOS/Linuxbrew, a pinned SHA-256-verified GitHub release into
+  `~/.local/bin` on native Linux/WSL, and Scoop with npm fallback on Windows.
+  Windows `-All` also installs VS Build Tools so parser builds can find MSVC.
 - `install-deps` prints a dependency pre-flight table before package-manager
   bootstrap and before the one-shot install prompt, showing the package manager
   itself, present/missing tools, best-effort versions, and the resulting
@@ -399,17 +404,18 @@ update PRs are intentionally not configured.
 |---|---|---|
 | GitHub Actions | Managed, digest-pinned, labeled `github-actions` | Actions are repo-owned CI inputs with stable Renovate support. |
 | GitHub runner images | Managed, labeled `github-runners`, reviewed separately | `ubuntu-*`, `macos-*`, and `windows-*` bumps can change the supported CI platform, so they should not be mixed with ordinary Action bumps. |
-| Repo-pinned installer versions/refs | Managed, labeled `pinned-downloads`, never automerged | Neovim Linux tarballs, lazygit Linux tarballs, Hack Nerd Font, Windows Terminal portable zip, Ubuntu Ghostty, zsh plugin refs, and the CI `cargo-binstall` commit are explicit repo pins. |
+| Repo-pinned installer versions/refs | Managed, labeled `pinned-downloads`, never automerged | Neovim Linux tarballs, lazygit Linux tarballs, tree-sitter CLI Linux archives, Hack Nerd Font, Windows Terminal portable zip, Ubuntu Ghostty, zsh plugin refs, and the CI `cargo-binstall` commit are explicit repo pins. |
 | Adjacent SHA-256 / commit constants | Not managed; matched only as regex context | Renovate can bump the version/ref but cannot recompute archive/script hashes or verify tag commit IDs. CI must fail until a human recomputes and reviews them. |
 | Package-manager catalogs | Not managed | Brew, apt, dnf, pacman, zypper, apk, Scoop, winget, and choco entries are package names/IDs, not repo version pins. Let the package manager resolve current versions. |
 | Neovim plugin and Mason tools | Not managed | `lazy-lock.json` is refreshed with Lazy and tested as editor behavior; Mason intentionally has no machine-pinned lockfile. |
 
-Direct-download SHA-256 values for Neovim tarballs, lazygit tarballs, Hack Nerd
-Font, the Windows Terminal portable zip, the Ubuntu Ghostty installer, and the
-CI `cargo-binstall` installer script are intentionally human-reviewed. zsh
-plugin tag commits are also human-reviewed because the installer verifies the
-checked-out commit after cloning the bumped tag. Do not capture direct-download
-SHA constants as Renovate `currentDigest` values: that creates
+Direct-download SHA-256 values for Neovim tarballs, lazygit tarballs,
+tree-sitter CLI archives, Hack Nerd Font, the Windows Terminal portable zip,
+the Ubuntu Ghostty installer, and the CI `cargo-binstall` installer script are
+intentionally human-reviewed. zsh plugin tag commits are also human-reviewed
+because the installer verifies the checked-out commit after cloning the bumped
+tag. Do not capture direct-download SHA constants as Renovate `currentDigest`
+values: that creates
 noisy/unresolvable digest updates instead of a trustworthy checksum review. A
 Renovate PR may bump the version/ref while leaving the adjacent SHA or commit
 stale; CI then fails verification until a human reviews the adjacent constant.
@@ -580,6 +586,7 @@ MIT. See `LICENSE`.
 | `<leader>X` keymaps fire `\X` instead of `<Space>X` | mapleader set after lazy.setup somehow | restore the order in `nvim/init.lua` — leader **before** `require("lazy").setup` |
 | Formatter runs twice or shows two BufWritePre autocmds | someone added a second handler outside conform.nvim | `:lua print(#vim.api.nvim_get_autocmds({event="BufWritePre"}))` should be 1; if not, find the second autocmd and delete it |
 | Lazy/Mason says `No C compiler found` | WSL/Linux has `make` but no `cc`/`gcc`/`clang`; some plugin builds compile native code | re-run `./setup.sh --skip-config` to install the Linux compiler toolchain, or on Ubuntu run `sudo apt-get update && sudo apt-get install -y build-essential`, then `./setup.sh --skip-deps --skip-config` |
+| nvim treesitter parsers fail to compile on Windows / `cl.exe` not found | `nvim-treesitter` main builds parsers with the Rust `cc` crate, which needs MSVC env vars | run `.\setup.ps1 -All` to install VS Build Tools and let setup import the VS DevShell before `Lazy! sync`; for ad-hoc `:TSUpdate`, open a "Developer PowerShell for VS" or rerun setup |
 | Clipboard not crossing host on WSL | `win32yank.exe` not on PATH | install win32yank via scoop on Windows side, ensure WSL PATH picks it up |
 | Starship prompt missing in the PowerShell window you ran setup in (but it works in psmux / a new window) | that shell loaded `$PROFILE` **before** setup put starship on PATH; the profile skips starship when `Get-Command starship` finds nothing | open a **new** PowerShell window, or run `. $PROFILE` in the current one — newly-installed tools are not on an already-open shell's PATH |
 | Starship init warns that `starship.ps1` is being used by another process | old checkout wrote the PowerShell init cache directly while several WT tabs or psmux panes started together | update this repo and reopen PowerShell; the profile now writes a temp file, moves it into place, and retries a short read lock |

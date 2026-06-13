@@ -183,7 +183,9 @@ launch URL, or put project-specific `dap.configurations` in a workspace
 
 `nvim-treesitter` tracks the upstream `main` rewrite and therefore requires
 Neovim 0.12+. The legacy `require("nvim-treesitter.configs").setup` API is not
-available here.
+available here. Parser installation runs `tree-sitter generate` and
+`tree-sitter build`, so fresh machines need the standalone `tree-sitter` CLI
+plus a real C compiler before `:TSUpdate` can succeed.
 
 1. Add the parser name to `treesitter_parsers` in
    `nvim/lua/plugins/treesitter.lua`.
@@ -191,6 +193,8 @@ available here.
    `parser_filetype_aliases` so the `FileType` autocmd can call
    `vim.treesitter.start()` for real buffers.
 3. Add it to `required` in `tests/nvim/spec/treesitter_spec.lua`.
+4. If the parser has unusual generated sources, verify it through
+   `:TSUpdate <parser>` on a machine with `tree-sitter` and a compiler on PATH.
 
 ### Rebind a Rose Pine color anywhere
 
@@ -512,8 +516,8 @@ save only**. The next plain `:w` formats normally. Implemented in
   `scoop update <pkg>` after one manifest refresh). It must not run blanket
   upgrades such as `brew upgrade`, `apt upgrade`, or `scoop update *`, and it
   must not touch pinned direct downloads, PSFzf, `lazy-lock.json`, or configs.
-  On native Linux, `nvim` and `lazygit` are pinned direct-download binaries and
-  stay out of the update path.
+  On native Linux, `nvim`, `lazygit`, and `tree-sitter` are pinned
+  direct-download binaries and stay out of the update path.
 - **A C compiler is installed so LuaSnip can build `jsregexp`.** Without one,
   the nvim Lazy build prints "No C compiler found" and `jsregexp` is skipped
   (LuaSnip still works, minus JS-regex snippet transforms). POSIX installs the
@@ -521,6 +525,25 @@ save only**. The next plain `:w` formats normally. Implemented in
   `cc`/`gcc`/`clang`/`zig`/`cl` is already present. On Windows a clean machine
   has none, so `install-deps.ps1` carries **`zig`** in `$Catalog` (LuaSnip
   detects `zig cc`); it is skipped if already installed like any other tool.
+- **nvim-treesitter main needs both `tree-sitter` and MSVC on Windows.**
+  The main-branch installer shells out to the standalone `tree-sitter` CLI and
+  then builds parsers through the Rust `cc` crate. `install-deps.sh` provisions
+  the CLI per OS: macOS/Linuxbrew use Homebrew, and native Linux/WSL installs a
+  pinned `tree-sitter/tree-sitter` release asset into `~/.local/bin` with
+  SHA-256 verification. `install-deps.ps1` installs the CLI through the Scoop
+  `tree-sitter` manifest first and falls back to `npm install -g
+  tree-sitter-cli` after Node is present. Windows compiler support is separate:
+  `install-deps.ps1 -All` auto-installs Visual Studio 2022 Build Tools with the
+  `Microsoft.VisualStudio.Workload.VCTools` workload through winget or choco.
+  Scoop does not carry VS Build Tools, so this is the deliberate exception to
+  the Scoop-first catalog rule. `setup.ps1` imports the VS DevShell into the
+  current process before headless `Lazy! sync`, so `tree-sitter build` inherits
+  `cl.exe`, `INCLUDE`, and `LIB`. Do not put the DevShell import in the
+  PowerShell profile. Zig stays installed for LuaSnip `jsregexp`, but do not
+  wire zig into nvim-treesitter main: the old `master` branch could use it,
+  while main emits MSVC-style `cc` crate flags that require MSVC. Ad-hoc
+  `:TSUpdate` parser rebuilds on Windows should run from a "Developer
+  PowerShell for VS" shell or after rerunning setup.
 - **`uninstall.sh` / `uninstall.ps1` are greenfield teardown tools, not purge.**
   They enumerate targets with `chezmoi --source <repo>/home managed --path-style
   absolute`, remove only repo-owned symlinks or byte-identical Windows
@@ -603,14 +626,15 @@ save only**. The next plain `:w` formats normally. Implemented in
   `[char]0xE9` so that file stays pure ASCII (invariant), while the sh side uses
   the literal é.
 - **Direct GitHub downloads are pinned and SHA-256 verified.** `install-deps.sh`
-  verifies the pinned Neovim Linux tarballs, lazygit Linux tarballs, and Hack
-  Nerd Font zip before extraction; `install-deps.ps1` verifies the pinned
-  Hack.zip before registering fonts and the pinned Windows Terminal portable
-  zip before extracting the fallback install. A Hack.zip checksum mismatch
-  records a `FAIL:` install marker and does not extract. A successful Windows
-  font install broadcasts `WM_FONTCHANGE` best-effort so Windows Terminal can
-  re-enumerate fonts without making setup depend on that notification. The CI
-  workflows also pin and verify their direct GitHub downloads.
+  verifies the pinned Neovim Linux tarballs, lazygit Linux tarballs,
+  tree-sitter CLI Linux archives, and Hack Nerd Font zip before extraction;
+  `install-deps.ps1` verifies the pinned Hack.zip before registering fonts and
+  the pinned Windows Terminal portable zip before extracting the fallback
+  install. A Hack.zip checksum mismatch records a `FAIL:` install marker and
+  does not extract. A successful Windows font install broadcasts
+  `WM_FONTCHANGE` best-effort so Windows Terminal can re-enumerate fonts without
+  making setup depend on that notification. The CI workflows also pin and
+  verify their direct GitHub downloads.
   This extends to the **Ubuntu Ghostty installer**: `install_ghostty_linux`
   pins `mkasberg/ghostty-ubuntu`'s `install.sh` to `GHOSTTY_UBUNTU_VERSION` and
   SHA-256 verifies the script (`GHOSTTY_UBUNTU_INSTALL_SHA256`) before running
@@ -623,15 +647,19 @@ save only**. The next plain `:w` formats normally. Implemented in
   Update the version and checksum constants together. zsh plugin refs are also
   pinned by tag plus expected commit; update both after reviewing a Renovate tag
   bump. Guarded by `tests/shell/ghostty_install_fail_test.sh`,
-  `tests/shell/wsl_gui_tools_test.sh`, `tests/shell/lazygit_install_test.sh`, and
-  `tests/shell/zsh_plugins_test.sh`.
+  `tests/shell/wsl_gui_tools_test.sh`, `tests/shell/lazygit_install_test.sh`,
+  `tests/shell/treesitter_cli_test.sh`, and `tests/shell/zsh_plugins_test.sh`.
   Renovate can open version/ref bumps for these constants and for the CI
   cargo-binstall installer commit, but it cannot recompute adjacent SHA-256
   values or verify tag commit IDs; leave CI red until a human has reviewed the
-  download/ref and updated the adjacent constant. In `renovate.json`,
-  direct-download SHA-256 values must be matched as context only, not named
-  `currentDigest`, otherwise Renovate will schedule same-version digest updates
-  for checksums it cannot actually resolve.
+  download/ref and updated the adjacent constant. The
+  `TREE_SITTER_CLI_LINUX_VERSION` custom managers follow the lazygit shape:
+  Renovate may bump the version constant, while
+  `TREE_SITTER_CLI_LINUX_X86_64_SHA256` and
+  `TREE_SITTER_CLI_LINUX_ARM64_SHA256` remain adjacent context only. In
+  `renovate.json`, direct-download SHA-256 values must be matched as context
+  only, not named `currentDigest`, otherwise Renovate will schedule same-version
+  digest updates for checksums it cannot actually resolve.
 - **Both installers open with an "install EVERYTHING?" prompt.** Interactive
   runs that didn't pass `--all`/`-All` get one upfront question; answering yes
   flips `YES_ALL`/`$All` so the rest runs with no per-item prompts. Skipped when
@@ -844,6 +872,10 @@ host OS or shell would otherwise hide a branch from CI.
   the caller's locale untouched when neither exists.
 - **`nvim/lazy-lock.json` is tracked** (NOT in `.gitignore`). This is how
   every machine ends up on the same plugin commits.
+- **VS Build Tools for nvim-treesitter main is intentional.** It is large, but
+  it is the compiler path the Rust `cc` crate expects on Windows. The existing
+  zig install remains for LuaSnip `jsregexp`; it is not a substitute for
+  nvim-treesitter main parser builds.
 - **`ghostty/config` sets `window-save-state = default`** (NOT `always`)
   alongside `maximize = true`. It's not an oversight: on macOS
   `window-save-state = always` restores the last window geometry *after*

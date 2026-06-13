@@ -26,6 +26,9 @@ CHEZMOI_VERSION="v2.70.5"
 LAZYGIT_LINUX_VERSION="v0.62.2"
 LAZYGIT_LINUX_X86_64_SHA256="8b9a4c2d0969cbea92b45c956dd2a44e1ba76900c9df49f1c60984045ce77984"
 LAZYGIT_LINUX_ARM64_SHA256="9ab63dd75a7e9711c4c68a37d77f4334b8099a5d6a3f8fbe8f4e2768b159c9e9"
+TREE_SITTER_CLI_LINUX_VERSION="v0.26.9"
+TREE_SITTER_CLI_LINUX_X86_64_SHA256="0ea5daaef79145fe73786f0e3cdc43b62b22ddb36f7f6676c9f8bb72434d78e9"
+TREE_SITTER_CLI_LINUX_ARM64_SHA256="8b6c0f53593ce17c7eb90eb08de5ffb9f513f3db585b1fbef12219cacf7e8a68"
 ZSH_AUTOCOMPLETE_VERSION="25.03.19"
 ZSH_AUTOCOMPLETE_COMMIT="a76f26ae25528e76ee53df98ad38fbacdf89fd2e"
 ZSH_AUTOSUGGESTIONS_VERSION="v0.7.1"
@@ -1042,6 +1045,108 @@ install_lazygit() {
     fi
 }
 
+install_tree_sitter_cli_linux() {
+    if have tree-sitter; then
+        printf "  ok        %-26s already installed\n" "tree-sitter"
+        return
+    fi
+
+    local machine arch expected asset url tmp archive extract_dir source_bin install_target
+    machine="$(uname -m)"
+    case "$machine" in
+        x86_64|amd64)
+            arch="x64"
+            expected="$TREE_SITTER_CLI_LINUX_X86_64_SHA256"
+            ;;
+        aarch64|arm64)
+            arch="arm64"
+            expected="$TREE_SITTER_CLI_LINUX_ARM64_SHA256"
+            ;;
+        *)
+            printf "  manual    %-26s unsupported Linux arch: %s\n" "tree-sitter" "$machine"
+            echo "            install from https://github.com/tree-sitter/tree-sitter/releases"
+            return
+            ;;
+    esac
+
+    asset="tree-sitter-cli-linux-${arch}.zip"
+    url="https://github.com/tree-sitter/tree-sitter/releases/download/${TREE_SITTER_CLI_LINUX_VERSION}/${asset}"
+
+    if ! ask "Install tree-sitter CLI (pinned GitHub release ${TREE_SITTER_CLI_LINUX_VERSION}, Linux ${arch})?"; then
+        printf "  skipped   %-26s\n" "tree-sitter"
+        return
+    fi
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        echo "  would: curl -fsSL $url -o /tmp/$asset"
+        echo "         verify sha256 $expected"
+        echo "         unzip tree-sitter -> \$HOME/.local/bin/tree-sitter"
+        return
+    fi
+    require_downloader || return 1
+    if ! have unzip; then
+        echo "  need      unzip missing; installing extractor for tree-sitter"
+        install unzip "extract tree-sitter CLI release archive"
+        if ! have unzip; then
+            echo "  FAIL: need unzip to extract $asset"
+            return 1
+        fi
+    fi
+
+    tmp="$(mktemp -d)"
+    archive="$tmp/$asset"
+    extract_dir="$tmp/extract"
+    mkdir -p "$extract_dir"
+    if ! curl -fsSL "$url" -o "$archive"; then
+        echo "  FAIL: tree-sitter download failed from $url"
+        rm -rf "$tmp"
+        return 1
+    fi
+    if ! verify_sha256 "$archive" "$expected"; then
+        echo "  FAIL: checksum mismatch for $asset"
+        rm -rf "$tmp"
+        return 1
+    fi
+    if ! unzip -oq "$archive" -d "$extract_dir"; then
+        echo "  FAIL: could not extract tree-sitter from $asset"
+        rm -rf "$tmp"
+        return 1
+    fi
+
+    source_bin="$extract_dir/tree-sitter"
+    if [[ ! -f "$source_bin" ]]; then
+        source_bin="$(find "$extract_dir" -type f -name tree-sitter -print -quit)"
+    fi
+    if [[ -z "$source_bin" || ! -f "$source_bin" ]]; then
+        echo "  FAIL: tree-sitter binary missing from $asset"
+        rm -rf "$tmp"
+        return 1
+    fi
+
+    install_target="$HOME/.local/bin/tree-sitter"
+    mkdir -p "$HOME/.local/bin"
+    cp "$source_bin" "$install_target"
+    chmod 0755 "$install_target"
+    rm -rf "$tmp"
+    if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
+        PATH="$HOME/.local/bin:$PATH"
+        export PATH
+        hash -r 2>/dev/null || true
+    fi
+    printf "  installed %-26s -> %s\n" "tree-sitter" "$install_target"
+}
+
+install_tree_sitter_cli() {
+    if have tree-sitter; then
+        printf "  ok        %-26s already installed\n" "tree-sitter"
+        return
+    fi
+    if [[ "$(uname -s)" == "Linux" && "$PM" != "brew" ]]; then
+        install_tree_sitter_cli_linux
+    else
+        install tree-sitter "nvim-treesitter main parser CLI"
+    fi
+}
+
 install_chezmoi() {
     if have chezmoi; then
         printf "  ok        %-26s already installed\n" "chezmoi"
@@ -1221,6 +1326,7 @@ tmux|tmux|tmux|tmux|tmux|tmux|tmux
 zsh|zsh|zsh|zsh|zsh|zsh|zsh
 python3|python@3.12|python3|python3|python|python311|python3
 node|node|nodejs|nodejs|nodejs|nodejs|nodejs
+tree-sitter|tree-sitter|||||
 shellcheck|shellcheck|shellcheck|ShellCheck|shellcheck|ShellCheck|shellcheck
 jq|jq|jq|jq|jq|jq|jq
 bats|bats-core|bats|bats|bats|bats|bats
@@ -1364,7 +1470,7 @@ is_pinned_direct_update_tool() {
     local tool="$1"
     [[ "$(uname -s)" == "Linux" ]] || return 1
     case "$tool" in
-        nvim|lazygit) return 0 ;;
+        nvim|lazygit|tree-sitter) return 0 ;;
         *) return 1 ;;
     esac
 }
@@ -1428,7 +1534,7 @@ run_update_mode() {
 
     update_catalog_tools
     echo
-    echo "note: pinned binaries (Neovim/lazygit Linux tarballs, Hack Nerd Font, Windows Terminal portable), PSFzf, plugins, and configs update via git pull and re-running setup."
+    echo "note: pinned binaries (Neovim/lazygit/tree-sitter Linux archives, Hack Nerd Font, Windows Terminal portable), PSFzf, plugins, and configs update via git pull and re-running setup."
 }
 
 unique_backup_path() {
@@ -1877,6 +1983,7 @@ install_dependency_scan_items() {
         "code|command|code" \
         "python3|command|python3" \
         "node|command|node" \
+        "tree-sitter|command|tree-sitter" \
         "shellcheck|command|shellcheck" \
         "jq|command|jq" \
         "bats|command|bats" \
@@ -2138,6 +2245,7 @@ fi
 section "language tooling (for LSP / formatter back-ends)"
 install python3 "needed by pyright"
 install node "needed by prettier and JS tooling"
+install_tree_sitter_cli
 
 if is_wsl; then
     section "WSL clipboard bridge"

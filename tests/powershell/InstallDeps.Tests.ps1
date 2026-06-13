@@ -436,6 +436,87 @@ Describe "install-deps.ps1" {
         $Catalog['chezmoi'].choco | Should -Be 'chezmoi'
     }
 
+    It "registers tree-sitter in the Windows package catalog" {
+        . $script:ImportInstallDepsForTest
+
+        $Catalog.ContainsKey('tree-sitter') | Should -BeTrue
+        $BinaryName['tree-sitter'] | Should -Be 'tree-sitter'
+        $Catalog['tree-sitter'].scoop | Should -Be 'tree-sitter'
+        $Catalog['tree-sitter'].purpose | Should -Match 'nvim-treesitter main'
+    }
+
+    It "dry-runs VS Build Tools without invoking package managers" {
+        . $script:ImportInstallDepsForTest -DryRun
+        Mock -CommandName Get-VsBuildToolsInstallationPath -MockWith { return '' }
+        Mock -CommandName winget -MockWith { throw "winget must not run under -DryRun" }
+        Mock -CommandName choco -MockWith { throw "choco must not run under -DryRun" }
+
+        $output = & { Install-VsBuildTools } 6>&1 | Out-String
+
+        $output | Should -Match 'Microsoft\.VisualStudio\.2022\.BuildTools'
+        $output | Should -Match 'Microsoft\.VisualStudio\.Workload\.VCTools'
+        Should -Invoke -CommandName winget -Times 0 -Exactly
+        Should -Invoke -CommandName choco -Times 0 -Exactly
+    }
+
+    It "skips VS Build Tools when a VC toolset is already present" {
+        . $script:ImportInstallDepsForTest
+        Mock -CommandName Get-VsBuildToolsInstallationPath -MockWith { return 'C:\VS' }
+        Mock -CommandName winget -MockWith { throw "winget must not run when VC tools are present" }
+        Mock -CommandName choco -MockWith { throw "choco must not run when VC tools are present" }
+
+        $output = & { Install-VsBuildTools } 6>&1 | Out-String
+
+        $output | Should -Match 'VC toolset at C:\\VS'
+        Should -Invoke -CommandName winget -Times 0 -Exactly
+        Should -Invoke -CommandName choco -Times 0 -Exactly
+    }
+
+    It "runs VS Build Tools only under All gating" {
+        . $script:ImportInstallDepsForTest
+        $script:VsBuildToolsCalls = 0
+        Mock -CommandName Install-VsBuildTools -MockWith { $script:VsBuildToolsCalls += 1 }
+
+        Install-VsBuildToolsWhenAll -IsAll:$false
+        Install-VsBuildToolsWhenAll -IsAll:$true
+
+        $script:VsBuildToolsCalls | Should -Be 1
+    }
+
+    It "uses the VS Build Tools VCTools workload override" {
+        . $script:ImportInstallDepsForTest
+        $script:VsBuildToolsPath = ''
+        $script:WingetArgs = @()
+        Mock -CommandName Get-VsBuildToolsInstallationPath -MockWith { return $script:VsBuildToolsPath }
+        Mock -CommandName winget -MockWith {
+            $script:WingetArgs = @($args)
+            $script:VsBuildToolsPath = 'C:\VS'
+            $global:LASTEXITCODE = 0
+        }
+        Mock -CommandName choco -MockWith { throw "choco must not run after winget succeeds" }
+
+        Install-VsBuildTools
+
+        $joined = $script:WingetArgs -join ' '
+        $joined | Should -Match 'install --id Microsoft\.VisualStudio\.2022\.BuildTools -e'
+        $joined | Should -Match '--override'
+        $joined | Should -Match 'Microsoft\.VisualStudio\.Workload\.VCTools'
+        $joined | Should -Match '--includeRecommended'
+        Should -Invoke -CommandName choco -Times 0 -Exactly
+    }
+
+    It "keeps VS Build Tools install failure best effort with a FAIL marker" {
+        . $script:ImportInstallDepsForTest
+        Mock -CommandName Get-VsBuildToolsInstallationPath -MockWith { return '' }
+        Mock -CommandName winget -MockWith { $global:LASTEXITCODE = 55 }
+        Mock -CommandName choco -MockWith { $global:LASTEXITCODE = 56 }
+
+        $output = & { Install-VsBuildTools } 6>&1 | Out-String
+
+        $output | Should -Match 'FAIL: VS Build Tools install failed'
+        $script:InstallFailures.Count | Should -Be 0
+    }
+
     It "registers Windows Terminal in the Windows package catalog" {
         . $script:ImportInstallDepsForTest
 

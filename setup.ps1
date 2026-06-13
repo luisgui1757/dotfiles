@@ -56,6 +56,73 @@ function Update-RuntimePath {
     $env:PATH = ($parts | Where-Object { $_ -and $seen.Add($_) }) -join ';'
 }
 
+function Get-VsWherePath {
+    $programFilesX86 = ${env:ProgramFiles(x86)}
+    if ([string]::IsNullOrWhiteSpace($programFilesX86)) { return '' }
+    return (Join-Path $programFilesX86 'Microsoft Visual Studio\Installer\vswhere.exe')
+}
+
+function Get-VsBuildToolsInstallationPath {
+    param([string]$VsWherePath = (Get-VsWherePath))
+
+    if ([string]::IsNullOrWhiteSpace($VsWherePath)) { return '' }
+    if (-not (Test-Path -LiteralPath $VsWherePath -PathType Leaf)) { return '' }
+
+    try {
+        $result = @(& $VsWherePath `
+                -products * `
+                -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+                -property installationPath 2>$null)
+        if ($LASTEXITCODE -ne 0) { return '' }
+        foreach ($line in $result) {
+            $path = ([string]$line).Trim()
+            if (-not [string]::IsNullOrWhiteSpace($path)) {
+                return $path
+            }
+        }
+    } catch {
+        return ''
+    }
+    return ''
+}
+
+function Enter-VsDeveloperEnvironment {
+    param(
+        [bool]$IsWindows = ($env:OS -eq 'Windows_NT'),
+        [scriptblock]$InstallationPathResolver = { Get-VsBuildToolsInstallationPath },
+        [scriptblock]$ModulePathTester = { param([string]$Path) Test-Path -LiteralPath $Path -PathType Leaf },
+        [scriptblock]$ModuleImporter = { param([string]$Path) Import-Module $Path -ErrorAction Stop },
+        [scriptblock]$DevShellInvoker = {
+            param([string]$InstallPath)
+            Enter-VsDevShell -VsInstallPath $InstallPath -SkipAutomaticLocation -DevCmdArguments '-arch=x64 -host_arch=x64 -no_logo'
+        }
+    )
+
+    if (-not $IsWindows) { return $false }
+
+    $vsPath = [string](& $InstallationPathResolver)
+    if ([string]::IsNullOrWhiteSpace($vsPath)) {
+        Write-Host "  info      VS Build Tools not detected; nvim parser rebuilds may need Developer PowerShell for VS"
+        return $false
+    }
+
+    $devShell = Join-Path $vsPath 'Common7\Tools\Microsoft.VisualStudio.DevShell.dll'
+    if (-not (& $ModulePathTester $devShell)) {
+        Write-Host "  FAIL: VS DevShell module missing at $devShell" -ForegroundColor Red
+        return $false
+    }
+
+    try {
+        & $ModuleImporter $devShell
+        & $DevShellInvoker $vsPath
+        Write-Host ("  ok        {0,-26} imported for nvim parser builds" -f "VS DevShell")
+        return $true
+    } catch {
+        Write-Host ("  FAIL: VS DevShell import failed: " + $_.Exception.Message) -ForegroundColor Red
+        return $false
+    }
+}
+
 $inputRedirected = $false
 $outputRedirected = $false
 try { $inputRedirected = [Console]::IsInputRedirected } catch { $inputRedirected = $true }
@@ -796,6 +863,40 @@ function Invoke-NvimCommandOrFail {
     }
 }
 
+function Invoke-NvimSyncPhases {
+    param(
+        [bool]$SkipNvimPhase = $SkipNvim,
+        [bool]$IsDryRun = $DryRun,
+        [scriptblock]$CommandTester = { param([string]$Name) [bool](Get-Command $Name -ErrorAction SilentlyContinue) },
+        [scriptblock]$DevEnvironmentEntrypoint = { Enter-VsDeveloperEnvironment },
+        [scriptblock]$LazyRunner = { & nvim --headless "+Lazy! sync" "+qa" },
+        [scriptblock]$MasonRunner = { & nvim --headless "+MasonToolsInstallSync" "+qa" }
+    )
+
+    if (-not $SkipNvimPhase -and -not $IsDryRun) {
+        if (& $CommandTester 'nvim') {
+            & $DevEnvironmentEntrypoint | Out-Null
+            Phase "Phase 3/4: sync Neovim plugins (lazy.nvim)"
+            Invoke-NvimCommandOrFail "Lazy sync" $LazyRunner
+
+            Phase "Phase 4/4: install LSP servers + formatters (Mason)"
+            Write-Host "  this can take 3-8 minutes on a fresh Windows machine."
+            Invoke-NvimCommandOrFail "Mason install" $MasonRunner
+        } else {
+            Write-Host ""
+            Write-Host "skipped: Phase 3-4 (nvim plugins) -- nvim not on PATH yet."
+            Write-Host "         Open a new shell so PATH refreshes, then run:"
+            Write-Host "             .\setup.ps1 -SkipDeps -SkipConfig"
+        }
+    } elseif ($IsDryRun) {
+        Write-Host ""
+        Write-Host "skipped: Phase 3-4 (nvim plugins) in -DryRun mode"
+    } else {
+        Write-Host ""
+        Write-Host "skipped: Phase 3-4 (nvim plugins) via -SkipNvim"
+    }
+}
+
 function Invoke-SetupUpdateMode {
     param(
         [string]$Root = $ScriptDir,
@@ -910,27 +1011,7 @@ if (-not ($SkipBootstrap -or $SkipConfig)) {
 # Lazy + Mason failures are FATAL by default. Pass -BestEffort to downgrade
 # them to warnings (useful for offline / proxy-restricted environments where
 # you accept a partial install and will run :Lazy / :Mason interactively).
-if (-not $SkipNvim -and -not $DryRun) {
-    if (Get-Command nvim -ErrorAction SilentlyContinue) {
-        Phase "Phase 3/4: sync Neovim plugins (lazy.nvim)"
-        Invoke-NvimCommandOrFail "Lazy sync" { & nvim --headless "+Lazy! sync" "+qa" }
-
-        Phase "Phase 4/4: install LSP servers + formatters (Mason)"
-        Write-Host "  this can take 3-8 minutes on a fresh Windows machine."
-        Invoke-NvimCommandOrFail "Mason install" { & nvim --headless "+MasonToolsInstallSync" "+qa" }
-    } else {
-        Write-Host ""
-        Write-Host "skipped: Phase 3-4 (nvim plugins) -- nvim not on PATH yet."
-        Write-Host "         Open a new shell so PATH refreshes, then run:"
-        Write-Host "             .\setup.ps1 -SkipDeps -SkipConfig"
-    }
-} elseif ($DryRun) {
-    Write-Host ""
-    Write-Host "skipped: Phase 3-4 (nvim plugins) in -DryRun mode"
-} else {
-    Write-Host ""
-    Write-Host "skipped: Phase 3-4 (nvim plugins) via -SkipNvim"
-}
+Invoke-NvimSyncPhases
 
 # ---- Summary -----------------------------------------------------------------
 Write-Host ""

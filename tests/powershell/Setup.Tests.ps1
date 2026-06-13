@@ -219,6 +219,79 @@ Describe "setup.ps1 update mode" {
     }
 }
 
+Describe "setup.ps1 VS developer environment" {
+    BeforeEach {
+        . $script:ImportSetupForTest
+    }
+
+    It "imports the VS DevShell when a VC toolset is present" {
+        $script:CheckedDevShellPath = ''
+        $script:ImportedDevShellPath = ''
+        $script:EnteredVsPath = ''
+
+        $result = Enter-VsDeveloperEnvironment `
+            -IsWindows:$true `
+            -InstallationPathResolver { return 'C:\VS' } `
+            -ModulePathTester {
+                param([string]$Path)
+                $script:CheckedDevShellPath = $Path
+                return $true
+            } `
+            -ModuleImporter {
+                param([string]$Path)
+                $script:ImportedDevShellPath = $Path
+            } `
+            -DevShellInvoker {
+                param([string]$InstallPath)
+                $script:EnteredVsPath = $InstallPath
+            }
+
+        $result | Should -BeTrue
+        $script:CheckedDevShellPath | Should -Match 'Microsoft\.VisualStudio\.DevShell\.dll$'
+        $script:ImportedDevShellPath | Should -Be $script:CheckedDevShellPath
+        $script:EnteredVsPath | Should -Be 'C:\VS'
+    }
+
+    It "attempts the VS environment before Lazy sync" {
+        $script:NvimSyncEvents = @()
+        $commandTester = {
+            param([string]$Name)
+            return ($Name -eq 'nvim')
+        }
+        $devEnvironment = {
+            $script:NvimSyncEvents += 'dev-env'
+            return $true
+        }
+        $lazyRunner = {
+            $script:NvimSyncEvents += 'lazy'
+            $global:LASTEXITCODE = 0
+        }
+        $masonRunner = {
+            $script:NvimSyncEvents += 'mason'
+            $global:LASTEXITCODE = 0
+        }
+
+        Invoke-NvimSyncPhases `
+            -CommandTester $commandTester `
+            -DevEnvironmentEntrypoint $devEnvironment `
+            -LazyRunner $lazyRunner `
+            -MasonRunner $masonRunner
+
+        ($script:NvimSyncEvents -join ',') | Should -Be 'dev-env,lazy,mason'
+    }
+
+    It "emits a FAIL marker when a present VC toolset cannot import DevShell" {
+        $output = & {
+            Enter-VsDeveloperEnvironment `
+                -IsWindows:$true `
+                -InstallationPathResolver { return 'C:\VS' } `
+                -ModulePathTester { return $false }
+        } 6>&1 | Out-String
+
+        $output | Should -Match 'FAIL: VS DevShell module missing'
+    }
+}
+
 Describe "setup.ps1 Windows Terminal backup" {
     BeforeEach {
         $script:OldLocalAppData = $env:LOCALAPPDATA

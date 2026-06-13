@@ -52,6 +52,10 @@ significant change to the relevant area.
       new pwsh tab shows the rose-pine starship prompt; new WT tab has
       the rose-pine scheme and opens PowerShell 7 when WT already has
       `settings.json`; `nvim` works.
+- [ ] **Windows treesitter compile**: after `.\setup.ps1 -All`, open nvim and
+      run `:checkhealth nvim-treesitter`; it reports the tree-sitter CLI and
+      compiler OK. Open a Python file and confirm `python` parser highlighting
+      works.
 - [ ] **Fresh WSL Ubuntu**: on Windows first run
       `.\setup.ps1 -All`, then inside WSL run
       `./setup.sh --all` and `./tests/wsl/e2e.sh`. Confirm the script passes:

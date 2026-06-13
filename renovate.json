@@ -132,6 +132,28 @@
     },
     {
       "customType": "regex",
+      "description": "tree-sitter CLI Linux x86_64 release version. Adjacent Linux asset SHA-256 values must be recomputed manually after Renovate bumps this.",
+      "managerFilePatterns": ["/^install-deps\\.sh$/"],
+      "matchStrings": [
+        "TREE_SITTER_CLI_LINUX_VERSION=\"(?<currentValue>v[^\"]+)\"\\s+TREE_SITTER_CLI_LINUX_X86_64_SHA256=\"[a-f0-9]{64}\""
+      ],
+      "depNameTemplate": "tree-sitter/tree-sitter",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "description": "tree-sitter CLI Linux arm64 release version. Adjacent Linux asset SHA-256 values must be recomputed manually after Renovate bumps this.",
+      "managerFilePatterns": ["/^install-deps\\.sh$/"],
+      "matchStrings": [
+        "TREE_SITTER_CLI_LINUX_VERSION=\"(?<currentValue>v[^\"]+)\"(?:.|\\n)*?TREE_SITTER_CLI_LINUX_ARM64_SHA256=\"[a-f0-9]{64}\""
+      ],
+      "depNameTemplate": "tree-sitter/tree-sitter",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
       "description": "zsh-autocomplete pinned tag. The adjacent commit SHA must be reviewed manually after Renovate bumps this.",
       "managerFilePatterns": ["/^install-deps\\.sh$/"],
       "matchStrings": [

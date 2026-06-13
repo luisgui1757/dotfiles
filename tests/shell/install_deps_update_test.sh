@@ -14,7 +14,7 @@ TMP_ROOT="$(mktemp -d)"
 trap 'rm -rf "$TMP_ROOT"' EXIT
 mkdir -p "$TMP_ROOT/fakebin"
 
-for tool in rg nvim lazygit; do
+for tool in rg nvim lazygit tree-sitter; do
     cat > "$TMP_ROOT/fakebin/$tool" <<'EOF'
 #!/usr/bin/env bash
 exit 0
@@ -25,7 +25,7 @@ done
 PATH="$TMP_ROOT/fakebin:/usr/bin:/bin"
 PM=apt
 DRY_RUN=0
-INSTALL_DEPS_UPDATE_TOOLS=$'rg\nfd\nnvim\nlazygit'
+INSTALL_DEPS_UPDATE_TOOLS=$'rg\nfd\nnvim\nlazygit\ntree-sitter'
 COMMAND_LOG="$TMP_ROOT/commands.log"
 
 uname() {
@@ -53,7 +53,9 @@ printf '%s\n' "$output" | grep -Eq '^  skipped[[:space:]]+nvim[[:space:]]+pinned
     || fail "pinned Linux nvim was not skipped"
 printf '%s\n' "$output" | grep -Eq '^  skipped[[:space:]]+lazygit[[:space:]]+pinned Linux direct download' \
     || fail "pinned Linux lazygit was not skipped"
-if grep -Eq 'apt-get install -y (fd-find|neovim|lazygit)' "$COMMAND_LOG"; then
+printf '%s\n' "$output" | grep -Eq '^  skipped[[:space:]]+tree-sitter[[:space:]]+pinned Linux direct download' \
+    || fail "pinned Linux tree-sitter was not skipped"
+if grep -Eq 'apt-get install -y (fd-find|neovim|lazygit|tree-sitter)' "$COMMAND_LOG"; then
     fail "update mode attempted an install or pinned binary package"
 fi
 
