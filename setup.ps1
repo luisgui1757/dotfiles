@@ -941,4 +941,9 @@ Write-Host ""
 Write-Host "Repo:    $ScriptDir"
 Write-Host "Try it:  nvim  (then <Space>fg for live grep, :wnf to save w/o format)"
 Write-Host ""
+Write-Host "Note:    open a NEW PowerShell window so starship + newly-installed"
+Write-Host '         tools pick up PATH (or run  . $PROFILE  in this one) -- this'
+Write-Host "         shell started before they were installed, so its prompt is"
+Write-Host "         not themed yet."
+Write-Host ""
 if ($DryRun) { Write-Host "(dry run -- nothing was actually installed or changed)" }
