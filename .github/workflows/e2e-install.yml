@@ -155,8 +155,8 @@ jobs:
           command -v lazygit >/dev/null 2>&1 || fail "lazygit is not on PATH"
           nvim_line="$(nvim --version | head -n 1)"
           case "$nvim_line" in
-            "NVIM v0.11"*|"NVIM v0.12"*|"NVIM v1."*) ;;
-            *) fail "nvim version is below 0.11: $nvim_line" ;;
+            "NVIM v0.12"*|"NVIM v1."*) ;;
+            *) fail "nvim version is below 0.12: $nvim_line" ;;
           esac
           repo="$(pwd -P)"
           assert_dir_resolves "$HOME/.config/nvim" "$repo/nvim"
@@ -286,8 +286,8 @@ jobs:
               throw 'lazygit is not on PATH'
           }
           $nvimLine = & nvim --version | Select-Object -First 1
-          if ($nvimLine -notmatch '^NVIM v(0\.1[1-9]|0\.[2-9][0-9]|[1-9]\.)') {
-              throw "nvim version is below 0.11: $nvimLine"
+          if ($nvimLine -notmatch '^NVIM v(0\.1[2-9]|0\.[2-9][0-9]|[1-9]\.)') {
+              throw "nvim version is below 0.12: $nvimLine"
           }
           $repo = (Resolve-Path -LiteralPath '.').Path
           $nvimTarget = Join-Path $env:LOCALAPPDATA 'nvim'

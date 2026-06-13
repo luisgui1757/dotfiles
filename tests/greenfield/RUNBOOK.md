@@ -7,7 +7,7 @@ Three environments are covered: **Windows Sandbox**, a **`tart` macOS VM**, and 
 What is automated vs manual:
 
 - **Scripted** (no eyeballs): spin-up + `setup` + `validate.{sh,ps1}` assert the
-  install (tools on PATH, Neovim >= 0.11, managed configs match the repo, Mason,
+  install (tools on PATH, Neovim >= 0.12, managed configs match the repo, Mason,
   `chezmoi verify`). See the launchers in this directory.
 - **Manual** (you must LOOK): the visual/interactive behaviour — colours, glyphs,
   predictions, "does psmux freeze", VS Code theme/font. That is the checklist in

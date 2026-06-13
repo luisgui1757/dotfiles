@@ -206,8 +206,8 @@ assert_nvim_version() {
     fi
     nvim_line="$(nvim --version | head -n 1)"
     case "$nvim_line" in
-        "NVIM v0.11"* | "NVIM v0.12"* | "NVIM v1."*) pass_check "nvim version is supported: $nvim_line" ;;
-        *) fail_check "nvim version is below 0.11: $nvim_line" ;;
+        "NVIM v0.12"* | "NVIM v1."*) pass_check "nvim version is supported: $nvim_line" ;;
+        *) fail_check "nvim version is below 0.12: $nvim_line" ;;
     esac
 }
 

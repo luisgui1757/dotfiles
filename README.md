@@ -330,7 +330,7 @@ The e2e jobs cover different install paths, not symmetric container platforms:
 
 | Check | What it proves |
 |---|---|
-| `e2e containers / ubuntu-24.04` | Clean `ubuntu:24.04`, non-root user, native `apt`, no Linuxbrew (`DOTFILES_SKIP_BREW_BOOTSTRAP=1`), then `install-deps.sh --all`, chezmoi config apply, tool assertions, Neovim >= 0.11, lazygit, zsh plugin files, config content assertions, and nvim directory realpath assertion. |
+| `e2e containers / ubuntu-24.04` | Clean `ubuntu:24.04`, non-root user, native `apt`, no Linuxbrew (`DOTFILES_SKIP_BREW_BOOTSTRAP=1`), then `install-deps.sh --all`, chezmoi config apply, tool assertions, Neovim >= 0.12, lazygit, zsh plugin files, config content assertions, and nvim directory realpath assertion. |
 | `setup.sh / ubuntu-24.04` | Full Unix setup on the hosted Ubuntu runner. This runner has Linuxbrew available, so it proves the Linuxbrew path that users may hit. |
 | `setup.sh / macos-15` | Full macOS setup through the real macOS hosted runner and Homebrew path. Docker cannot model macOS. |
 | `setup.ps1 / windows-2025` | Full Windows setup through the real Windows hosted runner, including Scoop/winget/choco behavior, PowerShell, symlinks, and Neovim sync. Windows containers do not model the desktop/user-profile setup well. |
@@ -348,7 +348,7 @@ WSL config-template coverage. Do not add the WSL2 canary to
 required checks unless the owner explicitly accepts the flake risk.
 
 These e2e jobs fail if setup skips Phase 3-4, emits a precise `FAIL:` marker,
-installs Neovim below 0.11, Lazy/Mason headless sync exits nonzero, or expected
+installs Neovim below 0.12, Lazy/Mason headless sync exits nonzero, or expected
 Mason-installed binaries are missing. They do not blanket-fail on benign
 warning/deprecation text.
 
@@ -538,9 +538,10 @@ Lazy auto-discovers it. Default to lazy-loading (`event` / `cmd` / `keys` /
 
 ### Adding an LSP server / formatter / treesitter parser
 
-See `CLAUDE.md` -> "Common workflows". Three small edits each: the plugin
-spec, the Mason ensure_installed list, and the corresponding test under
-`tests/nvim/spec/`.
+See `CLAUDE.md` -> "Common workflows". LSP servers and formatters update the
+plugin spec, Mason `ensure_installed`, and the matching spec. Treesitter parsers
+use `nvim-treesitter` main's `treesitter_parsers` list plus a filetype alias
+when Neovim's filetype differs from the parser name.
 
 ### Refreshing the plugin lockfile
 

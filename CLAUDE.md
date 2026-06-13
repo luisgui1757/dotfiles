@@ -179,9 +179,16 @@ launch URL, or put project-specific `dap.configurations` in a workspace
 
 ### Add a treesitter parser
 
-1. Add the parser name to `ensure_installed` in
+`nvim-treesitter` tracks the upstream `main` rewrite and therefore requires
+Neovim 0.12+. The legacy `require("nvim-treesitter.configs").setup` API is not
+available here.
+
+1. Add the parser name to `treesitter_parsers` in
    `nvim/lua/plugins/treesitter.lua`.
-2. Add it to `required` in `tests/nvim/spec/treesitter_spec.lua`.
+2. If the parser name differs from Neovim's filetype, add an entry to
+   `parser_filetype_aliases` so the `FileType` autocmd can call
+   `vim.treesitter.start()` for real buffers.
+3. Add it to `required` in `tests/nvim/spec/treesitter_spec.lua`.
 
 ### Rebind a Rose Pine color anywhere
 
@@ -284,7 +291,7 @@ install paths, not symmetric container platforms:
 - `e2e containers / ubuntu-24.04` runs an `ubuntu:24.04` container on an Ubuntu
   runner with `DOTFILES_SKIP_BREW_BOOTSTRAP=1`, creates a non-root user, runs
   real `install-deps.sh --all` (native `apt`, no Linuxbrew), then applies
-  configs with chezmoi and asserts tool presence, Neovim >= 0.11, lazygit, zsh
+  configs with chezmoi and asserts tool presence, Neovim >= 0.12, lazygit, zsh
   plugin files, config content matching the repo sources, and the Neovim
   directory resolving into repo `nvim/`.
   This is intentionally **not** a devcontainer. It stays because hosted Ubuntu
@@ -563,7 +570,7 @@ save only**. The next plain `:w` formats normally. Implemented in
   that directory to the current PATH.
 - **Alpine installs Neovim through `apk`.** The official Neovim Linux tarball
   targets glibc systems, so Alpine uses its native `neovim` package instead;
-  e2e still enforces the repo's Neovim >= 0.11 floor.
+  e2e still enforces the repo's Neovim >= 0.12 floor.
 - **`install-deps.sh` prompts for the notes/Obsidian vault** and persists
   `export NOTES_VAULT=…` to `~/.zshrc.local` (sourced by `zshrc`, read by
   `util/notes_path.lua`). The prompt is tty-gated (skipped under `--all` /

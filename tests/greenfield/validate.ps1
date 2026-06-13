@@ -110,10 +110,10 @@ function Assert-NvimVersion {
         return
     }
     $nvimLine = & nvim --version | Select-Object -First 1
-    if ($nvimLine -match '^NVIM v(0\.1[1-9]|0\.[2-9][0-9]|[1-9]\.)') {
+    if ($nvimLine -match '^NVIM v(0\.1[2-9]|0\.[2-9][0-9]|[1-9]\.)') {
         Add-Pass "nvim version is supported: $nvimLine"
     } else {
-        Add-Fail "nvim version is below 0.11: $nvimLine"
+        Add-Fail "nvim version is below 0.12: $nvimLine"
     }
 }
 

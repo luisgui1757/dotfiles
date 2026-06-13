@@ -2090,7 +2090,7 @@ install git "version control, required by lazy.nvim"
 if [[ "$(uname -s)" == "Linux" && "$PM" != "brew" ]]; then
     install_nvim_linux
 else
-    install nvim "Neovim 0.11+, the editor"
+    install nvim "Neovim 0.12+, the editor"
 fi
 install make "needed for some plugin builds (notably LuaSnip jsregexp)"
 install_c_toolchain_linux

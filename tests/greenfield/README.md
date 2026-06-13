@@ -28,7 +28,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\greenfield\valid
 ```
 
 The default mode mirrors the e2e post-install assertions: required tools on
-`PATH`, Neovim >= 0.11, managed config paths matching the repo, zsh plugin
+`PATH`, Neovim >= 0.12, managed config paths matching the repo, zsh plugin
 externals on POSIX, `chezmoi verify`, Lazy sync, Mason sync, and Mason binaries
 for `lua-language-server` and `stylua`.
 
