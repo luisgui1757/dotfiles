@@ -2,11 +2,13 @@
 # setup.sh -- one-shot end-to-end install for macOS / Linux / WSL.
 #
 # Local usage (from a checked-out copy):
-#   ./setup.sh                     interactive: Y/n per dep, then symlink + sync
+#   ./setup.sh                     interactive: Y/n per dep, then config + sync
 #   ./setup.sh --all               non-interactive: install everything missing
+#   ./setup.sh --update            update package-manager tools + Mason only
 #   ./setup.sh --dry-run           preview every step
-#   ./setup.sh --skip-deps         already have nvim/starship; just bootstrap+sync
-#   ./setup.sh --skip-bootstrap    already symlinked; just sync plugins+LSP
+#   ./setup.sh --skip-deps         already have nvim/starship; just config+sync
+#   ./setup.sh --skip-bootstrap    back-compat alias: skip config apply
+#   ./setup.sh --skip-config       already configured; just sync plugins+LSP
 #   ./setup.sh --skip-nvim         skip nvim plugin + Mason sync
 #   ./setup.sh --experimental-wsl-gui
 #                                  WSL opt-in: install/link Linux GUI terminal bits
@@ -25,6 +27,7 @@ DEFAULT_DEST="$HOME/dotfiles"
 
 ALL=0
 DRY_RUN=0
+UPDATE_MODE=0
 SKIP_DEPS=0
 SKIP_BOOTSTRAP=0
 SKIP_NVIM=0
@@ -37,9 +40,11 @@ setup.sh -- one-shot end-to-end install for macOS / Linux / WSL.
 Local usage:
   ./setup.sh                     interactive: one prompt, then end-to-end
   ./setup.sh --all               non-interactive: install everything missing
+  ./setup.sh --update            update package-manager tools + Mason only
   ./setup.sh --dry-run           preview every step
-  ./setup.sh --skip-deps         already installed; just bootstrap + sync
-  ./setup.sh --skip-bootstrap    already symlinked; just sync plugins + LSP
+  ./setup.sh --skip-deps         already installed; just config + sync
+  ./setup.sh --skip-bootstrap    back-compat alias: skip config apply
+  ./setup.sh --skip-config       already configured; just sync plugins + LSP
   ./setup.sh --skip-nvim         skip nvim plugin + Mason sync
   ./setup.sh --experimental-wsl-gui
                                 WSL opt-in: install/link Linux Ghostty + Linux fonts
@@ -53,8 +58,10 @@ for arg in "$@"; do
     case "$arg" in
         --all|-y)         ALL=1 ;;
         --dry-run)        DRY_RUN=1 ;;
+        --update)         UPDATE_MODE=1 ;;
         --skip-deps)      SKIP_DEPS=1 ;;
-        --skip-bootstrap) SKIP_BOOTSTRAP=1 ;;
+        --skip-bootstrap|--skip-config)
+                          SKIP_BOOTSTRAP=1 ;;
         --skip-nvim)      SKIP_NVIM=1 ;;
         --best-effort)    BEST_EFFORT=1 ;;
         --experimental-wsl-gui)
@@ -80,8 +87,16 @@ SCRIPT_DIR=""
 if [[ -n "${BASH_SOURCE[0]:-}" ]] && [[ -f "${BASH_SOURCE[0]:-}" ]]; then
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 fi
-if [[ -z "$SCRIPT_DIR" ]] || [[ ! -f "$SCRIPT_DIR/bootstrap.sh" ]]; then
+if [[ -z "$SCRIPT_DIR" ]] || [[ ! -d "$SCRIPT_DIR/home" ]]; then
     DEST="${DOTFILES_DEST:-$DEFAULT_DEST}"
+    if [[ "$UPDATE_MODE" -eq 1 ]]; then
+        if [[ -f "$DEST/setup.sh" && -d "$DEST/home" ]]; then
+            echo "setup.sh --update: using existing checkout at $DEST without git pull."
+            exec bash "$DEST/setup.sh" "$@"
+        fi
+        echo "setup.sh --update needs an existing checkout at $DEST; it does not clone or pull." >&2
+        exit 1
+    fi
     # DryRun honor: announce what we'd clone and exit BEFORE any git op.
     if [[ "$DRY_RUN" -eq 1 ]]; then
         echo "setup.sh (remote, dry-run): would clone $REPO_URL -> $DEST"
@@ -94,7 +109,7 @@ if [[ -z "$SCRIPT_DIR" ]] || [[ ! -f "$SCRIPT_DIR/bootstrap.sh" ]]; then
         if [[ "$(uname -s)" == "Darwin" ]]; then
             git_hint="brew install git"
         fi
-        echo "setup.sh: git is the only prerequisite for remote bootstrap, and it is required to clone the repo." >&2
+        echo "setup.sh: git is the only prerequisite for remote setup, and it is required to clone the repo." >&2
         echo "setup.sh: install git first: $git_hint" >&2
         exit 1
     fi
@@ -112,33 +127,21 @@ fi
 
 cd "$SCRIPT_DIR"
 
-# ---- Self-link guard ---------------------------------------------------------
-# If the repo lives at one of the symlink targets we will later create,
-# bootstrap.sh will try to symlink the path onto itself. Detect and refuse.
-NVIM_TARGET="$HOME/.config/nvim"
-if [[ "$SCRIPT_DIR" == "$NVIM_TARGET" ]]; then
-    cat >&2 <<EOF
-setup.sh: the repo is currently at $SCRIPT_DIR, which is the same path
-that bootstrap.sh would symlink to itself.
-
-Move the repo elsewhere first (e.g. ~/dotfiles), then re-run setup.sh:
-
-    mv "$SCRIPT_DIR" "$HOME/dotfiles"
-    cd "$HOME/dotfiles"
-    ./setup.sh
-EOF
-    exit 1
-fi
-
 # ---- Forward flags to sub-scripts --------------------------------------------
 DEPS_FLAGS=()
 [[ "$ALL" -eq 1 ]]      && DEPS_FLAGS+=(--all)
+[[ "$UPDATE_MODE" -eq 1 ]] && DEPS_FLAGS+=(--update)
 [[ "$DRY_RUN" -eq 1 ]]  && DEPS_FLAGS+=(--dry-run)
 [[ "$EXPERIMENTAL_WSL_GUI" -eq 1 ]] && DEPS_FLAGS+=(--experimental-wsl-gui)
 
-BOOTSTRAP_FLAGS=()
-[[ "$DRY_RUN" -eq 1 ]]  && BOOTSTRAP_FLAGS+=(--dry-run)
-[[ "$EXPERIMENTAL_WSL_GUI" -eq 1 ]] && BOOTSTRAP_FLAGS+=(--experimental-wsl-gui)
+CHEZMOI_SOURCE="$SCRIPT_DIR/home"
+CHEZMOI_BASE_ARGS=(--source "$CHEZMOI_SOURCE")
+CHEZMOI_CONFIG_ARGS=()
+CHEZMOI_DATA_ARGS=()
+TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
+if [[ "$EXPERIMENTAL_WSL_GUI" -eq 1 ]]; then
+    CHEZMOI_DATA_ARGS+=(--override-data '{"experimentalWslGui":true}')
+fi
 
 phase() {
     echo
@@ -172,38 +175,139 @@ refresh_runtime_path() {
     hash -r 2>/dev/null || true
 }
 
-# Test seam: `DOTFILES_SETUP_SOURCE_ONLY=1 source setup.sh` loads the helper
-# functions (phase, refresh_runtime_path) without running the install phases, so
-# tests can exercise refresh_runtime_path in isolation. Unset in normal runs.
-if [[ -n "${DOTFILES_SETUP_SOURCE_ONLY:-}" ]]; then
-    # shellcheck disable=SC2317  # the exit is reached only when executed, not sourced
-    return 0 2>/dev/null || exit 0
-fi
+unique_backup() {
+    local base="$1"
+    if [[ ! -e "$base" && ! -L "$base" ]]; then printf '%s' "$base"; return; fi
+    local i=1
+    while [[ -e "${base}.${i}" || -L "${base}.${i}" ]]; do i=$((i + 1)); done
+    printf '%s' "${base}.${i}"
+}
 
-# ---- Phase 1: dependencies ---------------------------------------------------
-if [[ "$SKIP_DEPS" -eq 0 ]]; then
-    phase "Phase 1/4: install dependencies"
-    bash "$SCRIPT_DIR/install-deps.sh" ${DEPS_FLAGS[@]+"${DEPS_FLAGS[@]}"}
-else
-    echo
-    echo "skipped: Phase 1 (deps) via --skip-deps"
-fi
-refresh_runtime_path
+realpath_or_self() {
+    if command -v realpath >/dev/null 2>&1; then
+        realpath "$1" 2>/dev/null || echo "$1"
+    elif command -v readlink >/dev/null 2>&1 && readlink -f / >/dev/null 2>&1; then
+        readlink -f "$1" 2>/dev/null || echo "$1"
+    else
+        ( cd "$1" 2>/dev/null && pwd -P ) || echo "$1"
+    fi
+}
 
-# ---- Phase 2: symlink configs ------------------------------------------------
-if [[ "$SKIP_BOOTSTRAP" -eq 0 ]]; then
-    phase "Phase 2/4: symlink configs into place"
-    bash "$SCRIPT_DIR/bootstrap.sh" ${BOOTSTRAP_FLAGS[@]+"${BOOTSTRAP_FLAGS[@]}"}
-else
-    echo
-    echo "skipped: Phase 2 (bootstrap) via --skip-bootstrap"
-fi
+refuse_nvim_self_link_if_needed() {
+    local nvim_target="$HOME/.config/nvim" target_real repo_real repo_nvim_real
 
-# ---- Phase 3: install Neovim plugins -----------------------------------------
-# ---- Phase 4: install LSP servers + formatters via Mason ---------------------
-#
-# By default, Lazy + Mason failures are FATAL — they leave the user with a
-# bare nvim config and no LSP. Pass --best-effort to downgrade to warnings.
+    [[ -e "$nvim_target" || -L "$nvim_target" ]] || return 0
+    # An existing SYMLINK is the normal already-installed case: it points into
+    # the repo, so its dereferenced value equals <repo>/nvim, but the target
+    # LOCATION is not the repo. chezmoi safely replaces it -- do NOT refuse.
+    # Only a REAL (non-symlink) directory AT the target that resolves to the repo
+    # root or <repo>/nvim is a genuine self-overlap (the repo lives there).
+    [[ -L "$nvim_target" ]] && return 0
+
+    target_real="$(realpath_or_self "$nvim_target")"
+    repo_real="$(realpath_or_self "$SCRIPT_DIR")"
+    repo_nvim_real="$(realpath_or_self "$SCRIPT_DIR/nvim")"
+
+    if [[ "$target_real" != "$repo_real" && "$target_real" != "$repo_nvim_real" ]]; then
+        return 0
+    fi
+
+    cat >&2 <<EOF
+setup.sh: the repo is currently at $SCRIPT_DIR, which overlaps the path
+that setup.sh would configure as the Neovim target.
+
+Move the repo elsewhere first (e.g. ~/dotfiles), then re-run setup.sh:
+
+    mv "$SCRIPT_DIR" "$HOME/dotfiles"
+    cd "$HOME/dotfiles"
+    ./setup.sh
+EOF
+    exit 1
+}
+
+run_chezmoi() {
+    chezmoi "${CHEZMOI_BASE_ARGS[@]}" \
+        ${CHEZMOI_CONFIG_ARGS[@]+"${CHEZMOI_CONFIG_ARGS[@]}"} \
+        ${CHEZMOI_DATA_ARGS[@]+"${CHEZMOI_DATA_ARGS[@]}"} \
+        "$@"
+}
+
+render_chezmoi_config_template() {
+    local output="$1"
+    chezmoi "${CHEZMOI_BASE_ARGS[@]}" \
+        ${CHEZMOI_DATA_ARGS[@]+"${CHEZMOI_DATA_ARGS[@]}"} \
+        execute-template --init < "$CHEZMOI_SOURCE/.chezmoi.toml.tmpl" > "$output"
+}
+
+target_content_matches_chezmoi() {
+    local target="$1" expected_file expected_ref
+
+    expected_file="$(mktemp)"
+    if ! run_chezmoi cat "$target" > "$expected_file" 2>/dev/null; then
+        rm -f "$expected_file"
+        return 1
+    fi
+
+    expected_ref="$(cat "$expected_file")"
+    if [[ -n "$expected_ref" && -e "$expected_ref" ]]; then
+        if [[ -d "$target" && -d "$expected_ref" ]]; then
+            if diff -qr "$target" "$expected_ref" >/dev/null 2>&1; then
+                rm -f "$expected_file"
+                return 0
+            fi
+        elif [[ -f "$expected_ref" && ( -f "$target" || -L "$target" ) ]]; then
+            if cmp -s "$target" "$expected_ref"; then
+                rm -f "$expected_file"
+                return 0
+            fi
+        fi
+    elif [[ -f "$target" || -L "$target" ]]; then
+        if cmp -s "$target" "$expected_file"; then
+            rm -f "$expected_file"
+            return 0
+        fi
+    fi
+
+    rm -f "$expected_file"
+    return 1
+}
+
+target_already_matches() {
+    local target="$1"
+    run_chezmoi verify "$target" >/dev/null 2>&1 ||
+        target_content_matches_chezmoi "$target"
+}
+
+backup_preexisting_managed_targets() {
+    local managed_output target backup
+
+    managed_output="$(run_chezmoi managed --path-style absolute --include files,symlinks)"
+    if [[ -z "$managed_output" ]]; then
+        echo "  backup    no managed file/symlink targets found"
+        return 0
+    fi
+
+    while IFS= read -r target; do
+        [[ -n "$target" ]] || continue
+        if [[ ! -e "$target" && ! -L "$target" ]]; then
+            continue
+        fi
+
+        if target_already_matches "$target"; then
+            echo "  ok        $target"
+            continue
+        fi
+
+        backup="$(unique_backup "${target}.bak.${TIMESTAMP}")"
+        if [[ "$DRY_RUN" -eq 1 ]]; then
+            echo "  backup    $target -> $backup; then chezmoi apply"
+        else
+            mv "$target" "$backup"
+            echo "  backed up $target -> $backup"
+        fi
+    done <<<"$managed_output"
+}
+
 run_or_fail() {
     local label="$1"; shift
     if "$@"; then return 0; fi
@@ -217,6 +321,105 @@ run_or_fail() {
     exit "$rc"
 }
 
+run_update_mode() {
+    if [[ "$SKIP_DEPS" -eq 0 ]]; then
+        phase "Update 1/2: update package-manager tools"
+        bash "$SCRIPT_DIR/install-deps.sh" ${DEPS_FLAGS[@]+"${DEPS_FLAGS[@]}"}
+    else
+        echo
+        echo "skipped: update dependency phase via --skip-deps"
+    fi
+
+    refresh_runtime_path
+
+    if [[ "$SKIP_NVIM" -eq 0 ]]; then
+        phase "Update 2/2: update Mason LSP servers + formatters"
+        if [[ "$DRY_RUN" -eq 1 ]]; then
+            echo "  would: nvim --headless +MasonToolsUpdate +qa"
+        elif command -v nvim >/dev/null 2>&1; then
+            run_or_fail "Mason update" nvim --headless "+MasonToolsUpdate" "+qa"
+        else
+            echo "  skipped   Mason update: nvim not on PATH"
+        fi
+    else
+        echo
+        echo "skipped: Mason update via --skip-nvim"
+    fi
+
+    echo
+    echo "Plugins (lazy-lock.json), pinned binaries, and configs update via \`git pull\` then re-run setup; \`:Lazy update\` re-pins plugins (a repo change)."
+    echo
+    echo "================================================================"
+    echo "==  setup.sh: update done"
+    echo "================================================================"
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        echo "(dry run -- nothing was actually installed or changed)"
+    fi
+}
+
+# Test seam: `DOTFILES_SETUP_SOURCE_ONLY=1 source setup.sh` loads the helper
+# functions (phase, refresh_runtime_path) without running the install phases, so
+# tests can exercise refresh_runtime_path in isolation. Unset in normal runs.
+if [[ -z "${DOTFILES_SETUP_SOURCE_ONLY:-}" ]]; then
+    refuse_nvim_self_link_if_needed
+fi
+if [[ -n "${DOTFILES_SETUP_SOURCE_ONLY:-}" ]]; then
+    # shellcheck disable=SC2317  # the exit is reached only when executed, not sourced
+    return 0 2>/dev/null || exit 0
+fi
+
+if [[ "$UPDATE_MODE" -eq 1 ]]; then
+    run_update_mode
+    exit 0
+fi
+
+# ---- Phase 1: dependencies ---------------------------------------------------
+if [[ "$SKIP_DEPS" -eq 0 ]]; then
+    phase "Phase 1/4: install dependencies"
+    bash "$SCRIPT_DIR/install-deps.sh" ${DEPS_FLAGS[@]+"${DEPS_FLAGS[@]}"}
+else
+    echo
+    echo "skipped: Phase 1 (deps) via --skip-deps"
+fi
+refresh_runtime_path
+
+# ---- Phase 2: apply configs --------------------------------------------------
+if [[ "$SKIP_BOOTSTRAP" -eq 0 ]]; then
+    phase "Phase 2/4: apply configs with chezmoi"
+    if ! command -v chezmoi >/dev/null 2>&1; then
+        if [[ "$DRY_RUN" -eq 1 ]]; then
+            # The dogfood dry-run runs BEFORE Phase 1 installs chezmoi; preview
+            # rather than fail (a real run has chezmoi on PATH after Phase 1).
+            echo "  would: chezmoi (installed in Phase 1) backs up any divergent"
+            echo "         pre-existing config, then 'chezmoi apply' the config layer"
+        else
+            echo "  FAIL: chezmoi is not on PATH after Phase 1"
+            echo "        Re-run without --skip-deps, or install chezmoi first."
+            exit 1
+        fi
+    elif [[ "$DRY_RUN" -eq 1 ]]; then
+        CHEZMOI_DRY_CONFIG="$(mktemp)"
+        render_chezmoi_config_template "$CHEZMOI_DRY_CONFIG"
+        CHEZMOI_CONFIG_ARGS=(--config "$CHEZMOI_DRY_CONFIG" --config-format toml)
+        backup_preexisting_managed_targets
+        run_chezmoi --dry-run --verbose apply
+        rm -f "$CHEZMOI_DRY_CONFIG"
+        CHEZMOI_CONFIG_ARGS=()
+    else
+        chezmoi "${CHEZMOI_BASE_ARGS[@]}" init
+        backup_preexisting_managed_targets
+        run_chezmoi --no-tty --force apply
+    fi
+else
+    echo
+    echo "skipped: Phase 2 (config) via --skip-bootstrap/--skip-config"
+fi
+
+# ---- Phase 3: install Neovim plugins -----------------------------------------
+# ---- Phase 4: install LSP servers + formatters via Mason ---------------------
+#
+# By default, Lazy + Mason failures are FATAL — they leave the user with a
+# bare nvim config and no LSP. Pass --best-effort to downgrade to warnings.
 if [[ "$SKIP_NVIM" -eq 0 ]] && [[ "$DRY_RUN" -eq 0 ]]; then
     if command -v nvim >/dev/null 2>&1; then
         phase "Phase 3/4: sync Neovim plugins (lazy.nvim)"
@@ -228,7 +431,7 @@ if [[ "$SKIP_NVIM" -eq 0 ]] && [[ "$DRY_RUN" -eq 0 ]]; then
     else
         echo
         echo "skipped: Phase 3-4 (nvim plugins) -- nvim not on PATH yet."
-        echo "         Re-run: ./setup.sh --skip-deps --skip-bootstrap"
+        echo "         Re-run: ./setup.sh --skip-deps --skip-config"
     fi
 elif [[ "$DRY_RUN" -eq 1 ]]; then
     echo

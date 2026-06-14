@@ -9,7 +9,7 @@ trap 'rm -rf "$WORK"' EXIT
 export HOME="$WORK/home"
 mkdir -p "$HOME/.local/bin"
 
-# Load setup.sh's helper functions without running the install/bootstrap/sync
+# Load setup.sh's helper functions without running the install/config/sync
 # phases. Unit-testing refresh_runtime_path directly avoids the nvim-precedence
 # fragility of a full setup.sh run (a real nvim in /usr/local/bin on a CI runner
 # would shadow a stub in ~/.local/bin, since the refresh APPENDS ~/.local/bin).

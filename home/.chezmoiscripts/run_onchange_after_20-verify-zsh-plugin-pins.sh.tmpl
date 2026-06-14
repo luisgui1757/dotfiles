@@ -1,0 +1,20 @@
+{{- if ne .targetOS "windows" -}}
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Externals use this fixed managed root; an XDG-aware root is Wave B.
+root="$HOME/.local/share/dotfiles/zsh-plugins"
+
+# Bash 3.2-safe: no associative arrays, no mapfile, no namerefs.
+for pair in \
+    "zsh-autocomplete a76f26ae25528e76ee53df98ad38fbacdf89fd2e" \
+    "zsh-autosuggestions e52ee8ca55bcc56a17c828767a3f98f22a68d4eb"; do
+    name="${pair%% *}"
+    want="${pair##* }"
+    got="$(git -C "$root/$name" rev-parse HEAD 2>/dev/null || true)"
+    if [[ "$got" != "$want" ]]; then
+        echo "FAIL: $name HEAD ${got:-unknown} != pinned $want" >&2
+        exit 1
+    fi
+done
+{{- end -}}

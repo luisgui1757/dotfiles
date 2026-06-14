@@ -3,7 +3,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 export REPO_ROOT
 
-files=$(find "$REPO_ROOT" -type f \( -name "*.yml" -o -name "*.yaml" \) -not -path "*/.git/*" -not -path "*/tests/.cache/*")
+files=$(find "$REPO_ROOT" -type f \( -name "*.yml" -o -name "*.yaml" \) -not -path "*/.git/*" -not -path "*/tests/.cache/*" -not -path "$REPO_ROOT/home/*")
 [[ -z "$files" ]] && { echo "no yaml files"; exit 0; }
 
 if command -v yamllint >/dev/null 2>&1; then
@@ -21,6 +21,7 @@ fail = 0
 for ext in ("yml","yaml"):
     for f in glob.glob(f"{root}/**/*.{ext}", recursive=True):
         if "/.git/" in f: continue
+        if f.startswith(f"{root}/home/"): continue
         try:
             with open(f) as fh: list(yaml.safe_load_all(fh))
         except Exception as e:

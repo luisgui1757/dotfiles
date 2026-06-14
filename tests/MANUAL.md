@@ -11,11 +11,18 @@ significant change to the relevant area.
 - [ ] **Ghostty**, mac, light mode: switches to Rose Pine Dawn when the
       system theme flips.
 - [ ] **Windows Terminal**: rose-pine scheme applied; tabs use the
-      configured theme; acrylic OFF on the body, ON in the tab row.
-- [ ] **Tmux status bar**: rose-pine colors, prefix is `C-b`,
+      configured theme; acrylic OFF on the body, ON in the tab row; a new tab
+      opens `PowerShell 7` unless the user intentionally chose another default.
+- [ ] **Tmux status bar**: rose-pine colors, inactive windows readable (iris)
+      and the active window gold-bold, prefix is `C-b`,
       `prefix r` reloads the conf and shows the "reloaded" message.
+- [ ] **psmux status bar**: inactive window titles are readable (iris on base)
+      after reopening psmux, matching the Windows overlay `status-style`
+      fallback.
 - [ ] **Starship prompt**: shows username pill, dir pill, git branch pill,
       git status icons (untracked/modified/staged), trailing time pill.
+- [ ] **PowerShell Tab completion**: press Tab into MenuComplete; the selected
+      item is light text on the Rose Pine overlay background.
 
 ## Cross-OS clipboard round-trip
 
@@ -41,12 +48,16 @@ significant change to the relevant area.
 
 - [ ] **New Mac**: `git clone`, `./setup.sh`, `exec zsh`, `nvim` opens
       and `:checkhealth` is clean except for optional system tools.
-- [ ] **Fresh Windows**: clone, `.\setup.ps1`, optionally
-      `.\bootstrap.ps1 -MergeWindowsTerminal`,
+- [ ] **Fresh Windows**: clone, `.\setup.ps1`,
       new pwsh tab shows the rose-pine starship prompt; new WT tab has
-      the rose-pine scheme; `nvim` works.
+      the rose-pine scheme and opens PowerShell 7 when WT already has
+      `settings.json`; `nvim` works.
+- [ ] **Windows treesitter compile**: after `.\setup.ps1 -All`, open nvim and
+      run `:checkhealth nvim-treesitter`; it reports the tree-sitter CLI and
+      compiler OK. Open a Python file and confirm `python` parser highlighting
+      works.
 - [ ] **Fresh WSL Ubuntu**: on Windows first run
-      `.\setup.ps1 -All -MergeWindowsTerminal`, then inside WSL run
+      `.\setup.ps1 -All`, then inside WSL run
       `./setup.sh --all` and `./tests/wsl/e2e.sh`. Confirm the script passes:
       Windows Terminal uses Hack Nerd Font, `win32yank` is reachable, lazygit is
       installed on both sides, zsh plugins are installed in WSL, nvim starts,

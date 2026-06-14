@@ -1,0 +1,3 @@
+# Keep zsh-autocomplete's completion setup deterministic across distros.
+# Do not put PATH, prompts, secrets, or slow work here: .zshenv runs for every zsh.
+skip_global_compinit=1

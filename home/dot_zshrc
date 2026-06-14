@@ -1,0 +1,145 @@
+#!/usr/bin/env zsh
+# shellcheck shell=bash  # closest available to zsh; expect false positives
+# shellcheck disable=SC1009,SC1036,SC1072,SC1073  # zsh-only glob qualifiers
+# Cross-platform zsh init. Safe on macOS (Homebrew), WSL Ubuntu, plain Linux.
+
+# ---- Locale (set early so anything that reads LANG gets it) ------------------
+_dotfiles_locale=""
+if command -v locale >/dev/null 2>&1; then
+  if locale -a 2>/dev/null | grep -qxE 'en_US\.(UTF-8|utf8)'; then
+    _dotfiles_locale="en_US.UTF-8"
+  elif locale -a 2>/dev/null | grep -qxE 'C\.(UTF-8|utf8)'; then
+    _dotfiles_locale="C.UTF-8"
+  fi
+fi
+if [[ -n "$_dotfiles_locale" ]]; then
+  export LANG="$_dotfiles_locale"
+  export LC_ALL="$_dotfiles_locale"
+  export LANGUAGE="$_dotfiles_locale"
+  export LC_MESSAGES="$_dotfiles_locale"
+fi
+unset _dotfiles_locale
+
+# ---- Homebrew detection (mac + linuxbrew) ------------------------------------
+# $HOMEBREW_PREFIX is set by `brew shellenv`; if not in the environment yet,
+# probe common locations rather than failing.
+if [[ -z "${HOMEBREW_PREFIX:-}" ]]; then
+  for candidate in /opt/homebrew /usr/local /home/linuxbrew/.linuxbrew "$HOME/.linuxbrew"; do
+    if [[ -x "$candidate/bin/brew" ]]; then
+      eval "$($candidate/bin/brew shellenv)"
+      break
+    fi
+  done
+fi
+
+# ---- PATH (de-duplicating helper, order: user-local → brew → python → system)
+# zsh's `typeset -U path` keeps the array unique automatically.
+typeset -U path PATH
+[[ -d "$HOME/.local/bin" ]] && path=("$HOME/.local/bin" $path)
+[[ -d "$HOME/.cargo/bin" ]] && path=("$HOME/.cargo/bin" $path)
+if [[ -n "${HOMEBREW_PREFIX:-}" ]]; then
+  [[ -d "$HOMEBREW_PREFIX/opt/python@3.12/bin" ]] && path=("$HOMEBREW_PREFIX/opt/python@3.12/bin" $path)
+  [[ -d "$HOMEBREW_PREFIX/bin" ]] && path=("$HOMEBREW_PREFIX/bin" $path)
+fi
+export PATH
+
+# ---- History -----------------------------------------------------------------
+HISTFILE="${HOME}/.zsh_history"
+HISTSIZE=50000
+SAVEHIST=50000
+setopt SHARE_HISTORY HIST_IGNORE_DUPS HIST_IGNORE_ALL_DUPS HIST_REDUCE_BLANKS \
+       HIST_IGNORE_SPACE HIST_VERIFY EXTENDED_HISTORY
+
+# ---- zsh plugins -------------------------------------------------------------
+# setup.sh installs repo-managed pinned plugins under XDG data. Runtime uses
+# those first, then falls back to package-manager paths if a machine has not
+# run the installer yet. Source exactly one readable path per plugin.
+_dotfiles_source_first_readable() {
+  local plugin
+  for plugin in "$@"; do
+    if [[ -r "$plugin" ]]; then
+      source "$plugin"
+      return 0
+    fi
+  done
+  return 1
+}
+
+_dotfiles_zsh_plugin_root="${XDG_DATA_HOME:-$HOME/.local/share}/dotfiles/zsh-plugins"
+_dotfiles_autocomplete_loaded=0
+if _dotfiles_source_first_readable \
+    "$_dotfiles_zsh_plugin_root/zsh-autocomplete/zsh-autocomplete.plugin.zsh" \
+    "${HOMEBREW_PREFIX:-}/share/zsh-autocomplete/zsh-autocomplete.plugin.zsh" \
+    "/usr/share/zsh-autocomplete/zsh-autocomplete.plugin.zsh"; then
+  _dotfiles_autocomplete_loaded=1
+fi
+
+# ---- Completion (cached compinit fallback; autocomplete manages its own) -----
+if [[ "$_dotfiles_autocomplete_loaded" -ne 1 ]]; then
+  autoload -Uz compinit
+  mkdir -p "${HOME}/.cache"
+  _zcompdump="${HOME}/.cache/zcompdump-${ZSH_VERSION}"
+  if [[ -n "$_zcompdump"(#qN.mh+24) ]]; then
+    compinit -d "$_zcompdump"
+  else
+    compinit -C -d "$_zcompdump"
+  fi
+  unset _zcompdump
+fi
+
+_dotfiles_source_first_readable \
+  "$_dotfiles_zsh_plugin_root/zsh-autosuggestions/zsh-autosuggestions.zsh" \
+  "${HOMEBREW_PREFIX:-}/share/zsh-autosuggestions/zsh-autosuggestions.zsh" \
+  "/usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
+
+unset _dotfiles_autocomplete_loaded _dotfiles_zsh_plugin_root
+unfunction _dotfiles_source_first_readable 2>/dev/null || true
+
+# ---- Starship init (precompiled, like the PowerShell profile) ---------------
+# Re-generate when the toml is newer than the cached init script, so config
+# tweaks always take effect. Falls back to live init if starship is missing.
+if command -v starship >/dev/null 2>&1; then
+  _starship_init="${HOME}/.cache/starship-init.zsh"
+  _starship_toml="${STARSHIP_CONFIG:-${HOME}/.config/starship.toml}"
+  if [[ ! -s "$_starship_init" ]] || [[ -f "$_starship_toml" && "$_starship_toml" -nt "$_starship_init" ]]; then
+    starship init zsh --print-full-init > "$_starship_init"
+  fi
+  source "$_starship_init"
+  unset _starship_init _starship_toml
+fi
+
+# ---- fzf (fuzzy finder): Ctrl-R history, Ctrl-T files, Alt-C cd --------------
+# Complements zsh-autosuggestions (inline ghosting) with an INTERACTIVE fuzzy
+# picker — different job, not a replacement. Quietly skips when fzf is absent.
+# Modern fzf (>=0.48) prints its own zsh integration via `fzf --zsh`; older
+# distro builds ship key-bindings/completion files under a share dir instead.
+# Guarded with `command -v` so a missing fzf never changes zshrc's exit status.
+if command -v fzf >/dev/null 2>&1; then
+  if fzf --zsh >/dev/null 2>&1; then
+    source <(fzf --zsh)
+  else
+    for _fzf_dir in \
+        "${HOMEBREW_PREFIX:-/opt/homebrew}/opt/fzf/shell" \
+        /usr/share/fzf /usr/share/fzf/shell /usr/share/doc/fzf/examples; do
+      [[ -r "$_fzf_dir/key-bindings.zsh" ]] && source "$_fzf_dir/key-bindings.zsh"
+      [[ -r "$_fzf_dir/completion.zsh"   ]] && source "$_fzf_dir/completion.zsh"
+    done
+    unset _fzf_dir
+  fi
+fi
+
+# Intentionally NOT rebinding Esc — it shadows the entire Meta prefix and
+# breaks every Alt-X keybinding (including Alt-h/j/k/l set in nvim's
+# vim-options.lua). If you want a single keystroke to clear the line, ^U
+# (kill-whole-line) is already the readline default.
+
+# ---- Machine-local overrides (NOT tracked) -----------------------------------
+# Put anything user/machine/employer-specific here so it never lands in this
+# public repo: secrets, work paths, NOTES_VAULT, $PATH tweaks, etc.
+# Example: export NOTES_VAULT="$HOME/Library/Mobile Documents/iCloud~md~obsidian/Documents/my-vault"
+# NOTE: use an `if` block, not `[[ -f ]] && source` — the && one-liner returns
+# exit 1 when the file is absent, which would become zshrc's exit status and
+# break callers that check it (e.g. the zsh-startup smoke test).
+if [[ -f "$HOME/.zshrc.local" ]]; then
+  source "$HOME/.zshrc.local"
+fi
