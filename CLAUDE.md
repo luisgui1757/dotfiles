@@ -760,11 +760,12 @@ save only**. The next plain `:w` formats normally. Implemented in
   into the main syntax hashtable: an unknown color key throws and would drop the
   WHOLE hashtable, so on an old PSReadLine the syntax colors must not depend on a
   prediction key existing. `Selection` is also isolated because MenuComplete uses
-  it for the selected row; it must be the full ANSI SGR sequence painting Rose
-  Pine `gold #f6c177` text on the `overlay #26233a` background (gold text on the
-  subtle overlay highlight so the selected completion stands out by color, with
-  the background left dark -- owner preferred this over a full gold-background
-  bar), not a bare dark foreground. Do NOT set `ListPredictionTooltip`.
+  it for the selected row; it is a `gold #f6c177` FOREGROUND-only SGR (no
+  background), so the selected row's background blends with the terminal
+  background and the gold text alone marks the selection (owner preferred this
+  over a highlighted background bar). Gold is bright enough that fg-only is
+  legible -- the original bug was a *dark* fg-only value (`#26233a`), not fg-only
+  itself. Do NOT set `ListPredictionTooltip`.
 - **PowerShell Starship init is cached without `Invoke-Expression`, and cache
   publication is race-safe.** (Race-safe, not a single atomic syscall: on the
   Windows PowerShell 5.1 host this profile also supports, `Move-Item -Force` is
@@ -943,16 +944,19 @@ host OS or shell would otherwise hide a branch from CI.
   explicit, different-from-default color does NOT make it opaque in WT (this was
   tried with `surface #1f1d2e` at `opacity: 95` and the bar stayed see-through).
   That "explicit bg renders opaque" behavior exists in some terminals (alacritty)
-  but NOT in Windows Terminal. Therefore the only way to a solid bar in WT is a
-  fully opaque window: the fragment ships **`opacity: 100`**. Status-area bgs stay
-  `base #191724` (the dark terminal color); the bar is solid because the whole WT
-  window is. macOS/Linux Ghostty keep `background-opacity 0.95` +
-  `background-blur-radius 15`, whose blur renders an opaque-LOOKING dark bar
-  WITHOUT full opacity (WT acrylic is the analog but is unreliable in a VM, hence
-  full opacity on Windows). Do NOT re-add an overlay `status-style` hack (a prior
-  wrong attempt assuming psmux ignores `window-status-style`, since removed) and
-  do NOT switch the bar bg to surface to "fix" opacity (it does not, in WT).
-  Guarded by `tests/tmux/option_test.sh`.
+  but NOT in Windows Terminal. The only way to a fully solid bar in WT is a fully
+  opaque window (`opacity: 100`). **The owner chose transparency over a solid
+  bar:** the fragment ships **`opacity: 95`** (see-through terminal), so the
+  status bar is transparent too -- an accepted trade for the see-through look,
+  themed via colors rather than opacity. Status-area bgs stay `base #191724` (the
+  dark terminal color). macOS/Linux Ghostty use `background-opacity 0.95` +
+  `background-blur-radius 15`, whose blur renders an opaque-LOOKING dark bar even
+  while transparent (WT acrylic is the analog but is unreliable in a VM, so WT
+  gets no blur). Do NOT re-add an overlay `status-style` hack (a prior wrong
+  attempt assuming psmux ignores `window-status-style`, since removed) and do NOT
+  switch the bar bg to surface to "fix" opacity (it does not, in WT). To flip to
+  a fully-solid bar, set WT `opacity: 100` (whole window). Guarded by
+  `tests/tmux/option_test.sh`.
   Status-left (iris-bold session + muted
   separator) and status-right (foam date + gold time) are our own
   customizations, palette-consistent. History/rejected attempts worth not

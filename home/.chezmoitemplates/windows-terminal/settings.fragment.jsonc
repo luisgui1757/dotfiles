@@ -56,7 +56,7 @@
         "defaults": {
             "colorScheme": "rose-pine",
             "font": { "face": "Hack Nerd Font", "size": 12 },
-            "opacity": 100,
+            "opacity": 95,
             "useAcrylic": false,
             "padding": "6, 6, 6, 6",
             "antialiasingMode": "grayscale",
