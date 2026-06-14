@@ -721,7 +721,7 @@ save only**. The next plain `:w` formats normally. Implemented in
   prior loads):
   `Remove-Item -LiteralPath "$HOME\.tmux.posix.conf" -Force -ErrorAction SilentlyContinue; taskkill /F /T /IM psmux.exe`
   then reopen the terminal.
-- **psmux + PSReadLine: Windows-only overlay, three settings.** psmux's default
+- **psmux + PSReadLine: Windows-only overlay, two settings.** psmux's default
   shell is **cmd**, not pwsh — which is the *real* reason "history prediction"
   and `MenuComplete` looked broken inside panes: PSReadLine was never loaded.
   The fix is a Windows-only overlay `tmux/tmux.windows.conf`, managed as
@@ -730,12 +730,7 @@ save only**. The next plain `:w` formats normally. Implemented in
   exist). The overlay sets:
   (1) `default-shell pwsh` — so fresh psmux panes spawn PowerShell 7, which
   loads PSReadLine + the profile.
-  (2) `status-style "fg=#c4a7e7,bg=#191724"` — psmux stores
-  `window-status-style` and ignores inline inactive-window `#[fg=...]`, but it
-  does render base `status-style`; setting iris-on-base in the Windows overlay
-  gives inactive psmux cells the same upstream inactive color real tmux gets
-  from `window-status-style` in `tmux.conf`.
-  (3) `allow-predictions on` — psmux otherwise resets `PredictionSource` to
+  (2) `allow-predictions on` — psmux otherwise resets `PredictionSource` to
   `None` during pane init (psmux issue #150 — fresh panes ignore the profile's
   `HistoryAndPlugin`). With this on, the profile's ListView prediction +
   `Tab=MenuComplete` survive into psmux panes.
@@ -765,9 +760,10 @@ save only**. The next plain `:w` formats normally. Implemented in
   into the main syntax hashtable: an unknown color key throws and would drop the
   WHOLE hashtable, so on an old PSReadLine the syntax colors must not depend on a
   prediction key existing. `Selection` is also isolated because MenuComplete uses
-  it for the selected row; it must be the full ANSI SGR sequence for Rose Pine
-  `text #e0def4` on `overlay #26233a`, not a bare dark background. Do NOT set
-  `ListPredictionTooltip`.
+  it for the selected row; it must be the full ANSI SGR sequence painting Rose
+  Pine `base #191724` on a `gold #f6c177` background (a high-contrast gold bar so
+  the selected completion clearly stands out from the others), not a bare dark
+  background. Do NOT set `ListPredictionTooltip`.
 - **PowerShell Starship init is cached without `Invoke-Expression`, and cache
   publication is race-safe.** (Race-safe, not a single atomic syscall: on the
   Windows PowerShell 5.1 host this profile also supports, `Move-Item -Force` is
@@ -937,12 +933,19 @@ host OS or shell would otherwise hide a branch from CI.
   Inactive cells use the upstream rose-pine/tmux color via
   `setw -g window-status-style "fg=#c4a7e7,bg=#191724"` (iris on base). The
   earlier `setw -gu` fallback to `status-style` (pine on base) was only 3.4:1 --
-  illegible, worst under psmux; iris is 8.4:1. Because psmux does NOT render
-  `window-status-style` for window cells and owner testing showed inline inactive
-  fg did not stick under psmux either, the Windows overlay instead sets
-  `status-style "fg=#c4a7e7,bg=#191724"` so inactive cells inherit iris there.
-  Real tmux keeps the canonical `window-status-style` path in `tmux.conf`;
-  `tmux.windows.conf` is guarded by `tests/tmux/windows_conf_test.sh`.
+  illegible; iris is 8.4:1. `tmux.windows.conf` is guarded by
+  `tests/tmux/windows_conf_test.sh`. NOTE: the Windows "transparent / washed-out
+  status bar" report was NOT a color or psmux-rendering problem -- it was Windows
+  Terminal transparency (`opacity` < 100 with `useAcrylic` false = sharp,
+  un-blurred see-through) bleeding a bright desktop wallpaper through the bar. An
+  earlier overlay `status-style` hack chased this as if psmux ignored
+  `window-status-style`; that was wrong and has been removed. The fragment now
+  ships `opacity: 100` (fully opaque, GPU-independent -- important under a VM
+  where WT acrylic blur is unreliable), matching how macOS Ghostty
+  (`background-opacity = 0.95` + `background-blur-radius = 15`) renders a
+  readable, opaque-looking bar. The `window-status-style` iris in `tmux.conf` is
+  what keeps inactive text legible on both platforms; do NOT re-add an overlay
+  `status-style` to "fix" psmux inactive color.
   Status-left (iris-bold session + muted
   separator) and status-right (foam date + gold time) are our own
   customizations, palette-consistent. History/rejected attempts worth not

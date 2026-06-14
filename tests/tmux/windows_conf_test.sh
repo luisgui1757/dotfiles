@@ -41,10 +41,6 @@ require_line '^set[[:space:]]+-g[[:space:]]+pwsh-mouse-selection[[:space:]]+off$
     'tmux.windows.conf must leave psmux pwsh mouse-selection off'
 require_line '^set[[:space:]]+-g[[:space:]]+scroll-enter-copy-mode[[:space:]]+on$' \
     'tmux.windows.conf must keep wheel-scroll copy-mode'
-require_line '^set[[:space:]]+-g[[:space:]]+status-style[[:space:]]+"fg=#c4a7e7,bg=#191724"$' \
-    'tmux.windows.conf must set psmux status-style to iris on base for inactive windows'
-reject_line '^setw[[:space:]]+-g[[:space:]]+window-status-format[[:space:]]+"#\[fg=#c4a7e7\]' \
-    'tmux.windows.conf must not rely on inline inactive-window fg under psmux'
 
 if [[ ! -f "$HOME_WIN_CONF" ]]; then
     echo "FAIL: home/dot_tmux.windows.conf must manage the psmux overlay on Windows"
