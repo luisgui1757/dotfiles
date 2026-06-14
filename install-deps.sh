@@ -1141,6 +1141,18 @@ install_tree_sitter_cli() {
         return
     fi
     if [[ "$(uname -s)" == "Linux" && "$PM" != "brew" ]]; then
+        # Alpine/musl cannot execute the glibc-linked upstream release binary
+        # (same reason install_nvim_linux carves Alpine out to apk). Use the
+        # native package so we never leave a non-runnable binary on PATH.
+        if [[ "$(native_linux_pm)" == "apk" ]]; then
+            if ! ask "Install tree-sitter CLI via apk (native Alpine package)?"; then
+                printf "  skipped   %-26s\n" "tree-sitter"
+                return
+            fi
+            native_linux_pm_install apk tree-sitter || \
+                printf "  manual    %-26s apk add tree-sitter failed; install the musl tree-sitter CLI manually\n" "tree-sitter"
+            return
+        fi
         install_tree_sitter_cli_linux
     else
         install tree-sitter "nvim-treesitter main parser CLI"

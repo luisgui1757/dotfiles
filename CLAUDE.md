@@ -769,7 +769,11 @@ save only**. The next plain `:w` formats normally. Implemented in
   `text #e0def4` on `overlay #26233a`, not a bare dark background. Do NOT set
   `ListPredictionTooltip`.
 - **PowerShell Starship init is cached without `Invoke-Expression`, and cache
-  publication is atomic.** `Confirm-StarshipInitScript` still writes
+  publication is race-safe.** (Race-safe, not a single atomic syscall: on the
+  Windows PowerShell 5.1 host this profile also supports, `Move-Item -Force` is
+  replace-via-delete-then-rename, not the .NET atomic-replace overload. The
+  no-torn-reads guarantee comes from writing to a private temp first, and a lost
+  race degrades to the existing cache.) `Confirm-StarshipInitScript` still writes
   `%LOCALAPPDATA%\starship.ps1` (or the cross-platform cache dir) and dot-sources
   it because `Invoke-Expression (& starship init powershell)` is banned. When the
   cache is missing or older than `starship.toml`, `Publish-StarshipInitScript`
