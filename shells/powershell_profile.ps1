@@ -179,7 +179,7 @@ if (Get-Module -ListAvailable PSReadLine) {
         try { Set-PSReadLineOption -PredictionSource History -ErrorAction Stop } catch { Write-Verbose $_.Exception.Message }
     }
 
-    $script:RosePineSelectionColor = "$([char]0x1b)[38;2;25;23;36;48;2;246;193;119m"
+    $script:RosePineSelectionColor = "$([char]0x1b)[38;2;246;193;119;48;2;38;35;58m"
 
     try {
         Set-PSReadLineOption -Colors @{
@@ -198,10 +198,11 @@ if (Get-Module -ListAvailable PSReadLine) {
         }
     } catch { Write-Verbose $_.Exception.Message }
 
-    # MenuComplete uses Selection for the highlighted row. Use Rose Pine base
-    # text on a GOLD background (one ANSI SGR sequence) so the currently selected
-    # completion clearly stands out from the rest; kept separate so invalid SGR
-    # support cannot drop the syntax color table above.
+    # MenuComplete uses Selection for the highlighted row. Use GOLD text on the
+    # Rose Pine overlay background (one ANSI SGR sequence) so the selected
+    # completion stands out via its text color while the background stays the
+    # subtle overlay highlight; kept separate so invalid SGR support cannot drop
+    # the syntax color table above.
     try { Set-PSReadLineOption -Colors @{ Selection = $script:RosePineSelectionColor } -ErrorAction Stop } catch { Write-Verbose $_.Exception.Message }
 
     # Prediction colors. The ListView prediction (the inline + dropdown

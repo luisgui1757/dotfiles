@@ -761,9 +761,10 @@ save only**. The next plain `:w` formats normally. Implemented in
   WHOLE hashtable, so on an old PSReadLine the syntax colors must not depend on a
   prediction key existing. `Selection` is also isolated because MenuComplete uses
   it for the selected row; it must be the full ANSI SGR sequence painting Rose
-  Pine `base #191724` on a `gold #f6c177` background (a high-contrast gold bar so
-  the selected completion clearly stands out from the others), not a bare dark
-  background. Do NOT set `ListPredictionTooltip`.
+  Pine `gold #f6c177` text on the `overlay #26233a` background (gold text on the
+  subtle overlay highlight so the selected completion stands out by color, with
+  the background left dark -- owner preferred this over a full gold-background
+  bar), not a bare dark foreground. Do NOT set `ListPredictionTooltip`.
 - **PowerShell Starship init is cached without `Invoke-Expression`, and cache
   publication is race-safe.** (Race-safe, not a single atomic syscall: on the
   Windows PowerShell 5.1 host this profile also supports, `Move-Item -Force` is
@@ -916,14 +917,14 @@ host OS or shell would otherwise hide a branch from CI.
   cmap with fontTools and asserting each non-ASCII codepoint is a member.
 - **tmux colors track the canonical rose-pine/tmux theme.** Source:
   <https://github.com/rose-pine/tmux>, main variant. Role-based styles
-  carry the colors. Map: status-style `fg=pine,bg=surface`; window-status
-  `fg=iris,bg=surface` (upstream inactive color, explicit -- legible);
+  carry the colors. Map: status-style `fg=pine,bg=base`; window-status
+  `fg=iris,bg=base` (upstream inactive color, explicit -- legible);
   window-status-current `fg=gold,bold`;
   window-status-activity `fg=base,bg=rose`; pane-border `fg=hl_high #524f67`
-  / pane-active-border `fg=gold`; message `fg=muted,bg=surface`;
-  message-command `fg=base,bg=gold`. (Status-area bgs are `surface`, not `base`,
-  so the bar renders opaque over a transparent terminal -- see the opaque-bar
-  note below.) **DO** set explicit
+  / pane-active-border `fg=gold`; message `fg=muted,bg=base`;
+  message-command `fg=base,bg=gold`. (Status-area bgs are `base` -- the dark
+  terminal color; bar opacity comes from WT `opacity: 100`, NOT the bg color, see
+  the opaque-bar note below.) **DO** set explicit
   `window-status-format "#I:#W#F"` and `window-status-current-format
   "#I:#W#F"` -- tmux's DEFAULT format contains a `#{?window_flags,...}`
   conditional that psmux v3.3.4 renders as a literal string in each cell.
@@ -933,24 +934,25 @@ host OS or shell would otherwise hide a branch from CI.
   the foreground-only canonical theme was too subtle in dark terminals; bold is
   the smallest divergence that fixes legibility without breaking the palette.
   Inactive cells use the upstream rose-pine/tmux iris fg via
-  `setw -g window-status-style "fg=#c4a7e7,bg=#1f1d2e"` (iris on surface). The
+  `setw -g window-status-style "fg=#c4a7e7,bg=#191724"` (iris on base). The
   earlier `setw -gu` pine fallback was only 3.4:1 -- illegible; iris is 8.4:1.
-  **Status-bar backgrounds are `surface #1f1d2e`, NOT `base #191724`, on
-  PURPOSE.** The Windows "transparent / washed-out status bar" report was NOT a
-  color or psmux-rendering problem: terminals (Windows Terminal, Ghostty) render
-  a cell whose bg EQUALS the terminal's default background as transparent (the
-  window `opacity` passes through), but render an explicit DIFFERENT bg as
-  opaque. A `base` bar == the terminal default, so it went see-through over the
-  95%-opaque terminal and bled the desktop wallpaper. Setting status bg to
-  `surface` (one shade off base) makes the bar render OPAQUE while the terminal
-  BODY keeps its transparency -- same dark look, legible bar, identical on
-  macOS/Linux Ghostty (`background-opacity = 0.95` + blur) and Windows WT
-  (`opacity: 95`, `useAcrylic` false). This is the synchronized cross-platform
-  fix; do NOT chase it with WT `opacity: 100` (breaks transparency parity) or an
-  overlay `status-style` hack (an earlier wrong attempt, since removed; it
-  assumed psmux ignores `window-status-style`). All status-area bgs (status-style,
-  window-status-style, message-style) use surface; guarded by
-  `tests/tmux/option_test.sh`.
+  **OPAQUE STATUS BAR -- the WT reality (owner-confirmed on a real machine).**
+  Windows Terminal applies its `opacity` WINDOW-WIDE to every cell, regardless of
+  the cell's background color. So a transparent WT (`opacity < 100`) has a
+  transparent status bar no matter what bg the bar uses -- giving the bar an
+  explicit, different-from-default color does NOT make it opaque in WT (this was
+  tried with `surface #1f1d2e` at `opacity: 95` and the bar stayed see-through).
+  That "explicit bg renders opaque" behavior exists in some terminals (alacritty)
+  but NOT in Windows Terminal. Therefore the only way to a solid bar in WT is a
+  fully opaque window: the fragment ships **`opacity: 100`**. Status-area bgs stay
+  `base #191724` (the dark terminal color); the bar is solid because the whole WT
+  window is. macOS/Linux Ghostty keep `background-opacity 0.95` +
+  `background-blur-radius 15`, whose blur renders an opaque-LOOKING dark bar
+  WITHOUT full opacity (WT acrylic is the analog but is unreliable in a VM, hence
+  full opacity on Windows). Do NOT re-add an overlay `status-style` hack (a prior
+  wrong attempt assuming psmux ignores `window-status-style`, since removed) and
+  do NOT switch the bar bg to surface to "fix" opacity (it does not, in WT).
+  Guarded by `tests/tmux/option_test.sh`.
   Status-left (iris-bold session + muted
   separator) and status-right (foam date + gold time) are our own
   customizations, palette-consistent. History/rejected attempts worth not
