@@ -45,10 +45,12 @@ check focus-events on
 check mouse on
 check escape-time 10
 check history-limit 50000
-# Inactive windows use the upstream rose-pine/tmux color (iris on base, 8.4:1);
-# the current-window cell is the gold-bold standout. The earlier `setw -gu`
-# fallback to status-style pine was only 3.4:1 and illegible.
-check window-status-style "fg=#c4a7e7,bg=#191724"
+# Status-bar backgrounds use surface (#1f1d2e), one shade off base, so the bar
+# renders OPAQUE over a transparent terminal (a base bg == the terminal default
+# and would go see-through). Inactive windows keep the upstream iris fg (8.4:1);
+# the current-window cell is the gold-bold standout.
+check status-style "fg=#31748f,bg=#1f1d2e"
+check window-status-style "fg=#c4a7e7,bg=#1f1d2e"
 check window-status-current-style "fg=#f6c177,bold"
 # psmux v3.3.4 stores window-status-current-style but does NOT apply it when
 # rendering window cells -- only inline `#[fg=...]` in the format survives.

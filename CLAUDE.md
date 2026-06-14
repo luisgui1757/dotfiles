@@ -916,12 +916,14 @@ host OS or shell would otherwise hide a branch from CI.
   cmap with fontTools and asserting each non-ASCII codepoint is a member.
 - **tmux colors track the canonical rose-pine/tmux theme.** Source:
   <https://github.com/rose-pine/tmux>, main variant. Role-based styles
-  carry the colors. Map: status-style `fg=pine,bg=base`; window-status
-  `fg=iris,bg=base` (upstream inactive color, explicit -- legible);
+  carry the colors. Map: status-style `fg=pine,bg=surface`; window-status
+  `fg=iris,bg=surface` (upstream inactive color, explicit -- legible);
   window-status-current `fg=gold,bold`;
   window-status-activity `fg=base,bg=rose`; pane-border `fg=hl_high #524f67`
-  / pane-active-border `fg=gold`; message `fg=muted,bg=base`;
-  message-command `fg=base,bg=gold`. **DO** set explicit
+  / pane-active-border `fg=gold`; message `fg=muted,bg=surface`;
+  message-command `fg=base,bg=gold`. (Status-area bgs are `surface`, not `base`,
+  so the bar renders opaque over a transparent terminal -- see the opaque-bar
+  note below.) **DO** set explicit
   `window-status-format "#I:#W#F"` and `window-status-current-format
   "#I:#W#F"` -- tmux's DEFAULT format contains a `#{?window_flags,...}`
   conditional that psmux v3.3.4 renders as a literal string in each cell.
@@ -930,22 +932,25 @@ host OS or shell would otherwise hide a branch from CI.
   in both real tmux and psmux. Active windows use gold with bold weight because
   the foreground-only canonical theme was too subtle in dark terminals; bold is
   the smallest divergence that fixes legibility without breaking the palette.
-  Inactive cells use the upstream rose-pine/tmux color via
-  `setw -g window-status-style "fg=#c4a7e7,bg=#191724"` (iris on base). The
-  earlier `setw -gu` fallback to `status-style` (pine on base) was only 3.4:1 --
-  illegible; iris is 8.4:1. `tmux.windows.conf` is guarded by
-  `tests/tmux/windows_conf_test.sh`. NOTE: the Windows "transparent / washed-out
-  status bar" report was NOT a color or psmux-rendering problem -- it was Windows
-  Terminal transparency (`opacity` < 100 with `useAcrylic` false = sharp,
-  un-blurred see-through) bleeding a bright desktop wallpaper through the bar. An
-  earlier overlay `status-style` hack chased this as if psmux ignored
-  `window-status-style`; that was wrong and has been removed. The fragment now
-  ships `opacity: 100` (fully opaque, GPU-independent -- important under a VM
-  where WT acrylic blur is unreliable), matching how macOS Ghostty
-  (`background-opacity = 0.95` + `background-blur-radius = 15`) renders a
-  readable, opaque-looking bar. The `window-status-style` iris in `tmux.conf` is
-  what keeps inactive text legible on both platforms; do NOT re-add an overlay
-  `status-style` to "fix" psmux inactive color.
+  Inactive cells use the upstream rose-pine/tmux iris fg via
+  `setw -g window-status-style "fg=#c4a7e7,bg=#1f1d2e"` (iris on surface). The
+  earlier `setw -gu` pine fallback was only 3.4:1 -- illegible; iris is 8.4:1.
+  **Status-bar backgrounds are `surface #1f1d2e`, NOT `base #191724`, on
+  PURPOSE.** The Windows "transparent / washed-out status bar" report was NOT a
+  color or psmux-rendering problem: terminals (Windows Terminal, Ghostty) render
+  a cell whose bg EQUALS the terminal's default background as transparent (the
+  window `opacity` passes through), but render an explicit DIFFERENT bg as
+  opaque. A `base` bar == the terminal default, so it went see-through over the
+  95%-opaque terminal and bled the desktop wallpaper. Setting status bg to
+  `surface` (one shade off base) makes the bar render OPAQUE while the terminal
+  BODY keeps its transparency -- same dark look, legible bar, identical on
+  macOS/Linux Ghostty (`background-opacity = 0.95` + blur) and Windows WT
+  (`opacity: 95`, `useAcrylic` false). This is the synchronized cross-platform
+  fix; do NOT chase it with WT `opacity: 100` (breaks transparency parity) or an
+  overlay `status-style` hack (an earlier wrong attempt, since removed; it
+  assumed psmux ignores `window-status-style`). All status-area bgs (status-style,
+  window-status-style, message-style) use surface; guarded by
+  `tests/tmux/option_test.sh`.
   Status-left (iris-bold session + muted
   separator) and status-right (foam date + gold time) are our own
   customizations, palette-consistent. History/rejected attempts worth not
