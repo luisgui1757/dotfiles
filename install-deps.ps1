@@ -1139,6 +1139,21 @@ function Set-VSCodeTheme {
 # VS Code detected -> offer the Rose Pine theme extension + set it active.
 function Install-VSCodeRosePine {
     if (-not (Get-Command code -ErrorAction SilentlyContinue)) {
+        # VS Code was very likely JUST installed in this same run (Install-One
+        # code, immediately above), so its `code` shim is already on the
+        # machine/user PATH in the registry but NOT yet in THIS process -- so the
+        # theme step would skip and VS Code would open as default Dark. Re-compose
+        # PATH from the registry (machine + user, deduped) the way a fresh process
+        # would, then look again. (On Linux the snap/apt `code` lands on PATH
+        # immediately, which is why the theme worked there but not on Windows.)
+        $deduped = (@(
+            [Environment]::GetEnvironmentVariable('PATH', 'Machine'),
+            [Environment]::GetEnvironmentVariable('PATH', 'User'),
+            $env:PATH
+        ) -join ';') -split ';' | Where-Object { $_ } | Select-Object -Unique
+        $env:PATH = $deduped -join ';'
+    }
+    if (-not (Get-Command code -ErrorAction SilentlyContinue)) {
         Write-Host ("  skipped   {0,-26} no 'code' CLI on PATH (reopen your shell after installing VS Code)" -f "rose-pine (vscode)")
         return
     }
