@@ -353,7 +353,25 @@ function Get-InstallDependencySpec {
 function Get-CommandVersionString {
     param([string]$CommandName)
     if ([string]::IsNullOrWhiteSpace($CommandName)) { return '-' }
-    if (-not (Get-Command -Name $CommandName -ErrorAction SilentlyContinue)) { return '-' }
+    $cmd = Get-Command -Name $CommandName -ErrorAction SilentlyContinue
+    if (-not $cmd) { return '-' }
+
+    # NEVER run `wt --version`: Windows Terminal (wt.exe) does NOT print a version
+    # to stdout -- it LAUNCHES a new terminal window to show it, which pops an
+    # annoying window during the dependency pre-flight table. Read the file
+    # version instead (works for the portable install; Store/scoop shims fall back
+    # to "installed"). Any other windowed/GUI tool belongs in this skip list.
+    if ($CommandName -in @('wt')) {
+        try {
+            $src = if ($cmd.PSObject.Properties.Name -contains 'Source') { $cmd.Source } else { $cmd.Path }
+            if ($src -and (Test-Path -LiteralPath $src -PathType Leaf)) {
+                $ver = (Get-Item -LiteralPath $src).VersionInfo.ProductVersion
+                if (-not [string]::IsNullOrWhiteSpace($ver)) { return ([string]$ver).Trim() }
+            }
+        } catch { }
+        return 'installed'
+    }
+
     try {
         $lines = @(& $CommandName --version 2>$null)
         foreach ($line in $lines) {

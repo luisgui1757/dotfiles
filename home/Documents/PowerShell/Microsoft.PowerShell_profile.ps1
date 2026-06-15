@@ -179,7 +179,7 @@ if (Get-Module -ListAvailable PSReadLine) {
         try { Set-PSReadLineOption -PredictionSource History -ErrorAction Stop } catch { Write-Verbose $_.Exception.Message }
     }
 
-    $script:RosePineSelectionColor = "$([char]0x1b)[38;2;246;193;119m"
+    $script:RosePineSelectionColor = "$([char]0x1b)[48;2;38;35;58m"
 
     try {
         Set-PSReadLineOption -Colors @{
@@ -198,11 +198,14 @@ if (Get-Module -ListAvailable PSReadLine) {
         }
     } catch { Write-Verbose $_.Exception.Message }
 
-    # MenuComplete uses Selection for the highlighted row. GOLD foreground ONLY
-    # (no background in the SGR), so the highlighted row keeps the terminal
-    # background -- it blends in and the gold text alone marks the selection.
-    # Kept separate so invalid SGR support cannot drop the syntax color table
-    # above.
+    # PSReadLine uses ONE Selection color for BOTH the highlighted menu item AND
+    # the completion suffix it inserts into the command line (e.g. the ".exe" of
+    # lazygit.exe). A gold FOREGROUND there split the typed line (lazygit in iris
+    # + .exe in gold), which looked wrong. So Selection is a BACKGROUND highlight
+    # (overlay, no foreground): the inserted suffix keeps its own color and blends
+    # with the line, while the selected menu item is marked by a subtle highlight
+    # instead of gold. Kept separate so invalid SGR support cannot drop the syntax
+    # color table above.
     try { Set-PSReadLineOption -Colors @{ Selection = $script:RosePineSelectionColor } -ErrorAction Stop } catch { Write-Verbose $_.Exception.Message }
 
     # Prediction colors. The ListView prediction (the inline + dropdown

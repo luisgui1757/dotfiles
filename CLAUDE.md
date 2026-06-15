@@ -759,13 +759,17 @@ save only**. The next plain `:w` formats normally. Implemented in
   These are applied in SEPARATE `Set-PSReadLineOption -Colors` calls, NOT folded
   into the main syntax hashtable: an unknown color key throws and would drop the
   WHOLE hashtable, so on an old PSReadLine the syntax colors must not depend on a
-  prediction key existing. `Selection` is also isolated because MenuComplete uses
-  it for the selected row; it is a `gold #f6c177` FOREGROUND-only SGR (no
-  background), so the selected row's background blends with the terminal
-  background and the gold text alone marks the selection (owner preferred this
-  over a highlighted background bar). Gold is bright enough that fg-only is
-  legible -- the original bug was a *dark* fg-only value (`#26233a`), not fg-only
-  itself. Do NOT set `ListPredictionTooltip`.
+  prediction key existing. `Selection` is also isolated, and it is a BACKGROUND-
+  only SGR (`overlay #26233a`, no foreground). Important: PSReadLine uses the ONE
+  `Selection` color for BOTH the highlighted MenuComplete item AND the completion
+  suffix it inserts into the command line (the ".exe" of `lazygit.exe`). A
+  foreground color there (e.g. gold) splits the typed line -- the typed prefix
+  keeps its syntax color while the inserted suffix takes the Selection color,
+  which looks wrong. A background-only Selection keeps the inserted suffix in its
+  own color (blends with the line) and marks the menu item with a subtle
+  highlight instead. Do NOT give `Selection` a foreground (it will re-introduce
+  the split), and do NOT use a *dark* foreground (the original dark-on-dark bug).
+  Do NOT set `ListPredictionTooltip`.
 - **PowerShell Starship init is cached without `Invoke-Expression`, and cache
   publication is race-safe.** (Race-safe, not a single atomic syscall: on the
   Windows PowerShell 5.1 host this profile also supports, `Move-Item -Force` is

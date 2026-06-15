@@ -5,6 +5,7 @@ BeforeAll {
     function winget {}
     function scoop {}
     function choco {}
+    function wt {}
 
     $script:ImportInstallDepsForTest = {
         param([switch]$DryRun)
@@ -434,6 +435,21 @@ Describe "install-deps.ps1" {
         $Catalog['chezmoi'].scoop | Should -Be 'chezmoi'
         $Catalog['chezmoi'].winget | Should -Be 'twpayne.chezmoi'
         $Catalog['chezmoi'].choco | Should -Be 'chezmoi'
+    }
+
+    It "reads the wt version from the file, never via 'wt --version' (which pops a window)" {
+        . $script:ImportInstallDepsForTest
+        Mock -CommandName Get-Command -MockWith {
+            [pscustomobject]@{ Name = 'wt'; Source = 'C:\fake\wt.exe' }
+        } -ParameterFilter { $Name -eq 'wt' }
+        Mock -CommandName Test-Path -MockWith { return $true }
+        Mock -CommandName Get-Item -MockWith {
+            [pscustomobject]@{ VersionInfo = [pscustomobject]@{ ProductVersion = '1.24.99' } }
+        }
+        Mock -CommandName wt -MockWith { throw 'wt must never be executed (it launches a window)' }
+
+        Get-CommandVersionString -CommandName 'wt' | Should -Be '1.24.99'
+        Should -Invoke -CommandName wt -Times 0 -Exactly
     }
 
     It "registers tree-sitter in the Windows package catalog" {

@@ -70,7 +70,7 @@ Describe "PowerShell profile" {
         $src | Should -Match '#c4a7e7'   # iris
         $src | Should -Match '#f6c177'   # gold
         $src | Should -Match 'RosePineSelectionColor'
-        $src | Should -Match '\[38;2;246;193;119m'   # gold foreground only (bg blends with terminal)
+        $src | Should -Match '\[48;2;38;35;58m'   # overlay background highlight, no foreground (suffix keeps its color)
         $src | Should -Match 'Set-PSReadLineOption\s+-Colors\s+@\{\s*Selection\s*=\s*\$script:RosePineSelectionColor'
     }
 }
