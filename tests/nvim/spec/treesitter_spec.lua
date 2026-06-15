@@ -57,6 +57,19 @@ describe("treesitter main migration", function()
     )
   end)
 
+  it("guards parser compilation on the tree-sitter CLI being on PATH", function()
+    -- main shells out to `tree-sitter` per parser; without this guard a missing
+    -- CLI dumps one ENOENT error per parser instead of one actionable message.
+    assert.is_truthy(
+      src:match('vim%.fn%.executable%("tree%-sitter"%)'),
+      "must check for the tree-sitter CLI before compiling parsers"
+    )
+    assert.is_truthy(
+      src:match("vim%.notify"),
+      "a missing tree-sitter CLI must surface one actionable warning, not N ENOENT errors"
+    )
+  end)
+
   it("does not use the legacy configs.setup API", function()
     assert.is_nil(src:match("nvim%-treesitter%.configs"), "legacy nvim-treesitter.configs module must be gone")
     assert.is_nil(src:match("ensure_installed"), "legacy ensure_installed must be gone")

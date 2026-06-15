@@ -49,7 +49,28 @@ return {
     event = { "BufReadPre", "BufNewFile" },
     config = function()
       local nvim_treesitter = require("nvim-treesitter")
-      nvim_treesitter.install(treesitter_parsers)
+
+      -- nvim-treesitter `main` shells out to the `tree-sitter` CLI to compile
+      -- each parser. When the CLI is not on PATH (nvim launched from a shell
+      -- that never sourced brew shellenv, or before setup finished installing
+      -- it), main emits a separate ENOENT error for EVERY parser. Guard on the
+      -- CLI so a missing toolchain surfaces ONE actionable message instead of a
+      -- wall of errors. setup installs it (macOS: brew; Linux/WSL: pinned
+      -- release in install-deps.sh; Windows: install-deps.ps1 -All) and re-runs
+      -- the sync with it on PATH; recompile in-session after fixing PATH with
+      -- :TSUpdate.
+      if vim.fn.executable("tree-sitter") == 1 then
+        nvim_treesitter.install(treesitter_parsers)
+      else
+        vim.schedule(function()
+          vim.notify(
+            "nvim-treesitter: 'tree-sitter' CLI not found on PATH; parsers were not compiled. "
+              .. "Install it (macOS: brew install tree-sitter; Linux/WSL: run the dotfiles setup; "
+              .. "Windows: install-deps.ps1 -All), then run :TSUpdate.",
+            vim.log.levels.WARN
+          )
+        end)
+      end
 
       for parser, filetypes in pairs(parser_filetype_aliases) do
         vim.treesitter.language.register(parser, filetypes)
