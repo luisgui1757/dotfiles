@@ -1,8 +1,11 @@
 # Roadmap: AI-CLI integration (Polaris + Pi) into dotfiles
 
-Status: **PLANNED — not implemented.** Best-guess canonical design; a Codex 5.5
-xhigh second opinion is being folded in. Build it on a **fresh branch after
-`chezmoi-pilot` merges** (do not pile it onto the in-test migration branch).
+Status: **PLANNED — not implemented.** Reconciled with a Codex 5.5 xhigh second
+opinion — it **agreed on every major decision** (Option A / Git-Bash, no vendor,
+no submodule, npm-only Pi, after `chezmoi-pilot` merges) and added the refinements
+folded in below (the careful Git-Bash invocation, verified pins, npm PATH repair).
+Build it on a **fresh branch after `chezmoi-pilot` merges** (do not pile it onto
+the in-test migration branch).
 
 ## What each thing is
 
@@ -45,11 +48,23 @@ everything on my machine" the answer is **install `--global`**, NOT vendor.
 | macOS / Linux / WSL | natively from `install-deps.sh` — `bash <polaris>/tools/install --global` |
 | **native Windows** | via **Git-Bash** from `install-deps.ps1` — git is a HARD prereq, so Git-for-Windows ships `bash.exe`. Resolve it from `git`'s install root (`<git>\usr\bin\bash.exe` or `<git>\bin\bash.exe`) and run `& $bash <polaris>/tools/install --global`. Under Git-Bash `$HOME` = `%USERPROFILE%`, so it writes `%USERPROFILE%\.claude\CLAUDE.md`, `%USERPROFILE%\.pi\agent\AGENTS.md`, etc. — the same paths the Windows CLIs read. |
 
-Rejected alternatives: a **pwsh re-implementation** of the renderer (duplicate
-logic, drift risk); **vendor on Windows** (still needs bash to render); **skip on
-Windows** (breaks cross-platform parity — only acceptable as a fallback if the
-Git-Bash path fails). **Open risk to verify:** Git-Bash `$HOME` / MSYS path
-translation / CRLF when the bash script writes Windows-side files.
+**Windows invocation must be careful — NOT a naive `& bash`** (Codex's key
+refinement): the wrapper must (1) locate Git-for-Windows bash specifically and
+**reject `C:\Windows\System32\bash.exe`** (the WSL launcher) / any WSL bash — else
+it writes into the WSL filesystem, not Windows; (2) set `HOME="$(cygpath -u
+"$USERPROFILE")"` and `cygpath -u` the Polaris checkout path; (3) normalize the env
+overrides the installer reads — `CODEX_HOME`, `XDG_CONFIG_HOME`,
+`PI_CODING_AGENT_DIR` — through `cygpath`; (4) run `& $gitBash --noprofile --norc
+-lc 'cd "$1"; exec tools/install --global' polaris <checkout>`. The installer uses
+`$HOME`/env + `mktemp`/`awk`/`cmp`/`mv` and writes LF Markdown, so it IS
+Git-Bash-compatible when invoked this way (confirmed by reading the script). The
+path-translation risk is real but **resolved by the cygpath normalization above**.
+
+Rejected alternatives: a **pwsh re-implementation** of the renderer (duplicates
+`compose_into` + bundle hashing + manifest parsing + drift logic — drift risk);
+**vendor on Windows** (still needs bash to render); **skip native Windows**
+(breaks cross-platform parity — last-resort fallback only, since Git-Bash is
+guaranteed by the git prereq).
 
 ## Honoring the dotfiles invariants
 
@@ -68,7 +83,18 @@ translation / CRLF when the bash script writes Windows-side files.
   other pinned downloads; verify integrity with Polaris's own bundle sha256 /
   `tools/verify-vendor` against a pinned `POLARIS_BUNDLE_SHA256`. Renovate bumps
   the ref; a human reviews the new bundle hash (same pattern as the lazygit /
-  tree-sitter pins). CI stays red until reviewed.
+  tree-sitter pins). CI stays red until reviewed. **Starting pins (Codex-computed,
+  re-verified here — `verify-vendor` reports "bundle MATCHES"):**
+  `POLARIS_REPO_URL=https://github.com/luisgui1757/polaris.git`,
+  `POLARIS_REF=65c96982eb055cca3d2a2bcf86844ca902b76c53`,
+  `POLARIS_BUNDLE_SHA256=eff45a5e7dc888f3c92642ccf677f7d5564e77c642cee1051ae1e005b6d558c2`.
+  Install root: `${XDG_DATA_HOME:-$HOME/.local/share}/dotfiles/polaris` (Unix) /
+  `%LOCALAPPDATA%\dotfiles\polaris` (Windows). Flow: clone → checkout detached REF
+  → assert `git rev-parse HEAD == POLARIS_REF` → `tools/verify-vendor <checkout>
+  $POLARIS_BUNDLE_SHA256` → `tools/install --global`.
+- **Static guard.** Never auto-run `tools/install --target <this repo>` (it would
+  commit a rules block into dotfiles' history) and keep this repo's own `AGENTS.md`
+  thin — add a test that asserts both.
 - **Idempotent + drift-gated + reversible.** `--global` is re-runnable (marked
   block); add `tools/install --check` as a test/CI drift gate; `--remove` is a
   clean uninstall (keeps the user's own text); `--dry-run` previews.
@@ -77,23 +103,37 @@ translation / CRLF when the bash script writes Windows-side files.
 
 ## Pi integration
 
-- Install cross-platform via **`npm install -g @earendil-works/pi-coding-agent`**
-  — node is already installed on every OS (prettier / tree-sitter). Add it as a
-  dedicated installer (like `Install-TreeSitterCli`) or a catalog+npm-fallback
-  entry; verify `pi --version` resolves after install (mind npm global PATH on
-  Linux non-root and the in-process PATH refresh on Windows).
+- **npm-ONLY — do NOT add `pi` to the Scoop/winget/choco `$Catalog`** (Codex's
+  refinement). Package `@earendil-works/pi-coding-agent` (npm/TypeScript,
+  v0.78.1 at time of writing), binary `pi` (`dist/cli.js`), reads
+  `~/.pi/agent/AGENTS.md` globally and per-repo `AGENTS.md`; `--no-context-files`
+  opts out. It is not in any OS package manager, so a dedicated installer
+  (`install_pi_cli` / `Install-PiCli`) running `npm install -g
+  @earendil-works/pi-coding-agent` is the one correct path on every OS — node is
+  already installed everywhere (prettier / tree-sitter).
+- **PATH repair (the real per-OS caveat).** Verify `pi --version` resolves after
+  install. On Linux non-root the npm global prefix is often unwritable / off
+  PATH — fall back to `npm install -g --prefix "$HOME/.local"` and ensure
+  `$HOME/.local/bin` is on PATH (same shim pattern as the `fd-find` → `fd`
+  fix). On Windows the freshly-created npm global shim dir isn't on the
+  in-process PATH — repair it with `Add-DirectoryToUserPath` (the same
+  registry-PATH re-read the VS Code shim fix uses), don't dead-end on a missing
+  `pi` in the same process.
 - **Composition:** install Pi first, then Polaris `--global` writes
   `~/.pi/agent/AGENTS.md`. Pi then auto-loads the rules at startup. No extra
   wiring — Polaris already targets Pi.
 
 ## Implementation checklist (when built)
 
-1. `install-deps.sh`: `install_pi_cli` (npm global) + `install_polaris`
-   (clone @ pinned SHA → `~/.local/share/polaris`, `verify-vendor`, then
-   `bash tools/install --global`); consent-gated, dry-run-safe.
-2. `install-deps.ps1`: `Install-PiCli` (npm) + `Install-Polaris` (clone →
-   `%LOCALAPPDATA%\polaris`, resolve Git-Bash from git, `& $bash tools/install
-   --global`); `-All`-gated/consent, DryRun-safe, best-effort + FAIL marker.
+1. `install-deps.sh`: `install_pi_cli` (npm global, `$HOME/.local` prefix
+   fallback when the global prefix is unwritable) + `install_polaris`
+   (clone @ pinned SHA → `~/.local/share/dotfiles/polaris`, `verify-vendor`,
+   then `bash tools/install --global`); consent-gated, dry-run-safe.
+2. `install-deps.ps1`: `Install-PiCli` (npm, then `Add-DirectoryToUserPath` for
+   the npm shim dir) + `Install-Polaris` (clone → `%LOCALAPPDATA%\dotfiles\polaris`,
+   resolve Git-for-Windows bash — reject WSL `System32\bash.exe` — `& $bash
+   --noprofile --norc -lc tools/install --global`); `-All`-gated/consent,
+   DryRun-safe, best-effort + FAIL marker. Pi stays npm-only (NOT in `$Catalog`).
 3. Pin constants: `POLARIS_REF`, `POLARIS_BUNDLE_SHA256`; renovate.json custom
    manager (version bumpable, SHA human-reviewed — context-only, NOT currentDigest).
 4. Tests: shell + Pester coverage (clone+verify+invoke stubbed; pinned-ref +
@@ -104,8 +144,13 @@ translation / CRLF when the bash script writes Windows-side files.
 
 ## Open questions (Codex pass + a real run will answer)
 
-- Git-Bash `$HOME` / MSYS path translation / CRLF when writing Windows files.
-- Exact Pi npm package name + whether `pi` lands on PATH cleanly per OS.
+- Git-Bash `$HOME` / MSYS path translation / CRLF when writing Windows files
+  (best-guess: resolved by the cygpath normalization + `--noprofile --norc -lc`
+  above; a real Windows run confirms).
+- Whether `pi` lands on PATH cleanly per OS (package name now confirmed:
+  `@earendil-works/pi-coding-agent`, binary `pi`). Best-guess: needs the
+  `$HOME/.local` prefix fallback on Linux non-root and `Add-DirectoryToUserPath`
+  on Windows — both already in the checklist.
 - Whether to also `tools/install --target ~/dotfiles` so the dotfiles repo itself
   carries the rules for contributors (orthogonal, optional, one-time + commit).
 - Renovate hashing of `POLARIS_BUNDLE_SHA256` (context-only match, like the other
