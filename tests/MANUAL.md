@@ -8,8 +8,9 @@ significant change to the relevant area.
 
 - [ ] **Ghostty**, mac: opens with Rose Pine dark, translucent background
       reads cleanly over a coloured wallpaper, font is Hack Nerd at 13pt.
-- [ ] **Ghostty**, mac, light mode: switches to Rose Pine Dawn when the
-      system theme flips.
+- [ ] **Ghostty**, any OS in light mode (e.g. fresh GNOME Ubuntu): STAYS Rose
+      Pine dark -- it must NOT flip to the cream Rose Pine Dawn (theme is forced
+      dark, not the adaptive dark:/light: split).
 - [ ] **Windows Terminal**: rose-pine scheme applied; tabs use the
       configured theme; acrylic OFF on the body, ON in the tab row; a new tab
       opens `PowerShell 7` unless the user intentionally chose another default.

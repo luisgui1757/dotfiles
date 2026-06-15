@@ -5,7 +5,12 @@
 # (chezmoi manages this file at the OS-specific path.)
 
 # ---- Theme -------------------------------------------------------------------
-theme = dark:Rose Pine,light:Rose Pine Dawn
+# ALWAYS the dark Rose Pine theme, every platform -- NOT adaptive
+# (`dark:Rose Pine,light:Rose Pine Dawn`). The whole stack (nvim, tmux, starship,
+# Windows Terminal) is dark Rose Pine; a light desktop -- e.g. a fresh GNOME
+# Ubuntu, which defaults to light -- would otherwise flip ghostty to the cream
+# Rose Pine Dawn variant, which is inconsistent and jarring. Keep this NON-split.
+theme = Rose Pine
 
 # ---- Font --------------------------------------------------------------------
 font-family = Hack Nerd Font

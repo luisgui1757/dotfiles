@@ -209,7 +209,9 @@ muted    #6e6a86   subtle  #908caa   text    #e0def4
 
 Surfaces that consume these: nvim (rose-pine plugin defaults), lualine
 (theme="rose-pine"), starship.toml (`[palettes.rose-pine]`), tmux.conf (hex
-literals in status/borders), ghostty/config (`theme = dark:Rose Pine,...`),
+literals in status/borders), ghostty/config (`theme = Rose Pine` -- forced dark
+on every platform, NOT the adaptive `dark:,light:` split, to match the dark
+stack),
 windows-terminal/settings.fragment.jsonc (`schemes` + `themes`),
 shells/powershell_profile.ps1 (PSReadLine `-Colors` for syntax, `Selection`,
 the version-gated prediction colors, and `$PSStyle.FileInfo.Directory` for `ls`
