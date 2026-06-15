@@ -919,8 +919,8 @@ host OS or shell would otherwise hide a branch from CI.
 - **tmux colors track the canonical rose-pine/tmux theme.** Source:
   <https://github.com/rose-pine/tmux>, main variant. Role-based styles
   carry the colors. Map: status-style `fg=pine,bg=base`; window-status
-  `fg=iris,bg=base` (upstream inactive color, explicit -- legible);
-  window-status-current `fg=gold,bold`;
+  is UNSET (`setw -gu`) so inactive windows inherit status-style (pine/teal) --
+  this teal bar is the owner-preferred look; window-status-current `fg=gold,bold`;
   window-status-activity `fg=base,bg=rose`; pane-border `fg=hl_high #524f67`
   / pane-active-border `fg=gold`; message `fg=muted,bg=base`;
   message-command `fg=base,bg=gold`. (Status-area bgs are `base` -- the dark
@@ -934,9 +934,11 @@ host OS or shell would otherwise hide a branch from CI.
   in both real tmux and psmux. Active windows use gold with bold weight because
   the foreground-only canonical theme was too subtle in dark terminals; bold is
   the smallest divergence that fixes legibility without breaking the palette.
-  Inactive cells use the upstream rose-pine/tmux iris fg via
-  `setw -g window-status-style "fg=#c4a7e7,bg=#191724"` (iris on base). The
-  earlier `setw -gu` pine fallback was only 3.4:1 -- illegible; iris is 8.4:1.
+  Inactive cells are UNSET (`setw -gu window-status-style`) so they inherit
+  status-style (pine on base, i.e. teal) -- the owner-preferred "teal bar". An
+  earlier explicit iris inactive (`fg=#c4a7e7`) was added while chasing a
+  legibility problem that turned out to be terminal TRANSPARENCY, not the color;
+  once that was understood the owner reverted to the inherited teal look.
   **OPAQUE STATUS BAR -- the WT reality (owner-confirmed on a real machine).**
   Windows Terminal applies its `opacity` WINDOW-WIDE to every cell, regardless of
   the cell's background color. So a transparent WT (`opacity < 100`) has a
@@ -967,11 +969,12 @@ host OS or shell would otherwise hide a branch from CI.
   (4) iris inactive + gold-bold ON `bg=overlay #26233a` active block
   (commit 9cf13f8) -- added a bold + bg-block on top of canonical, user
   preferred plain canonical so the embellishment was reverted;
-  (5) `setw -gu window-status-style` (inactive falls back to `status-style`
-  pine on base) -- 3.4:1, illegible (worst under psmux, which does not even
-  render the inherited style); this is exactly why inactive is now set
-  explicitly to the upstream iris. A prior "inactive unstyled" preference
-  (commit ee0d6c9) lost to legibility;
+  (5) explicit iris inactive (`fg=#c4a7e7`) -- added when inactive windows
+  looked illegible, but that was terminal TRANSPARENCY washing the text out, NOT
+  the pine color. Once understood, the owner reverted to `setw -gu` (inactive
+  inherits status-style pine/teal), which is the current default and the look the
+  owner runs. Do NOT re-add explicit iris as a "legibility fix" -- if inactive
+  reads poorly, the cause is WT transparency (`opacity`), not the color;
   (6) relying on `window-status-current-style` alone (commits ee0d6c9 /
   d642a31) -- psmux v3.3.4 stores the option but does NOT apply it when
   rendering window cells. Only `#[fg=...]` INLINED in

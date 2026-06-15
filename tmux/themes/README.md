@@ -29,9 +29,16 @@ final values (or the theme name) and I'll merge it into `tmux/tmux.conf`.
 
 ## What each option does
 
+The **committed default** (`tmux/tmux.conf`) is the **teal** bar: pine/teal
+status *and* inactive windows (inactive is `setw -gu`, so it inherits the pine
+status color), gold active window, iris session, foam date, gold time. These
+files are ALTERNATIVES you can audition against it; `prefix + r` reverts to the
+teal default.
+
 | File | Inactive windows | Active window | Date / time | Mood |
 |------|------------------|---------------|-------------|------|
-| `cool.conf`    | iris `#c4a7e7`  | gold bold | foam / gold  | cool, current default |
+| (default) `tmux.conf` | pine/teal `#31748f` | gold bold | foam / gold | the teal bar — your current look |
+| `cool.conf`    | iris `#c4a7e7`  | gold bold | foam / gold  | like the default but iris inactive |
 | `warm.conf`    | rose `#ebbcba`  | gold bold | rose / love  | warm, cosy |
 | `minimal.conf` | muted `#6e6a86` | bright text bold | muted / subtle | recedes; only active pops |
 
