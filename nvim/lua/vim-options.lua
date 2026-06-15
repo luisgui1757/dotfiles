@@ -79,13 +79,6 @@ vim.api.nvim_create_autocmd("VimEnter", {
   end,
 })
 
--- Disable arrow keys
-for _, mode in ipairs({ "n", "i" }) do
-  for _, key in ipairs({ "<Up>", "<Down>", "<Left>", "<Right>" }) do
-    vim.keymap.set(mode, key, "<Nop>", { noremap = true, silent = true })
-  end
-end
-
 -- Toggle relative line numbers
 vim.keymap.set("n", "<leader>lt", function()
   vim.wo.relativenumber = not vim.wo.relativenumber

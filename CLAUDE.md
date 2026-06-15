@@ -864,8 +864,10 @@ host OS or shell would otherwise hide a branch from CI.
   'NVIM SAW IT'<CR>` never fires) -- any visual "cursor moves on click"
   perception is Windows Terminal's selection anchor inside the nvim
   display rect, not nvim's cursor.
-- **Arrow keys are mapped to `<Nop>`** in `vim-options.lua`. User
-  preference; hjkl-only navigation enforced.
+- **Arrow keys are left at their Neovim defaults** (they move the cursor). An
+  earlier config mapped them to `<Nop>` to enforce hjkl-only navigation; that was
+  removed at the owner's request, so do NOT re-add the arrow `<Nop>` block in
+  `vim-options.lua`.
 - **`vim.opt.clipboard = "unnamedplus"`** even on macOS — works fine via
   pbcopy/pbpaste. The single-register `unnamed` value would lock WSL/Linux
   out.
