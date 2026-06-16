@@ -12,9 +12,14 @@ From any psmux / tmux session:
 # apply a whole theme instantly
 tmux source-file ~/dotfiles/tmux/themes/warm.conf      # adjust path to your clone
 
-# revert to the committed config
+# flip back to the committed "cool" default — either of:
+tmux source-file ~/dotfiles/tmux/themes/cool.conf      # symmetric with the others
 # (Ctrl-b then r — the `bind r source-file ~/.tmux.conf` binding)
 ```
+
+> `cool.conf` is NOT a duplicate of the default — it just re-sources
+> `~/.tmux.conf` (one source of truth), so sourcing it is identical to
+> `prefix + r`. It exists only so all four themes audition the same way.
 
 Tweak a single element live without editing any file — `Ctrl-b` then `:` then:
 
