@@ -355,26 +355,29 @@ is_local_account() {
     awk -F: -v u="$1" '$1==u{found=1} END{exit !found}' /etc/passwd
 }
 
-# Domain-account fallback: we can't chsh, so make INTERACTIVE bash re-exec into
-# zsh. Idempotent (a marked block, re-run safe), interactive-only (scp/rsync and
-# scripts stay bash), and it also points login shells (tmux, ssh) at ~/.bashrc
-# so the guard fires there too. Reversible — delete the marked block to undo.
+# Interactive bash fallback: make bash re-exec into zsh when Linux terminals or
+# tmux still start bash. Domain accounts cannot chsh; local graphical sessions
+# can also keep a stale $SHELL after chsh until full logout. Idempotent (marked
+# block, re-run safe), interactive-only (scp/rsync/scripts stay bash), and it
+# points login shells (tmux, ssh) at ~/.bashrc so the guard fires there too.
+# Reversible — delete the marked block to undo.
 ensure_bash_execs_zsh() {
     local rc="$HOME/.bashrc" profile="$HOME/.bash_profile"
-    local marker="# >>> dotfiles: exec zsh (domain login; chsh unavailable) >>>"
-    if [[ -f "$rc" ]] && grep -qF "$marker" "$rc"; then
+    local marker="# >>> dotfiles: exec zsh (interactive bash fallback) >>>"
+    local legacy_marker="# >>> dotfiles: exec zsh (domain login; chsh unavailable) >>>"
+    if [[ -f "$rc" ]] && { grep -qF "$marker" "$rc" || grep -qF "$legacy_marker" "$rc"; }; then
         echo "  ok        exec-zsh guard already present in ~/.bashrc"
     else
         cat >> "$rc" <<'EOF'
 
-# >>> dotfiles: exec zsh (domain login; chsh unavailable) >>>
+# >>> dotfiles: exec zsh (interactive bash fallback) >>>
 # Interactive bash re-execs into zsh. Guards: not already zsh (no loop), only
 # interactive shells (scp/rsync/scripts stay bash), and zsh must be installed.
 if [ -z "${ZSH_VERSION:-}" ] && [ -n "${BASH_VERSION:-}" ] && [[ $- == *i* ]] && command -v zsh >/dev/null 2>&1; then
     SHELL="$(command -v zsh)"; export SHELL
     exec zsh
 fi
-# <<< dotfiles: exec zsh (domain login; chsh unavailable) <<<
+# <<< dotfiles: exec zsh (interactive bash fallback) <<<
 EOF
     fi
     # tmux / ssh start a LOGIN bash, which reads ~/.bash_profile (not ~/.bashrc).
@@ -391,8 +394,13 @@ EOF
 
 # chsh path — local account, the textbook case.
 adopt_zsh_chsh() {
-    local zsh_path="$1" current="$2"
-    if ! ask "Make zsh your default login shell (chsh)? current: ${current:-unknown}"; then
+    local zsh_path="$1" current="$2" os prompt
+    os="$(uname -s)"
+    prompt="Make zsh your default login shell (chsh)? current: ${current:-unknown}"
+    if [[ "$os" != "Darwin" ]]; then
+        prompt="Make zsh your default shell now (chsh + interactive bash fallback)? current: ${current:-unknown}"
+    fi
+    if ! ask "$prompt"; then
         printf "  skipped   %-26s kept %s\n" "default shell" "${current:-current shell}"
         echo "            (~/.zshrc is symlinked, but tmux / new terminals keep"
         echo "             launching ${current##*/} until the login shell changes)"
@@ -400,6 +408,10 @@ adopt_zsh_chsh() {
     fi
     if [[ "$DRY_RUN" -eq 1 ]]; then
         echo "  would: register $zsh_path in /etc/shells if needed, then chsh -s $zsh_path"
+        if [[ "$os" != "Darwin" ]]; then
+            echo "  would: add an interactive 'exec zsh' guard to ~/.bashrc"
+            echo "         (+ make ~/.bash_profile source ~/.bashrc for login shells)"
+        fi
         return 0
     fi
     if ! ensure_in_etc_shells "$zsh_path"; then
@@ -408,8 +420,14 @@ adopt_zsh_chsh() {
     fi
     if set_login_shell "$zsh_path"; then
         printf "  changed   %-26s login shell -> %s\n" "default shell" "$zsh_path"
-        echo "            log out and back in for it to take effect (tmux started"
-        echo "            after re-login then launches zsh, not bash)"
+        if [[ "$os" != "Darwin" ]]; then
+            ensure_bash_execs_zsh
+            printf "  changed   %-26s ~/.bashrc now execs zsh for interactive shells\n" "default shell"
+            echo "            open a new shell (or new tmux) to land in zsh; chsh also"
+            echo "            fixes the real login shell for future sessions"
+        else
+            echo "            open a new terminal; log out/in if an app kept the old shell"
+        fi
     else
         echo "  WARN: chsh failed; login shell unchanged"
         echo "        manual:  chsh -s '$zsh_path'"

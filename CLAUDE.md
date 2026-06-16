@@ -813,12 +813,17 @@ and tmux / new terminals never source the symlinked `~/.zshrc` (this is the
 - **dry-run-safe** — prints a `would:` line and mutates nothing under `--dry-run`
   (this is why the CI `--dry-run --all` dogfood stays green);
 - it registers zsh in `/etc/shells` first (chsh refuses otherwise) and runs chsh
-  as root / via sudo / via plain PAM, whichever is available. Takes effect on the
-  next login.
+  as root / via sudo / via plain PAM, whichever is available;
+- on Linux local accounts, a successful chsh also installs the same
+  interactive-bash guard used for domain accounts, so new terminals and new tmux
+  sessions land in zsh immediately even when the already-running graphical
+  session still has stale `$SHELL=/bin/bash`. The chsh remains the source of
+  truth for future logins.
 
 It lives in `install-deps.sh`, NOT the chezmoi config layer, and
-NOT `tmux.conf` (a tmux-only `default-command` would paper over the symptom while
-bare TTYs and SSH sessions stayed bash).
+NOT `tmux.conf` or Ghostty config (a terminal-specific command would paper over
+one launcher while bare TTYs, SSH sessions, and tmux stayed coupled to whatever
+the account or parent shell says).
 
 **Domain / non-local accounts (AD/LDAP/SSSD):** these resolve through NSS but
 are NOT in local `/etc/passwd`, so `chsh` fails (`user '<name>' does not exist in
@@ -828,9 +833,11 @@ are NOT in local `/etc/passwd`, so `chsh` fails (`user '<name>' does not exist i
 appends an idempotent, **interactive-only** (`[[ $- == *i* ]]`, so scp/rsync and
 scripts stay bash) marked block to `~/.bashrc` that `export SHELL`s zsh and
 `exec zsh`, and makes `~/.bash_profile` source `~/.bashrc` so login shells (tmux,
-ssh) hit it too. macOS is excluded from this branch (its accounts live in dscl,
-not passwd files, and `chsh` works there). The textbook chsh path is unchanged
-for local accounts.
+ssh) hit it too. The marker is now generic (`interactive bash fallback`), but
+the helper also recognizes the legacy `domain login; chsh unavailable` marker so
+old domain installs do not get a duplicate block on re-run. macOS is excluded
+from the bashrc safety net (its accounts live in dscl, not passwd files, and
+Terminal/iTerm use the passwd shell normally).
 
 **Test seam — leave it:** the line `if [[ -n "${INSTALL_DEPS_SOURCE_ONLY:-}" ]];
 then return …` before the main install sections in `install-deps.sh` exists ONLY
