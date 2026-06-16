@@ -287,7 +287,7 @@ remove_externals() {
     fi
 
     root="$HOME/.local/share/dotfiles/zsh-plugins"
-    for name in zsh-autocomplete zsh-autosuggestions; do
+    for name in fzf-tab zsh-autosuggestions; do
         dir="$root/$name"
         target_exists "$dir" || continue
         if [[ "$FORCE_EXTERNALS" -ne 1 ]] && external_is_dirty "$dir"; then

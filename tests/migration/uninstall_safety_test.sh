@@ -30,14 +30,14 @@ chezmoi --source "$SRC" init
 apply
 pass "chezmoi apply completed"
 
-ext="$HOME/.local/share/dotfiles/zsh-plugins/zsh-autocomplete"
+ext="$HOME/.local/share/dotfiles/zsh-plugins/fzf-tab"
 [[ -d "$ext" ]] || fail "external missing after apply: $ext"
 
 # Scenario A: a DIRTY external must be preserved by --all (no --force-externals).
 printf 'my local hack\n' > "$ext/USER_UNCOMMITTED.txt" # untracked -> dirty
 "$REPO_ROOT/uninstall.sh" --all >"$HOME/A.log" 2>&1 || fail "uninstall --all failed: $(cat "$HOME/A.log")"
 [[ -d "$ext" && -f "$ext/USER_UNCOMMITTED.txt" ]] || fail "dirty external was deleted by --all (data loss)"
-grep -q "keeping .*zsh-autocomplete" "$HOME/A.log" || fail "expected a 'keeping' warning for the dirty external"
+grep -q "keeping .*fzf-tab" "$HOME/A.log" || fail "expected a 'keeping' warning for the dirty external"
 pass "dirty external preserved by --all"
 
 "$REPO_ROOT/uninstall.sh" --all --force-externals >/dev/null 2>&1 || fail "uninstall --force-externals failed"

@@ -285,7 +285,7 @@ function Remove-Externals {
         return
     }
     $root = Join-Path $env:USERPROFILE '.local\share\dotfiles\zsh-plugins'
-    foreach ($name in @('zsh-autocomplete', 'zsh-autosuggestions')) {
+    foreach ($name in @('fzf-tab', 'zsh-autosuggestions')) {
         $dir = Join-Path $root $name
         if (-not (Test-TargetExists -Path $dir)) { continue }
         if ((-not $ForceExternals) -and (Test-ExternalDirty -Dir $dir)) {

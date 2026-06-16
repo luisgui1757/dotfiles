@@ -1,3 +1,4 @@
-# Keep zsh-autocomplete's completion setup deterministic across distros.
+# Skip the global compinit so zshrc's own compinit (and fzf-tab on top of it) is
+# the single, deterministic completion setup across distros.
 # Do not put PATH, prompts, secrets, or slow work here: .zshenv runs for every zsh.
 skip_global_compinit=1

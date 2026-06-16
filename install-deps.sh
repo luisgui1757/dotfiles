@@ -29,8 +29,8 @@ LAZYGIT_LINUX_ARM64_SHA256="9ab63dd75a7e9711c4c68a37d77f4334b8099a5d6a3f8fbe8f4e
 TREE_SITTER_CLI_LINUX_VERSION="v0.26.9"
 TREE_SITTER_CLI_LINUX_X86_64_SHA256="0ea5daaef79145fe73786f0e3cdc43b62b22ddb36f7f6676c9f8bb72434d78e9"
 TREE_SITTER_CLI_LINUX_ARM64_SHA256="8b6c0f53593ce17c7eb90eb08de5ffb9f513f3db585b1fbef12219cacf7e8a68"
-ZSH_AUTOCOMPLETE_VERSION="25.03.19"
-ZSH_AUTOCOMPLETE_COMMIT="a76f26ae25528e76ee53df98ad38fbacdf89fd2e"
+FZF_TAB_VERSION="v1.3.0"
+FZF_TAB_COMMIT="d7e0234614dbe5369fdd760907d12c0e05a4dccc"
 ZSH_AUTOSUGGESTIONS_VERSION="v0.7.1"
 ZSH_AUTOSUGGESTIONS_COMMIT="e52ee8ca55bcc56a17c828767a3f98f22a68d4eb"
 HACK_NERD_FONT_VERSION="v3.4.0"
@@ -1390,27 +1390,29 @@ install_zsh_plugin_repo() {
 }
 
 install_zsh_plugins() {
-    local root autocomplete_dir autosuggestions_dir
+    # fzf-tab gives the fzf-driven fuzzy Tab completion menu; zsh-autosuggestions
+    # gives the inline gray history hint. See shells/zshrc + CLAUDE.md invariant 13.
+    local root fzf_tab_dir autosuggestions_dir
     root="$(zsh_plugin_root)"
-    autocomplete_dir="$root/zsh-autocomplete"
+    fzf_tab_dir="$root/fzf-tab"
     autosuggestions_dir="$root/zsh-autosuggestions"
 
-    if zsh_plugin_ok "$autocomplete_dir" "$ZSH_AUTOCOMPLETE_COMMIT" "zsh-autocomplete.plugin.zsh" &&
+    if zsh_plugin_ok "$fzf_tab_dir" "$FZF_TAB_COMMIT" "fzf-tab.plugin.zsh" &&
         zsh_plugin_ok "$autosuggestions_dir" "$ZSH_AUTOSUGGESTIONS_COMMIT" "zsh-autosuggestions.zsh"; then
         printf "  ok        %-26s pinned refs already installed\n" "zsh plugins"
         return 0
     fi
-    if ! ask "Install zsh-autocomplete + zsh-autosuggestions (repo-managed pinned refs)?"; then
+    if ! ask "Install fzf-tab + zsh-autosuggestions (repo-managed pinned refs)?"; then
         printf "  skipped   %-26s\n" "zsh plugins"
         return 0
     fi
 
     install_zsh_plugin_repo \
-        "zsh-autocomplete" \
-        "https://github.com/marlonrichert/zsh-autocomplete.git" \
-        "$ZSH_AUTOCOMPLETE_VERSION" \
-        "$ZSH_AUTOCOMPLETE_COMMIT" \
-        "zsh-autocomplete.plugin.zsh" || true
+        "fzf-tab" \
+        "https://github.com/Aloxaf/fzf-tab.git" \
+        "$FZF_TAB_VERSION" \
+        "$FZF_TAB_COMMIT" \
+        "fzf-tab.plugin.zsh" || true
     install_zsh_plugin_repo \
         "zsh-autosuggestions" \
         "https://github.com/zsh-users/zsh-autosuggestions.git" \
@@ -2156,11 +2158,11 @@ install_scan_present() {
             fc-list 2>/dev/null | grep -qi "hack.*nerd"
             ;;
         zsh-plugins)
-            local root autocomplete_dir autosuggestions_dir
+            local root fzf_tab_dir autosuggestions_dir
             root="$(zsh_plugin_root)"
-            autocomplete_dir="$root/zsh-autocomplete"
+            fzf_tab_dir="$root/fzf-tab"
             autosuggestions_dir="$root/zsh-autosuggestions"
-            zsh_plugin_ok "$autocomplete_dir" "$ZSH_AUTOCOMPLETE_COMMIT" "zsh-autocomplete.plugin.zsh" &&
+            zsh_plugin_ok "$fzf_tab_dir" "$FZF_TAB_COMMIT" "fzf-tab.plugin.zsh" &&
                 zsh_plugin_ok "$autosuggestions_dir" "$ZSH_AUTOSUGGESTIONS_COMMIT" "zsh-autosuggestions.zsh"
             ;;
         *)
@@ -2177,7 +2179,7 @@ install_scan_version() {
             return
             ;;
         zsh-plugins)
-            printf '%s\n' "$ZSH_AUTOCOMPLETE_VERSION/$ZSH_AUTOSUGGESTIONS_VERSION"
+            printf '%s\n' "$FZF_TAB_VERSION/$ZSH_AUTOSUGGESTIONS_VERSION"
             return
             ;;
         compiler)

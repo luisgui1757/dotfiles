@@ -154,14 +154,14 @@
     },
     {
       "customType": "regex",
-      "description": "zsh-autocomplete pinned tag. The adjacent commit SHA must be reviewed manually after Renovate bumps this.",
+      "description": "fzf-tab pinned tag. The adjacent commit SHA must be reviewed manually after Renovate bumps this.",
       "managerFilePatterns": ["/^install-deps\\.sh$/"],
       "matchStrings": [
-        "ZSH_AUTOCOMPLETE_VERSION=\"(?<currentValue>[^\"]+)\"\\s+ZSH_AUTOCOMPLETE_COMMIT=\"[a-f0-9]{40}\""
+        "FZF_TAB_VERSION=\"(?<currentValue>v[^\"]+)\"\\s+FZF_TAB_COMMIT=\"[a-f0-9]{40}\""
       ],
-      "depNameTemplate": "marlonrichert/zsh-autocomplete",
-      "datasourceTemplate": "github-releases",
-      "versioningTemplate": "loose"
+      "depNameTemplate": "Aloxaf/fzf-tab",
+      "datasourceTemplate": "github-tags",
+      "versioningTemplate": "semver"
     },
     {
       "customType": "regex",

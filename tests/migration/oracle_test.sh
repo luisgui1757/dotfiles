@@ -104,25 +104,25 @@ trap 'rm -rf "$COMMIT_HOME" "$VERIFY_HOME" "$WORK"' EXIT
 apply_clean_home "$COMMIT_HOME"
 pass "commit-assert oracle fixture applied cleanly"
 
-autocomplete_dir="$COMMIT_HOME/.local/share/dotfiles/zsh-plugins/zsh-autocomplete"
-[[ -d "$autocomplete_dir/.git" ]] || \
-    fail "zsh-autocomplete checkout missing at $autocomplete_dir"
+fzf_tab_dir="$COMMIT_HOME/.local/share/dotfiles/zsh-plugins/fzf-tab"
+[[ -d "$fzf_tab_dir/.git" ]] || \
+    fail "fzf-tab checkout missing at $fzf_tab_dir"
 
-pinned_head="$(git_head "$autocomplete_dir")"
-autocomplete_ref="$(git -C "$autocomplete_dir" describe --exact-match --tags HEAD 2>/dev/null || true)"
-[[ -n "$autocomplete_ref" ]] || \
-    fail "zsh-autocomplete HEAD is not at a tag; cannot deepen a known pinned ref"
-if ! git -C "$autocomplete_dir" rev-parse --verify HEAD~1 >/dev/null 2>&1; then
-    git -C "$autocomplete_dir" fetch --deepen=1 origin "$autocomplete_ref" >/dev/null 2>&1 || \
-        fail "could not deepen zsh-autocomplete checkout to find a different real commit"
+pinned_head="$(git_head "$fzf_tab_dir")"
+fzf_tab_ref="$(git -C "$fzf_tab_dir" describe --exact-match --tags HEAD 2>/dev/null || true)"
+[[ -n "$fzf_tab_ref" ]] || \
+    fail "fzf-tab HEAD is not at a tag; cannot deepen a known pinned ref"
+if ! git -C "$fzf_tab_dir" rev-parse --verify HEAD~1 >/dev/null 2>&1; then
+    git -C "$fzf_tab_dir" fetch --deepen=1 origin "$fzf_tab_ref" >/dev/null 2>&1 || \
+        fail "could not deepen fzf-tab checkout to find a different real commit"
 fi
-bad_head="$(git -C "$autocomplete_dir" rev-parse --verify HEAD~1)" || \
-    fail "could not resolve zsh-autocomplete HEAD~1 after deepen"
+bad_head="$(git -C "$fzf_tab_dir" rev-parse --verify HEAD~1)" || \
+    fail "could not resolve fzf-tab HEAD~1 after deepen"
 [[ "$bad_head" != "$pinned_head" ]] || \
-    fail "zsh-autocomplete alternate commit unexpectedly equals pinned HEAD"
-git -C "$autocomplete_dir" checkout --detach "$bad_head" >/dev/null 2>&1 || \
-    fail "could not corrupt zsh-autocomplete checkout to $bad_head"
-pass "commit-assert oracle corrupted zsh-autocomplete HEAD"
+    fail "fzf-tab alternate commit unexpectedly equals pinned HEAD"
+git -C "$fzf_tab_dir" checkout --detach "$bad_head" >/dev/null 2>&1 || \
+    fail "could not corrupt fzf-tab checkout to $bad_head"
+pass "commit-assert oracle corrupted fzf-tab HEAD"
 
 commit_assert="$WORK/verify-zsh-plugin-pins.sh"
 commit_assert_log="$WORK/verify-zsh-plugin-pins.log"
@@ -133,13 +133,13 @@ env HOME="$COMMIT_HOME" bash "$commit_assert" > "$commit_assert_log" 2>&1 || \
     commit_assert_rc=$?
 if [[ "$commit_assert_rc" -eq 0 ]]; then
     print_log "$commit_assert_log"
-    fail "commit-assert accepted a bad zsh-autocomplete pin"
+    fail "commit-assert accepted a bad fzf-tab pin"
 fi
-if ! grep -Fq "FAIL: zsh-autocomplete HEAD" "$commit_assert_log"; then
+if ! grep -Fq "FAIL: fzf-tab HEAD" "$commit_assert_log"; then
     print_log "$commit_assert_log"
-    fail "commit-assert failed without the zsh-autocomplete FAIL line"
+    fail "commit-assert failed without the fzf-tab FAIL line"
 fi
-pass "commit-assert fires on a bad zsh-autocomplete pin"
+pass "commit-assert fires on a bad fzf-tab pin"
 
 apply_clean_home "$VERIFY_HOME"
 pass "verify oracle fixture applied cleanly"

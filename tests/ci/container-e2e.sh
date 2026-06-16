@@ -93,8 +93,8 @@ if [[ "${1:-}" == "--as-user" ]]; then
     assert_file_content "$HOME/.config/lazygit/config.yml" "$repo/lazygit/config.yml"
 
     plugin_root="${XDG_DATA_HOME:-$HOME/.local/share}/dotfiles/zsh-plugins"
-    [[ -r "$plugin_root/zsh-autocomplete/zsh-autocomplete.plugin.zsh" ]] \
-        || fail "zsh-autocomplete plugin file missing"
+    [[ -r "$plugin_root/fzf-tab/fzf-tab.plugin.zsh" ]] \
+        || fail "fzf-tab plugin file missing"
     [[ -r "$plugin_root/zsh-autosuggestions/zsh-autosuggestions.zsh" ]] \
         || fail "zsh-autosuggestions plugin file missing"
 

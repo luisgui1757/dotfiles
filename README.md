@@ -250,11 +250,14 @@ and whether `pwsh` is installed.
   skip/install action. The table is informational; the existing per-tool install
   logic still decides what actually runs.
 - zsh plugins are installed by Unix setup as repo-managed pinned git checkouts:
-  `zsh-autocomplete` and `zsh-autosuggestions` live under
+  `fzf-tab` and `zsh-autosuggestions` live under
   `${XDG_DATA_HOME:-$HOME/.local/share}/dotfiles/zsh-plugins`. `zshrc` sources
   those copies first and falls back to Homebrew/system paths only when the
-  managed copy is missing. `zsh-autocomplete` loads before local `compinit`;
-  `zsh-autosuggestions` loads after completion setup.
+  managed copy is missing. Completion is `fzf-tab` (an fzf-driven fuzzy Tab
+  menu over native `compinit`) — it loads *after* `compinit` and *before*
+  `zsh-autosuggestions`, and reclaims Tab after fzf's own key-bindings. This is
+  the PowerShell-PSReadLine analog (Tab menu + inline gray history prediction);
+  see CLAUDE.md invariant 13.
 - Linux without Homebrew gets Neovim from a pinned official GitHub release
   tarball installed into `/opt/nvim-linux-<arch>` and symlinked to
   `/usr/local/bin/nvim`. The tarball SHA-256 is verified before extraction.
@@ -493,7 +496,7 @@ stale; CI then fails verification until a human reviews the adjacent constant.
   prompt.
 - **Zsh starship init is precompiled** (mirroring the PowerShell profile
   approach) — re-generated only when `starship.toml` is newer than the cache.
-- **zsh plugin installs are repo-managed pins.** `zsh-autocomplete` and
+- **zsh plugin installs are repo-managed pins.** `fzf-tab` and
   `zsh-autosuggestions` are installed during Unix setup, sourced from XDG data
   before package-manager fallbacks, and verified against tag commit IDs so a
   Renovate ref bump still gets human review.

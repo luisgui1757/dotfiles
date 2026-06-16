@@ -66,33 +66,67 @@ _dotfiles_source_first_readable() {
 }
 
 _dotfiles_zsh_plugin_root="${XDG_DATA_HOME:-$HOME/.local/share}/dotfiles/zsh-plugins"
-_dotfiles_autocomplete_loaded=0
-if _dotfiles_source_first_readable \
-    "$_dotfiles_zsh_plugin_root/zsh-autocomplete/zsh-autocomplete.plugin.zsh" \
-    "${HOMEBREW_PREFIX:-}/share/zsh-autocomplete/zsh-autocomplete.plugin.zsh" \
-    "/usr/share/zsh-autocomplete/zsh-autocomplete.plugin.zsh"; then
-  _dotfiles_autocomplete_loaded=1
-fi
 
-# ---- Completion (cached compinit fallback; autocomplete manages its own) -----
-if [[ "$_dotfiles_autocomplete_loaded" -ne 1 ]]; then
-  autoload -Uz compinit
-  mkdir -p "${HOME}/.cache"
-  _zcompdump="${HOME}/.cache/zcompdump-${ZSH_VERSION}"
-  if [[ -n "$_zcompdump"(#qN.mh+24) ]]; then
-    compinit -d "$_zcompdump"
-  else
-    compinit -C -d "$_zcompdump"
+# ---- Completion: native compinit + fzf-tab fuzzy Tab menu (PowerShell-like) --
+# Tab opens an fzf-driven, fuzzy-filterable, navigable, colored picker over zsh's
+# REAL context-aware completions (git subcommands, ssh hosts, kill PIDs, env
+# vars -- not just files): the analog of PowerShell's MenuComplete, with fuzzy
+# narrowing on top. fzf-tab WRAPS the Tab widget, so it must load AFTER compinit
+# + the completion zstyles and BEFORE zsh-autosuggestions, and it must be the
+# LAST thing to own Tab (the fzf key-binding block below reclaims it). When fzf
+# is absent it falls back to the native `menu-select` widget so a no-fzf machine
+# still gets a usable menu (and zsh_startup_test stays green).
+autoload -Uz compinit
+mkdir -p "${HOME}/.cache"
+_zcompdump="${HOME}/.cache/zcompdump-${ZSH_VERSION}"
+if [[ -n "$_zcompdump"(#qN.mh+24) ]]; then
+  compinit -d "$_zcompdump"
+else
+  compinit -C -d "$_zcompdump"
+fi
+unset _zcompdump
+zmodload -i zsh/complist
+zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'   # case-insensitive matching
+zstyle ':completion:*' list-colors "${(s.:.)LS_COLORS}"     # colorize entries
+zstyle ':completion:*:descriptions' format '[%d]'           # fzf-tab group headers
+
+if command -v fzf >/dev/null 2>&1; then
+  # fzf-tab renders the menu via fzf, so zsh's own menu must be OFF.
+  zstyle ':completion:*' menu no
+  zstyle ':fzf-tab:*' switch-group '<' '>'
+  zstyle ':fzf-tab:*' fzf-min-height 15
+  zstyle ':fzf-tab:*' fzf-flags --color=hl:#f6c177,hl+:#f6c177   # gold = selected (Rose Pine)
+  zstyle ':fzf-tab:complete:cd:*' fzf-preview 'ls -1p -- "$realpath" 2>/dev/null'
+  if ! _dotfiles_source_first_readable \
+      "$_dotfiles_zsh_plugin_root/fzf-tab/fzf-tab.plugin.zsh"; then
+    # fzf present but fzf-tab not installed yet -> native menu fallback.
+    zstyle ':completion:*' menu select
+    bindkey '^I' menu-select
   fi
-  unset _zcompdump
+else
+  zstyle ':completion:*' menu select                        # no fzf -> native menu
+  bindkey '^I' menu-select
 fi
 
+# Inline gray history suggestion (the PowerShell InlinePrediction analog; accept
+# the whole suggestion with Right-arrow / End). Loads AFTER fzf-tab so widget
+# wrapping order is correct. The one zsh plugin sourced for prediction.
+ZSH_AUTOSUGGEST_STRATEGY=(history completion)               # ~ HistoryAndPlugin
+ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=#908caa'                # match PS InlinePrediction
+ZSH_AUTOSUGGEST_MANUAL_REBIND=1                             # perf: no per-prompt rebinds
 _dotfiles_source_first_readable \
   "$_dotfiles_zsh_plugin_root/zsh-autosuggestions/zsh-autosuggestions.zsh" \
   "${HOMEBREW_PREFIX:-}/share/zsh-autosuggestions/zsh-autosuggestions.zsh" \
   "/usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
 
-unset _dotfiles_autocomplete_loaded _dotfiles_zsh_plugin_root
+# Up / Down = prefix history search (PowerShell HistorySearchBackward/Forward).
+autoload -Uz up-line-or-beginning-search down-line-or-beginning-search
+zle -N up-line-or-beginning-search
+zle -N down-line-or-beginning-search
+bindkey '^[[A' up-line-or-beginning-search
+bindkey '^[[B' down-line-or-beginning-search
+
+unset _dotfiles_zsh_plugin_root
 unfunction _dotfiles_source_first_readable 2>/dev/null || true
 
 # ---- Starship init (precompiled, like the PowerShell profile) ---------------
@@ -125,6 +159,14 @@ if command -v fzf >/dev/null 2>&1; then
       [[ -r "$_fzf_dir/completion.zsh"   ]] && source "$_fzf_dir/completion.zsh"
     done
     unset _fzf_dir
+  fi
+  # fzf's `--zsh` integration ends by binding Tab to `fzf-completion`, stealing
+  # it. Keep fzf's Ctrl-R / Ctrl-T / Alt-C widgets, but reclaim Tab for fzf-tab
+  # so the structured fuzzy completion menu owns Tab. Guard on the widget
+  # existing so a machine with fzf but without fzf-tab keeps its native
+  # menu-select binding from the completion block above.
+  if whence -w fzf-tab-complete >/dev/null 2>&1; then
+    bindkey '^I' fzf-tab-complete
   fi
 fi
 

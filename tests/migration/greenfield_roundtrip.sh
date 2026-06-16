@@ -116,7 +116,7 @@ while IFS= read -r rel; do
     assert_symlink_into_repo "$rel" "$HOME/$rel"
 done < <(managed_rels_for_host)
 
-for plugin in zsh-autocomplete zsh-autosuggestions; do
+for plugin in fzf-tab zsh-autosuggestions; do
     [[ -d "$HOME/.local/share/dotfiles/zsh-plugins/$plugin" ]] || fail "missing external plugin: $plugin"
 done
 pass "zsh plugin externals exist after apply"
@@ -133,7 +133,7 @@ done < <(managed_rels_for_host)
 [[ "$(cat "$HOME/.tmux.conf")" == "$preseed" ]] || fail "restored ~/.tmux.conf content mismatch"
 pass "pre-seeded config restored from backup"
 
-for plugin in zsh-autocomplete zsh-autosuggestions; do
+for plugin in fzf-tab zsh-autosuggestions; do
     [[ ! -e "$HOME/.local/share/dotfiles/zsh-plugins/$plugin" ]] || fail "external plugin still exists after uninstall: $plugin"
 done
 pass "zsh plugin externals removed"

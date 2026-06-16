@@ -23,7 +23,7 @@ application remain owner-tracked release controls.
 | tmux POSIX overlay | `tmux/tmux.posix.conf`; `home/dot_tmux.posix.conf` | POSIX: `~/.tmux.posix.conf`; Windows: ignored | POSIX symlink only. Holds the native-clipboard `if-shell` probes, which hang psmux at config-load time, so it is **never** deployed on Windows; `tmux.conf` sources it with `source-file -q`. |
 | Windows Terminal | `windows-terminal/settings.fragment.jsonc`; `home/.chezmoitemplates/windows-terminal/settings.fragment.jsonc` | Windows: `%LOCALAPPDATA%\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json` | `setup.ps1` backs up an existing pre-merge file, then `modify_settings.json.ps1.tmpl` performs the read-modify-write merge. chezmoi owns only the packaged target; after apply, `setup.ps1` mirrors that file to the unpackaged portable WT path (`%LOCALAPPDATA%\Microsoft\Windows Terminal\settings.json`), or -- when no packaged WT exists (e.g. Windows Sandbox / portable-only) -- seeds or merges the Rose Pine + Hack Nerd Font settings into it directly via the shared `merge-settings.ps1` helper. |
 | PowerShell profile | `shells/powershell_profile.ps1`; `home/Documents/PowerShell/Microsoft.PowerShell_profile.ps1` | Windows PS7: `%USERPROFILE%\Documents\PowerShell\Microsoft.PowerShell_profile.ps1`; Windows PowerShell 5.1 and POSIX pwsh profile paths stay out of chezmoi scope | Windows PS7 profile copy via `mode = "file"`. |
-| zsh plugins | `home/.chezmoiexternal.toml.tmpl`; `home/.chezmoiscripts/run_onchange_after_20-verify-zsh-plugin-pins.sh.tmpl` | POSIX: `~/.local/share/dotfiles/zsh-plugins/{zsh-autocomplete,zsh-autosuggestions}`; Windows: ignored | Pinned `.chezmoiexternal` git repos plus `run_onchange_` exact-commit assertion. |
+| zsh plugins | `home/.chezmoiexternal.toml.tmpl`; `home/.chezmoiscripts/run_onchange_after_20-verify-zsh-plugin-pins.sh.tmpl` | POSIX: `~/.local/share/dotfiles/zsh-plugins/{fzf-tab,zsh-autosuggestions}`; Windows: ignored | Pinned `.chezmoiexternal` git repos plus `run_onchange_` exact-commit assertion. |
 
 The migration oracle is manifest-driven:
 `tests/migration/parity_gate.sh`, `tests/migration/oracle_test.sh`, and
@@ -73,7 +73,7 @@ then remove only targets they can prove are repo-owned:
   a target is removed. Pass `--no-restore-backups` / `-NoRestoreBackups` to
   skip restoration.
 - The zsh plugin externals under
-  `~/.local/share/dotfiles/zsh-plugins/{zsh-autocomplete,zsh-autosuggestions}`
+  `~/.local/share/dotfiles/zsh-plugins/{fzf-tab,zsh-autosuggestions}`
   are removed unless `--keep-externals` / `-KeepExternals` is passed. A checkout
   with uncommitted/untracked changes (or one whose cleanliness cannot be
   verified) is kept even under `--all`; pass `--force-externals` /

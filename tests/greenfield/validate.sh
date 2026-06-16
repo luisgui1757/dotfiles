@@ -218,10 +218,10 @@ assert_zsh_plugins() {
         return
     fi
     plugin_root="${XDG_DATA_HOME:-$HOME/.local/share}/dotfiles/zsh-plugins"
-    if [[ -r "$plugin_root/zsh-autocomplete/zsh-autocomplete.plugin.zsh" ]]; then
-        pass_check "zsh-autocomplete plugin file exists"
+    if [[ -r "$plugin_root/fzf-tab/fzf-tab.plugin.zsh" ]]; then
+        pass_check "fzf-tab plugin file exists"
     else
-        fail_check "zsh-autocomplete plugin file missing"
+        fail_check "fzf-tab plugin file missing"
     fi
     if [[ -r "$plugin_root/zsh-autosuggestions/zsh-autosuggestions.zsh" ]]; then
         pass_check "zsh-autosuggestions plugin file exists"

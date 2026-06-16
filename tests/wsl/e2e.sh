@@ -70,7 +70,7 @@ else
 fi
 
 plugin_root="${XDG_DATA_HOME:-$HOME/.local/share}/dotfiles/zsh-plugins"
-[[ -r "$plugin_root/zsh-autocomplete/zsh-autocomplete.plugin.zsh" ]] || fail "zsh-autocomplete plugin file missing"
+[[ -r "$plugin_root/fzf-tab/fzf-tab.plugin.zsh" ]] || fail "fzf-tab plugin file missing"
 [[ -r "$plugin_root/zsh-autosuggestions/zsh-autosuggestions.zsh" ]] || fail "zsh-autosuggestions plugin file missing"
 zsh -i -c "source '$HOME/.zshrc'" >/dev/null 2>&1 || fail "zshrc failed to source interactively"
 note "zsh plugins installed and zshrc sources cleanly"

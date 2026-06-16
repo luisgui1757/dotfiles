@@ -1,12 +1,12 @@
 {{- if ne .targetOS "windows" }}
 # POSIX-only: shells/zshrc sources these repo-managed plugin checkouts first.
-# Values are grounded in install-deps.sh:26-29,725-727,816-824.
-[".local/share/dotfiles/zsh-plugins/zsh-autocomplete"]
+# Pins are grounded in install-deps.sh FZF_TAB_* / ZSH_AUTOSUGGESTIONS_* constants.
+[".local/share/dotfiles/zsh-plugins/fzf-tab"]
     type = "git-repo"
-    url = "https://github.com/marlonrichert/zsh-autocomplete.git"
+    url = "https://github.com/Aloxaf/fzf-tab.git"
     refreshPeriod = "0"
-    [".local/share/dotfiles/zsh-plugins/zsh-autocomplete".clone]
-        args = ["--depth", "1", "--branch", "25.03.19"]
+    [".local/share/dotfiles/zsh-plugins/fzf-tab".clone]
+        args = ["--depth", "1", "--branch", "v1.3.0"]
 
 [".local/share/dotfiles/zsh-plugins/zsh-autosuggestions"]
     type = "git-repo"
