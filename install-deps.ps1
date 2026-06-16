@@ -8,19 +8,23 @@
 # Prints manual-install hints only when no manager carries the package.
 #
 # Usage:
-#   .\install-deps.ps1            prompt Y/n for each tool
+#   .\install-deps.ps1            show a dependency table, then prompt once
 #   .\install-deps.ps1 -All       skip prompts, install everything
+#   .\install-deps.ps1 -Update    update only present Scoop-managed catalog tools
 #   .\install-deps.ps1 -DryRun    print what would be installed without acting
 
 [CmdletBinding()]
 param(
     [switch]$All,
+    [switch]$Update,
     [switch]$DryRun
 )
 
 $ErrorActionPreference = 'Continue'
 $HackNerdFontVersion = 'v3.4.0'
 $HackNerdFontSha256 = '8ca33a60c791392d872b80d26c42f2bfa914a480f9eb2d7516d9f84373c36897'
+$WindowsTerminalVersion = 'v1.24.11321.0'
+$WindowsTerminalX64Sha256 = '7caef554147e5498ed1becdca73cdedb79fbc81f89032e46ae9b095c53433812'
 
 # ---- Package-manager detection + scoop bootstrap -----------------------------
 function Get-AvailablePM {
@@ -47,11 +51,86 @@ function Add-ScoopToPathForCurrentProcess {
     }
 }
 
+function Add-ScoopBucketSafe {
+    # Idempotent, non-interactive `scoop bucket add`. Returns $true if the bucket
+    # is present AND populated afterward, $false otherwise. NEVER throws, so a
+    # failed clone falls through to the next package manager instead of hanging
+    # or aborting (matters under a Stop-strict ErrorActionPreference too -- the
+    # chezmoi run-script port relies on this).
+    #
+    # Hardens two real, sporadic failures of `scoop bucket add` (it git-clones):
+    #   1) git / Git Credential Manager prompting (or popping a browser) over a
+    #      non-interactive console (psmux / SSH / setup.ps1 / chez apply) -> a
+    #      credential challenge would otherwise HANG the whole run and eventually
+    #      surface as "authentication failed". GIT_TERMINAL_PROMPT=0 +
+    #      GCM_INTERACTIVE=0 make git/GCM FAIL FAST instead.
+    #   2) ScoopInstaller/Scoop#5482 / #5814: `scoop bucket add` reports success
+    #      even when the underlying clone fails, leaving an EMPTY bucket. We verify
+    #      the bucket dir is non-empty and purge a half-clone so retry is clean.
+    #
+    # When $Url is empty, fall back to the bare `scoop bucket add <name>` form so
+    # the scoop known-bucket table resolves the canonical URL (extras / nerd-fonts).
+    param(
+        [Parameter(Mandatory)][string]$Name,
+        [string]$Url = ''
+    )
+    $scoopRoot = if ($env:SCOOP) { $env:SCOOP } else { Join-Path $env:USERPROFILE 'scoop' }
+    $bucketDir = Join-Path (Join-Path $scoopRoot 'buckets') $Name
+    $populated = {
+        (Test-Path -LiteralPath $bucketDir) -and
+        (@(Get-ChildItem -LiteralPath $bucketDir -Force -ErrorAction SilentlyContinue).Count -gt 0)
+    }
+
+    if (& $populated) { return $true }   # already added + populated: skip the clone
+
+    $oldPrompt = $env:GIT_TERMINAL_PROMPT
+    $oldGcm = $env:GCM_INTERACTIVE
+    $env:GIT_TERMINAL_PROMPT = '0'   # git: no terminal prompt -> fail instead of block
+    $env:GCM_INTERACTIVE = '0'       # GCM: never prompt / open a browser -> fail fast
+    try {
+        foreach ($attempt in 1..2) {
+            # 2>&1 keeps the diagnostic (NOT 2>$null) so a real failure is visible.
+            if ([string]::IsNullOrEmpty($Url)) {
+                scoop bucket add $Name 2>&1 | Out-Null
+            } else {
+                scoop bucket add $Name $Url 2>&1 | Out-Null
+            }
+            if (& $populated) { return $true }
+            # Purge a half-cloned / empty bucket so the next attempt starts clean
+            # (Scoop#5482: a registered-but-empty bucket otherwise blocks re-add).
+            if (Test-Path -LiteralPath $bucketDir) {
+                Remove-Item -LiteralPath $bucketDir -Recurse -Force -ErrorAction SilentlyContinue
+            }
+            scoop bucket rm $Name 2>&1 | Out-Null
+        }
+        Write-Warning ("scoop bucket add {0} did not populate a usable bucket; recover with 'scoop bucket rm {0}' then re-run" -f $Name)
+        return $false
+    } finally {
+        $env:GIT_TERMINAL_PROMPT = $oldPrompt
+        $env:GCM_INTERACTIVE = $oldGcm
+    }
+}
+
 function Ensure-ScoopBuckets {
     if (-not (Get-Command scoop -ErrorAction SilentlyContinue)) { return }
     if ($DryRun) { return }
-    scoop bucket add extras 2>$null | Out-Null
-    scoop bucket add nerd-fonts 2>$null | Out-Null
+    # `scoop bucket add` clones the bucket repo with git, so git MUST exist first.
+    # On a truly fresh machine (Windows Sandbox, clean install) git is not present
+    # yet at this point, and the extras/nerd-fonts adds fail with "Git is required
+    # for buckets". Install git from the main bucket first -- main ships with scoop
+    # and needs no git -- before adding the other buckets. (CI runners come with
+    # git preinstalled, which hid this on every hosted job.)
+    if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+        Write-Host "  scoop: installing git first (required to clone buckets)"
+        try {
+            scoop install git
+            Add-ScoopToPathForCurrentProcess
+        } catch {
+            Write-Warning ("scoop install git failed; bucket adds may fail: " + $_.Exception.Message)
+        }
+    }
+    Add-ScoopBucketSafe -Name 'extras' | Out-Null
+    Add-ScoopBucketSafe -Name 'nerd-fonts' | Out-Null
 }
 
 function Install-Scoop {
@@ -66,30 +145,33 @@ function Install-Scoop {
         if (Test-IsElevated) {
             Write-Host "  would: download get.scoop.sh, then run install.ps1 -RunAsAdmin"
         } else {
-            Write-Host "  would: irm get.scoop.sh | iex"
+            Write-Host "  would: download get.scoop.sh, then run install.ps1"
         }
         return $false
     }
     try {
         # The official scoop bootstrap. RemoteSigned policy is needed for the
-        # script; we set it for the current process only.
+        # script; it is set for the current process only.
         Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process -Force
+        $installer = Join-Path $env:TEMP "scoop-install-$([guid]::NewGuid()).ps1"
+        Invoke-WebRequest -Uri 'https://get.scoop.sh' -OutFile $installer -UseBasicParsing -ErrorAction Stop
         if (Test-IsElevated) {
             # GitHub Windows runners are elevated. Scoop blocks elevated
             # bootstrap by default, so use the installer documented opt-in
             # instead of trying to de-elevate the CI process.
-            $installer = Join-Path $env:TEMP "scoop-install-$([guid]::NewGuid()).ps1"
-            Invoke-WebRequest -Uri 'https://get.scoop.sh' -OutFile $installer -UseBasicParsing -ErrorAction Stop
             & $installer -RunAsAdmin
-            Remove-Item -LiteralPath $installer -Force -ErrorAction SilentlyContinue
         } else {
-            Invoke-Expression (Invoke-RestMethod -Uri 'https://get.scoop.sh' -ErrorAction Stop)
+            & $installer
         }
+        Remove-Item -LiteralPath $installer -Force -ErrorAction SilentlyContinue
         Add-ScoopToPathForCurrentProcess
         # Add the standard buckets so existing catalog entries resolve.
         Ensure-ScoopBuckets
         return [bool](Get-Command scoop -ErrorAction SilentlyContinue)
     } catch {
+        if ($installer) {
+            Remove-Item -LiteralPath $installer -Force -ErrorAction SilentlyContinue
+        }
         Write-Warning ("Scoop install failed: " + $_.Exception.Message)
         return $false
     }
@@ -104,26 +186,78 @@ function Ask {
     return ($resp -match '^[Yy]')
 }
 
+function Test-InstallPromptAvailable {
+    if ($All -or $DryRun) { return $false }
+    if (-not [Environment]::UserInteractive) { return $false }
+    try {
+        if ([Console]::IsInputRedirected) { return $false }
+    } catch {
+        return $false
+    }
+    return $true
+}
+
 function Test-FileSha256 {
     param([string]$Path, [string]$Expected)
     return ((Get-FileHash $Path -Algorithm SHA256).Hash.ToLowerInvariant() -eq $Expected.ToLowerInvariant())
+}
+
+function Normalize-PathListEntry {
+    param([string]$Value)
+    if ([string]::IsNullOrWhiteSpace($Value)) { return '' }
+    return $Value.Trim().TrimEnd([char[]]@([char]92, [char]47))
+}
+
+function Test-PathListContains {
+    param([string]$PathValue, [string]$Directory)
+    if ([string]::IsNullOrEmpty($PathValue)) { return $false }
+    $needle = Normalize-PathListEntry $Directory
+    if (-not $needle) { return $false }
+    foreach ($part in ($PathValue -split ';')) {
+        if ((Normalize-PathListEntry $part).Equals($needle, [StringComparison]::OrdinalIgnoreCase)) {
+            return $true
+        }
+    }
+    return $false
+}
+
+function Add-DirectoryToUserPath {
+    param([Parameter(Mandatory)][string]$Directory)
+    $full = [IO.Path]::GetFullPath($Directory)
+    if (-not (Test-Path -LiteralPath $full -PathType Container)) {
+        throw "PATH directory does not exist: $full"
+    }
+
+    if (-not (Test-PathListContains -PathValue $env:PATH -Directory $full)) {
+        $env:PATH = "$full;$env:PATH"
+    }
+
+    $userPath = [Environment]::GetEnvironmentVariable('PATH', 'User')
+    if (-not (Test-PathListContains -PathValue $userPath -Directory $full)) {
+        $newUserPath = if ([string]::IsNullOrWhiteSpace($userPath)) { $full } else { "$userPath;$full" }
+        [Environment]::SetEnvironmentVariable('PATH', $newUserPath, 'User')
+    }
 }
 
 # ---- Per-tool: package id per PM. Empty string means "not available there". --
 # Keys are the command name we check via Get-Command.
 $Catalog = @{
     git                  = @{ winget = 'Git.Git';                          choco = 'git';                  scoop = 'git'                  ; purpose = 'version control' }
-    nvim                 = @{ winget = 'Neovim.Neovim';                    choco = 'neovim';               scoop = 'neovim'               ; purpose = 'Neovim 0.11+ editor' }
+    nvim                 = @{ winget = 'Neovim.Neovim';                    choco = 'neovim';               scoop = 'neovim'               ; purpose = 'Neovim 0.12+ editor' }
     starship             = @{ winget = 'Starship.Starship';                choco = 'starship';             scoop = 'starship'             ; purpose = 'cross-shell prompt' }
     rg                   = @{ winget = 'BurntSushi.ripgrep.MSVC';          choco = 'ripgrep';              scoop = 'ripgrep'              ; purpose = 'Telescope live_grep backend' }
     fd                   = @{ winget = 'sharkdp.fd';                       choco = 'fd';                   scoop = 'fd'                   ; purpose = 'Telescope find_files backend' }
+    fzf                  = @{ winget = 'junegunn.fzf';                     choco = 'fzf';                  scoop = 'fzf'                  ; purpose = 'fuzzy finder (PSFzf history/file/dir pickers)' }
+    chezmoi              = @{ winget = 'twpayne.chezmoi';                  choco = 'chezmoi';              scoop = 'chezmoi'              ; purpose = 'dotfiles config manager' }
     lazygit              = @{ winget = 'JesseDuffield.lazygit';            choco = 'lazygit';              scoop = 'lazygit'              ; purpose = 'terminal git UI' }
     wt                   = @{ winget = 'Microsoft.WindowsTerminal';        choco = 'microsoft-windows-terminal'; scoop = 'extras/windows-terminal'; purpose = 'Windows Terminal host for PowerShell and WSL' }
     make                 = @{ winget = 'GnuWin32.Make';                    choco = 'make';                 scoop = 'make'                 ; purpose = 'plugin builds (LuaSnip jsregexp)' }
     pwsh                 = @{ winget = 'Microsoft.PowerShell';             choco = 'powershell-core';      scoop = 'pwsh'                 ; purpose = 'modern PowerShell 7' }
     'win32yank'          = @{ winget = '';                                 choco = 'win32yank';            scoop = 'win32yank'            ; purpose = 'clipboard bridge for WSL nvim' }
     node                 = @{ winget = 'OpenJS.NodeJS.LTS';                choco = 'nodejs-lts';           scoop = 'nodejs-lts'           ; purpose = 'prettier + JS tooling' }
+    'tree-sitter'        = @{                                               scoop = 'tree-sitter'           ; purpose = 'nvim-treesitter main: parser generate/build CLI' }
     python               = @{ winget = 'Python.Python.3.12';               choco = 'python';               scoop = 'python'               ; purpose = 'pyright + tooling' }
+    zig                  = @{ winget = 'zig.zig';                          choco = 'zig';                  scoop = 'zig'                  ; purpose = 'C compiler for the LuaSnip jsregexp build' }
     jq                   = @{ winget = 'jqlang.jq';                        choco = 'jq';                   scoop = 'jq'                   ; purpose = 'general-purpose JSON CLI' }
     shellcheck           = @{ winget = 'koalaman.shellcheck';              choco = 'shellcheck';           scoop = 'shellcheck'           ; purpose = 'shell-script linter' }
     hyperfine            = @{ winget = 'sharkdp.hyperfine';                choco = 'hyperfine';            scoop = 'hyperfine'            ; purpose = 'starship perf benchmark' }
@@ -134,8 +268,11 @@ $Catalog = @{
 # Some Catalog keys (e.g. "rg") map to a different actual binary on Windows
 # than on Unix. Provide a name -> binary mapping for Get-Command checks.
 $BinaryName = @{
+    scoop       = 'scoop'
     rg          = 'rg'
     fd          = 'fd'
+    fzf         = 'fzf'
+    chezmoi     = 'chezmoi'
     lazygit     = 'lazygit'
     wt          = 'wt'
     nvim        = 'nvim'
@@ -145,7 +282,9 @@ $BinaryName = @{
     git         = 'git'
     make        = 'make'
     node        = 'node'
+    'tree-sitter' = 'tree-sitter'
     python      = 'python'
+    zig         = 'zig'
     jq          = 'jq'
     shellcheck  = 'shellcheck'
     hyperfine   = 'hyperfine'
@@ -159,9 +298,228 @@ function Test-Tool {
     return [bool](Get-Command $BinaryName[$name] -ErrorAction SilentlyContinue)
 }
 
+function Get-RealPythonCommand {
+    # The Microsoft Store ships "App execution alias" stubs for python.exe and
+    # python3.exe under %LOCALAPPDATA%\Microsoft\WindowsApps that are NOT a real
+    # Python -- run with no args they just open the Store. Get-Command finds them,
+    # so a naive Test-Tool reports python as installed; Mason then fails its PyPI
+    # tools (clang-format / ruff / gersemi) with "Unable to find python3
+    # installation in PATH". Return the first python on PATH that is NOT that stub.
+    foreach ($name in @('python', 'python3')) {
+        foreach ($candidate in @(Get-Command $name -All -ErrorAction SilentlyContinue)) {
+            $source = $candidate.Source
+            if ([string]::IsNullOrWhiteSpace($source)) { continue }
+            if ($source -like '*\WindowsApps\*') { continue }
+            return $candidate
+        }
+    }
+    return $null
+}
+
+function Install-Python {
+    # Install a REAL python, not the Store stub (see Get-RealPythonCommand). Pass
+    # the stub-rejecting check to Install-One so the stub never short-circuits the
+    # install, then add the real python directory to the user PATH so the Mason
+    # sync and future shells resolve it ahead of the stub.
+    Install-One python -InstalledCheck { [bool](Get-RealPythonCommand) }
+    $real = Get-RealPythonCommand
+    if ($real -and -not [string]::IsNullOrWhiteSpace($real.Source)) {
+        Add-DirectoryToUserPath -Directory (Split-Path -Parent $real.Source)
+    }
+}
+
+function Get-InstallDependencySpec {
+    $toolOrder = @(
+        'scoop',
+        'git',
+        'nvim',
+        'make',
+        'rg',
+        'fd',
+        'fzf',
+        'chezmoi',
+        'lazygit',
+        'starship',
+        'wt',
+        'psmux',
+        'pwsh',
+        'python',
+        'node',
+        'tree-sitter',
+        'zig',
+        'win32yank',
+        'jq',
+        'shellcheck',
+        'hyperfine',
+        'taplo',
+        'code'
+    )
+    $emitted = @{}
+    foreach ($tool in $toolOrder) {
+        if (($tool -eq 'scoop') -or ($tool -eq 'psmux') -or $Catalog.ContainsKey($tool)) {
+            $emitted[$tool] = $true
+            [pscustomobject]@{
+                Tool = $tool
+                Kind = 'tool'
+                Binary = $BinaryName[$tool]
+                Module = ''
+            }
+        }
+    }
+    foreach ($tool in ($Catalog.Keys | Sort-Object)) {
+        if (-not $emitted.ContainsKey($tool)) {
+            [pscustomobject]@{
+                Tool = $tool
+                Kind = 'tool'
+                Binary = $BinaryName[$tool]
+                Module = ''
+            }
+        }
+    }
+    [pscustomobject]@{ Tool = 'PSFzf'; Kind = 'module'; Binary = ''; Module = 'PSFzf' }
+    [pscustomobject]@{ Tool = 'Hack Nerd Font'; Kind = 'font'; Binary = ''; Module = '' }
+}
+
+function Get-CommandVersionString {
+    param([string]$CommandName)
+    if ([string]::IsNullOrWhiteSpace($CommandName)) { return '-' }
+    $cmd = Get-Command -Name $CommandName -ErrorAction SilentlyContinue
+    if (-not $cmd) { return '-' }
+
+    # NEVER run `wt --version`: Windows Terminal (wt.exe) does NOT print a version
+    # to stdout -- it LAUNCHES a new terminal window to show it, which pops an
+    # annoying window during the dependency pre-flight table. Read the file
+    # version instead (works for the portable install; Store/scoop shims fall back
+    # to "installed"). Any other windowed/GUI tool belongs in this skip list.
+    if ($CommandName -in @('wt')) {
+        try {
+            $src = if ($cmd.PSObject.Properties.Name -contains 'Source') { $cmd.Source } else { $cmd.Path }
+            if ($src -and (Test-Path -LiteralPath $src -PathType Leaf)) {
+                $ver = (Get-Item -LiteralPath $src).VersionInfo.ProductVersion
+                if (-not [string]::IsNullOrWhiteSpace($ver)) { return ([string]$ver).Trim() }
+            }
+        } catch { }
+        return 'installed'
+    }
+
+    try {
+        $lines = @(& $CommandName --version 2>$null)
+        foreach ($line in $lines) {
+            $text = [string]$line
+            if (-not [string]::IsNullOrWhiteSpace($text)) {
+                return $text.Trim()
+            }
+        }
+    } catch {
+        return '-'
+    }
+    return '-'
+}
+
+function Get-ModuleVersionString {
+    param([string]$Name)
+    $module = Get-Module -ListAvailable -Name $Name |
+        Sort-Object -Property Version -Descending |
+        Select-Object -First 1
+    if ($module) { return $module.Version.ToString() }
+    return '-'
+}
+
+function Test-InstallDependencyPresent {
+    param([Parameter(Mandatory)]$Spec)
+    switch ($Spec.Kind) {
+        'tool' { return (Test-Tool $Spec.Tool) }
+        'module' { return [bool](Get-Module -ListAvailable -Name $Spec.Module) }
+        'font' { return (Test-HackNerdFontInstalled) }
+        default { return $false }
+    }
+}
+
+function Get-InstallDependencyVersion {
+    param([Parameter(Mandatory)]$Spec)
+    switch ($Spec.Kind) {
+        'tool' { return (Get-CommandVersionString -CommandName $Spec.Binary) }
+        'module' { return (Get-ModuleVersionString -Name $Spec.Module) }
+        default { return '-' }
+    }
+}
+
+function Get-InstallDependencyScan {
+    param(
+        [object[]]$SpecList,
+        [scriptblock]$PresenceTester,
+        [scriptblock]$VersionGetter
+    )
+    if ($null -eq $SpecList) {
+        $SpecList = @(Get-InstallDependencySpec)
+    }
+    foreach ($spec in $SpecList) {
+        $present = if ($PresenceTester) {
+            [bool](& $PresenceTester $spec)
+        } else {
+            Test-InstallDependencyPresent -Spec $spec
+        }
+        $version = '-'
+        $status = 'missing'
+        $action = 'install'
+        if ($present) {
+            $status = 'present'
+            $action = 'skip'
+            $version = if ($VersionGetter) {
+                [string](& $VersionGetter $spec)
+            } else {
+                Get-InstallDependencyVersion -Spec $spec
+            }
+            if ([string]::IsNullOrWhiteSpace($version)) {
+                $version = '-'
+            }
+        }
+        [pscustomobject]@{
+            Tool = $spec.Tool
+            Status = $status
+            Version = $version
+            Action = $action
+        }
+    }
+}
+
+function Format-InstallDependencyTable {
+    param([Parameter(Mandatory)][object[]]$Rows)
+    $lines = [System.Collections.Generic.List[string]]::new()
+    $lines.Add('Dependency pre-flight:')
+    $lines.Add(('{0,-22} {1,-8} {2,-34} {3,-7}' -f 'Tool', 'Status', 'Version', 'Action'))
+    $lines.Add(('{0,-22} {1,-8} {2,-34} {3,-7}' -f '----------------------', '--------', '----------------------------------', '-------'))
+    $present = 0
+    $missing = 0
+    foreach ($row in $Rows) {
+        $lines.Add(('{0,-22} {1,-8} {2,-34} {3,-7}' -f $row.Tool, $row.Status, $row.Version, $row.Action))
+        if ($row.Status -eq 'present') {
+            $present++
+        } else {
+            $missing++
+        }
+    }
+    $lines.Add(('{0} present, {1} missing' -f $present, $missing))
+    return $lines.ToArray()
+}
+
+function Show-InstallDependencyTable {
+    param([Parameter(Mandatory)][object[]]$Rows)
+    foreach ($line in (Format-InstallDependencyTable -Rows $Rows)) {
+        Write-Host $line
+    }
+}
+
 function Install-One {
-    param([string]$tool)
-    if (Test-Tool $tool) {
+    param([string]$tool, [switch]$SkipPrompt, [switch]$NoRecordFailure, [scriptblock]$InstalledCheck)
+    # Callers can override the install-check (e.g. python, whose Store stub fools
+    # Test-Tool -- see Get-RealPythonCommand). Call Test-Tool DIRECTLY in the
+    # default case (not via a `& {Test-Tool}` scriptblock, which runs in a child
+    # scope a Pester mock of Test-Tool cannot reach). NB: the param is
+    # $InstalledCheck, not $Installed -- PowerShell variable names are
+    # case-insensitive, so $Installed would alias the boolean $installed flag below.
+    $alreadyInstalled = if ($InstalledCheck) { [bool](& $InstalledCheck) } else { Test-Tool $tool }
+    if ($alreadyInstalled) {
         Write-Host ("  ok        {0,-26} already installed" -f $tool)
         return
     }
@@ -193,7 +551,7 @@ function Install-One {
     $first = $candidates[0]
     $purpose = $entry.purpose
     $promptText = if ($purpose) { "Install ${tool} via $($first.pm) (${purpose})?" } else { "Install ${tool} via $($first.pm)?" }
-    if (-not (Ask $promptText)) {
+    if ((-not $SkipPrompt) -and (-not (Ask $promptText))) {
         Write-Host ("  skipped   {0,-26}" -f $tool)
         return
     }
@@ -214,7 +572,7 @@ function Install-One {
             'choco'  { choco install $c.pkg -y }
             'scoop'  { scoop install $c.pkg }
         }
-        if ($LASTEXITCODE -eq 0 -and (Test-Tool $tool)) {
+        if ($LASTEXITCODE -eq 0 -and $(if ($InstalledCheck) { [bool](& $InstalledCheck) } else { Test-Tool $tool })) {
             Write-Host ("  installed {0,-26} via {1}" -f $tool, $c.pm)
             $installed = $true
             break
@@ -224,7 +582,66 @@ function Install-One {
     if (-not $installed) {
         # Track failures so we can summarize at the end instead of faking success.
         $tried = ($candidates | ForEach-Object { $_.pm }) -join '/'
-        $script:InstallFailures += [pscustomobject]@{ Tool = $tool; Pm = $tried; Pkg = $first.pkg; ExitCode = $LASTEXITCODE }
+        if (-not $NoRecordFailure) {
+            $script:InstallFailures += [pscustomobject]@{ Tool = $tool; Pm = $tried; Pkg = $first.pkg; ExitCode = $LASTEXITCODE }
+        }
+    }
+}
+
+# ---- Optional: keep a single scoop tool current ------------------------------
+# scoop pins to the installed version until `scoop update <pkg>`. This is the
+# explicit, consent-gated, idempotent "keep latest" step for ONE tool. We do NOT
+# run `scoop update *` -- that would upgrade every scoop tool (taplo, win32yank,
+# nerd-fonts, ...) beyond what the caller asked for and break the "run twice = no-op"
+# contract. Safe to call when the tool is absent (the install path owns that) and
+# when the tool was installed by another manager (the scoop list guard no-ops).
+function Update-ScoopTool {
+    param(
+        [string]$tool,
+        [switch]$NoPrompt,
+        [switch]$SkipManifestRefresh,
+        [switch]$ReportSkip,
+        [switch]$AssumePresent,
+        [bool]$IsDryRun = $DryRun
+    )
+    if (-not (Get-Command scoop -ErrorAction SilentlyContinue)) { return }
+    # -AssumePresent: the caller (update mode) already determined presence via its
+    # own tester, so skip the redundant Test-Tool recheck. Without it the two
+    # checks can disagree (e.g. a mocked tester vs the real Get-Command).
+    if ((-not $AssumePresent) -and (-not (Test-Tool $tool))) {
+        if ($ReportSkip) { Write-Host ("  skipped   {0,-26} not installed" -f $tool) }
+        return
+    }
+    $pkg = $Catalog[$tool].scoop
+    if (-not $pkg) {
+        if ($ReportSkip) { Write-Host ("  skipped   {0,-26} no scoop package in catalog" -f $tool) }
+        return
+    }
+    # Only update if scoop actually manages this tool (avoids warning on a
+    # winget/choco-installed pwsh that Install-One picked when scoop was absent).
+    $scoopListName = @($pkg -split '/')[-1]
+    $managed = (scoop list $scoopListName 2>$null | Select-String -SimpleMatch $scoopListName)
+    if (-not $managed) {
+        if ($ReportSkip) { Write-Host ("  skipped   {0,-26} present, but Scoop does not manage {1}" -f $tool, $pkg) }
+        return
+    }
+    if ((-not $NoPrompt) -and (-not (Ask "Update ${tool} to the latest scoop version?"))) { return }
+    if ($IsDryRun) {
+        if ($SkipManifestRefresh) {
+            Write-Host ("  would:    scoop update {0}" -f $pkg)
+        } else {
+            Write-Host ("  would:    scoop update; scoop update {0}" -f $pkg)
+        }
+        return
+    }
+    if (-not $SkipManifestRefresh) {
+        scoop update | Out-Null
+    }
+    scoop update $pkg
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host ("  updated   {0,-26} via scoop" -f $tool)
+    } else {
+        Write-Warning ("  scoop update of {0} failed (exit {1})" -f $pkg, $LASTEXITCODE)
     }
 }
 
@@ -233,18 +650,67 @@ function Install-One {
 $script:InstallFailures = @()
 
 # ---- Hack Nerd Font: prefer scoop bucket, fall back to direct download+register
-function Install-HackNerdFont {
-    # Already installed?
+function Get-HackNerdFontInstallScope {
     $userFonts = "$env:LOCALAPPDATA\Microsoft\Windows\Fonts"
     $sysFonts = "$env:WINDIR\Fonts"
     if ((Test-Path $userFonts -PathType Container) -and
         (Get-ChildItem -Path $userFonts -Filter "Hack*Nerd*" -ErrorAction SilentlyContinue)) {
-        Write-Host ("  ok        {0,-26} already installed (user)" -f "Hack Nerd Font")
-        return
+        return 'user'
     }
     if ((Test-Path $sysFonts -PathType Container) -and
         (Get-ChildItem -Path $sysFonts -Filter "Hack*Nerd*" -ErrorAction SilentlyContinue)) {
-        Write-Host ("  ok        {0,-26} already installed (system)" -f "Hack Nerd Font")
+        return 'system'
+    }
+    return ''
+}
+
+function Test-HackNerdFontInstalled {
+    return -not [string]::IsNullOrEmpty((Get-HackNerdFontInstallScope))
+}
+
+function Send-FontChangeNotification {
+    try {
+        $typeName = 'DotfilesFontChange.NativeMethods'
+        if (-not ([System.Management.Automation.PSTypeName]$typeName).Type) {
+            Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+
+namespace DotfilesFontChange {
+    public static class NativeMethods {
+        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+        public static extern IntPtr SendMessageTimeout(
+            IntPtr hWnd,
+            uint Msg,
+            UIntPtr wParam,
+            IntPtr lParam,
+            uint fuFlags,
+            uint uTimeout,
+            out UIntPtr lpdwResult);
+    }
+}
+"@
+        }
+        $result = [UIntPtr]::Zero
+        [DotfilesFontChange.NativeMethods]::SendMessageTimeout(
+            [IntPtr]0xffff,
+            0x001D,
+            [UIntPtr]::Zero,
+            [IntPtr]::Zero,
+            0x0002,
+            1000,
+            [ref]$result) | Out-Null
+        Write-Host "             notified Windows that fonts changed"
+    } catch {
+        Write-Warning ("Could not broadcast WM_FONTCHANGE: " + $_.Exception.Message)
+    }
+}
+
+function Install-HackNerdFont {
+    # Already installed?
+    $fontScope = Get-HackNerdFontInstallScope
+    if ($fontScope) {
+        Write-Host ("  ok        {0,-26} already installed ({1})" -f "Hack Nerd Font", $fontScope)
         return
     }
     if (-not (Ask "Install Hack Nerd Font?")) {
@@ -258,10 +724,11 @@ function Install-HackNerdFont {
             Write-Host "  would: scoop install nerd-fonts/Hack-NF"
             return
         }
-        scoop bucket add nerd-fonts 2>$null | Out-Null
+        Add-ScoopBucketSafe -Name 'nerd-fonts' | Out-Null
         scoop install nerd-fonts/Hack-NF
         if ($LASTEXITCODE -eq 0) {
             Write-Host ("  installed {0,-26} via scoop" -f "Hack Nerd Font")
+            Send-FontChangeNotification
             return
         }
         Write-Warning "scoop install failed; falling back to direct download."
@@ -272,12 +739,15 @@ function Install-HackNerdFont {
         Write-Host "  would: download nerd-fonts/$HackNerdFontVersion/Hack.zip, verify sha256, extract, register in HKCU\\Fonts"
         return
     }
+    $tmp = $null
     try {
         $tmp = New-Item -ItemType Directory -Force -Path (Join-Path $env:TEMP "hack-nf-$([guid]::NewGuid())")
         $zip = Join-Path $tmp.FullName "Hack.zip"
         Invoke-WebRequest -Uri "https://github.com/ryanoasis/nerd-fonts/releases/download/$HackNerdFontVersion/Hack.zip" -OutFile $zip -UseBasicParsing
         if (-not (Test-FileSha256 -Path $zip -Expected $HackNerdFontSha256)) {
-            throw "Hack.zip SHA256 verification failed"
+            Write-Host "  FAIL: checksum mismatch for Hack.zip" -ForegroundColor Red
+            $script:InstallFailures += [pscustomobject]@{ Tool = 'Hack Nerd Font'; Pm = 'direct'; Pkg = 'Hack.zip'; ExitCode = 'sha256' }
+            return
         }
         Expand-Archive -Path $zip -DestinationPath $tmp.FullName -Force
 
@@ -297,44 +767,494 @@ function Install-HackNerdFont {
                 -Value $destPath -PropertyType String -Force | Out-Null
             $installedCount++
         }
-        Remove-Item -Recurse -Force $tmp.FullName
         Write-Host ("  installed {0,-26} {1} font files registered in HKCU" -f "Hack Nerd Font", $installedCount)
+        Send-FontChangeNotification
         Write-Host "             (you may need to restart your terminal to see them)"
     } catch {
         Write-Warning ("Hack Nerd Font install failed: " + $_.Exception.Message)
         Write-Host  "  manual    download Hack.zip from nerd-fonts releases and install via the Fonts control panel."
+    } finally {
+        if ($tmp) {
+            Remove-Item -Recurse -Force $tmp.FullName -ErrorAction SilentlyContinue
+        }
     }
 }
 
 # ---- VS Code Rose Pine theme -------------------------------------------------
-# Set "workbench.colorTheme" to Rose Pine in %APPDATA%\Code\User\settings.json.
-# The theme label has an accented e; we write it as the JSON escape \u00e9 (this
-# file must stay pure ASCII) or build it with [char]0xE9 for the merge path.
+# Set Rose Pine plus Hack Nerd Font settings in VS Code user settings.
+# The theme label has an accented e. Build it with [char]0xE9 at runtime so
+# this file stays pure ASCII for Windows PowerShell 5.1.
+function Get-VSCodeSettingsSpec {
+    $theme = "Ros$([char]0xE9) Pine"        # dark label "Rose Pine" (accented e)
+    $font = "'Hack Nerd Font', Consolas, monospace"
+    # Theme resolution precedence is the whole reason a pre-set colorTheme can
+    # appear ignored: when window.autoDetectColorScheme is true (Settings Sync, an
+    # imported profile, or a future default can enable it), VS Code IGNORES
+    # workbench.colorTheme and resolves the active theme from
+    # workbench.preferredDark/LightColorTheme -- which, unset, hold the built-in
+    # defaults (Dark Modern / "Dark 2026"). This repo FORCES dark Rose Pine, not
+    # the adaptive dark/light split (same rule as Ghostty -- see tests/MANUAL.md),
+    # so: pin autoDetectColorScheme off (a real JSON boolean, not a string) to make
+    # colorTheme authoritative, AND point BOTH preferred slots at the SAME dark
+    # Rose Pine so no OS-scheme / autoDetect combination can ever yield a light
+    # theme. startupEditor=none opens straight to an empty workbench (no noisy
+    # Welcome tab) so the pre-set theme is the only thing on screen.
+    return @(
+        [pscustomobject]@{ Key = 'workbench.colorTheme'; Value = $theme },
+        [pscustomobject]@{ Key = 'workbench.preferredDarkColorTheme'; Value = $theme },
+        [pscustomobject]@{ Key = 'workbench.preferredLightColorTheme'; Value = $theme },
+        [pscustomobject]@{ Key = 'window.autoDetectColorScheme'; Value = $false; Raw = $true },
+        [pscustomobject]@{ Key = 'editor.fontFamily'; Value = $font },
+        [pscustomobject]@{ Key = 'terminal.integrated.fontFamily'; Value = $font },
+        [pscustomobject]@{ Key = 'workbench.startupEditor'; Value = 'none' }
+    )
+}
+
+# Escape every non-ASCII char (> 0x7F) in valid JSON text to a \uXXXX escape,
+# yielding PURE-ASCII JSON. This is the encoding-immunity fix for the VS Code
+# theme label "Rose Pine" (the accented e is U+00E9): a pure-ASCII settings.json
+# reads back byte-identical under ANY code page -- including the ANSI default
+# that Windows PowerShell 5.1 Get-Content uses -- so a later re-write can never
+# double-encode it into the "RosA(c) Pine" mojibake that VS Code cannot resolve (theme not
+# found -> silent fall back to the default dark theme). Safe on any valid JSON
+# because non-ASCII can only appear inside string tokens, where \uXXXX is the
+# canonical equivalent. This realizes the documented design intent (the ps1
+# emits the accented e as a \u JSON escape so the settings file stays pure ASCII).
+function ConvertTo-AsciiJson {
+    param([Parameter(Mandatory)][AllowEmptyString()][string]$Json)
+    $sb = [System.Text.StringBuilder]::new()
+    foreach ($ch in $Json.ToCharArray()) {
+        $code = [int][char]$ch
+        if ($code -gt 0x7F) {
+            [void]$sb.Append(('\u{0:x4}' -f $code))
+        } else {
+            [void]$sb.Append($ch)
+        }
+    }
+    return $sb.ToString()
+}
+
+function ConvertTo-JsonStringLiteral {
+    param([Parameter(Mandatory)][string]$Value)
+    $escaped = $Value.Replace('\', '\\').Replace('"', '\"')
+    return '"' + (ConvertTo-AsciiJson -Json $escaped) + '"'
+}
+
+# Render a settings spec value for the TEXT write paths (new-file + JSONC editor),
+# which otherwise quote every value. A spec with Raw=$true emits a bare JSON
+# literal -- needed for window.autoDetectColorScheme, which must be the boolean
+# false, not the string "false" (VS Code rejects the string form). String specs
+# fall through to the normal quoted-literal renderer. The clean-JSON merge path
+# does NOT use this -- it stores the native [bool] and lets ConvertTo-Json emit
+# bare false.
+function ConvertTo-VSCodeSettingJson {
+    param([Parameter(Mandatory)]$Spec)
+    if (($Spec.PSObject.Properties.Name -contains 'Raw') -and $Spec.Raw) {
+        if ($Spec.Value -is [bool]) {
+            if ($Spec.Value) { return 'true' } else { return 'false' }
+        }
+        return [string]$Spec.Value
+    }
+    return ConvertTo-JsonStringLiteral -Value ([string]$Spec.Value)
+}
+
+function Test-JsonCWhitespaceChar {
+    param([Parameter(Mandatory)][char]$Char)
+    return (
+        $Char -eq [char]32 -or
+        $Char -eq [char]9 -or
+        $Char -eq [char]10 -or
+        $Char -eq [char]13
+    )
+}
+
+function Get-JsonCTriviaEnd {
+    param(
+        [Parameter(Mandatory)][string]$Text,
+        [Parameter(Mandatory)][int]$Index
+    )
+    $length = $Text.Length
+    while ($Index -lt $length) {
+        $char = $Text[$Index]
+        if (Test-JsonCWhitespaceChar -Char $char) {
+            $Index++
+            continue
+        }
+        if (($char -eq [char]47) -and (($Index + 1) -lt $length)) {
+            $next = $Text[$Index + 1]
+            if ($next -eq [char]47) {
+                $Index += 2
+                while (($Index -lt $length) -and ($Text[$Index] -ne [char]10)) {
+                    $Index++
+                }
+                continue
+            }
+            if ($next -eq [char]42) {
+                $Index += 2
+                while (
+                    (($Index + 1) -lt $length) -and
+                    -not (($Text[$Index] -eq [char]42) -and ($Text[$Index + 1] -eq [char]47))
+                ) {
+                    $Index++
+                }
+                if (($Index + 1) -lt $length) {
+                    $Index += 2
+                }
+                continue
+            }
+        }
+        break
+    }
+    return $Index
+}
+
+function Find-JsonCStringEnd {
+    param(
+        [Parameter(Mandatory)][string]$Text,
+        [Parameter(Mandatory)][int]$Start
+    )
+    $escaped = $false
+    for ($i = $Start + 1; $i -lt $Text.Length; $i++) {
+        $char = $Text[$i]
+        if ($escaped) {
+            $escaped = $false
+            continue
+        }
+        if ($char -eq [char]92) {
+            $escaped = $true
+            continue
+        }
+        if ($char -eq [char]34) {
+            return $i
+        }
+    }
+    return -1
+}
+
+function Find-JsonCValueEnd {
+    param(
+        [Parameter(Mandatory)][string]$Text,
+        [Parameter(Mandatory)][int]$Start
+    )
+    $pos = Get-JsonCTriviaEnd -Text $Text -Index $Start
+    if ($pos -ge $Text.Length) {
+        return -1
+    }
+    $char = $Text[$pos]
+    if ($char -eq [char]34) {
+        return Find-JsonCStringEnd -Text $Text -Start $pos
+    }
+    if (($char -eq [char]123) -or ($char -eq [char]91)) {
+        $curlyDepth = 0
+        $squareDepth = 0
+        $i = $pos
+        while ($i -lt $Text.Length) {
+            $char = $Text[$i]
+            if (($char -eq [char]47) -and (($i + 1) -lt $Text.Length)) {
+                $next = $Text[$i + 1]
+                if ($next -eq [char]47) {
+                    $i += 2
+                    while (($i -lt $Text.Length) -and ($Text[$i] -ne [char]10)) {
+                        $i++
+                    }
+                    continue
+                }
+                if ($next -eq [char]42) {
+                    $i += 2
+                    while (
+                        (($i + 1) -lt $Text.Length) -and
+                        -not (($Text[$i] -eq [char]42) -and ($Text[$i + 1] -eq [char]47))
+                    ) {
+                        $i++
+                    }
+                    if (($i + 1) -lt $Text.Length) {
+                        $i += 2
+                    }
+                    continue
+                }
+            }
+            if ($char -eq [char]34) {
+                $end = Find-JsonCStringEnd -Text $Text -Start $i
+                if ($end -lt 0) {
+                    return -1
+                }
+                $i = $end + 1
+                continue
+            }
+            if ($char -eq [char]123) {
+                $curlyDepth++
+            } elseif ($char -eq [char]125) {
+                $curlyDepth--
+                if (($curlyDepth -eq 0) -and ($squareDepth -eq 0)) {
+                    return $i
+                }
+            } elseif ($char -eq [char]91) {
+                $squareDepth++
+            } elseif ($char -eq [char]93) {
+                $squareDepth--
+                if (($curlyDepth -eq 0) -and ($squareDepth -eq 0)) {
+                    return $i
+                }
+            }
+            $i++
+        }
+        return -1
+    }
+    $endIndex = $pos
+    for ($i = $pos; $i -lt $Text.Length; $i++) {
+        $char = $Text[$i]
+        if (($char -eq [char]44) -or ($char -eq [char]125)) {
+            break
+        }
+        if (($char -eq [char]47) -and (($i + 1) -lt $Text.Length)) {
+            $next = $Text[$i + 1]
+            if (($next -eq [char]47) -or ($next -eq [char]42)) {
+                break
+            }
+        }
+        $endIndex = $i
+    }
+    while (($endIndex -ge $pos) -and (Test-JsonCWhitespaceChar -Char $Text[$endIndex])) {
+        $endIndex--
+    }
+    return $endIndex
+}
+
+function Get-DominantLineEnding {
+    param([Parameter(Mandatory)][string]$Text)
+    $crlf = [regex]::Matches($Text, "`r`n").Count
+    $lf = [regex]::Matches($Text, "`n").Count - $crlf
+    if ($crlf -gt $lf) {
+        return "`r`n"
+    }
+    return "`n"
+}
+
+function Update-VSCodeJsonCSettings {
+    param([Parameter(Mandatory)][string]$Text)
+    $specs = @(Get-VSCodeSettingsSpec)
+    $seen = @{}
+    $replacements = @()
+    $rootIndex = -1
+    $curlyDepth = 0
+    $squareDepth = 0
+    $i = 0
+    while ($i -lt $Text.Length) {
+        $char = $Text[$i]
+        if (($char -eq [char]47) -and (($i + 1) -lt $Text.Length)) {
+            $next = $Text[$i + 1]
+            if ($next -eq [char]47) {
+                $i += 2
+                while (($i -lt $Text.Length) -and ($Text[$i] -ne [char]10)) {
+                    $i++
+                }
+                continue
+            }
+            if ($next -eq [char]42) {
+                $i += 2
+                while (
+                    (($i + 1) -lt $Text.Length) -and
+                    -not (($Text[$i] -eq [char]42) -and ($Text[$i + 1] -eq [char]47))
+                ) {
+                    $i++
+                }
+                if (($i + 1) -lt $Text.Length) {
+                    $i += 2
+                }
+                continue
+            }
+        }
+        if ($char -eq [char]34) {
+            $end = Find-JsonCStringEnd -Text $Text -Start $i
+            if ($end -lt 0) {
+                throw "Invalid JSONC string"
+            }
+            if (($curlyDepth -eq 1) -and ($squareDepth -eq 0)) {
+                $after = Get-JsonCTriviaEnd -Text $Text -Index ($end + 1)
+                if (($after -lt $Text.Length) -and ($Text[$after] -eq [char]58)) {
+                    $key = $Text.Substring($i + 1, $end - $i - 1)
+                    foreach ($spec in $specs) {
+                        if ($key -eq $spec.Key) {
+                            $valueStart = Get-JsonCTriviaEnd -Text $Text -Index ($after + 1)
+                            $valueEnd = Find-JsonCValueEnd -Text $Text -Start $valueStart
+                            if ($valueEnd -lt 0) {
+                                throw "Invalid JSONC value"
+                            }
+                            $seen[$spec.Key] = $true
+                            $replacements += [pscustomobject]@{
+                                Start = $valueStart
+                                End = $valueEnd
+                                Value = (ConvertTo-VSCodeSettingJson -Spec $spec)
+                            }
+                        }
+                    }
+                }
+            }
+            $i = $end + 1
+            continue
+        }
+        if ($char -eq [char]123) {
+            $curlyDepth++
+            if ($rootIndex -lt 0) {
+                $rootIndex = $i
+            }
+        } elseif ($char -eq [char]125) {
+            $curlyDepth--
+            if ($curlyDepth -lt 0) {
+                $curlyDepth = 0
+            }
+        } elseif ($char -eq [char]91) {
+            $squareDepth++
+        } elseif (($char -eq [char]93) -and ($squareDepth -gt 0)) {
+            $squareDepth--
+        }
+        $i++
+    }
+    if ($rootIndex -lt 0) {
+        throw "Root object not found"
+    }
+    foreach ($replacement in @($replacements | Sort-Object -Property Start -Descending)) {
+        $prefix = if ($replacement.Start -gt 0) { $Text.Substring(0, $replacement.Start) } else { '' }
+        $suffixIndex = $replacement.End + 1
+        $suffix = if ($suffixIndex -lt $Text.Length) { $Text.Substring($suffixIndex) } else { '' }
+        $Text = $prefix + $replacement.Value + $suffix
+    }
+    $missing = @()
+    foreach ($spec in $specs) {
+        if (-not $seen.ContainsKey($spec.Key)) {
+            $missing += $spec
+        }
+    }
+    if ($missing.Count -gt 0) {
+        $lineEnding = Get-DominantLineEnding -Text $Text
+        $first = Get-JsonCTriviaEnd -Text $Text -Index ($rootIndex + 1)
+        $hasExisting = (($first -lt $Text.Length) -and ($Text[$first] -ne [char]125))
+        $insertAt = $rootIndex + 1
+        if (
+            (($insertAt + 1) -lt $Text.Length) -and
+            ($Text[$insertAt] -eq [char]13) -and
+            ($Text[$insertAt + 1] -eq [char]10)
+        ) {
+            $insertAt += 2
+        } elseif (($insertAt -lt $Text.Length) -and ($Text[$insertAt] -eq [char]10)) {
+            $insertAt++
+        }
+        $lines = @()
+        for ($m = 0; $m -lt $missing.Count; $m++) {
+            $line = '  "' + $missing[$m].Key + '": ' + (ConvertTo-VSCodeSettingJson -Spec $missing[$m])
+            if ($hasExisting -or ($m -lt ($missing.Count - 1))) {
+                $line += ','
+            }
+            $lines += $line
+        }
+        $block = $lineEnding + ($lines -join $lineEnding) + $lineEnding
+        $Text = $Text.Substring(0, $rootIndex + 1) + $block + $Text.Substring($insertAt)
+    }
+    return $Text
+}
+
+# String-aware detector for JSONC comments. PowerShell 7 ConvertFrom-Json
+# TOLERATES // and /* */ comments (Windows PowerShell 5.1 and jq do not), so the
+# strict-JSON fast path below would silently reformat a commented settings.json
+# and DELETE the user comments. Gate the fast path on this returning false: only
+# a // or /* outside a string counts (a "https://" inside a string value does
+# not). Mirrors the comment handling in Update-VSCodeJsonCSettings.
+function Test-JsonTextHasComment {
+    param([Parameter(Mandatory)][string]$Text)
+    $i = 0
+    while ($i -lt $Text.Length) {
+        $c = $Text[$i]
+        if ($c -eq [char]34) {
+            $end = Find-JsonCStringEnd -Text $Text -Start $i
+            if ($end -lt 0) { return $true }
+            $i = $end + 1
+            continue
+        }
+        if (($c -eq [char]47) -and (($i + 1) -lt $Text.Length)) {
+            $n = $Text[$i + 1]
+            if (($n -eq [char]47) -or ($n -eq [char]42)) { return $true }
+        }
+        $i++
+    }
+    return $false
+}
+
 function Set-VSCodeTheme {
-    $settings = Join-Path $env:APPDATA "Code\User\settings.json"
-    $dir = Split-Path -Parent $settings
+    param([string]$SettingsPath)
+    if ([string]::IsNullOrWhiteSpace($SettingsPath)) {
+        $SettingsPath = Join-Path $env:APPDATA "Code\User\settings.json"
+    }
+    $dir = Split-Path -Parent $SettingsPath
     if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Force -Path $dir | Out-Null }
     $utf8 = [System.Text.UTF8Encoding]::new($false)   # no BOM
 
-    $raw = if (Test-Path -LiteralPath $settings) { Get-Content -Raw -LiteralPath $settings -ErrorAction SilentlyContinue } else { $null }
+    # Read as explicit UTF-8 -- VS Code always writes settings.json as UTF-8, but
+    # Windows PowerShell 5.1 defaults Get-Content to the ANSI code page, which
+    # would decode an accented byte sequence (C3 A9) as two chars ("A(c)") and
+    # double-encode every non-ASCII byte the moment we re-write. Pinning UTF-8
+    # makes the read/modify/write round-trip lossless on 5.1 and 7 alike.
+    $raw = if (Test-Path -LiteralPath $SettingsPath) { Get-Content -Raw -LiteralPath $SettingsPath -Encoding utf8 -ErrorAction SilentlyContinue } else { $null }
     if ([string]::IsNullOrWhiteSpace($raw)) {
-        $json = "{`r`n  ""workbench.colorTheme"": ""Ros\u00e9 Pine""`r`n}`r`n"
-        [System.IO.File]::WriteAllText($settings, $json, $utf8)
-        Write-Host ("  set       {0,-26} workbench.colorTheme (new settings.json)" -f "rose-pine (vscode)")
+        $specs = @(Get-VSCodeSettingsSpec)
+        $lines = @()
+        for ($i = 0; $i -lt $specs.Count; $i++) {
+            $comma = if ($i -lt ($specs.Count - 1)) { ',' } else { '' }
+            $lines += ('  "' + $specs[$i].Key + '": ' + (ConvertTo-VSCodeSettingJson -Spec $specs[$i]) + $comma)
+        }
+        $json = "{`r`n" + ($lines -join "`r`n") + "`r`n}`r`n"
+        [System.IO.File]::WriteAllText($SettingsPath, $json, $utf8)
+        Write-Host ("  set       {0,-26} theme and fonts (new settings.json)" -f "rose-pine (vscode)")
         return
     }
+    # Strict-JSON fast path ONLY when there are no comments. With comments present
+    # we must use the comment-preserving JSONC editor even on PowerShell 7 (whose
+    # ConvertFrom-Json would otherwise accept and silently strip them).
+    if (-not (Test-JsonTextHasComment -Text $raw)) {
+        try {
+            $obj = $raw | ConvertFrom-Json -ErrorAction Stop
+            if ($null -eq $obj -or $obj -is [System.Array]) {
+                throw "settings.json root must be an object"
+            }
+            foreach ($spec in @(Get-VSCodeSettingsSpec)) {
+                $obj | Add-Member -NotePropertyName $spec.Key -NotePropertyValue $spec.Value -Force
+            }
+            $merged = ConvertTo-AsciiJson -Json ($obj | ConvertTo-Json -Depth 100)
+            [System.IO.File]::WriteAllText($SettingsPath, $merged, $utf8)
+            Write-Host ("  set       {0,-26} theme and fonts (merged)" -f "rose-pine (vscode)")
+            return
+        } catch {
+            # Not strict JSON (e.g. trailing commas) -- fall through to the JSONC editor.
+        }
+    }
+    $timestamp = Get-Date -Format 'yyyyMMddHHmmssfff'
+    $backup = "$SettingsPath.bak.$timestamp"
+    Copy-Item -LiteralPath $SettingsPath -Destination $backup -Force
     try {
-        $obj = $raw | ConvertFrom-Json -ErrorAction Stop
-        $obj | Add-Member -NotePropertyName 'workbench.colorTheme' -NotePropertyValue ("Ros$([char]0xE9) Pine") -Force
-        [System.IO.File]::WriteAllText($settings, ($obj | ConvertTo-Json -Depth 100), $utf8)
-        Write-Host ("  set       {0,-26} workbench.colorTheme (merged)" -f "rose-pine (vscode)")
+        $updated = Update-VSCodeJsonCSettings -Text $raw
+        [System.IO.File]::WriteAllText($SettingsPath, $updated, $utf8)
+        Write-Host ("  set       {0,-26} theme and fonts (jsonc edit; backup: {1})" -f "rose-pine (vscode)", $backup)
     } catch {
-        Write-Host ("  note      set workbench.colorTheme to ""Rose Pine"" in $settings (left untouched: comments/invalid JSON)")
+        Write-Warning ("Could not edit VS Code settings in {0}; backup: {1}" -f $SettingsPath, $backup)
     }
 }
 
 # VS Code detected -> offer the Rose Pine theme extension + set it active.
 function Install-VSCodeRosePine {
+    if (-not (Get-Command code -ErrorAction SilentlyContinue)) {
+        # VS Code was very likely JUST installed in this same run (Install-One
+        # code, immediately above), so its `code` shim is already on the
+        # machine/user PATH in the registry but NOT yet in THIS process -- so the
+        # theme step would skip and VS Code would open as default Dark. Re-compose
+        # PATH from the registry (machine + user, deduped) the way a fresh process
+        # would, then look again. (On Linux the snap/apt `code` lands on PATH
+        # immediately, which is why the theme worked there but not on Windows.)
+        $deduped = (@(
+            [Environment]::GetEnvironmentVariable('PATH', 'Machine'),
+            [Environment]::GetEnvironmentVariable('PATH', 'User'),
+            $env:PATH
+        ) -join ';') -split ';' | Where-Object { $_ } | Select-Object -Unique
+        $env:PATH = $deduped -join ';'
+    }
     if (-not (Get-Command code -ErrorAction SilentlyContinue)) {
         Write-Host ("  skipped   {0,-26} no 'code' CLI on PATH (reopen your shell after installing VS Code)" -f "rose-pine (vscode)")
         return
@@ -344,7 +1264,7 @@ function Install-VSCodeRosePine {
         return
     }
     if ($DryRun) {
-        Write-Host "  would:    code --install-extension mvllow.rose-pine; set workbench.colorTheme = Rose Pine"
+        Write-Host "  would:    code --install-extension mvllow.rose-pine; set VS Code theme and font settings"
         return
     }
     code --install-extension mvllow.rose-pine 2>$null | Out-Null
@@ -354,6 +1274,71 @@ function Install-VSCodeRosePine {
         Write-Warning "  'code --install-extension mvllow.rose-pine' failed"
     }
     Set-VSCodeTheme
+}
+
+# ---- Windows Terminal: managers first, pinned portable zip fallback ----------
+function Install-WindowsTerminal {
+    if (Test-Tool 'wt') {
+        Write-Host ("  ok        {0,-26} already installed" -f "wt")
+        return
+    }
+    if (-not (Ask "Install wt (Windows Terminal host for PowerShell and WSL)?")) {
+        Write-Host ("  skipped   {0,-26}" -f "wt")
+        return
+    }
+
+    $assetVersion = $WindowsTerminalVersion -replace '^v', ''
+    $zipName = "Microsoft.WindowsTerminal_${assetVersion}_x64.zip"
+    $zipUrl = "https://github.com/microsoft/terminal/releases/download/$WindowsTerminalVersion/$zipName"
+
+    if ($DryRun) {
+        Write-Host "  would:    scoop install extras/windows-terminal   (fallback: winget / choco / pinned portable zip $WindowsTerminalVersion)"
+        Write-Host "  would:    download $zipName, verify sha256, extract under LOCALAPPDATA\\Programs\\WindowsTerminal, add to User PATH"
+        return
+    }
+
+    Install-One wt -SkipPrompt -NoRecordFailure
+    if (Test-Tool 'wt') { return }
+
+    $tmp = $null
+    try {
+        $tmp = New-Item -ItemType Directory -Force -Path (Join-Path ([IO.Path]::GetTempPath()) "wt-portable-$([guid]::NewGuid())")
+        $zip = Join-Path $tmp.FullName $zipName
+        $extractRoot = Join-Path $tmp.FullName 'extract'
+        Invoke-WebRequest -Uri $zipUrl -OutFile $zip -UseBasicParsing -ErrorAction Stop
+        if (-not (Test-FileSha256 -Path $zip -Expected $WindowsTerminalX64Sha256)) {
+            Write-Host "  FAIL: checksum mismatch for $zipName" -ForegroundColor Red
+            $script:InstallFailures += [pscustomobject]@{ Tool='wt'; Pm='portable'; Pkg=$zipName; ExitCode='sha256' }
+            return
+        }
+
+        Expand-Archive -Path $zip -DestinationPath $extractRoot -Force
+        $wtExe = @(Get-ChildItem -Path $extractRoot -Filter 'wt.exe' -File -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1)
+        if ($wtExe.Count -eq 0) {
+            throw "portable archive did not contain wt.exe"
+        }
+
+        $installRoot = Join-Path $env:LOCALAPPDATA 'Programs\WindowsTerminal'
+        if (Test-Path -LiteralPath $installRoot) {
+            Remove-Item -LiteralPath $installRoot -Recurse -Force
+        }
+        New-Item -ItemType Directory -Force -Path $installRoot | Out-Null
+        Copy-Item -Path (Join-Path $wtExe[0].DirectoryName '*') -Destination $installRoot -Recurse -Force
+        Add-DirectoryToUserPath -Directory $installRoot
+
+        if (Test-Tool 'wt') {
+            Write-Host ("  installed {0,-26} portable {1}" -f "wt", $WindowsTerminalVersion)
+            return
+        }
+        throw "portable wt.exe installed but wt is not on PATH"
+    } catch {
+        Write-Warning ("Windows Terminal portable install failed: " + $_.Exception.Message)
+        $script:InstallFailures += [pscustomobject]@{ Tool='wt'; Pm='portable'; Pkg=$zipName; ExitCode=$LASTEXITCODE }
+    } finally {
+        if ($tmp) {
+            Remove-Item -LiteralPath $tmp.FullName -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
 }
 
 # ---- psmux: native Windows tmux (reads our existing tmux/tmux.conf) ---------
@@ -370,17 +1355,20 @@ function Install-Psmux {
         return
     }
     if ($DryRun) {
-        Write-Host "  would: scoop bucket add psmux https://github.com/psmux/scoop-psmux; scoop install psmux  (fallback: winget / choco)"
+        Write-Host "  would: Add-ScoopBucketSafe psmux; scoop install psmux/psmux  (fallback: winget / choco)"
         return
     }
     if (Get-Command scoop -ErrorAction SilentlyContinue) {
-        scoop bucket add psmux https://github.com/psmux/scoop-psmux 2>$null | Out-Null
-        scoop install psmux
-        if ($LASTEXITCODE -eq 0 -and (Test-Tool 'psmux')) {
-            Write-Host ("  installed {0,-26} via scoop" -f "psmux")
-            return
+        if (Add-ScoopBucketSafe -Name 'psmux' -Url 'https://github.com/psmux/scoop-psmux') {
+            scoop install psmux/psmux
+            if ($LASTEXITCODE -eq 0 -and (Test-Tool 'psmux')) {
+                Write-Host ("  installed {0,-26} via scoop" -f "psmux")
+                return
+            }
+            Write-Warning "scoop install of psmux failed; trying winget..."
+        } else {
+            Write-Warning "scoop bucket add psmux failed (clone auth/network); trying winget..."
         }
-        Write-Warning "scoop install of psmux failed; trying winget..."
     }
     if (Get-Command winget -ErrorAction SilentlyContinue) {
         winget install psmux --accept-source-agreements --accept-package-agreements --silent
@@ -401,9 +1389,232 @@ function Install-Psmux {
     $script:InstallFailures += [pscustomobject]@{ Tool='psmux'; Pm='scoop/winget/choco'; Pkg='psmux'; ExitCode=$LASTEXITCODE }
 }
 
+function Install-TreeSitterCli {
+    if (Test-Tool 'tree-sitter') {
+        Write-Host ("  ok        {0,-26} already installed" -f "tree-sitter")
+        return
+    }
+    if (-not (Ask "Install tree-sitter CLI (nvim-treesitter main parser builds)?")) {
+        Write-Host ("  skipped   {0,-26}" -f "tree-sitter")
+        return
+    }
+    if ($DryRun) {
+        Write-Host "  would:    scoop install tree-sitter"
+        Write-Host "  would:    npm install -g tree-sitter-cli   (fallback if package managers do not provide tree-sitter)"
+        return
+    }
+
+    Install-One 'tree-sitter' -SkipPrompt -NoRecordFailure
+    if (Test-Tool 'tree-sitter') { return }
+
+    if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
+        Write-Warning "npm is not on PATH; cannot use npm tree-sitter-cli fallback"
+        $script:InstallFailures += [pscustomobject]@{ Tool='tree-sitter'; Pm='scoop/npm'; Pkg='tree-sitter-cli'; ExitCode='npm-missing' }
+        return
+    }
+
+    npm install -g tree-sitter-cli
+    if ($LASTEXITCODE -eq 0 -and (Test-Tool 'tree-sitter')) {
+        Write-Host ("  installed {0,-26} via npm" -f "tree-sitter")
+        return
+    }
+
+    Write-Warning "npm install of tree-sitter-cli failed or tree-sitter is still not on PATH"
+    $script:InstallFailures += [pscustomobject]@{ Tool='tree-sitter'; Pm='scoop/npm'; Pkg='tree-sitter-cli'; ExitCode=$LASTEXITCODE }
+}
+
+function Get-VsWherePath {
+    $programFilesX86 = ${env:ProgramFiles(x86)}
+    if ([string]::IsNullOrWhiteSpace($programFilesX86)) { return '' }
+    return (Join-Path $programFilesX86 'Microsoft Visual Studio\Installer\vswhere.exe')
+}
+
+function Get-VsBuildToolsInstallationPath {
+    param([string]$VsWherePath = (Get-VsWherePath))
+
+    if ([string]::IsNullOrWhiteSpace($VsWherePath)) { return '' }
+    if (-not (Test-Path -LiteralPath $VsWherePath -PathType Leaf)) { return '' }
+
+    try {
+        $result = @(& $VsWherePath `
+                -products * `
+                -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+                -property installationPath 2>$null)
+        if ($LASTEXITCODE -ne 0) { return '' }
+        foreach ($line in $result) {
+            $path = ([string]$line).Trim()
+            if (-not [string]::IsNullOrWhiteSpace($path)) {
+                return $path
+            }
+        }
+    } catch {
+        return ''
+    }
+    return ''
+}
+
+function Install-VsBuildTools {
+    $existingPath = Get-VsBuildToolsInstallationPath
+    if (-not [string]::IsNullOrWhiteSpace($existingPath)) {
+        Write-Host ("  ok        {0,-26} VC toolset at {1}" -f "VS Build Tools", $existingPath)
+        return
+    }
+
+    $wingetId = 'Microsoft.VisualStudio.2022.BuildTools'
+    $override = '--quiet --wait --norestart --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended'
+    if ($DryRun) {
+        Write-Host "  would:    winget install --id $wingetId -e --accept-package-agreements --accept-source-agreements --override `"$override`""
+        Write-Host "  would:    choco install -y visualstudio2022buildtools; choco install -y visualstudio2022-workload-vctools"
+        return
+    }
+
+    Write-Host "  note      VS Build Tools is a multi-GB install; this can take a while."
+    try {
+        if (Get-Command winget -ErrorAction SilentlyContinue) {
+            winget install --id $wingetId -e --accept-package-agreements --accept-source-agreements --override $override
+            if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace((Get-VsBuildToolsInstallationPath))) {
+                Write-Host ("  installed {0,-26} via winget" -f "VS Build Tools")
+                return
+            }
+            Write-Warning "winget VS Build Tools install did not leave a detected VC toolset; trying choco..."
+        }
+
+        if (Get-Command choco -ErrorAction SilentlyContinue) {
+            choco install -y visualstudio2022buildtools
+            $buildToolsExit = $LASTEXITCODE
+            choco install -y visualstudio2022-workload-vctools
+            $workloadExit = $LASTEXITCODE
+            if ($buildToolsExit -eq 0 -and $workloadExit -eq 0 -and -not [string]::IsNullOrWhiteSpace((Get-VsBuildToolsInstallationPath))) {
+                Write-Host ("  installed {0,-26} via choco" -f "VS Build Tools")
+                return
+            }
+        }
+    } catch {
+        Write-Warning ("VS Build Tools install raised an exception: " + $_.Exception.Message)
+    }
+
+    Write-Host "  FAIL: VS Build Tools install failed or VC toolset was not detected" -ForegroundColor Red
+}
+
+function Install-VsBuildToolsWhenAll {
+    param([bool]$IsAll = $All)
+    if ($IsAll) {
+        Install-VsBuildTools
+    }
+}
+
+# PSFzf is a PowerShell module (PSGallery), not a package-manager binary, so it
+# installs via Install-Module rather than the $Catalog. It wires fzf into
+# PSReadLine (Ctrl+R / Ctrl+T / Alt+C); the profile activates those bindings only
+# when both PSFzf and the fzf binary are present. Not pinned -- matches the rest
+# of the provisioning layer.
+function Install-PSFzf {
+    if (Get-Module -ListAvailable -Name PSFzf) {
+        Write-Host ("  ok        {0,-26} already installed" -f "PSFzf")
+        return
+    }
+    if (-not (Ask "Install PSFzf (fzf fuzzy pickers for PSReadLine)?")) {
+        Write-Host ("  skipped   {0,-26}" -f "PSFzf")
+        return
+    }
+    if ($DryRun) {
+        Write-Host "  would: Install-Module PSFzf -Scope CurrentUser -Repository PSGallery -Force"
+        return
+    }
+    try {
+        # Non-interactive bootstrap: ensure the NuGet provider so Install-Module
+        # never blocks on a Y/N prompt in CI. -Force suppresses the
+        # untrusted-repository prompt for PSGallery.
+        try { $null = Get-PackageProvider -Name NuGet -ForceBootstrap -ErrorAction Stop } catch { Write-Verbose $_.Exception.Message }
+        Install-Module -Name PSFzf -Scope CurrentUser -Repository PSGallery -Force -AllowClobber -ErrorAction Stop
+        if (Get-Module -ListAvailable -Name PSFzf) {
+            Write-Host ("  installed {0,-26} via PSGallery" -f "PSFzf")
+            return
+        }
+    } catch {
+        Write-Warning ("PSFzf install failed: " + $_.Exception.Message)
+    }
+    $script:InstallFailures += [pscustomobject]@{ Tool='PSFzf'; Pm='PSGallery'; Pkg='PSFzf'; ExitCode=$LASTEXITCODE }
+}
+
+function Get-CatalogUpdateSpec {
+    param([object[]]$SpecList = @(Get-InstallDependencySpec))
+    $seen = @{}
+    foreach ($spec in $SpecList) {
+        if ($Catalog.ContainsKey($spec.Tool) -and -not $seen.ContainsKey($spec.Tool)) {
+            $seen[$spec.Tool] = $true
+            $spec
+        }
+    }
+}
+
+function Invoke-InstallDepsUpdateMode {
+    param(
+        [object[]]$SpecList = @(Get-InstallDependencySpec),
+        [scriptblock]$PresenceTester,
+        [bool]$IsDryRun = $DryRun
+    )
+
+    Write-Host ("install-deps: update mode  scoop=" + [bool](Get-Command scoop -ErrorAction SilentlyContinue) + "  dry-run=$IsDryRun")
+    Write-Host "note: winget/choco-installed tools update via their own managers."
+    Write-Host ""
+
+    if (-not (Get-Command scoop -ErrorAction SilentlyContinue)) {
+        Write-Host "  skipped   scoop update              Scoop is not installed"
+    } elseif ($IsDryRun) {
+        Write-Host "  would:    scoop update"
+    } else {
+        scoop update | Out-Null
+    }
+
+    foreach ($spec in (Get-CatalogUpdateSpec -SpecList $SpecList)) {
+        $tool = $spec.Tool
+        $present = if ($PresenceTester) {
+            [bool](& $PresenceTester $tool)
+        } else {
+            Test-Tool $tool
+        }
+        if (-not $present) {
+            Write-Host ("  skipped   {0,-26} not installed" -f $tool)
+            continue
+        }
+        Update-ScoopTool -tool $tool -NoPrompt -SkipManifestRefresh -ReportSkip -AssumePresent -IsDryRun $IsDryRun
+    }
+
+    Write-Host ""
+    Write-Host "note: pinned binaries (Neovim/lazygit/tree-sitter Linux archives, Hack Nerd Font, Windows Terminal portable), PSFzf, plugins, and configs update via git pull and re-running setup."
+}
+
 if ($env:INSTALL_DEPS_PS1_SOURCE_ONLY) { return }
 
 $Pm = Get-AvailablePM
+
+if ($Update) {
+    Invoke-InstallDepsUpdateMode -IsDryRun $DryRun
+    exit 0
+}
+
+Write-Host ""
+Write-Host ("install-deps: primary PM=$Pm  scoop=" + [bool](Get-Command scoop -ErrorAction SilentlyContinue) + "  dry-run=$DryRun  yes-all=$All")
+Write-Host ""
+
+$dependencyScan = @(Get-InstallDependencyScan)
+Show-InstallDependencyTable -Rows $dependencyScan
+Write-Host ""
+$missingDependencyCount = @($dependencyScan | Where-Object { $_.Status -eq 'missing' }).Count
+
+# One-shot "install everything" vs per-item prompts. Skipped when -All / -DryRun
+# was passed or the session is non-interactive. Enter / Y == everything.
+if (Test-InstallPromptAvailable) {
+    $resp = Read-Host "Install the $missingDependencyCount missing tools listed above without further prompts? [Y/n]  (n = choose per tool)"
+    if ($resp -match '^[Nn]') {
+        Write-Host "  -> per-item prompts"
+    } else {
+        $All = $true
+        Write-Host "  -> installing everything; no further prompts"
+    }
+    Write-Host ""
+}
 
 # If no package manager at all, try scoop first (no admin required).
 if (-not $Pm) {
@@ -418,29 +1629,13 @@ if ($Pm -and -not (Get-Command scoop -ErrorAction SilentlyContinue)) {
     Write-Host "Detected $Pm. Scoop is also recommended -- it carries taplo,"
     Write-Host "win32yank, and the nerd-fonts bucket that $Pm does not have."
     Install-Scoop | Out-Null
+    $Pm = Get-AvailablePM
 }
-
-Write-Host ""
-Write-Host ("install-deps: primary PM=$Pm  scoop=" + [bool](Get-Command scoop -ErrorAction SilentlyContinue) + "  dry-run=$DryRun  yes-all=$All")
-Write-Host ""
 
 if (-not $Pm) {
     Write-Warning "No supported package manager available. Install winget from the"
     Write-Warning "Microsoft Store ('App Installer'), or accept the Scoop offer above."
     exit 1
-}
-
-# One-shot "install everything" vs per-item prompts. Skipped when -All / -DryRun
-# was passed or the session is non-interactive. Enter / Y == everything.
-if ((-not $All) -and (-not $DryRun) -and [Environment]::UserInteractive) {
-    $resp = Read-Host "Install EVERYTHING without further prompts? [Y/n]  (n = choose per tool)"
-    if ($resp -match '^[Nn]') {
-        Write-Host "  -> per-item prompts"
-    } else {
-        $All = $true
-        Write-Host "  -> installing everything; no further prompts"
-    }
-    Write-Host ""
 }
 
 function Section { param([string]$title) Write-Host ""; Write-Host "== $title ==" }
@@ -452,23 +1647,30 @@ Install-One nvim
 Install-One make
 Install-One rg
 Install-One fd
+Install-One fzf
+Install-One chezmoi
 Install-One lazygit
 
 Section "prompt"
 Install-One starship
 
 Section "terminal host"
-Install-One wt
+Install-WindowsTerminal
 
 Section "terminal multiplexer (psmux: tmux for native Windows, optional)"
 Install-Psmux
 
 Section "modern shell (optional, you can stay on Windows PowerShell 5.1)"
 Install-One pwsh
+Update-ScoopTool pwsh
+Install-PSFzf
 
 Section "language tooling (for LSP / formatter back-ends)"
-Install-One python
+Install-Python
 Install-One node
+Install-TreeSitterCli
+Install-One zig
+Install-VsBuildToolsWhenAll
 
 Section "WSL clipboard bridge (skip if you don't use WSL nvim)"
 Install-One win32yank
@@ -488,8 +1690,8 @@ Install-HackNerdFont
 
 Section "Ghostty terminal (manual step on Windows)"
 Write-Host "  manual    Ghostty does not have a Windows build yet."
-Write-Host "            Use Windows Terminal (.\bootstrap.ps1 -MergeWindowsTerminal applies"
-Write-Host "            the rose-pine fragment) or WezTerm for now."
+Write-Host "            Use Windows Terminal (setup applies the rose-pine"
+Write-Host "            fragment by default) or WezTerm for now."
 
 Write-Host ""
 if ($script:InstallFailures.Count -gt 0) {

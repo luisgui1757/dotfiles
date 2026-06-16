@@ -88,6 +88,17 @@
     },
     {
       "customType": "regex",
+      "description": "Windows Terminal portable archive version for Windows. The SHA-256 must be recomputed manually after Renovate bumps this.",
+      "managerFilePatterns": ["/^install-deps\\.ps1$/"],
+      "matchStrings": [
+        "\\$WindowsTerminalVersion\\s*=\\s*'(?<currentValue>v[^']+)'\\s+\\$WindowsTerminalX64Sha256\\s*=\\s*'[a-f0-9]{64}'"
+      ],
+      "depNameTemplate": "microsoft/terminal",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "loose"
+    },
+    {
+      "customType": "regex",
       "description": "Ubuntu Ghostty installer version. The installer SHA-256 must be recomputed manually after Renovate bumps this.",
       "managerFilePatterns": ["/^install-deps\\.sh$/"],
       "matchStrings": [
@@ -121,14 +132,36 @@
     },
     {
       "customType": "regex",
-      "description": "zsh-autocomplete pinned tag. The adjacent commit SHA must be reviewed manually after Renovate bumps this.",
+      "description": "tree-sitter CLI Linux x86_64 release version. Adjacent Linux asset SHA-256 values must be recomputed manually after Renovate bumps this.",
       "managerFilePatterns": ["/^install-deps\\.sh$/"],
       "matchStrings": [
-        "ZSH_AUTOCOMPLETE_VERSION=\"(?<currentValue>[^\"]+)\"\\s+ZSH_AUTOCOMPLETE_COMMIT=\"[a-f0-9]{40}\""
+        "TREE_SITTER_CLI_LINUX_VERSION=\"(?<currentValue>v[^\"]+)\"\\s+TREE_SITTER_CLI_LINUX_X86_64_SHA256=\"[a-f0-9]{64}\""
       ],
-      "depNameTemplate": "marlonrichert/zsh-autocomplete",
+      "depNameTemplate": "tree-sitter/tree-sitter",
       "datasourceTemplate": "github-releases",
-      "versioningTemplate": "loose"
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "description": "tree-sitter CLI Linux arm64 release version. Adjacent Linux asset SHA-256 values must be recomputed manually after Renovate bumps this.",
+      "managerFilePatterns": ["/^install-deps\\.sh$/"],
+      "matchStrings": [
+        "TREE_SITTER_CLI_LINUX_VERSION=\"(?<currentValue>v[^\"]+)\"(?:.|\\n)*?TREE_SITTER_CLI_LINUX_ARM64_SHA256=\"[a-f0-9]{64}\""
+      ],
+      "depNameTemplate": "tree-sitter/tree-sitter",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "description": "fzf-tab pinned tag. The adjacent commit SHA must be reviewed manually after Renovate bumps this.",
+      "managerFilePatterns": ["/^install-deps\\.sh$/"],
+      "matchStrings": [
+        "FZF_TAB_VERSION=\"(?<currentValue>v[^\"]+)\"\\s+FZF_TAB_COMMIT=\"[a-f0-9]{40}\""
+      ],
+      "depNameTemplate": "Aloxaf/fzf-tab",
+      "datasourceTemplate": "github-tags",
+      "versioningTemplate": "semver"
     },
     {
       "customType": "regex",

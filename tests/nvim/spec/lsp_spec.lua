@@ -35,10 +35,18 @@ describe("LSP server coverage", function()
       assert.is_truthy(code_only:match(pattern), 'vim.lsp.config("' .. server .. '", ...) not found in lsp-config.lua')
     end)
     it("enables " .. server, function()
-      local pattern = '"' .. server .. '"'
-      local enable_block = code_only:match("vim%.lsp%.enable%({(.-)}%)")
-      assert.is_not_nil(enable_block, "vim.lsp.enable({...}) block missing")
-      assert.is_truthy(enable_block:find(pattern, 1, true), server .. " not in vim.lsp.enable list")
+      -- The enabled list is built as `local enabled_servers = { ... }` then
+      -- passed to vim.lsp.enable. powershell_es is appended conditionally via
+      -- table.insert (it needs pwsh + the PSES bundle), so accept either spot.
+      assert.is_truthy(
+        code_only:find("vim.lsp.enable(enabled_servers)", 1, true),
+        "vim.lsp.enable(enabled_servers) call missing"
+      )
+      local enable_block = code_only:match("enabled_servers%s*=%s*{(.-)}")
+      assert.is_not_nil(enable_block, "enabled_servers = { ... } block missing")
+      local in_list = enable_block:find('"' .. server .. '"', 1, true)
+      local inserted = code_only:find('table.insert(enabled_servers, "' .. server .. '")', 1, true)
+      assert.is_truthy(in_list or inserted, server .. " not enabled (missing from enabled_servers and table.insert)")
     end)
   end
 

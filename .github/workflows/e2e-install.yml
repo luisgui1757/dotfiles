@@ -113,11 +113,18 @@ jobs:
             [ -x "$p/bin/brew" ] && eval "$("$p/bin/brew" shellenv)" && break
           done
           fail() { echo "FAIL: $*" >&2; exit 1; }
-          assert_link() {
+          assert_file_content() {
+            local path="$1" expected="$2"
+            [[ -e "$path" ]] || fail "$path does not exist"
+            [[ -f "$path" ]] || fail "$path does not dereference to a file"
+            cmp -s "$path" "$expected" || fail "$path content differs from $expected"
+          }
+          assert_dir_resolves() {
             local path="$1" expected="$2" actual
-            [[ -L "$path" ]] || fail "$path is not a symlink"
-            actual="$(readlink "$path")"
-            [[ "$actual" == "$expected" ]] || fail "$path points to $actual, expected $expected"
+            [[ -d "$path" ]] || fail "$path is not a directory"
+            actual="$(cd "$path" && pwd -P)"
+            expected="$(cd "$expected" && pwd -P)"
+            [[ "$actual" == "$expected" ]] || fail "$path resolves to $actual, expected $expected"
           }
           run_nvim_checked() {
             local label="$1"; shift
@@ -148,22 +155,31 @@ jobs:
           command -v lazygit >/dev/null 2>&1 || fail "lazygit is not on PATH"
           nvim_line="$(nvim --version | head -n 1)"
           case "$nvim_line" in
-            "NVIM v0.11"*|"NVIM v0.12"*|"NVIM v1."*) ;;
-            *) fail "nvim version is below 0.11: $nvim_line" ;;
+            "NVIM v0.12"*|"NVIM v1."*) ;;
+            *) fail "nvim version is below 0.12: $nvim_line" ;;
           esac
           repo="$(pwd -P)"
-          assert_link "$HOME/.config/nvim" "$repo/nvim"
-          assert_link "$HOME/.config/starship.toml" "$repo/starship/starship.toml"
-          assert_link "$HOME/.tmux.conf" "$repo/tmux/tmux.conf"
-          assert_link "$HOME/.zshenv" "$repo/shells/zshenv"
-          assert_link "$HOME/.zshrc" "$repo/shells/zshrc"
+          assert_dir_resolves "$HOME/.config/nvim" "$repo/nvim"
+          assert_file_content "$HOME/.config/nvim/init.lua" "$repo/nvim/init.lua"
+          assert_file_content "$HOME/.config/starship.toml" "$repo/starship/starship.toml"
+          assert_file_content "$HOME/.tmux.conf" "$repo/tmux/tmux.conf"
+          assert_file_content "$HOME/.zshenv" "$repo/shells/zshenv"
+          assert_file_content "$HOME/.zshrc" "$repo/shells/zshrc"
           plugin_root="${XDG_DATA_HOME:-$HOME/.local/share}/dotfiles/zsh-plugins"
-          [[ -r "$plugin_root/zsh-autocomplete/zsh-autocomplete.plugin.zsh" ]] || fail "zsh-autocomplete plugin file missing"
+          [[ -r "$plugin_root/fzf-tab/fzf-tab.plugin.zsh" ]] || fail "fzf-tab plugin file missing"
           [[ -r "$plugin_root/zsh-autosuggestions/zsh-autosuggestions.zsh" ]] || fail "zsh-autosuggestions plugin file missing"
           run_nvim_checked lazy "+Lazy! sync" "+qa"
           run_nvim_checked mason "+MasonToolsInstallSync" "+qa"
           assert_mason_tool "lua-language-server" lua-language-server lua-language-server.cmd lua-language-server.exe
           assert_mason_tool "stylua" stylua stylua.cmd stylua.exe
+          # Tier 2 language smoke: parser-support (get_available) AND LSP-attach,
+          # both STRICT. The treesitter-highlight bug that previously forced
+          # LSP-attach to report-only is fixed canonically (nvim-bundled langs are
+          # no longer installed by nvim-treesitter), so a non-gated server that
+          # does not attach -- or a fixture open that raises -- now cquits.
+          # run_nvim_checked fails on the nonzero exit. The trailing +qa is
+          # insurance if the probe ever leaves nvim alive.
+          DOTFILES_LSP_SMOKE=strict run_nvim_checked lsp-smoke -u "$repo/nvim/init.lua" -c "luafile $repo/tests/nvim/lsp_smoke.lua" +qa
 
   setup-ps1:
     name: setup.ps1 / windows-2025
@@ -225,7 +241,7 @@ jobs:
           }
           $pathParts += ($env:PATH -split ';')
           $env:PATH = ($pathParts | Where-Object { $_ } | Select-Object -Unique) -join ';'
-          function Assert-LinkTarget {
+          function Assert-NvimSymlink {
               param([string]$Path, [string]$Expected)
               $item = Get-Item -LiteralPath $Path -Force -ErrorAction Stop
               if ($item.LinkType -ne 'SymbolicLink') {
@@ -236,6 +252,17 @@ jobs:
               $expectedResolved = (Resolve-Path -LiteralPath $Expected -ErrorAction Stop).Path
               if ($actualResolved -ne $expectedResolved) {
                   throw "$Path points to $actualResolved, expected $expectedResolved"
+              }
+          }
+          function Assert-ContentEqual {
+              param([string]$Path, [string]$Expected)
+              if (-not (Test-Path -LiteralPath $Path)) {
+                  throw "$Path does not exist"
+              }
+              $actualHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $Path).Hash
+              $expectedHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $Expected).Hash
+              if ($actualHash -ne $expectedHash) {
+                  throw "$Path content differs from $Expected"
               }
           }
           function Invoke-NvimChecked {
@@ -267,18 +294,41 @@ jobs:
               throw 'lazygit is not on PATH'
           }
           $nvimLine = & nvim --version | Select-Object -First 1
-          if ($nvimLine -notmatch '^NVIM v(0\.1[1-9]|0\.[2-9][0-9]|[1-9]\.)') {
-              throw "nvim version is below 0.11: $nvimLine"
+          if ($nvimLine -notmatch '^NVIM v(0\.1[2-9]|0\.[2-9][0-9]|[1-9]\.)') {
+              throw "nvim version is below 0.12: $nvimLine"
           }
           $repo = (Resolve-Path -LiteralPath '.').Path
-          Assert-LinkTarget -Path (Join-Path $env:LOCALAPPDATA 'nvim') -Expected (Join-Path $repo 'nvim')
-          Assert-LinkTarget -Path (Join-Path $env:USERPROFILE '.config\starship.toml') -Expected (Join-Path $repo 'starship\starship.toml')
-          Assert-LinkTarget -Path (Join-Path $env:USERPROFILE '.tmux.conf') -Expected (Join-Path $repo 'tmux\tmux.conf')
-          Assert-LinkTarget -Path $PROFILE -Expected (Join-Path $repo 'shells\powershell_profile.ps1')
+          $nvimTarget = Join-Path $env:LOCALAPPDATA 'nvim'
+          Assert-NvimSymlink -Path $nvimTarget -Expected (Join-Path $repo 'nvim')
+          Assert-ContentEqual -Path (Join-Path $nvimTarget 'init.lua') -Expected (Join-Path $repo 'nvim\init.lua')
+          Assert-ContentEqual -Path (Join-Path $env:USERPROFILE '.config\starship.toml') -Expected (Join-Path $repo 'starship\starship.toml')
+          Assert-ContentEqual -Path (Join-Path $env:USERPROFILE '.tmux.conf') -Expected (Join-Path $repo 'tmux\tmux.conf')
+          Assert-ContentEqual -Path (Join-Path $env:USERPROFILE '.tmux.windows.conf') -Expected (Join-Path $repo 'tmux\tmux.windows.conf')
+          Assert-ContentEqual -Path $PROFILE -Expected (Join-Path $repo 'shells\powershell_profile.ps1')
+          Assert-ContentEqual -Path (Join-Path $env:LOCALAPPDATA 'lazygit\config.yml') -Expected (Join-Path $repo 'lazygit\config.yml')
           Invoke-NvimChecked -Name lazy -NvimArgs @('+Lazy! sync', '+qa')
           Invoke-NvimChecked -Name mason -NvimArgs @('+MasonToolsInstallSync', '+qa')
           Assert-MasonTool -Name 'lua-language-server' -FileNames @('lua-language-server.cmd', 'lua-language-server.exe', 'lua-language-server')
           Assert-MasonTool -Name 'stylua' -FileNames @('stylua.cmd', 'stylua.exe', 'stylua')
+          # powershell_es is the Windows-only LSP target. The Tier 2 smoke enforces
+          # it (fails if pwsh or the PSES bundle is missing); assert the same
+          # preconditions here too so a setup regression has a clear, early locus.
+          if (-not (Get-Command pwsh -ErrorAction SilentlyContinue)) {
+              throw 'pwsh is not on PATH (setup.ps1 -All should install PowerShell 7)'
+          }
+          $psesDir = Join-Path $env:LOCALAPPDATA 'nvim-data\mason\packages\powershell-editor-services'
+          if (-not (Test-Path -LiteralPath $psesDir)) {
+              throw "Mason did not install powershell-editor-services into $psesDir"
+          }
+          # Tier 2 language smoke: parser-support (get_available) AND LSP-attach,
+          # both STRICT (see lsp_smoke.lua). On Windows this is where powershell_es
+          # is actually enforced (pwsh + PSES bundle present). cquit on any failure
+          # -> Invoke-NvimChecked throws.
+          $initLua = (Join-Path $repo 'nvim\init.lua') -replace '\\', '/'
+          $smokeLua = (Join-Path $repo 'tests\nvim\lsp_smoke.lua') -replace '\\', '/'
+          $env:DOTFILES_LSP_SMOKE = 'strict'
+          Invoke-NvimChecked -Name lsp-smoke -NvimArgs @('-u', $initLua, '-c', "luafile $smokeLua", '+qa')
+          Remove-Item Env:DOTFILES_LSP_SMOKE
 
   wsl2-canary:
     name: setup.sh / WSL2 Ubuntu-24.04 (best-effort canary)
@@ -320,6 +370,6 @@ jobs:
           fi
           command -v nvim >/dev/null 2>&1
           command -v lazygit >/dev/null 2>&1
-          test -r "${XDG_DATA_HOME:-$HOME/.local/share}/dotfiles/zsh-plugins/zsh-autocomplete/zsh-autocomplete.plugin.zsh"
+          test -r "${XDG_DATA_HOME:-$HOME/.local/share}/dotfiles/zsh-plugins/fzf-tab/fzf-tab.plugin.zsh"
           test -r "${XDG_DATA_HOME:-$HOME/.local/share}/dotfiles/zsh-plugins/zsh-autosuggestions/zsh-autosuggestions.zsh"
           nvim --version | head -n 1

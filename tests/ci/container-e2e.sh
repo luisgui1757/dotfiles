@@ -7,7 +7,7 @@
 #   (no args)   root: install prereqs for $EXPECTED_PM, create an unprivileged
 #               user, copy the read-only /repo mount, then re-exec as that user.
 #   --as-user   run the REAL install-deps.sh --all (native PM, no brew) +
-#               bootstrap.sh, then assert the result.
+#               chezmoi config apply, then assert the result.
 set -euo pipefail
 
 EXPECTED_PM="${EXPECTED_PM:?EXPECTED_PM must be set}"
@@ -29,15 +29,26 @@ run_and_capture() {
     fi
 }
 
-assert_link() {
-    # assert_link <path> <expected-target>
-    [[ -L "$1" ]] || fail "$1 is not a symlink"
-    _actual="$(readlink "$1")"
-    [[ "$_actual" == "$2" ]] || fail "$1 points to $_actual, expected $2"
+assert_file_content() {
+    # assert_file_content <managed-path> <canonical-source>
+    [[ -e "$1" ]] || fail "$1 does not exist"
+    [[ -f "$1" ]] || fail "$1 does not dereference to a file"
+    cmp -s "$1" "$2" || fail "$1 content differs from $2"
+}
+
+assert_dir_resolves() {
+    # assert_dir_resolves <managed-dir> <canonical-source-dir>
+    local actual expected
+    [[ -d "$1" ]] || fail "$1 is not a directory"
+    actual="$(readlink -f "$1")"
+    expected="$(readlink -f "$2")"
+    [[ "$actual" == "$expected" ]] || fail "$1 resolves to $actual, expected $expected"
 }
 
 if [[ "${1:-}" == "--as-user" ]]; then
     cd "$HOME/dotfiles" || fail "repo copy missing at $HOME/dotfiles"
+
+    repo="$(pwd -P)"
 
     run_and_capture "install-deps.sh" "$HOME/install-deps.log" ./install-deps.sh --all
     grep -F "package manager=$EXPECTED_PM" "$HOME/install-deps.log" >/dev/null \
@@ -46,10 +57,10 @@ if [[ "${1:-}" == "--as-user" ]]; then
         fail "install-deps switched to brew (native PM expected)"
     fi
 
-    run_and_capture "bootstrap.sh" "$HOME/bootstrap.log" ./bootstrap.sh
-
-    # install_nvim_linux symlinks nvim into /usr/local/bin, and apt's fd-find is
-    # symlinked to ~/.local/bin/fd. A real login shell has both on PATH.
+    # install_nvim_linux symlinks nvim into /usr/local/bin, apt's fd-find is
+    # symlinked to ~/.local/bin/fd, and install-deps installs chezmoi into
+    # ~/.local/bin. A real login shell has these on PATH; add them BEFORE we call
+    # chezmoi for the config apply (and the tool-presence checks below).
     for d in /usr/local/bin "$HOME/.local/bin"; do
         case ":$PATH:" in
             *":$d:"*) ;;
@@ -58,27 +69,32 @@ if [[ "${1:-}" == "--as-user" ]]; then
     done
     export PATH
 
-    for cmd in nvim rg fd fzf tmux zsh git lazygit; do
+    run_and_capture "chezmoi init" "$HOME/chezmoi-init.log" \
+        chezmoi --source "$repo/home" init
+    run_and_capture "chezmoi apply" "$HOME/chezmoi-apply.log" \
+        chezmoi --source "$repo/home" --no-tty --force apply
+
+    for cmd in nvim rg fd fzf tmux zsh git lazygit tree-sitter; do
         command -v "$cmd" >/dev/null 2>&1 || fail "$cmd is not on PATH"
     done
 
     nvim_line="$(nvim --version | head -n 1)"
     case "$nvim_line" in
-        "NVIM v0.11"* | "NVIM v0.12"* | "NVIM v1."*) ;;
-        *) fail "nvim version is below 0.11: $nvim_line" ;;
+        "NVIM v0.12"* | "NVIM v1."*) ;;
+        *) fail "nvim version is below 0.12: $nvim_line" ;;
     esac
 
-    repo="$(pwd -P)"
-    assert_link "$HOME/.config/nvim" "$repo/nvim"
-    assert_link "$HOME/.config/starship.toml" "$repo/starship/starship.toml"
-    assert_link "$HOME/.tmux.conf" "$repo/tmux/tmux.conf"
-    assert_link "$HOME/.zshenv" "$repo/shells/zshenv"
-    assert_link "$HOME/.zshrc" "$repo/shells/zshrc"
-    assert_link "$HOME/.config/lazygit/config.yml" "$repo/lazygit/config.yml"
+    assert_dir_resolves "$HOME/.config/nvim" "$repo/nvim"
+    assert_file_content "$HOME/.config/nvim/init.lua" "$repo/nvim/init.lua"
+    assert_file_content "$HOME/.config/starship.toml" "$repo/starship/starship.toml"
+    assert_file_content "$HOME/.tmux.conf" "$repo/tmux/tmux.conf"
+    assert_file_content "$HOME/.zshenv" "$repo/shells/zshenv"
+    assert_file_content "$HOME/.zshrc" "$repo/shells/zshrc"
+    assert_file_content "$HOME/.config/lazygit/config.yml" "$repo/lazygit/config.yml"
 
     plugin_root="${XDG_DATA_HOME:-$HOME/.local/share}/dotfiles/zsh-plugins"
-    [[ -r "$plugin_root/zsh-autocomplete/zsh-autocomplete.plugin.zsh" ]] \
-        || fail "zsh-autocomplete plugin file missing"
+    [[ -r "$plugin_root/fzf-tab/fzf-tab.plugin.zsh" ]] \
+        || fail "fzf-tab plugin file missing"
     [[ -r "$plugin_root/zsh-autosuggestions/zsh-autosuggestions.zsh" ]] \
         || fail "zsh-autosuggestions plugin file missing"
 

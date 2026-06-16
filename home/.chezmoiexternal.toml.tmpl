@@ -1,0 +1,17 @@
+{{- if ne .targetOS "windows" }}
+# POSIX-only: shells/zshrc sources these repo-managed plugin checkouts first.
+# Pins are grounded in install-deps.sh FZF_TAB_* / ZSH_AUTOSUGGESTIONS_* constants.
+[".local/share/dotfiles/zsh-plugins/fzf-tab"]
+    type = "git-repo"
+    url = "https://github.com/Aloxaf/fzf-tab.git"
+    refreshPeriod = "0"
+    [".local/share/dotfiles/zsh-plugins/fzf-tab".clone]
+        args = ["--depth", "1", "--branch", "v1.3.0"]
+
+[".local/share/dotfiles/zsh-plugins/zsh-autosuggestions"]
+    type = "git-repo"
+    url = "https://github.com/zsh-users/zsh-autosuggestions.git"
+    refreshPeriod = "0"
+    [".local/share/dotfiles/zsh-plugins/zsh-autosuggestions".clone]
+        args = ["--depth", "1", "--branch", "v0.7.1"]
+{{- end }}

@@ -2,13 +2,13 @@
 # current OS; sub-targets skip themselves with a clear message when the
 # tool they depend on isn't installed.
 
-.PHONY: test test-nvim test-shell test-starship test-tmux test-ghostty test-bootstrap test-static validate-renovate lint setup setup-dryrun install dryrun deps deps-dryrun help
+.PHONY: test test-nvim test-shell test-starship test-tmux test-ghostty test-static validate-renovate lint setup setup-dryrun install dryrun deps deps-dryrun chezmoi chezmoi-diff help
 
 REPO := $(shell pwd)
 
 help:
 	@echo "Targets:"
-	@echo "  setup           — ONE-SHOT: deps + symlinks + plugins + LSP (recommended)"
+	@echo "  setup           — ONE-SHOT: deps + config + plugins + LSP (recommended)"
 	@echo "  setup-dryrun    — preview every step of setup without acting"
 	@echo "  test            — run all test sub-targets (skips what's not installed)"
 	@echo "  test-nvim       — plenary busted suite under nvim --headless"
@@ -16,7 +16,6 @@ help:
 	@echo "  test-starship   — render snapshot + perf budget (<25ms mean)"
 	@echo "  test-tmux       — load + option assertions"
 	@echo "  test-ghostty    — +validate-config + scheme grep (mac only)"
-	@echo "  test-bootstrap  — bats coverage of bootstrap.sh idempotency"
 	@echo "  test-static     — json/toml/yaml lint, editorconfig, invariants"
 	@echo "  validate-renovate — schema-check renovate.json under Node 24"
 	@echo "  lint            — shellcheck everything"
@@ -24,8 +23,12 @@ help:
 	@echo "Maintainer phase targets:"
 	@echo "  deps            — phase 1 only: dependency install"
 	@echo "  deps-dryrun     — preview phase 1"
-	@echo "  install         — phase 2 only: symlink configs"
-	@echo "  dryrun          — preview phase 2"
+	@echo "  install         — phase 2 only: apply configs with chezmoi"
+	@echo "  dryrun          — preview phase 2 with chezmoi diff"
+	@echo
+	@echo "chezmoi (config layer):"
+	@echo "  chezmoi         — apply the config layer with chezmoi (config only, no deps)"
+	@echo "  chezmoi-diff    — preview what chezmoi would change (dry run)"
 
 setup:
 	@bash setup.sh
@@ -40,12 +43,20 @@ deps-dryrun:
 	@bash install-deps.sh --dry-run
 
 install:
-	@bash bootstrap.sh
+	@chezmoi --source $(REPO)/home apply
 
 dryrun:
-	@bash bootstrap.sh --dry-run
+	@chezmoi --source $(REPO)/home diff
 
-test: test-static lint test-nvim test-shell test-starship test-tmux test-ghostty test-bootstrap
+# Config-only re-apply via chezmoi (the migrated config layer; no provisioning).
+# Source tree is home/; .chezmoiroot lets remote `chezmoi init --apply` find it too.
+chezmoi:
+	@chezmoi --source $(REPO)/home apply
+
+chezmoi-diff:
+	@chezmoi --source $(REPO)/home diff
+
+test: test-static lint test-nvim test-shell test-starship test-tmux test-ghostty
 	@echo
 	@echo "=== test summary: see individual sub-target output above ==="
 
@@ -63,9 +74,6 @@ test-tmux:
 
 test-ghostty:
 	@bash tests/ghostty/run_all.sh
-
-test-bootstrap:
-	@bash tests/bootstrap/run.sh
 
 test-static:
 	@bash tests/static/run_all.sh

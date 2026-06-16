@@ -8,7 +8,7 @@ err=$(mktemp "$CACHE_DIR/json-lint.XXXXXX")
 trap 'rm -f "$err"' EXIT
 
 # Standard JSON files: lazy-lock.json, .editorconfig-checker.json, etc.
-json_files=$(find "$REPO_ROOT" -type f -name "*.json" -not -path "*/.git/*" -not -path "*/tests/.cache/*" -not -name "*.tmp")
+json_files=$(find "$REPO_ROOT" -type f -name "*.json" -not -path "*/.git/*" -not -path "*/tests/.cache/*" -not -path "$REPO_ROOT/home/*" -not -name "*.tmp")
 if command -v jq >/dev/null 2>&1; then
     fail=0
     for f in $json_files; do
@@ -22,7 +22,7 @@ else
 fi
 
 # JSONC: strip // line comments and run through jq.
-jsonc_files=$(find "$REPO_ROOT" -type f -name "*.jsonc" -not -path "*/.git/*" -not -path "*/tests/.cache/*")
+jsonc_files=$(find "$REPO_ROOT" -type f -name "*.jsonc" -not -path "*/.git/*" -not -path "*/tests/.cache/*" -not -path "$REPO_ROOT/home/*")
 if command -v jq >/dev/null 2>&1; then
     fail=0
     for f in $jsonc_files; do

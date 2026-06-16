@@ -14,14 +14,17 @@ the install script works, read this too.
 Cross-platform dotfiles: Neovim (lazy.nvim), Starship, Ghostty, Windows
 Terminal, tmux, zshenv/zshrc, PowerShell profile, lazygit. Public installs go
 through `setup.sh` (macOS / Linux / WSL) or `setup.ps1` (Windows), which install
-dependencies, symlink configs, and sync Neovim plugins + Mason tools. The
-underlying bootstrap scripts are **location-independent** (they resolve
-`$REPO_ROOT` / `$RepoRoot` from their own path), so the repo can live anywhere —
-`~/dotfiles/`, `~/Documents/dotfiles/`, etc. The remote-clone default in
-`setup.{sh,ps1}` is `~/dotfiles/`, but an in-place clone elsewhere works too.
-Do NOT put the repo at `~/.config/nvim/` — the installer creates that path as a
-symlink **pointing into** the repo, so a repo there would self-overlap (the
-self-link guard refuses this).
+dependencies, apply the chezmoi config layer, and sync Neovim plugins + Mason
+tools. The repo can live anywhere — `~/dotfiles/`, `~/Documents/dotfiles/`,
+etc. The remote-clone default in `setup.{sh,ps1}` is `~/dotfiles/`, but an
+in-place clone elsewhere works too. Do NOT put the repo at `~/.config/nvim/` —
+the installer creates that path as a symlink **pointing into** the repo, so a
+repo there would self-overlap (the self-link guard refuses this).
+
+The `home/` tree is the chezmoi source tree for the full config layer. `setup.*`
+uses it in Phase 2. Top-level config files and their `home/` copies/templates
+must stay byte-identical where the parity manifest says so; update both in the
+same change.
 
 Agent settings are intentionally **NOT** synced through this repo. Keep local
 agent preferences in the agent's per-machine state directory; this repo does
@@ -38,15 +41,14 @@ not ship synced agent preference folders.
 ├── ghostty/               config (Rose Pine, Hack Nerd, tuned for tmux)
 ├── windows-terminal/      settings.fragment.jsonc + merge README
 ├── lazygit/               config.yml (J/K move-commit binding)
+├── home/                  chezmoi source tree for the config layer
 ├── tests/                 automated tests, grouped by tool
 ├── tests/wsl/             manual WSL split-host e2e check
-├── .github/workflows/     CI matrix: ubuntu / macos / windows
+├── .github/workflows/     CI matrix + chezmoi parity
 ├── .github/rulesets/      checked-in GitHub ruleset payloads for main
 ├── docs/security/         branch-protection runbook
 ├── setup.sh               public macOS/Linux/WSL setup entry point
 ├── setup.ps1              public Windows setup entry point
-├── bootstrap.sh           setup phase: Unix symlinks (idempotent)
-├── bootstrap.ps1          setup phase: Windows symlinks (idempotent)
 ├── test.ps1               Windows test entry point
 ├── Makefile               Unix `make setup`, `make test`, `make lint`
 ├── .editorconfig          formatting rules every editor + agent respects
@@ -102,18 +104,47 @@ that violates one of these, fix it instead of disabling the test.
 12. **No `vim.lsp.set_log_level(...)`.** Deprecated in nvim 0.11; use the module
     form `vim.lsp.log.set_level(...)` (see `lsp-config.lua`). Guarded by
     `invariants_test.sh`.
-13. **zsh plugin order is intentional.** `zsh-autocomplete` must be sourced
-    before local `compinit`; when autocomplete loads, `zshrc` must skip the
-    repo's manual `compinit` block. `zsh-autosuggestions` loads after completion
-    setup. Keep `shells/zshenv` minimal and keep `skip_global_compinit=1` there.
+13. **Completion is fzf-tab over native compinit (Tab-driven, PowerShell-like).**
+    `shells/zshrc` runs `compinit`, `zmodload`s `zsh/complist`, sets the
+    `matcher-list` (case-insensitive) + `list-colors`, then — when `fzf` is on
+    PATH — sets `zstyle ':completion:*' menu no` (fzf-tab draws the menu) and
+    sources **fzf-tab** (`Aloxaf/fzf-tab`). Tab opens an fzf fuzzy picker over
+    zsh's real context-aware completions; a single match completes directly.
+    **Load order is load-bearing:** fzf-tab sources AFTER compinit + the
+    completion `zstyle`s and BEFORE `zsh-autosuggestions`; then the fzf
+    key-binding block (`source <(fzf --zsh)`) runs, which rebinds Tab to
+    `fzf-completion`, so `zshrc` **reclaims Tab** with
+    `bindkey '^I' fzf-tab-complete` AFTER that block (guarded on the widget
+    existing). fzf keeps Ctrl-R / Ctrl-T / Alt-C. When fzf is absent, the block
+    falls back to native `menu-select` (so `zsh_startup_test` stays green).
+    `zsh-autosuggestions` (inline gray history, strategy `history completion`,
+    `#908caa`) is the only other sourced zsh plugin. Up/Down do prefix history
+    search (PowerShell `HistorySearch` parity). Do NOT swap in an always-on
+    as-you-type completion-list plugin — that paradigm rebinds Ctrl-R, fights
+    `zsh-autosuggestions`, and is slow; fzf-tab + autosuggestions is the
+    quiet-until-Tab PowerShell-PSReadLine analog and is the chosen design. Keep
+    `shells/zshenv` minimal with `skip_global_compinit=1`. Guarded by
+    `tests/shell/zsh_plugins_test.sh`.
 14. **WSL is split-host by default.** Windows Terminal, Hack Nerd Font, and
     `win32yank` are Windows-host responsibilities. WSL installs the Linux CLI
     stack. Linux Ghostty and Linux fontconfig fonts in WSL require
     `--experimental-wsl-gui`; do not make them the default path again.
 15. **Windows Terminal is installed by Windows setup.** Keep `wt` in the
     `install-deps.ps1` Scoop-first catalog (`extras/windows-terminal` ->
-    `Microsoft.WindowsTerminal` -> `microsoft-windows-terminal`). The app
-    install and `-MergeWindowsTerminal` settings merge are separate steps.
+    `Microsoft.WindowsTerminal` -> `microsoft-windows-terminal`). If those
+    MSIX-backed installs do not put `wt` on PATH, `Install-WindowsTerminal`
+    falls back to the pinned portable GitHub release zip and verifies SHA-256
+    before extraction. The app install and settings merge are separate code
+    paths (`install-deps.ps1` vs chezmoi's `modify_` entry), and setup runs the
+    merge by default. Opt out with `-SkipWindowsTerminalMerge`;
+    `-MergeWindowsTerminal` is a retained no-op alias. The packaged `modify_`
+    target still emits nothing on blank stdin so a bare `chezmoi apply` does not
+    fabricate Store WT settings, but setup also handles portable WT after apply:
+    it mirrors the packaged file when present, or seeds/merges the unpackaged
+    path from `windows-terminal/settings.fragment.jsonc` when packaged settings
+    are absent and portable WT is detected. The merge adds a fixed PowerShell 7
+    profile (`pwsh.exe`) and promotes an empty or built-in Windows PowerShell 5.1
+    `defaultProfile` to that profile; a custom user default is preserved.
 16. **tmux uppercase `H`/`L` are window swaps.** Lowercase `h`/`l` stay pane
     focus bindings. Do not replace them with arrow-key bindings unless the
     terminal/psmux behavior has been revalidated.
@@ -125,6 +156,23 @@ that violates one of these, fix it instead of disabling the test.
     owner update bypass belongs only in
     `.github/rulesets/main-owner-updates.json`. Both bypasses must use
     `bypass_mode = pull_request`. Do not collapse these rulesets into one.
+19. **`treesitter_parsers` must exclude the 7 Neovim-bundled languages** (`c`,
+    `lua`, `markdown`, `markdown_inline`, `query`, `vim`, `vimdoc`). Neovim ships
+    matched built-in parser+query pairs for them — real parser `.so` files under
+    the install prefix (e.g. `<prefix>/lib/nvim/parser/lua.so`) plus queries in
+    `$VIMRUNTIME/queries/` — and that parser dir is on the runtimepath. Letting
+    nvim-treesitter install its own (regenerated, sometimes stale-cached) parser
+    overrides the built-in and breaks the bundled query (`E5113: Invalid field
+    name "operator"` on lua). Excluding them stops future installs, but the
+    config ALSO **purges** any nvim-treesitter-managed `parser/<bundled>.so`
+    already present (a leftover from an older config, or restored from a CI
+    cache, still overrides the built-in). The purge is **scoped to
+    `stdpath('data')`** (nvim-treesitter installs under `…/site`; the install
+    prefix does not) — an unscoped delete would wipe Neovim's OWN built-in
+    parsers. `c` and `vim` are bundled but not auto-started, so the config starts
+    them via `nvim_bundled_started_here = { "c", "vim" }`. See "Add a treesitter
+    parser". Guarded by `treesitter_spec.lua`, `language_smoke_spec.lua`, and the
+    Tier-2 `lsp_smoke.lua` runtime preflight.
 
 ## Common workflows
 
@@ -167,9 +215,59 @@ launch URL, or put project-specific `dap.configurations` in a workspace
 
 ### Add a treesitter parser
 
-1. Add the parser name to `ensure_installed` in
+`nvim-treesitter` tracks the upstream `main` rewrite and therefore requires
+Neovim 0.12+. The legacy `require("nvim-treesitter.configs").setup` API is not
+available here. Parser installation runs `tree-sitter generate` and
+`tree-sitter build`, so fresh machines need the standalone `tree-sitter` CLI
+plus a real C compiler before `:TSUpdate` can succeed.
+
+1. Add the parser name to `treesitter_parsers` in
    `nvim/lua/plugins/treesitter.lua`.
-2. Add it to `required` in `tests/nvim/spec/treesitter_spec.lua`.
+2. If the parser name differs from Neovim's filetype, add an entry to
+   `parser_filetype_aliases` so the `FileType` autocmd can call
+   `vim.treesitter.start()` for real buffers.
+3. Add it to `required` in `tests/nvim/spec/treesitter_spec.lua`.
+4. If the parser has unusual generated sources, verify it through
+   `:TSUpdate <parser>` on a machine with `tree-sitter` and a compiler on PATH.
+
+> **Never install a Neovim-bundled language with nvim-treesitter.** Neovim 0.12
+> ships matched built-in parser+query pairs for **c, lua, markdown,
+> markdown_inline, query, vim, vimdoc** — the parsers are real `.so` files under
+> the install prefix (e.g. `<prefix>/lib/nvim/parser/lua.so`, which is on the
+> runtimepath; note this is NOT `$VIMRUNTIME/parser/`, which is empty), and the
+> matched queries live in `$VIMRUNTIME/queries/`. nvim-treesitter `main`
+> *regenerates* a parser from `grammar.js` via `tree-sitter generate` at install
+> time and drops it under `stdpath('data')/site/parser/`, which (earlier on the
+> runtimepath) **overrides** the built-in. When that regenerated/cached parser's
+> field table drifts from Neovim's bundled query, every buffer of that filetype
+> throws -- e.g. a lua parser generated before tree-sitter-lua commit `d760230`
+> lacks the `operator` field that Neovim's bundled `lua/highlights.scm`
+> references at line 74, so `ftplugin/lua.lua`'s auto `vim.treesitter.start()`
+> raises `E5113: Invalid field name "operator"` on every lua file. This actually
+> happened in e2e (commit `c3042df`, all three OSes). So `treesitter_parsers`
+> **excludes** those 7, AND the config purges any nvim-treesitter-managed
+> override already on disk — scoped to `stdpath('data')` so Neovim's own
+> install-prefix parsers are never deleted. Neovim auto-starts treesitter for
+> lua/markdown/vimdoc/query via its runtime ftplugins; `c` and `vim` are bundled
+> but NOT auto-started, so the config starts them itself via
+> `nvim_bundled_started_here = { "c", "vim" }` using the matched built-in parser.
+> Guarded by `tests/nvim/spec/treesitter_spec.lua`, the per-language
+> `language_smoke_spec.lua` (`bundled` rows assert the parser is *absent* from
+> the install list), and the Tier-2 `lsp_smoke.lua` runtime override preflight.
+
+**Recorded decision — `main` vs `master` branch of nvim-treesitter.** We track
+`main` (the upstream rewrite: regenerates parsers from `grammar.js` via the
+`tree-sitter` CLI at install, requires Neovim 0.12+) on purpose — it is the
+canonical forward direction, and Neovim core increasingly owns the bundled
+languages it ships, which is exactly the division the exclusion above enforces.
+The legacy `master` branch is internally self-consistent (it ships precompiled
+parsers *and* its own matched queries, so there is no core-vs-plugin query split
+to drift, and it is therefore less exposed to the `operator`/E5113 class of bug)
+**but it is deprecated and sunsetting**, so we do NOT use it. The robustness we
+would have gotten from `master` is instead provided by invariant 19's strict
+"one owner per language" rule (core owns its bundled 7, nvim-treesitter installs
+the rest). Do not switch branches to dodge a parser/query mismatch — keep the
+ownership boundary instead.
 
 ### Rebind a Rose Pine color anywhere
 
@@ -184,9 +282,13 @@ muted    #6e6a86   subtle  #908caa   text    #e0def4
 
 Surfaces that consume these: nvim (rose-pine plugin defaults), lualine
 (theme="rose-pine"), starship.toml (`[palettes.rose-pine]`), tmux.conf (hex
-literals in status/borders), ghostty/config (`theme = dark:Rose Pine,...`),
+literals in status/borders), ghostty/config (`theme = Rose Pine` -- forced dark
+on every platform, NOT the adaptive `dark:,light:` split, to match the dark
+stack),
 windows-terminal/settings.fragment.jsonc (`schemes` + `themes`),
-shells/powershell_profile.ps1 (PSReadLine `-Colors`).
+shells/powershell_profile.ps1 (PSReadLine `-Colors` for syntax, `Selection`,
+the version-gated prediction colors, and `$PSStyle.FileInfo.Directory` for `ls`
+directory color).
 
 ### Refresh the lazy lockfile after adding plugins
 
@@ -213,7 +315,6 @@ ensures the named tools exist on each machine.
 make help            # list all sub-targets
 make test            # run everything that can run on this OS
 make test-nvim       # plenary busted suite
-make test-bootstrap  # bats coverage of bootstrap.sh idempotency
 make lint            # shellcheck across all .sh
 ./tests/wsl/e2e.sh   # manual WSL split-host validation from inside WSL
 ```
@@ -238,8 +339,17 @@ problem.
 Sub-targets **skip gracefully** when their tool isn't installed
 (`yamllint`/`editorconfig-checker`/`hyperfine`/`bats`/`ghostty`). The
 ubuntu/macos/windows CI matrix in `.github/workflows/test.yml` installs
-everything, and `test.ps1` treats missing Windows test dependencies as fatal
-under CI, so anything passing locally + CI is genuinely cross-platform.
+everything, `chezmoi-parity`, `chezmoi-parity-macos`, and
+`chezmoi-parity-windows` install pinned chezmoi for the config-layer migration
+oracle (`template_test.sh`, canonical-only `parity_gate.sh`, Windows apply, and
+round-trip uninstall), and `test.ps1` treats missing Windows test dependencies
+as fatal under CI, so anything passing locally + CI is genuinely cross-platform.
+Static repo walkers intentionally exclude `home/` managed copies; those copies
+are validated by `tests/migration/parity_gate.sh` against the canonical
+top-level sources instead of being re-linted as independent source.
+`tests/static/toml_lint.sh` uses `taplo` when it is healthy, but if local macOS
+`taplo` panics with the known system-configuration null-object crash it falls
+back to Python `tomllib`; ordinary `taplo` lint errors still fail.
 
 When adding a new spec:
 - Plenary specs: drop a `*_spec.lua` under `tests/nvim/spec/`. Use plenary
@@ -250,19 +360,21 @@ When adding a new spec:
 
 ## CI / repository safeguards
 
-`test.yml` remains the fast cross-platform suite. Warnings are treated as
-failures where the tools expose them cleanly: shellcheck exits nonzero,
-PSScriptAnalyzer runs at `Warning,Error`, yamllint/parser checks are part of
-`make test-static`, and Windows CI treats missing test dependencies as fatal.
+`test.yml` remains the fast cross-platform suite and now also owns the
+`chezmoi-parity` migration gate. Warnings are treated as failures where the
+tools expose them cleanly: shellcheck exits nonzero, PSScriptAnalyzer runs at
+`Warning,Error`, yamllint/parser checks are part of `make test-static`, and
+Windows CI treats missing test dependencies as fatal.
 
 `e2e-install.yml` is the required real-install gate. The jobs cover different
 install paths, not symmetric container platforms:
 
 - `e2e containers / ubuntu-24.04` runs an `ubuntu:24.04` container on an Ubuntu
   runner with `DOTFILES_SKIP_BREW_BOOTSTRAP=1`, creates a non-root user, runs
-  real `install-deps.sh --all` (native `apt`, no Linuxbrew), then `bootstrap.sh`,
-  and asserts tool presence, Neovim >= 0.11, lazygit, zsh plugin files, and
-  symlinks pointing into the repo.
+  real `install-deps.sh --all` (native `apt`, no Linuxbrew), then applies
+  configs with chezmoi and asserts tool presence, Neovim >= 0.12, lazygit, zsh
+  plugin files, config content matching the repo sources, and the Neovim
+  directory resolving into repo `nvim/`.
   This is intentionally **not** a devcontainer. It stays because hosted Ubuntu
   has Linuxbrew available, so the container is the only automated proof of the
   clean-image native `apt` path: pinned Neovim tarball install, pinned lazygit
@@ -272,9 +384,19 @@ install paths, not symmetric container platforms:
   Re-adding another distro requires both a matrix entry in `e2e-install.yml` and
   a matching root-prep branch in `tests/ci/container-e2e.sh`.
 - `setup.sh / ubuntu-24.04`, `setup.sh / macos-15`, and
-  `setup.ps1 / windows-2025` run the real public setup entry points and then
-  rerun Lazy/Mason headless sync. They explicitly fail if setup skips Phase 3-4,
-  emits a `FAIL:` marker, or Mason did not install expected tools.
+  `setup.ps1 / windows-2025` run the real public setup entry points, apply
+  configs through chezmoi in Phase 2, and then rerun Lazy/Mason headless sync.
+  They explicitly fail if setup skips Phase 3-4, emits a `FAIL:` marker, or
+  Mason did not install expected tools. After the Mason sync they also run the
+  **Tier 2 language smoke** (`tests/nvim/lsp_smoke.lua`, gated on
+  `DOTFILES_LSP_SMOKE=strict`): against the production init it asserts every
+  `treesitter_parsers` entry is one nvim-treesitter `main` supports
+  (`get_available()`/`get_available(4)` — the jsonc "unsupported language"
+  catcher) and that each fixture's LSP attaches. Non-gated servers are strict on
+  every OS; `powershell_es` is enforced only on Windows (pwsh + the PSES bundle)
+  and skips cleanly on Unix. The fast `make test-nvim` runs Tier 1 only
+  (`tests/nvim/spec/language_smoke_spec.lua` + `tests/nvim/language_matrix.lua`):
+  filetype + conform-formatter + parser-in-install-list per fixture.
 - There is no macOS/Windows container analog to add for symmetry. Docker cannot
   model macOS, and Windows containers do not model the real desktop/user-profile
   install surface: Scoop/winget/choco, Developer Mode symlink behavior, font
@@ -286,7 +408,13 @@ install paths, not symmetric container platforms:
   the owner intentionally accepts that flake risk. The required WSL proxy is the
   Linux Ubuntu container plus the existing `DOTFILES_FORCE_OS=wsl` bats coverage.
   Full WSL host/guest validation is manual: run `./tests/wsl/e2e.sh` from inside
-  WSL after running `.\setup.ps1 -All -MergeWindowsTerminal` on Windows.
+  WSL after running `.\setup.ps1 -All` on Windows. Windows Terminal settings
+  handling is default-on: packaged WT is merged when its settings file exists,
+  and portable WT is seeded or merged at the unpackaged path when the packaged
+  file is absent.
+
+Local clean-machine harnesses live in `tests/greenfield/README.md`; keep them
+manual VM/Sandbox tools and do not add them to the headless CI matrix.
 
 Main-branch safeguards are canonical in `.github/rulesets/` and applied live by
 `scripts/apply-repo-safeguards.sh`. `.github/settings.yml` is only the classic
@@ -361,40 +489,157 @@ save only**. The next plain `:w` formats normally. Implemented in
 `nvim/lua/plugins/conform.lua`'s `format_on_save` callback and cleared by a
 `BufWritePost` autocmd.
 
-## Bootstrap details (don't reinvent these)
+## Config apply (chezmoi, via setup Phase 2)
 
-- Both installers are **idempotent** — running twice produces zero diffs.
-  Tested by `tests/bootstrap/sh_test.bats` (and `ps1_test.ps1` on Windows).
-- `bootstrap.sh` does not require git; it only creates symlinks. `setup.sh`
-  owns cloning and pull/update behavior before bootstrap runs.
+- `setup.sh` and `setup.ps1` run `chezmoi init`, back up pre-existing managed
+  file/symlink targets to `<target>.bak.<timestamp>` only when the target is not
+  already exact chezmoi state or content-equivalent to the chezmoi target, then
+  run `chezmoi --no-tty --force apply`. `--skip-bootstrap` remains a back-compat
+  alias for `--skip-config` / `-SkipConfig`.
+- `setup.ps1` runs a symlink-privilege pre-flight before chezmoi apply because
+  the Windows Neovim target is still a directory symlink: dry-run warns and
+  skips the probe; real runs print elevated/Developer Mode state plus the
+  Developer Mode or elevated-config-step fix before attempting apply.
 - Remote `setup.{sh,ps1}` has exactly one hard prerequisite: `git`, because the
   remote path must clone this repo before it can install everything else. The
   missing-git errors name the canonical first install command (`brew install
   git`, `apt install git`, or `winget install Git.Git`).
-- Pre-existing non-symlink targets are backed up to
-  `<target>.bak.<timestamp>` (with `.1`, `.2`, … suffixes if a collision
-  exists). Backups are never overwritten. New symlinks are staged as
-  `<target>.new` and then renamed into place.
-- Broken symlinks are treated as wrong symlinks: bootstrap backs up the link
-  itself and replaces it with the repo target, so reruns recover stale moved
-  targets idempotently.
-- `bootstrap.sh` links both `~/.zshenv` and `~/.zshrc`. Keep `.zshenv`
-  minimal; it exists only to set `skip_global_compinit=1` before zsh startup.
-- On WSL, `bootstrap.sh` skips `~/.config/ghostty/config` unless
-  `--experimental-wsl-gui` or `DOTFILES_EXPERIMENTAL_WSL_GUI=1` is set. Default
-  WSL terminal/font config lives on the Windows host via Windows Terminal.
-- `bootstrap.sh --dry-run` and `bootstrap.ps1 -DryRun` print the planned
-  actions without touching disk. The Windows DryRun does not require
-  Developer Mode — it downgrades the symlink-permission probe to a warning.
-- The Windows installer does NOT symlink `settings.json` for Windows
-  Terminal — WT rewrites that file on launch. Use
-  `.\bootstrap.ps1 -MergeWindowsTerminal` to merge the user-owned keys in;
-  it backs up the pre-merge `settings.json` first.
+- The Windows installer does NOT symlink `settings.json` for Windows Terminal:
+  WT rewrites that file on launch. `setup.ps1` Phase 2 copies an existing
+  pre-merge file to `settings.json.bak.<timestamp>` before running chezmoi apply,
+  unless `-SkipWindowsTerminalMerge` is passed. Chezmoi's `modify_` entry then
+  merges the user-owned keys by default; a bare `chezmoi apply` performs the
+  merge but does not create setup's backup. After a real non-dry-run apply,
+  setup also best-effort copies the merged MSIX settings file to the unpackaged
+  portable-WT path `%LOCALAPPDATA%\Microsoft\Windows Terminal\settings.json`.
+  If the MSIX settings file is absent but portable WT is detected, setup seeds
+  or merges that unpackaged file directly from
+  `windows-terminal/settings.fragment.jsonc`. Both portable paths are skipped
+  when `-SkipWindowsTerminalMerge` is passed. Store WT ignores the unpackaged
+  file. The managed WT profile is an explicit fixed-GUID `pwsh.exe` profile
+  named `PowerShell 7`; do not rely on WT's dynamic PowerShell 7 profile GUID
+  being present. Do not backport the theme/profile to Windows PowerShell 5.1:
+  this repo installs/configures PS7 and 5.1 lacks the PSReadLine ListView and
+  `$PSStyle` behavior used by the managed profile.
+  The legacy `-MergeWindowsTerminal` switch remains accepted as a no-op alias.
 - **lazygit config paths are OS-specific.** On macOS, lazygit v0.58 reports
   `~/Library/Application Support/lazygit` from `lazygit --print-config-dir`;
   on Linux/WSL it uses `~/.config/lazygit`; on Windows it uses
-  `%LOCALAPPDATA%\lazygit`. Keep `bootstrap.sh`, `bootstrap.ps1`, README, and
-  tests aligned with those real read paths.
+  `%LOCALAPPDATA%\lazygit`. Keep the chezmoi templates, README, and tests
+  aligned with those real read paths.
+- **The chezmoi tree in `home/` owns the config layer, not provisioning.** The
+  rule is `chezmoi=dotfiles, install-deps=provisioning`: do not port package
+  installs, pinned binary/font installers, login-shell mutation, devilspie2, VS
+  Code, psmux installation, or distro package-manager policy into chezmoi
+  run-scripts. psmux stays in `install-deps.ps1` via `Install-Psmux` and the
+  hardened `Add-ScoopBucketSafe` path; chezmoi only owns the psmux-readable
+  config files (`.tmux.conf` and `.tmux.windows.conf`).
+  `home/.chezmoi.toml.tmpl` is the mode switch: POSIX uses `mode = "symlink"`
+  for live-edit behavior, Windows uses `mode = "file"` for simple single-file
+  configs, but Windows `nvim` remains a directory symlink and still needs
+  Developer Mode or elevation. Same-path config files use managed source copies; path-divergent
+  lazygit and Ghostty configs use `.chezmoitemplates/**` plus POSIX
+  `symlink_*.tmpl` wrappers and Windows rendered `.tmpl` copies where
+  applicable. Windows Terminal is a `modify_` read-modify-write merge, not a
+  symlink or fragment-only replacement. WT opens **maximized** (`launchMode`,
+  not fullscreen) with a **visible** scrollbar (`scrollbarState` in
+  `profiles.defaults`) and defaults to the fixed `PowerShell 7` profile only
+  when `defaultProfile` is empty or still the built-in Windows PowerShell 5.1
+  default; a custom default is left alone. Adding a new unconditional top-level
+  scalar fragment key requires FOUR edits in lockstep or the
+  `windows_apply_test.ps1` deep-compare fails: the fragment (+ its
+  `home/.chezmoitemplates` mirror),
+  `home/.chezmoitemplates/windows-terminal/merge-settings.ps1`, the test mirror
+  `Invoke-ExpectedWindowsTerminalMergeOnly`, and `$script:ManagedGlobals`.
+  Conditional keys like `defaultProfile` need the same helper/test mirror but are
+  intentionally excluded from `$script:ManagedGlobals`. `profiles.defaults` is
+  replaced wholesale, so keys inside it (e.g. `scrollbarState`) need no
+  merge-template change. The nvim tree is intentionally NOT
+  copied under `home/`: POSIX `home/dot_config/symlink_nvim.tmpl` and Windows
+  `home/AppData/Local/symlink_nvim.tmpl` both point at
+  `{{ .chezmoi.sourceDir }}/../nvim`, so managed targets resolve to the repo
+  top-level `nvim/` directory. Windows nvim is therefore still a
+  directory symlink and still needs Developer Mode or elevation; the
+  no-Developer-Mode win applies to simple copied files. Do not use `exact_` for
+  nvim; app runtime state lives outside `.config/nvim`, but user/plugin-added
+  config files should not be deleted by chezmoi. `home/.chezmoiignore` must gate
+  whole wrong-OS directories to avoid empty parent dirs. The Windows PowerShell
+  7 profile path is managed at
+  `Documents/PowerShell/Microsoft.PowerShell_profile.ps1`; the Windows
+  PowerShell 5.1 profile path under `Documents/WindowsPowerShell/` is out of
+  scope because this repo is pwsh-first. POSIX pwsh profile management remains
+  outside the static chezmoi source tree because it depends on which host shell
+  and `$PROFILE` path are available after `pwsh` is installed. WSL is gated
+  through `home/.chezmoi.toml.tmpl`'s `isWsl` data value:
+  `.chezmoiignore` skips Linux Ghostty on WSL unless setup passes the per-run
+  `experimentalWslGui` data override for `--experimental-wsl-gui`. The migration oracle is `tests/migration/parity_gate.sh` +
+  `tests/migration/oracle_test.sh` + `tests/migration/windows_apply_test.ps1`;
+  it enforces canonical repo-source parity, nvim dir-symlink realpath/content parity,
+  single-source byte equality, wrong-OS absence, zsh exact-pin failure behavior,
+  and Windows copy-mode + WT merge parity.
+- **`install-deps` provisions chezmoi itself.** Unix setup installs `chezmoi`
+  with Homebrew when brew is the selected manager; native Linux without brew
+  uses the pinned `CHEZMOI_VERSION` release through the same trusted
+  `get.chezmoi.io` installer form as CI, into `~/.local/bin`. Windows setup
+  installs `chezmoi` through the normal Scoop-first `$Catalog` fallback chain
+  (`scoop` -> `winget` -> `choco`). This keeps `make chezmoi` usable after full
+  setup before the Phase 2 chezmoi apply.
+- **`install-deps` shows a true pre-bootstrap dependency table before the
+  one-shot install prompt.** Package-manager detection runs first, but Scoop /
+  Homebrew bootstrap runs only after the table and prompt. The table includes a
+  package-manager row (`scoop` on Windows, detected POSIX manager on Unix),
+  uses the same presence checks as the installer, best-effort `--version`
+  probes, and still leaves all actual install/skip decisions to the existing
+  per-tool functions.
+- **`--update` is a scoped drift-edge refresh, not a repo update.**
+  `setup.sh --update` / `setup.ps1 -Update` run only `install-deps --update`
+  and `nvim --headless +MasonToolsUpdate +qa`. They skip git pull, chezmoi
+  apply, Lazy sync, and Lazy update. `install-deps --update` updates only
+  present catalog tools through scoped per-package manager commands
+  (`brew upgrade <formula>`, native Linux package upgrade commands, or
+  `scoop update <pkg>` after one manifest refresh). It must not run blanket
+  upgrades such as `brew upgrade`, `apt upgrade`, or `scoop update *`, and it
+  must not touch pinned direct downloads, PSFzf, `lazy-lock.json`, or configs.
+  On native Linux, `nvim`, `lazygit`, and `tree-sitter` are pinned
+  direct-download binaries and stay out of the update path.
+- **A C compiler is installed so LuaSnip can build `jsregexp`.** Without one,
+  the nvim Lazy build prints "No C compiler found" and `jsregexp` is skipped
+  (LuaSnip still works, minus JS-regex snippet transforms). POSIX installs the
+  native toolchain (`build-essential` / `gcc` / `base-devel`), only if none of
+  `cc`/`gcc`/`clang`/`zig`/`cl` is already present. On Windows a clean machine
+  has none, so `install-deps.ps1` carries **`zig`** in `$Catalog` (LuaSnip
+  detects `zig cc`); it is skipped if already installed like any other tool.
+- **nvim-treesitter main needs both `tree-sitter` and MSVC on Windows.**
+  The main-branch installer shells out to the standalone `tree-sitter` CLI and
+  then builds parsers through the Rust `cc` crate. `install-deps.sh` provisions
+  the CLI per OS: macOS/Linuxbrew use the Homebrew **`tree-sitter-cli`** formula
+  (NOT `tree-sitter` — Homebrew split the formula, and `tree-sitter` now installs
+  only `libtree-sitter` with no CLI binary, so a fresh machine would be left
+  without the `tree-sitter` executable; `tree-sitter-cli` ships the 0.26.x
+  binary). The `PKG_TABLE` brew column for `tree-sitter` is therefore
+  `tree-sitter-cli`, while `binaries_for` still probes for the `tree-sitter`
+  binary. Native Linux/WSL installs a pinned `tree-sitter/tree-sitter` release
+  asset (v0.26.9) into `~/.local/bin` with SHA-256 verification. `install-deps.ps1` installs the CLI through the Scoop
+  `tree-sitter` manifest first and falls back to `npm install -g
+  tree-sitter-cli` after Node is present. Windows compiler support is separate:
+  `install-deps.ps1 -All` auto-installs Visual Studio 2022 Build Tools with the
+  `Microsoft.VisualStudio.Workload.VCTools` workload through winget or choco.
+  Scoop does not carry VS Build Tools, so this is the deliberate exception to
+  the Scoop-first catalog rule. `setup.ps1` imports the VS DevShell into the
+  current process before headless `Lazy! sync`, so `tree-sitter build` inherits
+  `cl.exe`, `INCLUDE`, and `LIB`. Do not put the DevShell import in the
+  PowerShell profile. Zig stays installed for LuaSnip `jsregexp`, but do not
+  wire zig into nvim-treesitter main: the old `master` branch could use it,
+  while main emits MSVC-style `cc` crate flags that require MSVC. Ad-hoc
+  `:TSUpdate` parser rebuilds on Windows should run from a "Developer
+  PowerShell for VS" shell or after rerunning setup.
+- **`uninstall.sh` / `uninstall.ps1` are greenfield teardown tools, not purge.**
+  They enumerate targets with `chezmoi --source <repo>/home managed --path-style
+  absolute`, remove only repo-owned symlinks or byte-identical Windows
+  copy-mode files, restore newest bootstrap-style `<target>.bak.<timestamp>`
+  backups by default, and leave chezmoi's own config/state alone. Windows
+  Terminal `settings.json` is never deleted because the merge is idempotent but
+  not invertible; use the printed backup path for manual restore if needed.
 - **lazygit binary install paths differ by OS.** Homebrew owns macOS/Linuxbrew,
   Windows setup installs it through Scoop/winget/choco, and native Linux/WSL
   without brew uses a pinned GitHub release tarball with SHA-256 verification.
@@ -404,16 +649,38 @@ save only**. The next plain `:w` formats normally. Implemented in
   tries each until one succeeds — so a winget `No package found` (exit
   `-1978335212`) no longer dead-ends a tool. scoop carries the cataloged
   CLI/terminal tools, including Windows Terminal as `wt`
-  (`extras/windows-terminal`).
+  (`extras/windows-terminal`). Windows Terminal is special-cased through
+  `Install-WindowsTerminal`: it reuses the catalog manager chain first, then
+  falls back to the pinned portable `microsoft/terminal` zip when MSIX-backed
+  manager installs fail to register `wt`, such as in Windows Sandbox or
+  MSIX-restricted hosts. The portable fallback is SHA-256 verified before
+  extraction and adds `%LOCALAPPDATA%\Programs\WindowsTerminal` to both the
+  current process PATH and persistent User PATH.
+- **`Update-ScoopTool` is the only scoop update path.** It is intentionally
+  single-package and consent-gated for the PowerShell 7 keep-latest path; never
+  replace it with `scoop update *` or another blanket scoop upgrade.
 - **Windows CI uses Scoop's documented elevated bootstrap.** GitHub-hosted
   `windows-2025` runners are elevated, and Scoop blocks elevated install by
   default. `Install-Scoop` detects elevation and runs the official installer
   with `-RunAsAdmin`, then adds the Scoop `shims` dir to the current process
   PATH so the rest of `install-deps.ps1` can immediately use `scoop`.
   `Install-Scoop` also ensures the `extras` and `nerd-fonts` buckets whenever
-  Scoop exists, including pre-existing user installs. Local setup still
-  recommends Developer Mode plus a normal PowerShell; do not elevate the whole
-  local setup unless you intentionally want the admin path.
+  Scoop exists, including pre-existing user installs. Every bucket add routes
+  through `Add-ScoopBucketSafe`: idempotent; non-interactive via
+  `GIT_TERMINAL_PROMPT=0` + `GCM_INTERACTIVE=0`; and verified populated so
+  Scoop#5482's registered-but-empty bucket state does not masquerade as
+  success. All `scoop bucket add` calls in `install-deps.ps1` must go through
+  `Add-ScoopBucketSafe` (guarded by `tests/static/repo_policy_test.sh`). Local
+  setup still recommends Developer Mode plus a normal PowerShell; do not
+  elevate the whole local setup unless you intentionally want the admin path.
+  **`Ensure-ScoopBuckets` installs `git` (from the bucket-less `main` bucket)
+  BEFORE adding `extras`/`nerd-fonts`.** `scoop bucket add` git-clones the bucket
+  repo, so on a truly fresh machine (Windows Sandbox / clean install) the adds
+  fail with "Git is required for buckets" because git is not installed yet at
+  that point. CI runners ship git preinstalled, which hid this on every hosted
+  job -- it only surfaced in a real greenfield Sandbox run. Guarded by the
+  "installs git before adding scoop buckets when git is absent" Pester test in
+  `InstallDeps.Tests.ps1`.
 - **`DOTFILES_SKIP_BREW_BOOTSTRAP=1` is a CI/native-PM test knob.** On Linux,
   when no `brew` is already installed, this prevents `install-deps.sh --all`
   from bootstrapping Linuxbrew and keeps the detected native package manager
@@ -426,7 +693,7 @@ save only**. The next plain `:w` formats normally. Implemented in
   that directory to the current PATH.
 - **Alpine installs Neovim through `apk`.** The official Neovim Linux tarball
   targets glibc systems, so Alpine uses its native `neovim` package instead;
-  e2e still enforces the repo's Neovim >= 0.11 floor.
+  e2e still enforces the repo's Neovim >= 0.12 floor.
 - **`install-deps.sh` prompts for the notes/Obsidian vault** and persists
   `export NOTES_VAULT=…` to `~/.zshrc.local` (sourced by `zshrc`, read by
   `util/notes_path.lua`). The prompt is tty-gated (skipped under `--all` /
@@ -435,19 +702,75 @@ save only**. The next plain `:w` formats normally. Implemented in
 - **`install-deps` can install VS Code + the Rose Pine theme.** Both installers
   offer VS Code (macOS brew cask; Linux snap/flatpak/manual; Windows
   winget/scoop/choco). Then, **only if `code` is detected**, they install the
-  `mvllow.rose-pine` extension and set `workbench.colorTheme` to "Rosé Pine".
+  `mvllow.rose-pine` extension, set `workbench.colorTheme` to "Rosé Pine", and
+  set `editor.fontFamily` plus `terminal.integrated.fontFamily` to
+  `'Hack Nerd Font', Consolas, monospace`.
+  **Forcing dark is load-bearing.** Setting only `workbench.colorTheme` is NOT
+  enough: when `window.autoDetectColorScheme` is `true` (Settings Sync, an
+  imported profile, or a future VS Code default can enable it) VS Code IGNORES
+  `colorTheme` and resolves the theme from
+  `workbench.preferredDark/LightColorTheme` (defaulting to Dark Modern /
+  "Dark 2026") — which is exactly why a fresh Windows install showed Dark despite
+  the setting. So both installers ALSO set `window.autoDetectColorScheme` to a
+  real JSON boolean `false` (NOT the string `"false"`, which VS Code ignores) and
+  point BOTH `preferredDark`/`preferredLight` slots at the same dark "Rosé Pine"
+  so no OS-scheme combination yields a light theme (same forced-dark rule as
+  Ghostty; see `tests/MANUAL.md`). In the ps1, the boolean flows through a `Raw`
+  spec flag + `ConvertTo-VSCodeSettingJson` so the text write-paths emit a bare
+  literal; the clean-JSON merge path stores a native `[bool]`.
   The theme setter (`set_vscode_theme` in sh, tested by `vscode_theme_test.sh`;
-  `Set-VSCodeTheme` in ps1) only merges into *clean* JSON (jq /
-  `ConvertFrom-Json`) — VS Code settings are usually JSONC with comments, so it
-  leaves those untouched rather than clobbering them. The theme value must keep
-  its accented é to match the extension's label; the ps1 emits it as a `\u` JSON
-  escape (or `[char]0xE9`) so that file stays pure ASCII (invariant), while the
-  sh side uses the literal é.
+  `Set-VSCodeTheme` in ps1, tested by `InstallDeps.Tests.ps1`) uses jq /
+  `ConvertFrom-Json` for strict JSON and a comment-aware scanner for JSONC. The
+  JSONC fallback edits only top-level keys, ignores comments/strings and nested
+  objects, preserves the dominant line ending, and creates
+  `settings.json.bak.<timestamp>` before writing.
+  **Encoding is load-bearing on Windows.** The theme value must keep its accented
+  é to match the extension's label "Rosé Pine", but a literal `é` byte in
+  `settings.json` is fragile under Windows PowerShell 5.1: its `Get-Content`
+  default is the ANSI code page, so reading a UTF-8 `é` (`C3 A9`) back as ANSI
+  yields two chars (`Ã©`) that re-encode to `C3 83 C2 A9` on the next write —
+  the double-encoded "RosÃ© Pine" mojibake VS Code cannot resolve, so it silently
+  falls back to the default dark theme. So the ps1:
+  (1) reads with `Get-Content -Raw -Encoding utf8` (lossless read/modify/write on
+  5.1 and 7 — so any pre-existing non-ASCII content round-trips intact instead of
+  double-encoding); and (2) writes the *managed* theme value as a pure-ASCII
+  `\u00e9` JSON escape via `ConvertTo-AsciiJson` (escapes every char > `0x7F` to
+  `\uXXXX`) on EVERY write path — new-file, JSONC editor (through
+  `ConvertTo-JsonStringLiteral`), and the clean-JSON merge (wrapping
+  `ConvertTo-Json`, which only PS 7 leaves un-escaped). So the colorTheme /
+  preferred-theme values VS Code must resolve are encoding-immune regardless of
+  code page, and a rerun self-heals an already-double-encoded value. (Scope note:
+  new-file and merge emit a wholly pure-ASCII file; the JSONC editor only
+  ASCII-normalizes the values it inserts/replaces, so unrelated non-ASCII in a
+  user's own comments/values is preserved verbatim — losslessly, thanks to the
+  UTF-8 read — rather than rewritten as escapes, so we never mangle comment text.)
+  Guarded by `Test-FileIsPureAscii`, the non-ASCII-comment round-trip JSONC test,
+  and `ConvertTo-AsciiJson` unit tests in `InstallDeps.Tests.ps1`. The `.ps1`
+  source itself still stays pure ASCII (invariant): the in-memory label is built
+  with `[char]0xE9`. The sh side keeps the literal é (macOS/Linux are
+  UTF-8-native, so the ANSI-read hazard does not exist there).
+  **KNOWN ISSUE (open, shipped as-is 2026-06-16):** the encoding hardening above
+  is correct and Codex-reviewed, but it did NOT resolve the field symptom — on at
+  least one Windows machine VS Code still opens in default Dark even after a
+  rerun + full restart with `workbench.colorTheme` correctly set. So encoding was
+  a real latent bug but is NOT (or not the only) cause of the auto-apply failure.
+  Do NOT re-investigate the encoding angle. Leading unexplored suspects, in
+  rough priority: (1) Settings Sync pulling cloud settings that override the local
+  file; (2) a non-default VS Code profile (settings written to the default
+  profile dir while VS Code runs another); (3) the `mvllow.rose-pine` extension
+  not yet activated when `colorTheme` is first read (needs an Extensions reload /
+  second launch); (4) a workspace `.vscode/settings.json` override. Confirm which
+  profile is active and whether Sync is on before touching code again.
 - **Direct GitHub downloads are pinned and SHA-256 verified.** `install-deps.sh`
-  verifies the pinned Neovim Linux tarballs, lazygit Linux tarballs, and Hack
-  Nerd Font zip before extraction; `install-deps.ps1` verifies the pinned
-  Hack.zip before registering fonts. The CI workflows also pin and verify their
-  direct GitHub downloads.
+  verifies the pinned Neovim Linux tarballs, lazygit Linux tarballs,
+  tree-sitter CLI Linux archives, and Hack Nerd Font zip before extraction;
+  `install-deps.ps1` verifies the pinned Hack.zip before registering fonts and
+  the pinned Windows Terminal portable zip before extracting the fallback
+  install. A Hack.zip checksum mismatch records a `FAIL:` install marker and
+  does not extract. A successful Windows font install broadcasts
+  `WM_FONTCHANGE` best-effort so Windows Terminal can re-enumerate fonts without
+  making setup depend on that notification. The CI workflows also pin and
+  verify their direct GitHub downloads.
   This extends to the **Ubuntu Ghostty installer**: `install_ghostty_linux`
   pins `mkasberg/ghostty-ubuntu`'s `install.sh` to `GHOSTTY_UBUNTU_VERSION` and
   SHA-256 verifies the script (`GHOSTTY_UBUNTU_INSTALL_SHA256`) before running
@@ -460,27 +783,32 @@ save only**. The next plain `:w` formats normally. Implemented in
   Update the version and checksum constants together. zsh plugin refs are also
   pinned by tag plus expected commit; update both after reviewing a Renovate tag
   bump. Guarded by `tests/shell/ghostty_install_fail_test.sh`,
-  `tests/shell/wsl_gui_tools_test.sh`, `tests/shell/lazygit_install_test.sh`, and
-  `tests/shell/zsh_plugins_test.sh`.
+  `tests/shell/wsl_gui_tools_test.sh`, `tests/shell/lazygit_install_test.sh`,
+  `tests/shell/treesitter_cli_test.sh`, and `tests/shell/zsh_plugins_test.sh`.
   Renovate can open version/ref bumps for these constants and for the CI
   cargo-binstall installer commit, but it cannot recompute adjacent SHA-256
   values or verify tag commit IDs; leave CI red until a human has reviewed the
-  download/ref and updated the adjacent constant. In `renovate.json`,
-  direct-download SHA-256 values must be matched as context only, not named
-  `currentDigest`, otherwise Renovate will schedule same-version digest updates
-  for checksums it cannot actually resolve.
+  download/ref and updated the adjacent constant. The
+  `TREE_SITTER_CLI_LINUX_VERSION` custom managers follow the lazygit shape:
+  Renovate may bump the version constant, while
+  `TREE_SITTER_CLI_LINUX_X86_64_SHA256` and
+  `TREE_SITTER_CLI_LINUX_ARM64_SHA256` remain adjacent context only. In
+  `renovate.json`, direct-download SHA-256 values must be matched as context
+  only, not named `currentDigest`, otherwise Renovate will schedule same-version
+  digest updates for checksums it cannot actually resolve.
 - **Both installers open with an "install EVERYTHING?" prompt.** Interactive
   runs that didn't pass `--all`/`-All` get one upfront question; answering yes
   flips `YES_ALL`/`$All` so the rest runs with no per-item prompts. Skipped when
   `--all`/`--dry-run` was passed or there's no tty (so `curl|bash` and the CI
   `--dry-run --all` dogfood don't hang).
-- **`bootstrap.ps1` reports WHY symlinks fail and how to fix it.** When the
-  symlink probe fails it prints your *elevated* (admin) and *Developer Mode*
-  state, then the two fixes (Developer Mode — no admin, recommended — or an
-  elevated shell), and `exit 1` via `Write-Host` (not `Write-Error`, so no stack
-  trace). `setup.ps1` resets `$LASTEXITCODE` before Phase 2 and stops if
-  bootstrap fails, so nvim sync never runs against un-symlinked configs. Note:
-  don't elevate the whole `setup.ps1` — scoop refuses to run as admin.
+- **Windows symlink pre-flight reports WHY symlinks fail and how to fix it.**
+  `setup.ps1` probes symlink capability before chezmoi apply. When the probe
+  fails it prints your *elevated* (admin) and *Developer Mode* state, then the
+  two fixes (Developer Mode, no admin, recommended; or an elevated config-only
+  setup step), and `exit 1` via `Write-Host` (not `Write-Error`, so no stack
+  trace). This keeps nvim sync from running against unapplied configs. Note:
+  don't elevate the dependency-install run because Scoop refuses to run as
+  admin.
 - **Forcing Ghostty maximize on Linux is WM-side, not config.** `maximize = true`
   is only a hint the compositor may ignore — confirmed on **GNOME 46 / X11**,
   where Mutter does NOT honor it. `install-deps.sh`'s `setup_ghostty_maximize`
@@ -488,23 +816,52 @@ save only**. The next plain `:w` formats normally. Implemented in
   devilspie2, symlinks `linux/devilspie2/ghostty-maximize.lua` (keyed on WM_CLASS
   `com.mitchellh.ghostty`) into `~/.config/devilspie2/`, and writes a
   `~/.config/autostart/devilspie2.desktop`. It lives in install-deps (installs a
-  package + runs a daemon), NOT bootstrap (pure-symlink); Wayland needs a GNOME
+  package + runs a daemon), NOT the chezmoi config layer; Wayland needs a GNOME
   Shell extension instead. Guarded by `tests/shell/devilspie2_test.sh`.
 - **psmux is the Windows tmux** (`install-deps.ps1` → `Install-Psmux`). Picked
   because it **reads `~/.tmux.conf`** and speaks the tmux command language, so
   Windows reuses the *same* `tmux/tmux.conf` we maintain for Unix — one source
-  of truth, Rose Pine carries over, no parallel config. `bootstrap.ps1` symlinks
-  `tmux\tmux.conf` to `%USERPROFILE%\.tmux.conf` (mirrors the Unix
-  `~/.tmux.conf` link). If the Unix-shaped `if-shell` clipboard block ever
-  chokes under ConPTY on a given machine, guard that block rather than fork the
-  config. Install-Psmux is NOT in the `$Catalog` because scoop needs a custom
-  bucket (`scoop bucket add psmux …`) — the helper does that, then falls back
-  to winget / choco.
+  of truth, Rose Pine carries over, no parallel config. Chezmoi manages
+  `%USERPROFILE%\.tmux.conf` from `tmux\tmux.conf` (mirrors the Unix
+  `~/.tmux.conf` target). Install-Psmux is NOT in the `$Catalog` because scoop needs a custom
+  psmux bucket URL; it passes that URL through `Add-ScoopBucketSafe`, installs
+  the explicit `psmux/psmux` manifest to avoid ambiguous Scoop bucket matches,
+  then falls through to winget / choco if the bucket clone or scoop install
+  fails.
+- **The clipboard `if-shell` probes are POSIX-ONLY (`tmux/tmux.posix.conf`) —
+  they FREEZE psmux.** `if-shell 'command -v pbcopy …'` spawns a shell at
+  config-**load** time. Under psmux/ConPTY on Windows that shell never returns:
+  the pane initializes but never finishes rendering, the orphaned probe shells
+  pin CPU, and a `conhost.exe` leaks per session (plus an "auth failed, retry
+  works" stale-server artifact). So the five native-CLI probes
+  (pbcopy→wl-copy→xclip→xsel→win32yank) live in a **POSIX-only overlay**
+  `tmux/tmux.posix.conf`, managed as `~/.tmux.posix.conf` by chezmoi on Unix/WSL
+  and **ignored on Windows** in `home/.chezmoiignore` (mirror of how
+  `.tmux.windows.conf` is ignored off-Windows). The cross-platform
+  `tmux/tmux.conf` keeps only a psmux-safe OSC52 baseline
+  (`bind -T copy-mode-vi y send -X copy-pipe-and-cancel`, no shell) and
+  `source-file -q "~/.tmux.posix.conf"` — a silent no-op on Windows where the
+  file is absent (same proven mechanism as the Windows overlay source). On POSIX
+  the overlay re-binds `y` to the native CLI when one exists. This is the
+  canonical "guard the block, don't fork the config" fix. **Invariant:** the
+  cross-platform `tmux/tmux.conf` (and its `home/dot_tmux.conf` mirror) must
+  contain NO command-position `if-shell` — guarded by `invariants_test.sh`
+  ("psmux freeze guard") and `tests/tmux/option_test.sh` (baseline binds with no
+  shell probe; the overlay rebinds `y`→pbcopy on macOS), plus a Windows apply
+  absence assertion (`tests/migration/windows_apply_test.ps1` +
+  `windows_roundtrip_test.ps1`: `~/.tmux.posix.conf` must NOT exist on Windows).
+  Native-Windows copy-mode `y` is rebound to built-in `clip.exe` in
+  `tmux/tmux.windows.conf` (runs at copy time, not load time — psmux-safe — and
+  does not depend on unverified OSC52-through-ConPTY). One-time cleanup on an
+  already-broken Windows box (orphaned servers/conhost + any stale overlay from
+  prior loads):
+  `Remove-Item -LiteralPath "$HOME\.tmux.posix.conf" -Force -ErrorAction SilentlyContinue; taskkill /F /T /IM psmux.exe`
+  then reopen the terminal.
 - **psmux + PSReadLine: Windows-only overlay, two settings.** psmux's default
   shell is **cmd**, not pwsh — which is the *real* reason "history prediction"
   and `MenuComplete` looked broken inside panes: PSReadLine was never loaded.
-  The fix is a Windows-only overlay `tmux/tmux.windows.conf`, symlinked to
-  `~/.tmux.windows.conf` by `bootstrap.ps1` and pulled in by the main
+  The fix is a Windows-only overlay `tmux/tmux.windows.conf`, managed as
+  `~/.tmux.windows.conf` by chezmoi on Windows and pulled in by the main
   `tmux/tmux.conf` via `source-file -q` (silent no-op on Unix where it does not
   exist). The overlay sets:
   (1) `default-shell pwsh` — so fresh psmux panes spawn PowerShell 7, which
@@ -513,9 +870,8 @@ save only**. The next plain `:w` formats normally. Implemented in
   `None` during pane init (psmux issue #150 — fresh panes ignore the profile's
   `HistoryAndPlugin`). With this on, the profile's ListView prediction +
   `Tab=MenuComplete` survive into psmux panes.
-  `bootstrap.ps1` warns but continues when `pwsh` is missing, because the
-  overlay is still the correct symlink and `install-deps.ps1` owns installing
-  PowerShell 7.
+  `install-deps.ps1` owns installing PowerShell 7; the overlay intentionally
+  assumes `pwsh` is present after setup.
   Diagnose inside a pane with `(Get-Process -Id $PID).Name` (expect `pwsh`).
   Do NOT add `set -g default-shell` to the main `tmux.conf` — `pwsh` does not
   exist on Unix; keep Windows-specific tmux settings in the overlay.
@@ -531,6 +887,50 @@ save only**. The next plain `:w` formats normally. Implemented in
   parameter exists, PSReadLine ≥ 2.3.4). Microsoft + psmux #150 both point at
   `OnIdle` as the right hook. Drop it once a psmux release fixes the residual
   race upstream (no PR yet; track issue #150 / #165).
+- **Prediction colors are version-gated and isolated from the syntax `-Colors`.**
+  The ListView prediction (the inline + dropdown history suggestions — our
+  "fzf-like" history UI) defaulted to a near-background grey that is invisible on
+  Rose Pine. The fix sets `InlinePrediction` (`#908caa`, PSReadLine ≥ 2.1.0) and
+  `ListPrediction` (`#ebbcba`) / `ListPredictionSelected` (`#f6c177`) (≥ 2.2.0).
+  These are applied in SEPARATE `Set-PSReadLineOption -Colors` calls, NOT folded
+  into the main syntax hashtable: an unknown color key throws and would drop the
+  WHOLE hashtable, so on an old PSReadLine the syntax colors must not depend on a
+  prediction key existing. `Selection` is also isolated; it is a `gold #f6c177`
+  FOREGROUND SGR because the owner wants the selected MenuComplete option gold.
+  Known, UNAVOIDABLE caveat (do not "fix" it by removing the gold -- the owner
+  explicitly wants the gold option): PSReadLine uses the ONE `Selection` color
+  for BOTH the highlighted MenuComplete item AND the completion suffix it inserts
+  into the command line while navigating (the ".exe" of `lazygit.exe`), so that
+  suffix also shows gold until accepted. There is no separate color for the two.
+  Do NOT use a *dark* `Selection` foreground (the original dark-on-dark bug). Do
+  NOT set `ListPredictionTooltip`.
+- **PowerShell Starship init is cached without `Invoke-Expression`, and cache
+  publication is race-safe.** (Race-safe, not a single atomic syscall: on the
+  Windows PowerShell 5.1 host this profile also supports, `Move-Item -Force` is
+  replace-via-delete-then-rename, not the .NET atomic-replace overload. The
+  no-torn-reads guarantee comes from writing to a private temp first, and a lost
+  race degrades to the existing cache.) `Confirm-StarshipInitScript` still writes
+  `%LOCALAPPDATA%\starship.ps1` (or the cross-platform cache dir) and dot-sources
+  it because `Invoke-Expression (& starship init powershell)` is banned. When the
+  cache is missing or older than `starship.toml`, `Publish-StarshipInitScript`
+  writes UTF-8 no-BOM to a same-directory `starship.ps1.<pid>.<guid>.tmp`, then
+  `Move-Item -Force`s it into place. If another shell wins the race and the move
+  fails, the profile falls back to the existing cache instead of warning.
+  `Import-StarshipInitScriptWithRetry` tolerates a short read lock while another
+  tab is publishing.
+- **fzf is unified across shells via PSFzf.** `install-deps.ps1` installs `fzf`
+  (catalog: winget `junegunn.fzf` / choco / scoop) and `Install-PSFzf` installs
+  the PSFzf module from PSGallery (NOT in `$Catalog` — it is a module, not a
+  binary; bootstraps the NuGet provider first so `Install-Module` never blocks on
+  a prompt in CI). The profile wires Ctrl+R (fuzzy history, intentionally
+  overriding PSReadLine's reverse-search for POSIX parity with zsh), Ctrl+T
+  (file) and Alt+C (cd) ONLY when both the PSFzf module and the `fzf` binary are
+  present. The zsh side already used `fzf`; this brings Windows to parity.
+- **`ls`/`Get-ChildItem` directories are gold via `$PSStyle.FileInfo.Directory`.**
+  The default directory color (bright blue) is unreadable on Rose Pine dark.
+  Guarded by `if ($PSStyle)` (absent on Windows PowerShell 5.1 and pwsh < 7.2);
+  uses `$PSStyle.Foreground.FromRgb(0xf6c177)` so the source carries no raw ANSI
+  escape byte (keeps the `.ps1` pure-ASCII invariant).
 
 ## Login shell: zsh adoption (install-deps.sh)
 
@@ -547,12 +947,17 @@ and tmux / new terminals never source the symlinked `~/.zshrc` (this is the
 - **dry-run-safe** — prints a `would:` line and mutates nothing under `--dry-run`
   (this is why the CI `--dry-run --all` dogfood stays green);
 - it registers zsh in `/etc/shells` first (chsh refuses otherwise) and runs chsh
-  as root / via sudo / via plain PAM, whichever is available. Takes effect on the
-  next login.
+  as root / via sudo / via plain PAM, whichever is available;
+- on Linux local accounts, a successful chsh also installs the same
+  interactive-bash guard used for domain accounts, so new terminals and new tmux
+  sessions land in zsh immediately even when the already-running graphical
+  session still has stale `$SHELL=/bin/bash`. The chsh remains the source of
+  truth for future logins.
 
-It lives in `install-deps.sh`, NOT `bootstrap.sh` (which stays pure-symlink), and
-NOT `tmux.conf` (a tmux-only `default-command` would paper over the symptom while
-bare TTYs and SSH sessions stayed bash).
+It lives in `install-deps.sh`, NOT the chezmoi config layer, and
+NOT `tmux.conf` or Ghostty config (a terminal-specific command would paper over
+one launcher while bare TTYs, SSH sessions, and tmux stayed coupled to whatever
+the account or parent shell says).
 
 **Domain / non-local accounts (AD/LDAP/SSSD):** these resolve through NSS but
 are NOT in local `/etc/passwd`, so `chsh` fails (`user '<name>' does not exist in
@@ -562,21 +967,18 @@ are NOT in local `/etc/passwd`, so `chsh` fails (`user '<name>' does not exist i
 appends an idempotent, **interactive-only** (`[[ $- == *i* ]]`, so scp/rsync and
 scripts stay bash) marked block to `~/.bashrc` that `export SHELL`s zsh and
 `exec zsh`, and makes `~/.bash_profile` source `~/.bashrc` so login shells (tmux,
-ssh) hit it too. macOS is excluded from this branch (its accounts live in dscl,
-not passwd files, and `chsh` works there). The textbook chsh path is unchanged
-for local accounts.
+ssh) hit it too. The marker is now generic (`interactive bash fallback`), but
+the helper also recognizes the legacy `domain login; chsh unavailable` marker so
+old domain installs do not get a duplicate block on re-run. macOS is excluded
+from the bashrc safety net (its accounts live in dscl, not passwd files, and
+Terminal/iTerm use the passwd shell normally).
 
 **Test seam — leave it:** the line `if [[ -n "${INSTALL_DEPS_SOURCE_ONLY:-}" ]];
 then return …` before the main install sections in `install-deps.sh` exists ONLY
 so shell tests can `source` the installer function defs (without running any
 installs) and exercise them against stubbed seams. Unset in normal runs, so it's
-skipped. Two sibling seams exist for the same reason: `bootstrap.sh`'s
-`DOTFILES_FORCE_OS` (lets the bats suite drive `macos`, `linux`, and `wsl` link
-branches regardless of the host runner) and `bootstrap.ps1`'s
-`DOTFILES_BOOTSTRAP_SOURCE_ONLY` (dot-source the functions — e.g.
-`New-SymbolicLinkItem` / `New-NativeSymLink` — without running the symlink phase,
-so `tests/bootstrap/ps1_test.ps1` can force the native CreateSymbolicLink
-fallback). Both are unset in normal runs.
+skipped. Keep similar explicit test seams in setup/config code only when the
+host OS or shell would otherwise hide a branch from CI.
 
 ## Things that look weird but are intentional
 
@@ -603,8 +1005,10 @@ fallback). Both are unset in normal runs.
   'NVIM SAW IT'<CR>` never fires) -- any visual "cursor moves on click"
   perception is Windows Terminal's selection anchor inside the nvim
   display rect, not nvim's cursor.
-- **Arrow keys are mapped to `<Nop>`** in `vim-options.lua`. User
-  preference; hjkl-only navigation enforced.
+- **Arrow keys are left at their Neovim defaults** (they move the cursor). An
+  earlier config mapped them to `<Nop>` to enforce hjkl-only navigation; that was
+  removed at the owner's request, so do NOT re-add the arrow `<Nop>` block in
+  `vim-options.lua`.
 - **`vim.opt.clipboard = "unnamedplus"`** even on macOS — works fine via
   pbcopy/pbpaste. The single-register `unnamed` value would lock WSL/Linux
   out.
@@ -617,6 +1021,10 @@ fallback). Both are unset in normal runs.
   the caller's locale untouched when neither exists.
 - **`nvim/lazy-lock.json` is tracked** (NOT in `.gitignore`). This is how
   every machine ends up on the same plugin commits.
+- **VS Build Tools for nvim-treesitter main is intentional.** It is large, but
+  it is the compiler path the Rust `cc` crate expects on Windows. The existing
+  zig install remains for LuaSnip `jsregexp`; it is not a substitute for
+  nvim-treesitter main parser builds.
 - **`ghostty/config` sets `window-save-state = default`** (NOT `always`)
   alongside `maximize = true`. It's not an oversight: on macOS
   `window-save-state = always` restores the last window geometry *after*
@@ -642,14 +1050,29 @@ fallback). Both are unset in normal runs.
   become a bare space** — an earlier encoding pass stripped three of these to
   U+0020, which rendered `~/Downloads`, `~/Music`, `~/Pictures` as a blank `~/`.
   The same `directory_test.sh` guards against whitespace-only values.
+- **Language/branch module symbols are starship DEFAULTS, glyph-verified against
+  Hack Nerd Font.** The same bare-space stripping bug had also emptied the
+  `git_branch` / `c` / `golang` / `rust` / `python` symbols (and left `nodejs` on
+  an MDI glyph). They are restored to starship's default dev-icons (U+E0A0 branch,
+  U+E61E c, U+E627 go, U+E718 node, U+E7A8 rust, U+E606 python) — every codepoint
+  CONFIRMED present in `HackNerdFont-Regular.ttf` via `fontTools` (load the cmap,
+  test membership; that is the authoritative no-tofu check, NOT eyeballing). The
+  ONE starship default NOT in Hack Nerd Font is `conda` `🅒` (U+1F152, an emoji),
+  kept as the documented default (renders via the terminal emoji fallback). The
+  `git_status` `✓` (U+2713) / `✘` (U+2718) are also outside the font but are
+  common BMP symbols every terminal renders via fallback (unlike PUA nerd
+  glyphs), so they stay. Re-audit after any symbol change by loading the font
+  cmap with fontTools and asserting each non-ASCII codepoint is a member.
 - **tmux colors track the canonical rose-pine/tmux theme.** Source:
   <https://github.com/rose-pine/tmux>, main variant. Role-based styles
   carry the colors. Map: status-style `fg=pine,bg=base`; window-status
-  **UNSET** (inactive cells inherit from status-style);
-  window-status-current `fg=gold,bold`;
+  `fg=iris,bg=base` (inactive windows; this is the "cool" default the owner chose
+  after auditioning `tmux/themes/`); window-status-current `fg=gold,bold`;
   window-status-activity `fg=base,bg=rose`; pane-border `fg=hl_high #524f67`
   / pane-active-border `fg=gold`; message `fg=muted,bg=base`;
-  message-command `fg=base,bg=gold`. **DO** set explicit
+  message-command `fg=base,bg=gold`. (Status-area bgs are `base` -- the dark
+  terminal color; bar opacity comes from WT `opacity: 100`, NOT the bg color, see
+  the opaque-bar note below.) **DO** set explicit
   `window-status-format "#I:#W#F"` and `window-status-current-format
   "#I:#W#F"` -- tmux's DEFAULT format contains a `#{?window_flags,...}`
   conditional that psmux v3.3.4 renders as a literal string in each cell.
@@ -658,10 +1081,32 @@ fallback). Both are unset in normal runs.
   in both real tmux and psmux. Active windows use gold with bold weight because
   the foreground-only canonical theme was too subtle in dark terminals; bold is
   the smallest divergence that fixes legibility without breaking the palette.
-  Inactive cells deliberately use `setw -gu window-status-style` (unset) so
-  they fall through to `status-style` (pine on base) -- one source of
-  truth, no duplicate fg/bg, and any future status-style tweak (e.g.
-  transparency) ripples through cleanly.
+  Inactive cells use iris (`setw -g window-status-style "fg=#c4a7e7,bg=#191724"`,
+  8.4:1) -- the "cool" theme, which the owner chose as the default after
+  auditioning the alternatives in `tmux/themes/` (warm/minimal/teal). The teal
+  variant (inactive inherits pine via `setw -gu`) lives in `tmux/themes/teal.conf`
+  if you want it back. Earlier churn (transparency was misdiagnosed as a color
+  problem) is settled; the legibility knob was always WT opacity, not the color.
+  **OPAQUE STATUS BAR -- the WT reality (owner-confirmed on a real machine).**
+  Windows Terminal applies its `opacity` WINDOW-WIDE to every cell, regardless of
+  the cell's background color. So a transparent WT (`opacity < 100`) has a
+  transparent status bar no matter what bg the bar uses -- giving the bar an
+  explicit, different-from-default color does NOT make it opaque in WT (this was
+  tried with `surface #1f1d2e` at `opacity: 95` and the bar stayed see-through).
+  That "explicit bg renders opaque" behavior exists in some terminals (alacritty)
+  but NOT in Windows Terminal. The only way to a fully solid bar in WT is a fully
+  opaque window (`opacity: 100`). **The owner chose transparency over a solid
+  bar:** the fragment ships **`opacity: 95`** (see-through terminal), so the
+  status bar is transparent too -- an accepted trade for the see-through look,
+  themed via colors rather than opacity. Status-area bgs stay `base #191724` (the
+  dark terminal color). macOS/Linux Ghostty use `background-opacity 0.95` +
+  `background-blur-radius 15`, whose blur renders an opaque-LOOKING dark bar even
+  while transparent (WT acrylic is the analog but is unreliable in a VM, so WT
+  gets no blur). Do NOT re-add an overlay `status-style` hack (a prior wrong
+  attempt assuming psmux ignores `window-status-style`, since removed) and do NOT
+  switch the bar bg to surface to "fix" opacity (it does not, in WT). To flip to
+  a fully-solid bar, set WT `opacity: 100` (whole window). Guarded by
+  `tests/tmux/option_test.sh`.
   Status-left (iris-bold session + muted
   separator) and status-right (foam date + gold time) are our own
   customizations, palette-consistent. History/rejected attempts worth not
@@ -672,8 +1117,11 @@ fallback). Both are unset in normal runs.
   (4) iris inactive + gold-bold ON `bg=overlay #26233a` active block
   (commit 9cf13f8) -- added a bold + bg-block on top of canonical, user
   preferred plain canonical so the embellishment was reverted;
-  (5) explicit inactive `fg=iris` (commit ee0d6c9) -- user wanted active
-  to be the only styled cell, inactive should fall back to status-style;
+  (5) inactive color (iris vs inherited-pine "teal") flip-flopped while
+  transparency was misdiagnosed as a color problem; settled by the owner
+  auditioning `tmux/themes/` and picking iris ("cool") as the default, with teal
+  kept as `tmux/themes/teal.conf`. If inactive reads poorly it is WT transparency
+  (`opacity`), NOT the color -- do not chase it by re-coloring;
   (6) relying on `window-status-current-style` alone (commits ee0d6c9 /
   d642a31) -- psmux v3.3.4 stores the option but does NOT apply it when
   rendering window cells. Only `#[fg=...]` INLINED in
@@ -691,15 +1139,15 @@ fallback). Both are unset in normal runs.
   `space`. Both pieces are required: editorconfig controls nvim's buffer
   behavior while editing; stylua.toml controls what gets written back.
   Guarded by `invariants_test.sh` ("no tab-indented .lua").
-- **lazygit move-commit uses uppercase J / K, and the config must symlink into
+- **lazygit move-commit uses uppercase J / K, and the config must be managed at
   `%LOCALAPPDATA%\lazygit\`.** Two separate gotchas wrapped together:
   1. **Config path:** lazygit v0.58 reads its config from
      `%LOCALAPPDATA%\lazygit\config.yml` (verified via `lazygit
-     --print-config-dir`), NOT `%APPDATA%\lazygit\config.yml`. An earlier
-     bootstrap.ps1 symlinked into `%APPDATA%` -- the file existed but
+     --print-config-dir`), NOT `%APPDATA%\lazygit\config.yml`. Earlier
+     Windows config wiring targeted `%APPDATA%` -- the file existed but
      lazygit never loaded it, so EVERY custom binding looked dead.
-     Bootstrap now targets LocalAppData. Asserted by
-     `tests/bootstrap/ps1_test.ps1`.
+     Chezmoi now targets LocalAppData. Asserted by
+     `tests/migration/windows_apply_test.ps1`.
   2. **Binding:** `lazygit/config.yml` binds
      `keybinding.commits.moveDownCommit` / `moveUpCommit` to uppercase
      `J` / `K`. We intentionally do NOT use Ctrl+J / Ctrl+K: Ctrl+J is

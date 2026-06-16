@@ -20,7 +20,7 @@ check_absent() {
 
 check_absent "NODE_TLS_REJECT_UNAUTHORIZED gone (security)" \
     "NODE_TLS_REJECT_UNAUTHORIZED" \
-    --exclude-dir=.git --exclude-dir=.claude \
+    --exclude-dir=.git --exclude-dir=.claude --exclude-dir=home \
     --exclude-dir=tests \
     --exclude="CLAUDE.md" --exclude="README.md" \
     .
@@ -49,6 +49,17 @@ check_absent "bare-Esc kill-whole-line bindkey gone (Meta prefix shadow)" \
     "bindkey[[:space:]]+'\\\\e'[[:space:]]+kill-whole-line" \
     --exclude-dir=.git --exclude-dir=tests \
     shells/
+
+# psmux freeze guard. The native-clipboard probes use `if-shell`, which spawns a
+# shell at config-LOAD time; under psmux/ConPTY on Windows that shell never
+# returns and hangs the whole config load. Those probes live ONLY in the
+# POSIX-only tmux.posix.conf overlay (sourced via `source-file -q`, absent on
+# Windows). The cross-platform tmux.conf -- and its byte-identical chezmoi mirror
+# -- must contain NO command-position `if-shell`. tmux.posix.conf legitimately
+# does, so it is deliberately NOT in this check's file set.
+check_absent "no load-time if-shell in cross-platform tmux.conf (psmux freeze guard)" \
+    "^[[:space:]]*if-shell" \
+    tmux/tmux.conf home/dot_tmux.conf
 
 # Lazy-load discipline: only rose-pine should be lazy=false
 nonlazy=$(grep -lE "lazy[[:space:]]*=[[:space:]]*false" nvim/lua/plugins/*.lua 2>/dev/null | grep -v rose-pine.lua || true)
@@ -142,7 +153,8 @@ fi
 # errors. Save-as-UTF-8-BOM would also work, but ASCII is simpler.
 ps1_files=()
 while IFS= read -r f; do ps1_files+=("$f"); done < <(
-    find . -type f -name '*.ps1' -not -path './.git/*' -not -path './tests/.cache/*'
+    find . -type f -name '*.ps1' -not -path './.git/*' -not -path './tests/.cache/*' -not -path './home/*'
+    find ./home/.chezmoitemplates -type f -name '*.ps1' 2>/dev/null
 )
 find_non_ascii_ps1() {
     [[ "$#" -gt 0 ]] || return 0
@@ -194,6 +206,25 @@ if [[ -n "$ps1_comment_apos" ]]; then
     fail=1
 else
     echo "ok  : no apostrophes in .ps1 comments"
+fi
+
+# $Home is a READ-ONLY automatic variable. Assigning to it -- including declaring
+# a param named $Home -- PARSES fine but CRASHES at runtime ("Cannot overwrite
+# variable Home because it is read-only or constant"). It bit validate.ps1
+# (a `[string]$Home` param) and only surfaced on a real Windows run. Use
+# $HomeOverride / $userHome / $env:USERPROFILE instead. This flags an assignment
+# (`$Home =`) or a typed param (`[string]$Home`); reading $Home is fine.
+# ($matches is a DIFFERENT trap -- it is writable but gets clobbered by -match,
+# a correctness issue, not a crash -- so it is not banned here.)
+# shellcheck disable=SC2016  # literal $home in the grep regex, not a shell expansion
+ps1_home_assign=$(grep -nEi '\$home[[:space:]]*=|\]\$home\b' "${ps1_files[@]}" 2>/dev/null || true)
+if [[ -n "$ps1_home_assign" ]]; then
+    echo "FAIL: assignment to read-only \$Home crashes PowerShell at runtime:"
+    # shellcheck disable=SC2001  # sed is clearer than ${//} for line-prefixing
+    echo "$ps1_home_assign" | sed 's/^/  /'
+    fail=1
+else
+    echo "ok  : no assignment to read-only \$Home in .ps1"
 fi
 
 # Lua indentation: spaces only. stylua.toml at repo root declares Spaces+2;

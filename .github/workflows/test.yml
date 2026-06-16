@@ -20,6 +20,7 @@ defaults:
 env:
   CARGO_BINSTALL_COMMIT: f8810ffa11196f23afb38e6fb64716fbf814ad8f
   CARGO_BINSTALL_INSTALLER_SHA256: d3a93702160e0ec03e2a4e996855db1f01adee801fb84a43add24e0877ef8eae
+  CHEZMOI_VERSION: v2.70.5
   NVIM_LINUX_VERSION: v0.12.2
   NVIM_LINUX_X86_64_SHA256: 31cf85945cb600d96cdf69f88bc68bec814acbff50863c5546adef3a1bcef260
   PIP_DISABLE_PIP_VERSION_CHECK: "1"
@@ -50,7 +51,10 @@ jobs:
           curl -fsSL "https://raw.githubusercontent.com/cargo-bins/cargo-binstall/${CARGO_BINSTALL_COMMIT}/install-from-binstall-release.sh" -o /tmp/cargo-binstall.sh
           printf '%s  %s\n' "$CARGO_BINSTALL_INSTALLER_SHA256" /tmp/cargo-binstall.sh | sha256sum -c -
           bash /tmp/cargo-binstall.sh
-          "$HOME/.cargo/bin/cargo-binstall" -y taplo-cli hyperfine
+          # taplo-cli 0.10.0 has no cargo-binstall prebuilt (quickinstall 404) and
+          # fails to source-build on the current runner Rust (time-crate E0119), so
+          # pin 0.9.3, which has a quickinstall prebuilt and installs without compiling.
+          "$HOME/.cargo/bin/cargo-binstall" -y taplo-cli@0.9.3 hyperfine
           python3 -m pip install --user --break-system-packages --disable-pip-version-check yamllint editorconfig-checker
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           export PATH="$HOME/.local/bin:$PATH"
@@ -79,10 +83,6 @@ jobs:
         run: |
           set -euo pipefail
           make lint
-      - name: Bootstrap idempotency
-        run: |
-          set -euo pipefail
-          make test-bootstrap
       - name: Shell smoke
         run: |
           set -euo pipefail
@@ -183,3 +183,127 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $PSNativeCommandUseErrorActionPreference = $true
           .\test.ps1
+
+  chezmoi-parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - name: Install deps
+        run: |
+          set -euxo pipefail
+          sudo apt-get update
+          sudo apt-get install -y ca-certificates curl git python3
+          # -t pins the tag (+ SHA-256 verifies the release); a bare positional
+          # would be treated as a chezmoi command to run after install.
+          sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin" -t "$CHEZMOI_VERSION"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/chezmoi" --version
+      - name: Template tests
+        run: |
+          set -euo pipefail
+          PATH="$HOME/.local/bin:$PATH" bash tests/migration/template_test.sh
+      - name: Parity gate
+        run: |
+          set -euo pipefail
+          PATH="$HOME/.local/bin:$PATH" bash tests/migration/parity_gate.sh
+      - name: Greenfield round-trip uninstall
+        run: |
+          set -euo pipefail
+          PATH="$HOME/.local/bin:$PATH" bash tests/migration/greenfield_roundtrip.sh
+      - name: Uninstall safety (adversarial)
+        run: |
+          set -euo pipefail
+          PATH="$HOME/.local/bin:$PATH" bash tests/migration/uninstall_safety_test.sh
+      - name: Windows template render/parse/merge (pwsh)
+        run: |
+          set -euo pipefail
+          # ubuntu-latest ships pwsh, so this exercises the Windows-only
+          # .ps1.tmpl scripts (render + parse + WT merge) that ps1_parse.sh
+          # cannot see; the test self-skips if pwsh is ever absent.
+          PATH="$HOME/.local/bin:$PATH" bash tests/migration/windows_render_test.sh
+      - name: Oracle (negative) tests
+        run: |
+          set -euo pipefail
+          PATH="$HOME/.local/bin:$PATH" bash tests/migration/oracle_test.sh
+
+  chezmoi-parity-macos:
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - name: Install chezmoi
+        run: |
+          set -euxo pipefail
+          command -v python3
+          command -v git
+          # -t pins the tag (+ SHA-256 verifies the release); a bare positional
+          # would be treated as a chezmoi command to run after install.
+          sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin" -t "$CHEZMOI_VERSION"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/chezmoi" --version
+      - name: Template tests
+        run: |
+          set -euo pipefail
+          PATH="$HOME/.local/bin:$PATH" bash tests/migration/template_test.sh
+      - name: Parity gate
+        run: |
+          set -euo pipefail
+          PATH="$HOME/.local/bin:$PATH" bash tests/migration/parity_gate.sh
+      - name: Greenfield round-trip uninstall
+        run: |
+          set -euo pipefail
+          PATH="$HOME/.local/bin:$PATH" bash tests/migration/greenfield_roundtrip.sh
+      - name: Uninstall safety (adversarial)
+        run: |
+          set -euo pipefail
+          PATH="$HOME/.local/bin:$PATH" bash tests/migration/uninstall_safety_test.sh
+      - name: Oracle (negative) tests
+        run: |
+          set -euo pipefail
+          PATH="$HOME/.local/bin:$PATH" bash tests/migration/oracle_test.sh
+
+  chezmoi-parity-windows:
+    runs-on: windows-2025
+    # Heaviest job: a full Windows chezmoi apply plus the WT managed-subset
+    # deep-compare. Borderline at 25 on a slow runner (one cancellation), so
+    # give headroom.
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - name: Install chezmoi
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (Get-Variable -Name PSNativeCommandUseErrorActionPreference -ErrorAction SilentlyContinue) {
+            $PSNativeCommandUseErrorActionPreference = $true
+          }
+
+          $bin = Join-Path $env:USERPROFILE 'bin'
+          New-Item -ItemType Directory -Force -Path $bin | Out-Null
+          $installScript = Invoke-RestMethod -UseBasicParsing 'https://get.chezmoi.io/ps1'
+          & ([scriptblock]::Create($installScript)) -b $bin -t $env:CHEZMOI_VERSION
+
+          Add-Content -Path $env:GITHUB_PATH -Value $bin
+          $env:PATH = "$bin;$env:PATH"
+          $version = (& (Join-Path $bin 'chezmoi.exe') --version) -join "`n"
+          Write-Host $version
+          if ($version -notmatch [regex]::Escape($env:CHEZMOI_VERSION)) {
+            throw "chezmoi version output does not include $env:CHEZMOI_VERSION"
+          }
+      - name: Windows chezmoi apply parity
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (Get-Variable -Name PSNativeCommandUseErrorActionPreference -ErrorAction SilentlyContinue) {
+            $PSNativeCommandUseErrorActionPreference = $true
+          }
+          .\tests\migration\windows_apply_test.ps1
+      - name: Windows greenfield round-trip uninstall
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (Get-Variable -Name PSNativeCommandUseErrorActionPreference -ErrorAction SilentlyContinue) {
+            $PSNativeCommandUseErrorActionPreference = $true
+          }
+          .\tests\migration\windows_roundtrip_test.ps1

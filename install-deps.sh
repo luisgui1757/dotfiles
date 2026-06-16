@@ -8,6 +8,7 @@
 # Usage:
 #   ./install-deps.sh           prompt Y/n for each tool
 #   ./install-deps.sh --all     skip prompts, install everything
+#   ./install-deps.sh --update  update only present package-manager tools
 #   ./install-deps.sh --dry-run print what would be installed without acting
 #   ./install-deps.sh --experimental-wsl-gui
 #                              WSL opt-in: Linux Ghostty + Linux fontconfig fonts
@@ -16,15 +17,20 @@ set -euo pipefail
 
 YES_ALL=0
 DRY_RUN=0
+UPDATE_ONLY=0
 EXPERIMENTAL_WSL_GUI="${DOTFILES_EXPERIMENTAL_WSL_GUI:-0}"
 NVIM_LINUX_VERSION="v0.12.2"
 NVIM_LINUX_X86_64_SHA256="31cf85945cb600d96cdf69f88bc68bec814acbff50863c5546adef3a1bcef260"
 NVIM_LINUX_ARM64_SHA256="f697d4e4582b6e4b5c3c26e76e06ce26efa08ba1768e03fd2733fcc422bb0490"
+CHEZMOI_VERSION="v2.70.5"
 LAZYGIT_LINUX_VERSION="v0.62.2"
 LAZYGIT_LINUX_X86_64_SHA256="8b9a4c2d0969cbea92b45c956dd2a44e1ba76900c9df49f1c60984045ce77984"
 LAZYGIT_LINUX_ARM64_SHA256="9ab63dd75a7e9711c4c68a37d77f4334b8099a5d6a3f8fbe8f4e2768b159c9e9"
-ZSH_AUTOCOMPLETE_VERSION="25.03.19"
-ZSH_AUTOCOMPLETE_COMMIT="a76f26ae25528e76ee53df98ad38fbacdf89fd2e"
+TREE_SITTER_CLI_LINUX_VERSION="v0.26.9"
+TREE_SITTER_CLI_LINUX_X86_64_SHA256="0ea5daaef79145fe73786f0e3cdc43b62b22ddb36f7f6676c9f8bb72434d78e9"
+TREE_SITTER_CLI_LINUX_ARM64_SHA256="8b6c0f53593ce17c7eb90eb08de5ffb9f513f3db585b1fbef12219cacf7e8a68"
+FZF_TAB_VERSION="v1.3.0"
+FZF_TAB_COMMIT="d7e0234614dbe5369fdd760907d12c0e05a4dccc"
 ZSH_AUTOSUGGESTIONS_VERSION="v0.7.1"
 ZSH_AUTOSUGGESTIONS_COMMIT="e52ee8ca55bcc56a17c828767a3f98f22a68d4eb"
 HACK_NERD_FONT_VERSION="v3.4.0"
@@ -39,6 +45,7 @@ for arg in "$@"; do
     case "$arg" in
         --all|-y)   YES_ALL=1 ;;
         --dry-run)  DRY_RUN=1 ;;
+        --update)   UPDATE_ONLY=1 ;;
         --experimental-wsl-gui)
                     EXPERIMENTAL_WSL_GUI=1
                     export DOTFILES_EXPERIMENTAL_WSL_GUI=1 ;;
@@ -105,6 +112,22 @@ native_linux_pm() {
     elif have apk;     then echo apk
     else echo unknown
     fi
+}
+
+detect_update_pm() {
+    case "$(uname -s)" in
+        Darwin)
+            if homebrew_bin >/dev/null 2>&1; then echo brew
+            else echo brew_missing
+            fi
+            ;;
+        Linux)
+            native_linux_pm
+            ;;
+        *)
+            echo unknown
+            ;;
+    esac
 }
 
 homebrew_bin() {
@@ -332,26 +355,29 @@ is_local_account() {
     awk -F: -v u="$1" '$1==u{found=1} END{exit !found}' /etc/passwd
 }
 
-# Domain-account fallback: we can't chsh, so make INTERACTIVE bash re-exec into
-# zsh. Idempotent (a marked block, re-run safe), interactive-only (scp/rsync and
-# scripts stay bash), and it also points login shells (tmux, ssh) at ~/.bashrc
-# so the guard fires there too. Reversible — delete the marked block to undo.
+# Interactive bash fallback: make bash re-exec into zsh when Linux terminals or
+# tmux still start bash. Domain accounts cannot chsh; local graphical sessions
+# can also keep a stale $SHELL after chsh until full logout. Idempotent (marked
+# block, re-run safe), interactive-only (scp/rsync/scripts stay bash), and it
+# points login shells (tmux, ssh) at ~/.bashrc so the guard fires there too.
+# Reversible — delete the marked block to undo.
 ensure_bash_execs_zsh() {
     local rc="$HOME/.bashrc" profile="$HOME/.bash_profile"
-    local marker="# >>> dotfiles: exec zsh (domain login; chsh unavailable) >>>"
-    if [[ -f "$rc" ]] && grep -qF "$marker" "$rc"; then
+    local marker="# >>> dotfiles: exec zsh (interactive bash fallback) >>>"
+    local legacy_marker="# >>> dotfiles: exec zsh (domain login; chsh unavailable) >>>"
+    if [[ -f "$rc" ]] && { grep -qF "$marker" "$rc" || grep -qF "$legacy_marker" "$rc"; }; then
         echo "  ok        exec-zsh guard already present in ~/.bashrc"
     else
         cat >> "$rc" <<'EOF'
 
-# >>> dotfiles: exec zsh (domain login; chsh unavailable) >>>
+# >>> dotfiles: exec zsh (interactive bash fallback) >>>
 # Interactive bash re-execs into zsh. Guards: not already zsh (no loop), only
 # interactive shells (scp/rsync/scripts stay bash), and zsh must be installed.
 if [ -z "${ZSH_VERSION:-}" ] && [ -n "${BASH_VERSION:-}" ] && [[ $- == *i* ]] && command -v zsh >/dev/null 2>&1; then
     SHELL="$(command -v zsh)"; export SHELL
     exec zsh
 fi
-# <<< dotfiles: exec zsh (domain login; chsh unavailable) <<<
+# <<< dotfiles: exec zsh (interactive bash fallback) <<<
 EOF
     fi
     # tmux / ssh start a LOGIN bash, which reads ~/.bash_profile (not ~/.bashrc).
@@ -368,8 +394,13 @@ EOF
 
 # chsh path — local account, the textbook case.
 adopt_zsh_chsh() {
-    local zsh_path="$1" current="$2"
-    if ! ask "Make zsh your default login shell (chsh)? current: ${current:-unknown}"; then
+    local zsh_path="$1" current="$2" os prompt
+    os="$(uname -s)"
+    prompt="Make zsh your default login shell (chsh)? current: ${current:-unknown}"
+    if [[ "$os" != "Darwin" ]]; then
+        prompt="Make zsh your default shell now (chsh + interactive bash fallback)? current: ${current:-unknown}"
+    fi
+    if ! ask "$prompt"; then
         printf "  skipped   %-26s kept %s\n" "default shell" "${current:-current shell}"
         echo "            (~/.zshrc is symlinked, but tmux / new terminals keep"
         echo "             launching ${current##*/} until the login shell changes)"
@@ -377,6 +408,10 @@ adopt_zsh_chsh() {
     fi
     if [[ "$DRY_RUN" -eq 1 ]]; then
         echo "  would: register $zsh_path in /etc/shells if needed, then chsh -s $zsh_path"
+        if [[ "$os" != "Darwin" ]]; then
+            echo "  would: add an interactive 'exec zsh' guard to ~/.bashrc"
+            echo "         (+ make ~/.bash_profile source ~/.bashrc for login shells)"
+        fi
         return 0
     fi
     if ! ensure_in_etc_shells "$zsh_path"; then
@@ -385,8 +420,14 @@ adopt_zsh_chsh() {
     fi
     if set_login_shell "$zsh_path"; then
         printf "  changed   %-26s login shell -> %s\n" "default shell" "$zsh_path"
-        echo "            log out and back in for it to take effect (tmux started"
-        echo "            after re-login then launches zsh, not bash)"
+        if [[ "$os" != "Darwin" ]]; then
+            ensure_bash_execs_zsh
+            printf "  changed   %-26s ~/.bashrc now execs zsh for interactive shells\n" "default shell"
+            echo "            open a new shell (or new tmux) to land in zsh; chsh also"
+            echo "            fixes the real login shell for future sessions"
+        else
+            echo "            open a new terminal; log out/in if an app kept the old shell"
+        fi
     else
         echo "  WARN: chsh failed; login shell unchanged"
         echo "        manual:  chsh -s '$zsh_path'"
@@ -505,34 +546,349 @@ vscode_settings_path() {
     fi
 }
 
-# Set "workbench.colorTheme":"Rosé Pine" in a VS Code settings.json. The value
-# is a literal é (UTF-8) — it must match the theme label contributed by the
-# mvllow.rose-pine extension exactly. Handles:
-#   - absent/empty  -> write a fresh minimal settings.json
-#   - valid JSON    -> jq-merge the key (preserves existing settings)
-#   - JSONC/no jq   -> leave the file untouched and print an instruction
-#                      (VS Code settings are usually JSONC; never clobber them)
+# Set the VS Code Rose Pine theme plus Hack Nerd Font settings. The theme value
+# is a literal é (UTF-8) because it must match the mvllow.rose-pine label.
+write_vscode_jsonc_settings() {
+    local settings="$1" tmp="$2"
+    local theme="Rosé Pine"
+    local font="'Hack Nerd Font', Consolas, monospace"
+    local cr_count lf_count bare_lf_count use_crlf cr_char lf_char
+    cr_char=$'\r'
+    lf_char=$'\n'
+    cr_count="$(LC_ALL=C tr -cd "$cr_char" < "$settings" | wc -c | tr -d ' ')"
+    lf_count="$(LC_ALL=C tr -cd "$lf_char" < "$settings" | wc -c | tr -d ' ')"
+    bare_lf_count=$((lf_count - cr_count))
+    use_crlf=0
+    if (( cr_count > bare_lf_count )); then
+        use_crlf=1
+    fi
+    awk -v theme="$theme" -v font="$font" -v use_crlf="$use_crlf" '
+function json_quote(s, out) {
+    out = s
+    gsub(/\\/, "\\\\", out)
+    gsub(/"/, "\\\"", out)
+    return "\"" out "\""
+}
+function is_ws(c) {
+    return c == " " || c == "\t" || c == "\r" || c == "\n"
+}
+function skip_trivia(pos, c, n) {
+    while (pos <= len) {
+        c = substr(text, pos, 1)
+        if (is_ws(c)) {
+            pos++
+            continue
+        }
+        if (c == "/" && pos < len) {
+            n = substr(text, pos + 1, 1)
+            if (n == "/") {
+                pos += 2
+                while (pos <= len && substr(text, pos, 1) != "\n") {
+                    pos++
+                }
+                continue
+            }
+            if (n == "*") {
+                pos += 2
+                while (pos < len && !(substr(text, pos, 1) == "*" && substr(text, pos + 1, 1) == "/")) {
+                    pos++
+                }
+                if (pos < len) {
+                    pos += 2
+                }
+                continue
+            }
+        }
+        break
+    }
+    return pos
+}
+function scan_string_end(pos, i, c, escaped) {
+    escaped = 0
+    for (i = pos + 1; i <= len; i++) {
+        c = substr(text, i, 1)
+        if (escaped) {
+            escaped = 0
+            continue
+        }
+        if (c == "\\") {
+            escaped = 1
+            continue
+        }
+        if (c == "\"") {
+            return i
+        }
+    }
+    return 0
+}
+function find_value_end(pos, i, c, n, end, curly, square) {
+    pos = skip_trivia(pos)
+    if (pos > len) {
+        return 0
+    }
+    c = substr(text, pos, 1)
+    if (c == "\"") {
+        return scan_string_end(pos)
+    }
+    if (c == "{" || c == "[") {
+        curly = 0
+        square = 0
+        i = pos
+        while (i <= len) {
+            c = substr(text, i, 1)
+            if (c == "/" && i < len) {
+                n = substr(text, i + 1, 1)
+                if (n == "/") {
+                    i += 2
+                    while (i <= len && substr(text, i, 1) != "\n") {
+                        i++
+                    }
+                    continue
+                }
+                if (n == "*") {
+                    i += 2
+                    while (i < len && !(substr(text, i, 1) == "*" && substr(text, i + 1, 1) == "/")) {
+                        i++
+                    }
+                    if (i < len) {
+                        i += 2
+                    }
+                    continue
+                }
+            }
+            if (c == "\"") {
+                i = scan_string_end(i)
+                if (i == 0) {
+                    return 0
+                }
+            } else if (c == "{") {
+                curly++
+            } else if (c == "}") {
+                curly--
+                if (curly == 0 && square == 0) {
+                    return i
+                }
+            } else if (c == "[") {
+                square++
+            } else if (c == "]") {
+                square--
+                if (curly == 0 && square == 0) {
+                    return i
+                }
+            }
+            i++
+        }
+        return 0
+    }
+    end = pos
+    for (i = pos; i <= len; i++) {
+        c = substr(text, i, 1)
+        if (c == "," || c == "}") {
+            break
+        }
+        if (c == "/" && i < len) {
+            n = substr(text, i + 1, 1)
+            if (n == "/" || n == "*") {
+                break
+            }
+        }
+        end = i
+    }
+    while (end >= pos && is_ws(substr(text, end, 1))) {
+        end--
+    }
+    return end
+}
+{
+    lines[++line_count] = $0
+}
+END {
+    keys[1] = "workbench.colorTheme"
+    keys[2] = "workbench.preferredDarkColorTheme"
+    keys[3] = "workbench.preferredLightColorTheme"
+    keys[4] = "window.autoDetectColorScheme"
+    keys[5] = "editor.fontFamily"
+    keys[6] = "terminal.integrated.fontFamily"
+    values[1] = json_quote(theme)
+    values[2] = json_quote(theme)
+    values[3] = json_quote(theme)
+    values[4] = "false"
+    values[5] = json_quote(font)
+    values[6] = json_quote(font)
+    eol = use_crlf ? "\r\n" : "\n"
+
+    for (i = 1; i <= line_count; i++) {
+        line = lines[i]
+        sub(/\r$/, "", line)
+        text = text line eol
+    }
+    len = length(text)
+    root = 0
+    curly = 0
+    square = 0
+    i = 1
+    while (i <= len) {
+        c = substr(text, i, 1)
+        if (c == "/" && i < len) {
+            n = substr(text, i + 1, 1)
+            if (n == "/") {
+                i += 2
+                while (i <= len && substr(text, i, 1) != "\n") {
+                    i++
+                }
+                continue
+            }
+            if (n == "*") {
+                i += 2
+                while (i < len && !(substr(text, i, 1) == "*" && substr(text, i + 1, 1) == "/")) {
+                    i++
+                }
+                if (i < len) {
+                    i += 2
+                }
+                continue
+            }
+        }
+        if (c == "\"") {
+            end = scan_string_end(i)
+            if (end == 0) {
+                exit 2
+            }
+            if (curly == 1 && square == 0) {
+                after = skip_trivia(end + 1)
+                if (after <= len && substr(text, after, 1) == ":") {
+                    key = substr(text, i + 1, end - i - 1)
+                    for (k = 1; k <= 6; k++) {
+                        if (key == keys[k]) {
+                            vstart = skip_trivia(after + 1)
+                            vend = find_value_end(vstart)
+                            if (vend == 0) {
+                                exit 2
+                            }
+                            seen[k] = 1
+                            rep_count++
+                            rep_start[rep_count] = vstart
+                            rep_end[rep_count] = vend
+                            rep_value[rep_count] = values[k]
+                        }
+                    }
+                }
+            }
+            i = end + 1
+            continue
+        }
+        if (c == "{") {
+            curly++
+            if (root == 0) {
+                root = i
+            }
+        } else if (c == "}") {
+            curly--
+            if (curly < 0) {
+                curly = 0
+            }
+        } else if (c == "[") {
+            square++
+        } else if (c == "]" && square > 0) {
+            square--
+        }
+        i++
+    }
+    if (root == 0) {
+        exit 2
+    }
+    for (r = rep_count; r >= 1; r--) {
+        text = substr(text, 1, rep_start[r] - 1) rep_value[r] substr(text, rep_end[r] + 1)
+    }
+    len = length(text)
+    missing_count = 0
+    for (k = 1; k <= 6; k++) {
+        if (!seen[k]) {
+            missing_count++
+            missing_keys[missing_count] = keys[k]
+            missing_values[missing_count] = values[k]
+        }
+    }
+    if (missing_count > 0) {
+        first = skip_trivia(root + 1)
+        has_existing = first <= len && substr(text, first, 1) != "}"
+        insert_at = root + 1
+        if (substr(text, insert_at, 2) == "\r\n") {
+            insert_at += 2
+        } else if (substr(text, insert_at, 1) == "\n") {
+            insert_at++
+        }
+        block = eol
+        for (m = 1; m <= missing_count; m++) {
+            line = "  \"" missing_keys[m] "\": " missing_values[m]
+            if (has_existing || m < missing_count) {
+                line = line ","
+            }
+            block = block line eol
+        }
+        text = substr(text, 1, root) block substr(text, insert_at)
+    }
+    printf "%s", text
+}
+' "$settings" > "$tmp"
+}
+
+# Handles:
+#   - absent/empty -> write a fresh minimal settings.json
+#   - valid JSON -> jq-merge the top-level settings
+#   - JSONC -> comment-aware top-level edit with a timestamped backup
 set_vscode_theme() {
     local settings="${1:-}"
+    local theme="Rosé Pine"
+    local font="'Hack Nerd Font', Consolas, monospace"
     [[ -n "$settings" ]] || settings="$(vscode_settings_path)"
     mkdir -p "$(dirname "$settings")" 2>/dev/null || true
+    # FORCE dark Rose Pine. When window.autoDetectColorScheme is true (Settings
+    # Sync / an imported profile can enable it) VS Code IGNORES colorTheme and
+    # uses workbench.preferredDark/LightColorTheme (defaulting to Dark Modern).
+    # So pin autoDetect off (a JSON boolean, not a string) AND point both
+    # preferred slots at the same dark Rose Pine -- no OS-scheme combination can
+    # yield a light theme (same forced-dark rule as Ghostty; see tests/MANUAL.md).
     if [[ ! -s "$settings" ]]; then
-        printf '{\n  "workbench.colorTheme": "Rosé Pine"\n}\n' > "$settings"
-        printf "  set       %-26s workbench.colorTheme (new settings.json)\n" "rose-pine (vscode)"
+        printf '{\n  "workbench.colorTheme": "%s",\n  "workbench.preferredDarkColorTheme": "%s",\n  "workbench.preferredLightColorTheme": "%s",\n  "window.autoDetectColorScheme": false,\n  "editor.fontFamily": "%s",\n  "terminal.integrated.fontFamily": "%s"\n}\n' \
+            "$theme" "$theme" "$theme" "$font" "$font" > "$settings"
+        printf "  set       %-26s theme and fonts (new settings.json)\n" "rose-pine (vscode)"
         return 0
     fi
     if have jq && jq -e . "$settings" >/dev/null 2>&1; then
         local tmp; tmp="$(mktemp)"
-        if jq '. + {"workbench.colorTheme":"Rosé Pine"}' "$settings" > "$tmp"; then
+        if jq --arg theme "$theme" --arg font "$font" \
+            '. + {
+                "workbench.colorTheme": $theme,
+                "workbench.preferredDarkColorTheme": $theme,
+                "workbench.preferredLightColorTheme": $theme,
+                "window.autoDetectColorScheme": false,
+                "editor.fontFamily": $font,
+                "terminal.integrated.fontFamily": $font
+            }' "$settings" > "$tmp"; then
             mv "$tmp" "$settings"
-            printf "  set       %-26s workbench.colorTheme (merged)\n" "rose-pine (vscode)"
+            printf "  set       %-26s theme and fonts (merged)\n" "rose-pine (vscode)"
         else
             rm -f "$tmp"
-            echo "  WARN: could not merge theme into $settings"
+            echo "  WARN: could not merge VS Code settings into $settings"
         fi
         return 0
     fi
-    echo "  note      set workbench.colorTheme to \"Rose Pine\" in $settings (left untouched: comments / no jq)"
+    local backup timestamp
+    timestamp="$(date +%Y%m%d%H%M%S)"
+    backup="$settings.bak.$timestamp"
+    while [[ -e "$backup" ]]; do
+        backup="$settings.bak.$timestamp.$RANDOM"
+    done
+    cp "$settings" "$backup"
+    local tmp; tmp="$(mktemp)"
+    if write_vscode_jsonc_settings "$settings" "$tmp"; then
+        mv "$tmp" "$settings"
+        printf "  set       %-26s theme and fonts (jsonc edit; backup: %s)\n" "rose-pine (vscode)" "$backup"
+    else
+        rm -f "$tmp"
+        echo "  WARN: could not edit VS Code settings in $settings (backup: $backup)"
+    fi
     return 0
 }
 
@@ -722,6 +1078,259 @@ install_lazygit() {
     fi
 }
 
+install_tree_sitter_cli_linux() {
+    if have tree-sitter; then
+        printf "  ok        %-26s already installed\n" "tree-sitter"
+        return
+    fi
+
+    local machine arch expected asset url tmp archive extract_dir source_bin install_target
+    machine="$(uname -m)"
+    case "$machine" in
+        x86_64|amd64)
+            arch="x64"
+            expected="$TREE_SITTER_CLI_LINUX_X86_64_SHA256"
+            ;;
+        aarch64|arm64)
+            arch="arm64"
+            expected="$TREE_SITTER_CLI_LINUX_ARM64_SHA256"
+            ;;
+        *)
+            printf "  manual    %-26s unsupported Linux arch: %s\n" "tree-sitter" "$machine"
+            echo "            install from https://github.com/tree-sitter/tree-sitter/releases"
+            return
+            ;;
+    esac
+
+    asset="tree-sitter-cli-linux-${arch}.zip"
+    url="https://github.com/tree-sitter/tree-sitter/releases/download/${TREE_SITTER_CLI_LINUX_VERSION}/${asset}"
+
+    if ! ask "Install tree-sitter CLI (pinned GitHub release ${TREE_SITTER_CLI_LINUX_VERSION}, Linux ${arch})?"; then
+        printf "  skipped   %-26s\n" "tree-sitter"
+        return
+    fi
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        echo "  would: curl -fsSL $url -o /tmp/$asset"
+        echo "         verify sha256 $expected"
+        echo "         unzip tree-sitter -> \$HOME/.local/bin/tree-sitter"
+        return
+    fi
+    require_downloader || return 1
+    if ! have unzip; then
+        echo "  need      unzip missing; installing extractor for tree-sitter"
+        install unzip "extract tree-sitter CLI release archive"
+        if ! have unzip; then
+            echo "  FAIL: need unzip to extract $asset"
+            return 1
+        fi
+    fi
+
+    tmp="$(mktemp -d)"
+    archive="$tmp/$asset"
+    extract_dir="$tmp/extract"
+    mkdir -p "$extract_dir"
+    if ! curl -fsSL "$url" -o "$archive"; then
+        echo "  FAIL: tree-sitter download failed from $url"
+        rm -rf "$tmp"
+        return 1
+    fi
+    if ! verify_sha256 "$archive" "$expected"; then
+        echo "  FAIL: checksum mismatch for $asset"
+        rm -rf "$tmp"
+        return 1
+    fi
+    if ! unzip -oq "$archive" -d "$extract_dir"; then
+        echo "  FAIL: could not extract tree-sitter from $asset"
+        rm -rf "$tmp"
+        return 1
+    fi
+
+    source_bin="$extract_dir/tree-sitter"
+    if [[ ! -f "$source_bin" ]]; then
+        source_bin="$(find "$extract_dir" -type f -name tree-sitter -print -quit)"
+    fi
+    if [[ -z "$source_bin" || ! -f "$source_bin" ]]; then
+        echo "  FAIL: tree-sitter binary missing from $asset"
+        rm -rf "$tmp"
+        return 1
+    fi
+
+    install_target="$HOME/.local/bin/tree-sitter"
+    mkdir -p "$HOME/.local/bin"
+    cp "$source_bin" "$install_target"
+    chmod 0755 "$install_target"
+    rm -rf "$tmp"
+    if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
+        PATH="$HOME/.local/bin:$PATH"
+        export PATH
+        hash -r 2>/dev/null || true
+    fi
+    printf "  installed %-26s -> %s\n" "tree-sitter" "$install_target"
+}
+
+install_tree_sitter_cli() {
+    if have tree-sitter; then
+        printf "  ok        %-26s already installed\n" "tree-sitter"
+        return
+    fi
+    if [[ "$(uname -s)" == "Linux" && "$PM" != "brew" ]]; then
+        # Alpine/musl cannot execute the glibc-linked upstream release binary
+        # (same reason install_nvim_linux carves Alpine out to apk). Use the
+        # native package so we never leave a non-runnable binary on PATH.
+        if [[ "$(native_linux_pm)" == "apk" ]]; then
+            if ! ask "Install tree-sitter CLI via apk (native Alpine package)?"; then
+                printf "  skipped   %-26s\n" "tree-sitter"
+                return
+            fi
+            native_linux_pm_install apk tree-sitter || \
+                printf "  manual    %-26s apk add tree-sitter failed; install the musl tree-sitter CLI manually\n" "tree-sitter"
+            return
+        fi
+        install_tree_sitter_cli_linux
+    else
+        # brew (macOS + Linuxbrew): the package is `tree-sitter-cli`, NOT
+        # `tree-sitter`. Homebrew split the formula -- `tree-sitter` now installs
+        # only libtree-sitter (no CLI binary), so a fresh machine would be left
+        # without the `tree-sitter` executable nvim-treesitter `main` needs to
+        # generate/build parsers. `tree-sitter-cli` provides the `tree-sitter`
+        # binary (0.26.x, matching the pinned Linux release). The PKG_TABLE brew
+        # column carries that name; `binaries_for` still checks for `tree-sitter`.
+        install tree-sitter "nvim-treesitter main parser CLI"
+    fi
+}
+
+# Debian/Ubuntu ship python3 WITHOUT ensurepip/venv -- they live in the separate
+# python3-venv + python3-pip packages. Mason installs clang-format / ruff /
+# gersemi from PyPI, which runs `python3 -m venv` + pip, so on apt those tools
+# fail with "ensurepip is not available" until venv + pip are present. brew, dnf,
+# and pacman python already bundle them, so this only does work on apt systems.
+ensure_python_pip_venv() {
+    command -v python3 >/dev/null 2>&1 || return 0
+    if python3 -c 'import ensurepip, venv' >/dev/null 2>&1; then
+        printf "  ok        %-26s venv + pip present\n" "python venv/pip"
+        return
+    fi
+    if [[ "$PM" == "brew" ]]; then
+        return 0
+    fi
+    local native_pm
+    native_pm="$(native_linux_pm 2>/dev/null || true)"
+    case "$native_pm" in
+        apt)
+            if ! ask "Install python3-venv + python3-pip (Mason PyPI tools need them)?"; then
+                printf "  skipped   %-26s\n" "python venv/pip"
+                return
+            fi
+            if [[ "$DRY_RUN" -eq 1 ]]; then
+                echo "  would:    apt-get install -y python3-venv python3-pip"
+                return
+            fi
+            native_linux_pm_install apt python3-venv python3-pip \
+                || echo "  FAIL: python3-venv/python3-pip install failed (Mason PyPI tools will not build)"
+            ;;
+        dnf|zypper)
+            if ! ask "Install python3-pip (Mason PyPI tools need it)?"; then
+                printf "  skipped   %-26s\n" "python venv/pip"
+                return
+            fi
+            if [[ "$DRY_RUN" -eq 1 ]]; then
+                echo "  would:    install python3-pip"
+                return
+            fi
+            native_linux_pm_install "$native_pm" python3-pip \
+                || echo "  WARN: python3-pip install failed; continuing"
+            ;;
+        *)
+            printf "  manual    %-26s install your distro python3-venv + python3-pip\n" "python venv/pip"
+            ;;
+    esac
+}
+
+# Debian/Ubuntu's `nodejs` apt package does NOT bundle npm -- it is a separate
+# `npm` package. Mason installs pyright, prettier, the bash/yaml/json language
+# servers, and js-debug-adapter from npm, so without npm those Mason tools fail
+# to install. brew/dnf node bundle npm; on apt and pacman it can be separate.
+ensure_npm() {
+    command -v node >/dev/null 2>&1 || return 0
+    if command -v npm >/dev/null 2>&1; then
+        printf "  ok        %-26s already installed\n" "npm"
+        return
+    fi
+    if [[ "$PM" == "brew" ]]; then
+        return 0
+    fi
+    local native_pm
+    native_pm="$(native_linux_pm 2>/dev/null || true)"
+    case "$native_pm" in
+        apt)
+            if ! ask "Install npm (Mason npm tools -- pyright, prettier, LSPs -- need it)?"; then
+                printf "  skipped   %-26s\n" "npm"
+                return
+            fi
+            if [[ "$DRY_RUN" -eq 1 ]]; then
+                echo "  would:    apt-get install -y npm"
+                return
+            fi
+            native_linux_pm_install apt npm \
+                || echo "  FAIL: npm install failed (Mason npm tools will not build)"
+            ;;
+        dnf|pacman|zypper)
+            if ! ask "Install npm (Mason npm tools need it)?"; then
+                printf "  skipped   %-26s\n" "npm"
+                return
+            fi
+            if [[ "$DRY_RUN" -eq 1 ]]; then
+                echo "  would:    install npm via $native_pm"
+                return
+            fi
+            native_linux_pm_install "$native_pm" npm \
+                || echo "  WARN: npm install failed; continuing"
+            ;;
+        *)
+            printf "  manual    %-26s install your distro npm package\n" "npm"
+            ;;
+    esac
+}
+
+install_chezmoi() {
+    if have chezmoi; then
+        printf "  ok        %-26s already installed\n" "chezmoi"
+        return
+    fi
+
+    if [[ "$PM" == "brew" ]]; then
+        install chezmoi "dotfiles config manager"
+        return
+    fi
+
+    if [[ "$(uname -s)" != "Linux" ]]; then
+        install chezmoi "dotfiles config manager"
+        return
+    fi
+
+    if ! ask "Install chezmoi (dotfiles config manager, pinned ${CHEZMOI_VERSION})?"; then
+        printf "  skipped   %-26s\n" "chezmoi"
+        return
+    fi
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        echo "  would: sh -c \"\$(curl -fsLS get.chezmoi.io)\" -- -b \"\$HOME/.local/bin\" -t \"$CHEZMOI_VERSION\""
+        return
+    fi
+
+    require_downloader || return 1
+    mkdir -p "$HOME/.local/bin"
+    if sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin" -t "$CHEZMOI_VERSION"; then
+        if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
+            PATH="$HOME/.local/bin:$PATH"
+            export PATH
+            hash -r 2>/dev/null || true
+        fi
+        printf "  installed %-26s %s -> %s\n" "chezmoi" "$CHEZMOI_VERSION" "$HOME/.local/bin/chezmoi"
+    else
+        echo "  WARN: chezmoi install failed; continuing"
+    fi
+}
+
 zsh_plugin_root() {
     printf '%s\n' "${XDG_DATA_HOME:-$HOME/.local/share}/dotfiles/zsh-plugins"
 }
@@ -796,27 +1405,29 @@ install_zsh_plugin_repo() {
 }
 
 install_zsh_plugins() {
-    local root autocomplete_dir autosuggestions_dir
+    # fzf-tab gives the fzf-driven fuzzy Tab completion menu; zsh-autosuggestions
+    # gives the inline gray history hint. See shells/zshrc + CLAUDE.md invariant 13.
+    local root fzf_tab_dir autosuggestions_dir
     root="$(zsh_plugin_root)"
-    autocomplete_dir="$root/zsh-autocomplete"
+    fzf_tab_dir="$root/fzf-tab"
     autosuggestions_dir="$root/zsh-autosuggestions"
 
-    if zsh_plugin_ok "$autocomplete_dir" "$ZSH_AUTOCOMPLETE_COMMIT" "zsh-autocomplete.plugin.zsh" &&
+    if zsh_plugin_ok "$fzf_tab_dir" "$FZF_TAB_COMMIT" "fzf-tab.plugin.zsh" &&
         zsh_plugin_ok "$autosuggestions_dir" "$ZSH_AUTOSUGGESTIONS_COMMIT" "zsh-autosuggestions.zsh"; then
         printf "  ok        %-26s pinned refs already installed\n" "zsh plugins"
         return 0
     fi
-    if ! ask "Install zsh-autocomplete + zsh-autosuggestions (repo-managed pinned refs)?"; then
+    if ! ask "Install fzf-tab + zsh-autosuggestions (repo-managed pinned refs)?"; then
         printf "  skipped   %-26s\n" "zsh plugins"
         return 0
     fi
 
     install_zsh_plugin_repo \
-        "zsh-autocomplete" \
-        "https://github.com/marlonrichert/zsh-autocomplete.git" \
-        "$ZSH_AUTOCOMPLETE_VERSION" \
-        "$ZSH_AUTOCOMPLETE_COMMIT" \
-        "zsh-autocomplete.plugin.zsh" || true
+        "fzf-tab" \
+        "https://github.com/Aloxaf/fzf-tab.git" \
+        "$FZF_TAB_VERSION" \
+        "$FZF_TAB_COMMIT" \
+        "fzf-tab.plugin.zsh" || true
     install_zsh_plugin_repo \
         "zsh-autosuggestions" \
         "https://github.com/zsh-users/zsh-autosuggestions.git" \
@@ -855,12 +1466,14 @@ make|make|make|make|make|make|make
 rg|ripgrep|ripgrep|ripgrep|ripgrep|ripgrep|ripgrep
 fd|fd|fd-find|fd-find|fd|fd|fd
 fzf|fzf|fzf|fzf|fzf|fzf|fzf
+chezmoi|chezmoi|||||
 lazygit|lazygit|||||
 starship|starship||||||
 tmux|tmux|tmux|tmux|tmux|tmux|tmux
 zsh|zsh|zsh|zsh|zsh|zsh|zsh
 python3|python@3.12|python3|python3|python|python311|python3
 node|node|nodejs|nodejs|nodejs|nodejs|nodejs
+tree-sitter|tree-sitter-cli|||||
 shellcheck|shellcheck|shellcheck|ShellCheck|shellcheck|ShellCheck|shellcheck
 jq|jq|jq|jq|jq|jq|jq
 bats|bats-core|bats|bats|bats|bats|bats
@@ -928,6 +1541,147 @@ native_linux_pm_install() {
         apk)    maybe_sudo apk add "${pkgs[@]}" ;;
         *)      return 1 ;;
     esac
+}
+
+catalog_tools() {
+    if [[ -n "${INSTALL_DEPS_UPDATE_TOOLS:-}" ]]; then
+        printf '%s\n' "$INSTALL_DEPS_UPDATE_TOOLS"
+        return
+    fi
+    printf '%s\n' "$PKG_TABLE" | awk -F'|' 'NF { print $1 }'
+}
+
+update_tool_present() {
+    local tool="$1" bins
+    bins="$(binaries_for "$tool")"
+    # shellcheck disable=SC2086  # $bins is intentional word-splitting
+    have_any $bins
+}
+
+pm_pkg_installed() {
+    local pm="$1" pkg="$2" pkg_name
+    pkg_name="${pkg##*/}"
+    case "$pm" in
+        brew)
+            brew list --formula "$pkg_name" >/dev/null 2>&1
+            ;;
+        apt)
+            dpkg-query -W -f='${Status}' "$pkg" 2>/dev/null | grep -q 'install ok installed'
+            ;;
+        dnf|zypper)
+            rpm -q "$pkg" >/dev/null 2>&1
+            ;;
+        pacman)
+            pacman -Q "$pkg" >/dev/null 2>&1
+            ;;
+        apk)
+            apk info -e "$pkg" >/dev/null 2>&1
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+pm_update() {
+    local tool="$1" pkg="$2"
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        case "$PM" in
+            brew)   printf "  would update %-26s via brew: brew upgrade %s\n" "$tool" "$pkg" ;;
+            apt)    printf "  would update %-26s via apt: apt-get install --only-upgrade %s\n" "$tool" "$pkg" ;;
+            dnf)    printf "  would update %-26s via dnf: dnf upgrade %s\n" "$tool" "$pkg" ;;
+            pacman) printf "  would update %-26s via pacman: pacman -S %s\n" "$tool" "$pkg" ;;
+            zypper) printf "  would update %-26s via zypper: zypper update %s\n" "$tool" "$pkg" ;;
+            apk)    printf "  would update %-26s via apk: apk upgrade %s\n" "$tool" "$pkg" ;;
+        esac
+        return 0
+    fi
+    case "$PM" in
+        brew)   brew upgrade "$pkg" ;;
+        apt)    maybe_sudo apt-get update -qq && maybe_sudo apt-get install -y --only-upgrade "$pkg" ;;
+        dnf)    maybe_sudo dnf upgrade -y "$pkg" ;;
+        pacman) maybe_sudo pacman -S --noconfirm "$pkg" ;;
+        zypper) maybe_sudo zypper update -y "$pkg" ;;
+        apk)    maybe_sudo apk upgrade "$pkg" ;;
+    esac
+    local rc=$?
+    if [[ "$rc" -eq 0 ]]; then
+        printf "  updated   %-26s via %s\n" "$tool" "$PM"
+    else
+        printf "  WARN: %s update of %s returned %s\n" "$PM" "$pkg" "$rc" >&2
+    fi
+    return "$rc"
+}
+
+is_pinned_direct_update_tool() {
+    local tool="$1"
+    [[ "$(uname -s)" == "Linux" ]] || return 1
+    case "$tool" in
+        nvim|lazygit|tree-sitter) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+update_catalog_tool() {
+    local tool="$1" pkg
+    [[ -n "$tool" ]] || return 0
+
+    if is_pinned_direct_update_tool "$tool"; then
+        printf "  skipped   %-26s pinned Linux direct download; update via git pull + setup\n" "$tool"
+        return 0
+    fi
+
+    if ! update_tool_present "$tool"; then
+        printf "  skipped   %-26s not installed\n" "$tool"
+        return 0
+    fi
+
+    pkg="$(pkg_for "$tool")"
+    if [[ -z "$pkg" ]]; then
+        printf "  skipped   %-26s no %s package in catalog\n" "$tool" "$PM"
+        return 0
+    fi
+
+    if ! pm_pkg_installed "$PM" "$pkg"; then
+        printf "  skipped   %-26s present, but %s does not manage %s\n" "$tool" "$PM" "$pkg"
+        return 0
+    fi
+
+    pm_update "$tool" "$pkg" || true
+}
+
+update_catalog_tools() {
+    local tool
+    while IFS= read -r tool; do
+        [[ -n "$tool" ]] || continue
+        update_catalog_tool "$tool"
+    done <<EOF
+$(catalog_tools)
+EOF
+}
+
+run_update_mode() {
+    PM="$(detect_update_pm)"
+    OS_LABEL="$(uname -s)"
+    if is_wsl; then OS_LABEL="WSL ($OS_LABEL)"; fi
+    echo "install-deps: update mode OS=$OS_LABEL  package manager=$PM  dry-run=$DRY_RUN"
+    echo
+
+    if [[ "$PM" == "brew_missing" ]]; then
+        echo "install-deps: Homebrew is not installed; update mode will not bootstrap it." >&2
+        return 1
+    fi
+    if [[ "$PM" == "unknown" ]]; then
+        echo "install-deps: no supported package manager found for update mode." >&2
+        return 1
+    fi
+    if [[ "$PM" == "brew" ]]; then
+        enable_homebrew_for_current_shell || true
+    fi
+
+    update_catalog_tools
+    echo
+    echo "note: pinned binaries (Neovim/lazygit/tree-sitter Linux archives, Hack Nerd Font, Windows Terminal portable), PSFzf, plugins, and configs update via git pull and re-running setup."
 }
 
 unique_backup_path() {
@@ -1277,7 +2031,7 @@ configure_vscode_rose_pine() {
         return
     fi
     if [[ "$DRY_RUN" -eq 1 ]]; then
-        echo "  would: code --install-extension mvllow.rose-pine; set workbench.colorTheme = Rose Pine"
+        echo "  would: code --install-extension mvllow.rose-pine; set VS Code theme and font settings"
         return
     fi
     if code --install-extension mvllow.rose-pine >/dev/null 2>&1; then
@@ -1347,6 +2101,181 @@ check_wsl_clipboard() {
     echo "            automatically once installed via scoop)."
 }
 
+install_dependency_pm_scan_item() {
+    local pm_tool=""
+    case "${PM:-unknown}" in
+        brew|brew_missing) pm_tool="brew" ;;
+        apt|dnf|pacman|zypper|apk) pm_tool="$PM" ;;
+    esac
+    if [[ -n "$pm_tool" ]]; then
+        printf '%s\n' "${pm_tool}|command|${pm_tool}"
+    fi
+}
+
+install_dependency_scan_items() {
+    printf '%s\n' \
+        "git|command|git" \
+        "nvim|command|nvim" \
+        "make|command|make" \
+        "C compiler|compiler|" \
+        "rg|command|rg" \
+        "fd|command|" \
+        "fzf|command|fzf" \
+        "chezmoi|command|chezmoi" \
+        "lazygit|command|lazygit" \
+        "starship|command|starship" \
+        "tmux|command|tmux" \
+        "zsh|command|zsh" \
+        "zsh plugins|zsh-plugins|" \
+        "code|command|code" \
+        "python3|command|python3" \
+        "node|command|node" \
+        "tree-sitter|command|tree-sitter" \
+        "shellcheck|command|shellcheck" \
+        "jq|command|jq" \
+        "bats|command|bats" \
+        "hyperfine|command|hyperfine" \
+        "taplo|command|taplo" \
+        "yamllint|command|yamllint" \
+        "editorconfig-checker|command|editorconfig-checker"
+
+    if [[ "$(uname -s)" == "Darwin" && ( "$PM" == "brew" || "$PM" == "brew_missing" ) ]]; then
+        printf '%s\n' "ghostty|command|ghostty"
+    elif [[ "$(uname -s)" == "Linux" ]]; then
+        if ! is_wsl || wsl_gui_opt_in; then
+            printf '%s\n' "ghostty|command|ghostty"
+        fi
+    fi
+
+    if ! is_wsl || wsl_gui_opt_in; then
+        printf '%s\n' "fc-cache|command|fc-cache" "Hack Nerd Font|font|"
+    fi
+
+    if is_wsl; then
+        printf '%s\n' "win32yank.exe|command|win32yank.exe"
+    elif [[ "$(uname -s)" == "Linux" ]]; then
+        printf '%s\n' "xclip|command|xclip" "wl-copy|command|wl-copy"
+    fi
+}
+
+install_scan_present() {
+    local tool="$1" kind="$2" bins
+    case "$kind" in
+        command)
+            bins="$(binaries_for "$tool")"
+            # shellcheck disable=SC2086  # $bins is intentional word-splitting
+            have_any $bins
+            ;;
+        compiler)
+            have_c_compiler
+            ;;
+        font)
+            fc-list 2>/dev/null | grep -qi "hack.*nerd"
+            ;;
+        zsh-plugins)
+            local root fzf_tab_dir autosuggestions_dir
+            root="$(zsh_plugin_root)"
+            fzf_tab_dir="$root/fzf-tab"
+            autosuggestions_dir="$root/zsh-autosuggestions"
+            zsh_plugin_ok "$fzf_tab_dir" "$FZF_TAB_COMMIT" "fzf-tab.plugin.zsh" &&
+                zsh_plugin_ok "$autosuggestions_dir" "$ZSH_AUTOSUGGESTIONS_COMMIT" "zsh-autosuggestions.zsh"
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+install_scan_version() {
+    local tool="$1" kind="$2" version_bin="${3:-}" bins candidate first_line
+    case "$kind" in
+        font)
+            printf '%s\n' "-"
+            return
+            ;;
+        zsh-plugins)
+            printf '%s\n' "$FZF_TAB_VERSION/$ZSH_AUTOSUGGESTIONS_VERSION"
+            return
+            ;;
+        compiler)
+            for candidate in cc gcc clang zig cl; do
+                if have "$candidate"; then
+                    version_bin="$candidate"
+                    break
+                fi
+            done
+            ;;
+        command)
+            if [[ -z "$version_bin" ]]; then
+                bins="$(binaries_for "$tool")"
+                for candidate in $bins; do
+                    if have "$candidate"; then
+                        version_bin="$candidate"
+                        break
+                    fi
+                done
+            fi
+            ;;
+    esac
+    if [[ -z "$version_bin" ]] || ! have "$version_bin"; then
+        printf '%s\n' "-"
+        return
+    fi
+    first_line="$("$version_bin" --version 2>/dev/null | sed -n '1p' || true)"
+    if [[ -z "$first_line" ]]; then
+        first_line="-"
+    fi
+    printf '%s\n' "$first_line"
+}
+
+scan_install_dependencies() {
+    local spec_source pm_item tool kind version_bin status version action
+    if [[ -n "${INSTALL_DEPS_SCAN_ITEMS:-}" ]]; then
+        spec_source="$INSTALL_DEPS_SCAN_ITEMS"
+    else
+        spec_source="$(install_dependency_scan_items)"
+    fi
+    pm_item="$(install_dependency_pm_scan_item)"
+    if [[ -n "$pm_item" ]]; then
+        spec_source="$(printf '%s\n%s\n' "$pm_item" "$spec_source")"
+    fi
+    while IFS='|' read -r tool kind version_bin; do
+        [[ -n "$tool" ]] || continue
+        status="missing"
+        version="-"
+        action="install"
+        if install_scan_present "$tool" "$kind"; then
+            status="present"
+            version="$(install_scan_version "$tool" "$kind" "$version_bin")"
+            action="skip"
+        fi
+        printf '%s|%s|%s|%s\n' "$tool" "$status" "$version" "$action"
+    done <<EOF
+$spec_source
+EOF
+}
+
+print_install_dependency_table() {
+    local rows tool status version action present=0 missing=0
+    rows="$(scan_install_dependencies)"
+    echo "Dependency pre-flight:"
+    printf "%-22s %-8s %-34s %-7s\n" "Tool" "Status" "Version" "Action"
+    printf "%-22s %-8s %-34s %-7s\n" "----------------------" "--------" "----------------------------------" "-------"
+    while IFS='|' read -r tool status version action; do
+        [[ -n "$tool" ]] || continue
+        printf "%-22s %-8s %-34s %-7s\n" "$tool" "$status" "$version" "$action"
+        if [[ "$status" == "present" ]]; then
+            present=$((present + 1))
+        else
+            missing=$((missing + 1))
+        fi
+    done <<EOF
+$rows
+EOF
+    INSTALL_SCAN_MISSING=$missing
+    printf "%s present, %s missing\n" "$present" "$missing"
+}
+
 # Test seam: `INSTALL_DEPS_SOURCE_ONLY=1 source install-deps.sh` defines the
 # installer functions WITHOUT running any package installs.
 if [[ -n "${INSTALL_DEPS_SOURCE_ONLY:-}" ]]; then
@@ -1354,38 +2283,25 @@ if [[ -n "${INSTALL_DEPS_SOURCE_ONLY:-}" ]]; then
     return 0 2>/dev/null || exit 0
 fi
 
-PM="$(detect_pm)"
-if [[ "$PM" == "brew" ]]; then
-    enable_homebrew_for_current_shell || true
-    persist_homebrew_shellenv
+if [[ "$UPDATE_ONLY" -eq 1 ]]; then
+    run_update_mode
+    exit $?
 fi
+
+PM="$(detect_pm)"
 OS_LABEL="$(uname -s)"
 if is_wsl; then OS_LABEL="WSL ($OS_LABEL)"; fi
 
-# Bootstrap brew if asked. Re-detect after.
-if [[ "$PM" == "brew_missing" ]]; then
-    if maybe_install_brew; then PM="$(detect_pm)"
-    else PM="unknown"; fi
-elif [[ "$PM" != "brew" && "$(uname -s)" == "Linux" ]]; then
-    echo "Detected $PM as the system package manager."
-    if maybe_install_brew; then PM="$(detect_pm)"; fi
-fi
-
-if [[ "$PM" == "unknown" ]]; then
-    echo "install-deps: no supported package manager found." >&2
-    echo "  Supported: brew (mac/Linux), apt (Debian/Ubuntu), dnf (Fedora)," >&2
-    echo "             pacman (Arch), zypper (openSUSE), apk (Alpine)." >&2
-    exit 1
-fi
-
 echo "install-deps: OS=$OS_LABEL  package manager=$PM  dry-run=$DRY_RUN  yes-all=$YES_ALL  experimental-wsl-gui=$EXPERIMENTAL_WSL_GUI"
+echo
+print_install_dependency_table
 echo
 
 # One-shot "install everything" vs the per-item prompts. Skipped when --all was
 # already passed, and when there's no tty to read from (e.g. curl | bash).
 # Enter / Y == everything (recommended); n == choose per tool.
 if [[ "$YES_ALL" -ne 1 && "$DRY_RUN" -ne 1 && -t 0 ]]; then
-    printf "Install EVERYTHING without further prompts? [Y/n]  (n = choose per tool) "
+    printf "Install the %s missing tools listed above without further prompts? [Y/n]  (n = choose per tool) " "$INSTALL_SCAN_MISSING"
     if IFS= read -r _all_ans && [[ "$_all_ans" =~ ^[Nn] ]]; then
         echo "  -> per-item prompts"
     else
@@ -1396,6 +2312,30 @@ if [[ "$YES_ALL" -ne 1 && "$DRY_RUN" -ne 1 && -t 0 ]]; then
     echo
 fi
 
+# Bootstrap brew only after the pre-flight table and one-shot prompt. Re-detect
+# after bootstrap so the per-tool installers see the manager that now exists.
+if [[ "$PM" == "brew" ]]; then
+    enable_homebrew_for_current_shell || true
+    persist_homebrew_shellenv
+elif [[ "$PM" == "brew_missing" ]]; then
+    if maybe_install_brew; then PM="$(detect_pm)"
+    else PM="unknown"; fi
+elif [[ "$(uname -s)" == "Linux" ]]; then
+    echo "Detected $PM as the system package manager."
+    if maybe_install_brew; then PM="$(detect_pm)"; fi
+fi
+
+if [[ "$PM" == "brew" ]]; then
+    enable_homebrew_for_current_shell || true
+fi
+
+if [[ "$PM" == "unknown" ]]; then
+    echo "install-deps: no supported package manager found." >&2
+    echo "  Supported: brew (mac/Linux), apt (Debian/Ubuntu), dnf (Fedora)," >&2
+    echo "             pacman (Arch), zypper (openSUSE), apk (Alpine)." >&2
+    exit 1
+fi
+
 # ---- Sections ----------------------------------------------------------------
 section() { echo; echo "== $1 =="; }
 
@@ -1404,13 +2344,14 @@ install git "version control, required by lazy.nvim"
 if [[ "$(uname -s)" == "Linux" && "$PM" != "brew" ]]; then
     install_nvim_linux
 else
-    install nvim "Neovim 0.11+, the editor"
+    install nvim "Neovim 0.12+, the editor"
 fi
 install make "needed for some plugin builds (notably LuaSnip jsregexp)"
 install_c_toolchain_linux
 install rg "ripgrep, powers Telescope live_grep"
 install fd "fd, powers Telescope find_files"
 install fzf "fuzzy finder: Ctrl-R history, Ctrl-T files, Alt-C cd (zsh wiring in shells/zshrc)"
+install_chezmoi
 install_lazygit
 
 section "prompt"
@@ -1450,7 +2391,10 @@ fi
 
 section "language tooling (for LSP / formatter back-ends)"
 install python3 "needed by pyright"
+ensure_python_pip_venv
 install node "needed by prettier and JS tooling"
+ensure_npm
+install_tree_sitter_cli
 
 if is_wsl; then
     section "WSL clipboard bridge"
@@ -1464,7 +2408,7 @@ fi
 section "developer / test dependencies (optional)"
 install shellcheck "shell script linter"
 install jq "JSON CLI, general-purpose tool used by many scripts"
-install bats "bats-core, for tests/bootstrap/sh_test.bats"
+install bats "bats-core, for optional local shell tests"
 install hyperfine "starship prompt perf test"
 install taplo "TOML linter"
 install yamllint "YAML linter"
