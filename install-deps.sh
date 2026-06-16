@@ -58,6 +58,15 @@ done
 
 # ---- Bash 3.2-safe helpers ---------------------------------------------------
 have() { command -v "$1" >/dev/null 2>&1; }
+# Idempotently prepend ~/.local/bin to PATH for THIS process (pinned binaries,
+# pip --user, and chezmoi all land there). Safe to call repeatedly.
+ensure_local_bin_on_path() {
+    if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
+        PATH="$HOME/.local/bin:$PATH"
+        export PATH
+        hash -r 2>/dev/null || true
+    fi
+}
 verify_sha256() {
     local f="$1" expected="$2" got
     if have shasum; then
@@ -1060,11 +1069,7 @@ install_lazygit_linux() {
     cp "$tmp/lazygit" "$install_target"
     chmod 0755 "$install_target"
     rm -rf "$tmp"
-    if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
-        PATH="$HOME/.local/bin:$PATH"
-        export PATH
-        hash -r 2>/dev/null || true
-    fi
+    ensure_local_bin_on_path
     printf "  installed %-26s -> %s\n" "lazygit" "$install_target"
 }
 
@@ -1160,11 +1165,7 @@ install_tree_sitter_cli_linux() {
     cp "$source_bin" "$install_target"
     chmod 0755 "$install_target"
     rm -rf "$tmp"
-    if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
-        PATH="$HOME/.local/bin:$PATH"
-        export PATH
-        hash -r 2>/dev/null || true
-    fi
+    ensure_local_bin_on_path
     printf "  installed %-26s -> %s\n" "tree-sitter" "$install_target"
 }
 
@@ -1320,11 +1321,7 @@ install_chezmoi() {
     require_downloader || return 1
     mkdir -p "$HOME/.local/bin"
     if sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin" -t "$CHEZMOI_VERSION"; then
-        if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
-            PATH="$HOME/.local/bin:$PATH"
-            export PATH
-            hash -r 2>/dev/null || true
-        fi
+        ensure_local_bin_on_path
         printf "  installed %-26s %s -> %s\n" "chezmoi" "$CHEZMOI_VERSION" "$HOME/.local/bin/chezmoi"
     else
         echo "  WARN: chezmoi install failed; continuing"
@@ -1821,11 +1818,7 @@ install() {
             if [[ ! -L "$fd_link" ]]; then
                 ln -s "$fdfind_bin" "$fd_link"
             fi
-            if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
-                PATH="$HOME/.local/bin:$PATH"
-                export PATH
-                hash -r 2>/dev/null || true
-            fi
+            ensure_local_bin_on_path
             printf "  set       %-26s ~/.local/bin/fd -> fdfind\n" "fd"
         fi
     else
