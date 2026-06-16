@@ -185,7 +185,7 @@ jobs:
           .\test.ps1
 
   chezmoi-parity:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
@@ -218,7 +218,7 @@ jobs:
       - name: Windows template render/parse/merge (pwsh)
         run: |
           set -euo pipefail
-          # ubuntu-latest ships pwsh, so this exercises the Windows-only
+          # the ubuntu runner ships pwsh, so this exercises the Windows-only
           # .ps1.tmpl scripts (render + parse + WT merge) that ps1_parse.sh
           # cannot see; the test self-skips if pwsh is ever absent.
           PATH="$HOME/.local/bin:$PATH" bash tests/migration/windows_render_test.sh
