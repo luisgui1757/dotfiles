@@ -20,20 +20,25 @@ out="$(install_zsh_plugins)"
 [[ "$out" == *"$ZSH_AUTOSUGGESTIONS_VERSION"* ]]
 [[ "$out" == *"$ZSH_AUTOSUGGESTIONS_COMMIT"* ]]
 
-# Fail-closed: a failing pinned-plugin install must surface a FAIL: marker (so CI
-# catches it) and return non-zero -- the old `|| true` swallowed it and reported
-# success with the plugin absent. Stubs are isolated in a subshell.
+# A failing pinned-plugin install must (1) still attempt BOTH plugins, (2) surface
+# a FAIL: marker so CI catches it (the old `|| true` swallowed it and reported
+# success), yet (3) CONTINUE (return 0) -- zsh plugins are non-critical, so a clone
+# hiccup must not abort the whole setup under set -e. Stubs isolated in a subshell;
+# the attempt log is a FILE because the $(...) capture runs in its own subshell.
 (
-    set +e  # we EXPECT a non-zero return; capture it instead of aborting
-    zsh_plugin_ok() { return 1; }            # force "not installed" so it proceeds
-    install_zsh_plugin_repo() { return 1; }  # simulate a clone/verify failure
+    set +e
+    attempt_log="$TMP_HOME/zsh_attempts.log"; : > "$attempt_log"
+    zsh_plugin_ok() { return 1; }                                        # force "not installed"
+    install_zsh_plugin_repo() { echo "$1" >> "$attempt_log"; return 1; } # log name, simulate failure
     YES_ALL=1
     DRY_RUN=0
     fc_out="$(install_zsh_plugins 2>&1)"; fc_rc=$?
-    [[ "$fc_rc" -ne 0 ]] \
-        || { echo "FAIL: install_zsh_plugins must return non-zero when a plugin fails"; exit 1; }
+    { grep -qx 'fzf-tab' "$attempt_log" && grep -qx 'zsh-autosuggestions' "$attempt_log"; } \
+        || { echo "FAIL: install_zsh_plugins must attempt BOTH plugins when the first fails"; exit 1; }
     [[ "$fc_out" == *"FAIL:"* ]] \
         || { echo "FAIL: install_zsh_plugins must emit a FAIL: marker on plugin failure"; exit 1; }
+    [[ "$fc_rc" -eq 0 ]] \
+        || { echo "FAIL: install_zsh_plugins must return 0 (continue) on a non-critical plugin failure"; exit 1; }
 )
 
 zshrc="$REPO_ROOT/shells/zshrc"

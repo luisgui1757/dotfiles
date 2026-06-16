@@ -73,18 +73,35 @@ return {
       -- NOTE: format-on-save lives in conform.nvim, NOT here.
       -- Don't add a BufWritePre formatter here or it will race conform.
 
-      -- clangd discovers compile_commands.json itself: it searches the resolved
-      -- project root (root_markers below) and its parents, plus a sibling
-      -- `build/` dir, PER FILE. The previous get_clangd_cmd() baked a single
-      -- `--compile-commands-dir` into the static `cmd` at config-load time, from
-      -- a probe of RELATIVE paths -- i.e. relative to nvim's startup cwd, not the
-      -- edited file's project -- and then froze it for the whole session. That was
-      -- wrong for any file outside the cwd and never updated when you opened a
-      -- second project. A non-standard DB dir (out/, .cache/clangd) is the job of
-      -- a project-local `.clangd` file (`CompilationDatabase: out`), which is the
-      -- canonical clangd mechanism and is picked up via the `.clangd` root marker.
+      -- clangd: look for compile_commands.json in fixed root-relative locations.
+      -- Avoid the recursive `o/**` glob — it traversed huge build trees on
+      -- every first buffer open. clangd already auto-discovers ancestors
+      -- of the file's directory, so this just nudges the *workspace* root.
+      -- NOTE (deferred): this probes RELATIVE paths at config-load, i.e. relative
+      -- to nvim's startup cwd and frozen for the session -- correct for the common
+      -- `cd project && nvim` case but stale across projects. A proper per-root fix
+      -- (compute --compile-commands-dir from the resolved root, or rely on a
+      -- project `.clangd`) needs a real C project to validate and is intentionally
+      -- left out of the audit PR rather than shipped unverified.
+      local function get_clangd_cmd()
+        local cmd = { "clangd", "--background-index", "--clang-tidy" }
+        local fixed_candidates = {
+          "compile_commands.json",
+          "build/compile_commands.json",
+          "out/compile_commands.json",
+          ".cache/clangd/compile_commands.json",
+        }
+        for _, rel in ipairs(fixed_candidates) do
+          if vim.uv.fs_stat(rel) then
+            table.insert(cmd, "--compile-commands-dir=" .. vim.fn.fnamemodify(rel, ":h"))
+            break
+          end
+        end
+        return cmd
+      end
+
       vim.lsp.config("clangd", {
-        cmd = { "clangd", "--background-index", "--clang-tidy" },
+        cmd = get_clangd_cmd(),
         capabilities = capabilities,
         root_markers = { "compile_commands.json", ".clangd", "CMakeLists.txt", ".git" },
       })

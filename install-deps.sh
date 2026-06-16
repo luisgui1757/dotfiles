@@ -1419,11 +1419,14 @@ install_zsh_plugins() {
         return 0
     fi
 
-    # Attempt BOTH plugins (one failing must not skip the other), but do NOT
-    # swallow the result with `|| true`: a swallowed failure let setup report
-    # success while a required plugin was absent. Aggregate and emit a FAIL:
-    # marker so CI catches it; real-user setup still continues (no set -e) -- the
-    # fuzzy-Tab menu / gray hint is simply missing until the next good run.
+    # Attempt BOTH plugins (one failing must not skip the other) and do NOT
+    # swallow the result with `|| true` -- that let setup report success with a
+    # plugin absent. Each `|| rc=1` absorbs a failure (so `set -e` -- enabled at
+    # the top of this file -- does not abort mid-list), then we emit a FAIL:
+    # marker so CI catches it. We deliberately still RETURN 0 (continue): zsh
+    # plugins are non-critical (the shell works, just without the fuzzy-Tab menu /
+    # gray hint), so login-shell adoption and the rest of setup still run. This is
+    # the same emit-FAIL-and-continue pattern as install_ghostty_linux.
     local rc=0
     install_zsh_plugin_repo \
         "fzf-tab" \
@@ -1439,7 +1442,6 @@ install_zsh_plugins() {
         "zsh-autosuggestions.zsh" || rc=1
     if [[ "$rc" -ne 0 ]]; then
         printf "  FAIL: %-26s one or more pinned zsh plugins failed to install\n" "zsh plugins" >&2
-        return 1
     fi
     return 0
 }
