@@ -1159,6 +1159,53 @@ install_tree_sitter_cli() {
     fi
 }
 
+# Debian/Ubuntu ship python3 WITHOUT ensurepip/venv -- they live in the separate
+# python3-venv + python3-pip packages. Mason installs clang-format / ruff /
+# gersemi from PyPI, which runs `python3 -m venv` + pip, so on apt those tools
+# fail with "ensurepip is not available" until venv + pip are present. brew, dnf,
+# and pacman python already bundle them, so this only does work on apt systems.
+ensure_python_pip_venv() {
+    command -v python3 >/dev/null 2>&1 || return 0
+    if python3 -c 'import ensurepip, venv' >/dev/null 2>&1; then
+        printf "  ok        %-26s venv + pip present\n" "python venv/pip"
+        return
+    fi
+    if [[ "$PM" == "brew" ]]; then
+        return 0
+    fi
+    local native_pm
+    native_pm="$(native_linux_pm 2>/dev/null || true)"
+    case "$native_pm" in
+        apt)
+            if ! ask "Install python3-venv + python3-pip (Mason PyPI tools need them)?"; then
+                printf "  skipped   %-26s\n" "python venv/pip"
+                return
+            fi
+            if [[ "$DRY_RUN" -eq 1 ]]; then
+                echo "  would:    apt-get install -y python3-venv python3-pip"
+                return
+            fi
+            native_linux_pm_install apt python3-venv python3-pip \
+                || echo "  FAIL: python3-venv/python3-pip install failed (Mason PyPI tools will not build)"
+            ;;
+        dnf|zypper)
+            if ! ask "Install python3-pip (Mason PyPI tools need it)?"; then
+                printf "  skipped   %-26s\n" "python venv/pip"
+                return
+            fi
+            if [[ "$DRY_RUN" -eq 1 ]]; then
+                echo "  would:    install python3-pip"
+                return
+            fi
+            native_linux_pm_install "$native_pm" python3-pip \
+                || echo "  WARN: python3-pip install failed; continuing"
+            ;;
+        *)
+            printf "  manual    %-26s install your distro python3-venv + python3-pip\n" "python venv/pip"
+            ;;
+    esac
+}
+
 install_chezmoi() {
     if have chezmoi; then
         printf "  ok        %-26s already installed\n" "chezmoi"
@@ -2256,6 +2303,7 @@ fi
 
 section "language tooling (for LSP / formatter back-ends)"
 install python3 "needed by pyright"
+ensure_python_pip_venv
 install node "needed by prettier and JS tooling"
 install_tree_sitter_cli
 
