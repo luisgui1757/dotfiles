@@ -73,29 +73,18 @@ return {
       -- NOTE: format-on-save lives in conform.nvim, NOT here.
       -- Don't add a BufWritePre formatter here or it will race conform.
 
-      -- clangd: look for compile_commands.json in fixed root-relative locations.
-      -- Avoid the recursive `o/**` glob — it traversed huge build trees on
-      -- every first buffer open. clangd already auto-discovers ancestors
-      -- of the file's directory, so this just nudges the *workspace* root.
-      local function get_clangd_cmd()
-        local cmd = { "clangd", "--background-index", "--clang-tidy" }
-        local fixed_candidates = {
-          "compile_commands.json",
-          "build/compile_commands.json",
-          "out/compile_commands.json",
-          ".cache/clangd/compile_commands.json",
-        }
-        for _, rel in ipairs(fixed_candidates) do
-          if vim.uv.fs_stat(rel) then
-            table.insert(cmd, "--compile-commands-dir=" .. vim.fn.fnamemodify(rel, ":h"))
-            break
-          end
-        end
-        return cmd
-      end
-
+      -- clangd discovers compile_commands.json itself: it searches the resolved
+      -- project root (root_markers below) and its parents, plus a sibling
+      -- `build/` dir, PER FILE. The previous get_clangd_cmd() baked a single
+      -- `--compile-commands-dir` into the static `cmd` at config-load time, from
+      -- a probe of RELATIVE paths -- i.e. relative to nvim's startup cwd, not the
+      -- edited file's project -- and then froze it for the whole session. That was
+      -- wrong for any file outside the cwd and never updated when you opened a
+      -- second project. A non-standard DB dir (out/, .cache/clangd) is the job of
+      -- a project-local `.clangd` file (`CompilationDatabase: out`), which is the
+      -- canonical clangd mechanism and is picked up via the `.clangd` root marker.
       vim.lsp.config("clangd", {
-        cmd = get_clangd_cmd(),
+        cmd = { "clangd", "--background-index", "--clang-tidy" },
         capabilities = capabilities,
         root_markers = { "compile_commands.json", ".clangd", "CMakeLists.txt", ".git" },
       })
@@ -122,7 +111,11 @@ return {
         settings = {
           ["rust-analyzer"] = {
             cargo = { allFeatures = true },
-            checkOnSave = { command = "clippy" },
+            -- rust-analyzer removed the nested `checkOnSave = { command = ... }`
+            -- schema: `checkOnSave` is now a boolean and the command moved to
+            -- `check.command`. The old nested form is silently ignored.
+            checkOnSave = true,
+            check = { command = "clippy" },
           },
         },
       })
@@ -181,12 +174,15 @@ return {
       end
       vim.lsp.enable(enabled_servers)
 
-      -- Race fix: if a buffer opened *before* mason-tool-installer
-      -- finished installing its server, those buffers won't have an
-      -- LSP client. Re-fire the LspAttach codepath for each loaded
-      -- buffer by issuing :edit INSIDE THAT BUFFER via nvim_buf_call
-      -- (the previous version only re-edited the current buffer for
-      -- every iteration, leaving background buffers stranded).
+      -- Race fix: if a buffer opened *before* mason-tool-installer finished
+      -- installing its server, that buffer has no LSP client. Re-fire FileType
+      -- for each loaded buffer, which re-runs the vim.lsp.enable() attach check
+      -- (LSP is FileType-driven) WITHOUT reloading the buffer. The previous
+      -- version issued :edit, which throws E37 ("No write since last change") on
+      -- any buffer with unsaved edits; the pcall swallowed it, silently leaving
+      -- every modified buffer stranded with no LSP. Re-asserting &filetype inside
+      -- the buffer's own context fires FileType for exactly that buffer and never
+      -- touches its contents.
       vim.api.nvim_create_autocmd("User", {
         pattern = "MasonToolsUpdateCompleted",
         callback = function()
@@ -195,9 +191,10 @@ return {
               vim.api.nvim_buf_is_loaded(buf)
               and vim.bo[buf].buftype == ""
               and vim.api.nvim_buf_get_name(buf) ~= ""
+              and vim.bo[buf].filetype ~= ""
             then
               pcall(vim.api.nvim_buf_call, buf, function()
-                vim.cmd("edit")
+                vim.bo.filetype = vim.bo.filetype
               end)
             end
           end
