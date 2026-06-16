@@ -298,6 +298,36 @@ function Test-Tool {
     return [bool](Get-Command $BinaryName[$name] -ErrorAction SilentlyContinue)
 }
 
+function Get-RealPythonCommand {
+    # The Microsoft Store ships "App execution alias" stubs for python.exe and
+    # python3.exe under %LOCALAPPDATA%\Microsoft\WindowsApps that are NOT a real
+    # Python -- run with no args they just open the Store. Get-Command finds them,
+    # so a naive Test-Tool reports python as installed; Mason then fails its PyPI
+    # tools (clang-format / ruff / gersemi) with "Unable to find python3
+    # installation in PATH". Return the first python on PATH that is NOT that stub.
+    foreach ($name in @('python', 'python3')) {
+        foreach ($candidate in @(Get-Command $name -All -ErrorAction SilentlyContinue)) {
+            $source = $candidate.Source
+            if ([string]::IsNullOrWhiteSpace($source)) { continue }
+            if ($source -like '*\WindowsApps\*') { continue }
+            return $candidate
+        }
+    }
+    return $null
+}
+
+function Install-Python {
+    # Install a REAL python, not the Store stub (see Get-RealPythonCommand). Pass
+    # the stub-rejecting check to Install-One so the stub never short-circuits the
+    # install, then add the real python directory to the user PATH so the Mason
+    # sync and future shells resolve it ahead of the stub.
+    Install-One python -InstalledCheck { [bool](Get-RealPythonCommand) }
+    $real = Get-RealPythonCommand
+    if ($real -and -not [string]::IsNullOrWhiteSpace($real.Source)) {
+        Add-DirectoryToUserPath -Directory (Split-Path -Parent $real.Source)
+    }
+}
+
 function Get-InstallDependencySpec {
     $toolOrder = @(
         'scoop',
@@ -481,8 +511,15 @@ function Show-InstallDependencyTable {
 }
 
 function Install-One {
-    param([string]$tool, [switch]$SkipPrompt, [switch]$NoRecordFailure)
-    if (Test-Tool $tool) {
+    param([string]$tool, [switch]$SkipPrompt, [switch]$NoRecordFailure, [scriptblock]$InstalledCheck)
+    # Callers can override the install-check (e.g. python, whose Store stub fools
+    # Test-Tool -- see Get-RealPythonCommand). Call Test-Tool DIRECTLY in the
+    # default case (not via a `& {Test-Tool}` scriptblock, which runs in a child
+    # scope a Pester mock of Test-Tool cannot reach). NB: the param is
+    # $InstalledCheck, not $Installed -- PowerShell variable names are
+    # case-insensitive, so $Installed would alias the boolean $installed flag below.
+    $alreadyInstalled = if ($InstalledCheck) { [bool](& $InstalledCheck) } else { Test-Tool $tool }
+    if ($alreadyInstalled) {
         Write-Host ("  ok        {0,-26} already installed" -f $tool)
         return
     }
@@ -535,7 +572,7 @@ function Install-One {
             'choco'  { choco install $c.pkg -y }
             'scoop'  { scoop install $c.pkg }
         }
-        if ($LASTEXITCODE -eq 0 -and (Test-Tool $tool)) {
+        if ($LASTEXITCODE -eq 0 -and $(if ($InstalledCheck) { [bool](& $InstalledCheck) } else { Test-Tool $tool })) {
             Write-Host ("  installed {0,-26} via {1}" -f $tool, $c.pm)
             $installed = $true
             break
@@ -1564,7 +1601,7 @@ Update-ScoopTool pwsh
 Install-PSFzf
 
 Section "language tooling (for LSP / formatter back-ends)"
-Install-One python
+Install-Python
 Install-One node
 Install-TreeSitterCli
 Install-One zig

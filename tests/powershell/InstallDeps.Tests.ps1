@@ -890,3 +890,31 @@ Describe "Set-VSCodeTheme" {
         Test-AllVSCodeSettingsText -Text $updated
     }
 }
+
+Describe "Python install rejects the Microsoft Store stub" {
+    It "Get-RealPythonCommand returns null when only the WindowsApps stub is on PATH" {
+        . $script:ImportInstallDepsForTest
+        Mock Get-Command {
+            [pscustomobject]@{ Source = "C:\Users\U\AppData\Local\Microsoft\WindowsApps\$Name.exe" }
+        } -ParameterFilter { $Name -in @('python', 'python3') }
+        Get-RealPythonCommand | Should -BeNullOrEmpty
+    }
+
+    It "Get-RealPythonCommand returns the real python when one exists alongside the stub" {
+        . $script:ImportInstallDepsForTest
+        Mock Get-Command {
+            @(
+                [pscustomobject]@{ Source = "C:\Users\U\AppData\Local\Microsoft\WindowsApps\python.exe" },
+                [pscustomobject]@{ Source = "C:\Users\U\scoop\shims\python.exe" }
+            )
+        } -ParameterFilter { $Name -eq 'python' }
+        (Get-RealPythonCommand).Source | Should -Be "C:\Users\U\scoop\shims\python.exe"
+    }
+
+    It "Install-One consults the custom -InstalledCheck and short-circuits when true" {
+        . $script:ImportInstallDepsForTest
+        $script:probeCount = 0
+        Install-One 'python' -InstalledCheck { $script:probeCount++; $true } -SkipPrompt -NoRecordFailure
+        $script:probeCount | Should -BeGreaterThan 0
+    }
+}
