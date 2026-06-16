@@ -799,6 +799,7 @@ Describe "Set-VSCodeTheme" {
             $Text | Should -Match ('"workbench\.colorTheme"\s*:\s*"' + $escapedTheme + '"')
             $Text | Should -Match ('"editor\.fontFamily"\s*:\s*"' + $escapedFont + '"')
             $Text | Should -Match ('"terminal\.integrated\.fontFamily"\s*:\s*"' + $escapedFont + '"')
+            $Text | Should -Match '"workbench\.startupEditor"\s*:\s*"none"'
         }
     }
 
@@ -817,6 +818,7 @@ Describe "Set-VSCodeTheme" {
         $settings.'workbench.colorTheme' | Should -Be $script:ExpectedTheme
         $settings.'editor.fontFamily' | Should -Be $script:ExpectedFont
         $settings.'terminal.integrated.fontFamily' | Should -Be $script:ExpectedFont
+        $settings.'workbench.startupEditor' | Should -Be 'none'
     }
 
     It "merges strict JSON while preserving existing keys" {
@@ -830,6 +832,7 @@ Describe "Set-VSCodeTheme" {
         $settings.'workbench.colorTheme' | Should -Be $script:ExpectedTheme
         $settings.'editor.fontFamily' | Should -Be $script:ExpectedFont
         $settings.'terminal.integrated.fontFamily' | Should -Be $script:ExpectedFont
+        $settings.'workbench.startupEditor' | Should -Be 'none'
     }
 
     It "edits JSONC comments in place, preserves CRLF, and stays idempotent" {

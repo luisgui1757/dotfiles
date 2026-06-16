@@ -787,10 +787,16 @@ function Install-HackNerdFont {
 function Get-VSCodeSettingsSpec {
     $theme = "Ros$([char]0xE9) Pine"
     $font = "'Hack Nerd Font', Consolas, monospace"
+    # startupEditor=none opens VS Code straight to an empty workbench instead of
+    # the Get-Started / Welcome tab. We pre-seed the theme before first launch,
+    # but the Welcome page on a fresh install is noisy and coincides with the
+    # first-frame fallback to Dark before the rose-pine extension registers --
+    # suppressing it makes the pre-set theme the obvious, only thing on screen.
     return @(
         [pscustomobject]@{ Key = 'workbench.colorTheme'; Value = $theme },
         [pscustomobject]@{ Key = 'editor.fontFamily'; Value = $font },
-        [pscustomobject]@{ Key = 'terminal.integrated.fontFamily'; Value = $font }
+        [pscustomobject]@{ Key = 'terminal.integrated.fontFamily'; Value = $font },
+        [pscustomobject]@{ Key = 'workbench.startupEditor'; Value = 'none' }
     )
 }
 
