@@ -8,7 +8,11 @@ local treesitter_parsers = {
   "bash",
   "powershell",
   "json",
-  "jsonc",
+  -- No jsonc here: nvim-treesitter main has no jsonc grammar (it warns that the
+  -- language is unsupported). jsonc files use Neovim built-in syntax and still
+  -- get prettier (conform) + the json LSP. Do NOT alias the json parser to
+  -- jsonc -- the json grammar errors on slash-slash comments. (Keep this comment
+  -- quote-free: treesitter_spec extracts quoted strings from this block.)
   "yaml",
   "toml",
   "markdown",

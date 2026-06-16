@@ -30,7 +30,6 @@ describe("treesitter main migration", function()
     "bash",
     "powershell",
     "json",
-    "jsonc",
     "yaml",
     "toml",
     "markdown",

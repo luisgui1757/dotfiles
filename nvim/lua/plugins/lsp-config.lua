@@ -160,7 +160,12 @@ return {
         bundle_path = vim.fn.stdpath("data") .. "/mason/packages/powershell-editor-services",
       })
 
-      vim.lsp.enable({
+      -- powershell_es starts via `pwsh` and runs the PowerShellEditorServices
+      -- bundle; on a host without pwsh (e.g. Linux), enabling it makes opening a
+      -- .ps1 throw a spawn failure ("language server is either not installed").
+      -- Gate it on BOTH pwsh and the bundle existing so ps1 LSP cleanly no-ops
+      -- where it cannot run, and attaches where it can.
+      local enabled_servers = {
         "clangd",
         "lua_ls",
         "pyright",
@@ -169,8 +174,12 @@ return {
         "yamlls",
         "jsonls",
         "neocmake",
-        "powershell_es",
-      })
+      }
+      local pses_bundle = vim.fn.stdpath("data") .. "/mason/packages/powershell-editor-services"
+      if vim.fn.executable("pwsh") == 1 and vim.fn.isdirectory(pses_bundle) == 1 then
+        table.insert(enabled_servers, "powershell_es")
+      end
+      vim.lsp.enable(enabled_servers)
 
       -- Race fix: if a buffer opened *before* mason-tool-installer
       -- finished installing its server, those buffers won't have an
