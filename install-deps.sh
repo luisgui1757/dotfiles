@@ -1173,6 +1173,13 @@ install_tree_sitter_cli() {
         fi
         install_tree_sitter_cli_linux
     else
+        # brew (macOS + Linuxbrew): the package is `tree-sitter-cli`, NOT
+        # `tree-sitter`. Homebrew split the formula -- `tree-sitter` now installs
+        # only libtree-sitter (no CLI binary), so a fresh machine would be left
+        # without the `tree-sitter` executable nvim-treesitter `main` needs to
+        # generate/build parsers. `tree-sitter-cli` provides the `tree-sitter`
+        # binary (0.26.x, matching the pinned Linux release). The PKG_TABLE brew
+        # column carries that name; `binaries_for` still checks for `tree-sitter`.
         install tree-sitter "nvim-treesitter main parser CLI"
     fi
 }
@@ -1449,7 +1456,7 @@ tmux|tmux|tmux|tmux|tmux|tmux|tmux
 zsh|zsh|zsh|zsh|zsh|zsh|zsh
 python3|python@3.12|python3|python3|python|python311|python3
 node|node|nodejs|nodejs|nodejs|nodejs|nodejs
-tree-sitter|tree-sitter|||||
+tree-sitter|tree-sitter-cli|||||
 shellcheck|shellcheck|shellcheck|ShellCheck|shellcheck|ShellCheck|shellcheck
 jq|jq|jq|jq|jq|jq|jq
 bats|bats-core|bats|bats|bats|bats|bats

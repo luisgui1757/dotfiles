@@ -125,7 +125,7 @@ return {
         vim.schedule(function()
           vim.notify(
             "nvim-treesitter: 'tree-sitter' CLI not found on PATH; parsers were not compiled. "
-              .. "Install it (macOS: brew install tree-sitter; Linux/WSL: run the dotfiles setup; "
+              .. "Install it (macOS: brew install tree-sitter-cli; Linux/WSL: run the dotfiles setup; "
               .. "Windows: install-deps.ps1 -All), then run :TSUpdate.",
             vim.log.levels.WARN
           )

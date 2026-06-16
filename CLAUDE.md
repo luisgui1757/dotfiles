@@ -595,9 +595,14 @@ save only**. The next plain `:w` formats normally. Implemented in
 - **nvim-treesitter main needs both `tree-sitter` and MSVC on Windows.**
   The main-branch installer shells out to the standalone `tree-sitter` CLI and
   then builds parsers through the Rust `cc` crate. `install-deps.sh` provisions
-  the CLI per OS: macOS/Linuxbrew use Homebrew, and native Linux/WSL installs a
-  pinned `tree-sitter/tree-sitter` release asset into `~/.local/bin` with
-  SHA-256 verification. `install-deps.ps1` installs the CLI through the Scoop
+  the CLI per OS: macOS/Linuxbrew use the Homebrew **`tree-sitter-cli`** formula
+  (NOT `tree-sitter` — Homebrew split the formula, and `tree-sitter` now installs
+  only `libtree-sitter` with no CLI binary, so a fresh machine would be left
+  without the `tree-sitter` executable; `tree-sitter-cli` ships the 0.26.x
+  binary). The `PKG_TABLE` brew column for `tree-sitter` is therefore
+  `tree-sitter-cli`, while `binaries_for` still probes for the `tree-sitter`
+  binary. Native Linux/WSL installs a pinned `tree-sitter/tree-sitter` release
+  asset (v0.26.9) into `~/.local/bin` with SHA-256 verification. `install-deps.ps1` installs the CLI through the Scoop
   `tree-sitter` manifest first and falls back to `npm install -g
   tree-sitter-cli` after Node is present. Windows compiler support is separate:
   `install-deps.ps1 -All` auto-installs Visual Studio 2022 Build Tools with the

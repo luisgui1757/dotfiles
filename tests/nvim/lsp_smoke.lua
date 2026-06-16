@@ -114,6 +114,24 @@ local ok, err = pcall(function()
   -- enforce it only on Windows, and skip cleanly elsewhere -- a legitimately
   -- absent runtime is never a failure, even under strict. This is what keeps the
   -- Unix e2e jobs from failing on a server designed not to run there.
+  --
+  -- mason.nvim prepends its bin dir to PATH inside its config, which for a real
+  -- session runs on VeryLazy. Headless nvim never fires VeryLazy, so without this
+  -- the servers Mason installed are NOT on PATH and every spawn fails with
+  -- "missing from PATH" -- the gate could never actually test attachment. Force-
+  -- load mason so its PATH prepend runs (the same mechanism real sessions use),
+  -- then sanity-check that mason's bin actually reached PATH so a broken load
+  -- surfaces as one clear failure instead of N opaque "did not attach"s.
+  pcall(function()
+    require("lazy").load({ plugins = { "mason.nvim" } })
+  end)
+  if vim.fn.executable("lua-language-server") ~= 1 then
+    fail(
+      "Mason bin not on PATH after loading mason; LSP servers are unreachable (expected "
+        .. vim.fn.stdpath("data")
+        .. "/mason/bin on PATH)"
+    )
+  end
   for _, row in ipairs(matrix) do
     if row.lsp then
       local skip, gated_fail
