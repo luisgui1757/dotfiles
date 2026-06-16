@@ -1206,6 +1206,52 @@ ensure_python_pip_venv() {
     esac
 }
 
+# Debian/Ubuntu's `nodejs` apt package does NOT bundle npm -- it is a separate
+# `npm` package. Mason installs pyright, prettier, the bash/yaml/json language
+# servers, and js-debug-adapter from npm, so without npm those Mason tools fail
+# to install. brew/dnf node bundle npm; on apt and pacman it can be separate.
+ensure_npm() {
+    command -v node >/dev/null 2>&1 || return 0
+    if command -v npm >/dev/null 2>&1; then
+        printf "  ok        %-26s already installed\n" "npm"
+        return
+    fi
+    if [[ "$PM" == "brew" ]]; then
+        return 0
+    fi
+    local native_pm
+    native_pm="$(native_linux_pm 2>/dev/null || true)"
+    case "$native_pm" in
+        apt)
+            if ! ask "Install npm (Mason npm tools -- pyright, prettier, LSPs -- need it)?"; then
+                printf "  skipped   %-26s\n" "npm"
+                return
+            fi
+            if [[ "$DRY_RUN" -eq 1 ]]; then
+                echo "  would:    apt-get install -y npm"
+                return
+            fi
+            native_linux_pm_install apt npm \
+                || echo "  FAIL: npm install failed (Mason npm tools will not build)"
+            ;;
+        dnf|pacman|zypper)
+            if ! ask "Install npm (Mason npm tools need it)?"; then
+                printf "  skipped   %-26s\n" "npm"
+                return
+            fi
+            if [[ "$DRY_RUN" -eq 1 ]]; then
+                echo "  would:    install npm via $native_pm"
+                return
+            fi
+            native_linux_pm_install "$native_pm" npm \
+                || echo "  WARN: npm install failed; continuing"
+            ;;
+        *)
+            printf "  manual    %-26s install your distro npm package\n" "npm"
+            ;;
+    esac
+}
+
 install_chezmoi() {
     if have chezmoi; then
         printf "  ok        %-26s already installed\n" "chezmoi"
@@ -2305,6 +2351,7 @@ section "language tooling (for LSP / formatter back-ends)"
 install python3 "needed by pyright"
 ensure_python_pip_venv
 install node "needed by prettier and JS tooling"
+ensure_npm
 install_tree_sitter_cli
 
 if is_wsl; then
