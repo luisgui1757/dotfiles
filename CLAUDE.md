@@ -749,6 +749,18 @@ save only**. The next plain `:w` formats normally. Implemented in
   source itself still stays pure ASCII (invariant): the in-memory label is built
   with `[char]0xE9`. The sh side keeps the literal é (macOS/Linux are
   UTF-8-native, so the ANSI-read hazard does not exist there).
+  **KNOWN ISSUE (open, shipped as-is 2026-06-16):** the encoding hardening above
+  is correct and Codex-reviewed, but it did NOT resolve the field symptom — on at
+  least one Windows machine VS Code still opens in default Dark even after a
+  rerun + full restart with `workbench.colorTheme` correctly set. So encoding was
+  a real latent bug but is NOT (or not the only) cause of the auto-apply failure.
+  Do NOT re-investigate the encoding angle. Leading unexplored suspects, in
+  rough priority: (1) Settings Sync pulling cloud settings that override the local
+  file; (2) a non-default VS Code profile (settings written to the default
+  profile dir while VS Code runs another); (3) the `mvllow.rose-pine` extension
+  not yet activated when `colorTheme` is first read (needs an Extensions reload /
+  second launch); (4) a workspace `.vscode/settings.json` override. Confirm which
+  profile is active and whether Sync is on before touching code again.
 - **Direct GitHub downloads are pinned and SHA-256 verified.** `install-deps.sh`
   verifies the pinned Neovim Linux tarballs, lazygit Linux tarballs,
   tree-sitter CLI Linux archives, and Hack Nerd Font zip before extraction;
