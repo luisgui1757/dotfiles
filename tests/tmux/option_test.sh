@@ -25,8 +25,18 @@ cleanup() {
 }
 trap cleanup EXIT
 
-tmux -L "$sock_name" -f "$REPO_ROOT/tmux/tmux.conf" \
-    new-session -d -s "$session_name" 'sleep 30'
+# Capture the config-load output. tmux WARNS-but-continues on an unknown option
+# (the option checks below still pass), which is exactly how a tmux 3.5+-only
+# option like `extended-keys-format` slipped past CI yet broke real tmux 3.4 on
+# Ubuntu 24.04. Assert the load is error-free so a future version-incompatible
+# option fails here instead of in a user's terminal. `|| true` keeps `set -e`
+# from killing us before we can report the captured error.
+load_output="$(tmux -L "$sock_name" -f "$REPO_ROOT/tmux/tmux.conf" \
+    new-session -d -s "$session_name" 'sleep 30' 2>&1 || true)"
+if printf '%s\n' "$load_output" | grep -qiE 'invalid option|unknown option|invalid command|unknown command'; then
+    echo "FAIL: tmux.conf produced a config error on $(tmux -V): $load_output"
+    exit 1
+fi
 
 show() { tmux -L "$sock_name" show-options -gv "$1" 2>&1; }
 
