@@ -55,6 +55,17 @@ local ok, err = pcall(function()
   local matrix = dofile(repo_root .. "/tests/nvim/language_matrix.lua")
   local fixtures = repo_root .. "/tests/nvim/fixtures/"
 
+  -- The bundled-parser purge runs in nvim-treesitter's `config` (on plugin load,
+  -- event = BufReadPre/BufNewFile). This headless probe opens no file before
+  -- gate 0, so force-load the plugin now so its purge actually runs first --
+  -- otherwise a cache-restored stale `parser/<bundled>.so` (the Windows e2e
+  -- caches nvim-data/site) is still present when gate 0 checks, and the gate
+  -- fails for a state real sessions never see (a real session opens a file,
+  -- which loads the plugin and purges before any treesitter use).
+  pcall(function()
+    require("lazy").load({ plugins = { "nvim-treesitter" } })
+  end)
+
   -- (0) Bundled-parser override preflight. The production config purges any
   -- nvim-treesitter parser for a Neovim-bundled language on load; after that, no
   -- nvim-treesitter-managed `parser/<bundled>.so` may remain. A leftover (e.g.
