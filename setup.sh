@@ -46,6 +46,7 @@ Local usage:
   ./setup.sh --skip-bootstrap    back-compat alias: skip config apply
   ./setup.sh --skip-config       already configured; just sync plugins + LSP
   ./setup.sh --skip-nvim         skip nvim plugin + Mason sync
+  ./setup.sh --best-effort       continue past plugin/LSP/Mason phase failures
   ./setup.sh --experimental-wsl-gui
                                 WSL opt-in: install/link Linux Ghostty + Linux fonts
 

@@ -9,6 +9,7 @@
 #   .\setup.ps1 -SkipBootstrap   back-compat alias: skip config apply
 #   .\setup.ps1 -SkipConfig      already configured; just sync plugins+LSP
 #   .\setup.ps1 -SkipNvim        skip nvim plugin + Mason sync
+#   .\setup.ps1 -BestEffort      continue past plugin/LSP/Mason phase failures
 #   .\setup.ps1 -SkipWindowsTerminalMerge   config+sync but leave WT settings.json untouched
 #   .\setup.ps1 -MergeWindowsTerminal        (no-op alias; the WT rose-pine merge is now default-on)
 #
