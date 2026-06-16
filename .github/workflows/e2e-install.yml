@@ -172,11 +172,11 @@ jobs:
           run_nvim_checked mason "+MasonToolsInstallSync" "+qa"
           assert_mason_tool "lua-language-server" lua-language-server lua-language-server.cmd lua-language-server.exe
           assert_mason_tool "stylua" stylua stylua.cmd stylua.exe
-          # Tier 2 language smoke: parser-support (get_available) + LSP-attach,
-          # now that Mason has installed the servers. Non-gated servers must
-          # attach; powershell_es is enforced only on Windows and skips here.
-          # cquit on failure -> run_nvim_checked fails. The trailing +qa only
-          # matters if the probe ever leaves nvim alive (it should not).
+          # Tier 2 language smoke: parser-support (get_available, STRICT) +
+          # LSP-attach (report-only for now -- a treesitter-highlight bug can
+          # abort the FileType chain; see lsp_smoke.lua). cquit on a parser-support
+          # failure -> run_nvim_checked fails. The trailing +qa is insurance if the
+          # probe ever leaves nvim alive.
           DOTFILES_LSP_SMOKE=strict run_nvim_checked lsp-smoke -u "$repo/nvim/init.lua" -c "luafile $repo/tests/nvim/lsp_smoke.lua" +qa
 
   setup-ps1:
@@ -308,9 +308,9 @@ jobs:
           Invoke-NvimChecked -Name mason -NvimArgs @('+MasonToolsInstallSync', '+qa')
           Assert-MasonTool -Name 'lua-language-server' -FileNames @('lua-language-server.cmd', 'lua-language-server.exe', 'lua-language-server')
           Assert-MasonTool -Name 'stylua' -FileNames @('stylua.cmd', 'stylua.exe', 'stylua')
-          # Tier 2 language smoke: parser-support (get_available) + LSP-attach,
-          # now that Mason has installed the servers. pwsh is present here, so
-          # powershell_es is enforced too. cquit -> Invoke-NvimChecked throws.
+          # Tier 2 language smoke: parser-support (get_available, STRICT) +
+          # LSP-attach (report-only; see lsp_smoke.lua). cquit on a parser-support
+          # failure -> Invoke-NvimChecked throws.
           $initLua = (Join-Path $repo 'nvim\init.lua') -replace '\\', '/'
           $smokeLua = (Join-Path $repo 'tests\nvim\lsp_smoke.lua') -replace '\\', '/'
           $env:DOTFILES_LSP_SMOKE = 'strict'
