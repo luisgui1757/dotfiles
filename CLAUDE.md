@@ -314,7 +314,16 @@ install paths, not symmetric container platforms:
   `setup.ps1 / windows-2025` run the real public setup entry points, apply
   configs through chezmoi in Phase 2, and then rerun Lazy/Mason headless sync.
   They explicitly fail if setup skips Phase 3-4, emits a `FAIL:` marker, or
-  Mason did not install expected tools.
+  Mason did not install expected tools. After the Mason sync they also run the
+  **Tier 2 language smoke** (`tests/nvim/lsp_smoke.lua`, gated on
+  `DOTFILES_LSP_SMOKE=strict`): against the production init it asserts every
+  `treesitter_parsers` entry is one nvim-treesitter `main` supports
+  (`get_available()`/`get_available(4)` — the jsonc "unsupported language"
+  catcher) and that each fixture's LSP attaches. Non-gated servers are strict on
+  every OS; `powershell_es` is enforced only on Windows (pwsh + the PSES bundle)
+  and skips cleanly on Unix. The fast `make test-nvim` runs Tier 1 only
+  (`tests/nvim/spec/language_smoke_spec.lua` + `tests/nvim/language_matrix.lua`):
+  filetype + conform-formatter + parser-in-install-list per fixture.
 - There is no macOS/Windows container analog to add for symmetry. Docker cannot
   model macOS, and Windows containers do not model the real desktop/user-profile
   install surface: Scoop/winget/choco, Developer Mode symlink behavior, font
