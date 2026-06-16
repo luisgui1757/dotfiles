@@ -723,10 +723,32 @@ save only**. The next plain `:w` formats normally. Implemented in
   `ConvertFrom-Json` for strict JSON and a comment-aware scanner for JSONC. The
   JSONC fallback edits only top-level keys, ignores comments/strings and nested
   objects, preserves the dominant line ending, and creates
-  `settings.json.bak.<timestamp>` before writing. The theme value must keep its
-  accented é to match the extension's label; the ps1 builds it with
-  `[char]0xE9` so that file stays pure ASCII (invariant), while the sh side uses
-  the literal é.
+  `settings.json.bak.<timestamp>` before writing.
+  **Encoding is load-bearing on Windows.** The theme value must keep its accented
+  é to match the extension's label "Rosé Pine", but a literal `é` byte in
+  `settings.json` is fragile under Windows PowerShell 5.1: its `Get-Content`
+  default is the ANSI code page, so reading a UTF-8 `é` (`C3 A9`) back as ANSI
+  yields two chars (`Ã©`) that re-encode to `C3 83 C2 A9` on the next write —
+  the double-encoded "RosÃ© Pine" mojibake VS Code cannot resolve, so it silently
+  falls back to the default dark theme. So the ps1:
+  (1) reads with `Get-Content -Raw -Encoding utf8` (lossless read/modify/write on
+  5.1 and 7 — so any pre-existing non-ASCII content round-trips intact instead of
+  double-encoding); and (2) writes the *managed* theme value as a pure-ASCII
+  `\u00e9` JSON escape via `ConvertTo-AsciiJson` (escapes every char > `0x7F` to
+  `\uXXXX`) on EVERY write path — new-file, JSONC editor (through
+  `ConvertTo-JsonStringLiteral`), and the clean-JSON merge (wrapping
+  `ConvertTo-Json`, which only PS 7 leaves un-escaped). So the colorTheme /
+  preferred-theme values VS Code must resolve are encoding-immune regardless of
+  code page, and a rerun self-heals an already-double-encoded value. (Scope note:
+  new-file and merge emit a wholly pure-ASCII file; the JSONC editor only
+  ASCII-normalizes the values it inserts/replaces, so unrelated non-ASCII in a
+  user's own comments/values is preserved verbatim — losslessly, thanks to the
+  UTF-8 read — rather than rewritten as escapes, so we never mangle comment text.)
+  Guarded by `Test-FileIsPureAscii`, the non-ASCII-comment round-trip JSONC test,
+  and `ConvertTo-AsciiJson` unit tests in `InstallDeps.Tests.ps1`. The `.ps1`
+  source itself still stays pure ASCII (invariant): the in-memory label is built
+  with `[char]0xE9`. The sh side keeps the literal é (macOS/Linux are
+  UTF-8-native, so the ANSI-read hazard does not exist there).
 - **Direct GitHub downloads are pinned and SHA-256 verified.** `install-deps.sh`
   verifies the pinned Neovim Linux tarballs, lazygit Linux tarballs,
   tree-sitter CLI Linux archives, and Hack Nerd Font zip before extraction;

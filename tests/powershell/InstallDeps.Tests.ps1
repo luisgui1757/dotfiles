@@ -754,6 +754,11 @@ Describe "Set-VSCodeTheme" {
     BeforeAll {
         . $script:ImportInstallDepsForTest
         $script:ExpectedTheme = "Ros$([char]0xE9) Pine"
+        # On disk the accented e is written as a pure-ASCII \u00e9 JSON escape so
+        # the file reads back byte-identical under any code page (no mojibake).
+        # This literal IS pure ASCII (backslash u 0 0 e 9), keeping this test
+        # file PS-5.1-safe like the rest of the .ps1 sources.
+        $script:ExpectedThemeText = 'Ros\u00e9 Pine'
         $script:ExpectedFont = "'Hack Nerd Font', Consolas, monospace"
         $script:Utf8NoBom = [System.Text.UTF8Encoding]::new($false)
         $script:VSCodeThemeTempDirs = @()
@@ -794,7 +799,12 @@ Describe "Set-VSCodeTheme" {
 
         function Test-AllVSCodeSettingsText {
             param([Parameter(Mandatory)][string]$Text)
-            $escapedTheme = [regex]::Escape($script:ExpectedTheme)
+            # The on-disk theme value is the pure-ASCII \u00e9 escape (Ros\u00e9 Pine),
+            # NOT a literal accented byte. Match that exact escaped text so this
+            # guard fails if a write path ever regresses to literal \u00e9 (which
+            # the Windows PowerShell 5.1 ANSI Get-Content default would later
+            # double-encode into the unresolvable "RosA(c) Pine" mojibake).
+            $escapedTheme = [regex]::Escape($script:ExpectedThemeText)
             $escapedFont = [regex]::Escape($script:ExpectedFont)
             $Text | Should -Match ('"workbench\.colorTheme"\s*:\s*"' + $escapedTheme + '"')
             # Forced dark: both preferred slots = the same dark theme, and
@@ -807,6 +817,13 @@ Describe "Set-VSCodeTheme" {
             $Text | Should -Match ('"editor\.fontFamily"\s*:\s*"' + $escapedFont + '"')
             $Text | Should -Match ('"terminal\.integrated\.fontFamily"\s*:\s*"' + $escapedFont + '"')
             $Text | Should -Match '"workbench\.startupEditor"\s*:\s*"none"'
+        }
+
+        function Test-FileIsPureAscii {
+            param([Parameter(Mandatory)][string]$Path)
+            $bytes = [System.IO.File]::ReadAllBytes($Path)
+            $nonAscii = @($bytes | Where-Object { $_ -gt 0x7F })
+            $nonAscii.Count | Should -Be 0
         }
     }
 
@@ -830,6 +847,7 @@ Describe "Set-VSCodeTheme" {
         $settings.'editor.fontFamily' | Should -Be $script:ExpectedFont
         $settings.'terminal.integrated.fontFamily' | Should -Be $script:ExpectedFont
         $settings.'workbench.startupEditor' | Should -Be 'none'
+        Test-FileIsPureAscii -Path $settingsPath
     }
 
     It "merges strict JSON while preserving existing keys" {
@@ -848,6 +866,7 @@ Describe "Set-VSCodeTheme" {
         $settings.'editor.fontFamily' | Should -Be $script:ExpectedFont
         $settings.'terminal.integrated.fontFamily' | Should -Be $script:ExpectedFont
         $settings.'workbench.startupEditor' | Should -Be 'none'
+        Test-FileIsPureAscii -Path $settingsPath
     }
 
     It "edits JSONC comments in place, preserves CRLF, and stays idempotent" {
@@ -863,6 +882,7 @@ Describe "Set-VSCodeTheme" {
         $updated.Contains("`r`n") | Should -BeTrue
         Test-AllVSCodeSettingsText -Text $updated
         (Get-LiveThemeKeyCount -Text $updated) | Should -Be 1
+        Test-FileIsPureAscii -Path $settingsPath
         @(Get-ChildItem -LiteralPath (Split-Path -Parent $settingsPath) -Filter 'settings.json.bak.*').Count | Should -Be 1
 
         Set-VSCodeTheme -SettingsPath $settingsPath
@@ -906,6 +926,84 @@ Describe "Set-VSCodeTheme" {
         $updated | Should -Match '"workbench\.colorTheme"\s*:\s*"Nested Old"'
         (Get-LiveThemeKeyCount -Text $updated) | Should -Be 1
         Test-AllVSCodeSettingsText -Text $updated
+    }
+
+    It "self-heals a previously double-encoded theme value to pure ASCII" {
+        # Reproduce the field bug: an earlier run left settings.json with the
+        # double-encoded "RosA(c) Pine" byte sequence (C3 83 C2 A9), which VS
+        # Code cannot resolve to a theme. A rerun must overwrite it with the
+        # pure-ASCII \u00e9 escape so the theme loads again.
+        $settingsPath = New-SettingsPath
+        $mojibake = 'Ros' + [char]0x00C3 + [char]0x00A9 + ' Pine'
+        Write-TestSettings -Path $settingsPath -Text ("{`n  `"workbench.colorTheme`": `"" + $mojibake + "`"`n}`n")
+
+        Set-VSCodeTheme -SettingsPath $settingsPath
+
+        Test-FileIsPureAscii -Path $settingsPath
+        $settings = Read-StrictSettings -Path $settingsPath
+        $settings.'workbench.colorTheme' | Should -Be $script:ExpectedTheme
+        $settings.'workbench.preferredDarkColorTheme' | Should -Be $script:ExpectedTheme
+    }
+
+    It "preserves a non-ASCII JSONC comment verbatim while escaping the managed value" {
+        # The JSONC editor only ASCII-normalizes the values it inserts/replaces.
+        # A user comment with its own accented char must survive byte-for-byte
+        # (the UTF-8 read pin prevents double-encoding it), NOT get rewritten as a
+        # \uXXXX escape inside the comment text.
+        $settingsPath = New-SettingsPath
+        $cafe = 'caf' + [char]0x00E9
+        Write-TestSettings -Path $settingsPath -Text ("// " + $cafe + " note`n{`n  `"editor.fontSize`": 14`n}`n")
+
+        Set-VSCodeTheme -SettingsPath $settingsPath
+
+        # Comment text round-trips intact (read back as UTF-8), NOT escaped/mangled.
+        $utf8Text = [System.IO.File]::ReadAllText($settingsPath, [System.Text.UTF8Encoding]::new($false))
+        $utf8Text | Should -Match ([regex]::Escape('// ' + $cafe + ' note'))
+        # The managed theme value is still the pure-ASCII escape.
+        $utf8Text | Should -Match ('"workbench\.colorTheme"\s*:\s*"' + [regex]::Escape($script:ExpectedThemeText) + '"')
+        $settings = Read-StrictSettings -Path $settingsPath
+        $settings.'workbench.colorTheme' | Should -Be $script:ExpectedTheme
+    }
+
+    It "preserves non-ASCII content in OTHER keys across a rewrite (no double-encode)" {
+        # A user value with its own accented char must survive a read/modify/write
+        # round-trip intact -- the UTF-8 read pin is what prevents 5.1 from
+        # decoding it as ANSI and double-encoding it on the way back out.
+        $settingsPath = New-SettingsPath
+        $cafe = 'caf' + [char]0x00E9
+        Write-TestSettings -Path $settingsPath -Text ("{`n  `"some.userValue`": `"" + $cafe + "`"`n}`n")
+
+        Set-VSCodeTheme -SettingsPath $settingsPath
+
+        Test-FileIsPureAscii -Path $settingsPath
+        $settings = Read-StrictSettings -Path $settingsPath
+        $settings.'some.userValue' | Should -Be $cafe
+        $settings.'workbench.colorTheme' | Should -Be $script:ExpectedTheme
+    }
+}
+
+Describe "ConvertTo-AsciiJson" {
+    BeforeAll {
+        . $script:ImportInstallDepsForTest
+    }
+
+    It "escapes non-ASCII chars to lowercase \uXXXX and leaves ASCII untouched" {
+        $input = 'Ros' + [char]0x00E9 + ' Pine'
+        $out = ConvertTo-AsciiJson -Json $input
+        $out | Should -Be 'Ros\u00e9 Pine'
+        # Output must be pure ASCII.
+        @([System.Text.Encoding]::UTF8.GetBytes($out) | Where-Object { $_ -gt 0x7F }).Count | Should -Be 0
+    }
+
+    It "is a no-op for already-ASCII JSON" {
+        $input = '{"a":1,"b":"plain"}'
+        (ConvertTo-AsciiJson -Json $input) | Should -Be $input
+    }
+
+    It "round-trips back to the original through ConvertFrom-Json" {
+        $obj = [pscustomobject]@{ 'workbench.colorTheme' = ('Ros' + [char]0x00E9 + ' Pine') }
+        $ascii = ConvertTo-AsciiJson -Json ($obj | ConvertTo-Json -Compress)
+        ($ascii | ConvertFrom-Json).'workbench.colorTheme' | Should -Be ('Ros' + [char]0x00E9 + ' Pine')
     }
 }
 

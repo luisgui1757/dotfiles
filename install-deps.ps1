@@ -810,9 +810,34 @@ function Get-VSCodeSettingsSpec {
     )
 }
 
+# Escape every non-ASCII char (> 0x7F) in valid JSON text to a \uXXXX escape,
+# yielding PURE-ASCII JSON. This is the encoding-immunity fix for the VS Code
+# theme label "Rose Pine" (the accented e is U+00E9): a pure-ASCII settings.json
+# reads back byte-identical under ANY code page -- including the ANSI default
+# that Windows PowerShell 5.1 Get-Content uses -- so a later re-write can never
+# double-encode it into the "RosA(c) Pine" mojibake that VS Code cannot resolve (theme not
+# found -> silent fall back to the default dark theme). Safe on any valid JSON
+# because non-ASCII can only appear inside string tokens, where \uXXXX is the
+# canonical equivalent. This realizes the documented design intent (the ps1
+# emits the accented e as a \u JSON escape so the settings file stays pure ASCII).
+function ConvertTo-AsciiJson {
+    param([Parameter(Mandatory)][AllowEmptyString()][string]$Json)
+    $sb = [System.Text.StringBuilder]::new()
+    foreach ($ch in $Json.ToCharArray()) {
+        $code = [int][char]$ch
+        if ($code -gt 0x7F) {
+            [void]$sb.Append(('\u{0:x4}' -f $code))
+        } else {
+            [void]$sb.Append($ch)
+        }
+    }
+    return $sb.ToString()
+}
+
 function ConvertTo-JsonStringLiteral {
     param([Parameter(Mandatory)][string]$Value)
-    return '"' + $Value.Replace('\', '\\').Replace('"', '\"') + '"'
+    $escaped = $Value.Replace('\', '\\').Replace('"', '\"')
+    return '"' + (ConvertTo-AsciiJson -Json $escaped) + '"'
 }
 
 # Render a settings spec value for the TEXT write paths (new-file + JSONC editor),
@@ -1163,7 +1188,12 @@ function Set-VSCodeTheme {
     if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Force -Path $dir | Out-Null }
     $utf8 = [System.Text.UTF8Encoding]::new($false)   # no BOM
 
-    $raw = if (Test-Path -LiteralPath $SettingsPath) { Get-Content -Raw -LiteralPath $SettingsPath -ErrorAction SilentlyContinue } else { $null }
+    # Read as explicit UTF-8 -- VS Code always writes settings.json as UTF-8, but
+    # Windows PowerShell 5.1 defaults Get-Content to the ANSI code page, which
+    # would decode an accented byte sequence (C3 A9) as two chars ("A(c)") and
+    # double-encode every non-ASCII byte the moment we re-write. Pinning UTF-8
+    # makes the read/modify/write round-trip lossless on 5.1 and 7 alike.
+    $raw = if (Test-Path -LiteralPath $SettingsPath) { Get-Content -Raw -LiteralPath $SettingsPath -Encoding utf8 -ErrorAction SilentlyContinue } else { $null }
     if ([string]::IsNullOrWhiteSpace($raw)) {
         $specs = @(Get-VSCodeSettingsSpec)
         $lines = @()
@@ -1188,7 +1218,8 @@ function Set-VSCodeTheme {
             foreach ($spec in @(Get-VSCodeSettingsSpec)) {
                 $obj | Add-Member -NotePropertyName $spec.Key -NotePropertyValue $spec.Value -Force
             }
-            [System.IO.File]::WriteAllText($SettingsPath, ($obj | ConvertTo-Json -Depth 100), $utf8)
+            $merged = ConvertTo-AsciiJson -Json ($obj | ConvertTo-Json -Depth 100)
+            [System.IO.File]::WriteAllText($SettingsPath, $merged, $utf8)
             Write-Host ("  set       {0,-26} theme and fonts (merged)" -f "rose-pine (vscode)")
             return
         } catch {
