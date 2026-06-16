@@ -785,15 +785,25 @@ function Install-HackNerdFont {
 # The theme label has an accented e. Build it with [char]0xE9 at runtime so
 # this file stays pure ASCII for Windows PowerShell 5.1.
 function Get-VSCodeSettingsSpec {
-    $theme = "Ros$([char]0xE9) Pine"
+    $theme = "Ros$([char]0xE9) Pine"        # dark label "Rose Pine" (accented e)
     $font = "'Hack Nerd Font', Consolas, monospace"
-    # startupEditor=none opens VS Code straight to an empty workbench instead of
-    # the Get-Started / Welcome tab. We pre-seed the theme before first launch,
-    # but the Welcome page on a fresh install is noisy and coincides with the
-    # first-frame fallback to Dark before the rose-pine extension registers --
-    # suppressing it makes the pre-set theme the obvious, only thing on screen.
+    # Theme resolution precedence is the whole reason a pre-set colorTheme can
+    # appear ignored: when window.autoDetectColorScheme is true (Settings Sync, an
+    # imported profile, or a future default can enable it), VS Code IGNORES
+    # workbench.colorTheme and resolves the active theme from
+    # workbench.preferredDark/LightColorTheme -- which, unset, hold the built-in
+    # defaults (Dark Modern / "Dark 2026"). This repo FORCES dark Rose Pine, not
+    # the adaptive dark/light split (same rule as Ghostty -- see tests/MANUAL.md),
+    # so: pin autoDetectColorScheme off (a real JSON boolean, not a string) to make
+    # colorTheme authoritative, AND point BOTH preferred slots at the SAME dark
+    # Rose Pine so no OS-scheme / autoDetect combination can ever yield a light
+    # theme. startupEditor=none opens straight to an empty workbench (no noisy
+    # Welcome tab) so the pre-set theme is the only thing on screen.
     return @(
         [pscustomobject]@{ Key = 'workbench.colorTheme'; Value = $theme },
+        [pscustomobject]@{ Key = 'workbench.preferredDarkColorTheme'; Value = $theme },
+        [pscustomobject]@{ Key = 'workbench.preferredLightColorTheme'; Value = $theme },
+        [pscustomobject]@{ Key = 'window.autoDetectColorScheme'; Value = $false; Raw = $true },
         [pscustomobject]@{ Key = 'editor.fontFamily'; Value = $font },
         [pscustomobject]@{ Key = 'terminal.integrated.fontFamily'; Value = $font },
         [pscustomobject]@{ Key = 'workbench.startupEditor'; Value = 'none' }
@@ -803,6 +813,24 @@ function Get-VSCodeSettingsSpec {
 function ConvertTo-JsonStringLiteral {
     param([Parameter(Mandatory)][string]$Value)
     return '"' + $Value.Replace('\', '\\').Replace('"', '\"') + '"'
+}
+
+# Render a settings spec value for the TEXT write paths (new-file + JSONC editor),
+# which otherwise quote every value. A spec with Raw=$true emits a bare JSON
+# literal -- needed for window.autoDetectColorScheme, which must be the boolean
+# false, not the string "false" (VS Code rejects the string form). String specs
+# fall through to the normal quoted-literal renderer. The clean-JSON merge path
+# does NOT use this -- it stores the native [bool] and lets ConvertTo-Json emit
+# bare false.
+function ConvertTo-VSCodeSettingJson {
+    param([Parameter(Mandatory)]$Spec)
+    if (($Spec.PSObject.Properties.Name -contains 'Raw') -and $Spec.Raw) {
+        if ($Spec.Value -is [bool]) {
+            if ($Spec.Value) { return 'true' } else { return 'false' }
+        }
+        return [string]$Spec.Value
+    }
+    return ConvertTo-JsonStringLiteral -Value ([string]$Spec.Value)
 }
 
 function Test-JsonCWhitespaceChar {
@@ -1031,7 +1059,7 @@ function Update-VSCodeJsonCSettings {
                             $replacements += [pscustomobject]@{
                                 Start = $valueStart
                                 End = $valueEnd
-                                Value = (ConvertTo-JsonStringLiteral -Value $spec.Value)
+                                Value = (ConvertTo-VSCodeSettingJson -Spec $spec)
                             }
                         }
                     }
@@ -1088,7 +1116,7 @@ function Update-VSCodeJsonCSettings {
         }
         $lines = @()
         for ($m = 0; $m -lt $missing.Count; $m++) {
-            $line = '  "' + $missing[$m].Key + '": ' + (ConvertTo-JsonStringLiteral -Value $missing[$m].Value)
+            $line = '  "' + $missing[$m].Key + '": ' + (ConvertTo-VSCodeSettingJson -Spec $missing[$m])
             if ($hasExisting -or ($m -lt ($missing.Count - 1))) {
                 $line += ','
             }
@@ -1141,7 +1169,7 @@ function Set-VSCodeTheme {
         $lines = @()
         for ($i = 0; $i -lt $specs.Count; $i++) {
             $comma = if ($i -lt ($specs.Count - 1)) { ',' } else { '' }
-            $lines += ('  "' + $specs[$i].Key + '": ' + (ConvertTo-JsonStringLiteral -Value $specs[$i].Value) + $comma)
+            $lines += ('  "' + $specs[$i].Key + '": ' + (ConvertTo-VSCodeSettingJson -Spec $specs[$i]) + $comma)
         }
         $json = "{`r`n" + ($lines -join "`r`n") + "`r`n}`r`n"
         [System.IO.File]::WriteAllText($SettingsPath, $json, $utf8)

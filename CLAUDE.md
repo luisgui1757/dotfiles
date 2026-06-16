@@ -705,6 +705,19 @@ save only**. The next plain `:w` formats normally. Implemented in
   `mvllow.rose-pine` extension, set `workbench.colorTheme` to "Rosé Pine", and
   set `editor.fontFamily` plus `terminal.integrated.fontFamily` to
   `'Hack Nerd Font', Consolas, monospace`.
+  **Forcing dark is load-bearing.** Setting only `workbench.colorTheme` is NOT
+  enough: when `window.autoDetectColorScheme` is `true` (Settings Sync, an
+  imported profile, or a future VS Code default can enable it) VS Code IGNORES
+  `colorTheme` and resolves the theme from
+  `workbench.preferredDark/LightColorTheme` (defaulting to Dark Modern /
+  "Dark 2026") — which is exactly why a fresh Windows install showed Dark despite
+  the setting. So both installers ALSO set `window.autoDetectColorScheme` to a
+  real JSON boolean `false` (NOT the string `"false"`, which VS Code ignores) and
+  point BOTH `preferredDark`/`preferredLight` slots at the same dark "Rosé Pine"
+  so no OS-scheme combination yields a light theme (same forced-dark rule as
+  Ghostty; see `tests/MANUAL.md`). In the ps1, the boolean flows through a `Raw`
+  spec flag + `ConvertTo-VSCodeSettingJson` so the text write-paths emit a bare
+  literal; the clean-JSON merge path stores a native `[bool]`.
   The theme setter (`set_vscode_theme` in sh, tested by `vscode_theme_test.sh`;
   `Set-VSCodeTheme` in ps1, tested by `InstallDeps.Tests.ps1`) uses jq /
   `ConvertFrom-Json` for strict JSON and a comment-aware scanner for JSONC. The

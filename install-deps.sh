@@ -704,11 +704,17 @@ function find_value_end(pos, i, c, n, end, curly, square) {
 }
 END {
     keys[1] = "workbench.colorTheme"
-    keys[2] = "editor.fontFamily"
-    keys[3] = "terminal.integrated.fontFamily"
+    keys[2] = "workbench.preferredDarkColorTheme"
+    keys[3] = "workbench.preferredLightColorTheme"
+    keys[4] = "window.autoDetectColorScheme"
+    keys[5] = "editor.fontFamily"
+    keys[6] = "terminal.integrated.fontFamily"
     values[1] = json_quote(theme)
-    values[2] = json_quote(font)
-    values[3] = json_quote(font)
+    values[2] = json_quote(theme)
+    values[3] = json_quote(theme)
+    values[4] = "false"
+    values[5] = json_quote(font)
+    values[6] = json_quote(font)
     eol = use_crlf ? "\r\n" : "\n"
 
     for (i = 1; i <= line_count; i++) {
@@ -752,7 +758,7 @@ END {
                 after = skip_trivia(end + 1)
                 if (after <= len && substr(text, after, 1) == ":") {
                     key = substr(text, i + 1, end - i - 1)
-                    for (k = 1; k <= 3; k++) {
+                    for (k = 1; k <= 6; k++) {
                         if (key == keys[k]) {
                             vstart = skip_trivia(after + 1)
                             vend = find_value_end(vstart)
@@ -796,7 +802,7 @@ END {
     }
     len = length(text)
     missing_count = 0
-    for (k = 1; k <= 3; k++) {
+    for (k = 1; k <= 6; k++) {
         if (!seen[k]) {
             missing_count++
             missing_keys[missing_count] = keys[k]
@@ -837,9 +843,15 @@ set_vscode_theme() {
     local font="'Hack Nerd Font', Consolas, monospace"
     [[ -n "$settings" ]] || settings="$(vscode_settings_path)"
     mkdir -p "$(dirname "$settings")" 2>/dev/null || true
+    # FORCE dark Rose Pine. When window.autoDetectColorScheme is true (Settings
+    # Sync / an imported profile can enable it) VS Code IGNORES colorTheme and
+    # uses workbench.preferredDark/LightColorTheme (defaulting to Dark Modern).
+    # So pin autoDetect off (a JSON boolean, not a string) AND point both
+    # preferred slots at the same dark Rose Pine -- no OS-scheme combination can
+    # yield a light theme (same forced-dark rule as Ghostty; see tests/MANUAL.md).
     if [[ ! -s "$settings" ]]; then
-        printf '{\n  "workbench.colorTheme": "%s",\n  "editor.fontFamily": "%s",\n  "terminal.integrated.fontFamily": "%s"\n}\n' \
-            "$theme" "$font" "$font" > "$settings"
+        printf '{\n  "workbench.colorTheme": "%s",\n  "workbench.preferredDarkColorTheme": "%s",\n  "workbench.preferredLightColorTheme": "%s",\n  "window.autoDetectColorScheme": false,\n  "editor.fontFamily": "%s",\n  "terminal.integrated.fontFamily": "%s"\n}\n' \
+            "$theme" "$theme" "$theme" "$font" "$font" > "$settings"
         printf "  set       %-26s theme and fonts (new settings.json)\n" "rose-pine (vscode)"
         return 0
     fi
@@ -848,6 +860,9 @@ set_vscode_theme() {
         if jq --arg theme "$theme" --arg font "$font" \
             '. + {
                 "workbench.colorTheme": $theme,
+                "workbench.preferredDarkColorTheme": $theme,
+                "workbench.preferredLightColorTheme": $theme,
+                "window.autoDetectColorScheme": false,
                 "editor.fontFamily": $font,
                 "terminal.integrated.fontFamily": $font
             }' "$settings" > "$tmp"; then

@@ -797,6 +797,13 @@ Describe "Set-VSCodeTheme" {
             $escapedTheme = [regex]::Escape($script:ExpectedTheme)
             $escapedFont = [regex]::Escape($script:ExpectedFont)
             $Text | Should -Match ('"workbench\.colorTheme"\s*:\s*"' + $escapedTheme + '"')
+            # Forced dark: both preferred slots = the same dark theme, and
+            # autoDetect is a BARE JSON boolean false (string "false" is ignored
+            # by VS Code and lets it fall back to the default theme).
+            $Text | Should -Match ('"workbench\.preferredDarkColorTheme"\s*:\s*"' + $escapedTheme + '"')
+            $Text | Should -Match ('"workbench\.preferredLightColorTheme"\s*:\s*"' + $escapedTheme + '"')
+            $Text | Should -Match '"window\.autoDetectColorScheme"\s*:\s*false'
+            $Text | Should -Not -Match '"window\.autoDetectColorScheme"\s*:\s*"false"'
             $Text | Should -Match ('"editor\.fontFamily"\s*:\s*"' + $escapedFont + '"')
             $Text | Should -Match ('"terminal\.integrated\.fontFamily"\s*:\s*"' + $escapedFont + '"')
             $Text | Should -Match '"workbench\.startupEditor"\s*:\s*"none"'
@@ -816,6 +823,10 @@ Describe "Set-VSCodeTheme" {
 
         $settings = Read-StrictSettings -Path $settingsPath
         $settings.'workbench.colorTheme' | Should -Be $script:ExpectedTheme
+        $settings.'workbench.preferredDarkColorTheme' | Should -Be $script:ExpectedTheme
+        $settings.'workbench.preferredLightColorTheme' | Should -Be $script:ExpectedTheme
+        $settings.'window.autoDetectColorScheme' | Should -BeFalse
+        $settings.'window.autoDetectColorScheme' | Should -BeOfType [bool]
         $settings.'editor.fontFamily' | Should -Be $script:ExpectedFont
         $settings.'terminal.integrated.fontFamily' | Should -Be $script:ExpectedFont
         $settings.'workbench.startupEditor' | Should -Be 'none'
@@ -830,6 +841,10 @@ Describe "Set-VSCodeTheme" {
         $settings = Read-StrictSettings -Path $settingsPath
         $settings.'editor.fontSize' | Should -Be 14
         $settings.'workbench.colorTheme' | Should -Be $script:ExpectedTheme
+        $settings.'workbench.preferredDarkColorTheme' | Should -Be $script:ExpectedTheme
+        $settings.'workbench.preferredLightColorTheme' | Should -Be $script:ExpectedTheme
+        $settings.'window.autoDetectColorScheme' | Should -BeFalse
+        $settings.'window.autoDetectColorScheme' | Should -BeOfType [bool]
         $settings.'editor.fontFamily' | Should -Be $script:ExpectedFont
         $settings.'terminal.integrated.fontFamily' | Should -Be $script:ExpectedFont
         $settings.'workbench.startupEditor' | Should -Be 'none'

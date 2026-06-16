@@ -23,6 +23,12 @@ json_value() {
 assert_all_settings_with_jq() {
     local file="$1"
     [[ "$(json_value "workbench.colorTheme" "$file")" == "$theme" ]] || fail "$file missing Rose Pine theme"
+    # Forced dark: both preferred slots point at the SAME dark theme, and
+    # autoDetect is pinned off as a real JSON boolean (string "false" would be
+    # silently ignored by VS Code and let it fall back to the default theme).
+    [[ "$(json_value "workbench.preferredDarkColorTheme" "$file")" == "$theme" ]] || fail "$file missing preferredDark theme"
+    [[ "$(json_value "workbench.preferredLightColorTheme" "$file")" == "$theme" ]] || fail "$file missing preferredLight theme"
+    jq -e '."window.autoDetectColorScheme" == false' "$file" >/dev/null || fail "$file autoDetectColorScheme is not boolean false"
     [[ "$(json_value "editor.fontFamily" "$file")" == "$font" ]] || fail "$file missing editor font"
     [[ "$(json_value "terminal.integrated.fontFamily" "$file")" == "$font" ]] || fail "$file missing terminal font"
 }
@@ -34,6 +40,10 @@ live_theme_count() {
 assert_all_settings_text() {
     local file="$1"
     grep -Fq "\"workbench.colorTheme\": \"$theme\"" "$file" || fail "$file missing Rose Pine theme text"
+    grep -Fq "\"workbench.preferredDarkColorTheme\": \"$theme\"" "$file" || fail "$file missing preferredDark text"
+    grep -Fq "\"workbench.preferredLightColorTheme\": \"$theme\"" "$file" || fail "$file missing preferredLight text"
+    grep -Eq '"window\.autoDetectColorScheme"[[:space:]]*:[[:space:]]*false' "$file" || fail "$file missing bare-false autoDetect"
+    grep -Fq '"window.autoDetectColorScheme": "false"' "$file" && fail "$file wrote autoDetect as a STRING, not a boolean"
     grep -Fq "\"editor.fontFamily\": \"$font\"" "$file" || fail "$file missing editor font text"
     grep -Fq "\"terminal.integrated.fontFamily\": \"$font\"" "$file" || fail "$file missing terminal font text"
 }
