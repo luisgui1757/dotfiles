@@ -1422,18 +1422,29 @@ install_zsh_plugins() {
         return 0
     fi
 
+    # Attempt BOTH plugins (one failing must not skip the other), but do NOT
+    # swallow the result with `|| true`: a swallowed failure let setup report
+    # success while a required plugin was absent. Aggregate and emit a FAIL:
+    # marker so CI catches it; real-user setup still continues (no set -e) -- the
+    # fuzzy-Tab menu / gray hint is simply missing until the next good run.
+    local rc=0
     install_zsh_plugin_repo \
         "fzf-tab" \
         "https://github.com/Aloxaf/fzf-tab.git" \
         "$FZF_TAB_VERSION" \
         "$FZF_TAB_COMMIT" \
-        "fzf-tab.plugin.zsh" || true
+        "fzf-tab.plugin.zsh" || rc=1
     install_zsh_plugin_repo \
         "zsh-autosuggestions" \
         "https://github.com/zsh-users/zsh-autosuggestions.git" \
         "$ZSH_AUTOSUGGESTIONS_VERSION" \
         "$ZSH_AUTOSUGGESTIONS_COMMIT" \
-        "zsh-autosuggestions.zsh" || true
+        "zsh-autosuggestions.zsh" || rc=1
+    if [[ "$rc" -ne 0 ]]; then
+        printf "  FAIL: %-26s one or more pinned zsh plugins failed to install\n" "zsh plugins" >&2
+        return 1
+    fi
+    return 0
 }
 
 install_ghostty_macos() {

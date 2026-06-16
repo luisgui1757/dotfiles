@@ -20,6 +20,22 @@ out="$(install_zsh_plugins)"
 [[ "$out" == *"$ZSH_AUTOSUGGESTIONS_VERSION"* ]]
 [[ "$out" == *"$ZSH_AUTOSUGGESTIONS_COMMIT"* ]]
 
+# Fail-closed: a failing pinned-plugin install must surface a FAIL: marker (so CI
+# catches it) and return non-zero -- the old `|| true` swallowed it and reported
+# success with the plugin absent. Stubs are isolated in a subshell.
+(
+    set +e  # we EXPECT a non-zero return; capture it instead of aborting
+    zsh_plugin_ok() { return 1; }            # force "not installed" so it proceeds
+    install_zsh_plugin_repo() { return 1; }  # simulate a clone/verify failure
+    YES_ALL=1
+    DRY_RUN=0
+    fc_out="$(install_zsh_plugins 2>&1)"; fc_rc=$?
+    [[ "$fc_rc" -ne 0 ]] \
+        || { echo "FAIL: install_zsh_plugins must return non-zero when a plugin fails"; exit 1; }
+    [[ "$fc_out" == *"FAIL:"* ]] \
+        || { echo "FAIL: install_zsh_plugins must emit a FAIL: marker on plugin failure"; exit 1; }
+)
+
 zshrc="$REPO_ROOT/shells/zshrc"
 # shellcheck disable=SC2016 # grep literals intentionally include shell syntax.
 grep -F '_dotfiles_zsh_plugin_root="${XDG_DATA_HOME:-$HOME/.local/share}/dotfiles/zsh-plugins"' "$zshrc" >/dev/null
