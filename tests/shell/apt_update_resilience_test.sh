@@ -40,16 +40,17 @@ grep -Fq 'apt-get install -y ripgrep curl' "$CMD_LOG" || fail "pm_install: insta
 [[ "$rc" -eq 0 ]] || fail "pm_install: returned $rc; should reflect the (successful) install, not the failed update"
 printf '%s\n' "$err" | grep -Fq 'WARN: apt-get update failed' || fail "pm_install: no WARN emitted on update failure"
 
-# --- native_linux_pm_install: same decoupling --------------------------------
+# --- native_linux_pm_install: same decoupling, same return semantics ---------
 : > "$CMD_LOG"
-native_pm=apt
-native_linux_pm_install apt ripgrep >/dev/null 2>&1
+native_linux_pm_install apt ripgrep >/dev/null 2>&1; rc=$?
 grep -Fq 'apt-get install -y ripgrep' "$CMD_LOG" || fail "native_linux_pm_install: install SKIPPED after failing update"
+[[ "$rc" -eq 0 ]] || fail "native_linux_pm_install: returned $rc; should reflect the install, not the failed update"
 
 # --- pm_update: scoped upgrade still proceeds (tool, pkg) --------------------
 : > "$CMD_LOG"
 PM=apt
-pm_update ripgrep ripgrep >/dev/null 2>&1
+pm_update ripgrep ripgrep >/dev/null 2>&1; rc=$?
 grep -Fq 'apt-get install -y --only-upgrade ripgrep' "$CMD_LOG" || fail "pm_update: upgrade SKIPPED after failing update"
+[[ "$rc" -eq 0 ]] || fail "pm_update: returned $rc; should reflect the upgrade, not the failed update"
 
 echo "OK"
