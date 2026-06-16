@@ -108,7 +108,11 @@ local ok, err = pcall(function()
         -- per-fixture (logged as a note) instead of letting it abort the probe.
         local open_ok, open_err = pcall(vim.cmd.edit, vim.fn.fnameescape(fixtures .. row.fixture))
         if not open_ok then
-          note(row.fixture .. ": open raised (treesitter highlight, not the LSP): " .. (tostring(open_err):match("([^\r\n]+)") or "error"))
+          note(
+            row.fixture
+              .. ": open raised (treesitter highlight, not the LSP): "
+              .. (tostring(open_err):match("([^\r\n]+)") or "error")
+          )
         end
         local buf = vim.api.nvim_get_current_buf()
         local attached = vim.wait(15000, function()
