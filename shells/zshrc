@@ -66,33 +66,40 @@ _dotfiles_source_first_readable() {
 }
 
 _dotfiles_zsh_plugin_root="${XDG_DATA_HOME:-$HOME/.local/share}/dotfiles/zsh-plugins"
-_dotfiles_autocomplete_loaded=0
-if _dotfiles_source_first_readable \
-    "$_dotfiles_zsh_plugin_root/zsh-autocomplete/zsh-autocomplete.plugin.zsh" \
-    "${HOMEBREW_PREFIX:-}/share/zsh-autocomplete/zsh-autocomplete.plugin.zsh" \
-    "/usr/share/zsh-autocomplete/zsh-autocomplete.plugin.zsh"; then
-  _dotfiles_autocomplete_loaded=1
-fi
 
-# ---- Completion (cached compinit fallback; autocomplete manages its own) -----
-if [[ "$_dotfiles_autocomplete_loaded" -ne 1 ]]; then
-  autoload -Uz compinit
-  mkdir -p "${HOME}/.cache"
-  _zcompdump="${HOME}/.cache/zcompdump-${ZSH_VERSION}"
-  if [[ -n "$_zcompdump"(#qN.mh+24) ]]; then
-    compinit -d "$_zcompdump"
-  else
-    compinit -C -d "$_zcompdump"
-  fi
-  unset _zcompdump
+# ---- Completion: native zsh menu-select (Tab-driven, PowerShell-like) --------
+# Tab completes immediately when there is a single match, and opens a navigable
+# menu when there are several (arrow keys + Enter to pick; Tab / Shift-Tab cycle
+# forward / back). This is the native zsh completion system ON PURPOSE -- NOT
+# zsh-autocomplete, whose always-on as-you-type list is a different paradigm we
+# deliberately moved off (it fought zsh-autosuggestions and could not give the
+# quiet-until-Tab behavior). `zmodload zsh/complist` provides the `menu-select`
+# widget + the `menuselect` keymap that makes the menu interactive.
+autoload -Uz compinit
+mkdir -p "${HOME}/.cache"
+_zcompdump="${HOME}/.cache/zcompdump-${ZSH_VERSION}"
+if [[ -n "$_zcompdump"(#qN.mh+24) ]]; then
+  compinit -d "$_zcompdump"
+else
+  compinit -C -d "$_zcompdump"
 fi
+unset _zcompdump
+zmodload -i zsh/complist
+zstyle ':completion:*' menu select                          # interactive menu on ambiguity
+zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'   # case-insensitive matching
+zstyle ':completion:*' list-colors "${(s.:.)LS_COLORS}"     # colorize the menu
+bindkey '^I' menu-select                                    # Tab -> menu-select widget
 
+# Inline gray history suggestion (the PowerShell-prediction analog; accept the
+# whole suggestion with Right-arrow). Loads after the completion system is set
+# up. Keep this -- it is the one plugin that survived the move off
+# zsh-autocomplete.
 _dotfiles_source_first_readable \
   "$_dotfiles_zsh_plugin_root/zsh-autosuggestions/zsh-autosuggestions.zsh" \
   "${HOMEBREW_PREFIX:-}/share/zsh-autosuggestions/zsh-autosuggestions.zsh" \
   "/usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
 
-unset _dotfiles_autocomplete_loaded _dotfiles_zsh_plugin_root
+unset _dotfiles_zsh_plugin_root
 unfunction _dotfiles_source_first_readable 2>/dev/null || true
 
 # ---- Starship init (precompiled, like the PowerShell profile) ---------------
@@ -126,6 +133,10 @@ if command -v fzf >/dev/null 2>&1; then
     done
     unset _fzf_dir
   fi
+  # fzf's integration ends by binding Tab to `fzf-completion`, stealing it from
+  # our native menu. Keep fzf's Ctrl-R / Ctrl-T / Alt-C widgets but reclaim Tab
+  # for `menu-select` so Tab stays the PowerShell-like completion menu.
+  bindkey '^I' menu-select
 fi
 
 # Intentionally NOT rebinding Esc — it shadows the entire Meta prefix and

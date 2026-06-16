@@ -23,19 +23,32 @@ out="$(install_zsh_plugins)"
 zshrc="$REPO_ROOT/shells/zshrc"
 # shellcheck disable=SC2016 # grep literals intentionally include shell syntax.
 grep -F '_dotfiles_zsh_plugin_root="${XDG_DATA_HOME:-$HOME/.local/share}/dotfiles/zsh-plugins"' "$zshrc" >/dev/null
-grep -F 'zsh-autocomplete/zsh-autocomplete.plugin.zsh' "$zshrc" >/dev/null
+# zsh-autosuggestions (inline gray history) is the one sourced zsh plugin.
 grep -F 'zsh-autosuggestions/zsh-autosuggestions.zsh' "$zshrc" >/dev/null
-# shellcheck disable=SC2016 # grep literal intentionally includes shell syntax.
-grep -F 'if [[ "$_dotfiles_autocomplete_loaded" -ne 1 ]]; then' "$zshrc" >/dev/null
 
+# Completion is the NATIVE zsh menu-select system (Tab-driven, PowerShell-like),
+# NOT zsh-autocomplete's always-on list. zshrc must NOT source zsh-autocomplete.
+if grep -F 'zsh-autocomplete/zsh-autocomplete.plugin.zsh' "$zshrc" >/dev/null; then
+    echo "FAIL: zshrc must NOT source zsh-autocomplete (completion is native menu-select)"
+    exit 1
+fi
+grep -F 'autoload -Uz compinit' "$zshrc" >/dev/null || { echo "FAIL: zshrc must run compinit"; exit 1; }
+grep -F "zstyle ':completion:*' menu select" "$zshrc" >/dev/null \
+    || { echo "FAIL: zshrc must enable menu select"; exit 1; }
+grep -F 'zmodload -i zsh/complist' "$zshrc" >/dev/null \
+    || { echo "FAIL: zshrc must load zsh/complist for the menu-select widget"; exit 1; }
+
+# Tab -> menu-select, and it must be RECLAIMED after fzf (fzf's `--zsh` integration
+# rebinds Tab to fzf-completion). The reclaiming bindkey must come AFTER the fzf
+# source, or fzf wins Tab and the native menu is unreachable.
 if awk '
-    /zsh-autocomplete\/zsh-autocomplete.plugin.zsh/ { autocomplete = NR }
-    /autoload -Uz compinit/ { compinit = NR }
-    END { exit !(autocomplete && compinit && autocomplete < compinit) }
+    /source <\(fzf --zsh\)/ { fzf = NR }
+    /bindkey .\^I. menu-select/ { last_bind = NR }
+    END { exit !(fzf && last_bind && last_bind > fzf) }
 ' "$zshrc"; then
     :
 else
-    echo "FAIL: zsh-autocomplete must be sourced before local compinit"
+    echo "FAIL: zshrc must reclaim Tab with bindkey menu-select AFTER sourcing fzf"
     exit 1
 fi
 

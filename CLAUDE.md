@@ -104,10 +104,20 @@ that violates one of these, fix it instead of disabling the test.
 12. **No `vim.lsp.set_log_level(...)`.** Deprecated in nvim 0.11; use the module
     form `vim.lsp.log.set_level(...)` (see `lsp-config.lua`). Guarded by
     `invariants_test.sh`.
-13. **zsh plugin order is intentional.** `zsh-autocomplete` must be sourced
-    before local `compinit`; when autocomplete loads, `zshrc` must skip the
-    repo's manual `compinit` block. `zsh-autosuggestions` loads after completion
-    setup. Keep `shells/zshenv` minimal and keep `skip_global_compinit=1` there.
+13. **Completion is native zsh `menu-select` (Tab-driven, PowerShell-like).**
+    `shells/zshrc` runs `compinit`, sets `zstyle ':completion:*' menu select`,
+    `zmodload`s `zsh/complist`, and binds Tab to the `menu-select` widget: Tab
+    completes a single match and opens an arrow-navigable menu on ambiguity. fzf
+    is sourced later and rebinds Tab to `fzf-completion`, so `zshrc` **reclaims
+    Tab** with `bindkey '^I' menu-select` AFTER the fzf block (fzf keeps
+    Ctrl-R/T, Alt-C). `zsh-autosuggestions` (inline gray history) is the only
+    sourced zsh plugin and loads after completion setup. We deliberately do NOT
+    source `zsh-autocomplete` — its always-on as-you-type list is a different
+    paradigm; it binds Tab to `complete-word` and shows the menu via
+    Down/Ctrl-N, which is not the quiet-until-Tab behavior we want. (The pinned
+    `zsh-autocomplete` install/external still exists as a migration-test fixture;
+    removing it is tracked follow-up.) Keep `shells/zshenv` minimal with
+    `skip_global_compinit=1`. Guarded by `tests/shell/zsh_plugins_test.sh`.
 14. **WSL is split-host by default.** Windows Terminal, Hack Nerd Font, and
     `win32yank` are Windows-host responsibilities. WSL installs the Linux CLI
     stack. Linux Ghostty and Linux fontconfig fonts in WSL require
