@@ -115,10 +115,16 @@ if [[ -z "$SCRIPT_DIR" ]] || [[ ! -d "$SCRIPT_DIR/home" ]]; then
     fi
     if [[ -d "$DEST/.git" ]]; then
         echo "Repo already cloned at $DEST. Pulling latest."
-        git -C "$DEST" pull --ff-only
+        if ! git -C "$DEST" pull --ff-only; then
+            echo "setup.sh: 'git pull --ff-only' failed in $DEST; refusing to run against a stale checkout." >&2
+            exit 1
+        fi
     else
         echo "Cloning $REPO_URL -> $DEST"
-        git clone "$REPO_URL" "$DEST"
+        if ! git clone "$REPO_URL" "$DEST"; then
+            echo "setup.sh: 'git clone' of $REPO_URL failed; cannot continue." >&2
+            exit 1
+        fi
     fi
     echo
     echo "Re-invoking setup.sh from the clone."

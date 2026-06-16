@@ -691,6 +691,13 @@ save only**. The next plain `:w` formats normally. Implemented in
   `fdfind`, but Telescope expects `fd`. After installing `fd-find`,
   `install-deps.sh` idempotently links `~/.local/bin/fd` to `fdfind` and adds
   that directory to the current PATH.
+- **Apt `update` is best-effort, decoupled from `install`.** The apt arms of
+  `pm_install`, `native_linux_pm_install`, and `pm_update` run `apt-get update`
+  on its own line (`|| warn`), then ALWAYS run `apt-get install`. Do NOT restore
+  the `apt-get update && apt-get install` coupling: a single flaky `update` (an
+  unreachable third-party PPA, an expired repo key, a transient mirror outage)
+  would short-circuit the `&&` and skip the install entirely, even for packages
+  already in the local apt cache. Guarded by `tests/shell/apt_update_resilience_test.sh`.
 - **Alpine installs Neovim through `apk`.** The official Neovim Linux tarball
   targets glibc systems, so Alpine uses its native `neovim` package instead;
   e2e still enforces the repo's Neovim >= 0.12 floor.

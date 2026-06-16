@@ -169,9 +169,17 @@ if (-not $ScriptDir -or -not (Test-Path (Join-Path $ScriptDir 'home'))) {
     if (Test-Path (Join-Path $dest '.git')) {
         Write-Host "Repo already cloned at $dest. Pulling latest."
         git -C $dest pull --ff-only
+        if ($LASTEXITCODE -ne 0) {
+            Write-Error "setup.ps1: 'git pull --ff-only' failed in $dest; refusing to run against a stale checkout."
+            exit 1
+        }
     } else {
         Write-Host "Cloning $RepoUrl -> $dest"
         git clone $RepoUrl $dest
+        if ($LASTEXITCODE -ne 0) {
+            Write-Error "setup.ps1: 'git clone' of $RepoUrl failed; cannot continue."
+            exit 1
+        }
     }
     Write-Host ""
     Write-Host "Re-invoking setup.ps1 from the clone."
@@ -282,16 +290,21 @@ failed to create symlink:
 }
 
 function Test-CanCreateSymlinks {
+    # Compute the probe paths OUTSIDE the try so the finally can always clean up.
+    # Previously the Remove-Item calls lived in the try body, so a throwing
+    # New-SymbolicLinkItem left the probe target file orphaned in %TEMP% on every
+    # failed probe (the common no-Developer-Mode case).
+    $tmp = Join-Path $env:TEMP "symlink-probe-$([guid]::NewGuid())"
+    $target = Join-Path $env:TEMP "symlink-probe-target-$([guid]::NewGuid())"
     try {
-        $tmp = Join-Path $env:TEMP "symlink-probe-$([guid]::NewGuid())"
-        $target = Join-Path $env:TEMP "symlink-probe-target-$([guid]::NewGuid())"
         New-Item -ItemType File -Path $target -Force | Out-Null
         New-SymbolicLinkItem -Source $target -Destination $tmp
-        Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
-        Remove-Item -LiteralPath $target -Force -ErrorAction SilentlyContinue
         return $true
     } catch {
         return $false
+    } finally {
+        Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $target -Force -ErrorAction SilentlyContinue
     }
 }
 

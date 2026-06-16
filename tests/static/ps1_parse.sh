@@ -14,16 +14,22 @@ fi
 fail=0
 check_file() {
     local f="$1"
-    pwsh -NoProfile -Command "
-\$tokens = \$null
-\$errors = \$null
-[System.Management.Automation.Language.Parser]::ParseFile('$f', [ref]\$tokens, [ref]\$errors) | Out-Null
-if (\$errors.Count -gt 0) {
-    foreach (\$e in \$errors) { Write-Error \$e.Message }
+    # Pass the path through an environment variable, NOT interpolated into the
+    # command string. The old form embedded $f inside a single-quoted PowerShell
+    # literal, so a repo path containing a single quote broke the parser harness
+    # itself. An env var needs no quoting and is robust to any character.
+    # shellcheck disable=SC2016  # the $ are PowerShell vars; single quotes are deliberate
+    PS1_PARSE_FILE="$f" pwsh -NoProfile -Command '
+$path = $env:PS1_PARSE_FILE
+$tokens = $null
+$errors = $null
+[System.Management.Automation.Language.Parser]::ParseFile($path, [ref]$tokens, [ref]$errors) | Out-Null
+if ($errors.Count -gt 0) {
+    foreach ($e in $errors) { Write-Error $e.Message }
     exit 1
 }
 exit 0
-"
+'
 }
 
 while IFS= read -r f; do

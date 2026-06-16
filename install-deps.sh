@@ -1514,7 +1514,8 @@ pm_install() {
     fi
     case "$PM" in
         brew)   brew install "${pkgs[@]}" ;;
-        apt)    maybe_sudo apt-get update -qq && maybe_sudo apt-get install -y "${pkgs[@]}" ;;
+        apt)    maybe_sudo apt-get update -qq || echo "  WARN: apt-get update failed; installing from the existing apt cache" >&2
+                maybe_sudo apt-get install -y "${pkgs[@]}" ;;
         dnf)    maybe_sudo dnf install -y "${pkgs[@]}" ;;
         pacman) maybe_sudo pacman -S --noconfirm "${pkgs[@]}" ;;
         zypper) maybe_sudo zypper install -y "${pkgs[@]}" ;;
@@ -1534,7 +1535,8 @@ native_linux_pm_install() {
         echo "  would: $native_pm install ${pkgs[*]}"; return 0
     fi
     case "$native_pm" in
-        apt)    maybe_sudo apt-get update -qq && maybe_sudo apt-get install -y "${pkgs[@]}" ;;
+        apt)    maybe_sudo apt-get update -qq || echo "  WARN: apt-get update failed; installing from the existing apt cache" >&2
+                maybe_sudo apt-get install -y "${pkgs[@]}" ;;
         dnf)    maybe_sudo dnf install -y "${pkgs[@]}" ;;
         pacman) maybe_sudo pacman -S --noconfirm --needed "${pkgs[@]}" ;;
         zypper) maybe_sudo zypper install -y "${pkgs[@]}" ;;
@@ -1598,7 +1600,8 @@ pm_update() {
     fi
     case "$PM" in
         brew)   brew upgrade "$pkg" ;;
-        apt)    maybe_sudo apt-get update -qq && maybe_sudo apt-get install -y --only-upgrade "$pkg" ;;
+        apt)    maybe_sudo apt-get update -qq || echo "  WARN: apt-get update failed; upgrading from the existing apt cache" >&2
+                maybe_sudo apt-get install -y --only-upgrade "$pkg" ;;
         dnf)    maybe_sudo dnf upgrade -y "$pkg" ;;
         pacman) maybe_sudo pacman -S --noconfirm "$pkg" ;;
         zypper) maybe_sudo zypper update -y "$pkg" ;;
@@ -1827,9 +1830,12 @@ install_starship_curl() {
     fi
     if ask "Install starship (prompt) via official curl installer?"; then
         if [[ "$DRY_RUN" -eq 1 ]]; then
-            echo "  would: curl -sS https://starship.rs/install.sh | sh -s -- -y"
+            echo "  would: curl -fsSL https://starship.rs/install.sh | sh -s -- -y"
         else
-            curl -sS https://starship.rs/install.sh | sh -s -- -y || echo "  WARN: starship install failed"
+            # -f: fail (non-zero) on an HTTP 4xx/5xx instead of piping an error
+            # page into sh. -L: follow redirects. Keeps the documented official
+            # curl|sh install path, just makes the fetch fail-closed.
+            curl -fsSL https://starship.rs/install.sh | sh -s -- -y || echo "  WARN: starship install failed"
         fi
     else
         printf "  skipped   %-26s\n" "starship"
