@@ -172,11 +172,13 @@ jobs:
           run_nvim_checked mason "+MasonToolsInstallSync" "+qa"
           assert_mason_tool "lua-language-server" lua-language-server lua-language-server.cmd lua-language-server.exe
           assert_mason_tool "stylua" stylua stylua.cmd stylua.exe
-          # Tier 2 language smoke: parser-support (get_available, STRICT) +
-          # LSP-attach (report-only for now -- a treesitter-highlight bug can
-          # abort the FileType chain; see lsp_smoke.lua). cquit on a parser-support
-          # failure -> run_nvim_checked fails. The trailing +qa is insurance if the
-          # probe ever leaves nvim alive.
+          # Tier 2 language smoke: parser-support (get_available) AND LSP-attach,
+          # both STRICT. The treesitter-highlight bug that previously forced
+          # LSP-attach to report-only is fixed canonically (nvim-bundled langs are
+          # no longer installed by nvim-treesitter), so a non-gated server that
+          # does not attach -- or a fixture open that raises -- now cquits.
+          # run_nvim_checked fails on the nonzero exit. The trailing +qa is
+          # insurance if the probe ever leaves nvim alive.
           DOTFILES_LSP_SMOKE=strict run_nvim_checked lsp-smoke -u "$repo/nvim/init.lua" -c "luafile $repo/tests/nvim/lsp_smoke.lua" +qa
 
   setup-ps1:
@@ -308,9 +310,20 @@ jobs:
           Invoke-NvimChecked -Name mason -NvimArgs @('+MasonToolsInstallSync', '+qa')
           Assert-MasonTool -Name 'lua-language-server' -FileNames @('lua-language-server.cmd', 'lua-language-server.exe', 'lua-language-server')
           Assert-MasonTool -Name 'stylua' -FileNames @('stylua.cmd', 'stylua.exe', 'stylua')
-          # Tier 2 language smoke: parser-support (get_available, STRICT) +
-          # LSP-attach (report-only; see lsp_smoke.lua). cquit on a parser-support
-          # failure -> Invoke-NvimChecked throws.
+          # powershell_es is the Windows-only LSP target. The Tier 2 smoke enforces
+          # it (fails if pwsh or the PSES bundle is missing); assert the same
+          # preconditions here too so a setup regression has a clear, early locus.
+          if (-not (Get-Command pwsh -ErrorAction SilentlyContinue)) {
+              throw 'pwsh is not on PATH (setup.ps1 -All should install PowerShell 7)'
+          }
+          $psesDir = Join-Path $env:LOCALAPPDATA 'nvim-data\mason\packages\powershell-editor-services'
+          if (-not (Test-Path -LiteralPath $psesDir)) {
+              throw "Mason did not install powershell-editor-services into $psesDir"
+          }
+          # Tier 2 language smoke: parser-support (get_available) AND LSP-attach,
+          # both STRICT (see lsp_smoke.lua). On Windows this is where powershell_es
+          # is actually enforced (pwsh + PSES bundle present). cquit on any failure
+          # -> Invoke-NvimChecked throws.
           $initLua = (Join-Path $repo 'nvim\init.lua') -replace '\\', '/'
           $smokeLua = (Join-Path $repo 'tests\nvim\lsp_smoke.lua') -replace '\\', '/'
           $env:DOTFILES_LSP_SMOKE = 'strict'

@@ -20,11 +20,14 @@ local function assert_same_list(actual, expected)
 end
 
 describe("treesitter main migration", function()
+  -- nvim-treesitter installs ONLY the languages Neovim does NOT bundle. The
+  -- bundled set (c, lua, markdown, markdown_inline, query, vim, vimdoc) is
+  -- deliberately excluded so Neovim's matched built-in parser+query is used --
+  -- installing nvim-treesitter's would override the built-in and break the
+  -- bundled query (e.g. lua highlights `operator:` -> "Invalid field name").
   local required = {
-    "c",
     "cpp",
     "cmake",
-    "lua",
     "python",
     "rust",
     "bash",
@@ -32,11 +35,6 @@ describe("treesitter main migration", function()
     "json",
     "yaml",
     "toml",
-    "markdown",
-    "markdown_inline",
-    "vim",
-    "vimdoc",
-    "query",
     "diff",
     "gitcommit",
   }
@@ -47,6 +45,63 @@ describe("treesitter main migration", function()
 
   it("keeps the required parser list unchanged", function()
     assert_same_list(extract_string_list("treesitter_parsers"), required)
+  end)
+
+  it("excludes Neovim-bundled languages from the install list (canonical fix)", function()
+    local installed = {}
+    for _, p in ipairs(extract_string_list("treesitter_parsers")) do
+      installed[p] = true
+    end
+    -- Languages Neovim 0.12 bundles a matched parser+query for. Installing
+    -- nvim-treesitter's parser overrides the built-in and breaks the bundled
+    -- query (e.g. lua highlights `operator:` -> E5113 "Invalid field name").
+    for _, bundled in ipairs({ "c", "lua", "markdown", "markdown_inline", "query", "vim", "vimdoc" }) do
+      assert.is_nil(installed[bundled], bundled .. " is Neovim-bundled; it must NOT be in treesitter_parsers")
+    end
+    -- c and vim are bundled but Neovim does not auto-start them, so we do.
+    assert.is_truthy(
+      src:match('nvim_bundled_started_here%s*=%s*%{ "c", "vim" %}'),
+      "c and vim must be started via Neovim's matched built-in parser"
+    )
+  end)
+
+  it("purges stale nvim-treesitter parser overrides for the bundled languages", function()
+    -- Excluding the bundled langs stops future installs, but a parser/<lang>.so
+    -- already on the runtimepath (older config, or a restored CI cache) still
+    -- overrides the built-in and re-creates the E5113 mismatch. The config must
+    -- actively delete those on load.
+    assert.is_truthy(
+      src:match('nvim_bundled_parsers%s*=%s*%{ "c", "lua", "markdown", "markdown_inline", "query", "vim", "vimdoc" %}'),
+      "must enumerate the bundled parser (.so) set to purge"
+    )
+    assert.is_truthy(
+      src:match('purge%("parser/%*%.so"%)'),
+      "must scan the runtimepath for stale bundled parser overrides"
+    )
+    assert.is_truthy(src:match("vim%.fn%.delete"), "must delete stale bundled parser overrides")
+    -- CRITICAL safety: deletes MUST be scoped to stdpath('data'). Neovim ships
+    -- its own bundled parsers as .so files under the install prefix, on the
+    -- runtimepath -- an unscoped purge would wipe Neovim's built-in parsers.
+    assert.is_truthy(
+      src:match("vim%.startswith") and src:match('vim%.fn%.stdpath%("data"%)'),
+      "purge must be scoped to stdpath('data') so Neovim's built-in parsers are never deleted"
+    )
+  end)
+
+  it("still covers the auto-started bundled filetypes so they keep indentexpr (no regression)", function()
+    -- Excluding the bundled langs from the install list must NOT drop the
+    -- FileType autocmd coverage that gives lua/markdown/help/query
+    -- nvim-treesitter's indentexpr (the pre-fix behavior). The autocmd fires for
+    -- treesitter_filetypes, which must include these via
+    -- nvim_bundled_autostarted_filetypes.
+    assert.is_truthy(
+      src:match('nvim_bundled_autostarted_filetypes%s*=%s*%{ "lua", "markdown", "help", "query" %}'),
+      "auto-started bundled filetypes must still get indentexpr"
+    )
+    assert.is_truthy(
+      src:match("for _, filetype in ipairs%(nvim_bundled_autostarted_filetypes%)"),
+      "auto-started bundled filetypes must be appended to treesitter_filetypes"
+    )
   end)
 
   it("installs parsers with the main API", function()
@@ -86,7 +141,9 @@ describe("treesitter main migration", function()
   it("registers filetype aliases for parsers whose names differ from Neovim filetypes", function()
     assert.is_truthy(src:match('bash%s*=%s*%{ "sh" %}'), "sh files should use the bash parser")
     assert.is_truthy(src:match('powershell%s*=%s*%{ "ps1" %}'), "ps1 files should use the powershell parser")
-    assert.is_truthy(src:match('vimdoc%s*=%s*%{ "help" %}'), "help buffers should use the vimdoc parser")
+    -- No vimdoc={help} alias: vimdoc is Neovim-bundled and Neovim already maps
+    -- help -> vimdoc and auto-starts it, so the repo must NOT register it.
+    assert.is_nil(src:match('vimdoc%s*=%s*%{ "help" %}'), "vimdoc is nvim-bundled; do not alias help to it")
     assert.is_truthy(
       src:match("vim%.treesitter%.language%.register%(parser, filetypes%)"),
       "aliases must be registered"

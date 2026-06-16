@@ -46,9 +46,19 @@ describe("language smoke (Tier 1)", function()
     end)
 
     if row.parser then
-      it("installs the " .. row.parser .. " parser for " .. row.fixture, function()
-        assert.is_truthy(parsers[row.parser], row.parser .. " is in the matrix but not in treesitter_parsers")
-      end)
+      if row.bundled then
+        it("does NOT install the Neovim-bundled " .. row.parser .. " parser for " .. row.fixture, function()
+          -- Neovim bundles a matched parser+query for this language. Installing
+          -- nvim-treesitter's would override the built-in and break the bundled
+          -- query (e.g. lua highlights `operator:` -> E5113); Neovim's built-in
+          -- handles it, so it must stay OUT of treesitter_parsers.
+          assert.is_nil(parsers[row.parser], row.parser .. " is Neovim-bundled; it must NOT be in treesitter_parsers")
+        end)
+      else
+        it("installs the " .. row.parser .. " parser for " .. row.fixture, function()
+          assert.is_truthy(parsers[row.parser], row.parser .. " is in the matrix but not in treesitter_parsers")
+        end)
+      end
     end
   end
 end)

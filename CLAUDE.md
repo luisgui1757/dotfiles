@@ -139,6 +139,23 @@ that violates one of these, fix it instead of disabling the test.
     owner update bypass belongs only in
     `.github/rulesets/main-owner-updates.json`. Both bypasses must use
     `bypass_mode = pull_request`. Do not collapse these rulesets into one.
+19. **`treesitter_parsers` must exclude the 7 Neovim-bundled languages** (`c`,
+    `lua`, `markdown`, `markdown_inline`, `query`, `vim`, `vimdoc`). Neovim ships
+    matched built-in parser+query pairs for them — real parser `.so` files under
+    the install prefix (e.g. `<prefix>/lib/nvim/parser/lua.so`) plus queries in
+    `$VIMRUNTIME/queries/` — and that parser dir is on the runtimepath. Letting
+    nvim-treesitter install its own (regenerated, sometimes stale-cached) parser
+    overrides the built-in and breaks the bundled query (`E5113: Invalid field
+    name "operator"` on lua). Excluding them stops future installs, but the
+    config ALSO **purges** any nvim-treesitter-managed `parser/<bundled>.so`
+    already present (a leftover from an older config, or restored from a CI
+    cache, still overrides the built-in). The purge is **scoped to
+    `stdpath('data')`** (nvim-treesitter installs under `…/site`; the install
+    prefix does not) — an unscoped delete would wipe Neovim's OWN built-in
+    parsers. `c` and `vim` are bundled but not auto-started, so the config starts
+    them via `nvim_bundled_started_here = { "c", "vim" }`. See "Add a treesitter
+    parser". Guarded by `treesitter_spec.lua`, `language_smoke_spec.lua`, and the
+    Tier-2 `lsp_smoke.lua` runtime preflight.
 
 ## Common workflows
 
@@ -195,6 +212,45 @@ plus a real C compiler before `:TSUpdate` can succeed.
 3. Add it to `required` in `tests/nvim/spec/treesitter_spec.lua`.
 4. If the parser has unusual generated sources, verify it through
    `:TSUpdate <parser>` on a machine with `tree-sitter` and a compiler on PATH.
+
+> **Never install a Neovim-bundled language with nvim-treesitter.** Neovim 0.12
+> ships matched built-in parser+query pairs for **c, lua, markdown,
+> markdown_inline, query, vim, vimdoc** — the parsers are real `.so` files under
+> the install prefix (e.g. `<prefix>/lib/nvim/parser/lua.so`, which is on the
+> runtimepath; note this is NOT `$VIMRUNTIME/parser/`, which is empty), and the
+> matched queries live in `$VIMRUNTIME/queries/`. nvim-treesitter `main`
+> *regenerates* a parser from `grammar.js` via `tree-sitter generate` at install
+> time and drops it under `stdpath('data')/site/parser/`, which (earlier on the
+> runtimepath) **overrides** the built-in. When that regenerated/cached parser's
+> field table drifts from Neovim's bundled query, every buffer of that filetype
+> throws -- e.g. a lua parser generated before tree-sitter-lua commit `d760230`
+> lacks the `operator` field that Neovim's bundled `lua/highlights.scm`
+> references at line 74, so `ftplugin/lua.lua`'s auto `vim.treesitter.start()`
+> raises `E5113: Invalid field name "operator"` on every lua file. This actually
+> happened in e2e (commit `c3042df`, all three OSes). So `treesitter_parsers`
+> **excludes** those 7, AND the config purges any nvim-treesitter-managed
+> override already on disk — scoped to `stdpath('data')` so Neovim's own
+> install-prefix parsers are never deleted. Neovim auto-starts treesitter for
+> lua/markdown/vimdoc/query via its runtime ftplugins; `c` and `vim` are bundled
+> but NOT auto-started, so the config starts them itself via
+> `nvim_bundled_started_here = { "c", "vim" }` using the matched built-in parser.
+> Guarded by `tests/nvim/spec/treesitter_spec.lua`, the per-language
+> `language_smoke_spec.lua` (`bundled` rows assert the parser is *absent* from
+> the install list), and the Tier-2 `lsp_smoke.lua` runtime override preflight.
+
+**Recorded decision — `main` vs `master` branch of nvim-treesitter.** We track
+`main` (the upstream rewrite: regenerates parsers from `grammar.js` via the
+`tree-sitter` CLI at install, requires Neovim 0.12+) on purpose — it is the
+canonical forward direction, and Neovim core increasingly owns the bundled
+languages it ships, which is exactly the division the exclusion above enforces.
+The legacy `master` branch is internally self-consistent (it ships precompiled
+parsers *and* its own matched queries, so there is no core-vs-plugin query split
+to drift, and it is therefore less exposed to the `operator`/E5113 class of bug)
+**but it is deprecated and sunsetting**, so we do NOT use it. The robustness we
+would have gotten from `master` is instead provided by invariant 19's strict
+"one owner per language" rule (core owns its bundled 7, nvim-treesitter installs
+the rest). Do not switch branches to dodge a parser/query mismatch — keep the
+ownership boundary instead.
 
 ### Rebind a Rose Pine color anywhere
 

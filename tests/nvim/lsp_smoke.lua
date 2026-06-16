@@ -8,14 +8,20 @@
 --
 -- Exits nonzero (cquit) on any failure so the CI step fails.
 --
+-- Gates (all fail the run under strict):
+--   (0) no `parser/<bundled>.so` override remains on the runtimepath (the config
+--       purges them; a leftover re-creates the E5113 mismatch),
+--   (1) every installed parser is one nvim-treesitter `main` supports,
+--   (2) every non-gated LSP attaches, and every gated LSP attaches ON its target
+--       OS (powershell_es -> Windows); a gated server is skipped only OFF target,
+--       and a MISSING runtime on the target OS is a failure, not a skip,
+--   (3) the auto-started bundled filetypes (lua/markdown/help/query) keep the
+--       nvim-treesitter indentexpr the FileType autocmd promises.
+--
 -- DOTFILES_LSP_SMOKE:
 --   unset  -> no-op (an accidental run in the fast suite is harmless)
---   strict -> parser-support is the STRICT gate (an unsupported parser fails).
---             LSP-attach is currently REPORT-ONLY (logged, never fails) because a
---             separate treesitter-highlight bug (the nvim 0.12 bundled lua
---             highlights query vs the nvim-treesitter main parser) can abort the
---             FileType chain before a server enables. Once that is fixed and
---             attach is confirmed green, flip the attach branch back to fail().
+--   strict -> all four gates above fail the run
+--   other  -> same behaviour (a gated row off its target OS still skips cleanly)
 
 local mode = vim.env.DOTFILES_LSP_SMOKE
 if not mode or mode == "" then
@@ -48,6 +54,29 @@ local ok, err = pcall(function()
   local repo_root = vim.fn.fnamemodify(script, ":h:h:h") -- tests/nvim/lsp_smoke.lua -> repo root
   local matrix = dofile(repo_root .. "/tests/nvim/language_matrix.lua")
   local fixtures = repo_root .. "/tests/nvim/fixtures/"
+
+  -- (0) Bundled-parser override preflight. The production config purges any
+  -- nvim-treesitter parser for a Neovim-bundled language on load; after that, no
+  -- nvim-treesitter-managed `parser/<bundled>.so` may remain. A leftover (e.g.
+  -- restored from a CI cache, or installed by an older config) overrides
+  -- Neovim's matched built-in parser and re-creates the E5113 query/parser
+  -- mismatch this whole change exists to prevent. Scope to stdpath('data'):
+  -- Neovim's OWN bundled parser .so files live under the install prefix and are
+  -- legitimately on the runtimepath -- they must NOT trip this gate.
+  local managed = vim.fs.normalize(vim.fn.stdpath("data")) .. "/"
+  for _, lang in ipairs({ "c", "lua", "markdown", "markdown_inline", "query", "vim", "vimdoc" }) do
+    local overrides = {}
+    for _, so in ipairs(vim.api.nvim_get_runtime_file("parser/" .. lang .. ".so", true)) do
+      if vim.startswith(vim.fs.normalize(so), managed) then
+        table.insert(overrides, so)
+      end
+    end
+    if #overrides > 0 then
+      fail("nvim-treesitter override still present for bundled " .. lang .. ": " .. table.concat(overrides, ", "))
+    else
+      note("no nvim-treesitter override for bundled " .. lang)
+    end
+  end
 
   -- (1) Parser support: every parser the repo installs must be one
   -- nvim-treesitter `main` supports -- the jsonc "skipping unsupported language"
@@ -87,47 +116,112 @@ local ok, err = pcall(function()
   -- Unix e2e jobs from failing on a server designed not to run there.
   for _, row in ipairs(matrix) do
     if row.lsp then
-      local skip
+      local skip, gated_fail
       if row.lsp_gated then
+        -- A gated server is skip-not-fail only OFF its target OS. ON the target
+        -- (powershell_es -> Windows), the runtime MUST be present: setup.ps1
+        -- -All installs pwsh and Mason installs the PSES bundle, so a missing
+        -- one is a real setup regression, not a legitimate absence. Failing here
+        -- is what makes the Windows STRICT path actually strict (otherwise it
+        -- could pass for the wrong reason -- a silently-skipped target server).
         local pses = vim.fn.stdpath("data") .. "/mason/packages/powershell-editor-services"
         if vim.fn.has("win32") ~= 1 then
           skip = "ps1 LSP is a Windows target (not enforced on this OS)"
         elseif vim.fn.executable("pwsh") ~= 1 then
-          skip = "pwsh not installed"
+          gated_fail = "pwsh missing on the Windows target (setup.ps1 -All should install it)"
         elseif vim.fn.isdirectory(pses) ~= 1 then
-          skip = "PSES bundle not installed"
+          gated_fail = "PSES bundle missing on the Windows target (Mason should install powershell-editor-services)"
         end
       end
-      if skip then
+      if gated_fail then
+        fail(row.fixture .. " [" .. row.lsp .. "]: " .. gated_fail)
+      elseif skip then
         note(row.fixture .. " [" .. row.lsp .. "]: skipped (" .. skip .. ")")
       else
-        -- Opening a fixture can throw a treesitter HIGHLIGHT query error during
-        -- BufReadPost (e.g. the nvim 0.12 bundled lua highlights query vs the
-        -- nvim-treesitter main parser). That is unrelated to LSP attach -- the
-        -- buffer still opens and the LSP enables on FileType -- so isolate it
-        -- per-fixture (logged as a note) instead of letting it abort the probe.
+        -- Opening a fixture must NOT raise. The treesitter HIGHLIGHT query error
+        -- that used to fire during BufReadPost (nvim 0.12 bundled lua highlights
+        -- query vs nvim-treesitter main's older parser -> E5113) is fixed
+        -- canonically: the nvim-bundled langs are no longer installed by
+        -- nvim-treesitter, so the matched built-in query is in effect. A raise
+        -- here now means that regression is back -- record it as a failure, but
+        -- still pcall-isolate it so one bad fixture does not abort the probe.
         local open_ok, open_err = pcall(vim.cmd.edit, vim.fn.fnameescape(fixtures .. row.fixture))
         if not open_ok then
-          note(
+          fail(
             row.fixture
-              .. ": open raised (treesitter highlight, not the LSP): "
+              .. ": open raised (treesitter highlight regression?): "
               .. (tostring(open_err):match("([^\r\n]+)") or "error")
           )
         end
         local buf = vim.api.nvim_get_current_buf()
-        local attached = vim.wait(15000, function()
+        local attached = vim.wait(45000, function()
           return #vim.lsp.get_clients({ bufnr = buf, name = row.lsp }) > 0
         end, 200)
-        -- REPORT-ONLY (see the header): record attach status but do not fail,
-        -- until the treesitter-highlight bug that can abort FileType is resolved.
+        -- STRICT (see the header): a non-gated server that does not attach is a
+        -- hard failure. The treesitter highlight error that aborted FileType is
+        -- fixed canonically (the nvim-bundled langs are no longer installed by
+        -- nvim-treesitter), so a non-attach is now a real LSP/Mason regression.
         if attached then
           note(row.fixture .. " [" .. row.lsp .. "]: attached")
         else
-          note(row.fixture .. " [" .. row.lsp .. "]: did NOT attach within 15s (report-only)")
+          fail(row.fixture .. " [" .. row.lsp .. "]: did NOT attach within 45s")
         end
         pcall(vim.cmd, "silent! bwipeout!")
       end
     end
+  end
+
+  -- (3) indentexpr preservation for the auto-started bundled filetypes. Removing
+  -- the bundled langs from the install list must NOT drop the indentexpr the
+  -- FileType autocmd promises (the pre-fix behavior). Source-shape tests only
+  -- prove the table/loop exist; this proves the option is actually set on a real
+  -- buffer after FileType processing. help has no fixture, so synthesize one.
+  local indent_expr = "v:lua.require'nvim-treesitter'.indentexpr()"
+  local bundled_indent = {
+    { ft = "lua", fixture = "sample.lua" },
+    { ft = "markdown", fixture = "sample.md" },
+    { ft = "query", fixture = "queries/lua/highlights.scm" },
+    { ft = "help", synth = true },
+  }
+  for _, b in ipairs(bundled_indent) do
+    local opened = true
+    if b.synth then
+      vim.cmd("enew")
+      vim.api.nvim_buf_set_lines(0, 0, -1, false, { "*synthetic.txt*  A synthetic help buffer", "", "Heading~" })
+      vim.bo.filetype = b.ft -- fires FileType help -> our autocmd sets indentexpr
+    else
+      -- A fixture that fails to open (or that detects the wrong filetype) would
+      -- silently make the indentexpr check meaningless -- treat both as failures
+      -- so this gate can't pass for the wrong reason.
+      local open_ok, open_err = pcall(vim.cmd.edit, vim.fn.fnameescape(fixtures .. b.fixture))
+      if not open_ok then
+        opened = false
+        fail(b.fixture .. ": open raised in indentexpr gate: " .. (tostring(open_err):match("([^\r\n]+)") or "error"))
+      end
+    end
+    if opened and vim.bo.filetype ~= b.ft then
+      fail(
+        "indentexpr gate: expected filetype "
+          .. b.ft
+          .. " for "
+          .. (b.fixture or "synthetic help")
+          .. ", got "
+          .. tostring(vim.bo.filetype)
+      )
+    elseif opened then
+      if vim.bo.indentexpr == indent_expr then
+        note("indentexpr preserved: " .. b.ft)
+      else
+        fail(
+          "indentexpr NOT set for auto-started bundled filetype "
+            .. b.ft
+            .. " (got: "
+            .. tostring(vim.bo.indentexpr)
+            .. ")"
+        )
+      end
+    end
+    pcall(vim.cmd, "silent! bwipeout!")
   end
 end)
 

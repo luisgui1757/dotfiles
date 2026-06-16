@@ -341,15 +341,24 @@ The e2e jobs cover different install paths, not symmetric container platforms:
 | `setup.sh / ubuntu-24.04` | Full Unix setup on the hosted Ubuntu runner. This runner has Linuxbrew available, so it proves the Linuxbrew path that users may hit. |
 | `setup.sh / macos-15` | Full macOS setup through the real macOS hosted runner and Homebrew path. Docker cannot model macOS. |
 | `setup.ps1 / windows-2025` | Full Windows setup through the real Windows hosted runner, including Scoop/winget/choco behavior, PowerShell, symlinks, and Neovim sync. Windows containers do not model the desktop/user-profile setup well. |
+| `setup.sh / WSL2 Ubuntu-24.04 (best-effort canary)` | Non-required WSL smoke signal. Hosted runners cannot provide reliable nested virtualization, so this is intentionally best-effort. |
 
 After the Mason sync, each `setup.sh`/`setup.ps1` job also runs the **Tier 2
 language smoke** (`tests/nvim/lsp_smoke.lua`): against the real Neovim config it
-asserts every installed treesitter parser is one nvim-treesitter `main` actually
-supports, and that each language's LSP attaches (`powershell_es` enforced on
-Windows only). The fast `make test-nvim` runs Tier 1 (filetype + formatter +
-parser-list consistency per fixture). Adding a language is "drop a fixture + a
-row in `tests/nvim/language_matrix.lua`".
-| `setup.sh / WSL2 Ubuntu-24.04 (best-effort canary)` | Non-required WSL smoke signal. Hosted runners cannot provide reliable nested virtualization, so this is intentionally best-effort. |
+asserts (0) no nvim-treesitter parser override for a bundled language remains on
+the runtimepath under `stdpath('data')`, (1) every installed treesitter parser is
+one nvim-treesitter `main` supports, (2) each language's LSP attaches
+(`powershell_es` enforced on Windows only), and (3) the auto-started bundled
+filetypes keep nvim-treesitter's `indentexpr`. The fast `make test-nvim` runs
+Tier 1 (filetype + formatter + parser-list consistency per fixture). Adding a
+language is "drop a fixture + a row in `tests/nvim/language_matrix.lua`". The
+smoke matrix also encodes the Neovim-bundled languages (`c`, `lua`, `markdown`,
+`query`, `vim`): those must stay **out** of the install list — and any stale
+override of them is purged on config load (scoped to `stdpath('data')` so
+Neovim's own install-prefix parsers are never touched) — so Neovim's matched
+built-in parser+query is used instead of an nvim-treesitter parser that can drift
+from the bundled query (this caught a real lua `E5113: Invalid field name
+"operator"` regression).
 
 The Ubuntu container is intentionally **not** a devcontainer. It stays because
 the hosted Ubuntu runner can take the Linuxbrew path, while the container is the
