@@ -871,12 +871,8 @@ set_vscode_theme() {
         fi
         return 0
     fi
-    local backup timestamp
-    timestamp="$(date +%Y%m%d%H%M%S)"
-    backup="$settings.bak.$timestamp"
-    while [[ -e "$backup" ]]; do
-        backup="$settings.bak.$timestamp.$RANDOM"
-    done
+    local backup
+    backup="$(unique_backup_path "$settings")"
     cp "$settings" "$backup"
     local tmp; tmp="$(mktemp)"
     if write_vscode_jsonc_settings "$settings" "$tmp"; then

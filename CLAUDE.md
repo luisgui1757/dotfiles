@@ -745,7 +745,8 @@ save only**. The next plain `:w` formats normally. Implemented in
   `ConvertFrom-Json` for strict JSON and a comment-aware scanner for JSONC. The
   JSONC fallback edits only top-level keys, ignores comments/strings and nested
   objects, preserves the dominant line ending, and creates
-  `settings.json.bak.<timestamp>` before writing.
+  a non-colliding `settings.json.bak.<timestamp>[.n]` backup through the shared
+  `unique_backup_path` helper before writing.
   **Encoding is load-bearing on Windows.** The theme value must keep its accented
   é to match the extension's label "Rosé Pine", but a literal `é` byte in
   `settings.json` is fragile under Windows PowerShell 5.1: its `Get-Content`
