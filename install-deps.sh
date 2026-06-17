@@ -944,6 +944,7 @@ install_nvim_linux() {
     fi
 
     tmp="$(mktemp -d)"
+    trap 'rm -rf "$tmp"; trap - RETURN' RETURN
     tarball="$tmp/$asset"
     if ! curl -fsSL "$url" -o "$tarball"; then
         echo "  FAIL: nvim download failed from $url"
@@ -1038,6 +1039,7 @@ install_lazygit_linux() {
     fi
 
     tmp="$(mktemp -d)"
+    trap 'rm -rf "$tmp"; trap - RETURN' RETURN
     tarball="$tmp/$asset"
     if ! curl -fsSL "$url" -o "$tarball"; then
         echo "  FAIL: lazygit download failed from $url"
@@ -1067,9 +1069,12 @@ install_lazygit_linux() {
     fi
 
     install_target="$HOME/.local/bin/lazygit"
-    mkdir -p "$HOME/.local/bin"
-    cp "$tmp/lazygit" "$install_target"
-    chmod 0755 "$install_target"
+    if ! mkdir -p "$HOME/.local/bin" ||
+        ! cp "$tmp/lazygit" "$install_target" ||
+        ! chmod 0755 "$install_target"; then
+        echo "  FAIL: could not install lazygit to $install_target"
+        return 1
+    fi
     rm -rf "$tmp"
     ensure_local_bin_on_path
     printf "  installed %-26s -> %s\n" "lazygit" "$install_target"
@@ -1133,6 +1138,7 @@ install_tree_sitter_cli_linux() {
     fi
 
     tmp="$(mktemp -d)"
+    trap 'rm -rf "$tmp"; trap - RETURN' RETURN
     archive="$tmp/$asset"
     extract_dir="$tmp/extract"
     mkdir -p "$extract_dir"
@@ -1899,6 +1905,7 @@ install_nerd_font() {
     fi
     local font_dir="${XDG_DATA_HOME:-$HOME/.local/share}/fonts/HackNerdFont"
     local tmp; tmp="$(mktemp -d)"
+    trap 'rm -rf "$tmp"; trap - RETURN' RETURN
     if ! curl -fL -o "$tmp/Hack.zip" "$url"; then
         echo "  FAIL: download failed; install Hack Nerd Font manually from nerd-fonts releases"
         rm -rf "$tmp"; return 1
@@ -1909,9 +1916,15 @@ install_nerd_font() {
     fi
     mkdir -p "$font_dir"
     if have unzip; then
-        unzip -oq "$tmp/Hack.zip" -d "$font_dir"
+        if ! unzip -oq "$tmp/Hack.zip" -d "$font_dir"; then
+            echo "  FAIL: could not extract Hack.zip"
+            return 1
+        fi
     else
-        bsdtar -xf "$tmp/Hack.zip" -C "$font_dir"
+        if ! bsdtar -xf "$tmp/Hack.zip" -C "$font_dir"; then
+            echo "  FAIL: could not extract Hack.zip"
+            return 1
+        fi
     fi
     rm -rf "$tmp"
     if have fc-cache; then
@@ -1927,6 +1940,7 @@ install_nerd_font() {
 run_ghostty_ubuntu_installer() {
     local url="$1" tmp script rc=0
     tmp="$(mktemp -d)"
+    trap 'rm -rf "$tmp"; trap - RETURN' RETURN
     script="$tmp/ghostty-ubuntu-install.sh"
     if ! curl -fsSL -o "$script" "$url"; then
         echo "  FAIL: could not download ghostty installer"

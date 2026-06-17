@@ -788,8 +788,10 @@ save only**. The next plain `:w` formats normally. Implemented in
   tree-sitter CLI Linux archives, and Hack Nerd Font zip before extraction;
   `install-deps.ps1` verifies the pinned Hack.zip before registering fonts and
   the pinned Windows Terminal portable zip before extracting the fallback
-  install. A Hack.zip checksum mismatch records a `FAIL:` install marker and
-  does not extract. A successful Windows font install broadcasts
+  install. POSIX helpers that unpack into `mktemp -d` install a cleanup trap
+  immediately after creating the directory, so failure paths do not leak
+  archives or partial extracts. A Hack.zip checksum mismatch records a `FAIL:`
+  install marker and does not extract. A successful Windows font install broadcasts
   `WM_FONTCHANGE` best-effort so Windows Terminal can re-enumerate fonts without
   making setup depend on that notification. The CI workflows also pin and
   verify their direct GitHub downloads.
