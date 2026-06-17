@@ -443,7 +443,9 @@ credentials, not owner-account, admin, or `delete_repo` capable tokens.
 Run `scripts/apply-repo-safeguards.sh luisgui1757/dotfiles` after changing the
 rulesets, then verify the live posture with the commands in
 `docs/security/branch-protection.md`. Do not add the WSL2 canary to required
-checks unless asked.
+checks unless asked. If live GitHub has duplicate rulesets with the same
+protected name, the script fails closed instead of choosing one; delete the
+duplicate live ruleset and re-run.
 
 `renovate.json` owns GitHub Actions version updates and repo-pinned version/ref
 constants. Dependabot version-update PRs are intentionally disabled; GitHub

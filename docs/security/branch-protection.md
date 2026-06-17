@@ -28,7 +28,8 @@ scripts/apply-repo-safeguards.sh luisgui1757/dotfiles
 The script sets squash-only repository settings, keeps auto-merge disabled,
 upserts the three rulesets, keeps the classic branch protection fallback
 aligned, and enables GitHub security alerts/security fixes where the plan
-supports them.
+supports them. If GitHub has duplicate rulesets with the same protected name,
+the script fails closed; delete the duplicate live ruleset before re-running it.
 
 ## Verify
 
