@@ -847,7 +847,13 @@ Exit-InstallDepsIfFailures
 exit 0
 "@
 
-        $output = & $pwsh -NoProfile -ExecutionPolicy Bypass -Command $command *>&1 | Out-String
+        $oldNativeCommandUseErrorActionPreference = $PSNativeCommandUseErrorActionPreference
+        try {
+            $PSNativeCommandUseErrorActionPreference = $false
+            $output = & $pwsh -NoProfile -ExecutionPolicy Bypass -Command $command *>&1 | Out-String
+        } finally {
+            $PSNativeCommandUseErrorActionPreference = $oldNativeCommandUseErrorActionPreference
+        }
 
         $LASTEXITCODE | Should -Be 1
         $output | Should -Match 'scoop manifest refresh failed'
