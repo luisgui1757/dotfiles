@@ -636,12 +636,18 @@ function Update-ScoopTool {
     }
     if (-not $SkipManifestRefresh) {
         scoop update | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warning ("  scoop manifest refresh failed (exit {0})" -f $LASTEXITCODE)
+            $script:InstallFailures += [pscustomobject]@{ Tool=$tool; Pm='scoop'; Pkg='manifest'; ExitCode=$LASTEXITCODE }
+            return
+        }
     }
     scoop update $pkg
     if ($LASTEXITCODE -eq 0) {
         Write-Host ("  updated   {0,-26} via scoop" -f $tool)
     } else {
         Write-Warning ("  scoop update of {0} failed (exit {1})" -f $pkg, $LASTEXITCODE)
+        $script:InstallFailures += [pscustomobject]@{ Tool=$tool; Pm='scoop'; Pkg=$pkg; ExitCode=$LASTEXITCODE }
     }
 }
 
@@ -743,7 +749,7 @@ function Install-HackNerdFont {
     try {
         $tmp = New-Item -ItemType Directory -Force -Path (Join-Path $env:TEMP "hack-nf-$([guid]::NewGuid())")
         $zip = Join-Path $tmp.FullName "Hack.zip"
-        Invoke-WebRequest -Uri "https://github.com/ryanoasis/nerd-fonts/releases/download/$HackNerdFontVersion/Hack.zip" -OutFile $zip -UseBasicParsing
+        Invoke-WebRequest -Uri "https://github.com/ryanoasis/nerd-fonts/releases/download/$HackNerdFontVersion/Hack.zip" -OutFile $zip -UseBasicParsing -ErrorAction Stop
         if (-not (Test-FileSha256 -Path $zip -Expected $HackNerdFontSha256)) {
             Write-Host "  FAIL: checksum mismatch for Hack.zip" -ForegroundColor Red
             $script:InstallFailures += [pscustomobject]@{ Tool = 'Hack Nerd Font'; Pm = 'direct'; Pkg = 'Hack.zip'; ExitCode = 'sha256' }
@@ -1494,6 +1500,7 @@ function Install-VsBuildTools {
     }
 
     Write-Host "  FAIL: VS Build Tools install failed or VC toolset was not detected" -ForegroundColor Red
+    $script:InstallFailures += [pscustomobject]@{ Tool='VS Build Tools'; Pm='winget/choco'; Pkg='Microsoft.VisualStudio.Workload.VCTools'; ExitCode=$LASTEXITCODE }
 }
 
 function Install-VsBuildToolsWhenAll {
@@ -1565,6 +1572,10 @@ function Invoke-InstallDepsUpdateMode {
         Write-Host "  would:    scoop update"
     } else {
         scoop update | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warning ("  scoop manifest refresh failed (exit {0})" -f $LASTEXITCODE)
+            $script:InstallFailures += [pscustomobject]@{ Tool='scoop'; Pm='scoop'; Pkg='manifest'; ExitCode=$LASTEXITCODE }
+        }
     }
 
     foreach ($spec in (Get-CatalogUpdateSpec -SpecList $SpecList)) {

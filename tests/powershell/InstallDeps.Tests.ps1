@@ -530,7 +530,11 @@ Describe "install-deps.ps1" {
         $output = & { Install-VsBuildTools } 6>&1 | Out-String
 
         $output | Should -Match 'FAIL: VS Build Tools install failed'
-        $script:InstallFailures.Count | Should -Be 0
+        $script:InstallFailures.Count | Should -Be 1
+        $script:InstallFailures[0].Tool | Should -Be 'VS Build Tools'
+        $script:InstallFailures[0].Pm | Should -Be 'winget/choco'
+        $script:InstallFailures[0].Pkg | Should -Be 'Microsoft.VisualStudio.Workload.VCTools'
+        $script:InstallFailures[0].ExitCode | Should -Be 56
     }
 
     It "registers Windows Terminal in the Windows package catalog" {
@@ -604,6 +608,9 @@ Describe "install-deps.ps1" {
             $script:InstallFailures[0].Pkg | Should -Be 'Hack.zip'
             $script:InstallFailures[0].ExitCode | Should -Be 'sha256'
             Should -Invoke -CommandName Expand-Archive -Times 0 -Exactly
+            Should -Invoke -CommandName Invoke-WebRequest -Times 1 -Exactly -ParameterFilter {
+                $ErrorAction -eq 'Stop'
+            }
         } finally {
             if ($null -eq $oldTemp) {
                 Remove-Item Env:TEMP -ErrorAction SilentlyContinue
@@ -747,6 +754,77 @@ Describe "install-deps.ps1" {
         Should -Invoke -CommandName Install-WindowsTerminal -Times 0 -Exactly
         Should -Invoke -CommandName Install-HackNerdFont -Times 0 -Exactly
         Should -Invoke -CommandName Install-PSFzf -Times 0 -Exactly
+    }
+
+    It "records failed Scoop package updates" {
+        . $script:ImportInstallDepsForTest
+        $script:ScoopArgs = @()
+
+        Mock -CommandName Get-Command -MockWith {
+            param([string]$Name)
+            if ($Name -eq 'scoop') {
+                return [pscustomobject]@{ Name = $Name; Source = $Name }
+            }
+            return $null
+        }
+        Mock -CommandName scoop -MockWith {
+            $joined = $args -join ' '
+            $script:ScoopArgs += $joined
+            switch ($joined) {
+                'list git' {
+                    $global:LASTEXITCODE = 0
+                    return 'git 2.50.0'
+                }
+                'update git' {
+                    $global:LASTEXITCODE = 44
+                    return
+                }
+                default {
+                    $global:LASTEXITCODE = 0
+                }
+            }
+        }
+
+        & { Update-ScoopTool git -NoPrompt -SkipManifestRefresh -AssumePresent } 3>&1 6>&1 | Out-Null
+
+        $script:ScoopArgs | Should -Contain 'update git'
+        $script:InstallFailures.Count | Should -Be 1
+        $script:InstallFailures[0].Tool | Should -Be 'git'
+        $script:InstallFailures[0].Pm | Should -Be 'scoop'
+        $script:InstallFailures[0].Pkg | Should -Be 'git'
+        $script:InstallFailures[0].ExitCode | Should -Be 44
+    }
+
+    It "records failed Scoop manifest refresh in update mode" {
+        . $script:ImportInstallDepsForTest
+        $script:ScoopArgs = @()
+
+        Mock -CommandName Get-Command -MockWith {
+            param([string]$Name)
+            if ($Name -eq 'scoop') {
+                return [pscustomobject]@{ Name = $Name; Source = $Name }
+            }
+            return $null
+        }
+        Mock -CommandName scoop -MockWith {
+            $joined = $args -join ' '
+            $script:ScoopArgs += $joined
+            if ($joined -eq 'update') {
+                $global:LASTEXITCODE = 33
+                return
+            }
+            $global:LASTEXITCODE = 0
+        }
+
+        $output = & { Invoke-InstallDepsUpdateMode -SpecList @() -IsDryRun $false } 3>&1 6>&1 | Out-String
+
+        $output | Should -Match 'scoop manifest refresh failed'
+        $script:ScoopArgs | Should -Contain 'update'
+        $script:InstallFailures.Count | Should -Be 1
+        $script:InstallFailures[0].Tool | Should -Be 'scoop'
+        $script:InstallFailures[0].Pm | Should -Be 'scoop'
+        $script:InstallFailures[0].Pkg | Should -Be 'manifest'
+        $script:InstallFailures[0].ExitCode | Should -Be 33
     }
 }
 

@@ -641,9 +641,11 @@ save only**. The next plain `:w` formats normally. Implemented in
   `install-deps.ps1 -All` auto-installs Visual Studio 2022 Build Tools with the
   `Microsoft.VisualStudio.Workload.VCTools` workload through winget or choco.
   Scoop does not carry VS Build Tools, so this is the deliberate exception to
-  the Scoop-first catalog rule. `setup.ps1` imports the VS DevShell into the
-  current process before headless `Lazy! sync`, so `tree-sitter build` inherits
-  `cl.exe`, `INCLUDE`, and `LIB`. Do not put the DevShell import in the
+  the Scoop-first catalog rule. A failed VS Build Tools attempt records an
+  `InstallFailures` entry so `-All` cannot report success without MSVC.
+  `setup.ps1` imports the VS DevShell into the current process before headless
+  `Lazy! sync`, so `tree-sitter build` inherits `cl.exe`, `INCLUDE`, and `LIB`.
+  Do not put the DevShell import in the
   PowerShell profile. Zig stays installed for LuaSnip `jsregexp`, but do not
   wire zig into nvim-treesitter main: the old `master` branch could use it,
   while main emits MSVC-style `cc` crate flags that require MSVC. Ad-hoc
@@ -675,7 +677,9 @@ save only**. The next plain `:w` formats normally. Implemented in
   current process PATH and persistent User PATH.
 - **`Update-ScoopTool` is the only scoop update path.** It is intentionally
   single-package and consent-gated for the PowerShell 7 keep-latest path; never
-  replace it with `scoop update *` or another blanket scoop upgrade.
+  replace it with `scoop update *` or another blanket scoop upgrade. Failed
+  manifest refreshes or package updates append to `InstallFailures`, so update
+  mode exits nonzero when a scoped refresh did not actually succeed.
 - **Windows CI uses Scoop's documented elevated bootstrap.** GitHub-hosted
   `windows-2025` runners are elevated, and Scoop blocks elevated install by
   default. `Install-Scoop` detects elevation and runs the official installer
