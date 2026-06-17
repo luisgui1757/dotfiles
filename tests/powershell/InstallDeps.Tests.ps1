@@ -826,6 +826,33 @@ Describe "install-deps.ps1" {
         $script:InstallFailures[0].Pkg | Should -Be 'manifest'
         $script:InstallFailures[0].ExitCode | Should -Be 33
     }
+
+    It "exits nonzero when update mode records failures" {
+        $pwsh = (Get-Command pwsh -ErrorAction Stop).Source
+        $installDepsPath = $script:InstallDeps.Replace("'", "''")
+        $command = @"
+`$env:INSTALL_DEPS_PS1_SOURCE_ONLY = '1'
+. '$installDepsPath'
+Remove-Item Env:INSTALL_DEPS_PS1_SOURCE_ONLY -ErrorAction SilentlyContinue
+function scoop {
+    `$joined = `$args -join ' '
+    if (`$joined -eq 'update') {
+        `$global:LASTEXITCODE = 33
+        return
+    }
+    `$global:LASTEXITCODE = 0
+}
+Invoke-InstallDepsUpdateMode -SpecList @() -IsDryRun:`$false
+Exit-InstallDepsIfFailures
+exit 0
+"@
+
+        $output = & $pwsh -NoProfile -ExecutionPolicy Bypass -Command $command *>&1 | Out-String
+
+        $LASTEXITCODE | Should -Be 1
+        $output | Should -Match 'scoop manifest refresh failed'
+        $output | Should -Match 'install-deps: completed with 1 FAILED install'
+    }
 }
 
 Describe "Set-VSCodeTheme" {

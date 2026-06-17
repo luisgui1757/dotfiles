@@ -1596,12 +1596,29 @@ function Invoke-InstallDepsUpdateMode {
     Write-Host "note: pinned binaries (Neovim/lazygit/tree-sitter Linux archives, Hack Nerd Font, Windows Terminal portable), PSFzf, plugins, and configs update via git pull and re-running setup."
 }
 
+function Exit-InstallDepsIfFailures {
+    if ($script:InstallFailures.Count -eq 0) { return }
+
+    Write-Host "install-deps: completed with $($script:InstallFailures.Count) FAILED install(s):"
+    foreach ($f in $script:InstallFailures) {
+        Write-Host ("  FAIL  {0,-20} via {1,-8} pkg={2}  (exit {3})" -f $f.Tool, $f.Pm, $f.Pkg, $f.ExitCode) -ForegroundColor Red
+    }
+    Write-Host ""
+    Write-Host "Re-run install-deps.ps1 after addressing the failures, or"
+    Write-Host "install the listed packages manually."
+    if ($DryRun) { Write-Host "(dry run -- nothing was actually attempted)" }
+    Write-Host ""
+    Write-Host "Next: run .\setup.ps1, or let setup.ps1 continue if it invoked this phase."
+    exit 1
+}
+
 if ($env:INSTALL_DEPS_PS1_SOURCE_ONLY) { return }
 
 $Pm = Get-AvailablePM
 
 if ($Update) {
     Invoke-InstallDepsUpdateMode -IsDryRun $DryRun
+    Exit-InstallDepsIfFailures
     exit 0
 }
 
@@ -1705,19 +1722,7 @@ Write-Host "            Use Windows Terminal (setup applies the rose-pine"
 Write-Host "            fragment by default) or WezTerm for now."
 
 Write-Host ""
-if ($script:InstallFailures.Count -gt 0) {
-    Write-Host "install-deps: completed with $($script:InstallFailures.Count) FAILED install(s):"
-    foreach ($f in $script:InstallFailures) {
-        Write-Host ("  FAIL  {0,-20} via {1,-8} pkg={2}  (exit {3})" -f $f.Tool, $f.Pm, $f.Pkg, $f.ExitCode) -ForegroundColor Red
-    }
-    Write-Host ""
-    Write-Host "Re-run install-deps.ps1 after addressing the failures, or"
-    Write-Host "install the listed packages manually."
-    if ($DryRun) { Write-Host "(dry run -- nothing was actually attempted)" }
-    Write-Host ""
-    Write-Host "Next: run .\setup.ps1, or let setup.ps1 continue if it invoked this phase."
-    exit 1
-}
+Exit-InstallDepsIfFailures
 Write-Host "install-deps: done"
 if ($DryRun) { Write-Host "(dry run -- nothing was installed)" }
 Write-Host ""
