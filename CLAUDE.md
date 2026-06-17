@@ -364,7 +364,9 @@ When adding a new spec:
 `chezmoi-parity` migration gate. Warnings are treated as failures where the
 tools expose them cleanly: shellcheck exits nonzero, PSScriptAnalyzer runs at
 `Warning,Error`, yamllint/parser checks are part of `make test-static`, and
-Windows CI treats missing test dependencies as fatal.
+Windows CI treats missing test dependencies as fatal. PSGallery module installs
+in Windows CI use bounded retries for transient gallery lookup failures; the
+final miss still fails the job.
 
 `e2e-install.yml` is the required real-install gate. The jobs cover different
 install paths, not symmetric container platforms:

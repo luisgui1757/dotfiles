@@ -332,7 +332,9 @@ Pull requests are meant to be gated by two workflows:
   starship, Neovim, Windows Pester/PSScriptAnalyzer, and `chezmoi-parity`
   suites. Warnings are treated as failures where the tools expose them cleanly:
   shellcheck exits nonzero, PSScriptAnalyzer runs at `Warning,Error`, and YAML
-  parsing/linting is part of `make test-static`.
+  parsing/linting is part of `make test-static`. Windows PSGallery module
+  installs retry transient lookup failures, but missing test dependencies remain
+  fatal.
 - `.github/workflows/e2e-install.yml` is the real install guarantee. It proves
   the public setup paths on fresh hosted runners and keeps one clean Ubuntu
   container for the native `apt` branch.
