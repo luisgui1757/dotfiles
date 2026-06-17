@@ -486,7 +486,9 @@ npx --yes --package node@24.11.0 -- bash -c \
   'npm exec --yes --package renovate@latest -- renovate-config-validator --strict renovate.json'
 ```
 
-`tests/static/json_lint.sh` only checks JSON syntax. The Renovate validator
+`tests/static/json_lint.sh` only checks JSON syntax. Its JSONC path strips `//`
+comments with a string-aware Python pass so URL values like `https://...` and
+quoted `//` text survive before `jq` parses the result. The Renovate validator
 checks schema, and the first live Dependency Dashboard/PR should still be used
 to confirm the custom regex managers match the intended files.
 

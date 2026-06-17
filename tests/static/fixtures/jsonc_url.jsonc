@@ -1,0 +1,6 @@
+{
+  // URLs contain // inside quoted strings.
+  "url": "https://example.com/docs",
+  "note": "keep https://example.com/path // inside this string",
+  "enabled": true // trailing JSONC comment
+}
