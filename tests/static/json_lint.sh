@@ -8,6 +8,15 @@ err=$(mktemp "$CACHE_DIR/json-lint.XXXXXX")
 trap 'rm -f "$err"' EXIT
 
 strip_jsonc_comments() {
+    # Prefer a string-aware Python pass that only strips a // when it is OUTSIDE
+    # a quoted string (so URL values like "https://..." and quoted // text
+    # survive). Gate on python3 and fall back to the simple sed strip when it is
+    # absent, matching the repo's skip-gracefully convention (yaml_lint /
+    # toml_lint also gate on python3).
+    if ! command -v python3 >/dev/null 2>&1; then
+        sed -E 's|//[^"]*$||g' "$1"
+        return
+    fi
     python3 - "$1" <<'PY'
 import sys
 from pathlib import Path
