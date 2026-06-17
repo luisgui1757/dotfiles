@@ -1042,7 +1042,9 @@ host OS or shell would otherwise hide a branch from CI.
   `vim-options.lua`.
 - **`vim.opt.clipboard = "unnamedplus"`** even on macOS — works fine via
   pbcopy/pbpaste. The single-register `unnamed` value would lock WSL/Linux
-  out.
+  out. The delayed missing-provider warning in `vim-options.lua` is routed
+  through `_warn_if_missing_clipboard_provider` so `clipboard_spec.lua` can test
+  both the warning branch and the `vim.g.clipboard` escape hatch.
 - **`shells/zshrc` has shellcheck disable directives** at the top — zsh
   has glob qualifiers (`(#qN.mh+24)`) that shellcheck (a bash linter)
   cannot parse. The directives suppress the noise; the file is otherwise

@@ -1,3 +1,5 @@
+local M = {}
+
 -- Indentation
 vim.opt.expandtab = true
 vim.opt.tabstop = 2
@@ -50,32 +52,34 @@ vim.opt.clipboard = "unnamedplus"
 -- PATH, yanks will silently fail to reach the system clipboard. Warn once
 -- on a delayed timer so the message lands AFTER the colorscheme + lualine
 -- load (otherwise it gets buried in startup output).
+function M._warn_if_missing_clipboard_provider()
+  -- Escape hatch: a user-defined vim.g.clipboard provider overrides
+  -- nvim's discovery chain. Don't warn in that case.
+  if vim.g.clipboard ~= nil then
+    return
+  end
+  local providers = { "pbcopy", "wl-copy", "xclip", "xsel", "win32yank.exe" }
+  for _, p in ipairs(providers) do
+    if vim.fn.executable(p) == 1 then
+      return
+    end
+  end
+  vim.notify(
+    "clipboard: no provider on PATH (pbcopy / wl-copy / xclip / xsel / win32yank.exe).\n"
+      .. "Yanks will not reach the system clipboard. Install one for your OS:\n"
+      .. "  macOS:        pre-installed (pbcopy)\n"
+      .. "  Linux X11:    sudo apt install xclip\n"
+      .. "  Linux Wayland: sudo apt install wl-clipboard\n"
+      .. "  WSL:          install win32yank on the Windows side (scoop install win32yank)\n"
+      .. "(Set vim.g.clipboard = {...} to define a custom provider and silence this warning.)",
+    vim.log.levels.WARN
+  )
+end
+
 vim.api.nvim_create_autocmd("VimEnter", {
   once = true,
   callback = function()
-    vim.defer_fn(function()
-      -- Escape hatch: a user-defined vim.g.clipboard provider overrides
-      -- nvim's discovery chain. Don't warn in that case.
-      if vim.g.clipboard ~= nil then
-        return
-      end
-      local providers = { "pbcopy", "wl-copy", "xclip", "xsel", "win32yank.exe" }
-      for _, p in ipairs(providers) do
-        if vim.fn.executable(p) == 1 then
-          return
-        end
-      end
-      vim.notify(
-        "clipboard: no provider on PATH (pbcopy / wl-copy / xclip / xsel / win32yank.exe).\n"
-          .. "Yanks will not reach the system clipboard. Install one for your OS:\n"
-          .. "  macOS:        pre-installed (pbcopy)\n"
-          .. "  Linux X11:    sudo apt install xclip\n"
-          .. "  Linux Wayland: sudo apt install wl-clipboard\n"
-          .. "  WSL:          install win32yank on the Windows side (scoop install win32yank)\n"
-          .. "(Set vim.g.clipboard = {...} to define a custom provider and silence this warning.)",
-        vim.log.levels.WARN
-      )
-    end, 500)
+    vim.defer_fn(M._warn_if_missing_clipboard_provider, 500)
   end,
 })
 
@@ -142,3 +146,5 @@ vim.api.nvim_create_user_command("E", function(opts)
     vim.cmd("edit " .. vim.fn.fnameescape(opts.args))
   end
 end, { nargs = "?", complete = "file", desc = "Open netrw, or edit the given file" })
+
+return M
