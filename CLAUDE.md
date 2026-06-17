@@ -507,7 +507,9 @@ save only**. The next plain `:w` formats normally. Implemented in
   file/symlink targets to `<target>.bak.<timestamp>` only when the target is not
   already exact chezmoi state or content-equivalent to the chezmoi target, then
   run `chezmoi --no-tty --force apply`. `--skip-bootstrap` remains a back-compat
-  alias for `--skip-config` / `-SkipConfig`.
+  alias for `--skip-config` / `-SkipConfig`. POSIX dry-run renders temporary
+  chezmoi config/expected files and must clean them on failure; Homebrew
+  `shellenv` output is evaled only after the `brew shellenv` command succeeds.
 - `setup.ps1` runs a symlink-privilege pre-flight before chezmoi apply because
   the Windows Neovim target is still a directory symlink: dry-run warns and
   skips the probe; real runs print elevated/Developer Mode state plus the

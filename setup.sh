@@ -158,7 +158,7 @@ phase() {
 }
 
 refresh_runtime_path() {
-    local brew_bin dir
+    local brew_bin brew_env dir
 
     [[ "$DRY_RUN" -eq 1 ]] && return 0
 
@@ -168,7 +168,11 @@ refresh_runtime_path() {
         "$HOME/.linuxbrew/bin/brew" \
         /home/linuxbrew/.linuxbrew/bin/brew; do
         if [[ -n "$brew_bin" && -x "$brew_bin" ]]; then
-            eval "$("$brew_bin" shellenv)"
+            if brew_env="$("$brew_bin" shellenv)"; then
+                eval "$brew_env"
+            else
+                echo "  WARN: $brew_bin shellenv failed; leaving PATH unchanged for that Homebrew prefix" >&2
+            fi
             break
         fi
     done
@@ -250,6 +254,7 @@ target_content_matches_chezmoi() {
     local target="$1" expected_file expected_ref
 
     expected_file="$(mktemp)"
+    trap 'rm -f "$expected_file"; trap - RETURN' RETURN
     if ! run_chezmoi cat "$target" > "$expected_file" 2>/dev/null; then
         rm -f "$expected_file"
         return 1
@@ -326,6 +331,11 @@ run_or_fail() {
     echo "  FAIL: $label exited $rc"
     echo "        To continue past plugin/LSP failures, re-run with --best-effort."
     exit "$rc"
+}
+
+cleanup_chezmoi_dry_config() {
+    rm -f "${CHEZMOI_DRY_CONFIG:-}"
+    CHEZMOI_CONFIG_ARGS=()
 }
 
 run_update_mode() {
@@ -406,12 +416,13 @@ if [[ "$SKIP_BOOTSTRAP" -eq 0 ]]; then
         fi
     elif [[ "$DRY_RUN" -eq 1 ]]; then
         CHEZMOI_DRY_CONFIG="$(mktemp)"
+        trap 'cleanup_chezmoi_dry_config; trap - EXIT' EXIT
         render_chezmoi_config_template "$CHEZMOI_DRY_CONFIG"
         CHEZMOI_CONFIG_ARGS=(--config "$CHEZMOI_DRY_CONFIG" --config-format toml)
         backup_preexisting_managed_targets
         run_chezmoi --dry-run --verbose apply
-        rm -f "$CHEZMOI_DRY_CONFIG"
-        CHEZMOI_CONFIG_ARGS=()
+        cleanup_chezmoi_dry_config
+        trap - EXIT
     else
         chezmoi "${CHEZMOI_BASE_ARGS[@]}" init
         backup_preexisting_managed_targets
