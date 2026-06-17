@@ -124,19 +124,7 @@ native_linux_pm() {
 }
 
 detect_update_pm() {
-    case "$(uname -s)" in
-        Darwin)
-            if homebrew_bin >/dev/null 2>&1; then echo brew
-            else echo brew_missing
-            fi
-            ;;
-        Linux)
-            native_linux_pm
-            ;;
-        *)
-            echo unknown
-            ;;
-    esac
+    detect_pm
 }
 
 homebrew_bin() {
@@ -1501,6 +1489,14 @@ EOF
 
 pkg_for() {
     local tool="$1"
+    if [[ "$PM" == "apk" ]]; then
+        case "$tool" in
+            lazygit|tree-sitter)
+                printf '%s\n' "$tool"
+                return
+                ;;
+        esac
+    fi
     local row
     row=$(printf '%s\n' "$PKG_TABLE" | awk -F'|' -v t="$tool" '$1==t{print; exit}')
     [[ -z "$row" ]] && { echo ""; return; }
@@ -1629,6 +1625,8 @@ pm_update() {
 is_pinned_direct_update_tool() {
     local tool="$1"
     [[ "$(uname -s)" == "Linux" ]] || return 1
+    [[ "$PM" == "brew" ]] && return 1
+    [[ "$(native_linux_pm 2>/dev/null || true)" == "apk" ]] && return 1
     case "$tool" in
         nvim|lazygit|tree-sitter) return 0 ;;
         *) return 1 ;;

@@ -608,8 +608,10 @@ save only**. The next plain `:w` formats normally. Implemented in
   `scoop update <pkg>` after one manifest refresh). It must not run blanket
   upgrades such as `brew upgrade`, `apt upgrade`, or `scoop update *`, and it
   must not touch pinned direct downloads, PSFzf, `lazy-lock.json`, or configs.
-  On native Linux, `nvim`, `lazygit`, and `tree-sitter` are pinned
-  direct-download binaries and stay out of the update path.
+  On native Linux without Linuxbrew or Alpine/apk, `nvim`, `lazygit`, and
+  `tree-sitter` are pinned direct-download binaries and stay out of the update
+  path. Linuxbrew updates them through `brew upgrade <formula>`; Alpine updates
+  its native `neovim`, `lazygit`, and `tree-sitter` packages through apk.
 - **A C compiler is installed so LuaSnip can build `jsregexp`.** Without one,
   the nvim Lazy build prints "No C compiler found" and `jsregexp` is skipped
   (LuaSnip still works, minus JS-regex snippet transforms). POSIX installs the

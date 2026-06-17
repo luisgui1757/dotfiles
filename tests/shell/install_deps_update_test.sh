@@ -59,4 +59,52 @@ if grep -Eq 'apt-get install -y (fd-find|neovim|lazygit|tree-sitter)' "$COMMAND_
     fail "update mode attempted an install or pinned binary package"
 fi
 
+PM=apk
+: > "$COMMAND_LOG"
+native_linux_pm() {
+    printf '%s\n' "apk"
+}
+pm_pkg_installed() {
+    local _pm="$1" pkg="$2"
+    case "$pkg" in
+        neovim|lazygit|tree-sitter) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+output="$(update_catalog_tools)"
+
+printf '%s\n' "$output" | grep -Eq '^  skipped[[:space:]]+nvim[[:space:]]+pinned Linux direct download' \
+    && fail "apk-managed nvim was skipped as a pinned Linux direct download"
+printf '%s\n' "$output" | grep -Eq '^  skipped[[:space:]]+tree-sitter[[:space:]]+pinned Linux direct download' \
+    && fail "apk-managed tree-sitter was skipped as a pinned Linux direct download"
+grep -F 'apk upgrade neovim' "$COMMAND_LOG" >/dev/null \
+    || fail "apk-managed nvim did not use apk upgrade neovim"
+grep -F 'apk upgrade tree-sitter' "$COMMAND_LOG" >/dev/null \
+    || fail "apk-managed tree-sitter did not use apk upgrade tree-sitter"
+grep -F 'apk upgrade lazygit' "$COMMAND_LOG" >/dev/null \
+    || fail "apk-managed lazygit did not use apk upgrade lazygit"
+
+PM=brew
+: > "$COMMAND_LOG"
+pm_pkg_installed() {
+    local _pm="$1" pkg="$2"
+    case "$pkg" in
+        neovim|lazygit|tree-sitter-cli) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+brew() {
+    printf '%s\n' "brew $*" >> "$COMMAND_LOG"
+}
+output="$(update_catalog_tools)"
+
+printf '%s\n' "$output" | grep -Eq '^  skipped[[:space:]]+nvim[[:space:]]+pinned Linux direct download' \
+    && fail "Linuxbrew-managed nvim was skipped as a pinned Linux direct download"
+printf '%s\n' "$output" | grep -Eq '^  skipped[[:space:]]+tree-sitter[[:space:]]+pinned Linux direct download' \
+    && fail "Linuxbrew-managed tree-sitter was skipped as a pinned Linux direct download"
+grep -F 'brew upgrade neovim' "$COMMAND_LOG" >/dev/null \
+    || fail "Linuxbrew-managed nvim did not use brew upgrade neovim"
+grep -F 'brew upgrade tree-sitter-cli' "$COMMAND_LOG" >/dev/null \
+    || fail "Linuxbrew-managed tree-sitter did not use brew upgrade tree-sitter-cli"
+
 echo "OK"
