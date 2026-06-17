@@ -77,6 +77,12 @@ return {
       -- Avoid the recursive `o/**` glob — it traversed huge build trees on
       -- every first buffer open. clangd already auto-discovers ancestors
       -- of the file's directory, so this just nudges the *workspace* root.
+      -- NOTE (deferred): this probes RELATIVE paths at config-load, i.e. relative
+      -- to nvim's startup cwd and frozen for the session -- correct for the common
+      -- `cd project && nvim` case but stale across projects. A proper per-root fix
+      -- (compute --compile-commands-dir from the resolved root, or rely on a
+      -- project `.clangd`) needs a real C project to validate and is intentionally
+      -- left out of the audit PR rather than shipped unverified.
       local function get_clangd_cmd()
         local cmd = { "clangd", "--background-index", "--clang-tidy" }
         local fixed_candidates = {
@@ -122,7 +128,11 @@ return {
         settings = {
           ["rust-analyzer"] = {
             cargo = { allFeatures = true },
-            checkOnSave = { command = "clippy" },
+            -- rust-analyzer removed the nested `checkOnSave = { command = ... }`
+            -- schema: `checkOnSave` is now a boolean and the command moved to
+            -- `check.command`. The old nested form is silently ignored.
+            checkOnSave = true,
+            check = { command = "clippy" },
           },
         },
       })
@@ -181,12 +191,15 @@ return {
       end
       vim.lsp.enable(enabled_servers)
 
-      -- Race fix: if a buffer opened *before* mason-tool-installer
-      -- finished installing its server, those buffers won't have an
-      -- LSP client. Re-fire the LspAttach codepath for each loaded
-      -- buffer by issuing :edit INSIDE THAT BUFFER via nvim_buf_call
-      -- (the previous version only re-edited the current buffer for
-      -- every iteration, leaving background buffers stranded).
+      -- Race fix: if a buffer opened *before* mason-tool-installer finished
+      -- installing its server, that buffer has no LSP client. Re-fire FileType
+      -- for each loaded buffer, which re-runs the vim.lsp.enable() attach check
+      -- (LSP is FileType-driven) WITHOUT reloading the buffer. The previous
+      -- version issued :edit, which throws E37 ("No write since last change") on
+      -- any buffer with unsaved edits; the pcall swallowed it, silently leaving
+      -- every modified buffer stranded with no LSP. Re-asserting &filetype inside
+      -- the buffer's own context fires FileType for exactly that buffer and never
+      -- touches its contents.
       vim.api.nvim_create_autocmd("User", {
         pattern = "MasonToolsUpdateCompleted",
         callback = function()
@@ -195,9 +208,10 @@ return {
               vim.api.nvim_buf_is_loaded(buf)
               and vim.bo[buf].buftype == ""
               and vim.api.nvim_buf_get_name(buf) ~= ""
+              and vim.bo[buf].filetype ~= ""
             then
               pcall(vim.api.nvim_buf_call, buf, function()
-                vim.cmd("edit")
+                vim.bo.filetype = vim.bo.filetype
               end)
             end
           end

@@ -58,6 +58,15 @@ done
 
 # ---- Bash 3.2-safe helpers ---------------------------------------------------
 have() { command -v "$1" >/dev/null 2>&1; }
+# Idempotently prepend ~/.local/bin to PATH for THIS process (pinned binaries,
+# pip --user, and chezmoi all land there). Safe to call repeatedly.
+ensure_local_bin_on_path() {
+    if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
+        PATH="$HOME/.local/bin:$PATH"
+        export PATH
+        hash -r 2>/dev/null || true
+    fi
+}
 verify_sha256() {
     local f="$1" expected="$2" got
     if have shasum; then
@@ -1060,11 +1069,7 @@ install_lazygit_linux() {
     cp "$tmp/lazygit" "$install_target"
     chmod 0755 "$install_target"
     rm -rf "$tmp"
-    if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
-        PATH="$HOME/.local/bin:$PATH"
-        export PATH
-        hash -r 2>/dev/null || true
-    fi
+    ensure_local_bin_on_path
     printf "  installed %-26s -> %s\n" "lazygit" "$install_target"
 }
 
@@ -1160,11 +1165,7 @@ install_tree_sitter_cli_linux() {
     cp "$source_bin" "$install_target"
     chmod 0755 "$install_target"
     rm -rf "$tmp"
-    if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
-        PATH="$HOME/.local/bin:$PATH"
-        export PATH
-        hash -r 2>/dev/null || true
-    fi
+    ensure_local_bin_on_path
     printf "  installed %-26s -> %s\n" "tree-sitter" "$install_target"
 }
 
@@ -1320,11 +1321,7 @@ install_chezmoi() {
     require_downloader || return 1
     mkdir -p "$HOME/.local/bin"
     if sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin" -t "$CHEZMOI_VERSION"; then
-        if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
-            PATH="$HOME/.local/bin:$PATH"
-            export PATH
-            hash -r 2>/dev/null || true
-        fi
+        ensure_local_bin_on_path
         printf "  installed %-26s %s -> %s\n" "chezmoi" "$CHEZMOI_VERSION" "$HOME/.local/bin/chezmoi"
     else
         echo "  WARN: chezmoi install failed; continuing"
@@ -1422,18 +1419,31 @@ install_zsh_plugins() {
         return 0
     fi
 
+    # Attempt BOTH plugins (one failing must not skip the other) and do NOT
+    # swallow the result with `|| true` -- that let setup report success with a
+    # plugin absent. Each `|| rc=1` absorbs a failure (so `set -e` -- enabled at
+    # the top of this file -- does not abort mid-list), then we emit a FAIL:
+    # marker so CI catches it. We deliberately still RETURN 0 (continue): zsh
+    # plugins are non-critical (the shell works, just without the fuzzy-Tab menu /
+    # gray hint), so login-shell adoption and the rest of setup still run. This is
+    # the same emit-FAIL-and-continue pattern as install_ghostty_linux.
+    local rc=0
     install_zsh_plugin_repo \
         "fzf-tab" \
         "https://github.com/Aloxaf/fzf-tab.git" \
         "$FZF_TAB_VERSION" \
         "$FZF_TAB_COMMIT" \
-        "fzf-tab.plugin.zsh" || true
+        "fzf-tab.plugin.zsh" || rc=1
     install_zsh_plugin_repo \
         "zsh-autosuggestions" \
         "https://github.com/zsh-users/zsh-autosuggestions.git" \
         "$ZSH_AUTOSUGGESTIONS_VERSION" \
         "$ZSH_AUTOSUGGESTIONS_COMMIT" \
-        "zsh-autosuggestions.zsh" || true
+        "zsh-autosuggestions.zsh" || rc=1
+    if [[ "$rc" -ne 0 ]]; then
+        printf "  FAIL: %-26s one or more pinned zsh plugins failed to install\n" "zsh plugins" >&2
+    fi
+    return 0
 }
 
 install_ghostty_macos() {
@@ -1514,7 +1524,8 @@ pm_install() {
     fi
     case "$PM" in
         brew)   brew install "${pkgs[@]}" ;;
-        apt)    maybe_sudo apt-get update -qq && maybe_sudo apt-get install -y "${pkgs[@]}" ;;
+        apt)    maybe_sudo apt-get update -qq || echo "  WARN: apt-get update failed; installing from the existing apt cache" >&2
+                maybe_sudo apt-get install -y "${pkgs[@]}" ;;
         dnf)    maybe_sudo dnf install -y "${pkgs[@]}" ;;
         pacman) maybe_sudo pacman -S --noconfirm "${pkgs[@]}" ;;
         zypper) maybe_sudo zypper install -y "${pkgs[@]}" ;;
@@ -1534,7 +1545,8 @@ native_linux_pm_install() {
         echo "  would: $native_pm install ${pkgs[*]}"; return 0
     fi
     case "$native_pm" in
-        apt)    maybe_sudo apt-get update -qq && maybe_sudo apt-get install -y "${pkgs[@]}" ;;
+        apt)    maybe_sudo apt-get update -qq || echo "  WARN: apt-get update failed; installing from the existing apt cache" >&2
+                maybe_sudo apt-get install -y "${pkgs[@]}" ;;
         dnf)    maybe_sudo dnf install -y "${pkgs[@]}" ;;
         pacman) maybe_sudo pacman -S --noconfirm --needed "${pkgs[@]}" ;;
         zypper) maybe_sudo zypper install -y "${pkgs[@]}" ;;
@@ -1598,7 +1610,8 @@ pm_update() {
     fi
     case "$PM" in
         brew)   brew upgrade "$pkg" ;;
-        apt)    maybe_sudo apt-get update -qq && maybe_sudo apt-get install -y --only-upgrade "$pkg" ;;
+        apt)    maybe_sudo apt-get update -qq || echo "  WARN: apt-get update failed; upgrading from the existing apt cache" >&2
+                maybe_sudo apt-get install -y --only-upgrade "$pkg" ;;
         dnf)    maybe_sudo dnf upgrade -y "$pkg" ;;
         pacman) maybe_sudo pacman -S --noconfirm "$pkg" ;;
         zypper) maybe_sudo zypper update -y "$pkg" ;;
@@ -1807,11 +1820,7 @@ install() {
             if [[ ! -L "$fd_link" ]]; then
                 ln -s "$fdfind_bin" "$fd_link"
             fi
-            if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
-                PATH="$HOME/.local/bin:$PATH"
-                export PATH
-                hash -r 2>/dev/null || true
-            fi
+            ensure_local_bin_on_path
             printf "  set       %-26s ~/.local/bin/fd -> fdfind\n" "fd"
         fi
     else
@@ -1827,9 +1836,12 @@ install_starship_curl() {
     fi
     if ask "Install starship (prompt) via official curl installer?"; then
         if [[ "$DRY_RUN" -eq 1 ]]; then
-            echo "  would: curl -sS https://starship.rs/install.sh | sh -s -- -y"
+            echo "  would: curl -fsSL https://starship.rs/install.sh | sh -s -- -y"
         else
-            curl -sS https://starship.rs/install.sh | sh -s -- -y || echo "  WARN: starship install failed"
+            # -f: fail (non-zero) on an HTTP 4xx/5xx instead of piping an error
+            # page into sh. -L: follow redirects. Keeps the documented official
+            # curl|sh install path, just makes the fetch fail-closed.
+            curl -fsSL https://starship.rs/install.sh | sh -s -- -y || echo "  WARN: starship install failed"
         fi
     else
         printf "  skipped   %-26s\n" "starship"

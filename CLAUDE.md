@@ -464,6 +464,14 @@ direct-download SHA-256 constants as Renovate `currentDigest` captures; in
 Renovate terms those are not datasource digests. Only the cargo-binstall git
 commit is captured as a digest.
 
+Several pins are also **mirrored across files** (nvim version/SHA in
+`install-deps.sh`, `test.yml`, and `tests/shell/install_nvim_linux{,_fail}_test.sh`;
+zsh plugin tag/commit in `install-deps.sh`, `home/.chezmoiexternal.toml.tmpl`, and
+the verify-pins run-script). A Renovate bump touches one surface and strands the
+mirrors. `tests/static/pin_consistency_test.sh` is the canonical drift guard — it
+fails CI when any mirror disagrees. When you bump a pin, update every mirror and
+keep that test green.
+
 Validate `renovate.json` locally with Renovate's own schema validator, not just
 `jq`: `make validate-renovate`. That target runs Renovate under Node 24 because
 Renovate's `engines.node` supports the Node 24 LTS line; running the validator
@@ -691,6 +699,13 @@ save only**. The next plain `:w` formats normally. Implemented in
   `fdfind`, but Telescope expects `fd`. After installing `fd-find`,
   `install-deps.sh` idempotently links `~/.local/bin/fd` to `fdfind` and adds
   that directory to the current PATH.
+- **Apt `update` is best-effort, decoupled from `install`.** The apt arms of
+  `pm_install`, `native_linux_pm_install`, and `pm_update` run `apt-get update`
+  on its own line (`|| warn`), then ALWAYS run `apt-get install`. Do NOT restore
+  the `apt-get update && apt-get install` coupling: a single flaky `update` (an
+  unreachable third-party PPA, an expired repo key, a transient mirror outage)
+  would short-circuit the `&&` and skip the install entirely, even for packages
+  already in the local apt cache. Guarded by `tests/shell/apt_update_resilience_test.sh`.
 - **Alpine installs Neovim through `apk`.** The official Neovim Linux tarball
   targets glibc systems, so Alpine uses its native `neovim` package instead;
   e2e still enforces the repo's Neovim >= 0.12 floor.

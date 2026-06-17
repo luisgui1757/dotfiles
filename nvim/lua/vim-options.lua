@@ -114,9 +114,16 @@ vim.api.nvim_create_user_command("WNF", function()
   vim.b.skip_format_on_save = true
   vim.cmd.write()
 end, { desc = "Write without running formatters" })
-vim.cmd("cnoreabbrev wnf WNF")
+-- Expand `wnf` to `WNF` ONLY when it is the entire command (command position),
+-- not when the word 'wnf' appears as an argument (e.g. `:e wnf.txt`). A bare
+-- `cnoreabbrev wnf WNF` is a global cmdline abbreviation that fires anywhere on
+-- the cmdline.
+vim.cmd([[cnoreabbrev <expr> wnf (getcmdtype() == ':' && getcmdline() ==# 'wnf') ? 'WNF' : 'wnf']])
 
+-- Augroup so re-sourcing this file (tests, :luafile) clears the prior autocmd
+-- instead of stacking a duplicate that runs the callback twice per write.
 vim.api.nvim_create_autocmd("BufWritePost", {
+  group = vim.api.nvim_create_augroup("WnfClearSkipFlag", { clear = true }),
   callback = function(args)
     vim.b[args.buf].skip_format_on_save = nil
   end,
