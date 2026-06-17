@@ -262,8 +262,9 @@ and whether `pwsh` is installed.
   tarball installed into `/opt/nvim-linux-<arch>` and symlinked to
   `/usr/local/bin/nvim`. The tarball SHA-256 is verified before extraction.
 - macOS and Linuxbrew install lazygit through Homebrew (`brew install lazygit`).
-  Native Linux/WSL without Homebrew gets lazygit from a pinned GitHub release
-  tarball with SHA-256 verification. Setup installs it to
+  Alpine installs the native `lazygit` apk package. Other native Linux/WSL
+  hosts without Homebrew get lazygit from a pinned GitHub release tarball with
+  SHA-256 verification. Setup installs it to
   `/usr/local/bin/lazygit`, or falls back to `~/.local/bin/lazygit` when sudo is
   unavailable.
 - macOS installs Ghostty through `brew install --cask ghostty` when selected.

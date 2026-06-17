@@ -651,8 +651,9 @@ save only**. The next plain `:w` formats normally. Implemented in
   Terminal `settings.json` is never deleted because the merge is idempotent but
   not invertible; use the printed backup path for manual restore if needed.
 - **lazygit binary install paths differ by OS.** Homebrew owns macOS/Linuxbrew,
-  Windows setup installs it through Scoop/winget/choco, and native Linux/WSL
-  without brew uses a pinned GitHub release tarball with SHA-256 verification.
+  Alpine uses the native `lazygit` apk package, Windows setup installs it
+  through Scoop/winget/choco, and other native Linux/WSL hosts without brew use
+  a pinned GitHub release tarball with SHA-256 verification.
 - **`install-deps.ps1` prefers scoop, then falls back across managers
   per tool.** `Install-One` builds an ordered candidate list (scoop → primary →
   winget → choco) of managers that are installed AND carry the package, and

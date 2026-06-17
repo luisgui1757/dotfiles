@@ -979,6 +979,20 @@ install_lazygit_linux() {
         printf "  ok        %-26s already installed\n" "lazygit"
         return
     fi
+    if [[ "$(native_linux_pm)" == "apk" ]]; then
+        if ! ask "Install lazygit via apk (native Alpine package)?"; then
+            printf "  skipped   %-26s\n" "lazygit"
+            return
+        fi
+        native_linux_pm_install apk lazygit || {
+            echo "  WARN: lazygit install failed; continuing"
+            return
+        }
+        if have lazygit; then
+            printf "  installed %-26s via apk\n" "lazygit"
+        fi
+        return
+    fi
 
     local machine arch expected version_no_v asset url tmp tarball install_target
     machine="$(uname -m)"
