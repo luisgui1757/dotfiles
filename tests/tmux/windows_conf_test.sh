@@ -41,6 +41,8 @@ require_line '^set[[:space:]]+-g[[:space:]]+pwsh-mouse-selection[[:space:]]+off$
     'tmux.windows.conf must leave psmux pwsh mouse-selection off'
 require_line '^set[[:space:]]+-g[[:space:]]+scroll-enter-copy-mode[[:space:]]+on$' \
     'tmux.windows.conf must keep wheel-scroll copy-mode'
+require_line '^bind-key[[:space:]]+-T[[:space:]]+root[[:space:]]+Escape[[:space:]]+send-keys[[:space:]]+esc$' \
+    'tmux.windows.conf must forward bare Escape through psmux to modal TUIs'
 
 if [[ ! -f "$HOME_WIN_CONF" ]]; then
     echo "FAIL: home/dot_tmux.windows.conf must manage the psmux overlay on Windows"

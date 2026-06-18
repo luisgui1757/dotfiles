@@ -250,7 +250,9 @@ and whether `pwsh` is installed.
 - `install-deps` provisions the `tree-sitter` CLI for `nvim-treesitter` main:
   Homebrew on macOS/Linuxbrew, a pinned SHA-256-verified GitHub release into
   `~/.local/bin` on native Linux/WSL, and Scoop with npm fallback on Windows.
-  Windows `-All` also installs VS Build Tools so parser builds can find MSVC.
+  Windows `-All` also installs VS Build Tools so parser builds can find MSVC;
+  after winget/choco failures it falls back to Microsoft's official
+  `vs_BuildTools.exe` bootstrapper with the same VCTools workload.
 - `install-deps` prints a dependency pre-flight table before package-manager
   bootstrap and before the one-shot install prompt, showing the package manager
   itself, present/missing tools, best-effort versions, and the resulting
@@ -640,6 +642,7 @@ MIT. See `LICENSE`.
 | Starship shows only the last few folders (or a leading `…/`) | the `[directory]` module was truncating the path | `starship/starship.toml` sets `truncation_length = 0` + `truncate_to_repo = false` for the full path; raise the length or set `truncate_to_repo = true` to shorten again |
 | A folder like `Downloads`/`Music`/`Pictures` shows as a blank `~/` | its `[directory.substitutions]` glyph was stripped to a bare space | values are `icon + name` (e.g. `Downloads = "<nerd-font-glyph> Downloads"`) using a codepoint your font has; `tests/starship/directory_test.sh` fails on a whitespace-only value |
 | `Alt-h/j/k/l` window nav doesn't work in terminal | something rebinds bare Esc in the shell | `bindkey | grep '^"\^\['` in zsh — should NOT show `kill-whole-line` |
+| `Esc` does nothing in lazygit inside psmux | psmux v3.3.x has an upstream bare-Escape forwarding bug | update this repo and reopen psmux; the Windows overlay binds root `Escape` to `send-keys esc` so lazygit and vim receive the escape byte |
 | tmux (or any new terminal) launches **bash on Linux**, not zsh | either the login shell was never changed, or an already-running graphical session kept stale `$SHELL=/bin/bash` after `chsh` | if the login shell is still bash, re-run current `./setup.sh` and accept the zsh adoption prompt. Local accounts get `chsh` plus an interactive bash guard so new terminals/tmux land in zsh without a full graphical relogin; manual `chsh` or older setup runs that already changed `/etc/passwd` still need relogin |
 | `chsh` fails with `user '<name>' does not exist in /etc/passwd` | you log in via a **domain** account (AD/LDAP/SSSD) that isn't in local `/etc/passwd`, so `chsh` can't touch it | re-run `./setup.sh` — it detects this and offers to re-exec interactive bash into zsh via `~/.bashrc` instead. The "proper" fix is admin-side: set the directory `loginShell` / SSSD `default_shell` |
 | Move commits in lazygit, including inside psmux | Ctrl+J collides with Enter on the wire, and psmux v3.3.4 does not relay Windows Terminal's Win32-input-mode modifier data into panes | use uppercase `J` / `K`. `%LOCALAPPDATA%\lazygit\config.yml` binds commits-panel moveDownCommit / moveUpCommit to printable J/K, so no psmux root bind is needed. In the commits panel, use PgUp/PgDn or Ctrl-U/Ctrl-D to scroll the diff |
@@ -652,4 +655,4 @@ MIT. See `LICENSE`.
 | Windows Terminal lost a profile after merge | WT auto-rewrites — pre-merge backup is at `<settings.json>.bak.<timestamp>` | restore the profile list from the backup |
 | `setup.ps1` errors "cannot create symbolic links" | Developer Mode off and not elevated | `setup.ps1` reports your *elevated* + *Developer Mode* state before chezmoi apply. Enable Developer Mode (Settings -> Privacy & security -> For developers, no admin, recommended) **then** `.\setup.ps1 -SkipDeps`; OR run just the config phase elevated with `.\setup.ps1 -SkipDeps -SkipNvim`, then return to a normal shell for `.\setup.ps1 -SkipDeps -SkipConfig`. Don't elevate the dependency-install run because Scoop refuses admin installs |
 | Ghostty won't open maximized on Linux/GNOME | `maximize = true` is a hint the WM may ignore (GNOME Mutter often does) | on **X11**, `install-deps` offers a devilspie2 setup through the native Linux package manager, even when Linuxbrew is the main CLI manager; the rule is keyed on `com.mitchellh.ghostty`. Wayland needs a GNOME Shell extension instead |
-| `install-deps.ps1`: winget `No package found matching input criteria` (exit `-1978335212`) | winget source/catalog flakiness | install-deps now **prefers scoop** and falls back across managers per tool -- accept the scoop bootstrap when offered and re-run; scoop carries the cataloged CLI/terminal tools here |
+| `install-deps.ps1`: winget `No package found matching input criteria` (exit `-1978335212`) | winget source/catalog flakiness | install-deps now **prefers scoop** and falls back across managers per tool -- accept the scoop bootstrap when offered and re-run; VS Build Tools has no Scoop package, so it falls through to choco and then Microsoft's official bootstrapper |

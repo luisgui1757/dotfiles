@@ -659,9 +659,11 @@ save only**. The next plain `:w` formats normally. Implemented in
   `tree-sitter` manifest first and falls back to `npm install -g
   tree-sitter-cli` after Node is present. Windows compiler support is separate:
   `install-deps.ps1 -All` auto-installs Visual Studio 2022 Build Tools with the
-  `Microsoft.VisualStudio.Workload.VCTools` workload through winget or choco.
-  Scoop does not carry VS Build Tools, so this is the deliberate exception to
-  the Scoop-first catalog rule. A failed VS Build Tools attempt records an
+  `Microsoft.VisualStudio.Workload.VCTools` workload through winget or choco,
+  then falls back to Microsoft's official `vs_BuildTools.exe` bootstrapper with
+  the same workload. Scoop does not carry VS Build Tools, so this is the
+  deliberate exception to the Scoop-first catalog rule. A failed winget/choco
+  pass is not final; a failed package-manager-plus-bootstrapper pass records an
   `InstallFailures` entry so `-All` cannot report success without MSVC.
   `setup.ps1` imports the VS DevShell into the current process before headless
   `Lazy! sync`, so `tree-sitter build` inherits `cl.exe`, `INCLUDE`, and `LIB`.
@@ -721,6 +723,10 @@ save only**. The next plain `:w` formats normally. Implemented in
   `Add-ScoopBucketSafe` (guarded by `tests/static/repo_policy_test.sh`). Local
   setup still recommends Developer Mode plus a normal PowerShell; do not
   elevate the whole local setup unless you intentionally want the admin path.
+  PowerShell tests dot-source `install-deps.ps1` on macOS too, where
+  `USERPROFILE` can be empty; use `Get-ScoopRoot` instead of direct
+  `Join-Path $env:USERPROFILE` for Scoop paths so source-only tests stay
+  portable.
   **`Ensure-ScoopBuckets` installs `git` (from the bucket-less `main` bucket)
   BEFORE adding `extras`/`nerd-fonts`.** `scoop bucket add` git-clones the bucket
   repo, so on a truly fresh machine (Windows Sandbox / clean install) the adds
@@ -947,6 +953,12 @@ save only**. The next plain `:w` formats normally. Implemented in
   Diagnose inside a pane with `(Get-Process -Id $PID).Name` (expect `pwsh`).
   Do NOT add `set -g default-shell` to the main `tmux.conf` — `pwsh` does not
   exist on Unix; keep Windows-specific tmux settings in the overlay.
+- **psmux bare Escape is explicitly forwarded.** psmux v3.3.x has an upstream
+  Esc-forwarding bug (#380) that breaks modal TUIs such as lazygit and vim. The
+  Windows-only overlay binds root `Escape` to `send-keys esc` so the active pane
+  receives the escape byte. Keep this out of the shared `tmux/tmux.conf`; POSIX
+  tmux does not need it, and the Windows overlay is where psmux-specific quirks
+  belong.
 - **psmux residual race (v3.3.4): `OnIdle` workaround in the profile.** Even
   with `allow-predictions on`, fresh psmux panes were observed at
   `PredictionSource=None` / `PredictionViewStyle=InlineView` -- the documented

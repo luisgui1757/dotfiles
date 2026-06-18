@@ -25,6 +25,7 @@ $HackNerdFontVersion = 'v3.4.0'
 $HackNerdFontSha256 = '8ca33a60c791392d872b80d26c42f2bfa914a480f9eb2d7516d9f84373c36897'
 $WindowsTerminalVersion = 'v1.24.11321.0'
 $WindowsTerminalX64Sha256 = '7caef554147e5498ed1becdca73cdedb79fbc81f89032e46ae9b095c53433812'
+$VsBuildToolsBootstrapperUrl = 'https://aka.ms/vs/17/release/vs_BuildTools.exe'
 
 # ---- Package-manager detection + scoop bootstrap -----------------------------
 function Get-AvailablePM {
@@ -43,8 +44,17 @@ function Test-IsElevated {
     }
 }
 
+function Get-ScoopRoot {
+    if (-not [string]::IsNullOrWhiteSpace($env:SCOOP)) { return $env:SCOOP }
+    $base = $env:USERPROFILE
+    if ([string]::IsNullOrWhiteSpace($base)) { $base = $HOME }
+    if ([string]::IsNullOrWhiteSpace($base)) { $base = [Environment]::GetFolderPath('UserProfile') }
+    if ([string]::IsNullOrWhiteSpace($base)) { $base = [System.IO.Path]::GetTempPath() }
+    return (Join-Path $base 'scoop')
+}
+
 function Add-ScoopToPathForCurrentProcess {
-    $scoopRoot = if ($env:SCOOP) { $env:SCOOP } else { Join-Path $env:USERPROFILE 'scoop' }
+    $scoopRoot = Get-ScoopRoot
     $shimDir = Join-Path $scoopRoot 'shims'
     if ((Test-Path -LiteralPath $shimDir) -and (($env:PATH -split ';') -notcontains $shimDir)) {
         $env:PATH = "$shimDir;$env:PATH"
@@ -74,7 +84,7 @@ function Add-ScoopBucketSafe {
         [Parameter(Mandatory)][string]$Name,
         [string]$Url = ''
     )
-    $scoopRoot = if ($env:SCOOP) { $env:SCOOP } else { Join-Path $env:USERPROFILE 'scoop' }
+    $scoopRoot = Get-ScoopRoot
     $bucketDir = Join-Path (Join-Path $scoopRoot 'buckets') $Name
     $populated = {
         (Test-Path -LiteralPath $bucketDir) -and
@@ -1471,13 +1481,17 @@ function Install-VsBuildTools {
     if ($DryRun) {
         Write-Host "  would:    winget install --id $wingetId -e --accept-package-agreements --accept-source-agreements --override `"$override`""
         Write-Host "  would:    choco install -y visualstudio2022buildtools; choco install -y visualstudio2022-workload-vctools"
+        Write-Host "  would:    download $VsBuildToolsBootstrapperUrl"
+        Write-Host "  would:    vs_BuildTools.exe $override"
         return
     }
 
     Write-Host "  note      VS Build Tools is a multi-GB install; this can take a while."
+    $lastExit = $null
     try {
         if (Get-Command winget -ErrorAction SilentlyContinue) {
             winget install --id $wingetId -e --accept-package-agreements --accept-source-agreements --override $override
+            $lastExit = $LASTEXITCODE
             if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace((Get-VsBuildToolsInstallationPath))) {
                 Write-Host ("  installed {0,-26} via winget" -f "VS Build Tools")
                 return
@@ -1490,17 +1504,58 @@ function Install-VsBuildTools {
             $buildToolsExit = $LASTEXITCODE
             choco install -y visualstudio2022-workload-vctools
             $workloadExit = $LASTEXITCODE
+            $lastExit = $workloadExit
             if ($buildToolsExit -eq 0 -and $workloadExit -eq 0 -and -not [string]::IsNullOrWhiteSpace((Get-VsBuildToolsInstallationPath))) {
                 Write-Host ("  installed {0,-26} via choco" -f "VS Build Tools")
                 return
             }
+        }
+
+        Write-Warning "Package managers did not leave a detected VC toolset; trying the official Microsoft bootstrapper..."
+        $bootstrapExit = Install-VsBuildToolsFromBootstrapper
+        $lastExit = $bootstrapExit
+        if ($bootstrapExit -eq 0 -and -not [string]::IsNullOrWhiteSpace((Get-VsBuildToolsInstallationPath))) {
+            Write-Host ("  installed {0,-26} via Microsoft bootstrapper" -f "VS Build Tools")
+            return
         }
     } catch {
         Write-Warning ("VS Build Tools install raised an exception: " + $_.Exception.Message)
     }
 
     Write-Host "  FAIL: VS Build Tools install failed or VC toolset was not detected" -ForegroundColor Red
-    $script:InstallFailures += [pscustomobject]@{ Tool='VS Build Tools'; Pm='winget/choco'; Pkg='Microsoft.VisualStudio.Workload.VCTools'; ExitCode=$LASTEXITCODE }
+    $script:InstallFailures += [pscustomobject]@{ Tool='VS Build Tools'; Pm='winget/choco/bootstrapper'; Pkg='Microsoft.VisualStudio.Workload.VCTools'; ExitCode=$lastExit }
+}
+
+function Install-VsBuildToolsFromBootstrapper {
+    $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) ("dotfiles-vs-buildtools-" + [System.Guid]::NewGuid())
+    $installer = Join-Path $tempDir 'vs_BuildTools.exe'
+    $args = @(
+        '--quiet',
+        '--wait',
+        '--norestart',
+        '--add',
+        'Microsoft.VisualStudio.Workload.VCTools',
+        '--includeRecommended'
+    )
+
+    try {
+        New-Item -ItemType Directory -Force -Path $tempDir | Out-Null
+        Invoke-WebRequest -Uri $VsBuildToolsBootstrapperUrl -OutFile $installer -UseBasicParsing -ErrorAction Stop
+
+        $process = Start-Process -FilePath $installer -ArgumentList $args -Wait -PassThru
+        $exitCode = [int]$process.ExitCode
+        if ($exitCode -eq 740 -and -not (Test-IsElevated)) {
+            Write-Host "  note      VS Build Tools requires elevation; requesting UAC for the Microsoft bootstrapper."
+            $process = Start-Process -FilePath $installer -ArgumentList $args -Wait -PassThru -Verb RunAs
+            $exitCode = [int]$process.ExitCode
+        }
+        return $exitCode
+    } catch {
+        Write-Warning ("VS Build Tools bootstrapper failed: " + $_.Exception.Message)
+        return 1
+    } finally {
+        Remove-Item -LiteralPath $tempDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
 }
 
 function Install-VsBuildToolsWhenAll {
