@@ -364,7 +364,9 @@ When adding a new spec:
 `chezmoi-parity` migration gate. Warnings are treated as failures where the
 tools expose them cleanly: shellcheck exits nonzero, PSScriptAnalyzer runs at
 `Warning,Error`, yamllint/parser checks are part of `make test-static`, and
-Windows CI treats missing test dependencies as fatal.
+Windows CI treats missing test dependencies as fatal. PSGallery module installs
+in Windows CI use bounded retries for transient gallery lookup failures; the
+final miss still fails the job.
 
 `e2e-install.yml` is the required real-install gate. The jobs cover different
 install paths, not symmetric container platforms:
@@ -443,7 +445,9 @@ credentials, not owner-account, admin, or `delete_repo` capable tokens.
 Run `scripts/apply-repo-safeguards.sh luisgui1757/dotfiles` after changing the
 rulesets, then verify the live posture with the commands in
 `docs/security/branch-protection.md`. Do not add the WSL2 canary to required
-checks unless asked.
+checks unless asked. If live GitHub has duplicate rulesets with the same
+protected name, the script fails closed instead of choosing one; delete the
+duplicate live ruleset and re-run.
 
 `renovate.json` owns GitHub Actions version updates and repo-pinned version/ref
 constants. Dependabot version-update PRs are intentionally disabled; GitHub
@@ -484,7 +488,9 @@ npx --yes --package node@24.11.0 -- bash -c \
   'npm exec --yes --package renovate@latest -- renovate-config-validator --strict renovate.json'
 ```
 
-`tests/static/json_lint.sh` only checks JSON syntax. The Renovate validator
+`tests/static/json_lint.sh` only checks JSON syntax. Its JSONC path strips `//`
+comments with a string-aware Python pass so URL values like `https://...` and
+quoted `//` text survive before `jq` parses the result. The Renovate validator
 checks schema, and the first live Dependency Dashboard/PR should still be used
 to confirm the custom regex managers match the intended files.
 
@@ -503,7 +509,9 @@ save only**. The next plain `:w` formats normally. Implemented in
   file/symlink targets to `<target>.bak.<timestamp>` only when the target is not
   already exact chezmoi state or content-equivalent to the chezmoi target, then
   run `chezmoi --no-tty --force apply`. `--skip-bootstrap` remains a back-compat
-  alias for `--skip-config` / `-SkipConfig`.
+  alias for `--skip-config` / `-SkipConfig`. POSIX dry-run renders temporary
+  chezmoi config/expected files and must clean them on failure; Homebrew
+  `shellenv` output is evaled only after the `brew shellenv` command succeeds.
 - `setup.ps1` runs a symlink-privilege pre-flight before chezmoi apply because
   the Windows Neovim target is still a directory symlink: dry-run warns and
   skips the probe; real runs print elevated/Developer Mode state plus the
@@ -608,8 +616,10 @@ save only**. The next plain `:w` formats normally. Implemented in
   `scoop update <pkg>` after one manifest refresh). It must not run blanket
   upgrades such as `brew upgrade`, `apt upgrade`, or `scoop update *`, and it
   must not touch pinned direct downloads, PSFzf, `lazy-lock.json`, or configs.
-  On native Linux, `nvim`, `lazygit`, and `tree-sitter` are pinned
-  direct-download binaries and stay out of the update path.
+  On native Linux without Linuxbrew or Alpine/apk, `nvim`, `lazygit`, and
+  `tree-sitter` are pinned direct-download binaries and stay out of the update
+  path. Linuxbrew updates them through `brew upgrade <formula>`; Alpine updates
+  its native `neovim`, `lazygit`, and `tree-sitter` packages through apk.
 - **A C compiler is installed so LuaSnip can build `jsregexp`.** Without one,
   the nvim Lazy build prints "No C compiler found" and `jsregexp` is skipped
   (LuaSnip still works, minus JS-regex snippet transforms). POSIX installs the
@@ -633,9 +643,11 @@ save only**. The next plain `:w` formats normally. Implemented in
   `install-deps.ps1 -All` auto-installs Visual Studio 2022 Build Tools with the
   `Microsoft.VisualStudio.Workload.VCTools` workload through winget or choco.
   Scoop does not carry VS Build Tools, so this is the deliberate exception to
-  the Scoop-first catalog rule. `setup.ps1` imports the VS DevShell into the
-  current process before headless `Lazy! sync`, so `tree-sitter build` inherits
-  `cl.exe`, `INCLUDE`, and `LIB`. Do not put the DevShell import in the
+  the Scoop-first catalog rule. A failed VS Build Tools attempt records an
+  `InstallFailures` entry so `-All` cannot report success without MSVC.
+  `setup.ps1` imports the VS DevShell into the current process before headless
+  `Lazy! sync`, so `tree-sitter build` inherits `cl.exe`, `INCLUDE`, and `LIB`.
+  Do not put the DevShell import in the
   PowerShell profile. Zig stays installed for LuaSnip `jsregexp`, but do not
   wire zig into nvim-treesitter main: the old `master` branch could use it,
   while main emits MSVC-style `cc` crate flags that require MSVC. Ad-hoc
@@ -649,8 +661,9 @@ save only**. The next plain `:w` formats normally. Implemented in
   Terminal `settings.json` is never deleted because the merge is idempotent but
   not invertible; use the printed backup path for manual restore if needed.
 - **lazygit binary install paths differ by OS.** Homebrew owns macOS/Linuxbrew,
-  Windows setup installs it through Scoop/winget/choco, and native Linux/WSL
-  without brew uses a pinned GitHub release tarball with SHA-256 verification.
+  Alpine uses the native `lazygit` apk package, Windows setup installs it
+  through Scoop/winget/choco, and other native Linux/WSL hosts without brew use
+  a pinned GitHub release tarball with SHA-256 verification.
 - **`install-deps.ps1` prefers scoop, then falls back across managers
   per tool.** `Install-One` builds an ordered candidate list (scoop → primary →
   winget → choco) of managers that are installed AND carry the package, and
@@ -666,7 +679,9 @@ save only**. The next plain `:w` formats normally. Implemented in
   current process PATH and persistent User PATH.
 - **`Update-ScoopTool` is the only scoop update path.** It is intentionally
   single-package and consent-gated for the PowerShell 7 keep-latest path; never
-  replace it with `scoop update *` or another blanket scoop upgrade.
+  replace it with `scoop update *` or another blanket scoop upgrade. Failed
+  manifest refreshes or package updates append to `InstallFailures`, so update
+  mode exits nonzero when a scoped refresh did not actually succeed.
 - **Windows CI uses Scoop's documented elevated bootstrap.** GitHub-hosted
   `windows-2025` runners are elevated, and Scoop blocks elevated install by
   default. `Install-Scoop` detects elevation and runs the official installer
@@ -738,7 +753,8 @@ save only**. The next plain `:w` formats normally. Implemented in
   `ConvertFrom-Json` for strict JSON and a comment-aware scanner for JSONC. The
   JSONC fallback edits only top-level keys, ignores comments/strings and nested
   objects, preserves the dominant line ending, and creates
-  `settings.json.bak.<timestamp>` before writing.
+  a non-colliding `settings.json.bak.<timestamp>[.n]` backup through the shared
+  `unique_backup_path` helper before writing.
   **Encoding is load-bearing on Windows.** The theme value must keep its accented
   é to match the extension's label "Rosé Pine", but a literal `é` byte in
   `settings.json` is fragile under Windows PowerShell 5.1: its `Get-Content`
@@ -781,8 +797,10 @@ save only**. The next plain `:w` formats normally. Implemented in
   tree-sitter CLI Linux archives, and Hack Nerd Font zip before extraction;
   `install-deps.ps1` verifies the pinned Hack.zip before registering fonts and
   the pinned Windows Terminal portable zip before extracting the fallback
-  install. A Hack.zip checksum mismatch records a `FAIL:` install marker and
-  does not extract. A successful Windows font install broadcasts
+  install. POSIX helpers that unpack into `mktemp -d` install a cleanup trap
+  immediately after creating the directory, so failure paths do not leak
+  archives or partial extracts. A Hack.zip checksum mismatch records a `FAIL:`
+  install marker and does not extract. A successful Windows font install broadcasts
   `WM_FONTCHANGE` best-effort so Windows Terminal can re-enumerate fonts without
   making setup depend on that notification. The CI workflows also pin and
   verify their direct GitHub downloads.
@@ -1026,7 +1044,9 @@ host OS or shell would otherwise hide a branch from CI.
   `vim-options.lua`.
 - **`vim.opt.clipboard = "unnamedplus"`** even on macOS — works fine via
   pbcopy/pbpaste. The single-register `unnamed` value would lock WSL/Linux
-  out.
+  out. The delayed missing-provider warning in `vim-options.lua` is routed
+  through `_warn_if_missing_clipboard_provider` so `clipboard_spec.lua` can test
+  both the warning branch and the `vim.g.clipboard` escape hatch.
 - **`shells/zshrc` has shellcheck disable directives** at the top — zsh
   has glob qualifiers (`(#qN.mh+24)`) that shellcheck (a bash linter)
   cannot parse. The directives suppress the noise; the file is otherwise

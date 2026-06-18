@@ -124,19 +124,7 @@ native_linux_pm() {
 }
 
 detect_update_pm() {
-    case "$(uname -s)" in
-        Darwin)
-            if homebrew_bin >/dev/null 2>&1; then echo brew
-            else echo brew_missing
-            fi
-            ;;
-        Linux)
-            native_linux_pm
-            ;;
-        *)
-            echo unknown
-            ;;
-    esac
+    detect_pm
 }
 
 homebrew_bin() {
@@ -883,12 +871,8 @@ set_vscode_theme() {
         fi
         return 0
     fi
-    local backup timestamp
-    timestamp="$(date +%Y%m%d%H%M%S)"
-    backup="$settings.bak.$timestamp"
-    while [[ -e "$backup" ]]; do
-        backup="$settings.bak.$timestamp.$RANDOM"
-    done
+    local backup
+    backup="$(unique_backup_path "$settings")"
     cp "$settings" "$backup"
     local tmp; tmp="$(mktemp)"
     if write_vscode_jsonc_settings "$settings" "$tmp"; then
@@ -956,6 +940,7 @@ install_nvim_linux() {
     fi
 
     tmp="$(mktemp -d)"
+    trap 'rm -rf "$tmp"; trap - RETURN' RETURN
     tarball="$tmp/$asset"
     if ! curl -fsSL "$url" -o "$tarball"; then
         echo "  FAIL: nvim download failed from $url"
@@ -989,6 +974,20 @@ install_nvim_linux() {
 install_lazygit_linux() {
     if have lazygit; then
         printf "  ok        %-26s already installed\n" "lazygit"
+        return
+    fi
+    if [[ "$(native_linux_pm)" == "apk" ]]; then
+        if ! ask "Install lazygit via apk (native Alpine package)?"; then
+            printf "  skipped   %-26s\n" "lazygit"
+            return
+        fi
+        native_linux_pm_install apk lazygit || {
+            echo "  WARN: lazygit install failed; continuing"
+            return
+        }
+        if have lazygit; then
+            printf "  installed %-26s via apk\n" "lazygit"
+        fi
         return
     fi
 
@@ -1036,6 +1035,7 @@ install_lazygit_linux() {
     fi
 
     tmp="$(mktemp -d)"
+    trap 'rm -rf "$tmp"; trap - RETURN' RETURN
     tarball="$tmp/$asset"
     if ! curl -fsSL "$url" -o "$tarball"; then
         echo "  FAIL: lazygit download failed from $url"
@@ -1065,9 +1065,12 @@ install_lazygit_linux() {
     fi
 
     install_target="$HOME/.local/bin/lazygit"
-    mkdir -p "$HOME/.local/bin"
-    cp "$tmp/lazygit" "$install_target"
-    chmod 0755 "$install_target"
+    if ! mkdir -p "$HOME/.local/bin" ||
+        ! cp "$tmp/lazygit" "$install_target" ||
+        ! chmod 0755 "$install_target"; then
+        echo "  FAIL: could not install lazygit to $install_target"
+        return 1
+    fi
     rm -rf "$tmp"
     ensure_local_bin_on_path
     printf "  installed %-26s -> %s\n" "lazygit" "$install_target"
@@ -1131,6 +1134,7 @@ install_tree_sitter_cli_linux() {
     fi
 
     tmp="$(mktemp -d)"
+    trap 'rm -rf "$tmp"; trap - RETURN' RETURN
     archive="$tmp/$asset"
     extract_dir="$tmp/extract"
     mkdir -p "$extract_dir"
@@ -1501,6 +1505,14 @@ EOF
 
 pkg_for() {
     local tool="$1"
+    if [[ "$PM" == "apk" ]]; then
+        case "$tool" in
+            lazygit|tree-sitter)
+                printf '%s\n' "$tool"
+                return
+                ;;
+        esac
+    fi
     local row
     row=$(printf '%s\n' "$PKG_TABLE" | awk -F'|' -v t="$tool" '$1==t{print; exit}')
     [[ -z "$row" ]] && { echo ""; return; }
@@ -1629,6 +1641,8 @@ pm_update() {
 is_pinned_direct_update_tool() {
     local tool="$1"
     [[ "$(uname -s)" == "Linux" ]] || return 1
+    [[ "$PM" == "brew" ]] && return 1
+    [[ "$(native_linux_pm 2>/dev/null || true)" == "apk" ]] && return 1
     case "$tool" in
         nvim|lazygit|tree-sitter) return 0 ;;
         *) return 1 ;;
@@ -1887,6 +1901,7 @@ install_nerd_font() {
     fi
     local font_dir="${XDG_DATA_HOME:-$HOME/.local/share}/fonts/HackNerdFont"
     local tmp; tmp="$(mktemp -d)"
+    trap 'rm -rf "$tmp"; trap - RETURN' RETURN
     if ! curl -fL -o "$tmp/Hack.zip" "$url"; then
         echo "  FAIL: download failed; install Hack Nerd Font manually from nerd-fonts releases"
         rm -rf "$tmp"; return 1
@@ -1897,9 +1912,15 @@ install_nerd_font() {
     fi
     mkdir -p "$font_dir"
     if have unzip; then
-        unzip -oq "$tmp/Hack.zip" -d "$font_dir"
+        if ! unzip -oq "$tmp/Hack.zip" -d "$font_dir"; then
+            echo "  FAIL: could not extract Hack.zip"
+            return 1
+        fi
     else
-        bsdtar -xf "$tmp/Hack.zip" -C "$font_dir"
+        if ! bsdtar -xf "$tmp/Hack.zip" -C "$font_dir"; then
+            echo "  FAIL: could not extract Hack.zip"
+            return 1
+        fi
     fi
     rm -rf "$tmp"
     if have fc-cache; then
@@ -1915,6 +1936,7 @@ install_nerd_font() {
 run_ghostty_ubuntu_installer() {
     local url="$1" tmp script rc=0
     tmp="$(mktemp -d)"
+    trap 'rm -rf "$tmp"; trap - RETURN' RETURN
     script="$tmp/ghostty-ubuntu-install.sh"
     if ! curl -fsSL -o "$script" "$url"; then
         echo "  FAIL: could not download ghostty installer"

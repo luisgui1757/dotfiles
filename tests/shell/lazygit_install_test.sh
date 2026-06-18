@@ -42,4 +42,12 @@ out="$(install_lazygit)"
 [[ "$out" == *"would: brew install lazygit"* ]]
 [[ "$out" != *"github.com/jesseduffield/lazygit/releases"* ]]
 
+PM=apk
+native_linux_pm() {
+    printf '%s\n' "apk"
+}
+out="$(install_lazygit)"
+[[ "$out" == *"would: apk install lazygit"* ]]
+[[ "$out" != *"github.com/jesseduffield/lazygit/releases"* ]]
+
 echo "OK"

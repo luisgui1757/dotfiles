@@ -148,14 +148,40 @@ jobs:
           if (Get-PSRepository -Name PSGallery -ErrorAction SilentlyContinue) {
             Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
           }
+          function Install-ModuleWithRetry {
+            param(
+              [Parameter(Mandatory)][string]$Name,
+              [string]$MinimumVersion = ''
+            )
+            $installArgs = @{
+              Name = $Name
+              Force = $true
+              Scope = 'CurrentUser'
+              SkipPublisherCheck = $true
+              ErrorAction = 'Stop'
+            }
+            if (-not [string]::IsNullOrWhiteSpace($MinimumVersion)) {
+              $installArgs.MinimumVersion = $MinimumVersion
+            }
+            for ($attempt = 1; $attempt -le 3; $attempt++) {
+              try {
+                Install-Module @installArgs
+                return
+              } catch {
+                if ($attempt -eq 3) { throw }
+                Write-Host ("WARN: Install-Module {0} failed on attempt {1}/3: {2}" -f $Name, $attempt, $_.Exception.Message)
+                Start-Sleep -Seconds (5 * $attempt)
+              }
+            }
+          }
           $pester = Get-Module -ListAvailable Pester |
             Where-Object { $_.Version -ge [version]'5.0.0' } |
             Sort-Object Version -Descending |
             Select-Object -First 1
           if (-not $pester) {
-            Install-Module -Name Pester -Force -Scope CurrentUser -MinimumVersion 5.5.0 -SkipPublisherCheck
+            Install-ModuleWithRetry -Name Pester -MinimumVersion 5.5.0
           }
-          Install-Module -Name PSScriptAnalyzer -Force -Scope CurrentUser -SkipPublisherCheck
+          Install-ModuleWithRetry -Name PSScriptAnalyzer
           choco install neovim -y
           $nvim = Get-Command nvim -ErrorAction SilentlyContinue
           if (-not $nvim) {

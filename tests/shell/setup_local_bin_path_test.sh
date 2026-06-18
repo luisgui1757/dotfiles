@@ -33,4 +33,29 @@ before="$PATH"
 refresh_runtime_path
 [[ "$PATH" == "$before" ]] || fail "refresh_runtime_path mutated PATH during --dry-run"
 
+mkdir -p "$WORK/bin"
+cat > "$WORK/bin/brew" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+if [[ "${1:-}" == "shellenv" ]]; then
+    printf '%s\n' 'export PATH="/bad-brew-shellenv:$PATH"'
+    exit 17
+fi
+exit 0
+EOF
+chmod +x "$WORK/bin/brew"
+
+DRY_RUN=0
+PATH="$WORK/bin:/usr/bin:/bin"
+refresh_runtime_path 2>"$WORK/brew.err"
+case ":$PATH:" in
+    *":/bad-brew-shellenv:"*) fail "refresh_runtime_path evaled failed brew shellenv output" ;;
+esac
+case ":$PATH:" in
+    *":$HOME/.local/bin:"*) ;;
+    *) fail "refresh_runtime_path did not continue after failed brew shellenv" ;;
+esac
+grep -F "shellenv failed" "$WORK/brew.err" >/dev/null \
+    || fail "refresh_runtime_path did not warn about failed brew shellenv"
+
 echo "OK"

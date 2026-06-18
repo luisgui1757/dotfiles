@@ -262,8 +262,9 @@ and whether `pwsh` is installed.
   tarball installed into `/opt/nvim-linux-<arch>` and symlinked to
   `/usr/local/bin/nvim`. The tarball SHA-256 is verified before extraction.
 - macOS and Linuxbrew install lazygit through Homebrew (`brew install lazygit`).
-  Native Linux/WSL without Homebrew gets lazygit from a pinned GitHub release
-  tarball with SHA-256 verification. Setup installs it to
+  Alpine installs the native `lazygit` apk package. Other native Linux/WSL
+  hosts without Homebrew get lazygit from a pinned GitHub release tarball with
+  SHA-256 verification. Setup installs it to
   `/usr/local/bin/lazygit`, or falls back to `~/.local/bin/lazygit` when sudo is
   unavailable.
 - macOS installs Ghostty through `brew install --cask ghostty` when selected.
@@ -331,7 +332,9 @@ Pull requests are meant to be gated by two workflows:
   starship, Neovim, Windows Pester/PSScriptAnalyzer, and `chezmoi-parity`
   suites. Warnings are treated as failures where the tools expose them cleanly:
   shellcheck exits nonzero, PSScriptAnalyzer runs at `Warning,Error`, and YAML
-  parsing/linting is part of `make test-static`.
+  parsing/linting is part of `make test-static`. Windows PSGallery module
+  installs retry transient lookup failures, but missing test dependencies remain
+  fatal.
 - `.github/workflows/e2e-install.yml` is the real install guarantee. It proves
   the public setup paths on fresh hosted runners and keeps one clean Ubuntu
   container for the native `apt` branch.

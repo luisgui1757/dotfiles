@@ -83,10 +83,15 @@ try_gh_api() {
 }
 
 ruleset_id_by_name() {
-    local name="$1"
-    gh api "repos/$repo/rulesets?includes_parents=false" \
-        --jq ".[] | select(.name == \"$name\") | .id" \
-        | head -n 1
+    local name="$1" ids count
+    ids="$(gh api "repos/$repo/rulesets?includes_parents=false" \
+        --jq ".[] | select(.name == \"$name\") | .id")"
+    count="$(awk 'NF { count++ } END { print count + 0 }' <<<"$ids")"
+    if [[ "$count" -gt 1 ]]; then
+        echo "FAIL: found $count rulesets named '$name'; delete duplicates before applying safeguards." >&2
+        return 1
+    fi
+    printf '%s\n' "$ids"
 }
 
 upsert_ruleset() {
