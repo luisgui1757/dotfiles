@@ -10,8 +10,8 @@
   <!-- Self-contained: no mapped folder. The logon command downloads the repo and
        runs the greenfield flow, so double-clicking this .wsb works from anywhere
        (a mapped HostFolder needed Win11 22H2+ AND the repo cloned at the right
-       spot). To test a different branch, change the ref in the URL below. -->
+       spot). To test a PR or branch, change the -Ref value below. -->
   <LogonCommand>
-    <Command>powershell.exe -NoExit -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; iex (irm 'https://raw.githubusercontent.com/luisgui1757/dotfiles/chezmoi-pilot/tests/greenfield/sandbox-bootstrap.ps1')"</Command>
+    <Command>powershell.exe -NoExit -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; $bootstrap = irm 'https://raw.githubusercontent.com/luisgui1757/dotfiles/main/tests/greenfield/sandbox-bootstrap.ps1'; &amp; ([scriptblock]::Create($bootstrap)) -Ref 'main'"</Command>
   </LogonCommand>
 </Configuration>

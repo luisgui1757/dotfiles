@@ -106,6 +106,22 @@ else
     echo "ok  : plenary test harness is lockfile-pinned"
 fi
 
+if ! grep -Fq -- "-path './tests/.cache'" tests/static/editorconfig_check.sh \
+    || ! grep -Fq "editorconfig-checker \"\$file\"" tests/static/editorconfig_check.sh; then
+    echo "FAIL: editorconfig_check.sh must feed editorconfig-checker a pruned file list excluding generated tests/.cache content"
+    fail=1
+elif find . \
+    \( -path './.git' -o -path './.claude' -o -path './tests/.cache' -o -path './home' \) -prune -o \
+    -type f \
+    ! -path './nvim/lazy-lock.json' \
+    -print |
+    grep -Fqx './tests/.cache/plenary.nvim/README.md'; then
+    echo "FAIL: editorconfig_check.sh file-list pruning still includes generated tests/.cache content"
+    fail=1
+else
+    echo "ok  : editorconfig_check.sh excludes generated tests/.cache content"
+fi
+
 if ! grep -Fq '.\test.ps1' .github/workflows/test.yml; then
     echo "FAIL: Windows CI must use the repo-local test.ps1 entry point"
     fail=1

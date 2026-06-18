@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Determinism: the chezmoi externals install to a fixed ~/.local/share path.
-# Unset any inherited XDG_DATA_HOME so the gate exercises that canonical path.
-# An XDG_DATA_HOME-aware managed root is Wave B.
-unset XDG_DATA_HOME
+# Determinism: zsh plugin externals install to a fixed ~/.local/share path.
+# The gate sets XDG_DATA_HOME to a hostile value below so fixed-root drift cannot
+# pass by accidentally inheriting the default.
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 SRC="$REPO_ROOT/home"
@@ -234,8 +233,11 @@ esac
 pass "detected parity host OS: $target_os"
 
 APPLY_HOME="$(mktemp -d)"
+DOCTOR_SRC="$(mktemp -d)"
+export XDG_DATA_HOME="$APPLY_HOME/xdg-data"
 cleanup() {
     rm -rf "$APPLY_HOME"
+    rm -rf "$DOCTOR_SRC"
 }
 trap cleanup EXIT
 
@@ -268,7 +270,8 @@ pass "chezmoi verify clean"
 
 doctor_output=""
 doctor_rc=0
-doctor_output="$(env HOME="$APPLY_HOME" chezmoi --source "$SRC" doctor 2>&1)" || doctor_rc=$?
+cp -R "$SRC/." "$DOCTOR_SRC/"
+doctor_output="$(env HOME="$APPLY_HOME" chezmoi --source "$DOCTOR_SRC" --no-tty doctor --no-network 2>&1)" || doctor_rc=$?
 if grep -Eq '^[[:space:]]*error([[:space:]:]|$)' <<<"$doctor_output"; then
     echo "chezmoi doctor output:" >&2
     printf '%s\n' "$doctor_output" >&2

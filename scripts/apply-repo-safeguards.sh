@@ -112,6 +112,35 @@ require_live_value() {
     fi
 }
 
+required_check_contexts() {
+    cat <<'EOF'
+ubuntu
+macos
+windows
+chezmoi-parity
+chezmoi-parity-macos
+chezmoi-parity-windows
+e2e containers / ubuntu-24.04
+setup.sh / ubuntu-24.04
+setup.sh / macos-15
+setup.ps1 / windows-2025
+EOF
+}
+
+verify_required_contexts() {
+    local desc="$1" actual="$2" tmp_expected tmp_actual
+    tmp_expected="$(mktemp)"
+    tmp_actual="$(mktemp)"
+    required_check_contexts | LC_ALL=C sort > "$tmp_expected"
+    printf '%s\n' "$actual" | LC_ALL=C sort > "$tmp_actual"
+    if ! diff -u "$tmp_expected" "$tmp_actual"; then
+        rm -f "$tmp_expected" "$tmp_actual"
+        echo "FAIL: $desc required status checks differ from the canonical list" >&2
+        exit 4
+    fi
+    rm -f "$tmp_expected" "$tmp_actual"
+}
+
 echo "Applying repository safeguards to $repo"
 
 gh_api PATCH "repos/$repo" \
@@ -190,6 +219,14 @@ fi
 integrity_bypass_count="$(gh api "repos/$repo/rulesets/$integrity_id" --jq '.bypass_actors | length')"
 require_live_value "integrity bypass actor count" "$integrity_bypass_count" "0"
 
+integrity_strict="$(gh api "repos/$repo/rulesets/$integrity_id" \
+    --jq '.rules[] | select(.type == "required_status_checks") | .parameters.strict_required_status_checks_policy')"
+require_live_value "integrity strict required-status policy" "$integrity_strict" "true"
+
+integrity_required_contexts="$(gh api "repos/$repo/rulesets/$integrity_id" \
+    --jq '.rules[] | select(.type == "required_status_checks") | .parameters.required_status_checks[].context')"
+verify_required_contexts "integrity ruleset" "$integrity_required_contexts"
+
 review_bypass="$(gh api "repos/$repo/rulesets/$review_id" \
     --jq '.bypass_actors[] | "\(.actor_type):\(.actor_id):\(.bypass_mode)"')"
 require_live_value "review bypass actor" "$review_bypass" "User:139752288:pull_request"
@@ -201,5 +238,11 @@ require_live_value "owner-updates bypass actor" "$owner_updates_bypass" "User:13
 owner_updates_rule="$(gh api "repos/$repo/rulesets/$owner_updates_id" \
     --jq '.rules[] | select(.type == "update") | (.parameters.update_allows_fetch_and_merge // false)')"
 require_live_value "owner-updates fetch-and-merge exception" "$owner_updates_rule" "false"
+
+classic_strict="$(gh api "repos/$repo/branches/main/protection/required_status_checks" --jq '.strict')"
+require_live_value "classic branch-protection strict required-status policy" "$classic_strict" "true"
+
+classic_required_contexts="$(gh api "repos/$repo/branches/main/protection/required_status_checks" --jq '.contexts[]')"
+verify_required_contexts "classic branch-protection fallback" "$classic_required_contexts"
 
 echo "Repository safeguards applied and verified. Re-run safely any time."

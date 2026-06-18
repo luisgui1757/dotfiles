@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([string]$Ref = 'chezmoi-pilot')
+param([string]$Ref = 'main')
 
 # Self-contained Windows Sandbox greenfield bootstrap. windows-sandbox.wsb fetches
 # and runs THIS via its LogonCommand, so the sandbox does NOT depend on a mapped

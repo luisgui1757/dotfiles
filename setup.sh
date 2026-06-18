@@ -13,12 +13,13 @@
 #   ./setup.sh --experimental-wsl-gui
 #                                  WSL opt-in: install/link Linux GUI terminal bits
 #
-# Remote usage (no checkout yet):
-#   curl -fsSL https://raw.githubusercontent.com/luisgui1757/dotfiles/main/setup.sh | bash -s -- --all
+# First run (no checkout yet):
+#   git clone https://github.com/luisgui1757/dotfiles.git "${DOTFILES_DEST:-$HOME/dotfiles}"
+#   cd "${DOTFILES_DEST:-$HOME/dotfiles}"
+#   ./setup.sh --all
 #
-# The remote form clones the repo to $DOTFILES_DEST (default ~/dotfiles)
-# and then re-invokes itself locally. Set DOTFILES_DEST=/some/other/path
-# in the environment if you want a different location.
+# Set DOTFILES_DEST=/some/other/path in the environment if you want a
+# different checkout location.
 
 set -euo pipefail
 
@@ -50,8 +51,10 @@ Local usage:
   ./setup.sh --experimental-wsl-gui
                                 WSL opt-in: install/link Linux Ghostty + Linux fonts
 
-Remote usage:
-  curl -fsSL https://raw.githubusercontent.com/luisgui1757/dotfiles/main/setup.sh | bash -s -- --all
+First run:
+  git clone https://github.com/luisgui1757/dotfiles.git "${DOTFILES_DEST:-$HOME/dotfiles}"
+  cd "${DOTFILES_DEST:-$HOME/dotfiles}"
+  ./setup.sh --all
 EOF
 }
 
@@ -81,9 +84,9 @@ if [[ "$ALL" -eq 0 && "$DRY_RUN" -eq 0 && ! -t 0 ]]; then
 fi
 
 # ---- Locate / clone the repo -------------------------------------------------
-# When invoked via `curl | bash`, BASH_SOURCE is empty and there is no
-# script_dir. In that case we clone the repo and re-exec ourselves from
-# the clone so all downstream paths resolve correctly.
+# When run from stdin, BASH_SOURCE is empty and there is no script_dir. In that
+# case we clone the repo and re-exec ourselves from the clone so all downstream
+# paths resolve correctly.
 SCRIPT_DIR=""
 if [[ -n "${BASH_SOURCE[0]:-}" ]] && [[ -f "${BASH_SOURCE[0]:-}" ]]; then
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"

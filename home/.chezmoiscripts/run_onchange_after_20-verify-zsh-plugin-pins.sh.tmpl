@@ -2,7 +2,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Externals use this fixed managed root; an XDG-aware root is Wave B.
+# Externals use this fixed managed root; keep it aligned with shells/zshrc,
+# uninstall, and the parity tests.
 root="$HOME/.local/share/dotfiles/zsh-plugins"
 
 # Bash 3.2-safe: no associative arrays, no mapfile, no namerefs.

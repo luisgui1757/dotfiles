@@ -13,12 +13,13 @@
 #   .\setup.ps1 -SkipWindowsTerminalMerge   config+sync but leave WT settings.json untouched
 #   .\setup.ps1 -MergeWindowsTerminal        (no-op alias; the WT rose-pine merge is now default-on)
 #
-# Remote usage (no checkout yet):
-#   iwr https://raw.githubusercontent.com/luisgui1757/dotfiles/main/setup.ps1 -OutFile setup.ps1
+# First run (no checkout yet):
+#   git clone https://github.com/luisgui1757/dotfiles.git "$env:USERPROFILE\dotfiles"
+#   Set-Location "$env:USERPROFILE\dotfiles"
 #   .\setup.ps1 -All
 #
-# The remote form clones the repo to $env:DOTFILES_DEST (default
-# %USERPROFILE%\dotfiles) and re-invokes itself locally.
+# Set DOTFILES_DEST to a different absolute path before cloning if you want a
+# different checkout location.
 
 [CmdletBinding()]
 param(

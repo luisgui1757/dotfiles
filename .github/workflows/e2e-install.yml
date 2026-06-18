@@ -165,7 +165,7 @@ jobs:
           assert_file_content "$HOME/.tmux.conf" "$repo/tmux/tmux.conf"
           assert_file_content "$HOME/.zshenv" "$repo/shells/zshenv"
           assert_file_content "$HOME/.zshrc" "$repo/shells/zshrc"
-          plugin_root="${XDG_DATA_HOME:-$HOME/.local/share}/dotfiles/zsh-plugins"
+          plugin_root="$HOME/.local/share/dotfiles/zsh-plugins"
           [[ -r "$plugin_root/fzf-tab/fzf-tab.plugin.zsh" ]] || fail "fzf-tab plugin file missing"
           [[ -r "$plugin_root/zsh-autosuggestions/zsh-autosuggestions.zsh" ]] || fail "zsh-autosuggestions plugin file missing"
           run_nvim_checked lazy "+Lazy! sync" "+qa"
@@ -370,6 +370,6 @@ jobs:
           fi
           command -v nvim >/dev/null 2>&1
           command -v lazygit >/dev/null 2>&1
-          test -r "${XDG_DATA_HOME:-$HOME/.local/share}/dotfiles/zsh-plugins/fzf-tab/fzf-tab.plugin.zsh"
-          test -r "${XDG_DATA_HOME:-$HOME/.local/share}/dotfiles/zsh-plugins/zsh-autosuggestions/zsh-autosuggestions.zsh"
+          test -r "$HOME/.local/share/dotfiles/zsh-plugins/fzf-tab/fzf-tab.plugin.zsh"
+          test -r "$HOME/.local/share/dotfiles/zsh-plugins/zsh-autosuggestions/zsh-autosuggestions.zsh"
           nvim --version | head -n 1

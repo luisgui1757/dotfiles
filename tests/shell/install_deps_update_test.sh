@@ -14,7 +14,7 @@ TMP_ROOT="$(mktemp -d)"
 trap 'rm -rf "$TMP_ROOT"' EXIT
 mkdir -p "$TMP_ROOT/fakebin"
 
-for tool in rg nvim lazygit tree-sitter; do
+for tool in rg nvim lazygit starship tree-sitter; do
     cat > "$TMP_ROOT/fakebin/$tool" <<'EOF'
 #!/usr/bin/env bash
 exit 0
@@ -25,7 +25,7 @@ done
 PATH="$TMP_ROOT/fakebin:/usr/bin:/bin"
 PM=apt
 DRY_RUN=0
-INSTALL_DEPS_UPDATE_TOOLS=$'rg\nfd\nnvim\nlazygit\ntree-sitter'
+INSTALL_DEPS_UPDATE_TOOLS=$'rg\nfd\nnvim\nlazygit\nstarship\ntree-sitter'
 COMMAND_LOG="$TMP_ROOT/commands.log"
 
 uname() {
@@ -53,9 +53,11 @@ printf '%s\n' "$output" | grep -Eq '^  skipped[[:space:]]+nvim[[:space:]]+pinned
     || fail "pinned Linux nvim was not skipped"
 printf '%s\n' "$output" | grep -Eq '^  skipped[[:space:]]+lazygit[[:space:]]+pinned Linux direct download' \
     || fail "pinned Linux lazygit was not skipped"
+printf '%s\n' "$output" | grep -Eq '^  skipped[[:space:]]+starship[[:space:]]+pinned Linux direct download' \
+    || fail "pinned Linux starship was not skipped"
 printf '%s\n' "$output" | grep -Eq '^  skipped[[:space:]]+tree-sitter[[:space:]]+pinned Linux direct download' \
     || fail "pinned Linux tree-sitter was not skipped"
-if grep -Eq 'apt-get install -y (fd-find|neovim|lazygit|tree-sitter)' "$COMMAND_LOG"; then
+if grep -Eq 'apt-get install -y (fd-find|neovim|lazygit|starship|tree-sitter)' "$COMMAND_LOG"; then
     fail "update mode attempted an install or pinned binary package"
 fi
 
@@ -67,7 +69,7 @@ native_linux_pm() {
 pm_pkg_installed() {
     local _pm="$1" pkg="$2"
     case "$pkg" in
-        neovim|lazygit|tree-sitter) return 0 ;;
+        neovim|lazygit|starship|tree-sitter) return 0 ;;
         *) return 1 ;;
     esac
 }
@@ -77,19 +79,23 @@ printf '%s\n' "$output" | grep -Eq '^  skipped[[:space:]]+nvim[[:space:]]+pinned
     && fail "apk-managed nvim was skipped as a pinned Linux direct download"
 printf '%s\n' "$output" | grep -Eq '^  skipped[[:space:]]+tree-sitter[[:space:]]+pinned Linux direct download' \
     && fail "apk-managed tree-sitter was skipped as a pinned Linux direct download"
+printf '%s\n' "$output" | grep -Eq '^  skipped[[:space:]]+starship[[:space:]]+pinned Linux direct download' \
+    && fail "apk-managed starship was skipped as a pinned Linux direct download"
 grep -F 'apk upgrade neovim' "$COMMAND_LOG" >/dev/null \
     || fail "apk-managed nvim did not use apk upgrade neovim"
 grep -F 'apk upgrade tree-sitter' "$COMMAND_LOG" >/dev/null \
     || fail "apk-managed tree-sitter did not use apk upgrade tree-sitter"
 grep -F 'apk upgrade lazygit' "$COMMAND_LOG" >/dev/null \
     || fail "apk-managed lazygit did not use apk upgrade lazygit"
+grep -F 'apk upgrade starship' "$COMMAND_LOG" >/dev/null \
+    || fail "apk-managed starship did not use apk upgrade starship"
 
 PM=brew
 : > "$COMMAND_LOG"
 pm_pkg_installed() {
     local _pm="$1" pkg="$2"
     case "$pkg" in
-        neovim|lazygit|tree-sitter-cli) return 0 ;;
+        neovim|lazygit|starship|tree-sitter-cli) return 0 ;;
         *) return 1 ;;
     esac
 }
@@ -102,9 +108,13 @@ printf '%s\n' "$output" | grep -Eq '^  skipped[[:space:]]+nvim[[:space:]]+pinned
     && fail "Linuxbrew-managed nvim was skipped as a pinned Linux direct download"
 printf '%s\n' "$output" | grep -Eq '^  skipped[[:space:]]+tree-sitter[[:space:]]+pinned Linux direct download' \
     && fail "Linuxbrew-managed tree-sitter was skipped as a pinned Linux direct download"
+printf '%s\n' "$output" | grep -Eq '^  skipped[[:space:]]+starship[[:space:]]+pinned Linux direct download' \
+    && fail "Linuxbrew-managed starship was skipped as a pinned Linux direct download"
 grep -F 'brew upgrade neovim' "$COMMAND_LOG" >/dev/null \
     || fail "Linuxbrew-managed nvim did not use brew upgrade neovim"
 grep -F 'brew upgrade tree-sitter-cli' "$COMMAND_LOG" >/dev/null \
     || fail "Linuxbrew-managed tree-sitter did not use brew upgrade tree-sitter-cli"
+grep -F 'brew upgrade starship' "$COMMAND_LOG" >/dev/null \
+    || fail "Linuxbrew-managed starship did not use brew upgrade starship"
 
 echo "OK"

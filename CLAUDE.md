@@ -118,7 +118,10 @@ that violates one of these, fix it instead of disabling the test.
     existing). fzf keeps Ctrl-R / Ctrl-T / Alt-C. When fzf is absent, the block
     falls back to native `menu-select` (so `zsh_startup_test` stays green).
     `zsh-autosuggestions` (inline gray history, strategy `history completion`,
-    `#908caa`) is the only other sourced zsh plugin. Up/Down do prefix history
+    `#908caa`) is the only other sourced zsh plugin. The repo-managed plugin
+    root is fixed at `~/.local/share/dotfiles/zsh-plugins`; do not make it
+    depend on `XDG_DATA_HOME` unless every producer, verifier, runtime source,
+    uninstall path, and parity test changes together. Up/Down do prefix history
     search (PowerShell `HistorySearch` parity). Do NOT swap in an always-on
     as-you-type completion-list plugin — that paradigm rebinds Ctrl-R, fights
     `zsh-autosuggestions`, and is slow; fzf-tab + autosuggestions is the
@@ -313,7 +316,8 @@ ensures the named tools exist on each machine.
 
 ```bash
 make help            # list all sub-targets
-make test            # run everything that can run on this OS
+make ci              # full local pre-PR gate: test + Renovate + migration
+make test            # current-host fast suite
 make test-nvim       # plenary busted suite
 make lint            # shellcheck across all .sh
 ./tests/wsl/e2e.sh   # manual WSL split-host validation from inside WSL
@@ -334,7 +338,9 @@ On Unix, `tests/nvim/run.sh` uses `PlenaryBustedDirectory` with an explicit
 `timeout = 180000`. Keep that value explicit: `startup_spec.lua` prewarms a real
 production init under isolated XDG dirs, and Plenary's default 50s timeout can
 SIGTERM the child before the startup-budget assertion reports the actual
-problem.
+problem. The startup budget itself is strict, but the spec measures up to three
+warm starts and accepts the fastest run; this filters scheduler/filesystem
+outliers while still failing a consistently slow production init.
 
 Sub-targets **skip gracefully** when their tool isn't installed
 (`yamllint`/`editorconfig-checker`/`hyperfine`/`bats`/`ghostty`). The
@@ -347,6 +353,11 @@ as fatal under CI, so anything passing locally + CI is genuinely cross-platform.
 Static repo walkers intentionally exclude `home/` managed copies; those copies
 are validated by `tests/migration/parity_gate.sh` against the canonical
 top-level sources instead of being re-linted as independent source.
+`tests/static/editorconfig_check.sh` feeds `editorconfig-checker` a pruned
+per-file list instead of using the checker's recursive walker. Keep generated
+plugin caches under `tests/.cache/` out of that list; Neovim tests clone real
+plugin repositories there, and those vendored files are not repo formatting
+surface.
 `tests/static/toml_lint.sh` uses `taplo` when it is healthy, but if local macOS
 `taplo` panics with the known system-configuration null-object crash it falls
 back to Python `tomllib`; ordinary `taplo` lint errors still fail.
@@ -360,13 +371,14 @@ When adding a new spec:
 
 ## CI / repository safeguards
 
-`test.yml` remains the fast cross-platform suite and now also owns the
-`chezmoi-parity` migration gate. Warnings are treated as failures where the
-tools expose them cleanly: shellcheck exits nonzero, PSScriptAnalyzer runs at
-`Warning,Error`, yamllint/parser checks are part of `make test-static`, and
-Windows CI treats missing test dependencies as fatal. PSGallery module installs
-in Windows CI use bounded retries for transient gallery lookup failures; the
-final miss still fails the job.
+`test.yml` remains the fast cross-platform suite and now also owns Renovate
+schema validation and the `chezmoi-parity` migration gate. Warnings are treated
+as failures where the tools expose them cleanly: shellcheck exits nonzero,
+PSScriptAnalyzer runs at `Warning,Error`, yamllint/parser checks are part of
+`make test-static`, `scripts/validate-renovate.sh` fails when `npx` is missing
+under `CI=true`, and Windows CI treats missing test dependencies as fatal.
+PSGallery module installs in Windows CI use bounded retries for transient
+gallery lookup failures; the final miss still fails the job.
 
 `e2e-install.yml` is the required real-install gate. The jobs cover different
 install paths, not symmetric container platforms:
@@ -375,12 +387,13 @@ install paths, not symmetric container platforms:
   runner with `DOTFILES_SKIP_BREW_BOOTSTRAP=1`, creates a non-root user, runs
   real `install-deps.sh --all` (native `apt`, no Linuxbrew), then applies
   configs with chezmoi and asserts tool presence, Neovim >= 0.12, lazygit, zsh
-  plugin files, config content matching the repo sources, and the Neovim
+  plugin files under `~/.local/share/dotfiles/zsh-plugins`, config content
+  matching the repo sources, and the Neovim
   directory resolving into repo `nvim/`.
   This is intentionally **not** a devcontainer. It stays because hosted Ubuntu
   has Linuxbrew available, so the container is the only automated proof of the
   clean-image native `apt` path: pinned Neovim tarball install, pinned lazygit
-  release install, zsh plugin install, `fd-find` -> `fd` shim, and apt
+  release install, fixed-root zsh plugin install, `fd-find` -> `fd` shim, and apt
   fallbacks. Scope is intentionally **Ubuntu only** (the supported Linux/WSL2
   proxy target).
   Re-adding another distro requires both a matrix entry in `e2e-install.yml` and
@@ -477,15 +490,16 @@ fails CI when any mirror disagrees. When you bump a pin, update every mirror and
 keep that test green.
 
 Validate `renovate.json` locally with Renovate's own schema validator, not just
-`jq`: `make validate-renovate`. That target runs Renovate under Node 24 because
-Renovate's `engines.node` supports the Node 24 LTS line; running the validator
-directly under an unsupported odd/current host Node such as 25.x emits
-`EBADENGINE`. Do not silence that warning with npm config. Switch runtimes or use
-the repo target, which shells into Node 24 before running:
+`jq`: `make validate-renovate`, or `make ci` for the full pre-PR bundle. That
+target runs Renovate under Node 24 because Renovate's `engines.node` supports
+the Node 24 LTS line; running the validator directly under an unsupported
+odd/current host Node such as 25.x emits `EBADENGINE`. Do not silence that
+warning with npm config. Switch runtimes or use the repo target, which shells
+into Node 24 before running:
 
 ```bash
 npx --yes --package node@24.11.0 -- bash -c \
-  'npm exec --yes --package renovate@latest -- renovate-config-validator --strict renovate.json'
+  'npm exec --yes --package renovate@43.230.1 -- renovate-config-validator --strict renovate.json'
 ```
 
 `tests/static/json_lint.sh` only checks JSON syntax. Its JSONC path strips `//`
@@ -592,14 +606,17 @@ save only**. The next plain `:w` formats normally. Implemented in
   `tests/migration/oracle_test.sh` + `tests/migration/windows_apply_test.ps1`;
   it enforces canonical repo-source parity, nvim dir-symlink realpath/content parity,
   single-source byte equality, wrong-OS absence, zsh exact-pin failure behavior,
-  and Windows copy-mode + WT merge parity.
+  and Windows copy-mode + WT merge parity. `parity_gate.sh` runs
+  `chezmoi doctor` against a temporary copy of `home/`, not the Git checkout,
+  so the migration proof is not coupled to local `git status` performance or
+  unrelated working-tree noise.
 - **`install-deps` provisions chezmoi itself.** Unix setup installs `chezmoi`
   with Homebrew when brew is the selected manager; native Linux without brew
-  uses the pinned `CHEZMOI_VERSION` release through the same trusted
-  `get.chezmoi.io` installer form as CI, into `~/.local/bin`. Windows setup
-  installs `chezmoi` through the normal Scoop-first `$Catalog` fallback chain
-  (`scoop` -> `winget` -> `choco`). This keeps `make chezmoi` usable after full
-  setup before the Phase 2 chezmoi apply.
+  downloads the pinned `CHEZMOI_VERSION` GitHub release tarball, verifies the
+  adjacent SHA-256 constant, and installs the binary into `~/.local/bin`.
+  Windows setup installs `chezmoi` through the normal Scoop-first `$Catalog`
+  fallback chain (`scoop` -> `winget` -> `choco`). This keeps `make chezmoi`
+  usable after full setup before the Phase 2 chezmoi apply.
 - **`install-deps` shows a true pre-bootstrap dependency table before the
   one-shot install prompt.** Package-manager detection runs first, but Scoop /
   Homebrew bootstrap runs only after the table and prompt. The table includes a
@@ -616,10 +633,11 @@ save only**. The next plain `:w` formats normally. Implemented in
   `scoop update <pkg>` after one manifest refresh). It must not run blanket
   upgrades such as `brew upgrade`, `apt upgrade`, or `scoop update *`, and it
   must not touch pinned direct downloads, PSFzf, `lazy-lock.json`, or configs.
-  On native Linux without Linuxbrew or Alpine/apk, `nvim`, `lazygit`, and
-  `tree-sitter` are pinned direct-download binaries and stay out of the update
-  path. Linuxbrew updates them through `brew upgrade <formula>`; Alpine updates
-  its native `neovim`, `lazygit`, and `tree-sitter` packages through apk.
+  On native Linux without Linuxbrew or Alpine/apk, `nvim`, `lazygit`,
+  `starship`, and `tree-sitter` are pinned direct-download binaries and stay
+  out of the update path. Linuxbrew updates them through
+  `brew upgrade <formula>`; Alpine updates its native `neovim`, `lazygit`,
+  `starship`, and `tree-sitter` packages through apk.
 - **A C compiler is installed so LuaSnip can build `jsregexp`.** Without one,
   the nvim Lazy build prints "No C compiler found" and `jsregexp` is skipped
   (LuaSnip still works, minus JS-regex snippet transforms). POSIX installs the
@@ -660,6 +678,13 @@ save only**. The next plain `:w` formats normally. Implemented in
   backups by default, and leave chezmoi's own config/state alone. Windows
   Terminal `settings.json` is never deleted because the merge is idempotent but
   not invertible; use the printed backup path for manual restore if needed.
+  Dry-run mode must also leave empty external parent directories in place; it
+  prints `would:` lines only and does not prune `~/.local/share/dotfiles`.
+- **Starship binary install paths differ by OS.** Homebrew owns
+  macOS/Linuxbrew, Alpine uses the native `starship` apk package, Windows setup
+  installs it through Scoop/winget/choco, and other native Linux/WSL hosts
+  without brew use a pinned Starship GitHub release tarball with SHA-256
+  verification.
 - **lazygit binary install paths differ by OS.** Homebrew owns macOS/Linuxbrew,
   Alpine uses the native `lazygit` apk package, Windows setup installs it
   through Scoop/winget/choco, and other native Linux/WSL hosts without brew use
@@ -792,9 +817,21 @@ save only**. The next plain `:w` formats normally. Implemented in
   not yet activated when `colorTheme` is first read (needs an Extensions reload /
   second launch); (4) a workspace `.vscode/settings.json` override. Confirm which
   profile is active and whether Sync is on before touching code again.
+- **Direct network executables are pinned or explicitly allowlisted.** New
+  installer code must prefer release artifacts with adjacent SHA-256
+  verification over fetched installer scripts. If a mutable bootstrap script is
+  unavoidable, it must be a named trust root with rationale in
+  `tests/static/supply_chain_remote_execution_test.sh`; the current installer
+  trust root is Scoop's official installer. Homebrew bootstrap is downloaded
+  from a pinned installer commit and SHA-256 verified before execution.
+  Recommended setup docs use `git clone` plus local `setup`, not raw remote
+  setup script execution from the current default branch.
 - **Direct GitHub downloads are pinned and SHA-256 verified.** `install-deps.sh`
-  verifies the pinned Neovim Linux tarballs, lazygit Linux tarballs,
-  tree-sitter CLI Linux archives, and Hack Nerd Font zip before extraction;
+  verifies the pinned Homebrew installer script, Neovim Linux tarballs,
+  native-Linux chezmoi tarballs, lazygit Linux tarballs, Starship Linux
+  tarballs, tree-sitter CLI Linux archives, and Hack Nerd Font zip before extraction;
+  CI also verifies the pinned chezmoi Linux, macOS, and Windows release
+  archives used by the parity jobs;
   `install-deps.ps1` verifies the pinned Hack.zip before registering fonts and
   the pinned Windows Terminal portable zip before extracting the fallback
   install. POSIX helpers that unpack into `mktemp -d` install a cleanup trap
@@ -817,22 +854,24 @@ save only**. The next plain `:w` formats normally. Implemented in
   pinned by tag plus expected commit; update both after reviewing a Renovate tag
   bump. Guarded by `tests/shell/ghostty_install_fail_test.sh`,
   `tests/shell/wsl_gui_tools_test.sh`, `tests/shell/lazygit_install_test.sh`,
+  `tests/shell/starship_linux_install_test.sh`,
   `tests/shell/treesitter_cli_test.sh`, and `tests/shell/zsh_plugins_test.sh`.
   Renovate can open version/ref bumps for these constants and for the CI
-  cargo-binstall installer commit, but it cannot recompute adjacent SHA-256
+  cargo-binstall installer commit and Renovate validator package/runtime pins,
+  but it cannot recompute adjacent SHA-256
   values or verify tag commit IDs; leave CI red until a human has reviewed the
   download/ref and updated the adjacent constant. The
+  `CHEZMOI_VERSION`, `STARSHIP_VERSION`, and
   `TREE_SITTER_CLI_LINUX_VERSION` custom managers follow the lazygit shape:
-  Renovate may bump the version constant, while
-  `TREE_SITTER_CLI_LINUX_X86_64_SHA256` and
-  `TREE_SITTER_CLI_LINUX_ARM64_SHA256` remain adjacent context only. In
+  Renovate may bump the version constants, while their adjacent SHA-256 values
+  remain context only. In
   `renovate.json`, direct-download SHA-256 values must be matched as context
   only, not named `currentDigest`, otherwise Renovate will schedule same-version
   digest updates for checksums it cannot actually resolve.
 - **Both installers open with an "install EVERYTHING?" prompt.** Interactive
   runs that didn't pass `--all`/`-All` get one upfront question; answering yes
   flips `YES_ALL`/`$All` so the rest runs with no per-item prompts. Skipped when
-  `--all`/`--dry-run` was passed or there's no tty (so `curl|bash` and the CI
+  `--all`/`--dry-run` was passed or there's no tty (so noninteractive setup and the CI
   `--dry-run --all` dogfood don't hang).
 - **Windows symlink pre-flight reports WHY symlinks fail and how to fix it.**
   `setup.ps1` probes symlink capability before chezmoi apply. When the probe
@@ -1206,8 +1245,8 @@ host OS or shell would otherwise hide a branch from CI.
 
 ## When you're about to make a change
 
-1. Run the local test entry point (`make test` on macOS/Linux/WSL,
-   `.\test.ps1` on Windows). Get baseline.
+1. Run the local gate (`make ci` on macOS/Linux/WSL, `.\test.ps1` on Windows).
+   Get baseline.
 2. Make the change.
 3. Update tests in the same diff (add a regression test for the new
    behavior; update an invariant assertion if you changed something this
@@ -1215,7 +1254,7 @@ host OS or shell would otherwise hide a branch from CI.
 4. Update this CLAUDE.md if you've changed any of the invariants or added a
    new common workflow.
 5. Update `README.md` if you've changed the install path / install command.
-6. Run the local test entry point again. Green.
+6. Run the local gate again. Green.
 7. Stage everything, commit.
 
 If a test breaks: fix the cause, not the test. The test names are

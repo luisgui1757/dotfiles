@@ -69,7 +69,7 @@ else
     note "WSL Ghostty config is not linked by default"
 fi
 
-plugin_root="${XDG_DATA_HOME:-$HOME/.local/share}/dotfiles/zsh-plugins"
+plugin_root="$HOME/.local/share/dotfiles/zsh-plugins"
 [[ -r "$plugin_root/fzf-tab/fzf-tab.plugin.zsh" ]] || fail "fzf-tab plugin file missing"
 [[ -r "$plugin_root/zsh-autosuggestions/zsh-autosuggestions.zsh" ]] || fail "zsh-autosuggestions plugin file missing"
 zsh -i -c "source '$HOME/.zshrc'" >/dev/null 2>&1 || fail "zshrc failed to source interactively"

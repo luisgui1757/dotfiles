@@ -1,11 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Determinism: the legacy install_zsh_plugins slice honors ${XDG_DATA_HOME:-...},
-# while the chezmoi externals install to a fixed ~/.local/share path. Unset
-# XDG_DATA_HOME so BOTH sides resolve to $HOME/.local/share and plugin pin checks
-# are apples-to-apples. (An XDG_DATA_HOME-aware managed root is Wave B.)
-unset XDG_DATA_HOME
+# Determinism: zsh plugin externals use a fixed ~/.local/share path. The test
+# sets XDG_DATA_HOME to a hostile value below so a future XDG-aware drift cannot
+# still pass by accident.
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 SRC="$REPO_ROOT/home"
@@ -100,6 +98,7 @@ COMMIT_HOME="$(mktemp -d)"
 VERIFY_HOME="$(mktemp -d)"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$COMMIT_HOME" "$VERIFY_HOME" "$WORK"' EXIT
+export XDG_DATA_HOME="$WORK/xdg-data"
 
 apply_clean_home "$COMMIT_HOME"
 pass "commit-assert oracle fixture applied cleanly"

@@ -217,7 +217,7 @@ assert_zsh_plugins() {
         skip_check "zsh external plugin check skipped by --config-only"
         return
     fi
-    plugin_root="${XDG_DATA_HOME:-$HOME/.local/share}/dotfiles/zsh-plugins"
+    plugin_root="$HOME/.local/share/dotfiles/zsh-plugins"
     if [[ -r "$plugin_root/fzf-tab/fzf-tab.plugin.zsh" ]]; then
         pass_check "fzf-tab plugin file exists"
     else

@@ -4,8 +4,8 @@ set -euo pipefail
 # Adversarial safety coverage for uninstall.sh. The greenfield round-trip proves
 # the clean path; this proves uninstall preserves user data it must never touch:
 # a dirty external checkout, a user-replaced managed file, and that it still
-# cleans a broken repo-pointing symlink. Mirrors parity_gate.sh sandboxing.
-unset XDG_DATA_HOME
+# cleans a broken repo-pointing symlink. XDG_DATA_HOME is set to a hostile value
+# after HOME is created so uninstall must target the fixed plugin root.
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 SRC="$REPO_ROOT/home"
@@ -19,14 +19,23 @@ require_cmd git
 
 HOME="$(mktemp -d)"
 export HOME
+export XDG_DATA_HOME="$HOME/xdg-data"
 trap 'rm -rf "$HOME"' EXIT
+
+chezmoi --source "$SRC" init
+
+dry_root="$HOME/.local/share/dotfiles/zsh-plugins"
+mkdir -p "$dry_root"
+"$REPO_ROOT/uninstall.sh" --dry-run --all >"$HOME/dry-run.log" 2>&1 || fail "uninstall dry-run failed: $(cat "$HOME/dry-run.log")"
+[[ -d "$dry_root" ]] || fail "dry-run removed the empty external root"
+[[ -d "$HOME/.local/share/dotfiles" ]] || fail "dry-run removed the empty external parent"
+pass "dry-run preserves empty external parent directories"
 
 # --refresh-externals on every apply: chezmoi caches externals (refreshPeriod=0)
 # and will NOT re-create one a prior scenario removed, so later scenarios that
 # need the externals back must force a re-fetch.
 apply() { chezmoi --source "$SRC" --no-tty --force --refresh-externals apply >/dev/null 2>&1; }
 
-chezmoi --source "$SRC" init
 apply
 pass "chezmoi apply completed"
 

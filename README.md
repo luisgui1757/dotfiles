@@ -25,10 +25,10 @@ that edge with `./setup.sh --update` or `.\setup.ps1 -Update`.
 
 ## Quick Start
 
-No checkout is required. `setup.{sh,ps1}` clones the repo to `~/dotfiles`
-or `%USERPROFILE%\dotfiles`, installs repo-managed dependencies, links every
-config, then runs `:Lazy! sync` and `:MasonToolsInstallSync` before the first
-interactive Neovim launch.
+Clone the repo first, then run the local setup entry point. `setup.{sh,ps1}`
+installs repo-managed dependencies, links every config, then runs
+`:Lazy! sync` and `:MasonToolsInstallSync` before the first interactive Neovim
+launch.
 
 Git is the only hard prerequisite for remote setup because setup needs it to
 clone this repo. If Git is missing, the setup scripts print the first install
@@ -36,13 +36,16 @@ command for the platform package manager.
 
 ```bash
 # mac / linux / wsl
-curl -fsSL https://raw.githubusercontent.com/luisgui1757/dotfiles/main/setup.sh | bash -s -- --all
+git clone https://github.com/luisgui1757/dotfiles.git ~/dotfiles
+cd ~/dotfiles
+./setup.sh --all
 ```
 
 ```powershell
 # windows -- enable Developer Mode, then run from a normal PowerShell
 # Settings -> Privacy & security -> For developers -> Developer Mode = On
-iwr https://raw.githubusercontent.com/luisgui1757/dotfiles/main/setup.ps1 -OutFile setup.ps1
+git clone https://github.com/luisgui1757/dotfiles.git $HOME\dotfiles
+Set-Location $HOME\dotfiles
 .\setup.ps1 -All
 ```
 
@@ -169,9 +172,10 @@ machine before greenfield testing:
 
 They remove only repo-owned symlinks or byte-identical Windows copies, restore
 the newest `<target>.bak.<timestamp>` backup by default, and leave chezmoi's own
-state/config alone. Windows Terminal `settings.json` is never deleted: the merge
-is idempotent but not invertible, so restore manually from the printed backup if
-you want to undo it.
+state/config alone. Dry-run mode prints the planned removals without deleting
+files or pruning empty external parent directories. Windows Terminal
+`settings.json` is never deleted: the merge is idempotent but not invertible, so
+restore manually from the printed backup if you want to undo it.
 
 ## What Setup Does
 
@@ -238,8 +242,11 @@ and whether `pwsh` is installed.
   when `chsh` cannot edit `/etc/passwd`. The prompt is consent-gated and
   auto-yes under `--all`.
 - `install-deps` provisions chezmoi itself: Homebrew on macOS/Linuxbrew,
-  pinned `get.chezmoi.io` release on native Linux without brew, and the
-  Scoop-first catalog on Windows.
+  a pinned SHA-256-verified GitHub release archive on native Linux without
+  brew, and the Scoop-first catalog on Windows.
+- `install-deps` provisions Starship through Homebrew on macOS/Linuxbrew,
+  Alpine's native package on Alpine, and a pinned SHA-256-verified Starship
+  GitHub release archive on other native Linux/WSL hosts.
 - `install-deps` provisions the `tree-sitter` CLI for `nvim-treesitter` main:
   Homebrew on macOS/Linuxbrew, a pinned SHA-256-verified GitHub release into
   `~/.local/bin` on native Linux/WSL, and Scoop with npm fallback on Windows.
@@ -251,10 +258,10 @@ and whether `pwsh` is installed.
   logic still decides what actually runs.
 - zsh plugins are installed by Unix setup as repo-managed pinned git checkouts:
   `fzf-tab` and `zsh-autosuggestions` live under
-  `${XDG_DATA_HOME:-$HOME/.local/share}/dotfiles/zsh-plugins`. `zshrc` sources
-  those copies first and falls back to Homebrew/system paths only when the
-  managed copy is missing. Completion is `fzf-tab` (an fzf-driven fuzzy Tab
-  menu over native `compinit`) — it loads *after* `compinit` and *before*
+  `~/.local/share/dotfiles/zsh-plugins`. `zshrc` sources those copies first and
+  falls back to Homebrew/system paths only when the managed copy is missing.
+  Completion is `fzf-tab` (an fzf-driven fuzzy Tab menu over native `compinit`)
+  — it loads *after* `compinit` and *before*
   `zsh-autosuggestions`, and reclaims Tab after fzf's own key-bindings. This is
   the PowerShell-PSReadLine analog (Tab menu + inline gray history prediction);
   see CLAUDE.md invariant 13.
@@ -292,7 +299,8 @@ Use the same top-level test command that CI uses for your OS:
 ```bash
 # mac / linux / wsl
 make help               # list targets
-make test               # run everything that can run on this OS
+make ci                 # full local pre-PR gate: test + Renovate + migration
+make test               # current-host fast suite
 make validate-renovate  # schema-check renovate.json under Renovate's Node 24
 make lint               # shellcheck everything
 ./tests/wsl/e2e.sh      # manual WSL split-host validation from inside WSL
@@ -329,10 +337,11 @@ post-install validators plus the manual desktop visual checklist.
 Pull requests are meant to be gated by two workflows:
 
 - `.github/workflows/test.yml` runs the static, shell, tmux,
-  starship, Neovim, Windows Pester/PSScriptAnalyzer, and `chezmoi-parity`
-  suites. Warnings are treated as failures where the tools expose them cleanly:
-  shellcheck exits nonzero, PSScriptAnalyzer runs at `Warning,Error`, and YAML
-  parsing/linting is part of `make test-static`. Windows PSGallery module
+  starship, Neovim, Windows Pester/PSScriptAnalyzer, Renovate schema, and
+  `chezmoi-parity` suites. Warnings are treated as failures where the tools
+  expose them cleanly: shellcheck exits nonzero, PSScriptAnalyzer runs at
+  `Warning,Error`, Renovate validation fails if `npx` is missing under CI, and
+  YAML parsing/linting is part of `make test-static`. Windows PSGallery module
   installs retry transient lookup failures, but missing test dependencies remain
   fatal.
 - `.github/workflows/e2e-install.yml` is the real install guarantee. It proves
@@ -429,18 +438,28 @@ update PRs are intentionally not configured.
 |---|---|---|
 | GitHub Actions | Managed, digest-pinned, labeled `github-actions` | Actions are repo-owned CI inputs with stable Renovate support. |
 | GitHub runner images | Managed, labeled `github-runners`, reviewed separately | `ubuntu-*`, `macos-*`, and `windows-*` bumps can change the supported CI platform, so they should not be mixed with ordinary Action bumps. |
-| Repo-pinned installer versions/refs | Managed, labeled `pinned-downloads`, never automerged | Neovim Linux tarballs, lazygit Linux tarballs, tree-sitter CLI Linux archives, Hack Nerd Font, Windows Terminal portable zip, Ubuntu Ghostty, zsh plugin refs, and the CI `cargo-binstall` commit are explicit repo pins. |
+| Repo-pinned installer versions/refs | Managed, labeled `pinned-downloads`, never automerged | Neovim Linux tarballs, chezmoi CI release archives, lazygit Linux tarballs, Starship Linux tarballs, tree-sitter CLI Linux archives, Hack Nerd Font, Windows Terminal portable zip, Ubuntu Ghostty, zsh plugin refs, the Homebrew installer commit, the Renovate validator package/runtime, and the CI `cargo-binstall` commit are explicit repo pins. |
 | Adjacent SHA-256 / commit constants | Not managed; matched only as regex context | Renovate can bump the version/ref but cannot recompute archive/script hashes or verify tag commit IDs. CI must fail until a human recomputes and reviews them. |
 | Package-manager catalogs | Not managed | Brew, apt, dnf, pacman, zypper, apk, Scoop, winget, and choco entries are package names/IDs, not repo version pins. Let the package manager resolve current versions. |
 | Neovim plugin and Mason tools | Not managed | `lazy-lock.json` is refreshed with Lazy and tested as editor behavior; Mason intentionally has no machine-pinned lockfile. |
 
-Direct-download SHA-256 values for Neovim tarballs, lazygit tarballs,
-tree-sitter CLI archives, Hack Nerd Font, the Windows Terminal portable zip,
-the Ubuntu Ghostty installer, and the CI `cargo-binstall` installer script are
-intentionally human-reviewed. zsh plugin tag commits are also human-reviewed
-because the installer verifies the checked-out commit after cloning the bumped
-tag. Do not capture direct-download SHA constants as Renovate `currentDigest`
-values: that creates
+Direct network executables must either be pinned and verified before execution
+or appear in the reviewed static allowlist with a rationale. The remaining
+package-manager bootstrap trust root is Scoop's official installer on Windows;
+it is consent-gated and guarded by
+`tests/static/supply_chain_remote_execution_test.sh`. Homebrew bootstrap is
+downloaded from a pinned installer commit and SHA-256 verified before
+execution. Recommended setup docs use `git clone` plus local `setup`, not raw
+`curl | bash`/`iwr` execution of the current default branch.
+
+Direct-download SHA-256 values for Neovim tarballs, chezmoi CI release archives,
+lazygit tarballs, Starship tarballs, tree-sitter CLI archives, Hack Nerd Font,
+the Windows Terminal portable zip, the Ubuntu Ghostty installer, Homebrew
+installer script, and the CI `cargo-binstall` installer script are
+intentionally human-reviewed. zsh plugin
+tag commits are also human-reviewed because the installer verifies the
+checked-out commit after cloning the bumped tag. Do not capture direct-download
+SHA constants as Renovate `currentDigest` values: that creates
 noisy/unresolvable digest updates instead of a trustworthy checksum review. A
 Renovate PR may bump the version/ref while leaving the adjacent SHA or commit
 stale; CI then fails verification until a human reviews the adjacent constant.

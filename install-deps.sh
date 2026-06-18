@@ -19,13 +19,20 @@ YES_ALL=0
 DRY_RUN=0
 UPDATE_ONLY=0
 EXPERIMENTAL_WSL_GUI="${DOTFILES_EXPERIMENTAL_WSL_GUI:-0}"
+HOMEBREW_INSTALL_COMMIT="b953a44e39533dae3c3bb60bbd80138a73c360ec"
+HOMEBREW_INSTALL_SHA256="2863708cb516c5d0bcdfff97dc13bffb61db93f7acc6ae559a5598a57ce11091"
 NVIM_LINUX_VERSION="v0.12.3"
 NVIM_LINUX_X86_64_SHA256="c441b547142860bf01bcce39e36cbed185c41112813e15443b16e5237750724d"
 NVIM_LINUX_ARM64_SHA256="e055af73fa9c72b37456da8d204fa5c09850bc07e80e9176fe3b87d4afb7a3fc"
 CHEZMOI_VERSION="v2.70.5"
+CHEZMOI_LINUX_X86_64_SHA256="6a76a0ac3718f0d45b34b4b57067f9556f8f6042e3da710a3c496838362aca14"
+CHEZMOI_LINUX_ARM64_SHA256="4f4f31d0a10ed3b955e814a5ae20075426e27c9d3a09f536bfa4a6c8718353f2"
 LAZYGIT_LINUX_VERSION="v0.62.2"
 LAZYGIT_LINUX_X86_64_SHA256="8b9a4c2d0969cbea92b45c956dd2a44e1ba76900c9df49f1c60984045ce77984"
 LAZYGIT_LINUX_ARM64_SHA256="9ab63dd75a7e9711c4c68a37d77f4334b8099a5d6a3f8fbe8f4e2768b159c9e9"
+STARSHIP_VERSION="v1.25.1"
+STARSHIP_LINUX_X86_64_SHA256="4488c11ca632327d1f1f16fb2f102c0646094c35479cd5435991385da43c61ac"
+STARSHIP_LINUX_ARM64_SHA256="01517aab398959ea9ea73bdb4f032ea4dbb51dff5c8e5eb05b4a1b9b7ab872b8"
 TREE_SITTER_CLI_LINUX_VERSION="v0.26.9"
 TREE_SITTER_CLI_LINUX_X86_64_SHA256="0ea5daaef79145fe73786f0e3cdc43b62b22ddb36f7f6676c9f8bb72434d78e9"
 TREE_SITTER_CLI_LINUX_ARM64_SHA256="8b6c0f53593ce17c7eb90eb08de5ffb9f513f3db585b1fbef12219cacf7e8a68"
@@ -271,11 +278,33 @@ maybe_install_brew() {
     fi
     echo "Homebrew is not installed. $kind."
     if ask "Install Homebrew via the official installer?"; then
+        local url tmp script
+        url="https://raw.githubusercontent.com/Homebrew/install/${HOMEBREW_INSTALL_COMMIT}/install.sh"
         if [[ "$DRY_RUN" -eq 1 ]]; then
-            echo "  would: /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
+            echo "  would: curl -fsSL $url -o /tmp/homebrew-install.sh"
+            echo "         verify sha256 $HOMEBREW_INSTALL_SHA256"
+            echo "         /bin/bash /tmp/homebrew-install.sh"
             return 1
         fi
-        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" || return 1
+        require_downloader || return 1
+        tmp="$(mktemp -d)"
+        trap 'rm -rf "$tmp"; trap - RETURN' RETURN
+        script="$tmp/homebrew-install.sh"
+        if ! curl -fsSL "$url" -o "$script"; then
+            echo "  FAIL: Homebrew installer download failed from $url"
+            rm -rf "$tmp"
+            return 1
+        fi
+        if ! verify_sha256 "$script" "$HOMEBREW_INSTALL_SHA256"; then
+            echo "  FAIL: checksum mismatch for Homebrew installer at $HOMEBREW_INSTALL_COMMIT"
+            rm -rf "$tmp"
+            return 1
+        fi
+        /bin/bash "$script" || {
+            rm -rf "$tmp"
+            return 1
+        }
+        rm -rf "$tmp"
         # Plumb brew into THIS shell so subsequent installs use it, then make
         # future zsh/bash sessions find it without manual Homebrew "Next steps".
         enable_homebrew_for_current_shell || true
@@ -1086,6 +1115,132 @@ install_lazygit() {
     fi
 }
 
+install_starship_linux() {
+    if have starship; then
+        printf "  ok        %-26s already installed\n" "starship"
+        return
+    fi
+    if [[ "$(native_linux_pm)" == "apk" ]]; then
+        if ! ask "Install starship via apk (native Alpine package)?"; then
+            printf "  skipped   %-26s\n" "starship"
+            return
+        fi
+        native_linux_pm_install apk starship || {
+            echo "  WARN: starship install failed; continuing"
+            return
+        }
+        if have starship; then
+            printf "  installed %-26s via apk\n" "starship"
+        fi
+        return
+    fi
+
+    local machine arch expected asset url tmp tarball source_bin install_target
+    machine="$(uname -m)"
+    case "$machine" in
+        x86_64|amd64)
+            arch="x86_64"
+            expected="$STARSHIP_LINUX_X86_64_SHA256"
+            asset="starship-x86_64-unknown-linux-gnu.tar.gz"
+            ;;
+        aarch64|arm64)
+            arch="aarch64"
+            expected="$STARSHIP_LINUX_ARM64_SHA256"
+            asset="starship-aarch64-unknown-linux-musl.tar.gz"
+            ;;
+        *)
+            printf "  manual    %-26s unsupported Linux arch: %s\n" "starship" "$machine"
+            echo "            install from https://github.com/starship/starship/releases"
+            return
+            ;;
+    esac
+
+    url="https://github.com/starship/starship/releases/download/${STARSHIP_VERSION}/${asset}"
+
+    if ! ask "Install starship (pinned GitHub release ${STARSHIP_VERSION}, Linux ${arch})?"; then
+        printf "  skipped   %-26s\n" "starship"
+        return
+    fi
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        echo "  would: curl -fsSL $url -o /tmp/$asset"
+        echo "         verify sha256 $expected"
+        echo "         install starship -> /usr/local/bin/starship"
+        echo "         fallback -> \$HOME/.local/bin/starship when sudo is unavailable"
+        return
+    fi
+    require_downloader || return 1
+    if ! have tar; then
+        echo "  need      tar missing; installing extractor for starship"
+        install tar "extract starship release archive"
+        if ! have tar; then
+            echo "  FAIL: need tar to extract $asset"
+            return 1
+        fi
+    fi
+
+    tmp="$(mktemp -d)"
+    trap 'rm -rf "$tmp"; trap - RETURN' RETURN
+    tarball="$tmp/$asset"
+    if ! curl -fsSL "$url" -o "$tarball"; then
+        echo "  FAIL: starship download failed from $url"
+        rm -rf "$tmp"
+        return 1
+    fi
+    if ! verify_sha256 "$tarball" "$expected"; then
+        echo "  FAIL: checksum mismatch for $asset"
+        rm -rf "$tmp"
+        return 1
+    fi
+    if ! tar -xzf "$tarball" -C "$tmp" starship; then
+        echo "  FAIL: could not extract starship from $asset"
+        rm -rf "$tmp"
+        return 1
+    fi
+
+    source_bin="$tmp/starship"
+    if [[ ! -f "$source_bin" ]]; then
+        source_bin="$(find "$tmp" -type f -name starship -print -quit)"
+    fi
+    if [[ -z "$source_bin" || ! -f "$source_bin" ]]; then
+        echo "  FAIL: starship binary missing from $asset"
+        rm -rf "$tmp"
+        return 1
+    fi
+
+    if [[ "$(id -u 2>/dev/null || echo 0)" -eq 0 ]] || have sudo; then
+        if maybe_sudo mkdir -p /usr/local/bin &&
+            maybe_sudo cp "$source_bin" /usr/local/bin/starship &&
+            maybe_sudo chmod 0755 /usr/local/bin/starship; then
+            rm -rf "$tmp"
+            printf "  installed %-26s -> /usr/local/bin/starship\n" "starship"
+            return
+        fi
+        echo "  WARN: could not install starship to /usr/local/bin; trying user-local bin"
+    fi
+
+    install_target="$HOME/.local/bin/starship"
+    if ! mkdir -p "$HOME/.local/bin" ||
+        ! cp "$source_bin" "$install_target" ||
+        ! chmod 0755 "$install_target"; then
+        echo "  FAIL: could not install starship to $install_target"
+        rm -rf "$tmp"
+        return 1
+    fi
+    rm -rf "$tmp"
+    ensure_local_bin_on_path
+    printf "  installed %-26s -> %s\n" "starship" "$install_target"
+}
+
+install_starship() {
+    if [[ "$PM" == "brew" ]]; then
+        install starship "cross-shell prompt"
+    elif [[ "$(uname -s)" == "Linux" ]]; then
+        install_starship_linux
+    else
+        install starship "cross-shell prompt"
+    fi
+}
+
 install_tree_sitter_cli_linux() {
     if have tree-sitter; then
         printf "  ok        %-26s already installed\n" "tree-sitter"
@@ -1313,27 +1468,89 @@ install_chezmoi() {
         return
     fi
 
-    if ! ask "Install chezmoi (dotfiles config manager, pinned ${CHEZMOI_VERSION})?"; then
+    local machine arch expected version_no_v asset url tmp tarball source_bin install_target
+    machine="$(uname -m)"
+    case "$machine" in
+        x86_64|amd64)
+            arch="amd64"
+            expected="$CHEZMOI_LINUX_X86_64_SHA256"
+            ;;
+        aarch64|arm64)
+            arch="arm64"
+            expected="$CHEZMOI_LINUX_ARM64_SHA256"
+            ;;
+        *)
+            printf "  manual    %-26s unsupported Linux arch: %s\n" "chezmoi" "$machine"
+            echo "            install from https://github.com/twpayne/chezmoi/releases"
+            return
+            ;;
+    esac
+
+    version_no_v="${CHEZMOI_VERSION#v}"
+    asset="chezmoi_${version_no_v}_linux_${arch}.tar.gz"
+    url="https://github.com/twpayne/chezmoi/releases/download/${CHEZMOI_VERSION}/${asset}"
+
+    if ! ask "Install chezmoi (pinned GitHub release ${CHEZMOI_VERSION}, Linux ${arch})?"; then
         printf "  skipped   %-26s\n" "chezmoi"
         return
     fi
     if [[ "$DRY_RUN" -eq 1 ]]; then
-        echo "  would: sh -c \"\$(curl -fsLS get.chezmoi.io)\" -- -b \"\$HOME/.local/bin\" -t \"$CHEZMOI_VERSION\""
+        echo "  would: curl -fsSL $url -o /tmp/$asset"
+        echo "         verify sha256 $expected"
+        echo "         extract chezmoi -> \$HOME/.local/bin/chezmoi"
         return
     fi
 
     require_downloader || return 1
-    mkdir -p "$HOME/.local/bin"
-    if sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin" -t "$CHEZMOI_VERSION"; then
-        ensure_local_bin_on_path
-        printf "  installed %-26s %s -> %s\n" "chezmoi" "$CHEZMOI_VERSION" "$HOME/.local/bin/chezmoi"
-    else
-        echo "  WARN: chezmoi install failed; continuing"
+    if ! have tar; then
+        echo "  need      tar missing; installing extractor for chezmoi"
+        install tar "extract chezmoi release archive"
+        if ! have tar; then
+            echo "  FAIL: need tar to extract $asset"
+            return 1
+        fi
     fi
+
+    tmp="$(mktemp -d)"
+    trap 'rm -rf "$tmp"; trap - RETURN' RETURN
+    tarball="$tmp/$asset"
+    if ! curl -fsSL "$url" -o "$tarball"; then
+        echo "  FAIL: chezmoi download failed from $url"
+        rm -rf "$tmp"
+        return 1
+    fi
+    if ! verify_sha256 "$tarball" "$expected"; then
+        echo "  FAIL: checksum mismatch for $asset"
+        rm -rf "$tmp"
+        return 1
+    fi
+    if ! tar -xzf "$tarball" -C "$tmp"; then
+        echo "  FAIL: could not extract chezmoi from $asset"
+        rm -rf "$tmp"
+        return 1
+    fi
+
+    source_bin="$tmp/chezmoi"
+    if [[ ! -f "$source_bin" ]]; then
+        source_bin="$(find "$tmp" -type f -name chezmoi -print -quit)"
+    fi
+    if [[ -z "$source_bin" || ! -f "$source_bin" ]]; then
+        echo "  FAIL: chezmoi binary missing from $asset"
+        rm -rf "$tmp"
+        return 1
+    fi
+
+    install_target="$HOME/.local/bin/chezmoi"
+    mkdir -p "$HOME/.local/bin"
+    cp "$source_bin" "$install_target"
+    chmod 0755 "$install_target"
+    rm -rf "$tmp"
+    ensure_local_bin_on_path
+    printf "  installed %-26s %s -> %s\n" "chezmoi" "$CHEZMOI_VERSION" "$install_target"
 }
 
 zsh_plugin_root() {
-    printf '%s\n' "${XDG_DATA_HOME:-$HOME/.local/share}/dotfiles/zsh-plugins"
+    printf '%s\n' "$HOME/.local/share/dotfiles/zsh-plugins"
 }
 
 zsh_plugin_ok() {
@@ -1482,7 +1699,7 @@ fd|fd|fd-find|fd-find|fd|fd|fd
 fzf|fzf|fzf|fzf|fzf|fzf|fzf
 chezmoi|chezmoi|||||
 lazygit|lazygit|||||
-starship|starship||||||
+starship|starship|||||
 tmux|tmux|tmux|tmux|tmux|tmux|tmux
 zsh|zsh|zsh|zsh|zsh|zsh|zsh
 python3|python@3.12|python3|python3|python|python311|python3
@@ -1507,7 +1724,7 @@ pkg_for() {
     local tool="$1"
     if [[ "$PM" == "apk" ]]; then
         case "$tool" in
-            lazygit|tree-sitter)
+            lazygit|starship|tree-sitter)
                 printf '%s\n' "$tool"
                 return
                 ;;
@@ -1644,7 +1861,7 @@ is_pinned_direct_update_tool() {
     [[ "$PM" == "brew" ]] && return 1
     [[ "$(native_linux_pm 2>/dev/null || true)" == "apk" ]] && return 1
     case "$tool" in
-        nvim|lazygit|tree-sitter) return 0 ;;
+        nvim|lazygit|starship|tree-sitter) return 0 ;;
         *) return 1 ;;
     esac
 }
@@ -1708,7 +1925,7 @@ run_update_mode() {
 
     update_catalog_tools
     echo
-    echo "note: pinned binaries (Neovim/lazygit/tree-sitter Linux archives, Hack Nerd Font, Windows Terminal portable), PSFzf, plugins, and configs update via git pull and re-running setup."
+    echo "note: pinned binaries (Neovim/lazygit/Starship/tree-sitter Linux archives, Hack Nerd Font, Windows Terminal portable), PSFzf, plugins, and configs update via git pull and re-running setup."
 }
 
 unique_backup_path() {
@@ -1839,26 +2056,6 @@ install() {
         fi
     else
         printf "  skipped   %-26s\n" "$tool"
-    fi
-}
-
-# Starship has an official one-liner installer that works without a PM.
-install_starship_curl() {
-    if have starship; then
-        printf "  ok        %-26s already installed\n" "starship"
-        return
-    fi
-    if ask "Install starship (prompt) via official curl installer?"; then
-        if [[ "$DRY_RUN" -eq 1 ]]; then
-            echo "  would: curl -fsSL https://starship.rs/install.sh | sh -s -- -y"
-        else
-            # -f: fail (non-zero) on an HTTP 4xx/5xx instead of piping an error
-            # page into sh. -L: follow redirects. Keeps the documented official
-            # curl|sh install path, just makes the fetch fail-closed.
-            curl -fsSL https://starship.rs/install.sh | sh -s -- -y || echo "  WARN: starship install failed"
-        fi
-    else
-        printf "  skipped   %-26s\n" "starship"
     fi
 }
 
@@ -2000,7 +2197,7 @@ install_ghostty_linux() {
     fi
     echo "  manual    ghostty has no native $PM package. Options:"
     echo "              - ubuntu:  re-run this script for the verified pinned installer"
-    echo "              - manual:  curl -fsSL $ubuntu_url | bash   (unverified fallback, pinned $GHOSTTY_UBUNTU_VERSION)"
+    echo "              - manual:  follow https://ghostty.org/docs/install/binary"
     echo "              - snap:    sudo snap install ghostty --classic"
     echo "              - flatpak: search 'ghostty' on flathub"
     echo "              - source:  https://ghostty.org/docs/install/build"
@@ -2389,11 +2586,7 @@ install_chezmoi
 install_lazygit
 
 section "prompt"
-if [[ "$PM" == "brew" ]]; then
-    install starship
-else
-    install_starship_curl
-fi
+install_starship
 
 section "terminal multiplexer + shell"
 install tmux

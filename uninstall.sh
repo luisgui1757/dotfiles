@@ -303,7 +303,9 @@ remove_externals() {
             echo "  removed   $dir"
         fi
     done
-    rmdir "$root" "$HOME/.local/share/dotfiles" 2>/dev/null || true
+    if [[ "$DRY_RUN" -ne 1 ]]; then
+        rmdir "$root" "$HOME/.local/share/dotfiles" 2>/dev/null || true
+    fi
 }
 
 echo "uninstall: repo=$REPO_ROOT source=$SOURCE_DIR dry-run=$DRY_RUN restore-backups=$RESTORE_BACKUPS"

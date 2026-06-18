@@ -21,9 +21,18 @@ env:
   CARGO_BINSTALL_COMMIT: 252c5e70a6eae3a9de06b610159a568eaf705055
   CARGO_BINSTALL_INSTALLER_SHA256: d3a93702160e0ec03e2a4e996855db1f01adee801fb84a43add24e0877ef8eae
   CHEZMOI_VERSION: v2.70.5
+  CHEZMOI_LINUX_X86_64_SHA256: 6a76a0ac3718f0d45b34b4b57067f9556f8f6042e3da710a3c496838362aca14
+  CHEZMOI_LINUX_ARM64_SHA256: 4f4f31d0a10ed3b955e814a5ae20075426e27c9d3a09f536bfa4a6c8718353f2
+  CHEZMOI_DARWIN_X86_64_SHA256: 6676e06f094e5b0860bd3642d203b71869b5cbeb8089155886bc54c1096b9d3c
+  CHEZMOI_DARWIN_ARM64_SHA256: c3531896769175089b9b2e9cf99b15a2357427f776289b66583a2432d69cd3cc
+  CHEZMOI_WINDOWS_X86_64_SHA256: ebc29455dc9106e8d2d980708b45bd3120e44c7d5e6a06787ff307faaa0681a8
   NVIM_LINUX_VERSION: v0.12.3
   NVIM_LINUX_X86_64_SHA256: c441b547142860bf01bcce39e36cbed185c41112813e15443b16e5237750724d
   PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  STARSHIP_VERSION: v1.25.1
+  STARSHIP_LINUX_X86_64_SHA256: 4488c11ca632327d1f1f16fb2f102c0646094c35479cd5435991385da43c61ac
+  TREE_SITTER_CLI_LINUX_VERSION: v0.26.9
+  TREE_SITTER_CLI_LINUX_X86_64_SHA256: 0ea5daaef79145fe73786f0e3cdc43b62b22ddb36f7f6676c9f8bb72434d78e9
 
 jobs:
   ubuntu:
@@ -43,11 +52,18 @@ jobs:
         run: |
           set -euxo pipefail
           sudo apt-get update
-          sudo apt-get install -y ca-certificates curl shellcheck tmux zsh bats python3-pip
-          if ! sudo snap install starship --classic; then
-            curl -fsSL https://starship.rs/install.sh -o /tmp/starship-install.sh
-            sh /tmp/starship-install.sh -y
-          fi
+          sudo apt-get install -y ca-certificates curl shellcheck tmux zsh bats python3-pip unzip
+          curl -fsSL "https://github.com/starship/starship/releases/download/${STARSHIP_VERSION}/starship-x86_64-unknown-linux-gnu.tar.gz" -o /tmp/starship.tar.gz
+          printf '%s  %s\n' "$STARSHIP_LINUX_X86_64_SHA256" /tmp/starship.tar.gz | sha256sum -c -
+          sudo tar -xzf /tmp/starship.tar.gz -C /usr/local/bin starship
+          starship --version
+          curl -fsSL "https://github.com/tree-sitter/tree-sitter/releases/download/${TREE_SITTER_CLI_LINUX_VERSION}/tree-sitter-cli-linux-x64.zip" -o /tmp/tree-sitter-cli-linux-x64.zip
+          printf '%s  %s\n' "$TREE_SITTER_CLI_LINUX_X86_64_SHA256" /tmp/tree-sitter-cli-linux-x64.zip | sha256sum -c -
+          rm -rf /tmp/tree-sitter-cli
+          mkdir -p /tmp/tree-sitter-cli
+          unzip -oq /tmp/tree-sitter-cli-linux-x64.zip -d /tmp/tree-sitter-cli
+          sudo install -m 0755 /tmp/tree-sitter-cli/tree-sitter /usr/local/bin/tree-sitter
+          tree-sitter --version
           curl -fsSL "https://raw.githubusercontent.com/cargo-bins/cargo-binstall/${CARGO_BINSTALL_COMMIT}/install-from-binstall-release.sh" -o /tmp/cargo-binstall.sh
           printf '%s  %s\n' "$CARGO_BINSTALL_INSTALLER_SHA256" /tmp/cargo-binstall.sh | sha256sum -c -
           bash /tmp/cargo-binstall.sh
@@ -79,6 +95,10 @@ jobs:
         run: |
           set -euo pipefail
           make test-static
+      - name: Renovate schema
+        run: |
+          set -euo pipefail
+          make validate-renovate
       - name: shellcheck
         run: |
           set -euo pipefail
@@ -116,7 +136,7 @@ jobs:
       - name: Install deps
         run: |
           set -euxo pipefail
-          brew install shellcheck neovim tmux starship taplo hyperfine yamllint editorconfig-checker bats-core
+          brew install shellcheck neovim tmux starship tree-sitter-cli taplo hyperfine yamllint editorconfig-checker bats-core
       - name: Make test (full matrix)
         run: |
           set -euo pipefail
@@ -220,9 +240,7 @@ jobs:
           set -euxo pipefail
           sudo apt-get update
           sudo apt-get install -y ca-certificates curl git python3
-          # -t pins the tag (+ SHA-256 verifies the release); a bare positional
-          # would be treated as a chezmoi command to run after install.
-          sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin" -t "$CHEZMOI_VERSION"
+          scripts/install-pinned-chezmoi.sh "$HOME/.local/bin"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           "$HOME/.local/bin/chezmoi" --version
       - name: Template tests
@@ -263,9 +281,7 @@ jobs:
           set -euxo pipefail
           command -v python3
           command -v git
-          # -t pins the tag (+ SHA-256 verifies the release); a bare positional
-          # would be treated as a chezmoi command to run after install.
-          sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin" -t "$CHEZMOI_VERSION"
+          scripts/install-pinned-chezmoi.sh "$HOME/.local/bin"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           "$HOME/.local/bin/chezmoi" --version
       - name: Template tests
@@ -307,8 +323,21 @@ jobs:
 
           $bin = Join-Path $env:USERPROFILE 'bin'
           New-Item -ItemType Directory -Force -Path $bin | Out-Null
-          $installScript = Invoke-RestMethod -UseBasicParsing 'https://get.chezmoi.io/ps1'
-          & ([scriptblock]::Create($installScript)) -b $bin -t $env:CHEZMOI_VERSION
+          $version = $env:CHEZMOI_VERSION.TrimStart('v')
+          $asset = "chezmoi_${version}_windows_amd64.zip"
+          $zip = Join-Path $env:TEMP $asset
+          $extract = Join-Path $env:TEMP "chezmoi-$([guid]::NewGuid())"
+          Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/twpayne/chezmoi/releases/download/$env:CHEZMOI_VERSION/$asset" -OutFile $zip
+          $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $zip).Hash.ToLowerInvariant()
+          if ($actual -ne $env:CHEZMOI_WINDOWS_X86_64_SHA256) {
+            throw "checksum mismatch for ${asset}: got $actual expected $env:CHEZMOI_WINDOWS_X86_64_SHA256"
+          }
+          Expand-Archive -Path $zip -DestinationPath $extract -Force
+          $chezmoi = Get-ChildItem -Path $extract -Filter 'chezmoi.exe' -File -Recurse | Select-Object -First 1
+          if (-not $chezmoi) {
+            throw "chezmoi.exe missing from $asset"
+          }
+          Copy-Item -LiteralPath $chezmoi.FullName -Destination (Join-Path $bin 'chezmoi.exe') -Force
 
           Add-Content -Path $env:GITHUB_PATH -Value $bin
           $env:PATH = "$bin;$env:PATH"

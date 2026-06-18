@@ -8,7 +8,10 @@ config must stay single-source: when a top-level config has a managed copy or
 template under `home/`, update both in the same change and let the parity gate
 prove byte equality. Wave C stage 4 retired the old direct config scripts and
 made the parity gate canonical-only; the N-green counter and required-check
-application remain owner-tracked release controls.
+application remain owner-tracked release controls. Greenfield desktop evidence
+is tracked in `tests/greenfield/LEDGER.md`; docs and launchers default to
+`main`, with PR validation handled by explicit branch overrides in the
+greenfield runbook.
 
 | Config | Source file(s) | Per-OS target(s) | Chezmoi mechanism |
 |---|---|---|---|
@@ -86,8 +89,10 @@ then remove only targets they can prove are repo-owned:
 Both scripts support dry-run and non-interactive flags:
 `--dry-run --all --keep-externals --no-restore-backups --force-externals` on
 POSIX, and `-DryRun -All -KeepExternals -NoRestoreBackups -ForceExternals` on
-Windows. Adversarial safety (dirty external preserved, user-replaced managed
-file skipped, broken repo-symlink still cleaned) is covered by
+Windows. POSIX dry-run also leaves empty zsh-external parent directories in
+place instead of pruning `~/.local/share/dotfiles`. Adversarial safety (dry-run
+does not mutate, dirty external preserved, user-replaced managed file skipped,
+broken repo-symlink still cleaned) is covered by
 `tests/migration/uninstall_safety_test.sh`.
 
 ## Owner sign-off / known caveats
@@ -109,7 +114,7 @@ file skipped, broken repo-symlink still cleaned) is covered by
       before forced apply, preserves `--skip-bootstrap` / `-SkipBootstrap` as
       aliases for the new config skip, and keeps the Windows Developer
       Mode/elevation pre-flight before apply.
-- [x] Wave C stage 4 is done on branch `chezmoi-pilot`: the legacy direct
+- [x] Wave C stage 4 is done on the pilot migration branch: the legacy direct
       config scripts and their direct test harness were deleted, the old Make
       target was retired, setup remains chezmoi-native, the native-apt container
       e2e applies via chezmoi, and `tests/migration/parity_gate.sh` is
@@ -123,19 +128,32 @@ file skipped, broken repo-symlink still cleaned) is covered by
       the symlink-reference path branch, and byte-compares ordinary managed
       files against the captured content before deciding to create a
       `<target>.bak.<timestamp>` backup.
+- [x] Greenfield Windows Sandbox, manual Windows, macOS VM, and Linux VM
+      instructions now default to `main`; PR validation uses documented branch
+      overrides, and `tests/static/stale_greenfield_refs_test.sh` guards against
+      reintroducing the retired pilot branch name outside archived historical
+      docs.
+- [x] `tests/greenfield/LEDGER.md` is the append-only evidence ledger for
+      clean-machine automated runs and manual visual observations.
+- [x] `XDG_DATA_HOME` is intentionally not modeled for zsh plugin externals.
+      The repo-wide contract is the fixed
+      `~/.local/share/dotfiles/zsh-plugins` root. Chezmoi installs there,
+      `install-deps.sh` installs there, `shells/zshrc` sources there first, the
+      verifier checks there, uninstall removes there, and parity tests assert
+      that root under a hostile `XDG_DATA_HOME`.
+- [x] Live `main` protection requires `chezmoi-parity`,
+      `chezmoi-parity-macos`, and `chezmoi-parity-windows` as of 2026-06-18.
+      `scripts/apply-repo-safeguards.sh luisgui1757/dotfiles` applied and
+      verified the active integrity ruleset plus the classic branch-protection
+      fallback. The integrity ruleset is active, strict, and has no bypass
+      actors; the classic fallback is strict and has the same required context
+      set.
 
 ### Open
 
 - [ ] N-green-runs counter for Wave C: `0 / 10` consecutive green Ubuntu parity
-      runs recorded here. Stage 4 has landed on branch `chezmoi-pilot`; this
-      counter remains owner release evidence alongside green macOS/Windows
-      parity arms.
-- [ ] Making `chezmoi-parity`, `chezmoi-parity-macos`, and
-      `chezmoi-parity-windows` live required checks remains an owner action via
-      `scripts/apply-repo-safeguards.sh`.
-- [ ] `XDG_DATA_HOME` is not modeled for externals. Chezmoi installs zsh plugins
-      to fixed `.local/share`, and the verifier checks that same fixed path; an
-      XDG-aware managed root is Wave B.
+      runs recorded in `tests/greenfield/LEDGER.md`. This counter remains owner
+      release evidence alongside green macOS/Windows parity arms.
 - [ ] No secrets or `age` tier has been started.
 - [ ] The Windows PowerShell profile managed by chezmoi is the PowerShell 7
       path (`Documents\PowerShell\Microsoft.PowerShell_profile.ps1`). The

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC1091,SC2034,SC2329
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
@@ -8,7 +9,7 @@ TMP_HOME="$(mktemp -d)"
 trap 'rm -rf "$TMP_HOME"' EXIT
 
 HOME="$TMP_HOME"
-XDG_DATA_HOME="$TMP_HOME/.local/share"
+XDG_DATA_HOME="$TMP_HOME/.xdg-data"
 YES_ALL=1
 DRY_RUN=1
 
@@ -43,7 +44,18 @@ out="$(install_zsh_plugins)"
 
 zshrc="$REPO_ROOT/shells/zshrc"
 # shellcheck disable=SC2016 # grep literals intentionally include shell syntax.
-grep -F '_dotfiles_zsh_plugin_root="${XDG_DATA_HOME:-$HOME/.local/share}/dotfiles/zsh-plugins"' "$zshrc" >/dev/null
+grep -F '_dotfiles_zsh_plugin_root="$HOME/.local/share/dotfiles/zsh-plugins"' "$zshrc" >/dev/null \
+    || { echo "FAIL: zshrc must use the fixed ~/.local/share zsh plugin root"; exit 1; }
+if grep -F 'XDG_DATA_HOME' "$zshrc" | grep -F 'zsh-plugins' >/dev/null; then
+    echo "FAIL: zshrc must not make the zsh plugin root depend on XDG_DATA_HOME"
+    exit 1
+fi
+grep -F '[".local/share/dotfiles/zsh-plugins/fzf-tab"]' "$REPO_ROOT/home/.chezmoiexternal.toml.tmpl" >/dev/null \
+    || { echo "FAIL: chezmoi externals must install fzf-tab under the fixed root"; exit 1; }
+# shellcheck disable=SC2016 # literal template syntax is intentional.
+grep -F 'root="$HOME/.local/share/dotfiles/zsh-plugins"' \
+    "$REPO_ROOT/home/.chezmoiscripts/run_onchange_after_20-verify-zsh-plugin-pins.sh.tmpl" >/dev/null \
+    || { echo "FAIL: zsh pin verifier must check the fixed plugin root"; exit 1; }
 # zsh-autosuggestions (inline gray history) is sourced for prediction.
 grep -F 'zsh-autosuggestions/zsh-autosuggestions.zsh' "$zshrc" >/dev/null
 
