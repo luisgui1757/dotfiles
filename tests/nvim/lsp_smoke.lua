@@ -17,8 +17,8 @@
 --       and a MISSING runtime on the target OS is a failure, not a skip,
 --   (3) the auto-started bundled filetypes (lua/markdown/help/query) keep the
 --       nvim-treesitter indentexpr the FileType autocmd promises.
---   (4) sparse C-family/CMake buffers keep Vim regex syntax groups in addition
---       to Tree-sitter captures.
+--   (4) daily language buffers keep Vim regex syntax groups in addition to
+--       Tree-sitter captures where parsers exist.
 --
 -- DOTFILES_LSP_SMOKE:
 --   unset  -> no-op (an accidental run in the fast suite is harmless)
@@ -255,16 +255,23 @@ local ok, err = pcall(function()
     pcall(vim.cmd, "silent! bwipeout!")
   end
 
-  -- (4) Regex syntax fallback for sparse/high-value languages. Tree-sitter
-  -- main clears the buffer-local 'syntax' option when it starts; for C, C++,
-  -- and CMake we intentionally restore the built-in syntax file afterward so
-  -- sparse queries do not make real buffers look like plain text.
+  -- (4) Regex syntax fallback for daily editing languages. Tree-sitter main
+  -- clears the buffer-local 'syntax' option when it starts; restore the built-in
+  -- syntax file afterward so real buffers do not look like plain text.
   local syntax_fallback = {
     { fixture = "sample.c", ft = "c", syntax = { 0, 0 }, treesitter = { 0, 0 } },
     { fixture = "sample.cpp", ft = "cpp", syntax = { 0, 0 }, treesitter = { 0, 0 } },
     -- CMake arguments are the important syntax-only fallback case; command
     -- names still prove Tree-sitter is active.
     { fixture = "CMakeLists.txt", ft = "cmake", syntax = { 1, 8 }, treesitter = { 1, 0 } },
+    { fixture = "sample.py", ft = "python", syntax = { 0, 0 }, treesitter = { 0, 0 } },
+    { fixture = "sample.rs", ft = "rust", syntax = { 0, 0 }, treesitter = { 0, 0 } },
+    { fixture = "sample.ps1", ft = "ps1", syntax = { 0, 0 }, treesitter = { 0, 0 } },
+    { fixture = "sample.sh", ft = "sh", syntax = { 1, 0 }, treesitter = { 1, 0 } },
+    { fixture = "sample.yaml", ft = "yaml", syntax = { 0, 0 }, treesitter = { 0, 0 } },
+    { fixture = "sample.json", ft = "json", syntax = { 0, 2 }, treesitter = { 0, 2 } },
+    { fixture = "sample.md", ft = "markdown", syntax = { 0, 0 }, treesitter = { 0, 0 } },
+    { fixture = "sample.bat", ft = "dosbatch", syntax = { 1, 0 }, treesitter = false },
   }
   for _, row in ipairs(syntax_fallback) do
     local open_ok, open_err = pcall(vim.cmd.edit, vim.fn.fnameescape(fixtures .. row.fixture))
@@ -273,19 +280,22 @@ local ok, err = pcall(function()
     else
       local buf = vim.api.nvim_get_current_buf()
       vim.wait(5000, function()
-        return #vim.inspect_pos(buf, row.syntax[1], row.syntax[2]).syntax > 0
-          and #vim.inspect_pos(buf, row.treesitter[1], row.treesitter[2]).treesitter > 0
+        local syntax_ready = #vim.inspect_pos(buf, row.syntax[1], row.syntax[2]).syntax > 0
+        if not row.treesitter then
+          return syntax_ready
+        end
+        return syntax_ready and #vim.inspect_pos(buf, row.treesitter[1], row.treesitter[2]).treesitter > 0
       end, 50)
       local syntax_pos = vim.inspect_pos(buf, row.syntax[1], row.syntax[2])
-      local treesitter_pos = vim.inspect_pos(buf, row.treesitter[1], row.treesitter[2])
+      local treesitter_pos = row.treesitter and vim.inspect_pos(buf, row.treesitter[1], row.treesitter[2])
       if vim.bo[buf].syntax ~= row.ft then
         fail(row.fixture .. ": syntax fallback not restored (got: " .. tostring(vim.bo[buf].syntax) .. ")")
       elseif #syntax_pos.syntax == 0 then
         fail(row.fixture .. ": syntax fallback restored but no syntax groups reported at probe position")
-      elseif #treesitter_pos.treesitter == 0 then
+      elseif row.treesitter and #treesitter_pos.treesitter == 0 then
         fail(row.fixture .. ": syntax fallback present but Tree-sitter captures missing at probe position")
       else
-        note(row.fixture .. ": syntax fallback + Tree-sitter captures active")
+        note(row.fixture .. ": syntax fallback" .. (row.treesitter and " + Tree-sitter captures active" or " active"))
       end
     end
     pcall(vim.cmd, "silent! bwipeout!")

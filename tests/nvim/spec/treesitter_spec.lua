@@ -138,19 +138,39 @@ describe("treesitter main migration", function()
   it("registers highlighting before FileType fires on real file opens", function()
     assert.is_truthy(src:match('event%s*=%s*%{ "BufReadPre", "BufNewFile" %}'), "must load before FileType")
     assert.is_truthy(src:match('nvim_create_autocmd%("FileType"'), "must create a FileType autocmd")
-    assert.is_truthy(src:match("pattern%s*=%s*treesitter_filetypes"), "FileType autocmd must be scoped")
+    assert.is_truthy(src:match("pattern%s*=%s*highlight_filetypes"), "FileType autocmd must be scoped")
+    assert.is_truthy(src:match("if treesitter_filetype_set%[filetype%] then"), "only parser-backed filetypes should start Tree-sitter")
     assert.is_truthy(src:match("pcall%(vim%.treesitter%.start, args%.buf%)"), "missing parsers must not error")
   end)
 
-  it("keeps regex syntax fallback for sparse C-family and CMake highlighting", function()
+  it("keeps regex syntax fallback for user-facing language highlighting", function()
+    for filetype, syntax in pairs({
+      c = "c",
+      cpp = "cpp",
+      cmake = "cmake",
+      dosbatch = "dosbatch",
+      json = "json",
+      markdown = "markdown",
+      ps1 = "ps1",
+      python = "python",
+      rust = "rust",
+      sh = "sh",
+      yaml = "yaml",
+    }) do
+      assert.is_truthy(
+        src:match(filetype .. '%s*=%s*"' .. syntax .. '"'),
+        filetype .. " should keep built-in syntax groups in addition to richer highlighting"
+      )
+    end
     assert.is_truthy(
-      src:match("regex_syntax_fallback_filetypes%s*=%s*%{.-c%s*=%s*true.-cpp%s*=%s*true.-cmake%s*=%s*true.-%}"),
-      "C, C++, and CMake should keep built-in syntax groups in addition to Treesitter captures"
-    )
-    assert.is_truthy(
-      src:match("vim%.bo%[args%.buf%]%.syntax%s*=%s*filetype"),
+      src:match("vim%.bo%[args%.buf%]%.syntax%s*=%s*syntax"),
       "FileType callback must restore syntax fallback after vim.treesitter.start() clears it"
     )
+    local installed = {}
+    for _, parser in ipairs(extract_string_list("treesitter_parsers")) do
+      installed[parser] = true
+    end
+    assert.is_nil(installed.dosbatch, "dosbatch has no pinned nvim-treesitter parser; keep it syntax-only")
   end)
 
   it("registers filetype aliases for parsers whose names differ from Neovim filetypes", function()

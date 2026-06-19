@@ -54,27 +54,54 @@ local parser_filetype_aliases = {
 }
 
 -- nvim-treesitter main no longer exposes the legacy
--- `additional_vim_regex_highlighting` option. Keep the same useful hybrid
--- behavior explicitly for languages where Tree-sitter queries are deliberately
--- sparse or where the built-in syntax files add valuable secondary groups.
+-- `additional_vim_regex_highlighting` option. Keep that useful hybrid behavior
+-- explicitly for user-facing languages where the built-in syntax files add
+-- valuable secondary groups or where no Tree-sitter parser exists.
 local regex_syntax_fallback_filetypes = {
-  c = true,
-  cpp = true,
-  cmake = true,
+  c = "c",
+  cpp = "cpp",
+  cmake = "cmake",
+  dosbatch = "dosbatch",
+  json = "json",
+  markdown = "markdown",
+  ps1 = "ps1",
+  python = "python",
+  rust = "rust",
+  sh = "sh",
+  yaml = "yaml",
 }
 
 local treesitter_filetypes = {}
+local treesitter_filetype_set = {}
+local highlight_filetypes = {}
+local highlight_filetype_set = {}
+
+local function add_unique(list, set, value)
+  if not set[value] then
+    set[value] = true
+    table.insert(list, value)
+  end
+end
+
+local function add_treesitter_filetype(filetype)
+  add_unique(treesitter_filetypes, treesitter_filetype_set, filetype)
+  add_unique(highlight_filetypes, highlight_filetype_set, filetype)
+end
+
 for _, parser in ipairs(treesitter_parsers) do
-  table.insert(treesitter_filetypes, parser)
+  add_treesitter_filetype(parser)
   for _, filetype in ipairs(parser_filetype_aliases[parser] or {}) do
-    table.insert(treesitter_filetypes, filetype)
+    add_treesitter_filetype(filetype)
   end
 end
 for _, filetype in ipairs(nvim_bundled_started_here) do
-  table.insert(treesitter_filetypes, filetype)
+  add_treesitter_filetype(filetype)
 end
 for _, filetype in ipairs(nvim_bundled_autostarted_filetypes) do
-  table.insert(treesitter_filetypes, filetype)
+  add_treesitter_filetype(filetype)
+end
+for filetype, _ in pairs(regex_syntax_fallback_filetypes) do
+  add_unique(highlight_filetypes, highlight_filetype_set, filetype)
 end
 
 return {
@@ -174,14 +201,18 @@ return {
 
       vim.api.nvim_create_autocmd("FileType", {
         group = vim.api.nvim_create_augroup("DotfilesTreesitter", { clear = true }),
-        pattern = treesitter_filetypes,
+        pattern = highlight_filetypes,
         callback = function(args)
           local filetype = vim.bo[args.buf].filetype
-          local ok = pcall(vim.treesitter.start, args.buf)
-          if regex_syntax_fallback_filetypes[filetype] then
-            vim.bo[args.buf].syntax = filetype
+          local ok = true
+          if treesitter_filetype_set[filetype] then
+            ok = pcall(vim.treesitter.start, args.buf)
           end
-          if ok then
+          local syntax = regex_syntax_fallback_filetypes[filetype]
+          if syntax then
+            vim.bo[args.buf].syntax = syntax
+          end
+          if ok and treesitter_filetype_set[filetype] then
             -- nvim-treesitter main removed the legacy indent module; use its
             -- documented indent expression instead when the main API is present.
             if type(nvim_treesitter.indentexpr) == "function" then

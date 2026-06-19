@@ -683,13 +683,15 @@ save only**. The next plain `:w` formats normally. Implemented in
   `vim.treesitter.start()`; never let parser auto-install API drift abort buffer
   highlighting. The recovery path is `:Lazy! sync` followed by `:TSUpdate`, or
   rerun `setup.ps1` on Windows so VS DevShell is imported before parser builds.
-- **C/C++/CMake keep regex syntax fallback after Tree-sitter starts.**
-  `vim.treesitter.start()` clears the buffer-local `syntax` option. For C,
-  C++, and CMake this makes buffers look materially worse because the built-in
-  syntax files add useful groups that the sparse Tree-sitter queries do not
-  cover. Keep `regex_syntax_fallback_filetypes` in
-  `nvim/lua/plugins/treesitter.lua` for `c`, `cpp`, and `cmake`; `:Inspect` on
-  those buffers should show both `treesitter` captures and `syntax` groups.
+- **User-facing languages keep regex syntax fallback after Tree-sitter starts.**
+  `vim.treesitter.start()` clears the buffer-local `syntax` option. That can
+  make buffers look materially worse even when Tree-sitter is active, because
+  the built-in syntax files add useful secondary groups. Keep
+  `regex_syntax_fallback_filetypes` in `nvim/lua/plugins/treesitter.lua` for
+  the configured daily languages (`c`, `cpp`, `cmake`, `python`, `rust`, `ps1`,
+  `sh`, `yaml`, `json`, `markdown`) and for syntax-only `dosbatch`. `:Inspect`
+  should show both `treesitter` captures and `syntax` groups for parser-backed
+  fallback languages; `.bat`/`dosbatch` should show syntax groups.
 - **`uninstall.sh` / `uninstall.ps1` are greenfield teardown tools, not purge.**
   They enumerate targets with `chezmoi --source <repo>/home managed --path-style
   absolute`, remove only repo-owned symlinks or byte-identical Windows

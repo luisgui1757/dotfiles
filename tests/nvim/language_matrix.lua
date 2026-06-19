@@ -44,6 +44,7 @@ return {
   { fixture = "CMakeLists.txt", filetype = "cmake", parser = "cmake", formatters = { "gersemi" }, lsp = "neocmake" },
   { fixture = "sample.sh", filetype = "sh", parser = "bash", formatters = { "shfmt" }, lsp = "bashls" },
   { fixture = "sample.zsh", filetype = "zsh", parser = false, formatters = { "shfmt" }, lsp = "bashls" },
+  { fixture = "sample.bat", filetype = "dosbatch", parser = false, formatters = {}, lsp = false },
   {
     fixture = "sample.ps1",
     filetype = "ps1",
