@@ -120,7 +120,33 @@ return {
       -- the sync with it on PATH; recompile in-session after fixing PATH with
       -- :TSUpdate.
       if vim.fn.executable("tree-sitter") == 1 then
-        nvim_treesitter.install(treesitter_parsers)
+        if type(nvim_treesitter.install) == "function" then
+          local ok, err = pcall(nvim_treesitter.install, treesitter_parsers)
+          if not ok then
+            vim.schedule(function()
+              vim.notify(
+                "nvim-treesitter parser auto-install failed: "
+                  .. tostring(err)
+                  .. ". Run :Lazy! sync and :TSUpdate after the toolchain is fixed.",
+                vim.log.levels.WARN
+              )
+            end)
+          end
+        else
+          -- A stale local lazy.nvim checkout can still be on nvim-treesitter's
+          -- frozen master branch even after this repo moved to the main rewrite.
+          -- That branch lacks require("nvim-treesitter").install. Do not let the
+          -- installer API mismatch abort the FileType autocmd below; existing
+          -- parsers can still highlight buffers while :Lazy! sync repairs the
+          -- plugin checkout.
+          vim.schedule(function()
+            vim.notify(
+              "nvim-treesitter main API is missing; run :Lazy! sync, then :TSUpdate. "
+                .. "Existing parsers will still be started when available.",
+              vim.log.levels.WARN
+            )
+          end)
+        end
       else
         vim.schedule(function()
           vim.notify(
@@ -143,8 +169,10 @@ return {
           local ok = pcall(vim.treesitter.start, args.buf)
           if ok then
             -- nvim-treesitter main removed the legacy indent module; use its
-            -- documented indent expression instead.
-            vim.bo[args.buf].indentexpr = "v:lua.require'nvim-treesitter'.indentexpr()"
+            -- documented indent expression instead when the main API is present.
+            if type(nvim_treesitter.indentexpr) == "function" then
+              vim.bo[args.buf].indentexpr = "v:lua.require'nvim-treesitter'.indentexpr()"
+            end
           end
         end,
       })

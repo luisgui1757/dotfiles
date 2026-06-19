@@ -106,8 +106,12 @@ describe("treesitter main migration", function()
 
   it("installs parsers with the main API", function()
     assert.is_truthy(
-      src:match('require%("nvim%-treesitter"%)') and src:match("nvim_treesitter%.install%(treesitter_parsers%)"),
+      src:match('require%("nvim%-treesitter"%)') and src:match('type%(nvim_treesitter%.install%)%s*==%s*"function"'),
       "main branch must use require('nvim-treesitter').install(...)"
+    )
+    assert.is_truthy(
+      src:match("pcall%(nvim_treesitter%.install, treesitter_parsers%)"),
+      "parser auto-install must not abort highlighting setup when the install API drifts"
     )
   end)
 
@@ -151,6 +155,10 @@ describe("treesitter main migration", function()
   end)
 
   it("uses the main-branch indentation replacement", function()
+    assert.is_truthy(
+      src:match('type%(nvim_treesitter%.indentexpr%)%s*==%s*"function"'),
+      "main indentexpr must be gated so stale plugin caches do not break buffer highlighting"
+    )
     assert.is_truthy(
       src:match([[vim%.bo%[args%.buf%]%.indentexpr%s*=%s*"v:lua%.require'nvim%-treesitter'%.indentexpr%(%)"]]),
       "legacy indent.enable should be replaced with nvim-treesitter main indentexpr"

@@ -675,6 +675,14 @@ save only**. The next plain `:w` formats normally. Implemented in
   while main emits MSVC-style `cc` crate flags that require MSVC. Ad-hoc
   `:TSUpdate` parser rebuilds on Windows should run from a "Developer
   PowerShell for VS" shell or after rerunning setup.
+- **nvim-treesitter installer drift must not disable highlighting.** A stale
+  lazy.nvim cache can keep `nvim-treesitter` on the frozen `master` API while
+  this repo expects the `main` rewrite. In that state
+  `require("nvim-treesitter").install` and `.indentexpr` are absent. The config
+  must warn and continue registering the `FileType` autocmd that calls
+  `vim.treesitter.start()`; never let parser auto-install API drift abort buffer
+  highlighting. The recovery path is `:Lazy! sync` followed by `:TSUpdate`, or
+  rerun `setup.ps1` on Windows so VS DevShell is imported before parser builds.
 - **`uninstall.sh` / `uninstall.ps1` are greenfield teardown tools, not purge.**
   They enumerate targets with `chezmoi --source <repo>/home managed --path-style
   absolute`, remove only repo-owned symlinks or byte-identical Windows
