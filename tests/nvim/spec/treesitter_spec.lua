@@ -142,6 +142,17 @@ describe("treesitter main migration", function()
     assert.is_truthy(src:match("pcall%(vim%.treesitter%.start, args%.buf%)"), "missing parsers must not error")
   end)
 
+  it("keeps regex syntax fallback for sparse C-family and CMake highlighting", function()
+    assert.is_truthy(
+      src:match("regex_syntax_fallback_filetypes%s*=%s*%{.-c%s*=%s*true.-cpp%s*=%s*true.-cmake%s*=%s*true.-%}"),
+      "C, C++, and CMake should keep built-in syntax groups in addition to Treesitter captures"
+    )
+    assert.is_truthy(
+      src:match("vim%.bo%[args%.buf%]%.syntax%s*=%s*filetype"),
+      "FileType callback must restore syntax fallback after vim.treesitter.start() clears it"
+    )
+  end)
+
   it("registers filetype aliases for parsers whose names differ from Neovim filetypes", function()
     assert.is_truthy(src:match('bash%s*=%s*%{ "sh" %}'), "sh files should use the bash parser")
     assert.is_truthy(src:match('powershell%s*=%s*%{ "ps1" %}'), "ps1 files should use the powershell parser")

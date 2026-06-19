@@ -53,6 +53,16 @@ local parser_filetype_aliases = {
   powershell = { "ps1" },
 }
 
+-- nvim-treesitter main no longer exposes the legacy
+-- `additional_vim_regex_highlighting` option. Keep the same useful hybrid
+-- behavior explicitly for languages where Tree-sitter queries are deliberately
+-- sparse or where the built-in syntax files add valuable secondary groups.
+local regex_syntax_fallback_filetypes = {
+  c = true,
+  cpp = true,
+  cmake = true,
+}
+
 local treesitter_filetypes = {}
 for _, parser in ipairs(treesitter_parsers) do
   table.insert(treesitter_filetypes, parser)
@@ -166,7 +176,11 @@ return {
         group = vim.api.nvim_create_augroup("DotfilesTreesitter", { clear = true }),
         pattern = treesitter_filetypes,
         callback = function(args)
+          local filetype = vim.bo[args.buf].filetype
           local ok = pcall(vim.treesitter.start, args.buf)
+          if regex_syntax_fallback_filetypes[filetype] then
+            vim.bo[args.buf].syntax = filetype
+          end
           if ok then
             -- nvim-treesitter main removed the legacy indent module; use its
             -- documented indent expression instead when the main API is present.

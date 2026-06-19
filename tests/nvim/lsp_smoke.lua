@@ -17,6 +17,8 @@
 --       and a MISSING runtime on the target OS is a failure, not a skip,
 --   (3) the auto-started bundled filetypes (lua/markdown/help/query) keep the
 --       nvim-treesitter indentexpr the FileType autocmd promises.
+--   (4) sparse C-family/CMake buffers keep Vim regex syntax groups in addition
+--       to Tree-sitter captures.
 --
 -- DOTFILES_LSP_SMOKE:
 --   unset  -> no-op (an accidental run in the fast suite is harmless)
@@ -248,6 +250,42 @@ local ok, err = pcall(function()
             .. tostring(vim.bo.indentexpr)
             .. ")"
         )
+      end
+    end
+    pcall(vim.cmd, "silent! bwipeout!")
+  end
+
+  -- (4) Regex syntax fallback for sparse/high-value languages. Tree-sitter
+  -- main clears the buffer-local 'syntax' option when it starts; for C, C++,
+  -- and CMake we intentionally restore the built-in syntax file afterward so
+  -- sparse queries do not make real buffers look like plain text.
+  local syntax_fallback = {
+    { fixture = "sample.c", ft = "c", syntax = { 0, 0 }, treesitter = { 0, 0 } },
+    { fixture = "sample.cpp", ft = "cpp", syntax = { 0, 0 }, treesitter = { 0, 0 } },
+    -- CMake arguments are the important syntax-only fallback case; command
+    -- names still prove Tree-sitter is active.
+    { fixture = "CMakeLists.txt", ft = "cmake", syntax = { 1, 8 }, treesitter = { 1, 0 } },
+  }
+  for _, row in ipairs(syntax_fallback) do
+    local open_ok, open_err = pcall(vim.cmd.edit, vim.fn.fnameescape(fixtures .. row.fixture))
+    if not open_ok then
+      fail(row.fixture .. ": open raised in syntax fallback gate: " .. (tostring(open_err):match("([^\r\n]+)") or "error"))
+    else
+      local buf = vim.api.nvim_get_current_buf()
+      vim.wait(5000, function()
+        return #vim.inspect_pos(buf, row.syntax[1], row.syntax[2]).syntax > 0
+          and #vim.inspect_pos(buf, row.treesitter[1], row.treesitter[2]).treesitter > 0
+      end, 50)
+      local syntax_pos = vim.inspect_pos(buf, row.syntax[1], row.syntax[2])
+      local treesitter_pos = vim.inspect_pos(buf, row.treesitter[1], row.treesitter[2])
+      if vim.bo[buf].syntax ~= row.ft then
+        fail(row.fixture .. ": syntax fallback not restored (got: " .. tostring(vim.bo[buf].syntax) .. ")")
+      elseif #syntax_pos.syntax == 0 then
+        fail(row.fixture .. ": syntax fallback restored but no syntax groups reported at probe position")
+      elseif #treesitter_pos.treesitter == 0 then
+        fail(row.fixture .. ": syntax fallback present but Tree-sitter captures missing at probe position")
+      else
+        note(row.fixture .. ": syntax fallback + Tree-sitter captures active")
       end
     end
     pcall(vim.cmd, "silent! bwipeout!")
