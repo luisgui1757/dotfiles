@@ -274,7 +274,7 @@ Assert-ContentEqual -Path (Join-Path $env:USERPROFILE '.config\starship.toml') -
 Assert-ContentEqual -Path (Join-Path $env:USERPROFILE '.tmux.conf') -Expected (Join-Path $Repo 'tmux\tmux.conf')
 Assert-ContentEqual -Path (Join-Path $env:USERPROFILE '.tmux.windows.conf') -Expected (Join-Path $Repo 'tmux\tmux.windows.conf')
 Assert-ContentEqual -Path (Join-Path $env:USERPROFILE 'Documents\PowerShell\Microsoft.PowerShell_profile.ps1') -Expected (Join-Path $Repo 'shells\powershell_profile.ps1')
-Assert-ContentEqual -Path (Join-Path $env:LOCALAPPDATA 'lazygit\config.yml') -Expected (Join-Path $Repo 'lazygit\config.yml')
+Assert-ContentEqual -Path (Join-Path $env:LOCALAPPDATA 'lazygit\config.yml') -Expected (Join-Path $Repo 'lazygit\config.windows.yml')
 Assert-WindowsTerminalPortableSettings
 
 Assert-ChezmoiVerify

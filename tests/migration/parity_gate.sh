@@ -68,6 +68,7 @@ EOF
 single_source_entries() {
     cat <<'EOF'
 windows-terminal fragment|windows-terminal/settings.fragment.jsonc|home/.chezmoitemplates/windows-terminal/settings.fragment.jsonc
+windows lazygit config|lazygit/config.windows.yml|home/.chezmoitemplates/lazygit/config.windows.yml
 EOF
 }
 

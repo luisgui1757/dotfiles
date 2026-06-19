@@ -40,7 +40,7 @@ not ship synced agent preference folders.
 ├── tmux/                  tmux.conf (Rose Pine, vi-mode, OSC52 clipboard)
 ├── ghostty/               config (Rose Pine, Hack Nerd, tuned for tmux)
 ├── windows-terminal/      settings.fragment.jsonc + merge README
-├── lazygit/               config.yml (J/K move-commit binding)
+├── lazygit/               config.yml + config.windows.yml (J/K + Windows Ctrl-G)
 ├── home/                  chezmoi source tree for the config layer
 ├── tests/                 automated tests, grouped by tool
 ├── tests/wsl/             manual WSL split-host e2e check
@@ -555,8 +555,10 @@ save only**. The next plain `:w` formats normally. Implemented in
 - **lazygit config paths are OS-specific.** On macOS, lazygit v0.58 reports
   `~/Library/Application Support/lazygit` from `lazygit --print-config-dir`;
   on Linux/WSL it uses `~/.config/lazygit`; on Windows it uses
-  `%LOCALAPPDATA%\lazygit`. Keep the chezmoi templates, README, and tests
-  aligned with those real read paths.
+  `%LOCALAPPDATA%\lazygit`. POSIX hosts use `lazygit/config.yml`; native
+  Windows renders `lazygit/config.windows.yml` so psmux users get a Ctrl-G
+  return/cancel binding without changing macOS/Linux Esc behavior. Keep the
+  chezmoi templates, README, and tests aligned with those real read paths.
 - **The chezmoi tree in `home/` owns the config layer, not provisioning.** The
   rule is `chezmoi=dotfiles, install-deps=provisioning`: do not port package
   installs, pinned binary/font installers, login-shell mutation, devilspie2, VS
@@ -953,12 +955,13 @@ save only**. The next plain `:w` formats normally. Implemented in
   Diagnose inside a pane with `(Get-Process -Id $PID).Name` (expect `pwsh`).
   Do NOT add `set -g default-shell` to the main `tmux.conf` — `pwsh` does not
   exist on Unix; keep Windows-specific tmux settings in the overlay.
-- **psmux bare Escape is explicitly forwarded.** psmux v3.3.x has an upstream
-  Esc-forwarding bug (#380) that breaks modal TUIs such as lazygit and vim. The
-  Windows-only overlay binds root `Escape` to `send-keys esc` so the active pane
-  receives the escape byte. Keep this out of the shared `tmux/tmux.conf`; POSIX
-  tmux does not need it, and the Windows overlay is where psmux-specific quirks
-  belong.
+- **psmux bare Escape is NOT patched in tmux config.** psmux v3.3.x has an
+  upstream Esc-forwarding bug that breaks modal TUIs such as lazygit. A
+  Windows-only root-table `Escape -> send-keys esc` binding was tested and did
+  not reliably reach lazygit, so do not re-add it. The supported native-Windows
+  lazygit workaround lives in `lazygit/config.windows.yml`: it binds
+  `keybinding.universal.return` to `<c-g>`, which makes lazygit's `?`
+  keybindings view show Ctrl-G as the working return/cancel key inside psmux.
 - **psmux residual race (v3.3.4): `OnIdle` workaround in the profile.** Even
   with `allow-predictions on`, fresh psmux panes were observed at
   `PredictionSource=None` / `PredictionViewStyle=InlineView` -- the documented
@@ -1234,16 +1237,18 @@ host OS or shell would otherwise hide a branch from CI.
      lazygit never loaded it, so EVERY custom binding looked dead.
      Chezmoi now targets LocalAppData. Asserted by
      `tests/migration/windows_apply_test.ps1`.
-  2. **Binding:** `lazygit/config.yml` binds
+  2. **Binding:** `lazygit/config.yml` and `lazygit/config.windows.yml` bind
      `keybinding.commits.moveDownCommit` / `moveUpCommit` to uppercase
-     `J` / `K`. We intentionally do NOT use Ctrl+J / Ctrl+K: Ctrl+J is
+     `J` / `K`. The Windows variant also binds `keybinding.universal.return`
+     to `<c-g>` because psmux does not reliably deliver bare Esc to lazygit, and
+     lazygit's `?` keybindings view should advertise the working cancel key. We
+     intentionally do NOT use Ctrl+J / Ctrl+K for commit movement: Ctrl+J is
      ASCII LF (0x0A), the same byte as Enter. Disambiguating requires
-     Win32-input-mode (ConPTY DECSET 9001), modifyOtherKeys, or kitty
-     keyboard protocol metadata. Windows Terminal sends it and lazygit's
-     tcell/v3 can decode it, but psmux v3.3.4 does NOT relay the metadata
-     to panes, so default Ctrl+J degrades to Enter inside psmux. Uppercase
-     J / K are normal printable bytes and skip that entire transport
-     problem.
+     Win32-input-mode (ConPTY DECSET 9001), modifyOtherKeys, or kitty keyboard
+     protocol metadata. Windows Terminal sends it and lazygit's tcell/v3 can
+     decode it, but psmux v3.3.4 does NOT relay the metadata to panes, so
+     default Ctrl+J degrades to Enter inside psmux. Uppercase J / K are normal
+     printable bytes and skip that entire transport problem.
      This is safe because lazygit v0.58.1 dispatches commits-context
      bindings before universal bindings, then falls through on
      ErrKeybindingNotHandled (`pkg/gui/keybindings.go:420-441` and

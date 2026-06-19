@@ -369,7 +369,7 @@ function Assert-Part1Files {
         '~/.tmux.posix.conf must NOT be deployed on Windows (psmux config-load freeze boundary)'
     Assert-CopyModeFileMatches `
         -ActualPath (Join-Path $Sandbox 'AppData\Local\lazygit\config.yml') `
-        -ExpectedPath (Join-Path $script:RepoRoot 'lazygit\config.yml') `
+        -ExpectedPath (Join-Path $script:RepoRoot 'lazygit\config.windows.yml') `
         -Label 'lazygit config'
     Assert-CopyModeFileMatches `
         -ActualPath (Join-Path $Sandbox '.config\starship.toml') `
