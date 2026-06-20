@@ -258,10 +258,12 @@ $Catalog = @{
     rg                   = @{ winget = 'BurntSushi.ripgrep.MSVC';          choco = 'ripgrep';              scoop = 'ripgrep'              ; purpose = 'Telescope live_grep backend' }
     fd                   = @{ winget = 'sharkdp.fd';                       choco = 'fd';                   scoop = 'fd'                   ; purpose = 'Telescope find_files backend' }
     fzf                  = @{ winget = 'junegunn.fzf';                     choco = 'fzf';                  scoop = 'fzf'                  ; purpose = 'fuzzy finder (PSFzf history/file/dir pickers)' }
+    lsd                  = @{ winget = 'lsd-rs.lsd';                       choco = 'lsd';                  scoop = 'lsd'                  ; purpose = 'modern ls replacement with colors, icons, and tree view' }
     chezmoi              = @{ winget = 'twpayne.chezmoi';                  choco = 'chezmoi';              scoop = 'chezmoi'              ; purpose = 'dotfiles config manager' }
     lazygit              = @{ winget = 'JesseDuffield.lazygit';            choco = 'lazygit';              scoop = 'lazygit'              ; purpose = 'terminal git UI' }
     wt                   = @{ winget = 'Microsoft.WindowsTerminal';        choco = 'microsoft-windows-terminal'; scoop = 'extras/windows-terminal'; purpose = 'Windows Terminal host for PowerShell and WSL' }
     make                 = @{ winget = 'GnuWin32.Make';                    choco = 'make';                 scoop = 'make'                 ; purpose = 'plugin builds (LuaSnip jsregexp)' }
+    cmake                = @{ winget = 'Kitware.CMake';                    choco = 'cmake';                scoop = 'cmake'                ; purpose = 'CMake CLI required by neocmakelsp and CMake projects' }
     pwsh                 = @{ winget = 'Microsoft.PowerShell';             choco = 'powershell-core';      scoop = 'pwsh'                 ; purpose = 'modern PowerShell 7' }
     'win32yank'          = @{ winget = '';                                 choco = 'win32yank';            scoop = 'win32yank'            ; purpose = 'clipboard bridge for WSL nvim' }
     node                 = @{ winget = 'OpenJS.NodeJS.LTS';                choco = 'nodejs-lts';           scoop = 'nodejs-lts'           ; purpose = 'prettier + JS tooling' }
@@ -282,6 +284,7 @@ $BinaryName = @{
     rg          = 'rg'
     fd          = 'fd'
     fzf         = 'fzf'
+    lsd         = 'lsd'
     chezmoi     = 'chezmoi'
     lazygit     = 'lazygit'
     wt          = 'wt'
@@ -291,6 +294,7 @@ $BinaryName = @{
     starship    = 'starship'
     git         = 'git'
     make        = 'make'
+    cmake       = 'cmake'
     node        = 'node'
     'tree-sitter' = 'tree-sitter'
     python      = 'python'
@@ -344,9 +348,11 @@ function Get-InstallDependencySpec {
         'git',
         'nvim',
         'make',
+        'cmake',
         'rg',
         'fd',
         'fzf',
+        'lsd',
         'chezmoi',
         'lazygit',
         'starship',
@@ -1728,9 +1734,11 @@ Section "core editor stack"
 Install-One git
 Install-One nvim
 Install-One make
+Install-One cmake
 Install-One rg
 Install-One fd
 Install-One fzf
+Install-One lsd
 Install-One chezmoi
 Install-One lazygit
 

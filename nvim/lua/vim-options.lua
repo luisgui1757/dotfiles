@@ -133,6 +133,15 @@ vim.api.nvim_create_autocmd("BufWritePost", {
   end,
 })
 
+vim.filetype.add({
+  filename = {
+    [".curlrc"] = "conf",
+  },
+  extension = {
+    curlrc = "conf",
+  },
+})
+
 -- Drop nvim's default :EditQuery user command. We don't use the
 -- treesitter query editor, and keeping it around made :E<Enter>
 -- resolve to :EditQuery instead of netrw's :Explore.

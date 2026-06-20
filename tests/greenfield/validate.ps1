@@ -260,7 +260,7 @@ Write-Host ("validate.ps1: repo={0} home={1} mode={2}" -f $Repo, $env:USERPROFIL
 if ($ConfigOnly) {
     Add-Skip "full setup tool checks skipped by -ConfigOnly"
 } else {
-    foreach ($cmd in @('git', 'nvim', 'rg', 'fd', 'fzf', 'chezmoi', 'lazygit', 'starship', 'psmux', 'pwsh', 'win32yank')) {
+    foreach ($cmd in @('git', 'nvim', 'rg', 'fd', 'fzf', 'chezmoi', 'lazygit', 'starship', 'tree-sitter', 'cmake', 'lsd', 'psmux', 'pwsh', 'win32yank')) {
         Test-CommandPath $cmd
     }
 }
@@ -279,6 +279,17 @@ Assert-WindowsTerminalPortableSettings
 
 Assert-ChezmoiVerify
 Invoke-NvimChecked -Name lazy -NvimArgs @('+Lazy! sync', '+qa')
+$oldTreeSitterSyncInstall = $env:DOTFILES_TREESITTER_SYNC_INSTALL
+try {
+    $env:DOTFILES_TREESITTER_SYNC_INSTALL = '1'
+    Invoke-NvimChecked -Name treesitter -NvimArgs @('-u', ((Join-Path $Repo 'nvim\init.lua') -replace '\\', '/'), '-c', "lua require('lazy').load({ plugins = { 'nvim-treesitter' } })", '+qa')
+} finally {
+    if ($null -eq $oldTreeSitterSyncInstall) {
+        Remove-Item Env:DOTFILES_TREESITTER_SYNC_INSTALL -ErrorAction SilentlyContinue
+    } else {
+        $env:DOTFILES_TREESITTER_SYNC_INSTALL = $oldTreeSitterSyncInstall
+    }
+}
 Invoke-NvimChecked -Name mason -NvimArgs @('+MasonToolsInstallSync', '+qa')
 Assert-MasonTool -Name 'lua-language-server' -FileNames @('lua-language-server.cmd', 'lua-language-server.exe', 'lua-language-server')
 Assert-MasonTool -Name 'stylua' -FileNames @('stylua.cmd', 'stylua.exe', 'stylua')

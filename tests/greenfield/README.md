@@ -29,8 +29,9 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\greenfield\valid
 
 The default mode mirrors the e2e post-install assertions: required tools on
 `PATH`, Neovim >= 0.12, managed config paths matching the repo, zsh plugin
-externals on POSIX, `chezmoi verify`, Lazy sync, Mason sync, and Mason binaries
-for `lua-language-server` and `stylua`.
+externals on POSIX, `chezmoi verify`, Lazy sync, synchronous Tree-sitter parser
+bootstrap, Mason sync, and Mason binaries for `lua-language-server` and
+`stylua`.
 
 Caveat: the default mode runs a real `Lazy! sync`, which writes
 `nvim/lazy-lock.json` THROUGH the managed `~/.config/nvim` symlink. In a real
@@ -38,7 +39,7 @@ greenfield run that symlink points at a repo COPY (the sandbox/VM/distro clone),
 so this is harmless. But if you run the full validator on your own machine
 against a HOME whose nvim symlinks into your LIVE checkout, the sync can bump the
 lockfile in that checkout — use a throwaway clone, or `--config-only` (which
-skips Lazy/Mason), to avoid an accidental plugin-pin change.
+skips Lazy/Tree-sitter/Mason), to avoid an accidental plugin-pin change.
 
 For a temp-HOME config-layer proof, use `--config-only`; this skips tool,
 external clone, Lazy, and Mason checks that require a full setup:

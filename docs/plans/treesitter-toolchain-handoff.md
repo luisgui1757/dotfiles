@@ -1,11 +1,15 @@
 # Handoff: nvim-treesitter `main` parser-build toolchain
 
-Status: **REFERENCE + open-questions handoff.** No code change pending beyond the
-shipped guard (`f80e128`). This document exists so the tree-sitter toolchain work
-can be picked up later — by a human or by **Codex 5.5 xhigh** on the Codex side —
-without re-deriving the per-OS machinery or re-litigating the "was it zig?"
-question. Adversarial findings from a Codex 5.5 xhigh read-only audit are folded
-into [§7](#7-adversarial-review-codex-55-xhigh).
+Status: **HISTORICAL REFERENCE.** This handoff records the investigation that
+rejected the "zig fixed tree-sitter" hypothesis. The current implementation has
+since moved beyond the original open-questions state: setup now has five phases
+with an explicit synchronous Tree-sitter parser install phase, the sync path
+requires the waitable `nvim-treesitter` install task to return `true`, and the
+current canonical contract lives in `CLAUDE.md` plus `README.md`.
+
+Keep this document for provenance, but do not treat the older open-item tables
+below as the live roadmap without first checking the current installer, tests,
+and docs.
 
 > **Resume on the Codex side:** the audit spec is checked in below
 > ([§9](#9-how-to-continue-on-the-codex-side)); re-run with
@@ -30,13 +34,16 @@ ENOENT: no such file or directory (cmd): 'tree-sitter'`. The hypothesis to test 
 
 | OS | `tree-sitter` CLI | C compiler (cc crate) | On PATH for the headless sync via |
 |---|---|---|---|
-| **macOS** | `brew install tree-sitter` — catalog row `tree-sitter\|tree-sitter\|\|\|\|\|` (`install-deps.sh:1341`), dispatched by `install_tree_sitter_cli` (`install-deps.sh:1138`, called `:2260` after `install node`) | cc/clang from Xcode CLT | `setup.sh` `refresh_runtime_path` (`:153`, called `:384`) runs `eval "$(brew shellenv)"` → `/opt/homebrew/bin` (ARM) / `/usr/local/bin` (Intel) |
+| **macOS** | `brew install tree-sitter-cli` — the logical tool remains `tree-sitter`, but the Homebrew formula is `tree-sitter-cli` because `tree-sitter` no longer ships the CLI binary | cc/clang from Xcode CLT | `setup.sh` `refresh_runtime_path` runs `eval "$(brew shellenv)"` → `/opt/homebrew/bin` (ARM) / `/usr/local/bin` (Intel) |
 | **Linux/WSL** | pinned GitHub release binary, SHA-256 verified, into `~/.local/bin` — `install_tree_sitter_cli_linux` (`install-deps.sh:1048`), constants `TREE_SITTER_CLI_LINUX_*` (`:29-31`). Alpine → `apk` (`:1147`) | `build-essential`/`gcc` (`install-deps.sh:1583-1599`) | `refresh_runtime_path` adds `$HOME/.local/bin` |
 | **Windows** | scoop `tree-sitter` (catalog `:258`) via `Install-TreeSitterCli` (`install-deps.ps1:1290`); **npm `tree-sitter-cli` fallback** (`:1314`) records a FAIL marker if npm is missing (`:1310`) | **MSVC / VS Build Tools (VCTools)** — `Install-VsBuildTools` (`install-deps.ps1:1354`), `Install-VsBuildToolsWhenAll` (`:1397`, called `:1571`) | `setup.ps1` `Enter-VsDeveloperEnvironment` (`:89`) imports the VS DevShell before `Invoke-NvimSyncPhases` (`:869`, called `:1017`) so `cl.exe` resolves |
 
-setup.sh phase order: Phase 1 `install-deps.sh` → `refresh_runtime_path` (`:384`) →
-Phase 2 chezmoi → **Phase 3 `nvim --headless +Lazy! sync`** (`:426`, runs the
-`build = ":TSUpdate"` step) → Phase 4 Mason.
+setup.sh phase order is now: Phase 1 `install-deps.sh` → `refresh_runtime_path` →
+Phase 2 chezmoi → **Phase 3 `nvim --headless +Lazy! sync`** → **Phase 4
+`DOTFILES_TREESITTER_SYNC_INSTALL=1 nvim ... require('lazy').load({ plugins =
+{ 'nvim-treesitter' } })`** → Phase 5 Mason. Phase 4 is the explicit proof path:
+it blocks on `install(...):wait(...)` and fails unless the waitable task reports
+`true`.
 
 ## 3. The macOS incident — root cause
 
@@ -92,9 +99,11 @@ change any installer — the healthy path (CLI present) is unchanged. Regression
 `tests/nvim/spec/treesitter_spec.lua` asserts the `executable("tree-sitter")` guard and
 the `vim.notify` fallback. CI-green on `f80e128` (both `test` and `e2e-install`).
 
-## 6. Known asymmetries / candidate hardening (not yet shipped)
+## 6. Historical asymmetries / candidate hardening
 
-These are the open items a follow-up (Codex or human) could pick up:
+This section is historical. Several items below have since been superseded by
+the five-phase setup and stricter e2e/Tier-2 smoke gates; verify against current
+source before treating any line as still open.
 
 1. **macOS failure is quieter than Linux/Windows.** A failed/declined `brew install
    tree-sitter` on macOS only prints `WARN: ... continuing` (the generic `install`
@@ -107,9 +116,10 @@ These are the open items a follow-up (Codex or human) could pick up:
    before the Phase 3 headless sync. Candidate: a guard in setup.sh that, when nvim is on
    PATH but `tree-sitter` is not, emits a clear FAIL/skip instead of letting the sync dump
    the ENOENT spam.
-3. **Async compile vs `+qa`.** `nvim_treesitter.install(...)` (and `:TSUpdate`) compile
-   asynchronously; the headless `+qa` may quit before compilation finishes or before
-   errors surface. Worth confirming the Phase 3 sync actually blocks on parser builds.
+3. **Async compile vs `+qa`.** Superseded for the dedicated parser phase: Phase 4
+   sets `DOTFILES_TREESITTER_SYNC_INSTALL=1`, waits on the install task, and treats
+   a non-`true` result as failure. Lazy's own `build = ":TSUpdate"` remains a plugin
+   update hook; Phase 4 is the canonical parser proof.
 4. **Guard is one-shot.** Under lazy, `config` runs once; if the guard fires (CLI absent),
    there is no in-session recovery — the user must fix PATH and restart nvim (or run
    `:TSUpdate`). The message says so, but a `:checkhealth` entry could make it discoverable.

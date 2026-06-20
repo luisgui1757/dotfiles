@@ -175,7 +175,20 @@ that violates one of these, fix it instead of disabling the test.
     parsers. `c` and `vim` are bundled but not auto-started, so the config starts
     them via `nvim_bundled_started_here = { "c", "vim" }`. See "Add a treesitter
     parser". Guarded by `treesitter_spec.lua`, `language_smoke_spec.lua`, and the
-    Tier-2 `lsp_smoke.lua` runtime preflight.
+    Tier-2 `lsp_smoke.lua` runtime preflight, which synchronously bootstraps
+    parsers and opens every language-matrix fixture under the production config
+    so missing parser builds or parser/query runtime failures cannot hide behind
+    non-LSP rows. The preflight also rejects unexpected nvim-treesitter-managed
+    install-output parser `.so` files under `stdpath('data')/site/parser`,
+    allowing only the explicit parser list plus upstream dependency parsers.
+20. **Repo text stays LF-only.** `.gitattributes` force-normalizes text files to
+    LF so Windows checkouts do not CRLF-corrupt shell/WSL entry points, and
+    `.editorconfig` must not reintroduce `end_of_line = crlf` exceptions (even
+    for `*.bat` / `*.cmd`). Batch and cmd files have explicit
+    `text eol=lf` attributes, and fixtures/scripts are validated as LF text like
+    the rest of the repo. Guarded by `editorconfig_check.sh` and
+    `invariants_test.sh`, including `git check-attr` probes for `.bat` and
+    `.cmd`.
 
 ## Common workflows
 
@@ -225,11 +238,18 @@ available here. Parser installation runs `tree-sitter generate` and
 plus a real C compiler before `:TSUpdate` can succeed.
 
 1. Add the parser name to `treesitter_parsers` in
-   `nvim/lua/plugins/treesitter.lua`.
+   `nvim/lua/plugins/treesitter.lua`. The list intentionally covers a broad
+   everyday language surface for highlighting (web formats, Go, SQL, .NET/Razor,
+   PHP/Perl/Ruby/JVM languages, Zig, assembly, infra/data formats, Git/SSH/editor
+   config, build-tool files, TeX/BibTeX/Typst/Mermaid, shaders, QML, Bicep, and
+   common platform/scientific languages), but it is still explicit because
+   parser installation is toolchain-backed and must stay reproducible.
 2. If the parser name differs from Neovim's filetype, add an entry to
    `parser_filetype_aliases` so the `FileType` autocmd can call
    `vim.treesitter.start()` for real buffers.
-3. Add it to `required` in `tests/nvim/spec/treesitter_spec.lua`.
+3. Add it to `required` in `tests/nvim/spec/treesitter_spec.lua`, and add a
+   fixture row in `tests/nvim/language_matrix.lua` so filetype detection,
+   formatter mapping, and parser ownership are tested together.
 4. If the parser has unusual generated sources, verify it through
    `:TSUpdate <parser>` on a machine with `tree-sitter` and a compiler on PATH.
 
@@ -400,16 +420,22 @@ install paths, not symmetric container platforms:
   a matching root-prep branch in `tests/ci/container-e2e.sh`.
 - `setup.sh / ubuntu-24.04`, `setup.sh / macos-15`, and
   `setup.ps1 / windows-2025` run the real public setup entry points, apply
-  configs through chezmoi in Phase 2, and then rerun Lazy/Mason headless sync.
-  They explicitly fail if setup skips Phase 3-4, emits a `FAIL:` marker, or
-  Mason did not install expected tools. After the Mason sync they also run the
+  configs through chezmoi in Phase 2, and then rerun Lazy/Tree-sitter/Mason
+  headless sync. They explicitly fail if setup skips Phase 3-5, emits a `FAIL:`
+  marker, or Mason did not install expected tools. After the full sync they also run the
   **Tier 2 language smoke** (`tests/nvim/lsp_smoke.lua`, gated on
   `DOTFILES_LSP_SMOKE=strict`): against the production init it asserts every
   `treesitter_parsers` entry is one nvim-treesitter `main` supports
   (`get_available()`/`get_available(4)` — the jsonc "unsupported language"
-  catcher) and that each fixture's LSP attaches. Non-gated servers are strict on
-  every OS; `powershell_es` is enforced only on Windows (pwsh + the PSES bundle)
-  and skips cleanly on Unix. The fast `make test-nvim` runs Tier 1 only
+  catcher), synchronously bootstraps parser installs with the upstream waitable
+  install task and requires it to return exactly `true`, rejects unexpected
+  install-output parser `.so` files under `stdpath('data')/site/parser`, opens
+  every language-matrix fixture, requires real Tree-sitter captures for
+  parser-backed rows, proves syntax-only fallback rows have real Vim syntax
+  groups, and asserts that each fixture's LSP attaches.
+  Non-gated servers are strict on every OS; `powershell_es` is
+  enforced only on Windows (pwsh + the PSES bundle) and skips cleanly on Unix.
+  The fast `make test-nvim` runs Tier 1 only
   (`tests/nvim/spec/language_smoke_spec.lua` + `tests/nvim/language_matrix.lua`):
   filetype + conform-formatter + parser-in-install-list per fixture.
 - There is no macOS/Windows container analog to add for symmetry. Docker cannot
@@ -647,6 +673,11 @@ save only**. The next plain `:w` formats normally. Implemented in
   `cc`/`gcc`/`clang`/`zig`/`cl` is already present. On Windows a clean machine
   has none, so `install-deps.ps1` carries **`zig`** in `$Catalog` (LuaSnip
   detects `zig cc`); it is skipped if already installed like any other tool.
+- **The CMake LSP needs the real `cmake` CLI.** Mason installs `neocmakelsp`,
+  but that server shells out to `cmake`; setup therefore installs `cmake` through
+  every supported OS package manager. Do not remove the CLI dependency while
+  keeping `neocmake` enabled, or strict Tier 2 smoke can hang on a crashing
+  local language server.
 - **nvim-treesitter main needs both `tree-sitter` and MSVC on Windows.**
   The main-branch installer shells out to the standalone `tree-sitter` CLI and
   then builds parsers through the Rust `cc` crate. `install-deps.sh` provisions
@@ -683,15 +714,26 @@ save only**. The next plain `:w` formats normally. Implemented in
   `vim.treesitter.start()`; never let parser auto-install API drift abort buffer
   highlighting. The recovery path is `:Lazy! sync` followed by `:TSUpdate`, or
   rerun `setup.ps1` on Windows so VS DevShell is imported before parser builds.
-- **User-facing languages keep regex syntax fallback after Tree-sitter starts.**
+- **Regex syntax fallback is capability-driven, not a language allowlist.**
   `vim.treesitter.start()` clears the buffer-local `syntax` option. That can
   make buffers look materially worse even when Tree-sitter is active, because
-  the built-in syntax files add useful secondary groups. Keep
-  `regex_syntax_fallback_filetypes` in `nvim/lua/plugins/treesitter.lua` for
-  the configured daily languages (`c`, `cpp`, `cmake`, `python`, `rust`, `ps1`,
-  `sh`, `yaml`, `json`, `markdown`) and for syntax-only `dosbatch`. `:Inspect`
-  should show both `treesitter` captures and `syntax` groups for parser-backed
-  fallback languages; `.bat`/`dosbatch` should show syntax groups.
+  the built-in syntax files add useful secondary groups. The FileType autocmd in
+  `nvim/lua/plugins/treesitter.lua` therefore runs for every detected filetype,
+  starts Tree-sitter only for parser-backed filetypes, and restores `syntax`
+  only when Neovim has a matching `syntax/<filetype>.vim` runtime file (or the
+  runtime had already set a syntax name before Tree-sitter cleared it). Do NOT
+  reintroduce a hand-curated syntax fallback table; add Tree-sitter parsers
+  explicitly when richer parser-backed support is desired, and let runtime
+  syntax detection cover the long tail. `:Inspect` should show both
+  `treesitter` captures and `syntax` groups for parser-backed fallback
+  languages; syntax-only filetypes should show syntax groups without
+  Tree-sitter captures.
+  Filetypes with no supported nvim-treesitter parser, such as `.curlrc`, must be
+  tested as syntax-only rows instead of inventing parser names, and Tier 2 must
+  probe at least one meaningful syntax position for important syntax-only rows.
+  `.curlrc` maps
+  to Neovim's generic `conf` filetype because upstream Neovim has no dedicated
+  curl config syntax.
 - **`uninstall.sh` / `uninstall.ps1` are greenfield teardown tools, not purge.**
   They enumerate targets with `chezmoi --source <repo>/home managed --path-style
   absolute`, remove only repo-owned symlinks or byte-identical Windows
@@ -745,7 +787,9 @@ save only**. The next plain `:w` formats normally. Implemented in
   PowerShell tests dot-source `install-deps.ps1` on macOS too, where
   `USERPROFILE` can be empty; use `Get-ScoopRoot` instead of direct
   `Join-Path $env:USERPROFILE` for Scoop paths so source-only tests stay
-  portable.
+  portable. `setup.ps1` has the same source-only portability requirement for
+  tests; its default checkout path must derive from `USERPROFILE`, then `HOME`,
+  then .NET's user-profile folder instead of assuming `USERPROFILE` exists.
   **`Ensure-ScoopBuckets` installs `git` (from the bucket-less `main` bucket)
   BEFORE adding `extras`/`nerd-fonts`.** `scoop bucket add` git-clones the bucket
   repo, so on a truly fresh machine (Windows Sandbox / clean install) the adds
@@ -1030,6 +1074,14 @@ save only**. The next plain `:w` formats normally. Implemented in
   overriding PSReadLine's reverse-search for POSIX parity with zsh), Ctrl+T
   (file) and Alt+C (cd) ONLY when both the PSFzf module and the `fzf` binary are
   present. The zsh side already used `fzf`; this brings Windows to parity.
+- **lsd owns interactive `ls` ergonomics when installed.** `install-deps.sh`
+  installs `lsd` through each supported OS package manager; `install-deps.ps1`
+  carries it in the Scoop-first catalog (`lsd` -> winget `lsd-rs.lsd` -> choco
+  `lsd`). zsh defines the upstream documented aliases (`ls`, `l`, `la`, `lla`,
+  `lt`) only when `lsd` is on PATH. PowerShell removes the built-in `ls` alias
+  only after `lsd` is present, then defines functions for the same names because
+  PowerShell aliases cannot carry arguments like `-l` or `--tree`. Keep both
+  profiles guarded so partially provisioned shells stay silent and usable.
 - **`ls`/`Get-ChildItem` directories are gold via `$PSStyle.FileInfo.Directory`.**
   The default directory color (bright blue) is unreadable on Rose Pine dark.
   Guarded by `if ($PSStyle)` (absent on Windows PowerShell 5.1 and pwsh < 7.2);

@@ -27,8 +27,8 @@ that edge with `./setup.sh --update` or `.\setup.ps1 -Update`.
 
 Clone the repo first, then run the local setup entry point. `setup.{sh,ps1}`
 installs repo-managed dependencies, links every config, then runs
-`:Lazy! sync` and `:MasonToolsInstallSync` before the first interactive Neovim
-launch.
+`:Lazy! sync`, a synchronous nvim-treesitter parser install, and
+`:MasonToolsInstallSync` before the first interactive Neovim launch.
 
 Git is the only hard prerequisite for remote setup because setup needs it to
 clone this repo. If Git is missing, the setup scripts print the first install
@@ -179,13 +179,14 @@ restore manually from the printed backup if you want to undo it.
 
 ## What Setup Does
 
-`setup` is a four-phase, idempotent orchestrator:
+`setup` is a five-phase, idempotent orchestrator:
 
 ```text
 setup -> install-deps                 phase 1: programs and optional tools
       -> chezmoi apply                phase 2: config layer with pre-apply backups
       -> nvim "+Lazy! sync" +qa       phase 3: plugins
-      -> nvim "+MasonToolsInstallSync" +qa  phase 4: LSP servers and formatters
+      -> nvim +DOTFILES_TREESITTER_SYNC_INSTALL  phase 4: Tree-sitter parsers
+      -> nvim "+MasonToolsInstallSync" +qa        phase 5: LSP servers and formatters
 ```
 
 Pass `--all` / `-All` for explicit non-interactive installs (Y to every prompt).
@@ -198,8 +199,9 @@ Add `--dry-run` / `-DryRun` to preview every step without touching disk.
 Pass `--update` / `-Update` from an existing checkout to run only the
 drift-edge refresh: scoped package-manager updates for present catalog tools,
 then `nvim --headless +MasonToolsUpdate +qa`. It deliberately skips `git pull`,
-`chezmoi apply`, `:Lazy sync`, and `:Lazy update`; the last one changes
-`lazy-lock.json` and is therefore a repo update, not a machine refresh.
+`chezmoi apply`, `:Lazy sync`, synchronous Tree-sitter parser bootstrap, and
+`:Lazy update`; the last one changes `lazy-lock.json` and is therefore a repo
+update, not a machine refresh.
 
 Every script is safe to rerun. Pre-existing non-symlink targets are backed up to
 `<target>.bak.<timestamp>` with collision-proof suffixes (`.1`, `.2`, ...).
@@ -247,6 +249,13 @@ and whether `pwsh` is installed.
 - `install-deps` provisions Starship through Homebrew on macOS/Linuxbrew,
   Alpine's native package on Alpine, and a pinned SHA-256-verified Starship
   GitHub release archive on other native Linux/WSL hosts.
+- `install-deps` provisions `lsd` through the supported package managers
+  (Homebrew, native Linux package managers where available, and the Windows
+  Scoop-first catalog). Interactive shells replace `ls` with `lsd` and add the
+  useful `l`, `la`, `lla`, and `lt` shortcuts only when the binary is present.
+- `install-deps` provisions the `cmake` CLI because the configured CMake LSP
+  (`neocmakelsp`) shells out to it; Mason installs the language server, not the
+  project toolchain it drives.
 - `install-deps` provisions the `tree-sitter` CLI for `nvim-treesitter` main:
   Homebrew on macOS/Linuxbrew, a pinned SHA-256-verified GitHub release into
   `~/.local/bin` on native Linux/WSL, and Scoop with npm fallback on Windows.
@@ -360,22 +369,31 @@ The e2e jobs cover different install paths, not symmetric container platforms:
 | `setup.ps1 / windows-2025` | Full Windows setup through the real Windows hosted runner, including Scoop/winget/choco behavior, PowerShell, symlinks, and Neovim sync. Windows containers do not model the desktop/user-profile setup well. |
 | `setup.sh / WSL2 Ubuntu-24.04 (best-effort canary)` | Non-required WSL smoke signal. Hosted runners cannot provide reliable nested virtualization, so this is intentionally best-effort. |
 
-After the Mason sync, each `setup.sh`/`setup.ps1` job also runs the **Tier 2
-language smoke** (`tests/nvim/lsp_smoke.lua`): against the real Neovim config it
-asserts (0) no nvim-treesitter parser override for a bundled language remains on
-the runtimepath under `stdpath('data')`, (1) every installed treesitter parser is
-one nvim-treesitter `main` supports, (2) each language's LSP attaches
-(`powershell_es` enforced on Windows only), and (3) the auto-started bundled
-filetypes keep nvim-treesitter's `indentexpr`. The fast `make test-nvim` runs
-Tier 1 (filetype + formatter + parser-list consistency per fixture). Adding a
-language is "drop a fixture + a row in `tests/nvim/language_matrix.lua`". The
-smoke matrix also encodes the Neovim-bundled languages (`c`, `lua`, `markdown`,
-`query`, `vim`): those must stay **out** of the install list — and any stale
-override of them is purged on config load (scoped to `stdpath('data')` so
-Neovim's own install-prefix parsers are never touched) — so Neovim's matched
-built-in parser+query is used instead of an nvim-treesitter parser that can drift
-from the bundled query (this caught a real lua `E5113: Invalid field name
-"operator"` regression).
+After the Lazy/Tree-sitter/Mason sync, each `setup.sh`/`setup.ps1` job also
+runs the **Tier 2 language smoke** (`tests/nvim/lsp_smoke.lua`): against the
+real Neovim config it asserts (0) no nvim-treesitter parser override for a
+bundled language remains on the runtimepath under `stdpath('data')`, (1) every
+installed treesitter parser is one nvim-treesitter `main` supports and no
+unexpected nvim-treesitter install-output parser `.so` is present under
+`stdpath('data')/site/parser` beyond the explicit list plus upstream dependency
+parsers, (2) synchronous parser bootstrap
+completes through nvim-treesitter's waitable install task and returns exactly
+`true`, (3) every language-matrix fixture opens with the expected filetype and
+every parser-backed row reports real Tree-sitter highlight captures, (4) each
+language's LSP attaches (`powershell_es` enforced on Windows only), and (5) the
+auto-started bundled filetypes keep nvim-treesitter's `indentexpr`. The
+fast `make test-nvim` runs Tier 1 (filetype + formatter + parser-list
+consistency per fixture). Adding a language is "drop a fixture + a row in
+`tests/nvim/language_matrix.lua`"; syntax-only fallbacks such as `.curlrc`
+belong in the same matrix, must not pretend to have unsupported parsers, and
+Tier 2 syntax probes must prove they still produce real Vim syntax groups. The
+smoke matrix also encodes the
+Neovim-bundled languages (`c`, `lua`, `markdown`, `query`, `vim`): those must
+stay **out** of the install list — and any stale override of them is purged on
+config load (scoped to `stdpath('data')` so Neovim's own install-prefix parsers
+are never touched) — so Neovim's matched built-in parser+query is used instead
+of an nvim-treesitter parser that can drift from the bundled query (this caught
+a real lua `E5113: Invalid field name "operator"` regression).
 
 The Ubuntu container is intentionally **not** a devcontainer. It stays because
 the hosted Ubuntu runner can take the Linuxbrew path, while the container is the
@@ -388,10 +406,10 @@ systems, while the required WSL proxy is the Ubuntu container plus the
 WSL config-template coverage. Do not add the WSL2 canary to
 required checks unless the owner explicitly accepts the flake risk.
 
-These e2e jobs fail if setup skips Phase 3-4, emits a precise `FAIL:` marker,
-installs Neovim below 0.12, Lazy/Mason headless sync exits nonzero, or expected
-Mason-installed binaries are missing. They do not blanket-fail on benign
-warning/deprecation text.
+These e2e jobs fail if setup skips Phase 3-5, emits a precise `FAIL:` marker,
+installs Neovim below 0.12, Lazy/Tree-sitter/Mason headless sync exits nonzero,
+or expected Mason-installed binaries are missing. They do not blanket-fail on
+benign warning/deprecation text.
 
 ## Repository Safeguards
 
@@ -531,6 +549,9 @@ stale; CI then fails verification until a human reviews the adjacent constant.
   ghosting), it doesn't replace it. Guarded by `command -v fzf` so a machine
   without it still starts cleanly; uses `fzf --zsh` with a share-dir fallback
   for older distro builds.
+- **lsd wired into interactive shells** — setup installs it where the platform
+  package manager carries it, then zsh and PowerShell expose the documented
+  `ls`, `l`, `la`, `lla`, and `lt` commands when `lsd` is present.
 - **No `bindkey '\e' kill-whole-line`** — that shadowed the entire Meta
   prefix and silently broke Alt-h/j/k/l window nav in nvim.
 - **tmux window swaps use uppercase Vim directions.** `prefix+H` swaps the
@@ -598,7 +619,15 @@ Lazy auto-discovers it. Default to lazy-loading (`event` / `cmd` / `keys` /
 See `CLAUDE.md` -> "Common workflows". LSP servers and formatters update the
 plugin spec, Mason `ensure_installed`, and the matching spec. Treesitter parsers
 use `nvim-treesitter` main's `treesitter_parsers` list plus a filetype alias
-when Neovim's filetype differs from the parser name.
+when Neovim's filetype differs from the parser name, and every parser-backed
+language gets a fixture row in `tests/nvim/language_matrix.lua`. The current
+matrix covers daily application languages, shells, web formats, .NET project
+files/Razor, data/config/build files, TeX/BibTeX/Typst/Mermaid, shader formats,
+and common platform/scientific languages. Built-in regex syntax fallback is
+automatic for any detected filetype with a Neovim `syntax/<filetype>.vim`
+runtime file; do not add per-language syntax fallback allowlists or fake parser
+names for formats nvim-treesitter does not support. If a syntax-only fallback is
+important enough to add to the matrix, add a Tier 2 syntax probe too.
 
 ### Refreshing the plugin lockfile
 
@@ -633,7 +662,7 @@ MIT. See `LICENSE`.
 |---|---|---|
 | `<leader>X` keymaps fire `\X` instead of `<Space>X` | mapleader set after lazy.setup somehow | restore the order in `nvim/init.lua` — leader **before** `require("lazy").setup` |
 | Formatter runs twice or shows two BufWritePre autocmds | someone added a second handler outside conform.nvim | `:lua print(#vim.api.nvim_get_autocmds({event="BufWritePre"}))` should be 1; if not, find the second autocmd and delete it |
-| Lazy/Mason says `No C compiler found` | WSL/Linux has `make` but no `cc`/`gcc`/`clang`; some plugin builds compile native code | re-run `./setup.sh --skip-config` to install the Linux compiler toolchain, or on Ubuntu run `sudo apt-get update && sudo apt-get install -y build-essential`, then `./setup.sh --skip-deps --skip-config` |
+| Lazy/Tree-sitter/Mason says `No C compiler found` | WSL/Linux has `make` but no `cc`/`gcc`/`clang`; Tree-sitter parsers and some plugin builds compile native code | re-run `./setup.sh --skip-config` to install the Linux compiler toolchain, or on Ubuntu run `sudo apt-get update && sudo apt-get install -y build-essential`, then `./setup.sh --skip-deps --skip-config` |
 | nvim treesitter parsers fail to compile on Windows / `cl.exe` not found | `nvim-treesitter` main builds parsers with the Rust `cc` crate, which needs MSVC env vars | run `.\setup.ps1 -All` to install VS Build Tools and let setup import the VS DevShell before `Lazy! sync`; for ad-hoc `:TSUpdate`, open a "Developer PowerShell for VS" or rerun setup |
 | nvim syntax looks weak or files look plain text | Tree-sitter is inactive, or the hybrid built-in syntax fallback was not restored after Tree-sitter starts | update this repo, re-run setup, then check `:Inspect` on a token; parser-backed languages should show `treesitter` captures plus `syntax` groups, while `.bat` should show `syntax` groups |
 | Clipboard not crossing host on WSL | `win32yank.exe` not on PATH | install win32yank via scoop on Windows side, ensure WSL PATH picks it up |

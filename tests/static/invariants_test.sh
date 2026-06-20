@@ -107,19 +107,41 @@ else
 fi
 
 if ! grep -Fq -- "-path './tests/.cache'" tests/static/editorconfig_check.sh \
+    || ! grep -Fq -- "! -name '.DS_Store'" tests/static/editorconfig_check.sh \
     || ! grep -Fq "editorconfig-checker \"\$file\"" tests/static/editorconfig_check.sh; then
-    echo "FAIL: editorconfig_check.sh must feed editorconfig-checker a pruned file list excluding generated tests/.cache content"
+    echo "FAIL: editorconfig_check.sh must feed editorconfig-checker a pruned file list excluding generated tests/.cache and OS metadata content"
     fail=1
 elif find . \
     \( -path './.git' -o -path './.claude' -o -path './tests/.cache' -o -path './home' \) -prune -o \
     -type f \
+    ! -name '.DS_Store' \
     ! -path './nvim/lazy-lock.json' \
     -print |
     grep -Fqx './tests/.cache/plenary.nvim/README.md'; then
     echo "FAIL: editorconfig_check.sh file-list pruning still includes generated tests/.cache content"
     fail=1
 else
-    echo "ok  : editorconfig_check.sh excludes generated tests/.cache content"
+    echo "ok  : editorconfig_check.sh excludes generated tests/.cache and OS metadata content"
+fi
+
+if grep -Eq '^[[:space:]]*end_of_line[[:space:]]*=[[:space:]]*crlf' .editorconfig; then
+    echo "FAIL: .editorconfig must not request CRLF; .gitattributes intentionally keeps repo text LF-only"
+    fail=1
+elif awk '$0 !~ /^[[:space:]]*#/ && $0 ~ /eol=crlf/ { found = 1 } END { exit(found ? 0 : 1) }' .gitattributes; then
+    echo "FAIL: .gitattributes must not add CRLF overrides; repo text stays LF-only across platforms"
+    fail=1
+elif ! git check-attr eol text -- tests/nvim/fixtures/sample.bat tests/.cache/attr-probe.cmd |
+    grep -Fqx 'tests/nvim/fixtures/sample.bat: eol: lf' ||
+    ! git check-attr eol text -- tests/nvim/fixtures/sample.bat tests/.cache/attr-probe.cmd |
+        grep -Fqx 'tests/nvim/fixtures/sample.bat: text: set' ||
+    ! git check-attr eol text -- tests/nvim/fixtures/sample.bat tests/.cache/attr-probe.cmd |
+        grep -Fqx 'tests/.cache/attr-probe.cmd: eol: lf' ||
+    ! git check-attr eol text -- tests/nvim/fixtures/sample.bat tests/.cache/attr-probe.cmd |
+        grep -Fqx 'tests/.cache/attr-probe.cmd: text: set'; then
+    echo "FAIL: .gitattributes must explicitly enforce LF text checkout for .bat and .cmd files"
+    fail=1
+else
+    echo "ok  : repo text line endings stay LF-only across EditorConfig and Git attributes"
 fi
 
 if ! grep -Fq '.\test.ps1' .github/workflows/test.yml; then

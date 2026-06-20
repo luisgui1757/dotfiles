@@ -91,8 +91,8 @@ jobs:
           set -euo pipefail
           setup_log="$RUNNER_TEMP/setup-sh.log"
           ./setup.sh --all 2>&1 | tee "$setup_log"
-          if grep -Fq "skipped: Phase 3-4" "$setup_log"; then
-            echo "setup.sh skipped Phase 3-4" >&2
+          if grep -Fq "skipped: Phase 3-5" "$setup_log"; then
+            echo "setup.sh skipped Phase 3-5" >&2
             exit 1
           fi
           if grep -Eq '^[[:space:]]*FAIL:' "$setup_log"; then
@@ -101,8 +101,9 @@ jobs:
           fi
           # Warnings-as-errors is enforced precisely (shellcheck, PSScriptAnalyzer,
           # pipefail, exit codes, FAIL markers, and the explicit assertions below).
-          grep -F "Phase 3/4" "$setup_log" >/dev/null
-          grep -F "Phase 4/4" "$setup_log" >/dev/null
+          grep -F "Phase 3/5" "$setup_log" >/dev/null
+          grep -F "Phase 4/5" "$setup_log" >/dev/null
+          grep -F "Phase 5/5" "$setup_log" >/dev/null
 
       - name: Post-install assertions
         run: |
@@ -153,6 +154,8 @@ jobs:
           }
           command -v nvim >/dev/null 2>&1 || fail "nvim is not on PATH"
           command -v lazygit >/dev/null 2>&1 || fail "lazygit is not on PATH"
+          command -v cmake >/dev/null 2>&1 || fail "cmake is not on PATH"
+          command -v lsd >/dev/null 2>&1 || fail "lsd is not on PATH"
           nvim_line="$(nvim --version | head -n 1)"
           case "$nvim_line" in
             "NVIM v0.12"*|"NVIM v1."*) ;;
@@ -169,14 +172,15 @@ jobs:
           [[ -r "$plugin_root/fzf-tab/fzf-tab.plugin.zsh" ]] || fail "fzf-tab plugin file missing"
           [[ -r "$plugin_root/zsh-autosuggestions/zsh-autosuggestions.zsh" ]] || fail "zsh-autosuggestions plugin file missing"
           run_nvim_checked lazy "+Lazy! sync" "+qa"
+          DOTFILES_TREESITTER_SYNC_INSTALL=1 run_nvim_checked treesitter -u "$repo/nvim/init.lua" -c "lua require('lazy').load({ plugins = { 'nvim-treesitter' } })" +qa
           run_nvim_checked mason "+MasonToolsInstallSync" "+qa"
           assert_mason_tool "lua-language-server" lua-language-server lua-language-server.cmd lua-language-server.exe
           assert_mason_tool "stylua" stylua stylua.cmd stylua.exe
-          # Tier 2 language smoke: parser-support (get_available) AND LSP-attach,
+          # Tier 2 language smoke: parser support, Tree-sitter captures, AND LSP-attach,
           # both STRICT. The treesitter-highlight bug that previously forced
           # LSP-attach to report-only is fixed canonically (nvim-bundled langs are
           # no longer installed by nvim-treesitter), so a non-gated server that
-          # does not attach -- or a fixture open that raises -- now cquits.
+          # does not attach -- or a parser-backed fixture without captures -- now cquits.
           # run_nvim_checked fails on the nonzero exit. The trailing +qa is
           # insurance if the probe ever leaves nvim alive.
           DOTFILES_LSP_SMOKE=strict run_nvim_checked lsp-smoke -u "$repo/nvim/init.lua" -c "luafile $repo/tests/nvim/lsp_smoke.lua" +qa
@@ -215,14 +219,14 @@ jobs:
             throw "setup.ps1 exited $LASTEXITCODE"
           }
           $content = Get-Content -Raw -LiteralPath $setupLog
-          if ($content -match 'skipped: Phase 3-4') {
-            throw 'setup.ps1 skipped Phase 3-4'
+          if ($content -match 'skipped: Phase 3-5') {
+            throw 'setup.ps1 skipped Phase 3-5'
           }
           if ($content -match '(?m)^\s*FAIL:') {
             throw 'setup.ps1 emitted a FAIL marker'
           }
-          if (($content -notmatch 'Phase 3/4') -or ($content -notmatch 'Phase 4/4')) {
-            throw 'setup.ps1 did not run both nvim phases'
+          if (($content -notmatch 'Phase 3/5') -or ($content -notmatch 'Phase 4/5') -or ($content -notmatch 'Phase 5/5')) {
+            throw 'setup.ps1 did not run all nvim phases'
           }
           # Warnings-as-errors enforced precisely through PSScriptAnalyzer, exit
           # codes, FAIL markers, and explicit assertions.
@@ -293,6 +297,12 @@ jobs:
           if (-not (Get-Command lazygit -ErrorAction SilentlyContinue)) {
               throw 'lazygit is not on PATH'
           }
+          if (-not (Get-Command cmake -ErrorAction SilentlyContinue)) {
+              throw 'cmake is not on PATH'
+          }
+          if (-not (Get-Command lsd -ErrorAction SilentlyContinue)) {
+              throw 'lsd is not on PATH'
+          }
           $nvimLine = & nvim --version | Select-Object -First 1
           if ($nvimLine -notmatch '^NVIM v(0\.1[2-9]|0\.[2-9][0-9]|[1-9]\.)') {
               throw "nvim version is below 0.12: $nvimLine"
@@ -307,6 +317,9 @@ jobs:
           Assert-ContentEqual -Path $PROFILE -Expected (Join-Path $repo 'shells\powershell_profile.ps1')
           Assert-ContentEqual -Path (Join-Path $env:LOCALAPPDATA 'lazygit\config.yml') -Expected (Join-Path $repo 'lazygit\config.yml')
           Invoke-NvimChecked -Name lazy -NvimArgs @('+Lazy! sync', '+qa')
+          $env:DOTFILES_TREESITTER_SYNC_INSTALL = '1'
+          Invoke-NvimChecked -Name treesitter -NvimArgs @('-u', ((Join-Path $repo 'nvim\init.lua') -replace '\\', '/'), '-c', "lua require('lazy').load({ plugins = { 'nvim-treesitter' } })", '+qa')
+          Remove-Item Env:DOTFILES_TREESITTER_SYNC_INSTALL
           Invoke-NvimChecked -Name mason -NvimArgs @('+MasonToolsInstallSync', '+qa')
           Assert-MasonTool -Name 'lua-language-server' -FileNames @('lua-language-server.cmd', 'lua-language-server.exe', 'lua-language-server')
           Assert-MasonTool -Name 'stylua' -FileNames @('stylua.cmd', 'stylua.exe', 'stylua')
@@ -320,7 +333,7 @@ jobs:
           if (-not (Test-Path -LiteralPath $psesDir)) {
               throw "Mason did not install powershell-editor-services into $psesDir"
           }
-          # Tier 2 language smoke: parser-support (get_available) AND LSP-attach,
+          # Tier 2 language smoke: parser support, Tree-sitter captures, AND LSP-attach,
           # both STRICT (see lsp_smoke.lua). On Windows this is where powershell_es
           # is actually enforced (pwsh + PSES bundle present). cquit on any failure
           # -> Invoke-NvimChecked throws.
@@ -360,8 +373,8 @@ jobs:
           repo="$(wslpath "$GITHUB_WORKSPACE")"
           cd "$repo"
           ./setup.sh --all 2>&1 | tee /tmp/dotfiles-wsl2-setup.log
-          if grep -Fq "skipped: Phase 3-4" /tmp/dotfiles-wsl2-setup.log; then
-            echo "setup.sh skipped Phase 3-4" >&2
+          if grep -Fq "skipped: Phase 3-5" /tmp/dotfiles-wsl2-setup.log; then
+            echo "setup.sh skipped Phase 3-5" >&2
             exit 1
           fi
           if grep -Eq '^[[:space:]]*FAIL:' /tmp/dotfiles-wsl2-setup.log; then
@@ -370,6 +383,8 @@ jobs:
           fi
           command -v nvim >/dev/null 2>&1
           command -v lazygit >/dev/null 2>&1
+          command -v cmake >/dev/null 2>&1
+          command -v lsd >/dev/null 2>&1
           test -r "$HOME/.local/share/dotfiles/zsh-plugins/fzf-tab/fzf-tab.plugin.zsh"
           test -r "$HOME/.local/share/dotfiles/zsh-plugins/zsh-autosuggestions/zsh-autosuggestions.zsh"
           nvim --version | head -n 1

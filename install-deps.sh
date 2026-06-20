@@ -1694,9 +1694,11 @@ PKG_TABLE=$(cat <<'EOF'
 git|git|git|git|git|git|git
 nvim|neovim|neovim|neovim|neovim|neovim|neovim
 make|make|make|make|make|make|make
+cmake|cmake|cmake|cmake|cmake|cmake|cmake
 rg|ripgrep|ripgrep|ripgrep|ripgrep|ripgrep|ripgrep
 fd|fd|fd-find|fd-find|fd|fd|fd
 fzf|fzf|fzf|fzf|fzf|fzf|fzf
+lsd|lsd|lsd|lsd|lsd|lsd|lsd
 chezmoi|chezmoi|||||
 lazygit|lazygit|||||
 starship|starship|||||
@@ -2348,10 +2350,12 @@ install_dependency_scan_items() {
         "git|command|git" \
         "nvim|command|nvim" \
         "make|command|make" \
+        "cmake|command|cmake" \
         "C compiler|compiler|" \
         "rg|command|rg" \
         "fd|command|" \
         "fzf|command|fzf" \
+        "lsd|command|lsd" \
         "chezmoi|command|chezmoi" \
         "lazygit|command|lazygit" \
         "starship|command|starship" \
@@ -2578,10 +2582,12 @@ else
     install nvim "Neovim 0.12+, the editor"
 fi
 install make "needed for some plugin builds (notably LuaSnip jsregexp)"
+install cmake "CMake CLI required by neocmakelsp and CMake projects"
 install_c_toolchain_linux
 install rg "ripgrep, powers Telescope live_grep"
 install fd "fd, powers Telescope find_files"
 install fzf "fuzzy finder: Ctrl-R history, Ctrl-T files, Alt-C cd (zsh wiring in shells/zshrc)"
+install lsd "modern ls replacement with colors, icons, and tree view"
 install_chezmoi
 install_lazygit
 

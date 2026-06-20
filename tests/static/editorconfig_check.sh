@@ -15,6 +15,7 @@ while IFS= read -r -d '' file; do
 done < <(find . \
     \( -path './.git' -o -path './.claude' -o -path './tests/.cache' -o -path './home' \) -prune -o \
     -type f \
+    ! -name '.DS_Store' \
     ! -path './nvim/lazy-lock.json' \
     -print0)
 echo "OK"

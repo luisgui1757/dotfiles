@@ -171,6 +171,17 @@ if command -v fzf >/dev/null 2>&1; then
   fi
 fi
 
+# ---- lsd directory listings --------------------------------------------------
+# lsd is installed by setup where the OS package manager carries it. Keep the
+# aliases guarded so a partially provisioned shell still starts cleanly.
+if command -v lsd >/dev/null 2>&1; then
+  alias ls='lsd'
+  alias l='lsd -l'
+  alias la='lsd -a'
+  alias lla='lsd -la'
+  alias lt='lsd --tree'
+fi
+
 # Intentionally NOT rebinding Esc — it shadows the entire Meta prefix and
 # breaks every Alt-X keybinding (including Alt-h/j/k/l set in nvim's
 # vim-options.lua). If you want a single keystroke to clear the line, ^U

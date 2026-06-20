@@ -74,7 +74,7 @@ if [[ "${1:-}" == "--as-user" ]]; then
     run_and_capture "chezmoi apply" "$HOME/chezmoi-apply.log" \
         chezmoi --source "$repo/home" --no-tty --force apply
 
-    for cmd in nvim rg fd fzf tmux zsh git lazygit tree-sitter; do
+    for cmd in nvim rg fd fzf tmux zsh git lazygit tree-sitter cmake lsd; do
         command -v "$cmd" >/dev/null 2>&1 || fail "$cmd is not on PATH"
     done
 

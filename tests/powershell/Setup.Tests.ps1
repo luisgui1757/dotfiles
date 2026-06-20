@@ -85,6 +85,7 @@ Describe "setup.ps1 Update-RuntimePath" {
         $script:OldPath = $env:PATH
         $script:OldScoop = $env:SCOOP
         $script:OldUserProfile = $env:USERPROFILE
+        $script:OldHome = $env:HOME
         $script:FakeHome = Join-Path ([System.IO.Path]::GetTempPath()) ("setup-path-" + [System.Guid]::NewGuid())
         New-Item -ItemType Directory -Force -Path $script:FakeHome | Out-Null
         $env:USERPROFILE = $script:FakeHome
@@ -97,6 +98,11 @@ Describe "setup.ps1 Update-RuntimePath" {
             Remove-Item Env:USERPROFILE -ErrorAction SilentlyContinue
         } else {
             $env:USERPROFILE = $script:OldUserProfile
+        }
+        if ($null -eq $script:OldHome) {
+            Remove-Item Env:HOME -ErrorAction SilentlyContinue
+        } else {
+            $env:HOME = $script:OldHome
         }
         if ($null -eq $script:OldScoop) {
             Remove-Item Env:SCOOP -ErrorAction SilentlyContinue
@@ -135,6 +141,45 @@ Describe "setup.ps1 Update-RuntimePath" {
         $parts = $env:PATH -split ';'
         @($parts | Where-Object { $_ -eq $missingShim }).Count | Should -Be 0
         @($parts | Where-Object { $_ -eq $fakeOne }).Count | Should -Be 1
+    }
+
+    It "falls back to HOME when USERPROFILE and SCOOP are absent" {
+        Remove-Item Env:SCOOP -ErrorAction SilentlyContinue
+        Remove-Item Env:USERPROFILE -ErrorAction SilentlyContinue
+        $env:HOME = $script:FakeHome
+        $shimDir = Join-Path $script:FakeHome 'scoop/shims'
+        New-Item -ItemType Directory -Force -Path $shimDir | Out-Null
+        $fakeOne = Join-Path $script:FakeHome 'one'
+        $env:PATH = "$fakeOne;$fakeOne"
+
+        Update-RuntimePath
+
+        $parts = $env:PATH -split ';'
+        $parts[0] | Should -Be $shimDir
+        @($parts | Where-Object { $_ -eq $fakeOne }).Count | Should -Be 1
+    }
+}
+
+Describe "setup.ps1 source-only import" {
+    It "does not require USERPROFILE on non-Windows hosts" {
+        $oldUserProfile = $env:USERPROFILE
+        try {
+            Remove-Item Env:USERPROFILE -ErrorAction SilentlyContinue
+            $importError = $null
+            try {
+                . $script:ImportSetupForTest
+            } catch {
+                $importError = $_
+            }
+            $importError | Should -BeNullOrEmpty
+            Get-DefaultProfileRoot | Should -Not -BeNullOrEmpty
+        } finally {
+            if ($null -eq $oldUserProfile) {
+                Remove-Item Env:USERPROFILE -ErrorAction SilentlyContinue
+            } else {
+                $env:USERPROFILE = $oldUserProfile
+            }
+        }
     }
 }
 
@@ -181,7 +226,7 @@ Describe "setup.ps1 update mode" {
         $output | Should -Match 'Update 1/2'
         $output | Should -Match 'Update 2/2'
         $output | Should -Match 'Plugins \(lazy-lock\.json\), pinned binaries, and configs update via `git pull` then re-run setup'
-        $output | Should -Not -Match 'chezmoi|Lazy sync|MasonToolsInstallSync'
+        $output | Should -Not -Match 'chezmoi|Lazy sync|Tree-sitter|MasonToolsInstallSync'
         Should -Invoke -CommandName Invoke-ChezmoiApplyPhase -Times 0 -Exactly
     }
 
@@ -266,6 +311,10 @@ Describe "setup.ps1 VS developer environment" {
             $script:NvimSyncEvents += 'lazy'
             $global:LASTEXITCODE = 0
         }
+        $treesitterRunner = {
+            $script:NvimSyncEvents += 'treesitter'
+            $global:LASTEXITCODE = 0
+        }
         $masonRunner = {
             $script:NvimSyncEvents += 'mason'
             $global:LASTEXITCODE = 0
@@ -275,9 +324,10 @@ Describe "setup.ps1 VS developer environment" {
             -CommandTester $commandTester `
             -DevEnvironmentEntrypoint $devEnvironment `
             -LazyRunner $lazyRunner `
+            -TreesitterRunner $treesitterRunner `
             -MasonRunner $masonRunner
 
-        ($script:NvimSyncEvents -join ',') | Should -Be 'dev-env,lazy,mason'
+        ($script:NvimSyncEvents -join ',') | Should -Be 'dev-env,lazy,treesitter,mason'
     }
 
     It "emits a FAIL marker when a present VC toolset cannot import DevShell" {

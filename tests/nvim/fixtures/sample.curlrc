@@ -1,0 +1,3 @@
+url = "https://example.com"
+header = "Accept: application/json"
+request = GET

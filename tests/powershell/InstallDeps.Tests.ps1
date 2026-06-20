@@ -461,6 +461,27 @@ Describe "install-deps.ps1" {
         $Catalog['tree-sitter'].purpose | Should -Match 'nvim-treesitter main'
     }
 
+    It "registers lsd in the Windows package catalog" {
+        . $script:ImportInstallDepsForTest
+
+        $Catalog.ContainsKey('lsd') | Should -BeTrue
+        $BinaryName['lsd'] | Should -Be 'lsd'
+        $Catalog['lsd'].scoop | Should -Be 'lsd'
+        $Catalog['lsd'].winget | Should -Be 'lsd-rs.lsd'
+        $Catalog['lsd'].choco | Should -Be 'lsd'
+    }
+
+    It "registers cmake in the Windows package catalog" {
+        . $script:ImportInstallDepsForTest
+
+        $Catalog.ContainsKey('cmake') | Should -BeTrue
+        $BinaryName['cmake'] | Should -Be 'cmake'
+        $Catalog['cmake'].scoop | Should -Be 'cmake'
+        $Catalog['cmake'].winget | Should -Be 'Kitware.CMake'
+        $Catalog['cmake'].choco | Should -Be 'cmake'
+        $Catalog['cmake'].purpose | Should -Match 'neocmakelsp'
+    }
+
     It "dry-runs VS Build Tools without invoking package managers" {
         . $script:ImportInstallDepsForTest -DryRun
         Mock -CommandName Get-VsBuildToolsInstallationPath -MockWith { return '' }

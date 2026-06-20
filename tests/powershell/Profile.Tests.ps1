@@ -73,4 +73,48 @@ Describe "PowerShell profile" {
         $src | Should -Match '\[38;2;246;193;119m'   # gold foreground (selected completion option is gold)
         $src | Should -Match 'Set-PSReadLineOption\s+-Colors\s+@\{\s*Selection\s*=\s*\$script:RosePineSelectionColor'
     }
+
+    It "wires lsd functions only when lsd exists" {
+        $src = Get-Content -Raw -LiteralPath $script:Profile
+        $src | Should -Match 'Get-Command\s+lsd\s+-ErrorAction\s+SilentlyContinue'
+        $src | Should -Match "foreach\s+\(\s*\`$name\s+in\s+'ls',\s+'l',\s+'la',\s+'lla',\s+'lt'\s*\)"
+        $src | Should -Match 'Remove-Item\s+"Alias:\$name"\s+-ErrorAction\s+SilentlyContinue'
+        $src | Should -Match 'function global:ls\s+\{\s+lsd\s+@args\s+\}'
+        $src | Should -Match 'function global:l\s+\{\s+lsd\s+-l\s+@args\s+\}'
+        $src | Should -Match 'function global:la\s+\{\s+lsd\s+-a\s+@args\s+\}'
+        $src | Should -Match 'function global:lla\s+\{\s+lsd\s+-la\s+@args\s+\}'
+        $src | Should -Match 'function global:lt\s+\{\s+lsd\s+--tree\s+@args\s+\}'
+    }
+
+    It "removes pre-existing lsd shortcut aliases so functions win command resolution" {
+        $pwshExe = (Get-Command pwsh -ErrorAction SilentlyContinue).Source
+        if (-not $pwshExe) {
+            $pwshExe = (Get-Command pwsh.exe -ErrorAction SilentlyContinue).Source
+        }
+        $pwshExe | Should -Not -BeNullOrEmpty
+
+        $profilePath = $script:Profile.Replace('"', '`"')
+        $scriptBlock = @"
+function global:lsd { param([Parameter(ValueFromRemainingArguments = `$true)] [object[]] `$Rest) }
+foreach (`$name in 'ls', 'l', 'la', 'lla', 'lt') {
+    Set-Alias -Name `$name -Value Get-Location -Scope Global -Force
+}
+. "$profilePath"
+`$failures = @()
+foreach (`$name in 'ls', 'l', 'la', 'lla', 'lt') {
+    `$command = Get-Command `$name -All | Select-Object -First 1
+    if (`$command.CommandType -ne 'Function') {
+        `$failures += "`$name resolved to `$(`$command.CommandType)"
+    }
+}
+if (`$failures.Count -gt 0) {
+    Write-Error (`$failures -join '; ')
+    exit 1
+}
+exit 0
+"@
+
+        & $pwshExe -NoProfile -Command $scriptBlock
+        $LASTEXITCODE | Should -Be 0
+    }
 }
