@@ -7,7 +7,6 @@ cd "$REPO_ROOT"
 python3 - <<'PY'
 import pathlib
 import re
-import subprocess
 import sys
 
 root = pathlib.Path(".")
@@ -177,35 +176,43 @@ for path in scan_files:
         if key in allowlist:
             seen_allowlist.add(key)
 
-rg_pattern = "|".join(pattern_sources)
-rg = subprocess.run(
-    [
-        "rg",
-        "-n",
-        "--hidden",
-        "--no-heading",
-        "-g", "*.sh",
-        "-g", "*.ps1",
-        "-g", "*.yml",
-        "-g", "*.yaml",
-        "-g", "*.wsb",
-        "-g", "!docs/archive/**",
-        "-g", "!tests/.cache/**",
-        "-g", "!node_modules/**",
-        "-g", "!.git/**",
-        "-g", "!tests/static/supply_chain_remote_execution_test.sh",
-        rg_pattern,
-        ".",
-    ],
-    text=True,
-    capture_output=True,
+scan_suffixes = {".ps1", ".sh", ".wsb", ".yaml", ".yml"}
+excluded_roots = {
+    pathlib.Path(".git"),
+    pathlib.Path("docs/archive"),
+    pathlib.Path("node_modules"),
+    pathlib.Path("tests/.cache"),
+}
+excluded_files = {
+    pathlib.Path("tests/static/supply_chain_remote_execution_test.sh"),
+}
+
+
+def is_excluded(path):
+    return path in excluded_files or any(
+        path == excluded_root or excluded_root in path.parents
+        for excluded_root in excluded_roots
+    )
+
+
+scan_paths = sorted(
+    (
+        path
+        for path in root.rglob("*")
+        if path.is_file() and path.suffix in scan_suffixes
+    ),
+    key=lambda path: path.as_posix(),
 )
-if rg.returncode not in (0, 1):
-    failures.append(f"rg scan failed: {rg.stderr.strip()}")
-else:
-    for row in rg.stdout.splitlines():
-        path_text, lineno_text, line = row.split(":", 2)
-        path = pathlib.Path(path_text.removeprefix("./"))
+for path in scan_paths:
+    if is_excluded(path):
+        continue
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except UnicodeDecodeError as exc:
+        failures.append(f"{path}: could not decode as UTF-8 during remote executable scan: {exc}")
+        continue
+
+    for lineno, line in enumerate(lines, start=1):
         normalized = line.strip()
         key = (path.as_posix(), normalized)
         if key in allowlist:
@@ -213,7 +220,7 @@ else:
         if not flag_line(path, line):
             continue
         if key not in allowlist:
-            failures.append(f"{path}:{lineno_text}: unreviewed remote executable pattern: {normalized}")
+            failures.append(f"{path}:{lineno}: unreviewed remote executable pattern: {normalized}")
 
 for key in sorted(set(allowlist) - seen_allowlist):
     failures.append(f"{key[0]}: allowlist entry no longer matches and should be removed: {key[1]}")

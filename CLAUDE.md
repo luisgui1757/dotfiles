@@ -385,6 +385,9 @@ surface.
 it is healthy, but if local macOS `taplo` panics with the known
 system-configuration null-object crash they fall back to Python `tomllib`;
 ordinary `taplo` lint errors still fail.
+`tests/static/supply_chain_remote_execution_test.sh` must stay pure Python for
+the repository-wide scan; fast CI runs static tests before optional developer
+tools like ripgrep are installed.
 `tests/tmux/load_test.sh` must keep its own `tmux -S` socket path so tmux socket
 creation is hermetic and does not depend on host `/tmp/tmux-$UID` permissions.
 
