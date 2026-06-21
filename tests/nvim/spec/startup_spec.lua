@@ -159,10 +159,10 @@ describe("startup time", function()
     -- A cold Lazy cache can still be installing the plugin graph after lazy.nvim
     -- itself exists. Do that work before measuring, otherwise the startup budget
     -- test measures first-run network/build cost instead of warm real-init time.
-    -- Once the locked plugin graph is cached, skip the sync so ordinary test
+    -- Once the locked plugin graph is cached, skip the restore so ordinary test
     -- runs do not contact remotes or measure dependency-management work.
     if #missing_plugin_caches(data_path, repo_root) > 0 then
-      run_real_init(env, run_root .. "/prewarm-plugins.log", { "+Lazy! sync", "+qa" })
+      run_real_init(env, run_root .. "/prewarm-plugins.log", { "+Lazy! restore", "+qa" })
     end
     assert_plugin_cache(data_path, repo_root)
 

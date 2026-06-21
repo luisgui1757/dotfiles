@@ -436,7 +436,7 @@ else
     echo "skipped: Phase 2 (config) via --skip-bootstrap/--skip-config"
 fi
 
-# ---- Phase 3: install Neovim plugins -----------------------------------------
+# ---- Phase 3: restore locked Neovim plugins ----------------------------------
 # ---- Phase 4: install Tree-sitter parsers -------------------------------------
 # ---- Phase 5: install LSP servers + formatters via Mason ----------------------
 #
@@ -445,8 +445,8 @@ fi
 # warnings.
 if [[ "$SKIP_NVIM" -eq 0 ]] && [[ "$DRY_RUN" -eq 0 ]]; then
     if command -v nvim >/dev/null 2>&1; then
-        phase "Phase 3/5: sync Neovim plugins (lazy.nvim)"
-        run_or_fail "Lazy sync" nvim --headless "+Lazy! sync" "+qa"
+        phase "Phase 3/5: restore Neovim plugins (lazy.nvim)"
+        run_or_fail "Lazy restore" nvim --headless "+Lazy! restore" "+qa"
 
         phase "Phase 4/5: install Tree-sitter parsers"
         echo "  this compiles nvim-treesitter parsers and can take several minutes."

@@ -226,7 +226,7 @@ Describe "setup.ps1 update mode" {
         $output | Should -Match 'Update 1/2'
         $output | Should -Match 'Update 2/2'
         $output | Should -Match 'Plugins \(lazy-lock\.json\), pinned binaries, and configs update via `git pull` then re-run setup'
-        $output | Should -Not -Match 'chezmoi|Lazy sync|Tree-sitter|MasonToolsInstallSync'
+        $output | Should -Not -Match 'chezmoi|Lazy restore|Lazy sync|Tree-sitter|MasonToolsInstallSync'
         Should -Invoke -CommandName Invoke-ChezmoiApplyPhase -Times 0 -Exactly
     }
 
@@ -297,7 +297,7 @@ Describe "setup.ps1 VS developer environment" {
         $script:EnteredVsPath | Should -Be 'C:\VS'
     }
 
-    It "attempts the VS environment before Lazy sync" {
+    It "attempts the VS environment before Lazy restore" {
         $script:NvimSyncEvents = @()
         $commandTester = {
             param([string]$Name)

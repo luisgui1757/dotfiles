@@ -14,9 +14,10 @@ the install script works, read this too.
 Cross-platform dotfiles: Neovim (lazy.nvim), Starship, Ghostty, Windows
 Terminal, tmux, zshenv/zshrc, PowerShell profile, lazygit. Public installs go
 through `setup.sh` (macOS / Linux / WSL) or `setup.ps1` (Windows), which install
-dependencies, apply the chezmoi config layer, and sync Neovim plugins + Mason
-tools. The repo can live anywhere — `~/dotfiles/`, `~/Documents/dotfiles/`,
-etc. The remote-clone default in `setup.{sh,ps1}` is `~/dotfiles/`, but an
+dependencies, apply the chezmoi config layer, restore locked Neovim plugins, and
+sync Mason tools. The repo can live anywhere — `~/dotfiles/`,
+`~/Documents/dotfiles/`, etc. The remote-clone default in `setup.{sh,ps1}` is
+`~/dotfiles/`, but an
 in-place clone elsewhere works too. Do NOT put the repo at `~/.config/nvim/` —
 the installer creates that path as a symlink **pointing into** the repo, so a
 repo there would self-overlap (the self-link guard refuses this).
@@ -321,7 +322,9 @@ git add nvim/lazy-lock.json
 ```
 
 `lazy-lock.json` is tracked (NOT gitignored) — that's how every machine ends
-up on the same commits.
+up on the same commits. Setup, e2e assertions, greenfield validators, and test
+prewarm paths must use `Lazy! restore`, not `Lazy! sync`; `sync` is only for
+intentional dependency maintenance that reviews and commits a lockfile diff.
 
 ### Update Mason-installed tools across machines
 
@@ -378,9 +381,12 @@ per-file list instead of using the checker's recursive walker. Keep generated
 plugin caches under `tests/.cache/` out of that list; Neovim tests clone real
 plugin repositories there, and those vendored files are not repo formatting
 surface.
-`tests/static/toml_lint.sh` uses `taplo` when it is healthy, but if local macOS
-`taplo` panics with the known system-configuration null-object crash it falls
-back to Python `tomllib`; ordinary `taplo` lint errors still fail.
+`tests/static/toml_lint.sh` and `tests/starship/toml_lint.sh` use `taplo` when
+it is healthy, but if local macOS `taplo` panics with the known
+system-configuration null-object crash they fall back to Python `tomllib`;
+ordinary `taplo` lint errors still fail.
+`tests/tmux/load_test.sh` must keep its own `tmux -S` socket path so tmux socket
+creation is hermetic and does not depend on host `/tmp/tmux-$UID` permissions.
 
 When adding a new spec:
 - Plenary specs: drop a `*_spec.lua` under `tests/nvim/spec/`. Use plenary
@@ -420,9 +426,10 @@ install paths, not symmetric container platforms:
   a matching root-prep branch in `tests/ci/container-e2e.sh`.
 - `setup.sh / ubuntu-24.04`, `setup.sh / macos-15`, and
   `setup.ps1 / windows-2025` run the real public setup entry points, apply
-  configs through chezmoi in Phase 2, and then rerun Lazy/Tree-sitter/Mason
-  headless sync. They explicitly fail if setup skips Phase 3-5, emits a `FAIL:`
-  marker, or Mason did not install expected tools. After the full sync they also run the
+  configs through chezmoi in Phase 2, and then rerun Lazy restore,
+  Tree-sitter parser install, and Mason headless sync. They explicitly fail if
+  setup skips Phase 3-5, emits a `FAIL:` marker, or Mason did not install
+  expected tools. After the full restore/sync they also run the
   **Tier 2 language smoke** (`tests/nvim/lsp_smoke.lua`, gated on
   `DOTFILES_LSP_SMOKE=strict`): against the production init it asserts every
   `treesitter_parsers` entry is one nvim-treesitter `main` supports
@@ -655,7 +662,7 @@ save only**. The next plain `:w` formats normally. Implemented in
 - **`--update` is a scoped drift-edge refresh, not a repo update.**
   `setup.sh --update` / `setup.ps1 -Update` run only `install-deps --update`
   and `nvim --headless +MasonToolsUpdate +qa`. They skip git pull, chezmoi
-  apply, Lazy sync, and Lazy update. `install-deps --update` updates only
+  apply, Lazy restore, Lazy sync, and Lazy update. `install-deps --update` updates only
   present catalog tools through scoped per-package manager commands
   (`brew upgrade <formula>`, native Linux package upgrade commands, or
   `scoop update <pkg>` after one manifest refresh). It must not run blanket
@@ -699,9 +706,9 @@ save only**. The next plain `:w` formats normally. Implemented in
   pass is not final; a failed package-manager-plus-bootstrapper pass records an
   `InstallFailures` entry so `-All` cannot report success without MSVC.
   `setup.ps1` imports the VS DevShell into the current process before headless
-  `Lazy! sync`, so `tree-sitter build` inherits `cl.exe`, `INCLUDE`, and `LIB`.
-  Do not put the DevShell import in the
-  PowerShell profile. Zig stays installed for LuaSnip `jsregexp`, but do not
+  Tree-sitter parser installation, so `tree-sitter build` inherits `cl.exe`,
+  `INCLUDE`, and `LIB`. Do not put the DevShell import in the PowerShell
+  profile. Zig stays installed for LuaSnip `jsregexp`, but do not
   wire zig into nvim-treesitter main: the old `master` branch could use it,
   while main emits MSVC-style `cc` crate flags that require MSVC. Ad-hoc
   `:TSUpdate` parser rebuilds on Windows should run from a "Developer
@@ -712,7 +719,7 @@ save only**. The next plain `:w` formats normally. Implemented in
   `require("nvim-treesitter").install` and `.indentexpr` are absent. The config
   must warn and continue registering the `FileType` autocmd that calls
   `vim.treesitter.start()`; never let parser auto-install API drift abort buffer
-  highlighting. The recovery path is `:Lazy! sync` followed by `:TSUpdate`, or
+  highlighting. The recovery path is `:Lazy! restore` followed by `:TSUpdate`, or
   rerun `setup.ps1` on Windows so VS DevShell is imported before parser builds.
 - **Regex syntax fallback is capability-driven, not a language allowlist.**
   `vim.treesitter.start()` clears the buffer-local `syntax` option. That can
@@ -1178,7 +1185,9 @@ host OS or shell would otherwise hide a branch from CI.
   `en_US.UTF-8` when `locale -a` reports it, fall back to `C.UTF-8`, and leave
   the caller's locale untouched when neither exists.
 - **`nvim/lazy-lock.json` is tracked** (NOT in `.gitignore`). This is how
-  every machine ends up on the same plugin commits.
+  every machine ends up on the same plugin commits. Setup and validation must
+  restore from it; only intentional plugin maintenance may sync/update and
+  change it.
 - **VS Build Tools for nvim-treesitter main is intentional.** It is large, but
   it is the compiler path the Rust `cc` crate expects on Windows. The existing
   zig install remains for LuaSnip `jsregexp`; it is not a substitute for

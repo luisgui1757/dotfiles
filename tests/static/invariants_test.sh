@@ -97,6 +97,17 @@ else
     echo "ok  : lazy.nvim bootstrap is lockfile-pinned"
 fi
 
+if lazy_sync_hits=$(grep -rnF '+Lazy! sync' \
+    setup.sh setup.ps1 .github/workflows/e2e-install.yml \
+    tests/greenfield/validate.sh tests/greenfield/validate.ps1 \
+    tests/nvim/spec/startup_spec.lua); then
+    echo "FAIL: setup and validation paths must use Lazy! restore, not Lazy! sync"
+    echo "$lazy_sync_hits"
+    fail=1
+else
+    echo "ok  : setup and validation paths restore lazy-lock.json instead of syncing upstream"
+fi
+
 if ! grep -q 'lazy-lock\.json' tests/nvim/minimal_init.lua \
     || ! grep -q 'locked_plugin_commit("plenary.nvim")' tests/nvim/minimal_init.lua \
     || ! grep -q '"checkout", "--detach", plenary_commit' tests/nvim/minimal_init.lua; then

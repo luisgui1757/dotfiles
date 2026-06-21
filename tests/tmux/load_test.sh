@@ -10,17 +10,20 @@ if ! command -v tmux >/dev/null 2>&1; then
 fi
 
 session_name="dotfiles-test-$$"
-sock_name="dotfiles-test-$$"
+tmux_socket_parent="${DOTFILES_TMUX_SOCKET_DIR:-/tmp}"
+tmux_socket_dir="$(mktemp -d "$tmux_socket_parent/dotfiles-tmux.XXXXXX")"
+tmux_socket="$tmux_socket_dir/socket"
 
 cleanup() {
-    tmux -L "$sock_name" kill-server >/dev/null 2>&1 || true
+    tmux -S "$tmux_socket" kill-server >/dev/null 2>&1 || true
+    rm -rf "$tmux_socket_dir"
 }
 trap cleanup EXIT
 
-tmux -L "$sock_name" -f "$REPO_ROOT/tmux/tmux.conf" \
+tmux -S "$tmux_socket" -f "$REPO_ROOT/tmux/tmux.conf" \
     new-session -d -s "$session_name" 'sleep 30'
 
-if ! tmux -L "$sock_name" has-session -t "$session_name" 2>/dev/null; then
+if ! tmux -S "$tmux_socket" has-session -t "$session_name" 2>/dev/null; then
     echo "FAIL: session did not start"
     exit 1
 fi

@@ -171,7 +171,7 @@ jobs:
           plugin_root="$HOME/.local/share/dotfiles/zsh-plugins"
           [[ -r "$plugin_root/fzf-tab/fzf-tab.plugin.zsh" ]] || fail "fzf-tab plugin file missing"
           [[ -r "$plugin_root/zsh-autosuggestions/zsh-autosuggestions.zsh" ]] || fail "zsh-autosuggestions plugin file missing"
-          run_nvim_checked lazy "+Lazy! sync" "+qa"
+          run_nvim_checked lazy "+Lazy! restore" "+qa"
           DOTFILES_TREESITTER_SYNC_INSTALL=1 run_nvim_checked treesitter -u "$repo/nvim/init.lua" -c "lua require('lazy').load({ plugins = { 'nvim-treesitter' } })" +qa
           run_nvim_checked mason "+MasonToolsInstallSync" "+qa"
           assert_mason_tool "lua-language-server" lua-language-server lua-language-server.cmd lua-language-server.exe
@@ -316,7 +316,7 @@ jobs:
           Assert-ContentEqual -Path (Join-Path $env:USERPROFILE '.tmux.windows.conf') -Expected (Join-Path $repo 'tmux\tmux.windows.conf')
           Assert-ContentEqual -Path $PROFILE -Expected (Join-Path $repo 'shells\powershell_profile.ps1')
           Assert-ContentEqual -Path (Join-Path $env:LOCALAPPDATA 'lazygit\config.yml') -Expected (Join-Path $repo 'lazygit\config.yml')
-          Invoke-NvimChecked -Name lazy -NvimArgs @('+Lazy! sync', '+qa')
+          Invoke-NvimChecked -Name lazy -NvimArgs @('+Lazy! restore', '+qa')
           $env:DOTFILES_TREESITTER_SYNC_INSTALL = '1'
           Invoke-NvimChecked -Name treesitter -NvimArgs @('-u', ((Join-Path $repo 'nvim\init.lua') -replace '\\', '/'), '-c', "lua require('lazy').load({ plugins = { 'nvim-treesitter' } })", '+qa')
           Remove-Item Env:DOTFILES_TREESITTER_SYNC_INSTALL

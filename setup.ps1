@@ -912,7 +912,7 @@ function Invoke-NvimSyncPhases {
         [bool]$IsDryRun = $DryRun,
         [scriptblock]$CommandTester = { param([string]$Name) [bool](Get-Command $Name -ErrorAction SilentlyContinue) },
         [scriptblock]$DevEnvironmentEntrypoint = { Enter-VsDeveloperEnvironment },
-        [scriptblock]$LazyRunner = { & nvim --headless "+Lazy! sync" "+qa" },
+        [scriptblock]$LazyRunner = { & nvim --headless "+Lazy! restore" "+qa" },
         [scriptblock]$TreesitterRunner = {
             $oldSyncInstall = $env:DOTFILES_TREESITTER_SYNC_INSTALL
             try {
@@ -932,8 +932,8 @@ function Invoke-NvimSyncPhases {
     if (-not $SkipNvimPhase -and -not $IsDryRun) {
         if (& $CommandTester 'nvim') {
             & $DevEnvironmentEntrypoint | Out-Null
-            Phase "Phase 3/5: sync Neovim plugins (lazy.nvim)"
-            Invoke-NvimCommandOrFail "Lazy sync" $LazyRunner
+            Phase "Phase 3/5: restore Neovim plugins (lazy.nvim)"
+            Invoke-NvimCommandOrFail "Lazy restore" $LazyRunner
 
             Phase "Phase 4/5: install Tree-sitter parsers"
             Write-Host "  this compiles nvim-treesitter parsers and can take several minutes."

@@ -2,14 +2,14 @@
 
 Cross-platform terminal and editor setup for macOS, Linux, WSL, and Windows.
 The repo owns the daily shell/editor stack: Neovim, tmux/psmux, Starship, zsh,
-PowerShell, Ghostty, lazygit, Windows Terminal theming, plugin sync, and LSP /
-formatter provisioning. It also provisions the `tree-sitter` CLI needed by
-`nvim-treesitter` main parser builds.
+PowerShell, Ghostty, lazygit, Windows Terminal theming, locked plugin restore,
+and LSP / formatter provisioning. It also provisions the `tree-sitter` CLI
+needed by `nvim-treesitter` main parser builds.
 
 The public interface is intentionally small:
 
 ```text
-run setup -> install programs -> link configs -> sync Neovim plugins -> sync Mason tools
+run setup -> install programs -> link configs -> restore Neovim plugins -> sync Mason tools
 ```
 
 For a fresh machine, run `setup`. The split is deliberate:
@@ -27,7 +27,7 @@ that edge with `./setup.sh --update` or `.\setup.ps1 -Update`.
 
 Clone the repo first, then run the local setup entry point. `setup.{sh,ps1}`
 installs repo-managed dependencies, links every config, then runs
-`:Lazy! sync`, a synchronous nvim-treesitter parser install, and
+`:Lazy! restore`, a synchronous nvim-treesitter parser install, and
 `:MasonToolsInstallSync` before the first interactive Neovim launch.
 
 Git is the only hard prerequisite for remote setup because setup needs it to
@@ -184,7 +184,7 @@ restore manually from the printed backup if you want to undo it.
 ```text
 setup -> install-deps                 phase 1: programs and optional tools
       -> chezmoi apply                phase 2: config layer with pre-apply backups
-      -> nvim "+Lazy! sync" +qa       phase 3: plugins
+      -> nvim "+Lazy! restore" +qa    phase 3: plugins from lazy-lock.json
       -> nvim +DOTFILES_TREESITTER_SYNC_INSTALL  phase 4: Tree-sitter parsers
       -> nvim "+MasonToolsInstallSync" +qa        phase 5: LSP servers and formatters
 ```
@@ -199,9 +199,9 @@ Add `--dry-run` / `-DryRun` to preview every step without touching disk.
 Pass `--update` / `-Update` from an existing checkout to run only the
 drift-edge refresh: scoped package-manager updates for present catalog tools,
 then `nvim --headless +MasonToolsUpdate +qa`. It deliberately skips `git pull`,
-`chezmoi apply`, `:Lazy sync`, synchronous Tree-sitter parser bootstrap, and
-`:Lazy update`; the last one changes `lazy-lock.json` and is therefore a repo
-update, not a machine refresh.
+`chezmoi apply`, `:Lazy restore`, synchronous Tree-sitter parser bootstrap,
+`:Lazy sync`, and `:Lazy update`; the last two can change `lazy-lock.json` and
+are therefore repo updates, not machine refreshes.
 
 Every script is safe to rerun. Pre-existing non-symlink targets are backed up to
 `<target>.bak.<timestamp>` with collision-proof suffixes (`.1`, `.2`, ...).
@@ -366,10 +366,11 @@ The e2e jobs cover different install paths, not symmetric container platforms:
 | `e2e containers / ubuntu-24.04` | Clean `ubuntu:24.04`, non-root user, native `apt`, no Linuxbrew (`DOTFILES_SKIP_BREW_BOOTSTRAP=1`), then `install-deps.sh --all`, chezmoi config apply, tool assertions, Neovim >= 0.12, lazygit, zsh plugin files, config content assertions, and nvim directory realpath assertion. |
 | `setup.sh / ubuntu-24.04` | Full Unix setup on the hosted Ubuntu runner. This runner has Linuxbrew available, so it proves the Linuxbrew path that users may hit. |
 | `setup.sh / macos-15` | Full macOS setup through the real macOS hosted runner and Homebrew path. Docker cannot model macOS. |
-| `setup.ps1 / windows-2025` | Full Windows setup through the real Windows hosted runner, including Scoop/winget/choco behavior, PowerShell, symlinks, and Neovim sync. Windows containers do not model the desktop/user-profile setup well. |
+| `setup.ps1 / windows-2025` | Full Windows setup through the real Windows hosted runner, including Scoop/winget/choco behavior, PowerShell, symlinks, and Neovim restore/sync phases. Windows containers do not model the desktop/user-profile setup well. |
 | `setup.sh / WSL2 Ubuntu-24.04 (best-effort canary)` | Non-required WSL smoke signal. Hosted runners cannot provide reliable nested virtualization, so this is intentionally best-effort. |
 
-After the Lazy/Tree-sitter/Mason sync, each `setup.sh`/`setup.ps1` job also
+After the Lazy restore, Tree-sitter parser install, and Mason sync, each
+`setup.sh`/`setup.ps1` job also
 runs the **Tier 2 language smoke** (`tests/nvim/lsp_smoke.lua`): against the
 real Neovim config it asserts (0) no nvim-treesitter parser override for a
 bundled language remains on the runtimepath under `stdpath('data')`, (1) every
@@ -407,9 +408,9 @@ WSL config-template coverage. Do not add the WSL2 canary to
 required checks unless the owner explicitly accepts the flake risk.
 
 These e2e jobs fail if setup skips Phase 3-5, emits a precise `FAIL:` marker,
-installs Neovim below 0.12, Lazy/Tree-sitter/Mason headless sync exits nonzero,
-or expected Mason-installed binaries are missing. They do not blanket-fail on
-benign warning/deprecation text.
+installs Neovim below 0.12, Lazy restore / Tree-sitter parser install / Mason
+sync exits nonzero, or expected Mason-installed binaries are missing. They do
+not blanket-fail on benign warning/deprecation text.
 
 ## Repository Safeguards
 
@@ -636,6 +637,10 @@ nvim --headless "+Lazy! sync" +qa
 git add nvim/lazy-lock.json   # tracked, not gitignored
 ```
 
+Setup and validation use `Lazy! restore` instead. Run `Lazy! sync` only when
+you intentionally want to refresh plugin pins and review the resulting lockfile
+diff.
+
 ### Updating Mason tools across machines
 
 ```bash
@@ -648,7 +653,7 @@ Run on each machine; there's no machine-pinned lockfile for Mason itself.
 
 ```bash
 git -C ~/dotfiles pull          # sync configs
-nvim --headless "+Lazy! sync" +qa     # match plugin commits
+nvim --headless "+Lazy! restore" +qa  # match plugin commits
 make test                       # verify the new state
 ```
 
@@ -663,7 +668,7 @@ MIT. See `LICENSE`.
 | `<leader>X` keymaps fire `\X` instead of `<Space>X` | mapleader set after lazy.setup somehow | restore the order in `nvim/init.lua` — leader **before** `require("lazy").setup` |
 | Formatter runs twice or shows two BufWritePre autocmds | someone added a second handler outside conform.nvim | `:lua print(#vim.api.nvim_get_autocmds({event="BufWritePre"}))` should be 1; if not, find the second autocmd and delete it |
 | Lazy/Tree-sitter/Mason says `No C compiler found` | WSL/Linux has `make` but no `cc`/`gcc`/`clang`; Tree-sitter parsers and some plugin builds compile native code | re-run `./setup.sh --skip-config` to install the Linux compiler toolchain, or on Ubuntu run `sudo apt-get update && sudo apt-get install -y build-essential`, then `./setup.sh --skip-deps --skip-config` |
-| nvim treesitter parsers fail to compile on Windows / `cl.exe` not found | `nvim-treesitter` main builds parsers with the Rust `cc` crate, which needs MSVC env vars | run `.\setup.ps1 -All` to install VS Build Tools and let setup import the VS DevShell before `Lazy! sync`; for ad-hoc `:TSUpdate`, open a "Developer PowerShell for VS" or rerun setup |
+| nvim treesitter parsers fail to compile on Windows / `cl.exe` not found | `nvim-treesitter` main builds parsers with the Rust `cc` crate, which needs MSVC env vars | run `.\setup.ps1 -All` to install VS Build Tools and let setup import the VS DevShell before parser installation; for ad-hoc `:TSUpdate`, open a "Developer PowerShell for VS" or rerun setup |
 | nvim syntax looks weak or files look plain text | Tree-sitter is inactive, or the hybrid built-in syntax fallback was not restored after Tree-sitter starts | update this repo, re-run setup, then check `:Inspect` on a token; parser-backed languages should show `treesitter` captures plus `syntax` groups, while `.bat` should show `syntax` groups |
 | Clipboard not crossing host on WSL | `win32yank.exe` not on PATH | install win32yank via scoop on Windows side, ensure WSL PATH picks it up |
 | Starship prompt missing in the PowerShell window you ran setup in (but it works in psmux / a new window) | that shell loaded `$PROFILE` **before** setup put starship on PATH; the profile skips starship when `Get-Command starship` finds nothing | open a **new** PowerShell window, or run `. $PROFILE` in the current one — newly-installed tools are not on an already-open shell's PATH |

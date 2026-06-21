@@ -32,14 +32,14 @@ ENOENT: no such file or directory (cmd): 'tree-sitter'`. The hypothesis to test 
 
 ## 2. The toolchain map (per-OS), with file:line
 
-| OS | `tree-sitter` CLI | C compiler (cc crate) | On PATH for the headless sync via |
+| OS | `tree-sitter` CLI | C compiler (cc crate) | On PATH for the headless setup via |
 |---|---|---|---|
 | **macOS** | `brew install tree-sitter-cli` — the logical tool remains `tree-sitter`, but the Homebrew formula is `tree-sitter-cli` because `tree-sitter` no longer ships the CLI binary | cc/clang from Xcode CLT | `setup.sh` `refresh_runtime_path` runs `eval "$(brew shellenv)"` → `/opt/homebrew/bin` (ARM) / `/usr/local/bin` (Intel) |
 | **Linux/WSL** | pinned GitHub release binary, SHA-256 verified, into `~/.local/bin` — `install_tree_sitter_cli_linux` (`install-deps.sh:1048`), constants `TREE_SITTER_CLI_LINUX_*` (`:29-31`). Alpine → `apk` (`:1147`) | `build-essential`/`gcc` (`install-deps.sh:1583-1599`) | `refresh_runtime_path` adds `$HOME/.local/bin` |
 | **Windows** | scoop `tree-sitter` (catalog `:258`) via `Install-TreeSitterCli` (`install-deps.ps1:1290`); **npm `tree-sitter-cli` fallback** (`:1314`) records a FAIL marker if npm is missing (`:1310`) | **MSVC / VS Build Tools (VCTools)** — `Install-VsBuildTools` (`install-deps.ps1:1354`), `Install-VsBuildToolsWhenAll` (`:1397`, called `:1571`) | `setup.ps1` `Enter-VsDeveloperEnvironment` (`:89`) imports the VS DevShell before `Invoke-NvimSyncPhases` (`:869`, called `:1017`) so `cl.exe` resolves |
 
 setup.sh phase order is now: Phase 1 `install-deps.sh` → `refresh_runtime_path` →
-Phase 2 chezmoi → **Phase 3 `nvim --headless +Lazy! sync`** → **Phase 4
+Phase 2 chezmoi → **Phase 3 `nvim --headless +Lazy! restore`** → **Phase 4
 `DOTFILES_TREESITTER_SYNC_INSTALL=1 nvim ... require('lazy').load({ plugins =
 { 'nvim-treesitter' } })`** → Phase 5 Mason. Phase 4 is the explicit proof path:
 it blocks on `install(...):wait(...)` and fails unless the waitable task reports
@@ -61,7 +61,7 @@ nvim attempted parser compilation (interactively, or via Lazy auto-sync on first
 launch) in a moment when `/opt/homebrew/bin` was not yet on that process's PATH —
 e.g. an nvim launched before the install finished, or before a fresh login shell
 sourced `brew shellenv`. A clean `./setup.sh` avoids it because `refresh_runtime_path`
-(`:384`) puts the brew bin on PATH before the Phase 3 headless sync.
+(`:384`) puts the brew bin on PATH before the Phase 4 parser install.
 
 Why it was confusing rather than catastrophic: nvim-treesitter `main` emits one ENOENT
 **per parser** (~10 lines) instead of a single "CLI missing" message.
@@ -112,10 +112,10 @@ source before treating any line as still open.
    `$script:InstallFailures`. A macOS user could end up with no CLI and a green-looking
    setup. Candidate: a post-install verification (`have tree-sitter` after
    `install_tree_sitter_cli` on brew) that emits a FAIL marker, mirroring the other OSes.
-2. **No pre-Phase-3 PATH assertion.** setup.sh does not assert `tree-sitter` is on PATH
-   before the Phase 3 headless sync. Candidate: a guard in setup.sh that, when nvim is on
-   PATH but `tree-sitter` is not, emits a clear FAIL/skip instead of letting the sync dump
-   the ENOENT spam.
+2. **No pre-Phase-4 PATH assertion.** setup.sh does not assert `tree-sitter` is on PATH
+   before the Phase 4 parser install. Candidate: a guard in setup.sh that, when nvim is on
+   PATH but `tree-sitter` is not, emits a clear FAIL/skip instead of letting the parser
+   install dump the ENOENT spam.
 3. **Async compile vs `+qa`.** Superseded for the dedicated parser phase: Phase 4
    sets `DOTFILES_TREESITTER_SYNC_INSTALL=1`, waits on the install task, and treats
    a non-`true` result as failure. Lazy's own `build = ":TSUpdate"` remains a plugin

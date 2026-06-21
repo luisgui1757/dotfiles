@@ -257,7 +257,7 @@ return {
             report_install_problem(
               "nvim-treesitter parser auto-install failed: "
                 .. tostring(task_or_err)
-                .. ". Run :Lazy! sync and :TSUpdate after the toolchain is fixed."
+                .. ". Run :Lazy! restore and :TSUpdate after the toolchain is fixed."
             )
           elseif sync_install then
             if type(task_or_err) ~= "table" or type(task_or_err.wait) ~= "function" then
@@ -276,10 +276,10 @@ return {
           -- frozen master branch even after this repo moved to the main rewrite.
           -- That branch lacks require("nvim-treesitter").install. Do not let the
           -- installer API mismatch abort the FileType autocmd below; existing
-          -- parsers can still highlight buffers while :Lazy! sync repairs the
+          -- parsers can still highlight buffers while :Lazy! restore repairs the
           -- plugin checkout.
           report_install_problem(
-            "nvim-treesitter main API is missing; run :Lazy! sync, then :TSUpdate. "
+            "nvim-treesitter main API is missing; run :Lazy! restore, then :TSUpdate. "
               .. "Existing parsers will still be started when available."
           )
         end

@@ -303,7 +303,7 @@ main() {
     assert_posix_managed_configs
     assert_zsh_plugins
     assert_chezmoi_verify
-    run_nvim_checked lazy "+Lazy! sync" "+qa"
+    run_nvim_checked lazy "+Lazy! restore" "+qa"
     DOTFILES_TREESITTER_SYNC_INSTALL=1 run_nvim_checked treesitter -u "$REPO_ROOT/nvim/init.lua" -c "lua require('lazy').load({ plugins = { 'nvim-treesitter' } })" +qa
     run_nvim_checked mason "+MasonToolsInstallSync" "+qa"
     assert_mason_tool "lua-language-server" lua-language-server lua-language-server.cmd lua-language-server.exe

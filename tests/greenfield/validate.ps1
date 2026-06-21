@@ -278,7 +278,7 @@ Assert-ContentEqual -Path (Join-Path $env:LOCALAPPDATA 'lazygit\config.yml') -Ex
 Assert-WindowsTerminalPortableSettings
 
 Assert-ChezmoiVerify
-Invoke-NvimChecked -Name lazy -NvimArgs @('+Lazy! sync', '+qa')
+Invoke-NvimChecked -Name lazy -NvimArgs @('+Lazy! restore', '+qa')
 $oldTreeSitterSyncInstall = $env:DOTFILES_TREESITTER_SYNC_INSTALL
 try {
     $env:DOTFILES_TREESITTER_SYNC_INSTALL = '1'

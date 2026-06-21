@@ -43,11 +43,11 @@ chmod +x "$TMP_ROOT/brewbin/brew" "$TMP_ROOT/home/.linuxbrew/bin/nvim"
 
 output="$(HOME="$TMP_ROOT/home" SETUP_TEST_ROOT="$TMP_ROOT" PATH="$TMP_ROOT/brewbin:/usr/bin:/bin" bash "$TMP_ROOT/setup.sh" --skip-bootstrap </dev/null)"
 
-[[ "$output" == *"Phase 3/5: sync Neovim plugins"* ]]
+[[ "$output" == *"Phase 3/5: restore Neovim plugins"* ]]
 [[ "$output" == *"Phase 4/5: install Tree-sitter parsers"* ]]
 [[ "$output" == *"Phase 5/5: install LSP servers + formatters"* ]]
 [[ "$output" != *"nvim not on PATH yet"* ]]
-grep -F -- "--headless +Lazy! sync +qa" "$TMP_ROOT/nvim.log" >/dev/null
+grep -F -- "--headless +Lazy! restore +qa" "$TMP_ROOT/nvim.log" >/dev/null
 grep -F -- "DOTFILES_TREESITTER_SYNC_INSTALL=1" "$TMP_ROOT/nvim.log" >/dev/null
 grep -F -- "--headless +lua require('lazy').load({ plugins = { 'nvim-treesitter' } }) +qa" "$TMP_ROOT/nvim.log" >/dev/null
 grep -F -- "--headless +MasonToolsInstallSync +qa" "$TMP_ROOT/nvim.log" >/dev/null
