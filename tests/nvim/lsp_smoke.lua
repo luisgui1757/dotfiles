@@ -215,48 +215,7 @@ local ok, err = pcall(function()
     return false
   end
 
-  -- (2) Matrix fixture runtime sanity. Parser support in gate 1 proves
-  -- nvim-treesitter advertises the parser; synchronous bootstrap above proves
-  -- setup can build it; opening every fixture under the real production init and
-  -- checking captures proves the config can actually highlight that filetype.
-  -- This covers parser-backed rows with no LSP, which the LSP attach gate below
-  -- intentionally skips.
-  for _, row in ipairs(matrix) do
-    local open_ok, open_err = pcall(vim.cmd.edit, vim.fn.fnameescape(fixtures .. row.fixture))
-    if not open_ok then
-      fail(
-        row.fixture .. ": open raised in matrix runtime gate: " .. (tostring(open_err):match("([^\r\n]+)") or "error")
-      )
-    elseif vim.bo.filetype ~= row.filetype then
-      fail(
-        row.fixture
-          .. ": expected filetype "
-          .. row.filetype
-          .. " in matrix runtime gate, got "
-          .. tostring(vim.bo.filetype)
-      )
-    elseif row.parser then
-      vim.wait(1000, function()
-        return has_treesitter_capture(0)
-      end, 50)
-      if has_treesitter_capture(0) then
-        note(row.fixture .. ": opens as " .. row.filetype .. " with Tree-sitter captures")
-      else
-        fail(row.fixture .. ": opened as " .. row.filetype .. " but no Tree-sitter captures were reported")
-      end
-    else
-      note(row.fixture .. ": opens as " .. row.filetype)
-    end
-    pcall(vim.cmd, "silent! bwipeout!")
-  end
-
-  -- The parser/capture gate above opens every fixture under the real production
-  -- config, so FileType-driven LSPs may start as collateral. Stop them before
-  -- the attach gate so each LSP row measures a fresh, deliberate attach and so
-  -- unrelated background servers cannot keep headless nvim alive.
-  stop_all_lsp_clients()
-
-  -- (3) LSP attach. Non-gated servers must attach on every OS. powershell_es is
+  -- (2) LSP attach. Non-gated servers must attach on every OS. powershell_es is
   -- a Windows target (lsp-config enables it only with pwsh + the PSES bundle):
   -- enforce it only on Windows, and skip cleanly elsewhere -- a legitimately
   -- absent runtime is never a failure, even under strict. This is what keeps the
@@ -327,6 +286,44 @@ local ok, err = pcall(function()
         stop_all_lsp_clients()
       end
     end
+  end
+
+  -- (3) Matrix fixture runtime sanity. Parser support in gate 1 proves
+  -- nvim-treesitter advertises the parser; synchronous bootstrap above proves
+  -- setup can build it; opening every fixture under the real production init and
+  -- checking captures proves the config can actually highlight that filetype.
+  -- This covers parser-backed rows with no LSP, which the LSP attach gate above
+  -- intentionally skips. Keep this AFTER the explicit LSP attach gate: opening
+  -- every fixture under the production config can start LSPs as collateral, and
+  -- force-stopping those collateral clients before their dedicated attach checks
+  -- races some servers on slower CI hosts.
+  for _, row in ipairs(matrix) do
+    local open_ok, open_err = pcall(vim.cmd.edit, vim.fn.fnameescape(fixtures .. row.fixture))
+    if not open_ok then
+      fail(
+        row.fixture .. ": open raised in matrix runtime gate: " .. (tostring(open_err):match("([^\r\n]+)") or "error")
+      )
+    elseif vim.bo.filetype ~= row.filetype then
+      fail(
+        row.fixture
+          .. ": expected filetype "
+          .. row.filetype
+          .. " in matrix runtime gate, got "
+          .. tostring(vim.bo.filetype)
+      )
+    elseif row.parser then
+      vim.wait(1000, function()
+        return has_treesitter_capture(0)
+      end, 50)
+      if has_treesitter_capture(0) then
+        note(row.fixture .. ": opens as " .. row.filetype .. " with Tree-sitter captures")
+      else
+        fail(row.fixture .. ": opened as " .. row.filetype .. " but no Tree-sitter captures were reported")
+      end
+    else
+      note(row.fixture .. ": opens as " .. row.filetype)
+    end
+    pcall(vim.cmd, "silent! bwipeout!")
   end
 
   -- (4) indentexpr preservation for the auto-started bundled filetypes. Removing

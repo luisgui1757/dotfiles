@@ -441,10 +441,14 @@ install paths, not symmetric container platforms:
   (`get_available()`/`get_available(4)` — the jsonc "unsupported language"
   catcher), synchronously bootstraps parser installs with the upstream waitable
   install task and requires it to return exactly `true`, rejects unexpected
-  install-output parser `.so` files under `stdpath('data')/site/parser`, opens
-  every language-matrix fixture, requires real Tree-sitter captures for
-  parser-backed rows, proves syntax-only fallback rows have real Vim syntax
-  groups, and asserts that each fixture's LSP attaches.
+  install-output parser `.so` files under `stdpath('data')/site/parser`, asserts
+  each fixture's LSP attaches, then opens every language-matrix fixture,
+  requires real Tree-sitter captures for parser-backed rows, and proves
+  syntax-only fallback rows have real Vim syntax groups. Keep the LSP attach
+  gate before the broad fixture-open gate; opening every fixture under the
+  production config can start LSPs as collateral, and force-stopping those
+  collateral clients before their dedicated attach checks races some servers on
+  slower CI hosts.
   Non-gated servers are strict on every OS; `powershell_es` is
   enforced only on Windows (pwsh + the PSES bundle) and skips cleanly on Unix.
   The fast `make test-nvim` runs Tier 1 only
