@@ -29,16 +29,14 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\greenfield\valid
 
 The default mode mirrors the e2e post-install assertions: required tools on
 `PATH`, Neovim >= 0.12, managed config paths matching the repo, zsh plugin
-externals on POSIX, `chezmoi verify`, Lazy sync, Mason sync, and Mason binaries
-for `lua-language-server` and `stylua`.
+externals on POSIX, `chezmoi verify`, Lazy restore, synchronous Tree-sitter parser
+bootstrap, Mason sync, and Mason binaries for `lua-language-server` and
+`stylua`.
 
-Caveat: the default mode runs a real `Lazy! sync`, which writes
-`nvim/lazy-lock.json` THROUGH the managed `~/.config/nvim` symlink. In a real
-greenfield run that symlink points at a repo COPY (the sandbox/VM/distro clone),
-so this is harmless. But if you run the full validator on your own machine
-against a HOME whose nvim symlinks into your LIVE checkout, the sync can bump the
-lockfile in that checkout — use a throwaway clone, or `--config-only` (which
-skips Lazy/Mason), to avoid an accidental plugin-pin change.
+The default mode runs `Lazy! restore`, not `Lazy! sync`, so it proves the
+committed `nvim/lazy-lock.json` without rewriting plugin pins through the
+managed `~/.config/nvim` symlink. Use `--config-only` when you only need a
+temp-HOME config-layer proof and want to skip Lazy/Tree-sitter/Mason entirely.
 
 For a temp-HOME config-layer proof, use `--config-only`; this skips tool,
 external clone, Lazy, and Mason checks that require a full setup:
@@ -79,6 +77,12 @@ runs `setup.ps1 -All`, rejects nonzero exit codes and `FAIL:` markers, runs
 `validate.ps1`, and leaves logs on the sandbox desktop. That single UAC prompt is
 the only thing you click.
 
+Supply-chain boundary: the `.wsb` `LogonCommand` intentionally downloads and
+executes the selected ref's `sandbox-bootstrap.ps1` from GitHub because it must
+be self-contained and run inside a disposable Windows Sandbox. This is a manual
+greenfield trust root, not a production setup recommendation; public setup docs
+use `git clone` plus local `setup`.
+
 Windows Sandbox starts with no winget and no Scoop. That is intentional: it
 exercises the real Scoop-first bootstrap path. The `setup.ps1` Scoop path does
 not require admin. Windows Terminal still cannot be registered as MSIX in
@@ -87,10 +91,13 @@ seeds or merges the Rose Pine + Hack Nerd Font settings into the portable
 (unpackaged) WT settings path; the greenfield portable helper remains as an
 idempotent safety net.
 
-To test a different branch, change the ref in the `windows-sandbox.wsb`
-`LogonCommand` URL (it points at `chezmoi-pilot`). The Neovim directory symlink
-needs Developer Mode, which the bootstrap enables via that one UAC prompt; if you
-decline it, enable Developer Mode manually (Settings -> Privacy & security -> For
+By default the Sandbox downloads `main`. To test a PR or branch, edit
+`windows-sandbox.wsb` and change the `-Ref 'main'` argument in the
+`LogonCommand` to the branch name. If the PR changes the bootstrap script
+itself, also change the raw GitHub URL branch segment so the Sandbox runs that
+version of `sandbox-bootstrap.ps1`. The Neovim directory symlink needs Developer
+Mode, which the bootstrap enables via that one UAC prompt; if you decline it,
+enable Developer Mode manually (Settings -> Privacy & security -> For
 developers) and re-run `cd $env:USERPROFILE\dotfiles; .\setup.ps1 -SkipDeps`.
 
 Fallbacks:
@@ -176,6 +183,10 @@ VMware Fusion, clone the repo, then run the same `--current-home` command. If no
 local VM is available, rely on the `setup.sh / macos-15` GitHub-hosted e2e job.
 
 ## Manual visual checklist
+
+Record completed clean-machine and visual runs in [LEDGER.md](LEDGER.md). Keep
+scripted validation and manual observations separate; do not mark a visual
+surface as checked unless it was inspected on a real desktop.
 
 Run these after the automated greenfield checks on a real desktop:
 

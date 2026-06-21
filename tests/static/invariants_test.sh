@@ -97,6 +97,17 @@ else
     echo "ok  : lazy.nvim bootstrap is lockfile-pinned"
 fi
 
+if lazy_sync_hits=$(grep -rnF '+Lazy! sync' \
+    setup.sh setup.ps1 .github/workflows/e2e-install.yml \
+    tests/greenfield/validate.sh tests/greenfield/validate.ps1 \
+    tests/nvim/spec/startup_spec.lua); then
+    echo "FAIL: setup and validation paths must use Lazy! restore, not Lazy! sync"
+    echo "$lazy_sync_hits"
+    fail=1
+else
+    echo "ok  : setup and validation paths restore lazy-lock.json instead of syncing upstream"
+fi
+
 if ! grep -q 'lazy-lock\.json' tests/nvim/minimal_init.lua \
     || ! grep -q 'locked_plugin_commit("plenary.nvim")' tests/nvim/minimal_init.lua \
     || ! grep -q '"checkout", "--detach", plenary_commit' tests/nvim/minimal_init.lua; then
@@ -106,11 +117,56 @@ else
     echo "ok  : plenary test harness is lockfile-pinned"
 fi
 
+if ! grep -Fq -- "-path './tests/.cache'" tests/static/editorconfig_check.sh \
+    || ! grep -Fq -- "! -name '.DS_Store'" tests/static/editorconfig_check.sh \
+    || ! grep -Fq "editorconfig-checker \"\$file\"" tests/static/editorconfig_check.sh; then
+    echo "FAIL: editorconfig_check.sh must feed editorconfig-checker a pruned file list excluding generated tests/.cache and OS metadata content"
+    fail=1
+elif find . \
+    \( -path './.git' -o -path './.claude' -o -path './tests/.cache' -o -path './home' \) -prune -o \
+    -type f \
+    ! -name '.DS_Store' \
+    ! -path './nvim/lazy-lock.json' \
+    -print |
+    grep -Fqx './tests/.cache/plenary.nvim/README.md'; then
+    echo "FAIL: editorconfig_check.sh file-list pruning still includes generated tests/.cache content"
+    fail=1
+else
+    echo "ok  : editorconfig_check.sh excludes generated tests/.cache and OS metadata content"
+fi
+
+if grep -Eq '^[[:space:]]*end_of_line[[:space:]]*=[[:space:]]*crlf' .editorconfig; then
+    echo "FAIL: .editorconfig must not request CRLF; .gitattributes intentionally keeps repo text LF-only"
+    fail=1
+elif awk '$0 !~ /^[[:space:]]*#/ && $0 ~ /eol=crlf/ { found = 1 } END { exit(found ? 0 : 1) }' .gitattributes; then
+    echo "FAIL: .gitattributes must not add CRLF overrides; repo text stays LF-only across platforms"
+    fail=1
+elif ! git check-attr eol text -- tests/nvim/fixtures/sample.bat tests/.cache/attr-probe.cmd |
+    grep -Fqx 'tests/nvim/fixtures/sample.bat: eol: lf' ||
+    ! git check-attr eol text -- tests/nvim/fixtures/sample.bat tests/.cache/attr-probe.cmd |
+        grep -Fqx 'tests/nvim/fixtures/sample.bat: text: set' ||
+    ! git check-attr eol text -- tests/nvim/fixtures/sample.bat tests/.cache/attr-probe.cmd |
+        grep -Fqx 'tests/.cache/attr-probe.cmd: eol: lf' ||
+    ! git check-attr eol text -- tests/nvim/fixtures/sample.bat tests/.cache/attr-probe.cmd |
+        grep -Fqx 'tests/.cache/attr-probe.cmd: text: set'; then
+    echo "FAIL: .gitattributes must explicitly enforce LF text checkout for .bat and .cmd files"
+    fail=1
+else
+    echo "ok  : repo text line endings stay LF-only across EditorConfig and Git attributes"
+fi
+
 if ! grep -Fq '.\test.ps1' .github/workflows/test.yml; then
     echo "FAIL: Windows CI must use the repo-local test.ps1 entry point"
     fail=1
 else
     echo "ok  : Windows CI uses test.ps1"
+fi
+
+if ! grep -Fq "Join-Path \$repo 'lazygit\config.windows.yml'" .github/workflows/e2e-install.yml; then
+    echo "FAIL: Windows e2e must assert native lazygit config.windows.yml, not the POSIX/default config"
+    fail=1
+else
+    echo "ok  : Windows e2e asserts the native lazygit config variant"
 fi
 
 if [[ ! -f AGENTS.md ]] || ! grep -q 'CLAUDE.md' AGENTS.md; then

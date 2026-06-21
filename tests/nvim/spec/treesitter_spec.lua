@@ -31,10 +31,91 @@ describe("treesitter main migration", function()
     "python",
     "rust",
     "bash",
+    "zsh",
     "powershell",
+    "javascript",
+    "typescript",
+    "tsx",
+    "html",
+    "css",
+    "scss",
+    "vue",
+    "svelte",
+    "astro",
+    "graphql",
     "json",
+    "json5",
     "yaml",
     "toml",
+    "xml",
+    "razor",
+    "csv",
+    "dockerfile",
+    "hcl",
+    "terraform",
+    "make",
+    "http",
+    "sql",
+    "proto",
+    "prisma",
+    "nix",
+    "ini",
+    "editorconfig",
+    "git_config",
+    "git_rebase",
+    "gitignore",
+    "ssh_config",
+    "requirements",
+    "fish",
+    "nu",
+    "just",
+    "meson",
+    "ninja",
+    "nginx",
+    "jq",
+    "kdl",
+    "desktop",
+    "latex",
+    "bibtex",
+    "typst",
+    "mermaid",
+    "glsl",
+    "wgsl",
+    "ron",
+    "go",
+    "gomod",
+    "gosum",
+    "gowork",
+    "c_sharp",
+    "fsharp",
+    "java",
+    "kotlin",
+    "scala",
+    "php",
+    "ruby",
+    "perl",
+    "swift",
+    "zig",
+    "asm",
+    "nasm",
+    "dart",
+    "elixir",
+    "erlang",
+    "clojure",
+    "haskell",
+    "ocaml",
+    "r",
+    "solidity",
+    "julia",
+    "fortran",
+    "pascal",
+    "ada",
+    "groovy",
+    "matlab",
+    "gleam",
+    "qmljs",
+    "bicep",
+    "earthfile",
     "diff",
     "gitcommit",
   }
@@ -106,9 +187,73 @@ describe("treesitter main migration", function()
 
   it("installs parsers with the main API", function()
     assert.is_truthy(
-      src:match('require%("nvim%-treesitter"%)') and src:match("nvim_treesitter%.install%(treesitter_parsers%)"),
+      src:match('require%("nvim%-treesitter"%)') and src:match('type%(nvim_treesitter%.install%)%s*==%s*"function"'),
       "main branch must use require('nvim-treesitter').install(...)"
     )
+    assert.is_truthy(
+      src:match("pcall%(nvim_treesitter%.install, treesitter_parsers%)"),
+      "parser auto-install must not abort highlighting setup when the install API drifts"
+    )
+    assert.is_truthy(
+      src:match("DOTFILES_TREESITTER_SYNC_INSTALL"),
+      "setup/CI must be able to force synchronous parser bootstrap"
+    )
+    assert.is_truthy(
+      src:match('type%(task_or_err%.wait%)%s*~=%s*"function"')
+        and src:match("local install_ok = task_or_err:wait%(300000%)"),
+      "synchronous parser bootstrap must require and wait on nvim-treesitter's install task"
+    )
+    assert.is_truthy(
+      src:match("if install_ok ~= true then%s*report_install_problem"),
+      "synchronous parser bootstrap must fail when the waitable install task reports false"
+    )
+    assert.is_truthy(
+      src:match("report_install_problem") and src:match("if sync_install then%s*error"),
+      "synchronous parser bootstrap must fail nvim instead of warning when install cannot be proven"
+    )
+  end)
+
+  it("errors in sync mode when the waitable parser install task reports false", function()
+    local old_tree_sitter = package.loaded["nvim-treesitter"]
+    local old_sync = vim.env.DOTFILES_TREESITTER_SYNC_INSTALL
+    local old_notify = vim.notify
+    local old_executable = vim.fn.executable
+    package.loaded["nvim-treesitter"] = {
+      install = function()
+        return {
+          wait = function()
+            return false
+          end,
+        }
+      end,
+      indentexpr = function()
+        return 0
+      end,
+    }
+    vim.env.DOTFILES_TREESITTER_SYNC_INSTALL = "1"
+    vim.notify = function() end
+    vim.fn.executable = function(name)
+      if name == "tree-sitter" then
+        return 1
+      end
+      return old_executable(name)
+    end
+
+    local ok, spec = pcall(dofile, repo_root .. "/nvim/lua/plugins/treesitter.lua")
+    assert.is_true(ok)
+    local config_ok, config_err = pcall(spec[1].config)
+
+    package.loaded["nvim-treesitter"] = old_tree_sitter
+    if old_sync == nil then
+      vim.env.DOTFILES_TREESITTER_SYNC_INSTALL = nil
+    else
+      vim.env.DOTFILES_TREESITTER_SYNC_INSTALL = old_sync
+    end
+    vim.notify = old_notify
+    vim.fn.executable = old_executable
+
+    assert.is_false(config_ok)
+    assert.matches("parser install failed", tostring(config_err), nil, true)
   end)
 
   it("guards parser compilation on the tree-sitter CLI being on PATH", function()
@@ -134,13 +279,64 @@ describe("treesitter main migration", function()
   it("registers highlighting before FileType fires on real file opens", function()
     assert.is_truthy(src:match('event%s*=%s*%{ "BufReadPre", "BufNewFile" %}'), "must load before FileType")
     assert.is_truthy(src:match('nvim_create_autocmd%("FileType"'), "must create a FileType autocmd")
-    assert.is_truthy(src:match("pattern%s*=%s*treesitter_filetypes"), "FileType autocmd must be scoped")
+    assert.is_truthy(src:match('pattern%s*=%s*"%*"'), "FileType autocmd must inspect every detected filetype")
+    assert.is_truthy(
+      src:match("if treesitter_filetype_set%[filetype%] then"),
+      "only parser-backed filetypes should start Tree-sitter"
+    )
     assert.is_truthy(src:match("pcall%(vim%.treesitter%.start, args%.buf%)"), "missing parsers must not error")
+  end)
+
+  it("keeps regex syntax fallback by runtime capability, not a language allowlist", function()
+    assert.is_nil(
+      src:match("regex_syntax_fallback_filetypes"),
+      "do not reintroduce a per-language syntax fallback table"
+    )
+    assert.is_truthy(src:match("runtime_syntax_for_filetype"), "must derive fallback syntax from runtime capability")
+    assert.is_truthy(
+      src:match('nvim_get_runtime_file%("syntax/" %.%. filetype %.%. "%.vim", false%)'),
+      "fallback must check whether Neovim actually has syntax/<filetype>.vim"
+    )
+    assert.is_truthy(
+      src:match("local syntax = runtime_syntax_for_filetype%(args%.buf, filetype%)"),
+      "FileType callback must capture syntax before vim.treesitter.start() can clear it"
+    )
+    assert.is_truthy(
+      src:match("vim%.bo%[args%.buf%]%.syntax%s*=%s*syntax"),
+      "FileType callback must restore syntax fallback after vim.treesitter.start() clears it"
+    )
+    local installed = {}
+    for _, parser in ipairs(extract_string_list("treesitter_parsers")) do
+      installed[parser] = true
+    end
+    assert.is_nil(installed.dosbatch, "dosbatch has no pinned nvim-treesitter parser; keep it syntax-only")
   end)
 
   it("registers filetype aliases for parsers whose names differ from Neovim filetypes", function()
     assert.is_truthy(src:match('bash%s*=%s*%{ "sh" %}'), "sh files should use the bash parser")
+    assert.is_truthy(src:match('bibtex%s*=%s*%{ "bib" %}'), "bib files should use the bibtex parser")
+    assert.is_truthy(src:match('c_sharp%s*=%s*%{ "cs" %}'), "cs files should use the c_sharp parser")
+    assert.is_truthy(
+      src:match('git_config%s*=%s*%{ "gitconfig" %}'),
+      "gitconfig files should use the git_config parser"
+    )
+    assert.is_truthy(
+      src:match('git_rebase%s*=%s*%{ "gitrebase" %}'),
+      "gitrebase files should use the git_rebase parser"
+    )
+    assert.is_truthy(src:match('ini%s*=%s*%{ "dosini" %}'), "dosini files should use the ini parser")
+    assert.is_truthy(
+      src:match('javascript%s*=%s*%{ "javascriptreact" %}'),
+      "jsx files should use the javascript parser"
+    )
+    assert.is_truthy(src:match('latex%s*=%s*%{ "plaintex", "tex" %}'), "tex/plaintex files should use the latex parser")
     assert.is_truthy(src:match('powershell%s*=%s*%{ "ps1" %}'), "ps1 files should use the powershell parser")
+    assert.is_truthy(src:match('qmljs%s*=%s*%{ "qml" %}'), "qml files should use the qmljs parser")
+    assert.is_truthy(
+      src:match('ssh_config%s*=%s*%{ "sshconfig" %}'),
+      "sshconfig files should use the ssh_config parser"
+    )
+    assert.is_truthy(src:match('tsx%s*=%s*%{ "typescriptreact" %}'), "tsx files should use the tsx parser")
     -- No vimdoc={help} alias: vimdoc is Neovim-bundled and Neovim already maps
     -- help -> vimdoc and auto-starts it, so the repo must NOT register it.
     assert.is_nil(src:match('vimdoc%s*=%s*%{ "help" %}'), "vimdoc is nvim-bundled; do not alias help to it")
@@ -151,6 +347,10 @@ describe("treesitter main migration", function()
   end)
 
   it("uses the main-branch indentation replacement", function()
+    assert.is_truthy(
+      src:match('type%(nvim_treesitter%.indentexpr%)%s*==%s*"function"'),
+      "main indentexpr must be gated so stale plugin caches do not break buffer highlighting"
+    )
     assert.is_truthy(
       src:match([[vim%.bo%[args%.buf%]%.indentexpr%s*=%s*"v:lua%.require'nvim%-treesitter'%.indentexpr%(%)"]]),
       "legacy indent.enable should be replaced with nvim-treesitter main indentexpr"

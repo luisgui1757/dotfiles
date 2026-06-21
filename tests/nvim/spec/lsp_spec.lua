@@ -61,7 +61,7 @@ describe("LSP server coverage", function()
     assert.is_nil(code_only:match("BufWritePre"), "format-on-save belongs in conform.nvim, not here")
   end)
 
-  -- setup.{sh,ps1} run `nvim --headless +MasonToolsInstallSync` (phase 4) and
+  -- setup.{sh,ps1} run `nvim --headless +MasonToolsInstallSync` (phase 5) and
   -- CLAUDE.md runs `+MasonToolsUpdate`. mason-tool-installer is event=VeryLazy,
   -- which never fires without a UI, so each command MUST also be a lazy `cmd`
   -- load-trigger or the headless invocation dies with "E492: Not an editor

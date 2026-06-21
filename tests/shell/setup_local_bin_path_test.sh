@@ -16,7 +16,7 @@ mkdir -p "$HOME/.local/bin"
 DOTFILES_SETUP_SOURCE_ONLY=1 source "$REPO_ROOT/setup.sh"
 
 # F7: a normal refresh must put ~/.local/bin on PATH, so install-deps' fd-find
-# symlink (~/.local/bin/fd on apt) resolves for Phase 3-4 and fresh shells.
+# symlink (~/.local/bin/fd on apt) resolves for Phase 3-5 and fresh shells.
 DRY_RUN=0
 PATH="/usr/bin:/bin"
 refresh_runtime_path

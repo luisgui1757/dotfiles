@@ -7,8 +7,15 @@ if ! command -v editorconfig-checker >/dev/null 2>&1; then
     echo "skipped: editorconfig-checker not installed (brew install editorconfig-checker)"
     exit 0
 fi
-# Exclude generated/vendored content, local agent state, and managed chezmoi
-# copies that are byte-checked against their canonical sources by the migration
-# parity gate.
-editorconfig-checker --exclude '\\.git/|\\.claude/|home/|nvim/lazy-lock\\.json'
+# Feed editorconfig-checker an explicit pruned file list instead of relying on
+# the checker's recursive walker to apply excludes before entering generated
+# plugin caches.
+while IFS= read -r -d '' file; do
+    editorconfig-checker "$file"
+done < <(find . \
+    \( -path './.git' -o -path './.claude' -o -path './tests/.cache' -o -path './home' \) -prune -o \
+    -type f \
+    ! -name '.DS_Store' \
+    ! -path './nvim/lazy-lock.json' \
+    -print0)
 echo "OK"

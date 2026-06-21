@@ -274,6 +274,21 @@ if ((Get-Module -ListAvailable PSFzf) -and (Get-Command fzf -ErrorAction Silentl
     } catch { Write-Verbose $_.Exception.Message }
 }
 
+# ---- lsd directory listings --------------------------------------------------
+# Keep this guarded so profile startup stays silent and clean before setup has
+# provisioned lsd. The upstream shell aliases include ls/l/la/lla/lt; functions
+# are required in PowerShell because useful entries carry arguments.
+if (Get-Command lsd -ErrorAction SilentlyContinue) {
+    foreach ($name in 'ls', 'l', 'la', 'lla', 'lt') {
+        Remove-Item "Alias:$name" -ErrorAction SilentlyContinue
+    }
+    function global:ls { lsd @args }
+    function global:l { lsd -l @args }
+    function global:la { lsd -a @args }
+    function global:lla { lsd -la @args }
+    function global:lt { lsd --tree @args }
+}
+
 # ---- Directory listing color -------------------------------------------------
 # PowerShell 7.2+ colorizes Get-ChildItem/ls via $PSStyle. The default directory
 # color (bright blue) is unreadable on the Rose Pine dark background, so paint

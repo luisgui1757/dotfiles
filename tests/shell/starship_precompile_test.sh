@@ -53,12 +53,11 @@ if ! grep -Fq "$SENTINEL" "$cache"; then
     exit 1
 fi
 
-# 3) Touching the toml makes the next run regenerate the cache (sentinel
-#    must be gone).
-touch "$TMP_CONFIG"
-# Tiny sleep to ensure touch's mtime lands AFTER the cache's mtime, even
-# on filesystems with coarse-grained timestamp resolution.
+# 3) Touching the toml makes the next run regenerate the cache (sentinel must
+#    be gone). Sleep before touching so the config mtime lands AFTER the cache
+#    mtime even on filesystems with coarse-grained timestamp resolution.
 sleep 1
+touch "$TMP_CONFIG"
 run_shell
 if grep -Fq "$SENTINEL" "$cache"; then
     echo "FAIL: touching the toml did not trigger regeneration"

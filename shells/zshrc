@@ -51,9 +51,10 @@ setopt SHARE_HISTORY HIST_IGNORE_DUPS HIST_IGNORE_ALL_DUPS HIST_REDUCE_BLANKS \
        HIST_IGNORE_SPACE HIST_VERIFY EXTENDED_HISTORY
 
 # ---- zsh plugins -------------------------------------------------------------
-# setup.sh installs repo-managed pinned plugins under XDG data. Runtime uses
-# those first, then falls back to package-manager paths if a machine has not
-# run the installer yet. Source exactly one readable path per plugin.
+# setup.sh/chezmoi install repo-managed pinned plugins under this fixed root.
+# Runtime uses those first, then falls back to package-manager paths if a
+# machine has not run the installer yet. Source exactly one readable path per
+# plugin.
 _dotfiles_source_first_readable() {
   local plugin
   for plugin in "$@"; do
@@ -65,7 +66,7 @@ _dotfiles_source_first_readable() {
   return 1
 }
 
-_dotfiles_zsh_plugin_root="${XDG_DATA_HOME:-$HOME/.local/share}/dotfiles/zsh-plugins"
+_dotfiles_zsh_plugin_root="$HOME/.local/share/dotfiles/zsh-plugins"
 
 # ---- Completion: native compinit + fzf-tab fuzzy Tab menu (PowerShell-like) --
 # Tab opens an fzf-driven, fuzzy-filterable, navigable, colored picker over zsh's
@@ -168,6 +169,17 @@ if command -v fzf >/dev/null 2>&1; then
   if whence -w fzf-tab-complete >/dev/null 2>&1; then
     bindkey '^I' fzf-tab-complete
   fi
+fi
+
+# ---- lsd directory listings --------------------------------------------------
+# lsd is installed by setup where the OS package manager carries it. Keep the
+# aliases guarded so a partially provisioned shell still starts cleanly.
+if command -v lsd >/dev/null 2>&1; then
+  alias ls='lsd'
+  alias l='lsd -l'
+  alias la='lsd -a'
+  alias lla='lsd -la'
+  alias lt='lsd --tree'
 fi
 
 # Intentionally NOT rebinding Esc — it shadows the entire Meta prefix and

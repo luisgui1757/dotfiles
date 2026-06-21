@@ -17,10 +17,91 @@ local treesitter_parsers = {
   "python",
   "rust",
   "bash",
+  "zsh",
   "powershell",
+  "javascript",
+  "typescript",
+  "tsx",
+  "html",
+  "css",
+  "scss",
+  "vue",
+  "svelte",
+  "astro",
+  "graphql",
   "json",
+  "json5",
   "yaml",
   "toml",
+  "xml",
+  "razor",
+  "csv",
+  "dockerfile",
+  "hcl",
+  "terraform",
+  "make",
+  "http",
+  "sql",
+  "proto",
+  "prisma",
+  "nix",
+  "ini",
+  "editorconfig",
+  "git_config",
+  "git_rebase",
+  "gitignore",
+  "ssh_config",
+  "requirements",
+  "fish",
+  "nu",
+  "just",
+  "meson",
+  "ninja",
+  "nginx",
+  "jq",
+  "kdl",
+  "desktop",
+  "latex",
+  "bibtex",
+  "typst",
+  "mermaid",
+  "glsl",
+  "wgsl",
+  "ron",
+  "go",
+  "gomod",
+  "gosum",
+  "gowork",
+  "c_sharp",
+  "fsharp",
+  "java",
+  "kotlin",
+  "scala",
+  "php",
+  "ruby",
+  "perl",
+  "swift",
+  "zig",
+  "asm",
+  "nasm",
+  "dart",
+  "elixir",
+  "erlang",
+  "clojure",
+  "haskell",
+  "ocaml",
+  "r",
+  "solidity",
+  "julia",
+  "fortran",
+  "pascal",
+  "ada",
+  "groovy",
+  "matlab",
+  "gleam",
+  "qmljs",
+  "bicep",
+  "earthfile",
   "diff",
   "gitcommit",
 }
@@ -50,21 +131,61 @@ local nvim_bundled_parsers = { "c", "lua", "markdown", "markdown_inline", "query
 
 local parser_filetype_aliases = {
   bash = { "sh" },
+  bibtex = { "bib" },
+  c_sharp = { "cs" },
+  git_config = { "gitconfig" },
+  git_rebase = { "gitrebase" },
+  ini = { "dosini" },
+  javascript = { "javascriptreact" },
+  latex = { "plaintex", "tex" },
   powershell = { "ps1" },
+  qmljs = { "qml" },
+  ssh_config = { "sshconfig" },
+  tsx = { "typescriptreact" },
 }
 
 local treesitter_filetypes = {}
+local treesitter_filetype_set = {}
+
+local function add_unique(list, set, value)
+  if not set[value] then
+    set[value] = true
+    table.insert(list, value)
+  end
+end
+
+local function add_treesitter_filetype(filetype)
+  add_unique(treesitter_filetypes, treesitter_filetype_set, filetype)
+end
+
 for _, parser in ipairs(treesitter_parsers) do
-  table.insert(treesitter_filetypes, parser)
+  add_treesitter_filetype(parser)
   for _, filetype in ipairs(parser_filetype_aliases[parser] or {}) do
-    table.insert(treesitter_filetypes, filetype)
+    add_treesitter_filetype(filetype)
   end
 end
 for _, filetype in ipairs(nvim_bundled_started_here) do
-  table.insert(treesitter_filetypes, filetype)
+  add_treesitter_filetype(filetype)
 end
 for _, filetype in ipairs(nvim_bundled_autostarted_filetypes) do
-  table.insert(treesitter_filetypes, filetype)
+  add_treesitter_filetype(filetype)
+end
+
+local function runtime_syntax_for_filetype(buf, filetype)
+  if filetype == "" or not filetype:match("^[%w_.-]+$") then
+    return nil
+  end
+
+  local current = vim.bo[buf].syntax
+  if current ~= "" then
+    return current
+  end
+
+  if #vim.api.nvim_get_runtime_file("syntax/" .. filetype .. ".vim", false) > 0 then
+    return filetype
+  end
+
+  return nil
 end
 
 return {
@@ -76,6 +197,16 @@ return {
     event = { "BufReadPre", "BufNewFile" },
     config = function()
       local nvim_treesitter = require("nvim-treesitter")
+      local sync_install = vim.env.DOTFILES_TREESITTER_SYNC_INSTALL == "1"
+
+      local function report_install_problem(message)
+        if sync_install then
+          error(message)
+        end
+        vim.schedule(function()
+          vim.notify(message, vim.log.levels.WARN)
+        end)
+      end
 
       -- Purge any stale nvim-treesitter parser for a Neovim-bundled language.
       -- Excluding them from the install list stops FUTURE installs, but a
@@ -116,20 +247,48 @@ return {
       -- it), main emits a separate ENOENT error for EVERY parser. Guard on the
       -- CLI so a missing toolchain surfaces ONE actionable message instead of a
       -- wall of errors. setup installs it (macOS: brew; Linux/WSL: pinned
-      -- release in install-deps.sh; Windows: install-deps.ps1 -All) and re-runs
-      -- the sync with it on PATH; recompile in-session after fixing PATH with
-      -- :TSUpdate.
+      -- release in install-deps.sh; Windows: install-deps.ps1 -All) and then
+      -- forces DOTFILES_TREESITTER_SYNC_INSTALL=1 so parser installation blocks
+      -- on install(...):wait(...). Interactive sessions keep the async path.
       if vim.fn.executable("tree-sitter") == 1 then
-        nvim_treesitter.install(treesitter_parsers)
-      else
-        vim.schedule(function()
-          vim.notify(
-            "nvim-treesitter: 'tree-sitter' CLI not found on PATH; parsers were not compiled. "
-              .. "Install it (macOS: brew install tree-sitter-cli; Linux/WSL: run the dotfiles setup; "
-              .. "Windows: install-deps.ps1 -All), then run :TSUpdate.",
-            vim.log.levels.WARN
+        if type(nvim_treesitter.install) == "function" then
+          local ok, task_or_err = pcall(nvim_treesitter.install, treesitter_parsers)
+          if not ok then
+            report_install_problem(
+              "nvim-treesitter parser auto-install failed: "
+                .. tostring(task_or_err)
+                .. ". Run :Lazy! restore and :TSUpdate after the toolchain is fixed."
+            )
+          elseif sync_install then
+            if type(task_or_err) ~= "table" or type(task_or_err.wait) ~= "function" then
+              report_install_problem(
+                "nvim-treesitter install did not return a waitable task; cannot prove parser bootstrap"
+              )
+            else
+              local install_ok = task_or_err:wait(300000)
+              if install_ok ~= true then
+                report_install_problem("nvim-treesitter parser install failed; see the parser build errors above")
+              end
+            end
+          end
+        else
+          -- A stale local lazy.nvim checkout can still be on nvim-treesitter's
+          -- frozen master branch even after this repo moved to the main rewrite.
+          -- That branch lacks require("nvim-treesitter").install. Do not let the
+          -- installer API mismatch abort the FileType autocmd below; existing
+          -- parsers can still highlight buffers while :Lazy! restore repairs the
+          -- plugin checkout.
+          report_install_problem(
+            "nvim-treesitter main API is missing; run :Lazy! restore, then :TSUpdate. "
+              .. "Existing parsers will still be started when available."
           )
-        end)
+        end
+      else
+        report_install_problem(
+          "nvim-treesitter: 'tree-sitter' CLI not found on PATH; parsers were not compiled. "
+            .. "Install it (macOS: brew install tree-sitter-cli; Linux/WSL: run the dotfiles setup; "
+            .. "Windows: install-deps.ps1 -All), then run :TSUpdate."
+        )
       end
 
       for parser, filetypes in pairs(parser_filetype_aliases) do
@@ -138,13 +297,23 @@ return {
 
       vim.api.nvim_create_autocmd("FileType", {
         group = vim.api.nvim_create_augroup("DotfilesTreesitter", { clear = true }),
-        pattern = treesitter_filetypes,
+        pattern = "*",
         callback = function(args)
-          local ok = pcall(vim.treesitter.start, args.buf)
-          if ok then
+          local filetype = vim.bo[args.buf].filetype
+          local syntax = runtime_syntax_for_filetype(args.buf, filetype)
+          local ok = true
+          if treesitter_filetype_set[filetype] then
+            ok = pcall(vim.treesitter.start, args.buf)
+          end
+          if syntax then
+            vim.bo[args.buf].syntax = syntax
+          end
+          if ok and treesitter_filetype_set[filetype] then
             -- nvim-treesitter main removed the legacy indent module; use its
-            -- documented indent expression instead.
-            vim.bo[args.buf].indentexpr = "v:lua.require'nvim-treesitter'.indentexpr()"
+            -- documented indent expression instead when the main API is present.
+            if type(nvim_treesitter.indentexpr) == "function" then
+              vim.bo[args.buf].indentexpr = "v:lua.require'nvim-treesitter'.indentexpr()"
+            end
           end
         end,
       })

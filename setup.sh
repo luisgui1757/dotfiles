@@ -8,17 +8,18 @@
 #   ./setup.sh --dry-run           preview every step
 #   ./setup.sh --skip-deps         already have nvim/starship; just config+sync
 #   ./setup.sh --skip-bootstrap    back-compat alias: skip config apply
-#   ./setup.sh --skip-config       already configured; just sync plugins+LSP
-#   ./setup.sh --skip-nvim         skip nvim plugin + Mason sync
+#   ./setup.sh --skip-config       already configured; just sync nvim
+#   ./setup.sh --skip-nvim         skip nvim plugin/parser/Mason sync
 #   ./setup.sh --experimental-wsl-gui
 #                                  WSL opt-in: install/link Linux GUI terminal bits
 #
-# Remote usage (no checkout yet):
-#   curl -fsSL https://raw.githubusercontent.com/luisgui1757/dotfiles/main/setup.sh | bash -s -- --all
+# First run (no checkout yet):
+#   git clone https://github.com/luisgui1757/dotfiles.git "${DOTFILES_DEST:-$HOME/dotfiles}"
+#   cd "${DOTFILES_DEST:-$HOME/dotfiles}"
+#   ./setup.sh --all
 #
-# The remote form clones the repo to $DOTFILES_DEST (default ~/dotfiles)
-# and then re-invokes itself locally. Set DOTFILES_DEST=/some/other/path
-# in the environment if you want a different location.
+# Set DOTFILES_DEST=/some/other/path in the environment if you want a
+# different checkout location.
 
 set -euo pipefail
 
@@ -44,14 +45,16 @@ Local usage:
   ./setup.sh --dry-run           preview every step
   ./setup.sh --skip-deps         already installed; just config + sync
   ./setup.sh --skip-bootstrap    back-compat alias: skip config apply
-  ./setup.sh --skip-config       already configured; just sync plugins + LSP
-  ./setup.sh --skip-nvim         skip nvim plugin + Mason sync
+  ./setup.sh --skip-config       already configured; just sync nvim
+  ./setup.sh --skip-nvim         skip nvim plugin/parser/Mason sync
   ./setup.sh --best-effort       continue past plugin/LSP/Mason phase failures
   ./setup.sh --experimental-wsl-gui
                                 WSL opt-in: install/link Linux Ghostty + Linux fonts
 
-Remote usage:
-  curl -fsSL https://raw.githubusercontent.com/luisgui1757/dotfiles/main/setup.sh | bash -s -- --all
+First run:
+  git clone https://github.com/luisgui1757/dotfiles.git "${DOTFILES_DEST:-$HOME/dotfiles}"
+  cd "${DOTFILES_DEST:-$HOME/dotfiles}"
+  ./setup.sh --all
 EOF
 }
 
@@ -81,9 +84,9 @@ if [[ "$ALL" -eq 0 && "$DRY_RUN" -eq 0 && ! -t 0 ]]; then
 fi
 
 # ---- Locate / clone the repo -------------------------------------------------
-# When invoked via `curl | bash`, BASH_SOURCE is empty and there is no
-# script_dir. In that case we clone the repo and re-exec ourselves from
-# the clone so all downstream paths resolve correctly.
+# When run from stdin, BASH_SOURCE is empty and there is no script_dir. In that
+# case we clone the repo and re-exec ourselves from the clone so all downstream
+# paths resolve correctly.
 SCRIPT_DIR=""
 if [[ -n "${BASH_SOURCE[0]:-}" ]] && [[ -f "${BASH_SOURCE[0]:-}" ]]; then
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
@@ -392,7 +395,7 @@ fi
 
 # ---- Phase 1: dependencies ---------------------------------------------------
 if [[ "$SKIP_DEPS" -eq 0 ]]; then
-    phase "Phase 1/4: install dependencies"
+    phase "Phase 1/5: install dependencies"
     bash "$SCRIPT_DIR/install-deps.sh" ${DEPS_FLAGS[@]+"${DEPS_FLAGS[@]}"}
 else
     echo
@@ -402,7 +405,7 @@ refresh_runtime_path
 
 # ---- Phase 2: apply configs --------------------------------------------------
 if [[ "$SKIP_BOOTSTRAP" -eq 0 ]]; then
-    phase "Phase 2/4: apply configs with chezmoi"
+    phase "Phase 2/5: apply configs with chezmoi"
     if ! command -v chezmoi >/dev/null 2>&1; then
         if [[ "$DRY_RUN" -eq 1 ]]; then
             # The dogfood dry-run runs BEFORE Phase 1 installs chezmoi; preview
@@ -433,30 +436,37 @@ else
     echo "skipped: Phase 2 (config) via --skip-bootstrap/--skip-config"
 fi
 
-# ---- Phase 3: install Neovim plugins -----------------------------------------
-# ---- Phase 4: install LSP servers + formatters via Mason ---------------------
+# ---- Phase 3: restore locked Neovim plugins ----------------------------------
+# ---- Phase 4: install Tree-sitter parsers -------------------------------------
+# ---- Phase 5: install LSP servers + formatters via Mason ----------------------
 #
-# By default, Lazy + Mason failures are FATAL — they leave the user with a
-# bare nvim config and no LSP. Pass --best-effort to downgrade to warnings.
+# By default, Lazy + Tree-sitter + Mason failures are FATAL — they leave the
+# user with a bare or weak nvim config. Pass --best-effort to downgrade to
+# warnings.
 if [[ "$SKIP_NVIM" -eq 0 ]] && [[ "$DRY_RUN" -eq 0 ]]; then
     if command -v nvim >/dev/null 2>&1; then
-        phase "Phase 3/4: sync Neovim plugins (lazy.nvim)"
-        run_or_fail "Lazy sync" nvim --headless "+Lazy! sync" "+qa"
+        phase "Phase 3/5: restore Neovim plugins (lazy.nvim)"
+        run_or_fail "Lazy restore" nvim --headless "+Lazy! restore" "+qa"
 
-        phase "Phase 4/4: install LSP servers + formatters (Mason)"
+        phase "Phase 4/5: install Tree-sitter parsers"
+        echo "  this compiles nvim-treesitter parsers and can take several minutes."
+        run_or_fail "Tree-sitter parser install" env DOTFILES_TREESITTER_SYNC_INSTALL=1 \
+            nvim --headless "+lua require('lazy').load({ plugins = { 'nvim-treesitter' } })" "+qa"
+
+        phase "Phase 5/5: install LSP servers + formatters (Mason)"
         echo "  this can take 3-8 minutes on a fresh machine."
         run_or_fail "Mason install" nvim --headless "+MasonToolsInstallSync" "+qa"
     else
         echo
-        echo "skipped: Phase 3-4 (nvim plugins) -- nvim not on PATH yet."
+        echo "skipped: Phase 3-5 (nvim plugins/parsers/tools) -- nvim not on PATH yet."
         echo "         Re-run: ./setup.sh --skip-deps --skip-config"
     fi
 elif [[ "$DRY_RUN" -eq 1 ]]; then
     echo
-    echo "skipped: Phase 3-4 (nvim plugins) in --dry-run mode"
+    echo "skipped: Phase 3-5 (nvim plugins/parsers/tools) in --dry-run mode"
 else
     echo
-    echo "skipped: Phase 3-4 (nvim plugins) via --skip-nvim"
+    echo "skipped: Phase 3-5 (nvim plugins/parsers/tools) via --skip-nvim"
 fi
 
 # ---- Summary -----------------------------------------------------------------

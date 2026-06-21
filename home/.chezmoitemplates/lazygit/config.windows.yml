@@ -1,0 +1,33 @@
+# lazygit config -- native Windows rendered config:
+#   Windows: %LOCALAPPDATA%\lazygit\config.yml
+#
+# Windows path was %APPDATA% in earlier commits; lazygit v0.58 actually
+# reads from %LOCALAPPDATA% (verified via `lazygit --print-config-dir`).
+#
+# psmux v3.3.x does not reliably deliver bare Esc to pane TUIs. Bind lazygit's
+# universal return/cancel action to Ctrl-G on native Windows so the `?`
+# keybindings view itself shows the working way to close help/popups. Keep this
+# in lazygit, not tmux/psmux: a psmux root-table Escape pass-through was tested
+# and did not reach lazygit reliably.
+#
+# Move commits with uppercase J / K, not Ctrl+J / Ctrl+K. In lazygit v0.58.1,
+# MoveDownCommit / MoveUpCommit are typed as Go string fields, so this override
+# REPLACES the default <c-j> / <c-k> instead of adding alternatives. Ctrl+J is
+# byte 0x0A (LF), the same byte as Enter; disambiguating it requires
+# Win32-input-mode / modifyOtherKeys / kitty keyboard protocol metadata, and
+# psmux v3.3.4 does not relay Windows Terminal's Win32-input-mode metadata to
+# panes. J / K are normal printable bytes that survive ConPTY, psmux, real
+# tmux, and bare terminals.
+#
+# Coexistence: J / K default to universal.scrollDownMain-alt1 /
+# scrollUpMain-alt1. lazygit registers commits-context bindings ahead of
+# universal bindings, so when the commits panel is focused J / K move commits;
+# in other panels J / K still scroll the main/diff window. Trade-off: while
+# focused on the commits panel, Shift-J / Shift-K no longer scroll the
+# main/diff window. Use PgUp / PgDn or Ctrl-U / Ctrl-D there instead.
+keybinding:
+  universal:
+    return: '<c-g>'
+  commits:
+    moveDownCommit: 'J'
+    moveUpCommit: 'K'

@@ -14,9 +14,10 @@ the install script works, read this too.
 Cross-platform dotfiles: Neovim (lazy.nvim), Starship, Ghostty, Windows
 Terminal, tmux, zshenv/zshrc, PowerShell profile, lazygit. Public installs go
 through `setup.sh` (macOS / Linux / WSL) or `setup.ps1` (Windows), which install
-dependencies, apply the chezmoi config layer, and sync Neovim plugins + Mason
-tools. The repo can live anywhere — `~/dotfiles/`, `~/Documents/dotfiles/`,
-etc. The remote-clone default in `setup.{sh,ps1}` is `~/dotfiles/`, but an
+dependencies, apply the chezmoi config layer, restore locked Neovim plugins, and
+sync Mason tools. The repo can live anywhere — `~/dotfiles/`,
+`~/Documents/dotfiles/`, etc. The remote-clone default in `setup.{sh,ps1}` is
+`~/dotfiles/`, but an
 in-place clone elsewhere works too. Do NOT put the repo at `~/.config/nvim/` —
 the installer creates that path as a symlink **pointing into** the repo, so a
 repo there would self-overlap (the self-link guard refuses this).
@@ -40,7 +41,7 @@ not ship synced agent preference folders.
 ├── tmux/                  tmux.conf (Rose Pine, vi-mode, OSC52 clipboard)
 ├── ghostty/               config (Rose Pine, Hack Nerd, tuned for tmux)
 ├── windows-terminal/      settings.fragment.jsonc + merge README
-├── lazygit/               config.yml (J/K move-commit binding)
+├── lazygit/               config.yml + config.windows.yml (J/K + Windows Ctrl-G)
 ├── home/                  chezmoi source tree for the config layer
 ├── tests/                 automated tests, grouped by tool
 ├── tests/wsl/             manual WSL split-host e2e check
@@ -118,7 +119,10 @@ that violates one of these, fix it instead of disabling the test.
     existing). fzf keeps Ctrl-R / Ctrl-T / Alt-C. When fzf is absent, the block
     falls back to native `menu-select` (so `zsh_startup_test` stays green).
     `zsh-autosuggestions` (inline gray history, strategy `history completion`,
-    `#908caa`) is the only other sourced zsh plugin. Up/Down do prefix history
+    `#908caa`) is the only other sourced zsh plugin. The repo-managed plugin
+    root is fixed at `~/.local/share/dotfiles/zsh-plugins`; do not make it
+    depend on `XDG_DATA_HOME` unless every producer, verifier, runtime source,
+    uninstall path, and parity test changes together. Up/Down do prefix history
     search (PowerShell `HistorySearch` parity). Do NOT swap in an always-on
     as-you-type completion-list plugin — that paradigm rebinds Ctrl-R, fights
     `zsh-autosuggestions`, and is slow; fzf-tab + autosuggestions is the
@@ -172,7 +176,20 @@ that violates one of these, fix it instead of disabling the test.
     parsers. `c` and `vim` are bundled but not auto-started, so the config starts
     them via `nvim_bundled_started_here = { "c", "vim" }`. See "Add a treesitter
     parser". Guarded by `treesitter_spec.lua`, `language_smoke_spec.lua`, and the
-    Tier-2 `lsp_smoke.lua` runtime preflight.
+    Tier-2 `lsp_smoke.lua` runtime preflight, which synchronously bootstraps
+    parsers and opens every language-matrix fixture under the production config
+    so missing parser builds or parser/query runtime failures cannot hide behind
+    non-LSP rows. The preflight also rejects unexpected nvim-treesitter-managed
+    install-output parser `.so` files under `stdpath('data')/site/parser`,
+    allowing only the explicit parser list plus upstream dependency parsers.
+20. **Repo text stays LF-only.** `.gitattributes` force-normalizes text files to
+    LF so Windows checkouts do not CRLF-corrupt shell/WSL entry points, and
+    `.editorconfig` must not reintroduce `end_of_line = crlf` exceptions (even
+    for `*.bat` / `*.cmd`). Batch and cmd files have explicit
+    `text eol=lf` attributes, and fixtures/scripts are validated as LF text like
+    the rest of the repo. Guarded by `editorconfig_check.sh` and
+    `invariants_test.sh`, including `git check-attr` probes for `.bat` and
+    `.cmd`.
 
 ## Common workflows
 
@@ -222,11 +239,18 @@ available here. Parser installation runs `tree-sitter generate` and
 plus a real C compiler before `:TSUpdate` can succeed.
 
 1. Add the parser name to `treesitter_parsers` in
-   `nvim/lua/plugins/treesitter.lua`.
+   `nvim/lua/plugins/treesitter.lua`. The list intentionally covers a broad
+   everyday language surface for highlighting (web formats, Go, SQL, .NET/Razor,
+   PHP/Perl/Ruby/JVM languages, Zig, assembly, infra/data formats, Git/SSH/editor
+   config, build-tool files, TeX/BibTeX/Typst/Mermaid, shaders, QML, Bicep, and
+   common platform/scientific languages), but it is still explicit because
+   parser installation is toolchain-backed and must stay reproducible.
 2. If the parser name differs from Neovim's filetype, add an entry to
    `parser_filetype_aliases` so the `FileType` autocmd can call
    `vim.treesitter.start()` for real buffers.
-3. Add it to `required` in `tests/nvim/spec/treesitter_spec.lua`.
+3. Add it to `required` in `tests/nvim/spec/treesitter_spec.lua`, and add a
+   fixture row in `tests/nvim/language_matrix.lua` so filetype detection,
+   formatter mapping, and parser ownership are tested together.
 4. If the parser has unusual generated sources, verify it through
    `:TSUpdate <parser>` on a machine with `tree-sitter` and a compiler on PATH.
 
@@ -298,7 +322,9 @@ git add nvim/lazy-lock.json
 ```
 
 `lazy-lock.json` is tracked (NOT gitignored) — that's how every machine ends
-up on the same commits.
+up on the same commits. Setup, e2e assertions, greenfield validators, and test
+prewarm paths must use `Lazy! restore`, not `Lazy! sync`; `sync` is only for
+intentional dependency maintenance that reviews and commits a lockfile diff.
 
 ### Update Mason-installed tools across machines
 
@@ -313,7 +339,8 @@ ensures the named tools exist on each machine.
 
 ```bash
 make help            # list all sub-targets
-make test            # run everything that can run on this OS
+make ci              # full local pre-PR gate: test + Renovate + migration
+make test            # current-host fast suite
 make test-nvim       # plenary busted suite
 make lint            # shellcheck across all .sh
 ./tests/wsl/e2e.sh   # manual WSL split-host validation from inside WSL
@@ -334,7 +361,9 @@ On Unix, `tests/nvim/run.sh` uses `PlenaryBustedDirectory` with an explicit
 `timeout = 180000`. Keep that value explicit: `startup_spec.lua` prewarms a real
 production init under isolated XDG dirs, and Plenary's default 50s timeout can
 SIGTERM the child before the startup-budget assertion reports the actual
-problem.
+problem. The startup budget itself is strict, but the spec measures up to three
+warm starts and accepts the fastest run; this filters scheduler/filesystem
+outliers while still failing a consistently slow production init.
 
 Sub-targets **skip gracefully** when their tool isn't installed
 (`yamllint`/`editorconfig-checker`/`hyperfine`/`bats`/`ghostty`). The
@@ -347,9 +376,20 @@ as fatal under CI, so anything passing locally + CI is genuinely cross-platform.
 Static repo walkers intentionally exclude `home/` managed copies; those copies
 are validated by `tests/migration/parity_gate.sh` against the canonical
 top-level sources instead of being re-linted as independent source.
-`tests/static/toml_lint.sh` uses `taplo` when it is healthy, but if local macOS
-`taplo` panics with the known system-configuration null-object crash it falls
-back to Python `tomllib`; ordinary `taplo` lint errors still fail.
+`tests/static/editorconfig_check.sh` feeds `editorconfig-checker` a pruned
+per-file list instead of using the checker's recursive walker. Keep generated
+plugin caches under `tests/.cache/` out of that list; Neovim tests clone real
+plugin repositories there, and those vendored files are not repo formatting
+surface.
+`tests/static/toml_lint.sh` and `tests/starship/toml_lint.sh` use `taplo` when
+it is healthy, but if local macOS `taplo` panics with the known
+system-configuration null-object crash they fall back to Python `tomllib`;
+ordinary `taplo` lint errors still fail.
+`tests/static/supply_chain_remote_execution_test.sh` must stay pure Python for
+the repository-wide scan; fast CI runs static tests before optional developer
+tools like ripgrep are installed.
+`tests/tmux/load_test.sh` must keep its own `tmux -S` socket path so tmux socket
+creation is hermetic and does not depend on host `/tmp/tmux-$UID` permissions.
 
 When adding a new spec:
 - Plenary specs: drop a `*_spec.lua` under `tests/nvim/spec/`. Use plenary
@@ -360,13 +400,14 @@ When adding a new spec:
 
 ## CI / repository safeguards
 
-`test.yml` remains the fast cross-platform suite and now also owns the
-`chezmoi-parity` migration gate. Warnings are treated as failures where the
-tools expose them cleanly: shellcheck exits nonzero, PSScriptAnalyzer runs at
-`Warning,Error`, yamllint/parser checks are part of `make test-static`, and
-Windows CI treats missing test dependencies as fatal. PSGallery module installs
-in Windows CI use bounded retries for transient gallery lookup failures; the
-final miss still fails the job.
+`test.yml` remains the fast cross-platform suite and now also owns Renovate
+schema validation and the `chezmoi-parity` migration gate. Warnings are treated
+as failures where the tools expose them cleanly: shellcheck exits nonzero,
+PSScriptAnalyzer runs at `Warning,Error`, yamllint/parser checks are part of
+`make test-static`, `scripts/validate-renovate.sh` fails when `npx` is missing
+under `CI=true`, and Windows CI treats missing test dependencies as fatal.
+PSGallery module installs in Windows CI use bounded retries for transient
+gallery lookup failures; the final miss still fails the job.
 
 `e2e-install.yml` is the required real-install gate. The jobs cover different
 install paths, not symmetric container platforms:
@@ -375,28 +416,42 @@ install paths, not symmetric container platforms:
   runner with `DOTFILES_SKIP_BREW_BOOTSTRAP=1`, creates a non-root user, runs
   real `install-deps.sh --all` (native `apt`, no Linuxbrew), then applies
   configs with chezmoi and asserts tool presence, Neovim >= 0.12, lazygit, zsh
-  plugin files, config content matching the repo sources, and the Neovim
+  plugin files under `~/.local/share/dotfiles/zsh-plugins`, config content
+  matching the repo sources, and the Neovim
   directory resolving into repo `nvim/`.
   This is intentionally **not** a devcontainer. It stays because hosted Ubuntu
   has Linuxbrew available, so the container is the only automated proof of the
   clean-image native `apt` path: pinned Neovim tarball install, pinned lazygit
-  release install, zsh plugin install, `fd-find` -> `fd` shim, and apt
+  release install, fixed-root zsh plugin install, `fd-find` -> `fd` shim, and apt
   fallbacks. Scope is intentionally **Ubuntu only** (the supported Linux/WSL2
   proxy target).
   Re-adding another distro requires both a matrix entry in `e2e-install.yml` and
   a matching root-prep branch in `tests/ci/container-e2e.sh`.
 - `setup.sh / ubuntu-24.04`, `setup.sh / macos-15`, and
   `setup.ps1 / windows-2025` run the real public setup entry points, apply
-  configs through chezmoi in Phase 2, and then rerun Lazy/Mason headless sync.
-  They explicitly fail if setup skips Phase 3-4, emits a `FAIL:` marker, or
-  Mason did not install expected tools. After the Mason sync they also run the
+  configs through chezmoi in Phase 2, and then rerun Lazy restore,
+  Tree-sitter parser install, and Mason headless sync. They explicitly fail if
+  setup skips Phase 3-5, emits a `FAIL:` marker, or Mason did not install
+  expected tools. Windows e2e must assert `%LOCALAPPDATA%\lazygit\config.yml`
+  against `lazygit/config.windows.yml`, not the POSIX/default
+  `lazygit/config.yml`. After the full restore/sync they also run the
   **Tier 2 language smoke** (`tests/nvim/lsp_smoke.lua`, gated on
   `DOTFILES_LSP_SMOKE=strict`): against the production init it asserts every
   `treesitter_parsers` entry is one nvim-treesitter `main` supports
   (`get_available()`/`get_available(4)` — the jsonc "unsupported language"
-  catcher) and that each fixture's LSP attaches. Non-gated servers are strict on
-  every OS; `powershell_es` is enforced only on Windows (pwsh + the PSES bundle)
-  and skips cleanly on Unix. The fast `make test-nvim` runs Tier 1 only
+  catcher), synchronously bootstraps parser installs with the upstream waitable
+  install task and requires it to return exactly `true`, rejects unexpected
+  install-output parser `.so` files under `stdpath('data')/site/parser`, asserts
+  each fixture's LSP attaches, then opens every language-matrix fixture,
+  requires real Tree-sitter captures for parser-backed rows, and proves
+  syntax-only fallback rows have real Vim syntax groups. Keep the LSP attach
+  gate before the broad fixture-open gate; opening every fixture under the
+  production config can start LSPs as collateral, and force-stopping those
+  collateral clients before their dedicated attach checks races some servers on
+  slower CI hosts.
+  Non-gated servers are strict on every OS; `powershell_es` is
+  enforced only on Windows (pwsh + the PSES bundle) and skips cleanly on Unix.
+  The fast `make test-nvim` runs Tier 1 only
   (`tests/nvim/spec/language_smoke_spec.lua` + `tests/nvim/language_matrix.lua`):
   filetype + conform-formatter + parser-in-install-list per fixture.
 - There is no macOS/Windows container analog to add for symmetry. Docker cannot
@@ -477,15 +532,16 @@ fails CI when any mirror disagrees. When you bump a pin, update every mirror and
 keep that test green.
 
 Validate `renovate.json` locally with Renovate's own schema validator, not just
-`jq`: `make validate-renovate`. That target runs Renovate under Node 24 because
-Renovate's `engines.node` supports the Node 24 LTS line; running the validator
-directly under an unsupported odd/current host Node such as 25.x emits
-`EBADENGINE`. Do not silence that warning with npm config. Switch runtimes or use
-the repo target, which shells into Node 24 before running:
+`jq`: `make validate-renovate`, or `make ci` for the full pre-PR bundle. That
+target runs Renovate under Node 24 because Renovate's `engines.node` supports
+the Node 24 LTS line; running the validator directly under an unsupported
+odd/current host Node such as 25.x emits `EBADENGINE`. Do not silence that
+warning with npm config. Switch runtimes or use the repo target, which shells
+into Node 24 before running:
 
 ```bash
 npx --yes --package node@24.11.0 -- bash -c \
-  'npm exec --yes --package renovate@latest -- renovate-config-validator --strict renovate.json'
+  'npm exec --yes --package renovate@43.230.1 -- renovate-config-validator --strict renovate.json'
 ```
 
 `tests/static/json_lint.sh` only checks JSON syntax. Its JSONC path strips `//`
@@ -541,8 +597,10 @@ save only**. The next plain `:w` formats normally. Implemented in
 - **lazygit config paths are OS-specific.** On macOS, lazygit v0.58 reports
   `~/Library/Application Support/lazygit` from `lazygit --print-config-dir`;
   on Linux/WSL it uses `~/.config/lazygit`; on Windows it uses
-  `%LOCALAPPDATA%\lazygit`. Keep the chezmoi templates, README, and tests
-  aligned with those real read paths.
+  `%LOCALAPPDATA%\lazygit`. POSIX hosts use `lazygit/config.yml`; native
+  Windows renders `lazygit/config.windows.yml` so psmux users get a Ctrl-G
+  return/cancel binding without changing macOS/Linux Esc behavior. Keep the
+  chezmoi templates, README, and tests aligned with those real read paths.
 - **The chezmoi tree in `home/` owns the config layer, not provisioning.** The
   rule is `chezmoi=dotfiles, install-deps=provisioning`: do not port package
   installs, pinned binary/font installers, login-shell mutation, devilspie2, VS
@@ -592,14 +650,17 @@ save only**. The next plain `:w` formats normally. Implemented in
   `tests/migration/oracle_test.sh` + `tests/migration/windows_apply_test.ps1`;
   it enforces canonical repo-source parity, nvim dir-symlink realpath/content parity,
   single-source byte equality, wrong-OS absence, zsh exact-pin failure behavior,
-  and Windows copy-mode + WT merge parity.
+  and Windows copy-mode + WT merge parity. `parity_gate.sh` runs
+  `chezmoi doctor` against a temporary copy of `home/`, not the Git checkout,
+  so the migration proof is not coupled to local `git status` performance or
+  unrelated working-tree noise.
 - **`install-deps` provisions chezmoi itself.** Unix setup installs `chezmoi`
   with Homebrew when brew is the selected manager; native Linux without brew
-  uses the pinned `CHEZMOI_VERSION` release through the same trusted
-  `get.chezmoi.io` installer form as CI, into `~/.local/bin`. Windows setup
-  installs `chezmoi` through the normal Scoop-first `$Catalog` fallback chain
-  (`scoop` -> `winget` -> `choco`). This keeps `make chezmoi` usable after full
-  setup before the Phase 2 chezmoi apply.
+  downloads the pinned `CHEZMOI_VERSION` GitHub release tarball, verifies the
+  adjacent SHA-256 constant, and installs the binary into `~/.local/bin`.
+  Windows setup installs `chezmoi` through the normal Scoop-first `$Catalog`
+  fallback chain (`scoop` -> `winget` -> `choco`). This keeps `make chezmoi`
+  usable after full setup before the Phase 2 chezmoi apply.
 - **`install-deps` shows a true pre-bootstrap dependency table before the
   one-shot install prompt.** Package-manager detection runs first, but Scoop /
   Homebrew bootstrap runs only after the table and prompt. The table includes a
@@ -610,16 +671,17 @@ save only**. The next plain `:w` formats normally. Implemented in
 - **`--update` is a scoped drift-edge refresh, not a repo update.**
   `setup.sh --update` / `setup.ps1 -Update` run only `install-deps --update`
   and `nvim --headless +MasonToolsUpdate +qa`. They skip git pull, chezmoi
-  apply, Lazy sync, and Lazy update. `install-deps --update` updates only
+  apply, Lazy restore, Lazy sync, and Lazy update. `install-deps --update` updates only
   present catalog tools through scoped per-package manager commands
   (`brew upgrade <formula>`, native Linux package upgrade commands, or
   `scoop update <pkg>` after one manifest refresh). It must not run blanket
   upgrades such as `brew upgrade`, `apt upgrade`, or `scoop update *`, and it
   must not touch pinned direct downloads, PSFzf, `lazy-lock.json`, or configs.
-  On native Linux without Linuxbrew or Alpine/apk, `nvim`, `lazygit`, and
-  `tree-sitter` are pinned direct-download binaries and stay out of the update
-  path. Linuxbrew updates them through `brew upgrade <formula>`; Alpine updates
-  its native `neovim`, `lazygit`, and `tree-sitter` packages through apk.
+  On native Linux without Linuxbrew or Alpine/apk, `nvim`, `lazygit`,
+  `starship`, and `tree-sitter` are pinned direct-download binaries and stay
+  out of the update path. Linuxbrew updates them through
+  `brew upgrade <formula>`; Alpine updates its native `neovim`, `lazygit`,
+  `starship`, and `tree-sitter` packages through apk.
 - **A C compiler is installed so LuaSnip can build `jsregexp`.** Without one,
   the nvim Lazy build prints "No C compiler found" and `jsregexp` is skipped
   (LuaSnip still works, minus JS-regex snippet transforms). POSIX installs the
@@ -627,6 +689,11 @@ save only**. The next plain `:w` formats normally. Implemented in
   `cc`/`gcc`/`clang`/`zig`/`cl` is already present. On Windows a clean machine
   has none, so `install-deps.ps1` carries **`zig`** in `$Catalog` (LuaSnip
   detects `zig cc`); it is skipped if already installed like any other tool.
+- **The CMake LSP needs the real `cmake` CLI.** Mason installs `neocmakelsp`,
+  but that server shells out to `cmake`; setup therefore installs `cmake` through
+  every supported OS package manager. Do not remove the CLI dependency while
+  keeping `neocmake` enabled, or strict Tier 2 smoke can hang on a crashing
+  local language server.
 - **nvim-treesitter main needs both `tree-sitter` and MSVC on Windows.**
   The main-branch installer shells out to the standalone `tree-sitter` CLI and
   then builds parsers through the Rust `cc` crate. `install-deps.sh` provisions
@@ -641,18 +708,48 @@ save only**. The next plain `:w` formats normally. Implemented in
   `tree-sitter` manifest first and falls back to `npm install -g
   tree-sitter-cli` after Node is present. Windows compiler support is separate:
   `install-deps.ps1 -All` auto-installs Visual Studio 2022 Build Tools with the
-  `Microsoft.VisualStudio.Workload.VCTools` workload through winget or choco.
-  Scoop does not carry VS Build Tools, so this is the deliberate exception to
-  the Scoop-first catalog rule. A failed VS Build Tools attempt records an
+  `Microsoft.VisualStudio.Workload.VCTools` workload through winget or choco,
+  then falls back to Microsoft's official `vs_BuildTools.exe` bootstrapper with
+  the same workload. Scoop does not carry VS Build Tools, so this is the
+  deliberate exception to the Scoop-first catalog rule. A failed winget/choco
+  pass is not final; a failed package-manager-plus-bootstrapper pass records an
   `InstallFailures` entry so `-All` cannot report success without MSVC.
   `setup.ps1` imports the VS DevShell into the current process before headless
-  `Lazy! sync`, so `tree-sitter build` inherits `cl.exe`, `INCLUDE`, and `LIB`.
-  Do not put the DevShell import in the
-  PowerShell profile. Zig stays installed for LuaSnip `jsregexp`, but do not
+  Tree-sitter parser installation, so `tree-sitter build` inherits `cl.exe`,
+  `INCLUDE`, and `LIB`. Do not put the DevShell import in the PowerShell
+  profile. Zig stays installed for LuaSnip `jsregexp`, but do not
   wire zig into nvim-treesitter main: the old `master` branch could use it,
   while main emits MSVC-style `cc` crate flags that require MSVC. Ad-hoc
   `:TSUpdate` parser rebuilds on Windows should run from a "Developer
   PowerShell for VS" shell or after rerunning setup.
+- **nvim-treesitter installer drift must not disable highlighting.** A stale
+  lazy.nvim cache can keep `nvim-treesitter` on the frozen `master` API while
+  this repo expects the `main` rewrite. In that state
+  `require("nvim-treesitter").install` and `.indentexpr` are absent. The config
+  must warn and continue registering the `FileType` autocmd that calls
+  `vim.treesitter.start()`; never let parser auto-install API drift abort buffer
+  highlighting. The recovery path is `:Lazy! restore` followed by `:TSUpdate`, or
+  rerun `setup.ps1` on Windows so VS DevShell is imported before parser builds.
+- **Regex syntax fallback is capability-driven, not a language allowlist.**
+  `vim.treesitter.start()` clears the buffer-local `syntax` option. That can
+  make buffers look materially worse even when Tree-sitter is active, because
+  the built-in syntax files add useful secondary groups. The FileType autocmd in
+  `nvim/lua/plugins/treesitter.lua` therefore runs for every detected filetype,
+  starts Tree-sitter only for parser-backed filetypes, and restores `syntax`
+  only when Neovim has a matching `syntax/<filetype>.vim` runtime file (or the
+  runtime had already set a syntax name before Tree-sitter cleared it). Do NOT
+  reintroduce a hand-curated syntax fallback table; add Tree-sitter parsers
+  explicitly when richer parser-backed support is desired, and let runtime
+  syntax detection cover the long tail. `:Inspect` should show both
+  `treesitter` captures and `syntax` groups for parser-backed fallback
+  languages; syntax-only filetypes should show syntax groups without
+  Tree-sitter captures.
+  Filetypes with no supported nvim-treesitter parser, such as `.curlrc`, must be
+  tested as syntax-only rows instead of inventing parser names, and Tier 2 must
+  probe at least one meaningful syntax position for important syntax-only rows.
+  `.curlrc` maps
+  to Neovim's generic `conf` filetype because upstream Neovim has no dedicated
+  curl config syntax.
 - **`uninstall.sh` / `uninstall.ps1` are greenfield teardown tools, not purge.**
   They enumerate targets with `chezmoi --source <repo>/home managed --path-style
   absolute`, remove only repo-owned symlinks or byte-identical Windows
@@ -660,6 +757,13 @@ save only**. The next plain `:w` formats normally. Implemented in
   backups by default, and leave chezmoi's own config/state alone. Windows
   Terminal `settings.json` is never deleted because the merge is idempotent but
   not invertible; use the printed backup path for manual restore if needed.
+  Dry-run mode must also leave empty external parent directories in place; it
+  prints `would:` lines only and does not prune `~/.local/share/dotfiles`.
+- **Starship binary install paths differ by OS.** Homebrew owns
+  macOS/Linuxbrew, Alpine uses the native `starship` apk package, Windows setup
+  installs it through Scoop/winget/choco, and other native Linux/WSL hosts
+  without brew use a pinned Starship GitHub release tarball with SHA-256
+  verification.
 - **lazygit binary install paths differ by OS.** Homebrew owns macOS/Linuxbrew,
   Alpine uses the native `lazygit` apk package, Windows setup installs it
   through Scoop/winget/choco, and other native Linux/WSL hosts without brew use
@@ -696,6 +800,12 @@ save only**. The next plain `:w` formats normally. Implemented in
   `Add-ScoopBucketSafe` (guarded by `tests/static/repo_policy_test.sh`). Local
   setup still recommends Developer Mode plus a normal PowerShell; do not
   elevate the whole local setup unless you intentionally want the admin path.
+  PowerShell tests dot-source `install-deps.ps1` on macOS too, where
+  `USERPROFILE` can be empty; use `Get-ScoopRoot` instead of direct
+  `Join-Path $env:USERPROFILE` for Scoop paths so source-only tests stay
+  portable. `setup.ps1` has the same source-only portability requirement for
+  tests; its default checkout path must derive from `USERPROFILE`, then `HOME`,
+  then .NET's user-profile folder instead of assuming `USERPROFILE` exists.
   **`Ensure-ScoopBuckets` installs `git` (from the bucket-less `main` bucket)
   BEFORE adding `extras`/`nerd-fonts`.** `scoop bucket add` git-clones the bucket
   repo, so on a truly fresh machine (Windows Sandbox / clean install) the adds
@@ -792,9 +902,21 @@ save only**. The next plain `:w` formats normally. Implemented in
   not yet activated when `colorTheme` is first read (needs an Extensions reload /
   second launch); (4) a workspace `.vscode/settings.json` override. Confirm which
   profile is active and whether Sync is on before touching code again.
+- **Direct network executables are pinned or explicitly allowlisted.** New
+  installer code must prefer release artifacts with adjacent SHA-256
+  verification over fetched installer scripts. If a mutable bootstrap script is
+  unavoidable, it must be a named trust root with rationale in
+  `tests/static/supply_chain_remote_execution_test.sh`; the current installer
+  trust root is Scoop's official installer. Homebrew bootstrap is downloaded
+  from a pinned installer commit and SHA-256 verified before execution.
+  Recommended setup docs use `git clone` plus local `setup`, not raw remote
+  setup script execution from the current default branch.
 - **Direct GitHub downloads are pinned and SHA-256 verified.** `install-deps.sh`
-  verifies the pinned Neovim Linux tarballs, lazygit Linux tarballs,
-  tree-sitter CLI Linux archives, and Hack Nerd Font zip before extraction;
+  verifies the pinned Homebrew installer script, Neovim Linux tarballs,
+  native-Linux chezmoi tarballs, lazygit Linux tarballs, Starship Linux
+  tarballs, tree-sitter CLI Linux archives, and Hack Nerd Font zip before extraction;
+  CI also verifies the pinned chezmoi Linux, macOS, and Windows release
+  archives used by the parity jobs;
   `install-deps.ps1` verifies the pinned Hack.zip before registering fonts and
   the pinned Windows Terminal portable zip before extracting the fallback
   install. POSIX helpers that unpack into `mktemp -d` install a cleanup trap
@@ -817,22 +939,24 @@ save only**. The next plain `:w` formats normally. Implemented in
   pinned by tag plus expected commit; update both after reviewing a Renovate tag
   bump. Guarded by `tests/shell/ghostty_install_fail_test.sh`,
   `tests/shell/wsl_gui_tools_test.sh`, `tests/shell/lazygit_install_test.sh`,
+  `tests/shell/starship_linux_install_test.sh`,
   `tests/shell/treesitter_cli_test.sh`, and `tests/shell/zsh_plugins_test.sh`.
   Renovate can open version/ref bumps for these constants and for the CI
-  cargo-binstall installer commit, but it cannot recompute adjacent SHA-256
+  cargo-binstall installer commit and Renovate validator package/runtime pins,
+  but it cannot recompute adjacent SHA-256
   values or verify tag commit IDs; leave CI red until a human has reviewed the
   download/ref and updated the adjacent constant. The
+  `CHEZMOI_VERSION`, `STARSHIP_VERSION`, and
   `TREE_SITTER_CLI_LINUX_VERSION` custom managers follow the lazygit shape:
-  Renovate may bump the version constant, while
-  `TREE_SITTER_CLI_LINUX_X86_64_SHA256` and
-  `TREE_SITTER_CLI_LINUX_ARM64_SHA256` remain adjacent context only. In
+  Renovate may bump the version constants, while their adjacent SHA-256 values
+  remain context only. In
   `renovate.json`, direct-download SHA-256 values must be matched as context
   only, not named `currentDigest`, otherwise Renovate will schedule same-version
   digest updates for checksums it cannot actually resolve.
 - **Both installers open with an "install EVERYTHING?" prompt.** Interactive
   runs that didn't pass `--all`/`-All` get one upfront question; answering yes
   flips `YES_ALL`/`$All` so the rest runs with no per-item prompts. Skipped when
-  `--all`/`--dry-run` was passed or there's no tty (so `curl|bash` and the CI
+  `--all`/`--dry-run` was passed or there's no tty (so noninteractive setup and the CI
   `--dry-run --all` dogfood don't hang).
 - **Windows symlink pre-flight reports WHY symlinks fail and how to fix it.**
   `setup.ps1` probes symlink capability before chezmoi apply. When the probe
@@ -908,6 +1032,13 @@ save only**. The next plain `:w` formats normally. Implemented in
   Diagnose inside a pane with `(Get-Process -Id $PID).Name` (expect `pwsh`).
   Do NOT add `set -g default-shell` to the main `tmux.conf` — `pwsh` does not
   exist on Unix; keep Windows-specific tmux settings in the overlay.
+- **psmux bare Escape is NOT patched in tmux config.** psmux v3.3.x has an
+  upstream Esc-forwarding bug that breaks modal TUIs such as lazygit. A
+  Windows-only root-table `Escape -> send-keys esc` binding was tested and did
+  not reliably reach lazygit, so do not re-add it. The supported native-Windows
+  lazygit workaround lives in `lazygit/config.windows.yml`: it binds
+  `keybinding.universal.return` to `<c-g>`, which makes lazygit's `?`
+  keybindings view show Ctrl-G as the working return/cancel key inside psmux.
 - **psmux residual race (v3.3.4): `OnIdle` workaround in the profile.** Even
   with `allow-predictions on`, fresh psmux panes were observed at
   `PredictionSource=None` / `PredictionViewStyle=InlineView` -- the documented
@@ -959,6 +1090,14 @@ save only**. The next plain `:w` formats normally. Implemented in
   overriding PSReadLine's reverse-search for POSIX parity with zsh), Ctrl+T
   (file) and Alt+C (cd) ONLY when both the PSFzf module and the `fzf` binary are
   present. The zsh side already used `fzf`; this brings Windows to parity.
+- **lsd owns interactive `ls` ergonomics when installed.** `install-deps.sh`
+  installs `lsd` through each supported OS package manager; `install-deps.ps1`
+  carries it in the Scoop-first catalog (`lsd` -> winget `lsd-rs.lsd` -> choco
+  `lsd`). zsh defines the upstream documented aliases (`ls`, `l`, `la`, `lla`,
+  `lt`) only when `lsd` is on PATH. PowerShell removes the built-in `ls` alias
+  only after `lsd` is present, then defines functions for the same names because
+  PowerShell aliases cannot carry arguments like `-l` or `--tree`. Keep both
+  profiles guarded so partially provisioned shells stay silent and usable.
 - **`ls`/`Get-ChildItem` directories are gold via `$PSStyle.FileInfo.Directory`.**
   The default directory color (bright blue) is unreadable on Rose Pine dark.
   Guarded by `if ($PSStyle)` (absent on Windows PowerShell 5.1 and pwsh < 7.2);
@@ -1055,7 +1194,9 @@ host OS or shell would otherwise hide a branch from CI.
   `en_US.UTF-8` when `locale -a` reports it, fall back to `C.UTF-8`, and leave
   the caller's locale untouched when neither exists.
 - **`nvim/lazy-lock.json` is tracked** (NOT in `.gitignore`). This is how
-  every machine ends up on the same plugin commits.
+  every machine ends up on the same plugin commits. Setup and validation must
+  restore from it; only intentional plugin maintenance may sync/update and
+  change it.
 - **VS Build Tools for nvim-treesitter main is intentional.** It is large, but
   it is the compiler path the Rust `cc` crate expects on Windows. The existing
   zig install remains for LuaSnip `jsregexp`; it is not a substitute for
@@ -1183,16 +1324,18 @@ host OS or shell would otherwise hide a branch from CI.
      lazygit never loaded it, so EVERY custom binding looked dead.
      Chezmoi now targets LocalAppData. Asserted by
      `tests/migration/windows_apply_test.ps1`.
-  2. **Binding:** `lazygit/config.yml` binds
+  2. **Binding:** `lazygit/config.yml` and `lazygit/config.windows.yml` bind
      `keybinding.commits.moveDownCommit` / `moveUpCommit` to uppercase
-     `J` / `K`. We intentionally do NOT use Ctrl+J / Ctrl+K: Ctrl+J is
+     `J` / `K`. The Windows variant also binds `keybinding.universal.return`
+     to `<c-g>` because psmux does not reliably deliver bare Esc to lazygit, and
+     lazygit's `?` keybindings view should advertise the working cancel key. We
+     intentionally do NOT use Ctrl+J / Ctrl+K for commit movement: Ctrl+J is
      ASCII LF (0x0A), the same byte as Enter. Disambiguating requires
-     Win32-input-mode (ConPTY DECSET 9001), modifyOtherKeys, or kitty
-     keyboard protocol metadata. Windows Terminal sends it and lazygit's
-     tcell/v3 can decode it, but psmux v3.3.4 does NOT relay the metadata
-     to panes, so default Ctrl+J degrades to Enter inside psmux. Uppercase
-     J / K are normal printable bytes and skip that entire transport
-     problem.
+     Win32-input-mode (ConPTY DECSET 9001), modifyOtherKeys, or kitty keyboard
+     protocol metadata. Windows Terminal sends it and lazygit's tcell/v3 can
+     decode it, but psmux v3.3.4 does NOT relay the metadata to panes, so
+     default Ctrl+J degrades to Enter inside psmux. Uppercase J / K are normal
+     printable bytes and skip that entire transport problem.
      This is safe because lazygit v0.58.1 dispatches commits-context
      bindings before universal bindings, then falls through on
      ErrKeybindingNotHandled (`pkg/gui/keybindings.go:420-441` and
@@ -1206,8 +1349,8 @@ host OS or shell would otherwise hide a branch from CI.
 
 ## When you're about to make a change
 
-1. Run the local test entry point (`make test` on macOS/Linux/WSL,
-   `.\test.ps1` on Windows). Get baseline.
+1. Run the local gate (`make ci` on macOS/Linux/WSL, `.\test.ps1` on Windows).
+   Get baseline.
 2. Make the change.
 3. Update tests in the same diff (add a regression test for the new
    behavior; update an invariant assertion if you changed something this
@@ -1215,7 +1358,7 @@ host OS or shell would otherwise hide a branch from CI.
 4. Update this CLAUDE.md if you've changed any of the invariants or added a
    new common workflow.
 5. Update `README.md` if you've changed the install path / install command.
-6. Run the local test entry point again. Green.
+6. Run the local gate again. Green.
 7. Stage everything, commit.
 
 If a test breaks: fix the cause, not the test. The test names are

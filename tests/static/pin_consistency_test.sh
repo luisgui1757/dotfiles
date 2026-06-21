@@ -30,6 +30,7 @@ assert_eq() {
 }
 
 sh_const() { grep -E "^$1=" install-deps.sh | head -1 | cut -d'"' -f2; }
+yml_const() { awk -v key="$1" '$1 == key ":" { print $2; exit }' .github/workflows/test.yml; }
 
 # --- nvim Linux: install-deps.sh <-> test.yml <-> the two install tests -------
 nvim_ver_sh="$(sh_const NVIM_LINUX_VERSION)"
@@ -45,6 +46,22 @@ assert_eq "nvim x86_64 SHA (install-deps.sh == test.yml)"         "$nvim_x86_sh"
 assert_eq "nvim version (install-deps.sh == install_nvim test)"   "$nvim_ver_sh"  "$nvim_ver_test"
 assert_eq "nvim x86_64 SHA (install-deps.sh == install_nvim test)" "$nvim_x86_sh" "$nvim_sha_test"
 assert_eq "nvim x86_64 SHA (install-deps.sh == nvim FAIL test)"    "$nvim_x86_sh" "$nvim_sha_fail"
+
+# --- mirrored direct-download pins: install-deps.sh <-> required Ubuntu CI ---
+assert_eq "chezmoi version (install-deps.sh == test.yml)" \
+    "$(sh_const CHEZMOI_VERSION)" "$(yml_const CHEZMOI_VERSION)"
+assert_eq "chezmoi x86_64 SHA (install-deps.sh == test.yml)" \
+    "$(sh_const CHEZMOI_LINUX_X86_64_SHA256)" "$(yml_const CHEZMOI_LINUX_X86_64_SHA256)"
+assert_eq "chezmoi arm64 SHA (install-deps.sh == test.yml)" \
+    "$(sh_const CHEZMOI_LINUX_ARM64_SHA256)" "$(yml_const CHEZMOI_LINUX_ARM64_SHA256)"
+assert_eq "starship version (install-deps.sh == test.yml)" \
+    "$(sh_const STARSHIP_VERSION)" "$(yml_const STARSHIP_VERSION)"
+assert_eq "starship x86_64 SHA (install-deps.sh == test.yml)" \
+    "$(sh_const STARSHIP_LINUX_X86_64_SHA256)" "$(yml_const STARSHIP_LINUX_X86_64_SHA256)"
+assert_eq "tree-sitter version (install-deps.sh == test.yml)" \
+    "$(sh_const TREE_SITTER_CLI_LINUX_VERSION)" "$(yml_const TREE_SITTER_CLI_LINUX_VERSION)"
+assert_eq "tree-sitter x86_64 SHA (install-deps.sh == test.yml)" \
+    "$(sh_const TREE_SITTER_CLI_LINUX_X86_64_SHA256)" "$(yml_const TREE_SITTER_CLI_LINUX_X86_64_SHA256)"
 
 # --- zsh plugins: install-deps.sh <-> chezmoi external (tag) <-> verify (commit)
 ext_tag() { grep -A4 "$1" home/.chezmoiexternal.toml.tmpl | grep -oE '"v[0-9][0-9.]*"' | tr -d '"' | head -1; }

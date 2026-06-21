@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC1091,SC2034
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
@@ -34,10 +35,24 @@ have_any() {
 YES_ALL=1
 DRY_RUN=1
 PM=apt
+case "$(command uname -m)" in
+    x86_64|amd64)
+        expected_chezmoi_sha="$CHEZMOI_LINUX_X86_64_SHA256"
+        ;;
+    aarch64|arm64)
+        expected_chezmoi_sha="$CHEZMOI_LINUX_ARM64_SHA256"
+        ;;
+    *)
+        expected_chezmoi_sha=""
+        ;;
+esac
 
 out="$(install_chezmoi)"
-[[ "$out" == *"get.chezmoi.io"* ]] || fail "native Linux path did not use get.chezmoi.io"
-[[ "$out" == *"-b \"\$HOME/.local/bin\" -t \"$CHEZMOI_VERSION\""* ]] || fail "native Linux path did not pin $CHEZMOI_VERSION"
+[[ "$out" == *"github.com/twpayne/chezmoi/releases/download/$CHEZMOI_VERSION/"* ]] || fail "native Linux path did not use the pinned GitHub release"
+[[ -n "$expected_chezmoi_sha" ]] || fail "test host arch is unsupported by install_chezmoi"
+[[ "$out" == *"verify sha256 $expected_chezmoi_sha"* ]] || fail "native Linux path did not verify the expected checksum"
+[[ "$out" == *"extract chezmoi -> \$HOME/.local/bin/chezmoi"* ]] || fail "native Linux path did not install to ~/.local/bin"
+[[ "$out" != *"get.chezmoi.io"* ]] || fail "native Linux path still used get.chezmoi.io"
 [[ "$out" != *"brew install chezmoi"* ]] || fail "native Linux path used brew"
 
 PM=brew

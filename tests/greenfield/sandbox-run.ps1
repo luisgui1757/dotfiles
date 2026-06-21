@@ -93,14 +93,14 @@ function Invoke-SetupAndCheck {
         Stop-Greenfield "setup.ps1 exited $rc; log: $Log"
     }
     $content = Get-Content -Raw -LiteralPath $Log
-    if ($content -match 'skipped: Phase 3-4') {
-        Stop-Greenfield "setup.ps1 skipped Phase 3-4; log: $Log"
+    if ($content -match 'skipped: Phase 3-5') {
+        Stop-Greenfield "setup.ps1 skipped Phase 3-5; log: $Log"
     }
     if ($content -match '(?m)^\s*FAIL:') {
         Stop-Greenfield "setup.ps1 emitted a FAIL marker; log: $Log"
     }
-    if (($content -notmatch 'Phase 3/4') -or ($content -notmatch 'Phase 4/4')) {
-        Stop-Greenfield "setup.ps1 did not run both nvim phases; log: $Log"
+    if (($content -notmatch 'Phase 3/5') -or ($content -notmatch 'Phase 4/5') -or ($content -notmatch 'Phase 5/5')) {
+        Stop-Greenfield "setup.ps1 did not run all nvim phases; log: $Log"
     }
 }
 

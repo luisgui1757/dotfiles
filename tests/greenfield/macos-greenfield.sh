@@ -104,11 +104,12 @@ echo "macos-greenfield: log=$SETUP_LOG"
 
 HOME="$TARGET_HOME" run_and_capture "setup.sh" "$SETUP_LOG" "$REPO_ROOT/setup.sh" --all
 
-if grep -Fq "skipped: Phase 3-4" "$SETUP_LOG"; then
-    fail "setup.sh skipped Phase 3-4; log: $SETUP_LOG"
+if grep -Fq "skipped: Phase 3-5" "$SETUP_LOG"; then
+    fail "setup.sh skipped Phase 3-5; log: $SETUP_LOG"
 fi
-grep -F "Phase 3/4" "$SETUP_LOG" >/dev/null || fail "setup.sh did not run Phase 3/4; log: $SETUP_LOG"
-grep -F "Phase 4/4" "$SETUP_LOG" >/dev/null || fail "setup.sh did not run Phase 4/4; log: $SETUP_LOG"
+grep -F "Phase 3/5" "$SETUP_LOG" >/dev/null || fail "setup.sh did not run Phase 3/5; log: $SETUP_LOG"
+grep -F "Phase 4/5" "$SETUP_LOG" >/dev/null || fail "setup.sh did not run Phase 4/5; log: $SETUP_LOG"
+grep -F "Phase 5/5" "$SETUP_LOG" >/dev/null || fail "setup.sh did not run Phase 5/5; log: $SETUP_LOG"
 
 HOME="$TARGET_HOME" "$REPO_ROOT/tests/greenfield/validate.sh" --repo "$REPO_ROOT"
 

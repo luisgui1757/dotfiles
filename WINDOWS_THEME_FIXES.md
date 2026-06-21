@@ -1,4 +1,4 @@
-# Windows theming fixes — work order (chezmoi-pilot)
+# Windows theming fixes - work order (pilot migration branch)
 
 > **Temporary handoff doc.** Delete this file once the fixes below land + are
 > validated. Written 2026-06-12 by Claude (Opus 4.8), root-cause confirmed by
@@ -13,20 +13,20 @@
 ## How to use this doc
 
 You are (likely) a fresh Claude Code session on a **Windows** machine, picking
-up three theming bugs found while greenfield-testing `chezmoi-pilot` in Windows
+up three theming bugs found while greenfield-testing the pilot migration branch in Windows
 Sandbox. The diagnosis is done and confirmed; your job is to **implement the
 fixes test-first, validate in Sandbox, and keep CI green**. Then the same gets
 re-validated on macOS (see [Cross-machine plan](#cross-machine-plan)).
 
-Durable state lives in git, not in any chat — this branch (`chezmoi-pilot`,
-PR #21) is the source of truth. Read `CLAUDE.md` first (repo invariants), then
+Durable state lives in git, not in any chat - the pilot migration branch and
+PR #21 are the source of truth. Read `CLAUDE.md` first (repo invariants), then
 this file.
 
 ---
 
 ## The three symptoms
 
-Observed in a **fresh Windows Sandbox** after `.\setup.ps1 -All` on `chezmoi-pilot`:
+Observed in a **fresh Windows Sandbox** after `.\setup.ps1 -All` on the pilot migration branch:
 
 1. **Windows Terminal is not Rose Pine** (default theme), and the **PowerShell
    7.6.2 prompt is not Rose Pine** either.
@@ -232,7 +232,7 @@ Pro/Enterprise/Education) and virtualization on in BIOS.
 
 **Caveat for AUTONOMOUS testing (a Claude session reading the result):** the
 repo's shipped `tests/greenfield/windows-sandbox.wsb` is **self-contained** — it
-downloads the *remote* `chezmoi-pilot` and writes logs to the **sandbox
+downloads the *remote* pilot migration branch and writes logs to the **sandbox
 desktop**, which is ephemeral and **not visible to the host**. That's fine for a
 human watching the window, but a host-side Claude can't read PASS/FAIL.
 
@@ -271,7 +271,7 @@ piece that makes Sandbox a real autonomous test loop.
 
 ## Cross-machine plan
 
-1. **Windows first:** implement Fixes 1-4 on `chezmoi-pilot`, validate in
+1. **Windows first:** implement Fixes 1-4 on the pilot migration branch, validate in
    Sandbox (manual, then ideally the autonomous `.wsb` above), keep CI green,
    push. Delete this file when done.
 2. **macOS next:** re-validate the non-Windows paths with `tart` —
@@ -284,7 +284,7 @@ piece that makes Sandbox a real autonomous test loop.
 
 ---
 
-## File reference (chezmoi-pilot @ 70eb850; line numbers ±a few)
+## File reference (pilot migration branch @ 70eb850; line numbers +/- a few)
 
 - `home/AppData/Local/Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/LocalState/modify_settings.json.ps1.tmpl` — `IsNullOrWhiteSpace → return` (the no-fabricate gate)
 - `home/.chezmoitemplates/windows-terminal/settings.fragment.jsonc` — `theme` ~29, `colorScheme` + `font.face` ~53-54, scheme/theme defs ~63-110

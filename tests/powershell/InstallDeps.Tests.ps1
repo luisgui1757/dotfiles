@@ -461,6 +461,27 @@ Describe "install-deps.ps1" {
         $Catalog['tree-sitter'].purpose | Should -Match 'nvim-treesitter main'
     }
 
+    It "registers lsd in the Windows package catalog" {
+        . $script:ImportInstallDepsForTest
+
+        $Catalog.ContainsKey('lsd') | Should -BeTrue
+        $BinaryName['lsd'] | Should -Be 'lsd'
+        $Catalog['lsd'].scoop | Should -Be 'lsd'
+        $Catalog['lsd'].winget | Should -Be 'lsd-rs.lsd'
+        $Catalog['lsd'].choco | Should -Be 'lsd'
+    }
+
+    It "registers cmake in the Windows package catalog" {
+        . $script:ImportInstallDepsForTest
+
+        $Catalog.ContainsKey('cmake') | Should -BeTrue
+        $BinaryName['cmake'] | Should -Be 'cmake'
+        $Catalog['cmake'].scoop | Should -Be 'cmake'
+        $Catalog['cmake'].winget | Should -Be 'Kitware.CMake'
+        $Catalog['cmake'].choco | Should -Be 'cmake'
+        $Catalog['cmake'].purpose | Should -Match 'neocmakelsp'
+    }
+
     It "dry-runs VS Build Tools without invoking package managers" {
         . $script:ImportInstallDepsForTest -DryRun
         Mock -CommandName Get-VsBuildToolsInstallationPath -MockWith { return '' }
@@ -471,6 +492,7 @@ Describe "install-deps.ps1" {
 
         $output | Should -Match 'Microsoft\.VisualStudio\.2022\.BuildTools'
         $output | Should -Match 'Microsoft\.VisualStudio\.Workload\.VCTools'
+        $output | Should -Match 'https://aka\.ms/vs/17/release/vs_BuildTools\.exe'
         Should -Invoke -CommandName winget -Times 0 -Exactly
         Should -Invoke -CommandName choco -Times 0 -Exactly
     }
@@ -521,20 +543,50 @@ Describe "install-deps.ps1" {
         Should -Invoke -CommandName choco -Times 0 -Exactly
     }
 
+    It "falls back to the official VS Build Tools bootstrapper after package managers fail" {
+        . $script:ImportInstallDepsForTest
+        $script:VsBuildToolsPath = ''
+        $script:BootstrapperUri = ''
+        $script:BootstrapperArgs = @()
+        Mock -CommandName Get-VsBuildToolsInstallationPath -MockWith { return $script:VsBuildToolsPath }
+        Mock -CommandName winget -MockWith { $global:LASTEXITCODE = -1978335212 }
+        Mock -CommandName choco -MockWith { $global:LASTEXITCODE = 56 }
+        Mock -CommandName Invoke-WebRequest -MockWith {
+            param($Uri)
+            $script:BootstrapperUri = $Uri
+        }
+        Mock -CommandName Start-Process -MockWith {
+            param($FilePath, $ArgumentList)
+            $script:BootstrapperArgs = @($ArgumentList)
+            $script:VsBuildToolsPath = 'C:\VS'
+            return [pscustomobject]@{ ExitCode = 0 }
+        }
+
+        $output = & { Install-VsBuildTools } 6>&1 | Out-String
+
+        $script:BootstrapperUri | Should -Be 'https://aka.ms/vs/17/release/vs_BuildTools.exe'
+        ($script:BootstrapperArgs -join ' ') | Should -Match 'Microsoft\.VisualStudio\.Workload\.VCTools'
+        ($script:BootstrapperArgs -join ' ') | Should -Match '--includeRecommended'
+        $output | Should -Match 'Microsoft bootstrapper'
+        $script:InstallFailures.Count | Should -Be 0
+    }
+
     It "keeps VS Build Tools install failure best effort with a FAIL marker" {
         . $script:ImportInstallDepsForTest
         Mock -CommandName Get-VsBuildToolsInstallationPath -MockWith { return '' }
         Mock -CommandName winget -MockWith { $global:LASTEXITCODE = 55 }
         Mock -CommandName choco -MockWith { $global:LASTEXITCODE = 56 }
+        Mock -CommandName Invoke-WebRequest -MockWith { }
+        Mock -CommandName Start-Process -MockWith { return [pscustomobject]@{ ExitCode = 57 } }
 
         $output = & { Install-VsBuildTools } 6>&1 | Out-String
 
         $output | Should -Match 'FAIL: VS Build Tools install failed'
         $script:InstallFailures.Count | Should -Be 1
         $script:InstallFailures[0].Tool | Should -Be 'VS Build Tools'
-        $script:InstallFailures[0].Pm | Should -Be 'winget/choco'
+        $script:InstallFailures[0].Pm | Should -Be 'winget/choco/bootstrapper'
         $script:InstallFailures[0].Pkg | Should -Be 'Microsoft.VisualStudio.Workload.VCTools'
-        $script:InstallFailures[0].ExitCode | Should -Be 56
+        $script:InstallFailures[0].ExitCode | Should -Be 57
     }
 
     It "registers Windows Terminal in the Windows package catalog" {

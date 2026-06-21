@@ -74,7 +74,7 @@ if [[ "${1:-}" == "--as-user" ]]; then
     run_and_capture "chezmoi apply" "$HOME/chezmoi-apply.log" \
         chezmoi --source "$repo/home" --no-tty --force apply
 
-    for cmd in nvim rg fd fzf tmux zsh git lazygit tree-sitter; do
+    for cmd in nvim rg fd fzf tmux zsh git lazygit tree-sitter cmake lsd; do
         command -v "$cmd" >/dev/null 2>&1 || fail "$cmd is not on PATH"
     done
 
@@ -92,7 +92,7 @@ if [[ "${1:-}" == "--as-user" ]]; then
     assert_file_content "$HOME/.zshrc" "$repo/shells/zshrc"
     assert_file_content "$HOME/.config/lazygit/config.yml" "$repo/lazygit/config.yml"
 
-    plugin_root="${XDG_DATA_HOME:-$HOME/.local/share}/dotfiles/zsh-plugins"
+    plugin_root="$HOME/.local/share/dotfiles/zsh-plugins"
     [[ -r "$plugin_root/fzf-tab/fzf-tab.plugin.zsh" ]] \
         || fail "fzf-tab plugin file missing"
     [[ -r "$plugin_root/zsh-autosuggestions/zsh-autosuggestions.zsh" ]] \

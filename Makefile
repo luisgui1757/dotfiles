@@ -2,7 +2,7 @@
 # current OS; sub-targets skip themselves with a clear message when the
 # tool they depend on isn't installed.
 
-.PHONY: test test-nvim test-shell test-starship test-tmux test-ghostty test-static validate-renovate lint setup setup-dryrun install dryrun deps deps-dryrun chezmoi chezmoi-diff help
+.PHONY: ci test-required test test-migration test-nvim test-shell test-starship test-tmux test-ghostty test-static validate-renovate lint setup setup-dryrun install dryrun deps deps-dryrun chezmoi chezmoi-diff help
 
 REPO := $(shell pwd)
 
@@ -10,7 +10,10 @@ help:
 	@echo "Targets:"
 	@echo "  setup           — ONE-SHOT: deps + config + plugins + LSP (recommended)"
 	@echo "  setup-dryrun    — preview every step of setup without acting"
+	@echo "  ci              — full local pre-PR gate: test + Renovate + migration"
+	@echo "  test-required   — alias for ci"
 	@echo "  test            — run all test sub-targets (skips what's not installed)"
+	@echo "  test-migration  — chezmoi template/parity/round-trip/oracle checks"
 	@echo "  test-nvim       — plenary busted suite under nvim --headless"
 	@echo "  test-shell      — shellcheck + zsh smoke + Esc-binding regression"
 	@echo "  test-starship   — render snapshot + perf budget (<25ms mean)"
@@ -56,9 +59,23 @@ chezmoi:
 chezmoi-diff:
 	@chezmoi --source $(REPO)/home diff
 
+ci: test validate-renovate test-migration
+	@echo
+	@echo "=== ci summary: local pre-PR gate passed ==="
+
+test-required: ci
+
 test: test-static lint test-nvim test-shell test-starship test-tmux test-ghostty
 	@echo
 	@echo "=== test summary: see individual sub-target output above ==="
+
+test-migration:
+	@PATH="$$HOME/.local/bin:$$PATH" bash tests/migration/template_test.sh
+	@PATH="$$HOME/.local/bin:$$PATH" bash tests/migration/parity_gate.sh
+	@PATH="$$HOME/.local/bin:$$PATH" bash tests/migration/greenfield_roundtrip.sh
+	@PATH="$$HOME/.local/bin:$$PATH" bash tests/migration/uninstall_safety_test.sh
+	@PATH="$$HOME/.local/bin:$$PATH" bash tests/migration/windows_render_test.sh
+	@PATH="$$HOME/.local/bin:$$PATH" bash tests/migration/oracle_test.sh
 
 test-nvim:
 	@bash tests/nvim/run.sh

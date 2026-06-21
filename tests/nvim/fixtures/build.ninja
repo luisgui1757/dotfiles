@@ -1,0 +1,3 @@
+rule echo
+  command = echo dotfiles
+build out: echo

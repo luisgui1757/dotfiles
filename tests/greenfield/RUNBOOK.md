@@ -13,8 +13,9 @@ What is automated vs manual:
   predictions, "does psmux freeze", VS Code theme/font. That is the checklist in
   Part 3 below. There is no way to script "is this glyph a tofu box".
 
-> Testing THIS PR: the `main` curl one-liner pulls the OLD code. Use the
-> `chezmoi-pilot` branch everywhere below until it is merged.
+> Default target: these steps validate `main`. For PR validation, use the
+> branch override notes in each environment, then record the result in
+> [LEDGER.md](LEDGER.md).
 
 ---
 
@@ -34,13 +35,22 @@ for you** (one UAC prompt -- click **Yes**), runs `setup.ps1 -All`, then
 `validate.ps1`. Watch the auto-opened PowerShell window for `PASS:` lines and a
 final summary; logs are on the sandbox desktop.
 
+Supply-chain boundary: the `.wsb` self-bootstrap intentionally executes the
+selected ref's `sandbox-bootstrap.ps1` inside a disposable Sandbox so the harness
+works without a preexisting checkout. This is a reviewed greenfield-only trust
+root, not the recommended public setup path; production setup guidance is
+`git clone` then run local `setup`.
+
 That single UAC prompt is the ONLY thing you click. You do NOT need to open
 Settings. (Background: the Neovim config is a symlink, which Windows only allows
 with Developer Mode on; the script flips that one registry key elevated, then
 runs setup non-elevated so Scoop still works.)
 
-To test a different branch, change the ref in the `.wsb` logon-command URL
-(it points at `chezmoi-pilot`). For more RAM, see "Speeding up the Sandbox" below.
+To test a PR or branch, edit the `.wsb` logon command and change the `-Ref
+'main'` argument to the branch name. If the PR changes the bootstrap script
+itself, also change the raw GitHub URL branch segment so the Sandbox runs that
+version of `sandbox-bootstrap.ps1`. For more RAM, see "Speeding up the Sandbox"
+below.
 
 Then do Part 3 inside the sandbox (it is a full Windows desktop: open Windows
 Terminal, VS Code, psmux).
@@ -55,11 +65,12 @@ If you would rather drive it by hand -- open Windows Sandbox yourself, then an
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 Set-ExecutionPolicy -Scope Process Bypass -Force
 
-# 2. Get the chezmoi-pilot branch as a ZIP (no git needed yet) and unpack it.
+# 2. Get the main branch as a ZIP (no git needed yet) and unpack it.
+#    For PR validation, replace both "main" path segments with the branch name.
 $zip = "$env:TEMP\dotfiles.zip"
-Invoke-WebRequest https://github.com/luisgui1757/dotfiles/archive/refs/heads/chezmoi-pilot.zip -OutFile $zip
+Invoke-WebRequest https://github.com/luisgui1757/dotfiles/archive/refs/heads/main.zip -OutFile $zip
 Expand-Archive $zip "$env:TEMP\df" -Force
-Move-Item "$env:TEMP\df\dotfiles-chezmoi-pilot" "$env:USERPROFILE\dotfiles" -Force
+Move-Item "$env:TEMP\df\dotfiles-main" "$env:USERPROFILE\dotfiles" -Force
 Set-Location "$env:USERPROFILE\dotfiles"
 
 # 3. Install + apply everything. Admin is fine HERE (disposable sandbox): the
@@ -111,12 +122,13 @@ ssh admin@$(tart ip dotfiles-macos)
 Inside the VM:
 
 ```bash
-git clone -b chezmoi-pilot https://github.com/luisgui1757/dotfiles ~/dotfiles
+git clone -b main https://github.com/luisgui1757/dotfiles ~/dotfiles
 cd ~/dotfiles
 ./setup.sh --all
 ./tests/greenfield/validate.sh
 ```
 
+For PR validation, replace `main` with the branch name in the clone command.
 Do the GUI/visual parts of Part 3 in the `tart run` window (VS Code, terminal
 colours); the CLI parts over SSH are fine too.
 
@@ -135,12 +147,13 @@ ssh <user>@$(tart ip dotfiles-linux)
 Inside the VM:
 
 ```bash
-git clone -b chezmoi-pilot https://github.com/luisgui1757/dotfiles ~/dotfiles
+git clone -b main https://github.com/luisgui1757/dotfiles ~/dotfiles
 cd ~/dotfiles
 ./setup.sh --all
 ./tests/greenfield/validate.sh
 ```
 
+For PR validation, replace `main` with the branch name in the clone command.
 A `tart` Linux guest is a real desktop (unlike WSL), so Ghostty + fonts install
 natively here and the visual checks apply. Over a headless SSH session the CLI
 checks (tmux/nvim/lazygit/shell) still apply; skip the GUI rows.
@@ -247,3 +260,6 @@ yourself:
 - `tart`: `tart delete <name>` and re-clone, or snapshot before install.
 - In place (not a clean OS): `./uninstall.sh --all` / `.\uninstall.ps1 -All`
   restores the pre-install backups, then re-run setup.
+
+After each completed run, append the environment, branch/SHA, command, result,
+and any skipped manual rows to [LEDGER.md](LEDGER.md).

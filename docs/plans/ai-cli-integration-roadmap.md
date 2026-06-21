@@ -1,7 +1,7 @@
 # Roadmap: AI-CLI integration (Polaris + Pi) into dotfiles
 
 Status: **PLANNED — not implemented.** Reconciled with a Codex 5.5 xhigh second
-opinion (no vendor, no submodule, npm-only Pi, after `chezmoi-pilot` merges) and
+opinion (no vendor, no submodule, npm-only Pi, after the pilot migration branch merges) and
 then **superseding the Git-Bash mechanism** per the owner's call: instead of
 shelling Polaris's bash installer through Git-Bash on Windows, **Polaris gains a
 native PowerShell installer** and dotfiles calls Polaris's installer per-OS (bash
@@ -9,7 +9,7 @@ on Unix, pwsh on Windows). That deletes the entire Git-Bash / cygpath / WSL-bash
 layer. **The new make-or-break is renderer byte-parity**: the Polaris bundle
 sha256 must be `eff45a5e…` identically on every OS or `--check` lies cross-platform
 (an adversarial parity pass confirmed 7 real divergence traps and dismissed 11;
-all folded in below). Build it on a **fresh branch after `chezmoi-pilot` merges**
+all folded in below). Build it on a **fresh branch after the pilot migration branch merges**
 (do not pile it onto the in-test migration branch).
 
 ## What each thing is
@@ -262,7 +262,7 @@ design sandbox. Before trusting parity in production:
 
 ## Recommendation
 
-Do it on a **fresh branch after `chezmoi-pilot` merges**, and land the **Polaris-side
+Do it on a **fresh branch after the pilot migration branch merges**, and land the **Polaris-side
 prerequisite first** (native `tools/install.ps1` + `.gitattributes` `*.md eol=lf` +
 the cross-impl golden-hash gate). Canonical shape: **install Pi via npm; clone
 Polaris at a pinned SHA with a forced-LF checkout; verify the bundle sha256; run

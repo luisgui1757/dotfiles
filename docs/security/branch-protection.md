@@ -35,7 +35,20 @@ the script fails closed; delete the duplicate live ruleset before re-running it.
 
 ```bash
 make test-static
-gh api repos/luisgui1757/dotfiles/rulesets --jq '.[] | {name,enforcement,bypass_actors}'
+integrity_id="$(
+  gh api repos/luisgui1757/dotfiles/rulesets \
+    --jq '.[] | select(.name == "Protect main: integrity") | .id'
+)"
+gh api "repos/luisgui1757/dotfiles/rulesets/$integrity_id" \
+  --jq '{
+    name,
+    enforcement,
+    bypass_count:(.bypass_actors | length),
+    strict:(.rules[] | select(.type == "required_status_checks") | .parameters.strict_required_status_checks_policy),
+    contexts:(.rules[] | select(.type == "required_status_checks") | .parameters.required_status_checks | map(.context))
+  }'
+gh api repos/luisgui1757/dotfiles/branches/main/protection/required_status_checks \
+  --jq '{strict,contexts}'
 gh api repos/luisgui1757/dotfiles --jq '{allow_merge_commit,allow_squash_merge,allow_rebase_merge,allow_auto_merge,delete_branch_on_merge}'
 ```
 
@@ -45,7 +58,11 @@ Expected live posture:
 - rebase merges disabled;
 - squash merges enabled;
 - auto-merge disabled;
-- required checks are strict and current with `main`;
+- required checks are strict and include exactly:
+  `ubuntu`, `macos`, `windows`, `chezmoi-parity`, `chezmoi-parity-macos`,
+  `chezmoi-parity-windows`, `e2e containers / ubuntu-24.04`,
+  `setup.sh / ubuntu-24.04`, `setup.sh / macos-15`, and
+  `setup.ps1 / windows-2025` in both the integrity ruleset and classic fallback;
 - only `Protect main: review` and `Protect main: owner updates` have bypass actors;
 - each bypass actor is `luisgui1757` with `bypass_mode: pull_request`;
 - `Protect main: integrity` has no bypass actors.

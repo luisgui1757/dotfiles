@@ -110,6 +110,51 @@
     },
     {
       "customType": "regex",
+      "description": "Homebrew installer script commit pinned to the current main branch digest. The adjacent installer script SHA-256 must be recomputed manually after Renovate bumps this.",
+      "managerFilePatterns": ["/^install-deps\\.sh$/"],
+      "matchStrings": [
+        "HOMEBREW_INSTALL_COMMIT=\"(?<currentDigest>[a-f0-9]{40})\"\\s+HOMEBREW_INSTALL_SHA256=\"[a-f0-9]{64}\""
+      ],
+      "currentValueTemplate": "main",
+      "depNameTemplate": "Homebrew/install",
+      "packageNameTemplate": "https://github.com/Homebrew/install",
+      "datasourceTemplate": "git-refs"
+    },
+    {
+      "customType": "regex",
+      "description": "chezmoi Linux x86_64 release version. Adjacent Linux asset SHA-256 values must be recomputed manually after Renovate bumps this.",
+      "managerFilePatterns": ["/^install-deps\\.sh$/"],
+      "matchStrings": [
+        "CHEZMOI_VERSION=\"(?<currentValue>v[^\"]+)\"\\s+CHEZMOI_LINUX_X86_64_SHA256=\"[a-f0-9]{64}\""
+      ],
+      "depNameTemplate": "twpayne/chezmoi",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "description": "chezmoi Linux arm64 release version. Adjacent Linux asset SHA-256 values must be recomputed manually after Renovate bumps this.",
+      "managerFilePatterns": ["/^install-deps\\.sh$/"],
+      "matchStrings": [
+        "CHEZMOI_VERSION=\"(?<currentValue>v[^\"]+)\"(?:.|\\n)*?CHEZMOI_LINUX_ARM64_SHA256=\"[a-f0-9]{64}\""
+      ],
+      "depNameTemplate": "twpayne/chezmoi",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "description": "chezmoi release version in CI. Adjacent Linux/macOS/Windows asset SHA-256 values must be recomputed manually after Renovate bumps this.",
+      "managerFilePatterns": ["/^\\.github/workflows/test\\.yml$/"],
+      "matchStrings": [
+        "CHEZMOI_VERSION:\\s*(?<currentValue>v[^\\s]+)\\s+CHEZMOI_LINUX_X86_64_SHA256:\\s*[a-f0-9]{64}"
+      ],
+      "depNameTemplate": "twpayne/chezmoi",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
       "description": "lazygit Linux release version. Adjacent Linux asset SHA-256 values must be recomputed manually after Renovate bumps this.",
       "managerFilePatterns": ["/^install-deps\\.sh$/"],
       "matchStrings": [
@@ -132,10 +177,54 @@
     },
     {
       "customType": "regex",
+      "description": "Starship Linux x86_64 release version. Adjacent Linux asset SHA-256 values must be recomputed manually after Renovate bumps this.",
+      "managerFilePatterns": ["/^install-deps\\.sh$/"],
+      "matchStrings": [
+        "STARSHIP_VERSION=\"(?<currentValue>v[^\"]+)\"\\s+STARSHIP_LINUX_X86_64_SHA256=\"[a-f0-9]{64}\""
+      ],
+      "depNameTemplate": "starship/starship",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "description": "Starship Linux arm64 release version. Adjacent Linux asset SHA-256 values must be recomputed manually after Renovate bumps this.",
+      "managerFilePatterns": ["/^install-deps\\.sh$/"],
+      "matchStrings": [
+        "STARSHIP_VERSION=\"(?<currentValue>v[^\"]+)\"(?:.|\\n)*?STARSHIP_LINUX_ARM64_SHA256=\"[a-f0-9]{64}\""
+      ],
+      "depNameTemplate": "starship/starship",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "description": "Starship Linux x86_64 release version in CI. The adjacent SHA-256 must be recomputed manually after Renovate bumps this.",
+      "managerFilePatterns": ["/^\\.github/workflows/test\\.yml$/"],
+      "matchStrings": [
+        "STARSHIP_VERSION:\\s*(?<currentValue>v[^\\s]+)\\s+STARSHIP_LINUX_X86_64_SHA256:\\s*[a-f0-9]{64}"
+      ],
+      "depNameTemplate": "starship/starship",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
       "description": "tree-sitter CLI Linux x86_64 release version. Adjacent Linux asset SHA-256 values must be recomputed manually after Renovate bumps this.",
       "managerFilePatterns": ["/^install-deps\\.sh$/"],
       "matchStrings": [
         "TREE_SITTER_CLI_LINUX_VERSION=\"(?<currentValue>v[^\"]+)\"\\s+TREE_SITTER_CLI_LINUX_X86_64_SHA256=\"[a-f0-9]{64}\""
+      ],
+      "depNameTemplate": "tree-sitter/tree-sitter",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "description": "tree-sitter CLI Linux x86_64 release version in CI. The adjacent SHA-256 must be recomputed manually after Renovate bumps this.",
+      "managerFilePatterns": ["/^\\.github/workflows/test\\.yml$/"],
+      "matchStrings": [
+        "TREE_SITTER_CLI_LINUX_VERSION:\\s*(?<currentValue>v[^\\s]+)\\s+TREE_SITTER_CLI_LINUX_X86_64_SHA256:\\s*[a-f0-9]{64}"
       ],
       "depNameTemplate": "tree-sitter/tree-sitter",
       "datasourceTemplate": "github-releases",
@@ -185,6 +274,28 @@
       "depNameTemplate": "cargo-bins/cargo-binstall",
       "packageNameTemplate": "https://github.com/cargo-bins/cargo-binstall",
       "datasourceTemplate": "git-refs"
+    },
+    {
+      "customType": "regex",
+      "description": "Node runtime version used to run Renovate's schema validator.",
+      "managerFilePatterns": ["/^scripts/validate-renovate\\.sh$/"],
+      "matchStrings": [
+        "RENOVATE_NODE_VERSION=\"(?<currentValue>[^\"]+)\""
+      ],
+      "depNameTemplate": "node",
+      "datasourceTemplate": "npm",
+      "versioningTemplate": "node"
+    },
+    {
+      "customType": "regex",
+      "description": "Renovate package version used by the required schema validator.",
+      "managerFilePatterns": ["/^scripts/validate-renovate\\.sh$/"],
+      "matchStrings": [
+        "RENOVATE_VERSION=\"(?<currentValue>[^\"]+)\""
+      ],
+      "depNameTemplate": "renovate",
+      "datasourceTemplate": "npm",
+      "versioningTemplate": "semver"
     }
   ],
   "packageRules": [

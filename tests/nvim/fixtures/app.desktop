@@ -1,0 +1,4 @@
+[Desktop Entry]
+Type=Application
+Name=Dotfiles Test
+Exec=dotfiles-test

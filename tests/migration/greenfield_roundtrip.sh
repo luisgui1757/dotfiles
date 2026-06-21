@@ -2,8 +2,8 @@
 set -euo pipefail
 
 # Determinism: match parity_gate.sh. Chezmoi externals use a fixed
-# ~/.local/share path; do not let an inherited XDG_DATA_HOME move the fixture.
-unset XDG_DATA_HOME
+# ~/.local/share path; the fixture sets XDG_DATA_HOME to a hostile value below
+# so path drift cannot pass by accident.
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 SRC="$REPO_ROOT/home"
@@ -99,6 +99,7 @@ require_cmd python3
 
 HOME="$(mktemp -d)"
 export HOME
+export XDG_DATA_HOME="$HOME/xdg-data"
 trap 'rm -rf "$HOME"' EXIT
 
 preseed="user tmux config from before chezmoi"

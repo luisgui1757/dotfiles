@@ -136,16 +136,17 @@ if [ "$rc" -ne 0 ]; then
     echo "FAIL: setup.sh exited $rc" >&2
     exit "$rc"
 fi
-if grep -Fq "skipped: Phase 3-4" "$setup_log"; then
-    echo "FAIL: setup.sh skipped Phase 3-4" >&2
+if grep -Fq "skipped: Phase 3-5" "$setup_log"; then
+    echo "FAIL: setup.sh skipped Phase 3-5" >&2
     exit 1
 fi
 if grep -Eq "^[[:space:]]*FAIL:" "$setup_log"; then
     echo "FAIL: setup.sh emitted a FAIL marker" >&2
     exit 1
 fi
-grep -F "Phase 3/4" "$setup_log" >/dev/null
-grep -F "Phase 4/4" "$setup_log" >/dev/null
+grep -F "Phase 3/5" "$setup_log" >/dev/null
+grep -F "Phase 4/5" "$setup_log" >/dev/null
+grep -F "Phase 5/5" "$setup_log" >/dev/null
 tests/greenfield/validate.sh
 '@
     Invoke-WslChecked -Arguments @('-d', $DistroName, '-u', 'dotfiles', '--', 'bash', '-lc', $runSetup)

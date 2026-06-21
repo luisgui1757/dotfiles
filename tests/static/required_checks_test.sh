@@ -9,7 +9,8 @@ trap 'rm -rf "$tmp"' EXIT
 
 expected="$tmp/expected.txt"
 settings="$tmp/settings.txt"
-safeguards="$tmp/safeguards.txt"
+safeguards_json="$tmp/safeguards-json.txt"
+safeguards_function="$tmp/safeguards-function.txt"
 ruleset="$tmp/ruleset.txt"
 
 {
@@ -68,7 +69,15 @@ awk '
     sub(/",?[[:space:]]*$/, "", line)
     if (line != "") print line
   }
-' scripts/apply-repo-safeguards.sh > "$safeguards"
+' scripts/apply-repo-safeguards.sh > "$safeguards_json"
+
+awk '
+  /^required_check_contexts\(\) \{/ { in_fn = 1; next }
+  in_fn && /^}/ { in_fn = 0; next }
+  in_fn && /^[[:space:]]*cat <<'\''EOF'\''/ { in_heredoc = 1; next }
+  in_fn && in_heredoc && /^EOF$/ { in_heredoc = 0; next }
+  in_fn && in_heredoc { print }
+' scripts/apply-repo-safeguards.sh > "$safeguards_function"
 
 python3 - <<'PY' > "$ruleset"
 import json
@@ -88,8 +97,13 @@ if ! diff -u "$expected" "$settings"; then
     exit 1
 fi
 
-if ! diff -u "$expected" "$safeguards"; then
-    echo "FAIL: scripts/apply-repo-safeguards.sh required checks are out of sync" >&2
+if ! diff -u "$expected" "$safeguards_json"; then
+    echo "FAIL: scripts/apply-repo-safeguards.sh JSON required checks are out of sync" >&2
+    exit 1
+fi
+
+if ! diff -u "$expected" "$safeguards_function"; then
+    echo "FAIL: scripts/apply-repo-safeguards.sh required_check_contexts is out of sync" >&2
     exit 1
 fi
 

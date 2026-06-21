@@ -217,7 +217,7 @@ assert_zsh_plugins() {
         skip_check "zsh external plugin check skipped by --config-only"
         return
     fi
-    plugin_root="${XDG_DATA_HOME:-$HOME/.local/share}/dotfiles/zsh-plugins"
+    plugin_root="$HOME/.local/share/dotfiles/zsh-plugins"
     if [[ -r "$plugin_root/fzf-tab/fzf-tab.plugin.zsh" ]]; then
         pass_check "fzf-tab plugin file exists"
     else
@@ -294,7 +294,7 @@ main() {
     if [[ "$CONFIG_ONLY" -eq 1 ]]; then
         skip_check "full setup tool checks skipped by --config-only"
     else
-        for cmd in git nvim rg fd fzf tmux zsh lazygit starship chezmoi; do
+        for cmd in git nvim rg fd fzf tmux zsh lazygit starship chezmoi tree-sitter cmake lsd; do
             require_cmd "$cmd"
         done
     fi
@@ -303,7 +303,8 @@ main() {
     assert_posix_managed_configs
     assert_zsh_plugins
     assert_chezmoi_verify
-    run_nvim_checked lazy "+Lazy! sync" "+qa"
+    run_nvim_checked lazy "+Lazy! restore" "+qa"
+    DOTFILES_TREESITTER_SYNC_INSTALL=1 run_nvim_checked treesitter -u "$REPO_ROOT/nvim/init.lua" -c "lua require('lazy').load({ plugins = { 'nvim-treesitter' } })" +qa
     run_nvim_checked mason "+MasonToolsInstallSync" "+qa"
     assert_mason_tool "lua-language-server" lua-language-server lua-language-server.cmd lua-language-server.exe
     assert_mason_tool "stylua" stylua stylua.cmd stylua.exe

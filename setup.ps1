@@ -7,18 +7,19 @@
 #   .\setup.ps1 -DryRun          preview every step
 #   .\setup.ps1 -SkipDeps        already have nvim/starship; just config+sync
 #   .\setup.ps1 -SkipBootstrap   back-compat alias: skip config apply
-#   .\setup.ps1 -SkipConfig      already configured; just sync plugins+LSP
-#   .\setup.ps1 -SkipNvim        skip nvim plugin + Mason sync
+#   .\setup.ps1 -SkipConfig      already configured; just sync nvim
+#   .\setup.ps1 -SkipNvim        skip nvim plugin/parser/Mason sync
 #   .\setup.ps1 -BestEffort      continue past plugin/LSP/Mason phase failures
 #   .\setup.ps1 -SkipWindowsTerminalMerge   config+sync but leave WT settings.json untouched
 #   .\setup.ps1 -MergeWindowsTerminal        (no-op alias; the WT rose-pine merge is now default-on)
 #
-# Remote usage (no checkout yet):
-#   iwr https://raw.githubusercontent.com/luisgui1757/dotfiles/main/setup.ps1 -OutFile setup.ps1
+# First run (no checkout yet):
+#   git clone https://github.com/luisgui1757/dotfiles.git "$env:USERPROFILE\dotfiles"
+#   Set-Location "$env:USERPROFILE\dotfiles"
 #   .\setup.ps1 -All
 #
-# The remote form clones the repo to $env:DOTFILES_DEST (default
-# %USERPROFILE%\dotfiles) and re-invokes itself locally.
+# Set DOTFILES_DEST to a different absolute path before cloning if you want a
+# different checkout location.
 
 [CmdletBinding()]
 param(
@@ -37,16 +38,32 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $RepoUrl     = 'https://github.com/luisgui1757/dotfiles.git'
-$DefaultDest = Join-Path $env:USERPROFILE 'dotfiles'
+
+function Get-DefaultProfileRoot {
+    if (-not [string]::IsNullOrWhiteSpace($env:USERPROFILE)) { return $env:USERPROFILE }
+    if (-not [string]::IsNullOrWhiteSpace($env:HOME)) { return $env:HOME }
+    return [Environment]::GetFolderPath([Environment+SpecialFolder]::UserProfile)
+}
+
+function Get-ScoopRoot {
+    if (-not [string]::IsNullOrWhiteSpace($env:SCOOP)) { return $env:SCOOP }
+    $profileRoot = Get-DefaultProfileRoot
+    if ([string]::IsNullOrWhiteSpace($profileRoot)) { return '' }
+    return (Join-Path $profileRoot 'scoop')
+}
+
+$DefaultDest = Join-Path (Get-DefaultProfileRoot) 'dotfiles'
 
 # Rebuild PATH from registry values plus Scoop shims, then de-duplicate.
 # This differs from setup.sh, which evaluates brew shellenv and appends Unix bin dirs.
 function Update-RuntimePath {
     $parts = @()
-    $scoopRoot = if ($env:SCOOP) { $env:SCOOP } else { Join-Path $env:USERPROFILE 'scoop' }
-    $shimDir = Join-Path $scoopRoot 'shims'
-    if (Test-Path -LiteralPath $shimDir) {
-        $parts += $shimDir
+    $scoopRoot = Get-ScoopRoot
+    if (-not [string]::IsNullOrWhiteSpace($scoopRoot)) {
+        $shimDir = Join-Path $scoopRoot 'shims'
+        if (Test-Path -LiteralPath $shimDir) {
+            $parts += $shimDir
+        }
     }
     foreach ($scope in 'Machine', 'User') {
         $p = [Environment]::GetEnvironmentVariable('PATH', $scope)
@@ -87,6 +104,15 @@ function Get-VsBuildToolsInstallationPath {
     return ''
 }
 
+function Join-VsDevShellPath {
+    param([Parameter(Mandatory)] [string]$InstallationPath)
+
+    if ($InstallationPath -match '^[A-Za-z]:[\\/]') {
+        return ($InstallationPath.TrimEnd([char[]]@('\', '/')) + '\Common7\Tools\Microsoft.VisualStudio.DevShell.dll')
+    }
+    return (Join-Path $InstallationPath 'Common7/Tools/Microsoft.VisualStudio.DevShell.dll')
+}
+
 function Enter-VsDeveloperEnvironment {
     param(
         # NOTE: do NOT name this $IsWindows -- that is a read-only automatic
@@ -110,7 +136,7 @@ function Enter-VsDeveloperEnvironment {
         return $false
     }
 
-    $devShell = Join-Path $vsPath 'Common7\Tools\Microsoft.VisualStudio.DevShell.dll'
+    $devShell = Join-VsDevShellPath -InstallationPath $vsPath
     if (-not (& $ModulePathTester $devShell)) {
         Write-Host "  FAIL: VS DevShell module missing at $devShell" -ForegroundColor Red
         return $false
@@ -886,31 +912,48 @@ function Invoke-NvimSyncPhases {
         [bool]$IsDryRun = $DryRun,
         [scriptblock]$CommandTester = { param([string]$Name) [bool](Get-Command $Name -ErrorAction SilentlyContinue) },
         [scriptblock]$DevEnvironmentEntrypoint = { Enter-VsDeveloperEnvironment },
-        [scriptblock]$LazyRunner = { & nvim --headless "+Lazy! sync" "+qa" },
+        [scriptblock]$LazyRunner = { & nvim --headless "+Lazy! restore" "+qa" },
+        [scriptblock]$TreesitterRunner = {
+            $oldSyncInstall = $env:DOTFILES_TREESITTER_SYNC_INSTALL
+            try {
+                $env:DOTFILES_TREESITTER_SYNC_INSTALL = '1'
+                & nvim --headless "+lua require('lazy').load({ plugins = { 'nvim-treesitter' } })" "+qa"
+            } finally {
+                if ($null -eq $oldSyncInstall) {
+                    Remove-Item Env:DOTFILES_TREESITTER_SYNC_INSTALL -ErrorAction SilentlyContinue
+                } else {
+                    $env:DOTFILES_TREESITTER_SYNC_INSTALL = $oldSyncInstall
+                }
+            }
+        },
         [scriptblock]$MasonRunner = { & nvim --headless "+MasonToolsInstallSync" "+qa" }
     )
 
     if (-not $SkipNvimPhase -and -not $IsDryRun) {
         if (& $CommandTester 'nvim') {
             & $DevEnvironmentEntrypoint | Out-Null
-            Phase "Phase 3/4: sync Neovim plugins (lazy.nvim)"
-            Invoke-NvimCommandOrFail "Lazy sync" $LazyRunner
+            Phase "Phase 3/5: restore Neovim plugins (lazy.nvim)"
+            Invoke-NvimCommandOrFail "Lazy restore" $LazyRunner
 
-            Phase "Phase 4/4: install LSP servers + formatters (Mason)"
+            Phase "Phase 4/5: install Tree-sitter parsers"
+            Write-Host "  this compiles nvim-treesitter parsers and can take several minutes."
+            Invoke-NvimCommandOrFail "Tree-sitter parser install" $TreesitterRunner
+
+            Phase "Phase 5/5: install LSP servers + formatters (Mason)"
             Write-Host "  this can take 3-8 minutes on a fresh Windows machine."
             Invoke-NvimCommandOrFail "Mason install" $MasonRunner
         } else {
             Write-Host ""
-            Write-Host "skipped: Phase 3-4 (nvim plugins) -- nvim not on PATH yet."
+            Write-Host "skipped: Phase 3-5 (nvim plugins/parsers/tools) -- nvim not on PATH yet."
             Write-Host "         Open a new shell so PATH refreshes, then run:"
             Write-Host "             .\setup.ps1 -SkipDeps -SkipConfig"
         }
     } elseif ($IsDryRun) {
         Write-Host ""
-        Write-Host "skipped: Phase 3-4 (nvim plugins) in -DryRun mode"
+        Write-Host "skipped: Phase 3-5 (nvim plugins/parsers/tools) in -DryRun mode"
     } else {
         Write-Host ""
-        Write-Host "skipped: Phase 3-4 (nvim plugins) via -SkipNvim"
+        Write-Host "skipped: Phase 3-5 (nvim plugins/parsers/tools) via -SkipNvim"
     }
 }
 
@@ -999,7 +1042,7 @@ if ($Update) {
 
 # ---- Phase 1: dependencies ---------------------------------------------------
 if (-not $SkipDeps) {
-    Phase "Phase 1/4: install dependencies"
+    Phase "Phase 1/5: install dependencies"
     & (Join-Path $ScriptDir 'install-deps.ps1') @depsArgs
 } else {
     Write-Host ""
@@ -1008,14 +1051,14 @@ if (-not $SkipDeps) {
 
 # Phase 1 may install nvim and tools into locations not yet on this process PATH.
 # A child installer cannot mutate our PATH, and persistent PATH edits only reach
-# new shells. Re-derive PATH so Phase 3-4 can find nvim.
+# new shells. Re-derive PATH so Phase 3-5 can find nvim.
 if (-not $DryRun) {
     Update-RuntimePath
 }
 
 # ---- Phase 2: apply configs --------------------------------------------------
 if (-not ($SkipBootstrap -or $SkipConfig)) {
-    Phase "Phase 2/4: apply configs with chezmoi"
+    Phase "Phase 2/5: apply configs with chezmoi"
     $global:LASTEXITCODE = 0   # reset so a stale code from Phase 1 cannot false-trip
     Invoke-ChezmoiApplyPhase
 } else {
