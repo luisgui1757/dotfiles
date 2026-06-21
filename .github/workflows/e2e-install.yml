@@ -315,7 +315,7 @@ jobs:
           Assert-ContentEqual -Path (Join-Path $env:USERPROFILE '.tmux.conf') -Expected (Join-Path $repo 'tmux\tmux.conf')
           Assert-ContentEqual -Path (Join-Path $env:USERPROFILE '.tmux.windows.conf') -Expected (Join-Path $repo 'tmux\tmux.windows.conf')
           Assert-ContentEqual -Path $PROFILE -Expected (Join-Path $repo 'shells\powershell_profile.ps1')
-          Assert-ContentEqual -Path (Join-Path $env:LOCALAPPDATA 'lazygit\config.yml') -Expected (Join-Path $repo 'lazygit\config.yml')
+          Assert-ContentEqual -Path (Join-Path $env:LOCALAPPDATA 'lazygit\config.yml') -Expected (Join-Path $repo 'lazygit\config.windows.yml')
           Invoke-NvimChecked -Name lazy -NvimArgs @('+Lazy! restore', '+qa')
           $env:DOTFILES_TREESITTER_SYNC_INSTALL = '1'
           Invoke-NvimChecked -Name treesitter -NvimArgs @('-u', ((Join-Path $repo 'nvim\init.lua') -replace '\\', '/'), '-c', "lua require('lazy').load({ plugins = { 'nvim-treesitter' } })", '+qa')

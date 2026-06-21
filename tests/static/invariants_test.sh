@@ -162,6 +162,13 @@ else
     echo "ok  : Windows CI uses test.ps1"
 fi
 
+if ! grep -Fq "Join-Path \$repo 'lazygit\config.windows.yml'" .github/workflows/e2e-install.yml; then
+    echo "FAIL: Windows e2e must assert native lazygit config.windows.yml, not the POSIX/default config"
+    fail=1
+else
+    echo "ok  : Windows e2e asserts the native lazygit config variant"
+fi
+
 if [[ ! -f AGENTS.md ]] || ! grep -q 'CLAUDE.md' AGENTS.md; then
     echo "FAIL: AGENTS.md must stay a thin pointer to CLAUDE.md"
     fail=1

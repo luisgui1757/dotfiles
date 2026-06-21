@@ -432,7 +432,9 @@ install paths, not symmetric container platforms:
   configs through chezmoi in Phase 2, and then rerun Lazy restore,
   Tree-sitter parser install, and Mason headless sync. They explicitly fail if
   setup skips Phase 3-5, emits a `FAIL:` marker, or Mason did not install
-  expected tools. After the full restore/sync they also run the
+  expected tools. Windows e2e must assert `%LOCALAPPDATA%\lazygit\config.yml`
+  against `lazygit/config.windows.yml`, not the POSIX/default
+  `lazygit/config.yml`. After the full restore/sync they also run the
   **Tier 2 language smoke** (`tests/nvim/lsp_smoke.lua`, gated on
   `DOTFILES_LSP_SMOKE=strict`): against the production init it asserts every
   `treesitter_parsers` entry is one nvim-treesitter `main` supports
