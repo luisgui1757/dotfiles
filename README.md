@@ -3,8 +3,8 @@
 Cross-platform terminal and editor setup for macOS, Linux, WSL, and Windows.
 The repo owns the daily shell/editor stack: Neovim, tmux/psmux, Starship, zsh,
 PowerShell, Ghostty, lazygit, Windows Terminal theming, locked plugin restore,
-and LSP / formatter provisioning. It also provisions the `tree-sitter` CLI
-needed by `nvim-treesitter` main parser builds.
+LSP / formatter provisioning, and global Polaris agent-policy bootstrap. It also
+provisions the `tree-sitter` CLI needed by `nvim-treesitter` main parser builds.
 
 The public interface is intentionally small:
 
@@ -110,6 +110,7 @@ apply.
 ./setup.sh --dry-run             # preview
 ./setup.sh --experimental-wsl-gui # WSL-only opt-in for Linux GUI terminal bits
 ./setup.sh --skip-config         # skip chezmoi config apply
+./setup.sh --skip-agents         # skip global Polaris agent policy
 make setup                       # same as ./setup.sh, via the Makefile
 ```
 
@@ -119,6 +120,7 @@ make setup                       # same as ./setup.sh, via the Makefile
 .\setup.ps1 -Update
 .\setup.ps1 -DryRun
 .\setup.ps1 -SkipConfig
+.\setup.ps1 -SkipAgents
 .\setup.ps1 -SkipWindowsTerminalMerge # leave WT settings.json untouched
 .\setup.ps1 -MergeWindowsTerminal     # accepted no-op alias; WT merge is default-on
 ```
@@ -179,7 +181,7 @@ restore manually from the printed backup if you want to undo it.
 
 ## What Setup Does
 
-`setup` is a five-phase, idempotent orchestrator:
+`setup` is a six-phase, idempotent orchestrator:
 
 ```text
 setup -> install-deps                 phase 1: programs and optional tools
@@ -187,6 +189,7 @@ setup -> install-deps                 phase 1: programs and optional tools
       -> nvim "+Lazy! restore" +qa    phase 3: plugins from lazy-lock.json
       -> nvim +DOTFILES_TREESITTER_SYNC_INSTALL  phase 4: Tree-sitter parsers
       -> nvim "+MasonToolsInstallSync" +qa        phase 5: LSP servers and formatters
+      -> Polaris global install       phase 6: per-user agent policy
 ```
 
 Pass `--all` / `-All` for explicit non-interactive installs (Y to every prompt).
@@ -196,6 +199,7 @@ requested, it defaults to all and prints `note: no TTY detected; running with
 **"install EVERYTHING without further prompts? [Y/n]"** question — answer `Y`
 to pull the lot in one go, or `n` to choose per tool.
 Add `--dry-run` / `-DryRun` to preview every step without touching disk.
+Pass `--skip-agents` / `-SkipAgents` to leave global AI-agent entrypoints alone.
 Pass `--update` / `-Update` from an existing checkout to run only the
 drift-edge refresh: scoped package-manager updates for present catalog tools,
 then `nvim --headless +MasonToolsUpdate +qa`. It deliberately skips `git pull`,
@@ -295,6 +299,19 @@ and whether `pwsh` is installed.
 - VS Code is optional. On WSL, use Windows VS Code plus `code .` for Remote -
   WSL, or use a Linux GUI build when WSLg / X11 is available. Rosé Pine setup
   follows whatever `code` CLI is on PATH.
+- Polaris agent policy is a supported setup phase, not a synced dotfile. `setup`
+  pins Polaris `0.1.1` at commit `489dcc6f991ddcff63c460a433e983264dc54cf7`,
+  caches that checkout under `~/.local/share/dotfiles/polaris/<commit>` on
+  POSIX and `%LOCALAPPDATA%\dotfiles\polaris\<commit>` on Windows, verifies the
+  checkout `VERSION`, then runs Polaris' own global installer and global check.
+  The global installer writes the per-user AI entrypoints for Codex
+  (`~/.codex/AGENTS.md`), Claude Code (`~/.claude/CLAUDE.md`), opencode
+  (`~/.config/opencode/AGENTS.md`), and Pi CLI (`~/.pi/agent/AGENTS.md`);
+  Copilot has no reliable global file path, so user-wide Copilot instructions
+  remain a manual VS Code/github.com profile step. To remove the global blocks,
+  run the cached Polaris installer with `--global --remove` on POSIX or
+  `-Global -Remove` on Windows. Project/team adoption is separate: run Polaris
+  repo-local install or vendoring in that project and commit those files there.
 - Notes / Obsidian support writes `export NOTES_VAULT=...` to
   `~/.zshrc.local` (gitignored, sourced by `zshrc`). Non-interactive runs skip
   the prompt, so set `NOTES_VAULT` yourself there.
@@ -407,10 +424,10 @@ systems, while the required WSL proxy is the Ubuntu container plus the
 WSL config-template coverage. Do not add the WSL2 canary to
 required checks unless the owner explicitly accepts the flake risk.
 
-These e2e jobs fail if setup skips Phase 3-5, emits a precise `FAIL:` marker,
-installs Neovim below 0.12, Lazy restore / Tree-sitter parser install / Mason
-sync exits nonzero, or expected Mason-installed binaries are missing. They do
-not blanket-fail on benign warning/deprecation text.
+These e2e jobs fail if setup skips Phase 3-5, omits Phase 6/6, emits a precise
+`FAIL:` marker, installs Neovim below 0.12, Lazy restore / Tree-sitter parser
+install / Mason sync exits nonzero, or expected Mason-installed binaries are
+missing. They do not blanket-fail on benign warning/deprecation text.
 
 ## Repository Safeguards
 
@@ -520,6 +537,10 @@ stale; CI then fails verification until a human reviews the adjacent constant.
 - **chezmoi is the config-layer path, not the provisioning path.** Do not move
   package installs, binary/font installers, login-shell changes, VS Code,
   devilspie2, or distro-manager policy out of `install-deps`.
+- **Polaris is global agent policy, not a dotfile mirror.** Setup installs it
+  from a pinned, version-checked upstream checkout and lets Polaris own its
+  managed global entrypoint blocks. This repo does not vendor Polaris core or
+  sync agent runtime state.
 - **Rose Pine everywhere it can render.** Nvim, lualine, starship, tmux,
   ghostty, Windows Terminal, PSReadLine — same palette across the stack. VS Code
   joins optionally: `install-deps` offers VS Code, and if `code` is detected it

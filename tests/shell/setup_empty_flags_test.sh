@@ -6,7 +6,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 
-out=$(/bin/bash "$REPO_ROOT/setup.sh" --skip-deps --skip-bootstrap --skip-nvim 2>&1)
+out=$(/bin/bash "$REPO_ROOT/setup.sh" --skip-deps --skip-bootstrap --skip-nvim --skip-agents 2>&1)
 rc=$?
 if [[ "$rc" -ne 0 ]]; then
     echo "FAIL: setup.sh --skip-* exited $rc"; echo "$out"; exit 1

@@ -183,6 +183,99 @@ Describe "setup.ps1 source-only import" {
     }
 }
 
+Describe "setup.ps1 Polaris agent policy" {
+    BeforeEach {
+        . $script:ImportSetupForTest
+        $script:PolarisTestRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("setup-polaris-" + [System.Guid]::NewGuid())
+        New-Item -ItemType Directory -Force -Path $script:PolarisTestRoot | Out-Null
+    }
+
+    AfterEach {
+        Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $script:PolarisTestRoot
+    }
+
+    It "previews the pinned Polaris global install in dry-run mode" {
+        $cache = Join-Path $script:PolarisTestRoot 'cache'
+        $output = & {
+            Invoke-PolarisAgentPolicy `
+                -AllMode:$true `
+                -IsDryRun:$true `
+                -Version '0.1.1' `
+                -Ref '489dcc6f991ddcff63c460a433e983264dc54cf7' `
+                -CacheRoot $cache
+        } 6>&1 | Out-String
+
+        $output | Should -Match 'Phase 6/6: apply global agent policy \(Polaris\)'
+        $output | Should -Match 'would\s+clone/fetch Polaris 0\.1\.1'
+        Test-Path -LiteralPath $cache | Should -BeFalse
+    }
+
+    It "honors -SkipAgents" {
+        $output = & {
+            Invoke-PolarisAgentPolicy -SkipAgentsPhase:$true -AllMode:$true
+        } 6>&1 | Out-String
+
+        $output | Should -Match 'skipped: Phase 6/6 \(agent policy\) via -SkipAgents'
+    }
+
+    It "uses the interactive prompt only outside all and dry-run modes" {
+        Test-ShouldApplyAgentPolicy `
+            -SkipAgentsPhase:$false `
+            -AllMode:$false `
+            -IsDryRun:$false `
+            -Prompt { return 'n' } | Should -BeFalse
+
+        Test-ShouldApplyAgentPolicy `
+            -SkipAgentsPhase:$false `
+            -AllMode:$false `
+            -IsDryRun:$false `
+            -Prompt { return '' } | Should -BeTrue
+    }
+
+    It "runs the pinned Polaris installer and global check from a verified checkout" {
+        $work = Join-Path $script:PolarisTestRoot 'polaris-work'
+        $tools = Join-Path $work 'tools'
+        New-Item -ItemType Directory -Force -Path $tools | Out-Null
+        & git -C $work init -q
+        & git -C $work config user.name 'Dotfiles Test'
+        & git -C $work config user.email 'dotfiles@example.invalid'
+        [System.IO.File]::WriteAllText((Join-Path $work 'VERSION'), "0.1.1`n", [System.Text.UTF8Encoding]::new($false))
+        $installer = Join-Path $tools 'install.ps1'
+        [System.IO.File]::WriteAllText($installer, @'
+Add-Content -LiteralPath $env:POLARIS_TEST_LOG -Value ($args -join ' ')
+exit 0
+'@, [System.Text.UTF8Encoding]::new($false))
+        & git -C $work add VERSION tools/install.ps1
+        & git -C $work commit -q -m 'fake polaris'
+        $sha = (& git -C $work rev-parse HEAD).Trim()
+
+        $cache = Join-Path $script:PolarisTestRoot 'cache'
+        New-Item -ItemType Directory -Force -Path $cache | Out-Null
+        Move-Item -LiteralPath $work -Destination (Join-Path $cache $sha)
+
+        $oldLog = $env:POLARIS_TEST_LOG
+        try {
+            $env:POLARIS_TEST_LOG = Join-Path $script:PolarisTestRoot 'polaris-install.log'
+            Invoke-PolarisAgentPolicy `
+                -AllMode:$true `
+                -IsDryRun:$false `
+                -Version '0.1.1' `
+                -Ref $sha `
+                -CacheRoot $cache
+
+            $calls = Get-Content -LiteralPath $env:POLARIS_TEST_LOG
+            $calls | Should -Contain '-Global'
+            $calls | Should -Contain '-Global -Check'
+        } finally {
+            if ($null -eq $oldLog) {
+                Remove-Item Env:POLARIS_TEST_LOG -ErrorAction SilentlyContinue
+            } else {
+                $env:POLARIS_TEST_LOG = $oldLog
+            }
+        }
+    }
+}
+
 Describe "setup.ps1 update mode" {
     BeforeEach {
         . $script:ImportSetupForTest

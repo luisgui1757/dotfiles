@@ -9,6 +9,7 @@
 #   .\setup.ps1 -SkipBootstrap   back-compat alias: skip config apply
 #   .\setup.ps1 -SkipConfig      already configured; just sync nvim
 #   .\setup.ps1 -SkipNvim        skip nvim plugin/parser/Mason sync
+#   .\setup.ps1 -SkipAgents      skip global Polaris agent-policy install
 #   .\setup.ps1 -BestEffort      continue past plugin/LSP/Mason phase failures
 #   .\setup.ps1 -SkipWindowsTerminalMerge   config+sync but leave WT settings.json untouched
 #   .\setup.ps1 -MergeWindowsTerminal        (no-op alias; the WT rose-pine merge is now default-on)
@@ -30,6 +31,7 @@ param(
     [switch]$SkipBootstrap,
     [switch]$SkipConfig,
     [switch]$SkipNvim,
+    [switch]$SkipAgents,
     [switch]$MergeWindowsTerminal,   # back-compat no-op: WT merge is now default-on
     [switch]$SkipWindowsTerminalMerge,
     [switch]$BestEffort
@@ -37,7 +39,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$RepoUrl     = 'https://github.com/luisgui1757/dotfiles.git'
+$RepoUrl        = 'https://github.com/luisgui1757/dotfiles.git'
+$PolarisRepoUrl = 'https://github.com/luisgui1757/polaris.git'
+$PolarisVersion = '0.1.1'
+$PolarisRef     = '489dcc6f991ddcff63c460a433e983264dc54cf7'
 
 function Get-DefaultProfileRoot {
     if (-not [string]::IsNullOrWhiteSpace($env:USERPROFILE)) { return $env:USERPROFILE }
@@ -246,6 +251,174 @@ function Phase {
 function Write-Step {
     param([string]$Message)
     Write-Host "  $Message"
+}
+
+function Get-PolarisCacheRoot {
+    if (-not [string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
+        return (Join-Path $env:LOCALAPPDATA 'dotfiles\polaris')
+    }
+    return (Join-Path (Get-DefaultProfileRoot) '.local\share\dotfiles\polaris')
+}
+
+function Get-PolarisCheckoutPath {
+    param(
+        [string]$CacheRoot = (Get-PolarisCacheRoot),
+        [string]$Ref = $PolarisRef
+    )
+    return (Join-Path $CacheRoot $Ref)
+}
+
+function Test-ShouldApplyAgentPolicy {
+    param(
+        [bool]$SkipAgentsPhase = $SkipAgents,
+        [bool]$AllMode = $All,
+        [bool]$IsDryRun = $DryRun,
+        [scriptblock]$Prompt
+    )
+
+    if ($SkipAgentsPhase) { return $false }
+    if ($AllMode -or $IsDryRun) { return $true }
+    if (-not [Environment]::UserInteractive) { return $true }
+    if (-not $Prompt) {
+        $Prompt = {
+            param([string]$Message)
+            Read-Host "  $Message [Y/n]"
+        }
+    }
+    $answer = [string](& $Prompt 'Apply Polaris global agent rules?')
+    return ([string]::IsNullOrWhiteSpace($answer) -or $answer -match '^(?i:y|yes)$')
+}
+
+function Get-PolarisVersionFromCheckout {
+    param([Parameter(Mandatory)] [string]$Checkout)
+    $versionPath = Join-Path $Checkout 'VERSION'
+    if (-not (Test-Path -LiteralPath $versionPath -PathType Leaf)) { return '' }
+    return ([System.IO.File]::ReadAllText($versionPath).Trim())
+}
+
+function Invoke-GitChecked {
+    param(
+        [Parameter(Mandatory)] [string[]]$Arguments,
+        [Parameter(Mandatory)] [string]$Label
+    )
+
+    & git @Arguments
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host ("  FAIL: {0} exited {1}" -f $Label, $LASTEXITCODE) -ForegroundColor Red
+        exit $LASTEXITCODE
+    }
+}
+
+function Ensure-PolarisCheckout {
+    param(
+        [string]$RepoUrl = $PolarisRepoUrl,
+        [string]$Version = $PolarisVersion,
+        [string]$Ref = $PolarisRef,
+        [string]$CacheRoot = (Get-PolarisCacheRoot)
+    )
+
+    $checkout = Get-PolarisCheckoutPath -CacheRoot $CacheRoot -Ref $Ref
+    if (Test-Path -LiteralPath (Join-Path $checkout '.git') -PathType Container) {
+        $head = [string](& git -C $checkout rev-parse HEAD 2>$null)
+        $head = $head.Trim()
+        if ($LASTEXITCODE -ne 0 -or $head -ne $Ref) {
+            Write-Host "  FAIL: Polaris cache is not at the pinned commit: $checkout" -ForegroundColor Red
+            Write-Host "        expected $Ref, found $head" -ForegroundColor Yellow
+            exit 1
+        }
+        $actualVersion = Get-PolarisVersionFromCheckout -Checkout $checkout
+        if ($actualVersion -ne $Version) {
+            Write-Host "  FAIL: Polaris cache VERSION mismatch: expected $Version, found $actualVersion" -ForegroundColor Red
+            exit 1
+        }
+        return $checkout
+    }
+
+    if (Test-Path -LiteralPath $checkout) {
+        Write-Host "  FAIL: Polaris cache path exists but is not a git checkout: $checkout" -ForegroundColor Red
+        exit 1
+    }
+
+    if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+        Write-Host "  FAIL: git is required to fetch Polaris. Re-run without -SkipDeps, or install git first." -ForegroundColor Red
+        exit 1
+    }
+
+    New-Item -ItemType Directory -Force -Path $CacheRoot | Out-Null
+    $tmp = Join-Path $CacheRoot ('.tmp.' + [guid]::NewGuid().ToString('N'))
+    try {
+        Invoke-GitChecked -Label 'git clone Polaris' -Arguments @('clone', $RepoUrl, $tmp)
+        Invoke-GitChecked -Label 'git checkout Polaris pin' -Arguments @('-C', $tmp, 'checkout', '--detach', $Ref)
+
+        $actualVersion = Get-PolarisVersionFromCheckout -Checkout $tmp
+        if ($actualVersion -ne $Version) {
+            Write-Host "  FAIL: fetched Polaris VERSION mismatch: expected $Version, found $actualVersion" -ForegroundColor Red
+            exit 1
+        }
+
+        Move-Item -LiteralPath $tmp -Destination $checkout
+        return $checkout
+    } finally {
+        Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Invoke-PolarisInstallChecked {
+    param(
+        [Parameter(Mandatory)] [string]$Installer,
+        [Parameter(Mandatory)] [string[]]$Arguments,
+        [Parameter(Mandatory)] [string]$Label
+    )
+
+    & $Installer @Arguments
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host ("  FAIL: {0} exited {1}" -f $Label, $LASTEXITCODE) -ForegroundColor Red
+        exit $LASTEXITCODE
+    }
+}
+
+function Invoke-PolarisAgentPolicy {
+    param(
+        [bool]$SkipAgentsPhase = $SkipAgents,
+        [bool]$AllMode = $All,
+        [bool]$IsDryRun = $DryRun,
+        [string]$RepoUrl = $PolarisRepoUrl,
+        [string]$Version = $PolarisVersion,
+        [string]$Ref = $PolarisRef,
+        [string]$CacheRoot = (Get-PolarisCacheRoot),
+        [scriptblock]$Prompt
+    )
+
+    if ($SkipAgentsPhase) {
+        Write-Host ""
+        Write-Host "skipped: Phase 6/6 (agent policy) via -SkipAgents"
+        return
+    }
+
+    if (-not (Test-ShouldApplyAgentPolicy -SkipAgentsPhase:$SkipAgentsPhase -AllMode:$AllMode -IsDryRun:$IsDryRun -Prompt $Prompt)) {
+        Write-Host ""
+        Write-Host "skipped: Phase 6/6 (agent policy)"
+        return
+    }
+
+    Phase "Phase 6/6: apply global agent policy (Polaris)"
+    $checkout = Get-PolarisCheckoutPath -CacheRoot $CacheRoot -Ref $Ref
+    if ($IsDryRun) {
+        Write-Step "would    clone/fetch Polaris $Version ($Ref)"
+        Write-Step "         into $checkout"
+        Write-Step "would    run Polaris tools/install.ps1 -Global, then -Global -Check"
+        return
+    }
+
+    $checkout = Ensure-PolarisCheckout -RepoUrl $RepoUrl -Version $Version -Ref $Ref -CacheRoot $CacheRoot
+    $installer = Join-Path $checkout 'tools\install.ps1'
+    if (-not (Test-Path -LiteralPath $installer -PathType Leaf)) {
+        Write-Host "  FAIL: Polaris installer missing: $installer" -ForegroundColor Red
+        exit 1
+    }
+
+    Invoke-PolarisInstallChecked -Installer $installer -Arguments @('-Global') -Label 'Polaris global install'
+    Invoke-PolarisInstallChecked -Installer $installer -Arguments @('-Global', '-Check') -Label 'Polaris global check'
 }
 
 function Get-UniqueBackupPath {
@@ -932,14 +1105,14 @@ function Invoke-NvimSyncPhases {
     if (-not $SkipNvimPhase -and -not $IsDryRun) {
         if (& $CommandTester 'nvim') {
             & $DevEnvironmentEntrypoint | Out-Null
-            Phase "Phase 3/5: restore Neovim plugins (lazy.nvim)"
+            Phase "Phase 3/6: restore Neovim plugins (lazy.nvim)"
             Invoke-NvimCommandOrFail "Lazy restore" $LazyRunner
 
-            Phase "Phase 4/5: install Tree-sitter parsers"
+            Phase "Phase 4/6: install Tree-sitter parsers"
             Write-Host "  this compiles nvim-treesitter parsers and can take several minutes."
             Invoke-NvimCommandOrFail "Tree-sitter parser install" $TreesitterRunner
 
-            Phase "Phase 5/5: install LSP servers + formatters (Mason)"
+            Phase "Phase 5/6: install LSP servers + formatters (Mason)"
             Write-Host "  this can take 3-8 minutes on a fresh Windows machine."
             Invoke-NvimCommandOrFail "Mason install" $MasonRunner
         } else {
@@ -1042,7 +1215,7 @@ if ($Update) {
 
 # ---- Phase 1: dependencies ---------------------------------------------------
 if (-not $SkipDeps) {
-    Phase "Phase 1/5: install dependencies"
+    Phase "Phase 1/6: install dependencies"
     & (Join-Path $ScriptDir 'install-deps.ps1') @depsArgs
 } else {
     Write-Host ""
@@ -1058,7 +1231,7 @@ if (-not $DryRun) {
 
 # ---- Phase 2: apply configs --------------------------------------------------
 if (-not ($SkipBootstrap -or $SkipConfig)) {
-    Phase "Phase 2/5: apply configs with chezmoi"
+    Phase "Phase 2/6: apply configs with chezmoi"
     $global:LASTEXITCODE = 0   # reset so a stale code from Phase 1 cannot false-trip
     Invoke-ChezmoiApplyPhase
 } else {
@@ -1066,12 +1239,14 @@ if (-not ($SkipBootstrap -or $SkipConfig)) {
     Write-Host "skipped: Phase 2 (config) via -SkipBootstrap/-SkipConfig"
 }
 
-# ---- Phases 3 + 4: nvim sync -------------------------------------------------
+# ---- Phases 3-5: nvim sync ---------------------------------------------------
 #
 # Lazy + Mason failures are FATAL by default. Pass -BestEffort to downgrade
 # them to warnings (useful for offline / proxy-restricted environments where
 # you accept a partial install and will run :Lazy / :Mason interactively).
 Invoke-NvimSyncPhases
+
+Invoke-PolarisAgentPolicy
 
 # ---- Summary -----------------------------------------------------------------
 Write-Host ""

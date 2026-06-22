@@ -31,6 +31,8 @@ assert_eq() {
 
 sh_const() { grep -E "^$1=" install-deps.sh | head -1 | cut -d'"' -f2; }
 yml_const() { awk -v key="$1" '$1 == key ":" { print $2; exit }' .github/workflows/test.yml; }
+setup_sh_const() { grep -E "^$1=" setup.sh | head -1 | cut -d'"' -f2; }
+setup_ps_const() { grep -E "^[[:space:]]*\\\$$1[[:space:]]*=" setup.ps1 | head -1 | cut -d"'" -f2; }
 
 # --- nvim Linux: install-deps.sh <-> test.yml <-> the two install tests -------
 nvim_ver_sh="$(sh_const NVIM_LINUX_VERSION)"
@@ -75,6 +77,21 @@ assert_eq "zsh-autosuggestions tag (install-deps.sh == chezmoi external)" \
     "$(sh_const ZSH_AUTOSUGGESTIONS_VERSION)" "$(ext_tag 'zsh-users/zsh-autosuggestions.git')"
 assert_eq "zsh-autosuggestions commit (install-deps.sh == verify script)" \
     "$(sh_const ZSH_AUTOSUGGESTIONS_COMMIT)" "$(verify_commit 'zsh-autosuggestions')"
+
+# --- Polaris: setup.sh <-> setup.ps1 -----------------------------------------
+polaris_version_sh="$(setup_sh_const POLARIS_VERSION)"
+polaris_ref_sh="$(setup_sh_const POLARIS_REF)"
+polaris_version_ps="$(setup_ps_const PolarisVersion)"
+polaris_ref_ps="$(setup_ps_const PolarisRef)"
+
+assert_eq "Polaris version (setup.sh == setup.ps1)" "$polaris_version_sh" "$polaris_version_ps"
+assert_eq "Polaris commit (setup.sh == setup.ps1)" "$polaris_ref_sh" "$polaris_ref_ps"
+if [[ ! "$polaris_ref_sh" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "FAIL: Polaris ref must be an immutable 40-character lowercase commit SHA, got '$polaris_ref_sh'"
+    fail=1
+else
+    echo "ok  : Polaris ref is immutable commit SHA"
+fi
 
 if [[ "$fail" -ne 0 ]]; then
     echo "pin consistency: DRIFT detected -- recompute/propagate the mirrored pin(s)."

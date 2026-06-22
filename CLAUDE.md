@@ -12,10 +12,11 @@ the install script works, read this too.
 ## What this repo is
 
 Cross-platform dotfiles: Neovim (lazy.nvim), Starship, Ghostty, Windows
-Terminal, tmux, zshenv/zshrc, PowerShell profile, lazygit. Public installs go
-through `setup.sh` (macOS / Linux / WSL) or `setup.ps1` (Windows), which install
-dependencies, apply the chezmoi config layer, restore locked Neovim plugins, and
-sync Mason tools. The repo can live anywhere — `~/dotfiles/`,
+Terminal, tmux, zshenv/zshrc, PowerShell profile, lazygit, and global Polaris
+agent-policy bootstrap. Public installs go through `setup.sh` (macOS / Linux /
+WSL) or `setup.ps1` (Windows), which install dependencies, apply the chezmoi
+config layer, restore locked Neovim plugins, sync Mason tools, and apply global
+agent policy. The repo can live anywhere — `~/dotfiles/`,
 `~/Documents/dotfiles/`, etc. The remote-clone default in `setup.{sh,ps1}` is
 `~/dotfiles/`, but an
 in-place clone elsewhere works too. Do NOT put the repo at `~/.config/nvim/` —
@@ -27,9 +28,10 @@ uses it in Phase 2. Top-level config files and their `home/` copies/templates
 must stay byte-identical where the parity manifest says so; update both in the
 same change.
 
-Agent settings are intentionally **NOT** synced through this repo. Keep local
-agent preferences in the agent's per-machine state directory; this repo does
-not ship synced agent preference folders.
+Agent runtime state and preferences are intentionally **NOT** synced through
+this repo. The supported agent surface is setup's global Polaris policy phase;
+local agent preference folders such as `.claude/`, `.codex/`, `.pi/`, sessions,
+auth files, and package caches stay per machine.
 
 ## Layout at a glance
 
@@ -59,8 +61,9 @@ not ship synced agent preference folders.
 └── CLAUDE.md              canonical tracked coding-agent guide
 ```
 
-Local agent state directories such as `.claude/` are **not** part of the synced
-configuration. Leave them untracked; preferences live per machine.
+Local agent state directories such as `.claude/`, `.codex/`, and `.pi/` are
+**not** part of the synced configuration. Leave them untracked; preferences,
+sessions, auth files, and caches live per machine.
 
 ## Non-negotiable invariants
 
@@ -429,10 +432,11 @@ install paths, not symmetric container platforms:
   a matching root-prep branch in `tests/ci/container-e2e.sh`.
 - `setup.sh / ubuntu-24.04`, `setup.sh / macos-15`, and
   `setup.ps1 / windows-2025` run the real public setup entry points, apply
-  configs through chezmoi in Phase 2, and then rerun Lazy restore,
-  Tree-sitter parser install, and Mason headless sync. They explicitly fail if
-  setup skips Phase 3-5, emits a `FAIL:` marker, or Mason did not install
-  expected tools. Windows e2e must assert `%LOCALAPPDATA%\lazygit\config.yml`
+  configs through chezmoi in Phase 2, then rerun Lazy restore, Tree-sitter
+  parser install, Mason headless sync, and the Polaris Phase 6/6 agent-policy
+  install. They explicitly fail if setup skips Phase 3-5, omits Phase 6/6,
+  emits a `FAIL:` marker, or Mason did not install expected tools. Windows e2e
+  must assert `%LOCALAPPDATA%\lazygit\config.yml`
   against `lazygit/config.windows.yml`, not the POSIX/default
   `lazygit/config.yml`. After the full restore/sync they also run the
   **Tier 2 language smoke** (`tests/nvim/lsp_smoke.lua`, gated on
@@ -683,6 +687,15 @@ save only**. The next plain `:w` formats normally. Implemented in
   out of the update path. Linuxbrew updates them through
   `brew upgrade <formula>`; Alpine updates its native `neovim`, `lazygit`,
   `starship`, and `tree-sitter` packages through apk.
+- **Polaris is setup Phase 6/6 and is opt-out, not experimental.** Full setup
+  (`--all` / `-All`) applies the pinned global Polaris policy unless
+  `--skip-agents` / `-SkipAgents` is passed. Interactive setup asks
+  `Apply Polaris global agent rules? [Y/n]`. The setup phase clones Polaris into
+  a dotfiles-owned cache (`~/.local/share/dotfiles/polaris/<commit>` on POSIX,
+  `%LOCALAPPDATA%\dotfiles\polaris\<commit>` on Windows), verifies the checkout
+  commit and `VERSION`, runs Polaris' own global installer, then runs its global
+  check. Do not inline or reimplement Polaris rendering here. Project/team
+  Polaris adoption is a separate repo-local install or vendoring decision.
 - **A C compiler is installed so LuaSnip can build `jsregexp`.** Without one,
   the nvim Lazy build prints "No C compiler found" and `jsregexp` is skipped
   (LuaSnip still works, minus JS-regex snippet transforms). POSIX installs the
@@ -958,6 +971,11 @@ save only**. The next plain `:w` formats normally. Implemented in
   `renovate.json`, direct-download SHA-256 values must be matched as context
   only, not named `currentDigest`, otherwise Renovate will schedule same-version
   digest updates for checksums it cannot actually resolve.
+- **Polaris is pinned by immutable Git commit plus `VERSION`, not a moving
+  branch.** Setup may clone from GitHub, but it must checkout the exact
+  `POLARIS_REF`, assert `POLARIS_VERSION`, and run only the installer from that
+  verified checkout. Updating Polaris means changing both constants, updating
+  README/CLAUDE references, and keeping shell/Pester tests green.
 - **Both installers open with an "install EVERYTHING?" prompt.** Interactive
   runs that didn't pass `--all`/`-All` get one upfront question; answering yes
   flips `YES_ALL`/`$All` so the rest runs with no per-item prompts. Skipped when
