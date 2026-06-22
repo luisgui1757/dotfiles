@@ -446,9 +446,10 @@ install paths, not symmetric container platforms:
   requires real Tree-sitter captures for parser-backed rows, and proves
   syntax-only fallback rows have real Vim syntax groups. Keep the LSP attach
   gate before the broad fixture-open gate; opening every fixture under the
-  production config can start LSPs as collateral, and force-stopping those
-  collateral clients before their dedicated attach checks races some servers on
-  slower CI hosts.
+  production config can start LSPs as collateral. After the explicit LSP attach
+  gate, the smoke disables the tested LSP configs before opening the broad
+  parser/syntax matrix so later non-LSP gates do not leave unrelated language
+  servers alive.
   Non-gated servers are strict on every OS; `powershell_es` is
   enforced only on Windows (pwsh + the PSES bundle) and skips cleanly on Unix.
   The fast `make test-nvim` runs Tier 1 only
@@ -693,7 +694,11 @@ save only**. The next plain `:w` formats normally. Implemented in
   but that server shells out to `cmake`; setup therefore installs `cmake` through
   every supported OS package manager. Do not remove the CLI dependency while
   keeping `neocmake` enabled, or strict Tier 2 smoke can hang on a crashing
-  local language server.
+  local language server. The `neocmake` config must also prefer Mason's real
+  package executable (`mason/packages/neocmakelsp/neocmakelsp[.exe]`) over the
+  `mason/bin` PATH shim. On Windows that shim is a `.cmd` wrapper; stopping the
+  wrapper can leave `neocmakelsp.exe` alive after headless nvim prints a passing
+  smoke result, holding CI open until the workflow timeout.
 - **nvim-treesitter main needs both `tree-sitter` and MSVC on Windows.**
   The main-branch installer shells out to the standalone `tree-sitter` CLI and
   then builds parsers through the Rust `cc` crate. `install-deps.sh` provisions

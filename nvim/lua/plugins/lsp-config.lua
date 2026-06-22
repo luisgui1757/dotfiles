@@ -100,6 +100,21 @@ return {
         return cmd
       end
 
+      local function get_neocmake_cmd()
+        local exe = "neocmakelsp"
+        if vim.fn.has("win32") == 1 then
+          exe = "neocmakelsp.exe"
+        end
+        -- Prefer the real Mason package binary over Mason's PATH shim. On
+        -- Windows the shim is a .cmd wrapper, and killing the wrapper can leave
+        -- the actual neocmakelsp.exe child alive after headless nvim exits.
+        local mason_exe = vim.fn.stdpath("data") .. "/mason/packages/neocmakelsp/" .. exe
+        if vim.fn.executable(mason_exe) == 1 then
+          return { mason_exe, "stdio" }
+        end
+        return { "neocmakelsp", "stdio" }
+      end
+
       vim.lsp.config("clangd", {
         cmd = get_clangd_cmd(),
         capabilities = capabilities,
@@ -160,6 +175,7 @@ return {
       })
 
       vim.lsp.config("neocmake", {
+        cmd = get_neocmake_cmd(),
         capabilities = capabilities,
         root_markers = { "CMakeLists.txt", ".git" },
       })

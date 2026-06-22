@@ -12,12 +12,12 @@
 --   (0) no `parser/<bundled>.so` override remains on the runtimepath (the config
 --       purges them; a leftover re-creates the E5113 mismatch),
 --   (1) every installed parser is one nvim-treesitter `main` supports,
---   (2) every matrix fixture opens under the production config with the expected
---       filetype, and every parser-backed row reports real Tree-sitter captures
---       so non-LSP parser/query runtime errors cannot hide,
---   (3) every non-gated LSP attaches, and every gated LSP attaches ON its target
+--   (2) every non-gated LSP attaches, and every gated LSP attaches ON its target
 --       OS (powershell_es -> Windows); a gated server is skipped only OFF target,
 --       and a MISSING runtime on the target OS is a failure, not a skip,
+--   (3) every matrix fixture opens under the production config with the expected
+--       filetype, and every parser-backed row reports real Tree-sitter captures
+--       so non-LSP parser/query runtime errors cannot hide,
 --   (4) the auto-started bundled filetypes (lua/markdown/help/query) keep the
 --       nvim-treesitter indentexpr the FileType autocmd promises.
 --   (5) daily language buffers keep Vim regex syntax groups in addition to
@@ -25,7 +25,7 @@
 --
 -- DOTFILES_LSP_SMOKE:
 --   unset  -> no-op (an accidental run in the fast suite is harmless)
---   strict -> all four gates above fail the run
+--   strict -> all gates above fail the run
 --   other  -> same behaviour (a gated row off its target OS still skips cleanly)
 
 local mode = vim.env.DOTFILES_LSP_SMOKE
@@ -52,14 +52,39 @@ local function to_set(list)
 end
 
 local function stop_all_lsp_clients()
-  for _, client in ipairs(vim.lsp.get_clients()) do
+  local clients = vim.lsp.get_clients()
+  if #clients == 0 then
+    return true
+  end
+  for _, client in ipairs(clients) do
     pcall(function()
       client:stop(true)
     end)
   end
-  vim.wait(5000, function()
-    return #vim.lsp.get_clients() == 0
+  local stopped = vim.wait(5000, function()
+    for _, client in ipairs(clients) do
+      local ok, is_stopped = pcall(function()
+        return client:is_stopped()
+      end)
+      if not ok or not is_stopped then
+        return false
+      end
+    end
+    return true
   end, 50)
+  if stopped then
+    return true
+  end
+  local lingering = {}
+  for _, client in ipairs(clients) do
+    local ok, is_stopped = pcall(function()
+      return client:is_stopped()
+    end)
+    if not ok or not is_stopped then
+      table.insert(lingering, (client.name or "<unnamed>") .. "#" .. tostring(client.id))
+    end
+  end
+  return false, table.concat(lingering, ", ")
 end
 
 -- All matrix-dependent work is pcall-wrapped: an uncaught error (a bad dofile, a
@@ -283,8 +308,20 @@ local ok, err = pcall(function()
           fail(row.fixture .. " [" .. row.lsp .. "]: did NOT attach within 45s")
         end
         pcall(vim.cmd, "silent! bwipeout!")
-        stop_all_lsp_clients()
+        local stopped, lingering = stop_all_lsp_clients()
+        if not stopped then
+          fail(row.fixture .. ": LSP clients did not stop after attach gate: " .. lingering)
+        end
       end
+    end
+  end
+
+  local lsp_names = {}
+  local lsp_seen = {}
+  for _, row in ipairs(matrix) do
+    if row.lsp and not lsp_seen[row.lsp] then
+      lsp_seen[row.lsp] = true
+      table.insert(lsp_names, row.lsp)
     end
   end
 
@@ -294,9 +331,15 @@ local ok, err = pcall(function()
   -- checking captures proves the config can actually highlight that filetype.
   -- This covers parser-backed rows with no LSP, which the LSP attach gate above
   -- intentionally skips. Keep this AFTER the explicit LSP attach gate: opening
-  -- every fixture under the production config can start LSPs as collateral, and
-  -- force-stopping those collateral clients before their dedicated attach checks
-  -- races some servers on slower CI hosts.
+  -- every fixture under the production config can start LSPs as collateral.
+  -- Disable the tested LSP configs after their explicit gate so these later
+  -- parser/syntax checks do not create unrelated server processes.
+  pcall(vim.lsp.enable, lsp_names, false)
+  local disabled_stopped, disabled_lingering = stop_all_lsp_clients()
+  if not disabled_stopped then
+    fail("LSP clients did not stop after disabling auto-start: " .. disabled_lingering)
+  end
+
   for _, row in ipairs(matrix) do
     local open_ok, open_err = pcall(vim.cmd.edit, vim.fn.fnameescape(fixtures .. row.fixture))
     if not open_ok then
