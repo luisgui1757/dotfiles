@@ -242,7 +242,8 @@ Describe "setup.ps1 Polaris agent policy" {
         [System.IO.File]::WriteAllText((Join-Path $work 'VERSION'), "0.1.1`n", [System.Text.UTF8Encoding]::new($false))
         $installer = Join-Path $tools 'install.ps1'
         [System.IO.File]::WriteAllText($installer, @'
-Add-Content -LiteralPath $env:POLARIS_TEST_LOG -Value ($args -join ' ')
+param([switch]$Global, [switch]$Check)
+Add-Content -LiteralPath $env:POLARIS_TEST_LOG -Value ("Global=$Global Check=$Check")
 exit 0
 '@, [System.Text.UTF8Encoding]::new($false))
         & git -C $work add VERSION tools/install.ps1
@@ -264,8 +265,8 @@ exit 0
                 -CacheRoot $cache
 
             $calls = Get-Content -LiteralPath $env:POLARIS_TEST_LOG
-            $calls | Should -Contain '-Global'
-            $calls | Should -Contain '-Global -Check'
+            $calls | Should -Contain 'Global=True Check=False'
+            $calls | Should -Contain 'Global=True Check=True'
         } finally {
             if ($null -eq $oldLog) {
                 Remove-Item Env:POLARIS_TEST_LOG -ErrorAction SilentlyContinue

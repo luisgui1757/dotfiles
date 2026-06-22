@@ -366,11 +366,11 @@ function Ensure-PolarisCheckout {
 function Invoke-PolarisInstallChecked {
     param(
         [Parameter(Mandatory)] [string]$Installer,
-        [Parameter(Mandatory)] [string[]]$Arguments,
+        [Parameter(Mandatory)] [hashtable]$Parameters,
         [Parameter(Mandatory)] [string]$Label
     )
 
-    & $Installer @Arguments
+    & $Installer @Parameters
     if ($LASTEXITCODE -ne 0) {
         Write-Host ("  FAIL: {0} exited {1}" -f $Label, $LASTEXITCODE) -ForegroundColor Red
         exit $LASTEXITCODE
@@ -417,8 +417,8 @@ function Invoke-PolarisAgentPolicy {
         exit 1
     }
 
-    Invoke-PolarisInstallChecked -Installer $installer -Arguments @('-Global') -Label 'Polaris global install'
-    Invoke-PolarisInstallChecked -Installer $installer -Arguments @('-Global', '-Check') -Label 'Polaris global check'
+    Invoke-PolarisInstallChecked -Installer $installer -Parameters @{ Global = $true } -Label 'Polaris global install'
+    Invoke-PolarisInstallChecked -Installer $installer -Parameters @{ Global = $true; Check = $true } -Label 'Polaris global check'
 }
 
 function Get-UniqueBackupPath {
