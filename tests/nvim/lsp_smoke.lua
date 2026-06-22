@@ -355,7 +355,9 @@ local ok, err = pcall(function()
           .. tostring(vim.bo.filetype)
       )
     elseif row.parser then
-      vim.wait(1000, function()
+      -- macOS setup e2e can materialize some post-install parser captures
+      -- noticeably later than the local unit gate after the full setup pass.
+      vim.wait(5000, function()
         return has_treesitter_capture(0)
       end, 50)
       if has_treesitter_capture(0) then
