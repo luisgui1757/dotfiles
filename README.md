@@ -304,7 +304,8 @@ and whether `pwsh` is installed.
   caches that checkout under `~/.local/share/dotfiles/polaris/<commit>` on
   POSIX and `%LOCALAPPDATA%\dotfiles\polaris\<commit>` on Windows, verifies the
   checkout `VERSION`, then runs Polaris' Bash global installer and global check
-  (`tools/install --global`, then `--global --check`; Windows uses Git Bash).
+  (`tools/install --global`, then `--global --check`; Windows uses Git Bash's
+  POSIX toolchain path for this Bash phase).
   The global installer writes the per-user AI entrypoints for Codex
   (`~/.codex/AGENTS.md`), Claude Code (`~/.claude/CLAUDE.md`), opencode
   (`~/.config/opencode/AGENTS.md`), and Pi CLI (`~/.pi/agent/AGENTS.md`);

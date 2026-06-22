@@ -244,6 +244,7 @@ Describe "setup.ps1 Polaris agent policy" {
         $installer = Join-Path $tools 'install'
         [System.IO.File]::WriteAllText($installer, @'
 #!/usr/bin/env bash
+printf "PATH=%s\n" "$PATH" >> "$POLARIS_TEST_LOG"
 printf "%s\n" "$*" >> "$POLARIS_TEST_LOG"
 '@, [System.Text.UTF8Encoding]::new($false))
         & git -C $work add VERSION tools/install
@@ -267,6 +268,9 @@ printf "%s\n" "$*" >> "$POLARIS_TEST_LOG"
             $calls = Get-Content -LiteralPath $env:POLARIS_TEST_LOG
             $calls | Should -Contain '--global'
             $calls | Should -Contain '--global --check'
+            if ($env:OS -eq 'Windows_NT') {
+                $calls | Should -Contain 'PATH=/usr/bin:/bin'
+            }
         } finally {
             if ($null -eq $oldLog) {
                 Remove-Item Env:POLARIS_TEST_LOG -ErrorAction SilentlyContinue

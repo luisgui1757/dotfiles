@@ -296,6 +296,22 @@ function Get-PolarisBashCommand {
     return $null
 }
 
+function ConvertTo-PolarisBashPath {
+    param(
+        [Parameter(Mandatory)] [string]$Bash,
+        [Parameter(Mandatory)] [string]$Path
+    )
+
+    if ($env:OS -ne 'Windows_NT') { return $Path }
+
+    $converted = & $Bash --noprofile --norc -c 'cygpath -u "$1"' -- $Path
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($converted)) {
+        Write-Host "  FAIL: could not convert path for Git Bash: $Path" -ForegroundColor Red
+        exit 1
+    }
+    return ([string]$converted).Trim()
+}
+
 function Test-ShouldApplyAgentPolicy {
     param(
         [bool]$SkipAgentsPhase = $SkipAgents,
@@ -399,15 +415,32 @@ function Invoke-PolarisInstallChecked {
         [Parameter(Mandatory)] [string]$Label
     )
 
-    Push-Location -LiteralPath $Checkout
+    $bashCheckout = ConvertTo-PolarisBashPath -Bash $Bash -Path $Checkout
+    $bashCommand = if ($env:OS -eq 'Windows_NT') {
+        # Keep Git Bash on its POSIX userland. A Windows-native jq.exe in PATH
+        # emits CRLF records, which the Polaris 0.1.1 Bash manifest reader treats
+        # as literal path bytes and then fails to find core/*.md.
+        'export PATH=/usr/bin:/bin; cd "$1"; shift; exec bash tools/install "$@"'
+    } else {
+        'cd "$1"; shift; exec bash tools/install "$@"'
+    }
+
+    $oldNativePreference = $null
+    $hasNativePreference = Test-Path Variable:PSNativeCommandUseErrorActionPreference
     try {
-        & $Bash 'tools/install' @Arguments
+        if ($hasNativePreference) {
+            $oldNativePreference = $PSNativeCommandUseErrorActionPreference
+            $PSNativeCommandUseErrorActionPreference = $false
+        }
+        & $Bash --noprofile --norc -c $bashCommand -- $bashCheckout @Arguments
         if ($LASTEXITCODE -ne 0) {
             Write-Host ("  FAIL: {0} exited {1}" -f $Label, $LASTEXITCODE) -ForegroundColor Red
             exit $LASTEXITCODE
         }
     } finally {
-        Pop-Location
+        if ($hasNativePreference) {
+            $PSNativeCommandUseErrorActionPreference = $oldNativePreference
+        }
     }
 }
 
