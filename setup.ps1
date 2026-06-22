@@ -268,29 +268,92 @@ function Get-PolarisCheckoutPath {
     return (Join-Path $CacheRoot $Ref)
 }
 
-function Get-PolarisBashCommand {
-    $bash = Get-Command bash -ErrorAction SilentlyContinue
-    if ($bash) { return $bash.Source }
+function Assert-PolarisCheckoutClean {
+    param([Parameter(Mandatory)] [string]$Checkout)
 
+    $oldNativePreference = $null
+    $hasNativePreference = Test-Path Variable:PSNativeCommandUseErrorActionPreference
+    try {
+        if ($hasNativePreference) {
+            $oldNativePreference = $PSNativeCommandUseErrorActionPreference
+            $PSNativeCommandUseErrorActionPreference = $false
+        }
+        $status = @(& git -C $Checkout status --porcelain=v1 --untracked-files=all --ignored=matching 2>$null)
+        $rc = $LASTEXITCODE
+    } finally {
+        if ($hasNativePreference) {
+            $PSNativeCommandUseErrorActionPreference = $oldNativePreference
+        }
+    }
+    if ($rc -ne 0) {
+        Write-Host "  FAIL: could not inspect Polaris cache worktree: $Checkout" -ForegroundColor Red
+        exit 1
+    }
+
+    if ($status.Count -gt 0) {
+        Write-Host "  FAIL: Polaris cache has local changes; refusing to execute it: $Checkout" -ForegroundColor Red
+        foreach ($line in $status) {
+            Write-Host "        $line" -ForegroundColor Yellow
+        }
+        Write-Host "        Remove this cache directory and rerun setup to fetch the pinned checkout again." -ForegroundColor Yellow
+        exit 1
+    }
+}
+
+function Test-PolarisGitBashCommand {
+    param([string]$Candidate)
+
+    if ([string]::IsNullOrWhiteSpace($Candidate)) { return $false }
+    if (-not (Test-Path -LiteralPath $Candidate -PathType Leaf)) { return $false }
+
+    $oldNativePreference = $null
+    $hasNativePreference = Test-Path Variable:PSNativeCommandUseErrorActionPreference
+    try {
+        if ($hasNativePreference) {
+            $oldNativePreference = $PSNativeCommandUseErrorActionPreference
+            $PSNativeCommandUseErrorActionPreference = $false
+        }
+        & $Candidate --noprofile --norc -c 'command -v cygpath >/dev/null 2>&1'
+        return ($LASTEXITCODE -eq 0)
+    } finally {
+        if ($hasNativePreference) {
+            $PSNativeCommandUseErrorActionPreference = $oldNativePreference
+        }
+    }
+}
+
+function Get-PolarisBashCommand {
+    if ($env:OS -ne 'Windows_NT') {
+        $bash = Get-Command bash -ErrorAction SilentlyContinue
+        if ($bash) { return $bash.Source }
+        return $null
+    }
+
+    $candidates = @()
     $git = Get-Command git -ErrorAction SilentlyContinue
     if ($git) {
         $gitDir = Split-Path -Parent $git.Source
         $gitRoot = Split-Path -Parent $gitDir
-        foreach ($candidate in @(
+        $candidates += @(
             (Join-Path $gitDir 'bash.exe'),
             (Join-Path $gitRoot 'bin\bash.exe'),
             (Join-Path $gitRoot 'usr\bin\bash.exe')
-        )) {
-            if (Test-Path -LiteralPath $candidate -PathType Leaf) { return $candidate }
-        }
+        )
     }
 
     $scoopRoot = if ($env:SCOOP) { $env:SCOOP } else { Join-Path (Get-DefaultProfileRoot) 'scoop' }
-    foreach ($candidate in @(
+    $candidates += @(
         (Join-Path $scoopRoot 'apps\git\current\bin\bash.exe'),
         (Join-Path $scoopRoot 'apps\git\current\usr\bin\bash.exe')
-    )) {
-        if (Test-Path -LiteralPath $candidate -PathType Leaf) { return $candidate }
+    )
+
+    foreach ($candidate in $candidates) {
+        if (Test-PolarisGitBashCommand -Candidate $candidate) { return $candidate }
+    }
+
+    $bash = Get-Command bash -ErrorAction SilentlyContinue
+    if ($bash -and (Test-PolarisGitBashCommand -Candidate $bash.Source)) {
+        return $bash.Source
     }
 
     return $null
@@ -304,8 +367,21 @@ function ConvertTo-PolarisBashPath {
 
     if ($env:OS -ne 'Windows_NT') { return $Path }
 
-    $converted = & $Bash --noprofile --norc -c 'cygpath -u "$1"' -- $Path
-    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($converted)) {
+    $oldNativePreference = $null
+    $hasNativePreference = Test-Path Variable:PSNativeCommandUseErrorActionPreference
+    try {
+        if ($hasNativePreference) {
+            $oldNativePreference = $PSNativeCommandUseErrorActionPreference
+            $PSNativeCommandUseErrorActionPreference = $false
+        }
+        $converted = & $Bash --noprofile --norc -c 'cygpath -u "$1"' -- $Path
+        $rc = $LASTEXITCODE
+    } finally {
+        if ($hasNativePreference) {
+            $PSNativeCommandUseErrorActionPreference = $oldNativePreference
+        }
+    }
+    if ($rc -ne 0 -or [string]::IsNullOrWhiteSpace($converted)) {
         Write-Host "  FAIL: could not convert path for Git Bash: $Path" -ForegroundColor Red
         exit 1
     }
@@ -375,6 +451,7 @@ function Ensure-PolarisCheckout {
             Write-Host "  FAIL: Polaris cache VERSION mismatch: expected $Version, found $actualVersion" -ForegroundColor Red
             exit 1
         }
+        Assert-PolarisCheckoutClean -Checkout $checkout
         return $checkout
     }
 
@@ -399,6 +476,7 @@ function Ensure-PolarisCheckout {
             Write-Host "  FAIL: fetched Polaris VERSION mismatch: expected $Version, found $actualVersion" -ForegroundColor Red
             exit 1
         }
+        Assert-PolarisCheckoutClean -Checkout $tmp
 
         Move-Item -LiteralPath $tmp -Destination $checkout
         return $checkout

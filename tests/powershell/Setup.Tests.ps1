@@ -233,6 +233,65 @@ Describe "setup.ps1 Polaris agent policy" {
             -Prompt { return '' } | Should -BeTrue
     }
 
+    It "prefers validated Git Bash over PATH bash on Windows" {
+        $oldOs = $env:OS
+        try {
+            $env:OS = 'Windows_NT'
+            $gitRoot = Join-Path $script:PolarisTestRoot 'Git'
+            $script:ExpectedPolarisGitBash = Join-Path $gitRoot 'bin\bash.exe'
+            $pathBash = Join-Path $script:PolarisTestRoot 'System32\bash.exe'
+
+            Mock -CommandName Get-Command -MockWith {
+                param([string]$Name)
+                if ($Name -eq 'git') {
+                    return [pscustomobject]@{ Source = (Join-Path $gitRoot 'cmd\git.exe') }
+                }
+                if ($Name -eq 'bash') {
+                    return [pscustomobject]@{ Source = $pathBash }
+                }
+                return $null
+            }
+            Mock -CommandName Test-PolarisGitBashCommand -MockWith {
+                param([string]$Candidate)
+                return ($Candidate -eq $script:ExpectedPolarisGitBash)
+            }
+
+            Get-PolarisBashCommand | Should -Be $script:ExpectedPolarisGitBash
+        } finally {
+            Remove-Variable -Name ExpectedPolarisGitBash -Scope Script -ErrorAction SilentlyContinue
+            if ($null -eq $oldOs) {
+                Remove-Item Env:OS -ErrorAction SilentlyContinue
+            } else {
+                $env:OS = $oldOs
+            }
+        }
+    }
+
+    It "rejects PATH bash on Windows when it is not Git Bash" {
+        $oldOs = $env:OS
+        try {
+            $env:OS = 'Windows_NT'
+            $pathBash = Join-Path $script:PolarisTestRoot 'System32\bash.exe'
+
+            Mock -CommandName Get-Command -MockWith {
+                param([string]$Name)
+                if ($Name -eq 'bash') {
+                    return [pscustomobject]@{ Source = $pathBash }
+                }
+                return $null
+            }
+            Mock -CommandName Test-PolarisGitBashCommand -MockWith { return $false }
+
+            Get-PolarisBashCommand | Should -BeNullOrEmpty
+        } finally {
+            if ($null -eq $oldOs) {
+                Remove-Item Env:OS -ErrorAction SilentlyContinue
+            } else {
+                $env:OS = $oldOs
+            }
+        }
+    }
+
     It "runs the pinned Polaris installer and global check from a verified checkout" {
         $work = Join-Path $script:PolarisTestRoot 'polaris-work'
         $tools = Join-Path $work 'tools'
@@ -271,6 +330,67 @@ printf "%s\n" "$*" >> "$POLARIS_TEST_LOG"
             if ($env:OS -eq 'Windows_NT') {
                 $calls | Should -Contain 'PATH=/usr/bin:/bin'
             }
+        } finally {
+            if ($null -eq $oldLog) {
+                Remove-Item Env:POLARIS_TEST_LOG -ErrorAction SilentlyContinue
+            } else {
+                $env:POLARIS_TEST_LOG = $oldLog
+            }
+        }
+    }
+
+    It "rejects a dirty verified Polaris checkout before running the installer" {
+        $work = Join-Path $script:PolarisTestRoot 'polaris-work'
+        $tools = Join-Path $work 'tools'
+        New-Item -ItemType Directory -Force -Path $tools | Out-Null
+        & git -C $work init -q
+        & git -C $work config user.name 'Dotfiles Test'
+        & git -C $work config user.email 'dotfiles@example.invalid'
+        [System.IO.File]::WriteAllText((Join-Path $work 'VERSION'), "0.1.1`n", [System.Text.UTF8Encoding]::new($false))
+        $installer = Join-Path $tools 'install'
+        [System.IO.File]::WriteAllText($installer, @'
+#!/usr/bin/env bash
+printf "%s\n" "$*" >> "$POLARIS_TEST_LOG"
+'@, [System.Text.UTF8Encoding]::new($false))
+        & git -C $work add VERSION tools/install
+        & git -C $work commit -q -m 'fake polaris'
+        $sha = (& git -C $work rev-parse HEAD).Trim()
+
+        Add-Content -LiteralPath $installer -Value '# dirty cache regression'
+        $cache = Join-Path $script:PolarisTestRoot 'cache'
+        New-Item -ItemType Directory -Force -Path $cache | Out-Null
+        Move-Item -LiteralPath $work -Destination (Join-Path $cache $sha)
+
+        $oldLog = $env:POLARIS_TEST_LOG
+        try {
+            $env:POLARIS_TEST_LOG = Join-Path $script:PolarisTestRoot 'dirty-install.log'
+            $setupLiteral = $script:Setup.Replace("'", "''")
+            $cacheLiteral = $cache.Replace("'", "''")
+            $shaLiteral = $sha.Replace("'", "''")
+            $probe = @"
+`$ErrorActionPreference = 'Stop'
+`$env:DOTFILES_SETUP_PS1_SOURCE_ONLY = '1'
+. '$setupLiteral' -All
+Invoke-PolarisAgentPolicy -AllMode:`$true -IsDryRun:`$false -Version '0.1.1' -Ref '$shaLiteral' -CacheRoot '$cacheLiteral'
+"@
+            $oldNativePreference = $null
+            $hasNativePreference = Test-Path Variable:PSNativeCommandUseErrorActionPreference
+            try {
+                if ($hasNativePreference) {
+                    $oldNativePreference = $PSNativeCommandUseErrorActionPreference
+                    $PSNativeCommandUseErrorActionPreference = $false
+                }
+                $output = & pwsh -NoLogo -NoProfile -Command $probe 2>&1 | Out-String
+                $rc = $LASTEXITCODE
+            } finally {
+                if ($hasNativePreference) {
+                    $PSNativeCommandUseErrorActionPreference = $oldNativePreference
+                }
+            }
+
+            $rc | Should -Not -Be 0
+            $output | Should -Match 'Polaris cache has local changes'
+            Test-Path -LiteralPath $env:POLARIS_TEST_LOG | Should -BeFalse
         } finally {
             if ($null -eq $oldLog) {
                 Remove-Item Env:POLARIS_TEST_LOG -ErrorAction SilentlyContinue

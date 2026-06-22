@@ -192,12 +192,16 @@ setup -> install-deps                 phase 1: programs and optional tools
       -> Polaris global install       phase 6: per-user agent policy
 ```
 
-Pass `--all` / `-All` for explicit non-interactive installs (Y to every prompt).
+Pass `--all` / `-All` for explicit non-interactive installs (Y to every setup
+prompt).
 When setup detects redirected stdin/stdout and neither all nor dry-run was
 requested, it defaults to all and prints `note: no TTY detected; running with
---all` (or `-All`). An interactive run (no all flag) still opens with a single
-**"install EVERYTHING without further prompts? [Y/n]"** question — answer `Y`
-to pull the lot in one go, or `n` to choose per tool.
+--all` (or `-All`). An interactive run (no all flag) can still ask the
+dependency installer's **"install EVERYTHING without further prompts? [Y/n]"**
+question; answer `Y` to pull the tool catalog in one go, or `n` to choose per
+tool. Phase 6 then asks **"Apply Polaris global agent rules? [Y/n]"** unless
+`--all` / `-All`, `--dry-run` / `-DryRun`, or `--skip-agents` / `-SkipAgents`
+already made that decision.
 Add `--dry-run` / `-DryRun` to preview every step without touching disk.
 Pass `--skip-agents` / `-SkipAgents` to leave global AI-agent entrypoints alone.
 Pass `--update` / `-Update` from an existing checkout to run only the
@@ -303,9 +307,10 @@ and whether `pwsh` is installed.
   pins Polaris `0.1.1` at commit `489dcc6f991ddcff63c460a433e983264dc54cf7`,
   caches that checkout under `~/.local/share/dotfiles/polaris/<commit>` on
   POSIX and `%LOCALAPPDATA%\dotfiles\polaris\<commit>` on Windows, verifies the
-  checkout `VERSION`, then runs Polaris' Bash global installer and global check
-  (`tools/install --global`, then `--global --check`; Windows uses Git Bash's
-  POSIX toolchain path for this Bash phase).
+  checkout `VERSION` and a clean Git worktree, then runs Polaris' Bash global
+  installer and global check (`tools/install --global`, then
+  `--global --check`; Windows uses a validated Git Bash with `cygpath`, not WSL
+  bash or another PATH-only Bash).
   The global installer writes the per-user AI entrypoints for Codex
   (`~/.codex/AGENTS.md`), Claude Code (`~/.claude/CLAUDE.md`), opencode
   (`~/.config/opencode/AGENTS.md`), and Pi CLI (`~/.pi/agent/AGENTS.md`);

@@ -693,13 +693,14 @@ save only**. The next plain `:w` formats normally. Implemented in
   `Apply Polaris global agent rules? [Y/n]`. The setup phase clones Polaris into
   a dotfiles-owned cache (`~/.local/share/dotfiles/polaris/<commit>` on POSIX,
   `%LOCALAPPDATA%\dotfiles\polaris\<commit>` on Windows), verifies the checkout
-  commit and `VERSION`, runs Polaris' Bash global installer (`tools/install
-  --global`), then runs its global check. Windows setup invokes the same Bash
-  installer through Git Bash with Git Bash's POSIX-only PATH for the `0.1.1`
-  pin; do not use Polaris `tools/install.ps1` for global installs unless a newer
-  Polaris pin proves the PowerShell path in CI. Do not inline or reimplement
-  Polaris rendering here. Project/team Polaris adoption is a separate repo-local
-  install or vendoring decision.
+  commit, `VERSION`, and clean Git worktree, runs Polaris' Bash global installer
+  (`tools/install --global`), then runs its global check. Windows setup invokes
+  the same Bash installer through a validated Git Bash (`cygpath` must be
+  present) with Git Bash's POSIX-only PATH for the `0.1.1` pin; do not use
+  Polaris `tools/install.ps1` for global installs unless a newer Polaris pin
+  proves the PowerShell path in CI. Do not inline or reimplement Polaris
+  rendering here. Project/team Polaris adoption is a separate repo-local install
+  or vendoring decision.
 - **A C compiler is installed so LuaSnip can build `jsregexp`.** Without one,
   the nvim Lazy build prints "No C compiler found" and `jsregexp` is skipped
   (LuaSnip still works, minus JS-regex snippet transforms). POSIX installs the
@@ -977,14 +978,17 @@ save only**. The next plain `:w` formats normally. Implemented in
   digest updates for checksums it cannot actually resolve.
 - **Polaris is pinned by immutable Git commit plus `VERSION`, not a moving
   branch.** Setup may clone from GitHub, but it must checkout the exact
-  `POLARIS_REF`, assert `POLARIS_VERSION`, and run only the installer from that
-  verified checkout. Updating Polaris means changing both constants, updating
-  README/CLAUDE references, and keeping shell/Pester tests green.
-- **Both installers open with an "install EVERYTHING?" prompt.** Interactive
-  runs that didn't pass `--all`/`-All` get one upfront question; answering yes
-  flips `YES_ALL`/`$All` so the rest runs with no per-item prompts. Skipped when
-  `--all`/`--dry-run` was passed or there's no tty (so noninteractive setup and the CI
-  `--dry-run --all` dogfood don't hang).
+  `POLARIS_REF`, assert `POLARIS_VERSION`, reject dirty cached worktrees, and
+  run only the installer from that verified checkout. Updating Polaris means
+  changing both constants, updating README/CLAUDE references, and keeping
+  shell/Pester tests green.
+- **Dependency installers own the "install EVERYTHING?" prompt; Polaris owns a
+  separate global-policy prompt.** Interactive runs that didn't pass
+  `--all`/`-All` can get the dependency prompt; answering yes flips
+  `YES_ALL`/`$All` for dependency prompts. Phase 6 asks
+  `Apply Polaris global agent rules? [Y/n]` unless `--all`/`-All`,
+  `--dry-run`/`-DryRun`, no tty/user interaction, or `--skip-agents` /
+  `-SkipAgents` already made that decision.
 - **Windows symlink pre-flight reports WHY symlinks fail and how to fix it.**
   `setup.ps1` probes symlink capability before chezmoi apply. When the probe
   fails it prints your *elevated* (admin) and *Developer Mode* state, then the

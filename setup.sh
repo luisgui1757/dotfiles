@@ -201,6 +201,22 @@ polaris_checkout_dir() {
     printf '%s/%s\n' "$POLARIS_CACHE_ROOT" "$POLARIS_REF"
 }
 
+assert_polaris_checkout_clean() {
+    local checkout="$1" status
+
+    if ! status="$(git -C "$checkout" status --porcelain=v1 --untracked-files=all --ignored=matching 2>/dev/null)"; then
+        echo "  FAIL: could not inspect Polaris cache worktree: $checkout" >&2
+        exit 1
+    fi
+
+    if [[ -n "$status" ]]; then
+        echo "  FAIL: Polaris cache has local changes; refusing to execute it: $checkout" >&2
+        printf '%s\n' "$status" | sed 's/^/        /' >&2
+        echo "        Remove this cache directory and rerun setup to fetch the pinned checkout again." >&2
+        exit 1
+    fi
+}
+
 ask_yes_no_default_yes() {
     local prompt="$1" reply
     printf "  %s [Y/n] " "$prompt"
@@ -234,6 +250,7 @@ ensure_polaris_checkout() {
             echo "  FAIL: Polaris cache VERSION mismatch: expected $POLARIS_VERSION, found ${version:-missing}" >&2
             exit 1
         fi
+        assert_polaris_checkout_clean "$checkout"
         printf '%s\n' "$checkout"
         return 0
     fi
@@ -260,6 +277,7 @@ ensure_polaris_checkout() {
         echo "  FAIL: fetched Polaris VERSION mismatch: expected $POLARIS_VERSION, found ${version:-missing}" >&2
         exit 1
     fi
+    assert_polaris_checkout_clean "$tmp"
 
     mv "$tmp" "$checkout"
     trap - RETURN

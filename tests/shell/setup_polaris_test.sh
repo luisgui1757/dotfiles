@@ -71,4 +71,32 @@ grep -Fx -- "--global" "$POLARIS_TEST_LOG" >/dev/null \
 grep -Fx -- "--global --check" "$POLARIS_TEST_LOG" >/dev/null \
     || fail "Polaris global check was not invoked"
 
+before_dirty_count="$(wc -l < "$POLARIS_TEST_LOG" | tr -d ' ')"
+printf '\n# dirty cache regression\n' >> "$POLARIS_CACHE_ROOT/$sha/tools/install"
+set +e
+dirty_output="$( ( run_polaris_agent_policy ) 2>&1 )"
+dirty_rc=$?
+set -e
+[[ "$dirty_rc" -ne 0 ]] \
+    || fail "dirty tracked Polaris cache was accepted"
+[[ "$dirty_output" == *"Polaris cache has local changes"* ]] \
+    || fail "dirty tracked Polaris cache did not explain the refusal"
+after_dirty_count="$(wc -l < "$POLARIS_TEST_LOG" | tr -d ' ')"
+[[ "$after_dirty_count" == "$before_dirty_count" ]] \
+    || fail "dirty tracked Polaris cache executed the installer"
+
+git -C "$POLARIS_CACHE_ROOT/$sha" checkout -- tools/install
+touch "$POLARIS_CACHE_ROOT/$sha/UNTRACKED"
+set +e
+untracked_output="$( ( run_polaris_agent_policy ) 2>&1 )"
+untracked_rc=$?
+set -e
+[[ "$untracked_rc" -ne 0 ]] \
+    || fail "untracked Polaris cache was accepted"
+[[ "$untracked_output" == *"Polaris cache has local changes"* ]] \
+    || fail "untracked Polaris cache did not explain the refusal"
+after_untracked_count="$(wc -l < "$POLARIS_TEST_LOG" | tr -d ' ')"
+[[ "$after_untracked_count" == "$before_dirty_count" ]] \
+    || fail "untracked Polaris cache executed the installer"
+
 echo "OK"
