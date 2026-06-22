@@ -207,6 +207,7 @@ Describe "setup.ps1 Polaris agent policy" {
 
         $output | Should -Match 'Phase 6/6: apply global agent policy \(Polaris\)'
         $output | Should -Match 'would\s+clone/fetch Polaris 0\.1\.1'
+        $output | Should -Match 'tools/install --global'
         Test-Path -LiteralPath $cache | Should -BeFalse
     }
 
@@ -240,13 +241,12 @@ Describe "setup.ps1 Polaris agent policy" {
         & git -C $work config user.name 'Dotfiles Test'
         & git -C $work config user.email 'dotfiles@example.invalid'
         [System.IO.File]::WriteAllText((Join-Path $work 'VERSION'), "0.1.1`n", [System.Text.UTF8Encoding]::new($false))
-        $installer = Join-Path $tools 'install.ps1'
+        $installer = Join-Path $tools 'install'
         [System.IO.File]::WriteAllText($installer, @'
-param([switch]$Global, [switch]$Check)
-Add-Content -LiteralPath $env:POLARIS_TEST_LOG -Value ("Global=$Global Check=$Check")
-exit 0
+#!/usr/bin/env bash
+printf "%s\n" "$*" >> "$POLARIS_TEST_LOG"
 '@, [System.Text.UTF8Encoding]::new($false))
-        & git -C $work add VERSION tools/install.ps1
+        & git -C $work add VERSION tools/install
         & git -C $work commit -q -m 'fake polaris'
         $sha = (& git -C $work rev-parse HEAD).Trim()
 
@@ -265,8 +265,8 @@ exit 0
                 -CacheRoot $cache
 
             $calls = Get-Content -LiteralPath $env:POLARIS_TEST_LOG
-            $calls | Should -Contain 'Global=True Check=False'
-            $calls | Should -Contain 'Global=True Check=True'
+            $calls | Should -Contain '--global'
+            $calls | Should -Contain '--global --check'
         } finally {
             if ($null -eq $oldLog) {
                 Remove-Item Env:POLARIS_TEST_LOG -ErrorAction SilentlyContinue

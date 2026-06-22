@@ -303,14 +303,15 @@ and whether `pwsh` is installed.
   pins Polaris `0.1.1` at commit `489dcc6f991ddcff63c460a433e983264dc54cf7`,
   caches that checkout under `~/.local/share/dotfiles/polaris/<commit>` on
   POSIX and `%LOCALAPPDATA%\dotfiles\polaris\<commit>` on Windows, verifies the
-  checkout `VERSION`, then runs Polaris' own global installer and global check.
+  checkout `VERSION`, then runs Polaris' Bash global installer and global check
+  (`tools/install --global`, then `--global --check`; Windows uses Git Bash).
   The global installer writes the per-user AI entrypoints for Codex
   (`~/.codex/AGENTS.md`), Claude Code (`~/.claude/CLAUDE.md`), opencode
   (`~/.config/opencode/AGENTS.md`), and Pi CLI (`~/.pi/agent/AGENTS.md`);
   Copilot has no reliable global file path, so user-wide Copilot instructions
   remain a manual VS Code/github.com profile step. To remove the global blocks,
-  run the cached Polaris installer with `--global --remove` on POSIX or
-  `-Global -Remove` on Windows. Project/team adoption is separate: run Polaris
+  run the cached Polaris Bash installer with `--global --remove` on POSIX or
+  from Git Bash on Windows. Project/team adoption is separate: run Polaris
   repo-local install or vendoring in that project and commit those files there.
 - Notes / Obsidian support writes `export NOTES_VAULT=...` to
   `~/.zshrc.local` (gitignored, sourced by `zshrc`). Non-interactive runs skip

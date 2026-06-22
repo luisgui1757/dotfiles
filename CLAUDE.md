@@ -693,9 +693,13 @@ save only**. The next plain `:w` formats normally. Implemented in
   `Apply Polaris global agent rules? [Y/n]`. The setup phase clones Polaris into
   a dotfiles-owned cache (`~/.local/share/dotfiles/polaris/<commit>` on POSIX,
   `%LOCALAPPDATA%\dotfiles\polaris\<commit>` on Windows), verifies the checkout
-  commit and `VERSION`, runs Polaris' own global installer, then runs its global
-  check. Do not inline or reimplement Polaris rendering here. Project/team
-  Polaris adoption is a separate repo-local install or vendoring decision.
+  commit and `VERSION`, runs Polaris' Bash global installer (`tools/install
+  --global`), then runs its global check. Windows setup invokes the same Bash
+  installer through Git Bash for the `0.1.1` pin; do not use Polaris
+  `tools/install.ps1` for global installs unless a newer Polaris pin proves the
+  PowerShell path in CI. Do not inline or reimplement Polaris rendering here.
+  Project/team Polaris adoption is a separate repo-local install or vendoring
+  decision.
 - **A C compiler is installed so LuaSnip can build `jsregexp`.** Without one,
   the nvim Lazy build prints "No C compiler found" and `jsregexp` is skipped
   (LuaSnip still works, minus JS-regex snippet transforms). POSIX installs the

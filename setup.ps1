@@ -268,6 +268,34 @@ function Get-PolarisCheckoutPath {
     return (Join-Path $CacheRoot $Ref)
 }
 
+function Get-PolarisBashCommand {
+    $bash = Get-Command bash -ErrorAction SilentlyContinue
+    if ($bash) { return $bash.Source }
+
+    $git = Get-Command git -ErrorAction SilentlyContinue
+    if ($git) {
+        $gitDir = Split-Path -Parent $git.Source
+        $gitRoot = Split-Path -Parent $gitDir
+        foreach ($candidate in @(
+            (Join-Path $gitDir 'bash.exe'),
+            (Join-Path $gitRoot 'bin\bash.exe'),
+            (Join-Path $gitRoot 'usr\bin\bash.exe')
+        )) {
+            if (Test-Path -LiteralPath $candidate -PathType Leaf) { return $candidate }
+        }
+    }
+
+    $scoopRoot = if ($env:SCOOP) { $env:SCOOP } else { Join-Path (Get-DefaultProfileRoot) 'scoop' }
+    foreach ($candidate in @(
+        (Join-Path $scoopRoot 'apps\git\current\bin\bash.exe'),
+        (Join-Path $scoopRoot 'apps\git\current\usr\bin\bash.exe')
+    )) {
+        if (Test-Path -LiteralPath $candidate -PathType Leaf) { return $candidate }
+    }
+
+    return $null
+}
+
 function Test-ShouldApplyAgentPolicy {
     param(
         [bool]$SkipAgentsPhase = $SkipAgents,
@@ -365,15 +393,21 @@ function Ensure-PolarisCheckout {
 
 function Invoke-PolarisInstallChecked {
     param(
-        [Parameter(Mandatory)] [string]$Installer,
-        [Parameter(Mandatory)] [hashtable]$Parameters,
+        [Parameter(Mandatory)] [string]$Bash,
+        [Parameter(Mandatory)] [string]$Checkout,
+        [Parameter(Mandatory)] [string[]]$Arguments,
         [Parameter(Mandatory)] [string]$Label
     )
 
-    & $Installer @Parameters
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host ("  FAIL: {0} exited {1}" -f $Label, $LASTEXITCODE) -ForegroundColor Red
-        exit $LASTEXITCODE
+    Push-Location -LiteralPath $Checkout
+    try {
+        & $Bash 'tools/install' @Arguments
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host ("  FAIL: {0} exited {1}" -f $Label, $LASTEXITCODE) -ForegroundColor Red
+            exit $LASTEXITCODE
+        }
+    } finally {
+        Pop-Location
     }
 }
 
@@ -406,19 +440,24 @@ function Invoke-PolarisAgentPolicy {
     if ($IsDryRun) {
         Write-Step "would    clone/fetch Polaris $Version ($Ref)"
         Write-Step "         into $checkout"
-        Write-Step "would    run Polaris tools/install.ps1 -Global, then -Global -Check"
+        Write-Step "would    run Polaris tools/install --global, then --global --check"
         return
     }
 
     $checkout = Ensure-PolarisCheckout -RepoUrl $RepoUrl -Version $Version -Ref $Ref -CacheRoot $CacheRoot
-    $installer = Join-Path $checkout 'tools\install.ps1'
+    $installer = Join-Path $checkout 'tools\install'
     if (-not (Test-Path -LiteralPath $installer -PathType Leaf)) {
         Write-Host "  FAIL: Polaris installer missing: $installer" -ForegroundColor Red
         exit 1
     }
+    $bash = Get-PolarisBashCommand
+    if (-not $bash) {
+        Write-Host "  FAIL: bash is required to run the Polaris 0.1.1 global installer. Install Git for Windows first." -ForegroundColor Red
+        exit 1
+    }
 
-    Invoke-PolarisInstallChecked -Installer $installer -Parameters @{ Global = $true } -Label 'Polaris global install'
-    Invoke-PolarisInstallChecked -Installer $installer -Parameters @{ Global = $true; Check = $true } -Label 'Polaris global check'
+    Invoke-PolarisInstallChecked -Bash $bash -Checkout $checkout -Arguments @('--global') -Label 'Polaris global install'
+    Invoke-PolarisInstallChecked -Bash $bash -Checkout $checkout -Arguments @('--global', '--check') -Label 'Polaris global check'
 }
 
 function Get-UniqueBackupPath {
