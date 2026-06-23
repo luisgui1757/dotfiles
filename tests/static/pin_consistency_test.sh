@@ -29,6 +29,19 @@ assert_eq() {
     fi
 }
 
+assert_contains() {
+    local name="$1" file="$2" needle="$3"
+    if [[ -z "$needle" ]]; then
+        echo "FAIL: $name -- empty expected value; update the extractor"
+        fail=1
+    elif ! grep -F -- "$needle" "$file" >/dev/null; then
+        echo "FAIL: $name -- '$file' does not document '$needle'"
+        fail=1
+    else
+        echo "ok  : $name documents $needle"
+    fi
+}
+
 sh_const() { grep -E "^$1=" install-deps.sh | head -1 | cut -d'"' -f2; }
 yml_const() { awk -v key="$1" '$1 == key ":" { print $2; exit }' .github/workflows/test.yml; }
 setup_sh_const() { grep -E "^$1=" setup.sh | head -1 | cut -d'"' -f2; }
@@ -86,6 +99,10 @@ polaris_ref_ps="$(setup_ps_const PolarisRef)"
 
 assert_eq "Polaris version (setup.sh == setup.ps1)" "$polaris_version_sh" "$polaris_version_ps"
 assert_eq "Polaris commit (setup.sh == setup.ps1)" "$polaris_ref_sh" "$polaris_ref_ps"
+assert_contains "Polaris version (README.md)" "README.md" "$polaris_version_sh"
+assert_contains "Polaris commit (README.md)" "README.md" "$polaris_ref_sh"
+assert_contains "Polaris version (CLAUDE.md)" "CLAUDE.md" "$polaris_version_sh"
+assert_contains "Polaris commit (CLAUDE.md)" "CLAUDE.md" "$polaris_ref_sh"
 if [[ ! "$polaris_ref_sh" =~ ^[0-9a-f]{40}$ ]]; then
     echo "FAIL: Polaris ref must be an immutable 40-character lowercase commit SHA, got '$polaris_ref_sh'"
     fail=1

@@ -194,6 +194,72 @@ Describe "setup.ps1 Polaris agent policy" {
         Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $script:PolarisTestRoot
     }
 
+    function script:New-SetupTestPolarisRepo {
+        param(
+            [string]$Name = ('polaris-work-' + [System.Guid]::NewGuid().ToString('N')),
+            [string]$Installer = @'
+#!/usr/bin/env bash
+printf "%s\n" "$*" >> "$POLARIS_TEST_LOG"
+'@
+        )
+
+        $work = Join-Path $script:PolarisTestRoot $Name
+        $tools = Join-Path $work 'tools'
+        New-Item -ItemType Directory -Force -Path $tools | Out-Null
+        & git -C $work init -q
+        & git -C $work config user.name 'Dotfiles Test'
+        & git -C $work config user.email 'dotfiles@example.invalid'
+        [System.IO.File]::WriteAllText((Join-Path $work 'VERSION'), "0.1.1`n", [System.Text.UTF8Encoding]::new($false))
+        $installerPath = Join-Path $tools 'install'
+        [System.IO.File]::WriteAllText($installerPath, $Installer, [System.Text.UTF8Encoding]::new($false))
+        if ($env:OS -ne 'Windows_NT') {
+            & chmod +x $installerPath
+        }
+        & git -C $work add VERSION tools/install
+        & git -C $work commit -q -m 'fake polaris'
+        $sha = (& git -C $work rev-parse HEAD).Trim()
+        return [pscustomobject]@{
+            Work = $work
+            Installer = $installerPath
+            Sha = $sha
+        }
+    }
+
+    function script:Invoke-SetupTestPolarisPolicyChild {
+        param(
+            [Parameter(Mandatory)] [string]$Cache,
+            [Parameter(Mandatory)] [string]$Ref
+        )
+
+        $setupLiteral = $script:Setup.Replace("'", "''")
+        $cacheLiteral = $Cache.Replace("'", "''")
+        $refLiteral = $Ref.Replace("'", "''")
+        $probe = @"
+`$ErrorActionPreference = 'Stop'
+`$env:DOTFILES_SETUP_PS1_SOURCE_ONLY = '1'
+. '$setupLiteral' -All
+Invoke-PolarisAgentPolicy -AllMode:`$true -IsDryRun:`$false -Version '0.1.1' -Ref '$refLiteral' -CacheRoot '$cacheLiteral'
+"@
+        $oldNativePreference = $null
+        $hasNativePreference = Test-Path Variable:PSNativeCommandUseErrorActionPreference
+        try {
+            if ($hasNativePreference) {
+                $oldNativePreference = $PSNativeCommandUseErrorActionPreference
+                $PSNativeCommandUseErrorActionPreference = $false
+            }
+            $output = & pwsh -NoLogo -NoProfile -Command $probe 2>&1 | Out-String
+            $rc = $LASTEXITCODE
+        } finally {
+            if ($hasNativePreference) {
+                $PSNativeCommandUseErrorActionPreference = $oldNativePreference
+            }
+        }
+        return [pscustomobject]@{
+            ExitCode = $rc
+            Output = $output
+        }
+    }
+
     It "previews the pinned Polaris global install in dry-run mode" {
         $cache = Join-Path $script:PolarisTestRoot 'cache'
         $output = & {
@@ -339,6 +405,86 @@ printf "%s\n" "$*" >> "$POLARIS_TEST_LOG"
         }
     }
 
+    It "fetches Polaris without executing ambient Git config or template hooks" {
+        $repo = New-SetupTestPolarisRepo -Name 'polaris-fresh-work'
+        $cache = Join-Path $script:PolarisTestRoot 'fresh-cache'
+        $oldLog = $env:POLARIS_TEST_LOG
+        $gitEnvNames = @(
+            'GIT_CONFIG_GLOBAL',
+            'GIT_CONFIG_COUNT',
+            'GIT_CONFIG_KEY_0',
+            'GIT_CONFIG_VALUE_0',
+            'GIT_TEMPLATE_DIR'
+        )
+        $savedEnv = @{}
+        foreach ($name in $gitEnvNames) {
+            $savedEnv[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
+        }
+
+        $globalMarker = Join-Path $script:PolarisTestRoot 'fresh-global-fsmonitor-ran'
+        $envMarker = Join-Path $script:PolarisTestRoot 'fresh-env-fsmonitor-ran'
+        $templateMarker = Join-Path $script:PolarisTestRoot 'fresh-template-post-checkout-ran'
+        if ($env:OS -eq 'Windows_NT') {
+            $globalFsmonitor = Join-Path $script:PolarisTestRoot 'fresh-global-fsmonitor.cmd'
+            $envFsmonitor = Join-Path $script:PolarisTestRoot 'fresh-env-fsmonitor.cmd'
+            [System.IO.File]::WriteAllText($globalFsmonitor, "@echo off`r`necho ran> `"$globalMarker`"`r`nexit /b 0`r`n", [System.Text.UTF8Encoding]::new($false))
+            [System.IO.File]::WriteAllText($envFsmonitor, "@echo off`r`necho ran> `"$envMarker`"`r`nexit /b 0`r`n", [System.Text.UTF8Encoding]::new($false))
+        } else {
+            $globalFsmonitor = Join-Path $script:PolarisTestRoot 'fresh-global-fsmonitor'
+            $envFsmonitor = Join-Path $script:PolarisTestRoot 'fresh-env-fsmonitor'
+            [System.IO.File]::WriteAllText($globalFsmonitor, "#!/usr/bin/env bash`nprintf ran > '$globalMarker'`nexit 0`n", [System.Text.UTF8Encoding]::new($false))
+            [System.IO.File]::WriteAllText($envFsmonitor, "#!/usr/bin/env bash`nprintf ran > '$envMarker'`nexit 0`n", [System.Text.UTF8Encoding]::new($false))
+            & chmod +x $globalFsmonitor $envFsmonitor
+        }
+
+        $globalConfig = Join-Path $script:PolarisTestRoot 'fresh-hostile.gitconfig'
+        $globalFsmonitorForGit = $globalFsmonitor -replace '\\', '/'
+        [System.IO.File]::WriteAllText($globalConfig, "[core]`n`tfsmonitor = $globalFsmonitorForGit`n", [System.Text.UTF8Encoding]::new($false))
+
+        $templateDir = Join-Path $script:PolarisTestRoot 'fresh-template'
+        $templateHooks = Join-Path $templateDir 'hooks'
+        New-Item -ItemType Directory -Force -Path $templateHooks | Out-Null
+        $templateMarkerForGit = $templateMarker -replace '\\', '/'
+        $postCheckout = Join-Path $templateHooks 'post-checkout'
+        [System.IO.File]::WriteAllText($postCheckout, "#!/usr/bin/env sh`nprintf ran > '$templateMarkerForGit'`nexit 0`n", [System.Text.UTF8Encoding]::new($false))
+        if ($env:OS -ne 'Windows_NT') {
+            & chmod +x $postCheckout
+        }
+
+        try {
+            $env:POLARIS_TEST_LOG = Join-Path $script:PolarisTestRoot 'fresh-polaris-install.log'
+            [Environment]::SetEnvironmentVariable('GIT_CONFIG_GLOBAL', $globalConfig, 'Process')
+            [Environment]::SetEnvironmentVariable('GIT_CONFIG_COUNT', '1', 'Process')
+            [Environment]::SetEnvironmentVariable('GIT_CONFIG_KEY_0', 'core.fsmonitor', 'Process')
+            [Environment]::SetEnvironmentVariable('GIT_CONFIG_VALUE_0', ($envFsmonitor -replace '\\', '/'), 'Process')
+            [Environment]::SetEnvironmentVariable('GIT_TEMPLATE_DIR', $templateDir, 'Process')
+
+            Invoke-PolarisAgentPolicy `
+                -AllMode:$true `
+                -IsDryRun:$false `
+                -Version '0.1.1' `
+                -Ref $repo.Sha `
+                -RepoUrl $repo.Work `
+                -CacheRoot $cache
+
+            Test-Path -LiteralPath $globalMarker | Should -BeFalse
+            Test-Path -LiteralPath $envMarker | Should -BeFalse
+            Test-Path -LiteralPath $templateMarker | Should -BeFalse
+            $calls = Get-Content -LiteralPath $env:POLARIS_TEST_LOG
+            $calls | Should -Contain '--global'
+            $calls | Should -Contain '--global --check'
+        } finally {
+            foreach ($name in $gitEnvNames) {
+                [Environment]::SetEnvironmentVariable($name, $savedEnv[$name], 'Process')
+            }
+            if ($null -eq $oldLog) {
+                Remove-Item Env:POLARIS_TEST_LOG -ErrorAction SilentlyContinue
+            } else {
+                $env:POLARIS_TEST_LOG = $oldLog
+            }
+        }
+    }
+
     It "rejects a dirty verified Polaris checkout before running the installer" {
         $work = Join-Path $script:PolarisTestRoot 'polaris-work'
         $tools = Join-Path $work 'tools'
@@ -390,6 +536,59 @@ Invoke-PolarisAgentPolicy -AllMode:`$true -IsDryRun:`$false -Version '0.1.1' -Re
 
             $rc | Should -Not -Be 0
             $output | Should -Match 'Polaris cache has local changes'
+            Test-Path -LiteralPath $env:POLARIS_TEST_LOG | Should -BeFalse
+        } finally {
+            if ($null -eq $oldLog) {
+                Remove-Item Env:POLARIS_TEST_LOG -ErrorAction SilentlyContinue
+            } else {
+                $env:POLARIS_TEST_LOG = $oldLog
+            }
+        }
+    }
+
+    It "rejects an untracked file in a verified Polaris checkout before running the installer" {
+        $repo = New-SetupTestPolarisRepo -Name 'polaris-untracked-work'
+        $cache = Join-Path $script:PolarisTestRoot 'cache'
+        New-Item -ItemType Directory -Force -Path $cache | Out-Null
+        $checkout = Join-Path $cache $repo.Sha
+        Move-Item -LiteralPath $repo.Work -Destination $checkout
+        [System.IO.File]::WriteAllText((Join-Path $checkout 'UNTRACKED'), "dirty`n", [System.Text.UTF8Encoding]::new($false))
+
+        $oldLog = $env:POLARIS_TEST_LOG
+        try {
+            $env:POLARIS_TEST_LOG = Join-Path $script:PolarisTestRoot 'untracked-install.log'
+            $result = Invoke-SetupTestPolarisPolicyChild -Cache $cache -Ref $repo.Sha
+
+            $result.ExitCode | Should -Not -Be 0
+            $result.Output | Should -Match 'Polaris cache has local changes'
+            Test-Path -LiteralPath $env:POLARIS_TEST_LOG | Should -BeFalse
+        } finally {
+            if ($null -eq $oldLog) {
+                Remove-Item Env:POLARIS_TEST_LOG -ErrorAction SilentlyContinue
+            } else {
+                $env:POLARIS_TEST_LOG = $oldLog
+            }
+        }
+    }
+
+    It "rejects an ignored file in a verified Polaris checkout before running the installer" {
+        $repo = New-SetupTestPolarisRepo -Name 'polaris-ignored-work'
+        $cache = Join-Path $script:PolarisTestRoot 'cache'
+        New-Item -ItemType Directory -Force -Path $cache | Out-Null
+        $checkout = Join-Path $cache $repo.Sha
+        Move-Item -LiteralPath $repo.Work -Destination $checkout
+        $gitInfo = Join-Path $checkout '.git/info'
+        New-Item -ItemType Directory -Force -Path $gitInfo | Out-Null
+        Add-Content -LiteralPath (Join-Path $gitInfo 'exclude') -Value 'IGNORED'
+        [System.IO.File]::WriteAllText((Join-Path $checkout 'IGNORED'), "dirty`n", [System.Text.UTF8Encoding]::new($false))
+
+        $oldLog = $env:POLARIS_TEST_LOG
+        try {
+            $env:POLARIS_TEST_LOG = Join-Path $script:PolarisTestRoot 'ignored-install.log'
+            $result = Invoke-SetupTestPolarisPolicyChild -Cache $cache -Ref $repo.Sha
+
+            $result.ExitCode | Should -Not -Be 0
+            $result.Output | Should -Match 'Polaris cache has local changes'
             Test-Path -LiteralPath $env:POLARIS_TEST_LOG | Should -BeFalse
         } finally {
             if ($null -eq $oldLog) {

@@ -307,11 +307,11 @@ and whether `pwsh` is installed.
   pins Polaris `0.1.1` at commit `489dcc6f991ddcff63c460a433e983264dc54cf7`,
   caches that checkout under `~/.local/share/dotfiles/polaris/<commit>` on
   POSIX and `%LOCALAPPDATA%\dotfiles\polaris\<commit>` on Windows, verifies the
-  checkout `VERSION`, and inspects the exact cached path with executable Git
-  config features disabled, then runs Polaris' Bash global
-  installer and global check (`tools/install --global`, then
-  `--global --check`; Windows uses a validated Git Bash with `cygpath`, not WSL
-  bash or another PATH-only Bash).
+  checkout `VERSION`, and runs every Polaris Git operation with
+  system/global/env config, templates, hooks, and executable Git config features
+  disabled, then runs Polaris' Bash global installer and global check
+  (`tools/install --global`, then `--global --check`; Windows uses a validated
+  Git Bash with `cygpath`, not WSL bash or another PATH-only Bash).
   The global installer writes the per-user AI entrypoints for Codex
   (`~/.codex/AGENTS.md`), Claude Code (`~/.claude/CLAUDE.md`), opencode
   (`~/.config/opencode/AGENTS.md`), and Pi CLI (`~/.pi/agent/AGENTS.md`);

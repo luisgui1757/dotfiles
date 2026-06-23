@@ -201,14 +201,25 @@ polaris_checkout_dir() {
     printf '%s/%s\n' "$POLARIS_CACHE_ROOT" "$POLARIS_REF"
 }
 
+polaris_git() {
+    GIT_CONFIG_NOSYSTEM=1 \
+    GIT_CONFIG_SYSTEM=/dev/null \
+    GIT_CONFIG_GLOBAL=/dev/null \
+    GIT_CONFIG_COUNT=0 \
+    GIT_CONFIG_PARAMETERS='' \
+    GIT_TEMPLATE_DIR='' \
+        git \
+        -c core.fsmonitor=false \
+        -c core.untrackedCache=false \
+        -c core.hooksPath=/dev/null \
+        -c init.templateDir= \
+        "$@"
+}
+
 polaris_cache_git() {
     local checkout="$1"
     shift
-    GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null \
-        git --git-dir="$checkout/.git" --work-tree="$checkout" \
-        -c core.fsmonitor=false \
-        -c core.untrackedCache=false \
-        "$@"
+    polaris_git --git-dir="$checkout/.git" --work-tree="$checkout" "$@"
 }
 
 assert_polaris_checkout_clean() {
@@ -279,8 +290,8 @@ ensure_polaris_checkout() {
     tmp="$(mktemp -d "$POLARIS_CACHE_ROOT/.tmp.XXXXXX")"
     trap 'rm -rf "$tmp"' RETURN
 
-    git clone "$POLARIS_REPO_URL" "$tmp"
-    git -C "$tmp" checkout --detach "$POLARIS_REF"
+    polaris_git clone "$POLARIS_REPO_URL" "$tmp"
+    polaris_git -C "$tmp" checkout --detach "$POLARIS_REF"
 
     version="$(tr -d '[:space:]' < "$tmp/VERSION" 2>/dev/null || true)"
     if [[ "$version" != "$POLARIS_VERSION" ]]; then

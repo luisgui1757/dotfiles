@@ -39,6 +39,75 @@ output="$(run_polaris_agent_policy 2>&1)"
 [[ "$output" == *"skipped: Phase 6/6 (agent policy) via --skip-agents"* ]] \
     || fail "--skip-agents did not skip the Polaris phase"
 
+fresh_work="$TMP_ROOT/polaris-fresh-work"
+mkdir -p "$fresh_work/tools"
+git -C "$fresh_work" init -q
+git -C "$fresh_work" config user.name "Dotfiles Test"
+git -C "$fresh_work" config user.email "dotfiles@example.invalid"
+printf '0.1.1\n' > "$fresh_work/VERSION"
+cat > "$fresh_work/tools/install" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$POLARIS_TEST_LOG"
+EOF
+chmod +x "$fresh_work/tools/install"
+git -C "$fresh_work" add VERSION tools/install
+git -C "$fresh_work" commit -q -m "fake polaris fresh fetch"
+
+fresh_sha="$(git -C "$fresh_work" rev-parse HEAD)"
+fresh_global_marker="$TMP_ROOT/fresh-global-fsmonitor-ran"
+fresh_env_marker="$TMP_ROOT/fresh-env-fsmonitor-ran"
+fresh_template_marker="$TMP_ROOT/fresh-template-post-checkout-ran"
+cat > "$TMP_ROOT/fresh-global-fsmonitor" <<EOF
+#!/usr/bin/env bash
+printf ran > "$fresh_global_marker"
+exit 0
+EOF
+cat > "$TMP_ROOT/fresh-env-fsmonitor" <<EOF
+#!/usr/bin/env bash
+printf ran > "$fresh_env_marker"
+exit 0
+EOF
+chmod +x "$TMP_ROOT/fresh-global-fsmonitor" "$TMP_ROOT/fresh-env-fsmonitor"
+fresh_global_config="$TMP_ROOT/fresh-hostile.gitconfig"
+cat > "$fresh_global_config" <<EOF
+[core]
+  fsmonitor = $TMP_ROOT/fresh-global-fsmonitor
+EOF
+fresh_template_dir="$TMP_ROOT/fresh-template"
+mkdir -p "$fresh_template_dir/hooks"
+cat > "$fresh_template_dir/hooks/post-checkout" <<EOF
+#!/usr/bin/env bash
+printf ran > "$fresh_template_marker"
+exit 0
+EOF
+chmod +x "$fresh_template_dir/hooks/post-checkout"
+
+POLARIS_REPO_URL="$fresh_work"
+POLARIS_REF="$fresh_sha"
+POLARIS_CACHE_ROOT="$TMP_ROOT/fresh-cache"
+POLARIS_TEST_LOG="$TMP_ROOT/fresh-polaris-install.log"
+export POLARIS_TEST_LOG
+SKIP_AGENTS=0
+export GIT_CONFIG_GLOBAL="$fresh_global_config"
+export GIT_CONFIG_COUNT=1
+export GIT_CONFIG_KEY_0=core.fsmonitor
+export GIT_CONFIG_VALUE_0="$TMP_ROOT/fresh-env-fsmonitor"
+export GIT_TEMPLATE_DIR="$fresh_template_dir"
+
+run_polaris_agent_policy >/dev/null
+unset GIT_CONFIG_GLOBAL GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0 GIT_TEMPLATE_DIR
+
+[[ ! -e "$fresh_global_marker" ]] \
+    || fail "fresh Polaris fetch executed global core.fsmonitor"
+[[ ! -e "$fresh_env_marker" ]] \
+    || fail "fresh Polaris fetch executed env-injected core.fsmonitor"
+[[ ! -e "$fresh_template_marker" ]] \
+    || fail "fresh Polaris fetch executed a template post-checkout hook"
+grep -Fx -- "--global" "$POLARIS_TEST_LOG" >/dev/null \
+    || fail "fresh Polaris global install was not invoked"
+grep -Fx -- "--global --check" "$POLARIS_TEST_LOG" >/dev/null \
+    || fail "fresh Polaris global check was not invoked"
+
 work="$TMP_ROOT/polaris-work"
 mkdir -p "$work/tools"
 git -C "$work" init -q

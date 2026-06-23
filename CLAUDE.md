@@ -688,13 +688,15 @@ save only**. The next plain `:w` formats normally. Implemented in
   `brew upgrade <formula>`; Alpine updates its native `neovim`, `lazygit`,
   `starship`, and `tree-sitter` packages through apk.
 - **Polaris is setup Phase 6/6 and is opt-out, not experimental.** Full setup
-  (`--all` / `-All`) applies the pinned global Polaris policy unless
+  (`--all` / `-All`) applies Polaris `0.1.1` at commit
+  `489dcc6f991ddcff63c460a433e983264dc54cf7` unless
   `--skip-agents` / `-SkipAgents` is passed. Interactive setup asks
   `Apply Polaris global agent rules? [Y/n]`. The setup phase clones Polaris into
   a dotfiles-owned cache (`~/.local/share/dotfiles/polaris/<commit>` on POSIX,
   `%LOCALAPPDATA%\dotfiles\polaris\<commit>` on Windows), verifies the checkout
-  commit and `VERSION`, inspects the exact cache path as the Git worktree with
-  executable Git config features disabled, runs Polaris' Bash global installer
+  commit and `VERSION`, and performs all Polaris Git operations with system,
+  global, environment-injected config, templates, hooks, and executable Git
+  config features disabled. It then runs Polaris' Bash global installer
   (`tools/install --global`), then runs its global check. Windows setup invokes
   the same Bash installer through a validated Git Bash (`cygpath` must be
   present) with Git Bash's POSIX-only PATH for the `0.1.1` pin; do not use
@@ -980,13 +982,15 @@ save only**. The next plain `:w` formats normally. Implemented in
 - **Polaris is pinned by immutable Git commit plus `VERSION`, not a moving
   branch.** Setup may clone from GitHub, but it must checkout the exact
   `POLARIS_REF`, assert `POLARIS_VERSION`, reject dirty cached worktrees, and
-  run only the installer from that verified checkout. Cache validation must not
-  trust mutable `.git/config`: force the intended cache path with
-  `--git-dir`/`--work-tree` semantics and disable executable Git config features
-  such as `core.fsmonitor`, so `core.worktree` redirection or fsmonitor hooks
-  cannot run or hide modified files before the installer executes. Updating
-  Polaris means changing both constants, updating README/CLAUDE references, and
-  keeping shell/Pester tests green.
+  run only the installer from that verified checkout. Clone, checkout, and cache
+  validation must all use the Polaris Git wrapper: do not trust mutable system,
+  global, environment-injected, template, hook, or `.git/config` state. Cache
+  validation must force the intended cache path with `--git-dir`/`--work-tree`
+  semantics and disable executable Git config features such as `core.fsmonitor`,
+  so `core.worktree` redirection or fsmonitor hooks cannot run or hide modified
+  files before the installer executes. Updating Polaris means changing both
+  constants, updating README/CLAUDE references, and keeping shell/Pester/static
+  pin tests green.
 - **Dependency installers own the "install EVERYTHING?" prompt; Polaris owns a
   separate global-policy prompt.** Interactive runs that didn't pass
   `--all`/`-All` can get the dependency prompt; answering yes flips

@@ -268,6 +268,70 @@ function Get-PolarisCheckoutPath {
     return (Join-Path $CacheRoot $Ref)
 }
 
+function Invoke-PolarisGit {
+    param(
+        [Parameter(Mandatory)] [string[]]$Arguments,
+        [switch]$SuppressStderr
+    )
+
+    $oldNativePreference = $null
+    $hasNativePreference = Test-Path Variable:PSNativeCommandUseErrorActionPreference
+    $savedEnv = @{}
+    $gitEnvNames = @(
+        'GIT_CONFIG_NOSYSTEM',
+        'GIT_CONFIG_SYSTEM',
+        'GIT_CONFIG_GLOBAL',
+        'GIT_CONFIG_COUNT',
+        'GIT_CONFIG_PARAMETERS',
+        'GIT_TEMPLATE_DIR'
+    )
+    foreach ($name in $gitEnvNames) {
+        $savedEnv[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
+    }
+
+    $emptyGitConfig = [System.IO.Path]::GetTempFileName()
+    $hooksPath = if ($env:OS -eq 'Windows_NT') { 'NUL' } else { '/dev/null' }
+    try {
+        if ($hasNativePreference) {
+            $oldNativePreference = $PSNativeCommandUseErrorActionPreference
+            $PSNativeCommandUseErrorActionPreference = $false
+        }
+
+        [Environment]::SetEnvironmentVariable('GIT_CONFIG_NOSYSTEM', '1', 'Process')
+        [Environment]::SetEnvironmentVariable('GIT_CONFIG_SYSTEM', $emptyGitConfig, 'Process')
+        [Environment]::SetEnvironmentVariable('GIT_CONFIG_GLOBAL', $emptyGitConfig, 'Process')
+        [Environment]::SetEnvironmentVariable('GIT_CONFIG_COUNT', '0', 'Process')
+        [Environment]::SetEnvironmentVariable('GIT_CONFIG_PARAMETERS', $null, 'Process')
+        [Environment]::SetEnvironmentVariable('GIT_TEMPLATE_DIR', $null, 'Process')
+
+        $gitArgs = @(
+            '-c', 'core.fsmonitor=false',
+            '-c', 'core.untrackedCache=false',
+            '-c', "core.hooksPath=$hooksPath",
+            '-c', 'init.templateDir='
+        ) + $Arguments
+
+        if ($SuppressStderr) {
+            $output = @(& git @gitArgs 2>$null)
+        } else {
+            $output = @(& git @gitArgs)
+        }
+        $rc = $LASTEXITCODE
+    } finally {
+        if ($hasNativePreference) {
+            $PSNativeCommandUseErrorActionPreference = $oldNativePreference
+        }
+        foreach ($name in $gitEnvNames) {
+            [Environment]::SetEnvironmentVariable($name, $savedEnv[$name], 'Process')
+        }
+        Remove-Item -LiteralPath $emptyGitConfig -Force -ErrorAction SilentlyContinue
+    }
+    return @{
+        ExitCode = $rc
+        Output = @($output)
+    }
+}
+
 function Invoke-PolarisCacheGit {
     param(
         [Parameter(Mandatory)] [string]$Checkout,
@@ -275,29 +339,8 @@ function Invoke-PolarisCacheGit {
     )
 
     $gitDir = Join-Path $Checkout '.git'
-    $oldNativePreference = $null
-    $hasNativePreference = Test-Path Variable:PSNativeCommandUseErrorActionPreference
-    try {
-        if ($hasNativePreference) {
-            $oldNativePreference = $PSNativeCommandUseErrorActionPreference
-            $PSNativeCommandUseErrorActionPreference = $false
-        }
-        $output = @(& git `
-            "--git-dir=$gitDir" `
-            "--work-tree=$Checkout" `
-            -c core.fsmonitor=false `
-            -c core.untrackedCache=false `
-            @Arguments 2>$null)
-        $rc = $LASTEXITCODE
-    } finally {
-        if ($hasNativePreference) {
-            $PSNativeCommandUseErrorActionPreference = $oldNativePreference
-        }
-    }
-    return @{
-        ExitCode = $rc
-        Output = @($output)
-    }
+    $gitArgs = @("--git-dir=$gitDir", "--work-tree=$Checkout") + $Arguments
+    return Invoke-PolarisGit -Arguments $gitArgs -SuppressStderr
 }
 
 function Assert-PolarisCheckoutClean {
@@ -441,17 +484,18 @@ function Get-PolarisVersionFromCheckout {
     return ([System.IO.File]::ReadAllText($versionPath).Trim())
 }
 
-function Invoke-GitChecked {
+function Invoke-PolarisGitChecked {
     param(
         [Parameter(Mandatory)] [string[]]$Arguments,
         [Parameter(Mandatory)] [string]$Label
     )
 
-    & git @Arguments
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host ("  FAIL: {0} exited {1}" -f $Label, $LASTEXITCODE) -ForegroundColor Red
-        exit $LASTEXITCODE
+    $result = Invoke-PolarisGit -Arguments $Arguments
+    if ($result.ExitCode -ne 0) {
+        Write-Host ("  FAIL: {0} exited {1}" -f $Label, $result.ExitCode) -ForegroundColor Red
+        exit $result.ExitCode
     }
+    return @($result.Output)
 }
 
 function Ensure-PolarisCheckout {
@@ -493,8 +537,8 @@ function Ensure-PolarisCheckout {
     New-Item -ItemType Directory -Force -Path $CacheRoot | Out-Null
     $tmp = Join-Path $CacheRoot ('.tmp.' + [guid]::NewGuid().ToString('N'))
     try {
-        Invoke-GitChecked -Label 'git clone Polaris' -Arguments @('clone', $RepoUrl, $tmp)
-        Invoke-GitChecked -Label 'git checkout Polaris pin' -Arguments @('-C', $tmp, 'checkout', '--detach', $Ref)
+        Invoke-PolarisGitChecked -Label 'git clone Polaris' -Arguments @('clone', $RepoUrl, $tmp)
+        Invoke-PolarisGitChecked -Label 'git checkout Polaris pin' -Arguments @('-C', $tmp, 'checkout', '--detach', $Ref)
 
         $actualVersion = Get-PolarisVersionFromCheckout -Checkout $tmp
         if ($actualVersion -ne $Version) {
