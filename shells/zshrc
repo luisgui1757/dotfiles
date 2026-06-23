@@ -45,18 +45,27 @@ export PATH
 
 # ---- Rose Pine file listing colors ------------------------------------------
 # lsd reads LS_COLORS for file/directory names; zsh completion reuses the same
-# palette through the list-colors zstyle below.
+# palette through the list-colors zstyle below. Dotfiles owns this palette by
+# default; set DOTFILES_LS_COLORS before shell startup for an explicit override.
 _dotfiles_ls_colors=(
+  'no=38;2;224;222;244'
+  'fi=38;2;224;222;244'
   'di=38;2;246;193;119'
   'ln=38;2;196;167;231'
-  'or=38;2;235;111;146'
-  'mi=38;2;235;111;146'
-  'ex=38;2;235;111;146'
-  'fi=38;2;224;222;244'
   'pi=38;2;156;207;216'
   'so=38;2;156;207;216'
+  'do=38;2;156;207;216'
   'bd=38;2;235;188;186'
   'cd=38;2;235;188;186'
+  'or=38;2;235;111;146'
+  'mi=38;2;235;111;146'
+  'su=38;2;235;111;146'
+  'sg=38;2;246;193;119'
+  'ca=38;2;235;188;186'
+  'tw=38;2;246;193;119'
+  'ow=38;2;246;193;119'
+  'st=38;2;246;193;119'
+  'ex=38;2;235;111;146'
   '*.md=38;2;156;207;216'
   '*.markdown=38;2;156;207;216'
   '*.txt=38;2;224;222;244'
@@ -83,7 +92,7 @@ _dotfiles_ls_colors=(
   '*.webp=38;2;235;188;186'
   '*.svg=38;2;156;207;216'
 )
-export LS_COLORS="${LS_COLORS:-${(j.:.)_dotfiles_ls_colors}}"
+export LS_COLORS="${DOTFILES_LS_COLORS:-${(j.:.)_dotfiles_ls_colors}}"
 unset _dotfiles_ls_colors
 
 # ---- History -----------------------------------------------------------------

@@ -86,17 +86,21 @@ Describe "PowerShell profile" {
         $src | Should -Match 'function global:lt\s+\{\s+lsd\s+--tree\s+@args\s+\}'
     }
 
-    It "sets a Rose Pine LS_COLORS default before wiring lsd" {
+    It "sets an authoritative Rose Pine LS_COLORS palette before wiring lsd" {
         $src = Get-Content -Raw -LiteralPath $script:Profile
         $src | Should -Match '\$script:RosePineLsColors\s+=\s+@\('
         $src | Should -Match "'di=38;2;246;193;119'"
         $src | Should -Match "'ex=38;2;235;111;146'"
-        $src | Should -Match '\[string\]::IsNullOrWhiteSpace\(\$env:LS_COLORS\)'
+        foreach ($class in 'no', 'fi', 'di', 'ln', 'pi', 'so', 'do', 'bd', 'cd', 'or', 'mi', 'su', 'sg', 'ca', 'tw', 'ow', 'st', 'ex') {
+            $src | Should -Match "'$class="
+        }
+        $src | Should -Match '\[string\]::IsNullOrWhiteSpace\(\$env:DOTFILES_LS_COLORS\)'
         $src | Should -Match '\$env:LS_COLORS\s+=\s+\$script:RosePineLsColors'
+        $src | Should -Match '\$env:LS_COLORS\s+=\s+\$env:DOTFILES_LS_COLORS'
         $src.IndexOf('$script:RosePineLsColors') | Should -BeLessThan $src.IndexOf('if (Get-Command lsd')
     }
 
-    It "does not overwrite a user-provided LS_COLORS value" {
+    It "owns LS_COLORS by default and honors DOTFILES_LS_COLORS override" {
         $pwshExe = (Get-Command pwsh -ErrorAction SilentlyContinue).Source
         if (-not $pwshExe) {
             $pwshExe = (Get-Command pwsh.exe -ErrorAction SilentlyContinue).Source
@@ -105,10 +109,26 @@ Describe "PowerShell profile" {
 
         $profilePath = $script:Profile.Replace('"', '`"')
         $scriptBlock = @"
-`$env:LS_COLORS = 'user=provided'
+`$env:LS_COLORS = 'di=01;34:ex=01;32:fi=00'
+`$env:DOTFILES_LS_COLORS = `$null
 . "$profilePath"
-if (`$env:LS_COLORS -ne 'user=provided') {
-    Write-Error "LS_COLORS was overwritten: `$env:LS_COLORS"
+if (`$env:LS_COLORS -notmatch 'di=38;2;246;193;119') {
+    Write-Error "LS_COLORS did not use the Rose Pine directory color: `$env:LS_COLORS"
+    exit 1
+}
+if (`$env:LS_COLORS -match 'di=01;34') {
+    Write-Error "LS_COLORS inherited the ambient palette: `$env:LS_COLORS"
+    exit 1
+}
+if (`$env:LS_COLORS -notmatch 'ow=38;2;246;193;119' -or `$env:LS_COLORS -notmatch 'tw=38;2;246;193;119' -or `$env:LS_COLORS -notmatch 'st=38;2;246;193;119') {
+    Write-Error "LS_COLORS did not include special directory classes: `$env:LS_COLORS"
+    exit 1
+}
+`$env:LS_COLORS = 'di=01;34:ex=01;32:fi=00'
+`$env:DOTFILES_LS_COLORS = 'di=38;2;1;2;3:ex=38;2;4;5;6'
+. "$profilePath"
+if (`$env:LS_COLORS -ne `$env:DOTFILES_LS_COLORS) {
+    Write-Error "DOTFILES_LS_COLORS was not honored: `$env:LS_COLORS"
     exit 1
 }
 exit 0

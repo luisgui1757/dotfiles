@@ -264,8 +264,11 @@ and whether `pwsh` is installed.
   Scoop-first catalog). Interactive shells replace `ls` with `lsd` and add the
   useful `l`, `la`, `lla`, and `lt` shortcuts only when the binary is present.
   Chezmoi deploys `~/.config/lsd/config.yaml` and `colors.yaml`; shell profiles
-  set a default Rose Pine `LS_COLORS` so direct `lsd -la`, aliases, zsh
-  completions, and PowerShell functions share the same file/directory colors.
+  install the Rose Pine `LS_COLORS` palette by default so direct `lsd -la`,
+  aliases, zsh completions, and PowerShell functions share deterministic
+  file/directory colors across machines. Set `DOTFILES_LS_COLORS` before shell
+  startup for an explicit palette override; `NO_COLOR` remains the standard
+  color opt-out.
 - `install-deps` provisions the `cmake` CLI because the configured CMake LSP
   (`neocmakelsp`) shells out to it; Mason installs the language server, not the
   project toolchain it drives.
@@ -588,8 +591,11 @@ stale; CI then fails verification until a human reviews the adjacent constant.
 - **lsd wired and themed in interactive shells** — setup installs it where the
   platform package manager carries it, chezmoi deploys the custom Rose Pine
   theme, and zsh/PowerShell expose the documented `ls`, `l`, `la`, `lla`, and
-  `lt` commands when `lsd` is present. `LS_COLORS` owns file/directory names;
-  `colors.yaml` owns long-list metadata.
+  `lt` commands when `lsd` is present. The profiles own the Rose Pine
+  `LS_COLORS` palette for file/directory names, including special directory
+  classes such as sticky and other-writable directories; `colors.yaml` owns
+  long-list metadata. Set `DOTFILES_LS_COLORS` before shell startup for an
+  explicit palette override.
 - **No `bindkey '\e' kill-whole-line`** — that shadowed the entire Meta
   prefix and silently broke Alt-h/j/k/l window nav in nvim.
 - **tmux window swaps use uppercase Vim directions.** `prefix+H` swaps the

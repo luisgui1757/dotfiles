@@ -1143,9 +1143,14 @@ save only**. The next plain `:w` formats normally. Implemented in
   the same names because PowerShell aliases cannot carry arguments like `-l` or
   `--tree`. Keep both profiles guarded so partially provisioned shells stay
   silent and usable. `lsd` uses `LS_COLORS` for file/directory names and
-  `colors.yaml` for long-list metadata; shell profiles set a default Rose Pine
-  `LS_COLORS` but must not overwrite a user-provided value. `NO_COLOR` remains
-  an explicit opt-out and must not be unset by the profiles.
+  `colors.yaml` for long-list metadata; shell profiles intentionally replace
+  ambient/system `LS_COLORS` with the repo's Rose Pine palette so `ls`, `la`,
+  `lla`, and direct `lsd -la` render consistently across machines. Set
+  `DOTFILES_LS_COLORS` before shell/profile startup for an explicit palette
+  override. The repo palette must cover normal file types and special
+  directory classes such as `ow`, `tw`, and `st` so world-writable and sticky
+  directories do not fall back to upstream/default backgrounds. `NO_COLOR`
+  remains an explicit opt-out and must not be unset by the profiles.
 - **`ls`/`Get-ChildItem` directories are gold via LS_COLORS and `$PSStyle`.**
   The default directory color (bright blue) is unreadable on Rose Pine dark.
   `LS_COLORS` paints `lsd` directories gold on every shell. `$PSStyle.FileInfo`

@@ -1,5 +1,5 @@
 # Rose Pine mapped to crossterm's xterm-256 color values.
-# File and directory names are colored by LS_COLORS in the shell profiles.
+# File and directory names are colored by the shell profiles' LS_COLORS palette.
 user: 222
 group: 183
 
