@@ -728,12 +728,13 @@ Describe "setup.ps1 update mode" {
         $script:SetupUpdateDepsPath = ''
         $script:SetupUpdateDepsArgs = @{}
         $script:SetupUpdateNvimRan = $false
+        $script:SetupUpdateNvimArgs = @()
         $script:SetupUpdateRuntimeRefreshed = $false
         Mock -CommandName Update-RuntimePath -MockWith { $script:SetupUpdateRuntimeRefreshed = $true }
         Mock -CommandName Invoke-ChezmoiApplyPhase -MockWith { throw "chezmoi apply must not run in update mode" }
     }
 
-    It "runs install-deps Update and MasonToolsUpdate only" {
+    It "runs install-deps Update and MasonToolsUpdateSync only" {
         $root = Join-Path ([System.IO.Path]::GetTempPath()) 'setup-update-root'
         $depsRunner = {
             param([string]$Path, [hashtable]$Arguments)
@@ -744,23 +745,28 @@ Describe "setup.ps1 update mode" {
             param([string]$Name)
             return ($Name -eq 'nvim')
         }
-        $nvimRunner = {
+        function global:nvim {
             $script:SetupUpdateNvimRan = $true
+            $script:SetupUpdateNvimArgs = $args
             $global:LASTEXITCODE = 0
         }
 
-        $output = & {
-            Invoke-SetupUpdateMode `
-                -Root $root `
-                -DependencyArgs @{} `
-                -DependencyRunner $depsRunner `
-                -CommandTester $commandTester `
-                -NvimRunner $nvimRunner
-        } 6>&1 | Out-String
+        try {
+            $output = & {
+                Invoke-SetupUpdateMode `
+                    -Root $root `
+                    -DependencyArgs @{} `
+                    -DependencyRunner $depsRunner `
+                    -CommandTester $commandTester
+            } 6>&1 | Out-String
+        } finally {
+            Remove-Item Function:\global:nvim -ErrorAction SilentlyContinue
+        }
 
         $script:SetupUpdateDepsPath | Should -Be (Join-Path $root 'install-deps.ps1')
         $script:SetupUpdateDepsArgs['Update'] | Should -BeTrue
         $script:SetupUpdateNvimRan | Should -BeTrue
+        ($script:SetupUpdateNvimArgs -join ' ') | Should -Be '--headless +MasonToolsUpdateSync +qa'
         $script:SetupUpdateRuntimeRefreshed | Should -BeTrue
         $output | Should -Match 'Update 1/2'
         $output | Should -Match 'Update 2/2'
@@ -798,7 +804,7 @@ Describe "setup.ps1 update mode" {
         $script:SetupUpdateDepsArgs['Update'] | Should -BeTrue
         $script:SetupUpdateDepsArgs['DryRun'] | Should -BeTrue
         $script:SetupUpdateRuntimeRefreshed | Should -BeFalse
-        $output | Should -Match '(?m)^\s*would:\s+nvim --headless \+MasonToolsUpdate \+qa[ \t]*$'
+        $output | Should -Match '(?m)^\s*would:\s+nvim --headless \+MasonToolsUpdateSync \+qa[ \t]*$'
         Should -Invoke -CommandName Invoke-ChezmoiApplyPhase -Times 0 -Exactly
     }
 }

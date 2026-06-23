@@ -207,10 +207,11 @@ Add `--dry-run` / `-DryRun` to preview every step without touching disk.
 Pass `--skip-agents` / `-SkipAgents` to leave global AI-agent entrypoints alone.
 Pass `--update` / `-Update` from an existing checkout to run only the
 drift-edge refresh: scoped package-manager updates for present catalog tools,
-then `nvim --headless +MasonToolsUpdate +qa`. It deliberately skips `git pull`,
-`chezmoi apply`, `:Lazy restore`, synchronous Tree-sitter parser bootstrap,
-`:Lazy sync`, and `:Lazy update`; the last two can change `lazy-lock.json` and
-are therefore repo updates, not machine refreshes.
+then `nvim --headless +MasonToolsUpdateSync +qa`. The synchronous Mason command
+keeps headless Neovim alive until package installs finish. It deliberately skips
+`git pull`, `chezmoi apply`, `:Lazy restore`, synchronous Tree-sitter parser
+bootstrap, `:Lazy sync`, and `:Lazy update`; the last two can change
+`lazy-lock.json` and are therefore repo updates, not machine refreshes.
 
 Every script is safe to rerun. Pre-existing non-symlink targets are backed up to
 `<target>.bak.<timestamp>` with collision-proof suffixes (`.1`, `.2`, ...).
@@ -687,7 +688,7 @@ diff.
 ### Updating Mason tools across machines
 
 ```bash
-nvim --headless "+MasonToolsUpdate" +qa
+nvim --headless "+MasonToolsUpdateSync" +qa
 ```
 
 Run on each machine; there's no machine-pinned lockfile for Mason itself.
