@@ -2,7 +2,7 @@
 # setup.sh -- one-shot end-to-end install for macOS / Linux / WSL.
 #
 # Local usage (from a checked-out copy):
-#   ./setup.sh                     interactive: Y/n per dep, then config + sync
+#   ./setup.sh                     interactive: dependency prompts, then config + sync
 #   ./setup.sh --all               non-interactive: install everything missing
 #   ./setup.sh --update            update package-manager tools + Mason only
 #   ./setup.sh --dry-run           preview every step
@@ -45,7 +45,7 @@ usage() {
 setup.sh -- one-shot end-to-end install for macOS / Linux / WSL.
 
 Local usage:
-  ./setup.sh                     interactive: one prompt, then end-to-end
+  ./setup.sh                     interactive: dependency prompts, then config + sync
   ./setup.sh --all               non-interactive: install everything missing
   ./setup.sh --update            update package-manager tools + Mason only
   ./setup.sh --dry-run           preview every step
@@ -201,10 +201,20 @@ polaris_checkout_dir() {
     printf '%s/%s\n' "$POLARIS_CACHE_ROOT" "$POLARIS_REF"
 }
 
+polaris_cache_git() {
+    local checkout="$1"
+    shift
+    GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null \
+        git --git-dir="$checkout/.git" --work-tree="$checkout" \
+        -c core.fsmonitor=false \
+        -c core.untrackedCache=false \
+        "$@"
+}
+
 assert_polaris_checkout_clean() {
     local checkout="$1" status
 
-    if ! status="$(git -C "$checkout" status --porcelain=v1 --untracked-files=all --ignored=matching 2>/dev/null)"; then
+    if ! status="$(polaris_cache_git "$checkout" status --porcelain=v1 --untracked-files=all --ignored=matching 2>/dev/null)"; then
         echo "  FAIL: could not inspect Polaris cache worktree: $checkout" >&2
         exit 1
     fi
@@ -239,7 +249,7 @@ ensure_polaris_checkout() {
     checkout="$(polaris_checkout_dir)"
 
     if [[ -d "$checkout/.git" ]]; then
-        head="$(git -C "$checkout" rev-parse HEAD 2>/dev/null || true)"
+        head="$(polaris_cache_git "$checkout" rev-parse --verify 'HEAD^{commit}' 2>/dev/null || true)"
         if [[ "$head" != "$POLARIS_REF" ]]; then
             echo "  FAIL: Polaris cache is not at the pinned commit: $checkout" >&2
             echo "        expected $POLARIS_REF, found ${head:-unknown}" >&2

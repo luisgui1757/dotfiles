@@ -399,6 +399,128 @@ Invoke-PolarisAgentPolicy -AllMode:`$true -IsDryRun:`$false -Version '0.1.1' -Re
             }
         }
     }
+
+    It "does not execute a Polaris cache core.fsmonitor command during validation" {
+        $work = Join-Path $script:PolarisTestRoot 'polaris-work'
+        $tools = Join-Path $work 'tools'
+        New-Item -ItemType Directory -Force -Path $tools | Out-Null
+        & git -C $work init -q
+        & git -C $work config user.name 'Dotfiles Test'
+        & git -C $work config user.email 'dotfiles@example.invalid'
+        [System.IO.File]::WriteAllText((Join-Path $work 'VERSION'), "0.1.1`n", [System.Text.UTF8Encoding]::new($false))
+        $installer = Join-Path $tools 'install'
+        [System.IO.File]::WriteAllText($installer, @'
+#!/usr/bin/env bash
+printf "%s\n" "$*" >> "$POLARIS_TEST_LOG"
+'@, [System.Text.UTF8Encoding]::new($false))
+        & git -C $work add VERSION tools/install
+        & git -C $work commit -q -m 'fake polaris'
+        $sha = (& git -C $work rev-parse HEAD).Trim()
+
+        $cache = Join-Path $script:PolarisTestRoot 'cache'
+        New-Item -ItemType Directory -Force -Path $cache | Out-Null
+        Move-Item -LiteralPath $work -Destination (Join-Path $cache $sha)
+        $checkout = Join-Path $cache $sha
+        $marker = Join-Path $script:PolarisTestRoot 'fsmonitor-ran'
+        if ($env:OS -eq 'Windows_NT') {
+            $fsmonitor = Join-Path $script:PolarisTestRoot 'fsmonitor.cmd'
+            [System.IO.File]::WriteAllText($fsmonitor, "@echo off`r`necho ran> `"$marker`"`r`nexit /b 0`r`n", [System.Text.UTF8Encoding]::new($false))
+        } else {
+            $fsmonitor = Join-Path $script:PolarisTestRoot 'fsmonitor'
+            [System.IO.File]::WriteAllText($fsmonitor, "#!/usr/bin/env bash`nprintf ran > '$marker'`nexit 0`n", [System.Text.UTF8Encoding]::new($false))
+            & chmod +x $fsmonitor
+        }
+        & git -C $checkout config core.fsmonitor $fsmonitor
+
+        $oldLog = $env:POLARIS_TEST_LOG
+        try {
+            $env:POLARIS_TEST_LOG = Join-Path $script:PolarisTestRoot 'fsmonitor-install.log'
+            Invoke-PolarisAgentPolicy `
+                -AllMode:$true `
+                -IsDryRun:$false `
+                -Version '0.1.1' `
+                -Ref $sha `
+                -CacheRoot $cache
+
+            Test-Path -LiteralPath $marker | Should -BeFalse
+            $calls = Get-Content -LiteralPath $env:POLARIS_TEST_LOG
+            $calls | Should -Contain '--global'
+            $calls | Should -Contain '--global --check'
+        } finally {
+            if ($null -eq $oldLog) {
+                Remove-Item Env:POLARIS_TEST_LOG -ErrorAction SilentlyContinue
+            } else {
+                $env:POLARIS_TEST_LOG = $oldLog
+            }
+        }
+    }
+
+    It "rejects a cache whose core.worktree points at a clean alternate tree" {
+        $work = Join-Path $script:PolarisTestRoot 'polaris-work'
+        $tools = Join-Path $work 'tools'
+        New-Item -ItemType Directory -Force -Path $tools | Out-Null
+        & git -C $work init -q
+        & git -C $work config user.name 'Dotfiles Test'
+        & git -C $work config user.email 'dotfiles@example.invalid'
+        [System.IO.File]::WriteAllText((Join-Path $work 'VERSION'), "0.1.1`n", [System.Text.UTF8Encoding]::new($false))
+        $installer = Join-Path $tools 'install'
+        [System.IO.File]::WriteAllText($installer, "#!/usr/bin/env bash`nexit 0`n", [System.Text.UTF8Encoding]::new($false))
+        & git -C $work add VERSION tools/install
+        & git -C $work commit -q -m 'fake polaris'
+        $sha = (& git -C $work rev-parse HEAD).Trim()
+
+        $cleanWorktree = Join-Path $script:PolarisTestRoot 'clean-worktree'
+        New-Item -ItemType Directory -Force -Path (Join-Path $cleanWorktree 'tools') | Out-Null
+        Copy-Item -LiteralPath (Join-Path $work 'VERSION') -Destination (Join-Path $cleanWorktree 'VERSION')
+        Copy-Item -LiteralPath $installer -Destination (Join-Path (Join-Path $cleanWorktree 'tools') 'install')
+
+        $marker = Join-Path $script:PolarisTestRoot 'core-worktree-dirty-installer-ran'
+        [System.IO.File]::WriteAllText($installer, "#!/usr/bin/env bash`nprintf ran > '$marker'`n", [System.Text.UTF8Encoding]::new($false))
+        & git -C $work config core.worktree $cleanWorktree
+
+        $cache = Join-Path $script:PolarisTestRoot 'cache'
+        New-Item -ItemType Directory -Force -Path $cache | Out-Null
+        Move-Item -LiteralPath $work -Destination (Join-Path $cache $sha)
+
+        $oldLog = $env:POLARIS_TEST_LOG
+        try {
+            $env:POLARIS_TEST_LOG = Join-Path $script:PolarisTestRoot 'core-worktree-install.log'
+            $setupLiteral = $script:Setup.Replace("'", "''")
+            $cacheLiteral = $cache.Replace("'", "''")
+            $shaLiteral = $sha.Replace("'", "''")
+            $probe = @"
+`$ErrorActionPreference = 'Stop'
+`$env:DOTFILES_SETUP_PS1_SOURCE_ONLY = '1'
+. '$setupLiteral' -All
+Invoke-PolarisAgentPolicy -AllMode:`$true -IsDryRun:`$false -Version '0.1.1' -Ref '$shaLiteral' -CacheRoot '$cacheLiteral'
+"@
+            $oldNativePreference = $null
+            $hasNativePreference = Test-Path Variable:PSNativeCommandUseErrorActionPreference
+            try {
+                if ($hasNativePreference) {
+                    $oldNativePreference = $PSNativeCommandUseErrorActionPreference
+                    $PSNativeCommandUseErrorActionPreference = $false
+                }
+                $output = & pwsh -NoLogo -NoProfile -Command $probe 2>&1 | Out-String
+                $rc = $LASTEXITCODE
+            } finally {
+                if ($hasNativePreference) {
+                    $PSNativeCommandUseErrorActionPreference = $oldNativePreference
+                }
+            }
+
+            $rc | Should -Not -Be 0
+            $output | Should -Match 'Polaris cache has local changes'
+            Test-Path -LiteralPath $marker | Should -BeFalse
+            Test-Path -LiteralPath $env:POLARIS_TEST_LOG | Should -BeFalse
+        } finally {
+            if ($null -eq $oldLog) {
+                Remove-Item Env:POLARIS_TEST_LOG -ErrorAction SilentlyContinue
+            } else {
+                $env:POLARIS_TEST_LOG = $oldLog
+            }
+        }
+    }
 }
 
 Describe "setup.ps1 update mode" {

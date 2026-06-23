@@ -98,5 +98,59 @@ set -e
 after_untracked_count="$(wc -l < "$POLARIS_TEST_LOG" | tr -d ' ')"
 [[ "$after_untracked_count" == "$before_dirty_count" ]] \
     || fail "untracked Polaris cache executed the installer"
+rm "$POLARIS_CACHE_ROOT/$sha/UNTRACKED"
+
+printf 'IGNORED\n' >> "$POLARIS_CACHE_ROOT/$sha/.git/info/exclude"
+touch "$POLARIS_CACHE_ROOT/$sha/IGNORED"
+set +e
+ignored_output="$( ( run_polaris_agent_policy ) 2>&1 )"
+ignored_rc=$?
+set -e
+[[ "$ignored_rc" -ne 0 ]] \
+    || fail "ignored Polaris cache file was accepted"
+[[ "$ignored_output" == *"Polaris cache has local changes"* ]] \
+    || fail "ignored Polaris cache file did not explain the refusal"
+after_ignored_count="$(wc -l < "$POLARIS_TEST_LOG" | tr -d ' ')"
+[[ "$after_ignored_count" == "$before_dirty_count" ]] \
+    || fail "ignored Polaris cache file executed the installer"
+rm "$POLARIS_CACHE_ROOT/$sha/IGNORED"
+
+fsmonitor_marker="$TMP_ROOT/fsmonitor-ran"
+cat > "$TMP_ROOT/fsmonitor" <<EOF
+#!/usr/bin/env bash
+printf ran > "$fsmonitor_marker"
+exit 0
+EOF
+chmod +x "$TMP_ROOT/fsmonitor"
+git -C "$POLARIS_CACHE_ROOT/$sha" config core.fsmonitor "$TMP_ROOT/fsmonitor"
+run_polaris_agent_policy >/dev/null
+[[ ! -e "$fsmonitor_marker" ]] \
+    || fail "Polaris cache validation executed core.fsmonitor"
+
+before_worktree_count="$(wc -l < "$POLARIS_TEST_LOG" | tr -d ' ')"
+clean_worktree="$TMP_ROOT/clean-worktree"
+mkdir -p "$clean_worktree/tools"
+cp "$POLARIS_CACHE_ROOT/$sha/VERSION" "$clean_worktree/VERSION"
+cp "$POLARIS_CACHE_ROOT/$sha/tools/install" "$clean_worktree/tools/install"
+worktree_marker="$TMP_ROOT/core-worktree-dirty-installer-ran"
+cat > "$POLARIS_CACHE_ROOT/$sha/tools/install" <<EOF
+#!/usr/bin/env bash
+printf ran > "$worktree_marker"
+EOF
+chmod +x "$POLARIS_CACHE_ROOT/$sha/tools/install"
+git -C "$POLARIS_CACHE_ROOT/$sha" config core.worktree "$clean_worktree"
+set +e
+worktree_output="$( ( run_polaris_agent_policy ) 2>&1 )"
+worktree_rc=$?
+set -e
+[[ "$worktree_rc" -ne 0 ]] \
+    || fail "Polaris cache with redirected core.worktree was accepted"
+[[ "$worktree_output" == *"Polaris cache has local changes"* ]] \
+    || fail "redirected core.worktree cache did not explain the refusal"
+[[ ! -e "$worktree_marker" ]] \
+    || fail "redirected core.worktree executed the dirty installer"
+after_worktree_count="$(wc -l < "$POLARIS_TEST_LOG" | tr -d ' ')"
+[[ "$after_worktree_count" == "$before_worktree_count" ]] \
+    || fail "redirected core.worktree cache executed the installer"
 
 echo "OK"

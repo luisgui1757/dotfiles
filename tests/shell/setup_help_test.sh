@@ -13,5 +13,11 @@ esac
 if grep -qi 'No such file' <<<"$out"; then
     echo "FAIL: setup.sh piped help tried to read from bash"; echo "$out"; exit 1
 fi
+if ! grep -F 'interactive: dependency prompts, then config + sync' <<<"$out" >/dev/null; then
+    echo "FAIL: setup.sh help has stale interactive prompt wording"; echo "$out"; exit 1
+fi
+if grep -F 'interactive: one prompt' <<<"$out" >/dev/null; then
+    echo "FAIL: setup.sh help still claims a single interactive prompt"; echo "$out"; exit 1
+fi
 
 echo "OK"

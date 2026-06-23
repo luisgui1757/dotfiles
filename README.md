@@ -307,7 +307,8 @@ and whether `pwsh` is installed.
   pins Polaris `0.1.1` at commit `489dcc6f991ddcff63c460a433e983264dc54cf7`,
   caches that checkout under `~/.local/share/dotfiles/polaris/<commit>` on
   POSIX and `%LOCALAPPDATA%\dotfiles\polaris\<commit>` on Windows, verifies the
-  checkout `VERSION` and a clean Git worktree, then runs Polaris' Bash global
+  checkout `VERSION`, and inspects the exact cached path with executable Git
+  config features disabled, then runs Polaris' Bash global
   installer and global check (`tools/install --global`, then
   `--global --check`; Windows uses a validated Git Bash with `cygpath`, not WSL
   bash or another PATH-only Bash).

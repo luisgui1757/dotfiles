@@ -1,7 +1,7 @@
 # setup.ps1 -- one-shot end-to-end install for Windows.
 #
 # Local usage (from a checked-out copy):
-#   .\setup.ps1                  interactive: Y/n per dep, then config + sync
+#   .\setup.ps1                  interactive: dependency prompts, then config + sync
 #   .\setup.ps1 -All             non-interactive: install everything missing
 #   .\setup.ps1 -Update          update package-manager tools + Mason only
 #   .\setup.ps1 -DryRun          preview every step
@@ -268,9 +268,13 @@ function Get-PolarisCheckoutPath {
     return (Join-Path $CacheRoot $Ref)
 }
 
-function Assert-PolarisCheckoutClean {
-    param([Parameter(Mandatory)] [string]$Checkout)
+function Invoke-PolarisCacheGit {
+    param(
+        [Parameter(Mandatory)] [string]$Checkout,
+        [Parameter(Mandatory)] [string[]]$Arguments
+    )
 
+    $gitDir = Join-Path $Checkout '.git'
     $oldNativePreference = $null
     $hasNativePreference = Test-Path Variable:PSNativeCommandUseErrorActionPreference
     try {
@@ -278,14 +282,35 @@ function Assert-PolarisCheckoutClean {
             $oldNativePreference = $PSNativeCommandUseErrorActionPreference
             $PSNativeCommandUseErrorActionPreference = $false
         }
-        $status = @(& git -C $Checkout status --porcelain=v1 --untracked-files=all --ignored=matching 2>$null)
+        $output = @(& git `
+            "--git-dir=$gitDir" `
+            "--work-tree=$Checkout" `
+            -c core.fsmonitor=false `
+            -c core.untrackedCache=false `
+            @Arguments 2>$null)
         $rc = $LASTEXITCODE
     } finally {
         if ($hasNativePreference) {
             $PSNativeCommandUseErrorActionPreference = $oldNativePreference
         }
     }
-    if ($rc -ne 0) {
+    return @{
+        ExitCode = $rc
+        Output = @($output)
+    }
+}
+
+function Assert-PolarisCheckoutClean {
+    param([Parameter(Mandatory)] [string]$Checkout)
+
+    $result = Invoke-PolarisCacheGit -Checkout $Checkout -Arguments @(
+        'status',
+        '--porcelain=v1',
+        '--untracked-files=all',
+        '--ignored=matching'
+    )
+    $status = @($result.Output)
+    if ($result.ExitCode -ne 0) {
         Write-Host "  FAIL: could not inspect Polaris cache worktree: $Checkout" -ForegroundColor Red
         exit 1
     }
@@ -439,9 +464,9 @@ function Ensure-PolarisCheckout {
 
     $checkout = Get-PolarisCheckoutPath -CacheRoot $CacheRoot -Ref $Ref
     if (Test-Path -LiteralPath (Join-Path $checkout '.git') -PathType Container) {
-        $head = [string](& git -C $checkout rev-parse HEAD 2>$null)
-        $head = $head.Trim()
-        if ($LASTEXITCODE -ne 0 -or $head -ne $Ref) {
+        $headResult = Invoke-PolarisCacheGit -Checkout $checkout -Arguments @('rev-parse', '--verify', 'HEAD^{commit}')
+        $head = ([string]($headResult.Output -join '')).Trim()
+        if ($headResult.ExitCode -ne 0 -or $head -ne $Ref) {
             Write-Host "  FAIL: Polaris cache is not at the pinned commit: $checkout" -ForegroundColor Red
             Write-Host "        expected $Ref, found $head" -ForegroundColor Yellow
             exit 1
