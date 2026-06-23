@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Hermetic, host-independent proof of the per-OS .chezmoiignore gating: render the
-# ignore template against an injected targetOS and assert it equals EXACTLY the
-# expected ignore set for that OS. (The parity gate proves the applied per-config
-# result; this proves the gating logic on any host with no apply/network.)
+# Hermetic, host-independent proof of the per-OS .chezmoiignore gating: render
+# the ignore template against chezmoi --override-data and assert it equals
+# EXACTLY the expected ignore set for that OS. (The parity gate proves the
+# applied per-config result; this proves the gating logic on any host with no
+# apply/network.)
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
@@ -55,9 +56,9 @@ for case_name in darwin linux linux-wsl linux-wsl-gui windows; do
         linux-wsl-gui) os=linux; iswsl=true; experimental=true ;;
         *)             os="$case_name"; iswsl=false; experimental=false ;;
     esac
-    printf 'targetOS: %s\nisWsl: %s\nexperimentalWslGui: %s\n' "$os" "$iswsl" "$experimental" > "$fixture/.chezmoidata.yaml"
+    override_data="$(printf '{"targetOS":"%s","isWsl":%s,"experimentalWslGui":%s}' "$os" "$iswsl" "$experimental")"
     rendered_ignore="$rendered/.chezmoiignore.$case_name"
-    chezmoi --source "$fixture" execute-template < "$IGNORE_TEMPLATE" > "$rendered_ignore"
+    chezmoi --source "$fixture" execute-template --override-data "$override_data" < "$IGNORE_TEMPLATE" > "$rendered_ignore"
 
     actual="$(grep -vE '^[[:space:]]*$' "$rendered_ignore" | sort -u)"
     expected="$(expected_for "$case_name" | sort -u)"

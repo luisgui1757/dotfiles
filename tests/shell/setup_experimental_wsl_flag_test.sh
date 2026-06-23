@@ -33,7 +33,7 @@ fi
 EOF
 chmod +x "$TMP_ROOT/install-deps.sh" "$TMP_ROOT/fakebin/chezmoi" "$TMP_ROOT/fakebin/brew"
 
-output="$(SETUP_TEST_ROOT="$TMP_ROOT" PATH="$TMP_ROOT/fakebin:/usr/bin:/bin" bash "$TMP_ROOT/setup.sh" --all --skip-nvim --experimental-wsl-gui 2>&1)"
+output="$(SETUP_TEST_ROOT="$TMP_ROOT" PATH="$TMP_ROOT/fakebin:/usr/bin:/bin" bash "$TMP_ROOT/setup.sh" --all --skip-nvim --skip-agents --experimental-wsl-gui 2>&1)"
 [[ "$output" == *"setup.sh: done"* ]]
 grep -Fx -- "--experimental-wsl-gui" "$TMP_ROOT/deps.args" >/dev/null
 grep -Fx -- "1" "$TMP_ROOT/deps.env" >/dev/null

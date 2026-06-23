@@ -1,7 +1,7 @@
 # setup.ps1 -- one-shot end-to-end install for Windows.
 #
 # Local usage (from a checked-out copy):
-#   .\setup.ps1                  interactive: Y/n per dep, then config + sync
+#   .\setup.ps1                  interactive: dependency prompts, then config + sync
 #   .\setup.ps1 -All             non-interactive: install everything missing
 #   .\setup.ps1 -Update          update package-manager tools + Mason only
 #   .\setup.ps1 -DryRun          preview every step
@@ -9,6 +9,7 @@
 #   .\setup.ps1 -SkipBootstrap   back-compat alias: skip config apply
 #   .\setup.ps1 -SkipConfig      already configured; just sync nvim
 #   .\setup.ps1 -SkipNvim        skip nvim plugin/parser/Mason sync
+#   .\setup.ps1 -SkipAgents      skip global Polaris agent-policy install
 #   .\setup.ps1 -BestEffort      continue past plugin/LSP/Mason phase failures
 #   .\setup.ps1 -SkipWindowsTerminalMerge   config+sync but leave WT settings.json untouched
 #   .\setup.ps1 -MergeWindowsTerminal        (no-op alias; the WT rose-pine merge is now default-on)
@@ -30,6 +31,7 @@ param(
     [switch]$SkipBootstrap,
     [switch]$SkipConfig,
     [switch]$SkipNvim,
+    [switch]$SkipAgents,
     [switch]$MergeWindowsTerminal,   # back-compat no-op: WT merge is now default-on
     [switch]$SkipWindowsTerminalMerge,
     [switch]$BestEffort
@@ -37,7 +39,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$RepoUrl     = 'https://github.com/luisgui1757/dotfiles.git'
+$RepoUrl        = 'https://github.com/luisgui1757/dotfiles.git'
+$PolarisRepoUrl = 'https://github.com/luisgui1757/polaris.git'
+$PolarisVersion = '0.1.1'
+$PolarisRef     = '489dcc6f991ddcff63c460a433e983264dc54cf7'
 
 function Get-DefaultProfileRoot {
     if (-not [string]::IsNullOrWhiteSpace($env:USERPROFILE)) { return $env:USERPROFILE }
@@ -246,6 +251,393 @@ function Phase {
 function Write-Step {
     param([string]$Message)
     Write-Host "  $Message"
+}
+
+function Get-PolarisCacheRoot {
+    if (-not [string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
+        return (Join-Path $env:LOCALAPPDATA 'dotfiles\polaris')
+    }
+    return (Join-Path (Get-DefaultProfileRoot) '.local\share\dotfiles\polaris')
+}
+
+function Get-PolarisCheckoutPath {
+    param(
+        [string]$CacheRoot = (Get-PolarisCacheRoot),
+        [string]$Ref = $PolarisRef
+    )
+    return (Join-Path $CacheRoot $Ref)
+}
+
+function Invoke-PolarisGit {
+    param(
+        [Parameter(Mandatory)] [string[]]$Arguments,
+        [switch]$SuppressStderr
+    )
+
+    $oldNativePreference = $null
+    $hasNativePreference = Test-Path Variable:PSNativeCommandUseErrorActionPreference
+    $savedEnv = @{}
+    $gitEnvNames = @(
+        'GIT_CONFIG_NOSYSTEM',
+        'GIT_CONFIG_SYSTEM',
+        'GIT_CONFIG_GLOBAL',
+        'GIT_CONFIG_COUNT',
+        'GIT_CONFIG_PARAMETERS',
+        'GIT_TEMPLATE_DIR'
+    )
+    foreach ($name in $gitEnvNames) {
+        $savedEnv[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
+    }
+
+    $emptyGitConfig = [System.IO.Path]::GetTempFileName()
+    $hooksPath = if ($env:OS -eq 'Windows_NT') { 'NUL' } else { '/dev/null' }
+    try {
+        if ($hasNativePreference) {
+            $oldNativePreference = $PSNativeCommandUseErrorActionPreference
+            $PSNativeCommandUseErrorActionPreference = $false
+        }
+
+        [Environment]::SetEnvironmentVariable('GIT_CONFIG_NOSYSTEM', '1', 'Process')
+        [Environment]::SetEnvironmentVariable('GIT_CONFIG_SYSTEM', $emptyGitConfig, 'Process')
+        [Environment]::SetEnvironmentVariable('GIT_CONFIG_GLOBAL', $emptyGitConfig, 'Process')
+        [Environment]::SetEnvironmentVariable('GIT_CONFIG_COUNT', '0', 'Process')
+        [Environment]::SetEnvironmentVariable('GIT_CONFIG_PARAMETERS', $null, 'Process')
+        [Environment]::SetEnvironmentVariable('GIT_TEMPLATE_DIR', $null, 'Process')
+
+        $gitArgs = @(
+            '-c', 'core.fsmonitor=false',
+            '-c', 'core.untrackedCache=false',
+            '-c', "core.hooksPath=$hooksPath",
+            '-c', 'init.templateDir='
+        ) + $Arguments
+
+        if ($SuppressStderr) {
+            $output = @(& git @gitArgs 2>$null)
+        } else {
+            $output = @(& git @gitArgs)
+        }
+        $rc = $LASTEXITCODE
+    } finally {
+        if ($hasNativePreference) {
+            $PSNativeCommandUseErrorActionPreference = $oldNativePreference
+        }
+        foreach ($name in $gitEnvNames) {
+            [Environment]::SetEnvironmentVariable($name, $savedEnv[$name], 'Process')
+        }
+        Remove-Item -LiteralPath $emptyGitConfig -Force -ErrorAction SilentlyContinue
+    }
+    return @{
+        ExitCode = $rc
+        Output = @($output)
+    }
+}
+
+function Invoke-PolarisCacheGit {
+    param(
+        [Parameter(Mandatory)] [string]$Checkout,
+        [Parameter(Mandatory)] [string[]]$Arguments
+    )
+
+    $gitDir = Join-Path $Checkout '.git'
+    $gitArgs = @("--git-dir=$gitDir", "--work-tree=$Checkout") + $Arguments
+    return Invoke-PolarisGit -Arguments $gitArgs -SuppressStderr
+}
+
+function Assert-PolarisCheckoutClean {
+    param([Parameter(Mandatory)] [string]$Checkout)
+
+    $result = Invoke-PolarisCacheGit -Checkout $Checkout -Arguments @(
+        'status',
+        '--porcelain=v1',
+        '--untracked-files=all',
+        '--ignored=matching'
+    )
+    $status = @($result.Output)
+    if ($result.ExitCode -ne 0) {
+        Write-Host "  FAIL: could not inspect Polaris cache worktree: $Checkout" -ForegroundColor Red
+        exit 1
+    }
+
+    if ($status.Count -gt 0) {
+        Write-Host "  FAIL: Polaris cache has local changes; refusing to execute it: $Checkout" -ForegroundColor Red
+        foreach ($line in $status) {
+            Write-Host "        $line" -ForegroundColor Yellow
+        }
+        Write-Host "        Remove this cache directory and rerun setup to fetch the pinned checkout again." -ForegroundColor Yellow
+        exit 1
+    }
+}
+
+function Test-PolarisGitBashCommand {
+    param([string]$Candidate)
+
+    if ([string]::IsNullOrWhiteSpace($Candidate)) { return $false }
+    if (-not (Test-Path -LiteralPath $Candidate -PathType Leaf)) { return $false }
+
+    $oldNativePreference = $null
+    $hasNativePreference = Test-Path Variable:PSNativeCommandUseErrorActionPreference
+    try {
+        if ($hasNativePreference) {
+            $oldNativePreference = $PSNativeCommandUseErrorActionPreference
+            $PSNativeCommandUseErrorActionPreference = $false
+        }
+        & $Candidate --noprofile --norc -c 'command -v cygpath >/dev/null 2>&1'
+        return ($LASTEXITCODE -eq 0)
+    } finally {
+        if ($hasNativePreference) {
+            $PSNativeCommandUseErrorActionPreference = $oldNativePreference
+        }
+    }
+}
+
+function Get-PolarisBashCommand {
+    if ($env:OS -ne 'Windows_NT') {
+        $bash = Get-Command bash -ErrorAction SilentlyContinue
+        if ($bash) { return $bash.Source }
+        return $null
+    }
+
+    $candidates = @()
+    $git = Get-Command git -ErrorAction SilentlyContinue
+    if ($git) {
+        $gitDir = Split-Path -Parent $git.Source
+        $gitRoot = Split-Path -Parent $gitDir
+        $candidates += @(
+            (Join-Path $gitDir 'bash.exe'),
+            (Join-Path $gitRoot 'bin\bash.exe'),
+            (Join-Path $gitRoot 'usr\bin\bash.exe')
+        )
+    }
+
+    $scoopRoot = if ($env:SCOOP) { $env:SCOOP } else { Join-Path (Get-DefaultProfileRoot) 'scoop' }
+    $candidates += @(
+        (Join-Path $scoopRoot 'apps\git\current\bin\bash.exe'),
+        (Join-Path $scoopRoot 'apps\git\current\usr\bin\bash.exe')
+    )
+
+    foreach ($candidate in $candidates) {
+        if (Test-PolarisGitBashCommand -Candidate $candidate) { return $candidate }
+    }
+
+    $bash = Get-Command bash -ErrorAction SilentlyContinue
+    if ($bash -and (Test-PolarisGitBashCommand -Candidate $bash.Source)) {
+        return $bash.Source
+    }
+
+    return $null
+}
+
+function ConvertTo-PolarisBashPath {
+    param(
+        [Parameter(Mandatory)] [string]$Bash,
+        [Parameter(Mandatory)] [string]$Path
+    )
+
+    if ($env:OS -ne 'Windows_NT') { return $Path }
+
+    $oldNativePreference = $null
+    $hasNativePreference = Test-Path Variable:PSNativeCommandUseErrorActionPreference
+    try {
+        if ($hasNativePreference) {
+            $oldNativePreference = $PSNativeCommandUseErrorActionPreference
+            $PSNativeCommandUseErrorActionPreference = $false
+        }
+        $converted = & $Bash --noprofile --norc -c 'cygpath -u "$1"' -- $Path
+        $rc = $LASTEXITCODE
+    } finally {
+        if ($hasNativePreference) {
+            $PSNativeCommandUseErrorActionPreference = $oldNativePreference
+        }
+    }
+    if ($rc -ne 0 -or [string]::IsNullOrWhiteSpace($converted)) {
+        Write-Host "  FAIL: could not convert path for Git Bash: $Path" -ForegroundColor Red
+        exit 1
+    }
+    return ([string]$converted).Trim()
+}
+
+function Test-ShouldApplyAgentPolicy {
+    param(
+        [bool]$SkipAgentsPhase = $SkipAgents,
+        [bool]$AllMode = $All,
+        [bool]$IsDryRun = $DryRun,
+        [scriptblock]$Prompt
+    )
+
+    if ($SkipAgentsPhase) { return $false }
+    if ($AllMode -or $IsDryRun) { return $true }
+    if (-not [Environment]::UserInteractive) { return $true }
+    if (-not $Prompt) {
+        $Prompt = {
+            param([string]$Message)
+            Read-Host "  $Message [Y/n]"
+        }
+    }
+    $answer = [string](& $Prompt 'Apply Polaris global agent rules?')
+    return ([string]::IsNullOrWhiteSpace($answer) -or $answer -match '^(?i:y|yes)$')
+}
+
+function Get-PolarisVersionFromCheckout {
+    param([Parameter(Mandatory)] [string]$Checkout)
+    $versionPath = Join-Path $Checkout 'VERSION'
+    if (-not (Test-Path -LiteralPath $versionPath -PathType Leaf)) { return '' }
+    return ([System.IO.File]::ReadAllText($versionPath).Trim())
+}
+
+function Invoke-PolarisGitChecked {
+    param(
+        [Parameter(Mandatory)] [string[]]$Arguments,
+        [Parameter(Mandatory)] [string]$Label
+    )
+
+    $result = Invoke-PolarisGit -Arguments $Arguments
+    if ($result.ExitCode -ne 0) {
+        Write-Host ("  FAIL: {0} exited {1}" -f $Label, $result.ExitCode) -ForegroundColor Red
+        exit $result.ExitCode
+    }
+    return @($result.Output)
+}
+
+function Ensure-PolarisCheckout {
+    param(
+        [string]$RepoUrl = $PolarisRepoUrl,
+        [string]$Version = $PolarisVersion,
+        [string]$Ref = $PolarisRef,
+        [string]$CacheRoot = (Get-PolarisCacheRoot)
+    )
+
+    $checkout = Get-PolarisCheckoutPath -CacheRoot $CacheRoot -Ref $Ref
+    if (Test-Path -LiteralPath (Join-Path $checkout '.git') -PathType Container) {
+        $headResult = Invoke-PolarisCacheGit -Checkout $checkout -Arguments @('rev-parse', '--verify', 'HEAD^{commit}')
+        $head = ([string]($headResult.Output -join '')).Trim()
+        if ($headResult.ExitCode -ne 0 -or $head -ne $Ref) {
+            Write-Host "  FAIL: Polaris cache is not at the pinned commit: $checkout" -ForegroundColor Red
+            Write-Host "        expected $Ref, found $head" -ForegroundColor Yellow
+            exit 1
+        }
+        $actualVersion = Get-PolarisVersionFromCheckout -Checkout $checkout
+        if ($actualVersion -ne $Version) {
+            Write-Host "  FAIL: Polaris cache VERSION mismatch: expected $Version, found $actualVersion" -ForegroundColor Red
+            exit 1
+        }
+        Assert-PolarisCheckoutClean -Checkout $checkout
+        return $checkout
+    }
+
+    if (Test-Path -LiteralPath $checkout) {
+        Write-Host "  FAIL: Polaris cache path exists but is not a git checkout: $checkout" -ForegroundColor Red
+        exit 1
+    }
+
+    if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+        Write-Host "  FAIL: git is required to fetch Polaris. Re-run without -SkipDeps, or install git first." -ForegroundColor Red
+        exit 1
+    }
+
+    New-Item -ItemType Directory -Force -Path $CacheRoot | Out-Null
+    $tmp = Join-Path $CacheRoot ('.tmp.' + [guid]::NewGuid().ToString('N'))
+    try {
+        Invoke-PolarisGitChecked -Label 'git clone Polaris' -Arguments @('clone', $RepoUrl, $tmp)
+        Invoke-PolarisGitChecked -Label 'git checkout Polaris pin' -Arguments @('-C', $tmp, 'checkout', '--detach', $Ref)
+
+        $actualVersion = Get-PolarisVersionFromCheckout -Checkout $tmp
+        if ($actualVersion -ne $Version) {
+            Write-Host "  FAIL: fetched Polaris VERSION mismatch: expected $Version, found $actualVersion" -ForegroundColor Red
+            exit 1
+        }
+        Assert-PolarisCheckoutClean -Checkout $tmp
+
+        Move-Item -LiteralPath $tmp -Destination $checkout
+        return $checkout
+    } finally {
+        Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Invoke-PolarisInstallChecked {
+    param(
+        [Parameter(Mandatory)] [string]$Bash,
+        [Parameter(Mandatory)] [string]$Checkout,
+        [Parameter(Mandatory)] [string[]]$Arguments,
+        [Parameter(Mandatory)] [string]$Label
+    )
+
+    $bashCheckout = ConvertTo-PolarisBashPath -Bash $Bash -Path $Checkout
+    $bashCommand = if ($env:OS -eq 'Windows_NT') {
+        # Keep Git Bash on its POSIX userland. A Windows-native jq.exe in PATH
+        # emits CRLF records, which the Polaris 0.1.1 Bash manifest reader treats
+        # as literal path bytes and then fails to find core/*.md.
+        'export PATH=/usr/bin:/bin; cd "$1"; shift; exec bash tools/install "$@"'
+    } else {
+        'cd "$1"; shift; exec bash tools/install "$@"'
+    }
+
+    $oldNativePreference = $null
+    $hasNativePreference = Test-Path Variable:PSNativeCommandUseErrorActionPreference
+    try {
+        if ($hasNativePreference) {
+            $oldNativePreference = $PSNativeCommandUseErrorActionPreference
+            $PSNativeCommandUseErrorActionPreference = $false
+        }
+        & $Bash --noprofile --norc -c $bashCommand -- $bashCheckout @Arguments
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host ("  FAIL: {0} exited {1}" -f $Label, $LASTEXITCODE) -ForegroundColor Red
+            exit $LASTEXITCODE
+        }
+    } finally {
+        if ($hasNativePreference) {
+            $PSNativeCommandUseErrorActionPreference = $oldNativePreference
+        }
+    }
+}
+
+function Invoke-PolarisAgentPolicy {
+    param(
+        [bool]$SkipAgentsPhase = $SkipAgents,
+        [bool]$AllMode = $All,
+        [bool]$IsDryRun = $DryRun,
+        [string]$RepoUrl = $PolarisRepoUrl,
+        [string]$Version = $PolarisVersion,
+        [string]$Ref = $PolarisRef,
+        [string]$CacheRoot = (Get-PolarisCacheRoot),
+        [scriptblock]$Prompt
+    )
+
+    if ($SkipAgentsPhase) {
+        Write-Host ""
+        Write-Host "skipped: Phase 6/6 (agent policy) via -SkipAgents"
+        return
+    }
+
+    if (-not (Test-ShouldApplyAgentPolicy -SkipAgentsPhase:$SkipAgentsPhase -AllMode:$AllMode -IsDryRun:$IsDryRun -Prompt $Prompt)) {
+        Write-Host ""
+        Write-Host "skipped: Phase 6/6 (agent policy)"
+        return
+    }
+
+    Phase "Phase 6/6: apply global agent policy (Polaris)"
+    $checkout = Get-PolarisCheckoutPath -CacheRoot $CacheRoot -Ref $Ref
+    if ($IsDryRun) {
+        Write-Step "would    clone/fetch Polaris $Version ($Ref)"
+        Write-Step "         into $checkout"
+        Write-Step "would    run Polaris tools/install --global, then --global --check"
+        return
+    }
+
+    $checkout = Ensure-PolarisCheckout -RepoUrl $RepoUrl -Version $Version -Ref $Ref -CacheRoot $CacheRoot
+    $installer = Join-Path $checkout 'tools\install'
+    if (-not (Test-Path -LiteralPath $installer -PathType Leaf)) {
+        Write-Host "  FAIL: Polaris installer missing: $installer" -ForegroundColor Red
+        exit 1
+    }
+    $bash = Get-PolarisBashCommand
+    if (-not $bash) {
+        Write-Host "  FAIL: bash is required to run the Polaris 0.1.1 global installer. Install Git for Windows first." -ForegroundColor Red
+        exit 1
+    }
+
+    Invoke-PolarisInstallChecked -Bash $bash -Checkout $checkout -Arguments @('--global') -Label 'Polaris global install'
+    Invoke-PolarisInstallChecked -Bash $bash -Checkout $checkout -Arguments @('--global', '--check') -Label 'Polaris global check'
 }
 
 function Get-UniqueBackupPath {
@@ -932,14 +1324,14 @@ function Invoke-NvimSyncPhases {
     if (-not $SkipNvimPhase -and -not $IsDryRun) {
         if (& $CommandTester 'nvim') {
             & $DevEnvironmentEntrypoint | Out-Null
-            Phase "Phase 3/5: restore Neovim plugins (lazy.nvim)"
+            Phase "Phase 3/6: restore Neovim plugins (lazy.nvim)"
             Invoke-NvimCommandOrFail "Lazy restore" $LazyRunner
 
-            Phase "Phase 4/5: install Tree-sitter parsers"
+            Phase "Phase 4/6: install Tree-sitter parsers"
             Write-Host "  this compiles nvim-treesitter parsers and can take several minutes."
             Invoke-NvimCommandOrFail "Tree-sitter parser install" $TreesitterRunner
 
-            Phase "Phase 5/5: install LSP servers + formatters (Mason)"
+            Phase "Phase 5/6: install LSP servers + formatters (Mason)"
             Write-Host "  this can take 3-8 minutes on a fresh Windows machine."
             Invoke-NvimCommandOrFail "Mason install" $MasonRunner
         } else {
@@ -1042,7 +1434,7 @@ if ($Update) {
 
 # ---- Phase 1: dependencies ---------------------------------------------------
 if (-not $SkipDeps) {
-    Phase "Phase 1/5: install dependencies"
+    Phase "Phase 1/6: install dependencies"
     & (Join-Path $ScriptDir 'install-deps.ps1') @depsArgs
 } else {
     Write-Host ""
@@ -1058,7 +1450,7 @@ if (-not $DryRun) {
 
 # ---- Phase 2: apply configs --------------------------------------------------
 if (-not ($SkipBootstrap -or $SkipConfig)) {
-    Phase "Phase 2/5: apply configs with chezmoi"
+    Phase "Phase 2/6: apply configs with chezmoi"
     $global:LASTEXITCODE = 0   # reset so a stale code from Phase 1 cannot false-trip
     Invoke-ChezmoiApplyPhase
 } else {
@@ -1066,12 +1458,14 @@ if (-not ($SkipBootstrap -or $SkipConfig)) {
     Write-Host "skipped: Phase 2 (config) via -SkipBootstrap/-SkipConfig"
 }
 
-# ---- Phases 3 + 4: nvim sync -------------------------------------------------
+# ---- Phases 3-5: nvim sync ---------------------------------------------------
 #
 # Lazy + Mason failures are FATAL by default. Pass -BestEffort to downgrade
 # them to warnings (useful for offline / proxy-restricted environments where
 # you accept a partial install and will run :Lazy / :Mason interactively).
 Invoke-NvimSyncPhases
+
+Invoke-PolarisAgentPolicy
 
 # ---- Summary -----------------------------------------------------------------
 Write-Host ""

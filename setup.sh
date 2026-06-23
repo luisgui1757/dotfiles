@@ -2,7 +2,7 @@
 # setup.sh -- one-shot end-to-end install for macOS / Linux / WSL.
 #
 # Local usage (from a checked-out copy):
-#   ./setup.sh                     interactive: Y/n per dep, then config + sync
+#   ./setup.sh                     interactive: dependency prompts, then config + sync
 #   ./setup.sh --all               non-interactive: install everything missing
 #   ./setup.sh --update            update package-manager tools + Mason only
 #   ./setup.sh --dry-run           preview every step
@@ -10,6 +10,7 @@
 #   ./setup.sh --skip-bootstrap    back-compat alias: skip config apply
 #   ./setup.sh --skip-config       already configured; just sync nvim
 #   ./setup.sh --skip-nvim         skip nvim plugin/parser/Mason sync
+#   ./setup.sh --skip-agents       skip global Polaris agent-policy install
 #   ./setup.sh --experimental-wsl-gui
 #                                  WSL opt-in: install/link Linux GUI terminal bits
 #
@@ -32,14 +33,19 @@ UPDATE_MODE=0
 SKIP_DEPS=0
 SKIP_BOOTSTRAP=0
 SKIP_NVIM=0
+SKIP_AGENTS=0
 BEST_EFFORT=0
 EXPERIMENTAL_WSL_GUI=0
+POLARIS_REPO_URL="https://github.com/luisgui1757/polaris.git"
+POLARIS_VERSION="0.1.1"
+POLARIS_REF="489dcc6f991ddcff63c460a433e983264dc54cf7"
+POLARIS_CACHE_ROOT="$HOME/.local/share/dotfiles/polaris"
 usage() {
     cat <<'EOF'
 setup.sh -- one-shot end-to-end install for macOS / Linux / WSL.
 
 Local usage:
-  ./setup.sh                     interactive: one prompt, then end-to-end
+  ./setup.sh                     interactive: dependency prompts, then config + sync
   ./setup.sh --all               non-interactive: install everything missing
   ./setup.sh --update            update package-manager tools + Mason only
   ./setup.sh --dry-run           preview every step
@@ -47,6 +53,7 @@ Local usage:
   ./setup.sh --skip-bootstrap    back-compat alias: skip config apply
   ./setup.sh --skip-config       already configured; just sync nvim
   ./setup.sh --skip-nvim         skip nvim plugin/parser/Mason sync
+  ./setup.sh --skip-agents       skip global Polaris agent-policy install
   ./setup.sh --best-effort       continue past plugin/LSP/Mason phase failures
   ./setup.sh --experimental-wsl-gui
                                 WSL opt-in: install/link Linux Ghostty + Linux fonts
@@ -67,6 +74,7 @@ for arg in "$@"; do
         --skip-bootstrap|--skip-config)
                           SKIP_BOOTSTRAP=1 ;;
         --skip-nvim)      SKIP_NVIM=1 ;;
+        --skip-agents)    SKIP_AGENTS=1 ;;
         --best-effort)    BEST_EFFORT=1 ;;
         --experimental-wsl-gui)
                           EXPERIMENTAL_WSL_GUI=1 ;;
@@ -187,6 +195,148 @@ refresh_runtime_path() {
     done
     export PATH
     hash -r 2>/dev/null || true
+}
+
+polaris_checkout_dir() {
+    printf '%s/%s\n' "$POLARIS_CACHE_ROOT" "$POLARIS_REF"
+}
+
+polaris_git() {
+    GIT_CONFIG_NOSYSTEM=1 \
+    GIT_CONFIG_SYSTEM=/dev/null \
+    GIT_CONFIG_GLOBAL=/dev/null \
+    GIT_CONFIG_COUNT=0 \
+    GIT_CONFIG_PARAMETERS='' \
+    GIT_TEMPLATE_DIR='' \
+        git \
+        -c core.fsmonitor=false \
+        -c core.untrackedCache=false \
+        -c core.hooksPath=/dev/null \
+        -c init.templateDir= \
+        "$@"
+}
+
+polaris_cache_git() {
+    local checkout="$1"
+    shift
+    polaris_git --git-dir="$checkout/.git" --work-tree="$checkout" "$@"
+}
+
+assert_polaris_checkout_clean() {
+    local checkout="$1" status
+
+    if ! status="$(polaris_cache_git "$checkout" status --porcelain=v1 --untracked-files=all --ignored=matching 2>/dev/null)"; then
+        echo "  FAIL: could not inspect Polaris cache worktree: $checkout" >&2
+        exit 1
+    fi
+
+    if [[ -n "$status" ]]; then
+        echo "  FAIL: Polaris cache has local changes; refusing to execute it: $checkout" >&2
+        printf '%s\n' "$status" | sed 's/^/        /' >&2
+        echo "        Remove this cache directory and rerun setup to fetch the pinned checkout again." >&2
+        exit 1
+    fi
+}
+
+ask_yes_no_default_yes() {
+    local prompt="$1" reply
+    printf "  %s [Y/n] " "$prompt"
+    IFS= read -r reply || return 1
+    case "$reply" in
+        ""|[Yy]|[Yy][Ee][Ss]) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+should_apply_agent_policy() {
+    [[ "$SKIP_AGENTS" -eq 0 ]] || return 1
+    [[ "$ALL" -eq 1 || "$DRY_RUN" -eq 1 ]] && return 0
+    [[ -t 0 ]] || return 0
+    ask_yes_no_default_yes "Apply Polaris global agent rules?"
+}
+
+ensure_polaris_checkout() {
+    local checkout tmp version head
+    checkout="$(polaris_checkout_dir)"
+
+    if [[ -d "$checkout/.git" ]]; then
+        head="$(polaris_cache_git "$checkout" rev-parse --verify 'HEAD^{commit}' 2>/dev/null || true)"
+        if [[ "$head" != "$POLARIS_REF" ]]; then
+            echo "  FAIL: Polaris cache is not at the pinned commit: $checkout" >&2
+            echo "        expected $POLARIS_REF, found ${head:-unknown}" >&2
+            exit 1
+        fi
+        version="$(tr -d '[:space:]' < "$checkout/VERSION" 2>/dev/null || true)"
+        if [[ "$version" != "$POLARIS_VERSION" ]]; then
+            echo "  FAIL: Polaris cache VERSION mismatch: expected $POLARIS_VERSION, found ${version:-missing}" >&2
+            exit 1
+        fi
+        assert_polaris_checkout_clean "$checkout"
+        printf '%s\n' "$checkout"
+        return 0
+    fi
+
+    if [[ -e "$checkout" || -L "$checkout" ]]; then
+        echo "  FAIL: Polaris cache path exists but is not a git checkout: $checkout" >&2
+        exit 1
+    fi
+
+    if ! command -v git >/dev/null 2>&1; then
+        echo "  FAIL: git is required to fetch Polaris. Re-run without --skip-deps, or install git first." >&2
+        exit 1
+    fi
+
+    mkdir -p "$POLARIS_CACHE_ROOT"
+    tmp="$(mktemp -d "$POLARIS_CACHE_ROOT/.tmp.XXXXXX")"
+    trap 'rm -rf "$tmp"' RETURN
+
+    polaris_git clone "$POLARIS_REPO_URL" "$tmp"
+    polaris_git -C "$tmp" checkout --detach "$POLARIS_REF"
+
+    version="$(tr -d '[:space:]' < "$tmp/VERSION" 2>/dev/null || true)"
+    if [[ "$version" != "$POLARIS_VERSION" ]]; then
+        echo "  FAIL: fetched Polaris VERSION mismatch: expected $POLARIS_VERSION, found ${version:-missing}" >&2
+        exit 1
+    fi
+    assert_polaris_checkout_clean "$tmp"
+
+    mv "$tmp" "$checkout"
+    trap - RETURN
+    printf '%s\n' "$checkout"
+}
+
+run_polaris_agent_policy() {
+    local checkout installer
+
+    if [[ "$SKIP_AGENTS" -eq 1 ]]; then
+        echo
+        echo "skipped: Phase 6/6 (agent policy) via --skip-agents"
+        return 0
+    fi
+
+    if ! should_apply_agent_policy; then
+        echo
+        echo "skipped: Phase 6/6 (agent policy)"
+        return 0
+    fi
+
+    phase "Phase 6/6: apply global agent policy (Polaris)"
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        echo "  would: clone/fetch Polaris $POLARIS_VERSION ($POLARIS_REF)"
+        echo "         into $(polaris_checkout_dir)"
+        echo "  would: run Polaris tools/install --global, then --global --check"
+        return 0
+    fi
+
+    checkout="$(ensure_polaris_checkout)"
+    installer="$checkout/tools/install"
+    if [[ ! -x "$installer" ]]; then
+        echo "  FAIL: Polaris installer missing or not executable: $installer" >&2
+        exit 1
+    fi
+
+    bash "$installer" --global
+    bash "$installer" --global --check
 }
 
 unique_backup() {
@@ -395,7 +545,7 @@ fi
 
 # ---- Phase 1: dependencies ---------------------------------------------------
 if [[ "$SKIP_DEPS" -eq 0 ]]; then
-    phase "Phase 1/5: install dependencies"
+    phase "Phase 1/6: install dependencies"
     bash "$SCRIPT_DIR/install-deps.sh" ${DEPS_FLAGS[@]+"${DEPS_FLAGS[@]}"}
 else
     echo
@@ -405,7 +555,7 @@ refresh_runtime_path
 
 # ---- Phase 2: apply configs --------------------------------------------------
 if [[ "$SKIP_BOOTSTRAP" -eq 0 ]]; then
-    phase "Phase 2/5: apply configs with chezmoi"
+    phase "Phase 2/6: apply configs with chezmoi"
     if ! command -v chezmoi >/dev/null 2>&1; then
         if [[ "$DRY_RUN" -eq 1 ]]; then
             # The dogfood dry-run runs BEFORE Phase 1 installs chezmoi; preview
@@ -445,15 +595,15 @@ fi
 # warnings.
 if [[ "$SKIP_NVIM" -eq 0 ]] && [[ "$DRY_RUN" -eq 0 ]]; then
     if command -v nvim >/dev/null 2>&1; then
-        phase "Phase 3/5: restore Neovim plugins (lazy.nvim)"
+        phase "Phase 3/6: restore Neovim plugins (lazy.nvim)"
         run_or_fail "Lazy restore" nvim --headless "+Lazy! restore" "+qa"
 
-        phase "Phase 4/5: install Tree-sitter parsers"
+        phase "Phase 4/6: install Tree-sitter parsers"
         echo "  this compiles nvim-treesitter parsers and can take several minutes."
         run_or_fail "Tree-sitter parser install" env DOTFILES_TREESITTER_SYNC_INSTALL=1 \
             nvim --headless "+lua require('lazy').load({ plugins = { 'nvim-treesitter' } })" "+qa"
 
-        phase "Phase 5/5: install LSP servers + formatters (Mason)"
+        phase "Phase 5/6: install LSP servers + formatters (Mason)"
         echo "  this can take 3-8 minutes on a fresh machine."
         run_or_fail "Mason install" nvim --headless "+MasonToolsInstallSync" "+qa"
     else
@@ -468,6 +618,8 @@ else
     echo
     echo "skipped: Phase 3-5 (nvim plugins/parsers/tools) via --skip-nvim"
 fi
+
+run_polaris_agent_policy
 
 # ---- Summary -----------------------------------------------------------------
 echo

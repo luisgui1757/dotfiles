@@ -144,9 +144,10 @@ if grep -Eq "^[[:space:]]*FAIL:" "$setup_log"; then
     echo "FAIL: setup.sh emitted a FAIL marker" >&2
     exit 1
 fi
-grep -F "Phase 3/5" "$setup_log" >/dev/null
-grep -F "Phase 4/5" "$setup_log" >/dev/null
-grep -F "Phase 5/5" "$setup_log" >/dev/null
+grep -F "Phase 3/6" "$setup_log" >/dev/null
+grep -F "Phase 4/6" "$setup_log" >/dev/null
+grep -F "Phase 5/6" "$setup_log" >/dev/null
+grep -F "Phase 6/6" "$setup_log" >/dev/null
 tests/greenfield/validate.sh
 '@
     Invoke-WslChecked -Arguments @('-d', $DistroName, '-u', 'dotfiles', '--', 'bash', '-lc', $runSetup)

@@ -107,9 +107,10 @@ HOME="$TARGET_HOME" run_and_capture "setup.sh" "$SETUP_LOG" "$REPO_ROOT/setup.sh
 if grep -Fq "skipped: Phase 3-5" "$SETUP_LOG"; then
     fail "setup.sh skipped Phase 3-5; log: $SETUP_LOG"
 fi
-grep -F "Phase 3/5" "$SETUP_LOG" >/dev/null || fail "setup.sh did not run Phase 3/5; log: $SETUP_LOG"
-grep -F "Phase 4/5" "$SETUP_LOG" >/dev/null || fail "setup.sh did not run Phase 4/5; log: $SETUP_LOG"
-grep -F "Phase 5/5" "$SETUP_LOG" >/dev/null || fail "setup.sh did not run Phase 5/5; log: $SETUP_LOG"
+grep -F "Phase 3/6" "$SETUP_LOG" >/dev/null || fail "setup.sh did not run Phase 3/6; log: $SETUP_LOG"
+grep -F "Phase 4/6" "$SETUP_LOG" >/dev/null || fail "setup.sh did not run Phase 4/6; log: $SETUP_LOG"
+grep -F "Phase 5/6" "$SETUP_LOG" >/dev/null || fail "setup.sh did not run Phase 5/6; log: $SETUP_LOG"
+grep -F "Phase 6/6" "$SETUP_LOG" >/dev/null || fail "setup.sh did not run Phase 6/6; log: $SETUP_LOG"
 
 HOME="$TARGET_HOME" "$REPO_ROOT/tests/greenfield/validate.sh" --repo "$REPO_ROOT"
 

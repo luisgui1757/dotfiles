@@ -99,8 +99,8 @@ function Invoke-SetupAndCheck {
     if ($content -match '(?m)^\s*FAIL:') {
         Stop-Greenfield "setup.ps1 emitted a FAIL marker; log: $Log"
     }
-    if (($content -notmatch 'Phase 3/5') -or ($content -notmatch 'Phase 4/5') -or ($content -notmatch 'Phase 5/5')) {
-        Stop-Greenfield "setup.ps1 did not run all nvim phases; log: $Log"
+    if (($content -notmatch 'Phase 3/6') -or ($content -notmatch 'Phase 4/6') -or ($content -notmatch 'Phase 5/6') -or ($content -notmatch 'Phase 6/6')) {
+        Stop-Greenfield "setup.ps1 did not run all required setup phases; log: $Log"
     }
 }
 

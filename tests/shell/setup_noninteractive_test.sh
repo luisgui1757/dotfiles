@@ -14,7 +14,7 @@ set -euo pipefail
 printf '%s\n' "$@" > "$(cd "$(dirname "$0")" && pwd -P)/deps.args"
 EOF
 
-output="$(bash "$TMP_ROOT/setup.sh" --skip-bootstrap --skip-nvim </dev/null)"
+output="$(bash "$TMP_ROOT/setup.sh" --skip-bootstrap --skip-nvim --skip-agents </dev/null)"
 
 [[ "$output" == *"note: no TTY detected; running with --all"* ]]
 grep -Fx -- "--all" "$TMP_ROOT/deps.args" >/dev/null
