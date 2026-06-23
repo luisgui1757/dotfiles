@@ -86,6 +86,38 @@ Describe "PowerShell profile" {
         $src | Should -Match 'function global:lt\s+\{\s+lsd\s+--tree\s+@args\s+\}'
     }
 
+    It "sets a Rose Pine LS_COLORS default before wiring lsd" {
+        $src = Get-Content -Raw -LiteralPath $script:Profile
+        $src | Should -Match '\$script:RosePineLsColors\s+=\s+@\('
+        $src | Should -Match "'di=38;2;246;193;119'"
+        $src | Should -Match "'ex=38;2;235;111;146'"
+        $src | Should -Match '\[string\]::IsNullOrWhiteSpace\(\$env:LS_COLORS\)'
+        $src | Should -Match '\$env:LS_COLORS\s+=\s+\$script:RosePineLsColors'
+        $src.IndexOf('$script:RosePineLsColors') | Should -BeLessThan $src.IndexOf('if (Get-Command lsd')
+    }
+
+    It "does not overwrite a user-provided LS_COLORS value" {
+        $pwshExe = (Get-Command pwsh -ErrorAction SilentlyContinue).Source
+        if (-not $pwshExe) {
+            $pwshExe = (Get-Command pwsh.exe -ErrorAction SilentlyContinue).Source
+        }
+        $pwshExe | Should -Not -BeNullOrEmpty
+
+        $profilePath = $script:Profile.Replace('"', '`"')
+        $scriptBlock = @"
+`$env:LS_COLORS = 'user=provided'
+. "$profilePath"
+if (`$env:LS_COLORS -ne 'user=provided') {
+    Write-Error "LS_COLORS was overwritten: `$env:LS_COLORS"
+    exit 1
+}
+exit 0
+"@
+
+        & $pwshExe -NoProfile -Command $scriptBlock
+        $LASTEXITCODE | Should -Be 0
+    }
+
     It "removes pre-existing lsd shortcut aliases so functions win command resolution" {
         $pwshExe = (Get-Command pwsh -ErrorAction SilentlyContinue).Source
         if (-not $pwshExe) {

@@ -274,6 +274,50 @@ if ((Get-Module -ListAvailable PSFzf) -and (Get-Command fzf -ErrorAction Silentl
     } catch { Write-Verbose $_.Exception.Message }
 }
 
+# ---- Rose Pine file listing colors ------------------------------------------
+# lsd reads LS_COLORS for file/directory names. Keep this before the lsd
+# functions so every shortcut inherits the same palette.
+$script:RosePineLsColors = @(
+    'di=38;2;246;193;119'
+    'ln=38;2;196;167;231'
+    'or=38;2;235;111;146'
+    'mi=38;2;235;111;146'
+    'ex=38;2;235;111;146'
+    'fi=38;2;224;222;244'
+    'pi=38;2;156;207;216'
+    'so=38;2;156;207;216'
+    'bd=38;2;235;188;186'
+    'cd=38;2;235;188;186'
+    '*.md=38;2;156;207;216'
+    '*.markdown=38;2;156;207;216'
+    '*.txt=38;2;224;222;244'
+    '*.toml=38;2;156;207;216'
+    '*.yaml=38;2;156;207;216'
+    '*.yml=38;2;156;207;216'
+    '*.json=38;2;156;207;216'
+    '*.jsonc=38;2;156;207;216'
+    '*.lua=38;2;196;167;231'
+    '*.vim=38;2;196;167;231'
+    '*.sh=38;2;246;193;119'
+    '*.bash=38;2;246;193;119'
+    '*.zsh=38;2;246;193;119'
+    '*.ps1=38;2;196;167;231'
+    '*.zip=38;2;235;188;186'
+    '*.tar=38;2;235;188;186'
+    '*.gz=38;2;235;188;186'
+    '*.tgz=38;2;235;188;186'
+    '*.xz=38;2;235;188;186'
+    '*.7z=38;2;235;188;186'
+    '*.png=38;2;235;188;186'
+    '*.jpg=38;2;235;188;186'
+    '*.jpeg=38;2;235;188;186'
+    '*.webp=38;2;235;188;186'
+    '*.svg=38;2;156;207;216'
+) -join ':'
+if ([string]::IsNullOrWhiteSpace($env:LS_COLORS)) {
+    $env:LS_COLORS = $script:RosePineLsColors
+}
+
 # ---- lsd directory listings --------------------------------------------------
 # Keep this guarded so profile startup stays silent and clean before setup has
 # provisioned lsd. The upstream shell aliases include ls/l/la/lla/lt; functions

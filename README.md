@@ -2,9 +2,10 @@
 
 Cross-platform terminal and editor setup for macOS, Linux, WSL, and Windows.
 The repo owns the daily shell/editor stack: Neovim, tmux/psmux, Starship, zsh,
-PowerShell, Ghostty, lazygit, Windows Terminal theming, locked plugin restore,
-LSP / formatter provisioning, and global Polaris agent-policy bootstrap. It also
-provisions the `tree-sitter` CLI needed by `nvim-treesitter` main parser builds.
+PowerShell, Ghostty, lazygit, `lsd`, Windows Terminal theming, locked plugin
+restore, LSP / formatter provisioning, and global Polaris agent-policy
+bootstrap. It also provisions the `tree-sitter` CLI needed by
+`nvim-treesitter` main parser builds.
 
 The public interface is intentionally small:
 
@@ -235,6 +236,7 @@ symlink, and Windows Terminal remains a merge.
 | tmux / psmux | `~/.tmux.conf` -> `tmux/tmux.conf`; `~/.tmux.posix.conf` -> `tmux/tmux.posix.conf` (POSIX clipboard overlay) | same | `%USERPROFILE%\.tmux.conf` -> `tmux\tmux.conf` for psmux; the POSIX clipboard overlay is **excluded** on Windows (its `if-shell` probes hang psmux); WSL uses the Unix path |
 | Ghostty | `~/Library/Application Support/com.mitchellh.ghostty/config` -> `ghostty/config` | native Linux links `~/.config/ghostty/config`; WSL links it only with `--experimental-wsl-gui` | n/a |
 | lazygit | `~/Library/Application Support/lazygit/config.yml` -> `lazygit/config.yml` | `~/.config/lazygit/config.yml` -> `lazygit/config.yml` | `%LOCALAPPDATA%\lazygit\config.yml` -> `lazygit\config.windows.yml` |
+| lsd | `~/.config/lsd/{config.yaml,colors.yaml}` -> `lsd/{config.yaml,colors.yaml}` | same | `%USERPROFILE%\.config\lsd\{config.yaml,colors.yaml}` -> `lsd\{config.yaml,colors.yaml}` |
 | Windows Terminal | n/a | n/a | app installed by `setup.ps1` through Scoop/winget/choco, with a SHA-256-verified portable zip fallback; setup backs up existing packaged `settings.json`, then chezmoi merges `windows-terminal/settings.fragment.jsonc` by default, including a fixed PowerShell 7 profile used when WT is unset or still defaulting to Windows PowerShell 5.1; after apply, setup mirrors packaged settings to the unpackaged WT path or seeds/merges that path from the fragment when packaged WT is absent; opt out with `-SkipWindowsTerminalMerge`; see [windows-terminal/README.md](windows-terminal/README.md) |
 
 Chezmoi manages the Windows PowerShell 7 profile path
@@ -261,6 +263,9 @@ and whether `pwsh` is installed.
   (Homebrew, native Linux package managers where available, and the Windows
   Scoop-first catalog). Interactive shells replace `ls` with `lsd` and add the
   useful `l`, `la`, `lla`, and `lt` shortcuts only when the binary is present.
+  Chezmoi deploys `~/.config/lsd/config.yaml` and `colors.yaml`; shell profiles
+  set a default Rose Pine `LS_COLORS` so direct `lsd -la`, aliases, zsh
+  completions, and PowerShell functions share the same file/directory colors.
 - `install-deps` provisions the `cmake` CLI because the configured CMake LSP
   (`neocmakelsp`) shells out to it; Mason installs the language server, not the
   project toolchain it drives.
@@ -516,6 +521,7 @@ stale; CI then fails verification until a human reviews the adjacent constant.
 .
 ├── nvim/                  # Neovim — init.lua, lua/{vim-options,util,plugins}
 ├── starship/              # starship.toml (Rose Pine)
+├── lsd/                   # config.yaml + colors.yaml (Rose Pine)
 ├── shells/                # zshenv + zshrc + powershell_profile.ps1
 ├── tmux/                  # tmux.conf (Rose Pine, vi-mode, true-color)
 ├── ghostty/               # config (Rose Pine, Hack Nerd, Ghostty-tuned)
@@ -549,7 +555,7 @@ stale; CI then fails verification until a human reviews the adjacent constant.
   from a pinned, version-checked upstream checkout and lets Polaris own its
   managed global entrypoint blocks. This repo does not vendor Polaris core or
   sync agent runtime state.
-- **Rose Pine everywhere it can render.** Nvim, lualine, starship, tmux,
+- **Rose Pine everywhere it can render.** Nvim, lualine, starship, tmux, `lsd`,
   ghostty, Windows Terminal, PSReadLine — same palette across the stack. VS Code
   joins optionally: `install-deps` offers VS Code, and if `code` is detected it
   installs the `mvllow.rose-pine` theme, sets `workbench.colorTheme` (plus the
@@ -579,9 +585,11 @@ stale; CI then fails verification until a human reviews the adjacent constant.
   ghosting), it doesn't replace it. Guarded by `command -v fzf` so a machine
   without it still starts cleanly; uses `fzf --zsh` with a share-dir fallback
   for older distro builds.
-- **lsd wired into interactive shells** — setup installs it where the platform
-  package manager carries it, then zsh and PowerShell expose the documented
-  `ls`, `l`, `la`, `lla`, and `lt` commands when `lsd` is present.
+- **lsd wired and themed in interactive shells** — setup installs it where the
+  platform package manager carries it, chezmoi deploys the custom Rose Pine
+  theme, and zsh/PowerShell expose the documented `ls`, `l`, `la`, `lla`, and
+  `lt` commands when `lsd` is present. `LS_COLORS` owns file/directory names;
+  `colors.yaml` owns long-list metadata.
 - **No `bindkey '\e' kill-whole-line`** — that shadowed the entire Meta
   prefix and silently broke Alt-h/j/k/l window nav in nvim.
 - **tmux window swaps use uppercase Vim directions.** `prefix+H` swaps the

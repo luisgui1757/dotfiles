@@ -68,6 +68,8 @@ managed_rels_for_host() {
             cat <<'EOF'
 .tmux.conf
 .tmux.posix.conf
+.config/lsd/colors.yaml
+.config/lsd/config.yaml
 .config/nvim
 .config/starship.toml
 .zshenv
@@ -82,6 +84,8 @@ EOF
 .tmux.posix.conf
 .config/ghostty/config
 .config/lazygit/config.yml
+.config/lsd/colors.yaml
+.config/lsd/config.yaml
 .config/nvim
 .config/starship.toml
 .zshenv

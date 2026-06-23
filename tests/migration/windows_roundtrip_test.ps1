@@ -156,6 +156,8 @@ try {
             Assert-Condition (-not (Test-Path -LiteralPath (Join-Path $sandbox '.tmux.posix.conf'))) `
                 '~/.tmux.posix.conf must NOT be deployed on Windows (psmux config-load freeze boundary)'
             Assert-CopyModeFilePresent -Path (Join-Path $sandbox '.config\starship.toml')
+            Assert-CopyModeFilePresent -Path (Join-Path $sandbox '.config\lsd\config.yaml')
+            Assert-CopyModeFilePresent -Path (Join-Path $sandbox '.config\lsd\colors.yaml')
             Assert-CopyModeFilePresent -Path (Join-Path $sandbox 'Documents\PowerShell\Microsoft.PowerShell_profile.ps1')
             Assert-NvimSymlinkPresent -Sandbox $sandbox
             Pass 'managed Windows entries present after apply'
@@ -175,6 +177,8 @@ try {
             Assert-Condition (Test-Path -LiteralPath $tmuxWin) 'user-modified .tmux.windows.conf was deleted (data loss)'
             Assert-Condition ((Get-Content -Raw -LiteralPath $tmuxWin) -eq $tmuxWinExpected) 'user-modified .tmux.windows.conf content changed'
             Assert-Condition (-not (Test-Path -LiteralPath (Join-Path $sandbox '.config\starship.toml'))) 'starship copy was not removed'
+            Assert-Condition (-not (Test-Path -LiteralPath (Join-Path $sandbox '.config\lsd\config.yaml'))) 'lsd config copy was not removed'
+            Assert-Condition (-not (Test-Path -LiteralPath (Join-Path $sandbox '.config\lsd\colors.yaml'))) 'lsd colors copy was not removed'
             Assert-Condition (-not (Test-Path -LiteralPath (Join-Path $sandbox 'Documents\PowerShell\Microsoft.PowerShell_profile.ps1'))) 'PowerShell profile copy was not removed'
             Assert-Condition (-not (Test-Path -LiteralPath (Join-Path $sandbox 'AppData\Local\nvim'))) 'nvim symlink was not removed'
             Assert-Condition (Test-Path -LiteralPath $wtSettings) 'WT settings.json should not be deleted'

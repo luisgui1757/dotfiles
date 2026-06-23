@@ -87,6 +87,8 @@ if [[ "${1:-}" == "--as-user" ]]; then
     assert_dir_resolves "$HOME/.config/nvim" "$repo/nvim"
     assert_file_content "$HOME/.config/nvim/init.lua" "$repo/nvim/init.lua"
     assert_file_content "$HOME/.config/starship.toml" "$repo/starship/starship.toml"
+    assert_file_content "$HOME/.config/lsd/config.yaml" "$repo/lsd/config.yaml"
+    assert_file_content "$HOME/.config/lsd/colors.yaml" "$repo/lsd/colors.yaml"
     assert_file_content "$HOME/.tmux.conf" "$repo/tmux/tmux.conf"
     assert_file_content "$HOME/.zshenv" "$repo/shells/zshenv"
     assert_file_content "$HOME/.zshrc" "$repo/shells/zshrc"

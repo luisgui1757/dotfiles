@@ -268,6 +268,8 @@ assert_posix_managed_configs() {
     assert_dir_resolves "$HOME/.config/nvim" "$REPO_ROOT/nvim"
     assert_file_content "$HOME/.config/nvim/init.lua" "$REPO_ROOT/nvim/init.lua"
     assert_file_content "$HOME/.config/starship.toml" "$REPO_ROOT/starship/starship.toml"
+    assert_file_content "$HOME/.config/lsd/config.yaml" "$REPO_ROOT/lsd/config.yaml"
+    assert_file_content "$HOME/.config/lsd/colors.yaml" "$REPO_ROOT/lsd/colors.yaml"
     assert_file_content "$HOME/.tmux.conf" "$REPO_ROOT/tmux/tmux.conf"
     assert_file_content "$HOME/.tmux.posix.conf" "$REPO_ROOT/tmux/tmux.posix.conf"
     assert_file_content "$HOME/.zshenv" "$REPO_ROOT/shells/zshenv"
