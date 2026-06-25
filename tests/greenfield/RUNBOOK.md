@@ -193,7 +193,7 @@ proves.
 | open a new terminal | Starship prompt renders, Rose Pine colours, no `[]`/tofu boxes | prompt loads |
 | `cd ~/Downloads` then `cd ~` | folder shows a download glyph (icon + name), full path shown | directory substitutions |
 | `cd` into any repo | git branch glyph + status segment render (no literal `` boxes) | **starship dev-icons restored + glyph-verified** |
-| `ls` a dir that has sub-folders | directory names are **gold**, not blue-on-white | **`$PSStyle`/LS_COLORS dir colour** |
+| `ls -la` a dir that has normal, world-writable, and sticky sub-folders | directory names are **gold**, long-list metadata follows Rose Pine, not blue-on-white or green-background fallback | **`lsd` config + `$PSStyle`/LS_COLORS dir colour** |
 | type `cd Doc` and pause (Windows) | a greyed **prediction** appears in rose/gold and is readable | **PSReadLine prediction colours** |
 | press `Ctrl+R`, type a few chars | a fuzzy history picker opens (fzf / PSFzf) | **fzf + PSFzf unified** |
 

@@ -12,11 +12,11 @@ the install script works, read this too.
 ## What this repo is
 
 Cross-platform dotfiles: Neovim (lazy.nvim), Starship, Ghostty, Windows
-Terminal, tmux, zshenv/zshrc, PowerShell profile, lazygit, and global Polaris
-agent-policy bootstrap. Public installs go through `setup.sh` (macOS / Linux /
-WSL) or `setup.ps1` (Windows), which install dependencies, apply the chezmoi
-config layer, restore locked Neovim plugins, sync Mason tools, and apply global
-agent policy. The repo can live anywhere — `~/dotfiles/`,
+Terminal, tmux, zshenv/zshrc, PowerShell profile, lazygit, `lsd`, and global
+Polaris agent-policy bootstrap. Public installs go through `setup.sh` (macOS /
+Linux / WSL) or `setup.ps1` (Windows), which install dependencies, apply the
+chezmoi config layer, restore locked Neovim plugins, sync Mason tools, and
+apply global agent policy. The repo can live anywhere — `~/dotfiles/`,
 `~/Documents/dotfiles/`, etc. The remote-clone default in `setup.{sh,ps1}` is
 `~/dotfiles/`, but an
 in-place clone elsewhere works too. Do NOT put the repo at `~/.config/nvim/` —
@@ -39,6 +39,7 @@ auth files, and package caches stay per machine.
 ~/dotfiles/
 ├── nvim/                  Neovim — init.lua, lua/{vim-options,util,plugins}
 ├── starship/              starship.toml (Rose Pine palette)
+├── lsd/                   config.yaml + colors.yaml (Rose Pine)
 ├── shells/                zshenv + zshrc + powershell_profile.ps1
 ├── tmux/                  tmux.conf (Rose Pine, vi-mode, OSC52 clipboard)
 ├── ghostty/               config (Rose Pine, Hack Nerd, tuned for tmux)
@@ -1130,19 +1131,34 @@ save only**. The next plain `:w` formats normally. Implemented in
   overriding PSReadLine's reverse-search for POSIX parity with zsh), Ctrl+T
   (file) and Alt+C (cd) ONLY when both the PSFzf module and the `fzf` binary are
   present. The zsh side already used `fzf`; this brings Windows to parity.
-- **lsd owns interactive `ls` ergonomics when installed.** `install-deps.sh`
-  installs `lsd` through each supported OS package manager; `install-deps.ps1`
-  carries it in the Scoop-first catalog (`lsd` -> winget `lsd-rs.lsd` -> choco
-  `lsd`). zsh defines the upstream documented aliases (`ls`, `l`, `la`, `lla`,
-  `lt`) only when `lsd` is on PATH. PowerShell removes the built-in `ls` alias
-  only after `lsd` is present, then defines functions for the same names because
-  PowerShell aliases cannot carry arguments like `-l` or `--tree`. Keep both
-  profiles guarded so partially provisioned shells stay silent and usable.
-- **`ls`/`Get-ChildItem` directories are gold via `$PSStyle.FileInfo.Directory`.**
+- **lsd owns interactive `ls` ergonomics and its own Rose Pine theme.**
+  `install-deps.sh` installs `lsd` through each supported OS package manager;
+  `install-deps.ps1` carries it in the Scoop-first catalog (`lsd` -> winget
+  `lsd-rs.lsd` -> choco `lsd`). Chezmoi deploys
+  `~/.config/lsd/config.yaml` and `colors.yaml` from `lsd/`; the parity
+  manifest must keep both files byte-identical between `lsd/` and
+  `home/dot_config/lsd/`. zsh defines the upstream documented aliases (`ls`,
+  `l`, `la`, `lla`, `lt`) only when `lsd` is on PATH. PowerShell removes the
+  built-in `ls` alias only after `lsd` is present, then defines functions for
+  the same names because PowerShell aliases cannot carry arguments like `-l` or
+  `--tree`. Keep both profiles guarded so partially provisioned shells stay
+  silent and usable. `lsd` uses `LS_COLORS` for file/directory names and
+  `colors.yaml` for long-list metadata; shell profiles intentionally replace
+  ambient/system `LS_COLORS` with the repo's Rose Pine palette so `ls`, `la`,
+  `lla`, and direct `lsd -la` render consistently across machines. Set
+  `DOTFILES_LS_COLORS` before shell/profile startup for an explicit palette
+  override. The repo palette must cover normal file types and special
+  directory classes such as `ow`, `tw`, and `st` so world-writable and sticky
+  directories do not fall back to upstream/default backgrounds. `NO_COLOR`
+  remains an explicit opt-out and must not be unset by the profiles.
+- **`ls`/`Get-ChildItem` directories are gold via LS_COLORS and `$PSStyle`.**
   The default directory color (bright blue) is unreadable on Rose Pine dark.
-  Guarded by `if ($PSStyle)` (absent on Windows PowerShell 5.1 and pwsh < 7.2);
-  uses `$PSStyle.Foreground.FromRgb(0xf6c177)` so the source carries no raw ANSI
-  escape byte (keeps the `.ps1` pure-ASCII invariant).
+  `LS_COLORS` paints `lsd` directories gold on every shell. `$PSStyle.FileInfo`
+  still covers native PowerShell `Get-ChildItem` when users bypass the `lsd`
+  functions. Guard `$PSStyle` with `if ($PSStyle)` (absent on Windows PowerShell
+  5.1 and pwsh < 7.2); use `$PSStyle.Foreground.FromRgb(0xf6c177)` so the
+  source carries no raw ANSI escape byte (keeps the `.ps1` pure-ASCII
+  invariant).
 
 ## Login shell: zsh adoption (install-deps.sh)
 

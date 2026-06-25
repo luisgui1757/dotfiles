@@ -271,6 +271,8 @@ $nvimTarget = Join-Path $env:LOCALAPPDATA 'nvim'
 Assert-NvimSymlink -Path $nvimTarget -Expected (Join-Path $Repo 'nvim')
 Assert-ContentEqual -Path (Join-Path $nvimTarget 'init.lua') -Expected (Join-Path $Repo 'nvim\init.lua')
 Assert-ContentEqual -Path (Join-Path $env:USERPROFILE '.config\starship.toml') -Expected (Join-Path $Repo 'starship\starship.toml')
+Assert-ContentEqual -Path (Join-Path $env:USERPROFILE '.config\lsd\config.yaml') -Expected (Join-Path $Repo 'lsd\config.yaml')
+Assert-ContentEqual -Path (Join-Path $env:USERPROFILE '.config\lsd\colors.yaml') -Expected (Join-Path $Repo 'lsd\colors.yaml')
 Assert-ContentEqual -Path (Join-Path $env:USERPROFILE '.tmux.conf') -Expected (Join-Path $Repo 'tmux\tmux.conf')
 Assert-ContentEqual -Path (Join-Path $env:USERPROFILE '.tmux.windows.conf') -Expected (Join-Path $Repo 'tmux\tmux.windows.conf')
 Assert-ContentEqual -Path (Join-Path $env:USERPROFILE 'Documents\PowerShell\Microsoft.PowerShell_profile.ps1') -Expected (Join-Path $Repo 'shells\powershell_profile.ps1')

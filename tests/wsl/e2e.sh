@@ -52,12 +52,14 @@ for dir in /usr/local/bin "$HOME/.local/bin"; do
 done
 export PATH
 
-for cmd in git nvim tmux zsh rg fd fzf starship lazygit; do
+for cmd in git nvim tmux zsh rg fd fzf starship lazygit lsd; do
     assert_cmd "$cmd"
 done
 
 assert_link "$HOME/.config/nvim" "$REPO_ROOT/nvim"
 assert_link "$HOME/.config/starship.toml" "$REPO_ROOT/starship/starship.toml"
+assert_link "$HOME/.config/lsd/config.yaml" "$REPO_ROOT/lsd/config.yaml"
+assert_link "$HOME/.config/lsd/colors.yaml" "$REPO_ROOT/lsd/colors.yaml"
 assert_link "$HOME/.tmux.conf" "$REPO_ROOT/tmux/tmux.conf"
 assert_link "$HOME/.zshenv" "$REPO_ROOT/shells/zshenv"
 assert_link "$HOME/.zshrc" "$REPO_ROOT/shells/zshrc"
