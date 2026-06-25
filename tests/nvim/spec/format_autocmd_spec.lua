@@ -44,4 +44,24 @@ describe("format-on-save autocmds", function()
     local spec = require("plugins.conform")
     assert.are.same({ "ruff_fix", "ruff_format" }, spec.opts.formatters_by_ft.python)
   end)
+
+  it("keeps Prettier JSON-family output valid for jsonls", function()
+    package.loaded["plugins.conform"] = nil
+    local spec = require("plugins.conform")
+    local prettier = assert(spec.opts.formatters.prettier, "prettier formatter override missing")
+    assert.is_function(prettier.append_args)
+
+    for _, ft in ipairs({ "json", "jsonc", "json5" }) do
+      local buf = vim.api.nvim_create_buf(false, true)
+      vim.bo[buf].filetype = ft
+      assert.are.same({ "--trailing-comma", "none" }, prettier.append_args(prettier, { buf = buf }))
+      vim.api.nvim_buf_delete(buf, { force = true })
+    end
+  end)
+
+  it("does not duplicate Conform's built-in rustfmt edition args", function()
+    package.loaded["plugins.conform"] = nil
+    local spec = require("plugins.conform")
+    assert.is_nil(spec.opts.formatters.rustfmt, "Conform's built-in rustfmt config already sets the edition")
+  end)
 end)

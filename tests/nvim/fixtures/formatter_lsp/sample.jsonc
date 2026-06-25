@@ -1,0 +1,5 @@
+{
+  // JSONC comments must remain valid after Prettier formats through conform.
+  "editor": { "tabSize": 2, "rulers": [80, 100], "files.associations": { "*.tmpl": "gotmpl" } },
+  "features": ["lsp", "formatting"]
+}

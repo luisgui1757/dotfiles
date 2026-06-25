@@ -160,6 +160,10 @@ describe("treesitter main migration", function()
       "must scan the runtimepath for stale bundled parser overrides"
     )
     assert.is_truthy(src:match("vim%.fn%.delete"), "must delete stale bundled parser overrides")
+    assert.is_truthy(
+      src:match('purge%("queries/%*"%)'),
+      "must delete stale bundled query overrides as well as parser files"
+    )
     -- CRITICAL safety: deletes MUST be scoped to stdpath('data'). Neovim ships
     -- its own bundled parsers as .so files under the install prefix, on the
     -- runtimepath -- an unscoped purge would wipe Neovim's built-in parsers.
@@ -191,16 +195,29 @@ describe("treesitter main migration", function()
       "main branch must use require('nvim-treesitter').install(...)"
     )
     assert.is_truthy(
-      src:match("pcall%(nvim_treesitter%.install, treesitter_parsers%)"),
-      "parser auto-install must not abort highlighting setup when the install API drifts"
+      src:match("local function normalized_parser_dependencies%(%)") and src:match("treesitter_config%.norm_languages"),
+      "parser auto-install must inspect upstream normalized parser dependencies before installing"
+    )
+    assert.is_truthy(
+      src:match("local function remove_incomplete_parser_installs%(parser_dependencies%)")
+        and src:match('treesitter_config%.get_install_dir%("queries"%)'),
+      "parser auto-install must repair parser files that were installed without their query directories"
+    )
+    assert.is_truthy(
+      src:match("pcall%(nvim_treesitter%.install, treesitter_parsers, install_opts%)"),
+      "parser auto-install must let upstream install the declared parser list"
     )
     assert.is_truthy(
       src:match("DOTFILES_TREESITTER_SYNC_INSTALL"),
       "setup/CI must be able to force synchronous parser bootstrap"
     )
     assert.is_truthy(
+      src:match("install_opts%s*=%s*%{ max_jobs%s*=%s*1, summary%s*=%s*true %}"),
+      "synchronous parser bootstrap must serialize installs to avoid cache/temp-dir races"
+    )
+    assert.is_truthy(
       src:match('type%(task_or_err%.wait%)%s*~=%s*"function"')
-        and src:match("local install_ok = task_or_err:wait%(300000%)"),
+        and src:match("local install_ok = task_or_err:wait%(900000%)"),
       "synchronous parser bootstrap must require and wait on nvim-treesitter's install task"
     )
     assert.is_truthy(
@@ -215,11 +232,16 @@ describe("treesitter main migration", function()
 
   it("errors in sync mode when the waitable parser install task reports false", function()
     local old_tree_sitter = package.loaded["nvim-treesitter"]
+    local old_tree_sitter_config = package.loaded["nvim-treesitter.config"]
     local old_sync = vim.env.DOTFILES_TREESITTER_SYNC_INSTALL
     local old_notify = vim.notify
     local old_executable = vim.fn.executable
+    local received_parsers
+    local received_options
     package.loaded["nvim-treesitter"] = {
-      install = function()
+      install = function(parsers, options)
+        received_parsers = parsers
+        received_options = options
         return {
           wait = function()
             return false
@@ -228,6 +250,16 @@ describe("treesitter main migration", function()
       end,
       indentexpr = function()
         return 0
+      end,
+    }
+    package.loaded["nvim-treesitter.config"] = {
+      get_install_dir = function(name)
+        return vim.fs.joinpath(vim.fn.tempname(), name)
+      end,
+      norm_languages = function(parsers, options)
+        assert_same_list(parsers, required)
+        assert.are.same({ unsupported = true }, options)
+        return parsers
       end,
     }
     vim.env.DOTFILES_TREESITTER_SYNC_INSTALL = "1"
@@ -244,6 +276,7 @@ describe("treesitter main migration", function()
     local config_ok, config_err = pcall(spec[1].config)
 
     package.loaded["nvim-treesitter"] = old_tree_sitter
+    package.loaded["nvim-treesitter.config"] = old_tree_sitter_config
     if old_sync == nil then
       vim.env.DOTFILES_TREESITTER_SYNC_INSTALL = nil
     else
@@ -254,6 +287,8 @@ describe("treesitter main migration", function()
 
     assert.is_false(config_ok)
     assert.matches("parser install failed", tostring(config_err), nil, true)
+    assert_same_list(received_parsers, required)
+    assert.are.same({ max_jobs = 1, summary = true }, received_options)
   end)
 
   it("guards parser compilation on the tree-sitter CLI being on PATH", function()

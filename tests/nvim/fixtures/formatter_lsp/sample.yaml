@@ -1,0 +1,2 @@
+service: { name: api, ports: [8080, 9090], env: { LOG_LEVEL: info, CACHE: memory } }
+owners: [editor, reviewer]

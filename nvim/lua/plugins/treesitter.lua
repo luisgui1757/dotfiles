@@ -208,6 +208,56 @@ return {
         end)
       end
 
+      local bundled_set = {}
+      for _, lang in ipairs(nvim_bundled_parsers) do
+        bundled_set[lang] = true
+      end
+
+      local function normalized_parser_dependencies()
+        local config_ok, treesitter_config = pcall(require, "nvim-treesitter.config")
+        if not config_ok or type(treesitter_config.norm_languages) ~= "function" then
+          return nil, "nvim-treesitter.config.norm_languages is unavailable; cannot resolve parser dependencies"
+        end
+
+        local norm_ok, normalized_or_err =
+          pcall(treesitter_config.norm_languages, treesitter_parsers, { unsupported = true })
+        if not norm_ok or type(normalized_or_err) ~= "table" then
+          return nil, "nvim-treesitter parser dependency resolution failed: " .. tostring(normalized_or_err)
+        end
+
+        local install_parsers = {}
+        local install_parser_set = {}
+        for _, parser in ipairs(normalized_or_err) do
+          add_unique(install_parsers, install_parser_set, parser)
+        end
+        return install_parsers
+      end
+
+      local function remove_incomplete_parser_installs(parser_dependencies)
+        local config_ok, treesitter_config = pcall(require, "nvim-treesitter.config")
+        local parsers_ok, parser_configs = pcall(require, "nvim-treesitter.parsers")
+        if not config_ok or not parsers_ok or type(treesitter_config.get_install_dir) ~= "function" then
+          return
+        end
+
+        local parser_dir = treesitter_config.get_install_dir("parser")
+        local parser_info_dir = treesitter_config.get_install_dir("parser-info")
+        local query_dir = treesitter_config.get_install_dir("queries")
+        for _, parser in ipairs(parser_dependencies or {}) do
+          local parser_config = parser_configs[parser]
+          local has_runtime_queries = #vim.api.nvim_get_runtime_file("queries/" .. parser, false) > 0
+          if not bundled_set[parser] and parser_config and parser_config.install_info and has_runtime_queries then
+            local parser_path = vim.fs.joinpath(parser_dir, parser .. ".so")
+            local parser_info_path = vim.fs.joinpath(parser_info_dir, parser .. ".revision")
+            local query_path = vim.fs.joinpath(query_dir, parser)
+            if vim.uv.fs_stat(parser_path) and not vim.uv.fs_stat(query_path) then
+              pcall(vim.fn.delete, parser_path)
+              pcall(vim.fn.delete, parser_info_path)
+            end
+          end
+        end
+      end
+
       -- Purge any stale nvim-treesitter parser for a Neovim-bundled language.
       -- Excluding them from the install list stops FUTURE installs, but a
       -- `parser/<lang>.so` left from an older config -- or restored from a CI
@@ -224,14 +274,11 @@ return {
       -- parsers. nvim-treesitter installs only under stdpath('data') (its
       -- `site/parser` and the lazy plugin dir both live there); the built-in
       -- prefix does not. So scope every delete to stdpath('data').
-      local bundled_set = {}
-      for _, lang in ipairs(nvim_bundled_parsers) do
-        bundled_set[lang] = true
-      end
       local managed = vim.fs.normalize(vim.fn.stdpath("data")) .. "/"
       local function purge(pattern)
         for _, path in ipairs(vim.api.nvim_get_runtime_file(pattern, true)) do
-          if bundled_set[vim.fn.fnamemodify(path, ":t:r")] and vim.startswith(vim.fs.normalize(path), managed) then
+          local name = vim.fn.fnamemodify(path, ":t"):gsub("%.so$", ""):gsub("%.revision$", "")
+          if bundled_set[name] and vim.startswith(vim.fs.normalize(path), managed) then
             pcall(vim.fn.delete, path)
           end
         end
@@ -240,6 +287,10 @@ return {
       -- Also drop nvim-treesitter's install bookkeeping so it does not believe a
       -- bundled language is still installed.
       purge("parser-info/*.revision")
+      -- Upstream dependencies can also install query directories for bundled
+      -- languages (for example `cpp` requires `c`). Those query overrides are
+      -- managed artifacts too; remove them with the parser files.
+      purge("queries/*")
 
       -- nvim-treesitter `main` shells out to the `tree-sitter` CLI to compile
       -- each parser. When the CLI is not on PATH (nvim launched from a shell
@@ -252,7 +303,24 @@ return {
       -- on install(...):wait(...). Interactive sessions keep the async path.
       if vim.fn.executable("tree-sitter") == 1 then
         if type(nvim_treesitter.install) == "function" then
-          local ok, task_or_err = pcall(nvim_treesitter.install, treesitter_parsers)
+          local install_opts = nil
+          if sync_install then
+            -- Bootstrap/setup must be deterministic. nvim-treesitter's default
+            -- parallelism is optimized for interactive speed, but CI restores
+            -- parser caches across runs and can expose temp-dir races during a
+            -- cold sync install. Keep interactive installs fast; serialize the
+            -- proof path.
+            install_opts = { max_jobs = 1, summary = true }
+          end
+          local parser_dependencies, parser_dependencies_err = normalized_parser_dependencies()
+          if not parser_dependencies then
+            report_install_problem(
+              parser_dependencies_err .. ". Run :Lazy! restore and :TSUpdate after the plugin checkout is fixed."
+            )
+            parser_dependencies = treesitter_parsers
+          end
+          remove_incomplete_parser_installs(parser_dependencies)
+          local ok, task_or_err = pcall(nvim_treesitter.install, treesitter_parsers, install_opts)
           if not ok then
             report_install_problem(
               "nvim-treesitter parser auto-install failed: "
@@ -265,7 +333,10 @@ return {
                 "nvim-treesitter install did not return a waitable task; cannot prove parser bootstrap"
               )
             else
-              local install_ok = task_or_err:wait(300000)
+              local install_ok = task_or_err:wait(900000)
+              purge("parser/*.so")
+              purge("parser-info/*.revision")
+              purge("queries/*")
               if install_ok ~= true then
                 report_install_problem("nvim-treesitter parser install failed; see the parser build errors above")
               end
