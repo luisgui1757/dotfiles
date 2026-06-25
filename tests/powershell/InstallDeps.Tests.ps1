@@ -764,6 +764,107 @@ Describe "install-deps.ps1" {
         ($script:ScoopArgs | Where-Object { $_ -like 'update*' }).Count | Should -Be 0
     }
 
+    It "uses Scoop shim metadata as ownership proof for PowerShell" {
+        . $script:ImportInstallDepsForTest -DryRun
+        $script:ScoopArgs = @()
+
+        Mock -CommandName Read-Host -MockWith { throw "Read-Host must not run under -DryRun" }
+        Mock -CommandName Get-Command -MockWith {
+            param([string]$Name)
+            if ($Name -eq 'scoop') {
+                return [pscustomobject]@{ Name = $Name; Source = $Name }
+            }
+            if ($Name -eq 'pwsh') {
+                return [pscustomobject]@{ Name = $Name; Source = 'C:\Users\luigu\scoop\shims\pwsh.exe' }
+            }
+            return $null
+        }
+        Mock -CommandName Test-Path -MockWith {
+            param([string]$LiteralPath)
+            return ($LiteralPath -eq 'C:\Users\luigu\scoop\shims\pwsh.shim')
+        }
+        Mock -CommandName Get-Content -MockWith {
+            param([string]$LiteralPath)
+            if ($LiteralPath -eq 'C:\Users\luigu\scoop\shims\pwsh.shim') {
+                return 'path = "C:\Users\luigu\scoop\apps\pwsh\current\pwsh.exe"'
+            }
+            throw "unexpected Get-Content path: $LiteralPath"
+        }
+        Mock -CommandName scoop -MockWith {
+            $script:ScoopArgs += ($args -join ' ')
+            $global:LASTEXITCODE = 0
+        }
+
+        $output = & { Update-ManagedCatalogTool pwsh -AssumePresent -NoPrompt -ReportSkip -IsDryRun $true } 6>&1 | Out-String
+
+        $output | Should -Match 'scoop update pwsh'
+        $output | Should -Not -Match 'unmanaged|winget upgrade|choco upgrade'
+        ($script:ScoopArgs | Where-Object { $_ -like 'list*' }).Count | Should -Be 0
+        ($script:ScoopArgs | Where-Object { $_ -like 'update*' }).Count | Should -Be 0
+        $script:InstallFailures.Count | Should -Be 0
+        $script:UnmanagedDependencies.Count | Should -Be 0
+    }
+
+    It "maps Scoop shim package names that differ from binary names" {
+        . $script:ImportInstallDepsForTest -DryRun
+        $script:ScoopArgs = @()
+
+        Mock -CommandName Get-Command -MockWith {
+            param([string]$Name)
+            if ($Name -eq 'scoop') {
+                return [pscustomobject]@{ Name = $Name; Source = $Name }
+            }
+            if ($Name -eq 'rg') {
+                return [pscustomobject]@{ Name = $Name; Source = 'C:\Users\luigu\scoop\shims\rg.exe' }
+            }
+            return $null
+        }
+        Mock -CommandName Test-Path -MockWith {
+            param([string]$LiteralPath)
+            return ($LiteralPath -eq 'C:\Users\luigu\scoop\shims\rg.shim')
+        }
+        Mock -CommandName Get-Content -MockWith {
+            param([string]$LiteralPath)
+            if ($LiteralPath -eq 'C:\Users\luigu\scoop\shims\rg.shim') {
+                return 'path = "C:\Users\luigu\scoop\apps\ripgrep\current\rg.exe"'
+            }
+            throw "unexpected Get-Content path: $LiteralPath"
+        }
+        Mock -CommandName scoop -MockWith {
+            $script:ScoopArgs += ($args -join ' ')
+            $global:LASTEXITCODE = 0
+        }
+
+        $output = & { Update-ManagedCatalogTool rg -AssumePresent -NoPrompt -ReportSkip -IsDryRun $true } 6>&1 | Out-String
+
+        $output | Should -Match 'scoop update ripgrep'
+        $output | Should -Not -Match 'unmanaged|winget upgrade|choco upgrade'
+        ($script:ScoopArgs | Where-Object { $_ -like 'list*' }).Count | Should -Be 0
+        $script:InstallFailures.Count | Should -Be 0
+    }
+
+    It "does not let scoop list claim a command source outside Scoop" {
+        . $script:ImportInstallDepsForTest -DryRun
+
+        Mock -CommandName Get-Command -MockWith {
+            param([string]$Name)
+            if ($Name -eq 'scoop') {
+                return [pscustomobject]@{ Name = $Name; Source = $Name }
+            }
+            if ($Name -eq 'pwsh') {
+                return [pscustomobject]@{ Name = $Name; Source = 'C:\Manual\PowerShell\pwsh.exe' }
+            }
+            return $null
+        }
+        Mock -CommandName scoop -MockWith { throw "scoop list must not claim a manual command source" }
+
+        $output = & { Update-ManagedCatalogTool pwsh -AssumePresent -NoPrompt -ReportSkip -IsDryRun $true } 6>&1 | Out-String
+
+        $output | Should -Match 'unmanaged\s+pwsh\s+source=C:\\Manual\\PowerShell\\pwsh\.exe'
+        $script:InstallFailures.Count | Should -Be 0
+        $script:UnmanagedDependencies.Count | Should -Be 1
+    }
+
     It "dry-runs a scoped PowerShell winget update when winget owns pwsh" {
         . $script:ImportInstallDepsForTest -DryRun
         $script:WingetArgs = @()
@@ -807,7 +908,7 @@ Describe "install-deps.ps1" {
         $script:InstallFailures.Count | Should -Be 0
     }
 
-    It "skips winget-owned PowerShell when winget has no upgrade available" {
+    It "reports winget-owned PowerShell as current when winget has no upgrade available" {
         . $script:ImportInstallDepsForTest
         $script:WingetArgs = @()
 
@@ -841,7 +942,7 @@ Describe "install-deps.ps1" {
 
         $output = & { Update-ManagedCatalogTool pwsh -AssumePresent -NoPrompt -ReportSkip -IsDryRun $false } 3>&1 6>&1 | Out-String
 
-        $output | Should -Match 'no winget upgrade available'
+        $output | Should -Match 'current\s+pwsh\s+via winget'
         $script:WingetArgs | Should -Contain 'list --upgrade-available --id Microsoft.PowerShell -e --accept-source-agreements'
         ($script:WingetArgs | Where-Object { $_ -like 'upgrade*' }).Count | Should -Be 0
         $script:InstallFailures.Count | Should -Be 0
@@ -937,11 +1038,52 @@ Describe "install-deps.ps1" {
 
         $output = & { Update-ManagedCatalogTool pwsh -AssumePresent -ReportSkip -IsDryRun $true } 3>&1 6>&1 | Out-String
 
-        $output | Should -Match 'present at C:\\Manual\\PowerShell\\pwsh\.exe'
-        $output | Should -Match 'Scoop, winget, and Chocolatey do not claim it'
+        $output | Should -Match 'unmanaged\s+pwsh\s+source=C:\\Manual\\PowerShell\\pwsh\.exe'
+        $output | Should -Not -Match 'update skipped because|do not claim it'
         $script:InstallFailures.Count | Should -Be 0
         $script:UnmanagedDependencies.Count | Should -Be 1
         $script:UnmanagedDependencies[0].Tool | Should -Be 'pwsh'
+    }
+
+    It "fails closed instead of falling through when a Scoop shim has corrupt provenance" {
+        . $script:ImportInstallDepsForTest -DryRun
+
+        Mock -CommandName Get-Command -MockWith {
+            param([string]$Name)
+            if ($Name -eq 'scoop') {
+                return [pscustomobject]@{ Name = $Name; Source = $Name }
+            }
+            if ($Name -eq 'winget') {
+                return [pscustomobject]@{ Name = $Name; Source = $Name }
+            }
+            if ($Name -eq 'rg') {
+                return [pscustomobject]@{ Name = $Name; Source = 'C:\Users\luigu\scoop\shims\rg.exe' }
+            }
+            return $null
+        }
+        Mock -CommandName Test-Path -MockWith {
+            param([string]$LiteralPath)
+            return ($LiteralPath -eq 'C:\Users\luigu\scoop\shims\rg.shim')
+        }
+        Mock -CommandName Get-Content -MockWith {
+            param([string]$LiteralPath)
+            if ($LiteralPath -eq 'C:\Users\luigu\scoop\shims\rg.shim') {
+                return 'path = "C:\Tools\rg.exe"'
+            }
+            throw "unexpected Get-Content path: $LiteralPath"
+        }
+        Mock -CommandName winget -MockWith { throw "winget must not run after corrupt Scoop shim provenance" }
+
+        $output = & { Update-ManagedCatalogTool rg -AssumePresent -NoPrompt -ReportSkip -IsDryRun $true } 3>&1 6>&1 | Out-String
+
+        $output | Should -Match 'blocked\s+rg'
+        $output | Should -Match 'outside the apps tree'
+        $script:InstallFailures.Count | Should -Be 1
+        $script:InstallFailures[0].Tool | Should -Be 'rg'
+        $script:InstallFailures[0].Pm | Should -Be 'scoop'
+        $script:InstallFailures[0].Pkg | Should -Be 'ripgrep'
+        $script:InstallFailures[0].ExitCode | Should -Be 'scoop-shim-provenance'
+        $script:UnmanagedDependencies.Count | Should -Be 0
     }
 
     It "records failed winget package updates" {
@@ -1029,7 +1171,7 @@ Describe "install-deps.ps1" {
         $output = & { Update-ManagedCatalogTool pwsh -AssumePresent -NoPrompt -IsDryRun $false } 3>&1 6>&1 | Out-String
 
         $script:WingetArgs | Should -Contain 'upgrade --id Microsoft.PowerShell -e --accept-source-agreements --accept-package-agreements --silent'
-        $output | Should -Match 'no winget upgrade available'
+        $output | Should -Match 'current\s+pwsh\s+via winget'
         $script:InstallFailures.Count | Should -Be 0
     }
 
