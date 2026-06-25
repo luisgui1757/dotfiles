@@ -10,7 +10,7 @@
 # Usage:
 #   .\install-deps.ps1            show a dependency table, then prompt once
 #   .\install-deps.ps1 -All       skip prompts, install everything
-#   .\install-deps.ps1 -Update    update only present Scoop-managed catalog tools
+#   .\install-deps.ps1 -Update    update present manager-owned catalog tools
 #   .\install-deps.ps1 -DryRun    print what would be installed without acting
 
 [CmdletBinding()]
@@ -604,13 +604,176 @@ function Install-One {
     }
 }
 
-# ---- Optional: keep a single scoop tool current ------------------------------
-# scoop pins to the installed version until `scoop update <pkg>`. This is the
-# explicit, consent-gated, idempotent "keep latest" step for ONE tool. We do NOT
-# run `scoop update *` -- that would upgrade every scoop tool (taplo, win32yank,
-# nerd-fonts, ...) beyond what the caller asked for and break the "run twice = no-op"
-# contract. Safe to call when the tool is absent (the install path owns that) and
-# when the tool was installed by another manager (the scoop list guard no-ops).
+# ---- Optional: keep a single catalog tool current ----------------------------
+# Update mode is scoped to present catalog tools that a supported package manager
+# actually owns. It never runs blanket upgrades such as `scoop update *`,
+# `winget upgrade --all`, or `choco upgrade all`. A present tool outside
+# Scoop/winget/Chocolatey is reported as unmanaged instead of silently skipped.
+function Get-CatalogPackageId {
+    param([string]$tool, [string]$Manager)
+    if (-not $Catalog.ContainsKey($tool)) { return '' }
+    $pkg = $Catalog[$tool].$Manager
+    if ([string]::IsNullOrWhiteSpace([string]$pkg)) { return '' }
+    return [string]$pkg
+}
+
+function Get-CatalogToolCommandSource {
+    param([string]$tool)
+    if (-not $BinaryName.ContainsKey($tool)) { return '' }
+    $binary = $BinaryName[$tool]
+    if ([string]::IsNullOrWhiteSpace($binary)) { return '' }
+    $cmd = Get-Command $binary -ErrorAction SilentlyContinue | Select-Object -First 1
+    if (-not $cmd) { return '' }
+    foreach ($prop in @('Source', 'Path', 'Definition')) {
+        if (($cmd.PSObject.Properties.Name -contains $prop) -and
+            -not [string]::IsNullOrWhiteSpace([string]$cmd.$prop)) {
+            return [string]$cmd.$prop
+        }
+    }
+    return ''
+}
+
+function Get-ScoopPackageListName {
+    param([string]$Package)
+    if ([string]::IsNullOrWhiteSpace($Package)) { return '' }
+    return @($Package -split '/')[-1]
+}
+
+function Test-ScoopPackageManaged {
+    param([string]$Package)
+    if ([string]::IsNullOrWhiteSpace($Package)) { return $false }
+    if (-not (Get-Command scoop -ErrorAction SilentlyContinue)) { return $false }
+    $listName = Get-ScoopPackageListName -Package $Package
+    try {
+        $output = @(scoop list $listName 2>$null)
+        if ($LASTEXITCODE -ne 0) { return $false }
+        foreach ($line in $output) {
+            if ([string]$line -match "(^|\s)$([regex]::Escape($listName))(\s|$)") {
+                return $true
+            }
+        }
+    } catch {
+        return $false
+    }
+    return $false
+}
+
+function Test-WingetPackageManaged {
+    param([string]$Package)
+    if ([string]::IsNullOrWhiteSpace($Package)) { return $false }
+    if (-not (Get-Command winget -ErrorAction SilentlyContinue)) { return $false }
+    try {
+        $output = @(winget list --id $Package -e --accept-source-agreements 2>$null)
+        if ($LASTEXITCODE -ne 0) { return $false }
+        return (Test-WingetOutputContainsPackageId -Output $output -Package $Package)
+    } catch {
+        return $false
+    }
+    return $false
+}
+
+function Test-WingetOutputContainsPackageId {
+    param([object[]]$Output, [string]$Package)
+    if ([string]::IsNullOrWhiteSpace($Package)) { return $false }
+    $escaped = [regex]::Escape($Package)
+    foreach ($line in @($Output)) {
+        if ([string]$line -match "(^|\s)$escaped(\s|$)") {
+            return $true
+        }
+    }
+    return $false
+}
+
+function Test-WingetNoApplicableUpgradeExitCode {
+    param([object]$ExitCode)
+    $code = [string]$ExitCode
+    return ($code -in @('-1978335189', '-1978335153'))
+}
+
+function Get-WingetPackageUpgradeState {
+    param([string]$Package)
+    if ([string]::IsNullOrWhiteSpace($Package)) {
+        return [pscustomobject]@{ Status = 'none'; ExitCode = 0 }
+    }
+    if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
+        return [pscustomobject]@{ Status = 'error'; ExitCode = 'winget-missing' }
+    }
+    try {
+        $output = @(winget list --upgrade-available --id $Package -e --accept-source-agreements 2>$null)
+        $exitCode = $LASTEXITCODE
+        if ($exitCode -ne 0) {
+            if (Test-WingetNoApplicableUpgradeExitCode -ExitCode $exitCode) {
+                return [pscustomobject]@{ Status = 'none'; ExitCode = $exitCode }
+            }
+            return [pscustomobject]@{ Status = 'error'; ExitCode = $exitCode }
+        }
+        if (Test-WingetOutputContainsPackageId -Output $output -Package $Package) {
+            return [pscustomobject]@{ Status = 'available'; ExitCode = 0 }
+        }
+        return [pscustomobject]@{ Status = 'none'; ExitCode = 0 }
+    } catch {
+        return [pscustomobject]@{ Status = 'error'; ExitCode = 'exception' }
+    }
+}
+
+function Test-ChocoPackageManaged {
+    param([string]$Package)
+    if ([string]::IsNullOrWhiteSpace($Package)) { return $false }
+    if (-not (Get-Command choco -ErrorAction SilentlyContinue)) { return $false }
+    try {
+        $output = @(choco list $Package --local-only --exact --limit-output 2>$null)
+        if ($LASTEXITCODE -ne 0) { return $false }
+        $prefix = "$Package|"
+        foreach ($line in $output) {
+            if (([string]$line).StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) {
+                return $true
+            }
+        }
+    } catch {
+        return $false
+    }
+    return $false
+}
+
+function Get-ManagedCatalogToolUpdateTarget {
+    param([string]$tool)
+    foreach ($manager in @('scoop', 'winget', 'choco')) {
+        $pkg = Get-CatalogPackageId -tool $tool -Manager $manager
+        if ([string]::IsNullOrWhiteSpace($pkg)) { continue }
+        if (-not (Get-Command $manager -ErrorAction SilentlyContinue)) { continue }
+        $managed = switch ($manager) {
+            'scoop' { Test-ScoopPackageManaged -Package $pkg }
+            'winget' { Test-WingetPackageManaged -Package $pkg }
+            'choco' { Test-ChocoPackageManaged -Package $pkg }
+        }
+        if ($managed) {
+            return [pscustomobject]@{ Pm = $manager; Pkg = $pkg }
+        }
+    }
+    return $null
+}
+
+function Add-UnmanagedDependency {
+    param([string]$tool, [string]$Source)
+    if ($null -eq $script:UnmanagedDependencies) {
+        $script:UnmanagedDependencies = @()
+    }
+    foreach ($existing in @($script:UnmanagedDependencies)) {
+        if ($existing.Tool -eq $tool) { return }
+    }
+    $script:UnmanagedDependencies += [pscustomobject]@{ Tool = $tool; Source = $Source }
+}
+
+function Report-UnmanagedCatalogTool {
+    param([string]$tool, [switch]$ReportSkip)
+    $source = Get-CatalogToolCommandSource -tool $tool
+    if ([string]::IsNullOrWhiteSpace($source)) { $source = 'unknown source' }
+    Add-UnmanagedDependency -tool $tool -Source $source
+    if ($ReportSkip) {
+        Write-Warning ("  skipped   {0,-26} present at {1}; update skipped because Scoop, winget, and Chocolatey do not claim it" -f $tool, $source)
+    }
+}
+
 function Update-ScoopTool {
     param(
         [string]$tool,
@@ -618,26 +781,23 @@ function Update-ScoopTool {
         [switch]$SkipManifestRefresh,
         [switch]$ReportSkip,
         [switch]$AssumePresent,
+        [switch]$AssumeManaged,
         [bool]$IsDryRun = $DryRun
     )
     if (-not (Get-Command scoop -ErrorAction SilentlyContinue)) { return }
-    # -AssumePresent: the caller (update mode) already determined presence via its
-    # own tester, so skip the redundant Test-Tool recheck. Without it the two
-    # checks can disagree (e.g. a mocked tester vs the real Get-Command).
+    # -AssumePresent: the caller already determined presence via its own tester,
+    # so skip the redundant Test-Tool recheck. Without it the two checks can
+    # disagree in tests with mocked presence.
     if ((-not $AssumePresent) -and (-not (Test-Tool $tool))) {
         if ($ReportSkip) { Write-Host ("  skipped   {0,-26} not installed" -f $tool) }
         return
     }
-    $pkg = $Catalog[$tool].scoop
+    $pkg = Get-CatalogPackageId -tool $tool -Manager 'scoop'
     if (-not $pkg) {
         if ($ReportSkip) { Write-Host ("  skipped   {0,-26} no scoop package in catalog" -f $tool) }
         return
     }
-    # Only update if scoop actually manages this tool (avoids warning on a
-    # winget/choco-installed pwsh that Install-One picked when scoop was absent).
-    $scoopListName = @($pkg -split '/')[-1]
-    $managed = (scoop list $scoopListName 2>$null | Select-String -SimpleMatch $scoopListName)
-    if (-not $managed) {
+    if ((-not $AssumeManaged) -and (-not (Test-ScoopPackageManaged -Package $pkg))) {
         if ($ReportSkip) { Write-Host ("  skipped   {0,-26} present, but Scoop does not manage {1}" -f $tool, $pkg) }
         return
     }
@@ -667,9 +827,143 @@ function Update-ScoopTool {
     }
 }
 
+function Update-WingetTool {
+    param(
+        [string]$tool,
+        [switch]$NoPrompt,
+        [switch]$ReportSkip,
+        [switch]$AssumePresent,
+        [switch]$AssumeManaged,
+        [bool]$IsDryRun = $DryRun
+    )
+    if (-not (Get-Command winget -ErrorAction SilentlyContinue)) { return }
+    if ((-not $AssumePresent) -and (-not (Test-Tool $tool))) {
+        if ($ReportSkip) { Write-Host ("  skipped   {0,-26} not installed" -f $tool) }
+        return
+    }
+    $pkg = Get-CatalogPackageId -tool $tool -Manager 'winget'
+    if (-not $pkg) {
+        if ($ReportSkip) { Write-Host ("  skipped   {0,-26} no winget package in catalog" -f $tool) }
+        return
+    }
+    if ((-not $AssumeManaged) -and (-not (Test-WingetPackageManaged -Package $pkg))) {
+        if ($ReportSkip) { Write-Host ("  skipped   {0,-26} present, but winget does not manage {1}" -f $tool, $pkg) }
+        return
+    }
+    $upgradeState = Get-WingetPackageUpgradeState -Package $pkg
+    if ($upgradeState.Status -eq 'none') {
+        if ($ReportSkip) { Write-Host ("  skipped   {0,-26} no winget upgrade available" -f $tool) }
+        return
+    }
+    if ($upgradeState.Status -ne 'available') {
+        Write-Warning ("  winget upgrade availability check of {0} failed (exit {1})" -f $pkg, $upgradeState.ExitCode)
+        $script:InstallFailures += [pscustomobject]@{ Tool=$tool; Pm='winget'; Pkg=$pkg; ExitCode=$upgradeState.ExitCode }
+        return
+    }
+    if ((-not $NoPrompt) -and (-not (Ask "Update ${tool} to the latest winget version?"))) { return }
+    if ($IsDryRun) {
+        Write-Host ("  would:    winget upgrade --id {0} -e --accept-source-agreements --accept-package-agreements --silent" -f $pkg)
+        return
+    }
+    winget upgrade --id $pkg -e --accept-source-agreements --accept-package-agreements --silent
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host ("  updated   {0,-26} via winget" -f $tool)
+    } elseif (Test-WingetNoApplicableUpgradeExitCode -ExitCode $LASTEXITCODE) {
+        Write-Host ("  skipped   {0,-26} no winget upgrade available" -f $tool)
+    } else {
+        Write-Warning ("  winget upgrade of {0} failed (exit {1})" -f $pkg, $LASTEXITCODE)
+        $script:InstallFailures += [pscustomobject]@{ Tool=$tool; Pm='winget'; Pkg=$pkg; ExitCode=$LASTEXITCODE }
+    }
+}
+
+function Update-ChocoTool {
+    param(
+        [string]$tool,
+        [switch]$NoPrompt,
+        [switch]$ReportSkip,
+        [switch]$AssumePresent,
+        [switch]$AssumeManaged,
+        [bool]$IsDryRun = $DryRun
+    )
+    if (-not (Get-Command choco -ErrorAction SilentlyContinue)) { return }
+    if ((-not $AssumePresent) -and (-not (Test-Tool $tool))) {
+        if ($ReportSkip) { Write-Host ("  skipped   {0,-26} not installed" -f $tool) }
+        return
+    }
+    $pkg = Get-CatalogPackageId -tool $tool -Manager 'choco'
+    if (-not $pkg) {
+        if ($ReportSkip) { Write-Host ("  skipped   {0,-26} no choco package in catalog" -f $tool) }
+        return
+    }
+    if ((-not $AssumeManaged) -and (-not (Test-ChocoPackageManaged -Package $pkg))) {
+        if ($ReportSkip) { Write-Host ("  skipped   {0,-26} present, but Chocolatey does not manage {1}" -f $tool, $pkg) }
+        return
+    }
+    if ((-not $NoPrompt) -and (-not (Ask "Update ${tool} to the latest Chocolatey version?"))) { return }
+    if ($IsDryRun) {
+        Write-Host ("  would:    choco upgrade {0} -y" -f $pkg)
+        return
+    }
+    choco upgrade $pkg -y
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host ("  updated   {0,-26} via choco" -f $tool)
+    } else {
+        Write-Warning ("  choco upgrade of {0} failed (exit {1})" -f $pkg, $LASTEXITCODE)
+        $script:InstallFailures += [pscustomobject]@{ Tool=$tool; Pm='choco'; Pkg=$pkg; ExitCode=$LASTEXITCODE }
+    }
+}
+
+function Update-ManagedCatalogTool {
+    param(
+        [string]$tool,
+        [switch]$NoPrompt,
+        [switch]$SkipScoopManifestRefresh,
+        [switch]$ReportSkip,
+        [switch]$AssumePresent,
+        [bool]$IsDryRun = $DryRun
+    )
+    if ((-not $AssumePresent) -and (-not (Test-Tool $tool))) {
+        if ($ReportSkip) { Write-Host ("  skipped   {0,-26} not installed" -f $tool) }
+        return
+    }
+    if (-not $Catalog.ContainsKey($tool)) {
+        if ($ReportSkip) { Write-Host ("  skipped   {0,-26} no catalog entry" -f $tool) }
+        return
+    }
+
+    $target = Get-ManagedCatalogToolUpdateTarget -tool $tool
+    if (-not $target) {
+        Report-UnmanagedCatalogTool -tool $tool -ReportSkip:$ReportSkip
+        return
+    }
+
+    switch ($target.Pm) {
+        'scoop' {
+            Update-ScoopTool -tool $tool -NoPrompt:$NoPrompt -SkipManifestRefresh:$SkipScoopManifestRefresh -ReportSkip:$ReportSkip -AssumePresent -AssumeManaged -IsDryRun $IsDryRun
+        }
+        'winget' {
+            Update-WingetTool -tool $tool -NoPrompt:$NoPrompt -ReportSkip:$ReportSkip -AssumePresent -AssumeManaged -IsDryRun $IsDryRun
+        }
+        'choco' {
+            Update-ChocoTool -tool $tool -NoPrompt:$NoPrompt -ReportSkip:$ReportSkip -AssumePresent -AssumeManaged -IsDryRun $IsDryRun
+        }
+    }
+}
+
+function Write-UnmanagedDependencySummary {
+    if (($null -eq $script:UnmanagedDependencies) -or ($script:UnmanagedDependencies.Count -eq 0)) { return }
+    Write-Host ""
+    Write-Host "install-deps: present tools skipped because Scoop, winget, and Chocolatey do not claim them:"
+    foreach ($item in $script:UnmanagedDependencies) {
+        Write-Host ("  SKIP  {0,-20} source={1}" -f $item.Tool, $item.Source) -ForegroundColor Yellow
+    }
+    Write-Host "Install or migrate those tools through a supported package manager for setup.ps1 -Update to own their updates."
+}
+
 # Track failures across the run so we can warn loudly at the end instead of
 # pretending success.
 $script:InstallFailures = @()
+$script:UnmanagedDependencies = @()
 
 # ---- Hack Nerd Font: prefer scoop bucket, fall back to direct download+register
 function Get-HackNerdFontInstallScope {
@@ -1623,8 +1917,8 @@ function Invoke-InstallDepsUpdateMode {
         [bool]$IsDryRun = $DryRun
     )
 
-    Write-Host ("install-deps: update mode  scoop=" + [bool](Get-Command scoop -ErrorAction SilentlyContinue) + "  dry-run=$IsDryRun")
-    Write-Host "note: winget/choco-installed tools update via their own managers."
+    Write-Host ("install-deps: update mode  scoop=" + [bool](Get-Command scoop -ErrorAction SilentlyContinue) + "  winget=" + [bool](Get-Command winget -ErrorAction SilentlyContinue) + "  choco=" + [bool](Get-Command choco -ErrorAction SilentlyContinue) + "  dry-run=$IsDryRun")
+    Write-Host "note: present catalog tools update only through the package manager that owns them."
     Write-Host ""
 
     if (-not (Get-Command scoop -ErrorAction SilentlyContinue)) {
@@ -1650,9 +1944,10 @@ function Invoke-InstallDepsUpdateMode {
             Write-Host ("  skipped   {0,-26} not installed" -f $tool)
             continue
         }
-        Update-ScoopTool -tool $tool -NoPrompt -SkipManifestRefresh -ReportSkip -AssumePresent -IsDryRun $IsDryRun
+        Update-ManagedCatalogTool -tool $tool -NoPrompt -SkipScoopManifestRefresh -ReportSkip -AssumePresent -IsDryRun $IsDryRun
     }
 
+    Write-UnmanagedDependencySummary
     Write-Host ""
     Write-Host "note: pinned binaries (Neovim/lazygit/tree-sitter Linux archives, Hack Nerd Font, Windows Terminal portable), PSFzf, plugins, and configs update via git pull and re-running setup."
 }
@@ -1753,7 +2048,7 @@ Install-Psmux
 
 Section "modern shell (optional, you can stay on Windows PowerShell 5.1)"
 Install-One pwsh
-Update-ScoopTool pwsh
+Update-ManagedCatalogTool pwsh -ReportSkip
 Install-PSFzf
 
 Section "language tooling (for LSP / formatter back-ends)"
