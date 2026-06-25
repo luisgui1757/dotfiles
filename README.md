@@ -407,9 +407,10 @@ After the Lazy restore, deterministic Tree-sitter parser install, and Mason sync
 `setup.sh`/`setup.ps1` job also
 runs the **Tier 2 language smoke** (`tests/nvim/lsp_smoke.lua`): against the
 real Neovim config it asserts (0) no nvim-treesitter parser override for a
-bundled language remains on the runtimepath under `stdpath('data')`, (1) every
-declared treesitter parser is one nvim-treesitter `main` supports, every
-expected parser `.so` and query directory is actually present in
+bundled language remains on the runtimepath under `stdpath('data')`, and no
+managed nvim-treesitter query directory for a bundled language remains in the
+query install output, (1) every declared treesitter parser is one nvim-treesitter
+`main` supports, every expected parser `.so` and query directory is actually present in
 nvim-treesitter's installed output (including upstream paired parsers such as
 PHP's `php_only` and query-only dependencies), and no unexpected
 nvim-treesitter install-output parser `.so` is present under
@@ -430,8 +431,10 @@ Tier 2 syntax probes must prove they still produce real Vim syntax groups. The
 smoke matrix also encodes the
 Neovim-bundled languages (`c`, `lua`, `markdown`, `query`, `vim`): those must
 stay **out** of the install list — and any stale override of them is purged on
-config load (scoped to `stdpath('data')` so Neovim's own install-prefix parsers
-are never touched) — so Neovim's matched built-in parser+query is used instead
+config load (parser files scoped to `stdpath('data')`; query directories scoped
+to nvim-treesitter's managed `get_install_dir("queries")` output, which must
+also live under `stdpath('data')`, so Neovim's own install-prefix runtime is
+never touched) — so Neovim's matched built-in parser+query is used instead
 of an nvim-treesitter parser that can drift from the bundled query (this caught
 a real lua `E5113: Invalid field name "operator"` regression).
 

@@ -272,25 +272,50 @@ return {
       -- install prefix (e.g. <prefix>/lib/nvim/parser/lua.so) and that dir is on
       -- the runtimepath -- so an unscoped delete would wipe Neovim's built-in
       -- parsers. nvim-treesitter installs only under stdpath('data') (its
-      -- `site/parser` and the lazy plugin dir both live there); the built-in
-      -- prefix does not. So scope every delete to stdpath('data').
-      local managed = vim.fs.normalize(vim.fn.stdpath("data")) .. "/"
-      local function purge(pattern)
+      -- `site/parser`, `site/queries`, and lazy plugin dir all live there); the
+      -- built-in prefix does not. So scope every delete to stdpath('data').
+      local managed_data_dir = vim.fs.normalize(vim.fn.stdpath("data")) .. "/"
+      local function purge_managed_bundled_files(pattern)
         for _, path in ipairs(vim.api.nvim_get_runtime_file(pattern, true)) do
           local name = vim.fn.fnamemodify(path, ":t"):gsub("%.so$", ""):gsub("%.revision$", "")
-          if bundled_set[name] and vim.startswith(vim.fs.normalize(path), managed) then
+          if bundled_set[name] and vim.startswith(vim.fs.normalize(path), managed_data_dir) then
             pcall(vim.fn.delete, path)
           end
         end
       end
-      purge("parser/*.so")
+
+      local function managed_query_install_dir()
+        local config_ok, treesitter_config = pcall(require, "nvim-treesitter.config")
+        if config_ok and type(treesitter_config.get_install_dir) == "function" then
+          local dir_ok, dir = pcall(treesitter_config.get_install_dir, "queries")
+          if dir_ok and type(dir) == "string" and dir ~= "" then
+            return dir
+          end
+        end
+        return vim.fs.joinpath(vim.fn.stdpath("data"), "site", "queries")
+      end
+
+      local function purge_managed_bundled_query_dirs()
+        local query_dir = vim.fs.normalize(managed_query_install_dir())
+        if not vim.startswith(query_dir .. "/", managed_data_dir) then
+          return
+        end
+        for _, lang in ipairs(nvim_bundled_parsers) do
+          local path = vim.fs.joinpath(query_dir, lang)
+          if vim.fn.isdirectory(path) == 1 then
+            pcall(vim.fn.delete, path, "rf")
+          end
+        end
+      end
+
+      purge_managed_bundled_files("parser/*.so")
       -- Also drop nvim-treesitter's install bookkeeping so it does not believe a
       -- bundled language is still installed.
-      purge("parser-info/*.revision")
+      purge_managed_bundled_files("parser-info/*.revision")
       -- Upstream dependencies can also install query directories for bundled
       -- languages (for example `cpp` requires `c`). Those query overrides are
       -- managed artifacts too; remove them with the parser files.
-      purge("queries/*")
+      purge_managed_bundled_query_dirs()
 
       -- nvim-treesitter `main` shells out to the `tree-sitter` CLI to compile
       -- each parser. When the CLI is not on PATH (nvim launched from a shell
@@ -334,9 +359,9 @@ return {
               )
             else
               local install_ok = task_or_err:wait(900000)
-              purge("parser/*.so")
-              purge("parser-info/*.revision")
-              purge("queries/*")
+              purge_managed_bundled_files("parser/*.so")
+              purge_managed_bundled_files("parser-info/*.revision")
+              purge_managed_bundled_query_dirs()
               if install_ok ~= true then
                 report_install_problem("nvim-treesitter parser install failed; see the parser build errors above")
               end

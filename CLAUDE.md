@@ -173,21 +173,26 @@ that violates one of these, fix it instead of disabling the test.
     overrides the built-in and breaks the bundled query (`E5113: Invalid field
     name "operator"` on lua). Excluding them stops future installs, but the
     config ALSO **purges** any nvim-treesitter-managed `parser/<bundled>.so`
-    already present (a leftover from an older config, or restored from a CI
-    cache, still overrides the built-in). The purge is **scoped to
-    `stdpath('data')`** (nvim-treesitter installs under `…/site`; the install
-    prefix does not) — an unscoped delete would wipe Neovim's OWN built-in
-    parsers. `c` and `vim` are bundled but not auto-started, so the config starts
-    them via `nvim_bundled_started_here = { "c", "vim" }`. See "Add a treesitter
-    parser". Guarded by `treesitter_spec.lua`, `language_smoke_spec.lua`, and the
-    Tier-2 `lsp_smoke.lua` runtime preflight, which synchronously bootstraps
-    parsers and opens every language-matrix fixture under the production config
-    so missing parser builds or parser/query runtime failures cannot hide behind
-    non-LSP rows. The preflight also rejects unexpected nvim-treesitter-managed
+    already present and any managed `queries/<bundled>/` install-output
+    directory already present (leftovers from an older config, or restored from a
+    CI cache, still override the matched built-in parser/query pair). Parser-file
+    deletes are **scoped to `stdpath('data')`** (nvim-treesitter installs under
+    `…/site`; the install prefix does not), and query-directory deletes are
+    **scoped to nvim-treesitter's `get_install_dir("queries")` output**, which
+    must also live under `stdpath('data')`. An unscoped delete would wipe
+    Neovim's OWN built-in runtime. `c` and `vim` are bundled but not
+    auto-started, so the config starts them via
+    `nvim_bundled_started_here = { "c", "vim" }`. See "Add a treesitter parser".
+    Guarded by `treesitter_spec.lua`, `language_smoke_spec.lua`, and the Tier-2
+    `lsp_smoke.lua` runtime preflight, which synchronously bootstraps parsers and
+    opens every language-matrix fixture under the production config so missing
+    parser builds or parser/query runtime failures cannot hide behind non-LSP
+    rows. The preflight also rejects unexpected nvim-treesitter-managed
     install-output parser `.so` files under `stdpath('data')/site/parser`,
-    requires parser and query install output for the non-bundled upstream
-    dependency set (for example PHP's paired `php_only` parser), and purges
-    bundled parser/query overrides after setup installs complete.
+    rejects managed bundled query install-output directories, requires parser and
+    query install output for the non-bundled upstream dependency set (for example
+    PHP's paired `php_only` parser), and purges bundled parser/query overrides
+    after setup installs complete.
 20. **Repo text stays LF-only.** `.gitattributes` force-normalizes text files to
     LF so Windows checkouts do not CRLF-corrupt shell/WSL entry points, and
     `.editorconfig` must not reintroduce `end_of_line = crlf` exceptions (even

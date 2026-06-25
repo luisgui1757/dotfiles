@@ -156,21 +156,110 @@ describe("treesitter main migration", function()
       "must enumerate the bundled parser (.so) set to purge"
     )
     assert.is_truthy(
-      src:match('purge%("parser/%*%.so"%)'),
+      src:match('purge_managed_bundled_files%("parser/%*%.so"%)'),
       "must scan the runtimepath for stale bundled parser overrides"
     )
     assert.is_truthy(src:match("vim%.fn%.delete"), "must delete stale bundled parser overrides")
     assert.is_truthy(
-      src:match('purge%("queries/%*"%)'),
-      "must delete stale bundled query overrides as well as parser files"
+      src:match("local function purge_managed_bundled_query_dirs%(%)")
+        and src:match('treesitter_config%.get_install_dir%("queries"%)')
+        and src:match('vim%.fn%.delete, path, "rf"'),
+      "must recursively delete managed stale bundled query directories as well as parser files"
     )
     -- CRITICAL safety: deletes MUST be scoped to stdpath('data'). Neovim ships
     -- its own bundled parsers as .so files under the install prefix, on the
     -- runtimepath -- an unscoped purge would wipe Neovim's built-in parsers.
     assert.is_truthy(
       src:match("vim%.startswith") and src:match('vim%.fn%.stdpath%("data"%)'),
-      "purge must be scoped to stdpath('data') so Neovim's built-in parsers are never deleted"
+      "purge must be scoped to stdpath('data') so Neovim's built-in parsers/queries are never deleted"
     )
+  end)
+
+  it("recursively purges stale managed bundled query directories", function()
+    local old_tree_sitter = package.loaded["nvim-treesitter"]
+    local old_tree_sitter_config = package.loaded["nvim-treesitter.config"]
+    local old_tree_sitter_parsers = package.loaded["nvim-treesitter.parsers"]
+    local old_sync = vim.env.DOTFILES_TREESITTER_SYNC_INSTALL
+    local old_notify = vim.notify
+    local old_executable = vim.fn.executable
+    local old_stdpath = vim.fn.stdpath
+    local temp_root = vim.fn.tempname()
+    local data_root = vim.fs.joinpath(temp_root, "nvim-data")
+    local query_dir = vim.fs.joinpath(data_root, "site", "queries")
+
+    vim.fn.mkdir(vim.fs.joinpath(query_dir, "c"), "p")
+    vim.fn.mkdir(vim.fs.joinpath(query_dir, "lua"), "p")
+    vim.fn.mkdir(vim.fs.joinpath(query_dir, "python"), "p")
+    vim.fn.writefile({ "; stale bundled query" }, vim.fs.joinpath(query_dir, "c", "highlights.scm"))
+    vim.fn.writefile({ "; stale bundled query" }, vim.fs.joinpath(query_dir, "lua", "highlights.scm"))
+    vim.fn.writefile({ "; non-bundled query" }, vim.fs.joinpath(query_dir, "python", "highlights.scm"))
+
+    package.loaded["nvim-treesitter"] = {
+      install = function()
+        return {
+          wait = function()
+            return true
+          end,
+        }
+      end,
+      indentexpr = function()
+        return 0
+      end,
+    }
+    package.loaded["nvim-treesitter.config"] = {
+      get_install_dir = function(name)
+        return vim.fs.joinpath(data_root, "site", name)
+      end,
+      norm_languages = function(parsers, options)
+        assert_same_list(parsers, required)
+        assert.are.same({ unsupported = true }, options)
+        return parsers
+      end,
+    }
+    package.loaded["nvim-treesitter.parsers"] = {}
+    vim.env.DOTFILES_TREESITTER_SYNC_INSTALL = "1"
+    vim.notify = function() end
+    vim.fn.executable = function(name)
+      if name == "tree-sitter" then
+        return 1
+      end
+      return old_executable(name)
+    end
+    vim.fn.stdpath = function(name)
+      if name == "data" then
+        return data_root
+      end
+      return old_stdpath(name)
+    end
+
+    local ok, spec = pcall(dofile, repo_root .. "/nvim/lua/plugins/treesitter.lua")
+    local config_ok, config_err = false, nil
+    if ok then
+      config_ok, config_err = pcall(spec[1].config)
+    end
+
+    package.loaded["nvim-treesitter"] = old_tree_sitter
+    package.loaded["nvim-treesitter.config"] = old_tree_sitter_config
+    package.loaded["nvim-treesitter.parsers"] = old_tree_sitter_parsers
+    if old_sync == nil then
+      vim.env.DOTFILES_TREESITTER_SYNC_INSTALL = nil
+    else
+      vim.env.DOTFILES_TREESITTER_SYNC_INSTALL = old_sync
+    end
+    vim.notify = old_notify
+    vim.fn.executable = old_executable
+    vim.fn.stdpath = old_stdpath
+
+    local c_query_dir = vim.fn.isdirectory(vim.fs.joinpath(query_dir, "c"))
+    local lua_query_dir = vim.fn.isdirectory(vim.fs.joinpath(query_dir, "lua"))
+    local python_query_dir = vim.fn.isdirectory(vim.fs.joinpath(query_dir, "python"))
+    vim.fn.delete(temp_root, "rf")
+
+    assert.is_true(ok)
+    assert.is_true(config_ok, tostring(config_err))
+    assert.are.equal(0, c_query_dir)
+    assert.are.equal(0, lua_query_dir)
+    assert.are.equal(1, python_query_dir)
   end)
 
   it("still covers the auto-started bundled filetypes so they keep indentexpr (no regression)", function()

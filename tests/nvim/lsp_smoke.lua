@@ -9,8 +9,9 @@
 -- Exits nonzero (cquit) on any failure so the CI step fails.
 --
 -- Gates (all fail the run under strict):
---   (0) no `parser/<bundled>.so` override remains on the runtimepath (the config
---       purges them; a leftover re-creates the E5113 mismatch),
+--   (0) no `parser/<bundled>.so` or managed `queries/<bundled>/` override
+--       remains on the runtimepath/install output (the config purges them; a
+--       leftover re-creates the E5113 mismatch),
 --   (1) every installed parser is one nvim-treesitter `main` supports,
 --   (2) every non-gated LSP attaches, and every gated LSP attaches ON its target
 --       OS (powershell_es -> Windows); a gated server is skipped only OFF target,
@@ -124,15 +125,17 @@ local ok, err = pcall(function()
   end
 
   -- (0) Bundled-parser override preflight. The production config purges any
-  -- nvim-treesitter parser for a Neovim-bundled language on load; after that, no
-  -- nvim-treesitter-managed `parser/<bundled>.so` may remain. A leftover (e.g.
-  -- restored from a CI cache, or installed by an older config) overrides
-  -- Neovim's matched built-in parser and re-creates the E5113 query/parser
-  -- mismatch this whole change exists to prevent. Scope to stdpath('data'):
-  -- Neovim's OWN bundled parser .so files live under the install prefix and are
-  -- legitimately on the runtimepath -- they must NOT trip this gate.
+  -- nvim-treesitter parser/query output for a Neovim-bundled language on load;
+  -- after that, no nvim-treesitter-managed `parser/<bundled>.so` or
+  -- `queries/<bundled>/` may remain. A leftover (e.g. restored from a CI cache,
+  -- or installed by an older config) overrides Neovim's matched built-in
+  -- parser/query pair and re-creates the E5113 mismatch this whole change exists
+  -- to prevent. Scope parser .so checks to stdpath('data'): Neovim's OWN bundled
+  -- parser .so files live under the install prefix and are legitimately on the
+  -- runtimepath -- they must NOT trip this gate.
   local managed = vim.fs.normalize(vim.fn.stdpath("data")) .. "/"
-  for _, lang in ipairs({ "c", "lua", "markdown", "markdown_inline", "query", "vim", "vimdoc" }) do
+  local bundled_parsers = { "c", "lua", "markdown", "markdown_inline", "query", "vim", "vimdoc" }
+  for _, lang in ipairs(bundled_parsers) do
     local overrides = {}
     for _, so in ipairs(vim.api.nvim_get_runtime_file("parser/" .. lang .. ".so", true)) do
       if vim.startswith(vim.fs.normalize(so), managed) then
@@ -143,6 +146,28 @@ local ok, err = pcall(function()
       fail("nvim-treesitter override still present for bundled " .. lang .. ": " .. table.concat(overrides, ", "))
     else
       note("no nvim-treesitter override for bundled " .. lang)
+    end
+  end
+  local config_ok, treesitter_config = pcall(require, "nvim-treesitter.config")
+  local query_dir_ok, query_dir = false, nil
+  if config_ok and type(treesitter_config.get_install_dir) == "function" then
+    query_dir_ok, query_dir = pcall(treesitter_config.get_install_dir, "queries")
+  end
+  if not query_dir_ok or type(query_dir) ~= "string" or query_dir == "" then
+    fail("cannot inspect nvim-treesitter query install output for bundled overrides")
+  else
+    local normalized_query_dir = vim.fs.normalize(query_dir) .. "/"
+    if not vim.startswith(normalized_query_dir, managed) then
+      fail("nvim-treesitter query install output is outside stdpath('data'): " .. query_dir)
+    else
+      for _, lang in ipairs(bundled_parsers) do
+        local query_path = vim.fs.joinpath(query_dir, lang)
+        if vim.fn.isdirectory(query_path) == 1 then
+          fail("nvim-treesitter query override still present for bundled " .. lang .. ": " .. query_path)
+        else
+          note("no nvim-treesitter query override for bundled " .. lang)
+        end
+      end
     end
   end
 
