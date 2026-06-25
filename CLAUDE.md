@@ -697,15 +697,24 @@ save only**. The next plain `:w` formats normally. Implemented in
   installs. Update mode still skips git pull, chezmoi apply, Lazy restore, Lazy
   sync, and Lazy update. `install-deps --update` updates only present catalog
   tools through scoped per-package manager commands
-  (`brew upgrade <formula>`, native Linux package upgrade commands, or
-  `scoop update <pkg>` after one manifest refresh). It must not run blanket
-  upgrades such as `brew upgrade`, `apt upgrade`, or `scoop update *`, and it
-  must not touch pinned direct downloads, PSFzf, `lazy-lock.json`, or configs.
-  On native Linux without Linuxbrew or Alpine/apk, `nvim`, `lazygit`,
-  `starship`, and `tree-sitter` are pinned direct-download binaries and stay
-  out of the update path. Linuxbrew updates them through
-  `brew upgrade <formula>`; Alpine updates its native `neovim`, `lazygit`,
-  `starship`, and `tree-sitter` packages through apk.
+  (`brew upgrade <formula>`, native Linux package upgrade commands, Windows
+  `scoop update <pkg>` after one manifest refresh, Windows
+  `winget upgrade --id <id> -e`, or Windows `choco upgrade <pkg> -y`). Winget
+  updates require both exact ownership and an exact
+  `winget list --upgrade-available --id <id> -e --accept-source-agreements`
+  availability row; no matching available update is a successful skip, while a
+  failed availability query appends to `InstallFailures`. It must not run
+  blanket upgrades such as `brew upgrade`, `apt upgrade`,
+  `scoop update *`, `winget upgrade --all`, or `choco upgrade all`, and it must
+  not touch pinned direct downloads, PSFzf, `lazy-lock.json`, or configs. On
+  Windows, a present catalog tool is updated only when Scoop, winget, or
+  Chocolatey claims that exact package; otherwise update mode reports it as
+  unmanaged with its resolved executable path and exits successfully unless an
+  attempted scoped update failed. On native Linux without Linuxbrew or
+  Alpine/apk, `nvim`, `lazygit`, `starship`, and `tree-sitter` are pinned
+  direct-download binaries and stay out of the update path. Linuxbrew updates
+  them through `brew upgrade <formula>`; Alpine updates its native `neovim`,
+  `lazygit`, `starship`, and `tree-sitter` packages through apk.
 - **Polaris is setup Phase 6/6 and is opt-out, not experimental.** Full setup
   (`--all` / `-All`) applies Polaris `0.1.1` at commit
   `489dcc6f991ddcff63c460a433e983264dc54cf7` unless
@@ -834,11 +843,19 @@ save only**. The next plain `:w` formats normally. Implemented in
   MSIX-restricted hosts. The portable fallback is SHA-256 verified before
   extraction and adds `%LOCALAPPDATA%\Programs\WindowsTerminal` to both the
   current process PATH and persistent User PATH.
-- **`Update-ScoopTool` is the only scoop update path.** It is intentionally
-  single-package and consent-gated for the PowerShell 7 keep-latest path; never
-  replace it with `scoop update *` or another blanket scoop upgrade. Failed
-  manifest refreshes or package updates append to `InstallFailures`, so update
-  mode exits nonzero when a scoped refresh did not actually succeed.
+- **`Update-ManagedCatalogTool` is the Windows update dispatcher.** It detects
+  exact ownership through Scoop, winget, then Chocolatey, and dispatches only
+  one scoped package update. Winget ownership is not enough to run an update:
+  `Get-WingetPackageUpgradeState` must first prove exact upgrade availability
+  with `winget list --upgrade-available --id <id> -e`; no matching update is an
+  idempotent skip, and a failed availability query is a real update failure.
+  `Update-ScoopTool` remains the only Scoop-specific update path and is
+  intentionally single-package; never replace it with `scoop update *`,
+  `winget upgrade --all`, `choco upgrade all`, or another blanket upgrade.
+  Failed manifest refreshes, availability checks, or package updates append to
+  `InstallFailures`, so update mode exits nonzero when a scoped refresh did not
+  actually succeed. Present tools outside Scoop/winget/Chocolatey are reported
+  as unmanaged and do not count as successful dotfiles-owned updates.
 - **Windows CI uses Scoop's documented elevated bootstrap.** GitHub-hosted
   `windows-2025` runners are elevated, and Scoop blocks elevated install by
   default. `Install-Scoop` detects elevation and runs the official installer

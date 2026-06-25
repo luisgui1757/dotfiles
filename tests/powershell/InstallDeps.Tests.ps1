@@ -27,6 +27,7 @@ BeforeAll {
         }
 
         $script:InstallFailures = @()
+        $script:UnmanagedDependencies = @()
         $script:InstallAttempts = @()
         $script:ToolInstalled = $false
         $global:LASTEXITCODE = 0
@@ -761,6 +762,317 @@ Describe "install-deps.ps1" {
         $output | Should -Not -Match 'scoop update \*'
         $script:ScoopArgs | Should -Contain 'list pwsh'
         ($script:ScoopArgs | Where-Object { $_ -like 'update*' }).Count | Should -Be 0
+    }
+
+    It "dry-runs a scoped PowerShell winget update when winget owns pwsh" {
+        . $script:ImportInstallDepsForTest -DryRun
+        $script:WingetArgs = @()
+
+        Mock -CommandName Get-Command -MockWith {
+            param([string]$Name)
+            if ($Name -eq 'winget') {
+                return [pscustomobject]@{ Name = $Name; Source = $Name }
+            }
+            if ($Name -eq 'pwsh') {
+                return [pscustomobject]@{ Name = $Name; Source = 'C:\Program Files\PowerShell\7\pwsh.exe' }
+            }
+            return $null
+        }
+        Mock -CommandName winget -MockWith {
+            $joined = $args -join ' '
+            $script:WingetArgs += $joined
+            if ($joined -eq 'list --id Microsoft.PowerShell -e --accept-source-agreements') {
+                $global:LASTEXITCODE = 0
+                return 'PowerShell Microsoft.PowerShell 7.5.0 winget'
+            }
+            if ($joined -eq 'list --upgrade-available --id Microsoft.PowerShell -e --accept-source-agreements') {
+                $global:LASTEXITCODE = 0
+                return 'PowerShell Microsoft.PowerShell 7.5.0 7.6.2 winget'
+            }
+            $global:LASTEXITCODE = 0
+        }
+
+        $output = & {
+            Invoke-InstallDepsUpdateMode -SpecList @([pscustomobject]@{ Tool = 'pwsh'; Kind = 'tool'; Binary = 'pwsh'; Module = '' }) -PresenceTester {
+                param([string]$Tool)
+                return ($Tool -eq 'pwsh')
+            } -IsDryRun $true
+        } 6>&1 | Out-String
+
+        $output | Should -Match 'winget upgrade --id Microsoft\.PowerShell -e --accept-source-agreements --accept-package-agreements --silent'
+        $output | Should -Not -Match 'winget upgrade --all|scoop update \*|choco upgrade all'
+        $script:WingetArgs | Should -Contain 'list --id Microsoft.PowerShell -e --accept-source-agreements'
+        $script:WingetArgs | Should -Contain 'list --upgrade-available --id Microsoft.PowerShell -e --accept-source-agreements'
+        ($script:WingetArgs | Where-Object { $_ -like 'upgrade*' }).Count | Should -Be 0
+        $script:InstallFailures.Count | Should -Be 0
+    }
+
+    It "skips winget-owned PowerShell when winget has no upgrade available" {
+        . $script:ImportInstallDepsForTest
+        $script:WingetArgs = @()
+
+        Mock -CommandName Get-Command -MockWith {
+            param([string]$Name)
+            if ($Name -eq 'winget') {
+                return [pscustomobject]@{ Name = $Name; Source = $Name }
+            }
+            if ($Name -eq 'pwsh') {
+                return [pscustomobject]@{ Name = $Name; Source = 'C:\Program Files\PowerShell\7\pwsh.exe' }
+            }
+            return $null
+        }
+        Mock -CommandName winget -MockWith {
+            $joined = $args -join ' '
+            $script:WingetArgs += $joined
+            switch ($joined) {
+                'list --id Microsoft.PowerShell -e --accept-source-agreements' {
+                    $global:LASTEXITCODE = 0
+                    return 'PowerShell Microsoft.PowerShell 7.6.2 winget'
+                }
+                'list --upgrade-available --id Microsoft.PowerShell -e --accept-source-agreements' {
+                    $global:LASTEXITCODE = 0
+                    return ''
+                }
+                default {
+                    $global:LASTEXITCODE = 0
+                }
+            }
+        }
+
+        $output = & { Update-ManagedCatalogTool pwsh -AssumePresent -NoPrompt -ReportSkip -IsDryRun $false } 3>&1 6>&1 | Out-String
+
+        $output | Should -Match 'no winget upgrade available'
+        $script:WingetArgs | Should -Contain 'list --upgrade-available --id Microsoft.PowerShell -e --accept-source-agreements'
+        ($script:WingetArgs | Where-Object { $_ -like 'upgrade*' }).Count | Should -Be 0
+        $script:InstallFailures.Count | Should -Be 0
+    }
+
+    It "records failed winget upgrade availability checks" {
+        . $script:ImportInstallDepsForTest
+        $script:WingetArgs = @()
+
+        Mock -CommandName Get-Command -MockWith {
+            param([string]$Name)
+            if ($Name -eq 'winget') {
+                return [pscustomobject]@{ Name = $Name; Source = $Name }
+            }
+            if ($Name -eq 'pwsh') {
+                return [pscustomobject]@{ Name = $Name; Source = 'C:\Program Files\PowerShell\7\pwsh.exe' }
+            }
+            return $null
+        }
+        Mock -CommandName winget -MockWith {
+            $joined = $args -join ' '
+            $script:WingetArgs += $joined
+            switch ($joined) {
+                'list --id Microsoft.PowerShell -e --accept-source-agreements' {
+                    $global:LASTEXITCODE = 0
+                    return 'PowerShell Microsoft.PowerShell 7.6.2 winget'
+                }
+                'list --upgrade-available --id Microsoft.PowerShell -e --accept-source-agreements' {
+                    $global:LASTEXITCODE = 44
+                    return
+                }
+                default {
+                    $global:LASTEXITCODE = 0
+                }
+            }
+        }
+
+        $output = & { Update-ManagedCatalogTool pwsh -AssumePresent -NoPrompt -ReportSkip -IsDryRun $false } 3>&1 6>&1 | Out-String
+
+        $output | Should -Match 'winget upgrade availability check of Microsoft\.PowerShell failed'
+        $script:WingetArgs | Should -Contain 'list --upgrade-available --id Microsoft.PowerShell -e --accept-source-agreements'
+        ($script:WingetArgs | Where-Object { $_ -like 'upgrade*' }).Count | Should -Be 0
+        $script:InstallFailures.Count | Should -Be 1
+        $script:InstallFailures[0].Tool | Should -Be 'pwsh'
+        $script:InstallFailures[0].Pm | Should -Be 'winget'
+        $script:InstallFailures[0].Pkg | Should -Be 'Microsoft.PowerShell'
+        $script:InstallFailures[0].ExitCode | Should -Be 44
+    }
+
+    It "dry-runs a scoped PowerShell Chocolatey update when Chocolatey owns pwsh" {
+        . $script:ImportInstallDepsForTest -DryRun
+        $script:ChocoArgs = @()
+
+        Mock -CommandName Get-Command -MockWith {
+            param([string]$Name)
+            if ($Name -eq 'choco') {
+                return [pscustomobject]@{ Name = $Name; Source = $Name }
+            }
+            if ($Name -eq 'pwsh') {
+                return [pscustomobject]@{ Name = $Name; Source = 'C:\ProgramData\chocolatey\bin\pwsh.exe' }
+            }
+            return $null
+        }
+        Mock -CommandName choco -MockWith {
+            $joined = $args -join ' '
+            $script:ChocoArgs += $joined
+            if ($joined -eq 'list powershell-core --local-only --exact --limit-output') {
+                $global:LASTEXITCODE = 0
+                return 'powershell-core|7.5.0'
+            }
+            $global:LASTEXITCODE = 0
+        }
+
+        $output = & { Update-ManagedCatalogTool pwsh -AssumePresent -NoPrompt -ReportSkip -IsDryRun $true } 6>&1 | Out-String
+
+        $output | Should -Match 'choco upgrade powershell-core -y'
+        $output | Should -Not -Match 'winget upgrade --all|scoop update \*|choco upgrade all'
+        $script:ChocoArgs | Should -Contain 'list powershell-core --local-only --exact --limit-output'
+        ($script:ChocoArgs | Where-Object { $_ -like 'upgrade*' }).Count | Should -Be 0
+        $script:InstallFailures.Count | Should -Be 0
+    }
+
+    It "reports present unmanaged PowerShell instead of pretending update ownership" {
+        . $script:ImportInstallDepsForTest -DryRun
+
+        Mock -CommandName Get-Command -MockWith {
+            param([string]$Name)
+            if ($Name -eq 'pwsh') {
+                return [pscustomobject]@{ Name = $Name; Source = 'C:\Manual\PowerShell\pwsh.exe' }
+            }
+            return $null
+        }
+
+        $output = & { Update-ManagedCatalogTool pwsh -AssumePresent -ReportSkip -IsDryRun $true } 3>&1 6>&1 | Out-String
+
+        $output | Should -Match 'present at C:\\Manual\\PowerShell\\pwsh\.exe'
+        $output | Should -Match 'Scoop, winget, and Chocolatey do not claim it'
+        $script:InstallFailures.Count | Should -Be 0
+        $script:UnmanagedDependencies.Count | Should -Be 1
+        $script:UnmanagedDependencies[0].Tool | Should -Be 'pwsh'
+    }
+
+    It "records failed winget package updates" {
+        . $script:ImportInstallDepsForTest
+        $script:WingetArgs = @()
+
+        Mock -CommandName Get-Command -MockWith {
+            param([string]$Name)
+            if ($Name -eq 'winget') {
+                return [pscustomobject]@{ Name = $Name; Source = $Name }
+            }
+            if ($Name -eq 'pwsh') {
+                return [pscustomobject]@{ Name = $Name; Source = 'C:\Program Files\PowerShell\7\pwsh.exe' }
+            }
+            return $null
+        }
+        Mock -CommandName winget -MockWith {
+            $joined = $args -join ' '
+            $script:WingetArgs += $joined
+            switch ($joined) {
+                'list --id Microsoft.PowerShell -e --accept-source-agreements' {
+                    $global:LASTEXITCODE = 0
+                    return 'PowerShell Microsoft.PowerShell 7.5.0 winget'
+                }
+                'list --upgrade-available --id Microsoft.PowerShell -e --accept-source-agreements' {
+                    $global:LASTEXITCODE = 0
+                    return 'PowerShell Microsoft.PowerShell 7.5.0 7.6.2 winget'
+                }
+                'upgrade --id Microsoft.PowerShell -e --accept-source-agreements --accept-package-agreements --silent' {
+                    $global:LASTEXITCODE = 55
+                    return
+                }
+                default {
+                    $global:LASTEXITCODE = 0
+                }
+            }
+        }
+
+        & { Update-ManagedCatalogTool pwsh -AssumePresent -NoPrompt -IsDryRun $false } 3>&1 6>&1 | Out-Null
+
+        $script:WingetArgs | Should -Contain 'upgrade --id Microsoft.PowerShell -e --accept-source-agreements --accept-package-agreements --silent'
+        $script:InstallFailures.Count | Should -Be 1
+        $script:InstallFailures[0].Tool | Should -Be 'pwsh'
+        $script:InstallFailures[0].Pm | Should -Be 'winget'
+        $script:InstallFailures[0].Pkg | Should -Be 'Microsoft.PowerShell'
+        $script:InstallFailures[0].ExitCode | Should -Be 55
+    }
+
+    It "treats winget update-not-applicable during upgrade as a clean no-op" {
+        . $script:ImportInstallDepsForTest
+        $script:WingetArgs = @()
+
+        Mock -CommandName Get-Command -MockWith {
+            param([string]$Name)
+            if ($Name -eq 'winget') {
+                return [pscustomobject]@{ Name = $Name; Source = $Name }
+            }
+            if ($Name -eq 'pwsh') {
+                return [pscustomobject]@{ Name = $Name; Source = 'C:\Program Files\PowerShell\7\pwsh.exe' }
+            }
+            return $null
+        }
+        Mock -CommandName winget -MockWith {
+            $joined = $args -join ' '
+            $script:WingetArgs += $joined
+            switch ($joined) {
+                'list --id Microsoft.PowerShell -e --accept-source-agreements' {
+                    $global:LASTEXITCODE = 0
+                    return 'PowerShell Microsoft.PowerShell 7.5.0 winget'
+                }
+                'list --upgrade-available --id Microsoft.PowerShell -e --accept-source-agreements' {
+                    $global:LASTEXITCODE = 0
+                    return 'PowerShell Microsoft.PowerShell 7.5.0 7.6.2 winget'
+                }
+                'upgrade --id Microsoft.PowerShell -e --accept-source-agreements --accept-package-agreements --silent' {
+                    $global:LASTEXITCODE = -1978335189
+                    return 'No applicable update found.'
+                }
+                default {
+                    $global:LASTEXITCODE = 0
+                }
+            }
+        }
+
+        $output = & { Update-ManagedCatalogTool pwsh -AssumePresent -NoPrompt -IsDryRun $false } 3>&1 6>&1 | Out-String
+
+        $script:WingetArgs | Should -Contain 'upgrade --id Microsoft.PowerShell -e --accept-source-agreements --accept-package-agreements --silent'
+        $output | Should -Match 'no winget upgrade available'
+        $script:InstallFailures.Count | Should -Be 0
+    }
+
+    It "records failed Chocolatey package updates" {
+        . $script:ImportInstallDepsForTest
+        $script:ChocoArgs = @()
+
+        Mock -CommandName Get-Command -MockWith {
+            param([string]$Name)
+            if ($Name -eq 'choco') {
+                return [pscustomobject]@{ Name = $Name; Source = $Name }
+            }
+            if ($Name -eq 'pwsh') {
+                return [pscustomobject]@{ Name = $Name; Source = 'C:\ProgramData\chocolatey\bin\pwsh.exe' }
+            }
+            return $null
+        }
+        Mock -CommandName choco -MockWith {
+            $joined = $args -join ' '
+            $script:ChocoArgs += $joined
+            switch ($joined) {
+                'list powershell-core --local-only --exact --limit-output' {
+                    $global:LASTEXITCODE = 0
+                    return 'powershell-core|7.5.0'
+                }
+                'upgrade powershell-core -y' {
+                    $global:LASTEXITCODE = 66
+                    return
+                }
+                default {
+                    $global:LASTEXITCODE = 0
+                }
+            }
+        }
+
+        & { Update-ManagedCatalogTool pwsh -AssumePresent -NoPrompt -IsDryRun $false } 3>&1 6>&1 | Out-Null
+
+        $script:ChocoArgs | Should -Contain 'upgrade powershell-core -y'
+        $script:InstallFailures.Count | Should -Be 1
+        $script:InstallFailures[0].Tool | Should -Be 'pwsh'
+        $script:InstallFailures[0].Pm | Should -Be 'choco'
+        $script:InstallFailures[0].Pkg | Should -Be 'powershell-core'
+        $script:InstallFailures[0].ExitCode | Should -Be 66
     }
 
     It "dry-runs catalog update for present Scoop tools and skips absent tools" {
