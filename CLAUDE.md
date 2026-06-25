@@ -218,8 +218,8 @@ to lazy-loading (`event` / `cmd` / `keys` / `ft`). Only `rose-pine` may set
 > under `cmd = { … }`. Those `cmd` triggers are load-bearing — the setup phase
 > runs `nvim --headless +MasonToolsInstallSync`, and `VeryLazy` never fires
 > without a UI, so without the `cmd` trigger that command is `E492: Not an
-> editor command`. Keep `MasonToolsInstallSync`/`MasonToolsUpdate` in the `cmd`
-> list (guarded by `lsp_spec.lua`).
+> editor command`. Keep `MasonToolsInstallSync`/`MasonToolsUpdateSync` in the
+> `cmd` list (guarded by `lsp_spec.lua`).
 
 ### Add a new formatter
 
@@ -333,7 +333,7 @@ intentional dependency maintenance that reviews and commits a lockfile diff.
 ### Update Mason-installed tools across machines
 
 ```bash
-nvim --headless "+MasonToolsUpdate" +qa
+nvim --headless "+MasonToolsUpdateSync" +qa
 ```
 
 There's no machine-pinned lockfile for Mason itself — `mason-tool-installer`
@@ -676,9 +676,12 @@ save only**. The next plain `:w` formats normally. Implemented in
   per-tool functions.
 - **`--update` is a scoped drift-edge refresh, not a repo update.**
   `setup.sh --update` / `setup.ps1 -Update` run only `install-deps --update`
-  and `nvim --headless +MasonToolsUpdate +qa`. They skip git pull, chezmoi
-  apply, Lazy restore, Lazy sync, and Lazy update. `install-deps --update` updates only
-  present catalog tools through scoped per-package manager commands
+  and `nvim --headless +MasonToolsUpdateSync +qa`. The Mason command is
+  synchronous on purpose; the async update command can let headless Neovim exit
+  while package installs are still running, which Mason reports as aborted
+  installs. Update mode still skips git pull, chezmoi apply, Lazy restore, Lazy
+  sync, and Lazy update. `install-deps --update` updates only present catalog
+  tools through scoped per-package manager commands
   (`brew upgrade <formula>`, native Linux package upgrade commands, or
   `scoop update <pkg>` after one manifest refresh). It must not run blanket
   upgrades such as `brew upgrade`, `apt upgrade`, or `scoop update *`, and it

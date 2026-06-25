@@ -1376,7 +1376,7 @@ function Invoke-SetupUpdateMode {
     }
     if (-not $NvimRunner) {
         $NvimRunner = {
-            & nvim --headless "+MasonToolsUpdate" "+qa"
+            & nvim --headless "+MasonToolsUpdateSync" "+qa"
         }
     }
 
@@ -1401,7 +1401,7 @@ function Invoke-SetupUpdateMode {
     if (-not $SkipNvimPhase) {
         Phase "Update 2/2: update Mason LSP servers + formatters"
         if ($IsDryRun) {
-            Write-Host "  would: nvim --headless +MasonToolsUpdate +qa"
+            Write-Host "  would: nvim --headless +MasonToolsUpdateSync +qa"
         } elseif (& $CommandTester 'nvim') {
             Invoke-NvimCommandOrFail -Label "Mason update" -IsBestEffort $IsBestEffort -Block $NvimRunner
         } else {

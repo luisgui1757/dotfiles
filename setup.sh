@@ -505,9 +505,9 @@ run_update_mode() {
     if [[ "$SKIP_NVIM" -eq 0 ]]; then
         phase "Update 2/2: update Mason LSP servers + formatters"
         if [[ "$DRY_RUN" -eq 1 ]]; then
-            echo "  would: nvim --headless +MasonToolsUpdate +qa"
+            echo "  would: nvim --headless +MasonToolsUpdateSync +qa"
         elif command -v nvim >/dev/null 2>&1; then
-            run_or_fail "Mason update" nvim --headless "+MasonToolsUpdate" "+qa"
+            run_or_fail "Mason update" nvim --headless "+MasonToolsUpdateSync" "+qa"
         else
             echo "  skipped   Mason update: nvim not on PATH"
         fi

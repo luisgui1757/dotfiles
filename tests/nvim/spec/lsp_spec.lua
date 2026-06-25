@@ -62,11 +62,11 @@ describe("LSP server coverage", function()
   end)
 
   -- setup.{sh,ps1} run `nvim --headless +MasonToolsInstallSync` (phase 5) and
-  -- CLAUDE.md runs `+MasonToolsUpdate`. mason-tool-installer is event=VeryLazy,
+  -- update mode runs `+MasonToolsUpdateSync`. mason-tool-installer is event=VeryLazy,
   -- which never fires without a UI, so each command MUST also be a lazy `cmd`
   -- load-trigger or the headless invocation dies with "E492: Not an editor
   -- command". Regression guard for exactly that.
-  for _, mcmd in ipairs({ "MasonToolsInstallSync", "MasonToolsUpdate" }) do
+  for _, mcmd in ipairs({ "MasonToolsInstallSync", "MasonToolsUpdateSync" }) do
     it("registers " .. mcmd .. " as a cmd load-trigger (headless setup phase)", function()
       assert.is_truthy(
         code_only:find(mcmd, 1, true),
