@@ -6,8 +6,9 @@
 --   * conform's formatters_by_ft matches the matrix,
 --   * the matrix's parser is one the repo actually installs (treesitter_parsers).
 --
--- The Tier-2 LSP-attach smoke (needs Mason servers + runtimes) is a separate
--- spec gated on DOTFILES_LSP_SMOKE and only runs in the e2e jobs.
+-- The Tier-2 production smoke (needs Mason servers + runtimes) is a separate
+-- script gated on DOTFILES_LSP_SMOKE and only runs in the e2e jobs; it covers
+-- LSP attach plus formatter/LSP compatibility against real tools.
 local repo_root = _G.TEST_REPO_ROOT
 local matrix = dofile(repo_root .. "/tests/nvim/language_matrix.lua")
 local fixtures = repo_root .. "/tests/nvim/fixtures/"
@@ -24,6 +25,13 @@ local function installed_parsers()
     set[p] = true
   end
   return set
+end
+
+local function lsp_smoke_source()
+  local fh = assert(io.open(repo_root .. "/tests/nvim/lsp_smoke.lua", "r"))
+  local src = fh:read("*a")
+  fh:close()
+  return src
 end
 
 describe("language smoke (Tier 1)", function()
@@ -61,4 +69,34 @@ describe("language smoke (Tier 1)", function()
       end
     end
   end
+
+  it("Tier 2 proves declared parsers are actually installed before capture checks", function()
+    local src = lsp_smoke_source()
+    assert.is_truthy(
+      src:find("cfg.norm_languages(explicit_parsers, { unsupported = true })", 1, true),
+      "strict smoke must audit nvim-treesitter's normalized parser dependency list"
+    )
+    assert.is_truthy(
+      src:find('nts.get_installed("parsers")', 1, true),
+      "strict smoke must inspect nvim-treesitter's installed parser output"
+    )
+    assert.is_truthy(
+      src:find("expected nvim-treesitter parser install output missing", 1, true),
+      "strict smoke must fail causally when parser bootstrap is incomplete"
+    )
+    assert.is_truthy(
+      src:find("expected nvim-treesitter query install output missing", 1, true),
+      "strict smoke must fail causally when parser queries are incomplete"
+    )
+  end)
+
+  it("Tier 2 uses one platform-aware LSP attach timeout helper", function()
+    local src = lsp_smoke_source()
+    assert.is_truthy(
+      src:find('local lsp_attach_timeout_ms = vim.fn.has("win32") == 1 and 90000 or 45000', 1, true),
+      "Windows CI needs a longer cold-start LSP attach budget than Unix"
+    )
+    assert.is_truthy(src:find("local function wait_for_lsp_client", 1, true), "shared LSP wait helper missing")
+    assert.is_nil(src:find("vim.wait(45000", 1, true), "raw attach timeout must not be duplicated")
+  end)
 end)

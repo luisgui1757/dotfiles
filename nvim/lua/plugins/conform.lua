@@ -27,7 +27,8 @@ return {
       json5 = { "prettier" },
       yaml = { "prettier" },
       markdown = { "prettier" },
-      -- ps1 falls back to LSP (powershell_es) via lsp_format = "fallback"
+      -- ps1 has no external formatter here; LSP fallback only formats it if
+      -- powershell_es advertises formatting on that host.
     },
     format_on_save = function(bufnr)
       if vim.b[bufnr].skip_format_on_save then
@@ -36,8 +37,16 @@ return {
       return { timeout_ms = 3000, lsp_format = "fallback" }
     end,
     formatters = {
+      prettier = {
+        append_args = function(_, ctx)
+          local ft = vim.bo[ctx.buf].filetype
+          if ft == "json" or ft == "jsonc" or ft == "json5" then
+            return { "--trailing-comma", "none" }
+          end
+          return {}
+        end,
+      },
       shfmt = { prepend_args = { "-i", "2", "-ci" } },
-      rustfmt = { prepend_args = { "--edition=2021" } },
     },
   },
   keys = {

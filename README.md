@@ -403,30 +403,38 @@ The e2e jobs cover different install paths, not symmetric container platforms:
 | `setup.ps1 / windows-2025` | Full Windows setup through the real Windows hosted runner, including Scoop/winget/choco behavior, PowerShell, symlinks, and Neovim restore/sync phases. Windows containers do not model the desktop/user-profile setup well. |
 | `setup.sh / WSL2 Ubuntu-24.04 (best-effort canary)` | Non-required WSL smoke signal. Hosted runners cannot provide reliable nested virtualization, so this is intentionally best-effort. |
 
-After the Lazy restore, Tree-sitter parser install, and Mason sync, each
+After the Lazy restore, deterministic Tree-sitter parser install, and Mason sync, each
 `setup.sh`/`setup.ps1` job also
 runs the **Tier 2 language smoke** (`tests/nvim/lsp_smoke.lua`): against the
 real Neovim config it asserts (0) no nvim-treesitter parser override for a
-bundled language remains on the runtimepath under `stdpath('data')`, (1) every
-installed treesitter parser is one nvim-treesitter `main` supports and no
-unexpected nvim-treesitter install-output parser `.so` is present under
-`stdpath('data')/site/parser` beyond the explicit list plus upstream dependency
-parsers, (2) synchronous parser bootstrap
-completes through nvim-treesitter's waitable install task and returns exactly
-`true`, (3) every language-matrix fixture opens with the expected filetype and
-every parser-backed row reports real Tree-sitter highlight captures, (4) each
-language's LSP attaches (`powershell_es` enforced on Windows only), and (5) the
-auto-started bundled filetypes keep nvim-treesitter's `indentexpr`. The
-fast `make test-nvim` runs Tier 1 (filetype + formatter + parser-list
-consistency per fixture). Adding a language is "drop a fixture + a row in
+bundled language remains on the runtimepath under `stdpath('data')`, and no
+managed nvim-treesitter query directory for a bundled language remains in the
+query install output, (1) every declared treesitter parser is one nvim-treesitter
+`main` supports, every expected parser `.so` and query directory is actually present in
+nvim-treesitter's installed output (including upstream paired parsers such as
+PHP's `php_only` and query-only dependencies), and no unexpected
+nvim-treesitter install-output parser `.so` is present under
+`stdpath('data')/site/parser` beyond the explicit list plus non-bundled upstream
+dependency parsers, (2) each language's LSP attaches (`powershell_es` enforced on Windows
+only), (3) realistic formatter-owned buffers copied under `tests/.cache` format
+through conform.nvim's production route with the expected external formatter(s)
+and produce no LSP warnings/errors afterward, (4) every language-matrix fixture
+opens with the expected filetype and every parser-backed row reports real
+Tree-sitter highlight captures, and (5) the auto-started bundled filetypes keep
+nvim-treesitter's `indentexpr`. The fast `make test-nvim` runs Tier 1
+(filetype + formatter + parser-list consistency per fixture), plus source-shape
+guards for formatter policy such as JSON-family Prettier trailing commas. Adding
+a language is "drop a fixture + a row in
 `tests/nvim/language_matrix.lua`"; syntax-only fallbacks such as `.curlrc`
 belong in the same matrix, must not pretend to have unsupported parsers, and
 Tier 2 syntax probes must prove they still produce real Vim syntax groups. The
 smoke matrix also encodes the
 Neovim-bundled languages (`c`, `lua`, `markdown`, `query`, `vim`): those must
 stay **out** of the install list — and any stale override of them is purged on
-config load (scoped to `stdpath('data')` so Neovim's own install-prefix parsers
-are never touched) — so Neovim's matched built-in parser+query is used instead
+config load (parser files scoped to `stdpath('data')`; query directories scoped
+to nvim-treesitter's managed `get_install_dir("queries")` output, which must
+also live under `stdpath('data')`, so Neovim's own install-prefix runtime is
+never touched) — so Neovim's matched built-in parser+query is used instead
 of an nvim-treesitter parser that can drift from the bundled query (this caught
 a real lua `E5113: Invalid field name "operator"` regression).
 
@@ -569,7 +577,10 @@ stale; CI then fails verification until a human reviews the adjacent constant.
   settings are edited in place with comments preserved and a backup first.
 - **conform.nvim is the only format-on-save handler.** Replacing the
   prior LSP-attach autocmd + null-ls duo eliminates a real race condition
-  with different timeouts. `:WNF` (or `:wnf`) skips formatting for one save.
+  with different timeouts. Formatter output must still stay inside the LSP's
+  parser/schema rules; Tier 2 proves this by formatting realistic samples and
+  failing on post-format LSP warnings/errors. `:WNF` (or `:wnf`) skips
+  formatting for one save.
 - **Mason installs LSP servers + formatters via mason-tool-installer.** No
   `mason-lspconfig` — redundant on nvim 0.11 with `vim.lsp.enable`.
 - **DAP launches stay generic.** The shared browser launch defaults to
@@ -712,6 +723,7 @@ MIT. See `LICENSE`.
 | `<leader>X` keymaps fire `\X` instead of `<Space>X` | mapleader set after lazy.setup somehow | restore the order in `nvim/init.lua` — leader **before** `require("lazy").setup` |
 | Formatter runs twice or shows two BufWritePre autocmds | someone added a second handler outside conform.nvim | `:lua print(#vim.api.nvim_get_autocmds({event="BufWritePre"}))` should be 1; if not, find the second autocmd and delete it |
 | Lazy/Tree-sitter/Mason says `No C compiler found` | WSL/Linux has `make` but no `cc`/`gcc`/`clang`; Tree-sitter parsers and some plugin builds compile native code | re-run `./setup.sh --skip-config` to install the Linux compiler toolchain, or on Ubuntu run `sudo apt-get update && sudo apt-get install -y build-essential`, then `./setup.sh --skip-deps --skip-config` |
+| Tree-sitter parser install reports temp-dir rename errors such as `ENOTEMPTY` | a previous or parallel parser build left a partial grammar cache | update this repo and rerun setup; setup/CI now serializes synchronous nvim-treesitter bootstrap installs and Tier 2 fails causally if any declared parser is missing |
 | nvim treesitter parsers fail to compile on Windows / `cl.exe` not found | `nvim-treesitter` main builds parsers with the Rust `cc` crate, which needs MSVC env vars | run `.\setup.ps1 -All` to install VS Build Tools and let setup import the VS DevShell before parser installation; for ad-hoc `:TSUpdate`, open a "Developer PowerShell for VS" or rerun setup |
 | nvim syntax looks weak or files look plain text | Tree-sitter is inactive, or the hybrid built-in syntax fallback was not restored after Tree-sitter starts | update this repo, re-run setup, then check `:Inspect` on a token; parser-backed languages should show `treesitter` captures plus `syntax` groups, while `.bat` should show `syntax` groups |
 | Clipboard not crossing host on WSL | `win32yank.exe` not on PATH | install win32yank via scoop on Windows side, ensure WSL PATH picks it up |

@@ -9,18 +9,22 @@
 -- Exits nonzero (cquit) on any failure so the CI step fails.
 --
 -- Gates (all fail the run under strict):
---   (0) no `parser/<bundled>.so` override remains on the runtimepath (the config
---       purges them; a leftover re-creates the E5113 mismatch),
+--   (0) no `parser/<bundled>.so` or managed `queries/<bundled>/` override
+--       remains on the runtimepath/install output (the config purges them; a
+--       leftover re-creates the E5113 mismatch),
 --   (1) every installed parser is one nvim-treesitter `main` supports,
 --   (2) every non-gated LSP attaches, and every gated LSP attaches ON its target
 --       OS (powershell_es -> Windows); a gated server is skipped only OFF target,
 --       and a MISSING runtime on the target OS is a failure, not a skip,
---   (3) every matrix fixture opens under the production config with the expected
+--   (3) formatter/LSP compatibility: realistic formatter-owned buffers are
+--       formatted through conform.nvim's production route, must use the expected
+--       external formatter(s), and must produce no LSP warnings/errors afterward,
+--   (4) every matrix fixture opens under the production config with the expected
 --       filetype, and every parser-backed row reports real Tree-sitter captures
 --       so non-LSP parser/query runtime errors cannot hide,
---   (4) the auto-started bundled filetypes (lua/markdown/help/query) keep the
+--   (5) the auto-started bundled filetypes (lua/markdown/help/query) keep the
 --       nvim-treesitter indentexpr the FileType autocmd promises.
---   (5) daily language buffers keep Vim regex syntax groups in addition to
+--   (6) daily language buffers keep Vim regex syntax groups in addition to
 --       Tree-sitter captures where parsers exist.
 --
 -- DOTFILES_LSP_SMOKE:
@@ -121,15 +125,17 @@ local ok, err = pcall(function()
   end
 
   -- (0) Bundled-parser override preflight. The production config purges any
-  -- nvim-treesitter parser for a Neovim-bundled language on load; after that, no
-  -- nvim-treesitter-managed `parser/<bundled>.so` may remain. A leftover (e.g.
-  -- restored from a CI cache, or installed by an older config) overrides
-  -- Neovim's matched built-in parser and re-creates the E5113 query/parser
-  -- mismatch this whole change exists to prevent. Scope to stdpath('data'):
-  -- Neovim's OWN bundled parser .so files live under the install prefix and are
-  -- legitimately on the runtimepath -- they must NOT trip this gate.
+  -- nvim-treesitter parser/query output for a Neovim-bundled language on load;
+  -- after that, no nvim-treesitter-managed `parser/<bundled>.so` or
+  -- `queries/<bundled>/` may remain. A leftover (e.g. restored from a CI cache,
+  -- or installed by an older config) overrides Neovim's matched built-in
+  -- parser/query pair and re-creates the E5113 mismatch this whole change exists
+  -- to prevent. Scope parser .so checks to stdpath('data'): Neovim's OWN bundled
+  -- parser .so files live under the install prefix and are legitimately on the
+  -- runtimepath -- they must NOT trip this gate.
   local managed = vim.fs.normalize(vim.fn.stdpath("data")) .. "/"
-  for _, lang in ipairs({ "c", "lua", "markdown", "markdown_inline", "query", "vim", "vimdoc" }) do
+  local bundled_parsers = { "c", "lua", "markdown", "markdown_inline", "query", "vim", "vimdoc" }
+  for _, lang in ipairs(bundled_parsers) do
     local overrides = {}
     for _, so in ipairs(vim.api.nvim_get_runtime_file("parser/" .. lang .. ".so", true)) do
       if vim.startswith(vim.fs.normalize(so), managed) then
@@ -140,6 +146,28 @@ local ok, err = pcall(function()
       fail("nvim-treesitter override still present for bundled " .. lang .. ": " .. table.concat(overrides, ", "))
     else
       note("no nvim-treesitter override for bundled " .. lang)
+    end
+  end
+  local config_ok, treesitter_config = pcall(require, "nvim-treesitter.config")
+  local query_dir_ok, query_dir = false, nil
+  if config_ok and type(treesitter_config.get_install_dir) == "function" then
+    query_dir_ok, query_dir = pcall(treesitter_config.get_install_dir, "queries")
+  end
+  if not query_dir_ok or type(query_dir) ~= "string" or query_dir == "" then
+    fail("cannot inspect nvim-treesitter query install output for bundled overrides")
+  else
+    local normalized_query_dir = vim.fs.normalize(query_dir) .. "/"
+    if not vim.startswith(normalized_query_dir, managed) then
+      fail("nvim-treesitter query install output is outside stdpath('data'): " .. query_dir)
+    else
+      for _, lang in ipairs(bundled_parsers) do
+        local query_path = vim.fs.joinpath(query_dir, lang)
+        if vim.fn.isdirectory(query_path) == 1 then
+          fail("nvim-treesitter query override still present for bundled " .. lang .. ": " .. query_path)
+        else
+          note("no nvim-treesitter query override for bundled " .. lang)
+        end
+      end
     end
   end
 
@@ -174,13 +202,68 @@ local ok, err = pcall(function()
         end
       end
 
-      local expected_managed = {}
+      local expected_managed_parsers = {}
+      local expected_managed_parser_set = {}
+      local expected_managed_queries = {}
+      local expected_managed_query_set = {}
+      local parser_configs_ok, parser_configs = pcall(require, "nvim-treesitter.parsers")
+      local bundled_parser_set = to_set({ "c", "lua", "markdown", "markdown_inline", "query", "vim", "vimdoc" })
       local cfg_ok, cfg = pcall(require, "nvim-treesitter.config")
-      if not cfg_ok or type(cfg.norm_languages) ~= "function" then
-        fail("nvim-treesitter.config.norm_languages is unavailable; cannot audit managed parser files")
+      if
+        not cfg_ok
+        or type(cfg.norm_languages) ~= "function"
+        or type(cfg.get_install_dir) ~= "function"
+        or not parser_configs_ok
+      then
+        fail("nvim-treesitter config/parser metadata is unavailable; cannot audit managed parser/query output")
       else
         for _, parser in ipairs(cfg.norm_languages(explicit_parsers, { unsupported = true })) do
-          expected_managed[parser] = true
+          local parser_config = parser_configs[parser]
+          if not bundled_parser_set[parser] and parser_config then
+            if parser_config.install_info and not expected_managed_parser_set[parser] then
+              expected_managed_parser_set[parser] = true
+              table.insert(expected_managed_parsers, parser)
+            end
+            if
+              #vim.api.nvim_get_runtime_file("queries/" .. parser, false) > 0
+              and not expected_managed_query_set[parser]
+            then
+              expected_managed_query_set[parser] = true
+              table.insert(expected_managed_queries, parser)
+            end
+          end
+        end
+      end
+
+      if type(nts.get_installed) ~= "function" then
+        fail("nvim-treesitter.get_installed is unavailable; cannot prove parser install output")
+      else
+        local installed = to_set(nts.get_installed("parsers"))
+        local missing = {}
+        for _, parser in ipairs(expected_managed_parsers) do
+          if not installed[parser] then
+            table.insert(missing, parser)
+          end
+        end
+        if #missing > 0 then
+          fail("expected nvim-treesitter parser install output missing: " .. table.concat(missing, ", "))
+        else
+          note("all expected nvim-treesitter install-output parsers are present")
+        end
+      end
+
+      if cfg_ok and type(cfg.get_install_dir) == "function" then
+        local missing_queries = {}
+        local install_query_dir = cfg.get_install_dir("queries")
+        for _, parser in ipairs(expected_managed_queries) do
+          if vim.fn.isdirectory(vim.fs.joinpath(install_query_dir, parser)) ~= 1 then
+            table.insert(missing_queries, parser)
+          end
+        end
+        if #missing_queries > 0 then
+          fail("expected nvim-treesitter query install output missing: " .. table.concat(missing_queries, ", "))
+        else
+          note("all expected nvim-treesitter query install-output directories are present")
         end
       end
 
@@ -195,7 +278,7 @@ local ok, err = pcall(function()
         local normalized = vim.fs.normalize(so)
         if vim.startswith(normalized, managed_parser_dir) then
           local parser = vim.fn.fnamemodify(normalized, ":t:r")
-          if not expected_managed[parser] then
+          if not expected_managed_parser_set[parser] then
             table.insert(unexpected, normalized)
           end
         end
@@ -238,6 +321,68 @@ local ok, err = pcall(function()
       end
     end
     return false
+  end
+
+  local function same_list(actual, expected)
+    if #actual ~= #expected then
+      return false
+    end
+    for i, value in ipairs(expected) do
+      if actual[i] ~= value then
+        return false
+      end
+    end
+    return true
+  end
+
+  local function serious_diagnostics(buf)
+    local diagnostics = {}
+    for _, diagnostic in ipairs(vim.diagnostic.get(buf)) do
+      if not diagnostic.severity or diagnostic.severity <= vim.diagnostic.severity.WARN then
+        table.insert(diagnostics, diagnostic)
+      end
+    end
+    return diagnostics
+  end
+
+  local function render_diagnostics(diagnostics)
+    local rendered = {}
+    for _, diagnostic in ipairs(diagnostics) do
+      table.insert(
+        rendered,
+        table.concat({
+          diagnostic.source or "?",
+          vim.diagnostic.severity[diagnostic.severity] or tostring(diagnostic.severity),
+          tostring((diagnostic.lnum or 0) + 1),
+          tostring((diagnostic.col or 0) + 1),
+          diagnostic.message or "",
+        }, ":")
+      )
+    end
+    return table.concat(rendered, " | ")
+  end
+
+  local function wait_for_serious_diagnostics_to_settle(buf)
+    local start = vim.uv.now()
+    local stable_since = start
+    local last = nil
+    vim.wait(10000, function()
+      local rendered = render_diagnostics(serious_diagnostics(buf))
+      if rendered ~= last then
+        last = rendered
+        stable_since = vim.uv.now()
+      end
+      local now = vim.uv.now()
+      return now - start >= 1500 and now - stable_since >= 500
+    end, 100)
+    return serious_diagnostics(buf)
+  end
+
+  local lsp_attach_timeout_ms = vim.fn.has("win32") == 1 and 90000 or 45000
+  local function wait_for_lsp_client(buf, name)
+    return vim.wait(lsp_attach_timeout_ms, function()
+      return #vim.lsp.get_clients({ bufnr = buf, name = name }) > 0
+    end, 200)
   end
 
   -- (2) LSP attach. Non-gated servers must attach on every OS. powershell_es is
@@ -295,9 +440,7 @@ local ok, err = pcall(function()
           )
         end
         local buf = vim.api.nvim_get_current_buf()
-        local attached = vim.wait(45000, function()
-          return #vim.lsp.get_clients({ bufnr = buf, name = row.lsp }) > 0
-        end, 200)
+        local attached = wait_for_lsp_client(buf, row.lsp)
         -- STRICT (see the header): a non-gated server that does not attach is a
         -- hard failure. The treesitter highlight error that aborted FileType is
         -- fixed canonically (the nvim-bundled langs are no longer installed by
@@ -305,13 +448,223 @@ local ok, err = pcall(function()
         if attached then
           note(row.fixture .. " [" .. row.lsp .. "]: attached")
         else
-          fail(row.fixture .. " [" .. row.lsp .. "]: did NOT attach within 45s")
+          fail(
+            row.fixture
+              .. " ["
+              .. row.lsp
+              .. "]: did NOT attach within "
+              .. tostring(math.floor(lsp_attach_timeout_ms / 1000))
+              .. "s"
+          )
         end
         pcall(vim.cmd, "silent! bwipeout!")
         local stopped, lingering = stop_all_lsp_clients()
         if not stopped then
           fail(row.fixture .. ": LSP clients did not stop after attach gate: " .. lingering)
         end
+      end
+    end
+  end
+
+  -- (3) Formatter/LSP compatibility. Conform owns format-on-save, but the
+  -- output still has to satisfy the language server's parser/schema rules. Use
+  -- separate fixture copies under tests/.cache so the smoke can format real files
+  -- without mutating tracked fixtures.
+  local formatter_lsp_samples = {
+    {
+      source = "formatter_lsp/sample.lua",
+      target = "sample.lua",
+      ft = "lua",
+      lsp = "lua_ls",
+      formatters = { "stylua" },
+    },
+    {
+      source = "formatter_lsp/sample.py",
+      target = "sample.py",
+      ft = "python",
+      lsp = "pyright",
+      formatters = { "ruff_fix", "ruff_format" },
+    },
+    {
+      source = "formatter_lsp/sample.c",
+      target = "sample.c",
+      ft = "c",
+      lsp = "clangd",
+      formatters = { "clang_format" },
+    },
+    {
+      source = "formatter_lsp/sample.cpp",
+      target = "sample.cpp",
+      ft = "cpp",
+      lsp = "clangd",
+      formatters = { "clang_format" },
+    },
+    {
+      source = "formatter_lsp/sample.rs",
+      target = "sample.rs",
+      ft = "rust",
+      lsp = "rust_analyzer",
+      formatters = { "rustfmt" },
+    },
+    {
+      source = "formatter_lsp/CMakeLists.txt",
+      target = "cmake/CMakeLists.txt",
+      ft = "cmake",
+      lsp = "neocmake",
+      formatters = { "gersemi" },
+    },
+    {
+      source = "formatter_lsp/sample.bash",
+      target = "sample.bash",
+      ft = "sh",
+      lsp = "bashls",
+      formatters = { "shfmt" },
+    },
+    {
+      source = "formatter_lsp/sample.zsh",
+      target = "sample.zsh",
+      ft = "zsh",
+      lsp = "bashls",
+      formatters = { "shfmt" },
+    },
+    {
+      source = "formatter_lsp/sample.json",
+      target = "sample.json",
+      ft = "json",
+      lsp = "jsonls",
+      formatters = { "prettier" },
+    },
+    {
+      source = "formatter_lsp/sample.jsonc",
+      target = "sample.jsonc",
+      ft = "jsonc",
+      lsp = "jsonls",
+      formatters = { "prettier" },
+    },
+    {
+      source = "formatter_lsp/sample.yaml",
+      target = "sample.yaml",
+      ft = "yaml",
+      lsp = "yamlls",
+      formatters = { "prettier" },
+    },
+  }
+  local compat_root = repo_root .. "/tests/.cache/lsp-smoke-formatters"
+  vim.fn.delete(compat_root, "rf")
+  vim.fn.mkdir(compat_root, "p")
+  local conform_ok, conform = pcall(require, "conform")
+  if not conform_ok then
+    fail("formatter/LSP compatibility: require('conform') failed: " .. tostring(conform))
+  else
+    for _, sample in ipairs(formatter_lsp_samples) do
+      local source_path = fixtures .. sample.source
+      local target_path = compat_root .. "/" .. sample.target
+      vim.fn.mkdir(vim.fn.fnamemodify(target_path, ":h"), "p")
+      local read_ok, lines = pcall(vim.fn.readfile, source_path)
+      if not read_ok then
+        fail(sample.source .. ": could not read formatter/LSP fixture: " .. tostring(lines))
+      else
+        local write_ok, write_err = pcall(vim.fn.writefile, lines, target_path)
+        if not write_ok then
+          fail(sample.source .. ": could not write formatter/LSP temp file: " .. tostring(write_err))
+        else
+          local open_ok, open_err = pcall(vim.cmd.edit, vim.fn.fnameescape(target_path))
+          if not open_ok then
+            fail(
+              sample.source
+                .. ": open raised in formatter/LSP gate: "
+                .. (tostring(open_err):match("([^\r\n]+)") or "error")
+            )
+          elseif vim.bo.filetype ~= sample.ft then
+            fail(
+              sample.source
+                .. ": expected filetype "
+                .. sample.ft
+                .. " in formatter/LSP gate, got "
+                .. tostring(vim.bo.filetype)
+            )
+          else
+            local buf = vim.api.nvim_get_current_buf()
+            local attached = wait_for_lsp_client(buf, sample.lsp)
+            if not attached then
+              fail(
+                sample.source
+                  .. " ["
+                  .. sample.lsp
+                  .. "]: did NOT attach within "
+                  .. tostring(math.floor(lsp_attach_timeout_ms / 1000))
+                  .. "s in formatter/LSP gate"
+              )
+            else
+              local formatters, uses_lsp = conform.list_formatters_to_run(buf)
+              local formatter_names = {}
+              local unavailable = {}
+              for _, formatter in ipairs(formatters) do
+                table.insert(formatter_names, formatter.name)
+                if not formatter.available then
+                  table.insert(unavailable, formatter.name)
+                end
+              end
+              if not same_list(formatter_names, sample.formatters) then
+                fail(
+                  sample.source
+                    .. ": expected conform formatter(s) "
+                    .. table.concat(sample.formatters, ",")
+                    .. ", got "
+                    .. table.concat(formatter_names, ",")
+                )
+              elseif #unavailable > 0 then
+                fail(sample.source .. ": formatter(s) unavailable: " .. table.concat(unavailable, ","))
+              elseif uses_lsp then
+                fail(sample.source .. ": conform would use LSP formatting despite an external formatter mapping")
+              else
+                local format_call_ok, format_ok, format_err = pcall(conform.format, {
+                  bufnr = buf,
+                  async = false,
+                  lsp_format = "fallback",
+                  timeout_ms = 10000,
+                })
+                if not format_call_ok then
+                  fail(sample.source .. ": conform format raised: " .. tostring(format_ok))
+                elseif format_ok == false then
+                  fail(sample.source .. ": conform format failed: " .. tostring(format_err))
+                else
+                  -- This gate already invoked conform explicitly. Persist the
+                  -- temp buffer without letting the normal BufWritePre hook run
+                  -- a second formatter pass over the same sample.
+                  vim.b[buf].skip_format_on_save = true
+                  local save_ok, save_err = pcall(vim.cmd.write)
+                  if not save_ok then
+                    fail(sample.source .. ": could not write formatted temp file: " .. tostring(save_err))
+                  else
+                    local diagnostics = wait_for_serious_diagnostics_to_settle(buf)
+                    if #diagnostics > 0 then
+                      fail(
+                        sample.source
+                          .. ": LSP warning/error after conform formatting: "
+                          .. render_diagnostics(diagnostics)
+                      )
+                    else
+                      note(
+                        sample.source
+                          .. " ["
+                          .. sample.lsp
+                          .. "]: conform "
+                          .. table.concat(sample.formatters, "+")
+                          .. " output accepted by LSP"
+                      )
+                    end
+                  end
+                end
+              end
+            end
+          end
+        end
+      end
+      pcall(vim.cmd, "silent! bwipeout!")
+      local stopped, lingering = stop_all_lsp_clients()
+      if not stopped then
+        fail(sample.source .. ": LSP clients did not stop after formatter/LSP gate: " .. lingering)
       end
     end
   end
@@ -325,7 +678,7 @@ local ok, err = pcall(function()
     end
   end
 
-  -- (3) Matrix fixture runtime sanity. Parser support in gate 1 proves
+  -- (4) Matrix fixture runtime sanity. Parser support in gate 1 proves
   -- nvim-treesitter advertises the parser; synchronous bootstrap above proves
   -- setup can build it; opening every fixture under the real production init and
   -- checking captures proves the config can actually highlight that filetype.
@@ -371,7 +724,7 @@ local ok, err = pcall(function()
     pcall(vim.cmd, "silent! bwipeout!")
   end
 
-  -- (4) indentexpr preservation for the auto-started bundled filetypes. Removing
+  -- (5) indentexpr preservation for the auto-started bundled filetypes. Removing
   -- the bundled langs from the install list must NOT drop the indentexpr the
   -- FileType autocmd promises (the pre-fix behavior). Source-shape tests only
   -- prove the table/loop exist; this proves the option is actually set on a real
@@ -424,7 +777,7 @@ local ok, err = pcall(function()
     pcall(vim.cmd, "silent! bwipeout!")
   end
 
-  -- (5) Regex syntax fallback for daily editing languages. Tree-sitter main
+  -- (6) Regex syntax fallback for daily editing languages. Tree-sitter main
   -- clears the buffer-local 'syntax' option when it starts; restore the built-in
   -- syntax file afterward so real buffers do not look like plain text.
   local syntax_fallback = {

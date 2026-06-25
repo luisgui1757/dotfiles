@@ -173,19 +173,26 @@ that violates one of these, fix it instead of disabling the test.
     overrides the built-in and breaks the bundled query (`E5113: Invalid field
     name "operator"` on lua). Excluding them stops future installs, but the
     config ALSO **purges** any nvim-treesitter-managed `parser/<bundled>.so`
-    already present (a leftover from an older config, or restored from a CI
-    cache, still overrides the built-in). The purge is **scoped to
-    `stdpath('data')`** (nvim-treesitter installs under `…/site`; the install
-    prefix does not) — an unscoped delete would wipe Neovim's OWN built-in
-    parsers. `c` and `vim` are bundled but not auto-started, so the config starts
-    them via `nvim_bundled_started_here = { "c", "vim" }`. See "Add a treesitter
-    parser". Guarded by `treesitter_spec.lua`, `language_smoke_spec.lua`, and the
-    Tier-2 `lsp_smoke.lua` runtime preflight, which synchronously bootstraps
-    parsers and opens every language-matrix fixture under the production config
-    so missing parser builds or parser/query runtime failures cannot hide behind
-    non-LSP rows. The preflight also rejects unexpected nvim-treesitter-managed
+    already present and any managed `queries/<bundled>/` install-output
+    directory already present (leftovers from an older config, or restored from a
+    CI cache, still override the matched built-in parser/query pair). Parser-file
+    deletes are **scoped to `stdpath('data')`** (nvim-treesitter installs under
+    `…/site`; the install prefix does not), and query-directory deletes are
+    **scoped to nvim-treesitter's `get_install_dir("queries")` output**, which
+    must also live under `stdpath('data')`. An unscoped delete would wipe
+    Neovim's OWN built-in runtime. `c` and `vim` are bundled but not
+    auto-started, so the config starts them via
+    `nvim_bundled_started_here = { "c", "vim" }`. See "Add a treesitter parser".
+    Guarded by `treesitter_spec.lua`, `language_smoke_spec.lua`, and the Tier-2
+    `lsp_smoke.lua` runtime preflight, which synchronously bootstraps parsers and
+    opens every language-matrix fixture under the production config so missing
+    parser builds or parser/query runtime failures cannot hide behind non-LSP
+    rows. The preflight also rejects unexpected nvim-treesitter-managed
     install-output parser `.so` files under `stdpath('data')/site/parser`,
-    allowing only the explicit parser list plus upstream dependency parsers.
+    rejects managed bundled query install-output directories, requires parser and
+    query install output for the non-bundled upstream dependency set (for example
+    PHP's paired `php_only` parser), and purges bundled parser/query overrides
+    after setup installs complete.
 20. **Repo text stays LF-only.** `.gitattributes` force-normalizes text files to
     LF so Windows checkouts do not CRLF-corrupt shell/WSL entry points, and
     `.editorconfig` must not reintroduce `end_of_line = crlf` exceptions (even
@@ -225,7 +232,11 @@ to lazy-loading (`event` / `cmd` / `keys` / `ft`). Only `rose-pine` may set
 
 1. Add to `formatters_by_ft` in `nvim/lua/plugins/conform.lua`.
 2. Add the Mason package to `mason-tool-installer` `ensure_installed`.
-3. No new autocmd — conform's `format_on_save` handles it. The buffer-local
+3. If an LSP also attaches for that filetype, add or update a realistic fixture
+   under `tests/nvim/fixtures/formatter_lsp/` and the Tier-2 formatter/LSP
+   compatibility table in `tests/nvim/lsp_smoke.lua`. The invariant is:
+   conform's selected external formatter(s) must produce no LSP warnings/errors.
+4. No new autocmd — conform's `format_on_save` handles it. The buffer-local
    `vim.b.skip_format_on_save` short-circuit (i.e. `:WNF`) is already in place.
 
 ### Add a project-specific DAP launch
@@ -445,16 +456,20 @@ install paths, not symmetric container platforms:
   `treesitter_parsers` entry is one nvim-treesitter `main` supports
   (`get_available()`/`get_available(4)` — the jsonc "unsupported language"
   catcher), synchronously bootstraps parser installs with the upstream waitable
-  install task and requires it to return exactly `true`, rejects unexpected
+  install task and requires it to return exactly `true`, requires every declared
+  parser `.so` output and query install-output directories to be present,
+  rejects unexpected
   install-output parser `.so` files under `stdpath('data')/site/parser`, asserts
-  each fixture's LSP attaches, then opens every language-matrix fixture,
-  requires real Tree-sitter captures for parser-backed rows, and proves
-  syntax-only fallback rows have real Vim syntax groups. Keep the LSP attach
-  gate before the broad fixture-open gate; opening every fixture under the
-  production config can start LSPs as collateral. After the explicit LSP attach
-  gate, the smoke disables the tested LSP configs before opening the broad
-  parser/syntax matrix so later non-LSP gates do not leave unrelated language
-  servers alive.
+  each fixture's LSP attaches, formats realistic LSP-backed samples copied under
+  `tests/.cache` through conform.nvim's production route, requires the expected
+  external formatter(s), fails on post-format LSP warnings/errors, then opens
+  every language-matrix fixture, requires real Tree-sitter captures for
+  parser-backed rows, and proves syntax-only fallback rows have real Vim syntax
+  groups. Keep the LSP attach gate before the broad fixture-open gate; opening
+  every fixture under the production config can start LSPs as collateral. After
+  the explicit formatter/LSP gate, the smoke disables the tested LSP configs
+  before opening the broad parser/syntax matrix so later non-LSP gates do not
+  leave unrelated language servers alive.
   Non-gated servers are strict on every OS; `powershell_es` is
   enforced only on Windows (pwsh + the PSES bundle) and skips cleanly on Unix.
   The fast `make test-nvim` runs Tier 1 only
@@ -752,6 +767,14 @@ save only**. The next plain `:w` formats normally. Implemented in
   while main emits MSVC-style `cc` crate flags that require MSVC. Ad-hoc
   `:TSUpdate` parser rebuilds on Windows should run from a "Developer
   PowerShell for VS" shell or after rerunning setup.
+- **Synchronous nvim-treesitter bootstrap is serialized by design.**
+  nvim-treesitter `main` defaults to high parallelism for interactive installs.
+  That is not the setup/CI contract: hosted runners restore parser caches and
+  can expose temp-dir races such as `ENOTEMPTY` while compiling many grammars.
+  When `DOTFILES_TREESITTER_SYNC_INSTALL=1`, pass `max_jobs = 1` and wait up to
+  15 minutes; interactive installs keep upstream's faster default. Tier 2 then
+  checks `get_installed("parsers")` so a partial bootstrap fails at the parser
+  gate before later capture checks turn it into a vague highlighting failure.
 - **nvim-treesitter installer drift must not disable highlighting.** A stale
   lazy.nvim cache can keep `nvim-treesitter` on the frozen `master` API while
   this repo expects the `main` rewrite. In that state
