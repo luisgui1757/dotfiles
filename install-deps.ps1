@@ -633,13 +633,189 @@ function Get-CatalogToolCommandSource {
     return ''
 }
 
+function ConvertTo-WindowsComparablePath {
+    param([string]$Path)
+    if ([string]::IsNullOrWhiteSpace($Path)) { return '' }
+    return ([string]$Path).Trim().Trim('"').Replace('/', '\').TrimEnd('\')
+}
+
+function Get-WindowsPathDirectoryText {
+    param([string]$Path)
+    $normalized = ConvertTo-WindowsComparablePath -Path $Path
+    if ([string]::IsNullOrWhiteSpace($normalized)) { return '' }
+    $index = $normalized.LastIndexOf('\')
+    if ($index -lt 0) { return '' }
+    return $normalized.Substring(0, $index)
+}
+
+function Get-WindowsPathFileBaseText {
+    param([string]$Path)
+    $normalized = ConvertTo-WindowsComparablePath -Path $Path
+    if ([string]::IsNullOrWhiteSpace($normalized)) { return '' }
+    $index = $normalized.LastIndexOf('\')
+    $name = if ($index -ge 0) { $normalized.Substring($index + 1) } else { $normalized }
+    $dot = $name.LastIndexOf('.')
+    if ($dot -gt 0) { return $name.Substring(0, $dot) }
+    return $name
+}
+
+function Join-WindowsPathText {
+    param([string]$Left, [string]$Right)
+    $leftText = ConvertTo-WindowsComparablePath -Path $Left
+    $rightText = (ConvertTo-WindowsComparablePath -Path $Right).TrimStart('\')
+    if ([string]::IsNullOrWhiteSpace($leftText)) { return $rightText }
+    if ([string]::IsNullOrWhiteSpace($rightText)) { return $leftText }
+    return "$leftText\$rightText"
+}
+
+function Test-WindowsPathUnderDirectoryText {
+    param([string]$Path, [string]$Directory)
+    $pathText = ConvertTo-WindowsComparablePath -Path $Path
+    $directoryText = ConvertTo-WindowsComparablePath -Path $Directory
+    if ([string]::IsNullOrWhiteSpace($pathText) -or [string]::IsNullOrWhiteSpace($directoryText)) {
+        return $false
+    }
+    return $pathText.Equals($directoryText, [StringComparison]::OrdinalIgnoreCase) -or
+        $pathText.StartsWith("$directoryText\", [StringComparison]::OrdinalIgnoreCase)
+}
+
+function Get-ScoopRootCandidates {
+    $roots = @()
+    foreach ($candidate in @((Get-ScoopRoot), $env:SCOOP, $env:SCOOP_GLOBAL)) {
+        if (-not [string]::IsNullOrWhiteSpace($candidate)) {
+            $roots += (ConvertTo-WindowsComparablePath -Path $candidate)
+        }
+    }
+    if (-not [string]::IsNullOrWhiteSpace($env:ProgramData)) {
+        $roots += (Join-WindowsPathText -Left $env:ProgramData -Right 'scoop')
+    }
+    return @($roots | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique)
+}
+
+function Get-ScoopShimMetadataPath {
+    param([string]$Source)
+    $directory = Get-WindowsPathDirectoryText -Path $Source
+    $baseName = Get-WindowsPathFileBaseText -Path $Source
+    if ([string]::IsNullOrWhiteSpace($directory) -or [string]::IsNullOrWhiteSpace($baseName)) { return '' }
+    return (Join-WindowsPathText -Left $directory -Right "$baseName.shim")
+}
+
+function Test-ScoopShimSourceUnderKnownRoot {
+    param([string]$Source)
+    foreach ($root in (Get-ScoopRootCandidates)) {
+        $shimDir = Join-WindowsPathText -Left $root -Right 'shims'
+        if (Test-WindowsPathUnderDirectoryText -Path $Source -Directory $shimDir) {
+            return $true
+        }
+    }
+    return $false
+}
+
+function Get-ScoopRootFromShimSource {
+    param([string]$Source)
+    $directory = Get-WindowsPathDirectoryText -Path $Source
+    if ([string]::IsNullOrWhiteSpace($directory)) { return '' }
+    $leaf = Get-WindowsPathFileBaseText -Path $directory
+    if (-not $leaf.Equals('shims', [StringComparison]::OrdinalIgnoreCase)) { return '' }
+    return (Get-WindowsPathDirectoryText -Path $directory)
+}
+
+function Get-ScoopShimTargetFromContent {
+    param([string[]]$Content)
+    foreach ($line in @($Content)) {
+        if ([string]$line -match '^\s*path\s*=\s*(.+?)\s*$') {
+            $value = $Matches[1].Trim()
+            if (($value.StartsWith('"') -and $value.EndsWith('"')) -or
+                ($value.StartsWith("'") -and $value.EndsWith("'"))) {
+                $value = $value.Substring(1, $value.Length - 2)
+            }
+            return $value
+        }
+    }
+    return ''
+}
+
+function Get-ScoopPackageNameFromAppsPathText {
+    param([string]$Path)
+    $normalized = ConvertTo-WindowsComparablePath -Path $Path
+    $match = [regex]::Match($normalized, '(?i)(^|\\)apps\\([^\\]+)(\\|$)')
+    if (-not $match.Success) { return '' }
+    return $match.Groups[2].Value
+}
+
+function Get-ScoopPackageNameFromKnownAppsPath {
+    param([string]$Path, [string[]]$ExtraRoots = @())
+    $roots = @()
+    foreach ($candidate in @($ExtraRoots + (Get-ScoopRootCandidates))) {
+        if (-not [string]::IsNullOrWhiteSpace($candidate)) {
+            $roots += (ConvertTo-WindowsComparablePath -Path $candidate)
+        }
+    }
+    foreach ($root in @($roots | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique)) {
+        $appsDir = Join-WindowsPathText -Left $root -Right 'apps'
+        if (Test-WindowsPathUnderDirectoryText -Path $Path -Directory $appsDir) {
+            return (Get-ScoopPackageNameFromAppsPathText -Path $Path)
+        }
+    }
+    return ''
+}
+
+function Get-ScoopShimPackageState {
+    param([string]$tool)
+    $source = Get-CatalogToolCommandSource -tool $tool
+    if ([string]::IsNullOrWhiteSpace($source)) {
+        return [pscustomobject]@{ Status = 'none'; Source = ''; Shim = ''; Package = ''; Reason = '' }
+    }
+    $normalizedSource = ConvertTo-WindowsComparablePath -Path $source
+    if ($normalizedSource -notmatch '(?i)\\shims\\[^\\]+$') {
+        return [pscustomobject]@{ Status = 'none'; Source = $source; Shim = ''; Package = ''; Reason = '' }
+    }
+
+    $shimPath = Get-ScoopShimMetadataPath -Source $normalizedSource
+    $hasShim = -not [string]::IsNullOrWhiteSpace($shimPath) -and (Test-Path -LiteralPath $shimPath -PathType Leaf)
+    if (-not $hasShim) {
+        if (Test-ScoopShimSourceUnderKnownRoot -Source $normalizedSource) {
+            return [pscustomobject]@{
+                Status = 'error'; Source = $source; Shim = $shimPath; Package = '';
+                Reason = 'Scoop shim metadata file is missing'
+            }
+        }
+        return [pscustomobject]@{ Status = 'none'; Source = $source; Shim = $shimPath; Package = ''; Reason = '' }
+    }
+
+    try {
+        $target = Get-ScoopShimTargetFromContent -Content @(Get-Content -LiteralPath $shimPath -ErrorAction Stop)
+    } catch {
+        return [pscustomobject]@{
+            Status = 'error'; Source = $source; Shim = $shimPath; Package = '';
+            Reason = 'Scoop shim metadata file could not be read'
+        }
+    }
+    if ([string]::IsNullOrWhiteSpace($target)) {
+        return [pscustomobject]@{
+            Status = 'error'; Source = $source; Shim = $shimPath; Package = '';
+            Reason = 'Scoop shim metadata has no path entry'
+        }
+    }
+
+    $sourceRoot = Get-ScoopRootFromShimSource -Source $normalizedSource
+    $package = Get-ScoopPackageNameFromKnownAppsPath -Path $target -ExtraRoots @($sourceRoot)
+    if ([string]::IsNullOrWhiteSpace($package)) {
+        return [pscustomobject]@{
+            Status = 'error'; Source = $source; Shim = $shimPath; Package = '';
+            Reason = ("Scoop shim target is outside the apps tree: {0}" -f $target)
+        }
+    }
+    return [pscustomobject]@{ Status = 'found'; Source = $source; Shim = $shimPath; Package = $package; Reason = '' }
+}
+
 function Get-ScoopPackageListName {
     param([string]$Package)
     if ([string]::IsNullOrWhiteSpace($Package)) { return '' }
     return @($Package -split '/')[-1]
 }
 
-function Test-ScoopPackageManaged {
+function Test-ScoopPackageManagedByList {
     param([string]$Package)
     if ([string]::IsNullOrWhiteSpace($Package)) { return $false }
     if (-not (Get-Command scoop -ErrorAction SilentlyContinue)) { return $false }
@@ -656,6 +832,58 @@ function Test-ScoopPackageManaged {
         return $false
     }
     return $false
+}
+
+function Get-ScoopPackageOwnershipState {
+    param([string]$tool, [string]$Package)
+    $listName = Get-ScoopPackageListName -Package $Package
+    if ([string]::IsNullOrWhiteSpace($listName)) {
+        return [pscustomobject]@{ Status = 'not-managed'; Reason = ''; Source = ''; Package = ''; Expected = $listName }
+    }
+
+    $shimState = Get-ScoopShimPackageState -tool $tool
+    if ($shimState.Status -eq 'found') {
+        if ($shimState.Package.Equals($listName, [StringComparison]::OrdinalIgnoreCase)) {
+            return [pscustomobject]@{ Status = 'managed'; Reason = ''; Source = $shimState.Source; Package = $shimState.Package; Expected = $listName }
+        }
+        return [pscustomobject]@{
+            Status = 'error'; Source = $shimState.Source; Package = $shimState.Package; Expected = $listName;
+            Reason = ("Scoop shim points to package {0}, expected {1}" -f $shimState.Package, $listName)
+        }
+    }
+    if ($shimState.Status -eq 'error') {
+        return [pscustomobject]@{
+            Status = 'error'; Source = $shimState.Source; Package = $shimState.Package; Expected = $listName;
+            Reason = $shimState.Reason
+        }
+    }
+    if (-not [string]::IsNullOrWhiteSpace($shimState.Source)) {
+        $sourcePackage = Get-ScoopPackageNameFromKnownAppsPath -Path $shimState.Source
+        if (-not [string]::IsNullOrWhiteSpace($sourcePackage)) {
+            if ($sourcePackage.Equals($listName, [StringComparison]::OrdinalIgnoreCase)) {
+                return [pscustomobject]@{ Status = 'managed'; Reason = ''; Source = $shimState.Source; Package = $sourcePackage; Expected = $listName }
+            }
+            return [pscustomobject]@{
+                Status = 'error'; Source = $shimState.Source; Package = $sourcePackage; Expected = $listName;
+                Reason = ("Scoop app source points to package {0}, expected {1}" -f $sourcePackage, $listName)
+            }
+        }
+        return [pscustomobject]@{ Status = 'not-managed'; Reason = ''; Source = $shimState.Source; Package = ''; Expected = $listName }
+    }
+
+    if (Test-ScoopPackageManagedByList -Package $Package) {
+        return [pscustomobject]@{ Status = 'managed'; Reason = ''; Source = ''; Package = $listName; Expected = $listName }
+    }
+    return [pscustomobject]@{ Status = 'not-managed'; Reason = ''; Source = $shimState.Source; Package = ''; Expected = $listName }
+}
+
+function Test-ScoopPackageManaged {
+    param([string]$Package, [string]$Tool = '')
+    if ([string]::IsNullOrWhiteSpace($Tool)) {
+        return (Test-ScoopPackageManagedByList -Package $Package)
+    }
+    $state = Get-ScoopPackageOwnershipState -tool $Tool -Package $Package
+    return ($state.Status -eq 'managed')
 }
 
 function Test-WingetPackageManaged {
@@ -741,13 +969,28 @@ function Get-ManagedCatalogToolUpdateTarget {
         $pkg = Get-CatalogPackageId -tool $tool -Manager $manager
         if ([string]::IsNullOrWhiteSpace($pkg)) { continue }
         if (-not (Get-Command $manager -ErrorAction SilentlyContinue)) { continue }
-        $managed = switch ($manager) {
-            'scoop' { Test-ScoopPackageManaged -Package $pkg }
-            'winget' { Test-WingetPackageManaged -Package $pkg }
-            'choco' { Test-ChocoPackageManaged -Package $pkg }
+        $state = switch ($manager) {
+            'scoop' { Get-ScoopPackageOwnershipState -tool $tool -Package $pkg }
+            'winget' {
+                if (Test-WingetPackageManaged -Package $pkg) {
+                    [pscustomobject]@{ Status = 'managed'; Reason = ''; Source = ''; Package = $pkg; Expected = $pkg }
+                } else {
+                    [pscustomobject]@{ Status = 'not-managed'; Reason = ''; Source = ''; Package = ''; Expected = $pkg }
+                }
+            }
+            'choco' {
+                if (Test-ChocoPackageManaged -Package $pkg) {
+                    [pscustomobject]@{ Status = 'managed'; Reason = ''; Source = ''; Package = $pkg; Expected = $pkg }
+                } else {
+                    [pscustomobject]@{ Status = 'not-managed'; Reason = ''; Source = ''; Package = ''; Expected = $pkg }
+                }
+            }
         }
-        if ($managed) {
-            return [pscustomobject]@{ Pm = $manager; Pkg = $pkg }
+        if ($state.Status -eq 'error') {
+            return [pscustomobject]@{ Pm = $manager; Pkg = $pkg; Status = 'error'; Reason = $state.Reason; Source = $state.Source }
+        }
+        if ($state.Status -eq 'managed') {
+            return [pscustomobject]@{ Pm = $manager; Pkg = $pkg; Status = 'managed'; Reason = ''; Source = $state.Source }
         }
     }
     return $null
@@ -770,8 +1013,16 @@ function Report-UnmanagedCatalogTool {
     if ([string]::IsNullOrWhiteSpace($source)) { $source = 'unknown source' }
     Add-UnmanagedDependency -tool $tool -Source $source
     if ($ReportSkip) {
-        Write-Warning ("  skipped   {0,-26} present at {1}; update skipped because Scoop, winget, and Chocolatey do not claim it" -f $tool, $source)
+        Write-Host ("  unmanaged {0,-26} source={1}" -f $tool, $source)
     }
+}
+
+function Report-BlockedCatalogToolUpdate {
+    param([string]$tool, [object]$Target)
+    $reason = if ($Target -and -not [string]::IsNullOrWhiteSpace($Target.Reason)) { $Target.Reason } else { 'manager provenance could not be verified' }
+    $source = if ($Target -and -not [string]::IsNullOrWhiteSpace($Target.Source)) { $Target.Source } else { Get-CatalogToolCommandSource -tool $tool }
+    Write-Warning ("  blocked   {0,-26} {1}; source={2}" -f $tool, $reason, $source)
+    $script:InstallFailures += [pscustomobject]@{ Tool=$tool; Pm=$Target.Pm; Pkg=$Target.Pkg; ExitCode='scoop-shim-provenance' }
 }
 
 function Update-ScoopTool {
@@ -852,7 +1103,7 @@ function Update-WingetTool {
     }
     $upgradeState = Get-WingetPackageUpgradeState -Package $pkg
     if ($upgradeState.Status -eq 'none') {
-        if ($ReportSkip) { Write-Host ("  skipped   {0,-26} no winget upgrade available" -f $tool) }
+        if ($ReportSkip) { Write-Host ("  current   {0,-26} via winget" -f $tool) }
         return
     }
     if ($upgradeState.Status -ne 'available') {
@@ -869,7 +1120,7 @@ function Update-WingetTool {
     if ($LASTEXITCODE -eq 0) {
         Write-Host ("  updated   {0,-26} via winget" -f $tool)
     } elseif (Test-WingetNoApplicableUpgradeExitCode -ExitCode $LASTEXITCODE) {
-        Write-Host ("  skipped   {0,-26} no winget upgrade available" -f $tool)
+        Write-Host ("  current   {0,-26} via winget" -f $tool)
     } else {
         Write-Warning ("  winget upgrade of {0} failed (exit {1})" -f $pkg, $LASTEXITCODE)
         $script:InstallFailures += [pscustomobject]@{ Tool=$tool; Pm='winget'; Pkg=$pkg; ExitCode=$LASTEXITCODE }
@@ -936,6 +1187,10 @@ function Update-ManagedCatalogTool {
         Report-UnmanagedCatalogTool -tool $tool -ReportSkip:$ReportSkip
         return
     }
+    if ($target.Status -eq 'error') {
+        Report-BlockedCatalogToolUpdate -tool $tool -Target $target
+        return
+    }
 
     switch ($target.Pm) {
         'scoop' {
@@ -953,10 +1208,7 @@ function Update-ManagedCatalogTool {
 function Write-UnmanagedDependencySummary {
     if (($null -eq $script:UnmanagedDependencies) -or ($script:UnmanagedDependencies.Count -eq 0)) { return }
     Write-Host ""
-    Write-Host "install-deps: present tools skipped because Scoop, winget, and Chocolatey do not claim them:"
-    foreach ($item in $script:UnmanagedDependencies) {
-        Write-Host ("  SKIP  {0,-20} source={1}" -f $item.Tool, $item.Source) -ForegroundColor Yellow
-    }
+    Write-Host "install-deps: $($script:UnmanagedDependencies.Count) present tool(s) were not updated because supported managers do not own their command source."
     Write-Host "Install or migrate those tools through a supported package manager for setup.ps1 -Update to own their updates."
 }
 

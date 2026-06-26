@@ -699,11 +699,17 @@ save only**. The next plain `:w` formats normally. Implemented in
   tools through scoped per-package manager commands
   (`brew upgrade <formula>`, native Linux package upgrade commands, Windows
   `scoop update <pkg>` after one manifest refresh, Windows
-  `winget upgrade --id <id> -e`, or Windows `choco upgrade <pkg> -y`). Winget
-  updates require both exact ownership and an exact
+  `winget upgrade --id <id> -e`, or Windows `choco upgrade <pkg> -y`). Scoop
+  ownership must use shim metadata as the first proof layer: a command source
+  under `...\scoop\shims` must parse the sibling `.shim` target and match
+  `...\scoop\apps\<catalog-package>\...` before any package-list fallback. A
+  resolved command source outside Scoop must not be claimed by `scoop list`. A
+  corrupt or mismatched Scoop shim is a blocked update failure, not an unmanaged
+  tool and not a reason to fall through to winget/Chocolatey. Winget updates
+  require both exact ownership and an exact
   `winget list --upgrade-available --id <id> -e --accept-source-agreements`
-  availability row; no matching available update is a successful skip, while a
-  failed availability query appends to `InstallFailures`. It must not run
+  availability row; no matching available update is reported as `current`, while
+  a failed availability query appends to `InstallFailures`. It must not run
   blanket upgrades such as `brew upgrade`, `apt upgrade`,
   `scoop update *`, `winget upgrade --all`, or `choco upgrade all`, and it must
   not touch pinned direct downloads, PSFzf, `lazy-lock.json`, or configs. On
@@ -845,10 +851,18 @@ save only**. The next plain `:w` formats normally. Implemented in
   current process PATH and persistent User PATH.
 - **`Update-ManagedCatalogTool` is the Windows update dispatcher.** It detects
   exact ownership through Scoop, winget, then Chocolatey, and dispatches only
-  one scoped package update. Winget ownership is not enough to run an update:
+  one scoped package update. Scoop ownership is proven from shim metadata before
+  any package-list fallback: the sibling `.shim` file is authoritative for
+  mapping command binaries such as `rg.exe` back to package names such as
+  `ripgrep`. If the resolved command source is outside Scoop, `scoop list` must
+  not claim it. If a command resolves through Scoop shims but the metadata is
+  missing, unreadable, outside the apps tree, or mapped to a different package,
+  update mode records a blocked Scoop provenance failure and must not fall
+  through to another manager. Winget ownership is not enough to run an update:
   `Get-WingetPackageUpgradeState` must first prove exact upgrade availability
-  with `winget list --upgrade-available --id <id> -e`; no matching update is an
-  idempotent skip, and a failed availability query is a real update failure.
+  with `winget list --upgrade-available --id <id> -e`; no matching update is
+  reported as `current`, and a failed availability query is a real update
+  failure.
   `Update-ScoopTool` remains the only Scoop-specific update path and is
   intentionally single-package; never replace it with `scoop update *`,
   `winget upgrade --all`, `choco upgrade all`, or another blanket upgrade.
