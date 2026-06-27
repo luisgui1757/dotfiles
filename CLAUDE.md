@@ -716,11 +716,15 @@ save only**. The next plain `:w` formats normally. Implemented in
   Windows, a present catalog tool is updated only when Scoop, winget, or
   Chocolatey claims that exact package; otherwise update mode reports it as
   unmanaged with its resolved executable path and exits successfully unless an
-  attempted scoped update failed. On native Linux without Linuxbrew or
-  Alpine/apk, `nvim`, `lazygit`, `starship`, and `tree-sitter` are pinned
-  direct-download binaries and stay out of the update path. Linuxbrew updates
-  them through `brew upgrade <formula>`; Alpine updates its native `neovim`,
-  `lazygit`, `starship`, and `tree-sitter` packages through apk.
+  attempted scoped update failed. On Unix, a present catalog tool that is not
+  owned by the active package manager is also reported as `unmanaged` with the
+  resolved command source; do not use vague "present, but <manager> does not
+  manage" wording. For Homebrew, package-list ownership is not enough when the
+  resolved command source is outside the Homebrew prefix. On native Linux without
+  Linuxbrew or Alpine/apk, `nvim`, `lazygit`, `starship`, and `tree-sitter` are
+  pinned direct-download binaries and stay out of the update path. Linuxbrew
+  updates them through `brew upgrade <formula>`; Alpine updates its native
+  `neovim`, `lazygit`, `starship`, and `tree-sitter` packages through apk.
 - **Polaris is setup Phase 6/6 and is opt-out, not experimental.** Full setup
   (`--all` / `-All`) applies Polaris `0.1.1` at commit
   `489dcc6f991ddcff63c460a433e983264dc54cf7` unless

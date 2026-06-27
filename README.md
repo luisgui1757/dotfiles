@@ -284,22 +284,28 @@ and whether `pwsh` is installed.
   itself, present/missing tools, best-effort versions, and the resulting
   skip/install action. The table is informational; the existing per-tool install
   logic still decides what actually runs.
-- `setup.ps1 -Update` is scoped and manager-aware on Windows. It updates only
-  present catalog tools that Scoop, winget, or Chocolatey claims through exact
-  per-package commands such as `scoop update <pkg>`,
-  `winget upgrade --id <id> -e`, and `choco upgrade <pkg> -y`. It never runs
-  blanket upgrades such as `scoop update *`, `winget upgrade --all`, or
-  `choco upgrade all`. Scoop-owned tools are detected from their shim metadata
-  before any package-list fallback, so a command under `...\scoop\shims` updates
-  through Scoop even when the package name differs from the binary name (for
-  example `rg` -> `ripgrep`). `scoop list` is not allowed to claim a command
+- `setup.sh --update` and `setup.ps1 -Update` are scoped and manager-aware. They
+  update only present catalog tools that the active package manager owns through
+  exact per-package commands such as `brew upgrade <formula>`,
+  `apt-get install --only-upgrade <pkg>`, `scoop update <pkg>`,
+  `winget upgrade --id <id> -e`, and `choco upgrade <pkg> -y`. They never run
+  blanket upgrades such as `brew upgrade`, `apt upgrade`, `scoop update *`,
+  `winget upgrade --all`, or `choco upgrade all`. On Unix, a present catalog
+  tool outside active package-manager ownership is reported as `unmanaged` with
+  the resolved command source, for example Apple's Command Line Tools
+  `/usr/bin/git`. For Homebrew, package-list ownership is not enough when the
+  command still resolves outside the Homebrew prefix. On Windows, Scoop-owned
+  tools are detected from their shim metadata before any package-list fallback,
+  so a command under `...\scoop\shims` updates through Scoop even when the
+  package name differs from the binary name (for example `rg` -> `ripgrep`).
+  `scoop list` is not allowed to claim a command
   source outside Scoop. A corrupt Scoop shim blocks update mode and is reported
   as a failure instead of being mislabeled unmanaged. Winget-owned tools first
   need an exact `winget list --upgrade-available --id <id> -e` match; no
   available winget upgrade is reported as `current`, while a failed availability
-  query remains a failure. If a present tool such as `pwsh` was installed outside
-  those managers, update mode prints the executable path and reports it as
-  unmanaged instead of implying dotfiles updated it.
+  query remains a failure. If a present Windows tool such as `pwsh` was installed
+  outside the supported managers, update mode prints the executable path and
+  reports it as unmanaged instead of implying dotfiles updated it.
 - zsh plugins are installed by Unix setup as repo-managed pinned git checkouts:
   `fzf-tab` and `zsh-autosuggestions` live under
   `~/.local/share/dotfiles/zsh-plugins`. `zshrc` sources those copies first and
@@ -763,5 +769,6 @@ MIT. See `LICENSE`.
 | `setup.ps1` errors "cannot create symbolic links" | Developer Mode off and not elevated | `setup.ps1` reports your *elevated* + *Developer Mode* state before chezmoi apply. Enable Developer Mode (Settings -> Privacy & security -> For developers, no admin, recommended) **then** `.\setup.ps1 -SkipDeps`; OR run just the config phase elevated with `.\setup.ps1 -SkipDeps -SkipNvim`, then return to a normal shell for `.\setup.ps1 -SkipDeps -SkipConfig`. Don't elevate the dependency-install run because Scoop refuses admin installs |
 | Ghostty won't open maximized on Linux/GNOME | `maximize = true` is a hint the WM may ignore (GNOME Mutter often does) | on **X11**, `install-deps` offers a devilspie2 setup through the native Linux package manager, even when Linuxbrew is the main CLI manager; the rule is keyed on `com.mitchellh.ghostty`. Wayland needs a GNOME Shell extension instead |
 | `install-deps.ps1`: winget `No package found matching input criteria` (exit `-1978335212`) | winget source/catalog flakiness | install-deps now **prefers scoop** and falls back across managers per tool -- accept the scoop bootstrap when offered and re-run; VS Build Tools has no Scoop package, so it falls through to choco and then Microsoft's official bootstrapper |
+| `setup.sh --update` says a tool is `unmanaged` | the executable is present, but the active Unix package manager does not own the catalog package | use the system-provided tool as-is, or intentionally install/migrate that tool through the active package manager if you want dotfiles update mode to own future updates |
 | `setup.ps1 -Update` says a tool is `unmanaged` | the executable is present, but its command source is outside supported manager ownership | install or migrate that tool through Scoop, winget, or Chocolatey if you want dotfiles to own future updates; otherwise update that manually-installed copy outside dotfiles |
 | `setup.ps1 -Update` says a Scoop-owned tool is `blocked` | the command resolves through Scoop shims, but the shim metadata cannot prove the exact catalog package | repair or reinstall that Scoop package, then rerun update mode; dotfiles intentionally fails closed instead of updating a different manager's package |

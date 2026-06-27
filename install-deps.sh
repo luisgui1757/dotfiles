@@ -1801,6 +1801,20 @@ update_tool_present() {
     have_any $bins
 }
 
+update_tool_source() {
+    local tool="$1" bins bin source
+    bins="$(binaries_for "$tool")"
+    # shellcheck disable=SC2086  # $bins is intentional word-splitting
+    for bin in $bins; do
+        source="$(command -v "$bin" 2>/dev/null || true)"
+        if [[ -n "$source" ]]; then
+            printf '%s\n' "$source"
+            return 0
+        fi
+    done
+    return 1
+}
+
 pm_pkg_installed() {
     local pm="$1" pkg="$2" pkg_name
     pkg_name="${pkg##*/}"
@@ -1822,6 +1836,24 @@ pm_pkg_installed() {
             ;;
         *)
             return 1
+            ;;
+    esac
+}
+
+pm_owns_tool_source() {
+    local pm="$1" tool="$2" source prefix
+    case "$pm" in
+        brew)
+            source="$(update_tool_source "$tool" || true)"
+            prefix="$(brew --prefix 2>/dev/null || true)"
+            if [[ -z "$source" || -z "$prefix" ]]; then return 0; fi
+            case "$source" in
+                "$prefix"/*) return 0 ;;
+                *) return 1 ;;
+            esac
+            ;;
+        *)
+            return 0
             ;;
     esac
 }
@@ -1869,7 +1901,7 @@ is_pinned_direct_update_tool() {
 }
 
 update_catalog_tool() {
-    local tool="$1" pkg
+    local tool="$1" pkg source
     [[ -n "$tool" ]] || return 0
 
     if is_pinned_direct_update_tool "$tool"; then
@@ -1888,8 +1920,10 @@ update_catalog_tool() {
         return 0
     fi
 
-    if ! pm_pkg_installed "$PM" "$pkg"; then
-        printf "  skipped   %-26s present, but %s does not manage %s\n" "$tool" "$PM" "$pkg"
+    if ! pm_pkg_installed "$PM" "$pkg" || ! pm_owns_tool_source "$PM" "$tool"; then
+        source="$(update_tool_source "$tool" || true)"
+        if [[ -z "$source" ]]; then source="unknown source"; fi
+        printf "  unmanaged %-26s source=%s\n" "$tool" "$source"
         return 0
     fi
 
