@@ -117,4 +117,53 @@ grep -F 'brew upgrade tree-sitter-cli' "$COMMAND_LOG" >/dev/null \
 grep -F 'brew upgrade starship' "$COMMAND_LOG" >/dev/null \
     || fail "Linuxbrew-managed starship did not use brew upgrade starship"
 
+cat > "$TMP_ROOT/fakebin/git" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+chmod +x "$TMP_ROOT/fakebin/git"
+INSTALL_DEPS_UPDATE_TOOLS="git"
+
+: > "$COMMAND_LOG"
+pm_pkg_installed() {
+    return 0
+}
+brew() {
+    if [[ "$*" == "--prefix" ]]; then
+        printf '%s\n' "$TMP_ROOT/homebrew"
+        return 0
+    fi
+    printf '%s\n' "brew $*" >> "$COMMAND_LOG"
+}
+output="$(update_catalog_tools)"
+
+printf '%s\n' "$output" | grep -Eq "^  unmanaged[[:space:]]+git[[:space:]]+source=$TMP_ROOT/fakebin/git$" \
+    || fail "brew-installed but shadowed git did not report the resolved unmanaged source"
+grep -F 'brew upgrade git' "$COMMAND_LOG" >/dev/null \
+    && fail "brew-installed but shadowed git attempted a brew upgrade"
+
+mkdir -p "$TMP_ROOT/homebrew/bin"
+cat > "$TMP_ROOT/homebrew/bin/git" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+chmod +x "$TMP_ROOT/homebrew/bin/git"
+PATH="$TMP_ROOT/homebrew/bin:$TMP_ROOT/fakebin:/usr/bin:/bin"
+: > "$COMMAND_LOG"
+output="$(update_catalog_tools)"
+
+grep -F 'brew upgrade git' "$COMMAND_LOG" >/dev/null \
+    || fail "brew-owned git did not use brew upgrade git"
+
+PATH="$TMP_ROOT/fakebin:/usr/bin:/bin"
+pm_pkg_installed() {
+    return 1
+}
+output="$(update_catalog_tools)"
+
+printf '%s\n' "$output" | grep -Eq "^  unmanaged[[:space:]]+git[[:space:]]+source=$TMP_ROOT/fakebin/git$" \
+    || fail "brew-unowned git did not report the resolved unmanaged source"
+printf '%s\n' "$output" | grep -F 'present, but brew does not manage git' >/dev/null \
+    && fail "brew-unowned git used the old ambiguous ownership wording"
+
 echo "OK"
