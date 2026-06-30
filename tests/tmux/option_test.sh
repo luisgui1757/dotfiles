@@ -12,7 +12,7 @@ session_name="dotfiles-opt-$$"
 sock_name="dotfiles-opt-$$"
 
 # Hermetic HOME so the baseline check below is real: tmux.conf does
-# `source-file -q "~/.tmux.posix.conf"`, and if the runner already has that
+# `source-file -q ~/.tmux.posix.conf`, and if the runner already has that
 # overlay deployed in its real HOME, the POSIX probes would rebind copy-mode `y`
 # and mask the OSC52 baseline we are asserting. An empty temp HOME guarantees the
 # overlay is absent; we source it explicitly later for the pbcopy assertion.
@@ -89,8 +89,9 @@ for required in \
     "set -g @plugin 'psmux-plugins/ppm'" \
     "set -g @plugin 'psmux-plugins/psmux-theme-rosepine'" \
     "set -g @rosepine-variant 'main'" \
+    "set -g @rosepine-show-date-time 'off'" \
     "set -g status-position top" \
-    "set -g status-right \"\""; do
+    "run '~/.psmux/plugins/psmux-theme-rosepine/psmux-theme-rosepine.ps1'"; do
     if ! grep -F "$required" "$REPO_ROOT/tmux/tmux.windows.conf" >/dev/null; then
         echo "FAIL: tmux.windows.conf missing required plugin line: $required"
         exit 1
@@ -137,7 +138,7 @@ if [[ "$order" != *"1:two 2:one"* ]]; then
 fi
 
 # Copy-mode `y` baseline. The session above booted with `-f tmux/tmux.conf`;
-# its bottom-of-file `source-file -q "~/.tmux.posix.conf"` is a no-op under the
+# its bottom-of-file `source-file -q ~/.tmux.posix.conf` is a no-op under the
 # isolated HOME (the overlay is absent). So only the psmux-safe OSC52 baseline applies: `y`
 # must be bound to a BARE `copy-pipe-and-cancel` with NO pipe command after it.
 # The `$` anchor is load-bearing -- a probe rebind appends a pipe argument
@@ -163,5 +164,17 @@ if [[ "$(uname -s)" == "Darwin" ]]; then
     fi
     echo "  tmux.posix.conf overlay rebinds y -> pbcopy on macOS"
 fi
+
+# Prove the shared config's tilde overlay source lines actually load an overlay
+# from HOME. This catches quoted-tilde regressions that real tmux tolerates less
+# strictly than psmux, and prevents the Windows overlay from silently disappearing.
+printf '%s\n' 'set -g @dotfiles-test-windows-overlay loaded' > "$HOME/.tmux.windows.conf"
+tmux -L "$sock_name" source-file "$REPO_ROOT/tmux/tmux.conf"
+if [[ "$(tmux -L "$sock_name" show-options -gv @dotfiles-test-windows-overlay 2>/dev/null)" != "loaded" ]]; then
+    echo "FAIL: tmux.conf did not source ~/.tmux.windows.conf from HOME"
+    exit 1
+fi
+rm -f "$HOME/.tmux.windows.conf"
+echo "  tmux.conf sources ~/.tmux.windows.conf from HOME"
 
 echo "OK"

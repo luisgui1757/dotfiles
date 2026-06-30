@@ -272,7 +272,9 @@ and whether `pwsh` is installed.
   `main`; switch to `moon` or `dawn` by changing `@rose_pine_variant` in
   `tmux/tmux.posix.conf` and `@rosepine-variant` in `tmux/tmux.windows.conf`.
   The tmux/psmux bar intentionally has no date/time segment because Starship is
-  the single clock surface.
+  the single clock surface; Windows setup applies a recorded deterministic patch
+  to the pinned psmux Rose Pine plugin so `@rosepine-show-date-time 'off'`
+  removes the clock/date inside the theme instead of blanking `status-right`.
 - `install-deps` provisions `lsd` through the supported package managers
   (Homebrew, native Linux package managers where available, and the Windows
   Scoop-first catalog). Interactive shells replace `ls` with `lsd` and add the
@@ -676,7 +678,9 @@ stale; CI then fails verification until a human reviews the adjacent constant.
   TPM and Windows psmux uses PPM; both load pinned upstream Rose Pine plugins
   installed by setup. The repo default is upstream `main`, with `moon` / `dawn`
   available through the official plugin variant options. The bar is top-aligned
-  and clock-free on both runtimes; Starship owns time display.
+  and clock-free on both runtimes; Starship owns time display. The shared
+  `tmux.conf` sources overlays with unquoted `~/.tmux.*.conf` paths so psmux
+  loads the Windows overlay reliably.
 - **WSL is split-host by default.** Windows Terminal renders fonts and window UI
   on the Windows side; WSL installs the Linux CLI/editor stack. Linux Ghostty
   and Linux fontconfig fonts in WSL require `--experimental-wsl-gui`.

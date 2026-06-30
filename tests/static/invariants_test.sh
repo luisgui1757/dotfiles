@@ -61,6 +61,10 @@ check_absent "no load-time if-shell in cross-platform tmux.conf (psmux freeze gu
     "^[[:space:]]*if-shell" \
     tmux/tmux.conf home/dot_tmux.conf
 
+check_absent "tmux overlay source paths keep unquoted tilde for psmux" \
+    'source-file -q "~/' \
+    tmux/tmux.conf home/dot_tmux.conf
+
 if find tmux/themes -type f -name '*.conf' 2>/dev/null | grep -q .; then
     echo "FAIL: local tmux theme snippets must stay deleted; use upstream Rose Pine variants"
     find tmux/themes -type f -name '*.conf'

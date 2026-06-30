@@ -1150,9 +1150,10 @@ save only**. The next plain `:w` formats normally. Implemented in
   `.tmux.windows.conf` is ignored off-Windows). The cross-platform
   `tmux/tmux.conf` keeps only a psmux-safe OSC52 baseline
   (`bind -T copy-mode-vi y send -X copy-pipe-and-cancel`, no shell) and
-  `source-file -q "~/.tmux.posix.conf"` — a silent no-op on Windows where the
-  file is absent (same proven mechanism as the Windows overlay source). On POSIX
-  the overlay re-binds `y` to the native CLI when one exists. This is the
+  `source-file -q ~/.tmux.posix.conf` — a silent no-op on Windows where the
+  file is absent (same proven mechanism as the Windows overlay source). Keep the
+  tilde path unquoted because psmux is stricter than real tmux about quoted path
+  expansion. On POSIX the overlay re-binds `y` to the native CLI when one exists. This is the
   canonical "guard the block, don't fork the config" fix. **Invariant:** the
   cross-platform `tmux/tmux.conf` (and its `home/dot_tmux.conf` mirror) must
   contain NO command-position `if-shell` — guarded by `invariants_test.sh`
@@ -1172,8 +1173,8 @@ save only**. The next plain `:w` formats normally. Implemented in
   and `MenuComplete` looked broken inside panes: PSReadLine was never loaded.
   The fix is a Windows-only overlay `tmux/tmux.windows.conf`, managed as
   `~/.tmux.windows.conf` by chezmoi on Windows and pulled in by the main
-  `tmux/tmux.conf` via `source-file -q` (silent no-op on Unix where it does not
-  exist). The overlay sets:
+  `tmux/tmux.conf` via unquoted `source-file -q ~/.tmux.windows.conf`
+  (silent no-op on Unix where it does not exist). The overlay sets:
   (1) `default-shell pwsh` — so fresh psmux panes spawn PowerShell 7, which
   loads PSReadLine + the profile.
   (2) `allow-predictions on` — psmux otherwise resets `PredictionSource` to
@@ -1422,10 +1423,15 @@ host OS or shell would otherwise hide a branch from CI.
   selector is the upstream variant option: `@rose_pine_variant` on POSIX and
   `@rosepine-variant` on Windows, defaulting to `main` with `moon` / `dawn`
   available. Keep local `tmux/themes/*.conf` snippets deleted. The bar is
-  clock-free because Starship is the single time surface; psmux clears
-  `status-right` after the theme entrypoint because that plugin has no documented
-  clock toggle. Keep plugin managers in OS overlays only; shared `tmux.conf`
-  must remain free of load-time `if-shell` and psmux-specific plugin commands.
+  clock-free because Starship is the single time surface. Upstream
+  psmux-theme-rosepine has no clock toggle, so `install-deps.ps1` applies a
+  deterministic recorded patch to the pinned copied plugin, preserving the
+  plugin checkout's newline style and failing loudly if upstream anchors drift.
+  The Windows overlay sets `@rosepine-show-date-time 'off'`; do not blank
+  `status-right` after the theme, because that leaves a broken right-edge
+  segment. Keep plugin managers in OS overlays only; shared `tmux.conf` must
+  remain free of load-time `if-shell`, psmux-specific plugin commands, and
+  quoted overlay source paths.
   Current pins: TPM
   `e261deb1b47614eed3400089ce7197dc68acc4eb`, `rose-pine/tmux`
   `b6138c51573425ccdc33c91464597323baec3b7e`, and `psmux/psmux-plugins`

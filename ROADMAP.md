@@ -40,8 +40,10 @@ repeatable instead of tribal.
   required-check list duplication, and the Windows Sandbox bootstrap trust root.
 - The combined terminal/update PR removed local tmux theme snippets, kept the
   upstream Rose Pine plugin variants as the only theme surface (`main` by
-  default, `moon` / `dawn` available), and made the tmux/psmux bar clock-free so
-  Starship remains the single time display.
+  default, `moon` / `dawn` available), made the tmux/psmux bar clock-free so
+  Starship remains the single time display, and hardened psmux by using
+  unquoted overlay source paths plus a recorded patch to the pinned
+  psmux-theme-rosepine copy instead of blanking `status-right`.
 
 ## P0 - Total Update Ownership Model
 
