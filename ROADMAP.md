@@ -98,8 +98,10 @@ ownership**:
   runs against the existing cache.
 - Repo-pinned native-Linux artifacts (`nvim`, `lazygit`, `starship`,
   `tree-sitter`, and `chezmoi`) write durable provenance on install and are
-  updated only when the marker matches the resolved executable and the repo pin
-  has changed. Legacy unmarked binaries remain `unmanaged`.
+  updated only when the marker's command path matches the resolved executable,
+  the marker binary lives under the recorded install root, and the repo pin has
+  changed. A shadow command path that resolves to the same binary is still a
+  provenance mismatch. Legacy unmarked binaries remain `unmanaged`.
 - macOS `/bin/zsh` reports `system`; normal macOS developer tools still
   resolving from `/usr/bin` report `unmanaged` with a Homebrew migration hint.
 - Setup persists Homebrew shellenv and Homebrew GNU Make's `libexec/gnubin` path
@@ -108,9 +110,10 @@ ownership**:
 - Regression coverage lives in `tests/shell/install_deps_update_test.sh` for
   mixed Linuxbrew/apt dispatch, Homebrew `current`, shadowed Homebrew tools,
   Brew-prefix contradictions, apt `current`, pacman skip semantics, macOS system
-  zsh, direct-artifact current/unmarked/blocked/refresh behavior, plus install
-  tests that verify provenance markers for Neovim, lazygit, Starship,
-  tree-sitter CLI, and chezmoi.
+  zsh, direct-artifact current/unmarked/blocked/refresh behavior, command-path
+  shadowing, and install-root mismatches, plus install tests that verify
+  provenance markers for Neovim, lazygit, Starship, tree-sitter CLI, and
+  chezmoi.
 
 ### Required Design
 
@@ -278,6 +281,8 @@ ownership**:
    - prove the current executable resolves to the dotfiles-managed install
      shape, matching provenance, matching installed-binary checksum, and
      matching executable `--version` output;
+   - reject a different command path even if it is a symlink to the same binary;
+   - reject marker binaries that do not live under the recorded install root;
    - compare the installed executable version to the repo pin;
    - reinstall the pinned artifact with SHA-256 verification only when the repo
      pin is newer or the install is corrupt;

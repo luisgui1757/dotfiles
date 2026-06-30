@@ -2321,7 +2321,13 @@ direct_artifact_marker_path() {
 
 write_direct_artifact_provenance() {
     local tool="$1" command_path="$2" binary_path="$3" install_root="$4" url="$5" version="$6" sha256="$7"
-    local marker tmp binary_sha256
+    local marker tmp binary_sha256 binary_real install_root_real
+    binary_real="$(real_source_path "$binary_path")"
+    install_root_real="$(real_source_path "$install_root")"
+    if ! path_under "$binary_path" "$install_root" || ! path_under "$binary_real" "$install_root_real"; then
+        echo "  FAIL: direct artifact binary for $tool is outside install root $install_root" >&2
+        return 1
+    fi
     if ! binary_sha256="$(sha256_file "$binary_path")"; then
         echo "  FAIL: could not checksum installed $tool binary at $binary_path" >&2
         return 1
@@ -2463,7 +2469,7 @@ direct_artifact_binary_version_matches() {
 
 direct_artifact_claims_tool_source() {
     local tool="$1" source="$2" marker schema marker_tool version url sha256 binary_sha256 command_path binary_path install_root
-    local source_real binary_real current_binary_sha256
+    local source_real binary_real command_real install_root_real current_binary_sha256
     DIRECT_ARTIFACT_REASON=""
     direct_artifact_current_metadata "$tool" || return 1
     marker="$(direct_artifact_marker_path "$tool")"
@@ -2486,18 +2492,29 @@ direct_artifact_claims_tool_source() {
 
     source_real="$(real_source_path "$source")"
     binary_real="$(real_source_path "$binary_path")"
-    if [[ "$source" != "$command_path" && "$source_real" != "$binary_real" ]]; then
-        if path_under "$source" "$install_root" || path_under "$source_real" "$install_root"; then
-            DIRECT_ARTIFACT_REASON="source is inside marker root but does not match marker binary"
+    command_real="$(real_source_path "$command_path")"
+    install_root_real="$(real_source_path "$install_root")"
+    if [[ "$source" != "$command_path" ]]; then
+        if [[ "$source_real" == "$binary_real" || "$source_real" == "$command_real" ]] ||
+            path_under "$source" "$install_root" || path_under "$source_real" "$install_root_real"; then
+            DIRECT_ARTIFACT_REASON="command source does not match marker command path"
             return 2
         fi
         return 1
     fi
     if [[ "$source_real" != "$binary_real" ]]; then
+        if path_under "$source" "$install_root" || path_under "$source_real" "$install_root_real"; then
+            DIRECT_ARTIFACT_REASON="source is inside marker root but does not match marker binary"
+            return 2
+        fi
         DIRECT_ARTIFACT_REASON="command source target does not match marker binary"
         return 2
     fi
 
+    if ! path_under "$binary_path" "$install_root" || ! path_under "$binary_real" "$install_root_real"; then
+        DIRECT_ARTIFACT_REASON="marker binary is outside install root"
+        return 2
+    fi
     if [[ -n "$DIRECT_ARTIFACT_DEFAULT_BINARY" && "$binary_path" != "$DIRECT_ARTIFACT_DEFAULT_BINARY" ]]; then
         DIRECT_ARTIFACT_REASON="binary path does not match repo-pinned install shape"
         return 2

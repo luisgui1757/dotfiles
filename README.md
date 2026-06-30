@@ -313,7 +313,9 @@ and whether `pwsh` is installed.
   `apk info --who-owns`); dotfiles-owned Linux artifacts require a durable
   provenance marker with the expected version, URL, SHA-256, command path,
   binary path, install root, installed-binary SHA-256, and matching `--version`
-  output. Output distinguishes `updated`, `current`, `system`, `unmanaged`,
+  output. Shadow command paths and marker binaries outside the recorded install
+  root are blocked provenance failures, not ownership. Output distinguishes
+  `updated`, `current`, `system`, `unmanaged`,
   `blocked`, and `skipped`. `blocked` fails update mode;
   `unmanaged` reports the source path and exits successfully. On macOS,
   `/bin/zsh` is accepted as `system`, while normal Homebrew developer tools

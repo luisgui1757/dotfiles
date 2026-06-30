@@ -716,8 +716,10 @@ save only**. The next plain `:w` formats normally. Implemented in
   direct Linux artifacts (`nvim`, `lazygit`, `starship`, `tree-sitter`, and
   `chezmoi`) are owned only when their durable marker matches the repo-pinned
   version, URL, SHA-256, command path, binary path, install root, installed
-  binary SHA-256, and executable `--version` output. Legacy unmarked direct
-  binaries remain `unmanaged`. Homebrew current packages must
+  binary SHA-256, and executable `--version` output. A shadow command path that
+  resolves to the same binary is not ownership, and a marker binary outside the
+  recorded install root is corrupt provenance. Legacy unmarked direct binaries
+  remain `unmanaged`. Homebrew current packages must
   print `current` without running `brew upgrade`; Homebrew outdated detection
   must treat an exact `brew outdated --formula --quiet <pkg>` stdout row as
   outdated even when Brew returns nonzero, because Homebrew uses that exit state

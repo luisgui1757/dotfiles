@@ -731,6 +731,111 @@ case_direct_artifact_current() {
     assert_contains "owner=dotfiles-artifact version=$LAZYGIT_LINUX_VERSION source=$bin/lazygit" "$root.out" "direct artifact output did not include provenance proof"
 }
 
+case_direct_artifact_command_path_mismatch_blocks() {
+    local root="$TMP_ROOT/direct-command-path-blocked" canonical="$TMP_ROOT/direct-command-path-blocked/canonical" shadow="$TMP_ROOT/direct-command-path-blocked/shadow" marker_dir="$TMP_ROOT/direct-command-path-blocked/provenance"
+    mkdir -p "$canonical" "$shadow" "$marker_dir"
+    HOME="$TMP_ROOT/direct-command-path-blocked/home"
+    export HOME
+    mkversioned_tool "$canonical/lazygit" "lazygit ${LAZYGIT_LINUX_VERSION#v}"
+    ln -s "$canonical/lazygit" "$shadow/lazygit"
+    PATH="$shadow:/usr/bin:/bin"
+    export PATH
+    DRY_RUN=0
+    PM=unknown
+    DOTFILES_PROVENANCE_DIR="$marker_dir"
+    export DOTFILES_PROVENANCE_DIR
+    INSTALL_DEPS_UPDATE_TOOLS="lazygit"
+
+    uname() {
+        case "${1:-}" in
+            -s) printf '%s\n' "Linux" ;;
+            -m) printf '%s\n' "x86_64" ;;
+            *) command uname "$@" ;;
+        esac
+    }
+    homebrew_bin() { return 1; }
+    native_linux_pm() { printf '%s\n' "unknown"; }
+    direct_artifact_current_metadata lazygit
+    write_direct_artifact_provenance "lazygit" "$canonical/lazygit" "$canonical/lazygit" "$canonical" "$DIRECT_ARTIFACT_URL" "$DIRECT_ARTIFACT_VERSION" "$DIRECT_ARTIFACT_SHA256"
+
+    if update_catalog_tools > "$root.out" 2> "$root.err"; then
+        fail "direct artifact shadow command path did not fail closed"
+    fi
+    assert_contains "blocked   lazygit" "$root.err" "direct artifact command-path mismatch was not blocked"
+    assert_contains "reason=command source does not match marker command path" "$root.err" "direct artifact command-path mismatch reason was not precise"
+    assert_not_contains "current   lazygit" "$root.out" "direct artifact command-path mismatch was reported current"
+}
+
+case_direct_artifact_binary_outside_install_root_blocks() {
+    local root="$TMP_ROOT/direct-root-blocked" bin="$TMP_ROOT/direct-root-blocked/bin" marker_dir="$TMP_ROOT/direct-root-blocked/provenance"
+    local binary_sha256
+    mkdir -p "$bin" "$marker_dir"
+    HOME="$TMP_ROOT/direct-root-blocked/home"
+    export HOME
+    mkversioned_tool "$bin/lazygit" "lazygit ${LAZYGIT_LINUX_VERSION#v}"
+    PATH="$bin:/usr/bin:/bin"
+    export PATH
+    DRY_RUN=0
+    PM=unknown
+    DOTFILES_PROVENANCE_DIR="$marker_dir"
+    export DOTFILES_PROVENANCE_DIR
+    INSTALL_DEPS_UPDATE_TOOLS="lazygit"
+
+    uname() {
+        case "${1:-}" in
+            -s) printf '%s\n' "Linux" ;;
+            -m) printf '%s\n' "x86_64" ;;
+            *) command uname "$@" ;;
+        esac
+    }
+    homebrew_bin() { return 1; }
+    native_linux_pm() { printf '%s\n' "unknown"; }
+    direct_artifact_current_metadata lazygit
+    binary_sha256="$(sha256_file "$bin/lazygit")"
+    printf '%s\n' \
+        "schema=2" \
+        "tool=lazygit" \
+        "version=$DIRECT_ARTIFACT_VERSION" \
+        "source_url=$DIRECT_ARTIFACT_URL" \
+        "sha256=$DIRECT_ARTIFACT_SHA256" \
+        "binary_sha256=$binary_sha256" \
+        "command_path=$bin/lazygit" \
+        "binary_path=$bin/lazygit" \
+        "install_root=$TMP_ROOT/direct-root-blocked/not-root" \
+        > "$marker_dir/lazygit.env"
+
+    if update_catalog_tools > "$root.out" 2> "$root.err"; then
+        fail "direct artifact binary outside install root did not fail closed"
+    fi
+    assert_contains "blocked   lazygit" "$root.err" "direct artifact install-root mismatch was not blocked"
+    assert_contains "reason=marker binary is outside install root" "$root.err" "direct artifact install-root mismatch reason was not precise"
+    assert_not_contains "current   lazygit" "$root.out" "direct artifact install-root mismatch was reported current"
+}
+
+case_direct_artifact_writer_rejects_binary_outside_install_root() {
+    local root="$TMP_ROOT/direct-writer-root-blocked" bin="$TMP_ROOT/direct-writer-root-blocked/bin" marker_dir="$TMP_ROOT/direct-writer-root-blocked/provenance"
+    mkdir -p "$bin" "$marker_dir"
+    HOME="$TMP_ROOT/direct-writer-root-blocked/home"
+    export HOME
+    mkversioned_tool "$bin/lazygit" "lazygit ${LAZYGIT_LINUX_VERSION#v}"
+    DOTFILES_PROVENANCE_DIR="$marker_dir"
+    export DOTFILES_PROVENANCE_DIR
+
+    uname() {
+        case "${1:-}" in
+            -s) printf '%s\n' "Linux" ;;
+            -m) printf '%s\n' "x86_64" ;;
+            *) command uname "$@" ;;
+        esac
+    }
+    direct_artifact_current_metadata lazygit
+    if write_direct_artifact_provenance "lazygit" "$bin/lazygit" "$bin/lazygit" "$TMP_ROOT/direct-writer-root-blocked/not-root" "$DIRECT_ARTIFACT_URL" "$DIRECT_ARTIFACT_VERSION" "$DIRECT_ARTIFACT_SHA256" > "$root.out" 2> "$root.err"; then
+        fail "direct artifact writer accepted a binary outside install root"
+    fi
+    assert_contains "direct artifact binary for lazygit is outside install root" "$root.err" "direct artifact writer did not explain invalid root"
+    [[ ! -e "$marker_dir/lazygit.env" ]] || fail "direct artifact writer created a marker after rejecting invalid root"
+}
+
 case_direct_artifact_checksum_mismatch_blocks() {
     local root="$TMP_ROOT/direct-checksum-blocked" bin="$TMP_ROOT/direct-checksum-blocked/home/.local/bin" marker_dir="$TMP_ROOT/direct-checksum-blocked/provenance"
     mkdir -p "$bin" "$marker_dir"
@@ -914,6 +1019,9 @@ run_case "zypper probe failure" case_zypper_outdated_probe_failure_blocks
 run_case "apk owner update" case_apk_owner_updates
 run_case "apk probe failure" case_apk_outdated_probe_failure_blocks
 run_case "direct artifact current" case_direct_artifact_current
+run_case "direct artifact command path mismatch" case_direct_artifact_command_path_mismatch_blocks
+run_case "direct artifact install root mismatch" case_direct_artifact_binary_outside_install_root_blocks
+run_case "direct artifact writer install root guard" case_direct_artifact_writer_rejects_binary_outside_install_root
 run_case "direct artifact checksum mismatch" case_direct_artifact_checksum_mismatch_blocks
 run_case "direct artifact version mismatch" case_direct_artifact_version_mismatch_blocks
 run_case "direct artifact unmarked" case_direct_artifact_legacy_unmarked_is_unmanaged
