@@ -69,6 +69,24 @@ BeforeAll {
         Mock -CommandName scoop -MockWith { Invoke-MockedManager 'scoop' }
         Mock -CommandName choco -MockWith { Invoke-MockedManager 'choco' }
     }
+
+    function New-ScoopStatusRow {
+        param(
+            [Parameter(Mandatory)][string]$Name,
+            [Parameter(Mandatory)][string]$Installed,
+            [string]$Latest = '',
+            [string]$MissingDependencies = '',
+            [string]$Info = ''
+        )
+
+        [pscustomobject]@{
+            'Name' = $Name
+            'Installed Version' = $Installed
+            'Latest Version' = $Latest
+            'Missing Dependencies' = $MissingDependencies
+            'Info' = $Info
+        }
+    }
 }
 
 Describe "install-deps.ps1" {
@@ -795,17 +813,15 @@ Describe "install-deps.ps1" {
             }
             if ($joined -eq 'status') {
                 $global:LASTEXITCODE = 0
-                return 'pwsh 7.5.0 7.6.2'
+                return (New-ScoopStatusRow -Name 'pwsh' -Installed '7.5.0' -Latest '7.6.2')
             }
             $global:LASTEXITCODE = 0
         }
 
         $output = & { Update-ScoopTool pwsh } 6>&1 | Out-String
 
-        $wouldUpdatePwsh = @($output -split "`r?`n" | Where-Object {
-                $_ -match '^\s*would:\s+scoop update;\s+scoop update pwsh\s*$'
-            })
-        $wouldUpdatePwsh.Count | Should -Be 1
+        $output | Should -Match '(?m)^\s*would:\s+scoop update\s*$'
+        $output | Should -Match '(?m)^\s*would:\s+scoop update pwsh\s*$'
         $output | Should -Not -Match 'scoop update \*'
         $script:ScoopArgs | Should -Contain 'list pwsh'
         $script:ScoopArgs | Should -Contain 'status'
@@ -843,7 +859,7 @@ Describe "install-deps.ps1" {
             $script:ScoopArgs += $joined
             $global:LASTEXITCODE = 0
             if ($joined -eq 'status') {
-                return 'pwsh 7.5.0 7.6.2'
+                return (New-ScoopStatusRow -Name 'pwsh' -Installed '7.5.0' -Latest '7.6.2')
             }
         }
 
@@ -933,7 +949,7 @@ Describe "install-deps.ps1" {
             switch ($joined) {
                 'status' {
                     $global:LASTEXITCODE = 0
-                    return 'pwsh 7.5.0 7.6.2'
+                    return (New-ScoopStatusRow -Name 'pwsh' -Installed '7.5.0' -Latest '7.6.2')
                 }
                 'update pwsh' {
                     $global:LASTEXITCODE = 0
@@ -1003,6 +1019,75 @@ Describe "install-deps.ps1" {
         $script:InstallFailures[0].ExitCode | Should -Be 44
     }
 
+    It "fails closed on unhealthy Scoop status rows without updating the package" {
+        . $script:ImportInstallDepsForTest
+        $script:ScoopStatusRow = $null
+
+        Mock -CommandName Get-Command -MockWith {
+            param([string]$Name)
+            if ($Name -eq 'scoop') {
+                return [pscustomobject]@{ Name = $Name; Source = $Name }
+            }
+            return $null
+        }
+        Mock -CommandName scoop -MockWith {
+            $joined = $args -join ' '
+            $script:ScoopArgs += $joined
+            if ($joined -eq 'status') {
+                $global:LASTEXITCODE = 0
+                return $script:ScoopStatusRow
+            }
+            throw "scoop must not update an unhealthy status row: $joined"
+        }
+
+        $cases = @(
+            [pscustomobject]@{
+                Label = 'install failed text'
+                Row = 'pwsh 7.5.0 Install failed'
+                Reason = 'Install failed'
+            },
+            [pscustomobject]@{
+                Label = 'deprecated'
+                Row = (New-ScoopStatusRow -Name 'pwsh' -Installed '7.5.0' -Info 'Deprecated')
+                Reason = 'Deprecated'
+            },
+            [pscustomobject]@{
+                Label = 'manifest removed'
+                Row = (New-ScoopStatusRow -Name 'pwsh' -Installed '7.5.0' -Info 'Manifest removed')
+                Reason = 'Manifest removed'
+            },
+            [pscustomobject]@{
+                Label = 'held package'
+                Row = (New-ScoopStatusRow -Name 'pwsh' -Installed '7.5.0' -Latest '7.6.2' -Info 'Held package')
+                Reason = 'Held package'
+            },
+            [pscustomobject]@{
+                Label = 'missing dependencies'
+                Row = (New-ScoopStatusRow -Name 'pwsh' -Installed '7.5.0' -Latest '7.6.2' -MissingDependencies 'git')
+                Reason = 'missing dependencies: git'
+            }
+        )
+
+        foreach ($case in $cases) {
+            $script:ScoopArgs = @()
+            $script:InstallFailures = @()
+            $script:ScoopStatusRow = $case.Row
+
+            $output = & {
+                Update-ScoopTool pwsh -NoPrompt -SkipManifestRefresh -AssumePresent -AssumeManaged -ReportSkip -IsDryRun $false
+            } 3>&1 6>&1 | Out-String
+
+            $output | Should -Match 'scoop status check of pwsh failed'
+            $output | Should -Match ([regex]::Escape($case.Reason))
+            ($script:ScoopArgs | Where-Object { $_ -eq 'update pwsh' }).Count | Should -Be 0
+            $script:InstallFailures.Count | Should -Be 1
+            $script:InstallFailures[0].Tool | Should -Be 'pwsh'
+            $script:InstallFailures[0].Pm | Should -Be 'scoop'
+            $script:InstallFailures[0].Pkg | Should -Be 'pwsh'
+            $script:InstallFailures[0].ExitCode | Should -Be 'scoop-status-unhealthy'
+        }
+    }
+
     It "maps Scoop shim package names that differ from binary names" {
         . $script:ImportInstallDepsForTest -DryRun
         $script:ScoopArgs = @()
@@ -1033,7 +1118,7 @@ Describe "install-deps.ps1" {
             $script:ScoopArgs += $joined
             $global:LASTEXITCODE = 0
             if ($joined -eq 'status') {
-                return 'ripgrep 15.1.0 15.2.0'
+                return (New-ScoopStatusRow -Name 'ripgrep' -Installed '15.1.0' -Latest '15.2.0')
             }
         }
 
@@ -1677,7 +1762,7 @@ Describe "install-deps.ps1" {
             }
             if ($joined -eq 'status') {
                 $global:LASTEXITCODE = 0
-                return 'git 2.50.0 2.51.0'
+                return (New-ScoopStatusRow -Name 'git' -Installed '2.50.0' -Latest '2.51.0')
             }
             $global:LASTEXITCODE = 0
         }
@@ -1710,6 +1795,159 @@ Describe "install-deps.ps1" {
         Should -Invoke -CommandName Install-PSFzf -Times 0 -Exactly
     }
 
+    It "does not refresh Scoop when no catalog tool is present" {
+        . $script:ImportInstallDepsForTest
+        $script:ScoopArgs = @()
+
+        Mock -CommandName Get-Command -MockWith {
+            param([string]$Name)
+            if ($Name -eq 'scoop') {
+                return [pscustomobject]@{ Name = $Name; Source = $Name }
+            }
+            return $null
+        }
+        Mock -CommandName scoop -MockWith {
+            $script:ScoopArgs += ($args -join ' ')
+            throw "scoop must not run without a present owned target"
+        }
+
+        $output = & {
+            Invoke-InstallDepsUpdateMode -SpecList @(
+                [pscustomobject]@{ Tool = 'git'; Kind = 'tool'; Binary = 'git'; Module = '' },
+                [pscustomobject]@{ Tool = 'fd'; Kind = 'tool'; Binary = 'fd'; Module = '' }
+            ) -PresenceTester {
+                return $false
+            } -IsDryRun $false
+        } 3>&1 6>&1 | Out-String
+
+        $output | Should -Match 'skipped\s+git\s+not installed'
+        $output | Should -Match 'skipped\s+fd\s+not installed'
+        $output | Should -Not -Match 'scoop update|scoop manifest refresh'
+        $script:ScoopArgs.Count | Should -Be 0
+        $script:InstallFailures.Count | Should -Be 0
+    }
+
+    It "does not refresh Scoop when winget owns the present target" {
+        . $script:ImportInstallDepsForTest
+        $script:ScoopArgs = @()
+        $script:WingetArgs = @()
+
+        Mock -CommandName Get-Command -MockWith {
+            param([string]$Name)
+            if ($Name -eq 'scoop') {
+                return [pscustomobject]@{ Name = $Name; Source = $Name }
+            }
+            if ($Name -eq 'winget') {
+                return [pscustomobject]@{ Name = $Name; Source = $Name }
+            }
+            if ($Name -eq 'pwsh') {
+                return [pscustomobject]@{ Name = $Name; Source = 'C:\Program Files\PowerShell\7\pwsh.exe' }
+            }
+            return $null
+        }
+        Mock -CommandName scoop -MockWith {
+            $script:ScoopArgs += ($args -join ' ')
+            throw "scoop must not run for a winget-owned target"
+        }
+        Mock -CommandName winget -MockWith {
+            $joined = $args -join ' '
+            $script:WingetArgs += $joined
+            switch ($joined) {
+                'list --id Microsoft.PowerShell -e --accept-source-agreements' {
+                    $global:LASTEXITCODE = 0
+                    return 'PowerShell Microsoft.PowerShell 7.6.2 winget'
+                }
+                'list --upgrade-available --id Microsoft.PowerShell -e --accept-source-agreements' {
+                    $global:LASTEXITCODE = 0
+                    return ''
+                }
+                default {
+                    throw "unexpected winget command: $joined"
+                }
+            }
+        }
+
+        $output = & {
+            Invoke-InstallDepsUpdateMode -SpecList @(
+                [pscustomobject]@{ Tool = 'pwsh'; Kind = 'tool'; Binary = 'pwsh'; Module = '' }
+            ) -PresenceTester {
+                param([string]$Tool)
+                return ($Tool -eq 'pwsh')
+            } -IsDryRun $false
+        } 3>&1 6>&1 | Out-String
+
+        $output | Should -Match 'current\s+pwsh\s+via winget'
+        $script:ScoopArgs.Count | Should -Be 0
+        $script:WingetArgs | Should -Contain 'list --upgrade-available --id Microsoft.PowerShell -e --accept-source-agreements'
+        $script:InstallFailures.Count | Should -Be 0
+    }
+
+    It "refreshes Scoop manifests once for multiple Scoop-owned targets" {
+        . $script:ImportInstallDepsForTest
+        $script:ScoopArgs = @()
+
+        Mock -CommandName Get-Command -MockWith {
+            param([string]$Name)
+            if ($Name -eq 'scoop') {
+                return [pscustomobject]@{ Name = $Name; Source = $Name }
+            }
+            return $null
+        }
+        Mock -CommandName scoop -MockWith {
+            $joined = $args -join ' '
+            $script:ScoopArgs += $joined
+            switch ($joined) {
+                'list git' {
+                    $global:LASTEXITCODE = 0
+                    return 'git 2.50.0'
+                }
+                'list fd' {
+                    $global:LASTEXITCODE = 0
+                    return 'fd 10.3.0'
+                }
+                'update' {
+                    $global:LASTEXITCODE = 0
+                    return
+                }
+                'status' {
+                    $global:LASTEXITCODE = 0
+                    return @(
+                        (New-ScoopStatusRow -Name 'git' -Installed '2.50.0' -Latest '2.51.0'),
+                        (New-ScoopStatusRow -Name 'fd' -Installed '10.3.0' -Latest '10.4.0')
+                    )
+                }
+                'update git' {
+                    $global:LASTEXITCODE = 0
+                    return
+                }
+                'update fd' {
+                    $global:LASTEXITCODE = 0
+                    return
+                }
+                default {
+                    throw "unexpected scoop command: $joined"
+                }
+            }
+        }
+
+        $output = & {
+            Invoke-InstallDepsUpdateMode -SpecList @(
+                [pscustomobject]@{ Tool = 'git'; Kind = 'tool'; Binary = 'git'; Module = '' },
+                [pscustomobject]@{ Tool = 'fd'; Kind = 'tool'; Binary = 'fd'; Module = '' }
+            ) -PresenceTester {
+                param([string]$Tool)
+                return ($Tool -in @('git', 'fd'))
+            } -IsDryRun $false
+        } 3>&1 6>&1 | Out-String
+
+        $output | Should -Match 'updated\s+git\s+via scoop'
+        $output | Should -Match 'updated\s+fd\s+via scoop'
+        ($script:ScoopArgs | Where-Object { $_ -eq 'update' }).Count | Should -Be 1
+        $script:ScoopArgs | Should -Contain 'update git'
+        $script:ScoopArgs | Should -Contain 'update fd'
+        $script:InstallFailures.Count | Should -Be 0
+    }
+
     It "records failed Scoop package updates" {
         . $script:ImportInstallDepsForTest
         $script:ScoopArgs = @()
@@ -1731,7 +1969,7 @@ Describe "install-deps.ps1" {
                 }
                 'status' {
                     $global:LASTEXITCODE = 0
-                    return 'git 2.50.0 2.51.0'
+                    return (New-ScoopStatusRow -Name 'git' -Installed '2.50.0' -Latest '2.51.0')
                 }
                 'update git' {
                     $global:LASTEXITCODE = 44
@@ -1767,17 +2005,33 @@ Describe "install-deps.ps1" {
         Mock -CommandName scoop -MockWith {
             $joined = $args -join ' '
             $script:ScoopArgs += $joined
-            if ($joined -eq 'update') {
-                $global:LASTEXITCODE = 33
-                return
+            switch ($joined) {
+                'list git' {
+                    $global:LASTEXITCODE = 0
+                    return 'git 2.50.0'
+                }
+                'update' {
+                    $global:LASTEXITCODE = 33
+                    return
+                }
+                default {
+                    throw "scoop must not continue after a failed manifest refresh: $joined"
+                }
             }
-            $global:LASTEXITCODE = 0
         }
 
-        $output = & { Invoke-InstallDepsUpdateMode -SpecList @() -IsDryRun $false } 3>&1 6>&1 | Out-String
+        $output = & {
+            Invoke-InstallDepsUpdateMode -SpecList @(
+                [pscustomobject]@{ Tool = 'git'; Kind = 'tool'; Binary = 'git'; Module = '' }
+            ) -PresenceTester {
+                param([string]$Tool)
+                return ($Tool -eq 'git')
+            } -IsDryRun $false
+        } 3>&1 6>&1 | Out-String
 
         $output | Should -Match 'scoop manifest refresh failed'
         $script:ScoopArgs | Should -Contain 'update'
+        ($script:ScoopArgs | Where-Object { $_ -like 'status*' -or $_ -eq 'update git' }).Count | Should -Be 0
         $script:InstallFailures.Count | Should -Be 1
         $script:InstallFailures[0].Tool | Should -Be 'scoop'
         $script:InstallFailures[0].Pm | Should -Be 'scoop'
@@ -1794,13 +2048,17 @@ Describe "install-deps.ps1" {
 Remove-Item Env:INSTALL_DEPS_PS1_SOURCE_ONLY -ErrorAction SilentlyContinue
 function scoop {
     `$joined = `$args -join ' '
-    if (`$joined -eq 'update') {
-        `$global:LASTEXITCODE = 33
-        return
+    switch (`$joined) {
+        'update' {
+            `$global:LASTEXITCODE = 33
+            return
+        }
+        default {
+            throw "unexpected scoop command: `$joined"
+        }
     }
-    `$global:LASTEXITCODE = 0
 }
-Invoke-InstallDepsUpdateMode -SpecList @() -IsDryRun:`$false
+Update-ScoopTool git -NoPrompt -AssumePresent -AssumeManaged -IsDryRun:`$false
 Exit-InstallDepsIfFailures
 exit 0
 "@

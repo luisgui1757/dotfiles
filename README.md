@@ -333,7 +333,8 @@ and whether `pwsh` is installed.
   command source under that manager's supported install roots, so a manual
   `C:\Manual\...\pwsh.exe` is `unmanaged` even if a package row exists. Windows
   managers report `current` when their non-mutating availability probes have no
-  exact available-upgrade row for the package.
+  exact available-upgrade row for the package. Scoop status rows with unhealthy
+  `Info` or `Missing Dependencies` fields fail closed instead of updating.
 - zsh plugins are installed by Unix setup as repo-managed pinned git checkouts:
   `fzf-tab` and `zsh-autosuggestions` live under
   `~/.local/share/dotfiles/zsh-plugins`. `zshrc` sources those copies first and

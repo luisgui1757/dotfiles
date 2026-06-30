@@ -116,6 +116,8 @@ ownership**:
   package update when Scoop `status`, winget `list --upgrade-available`, or
   Chocolatey `outdated --limit-output` has no exact package row; failed
   availability probes are recorded as update failures, not successful no-ops.
+  Scoop availability uses structured status fields: exact `Name`, non-empty
+  `Latest Version`, and empty `Info`/`Missing Dependencies`.
 - Regression coverage lives in `tests/shell/install_deps_update_test.sh` for
   mixed Linuxbrew/apt dispatch, Homebrew `current`, shadowed Homebrew tools,
   Brew-prefix contradictions, Brew-prefix symlink escapes, external shadow
@@ -217,7 +219,8 @@ ownership**:
    - Windows: use manager-specific availability probes (`scoop status`,
      `winget list --upgrade-available`, `choco outdated --limit-output`) before
      any scoped package update, and report `current` instead of mutating when the
-     exact package has no available row.
+     exact package has no available row. Scoop status rows with unhealthy `Info`
+     or `Missing Dependencies` fields are update failures, not update proof.
 
 5. Make statuses precise and stable.
 
@@ -372,7 +375,8 @@ The shipped tests prove behavior, not just branches:
 12. Windows Pester coverage proves source-proven Scoop/winget/Chocolatey update
     ownership, manager-specific `current`/`updated`/availability-failure status,
     manual-source shadows with package rows, and Chocolatey-bin/package-list
-    contradictions, and is run with the full gate.
+    contradictions, and is run with the full gate. Scoop coverage includes lazy
+    ownership-gated manifest refresh and fail-closed unhealthy `status` rows.
 
 ### Documentation Shipped
 

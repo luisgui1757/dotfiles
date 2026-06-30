@@ -747,7 +747,9 @@ save only**. The next plain `:w` formats normally. Implemented in
   active command source under that manager's supported install roots; a manual
   `C:\Manual\...\pwsh.exe` is `unmanaged` even if winget/Chocolatey lists the
   package. Windows updates require a manager-specific non-mutating availability
-  proof before mutation: Scoop uses `scoop status`, winget uses
+  proof before mutation: Scoop uses the structured `scoop status` row for the
+  exact `Name` only when `Latest Version` is non-empty and both `Info` and
+  `Missing Dependencies` are empty, winget uses
   `winget list --upgrade-available --id <id> -e --accept-source-agreements`, and
   Chocolatey uses `choco outdated --limit-output`. No matching available update
   is reported as `current`, while a failed availability query appends to
@@ -910,7 +912,9 @@ save only**. The next plain `:w` formats normally. Implemented in
   supported install roots for that manager/package. A manual shadow command is
   `unmanaged`, not a manager-owned update target. A manager-specific
   availability probe must then prove the package is actually outdated before any
-  mutating package command runs: Scoop filters `scoop status`, winget filters
+  mutating package command runs: Scoop filters structured `scoop status` rows by
+  exact `Name` plus non-empty `Latest Version` and fails closed on non-empty
+  `Info` or `Missing Dependencies`, winget filters
   `winget list --upgrade-available --id <id> -e`, and Chocolatey filters
   `choco outdated --limit-output`. No matching update is reported as `current`,
   and a failed availability query is a real update failure. `Update-ScoopTool`

@@ -1029,17 +1029,71 @@ function Test-ScoopPackageManaged {
     return ($state.Status -eq 'managed')
 }
 
-function Test-ScoopStatusOutputContainsPackage {
-    param([object[]]$Output, [string]$Package)
-    if ([string]::IsNullOrWhiteSpace($Package)) { return $false }
-    $listName = Get-ScoopPackageListName -Package $Package
-    $escaped = [regex]::Escape($listName)
-    foreach ($line in @($Output)) {
-        if ([string]$line -match "(^|\s)$escaped(\s|$)") {
-            return $true
+function Get-ScoopStatusPropertyValue {
+    param([object]$Item, [string[]]$Names)
+    if ($null -eq $Item) { return '' }
+    foreach ($name in $Names) {
+        $property = $Item.PSObject.Properties[$name]
+        if ($null -ne $property) {
+            return ([string]$property.Value).Trim()
         }
     }
-    return $false
+    return ''
+}
+
+function Get-ScoopStatusRowState {
+    param([object]$Item, [string]$Package)
+    $listName = Get-ScoopPackageListName -Package $Package
+    if ([string]::IsNullOrWhiteSpace($listName)) {
+        return [pscustomobject]@{ Status = 'none'; Reason = '' }
+    }
+
+    $rowName = Get-ScoopStatusPropertyValue -Item $Item -Names @('Name')
+    if (-not [string]::IsNullOrWhiteSpace($rowName)) {
+        if (-not $rowName.Equals($listName, [StringComparison]::OrdinalIgnoreCase)) {
+            return [pscustomobject]@{ Status = 'none'; Reason = '' }
+        }
+        $latest = Get-ScoopStatusPropertyValue -Item $Item -Names @('Latest Version', 'LatestVersion')
+        $missing = Get-ScoopStatusPropertyValue -Item $Item -Names @('Missing Dependencies', 'MissingDependencies')
+        $info = Get-ScoopStatusPropertyValue -Item $Item -Names @('Info')
+        if (-not [string]::IsNullOrWhiteSpace($missing)) {
+            return [pscustomobject]@{ Status = 'error'; Reason = ("missing dependencies: {0}" -f $missing) }
+        }
+        if (-not [string]::IsNullOrWhiteSpace($info)) {
+            return [pscustomobject]@{ Status = 'error'; Reason = $info }
+        }
+        if (-not [string]::IsNullOrWhiteSpace($latest)) {
+            return [pscustomobject]@{ Status = 'available'; Reason = '' }
+        }
+        return [pscustomobject]@{ Status = 'none'; Reason = '' }
+    }
+
+    $line = ([string]$Item).Trim()
+    if ([string]::IsNullOrWhiteSpace($line)) {
+        return [pscustomobject]@{ Status = 'none'; Reason = '' }
+    }
+    if ($line -match '^(Name|[-]+)\b') {
+        return [pscustomobject]@{ Status = 'none'; Reason = '' }
+    }
+    if ($line -match ("^$([regex]::Escape($listName))(\s|$)")) {
+        foreach ($badState in @('Install failed', 'Deprecated', 'Manifest removed', 'Held package', 'Missing Dependencies')) {
+            if ($line -match [regex]::Escape($badState)) {
+                return [pscustomobject]@{ Status = 'error'; Reason = $badState }
+            }
+        }
+        return [pscustomobject]@{ Status = 'error'; Reason = ("unparseable Scoop status row: {0}" -f $line) }
+    }
+    return [pscustomobject]@{ Status = 'none'; Reason = '' }
+}
+
+function Get-ScoopStatusOutputPackageState {
+    param([object[]]$Output, [string]$Package)
+    foreach ($item in @($Output)) {
+        $state = Get-ScoopStatusRowState -Item $item -Package $Package
+        if ($state.Status -eq 'error') { return $state }
+        if ($state.Status -eq 'available') { return $state }
+    }
+    return [pscustomobject]@{ Status = 'none'; Reason = '' }
 }
 
 function Get-ScoopPackageUpgradeState {
@@ -1056,10 +1110,14 @@ function Get-ScoopPackageUpgradeState {
         if ($exitCode -ne 0) {
             return [pscustomobject]@{ Status = 'error'; ExitCode = $exitCode }
         }
-        if (Test-ScoopStatusOutputContainsPackage -Output $output -Package $Package) {
-            return [pscustomobject]@{ Status = 'available'; ExitCode = 0 }
+        $state = Get-ScoopStatusOutputPackageState -Output $output -Package $Package
+        if ($state.Status -eq 'available') {
+            return [pscustomobject]@{ Status = 'available'; ExitCode = 0; Reason = '' }
         }
-        return [pscustomobject]@{ Status = 'none'; ExitCode = 0 }
+        if ($state.Status -eq 'error') {
+            return [pscustomobject]@{ Status = 'error'; ExitCode = 'scoop-status-unhealthy'; Reason = $state.Reason }
+        }
+        return [pscustomobject]@{ Status = 'none'; ExitCode = 0; Reason = '' }
     } catch {
         return [pscustomobject]@{ Status = 'error'; ExitCode = 'exception' }
     }
@@ -1377,6 +1435,28 @@ function Report-BlockedCatalogToolUpdate {
     $script:InstallFailures += [pscustomobject]@{ Tool=$tool; Pm=$Target.Pm; Pkg=$Target.Pkg; ExitCode=$exitCode }
 }
 
+function Ensure-ScoopManifestRefreshedForUpdate {
+    param([bool]$IsDryRun = $DryRun)
+    if ($script:ScoopManifestRefreshState -eq 'done') { return $true }
+    if ($script:ScoopManifestRefreshState -eq 'failed') { return $false }
+
+    if ($IsDryRun) {
+        Write-Host "  would:    scoop update"
+        $script:ScoopManifestRefreshState = 'done'
+        return $true
+    }
+
+    scoop update | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warning ("  scoop manifest refresh failed (exit {0})" -f $LASTEXITCODE)
+        $script:InstallFailures += [pscustomobject]@{ Tool='scoop'; Pm='scoop'; Pkg='manifest'; ExitCode=$LASTEXITCODE }
+        $script:ScoopManifestRefreshState = 'failed'
+        return $false
+    }
+    $script:ScoopManifestRefreshState = 'done'
+    return $true
+}
+
 function Update-ScoopTool {
     param(
         [string]$tool,
@@ -1404,13 +1484,8 @@ function Update-ScoopTool {
         if ($ReportSkip) { Write-Host ("  skipped   {0,-26} present, but Scoop does not manage {1}" -f $tool, $pkg) }
         return
     }
-    if ((-not $SkipManifestRefresh) -and (-not $IsDryRun)) {
-        scoop update | Out-Null
-        if ($LASTEXITCODE -ne 0) {
-            Write-Warning ("  scoop manifest refresh failed (exit {0})" -f $LASTEXITCODE)
-            $script:InstallFailures += [pscustomobject]@{ Tool=$tool; Pm='scoop'; Pkg='manifest'; ExitCode=$LASTEXITCODE }
-            return
-        }
+    if ((-not $SkipManifestRefresh) -and (-not (Ensure-ScoopManifestRefreshedForUpdate -IsDryRun $IsDryRun))) {
+        return
     }
     $upgradeState = Get-ScoopPackageUpgradeState -Package $pkg
     if ($upgradeState.Status -eq 'none') {
@@ -1418,17 +1493,14 @@ function Update-ScoopTool {
         return
     }
     if ($upgradeState.Status -ne 'available') {
-        Write-Warning ("  scoop status check of {0} failed (exit {1})" -f $pkg, $upgradeState.ExitCode)
+        $reason = if ($upgradeState.Reason) { ": $($upgradeState.Reason)" } else { " (exit $($upgradeState.ExitCode))" }
+        Write-Warning ("  scoop status check of {0} failed{1}" -f $pkg, $reason)
         $script:InstallFailures += [pscustomobject]@{ Tool=$tool; Pm='scoop'; Pkg=$pkg; ExitCode=$upgradeState.ExitCode }
         return
     }
     if ((-not $NoPrompt) -and (-not (Ask "Update ${tool} to the latest scoop version?"))) { return }
     if ($IsDryRun) {
-        if ($SkipManifestRefresh) {
-            Write-Host ("  would:    scoop update {0}" -f $pkg)
-        } else {
-            Write-Host ("  would:    scoop update; scoop update {0}" -f $pkg)
-        }
+        Write-Host ("  would:    scoop update {0}" -f $pkg)
         return
     }
     scoop update $pkg
@@ -1604,6 +1676,7 @@ function Write-UnmanagedDependencySummary {
 # pretending success.
 $script:InstallFailures = @()
 $script:UnmanagedDependencies = @()
+$script:ScoopManifestRefreshState = ''
 
 # ---- Hack Nerd Font: prefer scoop bucket, fall back to direct download+register
 function Get-HackNerdFontInstallScope {
@@ -2699,18 +2772,7 @@ function Invoke-InstallDepsUpdateMode {
     Write-Host ("install-deps: update mode  scoop=" + [bool](Get-Command scoop -ErrorAction SilentlyContinue) + "  winget=" + [bool](Get-Command winget -ErrorAction SilentlyContinue) + "  choco=" + [bool](Get-Command choco -ErrorAction SilentlyContinue) + "  dry-run=$IsDryRun")
     Write-Host "note: present catalog tools update only through the package manager that owns them."
     Write-Host ""
-
-    if (-not (Get-Command scoop -ErrorAction SilentlyContinue)) {
-        Write-Host "  skipped   scoop update              Scoop is not installed"
-    } elseif ($IsDryRun) {
-        Write-Host "  would:    scoop update"
-    } else {
-        scoop update | Out-Null
-        if ($LASTEXITCODE -ne 0) {
-            Write-Warning ("  scoop manifest refresh failed (exit {0})" -f $LASTEXITCODE)
-            $script:InstallFailures += [pscustomobject]@{ Tool='scoop'; Pm='scoop'; Pkg='manifest'; ExitCode=$LASTEXITCODE }
-        }
-    }
+    $script:ScoopManifestRefreshState = ''
 
     foreach ($spec in (Get-CatalogUpdateSpec -SpecList $SpecList)) {
         $tool = $spec.Tool
@@ -2723,7 +2785,7 @@ function Invoke-InstallDepsUpdateMode {
             Write-Host ("  skipped   {0,-26} not installed" -f $tool)
             continue
         }
-        Update-ManagedCatalogTool -tool $tool -NoPrompt -SkipScoopManifestRefresh -ReportSkip -AssumePresent -IsDryRun $IsDryRun
+        Update-ManagedCatalogTool -tool $tool -NoPrompt -ReportSkip -AssumePresent -IsDryRun $IsDryRun
     }
 
     Write-UnmanagedDependencySummary
