@@ -48,6 +48,10 @@ HACK_NERD_FONT_SHA256="8ca33a60c791392d872b80d26c42f2bfa914a480f9eb2d7516d9f8437
 # release assets over HTTPS at run time. Bump the version + SHA together.
 GHOSTTY_UBUNTU_VERSION="1.3.1-0-ppa2"
 GHOSTTY_UBUNTU_INSTALL_SHA256="7517776f6d862ec523e627840af4806e13385302f653ae9f7a86aa6d5af1cae5"
+PYLATEXENC_BUILD_BACKEND_VERSION="80.9.0"
+PYLATEXENC_BUILD_BACKEND_SHA256="062d34222ad13e0cc312a4c02d73f059e86a4acbfbdea8f8f76b28c99f306922"
+PYLATEXENC_VERSION="2.10"
+PYLATEXENC_SHA256="3dd8fd84eb46dc30bee1e23eaab8d8fb5a7f507347b23e5f38ad9675c84f40d3"
 for arg in "$@"; do
     case "$arg" in
         --all|-y)   YES_ALL=1 ;;
@@ -1406,6 +1410,102 @@ ensure_python_pip_venv() {
     esac
 }
 
+pylatexenc_venv_dir() {
+    printf '%s\n' "$HOME/.local/share/dotfiles/python-tools/pylatexenc"
+}
+
+pylatexenc_converter_ready() {
+    local venv_dir venv_python converter
+    venv_dir="$(pylatexenc_venv_dir)"
+    venv_python="$venv_dir/bin/python"
+    converter="$venv_dir/bin/latex2text"
+    [[ -x "$venv_python" && -x "$converter" ]] || return 1
+    "$venv_python" - "$PYLATEXENC_VERSION" <<'PY' >/dev/null 2>&1
+import importlib.metadata
+import sys
+
+try:
+    version = importlib.metadata.version("pylatexenc")
+except importlib.metadata.PackageNotFoundError:
+    raise SystemExit(1)
+
+raise SystemExit(0 if version == sys.argv[1] else 1)
+PY
+}
+
+write_latex2text_shim() {
+    local converter="$1" shim="$2"
+    mkdir -p "$(dirname "$shim")"
+    cat > "$shim" <<EOF
+#!/usr/bin/env sh
+exec "$converter" "\$@"
+EOF
+    chmod 0755 "$shim"
+}
+
+install_pylatexenc_converter() {
+    local venv_dir venv_python converter shim req
+    venv_dir="$(pylatexenc_venv_dir)"
+    venv_python="$venv_dir/bin/python"
+    converter="$venv_dir/bin/latex2text"
+    shim="$HOME/.local/bin/latex2text"
+
+    if pylatexenc_converter_ready; then
+        [[ -x "$shim" ]] || write_latex2text_shim "$converter" "$shim"
+        ensure_local_bin_on_path
+        printf "  ok        %-26s pylatexenc %s\n" "latex2text" "$PYLATEXENC_VERSION"
+        return 0
+    fi
+
+    if ! have python3; then
+        echo "  FAIL: python3 is required before installing latex2text"
+        return 1
+    fi
+    if ! ask "Install latex2text via a pinned pylatexenc venv (Markdown equations)?"; then
+        printf "  skipped   %-26s\n" "latex2text"
+        return 0
+    fi
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        echo "  would:    python3 -m venv $venv_dir"
+        echo "  would:    pip install --require-hashes setuptools==$PYLATEXENC_BUILD_BACKEND_VERSION"
+        echo "             sha256=$PYLATEXENC_BUILD_BACKEND_SHA256"
+        echo "  would:    pip install --require-hashes --no-build-isolation pylatexenc==$PYLATEXENC_VERSION"
+        echo "             sha256=$PYLATEXENC_SHA256"
+        echo "  would:    write ~/.local/bin/latex2text shim"
+        return 0
+    fi
+
+    mkdir -p "$(dirname "$venv_dir")" "$HOME/.local/bin"
+    python3 -m venv "$venv_dir" || {
+        echo "  FAIL: could not create pylatexenc venv at $venv_dir"
+        return 1
+    }
+
+    req="$(mktemp)"
+    printf 'setuptools==%s --hash=sha256:%s\n' "$PYLATEXENC_BUILD_BACKEND_VERSION" "$PYLATEXENC_BUILD_BACKEND_SHA256" > "$req"
+    if ! "$venv_python" -m pip install --disable-pip-version-check --no-cache-dir --require-hashes --only-binary=:all: --no-deps -r "$req"; then
+        rm -f "$req"
+        echo "  FAIL: pinned setuptools install failed"
+        return 1
+    fi
+    printf 'pylatexenc==%s --hash=sha256:%s\n' "$PYLATEXENC_VERSION" "$PYLATEXENC_SHA256" > "$req"
+    if ! "$venv_python" -m pip install --disable-pip-version-check --no-cache-dir --require-hashes --no-deps --no-build-isolation -r "$req"; then
+        rm -f "$req"
+        echo "  FAIL: pylatexenc install failed"
+        return 1
+    fi
+    rm -f "$req"
+
+    if [[ ! -x "$converter" ]]; then
+        echo "  FAIL: pylatexenc installed without executable latex2text"
+        return 1
+    fi
+
+    write_latex2text_shim "$converter" "$shim"
+    ensure_local_bin_on_path
+    printf "  installed %-26s pylatexenc %s\n" "latex2text" "$PYLATEXENC_VERSION"
+}
+
 # Debian/Ubuntu's `nodejs` apt package does NOT bundle npm -- it is a separate
 # `npm` package. Mason installs pyright, prettier, the bash/yaml/json language
 # servers, and js-debug-adapter from npm, so without npm those Mason tools fail
@@ -2625,6 +2725,7 @@ fi
 section "language tooling (for LSP / formatter back-ends)"
 install python3 "needed by pyright"
 ensure_python_pip_venv
+install_pylatexenc_converter
 install node "needed by prettier and JS tooling"
 ensure_npm
 install_tree_sitter_cli

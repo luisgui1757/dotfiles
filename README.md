@@ -279,6 +279,11 @@ and whether `pwsh` is installed.
   Windows `-All` also installs VS Build Tools so parser builds can find MSVC;
   after winget/choco failures it falls back to Microsoft's official
   `vs_BuildTools.exe` bootstrapper with the same VCTools workload.
+- Neovim Markdown rendering is owned by `render-markdown.nvim`. Setup already
+  installs the explicit Tree-sitter parser matrix, including `latex`; it also
+  installs `latex2text` through a pinned, SHA-256-checked `pylatexenc` venv so
+  rendered Markdown equations work on fresh machines instead of depending on a
+  random host Python package.
 - `install-deps` prints a dependency pre-flight table before package-manager
   bootstrap and before the one-shot install prompt, showing the package manager
   itself, present/missing tools, best-effort versions, and the resulting

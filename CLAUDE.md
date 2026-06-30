@@ -106,6 +106,11 @@ that violates one of these, fix it instead of disabling the test.
     existing (`enabled = isdirectory(...)` silently disabled it on machines
     without a vault). It `mkdir -p`s the resolved vault and honors `NOTES_VAULT`
     (see `util/notes_path.lua`); set that env var to point at your real vault.
+    Equation rendering uses render-markdown's LaTeX path with the `latex`
+    Tree-sitter parser plus the `latex2text` converter. Setup installs
+    `latex2text` through a pinned, SHA-256-checked `pylatexenc` venv; its
+    `setuptools` build backend is pinned too. Do not replace this with an
+    unpinned host pip install or a second Markdown renderer.
 12. **No `vim.lsp.set_log_level(...)`.** Deprecated in nvim 0.11; use the module
     form `vim.lsp.log.set_level(...)` (see `lsp-config.lua`). Guarded by
     `invariants_test.sh`.
@@ -782,6 +787,18 @@ save only**. The next plain `:w` formats normally. Implemented in
   while main emits MSVC-style `cc` crate flags that require MSVC. Ad-hoc
   `:TSUpdate` parser rebuilds on Windows should run from a "Developer
   PowerShell for VS" shell or after rerunning setup.
+- **Markdown equations use a pinned `pylatexenc` converter.** render-markdown's
+  LaTeX support needs the non-bundled `latex` parser (already in
+  `treesitter_parsers`) and a converter executable. `install-deps.sh` creates
+  `~/.local/share/dotfiles/python-tools/pylatexenc`, installs pinned
+  `setuptools` first, installs `pylatexenc==2.10` with pip `--require-hashes`
+  and `--no-build-isolation`, and writes `~/.local/bin/latex2text`;
+  interactive zsh prepends `~/.local/bin`. `install-deps.ps1` creates the same
+  venv under
+  `%LOCALAPPDATA%\dotfiles\python-tools\pylatexenc` and adds its `Scripts`
+  directory to User PATH. Keep `nvim/lua/plugins/markdown.lua`'s converter set
+  to `latex2text` so machines use the setup-owned converter rather than
+  opportunistically preferring unrelated host tools.
 - **Synchronous nvim-treesitter bootstrap is serialized by design.**
   nvim-treesitter `main` defaults to high parallelism for interactive installs.
   That is not the setup/CI contract: hosted runners restore parser caches and
