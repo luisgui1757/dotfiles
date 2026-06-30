@@ -169,7 +169,7 @@ phase() {
 }
 
 refresh_runtime_path() {
-    local brew_bin brew_env dir
+    local brew_bin brew_env dir make_prefix gnubin
 
     [[ "$DRY_RUN" -eq 1 ]] && return 0
 
@@ -181,6 +181,11 @@ refresh_runtime_path() {
         if [[ -n "$brew_bin" && -x "$brew_bin" ]]; then
             if brew_env="$("$brew_bin" shellenv)"; then
                 eval "$brew_env"
+                make_prefix="$("$brew_bin" --prefix make 2>/dev/null || true)"
+                gnubin="$make_prefix/libexec/gnubin"
+                if [[ -n "$make_prefix" && -d "$gnubin" && ":$PATH:" != *":$gnubin:"* ]]; then
+                    PATH="$gnubin:$PATH"
+                fi
             else
                 echo "  WARN: $brew_bin shellenv failed; leaving PATH unchanged for that Homebrew prefix" >&2
             fi

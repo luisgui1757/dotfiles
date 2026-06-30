@@ -14,6 +14,7 @@ trap 'rm -rf "$TMP_ROOT"' EXIT
 mkdir -p "$TMP_ROOT/home" "$TMP_ROOT/fakebin"
 HOME="$TMP_ROOT/home"
 export HOME
+export DOTFILES_PROVENANCE_DIR="$TMP_ROOT/provenance"
 
 uname() {
     case "${1:-}" in
@@ -95,5 +96,13 @@ grep -F "$url" "$TMP_ROOT/curl.log" >/dev/null \
     || fail "curl did not request the pinned tree-sitter URL"
 printf '%s\n' "$PATH" | grep -F "$HOME/.local/bin" >/dev/null \
     || fail "tree-sitter install did not add user-local bin to PATH"
+grep -F "tool=tree-sitter" "$DOTFILES_PROVENANCE_DIR/tree-sitter.env" >/dev/null \
+    || fail "tree-sitter provenance marker was not written"
+grep -F "version=$TREE_SITTER_CLI_LINUX_VERSION" "$DOTFILES_PROVENANCE_DIR/tree-sitter.env" >/dev/null \
+    || fail "tree-sitter provenance marker has the wrong version"
+grep -F "sha256=$TREE_SITTER_CLI_LINUX_X86_64_SHA256" "$DOTFILES_PROVENANCE_DIR/tree-sitter.env" >/dev/null \
+    || fail "tree-sitter provenance marker has the wrong checksum"
+grep -F "command_path=$HOME/.local/bin/tree-sitter" "$DOTFILES_PROVENANCE_DIR/tree-sitter.env" >/dev/null \
+    || fail "tree-sitter provenance marker has the wrong command path"
 
 echo "OK"

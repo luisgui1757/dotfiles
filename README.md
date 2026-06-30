@@ -298,27 +298,29 @@ and whether `pwsh` is installed.
   skip/install action. The table is informational; the existing per-tool install
   logic still decides what actually runs.
 - `setup.sh --update` and `setup.ps1 -Update` are scoped and manager-aware. They
-  update only present catalog tools that the active package manager owns through
-  exact per-package commands such as `brew upgrade <formula>`,
-  `apt-get install --only-upgrade <pkg>`, `scoop update <pkg>`,
-  `winget upgrade --id <id> -e`, and `choco upgrade <pkg> -y`. They never run
-  blanket upgrades such as `brew upgrade`, `apt upgrade`, `scoop update *`,
-  `winget upgrade --all`, or `choco upgrade all`. On Unix, a present catalog
-  tool outside active package-manager ownership is reported as `unmanaged` with
-  the resolved command source, for example Apple's Command Line Tools
-  `/usr/bin/git`. For Homebrew, package-list ownership is not enough when the
-  command still resolves outside the Homebrew prefix. On Windows, Scoop-owned
-  tools are detected from their shim metadata before any package-list fallback,
-  so a command under `...\scoop\shims` updates through Scoop even when the
-  package name differs from the binary name (for example `rg` -> `ripgrep`).
-  `scoop list` is not allowed to claim a command
-  source outside Scoop. A corrupt Scoop shim blocks update mode and is reported
-  as a failure instead of being mislabeled unmanaged. Winget-owned tools first
-  need an exact `winget list --upgrade-available --id <id> -e` match; no
-  available winget upgrade is reported as `current`, while a failed availability
-  query remains a failure. If a present Windows tool such as `pwsh` was installed
-  outside the supported managers, update mode prints the executable path and
-  reports it as unmanaged instead of implying dotfiles updated it.
+  update only present catalog tools with proven per-tool ownership, then run an
+  exact per-package or repo-pinned artifact refresh such as
+  `brew upgrade <formula>`, `apt-get install --only-upgrade <pkg>`,
+  `scoop update <pkg>`, `winget upgrade --id <id> -e`, or
+  `choco upgrade <pkg> -y`. They never run blanket upgrades such as
+  `brew upgrade`, `apt upgrade`, `pacman -Syu`, `scoop update *`,
+  `winget upgrade --all`, or `choco upgrade all`. Unix ownership is resolved
+  from the executable source: Homebrew/Linuxbrew requires the source under
+  `brew --prefix` plus an installed formula; native Linux managers require file
+  ownership proof (`dpkg-query -S`, `rpm -qf`, `pacman -Qo`, or
+  `apk info --who-owns`); dotfiles-owned Linux artifacts require a durable
+  provenance marker with the expected version, URL, SHA-256, command path,
+  binary path, and install root. Output distinguishes `updated`, `current`,
+  `system`, `unmanaged`, `blocked`, and `skipped`. `blocked` fails update mode;
+  `unmanaged` reports the source path and exits successfully. On macOS,
+  `/bin/zsh` is accepted as `system`, while normal Homebrew developer tools
+  that still resolve from `/usr/bin` get an unmanaged line with a Homebrew
+  migration hint. Setup also persists Homebrew shellenv and Homebrew GNU Make's
+  `libexec/gnubin` path when the `make` formula is installed, so Brew-owned
+  `make` does not require a manual export. On Windows, Scoop-owned tools are
+  detected from shim metadata before package-list fallback; corrupt Scoop shims
+  are `blocked`, and winget reports `current` when no exact available-upgrade row
+  exists.
 - zsh plugins are installed by Unix setup as repo-managed pinned git checkouts:
   `fzf-tab` and `zsh-autosuggestions` live under
   `~/.local/share/dotfiles/zsh-plugins`. `zshrc` sources those copies first and
@@ -791,6 +793,10 @@ MIT. See `LICENSE`.
 | `setup.ps1` errors "cannot create symbolic links" | Developer Mode off and not elevated | `setup.ps1` reports your *elevated* + *Developer Mode* state before chezmoi apply. Enable Developer Mode (Settings -> Privacy & security -> For developers, no admin, recommended) **then** `.\setup.ps1 -SkipDeps`; OR run just the config phase elevated with `.\setup.ps1 -SkipDeps -SkipNvim`, then return to a normal shell for `.\setup.ps1 -SkipDeps -SkipConfig`. Don't elevate the dependency-install run because Scoop refuses admin installs |
 | Ghostty won't open maximized on Linux/GNOME | `maximize = true` is a hint the WM may ignore (GNOME Mutter often does) | on **X11**, `install-deps` offers a devilspie2 setup through the native Linux package manager, even when Linuxbrew is the main CLI manager; the rule is keyed on `com.mitchellh.ghostty`. Wayland needs a GNOME Shell extension instead |
 | `install-deps.ps1`: winget `No package found matching input criteria` (exit `-1978335212`) | winget source/catalog flakiness | install-deps now **prefers scoop** and falls back across managers per tool -- accept the scoop bootstrap when offered and re-run; VS Build Tools has no Scoop package, so it falls through to choco and then Microsoft's official bootstrapper |
-| `setup.sh --update` says a tool is `unmanaged` | the executable is present, but the active Unix package manager does not own the catalog package | use the system-provided tool as-is, or intentionally install/migrate that tool through the active package manager if you want dotfiles update mode to own future updates |
+| `setup.sh --update` says a tool is `system` | the executable is an explicitly accepted OS-vendor provider, such as macOS `/bin/zsh` | no action needed unless you intentionally want to adopt a package-manager version and own that migration separately |
+| `setup.sh --update` says a tool is `unmanaged` | the executable is present, but no supported Unix owner proves ownership of the resolved command source | use it as-is and update it outside dotfiles, or intentionally migrate it to Homebrew/Linuxbrew, the native package manager, or a dotfiles-provenanced direct artifact |
+| `setup.sh --update` says a tool is `blocked` | the source strongly implies supported ownership, but the package/provenance proof is contradictory or unsafe | repair or reinstall that manager package/artifact, then rerun update mode; dotfiles fails closed rather than guessing |
+| `setup.sh --update` still resolves `make` to `/usr/bin/make` after `brew install make` | Homebrew's GNU Make formula exposes `make` through `$(brew --prefix make)/libexec/gnubin` | rerun `./setup.sh --skip-config` or open a new shell after setup persists Homebrew shellenv; the managed shell block prepends the `gnubin` path when the formula is installed |
+| Mixed Linuxbrew and apt/dnf/pacman/zypper/apk tools update through different managers | update mode resolves ownership per executable source, not from one global active manager | this is expected: a Linuxbrew-owned `rg` can update through Brew while an apt-owned `/usr/bin/jq` updates through apt in the same run |
 | `setup.ps1 -Update` says a tool is `unmanaged` | the executable is present, but its command source is outside supported manager ownership | install or migrate that tool through Scoop, winget, or Chocolatey if you want dotfiles to own future updates; otherwise update that manually-installed copy outside dotfiles |
 | `setup.ps1 -Update` says a Scoop-owned tool is `blocked` | the command resolves through Scoop shims, but the shim metadata cannot prove the exact catalog package | repair or reinstall that Scoop package, then rerun update mode; dotfiles intentionally fails closed instead of updating a different manager's package |

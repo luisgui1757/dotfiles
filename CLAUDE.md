@@ -701,35 +701,43 @@ save only**. The next plain `:w` formats normally. Implemented in
   while package installs are still running, which Mason reports as aborted
   installs. Update mode still skips git pull, chezmoi apply, Lazy restore, Lazy
   sync, and Lazy update. `install-deps --update` updates only present catalog
-  tools through scoped per-package manager commands
-  (`brew upgrade <formula>`, native Linux package upgrade commands, Windows
-  `scoop update <pkg>` after one manifest refresh, Windows
-  `winget upgrade --id <id> -e`, or Windows `choco upgrade <pkg> -y`). Scoop
-  ownership must use shim metadata as the first proof layer: a command source
-  under `...\scoop\shims` must parse the sibling `.shim` target and match
-  `...\scoop\apps\<catalog-package>\...` before any package-list fallback. A
-  resolved command source outside Scoop must not be claimed by `scoop list`. A
-  corrupt or mismatched Scoop shim is a blocked update failure, not an unmanaged
-  tool and not a reason to fall through to winget/Chocolatey. Winget updates
-  require both exact ownership and an exact
+  tools after proving ownership from the executable source, then runs a scoped
+  per-package manager or repo-pinned artifact command (`brew upgrade <formula>`,
+  native Linux package-specific upgrade commands, Windows `scoop update <pkg>`
+  after one manifest refresh, Windows `winget upgrade --id <id> -e`, or Windows
+  `choco upgrade <pkg> -y`). It must not run blanket upgrades such as
+  `brew upgrade`, `apt upgrade`, `pacman -Syu`, `scoop update *`,
+  `winget upgrade --all`, or `choco upgrade all`, and it must not touch PSFzf,
+  `lazy-lock.json`, or configs. Unix update mode is per-tool, not one global
+  active-manager pass: Homebrew/Linuxbrew requires the resolved source under
+  `brew --prefix` plus the installed formula; apt/dnf/zypper/pacman/apk require
+  the manager's file-ownership proof for the resolved real path; repo-pinned
+  direct Linux artifacts (`nvim`, `lazygit`, `starship`, `tree-sitter`, and
+  `chezmoi`) are owned only when their durable marker matches the repo-pinned
+  version, URL, SHA-256, command path, binary path, and install root. Legacy
+  unmarked direct binaries remain `unmanaged`. Homebrew current packages must
+  print `current` without running `brew upgrade`; apt current packages must not
+  run `apt-get install --only-upgrade` after a successful metadata refresh proves
+  installed == candidate. Pacman-owned tools are `skipped` because package-level
+  updates would violate Arch's explicit full-system-upgrade model. `/bin/zsh` on
+  macOS is `system`. Normal macOS developer tools that still resolve from
+  `/usr/bin` are `unmanaged` with a Homebrew migration hint. Setup owns the
+  Homebrew shellenv block and Homebrew GNU Make `libexec/gnubin` PATH adoption
+  when the `make` formula is installed; do not document a hidden manual export
+  step instead. Scoop ownership must use shim metadata as the first proof layer:
+  a command source under `...\scoop\shims` must parse the sibling `.shim` target
+  and match `...\scoop\apps\<catalog-package>\...` before any package-list
+  fallback. A resolved command source outside Scoop must not be claimed by
+  `scoop list`. A corrupt or mismatched Scoop shim is a blocked update failure,
+  not an unmanaged tool and not a reason to fall through to winget/Chocolatey.
+  Winget updates require both exact ownership and an exact
   `winget list --upgrade-available --id <id> -e --accept-source-agreements`
   availability row; no matching available update is reported as `current`, while
-  a failed availability query appends to `InstallFailures`. It must not run
-  blanket upgrades such as `brew upgrade`, `apt upgrade`,
-  `scoop update *`, `winget upgrade --all`, or `choco upgrade all`, and it must
-  not touch pinned direct downloads, PSFzf, `lazy-lock.json`, or configs. On
-  Windows, a present catalog tool is updated only when Scoop, winget, or
-  Chocolatey claims that exact package; otherwise update mode reports it as
-  unmanaged with its resolved executable path and exits successfully unless an
-  attempted scoped update failed. On Unix, a present catalog tool that is not
-  owned by the active package manager is also reported as `unmanaged` with the
-  resolved command source; do not use vague "present, but <manager> does not
-  manage" wording. For Homebrew, package-list ownership is not enough when the
-  resolved command source is outside the Homebrew prefix. On native Linux without
-  Linuxbrew or Alpine/apk, `nvim`, `lazygit`, `starship`, and `tree-sitter` are
-  pinned direct-download binaries and stay out of the update path. Linuxbrew
-  updates them through `brew upgrade <formula>`; Alpine updates its native
-  `neovim`, `lazygit`, `starship`, and `tree-sitter` packages through apk.
+  a failed availability query appends to `InstallFailures`. Status vocabulary is
+  stable across OSes: `updated`, `current`, `system`, `unmanaged`, `blocked`, and
+  `skipped`; `blocked` exits nonzero, while `unmanaged` exits successfully with
+  the resolved source path. Do not use vague "present, but <manager> does not
+  manage" wording.
 - **Polaris is setup Phase 6/6 and is opt-out, not experimental.** Full setup
   (`--all` / `-All`) applies Polaris `0.1.1` at commit
   `489dcc6f991ddcff63c460a433e983264dc54cf7` unless

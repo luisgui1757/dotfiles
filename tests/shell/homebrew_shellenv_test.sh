@@ -8,7 +8,7 @@ fail() { echo "FAIL: $1"; exit 1; }
 
 WORK="$REPO_ROOT/tests/.cache/homebrew-shellenv-test"
 rm -rf "$WORK"
-mkdir -p "$WORK/home/.linuxbrew/bin"
+mkdir -p "$WORK/home/.linuxbrew/bin" "$WORK/home/.linuxbrew/opt/make/libexec/gnubin"
 trap 'rm -rf "$WORK"' EXIT
 
 export HOME="$WORK/home"
@@ -19,6 +19,8 @@ cat > "$prefix/bin/brew" <<EOF
 if [[ "\${1:-}" == "shellenv" ]]; then
     printf 'export HOMEBREW_PREFIX="%s"\n' "$prefix"
     printf 'export PATH="%s/bin:\$PATH"\n' "$prefix"
+elif [[ "\${1:-}" == "--prefix" && "\${2:-}" == "make" ]]; then
+    printf '%s\n' "$prefix/opt/make"
 fi
 EOF
 chmod +x "$prefix/bin/brew"
@@ -40,6 +42,10 @@ DRY_RUN=0
 enable_homebrew_for_current_shell
 [[ "${HOMEBREW_PREFIX:-}" == "$prefix" ]] || fail "HOMEBREW_PREFIX was not exported"
 [[ "$(command -v brew)" == "$prefix/bin/brew" ]] || fail "brew was not added to PATH"
+case ":$PATH:" in
+    *":$prefix/opt/make/libexec/gnubin:"*) ;;
+    *) fail "Homebrew make gnubin was not added to the current PATH" ;;
+esac
 
 persist_homebrew_shellenv
 persist_homebrew_shellenv
@@ -54,5 +60,7 @@ done
 # inner `bash -c`, not in this outer shell.
 # shellcheck disable=SC2016
 env -i HOME="$HOME" PATH="/usr/bin:/bin" bash -c 'source "$HOME/.bashrc"; [[ "$HOMEBREW_PREFIX" == "$HOME/.linuxbrew" ]]'
+# shellcheck disable=SC2016
+env -i HOME="$HOME" PATH="/usr/bin:/bin" bash -c 'source "$HOME/.bashrc"; [[ ":$PATH:" == *":$HOME/.linuxbrew/opt/make/libexec/gnubin:"* ]]'
 
 echo "OK"

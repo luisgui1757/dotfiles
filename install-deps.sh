@@ -153,11 +153,24 @@ enable_homebrew_for_current_shell() {
     local brew_bin
     brew_bin="$(homebrew_bin)" || return 1
     eval "$("$brew_bin" shellenv)"
+    enable_homebrew_make_gnubin_for_current_shell "$brew_bin" || true
     hash -r 2>/dev/null || true
 }
 
+enable_homebrew_make_gnubin_for_current_shell() {
+    local brew_bin="$1" make_prefix gnubin
+    make_prefix="$("$brew_bin" --prefix make 2>/dev/null || true)"
+    [[ -n "$make_prefix" ]] || return 0
+    gnubin="$make_prefix/libexec/gnubin"
+    [[ -d "$gnubin" ]] || return 0
+    case ":$PATH:" in
+        *":$gnubin:"*) ;;
+        *) PATH="$gnubin:$PATH"; export PATH ;;
+    esac
+}
+
 persist_homebrew_shellenv() {
-    local brew_bin brew_prefix marker block rc wrote=0
+    local brew_bin brew_prefix marker block wrote=0
     local rcs
     brew_bin="$(homebrew_bin)" || return 0
     brew_prefix="${brew_bin%/bin/brew}"
@@ -166,6 +179,14 @@ persist_homebrew_shellenv() {
 $marker
 if [ -x "$brew_prefix/bin/brew" ]; then
     eval "\$($brew_prefix/bin/brew shellenv)"
+    dotfiles_make_prefix="\$($brew_prefix/bin/brew --prefix make 2>/dev/null || true)"
+    dotfiles_make_gnubin="\$dotfiles_make_prefix/libexec/gnubin"
+    dotfiles_path_with_colons=":\$PATH:"
+    if [ -n "\$dotfiles_make_prefix" ] && [ -d "\$dotfiles_make_gnubin" ] &&
+        [ "\${dotfiles_path_with_colons#*:\$dotfiles_make_gnubin:}" = "\$dotfiles_path_with_colons" ]; then
+        export PATH="\$dotfiles_make_gnubin:\$PATH"
+    fi
+    unset dotfiles_make_prefix dotfiles_make_gnubin dotfiles_path_with_colons
 fi
 # <<< dotfiles: Homebrew shellenv <<<
 EOF
@@ -921,7 +942,7 @@ set_vscode_theme() {
 }
 
 install_nvim_linux() {
-    if have nvim; then
+    if have nvim && [[ "${DOTFILES_DIRECT_ARTIFACT_REINSTALL:-0}" != "1" ]]; then
         printf "  ok        %-26s already installed\n" "nvim"
         return
     fi
@@ -1002,12 +1023,13 @@ install_nvim_linux() {
         rm -rf "$tmp"
         return 1
     fi
+    write_direct_artifact_provenance "nvim" "/usr/local/bin/nvim" "$install_dir/bin/nvim" "$install_dir" "$url" "$NVIM_LINUX_VERSION" "$expected"
     rm -rf "$tmp"
     printf "  installed %-26s -> %s/bin/nvim\n" "nvim" "$install_dir"
 }
 
 install_lazygit_linux() {
-    if have lazygit; then
+    if have lazygit && [[ "${DOTFILES_DIRECT_ARTIFACT_REINSTALL:-0}" != "1" ]]; then
         printf "  ok        %-26s already installed\n" "lazygit"
         return
     fi
@@ -1092,6 +1114,7 @@ install_lazygit_linux() {
         if maybe_sudo mkdir -p /usr/local/bin &&
             maybe_sudo cp "$tmp/lazygit" /usr/local/bin/lazygit &&
             maybe_sudo chmod 0755 /usr/local/bin/lazygit; then
+            write_direct_artifact_provenance "lazygit" "/usr/local/bin/lazygit" "/usr/local/bin/lazygit" "/usr/local/bin" "$url" "$LAZYGIT_LINUX_VERSION" "$expected"
             rm -rf "$tmp"
             printf "  installed %-26s -> /usr/local/bin/lazygit\n" "lazygit"
             return
@@ -1106,6 +1129,7 @@ install_lazygit_linux() {
         echo "  FAIL: could not install lazygit to $install_target"
         return 1
     fi
+    write_direct_artifact_provenance "lazygit" "$install_target" "$install_target" "$(dirname "$install_target")" "$url" "$LAZYGIT_LINUX_VERSION" "$expected"
     rm -rf "$tmp"
     ensure_local_bin_on_path
     printf "  installed %-26s -> %s\n" "lazygit" "$install_target"
@@ -1122,7 +1146,7 @@ install_lazygit() {
 }
 
 install_starship_linux() {
-    if have starship; then
+    if have starship && [[ "${DOTFILES_DIRECT_ARTIFACT_REINSTALL:-0}" != "1" ]]; then
         printf "  ok        %-26s already installed\n" "starship"
         return
     fi
@@ -1217,6 +1241,7 @@ install_starship_linux() {
         if maybe_sudo mkdir -p /usr/local/bin &&
             maybe_sudo cp "$source_bin" /usr/local/bin/starship &&
             maybe_sudo chmod 0755 /usr/local/bin/starship; then
+            write_direct_artifact_provenance "starship" "/usr/local/bin/starship" "/usr/local/bin/starship" "/usr/local/bin" "$url" "$STARSHIP_VERSION" "$expected"
             rm -rf "$tmp"
             printf "  installed %-26s -> /usr/local/bin/starship\n" "starship"
             return
@@ -1232,6 +1257,7 @@ install_starship_linux() {
         rm -rf "$tmp"
         return 1
     fi
+    write_direct_artifact_provenance "starship" "$install_target" "$install_target" "$(dirname "$install_target")" "$url" "$STARSHIP_VERSION" "$expected"
     rm -rf "$tmp"
     ensure_local_bin_on_path
     printf "  installed %-26s -> %s\n" "starship" "$install_target"
@@ -1248,7 +1274,7 @@ install_starship() {
 }
 
 install_tree_sitter_cli_linux() {
-    if have tree-sitter; then
+    if have tree-sitter && [[ "${DOTFILES_DIRECT_ARTIFACT_REINSTALL:-0}" != "1" ]]; then
         printf "  ok        %-26s already installed\n" "tree-sitter"
         return
     fi
@@ -1329,13 +1355,14 @@ install_tree_sitter_cli_linux() {
     mkdir -p "$HOME/.local/bin"
     cp "$source_bin" "$install_target"
     chmod 0755 "$install_target"
+    write_direct_artifact_provenance "tree-sitter" "$install_target" "$install_target" "$(dirname "$install_target")" "$url" "$TREE_SITTER_CLI_LINUX_VERSION" "$expected"
     rm -rf "$tmp"
     ensure_local_bin_on_path
     printf "  installed %-26s -> %s\n" "tree-sitter" "$install_target"
 }
 
 install_tree_sitter_cli() {
-    if have tree-sitter; then
+    if have tree-sitter && [[ "${DOTFILES_DIRECT_ARTIFACT_REINSTALL:-0}" != "1" ]]; then
         printf "  ok        %-26s already installed\n" "tree-sitter"
         return
     fi
@@ -1555,12 +1582,12 @@ ensure_npm() {
 }
 
 install_chezmoi() {
-    if have chezmoi; then
+    if have chezmoi && [[ "${DOTFILES_DIRECT_ARTIFACT_REINSTALL:-0}" != "1" ]]; then
         printf "  ok        %-26s already installed\n" "chezmoi"
         return
     fi
 
-    if [[ "$PM" == "brew" ]]; then
+    if [[ "$PM" == "brew" && "${DOTFILES_DIRECT_ARTIFACT_REINSTALL:-0}" != "1" ]]; then
         install chezmoi "dotfiles config manager"
         return
     fi
@@ -1646,6 +1673,7 @@ install_chezmoi() {
     mkdir -p "$HOME/.local/bin"
     cp "$source_bin" "$install_target"
     chmod 0755 "$install_target"
+    write_direct_artifact_provenance "chezmoi" "$install_target" "$install_target" "$(dirname "$install_target")" "$url" "$CHEZMOI_VERSION" "$expected"
     rm -rf "$tmp"
     ensure_local_bin_on_path
     printf "  installed %-26s %s -> %s\n" "chezmoi" "$CHEZMOI_VERSION" "$install_target"
@@ -1936,9 +1964,9 @@ fc-cache|fontconfig|fontconfig|fontconfig|fontconfig|fontconfig|fontconfig
 EOF
 )
 
-pkg_for() {
-    local tool="$1"
-    if [[ "$PM" == "apk" ]]; then
+pkg_for_pm() {
+    local tool="$1" pm="${2:-$PM}"
+    if [[ "$pm" == "apk" ]]; then
         case "$tool" in
             lazygit|starship|tree-sitter)
                 printf '%s\n' "$tool"
@@ -1950,7 +1978,7 @@ pkg_for() {
     row=$(printf '%s\n' "$PKG_TABLE" | awk -F'|' -v t="$tool" '$1==t{print; exit}')
     [[ -z "$row" ]] && { echo ""; return; }
     local idx
-    case "$PM" in
+    case "$pm" in
         brew)   idx=2 ;;
         apt)    idx=3 ;;
         dnf)    idx=4 ;;
@@ -1960,6 +1988,10 @@ pkg_for() {
         *)      idx=2 ;;
     esac
     printf '%s\n' "$row" | awk -F'|' -v i="$idx" '{print $i}'
+}
+
+pkg_for() {
+    pkg_for_pm "$1" "$PM"
 }
 
 pm_install() {
@@ -2054,128 +2086,611 @@ pm_pkg_installed() {
     esac
 }
 
-pm_owns_tool_source() {
-    local pm="$1" tool="$2" source prefix
-    case "$pm" in
-        brew)
-            source="$(update_tool_source "$tool" || true)"
-            prefix="$(brew --prefix 2>/dev/null || true)"
-            if [[ -z "$source" || -z "$prefix" ]]; then return 0; fi
-            case "$source" in
-                "$prefix"/*) return 0 ;;
-                *) return 1 ;;
-            esac
-            ;;
-        *)
-            return 0
-            ;;
-    esac
-}
-
-pm_update() {
-    local tool="$1" pkg="$2"
-    if [[ "$DRY_RUN" -eq 1 ]]; then
-        case "$PM" in
-            brew)   printf "  would update %-26s via brew: brew upgrade %s\n" "$tool" "$pkg" ;;
-            apt)    printf "  would update %-26s via apt: apt-get install --only-upgrade %s\n" "$tool" "$pkg" ;;
-            dnf)    printf "  would update %-26s via dnf: dnf upgrade %s\n" "$tool" "$pkg" ;;
-            pacman) printf "  would update %-26s via pacman: pacman -S %s\n" "$tool" "$pkg" ;;
-            zypper) printf "  would update %-26s via zypper: zypper update %s\n" "$tool" "$pkg" ;;
-            apk)    printf "  would update %-26s via apk: apk upgrade %s\n" "$tool" "$pkg" ;;
-        esac
+real_source_path() {
+    local source="$1"
+    if have realpath; then
+        realpath "$source" 2>/dev/null && return 0
+    fi
+    if have python3; then
+        python3 - "$source" <<'PY' 2>/dev/null && return 0
+import os
+import sys
+print(os.path.realpath(sys.argv[1]))
+PY
+    fi
+    local dir base
+    dir="$(dirname "$source")"
+    base="$(basename "$source")"
+    if cd "$dir" 2>/dev/null; then
+        printf '%s/%s\n' "$(pwd -P)" "$base"
         return 0
     fi
-    case "$PM" in
-        brew)   brew upgrade "$pkg" ;;
-        apt)    maybe_sudo apt-get update -qq || echo "  WARN: apt-get update failed; upgrading from the existing apt cache" >&2
-                maybe_sudo apt-get install -y --only-upgrade "$pkg" ;;
-        dnf)    maybe_sudo dnf upgrade -y "$pkg" ;;
-        pacman) maybe_sudo pacman -S --noconfirm "$pkg" ;;
-        zypper) maybe_sudo zypper update -y "$pkg" ;;
-        apk)    maybe_sudo apk upgrade "$pkg" ;;
-    esac
-    local rc=$?
-    if [[ "$rc" -eq 0 ]]; then
-        printf "  updated   %-26s via %s\n" "$tool" "$PM"
-    else
-        printf "  WARN: %s update of %s returned %s\n" "$PM" "$pkg" "$rc" >&2
-    fi
-    return "$rc"
+    printf '%s\n' "$source"
 }
 
-is_pinned_direct_update_tool() {
-    local tool="$1"
-    [[ "$(uname -s)" == "Linux" ]] || return 1
-    [[ "$PM" == "brew" ]] && return 1
-    [[ "$(native_linux_pm 2>/dev/null || true)" == "apk" ]] && return 1
-    case "$tool" in
-        nvim|lazygit|starship|tree-sitter) return 0 ;;
+path_under() {
+    local path="$1" prefix="$2"
+    [[ -n "$path" && -n "$prefix" ]] || return 1
+    prefix="${prefix%/}"
+    case "$path" in
+        "$prefix"|"$prefix"/*) return 0 ;;
         *) return 1 ;;
     esac
 }
 
-update_catalog_tool() {
-    local tool="$1" pkg source
-    [[ -n "$tool" ]] || return 0
+package_name_matches() {
+    local actual="$1" expected="$2" expected_name
+    expected_name="${expected##*/}"
+    [[ "$actual" == "$expected" || "$actual" == "$expected_name" ]] && return 0
+    awk -v a="$actual" -v b="$expected" -v c="$expected_name" 'BEGIN { exit !((tolower(a)==tolower(b)) || (tolower(a)==tolower(c))) }'
+}
 
-    if is_pinned_direct_update_tool "$tool"; then
-        printf "  skipped   %-26s pinned Linux direct download; update via git pull + setup\n" "$tool"
+brew_prefix() {
+    local brew_bin
+    brew_bin="$(homebrew_bin 2>/dev/null || true)"
+    if [[ -n "$brew_bin" ]]; then
+        "$brew_bin" --prefix 2>/dev/null || true
+    fi
+}
+
+brew_claims_tool_source() {
+    local tool="$1" pkg="$2" source="$3" real_source prefix
+    prefix="$(brew_prefix)"
+    [[ -n "$source" && -n "$prefix" ]] || return 1
+    real_source="$(real_source_path "$source")"
+    if path_under "$source" "$prefix" || path_under "$real_source" "$prefix"; then
+        if pm_pkg_installed brew "$pkg"; then
+            return 0
+        fi
+        return 2
+    fi
+    return 1
+}
+
+dpkg_claims_tool_source() {
+    local pkg="$1" source="$2" real_source query owner
+    real_source="$(real_source_path "$source")"
+    for query in "$source" "$real_source"; do
+        [[ -n "$query" ]] || continue
+        owner="$(dpkg-query -S "$query" 2>/dev/null | awk -F: 'NR==1 { sub(/:.*/, "", $1); print $1 }')"
+        if [[ -n "$owner" ]] && package_name_matches "$owner" "$pkg"; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+rpm_claims_tool_source() {
+    local pkg="$1" source="$2" real_source query owner
+    real_source="$(real_source_path "$source")"
+    for query in "$source" "$real_source"; do
+        [[ -n "$query" ]] || continue
+        owner="$(rpm -qf --qf '%{NAME}\n' "$query" 2>/dev/null | awk 'NR==1 { print }')"
+        if [[ -n "$owner" ]] && package_name_matches "$owner" "$pkg"; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+pacman_claims_tool_source() {
+    local pkg="$1" source="$2" real_source query owner
+    real_source="$(real_source_path "$source")"
+    for query in "$source" "$real_source"; do
+        [[ -n "$query" ]] || continue
+        owner="$(pacman -Qo -q "$query" 2>/dev/null | awk 'NR==1 { print }')"
+        if [[ -n "$owner" ]] && package_name_matches "$owner" "$pkg"; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+apk_claims_tool_source() {
+    local pkg="$1" source="$2" real_source query owner
+    real_source="$(real_source_path "$source")"
+    for query in "$source" "$real_source"; do
+        [[ -n "$query" ]] || continue
+        owner="$(apk info --who-owns "$query" 2>/dev/null | awk '{
+            for (i = 1; i <= NF; i++) {
+                if ($i == "by") {
+                    print $(i + 1)
+                    exit
+                }
+            }
+        }')"
+        owner="${owner%-[0-9]*}"
+        if [[ -n "$owner" ]] && package_name_matches "$owner" "$pkg"; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+native_pm_claims_tool_source() {
+    local pm="$1" pkg="$2" source="$3"
+    case "$pm" in
+        apt) dpkg_claims_tool_source "$pkg" "$source" ;;
+        dnf|zypper) rpm_claims_tool_source "$pkg" "$source" ;;
+        pacman) pacman_claims_tool_source "$pkg" "$source" ;;
+        apk) apk_claims_tool_source "$pkg" "$source" ;;
+        *) return 1 ;;
+    esac
+}
+
+accepted_system_tool_source() {
+    local tool="$1" source="$2" real_source
+    real_source="$(real_source_path "$source")"
+    case "$(uname -s):$tool:$real_source" in
+        Darwin:zsh:/bin/zsh) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+direct_artifact_provenance_dir() {
+    printf '%s\n' "${DOTFILES_PROVENANCE_DIR:-$HOME/.local/share/dotfiles/provenance}"
+}
+
+direct_artifact_marker_path() {
+    printf '%s/%s.env\n' "$(direct_artifact_provenance_dir)" "$1"
+}
+
+write_direct_artifact_provenance() {
+    local tool="$1" command_path="$2" binary_path="$3" install_root="$4" url="$5" version="$6" sha256="$7"
+    local marker tmp
+    marker="$(direct_artifact_marker_path "$tool")"
+    mkdir -p "$(dirname "$marker")"
+    tmp="$marker.tmp.$$"
+    {
+        printf 'schema=1\n'
+        printf 'tool=%s\n' "$tool"
+        printf 'version=%s\n' "$version"
+        printf 'source_url=%s\n' "$url"
+        printf 'sha256=%s\n' "$sha256"
+        printf 'command_path=%s\n' "$command_path"
+        printf 'binary_path=%s\n' "$binary_path"
+        printf 'install_root=%s\n' "$install_root"
+    } > "$tmp"
+    mv "$tmp" "$marker"
+}
+
+direct_artifact_marker_value() {
+    local marker="$1" key="$2"
+    awk -F= -v key="$key" '$1 == key { sub(/^[^=]*=/, ""); print; exit }' "$marker" 2>/dev/null || true
+}
+
+direct_artifact_supported_tool() {
+    case "$1" in
+        nvim|lazygit|starship|tree-sitter|chezmoi) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+DIRECT_ARTIFACT_VERSION=""
+DIRECT_ARTIFACT_URL=""
+DIRECT_ARTIFACT_SHA256=""
+DIRECT_ARTIFACT_DEFAULT_ROOT=""
+DIRECT_ARTIFACT_DEFAULT_BINARY=""
+
+direct_artifact_current_metadata() {
+    local tool="$1" machine arch asset version_no_v
+    DIRECT_ARTIFACT_VERSION=""
+    DIRECT_ARTIFACT_URL=""
+    DIRECT_ARTIFACT_SHA256=""
+    DIRECT_ARTIFACT_DEFAULT_ROOT=""
+    DIRECT_ARTIFACT_DEFAULT_BINARY=""
+
+    [[ "$(uname -s)" == "Linux" ]] || return 1
+    direct_artifact_supported_tool "$tool" || return 1
+    machine="$(uname -m)"
+    case "$tool:$machine" in
+        nvim:x86_64|nvim:amd64)
+            arch="x86_64"
+            asset="nvim-linux-${arch}.tar.gz"
+            DIRECT_ARTIFACT_VERSION="$NVIM_LINUX_VERSION"
+            DIRECT_ARTIFACT_SHA256="$NVIM_LINUX_X86_64_SHA256"
+            DIRECT_ARTIFACT_URL="https://github.com/neovim/neovim/releases/download/${NVIM_LINUX_VERSION}/${asset}"
+            DIRECT_ARTIFACT_DEFAULT_ROOT="/opt/nvim-linux-${arch}"
+            DIRECT_ARTIFACT_DEFAULT_BINARY="$DIRECT_ARTIFACT_DEFAULT_ROOT/bin/nvim"
+            ;;
+        nvim:aarch64|nvim:arm64)
+            arch="arm64"
+            asset="nvim-linux-${arch}.tar.gz"
+            DIRECT_ARTIFACT_VERSION="$NVIM_LINUX_VERSION"
+            DIRECT_ARTIFACT_SHA256="$NVIM_LINUX_ARM64_SHA256"
+            DIRECT_ARTIFACT_URL="https://github.com/neovim/neovim/releases/download/${NVIM_LINUX_VERSION}/${asset}"
+            DIRECT_ARTIFACT_DEFAULT_ROOT="/opt/nvim-linux-${arch}"
+            DIRECT_ARTIFACT_DEFAULT_BINARY="$DIRECT_ARTIFACT_DEFAULT_ROOT/bin/nvim"
+            ;;
+        lazygit:x86_64|lazygit:amd64)
+            version_no_v="${LAZYGIT_LINUX_VERSION#v}"
+            asset="lazygit_${version_no_v}_linux_x86_64.tar.gz"
+            DIRECT_ARTIFACT_VERSION="$LAZYGIT_LINUX_VERSION"
+            DIRECT_ARTIFACT_SHA256="$LAZYGIT_LINUX_X86_64_SHA256"
+            DIRECT_ARTIFACT_URL="https://github.com/jesseduffield/lazygit/releases/download/${LAZYGIT_LINUX_VERSION}/${asset}"
+            ;;
+        lazygit:aarch64|lazygit:arm64)
+            version_no_v="${LAZYGIT_LINUX_VERSION#v}"
+            asset="lazygit_${version_no_v}_linux_arm64.tar.gz"
+            DIRECT_ARTIFACT_VERSION="$LAZYGIT_LINUX_VERSION"
+            DIRECT_ARTIFACT_SHA256="$LAZYGIT_LINUX_ARM64_SHA256"
+            DIRECT_ARTIFACT_URL="https://github.com/jesseduffield/lazygit/releases/download/${LAZYGIT_LINUX_VERSION}/${asset}"
+            ;;
+        starship:x86_64|starship:amd64)
+            asset="starship-x86_64-unknown-linux-gnu.tar.gz"
+            DIRECT_ARTIFACT_VERSION="$STARSHIP_VERSION"
+            DIRECT_ARTIFACT_SHA256="$STARSHIP_LINUX_X86_64_SHA256"
+            DIRECT_ARTIFACT_URL="https://github.com/starship/starship/releases/download/${STARSHIP_VERSION}/${asset}"
+            ;;
+        starship:aarch64|starship:arm64)
+            asset="starship-aarch64-unknown-linux-musl.tar.gz"
+            DIRECT_ARTIFACT_VERSION="$STARSHIP_VERSION"
+            DIRECT_ARTIFACT_SHA256="$STARSHIP_LINUX_ARM64_SHA256"
+            DIRECT_ARTIFACT_URL="https://github.com/starship/starship/releases/download/${STARSHIP_VERSION}/${asset}"
+            ;;
+        tree-sitter:x86_64|tree-sitter:amd64)
+            asset="tree-sitter-cli-linux-x64.zip"
+            DIRECT_ARTIFACT_VERSION="$TREE_SITTER_CLI_LINUX_VERSION"
+            DIRECT_ARTIFACT_SHA256="$TREE_SITTER_CLI_LINUX_X86_64_SHA256"
+            DIRECT_ARTIFACT_URL="https://github.com/tree-sitter/tree-sitter/releases/download/${TREE_SITTER_CLI_LINUX_VERSION}/${asset}"
+            ;;
+        tree-sitter:aarch64|tree-sitter:arm64)
+            asset="tree-sitter-cli-linux-arm64.zip"
+            DIRECT_ARTIFACT_VERSION="$TREE_SITTER_CLI_LINUX_VERSION"
+            DIRECT_ARTIFACT_SHA256="$TREE_SITTER_CLI_LINUX_ARM64_SHA256"
+            DIRECT_ARTIFACT_URL="https://github.com/tree-sitter/tree-sitter/releases/download/${TREE_SITTER_CLI_LINUX_VERSION}/${asset}"
+            ;;
+        chezmoi:x86_64|chezmoi:amd64)
+            version_no_v="${CHEZMOI_VERSION#v}"
+            asset="chezmoi_${version_no_v}_linux_amd64.tar.gz"
+            DIRECT_ARTIFACT_VERSION="$CHEZMOI_VERSION"
+            DIRECT_ARTIFACT_SHA256="$CHEZMOI_LINUX_X86_64_SHA256"
+            DIRECT_ARTIFACT_URL="https://github.com/twpayne/chezmoi/releases/download/${CHEZMOI_VERSION}/${asset}"
+            ;;
+        chezmoi:aarch64|chezmoi:arm64)
+            version_no_v="${CHEZMOI_VERSION#v}"
+            asset="chezmoi_${version_no_v}_linux_arm64.tar.gz"
+            DIRECT_ARTIFACT_VERSION="$CHEZMOI_VERSION"
+            DIRECT_ARTIFACT_SHA256="$CHEZMOI_LINUX_ARM64_SHA256"
+            DIRECT_ARTIFACT_URL="https://github.com/twpayne/chezmoi/releases/download/${CHEZMOI_VERSION}/${asset}"
+            ;;
+        *) return 1 ;;
+    esac
+}
+
+DIRECT_ARTIFACT_REASON=""
+
+direct_artifact_claims_tool_source() {
+    local tool="$1" source="$2" marker schema marker_tool version url sha256 command_path binary_path install_root
+    local source_real binary_real
+    DIRECT_ARTIFACT_REASON=""
+    direct_artifact_current_metadata "$tool" || return 1
+    marker="$(direct_artifact_marker_path "$tool")"
+    [[ -f "$marker" ]] || return 1
+
+    schema="$(direct_artifact_marker_value "$marker" schema)"
+    marker_tool="$(direct_artifact_marker_value "$marker" tool)"
+    version="$(direct_artifact_marker_value "$marker" version)"
+    url="$(direct_artifact_marker_value "$marker" source_url)"
+    sha256="$(direct_artifact_marker_value "$marker" sha256)"
+    command_path="$(direct_artifact_marker_value "$marker" command_path)"
+    binary_path="$(direct_artifact_marker_value "$marker" binary_path)"
+    install_root="$(direct_artifact_marker_value "$marker" install_root)"
+
+    if [[ "$schema" != "1" || "$marker_tool" != "$tool" || -z "$command_path" || -z "$binary_path" || -z "$install_root" ]]; then
+        DIRECT_ARTIFACT_REASON="invalid provenance marker"
+        return 2
+    fi
+
+    source_real="$(real_source_path "$source")"
+    binary_real="$(real_source_path "$binary_path")"
+    if [[ "$source" != "$command_path" && "$source_real" != "$binary_real" ]]; then
+        if path_under "$source" "$install_root" || path_under "$source_real" "$install_root"; then
+            DIRECT_ARTIFACT_REASON="source is inside marker root but does not match marker binary"
+            return 2
+        fi
+        return 1
+    fi
+    if [[ "$source_real" != "$binary_real" ]]; then
+        DIRECT_ARTIFACT_REASON="command source target does not match marker binary"
+        return 2
+    fi
+
+    if [[ -n "$DIRECT_ARTIFACT_DEFAULT_BINARY" && "$binary_path" != "$DIRECT_ARTIFACT_DEFAULT_BINARY" ]]; then
+        DIRECT_ARTIFACT_REASON="binary path does not match repo-pinned install shape"
+        return 2
+    fi
+    if [[ -n "$DIRECT_ARTIFACT_DEFAULT_ROOT" && "$install_root" != "$DIRECT_ARTIFACT_DEFAULT_ROOT" ]]; then
+        DIRECT_ARTIFACT_REASON="install root does not match repo-pinned install shape"
+        return 2
+    fi
+    if [[ ! -x "$binary_path" ]]; then
+        DIRECT_ARTIFACT_REASON="marker binary is missing or not executable"
+        return 2
+    fi
+    if [[ "$(real_source_path "$binary_path")" != "$binary_real" ]]; then
+        DIRECT_ARTIFACT_REASON="binary realpath changed during provenance check"
+        return 2
+    fi
+    if [[ "$version" != "$DIRECT_ARTIFACT_VERSION" || "$url" != "$DIRECT_ARTIFACT_URL" || "$sha256" != "$DIRECT_ARTIFACT_SHA256" ]]; then
+        DIRECT_ARTIFACT_REASON="repo pin changed"
+        return 3
+    fi
+    return 0
+}
+
+refresh_direct_artifact() {
+    local tool="$1" old_yes old_reinstall rc
+    old_yes="$YES_ALL"
+    old_reinstall="${DOTFILES_DIRECT_ARTIFACT_REINSTALL:-}"
+    YES_ALL=1
+    DOTFILES_DIRECT_ARTIFACT_REINSTALL=1
+    export DOTFILES_DIRECT_ARTIFACT_REINSTALL
+    rc=0
+    case "$tool" in
+        nvim) install_nvim_linux || rc=$? ;;
+        lazygit) install_lazygit_linux || rc=$? ;;
+        starship) install_starship_linux || rc=$? ;;
+        tree-sitter) install_tree_sitter_cli_linux || rc=$? ;;
+        chezmoi) install_chezmoi || rc=$? ;;
+        *) rc=1 ;;
+    esac
+    YES_ALL="$old_yes"
+    if [[ -n "$old_reinstall" ]]; then
+        DOTFILES_DIRECT_ARTIFACT_REINSTALL="$old_reinstall"
+    else
+        unset DOTFILES_DIRECT_ARTIFACT_REINSTALL
+    fi
+    return "$rc"
+}
+
+APT_UPDATE_REFRESHED=0
+APT_UPDATE_REFRESH_OK=1
+
+apt_refresh_metadata_once() {
+    if [[ "$APT_UPDATE_REFRESHED" -eq 1 ]]; then
+        return "$APT_UPDATE_REFRESH_OK"
+    fi
+    APT_UPDATE_REFRESHED=1
+    if maybe_sudo apt-get update -qq; then
+        APT_UPDATE_REFRESH_OK=0
+    else
+        APT_UPDATE_REFRESH_OK=1
+        echo "  WARN: apt-get update failed; upgrading from the existing apt cache" >&2
+    fi
+    return "$APT_UPDATE_REFRESH_OK"
+}
+
+apt_installed_version() {
+    dpkg-query -W -f='${Version}' "$1" 2>/dev/null || true
+}
+
+apt_candidate_version() {
+    apt-cache policy "$1" 2>/dev/null | awk '/^[[:space:]]*Candidate:/ { print $2; exit }' || true
+}
+
+brew_pkg_outdated() {
+    local pkg="$1"
+    brew outdated --formula --quiet "$pkg" 2>/dev/null | awk -v p="$pkg" '($1 == p) { found = 1 } END { exit !found }'
+}
+
+scoped_update_status() {
+    local owner="$1" tool="$2" pkg="$3" source="$4" before candidate after rc
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        case "$owner" in
+            brew)   printf "  would    %-26s owner=brew package=%s source=%s\n" "$tool" "$pkg" "$source" ;;
+            apt)    printf "  would    %-26s owner=apt package=%s source=%s\n" "$tool" "$pkg" "$source" ;;
+            dnf)    printf "  would    %-26s owner=dnf package=%s source=%s\n" "$tool" "$pkg" "$source" ;;
+            pacman) printf "  skipped  %-26s owner=pacman reason=requires explicit system upgrade source=%s\n" "$tool" "$source" ;;
+            zypper) printf "  would    %-26s owner=zypper package=%s source=%s\n" "$tool" "$pkg" "$source" ;;
+            apk)    printf "  would    %-26s owner=apk package=%s source=%s\n" "$tool" "$pkg" "$source" ;;
+        esac
         return 0
     fi
+    case "$owner" in
+        brew)
+            if brew_pkg_outdated "$pkg"; then
+                if brew upgrade "$pkg"; then
+                    printf "  updated   %-26s owner=brew package=%s source=%s\n" "$tool" "$pkg" "$source"
+                    return 0
+                fi
+                printf "  WARN: brew update of %s returned %s\n" "$pkg" "$?" >&2
+                return 1
+            fi
+            printf "  current   %-26s owner=brew package=%s source=%s\n" "$tool" "$pkg" "$source"
+            return 0
+            ;;
+        apt)
+            before="$(apt_installed_version "$pkg")"
+            apt_refresh_metadata_once || true
+            candidate="$(apt_candidate_version "$pkg")"
+            if [[ -n "$before" && -n "$candidate" && "$candidate" != "(none)" && "$before" == "$candidate" && "$APT_UPDATE_REFRESH_OK" -eq 0 ]]; then
+                printf "  current   %-26s owner=apt package=%s source=%s\n" "$tool" "$pkg" "$source"
+                return 0
+            fi
+            if maybe_sudo apt-get install -y --only-upgrade "$pkg"; then
+                after="$(apt_installed_version "$pkg")"
+                if [[ -n "$before" && -n "$after" && "$before" != "$after" ]]; then
+                    printf "  updated   %-26s owner=apt package=%s source=%s\n" "$tool" "$pkg" "$source"
+                elif [[ -n "$before" && -n "$candidate" && "$candidate" != "(none)" && "$before" != "$candidate" ]]; then
+                    printf "  updated   %-26s owner=apt package=%s source=%s\n" "$tool" "$pkg" "$source"
+                else
+                    printf "  current   %-26s owner=apt package=%s source=%s\n" "$tool" "$pkg" "$source"
+                fi
+                return 0
+            fi
+            printf "  WARN: apt update of %s failed\n" "$pkg" >&2
+            return 1
+            ;;
+        dnf)
+            dnf check-update --quiet "$pkg" >/dev/null 2>&1
+            rc=$?
+            if [[ "$rc" -eq 0 ]]; then
+                printf "  current   %-26s owner=dnf package=%s source=%s\n" "$tool" "$pkg" "$source"
+                return 0
+            fi
+            if [[ "$rc" -ne 100 ]]; then
+                printf "  blocked   %-26s owner=dnf package=%s reason=outdated-check-failed source=%s\n" "$tool" "$pkg" "$source" >&2
+                return 1
+            fi
+            maybe_sudo dnf upgrade -y "$pkg" &&
+                printf "  updated   %-26s owner=dnf package=%s source=%s\n" "$tool" "$pkg" "$source"
+            ;;
+        pacman)
+            printf "  skipped   %-26s owner=pacman reason=requires explicit system upgrade source=%s\n" "$tool" "$source"
+            return 0
+            ;;
+        zypper)
+            if zypper --non-interactive list-updates -t package "$pkg" 2>/dev/null | awk -F'|' -v p="$pkg" '{ gsub(/^[ \t]+|[ \t]+$/, "", $3); if ($3 == p) found = 1 } END { exit !found }'; then
+                maybe_sudo zypper update -y "$pkg" &&
+                    printf "  updated   %-26s owner=zypper package=%s source=%s\n" "$tool" "$pkg" "$source"
+            else
+                printf "  current   %-26s owner=zypper package=%s source=%s\n" "$tool" "$pkg" "$source"
+            fi
+            ;;
+        apk)
+            if apk version -l '<' "$pkg" 2>/dev/null | awk 'NF { found = 1 } END { exit !found }'; then
+                maybe_sudo apk upgrade "$pkg" &&
+                    printf "  updated   %-26s owner=apk package=%s source=%s\n" "$tool" "$pkg" "$source"
+            else
+                printf "  current   %-26s owner=apk package=%s source=%s\n" "$tool" "$pkg" "$source"
+            fi
+            ;;
+    esac
+    local rc=$?
+    if [[ "$rc" -ne 0 ]]; then
+        printf "  WARN: %s update of %s returned %s\n" "$owner" "$pkg" "$rc" >&2
+    fi
+    return "$rc"
+}
+
+pm_update() {
+    local tool="$1" pkg="$2"
+    scoped_update_status "$PM" "$tool" "$pkg" "$(update_tool_source "$tool" || true)"
+}
+
+update_catalog_tool() {
+    local tool="$1" pkg source brew_rc native_pm native_pkg direct_rc hint
+    [[ -n "$tool" ]] || return 0
 
     if ! update_tool_present "$tool"; then
         printf "  skipped   %-26s not installed\n" "$tool"
         return 0
     fi
 
-    pkg="$(pkg_for "$tool")"
-    if [[ -z "$pkg" ]]; then
-        printf "  skipped   %-26s no %s package in catalog\n" "$tool" "$PM"
+    source="$(update_tool_source "$tool" || true)"
+    if [[ -z "$source" ]]; then
+        printf "  unmanaged %-26s source=unknown\n" "$tool"
         return 0
     fi
 
-    if ! pm_pkg_installed "$PM" "$pkg" || ! pm_owns_tool_source "$PM" "$tool"; then
-        source="$(update_tool_source "$tool" || true)"
-        if [[ -z "$source" ]]; then source="unknown source"; fi
-        printf "  unmanaged %-26s source=%s\n" "$tool" "$source"
+    if accepted_system_tool_source "$tool" "$source"; then
+        printf "  system    %-26s source=%s\n" "$tool" "$source"
         return 0
     fi
 
-    pm_update "$tool" "$pkg" || true
+    pkg="$(pkg_for_pm "$tool" brew)"
+    if [[ -n "$pkg" ]] && homebrew_bin >/dev/null 2>&1; then
+        if brew_claims_tool_source "$tool" "$pkg" "$source"; then
+            brew_rc=0
+        else
+            brew_rc=$?
+        fi
+        if [[ "$brew_rc" -eq 0 ]]; then
+            scoped_update_status brew "$tool" "$pkg" "$source"
+            return $?
+        fi
+        if [[ "$brew_rc" -eq 2 ]]; then
+            printf "  blocked   %-26s owner=brew package=%s reason=source-under-brew-prefix-but-formula-not-installed source=%s\n" "$tool" "$pkg" "$source" >&2
+            return 1
+        fi
+    fi
+
+    native_pm="$(native_linux_pm 2>/dev/null || true)"
+    if [[ -n "$native_pm" && "$native_pm" != "unknown" ]]; then
+        native_pkg="$(pkg_for_pm "$tool" "$native_pm")"
+        if [[ -n "$native_pkg" ]] && native_pm_claims_tool_source "$native_pm" "$native_pkg" "$source"; then
+            scoped_update_status "$native_pm" "$tool" "$native_pkg" "$source"
+            return $?
+        fi
+    fi
+
+    if direct_artifact_supported_tool "$tool"; then
+        if direct_artifact_claims_tool_source "$tool" "$source"; then
+            direct_rc=0
+        else
+            direct_rc=$?
+        fi
+        if [[ "$direct_rc" -eq 0 ]]; then
+            printf "  current   %-26s owner=dotfiles-artifact version=%s source=%s\n" "$tool" "$DIRECT_ARTIFACT_VERSION" "$source"
+            return 0
+        fi
+        if [[ "$direct_rc" -eq 3 ]]; then
+            if [[ "$DRY_RUN" -eq 1 ]]; then
+                printf "  would     %-26s owner=dotfiles-artifact version=%s source=%s\n" "$tool" "$DIRECT_ARTIFACT_VERSION" "$source"
+                return 0
+            fi
+            if refresh_direct_artifact "$tool"; then
+                source="$(update_tool_source "$tool" || true)"
+                if direct_artifact_claims_tool_source "$tool" "$source"; then
+                    direct_rc=0
+                else
+                    direct_rc=$?
+                fi
+                if [[ "$direct_rc" -ne 0 ]]; then
+                    printf "  blocked   %-26s owner=dotfiles-artifact reason=post-update provenance mismatch source=%s\n" "$tool" "$source" >&2
+                    return 1
+                fi
+                printf "  updated   %-26s owner=dotfiles-artifact version=%s source=%s\n" "$tool" "$DIRECT_ARTIFACT_VERSION" "$source"
+                return 0
+            fi
+            printf "  WARN: dotfiles-artifact update of %s failed\n" "$tool" >&2
+            return 1
+        fi
+        if [[ "$direct_rc" -eq 2 ]]; then
+            printf "  blocked   %-26s owner=dotfiles-artifact reason=%s source=%s\n" "$tool" "$DIRECT_ARTIFACT_REASON" "$source" >&2
+            return 1
+        fi
+    fi
+
+    hint=""
+    if [[ "$(uname -s)" == "Darwin" && "$source" == /usr/bin/* && "$tool" != "zsh" ]]; then
+        pkg="$(pkg_for_pm "$tool" brew)"
+        if [[ -n "$pkg" ]]; then
+            hint=" hint=install-or-prioritize-homebrew-package:$pkg"
+        fi
+    fi
+    printf "  unmanaged %-26s source=%s%s\n" "$tool" "$source" "$hint"
+    return 0
 }
 
 update_catalog_tools() {
-    local tool
+    local tool rc=0
     while IFS= read -r tool; do
         [[ -n "$tool" ]] || continue
-        update_catalog_tool "$tool"
+        update_catalog_tool "$tool" || rc=1
     done <<EOF
 $(catalog_tools)
 EOF
+    return "$rc"
 }
 
 run_update_mode() {
     PM="$(detect_update_pm)"
     OS_LABEL="$(uname -s)"
     if is_wsl; then OS_LABEL="WSL ($OS_LABEL)"; fi
-    echo "install-deps: update mode OS=$OS_LABEL  package manager=$PM  dry-run=$DRY_RUN"
+    echo "install-deps: update mode OS=$OS_LABEL  detected package manager=$PM  dry-run=$DRY_RUN"
     echo
 
-    if [[ "$PM" == "brew_missing" ]]; then
-        echo "install-deps: Homebrew is not installed; update mode will not bootstrap it." >&2
-        return 1
-    fi
-    if [[ "$PM" == "unknown" ]]; then
-        echo "install-deps: no supported package manager found for update mode." >&2
-        return 1
-    fi
     if [[ "$PM" == "brew" ]]; then
         enable_homebrew_for_current_shell || true
     fi
 
     update_catalog_tools
+    local rc=$?
     echo
-    echo "note: pinned binaries (Neovim/lazygit/Starship/tree-sitter Linux archives, Hack Nerd Font, Windows Terminal portable), PSFzf, plugins, and configs update via git pull and re-running setup."
+    echo "note: repo pins, PSFzf, plugins, and configs update via git pull and re-running setup; dotfiles-owned Linux artifacts refresh only when provenance proves ownership."
+    return "$rc"
 }
 
 unique_backup_path() {

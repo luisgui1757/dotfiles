@@ -4,7 +4,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 TMP_ROOT="$REPO_ROOT/tests/.cache/setup-homebrew-path-test"
 rm -rf "$TMP_ROOT"
-mkdir -p "$TMP_ROOT/home/.linuxbrew/bin" "$TMP_ROOT/brewbin" "$TMP_ROOT/home"
+mkdir -p "$TMP_ROOT/home/.linuxbrew/bin" "$TMP_ROOT/home/.linuxbrew/opt/make/libexec/gnubin" "$TMP_ROOT/brewbin" "$TMP_ROOT/home"
 trap 'rm -rf "$TMP_ROOT"' EXIT
 
 cp "$REPO_ROOT/setup.sh" "$TMP_ROOT/setup.sh"
@@ -27,6 +27,8 @@ if [[ "${1:-}" == "shellenv" ]]; then
 export HOMEBREW_PREFIX="$HOME/.linuxbrew";
 export PATH="$HOME/.linuxbrew/bin:\$PATH";
 BREWENV
+elif [[ "${1:-}" == "--prefix" && "${2:-}" == "make" ]]; then
+    printf '%s\n' "$HOME/.linuxbrew/opt/make"
 fi
 EOF
 
@@ -36,6 +38,7 @@ set -euo pipefail
 if [[ "${DOTFILES_TREESITTER_SYNC_INSTALL:-}" == "1" ]]; then
     printf '%s\n' "DOTFILES_TREESITTER_SYNC_INSTALL=1" >> "$SETUP_TEST_ROOT/nvim.log"
 fi
+printf 'PATH=%s\n' "$PATH" >> "$SETUP_TEST_ROOT/nvim.log"
 printf '%s\n' "$*" >> "$SETUP_TEST_ROOT/nvim.log"
 EOF
 
@@ -51,5 +54,6 @@ grep -F -- "--headless +Lazy! restore +qa" "$TMP_ROOT/nvim.log" >/dev/null
 grep -F -- "DOTFILES_TREESITTER_SYNC_INSTALL=1" "$TMP_ROOT/nvim.log" >/dev/null
 grep -F -- "--headless +lua require('lazy').load({ plugins = { 'nvim-treesitter' } }) +qa" "$TMP_ROOT/nvim.log" >/dev/null
 grep -F -- "--headless +MasonToolsInstallSync +qa" "$TMP_ROOT/nvim.log" >/dev/null
+grep -F "$TMP_ROOT/home/.linuxbrew/opt/make/libexec/gnubin" "$TMP_ROOT/nvim.log" >/dev/null
 
 echo "OK"
