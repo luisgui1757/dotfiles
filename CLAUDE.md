@@ -718,8 +718,11 @@ save only**. The next plain `:w` formats normally. Implemented in
   version, URL, SHA-256, command path, binary path, install root, installed
   binary SHA-256, and executable `--version` output. Legacy unmarked direct
   binaries remain `unmanaged`. Homebrew current packages must
-  print `current` without running `brew upgrade`; apt current packages must not
-  run `apt-get install --only-upgrade` after a successful metadata refresh proves
+  print `current` without running `brew upgrade`; Homebrew outdated detection
+  must treat an exact `brew outdated --formula --quiet <pkg>` stdout row as
+  outdated even when Brew returns nonzero, because Homebrew uses that exit state
+  for named outdated formulae. Apt current packages must not run
+  `apt-get install --only-upgrade` after a successful metadata refresh proves
   installed == candidate. Pacman-owned tools are `skipped` because package-level
   updates would violate Arch's explicit full-system-upgrade model. `/bin/zsh` on
   macOS is `system`. Normal macOS developer tools that still resolve from

@@ -89,7 +89,9 @@ ownership**:
   manager commands. Pacman-owned packages are reported as `skipped` because a
   package-level update is not the canonical Arch operation.
 - Homebrew packages now report `current` without running `brew upgrade` when
-  `brew outdated --formula --quiet <pkg>` proves no update is available.
+  `brew outdated --formula --quiet <pkg>` proves no update is available, and
+  exact outdated stdout rows are treated as updates even when Homebrew returns
+  nonzero for a named outdated formula.
 - Apt metadata refresh runs once per update run. When a successful refresh shows
   installed == candidate, update mode reports `current` without running
   `apt-get install --only-upgrade`; when refresh fails, the scoped upgrade still
@@ -311,7 +313,9 @@ The shipped tests prove behavior, not just branches:
    while apt owns `jq`; both scoped managers are invoked, and apt reports
    `updated` only after the installed package version changes.
 3. Homebrew `current` is covered by proving `brew outdated` has no row and
-   asserting `brew upgrade <pkg>` is not called.
+   asserting `brew upgrade <pkg>` is not called; Homebrew `updated` is covered
+   with the real CLI shape where an exact outdated formula row may arrive with a
+   nonzero exit.
 4. Homebrew shadowing is covered by a formula-installed `git` whose resolved
    source is outside the Homebrew prefix; it is `unmanaged`, not updated.
 5. Homebrew prefix contradictions are covered by a command under `brew --prefix`

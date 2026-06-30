@@ -4,7 +4,7 @@
 # Local usage (from a checked-out copy):
 #   ./setup.sh                     interactive: dependency prompts, then config + sync
 #   ./setup.sh --all               non-interactive: install everything missing
-#   ./setup.sh --update            update package-manager tools + Mason only
+#   ./setup.sh --update            update proven dependency tools/artifacts + Mason only
 #   ./setup.sh --dry-run           preview every step
 #   ./setup.sh --skip-deps         already have nvim/starship; just config+sync
 #   ./setup.sh --skip-bootstrap    back-compat alias: skip config apply
@@ -498,7 +498,7 @@ cleanup_chezmoi_dry_config() {
 
 run_update_mode() {
     if [[ "$SKIP_DEPS" -eq 0 ]]; then
-        phase "Update 1/2: update package-manager tools"
+        phase "Update 1/2: update proven dependency tools and artifacts"
         bash "$SCRIPT_DIR/install-deps.sh" ${DEPS_FLAGS[@]+"${DEPS_FLAGS[@]}"}
     else
         echo

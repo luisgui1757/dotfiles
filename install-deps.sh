@@ -8,7 +8,7 @@
 # Usage:
 #   ./install-deps.sh           prompt Y/n for each tool
 #   ./install-deps.sh --all     skip prompts, install everything
-#   ./install-deps.sh --update  update only present package-manager tools
+#   ./install-deps.sh --update  update present manager-owned tools and proven dotfiles artifacts
 #   ./install-deps.sh --dry-run print what would be installed without acting
 #   ./install-deps.sh --experimental-wsl-gui
 #                              WSL opt-in: Linux Ghostty + Linux fontconfig fonts
@@ -2584,11 +2584,11 @@ apt_candidate_version() {
 }
 
 brew_pkg_outdated() {
-    local pkg="$1" out
-    if ! out="$(brew outdated --formula --quiet "$pkg" 2>/dev/null)"; then
-        return 2
-    fi
+    local pkg="$1" out rc
+    out="$(brew outdated --formula --quiet "$pkg" 2>/dev/null)"
+    rc=$?
     printf '%s\n' "$out" | awk -v p="$pkg" '($1 == p) { found = 1 } END { exit !found }' && return 0
+    [[ "$rc" -eq 0 ]] || return 2
     return 1
 }
 

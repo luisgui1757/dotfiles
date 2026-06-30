@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# shellcheck disable=SC1091,SC2034,SC2329
-# SC2329 is a false positive here: command stubs are invoked indirectly by the
-# sourced install-deps.sh functions under test.
+# shellcheck disable=SC1091,SC2034,SC2317,SC2329
+# SC2317/SC2329 are false positives here: command stubs are invoked indirectly
+# by the sourced install-deps.sh functions under test.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
@@ -94,7 +94,7 @@ EOF
         printf 'brew %s\n' "$*" >> "$COMMAND_LOG"
         case "$*" in
             "list --formula ripgrep") printf '%s\n' "$brew_prefix/bin/rg"; return 0 ;;
-            "outdated --formula --quiet ripgrep") printf '%s\n' "ripgrep"; return 0 ;;
+            "outdated --formula --quiet ripgrep") printf '%s\n' "ripgrep"; return 1 ;;
             "upgrade ripgrep") return 0 ;;
             *) return 1 ;;
         esac
