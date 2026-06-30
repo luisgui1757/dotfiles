@@ -2144,7 +2144,7 @@ pm_pkg_installed() {
 }
 
 real_source_path() {
-    local source="$1"
+    local source="$1" dir base physical_dir
     if have realpath; then
         realpath "$source" 2>/dev/null && return 0
     fi
@@ -2155,11 +2155,21 @@ import sys
 print(os.path.realpath(sys.argv[1]))
 PY
     fi
-    local dir base
     dir="$(dirname "$source")"
     base="$(basename "$source")"
-    if cd "$dir" 2>/dev/null; then
-        printf '%s/%s\n' "$(pwd -P)" "$base"
+    if physical_dir="$(cd "$dir" 2>/dev/null && pwd -P)"; then
+        printf '%s/%s\n' "$physical_dir" "$base"
+        return 0
+    fi
+    printf '%s\n' "$source"
+}
+
+physical_path() {
+    local source="$1" dir base physical_dir
+    dir="$(dirname "$source")"
+    base="$(basename "$source")"
+    if physical_dir="$(cd "$dir" 2>/dev/null && pwd -P)"; then
+        printf '%s/%s\n' "$physical_dir" "$base"
         return 0
     fi
     printf '%s\n' "$source"
@@ -2213,11 +2223,14 @@ EOF
 }
 
 brew_claims_tool_source() {
-    local tool="$1" pkg="$2" source="$3" real_source prefix owns_rc
+    local tool="$1" pkg="$2" source="$3" real_source source_physical prefix prefix_real owns_rc
     prefix="$(brew_prefix)"
     [[ -n "$source" && -n "$prefix" ]] || return 1
     real_source="$(real_source_path "$source")"
-    if path_under "$source" "$prefix" || path_under "$real_source" "$prefix"; then
+    source_physical="$(physical_path "$source")"
+    prefix_real="$(real_source_path "$prefix")"
+    if path_under "$source" "$prefix" || path_under "$source_physical" "$prefix_real"; then
+        path_under "$real_source" "$prefix" || path_under "$real_source" "$prefix_real" || return 4
         if pm_pkg_installed brew "$pkg"; then
             if brew_formula_owns_tool_source "$pkg" "$source"; then
                 return 0
@@ -2326,6 +2339,11 @@ write_direct_artifact_provenance() {
     install_root_real="$(real_source_path "$install_root")"
     if ! path_under "$binary_path" "$install_root" || ! path_under "$binary_real" "$install_root_real"; then
         echo "  FAIL: direct artifact binary for $tool is outside install root $install_root" >&2
+        return 1
+    fi
+    if ! direct_artifact_current_metadata "$tool" ||
+        ! direct_artifact_install_shape_allowed "$tool" "$command_path" "$binary_path" "$install_root"; then
+        echo "  FAIL: direct artifact install shape for $tool is not repo-managed: command=$command_path binary=$binary_path root=$install_root" >&2
         return 1
     fi
     if ! binary_sha256="$(sha256_file "$binary_path")"; then
@@ -2453,6 +2471,34 @@ direct_artifact_current_metadata() {
     esac
 }
 
+direct_artifact_install_shape_allowed() {
+    local tool="$1" command_path="$2" binary_path="$3" install_root="$4" user_root user_binary
+    user_root="$HOME/.local/bin"
+    user_binary="$user_root/$tool"
+
+    case "$tool" in
+        nvim)
+            [[ "$command_path" == "/usr/local/bin/nvim" &&
+                "$binary_path" == "$DIRECT_ARTIFACT_DEFAULT_BINARY" &&
+                "$install_root" == "$DIRECT_ARTIFACT_DEFAULT_ROOT" ]]
+            ;;
+        lazygit|starship)
+            [[ "$command_path" == "/usr/local/bin/$tool" &&
+                "$binary_path" == "/usr/local/bin/$tool" &&
+                "$install_root" == "/usr/local/bin" ]] ||
+                [[ "$command_path" == "$user_binary" &&
+                    "$binary_path" == "$user_binary" &&
+                    "$install_root" == "$user_root" ]]
+            ;;
+        tree-sitter|chezmoi)
+            [[ "$command_path" == "$user_binary" &&
+                "$binary_path" == "$user_binary" &&
+                "$install_root" == "$user_root" ]]
+            ;;
+        *) return 1 ;;
+    esac
+}
+
 DIRECT_ARTIFACT_REASON=""
 
 direct_artifact_binary_version_matches() {
@@ -2515,12 +2561,8 @@ direct_artifact_claims_tool_source() {
         DIRECT_ARTIFACT_REASON="marker binary is outside install root"
         return 2
     fi
-    if [[ -n "$DIRECT_ARTIFACT_DEFAULT_BINARY" && "$binary_path" != "$DIRECT_ARTIFACT_DEFAULT_BINARY" ]]; then
-        DIRECT_ARTIFACT_REASON="binary path does not match repo-pinned install shape"
-        return 2
-    fi
-    if [[ -n "$DIRECT_ARTIFACT_DEFAULT_ROOT" && "$install_root" != "$DIRECT_ARTIFACT_DEFAULT_ROOT" ]]; then
-        DIRECT_ARTIFACT_REASON="install root does not match repo-pinned install shape"
+    if ! direct_artifact_install_shape_allowed "$tool" "$command_path" "$binary_path" "$install_root"; then
+        DIRECT_ARTIFACT_REASON="path does not match repo-pinned install shape"
         return 2
     fi
     if [[ ! -x "$binary_path" ]]; then
@@ -2798,6 +2840,10 @@ update_catalog_tool() {
         fi
         if [[ "$brew_rc" -eq 3 ]]; then
             printf "  blocked   %-26s owner=brew package=%s reason=source-under-brew-prefix-but-formula-does-not-own-source source=%s\n" "$tool" "$pkg" "$source" >&2
+            return 1
+        fi
+        if [[ "$brew_rc" -eq 4 ]]; then
+            printf "  blocked   %-26s owner=brew package=%s reason=source-under-brew-prefix-but-resolved-source-outside-prefix source=%s\n" "$tool" "$pkg" "$source" >&2
             return 1
         fi
     fi

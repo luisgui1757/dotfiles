@@ -79,11 +79,12 @@ ownership**:
 
 - `install-deps.sh` now resolves update ownership per tool from the command
   source, not from the global installer package manager.
-- Homebrew/Linuxbrew ownership requires the resolved source under
-  `brew --prefix`, an installed formula, and `brew list --formula <formula>`
-  file ownership of the resolved executable. Formula-list presence alone cannot
-  claim `/usr/bin`, another shadowing path, or an unrelated file under the Brew
-  prefix.
+- Homebrew/Linuxbrew ownership requires the PATH-visible command path and its
+  resolved executable target to stay under `brew --prefix`, an installed
+  formula, and `brew list --formula <formula>` file ownership of the resolved
+  executable. Formula-list presence alone cannot claim `/usr/bin`, another
+  shadowing path, a Brew-prefix symlink that resolves outside the Brew prefix,
+  or an unrelated file under the Brew prefix.
 - Native Linux ownership is source-proven through `dpkg-query -S`, `rpm -qf`,
   `pacman -Qo`, or `apk info --who-owns`, then updated through package-scoped
   manager commands. Pacman-owned packages are reported as `skipped` because a
@@ -99,9 +100,13 @@ ownership**:
 - Repo-pinned native-Linux artifacts (`nvim`, `lazygit`, `starship`,
   `tree-sitter`, and `chezmoi`) write durable provenance on install and are
   updated only when the marker's command path matches the resolved executable,
-  the marker binary lives under the recorded install root, and the repo pin has
-  changed. A shadow command path that resolves to the same binary is still a
-  provenance mismatch. Legacy unmarked binaries remain `unmanaged`.
+  the marker binary lives under the recorded install root, the marker describes
+  a supported repo-managed install shape, and the repo pin has changed. Neovim
+  is `/usr/local/bin/nvim` pointing into `/opt/nvim-linux-*`; lazygit and
+  Starship are `/usr/local/bin/<tool>` or `~/.local/bin/<tool>`; tree-sitter and
+  chezmoi are `~/.local/bin/<tool>`. A shadow command path that resolves to the
+  same binary is still a provenance mismatch, and an arbitrary marker-named root
+  is not ownership. Legacy unmarked binaries remain `unmanaged`.
 - macOS `/bin/zsh` reports `system`; normal macOS developer tools still
   resolving from `/usr/bin` report `unmanaged` with a Homebrew migration hint.
 - Setup persists Homebrew shellenv and Homebrew GNU Make's `libexec/gnubin` path
@@ -109,11 +114,12 @@ ownership**:
   manual `export PATH=...` step.
 - Regression coverage lives in `tests/shell/install_deps_update_test.sh` for
   mixed Linuxbrew/apt dispatch, Homebrew `current`, shadowed Homebrew tools,
-  Brew-prefix contradictions, apt `current`, pacman skip semantics, macOS system
-  zsh, direct-artifact current/unmarked/blocked/refresh behavior, command-path
-  shadowing, and install-root mismatches, plus install tests that verify
-  provenance markers for Neovim, lazygit, Starship, tree-sitter CLI, and
-  chezmoi.
+  Brew-prefix contradictions, Brew-prefix symlink escapes, external shadow
+  symlinks to Brew, apt `current`, pacman skip semantics, macOS system zsh,
+  direct-artifact current/unmarked/blocked/refresh behavior, command-path
+  shadowing, install-root mismatches, and unsupported direct-artifact install
+  shapes, plus install tests that verify provenance markers for Neovim, lazygit,
+  Starship, tree-sitter CLI, and chezmoi.
 
 ### Required Design
 
@@ -280,7 +286,10 @@ ownership**:
      version in that provenance;
    - prove the current executable resolves to the dotfiles-managed install
      shape, matching provenance, matching installed-binary checksum, and
-     matching executable `--version` output;
+     matching executable `--version` output; supported shapes are
+     `/usr/local/bin/nvim` pointing into `/opt/nvim-linux-*`,
+     `/usr/local/bin/{lazygit,starship}`, and
+     `$HOME/.local/bin/{lazygit,starship,tree-sitter,chezmoi}`;
    - reject a different command path even if it is a symlink to the same binary;
    - reject marker binaries that do not live under the recorded install root;
    - compare the installed executable version to the repo pin;

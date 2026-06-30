@@ -306,14 +306,19 @@ and whether `pwsh` is installed.
   `choco upgrade <pkg> -y`. They never run blanket upgrades such as
   `brew upgrade`, `apt upgrade`, `pacman -Syu`, `scoop update *`,
   `winget upgrade --all`, or `choco upgrade all`. Unix ownership is resolved
-  from the executable source: Homebrew/Linuxbrew requires the source under
-  `brew --prefix`, an installed formula, and `brew list --formula <formula>`
-  file ownership of the resolved executable; native Linux managers require file
-  ownership proof (`dpkg-query -S`, `rpm -qf`, `pacman -Qo`, or
-  `apk info --who-owns`); dotfiles-owned Linux artifacts require a durable
-  provenance marker with the expected version, URL, SHA-256, command path,
-  binary path, install root, installed-binary SHA-256, and matching `--version`
-  output. Shadow command paths and marker binaries outside the recorded install
+  from the executable source: Homebrew/Linuxbrew requires the PATH-visible
+  command path and its resolved executable target to stay under `brew --prefix`,
+  plus an installed formula and `brew list --formula <formula>` file ownership
+  of the resolved executable; native Linux managers require file ownership proof
+  (`dpkg-query -S`, `rpm -qf`, `pacman -Qo`, or `apk info --who-owns`);
+  dotfiles-owned Linux artifacts require a durable provenance marker with the
+  expected version, URL, SHA-256, command path, binary path, install root,
+  installed-binary SHA-256, matching `--version` output, and a repo-managed
+  install shape: Neovim is `/usr/local/bin/nvim` pointing into
+  `/opt/nvim-linux-*`; lazygit and Starship are `/usr/local/bin/<tool>` or
+  `~/.local/bin/<tool>`; tree-sitter and chezmoi are `~/.local/bin/<tool>`.
+  Shadow command paths, Brew-prefix symlinks that escape the Brew prefix,
+  unsupported artifact roots, and marker binaries outside the recorded install
   root are blocked provenance failures, not ownership. Output distinguishes
   `updated`, `current`, `system`, `unmanaged`,
   `blocked`, and `skipped`. `blocked` fails update mode;

@@ -294,6 +294,95 @@ EOF
     assert_not_contains "brew upgrade ripgrep" "$COMMAND_LOG" "Brew file-ownership mismatch attempted an upgrade"
 }
 
+case_brew_prefix_symlink_to_external_blocks() {
+    local root="$TMP_ROOT/brew-prefix-escape" brew_prefix="$TMP_ROOT/brew-prefix-escape/homebrew" external="$TMP_ROOT/brew-prefix-escape/external"
+    mkdir -p "$brew_prefix/bin" "$external"
+    mktool "$external/rg"
+    ln -s "$external/rg" "$brew_prefix/bin/rg"
+    PATH="$brew_prefix/bin:/usr/bin:/bin"
+    export PATH
+    DRY_RUN=0
+    PM=brew
+    INSTALL_DEPS_UPDATE_TOOLS="rg"
+
+    uname() {
+        case "${1:-}" in
+            -s) printf '%s\n' "Linux" ;;
+            -m) printf '%s\n' "x86_64" ;;
+            *) command uname "$@" ;;
+        esac
+    }
+    native_linux_pm() { printf '%s\n' "unknown"; }
+    homebrew_bin() { printf '%s\n' "$brew_prefix/bin/brew"; }
+    cat > "$brew_prefix/bin/brew" <<EOF
+#!/usr/bin/env bash
+if [[ "\${1:-}" == "--prefix" ]]; then
+    printf '%s\n' "$brew_prefix"
+fi
+EOF
+    chmod +x "$brew_prefix/bin/brew"
+    brew() {
+        printf 'brew %s\n' "$*" >> "$COMMAND_LOG"
+        case "$*" in
+            "list --formula ripgrep") printf '%s\n' "$brew_prefix/bin/rg"; return 0 ;;
+            "outdated --formula --quiet ripgrep") printf '%s\n' "ripgrep"; return 1 ;;
+            "upgrade ripgrep") return 0 ;;
+            *) return 1 ;;
+        esac
+    }
+
+    if update_catalog_tools > "$root.out" 2> "$root.err"; then
+        fail "Brew-prefix rg symlinked outside the prefix did not fail closed"
+    fi
+    assert_contains "blocked   rg" "$root.err" "Brew prefix symlink escape was not blocked"
+    assert_contains "source-under-brew-prefix-but-resolved-source-outside-prefix" "$root.err" "Brew prefix symlink escape reason was not precise"
+    assert_not_contains "brew upgrade ripgrep" "$COMMAND_LOG" "Brew prefix symlink escape attempted an upgrade"
+}
+
+case_brew_external_symlink_to_prefix_is_unmanaged() {
+    local root="$TMP_ROOT/brew-external-symlink" brew_prefix="$TMP_ROOT/brew-external-symlink/homebrew" shadow="$TMP_ROOT/brew-external-symlink/shadow"
+    mkdir -p "$brew_prefix/bin" "$brew_prefix/Cellar/ripgrep/15.1.0/bin" "$shadow/bin"
+    mktool "$brew_prefix/Cellar/ripgrep/15.1.0/bin/rg"
+    ln -s "$brew_prefix/Cellar/ripgrep/15.1.0/bin/rg" "$shadow/bin/rg"
+    PATH="$shadow/bin:/usr/bin:/bin"
+    export PATH
+    DRY_RUN=0
+    PM=brew
+    INSTALL_DEPS_UPDATE_TOOLS="rg"
+
+    uname() {
+        case "${1:-}" in
+            -s) printf '%s\n' "Linux" ;;
+            -m) printf '%s\n' "x86_64" ;;
+            *) command uname "$@" ;;
+        esac
+    }
+    native_linux_pm() { printf '%s\n' "unknown"; }
+    homebrew_bin() { printf '%s\n' "$brew_prefix/bin/brew"; }
+    cat > "$brew_prefix/bin/brew" <<EOF
+#!/usr/bin/env bash
+if [[ "\${1:-}" == "--prefix" ]]; then
+    printf '%s\n' "$brew_prefix"
+fi
+EOF
+    chmod +x "$brew_prefix/bin/brew"
+    brew() {
+        printf 'brew %s\n' "$*" >> "$COMMAND_LOG"
+        case "$*" in
+            "list --formula ripgrep") printf '%s\n' "$brew_prefix/Cellar/ripgrep/15.1.0/bin/rg"; return 0 ;;
+            "outdated --formula --quiet ripgrep") printf '%s\n' "ripgrep"; return 1 ;;
+            "upgrade ripgrep") return 0 ;;
+            *) return 1 ;;
+        esac
+    }
+
+    update_catalog_tools > "$root.out"
+
+    assert_contains "unmanaged rg" "$root.out" "external symlink to Brew rg was not unmanaged"
+    assert_contains "source=$shadow/bin/rg" "$root.out" "external symlink did not report the PATH source"
+    assert_not_contains "brew upgrade ripgrep" "$COMMAND_LOG" "external symlink to Brew rg attempted a Brew upgrade"
+}
+
 case_brew_outdated_probe_failure_blocks() {
     local root="$TMP_ROOT/brew-probe-fail" brew_prefix="$TMP_ROOT/brew-probe-fail/homebrew"
     mkdir -p "$brew_prefix/bin"
@@ -732,9 +821,9 @@ case_direct_artifact_current() {
 }
 
 case_direct_artifact_command_path_mismatch_blocks() {
-    local root="$TMP_ROOT/direct-command-path-blocked" canonical="$TMP_ROOT/direct-command-path-blocked/canonical" shadow="$TMP_ROOT/direct-command-path-blocked/shadow" marker_dir="$TMP_ROOT/direct-command-path-blocked/provenance"
+    local root="$TMP_ROOT/direct-command-path-blocked" home="$TMP_ROOT/direct-command-path-blocked/home" canonical="$TMP_ROOT/direct-command-path-blocked/home/.local/bin" shadow="$TMP_ROOT/direct-command-path-blocked/shadow" marker_dir="$TMP_ROOT/direct-command-path-blocked/provenance"
     mkdir -p "$canonical" "$shadow" "$marker_dir"
-    HOME="$TMP_ROOT/direct-command-path-blocked/home"
+    HOME="$home"
     export HOME
     mkversioned_tool "$canonical/lazygit" "lazygit ${LAZYGIT_LINUX_VERSION#v}"
     ln -s "$canonical/lazygit" "$shadow/lazygit"
@@ -812,8 +901,54 @@ case_direct_artifact_binary_outside_install_root_blocks() {
     assert_not_contains "current   lazygit" "$root.out" "direct artifact install-root mismatch was reported current"
 }
 
+case_direct_artifact_unsupported_install_shape_blocks() {
+    local root="$TMP_ROOT/direct-shape-blocked" alien="$TMP_ROOT/direct-shape-blocked/alien/bin" marker_dir="$TMP_ROOT/direct-shape-blocked/provenance"
+    local binary_sha256
+    mkdir -p "$alien" "$marker_dir"
+    HOME="$TMP_ROOT/direct-shape-blocked/home"
+    export HOME
+    mkversioned_tool "$alien/starship" "starship ${STARSHIP_VERSION#v}"
+    PATH="$alien:/usr/bin:/bin"
+    export PATH
+    DRY_RUN=0
+    PM=unknown
+    DOTFILES_PROVENANCE_DIR="$marker_dir"
+    export DOTFILES_PROVENANCE_DIR
+    INSTALL_DEPS_UPDATE_TOOLS="starship"
+
+    uname() {
+        case "${1:-}" in
+            -s) printf '%s\n' "Linux" ;;
+            -m) printf '%s\n' "x86_64" ;;
+            *) command uname "$@" ;;
+        esac
+    }
+    homebrew_bin() { return 1; }
+    native_linux_pm() { printf '%s\n' "unknown"; }
+    direct_artifact_current_metadata starship
+    binary_sha256="$(sha256_file "$alien/starship")"
+    printf '%s\n' \
+        "schema=2" \
+        "tool=starship" \
+        "version=$DIRECT_ARTIFACT_VERSION" \
+        "source_url=$DIRECT_ARTIFACT_URL" \
+        "sha256=$DIRECT_ARTIFACT_SHA256" \
+        "binary_sha256=$binary_sha256" \
+        "command_path=$alien/starship" \
+        "binary_path=$alien/starship" \
+        "install_root=$alien" \
+        > "$marker_dir/starship.env"
+
+    if update_catalog_tools > "$root.out" 2> "$root.err"; then
+        fail "direct artifact marker under unsupported install shape did not fail closed"
+    fi
+    assert_contains "blocked   starship" "$root.err" "unsupported direct artifact install shape was not blocked"
+    assert_contains "reason=path does not match repo-pinned install shape" "$root.err" "unsupported direct artifact install-shape reason was not precise"
+    assert_not_contains "current   starship" "$root.out" "unsupported direct artifact install shape was reported current"
+}
+
 case_direct_artifact_writer_rejects_binary_outside_install_root() {
-    local root="$TMP_ROOT/direct-writer-root-blocked" bin="$TMP_ROOT/direct-writer-root-blocked/bin" marker_dir="$TMP_ROOT/direct-writer-root-blocked/provenance"
+    local root="$TMP_ROOT/direct-writer-root-blocked" bin="$TMP_ROOT/direct-writer-root-blocked/home/.local/bin" marker_dir="$TMP_ROOT/direct-writer-root-blocked/provenance"
     mkdir -p "$bin" "$marker_dir"
     HOME="$TMP_ROOT/direct-writer-root-blocked/home"
     export HOME
@@ -834,6 +969,30 @@ case_direct_artifact_writer_rejects_binary_outside_install_root() {
     fi
     assert_contains "direct artifact binary for lazygit is outside install root" "$root.err" "direct artifact writer did not explain invalid root"
     [[ ! -e "$marker_dir/lazygit.env" ]] || fail "direct artifact writer created a marker after rejecting invalid root"
+}
+
+case_direct_artifact_writer_rejects_unsupported_install_shape() {
+    local root="$TMP_ROOT/direct-writer-shape-blocked" alien="$TMP_ROOT/direct-writer-shape-blocked/alien/bin" marker_dir="$TMP_ROOT/direct-writer-shape-blocked/provenance"
+    mkdir -p "$alien" "$marker_dir"
+    HOME="$TMP_ROOT/direct-writer-shape-blocked/home"
+    export HOME
+    mkversioned_tool "$alien/starship" "starship ${STARSHIP_VERSION#v}"
+    DOTFILES_PROVENANCE_DIR="$marker_dir"
+    export DOTFILES_PROVENANCE_DIR
+
+    uname() {
+        case "${1:-}" in
+            -s) printf '%s\n' "Linux" ;;
+            -m) printf '%s\n' "x86_64" ;;
+            *) command uname "$@" ;;
+        esac
+    }
+    direct_artifact_current_metadata starship
+    if write_direct_artifact_provenance "starship" "$alien/starship" "$alien/starship" "$alien" "$DIRECT_ARTIFACT_URL" "$DIRECT_ARTIFACT_VERSION" "$DIRECT_ARTIFACT_SHA256" > "$root.out" 2> "$root.err"; then
+        fail "direct artifact writer accepted an unsupported install shape"
+    fi
+    assert_contains "direct artifact install shape for starship is not repo-managed" "$root.err" "direct artifact writer did not explain unsupported install shape"
+    [[ ! -e "$marker_dir/starship.env" ]] || fail "direct artifact writer created a marker after rejecting unsupported shape"
 }
 
 case_direct_artifact_checksum_mismatch_blocks() {
@@ -978,9 +1137,6 @@ case_direct_artifact_stale_marker_refreshes_pin() {
     DOTFILES_PROVENANCE_DIR="$marker_dir"
     export DOTFILES_PROVENANCE_DIR
     INSTALL_DEPS_UPDATE_TOOLS="lazygit"
-    mkversioned_tool "$bin/lazygit" "lazygit ${LAZYGIT_LINUX_VERSION#v}"
-    direct_artifact_current_metadata lazygit
-    write_direct_artifact_provenance "lazygit" "$bin/lazygit" "$bin/lazygit" "$bin" "$DIRECT_ARTIFACT_URL" "v0.0.0" "$DIRECT_ARTIFACT_SHA256"
 
     uname() {
         case "${1:-}" in
@@ -991,6 +1147,10 @@ case_direct_artifact_stale_marker_refreshes_pin() {
     }
     homebrew_bin() { return 1; }
     native_linux_pm() { printf '%s\n' "unknown"; }
+    mkversioned_tool "$bin/lazygit" "lazygit ${LAZYGIT_LINUX_VERSION#v}"
+    direct_artifact_current_metadata lazygit
+    write_direct_artifact_provenance "lazygit" "$bin/lazygit" "$bin/lazygit" "$bin" "$DIRECT_ARTIFACT_URL" "v0.0.0" "$DIRECT_ARTIFACT_SHA256"
+
     refresh_direct_artifact() {
         printf '%s\n' "refresh $1" >> "$COMMAND_LOG"
         direct_artifact_current_metadata "$1"
@@ -1008,6 +1168,8 @@ run_case "Brew current" case_brew_current_does_not_upgrade
 run_case "Brew shadowed source" case_brew_shadowed_source_is_unmanaged
 run_case "Brew prefix without formula" case_brew_prefix_without_formula_blocks
 run_case "Brew formula without file ownership" case_brew_formula_without_file_ownership_blocks
+run_case "Brew prefix symlink escape" case_brew_prefix_symlink_to_external_blocks
+run_case "Brew external symlink to prefix" case_brew_external_symlink_to_prefix_is_unmanaged
 run_case "Brew outdated probe failure" case_brew_outdated_probe_failure_blocks
 run_case "macOS system zsh" case_macos_system_zsh_is_accepted
 run_case "apt current" case_apt_current_skips_scoped_install
@@ -1021,7 +1183,9 @@ run_case "apk probe failure" case_apk_outdated_probe_failure_blocks
 run_case "direct artifact current" case_direct_artifact_current
 run_case "direct artifact command path mismatch" case_direct_artifact_command_path_mismatch_blocks
 run_case "direct artifact install root mismatch" case_direct_artifact_binary_outside_install_root_blocks
+run_case "direct artifact unsupported install shape" case_direct_artifact_unsupported_install_shape_blocks
 run_case "direct artifact writer install root guard" case_direct_artifact_writer_rejects_binary_outside_install_root
+run_case "direct artifact writer install shape guard" case_direct_artifact_writer_rejects_unsupported_install_shape
 run_case "direct artifact checksum mismatch" case_direct_artifact_checksum_mismatch_blocks
 run_case "direct artifact version mismatch" case_direct_artifact_version_mismatch_blocks
 run_case "direct artifact unmarked" case_direct_artifact_legacy_unmarked_is_unmanaged

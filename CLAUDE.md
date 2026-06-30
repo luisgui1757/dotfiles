@@ -709,15 +709,21 @@ save only**. The next plain `:w` formats normally. Implemented in
   `brew upgrade`, `apt upgrade`, `pacman -Syu`, `scoop update *`,
   `winget upgrade --all`, or `choco upgrade all`, and it must not touch PSFzf,
   `lazy-lock.json`, or configs. Unix update mode is per-tool, not one global
-  active-manager pass: Homebrew/Linuxbrew requires the resolved source under
-  `brew --prefix`, the installed formula, and `brew list --formula <formula>`
-  file ownership of the resolved executable; apt/dnf/zypper/pacman/apk require
+  active-manager pass: Homebrew/Linuxbrew requires the PATH-visible command path
+  and its resolved executable target to stay under `brew --prefix`, the
+  installed formula, and `brew list --formula <formula>` file ownership of the
+  resolved executable; apt/dnf/zypper/pacman/apk require
   the manager's file-ownership proof for the resolved real path; repo-pinned
   direct Linux artifacts (`nvim`, `lazygit`, `starship`, `tree-sitter`, and
   `chezmoi`) are owned only when their durable marker matches the repo-pinned
   version, URL, SHA-256, command path, binary path, install root, installed
-  binary SHA-256, and executable `--version` output. A shadow command path that
-  resolves to the same binary is not ownership, and a marker binary outside the
+  binary SHA-256, executable `--version` output, and supported install shape:
+  Neovim is `/usr/local/bin/nvim` pointing into `/opt/nvim-linux-*`; lazygit and
+  Starship are `/usr/local/bin/<tool>` or `~/.local/bin/<tool>`; tree-sitter and
+  chezmoi are `~/.local/bin/<tool>`. A Brew-prefix command symlink that resolves
+  outside the Brew prefix is a blocked ownership contradiction, a shadow command
+  path that resolves to the same binary is not ownership, an unsupported
+  direct-artifact root is not ownership, and a marker binary outside the
   recorded install root is corrupt provenance. Legacy unmarked direct binaries
   remain `unmanaged`. Homebrew current packages must
   print `current` without running `brew upgrade`; Homebrew outdated detection
