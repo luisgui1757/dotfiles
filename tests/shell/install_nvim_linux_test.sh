@@ -77,6 +77,17 @@ verify_sha256() {
     return 0
 }
 
+sha256_file() {
+    case "$1" in
+        /opt/nvim-linux-x86_64/bin/nvim)
+            printf '%s\n' "fake-installed-nvim-binary-sha256"
+            ;;
+        *)
+            command shasum -a 256 "$1" | awk '{print $1}'
+            ;;
+    esac
+}
+
 YES_ALL=1
 DRY_RUN=0
 output="$(install_nvim_linux)"
@@ -89,8 +100,10 @@ grep -F -- "-C /opt" "$TMP_ROOT/tar.log" >/dev/null
 grep -F "/opt/nvim-linux-x86_64" "$TMP_ROOT/sudo.log" >/dev/null
 grep -F "/usr/local/bin/nvim" "$TMP_ROOT/sudo.log" >/dev/null
 grep -F "tool=nvim" "$DOTFILES_PROVENANCE_DIR/nvim.env" >/dev/null
+grep -F "schema=2" "$DOTFILES_PROVENANCE_DIR/nvim.env" >/dev/null
 grep -F "version=$NVIM_LINUX_VERSION" "$DOTFILES_PROVENANCE_DIR/nvim.env" >/dev/null
 grep -F "sha256=$NVIM_LINUX_X86_64_SHA256" "$DOTFILES_PROVENANCE_DIR/nvim.env" >/dev/null
+grep -F "binary_sha256=" "$DOTFILES_PROVENANCE_DIR/nvim.env" >/dev/null
 grep -F "command_path=/usr/local/bin/nvim" "$DOTFILES_PROVENANCE_DIR/nvim.env" >/dev/null
 grep -F "binary_path=/opt/nvim-linux-x86_64/bin/nvim" "$DOTFILES_PROVENANCE_DIR/nvim.env" >/dev/null
 

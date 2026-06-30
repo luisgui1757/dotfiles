@@ -306,12 +306,14 @@ and whether `pwsh` is installed.
   `brew upgrade`, `apt upgrade`, `pacman -Syu`, `scoop update *`,
   `winget upgrade --all`, or `choco upgrade all`. Unix ownership is resolved
   from the executable source: Homebrew/Linuxbrew requires the source under
-  `brew --prefix` plus an installed formula; native Linux managers require file
+  `brew --prefix`, an installed formula, and `brew list --formula <formula>`
+  file ownership of the resolved executable; native Linux managers require file
   ownership proof (`dpkg-query -S`, `rpm -qf`, `pacman -Qo`, or
   `apk info --who-owns`); dotfiles-owned Linux artifacts require a durable
   provenance marker with the expected version, URL, SHA-256, command path,
-  binary path, and install root. Output distinguishes `updated`, `current`,
-  `system`, `unmanaged`, `blocked`, and `skipped`. `blocked` fails update mode;
+  binary path, install root, installed-binary SHA-256, and matching `--version`
+  output. Output distinguishes `updated`, `current`, `system`, `unmanaged`,
+  `blocked`, and `skipped`. `blocked` fails update mode;
   `unmanaged` reports the source path and exits successfully. On macOS,
   `/bin/zsh` is accepted as `system`, while normal Homebrew developer tools
   that still resolve from `/usr/bin` get an unmanaged line with a Homebrew

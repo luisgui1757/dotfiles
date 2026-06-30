@@ -82,15 +82,22 @@ ensure_local_bin_on_path() {
 }
 verify_sha256() {
     local f="$1" expected="$2" got
-    if have shasum; then
-        got="$(shasum -a 256 "$f" | awk '{print $1}')"
-    elif have sha256sum; then
-        got="$(sha256sum "$f" | awk '{print $1}')"
-    else
+    got="$(sha256_file "$f")" || {
         echo "  FAIL: need shasum or sha256sum to verify $f" >&2
         return 1
-    fi
+    }
     [[ "$got" == "$expected" ]]
+}
+
+sha256_file() {
+    local f="$1"
+    if have shasum; then
+        shasum -a 256 "$f" | awk '{print $1}'
+    elif have sha256sum; then
+        sha256sum "$f" | awk '{print $1}'
+    else
+        return 1
+    fi
 }
 have_any() {
     local b
@@ -170,11 +177,13 @@ enable_homebrew_make_gnubin_for_current_shell() {
 }
 
 persist_homebrew_shellenv() {
-    local brew_bin brew_prefix marker block wrote=0
+    local brew_bin brew_prefix marker end_marker block wrote=0
+    local tmp block_tmp rc
     local rcs
     brew_bin="$(homebrew_bin)" || return 0
     brew_prefix="${brew_bin%/bin/brew}"
     marker="# >>> dotfiles: Homebrew shellenv >>>"
+    end_marker="# <<< dotfiles: Homebrew shellenv <<<"
     block="$(cat <<EOF
 $marker
 if [ -x "$brew_prefix/bin/brew" ]; then
@@ -188,7 +197,7 @@ if [ -x "$brew_prefix/bin/brew" ]; then
     fi
     unset dotfiles_make_prefix dotfiles_make_gnubin dotfiles_path_with_colons
 fi
-# <<< dotfiles: Homebrew shellenv <<<
+$end_marker
 EOF
 )"
 
@@ -198,17 +207,65 @@ EOF
     fi
 
     for rc in "${rcs[@]}"; do
-        if [[ -f "$rc" ]] && grep -qF "$marker" "$rc"; then
-            continue
-        fi
         if [[ "$DRY_RUN" -eq 1 ]]; then
-            echo "  would: append Homebrew shellenv to $rc"
+            if [[ -f "$rc" ]] && grep -qF "$marker" "$rc"; then
+                echo "  would: refresh Homebrew shellenv in $rc"
+            else
+                echo "  would: append Homebrew shellenv to $rc"
+            fi
         else
             mkdir -p "$(dirname "$rc")"
-            {
-                printf '\n%s\n' "$block"
-            } >> "$rc"
-            wrote=1
+            tmp="$rc.tmp.$$"
+            block_tmp="$rc.block.$$"
+            printf '%s\n' "$block" > "$block_tmp"
+            if [[ -f "$rc" ]] && grep -qF "$marker" "$rc"; then
+                if ! awk -v start="$marker" -v end="$end_marker" -v block_file="$block_tmp" '
+                    $0 == start {
+                        if (seen) {
+                            exit 4
+                        }
+                        while ((getline line < block_file) > 0) {
+                            print line
+                        }
+                        close(block_file)
+                        inside = 1
+                        seen = 1
+                        next
+                    }
+                    inside && $0 == end {
+                        inside = 0
+                        next
+                    }
+                    !inside {
+                        print
+                    }
+                    END {
+                        if (inside) {
+                            exit 2
+                        }
+                    }
+                ' "$rc" > "$tmp"; then
+                    rm -f "$tmp" "$block_tmp"
+                    echo "  WARN: managed Homebrew shellenv block in $rc is malformed; leaving it unchanged" >&2
+                    continue
+                fi
+            else
+                if [[ -f "$rc" ]]; then
+                    cp "$rc" "$tmp"
+                else
+                    : > "$tmp"
+                fi
+                {
+                    printf '\n%s\n' "$block"
+                } >> "$tmp"
+            fi
+            rm -f "$block_tmp"
+            if [[ -f "$rc" ]] && cmp -s "$tmp" "$rc"; then
+                rm -f "$tmp"
+            else
+                mv "$tmp" "$rc"
+                wrote=1
+            fi
         fi
     done
     if [[ "$wrote" -eq 1 ]]; then
@@ -2133,14 +2190,41 @@ brew_prefix() {
     fi
 }
 
+brew_formula_owns_tool_source() {
+    local pkg="$1" source="$2" pkg_name files file real_source real_file
+    pkg_name="${pkg##*/}"
+    real_source="$(real_source_path "$source")"
+    if ! files="$(brew list --formula "$pkg_name" 2>/dev/null)"; then
+        return 2
+    fi
+    while IFS= read -r file; do
+        [[ -n "$file" ]] || continue
+        if [[ "$file" == "$source" || "$file" == "$real_source" ]]; then
+            return 0
+        fi
+        real_file="$(real_source_path "$file")"
+        if [[ "$real_file" == "$source" || "$real_file" == "$real_source" ]]; then
+            return 0
+        fi
+    done <<EOF
+$files
+EOF
+    return 1
+}
+
 brew_claims_tool_source() {
-    local tool="$1" pkg="$2" source="$3" real_source prefix
+    local tool="$1" pkg="$2" source="$3" real_source prefix owns_rc
     prefix="$(brew_prefix)"
     [[ -n "$source" && -n "$prefix" ]] || return 1
     real_source="$(real_source_path "$source")"
     if path_under "$source" "$prefix" || path_under "$real_source" "$prefix"; then
         if pm_pkg_installed brew "$pkg"; then
-            return 0
+            if brew_formula_owns_tool_source "$pkg" "$source"; then
+                return 0
+            fi
+            owns_rc=$?
+            [[ "$owns_rc" -eq 2 ]] && return 2
+            return 3
         fi
         return 2
     fi
@@ -2237,16 +2321,21 @@ direct_artifact_marker_path() {
 
 write_direct_artifact_provenance() {
     local tool="$1" command_path="$2" binary_path="$3" install_root="$4" url="$5" version="$6" sha256="$7"
-    local marker tmp
+    local marker tmp binary_sha256
+    if ! binary_sha256="$(sha256_file "$binary_path")"; then
+        echo "  FAIL: could not checksum installed $tool binary at $binary_path" >&2
+        return 1
+    fi
     marker="$(direct_artifact_marker_path "$tool")"
     mkdir -p "$(dirname "$marker")"
     tmp="$marker.tmp.$$"
     {
-        printf 'schema=1\n'
+        printf 'schema=2\n'
         printf 'tool=%s\n' "$tool"
         printf 'version=%s\n' "$version"
         printf 'source_url=%s\n' "$url"
         printf 'sha256=%s\n' "$sha256"
+        printf 'binary_sha256=%s\n' "$binary_sha256"
         printf 'command_path=%s\n' "$command_path"
         printf 'binary_path=%s\n' "$binary_path"
         printf 'install_root=%s\n' "$install_root"
@@ -2360,9 +2449,21 @@ direct_artifact_current_metadata() {
 
 DIRECT_ARTIFACT_REASON=""
 
+direct_artifact_binary_version_matches() {
+    local binary_path="$1" expected="$2" expected_no_v output
+    expected_no_v="${expected#v}"
+    if ! output="$("$binary_path" --version 2>&1)"; then
+        return 1
+    fi
+    case "$output" in
+        *"$expected"*|*"$expected_no_v"*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
 direct_artifact_claims_tool_source() {
-    local tool="$1" source="$2" marker schema marker_tool version url sha256 command_path binary_path install_root
-    local source_real binary_real
+    local tool="$1" source="$2" marker schema marker_tool version url sha256 binary_sha256 command_path binary_path install_root
+    local source_real binary_real current_binary_sha256
     DIRECT_ARTIFACT_REASON=""
     direct_artifact_current_metadata "$tool" || return 1
     marker="$(direct_artifact_marker_path "$tool")"
@@ -2373,11 +2474,12 @@ direct_artifact_claims_tool_source() {
     version="$(direct_artifact_marker_value "$marker" version)"
     url="$(direct_artifact_marker_value "$marker" source_url)"
     sha256="$(direct_artifact_marker_value "$marker" sha256)"
+    binary_sha256="$(direct_artifact_marker_value "$marker" binary_sha256)"
     command_path="$(direct_artifact_marker_value "$marker" command_path)"
     binary_path="$(direct_artifact_marker_value "$marker" binary_path)"
     install_root="$(direct_artifact_marker_value "$marker" install_root)"
 
-    if [[ "$schema" != "1" || "$marker_tool" != "$tool" || -z "$command_path" || -z "$binary_path" || -z "$install_root" ]]; then
+    if [[ "$schema" != "2" || "$marker_tool" != "$tool" || -z "$binary_sha256" || -z "$command_path" || -z "$binary_path" || -z "$install_root" ]]; then
         DIRECT_ARTIFACT_REASON="invalid provenance marker"
         return 2
     fi
@@ -2412,9 +2514,21 @@ direct_artifact_claims_tool_source() {
         DIRECT_ARTIFACT_REASON="binary realpath changed during provenance check"
         return 2
     fi
+    if ! current_binary_sha256="$(sha256_file "$binary_path")"; then
+        DIRECT_ARTIFACT_REASON="could not checksum marker binary"
+        return 2
+    fi
+    if [[ "$current_binary_sha256" != "$binary_sha256" ]]; then
+        DIRECT_ARTIFACT_REASON="marker binary checksum mismatch"
+        return 2
+    fi
     if [[ "$version" != "$DIRECT_ARTIFACT_VERSION" || "$url" != "$DIRECT_ARTIFACT_URL" || "$sha256" != "$DIRECT_ARTIFACT_SHA256" ]]; then
         DIRECT_ARTIFACT_REASON="repo pin changed"
         return 3
+    fi
+    if ! direct_artifact_binary_version_matches "$binary_path" "$DIRECT_ARTIFACT_VERSION"; then
+        DIRECT_ARTIFACT_REASON="binary version does not match repo pin"
+        return 2
     fi
     return 0
 }
@@ -2470,8 +2584,30 @@ apt_candidate_version() {
 }
 
 brew_pkg_outdated() {
-    local pkg="$1"
-    brew outdated --formula --quiet "$pkg" 2>/dev/null | awk -v p="$pkg" '($1 == p) { found = 1 } END { exit !found }'
+    local pkg="$1" out
+    if ! out="$(brew outdated --formula --quiet "$pkg" 2>/dev/null)"; then
+        return 2
+    fi
+    printf '%s\n' "$out" | awk -v p="$pkg" '($1 == p) { found = 1 } END { exit !found }' && return 0
+    return 1
+}
+
+zypper_pkg_outdated() {
+    local pkg="$1" out
+    if ! out="$(zypper --non-interactive list-updates -t package "$pkg" 2>/dev/null)"; then
+        return 2
+    fi
+    printf '%s\n' "$out" | awk -F'|' -v p="$pkg" '{ gsub(/^[ \t]+|[ \t]+$/, "", $3); if ($3 == p) found = 1 } END { exit !found }' && return 0
+    return 1
+}
+
+apk_pkg_outdated() {
+    local pkg="$1" out
+    if ! out="$(apk version -l '<' "$pkg" 2>/dev/null)"; then
+        return 2
+    fi
+    [[ -n "$out" ]] && return 0
+    return 1
 }
 
 scoped_update_status() {
@@ -2490,11 +2626,20 @@ scoped_update_status() {
     case "$owner" in
         brew)
             if brew_pkg_outdated "$pkg"; then
+                rc=0
+            else
+                rc=$?
+            fi
+            if [[ "$rc" -eq 0 ]]; then
                 if brew upgrade "$pkg"; then
                     printf "  updated   %-26s owner=brew package=%s source=%s\n" "$tool" "$pkg" "$source"
                     return 0
                 fi
                 printf "  WARN: brew update of %s returned %s\n" "$pkg" "$?" >&2
+                return 1
+            fi
+            if [[ "$rc" -ne 1 ]]; then
+                printf "  blocked   %-26s owner=brew package=%s reason=outdated-check-failed source=%s\n" "$tool" "$pkg" "$source" >&2
                 return 1
             fi
             printf "  current   %-26s owner=brew package=%s source=%s\n" "$tool" "$pkg" "$source"
@@ -2512,8 +2657,9 @@ scoped_update_status() {
                 after="$(apt_installed_version "$pkg")"
                 if [[ -n "$before" && -n "$after" && "$before" != "$after" ]]; then
                     printf "  updated   %-26s owner=apt package=%s source=%s\n" "$tool" "$pkg" "$source"
-                elif [[ -n "$before" && -n "$candidate" && "$candidate" != "(none)" && "$before" != "$candidate" ]]; then
-                    printf "  updated   %-26s owner=apt package=%s source=%s\n" "$tool" "$pkg" "$source"
+                elif [[ "$APT_UPDATE_REFRESH_OK" -eq 0 && -n "$before" && -n "$candidate" && "$candidate" != "(none)" && "$before" != "$candidate" ]]; then
+                    printf "  blocked   %-26s owner=apt package=%s reason=post-upgrade-version-unchanged source=%s\n" "$tool" "$pkg" "$source" >&2
+                    return 1
                 else
                     printf "  current   %-26s owner=apt package=%s source=%s\n" "$tool" "$pkg" "$source"
                 fi
@@ -2523,8 +2669,11 @@ scoped_update_status() {
             return 1
             ;;
         dnf)
-            dnf check-update --quiet "$pkg" >/dev/null 2>&1
-            rc=$?
+            if dnf check-update --quiet "$pkg" >/dev/null 2>&1; then
+                rc=0
+            else
+                rc=$?
+            fi
             if [[ "$rc" -eq 0 ]]; then
                 printf "  current   %-26s owner=dnf package=%s source=%s\n" "$tool" "$pkg" "$source"
                 return 0
@@ -2541,20 +2690,46 @@ scoped_update_status() {
             return 0
             ;;
         zypper)
-            if zypper --non-interactive list-updates -t package "$pkg" 2>/dev/null | awk -F'|' -v p="$pkg" '{ gsub(/^[ \t]+|[ \t]+$/, "", $3); if ($3 == p) found = 1 } END { exit !found }'; then
-                maybe_sudo zypper update -y "$pkg" &&
-                    printf "  updated   %-26s owner=zypper package=%s source=%s\n" "$tool" "$pkg" "$source"
+            if zypper_pkg_outdated "$pkg"; then
+                rc=0
             else
-                printf "  current   %-26s owner=zypper package=%s source=%s\n" "$tool" "$pkg" "$source"
+                rc=$?
             fi
+            if [[ "$rc" -eq 1 ]]; then
+                printf "  current   %-26s owner=zypper package=%s source=%s\n" "$tool" "$pkg" "$source"
+                return 0
+            fi
+            if [[ "$rc" -ne 0 ]]; then
+                printf "  blocked   %-26s owner=zypper package=%s reason=outdated-check-failed source=%s\n" "$tool" "$pkg" "$source" >&2
+                return 1
+            fi
+            if maybe_sudo zypper update -y "$pkg"; then
+                printf "  updated   %-26s owner=zypper package=%s source=%s\n" "$tool" "$pkg" "$source"
+                return 0
+            fi
+            printf "  WARN: zypper update of %s failed\n" "$pkg" >&2
+            return 1
             ;;
         apk)
-            if apk version -l '<' "$pkg" 2>/dev/null | awk 'NF { found = 1 } END { exit !found }'; then
-                maybe_sudo apk upgrade "$pkg" &&
-                    printf "  updated   %-26s owner=apk package=%s source=%s\n" "$tool" "$pkg" "$source"
+            if apk_pkg_outdated "$pkg"; then
+                rc=0
             else
-                printf "  current   %-26s owner=apk package=%s source=%s\n" "$tool" "$pkg" "$source"
+                rc=$?
             fi
+            if [[ "$rc" -eq 1 ]]; then
+                printf "  current   %-26s owner=apk package=%s source=%s\n" "$tool" "$pkg" "$source"
+                return 0
+            fi
+            if [[ "$rc" -ne 0 ]]; then
+                printf "  blocked   %-26s owner=apk package=%s reason=outdated-check-failed source=%s\n" "$tool" "$pkg" "$source" >&2
+                return 1
+            fi
+            if maybe_sudo apk upgrade "$pkg"; then
+                printf "  updated   %-26s owner=apk package=%s source=%s\n" "$tool" "$pkg" "$source"
+                return 0
+            fi
+            printf "  WARN: apk update of %s failed\n" "$pkg" >&2
+            return 1
             ;;
     esac
     local rc=$?
@@ -2602,6 +2777,10 @@ update_catalog_tool() {
         fi
         if [[ "$brew_rc" -eq 2 ]]; then
             printf "  blocked   %-26s owner=brew package=%s reason=source-under-brew-prefix-but-formula-not-installed source=%s\n" "$tool" "$pkg" "$source" >&2
+            return 1
+        fi
+        if [[ "$brew_rc" -eq 3 ]]; then
+            printf "  blocked   %-26s owner=brew package=%s reason=source-under-brew-prefix-but-formula-does-not-own-source source=%s\n" "$tool" "$pkg" "$source" >&2
             return 1
         fi
     fi

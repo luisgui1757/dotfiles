@@ -80,8 +80,10 @@ ownership**:
 - `install-deps.sh` now resolves update ownership per tool from the command
   source, not from the global installer package manager.
 - Homebrew/Linuxbrew ownership requires the resolved source under
-  `brew --prefix` plus an installed formula. Formula-list presence alone cannot
-  claim `/usr/bin` or another shadowing path.
+  `brew --prefix`, an installed formula, and `brew list --formula <formula>`
+  file ownership of the resolved executable. Formula-list presence alone cannot
+  claim `/usr/bin`, another shadowing path, or an unrelated file under the Brew
+  prefix.
 - Native Linux ownership is source-proven through `dpkg-query -S`, `rpm -qf`,
   `pacman -Qo`, or `apk info --who-owns`, then updated through package-scoped
   manager commands. Pacman-owned packages are reported as `skipped` because a
@@ -152,9 +154,10 @@ ownership**:
    Required Unix proof rules:
 
    - Homebrew/Linuxbrew: resolved executable path must live under
-     `brew --prefix`, and the declared formula must be installed. A formula list
-     entry alone is not enough if PATH still resolves to `/usr/bin` or another
-     source.
+     `brew --prefix`, the declared formula must be installed, and
+     `brew list --formula <formula>` must list the resolved executable target.
+     A formula list entry alone is not enough if PATH still resolves to
+     `/usr/bin`, another source, or an unrelated file under the Brew prefix.
    - `apt`: resolved real path must be claimed by `dpkg-query -S`, and the
      owning Debian package must match the catalog package or an explicitly
      declared package alias.
@@ -268,10 +271,12 @@ ownership**:
    - add durable provenance markers for fresh direct-artifact installs before
      update mode tries to own them;
    - include tool name, version, source URL, SHA-256, install root, managed
-     symlink(s), binary path, and installer schema version in that provenance;
+     symlink(s), binary path, installed-binary SHA-256, and installer schema
+     version in that provenance;
    - prove the current executable resolves to the dotfiles-managed install
-     shape and matching provenance;
-   - compare the installed version to the repo pin;
+     shape, matching provenance, matching installed-binary checksum, and
+     matching executable `--version` output;
+   - compare the installed executable version to the repo pin;
    - reinstall the pinned artifact with SHA-256 verification only when the repo
      pin is newer or the install is corrupt;
    - report `current` when the installed artifact already matches the repo pin;
@@ -303,27 +308,36 @@ The shipped tests prove behavior, not just branches:
    databases for Linuxbrew, apt, pacman, macOS system zsh, and repo-pinned
    direct artifacts.
 2. Mixed-owner dispatch is covered by a single run where Linuxbrew owns `rg`
-   while apt owns `jq`; both scoped managers are invoked.
+   while apt owns `jq`; both scoped managers are invoked, and apt reports
+   `updated` only after the installed package version changes.
 3. Homebrew `current` is covered by proving `brew outdated` has no row and
    asserting `brew upgrade <pkg>` is not called.
 4. Homebrew shadowing is covered by a formula-installed `git` whose resolved
    source is outside the Homebrew prefix; it is `unmanaged`, not updated.
 5. Homebrew prefix contradictions are covered by a command under `brew --prefix`
-   whose formula is not installed; the run is `blocked` and exits nonzero.
+   whose formula is not installed, and by a formula that is installed but does
+   not own the resolved executable file; both runs are `blocked` and exit
+   nonzero. Homebrew outdated-probe failures are also `blocked`, not `current`.
 6. Apt `current` is covered by installed == candidate after one metadata refresh
    and asserts no scoped install runs. The existing apt-resilience test still
    proves a failed metadata refresh does not skip a scoped upgrade attempt.
+   An advertised apt upgrade that leaves the installed version unchanged is
+   covered as `blocked`, not `updated`.
 7. Pacman ownership is covered as `skipped` with
    `reason=requires explicit system upgrade`.
-8. Direct-artifact coverage includes matching provenance -> `current`, legacy
-   unmarked binary -> `unmanaged`, corrupt marker -> `blocked`, and stale marker
-   -> refresh to the repo pin.
-9. Direct-install tests verify provenance markers for Neovim, Starship,
-   tree-sitter CLI, and chezmoi; lazygit remains covered by update-mode marker
-   tests and its dry-run installer path.
-10. Homebrew shellenv/setup tests prove the managed `make` `libexec/gnubin`
-    path is added to the current setup process and persisted for future shells.
-11. Windows Pester coverage remains the stricter source-proven Scoop/winget/
+8. Dnf/zypper RPM ownership and apk ownership are covered with manager-specific
+   file-owner proofs and scoped package updates. Zypper/apk outdated-probe
+   failures are covered as `blocked`.
+9. Direct-artifact coverage includes matching provenance plus matching
+   executable version -> `current`, binary checksum mismatch -> `blocked`,
+   binary version mismatch -> `blocked`, legacy unmarked binary -> `unmanaged`,
+   corrupt marker -> `blocked`, and stale marker -> refresh to the repo pin.
+10. Direct-install tests verify schema-2 provenance markers and installed-binary
+    checksum fields for Neovim, lazygit, Starship, tree-sitter CLI, and chezmoi.
+11. Homebrew shellenv/setup tests prove the managed `make` `libexec/gnubin`
+    path is added to the current setup process, persisted for future shells, and
+    retrofitted into a legacy managed block without dropping user content.
+12. Windows Pester coverage remains the stricter source-proven Scoop/winget/
     Chocolatey model and is run with the full gate.
 
 ### Documentation Shipped

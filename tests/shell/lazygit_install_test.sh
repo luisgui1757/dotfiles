@@ -36,10 +36,14 @@ out="$(install_lazygit)"
 version_no_v="${LAZYGIT_LINUX_VERSION#v}"
 asset="lazygit_${version_no_v}_linux_x86_64.tar.gz"
 
-[[ "$out" == *"github.com/jesseduffield/lazygit/releases/download/${LAZYGIT_LINUX_VERSION}/${asset}"* ]]
-[[ "$out" == *"verify sha256 $LAZYGIT_LINUX_X86_64_SHA256"* ]]
-[[ "$out" == *"/usr/local/bin/lazygit"* ]]
-[[ "$out" == *"\$HOME/.local/bin/lazygit"* ]]
+[[ "$out" == *"github.com/jesseduffield/lazygit/releases/download/${LAZYGIT_LINUX_VERSION}/${asset}"* ]] \
+    || fail "dry-run output did not include the pinned lazygit release URL"
+[[ "$out" == *"verify sha256 $LAZYGIT_LINUX_X86_64_SHA256"* ]] \
+    || fail "dry-run output did not include the pinned lazygit checksum"
+[[ "$out" == *"/usr/local/bin/lazygit"* ]] \
+    || fail "dry-run output did not include the system install target"
+[[ "$out" == *"\$HOME/.local/bin/lazygit"* ]] \
+    || fail "dry-run output did not include the user-local fallback target"
 
 HOME="$TMP_ROOT/home"
 export HOME
@@ -90,8 +94,12 @@ grep -F "$LAZYGIT_LINUX_X86_64_SHA256" "$TMP_ROOT/sha.log" >/dev/null \
     || fail "lazygit install did not verify the pinned checksum"
 grep -F "tool=lazygit" "$DOTFILES_PROVENANCE_DIR/lazygit.env" >/dev/null \
     || fail "lazygit provenance marker was not written"
+grep -F "schema=2" "$DOTFILES_PROVENANCE_DIR/lazygit.env" >/dev/null \
+    || fail "lazygit provenance marker has the wrong schema"
 grep -F "version=$LAZYGIT_LINUX_VERSION" "$DOTFILES_PROVENANCE_DIR/lazygit.env" >/dev/null \
     || fail "lazygit provenance marker has the wrong version"
+grep -F "binary_sha256=" "$DOTFILES_PROVENANCE_DIR/lazygit.env" >/dev/null \
+    || fail "lazygit provenance marker is missing the installed binary checksum"
 grep -F "command_path=$HOME/.local/bin/lazygit" "$DOTFILES_PROVENANCE_DIR/lazygit.env" >/dev/null \
     || fail "lazygit provenance marker has the wrong command path"
 
@@ -102,16 +110,21 @@ fi
 
 DRY_RUN=1
 PM=brew
+PATH="/usr/bin:/bin"
 out="$(install_lazygit)"
-[[ "$out" == *"would: brew install lazygit"* ]]
-[[ "$out" != *"github.com/jesseduffield/lazygit/releases"* ]]
+[[ "$out" == *"would: brew install lazygit"* ]] \
+    || fail "brew dry-run did not delegate lazygit to Homebrew"
+[[ "$out" != *"github.com/jesseduffield/lazygit/releases"* ]] \
+    || fail "brew dry-run incorrectly used the direct GitHub lazygit installer"
 
 PM=apk
 native_linux_pm() {
     printf '%s\n' "apk"
 }
 out="$(install_lazygit)"
-[[ "$out" == *"would: apk install lazygit"* ]]
-[[ "$out" != *"github.com/jesseduffield/lazygit/releases"* ]]
+[[ "$out" == *"would: apk install lazygit"* ]] \
+    || fail "apk dry-run did not delegate lazygit to Alpine's native package"
+[[ "$out" != *"github.com/jesseduffield/lazygit/releases"* ]] \
+    || fail "apk dry-run incorrectly used the direct GitHub lazygit installer"
 
 echo "OK"

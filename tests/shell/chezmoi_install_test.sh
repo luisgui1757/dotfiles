@@ -101,8 +101,12 @@ grep -F "$expected_chezmoi_sha" "$TMP_ROOT/sha.log" >/dev/null \
     || fail "chezmoi install did not verify the pinned checksum"
 grep -F "tool=chezmoi" "$DOTFILES_PROVENANCE_DIR/chezmoi.env" >/dev/null \
     || fail "chezmoi provenance marker was not written"
+grep -F "schema=2" "$DOTFILES_PROVENANCE_DIR/chezmoi.env" >/dev/null \
+    || fail "chezmoi provenance marker has the wrong schema"
 grep -F "version=$CHEZMOI_VERSION" "$DOTFILES_PROVENANCE_DIR/chezmoi.env" >/dev/null \
     || fail "chezmoi provenance marker has the wrong version"
+grep -F "binary_sha256=" "$DOTFILES_PROVENANCE_DIR/chezmoi.env" >/dev/null \
+    || fail "chezmoi provenance marker is missing the installed binary checksum"
 grep -F "command_path=$HOME/.local/bin/chezmoi" "$DOTFILES_PROVENANCE_DIR/chezmoi.env" >/dev/null \
     || fail "chezmoi provenance marker has the wrong command path"
 

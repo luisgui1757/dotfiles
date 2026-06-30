@@ -121,10 +121,14 @@ printf '%s\n' "$PATH" | grep -F "$HOME/.local/bin" >/dev/null \
     || fail "starship install did not add user-local bin to PATH"
 grep -F "tool=starship" "$DOTFILES_PROVENANCE_DIR/starship.env" >/dev/null \
     || fail "starship provenance marker was not written"
+grep -F "schema=2" "$DOTFILES_PROVENANCE_DIR/starship.env" >/dev/null \
+    || fail "starship provenance marker has the wrong schema"
 grep -F "version=$STARSHIP_VERSION" "$DOTFILES_PROVENANCE_DIR/starship.env" >/dev/null \
     || fail "starship provenance marker has the wrong version"
 grep -F "sha256=$STARSHIP_LINUX_X86_64_SHA256" "$DOTFILES_PROVENANCE_DIR/starship.env" >/dev/null \
     || fail "starship provenance marker has the wrong checksum"
+grep -F "binary_sha256=" "$DOTFILES_PROVENANCE_DIR/starship.env" >/dev/null \
+    || fail "starship provenance marker is missing the installed binary checksum"
 grep -F "command_path=$HOME/.local/bin/starship" "$DOTFILES_PROVENANCE_DIR/starship.env" >/dev/null \
     || fail "starship provenance marker has the wrong command path"
 

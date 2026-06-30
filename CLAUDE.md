@@ -710,12 +710,14 @@ save only**. The next plain `:w` formats normally. Implemented in
   `winget upgrade --all`, or `choco upgrade all`, and it must not touch PSFzf,
   `lazy-lock.json`, or configs. Unix update mode is per-tool, not one global
   active-manager pass: Homebrew/Linuxbrew requires the resolved source under
-  `brew --prefix` plus the installed formula; apt/dnf/zypper/pacman/apk require
+  `brew --prefix`, the installed formula, and `brew list --formula <formula>`
+  file ownership of the resolved executable; apt/dnf/zypper/pacman/apk require
   the manager's file-ownership proof for the resolved real path; repo-pinned
   direct Linux artifacts (`nvim`, `lazygit`, `starship`, `tree-sitter`, and
   `chezmoi`) are owned only when their durable marker matches the repo-pinned
-  version, URL, SHA-256, command path, binary path, and install root. Legacy
-  unmarked direct binaries remain `unmanaged`. Homebrew current packages must
+  version, URL, SHA-256, command path, binary path, install root, installed
+  binary SHA-256, and executable `--version` output. Legacy unmarked direct
+  binaries remain `unmanaged`. Homebrew current packages must
   print `current` without running `brew upgrade`; apt current packages must not
   run `apt-get install --only-upgrade` after a successful metadata refresh proves
   installed == candidate. Pacman-owned tools are `skipped` because package-level

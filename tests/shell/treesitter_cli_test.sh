@@ -98,10 +98,14 @@ printf '%s\n' "$PATH" | grep -F "$HOME/.local/bin" >/dev/null \
     || fail "tree-sitter install did not add user-local bin to PATH"
 grep -F "tool=tree-sitter" "$DOTFILES_PROVENANCE_DIR/tree-sitter.env" >/dev/null \
     || fail "tree-sitter provenance marker was not written"
+grep -F "schema=2" "$DOTFILES_PROVENANCE_DIR/tree-sitter.env" >/dev/null \
+    || fail "tree-sitter provenance marker has the wrong schema"
 grep -F "version=$TREE_SITTER_CLI_LINUX_VERSION" "$DOTFILES_PROVENANCE_DIR/tree-sitter.env" >/dev/null \
     || fail "tree-sitter provenance marker has the wrong version"
 grep -F "sha256=$TREE_SITTER_CLI_LINUX_X86_64_SHA256" "$DOTFILES_PROVENANCE_DIR/tree-sitter.env" >/dev/null \
     || fail "tree-sitter provenance marker has the wrong checksum"
+grep -F "binary_sha256=" "$DOTFILES_PROVENANCE_DIR/tree-sitter.env" >/dev/null \
+    || fail "tree-sitter provenance marker is missing the installed binary checksum"
 grep -F "command_path=$HOME/.local/bin/tree-sitter" "$DOTFILES_PROVENANCE_DIR/tree-sitter.env" >/dev/null \
     || fail "tree-sitter provenance marker has the wrong command path"
 

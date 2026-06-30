@@ -47,6 +47,16 @@ case ":$PATH:" in
     *) fail "Homebrew make gnubin was not added to the current PATH" ;;
 esac
 
+cat > "$HOME/.bashrc" <<EOF
+# user content before managed block
+# >>> dotfiles: Homebrew shellenv >>>
+if [ -x "$prefix/bin/brew" ]; then
+    eval "\$($prefix/bin/brew shellenv)"
+fi
+# <<< dotfiles: Homebrew shellenv <<<
+# user content after managed block
+EOF
+
 persist_homebrew_shellenv
 persist_homebrew_shellenv
 
@@ -55,6 +65,12 @@ for rc in "$HOME/.zshrc.local" "$HOME/.bashrc"; do
     count="$(grep -cF '# >>> dotfiles: Homebrew shellenv >>>' "$rc")"
     [[ "$count" == "1" ]] || fail "$rc marker count is $count"
 done
+grep -F 'dotfiles_make_gnubin' "$HOME/.bashrc" >/dev/null \
+    || fail "legacy managed bashrc block was not upgraded with Homebrew make gnubin"
+grep -F '# user content before managed block' "$HOME/.bashrc" >/dev/null \
+    || fail "legacy managed bashrc replacement dropped content before the block"
+grep -F '# user content after managed block' "$HOME/.bashrc" >/dev/null \
+    || fail "legacy managed bashrc replacement dropped content after the block"
 
 # Single quotes are intentional: $HOME / $HOMEBREW_PREFIX must expand inside the
 # inner `bash -c`, not in this outer shell.
