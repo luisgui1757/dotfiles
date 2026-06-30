@@ -988,6 +988,40 @@ Describe "install-deps.ps1" {
         $script:InstallFailures.Count | Should -Be 0
     }
 
+    It "does not let winget list claim a manual command source" {
+        . $script:ImportInstallDepsForTest -DryRun
+        $script:WingetArgs = @()
+
+        Mock -CommandName Get-Command -MockWith {
+            param([string]$Name)
+            if ($Name -eq 'winget') {
+                return [pscustomobject]@{ Name = $Name; Source = $Name }
+            }
+            if ($Name -eq 'pwsh') {
+                return [pscustomobject]@{ Name = $Name; Source = 'C:\Manual\PowerShell\pwsh.exe' }
+            }
+            return $null
+        }
+        Mock -CommandName winget -MockWith {
+            $joined = $args -join ' '
+            $script:WingetArgs += $joined
+            if ($joined -eq 'list --id Microsoft.PowerShell -e --accept-source-agreements') {
+                $global:LASTEXITCODE = 0
+                return 'PowerShell Microsoft.PowerShell 7.5.0 winget'
+            }
+            throw "winget must not check upgrades or update a manual command source: $joined"
+        }
+
+        $output = & { Update-ManagedCatalogTool pwsh -AssumePresent -NoPrompt -ReportSkip -IsDryRun $true } 6>&1 | Out-String
+
+        $output | Should -Match 'unmanaged\s+pwsh\s+source=C:\\Manual\\PowerShell\\pwsh\.exe'
+        $output | Should -Not -Match 'winget upgrade|current\s+pwsh\s+via winget'
+        $script:WingetArgs | Should -Contain 'list --id Microsoft.PowerShell -e --accept-source-agreements'
+        ($script:WingetArgs | Where-Object { $_ -like 'list --upgrade-available*' }).Count | Should -Be 0
+        $script:InstallFailures.Count | Should -Be 0
+        $script:UnmanagedDependencies.Count | Should -Be 1
+    }
+
     It "records failed winget upgrade availability checks" {
         . $script:ImportInstallDepsForTest
         $script:WingetArgs = @()
@@ -1063,6 +1097,74 @@ Describe "install-deps.ps1" {
         $script:ChocoArgs | Should -Contain 'list powershell-core --local-only --exact --limit-output'
         ($script:ChocoArgs | Where-Object { $_ -like 'upgrade*' }).Count | Should -Be 0
         $script:InstallFailures.Count | Should -Be 0
+    }
+
+    It "does not let Chocolatey list claim a manual command source" {
+        . $script:ImportInstallDepsForTest -DryRun
+        $script:ChocoArgs = @()
+
+        Mock -CommandName Get-Command -MockWith {
+            param([string]$Name)
+            if ($Name -eq 'choco') {
+                return [pscustomobject]@{ Name = $Name; Source = $Name }
+            }
+            if ($Name -eq 'pwsh') {
+                return [pscustomobject]@{ Name = $Name; Source = 'C:\Manual\PowerShell\pwsh.exe' }
+            }
+            return $null
+        }
+        Mock -CommandName choco -MockWith {
+            $joined = $args -join ' '
+            $script:ChocoArgs += $joined
+            if ($joined -eq 'list powershell-core --local-only --exact --limit-output') {
+                $global:LASTEXITCODE = 0
+                return 'powershell-core|7.5.0'
+            }
+            throw "choco must not update a manual command source: $joined"
+        }
+
+        $output = & { Update-ManagedCatalogTool pwsh -AssumePresent -NoPrompt -ReportSkip -IsDryRun $true } 6>&1 | Out-String
+
+        $output | Should -Match 'unmanaged\s+pwsh\s+source=C:\\Manual\\PowerShell\\pwsh\.exe'
+        $output | Should -Not -Match 'choco upgrade powershell-core'
+        $script:ChocoArgs | Should -Contain 'list powershell-core --local-only --exact --limit-output'
+        $script:InstallFailures.Count | Should -Be 0
+        $script:UnmanagedDependencies.Count | Should -Be 1
+    }
+
+    It "blocks a Chocolatey-bin command source when the expected package is missing" {
+        . $script:ImportInstallDepsForTest -DryRun
+        $script:ChocoArgs = @()
+
+        Mock -CommandName Get-Command -MockWith {
+            param([string]$Name)
+            if ($Name -eq 'choco') {
+                return [pscustomobject]@{ Name = $Name; Source = $Name }
+            }
+            if ($Name -eq 'pwsh') {
+                return [pscustomobject]@{ Name = $Name; Source = 'C:\ProgramData\chocolatey\bin\pwsh.exe' }
+            }
+            return $null
+        }
+        Mock -CommandName choco -MockWith {
+            $joined = $args -join ' '
+            $script:ChocoArgs += $joined
+            if ($joined -eq 'list powershell-core --local-only --exact --limit-output') {
+                $global:LASTEXITCODE = 0
+                return ''
+            }
+            throw "choco must not update after a package/source contradiction: $joined"
+        }
+
+        $output = & { Update-ManagedCatalogTool pwsh -AssumePresent -NoPrompt -ReportSkip -IsDryRun $true } 3>&1 6>&1 | Out-String
+
+        $output | Should -Match 'blocked\s+pwsh'
+        $output | Should -Match 'Chocolatey command source is under Chocolatey bin but package powershell-core is not installed'
+        $output | Should -Not -Match 'choco upgrade powershell-core'
+        $script:InstallFailures.Count | Should -Be 1
+        $script:InstallFailures[0].Pm | Should -Be 'choco'
+        $script:InstallFailures[0].ExitCode | Should -Be 'manager-provenance'
+        $script:UnmanagedDependencies.Count | Should -Be 0
     }
 
     It "reports present unmanaged PowerShell instead of pretending update ownership" {

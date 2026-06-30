@@ -307,7 +307,7 @@ ownership**:
 
 8. Preserve Windows' stricter provenance lessons.
 
-   The Unix implementation should mirror the Windows guarantees already added:
+   Unix and Windows update ownership share the same non-negotiable guarantees:
 
    - a command source can only be claimed by a manager that proves it owns that
      source;
@@ -315,6 +315,12 @@ ownership**:
    - corrupt provenance is `blocked`, not `unmanaged`;
    - no later manager gets to update a tool after an earlier manager's ownership
      proof is corrupt.
+
+   On Windows, Scoop proves ownership through shim metadata before list fallback.
+   Winget and Chocolatey require both an exact package-list row and a command
+   source under supported manager install roots; a manual shadow such as
+   `C:\Manual\PowerShell\pwsh.exe` remains `unmanaged` even when a package row
+   exists.
 
 ### Shipped Regression Coverage
 
@@ -355,14 +361,15 @@ The shipped tests prove behavior, not just branches:
 11. Homebrew shellenv/setup tests prove the managed `make` `libexec/gnubin`
     path is added to the current setup process, persisted for future shells, and
     retrofitted into a legacy managed block without dropping user content.
-12. Windows Pester coverage remains the stricter source-proven Scoop/winget/
-    Chocolatey model and is run with the full gate.
+12. Windows Pester coverage proves source-proven Scoop/winget/Chocolatey update
+    ownership, including manual-source shadows with package rows and
+    Chocolatey-bin/package-list contradictions, and is run with the full gate.
 
 ### Documentation Shipped
 
 1. `README.md` documents the stable status vocabulary, Unix per-tool ownership,
-   direct-artifact provenance, Windows manager proof, and Homebrew GNU Make
-   `gnubin` adoption.
+   direct-artifact provenance, Windows source-proven manager proof, and Homebrew
+   GNU Make `gnubin` adoption.
 2. `README.md` troubleshooting now covers `system`, `unmanaged`, `blocked`,
    Homebrew `make` still resolving to `/usr/bin/make`, and mixed
    Linuxbrew/native-manager machines.

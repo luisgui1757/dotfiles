@@ -1029,6 +1029,112 @@ function Test-ScoopPackageManaged {
     return ($state.Status -eq 'managed')
 }
 
+function Get-WingetRootCandidates {
+    $roots = @()
+    foreach ($base in @($env:LOCALAPPDATA)) {
+        if (-not [string]::IsNullOrWhiteSpace($base)) {
+            $roots += (Join-WindowsPathText -Left $base -Right 'Microsoft\WinGet\Links')
+            $roots += (Join-WindowsPathText -Left $base -Right 'Microsoft\WinGet\Packages')
+            $roots += (Join-WindowsPathText -Left $base -Right 'Microsoft\WindowsApps')
+        }
+    }
+    foreach ($base in @($env:ProgramFiles, ${env:ProgramFiles(x86)})) {
+        if (-not [string]::IsNullOrWhiteSpace($base)) {
+            $roots += (Join-WindowsPathText -Left $base -Right 'WinGet\Links')
+            $roots += (Join-WindowsPathText -Left $base -Right 'WinGet\Packages')
+            $roots += (Join-WindowsPathText -Left $base -Right 'WindowsApps')
+        }
+    }
+    $roots += @(
+        'C:\Program Files\WinGet\Links',
+        'C:\Program Files\WinGet\Packages',
+        'C:\Program Files (x86)\WinGet\Links',
+        'C:\Program Files (x86)\WinGet\Packages',
+        'C:\Program Files\WindowsApps'
+    )
+    return @($roots | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique)
+}
+
+function Get-WingetProgramRootCandidates {
+    $roots = @()
+    foreach ($candidate in @($env:ProgramFiles, ${env:ProgramFiles(x86)}, 'C:\Program Files', 'C:\Program Files (x86)')) {
+        if (-not [string]::IsNullOrWhiteSpace($candidate)) { $roots += (ConvertTo-WindowsComparablePath -Path $candidate) }
+    }
+    if (-not [string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
+        $roots += (Join-WindowsPathText -Left $env:LOCALAPPDATA -Right 'Programs')
+    }
+    return @($roots | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique)
+}
+
+function Get-WingetToolInstallSuffixes {
+    param([string]$tool)
+    switch ($tool) {
+        'git' { return @('Git\cmd', 'Git\bin') }
+        'nvim' { return @('Neovim\bin') }
+        'starship' { return @('Starship\bin', 'starship\bin', 'starship') }
+        'rg' { return @('ripgrep', 'ripgrep\bin') }
+        'fd' { return @('fd', 'fd\bin') }
+        'fzf' { return @('fzf', 'fzf\bin') }
+        'lsd' { return @('lsd', 'lsd\bin') }
+        'chezmoi' { return @('chezmoi', 'chezmoi\bin') }
+        'lazygit' { return @('lazygit', 'lazygit\bin') }
+        'wt' { return @('WindowsApps') }
+        'make' { return @('GnuWin32\bin') }
+        'cmake' { return @('CMake\bin') }
+        'pwsh' { return @('PowerShell\7') }
+        'node' { return @('nodejs') }
+        'python' { return @('Python\Python312', 'Python312') }
+        'zig' { return @('zig', 'Zig') }
+        'jq' { return @('jq', 'jq\bin') }
+        'shellcheck' { return @('ShellCheck', 'ShellCheck\bin') }
+        'hyperfine' { return @('hyperfine', 'hyperfine\bin') }
+        'code' { return @('Microsoft VS Code\bin') }
+        default { return @() }
+    }
+}
+
+function Test-WingetToolSourceMatchesPackage {
+    param([string]$tool, [string]$Package, [string]$Source)
+    if ([string]::IsNullOrWhiteSpace($tool) -or [string]::IsNullOrWhiteSpace($Package) -or [string]::IsNullOrWhiteSpace($Source)) {
+        return $false
+    }
+    $expected = Get-CatalogPackageId -tool $tool -Manager 'winget'
+    if ([string]::IsNullOrWhiteSpace($expected) -or -not $expected.Equals($Package, [StringComparison]::OrdinalIgnoreCase)) {
+        return $false
+    }
+
+    foreach ($root in (Get-WingetRootCandidates)) {
+        if (Test-WindowsPathUnderDirectoryText -Path $Source -Directory $root) {
+            return $true
+        }
+    }
+
+    foreach ($root in (Get-WingetProgramRootCandidates)) {
+        foreach ($suffix in (Get-WingetToolInstallSuffixes -tool $tool)) {
+            $candidate = Join-WindowsPathText -Left $root -Right $suffix
+            if (Test-WindowsPathUnderDirectoryText -Path $Source -Directory $candidate) {
+                return $true
+            }
+        }
+    }
+    return $false
+}
+
+function Get-WingetPackageOwnershipState {
+    param([string]$tool, [string]$Package)
+    $source = Get-CatalogToolCommandSource -tool $tool
+    if ([string]::IsNullOrWhiteSpace($source)) {
+        return [pscustomobject]@{ Status = 'not-managed'; Reason = ''; Source = ''; Package = ''; Expected = $Package }
+    }
+    if (-not (Test-WingetPackageManaged -Package $Package)) {
+        return [pscustomobject]@{ Status = 'not-managed'; Reason = ''; Source = $source; Package = ''; Expected = $Package }
+    }
+    if (Test-WingetToolSourceMatchesPackage -tool $tool -Package $Package -Source $source) {
+        return [pscustomobject]@{ Status = 'managed'; Reason = ''; Source = $source; Package = $Package; Expected = $Package }
+    }
+    return [pscustomobject]@{ Status = 'not-managed'; Reason = ''; Source = $source; Package = ''; Expected = $Package }
+}
+
 function Test-WingetPackageManaged {
     param([string]$Package)
     if ([string]::IsNullOrWhiteSpace($Package)) { return $false }
@@ -1106,6 +1212,49 @@ function Test-ChocoPackageManaged {
     return $false
 }
 
+function Get-ChocolateyRootCandidates {
+    $roots = @()
+    if (-not [string]::IsNullOrWhiteSpace($env:ChocolateyInstall)) {
+        $roots += (ConvertTo-WindowsComparablePath -Path $env:ChocolateyInstall)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($env:ProgramData)) {
+        $roots += (Join-WindowsPathText -Left $env:ProgramData -Right 'chocolatey')
+    }
+    $roots += 'C:\ProgramData\chocolatey'
+    return @($roots | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique)
+}
+
+function Test-ChocolateyToolSourceUnderKnownRoot {
+    param([string]$Source)
+    foreach ($root in (Get-ChocolateyRootCandidates)) {
+        $binDir = Join-WindowsPathText -Left $root -Right 'bin'
+        if (Test-WindowsPathUnderDirectoryText -Path $Source -Directory $binDir) {
+            return $true
+        }
+    }
+    return $false
+}
+
+function Get-ChocoPackageOwnershipState {
+    param([string]$tool, [string]$Package)
+    $source = Get-CatalogToolCommandSource -tool $tool
+    if ([string]::IsNullOrWhiteSpace($source)) {
+        return [pscustomobject]@{ Status = 'not-managed'; Reason = ''; Source = ''; Package = ''; Expected = $Package }
+    }
+    $sourceUnderChoco = Test-ChocolateyToolSourceUnderKnownRoot -Source $source
+    $packageInstalled = Test-ChocoPackageManaged -Package $Package
+    if ($sourceUnderChoco -and $packageInstalled) {
+        return [pscustomobject]@{ Status = 'managed'; Reason = ''; Source = $source; Package = $Package; Expected = $Package }
+    }
+    if ($sourceUnderChoco -and -not $packageInstalled) {
+        return [pscustomobject]@{
+            Status = 'error'; Source = $source; Package = ''; Expected = $Package;
+            Reason = ("Chocolatey command source is under Chocolatey bin but package {0} is not installed" -f $Package)
+        }
+    }
+    return [pscustomobject]@{ Status = 'not-managed'; Reason = ''; Source = $source; Package = ''; Expected = $Package }
+}
+
 function Get-ManagedCatalogToolUpdateTarget {
     param([string]$tool)
     foreach ($manager in @('scoop', 'winget', 'choco')) {
@@ -1114,20 +1263,8 @@ function Get-ManagedCatalogToolUpdateTarget {
         if (-not (Get-Command $manager -ErrorAction SilentlyContinue)) { continue }
         $state = switch ($manager) {
             'scoop' { Get-ScoopPackageOwnershipState -tool $tool -Package $pkg }
-            'winget' {
-                if (Test-WingetPackageManaged -Package $pkg) {
-                    [pscustomobject]@{ Status = 'managed'; Reason = ''; Source = ''; Package = $pkg; Expected = $pkg }
-                } else {
-                    [pscustomobject]@{ Status = 'not-managed'; Reason = ''; Source = ''; Package = ''; Expected = $pkg }
-                }
-            }
-            'choco' {
-                if (Test-ChocoPackageManaged -Package $pkg) {
-                    [pscustomobject]@{ Status = 'managed'; Reason = ''; Source = ''; Package = $pkg; Expected = $pkg }
-                } else {
-                    [pscustomobject]@{ Status = 'not-managed'; Reason = ''; Source = ''; Package = ''; Expected = $pkg }
-                }
-            }
+            'winget' { Get-WingetPackageOwnershipState -tool $tool -Package $pkg }
+            'choco' { Get-ChocoPackageOwnershipState -tool $tool -Package $pkg }
         }
         if ($state.Status -eq 'error') {
             return [pscustomobject]@{ Pm = $manager; Pkg = $pkg; Status = 'error'; Reason = $state.Reason; Source = $state.Source }
@@ -1165,7 +1302,8 @@ function Report-BlockedCatalogToolUpdate {
     $reason = if ($Target -and -not [string]::IsNullOrWhiteSpace($Target.Reason)) { $Target.Reason } else { 'manager provenance could not be verified' }
     $source = if ($Target -and -not [string]::IsNullOrWhiteSpace($Target.Source)) { $Target.Source } else { Get-CatalogToolCommandSource -tool $tool }
     Write-Warning ("  blocked   {0,-26} {1}; source={2}" -f $tool, $reason, $source)
-    $script:InstallFailures += [pscustomobject]@{ Tool=$tool; Pm=$Target.Pm; Pkg=$Target.Pkg; ExitCode='scoop-shim-provenance' }
+    $exitCode = if ($Target.Pm -eq 'scoop') { 'scoop-shim-provenance' } else { 'manager-provenance' }
+    $script:InstallFailures += [pscustomobject]@{ Tool=$tool; Pm=$Target.Pm; Pkg=$Target.Pkg; ExitCode=$exitCode }
 }
 
 function Update-ScoopTool {
@@ -1240,9 +1378,17 @@ function Update-WingetTool {
         if ($ReportSkip) { Write-Host ("  skipped   {0,-26} no winget package in catalog" -f $tool) }
         return
     }
-    if ((-not $AssumeManaged) -and (-not (Test-WingetPackageManaged -Package $pkg))) {
-        if ($ReportSkip) { Write-Host ("  skipped   {0,-26} present, but winget does not manage {1}" -f $tool, $pkg) }
-        return
+    if (-not $AssumeManaged) {
+        $state = Get-WingetPackageOwnershipState -tool $tool -Package $pkg
+        if ($state.Status -eq 'error') {
+            Report-BlockedCatalogToolUpdate -tool $tool -Target ([pscustomobject]@{ Pm='winget'; Pkg=$pkg; Reason=$state.Reason; Source=$state.Source })
+            return
+        }
+        if ($state.Status -ne 'managed') {
+            if ($ReportSkip) { Write-Host ("  unmanaged {0,-26} source={1}" -f $tool, $(if ($state.Source) { $state.Source } else { 'unknown source' })) }
+            Add-UnmanagedDependency -tool $tool -Source $state.Source
+            return
+        }
     }
     $upgradeState = Get-WingetPackageUpgradeState -Package $pkg
     if ($upgradeState.Status -eq 'none') {
@@ -1289,9 +1435,17 @@ function Update-ChocoTool {
         if ($ReportSkip) { Write-Host ("  skipped   {0,-26} no choco package in catalog" -f $tool) }
         return
     }
-    if ((-not $AssumeManaged) -and (-not (Test-ChocoPackageManaged -Package $pkg))) {
-        if ($ReportSkip) { Write-Host ("  skipped   {0,-26} present, but Chocolatey does not manage {1}" -f $tool, $pkg) }
-        return
+    if (-not $AssumeManaged) {
+        $state = Get-ChocoPackageOwnershipState -tool $tool -Package $pkg
+        if ($state.Status -eq 'error') {
+            Report-BlockedCatalogToolUpdate -tool $tool -Target ([pscustomobject]@{ Pm='choco'; Pkg=$pkg; Reason=$state.Reason; Source=$state.Source })
+            return
+        }
+        if ($state.Status -ne 'managed') {
+            if ($ReportSkip) { Write-Host ("  unmanaged {0,-26} source={1}" -f $tool, $(if ($state.Source) { $state.Source } else { 'unknown source' })) }
+            Add-UnmanagedDependency -tool $tool -Source $state.Source
+            return
+        }
     }
     if ((-not $NoPrompt) -and (-not (Ask "Update ${tool} to the latest Chocolatey version?"))) { return }
     if ($IsDryRun) {

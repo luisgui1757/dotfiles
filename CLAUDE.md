@@ -743,7 +743,10 @@ save only**. The next plain `:w` formats normally. Implemented in
   fallback. A resolved command source outside Scoop must not be claimed by
   `scoop list`. A corrupt or mismatched Scoop shim is a blocked update failure,
   not an unmanaged tool and not a reason to fall through to winget/Chocolatey.
-  Winget updates require both exact ownership and an exact
+  Winget and Chocolatey ownership require both an exact package-list row and an
+  active command source under that manager's supported install roots; a manual
+  `C:\Manual\...\pwsh.exe` is `unmanaged` even if winget/Chocolatey lists the
+  package. Winget updates also require an exact
   `winget list --upgrade-available --id <id> -e --accept-source-agreements`
   availability row; no matching available update is reported as `current`, while
   a failed availability query appends to `InstallFailures`. Status vocabulary is
@@ -900,11 +903,13 @@ save only**. The next plain `:w` formats normally. Implemented in
   not claim it. If a command resolves through Scoop shims but the metadata is
   missing, unreadable, outside the apps tree, or mapped to a different package,
   update mode records a blocked Scoop provenance failure and must not fall
-  through to another manager. Winget ownership is not enough to run an update:
-  `Get-WingetPackageUpgradeState` must first prove exact upgrade availability
-  with `winget list --upgrade-available --id <id> -e`; no matching update is
-  reported as `current`, and a failed availability query is a real update
-  failure.
+  through to another manager. Winget/Chocolatey package-list ownership is not
+  enough to run an update: the active command source must also live under the
+  supported install roots for that manager/package. A manual shadow command is
+  `unmanaged`, not a manager-owned update target. `Get-WingetPackageUpgradeState`
+  must then prove exact upgrade availability with
+  `winget list --upgrade-available --id <id> -e`; no matching update is reported
+  as `current`, and a failed availability query is a real update failure.
   `Update-ScoopTool` remains the only Scoop-specific update path and is
   intentionally single-package; never replace it with `scoop update *`,
   `winget upgrade --all`, `choco upgrade all`, or another blanket upgrade.
