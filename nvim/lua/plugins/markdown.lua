@@ -13,10 +13,15 @@ return {
       completions = { lsp = { enabled = true } },
 
       heading = {
-        sign = false,
-        width = "block",
-        min_width = 40,
-        border = false,
+        sign = true,
+        position = "inline",
+        width = { "full", "full", "block" },
+        min_width = { 70, 60, 40 },
+        left_pad = { 1, 1, 0 },
+        right_pad = 1,
+        border = { true, true, false },
+        border_virtual = true,
+        border_prefix = true,
         icons = { "󰉫 ", "󰉬 ", "󰉭 ", "󰉮 ", "󰉯 ", "󰉰 " },
         backgrounds = {
           "RenderMarkdownH1Bg",
@@ -38,15 +43,26 @@ return {
 
       code = {
         sign = false,
+        style = "full",
         width = "block",
-        min_width = 60,
+        min_width = 70,
+        left_pad = 1,
+        right_pad = 1,
         border = "thin",
-        language_pad = 2,
+        language = true,
+        position = "left",
+        language_icon = true,
+        language_name = true,
+        language_info = true,
+        language_pad = 1,
         highlight = "RenderMarkdownCode",
+        highlight_info = "RenderMarkdownCodeInfo",
+        highlight_border = "RenderMarkdownCodeBorder",
+        highlight_fallback = "RenderMarkdownCodeFallback",
         highlight_inline = "RenderMarkdownCodeInline",
+        inline_pad = 1,
       },
 
-      -- Task lists: this is the bit the user asked about.
       checkbox = {
         enabled = true,
         right_pad = 1,
@@ -63,22 +79,74 @@ return {
       bullet = {
         icons = { "●", "○", "◆", "◇" },
         right_pad = 1,
+        highlight = "RenderMarkdownBullet",
       },
 
-      quote = { repeat_linebreak = true },
+      dash = {
+        icon = "─",
+        width = "full",
+        highlight = "RenderMarkdownDash",
+      },
+
+      quote = {
+        icon = "▌",
+        repeat_linebreak = true,
+        highlight = {
+          "RenderMarkdownQuote",
+          "RenderMarkdownQuote",
+          "RenderMarkdownQuote",
+          "RenderMarkdownQuote",
+          "RenderMarkdownQuote",
+          "RenderMarkdownQuote",
+        },
+      },
+
+      latex = {
+        enabled = true,
+        converter = "latex2text",
+        highlight = "RenderMarkdownMath",
+        position = "center",
+        top_pad = 0,
+        bottom_pad = 0,
+      },
 
       -- Obsidian-style callouts (> [!NOTE], > [!WARNING], etc.) — these
       -- come built-in; we just confirm the common ones are enabled.
       callout = {
-        note = { raw = "[!NOTE]", rendered = "󰋽 Note", highlight = "RenderMarkdownInfo" },
-        tip = { raw = "[!TIP]", rendered = "󰌶 Tip", highlight = "RenderMarkdownSuccess" },
-        important = { raw = "[!IMPORTANT]", rendered = "󰅾 Important", highlight = "RenderMarkdownHint" },
-        warning = { raw = "[!WARNING]", rendered = "󰀪 Warning", highlight = "RenderMarkdownWarn" },
-        caution = { raw = "[!CAUTION]", rendered = "󰳦 Caution", highlight = "RenderMarkdownError" },
-        abstract = { raw = "[!ABSTRACT]", rendered = "󰨸 Abstract", highlight = "RenderMarkdownInfo" },
-        todo = { raw = "[!TODO]", rendered = "󰗡 Todo", highlight = "RenderMarkdownInfo" },
-        question = { raw = "[!QUESTION]", rendered = "󰘥 Question", highlight = "RenderMarkdownWarn" },
-        quote = { raw = "[!QUOTE]", rendered = "󱆨 Quote", highlight = "RenderMarkdownQuote" },
+        note = { raw = "[!NOTE]", rendered = "󰋽 Note", highlight = "RenderMarkdownInfo", quote_icon = "▌" },
+        tip = { raw = "[!TIP]", rendered = "󰌶 Tip", highlight = "RenderMarkdownSuccess", quote_icon = "▌" },
+        important = {
+          raw = "[!IMPORTANT]",
+          rendered = "󰅾 Important",
+          highlight = "RenderMarkdownHint",
+          quote_icon = "▌",
+        },
+        warning = {
+          raw = "[!WARNING]",
+          rendered = "󰀪 Warning",
+          highlight = "RenderMarkdownWarn",
+          quote_icon = "▌",
+        },
+        caution = {
+          raw = "[!CAUTION]",
+          rendered = "󰳦 Caution",
+          highlight = "RenderMarkdownError",
+          quote_icon = "▌",
+        },
+        abstract = {
+          raw = "[!ABSTRACT]",
+          rendered = "󰨸 Abstract",
+          highlight = "RenderMarkdownInfo",
+          quote_icon = "▌",
+        },
+        todo = { raw = "[!TODO]", rendered = "󰗡 Todo", highlight = "RenderMarkdownInfo", quote_icon = "▌" },
+        question = {
+          raw = "[!QUESTION]",
+          rendered = "󰘥 Question",
+          highlight = "RenderMarkdownWarn",
+          quote_icon = "▌",
+        },
+        quote = { raw = "[!QUOTE]", rendered = "󱆨 Quote", highlight = "RenderMarkdownQuote", quote_icon = "▌" },
       },
 
       -- Links: render wikilinks (Obsidian syntax) as a small icon.
@@ -92,10 +160,15 @@ return {
 
       pipe_table = {
         preset = "round",
+        cell = "padded",
+        padding = 1,
+        min_width = 3,
+        head = "RenderMarkdownTableHead",
+        row = "RenderMarkdownTableRow",
         style = "full",
       },
 
-      -- Rose Pine palette overrides for the heading/code surfaces.
+      -- Rose Pine palette overrides for the rendered Markdown surfaces.
       -- The plugin's defaults look fine on most colorschemes; these
       -- pin our rose-pine variants so headings have consistent depth.
       win_options = {
@@ -125,7 +198,12 @@ return {
       hi("RenderMarkdownH5Bg", { bg = "#1f262a" })
       hi("RenderMarkdownH6Bg", { bg = "#33222a" })
       hi("RenderMarkdownCode", { bg = "#1f1d2e" })
+      hi("RenderMarkdownCodeInfo", { fg = "#9ccfd8", bg = "#1f1d2e", italic = true })
+      hi("RenderMarkdownCodeBorder", { fg = "#6e6a86", bg = "#1f1d2e" })
+      hi("RenderMarkdownCodeFallback", { fg = "#c4a7e7", bg = "#1f1d2e" })
       hi("RenderMarkdownCodeInline", { bg = "#26233a", fg = "#ebbcba" })
+      hi("RenderMarkdownDash", { fg = "#6e6a86" })
+      hi("RenderMarkdownBullet", { fg = "#f6c177" })
       hi("RenderMarkdownChecked", { fg = "#9ccfd8" })
       hi("RenderMarkdownUnchecked", { fg = "#6e6a86" })
       hi("RenderMarkdownTodo", { fg = "#f6c177" })
@@ -135,6 +213,9 @@ return {
       hi("RenderMarkdownWarn", { fg = "#f6c177" })
       hi("RenderMarkdownError", { fg = "#eb6f92" })
       hi("RenderMarkdownQuote", { fg = "#ebbcba", italic = true })
+      hi("RenderMarkdownTableHead", { fg = "#191724", bg = "#c4a7e7", bold = true })
+      hi("RenderMarkdownTableRow", { fg = "#e0def4", bg = "#1f1d2e" })
+      hi("RenderMarkdownMath", { fg = "#f6c177", bg = "#1f1d2e" })
       hi("RenderMarkdownWikiLink", { fg = "#c4a7e7", underline = true })
     end,
     keys = {

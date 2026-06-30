@@ -1691,3 +1691,75 @@ Describe "Python install rejects the Microsoft Store stub" {
         $script:probeCount | Should -BeGreaterThan 0
     }
 }
+
+Describe "Markdown equation converter provisioning" {
+    BeforeEach {
+        $script:OldLocalAppData = $env:LOCALAPPDATA
+        $env:LOCALAPPDATA = Join-Path $TestDrive 'localappdata'
+        New-Item -ItemType Directory -Force -Path $env:LOCALAPPDATA | Out-Null
+    }
+
+    AfterEach {
+        if ($null -eq $script:OldLocalAppData) {
+            Remove-Item Env:LOCALAPPDATA -ErrorAction SilentlyContinue
+        } else {
+            $env:LOCALAPPDATA = $script:OldLocalAppData
+        }
+    }
+
+    It "dry-run previews the pinned pylatexenc venv install" {
+        . $script:ImportInstallDepsForTest -DryRun
+        $output = Install-PylatexencConverter 6>&1 | Out-String
+
+        $output | Should -Match 'python -m venv'
+        $output | Should -Match 'setuptools==80\.9\.0'
+        $output | Should -Match $PylatexencBuildBackendSha256
+        $output | Should -Match 'pylatexenc==2\.10'
+        $output | Should -Match $PylatexencSha256
+    }
+
+    It "creates the pinned venv and adds latex2text to User PATH" {
+        . $script:ImportInstallDepsForTest
+        $script:AddedPath = ''
+        $script:SetuptoolsRequirementsText = ''
+        $script:RequirementsText = ''
+        $script:PythonCalls = @()
+
+        Mock Get-RealPythonCommand {
+            [pscustomobject]@{ Source = 'python' }
+        }
+        Mock Add-DirectoryToUserPath {
+            param([string]$Directory)
+            $script:AddedPath = $Directory
+        }
+        Mock Invoke-PythonCommand {
+            param([string]$Python, [string[]]$Arguments)
+            $script:PythonCalls += [pscustomobject]@{ Python = $Python; Arguments = $Arguments }
+            $global:LASTEXITCODE = 0
+            if ($Arguments[0] -eq '-m' -and $Arguments[1] -eq 'venv') {
+                $scripts = Join-Path $Arguments[2] 'Scripts'
+                New-Item -ItemType Directory -Force -Path $scripts | Out-Null
+                New-Item -ItemType File -Force -Path (Join-Path $scripts 'python.exe') | Out-Null
+                New-Item -ItemType File -Force -Path (Join-Path $scripts 'latex2text.exe') | Out-Null
+            }
+            if ($Arguments[0] -eq '-m' -and $Arguments[1] -eq 'pip') {
+                if ($Arguments -contains '--only-binary=:all:') {
+                    $script:SetuptoolsRequirementsText = Get-Content -LiteralPath $Arguments[-1] -Raw
+                } else {
+                    $script:RequirementsText = Get-Content -LiteralPath $Arguments[-1] -Raw
+                }
+            }
+        }
+
+        Install-PylatexencConverter
+
+        $expectedScripts = Join-Path (Get-PylatexencVenvRoot) 'Scripts'
+        $script:AddedPath | Should -Be $expectedScripts
+        $script:SetuptoolsRequirementsText | Should -Match 'setuptools==80\.9\.0'
+        $script:SetuptoolsRequirementsText | Should -Match $PylatexencBuildBackendSha256
+        $script:RequirementsText | Should -Match 'pylatexenc==2\.10'
+        $script:RequirementsText | Should -Match $PylatexencSha256
+        @($script:PythonCalls | Where-Object { $_.Arguments -contains '--require-hashes' }).Count | Should -Be 2
+        @($script:PythonCalls | Where-Object { $_.Arguments -contains '--no-build-isolation' }).Count | Should -Be 1
+    }
+}

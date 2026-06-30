@@ -28,6 +28,10 @@ $WindowsTerminalX64Sha256 = '7caef554147e5498ed1becdca73cdedb79fbc81f89032e46ae9
 $PsmuxPluginsCommit = '0f46ccca5a9b748fd03851db00b85fd784f42791'
 $PsmuxPluginsRepo = 'https://github.com/psmux/psmux-plugins.git'
 $VsBuildToolsBootstrapperUrl = 'https://aka.ms/vs/17/release/vs_BuildTools.exe'
+$PylatexencBuildBackendVersion = '80.9.0'
+$PylatexencBuildBackendSha256 = '062d34222ad13e0cc312a4c02d73f059e86a4acbfbdea8f8f76b28c99f306922'
+$PylatexencVersion = '2.10'
+$PylatexencSha256 = '3dd8fd84eb46dc30bee1e23eaab8d8fb5a7f507347b23e5f38ad9675c84f40d3'
 
 # ---- Package-manager detection + scoop bootstrap -----------------------------
 function Get-AvailablePM {
@@ -251,6 +255,32 @@ function Add-DirectoryToUserPath {
     }
 }
 
+function Get-DotfilesDataRoot {
+    if (-not [string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
+        return (Join-Path $env:LOCALAPPDATA 'dotfiles')
+    }
+    $base = if (-not [string]::IsNullOrWhiteSpace($env:USERPROFILE)) {
+        $env:USERPROFILE
+    } elseif (-not [string]::IsNullOrWhiteSpace($HOME)) {
+        $HOME
+    } else {
+        [System.IO.Path]::GetTempPath()
+    }
+    return (Join-Path (Join-Path $base '.local') 'share\dotfiles')
+}
+
+function Get-PylatexencVenvRoot {
+    return (Join-Path (Join-Path (Get-DotfilesDataRoot) 'python-tools') 'pylatexenc')
+}
+
+function Invoke-PythonCommand {
+    param(
+        [Parameter(Mandatory)][string]$Python,
+        [Parameter(Mandatory)][string[]]$Arguments
+    )
+    & $Python @Arguments
+}
+
 # ---- Per-tool: package id per PM. Empty string means "not available there". --
 # Keys are the command name we check via Get-Command.
 $Catalog = @{
@@ -342,6 +372,109 @@ function Install-Python {
     if ($real -and -not [string]::IsNullOrWhiteSpace($real.Source)) {
         Add-DirectoryToUserPath -Directory (Split-Path -Parent $real.Source)
     }
+}
+
+function Test-PylatexencConverter {
+    param([string]$VenvRoot = (Get-PylatexencVenvRoot))
+    $scriptsDir = Join-Path $VenvRoot 'Scripts'
+    $venvPython = Join-Path $scriptsDir 'python.exe'
+    $converter = Join-Path $scriptsDir 'latex2text.exe'
+    if (-not (Test-Path -LiteralPath $venvPython -PathType Leaf)) { return $false }
+    if (-not (Test-Path -LiteralPath $converter -PathType Leaf)) { return $false }
+
+    $probe = @'
+import importlib.metadata
+import sys
+
+try:
+    version = importlib.metadata.version("pylatexenc")
+except importlib.metadata.PackageNotFoundError:
+    raise SystemExit(1)
+
+raise SystemExit(0 if version == sys.argv[1] else 1)
+'@
+    Invoke-PythonCommand -Python $venvPython -Arguments @('-c', $probe, $PylatexencVersion) | Out-Null
+    return ($LASTEXITCODE -eq 0)
+}
+
+function Install-PylatexencConverter {
+    $venvRoot = Get-PylatexencVenvRoot
+    $scriptsDir = Join-Path $venvRoot 'Scripts'
+    if (Test-PylatexencConverter -VenvRoot $venvRoot) {
+        Add-DirectoryToUserPath -Directory $scriptsDir
+        Write-Host ("  ok        {0,-26} pylatexenc {1}" -f "latex2text", $PylatexencVersion)
+        return
+    }
+
+    if (-not (Ask "Install latex2text via a pinned pylatexenc venv (Markdown equations)?")) {
+        Write-Host ("  skipped   {0,-26}" -f "latex2text")
+        return
+    }
+    if ($DryRun) {
+        Write-Host ("  would:    python -m venv {0}" -f $venvRoot)
+        Write-Host ("  would:    pip install --require-hashes setuptools=={0}" -f $PylatexencBuildBackendVersion)
+        Write-Host ("             sha256={0}" -f $PylatexencBuildBackendSha256)
+        Write-Host ("  would:    pip install --require-hashes --no-build-isolation pylatexenc=={0}" -f $PylatexencVersion)
+        Write-Host ("             sha256={0}" -f $PylatexencSha256)
+        Write-Host ("  would:    add {0} to User PATH" -f $scriptsDir)
+        return
+    }
+
+    $real = Get-RealPythonCommand
+    if (-not $real) {
+        Install-Python
+        $real = Get-RealPythonCommand
+    }
+    if (-not $real -or [string]::IsNullOrWhiteSpace($real.Source)) {
+        Write-Warning "python is required before installing latex2text"
+        $script:InstallFailures += [pscustomobject]@{ Tool='latex2text'; Pm='python'; Pkg='pylatexenc'; ExitCode='python-missing' }
+        return
+    }
+
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $venvRoot) | Out-Null
+    Invoke-PythonCommand -Python $real.Source -Arguments @('-m', 'venv', $venvRoot)
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warning ("python venv creation failed for pylatexenc (exit {0})" -f $LASTEXITCODE)
+        $script:InstallFailures += [pscustomobject]@{ Tool='latex2text'; Pm='python'; Pkg='pylatexenc'; ExitCode=$LASTEXITCODE }
+        return
+    }
+
+    $venvPython = Join-Path $scriptsDir 'python.exe'
+    if (-not (Test-Path -LiteralPath $venvPython -PathType Leaf)) {
+        Write-Warning "python venv creation did not create Scripts\python.exe for pylatexenc"
+        $script:InstallFailures += [pscustomobject]@{ Tool='latex2text'; Pm='python'; Pkg='pylatexenc'; ExitCode='missing-venv-python' }
+        return
+    }
+
+    $requirements = New-TemporaryFile
+    try {
+        Set-Content -LiteralPath $requirements -Value ("setuptools=={0} --hash=sha256:{1}" -f $PylatexencBuildBackendVersion, $PylatexencBuildBackendSha256) -Encoding ascii
+        Invoke-PythonCommand -Python $venvPython -Arguments @('-m', 'pip', 'install', '--disable-pip-version-check', '--no-cache-dir', '--require-hashes', '--only-binary=:all:', '--no-deps', '-r', $requirements)
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warning ("pinned setuptools install failed (exit {0})" -f $LASTEXITCODE)
+            $script:InstallFailures += [pscustomobject]@{ Tool='latex2text'; Pm='pip'; Pkg='setuptools'; ExitCode=$LASTEXITCODE }
+            return
+        }
+
+        Set-Content -LiteralPath $requirements -Value ("pylatexenc=={0} --hash=sha256:{1}" -f $PylatexencVersion, $PylatexencSha256) -Encoding ascii
+        Invoke-PythonCommand -Python $venvPython -Arguments @('-m', 'pip', 'install', '--disable-pip-version-check', '--no-cache-dir', '--require-hashes', '--no-deps', '--no-build-isolation', '-r', $requirements)
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warning ("pylatexenc install failed (exit {0})" -f $LASTEXITCODE)
+            $script:InstallFailures += [pscustomobject]@{ Tool='latex2text'; Pm='pip'; Pkg='pylatexenc'; ExitCode=$LASTEXITCODE }
+            return
+        }
+    } finally {
+        Remove-Item -LiteralPath $requirements -Force -ErrorAction SilentlyContinue
+    }
+
+    if (-not (Test-Path -LiteralPath (Join-Path $scriptsDir 'latex2text.exe') -PathType Leaf)) {
+        Write-Warning "pylatexenc installed without executable latex2text"
+        $script:InstallFailures += [pscustomobject]@{ Tool='latex2text'; Pm='pip'; Pkg='pylatexenc'; ExitCode='missing-latex2text' }
+        return
+    }
+
+    Add-DirectoryToUserPath -Directory $scriptsDir
+    Write-Host ("  installed {0,-26} pylatexenc {1}" -f "latex2text", $PylatexencVersion)
 }
 
 function Get-InstallDependencySpec {
@@ -2455,6 +2588,7 @@ Install-PSFzf
 
 Section "language tooling (for LSP / formatter back-ends)"
 Install-Python
+Install-PylatexencConverter
 Install-One node
 Install-TreeSitterCli
 Install-One zig
