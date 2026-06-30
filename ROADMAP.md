@@ -115,7 +115,7 @@ ownership**:
 - Windows manager-owned packages now report `current` without running a mutating
   package update when Scoop `status`, winget `list --upgrade-available`, or
   Chocolatey `outdated --limit-output` has no exact package row; failed
-  availability probes are `blocked`, not successful no-ops.
+  availability probes are recorded as update failures, not successful no-ops.
 - Regression coverage lives in `tests/shell/install_deps_update_test.sh` for
   mixed Linuxbrew/apt dispatch, Homebrew `current`, shadowed Homebrew tools,
   Brew-prefix contradictions, Brew-prefix symlink escapes, external shadow
