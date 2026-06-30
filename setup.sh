@@ -47,7 +47,7 @@ setup.sh -- one-shot end-to-end install for macOS / Linux / WSL.
 Local usage:
   ./setup.sh                     interactive: dependency prompts, then config + sync
   ./setup.sh --all               non-interactive: install everything missing
-  ./setup.sh --update            update package-manager tools + Mason only
+  ./setup.sh --update            update proven dependency tools/artifacts + Mason only
   ./setup.sh --dry-run           preview every step
   ./setup.sh --skip-deps         already installed; just config + sync
   ./setup.sh --skip-bootstrap    back-compat alias: skip config apply

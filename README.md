@@ -19,9 +19,9 @@ dotfiles/config layer in `home/`. The full setup scripts now apply configs
 through chezmoi.
 
 Updates are deliberately two-track. The reproducible core is pinned in git:
-Neovim plugins (`nvim/lazy-lock.json`), SHA-256-verified direct downloads,
-and configs. Update that track with `git pull` and then re-run setup. The
-drift-tolerant edge is package-manager CLI tools plus Mason LSPs; refresh only
+Neovim plugins (`nvim/lazy-lock.json`) and configs update with `git pull` and
+then re-running setup. The drift-tolerant edge is package-manager CLI tools,
+proven dotfiles-owned direct artifacts on Unix, and Mason LSPs; refresh only
 that edge with `./setup.sh --update` or `.\setup.ps1 -Update`.
 
 ## Quick Start
@@ -107,7 +107,7 @@ apply.
 ```bash
 ./setup.sh                       # Y/n per dep, end-to-end
 ./setup.sh --all                 # non-interactive
-./setup.sh --update              # update PM tools + Mason, no git/config/Lazy
+./setup.sh --update              # update proven tools/artifacts + Mason, no git/config/Lazy
 ./setup.sh --dry-run             # preview
 ./setup.sh --experimental-wsl-gui # WSL-only opt-in for Linux GUI terminal bits
 ./setup.sh --skip-config         # skip chezmoi config apply
@@ -207,6 +207,7 @@ Add `--dry-run` / `-DryRun` to preview every step without touching disk.
 Pass `--skip-agents` / `-SkipAgents` to leave global AI-agent entrypoints alone.
 Pass `--update` / `-Update` from an existing checkout to run only the
 drift-edge refresh: scoped package-manager updates for present catalog tools,
+Unix direct-artifact refreshes only when dotfiles provenance proves ownership,
 then `nvim --headless +MasonToolsUpdateSync +qa`. The synchronous Mason command
 keeps headless Neovim alive until package installs finish. It deliberately skips
 `git pull`, `chezmoi apply`, `:Lazy restore`, synchronous Tree-sitter parser
