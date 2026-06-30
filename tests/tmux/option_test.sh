@@ -55,6 +55,7 @@ check focus-events on
 check mouse on
 check escape-time 10
 check history-limit 50000
+check status-position top
 # Status-style is pine on base. Inactive windows are iris (the "cool" default;
 # tmux/themes/ has warm/minimal/teal alternatives). The current window is the
 # gold-bold standout. Bar opacity is a Windows Terminal concern (WT `opacity` is
@@ -67,6 +68,18 @@ check window-status-current-style "fg=#f6c177,bold"
 # rendering window cells -- only inline `#[fg=...]` in the format survives.
 # Real tmux applies either; the inline form works on both, so we pin it.
 check window-status-current-format "#[fg=#f6c177,bold] #I:#W#F #[default]"
+
+for required in \
+    "set-environment -g TMUX_PLUGIN_MANAGER_PATH \"~/.local/share/dotfiles/tmux-plugins\"" \
+    "set -g @plugin 'tmux-plugins/tpm'" \
+    "set -g @plugin 'rose-pine/tmux'" \
+    "set -g @rose_pine_bar_bg_disable 'on'" \
+    "if-shell 'test -x \"\$HOME/.local/share/dotfiles/tmux-plugins/tpm/tpm\"'"; do
+    if ! grep -F "$required" "$REPO_ROOT/tmux/tmux.posix.conf" >/dev/null; then
+        echo "FAIL: tmux.posix.conf missing required plugin line: $required"
+        exit 1
+    fi
+done
 
 # Prefix isn't shown by show-options; verify via list-keys instead.
 if ! tmux -L "$sock_name" list-keys -T prefix >/dev/null 2>&1; then
@@ -107,9 +120,9 @@ if [[ "$order" != *"1:two 2:one"* ]]; then
     exit 1
 fi
 
-# Copy-mode `y` baseline. The session above booted with `-f tmux/tmux.conf`,
-# whose `source-file -q "~/.tmux.posix.conf"` is a no-op under the isolated HOME
-# (the overlay is absent). So only the psmux-safe OSC52 baseline applies: `y`
+# Copy-mode `y` baseline. The session above booted with `-f tmux/tmux.conf`;
+# its bottom-of-file `source-file -q "~/.tmux.posix.conf"` is a no-op under the
+# isolated HOME (the overlay is absent). So only the psmux-safe OSC52 baseline applies: `y`
 # must be bound to a BARE `copy-pipe-and-cancel` with NO pipe command after it.
 # The `$` anchor is load-bearing -- a probe rebind appends a pipe argument
 # (e.g. `... copy-pipe-and-cancel pbcopy`), and without the anchor this assertion

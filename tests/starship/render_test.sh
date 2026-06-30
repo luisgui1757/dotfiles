@@ -1,20 +1,25 @@
 #!/usr/bin/env bash
 # Render the prompt against the user's starship.toml and assert:
 #   - no literal `(style)` (regression guard for the deleted-files typo)
+#   - no background styles; terminal transparency owns the background surface
 #   - the rose-pine palette is referenced
 set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
-
-if ! command -v starship >/dev/null 2>&1; then
-    echo "skipped: starship not installed"
-    exit 0
-fi
 
 # Static-check the toml content as a first defense.
 if grep -E '\]\(style\)' "$REPO_ROOT/starship/starship.toml" >/dev/null; then
     echo "FAIL: starship.toml still contains literal (style) instead of (\$style)"
     grep -nE '\]\(style\)' "$REPO_ROOT/starship/starship.toml"
     exit 1
+fi
+if grep -nF 'bg:' "$REPO_ROOT/starship/starship.toml"; then
+    echo "FAIL: starship.toml must not use background styles; terminal transparency owns the background"
+    exit 1
+fi
+
+if ! command -v starship >/dev/null 2>&1; then
+    echo "skipped dynamic render: starship not installed (static checks passed)"
+    exit 0
 fi
 
 # Dynamic render -- needs a writable git working directory.

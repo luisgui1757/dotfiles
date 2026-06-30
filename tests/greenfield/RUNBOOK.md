@@ -201,7 +201,7 @@ proves.
 
 | Run | Expect | Proves |
 |-----|--------|--------|
-| `tmux` (macOS/Linux) or launch **psmux** (Windows) | a pane appears **immediately**, fully rendered, status bar Rose Pine; **no freeze, normal CPU** | **psmux config-load freeze fix** |
+| `tmux` (macOS/Linux) or launch **psmux** (Windows) | a pane appears **immediately**, fully rendered, Rose Pine status bar is at the top; **no freeze, normal CPU** | **psmux config-load freeze fix + plugin theme load** |
 | `C-b %` / `C-b "` then `C-b h/j/k/l` | split and move between panes | pane bindings |
 | `C-b H` / `C-b L` | current window swaps left / right | uppercase window-swap binding |
 | enter copy-mode (`C-b [`), `v` to select, `y` | text copies to the system clipboard (paste elsewhere) | clipboard (pbcopy/xclip/win32yank on POSIX, `clip.exe`/OSC52 on Windows) |

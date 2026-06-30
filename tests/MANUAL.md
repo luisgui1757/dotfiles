@@ -14,14 +14,14 @@ significant change to the relevant area.
 - [ ] **Windows Terminal**: rose-pine scheme applied; tabs use the
       configured theme; acrylic OFF on the body, ON in the tab row; a new tab
       opens `PowerShell 7` unless the user intentionally chose another default.
-- [ ] **Tmux status bar**: rose-pine colors, inactive windows readable (iris)
-      and the active window gold-bold, prefix is `C-b`,
+- [ ] **Tmux status bar**: Rose Pine plugin bar is at the top, segments are
+      readable, prefix is `C-b`,
       `prefix r` reloads the conf and shows the "reloaded" message.
-- [ ] **psmux status bar**: inactive window titles are readable (iris on base)
-      after reopening psmux, matching the Windows overlay `status-style`
-      fallback.
-- [ ] **Starship prompt**: shows username pill, dir pill, git branch pill,
-      git status icons (untracked/modified/staged), trailing time pill.
+- [ ] **psmux status bar**: psmux-theme-rosepine bar is at the top after
+      reopening psmux; no config-load freeze and no sustained CPU spike.
+- [ ] **Starship prompt**: shows username, dir, git branch, git status icons
+      (untracked/modified/staged), trailing time, and no opaque background
+      blocks behind prompt text.
 - [ ] **PowerShell Tab completion**: press Tab into MenuComplete; the selected
       item is light text on the Rose Pine overlay background.
 

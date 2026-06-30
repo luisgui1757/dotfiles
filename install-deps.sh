@@ -40,6 +40,8 @@ FZF_TAB_VERSION="v1.3.0"
 FZF_TAB_COMMIT="d7e0234614dbe5369fdd760907d12c0e05a4dccc"
 ZSH_AUTOSUGGESTIONS_VERSION="v0.7.1"
 ZSH_AUTOSUGGESTIONS_COMMIT="e52ee8ca55bcc56a17c828767a3f98f22a68d4eb"
+TPM_COMMIT="e261deb1b47614eed3400089ce7197dc68acc4eb"
+ROSE_PINE_TMUX_COMMIT="b6138c51573425ccdc33c91464597323baec3b7e"
 HACK_NERD_FONT_VERSION="v3.4.0"
 HACK_NERD_FONT_SHA256="8ca33a60c791392d872b80d26c42f2bfa914a480f9eb2d7516d9f84373c36897"
 # Ghostty on Ubuntu: we pin + SHA-256 verify the mkasberg/ghostty-ubuntu
@@ -1667,6 +1669,118 @@ install_zsh_plugins() {
     return 0
 }
 
+tmux_plugin_root() {
+    printf '%s\n' "$HOME/.local/share/dotfiles/tmux-plugins"
+}
+
+tmux_plugin_ok() {
+    local target="$1" expected_commit="$2" required_file="$3" current
+    [[ -d "$target/.git" ]] || return 1
+    [[ -r "$target/$required_file" ]] || return 1
+    current="$(git -C "$target" rev-parse HEAD 2>/dev/null || true)"
+    [[ "$current" == "$expected_commit" ]]
+}
+
+install_tmux_plugin_repo() {
+    local name="$1" repo="$2" expected_commit="$3" dirname="$4" required_file="$5"
+    local root target backup current
+    root="$(tmux_plugin_root)"
+    target="$root/$dirname"
+
+    if tmux_plugin_ok "$target" "$expected_commit" "$required_file"; then
+        printf "  ok        %-26s %s\n" "$name" "$expected_commit"
+        return 0
+    fi
+
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        echo "  would: git init/fetch exact commit $expected_commit from $repo"
+        echo "         checkout -> $target and verify $required_file"
+        return 0
+    fi
+    if ! have git; then
+        printf "  manual    %-26s git is required for pinned plugin install\n" "$name"
+        return 1
+    fi
+
+    mkdir -p "$root"
+    if [[ -e "$target" && ! -d "$target/.git" ]]; then
+        backup="$(unique_backup_path "$target")"
+        mv "$target" "$backup"
+        printf "  backup    %-26s %s\n" "$name" "$backup"
+    fi
+
+    if [[ ! -d "$target/.git" ]]; then
+        mkdir -p "$target"
+        git -C "$target" init -q || {
+            printf "  WARN: could not init %-20s at %s\n" "$name" "$target"
+            return 1
+        }
+        git -C "$target" remote add origin "$repo" >/dev/null 2>&1 || true
+    else
+        if git -C "$target" remote get-url origin >/dev/null 2>&1; then
+            git -C "$target" remote set-url origin "$repo"
+        else
+            git -C "$target" remote add origin "$repo"
+        fi
+    fi
+
+    git -C "$target" fetch --depth 1 origin "$expected_commit" >/dev/null 2>&1 || {
+        printf "  WARN: could not fetch %-18s commit %s\n" "$name" "$expected_commit"
+        return 1
+    }
+    git -C "$target" checkout --force FETCH_HEAD >/dev/null 2>&1 || {
+        printf "  WARN: could not checkout %-15s commit %s\n" "$name" "$expected_commit"
+        return 1
+    }
+
+    current="$(git -C "$target" rev-parse HEAD 2>/dev/null || true)"
+    if [[ "$current" != "$expected_commit" ]]; then
+        printf "  FAIL: %-26s got commit %s, expected %s\n" "$name" "${current:-unknown}" "$expected_commit"
+        return 1
+    fi
+    if [[ ! -r "$target/$required_file" ]]; then
+        printf "  FAIL: %-26s missing %s\n" "$name" "$required_file"
+        return 1
+    fi
+    printf "  installed %-26s %s\n" "$name" "$expected_commit"
+}
+
+install_tmux_plugins() {
+    # POSIX tmux loads TPM + rose-pine/tmux from tmux.posix.conf. The shared
+    # tmux.conf keeps a psmux-safe fallback status bar for missing plugins.
+    local root tpm_dir rosepine_dir rc=0
+    root="$(tmux_plugin_root)"
+    tpm_dir="$root/tpm"
+    rosepine_dir="$root/tmux"
+
+    if tmux_plugin_ok "$tpm_dir" "$TPM_COMMIT" "tpm" &&
+        tmux_plugin_ok "$rosepine_dir" "$ROSE_PINE_TMUX_COMMIT" "rose-pine.tmux"; then
+        printf "  ok        %-26s pinned refs already installed\n" "tmux plugins"
+        return 0
+    fi
+    if ! ask "Install TPM + rose-pine/tmux (repo-managed pinned refs)?"; then
+        printf "  skipped   %-26s\n" "tmux plugins"
+        return 0
+    fi
+
+    install_tmux_plugin_repo \
+        "tpm" \
+        "https://github.com/tmux-plugins/tpm.git" \
+        "$TPM_COMMIT" \
+        "tpm" \
+        "tpm" || rc=1
+    install_tmux_plugin_repo \
+        "rose-pine/tmux" \
+        "https://github.com/rose-pine/tmux.git" \
+        "$ROSE_PINE_TMUX_COMMIT" \
+        "tmux" \
+        "rose-pine.tmux" || rc=1
+    if [[ "$rc" -ne 0 ]]; then
+        printf "  FAIL: %-26s one or more pinned tmux plugins failed to install\n" "tmux plugins" >&2
+    fi
+    return 0
+}
+
 install_ghostty_macos() {
     if have ghostty; then
         printf "  ok        %-26s already installed\n" "ghostty"
@@ -2360,6 +2474,7 @@ install_dependency_scan_items() {
         "lazygit|command|lazygit" \
         "starship|command|starship" \
         "tmux|command|tmux" \
+        "tmux plugins|tmux-plugins|" \
         "zsh|command|zsh" \
         "zsh plugins|zsh-plugins|" \
         "code|command|code" \
@@ -2415,6 +2530,14 @@ install_scan_present() {
             zsh_plugin_ok "$fzf_tab_dir" "$FZF_TAB_COMMIT" "fzf-tab.plugin.zsh" &&
                 zsh_plugin_ok "$autosuggestions_dir" "$ZSH_AUTOSUGGESTIONS_COMMIT" "zsh-autosuggestions.zsh"
             ;;
+        tmux-plugins)
+            local root tpm_dir rosepine_dir
+            root="$(tmux_plugin_root)"
+            tpm_dir="$root/tpm"
+            rosepine_dir="$root/tmux"
+            tmux_plugin_ok "$tpm_dir" "$TPM_COMMIT" "tpm" &&
+                tmux_plugin_ok "$rosepine_dir" "$ROSE_PINE_TMUX_COMMIT" "rose-pine.tmux"
+            ;;
         *)
             return 1
             ;;
@@ -2430,6 +2553,10 @@ install_scan_version() {
             ;;
         zsh-plugins)
             printf '%s\n' "$FZF_TAB_VERSION/$ZSH_AUTOSUGGESTIONS_VERSION"
+            return
+            ;;
+        tmux-plugins)
+            printf '%s\n' "tpm:${TPM_COMMIT}/rose-pine:${ROSE_PINE_TMUX_COMMIT}"
             return
             ;;
         compiler)
@@ -2596,6 +2723,7 @@ install_starship
 
 section "terminal multiplexer + shell"
 install tmux
+install_tmux_plugins
 install zsh
 install_zsh_plugins
 set_default_shell_zsh   # make zsh the login shell so tmux/terminals launch it
