@@ -421,7 +421,7 @@ Describe "install-deps.ps1" {
         New-Item -ItemType Directory -Force -Path $target | Out-Null
         try {
             $themePath = Join-Path $target 'psmux-theme-rosepine.ps1'
-            @'
+            $lfFixture = @'
 $showPanes     = Get-Opt '@rosepine-show-pane-count' 'on'
 $leftIcon      = Get-Opt '@rosepine-left-icon' ''
 
@@ -430,7 +430,9 @@ $pfx = "#{?client_prefix,#[fg=$($p.love)]#[bg=$($p.base)]${sRL}#[bg=$($p.love)]#
 $right = "${pfx}${syncInd}#[fg=$($p.overlay),bg=$($p.base)]${sRL}#[fg=$($p.foam),bg=$($p.overlay)] ${iClock}%H:%M #[fg=$($p.muted),bg=$($p.overlay)]${sRL}#[fg=$($p.rose),bg=$($p.muted)] ${iCal}%a #[fg=$($p.iris),bg=$($p.muted)]${sRL}#[fg=$($p.base),bg=$($p.iris),bold] ${iCal}%d-%b "
 & $PSMUX set -g status-right $right 2>&1 | Out-Null
 & $PSMUX set -g status-right-length 80 2>&1 | Out-Null
-'@ | Set-Content -LiteralPath $themePath -Encoding utf8
+'@
+            $utf8 = New-Object System.Text.UTF8Encoding($false)
+            [IO.File]::WriteAllText($themePath, (($lfFixture -replace "`r`n", "`n") -replace "`r", "`n"), $utf8)
 
             Patch-PsmuxThemeRosepine -Target $target
             $patched = Get-Content -LiteralPath $themePath -Raw
