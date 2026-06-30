@@ -1356,72 +1356,31 @@ host OS or shell would otherwise hide a branch from CI.
   common BMP symbols every terminal renders via fallback (unlike PUA nerd
   glyphs), so they stay. Re-audit after any symbol change by loading the font
   cmap with fontTools and asserting each non-ASCII codepoint is a member.
-- **tmux colors track the canonical rose-pine/tmux theme.** Source:
-  <https://github.com/rose-pine/tmux>, main variant. Role-based styles
-  carry the colors. Map: status-style `fg=pine,bg=base`; window-status
-  `fg=iris,bg=base` (inactive windows; this is the "cool" default the owner chose
-  after auditioning `tmux/themes/`); window-status-current `fg=gold,bold`;
-  window-status-activity `fg=base,bg=rose`; pane-border `fg=hl_high #524f67`
-  / pane-active-border `fg=gold`; message `fg=muted,bg=base`;
-  message-command `fg=base,bg=gold`. (Status-area bgs are `base` -- the dark
-  terminal color; bar opacity comes from WT `opacity: 100`, NOT the bg color, see
-  the opaque-bar note below.) **DO** set explicit
-  `window-status-format "#I:#W#F"` and `window-status-current-format
-  "#I:#W#F"` -- tmux's DEFAULT format contains a `#{?window_flags,...}`
-  conditional that psmux v3.3.4 renders as a literal string in each cell.
-  An earlier ship that used `setw -gu window-status-format` (unset, fall
-  back to tmux default) lit that bug -- explicit `#I:#W#F` parses cleanly
-  in both real tmux and psmux. Active windows use gold with bold weight because
-  the foreground-only canonical theme was too subtle in dark terminals; bold is
-  the smallest divergence that fixes legibility without breaking the palette.
-  Inactive cells use iris (`setw -g window-status-style "fg=#c4a7e7,bg=#191724"`,
-  8.4:1) -- the "cool" theme, which the owner chose as the default after
-  auditioning the alternatives in `tmux/themes/` (warm/minimal/teal). The teal
-  variant (inactive inherits pine via `setw -gu`) lives in `tmux/themes/teal.conf`
-  if you want it back. Earlier churn (transparency was misdiagnosed as a color
-  problem) is settled; the legibility knob was always WT opacity, not the color.
-  **OPAQUE STATUS BAR -- the WT reality (owner-confirmed on a real machine).**
-  Windows Terminal applies its `opacity` WINDOW-WIDE to every cell, regardless of
-  the cell's background color. So a transparent WT (`opacity < 100`) has a
-  transparent status bar no matter what bg the bar uses -- giving the bar an
-  explicit, different-from-default color does NOT make it opaque in WT (this was
-  tried with `surface #1f1d2e` at `opacity: 95` and the bar stayed see-through).
-  That "explicit bg renders opaque" behavior exists in some terminals (alacritty)
-  but NOT in Windows Terminal. The only way to a fully solid bar in WT is a fully
-  opaque window (`opacity: 100`). **The owner chose transparency over a solid
-  bar:** the fragment ships **`opacity: 95`** (see-through terminal), so the
-  status bar is transparent too -- an accepted trade for the see-through look,
-  themed via colors rather than opacity. Status-area bgs stay `base #191724` (the
-  dark terminal color). macOS/Linux Ghostty use `background-opacity 0.95` +
-  `background-blur-radius 15`, whose blur renders an opaque-LOOKING dark bar even
-  while transparent (WT acrylic is the analog but is unreliable in a VM, so WT
-  gets no blur). Do NOT re-add an overlay `status-style` hack (a prior wrong
-  attempt assuming psmux ignores `window-status-style`, since removed) and do NOT
-  switch the bar bg to surface to "fix" opacity (it does not, in WT). To flip to
-  a fully-solid bar, set WT `opacity: 100` (whole window). Guarded by
-  `tests/tmux/option_test.sh`.
-  Status-left (iris-bold session + muted
-  separator) and status-right (foam date + gold time) are our own
-  customizations, palette-consistent. History/rejected attempts worth not
-  re-attempting:
-  (1) inactive `muted #6e6a86` -- 3.4:1 contrast, failed AA, illegible;
-  (2) inactive `subtle #908caa` -- 5.5:1, borderline, still illegible;
-  (3) inactive `text #e0def4` -- bright but flat, user wanted canonical;
-  (4) iris inactive + gold-bold ON `bg=overlay #26233a` active block
-  (commit 9cf13f8) -- added a bold + bg-block on top of canonical, user
-  preferred plain canonical so the embellishment was reverted;
-  (5) inactive color (iris vs inherited-pine "teal") flip-flopped while
-  transparency was misdiagnosed as a color problem; settled by the owner
-  auditioning `tmux/themes/` and picking iris ("cool") as the default, with teal
-  kept as `tmux/themes/teal.conf`. If inactive reads poorly it is WT transparency
-  (`opacity`), NOT the color -- do not chase it by re-coloring;
-  (6) relying on `window-status-current-style` alone (commits ee0d6c9 /
-  d642a31) -- psmux v3.3.4 stores the option but does NOT apply it when
-  rendering window cells. Only `#[fg=...]` INLINED in
-  `window-status-current-format` actually paints the current window
-  under psmux. Real tmux honors either; we ship the inline form so both
-  render. **Do NOT** switch inactive to `dim` -- it is terminal/ConPTY-flaky
-  under psmux and re-creates the legibility problem.
+- **Starship prompt segments are foreground-only.** `starship/starship.toml`
+  must not contain `bg:` styles. Terminal transparency belongs to Ghostty /
+  Windows Terminal; Starship-owned background blocks render as opaque character
+  cells and make the prompt look patched onto the transparent surface. Guarded
+  by `tests/starship/render_test.sh`.
+- **tmux / psmux Rose Pine themes are upstream plugins, pinned by setup.**
+  Shared `tmux/tmux.conf` is a psmux-safe fallback and sets `status-position top`.
+  POSIX loads `tmux/tmux.posix.conf` at the bottom, after fallback status config,
+  so TPM can load `rose-pine/tmux` as the final status owner. Windows loads
+  `tmux/tmux.windows.conf` at the bottom; it declares PPM + `psmux-theme-rosepine`,
+  runs the richer theme `.ps1` entrypoint, then reasserts `status-position top`
+  because upstream psmux Rose Pine defaults to bottom. Keep plugin managers in
+  OS overlays only; shared `tmux.conf` must remain free of load-time `if-shell`
+  and psmux-specific plugin commands. Current pins: TPM
+  `e261deb1b47614eed3400089ce7197dc68acc4eb`, `rose-pine/tmux`
+  `b6138c51573425ccdc33c91464597323baec3b7e`, and `psmux/psmux-plugins`
+  `0f46ccca5a9b748fd03851db00b85fd784f42791`. Guarded by
+  `tests/tmux/option_test.sh`, `tests/tmux/windows_conf_test.sh`, and
+  `tests/static/pin_consistency_test.sh`.
+- **Windows Terminal opacity remains window-wide.** A transparent WT
+  (`opacity < 100`) makes every cell transparent, including tmux/psmux status
+  cells, regardless of the cell background color. Do not chase opacity by
+  recoloring tmux backgrounds. To make the whole terminal solid, set WT
+  `opacity: 100`; otherwise let the upstream themes color foreground/status
+  roles and accept terminal-level transparency.
 - **`stylua.toml` at repo root is load-bearing.** stylua reads ONLY its own
   config (`stylua.toml` / `.stylua.toml`) -- it does NOT respect
   `.editorconfig`. Its built-in defaults are `indent_type = "Tabs"` and

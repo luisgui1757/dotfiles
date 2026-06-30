@@ -330,6 +330,46 @@ Describe "install-deps.ps1" {
         $script:InstallFailures.Count | Should -Be 0
     }
 
+    It "dry-runs pinned PPM and psmux Rose Pine plugin installs without prompting" {
+        . $script:ImportInstallDepsForTest -DryRun
+        Mock -CommandName Read-Host -MockWith { throw "Read-Host must not run under -DryRun" }
+
+        $oldUserProfile = $env:USERPROFILE
+        $tempProfile = Join-Path ([IO.Path]::GetTempPath()) "dotfiles-psmux-dryrun-$([guid]::NewGuid())"
+        $env:USERPROFILE = $tempProfile
+        try {
+            $output = & { Install-PsmuxPlugins } 6>&1 | Out-String
+
+            $output | Should -Match ([regex]::Escape($PsmuxPluginsCommit))
+            $output | Should -Match 'psmux-theme-rosepine'
+            $output | Should -Match ([regex]::Escape((Get-PsmuxPluginRoot)))
+            Should -Invoke -CommandName Read-Host -Times 0 -Exactly
+        } finally {
+            $env:USERPROFILE = $oldUserProfile
+            Remove-Item -LiteralPath $tempProfile -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    It "recognizes repo-managed psmux plugin pin metadata" {
+        . $script:ImportInstallDepsForTest
+
+        $oldUserProfile = $env:USERPROFILE
+        $tempProfile = Join-Path ([IO.Path]::GetTempPath()) "dotfiles-psmux-pin-$([guid]::NewGuid())"
+        $env:USERPROFILE = $tempProfile
+        try {
+            $target = Get-PsmuxPluginTarget -Name 'psmux-theme-rosepine'
+            New-Item -ItemType Directory -Force -Path $target | Out-Null
+            Set-Content -LiteralPath (Join-Path $target 'psmux-theme-rosepine.ps1') -Value '# test' -Encoding utf8
+            Write-PsmuxPluginPin -Target $target -Subdir 'psmux-theme-rosepine'
+
+            Test-PsmuxPluginPin -Name 'psmux-theme-rosepine' -Subdir 'psmux-theme-rosepine' -RequiredFile 'psmux-theme-rosepine.ps1' |
+                Should -BeTrue
+        } finally {
+            $env:USERPROFILE = $oldUserProfile
+            Remove-Item -LiteralPath $tempProfile -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
     It "uses winget when winget is the only installed manager" {
         . $script:ImportInstallDepsForTest
         $Pm = 'winget'

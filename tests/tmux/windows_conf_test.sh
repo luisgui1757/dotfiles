@@ -41,8 +41,23 @@ require_line '^set[[:space:]]+-g[[:space:]]+pwsh-mouse-selection[[:space:]]+off$
     'tmux.windows.conf must leave psmux pwsh mouse-selection off'
 require_line '^set[[:space:]]+-g[[:space:]]+scroll-enter-copy-mode[[:space:]]+on$' \
     'tmux.windows.conf must keep wheel-scroll copy-mode'
+require_line "^set[[:space:]]+-g[[:space:]]+@plugin[[:space:]]+'psmux-plugins/ppm'$" \
+    'tmux.windows.conf must declare PPM'
+require_line "^set[[:space:]]+-g[[:space:]]+@plugin[[:space:]]+'psmux-plugins/psmux-theme-rosepine'$" \
+    'tmux.windows.conf must declare psmux-theme-rosepine'
+require_line "^run[[:space:]]+'~/.psmux/plugins/ppm/ppm.ps1'$" \
+    'tmux.windows.conf must load PPM from the repo-managed plugin root'
+require_line "^run[[:space:]]+'~/.psmux/plugins/psmux-theme-rosepine/psmux-theme-rosepine.ps1'$" \
+    'tmux.windows.conf must load the psmux Rose Pine theme entrypoint'
 reject_line '^bind-key[[:space:]]+-T[[:space:]]+root[[:space:]]+Escape[[:space:]]+send-keys[[:space:]]+esc$' \
     'tmux.windows.conf must not carry the failed psmux Escape pass-through workaround'
+
+theme_run_line="$(grep -n "^run '~/.psmux/plugins/psmux-theme-rosepine/psmux-theme-rosepine.ps1'$" "$WIN_CONF" | tail -1 | cut -d: -f1)"
+top_line="$(awk '/^set -g status-position top$/ { n = NR } END { print n + 0 }' "$WIN_CONF")"
+if [[ -z "$theme_run_line" || "$top_line" -le "$theme_run_line" ]]; then
+    echo "FAIL: tmux.windows.conf must reassert status-position top after psmux-theme-rosepine loads"
+    exit 1
+fi
 
 if [[ ! -f "$HOME_WIN_CONF" ]]; then
     echo "FAIL: home/dot_tmux.windows.conf must manage the psmux overlay on Windows"

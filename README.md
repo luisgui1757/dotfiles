@@ -234,7 +234,7 @@ symlink, and Windows Terminal remains a merge.
 | Starship | `~/.config/starship.toml` -> `starship/starship.toml` | same | `%USERPROFILE%\.config\starship.toml` -> `starship\starship.toml` |
 | zsh | `~/.zshenv` -> `shells/zshenv`; `~/.zshrc` -> `shells/zshrc` | same | n/a |
 | PowerShell | n/a | n/a | `Documents\PowerShell\Microsoft.PowerShell_profile.ps1` -> `shells\powershell_profile.ps1` |
-| tmux / psmux | `~/.tmux.conf` -> `tmux/tmux.conf`; `~/.tmux.posix.conf` -> `tmux/tmux.posix.conf` (POSIX clipboard overlay) | same | `%USERPROFILE%\.tmux.conf` -> `tmux\tmux.conf` for psmux; the POSIX clipboard overlay is **excluded** on Windows (its `if-shell` probes hang psmux); WSL uses the Unix path |
+| tmux / psmux | `~/.tmux.conf` -> `tmux/tmux.conf`; `~/.tmux.posix.conf` -> `tmux/tmux.posix.conf` (POSIX clipboard + TPM/Rose Pine overlay) | same | `%USERPROFILE%\.tmux.conf` -> `tmux\tmux.conf`; `%USERPROFILE%\.tmux.windows.conf` -> `tmux\tmux.windows.conf` for psmux + PPM/Rose Pine; the POSIX overlay is **excluded** on Windows (its `if-shell` probes hang psmux); WSL uses the Unix path |
 | Ghostty | `~/Library/Application Support/com.mitchellh.ghostty/config` -> `ghostty/config` | native Linux links `~/.config/ghostty/config`; WSL links it only with `--experimental-wsl-gui` | n/a |
 | lazygit | `~/Library/Application Support/lazygit/config.yml` -> `lazygit/config.yml` | `~/.config/lazygit/config.yml` -> `lazygit/config.yml` | `%LOCALAPPDATA%\lazygit\config.yml` -> `lazygit\config.windows.yml` |
 | lsd | `~/.config/lsd/{config.yaml,colors.yaml}` -> `lsd/{config.yaml,colors.yaml}` | same | `%USERPROFILE%\.config\lsd\{config.yaml,colors.yaml}` -> `lsd\{config.yaml,colors.yaml}` |
@@ -260,6 +260,14 @@ and whether `pwsh` is installed.
 - `install-deps` provisions Starship through Homebrew on macOS/Linuxbrew,
   Alpine's native package on Alpine, and a pinned SHA-256-verified Starship
   GitHub release archive on other native Linux/WSL hosts.
+- `install-deps` provisions terminal multiplexer theme plugins as pinned
+  repo-managed copies. macOS/Linux/WSL install TPM
+  (`e261deb1b47614eed3400089ce7197dc68acc4eb`) and `rose-pine/tmux`
+  (`b6138c51573425ccdc33c91464597323baec3b7e`) under
+  `~/.local/share/dotfiles/tmux-plugins`; Windows installs PPM and
+  `psmux-theme-rosepine` from `psmux/psmux-plugins`
+  (`0f46ccca5a9b748fd03851db00b85fd784f42791`) under
+  `%USERPROFILE%\.psmux\plugins`.
 - `install-deps` provisions `lsd` through the supported package managers
   (Homebrew, native Linux package managers where available, and the Windows
   Scoop-first catalog). Interactive shells replace `ls` with `lsd` and add the
@@ -523,7 +531,7 @@ update PRs are intentionally not configured.
 |---|---|---|
 | GitHub Actions | Managed, digest-pinned, labeled `github-actions` | Actions are repo-owned CI inputs with stable Renovate support. |
 | GitHub runner images | Managed, labeled `github-runners`, reviewed separately | `ubuntu-*`, `macos-*`, and `windows-*` bumps can change the supported CI platform, so they should not be mixed with ordinary Action bumps. |
-| Repo-pinned installer versions/refs | Managed, labeled `pinned-downloads`, never automerged | Neovim Linux tarballs, chezmoi CI release archives, lazygit Linux tarballs, Starship Linux tarballs, tree-sitter CLI Linux archives, Hack Nerd Font, Windows Terminal portable zip, Ubuntu Ghostty, zsh plugin refs, the Homebrew installer commit, the Renovate validator package/runtime, and the CI `cargo-binstall` commit are explicit repo pins. |
+| Repo-pinned installer versions/refs | Managed, labeled `pinned-downloads`, never automerged | Neovim Linux tarballs, chezmoi CI release archives, lazygit Linux tarballs, Starship Linux tarballs, tree-sitter CLI Linux archives, Hack Nerd Font, Windows Terminal portable zip, Ubuntu Ghostty, zsh plugin refs, tmux/psmux plugin refs, the Homebrew installer commit, the Renovate validator package/runtime, and the CI `cargo-binstall` commit are explicit repo pins. |
 | Adjacent SHA-256 / commit constants | Not managed; matched only as regex context | Renovate can bump the version/ref but cannot recompute archive/script hashes or verify tag commit IDs. CI must fail until a human recomputes and reviews them. |
 | Package-manager catalogs | Not managed | Brew, apt, dnf, pacman, zypper, apk, Scoop, winget, and choco entries are package names/IDs, not repo version pins. Let the package manager resolve current versions. |
 | Neovim plugin and Mason tools | Not managed | `lazy-lock.json` is refreshed with Lazy and tested as editor behavior; Mason intentionally has no machine-pinned lockfile. |
@@ -541,9 +549,9 @@ Direct-download SHA-256 values for Neovim tarballs, chezmoi CI release archives,
 lazygit tarballs, Starship tarballs, tree-sitter CLI archives, Hack Nerd Font,
 the Windows Terminal portable zip, the Ubuntu Ghostty installer, Homebrew
 installer script, and the CI `cargo-binstall` installer script are
-intentionally human-reviewed. zsh plugin
-tag commits are also human-reviewed because the installer verifies the
-checked-out commit after cloning the bumped tag. Do not capture direct-download
+intentionally human-reviewed. zsh plugin tag commits and tmux/psmux plugin
+commits are also human-reviewed because the installers verify the checked-out
+commit after cloning/fetching. Do not capture direct-download
 SHA constants as Renovate `currentDigest` values: that creates
 noisy/unresolvable digest updates instead of a trustworthy checksum review. A
 Renovate PR may bump the version/ref while leaving the adjacent SHA or commit
@@ -589,14 +597,17 @@ stale; CI then fails verification until a human reviews the adjacent constant.
   from a pinned, version-checked upstream checkout and lets Polaris own its
   managed global entrypoint blocks. This repo does not vendor Polaris core or
   sync agent runtime state.
-- **Rose Pine everywhere it can render.** Nvim, lualine, starship, tmux, `lsd`,
-  ghostty, Windows Terminal, PSReadLine — same palette across the stack. VS Code
-  joins optionally: `install-deps` offers VS Code, and if `code` is detected it
-  installs the `mvllow.rose-pine` theme, sets `workbench.colorTheme` (plus the
-  `preferredDark`/`preferredLight` slots and `window.autoDetectColorScheme:false`
-  so dark Rose Pine is forced regardless of OS scheme), and sets VS Code
-  editor/terminal font families to Hack Nerd Font fallbacks. Existing JSONC
-  settings are edited in place with comments preserved and a backup first.
+- **Rose Pine everywhere it can render.** Nvim, lualine, foreground-only
+  Starship, tmux/psmux, `lsd`, ghostty, Windows Terminal, PSReadLine — same
+  palette across the stack. POSIX tmux uses pinned TPM + `rose-pine/tmux`;
+  Windows psmux uses pinned PPM + `psmux-theme-rosepine`; the shared tmux config
+  remains a psmux-safe fallback. VS Code joins optionally: `install-deps` offers
+  VS Code, and if `code` is detected it installs the `mvllow.rose-pine` theme,
+  sets `workbench.colorTheme` (plus the `preferredDark`/`preferredLight` slots
+  and `window.autoDetectColorScheme:false` so dark Rose Pine is forced
+  regardless of OS scheme), and sets VS Code editor/terminal font families to
+  Hack Nerd Font fallbacks. Existing JSONC settings are edited in place with
+  comments preserved and a backup first.
 - **conform.nvim is the only format-on-save handler.** Replacing the
   prior LSP-attach autocmd + null-ls duo eliminates a real race condition
   with different timeouts. Formatter output must still stay inside the LSP's
@@ -610,7 +621,8 @@ stale; CI then fails verification until a human reviews the adjacent constant.
   configs in workspace `.nvim.lua` files.
 - **Starship language modules pared down.** Only `c, go, node, rust, python,
   conda` are enabled. Disabled languages don't spawn version probes on every
-  prompt.
+  prompt. Prompt segments use foreground styles only so transparent terminals do
+  not show opaque character-width blocks behind rendered text.
 - **Zsh starship init is precompiled** (mirroring the PowerShell profile
   approach) — re-generated only when `starship.toml` is newer than the cache.
 - **zsh plugin installs are repo-managed pins.** `fzf-tab` and
@@ -635,6 +647,9 @@ stale; CI then fails verification until a human reviews the adjacent constant.
 - **tmux window swaps use uppercase Vim directions.** `prefix+H` swaps the
   current window left and `prefix+L` swaps it right. Lowercase `h/l` remain pane
   focus bindings, and arrow keys are left alone for terminal/psmux reliability.
+- **tmux themes follow the native plugin manager per runtime.** POSIX tmux uses
+  TPM and Windows psmux uses PPM; both load pinned upstream Rose Pine plugins
+  installed by setup. The repo default is a top status bar on both runtimes.
 - **WSL is split-host by default.** Windows Terminal renders fonts and window UI
   on the Windows side; WSL installs the Linux CLI/editor stack. Linux Ghostty
   and Linux fontconfig fonts in WSL require `--experimental-wsl-gui`.
@@ -752,6 +767,7 @@ MIT. See `LICENSE`.
 | Starship prompt missing in the PowerShell window you ran setup in (but it works in psmux / a new window) | that shell loaded `$PROFILE` **before** setup put starship on PATH; the profile skips starship when `Get-Command starship` finds nothing | open a **new** PowerShell window, or run `. $PROFILE` in the current one — newly-installed tools are not on an already-open shell's PATH |
 | Starship init warns that `starship.ps1` is being used by another process | old checkout wrote the PowerShell init cache directly while several WT tabs or psmux panes started together | update this repo and reopen PowerShell; the profile now writes a temp file, moves it into place, and retries a short read lock |
 | Starship prompt slow | a disabled language got re-enabled | check `starship/starship.toml` — only `c, go, nodejs, rust, python, conda` should be enabled |
+| Starship prompt text has opaque blocks behind each segment | a local/custom Starship config reintroduced `bg:` styles | update this repo and re-run setup; the managed `starship.toml` is foreground-only so terminal transparency owns the background |
 | Starship shows only the last few folders (or a leading `…/`) | the `[directory]` module was truncating the path | `starship/starship.toml` sets `truncation_length = 0` + `truncate_to_repo = false` for the full path; raise the length or set `truncate_to_repo = true` to shorten again |
 | A folder like `Downloads`/`Music`/`Pictures` shows as a blank `~/` | its `[directory.substitutions]` glyph was stripped to a bare space | values are `icon + name` (e.g. `Downloads = "<nerd-font-glyph> Downloads"`) using a codepoint your font has; `tests/starship/directory_test.sh` fails on a whitespace-only value |
 | `Alt-h/j/k/l` window nav doesn't work in terminal | something rebinds bare Esc in the shell | `bindkey | grep '^"\^\['` in zsh — should NOT show `kill-whole-line` |
@@ -760,6 +776,7 @@ MIT. See `LICENSE`.
 | `chsh` fails with `user '<name>' does not exist in /etc/passwd` | you log in via a **domain** account (AD/LDAP/SSSD) that isn't in local `/etc/passwd`, so `chsh` can't touch it | re-run `./setup.sh` — it detects this and offers to re-exec interactive bash into zsh via `~/.bashrc` instead. The "proper" fix is admin-side: set the directory `loginShell` / SSSD `default_shell` |
 | Move commits in lazygit, including inside psmux | Ctrl+J collides with Enter on the wire, and psmux v3.3.4 does not relay Windows Terminal's Win32-input-mode modifier data into panes | use uppercase `J` / `K`. `%LOCALAPPDATA%\lazygit\config.yml` binds commits-panel moveDownCommit / moveUpCommit to printable J/K, so no psmux root bind is needed. In the commits panel, use PgUp/PgDn or Ctrl-U/Ctrl-D to scroll the diff |
 | Windows Terminal opens Windows PowerShell 5.1 instead of PowerShell 7 | settings predate the managed WT default-profile merge, or the merge was skipped | re-run `.\setup.ps1 -SkipDeps -SkipNvim`; it adds the fixed `PowerShell 7` profile and promotes only an unset or legacy Windows PowerShell default, preserving a custom default |
+| tmux / psmux does not show the Rose Pine plugin status bar | pinned theme plugins are missing or stale | re-run setup. POSIX installs TPM + `rose-pine/tmux` under `~/.local/share/dotfiles/tmux-plugins`; Windows installs PPM + `psmux-theme-rosepine` under `%USERPROFILE%\.psmux\plugins` |
 | Want a fully solid (opaque) tmux/psmux status bar on Windows | Windows Terminal applies `opacity` window-wide to every cell, so a transparent WT (`opacity < 100`) has a transparent bar regardless of the bar's bg color — a distinct bg does NOT make it opaque in WT | the repo defaults to `opacity: 95` (see-through terminal). For a solid bar set WT `opacity: 100` in the fragment / `settings.json` (whole window opaque). macOS/Linux Ghostty get an opaque-looking bar from `background-opacity 0.95` + blur |
 | PowerShell Tab completion — the selected option is **gold** | PSReadLine `Selection` colors the highlighted MenuComplete option | it is a gold foreground. Note: PSReadLine uses that same `Selection` color for the completion suffix it inserts into the command line while you navigate, so that suffix also shows gold until you accept — it is one setting, not separable |
 | A `wt --version` window popped up during `setup.ps1 -All` | the dependency version table ran `<tool> --version`, and `wt --version` opens a Windows Terminal window instead of printing | fixed — `Get-CommandVersionString` never runs `wt --version`; it reads the file version (or shows `installed`) |
