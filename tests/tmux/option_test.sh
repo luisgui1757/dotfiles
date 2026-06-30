@@ -56,12 +56,14 @@ check mouse on
 check escape-time 10
 check history-limit 50000
 check status-position top
-# Status-style is pine on base. Inactive windows are iris (the "cool" default;
-# tmux/themes/ has warm/minimal/teal alternatives). The current window is the
-# gold-bold standout. Bar opacity is a Windows Terminal concern (WT `opacity` is
-# window-wide), not a tmux color, so it is not asserted here -- the repo ships
-# `opacity: 95` (transparent); set 100 for a solid bar.
+# Status-style is the Rose Pine fallback only; POSIX tmux and Windows psmux load
+# pinned upstream Rose Pine theme plugins when setup has installed them. The bar
+# stays clock-free because Starship is the single time surface. Bar opacity is a
+# Windows Terminal concern (WT `opacity` is window-wide), not a tmux color, so it
+# is not asserted here -- the repo ships `opacity: 95` (transparent); set 100 for
+# a solid bar.
 check status-style "fg=#31748f,bg=#191724"
+check status-right ""
 check window-status-style "fg=#c4a7e7,bg=#191724"
 check window-status-current-style "fg=#f6c177,bold"
 # psmux v3.3.4 stores window-status-current-style but does NOT apply it when
@@ -73,10 +75,24 @@ for required in \
     "set-environment -g TMUX_PLUGIN_MANAGER_PATH \"~/.local/share/dotfiles/tmux-plugins\"" \
     "set -g @plugin 'tmux-plugins/tpm'" \
     "set -g @plugin 'rose-pine/tmux'" \
+    "set -g @rose_pine_variant 'main'" \
     "set -g @rose_pine_bar_bg_disable 'on'" \
+    "set -g @rose_pine_date_time ''" \
     "if-shell 'test -x \"\$HOME/.local/share/dotfiles/tmux-plugins/tpm/tpm\"'"; do
     if ! grep -F "$required" "$REPO_ROOT/tmux/tmux.posix.conf" >/dev/null; then
         echo "FAIL: tmux.posix.conf missing required plugin line: $required"
+        exit 1
+    fi
+done
+
+for required in \
+    "set -g @plugin 'psmux-plugins/ppm'" \
+    "set -g @plugin 'psmux-plugins/psmux-theme-rosepine'" \
+    "set -g @rosepine-variant 'main'" \
+    "set -g status-position top" \
+    "set -g status-right \"\""; do
+    if ! grep -F "$required" "$REPO_ROOT/tmux/tmux.windows.conf" >/dev/null; then
+        echo "FAIL: tmux.windows.conf missing required plugin line: $required"
         exit 1
     fi
 done

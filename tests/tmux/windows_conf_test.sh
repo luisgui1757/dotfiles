@@ -45,6 +45,8 @@ require_line "^set[[:space:]]+-g[[:space:]]+@plugin[[:space:]]+'psmux-plugins/pp
     'tmux.windows.conf must declare PPM'
 require_line "^set[[:space:]]+-g[[:space:]]+@plugin[[:space:]]+'psmux-plugins/psmux-theme-rosepine'$" \
     'tmux.windows.conf must declare psmux-theme-rosepine'
+require_line "^set[[:space:]]+-g[[:space:]]+@rosepine-variant[[:space:]]+'main'$" \
+    'tmux.windows.conf must default to the upstream Rose Pine main variant'
 require_line "^run[[:space:]]+'~/.psmux/plugins/ppm/ppm.ps1'$" \
     'tmux.windows.conf must load PPM from the repo-managed plugin root'
 require_line "^run[[:space:]]+'~/.psmux/plugins/psmux-theme-rosepine/psmux-theme-rosepine.ps1'$" \
@@ -56,6 +58,11 @@ theme_run_line="$(grep -n "^run '~/.psmux/plugins/psmux-theme-rosepine/psmux-the
 top_line="$(awk '/^set -g status-position top$/ { n = NR } END { print n + 0 }' "$WIN_CONF")"
 if [[ -z "$theme_run_line" || "$top_line" -le "$theme_run_line" ]]; then
     echo "FAIL: tmux.windows.conf must reassert status-position top after psmux-theme-rosepine loads"
+    exit 1
+fi
+right_line="$(awk '/^set -g status-right ""$/ { n = NR } END { print n + 0 }' "$WIN_CONF")"
+if [[ "$right_line" -le "$theme_run_line" ]]; then
+    echo "FAIL: tmux.windows.conf must clear status-right after psmux-theme-rosepine loads"
     exit 1
 fi
 

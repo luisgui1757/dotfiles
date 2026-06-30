@@ -38,6 +38,10 @@ repeatable instead of tribal.
 - Post-fix audit hardening added regression coverage for POSIX uninstall
   dry-run immutability, mirrored chezmoi/Starship/tree-sitter pins,
   required-check list duplication, and the Windows Sandbox bootstrap trust root.
+- The combined terminal/update PR removed local tmux theme snippets, kept the
+  upstream Rose Pine plugin variants as the only theme surface (`main` by
+  default, `moon` / `dawn` available), and made the tmux/psmux bar clock-free so
+  Starship remains the single time display.
 
 ## P0 - Total Update Ownership Model
 

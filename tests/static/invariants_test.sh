@@ -61,6 +61,22 @@ check_absent "no load-time if-shell in cross-platform tmux.conf (psmux freeze gu
     "^[[:space:]]*if-shell" \
     tmux/tmux.conf home/dot_tmux.conf
 
+if find tmux/themes -type f -name '*.conf' 2>/dev/null | grep -q .; then
+    echo "FAIL: local tmux theme snippets must stay deleted; use upstream Rose Pine variants"
+    find tmux/themes -type f -name '*.conf'
+    fail=1
+else
+    echo "ok  : no local tmux theme snippets"
+fi
+
+if grep -rnE '(%H:%M|%I:%M|%a %d %b|%Y-%m-%d)' tmux home/dot_tmux* >/dev/null 2>&1; then
+    echo "FAIL: tmux/psmux bar must stay clock-free; Starship owns time display"
+    grep -rnE '(%H:%M|%I:%M|%a %d %b|%Y-%m-%d)' tmux home/dot_tmux* | head -5
+    fail=1
+else
+    echo "ok  : tmux/psmux bar is clock-free"
+fi
+
 # Lazy-load discipline: only rose-pine should be lazy=false
 nonlazy=$(grep -lE "lazy[[:space:]]*=[[:space:]]*false" nvim/lua/plugins/*.lua 2>/dev/null | grep -v rose-pine.lua || true)
 if [[ -n "$nonlazy" ]]; then

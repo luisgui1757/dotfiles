@@ -14,11 +14,12 @@ significant change to the relevant area.
 - [ ] **Windows Terminal**: rose-pine scheme applied; tabs use the
       configured theme; acrylic OFF on the body, ON in the tab row; a new tab
       opens `PowerShell 7` unless the user intentionally chose another default.
-- [ ] **Tmux status bar**: Rose Pine plugin bar is at the top, segments are
-      readable, prefix is `C-b`,
+- [ ] **Tmux status bar**: Rose Pine plugin bar is at the top, has no date/time
+      segment, segments are readable, prefix is `C-b`,
       `prefix r` reloads the conf and shows the "reloaded" message.
 - [ ] **psmux status bar**: psmux-theme-rosepine bar is at the top after
-      reopening psmux; no config-load freeze and no sustained CPU spike.
+      reopening psmux; no date/time segment, no config-load freeze, and no
+      sustained CPU spike.
 - [ ] **Starship prompt**: shows username, dir, git branch, git status icons
       (untracked/modified/staged), trailing time, and no opaque background
       blocks behind prompt text.

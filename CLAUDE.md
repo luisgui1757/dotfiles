@@ -1418,9 +1418,15 @@ host OS or shell would otherwise hide a branch from CI.
   so TPM can load `rose-pine/tmux` as the final status owner. Windows loads
   `tmux/tmux.windows.conf` at the bottom; it declares PPM + `psmux-theme-rosepine`,
   runs the richer theme `.ps1` entrypoint, then reasserts `status-position top`
-  because upstream psmux Rose Pine defaults to bottom. Keep plugin managers in
-  OS overlays only; shared `tmux.conf` must remain free of load-time `if-shell`
-  and psmux-specific plugin commands. Current pins: TPM
+  because upstream psmux Rose Pine defaults to bottom. The only supported flavor
+  selector is the upstream variant option: `@rose_pine_variant` on POSIX and
+  `@rosepine-variant` on Windows, defaulting to `main` with `moon` / `dawn`
+  available. Keep local `tmux/themes/*.conf` snippets deleted. The bar is
+  clock-free because Starship is the single time surface; psmux clears
+  `status-right` after the theme entrypoint because that plugin has no documented
+  clock toggle. Keep plugin managers in OS overlays only; shared `tmux.conf`
+  must remain free of load-time `if-shell` and psmux-specific plugin commands.
+  Current pins: TPM
   `e261deb1b47614eed3400089ce7197dc68acc4eb`, `rose-pine/tmux`
   `b6138c51573425ccdc33c91464597323baec3b7e`, and `psmux/psmux-plugins`
   `0f46ccca5a9b748fd03851db00b85fd784f42791`. Guarded by
