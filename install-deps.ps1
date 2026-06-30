@@ -1029,6 +1029,42 @@ function Test-ScoopPackageManaged {
     return ($state.Status -eq 'managed')
 }
 
+function Test-ScoopStatusOutputContainsPackage {
+    param([object[]]$Output, [string]$Package)
+    if ([string]::IsNullOrWhiteSpace($Package)) { return $false }
+    $listName = Get-ScoopPackageListName -Package $Package
+    $escaped = [regex]::Escape($listName)
+    foreach ($line in @($Output)) {
+        if ([string]$line -match "(^|\s)$escaped(\s|$)") {
+            return $true
+        }
+    }
+    return $false
+}
+
+function Get-ScoopPackageUpgradeState {
+    param([string]$Package)
+    if ([string]::IsNullOrWhiteSpace($Package)) {
+        return [pscustomobject]@{ Status = 'none'; ExitCode = 0 }
+    }
+    if (-not (Get-Command scoop -ErrorAction SilentlyContinue)) {
+        return [pscustomobject]@{ Status = 'error'; ExitCode = 'scoop-missing' }
+    }
+    try {
+        $output = @(scoop status 2>$null)
+        $exitCode = $LASTEXITCODE
+        if ($exitCode -ne 0) {
+            return [pscustomobject]@{ Status = 'error'; ExitCode = $exitCode }
+        }
+        if (Test-ScoopStatusOutputContainsPackage -Output $output -Package $Package) {
+            return [pscustomobject]@{ Status = 'available'; ExitCode = 0 }
+        }
+        return [pscustomobject]@{ Status = 'none'; ExitCode = 0 }
+    } catch {
+        return [pscustomobject]@{ Status = 'error'; ExitCode = 'exception' }
+    }
+}
+
 function Get-WingetRootCandidates {
     $roots = @()
     foreach ($base in @($env:LOCALAPPDATA)) {
@@ -1212,6 +1248,41 @@ function Test-ChocoPackageManaged {
     return $false
 }
 
+function Test-ChocoOutdatedOutputContainsPackage {
+    param([object[]]$Output, [string]$Package)
+    if ([string]::IsNullOrWhiteSpace($Package)) { return $false }
+    $prefix = "$Package|"
+    foreach ($line in @($Output)) {
+        if (([string]$line).StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) {
+            return $true
+        }
+    }
+    return $false
+}
+
+function Get-ChocoPackageUpgradeState {
+    param([string]$Package)
+    if ([string]::IsNullOrWhiteSpace($Package)) {
+        return [pscustomobject]@{ Status = 'none'; ExitCode = 0 }
+    }
+    if (-not (Get-Command choco -ErrorAction SilentlyContinue)) {
+        return [pscustomobject]@{ Status = 'error'; ExitCode = 'choco-missing' }
+    }
+    try {
+        $output = @(choco outdated --limit-output 2>$null)
+        $exitCode = $LASTEXITCODE
+        if (($exitCode -ne 0) -and ($exitCode -ne 2)) {
+            return [pscustomobject]@{ Status = 'error'; ExitCode = $exitCode }
+        }
+        if (Test-ChocoOutdatedOutputContainsPackage -Output $output -Package $Package) {
+            return [pscustomobject]@{ Status = 'available'; ExitCode = $exitCode }
+        }
+        return [pscustomobject]@{ Status = 'none'; ExitCode = $exitCode }
+    } catch {
+        return [pscustomobject]@{ Status = 'error'; ExitCode = 'exception' }
+    }
+}
+
 function Get-ChocolateyRootCandidates {
     $roots = @()
     if (-not [string]::IsNullOrWhiteSpace($env:ChocolateyInstall)) {
@@ -1333,6 +1404,24 @@ function Update-ScoopTool {
         if ($ReportSkip) { Write-Host ("  skipped   {0,-26} present, but Scoop does not manage {1}" -f $tool, $pkg) }
         return
     }
+    if ((-not $SkipManifestRefresh) -and (-not $IsDryRun)) {
+        scoop update | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warning ("  scoop manifest refresh failed (exit {0})" -f $LASTEXITCODE)
+            $script:InstallFailures += [pscustomobject]@{ Tool=$tool; Pm='scoop'; Pkg='manifest'; ExitCode=$LASTEXITCODE }
+            return
+        }
+    }
+    $upgradeState = Get-ScoopPackageUpgradeState -Package $pkg
+    if ($upgradeState.Status -eq 'none') {
+        if ($ReportSkip) { Write-Host ("  current   {0,-26} via scoop" -f $tool) }
+        return
+    }
+    if ($upgradeState.Status -ne 'available') {
+        Write-Warning ("  scoop status check of {0} failed (exit {1})" -f $pkg, $upgradeState.ExitCode)
+        $script:InstallFailures += [pscustomobject]@{ Tool=$tool; Pm='scoop'; Pkg=$pkg; ExitCode=$upgradeState.ExitCode }
+        return
+    }
     if ((-not $NoPrompt) -and (-not (Ask "Update ${tool} to the latest scoop version?"))) { return }
     if ($IsDryRun) {
         if ($SkipManifestRefresh) {
@@ -1341,14 +1430,6 @@ function Update-ScoopTool {
             Write-Host ("  would:    scoop update; scoop update {0}" -f $pkg)
         }
         return
-    }
-    if (-not $SkipManifestRefresh) {
-        scoop update | Out-Null
-        if ($LASTEXITCODE -ne 0) {
-            Write-Warning ("  scoop manifest refresh failed (exit {0})" -f $LASTEXITCODE)
-            $script:InstallFailures += [pscustomobject]@{ Tool=$tool; Pm='scoop'; Pkg='manifest'; ExitCode=$LASTEXITCODE }
-            return
-        }
     }
     scoop update $pkg
     if ($LASTEXITCODE -eq 0) {
@@ -1446,6 +1527,16 @@ function Update-ChocoTool {
             Add-UnmanagedDependency -tool $tool -Source $state.Source
             return
         }
+    }
+    $upgradeState = Get-ChocoPackageUpgradeState -Package $pkg
+    if ($upgradeState.Status -eq 'none') {
+        if ($ReportSkip) { Write-Host ("  current   {0,-26} via choco" -f $tool) }
+        return
+    }
+    if ($upgradeState.Status -ne 'available') {
+        Write-Warning ("  choco outdated check of {0} failed (exit {1})" -f $pkg, $upgradeState.ExitCode)
+        $script:InstallFailures += [pscustomobject]@{ Tool=$tool; Pm='choco'; Pkg=$pkg; ExitCode=$upgradeState.ExitCode }
+        return
     }
     if ((-not $NoPrompt) -and (-not (Ask "Update ${tool} to the latest Chocolatey version?"))) { return }
     if ($IsDryRun) {

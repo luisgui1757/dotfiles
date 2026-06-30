@@ -331,8 +331,9 @@ and whether `pwsh` is installed.
   detected from shim metadata before package-list fallback; corrupt Scoop shims
   are `blocked`; winget and Chocolatey require both package-list ownership and a
   command source under that manager's supported install roots, so a manual
-  `C:\Manual\...\pwsh.exe` is `unmanaged` even if a package row exists. Winget
-  reports `current` when no exact available-upgrade row exists.
+  `C:\Manual\...\pwsh.exe` is `unmanaged` even if a package row exists. Windows
+  managers report `current` when their non-mutating availability probes have no
+  exact available-upgrade row for the package.
 - zsh plugins are installed by Unix setup as repo-managed pinned git checkouts:
   `fzf-tab` and `zsh-autosuggestions` live under
   `~/.local/share/dotfiles/zsh-plugins`. `zshrc` sources those copies first and

@@ -746,13 +746,15 @@ save only**. The next plain `:w` formats normally. Implemented in
   Winget and Chocolatey ownership require both an exact package-list row and an
   active command source under that manager's supported install roots; a manual
   `C:\Manual\...\pwsh.exe` is `unmanaged` even if winget/Chocolatey lists the
-  package. Winget updates also require an exact
-  `winget list --upgrade-available --id <id> -e --accept-source-agreements`
-  availability row; no matching available update is reported as `current`, while
-  a failed availability query appends to `InstallFailures`. Status vocabulary is
-  stable across OSes: `updated`, `current`, `system`, `unmanaged`, `blocked`, and
-  `skipped`; `blocked` exits nonzero, while `unmanaged` exits successfully with
-  the resolved source path. Do not use vague "present, but <manager> does not
+  package. Windows updates require a manager-specific non-mutating availability
+  proof before mutation: Scoop uses `scoop status`, winget uses
+  `winget list --upgrade-available --id <id> -e --accept-source-agreements`, and
+  Chocolatey uses `choco outdated --limit-output`. No matching available update
+  is reported as `current`, while a failed availability query appends to
+  `InstallFailures`. Status vocabulary is stable across OSes: `updated`,
+  `current`, `system`, `unmanaged`, `blocked`, and `skipped`; `blocked` exits
+  nonzero, while `unmanaged` exits successfully with the resolved source path.
+  Do not use vague "present, but <manager> does not
   manage" wording.
 - **Polaris is setup Phase 6/6 and is opt-out, not experimental.** Full setup
   (`--all` / `-All`) applies Polaris `0.1.1` at commit
@@ -906,17 +908,19 @@ save only**. The next plain `:w` formats normally. Implemented in
   through to another manager. Winget/Chocolatey package-list ownership is not
   enough to run an update: the active command source must also live under the
   supported install roots for that manager/package. A manual shadow command is
-  `unmanaged`, not a manager-owned update target. `Get-WingetPackageUpgradeState`
-  must then prove exact upgrade availability with
-  `winget list --upgrade-available --id <id> -e`; no matching update is reported
-  as `current`, and a failed availability query is a real update failure.
-  `Update-ScoopTool` remains the only Scoop-specific update path and is
-  intentionally single-package; never replace it with `scoop update *`,
-  `winget upgrade --all`, `choco upgrade all`, or another blanket upgrade.
-  Failed manifest refreshes, availability checks, or package updates append to
-  `InstallFailures`, so update mode exits nonzero when a scoped refresh did not
-  actually succeed. Present tools outside Scoop/winget/Chocolatey are reported
-  as unmanaged and do not count as successful dotfiles-owned updates.
+  `unmanaged`, not a manager-owned update target. A manager-specific
+  availability probe must then prove the package is actually outdated before any
+  mutating package command runs: Scoop filters `scoop status`, winget filters
+  `winget list --upgrade-available --id <id> -e`, and Chocolatey filters
+  `choco outdated --limit-output`. No matching update is reported as `current`,
+  and a failed availability query is a real update failure. `Update-ScoopTool`
+  remains the only Scoop-specific update path and is intentionally
+  single-package; never replace it with `scoop update *`, `winget upgrade --all`,
+  `choco upgrade all`, or another blanket upgrade. Failed manifest refreshes,
+  availability checks, or package updates append to `InstallFailures`, so update
+  mode exits nonzero when a scoped refresh did not actually succeed. Present
+  tools outside Scoop/winget/Chocolatey are reported as unmanaged and do not
+  count as successful dotfiles-owned updates.
 - **Windows CI uses Scoop's documented elevated bootstrap.** GitHub-hosted
   `windows-2025` runners are elevated, and Scoop blocks elevated install by
   default. `Install-Scoop` detects elevation and runs the official installer
