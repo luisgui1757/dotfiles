@@ -369,7 +369,7 @@ and whether `pwsh` is installed.
   WSL, or use a Linux GUI build when WSLg / X11 is available. Rosé Pine setup
   follows whatever `code` CLI is on PATH.
 - Polaris agent policy is a supported setup phase, not a synced dotfile. `setup`
-  pins Polaris `0.1.1` at commit `489dcc6f991ddcff63c460a433e983264dc54cf7`,
+  pins Polaris `0.1.2` at commit `ecca742fa9ed1243a73981955850c1a8ef3e3b04`,
   caches that checkout under `~/.local/share/dotfiles/polaris/<commit>` on
   POSIX and `%LOCALAPPDATA%\dotfiles\polaris\<commit>` on Windows, verifies the
   checkout `VERSION`, and runs every Polaris Git operation with

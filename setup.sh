@@ -37,8 +37,8 @@ SKIP_AGENTS=0
 BEST_EFFORT=0
 EXPERIMENTAL_WSL_GUI=0
 POLARIS_REPO_URL="https://github.com/luisgui1757/polaris.git"
-POLARIS_VERSION="0.1.1"
-POLARIS_REF="489dcc6f991ddcff63c460a433e983264dc54cf7"
+POLARIS_VERSION="0.1.2"
+POLARIS_REF="ecca742fa9ed1243a73981955850c1a8ef3e3b04"
 POLARIS_CACHE_ROOT="$HOME/.local/share/dotfiles/polaris"
 usage() {
     cat <<'EOF'

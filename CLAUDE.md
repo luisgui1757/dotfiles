@@ -759,8 +759,8 @@ save only**. The next plain `:w` formats normally. Implemented in
   Do not use vague "present, but <manager> does not
   manage" wording.
 - **Polaris is setup Phase 6/6 and is opt-out, not experimental.** Full setup
-  (`--all` / `-All`) applies Polaris `0.1.1` at commit
-  `489dcc6f991ddcff63c460a433e983264dc54cf7` unless
+  (`--all` / `-All`) applies Polaris `0.1.2` at commit
+  `ecca742fa9ed1243a73981955850c1a8ef3e3b04` unless
   `--skip-agents` / `-SkipAgents` is passed. Interactive setup asks
   `Apply Polaris global agent rules? [Y/n]`. The setup phase clones Polaris into
   a dotfiles-owned cache (`~/.local/share/dotfiles/polaris/<commit>` on POSIX,
@@ -770,7 +770,7 @@ save only**. The next plain `:w` formats normally. Implemented in
   config features disabled. It then runs Polaris' Bash global installer
   (`tools/install --global`), then runs its global check. Windows setup invokes
   the same Bash installer through a validated Git Bash (`cygpath` must be
-  present) with Git Bash's POSIX-only PATH for the `0.1.1` pin; do not use
+  present) with Git Bash's POSIX-only PATH for the `0.1.2` pin; do not use
   Polaris `tools/install.ps1` for global installs unless a newer Polaris pin
   proves the PowerShell path in CI. Do not inline or reimplement Polaris
   rendering here. Project/team Polaris adoption is a separate repo-local install

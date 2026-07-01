@@ -41,8 +41,8 @@ $ErrorActionPreference = 'Stop'
 
 $RepoUrl        = 'https://github.com/luisgui1757/dotfiles.git'
 $PolarisRepoUrl = 'https://github.com/luisgui1757/polaris.git'
-$PolarisVersion = '0.1.1'
-$PolarisRef     = '489dcc6f991ddcff63c460a433e983264dc54cf7'
+$PolarisVersion = '0.1.2'
+$PolarisRef     = 'ecca742fa9ed1243a73981955850c1a8ef3e3b04'
 
 function Get-DefaultProfileRoot {
     if (-not [string]::IsNullOrWhiteSpace($env:USERPROFILE)) { return $env:USERPROFILE }
