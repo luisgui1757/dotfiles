@@ -33,10 +33,10 @@ fi
 # arrays / mapfile).
 expected_for() {
     case "$1" in
-        darwin)    printf '%s\n' ".config/ghostty" ".config/lazygit" ".tmux.rose-pine.ps1" ".tmux.windows.conf" "AppData" "Documents" ;;
-        linux)     printf '%s\n' ".tmux.rose-pine.ps1" ".tmux.windows.conf" "AppData" "Documents" "Library" ;;
-        linux-wsl) printf '%s\n' ".config/ghostty" ".tmux.rose-pine.ps1" ".tmux.windows.conf" "AppData" "Documents" "Library" ;;
-        linux-wsl-gui) printf '%s\n' ".tmux.rose-pine.ps1" ".tmux.windows.conf" "AppData" "Documents" "Library" ;;
+        darwin)    printf '%s\n' ".config/ghostty" ".config/lazygit" ".tmux.rose-pine.dawn.conf" ".tmux.rose-pine.main.conf" ".tmux.rose-pine.moon.conf" ".tmux.rose-pine.ps1" ".tmux.windows.conf" "AppData" "Documents" ;;
+        linux)     printf '%s\n' ".tmux.rose-pine.dawn.conf" ".tmux.rose-pine.main.conf" ".tmux.rose-pine.moon.conf" ".tmux.rose-pine.ps1" ".tmux.windows.conf" "AppData" "Documents" "Library" ;;
+        linux-wsl) printf '%s\n' ".config/ghostty" ".tmux.rose-pine.dawn.conf" ".tmux.rose-pine.main.conf" ".tmux.rose-pine.moon.conf" ".tmux.rose-pine.ps1" ".tmux.windows.conf" "AppData" "Documents" "Library" ;;
+        linux-wsl-gui) printf '%s\n' ".tmux.rose-pine.dawn.conf" ".tmux.rose-pine.main.conf" ".tmux.rose-pine.moon.conf" ".tmux.rose-pine.ps1" ".tmux.windows.conf" "AppData" "Documents" "Library" ;;
         windows)   printf '%s\n' ".config/ghostty" ".config/lazygit" ".config/nvim" ".tmux.posix.conf" ".zshenv" ".zshrc" "Library" ;;
         *)         fail "unsupported OS fixture: $1" ;;
     esac

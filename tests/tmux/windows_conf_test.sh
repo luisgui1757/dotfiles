@@ -8,6 +8,7 @@ WIN_CONF="$REPO_ROOT/tmux/tmux.windows.conf"
 HOME_WIN_CONF="$REPO_ROOT/home/dot_tmux.windows.conf"
 RENDERER="$REPO_ROOT/tmux/psmux-rose-pine.ps1"
 HOME_RENDERER="$REPO_ROOT/home/dot_tmux.rose-pine.ps1"
+ROSEPINE_VARIANTS=(main moon dawn)
 
 require_line() {
     local pattern=$1 message=$2
@@ -47,16 +48,23 @@ require_line '^set[[:space:]]+-g[[:space:]]+pwsh-mouse-selection[[:space:]]+off$
 require_line '^set[[:space:]]+-g[[:space:]]+scroll-enter-copy-mode[[:space:]]+on$' \
     'tmux.windows.conf must keep wheel-scroll copy-mode'
 
-# Rose Pine renderer wiring: default variant + run the repo-owned psmux port.
-require_line "^set[[:space:]]+-g[[:space:]]+@rosepine-variant[[:space:]]+'main'$" \
+# Rose Pine renderer wiring: default variant + source generated psmux configs.
+require_line "^set[[:space:]]+-go[[:space:]]+@rosepine-variant[[:space:]]+'main'$" \
     'tmux.windows.conf must default the Rose Pine variant to main'
-require_line "^run[[:space:]]+'~/\.tmux\.rose-pine\.ps1'$" \
-    'tmux.windows.conf must run the repo-owned psmux Rose Pine renderer'
-# psmux paints its default status bar during client init (after config-parse), so
-# a bare config-load run is overwritten. The client-attached hook re-applies the
-# renderer post-attach so the theme is on by default, not only after a manual run.
-require_line 'set-hook -g client-attached .*\.tmux\.rose-pine\.ps1' \
-    'tmux.windows.conf must reapply the renderer on client-attached (survives psmux default-bar paint)'
+require_line '^source-file[[:space:]]+~/\.tmux\.rose-pine\.main\.conf$' \
+    'tmux.windows.conf must source the generated main Rose Pine config'
+require_line '^source-file[[:space:]]+~/\.tmux\.rose-pine\.moon\.conf$' \
+    'tmux.windows.conf must source the generated moon Rose Pine config'
+require_line '^source-file[[:space:]]+~/\.tmux\.rose-pine\.dawn\.conf$' \
+    'tmux.windows.conf must source the generated dawn Rose Pine config'
+require_line '^%if[[:space:]]+"#\{==:#\{@rosepine-variant\},moon\}"$' \
+    'tmux.windows.conf must select the moon generated config by @rosepine-variant'
+require_line '^%elif[[:space:]]+"#\{==:#\{@rosepine-variant\},dawn\}"$' \
+    'tmux.windows.conf must select the dawn generated config by @rosepine-variant'
+reject_line "^run[[:space:]]+'~/\.tmux\.rose-pine\.ps1'$" \
+    'tmux.windows.conf must not use async run for startup Rose Pine'
+reject_line 'set-hook[[:space:]]+-g[[:space:]]+client-attached.*\.tmux\.rose-pine' \
+    'tmux.windows.conf must not rely on client-attached to apply startup Rose Pine'
 
 # The upstream powerline plugin must not come back: it renders a different bar
 # (colored segment blocks) that does not match rose-pine/tmux and fights the
@@ -69,17 +77,17 @@ reject_line "^run[[:space:]]+'~/\.psmux/plugins/" \
 reject_line '^[[:space:]]*if-shell' \
     'tmux.windows.conf must not use load-time if-shell (psmux ConPTY freeze)'
 
-# Ordering: variant must be set before the renderer reads it, and status-position
-# top must be reasserted after the render.
-variant_line="$(grep -nE "^set -g @rosepine-variant 'main'$" "$WIN_CONF" | head -1 | cut -d: -f1)"
-run_line="$(grep -nE "^run '~/\.tmux\.rose-pine\.ps1'$" "$WIN_CONF" | head -1 | cut -d: -f1)"
+# Ordering: variant must be set before the generated config selector, and
+# status-position top must be reasserted after the sourced variant.
+variant_line="$(grep -nE "^set -go @rosepine-variant 'main'$" "$WIN_CONF" | head -1 | cut -d: -f1)"
+source_line="$(awk '/^source-file ~\/\.tmux\.rose-pine\.(main|moon|dawn)\.conf$/ { n = NR } END { print n + 0 }' "$WIN_CONF")"
 top_line="$(awk '/^set -g status-position top$/ { n = NR } END { print n + 0 }' "$WIN_CONF")"
-if [[ -z "$variant_line" || -z "$run_line" || "$variant_line" -ge "$run_line" ]]; then
-    echo "FAIL: tmux.windows.conf must set @rosepine-variant before running the renderer"
+if [[ -z "$variant_line" || "$source_line" -eq 0 || "$variant_line" -ge "$source_line" ]]; then
+    echo "FAIL: tmux.windows.conf must set @rosepine-variant before sourcing generated Rose Pine configs"
     exit 1
 fi
-if [[ "$top_line" -le "$run_line" ]]; then
-    echo "FAIL: tmux.windows.conf must reassert status-position top after the renderer runs"
+if [[ "$top_line" -le "$source_line" ]]; then
+    echo "FAIL: tmux.windows.conf must reassert status-position top after the generated Rose Pine source"
     exit 1
 fi
 
@@ -103,6 +111,22 @@ if ! cmp -s "$RENDERER" "$HOME_RENDERER"; then
     echo "FAIL: home/dot_tmux.rose-pine.ps1 must match tmux/psmux-rose-pine.ps1"
     exit 1
 fi
+for variant in "${ROSEPINE_VARIANTS[@]}"; do
+    conf="$REPO_ROOT/tmux/psmux-rose-pine.$variant.conf"
+    home_conf="$REPO_ROOT/home/dot_tmux.rose-pine.$variant.conf"
+    if [[ ! -f "$conf" ]]; then
+        echo "FAIL: tmux/psmux-rose-pine.$variant.conf generated config is missing"
+        exit 1
+    fi
+    if [[ ! -f "$home_conf" ]]; then
+        echo "FAIL: home/dot_tmux.rose-pine.$variant.conf must manage the generated config on Windows"
+        exit 1
+    fi
+    if ! cmp -s "$conf" "$home_conf"; then
+        echo "FAIL: home/dot_tmux.rose-pine.$variant.conf must match tmux/psmux-rose-pine.$variant.conf"
+        exit 1
+    fi
+done
 
 if ! grep -Fx '.tmux.windows.conf' "$REPO_ROOT/home/.chezmoiignore" >/dev/null; then
     echo "FAIL: home/.chezmoiignore must ignore .tmux.windows.conf off Windows"
@@ -112,5 +136,11 @@ if ! grep -Fx '.tmux.rose-pine.ps1' "$REPO_ROOT/home/.chezmoiignore" >/dev/null;
     echo "FAIL: home/.chezmoiignore must ignore .tmux.rose-pine.ps1 off Windows"
     exit 1
 fi
+for variant in "${ROSEPINE_VARIANTS[@]}"; do
+    if ! grep -Fx ".tmux.rose-pine.$variant.conf" "$REPO_ROOT/home/.chezmoiignore" >/dev/null; then
+        echo "FAIL: home/.chezmoiignore must ignore .tmux.rose-pine.$variant.conf off Windows"
+        exit 1
+    fi
+done
 
 echo "OK"

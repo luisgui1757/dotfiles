@@ -633,7 +633,8 @@ save only**. The next plain `:w` formats normally. Implemented in
   Code, psmux installation, or distro package-manager policy into chezmoi
   run-scripts. psmux stays in `install-deps.ps1` via `Install-Psmux` and the
   hardened `Add-ScoopBucketSafe` path; chezmoi only owns the psmux-readable
-  config files (`.tmux.conf` and `.tmux.windows.conf`).
+  config files (`.tmux.conf`, `.tmux.windows.conf`, and the generated
+  `.tmux.rose-pine.{main,moon,dawn}.conf` files).
   `home/.chezmoi.toml.tmpl` is the mode switch: POSIX uses `mode = "symlink"`
   for live-edit behavior, Windows uses `mode = "file"` for simple single-file
   configs, but Windows `nvim` remains a directory symlink and still needs
@@ -1420,31 +1421,39 @@ host OS or shell would otherwise hide a branch from CI.
   repo-managed plugin root `~/.local/share/dotfiles/tmux-plugins` and enables
   user, short host, date/time, directory, and current-program window names.
   Windows loads `tmux/tmux.windows.conf`, which sets `@rosepine-variant` and
-  `run`s a **repo-owned renderer** (`tmux/psmux-rose-pine.ps1`, deployed by
-  chezmoi as `~/.tmux.rose-pine.ps1`) that reproduces rose-pine/tmux's rendered
-  `set -g` output so the psmux bar matches the flat, foreground-only POSIX bar.
-  The overlay applies the renderer both once at load AND via a
-  `set-hook -g client-attached` hook: psmux paints its default status bar during
-  client init (after config-parse), so a bare config-load `run` is overwritten
-  (the "default bar on a fresh psmux" symptom) -- the hook re-applies it
-  post-attach so the theme is on by default. Guarded by `windows_conf_test.sh`.
+  `source-file`s one generated repo-owned config
+  (`tmux/psmux-rose-pine.{main,moon,dawn}.conf`, deployed by chezmoi as
+  `~/.tmux.rose-pine.{main,moon,dawn}.conf`). Those generated configs reproduce
+  rose-pine/tmux's rendered `set -g` output so the psmux bar matches the flat,
+  foreground-only POSIX bar, and they apply synchronously during config parse.
+  This is load-bearing: psmux `run` / `run-shell` always spawns non-blocking, so
+  a PowerShell renderer that shells back through `psmux set -g ...` can race the
+  first client/status paint and leave the default blue bar until a manual
+  post-attach run. `source-file` parses the literal `set -g` lines in-process
+  before the first window/client state is rendered, matching psmux's native
+  `plugin.conf` theme path. Guarded by `windows_conf_test.sh`.
   We deliberately do NOT use the community `psmux-theme-rosepine` plugin (it
   renders a different powerline bar of colored segment blocks) and cannot run the
   official `rose-pine/tmux` on psmux (it is a bash/TPM script that shells out
   ~30x at load and would hang ConPTY). The renderer is pure declarative `set -g`
-  (no load-time `if-shell`, no per-redraw `#(...)` shell -- it bakes in the
-  username/hostname and uses native `#{...}` formats), inlines every `#[fg=...]`
-  because psmux stores-but-ignores `window-status-*-style`, and ships all three
-  variants (`main` default, `moon`, `dawn`) selected by `@rosepine-variant`;
-  POSIX selects the same via `@rose_pine_variant`. `tmux/psmux-rose-pine.ps1`
-  MUST stay pure ASCII (PS 5.1 parse safety, guarded by `invariants_test.sh`) --
-  the Nerd Font glyphs are built from codepoints at runtime, matching the icons
-  in `tmux/tmux.posix.conf`. Keep local `tmux/themes/*.conf` snippets deleted.
+  (no load-time `if-shell`, no per-redraw `#(...)` shell; generated startup
+  configs use native `#{user}`, `#{host_short}`, `#{b:pane_current_path}`, and
+  `#{p2:}` padding formats), inlines every `#[fg=...]` because psmux
+  stores-but-ignores `window-status-*-style`, and ships all three variants
+  (`main` default, `moon`, `dawn`) selected by `@rosepine-variant`; POSIX
+  selects the same via `@rose_pine_variant`. `tmux/psmux-rose-pine.ps1` MUST
+  stay pure ASCII (PS 5.1 parse safety, guarded by `invariants_test.sh`) -- the
+  Nerd Font glyphs are built from codepoints at runtime, matching the icons in
+  `tmux/tmux.posix.conf`, and the generated `.conf` artifacts carry the rendered
+  glyphs. Keep local `tmux/themes/*.conf` snippets deleted.
   Keep plugin managers in OS overlays only; shared `tmux.conf` must remain free
   of load-time `if-shell`, psmux-specific commands, and quoted overlay source
   paths, and the Windows overlay must not reintroduce `@plugin`/PPM or a
-  plugin-root `run`. Live variant switch:
-  `psmux set -g @rosepine-variant moon; psmux run '~/.tmux.rose-pine.ps1'`.
+  plugin-root `run`. The generated `.conf` files are committed artifacts;
+  regenerate them with the renderer's `-EmitConf -Variant <name>` mode once per
+  variant, and `tests/powershell/PsmuxRosePine.Tests.ps1` asserts byte
+  freshness. Live variant switch:
+  `psmux set -g @rosepine-variant moon; psmux source-file ~/.tmux.windows.conf`.
   Current pins (POSIX plugins only): TPM
   `e261deb1b47614eed3400089ce7197dc68acc4eb` and `rose-pine/tmux`
   `b6138c51573425ccdc33c91464597323baec3b7e`. Guarded by

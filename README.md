@@ -235,7 +235,7 @@ symlink, and Windows Terminal remains a merge.
 | Starship | `~/.config/starship.toml` -> `starship/starship.toml` | same | `%USERPROFILE%\.config\starship.toml` -> `starship\starship.toml` |
 | zsh | `~/.zshenv` -> `shells/zshenv`; `~/.zshrc` -> `shells/zshrc` | same | n/a |
 | PowerShell | n/a | n/a | `Documents\PowerShell\Microsoft.PowerShell_profile.ps1` -> `shells\powershell_profile.ps1` |
-| tmux / psmux | `~/.tmux.conf` -> `tmux/tmux.conf`; `~/.tmux.posix.conf` -> `tmux/tmux.posix.conf` (POSIX clipboard + TPM/Rose Pine overlay) | same | `%USERPROFILE%\.tmux.conf` -> `tmux\tmux.conf`; `%USERPROFILE%\.tmux.windows.conf` -> `tmux\tmux.windows.conf`; `%USERPROFILE%\.tmux.rose-pine.ps1` -> `tmux\psmux-rose-pine.ps1` (repo-owned psmux Rose Pine renderer); the POSIX overlay is **excluded** on Windows (its `if-shell` probes hang psmux); WSL uses the Unix path |
+| tmux / psmux | `~/.tmux.conf` -> `tmux/tmux.conf`; `~/.tmux.posix.conf` -> `tmux/tmux.posix.conf` (POSIX clipboard + TPM/Rose Pine overlay) | same | `%USERPROFILE%\.tmux.conf` -> `tmux\tmux.conf`; `%USERPROFILE%\.tmux.windows.conf` -> `tmux\tmux.windows.conf`; `%USERPROFILE%\.tmux.rose-pine.ps1` -> `tmux\psmux-rose-pine.ps1` (repo-owned psmux Rose Pine generator/manual helper); `%USERPROFILE%\.tmux.rose-pine.{main,moon,dawn}.conf` -> generated `tmux\psmux-rose-pine.{main,moon,dawn}.conf` startup configs; the POSIX overlay is **excluded** on Windows (its `if-shell` probes hang psmux); WSL uses the Unix path |
 | Ghostty | `~/Library/Application Support/com.mitchellh.ghostty/config` -> `ghostty/config` | native Linux links `~/.config/ghostty/config`; WSL links it only with `--experimental-wsl-gui` | n/a |
 | lazygit | `~/Library/Application Support/lazygit/config.yml` -> `lazygit/config.yml` | `~/.config/lazygit/config.yml` -> `lazygit/config.yml` | `%LOCALAPPDATA%\lazygit\config.yml` -> `lazygit\config.windows.yml` |
 | lsd | `~/.config/lsd/{config.yaml,colors.yaml}` -> `lsd/{config.yaml,colors.yaml}` | same | `%USERPROFILE%\.config\lsd\{config.yaml,colors.yaml}` -> `lsd\{config.yaml,colors.yaml}` |
@@ -265,15 +265,15 @@ and whether `pwsh` is installed.
   provisions the upstream tmux theme plugin as pinned repo-managed copies: TPM
   (`e261deb1b47614eed3400089ce7197dc68acc4eb`) and `rose-pine/tmux`
   (`b6138c51573425ccdc33c91464597323baec3b7e`) under
-  `~/.local/share/dotfiles/tmux-plugins`. Windows psmux instead runs a
-  **repo-owned renderer** (`tmux/psmux-rose-pine.ps1`, deployed by chezmoi as
-  `~/.tmux.rose-pine.ps1`) that reproduces rose-pine/tmux's flat, foreground-only
-  status bar directly: the official `rose-pine/tmux` is a bash/TPM script that
-  cannot run on psmux, and the community powerline `psmux-theme-rosepine` plugin
-  renders a different look. The committed variant is `main`; switch to `moon` or
-  `dawn` by changing `@rose_pine_variant` in `tmux/tmux.posix.conf` or
+  `~/.local/share/dotfiles/tmux-plugins`. Windows psmux instead source-files
+  generated repo-owned configs (`~/.tmux.rose-pine.{main,moon,dawn}.conf`) that
+  reproduce rose-pine/tmux's flat, foreground-only status bar directly during
+  config parse: the official `rose-pine/tmux` is a bash/TPM script that cannot
+  run on psmux, and the community powerline `psmux-theme-rosepine` plugin renders
+  a different look. The committed variant is `main`; switch to `moon` or `dawn`
+  by changing `@rose_pine_variant` in `tmux/tmux.posix.conf` or
   `@rosepine-variant` in `tmux/tmux.windows.conf`, or live with
-  `psmux set -g @rosepine-variant moon; psmux run '~/.tmux.rose-pine.ps1'`.
+  `psmux set -g @rosepine-variant moon; psmux source-file ~/.tmux.windows.conf`.
 - `install-deps` provisions `lsd` through the supported package managers
   (Homebrew, native Linux package managers where available, and the Windows
   Scoop-first catalog). Interactive shells replace `ls` with `lsd` and add the
@@ -626,8 +626,8 @@ stale; CI then fails verification until a human reviews the adjacent constant.
 - **Rose Pine everywhere it can render.** Nvim, lualine, foreground-only
   Starship, tmux/psmux, `lsd`, ghostty, Windows Terminal, PSReadLine — same
   palette across the stack. POSIX tmux uses pinned TPM + `rose-pine/tmux`;
-  Windows psmux runs a repo-owned renderer (`tmux/psmux-rose-pine.ps1`) that
-  reproduces the same rose-pine/tmux look; the shared tmux config remains a
+  Windows psmux source-files generated repo-owned Rose Pine configs built by
+  `tmux/psmux-rose-pine.ps1`; the shared tmux config remains a
   psmux-safe fallback. VS Code joins optionally: `install-deps` offers
   VS Code, and if `code` is detected it installs the `mvllow.rose-pine` theme,
   sets `workbench.colorTheme` (plus the `preferredDark`/`preferredLight` slots
@@ -675,9 +675,10 @@ stale; CI then fails verification until a human reviews the adjacent constant.
   current window left and `prefix+L` swaps it right. Lowercase `h/l` remain pane
   focus bindings, and arrow keys are left alone for terminal/psmux reliability.
 - **tmux Rose Pine per runtime.** POSIX tmux loads the upstream `rose-pine/tmux`
-  plugin via TPM; Windows psmux runs a repo-owned renderer
-  (`tmux/psmux-rose-pine.ps1`) that reproduces the same flat, foreground-only
-  bar, because the bash/TPM upstream plugin cannot run on psmux. The repo default
+  plugin via TPM; Windows psmux source-files generated repo-owned configs
+  (`tmux/psmux-rose-pine.{main,moon,dawn}.conf`) that reproduce the same flat,
+  foreground-only bar, because the bash/TPM upstream plugin cannot run on psmux.
+  The repo default
   is `main`, with `moon` / `dawn` available through the variant option
   (`@rose_pine_variant` on POSIX, `@rosepine-variant` on Windows). Both bars are
   top-aligned and show the same segments (session, window, user, short host,
@@ -809,7 +810,7 @@ MIT. See `LICENSE`.
 | `chsh` fails with `user '<name>' does not exist in /etc/passwd` | you log in via a **domain** account (AD/LDAP/SSSD) that isn't in local `/etc/passwd`, so `chsh` can't touch it | re-run `./setup.sh` — it detects this and offers to re-exec interactive bash into zsh via `~/.bashrc` instead. The "proper" fix is admin-side: set the directory `loginShell` / SSSD `default_shell` |
 | Move commits in lazygit, including inside psmux | Ctrl+J collides with Enter on the wire, and psmux v3.3.4 does not relay Windows Terminal's Win32-input-mode modifier data into panes | use uppercase `J` / `K`. `%LOCALAPPDATA%\lazygit\config.yml` binds commits-panel moveDownCommit / moveUpCommit to printable J/K, so no psmux root bind is needed. In the commits panel, use PgUp/PgDn or Ctrl-U/Ctrl-D to scroll the diff |
 | Windows Terminal opens Windows PowerShell 5.1 instead of PowerShell 7 | settings predate the managed WT default-profile merge, or the merge was skipped | re-run `.\setup.ps1 -SkipDeps -SkipNvim`; it adds the fixed `PowerShell 7` profile and promotes only an unset or legacy Windows PowerShell default, preserving a custom default |
-| tmux / psmux does not show the Rose Pine status bar | POSIX plugins are missing/stale or loaded in an already-running server; on Windows the renderer did not run | re-run setup, then restart all tmux/psmux sessions. POSIX installs TPM + `rose-pine/tmux` under `~/.local/share/dotfiles/tmux-plugins` (TPM reloads them). Windows runs `tmux/psmux-rose-pine.ps1` (deployed as `~/.tmux.rose-pine.ps1`) from the overlay; re-apply chezmoi and reopen psmux. Change the `main` / `moon` / `dawn` variant option for a different flavor |
+| tmux / psmux does not show the Rose Pine status bar | POSIX plugins are missing/stale or loaded in an already-running server; on Windows the generated variant config was not deployed or sourced | re-run setup, then restart all tmux/psmux sessions. POSIX installs TPM + `rose-pine/tmux` under `~/.local/share/dotfiles/tmux-plugins` (TPM reloads them). Windows source-files `~/.tmux.rose-pine.{main,moon,dawn}.conf` from `~/.tmux.windows.conf`; re-apply chezmoi and reopen psmux. Change the `main` / `moon` / `dawn` variant option for a different flavor |
 | Want a fully solid (opaque) tmux/psmux status bar on Windows | Windows Terminal applies `opacity` window-wide to every cell, so a transparent WT (`opacity < 100`) has a transparent bar regardless of the bar's bg color — a distinct bg does NOT make it opaque in WT | the repo defaults to `opacity: 95` (see-through terminal). For a solid bar set WT `opacity: 100` in the fragment / `settings.json` (whole window opaque). macOS/Linux Ghostty get an opaque-looking bar from `background-opacity 0.95` + blur |
 | PowerShell Tab completion — the selected option is **gold** | PSReadLine `Selection` colors the highlighted MenuComplete option | it is a gold foreground. Note: PSReadLine uses that same `Selection` color for the completion suffix it inserts into the command line while you navigate, so that suffix also shows gold until you accept — it is one setting, not separable |
 | A `wt --version` window popped up during `setup.ps1 -All` | the dependency version table ran `<tool> --version`, and `wt --version` opens a Windows Terminal window instead of printing | fixed — `Get-CommandVersionString` never runs `wt --version`; it reads the file version (or shows `installed`) |

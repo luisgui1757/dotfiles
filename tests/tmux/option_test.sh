@@ -63,11 +63,13 @@ if grep -Eq 'source-file -q "~/' "$REPO_ROOT/tmux/tmux.conf"; then
 fi
 
 for required in \
-    "set -g @rosepine-variant 'main'" \
-    "run '~/.tmux.rose-pine.ps1'" \
+    "set -go @rosepine-variant 'main'" \
+    "source-file ~/.tmux.rose-pine.main.conf" \
+    "source-file ~/.tmux.rose-pine.moon.conf" \
+    "source-file ~/.tmux.rose-pine.dawn.conf" \
     "set -g status-position top"; do
     if ! grep -F "$required" "$REPO_ROOT/tmux/tmux.windows.conf" >/dev/null; then
-        echo "FAIL: tmux.windows.conf missing required renderer line: $required"
+        echo "FAIL: tmux.windows.conf missing required Rose Pine source line: $required"
         exit 1
     fi
 done

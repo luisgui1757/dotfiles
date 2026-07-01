@@ -53,6 +53,9 @@ tmux.conf|config-file|.tmux.conf|.tmux.conf|tmux/tmux.conf|home/dot_tmux.conf
 tmux.posix.conf|config-file|.tmux.posix.conf|.tmux.posix.conf|tmux/tmux.posix.conf|home/dot_tmux.posix.conf
 tmux.windows.conf|config-file|||tmux/tmux.windows.conf|home/dot_tmux.windows.conf
 psmux rose-pine renderer|config-file|||tmux/psmux-rose-pine.ps1|home/dot_tmux.rose-pine.ps1
+psmux rose-pine main conf|config-file|||tmux/psmux-rose-pine.main.conf|home/dot_tmux.rose-pine.main.conf
+psmux rose-pine moon conf|config-file|||tmux/psmux-rose-pine.moon.conf|home/dot_tmux.rose-pine.moon.conf
+psmux rose-pine dawn conf|config-file|||tmux/psmux-rose-pine.dawn.conf|home/dot_tmux.rose-pine.dawn.conf
 lazygit config|config-file|Library/Application Support/lazygit/config.yml|.config/lazygit/config.yml|lazygit/config.yml|home/.chezmoitemplates/lazygit/config.yml
 lsd config|config-file|.config/lsd/config.yaml|.config/lsd/config.yaml|lsd/config.yaml|home/dot_config/lsd/config.yaml
 lsd colors|config-file|.config/lsd/colors.yaml|.config/lsd/colors.yaml|lsd/colors.yaml|home/dot_config/lsd/colors.yaml

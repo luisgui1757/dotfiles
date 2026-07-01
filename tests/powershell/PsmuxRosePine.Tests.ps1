@@ -45,6 +45,30 @@ Describe 'psmux-rose-pine renderer' {
         $joined | Should -Not -Match '#\('
     }
 
+    It "emits a startup-safe generated config for <Variant>" -ForEach $variants {
+        $lines = Get-PsmuxRosePineConfigLine -Variant $Variant
+        $joined = $lines -join "`n"
+
+        $joined | Should -Match ([regex]::Escape('#{user}'))
+        $joined | Should -Match ([regex]::Escape('#{host_short}'))
+        $joined | Should -Match ([regex]::Escape('#{p2:}'))
+        $joined | Should -Not -Match '#\('
+        $joined | Should -Not -Match '(?m)^run'
+        $joined | Should -Not -Match '(?m)^set-hook'
+    }
+
+    It "keeps the generated <Variant> config committed and fresh" -ForEach $variants {
+        $expected = (Get-PsmuxRosePineConfigLine -Variant $Variant) -join "`n"
+        $expected = "$expected`n"
+        $actualPath = Join-Path $script:RepoRoot "tmux/psmux-rose-pine.$Variant.conf"
+        $mirrorPath = Join-Path $script:RepoRoot "home/dot_tmux.rose-pine.$Variant.conf"
+
+        (Test-Path -LiteralPath $actualPath) | Should -BeTrue
+        (Test-Path -LiteralPath $mirrorPath) | Should -BeTrue
+        (Get-Content -Raw -LiteralPath $actualPath) | Should -Be $expected
+        (Get-Content -Raw -LiteralPath $mirrorPath) | Should -Be $expected
+    }
+
     It "renders a flat bar with no powerline separator glyphs for <Variant>" -ForEach $variants {
         $cmds = Get-PsmuxRosePineCommand -Variant $Variant
         $joined = ($cmds | ForEach-Object { $_.Argv -join ' ' }) -join "`n"
