@@ -52,6 +52,11 @@ require_line "^set[[:space:]]+-g[[:space:]]+@rosepine-variant[[:space:]]+'main'$
     'tmux.windows.conf must default the Rose Pine variant to main'
 require_line "^run[[:space:]]+'~/\.tmux\.rose-pine\.ps1'$" \
     'tmux.windows.conf must run the repo-owned psmux Rose Pine renderer'
+# psmux paints its default status bar during client init (after config-parse), so
+# a bare config-load run is overwritten. The client-attached hook re-applies the
+# renderer post-attach so the theme is on by default, not only after a manual run.
+require_line 'set-hook -g client-attached .*\.tmux\.rose-pine\.ps1' \
+    'tmux.windows.conf must reapply the renderer on client-attached (survives psmux default-bar paint)'
 
 # The upstream powerline plugin must not come back: it renders a different bar
 # (colored segment blocks) that does not match rose-pine/tmux and fights the

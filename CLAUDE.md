@@ -1423,6 +1423,11 @@ host OS or shell would otherwise hide a branch from CI.
   `run`s a **repo-owned renderer** (`tmux/psmux-rose-pine.ps1`, deployed by
   chezmoi as `~/.tmux.rose-pine.ps1`) that reproduces rose-pine/tmux's rendered
   `set -g` output so the psmux bar matches the flat, foreground-only POSIX bar.
+  The overlay applies the renderer both once at load AND via a
+  `set-hook -g client-attached` hook: psmux paints its default status bar during
+  client init (after config-parse), so a bare config-load `run` is overwritten
+  (the "default bar on a fresh psmux" symptom) -- the hook re-applies it
+  post-attach so the theme is on by default. Guarded by `windows_conf_test.sh`.
   We deliberately do NOT use the community `psmux-theme-rosepine` plugin (it
   renders a different powerline bar of colored segment blocks) and cannot run the
   official `rose-pine/tmux` on psmux (it is a bash/TPM script that shells out
