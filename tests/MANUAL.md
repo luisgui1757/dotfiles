@@ -18,10 +18,13 @@ significant change to the relevant area.
       official rich segments (date/time, user/host, directory/current program),
       segments are readable, prefix is `C-b`,
       `prefix r` reloads the conf and shows the "reloaded" message.
-- [ ] **psmux status bar**: psmux-theme-rosepine bar is at the top after
-      reopening psmux; powerline/icons/date/time render, the appended directory
-      segment appears on the right, no config-load freeze, and no sustained CPU
-      spike.
+- [ ] **psmux status bar**: the repo-owned Rose Pine renderer
+      (`~/.tmux.rose-pine.ps1`) draws a FLAT bar (matching the POSIX tmux side,
+      NOT powerline) at the top after reopening psmux: session/window on the
+      left, user + short host + date/time + directory on the right, gold active
+      window / iris inactive, icons render, no config-load freeze, and no
+      sustained CPU spike. Switch flavor:
+      `psmux set -g @rosepine-variant moon; psmux run '~/.tmux.rose-pine.ps1'`.
 - [ ] **Starship prompt**: shows username, dir, git branch, git status icons
       (untracked/modified/staged), trailing time, and no opaque background
       blocks behind prompt text.

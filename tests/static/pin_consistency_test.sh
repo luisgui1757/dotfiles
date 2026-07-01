@@ -46,7 +46,6 @@ sh_const() { grep -E "^$1=" install-deps.sh | head -1 | cut -d'"' -f2; }
 yml_const() { awk -v key="$1" '$1 == key ":" { print $2; exit }' .github/workflows/test.yml; }
 setup_sh_const() { grep -E "^$1=" setup.sh | head -1 | cut -d'"' -f2; }
 setup_ps_const() { grep -E "^[[:space:]]*\\\$$1[[:space:]]*=" setup.ps1 | head -1 | cut -d"'" -f2; }
-install_ps_const() { grep -E "^[[:space:]]*\\\$$1[[:space:]]*=" install-deps.ps1 | head -1 | cut -d"'" -f2; }
 
 # --- nvim Linux: install-deps.sh <-> test.yml <-> the two install tests -------
 nvim_ver_sh="$(sh_const NVIM_LINUX_VERSION)"
@@ -92,10 +91,11 @@ assert_eq "zsh-autosuggestions tag (install-deps.sh == chezmoi external)" \
 assert_eq "zsh-autosuggestions commit (install-deps.sh == verify script)" \
     "$(sh_const ZSH_AUTOSUGGESTIONS_COMMIT)" "$(verify_commit 'zsh-autosuggestions')"
 
-# --- tmux / psmux plugin pins: installers <-> docs ---------------------------
+# --- tmux plugin pins (POSIX rose-pine/tmux): installers <-> docs -------------
+# Windows psmux uses a repo-owned renderer (tmux/psmux-rose-pine.ps1), not a
+# pinned third-party plugin, so there is no PsmuxPlugins commit to mirror here.
 tpm_commit="$(sh_const TPM_COMMIT)"
 rose_pine_tmux_commit="$(sh_const ROSE_PINE_TMUX_COMMIT)"
-psmux_plugins_commit="$(install_ps_const PsmuxPluginsCommit)"
 
 for pin_name in TPM_COMMIT ROSE_PINE_TMUX_COMMIT; do
     pin_value="$(sh_const "$pin_name")"
@@ -106,18 +106,10 @@ for pin_name in TPM_COMMIT ROSE_PINE_TMUX_COMMIT; do
         echo "ok  : $pin_name is immutable commit SHA"
     fi
 done
-if [[ ! "$psmux_plugins_commit" =~ ^[0-9a-f]{40}$ ]]; then
-    echo "FAIL: PsmuxPluginsCommit must be an immutable 40-character lowercase commit SHA, got '$psmux_plugins_commit'"
-    fail=1
-else
-    echo "ok  : PsmuxPluginsCommit is immutable commit SHA"
-fi
 assert_contains "TPM commit (README.md)" "README.md" "$tpm_commit"
 assert_contains "rose-pine/tmux commit (README.md)" "README.md" "$rose_pine_tmux_commit"
-assert_contains "psmux-plugins commit (README.md)" "README.md" "$psmux_plugins_commit"
 assert_contains "TPM commit (CLAUDE.md)" "CLAUDE.md" "$tpm_commit"
 assert_contains "rose-pine/tmux commit (CLAUDE.md)" "CLAUDE.md" "$rose_pine_tmux_commit"
-assert_contains "psmux-plugins commit (CLAUDE.md)" "CLAUDE.md" "$psmux_plugins_commit"
 
 # --- Polaris: setup.sh <-> setup.ps1 -----------------------------------------
 polaris_version_sh="$(setup_sh_const POLARIS_VERSION)"

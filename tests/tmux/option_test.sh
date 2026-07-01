@@ -63,30 +63,14 @@ if grep -Eq 'source-file -q "~/' "$REPO_ROOT/tmux/tmux.conf"; then
 fi
 
 for required in \
-    "set -g @plugin 'psmux-plugins/ppm'" \
-    "set -g @plugin 'psmux-plugins/psmux-theme-rosepine'" \
     "set -g @rosepine-variant 'main'" \
-    "set -g @rosepine-show-powerline 'on'" \
-    "set -g @rosepine-show-icons 'on'" \
-    "set -g @rosepine-show-zoom 'on'" \
-    "set -g @rosepine-show-sync 'on'" \
-    "set -g @rosepine-show-pane-count 'on'" \
-    "set -g status-right-length 140" \
-    "run '~/.psmux/plugins/psmux-theme-rosepine/psmux-theme-rosepine.ps1'" \
+    "run '~/.tmux.rose-pine.ps1'" \
     "set -g status-position top"; do
     if ! grep -F "$required" "$REPO_ROOT/tmux/tmux.windows.conf" >/dev/null; then
-        echo "FAIL: tmux.windows.conf missing required plugin line: $required"
+        echo "FAIL: tmux.windows.conf missing required renderer line: $required"
         exit 1
     fi
 done
-if grep -F "@rosepine-show-date-time 'off'" "$REPO_ROOT/tmux/tmux.windows.conf" >/dev/null; then
-    echo "FAIL: tmux.windows.conf must use the upstream psmux Rose Pine date/time segment while the full bar is being debugged"
-    exit 1
-fi
-if ! grep -Eq '^set[[:space:]]+-ag[[:space:]]+status-right.*pane_current_path' "$REPO_ROOT/tmux/tmux.windows.conf"; then
-    echo "FAIL: tmux.windows.conf must append a current-directory segment after the psmux theme"
-    exit 1
-fi
 
 # Prefix isn't shown by show-options; verify via list-keys instead.
 if ! tmux -L "$sock_name" list-keys -T prefix >/dev/null 2>&1; then

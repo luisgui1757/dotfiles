@@ -8,6 +8,7 @@
        WSL. */ -}}
 {{- if ne .targetOS "windows" }}
 .tmux.windows.conf
+.tmux.rose-pine.ps1
 AppData
 Documents
 {{- end }}

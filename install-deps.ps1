@@ -25,8 +25,6 @@ $HackNerdFontVersion = 'v3.4.0'
 $HackNerdFontSha256 = '8ca33a60c791392d872b80d26c42f2bfa914a480f9eb2d7516d9f84373c36897'
 $WindowsTerminalVersion = 'v1.24.11321.0'
 $WindowsTerminalX64Sha256 = '7caef554147e5498ed1becdca73cdedb79fbc81f89032e46ae9b095c53433812'
-$PsmuxPluginsCommit = '0f46ccca5a9b748fd03851db00b85fd784f42791'
-$PsmuxPluginsRepo = 'https://github.com/psmux/psmux-plugins.git'
 $VsBuildToolsBootstrapperUrl = 'https://aka.ms/vs/17/release/vs_BuildTools.exe'
 $PylatexencBuildBackendVersion = '80.9.0'
 $PylatexencBuildBackendSha256 = '062d34222ad13e0cc312a4c02d73f059e86a4acbfbdea8f8f76b28c99f306922'
@@ -493,7 +491,6 @@ function Get-InstallDependencySpec {
         'starship',
         'wt',
         'psmux',
-        'psmux plugins',
         'pwsh',
         'python',
         'node',
@@ -508,11 +505,11 @@ function Get-InstallDependencySpec {
     )
     $emitted = @{}
     foreach ($tool in $toolOrder) {
-        if (($tool -eq 'scoop') -or ($tool -eq 'psmux') -or ($tool -eq 'psmux plugins') -or $Catalog.ContainsKey($tool)) {
+        if (($tool -eq 'scoop') -or ($tool -eq 'psmux') -or $Catalog.ContainsKey($tool)) {
             $emitted[$tool] = $true
             [pscustomobject]@{
                 Tool = $tool
-                Kind = if ($tool -eq 'psmux plugins') { 'psmux-plugins' } else { 'tool' }
+                Kind = 'tool'
                 Binary = $BinaryName[$tool]
                 Module = ''
             }
@@ -583,12 +580,6 @@ function Test-InstallDependencyPresent {
         'tool' { return (Test-Tool $Spec.Tool) }
         'module' { return [bool](Get-Module -ListAvailable -Name $Spec.Module) }
         'font' { return (Test-HackNerdFontInstalled) }
-        'psmux-plugins' {
-            return (
-                (Test-PsmuxPluginPin -Name 'ppm' -Subdir 'ppm' -RequiredFile 'ppm.ps1') -and
-                (Test-PsmuxPluginPin -Name 'psmux-theme-rosepine' -Subdir 'psmux-theme-rosepine' -RequiredFile 'psmux-theme-rosepine.ps1')
-            )
-        }
         default { return $false }
     }
 }
@@ -598,7 +589,6 @@ function Get-InstallDependencyVersion {
     switch ($Spec.Kind) {
         'tool' { return (Get-CommandVersionString -CommandName $Spec.Binary) }
         'module' { return (Get-ModuleVersionString -Name $Spec.Module) }
-        'psmux-plugins' { return $PsmuxPluginsCommit }
         default { return '-' }
     }
 }
@@ -2418,146 +2408,6 @@ function Install-Psmux {
     $script:InstallFailures += [pscustomobject]@{ Tool='psmux'; Pm='scoop/winget/choco'; Pkg='psmux'; ExitCode=$LASTEXITCODE }
 }
 
-function Get-PsmuxPluginRoot {
-    $base = $env:USERPROFILE
-    if ([string]::IsNullOrWhiteSpace($base)) { $base = $HOME }
-    if ([string]::IsNullOrWhiteSpace($base)) { $base = [Environment]::GetFolderPath('UserProfile') }
-    if ([string]::IsNullOrWhiteSpace($base)) { $base = [System.IO.Path]::GetTempPath() }
-    return (Join-Path (Join-Path $base '.psmux') 'plugins')
-}
-
-function Get-PsmuxPluginTarget {
-    param([Parameter(Mandatory)][string]$Name)
-    return (Join-Path (Get-PsmuxPluginRoot) $Name)
-}
-
-function Test-PsmuxPluginPin {
-    param(
-        [Parameter(Mandatory)][string]$Name,
-        [Parameter(Mandatory)][string]$Subdir,
-        [Parameter(Mandatory)][string]$RequiredFile
-    )
-    $target = Get-PsmuxPluginTarget -Name $Name
-    $required = Join-Path $target $RequiredFile
-    $pinPath = Join-Path $target '.dotfiles-pin.json'
-    if (-not (Test-Path -LiteralPath $required -PathType Leaf)) { return $false }
-    if (-not (Test-Path -LiteralPath $pinPath -PathType Leaf)) { return $false }
-    try {
-        $pin = Get-Content -LiteralPath $pinPath -Raw | ConvertFrom-Json
-        if ($null -ne $pin.PSObject.Properties['patches']) { return $false }
-        return (
-            [string]$pin.repository -eq $PsmuxPluginsRepo -and
-            [string]$pin.commit -eq $PsmuxPluginsCommit -and
-            [string]$pin.subdir -eq $Subdir
-        )
-    } catch {
-        return $false
-    }
-}
-
-function Write-PsmuxPluginPin {
-    param(
-        [Parameter(Mandatory)][string]$Target,
-        [Parameter(Mandatory)][string]$Subdir
-    )
-    $pin = [ordered]@{
-        repository = $PsmuxPluginsRepo
-        commit = $PsmuxPluginsCommit
-        subdir = $Subdir
-        managedBy = 'dotfiles/install-deps.ps1'
-    } | ConvertTo-Json
-    $utf8 = New-Object System.Text.UTF8Encoding($false)
-    [System.IO.File]::WriteAllText((Join-Path $Target '.dotfiles-pin.json'), $pin + [Environment]::NewLine, $utf8)
-}
-
-function Install-PsmuxPluginFromClone {
-    param(
-        [Parameter(Mandatory)][string]$Name,
-        [Parameter(Mandatory)][string]$Subdir,
-        [Parameter(Mandatory)][string]$RequiredFile,
-        [Parameter(Mandatory)][string]$CloneRoot
-    )
-    $source = Join-Path $CloneRoot $Subdir
-    $target = Get-PsmuxPluginTarget -Name $Name
-    if (-not (Test-Path -LiteralPath (Join-Path $source $RequiredFile) -PathType Leaf)) {
-        throw "psmux plugin source $Subdir is missing required file $RequiredFile"
-    }
-
-    if (Test-Path -LiteralPath $target) {
-        $pinPath = Join-Path $target '.dotfiles-pin.json'
-        if (Test-Path -LiteralPath $pinPath -PathType Leaf) {
-            Remove-Item -LiteralPath $target -Recurse -Force
-        } else {
-            $backup = "$target.bak.$(Get-Date -Format 'yyyyMMdd-HHmmss')"
-            Move-Item -LiteralPath $target -Destination $backup -Force
-            Write-Host ("  backup    {0,-26} {1}" -f $Name, $backup)
-        }
-    }
-
-    New-Item -ItemType Directory -Force -Path $target | Out-Null
-    Get-ChildItem -LiteralPath $source -Force | ForEach-Object {
-        Copy-Item -LiteralPath $_.FullName -Destination $target -Recurse -Force
-    }
-    Write-PsmuxPluginPin -Target $target -Subdir $Subdir
-    if (-not (Test-PsmuxPluginPin -Name $Name -Subdir $Subdir -RequiredFile $RequiredFile)) {
-        throw "psmux plugin $Name failed post-install pin verification"
-    }
-    Write-Host ("  installed {0,-26} {1}" -f $Name, $PsmuxPluginsCommit)
-}
-
-function Install-PsmuxPlugins {
-    if (
-        (Test-PsmuxPluginPin -Name 'ppm' -Subdir 'ppm' -RequiredFile 'ppm.ps1') -and
-        (Test-PsmuxPluginPin -Name 'psmux-theme-rosepine' -Subdir 'psmux-theme-rosepine' -RequiredFile 'psmux-theme-rosepine.ps1')
-    ) {
-        Write-Host ("  ok        {0,-26} pinned refs already installed" -f "psmux plugins")
-        return
-    }
-    if (-not (Ask "Install PPM + psmux-theme-rosepine (repo-managed pinned refs)?")) {
-        Write-Host ("  skipped   {0,-26}" -f "psmux plugins")
-        return
-    }
-    if ($DryRun) {
-        Write-Host ("  would:    git init/fetch exact commit {0} from {1}" -f $PsmuxPluginsCommit, $PsmuxPluginsRepo)
-        Write-Host ("  would:    copy ppm + psmux-theme-rosepine into {0}" -f (Get-PsmuxPluginRoot))
-        return
-    }
-    if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
-        Write-Host ("  manual    {0,-26} git is required for pinned plugin install" -f "psmux plugins")
-        $script:InstallFailures += [pscustomobject]@{ Tool='psmux plugins'; Pm='git'; Pkg='psmux-plugins'; ExitCode='git-missing' }
-        return
-    }
-
-    $tmp = $null
-    try {
-        $tmp = New-Item -ItemType Directory -Force -Path (Join-Path ([IO.Path]::GetTempPath()) "psmux-plugins-$([guid]::NewGuid())")
-        $clone = Join-Path $tmp.FullName 'repo'
-        New-Item -ItemType Directory -Force -Path $clone | Out-Null
-        git -C $clone init -q 2>&1 | Out-Null
-        if ($LASTEXITCODE -ne 0) { throw "git init failed with exit $LASTEXITCODE" }
-        git -C $clone remote add origin $PsmuxPluginsRepo 2>&1 | Out-Null
-        if ($LASTEXITCODE -ne 0) { throw "git remote add failed with exit $LASTEXITCODE" }
-        git -C $clone fetch --depth 1 origin $PsmuxPluginsCommit 2>&1 | Out-Null
-        if ($LASTEXITCODE -ne 0) { throw "git fetch $PsmuxPluginsCommit failed with exit $LASTEXITCODE" }
-        git -C $clone checkout --force FETCH_HEAD 2>&1 | Out-Null
-        if ($LASTEXITCODE -ne 0) { throw "git checkout FETCH_HEAD failed with exit $LASTEXITCODE" }
-        $current = (git -C $clone rev-parse HEAD 2>$null).Trim()
-        if ($current -ne $PsmuxPluginsCommit) {
-            throw "psmux-plugins checkout resolved $current, expected $PsmuxPluginsCommit"
-        }
-
-        Install-PsmuxPluginFromClone -Name 'ppm' -Subdir 'ppm' -RequiredFile 'ppm.ps1' -CloneRoot $clone
-        Install-PsmuxPluginFromClone -Name 'psmux-theme-rosepine' -Subdir 'psmux-theme-rosepine' -RequiredFile 'psmux-theme-rosepine.ps1' -CloneRoot $clone
-    } catch {
-        Write-Warning ("psmux plugin install failed: " + $_.Exception.Message)
-        $script:InstallFailures += [pscustomobject]@{ Tool='psmux plugins'; Pm='git'; Pkg='psmux-plugins'; ExitCode=$LASTEXITCODE }
-    } finally {
-        if ($tmp) {
-            Remove-Item -LiteralPath $tmp.FullName -Recurse -Force -ErrorAction SilentlyContinue
-        }
-    }
-}
-
 function Install-TreeSitterCli {
     if (Test-Tool 'tree-sitter') {
         Write-Host ("  ok        {0,-26} already installed" -f "tree-sitter")
@@ -2887,7 +2737,6 @@ Install-WindowsTerminal
 
 Section "terminal multiplexer (psmux: tmux for native Windows, optional)"
 Install-Psmux
-Install-PsmuxPlugins
 
 Section "modern shell (optional, you can stay on Windows PowerShell 5.1)"
 Install-One pwsh

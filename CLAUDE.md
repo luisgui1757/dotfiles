@@ -1413,33 +1413,39 @@ host OS or shell would otherwise hide a branch from CI.
   Windows Terminal; Starship-owned background blocks render as opaque character
   cells and make the prompt look patched onto the transparent surface. Guarded
   by `tests/starship/render_test.sh`.
-- **tmux / psmux Rose Pine themes are upstream plugins, pinned by setup.**
-  Shared `tmux/tmux.conf` is psmux-safe and owns only cross-platform placement
-  (`status-position top`). POSIX loads `tmux/tmux.posix.conf`, which declares TPM
-  + `rose-pine/tmux` from the repo-managed plugin root
-  `~/.local/share/dotfiles/tmux-plugins`. Windows loads
-  `tmux/tmux.windows.conf`, which declares PPM + `psmux-theme-rosepine`, runs the
-  theme `.ps1` entrypoint, then reasserts `status-position top` because upstream
-  psmux Rose Pine defaults to bottom. The only supported flavor selector is the
-  upstream variant option: `@rose_pine_variant` on POSIX and
-  `@rosepine-variant` on Windows, defaulting to `main` with `moon` / `dawn`
-  available. Keep local `tmux/themes/*.conf` snippets deleted. Keep the full
-  official status surface visible while debugging: POSIX enables user, short
-  host, date/time, directory, and current-program window names; Windows enables
-  powerline, icons, user, zoom, sync, pane count, and date/time, then appends the
-  current directory after the psmux theme because upstream has no directory
-  module. Do not patch the pinned upstream psmux plugin and do not blank
-  `status-right` after the theme. Old `.dotfiles-pin.json` files with a
-  `patches` property are intentionally rejected so setup replaces previously
-  patched plugin copies with clean upstream copies. Keep plugin managers in OS overlays only;
-  shared `tmux.conf` must remain free of load-time `if-shell`, psmux-specific
-  plugin commands, and quoted overlay source paths.
-  Current pins: TPM
-  `e261deb1b47614eed3400089ce7197dc68acc4eb`, `rose-pine/tmux`
-  `b6138c51573425ccdc33c91464597323baec3b7e`, and `psmux/psmux-plugins`
-  `0f46ccca5a9b748fd03851db00b85fd784f42791`. Guarded by
-  `tests/tmux/option_test.sh`, `tests/tmux/windows_conf_test.sh`, and
-  `tests/static/pin_consistency_test.sh`.
+- **tmux Rose Pine: POSIX loads the upstream plugin; Windows renders a repo-owned
+  psmux-safe port.** Shared `tmux/tmux.conf` is psmux-safe and owns only
+  cross-platform placement (`status-position top`). POSIX loads
+  `tmux/tmux.posix.conf`, which declares TPM + `rose-pine/tmux` from the
+  repo-managed plugin root `~/.local/share/dotfiles/tmux-plugins` and enables
+  user, short host, date/time, directory, and current-program window names.
+  Windows loads `tmux/tmux.windows.conf`, which sets `@rosepine-variant` and
+  `run`s a **repo-owned renderer** (`tmux/psmux-rose-pine.ps1`, deployed by
+  chezmoi as `~/.tmux.rose-pine.ps1`) that reproduces rose-pine/tmux's rendered
+  `set -g` output so the psmux bar matches the flat, foreground-only POSIX bar.
+  We deliberately do NOT use the community `psmux-theme-rosepine` plugin (it
+  renders a different powerline bar of colored segment blocks) and cannot run the
+  official `rose-pine/tmux` on psmux (it is a bash/TPM script that shells out
+  ~30x at load and would hang ConPTY). The renderer is pure declarative `set -g`
+  (no load-time `if-shell`, no per-redraw `#(...)` shell -- it bakes in the
+  username/hostname and uses native `#{...}` formats), inlines every `#[fg=...]`
+  because psmux stores-but-ignores `window-status-*-style`, and ships all three
+  variants (`main` default, `moon`, `dawn`) selected by `@rosepine-variant`;
+  POSIX selects the same via `@rose_pine_variant`. `tmux/psmux-rose-pine.ps1`
+  MUST stay pure ASCII (PS 5.1 parse safety, guarded by `invariants_test.sh`) --
+  the Nerd Font glyphs are built from codepoints at runtime, matching the icons
+  in `tmux/tmux.posix.conf`. Keep local `tmux/themes/*.conf` snippets deleted.
+  Keep plugin managers in OS overlays only; shared `tmux.conf` must remain free
+  of load-time `if-shell`, psmux-specific commands, and quoted overlay source
+  paths, and the Windows overlay must not reintroduce `@plugin`/PPM or a
+  plugin-root `run`. Live variant switch:
+  `psmux set -g @rosepine-variant moon; psmux run '~/.tmux.rose-pine.ps1'`.
+  Current pins (POSIX plugins only): TPM
+  `e261deb1b47614eed3400089ce7197dc68acc4eb` and `rose-pine/tmux`
+  `b6138c51573425ccdc33c91464597323baec3b7e`. Guarded by
+  `tests/tmux/option_test.sh`, `tests/tmux/windows_conf_test.sh`,
+  `tests/powershell/PsmuxRosePine.Tests.ps1`, `tests/migration/parity_gate.sh`,
+  and `tests/static/pin_consistency_test.sh`.
 - **Windows Terminal opacity remains window-wide.** A transparent WT
   (`opacity < 100`) makes every cell transparent, including tmux/psmux status
   cells, regardless of the cell background color. Do not chase opacity by
