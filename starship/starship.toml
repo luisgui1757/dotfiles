@@ -1,7 +1,10 @@
 "$schema" = 'https://starship.rs/config-schema.json'
 
-# Performance: 500ms command timeout, no leading blank line.
-command_timeout = 500
+# Performance: command timeout, no leading blank line. Raised from starship's
+# 500ms default to 2000ms so git modules are not killed mid-run in large / Git
+# LFS repos -- starship killing git mid-filter-handshake surfaces to the terminal
+# as "writing filter-process initialization failed: ... pipe is being closed".
+command_timeout = 2000
 add_newline = false
 
 # Modules not listed in format do not render; explicit disables are unnecessary.
