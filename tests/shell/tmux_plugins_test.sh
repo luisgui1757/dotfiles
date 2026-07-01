@@ -20,9 +20,16 @@ out="$(install_tmux_plugins)"
 [[ "$out" == *"rose-pine/tmux.git"* ]]
 [[ "$out" == *"$ROSE_PINE_TMUX_COMMIT"* ]]
 
-# A failing pinned-plugin install must still attempt both plugins, emit a FAIL:
-# marker for setup logs, and return 0 so a non-critical theme clone hiccup does
-# not abort the rest of setup.
+grep -F "set -g @plugin 'tmux-plugins/tpm'" "$REPO_ROOT/tmux/tmux.posix.conf" >/dev/null \
+    || { echo "FAIL: tmux.posix.conf must declare tmux-plugins/tpm"; exit 1; }
+grep -F "set -g @plugin 'rose-pine/tmux'" "$REPO_ROOT/tmux/tmux.posix.conf" >/dev/null \
+    || { echo "FAIL: tmux.posix.conf must declare rose-pine/tmux"; exit 1; }
+grep -F "run-shell \"\$HOME/.local/share/dotfiles/tmux-plugins/tpm/tpm\"" "$REPO_ROOT/tmux/tmux.posix.conf" >/dev/null \
+    || { echo "FAIL: tmux.posix.conf must run TPM from the repo-managed plugin root"; exit 1; }
+
+# A failed tmux-theme plugin install is a hard provisioning failure: without it,
+# the config would silently fall back to a plain tmux status bar and recreate the
+# bug this test protects.
 (
     set +e
     attempt_log="$TMP_HOME/tmux_attempts.log"; : > "$attempt_log"
@@ -35,8 +42,8 @@ out="$(install_tmux_plugins)"
         || { echo "FAIL: install_tmux_plugins must attempt BOTH plugins when the first fails"; exit 1; }
     [[ "$fc_out" == *"FAIL:"* ]] \
         || { echo "FAIL: install_tmux_plugins must emit a FAIL: marker on plugin failure"; exit 1; }
-    [[ "$fc_rc" -eq 0 ]] \
-        || { echo "FAIL: install_tmux_plugins must return 0 (continue) on a non-critical plugin failure"; exit 1; }
+    [[ "$fc_rc" -ne 0 ]] \
+        || { echo "FAIL: install_tmux_plugins must fail closed when the theme plugins are absent"; exit 1; }
 )
 
 echo "OK"

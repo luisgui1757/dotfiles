@@ -1414,24 +1414,26 @@ host OS or shell would otherwise hide a branch from CI.
   cells and make the prompt look patched onto the transparent surface. Guarded
   by `tests/starship/render_test.sh`.
 - **tmux / psmux Rose Pine themes are upstream plugins, pinned by setup.**
-  Shared `tmux/tmux.conf` is a psmux-safe fallback and sets `status-position top`.
-  POSIX loads `tmux/tmux.posix.conf` at the bottom, after fallback status config,
-  so TPM can load `rose-pine/tmux` as the final status owner. Windows loads
-  `tmux/tmux.windows.conf` at the bottom; it declares PPM + `psmux-theme-rosepine`,
-  runs the richer theme `.ps1` entrypoint, then reasserts `status-position top`
-  because upstream psmux Rose Pine defaults to bottom. The only supported flavor
-  selector is the upstream variant option: `@rose_pine_variant` on POSIX and
+  Shared `tmux/tmux.conf` is psmux-safe and owns only cross-platform placement
+  (`status-position top`). POSIX loads `tmux/tmux.posix.conf`, which declares TPM
+  + `rose-pine/tmux` from the repo-managed plugin root
+  `~/.local/share/dotfiles/tmux-plugins`. Windows loads
+  `tmux/tmux.windows.conf`, which declares PPM + `psmux-theme-rosepine`, runs the
+  theme `.ps1` entrypoint, then reasserts `status-position top` because upstream
+  psmux Rose Pine defaults to bottom. The only supported flavor selector is the
+  upstream variant option: `@rose_pine_variant` on POSIX and
   `@rosepine-variant` on Windows, defaulting to `main` with `moon` / `dawn`
-  available. Keep local `tmux/themes/*.conf` snippets deleted. The bar is
-  clock-free because Starship is the single time surface. Upstream
-  psmux-theme-rosepine has no clock toggle, so `install-deps.ps1` applies a
-  deterministic recorded patch to the pinned copied plugin, preserving the
-  plugin checkout's newline style and failing loudly if upstream anchors drift.
-  The Windows overlay sets `@rosepine-show-date-time 'off'`; do not blank
-  `status-right` after the theme, because that leaves a broken right-edge
-  segment. Keep plugin managers in OS overlays only; shared `tmux.conf` must
-  remain free of load-time `if-shell`, psmux-specific plugin commands, and
-  quoted overlay source paths.
+  available. Keep local `tmux/themes/*.conf` snippets deleted. Keep the full
+  official status surface visible while debugging: POSIX enables user, short
+  host, date/time, directory, and current-program window names; Windows enables
+  powerline, icons, user, zoom, sync, pane count, and date/time, then appends the
+  current directory after the psmux theme because upstream has no directory
+  module. Do not patch the pinned upstream psmux plugin and do not blank
+  `status-right` after the theme. Old `.dotfiles-pin.json` files with a
+  `patches` property are intentionally rejected so setup replaces previously
+  patched plugin copies with clean upstream copies. Keep plugin managers in OS overlays only;
+  shared `tmux.conf` must remain free of load-time `if-shell`, psmux-specific
+  plugin commands, and quoted overlay source paths.
   Current pins: TPM
   `e261deb1b47614eed3400089ce7197dc68acc4eb`, `rose-pine/tmux`
   `b6138c51573425ccdc33c91464597323baec3b7e`, and `psmux/psmux-plugins`

@@ -27,7 +27,6 @@ $WindowsTerminalVersion = 'v1.24.11321.0'
 $WindowsTerminalX64Sha256 = '7caef554147e5498ed1becdca73cdedb79fbc81f89032e46ae9b095c53433812'
 $PsmuxPluginsCommit = '0f46ccca5a9b748fd03851db00b85fd784f42791'
 $PsmuxPluginsRepo = 'https://github.com/psmux/psmux-plugins.git'
-$PsmuxThemePatchId = 'dotfiles-psmux-rosepine-hide-date-time-v1'
 $VsBuildToolsBootstrapperUrl = 'https://aka.ms/vs/17/release/vs_BuildTools.exe'
 $PylatexencBuildBackendVersion = '80.9.0'
 $PylatexencBuildBackendSha256 = '062d34222ad13e0cc312a4c02d73f059e86a4acbfbdea8f8f76b28c99f306922'
@@ -2445,24 +2444,15 @@ function Test-PsmuxPluginPin {
     if (-not (Test-Path -LiteralPath $pinPath -PathType Leaf)) { return $false }
     try {
         $pin = Get-Content -LiteralPath $pinPath -Raw | ConvertFrom-Json
-        $expectedPatches = @(Get-PsmuxPluginPatchIds -Subdir $Subdir)
-        $actualPatches = @()
-        if ($null -ne $pin.patches) { $actualPatches = @($pin.patches) }
+        if ($null -ne $pin.PSObject.Properties['patches']) { return $false }
         return (
             [string]$pin.repository -eq $PsmuxPluginsRepo -and
             [string]$pin.commit -eq $PsmuxPluginsCommit -and
-            [string]$pin.subdir -eq $Subdir -and
-            (($expectedPatches -join "`n") -eq ($actualPatches -join "`n"))
+            [string]$pin.subdir -eq $Subdir
         )
     } catch {
         return $false
     }
-}
-
-function Get-PsmuxPluginPatchIds {
-    param([Parameter(Mandatory)][string]$Subdir)
-    if ($Subdir -eq 'psmux-theme-rosepine') { return @($PsmuxThemePatchId) }
-    return @()
 }
 
 function Write-PsmuxPluginPin {
@@ -2474,68 +2464,10 @@ function Write-PsmuxPluginPin {
         repository = $PsmuxPluginsRepo
         commit = $PsmuxPluginsCommit
         subdir = $Subdir
-        patches = @(Get-PsmuxPluginPatchIds -Subdir $Subdir)
         managedBy = 'dotfiles/install-deps.ps1'
     } | ConvertTo-Json
     $utf8 = New-Object System.Text.UTF8Encoding($false)
     [System.IO.File]::WriteAllText((Join-Path $Target '.dotfiles-pin.json'), $pin + [Environment]::NewLine, $utf8)
-}
-
-function Patch-PsmuxThemeRosepine {
-    param([Parameter(Mandatory)][string]$Target)
-    $themePath = Join-Path $Target 'psmux-theme-rosepine.ps1'
-    if (-not (Test-Path -LiteralPath $themePath -PathType Leaf)) {
-        throw "psmux Rose Pine theme patch target is missing $themePath"
-    }
-
-    $text = [System.IO.File]::ReadAllText($themePath)
-    $fileNewline = if ($text.Contains("`r`n")) { "`r`n" } else { "`n" }
-    $useFileNewline = {
-        param([Parameter(Mandatory)][string]$Value)
-        return ((($Value -replace "`r`n", "`n") -replace "`r", "`n") -replace "`n", $fileNewline)
-    }
-    if ($text.Contains("@rosepine-show-date-time")) {
-        if ($text.Contains("Dotfiles defaults")) { return }
-        throw "psmux Rose Pine theme patch failed: unexpected date-time option already present"
-    }
-
-    $optionNeedle = & $useFileNewline @'
-$showPanes     = Get-Opt '@rosepine-show-pane-count' 'on'
-$leftIcon      = Get-Opt '@rosepine-left-icon' ''
-'@
-    $optionReplacement = & $useFileNewline @'
-$showPanes     = Get-Opt '@rosepine-show-pane-count' 'on'
-$showDateTime  = Get-Opt '@rosepine-show-date-time' 'on'
-$leftIcon      = Get-Opt '@rosepine-left-icon' ''
-'@
-    if (-not $text.Contains($optionNeedle)) {
-        throw "psmux Rose Pine theme patch failed: option anchor changed"
-    }
-    $text = $text.Replace($optionNeedle, $optionReplacement)
-
-    $rightNeedle = & $useFileNewline @'
-# Status-right: prefix + sync + clock + date
-$pfx = "#{?client_prefix,#[fg=$($p.love)]#[bg=$($p.base)]${sRL}#[bg=$($p.love)]#[fg=$($p.base),bold] ${iPfx}PREF #[fg=$($p.love)]#[bg=$($p.base)]${sLR},}"
-$right = "${pfx}${syncInd}#[fg=$($p.overlay),bg=$($p.base)]${sRL}#[fg=$($p.foam),bg=$($p.overlay)] ${iClock}%H:%M #[fg=$($p.muted),bg=$($p.overlay)]${sRL}#[fg=$($p.rose),bg=$($p.muted)] ${iCal}%a #[fg=$($p.iris),bg=$($p.muted)]${sRL}#[fg=$($p.base),bg=$($p.iris),bold] ${iCal}%d-%b "
-& $PSMUX set -g status-right $right 2>&1 | Out-Null
-& $PSMUX set -g status-right-length 80 2>&1 | Out-Null
-'@
-    $rightReplacement = & $useFileNewline @'
-# Status-right: prefix/sync plus optional clock/date. Dotfiles defaults
-# @rosepine-show-date-time to off so Starship remains the single clock surface.
-$pfx = "#{?client_prefix,#[fg=$($p.love)]#[bg=$($p.base)]${sRL}#[bg=$($p.love)]#[fg=$($p.base),bold] ${iPfx}PREF #[fg=$($p.love)]#[bg=$($p.base)]${sLR},}"
-$dateTime = if ($showDateTime -eq 'on') { "#[fg=$($p.overlay),bg=$($p.base)]${sRL}#[fg=$($p.foam),bg=$($p.overlay)] ${iClock}%H:%M #[fg=$($p.muted),bg=$($p.overlay)]${sRL}#[fg=$($p.rose),bg=$($p.muted)] ${iCal}%a #[fg=$($p.iris),bg=$($p.muted)]${sRL}#[fg=$($p.base),bg=$($p.iris),bold] ${iCal}%d-%b " } else { "#[fg=$($p.base),bg=$($p.base)] " }
-$right = "${pfx}${syncInd}${dateTime}"
-& $PSMUX set -g status-right $right 2>&1 | Out-Null
-& $PSMUX set -g status-right-length 80 2>&1 | Out-Null
-'@
-    if (-not $text.Contains($rightNeedle)) {
-        throw "psmux Rose Pine theme patch failed: status-right anchor changed"
-    }
-    $text = $text.Replace($rightNeedle, $rightReplacement)
-
-    $utf8 = New-Object System.Text.UTF8Encoding($false)
-    [System.IO.File]::WriteAllText($themePath, $text, $utf8)
 }
 
 function Install-PsmuxPluginFromClone {
@@ -2565,9 +2497,6 @@ function Install-PsmuxPluginFromClone {
     New-Item -ItemType Directory -Force -Path $target | Out-Null
     Get-ChildItem -LiteralPath $source -Force | ForEach-Object {
         Copy-Item -LiteralPath $_.FullName -Destination $target -Recurse -Force
-    }
-    if ($Subdir -eq 'psmux-theme-rosepine') {
-        Patch-PsmuxThemeRosepine -Target $target
     }
     Write-PsmuxPluginPin -Target $target -Subdir $Subdir
     if (-not (Test-PsmuxPluginPin -Name $Name -Subdir $Subdir -RequiredFile $RequiredFile)) {

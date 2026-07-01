@@ -46,15 +46,29 @@ require_line "^set[[:space:]]+-g[[:space:]]+@plugin[[:space:]]+'psmux-plugins/pp
 require_line "^set[[:space:]]+-g[[:space:]]+@plugin[[:space:]]+'psmux-plugins/psmux-theme-rosepine'$" \
     'tmux.windows.conf must declare psmux-theme-rosepine'
 require_line "^set[[:space:]]+-g[[:space:]]+@rosepine-variant[[:space:]]+'main'$" \
-    'tmux.windows.conf must default to the upstream Rose Pine main variant'
-require_line "^set[[:space:]]+-g[[:space:]]+@rosepine-show-date-time[[:space:]]+'off'$" \
-    'tmux.windows.conf must disable psmux Rose Pine clock/date through the patched theme option'
+    'tmux.windows.conf must use Rose Pine main by default'
+require_line "^set[[:space:]]+-g[[:space:]]+@rosepine-show-powerline[[:space:]]+'on'$" \
+    'tmux.windows.conf must enable psmux powerline segments'
+require_line "^set[[:space:]]+-g[[:space:]]+@rosepine-show-icons[[:space:]]+'on'$" \
+    'tmux.windows.conf must enable psmux Nerd Font icons'
+require_line "^set[[:space:]]+-g[[:space:]]+@rosepine-show-user[[:space:]]+'on'$" \
+    'tmux.windows.conf must enable psmux user segment while debugging the full bar'
+require_line "^set[[:space:]]+-g[[:space:]]+@rosepine-show-zoom[[:space:]]+'on'$" \
+    'tmux.windows.conf must enable psmux zoom indicator'
+require_line "^set[[:space:]]+-g[[:space:]]+@rosepine-show-sync[[:space:]]+'on'$" \
+    'tmux.windows.conf must enable psmux sync indicator'
+require_line "^set[[:space:]]+-g[[:space:]]+@rosepine-show-pane-count[[:space:]]+'on'$" \
+    'tmux.windows.conf must enable psmux pane-count indicator'
 require_line "^run[[:space:]]+'~/.psmux/plugins/ppm/ppm.ps1'$" \
     'tmux.windows.conf must load PPM from the repo-managed plugin root'
 require_line "^run[[:space:]]+'~/.psmux/plugins/psmux-theme-rosepine/psmux-theme-rosepine.ps1'$" \
     'tmux.windows.conf must load the psmux Rose Pine theme entrypoint'
+require_line '^set[[:space:]]+-ag[[:space:]]+status-right.*pane_current_path' \
+    'tmux.windows.conf must keep a right-side current-directory segment after loading the psmux theme'
 reject_line '^bind-key[[:space:]]+-T[[:space:]]+root[[:space:]]+Escape[[:space:]]+send-keys[[:space:]]+esc$' \
     'tmux.windows.conf must not carry the failed psmux Escape pass-through workaround'
+reject_line "^set[[:space:]]+-g[[:space:]]+@rosepine-show-date-time[[:space:]]+'off'$" \
+    'tmux.windows.conf must not disable the upstream date/time segment while the full psmux bar is being debugged'
 
 theme_run_line="$(grep -n "^run '~/.psmux/plugins/psmux-theme-rosepine/psmux-theme-rosepine.ps1'$" "$WIN_CONF" | tail -1 | cut -d: -f1)"
 top_line="$(awk '/^set -g status-position top$/ { n = NR } END { print n + 0 }' "$WIN_CONF")"
@@ -63,7 +77,7 @@ if [[ -z "$theme_run_line" || "$top_line" -le "$theme_run_line" ]]; then
     exit 1
 fi
 if grep -Eq '^set[[:space:]]+-g[[:space:]]+status-right[[:space:]]+""$' "$WIN_CONF"; then
-    echo "FAIL: tmux.windows.conf must not blank status-right after the theme; use @rosepine-show-date-time"
+    echo "FAIL: tmux.windows.conf must not blank status-right after the theme; keep the upstream bar plus directory append"
     exit 1
 fi
 

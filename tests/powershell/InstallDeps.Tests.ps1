@@ -388,11 +388,11 @@ Describe "install-deps.ps1" {
         }
     }
 
-    It "rejects old psmux Rose Pine pin metadata without the dotfiles patch" {
+    It "accepts upstream psmux Rose Pine pin metadata without local patch markers" {
         . $script:ImportInstallDepsForTest
 
         $oldUserProfile = $env:USERPROFILE
-        $tempProfile = Join-Path ([IO.Path]::GetTempPath()) "dotfiles-psmux-old-pin-$([guid]::NewGuid())"
+        $tempProfile = Join-Path ([IO.Path]::GetTempPath()) "dotfiles-psmux-upstream-pin-$([guid]::NewGuid())"
         $env:USERPROFILE = $tempProfile
         try {
             $target = Get-PsmuxPluginTarget -Name 'psmux-theme-rosepine'
@@ -407,6 +407,33 @@ Describe "install-deps.ps1" {
                 Set-Content -LiteralPath (Join-Path $target '.dotfiles-pin.json') -Encoding utf8
 
             Test-PsmuxPluginPin -Name 'psmux-theme-rosepine' -Subdir 'psmux-theme-rosepine' -RequiredFile 'psmux-theme-rosepine.ps1' |
+                Should -BeTrue
+        } finally {
+            $env:USERPROFILE = $oldUserProfile
+            Remove-Item -LiteralPath $tempProfile -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    It "rejects stale psmux plugin pin metadata that records local patch state" {
+        . $script:ImportInstallDepsForTest
+
+        $oldUserProfile = $env:USERPROFILE
+        $tempProfile = Join-Path ([IO.Path]::GetTempPath()) "dotfiles-psmux-stale-patch-pin-$([guid]::NewGuid())"
+        $env:USERPROFILE = $tempProfile
+        try {
+            $target = Get-PsmuxPluginTarget -Name 'psmux-theme-rosepine'
+            New-Item -ItemType Directory -Force -Path $target | Out-Null
+            Set-Content -LiteralPath (Join-Path $target 'psmux-theme-rosepine.ps1') -Value '# test' -Encoding utf8
+            [ordered]@{
+                repository = $PsmuxPluginsRepo
+                commit = $PsmuxPluginsCommit
+                subdir = 'psmux-theme-rosepine'
+                patches = @('dotfiles-psmux-rosepine-hide-date-time-v1')
+                managedBy = 'dotfiles/install-deps.ps1'
+            } | ConvertTo-Json |
+                Set-Content -LiteralPath (Join-Path $target '.dotfiles-pin.json') -Encoding utf8
+
+            Test-PsmuxPluginPin -Name 'psmux-theme-rosepine' -Subdir 'psmux-theme-rosepine' -RequiredFile 'psmux-theme-rosepine.ps1' |
                 Should -BeFalse
         } finally {
             $env:USERPROFILE = $oldUserProfile
@@ -414,65 +441,31 @@ Describe "install-deps.ps1" {
         }
     }
 
-    It "patches psmux Rose Pine theme to support disabling date and time" {
+    It "copies the pinned psmux Rose Pine plugin without mutating the upstream entrypoint" {
         . $script:ImportInstallDepsForTest
 
-        $target = Join-Path ([IO.Path]::GetTempPath()) "dotfiles-psmux-theme-patch-$([guid]::NewGuid())"
-        New-Item -ItemType Directory -Force -Path $target | Out-Null
+        $oldUserProfile = $env:USERPROFILE
+        $tempProfile = Join-Path ([IO.Path]::GetTempPath()) "dotfiles-psmux-copy-profile-$([guid]::NewGuid())"
+        $checkout = Join-Path ([IO.Path]::GetTempPath()) "dotfiles-psmux-copy-checkout-$([guid]::NewGuid())"
+        $env:USERPROFILE = $tempProfile
+        New-Item -ItemType Directory -Force -Path (Join-Path $checkout 'psmux-theme-rosepine') | Out-Null
         try {
-            $themePath = Join-Path $target 'psmux-theme-rosepine.ps1'
-            $lfFixture = @'
-$showPanes     = Get-Opt '@rosepine-show-pane-count' 'on'
-$leftIcon      = Get-Opt '@rosepine-left-icon' ''
-
-# Status-right: prefix + sync + clock + date
-$pfx = "#{?client_prefix,#[fg=$($p.love)]#[bg=$($p.base)]${sRL}#[bg=$($p.love)]#[fg=$($p.base),bold] ${iPfx}PREF #[fg=$($p.love)]#[bg=$($p.base)]${sLR},}"
-$right = "${pfx}${syncInd}#[fg=$($p.overlay),bg=$($p.base)]${sRL}#[fg=$($p.foam),bg=$($p.overlay)] ${iClock}%H:%M #[fg=$($p.muted),bg=$($p.overlay)]${sRL}#[fg=$($p.rose),bg=$($p.muted)] ${iCal}%a #[fg=$($p.iris),bg=$($p.muted)]${sRL}#[fg=$($p.base),bg=$($p.iris),bold] ${iCal}%d-%b "
-& $PSMUX set -g status-right $right 2>&1 | Out-Null
-& $PSMUX set -g status-right-length 80 2>&1 | Out-Null
-'@
+            $themePath = Join-Path (Join-Path $checkout 'psmux-theme-rosepine') 'psmux-theme-rosepine.ps1'
+            $fixture = "upstream theme`r`n@rosepine-show-date-time is not a dotfiles-owned option`r`n"
             $utf8 = New-Object System.Text.UTF8Encoding($false)
-            [IO.File]::WriteAllText($themePath, (($lfFixture -replace "`r`n", "`n") -replace "`r", "`n"), $utf8)
+            [IO.File]::WriteAllText($themePath, $fixture, $utf8)
 
-            Patch-PsmuxThemeRosepine -Target $target
-            $patched = Get-Content -LiteralPath $themePath -Raw
+            Install-PsmuxPluginFromClone -Name 'psmux-theme-rosepine' -Subdir 'psmux-theme-rosepine' -RequiredFile 'psmux-theme-rosepine.ps1' -CloneRoot $checkout
 
-            $patched | Should -Match "@rosepine-show-date-time"
-            $patched | Should -Match "single clock surface"
-            $patched | Should -Match ([regex]::Escape('$dateTime = if ($showDateTime -eq ''on'')'))
-            $patched | Should -Match ([regex]::Escape('} else { "#[fg=$($p.base),bg=$($p.base)] " }'))
+            $target = Get-PsmuxPluginTarget -Name 'psmux-theme-rosepine'
+            [IO.File]::ReadAllText((Join-Path $target 'psmux-theme-rosepine.ps1')) | Should -Be $fixture
+            $pin = Get-Content -LiteralPath (Join-Path $target '.dotfiles-pin.json') -Raw
+            $pin | Should -Match ([regex]::Escape($PsmuxPluginsCommit))
+            $pin | Should -Not -Match '"patches"'
         } finally {
-            Remove-Item -LiteralPath $target -Recurse -Force -ErrorAction SilentlyContinue
-        }
-    }
-
-    It "patches CRLF psmux Rose Pine theme checkouts without changing newline style" {
-        . $script:ImportInstallDepsForTest
-
-        $target = Join-Path ([IO.Path]::GetTempPath()) "dotfiles-psmux-theme-patch-crlf-$([guid]::NewGuid())"
-        New-Item -ItemType Directory -Force -Path $target | Out-Null
-        try {
-            $themePath = Join-Path $target 'psmux-theme-rosepine.ps1'
-            $lfFixture = @'
-$showPanes     = Get-Opt '@rosepine-show-pane-count' 'on'
-$leftIcon      = Get-Opt '@rosepine-left-icon' ''
-
-# Status-right: prefix + sync + clock + date
-$pfx = "#{?client_prefix,#[fg=$($p.love)]#[bg=$($p.base)]${sRL}#[bg=$($p.love)]#[fg=$($p.base),bold] ${iPfx}PREF #[fg=$($p.love)]#[bg=$($p.base)]${sLR},}"
-$right = "${pfx}${syncInd}#[fg=$($p.overlay),bg=$($p.base)]${sRL}#[fg=$($p.foam),bg=$($p.overlay)] ${iClock}%H:%M #[fg=$($p.muted),bg=$($p.overlay)]${sRL}#[fg=$($p.rose),bg=$($p.muted)] ${iCal}%a #[fg=$($p.iris),bg=$($p.muted)]${sRL}#[fg=$($p.base),bg=$($p.iris),bold] ${iCal}%d-%b "
-& $PSMUX set -g status-right $right 2>&1 | Out-Null
-& $PSMUX set -g status-right-length 80 2>&1 | Out-Null
-'@
-            [IO.File]::WriteAllText($themePath, (($lfFixture -replace "`r`n", "`n") -replace "`n", "`r`n"))
-
-            Patch-PsmuxThemeRosepine -Target $target
-            $patched = [IO.File]::ReadAllText($themePath)
-
-            $patched | Should -Match "@rosepine-show-date-time"
-            $patched | Should -Match "`r`n"
-            $patched | Should -Not -Match "(?<!`r)`n"
-        } finally {
-            Remove-Item -LiteralPath $target -Recurse -Force -ErrorAction SilentlyContinue
+            $env:USERPROFILE = $oldUserProfile
+            Remove-Item -LiteralPath $tempProfile -Recurse -Force -ErrorAction SilentlyContinue
+            Remove-Item -LiteralPath $checkout -Recurse -Force -ErrorAction SilentlyContinue
         }
     }
 

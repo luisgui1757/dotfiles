@@ -1932,7 +1932,8 @@ install_tmux_plugin_repo() {
 
 install_tmux_plugins() {
     # POSIX tmux loads TPM + rose-pine/tmux from tmux.posix.conf. The shared
-    # tmux.conf keeps a psmux-safe fallback status bar for missing plugins.
+    # tmux.conf keeps only cross-platform placement; missing plugins are a real
+    # provisioning failure because no local fallback owns the rich status bar.
     local root tpm_dir rosepine_dir rc=0
     root="$(tmux_plugin_root)"
     tpm_dir="$root/tpm"
@@ -1963,7 +1964,7 @@ install_tmux_plugins() {
     if [[ "$rc" -ne 0 ]]; then
         printf "  FAIL: %-26s one or more pinned tmux plugins failed to install\n" "tmux plugins" >&2
     fi
-    return 0
+    return "$rc"
 }
 
 install_ghostty_macos() {

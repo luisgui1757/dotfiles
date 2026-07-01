@@ -40,10 +40,12 @@ repeatable instead of tribal.
   required-check list duplication, and the Windows Sandbox bootstrap trust root.
 - The combined terminal/update PR removed local tmux theme snippets, kept the
   upstream Rose Pine plugin variants as the only theme surface (`main` by
-  default, `moon` / `dawn` available), made the tmux/psmux bar clock-free so
-  Starship remains the single time display, and hardened psmux by using
-  unquoted overlay source paths plus a recorded patch to the pinned
-  psmux-theme-rosepine copy instead of blanking `status-right`.
+  default, `moon` / `dawn` available), moved status rendering to pinned upstream
+  TPM/PPM theme plugins, and kept the rich official segments visible while the
+  tmux/psmux surface is being debugged. Tests cover plugin provisioning,
+  unquoted overlay source paths, POSIX rich-module options, psmux post-theme top
+  placement, and the psmux current-directory append without mutating the pinned
+  upstream plugin copy.
 
 ## P0 - Total Update Ownership Model
 

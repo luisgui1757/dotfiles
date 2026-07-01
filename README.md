@@ -271,10 +271,11 @@ and whether `pwsh` is installed.
   `%USERPROFILE%\.psmux\plugins`. The committed variant is upstream Rose Pine
   `main`; switch to `moon` or `dawn` by changing `@rose_pine_variant` in
   `tmux/tmux.posix.conf` and `@rosepine-variant` in `tmux/tmux.windows.conf`.
-  The tmux/psmux bar intentionally has no date/time segment because Starship is
-  the single clock surface; Windows setup applies a recorded deterministic patch
-  to the pinned psmux Rose Pine plugin so `@rosepine-show-date-time 'off'`
-  removes the clock/date inside the theme instead of blanking `status-right`.
+  Both bars intentionally keep the official plugin segments visible, including
+  date/time, while the rich status surface is being debugged. The Windows overlay
+  adds only the current-directory segment after `psmux-theme-rosepine` loads,
+  because that upstream theme has no directory module. Re-running setup replaces
+  older dotfiles-patched psmux theme copies that recorded local patch metadata.
 - `install-deps` provisions `lsd` through the supported package managers
   (Homebrew, native Linux package managers where available, and the Windows
   Scoop-first catalog). Interactive shells replace `ls` with `lsd` and add the
@@ -677,10 +678,11 @@ stale; CI then fails verification until a human reviews the adjacent constant.
 - **tmux themes follow the native plugin manager per runtime.** POSIX tmux uses
   TPM and Windows psmux uses PPM; both load pinned upstream Rose Pine plugins
   installed by setup. The repo default is upstream `main`, with `moon` / `dawn`
-  available through the official plugin variant options. The bar is top-aligned
-  and clock-free on both runtimes; Starship owns time display. The shared
-  `tmux.conf` sources overlays with unquoted `~/.tmux.*.conf` paths so psmux
-  loads the Windows overlay reliably.
+  available through the official plugin variant options. The bars are
+  top-aligned and keep the official rich segments visible; Windows appends a
+  current-directory segment after the psmux theme because upstream does not
+  expose one. The shared `tmux.conf` sources overlays with unquoted
+  `~/.tmux.*.conf` paths so psmux loads the Windows overlay reliably.
 - **WSL is split-host by default.** Windows Terminal renders fonts and window UI
   on the Windows side; WSL installs the Linux CLI/editor stack. Linux Ghostty
   and Linux fontconfig fonts in WSL require `--experimental-wsl-gui`.
@@ -807,7 +809,7 @@ MIT. See `LICENSE`.
 | `chsh` fails with `user '<name>' does not exist in /etc/passwd` | you log in via a **domain** account (AD/LDAP/SSSD) that isn't in local `/etc/passwd`, so `chsh` can't touch it | re-run `./setup.sh` — it detects this and offers to re-exec interactive bash into zsh via `~/.bashrc` instead. The "proper" fix is admin-side: set the directory `loginShell` / SSSD `default_shell` |
 | Move commits in lazygit, including inside psmux | Ctrl+J collides with Enter on the wire, and psmux v3.3.4 does not relay Windows Terminal's Win32-input-mode modifier data into panes | use uppercase `J` / `K`. `%LOCALAPPDATA%\lazygit\config.yml` binds commits-panel moveDownCommit / moveUpCommit to printable J/K, so no psmux root bind is needed. In the commits panel, use PgUp/PgDn or Ctrl-U/Ctrl-D to scroll the diff |
 | Windows Terminal opens Windows PowerShell 5.1 instead of PowerShell 7 | settings predate the managed WT default-profile merge, or the merge was skipped | re-run `.\setup.ps1 -SkipDeps -SkipNvim`; it adds the fixed `PowerShell 7` profile and promotes only an unset or legacy Windows PowerShell default, preserving a custom default |
-| tmux / psmux does not show the Rose Pine plugin status bar | pinned theme plugins are missing or stale | re-run setup. POSIX installs TPM + `rose-pine/tmux` under `~/.local/share/dotfiles/tmux-plugins`; Windows installs PPM + `psmux-theme-rosepine` under `%USERPROFILE%\.psmux\plugins`. Change only the official `main` / `moon` / `dawn` variant option if you want a different Rose Pine flavor |
+| tmux / psmux does not show the Rose Pine plugin status bar | pinned theme plugins are missing, stale, or loaded in an already-running server | re-run setup, then restart all tmux/psmux sessions so TPM/PPM reload from the pinned plugin roots. POSIX installs TPM + `rose-pine/tmux` under `~/.local/share/dotfiles/tmux-plugins`; Windows installs PPM + `psmux-theme-rosepine` under `%USERPROFILE%\.psmux\plugins`. Change only the official `main` / `moon` / `dawn` variant option if you want a different Rose Pine flavor |
 | Want a fully solid (opaque) tmux/psmux status bar on Windows | Windows Terminal applies `opacity` window-wide to every cell, so a transparent WT (`opacity < 100`) has a transparent bar regardless of the bar's bg color — a distinct bg does NOT make it opaque in WT | the repo defaults to `opacity: 95` (see-through terminal). For a solid bar set WT `opacity: 100` in the fragment / `settings.json` (whole window opaque). macOS/Linux Ghostty get an opaque-looking bar from `background-opacity 0.95` + blur |
 | PowerShell Tab completion — the selected option is **gold** | PSReadLine `Selection` colors the highlighted MenuComplete option | it is a gold foreground. Note: PSReadLine uses that same `Selection` color for the completion suffix it inserts into the command line while you navigate, so that suffix also shows gold until you accept — it is one setting, not separable |
 | A `wt --version` window popped up during `setup.ps1 -All` | the dependency version table ran `<tool> --version`, and `wt --version` opens a Windows Terminal window instead of printing | fixed — `Get-CommandVersionString` never runs `wt --version`; it reads the file version (or shows `installed`) |

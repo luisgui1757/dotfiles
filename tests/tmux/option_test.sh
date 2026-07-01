@@ -56,47 +56,37 @@ check mouse on
 check escape-time 10
 check history-limit 50000
 check status-position top
-# Status-style is the Rose Pine fallback only; POSIX tmux and Windows psmux load
-# pinned upstream Rose Pine theme plugins when setup has installed them. The bar
-# stays clock-free because Starship is the single time surface. Bar opacity is a
-# Windows Terminal concern (WT `opacity` is window-wide), not a tmux color, so it
-# is not asserted here -- the repo ships `opacity: 95` (transparent); set 100 for
-# a solid bar.
-check status-style "fg=#31748f,bg=#191724"
-check status-right ""
-check window-status-style "fg=#c4a7e7,bg=#191724"
-check window-status-current-style "fg=#f6c177,bold"
-# psmux v3.3.4 stores window-status-current-style but does NOT apply it when
-# rendering window cells -- only inline `#[fg=...]` in the format survives.
-# Real tmux applies either; the inline form works on both, so we pin it.
-check window-status-current-format "#[fg=#f6c177,bold] #I:#W#F #[default]"
 
-for required in \
-    "set-environment -g TMUX_PLUGIN_MANAGER_PATH \"~/.local/share/dotfiles/tmux-plugins\"" \
-    "set -g @plugin 'tmux-plugins/tpm'" \
-    "set -g @plugin 'rose-pine/tmux'" \
-    "set -g @rose_pine_variant 'main'" \
-    "set -g @rose_pine_bar_bg_disable 'on'" \
-    "set -g @rose_pine_date_time ''" \
-    "if-shell 'test -x \"\$HOME/.local/share/dotfiles/tmux-plugins/tpm/tpm\"'"; do
-    if ! grep -F "$required" "$REPO_ROOT/tmux/tmux.posix.conf" >/dev/null; then
-        echo "FAIL: tmux.posix.conf missing required plugin line: $required"
-        exit 1
-    fi
-done
+if grep -Eq 'source-file -q "~/' "$REPO_ROOT/tmux/tmux.conf"; then
+    echo "FAIL: tmux.conf must not quote ~/.tmux.* overlay paths; psmux does not reliably expand quoted tilde paths"
+    exit 1
+fi
 
 for required in \
     "set -g @plugin 'psmux-plugins/ppm'" \
     "set -g @plugin 'psmux-plugins/psmux-theme-rosepine'" \
     "set -g @rosepine-variant 'main'" \
-    "set -g @rosepine-show-date-time 'off'" \
-    "set -g status-position top" \
-    "run '~/.psmux/plugins/psmux-theme-rosepine/psmux-theme-rosepine.ps1'"; do
+    "set -g @rosepine-show-powerline 'on'" \
+    "set -g @rosepine-show-icons 'on'" \
+    "set -g @rosepine-show-zoom 'on'" \
+    "set -g @rosepine-show-sync 'on'" \
+    "set -g @rosepine-show-pane-count 'on'" \
+    "set -g status-right-length 140" \
+    "run '~/.psmux/plugins/psmux-theme-rosepine/psmux-theme-rosepine.ps1'" \
+    "set -g status-position top"; do
     if ! grep -F "$required" "$REPO_ROOT/tmux/tmux.windows.conf" >/dev/null; then
         echo "FAIL: tmux.windows.conf missing required plugin line: $required"
         exit 1
     fi
 done
+if grep -F "@rosepine-show-date-time 'off'" "$REPO_ROOT/tmux/tmux.windows.conf" >/dev/null; then
+    echo "FAIL: tmux.windows.conf must use the upstream psmux Rose Pine date/time segment while the full bar is being debugged"
+    exit 1
+fi
+if ! grep -Eq '^set[[:space:]]+-ag[[:space:]]+status-right.*pane_current_path' "$REPO_ROOT/tmux/tmux.windows.conf"; then
+    echo "FAIL: tmux.windows.conf must append a current-directory segment after the psmux theme"
+    exit 1
+fi
 
 # Prefix isn't shown by show-options; verify via list-keys instead.
 if ! tmux -L "$sock_name" list-keys -T prefix >/dev/null 2>&1; then
@@ -156,6 +146,29 @@ echo "  copy-mode-vi y baseline bound (bare OSC52, no shell probe)"
 # On macOS that is pbcopy; assert it there (Linux CI has no single guaranteed
 # CLI installed). This proves the extracted if-shell probes still work on POSIX.
 tmux -L "$sock_name" source-file "$REPO_ROOT/tmux/tmux.posix.conf"
+check @plugin "rose-pine/tmux"
+for required in \
+    "set-environment -g TMUX_PLUGIN_MANAGER_PATH \"~/.local/share/dotfiles/tmux-plugins\"" \
+    "set -g @plugin 'tmux-plugins/tpm'" \
+    "set -g @plugin 'rose-pine/tmux'" \
+    "run-shell \"\$HOME/.local/share/dotfiles/tmux-plugins/tpm/tpm\""; do
+    if ! grep -F "$required" "$REPO_ROOT/tmux/tmux.posix.conf" >/dev/null; then
+        echo "FAIL: tmux.posix.conf missing required plugin line: $required"
+        exit 1
+    fi
+done
+check @rose_pine_variant main
+check @rose_pine_user on
+check @rose_pine_host on
+check @rose_pine_hostname_short on
+check @rose_pine_date_time "%a %d %b %H:%M"
+check @rose_pine_directory on
+check @rose_pine_show_current_program on
+if [[ "$(show "@rose_pine_show_pane_directory")" == "on" ]]; then
+    echo "FAIL: tmux.posix.conf must not enable the mutually-exclusive pane-directory window-name mode"
+    exit 1
+fi
+echo "  rose-pine/tmux rich modules configured"
 if [[ "$(uname -s)" == "Darwin" ]]; then
     overlay_keys="$(tmux -L "$sock_name" list-keys -T copy-mode-vi)"
     if ! printf '%s\n' "$overlay_keys" | grep -Eq 'copy-mode-vi[[:space:]]+y[[:space:]]+send.*copy-pipe-and-cancel.*pbcopy'; then

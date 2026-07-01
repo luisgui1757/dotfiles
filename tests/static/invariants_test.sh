@@ -73,12 +73,14 @@ else
     echo "ok  : no local tmux theme snippets"
 fi
 
-if grep -rnE '(%H:%M|%I:%M|%a %d %b|%Y-%m-%d)' tmux home/dot_tmux* >/dev/null 2>&1; then
-    echo "FAIL: tmux/psmux bar must stay clock-free; Starship owns time display"
-    grep -rnE '(%H:%M|%I:%M|%a %d %b|%Y-%m-%d)' tmux home/dot_tmux* | head -5
+if ! grep -F "set -g @rose_pine_date_time '%a %d %b %H:%M'" tmux/tmux.posix.conf >/dev/null; then
+    echo "FAIL: POSIX tmux must keep the official Rose Pine date/time segment enabled while debugging the rich bar"
+    fail=1
+elif grep -F "@rosepine-show-date-time 'off'" tmux/tmux.windows.conf >/dev/null; then
+    echo "FAIL: Windows psmux must not disable the upstream Rose Pine date/time segment while debugging the rich bar"
     fail=1
 else
-    echo "ok  : tmux/psmux bar is clock-free"
+    echo "ok  : tmux/psmux rich date/time segments are enabled"
 fi
 
 # Lazy-load discipline: only rose-pine should be lazy=false
