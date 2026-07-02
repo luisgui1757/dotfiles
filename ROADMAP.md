@@ -45,9 +45,9 @@ repeatable instead of tribal.
   repo-owned psmux-safe port of the same flat status bar because the community
   `psmux-theme-rosepine` plugin is a different powerline design. Tests cover
   plugin provisioning, unquoted overlay source paths, POSIX rich-module options,
-  the Windows `~/.psmux.conf` warm-session guard, generated psmux Rose Pine
-  freshness, and the terminal-edge safety space for right-aligned prompt/status
-  glyphs.
+  the Windows `~/.psmux.conf` warm-session guard plus flag-free psmux source of
+  `~/.tmux.windows.conf`, generated psmux Rose Pine freshness, and the
+  terminal-edge safety space for right-aligned prompt/status glyphs.
 
 ## P0 - Total Update Ownership Model
 

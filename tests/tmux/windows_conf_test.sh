@@ -117,6 +117,20 @@ if ! grep -Fx 'source-file ~/.tmux.conf' "$PSMUX_CONF" >/dev/null; then
     echo "FAIL: tmux/psmux.conf must source the shared tmux.conf entrypoint"
     exit 1
 fi
+if ! grep -Fx 'source-file ~/.tmux.windows.conf' "$PSMUX_CONF" >/dev/null; then
+    echo "FAIL: tmux/psmux.conf must source the Windows overlay with psmux flag-free source-file syntax"
+    exit 1
+fi
+if grep -Eq '^source-file[[:space:]]+-q[[:space:]]' "$PSMUX_CONF"; then
+    echo "FAIL: tmux/psmux.conf must not rely on source-file -q; psmux v3.3.x treats it differently than tmux"
+    exit 1
+fi
+shared_entry_line="$(grep -nFx 'source-file ~/.tmux.conf' "$PSMUX_CONF" | head -1 | cut -d: -f1)"
+windows_entry_line="$(grep -nFx 'source-file ~/.tmux.windows.conf' "$PSMUX_CONF" | head -1 | cut -d: -f1)"
+if [[ -z "$shared_entry_line" || -z "$windows_entry_line" || "$shared_entry_line" -ge "$windows_entry_line" ]]; then
+    echo "FAIL: tmux/psmux.conf must source ~/.tmux.conf before the explicit Windows overlay"
+    exit 1
+fi
 if [[ ! -f "$HOME_PSMUX_CONF" ]]; then
     echo "FAIL: home/dot_psmux.conf must manage ~/.psmux.conf on Windows"
     exit 1

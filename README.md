@@ -235,7 +235,7 @@ symlink, and Windows Terminal remains a merge.
 | Starship | `~/.config/starship.toml` -> `starship/starship.toml` | same | `%USERPROFILE%\.config\starship.toml` -> `starship\starship.toml` |
 | zsh | `~/.zshenv` -> `shells/zshenv`; `~/.zshrc` -> `shells/zshrc` | same | n/a |
 | PowerShell | n/a | n/a | `Documents\PowerShell\Microsoft.PowerShell_profile.ps1` -> `shells\powershell_profile.ps1` |
-| tmux / psmux | `~/.tmux.conf` -> `tmux/tmux.conf`; `~/.tmux.posix.conf` -> `tmux/tmux.posix.conf` (POSIX clipboard + TPM/Rose Pine overlay) | same | `%USERPROFILE%\.psmux.conf` -> `tmux\psmux.conf` (first psmux entrypoint, disables warm sessions before sourcing shared config); `%USERPROFILE%\.tmux.conf` -> `tmux\tmux.conf`; `%USERPROFILE%\.tmux.windows.conf` -> `tmux\tmux.windows.conf`; `%USERPROFILE%\.tmux.rose-pine.ps1` -> `tmux\psmux-rose-pine.ps1` (repo-owned psmux Rose Pine generator/manual helper); `%USERPROFILE%\.tmux.rose-pine.{main,moon,dawn}.conf` -> generated `tmux\psmux-rose-pine.{main,moon,dawn}.conf` startup configs; the POSIX overlay is **excluded** on Windows (its `if-shell` probes hang psmux); WSL uses the Unix path |
+| tmux / psmux | `~/.tmux.conf` -> `tmux/tmux.conf`; `~/.tmux.posix.conf` -> `tmux/tmux.posix.conf` (POSIX clipboard + TPM/Rose Pine overlay) | same | `%USERPROFILE%\.psmux.conf` -> `tmux\psmux.conf` (first psmux entrypoint, disables warm sessions, then flag-free source-files the Windows overlay); `%USERPROFILE%\.tmux.conf` -> `tmux\tmux.conf`; `%USERPROFILE%\.tmux.windows.conf` -> `tmux\tmux.windows.conf`; `%USERPROFILE%\.tmux.rose-pine.ps1` -> `tmux\psmux-rose-pine.ps1` (repo-owned psmux Rose Pine generator/manual helper); `%USERPROFILE%\.tmux.rose-pine.{main,moon,dawn}.conf` -> generated `tmux\psmux-rose-pine.{main,moon,dawn}.conf` startup configs; the POSIX overlay is **excluded** on Windows (its `if-shell` probes hang psmux); WSL uses the Unix path |
 | Ghostty | `~/Library/Application Support/com.mitchellh.ghostty/config` -> `ghostty/config` | native Linux links `~/.config/ghostty/config`; WSL links it only with `--experimental-wsl-gui` | n/a |
 | lazygit | `~/Library/Application Support/lazygit/config.yml` -> `lazygit/config.yml` | `~/.config/lazygit/config.yml` -> `lazygit/config.yml` | `%LOCALAPPDATA%\lazygit\config.yml` -> `lazygit\config.windows.yml` |
 | lsd | `~/.config/lsd/{config.yaml,colors.yaml}` -> `lsd/{config.yaml,colors.yaml}` | same | `%USERPROFILE%\.config\lsd\{config.yaml,colors.yaml}` -> `lsd\{config.yaml,colors.yaml}` |
@@ -277,7 +277,9 @@ and whether `pwsh` is installed.
 - Windows psmux uses a dedicated `~/.psmux.conf` entrypoint. It disables psmux
   warm sessions before sourcing `~/.tmux.conf`, so psmux cannot claim a stale
   warm server whose status theme loaded before chezmoi deployed the current
-  generated Rose Pine configs.
+  generated Rose Pine configs. It then source-files `~/.tmux.windows.conf`
+  explicitly with flag-free psmux syntax because psmux v3.3.x does not implement
+  tmux's `source-file -q` config flag.
 - `install-deps` provisions `lsd` through the supported package managers
   (Homebrew, native Linux package managers where available, and the Windows
   Scoop-first catalog). Interactive shells replace `ls` with `lsd` and add the
@@ -688,12 +690,12 @@ stale; CI then fails verification until a human reviews the adjacent constant.
   is `main`, with `moon` / `dawn` available through the variant option
   (`@rose_pine_variant` on POSIX, `@rosepine-variant` on Windows). Both bars are
   top-aligned and show the same segments (session, window, user, short host,
-  date/time, directory). The shared `tmux.conf` sources overlays with unquoted
-  `~/.tmux.*.conf` paths so psmux loads the Windows overlay reliably. Windows
-  psmux starts from `~/.psmux.conf`, which turns warm sessions off before
-  sourcing `~/.tmux.conf`; the generated psmux status-right and Starship time
-  segment keep one trailing safety space so the last visible glyph is not drawn
-  into the terminal's final column.
+  date/time, directory). Windows psmux starts from `~/.psmux.conf`, which turns
+  warm sessions off before sourcing `~/.tmux.conf`, then explicitly source-files
+  `~/.tmux.windows.conf` without `-q` because psmux v3.3.x does not implement
+  tmux's `source-file -q` config flag. The generated psmux status-right and
+  Starship time segment keep one trailing safety space so the last visible glyph
+  is not drawn into the terminal's final column.
 - **WSL is split-host by default.** Windows Terminal renders fonts and window UI
   on the Windows side; WSL installs the Linux CLI/editor stack. Linux Ghostty
   and Linux fontconfig fonts in WSL require `--experimental-wsl-gui`.
@@ -820,7 +822,7 @@ MIT. See `LICENSE`.
 | `chsh` fails with `user '<name>' does not exist in /etc/passwd` | you log in via a **domain** account (AD/LDAP/SSSD) that isn't in local `/etc/passwd`, so `chsh` can't touch it | re-run `./setup.sh` — it detects this and offers to re-exec interactive bash into zsh via `~/.bashrc` instead. The "proper" fix is admin-side: set the directory `loginShell` / SSSD `default_shell` |
 | Move commits in lazygit, including inside psmux | Ctrl+J collides with Enter on the wire, and psmux v3.3.4 does not relay Windows Terminal's Win32-input-mode modifier data into panes | use uppercase `J` / `K`. `%LOCALAPPDATA%\lazygit\config.yml` binds commits-panel moveDownCommit / moveUpCommit to printable J/K, so no psmux root bind is needed. In the commits panel, use PgUp/PgDn or Ctrl-U/Ctrl-D to scroll the diff |
 | Windows Terminal opens Windows PowerShell 5.1 instead of PowerShell 7 | settings predate the managed WT default-profile merge, or the merge was skipped | re-run `.\setup.ps1 -SkipDeps -SkipNvim`; it adds the fixed `PowerShell 7` profile and promotes only an unset or legacy Windows PowerShell default, preserving a custom default |
-| tmux / psmux does not show the Rose Pine status bar | POSIX plugins are missing/stale or loaded in an already-running server; on Windows the generated variant config was not deployed or sourced | re-run setup, then restart all tmux/psmux sessions. POSIX installs TPM + `rose-pine/tmux` under `~/.local/share/dotfiles/tmux-plugins` (TPM reloads them). Windows source-files `~/.tmux.rose-pine.{main,moon,dawn}.conf` from `~/.tmux.windows.conf`; re-apply chezmoi and reopen psmux. Change the `main` / `moon` / `dawn` variant option for a different flavor |
+| tmux / psmux does not show the Rose Pine status bar | POSIX plugins are missing/stale or loaded in an already-running server; on Windows the generated variant config was not deployed or sourced | re-run setup, then restart all tmux/psmux sessions. POSIX installs TPM + `rose-pine/tmux` under `~/.local/share/dotfiles/tmux-plugins` (TPM reloads them). Windows psmux starts from `~/.psmux.conf`, then flag-free source-files `~/.tmux.windows.conf`, which source-files `~/.tmux.rose-pine.{main,moon,dawn}.conf`; re-apply chezmoi and reopen psmux. Change the `main` / `moon` / `dawn` variant option for a different flavor |
 | Want a fully solid (opaque) tmux/psmux status bar on Windows | Windows Terminal applies `opacity` window-wide to every cell, so a transparent WT (`opacity < 100`) has a transparent bar regardless of the bar's bg color — a distinct bg does NOT make it opaque in WT | the repo defaults to `opacity: 95` (see-through terminal). For a solid bar set WT `opacity: 100` in the fragment / `settings.json` (whole window opaque). macOS/Linux Ghostty get an opaque-looking bar from `background-opacity 0.95` + blur |
 | PowerShell Tab completion — the selected option is **gold** | PSReadLine `Selection` colors the highlighted MenuComplete option | it is a gold foreground. Note: PSReadLine uses that same `Selection` color for the completion suffix it inserts into the command line while you navigate, so that suffix also shows gold until you accept — it is one setting, not separable |
 | A `wt --version` window popped up during `setup.ps1 -All` | the dependency version table ran `<tool> --version`, and `wt --version` opens a Windows Terminal window instead of printing | fixed — `Get-CommandVersionString` never runs `wt --version`; it reads the file version (or shows `installed`) |

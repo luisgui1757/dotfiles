@@ -1152,10 +1152,12 @@ save only**. The next plain `:w` formats normally. Implemented in
   `.tmux.windows.conf` is ignored off-Windows). The cross-platform
   `tmux/tmux.conf` keeps only a psmux-safe OSC52 baseline
   (`bind -T copy-mode-vi y send -X copy-pipe-and-cancel`, no shell) and
-  `source-file -q ~/.tmux.posix.conf` — a silent no-op on Windows where the
-  file is absent (same proven mechanism as the Windows overlay source). Keep the
-  tilde path unquoted because psmux is stricter than real tmux about quoted path
-  expansion. On POSIX the overlay re-binds `y` to the native CLI when one exists. This is the
+  `source-file -q ~/.tmux.posix.conf` — a silent no-op for real tmux when the
+  file is absent. Keep the tilde path unquoted because psmux is stricter than
+  real tmux about quoted path expansion. Do not rely on `source-file -q` for
+  psmux-only startup includes; psmux v3.3.x does not implement that config flag,
+  so `tmux/psmux.conf` source-files the Windows overlay explicitly without
+  flags. On POSIX the overlay re-binds `y` to the native CLI when one exists. This is the
   canonical "guard the block, don't fork the config" fix. **Invariant:** the
   cross-platform `tmux/tmux.conf` (and its `home/dot_tmux.conf` mirror) must
   contain NO command-position `if-shell` — guarded by `invariants_test.sh`
@@ -1174,9 +1176,11 @@ save only**. The next plain `:w` formats normally. Implemented in
   shell is **cmd**, not pwsh — which is the *real* reason "history prediction"
   and `MenuComplete` looked broken inside panes: PSReadLine was never loaded.
   The fix is a Windows-only overlay `tmux/tmux.windows.conf`, managed as
-  `~/.tmux.windows.conf` by chezmoi on Windows and pulled in by the main
-  `tmux/tmux.conf` via unquoted `source-file -q ~/.tmux.windows.conf`
-  (silent no-op on Unix where it does not exist). The overlay sets:
+  `~/.tmux.windows.conf` by chezmoi on Windows and pulled in by
+  `tmux/psmux.conf` via unquoted, flag-free
+  `source-file ~/.tmux.windows.conf`. The shared `tmux.conf` also carries
+  `source-file -q ~/.tmux.windows.conf` for real tmux compatibility, but that is
+  not a valid psmux startup include path. The overlay sets:
   (1) `default-shell pwsh` — so fresh psmux panes spawn PowerShell 7, which
   loads PSReadLine + the profile.
   (2) `allow-predictions on` — psmux otherwise resets `PredictionSource` to
@@ -1427,9 +1431,12 @@ host OS or shell would otherwise hide a branch from CI.
   which disables psmux warm sessions before sourcing `~/.tmux.conf`. This is
   required because psmux's pre-server warm check only shallow-scans the first
   config file and would otherwise be able to claim a stale warm server after
-  chezmoi changed the generated theme files. Windows then loads
-  `tmux/tmux.windows.conf`, which sets `@rosepine-variant` and `source-file`s one
-  generated repo-owned config
+  chezmoi changed the generated theme files. `tmux/psmux.conf` then
+  source-files `~/.tmux.windows.conf` explicitly with flag-free psmux syntax:
+  psmux v3.3.x does not implement tmux's `source-file -q` config flag, so the
+  shared `tmux.conf` include is not a valid startup path for the Windows
+  overlay in psmux. Windows then loads `tmux/tmux.windows.conf`, which sets
+  `@rosepine-variant` and `source-file`s one generated repo-owned config
   (`tmux/psmux-rose-pine.{main,moon,dawn}.conf`, deployed by chezmoi as
   `~/.tmux.rose-pine.{main,moon,dawn}.conf`). Those generated configs reproduce
   rose-pine/tmux's rendered `set -g` output so the psmux bar matches the flat,
