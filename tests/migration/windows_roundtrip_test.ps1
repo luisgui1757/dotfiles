@@ -152,6 +152,7 @@ try {
             Pass 'chezmoi apply completed'
 
             Assert-CopyModeFilePresent -Path (Join-Path $sandbox '.tmux.conf')
+            Assert-CopyModeFilePresent -Path (Join-Path $sandbox '.psmux.conf')
             Assert-CopyModeFilePresent -Path (Join-Path $sandbox '.tmux.windows.conf')
             Assert-CopyModeFilePresent -Path (Join-Path $sandbox '.tmux.rose-pine.ps1')
             Assert-CopyModeFilePresent -Path (Join-Path $sandbox '.tmux.rose-pine.main.conf')
@@ -180,6 +181,7 @@ try {
             Assert-FileContent -Path $tmuxPath -Expected $preseed -Label 'restored .tmux.conf'
             Assert-Condition (Test-Path -LiteralPath $tmuxWin) 'user-modified .tmux.windows.conf was deleted (data loss)'
             Assert-Condition ((Get-Content -Raw -LiteralPath $tmuxWin) -eq $tmuxWinExpected) 'user-modified .tmux.windows.conf content changed'
+            Assert-Condition (-not (Test-Path -LiteralPath (Join-Path $sandbox '.psmux.conf'))) 'psmux entrypoint config was not removed'
             Assert-Condition (-not (Test-Path -LiteralPath (Join-Path $sandbox '.tmux.rose-pine.main.conf'))) 'psmux rose-pine main config was not removed'
             Assert-Condition (-not (Test-Path -LiteralPath (Join-Path $sandbox '.tmux.rose-pine.moon.conf'))) 'psmux rose-pine moon config was not removed'
             Assert-Condition (-not (Test-Path -LiteralPath (Join-Path $sandbox '.tmux.rose-pine.dawn.conf'))) 'psmux rose-pine dawn config was not removed'

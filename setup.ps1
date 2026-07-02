@@ -42,6 +42,7 @@ $ErrorActionPreference = 'Stop'
 $RepoUrl        = 'https://github.com/luisgui1757/dotfiles.git'
 $PolarisRepoUrl = 'https://github.com/luisgui1757/polaris.git'
 $PolarisVersion = '0.1.2'
+$PolarisTag     = 'v0.1.2'
 $PolarisRef     = 'ecca742fa9ed1243a73981955850c1a8ef3e3b04'
 
 function Get-DefaultProfileRoot {
@@ -368,6 +369,38 @@ function Assert-PolarisCheckoutClean {
     }
 }
 
+function Assert-PolarisReleaseArtifact {
+    param(
+        [Parameter(Mandatory)] [string]$Checkout,
+        [Parameter(Mandatory)] [string]$Version,
+        [Parameter(Mandatory)] [string]$Tag,
+        [Parameter(Mandatory)] [string]$Ref
+    )
+
+    $headResult = Invoke-PolarisCacheGit -Checkout $Checkout -Arguments @('rev-parse', '--verify', 'HEAD^{commit}')
+    $head = ([string]($headResult.Output -join '')).Trim()
+    if ($headResult.ExitCode -ne 0 -or $head -ne $Ref) {
+        Write-Host "  FAIL: Polaris cache is not at the pinned commit: $Checkout" -ForegroundColor Red
+        Write-Host "        expected $Ref, found $head" -ForegroundColor Yellow
+        exit 1
+    }
+
+    $tagResult = Invoke-PolarisCacheGit -Checkout $Checkout -Arguments @('rev-parse', '--verify', "refs/tags/$Tag^{commit}")
+    $tagHead = ([string]($tagResult.Output -join '')).Trim()
+    if ($tagResult.ExitCode -ne 0 -or $tagHead -ne $Ref) {
+        Write-Host "  FAIL: Polaris tag mismatch for $Tag in $Checkout" -ForegroundColor Red
+        Write-Host "        expected tag to point at $Ref, found $tagHead" -ForegroundColor Yellow
+        Write-Host "        Remove this cache directory and rerun setup to fetch the pinned release artifact again." -ForegroundColor Yellow
+        exit 1
+    }
+
+    $actualVersion = Get-PolarisVersionFromCheckout -Checkout $Checkout
+    if ($actualVersion -ne $Version) {
+        Write-Host "  FAIL: Polaris cache VERSION mismatch: expected $Version, found $actualVersion" -ForegroundColor Red
+        exit 1
+    }
+}
+
 function Test-PolarisGitBashCommand {
     param([string]$Candidate)
 
@@ -502,24 +535,14 @@ function Ensure-PolarisCheckout {
     param(
         [string]$RepoUrl = $PolarisRepoUrl,
         [string]$Version = $PolarisVersion,
+        [string]$Tag = $PolarisTag,
         [string]$Ref = $PolarisRef,
         [string]$CacheRoot = (Get-PolarisCacheRoot)
     )
 
     $checkout = Get-PolarisCheckoutPath -CacheRoot $CacheRoot -Ref $Ref
     if (Test-Path -LiteralPath (Join-Path $checkout '.git') -PathType Container) {
-        $headResult = Invoke-PolarisCacheGit -Checkout $checkout -Arguments @('rev-parse', '--verify', 'HEAD^{commit}')
-        $head = ([string]($headResult.Output -join '')).Trim()
-        if ($headResult.ExitCode -ne 0 -or $head -ne $Ref) {
-            Write-Host "  FAIL: Polaris cache is not at the pinned commit: $checkout" -ForegroundColor Red
-            Write-Host "        expected $Ref, found $head" -ForegroundColor Yellow
-            exit 1
-        }
-        $actualVersion = Get-PolarisVersionFromCheckout -Checkout $checkout
-        if ($actualVersion -ne $Version) {
-            Write-Host "  FAIL: Polaris cache VERSION mismatch: expected $Version, found $actualVersion" -ForegroundColor Red
-            exit 1
-        }
+        Assert-PolarisReleaseArtifact -Checkout $checkout -Version $Version -Tag $Tag -Ref $Ref
         Assert-PolarisCheckoutClean -Checkout $checkout
         return $checkout
     }
@@ -540,11 +563,7 @@ function Ensure-PolarisCheckout {
         Invoke-PolarisGitChecked -Label 'git clone Polaris' -Arguments @('clone', $RepoUrl, $tmp)
         Invoke-PolarisGitChecked -Label 'git checkout Polaris pin' -Arguments @('-C', $tmp, 'checkout', '--detach', $Ref)
 
-        $actualVersion = Get-PolarisVersionFromCheckout -Checkout $tmp
-        if ($actualVersion -ne $Version) {
-            Write-Host "  FAIL: fetched Polaris VERSION mismatch: expected $Version, found $actualVersion" -ForegroundColor Red
-            exit 1
-        }
+        Assert-PolarisReleaseArtifact -Checkout $tmp -Version $Version -Tag $Tag -Ref $Ref
         Assert-PolarisCheckoutClean -Checkout $tmp
 
         Move-Item -LiteralPath $tmp -Destination $checkout
@@ -565,7 +584,7 @@ function Invoke-PolarisInstallChecked {
     $bashCheckout = ConvertTo-PolarisBashPath -Bash $Bash -Path $Checkout
     $bashCommand = if ($env:OS -eq 'Windows_NT') {
         # Keep Git Bash on its POSIX userland. A Windows-native jq.exe in PATH
-        # emits CRLF records, which the Polaris 0.1.1 Bash manifest reader treats
+        # emits CRLF records, which the Polaris Bash manifest reader treats
         # as literal path bytes and then fails to find core/*.md.
         'export PATH=/usr/bin:/bin; cd "$1"; shift; exec bash tools/install "$@"'
     } else {
@@ -598,6 +617,7 @@ function Invoke-PolarisAgentPolicy {
         [bool]$IsDryRun = $DryRun,
         [string]$RepoUrl = $PolarisRepoUrl,
         [string]$Version = $PolarisVersion,
+        [string]$Tag = $PolarisTag,
         [string]$Ref = $PolarisRef,
         [string]$CacheRoot = (Get-PolarisCacheRoot),
         [scriptblock]$Prompt
@@ -618,13 +638,13 @@ function Invoke-PolarisAgentPolicy {
     Phase "Phase 6/6: apply global agent policy (Polaris)"
     $checkout = Get-PolarisCheckoutPath -CacheRoot $CacheRoot -Ref $Ref
     if ($IsDryRun) {
-        Write-Step "would    clone/fetch Polaris $Version ($Ref)"
+        Write-Step "would    clone/fetch Polaris $Version ($Tag @ $Ref)"
         Write-Step "         into $checkout"
         Write-Step "would    run Polaris tools/install --global, then --global --check"
         return
     }
 
-    $checkout = Ensure-PolarisCheckout -RepoUrl $RepoUrl -Version $Version -Ref $Ref -CacheRoot $CacheRoot
+    $checkout = Ensure-PolarisCheckout -RepoUrl $RepoUrl -Version $Version -Tag $Tag -Ref $Ref -CacheRoot $CacheRoot
     $installer = Join-Path $checkout 'tools\install'
     if (-not (Test-Path -LiteralPath $installer -PathType Leaf)) {
         Write-Host "  FAIL: Polaris installer missing: $installer" -ForegroundColor Red
@@ -632,7 +652,7 @@ function Invoke-PolarisAgentPolicy {
     }
     $bash = Get-PolarisBashCommand
     if (-not $bash) {
-        Write-Host "  FAIL: bash is required to run the Polaris 0.1.1 global installer. Install Git for Windows first." -ForegroundColor Red
+        Write-Host "  FAIL: bash is required to run the Polaris global installer. Install Git for Windows first." -ForegroundColor Red
         exit 1
     }
 

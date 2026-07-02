@@ -358,6 +358,10 @@ function Assert-Part1Files {
         -ExpectedPath (Join-Path $script:RepoRoot 'tmux\tmux.conf') `
         -Label '~/.tmux.conf'
     Assert-CopyModeFileMatches `
+        -ActualPath (Join-Path $Sandbox '.psmux.conf') `
+        -ExpectedPath (Join-Path $script:RepoRoot 'tmux\psmux.conf') `
+        -Label '~/.psmux.conf'
+    Assert-CopyModeFileMatches `
         -ActualPath (Join-Path $Sandbox '.tmux.windows.conf') `
         -ExpectedPath (Join-Path $script:RepoRoot 'tmux\tmux.windows.conf') `
         -Label '~/.tmux.windows.conf'

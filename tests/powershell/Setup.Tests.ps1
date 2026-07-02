@@ -209,7 +209,7 @@ printf "%s\n" "$*" >> "$POLARIS_TEST_LOG"
         & git -C $work init -q
         & git -C $work config user.name 'Dotfiles Test'
         & git -C $work config user.email 'dotfiles@example.invalid'
-        [System.IO.File]::WriteAllText((Join-Path $work 'VERSION'), "0.1.1`n", [System.Text.UTF8Encoding]::new($false))
+        [System.IO.File]::WriteAllText((Join-Path $work 'VERSION'), "0.1.2`n", [System.Text.UTF8Encoding]::new($false))
         $installerPath = Join-Path $tools 'install'
         [System.IO.File]::WriteAllText($installerPath, $Installer, [System.Text.UTF8Encoding]::new($false))
         if ($env:OS -ne 'Windows_NT') {
@@ -218,10 +218,12 @@ printf "%s\n" "$*" >> "$POLARIS_TEST_LOG"
         & git -C $work add VERSION tools/install
         & git -C $work commit -q -m 'fake polaris'
         $sha = (& git -C $work rev-parse HEAD).Trim()
+        & git -C $work tag 'v0.1.2' $sha
         return [pscustomobject]@{
             Work = $work
             Installer = $installerPath
             Sha = $sha
+            Tag = 'v0.1.2'
         }
     }
 
@@ -238,7 +240,7 @@ printf "%s\n" "$*" >> "$POLARIS_TEST_LOG"
 `$ErrorActionPreference = 'Stop'
 `$env:DOTFILES_SETUP_PS1_SOURCE_ONLY = '1'
 . '$setupLiteral' -All
-Invoke-PolarisAgentPolicy -AllMode:`$true -IsDryRun:`$false -Version '0.1.1' -Ref '$refLiteral' -CacheRoot '$cacheLiteral'
+Invoke-PolarisAgentPolicy -AllMode:`$true -IsDryRun:`$false -Version '0.1.2' -Ref '$refLiteral' -CacheRoot '$cacheLiteral'
 "@
         $oldNativePreference = $null
         $hasNativePreference = Test-Path Variable:PSNativeCommandUseErrorActionPreference
@@ -266,13 +268,14 @@ Invoke-PolarisAgentPolicy -AllMode:`$true -IsDryRun:`$false -Version '0.1.1' -Re
             Invoke-PolarisAgentPolicy `
                 -AllMode:$true `
                 -IsDryRun:$true `
-                -Version '0.1.1' `
+                -Version '0.1.2' `
                 -Ref '489dcc6f991ddcff63c460a433e983264dc54cf7' `
                 -CacheRoot $cache
         } 6>&1 | Out-String
 
         $output | Should -Match 'Phase 6/6: apply global agent policy \(Polaris\)'
-        $output | Should -Match 'would\s+clone/fetch Polaris 0\.1\.1'
+        $output | Should -Match 'would\s+clone/fetch Polaris 0\.1\.2'
+        $output | Should -Match 'v0\.1\.2'
         $output | Should -Match 'tools/install --global'
         Test-Path -LiteralPath $cache | Should -BeFalse
     }
@@ -365,7 +368,7 @@ Invoke-PolarisAgentPolicy -AllMode:`$true -IsDryRun:`$false -Version '0.1.1' -Re
         & git -C $work init -q
         & git -C $work config user.name 'Dotfiles Test'
         & git -C $work config user.email 'dotfiles@example.invalid'
-        [System.IO.File]::WriteAllText((Join-Path $work 'VERSION'), "0.1.1`n", [System.Text.UTF8Encoding]::new($false))
+        [System.IO.File]::WriteAllText((Join-Path $work 'VERSION'), "0.1.2`n", [System.Text.UTF8Encoding]::new($false))
         $installer = Join-Path $tools 'install'
         [System.IO.File]::WriteAllText($installer, @'
 #!/usr/bin/env bash
@@ -375,6 +378,7 @@ printf "%s\n" "$*" >> "$POLARIS_TEST_LOG"
         & git -C $work add VERSION tools/install
         & git -C $work commit -q -m 'fake polaris'
         $sha = (& git -C $work rev-parse HEAD).Trim()
+        & git -C $work tag 'v0.1.2' $sha
 
         $cache = Join-Path $script:PolarisTestRoot 'cache'
         New-Item -ItemType Directory -Force -Path $cache | Out-Null
@@ -386,7 +390,7 @@ printf "%s\n" "$*" >> "$POLARIS_TEST_LOG"
             Invoke-PolarisAgentPolicy `
                 -AllMode:$true `
                 -IsDryRun:$false `
-                -Version '0.1.1' `
+                -Version '0.1.2' `
                 -Ref $sha `
                 -CacheRoot $cache
 
@@ -462,7 +466,7 @@ printf "%s\n" "$*" >> "$POLARIS_TEST_LOG"
             Invoke-PolarisAgentPolicy `
                 -AllMode:$true `
                 -IsDryRun:$false `
-                -Version '0.1.1' `
+                -Version '0.1.2' `
                 -Ref $repo.Sha `
                 -RepoUrl $repo.Work `
                 -CacheRoot $cache
@@ -492,7 +496,7 @@ printf "%s\n" "$*" >> "$POLARIS_TEST_LOG"
         & git -C $work init -q
         & git -C $work config user.name 'Dotfiles Test'
         & git -C $work config user.email 'dotfiles@example.invalid'
-        [System.IO.File]::WriteAllText((Join-Path $work 'VERSION'), "0.1.1`n", [System.Text.UTF8Encoding]::new($false))
+        [System.IO.File]::WriteAllText((Join-Path $work 'VERSION'), "0.1.2`n", [System.Text.UTF8Encoding]::new($false))
         $installer = Join-Path $tools 'install'
         [System.IO.File]::WriteAllText($installer, @'
 #!/usr/bin/env bash
@@ -501,6 +505,7 @@ printf "%s\n" "$*" >> "$POLARIS_TEST_LOG"
         & git -C $work add VERSION tools/install
         & git -C $work commit -q -m 'fake polaris'
         $sha = (& git -C $work rev-parse HEAD).Trim()
+        & git -C $work tag 'v0.1.2' $sha
 
         Add-Content -LiteralPath $installer -Value '# dirty cache regression'
         $cache = Join-Path $script:PolarisTestRoot 'cache'
@@ -517,7 +522,7 @@ printf "%s\n" "$*" >> "$POLARIS_TEST_LOG"
 `$ErrorActionPreference = 'Stop'
 `$env:DOTFILES_SETUP_PS1_SOURCE_ONLY = '1'
 . '$setupLiteral' -All
-Invoke-PolarisAgentPolicy -AllMode:`$true -IsDryRun:`$false -Version '0.1.1' -Ref '$shaLiteral' -CacheRoot '$cacheLiteral'
+Invoke-PolarisAgentPolicy -AllMode:`$true -IsDryRun:`$false -Version '0.1.2' -Ref '$shaLiteral' -CacheRoot '$cacheLiteral'
 "@
             $oldNativePreference = $null
             $hasNativePreference = Test-Path Variable:PSNativeCommandUseErrorActionPreference
@@ -571,6 +576,30 @@ Invoke-PolarisAgentPolicy -AllMode:`$true -IsDryRun:`$false -Version '0.1.1' -Re
         }
     }
 
+    It "rejects a cached Polaris checkout whose release tag is missing" {
+        $repo = New-SetupTestPolarisRepo -Name 'polaris-untagged-work'
+        & git -C $repo.Work tag -d $repo.Tag | Out-Null
+        $cache = Join-Path $script:PolarisTestRoot 'cache'
+        New-Item -ItemType Directory -Force -Path $cache | Out-Null
+        Move-Item -LiteralPath $repo.Work -Destination (Join-Path $cache $repo.Sha)
+
+        $oldLog = $env:POLARIS_TEST_LOG
+        try {
+            $env:POLARIS_TEST_LOG = Join-Path $script:PolarisTestRoot 'untagged-install.log'
+            $result = Invoke-SetupTestPolarisPolicyChild -Cache $cache -Ref $repo.Sha
+
+            $result.ExitCode | Should -Not -Be 0
+            $result.Output | Should -Match 'Polaris tag mismatch'
+            Test-Path -LiteralPath $env:POLARIS_TEST_LOG | Should -BeFalse
+        } finally {
+            if ($null -eq $oldLog) {
+                Remove-Item Env:POLARIS_TEST_LOG -ErrorAction SilentlyContinue
+            } else {
+                $env:POLARIS_TEST_LOG = $oldLog
+            }
+        }
+    }
+
     It "rejects an ignored file in a verified Polaris checkout before running the installer" {
         $repo = New-SetupTestPolarisRepo -Name 'polaris-ignored-work'
         $cache = Join-Path $script:PolarisTestRoot 'cache'
@@ -606,7 +635,7 @@ Invoke-PolarisAgentPolicy -AllMode:`$true -IsDryRun:`$false -Version '0.1.1' -Re
         & git -C $work init -q
         & git -C $work config user.name 'Dotfiles Test'
         & git -C $work config user.email 'dotfiles@example.invalid'
-        [System.IO.File]::WriteAllText((Join-Path $work 'VERSION'), "0.1.1`n", [System.Text.UTF8Encoding]::new($false))
+        [System.IO.File]::WriteAllText((Join-Path $work 'VERSION'), "0.1.2`n", [System.Text.UTF8Encoding]::new($false))
         $installer = Join-Path $tools 'install'
         [System.IO.File]::WriteAllText($installer, @'
 #!/usr/bin/env bash
@@ -615,6 +644,7 @@ printf "%s\n" "$*" >> "$POLARIS_TEST_LOG"
         & git -C $work add VERSION tools/install
         & git -C $work commit -q -m 'fake polaris'
         $sha = (& git -C $work rev-parse HEAD).Trim()
+        & git -C $work tag 'v0.1.2' $sha
 
         $cache = Join-Path $script:PolarisTestRoot 'cache'
         New-Item -ItemType Directory -Force -Path $cache | Out-Null
@@ -637,7 +667,7 @@ printf "%s\n" "$*" >> "$POLARIS_TEST_LOG"
             Invoke-PolarisAgentPolicy `
                 -AllMode:$true `
                 -IsDryRun:$false `
-                -Version '0.1.1' `
+                -Version '0.1.2' `
                 -Ref $sha `
                 -CacheRoot $cache
 
@@ -661,12 +691,13 @@ printf "%s\n" "$*" >> "$POLARIS_TEST_LOG"
         & git -C $work init -q
         & git -C $work config user.name 'Dotfiles Test'
         & git -C $work config user.email 'dotfiles@example.invalid'
-        [System.IO.File]::WriteAllText((Join-Path $work 'VERSION'), "0.1.1`n", [System.Text.UTF8Encoding]::new($false))
+        [System.IO.File]::WriteAllText((Join-Path $work 'VERSION'), "0.1.2`n", [System.Text.UTF8Encoding]::new($false))
         $installer = Join-Path $tools 'install'
         [System.IO.File]::WriteAllText($installer, "#!/usr/bin/env bash`nexit 0`n", [System.Text.UTF8Encoding]::new($false))
         & git -C $work add VERSION tools/install
         & git -C $work commit -q -m 'fake polaris'
         $sha = (& git -C $work rev-parse HEAD).Trim()
+        & git -C $work tag 'v0.1.2' $sha
 
         $cleanWorktree = Join-Path $script:PolarisTestRoot 'clean-worktree'
         New-Item -ItemType Directory -Force -Path (Join-Path $cleanWorktree 'tools') | Out-Null
@@ -691,7 +722,7 @@ printf "%s\n" "$*" >> "$POLARIS_TEST_LOG"
 `$ErrorActionPreference = 'Stop'
 `$env:DOTFILES_SETUP_PS1_SOURCE_ONLY = '1'
 . '$setupLiteral' -All
-Invoke-PolarisAgentPolicy -AllMode:`$true -IsDryRun:`$false -Version '0.1.1' -Ref '$shaLiteral' -CacheRoot '$cacheLiteral'
+Invoke-PolarisAgentPolicy -AllMode:`$true -IsDryRun:`$false -Version '0.1.2' -Ref '$shaLiteral' -CacheRoot '$cacheLiteral'
 "@
             $oldNativePreference = $null
             $hasNativePreference = Test-Path Variable:PSNativeCommandUseErrorActionPreference

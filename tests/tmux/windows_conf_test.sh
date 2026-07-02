@@ -6,6 +6,8 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 
 WIN_CONF="$REPO_ROOT/tmux/tmux.windows.conf"
 HOME_WIN_CONF="$REPO_ROOT/home/dot_tmux.windows.conf"
+PSMUX_CONF="$REPO_ROOT/tmux/psmux.conf"
+HOME_PSMUX_CONF="$REPO_ROOT/home/dot_psmux.conf"
 RENDERER="$REPO_ROOT/tmux/psmux-rose-pine.ps1"
 HOME_RENDERER="$REPO_ROOT/home/dot_tmux.rose-pine.ps1"
 ROSEPINE_VARIANTS=(main moon dawn)
@@ -103,6 +105,26 @@ if ! cmp -s "$WIN_CONF" "$HOME_WIN_CONF"; then
     echo "FAIL: home/dot_tmux.windows.conf must match tmux/tmux.windows.conf"
     exit 1
 fi
+if [[ ! -f "$PSMUX_CONF" ]]; then
+    echo "FAIL: tmux/psmux.conf psmux entrypoint is missing"
+    exit 1
+fi
+if ! grep -Fx 'set -g warm off' "$PSMUX_CONF" >/dev/null; then
+    echo "FAIL: tmux/psmux.conf must disable psmux warm sessions before source-file"
+    exit 1
+fi
+if ! grep -Fx 'source-file ~/.tmux.conf' "$PSMUX_CONF" >/dev/null; then
+    echo "FAIL: tmux/psmux.conf must source the shared tmux.conf entrypoint"
+    exit 1
+fi
+if [[ ! -f "$HOME_PSMUX_CONF" ]]; then
+    echo "FAIL: home/dot_psmux.conf must manage ~/.psmux.conf on Windows"
+    exit 1
+fi
+if ! cmp -s "$PSMUX_CONF" "$HOME_PSMUX_CONF"; then
+    echo "FAIL: home/dot_psmux.conf must match tmux/psmux.conf"
+    exit 1
+fi
 if [[ ! -f "$HOME_RENDERER" ]]; then
     echo "FAIL: home/dot_tmux.rose-pine.ps1 must manage the renderer on Windows"
     exit 1
@@ -126,8 +148,16 @@ for variant in "${ROSEPINE_VARIANTS[@]}"; do
         echo "FAIL: home/dot_tmux.rose-pine.$variant.conf must match tmux/psmux-rose-pine.$variant.conf"
         exit 1
     fi
+    if ! grep -Eq "^set -g status-right '.*#\\{b:pane_current_path\\} '$" "$conf"; then
+        echo "FAIL: psmux Rose Pine $variant status-right must keep one trailing safety space"
+        exit 1
+    fi
 done
 
+if ! grep -Fx '.psmux.conf' "$REPO_ROOT/home/.chezmoiignore" >/dev/null; then
+    echo "FAIL: home/.chezmoiignore must ignore .psmux.conf off Windows"
+    exit 1
+fi
 if ! grep -Fx '.tmux.windows.conf' "$REPO_ROOT/home/.chezmoiignore" >/dev/null; then
     echo "FAIL: home/.chezmoiignore must ignore .tmux.windows.conf off Windows"
     exit 1

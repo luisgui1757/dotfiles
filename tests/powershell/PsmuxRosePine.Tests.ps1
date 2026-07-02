@@ -35,6 +35,9 @@ Describe 'psmux-rose-pine renderer' {
         $opt['window-status-format'] | Should -Match ([regex]::Escape("#[fg=$Iris]"))
         # directory basename present, matching rose-pine/tmux @rose_pine_directory
         $opt['status-right'] | Should -Match ([regex]::Escape('#{b:pane_current_path}'))
+        # one terminal-edge safety cell: the last visible glyph/text must not sit
+        # in the final column on Windows Terminal / ConPTY.
+        $opt['status-right'] | Should -Match ([regex]::Escape('#{b:pane_current_path} '))
         # stays pinned to the top like the shared tmux.conf
         ($cmds | Where-Object { $_.Argv[2] -eq 'status-position' }).Argv[3] | Should -Be 'top'
     }

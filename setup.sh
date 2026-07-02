@@ -38,6 +38,7 @@ BEST_EFFORT=0
 EXPERIMENTAL_WSL_GUI=0
 POLARIS_REPO_URL="https://github.com/luisgui1757/polaris.git"
 POLARIS_VERSION="0.1.2"
+POLARIS_TAG="v0.1.2"
 POLARIS_REF="ecca742fa9ed1243a73981955850c1a8ef3e3b04"
 POLARIS_CACHE_ROOT="$HOME/.local/share/dotfiles/polaris"
 usage() {
@@ -243,6 +244,31 @@ assert_polaris_checkout_clean() {
     fi
 }
 
+assert_polaris_release_artifact() {
+    local checkout="$1" version="$2" tag="$3" ref="$4" head tag_head checkout_version
+
+    head="$(polaris_cache_git "$checkout" rev-parse --verify 'HEAD^{commit}' 2>/dev/null || true)"
+    if [[ "$head" != "$ref" ]]; then
+        echo "  FAIL: Polaris cache is not at the pinned commit: $checkout" >&2
+        echo "        expected $ref, found ${head:-unknown}" >&2
+        exit 1
+    fi
+
+    tag_head="$(polaris_cache_git "$checkout" rev-parse --verify "refs/tags/$tag^{commit}" 2>/dev/null || true)"
+    if [[ "$tag_head" != "$ref" ]]; then
+        echo "  FAIL: Polaris tag mismatch for $tag in $checkout" >&2
+        echo "        expected tag to point at $ref, found ${tag_head:-missing}" >&2
+        echo "        Remove this cache directory and rerun setup to fetch the pinned release artifact again." >&2
+        exit 1
+    fi
+
+    checkout_version="$(tr -d '[:space:]' < "$checkout/VERSION" 2>/dev/null || true)"
+    if [[ "$checkout_version" != "$version" ]]; then
+        echo "  FAIL: Polaris cache VERSION mismatch: expected $version, found ${checkout_version:-missing}" >&2
+        exit 1
+    fi
+}
+
 ask_yes_no_default_yes() {
     local prompt="$1" reply
     printf "  %s [Y/n] " "$prompt"
@@ -261,21 +287,11 @@ should_apply_agent_policy() {
 }
 
 ensure_polaris_checkout() {
-    local checkout tmp version head
+    local checkout tmp
     checkout="$(polaris_checkout_dir)"
 
     if [[ -d "$checkout/.git" ]]; then
-        head="$(polaris_cache_git "$checkout" rev-parse --verify 'HEAD^{commit}' 2>/dev/null || true)"
-        if [[ "$head" != "$POLARIS_REF" ]]; then
-            echo "  FAIL: Polaris cache is not at the pinned commit: $checkout" >&2
-            echo "        expected $POLARIS_REF, found ${head:-unknown}" >&2
-            exit 1
-        fi
-        version="$(tr -d '[:space:]' < "$checkout/VERSION" 2>/dev/null || true)"
-        if [[ "$version" != "$POLARIS_VERSION" ]]; then
-            echo "  FAIL: Polaris cache VERSION mismatch: expected $POLARIS_VERSION, found ${version:-missing}" >&2
-            exit 1
-        fi
+        assert_polaris_release_artifact "$checkout" "$POLARIS_VERSION" "$POLARIS_TAG" "$POLARIS_REF"
         assert_polaris_checkout_clean "$checkout"
         printf '%s\n' "$checkout"
         return 0
@@ -298,11 +314,7 @@ ensure_polaris_checkout() {
     polaris_git clone "$POLARIS_REPO_URL" "$tmp"
     polaris_git -C "$tmp" checkout --detach "$POLARIS_REF"
 
-    version="$(tr -d '[:space:]' < "$tmp/VERSION" 2>/dev/null || true)"
-    if [[ "$version" != "$POLARIS_VERSION" ]]; then
-        echo "  FAIL: fetched Polaris VERSION mismatch: expected $POLARIS_VERSION, found ${version:-missing}" >&2
-        exit 1
-    fi
+    assert_polaris_release_artifact "$tmp" "$POLARIS_VERSION" "$POLARIS_TAG" "$POLARIS_REF"
     assert_polaris_checkout_clean "$tmp"
 
     mv "$tmp" "$checkout"
@@ -327,7 +339,7 @@ run_polaris_agent_policy() {
 
     phase "Phase 6/6: apply global agent policy (Polaris)"
     if [[ "$DRY_RUN" -eq 1 ]]; then
-        echo "  would: clone/fetch Polaris $POLARIS_VERSION ($POLARIS_REF)"
+        echo "  would: clone/fetch Polaris $POLARIS_VERSION ($POLARIS_TAG @ $POLARIS_REF)"
         echo "         into $(polaris_checkout_dir)"
         echo "  would: run Polaris tools/install --global, then --global --check"
         return 0

@@ -760,15 +760,15 @@ save only**. The next plain `:w` formats normally. Implemented in
   Do not use vague "present, but <manager> does not
   manage" wording.
 - **Polaris is setup Phase 6/6 and is opt-out, not experimental.** Full setup
-  (`--all` / `-All`) applies Polaris `0.1.2` at commit
+  (`--all` / `-All`) applies Polaris `0.1.2` (`v0.1.2`) at commit
   `ecca742fa9ed1243a73981955850c1a8ef3e3b04` unless
   `--skip-agents` / `-SkipAgents` is passed. Interactive setup asks
   `Apply Polaris global agent rules? [Y/n]`. The setup phase clones Polaris into
   a dotfiles-owned cache (`~/.local/share/dotfiles/polaris/<commit>` on POSIX,
   `%LOCALAPPDATA%\dotfiles\polaris\<commit>` on Windows), verifies the checkout
-  commit and `VERSION`, and performs all Polaris Git operations with system,
-  global, environment-injected config, templates, hooks, and executable Git
-  config features disabled. It then runs Polaris' Bash global installer
+  tag, commit, and `VERSION`, and performs all Polaris Git operations with
+  system, global, environment-injected config, templates, hooks, and executable
+  Git config features disabled. It then runs Polaris' Bash global installer
   (`tools/install --global`), then runs its global check. Windows setup invokes
   the same Bash installer through a validated Git Bash (`cygpath` must be
   present) with Git Bash's POSIX-only PATH for the `0.1.2` pin; do not use
@@ -1093,18 +1093,19 @@ save only**. The next plain `:w` formats normally. Implemented in
   `renovate.json`, direct-download SHA-256 values must be matched as context
   only, not named `currentDigest`, otherwise Renovate will schedule same-version
   digest updates for checksums it cannot actually resolve.
-- **Polaris is pinned by immutable Git commit plus `VERSION`, not a moving
+- **Polaris is pinned by immutable Git tag + commit + `VERSION`, not a moving
   branch.** Setup may clone from GitHub, but it must checkout the exact
-  `POLARIS_REF`, assert `POLARIS_VERSION`, reject dirty cached worktrees, and
-  run only the installer from that verified checkout. Clone, checkout, and cache
-  validation must all use the Polaris Git wrapper: do not trust mutable system,
+  `POLARIS_REF`, assert that `POLARIS_TAG` peels to that commit, assert
+  `POLARIS_VERSION`, reject dirty cached worktrees, and run only the installer
+  from that verified checkout. Clone, checkout, and cache validation must all
+  use the Polaris Git wrapper: do not trust mutable system,
   global, environment-injected, template, hook, or `.git/config` state. Cache
   validation must force the intended cache path with `--git-dir`/`--work-tree`
   semantics and disable executable Git config features such as `core.fsmonitor`,
   so `core.worktree` redirection or fsmonitor hooks cannot run or hide modified
-  files before the installer executes. Updating Polaris means changing both
-  constants, updating README/CLAUDE references, and keeping shell/Pester/static
-  pin tests green.
+  files before the installer executes. Updating Polaris means changing the tag,
+  commit, and version constants together, updating README/CLAUDE references, and
+  keeping shell/Pester/static pin tests green.
 - **Dependency installers own the "install EVERYTHING?" prompt; Polaris owns a
   separate global-policy prompt.** Interactive runs that didn't pass
   `--all`/`-All` can get the dependency prompt; answering yes flips
@@ -1413,15 +1414,22 @@ host OS or shell would otherwise hide a branch from CI.
   must not contain `bg:` styles. Terminal transparency belongs to Ghostty /
   Windows Terminal; Starship-owned background blocks render as opaque character
   cells and make the prompt look patched onto the transparent surface. Guarded
-  by `tests/starship/render_test.sh`.
+  by `tests/starship/render_test.sh`. The right-aligned time module deliberately
+  keeps one trailing safety space so its final Nerd Font glyph is not drawn into
+  the terminal's last column.
 - **tmux Rose Pine: POSIX loads the upstream plugin; Windows renders a repo-owned
   psmux-safe port.** Shared `tmux/tmux.conf` is psmux-safe and owns only
   cross-platform placement (`status-position top`). POSIX loads
   `tmux/tmux.posix.conf`, which declares TPM + `rose-pine/tmux` from the
   repo-managed plugin root `~/.local/share/dotfiles/tmux-plugins` and enables
   user, short host, date/time, directory, and current-program window names.
-  Windows loads `tmux/tmux.windows.conf`, which sets `@rosepine-variant` and
-  `source-file`s one generated repo-owned config
+  Windows starts psmux through `tmux/psmux.conf` (deployed as `~/.psmux.conf`),
+  which disables psmux warm sessions before sourcing `~/.tmux.conf`. This is
+  required because psmux's pre-server warm check only shallow-scans the first
+  config file and would otherwise be able to claim a stale warm server after
+  chezmoi changed the generated theme files. Windows then loads
+  `tmux/tmux.windows.conf`, which sets `@rosepine-variant` and `source-file`s one
+  generated repo-owned config
   (`tmux/psmux-rose-pine.{main,moon,dawn}.conf`, deployed by chezmoi as
   `~/.tmux.rose-pine.{main,moon,dawn}.conf`). Those generated configs reproduce
   rose-pine/tmux's rendered `set -g` output so the psmux bar matches the flat,
@@ -1438,7 +1446,9 @@ host OS or shell would otherwise hide a branch from CI.
   ~30x at load and would hang ConPTY). The renderer is pure declarative `set -g`
   (no load-time `if-shell`, no per-redraw `#(...)` shell; generated startup
   configs use native `#{user}`, `#{host_short}`, `#{b:pane_current_path}`, and
-  `#{p2:}` padding formats), inlines every `#[fg=...]` because psmux
+  `#{p2:}` padding formats), keeps one trailing safety space after the
+  status-right directory so the final visible cell is not clipped by Windows
+  Terminal/ConPTY, inlines every `#[fg=...]` because psmux
   stores-but-ignores `window-status-*-style`, and ships all three variants
   (`main` default, `moon`, `dawn`) selected by `@rosepine-variant`; POSIX
   selects the same via `@rose_pine_variant`. `tmux/psmux-rose-pine.ps1` MUST
@@ -1449,7 +1459,8 @@ host OS or shell would otherwise hide a branch from CI.
   Keep plugin managers in OS overlays only; shared `tmux.conf` must remain free
   of load-time `if-shell`, psmux-specific commands, and quoted overlay source
   paths, and the Windows overlay must not reintroduce `@plugin`/PPM or a
-  plugin-root `run`. The generated `.conf` files are committed artifacts;
+  plugin-root `run`. Keep `tmux/psmux.conf` Windows-only and mirrored to
+  `home/dot_psmux.conf`. The generated `.conf` files are committed artifacts;
   regenerate them with the renderer's `-EmitConf -Variant <name>` mode once per
   variant, and `tests/powershell/PsmuxRosePine.Tests.ps1` asserts byte
   freshness. Live variant switch:

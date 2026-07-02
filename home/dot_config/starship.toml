@@ -78,7 +78,7 @@ behind = '[⇣\(${count}\)](fg:rose)'
 
 [time]
 disabled = false
-format = "[$time 󰴈]($style)"
+format = "[$time 󰴈 ]($style)"
 style = "fg:rose"
 time_format = "%I:%M%P"
 

@@ -108,7 +108,7 @@ function Get-PsmuxRosePineCommand {
     $showUser = "#[fg=$($p.iris)]$UserName#[fg=$($p.subtle)]$sep#[fg=$($p.subtle)]$iUser"
     $showHost = "#[fg=$($p.text)]$ComputerName#[fg=$($p.subtle)]$sep#[fg=$($p.subtle)]$iHost"
     $showDate = "#[fg=$($p.foam)]%a %d %b %H:%M#[fg=$($p.subtle)]$sep#[fg=$($p.subtle)]$iClock #[fg=$($p.text)]"
-    $showDir = "#[fg=$($p.subtle)]$iFolder #[fg=$($p.rose)]#{b:pane_current_path}"
+    $showDir = "#[fg=$($p.subtle)]$iFolder #[fg=$($p.rose)]#{b:pane_current_path} "
     $statusRight = "$showUser$field$showHost$field$showDate$field$showDir"
 
     $cmds = [System.Collections.Generic.List[object]]::new()

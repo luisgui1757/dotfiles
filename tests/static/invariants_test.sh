@@ -74,13 +74,13 @@ else
 fi
 
 if ! grep -F "set -g @rose_pine_date_time '%a %d %b %H:%M'" tmux/tmux.posix.conf >/dev/null; then
-    echo "FAIL: POSIX tmux must keep the official Rose Pine date/time segment enabled while debugging the rich bar"
+    echo "FAIL: POSIX tmux must keep the official Rose Pine date/time segment enabled"
     fail=1
-elif grep -F "@rosepine-show-date-time 'off'" tmux/tmux.windows.conf >/dev/null; then
-    echo "FAIL: Windows psmux must not disable the upstream Rose Pine date/time segment while debugging the rich bar"
+elif ! grep -F '%a %d %b %H:%M' tmux/psmux-rose-pine.main.conf >/dev/null; then
+    echo "FAIL: Windows psmux generated Rose Pine main config must keep the date/time segment enabled"
     fail=1
 else
-    echo "ok  : tmux/psmux rich date/time segments are enabled"
+    echo "ok  : tmux/psmux date/time segments are enabled"
 fi
 
 # Lazy-load discipline: only rose-pine should be lazy=false

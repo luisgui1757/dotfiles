@@ -16,6 +16,11 @@ if grep -nF 'bg:' "$REPO_ROOT/starship/starship.toml"; then
     echo "FAIL: starship.toml must not use background styles; terminal transparency owns the background"
     exit 1
 fi
+time_format_line="format = \"[\$time 󰴈 ](\$style)\""
+if ! grep -F "$time_format_line" "$REPO_ROOT/starship/starship.toml" >/dev/null; then
+    echo "FAIL: starship time segment must keep one trailing safety space before the right edge"
+    exit 1
+fi
 
 if ! command -v starship >/dev/null 2>&1; then
     echo "skipped dynamic render: starship not installed (static checks passed)"

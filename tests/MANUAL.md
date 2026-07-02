@@ -23,11 +23,13 @@ significant change to the relevant area.
       draws a FLAT bar (matching the POSIX tmux side, NOT powerline) at the top:
       session/window on the left, user + short host + date/time + directory on
       the right, gold active window / iris inactive, icons render, no config-load
-      freeze, and no sustained CPU spike. Switch flavor:
+      freeze, no sustained CPU spike, and no clipped final cell at the right
+      edge. Switch flavor:
       `psmux set -g @rosepine-variant moon; psmux source-file ~/.tmux.windows.conf`.
 - [ ] **Starship prompt**: shows username, dir, git branch, git status icons
       (untracked/modified/staged), trailing time, and no opaque background
-      blocks behind prompt text.
+      blocks behind prompt text. The final Rose glyph on the right-aligned time
+      must not be clipped by the terminal edge.
 - [ ] **PowerShell Tab completion**: press Tab into MenuComplete; the selected
       item is light text on the Rose Pine overlay background.
 

@@ -235,7 +235,7 @@ symlink, and Windows Terminal remains a merge.
 | Starship | `~/.config/starship.toml` -> `starship/starship.toml` | same | `%USERPROFILE%\.config\starship.toml` -> `starship\starship.toml` |
 | zsh | `~/.zshenv` -> `shells/zshenv`; `~/.zshrc` -> `shells/zshrc` | same | n/a |
 | PowerShell | n/a | n/a | `Documents\PowerShell\Microsoft.PowerShell_profile.ps1` -> `shells\powershell_profile.ps1` |
-| tmux / psmux | `~/.tmux.conf` -> `tmux/tmux.conf`; `~/.tmux.posix.conf` -> `tmux/tmux.posix.conf` (POSIX clipboard + TPM/Rose Pine overlay) | same | `%USERPROFILE%\.tmux.conf` -> `tmux\tmux.conf`; `%USERPROFILE%\.tmux.windows.conf` -> `tmux\tmux.windows.conf`; `%USERPROFILE%\.tmux.rose-pine.ps1` -> `tmux\psmux-rose-pine.ps1` (repo-owned psmux Rose Pine generator/manual helper); `%USERPROFILE%\.tmux.rose-pine.{main,moon,dawn}.conf` -> generated `tmux\psmux-rose-pine.{main,moon,dawn}.conf` startup configs; the POSIX overlay is **excluded** on Windows (its `if-shell` probes hang psmux); WSL uses the Unix path |
+| tmux / psmux | `~/.tmux.conf` -> `tmux/tmux.conf`; `~/.tmux.posix.conf` -> `tmux/tmux.posix.conf` (POSIX clipboard + TPM/Rose Pine overlay) | same | `%USERPROFILE%\.psmux.conf` -> `tmux\psmux.conf` (first psmux entrypoint, disables warm sessions before sourcing shared config); `%USERPROFILE%\.tmux.conf` -> `tmux\tmux.conf`; `%USERPROFILE%\.tmux.windows.conf` -> `tmux\tmux.windows.conf`; `%USERPROFILE%\.tmux.rose-pine.ps1` -> `tmux\psmux-rose-pine.ps1` (repo-owned psmux Rose Pine generator/manual helper); `%USERPROFILE%\.tmux.rose-pine.{main,moon,dawn}.conf` -> generated `tmux\psmux-rose-pine.{main,moon,dawn}.conf` startup configs; the POSIX overlay is **excluded** on Windows (its `if-shell` probes hang psmux); WSL uses the Unix path |
 | Ghostty | `~/Library/Application Support/com.mitchellh.ghostty/config` -> `ghostty/config` | native Linux links `~/.config/ghostty/config`; WSL links it only with `--experimental-wsl-gui` | n/a |
 | lazygit | `~/Library/Application Support/lazygit/config.yml` -> `lazygit/config.yml` | `~/.config/lazygit/config.yml` -> `lazygit/config.yml` | `%LOCALAPPDATA%\lazygit\config.yml` -> `lazygit\config.windows.yml` |
 | lsd | `~/.config/lsd/{config.yaml,colors.yaml}` -> `lsd/{config.yaml,colors.yaml}` | same | `%USERPROFILE%\.config\lsd\{config.yaml,colors.yaml}` -> `lsd\{config.yaml,colors.yaml}` |
@@ -274,6 +274,10 @@ and whether `pwsh` is installed.
   by changing `@rose_pine_variant` in `tmux/tmux.posix.conf` or
   `@rosepine-variant` in `tmux/tmux.windows.conf`, or live with
   `psmux set -g @rosepine-variant moon; psmux source-file ~/.tmux.windows.conf`.
+- Windows psmux uses a dedicated `~/.psmux.conf` entrypoint. It disables psmux
+  warm sessions before sourcing `~/.tmux.conf`, so psmux cannot claim a stale
+  warm server whose status theme loaded before chezmoi deployed the current
+  generated Rose Pine configs.
 - `install-deps` provisions `lsd` through the supported package managers
   (Homebrew, native Linux package managers where available, and the Windows
   Scoop-first catalog). Interactive shells replace `ls` with `lsd` and add the
@@ -369,10 +373,12 @@ and whether `pwsh` is installed.
   WSL, or use a Linux GUI build when WSLg / X11 is available. Rosé Pine setup
   follows whatever `code` CLI is on PATH.
 - Polaris agent policy is a supported setup phase, not a synced dotfile. `setup`
-  pins Polaris `0.1.2` at commit `ecca742fa9ed1243a73981955850c1a8ef3e3b04`,
+  pins Polaris `0.1.2` (`v0.1.2`) at commit
+  `ecca742fa9ed1243a73981955850c1a8ef3e3b04`,
   caches that checkout under `~/.local/share/dotfiles/polaris/<commit>` on
-  POSIX and `%LOCALAPPDATA%\dotfiles\polaris\<commit>` on Windows, verifies the
-  checkout `VERSION`, and runs every Polaris Git operation with
+  POSIX and `%LOCALAPPDATA%\dotfiles\polaris\<commit>` on Windows, verifies that
+  `v0.1.2` peels to the pinned commit plus the checkout `VERSION`, and runs
+  every Polaris Git operation with
   system/global/env config, templates, hooks, and executable Git config features
   disabled, then runs Polaris' Bash global installer and global check
   (`tools/install --global`, then `--global --check`; Windows uses a validated
@@ -683,7 +689,11 @@ stale; CI then fails verification until a human reviews the adjacent constant.
   (`@rose_pine_variant` on POSIX, `@rosepine-variant` on Windows). Both bars are
   top-aligned and show the same segments (session, window, user, short host,
   date/time, directory). The shared `tmux.conf` sources overlays with unquoted
-  `~/.tmux.*.conf` paths so psmux loads the Windows overlay reliably.
+  `~/.tmux.*.conf` paths so psmux loads the Windows overlay reliably. Windows
+  psmux starts from `~/.psmux.conf`, which turns warm sessions off before
+  sourcing `~/.tmux.conf`; the generated psmux status-right and Starship time
+  segment keep one trailing safety space so the last visible glyph is not drawn
+  into the terminal's final column.
 - **WSL is split-host by default.** Windows Terminal renders fonts and window UI
   on the Windows side; WSL installs the Linux CLI/editor stack. Linux Ghostty
   and Linux fontconfig fonts in WSL require `--experimental-wsl-gui`.
