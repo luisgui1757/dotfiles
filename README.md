@@ -274,6 +274,8 @@ and whether `pwsh` is installed.
   by changing `@rose_pine_variant` in `tmux/tmux.posix.conf` or
   `@rosepine-variant` in `tmux/tmux.windows.conf`, or live with
   `psmux set -g @rosepine-variant moon; psmux source-file ~/.tmux.windows.conf`.
+  Uniformity is strict: the generated psmux configs mirror rose-pine/tmux's
+  field spacing and Nerd Font separator glyphs, not just its palette.
 - Windows psmux uses a dedicated `~/.psmux.conf` entrypoint. It disables psmux
   warm sessions before sourcing `~/.tmux.conf`, so psmux cannot claim a stale
   warm server whose status theme loaded before chezmoi deployed the current
@@ -690,8 +692,9 @@ stale; CI then fails verification until a human reviews the adjacent constant.
   is `main`, with `moon` / `dawn` available through the variant option
   (`@rose_pine_variant` on POSIX, `@rosepine-variant` on Windows). Both bars are
   top-aligned and show the same segments (session, window, user, short host,
-  date/time, directory). Windows psmux starts from `~/.psmux.conf`, which turns
-  warm sessions off before sourcing `~/.tmux.conf`, then explicitly source-files
+  date/time, directory) with the same Rose Pine separator glyphs. Windows psmux
+  starts from `~/.psmux.conf`, which turns warm sessions off before sourcing
+  `~/.tmux.conf`, then explicitly source-files
   `~/.tmux.windows.conf` without `-q` because psmux v3.3.x does not implement
   tmux's `source-file -q` config flag. The generated psmux status-right and
   Starship time segment keep one trailing safety space so the last visible glyph

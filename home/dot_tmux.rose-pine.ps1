@@ -80,23 +80,31 @@ function Get-PsmuxRosePineCommand {
     $p = Get-PsmuxRosePinePalette -Variant $Variant
 
     # Nerd Font glyphs (codepoints -> runtime string keeps this .ps1 pure ASCII).
-    # Match the icons in tmux/tmux.posix.conf: session, current-window, folder, user,
-    # host, clock.
+    # Match the icons/separators used by rose-pine/tmux under tmux/tmux.posix.conf:
+    # session, current-window, folder, user, host, clock, right, left, windows.
     $iSession = [char]::ConvertFromUtf32(0xEB7F)
     $iWindow = [char]::ConvertFromUtf32(0xEB23)
     $iFolder = [char]::ConvertFromUtf32(0xF413)
     $iUser = [char]::ConvertFromUtf32(0xF007)
     $iHost = [char]::ConvertFromUtf32(0xF048B)
     $iClock = [char]::ConvertFromUtf32(0xF00F0)
+    $iRightSeparator = [char]::ConvertFromUtf32(0xEA9B)
+    $iLeftSeparator = [char]::ConvertFromUtf32(0xEA9C)
+    $iWindowStatusSeparator = [char]::ConvertFromUtf32(0xEB70)
 
-    # rose-pine/tmux defaults every separator to two spaces (flat, no powerline).
+    # rose-pine/tmux uses a two-space field separator between status modules and
+    # Nerd Font separators inside/right of window cells. They are flat glyphs, not
+    # powerline chevrons.
     $sep = $Separator
     $field = "#[fg=$($p.text)]$sep"
+    $rightSeparator = " $iRightSeparator "
+    $leftSeparator = " $iLeftSeparator "
+    $windowStatusSeparator = " $iWindowStatusSeparator "
 
     # Window list (rose-pine/tmux "show_current_program" mode). Foreground inlined
     # on the index too, so psmux paints it (window-status-*-style is ignored).
-    $winFormat = "#[fg=$($p.iris)]#I$sep#[fg=$($p.iris)]#W"
-    $winCurrentFormat = "#[fg=$($p.gold)]#I$sep#[fg=$($p.gold)]#W"
+    $winFormat = "#[fg=$($p.iris)]#I#[fg=$($p.iris)]$leftSeparator#[fg=$($p.iris)]#W"
+    $winCurrentFormat = "#[fg=$($p.gold)]#I#[fg=$($p.gold)]$leftSeparator#[fg=$($p.gold)]#W"
 
     # status-left: session (icon turns love while prefix is active) + window name.
     $showSession = "#{?client_prefix,#[fg=$($p.love)],#[fg=$($p.text)]}$iSession #[fg=$($p.text)]#S"
@@ -105,9 +113,9 @@ function Get-PsmuxRosePineCommand {
 
     # status-right: user + short host + date/time + directory basename. #(whoami)
     # and #h are replaced with load-time literals so no shell runs per redraw.
-    $showUser = "#[fg=$($p.iris)]$UserName#[fg=$($p.subtle)]$sep#[fg=$($p.subtle)]$iUser"
-    $showHost = "#[fg=$($p.text)]$ComputerName#[fg=$($p.subtle)]$sep#[fg=$($p.subtle)]$iHost"
-    $showDate = "#[fg=$($p.foam)]%a %d %b %H:%M#[fg=$($p.subtle)]$sep#[fg=$($p.subtle)]$iClock #[fg=$($p.text)]"
+    $showUser = "#[fg=$($p.iris)]$UserName#[fg=$($p.subtle)]$rightSeparator#[fg=$($p.subtle)]$iUser"
+    $showHost = "#[fg=$($p.text)]$ComputerName#[fg=$($p.subtle)]$rightSeparator#[fg=$($p.subtle)]$iHost"
+    $showDate = "#[fg=$($p.foam)]%a %d %b %H:%M#[fg=$($p.subtle)]$rightSeparator#[fg=$($p.subtle)]$iClock #[fg=$($p.text)]"
     $showDir = "#[fg=$($p.subtle)]$iFolder #[fg=$($p.rose)]#{b:pane_current_path} "
     $statusRight = "$showUser$field$showHost$field$showDate$field$showDir"
 
@@ -121,7 +129,7 @@ function Get-PsmuxRosePineCommand {
     & $add @('set', '-g', 'status-right-length', '200')
     & $add @('set', '-g', 'status-left', $statusLeft)
     & $add @('set', '-g', 'status-right', $statusRight)
-    & $add @('set', '-g', 'window-status-separator', $sep)
+    & $add @('set', '-g', 'window-status-separator', $windowStatusSeparator)
     & $add @('set', '-g', 'window-status-format', $winFormat)
     & $add @('set', '-g', 'window-status-current-format', $winCurrentFormat)
     & $add @('set', '-g', 'window-status-activity-style', "fg=$($p.base),bg=$($p.rose)")

@@ -1452,8 +1452,9 @@ host OS or shell would otherwise hide a branch from CI.
   official `rose-pine/tmux` on psmux (it is a bash/TPM script that shells out
   ~30x at load and would hang ConPTY). The renderer is pure declarative `set -g`
   (no load-time `if-shell`, no per-redraw `#(...)` shell; generated startup
-  configs use native `#{user}`, `#{host_short}`, `#{b:pane_current_path}`, and
-  literal two-space separators), keeps one trailing safety space after the
+  configs use native `#{user}`, `#{host_short}`, `#{b:pane_current_path}`,
+  rose-pine/tmux's literal two-space field separator, and its Nerd Font
+  left/right/window separators), keeps one trailing safety space after the
   status-right directory so the final visible cell is not clipped by Windows
   Terminal/ConPTY, inlines every `#[fg=...]` because psmux
   stores-but-ignores `window-status-*-style`, and ships all three variants

@@ -30,9 +30,16 @@ Describe 'psmux-rose-pine renderer' {
         foreach ($c in $cmds) { $opt[$c.Argv[2]] = $c.Argv[3] }
 
         $opt['status-style'] | Should -Be "fg=$Pine,bg=$Base"
+        $leftSeparator = [char]::ConvertFromUtf32(0xEA9C)
+        $rightSeparator = [char]::ConvertFromUtf32(0xEA9B)
+        $windowStatusSeparator = [char]::ConvertFromUtf32(0xEB70)
         # foreground inlined (psmux ignores window-status-*-style)
         $opt['window-status-current-format'] | Should -Match ([regex]::Escape("#[fg=$Gold]"))
         $opt['window-status-format'] | Should -Match ([regex]::Escape("#[fg=$Iris]"))
+        $opt['window-status-current-format'] | Should -Match ([regex]::Escape(" $leftSeparator "))
+        $opt['window-status-format'] | Should -Match ([regex]::Escape(" $leftSeparator "))
+        $opt['window-status-separator'] | Should -Be " $windowStatusSeparator "
+        $opt['status-right'] | Should -Match ([regex]::Escape(" $rightSeparator "))
         # directory basename present, matching rose-pine/tmux @rose_pine_directory
         $opt['status-right'] | Should -Match ([regex]::Escape('#{b:pane_current_path}'))
         # one terminal-edge safety cell: the last visible glyph/text must not sit
