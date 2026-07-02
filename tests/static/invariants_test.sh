@@ -61,6 +61,28 @@ check_absent "no load-time if-shell in cross-platform tmux.conf (psmux freeze gu
     "^[[:space:]]*if-shell" \
     tmux/tmux.conf home/dot_tmux.conf
 
+check_absent "tmux overlay source paths keep unquoted tilde for psmux" \
+    'source-file -q "~/' \
+    tmux/tmux.conf home/dot_tmux.conf
+
+if find tmux/themes -type f -name '*.conf' 2>/dev/null | grep -q .; then
+    echo "FAIL: local tmux theme snippets must stay deleted; use upstream Rose Pine variants"
+    find tmux/themes -type f -name '*.conf'
+    fail=1
+else
+    echo "ok  : no local tmux theme snippets"
+fi
+
+if ! grep -F "set -g @rose_pine_date_time '%a %d %b %H:%M'" tmux/tmux.posix.conf >/dev/null; then
+    echo "FAIL: POSIX tmux must keep the official Rose Pine date/time segment enabled"
+    fail=1
+elif ! grep -F '%a %d %b %H:%M' tmux/psmux-rose-pine.main.conf >/dev/null; then
+    echo "FAIL: Windows psmux generated Rose Pine main config must keep the date/time segment enabled"
+    fail=1
+else
+    echo "ok  : tmux/psmux date/time segments are enabled"
+fi
+
 # Lazy-load discipline: only rose-pine should be lazy=false
 nonlazy=$(grep -lE "lazy[[:space:]]*=[[:space:]]*false" nvim/lua/plugins/*.lua 2>/dev/null | grep -v rose-pine.lua || true)
 if [[ -n "$nonlazy" ]]; then

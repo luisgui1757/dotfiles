@@ -7,7 +7,12 @@
        is a Windows-host responsibility by default; lazygit stays managed on
        WSL. */ -}}
 {{- if ne .targetOS "windows" }}
+.psmux.conf
 .tmux.windows.conf
+.tmux.rose-pine.ps1
+.tmux.rose-pine.main.conf
+.tmux.rose-pine.moon.conf
+.tmux.rose-pine.dawn.conf
 AppData
 Documents
 {{- end }}

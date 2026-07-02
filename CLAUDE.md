@@ -106,6 +106,11 @@ that violates one of these, fix it instead of disabling the test.
     existing (`enabled = isdirectory(...)` silently disabled it on machines
     without a vault). It `mkdir -p`s the resolved vault and honors `NOTES_VAULT`
     (see `util/notes_path.lua`); set that env var to point at your real vault.
+    Equation rendering uses render-markdown's LaTeX path with the `latex`
+    Tree-sitter parser plus the `latex2text` converter. Setup installs
+    `latex2text` through a pinned, SHA-256-checked `pylatexenc` venv; its
+    `setuptools` build backend is pinned too. Do not replace this with an
+    unpinned host pip install or a second Markdown renderer.
 12. **No `vim.lsp.set_log_level(...)`.** Deprecated in nvim 0.11; use the module
     form `vim.lsp.log.set_level(...)` (see `lsp-config.lua`). Guarded by
     `invariants_test.sh`.
@@ -628,7 +633,8 @@ save only**. The next plain `:w` formats normally. Implemented in
   Code, psmux installation, or distro package-manager policy into chezmoi
   run-scripts. psmux stays in `install-deps.ps1` via `Install-Psmux` and the
   hardened `Add-ScoopBucketSafe` path; chezmoi only owns the psmux-readable
-  config files (`.tmux.conf` and `.tmux.windows.conf`).
+  config files (`.tmux.conf`, `.tmux.windows.conf`, and the generated
+  `.tmux.rose-pine.{main,moon,dawn}.conf` files).
   `home/.chezmoi.toml.tmpl` is the mode switch: POSIX uses `mode = "symlink"`
   for live-edit behavior, Windows uses `mode = "file"` for simple single-file
   configs, but Windows `nvim` remains a directory symlink and still needs
@@ -696,44 +702,76 @@ save only**. The next plain `:w` formats normally. Implemented in
   while package installs are still running, which Mason reports as aborted
   installs. Update mode still skips git pull, chezmoi apply, Lazy restore, Lazy
   sync, and Lazy update. `install-deps --update` updates only present catalog
-  tools through scoped per-package manager commands
-  (`brew upgrade <formula>`, native Linux package upgrade commands, Windows
-  `scoop update <pkg>` after one manifest refresh, Windows
-  `winget upgrade --id <id> -e`, or Windows `choco upgrade <pkg> -y`). Scoop
-  ownership must use shim metadata as the first proof layer: a command source
-  under `...\scoop\shims` must parse the sibling `.shim` target and match
-  `...\scoop\apps\<catalog-package>\...` before any package-list fallback. A
-  resolved command source outside Scoop must not be claimed by `scoop list`. A
-  corrupt or mismatched Scoop shim is a blocked update failure, not an unmanaged
-  tool and not a reason to fall through to winget/Chocolatey. Winget updates
-  require both exact ownership and an exact
-  `winget list --upgrade-available --id <id> -e --accept-source-agreements`
-  availability row; no matching available update is reported as `current`, while
-  a failed availability query appends to `InstallFailures`. It must not run
-  blanket upgrades such as `brew upgrade`, `apt upgrade`,
-  `scoop update *`, `winget upgrade --all`, or `choco upgrade all`, and it must
-  not touch pinned direct downloads, PSFzf, `lazy-lock.json`, or configs. On
-  Windows, a present catalog tool is updated only when Scoop, winget, or
-  Chocolatey claims that exact package; otherwise update mode reports it as
-  unmanaged with its resolved executable path and exits successfully unless an
-  attempted scoped update failed. On native Linux without Linuxbrew or
-  Alpine/apk, `nvim`, `lazygit`, `starship`, and `tree-sitter` are pinned
-  direct-download binaries and stay out of the update path. Linuxbrew updates
-  them through `brew upgrade <formula>`; Alpine updates its native `neovim`,
-  `lazygit`, `starship`, and `tree-sitter` packages through apk.
+  tools after proving ownership from the executable source, then runs a scoped
+  per-package manager or repo-pinned artifact command (`brew upgrade <formula>`,
+  native Linux package-specific upgrade commands, Windows `scoop update <pkg>`
+  after one manifest refresh, Windows `winget upgrade --id <id> -e`, or Windows
+  `choco upgrade <pkg> -y`). It must not run blanket upgrades such as
+  `brew upgrade`, `apt upgrade`, `pacman -Syu`, `scoop update *`,
+  `winget upgrade --all`, or `choco upgrade all`, and it must not touch PSFzf,
+  `lazy-lock.json`, or configs. Unix update mode is per-tool, not one global
+  active-manager pass: Homebrew/Linuxbrew requires the PATH-visible command path
+  and its resolved executable target to stay under `brew --prefix`, the
+  installed formula, and `brew list --formula <formula>` file ownership of the
+  resolved executable; apt/dnf/zypper/pacman/apk require
+  the manager's file-ownership proof for the resolved real path; repo-pinned
+  direct Linux artifacts (`nvim`, `lazygit`, `starship`, `tree-sitter`, and
+  `chezmoi`) are owned only when their durable marker matches the repo-pinned
+  version, URL, SHA-256, command path, binary path, install root, installed
+  binary SHA-256, executable `--version` output, and supported install shape:
+  Neovim is `/usr/local/bin/nvim` pointing into `/opt/nvim-linux-*`; lazygit and
+  Starship are `/usr/local/bin/<tool>` or `~/.local/bin/<tool>`; tree-sitter and
+  chezmoi are `~/.local/bin/<tool>`. A Brew-prefix command symlink that resolves
+  outside the Brew prefix is a blocked ownership contradiction, a shadow command
+  path that resolves to the same binary is not ownership, an unsupported
+  direct-artifact root is not ownership, and a marker binary outside the
+  recorded install root is corrupt provenance. Legacy unmarked direct binaries
+  remain `unmanaged`. Homebrew current packages must
+  print `current` without running `brew upgrade`; Homebrew outdated detection
+  must treat an exact `brew outdated --formula --quiet <pkg>` stdout row as
+  outdated even when Brew returns nonzero, because Homebrew uses that exit state
+  for named outdated formulae. Apt current packages must not run
+  `apt-get install --only-upgrade` after a successful metadata refresh proves
+  installed == candidate. Pacman-owned tools are `skipped` because package-level
+  updates would violate Arch's explicit full-system-upgrade model. `/bin/zsh` on
+  macOS is `system`. Normal macOS developer tools that still resolve from
+  `/usr/bin` are `unmanaged` with a Homebrew migration hint. Setup owns the
+  Homebrew shellenv block and Homebrew GNU Make `libexec/gnubin` PATH adoption
+  when the `make` formula is installed; do not document a hidden manual export
+  step instead. Scoop ownership must use shim metadata as the first proof layer:
+  a command source under `...\scoop\shims` must parse the sibling `.shim` target
+  and match `...\scoop\apps\<catalog-package>\...` before any package-list
+  fallback. A resolved command source outside Scoop must not be claimed by
+  `scoop list`. A corrupt or mismatched Scoop shim is a blocked update failure,
+  not an unmanaged tool and not a reason to fall through to winget/Chocolatey.
+  Winget and Chocolatey ownership require both an exact package-list row and an
+  active command source under that manager's supported install roots; a manual
+  `C:\Manual\...\pwsh.exe` is `unmanaged` even if winget/Chocolatey lists the
+  package. Windows updates require a manager-specific non-mutating availability
+  proof before mutation: Scoop uses the structured `scoop status` row for the
+  exact `Name` only when `Latest Version` is non-empty and both `Info` and
+  `Missing Dependencies` are empty, winget uses
+  `winget list --upgrade-available --id <id> -e --accept-source-agreements`, and
+  Chocolatey uses `choco outdated --limit-output`. No matching available update
+  is reported as `current`, while a failed availability query appends to
+  `InstallFailures`. Status vocabulary is stable across OSes: `updated`,
+  `current`, `system`, `unmanaged`, `blocked`, and `skipped`; `blocked` exits
+  nonzero, while `unmanaged` exits successfully with the resolved source path.
+  Do not use vague "present, but <manager> does not
+  manage" wording.
 - **Polaris is setup Phase 6/6 and is opt-out, not experimental.** Full setup
-  (`--all` / `-All`) applies Polaris `0.1.1` at commit
-  `489dcc6f991ddcff63c460a433e983264dc54cf7` unless
+  (`--all` / `-All`) applies Polaris `0.1.2` (`v0.1.2`) at commit
+  `ecca742fa9ed1243a73981955850c1a8ef3e3b04` unless
   `--skip-agents` / `-SkipAgents` is passed. Interactive setup asks
   `Apply Polaris global agent rules? [Y/n]`. The setup phase clones Polaris into
   a dotfiles-owned cache (`~/.local/share/dotfiles/polaris/<commit>` on POSIX,
   `%LOCALAPPDATA%\dotfiles\polaris\<commit>` on Windows), verifies the checkout
-  commit and `VERSION`, and performs all Polaris Git operations with system,
-  global, environment-injected config, templates, hooks, and executable Git
-  config features disabled. It then runs Polaris' Bash global installer
+  tag, commit, and `VERSION`, and performs all Polaris Git operations with
+  system, global, environment-injected config, templates, hooks, and executable
+  Git config features disabled. It then runs Polaris' Bash global installer
   (`tools/install --global`), then runs its global check. Windows setup invokes
   the same Bash installer through a validated Git Bash (`cygpath` must be
-  present) with Git Bash's POSIX-only PATH for the `0.1.1` pin; do not use
+  present) with Git Bash's POSIX-only PATH for the `0.1.2` pin; do not use
   Polaris `tools/install.ps1` for global installs unless a newer Polaris pin
   proves the PowerShell path in CI. Do not inline or reimplement Polaris
   rendering here. Project/team Polaris adoption is a separate repo-local install
@@ -782,6 +820,18 @@ save only**. The next plain `:w` formats normally. Implemented in
   while main emits MSVC-style `cc` crate flags that require MSVC. Ad-hoc
   `:TSUpdate` parser rebuilds on Windows should run from a "Developer
   PowerShell for VS" shell or after rerunning setup.
+- **Markdown equations use a pinned `pylatexenc` converter.** render-markdown's
+  LaTeX support needs the non-bundled `latex` parser (already in
+  `treesitter_parsers`) and a converter executable. `install-deps.sh` creates
+  `~/.local/share/dotfiles/python-tools/pylatexenc`, installs pinned
+  `setuptools` first, installs `pylatexenc==2.10` with pip `--require-hashes`
+  and `--no-build-isolation`, and writes `~/.local/bin/latex2text`;
+  interactive zsh prepends `~/.local/bin`. `install-deps.ps1` creates the same
+  venv under
+  `%LOCALAPPDATA%\dotfiles\python-tools\pylatexenc` and adds its `Scripts`
+  directory to User PATH. Keep `nvim/lua/plugins/markdown.lua`'s converter set
+  to `latex2text` so machines use the setup-owned converter rather than
+  opportunistically preferring unrelated host tools.
 - **Synchronous nvim-treesitter bootstrap is serialized by design.**
   nvim-treesitter `main` defaults to high parallelism for interactive installs.
   That is not the setup/CI contract: hosted runners restore parser caches and
@@ -858,18 +908,24 @@ save only**. The next plain `:w` formats normally. Implemented in
   not claim it. If a command resolves through Scoop shims but the metadata is
   missing, unreadable, outside the apps tree, or mapped to a different package,
   update mode records a blocked Scoop provenance failure and must not fall
-  through to another manager. Winget ownership is not enough to run an update:
-  `Get-WingetPackageUpgradeState` must first prove exact upgrade availability
-  with `winget list --upgrade-available --id <id> -e`; no matching update is
-  reported as `current`, and a failed availability query is a real update
-  failure.
-  `Update-ScoopTool` remains the only Scoop-specific update path and is
-  intentionally single-package; never replace it with `scoop update *`,
-  `winget upgrade --all`, `choco upgrade all`, or another blanket upgrade.
-  Failed manifest refreshes, availability checks, or package updates append to
-  `InstallFailures`, so update mode exits nonzero when a scoped refresh did not
-  actually succeed. Present tools outside Scoop/winget/Chocolatey are reported
-  as unmanaged and do not count as successful dotfiles-owned updates.
+  through to another manager. Winget/Chocolatey package-list ownership is not
+  enough to run an update: the active command source must also live under the
+  supported install roots for that manager/package. A manual shadow command is
+  `unmanaged`, not a manager-owned update target. A manager-specific
+  availability probe must then prove the package is actually outdated before any
+  mutating package command runs: Scoop filters structured `scoop status` rows by
+  exact `Name` plus non-empty `Latest Version` and fails closed on non-empty
+  `Info` or `Missing Dependencies`, winget filters
+  `winget list --upgrade-available --id <id> -e`, and Chocolatey filters
+  `choco outdated --limit-output`. No matching update is reported as `current`,
+  and a failed availability query is a real update failure. `Update-ScoopTool`
+  remains the only Scoop-specific update path and is intentionally
+  single-package; never replace it with `scoop update *`, `winget upgrade --all`,
+  `choco upgrade all`, or another blanket upgrade. Failed manifest refreshes,
+  availability checks, or package updates append to `InstallFailures`, so update
+  mode exits nonzero when a scoped refresh did not actually succeed. Present
+  tools outside Scoop/winget/Chocolatey are reported as unmanaged and do not
+  count as successful dotfiles-owned updates.
 - **Windows CI uses Scoop's documented elevated bootstrap.** GitHub-hosted
   `windows-2025` runners are elevated, and Scoop blocks elevated install by
   default. `Install-Scoop` detects elevation and runs the official installer
@@ -1037,18 +1093,19 @@ save only**. The next plain `:w` formats normally. Implemented in
   `renovate.json`, direct-download SHA-256 values must be matched as context
   only, not named `currentDigest`, otherwise Renovate will schedule same-version
   digest updates for checksums it cannot actually resolve.
-- **Polaris is pinned by immutable Git commit plus `VERSION`, not a moving
+- **Polaris is pinned by immutable Git tag + commit + `VERSION`, not a moving
   branch.** Setup may clone from GitHub, but it must checkout the exact
-  `POLARIS_REF`, assert `POLARIS_VERSION`, reject dirty cached worktrees, and
-  run only the installer from that verified checkout. Clone, checkout, and cache
-  validation must all use the Polaris Git wrapper: do not trust mutable system,
+  `POLARIS_REF`, assert that `POLARIS_TAG` peels to that commit, assert
+  `POLARIS_VERSION`, reject dirty cached worktrees, and run only the installer
+  from that verified checkout. Clone, checkout, and cache validation must all
+  use the Polaris Git wrapper: do not trust mutable system,
   global, environment-injected, template, hook, or `.git/config` state. Cache
   validation must force the intended cache path with `--git-dir`/`--work-tree`
   semantics and disable executable Git config features such as `core.fsmonitor`,
   so `core.worktree` redirection or fsmonitor hooks cannot run or hide modified
-  files before the installer executes. Updating Polaris means changing both
-  constants, updating README/CLAUDE references, and keeping shell/Pester/static
-  pin tests green.
+  files before the installer executes. Updating Polaris means changing the tag,
+  commit, and version constants together, updating README/CLAUDE references, and
+  keeping shell/Pester/static pin tests green.
 - **Dependency installers own the "install EVERYTHING?" prompt; Polaris owns a
   separate global-policy prompt.** Interactive runs that didn't pass
   `--all`/`-All` can get the dependency prompt; answering yes flips
@@ -1095,9 +1152,12 @@ save only**. The next plain `:w` formats normally. Implemented in
   `.tmux.windows.conf` is ignored off-Windows). The cross-platform
   `tmux/tmux.conf` keeps only a psmux-safe OSC52 baseline
   (`bind -T copy-mode-vi y send -X copy-pipe-and-cancel`, no shell) and
-  `source-file -q "~/.tmux.posix.conf"` — a silent no-op on Windows where the
-  file is absent (same proven mechanism as the Windows overlay source). On POSIX
-  the overlay re-binds `y` to the native CLI when one exists. This is the
+  `source-file -q ~/.tmux.posix.conf` — a silent no-op for real tmux when the
+  file is absent. Keep the tilde path unquoted because psmux is stricter than
+  real tmux about quoted path expansion. Do not rely on `source-file -q` for
+  psmux-only startup includes; psmux v3.3.x does not implement that config flag,
+  so `tmux/psmux.conf` source-files the Windows overlay explicitly without
+  flags. On POSIX the overlay re-binds `y` to the native CLI when one exists. This is the
   canonical "guard the block, don't fork the config" fix. **Invariant:** the
   cross-platform `tmux/tmux.conf` (and its `home/dot_tmux.conf` mirror) must
   contain NO command-position `if-shell` — guarded by `invariants_test.sh`
@@ -1116,9 +1176,11 @@ save only**. The next plain `:w` formats normally. Implemented in
   shell is **cmd**, not pwsh — which is the *real* reason "history prediction"
   and `MenuComplete` looked broken inside panes: PSReadLine was never loaded.
   The fix is a Windows-only overlay `tmux/tmux.windows.conf`, managed as
-  `~/.tmux.windows.conf` by chezmoi on Windows and pulled in by the main
-  `tmux/tmux.conf` via `source-file -q` (silent no-op on Unix where it does not
-  exist). The overlay sets:
+  `~/.tmux.windows.conf` by chezmoi on Windows and pulled in by
+  `tmux/psmux.conf` via unquoted, flag-free
+  `source-file ~/.tmux.windows.conf`. The shared `tmux.conf` also carries
+  `source-file -q ~/.tmux.windows.conf` for real tmux compatibility, but that is
+  not a valid psmux startup include path. The overlay sets:
   (1) `default-shell pwsh` — so fresh psmux panes spawn PowerShell 7, which
   loads PSReadLine + the profile.
   (2) `allow-predictions on` — psmux otherwise resets `PredictionSource` to
@@ -1352,72 +1414,77 @@ host OS or shell would otherwise hide a branch from CI.
   common BMP symbols every terminal renders via fallback (unlike PUA nerd
   glyphs), so they stay. Re-audit after any symbol change by loading the font
   cmap with fontTools and asserting each non-ASCII codepoint is a member.
-- **tmux colors track the canonical rose-pine/tmux theme.** Source:
-  <https://github.com/rose-pine/tmux>, main variant. Role-based styles
-  carry the colors. Map: status-style `fg=pine,bg=base`; window-status
-  `fg=iris,bg=base` (inactive windows; this is the "cool" default the owner chose
-  after auditioning `tmux/themes/`); window-status-current `fg=gold,bold`;
-  window-status-activity `fg=base,bg=rose`; pane-border `fg=hl_high #524f67`
-  / pane-active-border `fg=gold`; message `fg=muted,bg=base`;
-  message-command `fg=base,bg=gold`. (Status-area bgs are `base` -- the dark
-  terminal color; bar opacity comes from WT `opacity: 100`, NOT the bg color, see
-  the opaque-bar note below.) **DO** set explicit
-  `window-status-format "#I:#W#F"` and `window-status-current-format
-  "#I:#W#F"` -- tmux's DEFAULT format contains a `#{?window_flags,...}`
-  conditional that psmux v3.3.4 renders as a literal string in each cell.
-  An earlier ship that used `setw -gu window-status-format` (unset, fall
-  back to tmux default) lit that bug -- explicit `#I:#W#F` parses cleanly
-  in both real tmux and psmux. Active windows use gold with bold weight because
-  the foreground-only canonical theme was too subtle in dark terminals; bold is
-  the smallest divergence that fixes legibility without breaking the palette.
-  Inactive cells use iris (`setw -g window-status-style "fg=#c4a7e7,bg=#191724"`,
-  8.4:1) -- the "cool" theme, which the owner chose as the default after
-  auditioning the alternatives in `tmux/themes/` (warm/minimal/teal). The teal
-  variant (inactive inherits pine via `setw -gu`) lives in `tmux/themes/teal.conf`
-  if you want it back. Earlier churn (transparency was misdiagnosed as a color
-  problem) is settled; the legibility knob was always WT opacity, not the color.
-  **OPAQUE STATUS BAR -- the WT reality (owner-confirmed on a real machine).**
-  Windows Terminal applies its `opacity` WINDOW-WIDE to every cell, regardless of
-  the cell's background color. So a transparent WT (`opacity < 100`) has a
-  transparent status bar no matter what bg the bar uses -- giving the bar an
-  explicit, different-from-default color does NOT make it opaque in WT (this was
-  tried with `surface #1f1d2e` at `opacity: 95` and the bar stayed see-through).
-  That "explicit bg renders opaque" behavior exists in some terminals (alacritty)
-  but NOT in Windows Terminal. The only way to a fully solid bar in WT is a fully
-  opaque window (`opacity: 100`). **The owner chose transparency over a solid
-  bar:** the fragment ships **`opacity: 95`** (see-through terminal), so the
-  status bar is transparent too -- an accepted trade for the see-through look,
-  themed via colors rather than opacity. Status-area bgs stay `base #191724` (the
-  dark terminal color). macOS/Linux Ghostty use `background-opacity 0.95` +
-  `background-blur-radius 15`, whose blur renders an opaque-LOOKING dark bar even
-  while transparent (WT acrylic is the analog but is unreliable in a VM, so WT
-  gets no blur). Do NOT re-add an overlay `status-style` hack (a prior wrong
-  attempt assuming psmux ignores `window-status-style`, since removed) and do NOT
-  switch the bar bg to surface to "fix" opacity (it does not, in WT). To flip to
-  a fully-solid bar, set WT `opacity: 100` (whole window). Guarded by
-  `tests/tmux/option_test.sh`.
-  Status-left (iris-bold session + muted
-  separator) and status-right (foam date + gold time) are our own
-  customizations, palette-consistent. History/rejected attempts worth not
-  re-attempting:
-  (1) inactive `muted #6e6a86` -- 3.4:1 contrast, failed AA, illegible;
-  (2) inactive `subtle #908caa` -- 5.5:1, borderline, still illegible;
-  (3) inactive `text #e0def4` -- bright but flat, user wanted canonical;
-  (4) iris inactive + gold-bold ON `bg=overlay #26233a` active block
-  (commit 9cf13f8) -- added a bold + bg-block on top of canonical, user
-  preferred plain canonical so the embellishment was reverted;
-  (5) inactive color (iris vs inherited-pine "teal") flip-flopped while
-  transparency was misdiagnosed as a color problem; settled by the owner
-  auditioning `tmux/themes/` and picking iris ("cool") as the default, with teal
-  kept as `tmux/themes/teal.conf`. If inactive reads poorly it is WT transparency
-  (`opacity`), NOT the color -- do not chase it by re-coloring;
-  (6) relying on `window-status-current-style` alone (commits ee0d6c9 /
-  d642a31) -- psmux v3.3.4 stores the option but does NOT apply it when
-  rendering window cells. Only `#[fg=...]` INLINED in
-  `window-status-current-format` actually paints the current window
-  under psmux. Real tmux honors either; we ship the inline form so both
-  render. **Do NOT** switch inactive to `dim` -- it is terminal/ConPTY-flaky
-  under psmux and re-creates the legibility problem.
+- **Starship prompt segments are foreground-only.** `starship/starship.toml`
+  must not contain `bg:` styles. Terminal transparency belongs to Ghostty /
+  Windows Terminal; Starship-owned background blocks render as opaque character
+  cells and make the prompt look patched onto the transparent surface. Guarded
+  by `tests/starship/render_test.sh`. The right-aligned time module deliberately
+  keeps one trailing safety space so its final Nerd Font glyph is not drawn into
+  the terminal's last column.
+- **tmux Rose Pine: POSIX loads the upstream plugin; Windows renders a repo-owned
+  psmux-safe port.** Shared `tmux/tmux.conf` is psmux-safe and owns only
+  cross-platform placement (`status-position top`). POSIX loads
+  `tmux/tmux.posix.conf`, which declares TPM + `rose-pine/tmux` from the
+  repo-managed plugin root `~/.local/share/dotfiles/tmux-plugins` and enables
+  user, short host, date/time, directory, and current-program window names.
+  Windows starts psmux through `tmux/psmux.conf` (deployed as `~/.psmux.conf`),
+  which disables psmux warm sessions before sourcing `~/.tmux.conf`. This is
+  required because psmux's pre-server warm check only shallow-scans the first
+  config file and would otherwise be able to claim a stale warm server after
+  chezmoi changed the generated theme files. `tmux/psmux.conf` then
+  source-files `~/.tmux.windows.conf` explicitly with flag-free psmux syntax:
+  psmux v3.3.x does not implement tmux's `source-file -q` config flag, so the
+  shared `tmux.conf` include is not a valid startup path for the Windows
+  overlay in psmux. Windows then loads `tmux/tmux.windows.conf`, which sets
+  `@rosepine-variant` and `source-file`s one generated repo-owned config
+  (`tmux/psmux-rose-pine.{main,moon,dawn}.conf`, deployed by chezmoi as
+  `~/.tmux.rose-pine.{main,moon,dawn}.conf`). Those generated configs reproduce
+  rose-pine/tmux's rendered `set -g` output so the psmux bar matches the flat,
+  foreground-only POSIX bar, and they apply synchronously during config parse.
+  This is load-bearing: psmux `run` / `run-shell` always spawns non-blocking, so
+  a PowerShell renderer that shells back through `psmux set -g ...` can race the
+  first client/status paint and leave the default blue bar until a manual
+  post-attach run. `source-file` parses the literal `set -g` lines in-process
+  before the first window/client state is rendered, matching psmux's native
+  `plugin.conf` theme path. Guarded by `windows_conf_test.sh`.
+  We deliberately do NOT use the community `psmux-theme-rosepine` plugin (it
+  renders a different powerline bar of colored segment blocks) and cannot run the
+  official `rose-pine/tmux` on psmux (it is a bash/TPM script that shells out
+  ~30x at load and would hang ConPTY). The renderer is pure declarative `set -g`
+  (no load-time `if-shell`, no per-redraw `#(...)` shell; generated startup
+  configs use native `#{user}`, `#{host_short}`, `#{b:pane_current_path}`,
+  rose-pine/tmux's literal two-space field separator, and its Nerd Font
+  left/right/window separators), keeps one trailing safety space after the
+  status-right directory so the final visible cell is not clipped by Windows
+  Terminal/ConPTY, inlines every `#[fg=...]` because psmux
+  stores-but-ignores `window-status-*-style`, and ships all three variants
+  (`main` default, `moon`, `dawn`) selected by `@rosepine-variant`; POSIX
+  selects the same via `@rose_pine_variant`. `tmux/psmux-rose-pine.ps1` MUST
+  stay pure ASCII (PS 5.1 parse safety, guarded by `invariants_test.sh`) -- the
+  Nerd Font glyphs are built from codepoints at runtime, matching the icons in
+  `tmux/tmux.posix.conf`, and the generated `.conf` artifacts carry the rendered
+  glyphs. Keep local `tmux/themes/*.conf` snippets deleted.
+  Keep plugin managers in OS overlays only; shared `tmux.conf` must remain free
+  of load-time `if-shell`, psmux-specific commands, and quoted overlay source
+  paths, and the Windows overlay must not reintroduce `@plugin`/PPM or a
+  plugin-root `run`. Keep `tmux/psmux.conf` Windows-only and mirrored to
+  `home/dot_psmux.conf`. The generated `.conf` files are committed artifacts;
+  regenerate them with the renderer's `-EmitConf -Variant <name>` mode once per
+  variant, and `tests/powershell/PsmuxRosePine.Tests.ps1` asserts byte
+  freshness. Live variant switch:
+  `psmux set -g @rosepine-variant moon; psmux source-file ~/.tmux.windows.conf`.
+  Current pins (POSIX plugins only): TPM
+  `e261deb1b47614eed3400089ce7197dc68acc4eb` and `rose-pine/tmux`
+  `b6138c51573425ccdc33c91464597323baec3b7e`. Guarded by
+  `tests/tmux/option_test.sh`, `tests/tmux/windows_conf_test.sh`,
+  `tests/powershell/PsmuxRosePine.Tests.ps1`, `tests/migration/parity_gate.sh`,
+  and `tests/static/pin_consistency_test.sh`.
+- **Windows Terminal opacity remains window-wide.** A transparent WT
+  (`opacity < 100`) makes every cell transparent, including tmux/psmux status
+  cells, regardless of the cell background color. Do not chase opacity by
+  recoloring tmux backgrounds. To make the whole terminal solid, set WT
+  `opacity: 100`; otherwise let the upstream themes color foreground/status
+  roles and accept terminal-level transparency.
 - **`stylua.toml` at repo root is load-bearing.** stylua reads ONLY its own
   config (`stylua.toml` / `.stylua.toml`) -- it does NOT respect
   `.editorconfig`. Its built-in defaults are `indent_type = "Tabs"` and

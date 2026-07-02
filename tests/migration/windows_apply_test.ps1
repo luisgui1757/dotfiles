@@ -358,9 +358,29 @@ function Assert-Part1Files {
         -ExpectedPath (Join-Path $script:RepoRoot 'tmux\tmux.conf') `
         -Label '~/.tmux.conf'
     Assert-CopyModeFileMatches `
+        -ActualPath (Join-Path $Sandbox '.psmux.conf') `
+        -ExpectedPath (Join-Path $script:RepoRoot 'tmux\psmux.conf') `
+        -Label '~/.psmux.conf'
+    Assert-CopyModeFileMatches `
         -ActualPath (Join-Path $Sandbox '.tmux.windows.conf') `
         -ExpectedPath (Join-Path $script:RepoRoot 'tmux\tmux.windows.conf') `
         -Label '~/.tmux.windows.conf'
+    Assert-CopyModeFileMatches `
+        -ActualPath (Join-Path $Sandbox '.tmux.rose-pine.ps1') `
+        -ExpectedPath (Join-Path $script:RepoRoot 'tmux\psmux-rose-pine.ps1') `
+        -Label '~/.tmux.rose-pine.ps1'
+    Assert-CopyModeFileMatches `
+        -ActualPath (Join-Path $Sandbox '.tmux.rose-pine.main.conf') `
+        -ExpectedPath (Join-Path $script:RepoRoot 'tmux\psmux-rose-pine.main.conf') `
+        -Label '~/.tmux.rose-pine.main.conf'
+    Assert-CopyModeFileMatches `
+        -ActualPath (Join-Path $Sandbox '.tmux.rose-pine.moon.conf') `
+        -ExpectedPath (Join-Path $script:RepoRoot 'tmux\psmux-rose-pine.moon.conf') `
+        -Label '~/.tmux.rose-pine.moon.conf'
+    Assert-CopyModeFileMatches `
+        -ActualPath (Join-Path $Sandbox '.tmux.rose-pine.dawn.conf') `
+        -ExpectedPath (Join-Path $script:RepoRoot 'tmux\psmux-rose-pine.dawn.conf') `
+        -Label '~/.tmux.rose-pine.dawn.conf'
     # psmux freeze boundary: the POSIX-only clipboard overlay carries the
     # `if-shell` probes that hang psmux at config-load time. It MUST NOT be
     # deployed on Windows (home/.chezmoiignore ignores it). Assert its absence so

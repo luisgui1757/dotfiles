@@ -19,9 +19,9 @@ dotfiles/config layer in `home/`. The full setup scripts now apply configs
 through chezmoi.
 
 Updates are deliberately two-track. The reproducible core is pinned in git:
-Neovim plugins (`nvim/lazy-lock.json`), SHA-256-verified direct downloads,
-and configs. Update that track with `git pull` and then re-run setup. The
-drift-tolerant edge is package-manager CLI tools plus Mason LSPs; refresh only
+Neovim plugins (`nvim/lazy-lock.json`) and configs update with `git pull` and
+then re-running setup. The drift-tolerant edge is package-manager CLI tools,
+proven dotfiles-owned direct artifacts on Unix, and Mason LSPs; refresh only
 that edge with `./setup.sh --update` or `.\setup.ps1 -Update`.
 
 ## Quick Start
@@ -107,7 +107,7 @@ apply.
 ```bash
 ./setup.sh                       # Y/n per dep, end-to-end
 ./setup.sh --all                 # non-interactive
-./setup.sh --update              # update PM tools + Mason, no git/config/Lazy
+./setup.sh --update              # update proven tools/artifacts + Mason, no git/config/Lazy
 ./setup.sh --dry-run             # preview
 ./setup.sh --experimental-wsl-gui # WSL-only opt-in for Linux GUI terminal bits
 ./setup.sh --skip-config         # skip chezmoi config apply
@@ -207,6 +207,7 @@ Add `--dry-run` / `-DryRun` to preview every step without touching disk.
 Pass `--skip-agents` / `-SkipAgents` to leave global AI-agent entrypoints alone.
 Pass `--update` / `-Update` from an existing checkout to run only the
 drift-edge refresh: scoped package-manager updates for present catalog tools,
+Unix direct-artifact refreshes only when dotfiles provenance proves ownership,
 then `nvim --headless +MasonToolsUpdateSync +qa`. The synchronous Mason command
 keeps headless Neovim alive until package installs finish. It deliberately skips
 `git pull`, `chezmoi apply`, `:Lazy restore`, synchronous Tree-sitter parser
@@ -234,7 +235,7 @@ symlink, and Windows Terminal remains a merge.
 | Starship | `~/.config/starship.toml` -> `starship/starship.toml` | same | `%USERPROFILE%\.config\starship.toml` -> `starship\starship.toml` |
 | zsh | `~/.zshenv` -> `shells/zshenv`; `~/.zshrc` -> `shells/zshrc` | same | n/a |
 | PowerShell | n/a | n/a | `Documents\PowerShell\Microsoft.PowerShell_profile.ps1` -> `shells\powershell_profile.ps1` |
-| tmux / psmux | `~/.tmux.conf` -> `tmux/tmux.conf`; `~/.tmux.posix.conf` -> `tmux/tmux.posix.conf` (POSIX clipboard overlay) | same | `%USERPROFILE%\.tmux.conf` -> `tmux\tmux.conf` for psmux; the POSIX clipboard overlay is **excluded** on Windows (its `if-shell` probes hang psmux); WSL uses the Unix path |
+| tmux / psmux | `~/.tmux.conf` -> `tmux/tmux.conf`; `~/.tmux.posix.conf` -> `tmux/tmux.posix.conf` (POSIX clipboard + TPM/Rose Pine overlay) | same | `%USERPROFILE%\.psmux.conf` -> `tmux\psmux.conf` (first psmux entrypoint, disables warm sessions, then flag-free source-files the Windows overlay); `%USERPROFILE%\.tmux.conf` -> `tmux\tmux.conf`; `%USERPROFILE%\.tmux.windows.conf` -> `tmux\tmux.windows.conf`; `%USERPROFILE%\.tmux.rose-pine.ps1` -> `tmux\psmux-rose-pine.ps1` (repo-owned psmux Rose Pine generator/manual helper); `%USERPROFILE%\.tmux.rose-pine.{main,moon,dawn}.conf` -> generated `tmux\psmux-rose-pine.{main,moon,dawn}.conf` startup configs; the POSIX overlay is **excluded** on Windows (its `if-shell` probes hang psmux); WSL uses the Unix path |
 | Ghostty | `~/Library/Application Support/com.mitchellh.ghostty/config` -> `ghostty/config` | native Linux links `~/.config/ghostty/config`; WSL links it only with `--experimental-wsl-gui` | n/a |
 | lazygit | `~/Library/Application Support/lazygit/config.yml` -> `lazygit/config.yml` | `~/.config/lazygit/config.yml` -> `lazygit/config.yml` | `%LOCALAPPDATA%\lazygit\config.yml` -> `lazygit\config.windows.yml` |
 | lsd | `~/.config/lsd/{config.yaml,colors.yaml}` -> `lsd/{config.yaml,colors.yaml}` | same | `%USERPROFILE%\.config\lsd\{config.yaml,colors.yaml}` -> `lsd\{config.yaml,colors.yaml}` |
@@ -260,6 +261,27 @@ and whether `pwsh` is installed.
 - `install-deps` provisions Starship through Homebrew on macOS/Linuxbrew,
   Alpine's native package on Alpine, and a pinned SHA-256-verified Starship
   GitHub release archive on other native Linux/WSL hosts.
+- **tmux Rose Pine differs by platform.** macOS/Linux/WSL `install-deps`
+  provisions the upstream tmux theme plugin as pinned repo-managed copies: TPM
+  (`e261deb1b47614eed3400089ce7197dc68acc4eb`) and `rose-pine/tmux`
+  (`b6138c51573425ccdc33c91464597323baec3b7e`) under
+  `~/.local/share/dotfiles/tmux-plugins`. Windows psmux instead source-files
+  generated repo-owned configs (`~/.tmux.rose-pine.{main,moon,dawn}.conf`) that
+  reproduce rose-pine/tmux's flat, foreground-only status bar directly during
+  config parse: the official `rose-pine/tmux` is a bash/TPM script that cannot
+  run on psmux, and the community powerline `psmux-theme-rosepine` plugin renders
+  a different look. The committed variant is `main`; switch to `moon` or `dawn`
+  by changing `@rose_pine_variant` in `tmux/tmux.posix.conf` or
+  `@rosepine-variant` in `tmux/tmux.windows.conf`, or live with
+  `psmux set -g @rosepine-variant moon; psmux source-file ~/.tmux.windows.conf`.
+  Uniformity is strict: the generated psmux configs mirror rose-pine/tmux's
+  field spacing and Nerd Font separator glyphs, not just its palette.
+- Windows psmux uses a dedicated `~/.psmux.conf` entrypoint. It disables psmux
+  warm sessions before sourcing `~/.tmux.conf`, so psmux cannot claim a stale
+  warm server whose status theme loaded before chezmoi deployed the current
+  generated Rose Pine configs. It then source-files `~/.tmux.windows.conf`
+  explicitly with flag-free psmux syntax because psmux v3.3.x does not implement
+  tmux's `source-file -q` config flag.
 - `install-deps` provisions `lsd` through the supported package managers
   (Homebrew, native Linux package managers where available, and the Windows
   Scoop-first catalog). Interactive shells replace `ls` with `lsd` and add the
@@ -279,27 +301,53 @@ and whether `pwsh` is installed.
   Windows `-All` also installs VS Build Tools so parser builds can find MSVC;
   after winget/choco failures it falls back to Microsoft's official
   `vs_BuildTools.exe` bootstrapper with the same VCTools workload.
+- Neovim Markdown rendering is owned by `render-markdown.nvim`. Setup already
+  installs the explicit Tree-sitter parser matrix, including `latex`; it also
+  installs `latex2text` through a pinned, SHA-256-checked `pylatexenc` venv so
+  rendered Markdown equations work on fresh machines instead of depending on a
+  random host Python package.
 - `install-deps` prints a dependency pre-flight table before package-manager
   bootstrap and before the one-shot install prompt, showing the package manager
   itself, present/missing tools, best-effort versions, and the resulting
   skip/install action. The table is informational; the existing per-tool install
   logic still decides what actually runs.
-- `setup.ps1 -Update` is scoped and manager-aware on Windows. It updates only
-  present catalog tools that Scoop, winget, or Chocolatey claims through exact
-  per-package commands such as `scoop update <pkg>`,
-  `winget upgrade --id <id> -e`, and `choco upgrade <pkg> -y`. It never runs
-  blanket upgrades such as `scoop update *`, `winget upgrade --all`, or
-  `choco upgrade all`. Scoop-owned tools are detected from their shim metadata
-  before any package-list fallback, so a command under `...\scoop\shims` updates
-  through Scoop even when the package name differs from the binary name (for
-  example `rg` -> `ripgrep`). `scoop list` is not allowed to claim a command
-  source outside Scoop. A corrupt Scoop shim blocks update mode and is reported
-  as a failure instead of being mislabeled unmanaged. Winget-owned tools first
-  need an exact `winget list --upgrade-available --id <id> -e` match; no
-  available winget upgrade is reported as `current`, while a failed availability
-  query remains a failure. If a present tool such as `pwsh` was installed outside
-  those managers, update mode prints the executable path and reports it as
-  unmanaged instead of implying dotfiles updated it.
+- `setup.sh --update` and `setup.ps1 -Update` are scoped and manager-aware. They
+  update only present catalog tools with proven per-tool ownership, then run an
+  exact per-package or repo-pinned artifact refresh such as
+  `brew upgrade <formula>`, `apt-get install --only-upgrade <pkg>`,
+  `scoop update <pkg>`, `winget upgrade --id <id> -e`, or
+  `choco upgrade <pkg> -y`. They never run blanket upgrades such as
+  `brew upgrade`, `apt upgrade`, `pacman -Syu`, `scoop update *`,
+  `winget upgrade --all`, or `choco upgrade all`. Unix ownership is resolved
+  from the executable source: Homebrew/Linuxbrew requires the PATH-visible
+  command path and its resolved executable target to stay under `brew --prefix`,
+  plus an installed formula and `brew list --formula <formula>` file ownership
+  of the resolved executable; native Linux managers require file ownership proof
+  (`dpkg-query -S`, `rpm -qf`, `pacman -Qo`, or `apk info --who-owns`);
+  dotfiles-owned Linux artifacts require a durable provenance marker with the
+  expected version, URL, SHA-256, command path, binary path, install root,
+  installed-binary SHA-256, matching `--version` output, and a repo-managed
+  install shape: Neovim is `/usr/local/bin/nvim` pointing into
+  `/opt/nvim-linux-*`; lazygit and Starship are `/usr/local/bin/<tool>` or
+  `~/.local/bin/<tool>`; tree-sitter and chezmoi are `~/.local/bin/<tool>`.
+  Shadow command paths, Brew-prefix symlinks that escape the Brew prefix,
+  unsupported artifact roots, and marker binaries outside the recorded install
+  root are blocked provenance failures, not ownership. Output distinguishes
+  `updated`, `current`, `system`, `unmanaged`,
+  `blocked`, and `skipped`. `blocked` fails update mode;
+  `unmanaged` reports the source path and exits successfully. On macOS,
+  `/bin/zsh` is accepted as `system`, while normal Homebrew developer tools
+  that still resolve from `/usr/bin` get an unmanaged line with a Homebrew
+  migration hint. Setup also persists Homebrew shellenv and Homebrew GNU Make's
+  `libexec/gnubin` path when the `make` formula is installed, so Brew-owned
+  `make` does not require a manual export. On Windows, Scoop-owned tools are
+  detected from shim metadata before package-list fallback; corrupt Scoop shims
+  are `blocked`; winget and Chocolatey require both package-list ownership and a
+  command source under that manager's supported install roots, so a manual
+  `C:\Manual\...\pwsh.exe` is `unmanaged` even if a package row exists. Windows
+  managers report `current` when their non-mutating availability probes have no
+  exact available-upgrade row for the package. Scoop status rows with unhealthy
+  `Info` or `Missing Dependencies` fields fail closed instead of updating.
 - zsh plugins are installed by Unix setup as repo-managed pinned git checkouts:
   `fzf-tab` and `zsh-autosuggestions` live under
   `~/.local/share/dotfiles/zsh-plugins`. `zshrc` sources those copies first and
@@ -329,10 +377,12 @@ and whether `pwsh` is installed.
   WSL, or use a Linux GUI build when WSLg / X11 is available. Rosé Pine setup
   follows whatever `code` CLI is on PATH.
 - Polaris agent policy is a supported setup phase, not a synced dotfile. `setup`
-  pins Polaris `0.1.1` at commit `489dcc6f991ddcff63c460a433e983264dc54cf7`,
+  pins Polaris `0.1.2` (`v0.1.2`) at commit
+  `ecca742fa9ed1243a73981955850c1a8ef3e3b04`,
   caches that checkout under `~/.local/share/dotfiles/polaris/<commit>` on
-  POSIX and `%LOCALAPPDATA%\dotfiles\polaris\<commit>` on Windows, verifies the
-  checkout `VERSION`, and runs every Polaris Git operation with
+  POSIX and `%LOCALAPPDATA%\dotfiles\polaris\<commit>` on Windows, verifies that
+  `v0.1.2` peels to the pinned commit plus the checkout `VERSION`, and runs
+  every Polaris Git operation with
   system/global/env config, templates, hooks, and executable Git config features
   disabled, then runs Polaris' Bash global installer and global check
   (`tools/install --global`, then `--global --check`; Windows uses a validated
@@ -517,7 +567,7 @@ update PRs are intentionally not configured.
 |---|---|---|
 | GitHub Actions | Managed, digest-pinned, labeled `github-actions` | Actions are repo-owned CI inputs with stable Renovate support. |
 | GitHub runner images | Managed, labeled `github-runners`, reviewed separately | `ubuntu-*`, `macos-*`, and `windows-*` bumps can change the supported CI platform, so they should not be mixed with ordinary Action bumps. |
-| Repo-pinned installer versions/refs | Managed, labeled `pinned-downloads`, never automerged | Neovim Linux tarballs, chezmoi CI release archives, lazygit Linux tarballs, Starship Linux tarballs, tree-sitter CLI Linux archives, Hack Nerd Font, Windows Terminal portable zip, Ubuntu Ghostty, zsh plugin refs, the Homebrew installer commit, the Renovate validator package/runtime, and the CI `cargo-binstall` commit are explicit repo pins. |
+| Repo-pinned installer versions/refs | Managed, labeled `pinned-downloads`, never automerged | Neovim Linux tarballs, chezmoi CI release archives, lazygit Linux tarballs, Starship Linux tarballs, tree-sitter CLI Linux archives, Hack Nerd Font, Windows Terminal portable zip, Ubuntu Ghostty, zsh plugin refs, tmux/psmux plugin refs, the Homebrew installer commit, the Renovate validator package/runtime, and the CI `cargo-binstall` commit are explicit repo pins. |
 | Adjacent SHA-256 / commit constants | Not managed; matched only as regex context | Renovate can bump the version/ref but cannot recompute archive/script hashes or verify tag commit IDs. CI must fail until a human recomputes and reviews them. |
 | Package-manager catalogs | Not managed | Brew, apt, dnf, pacman, zypper, apk, Scoop, winget, and choco entries are package names/IDs, not repo version pins. Let the package manager resolve current versions. |
 | Neovim plugin and Mason tools | Not managed | `lazy-lock.json` is refreshed with Lazy and tested as editor behavior; Mason intentionally has no machine-pinned lockfile. |
@@ -535,9 +585,9 @@ Direct-download SHA-256 values for Neovim tarballs, chezmoi CI release archives,
 lazygit tarballs, Starship tarballs, tree-sitter CLI archives, Hack Nerd Font,
 the Windows Terminal portable zip, the Ubuntu Ghostty installer, Homebrew
 installer script, and the CI `cargo-binstall` installer script are
-intentionally human-reviewed. zsh plugin
-tag commits are also human-reviewed because the installer verifies the
-checked-out commit after cloning the bumped tag. Do not capture direct-download
+intentionally human-reviewed. zsh plugin tag commits and tmux/psmux plugin
+commits are also human-reviewed because the installers verify the checked-out
+commit after cloning/fetching. Do not capture direct-download
 SHA constants as Renovate `currentDigest` values: that creates
 noisy/unresolvable digest updates instead of a trustworthy checksum review. A
 Renovate PR may bump the version/ref while leaving the adjacent SHA or commit
@@ -583,14 +633,18 @@ stale; CI then fails verification until a human reviews the adjacent constant.
   from a pinned, version-checked upstream checkout and lets Polaris own its
   managed global entrypoint blocks. This repo does not vendor Polaris core or
   sync agent runtime state.
-- **Rose Pine everywhere it can render.** Nvim, lualine, starship, tmux, `lsd`,
-  ghostty, Windows Terminal, PSReadLine — same palette across the stack. VS Code
-  joins optionally: `install-deps` offers VS Code, and if `code` is detected it
-  installs the `mvllow.rose-pine` theme, sets `workbench.colorTheme` (plus the
-  `preferredDark`/`preferredLight` slots and `window.autoDetectColorScheme:false`
-  so dark Rose Pine is forced regardless of OS scheme), and sets VS Code
-  editor/terminal font families to Hack Nerd Font fallbacks. Existing JSONC
-  settings are edited in place with comments preserved and a backup first.
+- **Rose Pine everywhere it can render.** Nvim, lualine, foreground-only
+  Starship, tmux/psmux, `lsd`, ghostty, Windows Terminal, PSReadLine — same
+  palette across the stack. POSIX tmux uses pinned TPM + `rose-pine/tmux`;
+  Windows psmux source-files generated repo-owned Rose Pine configs built by
+  `tmux/psmux-rose-pine.ps1`; the shared tmux config remains a
+  psmux-safe fallback. VS Code joins optionally: `install-deps` offers
+  VS Code, and if `code` is detected it installs the `mvllow.rose-pine` theme,
+  sets `workbench.colorTheme` (plus the `preferredDark`/`preferredLight` slots
+  and `window.autoDetectColorScheme:false` so dark Rose Pine is forced
+  regardless of OS scheme), and sets VS Code editor/terminal font families to
+  Hack Nerd Font fallbacks. Existing JSONC settings are edited in place with
+  comments preserved and a backup first.
 - **conform.nvim is the only format-on-save handler.** Replacing the
   prior LSP-attach autocmd + null-ls duo eliminates a real race condition
   with different timeouts. Formatter output must still stay inside the LSP's
@@ -604,7 +658,8 @@ stale; CI then fails verification until a human reviews the adjacent constant.
   configs in workspace `.nvim.lua` files.
 - **Starship language modules pared down.** Only `c, go, node, rust, python,
   conda` are enabled. Disabled languages don't spawn version probes on every
-  prompt.
+  prompt. Prompt segments use foreground styles only so transparent terminals do
+  not show opaque character-width blocks behind rendered text.
 - **Zsh starship init is precompiled** (mirroring the PowerShell profile
   approach) — re-generated only when `starship.toml` is newer than the cache.
 - **zsh plugin installs are repo-managed pins.** `fzf-tab` and
@@ -629,6 +684,21 @@ stale; CI then fails verification until a human reviews the adjacent constant.
 - **tmux window swaps use uppercase Vim directions.** `prefix+H` swaps the
   current window left and `prefix+L` swaps it right. Lowercase `h/l` remain pane
   focus bindings, and arrow keys are left alone for terminal/psmux reliability.
+- **tmux Rose Pine per runtime.** POSIX tmux loads the upstream `rose-pine/tmux`
+  plugin via TPM; Windows psmux source-files generated repo-owned configs
+  (`tmux/psmux-rose-pine.{main,moon,dawn}.conf`) that reproduce the same flat,
+  foreground-only bar, because the bash/TPM upstream plugin cannot run on psmux.
+  The repo default
+  is `main`, with `moon` / `dawn` available through the variant option
+  (`@rose_pine_variant` on POSIX, `@rosepine-variant` on Windows). Both bars are
+  top-aligned and show the same segments (session, window, user, short host,
+  date/time, directory) with the same Rose Pine separator glyphs. Windows psmux
+  starts from `~/.psmux.conf`, which turns warm sessions off before sourcing
+  `~/.tmux.conf`, then explicitly source-files
+  `~/.tmux.windows.conf` without `-q` because psmux v3.3.x does not implement
+  tmux's `source-file -q` config flag. The generated psmux status-right and
+  Starship time segment keep one trailing safety space so the last visible glyph
+  is not drawn into the terminal's final column.
 - **WSL is split-host by default.** Windows Terminal renders fonts and window UI
   on the Windows side; WSL installs the Linux CLI/editor stack. Linux Ghostty
   and Linux fontconfig fonts in WSL require `--experimental-wsl-gui`.
@@ -746,6 +816,7 @@ MIT. See `LICENSE`.
 | Starship prompt missing in the PowerShell window you ran setup in (but it works in psmux / a new window) | that shell loaded `$PROFILE` **before** setup put starship on PATH; the profile skips starship when `Get-Command starship` finds nothing | open a **new** PowerShell window, or run `. $PROFILE` in the current one — newly-installed tools are not on an already-open shell's PATH |
 | Starship init warns that `starship.ps1` is being used by another process | old checkout wrote the PowerShell init cache directly while several WT tabs or psmux panes started together | update this repo and reopen PowerShell; the profile now writes a temp file, moves it into place, and retries a short read lock |
 | Starship prompt slow | a disabled language got re-enabled | check `starship/starship.toml` — only `c, go, nodejs, rust, python, conda` should be enabled |
+| Starship prompt text has opaque blocks behind each segment | a local/custom Starship config reintroduced `bg:` styles | update this repo and re-run setup; the managed `starship.toml` is foreground-only so terminal transparency owns the background |
 | Starship shows only the last few folders (or a leading `…/`) | the `[directory]` module was truncating the path | `starship/starship.toml` sets `truncation_length = 0` + `truncate_to_repo = false` for the full path; raise the length or set `truncate_to_repo = true` to shorten again |
 | A folder like `Downloads`/`Music`/`Pictures` shows as a blank `~/` | its `[directory.substitutions]` glyph was stripped to a bare space | values are `icon + name` (e.g. `Downloads = "<nerd-font-glyph> Downloads"`) using a codepoint your font has; `tests/starship/directory_test.sh` fails on a whitespace-only value |
 | `Alt-h/j/k/l` window nav doesn't work in terminal | something rebinds bare Esc in the shell | `bindkey | grep '^"\^\['` in zsh — should NOT show `kill-whole-line` |
@@ -754,6 +825,7 @@ MIT. See `LICENSE`.
 | `chsh` fails with `user '<name>' does not exist in /etc/passwd` | you log in via a **domain** account (AD/LDAP/SSSD) that isn't in local `/etc/passwd`, so `chsh` can't touch it | re-run `./setup.sh` — it detects this and offers to re-exec interactive bash into zsh via `~/.bashrc` instead. The "proper" fix is admin-side: set the directory `loginShell` / SSSD `default_shell` |
 | Move commits in lazygit, including inside psmux | Ctrl+J collides with Enter on the wire, and psmux v3.3.4 does not relay Windows Terminal's Win32-input-mode modifier data into panes | use uppercase `J` / `K`. `%LOCALAPPDATA%\lazygit\config.yml` binds commits-panel moveDownCommit / moveUpCommit to printable J/K, so no psmux root bind is needed. In the commits panel, use PgUp/PgDn or Ctrl-U/Ctrl-D to scroll the diff |
 | Windows Terminal opens Windows PowerShell 5.1 instead of PowerShell 7 | settings predate the managed WT default-profile merge, or the merge was skipped | re-run `.\setup.ps1 -SkipDeps -SkipNvim`; it adds the fixed `PowerShell 7` profile and promotes only an unset or legacy Windows PowerShell default, preserving a custom default |
+| tmux / psmux does not show the Rose Pine status bar | POSIX plugins are missing/stale or loaded in an already-running server; on Windows the generated variant config was not deployed or sourced | re-run setup, then restart all tmux/psmux sessions. POSIX installs TPM + `rose-pine/tmux` under `~/.local/share/dotfiles/tmux-plugins` (TPM reloads them). Windows psmux starts from `~/.psmux.conf`, then flag-free source-files `~/.tmux.windows.conf`, which source-files `~/.tmux.rose-pine.{main,moon,dawn}.conf`; re-apply chezmoi and reopen psmux. Change the `main` / `moon` / `dawn` variant option for a different flavor |
 | Want a fully solid (opaque) tmux/psmux status bar on Windows | Windows Terminal applies `opacity` window-wide to every cell, so a transparent WT (`opacity < 100`) has a transparent bar regardless of the bar's bg color — a distinct bg does NOT make it opaque in WT | the repo defaults to `opacity: 95` (see-through terminal). For a solid bar set WT `opacity: 100` in the fragment / `settings.json` (whole window opaque). macOS/Linux Ghostty get an opaque-looking bar from `background-opacity 0.95` + blur |
 | PowerShell Tab completion — the selected option is **gold** | PSReadLine `Selection` colors the highlighted MenuComplete option | it is a gold foreground. Note: PSReadLine uses that same `Selection` color for the completion suffix it inserts into the command line while you navigate, so that suffix also shows gold until you accept — it is one setting, not separable |
 | A `wt --version` window popped up during `setup.ps1 -All` | the dependency version table ran `<tool> --version`, and `wt --version` opens a Windows Terminal window instead of printing | fixed — `Get-CommandVersionString` never runs `wt --version`; it reads the file version (or shows `installed`) |
@@ -763,5 +835,10 @@ MIT. See `LICENSE`.
 | `setup.ps1` errors "cannot create symbolic links" | Developer Mode off and not elevated | `setup.ps1` reports your *elevated* + *Developer Mode* state before chezmoi apply. Enable Developer Mode (Settings -> Privacy & security -> For developers, no admin, recommended) **then** `.\setup.ps1 -SkipDeps`; OR run just the config phase elevated with `.\setup.ps1 -SkipDeps -SkipNvim`, then return to a normal shell for `.\setup.ps1 -SkipDeps -SkipConfig`. Don't elevate the dependency-install run because Scoop refuses admin installs |
 | Ghostty won't open maximized on Linux/GNOME | `maximize = true` is a hint the WM may ignore (GNOME Mutter often does) | on **X11**, `install-deps` offers a devilspie2 setup through the native Linux package manager, even when Linuxbrew is the main CLI manager; the rule is keyed on `com.mitchellh.ghostty`. Wayland needs a GNOME Shell extension instead |
 | `install-deps.ps1`: winget `No package found matching input criteria` (exit `-1978335212`) | winget source/catalog flakiness | install-deps now **prefers scoop** and falls back across managers per tool -- accept the scoop bootstrap when offered and re-run; VS Build Tools has no Scoop package, so it falls through to choco and then Microsoft's official bootstrapper |
+| `setup.sh --update` says a tool is `system` | the executable is an explicitly accepted OS-vendor provider, such as macOS `/bin/zsh` | no action needed unless you intentionally want to adopt a package-manager version and own that migration separately |
+| `setup.sh --update` says a tool is `unmanaged` | the executable is present, but no supported Unix owner proves ownership of the resolved command source | use it as-is and update it outside dotfiles, or intentionally migrate it to Homebrew/Linuxbrew, the native package manager, or a dotfiles-provenanced direct artifact |
+| `setup.sh --update` says a tool is `blocked` | the source strongly implies supported ownership, but the package/provenance proof is contradictory or unsafe | repair or reinstall that manager package/artifact, then rerun update mode; dotfiles fails closed rather than guessing |
+| `setup.sh --update` still resolves `make` to `/usr/bin/make` after `brew install make` | Homebrew's GNU Make formula exposes `make` through `$(brew --prefix make)/libexec/gnubin` | rerun `./setup.sh --skip-config` or open a new shell after setup persists Homebrew shellenv; the managed shell block prepends the `gnubin` path when the formula is installed |
+| Mixed Linuxbrew and apt/dnf/pacman/zypper/apk tools update through different managers | update mode resolves ownership per executable source, not from one global active manager | this is expected: a Linuxbrew-owned `rg` can update through Brew while an apt-owned `/usr/bin/jq` updates through apt in the same run |
 | `setup.ps1 -Update` says a tool is `unmanaged` | the executable is present, but its command source is outside supported manager ownership | install or migrate that tool through Scoop, winget, or Chocolatey if you want dotfiles to own future updates; otherwise update that manually-installed copy outside dotfiles |
 | `setup.ps1 -Update` says a Scoop-owned tool is `blocked` | the command resolves through Scoop shims, but the shim metadata cannot prove the exact catalog package | repair or reinstall that Scoop package, then rerun update mode; dotfiles intentionally fails closed instead of updating a different manager's package |

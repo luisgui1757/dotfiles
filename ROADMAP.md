@@ -38,6 +38,394 @@ repeatable instead of tribal.
 - Post-fix audit hardening added regression coverage for POSIX uninstall
   dry-run immutability, mirrored chezmoi/Starship/tree-sitter pins,
   required-check list duplication, and the Windows Sandbox bootstrap trust root.
+- The combined terminal/update PR removed local tmux theme snippets, kept the
+  upstream Rose Pine plugin variants as the only theme surface (`main` by
+  default, `moon` / `dawn` available), kept POSIX rendering on the pinned
+  upstream TPM `rose-pine/tmux` plugin, and moved Windows rendering to a
+  repo-owned psmux-safe port of the same flat status bar because the community
+  `psmux-theme-rosepine` plugin is a different powerline design. Tests cover
+  plugin provisioning, unquoted overlay source paths, POSIX rich-module options,
+  the Windows `~/.psmux.conf` warm-session guard plus flag-free psmux source of
+  `~/.tmux.windows.conf`, generated psmux Rose Pine freshness, and the
+  terminal-edge safety space for right-aligned prompt/status glyphs.
+
+## P0 - Total Update Ownership Model
+
+Status: shipped on 2026-06-30 in the combined terminal/Markdown/update PR.
+
+The Unix update system now uses per-tool proven ownership instead of one active
+package manager for the whole catalog. The install path still chooses a
+preferred package manager for new installs, but the update path resolves each
+present command from the executable source to a supported owner before taking
+action. This covers real machines where Homebrew/Linuxbrew, native Linux
+package managers, repo-pinned direct artifacts, and OS-vendor tools coexist.
+
+The ubiquitous uncompromised canonical gold-standard is **per-tool proven
+ownership**:
+
+- `--update` is a dependency drift-edge refresh, not a repo update and not
+  machine-wide package maintenance.
+- `--update` updates every present dotfiles dependency that dotfiles can prove
+  is owned by a supported owner.
+- Ownership is resolved from the command the shell will actually execute, not
+  from a package-list entry alone.
+- Every update is scoped to the exact package or repo-pinned artifact for that
+  one tool. Never run `brew upgrade`, `apt upgrade`, `dnf upgrade`, `pacman -Syu`,
+  `scoop update *`, `winget upgrade --all`, or `choco upgrade all`.
+- The output must distinguish `current`, `updated`, `system`, `unmanaged`,
+  `blocked`, and `skipped`; a successful no-op must not be printed as
+  `updated`.
+- Repo-pinned direct downloads are dotfiles-owned artifacts only after dotfiles
+  writes durable provenance for them. They may be refreshed only to the version
+  and digest pinned in this repo, never to "latest upstream".
+- System tools are not automatically defects. Each tool spec decides whether an
+  OS-vendor provider is accepted (`/bin/zsh` on macOS), should be migrated to
+  the selected developer toolchain (`jq` on a Homebrew-owned macOS profile), or
+  should remain unmanaged with an explicit source path.
+- Cleanup/prune remains a separate explicit operation. It must not be folded
+  into `--update` just to create false cross-manager symmetry.
+
+### Evidence
+
+- `install-deps.sh` now resolves update ownership per tool from the command
+  source, not from the global installer package manager.
+- Homebrew/Linuxbrew ownership requires the PATH-visible command path and its
+  resolved executable target to stay under `brew --prefix`, an installed
+  formula, and `brew list --formula <formula>` file ownership of the resolved
+  executable. Formula-list presence alone cannot claim `/usr/bin`, another
+  shadowing path, a Brew-prefix symlink that resolves outside the Brew prefix,
+  or an unrelated file under the Brew prefix.
+- Native Linux ownership is source-proven through `dpkg-query -S`, `rpm -qf`,
+  `pacman -Qo`, or `apk info --who-owns`, then updated through package-scoped
+  manager commands. Pacman-owned packages are reported as `skipped` because a
+  package-level update is not the canonical Arch operation.
+- Homebrew packages now report `current` without running `brew upgrade` when
+  `brew outdated --formula --quiet <pkg>` proves no update is available, and
+  exact outdated stdout rows are treated as updates even when Homebrew returns
+  nonzero for a named outdated formula.
+- Apt metadata refresh runs once per update run. When a successful refresh shows
+  installed == candidate, update mode reports `current` without running
+  `apt-get install --only-upgrade`; when refresh fails, the scoped upgrade still
+  runs against the existing cache.
+- Repo-pinned native-Linux artifacts (`nvim`, `lazygit`, `starship`,
+  `tree-sitter`, and `chezmoi`) write durable provenance on install and are
+  updated only when the marker's command path matches the resolved executable,
+  the marker binary lives under the recorded install root, the marker describes
+  a supported repo-managed install shape, and the repo pin has changed. Neovim
+  is `/usr/local/bin/nvim` pointing into `/opt/nvim-linux-*`; lazygit and
+  Starship are `/usr/local/bin/<tool>` or `~/.local/bin/<tool>`; tree-sitter and
+  chezmoi are `~/.local/bin/<tool>`. A shadow command path that resolves to the
+  same binary is still a provenance mismatch, and an arbitrary marker-named root
+  is not ownership. Legacy unmarked binaries remain `unmanaged`.
+- macOS `/bin/zsh` reports `system`; normal macOS developer tools still
+  resolving from `/usr/bin` report `unmanaged` with a Homebrew migration hint.
+- Setup persists Homebrew shellenv and Homebrew GNU Make's `libexec/gnubin` path
+  when the `make` formula is installed, so Brew-owned GNU Make is not a hidden
+  manual `export PATH=...` step.
+- Windows manager-owned packages now report `current` without running a mutating
+  package update when Scoop `status`, winget `list --upgrade-available`, or
+  Chocolatey `outdated --limit-output` has no exact package row; failed
+  availability probes are recorded as update failures, not successful no-ops.
+  Scoop availability uses structured status fields: exact `Name`, non-empty
+  `Latest Version`, and empty `Info`/`Missing Dependencies`.
+- Regression coverage lives in `tests/shell/install_deps_update_test.sh` for
+  mixed Linuxbrew/apt dispatch, Homebrew `current`, shadowed Homebrew tools,
+  Brew-prefix contradictions, Brew-prefix symlink escapes, external shadow
+  symlinks to Brew, apt `current`, pacman skip semantics, macOS system zsh,
+  direct-artifact current/unmarked/blocked/refresh behavior, command-path
+  shadowing, install-root mismatches, and unsupported direct-artifact install
+  shapes, plus install tests that verify provenance markers for Neovim, lazygit,
+  Starship, tree-sitter CLI, and chezmoi.
+
+### Required Design
+
+1. Define a first-class update owner model.
+
+   Each catalog tool needs a normalized spec:
+
+   - logical tool name (`nvim`, `jq`, `make`, `tree-sitter`);
+   - binary names that prove presence (`fd` and `fdfind` for `fd`);
+   - package IDs per package manager;
+   - accepted OS-vendor sources, if any;
+   - repo-pinned artifact metadata, if dotfiles can own the install directly;
+   - whether PATH migration is allowed or required for the tool.
+
+   The dispatcher should resolve:
+
+   ```text
+   tool -> executable source -> owner proof -> package/artifact -> action
+   ```
+
+   It must not resolve:
+
+   ```text
+   tool -> global active package manager -> maybe package exists -> action
+   ```
+
+2. Detect all supported Unix owners, not only one active manager.
+
+   The Unix update path should discover every relevant owner available on the
+   host:
+
+   - Homebrew/Linuxbrew;
+   - native Linux package manager (`apt`, `dnf`, `pacman`, `zypper`, `apk`);
+   - repo-pinned dotfiles artifacts;
+   - OS-vendor/system providers.
+
+   The install path may still choose a preferred manager for new installs. The
+   update path should be stricter: it updates what is already present and owned,
+   regardless of whether that owner is the default installer for new tools.
+
+3. Prove ownership from the executable source.
+
+   Required Unix proof rules:
+
+   - Homebrew/Linuxbrew: resolved executable path must live under
+     `brew --prefix`, the declared formula must be installed, and
+     `brew list --formula <formula>` must list the resolved executable target.
+     A formula list entry alone is not enough if PATH still resolves to
+     `/usr/bin`, another source, or an unrelated file under the Brew prefix.
+   - `apt`: resolved real path must be claimed by `dpkg-query -S`, and the
+     owning Debian package must match the catalog package or an explicitly
+     declared package alias.
+   - `dnf`/`zypper`: resolved real path must be claimed by RPM ownership
+     (`rpm -qf`), and the owning RPM must match the declared package or alias.
+   - `pacman`: resolved real path must be claimed by `pacman -Qo`, matching the
+     declared package or alias.
+   - `apk`: resolved real path must be claimed by `apk info --who-owns`,
+     matching the declared package or alias.
+   - repo-pinned direct artifacts: source path, symlink target, install root,
+     and a durable provenance marker must match a dotfiles-owned install shape
+     before update mode may reinstall it. Legacy unmarked binaries are not
+     automatically adopted.
+   - OS-vendor/system: recognized paths such as macOS `/bin/zsh` may be reported
+     as `system` only when the tool spec explicitly accepts that provider.
+   - unknown paths: report `unmanaged source=<path>` and do nothing.
+
+4. Refresh package metadata once per manager, then update per package.
+
+   Each manager should have a metadata refresh phase used only when at least one
+   owned package for that manager is present:
+
+   - Homebrew: use Homebrew's own outdated state. Do not run a formula upgrade
+     just to discover it is current.
+   - `apt`: run `apt-get update -qq` once, best-effort as already documented.
+     When metadata refresh succeeds, compare installed/candidate versions and
+     use `apt-get install -y --only-upgrade <pkg>` only when a candidate is
+     newer. When metadata refresh fails, preserve the existing resilience
+     invariant: still run the scoped `apt-get install -y --only-upgrade <pkg>`
+     against the local cache, then report `updated` only if the installed
+     package version changed and otherwise report `current` with a stale-cache
+     note. A failed metadata refresh alone must not skip the scoped upgrade.
+   - `dnf`: use a scoped check/update path for the package, not a system-wide
+     upgrade.
+   - `pacman`: do not perform a system upgrade as a side effect. If Arch cannot
+     safely update a single package without violating pacman's system-upgrade
+     model, document that limitation and report the package as `skipped` with a
+     reason, rather than pretending `pacman -S <pkg>` is always the canonical
+     answer.
+   - `zypper`: use scoped package updates.
+   - `apk`: use scoped package upgrades.
+   - Windows: use manager-specific availability probes (`scoop status`,
+     `winget list --upgrade-available`, `choco outdated --limit-output`) before
+     any scoped package update, and report `current` instead of mutating when the
+     exact package has no available row. Scoop status rows with unhealthy `Info`
+     or `Missing Dependencies` fields are update failures, not update proof.
+
+5. Make statuses precise and stable.
+
+   The output should use one status vocabulary across Unix and Windows:
+
+   - `updated`: an update was available and the scoped update completed.
+   - `current`: the manager proved the package is already current.
+   - `system`: the resolved executable is an accepted OS-vendor provider and is
+     intentionally outside dotfiles/package-manager update ownership.
+   - `unmanaged`: the tool exists, but no supported owner can prove ownership of
+     the resolved executable.
+   - `blocked`: ownership exists or is strongly implied, but provenance is
+     corrupt, contradictory, or unsafe to update.
+   - `skipped`: the tool is absent or intentionally out of scope for this mode.
+     It also covers proven owners whose package manager requires an explicit
+     operation outside dotfiles' scoped update contract.
+
+   Exit behavior is part of the contract:
+
+   - `updated`, `current`, `system`, `unmanaged`, and `skipped` exit
+     successfully unless another tool failed.
+   - `blocked` exits nonzero because dotfiles found unsafe or contradictory
+     ownership for a present dependency.
+   - a scoped update command that fails exits nonzero.
+
+   Output lines should include enough proof to debug without being noisy:
+
+   ```text
+   current   jq                        owner=brew package=jq source=/opt/homebrew/bin/jq
+   updated   rg                        owner=apt package=ripgrep source=/usr/bin/rg
+   system    zsh                       source=/bin/zsh
+   unmanaged foo                       source=/usr/local/bin/foo
+   blocked   rg                        owner=scoop reason=shim target mismatch
+   skipped   make                      owner=pacman reason=requires explicit system upgrade
+   skipped   code                      not installed
+   ```
+
+6. Make macOS Homebrew developer-toolchain ownership explicit.
+
+   For this repo's macOS profile, the canonical target should be:
+
+   - Homebrew owns normal developer CLI catalog tools (`git`, `make`, `jq`,
+     `nvim`, `cmake`, `rg`, `fd`, `fzf`, `lsd`, `chezmoi`, `lazygit`,
+     `starship`, `tmux`, `python3`, `node`, `tree-sitter`, `shellcheck`,
+     `bats`, `hyperfine`, `taplo`, `yamllint`, and similar).
+   - The repo manages Homebrew shellenv and any required PATH adoption. There
+     should be no hidden manual `export PATH=...` step.
+   - GNU Make's Homebrew `gnubin` path is required for this profile because
+     Homebrew's formula exposes GNU Make as `gmake` by default. If the catalog
+     says Homebrew owns `make`, setup must manage this PATH entry instead of
+     relying on manual shell edits:
+
+     ```sh
+     export PATH="$(brew --prefix make)/libexec/gnubin:$PATH"
+     ```
+
+   - zsh remains accepted as the macOS system shell by default unless a separate
+     login-shell policy intentionally adopts Homebrew zsh and handles
+     `/etc/shells`, `chsh`, recovery, and rollback.
+   - macOS tools that remain in `/usr/bin` but are normal catalog dependencies
+     should get a clear migration hint, not a vague unmanaged line.
+
+7. Treat repo-pinned direct downloads as dotfiles-owned artifacts only after
+   provenance exists.
+
+   Native Linux installs without Linuxbrew currently use pinned official
+   releases for some tools, but the current install layout is not enough to
+   prove ownership forever. The gold-standard update behavior is:
+
+   - add durable provenance markers for fresh direct-artifact installs before
+     update mode tries to own them;
+   - include tool name, version, source URL, SHA-256, install root, managed
+     symlink(s), binary path, installed-binary SHA-256, and installer schema
+     version in that provenance;
+   - prove the current executable resolves to the dotfiles-managed install
+     shape, matching provenance, matching installed-binary checksum, and
+     matching executable `--version` output; supported shapes are
+     `/usr/local/bin/nvim` pointing into `/opt/nvim-linux-*`,
+     `/usr/local/bin/{lazygit,starship}`, and
+     `$HOME/.local/bin/{lazygit,starship,tree-sitter,chezmoi}`;
+   - reject a different command path even if it is a symlink to the same binary;
+   - reject marker binaries that do not live under the recorded install root;
+   - compare the installed executable version to the repo pin;
+   - reinstall the pinned artifact with SHA-256 verification only when the repo
+     pin is newer or the install is corrupt;
+   - report `current` when the installed artifact already matches the repo pin;
+   - report `blocked` if the path looks dotfiles-owned but the symlink/install
+     root/marker is inconsistent.
+   - report legacy unmarked direct-download binaries as `unmanaged` unless a
+     separate explicit repair/adopt operation writes provenance after validating
+     the binary and install root.
+
+   This keeps update mode hermetic to the repo's declared pins without chasing
+   upstream "latest" or touching unrelated manually installed binaries.
+
+8. Preserve Windows' stricter provenance lessons.
+
+   Unix and Windows update ownership share the same non-negotiable guarantees:
+
+   - a command source can only be claimed by a manager that proves it owns that
+     source;
+   - package-list fallback cannot claim a command resolved outside that manager;
+   - corrupt provenance is `blocked`, not `unmanaged`;
+   - no later manager gets to update a tool after an earlier manager's ownership
+     proof is corrupt.
+
+   On Windows, Scoop proves ownership through shim metadata before list fallback.
+   Winget and Chocolatey require both an exact package-list row and a command
+   source under supported manager install roots; a manual shadow such as
+   `C:\Manual\PowerShell\pwsh.exe` remains `unmanaged` even when a package row
+   exists.
+
+### Shipped Regression Coverage
+
+The shipped tests prove behavior, not just branches:
+
+1. `tests/shell/install_deps_update_test.sh` simulates command sources and owner
+   databases for Linuxbrew, apt, pacman, macOS system zsh, and repo-pinned
+   direct artifacts.
+2. Mixed-owner dispatch is covered by a single run where Linuxbrew owns `rg`
+   while apt owns `jq`; both scoped managers are invoked, and apt reports
+   `updated` only after the installed package version changes.
+3. Homebrew `current` is covered by proving `brew outdated` has no row and
+   asserting `brew upgrade <pkg>` is not called; Homebrew `updated` is covered
+   with the real CLI shape where an exact outdated formula row may arrive with a
+   nonzero exit.
+4. Homebrew shadowing is covered by a formula-installed `git` whose resolved
+   source is outside the Homebrew prefix; it is `unmanaged`, not updated.
+5. Homebrew prefix contradictions are covered by a command under `brew --prefix`
+   whose formula is not installed, and by a formula that is installed but does
+   not own the resolved executable file; both runs are `blocked` and exit
+   nonzero. Homebrew outdated-probe failures are also `blocked`, not `current`.
+6. Apt `current` is covered by installed == candidate after one metadata refresh
+   and asserts no scoped install runs. The existing apt-resilience test still
+   proves a failed metadata refresh does not skip a scoped upgrade attempt.
+   An advertised apt upgrade that leaves the installed version unchanged is
+   covered as `blocked`, not `updated`.
+7. Pacman ownership is covered as `skipped` with
+   `reason=requires explicit system upgrade`.
+8. Dnf/zypper RPM ownership and apk ownership are covered with manager-specific
+   file-owner proofs and scoped package updates. Zypper/apk outdated-probe
+   failures are covered as `blocked`.
+9. Direct-artifact coverage includes matching provenance plus matching
+   executable version -> `current`, binary checksum mismatch -> `blocked`,
+   binary version mismatch -> `blocked`, legacy unmarked binary -> `unmanaged`,
+   corrupt marker -> `blocked`, and stale marker -> refresh to the repo pin.
+10. Direct-install tests verify schema-2 provenance markers and installed-binary
+    checksum fields for Neovim, lazygit, Starship, tree-sitter CLI, and chezmoi.
+11. Homebrew shellenv/setup tests prove the managed `make` `libexec/gnubin`
+    path is added to the current setup process, persisted for future shells, and
+    retrofitted into a legacy managed block without dropping user content.
+12. Windows Pester coverage proves source-proven Scoop/winget/Chocolatey update
+    ownership, manager-specific `current`/`updated`/availability-failure status,
+    manual-source shadows with package rows, and Chocolatey-bin/package-list
+    contradictions, and is run with the full gate. Scoop coverage includes lazy
+    ownership-gated manifest refresh and fail-closed unhealthy `status` rows.
+
+### Documentation Shipped
+
+1. `README.md` documents the stable status vocabulary, Unix per-tool ownership,
+   direct-artifact provenance, Windows source-proven manager proof, and Homebrew
+   GNU Make `gnubin` adoption.
+2. `README.md` troubleshooting now covers `system`, `unmanaged`, `blocked`,
+   Homebrew `make` still resolving to `/usr/bin/make`, and mixed
+   Linuxbrew/native-manager machines.
+3. `CLAUDE.md` now records the per-tool owner model as the repository invariant,
+   including direct-artifact marker requirements and the no-hidden-manual-export
+   Homebrew GNU Make policy.
+4. Cleanup/prune remains outside `--update`; this roadmap and the README keep
+   update scoped to dependency drift only.
+
+### Execution Summary
+
+1. Replaced the global Unix update manager pass with per-tool owner resolution.
+2. Added truthful `current` versus `updated` reporting for Homebrew and apt.
+3. Added native Linux file-ownership proof for apt, RPM-backed managers,
+   pacman, and apk.
+4. Added mixed-manager dispatch.
+5. Added direct-artifact provenance and marker-proven refresh semantics for
+   repo-pinned native-Linux artifacts.
+6. Added macOS/Homebrew developer-toolchain PATH adoption for GNU Make.
+7. Updated README/CLAUDE/ROADMAP in the same change.
+8. Verified with the full shell test bundle and full local gate before handoff.
+
+### Non-Goals
+
+- Do not make `--update` run repo `git pull`.
+- Do not make `--update` run `chezmoi apply`.
+- Do not make `--update` run Lazy plugin update or rewrite `lazy-lock.json`.
+- Do not run blanket package-manager upgrades.
+- Do not auto-trust third-party Homebrew taps.
+- Do not adopt Homebrew zsh unless login-shell migration is designed as its own
+  reversible policy.
+- Do not claim "updated" when the manager proved the package was already
+  current.
 
 ## P0 - Required Gate Reality
 

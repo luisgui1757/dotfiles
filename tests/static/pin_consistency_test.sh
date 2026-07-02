@@ -91,18 +91,49 @@ assert_eq "zsh-autosuggestions tag (install-deps.sh == chezmoi external)" \
 assert_eq "zsh-autosuggestions commit (install-deps.sh == verify script)" \
     "$(sh_const ZSH_AUTOSUGGESTIONS_COMMIT)" "$(verify_commit 'zsh-autosuggestions')"
 
+# --- tmux plugin pins (POSIX rose-pine/tmux): installers <-> docs -------------
+# Windows psmux uses a repo-owned renderer (tmux/psmux-rose-pine.ps1), not a
+# pinned third-party plugin, so there is no PsmuxPlugins commit to mirror here.
+tpm_commit="$(sh_const TPM_COMMIT)"
+rose_pine_tmux_commit="$(sh_const ROSE_PINE_TMUX_COMMIT)"
+
+for pin_name in TPM_COMMIT ROSE_PINE_TMUX_COMMIT; do
+    pin_value="$(sh_const "$pin_name")"
+    if [[ ! "$pin_value" =~ ^[0-9a-f]{40}$ ]]; then
+        echo "FAIL: $pin_name must be an immutable 40-character lowercase commit SHA, got '$pin_value'"
+        fail=1
+    else
+        echo "ok  : $pin_name is immutable commit SHA"
+    fi
+done
+assert_contains "TPM commit (README.md)" "README.md" "$tpm_commit"
+assert_contains "rose-pine/tmux commit (README.md)" "README.md" "$rose_pine_tmux_commit"
+assert_contains "TPM commit (CLAUDE.md)" "CLAUDE.md" "$tpm_commit"
+assert_contains "rose-pine/tmux commit (CLAUDE.md)" "CLAUDE.md" "$rose_pine_tmux_commit"
+
 # --- Polaris: setup.sh <-> setup.ps1 -----------------------------------------
 polaris_version_sh="$(setup_sh_const POLARIS_VERSION)"
+polaris_tag_sh="$(setup_sh_const POLARIS_TAG)"
 polaris_ref_sh="$(setup_sh_const POLARIS_REF)"
 polaris_version_ps="$(setup_ps_const PolarisVersion)"
+polaris_tag_ps="$(setup_ps_const PolarisTag)"
 polaris_ref_ps="$(setup_ps_const PolarisRef)"
 
 assert_eq "Polaris version (setup.sh == setup.ps1)" "$polaris_version_sh" "$polaris_version_ps"
+assert_eq "Polaris tag (setup.sh == setup.ps1)" "$polaris_tag_sh" "$polaris_tag_ps"
 assert_eq "Polaris commit (setup.sh == setup.ps1)" "$polaris_ref_sh" "$polaris_ref_ps"
 assert_contains "Polaris version (README.md)" "README.md" "$polaris_version_sh"
+assert_contains "Polaris tag (README.md)" "README.md" "$polaris_tag_sh"
 assert_contains "Polaris commit (README.md)" "README.md" "$polaris_ref_sh"
 assert_contains "Polaris version (CLAUDE.md)" "CLAUDE.md" "$polaris_version_sh"
+assert_contains "Polaris tag (CLAUDE.md)" "CLAUDE.md" "$polaris_tag_sh"
 assert_contains "Polaris commit (CLAUDE.md)" "CLAUDE.md" "$polaris_ref_sh"
+if [[ "$polaris_tag_sh" != "v$polaris_version_sh" ]]; then
+    echo "FAIL: Polaris tag must match version as v<version>, got version '$polaris_version_sh' and tag '$polaris_tag_sh'"
+    fail=1
+else
+    echo "ok  : Polaris tag matches version"
+fi
 if [[ ! "$polaris_ref_sh" =~ ^[0-9a-f]{40}$ ]]; then
     echo "FAIL: Polaris ref must be an immutable 40-character lowercase commit SHA, got '$polaris_ref_sh'"
     fail=1

@@ -4,7 +4,7 @@
 # Local usage (from a checked-out copy):
 #   ./setup.sh                     interactive: dependency prompts, then config + sync
 #   ./setup.sh --all               non-interactive: install everything missing
-#   ./setup.sh --update            update package-manager tools + Mason only
+#   ./setup.sh --update            update proven dependency tools/artifacts + Mason only
 #   ./setup.sh --dry-run           preview every step
 #   ./setup.sh --skip-deps         already have nvim/starship; just config+sync
 #   ./setup.sh --skip-bootstrap    back-compat alias: skip config apply
@@ -37,8 +37,9 @@ SKIP_AGENTS=0
 BEST_EFFORT=0
 EXPERIMENTAL_WSL_GUI=0
 POLARIS_REPO_URL="https://github.com/luisgui1757/polaris.git"
-POLARIS_VERSION="0.1.1"
-POLARIS_REF="489dcc6f991ddcff63c460a433e983264dc54cf7"
+POLARIS_VERSION="0.1.2"
+POLARIS_TAG="v0.1.2"
+POLARIS_REF="ecca742fa9ed1243a73981955850c1a8ef3e3b04"
 POLARIS_CACHE_ROOT="$HOME/.local/share/dotfiles/polaris"
 usage() {
     cat <<'EOF'
@@ -47,7 +48,7 @@ setup.sh -- one-shot end-to-end install for macOS / Linux / WSL.
 Local usage:
   ./setup.sh                     interactive: dependency prompts, then config + sync
   ./setup.sh --all               non-interactive: install everything missing
-  ./setup.sh --update            update package-manager tools + Mason only
+  ./setup.sh --update            update proven dependency tools/artifacts + Mason only
   ./setup.sh --dry-run           preview every step
   ./setup.sh --skip-deps         already installed; just config + sync
   ./setup.sh --skip-bootstrap    back-compat alias: skip config apply
@@ -169,7 +170,7 @@ phase() {
 }
 
 refresh_runtime_path() {
-    local brew_bin brew_env dir
+    local brew_bin brew_env dir make_prefix gnubin
 
     [[ "$DRY_RUN" -eq 1 ]] && return 0
 
@@ -181,6 +182,11 @@ refresh_runtime_path() {
         if [[ -n "$brew_bin" && -x "$brew_bin" ]]; then
             if brew_env="$("$brew_bin" shellenv)"; then
                 eval "$brew_env"
+                make_prefix="$("$brew_bin" --prefix make 2>/dev/null || true)"
+                gnubin="$make_prefix/libexec/gnubin"
+                if [[ -n "$make_prefix" && -d "$gnubin" && ":$PATH:" != *":$gnubin:"* ]]; then
+                    PATH="$gnubin:$PATH"
+                fi
             else
                 echo "  WARN: $brew_bin shellenv failed; leaving PATH unchanged for that Homebrew prefix" >&2
             fi
@@ -238,6 +244,31 @@ assert_polaris_checkout_clean() {
     fi
 }
 
+assert_polaris_release_artifact() {
+    local checkout="$1" version="$2" tag="$3" ref="$4" head tag_head checkout_version
+
+    head="$(polaris_cache_git "$checkout" rev-parse --verify 'HEAD^{commit}' 2>/dev/null || true)"
+    if [[ "$head" != "$ref" ]]; then
+        echo "  FAIL: Polaris cache is not at the pinned commit: $checkout" >&2
+        echo "        expected $ref, found ${head:-unknown}" >&2
+        exit 1
+    fi
+
+    tag_head="$(polaris_cache_git "$checkout" rev-parse --verify "refs/tags/$tag^{commit}" 2>/dev/null || true)"
+    if [[ "$tag_head" != "$ref" ]]; then
+        echo "  FAIL: Polaris tag mismatch for $tag in $checkout" >&2
+        echo "        expected tag to point at $ref, found ${tag_head:-missing}" >&2
+        echo "        Remove this cache directory and rerun setup to fetch the pinned release artifact again." >&2
+        exit 1
+    fi
+
+    checkout_version="$(tr -d '[:space:]' < "$checkout/VERSION" 2>/dev/null || true)"
+    if [[ "$checkout_version" != "$version" ]]; then
+        echo "  FAIL: Polaris cache VERSION mismatch: expected $version, found ${checkout_version:-missing}" >&2
+        exit 1
+    fi
+}
+
 ask_yes_no_default_yes() {
     local prompt="$1" reply
     printf "  %s [Y/n] " "$prompt"
@@ -256,21 +287,11 @@ should_apply_agent_policy() {
 }
 
 ensure_polaris_checkout() {
-    local checkout tmp version head
+    local checkout tmp
     checkout="$(polaris_checkout_dir)"
 
     if [[ -d "$checkout/.git" ]]; then
-        head="$(polaris_cache_git "$checkout" rev-parse --verify 'HEAD^{commit}' 2>/dev/null || true)"
-        if [[ "$head" != "$POLARIS_REF" ]]; then
-            echo "  FAIL: Polaris cache is not at the pinned commit: $checkout" >&2
-            echo "        expected $POLARIS_REF, found ${head:-unknown}" >&2
-            exit 1
-        fi
-        version="$(tr -d '[:space:]' < "$checkout/VERSION" 2>/dev/null || true)"
-        if [[ "$version" != "$POLARIS_VERSION" ]]; then
-            echo "  FAIL: Polaris cache VERSION mismatch: expected $POLARIS_VERSION, found ${version:-missing}" >&2
-            exit 1
-        fi
+        assert_polaris_release_artifact "$checkout" "$POLARIS_VERSION" "$POLARIS_TAG" "$POLARIS_REF"
         assert_polaris_checkout_clean "$checkout"
         printf '%s\n' "$checkout"
         return 0
@@ -293,11 +314,7 @@ ensure_polaris_checkout() {
     polaris_git clone "$POLARIS_REPO_URL" "$tmp"
     polaris_git -C "$tmp" checkout --detach "$POLARIS_REF"
 
-    version="$(tr -d '[:space:]' < "$tmp/VERSION" 2>/dev/null || true)"
-    if [[ "$version" != "$POLARIS_VERSION" ]]; then
-        echo "  FAIL: fetched Polaris VERSION mismatch: expected $POLARIS_VERSION, found ${version:-missing}" >&2
-        exit 1
-    fi
+    assert_polaris_release_artifact "$tmp" "$POLARIS_VERSION" "$POLARIS_TAG" "$POLARIS_REF"
     assert_polaris_checkout_clean "$tmp"
 
     mv "$tmp" "$checkout"
@@ -322,7 +339,7 @@ run_polaris_agent_policy() {
 
     phase "Phase 6/6: apply global agent policy (Polaris)"
     if [[ "$DRY_RUN" -eq 1 ]]; then
-        echo "  would: clone/fetch Polaris $POLARIS_VERSION ($POLARIS_REF)"
+        echo "  would: clone/fetch Polaris $POLARIS_VERSION ($POLARIS_TAG @ $POLARIS_REF)"
         echo "         into $(polaris_checkout_dir)"
         echo "  would: run Polaris tools/install --global, then --global --check"
         return 0
@@ -493,7 +510,7 @@ cleanup_chezmoi_dry_config() {
 
 run_update_mode() {
     if [[ "$SKIP_DEPS" -eq 0 ]]; then
-        phase "Update 1/2: update package-manager tools"
+        phase "Update 1/2: update proven dependency tools and artifacts"
         bash "$SCRIPT_DIR/install-deps.sh" ${DEPS_FLAGS[@]+"${DEPS_FLAGS[@]}"}
     else
         echo

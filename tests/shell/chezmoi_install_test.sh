@@ -4,6 +4,10 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 INSTALL_DEPS_SOURCE_ONLY=1 source "$REPO_ROOT/install-deps.sh"
+TMP_ROOT="$REPO_ROOT/tests/.cache/chezmoi-install-test"
+rm -rf "$TMP_ROOT"
+mkdir -p "$TMP_ROOT/home" "$TMP_ROOT/tmp"
+trap 'rm -rf "$TMP_ROOT"' EXIT
 
 fail() {
     echo "FAIL: $1"
@@ -13,6 +17,7 @@ fail() {
 uname() {
     case "${1:-}" in
         -s) printf '%s\n' "Linux" ;;
+        -m) printf '%s\n' "x86_64" ;;
         *) command uname "$@" ;;
     esac
 }
@@ -35,7 +40,7 @@ have_any() {
 YES_ALL=1
 DRY_RUN=1
 PM=apt
-case "$(command uname -m)" in
+case "$(uname -m)" in
     x86_64|amd64)
         expected_chezmoi_sha="$CHEZMOI_LINUX_X86_64_SHA256"
         ;;
@@ -55,7 +60,58 @@ out="$(install_chezmoi)"
 [[ "$out" != *"get.chezmoi.io"* ]] || fail "native Linux path still used get.chezmoi.io"
 [[ "$out" != *"brew install chezmoi"* ]] || fail "native Linux path used brew"
 
+HOME="$TMP_ROOT/home"
+export HOME
+export DOTFILES_PROVENANCE_DIR="$TMP_ROOT/provenance"
+export TMPDIR="$TMP_ROOT/tmp"
+DRY_RUN=0
+
+curl() {
+    local out=""
+    while [[ "$#" -gt 0 ]]; do
+        case "$1" in
+            -o) out="$2"; shift 2 ;;
+            *) shift ;;
+        esac
+    done
+    [[ -n "$out" ]] || fail "curl stub did not receive -o"
+    printf '%s\n' "archive" > "$out"
+}
+
+tar() {
+    local dest=""
+    while [[ "$#" -gt 0 ]]; do
+        case "$1" in
+            -C) dest="$2"; shift 2 ;;
+            *) shift ;;
+        esac
+    done
+    [[ -n "$dest" ]] || fail "tar stub did not receive -C"
+    printf '%s\n' "chezmoi" > "$dest/chezmoi"
+}
+
+verify_sha256() {
+    printf '%s %s\n' "$1" "$2" > "$TMP_ROOT/sha.log"
+    return 0
+}
+
+install_chezmoi >/dev/null
+[[ -x "$HOME/.local/bin/chezmoi" ]] || fail "chezmoi was not installed as executable"
+grep -F "$expected_chezmoi_sha" "$TMP_ROOT/sha.log" >/dev/null \
+    || fail "chezmoi install did not verify the pinned checksum"
+grep -F "tool=chezmoi" "$DOTFILES_PROVENANCE_DIR/chezmoi.env" >/dev/null \
+    || fail "chezmoi provenance marker was not written"
+grep -F "schema=2" "$DOTFILES_PROVENANCE_DIR/chezmoi.env" >/dev/null \
+    || fail "chezmoi provenance marker has the wrong schema"
+grep -F "version=$CHEZMOI_VERSION" "$DOTFILES_PROVENANCE_DIR/chezmoi.env" >/dev/null \
+    || fail "chezmoi provenance marker has the wrong version"
+grep -F "binary_sha256=" "$DOTFILES_PROVENANCE_DIR/chezmoi.env" >/dev/null \
+    || fail "chezmoi provenance marker is missing the installed binary checksum"
+grep -F "command_path=$HOME/.local/bin/chezmoi" "$DOTFILES_PROVENANCE_DIR/chezmoi.env" >/dev/null \
+    || fail "chezmoi provenance marker has the wrong command path"
+
 PM=brew
+DRY_RUN=1
 out="$(install_chezmoi)"
 [[ "$out" == *"would: brew install chezmoi"* ]] || fail "brew path did not use brew install"
 [[ "$out" != *"get.chezmoi.io"* ]] || fail "brew path used get.chezmoi.io"

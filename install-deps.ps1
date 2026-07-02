@@ -26,6 +26,10 @@ $HackNerdFontSha256 = '8ca33a60c791392d872b80d26c42f2bfa914a480f9eb2d7516d9f8437
 $WindowsTerminalVersion = 'v1.24.11321.0'
 $WindowsTerminalX64Sha256 = '7caef554147e5498ed1becdca73cdedb79fbc81f89032e46ae9b095c53433812'
 $VsBuildToolsBootstrapperUrl = 'https://aka.ms/vs/17/release/vs_BuildTools.exe'
+$PylatexencBuildBackendVersion = '80.9.0'
+$PylatexencBuildBackendSha256 = '062d34222ad13e0cc312a4c02d73f059e86a4acbfbdea8f8f76b28c99f306922'
+$PylatexencVersion = '2.10'
+$PylatexencSha256 = '3dd8fd84eb46dc30bee1e23eaab8d8fb5a7f507347b23e5f38ad9675c84f40d3'
 
 # ---- Package-manager detection + scoop bootstrap -----------------------------
 function Get-AvailablePM {
@@ -249,6 +253,32 @@ function Add-DirectoryToUserPath {
     }
 }
 
+function Get-DotfilesDataRoot {
+    if (-not [string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
+        return (Join-Path $env:LOCALAPPDATA 'dotfiles')
+    }
+    $base = if (-not [string]::IsNullOrWhiteSpace($env:USERPROFILE)) {
+        $env:USERPROFILE
+    } elseif (-not [string]::IsNullOrWhiteSpace($HOME)) {
+        $HOME
+    } else {
+        [System.IO.Path]::GetTempPath()
+    }
+    return (Join-Path (Join-Path $base '.local') 'share\dotfiles')
+}
+
+function Get-PylatexencVenvRoot {
+    return (Join-Path (Join-Path (Get-DotfilesDataRoot) 'python-tools') 'pylatexenc')
+}
+
+function Invoke-PythonCommand {
+    param(
+        [Parameter(Mandatory)][string]$Python,
+        [Parameter(Mandatory)][string[]]$Arguments
+    )
+    & $Python @Arguments
+}
+
 # ---- Per-tool: package id per PM. Empty string means "not available there". --
 # Keys are the command name we check via Get-Command.
 $Catalog = @{
@@ -340,6 +370,109 @@ function Install-Python {
     if ($real -and -not [string]::IsNullOrWhiteSpace($real.Source)) {
         Add-DirectoryToUserPath -Directory (Split-Path -Parent $real.Source)
     }
+}
+
+function Test-PylatexencConverter {
+    param([string]$VenvRoot = (Get-PylatexencVenvRoot))
+    $scriptsDir = Join-Path $VenvRoot 'Scripts'
+    $venvPython = Join-Path $scriptsDir 'python.exe'
+    $converter = Join-Path $scriptsDir 'latex2text.exe'
+    if (-not (Test-Path -LiteralPath $venvPython -PathType Leaf)) { return $false }
+    if (-not (Test-Path -LiteralPath $converter -PathType Leaf)) { return $false }
+
+    $probe = @'
+import importlib.metadata
+import sys
+
+try:
+    version = importlib.metadata.version("pylatexenc")
+except importlib.metadata.PackageNotFoundError:
+    raise SystemExit(1)
+
+raise SystemExit(0 if version == sys.argv[1] else 1)
+'@
+    Invoke-PythonCommand -Python $venvPython -Arguments @('-c', $probe, $PylatexencVersion) | Out-Null
+    return ($LASTEXITCODE -eq 0)
+}
+
+function Install-PylatexencConverter {
+    $venvRoot = Get-PylatexencVenvRoot
+    $scriptsDir = Join-Path $venvRoot 'Scripts'
+    if (Test-PylatexencConverter -VenvRoot $venvRoot) {
+        Add-DirectoryToUserPath -Directory $scriptsDir
+        Write-Host ("  ok        {0,-26} pylatexenc {1}" -f "latex2text", $PylatexencVersion)
+        return
+    }
+
+    if (-not (Ask "Install latex2text via a pinned pylatexenc venv (Markdown equations)?")) {
+        Write-Host ("  skipped   {0,-26}" -f "latex2text")
+        return
+    }
+    if ($DryRun) {
+        Write-Host ("  would:    python -m venv {0}" -f $venvRoot)
+        Write-Host ("  would:    pip install --require-hashes setuptools=={0}" -f $PylatexencBuildBackendVersion)
+        Write-Host ("             sha256={0}" -f $PylatexencBuildBackendSha256)
+        Write-Host ("  would:    pip install --require-hashes --no-build-isolation pylatexenc=={0}" -f $PylatexencVersion)
+        Write-Host ("             sha256={0}" -f $PylatexencSha256)
+        Write-Host ("  would:    add {0} to User PATH" -f $scriptsDir)
+        return
+    }
+
+    $real = Get-RealPythonCommand
+    if (-not $real) {
+        Install-Python
+        $real = Get-RealPythonCommand
+    }
+    if (-not $real -or [string]::IsNullOrWhiteSpace($real.Source)) {
+        Write-Warning "python is required before installing latex2text"
+        $script:InstallFailures += [pscustomobject]@{ Tool='latex2text'; Pm='python'; Pkg='pylatexenc'; ExitCode='python-missing' }
+        return
+    }
+
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $venvRoot) | Out-Null
+    Invoke-PythonCommand -Python $real.Source -Arguments @('-m', 'venv', $venvRoot)
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warning ("python venv creation failed for pylatexenc (exit {0})" -f $LASTEXITCODE)
+        $script:InstallFailures += [pscustomobject]@{ Tool='latex2text'; Pm='python'; Pkg='pylatexenc'; ExitCode=$LASTEXITCODE }
+        return
+    }
+
+    $venvPython = Join-Path $scriptsDir 'python.exe'
+    if (-not (Test-Path -LiteralPath $venvPython -PathType Leaf)) {
+        Write-Warning "python venv creation did not create Scripts\python.exe for pylatexenc"
+        $script:InstallFailures += [pscustomobject]@{ Tool='latex2text'; Pm='python'; Pkg='pylatexenc'; ExitCode='missing-venv-python' }
+        return
+    }
+
+    $requirements = New-TemporaryFile
+    try {
+        Set-Content -LiteralPath $requirements -Value ("setuptools=={0} --hash=sha256:{1}" -f $PylatexencBuildBackendVersion, $PylatexencBuildBackendSha256) -Encoding ascii
+        Invoke-PythonCommand -Python $venvPython -Arguments @('-m', 'pip', 'install', '--disable-pip-version-check', '--no-cache-dir', '--require-hashes', '--only-binary=:all:', '--no-deps', '-r', $requirements)
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warning ("pinned setuptools install failed (exit {0})" -f $LASTEXITCODE)
+            $script:InstallFailures += [pscustomobject]@{ Tool='latex2text'; Pm='pip'; Pkg='setuptools'; ExitCode=$LASTEXITCODE }
+            return
+        }
+
+        Set-Content -LiteralPath $requirements -Value ("pylatexenc=={0} --hash=sha256:{1}" -f $PylatexencVersion, $PylatexencSha256) -Encoding ascii
+        Invoke-PythonCommand -Python $venvPython -Arguments @('-m', 'pip', 'install', '--disable-pip-version-check', '--no-cache-dir', '--require-hashes', '--no-deps', '--no-build-isolation', '-r', $requirements)
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warning ("pylatexenc install failed (exit {0})" -f $LASTEXITCODE)
+            $script:InstallFailures += [pscustomobject]@{ Tool='latex2text'; Pm='pip'; Pkg='pylatexenc'; ExitCode=$LASTEXITCODE }
+            return
+        }
+    } finally {
+        Remove-Item -LiteralPath $requirements -Force -ErrorAction SilentlyContinue
+    }
+
+    if (-not (Test-Path -LiteralPath (Join-Path $scriptsDir 'latex2text.exe') -PathType Leaf)) {
+        Write-Warning "pylatexenc installed without executable latex2text"
+        $script:InstallFailures += [pscustomobject]@{ Tool='latex2text'; Pm='pip'; Pkg='pylatexenc'; ExitCode='missing-latex2text' }
+        return
+    }
+
+    Add-DirectoryToUserPath -Directory $scriptsDir
+    Write-Host ("  installed {0,-26} pylatexenc {1}" -f "latex2text", $PylatexencVersion)
 }
 
 function Get-InstallDependencySpec {
@@ -886,6 +1019,206 @@ function Test-ScoopPackageManaged {
     return ($state.Status -eq 'managed')
 }
 
+function Get-ScoopStatusPropertyValue {
+    param([object]$Item, [string[]]$Names)
+    if ($null -eq $Item) { return '' }
+    foreach ($name in $Names) {
+        $property = $Item.PSObject.Properties[$name]
+        if ($null -ne $property) {
+            return ([string]$property.Value).Trim()
+        }
+    }
+    return ''
+}
+
+function Get-ScoopStatusRowState {
+    param([object]$Item, [string]$Package)
+    $listName = Get-ScoopPackageListName -Package $Package
+    if ([string]::IsNullOrWhiteSpace($listName)) {
+        return [pscustomobject]@{ Status = 'none'; Reason = '' }
+    }
+
+    $rowName = Get-ScoopStatusPropertyValue -Item $Item -Names @('Name')
+    if (-not [string]::IsNullOrWhiteSpace($rowName)) {
+        if (-not $rowName.Equals($listName, [StringComparison]::OrdinalIgnoreCase)) {
+            return [pscustomobject]@{ Status = 'none'; Reason = '' }
+        }
+        $latest = Get-ScoopStatusPropertyValue -Item $Item -Names @('Latest Version', 'LatestVersion')
+        $missing = Get-ScoopStatusPropertyValue -Item $Item -Names @('Missing Dependencies', 'MissingDependencies')
+        $info = Get-ScoopStatusPropertyValue -Item $Item -Names @('Info')
+        if (-not [string]::IsNullOrWhiteSpace($missing)) {
+            return [pscustomobject]@{ Status = 'error'; Reason = ("missing dependencies: {0}" -f $missing) }
+        }
+        if (-not [string]::IsNullOrWhiteSpace($info)) {
+            return [pscustomobject]@{ Status = 'error'; Reason = $info }
+        }
+        if (-not [string]::IsNullOrWhiteSpace($latest)) {
+            return [pscustomobject]@{ Status = 'available'; Reason = '' }
+        }
+        return [pscustomobject]@{ Status = 'none'; Reason = '' }
+    }
+
+    $line = ([string]$Item).Trim()
+    if ([string]::IsNullOrWhiteSpace($line)) {
+        return [pscustomobject]@{ Status = 'none'; Reason = '' }
+    }
+    if ($line -match '^(Name|[-]+)\b') {
+        return [pscustomobject]@{ Status = 'none'; Reason = '' }
+    }
+    if ($line -match ("^$([regex]::Escape($listName))(\s|$)")) {
+        foreach ($badState in @('Install failed', 'Deprecated', 'Manifest removed', 'Held package', 'Missing Dependencies')) {
+            if ($line -match [regex]::Escape($badState)) {
+                return [pscustomobject]@{ Status = 'error'; Reason = $badState }
+            }
+        }
+        return [pscustomobject]@{ Status = 'error'; Reason = ("unparseable Scoop status row: {0}" -f $line) }
+    }
+    return [pscustomobject]@{ Status = 'none'; Reason = '' }
+}
+
+function Get-ScoopStatusOutputPackageState {
+    param([object[]]$Output, [string]$Package)
+    foreach ($item in @($Output)) {
+        $state = Get-ScoopStatusRowState -Item $item -Package $Package
+        if ($state.Status -eq 'error') { return $state }
+        if ($state.Status -eq 'available') { return $state }
+    }
+    return [pscustomobject]@{ Status = 'none'; Reason = '' }
+}
+
+function Get-ScoopPackageUpgradeState {
+    param([string]$Package)
+    if ([string]::IsNullOrWhiteSpace($Package)) {
+        return [pscustomobject]@{ Status = 'none'; ExitCode = 0 }
+    }
+    if (-not (Get-Command scoop -ErrorAction SilentlyContinue)) {
+        return [pscustomobject]@{ Status = 'error'; ExitCode = 'scoop-missing' }
+    }
+    try {
+        $output = @(scoop status 2>$null)
+        $exitCode = $LASTEXITCODE
+        if ($exitCode -ne 0) {
+            return [pscustomobject]@{ Status = 'error'; ExitCode = $exitCode }
+        }
+        $state = Get-ScoopStatusOutputPackageState -Output $output -Package $Package
+        if ($state.Status -eq 'available') {
+            return [pscustomobject]@{ Status = 'available'; ExitCode = 0; Reason = '' }
+        }
+        if ($state.Status -eq 'error') {
+            return [pscustomobject]@{ Status = 'error'; ExitCode = 'scoop-status-unhealthy'; Reason = $state.Reason }
+        }
+        return [pscustomobject]@{ Status = 'none'; ExitCode = 0; Reason = '' }
+    } catch {
+        return [pscustomobject]@{ Status = 'error'; ExitCode = 'exception' }
+    }
+}
+
+function Get-WingetRootCandidates {
+    $roots = @()
+    foreach ($base in @($env:LOCALAPPDATA)) {
+        if (-not [string]::IsNullOrWhiteSpace($base)) {
+            $roots += (Join-WindowsPathText -Left $base -Right 'Microsoft\WinGet\Links')
+            $roots += (Join-WindowsPathText -Left $base -Right 'Microsoft\WinGet\Packages')
+            $roots += (Join-WindowsPathText -Left $base -Right 'Microsoft\WindowsApps')
+        }
+    }
+    foreach ($base in @($env:ProgramFiles, ${env:ProgramFiles(x86)})) {
+        if (-not [string]::IsNullOrWhiteSpace($base)) {
+            $roots += (Join-WindowsPathText -Left $base -Right 'WinGet\Links')
+            $roots += (Join-WindowsPathText -Left $base -Right 'WinGet\Packages')
+            $roots += (Join-WindowsPathText -Left $base -Right 'WindowsApps')
+        }
+    }
+    $roots += @(
+        'C:\Program Files\WinGet\Links',
+        'C:\Program Files\WinGet\Packages',
+        'C:\Program Files (x86)\WinGet\Links',
+        'C:\Program Files (x86)\WinGet\Packages',
+        'C:\Program Files\WindowsApps'
+    )
+    return @($roots | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique)
+}
+
+function Get-WingetProgramRootCandidates {
+    $roots = @()
+    foreach ($candidate in @($env:ProgramFiles, ${env:ProgramFiles(x86)}, 'C:\Program Files', 'C:\Program Files (x86)')) {
+        if (-not [string]::IsNullOrWhiteSpace($candidate)) { $roots += (ConvertTo-WindowsComparablePath -Path $candidate) }
+    }
+    if (-not [string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
+        $roots += (Join-WindowsPathText -Left $env:LOCALAPPDATA -Right 'Programs')
+    }
+    return @($roots | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique)
+}
+
+function Get-WingetToolInstallSuffixes {
+    param([string]$tool)
+    switch ($tool) {
+        'git' { return @('Git\cmd', 'Git\bin') }
+        'nvim' { return @('Neovim\bin') }
+        'starship' { return @('Starship\bin', 'starship\bin', 'starship') }
+        'rg' { return @('ripgrep', 'ripgrep\bin') }
+        'fd' { return @('fd', 'fd\bin') }
+        'fzf' { return @('fzf', 'fzf\bin') }
+        'lsd' { return @('lsd', 'lsd\bin') }
+        'chezmoi' { return @('chezmoi', 'chezmoi\bin') }
+        'lazygit' { return @('lazygit', 'lazygit\bin') }
+        'wt' { return @('WindowsApps') }
+        'make' { return @('GnuWin32\bin') }
+        'cmake' { return @('CMake\bin') }
+        'pwsh' { return @('PowerShell\7') }
+        'node' { return @('nodejs') }
+        'python' { return @('Python\Python312', 'Python312') }
+        'zig' { return @('zig', 'Zig') }
+        'jq' { return @('jq', 'jq\bin') }
+        'shellcheck' { return @('ShellCheck', 'ShellCheck\bin') }
+        'hyperfine' { return @('hyperfine', 'hyperfine\bin') }
+        'code' { return @('Microsoft VS Code\bin') }
+        default { return @() }
+    }
+}
+
+function Test-WingetToolSourceMatchesPackage {
+    param([string]$tool, [string]$Package, [string]$Source)
+    if ([string]::IsNullOrWhiteSpace($tool) -or [string]::IsNullOrWhiteSpace($Package) -or [string]::IsNullOrWhiteSpace($Source)) {
+        return $false
+    }
+    $expected = Get-CatalogPackageId -tool $tool -Manager 'winget'
+    if ([string]::IsNullOrWhiteSpace($expected) -or -not $expected.Equals($Package, [StringComparison]::OrdinalIgnoreCase)) {
+        return $false
+    }
+
+    foreach ($root in (Get-WingetRootCandidates)) {
+        if (Test-WindowsPathUnderDirectoryText -Path $Source -Directory $root) {
+            return $true
+        }
+    }
+
+    foreach ($root in (Get-WingetProgramRootCandidates)) {
+        foreach ($suffix in (Get-WingetToolInstallSuffixes -tool $tool)) {
+            $candidate = Join-WindowsPathText -Left $root -Right $suffix
+            if (Test-WindowsPathUnderDirectoryText -Path $Source -Directory $candidate) {
+                return $true
+            }
+        }
+    }
+    return $false
+}
+
+function Get-WingetPackageOwnershipState {
+    param([string]$tool, [string]$Package)
+    $source = Get-CatalogToolCommandSource -tool $tool
+    if ([string]::IsNullOrWhiteSpace($source)) {
+        return [pscustomobject]@{ Status = 'not-managed'; Reason = ''; Source = ''; Package = ''; Expected = $Package }
+    }
+    if (-not (Test-WingetPackageManaged -Package $Package)) {
+        return [pscustomobject]@{ Status = 'not-managed'; Reason = ''; Source = $source; Package = ''; Expected = $Package }
+    }
+    if (Test-WingetToolSourceMatchesPackage -tool $tool -Package $Package -Source $source) {
+        return [pscustomobject]@{ Status = 'managed'; Reason = ''; Source = $source; Package = $Package; Expected = $Package }
+    }
+    return [pscustomobject]@{ Status = 'not-managed'; Reason = ''; Source = $source; Package = ''; Expected = $Package }
+}
+
 function Test-WingetPackageManaged {
     param([string]$Package)
     if ([string]::IsNullOrWhiteSpace($Package)) { return $false }
@@ -963,6 +1296,84 @@ function Test-ChocoPackageManaged {
     return $false
 }
 
+function Test-ChocoOutdatedOutputContainsPackage {
+    param([object[]]$Output, [string]$Package)
+    if ([string]::IsNullOrWhiteSpace($Package)) { return $false }
+    $prefix = "$Package|"
+    foreach ($line in @($Output)) {
+        if (([string]$line).StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) {
+            return $true
+        }
+    }
+    return $false
+}
+
+function Get-ChocoPackageUpgradeState {
+    param([string]$Package)
+    if ([string]::IsNullOrWhiteSpace($Package)) {
+        return [pscustomobject]@{ Status = 'none'; ExitCode = 0 }
+    }
+    if (-not (Get-Command choco -ErrorAction SilentlyContinue)) {
+        return [pscustomobject]@{ Status = 'error'; ExitCode = 'choco-missing' }
+    }
+    try {
+        $output = @(choco outdated --limit-output 2>$null)
+        $exitCode = $LASTEXITCODE
+        if (($exitCode -ne 0) -and ($exitCode -ne 2)) {
+            return [pscustomobject]@{ Status = 'error'; ExitCode = $exitCode }
+        }
+        if (Test-ChocoOutdatedOutputContainsPackage -Output $output -Package $Package) {
+            return [pscustomobject]@{ Status = 'available'; ExitCode = $exitCode }
+        }
+        return [pscustomobject]@{ Status = 'none'; ExitCode = $exitCode }
+    } catch {
+        return [pscustomobject]@{ Status = 'error'; ExitCode = 'exception' }
+    }
+}
+
+function Get-ChocolateyRootCandidates {
+    $roots = @()
+    if (-not [string]::IsNullOrWhiteSpace($env:ChocolateyInstall)) {
+        $roots += (ConvertTo-WindowsComparablePath -Path $env:ChocolateyInstall)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($env:ProgramData)) {
+        $roots += (Join-WindowsPathText -Left $env:ProgramData -Right 'chocolatey')
+    }
+    $roots += 'C:\ProgramData\chocolatey'
+    return @($roots | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique)
+}
+
+function Test-ChocolateyToolSourceUnderKnownRoot {
+    param([string]$Source)
+    foreach ($root in (Get-ChocolateyRootCandidates)) {
+        $binDir = Join-WindowsPathText -Left $root -Right 'bin'
+        if (Test-WindowsPathUnderDirectoryText -Path $Source -Directory $binDir) {
+            return $true
+        }
+    }
+    return $false
+}
+
+function Get-ChocoPackageOwnershipState {
+    param([string]$tool, [string]$Package)
+    $source = Get-CatalogToolCommandSource -tool $tool
+    if ([string]::IsNullOrWhiteSpace($source)) {
+        return [pscustomobject]@{ Status = 'not-managed'; Reason = ''; Source = ''; Package = ''; Expected = $Package }
+    }
+    $sourceUnderChoco = Test-ChocolateyToolSourceUnderKnownRoot -Source $source
+    $packageInstalled = Test-ChocoPackageManaged -Package $Package
+    if ($sourceUnderChoco -and $packageInstalled) {
+        return [pscustomobject]@{ Status = 'managed'; Reason = ''; Source = $source; Package = $Package; Expected = $Package }
+    }
+    if ($sourceUnderChoco -and -not $packageInstalled) {
+        return [pscustomobject]@{
+            Status = 'error'; Source = $source; Package = ''; Expected = $Package;
+            Reason = ("Chocolatey command source is under Chocolatey bin but package {0} is not installed" -f $Package)
+        }
+    }
+    return [pscustomobject]@{ Status = 'not-managed'; Reason = ''; Source = $source; Package = ''; Expected = $Package }
+}
+
 function Get-ManagedCatalogToolUpdateTarget {
     param([string]$tool)
     foreach ($manager in @('scoop', 'winget', 'choco')) {
@@ -971,20 +1382,8 @@ function Get-ManagedCatalogToolUpdateTarget {
         if (-not (Get-Command $manager -ErrorAction SilentlyContinue)) { continue }
         $state = switch ($manager) {
             'scoop' { Get-ScoopPackageOwnershipState -tool $tool -Package $pkg }
-            'winget' {
-                if (Test-WingetPackageManaged -Package $pkg) {
-                    [pscustomobject]@{ Status = 'managed'; Reason = ''; Source = ''; Package = $pkg; Expected = $pkg }
-                } else {
-                    [pscustomobject]@{ Status = 'not-managed'; Reason = ''; Source = ''; Package = ''; Expected = $pkg }
-                }
-            }
-            'choco' {
-                if (Test-ChocoPackageManaged -Package $pkg) {
-                    [pscustomobject]@{ Status = 'managed'; Reason = ''; Source = ''; Package = $pkg; Expected = $pkg }
-                } else {
-                    [pscustomobject]@{ Status = 'not-managed'; Reason = ''; Source = ''; Package = ''; Expected = $pkg }
-                }
-            }
+            'winget' { Get-WingetPackageOwnershipState -tool $tool -Package $pkg }
+            'choco' { Get-ChocoPackageOwnershipState -tool $tool -Package $pkg }
         }
         if ($state.Status -eq 'error') {
             return [pscustomobject]@{ Pm = $manager; Pkg = $pkg; Status = 'error'; Reason = $state.Reason; Source = $state.Source }
@@ -1022,7 +1421,30 @@ function Report-BlockedCatalogToolUpdate {
     $reason = if ($Target -and -not [string]::IsNullOrWhiteSpace($Target.Reason)) { $Target.Reason } else { 'manager provenance could not be verified' }
     $source = if ($Target -and -not [string]::IsNullOrWhiteSpace($Target.Source)) { $Target.Source } else { Get-CatalogToolCommandSource -tool $tool }
     Write-Warning ("  blocked   {0,-26} {1}; source={2}" -f $tool, $reason, $source)
-    $script:InstallFailures += [pscustomobject]@{ Tool=$tool; Pm=$Target.Pm; Pkg=$Target.Pkg; ExitCode='scoop-shim-provenance' }
+    $exitCode = if ($Target.Pm -eq 'scoop') { 'scoop-shim-provenance' } else { 'manager-provenance' }
+    $script:InstallFailures += [pscustomobject]@{ Tool=$tool; Pm=$Target.Pm; Pkg=$Target.Pkg; ExitCode=$exitCode }
+}
+
+function Ensure-ScoopManifestRefreshedForUpdate {
+    param([bool]$IsDryRun = $DryRun)
+    if ($script:ScoopManifestRefreshState -eq 'done') { return $true }
+    if ($script:ScoopManifestRefreshState -eq 'failed') { return $false }
+
+    if ($IsDryRun) {
+        Write-Host "  would:    scoop update"
+        $script:ScoopManifestRefreshState = 'done'
+        return $true
+    }
+
+    scoop update | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warning ("  scoop manifest refresh failed (exit {0})" -f $LASTEXITCODE)
+        $script:InstallFailures += [pscustomobject]@{ Tool='scoop'; Pm='scoop'; Pkg='manifest'; ExitCode=$LASTEXITCODE }
+        $script:ScoopManifestRefreshState = 'failed'
+        return $false
+    }
+    $script:ScoopManifestRefreshState = 'done'
+    return $true
 }
 
 function Update-ScoopTool {
@@ -1052,22 +1474,24 @@ function Update-ScoopTool {
         if ($ReportSkip) { Write-Host ("  skipped   {0,-26} present, but Scoop does not manage {1}" -f $tool, $pkg) }
         return
     }
-    if ((-not $NoPrompt) -and (-not (Ask "Update ${tool} to the latest scoop version?"))) { return }
-    if ($IsDryRun) {
-        if ($SkipManifestRefresh) {
-            Write-Host ("  would:    scoop update {0}" -f $pkg)
-        } else {
-            Write-Host ("  would:    scoop update; scoop update {0}" -f $pkg)
-        }
+    if ((-not $SkipManifestRefresh) -and (-not (Ensure-ScoopManifestRefreshedForUpdate -IsDryRun $IsDryRun))) {
         return
     }
-    if (-not $SkipManifestRefresh) {
-        scoop update | Out-Null
-        if ($LASTEXITCODE -ne 0) {
-            Write-Warning ("  scoop manifest refresh failed (exit {0})" -f $LASTEXITCODE)
-            $script:InstallFailures += [pscustomobject]@{ Tool=$tool; Pm='scoop'; Pkg='manifest'; ExitCode=$LASTEXITCODE }
-            return
-        }
+    $upgradeState = Get-ScoopPackageUpgradeState -Package $pkg
+    if ($upgradeState.Status -eq 'none') {
+        if ($ReportSkip) { Write-Host ("  current   {0,-26} via scoop" -f $tool) }
+        return
+    }
+    if ($upgradeState.Status -ne 'available') {
+        $reason = if ($upgradeState.Reason) { ": $($upgradeState.Reason)" } else { " (exit $($upgradeState.ExitCode))" }
+        Write-Warning ("  scoop status check of {0} failed{1}" -f $pkg, $reason)
+        $script:InstallFailures += [pscustomobject]@{ Tool=$tool; Pm='scoop'; Pkg=$pkg; ExitCode=$upgradeState.ExitCode }
+        return
+    }
+    if ((-not $NoPrompt) -and (-not (Ask "Update ${tool} to the latest scoop version?"))) { return }
+    if ($IsDryRun) {
+        Write-Host ("  would:    scoop update {0}" -f $pkg)
+        return
     }
     scoop update $pkg
     if ($LASTEXITCODE -eq 0) {
@@ -1097,9 +1521,17 @@ function Update-WingetTool {
         if ($ReportSkip) { Write-Host ("  skipped   {0,-26} no winget package in catalog" -f $tool) }
         return
     }
-    if ((-not $AssumeManaged) -and (-not (Test-WingetPackageManaged -Package $pkg))) {
-        if ($ReportSkip) { Write-Host ("  skipped   {0,-26} present, but winget does not manage {1}" -f $tool, $pkg) }
-        return
+    if (-not $AssumeManaged) {
+        $state = Get-WingetPackageOwnershipState -tool $tool -Package $pkg
+        if ($state.Status -eq 'error') {
+            Report-BlockedCatalogToolUpdate -tool $tool -Target ([pscustomobject]@{ Pm='winget'; Pkg=$pkg; Reason=$state.Reason; Source=$state.Source })
+            return
+        }
+        if ($state.Status -ne 'managed') {
+            if ($ReportSkip) { Write-Host ("  unmanaged {0,-26} source={1}" -f $tool, $(if ($state.Source) { $state.Source } else { 'unknown source' })) }
+            Add-UnmanagedDependency -tool $tool -Source $state.Source
+            return
+        }
     }
     $upgradeState = Get-WingetPackageUpgradeState -Package $pkg
     if ($upgradeState.Status -eq 'none') {
@@ -1146,8 +1578,26 @@ function Update-ChocoTool {
         if ($ReportSkip) { Write-Host ("  skipped   {0,-26} no choco package in catalog" -f $tool) }
         return
     }
-    if ((-not $AssumeManaged) -and (-not (Test-ChocoPackageManaged -Package $pkg))) {
-        if ($ReportSkip) { Write-Host ("  skipped   {0,-26} present, but Chocolatey does not manage {1}" -f $tool, $pkg) }
+    if (-not $AssumeManaged) {
+        $state = Get-ChocoPackageOwnershipState -tool $tool -Package $pkg
+        if ($state.Status -eq 'error') {
+            Report-BlockedCatalogToolUpdate -tool $tool -Target ([pscustomobject]@{ Pm='choco'; Pkg=$pkg; Reason=$state.Reason; Source=$state.Source })
+            return
+        }
+        if ($state.Status -ne 'managed') {
+            if ($ReportSkip) { Write-Host ("  unmanaged {0,-26} source={1}" -f $tool, $(if ($state.Source) { $state.Source } else { 'unknown source' })) }
+            Add-UnmanagedDependency -tool $tool -Source $state.Source
+            return
+        }
+    }
+    $upgradeState = Get-ChocoPackageUpgradeState -Package $pkg
+    if ($upgradeState.Status -eq 'none') {
+        if ($ReportSkip) { Write-Host ("  current   {0,-26} via choco" -f $tool) }
+        return
+    }
+    if ($upgradeState.Status -ne 'available') {
+        Write-Warning ("  choco outdated check of {0} failed (exit {1})" -f $pkg, $upgradeState.ExitCode)
+        $script:InstallFailures += [pscustomobject]@{ Tool=$tool; Pm='choco'; Pkg=$pkg; ExitCode=$upgradeState.ExitCode }
         return
     }
     if ((-not $NoPrompt) -and (-not (Ask "Update ${tool} to the latest Chocolatey version?"))) { return }
@@ -1216,6 +1666,7 @@ function Write-UnmanagedDependencySummary {
 # pretending success.
 $script:InstallFailures = @()
 $script:UnmanagedDependencies = @()
+$script:ScoopManifestRefreshState = ''
 
 # ---- Hack Nerd Font: prefer scoop bucket, fall back to direct download+register
 function Get-HackNerdFontInstallScope {
@@ -2172,18 +2623,7 @@ function Invoke-InstallDepsUpdateMode {
     Write-Host ("install-deps: update mode  scoop=" + [bool](Get-Command scoop -ErrorAction SilentlyContinue) + "  winget=" + [bool](Get-Command winget -ErrorAction SilentlyContinue) + "  choco=" + [bool](Get-Command choco -ErrorAction SilentlyContinue) + "  dry-run=$IsDryRun")
     Write-Host "note: present catalog tools update only through the package manager that owns them."
     Write-Host ""
-
-    if (-not (Get-Command scoop -ErrorAction SilentlyContinue)) {
-        Write-Host "  skipped   scoop update              Scoop is not installed"
-    } elseif ($IsDryRun) {
-        Write-Host "  would:    scoop update"
-    } else {
-        scoop update | Out-Null
-        if ($LASTEXITCODE -ne 0) {
-            Write-Warning ("  scoop manifest refresh failed (exit {0})" -f $LASTEXITCODE)
-            $script:InstallFailures += [pscustomobject]@{ Tool='scoop'; Pm='scoop'; Pkg='manifest'; ExitCode=$LASTEXITCODE }
-        }
-    }
+    $script:ScoopManifestRefreshState = ''
 
     foreach ($spec in (Get-CatalogUpdateSpec -SpecList $SpecList)) {
         $tool = $spec.Tool
@@ -2196,7 +2636,7 @@ function Invoke-InstallDepsUpdateMode {
             Write-Host ("  skipped   {0,-26} not installed" -f $tool)
             continue
         }
-        Update-ManagedCatalogTool -tool $tool -NoPrompt -SkipScoopManifestRefresh -ReportSkip -AssumePresent -IsDryRun $IsDryRun
+        Update-ManagedCatalogTool -tool $tool -NoPrompt -ReportSkip -AssumePresent -IsDryRun $IsDryRun
     }
 
     Write-UnmanagedDependencySummary
@@ -2305,6 +2745,7 @@ Install-PSFzf
 
 Section "language tooling (for LSP / formatter back-ends)"
 Install-Python
+Install-PylatexencConverter
 Install-One node
 Install-TreeSitterCli
 Install-One zig

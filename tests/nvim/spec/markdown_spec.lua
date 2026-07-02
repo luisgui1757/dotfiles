@@ -9,7 +9,10 @@ describe("markdown rendering plugin", function()
   end)
 
   it("lazy-loads on markdown ft only", function()
-    assert.is_truthy(src:match('ft = { "markdown" }'), "render-markdown should only load when entering a markdown buffer")
+    assert.is_truthy(
+      src:match('ft = { "markdown" }'),
+      "render-markdown should only load when entering a markdown buffer"
+    )
     assert.is_nil(src:match("Avante"))
     assert.is_nil(src:match("codecompanion"))
   end)
@@ -18,6 +21,23 @@ describe("markdown rendering plugin", function()
     assert.is_truthy(src:match("checkbox = {"), "checkbox config block missing")
     assert.is_truthy(src:match("unchecked = {"), "unchecked checkbox icon config missing")
     assert.is_truthy(src:match("checked%s+= {"), "checked checkbox icon config missing")
+  end)
+
+  it("enables equation rendering through the repo-provisioned converter", function()
+    assert.is_truthy(src:match("latex = {"), "latex config block missing")
+    assert.is_truthy(
+      src:match('converter = "latex2text"'),
+      "equation rendering must use the setup-provisioned converter"
+    )
+    assert.is_truthy(src:match('highlight = "RenderMarkdownMath"'), "math highlight group missing")
+  end)
+
+  it("uses richer render-markdown surfaces instead of a second renderer", function()
+    assert.is_truthy(src:match("border_virtual = true"), "heading borders should render as virtual lines")
+    assert.is_truthy(src:match('highlight_border = "RenderMarkdownCodeBorder"'), "code block border highlight missing")
+    assert.is_truthy(src:match("dash = {"), "thematic break rendering block missing")
+    assert.is_truthy(src:match('cell = "padded"'), "pipe tables should use padded cells")
+    assert.is_truthy(src:match('highlight = "RenderMarkdownBullet"'), "bullet highlight missing")
   end)
 
   it("enables Obsidian-style callouts ([!NOTE], [!WARNING], etc.)", function()

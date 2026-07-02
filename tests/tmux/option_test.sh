@@ -12,7 +12,7 @@ session_name="dotfiles-opt-$$"
 sock_name="dotfiles-opt-$$"
 
 # Hermetic HOME so the baseline check below is real: tmux.conf does
-# `source-file -q "~/.tmux.posix.conf"`, and if the runner already has that
+# `source-file -q ~/.tmux.posix.conf`, and if the runner already has that
 # overlay deployed in its real HOME, the POSIX probes would rebind copy-mode `y`
 # and mask the OSC52 baseline we are asserting. An empty temp HOME guarantees the
 # overlay is absent; we source it explicitly later for the pbcopy assertion.
@@ -55,18 +55,24 @@ check focus-events on
 check mouse on
 check escape-time 10
 check history-limit 50000
-# Status-style is pine on base. Inactive windows are iris (the "cool" default;
-# tmux/themes/ has warm/minimal/teal alternatives). The current window is the
-# gold-bold standout. Bar opacity is a Windows Terminal concern (WT `opacity` is
-# window-wide), not a tmux color, so it is not asserted here -- the repo ships
-# `opacity: 95` (transparent); set 100 for a solid bar.
-check status-style "fg=#31748f,bg=#191724"
-check window-status-style "fg=#c4a7e7,bg=#191724"
-check window-status-current-style "fg=#f6c177,bold"
-# psmux v3.3.4 stores window-status-current-style but does NOT apply it when
-# rendering window cells -- only inline `#[fg=...]` in the format survives.
-# Real tmux applies either; the inline form works on both, so we pin it.
-check window-status-current-format "#[fg=#f6c177,bold] #I:#W#F #[default]"
+check status-position top
+
+if grep -Eq 'source-file -q "~/' "$REPO_ROOT/tmux/tmux.conf"; then
+    echo "FAIL: tmux.conf must not quote ~/.tmux.* overlay paths; psmux does not reliably expand quoted tilde paths"
+    exit 1
+fi
+
+for required in \
+    "set -go @rosepine-variant 'main'" \
+    "source-file ~/.tmux.rose-pine.main.conf" \
+    "source-file ~/.tmux.rose-pine.moon.conf" \
+    "source-file ~/.tmux.rose-pine.dawn.conf" \
+    "set -g status-position top"; do
+    if ! grep -F "$required" "$REPO_ROOT/tmux/tmux.windows.conf" >/dev/null; then
+        echo "FAIL: tmux.windows.conf missing required Rose Pine source line: $required"
+        exit 1
+    fi
+done
 
 # Prefix isn't shown by show-options; verify via list-keys instead.
 if ! tmux -L "$sock_name" list-keys -T prefix >/dev/null 2>&1; then
@@ -107,9 +113,9 @@ if [[ "$order" != *"1:two 2:one"* ]]; then
     exit 1
 fi
 
-# Copy-mode `y` baseline. The session above booted with `-f tmux/tmux.conf`,
-# whose `source-file -q "~/.tmux.posix.conf"` is a no-op under the isolated HOME
-# (the overlay is absent). So only the psmux-safe OSC52 baseline applies: `y`
+# Copy-mode `y` baseline. The session above booted with `-f tmux/tmux.conf`;
+# its bottom-of-file `source-file -q ~/.tmux.posix.conf` is a no-op under the
+# isolated HOME (the overlay is absent). So only the psmux-safe OSC52 baseline applies: `y`
 # must be bound to a BARE `copy-pipe-and-cancel` with NO pipe command after it.
 # The `$` anchor is load-bearing -- a probe rebind appends a pipe argument
 # (e.g. `... copy-pipe-and-cancel pbcopy`), and without the anchor this assertion
@@ -126,6 +132,29 @@ echo "  copy-mode-vi y baseline bound (bare OSC52, no shell probe)"
 # On macOS that is pbcopy; assert it there (Linux CI has no single guaranteed
 # CLI installed). This proves the extracted if-shell probes still work on POSIX.
 tmux -L "$sock_name" source-file "$REPO_ROOT/tmux/tmux.posix.conf"
+check @plugin "rose-pine/tmux"
+for required in \
+    "set-environment -g TMUX_PLUGIN_MANAGER_PATH \"~/.local/share/dotfiles/tmux-plugins\"" \
+    "set -g @plugin 'tmux-plugins/tpm'" \
+    "set -g @plugin 'rose-pine/tmux'" \
+    "run-shell \"\$HOME/.local/share/dotfiles/tmux-plugins/tpm/tpm\""; do
+    if ! grep -F "$required" "$REPO_ROOT/tmux/tmux.posix.conf" >/dev/null; then
+        echo "FAIL: tmux.posix.conf missing required plugin line: $required"
+        exit 1
+    fi
+done
+check @rose_pine_variant main
+check @rose_pine_user on
+check @rose_pine_host on
+check @rose_pine_hostname_short on
+check @rose_pine_date_time "%a %d %b %H:%M"
+check @rose_pine_directory on
+check @rose_pine_show_current_program on
+if [[ "$(show "@rose_pine_show_pane_directory")" == "on" ]]; then
+    echo "FAIL: tmux.posix.conf must not enable the mutually-exclusive pane-directory window-name mode"
+    exit 1
+fi
+echo "  rose-pine/tmux rich modules configured"
 if [[ "$(uname -s)" == "Darwin" ]]; then
     overlay_keys="$(tmux -L "$sock_name" list-keys -T copy-mode-vi)"
     if ! printf '%s\n' "$overlay_keys" | grep -Eq 'copy-mode-vi[[:space:]]+y[[:space:]]+send.*copy-pipe-and-cancel.*pbcopy'; then
@@ -134,5 +163,17 @@ if [[ "$(uname -s)" == "Darwin" ]]; then
     fi
     echo "  tmux.posix.conf overlay rebinds y -> pbcopy on macOS"
 fi
+
+# Prove the shared config's tilde overlay source lines actually load an overlay
+# from HOME. This catches quoted-tilde regressions that real tmux tolerates less
+# strictly than psmux, and prevents the Windows overlay from silently disappearing.
+printf '%s\n' 'set -g @dotfiles-test-windows-overlay loaded' > "$HOME/.tmux.windows.conf"
+tmux -L "$sock_name" source-file "$REPO_ROOT/tmux/tmux.conf"
+if [[ "$(tmux -L "$sock_name" show-options -gv @dotfiles-test-windows-overlay 2>/dev/null)" != "loaded" ]]; then
+    echo "FAIL: tmux.conf did not source ~/.tmux.windows.conf from HOME"
+    exit 1
+fi
+rm -f "$HOME/.tmux.windows.conf"
+echo "  tmux.conf sources ~/.tmux.windows.conf from HOME"
 
 echo "OK"

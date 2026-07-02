@@ -18,6 +18,7 @@ HOME="$TMP_ROOT/home"
 export HOME
 export STARSHIP_TEST_ROOT="$TMP_ROOT"
 export TMPDIR="$TMP_ROOT/tmp"
+export DOTFILES_PROVENANCE_DIR="$TMP_ROOT/provenance"
 PATH="$TMP_ROOT/bin:/usr/bin:/bin"
 
 uname() {
@@ -118,6 +119,18 @@ grep -F "$url" "$TMP_ROOT/curl.log" >/dev/null \
     || fail "curl did not request the pinned starship URL"
 printf '%s\n' "$PATH" | grep -F "$HOME/.local/bin" >/dev/null \
     || fail "starship install did not add user-local bin to PATH"
+grep -F "tool=starship" "$DOTFILES_PROVENANCE_DIR/starship.env" >/dev/null \
+    || fail "starship provenance marker was not written"
+grep -F "schema=2" "$DOTFILES_PROVENANCE_DIR/starship.env" >/dev/null \
+    || fail "starship provenance marker has the wrong schema"
+grep -F "version=$STARSHIP_VERSION" "$DOTFILES_PROVENANCE_DIR/starship.env" >/dev/null \
+    || fail "starship provenance marker has the wrong version"
+grep -F "sha256=$STARSHIP_LINUX_X86_64_SHA256" "$DOTFILES_PROVENANCE_DIR/starship.env" >/dev/null \
+    || fail "starship provenance marker has the wrong checksum"
+grep -F "binary_sha256=" "$DOTFILES_PROVENANCE_DIR/starship.env" >/dev/null \
+    || fail "starship provenance marker is missing the installed binary checksum"
+grep -F "command_path=$HOME/.local/bin/starship" "$DOTFILES_PROVENANCE_DIR/starship.env" >/dev/null \
+    || fail "starship provenance marker has the wrong command path"
 
 PM=brew
 DRY_RUN=1

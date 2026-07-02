@@ -18,7 +18,10 @@ export HOME
 DOTFILES_SETUP_SOURCE_ONLY=1 source "$REPO_ROOT/setup.sh"
 
 POLARIS_CACHE_ROOT="$TMP_ROOT/cache"
-POLARIS_VERSION="0.1.1"
+TEST_POLARIS_VERSION="0.1.2"
+TEST_POLARIS_TAG="v0.1.2"
+POLARIS_VERSION="$TEST_POLARIS_VERSION"
+POLARIS_TAG="$TEST_POLARIS_TAG"
 POLARIS_REF="489dcc6f991ddcff63c460a433e983264dc54cf7"
 ALL=0
 DRY_RUN=1
@@ -27,7 +30,7 @@ SKIP_AGENTS=0
 output="$(run_polaris_agent_policy 2>&1)"
 [[ "$output" == *"Phase 6/6: apply global agent policy (Polaris)"* ]] \
     || fail "dry-run did not report the Polaris phase"
-[[ "$output" == *"would: clone/fetch Polaris 0.1.1"* ]] \
+[[ "$output" == *"would: clone/fetch Polaris $TEST_POLARIS_VERSION ($TEST_POLARIS_TAG @"* ]] \
     || fail "dry-run did not preview the pinned Polaris fetch"
 [[ ! -e "$POLARIS_CACHE_ROOT" ]] \
     || fail "dry-run created the Polaris cache"
@@ -44,7 +47,7 @@ mkdir -p "$fresh_work/tools"
 git -C "$fresh_work" init -q
 git -C "$fresh_work" config user.name "Dotfiles Test"
 git -C "$fresh_work" config user.email "dotfiles@example.invalid"
-printf '0.1.1\n' > "$fresh_work/VERSION"
+printf '%s\n' "$TEST_POLARIS_VERSION" > "$fresh_work/VERSION"
 cat > "$fresh_work/tools/install" <<'EOF'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >> "$POLARIS_TEST_LOG"
@@ -54,6 +57,7 @@ git -C "$fresh_work" add VERSION tools/install
 git -C "$fresh_work" commit -q -m "fake polaris fresh fetch"
 
 fresh_sha="$(git -C "$fresh_work" rev-parse HEAD)"
+git -C "$fresh_work" tag "$TEST_POLARIS_TAG" "$fresh_sha"
 fresh_global_marker="$TMP_ROOT/fresh-global-fsmonitor-ran"
 fresh_env_marker="$TMP_ROOT/fresh-env-fsmonitor-ran"
 fresh_template_marker="$TMP_ROOT/fresh-template-post-checkout-ran"
@@ -108,12 +112,41 @@ grep -Fx -- "--global" "$POLARIS_TEST_LOG" >/dev/null \
 grep -Fx -- "--global --check" "$POLARIS_TEST_LOG" >/dev/null \
     || fail "fresh Polaris global check was not invoked"
 
+untagged_work="$TMP_ROOT/polaris-untagged-work"
+mkdir -p "$untagged_work/tools"
+git -C "$untagged_work" init -q
+git -C "$untagged_work" config user.name "Dotfiles Test"
+git -C "$untagged_work" config user.email "dotfiles@example.invalid"
+printf '%s\n' "$TEST_POLARIS_VERSION" > "$untagged_work/VERSION"
+cat > "$untagged_work/tools/install" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$POLARIS_TEST_LOG"
+EOF
+chmod +x "$untagged_work/tools/install"
+git -C "$untagged_work" add VERSION tools/install
+git -C "$untagged_work" commit -q -m "fake polaris without release tag"
+untagged_sha="$(git -C "$untagged_work" rev-parse HEAD)"
+POLARIS_REPO_URL="$untagged_work"
+POLARIS_REF="$untagged_sha"
+POLARIS_CACHE_ROOT="$TMP_ROOT/untagged-cache"
+POLARIS_TEST_LOG="$TMP_ROOT/untagged-polaris-install.log"
+set +e
+untagged_output="$(run_polaris_agent_policy 2>&1)"
+untagged_rc=$?
+set -e
+[[ "$untagged_rc" -ne 0 ]] \
+    || fail "untagged Polaris release artifact was accepted"
+[[ "$untagged_output" == *"Polaris tag mismatch"* ]] \
+    || fail "untagged Polaris release artifact did not explain the tag refusal"
+[[ ! -e "$POLARIS_TEST_LOG" ]] \
+    || fail "untagged Polaris release artifact executed the installer"
+
 work="$TMP_ROOT/polaris-work"
 mkdir -p "$work/tools"
 git -C "$work" init -q
 git -C "$work" config user.name "Dotfiles Test"
 git -C "$work" config user.email "dotfiles@example.invalid"
-printf '0.1.1\n' > "$work/VERSION"
+printf '%s\n' "$TEST_POLARIS_VERSION" > "$work/VERSION"
 cat > "$work/tools/install" <<'EOF'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >> "$POLARIS_TEST_LOG"
@@ -123,6 +156,7 @@ git -C "$work" add VERSION tools/install
 git -C "$work" commit -q -m "fake polaris"
 
 sha="$(git -C "$work" rev-parse HEAD)"
+git -C "$work" tag "$TEST_POLARIS_TAG" "$sha"
 mkdir -p "$POLARIS_CACHE_ROOT"
 mv "$work" "$POLARIS_CACHE_ROOT/$sha"
 

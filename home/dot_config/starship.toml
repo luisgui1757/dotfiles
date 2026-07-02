@@ -1,7 +1,10 @@
 "$schema" = 'https://starship.rs/config-schema.json'
 
-# Performance: 500ms command timeout, no leading blank line.
-command_timeout = 500
+# Performance: command timeout, no leading blank line. Raised from starship's
+# 500ms default to 2000ms so git modules are not killed mid-run in large / Git
+# LFS repos -- starship killing git mid-filter-handshake surfaces to the terminal
+# as "writing filter-process initialization failed: ... pipe is being closed".
+command_timeout = 2000
 add_newline = false
 
 # Modules not listed in format do not render; explicit disables are unnecessary.
@@ -33,8 +36,8 @@ foam = '#9ccfd8'
 iris = '#c4a7e7'
 
 [directory]
-format = "[](fg:overlay)[ $path ]($style)[](fg:overlay) "
-style = "bg:overlay fg:pine"
+format = "[$path]($style) "
+style = "fg:pine"
 # Show the FULL current path. truncation_length = 0 disables the "keep only the
 # last N folders" limit; truncate_to_repo = false stops collapsing the path to
 # the git-repo root. Home still contracts to ~ (home_symbol). To shorten again,
@@ -54,72 +57,72 @@ style = "fg:overlay"
 symbol = " "
 
 [git_branch]
-format = "[](fg:overlay)[ $symbol $branch ]($style)[](fg:overlay) "
-style = "bg:overlay fg:foam"
+format = "[$symbol $branch]($style) "
+style = "fg:foam"
 symbol = ""
 
 [git_status]
 disabled = false
-style = "bg:overlay fg:love"
-format = '[](fg:overlay)([$all_status$ahead_behind]($style))[](fg:overlay) '
-up_to_date = '[ ✓ ](bg:overlay fg:iris)'
-untracked = '[?\($count\)](bg:overlay fg:gold)'
-stashed = '[\$](bg:overlay fg:iris)'
-modified = '[!\($count\)](bg:overlay fg:gold)'
-renamed = '[»\($count\)](bg:overlay fg:iris)'
+style = "fg:love"
+format = '([$all_status$ahead_behind]($style)) '
+up_to_date = '[✓](fg:iris)'
+untracked = '[?\($count\)](fg:gold)'
+stashed = '[\$](fg:iris)'
+modified = '[!\($count\)](fg:gold)'
+renamed = '[»\($count\)](fg:iris)'
 deleted = '[✘\($count\)]($style)'
-staged = '[++\($count\)](bg:overlay fg:gold)'
-ahead = '[⇡\(${count}\)](bg:overlay fg:foam)'
-diverged = '⇕[\[](bg:overlay fg:iris)[⇡\(${ahead_count}\)](bg:overlay fg:foam)[⇣\(${behind_count}\)](bg:overlay fg:rose)[\]](bg:overlay fg:iris)'
-behind = '[⇣\(${count}\)](bg:overlay fg:rose)'
+staged = '[++\($count\)](fg:gold)'
+ahead = '[⇡\(${count}\)](fg:foam)'
+diverged = '⇕[\[](fg:iris)[⇡\(${ahead_count}\)](fg:foam)[⇣\(${behind_count}\)](fg:rose)[\]](fg:iris)'
+behind = '[⇣\(${count}\)](fg:rose)'
 
 [time]
 disabled = false
-format = " [](fg:overlay)[ $time 󰴈 ]($style)[](fg:overlay)"
-style = "bg:overlay fg:rose"
+format = "[$time 󰴈 ]($style)"
+style = "fg:rose"
 time_format = "%I:%M%P"
 
 [username]
 disabled = false
-format = "[](fg:overlay)[ 󰧱 $user ]($style)[](fg:overlay) "
+format = "[󰧱 $user]($style) "
 show_always = true
-style_root = "bg:overlay fg:iris"
-style_user = "bg:overlay fg:iris"
+style_root = "fg:iris"
+style_user = "fg:iris"
 
 # === Active language modules (only languages the user actually works in) ===
 
 [c]
-style = "bg:overlay fg:pine"
-format = " [](fg:overlay)[ $symbol$version ]($style)[](fg:overlay)"
+style = "fg:pine"
+format = "[$symbol$version]($style) "
 disabled = false
 symbol = " "
 
 [golang]
-style = "bg:overlay fg:pine"
-format = " [](fg:overlay)[ $symbol$version ]($style)[](fg:overlay)"
+style = "fg:pine"
+format = "[$symbol$version]($style) "
 disabled = false
 symbol = " "
 
 [nodejs]
-style = "bg:overlay fg:pine"
-format = " [](fg:overlay)[ $symbol$version ]($style)[](fg:overlay)"
+style = "fg:pine"
+format = "[$symbol$version]($style) "
 disabled = false
 symbol = " "
 
 [rust]
-style = "bg:overlay fg:pine"
-format = " [](fg:overlay)[ $symbol$version ]($style)[](fg:overlay)"
+style = "fg:pine"
+format = "[$symbol$version]($style) "
 disabled = false
 symbol = " "
 
 [python]
-style = "bg:overlay fg:pine"
-format = " [](fg:overlay)[ $symbol$version ]($style)[](fg:overlay)"
+style = "fg:pine"
+format = "[$symbol$version]($style) "
 disabled = false
 symbol = " "
 
 [conda]
-style = "bg:overlay fg:pine"
-format = " [](fg:overlay)[ $symbol$environment ]($style)[](fg:overlay)"
+style = "fg:pine"
+format = "[$symbol$environment]($style) "
 disabled = false
 symbol = '🅒 '

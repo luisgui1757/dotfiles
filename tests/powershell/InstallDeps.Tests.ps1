@@ -69,6 +69,24 @@ BeforeAll {
         Mock -CommandName scoop -MockWith { Invoke-MockedManager 'scoop' }
         Mock -CommandName choco -MockWith { Invoke-MockedManager 'choco' }
     }
+
+    function New-ScoopStatusRow {
+        param(
+            [Parameter(Mandatory)][string]$Name,
+            [Parameter(Mandatory)][string]$Installed,
+            [string]$Latest = '',
+            [string]$MissingDependencies = '',
+            [string]$Info = ''
+        )
+
+        [pscustomobject]@{
+            'Name' = $Name
+            'Installed Version' = $Installed
+            'Latest Version' = $Latest
+            'Missing Dependencies' = $MissingDependencies
+            'Info' = $Info
+        }
+    }
 }
 
 Describe "install-deps.ps1" {
@@ -747,20 +765,26 @@ Describe "install-deps.ps1" {
         }
         Mock -CommandName Test-Tool -MockWith { return $true } -ParameterFilter { $name -eq 'pwsh' }
         Mock -CommandName scoop -MockWith {
-            $script:ScoopArgs += ($args -join ' ')
-            if (($args -join ' ') -eq 'list pwsh') {
+            $joined = $args -join ' '
+            $script:ScoopArgs += $joined
+            if ($joined -eq 'list pwsh') {
+                $global:LASTEXITCODE = 0
                 return 'pwsh 7.5.0'
             }
+            if ($joined -eq 'status') {
+                $global:LASTEXITCODE = 0
+                return (New-ScoopStatusRow -Name 'pwsh' -Installed '7.5.0' -Latest '7.6.2')
+            }
+            $global:LASTEXITCODE = 0
         }
 
         $output = & { Update-ScoopTool pwsh } 6>&1 | Out-String
 
-        $wouldUpdatePwsh = @($output -split "`r?`n" | Where-Object {
-                $_ -match '^\s*would:\s+scoop update;\s+scoop update pwsh\s*$'
-            })
-        $wouldUpdatePwsh.Count | Should -Be 1
+        $output | Should -Match '(?m)^\s*would:\s+scoop update\s*$'
+        $output | Should -Match '(?m)^\s*would:\s+scoop update pwsh\s*$'
         $output | Should -Not -Match 'scoop update \*'
         $script:ScoopArgs | Should -Contain 'list pwsh'
+        $script:ScoopArgs | Should -Contain 'status'
         ($script:ScoopArgs | Where-Object { $_ -like 'update*' }).Count | Should -Be 0
     }
 
@@ -791,8 +815,12 @@ Describe "install-deps.ps1" {
             throw "unexpected Get-Content path: $LiteralPath"
         }
         Mock -CommandName scoop -MockWith {
-            $script:ScoopArgs += ($args -join ' ')
+            $joined = $args -join ' '
+            $script:ScoopArgs += $joined
             $global:LASTEXITCODE = 0
+            if ($joined -eq 'status') {
+                return (New-ScoopStatusRow -Name 'pwsh' -Installed '7.5.0' -Latest '7.6.2')
+            }
         }
 
         $output = & { Update-ManagedCatalogTool pwsh -AssumePresent -NoPrompt -ReportSkip -IsDryRun $true } 6>&1 | Out-String
@@ -803,6 +831,221 @@ Describe "install-deps.ps1" {
         ($script:ScoopArgs | Where-Object { $_ -like 'update*' }).Count | Should -Be 0
         $script:InstallFailures.Count | Should -Be 0
         $script:UnmanagedDependencies.Count | Should -Be 0
+    }
+
+    It "reports Scoop-owned PowerShell as current when Scoop status has no update" {
+        . $script:ImportInstallDepsForTest
+        $script:ScoopArgs = @()
+
+        Mock -CommandName Get-Command -MockWith {
+            param([string]$Name)
+            if ($Name -eq 'scoop') {
+                return [pscustomobject]@{ Name = $Name; Source = $Name }
+            }
+            if ($Name -eq 'pwsh') {
+                return [pscustomobject]@{ Name = $Name; Source = 'C:\Users\luigu\scoop\shims\pwsh.exe' }
+            }
+            return $null
+        }
+        Mock -CommandName Test-Path -MockWith {
+            param([string]$LiteralPath)
+            return ($LiteralPath -eq 'C:\Users\luigu\scoop\shims\pwsh.shim')
+        }
+        Mock -CommandName Get-Content -MockWith {
+            param([string]$LiteralPath)
+            if ($LiteralPath -eq 'C:\Users\luigu\scoop\shims\pwsh.shim') {
+                return 'path = "C:\Users\luigu\scoop\apps\pwsh\current\pwsh.exe"'
+            }
+            throw "unexpected Get-Content path: $LiteralPath"
+        }
+        Mock -CommandName scoop -MockWith {
+            $joined = $args -join ' '
+            $script:ScoopArgs += $joined
+            if ($joined -eq 'status') {
+                $global:LASTEXITCODE = 0
+                return ''
+            }
+            throw "scoop must not update a current package: $joined"
+        }
+
+        $output = & {
+            Update-ManagedCatalogTool pwsh -AssumePresent -NoPrompt -ReportSkip -SkipScoopManifestRefresh -IsDryRun $false
+        } 3>&1 6>&1 | Out-String
+
+        $output | Should -Match 'current\s+pwsh\s+via scoop'
+        $script:ScoopArgs | Should -Contain 'status'
+        ($script:ScoopArgs | Where-Object { $_ -like 'update*' }).Count | Should -Be 0
+        $script:InstallFailures.Count | Should -Be 0
+    }
+
+    It "updates Scoop-owned PowerShell only when Scoop status reports an update" {
+        . $script:ImportInstallDepsForTest
+        $script:ScoopArgs = @()
+
+        Mock -CommandName Get-Command -MockWith {
+            param([string]$Name)
+            if ($Name -eq 'scoop') {
+                return [pscustomobject]@{ Name = $Name; Source = $Name }
+            }
+            if ($Name -eq 'pwsh') {
+                return [pscustomobject]@{ Name = $Name; Source = 'C:\Users\luigu\scoop\shims\pwsh.exe' }
+            }
+            return $null
+        }
+        Mock -CommandName Test-Path -MockWith {
+            param([string]$LiteralPath)
+            return ($LiteralPath -eq 'C:\Users\luigu\scoop\shims\pwsh.shim')
+        }
+        Mock -CommandName Get-Content -MockWith {
+            param([string]$LiteralPath)
+            if ($LiteralPath -eq 'C:\Users\luigu\scoop\shims\pwsh.shim') {
+                return 'path = "C:\Users\luigu\scoop\apps\pwsh\current\pwsh.exe"'
+            }
+            throw "unexpected Get-Content path: $LiteralPath"
+        }
+        Mock -CommandName scoop -MockWith {
+            $joined = $args -join ' '
+            $script:ScoopArgs += $joined
+            switch ($joined) {
+                'status' {
+                    $global:LASTEXITCODE = 0
+                    return (New-ScoopStatusRow -Name 'pwsh' -Installed '7.5.0' -Latest '7.6.2')
+                }
+                'update pwsh' {
+                    $global:LASTEXITCODE = 0
+                    return
+                }
+                default {
+                    throw "unexpected scoop command: $joined"
+                }
+            }
+        }
+
+        $output = & {
+            Update-ManagedCatalogTool pwsh -AssumePresent -NoPrompt -ReportSkip -SkipScoopManifestRefresh -IsDryRun $false
+        } 3>&1 6>&1 | Out-String
+
+        $output | Should -Match 'updated\s+pwsh\s+via scoop'
+        $script:ScoopArgs | Should -Contain 'status'
+        $script:ScoopArgs | Should -Contain 'update pwsh'
+        $script:InstallFailures.Count | Should -Be 0
+    }
+
+    It "records failed Scoop status checks without updating the package" {
+        . $script:ImportInstallDepsForTest
+        $script:ScoopArgs = @()
+
+        Mock -CommandName Get-Command -MockWith {
+            param([string]$Name)
+            if ($Name -eq 'scoop') {
+                return [pscustomobject]@{ Name = $Name; Source = $Name }
+            }
+            if ($Name -eq 'pwsh') {
+                return [pscustomobject]@{ Name = $Name; Source = 'C:\Users\luigu\scoop\shims\pwsh.exe' }
+            }
+            return $null
+        }
+        Mock -CommandName Test-Path -MockWith {
+            param([string]$LiteralPath)
+            return ($LiteralPath -eq 'C:\Users\luigu\scoop\shims\pwsh.shim')
+        }
+        Mock -CommandName Get-Content -MockWith {
+            param([string]$LiteralPath)
+            if ($LiteralPath -eq 'C:\Users\luigu\scoop\shims\pwsh.shim') {
+                return 'path = "C:\Users\luigu\scoop\apps\pwsh\current\pwsh.exe"'
+            }
+            throw "unexpected Get-Content path: $LiteralPath"
+        }
+        Mock -CommandName scoop -MockWith {
+            $joined = $args -join ' '
+            $script:ScoopArgs += $joined
+            if ($joined -eq 'status') {
+                $global:LASTEXITCODE = 44
+                return
+            }
+            throw "scoop must not update after a failed status check: $joined"
+        }
+
+        $output = & {
+            Update-ManagedCatalogTool pwsh -AssumePresent -NoPrompt -ReportSkip -SkipScoopManifestRefresh -IsDryRun $false
+        } 3>&1 6>&1 | Out-String
+
+        $output | Should -Match 'scoop status check of pwsh failed'
+        ($script:ScoopArgs | Where-Object { $_ -like 'update*' }).Count | Should -Be 0
+        $script:InstallFailures.Count | Should -Be 1
+        $script:InstallFailures[0].Tool | Should -Be 'pwsh'
+        $script:InstallFailures[0].Pm | Should -Be 'scoop'
+        $script:InstallFailures[0].Pkg | Should -Be 'pwsh'
+        $script:InstallFailures[0].ExitCode | Should -Be 44
+    }
+
+    It "fails closed on unhealthy Scoop status rows without updating the package" {
+        . $script:ImportInstallDepsForTest
+        $script:ScoopStatusRow = $null
+
+        Mock -CommandName Get-Command -MockWith {
+            param([string]$Name)
+            if ($Name -eq 'scoop') {
+                return [pscustomobject]@{ Name = $Name; Source = $Name }
+            }
+            return $null
+        }
+        Mock -CommandName scoop -MockWith {
+            $joined = $args -join ' '
+            $script:ScoopArgs += $joined
+            if ($joined -eq 'status') {
+                $global:LASTEXITCODE = 0
+                return $script:ScoopStatusRow
+            }
+            throw "scoop must not update an unhealthy status row: $joined"
+        }
+
+        $cases = @(
+            [pscustomobject]@{
+                Label = 'install failed text'
+                Row = 'pwsh 7.5.0 Install failed'
+                Reason = 'Install failed'
+            },
+            [pscustomobject]@{
+                Label = 'deprecated'
+                Row = (New-ScoopStatusRow -Name 'pwsh' -Installed '7.5.0' -Info 'Deprecated')
+                Reason = 'Deprecated'
+            },
+            [pscustomobject]@{
+                Label = 'manifest removed'
+                Row = (New-ScoopStatusRow -Name 'pwsh' -Installed '7.5.0' -Info 'Manifest removed')
+                Reason = 'Manifest removed'
+            },
+            [pscustomobject]@{
+                Label = 'held package'
+                Row = (New-ScoopStatusRow -Name 'pwsh' -Installed '7.5.0' -Latest '7.6.2' -Info 'Held package')
+                Reason = 'Held package'
+            },
+            [pscustomobject]@{
+                Label = 'missing dependencies'
+                Row = (New-ScoopStatusRow -Name 'pwsh' -Installed '7.5.0' -Latest '7.6.2' -MissingDependencies 'git')
+                Reason = 'missing dependencies: git'
+            }
+        )
+
+        foreach ($case in $cases) {
+            $script:ScoopArgs = @()
+            $script:InstallFailures = @()
+            $script:ScoopStatusRow = $case.Row
+
+            $output = & {
+                Update-ScoopTool pwsh -NoPrompt -SkipManifestRefresh -AssumePresent -AssumeManaged -ReportSkip -IsDryRun $false
+            } 3>&1 6>&1 | Out-String
+
+            $output | Should -Match 'scoop status check of pwsh failed'
+            $output | Should -Match ([regex]::Escape($case.Reason))
+            ($script:ScoopArgs | Where-Object { $_ -eq 'update pwsh' }).Count | Should -Be 0
+            $script:InstallFailures.Count | Should -Be 1
+            $script:InstallFailures[0].Tool | Should -Be 'pwsh'
+            $script:InstallFailures[0].Pm | Should -Be 'scoop'
+            $script:InstallFailures[0].Pkg | Should -Be 'pwsh'
+            $script:InstallFailures[0].ExitCode | Should -Be 'scoop-status-unhealthy'
+        }
     }
 
     It "maps Scoop shim package names that differ from binary names" {
@@ -831,8 +1074,12 @@ Describe "install-deps.ps1" {
             throw "unexpected Get-Content path: $LiteralPath"
         }
         Mock -CommandName scoop -MockWith {
-            $script:ScoopArgs += ($args -join ' ')
+            $joined = $args -join ' '
+            $script:ScoopArgs += $joined
             $global:LASTEXITCODE = 0
+            if ($joined -eq 'status') {
+                return (New-ScoopStatusRow -Name 'ripgrep' -Installed '15.1.0' -Latest '15.2.0')
+            }
         }
 
         $output = & { Update-ManagedCatalogTool rg -AssumePresent -NoPrompt -ReportSkip -IsDryRun $true } 6>&1 | Out-String
@@ -948,6 +1195,40 @@ Describe "install-deps.ps1" {
         $script:InstallFailures.Count | Should -Be 0
     }
 
+    It "does not let winget list claim a manual command source" {
+        . $script:ImportInstallDepsForTest -DryRun
+        $script:WingetArgs = @()
+
+        Mock -CommandName Get-Command -MockWith {
+            param([string]$Name)
+            if ($Name -eq 'winget') {
+                return [pscustomobject]@{ Name = $Name; Source = $Name }
+            }
+            if ($Name -eq 'pwsh') {
+                return [pscustomobject]@{ Name = $Name; Source = 'C:\Manual\PowerShell\pwsh.exe' }
+            }
+            return $null
+        }
+        Mock -CommandName winget -MockWith {
+            $joined = $args -join ' '
+            $script:WingetArgs += $joined
+            if ($joined -eq 'list --id Microsoft.PowerShell -e --accept-source-agreements') {
+                $global:LASTEXITCODE = 0
+                return 'PowerShell Microsoft.PowerShell 7.5.0 winget'
+            }
+            throw "winget must not check upgrades or update a manual command source: $joined"
+        }
+
+        $output = & { Update-ManagedCatalogTool pwsh -AssumePresent -NoPrompt -ReportSkip -IsDryRun $true } 6>&1 | Out-String
+
+        $output | Should -Match 'unmanaged\s+pwsh\s+source=C:\\Manual\\PowerShell\\pwsh\.exe'
+        $output | Should -Not -Match 'winget upgrade|current\s+pwsh\s+via winget'
+        $script:WingetArgs | Should -Contain 'list --id Microsoft.PowerShell -e --accept-source-agreements'
+        ($script:WingetArgs | Where-Object { $_ -like 'list --upgrade-available*' }).Count | Should -Be 0
+        $script:InstallFailures.Count | Should -Be 0
+        $script:UnmanagedDependencies.Count | Should -Be 1
+    }
+
     It "records failed winget upgrade availability checks" {
         . $script:ImportInstallDepsForTest
         $script:WingetArgs = @()
@@ -1013,6 +1294,10 @@ Describe "install-deps.ps1" {
                 $global:LASTEXITCODE = 0
                 return 'powershell-core|7.5.0'
             }
+            if ($joined -eq 'outdated --limit-output') {
+                $global:LASTEXITCODE = 2
+                return 'powershell-core|7.5.0|7.6.2|false'
+            }
             $global:LASTEXITCODE = 0
         }
 
@@ -1021,8 +1306,204 @@ Describe "install-deps.ps1" {
         $output | Should -Match 'choco upgrade powershell-core -y'
         $output | Should -Not -Match 'winget upgrade --all|scoop update \*|choco upgrade all'
         $script:ChocoArgs | Should -Contain 'list powershell-core --local-only --exact --limit-output'
+        $script:ChocoArgs | Should -Contain 'outdated --limit-output'
         ($script:ChocoArgs | Where-Object { $_ -like 'upgrade*' }).Count | Should -Be 0
         $script:InstallFailures.Count | Should -Be 0
+    }
+
+    It "reports Chocolatey-owned PowerShell as current when Chocolatey has no update" {
+        . $script:ImportInstallDepsForTest
+        $script:ChocoArgs = @()
+
+        Mock -CommandName Get-Command -MockWith {
+            param([string]$Name)
+            if ($Name -eq 'choco') {
+                return [pscustomobject]@{ Name = $Name; Source = $Name }
+            }
+            if ($Name -eq 'pwsh') {
+                return [pscustomobject]@{ Name = $Name; Source = 'C:\ProgramData\chocolatey\bin\pwsh.exe' }
+            }
+            return $null
+        }
+        Mock -CommandName choco -MockWith {
+            $joined = $args -join ' '
+            $script:ChocoArgs += $joined
+            switch ($joined) {
+                'list powershell-core --local-only --exact --limit-output' {
+                    $global:LASTEXITCODE = 0
+                    return 'powershell-core|7.6.2'
+                }
+                'outdated --limit-output' {
+                    $global:LASTEXITCODE = 0
+                    return ''
+                }
+                default {
+                    throw "choco must not update a current package: $joined"
+                }
+            }
+        }
+
+        $output = & { Update-ManagedCatalogTool pwsh -AssumePresent -NoPrompt -ReportSkip -IsDryRun $false } 3>&1 6>&1 | Out-String
+
+        $output | Should -Match 'current\s+pwsh\s+via choco'
+        $script:ChocoArgs | Should -Contain 'outdated --limit-output'
+        ($script:ChocoArgs | Where-Object { $_ -like 'upgrade*' }).Count | Should -Be 0
+        $script:InstallFailures.Count | Should -Be 0
+    }
+
+    It "updates Chocolatey-owned PowerShell only when Chocolatey reports an update" {
+        . $script:ImportInstallDepsForTest
+        $script:ChocoArgs = @()
+
+        Mock -CommandName Get-Command -MockWith {
+            param([string]$Name)
+            if ($Name -eq 'choco') {
+                return [pscustomobject]@{ Name = $Name; Source = $Name }
+            }
+            if ($Name -eq 'pwsh') {
+                return [pscustomobject]@{ Name = $Name; Source = 'C:\ProgramData\chocolatey\bin\pwsh.exe' }
+            }
+            return $null
+        }
+        Mock -CommandName choco -MockWith {
+            $joined = $args -join ' '
+            $script:ChocoArgs += $joined
+            switch ($joined) {
+                'list powershell-core --local-only --exact --limit-output' {
+                    $global:LASTEXITCODE = 0
+                    return 'powershell-core|7.5.0'
+                }
+                'outdated --limit-output' {
+                    $global:LASTEXITCODE = 2
+                    return 'powershell-core|7.5.0|7.6.2|false'
+                }
+                'upgrade powershell-core -y' {
+                    $global:LASTEXITCODE = 0
+                    return
+                }
+                default {
+                    throw "unexpected choco command: $joined"
+                }
+            }
+        }
+
+        $output = & { Update-ManagedCatalogTool pwsh -AssumePresent -NoPrompt -ReportSkip -IsDryRun $false } 3>&1 6>&1 | Out-String
+
+        $output | Should -Match 'updated\s+pwsh\s+via choco'
+        $script:ChocoArgs | Should -Contain 'outdated --limit-output'
+        $script:ChocoArgs | Should -Contain 'upgrade powershell-core -y'
+        $script:InstallFailures.Count | Should -Be 0
+    }
+
+    It "records failed Chocolatey outdated checks without updating the package" {
+        . $script:ImportInstallDepsForTest
+        $script:ChocoArgs = @()
+
+        Mock -CommandName Get-Command -MockWith {
+            param([string]$Name)
+            if ($Name -eq 'choco') {
+                return [pscustomobject]@{ Name = $Name; Source = $Name }
+            }
+            if ($Name -eq 'pwsh') {
+                return [pscustomobject]@{ Name = $Name; Source = 'C:\ProgramData\chocolatey\bin\pwsh.exe' }
+            }
+            return $null
+        }
+        Mock -CommandName choco -MockWith {
+            $joined = $args -join ' '
+            $script:ChocoArgs += $joined
+            switch ($joined) {
+                'list powershell-core --local-only --exact --limit-output' {
+                    $global:LASTEXITCODE = 0
+                    return 'powershell-core|7.5.0'
+                }
+                'outdated --limit-output' {
+                    $global:LASTEXITCODE = 44
+                    return
+                }
+                default {
+                    throw "choco must not update after a failed outdated check: $joined"
+                }
+            }
+        }
+
+        $output = & { Update-ManagedCatalogTool pwsh -AssumePresent -NoPrompt -ReportSkip -IsDryRun $false } 3>&1 6>&1 | Out-String
+
+        $output | Should -Match 'choco outdated check of powershell-core failed'
+        ($script:ChocoArgs | Where-Object { $_ -like 'upgrade*' }).Count | Should -Be 0
+        $script:InstallFailures.Count | Should -Be 1
+        $script:InstallFailures[0].Tool | Should -Be 'pwsh'
+        $script:InstallFailures[0].Pm | Should -Be 'choco'
+        $script:InstallFailures[0].Pkg | Should -Be 'powershell-core'
+        $script:InstallFailures[0].ExitCode | Should -Be 44
+    }
+
+    It "does not let Chocolatey list claim a manual command source" {
+        . $script:ImportInstallDepsForTest -DryRun
+        $script:ChocoArgs = @()
+
+        Mock -CommandName Get-Command -MockWith {
+            param([string]$Name)
+            if ($Name -eq 'choco') {
+                return [pscustomobject]@{ Name = $Name; Source = $Name }
+            }
+            if ($Name -eq 'pwsh') {
+                return [pscustomobject]@{ Name = $Name; Source = 'C:\Manual\PowerShell\pwsh.exe' }
+            }
+            return $null
+        }
+        Mock -CommandName choco -MockWith {
+            $joined = $args -join ' '
+            $script:ChocoArgs += $joined
+            if ($joined -eq 'list powershell-core --local-only --exact --limit-output') {
+                $global:LASTEXITCODE = 0
+                return 'powershell-core|7.5.0'
+            }
+            throw "choco must not update a manual command source: $joined"
+        }
+
+        $output = & { Update-ManagedCatalogTool pwsh -AssumePresent -NoPrompt -ReportSkip -IsDryRun $true } 6>&1 | Out-String
+
+        $output | Should -Match 'unmanaged\s+pwsh\s+source=C:\\Manual\\PowerShell\\pwsh\.exe'
+        $output | Should -Not -Match 'choco upgrade powershell-core'
+        $script:ChocoArgs | Should -Contain 'list powershell-core --local-only --exact --limit-output'
+        $script:InstallFailures.Count | Should -Be 0
+        $script:UnmanagedDependencies.Count | Should -Be 1
+    }
+
+    It "blocks a Chocolatey-bin command source when the expected package is missing" {
+        . $script:ImportInstallDepsForTest -DryRun
+        $script:ChocoArgs = @()
+
+        Mock -CommandName Get-Command -MockWith {
+            param([string]$Name)
+            if ($Name -eq 'choco') {
+                return [pscustomobject]@{ Name = $Name; Source = $Name }
+            }
+            if ($Name -eq 'pwsh') {
+                return [pscustomobject]@{ Name = $Name; Source = 'C:\ProgramData\chocolatey\bin\pwsh.exe' }
+            }
+            return $null
+        }
+        Mock -CommandName choco -MockWith {
+            $joined = $args -join ' '
+            $script:ChocoArgs += $joined
+            if ($joined -eq 'list powershell-core --local-only --exact --limit-output') {
+                $global:LASTEXITCODE = 0
+                return ''
+            }
+            throw "choco must not update after a package/source contradiction: $joined"
+        }
+
+        $output = & { Update-ManagedCatalogTool pwsh -AssumePresent -NoPrompt -ReportSkip -IsDryRun $true } 3>&1 6>&1 | Out-String
+
+        $output | Should -Match 'blocked\s+pwsh'
+        $output | Should -Match 'Chocolatey command source is under Chocolatey bin but package powershell-core is not installed'
+        $output | Should -Not -Match 'choco upgrade powershell-core'
+        $script:InstallFailures.Count | Should -Be 1
+        $script:InstallFailures[0].Pm | Should -Be 'choco'
+        $script:InstallFailures[0].ExitCode | Should -Be 'manager-provenance'
+        $script:UnmanagedDependencies.Count | Should -Be 0
     }
 
     It "reports present unmanaged PowerShell instead of pretending update ownership" {
@@ -1197,6 +1678,10 @@ Describe "install-deps.ps1" {
                     $global:LASTEXITCODE = 0
                     return 'powershell-core|7.5.0'
                 }
+                'outdated --limit-output' {
+                    $global:LASTEXITCODE = 2
+                    return 'powershell-core|7.5.0|7.6.2|false'
+                }
                 'upgrade powershell-core -y' {
                     $global:LASTEXITCODE = 66
                     return
@@ -1229,10 +1714,17 @@ Describe "install-deps.ps1" {
             return $null
         }
         Mock -CommandName scoop -MockWith {
-            $script:ScoopArgs += ($args -join ' ')
-            if (($args -join ' ') -eq 'list git') {
+            $joined = $args -join ' '
+            $script:ScoopArgs += $joined
+            if ($joined -eq 'list git') {
+                $global:LASTEXITCODE = 0
                 return 'git 2.50.0'
             }
+            if ($joined -eq 'status') {
+                $global:LASTEXITCODE = 0
+                return (New-ScoopStatusRow -Name 'git' -Installed '2.50.0' -Latest '2.51.0')
+            }
+            $global:LASTEXITCODE = 0
         }
         Mock -CommandName Install-WindowsTerminal -MockWith { throw "Windows Terminal installer must not run in update mode" }
         Mock -CommandName Install-HackNerdFont -MockWith { throw "font installer must not run in update mode" }
@@ -1256,10 +1748,164 @@ Describe "install-deps.ps1" {
         $output | Should -Match '(?m)^\s*skipped\s+fd\s+not installed[ \t]*$'
         $output | Should -Not -Match 'scoop install|winget install|choco install|Install-Module|Hack\.zip'
         $script:ScoopArgs | Should -Contain 'list git'
+        $script:ScoopArgs | Should -Contain 'status'
         ($script:ScoopArgs | Where-Object { $_ -like 'update*' }).Count | Should -Be 0
         Should -Invoke -CommandName Install-WindowsTerminal -Times 0 -Exactly
         Should -Invoke -CommandName Install-HackNerdFont -Times 0 -Exactly
         Should -Invoke -CommandName Install-PSFzf -Times 0 -Exactly
+    }
+
+    It "does not refresh Scoop when no catalog tool is present" {
+        . $script:ImportInstallDepsForTest
+        $script:ScoopArgs = @()
+
+        Mock -CommandName Get-Command -MockWith {
+            param([string]$Name)
+            if ($Name -eq 'scoop') {
+                return [pscustomobject]@{ Name = $Name; Source = $Name }
+            }
+            return $null
+        }
+        Mock -CommandName scoop -MockWith {
+            $script:ScoopArgs += ($args -join ' ')
+            throw "scoop must not run without a present owned target"
+        }
+
+        $output = & {
+            Invoke-InstallDepsUpdateMode -SpecList @(
+                [pscustomobject]@{ Tool = 'git'; Kind = 'tool'; Binary = 'git'; Module = '' },
+                [pscustomobject]@{ Tool = 'fd'; Kind = 'tool'; Binary = 'fd'; Module = '' }
+            ) -PresenceTester {
+                return $false
+            } -IsDryRun $false
+        } 3>&1 6>&1 | Out-String
+
+        $output | Should -Match 'skipped\s+git\s+not installed'
+        $output | Should -Match 'skipped\s+fd\s+not installed'
+        $output | Should -Not -Match 'scoop update|scoop manifest refresh'
+        $script:ScoopArgs.Count | Should -Be 0
+        $script:InstallFailures.Count | Should -Be 0
+    }
+
+    It "does not refresh Scoop when winget owns the present target" {
+        . $script:ImportInstallDepsForTest
+        $script:ScoopArgs = @()
+        $script:WingetArgs = @()
+
+        Mock -CommandName Get-Command -MockWith {
+            param([string]$Name)
+            if ($Name -eq 'scoop') {
+                return [pscustomobject]@{ Name = $Name; Source = $Name }
+            }
+            if ($Name -eq 'winget') {
+                return [pscustomobject]@{ Name = $Name; Source = $Name }
+            }
+            if ($Name -eq 'pwsh') {
+                return [pscustomobject]@{ Name = $Name; Source = 'C:\Program Files\PowerShell\7\pwsh.exe' }
+            }
+            return $null
+        }
+        Mock -CommandName scoop -MockWith {
+            $script:ScoopArgs += ($args -join ' ')
+            throw "scoop must not run for a winget-owned target"
+        }
+        Mock -CommandName winget -MockWith {
+            $joined = $args -join ' '
+            $script:WingetArgs += $joined
+            switch ($joined) {
+                'list --id Microsoft.PowerShell -e --accept-source-agreements' {
+                    $global:LASTEXITCODE = 0
+                    return 'PowerShell Microsoft.PowerShell 7.6.2 winget'
+                }
+                'list --upgrade-available --id Microsoft.PowerShell -e --accept-source-agreements' {
+                    $global:LASTEXITCODE = 0
+                    return ''
+                }
+                default {
+                    throw "unexpected winget command: $joined"
+                }
+            }
+        }
+
+        $output = & {
+            Invoke-InstallDepsUpdateMode -SpecList @(
+                [pscustomobject]@{ Tool = 'pwsh'; Kind = 'tool'; Binary = 'pwsh'; Module = '' }
+            ) -PresenceTester {
+                param([string]$Tool)
+                return ($Tool -eq 'pwsh')
+            } -IsDryRun $false
+        } 3>&1 6>&1 | Out-String
+
+        $output | Should -Match 'current\s+pwsh\s+via winget'
+        $script:ScoopArgs.Count | Should -Be 0
+        $script:WingetArgs | Should -Contain 'list --upgrade-available --id Microsoft.PowerShell -e --accept-source-agreements'
+        $script:InstallFailures.Count | Should -Be 0
+    }
+
+    It "refreshes Scoop manifests once for multiple Scoop-owned targets" {
+        . $script:ImportInstallDepsForTest
+        $script:ScoopArgs = @()
+
+        Mock -CommandName Get-Command -MockWith {
+            param([string]$Name)
+            if ($Name -eq 'scoop') {
+                return [pscustomobject]@{ Name = $Name; Source = $Name }
+            }
+            return $null
+        }
+        Mock -CommandName scoop -MockWith {
+            $joined = $args -join ' '
+            $script:ScoopArgs += $joined
+            switch ($joined) {
+                'list git' {
+                    $global:LASTEXITCODE = 0
+                    return 'git 2.50.0'
+                }
+                'list fd' {
+                    $global:LASTEXITCODE = 0
+                    return 'fd 10.3.0'
+                }
+                'update' {
+                    $global:LASTEXITCODE = 0
+                    return
+                }
+                'status' {
+                    $global:LASTEXITCODE = 0
+                    return @(
+                        (New-ScoopStatusRow -Name 'git' -Installed '2.50.0' -Latest '2.51.0'),
+                        (New-ScoopStatusRow -Name 'fd' -Installed '10.3.0' -Latest '10.4.0')
+                    )
+                }
+                'update git' {
+                    $global:LASTEXITCODE = 0
+                    return
+                }
+                'update fd' {
+                    $global:LASTEXITCODE = 0
+                    return
+                }
+                default {
+                    throw "unexpected scoop command: $joined"
+                }
+            }
+        }
+
+        $output = & {
+            Invoke-InstallDepsUpdateMode -SpecList @(
+                [pscustomobject]@{ Tool = 'git'; Kind = 'tool'; Binary = 'git'; Module = '' },
+                [pscustomobject]@{ Tool = 'fd'; Kind = 'tool'; Binary = 'fd'; Module = '' }
+            ) -PresenceTester {
+                param([string]$Tool)
+                return ($Tool -in @('git', 'fd'))
+            } -IsDryRun $false
+        } 3>&1 6>&1 | Out-String
+
+        $output | Should -Match 'updated\s+git\s+via scoop'
+        $output | Should -Match 'updated\s+fd\s+via scoop'
+        ($script:ScoopArgs | Where-Object { $_ -eq 'update' }).Count | Should -Be 1
+        $script:ScoopArgs | Should -Contain 'update git'
+        $script:ScoopArgs | Should -Contain 'update fd'
+        $script:InstallFailures.Count | Should -Be 0
     }
 
     It "records failed Scoop package updates" {
@@ -1280,6 +1926,10 @@ Describe "install-deps.ps1" {
                 'list git' {
                     $global:LASTEXITCODE = 0
                     return 'git 2.50.0'
+                }
+                'status' {
+                    $global:LASTEXITCODE = 0
+                    return (New-ScoopStatusRow -Name 'git' -Installed '2.50.0' -Latest '2.51.0')
                 }
                 'update git' {
                     $global:LASTEXITCODE = 44
@@ -1315,17 +1965,33 @@ Describe "install-deps.ps1" {
         Mock -CommandName scoop -MockWith {
             $joined = $args -join ' '
             $script:ScoopArgs += $joined
-            if ($joined -eq 'update') {
-                $global:LASTEXITCODE = 33
-                return
+            switch ($joined) {
+                'list git' {
+                    $global:LASTEXITCODE = 0
+                    return 'git 2.50.0'
+                }
+                'update' {
+                    $global:LASTEXITCODE = 33
+                    return
+                }
+                default {
+                    throw "scoop must not continue after a failed manifest refresh: $joined"
+                }
             }
-            $global:LASTEXITCODE = 0
         }
 
-        $output = & { Invoke-InstallDepsUpdateMode -SpecList @() -IsDryRun $false } 3>&1 6>&1 | Out-String
+        $output = & {
+            Invoke-InstallDepsUpdateMode -SpecList @(
+                [pscustomobject]@{ Tool = 'git'; Kind = 'tool'; Binary = 'git'; Module = '' }
+            ) -PresenceTester {
+                param([string]$Tool)
+                return ($Tool -eq 'git')
+            } -IsDryRun $false
+        } 3>&1 6>&1 | Out-String
 
         $output | Should -Match 'scoop manifest refresh failed'
         $script:ScoopArgs | Should -Contain 'update'
+        ($script:ScoopArgs | Where-Object { $_ -like 'status*' -or $_ -eq 'update git' }).Count | Should -Be 0
         $script:InstallFailures.Count | Should -Be 1
         $script:InstallFailures[0].Tool | Should -Be 'scoop'
         $script:InstallFailures[0].Pm | Should -Be 'scoop'
@@ -1342,13 +2008,17 @@ Describe "install-deps.ps1" {
 Remove-Item Env:INSTALL_DEPS_PS1_SOURCE_ONLY -ErrorAction SilentlyContinue
 function scoop {
     `$joined = `$args -join ' '
-    if (`$joined -eq 'update') {
-        `$global:LASTEXITCODE = 33
-        return
+    switch (`$joined) {
+        'update' {
+            `$global:LASTEXITCODE = 33
+            return
+        }
+        default {
+            throw "unexpected scoop command: `$joined"
+        }
     }
-    `$global:LASTEXITCODE = 0
 }
-Invoke-InstallDepsUpdateMode -SpecList @() -IsDryRun:`$false
+Update-ScoopTool git -NoPrompt -AssumePresent -AssumeManaged -IsDryRun:`$false
 Exit-InstallDepsIfFailures
 exit 0
 "@
@@ -1649,5 +2319,77 @@ Describe "Python install rejects the Microsoft Store stub" {
         $script:probeCount = 0
         Install-One 'python' -InstalledCheck { $script:probeCount++; $true } -SkipPrompt -NoRecordFailure
         $script:probeCount | Should -BeGreaterThan 0
+    }
+}
+
+Describe "Markdown equation converter provisioning" {
+    BeforeEach {
+        $script:OldLocalAppData = $env:LOCALAPPDATA
+        $env:LOCALAPPDATA = Join-Path $TestDrive 'localappdata'
+        New-Item -ItemType Directory -Force -Path $env:LOCALAPPDATA | Out-Null
+    }
+
+    AfterEach {
+        if ($null -eq $script:OldLocalAppData) {
+            Remove-Item Env:LOCALAPPDATA -ErrorAction SilentlyContinue
+        } else {
+            $env:LOCALAPPDATA = $script:OldLocalAppData
+        }
+    }
+
+    It "dry-run previews the pinned pylatexenc venv install" {
+        . $script:ImportInstallDepsForTest -DryRun
+        $output = Install-PylatexencConverter 6>&1 | Out-String
+
+        $output | Should -Match 'python -m venv'
+        $output | Should -Match 'setuptools==80\.9\.0'
+        $output | Should -Match $PylatexencBuildBackendSha256
+        $output | Should -Match 'pylatexenc==2\.10'
+        $output | Should -Match $PylatexencSha256
+    }
+
+    It "creates the pinned venv and adds latex2text to User PATH" {
+        . $script:ImportInstallDepsForTest
+        $script:AddedPath = ''
+        $script:SetuptoolsRequirementsText = ''
+        $script:RequirementsText = ''
+        $script:PythonCalls = @()
+
+        Mock Get-RealPythonCommand {
+            [pscustomobject]@{ Source = 'python' }
+        }
+        Mock Add-DirectoryToUserPath {
+            param([string]$Directory)
+            $script:AddedPath = $Directory
+        }
+        Mock Invoke-PythonCommand {
+            param([string]$Python, [string[]]$Arguments)
+            $script:PythonCalls += [pscustomobject]@{ Python = $Python; Arguments = $Arguments }
+            $global:LASTEXITCODE = 0
+            if ($Arguments[0] -eq '-m' -and $Arguments[1] -eq 'venv') {
+                $scripts = Join-Path $Arguments[2] 'Scripts'
+                New-Item -ItemType Directory -Force -Path $scripts | Out-Null
+                New-Item -ItemType File -Force -Path (Join-Path $scripts 'python.exe') | Out-Null
+                New-Item -ItemType File -Force -Path (Join-Path $scripts 'latex2text.exe') | Out-Null
+            }
+            if ($Arguments[0] -eq '-m' -and $Arguments[1] -eq 'pip') {
+                if ($Arguments -contains '--only-binary=:all:') {
+                    $script:SetuptoolsRequirementsText = Get-Content -LiteralPath $Arguments[-1] -Raw
+                } else {
+                    $script:RequirementsText = Get-Content -LiteralPath $Arguments[-1] -Raw
+                }
+            }
+        }
+
+        Install-PylatexencConverter
+
+        $expectedScripts = Join-Path (Get-PylatexencVenvRoot) 'Scripts'
+        $script:AddedPath | Should -Be $expectedScripts
+        $script:SetuptoolsRequirementsText | Should -Match 'setuptools==80\.9\.0'
+        $script:SetuptoolsRequirementsText | Should -Match $PylatexencBuildBackendSha256
+        $script:RequirementsText | Should -Match 'pylatexenc==2\.10'
+        $script:RequirementsText | Should -Match $PylatexencSha256
+        @($script:PythonCalls | Where-Object { $_.Arguments -contains '--require-hashes' }).Count | Should -Be 2
+        @($script:PythonCalls | Where-Object { $_.Arguments -contains '--no-build-isolation' }).Count | Should -Be 1
     }
 }
