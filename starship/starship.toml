@@ -9,7 +9,6 @@ add_newline = false
 
 # Modules not listed in format do not render; explicit disables are unnecessary.
 format = """
-$username\
 $directory\
 $git_branch\
 $git_status\
@@ -83,9 +82,9 @@ style = "fg:rose"
 time_format = "%I:%M%P"
 
 [username]
-disabled = false
+disabled = true
 format = "[󰧱 $user]($style) "
-show_always = true
+show_always = false
 style_root = "fg:iris"
 style_user = "fg:iris"
 

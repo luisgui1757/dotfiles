@@ -15,18 +15,19 @@ significant change to the relevant area.
       configured theme; acrylic OFF on the body, ON in the tab row; a new tab
       opens `PowerShell 7` unless the user intentionally chose another default.
 - [ ] **Tmux status bar**: Rose Pine plugin bar is at the top, includes the
-      official rich segments (date/time, user/host, directory/current program),
-      segments are readable, prefix is `C-b`,
+      signal-bar segments (session, window list/current program, directory
+      basename; no user/host/date/time duplication), segments are readable,
+      prefix is `C-b`,
       `prefix r` reloads the conf and shows the "reloaded" message.
 - [ ] **psmux status bar**: on a fresh `psmux` launch, with no manual command,
       the generated Rose Pine config (`~/.tmux.rose-pine.main.conf` by default)
       draws a FLAT bar (matching the POSIX tmux side, NOT powerline) at the top:
-      session/window on the left, user + short host + date/time + directory on
-      the right, gold active window / iris inactive, icons render, no config-load
-      freeze, no sustained CPU spike, and no clipped final cell at the right
-      edge. Switch flavor:
+      session/window list on the left, directory basename on the right, gold
+      active window / iris inactive, icons render, no config-load freeze, no
+      sustained CPU spike, and no clipped final cell at the right edge. Switch
+      flavor:
       `psmux set -g @rosepine-variant moon; psmux source-file ~/.tmux.windows.conf`.
-- [ ] **Starship prompt**: shows username, dir, git branch, git status icons
+- [ ] **Starship prompt**: shows dir, git branch, git status icons
       (untracked/modified/staged), trailing time, and no opaque background
       blocks behind prompt text. The final Rose glyph on the right-aligned time
       must not be clipped by the terminal edge.

@@ -16,6 +16,19 @@ if grep -nF 'bg:' "$REPO_ROOT/starship/starship.toml"; then
     echo "FAIL: starship.toml must not use background styles; terminal transparency owns the background"
     exit 1
 fi
+if grep -F "\$username\\" "$REPO_ROOT/starship/starship.toml" >/dev/null; then
+    echo "FAIL: starship format must not show username by default; identity is not part of the daily prompt surface"
+    exit 1
+fi
+if ! awk '
+    /^\[username\]$/ { in_user = 1; next }
+    /^\[/ { in_user = 0 }
+    in_user && /^disabled = true$/ { found = 1 }
+    END { exit(found ? 0 : 1) }
+' "$REPO_ROOT/starship/starship.toml"; then
+    echo "FAIL: starship username module must stay disabled by default"
+    exit 1
+fi
 time_format_line="format = \"[\$time 󰴈 ](\$style)\""
 if ! grep -F "$time_format_line" "$REPO_ROOT/starship/starship.toml" >/dev/null; then
     echo "FAIL: starship time segment must keep one trailing safety space before the right edge"

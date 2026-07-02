@@ -73,14 +73,20 @@ else
     echo "ok  : no local tmux theme snippets"
 fi
 
-if ! grep -F "set -g @rose_pine_date_time '%a %d %b %H:%M'" tmux/tmux.posix.conf >/dev/null; then
-    echo "FAIL: POSIX tmux must keep the official Rose Pine date/time segment enabled"
+if ! grep -F "set -g @rose_pine_date_time ''" tmux/tmux.posix.conf >/dev/null; then
+    echo "FAIL: POSIX tmux must leave date/time to Starship"
     fail=1
-elif ! grep -F '%a %d %b %H:%M' tmux/psmux-rose-pine.main.conf >/dev/null; then
-    echo "FAIL: Windows psmux generated Rose Pine main config must keep the date/time segment enabled"
+elif grep -F '%a %d %b %H:%M' tmux/psmux-rose-pine.main.conf >/dev/null; then
+    echo "FAIL: Windows psmux generated Rose Pine main config must leave date/time to Starship"
+    fail=1
+elif grep -Eq '#\{(user|host_short)\}' tmux/psmux-rose-pine.main.conf; then
+    echo "FAIL: Windows psmux generated Rose Pine main config must not duplicate user/host context"
+    fail=1
+elif ! grep -F '#{b:pane_current_path} ' tmux/psmux-rose-pine.main.conf >/dev/null; then
+    echo "FAIL: Windows psmux generated Rose Pine main config must keep directory context with a trailing safety cell"
     fail=1
 else
-    echo "ok  : tmux/psmux date/time segments are enabled"
+    echo "ok  : tmux/psmux own session/windows/directory only"
 fi
 
 # Lazy-load discipline: only rose-pine should be lazy=false

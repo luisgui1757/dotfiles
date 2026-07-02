@@ -166,6 +166,14 @@ for variant in "${ROSEPINE_VARIANTS[@]}"; do
         echo "FAIL: psmux Rose Pine $variant status-right must keep one trailing safety space"
         exit 1
     fi
+    if grep -Eq '#\{(user|host_short)\}' "$conf"; then
+        echo "FAIL: psmux Rose Pine $variant status-right must not duplicate Starship user/host context"
+        exit 1
+    fi
+    if grep -F '%a %d %b %H:%M' "$conf" >/dev/null; then
+        echo "FAIL: psmux Rose Pine $variant status-right must not duplicate Starship time context"
+        exit 1
+    fi
     if grep -F '#{p2:}' "$conf" >/dev/null; then
         echo "FAIL: psmux Rose Pine $variant generated config must not emit literal #{p2:}; psmux does not expand it in status formats"
         exit 1
@@ -176,10 +184,6 @@ for variant in "${ROSEPINE_VARIANTS[@]}"; do
     fi
     if ! grep -F '  ' "$conf" >/dev/null; then
         echo "FAIL: psmux Rose Pine $variant window cells must use the rose-pine/tmux left separator"
-        exit 1
-    fi
-    if ! grep -F '  ' "$conf" >/dev/null; then
-        echo "FAIL: psmux Rose Pine $variant status-right must use the rose-pine/tmux right separator"
         exit 1
     fi
 done

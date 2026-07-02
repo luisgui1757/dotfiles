@@ -144,17 +144,18 @@ for required in \
     fi
 done
 check @rose_pine_variant main
-check @rose_pine_user on
-check @rose_pine_host on
-check @rose_pine_hostname_short on
-check @rose_pine_date_time "%a %d %b %H:%M"
+check @rose_pine_user off
+check @rose_pine_host off
+check @rose_pine_date_time ""
 check @rose_pine_directory on
+check @rose_pine_status_right_append_section " "
+check @rose_pine_disable_active_window_menu on
 check @rose_pine_show_current_program on
 if [[ "$(show "@rose_pine_show_pane_directory")" == "on" ]]; then
     echo "FAIL: tmux.posix.conf must not enable the mutually-exclusive pane-directory window-name mode"
     exit 1
 fi
-echo "  rose-pine/tmux rich modules configured"
+echo "  rose-pine/tmux signal bar modules configured"
 if [[ "$(uname -s)" == "Darwin" ]]; then
     overlay_keys="$(tmux -L "$sock_name" list-keys -T copy-mode-vi)"
     if ! printf '%s\n' "$overlay_keys" | grep -Eq 'copy-mode-vi[[:space:]]+y[[:space:]]+send.*copy-pipe-and-cancel.*pbcopy'; then

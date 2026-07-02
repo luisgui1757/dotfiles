@@ -25,13 +25,12 @@ Describe 'psmux-rose-pine renderer' {
     )
 
     It "renders the <Variant> palette on the flat rose-pine/tmux status bar" -ForEach $variants {
-        $cmds = Get-PsmuxRosePineCommand -Variant $Variant -UserName 'tester' -ComputerName 'HOST'
+        $cmds = Get-PsmuxRosePineCommand -Variant $Variant
         $opt = @{}
         foreach ($c in $cmds) { $opt[$c.Argv[2]] = $c.Argv[3] }
 
         $opt['status-style'] | Should -Be "fg=$Pine,bg=$Base"
         $leftSeparator = [char]::ConvertFromUtf32(0xEA9C)
-        $rightSeparator = [char]::ConvertFromUtf32(0xEA9B)
         $windowStatusSeparator = [char]::ConvertFromUtf32(0xEB70)
         # foreground inlined (psmux ignores window-status-*-style)
         $opt['window-status-current-format'] | Should -Match ([regex]::Escape("#[fg=$Gold]"))
@@ -39,12 +38,18 @@ Describe 'psmux-rose-pine renderer' {
         $opt['window-status-current-format'] | Should -Match ([regex]::Escape(" $leftSeparator "))
         $opt['window-status-format'] | Should -Match ([regex]::Escape(" $leftSeparator "))
         $opt['window-status-separator'] | Should -Be " $windowStatusSeparator "
-        $opt['status-right'] | Should -Match ([regex]::Escape(" $rightSeparator "))
         # directory basename present, matching rose-pine/tmux @rose_pine_directory
         $opt['status-right'] | Should -Match ([regex]::Escape('#{b:pane_current_path}'))
         # one terminal-edge safety cell: the last visible glyph/text must not sit
         # in the final column on Windows Terminal / ConPTY.
         $opt['status-right'] | Should -Match ([regex]::Escape('#{b:pane_current_path} '))
+        # tmux/psmux owns multiplexer context only. Starship owns time/path/git,
+        # while user/host stay out of the daily surface.
+        $opt['status-right'] | Should -Not -Match ([regex]::Escape('#{user}'))
+        $opt['status-right'] | Should -Not -Match ([regex]::Escape('#{host_short}'))
+        $opt['status-right'] | Should -Not -Match '%a %d %b %H:%M'
+        $opt['status-left'] | Should -Match '#S'
+        $opt['status-left'] | Should -Not -Match '#W'
         # stays pinned to the top like the shared tmux.conf
         ($cmds | Where-Object { $_.Argv[2] -eq 'status-position' }).Argv[3] | Should -Be 'top'
     }
@@ -59,8 +64,9 @@ Describe 'psmux-rose-pine renderer' {
         $lines = Get-PsmuxRosePineConfigLine -Variant $Variant
         $joined = $lines -join "`n"
 
-        $joined | Should -Match ([regex]::Escape('#{user}'))
-        $joined | Should -Match ([regex]::Escape('#{host_short}'))
+        $joined | Should -Not -Match ([regex]::Escape('#{user}'))
+        $joined | Should -Not -Match ([regex]::Escape('#{host_short}'))
+        $joined | Should -Not -Match '%a %d %b %H:%M'
         $joined | Should -Not -Match ([regex]::Escape('#{p2:}'))
         $joined | Should -Not -Match '#\('
         $joined | Should -Not -Match '(?m)^run'
