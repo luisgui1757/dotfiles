@@ -1453,7 +1453,7 @@ host OS or shell would otherwise hide a branch from CI.
   ~30x at load and would hang ConPTY). The renderer is pure declarative `set -g`
   (no load-time `if-shell`, no per-redraw `#(...)` shell; generated startup
   configs use native `#{user}`, `#{host_short}`, `#{b:pane_current_path}`, and
-  `#{p2:}` padding formats), keeps one trailing safety space after the
+  literal two-space separators), keeps one trailing safety space after the
   status-right directory so the final visible cell is not clipped by Windows
   Terminal/ConPTY, inlines every `#[fg=...]` because psmux
   stores-but-ignores `window-status-*-style`, and ships all three variants

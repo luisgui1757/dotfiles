@@ -166,6 +166,10 @@ for variant in "${ROSEPINE_VARIANTS[@]}"; do
         echo "FAIL: psmux Rose Pine $variant status-right must keep one trailing safety space"
         exit 1
     fi
+    if grep -F '#{p2:}' "$conf" >/dev/null; then
+        echo "FAIL: psmux Rose Pine $variant generated config must not emit literal #{p2:}; psmux does not expand it in status formats"
+        exit 1
+    fi
 done
 
 if ! grep -Fx '.psmux.conf' "$REPO_ROOT/home/.chezmoiignore" >/dev/null; then

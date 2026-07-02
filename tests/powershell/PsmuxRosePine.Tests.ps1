@@ -54,7 +54,7 @@ Describe 'psmux-rose-pine renderer' {
 
         $joined | Should -Match ([regex]::Escape('#{user}'))
         $joined | Should -Match ([regex]::Escape('#{host_short}'))
-        $joined | Should -Match ([regex]::Escape('#{p2:}'))
+        $joined | Should -Not -Match ([regex]::Escape('#{p2:}'))
         $joined | Should -Not -Match '#\('
         $joined | Should -Not -Match '(?m)^run'
         $joined | Should -Not -Match '(?m)^set-hook'

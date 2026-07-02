@@ -163,8 +163,7 @@ function Get-PsmuxRosePineConfigLine {
     foreach ($cmd in (Get-PsmuxRosePineCommand `
             -Variant $confVariant `
             -UserName '#{user}' `
-            -ComputerName '#{host_short}' `
-            -Separator '#{p2:}')) {
+            -ComputerName '#{host_short}')) {
         $lines.Add((ConvertTo-PsmuxConfigLine -Command $cmd))
     }
     return $lines
