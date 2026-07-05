@@ -2393,3 +2393,104 @@ Describe "Markdown equation converter provisioning" {
         @($script:PythonCalls | Where-Object { $_.Arguments -contains '--no-build-isolation' }).Count | Should -Be 1
     }
 }
+
+Describe "psmux session plugin provisioning" {
+    It "pins psmux/psmux-plugins to an immutable 40-char commit SHA" {
+        . $script:ImportInstallDepsForTest
+        $PsmuxPluginsCommit | Should -Match '^[0-9a-f]{40}$'
+    }
+
+    It "vendors into a fixed .psmux/plugins root under the user profile" {
+        . $script:ImportInstallDepsForTest
+        $oldUser = $env:USERPROFILE
+        try {
+            $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ([System.Guid]::NewGuid().ToString('N'))
+            $env:USERPROFILE = $tmp
+            $root = Get-PsmuxPluginRoot
+            $root | Should -BeLike "$tmp*"
+            $root | Should -Match '[\\/]\.psmux[\\/]plugins$'
+        } finally {
+            $env:USERPROFILE = $oldUser
+        }
+    }
+
+    It "treats a plugin as pinned only when the entry file AND a matching commit marker exist" {
+        . $script:ImportInstallDepsForTest
+        $dir = Join-Path ([System.IO.Path]::GetTempPath()) ("ppp-" + [System.Guid]::NewGuid().ToString('N'))
+        try {
+            New-Item -ItemType Directory -Path $dir -Force | Out-Null
+            # no entry file yet
+            Test-PsmuxPluginPinned -Dir $dir -RequiredFile 'plugin.conf' | Should -BeFalse
+            Set-Content -LiteralPath (Join-Path $dir 'plugin.conf') -Value 'x'
+            # entry file, but no marker
+            Test-PsmuxPluginPinned -Dir $dir -RequiredFile 'plugin.conf' | Should -BeFalse
+            Set-Content -LiteralPath (Join-Path $dir '.pinned-commit') -Value 'deadbeef' -NoNewline
+            # marker mismatch
+            Test-PsmuxPluginPinned -Dir $dir -RequiredFile 'plugin.conf' | Should -BeFalse
+            Set-Content -LiteralPath (Join-Path $dir '.pinned-commit') -Value $PsmuxPluginsCommit -NoNewline
+            # entry file + matching marker
+            Test-PsmuxPluginPinned -Dir $dir -RequiredFile 'plugin.conf' | Should -BeTrue
+        } finally {
+            Remove-Item -Recurse -Force $dir -ErrorAction SilentlyContinue
+        }
+    }
+
+    It "does not clone in DryRun mode" {
+        . $script:ImportInstallDepsForTest -DryRun
+        $script:GitCalled = $false
+        Mock -CommandName Ask -MockWith { $true }
+        Mock -CommandName git -MockWith { $script:GitCalled = $true }
+        $oldUser = $env:USERPROFILE
+        try {
+            $env:USERPROFILE = (Join-Path ([System.IO.Path]::GetTempPath()) ([System.Guid]::NewGuid().ToString('N')))
+            Install-PsmuxPlugins
+        } finally {
+            $env:USERPROFILE = $oldUser
+        }
+        $script:GitCalled | Should -BeFalse
+        $script:InstallFailures.Count | Should -Be 0
+    }
+
+    It "fails closed (records a blocker) when the pinned commit cannot be checked out" {
+        . $script:ImportInstallDepsForTest
+        Mock -CommandName Ask -MockWith { $true }
+        # git operations succeed, but rev-parse reports the WRONG commit.
+        Mock -CommandName git -MockWith {
+            if ($args -contains 'rev-parse') { return 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef' }
+            $global:LASTEXITCODE = 0
+        }
+        $oldUser = $env:USERPROFILE
+        try {
+            $env:USERPROFILE = (Join-Path ([System.IO.Path]::GetTempPath()) ([System.Guid]::NewGuid().ToString('N')))
+            New-Item -ItemType Directory -Path $env:USERPROFILE -Force | Out-Null
+            Install-PsmuxPlugins
+        } finally {
+            if ($env:USERPROFILE -and (Test-Path $env:USERPROFILE)) { Remove-Item -Recurse -Force $env:USERPROFILE -ErrorAction SilentlyContinue }
+            $env:USERPROFILE = $oldUser
+        }
+        ($script:InstallFailures | Where-Object { $_.Tool -eq 'psmux plugins' }).Count | Should -BeGreaterThan 0
+    }
+
+    It "is a no-op (no git) when both ports are already pinned" {
+        . $script:ImportInstallDepsForTest
+        $script:GitCalled = $false
+        Mock -CommandName git -MockWith { $script:GitCalled = $true }
+        $oldUser = $env:USERPROFILE
+        try {
+            $env:USERPROFILE = (Join-Path ([System.IO.Path]::GetTempPath()) ([System.Guid]::NewGuid().ToString('N')))
+            $root = Get-PsmuxPluginRoot
+            foreach ($name in 'psmux-resurrect', 'psmux-continuum') {
+                $d = Join-Path $root $name
+                New-Item -ItemType Directory -Path $d -Force | Out-Null
+                Set-Content -LiteralPath (Join-Path $d 'plugin.conf') -Value 'x'
+                Set-Content -LiteralPath (Join-Path $d '.pinned-commit') -Value $PsmuxPluginsCommit -NoNewline
+            }
+            Install-PsmuxPlugins
+        } finally {
+            if ($env:USERPROFILE -and (Test-Path $env:USERPROFILE)) { Remove-Item -Recurse -Force $env:USERPROFILE -ErrorAction SilentlyContinue }
+            $env:USERPROFILE = $oldUser
+        }
+        $script:GitCalled | Should -BeFalse
+        $script:InstallFailures.Count | Should -Be 0
+    }
+}

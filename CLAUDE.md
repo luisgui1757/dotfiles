@@ -632,9 +632,11 @@ save only**. The next plain `:w` formats normally. Implemented in
   installs, pinned binary/font installers, login-shell mutation, devilspie2, VS
   Code, psmux installation, or distro package-manager policy into chezmoi
   run-scripts. psmux stays in `install-deps.ps1` via `Install-Psmux` and the
-  hardened `Add-ScoopBucketSafe` path; chezmoi only owns the psmux-readable
-  config files (`.tmux.conf`, `.tmux.windows.conf`, and the generated
-  `.tmux.rose-pine.{main,moon,dawn}.conf` files).
+  hardened `Add-ScoopBucketSafe` path, and the pinned psmux session plugins are
+  vendored by `Install-PsmuxPlugins` into `~/.psmux/plugins/` (also provisioning,
+  not chezmoi); chezmoi only owns the readable config files (`.tmux.conf`,
+  `.tmux.windows.conf`, and the generated `.tmux.rose-pine.{main,moon,dawn}.conf`
+  files, which are now deployed on BOTH POSIX and Windows).
   `home/.chezmoi.toml.tmpl` is the mode switch: POSIX uses `mode = "symlink"`
   for live-edit behavior, Windows uses `mode = "file"` for simple single-file
   configs, but Windows `nvim` remains a directory symlink and still needs
@@ -1422,69 +1424,86 @@ host OS or shell would otherwise hide a branch from CI.
   keeps one trailing safety space so its final Nerd Font glyph is not drawn into
   the terminal's last column. The username module is enabled and always shown at
   the prompt start; tmux/psmux must not duplicate username in the status bar.
-- **tmux Rose Pine: POSIX loads the upstream plugin; Windows renders a repo-owned
-  psmux-safe port.** Shared `tmux/tmux.conf` is psmux-safe and owns only
-  cross-platform placement (`status-position top`). POSIX loads
-  `tmux/tmux.posix.conf`, which declares TPM + `rose-pine/tmux` from the
-  repo-managed plugin root `~/.local/share/dotfiles/tmux-plugins`. The bar is a
-  signal bar: session, window list/current program, and current directory
-  basename only. Starship owns username, time, full path, git, and
-  language/runtime context; host stays out of the daily surface by default.
-  POSIX therefore disables the active-window menu, user, host, and date/time
-  Rose Pine modules while leaving directory and current-program window names
-  enabled.
-  Windows starts psmux through `tmux/psmux.conf` (deployed as `~/.psmux.conf`),
-  which disables psmux warm sessions before sourcing `~/.tmux.conf`. This is
-  required because psmux's pre-server warm check only shallow-scans the first
-  config file and would otherwise be able to claim a stale warm server after
-  chezmoi changed the generated theme files. `tmux/psmux.conf` then
-  source-files `~/.tmux.windows.conf` explicitly with flag-free psmux syntax:
-  psmux v3.3.x does not implement tmux's `source-file -q` config flag, so the
-  shared `tmux.conf` include is not a valid startup path for the Windows
-  overlay in psmux. Windows then loads `tmux/tmux.windows.conf`, which sets
-  `@rosepine-variant` and `source-file`s one generated repo-owned config
-  (`tmux/psmux-rose-pine.{main,moon,dawn}.conf`, deployed by chezmoi as
-  `~/.tmux.rose-pine.{main,moon,dawn}.conf`). Those generated configs reproduce
-  rose-pine/tmux's rendered `set -g` output so the psmux bar matches the flat,
-  foreground-only POSIX bar, and they apply synchronously during config parse.
-  This is load-bearing: psmux `run` / `run-shell` always spawns non-blocking, so
-  a PowerShell renderer that shells back through `psmux set -g ...` can race the
-  first client/status paint and leave the default blue bar until a manual
-  post-attach run. `source-file` parses the literal `set -g` lines in-process
-  before the first window/client state is rendered, matching psmux's native
-  `plugin.conf` theme path. Guarded by `windows_conf_test.sh`.
-  We deliberately do NOT use the community `psmux-theme-rosepine` plugin (it
-  renders a different powerline bar of colored segment blocks) and cannot run the
-  official `rose-pine/tmux` on psmux (it is a bash/TPM script that shells out
-  ~30x at load and would hang ConPTY). The renderer is pure declarative `set -g`
-  (no load-time `if-shell`, no per-redraw `#(...)` shell; generated startup
-  configs use native `#{b:pane_current_path}`, rose-pine/tmux's literal
-  two-space field separator, and its Nerd Font left/window separators), keeps one
-  trailing safety space after the
-  status-right directory so the final visible cell is not clipped by Windows
-  Terminal/ConPTY, inlines every `#[fg=...]` because psmux
-  stores-but-ignores `window-status-*-style`, and ships all three variants
-  (`main` default, `moon`, `dawn`) selected by `@rosepine-variant`; POSIX
-  selects the same via `@rose_pine_variant`. `tmux/psmux-rose-pine.ps1` MUST
-  stay pure ASCII (PS 5.1 parse safety, guarded by `invariants_test.sh`) -- the
-  Nerd Font glyphs are built from codepoints at runtime, matching the icons in
-  `tmux/tmux.posix.conf`, and the generated `.conf` artifacts carry the rendered
-  glyphs. Keep local `tmux/themes/*.conf` snippets deleted.
-  Keep plugin managers in OS overlays only; shared `tmux.conf` must remain free
-  of load-time `if-shell`, psmux-specific commands, and quoted overlay source
-  paths, and the Windows overlay must not reintroduce `@plugin`/PPM or a
-  plugin-root `run`. Keep `tmux/psmux.conf` Windows-only and mirrored to
-  `home/dot_psmux.conf`. The generated `.conf` files are committed artifacts;
-  regenerate them with the renderer's `-EmitConf -Variant <name>` mode once per
-  variant, and `tests/powershell/PsmuxRosePine.Tests.ps1` asserts byte
-  freshness. Live variant switch:
-  `psmux set -g @rosepine-variant moon; psmux source-file ~/.tmux.windows.conf`.
-  Current pins (POSIX plugins only): TPM
-  `e261deb1b47614eed3400089ce7197dc68acc4eb` and `rose-pine/tmux`
-  `b6138c51573425ccdc33c91464597323baec3b7e`. Guarded by
+- **tmux/psmux Rose Pine is ONE repo-owned generated bar, sourced on both
+  platforms.** This REPLACES the retired "POSIX loads the upstream `rose-pine/tmux`
+  plugin; Windows renders a port" policy. `tmux/psmux-rose-pine.ps1` renders an
+  Omer/Catppuccin-shaped Rose Pine pill bar (rounded session pill left,
+  number-on-right window cells with a zoom marker on the current window, directory
+  pill right) into `tmux/psmux-rose-pine.{main,moon,dawn}.conf`. BOTH POSIX tmux
+  (`tmux/tmux.posix.conf`) and native-Windows psmux (`tmux/tmux.windows.conf`)
+  `source-file` the SAME deployed variant (`~/.tmux.rose-pine.{main,moon,dawn}.conf`,
+  chezmoi-managed on both — no longer Windows-only), so the bar is byte-identical.
+  Shared `tmux/tmux.conf` stays psmux-safe and owns only cross-platform placement
+  (`status-position top`); it must remain free of load-time `if-shell`,
+  psmux-specific commands, and quoted overlay source paths. The bar is a signal
+  bar: session, window list, directory basename only. Starship owns username,
+  time, full path, git, and language/runtime context; host stays off the daily
+  surface. We do NOT use a theme plugin to render it: `rose-pine/tmux` is a
+  bash/TPM script that shells out ~30x at load and would hang psmux/ConPTY, and
+  the community `psmux-theme-rosepine` renders a different arrow-chevron powerline
+  bar. The renderer is pure declarative `set -g` (no load-time `if-shell`, no
+  per-redraw `#(...)`; dynamic fields use native formats `#S`/`#I`/`#W`/
+  `#{?client_prefix,...}`/`#{?window_zoomed_flag,...}`/`#{b:pane_current_path}`),
+  inlines every `#[fg=...,bg=...]` because psmux stores-but-ignores
+  `window-status-*-style`, uses rounded pill caps (U+E0B6/U+E0B4) and NOT
+  arrow-chevron powerline separators (U+E0B0/U+E0B2), and keeps one trailing
+  safety space after the status-right directory so the final cell is not clipped
+  by Windows Terminal/ConPTY. Default variant `main`, plus `moon`/`dawn`, selected
+  by `@rosepine-variant` on BOTH platforms. `tmux/psmux-rose-pine.ps1` MUST stay
+  pure ASCII (PS 5.1 parse safety, guarded by `invariants_test.sh`); the Nerd Font
+  glyphs are built from codepoints at runtime and only the generated `.conf`
+  artifacts carry rendered glyphs. Keep local `tmux/themes/*.conf` snippets
+  deleted. The generated `.conf` files are committed artifacts; regenerate with
+  the renderer's `-EmitConf -Variant <name>` mode once per variant and re-mirror
+  into `home/`. Live switch:
+  `tmux set -g @rosepine-variant moon; tmux source-file ~/.tmux.posix.conf`
+  (POSIX) / `psmux set -g @rosepine-variant moon; psmux source-file
+  ~/.tmux.windows.conf` (Windows).
+- **Functional tmux/psmux plugins (session save/restore), pinned + vendored.**
+  POSIX `tmux/tmux.posix.conf` declares TPM + the Omer functional set
+  (`tmux-sensible`, `tmux-yank`, `tmux-resurrect`, `tmux-continuum`) from the
+  repo-managed plugin root `~/.local/share/dotfiles/tmux-plugins`, sources the
+  generated bar BEFORE running TPM (so `tmux-continuum` prepends its invisible
+  save trigger to the themed `status-right`, not the default one), and sets
+  `@continuum-restore on` + `@resurrect-strategy-nvim session`. Windows starts
+  psmux through `tmux/psmux.conf` (`~/.psmux.conf`), which disables warm sessions
+  before sourcing `~/.tmux.conf` (psmux's pre-server warm check shallow-scans only
+  the first config file and could otherwise claim a stale warm server), then
+  flag-free `source-file`s `~/.tmux.windows.conf` (psmux v3.3.x does not implement
+  tmux's `source-file -q`). `tmux/tmux.windows.conf` source-files the vendored
+  psmux ports `~/.psmux/plugins/psmux-resurrect/plugin.conf` and
+  `~/.psmux/plugins/psmux-continuum/plugin.conf` (resurrect first — continuum
+  requires it) and sets `@continuum-restore on`. `install-deps.ps1`'s
+  `Install-PsmuxPlugins` vendors those ports from the `psmux/psmux-plugins`
+  monorepo at pinned commit `0f46ccca5a9b748fd03851db00b85fd784f42791` into
+  `~/.psmux/plugins/` (the plugin.conf files hardcode that path). We deliberately
+  do NOT use PPM: it clones the monorepo HEAD (unpinned) and its
+  `Persist-PluginActivation` rewrites `~/.psmux.conf`/`~/.tmux.conf`, which would
+  corrupt the chezmoi byte-parity model. There is NO `psmux-yank` port at that
+  pin (verified), so native-Windows yank stays the `clip.exe` copy-mode binding in
+  `tmux/tmux.windows.conf`. `psmux-sensible` is intentionally NOT sourced: its
+  `plugin.conf` is unconditional `set -g` (unlike the conditional `tmux-sensible`)
+  and would clobber our tuned shared `tmux.conf` (e.g. `escape-time`).
+  The Windows overlay must not reintroduce `@plugin`/PPM or a plugin-root `run`
+  (source-file of a pinned plugin.conf is the allowed mechanism); keep
+  `tmux/psmux.conf` Windows-only and mirrored to `home/dot_psmux.conf`.
+  **MANUAL WINDOWS VERIFICATION GAP:** `psmux-continuum/plugin.conf` registers
+  load-time `set-hook -g session-created`/`client-attached` that `run-shell` pwsh
+  scripts. `run-shell` is async/non-blocking (unlike the synchronous `if-shell`
+  freeze class), so this is expected safe, but it was NOT validated on a real
+  Windows psmux host (the change was authored on macOS). Smoke-test on Windows:
+  open psmux, confirm panes render without freezing, `psmux show-hooks -g`, and
+  `Prefix+Ctrl-s`/`Prefix+Ctrl-r` for manual resurrect save/restore.
+  Current pins: TPM `e261deb1b47614eed3400089ce7197dc68acc4eb`, `tmux-sensible`
+  `25cb91f42d020f675bb0a2ce3fbd3a5d96119efa`, `tmux-yank`
+  `acfd36e4fcba99f8310a7dfb432111c242fe7392`, `tmux-resurrect`
+  `cff343cf9e81983d3da0c8562b01616f12e8d548`, `tmux-continuum`
+  `0698e8f4b17d6454c71bf5212895ec055c578da0`, and `psmux/psmux-plugins`
+  `0f46ccca5a9b748fd03851db00b85fd784f42791`. Guarded by
   `tests/tmux/option_test.sh`, `tests/tmux/windows_conf_test.sh`,
-  `tests/powershell/PsmuxRosePine.Tests.ps1`, `tests/migration/parity_gate.sh`,
-  and `tests/static/pin_consistency_test.sh`.
+  `tests/shell/tmux_plugins_test.sh`, `tests/powershell/PsmuxRosePine.Tests.ps1`,
+  `tests/powershell/InstallDeps.Tests.ps1`, `tests/migration/parity_gate.sh`, and
+  `tests/static/pin_consistency_test.sh`.
 - **Windows Terminal opacity remains window-wide.** A transparent WT
   (`opacity < 100`) makes every cell transparent, including tmux/psmux status
   cells, regardless of the cell background color. Do not chase opacity by

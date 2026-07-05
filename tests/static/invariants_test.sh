@@ -73,20 +73,24 @@ else
     echo "ok  : no local tmux theme snippets"
 fi
 
-if ! grep -F "set -g @rose_pine_date_time ''" tmux/tmux.posix.conf >/dev/null; then
-    echo "FAIL: POSIX tmux must leave date/time to Starship"
-    fail=1
-elif grep -F '%a %d %b %H:%M' tmux/psmux-rose-pine.main.conf >/dev/null; then
-    echo "FAIL: Windows psmux generated Rose Pine main config must leave date/time to Starship"
+# The Rose Pine bar is a single repo-owned generated config sourced by BOTH tmux
+# and psmux. It must own only multiplexer context (session/windows/directory);
+# date/time, user, host stay with Starship. The old rose-pine/tmux plugin is
+# retired -- POSIX must not reference it.
+if grep -F '%a %d %b %H:%M' tmux/psmux-rose-pine.main.conf >/dev/null; then
+    echo "FAIL: generated Rose Pine main config must leave date/time to Starship"
     fail=1
 elif grep -Eq '#\{(user|host_short)\}' tmux/psmux-rose-pine.main.conf; then
-    echo "FAIL: Windows psmux generated Rose Pine main config must not duplicate user/host context"
+    echo "FAIL: generated Rose Pine main config must not duplicate Starship user/host context"
     fail=1
 elif ! grep -F '#{b:pane_current_path} ' tmux/psmux-rose-pine.main.conf >/dev/null; then
-    echo "FAIL: Windows psmux generated Rose Pine main config must keep directory context with a trailing safety cell"
+    echo "FAIL: generated Rose Pine main config must keep directory context with a trailing safety cell"
+    fail=1
+elif grep -F 'rose-pine/tmux' tmux/tmux.posix.conf >/dev/null; then
+    echo "FAIL: POSIX tmux must not use the rose-pine/tmux plugin (bar is a repo-owned generated config)"
     fail=1
 else
-    echo "ok  : tmux/psmux own session/windows/directory only"
+    echo "ok  : tmux/psmux own session/windows/directory only; Starship owns user/host/time"
 fi
 
 # Lazy-load discipline: only rose-pine should be lazy=false

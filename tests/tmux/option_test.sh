@@ -128,34 +128,42 @@ if ! printf '%s\n' "$copy_keys" | grep -Eq 'copy-mode-vi[[:space:]]+y[[:space:]]
 fi
 echo "  copy-mode-vi y baseline bound (bare OSC52, no shell probe)"
 
-# Sourcing the POSIX overlay re-binds `y` to the platform's native clipboard CLI.
-# On macOS that is pbcopy; assert it there (Linux CI has no single guaranteed
-# CLI installed). This proves the extracted if-shell probes still work on POSIX.
+# Deploy the generated Rose Pine configs into the isolated HOME so the overlay's
+# `source-file ~/.tmux.rose-pine.main.conf` resolves (mirrors a real chezmoi
+# apply). This also lets us assert the Omer bar actually applies below.
+cp "$REPO_ROOT/tmux/psmux-rose-pine.main.conf" "$HOME/.tmux.rose-pine.main.conf"
+cp "$REPO_ROOT/tmux/psmux-rose-pine.moon.conf" "$HOME/.tmux.rose-pine.moon.conf"
+cp "$REPO_ROOT/tmux/psmux-rose-pine.dawn.conf" "$HOME/.tmux.rose-pine.dawn.conf"
+
+# Sourcing the POSIX overlay declares the functional plugins + session options,
+# sources the generated Rose Pine bar, and re-binds `y` to the platform's native
+# clipboard CLI. On macOS that is pbcopy; assert it there (Linux CI has no single
+# guaranteed CLI installed).
 tmux -L "$sock_name" source-file "$REPO_ROOT/tmux/tmux.posix.conf"
-check @plugin "rose-pine/tmux"
+posix_conf="$REPO_ROOT/tmux/tmux.posix.conf"
 for required in \
     "set-environment -g TMUX_PLUGIN_MANAGER_PATH \"~/.local/share/dotfiles/tmux-plugins\"" \
     "set -g @plugin 'tmux-plugins/tpm'" \
-    "set -g @plugin 'rose-pine/tmux'" \
+    "set -g @plugin 'tmux-plugins/tmux-sensible'" \
+    "set -g @plugin 'tmux-plugins/tmux-yank'" \
+    "set -g @plugin 'tmux-plugins/tmux-resurrect'" \
+    "set -g @plugin 'tmux-plugins/tmux-continuum'" \
     "run-shell \"\$HOME/.local/share/dotfiles/tmux-plugins/tpm/tpm\""; do
-    if ! grep -F "$required" "$REPO_ROOT/tmux/tmux.posix.conf" >/dev/null; then
+    if ! grep -F "$required" "$posix_conf" >/dev/null; then
         echo "FAIL: tmux.posix.conf missing required plugin line: $required"
         exit 1
     fi
 done
-check @rose_pine_variant main
-check @rose_pine_user off
-check @rose_pine_host off
-check @rose_pine_date_time ""
-check @rose_pine_directory on
-check @rose_pine_status_right_append_section " "
-check @rose_pine_disable_active_window_menu on
-check @rose_pine_show_current_program on
-if [[ "$(show "@rose_pine_show_pane_directory")" == "on" ]]; then
-    echo "FAIL: tmux.posix.conf must not enable the mutually-exclusive pane-directory window-name mode"
+# rose-pine/tmux must be fully retired: the bar is a repo-owned generated config.
+if grep -F "rose-pine/tmux" "$posix_conf" >/dev/null; then
+    echo "FAIL: tmux.posix.conf must not reference rose-pine/tmux anymore"
     exit 1
 fi
-echo "  rose-pine/tmux signal bar modules configured"
+check @rosepine-variant main
+check @continuum-restore on
+check @resurrect-strategy-nvim session
+check @continuum-save-interval 15
+echo "  functional plugins + session save/restore configured"
 if [[ "$(uname -s)" == "Darwin" ]]; then
     overlay_keys="$(tmux -L "$sock_name" list-keys -T copy-mode-vi)"
     if ! printf '%s\n' "$overlay_keys" | grep -Eq 'copy-mode-vi[[:space:]]+y[[:space:]]+send.*copy-pipe-and-cancel.*pbcopy'; then
@@ -164,6 +172,31 @@ if [[ "$(uname -s)" == "Darwin" ]]; then
     fi
     echo "  tmux.posix.conf overlay rebinds y -> pbcopy on macOS"
 fi
+
+# End-to-end: sourcing the overlay above pulled in the generated Rose Pine bar
+# (variant main). Assert it actually applied the Omer-shaped bar (session pill
+# left, zoom-aware current window, directory pill right). This is the POSIX proof
+# that the generated artifact is not just byte-stable but valid tmux that applies.
+check status-style "fg=#908caa,bg=#191724"
+if ! show status-left | grep -q '#S'; then
+    echo "FAIL: Rose Pine status-left must render the session pill (#S)"; exit 1
+fi
+if show status-left | grep -q '#W'; then
+    echo "FAIL: Rose Pine status-left must not duplicate window names (#W belongs to the window list)"; exit 1
+fi
+if ! show window-status-current-format | grep -q 'window_zoomed_flag'; then
+    echo "FAIL: current window cell must carry the zoom marker"; exit 1
+fi
+if ! show window-status-current-format | grep -q '#f6c177'; then
+    echo "FAIL: current window number segment must fill gold"; exit 1
+fi
+if ! show status-right | grep -q 'b:pane_current_path'; then
+    echo "FAIL: status-right must render the directory pill (basename)"; exit 1
+fi
+if [[ "$(show status-right)" != *' ' ]]; then
+    echo "FAIL: status-right must keep one trailing safety cell"; exit 1
+fi
+echo "  generated Rose Pine bar applies (Omer-shaped pill bar)"
 
 # Prove the shared config's tilde overlay source lines actually load an overlay
 # from HOME. This catches quoted-tilde regressions that real tmux tolerates less

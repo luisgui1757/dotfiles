@@ -1,38 +1,40 @@
 #!/usr/bin/env pwsh
 # =============================================================================
-# psmux Rose Pine -- a psmux-safe port of the official rose-pine/tmux status bar.
+# Rose Pine status renderer -- the repo-owned source of truth for the tmux AND
+# psmux status bar. Emits an Omer/Catppuccin-shaped bar (rounded pills, session
+# on the left, window cells with the number on the right and a zoom marker on the
+# current window, directory on the right) painted with the Rose Pine palette.
 # =============================================================================
 #
 # WHY THIS EXISTS
-#   The POSIX side loads the upstream rose-pine/tmux plugin (a bash script run by
-#   TPM). That plugin CANNOT run on native-Windows psmux: there is no TPM/bash,
-#   and its ~30 load-time shell-outs would hang ConPTY. The community
-#   psmux-theme-rosepine plugin renders a DIFFERENT, powerline bar (colored
-#   segment blocks + arrow chevrons). To make Windows psmux look like the flat,
-#   foreground-only rose-pine/tmux bar the POSIX side shows, this script
-#   reproduces the rendered `set -g` output of rose-pine/tmux directly.
+#   The bar is generated once and sourced verbatim on BOTH platforms so the look
+#   is byte-identical everywhere:
+#     * POSIX tmux  -> tmux/tmux.posix.conf source-files the generated variant.
+#     * Windows psmux -> tmux/tmux.windows.conf source-files the same variant.
+#   We deliberately do NOT use a tmux/psmux theme *plugin* for rendering:
+#   rose-pine/tmux is a bash/TPM script (cannot run on psmux, ~30 load-time
+#   shell-outs would hang ConPTY), and the community psmux-theme-rosepine renders
+#   a different powerline bar (arrow chevrons + segment blocks). A single
+#   repo-owned renderer is the only way to guarantee the same Omer-style bar on
+#   both. TPM/PPM still install the FUNCTIONAL plugins (sensible/yank/resurrect/
+#   continuum) -- they do not own the status bar.
 #
-# PSMUX-SAFE
+# PSMUX-SAFE / TMUX-SAFE
 #   Pure declarative `set -g` output. No load-time `if-shell`. No per-redraw shell
-#   substitution (`#(...)`); dynamic fields use native psmux formats (`#S`, `#I`,
-#   `#W`, `#{?client_prefix,...}`, `#{b:pane_current_path}`). Colors are inlined
-#   with `#[fg=...]`
-#   because psmux stores but does NOT apply `window-status-*-style` (psmux v3.3.x),
-#   so relying on the style options would leave window cells uncolored.
+#   substitution (`#(...)`); dynamic fields use native formats (`#S`, `#I`, `#W`,
+#   `#{?client_prefix,...}`, `#{?window_zoomed_flag,...}`, `#{b:pane_current_path}`).
+#   Every colour is inlined with `#[fg=...,bg=...]` because psmux stores but does
+#   NOT apply `window-status-*-style` (psmux v3.3.x), so relying on the style
+#   options would leave window cells uncoloured. The rounded pill caps are the
+#   Nerd Font half-circles U+E0B6 / U+E0B4; we intentionally avoid the powerline
+#   arrow chevrons (U+E0B0/U+E0B2) that give the community powerline look.
 #
 # VARIANTS
-#   Reads `@rosepine-variant` (main|moon|dawn); defaults to main.
-#
-# SOURCE OF TRUTH
-#   Palette + role mapping + composition mirror rose-pine/tmux (rose-pine.tmux)
-#   at commit b6138c51573425ccdc33c91464597323baec3b7e, configured to match this
-#   dotfiles POSIX overlay (tmux/tmux.posix.conf): session + current-program
-#   window names on the left; current directory on the right; with the same Nerd
-#   Font icons. Starship owns username, time, full path, git, and runtime state.
-#   Host stays out of the daily bar/prompt surface by default.
+#   Reads the requested variant (main|moon|dawn); defaults to main.
 #
 # INVARIANT: this file MUST stay pure ASCII (Windows PowerShell 5.1 parse safety);
 # the Nerd Font glyphs are built from codepoints at runtime, never embedded.
+# The generated *.conf artifacts DO carry the rendered glyphs.
 # =============================================================================
 
 param(
@@ -48,21 +50,24 @@ function Get-PsmuxRosePinePalette {
     switch ($Variant) {
         'moon' {
             return @{
-                base = '#232136'; text = '#e0def4'; subtle = '#908caa'; muted = '#6e6a86'
+                base = '#232136'; surface = '#2a273f'; overlay = '#393552'
+                text = '#e0def4'; subtle = '#908caa'; muted = '#6e6a86'
                 love = '#eb6f92'; gold = '#f6c177'; rose = '#ea9a97'; pine = '#3e8fb0'
                 foam = '#9ccfd8'; iris = '#c4a7e7'; hlMed = '#44415a'; hlHigh = '#56526e'
             }
         }
         'dawn' {
             return @{
-                base = '#faf4ed'; text = '#575279'; subtle = '#797593'; muted = '#9893a5'
+                base = '#faf4ed'; surface = '#fffaf3'; overlay = '#f2e9e1'
+                text = '#575279'; subtle = '#797593'; muted = '#9893a5'
                 love = '#b4637a'; gold = '#ea9d34'; rose = '#d7827e'; pine = '#286983'
                 foam = '#56949f'; iris = '#907aa9'; hlMed = '#dfdad9'; hlHigh = '#cecacd'
             }
         }
         default {
             return @{
-                base = '#191724'; text = '#e0def4'; subtle = '#908caa'; muted = '#6e6a86'
+                base = '#191724'; surface = '#1f1d2e'; overlay = '#26233a'
+                text = '#e0def4'; subtle = '#908caa'; muted = '#6e6a86'
                 love = '#eb6f92'; gold = '#f6c177'; rose = '#ebbcba'; pine = '#31748f'
                 foam = '#9ccfd8'; iris = '#c4a7e7'; hlMed = '#403d52'; hlHigh = '#524f67'
             }
@@ -72,59 +77,54 @@ function Get-PsmuxRosePinePalette {
 
 function Get-PsmuxRosePineCommand {
     param(
-        [string]$Variant = 'main',
-        [string]$Separator = '  '
+        [string]$Variant = 'main'
     )
 
     $p = Get-PsmuxRosePinePalette -Variant $Variant
 
     # Nerd Font glyphs (codepoints -> runtime string keeps this .ps1 pure ASCII).
-    # Match the icons/separators used by rose-pine/tmux under tmux/tmux.posix.conf:
-    # session, folder, left, windows.
+    #   capLeft/capRight : rounded pill caps (half circles), NOT arrow chevrons.
+    #   iSession/iFolder : left session pill + right directory pill icons.
+    #   iZoom            : zoom marker shown on the current window when zoomed.
+    $capLeft = [char]::ConvertFromUtf32(0xE0B6)
+    $capRight = [char]::ConvertFromUtf32(0xE0B4)
     $iSession = [char]::ConvertFromUtf32(0xEB7F)
     $iFolder = [char]::ConvertFromUtf32(0xF413)
-    $iLeftSeparator = [char]::ConvertFromUtf32(0xEA9C)
-    $iWindowStatusSeparator = [char]::ConvertFromUtf32(0xEB70)
+    $iZoom = [char]::ConvertFromUtf32(0xF065)
 
-    # rose-pine/tmux uses a two-space field separator between status modules and
-    # Nerd Font separators inside/right of window cells. They are flat glyphs, not
-    # powerline chevrons.
-    $sep = $Separator
-    $field = "#[fg=$($p.text)]$sep"
-    $leftSeparator = " $iLeftSeparator "
-    $windowStatusSeparator = " $iWindowStatusSeparator "
+    # Session accent turns love while the prefix is held (Catppuccin-style
+    # active-state), otherwise iris. Used as a plain colour value inside #[...].
+    $sessAccent = "#{?client_prefix,$($p.love),$($p.iris)}"
 
-    # Window list (rose-pine/tmux "show_current_program" mode). Foreground inlined
-    # on the index too, so psmux paints it (window-status-*-style is ignored).
-    $winFormat = "#[fg=$($p.iris)]#I#[fg=$($p.iris)]$leftSeparator#[fg=$($p.iris)]#W"
-    $winCurrentFormat = "#[fg=$($p.gold)]#I#[fg=$($p.gold)]$leftSeparator#[fg=$($p.gold)]#W"
+    # status-left: rounded session pill. icon segment (accent bg) + name segment
+    # (overlay bg). Trailing space separates it from the window list.
+    $statusLeft = "#[fg=$sessAccent,bg=$($p.base)]$capLeft#[fg=$($p.base),bg=$sessAccent] $iSession #[fg=$($p.text),bg=$($p.overlay)] #S #[fg=$($p.overlay),bg=$($p.base)]$capRight "
 
-    # status-left: session only (icon turns love while prefix is active). Window
-    # names live in the normal tmux window list, matching
-    # @rose_pine_disable_active_window_menu enabled on the POSIX side.
-    $showSession = "#{?client_prefix,#[fg=$($p.love)],#[fg=$($p.text)]}$iSession #[fg=$($p.text)]#S"
-    $statusLeft = "$showSession$field"
+    # window cells: name segment (overlay bg) + number segment on the RIGHT
+    # (Catppuccin number_position=right, fill=number). Current window fills the
+    # number in gold and appends a zoom marker; inactive fills it muted.
+    $winFormat = "#[fg=$($p.overlay),bg=$($p.base)]$capLeft#[fg=$($p.subtle),bg=$($p.overlay)] #W #[fg=$($p.base),bg=$($p.muted)] #I #[fg=$($p.muted),bg=$($p.base)]$capRight"
+    $winCurrentFormat = "#[fg=$($p.overlay),bg=$($p.base)]$capLeft#[fg=$($p.text),bg=$($p.overlay)] #W#{?window_zoomed_flag, $iZoom,} #[fg=$($p.base),bg=$($p.gold)] #I #[fg=$($p.gold),bg=$($p.base)]$capRight"
 
-    # status-right: directory basename only, with one terminal-edge safety cell
-    # so Windows Terminal / ConPTY does not clip the final visible glyph.
-    $showDir = "#[fg=$($p.subtle)]$iFolder #[fg=$($p.rose)]#{b:pane_current_path} "
-    $statusRight = $showDir
+    # status-right: rounded directory pill (basename only). One terminal-edge
+    # safety cell so the last visible glyph is not clipped by Windows Terminal.
+    $statusRight = "#[fg=$($p.overlay),bg=$($p.base)]$capLeft#[fg=$($p.subtle),bg=$($p.overlay)] $iFolder #[fg=$($p.rose),bg=$($p.overlay)]#{b:pane_current_path} #[fg=$($p.overlay),bg=$($p.base)]$capRight "
 
     $cmds = [System.Collections.Generic.List[object]]::new()
     $add = { param([string[]]$Argv) $cmds.Add([pscustomobject]@{ Argv = $Argv }) }
 
     & $add @('set', '-g', 'status', 'on')
     & $add @('set', '-g', 'status-justify', 'left')
-    & $add @('set', '-g', 'status-style', "fg=$($p.pine),bg=$($p.base)")
+    & $add @('set', '-g', 'status-style', "fg=$($p.subtle),bg=$($p.base)")
     & $add @('set', '-g', 'status-left-length', '200')
     & $add @('set', '-g', 'status-right-length', '200')
     & $add @('set', '-g', 'status-left', $statusLeft)
     & $add @('set', '-g', 'status-right', $statusRight)
-    & $add @('set', '-g', 'window-status-separator', $windowStatusSeparator)
+    & $add @('set', '-g', 'window-status-separator', ' ')
     & $add @('set', '-g', 'window-status-format', $winFormat)
     & $add @('set', '-g', 'window-status-current-format', $winCurrentFormat)
     & $add @('set', '-g', 'window-status-activity-style', "fg=$($p.base),bg=$($p.rose)")
-    & $add @('set', '-g', 'message-style', "fg=$($p.muted),bg=$($p.base)")
+    & $add @('set', '-g', 'message-style', "fg=$($p.text),bg=$($p.overlay)")
     & $add @('set', '-g', 'message-command-style', "fg=$($p.base),bg=$($p.gold)")
     & $add @('set', '-g', 'pane-border-style', "fg=$($p.hlHigh)")
     & $add @('set', '-g', 'pane-active-border-style', "fg=$($p.gold)")
@@ -141,12 +141,12 @@ function ConvertTo-PsmuxConfigLine {
     param([Parameter(Mandatory)]$Command)
 
     if ($Command.Argv.Count -ne 4 -or $Command.Argv[0] -ne 'set' -or $Command.Argv[1] -ne '-g') {
-        throw "Unsupported psmux Rose Pine command shape"
+        throw "Unsupported Rose Pine command shape"
     }
 
     $value = [string]$Command.Argv[3]
     if ($value.Contains("'")) {
-        throw "Cannot emit psmux config value containing a single quote"
+        throw "Cannot emit config value containing a single quote"
     }
 
     return "set -g $($Command.Argv[2]) '$value'"
@@ -159,8 +159,7 @@ function Get-PsmuxRosePineConfigLine {
     $lines = [System.Collections.Generic.List[string]]::new()
     $lines.Add('# Generated by tmux/psmux-rose-pine.ps1 - do not edit by hand.')
     $lines.Add("# Variant: $confVariant")
-    foreach ($cmd in (Get-PsmuxRosePineCommand `
-            -Variant $confVariant)) {
+    foreach ($cmd in (Get-PsmuxRosePineCommand -Variant $confVariant)) {
         $lines.Add((ConvertTo-PsmuxConfigLine -Command $cmd))
     }
     return $lines

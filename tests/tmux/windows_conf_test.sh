@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Static guards for the Windows-only psmux overlay and its repo-owned Rose Pine
-# renderer (a psmux-safe port of rose-pine/tmux -- see tmux/psmux-rose-pine.ps1).
+# Static guards for the Windows-only psmux overlay, its repo-owned Rose Pine
+# renderer (an Omer/Catppuccin-shaped pill bar -- see tmux/psmux-rose-pine.ps1),
+# and the vendored psmux session plugins it source-files.
 set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 
@@ -50,6 +51,11 @@ require_line '^set[[:space:]]+-g[[:space:]]+pwsh-mouse-selection[[:space:]]+off$
 require_line '^set[[:space:]]+-g[[:space:]]+scroll-enter-copy-mode[[:space:]]+on$' \
     'tmux.windows.conf must keep wheel-scroll copy-mode'
 
+# Native-Windows yank: the psmux ecosystem has no psmux-yank port, so clip.exe is
+# the deterministic Windows clipboard.
+require_line '^bind[[:space:]]+-T[[:space:]]+copy-mode-vi[[:space:]]+y[[:space:]]+send[[:space:]]+-X[[:space:]]+copy-pipe-and-cancel[[:space:]]+"clip\.exe"$' \
+    'tmux.windows.conf must keep the clip.exe copy-mode yank (no psmux-yank port exists)'
+
 # Rose Pine renderer wiring: default variant + source generated psmux configs.
 require_line "^set[[:space:]]+-go[[:space:]]+@rosepine-variant[[:space:]]+'main'$" \
     'tmux.windows.conf must default the Rose Pine variant to main'
@@ -68,11 +74,28 @@ reject_line "^run[[:space:]]+'~/\.tmux\.rose-pine\.ps1'$" \
 reject_line 'set-hook[[:space:]]+-g[[:space:]]+client-attached.*\.tmux\.rose-pine' \
     'tmux.windows.conf must not rely on client-attached to apply startup Rose Pine'
 
-# The upstream powerline plugin must not come back: it renders a different bar
-# (colored segment blocks) that does not match rose-pine/tmux and fights the
-# renderer. Guard both the @plugin declarations and the plugin-root run lines.
+# Vendored psmux session plugins (resurrect + continuum), source-filed directly
+# from their pinned checkout under ~/.psmux/plugins/. We do NOT use PPM (it
+# clones monorepo HEAD and rewrites managed config), and we do NOT declare
+# @plugin lines here.
+require_line '^source-file[[:space:]]+~/\.psmux/plugins/psmux-resurrect/plugin\.conf$' \
+    'tmux.windows.conf must source the vendored psmux-resurrect plugin.conf'
+require_line '^source-file[[:space:]]+~/\.psmux/plugins/psmux-continuum/plugin\.conf$' \
+    'tmux.windows.conf must source the vendored psmux-continuum plugin.conf'
+require_line "^set[[:space:]]+-g[[:space:]]+@continuum-restore[[:space:]]+'on'$" \
+    'tmux.windows.conf must enable continuum auto-restore'
+# continuum requires resurrect: resurrect must be sourced first.
+resurrect_line="$(grep -nE '^source-file ~/\.psmux/plugins/psmux-resurrect/plugin\.conf$' "$WIN_CONF" | head -1 | cut -d: -f1)"
+continuum_line="$(grep -nE '^source-file ~/\.psmux/plugins/psmux-continuum/plugin\.conf$' "$WIN_CONF" | head -1 | cut -d: -f1)"
+if [[ -z "$resurrect_line" || -z "$continuum_line" || "$resurrect_line" -ge "$continuum_line" ]]; then
+    echo "FAIL: tmux.windows.conf must source psmux-resurrect before psmux-continuum"
+    exit 1
+fi
+
+# The community powerline plugin must not come back, and PPM must not be used:
+# PPM clones the monorepo HEAD (unpinned) and rewrites managed config files.
 reject_line "^set[[:space:]]+-g[[:space:]]+@plugin" \
-    'tmux.windows.conf must not declare psmux @plugin entries (renderer is repo-owned)'
+    'tmux.windows.conf must not declare psmux @plugin entries (plugins are vendored + source-filed)'
 reject_line "^run[[:space:]]+'~/\.psmux/plugins/" \
     'tmux.windows.conf must not run PPM or a psmux plugin-root script'
 # psmux config-load freeze boundary: no command-position if-shell in the overlay.
@@ -162,8 +185,10 @@ for variant in "${ROSEPINE_VARIANTS[@]}"; do
         echo "FAIL: home/dot_tmux.rose-pine.$variant.conf must match tmux/psmux-rose-pine.$variant.conf"
         exit 1
     fi
-    if ! grep -Eq "^set -g status-right '.*#\\{b:pane_current_path\\} '$" "$conf"; then
-        echo "FAIL: psmux Rose Pine $variant status-right must keep one trailing safety space"
+    # status-right: directory basename + one trailing safety cell (a space before
+    # the closing quote), no Starship-owned user/host/time context.
+    if ! grep -Eq "^set -g status-right '.*#\\{b:pane_current_path\\}.* '\$" "$conf"; then
+        echo "FAIL: psmux Rose Pine $variant status-right must render the directory basename with a trailing safety cell"
         exit 1
     fi
     if grep -Eq '#\{(user|host_short)\}' "$conf"; then
@@ -178,14 +203,24 @@ for variant in "${ROSEPINE_VARIANTS[@]}"; do
         echo "FAIL: psmux Rose Pine $variant generated config must not emit literal #{p2:}; psmux does not expand it in status formats"
         exit 1
     fi
-    if ! grep -Fx "set -g window-status-separator '  '" "$conf" >/dev/null; then
-        echo "FAIL: psmux Rose Pine $variant window-status-separator must match rose-pine/tmux"
+    if ! grep -Fx "set -g window-status-separator ' '" "$conf" >/dev/null; then
+        echo "FAIL: psmux Rose Pine $variant window cells must be standalone pills separated by a single space"
         exit 1
     fi
-    if ! grep -F '  ' "$conf" >/dev/null; then
-        echo "FAIL: psmux Rose Pine $variant window cells must use the rose-pine/tmux left separator"
-        exit 1
-    fi
+    # Rounded pill caps must be present; arrow-chevron powerline separators must
+    # not (that is the community powerline look we deliberately avoid).
+    python3 - "$conf" "$variant" <<'PY'
+import sys
+data = open(sys.argv[1], encoding="utf-8").read()
+variant = sys.argv[2]
+cap_left, cap_right = chr(0xE0B6), chr(0xE0B4)
+chevrons = [chr(cp) for cp in (0xE0B0, 0xE0B1, 0xE0B2, 0xE0B3, 0xE0B8, 0xE0BA, 0xE0BC, 0xE0BE)]
+if cap_left not in data or cap_right not in data:
+    sys.exit(f"FAIL: psmux Rose Pine {variant} must use rounded pill caps (U+E0B6/U+E0B4)")
+for ch in chevrons:
+    if ch in data:
+        sys.exit(f"FAIL: psmux Rose Pine {variant} must not use arrow-chevron powerline separators")
+PY
 done
 
 if ! grep -Fx '.psmux.conf' "$REPO_ROOT/home/.chezmoiignore" >/dev/null; then
@@ -197,12 +232,14 @@ if ! grep -Fx '.tmux.windows.conf' "$REPO_ROOT/home/.chezmoiignore" >/dev/null; 
     exit 1
 fi
 if ! grep -Fx '.tmux.rose-pine.ps1' "$REPO_ROOT/home/.chezmoiignore" >/dev/null; then
-    echo "FAIL: home/.chezmoiignore must ignore .tmux.rose-pine.ps1 off Windows"
+    echo "FAIL: home/.chezmoiignore must ignore .tmux.rose-pine.ps1 (renderer helper) off Windows"
     exit 1
 fi
+# The generated variant configs are now CROSS-PLATFORM (POSIX tmux sources them
+# too), so they must NOT be ignored off Windows.
 for variant in "${ROSEPINE_VARIANTS[@]}"; do
-    if ! grep -Fx ".tmux.rose-pine.$variant.conf" "$REPO_ROOT/home/.chezmoiignore" >/dev/null; then
-        echo "FAIL: home/.chezmoiignore must ignore .tmux.rose-pine.$variant.conf off Windows"
+    if grep -Fx ".tmux.rose-pine.$variant.conf" "$REPO_ROOT/home/.chezmoiignore" >/dev/null; then
+        echo "FAIL: home/.chezmoiignore must NOT ignore .tmux.rose-pine.$variant.conf (POSIX sources it too)"
         exit 1
     fi
 done

@@ -91,13 +91,16 @@ assert_eq "zsh-autosuggestions tag (install-deps.sh == chezmoi external)" \
 assert_eq "zsh-autosuggestions commit (install-deps.sh == verify script)" \
     "$(sh_const ZSH_AUTOSUGGESTIONS_COMMIT)" "$(verify_commit 'zsh-autosuggestions')"
 
-# --- tmux plugin pins (POSIX rose-pine/tmux): installers <-> docs -------------
-# Windows psmux uses a repo-owned renderer (tmux/psmux-rose-pine.ps1), not a
-# pinned third-party plugin, so there is no PsmuxPlugins commit to mirror here.
+# --- tmux/psmux plugin pins: installers <-> docs ------------------------------
+# POSIX: TPM + the functional plugins (sensible/yank/resurrect/continuum) in
+# install-deps.sh. Windows: the psmux/psmux-plugins monorepo commit in
+# install-deps.ps1 (vendored resurrect/continuum). The Rose Pine bar is a
+# repo-owned generated config, NOT a plugin, so rose-pine/tmux is retired.
+ps_const() { grep -E "^[[:space:]]*\\\$$1[[:space:]]*=" install-deps.ps1 | head -1 | cut -d"'" -f2; }
 tpm_commit="$(sh_const TPM_COMMIT)"
-rose_pine_tmux_commit="$(sh_const ROSE_PINE_TMUX_COMMIT)"
+psmux_plugins_commit="$(ps_const PsmuxPluginsCommit)"
 
-for pin_name in TPM_COMMIT ROSE_PINE_TMUX_COMMIT; do
+for pin_name in TPM_COMMIT TMUX_SENSIBLE_COMMIT TMUX_YANK_COMMIT TMUX_RESURRECT_COMMIT TMUX_CONTINUUM_COMMIT; do
     pin_value="$(sh_const "$pin_name")"
     if [[ ! "$pin_value" =~ ^[0-9a-f]{40}$ ]]; then
         echo "FAIL: $pin_name must be an immutable 40-character lowercase commit SHA, got '$pin_value'"
@@ -106,10 +109,30 @@ for pin_name in TPM_COMMIT ROSE_PINE_TMUX_COMMIT; do
         echo "ok  : $pin_name is immutable commit SHA"
     fi
 done
-assert_contains "TPM commit (README.md)" "README.md" "$tpm_commit"
-assert_contains "rose-pine/tmux commit (README.md)" "README.md" "$rose_pine_tmux_commit"
-assert_contains "TPM commit (CLAUDE.md)" "CLAUDE.md" "$tpm_commit"
-assert_contains "rose-pine/tmux commit (CLAUDE.md)" "CLAUDE.md" "$rose_pine_tmux_commit"
+if [[ ! "$psmux_plugins_commit" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "FAIL: PsmuxPluginsCommit must be an immutable 40-character lowercase commit SHA, got '$psmux_plugins_commit'"
+    fail=1
+else
+    echo "ok  : PsmuxPluginsCommit is immutable commit SHA"
+fi
+
+# rose-pine/tmux must stay fully retired from the pin surface.
+if grep -q 'ROSE_PINE_TMUX_COMMIT' install-deps.sh; then
+    echo "FAIL: ROSE_PINE_TMUX_COMMIT must be removed from install-deps.sh (rose-pine/tmux is retired)"
+    fail=1
+else
+    echo "ok  : rose-pine/tmux pin retired"
+fi
+
+# Docs mirror the plugin provisioning pins.
+for doc in README.md CLAUDE.md; do
+    assert_contains "TPM commit ($doc)" "$doc" "$tpm_commit"
+    assert_contains "tmux-sensible commit ($doc)" "$doc" "$(sh_const TMUX_SENSIBLE_COMMIT)"
+    assert_contains "tmux-yank commit ($doc)" "$doc" "$(sh_const TMUX_YANK_COMMIT)"
+    assert_contains "tmux-resurrect commit ($doc)" "$doc" "$(sh_const TMUX_RESURRECT_COMMIT)"
+    assert_contains "tmux-continuum commit ($doc)" "$doc" "$(sh_const TMUX_CONTINUUM_COMMIT)"
+    assert_contains "psmux-plugins commit ($doc)" "$doc" "$psmux_plugins_commit"
+done
 
 # --- Polaris: setup.sh <-> setup.ps1 -----------------------------------------
 polaris_version_sh="$(setup_sh_const POLARIS_VERSION)"
