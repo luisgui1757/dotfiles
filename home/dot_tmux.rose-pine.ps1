@@ -28,8 +28,8 @@
 #   at commit b6138c51573425ccdc33c91464597323baec3b7e, configured to match this
 #   dotfiles POSIX overlay (tmux/tmux.posix.conf): session + current-program
 #   window names on the left; current directory on the right; with the same Nerd
-#   Font icons. Starship owns time, full path, git, and runtime state. User/host
-#   stay out of the daily bar/prompt surface by default.
+#   Font icons. Starship owns username, time, full path, git, and runtime state.
+#   Host stays out of the daily bar/prompt surface by default.
 #
 # INVARIANT: this file MUST stay pure ASCII (Windows PowerShell 5.1 parse safety);
 # the Nerd Font glyphs are built from codepoints at runtime, never embedded.

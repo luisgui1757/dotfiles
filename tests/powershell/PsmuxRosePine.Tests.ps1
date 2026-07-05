@@ -43,8 +43,8 @@ Describe 'psmux-rose-pine renderer' {
         # one terminal-edge safety cell: the last visible glyph/text must not sit
         # in the final column on Windows Terminal / ConPTY.
         $opt['status-right'] | Should -Match ([regex]::Escape('#{b:pane_current_path} '))
-        # tmux/psmux owns multiplexer context only. Starship owns time/path/git,
-        # while user/host stay out of the daily surface.
+        # tmux/psmux owns multiplexer context only. Starship owns username,
+        # time/path/git, while host stays out of the daily surface.
         $opt['status-right'] | Should -Not -Match ([regex]::Escape('#{user}'))
         $opt['status-right'] | Should -Not -Match ([regex]::Escape('#{host_short}'))
         $opt['status-right'] | Should -Not -Match '%a %d %b %H:%M'

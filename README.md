@@ -277,8 +277,9 @@ and whether `pwsh` is installed.
   Uniformity is strict: the generated psmux configs mirror rose-pine/tmux's
   field spacing and Nerd Font separator glyphs, not just its palette. The status
   bar is intentionally a signal bar: tmux/psmux shows session, windows, and the
-  current directory basename; Starship shows full path, git, language/runtime,
-  and time context; user/host stay out of the daily surface by default.
+  current directory basename; Starship shows username, full path, git,
+  language/runtime, and time context; host stays out of the daily surface by
+  default.
 - Windows psmux uses a dedicated `~/.psmux.conf` entrypoint. It disables psmux
   warm sessions before sourcing `~/.tmux.conf`, so psmux cannot claim a stale
   warm server whose status theme loaded before chezmoi deployed the current
@@ -662,9 +663,9 @@ stale; CI then fails verification until a human reviews the adjacent constant.
 - **Starship language modules pared down.** Only `c, go, node, rust, python,
   conda` are enabled. Disabled languages don't spawn version probes on every
   prompt. Prompt segments use foreground styles only so transparent terminals do
-  not show opaque character-width blocks behind rendered text. The prompt does
-  not show the username by default; local identity belongs in the terminal title,
-  OS chrome, or explicit host diagnostics, not every shell prompt.
+  not show opaque character-width blocks behind rendered text. The prompt keeps
+  the username visible at the start; tmux/psmux does not duplicate it in the
+  status bar.
 - **Zsh starship init is precompiled** (mirroring the PowerShell profile
   approach) — re-generated only when `starship.toml` is newer than the cache.
 - **zsh plugin installs are repo-managed pins.** `fzf-tab` and
@@ -698,8 +699,8 @@ stale; CI then fails verification until a human reviews the adjacent constant.
   (`@rose_pine_variant` on POSIX, `@rosepine-variant` on Windows). Both bars are
   top-aligned and show the same segments (session, window list/current program,
   directory basename) with the same Rose Pine separator glyphs. Date/time, full
-  path, git, and runtime state stay in Starship rather than being duplicated in
-  tmux; user/host stay out of the daily surface by default. Windows psmux
+  path, username, git, and runtime state stay in Starship rather than being
+  duplicated in tmux; host stays out of the daily surface by default. Windows psmux
   starts from `~/.psmux.conf`, which turns warm sessions off before sourcing
   `~/.tmux.conf`, then explicitly source-files
   `~/.tmux.windows.conf` without `-q` because psmux v3.3.x does not implement

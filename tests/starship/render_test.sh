@@ -16,17 +16,18 @@ if grep -nF 'bg:' "$REPO_ROOT/starship/starship.toml"; then
     echo "FAIL: starship.toml must not use background styles; terminal transparency owns the background"
     exit 1
 fi
-if grep -F "\$username\\" "$REPO_ROOT/starship/starship.toml" >/dev/null; then
-    echo "FAIL: starship format must not show username by default; identity is not part of the daily prompt surface"
+if ! grep -F "\$username\\" "$REPO_ROOT/starship/starship.toml" >/dev/null; then
+    echo "FAIL: starship format must show username; tmux/psmux intentionally does not duplicate it"
     exit 1
 fi
 if ! awk '
     /^\[username\]$/ { in_user = 1; next }
     /^\[/ { in_user = 0 }
-    in_user && /^disabled = true$/ { found = 1 }
-    END { exit(found ? 0 : 1) }
+    in_user && /^disabled = false$/ { enabled = 1 }
+    in_user && /^show_always = true$/ { show_always = 1 }
+    END { exit(enabled && show_always ? 0 : 1) }
 ' "$REPO_ROOT/starship/starship.toml"; then
-    echo "FAIL: starship username module must stay disabled by default"
+    echo "FAIL: starship username module must stay enabled and always visible"
     exit 1
 fi
 time_format_line="format = \"[\$time 󰴈 ](\$style)\""

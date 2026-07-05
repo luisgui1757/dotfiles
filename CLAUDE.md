@@ -1420,19 +1420,19 @@ host OS or shell would otherwise hide a branch from CI.
   cells and make the prompt look patched onto the transparent surface. Guarded
   by `tests/starship/render_test.sh`. The right-aligned time module deliberately
   keeps one trailing safety space so its final Nerd Font glyph is not drawn into
-  the terminal's last column. The username module is disabled and absent from
-  the prompt format by default; local identity is low-signal on personal
-  machines and should not be duplicated in every shell prompt.
+  the terminal's last column. The username module is enabled and always shown at
+  the prompt start; tmux/psmux must not duplicate username in the status bar.
 - **tmux Rose Pine: POSIX loads the upstream plugin; Windows renders a repo-owned
   psmux-safe port.** Shared `tmux/tmux.conf` is psmux-safe and owns only
   cross-platform placement (`status-position top`). POSIX loads
   `tmux/tmux.posix.conf`, which declares TPM + `rose-pine/tmux` from the
   repo-managed plugin root `~/.local/share/dotfiles/tmux-plugins`. The bar is a
   signal bar: session, window list/current program, and current directory
-  basename only. Starship owns time, full path, git, and language/runtime
-  context; user/host stay out of the daily surface by default. POSIX therefore
-  disables the active-window menu, user, host, and date/time Rose Pine modules
-  while leaving directory and current-program window names enabled.
+  basename only. Starship owns username, time, full path, git, and
+  language/runtime context; host stays out of the daily surface by default.
+  POSIX therefore disables the active-window menu, user, host, and date/time
+  Rose Pine modules while leaving directory and current-program window names
+  enabled.
   Windows starts psmux through `tmux/psmux.conf` (deployed as `~/.psmux.conf`),
   which disables psmux warm sessions before sourcing `~/.tmux.conf`. This is
   required because psmux's pre-server warm check only shallow-scans the first
