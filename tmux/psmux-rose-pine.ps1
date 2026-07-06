@@ -92,9 +92,9 @@ function Get-PsmuxRosePineCommand {
     $iFolder = [char]::ConvertFromUtf32(0xF413)
     $iZoom = [char]::ConvertFromUtf32(0xF065)
 
-    # Session accent turns love while the prefix is held (Catppuccin-style
-    # active-state), otherwise iris. Used as a plain colour value inside #[...].
-    $sessAccent = "#{?client_prefix,$($p.love),$($p.iris)}"
+    # Session accent turns love while the prefix is held; otherwise use pine so
+    # the default session pill reads Rose Pine, not Catppuccin-purple.
+    $sessAccent = "#{?client_prefix,$($p.love),$($p.pine)}"
 
     # status-left: rounded session pill. icon segment (accent bg) + name segment
     # (overlay bg). Trailing space separates it from the window list.

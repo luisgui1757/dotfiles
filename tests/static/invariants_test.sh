@@ -65,6 +65,17 @@ check_absent "tmux overlay source paths keep unquoted tilde for psmux" \
     'source-file -q "~/' \
     tmux/tmux.conf home/dot_tmux.conf
 
+check_absent "psmux-parsed tmux configs avoid unsupported terminal-features warnings" \
+    "^[[:space:]]*set[[:space:]][^#]*terminal-features" \
+    tmux/tmux.conf home/dot_tmux.conf tmux/tmux.windows.conf home/dot_tmux.windows.conf
+
+for posix_conf in tmux/tmux.posix.conf home/dot_tmux.posix.conf; do
+    if ! grep -Fx "set -as terminal-features ',*:extkeys'" "$posix_conf" >/dev/null; then
+        echo "FAIL: $posix_conf must keep tmux extended-key terminal-features in the POSIX-only overlay"
+        fail=1
+    fi
+done
+
 if find tmux/themes -type f -name '*.conf' 2>/dev/null | grep -q .; then
     echo "FAIL: local tmux theme snippets must stay deleted; use upstream Rose Pine variants"
     find tmux/themes -type f -name '*.conf'

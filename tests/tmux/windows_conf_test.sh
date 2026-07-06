@@ -40,6 +40,8 @@ reject_line '^(bind|bind-key)[[:space:]]+L[[:space:]]+' \
     'tmux.windows.conf must not override prefix+L window-swap'
 reject_line '^bind-key[[:space:]]+-T[[:space:]]+root[[:space:]]+Escape[[:space:]]+send-keys[[:space:]]+esc$' \
     'tmux.windows.conf must not carry the failed psmux Escape pass-through workaround'
+reject_line '^[[:space:]]*set[[:space:]][^#]*terminal-features' \
+    'tmux.windows.conf must not set unsupported tmux terminal-features options under psmux'
 
 require_line '^set[[:space:]]+-g[[:space:]]+default-shell[[:space:]]+pwsh$' \
     'tmux.windows.conf must set psmux default-shell to pwsh'
@@ -201,6 +203,10 @@ for variant in "${ROSEPINE_VARIANTS[@]}"; do
     fi
     if grep -F '#{p2:}' "$conf" >/dev/null; then
         echo "FAIL: psmux Rose Pine $variant generated config must not emit literal #{p2:}; psmux does not expand it in status formats"
+        exit 1
+    fi
+    if [[ "$variant" == "main" ]] && grep -F '#{?client_prefix,#eb6f92,#c4a7e7}' "$conf" >/dev/null; then
+        echo "FAIL: psmux Rose Pine main session pill must use pine, not iris/Catppuccin-purple"
         exit 1
     fi
     if ! grep -Fx "set -g window-status-separator ' '" "$conf" >/dev/null; then

@@ -1448,7 +1448,9 @@ host OS or shell would otherwise hide a branch from CI.
   `window-status-*-style`, uses rounded pill caps (U+E0B6/U+E0B4) and NOT
   arrow-chevron powerline separators (U+E0B0/U+E0B2), and keeps one trailing
   safety space after the status-right directory so the final cell is not clipped
-  by Windows Terminal/ConPTY. Default variant `main`, plus `moon`/`dawn`, selected
+  by Windows Terminal/ConPTY. The normal session pill accent is Rose Pine `pine`
+  (not `iris`, which reads too close to Catppuccin purple in this layout);
+  holding the prefix changes it to `love`. Default variant `main`, plus `moon`/`dawn`, selected
   by `@rosepine-variant` on BOTH platforms. `tmux/psmux-rose-pine.ps1` MUST stay
   pure ASCII (PS 5.1 parse safety, guarded by `invariants_test.sh`); the Nerd Font
   glyphs are built from codepoints at runtime and only the generated `.conf`
@@ -1500,6 +1502,10 @@ host OS or shell would otherwise hide a branch from CI.
   smoke-test to unblock: open psmux, confirm panes render without freezing,
   `psmux show-hooks -g`, and Prefix+Ctrl-s/Prefix+Ctrl-r for manual resurrect
   save/restore first. POSIX tmux keeps `tmux-continuum` (testable on Linux).
+  psmux v3.3.x does not support tmux's `terminal-features` option. Keep
+  `set ... terminal-features` out of `tmux/tmux.conf`, `home/dot_tmux.conf`,
+  `tmux/tmux.windows.conf`, and `home/dot_tmux.windows.conf`; tmux extended-key
+  feature flags belong only in the POSIX overlay.
   POSIX `@rosepine-variant` uses `set -go` (only-if-unset) so a live
   `tmux set -g @rosepine-variant moon` survives repeated re-sourcing of the
   overlay instead of snapping back to main (matches Windows; guarded by

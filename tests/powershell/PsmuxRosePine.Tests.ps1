@@ -29,9 +29,9 @@ AfterAll {
 
 Describe 'psmux-rose-pine renderer' {
     $variants = @(
-        @{ Variant = 'main'; Base = '#191724'; Surface = '#1f1d2e'; Overlay = '#26233a'; Gold = '#f6c177'; Iris = '#c4a7e7'; Muted = '#6e6a86'; Rose = '#ebbcba'; Subtle = '#908caa'; Love = '#eb6f92'; Text = '#e0def4' }
-        @{ Variant = 'moon'; Base = '#232136'; Surface = '#2a273f'; Overlay = '#393552'; Gold = '#f6c177'; Iris = '#c4a7e7'; Muted = '#6e6a86'; Rose = '#ea9a97'; Subtle = '#908caa'; Love = '#eb6f92'; Text = '#e0def4' }
-        @{ Variant = 'dawn'; Base = '#faf4ed'; Surface = '#fffaf3'; Overlay = '#f2e9e1'; Gold = '#ea9d34'; Iris = '#907aa9'; Muted = '#9893a5'; Rose = '#d7827e'; Subtle = '#797593'; Love = '#b4637a'; Text = '#575279' }
+        @{ Variant = 'main'; Base = '#191724'; Surface = '#1f1d2e'; Overlay = '#26233a'; Gold = '#f6c177'; Pine = '#31748f'; Muted = '#6e6a86'; Rose = '#ebbcba'; Subtle = '#908caa'; Love = '#eb6f92'; Text = '#e0def4' }
+        @{ Variant = 'moon'; Base = '#232136'; Surface = '#2a273f'; Overlay = '#393552'; Gold = '#f6c177'; Pine = '#3e8fb0'; Muted = '#6e6a86'; Rose = '#ea9a97'; Subtle = '#908caa'; Love = '#eb6f92'; Text = '#e0def4' }
+        @{ Variant = 'dawn'; Base = '#faf4ed'; Surface = '#fffaf3'; Overlay = '#f2e9e1'; Gold = '#ea9d34'; Pine = '#286983'; Muted = '#9893a5'; Rose = '#d7827e'; Subtle = '#797593'; Love = '#b4637a'; Text = '#575279' }
     )
 
     It "paints the <Variant> palette on the flat pill bar" -ForEach $variants {
@@ -51,8 +51,8 @@ Describe 'psmux-rose-pine renderer' {
         $opt['window-status-format'] | Should -Not -Match ([regex]::Escape('window_zoomed_flag'))
         # Standalone pills separated by a single space (connect_separator=no).
         $opt['window-status-separator'] | Should -Be ' '
-        # Session pill: prefix turns the accent love, otherwise iris.
-        $opt['status-left'] | Should -Match ([regex]::Escape("#{?client_prefix,$Love,$Iris}"))
+        # Session pill: prefix turns the accent love, otherwise pine.
+        $opt['status-left'] | Should -Match ([regex]::Escape("#{?client_prefix,$Love,$Pine}"))
         $opt['status-left'] | Should -Match '#S'
         $opt['status-left'] | Should -Not -Match '#W'
         # Directory pill basename + one terminal-edge safety cell.
