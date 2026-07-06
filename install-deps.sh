@@ -41,7 +41,13 @@ FZF_TAB_COMMIT="d7e0234614dbe5369fdd760907d12c0e05a4dccc"
 ZSH_AUTOSUGGESTIONS_VERSION="v0.7.1"
 ZSH_AUTOSUGGESTIONS_COMMIT="e52ee8ca55bcc56a17c828767a3f98f22a68d4eb"
 TPM_COMMIT="e261deb1b47614eed3400089ce7197dc68acc4eb"
-ROSE_PINE_TMUX_COMMIT="b6138c51573425ccdc33c91464597323baec3b7e"
+# Functional tmux plugins (Omer-style set). The Rose Pine status bar is NOT a
+# plugin here -- it is a repo-owned generated config (tmux/psmux-rose-pine.ps1),
+# so rose-pine/tmux is no longer installed.
+TMUX_SENSIBLE_COMMIT="25cb91f42d020f675bb0a2ce3fbd3a5d96119efa"
+TMUX_YANK_COMMIT="acfd36e4fcba99f8310a7dfb432111c242fe7392"
+TMUX_RESURRECT_COMMIT="cff343cf9e81983d3da0c8562b01616f12e8d548"
+TMUX_CONTINUUM_COMMIT="0698e8f4b17d6454c71bf5212895ec055c578da0"
 HACK_NERD_FONT_VERSION="v3.4.0"
 HACK_NERD_FONT_SHA256="8ca33a60c791392d872b80d26c42f2bfa914a480f9eb2d7516d9f84373c36897"
 # Ghostty on Ubuntu: we pin + SHA-256 verify the mkasberg/ghostty-ubuntu
@@ -1931,20 +1937,24 @@ install_tmux_plugin_repo() {
 }
 
 install_tmux_plugins() {
-    # POSIX tmux loads TPM + rose-pine/tmux from tmux.posix.conf. The shared
-    # tmux.conf keeps only cross-platform placement; missing plugins are a real
-    # provisioning failure because no local fallback owns the rich status bar.
-    local root tpm_dir rosepine_dir rc=0
+    # POSIX tmux loads TPM + the functional plugins (sensible/yank/resurrect/
+    # continuum) from tmux.posix.conf. The Rose Pine status bar is a repo-owned
+    # generated config, NOT a plugin, so rose-pine/tmux is no longer installed.
+    # Missing plugins are a real provisioning failure (session save/restore and
+    # sane defaults depend on them), so this fails closed.
+    local root tpm_dir rc=0
     root="$(tmux_plugin_root)"
     tpm_dir="$root/tpm"
-    rosepine_dir="$root/tmux"
 
     if tmux_plugin_ok "$tpm_dir" "$TPM_COMMIT" "tpm" &&
-        tmux_plugin_ok "$rosepine_dir" "$ROSE_PINE_TMUX_COMMIT" "rose-pine.tmux"; then
+        tmux_plugin_ok "$root/tmux-sensible" "$TMUX_SENSIBLE_COMMIT" "sensible.tmux" &&
+        tmux_plugin_ok "$root/tmux-yank" "$TMUX_YANK_COMMIT" "yank.tmux" &&
+        tmux_plugin_ok "$root/tmux-resurrect" "$TMUX_RESURRECT_COMMIT" "resurrect.tmux" &&
+        tmux_plugin_ok "$root/tmux-continuum" "$TMUX_CONTINUUM_COMMIT" "continuum.tmux"; then
         printf "  ok        %-26s pinned refs already installed\n" "tmux plugins"
         return 0
     fi
-    if ! ask "Install TPM + rose-pine/tmux (repo-managed pinned refs)?"; then
+    if ! ask "Install TPM + tmux-sensible/yank/resurrect/continuum (repo-managed pinned refs)?"; then
         printf "  skipped   %-26s\n" "tmux plugins"
         return 0
     fi
@@ -1956,11 +1966,29 @@ install_tmux_plugins() {
         "tpm" \
         "tpm" || rc=1
     install_tmux_plugin_repo \
-        "rose-pine/tmux" \
-        "https://github.com/rose-pine/tmux.git" \
-        "$ROSE_PINE_TMUX_COMMIT" \
-        "tmux" \
-        "rose-pine.tmux" || rc=1
+        "tmux-sensible" \
+        "https://github.com/tmux-plugins/tmux-sensible.git" \
+        "$TMUX_SENSIBLE_COMMIT" \
+        "tmux-sensible" \
+        "sensible.tmux" || rc=1
+    install_tmux_plugin_repo \
+        "tmux-yank" \
+        "https://github.com/tmux-plugins/tmux-yank.git" \
+        "$TMUX_YANK_COMMIT" \
+        "tmux-yank" \
+        "yank.tmux" || rc=1
+    install_tmux_plugin_repo \
+        "tmux-resurrect" \
+        "https://github.com/tmux-plugins/tmux-resurrect.git" \
+        "$TMUX_RESURRECT_COMMIT" \
+        "tmux-resurrect" \
+        "resurrect.tmux" || rc=1
+    install_tmux_plugin_repo \
+        "tmux-continuum" \
+        "https://github.com/tmux-plugins/tmux-continuum.git" \
+        "$TMUX_CONTINUUM_COMMIT" \
+        "tmux-continuum" \
+        "continuum.tmux" || rc=1
     if [[ "$rc" -ne 0 ]]; then
         printf "  FAIL: %-26s one or more pinned tmux plugins failed to install\n" "tmux plugins" >&2
     fi
@@ -3423,12 +3451,14 @@ install_scan_present() {
                 zsh_plugin_ok "$autosuggestions_dir" "$ZSH_AUTOSUGGESTIONS_COMMIT" "zsh-autosuggestions.zsh"
             ;;
         tmux-plugins)
-            local root tpm_dir rosepine_dir
+            local root tpm_dir
             root="$(tmux_plugin_root)"
             tpm_dir="$root/tpm"
-            rosepine_dir="$root/tmux"
             tmux_plugin_ok "$tpm_dir" "$TPM_COMMIT" "tpm" &&
-                tmux_plugin_ok "$rosepine_dir" "$ROSE_PINE_TMUX_COMMIT" "rose-pine.tmux"
+                tmux_plugin_ok "$root/tmux-sensible" "$TMUX_SENSIBLE_COMMIT" "sensible.tmux" &&
+                tmux_plugin_ok "$root/tmux-yank" "$TMUX_YANK_COMMIT" "yank.tmux" &&
+                tmux_plugin_ok "$root/tmux-resurrect" "$TMUX_RESURRECT_COMMIT" "resurrect.tmux" &&
+                tmux_plugin_ok "$root/tmux-continuum" "$TMUX_CONTINUUM_COMMIT" "continuum.tmux"
             ;;
         *)
             return 1
@@ -3448,7 +3478,7 @@ install_scan_version() {
             return
             ;;
         tmux-plugins)
-            printf '%s\n' "tpm:${TPM_COMMIT}/rose-pine:${ROSE_PINE_TMUX_COMMIT}"
+            printf '%s\n' "tpm:${TPM_COMMIT}/sensible:${TMUX_SENSIBLE_COMMIT}/yank:${TMUX_YANK_COMMIT}/resurrect:${TMUX_RESURRECT_COMMIT}/continuum:${TMUX_CONTINUUM_COMMIT}"
             return
             ;;
         compiler)

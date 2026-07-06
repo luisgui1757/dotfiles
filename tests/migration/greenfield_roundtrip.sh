@@ -68,6 +68,9 @@ managed_rels_for_host() {
             cat <<'EOF'
 .tmux.conf
 .tmux.posix.conf
+.tmux.rose-pine.dawn.conf
+.tmux.rose-pine.main.conf
+.tmux.rose-pine.moon.conf
 .config/lsd/colors.yaml
 .config/lsd/config.yaml
 .config/nvim
@@ -82,6 +85,9 @@ EOF
             cat <<'EOF'
 .tmux.conf
 .tmux.posix.conf
+.tmux.rose-pine.dawn.conf
+.tmux.rose-pine.main.conf
+.tmux.rose-pine.moon.conf
 .config/ghostty/config
 .config/lazygit/config.yml
 .config/lsd/colors.yaml

@@ -128,33 +128,42 @@ if ! printf '%s\n' "$copy_keys" | grep -Eq 'copy-mode-vi[[:space:]]+y[[:space:]]
 fi
 echo "  copy-mode-vi y baseline bound (bare OSC52, no shell probe)"
 
-# Sourcing the POSIX overlay re-binds `y` to the platform's native clipboard CLI.
-# On macOS that is pbcopy; assert it there (Linux CI has no single guaranteed
-# CLI installed). This proves the extracted if-shell probes still work on POSIX.
+# Deploy the generated Rose Pine configs into the isolated HOME so the overlay's
+# `source-file ~/.tmux.rose-pine.main.conf` resolves (mirrors a real chezmoi
+# apply). This also lets us assert the Omer bar actually applies below.
+cp "$REPO_ROOT/tmux/psmux-rose-pine.main.conf" "$HOME/.tmux.rose-pine.main.conf"
+cp "$REPO_ROOT/tmux/psmux-rose-pine.moon.conf" "$HOME/.tmux.rose-pine.moon.conf"
+cp "$REPO_ROOT/tmux/psmux-rose-pine.dawn.conf" "$HOME/.tmux.rose-pine.dawn.conf"
+
+# Sourcing the POSIX overlay declares the functional plugins + session options,
+# sources the generated Rose Pine bar, and re-binds `y` to the platform's native
+# clipboard CLI. On macOS that is pbcopy; assert it there (Linux CI has no single
+# guaranteed CLI installed).
 tmux -L "$sock_name" source-file "$REPO_ROOT/tmux/tmux.posix.conf"
-check @plugin "rose-pine/tmux"
+posix_conf="$REPO_ROOT/tmux/tmux.posix.conf"
 for required in \
     "set-environment -g TMUX_PLUGIN_MANAGER_PATH \"~/.local/share/dotfiles/tmux-plugins\"" \
     "set -g @plugin 'tmux-plugins/tpm'" \
-    "set -g @plugin 'rose-pine/tmux'" \
+    "set -g @plugin 'tmux-plugins/tmux-sensible'" \
+    "set -g @plugin 'tmux-plugins/tmux-yank'" \
+    "set -g @plugin 'tmux-plugins/tmux-resurrect'" \
+    "set -g @plugin 'tmux-plugins/tmux-continuum'" \
     "run-shell \"\$HOME/.local/share/dotfiles/tmux-plugins/tpm/tpm\""; do
-    if ! grep -F "$required" "$REPO_ROOT/tmux/tmux.posix.conf" >/dev/null; then
+    if ! grep -F "$required" "$posix_conf" >/dev/null; then
         echo "FAIL: tmux.posix.conf missing required plugin line: $required"
         exit 1
     fi
 done
-check @rose_pine_variant main
-check @rose_pine_user on
-check @rose_pine_host on
-check @rose_pine_hostname_short on
-check @rose_pine_date_time "%a %d %b %H:%M"
-check @rose_pine_directory on
-check @rose_pine_show_current_program on
-if [[ "$(show "@rose_pine_show_pane_directory")" == "on" ]]; then
-    echo "FAIL: tmux.posix.conf must not enable the mutually-exclusive pane-directory window-name mode"
+# rose-pine/tmux must be fully retired: the bar is a repo-owned generated config.
+if grep -F "rose-pine/tmux" "$posix_conf" >/dev/null; then
+    echo "FAIL: tmux.posix.conf must not reference rose-pine/tmux anymore"
     exit 1
 fi
-echo "  rose-pine/tmux rich modules configured"
+check @rosepine-variant main
+check @continuum-restore on
+check @resurrect-strategy-nvim session
+check @continuum-save-interval 15
+echo "  functional plugins + session save/restore configured"
 if [[ "$(uname -s)" == "Darwin" ]]; then
     overlay_keys="$(tmux -L "$sock_name" list-keys -T copy-mode-vi)"
     if ! printf '%s\n' "$overlay_keys" | grep -Eq 'copy-mode-vi[[:space:]]+y[[:space:]]+send.*copy-pipe-and-cancel.*pbcopy'; then
@@ -163,6 +172,63 @@ if [[ "$(uname -s)" == "Darwin" ]]; then
     fi
     echo "  tmux.posix.conf overlay rebinds y -> pbcopy on macOS"
 fi
+
+# End-to-end: sourcing the overlay above pulled in the generated Rose Pine bar
+# (variant main). Assert it actually applied the Omer-shaped bar (session pill
+# left, zoom-aware current window, directory pill right). This is the POSIX proof
+# that the generated artifact is not just byte-stable but valid tmux that applies.
+check status-style "fg=#908caa,bg=default"
+if ! show status-left | grep -q '#26233a'; then
+    echo "FAIL: Rose Pine main status-left must render the main overlay pill"; exit 1
+fi
+if ! show status-left | grep -q '#S'; then
+    echo "FAIL: Rose Pine status-left must render the session pill (#S)"; exit 1
+fi
+if show status-left | grep -q '#W'; then
+    echo "FAIL: Rose Pine status-left must not duplicate window names (#W belongs to the window list)"; exit 1
+fi
+if ! show window-status-current-format | grep -q 'window_zoomed_flag'; then
+    echo "FAIL: current window cell must carry the zoom marker"; exit 1
+fi
+if ! show window-status-current-format | grep -q '#f6c177'; then
+    echo "FAIL: current window number segment must fill gold"; exit 1
+fi
+if ! show status-right | grep -q 'b:pane_current_path'; then
+    echo "FAIL: status-right must render the directory pill (basename)"; exit 1
+fi
+if [[ "$(show status-right)" != *' ' ]]; then
+    echo "FAIL: status-right must keep one trailing safety cell"; exit 1
+fi
+echo "  generated Rose Pine bar applies (Omer-shaped pill bar)"
+
+# Live variant switch must PERSIST across repeated sourcing. The overlay uses
+# `set -go @rosepine-variant` (only-if-unset), so a user's `tmux set -g
+# @rosepine-variant moon` is NOT clobbered back to main every time the overlay is
+# re-sourced. Distinguish variants by the generated pill overlay color (main
+# #26233a vs moon #393552) because the status canvas uses bg=default so terminal
+# transparency can show through. Re-sourcing an already-set `-go` option makes
+# tmux `source-file` exit nonzero ("already set"), which is expected -- the
+# point is that the value is preserved -- so tolerate the nonzero exit with
+# `|| true`.
+check @rosepine-variant main
+check status-style "fg=#908caa,bg=default"
+tmux -L "$sock_name" set -g @rosepine-variant moon
+tmux -L "$sock_name" source-file "$REPO_ROOT/tmux/tmux.posix.conf" || true
+check @rosepine-variant moon
+check status-style "fg=#908caa,bg=default"
+if ! show status-left | grep -q '#393552'; then
+    echo "FAIL: moon variant must repaint the generated pill overlay"; exit 1
+fi
+tmux -L "$sock_name" source-file "$REPO_ROOT/tmux/tmux.posix.conf" || true
+if [[ "$(show @rosepine-variant)" != "moon" ]]; then
+    echo "FAIL: @rosepine-variant snapped back to main on re-source (set -go regressed to set -g)"; exit 1
+fi
+if [[ "$(show status-left)" != *"#393552"* ]]; then
+    echo "FAIL: re-sourcing repainted the main bar; moon must persist"; exit 1
+fi
+# Restore the default so downstream assertions (if any) see main again.
+tmux -L "$sock_name" set -g @rosepine-variant main
+echo "  @rosepine-variant persists across repeated source (set -go, not clobbered)"
 
 # Prove the shared config's tilde overlay source lines actually load an overlay
 # from HOME. This catches quoted-tilde regressions that real tmux tolerates less
