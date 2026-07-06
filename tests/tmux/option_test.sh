@@ -198,6 +198,30 @@ if [[ "$(show status-right)" != *' ' ]]; then
 fi
 echo "  generated Rose Pine bar applies (Omer-shaped pill bar)"
 
+# Live variant switch must PERSIST across repeated sourcing. The overlay uses
+# `set -go @rosepine-variant` (only-if-unset), so a user's `tmux set -g
+# @rosepine-variant moon` is NOT clobbered back to main every time the overlay is
+# re-sourced. Distinguish variants by the status-style background (main base
+# #191724 vs moon base #232136). Re-sourcing an already-set `-go` option makes
+# tmux `source-file` exit nonzero ("already set"), which is expected -- the point
+# is that the value is preserved -- so tolerate the nonzero exit with `|| true`.
+check @rosepine-variant main
+check status-style "fg=#908caa,bg=#191724"
+tmux -L "$sock_name" set -g @rosepine-variant moon
+tmux -L "$sock_name" source-file "$REPO_ROOT/tmux/tmux.posix.conf" || true
+check @rosepine-variant moon
+check status-style "fg=#908caa,bg=#232136"
+tmux -L "$sock_name" source-file "$REPO_ROOT/tmux/tmux.posix.conf" || true
+if [[ "$(show @rosepine-variant)" != "moon" ]]; then
+    echo "FAIL: @rosepine-variant snapped back to main on re-source (set -go regressed to set -g)"; exit 1
+fi
+if [[ "$(show status-style)" != "fg=#908caa,bg=#232136" ]]; then
+    echo "FAIL: re-sourcing repainted the main bar; moon must persist"; exit 1
+fi
+# Restore the default so downstream assertions (if any) see main again.
+tmux -L "$sock_name" set -g @rosepine-variant main
+echo "  @rosepine-variant persists across repeated source (set -go, not clobbered)"
+
 # Prove the shared config's tilde overlay source lines actually load an overlay
 # from HOME. This catches quoted-tilde regressions that real tmux tolerates less
 # strictly than psmux, and prevents the Windows overlay from silently disappearing.

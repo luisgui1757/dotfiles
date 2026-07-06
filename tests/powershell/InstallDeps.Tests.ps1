@@ -2471,7 +2471,7 @@ Describe "psmux session plugin provisioning" {
         ($script:InstallFailures | Where-Object { $_.Tool -eq 'psmux plugins' }).Count | Should -BeGreaterThan 0
     }
 
-    It "is a no-op (no git) when both ports are already pinned" {
+    It "is a no-op (no git) when psmux-resurrect is already pinned" {
         . $script:ImportInstallDepsForTest
         $script:GitCalled = $false
         Mock -CommandName git -MockWith { $script:GitCalled = $true }
@@ -2479,12 +2479,10 @@ Describe "psmux session plugin provisioning" {
         try {
             $env:USERPROFILE = (Join-Path ([System.IO.Path]::GetTempPath()) ([System.Guid]::NewGuid().ToString('N')))
             $root = Get-PsmuxPluginRoot
-            foreach ($name in 'psmux-resurrect', 'psmux-continuum') {
-                $d = Join-Path $root $name
-                New-Item -ItemType Directory -Path $d -Force | Out-Null
-                Set-Content -LiteralPath (Join-Path $d 'plugin.conf') -Value 'x'
-                Set-Content -LiteralPath (Join-Path $d '.pinned-commit') -Value $PsmuxPluginsCommit -NoNewline
-            }
+            $d = Join-Path $root 'psmux-resurrect'
+            New-Item -ItemType Directory -Path $d -Force | Out-Null
+            Set-Content -LiteralPath (Join-Path $d 'plugin.conf') -Value 'x'
+            Set-Content -LiteralPath (Join-Path $d '.pinned-commit') -Value $PsmuxPluginsCommit -NoNewline
             Install-PsmuxPlugins
         } finally {
             if ($env:USERPROFILE -and (Test-Path $env:USERPROFILE)) { Remove-Item -Recurse -Force $env:USERPROFILE -ErrorAction SilentlyContinue }
@@ -2492,5 +2490,27 @@ Describe "psmux session plugin provisioning" {
         }
         $script:GitCalled | Should -BeFalse
         $script:InstallFailures.Count | Should -Be 0
+    }
+
+    It "never vendors psmux-continuum (blocked pending real Windows verification)" {
+        . $script:ImportInstallDepsForTest
+        # continuum is a documented blocker, so the vendor must never create a
+        # psmux-continuum directory. The mocked fetch produces no real checkout,
+        # so this fails closed, but the point is it never touches continuum.
+        Mock -CommandName Ask -MockWith { $true }
+        Mock -CommandName git -MockWith {
+            if ($args -contains 'rev-parse') { return $PsmuxPluginsCommit }
+            $global:LASTEXITCODE = 0
+        }
+        $oldUser = $env:USERPROFILE
+        try {
+            $env:USERPROFILE = (Join-Path ([System.IO.Path]::GetTempPath()) ([System.Guid]::NewGuid().ToString('N')))
+            $root = Get-PsmuxPluginRoot
+            Install-PsmuxPlugins
+            (Test-Path -LiteralPath (Join-Path $root 'psmux-continuum')) | Should -BeFalse
+        } finally {
+            if ($env:USERPROFILE -and (Test-Path $env:USERPROFILE)) { Remove-Item -Recurse -Force $env:USERPROFILE -ErrorAction SilentlyContinue }
+            $env:USERPROFILE = $oldUser
+        }
     }
 }

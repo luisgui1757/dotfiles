@@ -1470,30 +1470,40 @@ host OS or shell would otherwise hide a branch from CI.
   before sourcing `~/.tmux.conf` (psmux's pre-server warm check shallow-scans only
   the first config file and could otherwise claim a stale warm server), then
   flag-free `source-file`s `~/.tmux.windows.conf` (psmux v3.3.x does not implement
-  tmux's `source-file -q`). `tmux/tmux.windows.conf` source-files the vendored
-  psmux ports `~/.psmux/plugins/psmux-resurrect/plugin.conf` and
-  `~/.psmux/plugins/psmux-continuum/plugin.conf` (resurrect first — continuum
-  requires it) and sets `@continuum-restore on`. `install-deps.ps1`'s
-  `Install-PsmuxPlugins` vendors those ports from the `psmux/psmux-plugins`
-  monorepo at pinned commit `0f46ccca5a9b748fd03851db00b85fd784f42791` into
-  `~/.psmux/plugins/` (the plugin.conf files hardcode that path). We deliberately
-  do NOT use PPM: it clones the monorepo HEAD (unpinned) and its
-  `Persist-PluginActivation` rewrites `~/.psmux.conf`/`~/.tmux.conf`, which would
-  corrupt the chezmoi byte-parity model. There is NO `psmux-yank` port at that
-  pin (verified), so native-Windows yank stays the `clip.exe` copy-mode binding in
-  `tmux/tmux.windows.conf`. `psmux-sensible` is intentionally NOT sourced: its
-  `plugin.conf` is unconditional `set -g` (unlike the conditional `tmux-sensible`)
-  and would clobber our tuned shared `tmux.conf` (e.g. `escape-time`).
+  tmux's `source-file -q`). `tmux/tmux.windows.conf` source-files ONLY the vendored
+  `~/.psmux/plugins/psmux-resurrect/plugin.conf` (its plugin.conf adds two
+  keybinds — `Prefix+Ctrl-s`/`Prefix+Ctrl-r` — at load, no auto hooks).
+  `install-deps.ps1`'s `Install-PsmuxPlugins` vendors ONLY that port from the
+  `psmux/psmux-plugins` monorepo at pinned commit
+  `0f46ccca5a9b748fd03851db00b85fd784f42791` into `~/.psmux/plugins/` (the
+  plugin.conf hardcodes that path). We deliberately do NOT use PPM: it clones the
+  monorepo HEAD (unpinned) and its `Persist-PluginActivation` rewrites
+  `~/.psmux.conf`/`~/.tmux.conf`, which would corrupt the chezmoi byte-parity
+  model. At that pin there is no active top-level `psmux-yank` port (only a
+  retired `_trash/psmux-yank`), so native-Windows yank stays the `clip.exe`
+  copy-mode binding in `tmux/tmux.windows.conf`. `psmux-sensible` is intentionally
+  NOT sourced: its `plugin.conf` is unconditional `set -g` (unlike the conditional
+  `tmux-sensible`) and would clobber our tuned shared `tmux.conf` (e.g.
+  `escape-time`).
   The Windows overlay must not reintroduce `@plugin`/PPM or a plugin-root `run`
   (source-file of a pinned plugin.conf is the allowed mechanism); keep
   `tmux/psmux.conf` Windows-only and mirrored to `home/dot_psmux.conf`.
-  **MANUAL WINDOWS VERIFICATION GAP:** `psmux-continuum/plugin.conf` registers
-  load-time `set-hook -g session-created`/`client-attached` that `run-shell` pwsh
-  scripts. `run-shell` is async/non-blocking (unlike the synchronous `if-shell`
-  freeze class), so this is expected safe, but it was NOT validated on a real
-  Windows psmux host (the change was authored on macOS). Smoke-test on Windows:
-  open psmux, confirm panes render without freezing, `psmux show-hooks -g`, and
-  `Prefix+Ctrl-s`/`Prefix+Ctrl-r` for manual resurrect save/restore.
+  **`psmux-continuum` is BLOCKED on Windows, not shipped.** Its `plugin.conf`
+  registers load-time `set-hook -g session-created`/`client-attached` that
+  `run-shell` pwsh (auto-save loop + auto-restore). Although `run-shell` is async
+  (not the synchronous `if-shell` freeze class), it was NEVER validated on a real
+  Windows psmux host (authored on macOS), so it is deliberately not vendored, not
+  source-filed, and `@continuum-restore`/`@continuum-save-interval` are absent from
+  the Windows overlay (guarded by `windows_conf_test.sh` reject rules). Do NOT
+  ship it until someone proves on real Windows psmux that its hooks do not freeze
+  ConPTY, do not spawn runaway pwsh loops, and survive restart/reattach. Follow-up
+  smoke-test to unblock: open psmux, confirm panes render without freezing,
+  `psmux show-hooks -g`, and Prefix+Ctrl-s/Prefix+Ctrl-r for manual resurrect
+  save/restore first. POSIX tmux keeps `tmux-continuum` (testable on Linux).
+  POSIX `@rosepine-variant` uses `set -go` (only-if-unset) so a live
+  `tmux set -g @rosepine-variant moon` survives repeated re-sourcing of the
+  overlay instead of snapping back to main (matches Windows; guarded by
+  `option_test.sh`).
   Current pins: TPM `e261deb1b47614eed3400089ce7197dc68acc4eb`, `tmux-sensible`
   `25cb91f42d020f675bb0a2ce3fbd3a5d96119efa`, `tmux-yank`
   `acfd36e4fcba99f8310a7dfb432111c242fe7392`, `tmux-resurrect`

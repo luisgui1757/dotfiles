@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Static guards for the Windows-only psmux overlay, its repo-owned Rose Pine
 # renderer (an Omer/Catppuccin-shaped pill bar -- see tmux/psmux-rose-pine.ps1),
-# and the vendored psmux session plugins it source-files.
+# and the vendored psmux-resurrect plugin it source-files (continuum is blocked
+# pending real Windows psmux verification).
 set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 
@@ -51,10 +52,11 @@ require_line '^set[[:space:]]+-g[[:space:]]+pwsh-mouse-selection[[:space:]]+off$
 require_line '^set[[:space:]]+-g[[:space:]]+scroll-enter-copy-mode[[:space:]]+on$' \
     'tmux.windows.conf must keep wheel-scroll copy-mode'
 
-# Native-Windows yank: the psmux ecosystem has no psmux-yank port, so clip.exe is
-# the deterministic Windows clipboard.
+# Native-Windows yank: at the pinned psmux/psmux-plugins commit there is no active
+# top-level psmux-yank port (only a retired _trash/psmux-yank), so clip.exe is the
+# deterministic Windows clipboard.
 require_line '^bind[[:space:]]+-T[[:space:]]+copy-mode-vi[[:space:]]+y[[:space:]]+send[[:space:]]+-X[[:space:]]+copy-pipe-and-cancel[[:space:]]+"clip\.exe"$' \
-    'tmux.windows.conf must keep the clip.exe copy-mode yank (no psmux-yank port exists)'
+    'tmux.windows.conf must keep the clip.exe copy-mode yank (no active psmux-yank port at the pin)'
 
 # Rose Pine renderer wiring: default variant + source generated psmux configs.
 require_line "^set[[:space:]]+-go[[:space:]]+@rosepine-variant[[:space:]]+'main'$" \
@@ -74,23 +76,21 @@ reject_line "^run[[:space:]]+'~/\.tmux\.rose-pine\.ps1'$" \
 reject_line 'set-hook[[:space:]]+-g[[:space:]]+client-attached.*\.tmux\.rose-pine' \
     'tmux.windows.conf must not rely on client-attached to apply startup Rose Pine'
 
-# Vendored psmux session plugins (resurrect + continuum), source-filed directly
-# from their pinned checkout under ~/.psmux/plugins/. We do NOT use PPM (it
-# clones monorepo HEAD and rewrites managed config), and we do NOT declare
-# @plugin lines here.
+# Vendored psmux-resurrect ONLY, source-filed directly from its pinned checkout
+# under ~/.psmux/plugins/. We do NOT use PPM (it clones monorepo HEAD and rewrites
+# managed config), and we do NOT declare @plugin lines here.
 require_line '^source-file[[:space:]]+~/\.psmux/plugins/psmux-resurrect/plugin\.conf$' \
     'tmux.windows.conf must source the vendored psmux-resurrect plugin.conf'
-require_line '^source-file[[:space:]]+~/\.psmux/plugins/psmux-continuum/plugin\.conf$' \
-    'tmux.windows.conf must source the vendored psmux-continuum plugin.conf'
-require_line "^set[[:space:]]+-g[[:space:]]+@continuum-restore[[:space:]]+'on'$" \
-    'tmux.windows.conf must enable continuum auto-restore'
-# continuum requires resurrect: resurrect must be sourced first.
-resurrect_line="$(grep -nE '^source-file ~/\.psmux/plugins/psmux-resurrect/plugin\.conf$' "$WIN_CONF" | head -1 | cut -d: -f1)"
-continuum_line="$(grep -nE '^source-file ~/\.psmux/plugins/psmux-continuum/plugin\.conf$' "$WIN_CONF" | head -1 | cut -d: -f1)"
-if [[ -z "$resurrect_line" || -z "$continuum_line" || "$resurrect_line" -ge "$continuum_line" ]]; then
-    echo "FAIL: tmux.windows.conf must source psmux-resurrect before psmux-continuum"
-    exit 1
-fi
+# psmux-continuum is BLOCKED pending real Windows psmux verification: its
+# plugin.conf registers load-time async run-shell hooks that were never validated
+# on a Windows host. It must not be shipped in the Windows overlay (POSIX tmux
+# still gets tmux-continuum, which is testable on Linux).
+reject_line '^source-file[[:space:]]+~/\.psmux/plugins/psmux-continuum/' \
+    'tmux.windows.conf must NOT source psmux-continuum (blocked pending Windows verification)'
+reject_line '^set[[:space:]]+-g[[:space:]]+@continuum-restore' \
+    'tmux.windows.conf must NOT enable continuum auto-restore (blocked pending Windows verification)'
+reject_line '^set[[:space:]]+-g[[:space:]]+@continuum-save-interval' \
+    'tmux.windows.conf must NOT set a continuum save interval (blocked pending Windows verification)'
 
 # The community powerline plugin must not come back, and PPM must not be used:
 # PPM clones the monorepo HEAD (unpinned) and rewrites managed config files.

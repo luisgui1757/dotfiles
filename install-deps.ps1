@@ -30,9 +30,10 @@ $PylatexencBuildBackendVersion = '80.9.0'
 $PylatexencBuildBackendSha256 = '062d34222ad13e0cc312a4c02d73f059e86a4acbfbdea8f8f76b28c99f306922'
 $PylatexencVersion = '2.10'
 $PylatexencSha256 = '3dd8fd84eb46dc30bee1e23eaab8d8fb5a7f507347b23e5f38ad9675c84f40d3'
-# psmux session plugins (resurrect + continuum) are vendored from the
-# psmux/psmux-plugins monorepo at this immutable commit. We do NOT use PPM: it
-# clones the monorepo HEAD (unpinned) and rewrites managed config files.
+# psmux session plugin (resurrect only) is vendored from the psmux/psmux-plugins
+# monorepo at this immutable commit. We do NOT use PPM: it clones the monorepo
+# HEAD (unpinned) and rewrites managed config files. (psmux-continuum is blocked
+# pending real Windows psmux verification -- see Install-PsmuxPlugins.)
 $PsmuxPluginsCommit = '0f46ccca5a9b748fd03851db00b85fd784f42791'
 
 # ---- Package-manager detection + scoop bootstrap -----------------------------
@@ -2412,17 +2413,23 @@ function Install-Psmux {
     $script:InstallFailures += [pscustomobject]@{ Tool='psmux'; Pm='scoop/winget/choco'; Pkg='psmux'; ExitCode=$LASTEXITCODE }
 }
 
-# ---- psmux session plugins (resurrect + continuum), vendored + pinned --------
-# The psmux plugin PORTS live in the psmux/psmux-plugins monorepo. We vendor them
-# at an immutable pinned commit and source their plugin.conf directly from
-# tmux/tmux.windows.conf -- the same "vendor + source, skip the plugin manager"
-# pattern the Rose Pine renderer uses. We deliberately do NOT use PPM: it clones
-# the monorepo HEAD (unpinned) and rewrites managed ~/.psmux.conf / ~/.tmux.conf,
-# which would corrupt the chezmoi byte-parity model. The plugin.conf files
-# hardcode ~/.psmux/plugins/<name>/scripts/, so the vendor location is fixed.
-# There is no psmux-yank at this pin (verified) -- native yank is the clip.exe
-# copy-mode binding in tmux.windows.conf. psmux-continuum requires
-# psmux-resurrect.
+# ---- psmux session plugin (resurrect only), vendored + pinned ----------------
+# The psmux plugin PORTS live in the psmux/psmux-plugins monorepo. We vendor
+# psmux-resurrect at an immutable pinned commit and source its plugin.conf
+# directly from tmux/tmux.windows.conf -- the same "vendor + source, skip the
+# plugin manager" pattern the Rose Pine renderer uses. We deliberately do NOT use
+# PPM: it clones the monorepo HEAD (unpinned) and rewrites managed
+# ~/.psmux.conf / ~/.tmux.conf, which would corrupt the chezmoi byte-parity model.
+# The plugin.conf hardcodes ~/.psmux/plugins/psmux-resurrect/scripts/, so the
+# vendor location is fixed. At this pin there is no active top-level psmux-yank
+# port (only a retired _trash/psmux-yank), so native yank is the clip.exe
+# copy-mode binding in tmux.windows.conf.
+#
+# psmux-continuum is INTENTIONALLY NOT VENDORED. Its plugin.conf registers
+# load-time async run-shell hooks (auto-save/auto-restore) that were never
+# verified on a real Windows psmux host; until that verification proves they do
+# not freeze ConPTY, spawn runaway pwsh loops, or break restart/reattach, it stays
+# a blocked follow-up. POSIX tmux still gets tmux-continuum (testable on Linux).
 function Get-PsmuxPluginRoot {
     $userHome = if ($env:USERPROFILE) { $env:USERPROFILE }
     elseif ($HOME) { $HOME }
@@ -2441,7 +2448,6 @@ function Test-PsmuxPluginPinned {
 function Install-PsmuxPlugins {
     $plugins = @(
         @{ Name = 'psmux-resurrect'; Entry = 'plugin.conf' }
-        @{ Name = 'psmux-continuum'; Entry = 'plugin.conf' }
     )
     $root = Get-PsmuxPluginRoot
 
@@ -2453,12 +2459,12 @@ function Install-PsmuxPlugins {
         Write-Host ("  ok        {0,-26} pinned refs already installed" -f "psmux plugins")
         return
     }
-    if (-not (Ask "Install psmux session plugins (resurrect + continuum, repo-pinned)?")) {
+    if (-not (Ask "Install psmux session plugin (resurrect, repo-pinned)?")) {
         Write-Host ("  skipped   {0,-26}" -f "psmux plugins")
         return
     }
     if ($DryRun) {
-        Write-Host ("  would: git fetch psmux/psmux-plugins @ {0}; vendor resurrect + continuum into {1}" -f $PsmuxPluginsCommit, $root)
+        Write-Host ("  would: git fetch psmux/psmux-plugins @ {0}; vendor resurrect into {1}" -f $PsmuxPluginsCommit, $root)
         return
     }
     if (-not (Get-Command git -ErrorAction SilentlyContinue)) {

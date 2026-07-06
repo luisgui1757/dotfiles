@@ -286,12 +286,16 @@ and whether `pwsh` is installed.
   (`cff343cf9e81983d3da0c8562b01616f12e8d548`), and `tmux-continuum`
   (`0698e8f4b17d6454c71bf5212895ec055c578da0`); session save/restore is on
   (`@continuum-restore on`, `@resurrect-strategy-nvim session`). Windows
-  `install-deps.ps1` vendors the psmux ports (`psmux-resurrect` +
-  `psmux-continuum`) from the `psmux/psmux-plugins` monorepo at pinned commit
+  `install-deps.ps1` vendors ONLY the `psmux-resurrect` port from the
+  `psmux/psmux-plugins` monorepo at pinned commit
   `0f46ccca5a9b748fd03851db00b85fd784f42791` into `~/.psmux/plugins/`, sourced
-  directly by `tmux/tmux.windows.conf`. We do NOT use PPM (it clones the monorepo
-  HEAD unpinned and rewrites managed config), and there is no `psmux-yank` port
-  in that ecosystem (verified at the pinned commit), so native-Windows yank
+  directly by `tmux/tmux.windows.conf`. **`psmux-continuum` is intentionally NOT
+  shipped on Windows** — its `plugin.conf` registers load-time async `run-shell`
+  pwsh hooks that have not been verified on a real Windows psmux host, so it stays
+  a blocked follow-up (POSIX tmux still gets `tmux-continuum`, which is testable
+  on Linux). We do NOT use PPM (it clones the monorepo HEAD unpinned and rewrites
+  managed config), and at the pinned commit there is no active top-level
+  `psmux-yank` port (only a retired `_trash/psmux-yank`), so native-Windows yank
   stays the `clip.exe` copy-mode binding.
 - Windows psmux uses a dedicated `~/.psmux.conf` entrypoint. It disables psmux
   warm sessions before sourcing `~/.tmux.conf`, so psmux cannot claim a stale
@@ -722,13 +726,15 @@ stale; CI then fails verification until a human reviews the adjacent constant.
   v3.3.x does not implement tmux's `source-file -q` config flag. The generated
   status-right and Starship time segment keep one trailing safety space so the
   last visible glyph is not drawn into the terminal's final column.
-- **Session save/restore via resurrect + continuum.** POSIX runs the pinned
-  `tmux-resurrect`/`tmux-continuum` (TPM); Windows psmux vendors the pinned
-  `psmux-resurrect`/`psmux-continuum` ports from `psmux/psmux-plugins`. Auto-save
-  every 15 min, auto-restore on start (`@continuum-restore on`), and the nvim
-  session is restored (`@resurrect-strategy-nvim session`, POSIX). PPM is
-  deliberately unused (it clones monorepo HEAD unpinned and rewrites managed
-  config); the ports are source-filed from a pinned checkout instead.
+- **Session save/restore: full on POSIX, resurrect-only on Windows.** POSIX runs
+  the pinned `tmux-resurrect` + `tmux-continuum` (TPM): auto-save every 15 min,
+  auto-restore on start (`@continuum-restore on`), nvim session restored
+  (`@resurrect-strategy-nvim session`). Windows psmux vendors ONLY the pinned
+  `psmux-resurrect` port (manual `Prefix+Ctrl-s` / `Prefix+Ctrl-r`);
+  `psmux-continuum` is intentionally blocked pending real Windows psmux
+  verification of its load-time async `run-shell` hooks. PPM is deliberately
+  unused (it clones monorepo HEAD unpinned and rewrites managed config); the port
+  is source-filed from a pinned checkout instead.
 - **WSL is split-host by default.** Windows Terminal renders fonts and window UI
   on the Windows side; WSL installs the Linux CLI/editor stack. Linux Ghostty
   and Linux fontconfig fonts in WSL require `--experimental-wsl-gui`.
