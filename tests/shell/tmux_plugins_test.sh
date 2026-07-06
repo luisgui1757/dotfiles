@@ -49,8 +49,10 @@ done
 # The bar is the repo-owned generated config, sourced (not a theme plugin).
 grep -Eq '^source-file ~/\.tmux\.rose-pine\.main\.conf$' "$posix_conf" \
     || { echo "FAIL: tmux.posix.conf must source the generated Rose Pine main config"; exit 1; }
-grep -F "set -g @plugin 'rose-pine/tmux'" "$posix_conf" >/dev/null \
-    && { echo "FAIL: tmux.posix.conf must not declare rose-pine/tmux anymore"; exit 1; } || true
+if grep -F "set -g @plugin 'rose-pine/tmux'" "$posix_conf" >/dev/null; then
+    echo "FAIL: tmux.posix.conf must not declare rose-pine/tmux anymore"
+    exit 1
+fi
 
 # A failed plugin install is a hard provisioning failure: without the functional
 # plugins, session save/restore and sane defaults silently vanish. install must

@@ -428,6 +428,9 @@ PSScriptAnalyzer runs at `Warning,Error`, yamllint/parser checks are part of
 under `CI=true`, and Windows CI treats missing test dependencies as fatal.
 PSGallery module installs in Windows CI use bounded retries for transient
 gallery lookup failures; the final miss still fails the job.
+Shell tests use explicit `if`/`then` control flow for negative assertions; do not
+write `grep ... && fail || true` guards because Ubuntu ShellCheck flags `SC2015`
+and the compact form has ambiguous failure semantics.
 
 `e2e-install.yml` is the required real-install gate. The jobs cover different
 install paths, not symmetric container platforms:
