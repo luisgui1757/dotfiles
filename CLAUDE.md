@@ -1450,7 +1450,10 @@ host OS or shell would otherwise hide a branch from CI.
   safety space after the status-right directory so the final cell is not clipped
   by Windows Terminal/ConPTY. The normal session pill accent is Rose Pine `foam`
   (not `iris`, which reads too close to Catppuccin purple in this layout);
-  holding the prefix changes it to `love`. Default variant `main`, plus `moon`/`dawn`, selected
+  holding the prefix changes it to `love`. The empty status canvas and pill
+  outside-cap backgrounds MUST use `bg=default` so terminal transparency shows
+  through; only pill interiors should carry explicit Rose Pine backgrounds.
+  Default variant `main`, plus `moon`/`dawn`, selected
   by `@rosepine-variant` on BOTH platforms. `tmux/psmux-rose-pine.ps1` MUST stay
   pure ASCII (PS 5.1 parse safety, guarded by `invariants_test.sh`); the Nerd Font
   glyphs are built from codepoints at runtime and only the generated `.conf`
@@ -1526,12 +1529,12 @@ host OS or shell would otherwise hide a branch from CI.
   `tests/shell/tmux_plugins_test.sh`, `tests/powershell/PsmuxRosePine.Tests.ps1`,
   `tests/powershell/InstallDeps.Tests.ps1`, `tests/migration/parity_gate.sh`, and
   `tests/static/pin_consistency_test.sh`.
-- **Windows Terminal opacity remains window-wide.** A transparent WT
-  (`opacity < 100`) makes every cell transparent, including tmux/psmux status
-  cells, regardless of the cell background color. Do not chase opacity by
-  recoloring tmux backgrounds. To make the whole terminal solid, set WT
-  `opacity: 100`; otherwise let the upstream themes color foreground/status
-  roles and accept terminal-level transparency.
+- **tmux/psmux status transparency uses default backgrounds.** The generated bar
+  must not paint the whole status canvas with Rose Pine base. Use `bg=default`
+  for `status-style` and the outside rounded-cap backgrounds, and reserve
+  explicit Rose Pine backgrounds for the pill interiors. This keeps the status
+  bar visually attached to Ghostty / Windows Terminal transparency instead of
+  rendering as a solid strip.
 - **`stylua.toml` at repo root is load-bearing.** stylua reads ONLY its own
   config (`stylua.toml` / `.stylua.toml`) -- it does NOT respect
   `.editorconfig`. Its built-in defaults are `indent_type = "Tabs"` and

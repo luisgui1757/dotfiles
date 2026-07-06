@@ -39,13 +39,16 @@ Describe 'psmux-rose-pine renderer' {
         $opt = @{}
         foreach ($c in $cmds) { $opt[$c.Argv[2]] = $c.Argv[3] }
 
-        # Bar background is the variant base; empty regions use it.
-        $opt['status-style'] | Should -Be "fg=$Subtle,bg=$Base"
+        # Bar background uses the terminal default so the empty status surface
+        # follows terminal transparency; only pill interiors get explicit bg.
+        $opt['status-style'] | Should -Be "fg=$Subtle,bg=default"
         # Current window: gold number fill + rounded caps; inactive: muted fill.
         $opt['window-status-current-format'] | Should -Match ([regex]::Escape("bg=$Gold"))
         $opt['window-status-current-format'] | Should -Match ([regex]::Escape($script:CapLeft))
         $opt['window-status-current-format'] | Should -Match ([regex]::Escape($script:CapRight))
+        $opt['window-status-current-format'] | Should -Match ([regex]::Escape("bg=default"))
         $opt['window-status-format'] | Should -Match ([regex]::Escape("bg=$Muted"))
+        $opt['window-status-format'] | Should -Match ([regex]::Escape("bg=default"))
         # Zoom marker on the current window only.
         $opt['window-status-current-format'] | Should -Match ([regex]::Escape('#{?window_zoomed_flag,'))
         $opt['window-status-format'] | Should -Not -Match ([regex]::Escape('window_zoomed_flag'))
@@ -53,11 +56,13 @@ Describe 'psmux-rose-pine renderer' {
         $opt['window-status-separator'] | Should -Be ' '
         # Session pill: prefix turns the accent love, otherwise foam.
         $opt['status-left'] | Should -Match ([regex]::Escape("#{?client_prefix,$Love,$Foam}"))
+        $opt['status-left'] | Should -Match ([regex]::Escape("bg=default"))
         $opt['status-left'] | Should -Match '#S'
         $opt['status-left'] | Should -Not -Match '#W'
         # Directory pill basename + one terminal-edge safety cell.
         $opt['status-right'] | Should -Match ([regex]::Escape('#{b:pane_current_path}'))
         $opt['status-right'] | Should -Match ([regex]::Escape($Rose))
+        $opt['status-right'] | Should -Match ([regex]::Escape("bg=default"))
         $opt['status-right'] | Should -Match ' $'
         # tmux/psmux owns multiplexer context only. Starship owns username,
         # time/path/git; host stays out of the daily surface.
@@ -144,7 +149,7 @@ Describe 'psmux-rose-pine renderer' {
         $cmds = Get-PsmuxRosePineCommand -Variant 'bogus'
         $opt = @{}
         foreach ($c in $cmds) { $opt[$c.Argv[2]] = $c.Argv[3] }
-        $opt['status-style'] | Should -Be 'fg=#908caa,bg=#191724'
+        $opt['status-style'] | Should -Be 'fg=#908caa,bg=default'
     }
 
     It "produces a distinct base color for each of main/moon/dawn" {

@@ -17,6 +17,7 @@ significant change to the relevant area.
 - [ ] **Tmux status bar**: generated Rose Pine bar is at the top, includes the
       signal-bar segments (session, window list/current program, directory
       basename; no user/host/date/time duplication), segments are readable,
+      empty bar space follows terminal transparency,
       prefix is `C-b`,
       `prefix r` reloads the conf and shows the "reloaded" message.
 - [ ] **psmux status bar**: on a fresh `psmux` launch, with no manual command,
@@ -24,8 +25,9 @@ significant change to the relevant area.
       draws the same rounded pill bar as POSIX tmux at the top: session/window
       list on the left, directory basename on the right, foam session accent,
       gold active-window number, muted inactive-window number, icons render, no
-      config warnings, no config-load freeze, no sustained CPU spike, and no
-      clipped final cell at the right edge. Switch flavor:
+      config warnings, empty bar space follows terminal transparency, no
+      config-load freeze, no sustained CPU spike, and no clipped final cell at
+      the right edge. Switch flavor:
       `psmux set -g @rosepine-variant moon; psmux source-file ~/.tmux.windows.conf`.
 - [ ] **Starship prompt**: shows dir, git branch, git status icons
       (untracked/modified/staged), trailing time, and no opaque background

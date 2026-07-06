@@ -209,6 +209,10 @@ for variant in "${ROSEPINE_VARIANTS[@]}"; do
         echo "FAIL: psmux Rose Pine $variant generated config must not emit tmux-only display-panes colour options"
         exit 1
     fi
+    if ! grep -Eq "^set -g status-style 'fg=#[0-9a-f]{6},bg=default'$" "$conf"; then
+        echo "FAIL: psmux Rose Pine $variant status canvas must use bg=default for terminal transparency"
+        exit 1
+    fi
     if [[ "$variant" == "main" ]] && grep -Eq '#\{\?client_prefix,#eb6f92,#(c4a7e7|31748f)\}' "$conf"; then
         echo "FAIL: psmux Rose Pine main session pill must use foam, not iris or pine"
         exit 1

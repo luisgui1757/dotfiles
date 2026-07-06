@@ -95,20 +95,21 @@ function Get-PsmuxRosePineCommand {
     # Session accent turns love while the prefix is held; otherwise use foam
     # for the Omer-style cool accent without the iris/purple cast.
     $sessAccent = "#{?client_prefix,$($p.love),$($p.foam)}"
+    $barBg = 'default'
 
     # status-left: rounded session pill. icon segment (accent bg) + name segment
     # (overlay bg). Trailing space separates it from the window list.
-    $statusLeft = "#[fg=$sessAccent,bg=$($p.base)]$capLeft#[fg=$($p.base),bg=$sessAccent] $iSession #[fg=$($p.text),bg=$($p.overlay)] #S #[fg=$($p.overlay),bg=$($p.base)]$capRight "
+    $statusLeft = "#[fg=$sessAccent,bg=$barBg]$capLeft#[fg=$($p.base),bg=$sessAccent] $iSession #[fg=$($p.text),bg=$($p.overlay)] #S #[fg=$($p.overlay),bg=$barBg]$capRight "
 
     # window cells: name segment (overlay bg) + number segment on the RIGHT
     # (Catppuccin number_position=right, fill=number). Current window fills the
     # number in gold and appends a zoom marker; inactive fills it muted.
-    $winFormat = "#[fg=$($p.overlay),bg=$($p.base)]$capLeft#[fg=$($p.subtle),bg=$($p.overlay)] #W #[fg=$($p.base),bg=$($p.muted)] #I #[fg=$($p.muted),bg=$($p.base)]$capRight"
-    $winCurrentFormat = "#[fg=$($p.overlay),bg=$($p.base)]$capLeft#[fg=$($p.text),bg=$($p.overlay)] #W#{?window_zoomed_flag, $iZoom,} #[fg=$($p.base),bg=$($p.gold)] #I #[fg=$($p.gold),bg=$($p.base)]$capRight"
+    $winFormat = "#[fg=$($p.overlay),bg=$barBg]$capLeft#[fg=$($p.subtle),bg=$($p.overlay)] #W #[fg=$($p.base),bg=$($p.muted)] #I #[fg=$($p.muted),bg=$barBg]$capRight"
+    $winCurrentFormat = "#[fg=$($p.overlay),bg=$barBg]$capLeft#[fg=$($p.text),bg=$($p.overlay)] #W#{?window_zoomed_flag, $iZoom,} #[fg=$($p.base),bg=$($p.gold)] #I #[fg=$($p.gold),bg=$barBg]$capRight"
 
     # status-right: rounded directory pill (basename only). One terminal-edge
     # safety cell so the last visible glyph is not clipped by Windows Terminal.
-    $statusRight = "#[fg=$($p.overlay),bg=$($p.base)]$capLeft#[fg=$($p.subtle),bg=$($p.overlay)] $iFolder #[fg=$($p.rose),bg=$($p.overlay)]#{b:pane_current_path} #[fg=$($p.overlay),bg=$($p.base)]$capRight "
+    $statusRight = "#[fg=$($p.overlay),bg=$barBg]$capLeft#[fg=$($p.subtle),bg=$($p.overlay)] $iFolder #[fg=$($p.rose),bg=$($p.overlay)]#{b:pane_current_path} #[fg=$($p.overlay),bg=$barBg]$capRight "
 
     $cmds = [System.Collections.Generic.List[object]]::new()
     $add = { param([string[]]$Argv) $cmds.Add([pscustomobject]@{ Argv = $Argv }) }
@@ -118,7 +119,7 @@ function Get-PsmuxRosePineCommand {
     # stores unknown options but still warns on every config load.
     & $add @('set', '-g', 'status', 'on')
     & $add @('set', '-g', 'status-justify', 'left')
-    & $add @('set', '-g', 'status-style', "fg=$($p.subtle),bg=$($p.base)")
+    & $add @('set', '-g', 'status-style', "fg=$($p.subtle),bg=$barBg")
     & $add @('set', '-g', 'status-left-length', '200')
     & $add @('set', '-g', 'status-right-length', '200')
     & $add @('set', '-g', 'status-left', $statusLeft)

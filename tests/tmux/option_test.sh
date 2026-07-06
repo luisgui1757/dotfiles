@@ -177,7 +177,10 @@ fi
 # (variant main). Assert it actually applied the Omer-shaped bar (session pill
 # left, zoom-aware current window, directory pill right). This is the POSIX proof
 # that the generated artifact is not just byte-stable but valid tmux that applies.
-check status-style "fg=#908caa,bg=#191724"
+check status-style "fg=#908caa,bg=default"
+if ! show status-left | grep -q '#26233a'; then
+    echo "FAIL: Rose Pine main status-left must render the main overlay pill"; exit 1
+fi
 if ! show status-left | grep -q '#S'; then
     echo "FAIL: Rose Pine status-left must render the session pill (#S)"; exit 1
 fi
@@ -201,21 +204,26 @@ echo "  generated Rose Pine bar applies (Omer-shaped pill bar)"
 # Live variant switch must PERSIST across repeated sourcing. The overlay uses
 # `set -go @rosepine-variant` (only-if-unset), so a user's `tmux set -g
 # @rosepine-variant moon` is NOT clobbered back to main every time the overlay is
-# re-sourced. Distinguish variants by the status-style background (main base
-# #191724 vs moon base #232136). Re-sourcing an already-set `-go` option makes
-# tmux `source-file` exit nonzero ("already set"), which is expected -- the point
-# is that the value is preserved -- so tolerate the nonzero exit with `|| true`.
+# re-sourced. Distinguish variants by the generated pill overlay color (main
+# #26233a vs moon #393552) because the status canvas uses bg=default so terminal
+# transparency can show through. Re-sourcing an already-set `-go` option makes
+# tmux `source-file` exit nonzero ("already set"), which is expected -- the
+# point is that the value is preserved -- so tolerate the nonzero exit with
+# `|| true`.
 check @rosepine-variant main
-check status-style "fg=#908caa,bg=#191724"
+check status-style "fg=#908caa,bg=default"
 tmux -L "$sock_name" set -g @rosepine-variant moon
 tmux -L "$sock_name" source-file "$REPO_ROOT/tmux/tmux.posix.conf" || true
 check @rosepine-variant moon
-check status-style "fg=#908caa,bg=#232136"
+check status-style "fg=#908caa,bg=default"
+if ! show status-left | grep -q '#393552'; then
+    echo "FAIL: moon variant must repaint the generated pill overlay"; exit 1
+fi
 tmux -L "$sock_name" source-file "$REPO_ROOT/tmux/tmux.posix.conf" || true
 if [[ "$(show @rosepine-variant)" != "moon" ]]; then
     echo "FAIL: @rosepine-variant snapped back to main on re-source (set -go regressed to set -g)"; exit 1
 fi
-if [[ "$(show status-style)" != "fg=#908caa,bg=#232136" ]]; then
+if [[ "$(show status-left)" != *"#393552"* ]]; then
     echo "FAIL: re-sourcing repainted the main bar; moon must persist"; exit 1
 fi
 # Restore the default so downstream assertions (if any) see main again.
