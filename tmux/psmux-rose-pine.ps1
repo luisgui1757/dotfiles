@@ -92,9 +92,9 @@ function Get-PsmuxRosePineCommand {
     $iFolder = [char]::ConvertFromUtf32(0xF413)
     $iZoom = [char]::ConvertFromUtf32(0xF065)
 
-    # Session accent turns love while the prefix is held; otherwise use pine so
-    # the default session pill reads Rose Pine, not Catppuccin-purple.
-    $sessAccent = "#{?client_prefix,$($p.love),$($p.pine)}"
+    # Session accent turns love while the prefix is held; otherwise use foam
+    # for the Omer-style cool accent without the iris/purple cast.
+    $sessAccent = "#{?client_prefix,$($p.love),$($p.foam)}"
 
     # status-left: rounded session pill. icon segment (accent bg) + name segment
     # (overlay bg). Trailing space separates it from the window list.
@@ -113,6 +113,9 @@ function Get-PsmuxRosePineCommand {
     $cmds = [System.Collections.Generic.List[object]]::new()
     $add = { param([string[]]$Argv) $cmds.Add([pscustomobject]@{ Argv = $Argv }) }
 
+    # Keep emitted options in the tmux and psmux v3.3.6 shared set. tmux-only
+    # display-panes colour options are intentionally omitted because psmux
+    # stores unknown options but still warns on every config load.
     & $add @('set', '-g', 'status', 'on')
     & $add @('set', '-g', 'status-justify', 'left')
     & $add @('set', '-g', 'status-style', "fg=$($p.subtle),bg=$($p.base)")
@@ -128,8 +131,6 @@ function Get-PsmuxRosePineCommand {
     & $add @('set', '-g', 'message-command-style', "fg=$($p.base),bg=$($p.gold)")
     & $add @('set', '-g', 'pane-border-style', "fg=$($p.hlHigh)")
     & $add @('set', '-g', 'pane-active-border-style', "fg=$($p.gold)")
-    & $add @('set', '-g', 'display-panes-colour', $p.gold)
-    & $add @('set', '-g', 'display-panes-active-colour', $p.text)
     & $add @('set', '-g', 'clock-mode-colour', $p.love)
     & $add @('set', '-g', 'mode-style', "bg=$($p.hlMed)")
     & $add @('set', '-g', 'status-position', 'top')

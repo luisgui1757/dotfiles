@@ -29,9 +29,9 @@ AfterAll {
 
 Describe 'psmux-rose-pine renderer' {
     $variants = @(
-        @{ Variant = 'main'; Base = '#191724'; Surface = '#1f1d2e'; Overlay = '#26233a'; Gold = '#f6c177'; Pine = '#31748f'; Muted = '#6e6a86'; Rose = '#ebbcba'; Subtle = '#908caa'; Love = '#eb6f92'; Text = '#e0def4' }
-        @{ Variant = 'moon'; Base = '#232136'; Surface = '#2a273f'; Overlay = '#393552'; Gold = '#f6c177'; Pine = '#3e8fb0'; Muted = '#6e6a86'; Rose = '#ea9a97'; Subtle = '#908caa'; Love = '#eb6f92'; Text = '#e0def4' }
-        @{ Variant = 'dawn'; Base = '#faf4ed'; Surface = '#fffaf3'; Overlay = '#f2e9e1'; Gold = '#ea9d34'; Pine = '#286983'; Muted = '#9893a5'; Rose = '#d7827e'; Subtle = '#797593'; Love = '#b4637a'; Text = '#575279' }
+        @{ Variant = 'main'; Base = '#191724'; Surface = '#1f1d2e'; Overlay = '#26233a'; Gold = '#f6c177'; Foam = '#9ccfd8'; Muted = '#6e6a86'; Rose = '#ebbcba'; Subtle = '#908caa'; Love = '#eb6f92'; Text = '#e0def4' }
+        @{ Variant = 'moon'; Base = '#232136'; Surface = '#2a273f'; Overlay = '#393552'; Gold = '#f6c177'; Foam = '#9ccfd8'; Muted = '#6e6a86'; Rose = '#ea9a97'; Subtle = '#908caa'; Love = '#eb6f92'; Text = '#e0def4' }
+        @{ Variant = 'dawn'; Base = '#faf4ed'; Surface = '#fffaf3'; Overlay = '#f2e9e1'; Gold = '#ea9d34'; Foam = '#56949f'; Muted = '#9893a5'; Rose = '#d7827e'; Subtle = '#797593'; Love = '#b4637a'; Text = '#575279' }
     )
 
     It "paints the <Variant> palette on the flat pill bar" -ForEach $variants {
@@ -51,8 +51,8 @@ Describe 'psmux-rose-pine renderer' {
         $opt['window-status-format'] | Should -Not -Match ([regex]::Escape('window_zoomed_flag'))
         # Standalone pills separated by a single space (connect_separator=no).
         $opt['window-status-separator'] | Should -Be ' '
-        # Session pill: prefix turns the accent love, otherwise pine.
-        $opt['status-left'] | Should -Match ([regex]::Escape("#{?client_prefix,$Love,$Pine}"))
+        # Session pill: prefix turns the accent love, otherwise foam.
+        $opt['status-left'] | Should -Match ([regex]::Escape("#{?client_prefix,$Love,$Foam}"))
         $opt['status-left'] | Should -Match '#S'
         $opt['status-left'] | Should -Not -Match '#W'
         # Directory pill basename + one terminal-edge safety cell.
@@ -95,6 +95,37 @@ Describe 'psmux-rose-pine renderer' {
         $joined | Should -Not -Match '#\('
         $joined | Should -Not -Match '(?m)^run'
         $joined | Should -Not -Match '(?m)^set-hook'
+    }
+
+    It "emits only psmux-v3.3.6-verified status options for <Variant>" -ForEach $variants {
+        $allowed = @(
+            'clock-mode-colour',
+            'message-command-style',
+            'message-style',
+            'mode-style',
+            'pane-active-border-style',
+            'pane-border-style',
+            'status',
+            'status-justify',
+            'status-left',
+            'status-left-length',
+            'status-position',
+            'status-right',
+            'status-right-length',
+            'status-style',
+            'window-status-activity-style',
+            'window-status-current-format',
+            'window-status-format',
+            'window-status-separator'
+        )
+        $cmds = Get-PsmuxRosePineCommand -Variant $Variant
+        $names = $cmds | ForEach-Object { $_.Argv[2] }
+
+        foreach ($name in $names) {
+            $allowed | Should -Contain $name
+        }
+        $names | Should -Not -Contain 'display-panes-colour'
+        $names | Should -Not -Contain 'display-panes-active-colour'
     }
 
     It "keeps the generated <Variant> config committed and fresh" -ForEach $variants {

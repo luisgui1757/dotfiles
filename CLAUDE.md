@@ -1448,7 +1448,7 @@ host OS or shell would otherwise hide a branch from CI.
   `window-status-*-style`, uses rounded pill caps (U+E0B6/U+E0B4) and NOT
   arrow-chevron powerline separators (U+E0B0/U+E0B2), and keeps one trailing
   safety space after the status-right directory so the final cell is not clipped
-  by Windows Terminal/ConPTY. The normal session pill accent is Rose Pine `pine`
+  by Windows Terminal/ConPTY. The normal session pill accent is Rose Pine `foam`
   (not `iris`, which reads too close to Catppuccin purple in this layout);
   holding the prefix changes it to `love`. Default variant `main`, plus `moon`/`dawn`, selected
   by `@rosepine-variant` on BOTH platforms. `tmux/psmux-rose-pine.ps1` MUST stay
@@ -1457,7 +1457,13 @@ host OS or shell would otherwise hide a branch from CI.
   artifacts carry rendered glyphs. Keep local `tmux/themes/*.conf` snippets
   deleted. The generated `.conf` files are committed artifacts; regenerate with
   the renderer's `-EmitConf -Variant <name>` mode once per variant and re-mirror
-  into `home/`. Live switch:
+  into `home/`. Emitted options must stay inside the tmux/psmux option
+  intersection verified against psmux v3.3.6. Do not emit tmux-only
+  `display-panes-colour` / `display-panes-active-colour` in the shared artifacts:
+  psmux stores unknown options but still warns on every config load. If POSIX
+  pane-number colors become important later, apply them from the POSIX overlay
+  with a tmux-only `set -gF` path rather than polluting the shared artifact.
+  Live switch:
   `tmux set -g @rosepine-variant moon; tmux source-file ~/.tmux.posix.conf`
   (POSIX) / `psmux set -g @rosepine-variant moon; psmux source-file
   ~/.tmux.windows.conf` (Windows).

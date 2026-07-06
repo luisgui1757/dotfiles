@@ -271,9 +271,10 @@ and whether `pwsh` is installed.
   byte-identical everywhere. We do NOT use a theme plugin for rendering:
   `rose-pine/tmux` is a bash/TPM script that cannot run on psmux, and the
   community `psmux-theme-rosepine` renders a different arrow-chevron powerline
-  bar. The session pill uses Rose Pine `pine` normally and `love` while the
-  prefix is held, avoiding a Catppuccin-purple-looking default while retaining
-  the Omer/Catppuccin shape. Default variant is `main`; switch to `moon`/`dawn` via `@rosepine-variant`
+  bar. The session pill uses Rose Pine `foam` normally and `love` while the
+  prefix is held, keeping a cool Omer-style anchor without the iris/purple cast
+  while retaining the Omer/Catppuccin shape. Default variant is `main`; switch
+  to `moon`/`dawn` via `@rosepine-variant`
   (`tmux set -g @rosepine-variant moon; tmux source-file ~/.tmux.posix.conf` on
   POSIX, `psmux set -g @rosepine-variant moon; psmux source-file
   ~/.tmux.windows.conf` on Windows). The bar is a signal bar: tmux/psmux shows
@@ -307,6 +308,9 @@ and whether `pwsh` is installed.
   tmux's `source-file -q` config flag. psmux also does not implement tmux's
   `terminal-features` option, so extended-key feature flags live only in the
   POSIX overlay; psmux-parsed configs must not execute `set ... terminal-features`.
+  The generated shared Rose Pine artifacts also stay inside the tmux/psmux option
+  intersection: tmux-only display-pane color options are omitted because psmux
+  stores unknown options but still warns on every config load.
 - `install-deps` provisions `lsd` through the supported package managers
   (Homebrew, native Linux package managers where available, and the Windows
   Scoop-first catalog). Interactive shells replace `ls` with `lsd` and add the
@@ -725,12 +729,14 @@ stale; CI then fails verification until a human reviews the adjacent constant.
   Both bars are top-aligned and show session, window list, and directory
   basename; date/time, full path, username, git, and runtime state stay in
   Starship; host stays off the daily surface. The normal session pill accent is
-  Rose Pine `pine`; holding the prefix changes it to `love`. Windows psmux starts from
+  Rose Pine `foam`; holding the prefix changes it to `love`. Windows psmux starts from
   `~/.psmux.conf`, which turns warm sessions off before sourcing `~/.tmux.conf`,
   then explicitly source-files `~/.tmux.windows.conf` without `-q` because psmux
   v3.3.x does not implement tmux's `source-file -q` config flag. psmux-parsed
   configs also avoid `set ... terminal-features`; tmux-only extended-key flags
-  live in `~/.tmux.posix.conf`. The generated
+  live in `~/.tmux.posix.conf`. The generated Rose Pine artifacts stay inside
+  the shared tmux/psmux option set; tmux-only display-pane color options are
+  omitted because psmux warns on unknown options. The generated
   status-right and Starship time segment keep one trailing safety space so the
   last visible glyph is not drawn into the terminal's final column.
 - **Session save/restore: full on POSIX, resurrect-only on Windows.** POSIX runs
@@ -869,7 +875,7 @@ MIT. See `LICENSE`.
 | Move commits in lazygit, including inside psmux | Ctrl+J collides with Enter on the wire, and psmux v3.3.4 does not relay Windows Terminal's Win32-input-mode modifier data into panes | use uppercase `J` / `K`. `%LOCALAPPDATA%\lazygit\config.yml` binds commits-panel moveDownCommit / moveUpCommit to printable J/K, so no psmux root bind is needed. In the commits panel, use PgUp/PgDn or Ctrl-U/Ctrl-D to scroll the diff |
 | Windows Terminal opens Windows PowerShell 5.1 instead of PowerShell 7 | settings predate the managed WT default-profile merge, or the merge was skipped | re-run `.\setup.ps1 -SkipDeps -SkipNvim`; it adds the fixed `PowerShell 7` profile and promotes only an unset or legacy Windows PowerShell default, preserving a custom default |
 | tmux / psmux does not show the Rose Pine status bar | The generated variant config was not deployed or sourced, or it loaded in an already-running server | re-run setup / re-apply chezmoi, then restart all tmux/psmux sessions. The bar is the generated `~/.tmux.rose-pine.{main,moon,dawn}.conf`, sourced by `tmux/tmux.posix.conf` (POSIX) and `tmux/tmux.windows.conf` (Windows). Windows psmux starts from `~/.psmux.conf`, then flag-free source-files `~/.tmux.windows.conf`. Change the `@rosepine-variant` (`main` / `moon` / `dawn`) option for a different flavor |
-| psmux warns `unknown option "terminal-features"` while sourcing config | A psmux-parsed config still contains a tmux-only capability setter | update this repo and re-run `.\setup.ps1 -SkipDeps -SkipNvim`, then restart psmux. The managed shared and Windows configs intentionally avoid `set ... terminal-features`; the tmux extended-key flag lives only in the POSIX overlay |
+| psmux warns `unknown option` while sourcing config | A psmux-parsed config still contains a tmux-only option | update this repo and re-run `.\setup.ps1 -SkipDeps -SkipNvim`, then restart psmux. The managed shared and Windows configs intentionally avoid `set ... terminal-features`, and the generated Rose Pine artifacts omit tmux-only `display-panes-*` color options; tmux extended-key flags live only in the POSIX overlay |
 | Want a fully solid (opaque) tmux/psmux status bar on Windows | Windows Terminal applies `opacity` window-wide to every cell, so a transparent WT (`opacity < 100`) has a transparent bar regardless of the bar's bg color — a distinct bg does NOT make it opaque in WT | the repo defaults to `opacity: 95` (see-through terminal). For a solid bar set WT `opacity: 100` in the fragment / `settings.json` (whole window opaque). macOS/Linux Ghostty get an opaque-looking bar from `background-opacity 0.95` + blur |
 | PowerShell Tab completion — the selected option is **gold** | PSReadLine `Selection` colors the highlighted MenuComplete option | it is a gold foreground. Note: PSReadLine uses that same `Selection` color for the completion suffix it inserts into the command line while you navigate, so that suffix also shows gold until you accept — it is one setting, not separable |
 | A `wt --version` window popped up during `setup.ps1 -All` | the dependency version table ran `<tool> --version`, and `wt --version` opens a Windows Terminal window instead of printing | fixed — `Get-CommandVersionString` never runs `wt --version`; it reads the file version (or shows `installed`) |
