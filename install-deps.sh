@@ -3469,7 +3469,8 @@ install_wezterm_linux() {
         else
             require_downloader || return 1
             if ! run_wezterm_deb_install "$url" "$WEZTERM_DEB_AMD64_SHA256"; then
-                echo "  WARN: WezTerm .deb install failed; continuing"
+                echo "  FAIL: WezTerm .deb install failed"
+                return 1
             fi
         fi
         return
@@ -3523,7 +3524,10 @@ install_herdr() {
             echo "  would: brew install herdr"
             return
         fi
-        brew install herdr || echo "  WARN: herdr brew install failed"
+        if ! brew install herdr; then
+            echo "  FAIL: herdr brew install failed"
+            return 1
+        fi
         return
     fi
     if [[ "$(uname -s)" != "Linux" ]]; then
@@ -3559,8 +3563,8 @@ install_herdr() {
     fi
     require_downloader || return 1
     if ! run_herdr_linux_binary_install "$url" "$expected" "$dest"; then
-        echo "  WARN: herdr binary install failed; continuing"
-        return
+        echo "  FAIL: herdr binary install failed"
+        return 1
     fi
     write_direct_artifact_provenance "herdr" "$dest" "$dest" "$(dirname "$dest")" "$url" "$HERDR_VERSION" "$expected"
     ensure_local_bin_on_path

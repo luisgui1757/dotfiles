@@ -64,4 +64,30 @@ if [[ -e "$DEST" ]]; then
     exit 1
 fi
 
+# 3) wrapper path -> FAIL marker and nonzero, so --all/e2e cannot fake-green.
+YES_ALL=1
+DRY_RUN=0
+PM=unknown
+HOME="$TMP_ROOT/home"
+have() { return 1; }
+homebrew_bin() { return 1; }
+native_linux_pm() { printf '%s\n' "unknown"; }
+require_downloader() { return 0; }
+uname() {
+    case "${1:-}" in
+        -s) printf '%s\n' "Linux" ;;
+        -m) printf '%s\n' "x86_64" ;;
+        *) command uname "$@" ;;
+    esac
+}
+run_herdr_linux_binary_install() {
+    return 45
+}
+if output="$(install_herdr 2>&1)"; then
+    echo "FAIL: install_herdr returned success after binary install failure" >&2
+    echo "$output" >&2
+    exit 1
+fi
+[[ "$output" == *"FAIL: herdr binary install failed"* ]]
+
 echo "OK"

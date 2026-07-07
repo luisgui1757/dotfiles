@@ -337,6 +337,7 @@ $BinaryName = @{
     chezmoi     = 'chezmoi'
     lazygit     = 'lazygit'
     wt          = 'wt'
+    wezterm     = 'wezterm'
     nvim        = 'nvim'
     pwsh        = 'pwsh'
     'win32yank' = 'win32yank'
@@ -2866,7 +2867,7 @@ function Exit-InstallDepsIfFailures {
 
     Write-Host "install-deps: completed with $($script:InstallFailures.Count) FAILED install(s):"
     foreach ($f in $script:InstallFailures) {
-        Write-Host ("  FAIL  {0,-20} via {1,-8} pkg={2}  (exit {3})" -f $f.Tool, $f.Pm, $f.Pkg, $f.ExitCode) -ForegroundColor Red
+        Write-Host ("  FAIL: {0,-20} via {1,-8} pkg={2}  (exit {3})" -f $f.Tool, $f.Pm, $f.Pkg, $f.ExitCode) -ForegroundColor Red
     }
     Write-Host ""
     Write-Host "Re-run install-deps.ps1 after addressing the failures, or"

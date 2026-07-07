@@ -75,4 +75,29 @@ if [[ -e "$WEZTERM_FAIL_TEST_ROOT/apt.log" ]]; then
     exit 1
 fi
 
+# 3) wrapper path -> FAIL marker and nonzero, so --all/e2e cannot fake-green.
+YES_ALL=1
+DRY_RUN=0
+PM=apt
+have() { return 1; }
+is_wsl() { return 1; }
+is_ubuntu() { return 0; }
+require_downloader() { return 0; }
+uname() {
+    case "${1:-}" in
+        -s) printf '%s\n' "Linux" ;;
+        -m) printf '%s\n' "x86_64" ;;
+        *) command uname "$@" ;;
+    esac
+}
+run_wezterm_deb_install() {
+    return 44
+}
+if output="$(install_wezterm_linux 2>&1)"; then
+    echo "FAIL: install_wezterm_linux returned success after .deb install failure" >&2
+    echo "$output" >&2
+    exit 1
+fi
+[[ "$output" == *"FAIL: WezTerm .deb install failed"* ]]
+
 echo "OK"

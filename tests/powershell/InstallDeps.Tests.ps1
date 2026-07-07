@@ -481,6 +481,13 @@ Describe "install-deps.ps1" {
         $Catalog['lazygit'].winget | Should -Be 'JesseDuffield.lazygit'
     }
 
+    It "keeps every Windows package catalog key mapped to a command probe" {
+        . $script:ImportInstallDepsForTest
+
+        $missing = @($Catalog.Keys | Where-Object { -not $BinaryName.ContainsKey($_) } | Sort-Object)
+        $missing | Should -Be @()
+    }
+
     It "registers chezmoi in the Windows package catalog" {
         . $script:ImportInstallDepsForTest
 
@@ -2068,6 +2075,7 @@ exit 0
 
         $LASTEXITCODE | Should -Be 1
         $output | Should -Match 'scoop manifest refresh failed'
+        $output | Should -Match '(?m)^\s*FAIL: scoop\s+via scoop\s+pkg=manifest'
         $output | Should -Match 'install-deps: completed with 1 FAILED install'
     }
 }
@@ -2633,6 +2641,7 @@ Describe "WezTerm catalog entry" {
         $Catalog['wezterm'].winget  | Should -Be 'wez.wezterm'
         $Catalog['wezterm'].choco   | Should -Be 'wezterm'
         $Catalog['wezterm'].scoop   | Should -Be 'extras/wezterm'
+        $BinaryName['wezterm']      | Should -Be 'wezterm'
         $Catalog['wezterm'].purpose | Should -Match 'WezTerm'
     }
 }

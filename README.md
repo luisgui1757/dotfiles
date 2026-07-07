@@ -552,10 +552,10 @@ The e2e jobs cover different install paths, not symmetric container platforms:
 
 | Check | What it proves |
 |---|---|
-| `e2e containers / ubuntu-24.04` | Clean `ubuntu:24.04`, non-root user, native `apt`, no Linuxbrew (`DOTFILES_SKIP_BREW_BOOTSTRAP=1`), then `install-deps.sh --all`, chezmoi config apply, tool assertions, Neovim >= 0.12, lazygit, zsh plugin files, config content assertions, and nvim directory realpath assertion. |
-| `setup.sh / ubuntu-24.04` | Full Unix setup on the hosted Ubuntu runner. This runner has Linuxbrew available, so it proves the Linuxbrew path that users may hit. |
+| `e2e containers / ubuntu-24.04` | Clean `ubuntu:24.04`, non-root user, native `apt`, no Linuxbrew (`DOTFILES_SKIP_BREW_BOOTSTRAP=1`), then `install-deps.sh --all`, chezmoi config apply, tool assertions including `zoxide`, `gh`, WezTerm, and Herdr, Neovim >= 0.12, lazygit, zsh plugin files, config content assertions, and nvim directory realpath assertion. |
+| `setup.sh / ubuntu-24.04` | Full Unix setup on the hosted Ubuntu runner. This runner has Linuxbrew available, so it proves the Linuxbrew path that users may hit and asserts the new POSIX tool commands. |
 | `setup.sh / macos-15` | Full macOS setup through the real macOS hosted runner and Homebrew path. Docker cannot model macOS. |
-| `setup.ps1 / windows-2025` | Full Windows setup through the real Windows hosted runner, including Scoop/winget/choco behavior, PowerShell, symlinks, and Neovim restore/sync phases. Windows containers do not model the desktop/user-profile setup well. |
+| `setup.ps1 / windows-2025` | Full Windows setup through the real Windows hosted runner, including Scoop/winget/choco behavior, PowerShell, symlinks, `zoxide`/`gh`/WezTerm command probes, and Neovim restore/sync phases. Windows containers do not model the desktop/user-profile setup well. |
 | `setup.sh / WSL2 Ubuntu-24.04 (best-effort canary)` | Non-required WSL smoke signal. Hosted runners cannot provide reliable nested virtualization, so this is intentionally best-effort. |
 
 After the Lazy restore, deterministic Tree-sitter parser install, and Mason sync, each

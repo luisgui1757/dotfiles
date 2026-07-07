@@ -133,14 +133,17 @@ Commit-by-commit status:
   pwsh.exe (Windows), no tmux auto-launch. Packaging: brew cask (macOS),
   Scoop/winget/choco (Windows), pinned official `.deb` with SHA-256 (native
   Ubuntu). Tests: Lua smoke (stubbed `require`), parity row, no-auto-launch static
-  assertion, installer provenance. Runtime GUI / psmux-in-WezTerm visual
-  verification remains manual-verification-pending in `tests/MANUAL.md`.
+  assertion, installer provenance, Windows `$Catalog` -> `$BinaryName`
+  completeness, and required e2e PATH assertions on Linux + Windows. Runtime GUI
+  / psmux-in-WezTerm visual verification remains manual-verification-pending in
+  `tests/MANUAL.md`.
 - **Commit 3 - AeroSpace + Herdr — DONE.** AeroSpace (macOS-only tap cask,
   `start-at-login`, reserved-chord-safe keymap avoiding Alt-h/j/k/l and Alt-c),
   `aerospace/aerospace.toml` + chezmoi mirror, TOML lint. Herdr (macOS/Linux only,
   Homebrew/Linuxbrew formula or pinned native-Linux binary with provenance-backed
-  update ownership; native Windows blocked by tests + docs). AeroSpace TCC /
-  Accessibility and Herdr interactive-session behavior remain
+  update ownership; native Windows blocked by tests + docs). Herdr install
+  failures now emit `FAIL:` and the Linux/macOS e2e gates assert the command.
+  AeroSpace TCC / Accessibility and Herdr interactive-session behavior remain
   manual-verification-pending in `tests/MANUAL.md`.
 - **Commit 4 - Nix skeleton — DONE.** `flake.nix` + committed `flake.lock`
   (zero ownership), devShell + `checks`, `nix flake check` CI on Ubuntu + macOS,

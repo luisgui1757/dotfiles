@@ -528,7 +528,8 @@ install paths, not symmetric container platforms:
 - `e2e containers / ubuntu-24.04` runs an `ubuntu:24.04` container on an Ubuntu
   runner with `DOTFILES_SKIP_BREW_BOOTSTRAP=1`, creates a non-root user, runs
   real `install-deps.sh --all` (native `apt`, no Linuxbrew), then applies
-  configs with chezmoi and asserts tool presence, Neovim >= 0.12, lazygit, zsh
+  configs with chezmoi and asserts tool presence, including `zoxide`, `gh`,
+  WezTerm, and Herdr, Neovim >= 0.12, lazygit, zsh
   plugin files under `~/.local/share/dotfiles/zsh-plugins`, config content
   matching the repo sources, and the Neovim
   directory resolving into repo `nvim/`.
@@ -546,6 +547,9 @@ install paths, not symmetric container platforms:
   parser install, Mason headless sync, and the Polaris Phase 6/6 agent-policy
   install. They explicitly fail if setup skips Phase 3-5, omits Phase 6/6,
   emits a `FAIL:` marker, or Mason did not install expected tools. Windows e2e
+  also asserts the new Scoop/winget/choco catalog tools that must leave PATH
+  commands behind (`zoxide`, `gh`, `wezterm`), so an installer that exits 0 but
+  fails its command probe cannot fake-green.
   must assert `%LOCALAPPDATA%\lazygit\config.yml`
   against `lazygit/config.windows.yml`, not the POSIX/default
   `lazygit/config.yml`. After the full restore/sync they also run the

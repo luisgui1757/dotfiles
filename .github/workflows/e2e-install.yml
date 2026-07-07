@@ -157,11 +157,16 @@ jobs:
           command -v lazygit >/dev/null 2>&1 || fail "lazygit is not on PATH"
           command -v cmake >/dev/null 2>&1 || fail "cmake is not on PATH"
           command -v lsd >/dev/null 2>&1 || fail "lsd is not on PATH"
+          command -v zoxide >/dev/null 2>&1 || fail "zoxide is not on PATH"
+          command -v gh >/dev/null 2>&1 || fail "gh is not on PATH"
           if [[ "${RUNNER_OS:-}" == "macOS" ]]; then
             [[ -d /Applications/WezTerm.app || -d "$HOME/Applications/WezTerm.app" ]] \
               || fail "WezTerm.app is missing after setup.sh --all requested it"
             [[ -d /Applications/AeroSpace.app || -d "$HOME/Applications/AeroSpace.app" ]] \
               || fail "AeroSpace.app is missing after setup.sh --all requested it"
+            command -v herdr >/dev/null 2>&1 || fail "herdr is not on PATH after setup.sh --all requested it"
+          elif [[ "${RUNNER_OS:-}" == "Linux" ]]; then
+            command -v wezterm >/dev/null 2>&1 || fail "wezterm is not on PATH after setup.sh --all requested it"
             command -v herdr >/dev/null 2>&1 || fail "herdr is not on PATH after setup.sh --all requested it"
           fi
           nvim_line="$(nvim --version | head -n 1)"
@@ -311,6 +316,15 @@ jobs:
           }
           if (-not (Get-Command lsd -ErrorAction SilentlyContinue)) {
               throw 'lsd is not on PATH'
+          }
+          if (-not (Get-Command zoxide -ErrorAction SilentlyContinue)) {
+              throw 'zoxide is not on PATH'
+          }
+          if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
+              throw 'gh is not on PATH'
+          }
+          if (-not (Get-Command wezterm -ErrorAction SilentlyContinue)) {
+              throw 'wezterm is not on PATH'
           }
           $nvimLine = & nvim --version | Select-Object -First 1
           if ($nvimLine -notmatch '^NVIM v(0\.1[2-9]|0\.[2-9][0-9]|[1-9]\.)') {
