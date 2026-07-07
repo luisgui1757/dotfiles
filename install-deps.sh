@@ -40,6 +40,7 @@ FZF_TAB_VERSION="v1.3.0"
 FZF_TAB_COMMIT="d7e0234614dbe5369fdd760907d12c0e05a4dccc"
 ZSH_AUTOSUGGESTIONS_VERSION="v0.7.1"
 ZSH_AUTOSUGGESTIONS_COMMIT="e52ee8ca55bcc56a17c828767a3f98f22a68d4eb"
+GH_DASH_VERSION="v4.25.0"   # dlvhdr/gh-dash pinned gh-extension tag; mirror in install-deps.ps1 ($GhDashVersion)
 TPM_COMMIT="e261deb1b47614eed3400089ce7197dc68acc4eb"
 # Functional tmux plugins (Omer-style set). The Rose Pine status bar is NOT a
 # plugin here -- it is a repo-owned generated config (tmux/psmux-rose-pine.ps1),
@@ -1860,6 +1861,74 @@ install_zsh_plugins() {
     return 0
 }
 
+install_gh_dash_extension() {
+    # gh-dash is a gh CLI extension (there is no brew/apt package), pinned to
+    # GH_DASH_VERSION. It is only useful once `gh auth login` has run, and an
+    # UNAUTHENTICATED `gh extension install` hits GitHub's anonymous API rate
+    # limit and fails -- so we require auth before touching the extension. The
+    # chezmoi-managed config is applied regardless; this step only gates the
+    # extension binary. When gh is unauthenticated we skip cleanly (NOT a FAIL)
+    # and tell the user to authenticate and rerun. An authenticated install
+    # failure still emits a FAIL: marker for CI but does not abort setup (same
+    # emit-FAIL-and-continue pattern as install_zsh_plugins).
+    if ! have gh; then
+        printf "  skipped   %-26s gh CLI not installed (gh-dash is a gh extension)\n" "gh-dash"
+        return 0
+    fi
+    if ! gh auth status >/dev/null 2>&1; then
+        printf "  skipped   %-26s run 'gh auth login' then rerun to install gh-dash\n" "gh-dash"
+        return 0
+    fi
+
+    # Verify the *installed* pin, not merely presence -- an extension pinned to a
+    # different tag must be re-pinned, and a plain `gh extension install` of an
+    # already-present extension errors, so a mismatch takes the remove+install path.
+    local list installed_ver reinstall=0
+    list="$(gh extension list 2>/dev/null || true)"
+    if printf '%s\n' "$list" | grep -q 'dlvhdr/gh-dash'; then
+        installed_ver="$(printf '%s\n' "$list" \
+            | awk '{ for (i = 1; i <= NF; i++) if ($i == "dlvhdr/gh-dash") { print $(i + 1); exit } }')"
+        if [[ -n "$installed_ver" && "v${installed_ver#v}" == "$GH_DASH_VERSION" ]]; then
+            printf "  ok        %-26s already installed (pinned %s)\n" "gh-dash" "$GH_DASH_VERSION"
+            return 0
+        fi
+        reinstall=1
+    fi
+
+    local prompt
+    if [[ "$reinstall" -eq 1 ]]; then
+        prompt="Re-pin gh-dash to $GH_DASH_VERSION (currently ${installed_ver:-unknown})?"
+    else
+        prompt="Install gh-dash (pinned gh extension $GH_DASH_VERSION)?"
+    fi
+    if ! ask "$prompt"; then
+        printf "  skipped   %-26s\n" "gh-dash"
+        return 0
+    fi
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        if [[ "$reinstall" -eq 1 ]]; then
+            echo "  would: gh extension remove dash && gh extension install dlvhdr/gh-dash --pin $GH_DASH_VERSION"
+        else
+            echo "  would: gh extension install dlvhdr/gh-dash --pin $GH_DASH_VERSION"
+        fi
+        return 0
+    fi
+
+    if [[ "$reinstall" -eq 1 ]]; then
+        gh extension remove dash >/dev/null 2>&1 || true
+    fi
+    if gh extension install dlvhdr/gh-dash --pin "$GH_DASH_VERSION"; then
+        if [[ "$reinstall" -eq 1 ]]; then
+            printf "  installed %-26s %s (re-pinned)\n" "gh-dash" "$GH_DASH_VERSION"
+        else
+            printf "  installed %-26s %s\n" "gh-dash" "$GH_DASH_VERSION"
+        fi
+    else
+        printf "  FAIL: %-26s gh extension install dlvhdr/gh-dash --pin %s failed\n" "gh-dash" "$GH_DASH_VERSION" >&2
+    fi
+    return 0
+}
+
 tmux_plugin_root() {
     printf '%s\n' "$HOME/.local/share/dotfiles/tmux-plugins"
 }
@@ -2027,6 +2096,7 @@ rg|ripgrep|ripgrep|ripgrep|ripgrep|ripgrep|ripgrep
 fd|fd|fd-find|fd-find|fd|fd|fd
 fzf|fzf|fzf|fzf|fzf|fzf|fzf
 lsd|lsd|lsd|lsd|lsd|lsd|lsd
+zoxide|zoxide|zoxide|zoxide|zoxide|zoxide|zoxide
 chezmoi|chezmoi|||||
 lazygit|lazygit|||||
 starship|starship|||||
@@ -2037,6 +2107,7 @@ node|node|nodejs|nodejs|nodejs|nodejs|nodejs
 tree-sitter|tree-sitter-cli|||||
 shellcheck|shellcheck|shellcheck|ShellCheck|shellcheck|ShellCheck|shellcheck
 jq|jq|jq|jq|jq|jq|jq
+gh|gh|gh|gh|github-cli|gh|github-cli
 bats|bats-core|bats|bats|bats|bats|bats
 hyperfine|hyperfine|hyperfine|hyperfine|hyperfine|hyperfine|hyperfine
 taplo|taplo|||taplo-cli||
@@ -3637,6 +3708,7 @@ install rg "ripgrep, powers Telescope live_grep"
 install fd "fd, powers Telescope find_files"
 install fzf "fuzzy finder: Ctrl-R history, Ctrl-T files, Alt-C cd (zsh wiring in shells/zshrc)"
 install lsd "modern ls replacement with colors, icons, and tree view"
+install zoxide "smarter cd: z <dir> jumps by frecency, zi picks interactively (zsh/pwsh wiring in shell profiles)"
 install_chezmoi
 install_lazygit
 
@@ -3692,6 +3764,8 @@ fi
 section "developer / test dependencies (optional)"
 install shellcheck "shell script linter"
 install jq "JSON CLI, general-purpose tool used by many scripts"
+install gh "GitHub CLI (gh); also required by the gh-dash PR/issue dashboard"
+install_gh_dash_extension
 install bats "bats-core, for optional local shell tests"
 install hyperfine "starship prompt perf test"
 install taplo "TOML linter"

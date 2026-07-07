@@ -64,6 +64,38 @@ Describe "PowerShell profile" {
         $src | Should -Match 'Start-Sleep\s+-Milliseconds\s+\$DelayMilliseconds'
     }
 
+    It "caches the zoxide init without remote eval (no Invoke-Expression / iex)" {
+        $src = Get-Content -Raw -LiteralPath $script:Profile
+        $src | Should -Not -Match 'Invoke-Expression'
+        $src | Should -Not -Match '(^|[^A-Za-z0-9_])iex([^A-Za-z0-9_]|$)'
+        $src | Should -Match 'function Confirm-ZoxideInitScript'
+        $src | Should -Match 'function Import-ZoxideInitScriptWithRetry'
+    }
+
+    It "publishes the zoxide init cache atomically (UTF8 no-BOM temp + Move-Item)" {
+        $src = Get-Content -Raw -LiteralPath $script:Profile
+        $src | Should -Match 'function Publish-ZoxideInitScript'
+        $src | Should -Match '"\{0\}\.\{1\}\.\{2\}\.tmp"\s+-f\s+\$initLeaf,\s+\$PID'
+        $src | Should -Match '\[System\.Text\.UTF8Encoding\]::new\(\$false\)'
+        $src | Should -Match 'Move-Item\s+-LiteralPath\s+\$tempPath\s+-Destination\s+\$InitPath\s+-Force'
+    }
+
+    It "regenerates the zoxide cache only when missing or the version changed" {
+        $src = Get-Content -Raw -LiteralPath $script:Profile
+        $src | Should -Match 'function Test-ZoxideInitRegenerationNeeded'
+        $src | Should -Match 'zoxide --version'
+        $src | Should -Match '\$script:ZoxideVersionPath'
+    }
+
+    It "wires zoxide only when the binary exists, after starship" {
+        $src = Get-Content -Raw -LiteralPath $script:Profile
+        $src | Should -Match 'Get-Command\s+zoxide\s+-ErrorAction\s+SilentlyContinue'
+        $starshipIdx = $src.IndexOf('Get-Command starship')
+        $zoxideIdx = $src.IndexOf('Get-Command zoxide')
+        $starshipIdx | Should -BeGreaterOrEqual 0
+        $zoxideIdx | Should -BeGreaterThan $starshipIdx
+    }
+
     It "configures PSReadLine with Rose Pine colors" {
         $src = Get-Content -Raw -LiteralPath $script:Profile
         $src | Should -Match 'PredictionViewStyle\s+ListView'

@@ -6,6 +6,7 @@ BeforeAll {
     function scoop {}
     function choco {}
     function wt {}
+    function gh {}
 
     $script:ImportInstallDepsForTest = {
         param([switch]$DryRun)
@@ -85,6 +86,37 @@ BeforeAll {
             'Latest Version' = $Latest
             'Missing Dependencies' = $MissingDependencies
             'Info' = $Info
+        }
+    }
+
+    # gh stub for Install-GhDashExtension tests. `auth status` returns
+    # $script:GhAuthRc; `extension list` prints $script:GhListOut with exit
+    # $script:GhListRc; `extension install` exits $script:GhInstallRc. remove and
+    # install invocations are recorded to $script:GhCalls. Each branch sets
+    # $global:LASTEXITCODE like a native command so the no-leak regression is real.
+    function Set-GhDashMock {
+        Mock -CommandName gh -MockWith {
+            $a = @($args)
+            if ($a.Count -ge 2 -and $a[0] -eq 'auth' -and $a[1] -eq 'status') {
+                $global:LASTEXITCODE = $script:GhAuthRc
+                return
+            }
+            if ($a.Count -ge 2 -and $a[0] -eq 'extension' -and $a[1] -eq 'list') {
+                $global:LASTEXITCODE = $script:GhListRc
+                if ($script:GhListOut.Count -gt 0) { return $script:GhListOut }
+                return
+            }
+            if ($a.Count -ge 3 -and $a[0] -eq 'extension' -and $a[1] -eq 'remove') {
+                $script:GhCalls += ('remove ' + (($a[2..($a.Count - 1)]) -join ' '))
+                $global:LASTEXITCODE = 0
+                return
+            }
+            if ($a.Count -ge 3 -and $a[0] -eq 'extension' -and $a[1] -eq 'install') {
+                $script:GhCalls += ('install ' + (($a[2..($a.Count - 1)]) -join ' '))
+                $global:LASTEXITCODE = $script:GhInstallRc
+                return
+            }
+            $global:LASTEXITCODE = 0
         }
     }
 }
@@ -2512,5 +2544,81 @@ Describe "psmux session plugin provisioning" {
             if ($env:USERPROFILE -and (Test-Path $env:USERPROFILE)) { Remove-Item -Recurse -Force $env:USERPROFILE -ErrorAction SilentlyContinue }
             $env:USERPROFILE = $oldUser
         }
+    }
+}
+
+Describe "Install-GhDashExtension" {
+    BeforeEach {
+        $script:GhAuthRc = 0
+        $script:GhListRc = 0
+        $script:GhListOut = @()
+        $script:GhInstallRc = 0
+        $script:GhCalls = @()
+    }
+
+    It "skips cleanly when gh is not installed (no failure recorded)" {
+        . $script:ImportInstallDepsForTest -DryRun
+        Mock -CommandName Get-Command -MockWith { $null } -ParameterFilter { $Name -eq 'gh' }
+        Set-GhDashMock
+        Install-GhDashExtension
+        $script:InstallFailures.Count | Should -Be 0
+        $script:GhCalls.Count | Should -Be 0
+    }
+
+    It "skips without a failure when gh is unauthenticated, pointing at gh auth login" {
+        . $script:ImportInstallDepsForTest -DryRun
+        $script:GhAuthRc = 1
+        Set-GhDashMock
+        $out = (Install-GhDashExtension 6>&1 | Out-String)
+        $out | Should -Match 'gh auth login'
+        $script:InstallFailures.Count | Should -Be 0
+        $script:GhCalls.Count | Should -Be 0
+    }
+
+    It "prints the pinned install command in dry-run when authenticated and missing" {
+        . $script:ImportInstallDepsForTest -DryRun
+        Set-GhDashMock
+        $out = (Install-GhDashExtension 6>&1 | Out-String)
+        $out | Should -Match ([regex]::Escape("gh extension install dlvhdr/gh-dash --pin $GhDashVersion"))
+        $script:GhCalls.Count | Should -Be 0
+    }
+
+    It "is idempotent when installed at the expected pin" {
+        . $script:ImportInstallDepsForTest
+        $script:GhListOut = @("gh dash`tdlvhdr/gh-dash`t$GhDashVersion")
+        Set-GhDashMock
+        $out = (Install-GhDashExtension 6>&1 | Out-String)
+        $out | Should -Match 'already installed'
+        $script:GhCalls.Count | Should -Be 0
+        $script:InstallFailures.Count | Should -Be 0
+    }
+
+    It "force re-pins when installed at a different pin" {
+        . $script:ImportInstallDepsForTest
+        $script:GhListOut = @("gh dash`tdlvhdr/gh-dash`tv4.20.0")
+        Set-GhDashMock
+        Install-GhDashExtension
+        ($script:GhCalls -join "`n") | Should -Match 'remove dash'
+        ($script:GhCalls -join "`n") | Should -Match ([regex]::Escape("install dlvhdr/gh-dash --pin $GhDashVersion"))
+        $script:InstallFailures.Count | Should -Be 0
+    }
+
+    It "records a failure when the authenticated install fails" {
+        . $script:ImportInstallDepsForTest
+        $script:GhInstallRc = 1
+        Set-GhDashMock
+        Install-GhDashExtension
+        $script:InstallFailures.Count | Should -Be 1
+        $script:InstallFailures[0].Tool | Should -Be 'gh-dash'
+    }
+
+    It "does not leak a nonzero LASTEXITCODE from native gh probes (PSNativeCommandUseErrorActionPreference)" {
+        $PSNativeCommandUseErrorActionPreference = $true
+        . $script:ImportInstallDepsForTest -DryRun
+        $script:GhListRc = 1
+        Set-GhDashMock
+        $global:LASTEXITCODE = 0
+        { Install-GhDashExtension } | Should -Not -Throw
+        $LASTEXITCODE | Should -Be 0
     }
 }

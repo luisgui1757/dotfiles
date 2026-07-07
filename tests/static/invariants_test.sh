@@ -50,6 +50,16 @@ check_absent "bare-Esc kill-whole-line bindkey gone (Meta prefix shadow)" \
     --exclude-dir=.git --exclude-dir=tests \
     shells/
 
+# The PowerShell profiles must never use remote-eval (Invoke-Expression / iex) to
+# wire tools like zoxide or starship. Their documented one-liners pipe a freshly
+# generated init straight into Invoke-Expression; this repo instead caches the
+# init to a file and dot-sources it (race-safe, no remote eval). Guards the
+# canonical profile and its deployed chezmoi twin.
+check_absent "no Invoke-Expression/iex in PowerShell profiles (cached dot-source only)" \
+    "Invoke-Expression|(^|[^[:alnum:]_])iex([^[:alnum:]_]|\$)" \
+    shells/powershell_profile.ps1 \
+    home/Documents/PowerShell/Microsoft.PowerShell_profile.ps1
+
 # psmux freeze guard. The native-clipboard probes use `if-shell`, which spawns a
 # shell at config-LOAD time; under psmux/ConPTY on Windows that shell never
 # returns and hangs the whole config load. Those probes live ONLY in the

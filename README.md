@@ -2,9 +2,9 @@
 
 Cross-platform terminal and editor setup for macOS, Linux, WSL, and Windows.
 The repo owns the daily shell/editor stack: Neovim, tmux/psmux, Starship, zsh,
-PowerShell, Ghostty, lazygit, `lsd`, Windows Terminal theming, locked plugin
-restore, LSP / formatter provisioning, and global Polaris agent-policy
-bootstrap. It also provisions the `tree-sitter` CLI needed by
+PowerShell, Ghostty, lazygit, `lsd`, `zoxide` smart-cd, the `gh` CLI with the
+`gh-dash` dashboard, Windows Terminal theming, locked plugin restore, LSP /
+formatter provisioning, and global Polaris agent-policy bootstrap. It also provisions the `tree-sitter` CLI needed by
 `nvim-treesitter` main parser builds.
 
 The public interface is intentionally small:
@@ -239,6 +239,7 @@ symlink, and Windows Terminal remains a merge.
 | Ghostty | `~/Library/Application Support/com.mitchellh.ghostty/config` -> `ghostty/config` | native Linux links `~/.config/ghostty/config`; WSL links it only with `--experimental-wsl-gui` | n/a |
 | lazygit | `~/Library/Application Support/lazygit/config.yml` -> `lazygit/config.yml` | `~/.config/lazygit/config.yml` -> `lazygit/config.yml` | `%LOCALAPPDATA%\lazygit\config.yml` -> `lazygit\config.windows.yml` |
 | lsd | `~/.config/lsd/{config.yaml,colors.yaml}` -> `lsd/{config.yaml,colors.yaml}` | same | `%USERPROFILE%\.config\lsd\{config.yaml,colors.yaml}` -> `lsd\{config.yaml,colors.yaml}` |
+| gh-dash | `~/.config/gh-dash/config.yml` -> `gh-dash/config.yml` | same | `%USERPROFILE%\.config\gh-dash\config.yml` -> `gh-dash\config.yml` |
 | Windows Terminal | n/a | n/a | app installed by `setup.ps1` through Scoop/winget/choco, with a SHA-256-verified portable zip fallback; setup backs up existing packaged `settings.json`, then chezmoi merges `windows-terminal/settings.fragment.jsonc` by default, including a fixed PowerShell 7 profile used when WT is unset or still defaulting to Windows PowerShell 5.1; after apply, setup mirrors packaged settings to the unpackaged WT path or seeds/merges that path from the fragment when packaged WT is absent; opt out with `-SkipWindowsTerminalMerge`; see [windows-terminal/README.md](windows-terminal/README.md) |
 
 Chezmoi manages the Windows PowerShell 7 profile path
@@ -629,6 +630,7 @@ stale; CI then fails verification until a human reviews the adjacent constant.
 ├── nvim/                  # Neovim — init.lua, lua/{vim-options,util,plugins}
 ├── starship/              # starship.toml (Rose Pine)
 ├── lsd/                   # config.yaml + colors.yaml (Rose Pine)
+├── gh-dash/               # config.yml (gh-dash PR/issue dashboard)
 ├── shells/                # zshenv + zshrc + powershell_profile.ps1
 ├── tmux/                  # tmux.conf (Rose Pine, vi-mode, true-color)
 ├── ghostty/               # config (Rose Pine, Hack Nerd, Ghostty-tuned)
@@ -800,6 +802,32 @@ In any buffer: `:wnf<CR>` (lowercase) saves the file with formatters skipped
 **for this one save**. The next plain `:w` formats normally. Useful in legacy
 codebases where the formatter would create a noisy diff. Implemented in
 `nvim/lua/vim-options.lua`.
+
+### Neovim keymap discovery & scroll context
+
+which-key pops up a menu of the keys that can follow a prefix once you pause
+past `timeoutlen` (e.g. after `<leader>`); `<leader>?` lists the buffer-local
+keymaps on demand. The cursor also keeps **16 lines** of context above and below
+it (`scrolloff = 16`), so you never edit against the top or bottom edge.
+
+### zoxide — smarter `cd`
+
+`z <partial>` jumps to the best-matching directory you have visited (by
+frecency); `zi` opens an interactive picker. Works in zsh and PowerShell; plain
+`cd` is unchanged. Nothing to configure — `zoxide init` is wired into both shell
+profiles (PowerShell uses a cached init, no `Invoke-Expression`).
+
+### gh-dash — pull-request / issue dashboard
+
+Run `gh dash` for a terminal dashboard of your PRs, review requests, and issues.
+Its config (`~/.config/gh-dash/config.yml`, same relative path on Windows) is
+applied by setup **always**. The dashboard binary is a pinned `gh` CLI
+extension, and it only works once you have authenticated — so setup installs the
+extension only **after** `gh auth login`. If you have not authenticated yet,
+setup skips the extension cleanly (no error, because an unauthenticated install
+hits GitHub's anonymous rate limit); run `gh auth login`, then rerun `setup` /
+`install-deps` to pick it up. The token is machine-local and never stored in
+this repo.
 
 ### Adding a plugin
 

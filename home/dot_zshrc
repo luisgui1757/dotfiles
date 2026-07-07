@@ -234,6 +234,16 @@ if command -v lsd >/dev/null 2>&1; then
   alias lt='lsd --tree'
 fi
 
+# ---- zoxide (smarter cd: `z <dir>` jumps by frecency, `zi` picks fuzzily) -----
+# `zoxide init zsh` defines the `z`/`zi` widgets, the chpwd tracking hook, and
+# its completions. Upstream requires this to run AFTER `compinit` (done above),
+# so it is intentionally late in zshrc. Guarded so a machine without zoxide still
+# starts cleanly (zsh_startup_test sources this with no tools and expects exit 0).
+# No `--cmd cd` override -- `z`/`zi` only, so plain `cd` behaviour is untouched.
+if command -v zoxide >/dev/null 2>&1; then
+  eval "$(zoxide init zsh)"
+fi
+
 # Intentionally NOT rebinding Esc — it shadows the entire Meta prefix and
 # breaks every Alt-X keybinding (including Alt-h/j/k/l set in nvim's
 # vim-options.lua). If you want a single keystroke to clear the line, ^U

@@ -1255,6 +1255,56 @@ save only**. The next plain `:w` formats normally. Implemented in
   overriding PSReadLine's reverse-search for POSIX parity with zsh), Ctrl+T
   (file) and Alt+C (cd) ONLY when both the PSFzf module and the `fzf` binary are
   present. The zsh side already used `fzf`; this brings Windows to parity.
+- **zoxide is the cross-shell smart-cd (`z` / `zi`), wired without remote eval.**
+  `install-deps.sh` carries `zoxide` in `PKG_TABLE` (same package name on every
+  supported PM: brew/apt/dnf/pacman/zypper/apk) and `install-deps.ps1` carries it
+  in `$Catalog` (winget `ajeetdsouza.zoxide` / choco / scoop). `shells/zshrc`
+  runs a `command -v zoxide`-guarded `eval "$(zoxide init zsh)"` **after**
+  compinit — upstream requires post-compinit placement for its completions
+  (guarded by `zsh_plugins_test.sh`). The PowerShell profile does NOT use
+  zoxide's documented `Invoke-Expression` one-liner (banned here); instead it
+  caches `zoxide init powershell` to `zoxide.ps1` and dot-sources it, using the
+  SAME atomic temp-file + `Move-Item -Force` publish and retry-import helpers as
+  Starship (`Confirm-/Publish-/Import-ZoxideInitScript`). There is no config file
+  to stat, so the cache is regenerated only when missing or when `zoxide
+  --version` changed (a sidecar `zoxide.ps1.version` stamp). zoxide inits AFTER
+  Starship so its prompt hook wraps Starship's prompt. No `--cmd cd` override:
+  plain `cd` is untouched. `invariants_test.sh` bans `Invoke-Expression`/`iex` in
+  the PowerShell profiles; do not reintroduce the one-liner.
+- **gh-dash is a pinned gh CLI extension, not a package.** `gh` is in both
+  catalogs (`PKG_TABLE`: `gh` on brew/apt/dnf/zypper, `github-cli` on
+  pacman/apk; `$Catalog`: winget `GitHub.cli` / choco `gh` / scoop `gh`).
+  gh-dash itself has no brew/apt/scoop package — it installs via
+  `gh extension install dlvhdr/gh-dash --pin <tag>`, pinned to `v4.25.0`
+  (`GH_DASH_VERSION` in `install-deps.sh`, mirrored as `$GhDashVersion` in
+  `install-deps.ps1`; a Renovate `github-releases` manager can bump the tag and
+  `pin_consistency_test.sh` fails on sh/ps1/CLAUDE drift). The installers
+  (`install_gh_dash_extension` / `Install-GhDashExtension`) are gated on `gh`
+  being present **and authenticated** (`gh auth status`): an unauthenticated
+  `gh extension install` hits GitHub's anonymous API rate limit and fails, so
+  when unauthenticated they skip cleanly (NOT a FAIL) and tell the user to run
+  `gh auth login` and rerun. They verify the *installed* pin (not mere presence)
+  and re-pin (`gh extension remove dash` + install) on mismatch; they are
+  consent-gated, dry-run-safe, and emit-FAIL-and-continue only on an
+  *authenticated* install failure (non-critical, like the zsh plugins). In
+  PowerShell the read-only `gh` probes go through `Invoke-GhProbe`, which resets
+  `$global:LASTEXITCODE` so a probe's nonzero exit never leaks into the script's
+  exit code under `$PSNativeCommandUseErrorActionPreference` (that leak made
+  Windows dry-run exit 1 after "install-deps: done"). Its config is a single
+  same-path file on every OS: `~/.config/gh-dash/config.yml` on POSIX and
+  `%USERPROFILE%\.config\gh-dash\config.yml` on Windows (XDG-style, NOT
+  `%LOCALAPPDATA%`), chezmoi-managed from canonical `gh-dash/config.yml` (parity
+  row in `parity_gate.sh`); the config is applied regardless of auth — only the
+  extension binary is auth-gated. Running the dashboard needs `gh auth login` —
+  a manual, secret-bearing step this repo never automates or stores.
+- **which-key.nvim is the only keymap-hint plugin.** `nvim/lua/plugins/which-key.lua`
+  loads it on `event = "VeryLazy"` (never eager — only `rose-pine.lua` may load
+  eagerly, invariant 7) with `opts = {}` and a `<leader>?` popup of buffer-local
+  keymaps. It only *displays* existing keymaps, so it never contends with
+  conform/telescope/gitsigns for a chord; `:checkhealth which-key` must stay free
+  of overlap/duplicate errors. Refresh `nvim/lazy-lock.json` only via the
+  documented Lazy path (`Lazy! restore` then `Lazy! install`, or `Lazy! sync`);
+  guarded by `tests/nvim/spec/which_key_spec.lua` and the startup budget.
 - **lsd owns interactive `ls` ergonomics and its own Rose Pine theme.**
   `install-deps.sh` installs `lsd` through each supported OS package manager;
   `install-deps.ps1` carries it in the Scoop-first catalog (`lsd` -> winget

@@ -38,6 +38,8 @@ if (-not (Test-Path -LiteralPath $script:CacheDir)) {
     try { New-Item -ItemType Directory -Force -Path $script:CacheDir | Out-Null } catch { Write-Verbose $_.Exception.Message }
 }
 $script:StarshipInitPath = Join-Path $script:CacheDir 'starship.ps1'
+$script:ZoxideInitPath = Join-Path $script:CacheDir 'zoxide.ps1'
+$script:ZoxideVersionPath = Join-Path $script:CacheDir 'zoxide.ps1.version'
 
 # Windows PowerShell 5.1 Join-Path takes only ONE child path. PS 6+ allows
 # additional child paths via -AdditionalChildPath. Use nested Join-Path so
@@ -138,6 +140,128 @@ function Import-StarshipInitScriptWithRetry {
     }
 }
 
+# ---- Precompile zoxide init (idempotent; regenerates when zoxide changes) -----
+# Same cached, atomic-publish, no-remote-eval approach as Starship above. The
+# documented zoxide PowerShell init evaluates `zoxide init powershell` output
+# through the remote-eval cmdlet this repo bans; instead we cache the generated
+# init to a file and dot-source it. There is no config file to stat like Starship,
+# so the cache is regenerated only when missing or the installed version changed.
+function Get-ZoxideVersionString {
+    [CmdletBinding()]
+    param()
+    try {
+        return (@(& zoxide --version 2>$null) | Select-Object -First 1)
+    } catch {
+        Write-Verbose $_.Exception.Message
+        return ''
+    }
+}
+
+function Test-ZoxideInitRegenerationNeeded {
+    [CmdletBinding()]
+    param(
+        [string]$InitPath = $script:ZoxideInitPath,
+        [string]$VersionPath = $script:ZoxideVersionPath,
+        [string]$CurrentVersion
+    )
+
+    if (-not (Test-Path -LiteralPath $InitPath)) {
+        return $true
+    }
+    # If the version cannot be probed, keep the existing cache rather than churn.
+    if ([string]::IsNullOrWhiteSpace($CurrentVersion)) {
+        return $false
+    }
+    if (-not (Test-Path -LiteralPath $VersionPath)) {
+        return $true
+    }
+    $recorded = ''
+    try {
+        $recorded = (Get-Content -Raw -LiteralPath $VersionPath -ErrorAction Stop).Trim()
+    } catch {
+        return $true
+    }
+    return ($recorded -ne $CurrentVersion.Trim())
+}
+
+function Publish-ZoxideInitScript {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] [string]$InitPath,
+        [Parameter(Mandatory)] [string]$Content
+    )
+
+    $initDir = Split-Path -Parent $InitPath
+    if (-not (Test-Path -LiteralPath $initDir -PathType Container)) {
+        New-Item -ItemType Directory -Force -Path $initDir | Out-Null
+    }
+
+    $initLeaf = Split-Path -Leaf $InitPath
+    $tempPath = Join-Path $initDir ("{0}.{1}.{2}.tmp" -f $initLeaf, $PID, [guid]::NewGuid().ToString('N'))
+    try {
+        [System.IO.File]::WriteAllText($tempPath, $Content, [System.Text.UTF8Encoding]::new($false))
+        Move-Item -LiteralPath $tempPath -Destination $InitPath -Force -ErrorAction Stop
+        return $true
+    } catch {
+        Write-Verbose $_.Exception.Message
+        Remove-Item -LiteralPath $tempPath -Force -ErrorAction SilentlyContinue
+        if (Test-Path -LiteralPath $InitPath -PathType Leaf) {
+            return $false
+        }
+        throw
+    }
+}
+
+function Confirm-ZoxideInitScript {
+    [CmdletBinding()]
+    param(
+        [string]$InitPath = $script:ZoxideInitPath,
+        [string]$VersionPath = $script:ZoxideVersionPath
+    )
+
+    $current = Get-ZoxideVersionString
+    if (Test-ZoxideInitRegenerationNeeded -InitPath $InitPath -VersionPath $VersionPath -CurrentVersion $current) {
+        Write-Verbose 'Generating precompiled zoxide init script...'
+        $init = (& zoxide init powershell | Out-String)
+        $published = Publish-ZoxideInitScript -InitPath $InitPath -Content $init
+        if ($published -and -not [string]::IsNullOrWhiteSpace($current)) {
+            try {
+                [System.IO.File]::WriteAllText($VersionPath, $current, [System.Text.UTF8Encoding]::new($false))
+            } catch {
+                Write-Verbose $_.Exception.Message
+            }
+        }
+        if (-not $published -and -not (Test-Path -LiteralPath $InitPath -PathType Leaf)) {
+            throw "Zoxide init cache could not be published"
+        }
+    }
+}
+
+function Import-ZoxideInitScriptWithRetry {
+    [CmdletBinding()]
+    param(
+        [string]$InitPath = $script:ZoxideInitPath,
+        [int]$Attempts = 4,
+        [int]$DelayMilliseconds = 50
+    )
+
+    $lastError = $null
+    for ($attempt = 1; $attempt -le $Attempts; $attempt += 1) {
+        try {
+            . $InitPath
+            return
+        } catch {
+            $lastError = $_
+            if ($attempt -lt $Attempts) {
+                Start-Sleep -Milliseconds $DelayMilliseconds
+            }
+        }
+    }
+    if ($lastError) {
+        throw $lastError
+    }
+}
+
 if (Get-Command starship -ErrorAction SilentlyContinue) {
     try {
         Confirm-StarshipInitScript
@@ -153,6 +277,29 @@ if (Get-Command starship -ErrorAction SilentlyContinue) {
             Import-StarshipInitScriptWithRetry
         } catch {
             Write-Warning ("Starship init still failing: " + $_.Exception.Message)
+        }
+    }
+}
+
+# Init zoxide AFTER starship so the zoxide prompt hook wraps the starship prompt
+# (it tracks the current directory on every prompt). Guarded on the binary so a
+# machine without zoxide keeps a working profile.
+if (Get-Command zoxide -ErrorAction SilentlyContinue) {
+    try {
+        Confirm-ZoxideInitScript
+        Import-ZoxideInitScriptWithRetry
+    } catch {
+        # Cached zoxide init may be stale or corrupt from an interrupted write.
+        # Nuke it (and the version stamp) and rebuild once; if it still fails,
+        # give up silently rather than break every shell launch.
+        Write-Warning ("Zoxide init failed: " + $_.Exception.Message + ". Regenerating.")
+        Remove-Item -LiteralPath $script:ZoxideInitPath -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $script:ZoxideVersionPath -Force -ErrorAction SilentlyContinue
+        try {
+            Confirm-ZoxideInitScript
+            Import-ZoxideInitScriptWithRetry
+        } catch {
+            Write-Warning ("Zoxide init still failing: " + $_.Exception.Message)
         }
     }
 }
