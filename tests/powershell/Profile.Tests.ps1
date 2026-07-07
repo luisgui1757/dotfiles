@@ -201,4 +201,87 @@ exit 0
         & $pwshExe -NoProfile -Command $scriptBlock
         $LASTEXITCODE | Should -Be 0
     }
+
+    It "sets EditMode Vi before any key handler (changing EditMode resets handlers)" {
+        $src = Get-Content -Raw -LiteralPath $script:Profile
+        $src | Should -Match 'Set-PSReadLineOption -EditMode Vi'
+        $src | Should -Not -Match 'Set-PSReadLineOption -EditMode Windows'
+        # Anchor on the real cmdlet calls, not the surrounding comment prose.
+        $editModeIdx = $src.IndexOf('Set-PSReadLineOption -EditMode Vi')
+        $firstHandlerIdx = $src.IndexOf('Set-PSReadLineKeyHandler -Key Tab')
+        $editModeIdx | Should -BeGreaterOrEqual 0
+        $firstHandlerIdx | Should -BeGreaterThan $editModeIdx
+    }
+
+    It "binds Tab to MenuComplete on the vi Insert keymap" {
+        $src = Get-Content -Raw -LiteralPath $script:Profile
+        $src | Should -Match 'Set-PSReadLineKeyHandler\s+-Key Tab\s+-Function MenuComplete\s+-ViMode Insert'
+    }
+
+    It "binds Up/Down history search in both vi Insert and Command modes" {
+        $src = Get-Content -Raw -LiteralPath $script:Profile
+        $src | Should -Match 'Set-PSReadLineKeyHandler\s+-Key UpArrow\s+-Function HistorySearchBackward\s+-ViMode Insert'
+        $src | Should -Match 'Set-PSReadLineKeyHandler\s+-Key UpArrow\s+-Function HistorySearchBackward\s+-ViMode Command'
+        $src | Should -Match 'Set-PSReadLineKeyHandler\s+-Key DownArrow\s+-Function HistorySearchForward\s+-ViMode Insert'
+        $src | Should -Match 'Set-PSReadLineKeyHandler\s+-Key DownArrow\s+-Function HistorySearchForward\s+-ViMode Command'
+    }
+
+    It "version-gates -ViMode / -ViModeIndicator with a PS 5.1 fallback" {
+        $src = Get-Content -Raw -LiteralPath $script:Profile
+        $src | Should -Match "Parameters\.ContainsKey\('ViMode'\)"
+        $src | Should -Match "Parameters\.ContainsKey\('ViModeIndicator'\)"
+        $src | Should -Match 'Set-PSReadLineOption -ViModeIndicator Cursor'
+        # The -ViMode gate keeps an unscoped Tab binding for older PSReadLine.
+        $src | Should -Match 'Set-PSReadLineKeyHandler -Key Tab\s+-Function MenuComplete\s+-ErrorAction'
+    }
+
+    It "reapplies the vi-mode key handlers from the psmux OnIdle block" {
+        $src = Get-Content -Raw -LiteralPath $script:Profile
+        $onIdleIdx = $src.IndexOf('PowerShell.OnIdle')
+        $onIdleIdx | Should -BeGreaterThan 0
+        $tail = $src.Substring($onIdleIdx)
+        $tail | Should -Match 'Set-PSReadLineKeyHandler\s+-Key Tab\s+-Function MenuComplete\s+-ViMode Insert'
+        $tail | Should -Match 'Set-PSReadLineKeyHandler\s+-Key UpArrow\s+-Function HistorySearchBackward\s+-ViMode Insert'
+    }
+
+    It "keeps the PSFzf chords and wires them after EditMode" {
+        $src = Get-Content -Raw -LiteralPath $script:Profile
+        $src | Should -Match 'PSReadlineChordProvider'
+        $src | Should -Match 'PSReadlineChordReverseHistory'
+        $src | Should -Match 'PSReadlineChordSetLocation'
+        $editModeIdx = $src.IndexOf('-EditMode Vi')
+        $psfzfIdx = $src.IndexOf('Set-PsFzfOption')
+        $editModeIdx | Should -BeGreaterOrEqual 0
+        $psfzfIdx | Should -BeGreaterThan $editModeIdx
+    }
+
+    It "keeps the Rose Pine prediction + colors after enabling vi mode" {
+        $src = Get-Content -Raw -LiteralPath $script:Profile
+        $src | Should -Match 'PredictionSource HistoryAndPlugin'
+        $src | Should -Match 'PredictionViewStyle\s+ListView'
+        $src | Should -Match 'RosePineSelectionColor'
+    }
+
+    It "applies EditMode Vi, cursor indicator, and MenuComplete Tab when dot-sourced" {
+        $pwshExe = (Get-Command pwsh -ErrorAction SilentlyContinue).Source
+        if (-not $pwshExe) {
+            $pwshExe = (Get-Command pwsh.exe -ErrorAction SilentlyContinue).Source
+        }
+        $pwshExe | Should -Not -BeNullOrEmpty
+
+        $profilePath = $script:Profile.Replace('"', '`"')
+        $scriptBlock = @"
+. "$profilePath"
+`$o = Get-PSReadLineOption
+if (`$o.EditMode -ne 'Vi') { Write-Error "EditMode=`$(`$o.EditMode)"; exit 1 }
+`$tab = Get-PSReadLineKeyHandler -Bound | Where-Object { `$_.Key -eq 'Tab' }
+if (-not (`$tab | Where-Object { `$_.Function -eq 'MenuComplete' })) { Write-Error 'Tab not MenuComplete'; exit 2 }
+`$up = Get-PSReadLineKeyHandler -Bound | Where-Object { `$_.Key -eq 'UpArrow' }
+if (-not (`$up | Where-Object { `$_.Function -eq 'HistorySearchBackward' })) { Write-Error 'Up not HistorySearchBackward'; exit 3 }
+exit 0
+"@
+
+        & $pwshExe -NoProfile -Command $scriptBlock
+        $LASTEXITCODE | Should -Be 0
+    }
 }

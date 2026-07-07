@@ -829,6 +829,23 @@ hits GitHub's anonymous rate limit); run `gh auth login`, then rerun `setup` /
 `install-deps` to pick it up. The token is machine-local and never stored in
 this repo.
 
+### Command-line vi mode
+
+Both shells edit the command line with **vi keybindings**. Press `Esc` to leave
+insert mode and use `h`/`j`/`k`/`l`, `w`/`b`, `dd`, `cw`, `.` etc. on the current
+line; press `i`/`a`/`o` to type again. The cursor changes shape with the mode
+(beam while typing, block in normal mode). Everything you already use still
+works in insert mode: **Tab** opens the fuzzy completion menu, **Up/Down** do
+prefix history search, and **Ctrl-R / Ctrl-T / Alt-C** are the fzf history / file
+/ cd pickers. The arrows also search history from normal mode.
+
+- **zsh:** enabled with `bindkey -v`. `Esc` responsiveness vs. Alt/Meta chords is
+  governed by `KEYTIMEOUT` (250 ms by default). To retune it, export
+  `DOTFILES_KEYTIMEOUT` (hundredths of a second) or set `KEYTIMEOUT` in
+  `~/.zshrc.local`.
+- **PowerShell:** enabled with `Set-PSReadLineOption -EditMode Vi`; the mode
+  indicator changes the cursor shape on supported terminals (Windows Terminal).
+
 ### Adding a plugin
 
 Drop one file at `nvim/lua/plugins/<name>.lua` returning the lazy spec.

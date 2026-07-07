@@ -206,6 +206,36 @@ that violates one of these, fix it instead of disabling the test.
     the rest of the repo. Guarded by `editorconfig_check.sh` and
     `invariants_test.sh`, including `git check-attr` probes for `.bat` and
     `.cmd`.
+21. **Command-line vi mode is ENABLE-BEFORE-BIND on both shells.** Both shells
+    ship vi keybindings, and in both the mode switch RESETS the active bindings,
+    so it must run *before* every keymap/key-handler line — never after.
+    - **zsh (`shells/zshrc`):** `bindkey -v` runs in its own section *before* the
+      completion/keybinding region (before `compinit`, the fzf-tab Tab reclaim,
+      and the Up/Down bindings). It swaps the main keymap from emacs to `viins`,
+      so later unqualified `bindkey ...` calls land on the active vi insert
+      keymap; bindings that must also work in normal mode are added to `vicmd`
+      explicitly (Up/Down history search, the Tab reclaim, the Ctrl-R fallback).
+      `KEYTIMEOUT` is set explicitly (`${DOTFILES_KEYTIMEOUT:-25}`) — NOT left at
+      the default and NOT set to 1: a too-low value splits ESC-prefixed sequences
+      (the Meta/Alt prefix such as fzf's Alt-C, and the arrow-key `ESC [ A`
+      sequences) into "ESC then a normal-mode command"; override via
+      `DOTFILES_KEYTIMEOUT` or `~/.zshrc.local`. Cursor shape is registered
+      through `add-zle-hook-widget keymap-select`/`line-init` (NOT a raw
+      `zle -N zle-keymap-select`) so it COMPOSES with zsh-autosuggestions and
+      starship; registering it before starship init is load-bearing because
+      starship only *preserves* an already-registered `zle-keymap-select`. fzf's
+      own `--zsh` block already binds Ctrl-R/Ctrl-T/Alt-C in viins+vicmd, so those
+      chords survive vi mode without extra work. Guarded by
+      `tests/shell/zsh_vi_mode_test.sh` (static ordering + live-keymap probe).
+    - **PowerShell (`shells/powershell_profile.ps1`):** `Set-PSReadLineOption
+      -EditMode Vi` runs *before* any `Set-PSReadLineKeyHandler` (changing
+      EditMode wipes handlers). Tab=MenuComplete and Up/Down history search are
+      re-applied after, with `-ViMode Insert` (Up/Down also `-ViMode Command`);
+      `-ViMode` and `-ViModeIndicator` are gated on the parameter existing so
+      PS 5.1 / old PSReadLine falls back to unscoped bindings. The psmux
+      `PowerShell.OnIdle` re-apply also re-asserts these handlers but does NOT
+      re-set EditMode (that would wipe PSFzf's Ctrl+R/T + Alt+C chords). Guarded
+      by the vi-mode `It` blocks in `tests/powershell/Profile.Tests.ps1`.
 
 ## Common workflows
 
