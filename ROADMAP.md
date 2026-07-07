@@ -139,7 +139,7 @@ Commit-by-commit status:
 - **Commit 4 - Nix skeleton — DONE.** `flake.nix` + committed `flake.lock`
   (zero ownership), devShell + `checks`, `nix flake check` CI on Ubuntu + macOS,
   Renovate `nix` manager, disjointness static tests.
-- **Commit 5 - nix-darwin + declarative Homebrew — PLANNED.**
+- **Commit 5 - nix-darwin + declarative Homebrew — DONE.**
   `darwinConfigurations` with `system.primaryUser`; nix-homebrew (pinned taps,
   `mutableTaps = false`); homebrew module (`autoUpdate = false`, `upgrade = false`,
   `cleanup = "check"`); casks WezTerm + AeroSpace; brews Herdr + selected CLI; Home

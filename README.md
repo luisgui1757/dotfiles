@@ -111,10 +111,20 @@ apply.
 ./setup.sh --update              # update proven tools/artifacts + Mason, no git/config/Lazy
 ./setup.sh --dry-run             # preview
 ./setup.sh --experimental-wsl-gui # WSL-only opt-in for Linux GUI terminal bits
+./setup.sh --nix-darwin          # macOS-only opt-in: apply the nix-darwin package layer
 ./setup.sh --skip-config         # skip chezmoi config apply
 ./setup.sh --skip-agents         # skip global Polaris agent policy
 make setup                       # same as ./setup.sh, via the Makefile
 ```
+
+**Nix layer (optional, POSIX packages only).** `flake.nix` + a committed
+`flake.lock` provide a package layer (nix-darwin + declarative Homebrew + Home
+Manager on macOS). chezmoi still owns **every** dotfile; Nix owns no config.
+It is opt-in and off by default: `./setup.sh --nix-darwin` (macOS-only,
+consent-gated) runs `darwin-rebuild switch --flake .#dotfiles`, which activates
+the declarative Homebrew casks (WezTerm, AeroSpace) + Herdr brew and the
+nix-owned CLI package set. Native Windows is non-Nix. `nix flake check` runs in
+CI (`.github/workflows/nix.yml`) on Ubuntu + macOS.
 
 ```powershell
 .\setup.ps1

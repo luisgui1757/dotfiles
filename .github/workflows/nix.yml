@@ -33,3 +33,7 @@ jobs:
         uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22
       - name: nix flake check
         run: nix flake check --print-build-logs
+      - name: nix files are nixpkgs-fmt formatted
+        run: nix fmt -- --check flake.nix nix/
+      - name: nix-darwin + setup integration assertions
+        run: bash tests/nix/run_all.sh

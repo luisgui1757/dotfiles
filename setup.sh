@@ -36,6 +36,7 @@ SKIP_NVIM=0
 SKIP_AGENTS=0
 BEST_EFFORT=0
 EXPERIMENTAL_WSL_GUI=0
+NIX_DARWIN=0
 POLARIS_REPO_URL="https://github.com/luisgui1757/polaris.git"
 POLARIS_VERSION="0.1.2"
 POLARIS_TAG="v0.1.2"
@@ -58,6 +59,8 @@ Local usage:
   ./setup.sh --best-effort       continue past plugin/LSP/Mason phase failures
   ./setup.sh --experimental-wsl-gui
                                 WSL opt-in: install/link Linux Ghostty + Linux fonts
+  ./setup.sh --nix-darwin        macOS opt-in: apply the nix-darwin package layer
+                                (declarative Homebrew casks/brews + nix CLI set)
 
 First run:
   git clone https://github.com/luisgui1757/dotfiles.git "${DOTFILES_DEST:-$HOME/dotfiles}"
@@ -79,6 +82,7 @@ for arg in "$@"; do
         --best-effort)    BEST_EFFORT=1 ;;
         --experimental-wsl-gui)
                           EXPERIMENTAL_WSL_GUI=1 ;;
+        --nix-darwin)     NIX_DARWIN=1 ;;
         -h|--help)        usage; exit 0 ;;
         *) echo "Unknown arg: $arg" >&2; exit 2 ;;
     esac
@@ -544,6 +548,57 @@ run_update_mode() {
     fi
 }
 
+# Optional, EXPLICIT opt-in: apply the Nix (nix-darwin) package layer. This is
+# NOT part of the default flow and never runs without --nix-darwin, so setup
+# defaults are unchanged. It activates declarative Homebrew (WezTerm/AeroSpace
+# casks, Herdr brew) and the nix-owned CLI package set on macOS. chezmoi still
+# owns every dotfile (invariant 22). --impure lets the flake resolve $USER for
+# system.primaryUser; modern nix-darwin runs the privileged activation itself
+# (no outer sudo), so $USER stays the real user, not root.
+run_nix_darwin_switch() {
+    [[ "$NIX_DARWIN" -eq 1 ]] || return 0
+    if [[ "$(uname -s)" != "Darwin" ]]; then
+        echo
+        echo "skipped: --nix-darwin is macOS-only (nix-darwin has no Linux/Windows target)"
+        return 0
+    fi
+    phase "Optional: apply the Nix (nix-darwin) package layer"
+    if ! command -v nix >/dev/null 2>&1; then
+        echo "  skipped: nix is not installed. Install Nix first (e.g. the notarized"
+        echo "           Determinate pkg), then re-run: ./setup.sh --nix-darwin"
+        return 0
+    fi
+    local flake_ref="$SCRIPT_DIR#dotfiles"
+    echo "  Runs 'darwin-rebuild switch --flake $flake_ref --impure':"
+    echo "  declarative Homebrew (WezTerm/AeroSpace casks, Herdr brew) + nix CLI set."
+    echo "  It will prompt for sudo during system activation."
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        echo "  would: darwin-rebuild switch --flake $flake_ref --impure"
+        echo "         (first-time bootstrap: nix run nix-darwin -- switch --flake $flake_ref --impure)"
+        return 0
+    fi
+    if [[ "$ALL" -eq 0 ]]; then
+        printf "  Apply nix-darwin now? [y/N] "
+        local reply=""
+        read -r reply || true
+        case "$reply" in
+            y | Y | yes | YES | Yes) ;;
+            *)
+                echo "  skipped nix-darwin apply"
+                return 0
+                ;;
+        esac
+    fi
+    if command -v darwin-rebuild >/dev/null 2>&1; then
+        darwin-rebuild switch --flake "$flake_ref" --impure ||
+            echo "  WARN: darwin-rebuild switch failed (opt-in layer; setup continues)"
+    else
+        echo "  bootstrapping nix-darwin (first run)..."
+        nix run nix-darwin -- switch --flake "$flake_ref" --impure ||
+            echo "  WARN: nix-darwin bootstrap switch failed (opt-in layer; setup continues)"
+    fi
+}
+
 # Test seam: `DOTFILES_SETUP_SOURCE_ONLY=1 source setup.sh` loads the helper
 # functions (phase, refresh_runtime_path) without running the install phases, so
 # tests can exercise refresh_runtime_path in isolation. Unset in normal runs.
@@ -637,6 +692,8 @@ else
 fi
 
 run_polaris_agent_policy
+
+run_nix_darwin_switch
 
 # ---- Summary -----------------------------------------------------------------
 echo

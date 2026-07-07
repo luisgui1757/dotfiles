@@ -50,10 +50,13 @@ scan_nix() {
 #     and friends -- exactly the files chezmoi owns. programs.home-manager
 #     (which only manages HM itself) is the one allowed programs.* module.
 # ---------------------------------------------------------------------------
+# The trailing (\.|=|"|\{) requirement makes these match real attribute usage
+# (home.file."x" = ..., xdg.configFile.foo.text = ...) but NOT documenting prose
+# like "declares no home.file / xdg.configFile" in a comment.
 scan_nix "HM/darwin declares no home.file dotfiles (packages-only)" \
     '(^|[^[:alnum:]_.])home\.file[[:space:]]*(\.|=|"|\{)'
 scan_nix "HM/darwin declares no xdg.configFile / xdg.dataFile / xdg.desktopEntries" \
-    '(^|[^[:alnum:]_.])xdg\.(configFile|dataFile|desktopEntries)'
+    '(^|[^[:alnum:]_.])xdg\.(configFile|dataFile|desktopEntries)[[:space:]]*(\.|=|"|\{)'
 scan_nix "HM/darwin declares no config-generating programs.<tool> for chezmoi-owned tools" \
     '(^|[^[:alnum:]_.])programs\.(zsh|bash|fish|nushell|neovim|vim|tmux|starship|git|kitty|alacritty|wezterm|ghostty|zoxide|fzf|lsd|eza|bat|direnv|gh|lazygit|readline)([.[:space:]=]|$)'
 scan_nix "HM/darwin writes no config via home.activation file emission" \

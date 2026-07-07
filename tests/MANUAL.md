@@ -103,6 +103,25 @@ significant change to the relevant area.
       the ListView history prediction is back, and the PSFzf `Ctrl+R` picker
       still works (the re-apply must NOT have wiped the fzf chords).
 
+## Nix layer (macOS opt-in)
+
+- [ ] **`nix flake check`**: on a Nix host run `nix flake check` at the repo root
+      — it evaluates `darwinConfigurations.dotfiles` (build skipped) and builds
+      `checks.<system>.toolchain`, exit 0.
+- [ ] **nix-darwin bootstrap/switch**, macOS: with Nix installed, run
+      `./setup.sh --nix-darwin` (or `nix run nix-darwin -- switch --flake .#dotfiles --impure`
+      the first time). Confirm it prompts for sudo only at activation, sets
+      `system.primaryUser` to the real `$USER` (not root), installs the WezTerm +
+      AeroSpace casks and the Herdr brew via declarative Homebrew (no `brew
+      update`/`upgrade`; `cleanup = check` only reports drift), and puts the
+      nix-owned CLI set on PATH from `~/.nix-profile` / the system profile.
+- [ ] **Nix owns packages, chezmoi owns config**: after the switch, `~/.config`
+      dotfiles (nvim, wezterm, aerospace, starship, zsh, tmux…) are still the
+      chezmoi symlinks/copies — the Nix switch must NOT have replaced or
+      duplicated any managed dotfile.
+- [ ] **flake.lock is not silently mutated**: a normal `./setup.sh` /
+      `./setup.sh --update` run leaves `git status` on `flake.lock` clean.
+
 ## Cross-OS clipboard round-trip
 
 - [ ] **macOS**: yank in nvim, ⌘V into Notes — pastes.

@@ -1407,6 +1407,56 @@ save only**. The next plain `:w` formats normally. Implemented in
   source carries no raw ANSI escape byte (keeps the `.ps1` pure-ASCII
   invariant).
 
+## Nix layer (optional POSIX packages; chezmoi still owns every dotfile)
+
+The `flake.nix` + committed `flake.lock` are the POSIX **package** layer. They own
+NO dotfiles — chezmoi does, on every OS (invariant 22). Native Windows is
+non-Nix. The whole layer is opt-in; setup defaults are unchanged.
+
+- **`flake.nix` structure.** `nixpkgs` (nixos-unstable, pinned by `flake.lock`),
+  plus `nix-darwin`, `home-manager`, `nix-homebrew`, and the three Homebrew taps
+  (`homebrew-core`, `homebrew-cask`, `nikitabobko/homebrew-tap`) as pinned
+  (`flake = false`) inputs. `systems` covers the four POSIX systems only — there
+  is deliberately **no windows system**. Outputs: a packages-only `devShells`,
+  a hermetic `checks.<system>.toolchain` (proves nixpkgs resolves the CLI
+  toolchain), `formatter = nixpkgs-fmt`, and `darwinConfigurations."dotfiles"`.
+- **`nix flake check` in CI does NOT build the darwin toplevel.** It *evaluates*
+  `darwinConfigurations.dotfiles` (catching config errors — it caught a
+  `nixpkgs.hostPlatform` recursion and a null `home.homeDirectory` during
+  development) but reports "(build skipped)", so CI never fetches the multi-GB
+  Homebrew taps. `.github/workflows/nix.yml` runs `nix flake check`, the
+  `nix fmt --check`, and `tests/nix/run_all.sh` on Ubuntu + macOS. It is a
+  SEPARATE workflow from `test.yml` so it is not auto-derived into the required
+  check set (`required_checks_test.sh` parses only `test.yml` + `e2e-install.yml`).
+- **nix-darwin (`nix/darwin/configuration.nix`).** `nix.enable = false` — the
+  **Determinate** daemon owns Nix, so nix-darwin must not fight it. Declarative
+  Homebrew: `onActivation` `autoUpdate = false`, `upgrade = false`,
+  `cleanup = "check"` (report drift, never destroy); casks = WezTerm + AeroSpace
+  (GUI/vendor apps, never nixpkgs); brews = Herdr. nix-homebrew runs
+  `mutableTaps = false` with the taps supplied as pinned inputs, and
+  `homebrew.taps = builtins.attrNames config.nix-homebrew.taps`. `system.primaryUser`
+  + `users.users.<user>.home` are resolved from `$USER`.
+- **User resolution.** The flake reads `builtins.getEnv "USER"` with a `"runner"`
+  fallback so pure eval / `nix flake check` still evaluates; setup.sh runs
+  `darwin-rebuild switch --flake .#dotfiles --impure` so the real switch resolves
+  the real user. Do NOT wrap that switch in an outer `sudo` (modern nix-darwin
+  runs the privileged activation itself; an outer sudo would make `$USER` = root).
+- **Home Manager is packages-only** (`nix/home/darwin.nix`): `home.packages` +
+  the minimal `home.username`/`home.stateVersion`. `home.homeDirectory` is left
+  to the nix-darwin HM integration (derived from `users.users.<user>.home`) to
+  avoid a conflicting definition. No `home.file`, no `xdg.configFile`, no
+  `programs.<tool>`. Guarded at the SOURCE level by
+  `tests/static/nix_architecture_test.sh` (its `home.file`/`xdg.*File` regexes
+  require a trailing `= . " {` so documenting prose does not false-positive).
+- **setup.sh integration is explicit + consent-gated.** `setup.sh --nix-darwin`
+  (macOS-only) is the ONLY path that runs `darwin-rebuild switch`; without the
+  flag setup never touches Nix. It is dry-run-safe (previews the command),
+  prompts unless `--all`, skips cleanly off-macOS or without nix, and is
+  WARN-non-fatal. Guarded by `tests/nix/setup_nix_darwin_test.sh`.
+- **Renovate** owns `flake.lock` bumps via the `nix` manager (reviewed PRs). Do
+  NOT rewrite `flake.lock` silently in setup/update; a bump is always a PR.
+- **`--update` owner=nix** is Phase 7 (`tests/shell/install_deps_update_test.sh`).
+
 ## Login shell: zsh adoption (install-deps.sh)
 
 Installing the zsh *package* does NOT make zsh your login shell — that takes a
