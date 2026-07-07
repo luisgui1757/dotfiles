@@ -155,10 +155,18 @@ Commit-by-commit status:
   the E5113 parser/ABI mismatch. They stay native until nvim + its parser
   toolchain can move into one ABI-matched Nix closure (follow-up). Excluded from
   `nix/home/common.nix` and asserted absent by `tests/nix/linux_home_test.sh`.
-- **Commit 7 - setup/update ownership integration — PLANNED.** Unix update
-  ownership recognizes Nix-owned tools (`owner=nix`); no blanket
-  `nix profile upgrade`; no silent `flake.lock` rewrite; explicit documented +
-  tested Nix switch flag.
+- **Commit 7 - setup/update ownership integration — DONE.** Unix update
+  ownership recognizes Nix-owned tools: `install-deps.sh --update` resolves a
+  tool's command source (or real path) and, when it lives under a Nix
+  store/profile path, reports `skipped … owner=nix reason=managed by the Nix
+  layer …` (reusing the documented vocabulary, not a new status word). No blanket
+  `nix profile upgrade` / `nix-env -u` / `nix flake update`; no silent
+  `flake.lock` rewrite (lock bumps are reviewed Renovate PRs; the layer is
+  refreshed by the opt-in `setup.sh --nix-darwin` / `--home-manager` switches,
+  the explicit + tested Nix switch flags). Existing per-manager ownership is
+  preserved. Guarded by the new `nix-owned tool reports owner=nix` case in
+  `install_deps_update_test.sh` + the blanket-upgrade guard in
+  `nix_architecture_test.sh`.
 
 Each commit flips its own status to DONE in the same commit that lands it, per
 the repo's doc-discipline rule.

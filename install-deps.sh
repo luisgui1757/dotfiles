@@ -2959,6 +2959,30 @@ pm_update() {
     scoped_update_status "$PM" "$tool" "$pkg" "$(update_tool_source "$tool" || true)"
 }
 
+# A resolved executable is Nix-owned when its command source (or its real path)
+# lives under a Nix store / profile path. Update mode reports these as
+# owner=nix and does NOT try to update them: Nix-owned tools are refreshed
+# through the OPT-IN Nix layer (setup.sh --nix-darwin / --home-manager, or a
+# reviewed flake.lock bump), never a blanket `nix profile upgrade` and never a
+# silent flake.lock rewrite. Every other tool keeps its existing per-manager
+# ownership -- this only fires when PATH actually resolves the tool from Nix.
+nix_owns_tool_source() {
+    local source="$1" real
+    [[ -n "$source" ]] || return 1
+    case "$source" in
+        /nix/store/* | *"/.nix-profile/"* | *"/.local/state/nix/profile/"* | /run/current-system/sw/* | /etc/profiles/per-user/* | /nix/var/nix/profiles/*)
+            return 0
+            ;;
+    esac
+    real="$(real_source_path "$source" 2>/dev/null || true)"
+    case "$real" in
+        /nix/store/* | /run/current-system/sw/* | /etc/profiles/per-user/*)
+            return 0
+            ;;
+    esac
+    return 1
+}
+
 update_catalog_tool() {
     local tool="$1" pkg source brew_rc native_pm native_pkg direct_rc hint
     [[ -n "$tool" ]] || return 0
@@ -2976,6 +3000,11 @@ update_catalog_tool() {
 
     if accepted_system_tool_source "$tool" "$source"; then
         printf "  system    %-26s source=%s\n" "$tool" "$source"
+        return 0
+    fi
+
+    if nix_owns_tool_source "$source"; then
+        printf "  skipped   %-26s owner=nix reason=managed by the Nix layer (setup.sh --nix-darwin/--home-manager or a reviewed flake.lock bump) source=%s\n" "$tool" "$source"
         return 0
     fi
 

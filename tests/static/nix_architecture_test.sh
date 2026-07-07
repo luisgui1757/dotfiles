@@ -108,5 +108,29 @@ else
     echo "ok  : no remote-eval Nix installer in repo installer code"
 fi
 
+# ---------------------------------------------------------------------------
+# (e) update mode must not run a blanket Nix upgrade or silently rewrite
+#     flake.lock. No installer code may RUN `nix profile upgrade`, `nix-env -u`,
+#     `nix flake update`, or `nix flake lock --update-input`. The opt-in switches
+#     (`nix run nix-darwin -- switch`, `home-manager switch`) are fine; those are
+#     activation, not a blanket package upgrade or a lock rewrite. (Comments that
+#     merely describe the ban are allowed.)
+# ---------------------------------------------------------------------------
+blanket_nix_pattern='nix[[:space:]]+profile[[:space:]]+upgrade|nix-env[[:space:]]+([^#]*[[:space:]])?-u|nix[[:space:]]+flake[[:space:]]+update|nix[[:space:]]+flake[[:space:]]+lock[[:space:]][^#]*--(update-input|recreate-lock-file)'
+blanket_hits=""
+for f in install-deps.sh setup.sh install-deps.ps1 setup.ps1; do
+    [[ -f "$f" ]] || continue
+    while IFS= read -r line; do
+        blanket_hits+="$f:$line"$'\n'
+    done < <(grep -nE "$blanket_nix_pattern" "$f" 2>/dev/null | grep -vE '^[0-9]+:[[:space:]]*#')
+done
+if [[ -n "${blanket_hits//[[:space:]]/}" ]]; then
+    echo "FAIL: installer code runs a blanket Nix upgrade / silent flake.lock rewrite:"
+    printf '%s' "$blanket_hits" | sed 's/^/  /'
+    fail=1
+else
+    echo "ok  : no blanket nix upgrade / silent flake.lock rewrite in installer code"
+fi
+
 [[ "$fail" -eq 0 ]] || exit 1
 echo "all nix-architecture invariants OK"

@@ -271,14 +271,24 @@ that violates one of these, fix it instead of disabling the test.
       not repo code. Repo-side Nix bootstrap docs use verified artifacts, never a
       mutable remote script. (Also covered by
       `tests/static/supply_chain_remote_execution_test.sh`.)
-    - **(e) Nix owner reporting in update mode.** When `--update` resolves a tool
-      whose executable lives under a Nix profile/store path
-      (`/nix/store`, `~/.nix-profile`, `/run/current-system/sw`,
-      `/etc/profiles/per-user`, or a `nix profile` link), it reports the truthful
-      `owner=nix` status in the same stable vocabulary as the other owners. It
-      must NOT run a blanket `nix profile upgrade '.*'` and must NOT silently
-      rewrite `flake.lock`; the pinned lock is bumped only by an explicit,
-      documented switch flag.
+    - **(e) Nix owner reporting in update mode.** When `install-deps.sh --update`
+      resolves a tool whose command source (or its real path) lives under a Nix
+      profile/store path (`/nix/store`, `*/.nix-profile/*`,
+      `*/.local/state/nix/profile/*`, `/run/current-system/sw`,
+      `/etc/profiles/per-user`, `/nix/var/nix/profiles/*`), `nix_owns_tool_source`
+      reports it truthfully as `skipped … owner=nix reason=managed by the Nix
+      layer …` — reusing the documented `skipped` vocabulary (like the pacman
+      "explicit system upgrade" case), not a new status word. It fires only when
+      PATH actually resolves the tool from Nix, so every other tool keeps its
+      existing per-manager ownership. Update mode must NOT run a blanket
+      `nix profile upgrade`, `nix-env -u`, or `nix flake update`, and must NOT
+      silently rewrite `flake.lock`; the pinned lock is bumped only by an
+      explicit, reviewed PR (Renovate `nix` manager), and the Nix layer is
+      refreshed by the opt-in `setup.sh --nix-darwin` / `--home-manager` switch.
+      Guarded by the `nix-owned tool reports owner=nix` case in
+      `tests/shell/install_deps_update_test.sh` (which also proves update mode
+      never shells out to `nix` for an owned tool) and the "no blanket nix
+      upgrade / silent flake.lock rewrite" check in `nix_architecture_test.sh`.
 
 ## Common workflows
 
