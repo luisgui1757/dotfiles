@@ -43,10 +43,13 @@ significant change to the relevant area.
       zsh and a fresh PowerShell (incl. inside psmux). Plain `cd` is unchanged.
 - [ ] **which-key**: in nvim press `<leader>` and pause past `timeoutlen`; a
       popup lists the follow-up keys. `<leader>?` shows the buffer-local keymaps.
-- [ ] **gh-dash**: run `gh auth login` once, then `gh dash` renders the
+- [ ] **gh-dash**: the config (`~/.config/gh-dash/config.yml`;
+      `%USERPROFILE%\.config\gh-dash\config.yml` on Windows) is applied by setup
+      regardless of auth; the extension binary installs only **after**
+      `gh auth login` (setup skips it cleanly when unauthenticated — rerun
+      setup/install-deps after authenticating). Then `gh dash` renders the
       dashboard (My Pull Requests / Needs My Review / My Issues) with Nerd Font
-      icons. Config is read from `~/.config/gh-dash/config.yml`
-      (`%USERPROFILE%\.config\gh-dash\config.yml` on Windows).
+      icons.
 
 ## Cross-OS clipboard round-trip
 

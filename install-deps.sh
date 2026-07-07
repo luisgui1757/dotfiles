@@ -1863,28 +1863,66 @@ install_zsh_plugins() {
 
 install_gh_dash_extension() {
     # gh-dash is a gh CLI extension (there is no brew/apt package), pinned to
-    # GH_DASH_VERSION. It needs the gh CLI; running the dashboard also needs
-    # `gh auth login` -- a manual, secret-bearing step we never automate or store.
-    # Non-critical: a failure emits a FAIL: marker for CI but does not abort setup
-    # (same emit-FAIL-and-continue pattern as install_zsh_plugins).
+    # GH_DASH_VERSION. It is only useful once `gh auth login` has run, and an
+    # UNAUTHENTICATED `gh extension install` hits GitHub's anonymous API rate
+    # limit and fails -- so we require auth before touching the extension. The
+    # chezmoi-managed config is applied regardless; this step only gates the
+    # extension binary. When gh is unauthenticated we skip cleanly (NOT a FAIL)
+    # and tell the user to authenticate and rerun. An authenticated install
+    # failure still emits a FAIL: marker for CI but does not abort setup (same
+    # emit-FAIL-and-continue pattern as install_zsh_plugins).
     if ! have gh; then
         printf "  skipped   %-26s gh CLI not installed (gh-dash is a gh extension)\n" "gh-dash"
         return 0
     fi
-    if gh extension list 2>/dev/null | grep -q 'dlvhdr/gh-dash'; then
-        printf "  ok        %-26s already installed (pinned %s)\n" "gh-dash" "$GH_DASH_VERSION"
+    if ! gh auth status >/dev/null 2>&1; then
+        printf "  skipped   %-26s run 'gh auth login' then rerun to install gh-dash\n" "gh-dash"
         return 0
     fi
-    if ! ask "Install gh-dash (pinned gh extension $GH_DASH_VERSION)?"; then
+
+    # Verify the *installed* pin, not merely presence -- an extension pinned to a
+    # different tag must be re-pinned, and a plain `gh extension install` of an
+    # already-present extension errors, so a mismatch takes the remove+install path.
+    local list installed_ver reinstall=0
+    list="$(gh extension list 2>/dev/null || true)"
+    if printf '%s\n' "$list" | grep -q 'dlvhdr/gh-dash'; then
+        installed_ver="$(printf '%s\n' "$list" \
+            | awk '{ for (i = 1; i <= NF; i++) if ($i == "dlvhdr/gh-dash") { print $(i + 1); exit } }')"
+        if [[ -n "$installed_ver" && "v${installed_ver#v}" == "$GH_DASH_VERSION" ]]; then
+            printf "  ok        %-26s already installed (pinned %s)\n" "gh-dash" "$GH_DASH_VERSION"
+            return 0
+        fi
+        reinstall=1
+    fi
+
+    local prompt
+    if [[ "$reinstall" -eq 1 ]]; then
+        prompt="Re-pin gh-dash to $GH_DASH_VERSION (currently ${installed_ver:-unknown})?"
+    else
+        prompt="Install gh-dash (pinned gh extension $GH_DASH_VERSION)?"
+    fi
+    if ! ask "$prompt"; then
         printf "  skipped   %-26s\n" "gh-dash"
         return 0
     fi
     if [[ "$DRY_RUN" -eq 1 ]]; then
-        echo "  would: gh extension install dlvhdr/gh-dash --pin $GH_DASH_VERSION"
+        if [[ "$reinstall" -eq 1 ]]; then
+            echo "  would: gh extension remove dash && gh extension install dlvhdr/gh-dash --pin $GH_DASH_VERSION"
+        else
+            echo "  would: gh extension install dlvhdr/gh-dash --pin $GH_DASH_VERSION"
+        fi
         return 0
     fi
+
+    if [[ "$reinstall" -eq 1 ]]; then
+        gh extension remove dash >/dev/null 2>&1 || true
+    fi
     if gh extension install dlvhdr/gh-dash --pin "$GH_DASH_VERSION"; then
-        printf "  installed %-26s %s\n" "gh-dash" "$GH_DASH_VERSION"
+        if [[ "$reinstall" -eq 1 ]]; then
+            printf "  installed %-26s %s (re-pinned)\n" "gh-dash" "$GH_DASH_VERSION"
+        else
+            printf "  installed %-26s %s\n" "gh-dash" "$GH_DASH_VERSION"
+        fi
     else
         printf "  FAIL: %-26s gh extension install dlvhdr/gh-dash --pin %s failed\n" "gh-dash" "$GH_DASH_VERSION" >&2
     fi

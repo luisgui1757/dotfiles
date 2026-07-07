@@ -820,10 +820,14 @@ profiles (PowerShell uses a cached init, no `Invoke-Expression`).
 ### gh-dash — pull-request / issue dashboard
 
 Run `gh dash` for a terminal dashboard of your PRs, review requests, and issues.
-It is a pinned `gh` CLI extension; its config lives at
-`~/.config/gh-dash/config.yml` (same relative path on Windows). **Run once
-first:** `gh auth login` — the token is machine-local and never stored in this
-repo.
+Its config (`~/.config/gh-dash/config.yml`, same relative path on Windows) is
+applied by setup **always**. The dashboard binary is a pinned `gh` CLI
+extension, and it only works once you have authenticated — so setup installs the
+extension only **after** `gh auth login`. If you have not authenticated yet,
+setup skips the extension cleanly (no error, because an unauthenticated install
+hits GitHub's anonymous rate limit); run `gh auth login`, then rerun `setup` /
+`install-deps` to pick it up. The token is machine-local and never stored in
+this repo.
 
 ### Adding a plugin
 

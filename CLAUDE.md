@@ -1280,14 +1280,23 @@ save only**. The next plain `:w` formats normally. Implemented in
   `install-deps.ps1`; a Renovate `github-releases` manager can bump the tag and
   `pin_consistency_test.sh` fails on sh/ps1/CLAUDE drift). The installers
   (`install_gh_dash_extension` / `Install-GhDashExtension`) are gated on `gh`
-  being present, idempotent (skip when the extension is already installed),
-  consent-gated, dry-run-safe, and emit-FAIL-and-continue (non-critical, like
-  the zsh plugins). Its config is a single same-path file on every OS:
-  `~/.config/gh-dash/config.yml` on POSIX and
+  being present **and authenticated** (`gh auth status`): an unauthenticated
+  `gh extension install` hits GitHub's anonymous API rate limit and fails, so
+  when unauthenticated they skip cleanly (NOT a FAIL) and tell the user to run
+  `gh auth login` and rerun. They verify the *installed* pin (not mere presence)
+  and re-pin (`gh extension remove dash` + install) on mismatch; they are
+  consent-gated, dry-run-safe, and emit-FAIL-and-continue only on an
+  *authenticated* install failure (non-critical, like the zsh plugins). In
+  PowerShell the read-only `gh` probes go through `Invoke-GhProbe`, which resets
+  `$global:LASTEXITCODE` so a probe's nonzero exit never leaks into the script's
+  exit code under `$PSNativeCommandUseErrorActionPreference` (that leak made
+  Windows dry-run exit 1 after "install-deps: done"). Its config is a single
+  same-path file on every OS: `~/.config/gh-dash/config.yml` on POSIX and
   `%USERPROFILE%\.config\gh-dash\config.yml` on Windows (XDG-style, NOT
   `%LOCALAPPDATA%`), chezmoi-managed from canonical `gh-dash/config.yml` (parity
-  row in `parity_gate.sh`). Running the dashboard needs `gh auth login` — a
-  manual, secret-bearing step this repo never automates or stores.
+  row in `parity_gate.sh`); the config is applied regardless of auth — only the
+  extension binary is auth-gated. Running the dashboard needs `gh auth login` —
+  a manual, secret-bearing step this repo never automates or stores.
 - **which-key.nvim is the only keymap-hint plugin.** `nvim/lua/plugins/which-key.lua`
   loads it on `event = "VeryLazy"` (never eager — only `rose-pine.lua` may load
   eagerly, invariant 7) with `opts = {}` and a `<leader>?` popup of buffer-local
