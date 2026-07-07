@@ -308,8 +308,23 @@ if (Get-Command zoxide -ErrorAction SilentlyContinue) {
 if (Get-Module -ListAvailable PSReadLine) {
     Import-Module PSReadLine -ErrorAction SilentlyContinue
 
+    # EditMode Vi enables command-line vi keybindings (Esc -> normal mode). It is
+    # applied HERE, before any Set-PSReadLineKeyHandler call below, because
+    # changing EditMode RESETS all key handlers to the defaults for that mode --
+    # handlers must be (re)applied AFTER this, never before. EditMode works on
+    # every PSReadLine version.
+    try { Set-PSReadLineOption -EditMode Vi -ErrorAction Stop } catch { Write-Verbose $_.Exception.Message }
+
+    # Cursor feedback for the current vi mode (block in Command, beam in Insert).
+    # ViModeIndicator landed in PSReadLine 2.0; older PS 5.1 (PSReadLine 1.x) lacks
+    # the parameter, so gate on it. Cursor mode is terminal-native (Windows
+    # Terminal honours DECSCUSR) and needs no ViModeChangeHandler script.
+    $splo = Get-Command Set-PSReadLineOption -ErrorAction SilentlyContinue
+    if ($splo -and $splo.Parameters.ContainsKey('ViModeIndicator')) {
+        try { Set-PSReadLineOption -ViModeIndicator Cursor -ErrorAction Stop } catch { Write-Verbose $_.Exception.Message }
+    }
+
     # Options that work on every PSReadLine version since 2.0:
-    try { Set-PSReadLineOption -EditMode Windows -ErrorAction Stop } catch { Write-Verbose $_.Exception.Message }
     try { Set-PSReadLineOption -BellStyle None -ErrorAction Stop } catch { Write-Verbose $_.Exception.Message }
     try { Set-PSReadLineOption -HistoryNoDuplicates -ErrorAction Stop } catch { Write-Verbose $_.Exception.Message }
     try { Set-PSReadLineOption -HistorySearchCursorMovesToEnd -ErrorAction Stop } catch { Write-Verbose $_.Exception.Message }
@@ -374,9 +389,26 @@ if (Get-Module -ListAvailable PSReadLine) {
         } catch { Write-Verbose $_.Exception.Message }
     }
 
-    try { Set-PSReadLineKeyHandler -Key Tab -Function MenuComplete -ErrorAction Stop } catch { Write-Verbose $_.Exception.Message }
-    try { Set-PSReadLineKeyHandler -Key UpArrow -Function HistorySearchBackward -ErrorAction Stop } catch { Write-Verbose $_.Exception.Message }
-    try { Set-PSReadLineKeyHandler -Key DownArrow -Function HistorySearchForward -ErrorAction Stop } catch { Write-Verbose $_.Exception.Message }
+    # Vi-mode key handlers, applied AFTER EditMode above. Tab=MenuComplete and
+    # Up/Down history search must land on the vi INSERT keymap (where you type),
+    # so they are bound with -ViMode Insert; Up/Down are ALSO bound in Command
+    # mode so the arrows still search history in normal mode. -ViMode is gated on
+    # the parameter existing because older PSReadLine (PS 5.1) may lack it; there
+    # we bind the keys unscoped so the behaviour still survives.
+    $skh = Get-Command Set-PSReadLineKeyHandler -ErrorAction SilentlyContinue
+    if ($skh -and $skh.Parameters.ContainsKey('ViMode')) {
+        try {
+            Set-PSReadLineKeyHandler -Key Tab       -Function MenuComplete          -ViMode Insert  -ErrorAction Stop
+            Set-PSReadLineKeyHandler -Key UpArrow   -Function HistorySearchBackward  -ViMode Insert  -ErrorAction Stop
+            Set-PSReadLineKeyHandler -Key UpArrow   -Function HistorySearchBackward  -ViMode Command -ErrorAction Stop
+            Set-PSReadLineKeyHandler -Key DownArrow -Function HistorySearchForward   -ViMode Insert  -ErrorAction Stop
+            Set-PSReadLineKeyHandler -Key DownArrow -Function HistorySearchForward   -ViMode Command -ErrorAction Stop
+        } catch { Write-Verbose $_.Exception.Message }
+    } else {
+        try { Set-PSReadLineKeyHandler -Key Tab       -Function MenuComplete         -ErrorAction Stop } catch { Write-Verbose $_.Exception.Message }
+        try { Set-PSReadLineKeyHandler -Key UpArrow   -Function HistorySearchBackward -ErrorAction Stop } catch { Write-Verbose $_.Exception.Message }
+        try { Set-PSReadLineKeyHandler -Key DownArrow -Function HistorySearchForward  -ErrorAction Stop } catch { Write-Verbose $_.Exception.Message }
+    }
 
     # psmux residual race-fix (issue #150 / v3.3.4): psmux resets
     # PredictionSource to None during pane init, AFTER our profile sets
@@ -400,7 +432,24 @@ if (Get-Module -ListAvailable PSReadLine) {
             if ($sop -and $sop.Parameters.ContainsKey('ShowToolTips')) {
                 Set-PSReadLineOption -ShowToolTips -ErrorAction SilentlyContinue
             }
-            Set-PSReadLineKeyHandler -Key Tab -Function MenuComplete -ErrorAction SilentlyContinue
+            # psmux can also drop our vi-mode key handlers during pane init, so
+            # re-apply Tab=MenuComplete + Up/Down history search on the vi Insert
+            # (and Command, for arrows) keymaps. We deliberately do NOT re-set
+            # EditMode here: that would reset ALL handlers, including the PSFzf
+            # Ctrl+R/T + Alt+C chords set later. Rebinding only these keys leaves
+            # the fzf chords intact.
+            $skh = Get-Command Set-PSReadLineKeyHandler -ErrorAction SilentlyContinue
+            if ($skh -and $skh.Parameters.ContainsKey('ViMode')) {
+                Set-PSReadLineKeyHandler -Key Tab       -Function MenuComplete          -ViMode Insert  -ErrorAction SilentlyContinue
+                Set-PSReadLineKeyHandler -Key UpArrow   -Function HistorySearchBackward  -ViMode Insert  -ErrorAction SilentlyContinue
+                Set-PSReadLineKeyHandler -Key UpArrow   -Function HistorySearchBackward  -ViMode Command -ErrorAction SilentlyContinue
+                Set-PSReadLineKeyHandler -Key DownArrow -Function HistorySearchForward   -ViMode Insert  -ErrorAction SilentlyContinue
+                Set-PSReadLineKeyHandler -Key DownArrow -Function HistorySearchForward   -ViMode Command -ErrorAction SilentlyContinue
+            } else {
+                Set-PSReadLineKeyHandler -Key Tab       -Function MenuComplete         -ErrorAction SilentlyContinue
+                Set-PSReadLineKeyHandler -Key UpArrow   -Function HistorySearchBackward -ErrorAction SilentlyContinue
+                Set-PSReadLineKeyHandler -Key DownArrow -Function HistorySearchForward  -ErrorAction SilentlyContinue
+            }
         }
     }
 }

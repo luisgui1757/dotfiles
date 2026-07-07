@@ -102,6 +102,46 @@ SAVEHIST=50000
 setopt SHARE_HISTORY HIST_IGNORE_DUPS HIST_IGNORE_ALL_DUPS HIST_REDUCE_BLANKS \
        HIST_IGNORE_SPACE HIST_VERIFY EXTENDED_HISTORY
 
+# ---- Command-line vi mode ----------------------------------------------------
+# vi keybindings on the command line. This MUST come before the completion and
+# keybinding region below: `bindkey -v` swaps the main keymap from emacs to
+# `viins`, so every later unqualified `bindkey ...` (the fzf-tab Tab reclaim, the
+# Up/Down history search) lands on the active vi insert keymap instead of a now
+# inactive emacs map. Bindings that must also work in normal mode are added to
+# `vicmd` explicitly. fzf's own `--zsh` block already binds Ctrl-R/Ctrl-T/Alt-C
+# in viins+vicmd, so those chords survive vi mode automatically.
+bindkey -v
+
+# KEYTIMEOUT (hundredths of a second) is how long ZLE waits after an ESC before
+# treating it as a lone key. In vi mode ESC also leaves insert mode, so this is a
+# direct trade-off: too low and any sequence that STARTS with ESC gets split --
+# the Meta/Alt prefix (fzf's Alt-C is ESC c) and the arrow-key sequences
+# (ESC [ A / ESC [ B) would be misread as "ESC, then a normal-mode command"; too
+# high and leaving insert mode feels laggy. 25 (250 ms) keeps Alt/Meta chords and
+# arrow keys reliable while staying responsive. Override by exporting
+# DOTFILES_KEYTIMEOUT before startup, or by setting KEYTIMEOUT in ~/.zshrc.local
+# (sourced last, so it always wins).
+KEYTIMEOUT="${DOTFILES_KEYTIMEOUT:-25}"
+
+# Cursor shape tracks the mode: steady block in normal (vicmd), steady beam in
+# insert (viins). DECSCUSR (ESC [ N q) is honoured by Ghostty and Windows
+# Terminal and passed through by tmux; terminals that don't support it ignore the
+# sequence. Registered through add-zle-hook-widget so it COMPOSES with
+# zsh-autosuggestions' own line-init hook instead of clobbering it. Registering
+# HERE (before starship init, further down) is load-bearing: starship also hooks
+# zle-keymap-select and only PRESERVES an already-registered one, so our
+# dispatcher must exist first for the live insert<->normal cursor switch to fire.
+_dotfiles_vi_cursor_shape() {
+  case "${KEYMAP:-main}" in
+    vicmd) print -n '\e[2 q' ;;   # steady block = command (normal) mode
+    *)     print -n '\e[6 q' ;;   # steady beam  = insert mode
+  esac
+}
+autoload -Uz add-zle-hook-widget
+zle -N _dotfiles_vi_cursor_shape
+add-zle-hook-widget keymap-select _dotfiles_vi_cursor_shape
+add-zle-hook-widget line-init     _dotfiles_vi_cursor_shape
+
 # ---- zsh plugins -------------------------------------------------------------
 # setup.sh/chezmoi install repo-managed pinned plugins under this fixed root.
 # Runtime uses those first, then falls back to package-manager paths if a
@@ -154,11 +194,13 @@ if command -v fzf >/dev/null 2>&1; then
       "$_dotfiles_zsh_plugin_root/fzf-tab/fzf-tab.plugin.zsh"; then
     # fzf present but fzf-tab not installed yet -> native menu fallback.
     zstyle ':completion:*' menu select
-    bindkey '^I' menu-select
+    bindkey '^I' menu-select                                # viins (main after `bindkey -v`)
+    bindkey -M vicmd '^I' menu-select
   fi
 else
   zstyle ':completion:*' menu select                        # no fzf -> native menu
-  bindkey '^I' menu-select
+  bindkey '^I' menu-select                                  # viins (main after `bindkey -v`)
+  bindkey -M vicmd '^I' menu-select
 fi
 
 # Inline gray history suggestion (the PowerShell InlinePrediction analog; accept
@@ -172,12 +214,24 @@ _dotfiles_source_first_readable \
   "${HOMEBREW_PREFIX:-}/share/zsh-autosuggestions/zsh-autosuggestions.zsh" \
   "/usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
 
-# Up / Down = prefix history search (PowerShell HistorySearchBackward/Forward).
+# Up / Down = prefix history search (PowerShell HistorySearchBackward/Forward),
+# in BOTH vi insert and command mode so the arrows behave the same regardless of
+# mode. (vicmd's own k/j keep their default vi history-line motions.)
 autoload -Uz up-line-or-beginning-search down-line-or-beginning-search
 zle -N up-line-or-beginning-search
 zle -N down-line-or-beginning-search
-bindkey '^[[A' up-line-or-beginning-search
-bindkey '^[[B' down-line-or-beginning-search
+bindkey -M viins '^[[A' up-line-or-beginning-search
+bindkey -M viins '^[[B' down-line-or-beginning-search
+bindkey -M vicmd '^[[A' up-line-or-beginning-search
+bindkey -M vicmd '^[[B' down-line-or-beginning-search
+
+# Ctrl-R fallback for machines WITHOUT fzf: emacs mode defaulted Ctrl-R to
+# incremental history search, but viins/vicmd default it to redisplay, so bind
+# the search explicitly to preserve that behaviour. When fzf is present its
+# `--zsh` block below rebinds Ctrl-R (viins+vicmd) to the fuzzy history picker,
+# overriding this.
+bindkey -M viins '^R' history-incremental-search-backward
+bindkey -M vicmd '^R' history-incremental-search-backward
 
 unset _dotfiles_zsh_plugin_root
 unfunction _dotfiles_source_first_readable 2>/dev/null || true
@@ -219,7 +273,8 @@ if command -v fzf >/dev/null 2>&1; then
   # existing so a machine with fzf but without fzf-tab keeps its native
   # menu-select binding from the completion block above.
   if whence -w fzf-tab-complete >/dev/null 2>&1; then
-    bindkey '^I' fzf-tab-complete
+    bindkey '^I' fzf-tab-complete            # viins (main after `bindkey -v`)
+    bindkey -M vicmd '^I' fzf-tab-complete
   fi
 fi
 
@@ -244,10 +299,13 @@ if command -v zoxide >/dev/null 2>&1; then
   eval "$(zoxide init zsh)"
 fi
 
-# Intentionally NOT rebinding Esc — it shadows the entire Meta prefix and
-# breaks every Alt-X keybinding (including Alt-h/j/k/l set in nvim's
-# vim-options.lua). If you want a single keystroke to clear the line, ^U
-# (kill-whole-line) is already the readline default.
+# Intentionally NOT adding a custom Esc binding. In vi mode ESC already leaves
+# insert mode for `vicmd`; how quickly a lone ESC is recognised — versus ESC as
+# the Meta/Alt prefix (fzf's Alt-C is ESC c) or the arrow-key ESC [ A sequences —
+# is governed by KEYTIMEOUT set above, NOT by rebinding ESC. Binding bare Esc to
+# a widget would shadow the whole Meta prefix and break every Alt-X chord
+# (including Alt-h/j/k/l set in nvim's vim-options.lua). To clear the line, ^U
+# (kill-whole-line) is already the default.
 
 # ---- Machine-local overrides (NOT tracked) -----------------------------------
 # Put anything user/machine/employer-specific here so it never lands in this

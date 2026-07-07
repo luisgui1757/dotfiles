@@ -51,6 +51,25 @@ significant change to the relevant area.
       dashboard (My Pull Requests / Needs My Review / My Issues) with Nerd Font
       icons.
 
+## Command-line vi mode
+
+- [ ] **zsh vi mode**: in a fresh zsh, type a command, press `Esc` — the cursor
+      turns to a block and `h`/`j`/`k`/`l`, `w`/`b`, `dd`, `cw`, `.` edit the
+      line; `i`/`a` returns to insert (beam cursor). While typing (insert): `Tab`
+      opens the fuzzy completion menu, `Up`/`Down` prefix-search history, and
+      `Ctrl-R`/`Ctrl-T`/`Alt-C` are the fzf pickers. In normal mode the arrows
+      still search history. `Esc` feels responsive but `Alt-C` and the arrow
+      keys are NOT split (tune with `DOTFILES_KEYTIMEOUT` if needed).
+- [ ] **PowerShell vi mode**: in a fresh pwsh, `Get-PSReadLineOption` shows
+      `EditMode = Vi`. `Esc` enters command mode (cursor becomes a block on
+      Windows Terminal); `Tab` still opens MenuComplete while typing, `Up`/`Down`
+      history-search, and PSFzf `Ctrl+R`/`Ctrl+T`/`Alt+C` still work.
+- [ ] **PowerShell vi mode inside psmux**: open a fresh psmux pane, wait for the
+      prompt to settle (the `OnIdle` re-apply runs ~300 ms in), then confirm
+      `Get-PSReadLineOption` still shows `EditMode = Vi`, `Tab` = MenuComplete,
+      the ListView history prediction is back, and the PSFzf `Ctrl+R` picker
+      still works (the re-apply must NOT have wiped the fzf chords).
+
 ## Cross-OS clipboard round-trip
 
 - [ ] **macOS**: yank in nvim, ⌘V into Notes — pastes.

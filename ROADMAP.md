@@ -69,15 +69,20 @@ remote-eval installers.
 
 Sequenced PRs (split for independent, revertable blast radius):
 
-- **PR-1 `feat/ergonomics-core` - IN PROGRESS (this branch).** No Nix, no
-  vi-mode. Neovim `scrolloff = 16`; which-key.nvim (`<leader>?`, VeryLazy);
-  zoxide across zsh + PowerShell + both installers (cached,
-  no-`Invoke-Expression` PowerShell init); `gh` + pinned `gh-dash` extension
-  (`v4.25.0`) with a chezmoi-managed same-path config and Renovate /
-  pin-consistency coverage.
-- **PR-2 `feat/vi-mode`** - zsh (`bindkey -v`) + PSReadLine (`-EditMode Vi`)
-  command-line vi-mode with a full re-bind matrix (must not break the
-  invariant-13 fzf-tab / history stack) and new regression tests.
+- **PR-1 `feat/ergonomics-core` - DONE (merged as #42).** No Nix, no vi-mode.
+  Neovim `scrolloff = 16`; which-key.nvim (`<leader>?`, VeryLazy); zoxide across
+  zsh + PowerShell + both installers (cached, no-`Invoke-Expression` PowerShell
+  init); `gh` + pinned `gh-dash` extension (`v4.25.0`) with a chezmoi-managed
+  same-path config and Renovate / pin-consistency coverage.
+- **PR-2 `feat/vi-mode` - IN PROGRESS (this branch).** zsh (`bindkey -v`) +
+  PSReadLine (`-EditMode Vi`) command-line vi-mode with a full re-bind matrix
+  that preserves the invariant-13 fzf-tab / history stack: vi mode is enabled
+  BEFORE the completion/keybinding region (zsh) and BEFORE the key handlers
+  (PSReadLine) so the mode switch doesn't wipe them; Tab/Up/Down/Ctrl-R are bound
+  on the right vi keymaps; explicit `KEYTIMEOUT` (chord-safe) + cursor-shape
+  feedback; the psmux `OnIdle` re-apply also re-asserts the vi handlers. Recorded
+  as CLAUDE.md invariant 21 and guarded by `tests/shell/zsh_vi_mode_test.sh` +
+  new `Profile.Tests.ps1` vi-mode cases.
 - **PR-3 `feat/wezterm`** - WezTerm on all OSes (brew cask / pinned `.deb` /
   `$Catalog`), Rose Pine + transparency + Hack Nerd Font parity, chezmoi-only
   config; not a Nix/nixpkgs GUI package.
