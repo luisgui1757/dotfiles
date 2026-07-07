@@ -134,13 +134,17 @@ ssh admin@$(tart ip dotfiles-macos)
 Inside the VM:
 
 ```bash
-git clone -b main https://github.com/luisgui1757/dotfiles ~/dotfiles
+git clone https://github.com/luisgui1757/dotfiles ~/dotfiles
 cd ~/dotfiles
+git fetch --depth 1 origin <full-40-character-sha>
+git checkout --detach FETCH_HEAD
+test "$(git rev-parse HEAD)" = "<full-40-character-sha>"
 ./setup.sh --all
 ./tests/greenfield/validate.sh
 ```
 
-For PR validation, replace `main` with the branch name in the clone command.
+For PR validation, use the PR head commit SHA. For main validation, use the
+current full `origin/main` SHA. Do not validate a moving branch name.
 Do the GUI/visual parts of Part 3 in the `tart run` window (VS Code, terminal
 colours); the CLI parts over SSH are fine too.
 
@@ -159,13 +163,17 @@ ssh <user>@$(tart ip dotfiles-linux)
 Inside the VM:
 
 ```bash
-git clone -b main https://github.com/luisgui1757/dotfiles ~/dotfiles
+git clone https://github.com/luisgui1757/dotfiles ~/dotfiles
 cd ~/dotfiles
+git fetch --depth 1 origin <full-40-character-sha>
+git checkout --detach FETCH_HEAD
+test "$(git rev-parse HEAD)" = "<full-40-character-sha>"
 ./setup.sh --all
 ./tests/greenfield/validate.sh
 ```
 
-For PR validation, replace `main` with the branch name in the clone command.
+For PR validation, use the PR head commit SHA. For main validation, use the
+current full `origin/main` SHA. Do not validate a moving branch name.
 A `tart` Linux guest is a real desktop (unlike WSL), so Ghostty + fonts install
 natively here and the visual checks apply. Over a headless SSH session the CLI
 checks (tmux/nvim/lazygit/shell) still apply; skip the GUI rows.

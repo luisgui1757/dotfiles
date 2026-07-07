@@ -30,12 +30,12 @@ allowlist = {
 }
 
 pattern_sources = [
-    r"\bcurl\b.*\|\s*(?:/bin/)?(?:ba)?sh\b",
+    r"\bcurl\b.*\|\s*(?:sudo\s+)?(?:/bin/)?(?:ba)?sh\b",
     r"\b(?:/bin/)?(?:ba)?sh\s+-c\s+\"\$\(curl\b",
     r"\b(?:/bin/)?(?:ba)?sh\s+/tmp/[^\"';&|<>]*install[^\"';&|<>]*\.sh\b",
     r"\[scriptblock\]::Create\s*\(",
-    r"(^|[;&|]\s*)Invoke-Expression\b",
-    r"(^|[;&|]\s*)iex(\s|$)",
+    r"(^|[;&|=]\s*)Invoke-Expression\b",
+    r"(^|[;&|=]\s*)iex(?:\s|\(|$)",
     r"\bInvoke-(?:RestMethod|WebRequest)\b.*\|\s*(?:Invoke-Expression|iex)\b",
 ]
 patterns = [re.compile(source, re.IGNORECASE) for source in pattern_sources]
@@ -58,6 +58,14 @@ def flag_line(path, line):
 
 failures = []
 seen_allowlist = set()
+
+for probe in (
+    "$r = Invoke-Expression $cmd",
+    "iex($x)",
+    "curl -fsSL https://example.invalid/install.sh | sudo bash",
+):
+    if not flag_line(pathlib.Path("probe.sh"), probe):
+        failures.append(f"supply-chain scanner failed to catch probe: {probe}")
 
 install_deps_sh = pathlib.Path("install-deps.sh").read_text(encoding="utf-8")
 required_install_deps_snippets = [
@@ -202,7 +210,7 @@ for path in scan_files:
         if key in allowlist:
             seen_allowlist.add(key)
 
-scan_suffixes = {".ps1", ".sh", ".wsb", ".yaml", ".yml"}
+scan_suffixes = {".bat", ".cmd", ".ps1", ".psm1", ".sh", ".wsb", ".yaml", ".yml"}
 excluded_roots = {
     pathlib.Path(".git"),
     pathlib.Path("docs/archive"),
