@@ -8,7 +8,7 @@
     ":semanticCommits",
     ":timezone(Etc/UTC)"
   ],
-  "enabledManagers": ["github-actions", "custom.regex"],
+  "enabledManagers": ["github-actions", "custom.regex", "nix"],
   "dependencyDashboard": true,
   "dependencyDashboardTitle": "Renovate dashboard",
   "schedule": ["before 06:00 on monday"],
@@ -339,6 +339,12 @@
       "matchDatasources": ["github-runners"],
       "groupName": "github runner images",
       "addLabels": ["github-runners"],
+      "automerge": false
+    },
+    {
+      "matchManagers": ["nix"],
+      "groupName": "nix flake inputs",
+      "addLabels": ["nix"],
       "automerge": false
     }
   ]

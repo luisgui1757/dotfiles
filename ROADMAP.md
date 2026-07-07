@@ -136,7 +136,7 @@ Commit-by-commit status:
   `start-at-login`, reserved-chord-safe keymap avoiding Alt-h/j/k/l and Alt-c),
   `aerospace/aerospace.toml` + chezmoi mirror, TOML lint. Herdr (macOS/Linux only,
   Homebrew/Linuxbrew formula; native Windows blocked by tests + docs).
-- **Commit 4 - Nix skeleton — PLANNED.** `flake.nix` + committed `flake.lock`
+- **Commit 4 - Nix skeleton — DONE.** `flake.nix` + committed `flake.lock`
   (zero ownership), devShell + `checks`, `nix flake check` CI on Ubuntu + macOS,
   Renovate `nix` manager, disjointness static tests.
 - **Commit 5 - nix-darwin + declarative Homebrew — PLANNED.**

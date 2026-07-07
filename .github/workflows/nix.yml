@@ -1,0 +1,35 @@
+name: nix
+
+# Validates the Nix layer (flake.nix + committed flake.lock) on Ubuntu and
+# macOS. This is intentionally a SEPARATE workflow from test.yml so it is not
+# auto-derived into the required-status-check set (required_checks_test.sh reads
+# only test.yml + e2e-install.yml). Promote it to a required check later via
+# scripts/apply-repo-safeguards.sh if desired.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  flake-check:
+    name: nix flake check
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-26]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - name: Install Nix (flakes enabled)
+        uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22
+      - name: nix flake check
+        run: nix flake check --print-build-logs
