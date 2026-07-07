@@ -343,7 +343,7 @@ fi
 # manually. Scope: every .lua under nvim/, tests/nvim/, linux/. Portable
 # `grep -E "^<TAB>"` via printf so this passes on BSD grep (macOS) too.
 tab_pat="$(printf '^\t')"
-tab_indented_lua=$(find nvim tests/nvim linux -name '*.lua' -type f \
+tab_indented_lua=$(find nvim tests/nvim linux wezterm -name '*.lua' -type f \
     -exec grep -lE "$tab_pat" {} + 2>/dev/null || true)
 if [[ -n "$tab_indented_lua" ]]; then
     echo "FAIL: .lua files have tab indentation (should be spaces):"

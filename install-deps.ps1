@@ -299,6 +299,7 @@ $Catalog = @{
     chezmoi              = @{ winget = 'twpayne.chezmoi';                  choco = 'chezmoi';              scoop = 'chezmoi'              ; purpose = 'dotfiles config manager' }
     lazygit              = @{ winget = 'JesseDuffield.lazygit';            choco = 'lazygit';              scoop = 'lazygit'              ; purpose = 'terminal git UI' }
     wt                   = @{ winget = 'Microsoft.WindowsTerminal';        choco = 'microsoft-windows-terminal'; scoop = 'extras/windows-terminal'; purpose = 'Windows Terminal host for PowerShell and WSL' }
+    wezterm              = @{ winget = 'wez.wezterm';                      choco = 'wezterm';              scoop = 'extras/wezterm'       ; purpose = 'WezTerm GPU terminal (Rose Pine, Hack Nerd Font, pwsh)' }
     make                 = @{ winget = 'GnuWin32.Make';                    choco = 'make';                 scoop = 'make'                 ; purpose = 'plugin builds (LuaSnip jsregexp)' }
     cmake                = @{ winget = 'Kitware.CMake';                    choco = 'cmake';                scoop = 'cmake'                ; purpose = 'CMake CLI required by neocmakelsp and CMake projects' }
     pwsh                 = @{ winget = 'Microsoft.PowerShell';             choco = 'powershell-core';      scoop = 'pwsh'                 ; purpose = 'modern PowerShell 7' }
@@ -2942,6 +2943,9 @@ Install-One starship
 
 Section "terminal host"
 Install-WindowsTerminal
+
+Section "terminal (optional): WezTerm"
+Install-One wezterm
 
 Section "terminal multiplexer (psmux: tmux for native Windows, optional)"
 Install-Psmux

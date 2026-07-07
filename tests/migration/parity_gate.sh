@@ -66,6 +66,7 @@ starship|config-file|.config/starship.toml|.config/starship.toml|starship/starsh
 zshenv|config-file|.zshenv|.zshenv|shells/zshenv|home/dot_zshenv
 zshrc|config-file|.zshrc|.zshrc|shells/zshrc|home/dot_zshrc
 ghostty config|config-file|Library/Application Support/com.mitchellh.ghostty/config|.config/ghostty/config|ghostty/config|home/.chezmoitemplates/ghostty/config
+wezterm config|config-file|.config/wezterm/wezterm.lua|.config/wezterm/wezterm.lua|wezterm/wezterm.lua|home/dot_config/wezterm/wezterm.lua
 powershell profile|config-file|||shells/powershell_profile.ps1|home/Documents/PowerShell/Microsoft.PowerShell_profile.ps1
 EOF
 }

@@ -2622,3 +2622,14 @@ Describe "Install-GhDashExtension" {
         $LASTEXITCODE | Should -Be 0
     }
 }
+
+Describe "WezTerm catalog entry" {
+    It "declares wezterm with winget/scoop/choco package IDs (native Windows install path)" {
+        . $script:ImportInstallDepsForTest -DryRun
+        $Catalog.ContainsKey('wezterm') | Should -BeTrue
+        $Catalog['wezterm'].winget  | Should -Be 'wez.wezterm'
+        $Catalog['wezterm'].choco   | Should -Be 'wezterm'
+        $Catalog['wezterm'].scoop   | Should -Be 'extras/wezterm'
+        $Catalog['wezterm'].purpose | Should -Match 'WezTerm'
+    }
+}

@@ -404,6 +404,10 @@ function Assert-Part1Files {
         -ExpectedPath (Join-Path $script:RepoRoot 'lsd\colors.yaml') `
         -Label 'lsd colors'
     Assert-CopyModeFileMatches `
+        -ActualPath (Join-Path $Sandbox '.config\wezterm\wezterm.lua') `
+        -ExpectedPath (Join-Path $script:RepoRoot 'wezterm\wezterm.lua') `
+        -Label 'wezterm config'
+    Assert-CopyModeFileMatches `
         -ActualPath (Join-Path $Sandbox 'Documents\PowerShell\Microsoft.PowerShell_profile.ps1') `
         -ExpectedPath (Join-Path $script:RepoRoot 'shells\powershell_profile.ps1') `
         -Label 'PowerShell profile'

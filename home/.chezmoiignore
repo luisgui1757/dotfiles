@@ -27,4 +27,5 @@ Library
 .config/ghostty
 {{- else if and .isWsl (not (get . "experimentalWslGui" | default false)) }}
 .config/ghostty
+.config/wezterm
 {{- end }}

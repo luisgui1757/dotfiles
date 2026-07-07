@@ -125,7 +125,7 @@ Commit-by-commit status:
   native-Windows-non-Nix, no-remote-eval installer, Nix owner reporting in update
   mode); `tests/static/nix_architecture_test.sh` enforces the file-ownership
   disjointness and no-Windows-path rules statically.
-- **Commit 2 - WezTerm — PLANNED.** Canonical `wezterm/wezterm.lua`, chezmoi
+- **Commit 2 - WezTerm — DONE.** Canonical `wezterm/wezterm.lua`, chezmoi
   mirror, same-path deploy on POSIX + Windows (WSL-gated off like ghostty), Rose
   Pine + transparency + Hack Nerd Font parity, shell = zsh (POSIX login shell) /
   pwsh.exe (Windows), no tmux auto-launch. Packaging: brew cask (macOS),

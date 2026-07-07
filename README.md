@@ -2,7 +2,7 @@
 
 Cross-platform terminal and editor setup for macOS, Linux, WSL, and Windows.
 The repo owns the daily shell/editor stack: Neovim, tmux/psmux, Starship, zsh,
-PowerShell, Ghostty, lazygit, `lsd`, `zoxide` smart-cd, the `gh` CLI with the
+PowerShell, Ghostty, WezTerm, lazygit, `lsd`, `zoxide` smart-cd, the `gh` CLI with the
 `gh-dash` dashboard, Windows Terminal theming, locked plugin restore, LSP /
 formatter provisioning, and global Polaris agent-policy bootstrap. It also provisions the `tree-sitter` CLI needed by
 `nvim-treesitter` main parser builds.
@@ -237,6 +237,7 @@ symlink, and Windows Terminal remains a merge.
 | PowerShell | n/a | n/a | `Documents\PowerShell\Microsoft.PowerShell_profile.ps1` -> `shells\powershell_profile.ps1` |
 | tmux / psmux | `~/.tmux.conf` -> `tmux/tmux.conf`; `~/.tmux.posix.conf` -> `tmux/tmux.posix.conf` (POSIX clipboard + TPM functional plugins + generated Rose Pine bar); `~/.tmux.rose-pine.{main,moon,dawn}.conf` -> generated `tmux/psmux-rose-pine.{main,moon,dawn}.conf` (Omer-shaped Rose Pine bar, **shared** with Windows) | same | `%USERPROFILE%\.psmux.conf` -> `tmux\psmux.conf` (first psmux entrypoint, disables warm sessions, then flag-free source-files the Windows overlay); `%USERPROFILE%\.tmux.conf` -> `tmux\tmux.conf`; `%USERPROFILE%\.tmux.windows.conf` -> `tmux\tmux.windows.conf`; `%USERPROFILE%\.tmux.rose-pine.ps1` -> `tmux\psmux-rose-pine.ps1` (Rose Pine bar generator / manual live-switch helper); `%USERPROFILE%\.tmux.rose-pine.{main,moon,dawn}.conf` -> the same generated `tmux\psmux-rose-pine.{main,moon,dawn}.conf`; the POSIX overlay is **excluded** on Windows (its `if-shell` probes hang psmux); WSL uses the Unix path |
 | Ghostty | `~/Library/Application Support/com.mitchellh.ghostty/config` -> `ghostty/config` | native Linux links `~/.config/ghostty/config`; WSL links it only with `--experimental-wsl-gui` | n/a |
+| WezTerm | `~/.config/wezterm/wezterm.lua` -> `wezterm/wezterm.lua` | same; WSL links it only with `--experimental-wsl-gui` | `%USERPROFILE%\.config\wezterm\wezterm.lua` -> `wezterm\wezterm.lua` (copied) |
 | lazygit | `~/Library/Application Support/lazygit/config.yml` -> `lazygit/config.yml` | `~/.config/lazygit/config.yml` -> `lazygit/config.yml` | `%LOCALAPPDATA%\lazygit\config.yml` -> `lazygit\config.windows.yml` |
 | lsd | `~/.config/lsd/{config.yaml,colors.yaml}` -> `lsd/{config.yaml,colors.yaml}` | same | `%USERPROFILE%\.config\lsd\{config.yaml,colors.yaml}` -> `lsd\{config.yaml,colors.yaml}` |
 | gh-dash | `~/.config/gh-dash/config.yml` -> `gh-dash/config.yml` | same | `%USERPROFILE%\.config\gh-dash\config.yml` -> `gh-dash\config.yml` |
@@ -400,6 +401,13 @@ and whether `pwsh` is installed.
   Native Linux uses Linux-specific Ghostty paths. WSL defaults to Windows
   Terminal on the Windows host; Linux Ghostty in WSL requires
   `--experimental-wsl-gui`.
+- WezTerm installs from the vendor channel per OS: `brew install --cask wezterm`
+  on macOS, the `wez.wezterm` Scoop/winget/choco catalog entry on Windows, and
+  the official pinned, SHA-256-verified `.deb` on amd64 Ubuntu. WezTerm is a GUI
+  terminal, so headless hosts/containers and split-host WSL skip it (WSL uses the
+  Windows-host terminal unless `--experimental-wsl-gui`); arm64 Linux / non-Ubuntu
+  get manual guidance. The Rose Pine + Hack Nerd Font + transparency config is
+  chezmoi-owned, never a Nix/nixpkgs GUI package.
 - WSL fonts are host-rendered in the supported path. Install and merge Windows
   Terminal from Windows (`.\setup.ps1 -All`; the merge is default-on); the WSL
   Linux fontconfig install is only for `--experimental-wsl-gui`.

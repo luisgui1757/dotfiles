@@ -11,6 +11,19 @@ significant change to the relevant area.
 - [ ] **Ghostty**, any OS in light mode (e.g. fresh GNOME Ubuntu): STAYS Rose
       Pine dark -- it must NOT flip to the cream Rose Pine Dawn (theme is forced
       dark, not the adaptive dark:/light: split).
+- [ ] **WezTerm** visual parity, any OS (macOS cask / Windows catalog / amd64
+      Ubuntu .deb): opens **maximized** with Rose Pine dark, mild translucency
+      reads cleanly over a coloured wallpaper (opacity 0.95; macOS blur), font is
+      Hack Nerd at 13pt with ligatures, block cursor (no blink), and glyphs (e.g.
+      a starship prompt) render via the Hack Nerd / Symbols Nerd fallback. On
+      Windows a new window is `pwsh.exe`; on POSIX it is the login shell (zsh).
+      It must NOT auto-launch a multiplexer -- you get a bare shell.
+- [ ] **WezTerm** in light mode (e.g. fresh GNOME Ubuntu / macOS light): STAYS
+      Rose Pine dark, same forced-dark rule as Ghostty.
+- [ ] **psmux inside WezTerm** (Windows): open WezTerm, run `psmux`, confirm the
+      pane renders without a config-load freeze, no runaway `psmux.exe`/`conhost`
+      CPU, the generated Rose Pine bar draws, and `pwsh` prediction/MenuComplete
+      still work inside the pane (same smoke as psmux inside Windows Terminal).
 - [ ] **Windows Terminal**: rose-pine scheme applied; tabs use the
       configured theme; acrylic OFF on the body, ON in the tab row; a new tab
       opens `PowerShell 7` unless the user intentionally chose another default.

@@ -57,6 +57,16 @@ HACK_NERD_FONT_SHA256="8ca33a60c791392d872b80d26c42f2bfa914a480f9eb2d7516d9f8437
 # release assets over HTTPS at run time. Bump the version + SHA together.
 GHOSTTY_UBUNTU_VERSION="1.3.1-0-ppa2"
 GHOSTTY_UBUNTU_INSTALL_SHA256="7517776f6d862ec523e627840af4806e13385302f653ae9f7a86aa6d5af1cae5"
+# WezTerm on Ubuntu (amd64): pin + SHA-256 verify the OFFICIAL .deb from the
+# stable release. macOS uses the Homebrew cask; Windows uses install-deps.ps1's
+# catalog. arm64 Linux and non-Ubuntu hosts get manual guidance -- upstream did
+# not publish an arm64 .sha256 sidecar for this stable tag, so we do not pin a
+# checksum we cannot verify. The amd64 SHA below was verified against upstream's
+# published `wezterm-...Ubuntu22.04.deb.sha256` sidecar on 2026-07-07. Bump the
+# version + SHA together. (Windows installs WezTerm from the install-deps.ps1
+# catalog via winget/scoop/choco, so there is no Windows version pin to mirror.)
+WEZTERM_VERSION="20240203-110809-5046fc22"
+WEZTERM_DEB_AMD64_SHA256="86358dab5794a4fb63f7c91dd68d4fdc3da58faad648a58fc77d2bd51c7b0686"
 PYLATEXENC_BUILD_BACKEND_VERSION="80.9.0"
 PYLATEXENC_BUILD_BACKEND_SHA256="062d34222ad13e0cc312a4c02d73f059e86a4acbfbdea8f8f76b28c99f306922"
 PYLATEXENC_VERSION="2.10"
@@ -2080,6 +2090,22 @@ install_ghostty_macos() {
     brew install --cask ghostty || echo "  WARN: ghostty cask install failed"
 }
 
+install_wezterm_macos() {
+    if have wezterm; then
+        printf "  ok        %-26s already installed\n" "wezterm"
+        return
+    fi
+    if ! ask "Install WezTerm (terminal) via Homebrew cask?"; then
+        printf "  skipped   %-26s\n" "wezterm"
+        return
+    fi
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        echo "  would: brew install --cask wezterm"
+        return
+    fi
+    brew install --cask wezterm || echo "  WARN: wezterm cask install failed"
+}
+
 # ---- Package-name resolution (Bash 3.2-safe, no associative arrays) ----------
 #
 # Table format: lines of "tool|brew|apt|dnf|pacman|zypper|apk".
@@ -3310,6 +3336,74 @@ install_ghostty_linux() {
     echo "              - source:  https://ghostty.org/docs/install/build"
 }
 
+# Download, SHA-256 verify, and install the pinned WezTerm .deb. We verify the
+# .deb before touching the package database (unlike a bare `apt install <url>`),
+# so an upstream change at the pinned tag fails closed. `apt-get install <file>`
+# resolves the GUI runtime deps in one step. require_downloader already ran.
+run_wezterm_deb_install() {
+    local url="$1" expected="$2" tmp deb rc=0
+    tmp="$(mktemp -d)"
+    trap 'rm -rf "$tmp"; trap - RETURN' RETURN
+    deb="$tmp/wezterm.deb"
+    if ! curl -fsSL -o "$deb" "$url"; then
+        echo "  FAIL: could not download WezTerm .deb"
+        rm -rf "$tmp"; return 1
+    fi
+    if ! verify_sha256 "$deb" "$expected"; then
+        echo "  FAIL: checksum mismatch for WezTerm .deb (pinned $WEZTERM_VERSION)"
+        echo "        upstream changed; review it, then bump WEZTERM_VERSION + SHA together"
+        rm -rf "$tmp"; return 1
+    fi
+    maybe_sudo apt-get install -y "$deb" || rc=$?
+    rm -rf "$tmp"
+    return "$rc"
+}
+
+# WezTerm: Homebrew cask is macOS-only, so Linux uses the official pinned .deb
+# (amd64 Ubuntu). WezTerm is a GUI terminal, so headless hosts/containers and
+# split-host WSL skip it -- same terminal-is-a-Windows-host-responsibility rule
+# as ghostty. arm64 Linux / non-Ubuntu get manual guidance.
+install_wezterm_linux() {
+    local url arch
+    if have wezterm; then
+        printf "  ok        %-26s already installed\n" "wezterm"
+        return
+    fi
+    if is_wsl && ! wsl_gui_opt_in; then
+        printf "  skipped   %-26s WSL uses the Windows-host terminal by default\n" "wezterm"
+        echo "            Linux WezTerm in WSL is experimental: re-run with --experimental-wsl-gui"
+        echo "            Windows host setup installs WezTerm via .\\setup.ps1 -All"
+        return
+    fi
+    if ! can_show_gui; then
+        printf "  skipped   %-26s no GUI display (WezTerm is a GUI terminal)\n" "wezterm"
+        echo "            install-deps skips GUI terminals on headless hosts/containers"
+        return
+    fi
+    [[ "$PM" == "brew" ]] && printf "  skipped   %-26s Homebrew cask is macOS-only on Linux\n" "wezterm via brew"
+    arch="$(uname -m)"
+    if is_ubuntu && { [[ "$arch" == "x86_64" ]] || [[ "$arch" == "amd64" ]]; }; then
+        url="https://github.com/wezterm/wezterm/releases/download/${WEZTERM_VERSION}/wezterm-${WEZTERM_VERSION}.Ubuntu22.04.deb"
+        if ask "Install WezTerm via official Ubuntu .deb (pinned $WEZTERM_VERSION, SHA-256 verified)?"; then
+            if [[ "$DRY_RUN" -eq 1 ]]; then
+                echo "  would: curl -fsSL $url"
+                echo "         verify sha256 $WEZTERM_DEB_AMD64_SHA256"
+                echo "         apt-get install -y <downloaded .deb>   (resolves GUI deps)"
+            else
+                require_downloader || return 1
+                if ! run_wezterm_deb_install "$url" "$WEZTERM_DEB_AMD64_SHA256"; then
+                    echo "  WARN: WezTerm .deb install failed; continuing"
+                fi
+            fi
+            return
+        fi
+    fi
+    echo "  manual    wezterm has no verified pinned $PM package for this host. Options:"
+    echo "              - ubuntu amd64: re-run for the verified pinned .deb"
+    echo "              - other:        https://wezterm.org/install/linux.html"
+    echo "              - flatpak:      flatpak install flathub org.wezfurlong.wezterm"
+}
+
 # VS Code: brew cask on macOS; snap, then flatpak, then a manual hint on Linux.
 install_vscode() {
     if have code; then
@@ -3725,8 +3819,10 @@ set_default_shell_zsh   # make zsh the login shell so tmux/terminals launch it
 section "terminals (optional)"
 if [[ "$(uname -s)" == "Darwin" ]] && [[ "$PM" == "brew" ]]; then
     install_ghostty_macos
+    install_wezterm_macos
 elif [[ "$(uname -s)" == "Linux" ]]; then
     install_ghostty_linux
+    install_wezterm_linux
 fi
 setup_ghostty_maximize   # GNOME/X11 only: enforce Ghostty maximize via devilspie2 (opt-in)
 
