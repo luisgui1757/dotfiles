@@ -425,9 +425,13 @@ git add nvim/lazy-lock.json
 ```
 
 `lazy-lock.json` is tracked (NOT gitignored) — that's how every machine ends
-up on the same commits. Setup, e2e assertions, greenfield validators, and test
-prewarm paths must use `Lazy! restore`, not `Lazy! sync`; `sync` is only for
-intentional dependency maintenance that reviews and commits a lockfile diff.
+up on the same commits. Setup, e2e assertions, and greenfield validators must
+use `Lazy! restore`, not `Lazy! sync`; `sync` is only for intentional dependency
+maintenance that reviews and commits a lockfile diff. The startup-budget spec is
+the exception: it preclones the locked plugin checkouts into its isolated cache
+instead of invoking Lazy install/restore, because restore runs plugin build hooks
+and nvim-treesitter's `:TSUpdate` build starts compiler work that can outlive the
+prewarm child and pollute the startup measurement.
 
 ### Update Mason-installed tools across machines
 
@@ -461,12 +465,15 @@ its parent process can false-fail after all child specs passed when PowerShell
 native-command error promotion is enabled.
 
 On Unix, `tests/nvim/run.sh` uses `PlenaryBustedDirectory` with an explicit
-`timeout = 180000`. Keep that value explicit: `startup_spec.lua` prewarms a real
-production init under isolated XDG dirs, and Plenary's default 50s timeout can
-SIGTERM the child before the startup-budget assertion reports the actual
-problem. The startup budget itself is strict, but the spec measures up to three
-warm starts and accepts the fastest run; this filters scheduler/filesystem
-outliers while still failing a consistently slow production init.
+`timeout = 180000`. Keep that value explicit: `startup_spec.lua` preclones the
+locked plugin checkouts under isolated XDG dirs, prewarms a real production init,
+and Plenary's default 50s timeout can SIGTERM the child before the startup-budget
+assertion reports the actual problem. The startup spec must not invoke Lazy's
+install/restore path or leave nvim-treesitter parser outputs in its cache; those
+are dependency-bootstrap costs, not warm startup costs. The startup budget itself
+is strict, but the spec measures up to three warm starts and accepts the fastest
+run; this filters scheduler/filesystem outliers while still failing a
+consistently slow production init.
 
 Sub-targets **skip gracefully** when their tool isn't installed
 (`yamllint`/`editorconfig-checker`/`hyperfine`/`bats`/`ghostty`). The

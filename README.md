@@ -515,7 +515,10 @@ promotion.
 
 Unix runs Neovim specs through `PlenaryBustedDirectory` with an explicit timeout
 so the startup-budget spec reports its own assertion instead of being killed by
-Plenary's default timeout.
+Plenary's default timeout. The startup-budget spec preclones the locked plugin
+checkouts into isolated XDG dirs before measuring warm production init; it must
+not invoke Lazy install/restore or leave nvim-treesitter parser outputs in that
+cache, because parser builds are setup/bootstrap work rather than startup work.
 
 Sub-targets skip themselves with a `skipped: <tool> not installed` message
 when their dependency tool is missing on the current machine. In CI, missing
@@ -932,7 +935,9 @@ git add nvim/lazy-lock.json   # tracked, not gitignored
 
 Setup and validation use `Lazy! restore` instead. Run `Lazy! sync` only when
 you intentionally want to refresh plugin pins and review the resulting lockfile
-diff.
+diff. The startup-budget spec is intentionally different: it preclones locked
+plugin checkouts without running Lazy build hooks so asynchronous parser builds
+cannot pollute the startup timing assertion.
 
 ### Updating Mason tools across machines
 

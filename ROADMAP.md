@@ -22,9 +22,11 @@ repeatable instead of tribal.
   brittleness. `editorconfig_check.sh` now feeds a pruned per-file list,
   `invariants_test.sh` guards that pruning, and `parity_gate.sh` runs
   `chezmoi doctor` against a temporary copy of `home/` outside the Git checkout.
-- `startup_spec.lua` now prewarms the locked Lazy plugin graph only when missing
-  and uses a strict best-of-three warm measurement so local scheduler/filesystem
-  outliers do not masquerade as production startup regressions.
+- `startup_spec.lua` now preclones locked plugin checkouts into its isolated
+  cache, asserts that nvim-treesitter parser builds do not run during the
+  benchmark, and uses a strict best-of-three warm measurement so local
+  scheduler/filesystem outliers do not masquerade as production startup
+  regressions.
 - Live GitHub protection was applied and verified on 2026-06-18 with
   `scripts/apply-repo-safeguards.sh luisgui1757/dotfiles`.
 - The active `Protect main: integrity` ruleset is active, strict, has no bypass
