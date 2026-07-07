@@ -115,6 +115,15 @@ significant change to the relevant area.
       AeroSpace casks and the Herdr brew via declarative Homebrew (no `brew
       update`/`upgrade`; `cleanup = check` only reports drift), and puts the
       nix-owned CLI set on PATH from `~/.nix-profile` / the system profile.
+- [ ] **Home Manager (Linux/WSL)**: with Nix installed, run
+      `./setup.sh --home-manager` (or `nix run home-manager -- switch --flake .#$(uname -m)-linux --impure`
+      the first time). Confirm the nix CLI set (ripgrep/fd/fzf/jq/lazygit/starship/
+      zoxide) lands in `~/.nix-profile/bin` with NO root, and that `nvim` +
+      `tree-sitter` are still the native install-deps binaries (NOT nix) so
+      parser builds keep working.
+- [ ] **WSL split-host under Home Manager**: on WSL, after `--home-manager`,
+      confirm nothing was written under `/mnt/c` — Home Manager touches only the
+      Linux `~/.nix-profile`; Windows Terminal/fonts/WezTerm stay Windows-host.
 - [ ] **Nix owns packages, chezmoi owns config**: after the switch, `~/.config`
       dotfiles (nvim, wezterm, aerospace, starship, zsh, tmux…) are still the
       chezmoi symlinks/copies — the Nix switch must NOT have replaced or

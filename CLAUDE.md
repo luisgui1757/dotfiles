@@ -1453,6 +1453,26 @@ non-Nix. The whole layer is opt-in; setup defaults are unchanged.
   flag setup never touches Nix. It is dry-run-safe (previews the command),
   prompts unless `--all`, skips cleanly off-macOS or without nix, and is
   WARN-non-fatal. Guarded by `tests/nix/setup_nix_darwin_test.sh`.
+- **Linux/WSL Home Manager (standalone, packages-only).**
+  `homeConfigurations."<arch>-linux"` (`nix/home/linux.nix` + the shared
+  `nix/home/common.nix`) is the nix-owned CLI set for Linux/WSL, activated by
+  `setup.sh --home-manager` (Linux-only, same opt-in/consent/dry-run contract as
+  `--nix-darwin`). `programs.home-manager.enable` is the ONE allowed `programs.*`
+  (it installs the standalone HM CLI). On WSL it writes ONLY to `~/.nix-profile`,
+  never `/mnt/c` — split-host preserved. **Native install-deps arms are RETAINED
+  as the default provisioning path**; the Nix package layer is additive/opt-in,
+  proven by tests before anything is deleted. Guarded by
+  `tests/nix/linux_home_test.sh` + `tests/nix/setup_home_manager_test.sh`.
+- **nvim + the tree-sitter CLI are DELIBERATELY NOT in the Nix package set
+  (deferred, with proof).** nvim-treesitter `main` compiles parsers whose ABI
+  must match nvim's built-in libtree-sitter, and the repo pins the tree-sitter
+  CLI to `v0.26.9` precisely to keep that build reproducible (invariant 19). A
+  nix neovim / tree-sitter shadowing the pinned native binaries would risk the
+  `E5113` parser/ABI-mismatch class of bug. So `nix/home/common.nix` omits both;
+  they stay on the native install-deps path. Moving nvim into the SAME Nix
+  closure as its parser toolchain (nix nvim + nix tree-sitter CLI + nix compiler,
+  ABI-matched) is the follow-up — do not add `neovim`/`tree-sitter` to the HM
+  package set until that closure is proven.
 - **Renovate** owns `flake.lock` bumps via the `nix` manager (reviewed PRs). Do
   NOT rewrite `flake.lock` silently in setup/update; a bump is always a PR.
 - **`--update` owner=nix** is Phase 7 (`tests/shell/install_deps_update_test.sh`).

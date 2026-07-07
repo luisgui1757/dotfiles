@@ -95,6 +95,18 @@
             }
           ];
         };
+
+      # Standalone Home Manager for native Linux / WSL userland (packages only).
+      # Activated on the real host by setup.sh's consent-gated
+      # `home-manager switch --flake .#<arch>-linux` -- no root, WSL split-host
+      # preserved (writes only to the Linux ~/.nix-profile, never /mnt/c).
+      mkHome =
+        system:
+        home-manager.lib.homeManagerConfiguration {
+          pkgs = nixpkgs.legacyPackages.${system};
+          extraSpecialArgs = { username = resolvedUser; };
+          modules = [ ./nix/home/linux.nix ];
+        };
     in
     {
       # Convenience dev shell mirroring the repo's lint/test toolchain. This is a
@@ -141,5 +153,12 @@
       # (packages only). Activated on the real Mac by setup.sh's consent-gated
       # `darwin-rebuild switch --flake .#dotfiles` (never in normal setup/update).
       darwinConfigurations."dotfiles" = mkDarwin { username = resolvedUser; };
+
+      # Native Linux / WSL userland package sets (Home Manager, packages only).
+      # Keyed by arch so setup.sh can `home-manager switch --flake .#$(uname -m)-linux`.
+      homeConfigurations = {
+        "x86_64-linux" = mkHome "x86_64-linux";
+        "aarch64-linux" = mkHome "aarch64-linux";
+      };
     };
 }

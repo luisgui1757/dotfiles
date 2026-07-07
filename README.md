@@ -112,6 +112,7 @@ apply.
 ./setup.sh --dry-run             # preview
 ./setup.sh --experimental-wsl-gui # WSL-only opt-in for Linux GUI terminal bits
 ./setup.sh --nix-darwin          # macOS-only opt-in: apply the nix-darwin package layer
+./setup.sh --home-manager        # Linux/WSL-only opt-in: apply the Home Manager package layer
 ./setup.sh --skip-config         # skip chezmoi config apply
 ./setup.sh --skip-agents         # skip global Polaris agent policy
 make setup                       # same as ./setup.sh, via the Makefile
@@ -123,8 +124,14 @@ Manager on macOS). chezmoi still owns **every** dotfile; Nix owns no config.
 It is opt-in and off by default: `./setup.sh --nix-darwin` (macOS-only,
 consent-gated) runs `darwin-rebuild switch --flake .#dotfiles`, which activates
 the declarative Homebrew casks (WezTerm, AeroSpace) + Herdr brew and the
-nix-owned CLI package set. Native Windows is non-Nix. `nix flake check` runs in
-CI (`.github/workflows/nix.yml`) on Ubuntu + macOS.
+nix-owned CLI package set. On Linux/WSL, `./setup.sh --home-manager` applies the
+standalone Home Manager package set (`home-manager switch --flake .#<arch>-linux`;
+WSL writes only to the Linux `~/.nix-profile`, never `/mnt/c`). Both keep the
+native install-deps arms as the default — the Nix layer is additive. **nvim and
+the tree-sitter CLI stay native** (ABI-coupled to nvim-treesitter parser builds;
+migrating them into a same-closure toolchain is a follow-up). Native Windows is
+non-Nix. `nix flake check` runs in CI (`.github/workflows/nix.yml`) on Ubuntu +
+macOS.
 
 ```powershell
 .\setup.ps1

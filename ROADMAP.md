@@ -144,10 +144,17 @@ Commit-by-commit status:
   `mutableTaps = false`); homebrew module (`autoUpdate = false`, `upgrade = false`,
   `cleanup = "check"`); casks WezTerm + AeroSpace; brews Herdr + selected CLI; Home
   Manager packages-only; consent-gated `darwin-rebuild switch` in setup.sh.
-- **Commit 6 - Linux/WSL Home Manager packages-only — PLANNED.** HM standalone for
-  native Linux + WSL userland; packages only; split-host WSL preserved; native
-  install arms retained (nvim migration intentionally deferred with proof — see
-  the phase notes).
+- **Commit 6 - Linux/WSL Home Manager packages-only — DONE.** HM standalone for
+  native Linux + WSL userland (`homeConfigurations."<arch>-linux"`); packages
+  only; `setup.sh --home-manager` opt-in; split-host WSL preserved (writes only
+  to `~/.nix-profile`, never `/mnt/c`); native install arms RETAINED as the
+  default. **nvim + the tree-sitter CLI are intentionally deferred with proof:**
+  they are ABI-coupled (nvim-treesitter `main` compiles parsers whose ABI must
+  match nvim's built-in libtree-sitter; the CLI is pinned to v0.26.9 — invariant
+  19), so a nix nvim/tree-sitter shadowing the pinned native binaries would risk
+  the E5113 parser/ABI mismatch. They stay native until nvim + its parser
+  toolchain can move into one ABI-matched Nix closure (follow-up). Excluded from
+  `nix/home/common.nix` and asserted absent by `tests/nix/linux_home_test.sh`.
 - **Commit 7 - setup/update ownership integration — PLANNED.** Unix update
   ownership recognizes Nix-owned tools (`owner=nix`); no blanket
   `nix profile upgrade`; no silent `flake.lock` rewrite; explicit documented +

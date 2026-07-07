@@ -37,6 +37,7 @@ SKIP_AGENTS=0
 BEST_EFFORT=0
 EXPERIMENTAL_WSL_GUI=0
 NIX_DARWIN=0
+HOME_MANAGER=0
 POLARIS_REPO_URL="https://github.com/luisgui1757/polaris.git"
 POLARIS_VERSION="0.1.2"
 POLARIS_TAG="v0.1.2"
@@ -61,6 +62,8 @@ Local usage:
                                 WSL opt-in: install/link Linux Ghostty + Linux fonts
   ./setup.sh --nix-darwin        macOS opt-in: apply the nix-darwin package layer
                                 (declarative Homebrew casks/brews + nix CLI set)
+  ./setup.sh --home-manager      Linux/WSL opt-in: apply the Home Manager package
+                                layer (nix CLI set; native install arms untouched)
 
 First run:
   git clone https://github.com/luisgui1757/dotfiles.git "${DOTFILES_DEST:-$HOME/dotfiles}"
@@ -83,6 +86,7 @@ for arg in "$@"; do
         --experimental-wsl-gui)
                           EXPERIMENTAL_WSL_GUI=1 ;;
         --nix-darwin)     NIX_DARWIN=1 ;;
+        --home-manager)   HOME_MANAGER=1 ;;
         -h|--help)        usage; exit 0 ;;
         *) echo "Unknown arg: $arg" >&2; exit 2 ;;
     esac
@@ -599,6 +603,65 @@ run_nix_darwin_switch() {
     fi
 }
 
+# Optional, EXPLICIT opt-in: apply the Nix Home Manager package layer on
+# Linux/WSL. Like --nix-darwin, it never runs without --home-manager, so setup
+# defaults are unchanged and the native install arms in install-deps.sh stay the
+# default provisioning path. It installs the nix-owned CLI package set into the
+# user profile (no root). On WSL it writes ONLY to the Linux ~/.nix-profile, so
+# the split-host model is preserved. --impure lets the flake resolve $USER.
+run_home_manager_switch() {
+    [[ "$HOME_MANAGER" -eq 1 ]] || return 0
+    if [[ "$(uname -s)" != "Linux" ]]; then
+        echo
+        echo "skipped: --home-manager is Linux/WSL-only (macOS uses --nix-darwin)"
+        return 0
+    fi
+    phase "Optional: apply the Nix Home Manager package layer (Linux/WSL)"
+    if ! command -v nix >/dev/null 2>&1; then
+        echo "  skipped: nix is not installed. Install Nix first, then re-run:"
+        echo "           ./setup.sh --home-manager"
+        return 0
+    fi
+    local arch config_name flake_ref
+    arch="$(uname -m)"
+    case "$arch" in
+        x86_64 | amd64) config_name="x86_64-linux" ;;
+        aarch64 | arm64) config_name="aarch64-linux" ;;
+        *)
+            echo "  skipped: no Home Manager config for arch $arch"
+            return 0
+            ;;
+    esac
+    flake_ref="$SCRIPT_DIR#$config_name"
+    echo "  Runs 'home-manager switch --flake $flake_ref --impure' (no root;"
+    echo "  WSL writes only to the Linux ~/.nix-profile, never /mnt/c)."
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        echo "  would: home-manager switch --flake $flake_ref --impure"
+        echo "         (first-time bootstrap: nix run home-manager -- switch --flake $flake_ref --impure)"
+        return 0
+    fi
+    if [[ "$ALL" -eq 0 ]]; then
+        printf "  Apply Home Manager now? [y/N] "
+        local reply=""
+        read -r reply || true
+        case "$reply" in
+            y | Y | yes | YES | Yes) ;;
+            *)
+                echo "  skipped Home Manager apply"
+                return 0
+                ;;
+        esac
+    fi
+    if command -v home-manager >/dev/null 2>&1; then
+        home-manager switch --flake "$flake_ref" --impure ||
+            echo "  WARN: home-manager switch failed (opt-in layer; setup continues)"
+    else
+        echo "  bootstrapping Home Manager (first run)..."
+        nix run home-manager -- switch --flake "$flake_ref" --impure ||
+            echo "  WARN: Home Manager bootstrap switch failed (opt-in layer; setup continues)"
+    fi
+}
+
 # Test seam: `DOTFILES_SETUP_SOURCE_ONLY=1 source setup.sh` loads the helper
 # functions (phase, refresh_runtime_path) without running the install phases, so
 # tests can exercise refresh_runtime_path in isolation. Unset in normal runs.
@@ -694,6 +757,7 @@ fi
 run_polaris_agent_policy
 
 run_nix_darwin_switch
+run_home_manager_switch
 
 # ---- Summary -----------------------------------------------------------------
 echo
