@@ -132,7 +132,7 @@ Commit-by-commit status:
   Scoop/winget/choco (Windows), pinned official `.deb` with SHA-256 (native
   Ubuntu). Tests: Lua smoke (stubbed `require`), parity row, no-auto-launch static
   assertion, installer provenance.
-- **Commit 3 - AeroSpace + Herdr — PLANNED.** AeroSpace (macOS-only tap cask,
+- **Commit 3 - AeroSpace + Herdr — DONE.** AeroSpace (macOS-only tap cask,
   `start-at-login`, reserved-chord-safe keymap avoiding Alt-h/j/k/l and Alt-c),
   `aerospace/aerospace.toml` + chezmoi mirror, TOML lint. Herdr (macOS/Linux only,
   Homebrew/Linuxbrew formula; native Windows blocked by tests + docs).

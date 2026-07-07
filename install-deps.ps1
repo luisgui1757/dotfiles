@@ -2947,6 +2947,11 @@ Install-WindowsTerminal
 Section "terminal (optional): WezTerm"
 Install-One wezterm
 
+# Herdr (agent multiplexer) is intentionally NOT installed on native Windows: its
+# stable channel is macOS/Linux only, and the native Windows build is preview-only
+# beta, installable only through a banned irm|iex remote-eval. macOS/Linux install
+# Herdr via install-deps.sh. Guarded by tests/static/herdr_windows_block_test.sh.
+
 Section "terminal multiplexer (psmux: tmux for native Windows, optional)"
 Install-Psmux
 Install-PsmuxPlugins

@@ -2,7 +2,7 @@
 # current OS; sub-targets skip themselves with a clear message when the
 # tool they depend on isn't installed.
 
-.PHONY: ci test-required test test-migration test-nvim test-shell test-starship test-tmux test-ghostty test-wezterm test-static validate-renovate lint setup setup-dryrun install dryrun deps deps-dryrun chezmoi chezmoi-diff help
+.PHONY: ci test-required test test-migration test-nvim test-shell test-starship test-tmux test-ghostty test-wezterm test-aerospace test-static validate-renovate lint setup setup-dryrun install dryrun deps deps-dryrun chezmoi chezmoi-diff help
 
 REPO := $(shell pwd)
 
@@ -20,6 +20,7 @@ help:
 	@echo "  test-tmux       — load + option assertions"
 	@echo "  test-ghostty    — +validate-config + scheme grep (mac only)"
 	@echo "  test-wezterm    — Lua smoke (stubbed require) + no-multiplexer-autolaunch"
+	@echo "  test-aerospace  — reserved-chord + start-at-login config guards (mac WM)"
 	@echo "  test-static     — json/toml/yaml lint, editorconfig, invariants"
 	@echo "  validate-renovate — schema-check renovate.json under Node 24"
 	@echo "  lint            — shellcheck everything"
@@ -66,7 +67,7 @@ ci: test validate-renovate test-migration
 
 test-required: ci
 
-test: test-static lint test-nvim test-shell test-starship test-tmux test-ghostty test-wezterm
+test: test-static lint test-nvim test-shell test-starship test-tmux test-ghostty test-wezterm test-aerospace
 	@echo
 	@echo "=== test summary: see individual sub-target output above ==="
 
@@ -95,6 +96,9 @@ test-ghostty:
 
 test-wezterm:
 	@bash tests/wezterm/run_all.sh
+
+test-aerospace:
+	@bash tests/aerospace/run_all.sh
 
 test-static:
 	@bash tests/static/run_all.sh

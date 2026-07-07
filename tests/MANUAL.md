@@ -49,6 +49,26 @@ significant change to the relevant area.
 - [ ] **PowerShell Tab completion**: press Tab into MenuComplete; the selected
       item is light text on the Rose Pine overlay background.
 
+## Window manager / multiplexer (macOS + Linux)
+
+- [ ] **AeroSpace Accessibility (TCC) grant**, macOS: after
+      `brew install --cask nikitabobko/tap/aerospace` and launch, macOS prompts
+      for Accessibility — grant it (System Settings -> Privacy & Security ->
+      Accessibility -> AeroSpace ON). Confirm AeroSpace starts at login
+      (`start-at-login = true`) and tiles windows.
+- [ ] **AeroSpace reserved-chord safety**, macOS: with AeroSpace running, open a
+      terminal + nvim. `ctrl-alt-h/j/k/l` moves WM focus between windows;
+      **bare `Alt-h/j/k/l` still reaches nvim** (window nav) and is NOT captured
+      by AeroSpace; `Alt-c` still triggers fzf-tab / PSFzf `cd`. `alt-1..9`
+      switches workspaces; `alt-shift-1..9` moves the window; `ctrl-alt-f`
+      fullscreen; `ctrl-alt-shift-;` enters service mode (esc reloads config).
+- [ ] **Herdr session smoke**, macOS/Linux: `herdr --version` prints the pinned
+      version; start a session (`herdr`), confirm it opens panes and its
+      agent-state awareness works, then exit cleanly. On native Linux without
+      brew, confirm the binary is the pinned SHA-256-verified release
+      (`~/.local/bin/herdr`), not a remote-eval install. Herdr must NOT be
+      present on native Windows.
+
 ## Shell tooling
 
 - [ ] **zoxide**: after visiting a few directories, `z <partial>` jumps to the

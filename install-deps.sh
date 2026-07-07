@@ -67,6 +67,16 @@ GHOSTTY_UBUNTU_INSTALL_SHA256="7517776f6d862ec523e627840af4806e13385302f653ae9f7
 # catalog via winget/scoop/choco, so there is no Windows version pin to mirror.)
 WEZTERM_VERSION="20240203-110809-5046fc22"
 WEZTERM_DEB_AMD64_SHA256="86358dab5794a4fb63f7c91dd68d4fdc3da58faad648a58fc77d2bd51c7b0686"
+# Herdr (agent multiplexer). macOS + Linuxbrew use the canonical homebrew-core
+# formula (`brew install herdr`). Native Linux without brew installs the pinned
+# release binary, SHA-256 verified. Upstream publishes no checksum sidecar, so
+# these SHAs were computed from the pinned v0.7.1 assets on 2026-07-07 (bump the
+# version + both SHAs together). NOT the herdr.dev install.sh remote-eval path.
+# Native Windows Herdr is preview-only beta (irm|iex installer) and is
+# intentionally NOT installed by install-deps.ps1.
+HERDR_VERSION="v0.7.1"
+HERDR_LINUX_X86_64_SHA256="b965acaffc2c22f54b6e6c64af7cf8e98a3f4ac2622630a0599c67a4b9d8a654"
+HERDR_LINUX_ARM64_SHA256="3d757ac30c631e79dc45038c3ecc6423fe13a89f9cffa0f415aedd2c27f1576c"
 PYLATEXENC_BUILD_BACKEND_VERSION="80.9.0"
 PYLATEXENC_BUILD_BACKEND_SHA256="062d34222ad13e0cc312a4c02d73f059e86a4acbfbdea8f8f76b28c99f306922"
 PYLATEXENC_VERSION="2.10"
@@ -2106,6 +2116,26 @@ install_wezterm_macos() {
     brew install --cask wezterm || echo "  WARN: wezterm cask install failed"
 }
 
+# AeroSpace: i3-like tiling WM, macOS only. Official tap cask (nikitabobko/tap).
+# NOT nixpkgs. Needs an Accessibility (TCC) grant on first launch -- unscriptable.
+install_aerospace_macos() {
+    if have aerospace; then
+        printf "  ok        %-26s already installed\n" "aerospace"
+        return
+    fi
+    if ! ask "Install AeroSpace (tiling WM, macOS) via Homebrew cask (nikitabobko/tap)?"; then
+        printf "  skipped   %-26s\n" "aerospace"
+        return
+    fi
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        echo "  would: brew install --cask nikitabobko/tap/aerospace"
+        return
+    fi
+    brew install --cask nikitabobko/tap/aerospace || echo "  WARN: aerospace cask install failed"
+    echo "  note: grant AeroSpace Accessibility permission (System Settings ->"
+    echo "        Privacy & Security -> Accessibility). This TCC grant is unscriptable."
+}
+
 # ---- Package-name resolution (Bash 3.2-safe, no associative arrays) ----------
 #
 # Table format: lines of "tool|brew|apt|dnf|pacman|zypper|apk".
@@ -3404,6 +3434,89 @@ install_wezterm_linux() {
     echo "              - flatpak:      flatpak install flathub org.wezfurlong.wezterm"
 }
 
+# Download, SHA-256 verify, and install the pinned Herdr Linux binary. We verify
+# the binary before installing it (unlike the herdr.dev install.sh remote-eval
+# path), so an upstream change at the pinned tag fails closed. require_downloader
+# already ran.
+run_herdr_linux_binary_install() {
+    local url="$1" expected="$2" dest="$3" tmp bin rc=0
+    tmp="$(mktemp -d)"
+    trap 'rm -rf "$tmp"; trap - RETURN' RETURN
+    bin="$tmp/herdr"
+    if ! curl -fsSL -o "$bin" "$url"; then
+        echo "  FAIL: could not download herdr binary"
+        rm -rf "$tmp"; return 1
+    fi
+    if ! verify_sha256 "$bin" "$expected"; then
+        echo "  FAIL: checksum mismatch for herdr $HERDR_VERSION"
+        echo "        upstream changed; review it, then bump HERDR_VERSION + SHA together"
+        rm -rf "$tmp"; return 1
+    fi
+    mkdir -p "$(dirname "$dest")"
+    install -m 755 "$bin" "$dest" || rc=$?
+    rm -rf "$tmp"
+    return "$rc"
+}
+
+# Herdr: agent multiplexer. macOS + Linuxbrew use the canonical homebrew-core
+# formula; native Linux without brew uses the pinned, SHA-256-verified release
+# binary. macOS/Linux only -- native Windows Herdr is preview-only beta (and only
+# installable via a banned irm|iex remote-eval), so install-deps.ps1 omits it.
+install_herdr() {
+    local arch asset expected url dest
+    if have herdr; then
+        printf "  ok        %-26s already installed\n" "herdr"
+        return
+    fi
+    if [[ "$PM" == "brew" ]]; then
+        if ! ask "Install Herdr (agent multiplexer) via Homebrew (brew install herdr)?"; then
+            printf "  skipped   %-26s\n" "herdr"
+            return
+        fi
+        if [[ "$DRY_RUN" -eq 1 ]]; then
+            echo "  would: brew install herdr"
+            return
+        fi
+        brew install herdr || echo "  WARN: herdr brew install failed"
+        return
+    fi
+    if [[ "$(uname -s)" != "Linux" ]]; then
+        printf "  skipped   %-26s no Homebrew and not Linux\n" "herdr"
+        return
+    fi
+    arch="$(uname -m)"
+    case "$arch" in
+        x86_64 | amd64)
+            asset="herdr-linux-x86_64"
+            expected="$HERDR_LINUX_X86_64_SHA256"
+            ;;
+        aarch64 | arm64)
+            asset="herdr-linux-aarch64"
+            expected="$HERDR_LINUX_ARM64_SHA256"
+            ;;
+        *)
+            echo "  manual    herdr has no pinned Linux binary for arch $arch; see https://herdr.dev/docs/install/"
+            return
+            ;;
+    esac
+    url="https://github.com/ogulcancelik/herdr/releases/download/${HERDR_VERSION}/${asset}"
+    dest="$HOME/.local/bin/herdr"
+    if ! ask "Install Herdr (agent multiplexer) via pinned GitHub release ${HERDR_VERSION} binary (SHA-256 verified)?"; then
+        printf "  skipped   %-26s\n" "herdr"
+        return
+    fi
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        echo "  would: curl -fsSL $url"
+        echo "         verify sha256 $expected"
+        echo "         install -m 755 -> $dest"
+        return
+    fi
+    require_downloader || return 1
+    if ! run_herdr_linux_binary_install "$url" "$expected" "$dest"; then
+        echo "  WARN: herdr binary install failed; continuing"
+    fi
+}
+
 # VS Code: brew cask on macOS; snap, then flatpak, then a manual hint on Linux.
 install_vscode() {
     if have code; then
@@ -3825,6 +3938,16 @@ elif [[ "$(uname -s)" == "Linux" ]]; then
     install_wezterm_linux
 fi
 setup_ghostty_maximize   # GNOME/X11 only: enforce Ghostty maximize via devilspie2 (opt-in)
+
+section "window manager (macOS, optional)"
+if [[ "$(uname -s)" == "Darwin" ]] && [[ "$PM" == "brew" ]]; then
+    install_aerospace_macos
+else
+    printf "  skipped   %-26s AeroSpace is macOS-only\n" "aerospace"
+fi
+
+section "agent multiplexer (optional): Herdr"
+install_herdr   # macOS/Linux only; native Windows Herdr is preview-beta and omitted
 
 section "editor: VS Code (optional)"
 install_vscode

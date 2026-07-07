@@ -5,7 +5,8 @@ The repo owns the daily shell/editor stack: Neovim, tmux/psmux, Starship, zsh,
 PowerShell, Ghostty, WezTerm, lazygit, `lsd`, `zoxide` smart-cd, the `gh` CLI with the
 `gh-dash` dashboard, Windows Terminal theming, locked plugin restore, LSP /
 formatter provisioning, and global Polaris agent-policy bootstrap. It also provisions the `tree-sitter` CLI needed by
-`nvim-treesitter` main parser builds.
+`nvim-treesitter` main parser builds, plus AeroSpace (macOS tiling WM) and Herdr
+(agent multiplexer, macOS/Linux) as optional vendor-channel installs.
 
 The public interface is intentionally small:
 
@@ -238,6 +239,7 @@ symlink, and Windows Terminal remains a merge.
 | tmux / psmux | `~/.tmux.conf` -> `tmux/tmux.conf`; `~/.tmux.posix.conf` -> `tmux/tmux.posix.conf` (POSIX clipboard + TPM functional plugins + generated Rose Pine bar); `~/.tmux.rose-pine.{main,moon,dawn}.conf` -> generated `tmux/psmux-rose-pine.{main,moon,dawn}.conf` (Omer-shaped Rose Pine bar, **shared** with Windows) | same | `%USERPROFILE%\.psmux.conf` -> `tmux\psmux.conf` (first psmux entrypoint, disables warm sessions, then flag-free source-files the Windows overlay); `%USERPROFILE%\.tmux.conf` -> `tmux\tmux.conf`; `%USERPROFILE%\.tmux.windows.conf` -> `tmux\tmux.windows.conf`; `%USERPROFILE%\.tmux.rose-pine.ps1` -> `tmux\psmux-rose-pine.ps1` (Rose Pine bar generator / manual live-switch helper); `%USERPROFILE%\.tmux.rose-pine.{main,moon,dawn}.conf` -> the same generated `tmux\psmux-rose-pine.{main,moon,dawn}.conf`; the POSIX overlay is **excluded** on Windows (its `if-shell` probes hang psmux); WSL uses the Unix path |
 | Ghostty | `~/Library/Application Support/com.mitchellh.ghostty/config` -> `ghostty/config` | native Linux links `~/.config/ghostty/config`; WSL links it only with `--experimental-wsl-gui` | n/a |
 | WezTerm | `~/.config/wezterm/wezterm.lua` -> `wezterm/wezterm.lua` | same; WSL links it only with `--experimental-wsl-gui` | `%USERPROFILE%\.config\wezterm\wezterm.lua` -> `wezterm\wezterm.lua` (copied) |
+| AeroSpace | `~/.config/aerospace/aerospace.toml` -> `aerospace/aerospace.toml` (macOS tiling WM; focus/move on `ctrl-alt(-shift)` to avoid nvim `<A-h/j/k/l>` and fzf `Alt-c`) | n/a (macOS-only) | n/a (macOS-only) |
 | lazygit | `~/Library/Application Support/lazygit/config.yml` -> `lazygit/config.yml` | `~/.config/lazygit/config.yml` -> `lazygit/config.yml` | `%LOCALAPPDATA%\lazygit\config.yml` -> `lazygit\config.windows.yml` |
 | lsd | `~/.config/lsd/{config.yaml,colors.yaml}` -> `lsd/{config.yaml,colors.yaml}` | same | `%USERPROFILE%\.config\lsd\{config.yaml,colors.yaml}` -> `lsd\{config.yaml,colors.yaml}` |
 | gh-dash | `~/.config/gh-dash/config.yml` -> `gh-dash/config.yml` | same | `%USERPROFILE%\.config\gh-dash\config.yml` -> `gh-dash\config.yml` |
@@ -408,6 +410,19 @@ and whether `pwsh` is installed.
   Windows-host terminal unless `--experimental-wsl-gui`); arm64 Linux / non-Ubuntu
   get manual guidance. The Rose Pine + Hack Nerd Font + transparency config is
   chezmoi-owned, never a Nix/nixpkgs GUI package.
+- AeroSpace (macOS-only i3-like tiling WM) installs from the official tap cask
+  (`brew install --cask nikitabobko/tap/aerospace`), `start-at-login = true`,
+  chezmoi-owned config. Its keymap deliberately avoids the reserved chords:
+  window focus/move live on `ctrl-alt(-shift)-h/j/k/l` so they never shadow
+  Neovim's `<A-h/j/k/l>` window navigation, and nothing uses `Alt-c` (fzf-tab /
+  PSFzf `cd`). On first launch grant it Accessibility permission (System Settings
+  -> Privacy & Security -> Accessibility) — a TCC grant that cannot be scripted.
+  Not a Nix/nixpkgs package.
+- Herdr (agent multiplexer) installs on macOS/Linux only: `brew install herdr`
+  (homebrew-core) on macOS and Linuxbrew, or a pinned, SHA-256-verified GitHub
+  release binary on native Linux without brew (never the `herdr.dev` remote-eval
+  installer). Native Windows Herdr is preview-only beta (installable only via an
+  `irm | iex` remote-eval), so it is intentionally not installed on Windows.
 - WSL fonts are host-rendered in the supported path. Install and merge Windows
   Terminal from Windows (`.\setup.ps1 -All`; the merge is default-on); the WSL
   Linux fontconfig install is only for `--experimental-wsl-gui`.

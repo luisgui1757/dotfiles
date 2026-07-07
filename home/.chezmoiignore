@@ -21,6 +21,7 @@ Documents
 {{- end }}
 {{- if ne .targetOS "darwin" }}
 Library
+.config/aerospace
 {{- end }}
 {{- if ne .targetOS "linux" }}
 .config/lazygit
