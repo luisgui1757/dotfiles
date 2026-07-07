@@ -33,6 +33,10 @@ describe("vim-options", function()
     assert.is_true(vim.opt.smartcase:get())
   end)
 
+  it("keeps scrolloff at 16 (generous vertical context)", function()
+    assert.are.equal(16, vim.opt.scrolloff:get())
+  end)
+
   it("mapleader is space", function()
     assert.are.equal(" ", vim.g.mapleader)
   end)

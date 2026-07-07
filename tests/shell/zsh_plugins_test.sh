@@ -88,6 +88,22 @@ else
     exit 1
 fi
 
+# zoxide's `z`/`zi` init must be guarded (so a machine without zoxide still
+# starts) AND must run AFTER compinit -- upstream requires post-compinit
+# placement for its completions to register.
+grep -F 'command -v zoxide' "$zshrc" >/dev/null \
+    || { echo "FAIL: zshrc must guard zoxide init with 'command -v zoxide'"; exit 1; }
+if awk '
+    /^[[:space:]]*compinit[[:space:]]/ { compinit_call = NR }
+    /zoxide init zsh/                  { zoxide_line = NR }
+    END { exit !(compinit_call && zoxide_line && zoxide_line > compinit_call) }
+' "$zshrc"; then
+    :
+else
+    echo "FAIL: zshrc must run 'zoxide init zsh' AFTER compinit"
+    exit 1
+fi
+
 grep -F 'skip_global_compinit=1' "$REPO_ROOT/shells/zshenv" >/dev/null
 
 # The chezmoi source twin must stay byte-identical to the canonical file, else

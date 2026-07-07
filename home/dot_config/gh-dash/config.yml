@@ -1,0 +1,21 @@
+# gh-dash dashboard -- https://www.gh-dash.dev/configuration/
+# Requires `gh auth login` first (a manual, secret-bearing step; never stored here).
+# gh-dash reads this from ~/.config/gh-dash/config.yml on macOS/Linux and
+# %USERPROFILE%\.config\gh-dash\config.yml on Windows (XDG-style, not AppData).
+prSections:
+  - title: My Pull Requests
+    filters: is:open author:@me
+  - title: Needs My Review
+    filters: is:open review-requested:@me
+  - title: Involved
+    filters: is:open involves:@me -author:@me
+issuesSections:
+  - title: My Issues
+    filters: is:open author:@me
+  - title: Assigned
+    filters: is:open assignee:@me
+defaults:
+  preview:
+    open: true
+    width: 60
+  refetchIntervalMinutes: 30

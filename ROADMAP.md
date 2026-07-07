@@ -38,16 +38,62 @@ repeatable instead of tribal.
 - Post-fix audit hardening added regression coverage for POSIX uninstall
   dry-run immutability, mirrored chezmoi/Starship/tree-sitter pins,
   required-check list duplication, and the Windows Sandbox bootstrap trust root.
-- The combined terminal/update PR removed local tmux theme snippets, kept the
-  upstream Rose Pine plugin variants as the only theme surface (`main` by
-  default, `moon` / `dawn` available), kept POSIX rendering on the pinned
-  upstream TPM `rose-pine/tmux` plugin, and moved Windows rendering to a
-  repo-owned psmux-safe port of the same flat status bar because the community
-  `psmux-theme-rosepine` plugin is a different powerline design. Tests cover
-  plugin provisioning, unquoted overlay source paths, POSIX rich-module options,
-  the Windows `~/.psmux.conf` warm-session guard plus flag-free psmux source of
-  `~/.tmux.windows.conf`, generated psmux Rose Pine freshness, and the
-  terminal-edge safety space for right-aligned prompt/status glyphs.
+- The tmux/psmux Rose Pine bar is now ONE repo-owned generated artifact sourced
+  on BOTH platforms (PRs #39 / #41): `tmux/psmux-rose-pine.ps1` renders
+  `tmux/psmux-rose-pine.{main,moon,dawn}.conf`, and both POSIX tmux
+  (`tmux.posix.conf`) and native-Windows psmux (`tmux.windows.conf`) source the
+  SAME deployed variant (`~/.tmux.rose-pine.{main,moon,dawn}.conf`,
+  chezmoi-managed on both). The upstream `rose-pine/tmux` TPM plugin is retired
+  from the theme surface (it shelled out ~30x at load and hung psmux/ConPTY);
+  `main` is the default variant, with `moon` / `dawn` selectable via
+  `@rosepine-variant`. POSIX still loads the functional TPM set
+  (sensible/yank/resurrect/continuum). Tests cover plugin provisioning, unquoted
+  overlay source paths, the Windows `~/.psmux.conf` warm-session guard plus
+  flag-free psmux source of `~/.tmux.windows.conf`, generated psmux Rose Pine
+  freshness, and the terminal-edge safety space for right-aligned prompt/status
+  glyphs.
+
+## Nix + Tooling Migration (2026-07, in progress)
+
+An adversarial architecture review (2026-07-06) accepted, with required changes,
+a staged migration toward Nix-owned POSIX **packages** (nix-darwin + Home Manager
++ declarative Homebrew on macOS; Home Manager standalone on Linux/WSL userland)
+while **chezmoi stays the single owner of every dotfile target on every OS**, and
+native Windows stays on `setup.ps1` + native package managers (Nix has no
+supported native-Windows story; WSL2 only). Ruling highlights: exactly one owner
+per path (Nix/Home Manager and chezmoi must never co-own a file); GUI /
+TCC-sensitive apps (AeroSpace, WezTerm, Herdr) come from vendor channels
+(casks / pinned artifacts), never nixpkgs; Herdr native Windows is preview-beta
+and stays off by default; no `Invoke-Expression` / `curl|sh` / `irm|iex`
+remote-eval installers.
+
+Sequenced PRs (split for independent, revertable blast radius):
+
+- **PR-1 `feat/ergonomics-core` - IN PROGRESS (this branch).** No Nix, no
+  vi-mode. Neovim `scrolloff = 16`; which-key.nvim (`<leader>?`, VeryLazy);
+  zoxide across zsh + PowerShell + both installers (cached,
+  no-`Invoke-Expression` PowerShell init); `gh` + pinned `gh-dash` extension
+  (`v4.25.0`) with a chezmoi-managed same-path config and Renovate /
+  pin-consistency coverage.
+- **PR-2 `feat/vi-mode`** - zsh (`bindkey -v`) + PSReadLine (`-EditMode Vi`)
+  command-line vi-mode with a full re-bind matrix (must not break the
+  invariant-13 fzf-tab / history stack) and new regression tests.
+- **PR-3 `feat/wezterm`** - WezTerm on all OSes (brew cask / pinned `.deb` /
+  `$Catalog`), Rose Pine + transparency + Hack Nerd Font parity, chezmoi-only
+  config; not a Nix/nixpkgs GUI package.
+- **PR-4 `feat/aerospace-herdr`** - AeroSpace (macOS tap cask,
+  reserved-chord-safe keymap) + Herdr (macOS/Linux only; native Windows gated
+  off).
+- **PR-5 `feat/nix-skeleton`** - flake + committed `flake.lock` with ZERO
+  ownership; `nix flake check` CI; disjointness test (Home Manager declares no
+  file targets); Renovate `nix` manager.
+- **PR-6 `feat/nix-darwin`** - macOS host config: `darwinConfigurations` +
+  `system.primaryUser`; nix-homebrew (pinned taps, `mutableTaps = false`) +
+  homebrew module (`cleanup = "check"`, no auto-update/upgrade); Home Manager
+  **packages only**; `--update` gains an `owner=nix` status.
+- **PR-7 `feat/nix-linux`** - Home Manager standalone on Ubuntu/WSL userland;
+  per-tool apt / pinned-artifact -> nix handoff (nvim last, for ABI reasons);
+  native install arms retire only after green e2e + greenfield-ledger evidence.
 
 ## P0 - Total Update Ownership Model
 

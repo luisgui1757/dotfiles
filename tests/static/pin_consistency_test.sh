@@ -134,6 +134,12 @@ for doc in README.md CLAUDE.md; do
     assert_contains "psmux-plugins commit ($doc)" "$doc" "$psmux_plugins_commit"
 done
 
+# --- gh-dash pinned extension tag: install-deps.sh <-> install-deps.ps1 <-> docs
+gh_dash_sh="$(sh_const GH_DASH_VERSION)"
+gh_dash_ps="$(ps_const GhDashVersion)"
+assert_eq "gh-dash tag (install-deps.sh == install-deps.ps1)" "$gh_dash_sh" "$gh_dash_ps"
+assert_contains "gh-dash tag (CLAUDE.md)" "CLAUDE.md" "$gh_dash_sh"
+
 # --- Polaris: setup.sh <-> setup.ps1 -----------------------------------------
 polaris_version_sh="$(setup_sh_const POLARIS_VERSION)"
 polaris_tag_sh="$(setup_sh_const POLARIS_TAG)"

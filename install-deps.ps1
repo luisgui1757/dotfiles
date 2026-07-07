@@ -30,6 +30,7 @@ $PylatexencBuildBackendVersion = '80.9.0'
 $PylatexencBuildBackendSha256 = '062d34222ad13e0cc312a4c02d73f059e86a4acbfbdea8f8f76b28c99f306922'
 $PylatexencVersion = '2.10'
 $PylatexencSha256 = '3dd8fd84eb46dc30bee1e23eaab8d8fb5a7f507347b23e5f38ad9675c84f40d3'
+$GhDashVersion = 'v4.25.0'   # dlvhdr/gh-dash pinned gh-extension tag; mirror in install-deps.sh (GH_DASH_VERSION)
 # psmux session plugin (resurrect only) is vendored from the psmux/psmux-plugins
 # monorepo at this immutable commit. We do NOT use PPM: it clones the monorepo
 # HEAD (unpinned) and rewrites managed config files. (psmux-continuum is blocked
@@ -294,6 +295,7 @@ $Catalog = @{
     fd                   = @{ winget = 'sharkdp.fd';                       choco = 'fd';                   scoop = 'fd'                   ; purpose = 'Telescope find_files backend' }
     fzf                  = @{ winget = 'junegunn.fzf';                     choco = 'fzf';                  scoop = 'fzf'                  ; purpose = 'fuzzy finder (PSFzf history/file/dir pickers)' }
     lsd                  = @{ winget = 'lsd-rs.lsd';                       choco = 'lsd';                  scoop = 'lsd'                  ; purpose = 'modern ls replacement with colors, icons, and tree view' }
+    zoxide               = @{ winget = 'ajeetdsouza.zoxide';              choco = 'zoxide';               scoop = 'zoxide'               ; purpose = 'smarter cd (z / zi), cached pwsh + zsh integration' }
     chezmoi              = @{ winget = 'twpayne.chezmoi';                  choco = 'chezmoi';              scoop = 'chezmoi'              ; purpose = 'dotfiles config manager' }
     lazygit              = @{ winget = 'JesseDuffield.lazygit';            choco = 'lazygit';              scoop = 'lazygit'              ; purpose = 'terminal git UI' }
     wt                   = @{ winget = 'Microsoft.WindowsTerminal';        choco = 'microsoft-windows-terminal'; scoop = 'extras/windows-terminal'; purpose = 'Windows Terminal host for PowerShell and WSL' }
@@ -306,6 +308,7 @@ $Catalog = @{
     python               = @{ winget = 'Python.Python.3.12';               choco = 'python';               scoop = 'python'               ; purpose = 'pyright + tooling' }
     zig                  = @{ winget = 'zig.zig';                          choco = 'zig';                  scoop = 'zig'                  ; purpose = 'C compiler for the LuaSnip jsregexp build' }
     jq                   = @{ winget = 'jqlang.jq';                        choco = 'jq';                   scoop = 'jq'                   ; purpose = 'general-purpose JSON CLI' }
+    gh                   = @{ winget = 'GitHub.cli';                       choco = 'gh';                   scoop = 'gh'                   ; purpose = 'GitHub CLI (gh); also backs the gh-dash dashboard' }
     shellcheck           = @{ winget = 'koalaman.shellcheck';              choco = 'shellcheck';           scoop = 'shellcheck'           ; purpose = 'shell-script linter' }
     hyperfine            = @{ winget = 'sharkdp.hyperfine';                choco = 'hyperfine';            scoop = 'hyperfine'            ; purpose = 'starship perf benchmark' }
     taplo                = @{ winget = '';                                 choco = '';                     scoop = 'taplo'                ; purpose = 'TOML linter' }
@@ -320,6 +323,7 @@ $BinaryName = @{
     fd          = 'fd'
     fzf         = 'fzf'
     lsd         = 'lsd'
+    zoxide      = 'zoxide'
     chezmoi     = 'chezmoi'
     lazygit     = 'lazygit'
     wt          = 'wt'
@@ -335,6 +339,7 @@ $BinaryName = @{
     python      = 'python'
     zig         = 'zig'
     jq          = 'jq'
+    gh          = 'gh'
     shellcheck  = 'shellcheck'
     hyperfine   = 'hyperfine'
     taplo       = 'taplo'
@@ -2713,6 +2718,43 @@ function Install-PSFzf {
     $script:InstallFailures += [pscustomobject]@{ Tool='PSFzf'; Pm='PSGallery'; Pkg='PSFzf'; ExitCode=$LASTEXITCODE }
 }
 
+function Install-GhDashExtension {
+    # gh-dash is a pinned gh CLI extension (no Scoop/winget/choco package). It
+    # needs the gh CLI; running the dashboard also needs `gh auth login` -- a
+    # manual, secret-bearing step we never automate or store. Non-critical: a
+    # failure records an InstallFailures entry but does not abort setup.
+    if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
+        Write-Host ("  skipped   {0,-26} gh CLI not installed (gh-dash is a gh extension)" -f "gh-dash")
+        return
+    }
+    $installed = $false
+    try {
+        $installed = [bool](@(& gh extension list 2>$null) -match 'dlvhdr/gh-dash')
+    } catch { Write-Verbose $_.Exception.Message }
+    if ($installed) {
+        Write-Host ("  ok        {0,-26} already installed (pinned {1})" -f "gh-dash", $GhDashVersion)
+        return
+    }
+    if (-not (Ask "Install gh-dash (pinned gh extension $GhDashVersion)?")) {
+        Write-Host ("  skipped   {0,-26}" -f "gh-dash")
+        return
+    }
+    if ($DryRun) {
+        Write-Host "  would: gh extension install dlvhdr/gh-dash --pin $GhDashVersion"
+        return
+    }
+    try {
+        & gh extension install dlvhdr/gh-dash --pin $GhDashVersion
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host ("  installed {0,-26} {1}" -f "gh-dash", $GhDashVersion)
+            return
+        }
+    } catch {
+        Write-Warning ("gh-dash install failed: " + $_.Exception.Message)
+    }
+    $script:InstallFailures += [pscustomobject]@{ Tool='gh-dash'; Pm='gh-extension'; Pkg="dlvhdr/gh-dash@$GhDashVersion"; ExitCode=$LASTEXITCODE }
+}
+
 function Get-CatalogUpdateSpec {
     param([object[]]$SpecList = @(Get-InstallDependencySpec))
     $seen = @{}
@@ -2837,6 +2879,7 @@ Install-One rg
 Install-One fd
 Install-One fzf
 Install-One lsd
+Install-One zoxide
 Install-One chezmoi
 Install-One lazygit
 
@@ -2868,6 +2911,8 @@ Install-One win32yank
 
 Section "developer / test dependencies (optional)"
 Install-One jq
+Install-One gh
+Install-GhDashExtension
 Install-One shellcheck
 Install-One hyperfine
 Install-One taplo

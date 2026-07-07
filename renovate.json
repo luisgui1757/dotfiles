@@ -265,6 +265,28 @@
     },
     {
       "customType": "regex",
+      "description": "gh-dash pinned gh-extension tag (install-deps.sh). Mirrored in install-deps.ps1; no adjacent SHA to recompute.",
+      "managerFilePatterns": ["/^install-deps\\.sh$/"],
+      "matchStrings": [
+        "GH_DASH_VERSION=\"(?<currentValue>v[^\"]+)\""
+      ],
+      "depNameTemplate": "dlvhdr/gh-dash",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "description": "gh-dash pinned gh-extension tag (install-deps.ps1). Mirrored in install-deps.sh; no adjacent SHA to recompute.",
+      "managerFilePatterns": ["/^install-deps\\.ps1$/"],
+      "matchStrings": [
+        "\\$GhDashVersion\\s*=\\s*'(?<currentValue>v[^']+)'"
+      ],
+      "depNameTemplate": "dlvhdr/gh-dash",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
       "description": "cargo-binstall installer script commit pinned to the current main branch digest. The adjacent installer script SHA-256 must be recomputed manually after Renovate bumps this.",
       "managerFilePatterns": ["/^\\.github/workflows/test\\.yml$/"],
       "matchStrings": [

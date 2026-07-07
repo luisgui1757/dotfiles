@@ -36,6 +36,18 @@ significant change to the relevant area.
 - [ ] **PowerShell Tab completion**: press Tab into MenuComplete; the selected
       item is light text on the Rose Pine overlay background.
 
+## Shell tooling
+
+- [ ] **zoxide**: after visiting a few directories, `z <partial>` jumps to the
+      best-matching one and `zi` opens the interactive picker — in BOTH a fresh
+      zsh and a fresh PowerShell (incl. inside psmux). Plain `cd` is unchanged.
+- [ ] **which-key**: in nvim press `<leader>` and pause past `timeoutlen`; a
+      popup lists the follow-up keys. `<leader>?` shows the buffer-local keymaps.
+- [ ] **gh-dash**: run `gh auth login` once, then `gh dash` renders the
+      dashboard (My Pull Requests / Needs My Review / My Issues) with Nerd Font
+      icons. Config is read from `~/.config/gh-dash/config.yml`
+      (`%USERPROFILE%\.config\gh-dash\config.yml` on Windows).
+
 ## Cross-OS clipboard round-trip
 
 - [ ] **macOS**: yank in nvim, ⌘V into Notes — pastes.
