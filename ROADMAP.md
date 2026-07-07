@@ -135,15 +135,18 @@ Commit-by-commit status:
 - **Commit 3 - AeroSpace + Herdr — DONE.** AeroSpace (macOS-only tap cask,
   `start-at-login`, reserved-chord-safe keymap avoiding Alt-h/j/k/l and Alt-c),
   `aerospace/aerospace.toml` + chezmoi mirror, TOML lint. Herdr (macOS/Linux only,
-  Homebrew/Linuxbrew formula; native Windows blocked by tests + docs).
+  Homebrew/Linuxbrew formula or pinned native-Linux binary with provenance-backed
+  update ownership; native Windows blocked by tests + docs).
 - **Commit 4 - Nix skeleton — DONE.** `flake.nix` + committed `flake.lock`
   (zero ownership), devShell + `checks`, `nix flake check` CI on Ubuntu + macOS,
   Renovate `nix` manager, disjointness static tests.
 - **Commit 5 - nix-darwin + declarative Homebrew — DONE.**
-  `darwinConfigurations` with `system.primaryUser`; nix-homebrew (pinned taps,
+  `darwinConfigurations` with `system.primaryUser` resolved from `SUDO_USER` before
+  `USER`; nix-homebrew (pinned taps,
   `mutableTaps = false`); homebrew module (`autoUpdate = false`, `upgrade = false`,
   `cleanup = "check"`); casks WezTerm + AeroSpace; brews Herdr + selected CLI; Home
-  Manager packages-only; consent-gated `darwin-rebuild switch` in setup.sh.
+  Manager packages-only; consent-gated `sudo darwin-rebuild switch` in setup.sh
+  with first-run bootstrap pinned to the locked nix-darwin rev.
 - **Commit 6 - Linux/WSL Home Manager packages-only — DONE.** HM standalone for
   native Linux + WSL userland (`homeConfigurations."<arch>-linux"`); packages
   only; `setup.sh --home-manager` opt-in; split-host WSL preserved (writes only
@@ -167,6 +170,13 @@ Commit-by-commit status:
   preserved. Guarded by the new `nix-owned tool reports owner=nix` case in
   `install_deps_update_test.sh` + the blanket-upgrade guard in
   `nix_architecture_test.sh`.
+- **Fable review remediation — DONE.** Accepted review fixes folded into this
+  branch: sudo/pinned nix-darwin activation, flake.lock-pinned Home Manager
+  bootstrap, packages-only static allowlist (`programs.home-manager` only,
+  no `home.activation`), WezTerm Linux gate alignment with Ghostty, Ubuntu CI
+  coverage for WezTerm/AeroSpace/Nix suites, Renovate managers for WezTerm +
+  Herdr pins, Herdr direct-artifact provenance/update ownership, and setup-test
+  robustness for bootstrap dispatch/sentinels/deferred-tool regexes.
 
 Each commit flips its own status to DONE in the same commit that lands it, per
 the repo's doc-discipline rule.

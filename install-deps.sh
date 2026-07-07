@@ -2164,6 +2164,7 @@ tree-sitter|tree-sitter-cli|||||
 shellcheck|shellcheck|shellcheck|ShellCheck|shellcheck|ShellCheck|shellcheck
 jq|jq|jq|jq|jq|jq|jq
 gh|gh|gh|gh|github-cli|gh|github-cli
+herdr|herdr|||||
 bats|bats-core|bats|bats|bats|bats|bats
 hyperfine|hyperfine|hyperfine|hyperfine|hyperfine|hyperfine|hyperfine
 taplo|taplo|||taplo-cli||
@@ -2530,7 +2531,7 @@ direct_artifact_marker_value() {
 
 direct_artifact_supported_tool() {
     case "$1" in
-        nvim|lazygit|starship|tree-sitter|chezmoi) return 0 ;;
+        nvim|lazygit|starship|tree-sitter|chezmoi|herdr) return 0 ;;
         *) return 1 ;;
     esac
 }
@@ -2623,6 +2624,18 @@ direct_artifact_current_metadata() {
             DIRECT_ARTIFACT_SHA256="$CHEZMOI_LINUX_ARM64_SHA256"
             DIRECT_ARTIFACT_URL="https://github.com/twpayne/chezmoi/releases/download/${CHEZMOI_VERSION}/${asset}"
             ;;
+        herdr:x86_64|herdr:amd64)
+            asset="herdr-linux-x86_64"
+            DIRECT_ARTIFACT_VERSION="$HERDR_VERSION"
+            DIRECT_ARTIFACT_SHA256="$HERDR_LINUX_X86_64_SHA256"
+            DIRECT_ARTIFACT_URL="https://github.com/ogulcancelik/herdr/releases/download/${HERDR_VERSION}/${asset}"
+            ;;
+        herdr:aarch64|herdr:arm64)
+            asset="herdr-linux-aarch64"
+            DIRECT_ARTIFACT_VERSION="$HERDR_VERSION"
+            DIRECT_ARTIFACT_SHA256="$HERDR_LINUX_ARM64_SHA256"
+            DIRECT_ARTIFACT_URL="https://github.com/ogulcancelik/herdr/releases/download/${HERDR_VERSION}/${asset}"
+            ;;
         *) return 1 ;;
     esac
 }
@@ -2646,7 +2659,7 @@ direct_artifact_install_shape_allowed() {
                     "$binary_path" == "$user_binary" &&
                     "$install_root" == "$user_root" ]]
             ;;
-        tree-sitter|chezmoi)
+        tree-sitter|chezmoi|herdr)
             [[ "$command_path" == "$user_binary" &&
                 "$binary_path" == "$user_binary" &&
                 "$install_root" == "$user_root" ]]
@@ -2762,6 +2775,7 @@ refresh_direct_artifact() {
         starship) install_starship_linux || rc=$? ;;
         tree-sitter) install_tree_sitter_cli_linux || rc=$? ;;
         chezmoi) install_chezmoi || rc=$? ;;
+        herdr) install_herdr || rc=$? ;;
         *) rc=1 ;;
     esac
     YES_ALL="$old_yes"
@@ -3419,9 +3433,10 @@ run_wezterm_deb_install() {
 }
 
 # WezTerm: Homebrew cask is macOS-only, so Linux uses the official pinned .deb
-# (amd64 Ubuntu). WezTerm is a GUI terminal, so headless hosts/containers and
-# split-host WSL skip it -- same terminal-is-a-Windows-host-responsibility rule
-# as ghostty. arm64 Linux / non-Ubuntu get manual guidance.
+# (amd64 Ubuntu). Split-host WSL skips it unless the user opts into WSL GUI,
+# matching Ghostty's convention; native Linux may install it even from a
+# headless shell because package installation is not a runtime display probe.
+# arm64 Linux / non-Ubuntu get manual guidance.
 install_wezterm_linux() {
     local url arch
     if have wezterm; then
@@ -3434,30 +3449,32 @@ install_wezterm_linux() {
         echo "            Windows host setup installs WezTerm via .\\setup.ps1 -All"
         return
     fi
-    if ! can_show_gui; then
-        printf "  skipped   %-26s no GUI display (WezTerm is a GUI terminal)\n" "wezterm"
-        echo "            install-deps skips GUI terminals on headless hosts/containers"
+    if is_wsl && ! can_show_gui; then
+        printf "  skipped   %-26s WSL GUI display not detected\n" "wezterm"
+        echo "            --experimental-wsl-gui needs WSLg/X11/Wayland to be available"
         return
     fi
     [[ "$PM" == "brew" ]] && printf "  skipped   %-26s Homebrew cask is macOS-only on Linux\n" "wezterm via brew"
     arch="$(uname -m)"
     if is_ubuntu && { [[ "$arch" == "x86_64" ]] || [[ "$arch" == "amd64" ]]; }; then
         url="https://github.com/wezterm/wezterm/releases/download/${WEZTERM_VERSION}/wezterm-${WEZTERM_VERSION}.Ubuntu22.04.deb"
-        if ask "Install WezTerm via official Ubuntu .deb (pinned $WEZTERM_VERSION, SHA-256 verified)?"; then
-            if [[ "$DRY_RUN" -eq 1 ]]; then
-                echo "  would: curl -fsSL $url"
-                echo "         verify sha256 $WEZTERM_DEB_AMD64_SHA256"
-                echo "         apt-get install -y <downloaded .deb>   (resolves GUI deps)"
-            else
-                require_downloader || return 1
-                if ! run_wezterm_deb_install "$url" "$WEZTERM_DEB_AMD64_SHA256"; then
-                    echo "  WARN: WezTerm .deb install failed; continuing"
-                fi
-            fi
+        if ! ask "Install WezTerm via official Ubuntu .deb (pinned $WEZTERM_VERSION, SHA-256 verified)?"; then
+            printf "  skipped   %-26s\n" "wezterm"
             return
         fi
+        if [[ "$DRY_RUN" -eq 1 ]]; then
+            echo "  would: curl -fsSL $url"
+            echo "         verify sha256 $WEZTERM_DEB_AMD64_SHA256"
+            echo "         apt-get install -y <downloaded .deb>   (resolves GUI deps)"
+        else
+            require_downloader || return 1
+            if ! run_wezterm_deb_install "$url" "$WEZTERM_DEB_AMD64_SHA256"; then
+                echo "  WARN: WezTerm .deb install failed; continuing"
+            fi
+        fi
+        return
     fi
-    echo "  manual    wezterm has no verified pinned $PM package for this host. Options:"
+    echo "  manual    wezterm is not auto-installed on this Linux host. Options:"
     echo "              - ubuntu amd64: re-run for the verified pinned .deb"
     echo "              - other:        https://wezterm.org/install/linux.html"
     echo "              - flatpak:      flatpak install flathub org.wezfurlong.wezterm"
@@ -3482,7 +3499,7 @@ run_herdr_linux_binary_install() {
         rm -rf "$tmp"; return 1
     fi
     mkdir -p "$(dirname "$dest")"
-    install -m 755 "$bin" "$dest" || rc=$?
+    cp "$bin" "$dest" && chmod 0755 "$dest" || rc=$?
     rm -rf "$tmp"
     return "$rc"
 }
@@ -3493,11 +3510,11 @@ run_herdr_linux_binary_install() {
 # installable via a banned irm|iex remote-eval), so install-deps.ps1 omits it.
 install_herdr() {
     local arch asset expected url dest
-    if have herdr; then
+    if have herdr && [[ "${DOTFILES_DIRECT_ARTIFACT_REINSTALL:-0}" != "1" ]]; then
         printf "  ok        %-26s already installed\n" "herdr"
         return
     fi
-    if [[ "$PM" == "brew" ]]; then
+    if [[ "$PM" == "brew" && "${DOTFILES_DIRECT_ARTIFACT_REINSTALL:-0}" != "1" ]]; then
         if ! ask "Install Herdr (agent multiplexer) via Homebrew (brew install herdr)?"; then
             printf "  skipped   %-26s\n" "herdr"
             return
@@ -3543,7 +3560,11 @@ install_herdr() {
     require_downloader || return 1
     if ! run_herdr_linux_binary_install "$url" "$expected" "$dest"; then
         echo "  WARN: herdr binary install failed; continuing"
+        return
     fi
+    write_direct_artifact_provenance "herdr" "$dest" "$dest" "$(dirname "$dest")" "$url" "$HERDR_VERSION" "$expected"
+    ensure_local_bin_on_path
+    printf "  installed %-26s -> %s\n" "herdr" "$dest"
 }
 
 # VS Code: brew cask on macOS; snap, then flatpak, then a manual hint on Linux.

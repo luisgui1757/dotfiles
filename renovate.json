@@ -110,6 +110,39 @@
     },
     {
       "customType": "regex",
+      "description": "WezTerm Ubuntu .deb version. The adjacent .deb SHA-256 must be recomputed manually after Renovate bumps this.",
+      "managerFilePatterns": ["/^install-deps\\.sh$/"],
+      "matchStrings": [
+        "WEZTERM_VERSION=\"(?<currentValue>[^\"]+)\"\\s+WEZTERM_DEB_AMD64_SHA256=\"[a-f0-9]{64}\""
+      ],
+      "depNameTemplate": "wezterm/wezterm",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "loose"
+    },
+    {
+      "customType": "regex",
+      "description": "Herdr Linux x86_64 binary version. Adjacent Linux asset SHA-256 values must be recomputed manually after Renovate bumps this.",
+      "managerFilePatterns": ["/^install-deps\\.sh$/"],
+      "matchStrings": [
+        "HERDR_VERSION=\"(?<currentValue>v[^\"]+)\"\\s+HERDR_LINUX_X86_64_SHA256=\"[a-f0-9]{64}\""
+      ],
+      "depNameTemplate": "ogulcancelik/herdr",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "description": "Herdr Linux arm64 binary version. Adjacent Linux asset SHA-256 values must be recomputed manually after Renovate bumps this.",
+      "managerFilePatterns": ["/^install-deps\\.sh$/"],
+      "matchStrings": [
+        "HERDR_VERSION=\"(?<currentValue>v[^\"]+)\"(?:.|\\n)*?HERDR_LINUX_ARM64_SHA256=\"[a-f0-9]{64}\""
+      ],
+      "depNameTemplate": "ogulcancelik/herdr",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
       "description": "Homebrew installer script commit pinned to the current main branch digest. The adjacent installer script SHA-256 must be recomputed manually after Renovate bumps this.",
       "managerFilePatterns": ["/^install-deps\\.sh$/"],
       "matchStrings": [

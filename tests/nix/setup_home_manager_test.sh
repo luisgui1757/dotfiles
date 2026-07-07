@@ -2,31 +2,62 @@
 # setup.sh --home-manager is an EXPLICIT, opt-in, dry-run-safe, Linux/WSL-only
 # step. Prove: the default flow never applies Home Manager (even with --all); a
 # --home-manager --dry-run run only PREVIEWS; --home-manager on macOS is skipped;
-# and --home-manager --all on Linux DOES invoke the switch. Stubs home-manager +
-# nix so no real activation happens.
+# --home-manager --all on Linux invokes the switch; and first-run bootstrap uses
+# the flake.lock-pinned Home Manager rev, never the mutable registry alias.
 set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 WORK="$REPO_ROOT/tests/.cache/home-manager-setup-test"
 rm -rf "$WORK"
 mkdir -p "$WORK"
 trap 'rm -rf "$WORK"' EXIT
+LOCKED_HOME_MANAGER_REV="$(
+    python3 - <<'PY' "$REPO_ROOT/flake.lock"
+import json, sys
+print(json.load(open(sys.argv[1], encoding="utf-8"))["nodes"]["home-manager"]["locked"]["rev"])
+PY
+)"
 
-# probe <setup-args> <fake-uname-os> -> echoes CALLED if a switch was attempted.
+enable_nix_path() {
+    if ! command -v nix >/dev/null 2>&1 && [ -e /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh ]; then
+        unset __ETC_PROFILE_NIX_SOURCED
+        # shellcheck disable=SC1091
+        . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
+    fi
+    command -v nix >/dev/null 2>&1
+}
+
+# probe <setup-args> <fake-uname-os> <installed|bootstrap> -> echoes attempted commands.
 probe() {
-    local setup_args="$1" fake_os="$2"
+    local setup_args="$1" fake_os="$2" mode="${3:-installed}"
     local script="$WORK/probe.sh"
     : > "$WORK/calls"
-    cat > "$script" <<EOF
+    {
+        cat <<EOF
 set -uo pipefail
 CALLS="$WORK/calls"
-home-manager() { echo "home-manager \$*" >> "\$CALLS"; }
-nix() { [ "\${1:-}" = run ] && echo "nix run \$*" >> "\$CALLS"; return 0; }
+LOCKED_HOME_MANAGER_REV="$LOCKED_HOME_MANAGER_REV"
+PATH="/usr/bin:/bin"
+export PATH
+nix() {
+    if [ "\${1:-}" = eval ]; then
+        printf '%s\n' "\$LOCKED_HOME_MANAGER_REV"
+        return 0
+    fi
+    [ "\${1:-}" = run ] && echo "nix \$*" >> "\$CALLS"
+    return 0
+}
 uname() { case "\${1:-}" in -m) echo x86_64 ;; *) echo "$fake_os" ;; esac; }
+EOF
+        if [[ "$mode" == "installed" ]]; then
+            printf '%s\n' "home-manager() { echo \"home-manager \$*\" >> \"\$CALLS\"; }"
+        fi
+        cat <<EOF
 DOTFILES_SETUP_SOURCE_ONLY=1 source "$REPO_ROOT/setup.sh" $setup_args >/dev/null 2>&1
 run_home_manager_switch >/dev/null 2>&1
 EOF
+    } > "$script"
     bash "$script" || true
-    if [[ -s "$WORK/calls" ]]; then echo "CALLED"; else echo "NOCALL"; fi
+    if [[ -s "$WORK/calls" ]]; then cat "$WORK/calls"; else echo "NOCALL"; fi
 }
 
 fail=0
@@ -47,7 +78,61 @@ assert_eq "--home-manager --dry-run only previews (no switch)" \
 assert_eq "--home-manager on macOS is skipped (use --nix-darwin)" \
     NOCALL "$(probe '--all --home-manager' Darwin)"
 assert_eq "--home-manager --all on Linux invokes home-manager switch" \
-    CALLED "$(probe '--all --home-manager' Linux)"
+    "home-manager switch --flake $REPO_ROOT#x86_64-linux --impure" \
+    "$(probe '--all --home-manager' Linux installed)"
+assert_eq "--home-manager bootstrap uses locked Home Manager rev" \
+    "nix run github:nix-community/home-manager/$LOCKED_HOME_MANAGER_REV#home-manager -- switch --flake $REPO_ROOT#x86_64-linux --impure" \
+    "$(probe '--all --home-manager' Linux bootstrap)"
+
+dry_bin="$WORK/dry-bin"
+mkdir -p "$dry_bin"
+cat > "$dry_bin/nix" <<EOF
+#!/usr/bin/env bash
+if [[ "\${1:-}" == "eval" ]]; then
+    printf '%s\n' "$LOCKED_HOME_MANAGER_REV"
+    exit 0
+fi
+exit 0
+EOF
+chmod +x "$dry_bin/nix"
+old_path="$PATH"
+PATH="$dry_bin:/usr/bin:/bin"
+export PATH
+dry_output="$(
+    DOTFILES_SETUP_SOURCE_ONLY=1 source "$REPO_ROOT/setup.sh" --all --dry-run --home-manager >/dev/null 2>&1
+    uname() { if [[ "${1:-}" == "-m" ]]; then echo x86_64; else echo Linux; fi; }
+    run_home_manager_switch
+)"
+PATH="$old_path"
+export PATH
+if [[ "$dry_output" == *"home-manager switch --flake $REPO_ROOT#x86_64-linux --impure"* ]] &&
+    [[ "$dry_output" == *"github:nix-community/home-manager/$LOCKED_HOME_MANAGER_REV#home-manager"* ]] &&
+    [[ "$dry_output" != *"nix run home-manager"* ]]; then
+    echo "ok  : dry-run previews installed switch and locked bootstrap ref"
+else
+    echo "FAIL: dry-run output did not show locked Home Manager bootstrap ref"
+    printf '%s\n' "$dry_output"
+    fail=1
+fi
+
+if grep -Eq '^[[:space:]]*run_home_manager_switch[[:space:]]*$' "$REPO_ROOT/setup.sh"; then
+    echo "ok  : setup.sh dispatches the Home Manager opt-in function"
+else
+    echo "FAIL: setup.sh no longer dispatches run_home_manager_switch"
+    fail=1
+fi
+
+if enable_nix_path; then
+    real_ref="$(
+        DOTFILES_SETUP_SOURCE_ONLY=1 source "$REPO_ROOT/setup.sh" --home-manager >/dev/null
+        pinned_home_manager_run_ref
+    )"
+    assert_eq "real Nix parser returns locked Home Manager bootstrap ref" \
+        "github:nix-community/home-manager/$LOCKED_HOME_MANAGER_REV#home-manager" \
+        "$real_ref"
+else
+    echo "ok  : real Nix parser check skipped (nix not installed)"
+fi
 
 [[ "$fail" -eq 0 ]] && echo "all setup --home-manager behaviors OK"
 exit "$fail"

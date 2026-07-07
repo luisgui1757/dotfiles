@@ -122,16 +122,25 @@ make setup                       # same as ./setup.sh, via the Makefile
 `flake.lock` provide a package layer (nix-darwin + declarative Homebrew + Home
 Manager on macOS). chezmoi still owns **every** dotfile; Nix owns no config.
 It is opt-in and off by default: `./setup.sh --nix-darwin` (macOS-only,
-consent-gated) runs `darwin-rebuild switch --flake .#dotfiles`, which activates
-the declarative Homebrew casks (WezTerm, AeroSpace) + Herdr brew and the
-nix-owned CLI package set. On Linux/WSL, `./setup.sh --home-manager` applies the
-standalone Home Manager package set (`home-manager switch --flake .#<arch>-linux`;
-WSL writes only to the Linux `~/.nix-profile`, never `/mnt/c`). Both keep the
-native install-deps arms as the default — the Nix layer is additive. **nvim and
-the tree-sitter CLI stay native** (ABI-coupled to nvim-treesitter parser builds;
+consent-gated) runs `sudo darwin-rebuild switch --flake .#dotfiles --impure`,
+which activates the declarative Homebrew casks (WezTerm, AeroSpace) + Herdr brew
+and the nix-owned CLI package set. The flake resolves the real invoking user
+from `SUDO_USER` before `USER`, so Homebrew/Home Manager do not target `root`
+during sudo activation. First-run bootstrap is also pinned: setup derives the
+locked nix-darwin rev from `flake.lock` before running `sudo nix run
+github:nix-darwin/nix-darwin/<locked-rev>#darwin-rebuild -- ...`; it never uses
+the mutable `nix-darwin` registry alias. On Linux/WSL, `./setup.sh
+--home-manager` applies the standalone Home Manager package set
+(`home-manager switch --flake .#<arch>-linux`; first-run bootstrap uses the
+locked `github:nix-community/home-manager/<locked-rev>#home-manager` ref). WSL
+writes only to the Linux `~/.nix-profile`, never `/mnt/c`. Both keep the native
+install-deps arms as the default — the Nix layer is additive. **nvim and the
+tree-sitter CLI stay native** (ABI-coupled to nvim-treesitter parser builds;
 migrating them into a same-closure toolchain is a follow-up). Native Windows is
 non-Nix. `nix flake check` runs in CI (`.github/workflows/nix.yml`) on Ubuntu +
-macOS.
+macOS. The current `darwinConfigurations.dotfiles` activation target is
+`aarch64-darwin`; x86_64 Darwin still gets dev shells/checks but no supported
+host activation config yet.
 
 ```powershell
 .\setup.ps1
@@ -379,8 +388,8 @@ and whether `pwsh` is installed.
   installed-binary SHA-256, matching `--version` output, and a repo-managed
   install shape: Neovim is `/usr/local/bin/nvim` pointing into
   `/opt/nvim-linux-*`; lazygit and Starship are `/usr/local/bin/<tool>` or
-  `~/.local/bin/<tool>`; tree-sitter and chezmoi are `~/.local/bin/<tool>`.
-  Shadow command paths, Brew-prefix symlinks that escape the Brew prefix,
+  `~/.local/bin/<tool>`; tree-sitter, chezmoi, and Herdr are
+  `~/.local/bin/<tool>`. Shadow command paths, Brew-prefix symlinks that escape the Brew prefix,
   unsupported artifact roots, and marker binaries outside the recorded install
   root are blocked provenance failures, not ownership. Output distinguishes
   `updated`, `current`, `system`, `unmanaged`,
@@ -423,10 +432,11 @@ and whether `pwsh` is installed.
 - WezTerm installs from the vendor channel per OS: `brew install --cask wezterm`
   on macOS, the `wez.wezterm` Scoop/winget/choco catalog entry on Windows, and
   the official pinned, SHA-256-verified `.deb` on amd64 Ubuntu. WezTerm is a GUI
-  terminal, so headless hosts/containers and split-host WSL skip it (WSL uses the
-  Windows-host terminal unless `--experimental-wsl-gui`); arm64 Linux / non-Ubuntu
-  get manual guidance. The Rose Pine + Hack Nerd Font + transparency config is
-  chezmoi-owned, never a Nix/nixpkgs GUI package.
+  terminal, but native Linux package installation does not require a display at
+  install time. Split-host WSL skips Linux WezTerm unless
+  `--experimental-wsl-gui` is set; arm64 Linux / non-Ubuntu get manual guidance.
+  The Rose Pine + Hack Nerd Font + transparency config is chezmoi-owned, never a
+  Nix/nixpkgs GUI package.
 - AeroSpace (macOS-only i3-like tiling WM) installs from the official tap cask
   (`brew install --cask nikitabobko/tap/aerospace`), `start-at-login = true`,
   chezmoi-owned config. Its keymap deliberately avoids the reserved chords:
@@ -434,12 +444,17 @@ and whether `pwsh` is installed.
   Neovim's `<A-h/j/k/l>` window navigation, and nothing uses `Alt-c` (fzf-tab /
   PSFzf `cd`). On first launch grant it Accessibility permission (System Settings
   -> Privacy & Security -> Accessibility) — a TCC grant that cannot be scripted.
-  Not a Nix/nixpkgs package.
+  AeroSpace reads the XDG path this repo manages; a legacy `~/.aerospace.toml`
+  conflicts loudly with that model and should be removed or migrated before
+  judging the managed config. Not a Nix/nixpkgs package.
 - Herdr (agent multiplexer) installs on macOS/Linux only: `brew install herdr`
   (homebrew-core) on macOS and Linuxbrew, or a pinned, SHA-256-verified GitHub
   release binary on native Linux without brew (never the `herdr.dev` remote-eval
-  installer). Native Windows Herdr is preview-only beta (installable only via an
-  `irm | iex` remote-eval), so it is intentionally not installed on Windows.
+  installer). Native-Linux Herdr writes the same provenance marker as the other
+  dotfiles-owned direct artifacts, so `./setup.sh --update` can prove ownership
+  and refresh only the repo-pinned version. Native Windows Herdr is preview-only
+  beta (installable only via an `irm | iex` remote-eval), so it is intentionally
+  not installed on Windows.
 - WSL fonts are host-rendered in the supported path. Install and merge Windows
   Terminal from Windows (`.\setup.ps1 -All`; the merge is default-on); the WSL
   Linux fontconfig install is only for `--experimental-wsl-gui`.
@@ -637,7 +652,7 @@ update PRs are intentionally not configured.
 |---|---|---|
 | GitHub Actions | Managed, digest-pinned, labeled `github-actions` | Actions are repo-owned CI inputs with stable Renovate support. |
 | GitHub runner images | Managed, labeled `github-runners`, reviewed separately | `ubuntu-*`, `macos-*`, and `windows-*` bumps can change the supported CI platform, so they should not be mixed with ordinary Action bumps. |
-| Repo-pinned installer versions/refs | Managed, labeled `pinned-downloads`, never automerged | Neovim Linux tarballs, chezmoi CI release archives, lazygit Linux tarballs, Starship Linux tarballs, tree-sitter CLI Linux archives, Hack Nerd Font, Windows Terminal portable zip, Ubuntu Ghostty, zsh plugin refs, tmux/psmux plugin refs, the Homebrew installer commit, the Renovate validator package/runtime, and the CI `cargo-binstall` commit are explicit repo pins. |
+| Repo-pinned installer versions/refs | Managed, labeled `pinned-downloads`, never automerged | Neovim Linux tarballs, chezmoi CI release archives, lazygit Linux tarballs, Starship Linux tarballs, tree-sitter CLI Linux archives, WezTerm Ubuntu `.deb`, Herdr Linux binaries, Hack Nerd Font, Windows Terminal portable zip, Ubuntu Ghostty, zsh plugin refs, tmux/psmux plugin refs, the Homebrew installer commit, the Renovate validator package/runtime, and the CI `cargo-binstall` commit are explicit repo pins. |
 | Adjacent SHA-256 / commit constants | Not managed; matched only as regex context | Renovate can bump the version/ref but cannot recompute archive/script hashes or verify tag commit IDs. CI must fail until a human recomputes and reviews them. |
 | Package-manager catalogs | Not managed | Brew, apt, dnf, pacman, zypper, apk, Scoop, winget, and choco entries are package names/IDs, not repo version pins. Let the package manager resolve current versions. |
 | Neovim plugin and Mason tools | Not managed | `lazy-lock.json` is refreshed with Lazy and tested as editor behavior; Mason intentionally has no machine-pinned lockfile. |
@@ -652,9 +667,10 @@ execution. Recommended setup docs use `git clone` plus local `setup`, not raw
 `curl | bash`/`iwr` execution of the current default branch.
 
 Direct-download SHA-256 values for Neovim tarballs, chezmoi CI release archives,
-lazygit tarballs, Starship tarballs, tree-sitter CLI archives, Hack Nerd Font,
-the Windows Terminal portable zip, the Ubuntu Ghostty installer, Homebrew
-installer script, and the CI `cargo-binstall` installer script are
+lazygit tarballs, Starship tarballs, tree-sitter CLI archives, the WezTerm
+Ubuntu `.deb`, Herdr Linux binaries, Hack Nerd Font, the Windows Terminal
+portable zip, the Ubuntu Ghostty installer, Homebrew installer script, and the
+CI `cargo-binstall` installer script are
 intentionally human-reviewed. zsh plugin tag commits and tmux/psmux plugin
 commits are also human-reviewed because the installers verify the checked-out
 commit after cloning/fetching. Do not capture direct-download

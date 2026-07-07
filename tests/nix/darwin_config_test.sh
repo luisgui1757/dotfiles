@@ -52,6 +52,13 @@ assert_eq "nix-homebrew mutableTaps = false (pinned taps)" 'false' "$(eval_raw n
 assert_eq "nix.enable = false (Determinate owns the daemon)" 'false' "$(eval_raw nix.enable)"
 assert_eq "system.primaryUser is set (placeholder in pure eval)" '"runner"' "$(eval_raw system.primaryUser)"
 
+sudo_primary_user="$(env SUDO_USER=alice USER=root nix eval --raw --impure "$cfg.system.primaryUser" 2>/dev/null || true)"
+assert_eq "SUDO_USER wins over USER=root for darwin primary user" "alice" "$sudo_primary_user"
+sudo_home="$(env SUDO_USER=alice USER=root nix eval --raw --impure "$cfg.users.users.alice.home" 2>/dev/null || true)"
+assert_eq "SUDO_USER drives darwin user home" "/Users/alice" "$sudo_home"
+sudo_hm_user="$(env SUDO_USER=alice USER=root nix eval --raw --impure "$cfg.home-manager.users.alice.home.username" 2>/dev/null || true)"
+assert_eq "SUDO_USER drives Home Manager user" "alice" "$sudo_hm_user"
+
 # Home Manager on darwin is packages-only: the user's home.packages is a
 # non-empty list. (The stronger "our source declares NO home.file / xdg.configFile
 # / programs.<tool>" boundary is enforced at the SOURCE level by

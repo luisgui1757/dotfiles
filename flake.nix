@@ -53,14 +53,15 @@
       ];
       forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f nixpkgs.legacyPackages.${system});
 
-      # The proving host's user is resolved impurely from $USER at switch time
-      # (setup.sh runs darwin-rebuild with --impure). Pure eval / `nix flake
-      # check` gets a safe placeholder so the config still evaluates.
+      # The proving host's user is resolved impurely at switch time. sudo-based
+      # nix-darwin activation leaves USER=root, so prefer SUDO_USER when present,
+      # then USER, and keep runner only for pure eval / CI.
       resolvedUser =
         let
-          u = builtins.getEnv "USER";
+          sudoUser = builtins.getEnv "SUDO_USER";
+          user = builtins.getEnv "USER";
         in
-        if u == "" then "runner" else u;
+        if sudoUser != "" then sudoUser else if user != "" then user else "runner";
 
       mkDarwin =
         { username

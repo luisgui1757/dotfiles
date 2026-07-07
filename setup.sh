@@ -552,13 +552,44 @@ run_update_mode() {
     fi
 }
 
+# Read the committed flake.lock with Nix's JSON parser so first-run bootstrap
+# commands use the same pinned inputs as the repo flake.
+flake_lock_github_rev() {
+    local node="$1" owner="$2" repo="$3" expr rev
+    expr='let
+  lock = builtins.fromJSON (builtins.readFile ./flake.lock);
+  node = lock.nodes."'"$node"'".locked or {};
+  owner = node.owner or "";
+  repo = node.repo or "";
+  rev = node.rev or "";
+in
+  if owner == "'"$owner"'" && repo == "'"$repo"'" && rev != "" then rev
+  else throw "flake.lock node '"$node"' is not github:'"$owner"'/'"$repo"' with a locked rev"'
+    if ! rev="$(nix eval --impure --raw --expr "$expr" 2>/dev/null)"; then
+        echo "  FAIL: could not read locked $owner/$repo revision from flake.lock" >&2
+        return 1
+    fi
+    printf '%s\n' "$rev"
+}
+
+pinned_nix_darwin_run_ref() {
+    local rev
+    rev="$(flake_lock_github_rev "nix-darwin" "nix-darwin" "nix-darwin")" || return 1
+    printf 'github:nix-darwin/nix-darwin/%s#darwin-rebuild\n' "$rev"
+}
+
+pinned_home_manager_run_ref() {
+    local rev
+    rev="$(flake_lock_github_rev "home-manager" "nix-community" "home-manager")" || return 1
+    printf 'github:nix-community/home-manager/%s#home-manager\n' "$rev"
+}
+
 # Optional, EXPLICIT opt-in: apply the Nix (nix-darwin) package layer. This is
 # NOT part of the default flow and never runs without --nix-darwin, so setup
 # defaults are unchanged. It activates declarative Homebrew (WezTerm/AeroSpace
 # casks, Herdr brew) and the nix-owned CLI package set on macOS. chezmoi still
-# owns every dotfile (invariant 22). --impure lets the flake resolve $USER for
-# system.primaryUser; modern nix-darwin runs the privileged activation itself
-# (no outer sudo), so $USER stays the real user, not root.
+# owns every dotfile (invariant 22). --impure lets the flake resolve SUDO_USER
+# for system.primaryUser while sudo makes USER=root during activation.
 run_nix_darwin_switch() {
     [[ "$NIX_DARWIN" -eq 1 ]] || return 0
     if [[ "$(uname -s)" != "Darwin" ]]; then
@@ -572,13 +603,15 @@ run_nix_darwin_switch() {
         echo "           Determinate pkg), then re-run: ./setup.sh --nix-darwin"
         return 0
     fi
-    local flake_ref="$SCRIPT_DIR#dotfiles"
-    echo "  Runs 'darwin-rebuild switch --flake $flake_ref --impure':"
+    local flake_ref="$SCRIPT_DIR#dotfiles" bootstrap_ref
+    bootstrap_ref="$(pinned_nix_darwin_run_ref)" || return 1
+    echo "  Runs 'sudo darwin-rebuild switch --flake $flake_ref --impure':"
     echo "  declarative Homebrew (WezTerm/AeroSpace casks, Herdr brew) + nix CLI set."
-    echo "  It will prompt for sudo during system activation."
+    echo "  It uses sudo for nix-darwin's upstream activation shape; flake user"
+    echo "  resolution reads SUDO_USER so Homebrew/Home Manager target the real user."
     if [[ "$DRY_RUN" -eq 1 ]]; then
-        echo "  would: darwin-rebuild switch --flake $flake_ref --impure"
-        echo "         (first-time bootstrap: nix run nix-darwin -- switch --flake $flake_ref --impure)"
+        echo "  would: sudo darwin-rebuild switch --flake $flake_ref --impure"
+        echo "         (first-time bootstrap: sudo nix run $bootstrap_ref -- switch --flake $flake_ref --impure)"
         return 0
     fi
     if [[ "$ALL" -eq 0 ]]; then
@@ -594,13 +627,20 @@ run_nix_darwin_switch() {
         esac
     fi
     if command -v darwin-rebuild >/dev/null 2>&1; then
-        darwin-rebuild switch --flake "$flake_ref" --impure ||
-            echo "  WARN: darwin-rebuild switch failed (opt-in layer; setup continues)"
+        if ! sudo darwin-rebuild switch --flake "$flake_ref" --impure; then
+            echo "  FAIL: nix-darwin activation failed; setup did not apply the requested Nix package layer." >&2
+            echo "        Re-run './setup.sh --nix-darwin' after fixing the activation error." >&2
+            return 1
+        fi
     else
-        echo "  bootstrapping nix-darwin (first run)..."
-        nix run nix-darwin -- switch --flake "$flake_ref" --impure ||
-            echo "  WARN: nix-darwin bootstrap switch failed (opt-in layer; setup continues)"
+        echo "  bootstrapping nix-darwin from flake.lock ($bootstrap_ref)..."
+        if ! sudo nix run "$bootstrap_ref" -- switch --flake "$flake_ref" --impure; then
+            echo "  FAIL: nix-darwin bootstrap activation failed; setup did not apply the requested Nix package layer." >&2
+            echo "        Re-run './setup.sh --nix-darwin' after fixing the activation error." >&2
+            return 1
+        fi
     fi
+    echo "  ok        nix-darwin package layer applied"
 }
 
 # Optional, EXPLICIT opt-in: apply the Nix Home Manager package layer on
@@ -622,7 +662,7 @@ run_home_manager_switch() {
         echo "           ./setup.sh --home-manager"
         return 0
     fi
-    local arch config_name flake_ref
+    local arch config_name flake_ref bootstrap_ref
     arch="$(uname -m)"
     case "$arch" in
         x86_64 | amd64) config_name="x86_64-linux" ;;
@@ -633,11 +673,12 @@ run_home_manager_switch() {
             ;;
     esac
     flake_ref="$SCRIPT_DIR#$config_name"
+    bootstrap_ref="$(pinned_home_manager_run_ref)" || return 1
     echo "  Runs 'home-manager switch --flake $flake_ref --impure' (no root;"
     echo "  WSL writes only to the Linux ~/.nix-profile, never /mnt/c)."
     if [[ "$DRY_RUN" -eq 1 ]]; then
         echo "  would: home-manager switch --flake $flake_ref --impure"
-        echo "         (first-time bootstrap: nix run home-manager -- switch --flake $flake_ref --impure)"
+        echo "         (first-time bootstrap: nix run $bootstrap_ref -- switch --flake $flake_ref --impure)"
         return 0
     fi
     if [[ "$ALL" -eq 0 ]]; then
@@ -653,13 +694,20 @@ run_home_manager_switch() {
         esac
     fi
     if command -v home-manager >/dev/null 2>&1; then
-        home-manager switch --flake "$flake_ref" --impure ||
-            echo "  WARN: home-manager switch failed (opt-in layer; setup continues)"
+        if ! home-manager switch --flake "$flake_ref" --impure; then
+            echo "  FAIL: Home Manager activation failed; setup did not apply the requested Nix package layer." >&2
+            echo "        Re-run './setup.sh --home-manager' after fixing the activation error." >&2
+            return 1
+        fi
     else
-        echo "  bootstrapping Home Manager (first run)..."
-        nix run home-manager -- switch --flake "$flake_ref" --impure ||
-            echo "  WARN: Home Manager bootstrap switch failed (opt-in layer; setup continues)"
+        echo "  bootstrapping Home Manager from flake.lock ($bootstrap_ref)..."
+        if ! nix run "$bootstrap_ref" -- switch --flake "$flake_ref" --impure; then
+            echo "  FAIL: Home Manager bootstrap activation failed; setup did not apply the requested Nix package layer." >&2
+            echo "        Re-run './setup.sh --home-manager' after fixing the activation error." >&2
+            return 1
+        fi
     fi
+    echo "  ok        Home Manager package layer applied"
 }
 
 # Test seam: `DOTFILES_SETUP_SOURCE_ONLY=1 source setup.sh` loads the helper

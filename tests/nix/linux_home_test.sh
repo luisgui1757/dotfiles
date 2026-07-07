@@ -60,7 +60,7 @@ for arch in x86_64-linux aarch64-linux; do
     # nvim + the tree-sitter CLI are ABI-coupled to nvim-treesitter parser builds
     # and are intentionally DEFERRED (stay native). Prove they are NOT in the set.
     names="$(nix eval --json "$cfg.home.packages" --apply 'ps: map (p: p.pname or p.name or "") ps' 2>/dev/null | jq -r '.[]' 2>/dev/null || echo "")"
-    if printf '%s\n' "$names" | grep -qiE '^(neovim|nvim|tree-sitter)$'; then
+    if printf '%s\n' "$names" | grep -qiE '(^|[^[:alnum:]])(neovim|nvim|tree-sitter)([^[:alnum:]]|$)'; then
         echo "FAIL: $arch HM set includes an ABI-coupled deferred tool (neovim/tree-sitter)"
         fail=1
     else

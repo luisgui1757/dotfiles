@@ -1168,7 +1168,7 @@ case_nix_owned_tool_reports_owner_nix() {
     # owner=nix and is NOT updated (refreshed via the opt-in Nix layer). Covers a
     # ~/.nix-profile source (matched directly) AND a plain source whose realpath
     # resolves into /nix/store. Proves update mode never shells out to `nix`.
-    local root="$TMP_ROOT/nix-owned"
+    local root="$TMP_ROOT/nix-owned" nix_sentinel="$TMP_ROOT/nix-owned.nix-invoked"
     local profbin="$root/home/.nix-profile/bin"
     local wrapbin="$root/wrap/bin"
     mkdir -p "$profbin" "$wrapbin"
@@ -1189,8 +1189,9 @@ jq"
     }
     homebrew_bin() { return 1; }
     native_linux_pm() { printf '%s\n' "unknown"; }
-    # If update mode ever shells out to nix for an owned tool, record it.
-    nix() { printf 'NIX_INVOKED %s\n' "$*" >> "$root.out"; return 0; }
+    # If update mode ever shells out to nix for an owned tool, record it in a
+    # separate sentinel file so stdout capture cannot erase the evidence.
+    nix() { printf 'NIX_INVOKED %s\n' "$*" >> "$nix_sentinel"; return 0; }
 
     # Direct path-form unit checks of the resolver.
     local p
@@ -1211,7 +1212,7 @@ jq"
     assert_contains "owner=nix reason=managed by the Nix layer" "$root.out" "nix-owned rg did not report the owner=nix reason"
     grep -Eq "skipped[[:space:]]+rg[[:space:]].*owner=nix" "$root.out" || fail "nix-profile rg was not skipped as owner=nix"
     grep -Eq "skipped[[:space:]]+jq[[:space:]].*owner=nix" "$root.out" || fail "/nix/store jq was not skipped as owner=nix"
-    assert_not_contains "NIX_INVOKED" "$root.out" "update mode shelled out to nix for a nix-owned tool"
+    [[ ! -e "$nix_sentinel" ]] || fail "update mode shelled out to nix for a nix-owned tool"
     assert_not_contains "owner=brew" "$root.out" "nix-owned tool was mis-claimed by brew"
 }
 

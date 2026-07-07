@@ -109,15 +109,21 @@ significant change to the relevant area.
       — it evaluates `darwinConfigurations.dotfiles` (build skipped) and builds
       `checks.<system>.toolchain`, exit 0.
 - [ ] **nix-darwin bootstrap/switch**, macOS: with Nix installed, run
-      `./setup.sh --nix-darwin` (or `nix run nix-darwin -- switch --flake .#dotfiles --impure`
-      the first time). Confirm it prompts for sudo only at activation, sets
-      `system.primaryUser` to the real `$USER` (not root), installs the WezTerm +
-      AeroSpace casks and the Herdr brew via declarative Homebrew (no `brew
-      update`/`upgrade`; `cleanup = check` only reports drift), and puts the
-      nix-owned CLI set on PATH from `~/.nix-profile` / the system profile.
+      `./setup.sh --nix-darwin` (equivalent activation:
+      `sudo darwin-rebuild switch --flake .#dotfiles --impure`; first-run setup
+      derives the locked `github:nix-darwin/nix-darwin/<rev>#darwin-rebuild`
+      ref from `flake.lock`). Confirm activation uses sudo, sets
+      `system.primaryUser` to the real invoking user via `SUDO_USER` (not
+      `root`), installs the WezTerm + AeroSpace casks and the Herdr brew via
+      declarative Homebrew (no `brew update`/`upgrade`; `cleanup = check` only
+      reports drift), and puts the nix-owned CLI set on PATH from
+      `~/.nix-profile` / the system profile.
 - [ ] **Home Manager (Linux/WSL)**: with Nix installed, run
-      `./setup.sh --home-manager` (or `nix run home-manager -- switch --flake .#$(uname -m)-linux --impure`
-      the first time). Confirm the nix CLI set (ripgrep/fd/fzf/jq/lazygit/starship/
+      `./setup.sh --home-manager` (equivalent installed command:
+      `home-manager switch --flake .#$(uname -m)-linux --impure`; first-run
+      setup derives the locked
+      `github:nix-community/home-manager/<rev>#home-manager` ref from
+      `flake.lock`). Confirm the nix CLI set (ripgrep/fd/fzf/jq/lazygit/starship/
       zoxide) lands in `~/.nix-profile/bin` with NO root, and that `nvim` +
       `tree-sitter` are still the native install-deps binaries (NOT nix) so
       parser builds keep working.

@@ -19,10 +19,8 @@ fail=0
 # Collect every tracked-ish .nix file, excluding VCS and generated caches.
 nix_files=()
 while IFS= read -r f; do nix_files+=("$f"); done < <(
-    find . -type f -name '*.nix' \
-        -not -path './.git/*' \
-        -not -path './tests/.cache/*' \
-        | sort
+    find . \( -path './.git' -o -path './tests/.cache' \) -prune -o \
+        -type f -name '*.nix' -print | sort
 )
 
 scan_nix() {
@@ -38,6 +36,42 @@ scan_nix() {
         fail=1
     else
         echo "ok  : $desc"
+    fi
+}
+
+scan_programs_allowlist() {
+    local hits
+    if [[ "${#nix_files[@]}" -eq 0 ]]; then
+        echo "ok  : HM/darwin declares only allowed programs.* modules (no .nix files present yet)"
+        return
+    fi
+    hits="$(
+        python3 - "${nix_files[@]}" <<'PY'
+import pathlib
+import re
+import sys
+
+program_attr = re.compile(r'(?<![\w.])programs\.([A-Za-z0-9_-]+)')
+program_set = re.compile(r'(?<![\w.])programs\s*=')
+
+for raw in sys.argv[1:]:
+    path = pathlib.Path(raw)
+    for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+        source = line.split("#", 1)[0]
+        for match in program_attr.finditer(source):
+            name = match.group(1)
+            if name != "home-manager":
+                print(f"{path}:{lineno}:{line}")
+        if program_set.search(source):
+            print(f"{path}:{lineno}:{line}")
+PY
+    )"
+    if [[ -n "${hits//[[:space:]]/}" ]]; then
+        echo "FAIL: HM/darwin declares a programs.* module outside the allowlist (only programs.home-manager is allowed)"
+        printf '%s\n' "$hits" | head -8 | sed 's/^/  /'
+        fail=1
+    else
+        echo "ok  : HM/darwin declares only allowed programs.* modules (programs.home-manager)"
     fi
 }
 
@@ -57,10 +91,9 @@ scan_nix "HM/darwin declares no home.file dotfiles (packages-only)" \
     '(^|[^[:alnum:]_.])home\.file[[:space:]]*(\.|=|"|\{)'
 scan_nix "HM/darwin declares no xdg.configFile / xdg.dataFile / xdg.desktopEntries" \
     '(^|[^[:alnum:]_.])xdg\.(configFile|dataFile|desktopEntries)[[:space:]]*(\.|=|"|\{)'
-scan_nix "HM/darwin declares no config-generating programs.<tool> for chezmoi-owned tools" \
-    '(^|[^[:alnum:]_.])programs\.(zsh|bash|fish|nushell|neovim|vim|tmux|starship|git|kitty|alacritty|wezterm|ghostty|zoxide|fzf|lsd|eza|bat|direnv|gh|lazygit|readline)([.[:space:]=]|$)'
-scan_nix "HM/darwin writes no config via home.activation file emission" \
-    '(^|[^[:alnum:]_.])home\.activation[[:space:]]*(\.|=|"|\{).*(writeText|\.config|\.zshrc|dotfile)'
+scan_programs_allowlist
+scan_nix "HM/darwin declares no home.activation hooks (packages-only)" \
+    '(^|[^[:alnum:]_.])home\.activation[[:space:]]*(\.|=|"|\{)'
 
 # ---------------------------------------------------------------------------
 # (c) native Windows is NON-NIX. Nix applies to WSL2 userland only, never to
@@ -111,10 +144,10 @@ fi
 # ---------------------------------------------------------------------------
 # (e) update mode must not run a blanket Nix upgrade or silently rewrite
 #     flake.lock. No installer code may RUN `nix profile upgrade`, `nix-env -u`,
-#     `nix flake update`, or `nix flake lock --update-input`. The opt-in switches
-#     (`nix run nix-darwin -- switch`, `home-manager switch`) are fine; those are
-#     activation, not a blanket package upgrade or a lock rewrite. (Comments that
-#     merely describe the ban are allowed.)
+#     `nix flake update`, or `nix flake lock --update-input`. Opt-in activation
+#     switches are fine when they use installed tools or flake.lock-pinned
+#     bootstrap refs; they are not blanket package upgrades or lock rewrites.
+#     (Comments that merely describe the ban are allowed.)
 # ---------------------------------------------------------------------------
 blanket_nix_pattern='nix[[:space:]]+profile[[:space:]]+upgrade|nix-env[[:space:]]+([^#]*[[:space:]])?-u|nix[[:space:]]+flake[[:space:]]+update|nix[[:space:]]+flake[[:space:]]+lock[[:space:]][^#]*--(update-input|recreate-lock-file)'
 blanket_hits=""
@@ -130,6 +163,22 @@ if [[ -n "${blanket_hits//[[:space:]]/}" ]]; then
     fail=1
 else
     echo "ok  : no blanket nix upgrade / silent flake.lock rewrite in installer code"
+fi
+
+mutable_bootstrap_pattern='nix[[:space:]]+run[[:space:]]+(nix-darwin|home-manager)([[:space:]]|$)'
+mutable_bootstrap_hits=""
+for f in install-deps.sh setup.sh install-deps.ps1 setup.ps1; do
+    [[ -f "$f" ]] || continue
+    while IFS= read -r line; do
+        mutable_bootstrap_hits+="$f:$line"$'\n'
+    done < <(grep -nE "$mutable_bootstrap_pattern" "$f" 2>/dev/null | grep -vE '^[0-9]+:[[:space:]]*#')
+done
+if [[ -n "${mutable_bootstrap_hits//[[:space:]]/}" ]]; then
+    echo "FAIL: installer code uses mutable Nix registry aliases for bootstrap:"
+    printf '%s' "$mutable_bootstrap_hits" | sed 's/^/  /'
+    fail=1
+else
+    echo "ok  : Nix bootstrap commands use locked flake refs, not mutable registry aliases"
 fi
 
 [[ "$fail" -eq 0 ]] || exit 1

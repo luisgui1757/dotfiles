@@ -249,9 +249,9 @@ that violates one of these, fix it instead of disabling the test.
       any other config surface. If Nix and chezmoi ever co-own a path, that is the
       bug.
     - **(b) Home Manager / nix-darwin is packages-only.** No `home.file`, no
-      `xdg.configFile`, no `xdg.dataFile`, no `home.activation` that writes config,
-      and no `programs.<tool>.enable` config-generating module for a chezmoi-owned
-      tool (`programs.home-manager` is the only allowed `programs.*`). Home Manager
+      `xdg.configFile`, no `xdg.dataFile`, no `home.activation` at all, and no
+      `programs.*` module except `programs.home-manager` (the standalone HM CLI).
+      Home Manager
       declares `home.packages` (plus the minimal `home.username` /
       `home.homeDirectory` / `home.stateVersion`) and nothing that renders a
       shell/editor/terminal config file. GUI / TCC-sensitive apps (WezTerm,
@@ -803,13 +803,13 @@ save only**. The next plain `:w` formats normally. Implemented in
   installed formula, and `brew list --formula <formula>` file ownership of the
   resolved executable; apt/dnf/zypper/pacman/apk require
   the manager's file-ownership proof for the resolved real path; repo-pinned
-  direct Linux artifacts (`nvim`, `lazygit`, `starship`, `tree-sitter`, and
-  `chezmoi`) are owned only when their durable marker matches the repo-pinned
+  direct Linux artifacts (`nvim`, `lazygit`, `starship`, `tree-sitter`,
+  `chezmoi`, and `herdr`) are owned only when their durable marker matches the repo-pinned
   version, URL, SHA-256, command path, binary path, install root, installed
   binary SHA-256, executable `--version` output, and supported install shape:
   Neovim is `/usr/local/bin/nvim` pointing into `/opt/nvim-linux-*`; lazygit and
-  Starship are `/usr/local/bin/<tool>` or `~/.local/bin/<tool>`; tree-sitter and
-  chezmoi are `~/.local/bin/<tool>`. A Brew-prefix command symlink that resolves
+  Starship are `/usr/local/bin/<tool>` or `~/.local/bin/<tool>`; tree-sitter,
+  chezmoi, and Herdr are `~/.local/bin/<tool>`. A Brew-prefix command symlink that resolves
   outside the Brew prefix is a blocked ownership contradiction, a shadow command
   path that resolves to the same binary is not ownership, an unsupported
   direct-artifact root is not ownership, and a marker binary outside the
@@ -1142,7 +1142,8 @@ save only**. The next plain `:w` formats normally. Implemented in
 - **Direct GitHub downloads are pinned and SHA-256 verified.** `install-deps.sh`
   verifies the pinned Homebrew installer script, Neovim Linux tarballs,
   native-Linux chezmoi tarballs, lazygit Linux tarballs, Starship Linux
-  tarballs, tree-sitter CLI Linux archives, and Hack Nerd Font zip before extraction;
+  tarballs, tree-sitter CLI Linux archives, the WezTerm Ubuntu `.deb`, Herdr
+  Linux binaries, and Hack Nerd Font zip before extraction;
   CI also verifies the pinned chezmoi Linux, macOS, and Windows release
   archives used by the parity jobs;
   `install-deps.ps1` verifies the pinned Hack.zip before registering fonts and
@@ -1166,6 +1167,8 @@ save only**. The next plain `:w` formats normally. Implemented in
   Update the version and checksum constants together. zsh plugin refs are also
   pinned by tag plus expected commit; update both after reviewing a Renovate tag
   bump. Guarded by `tests/shell/ghostty_install_fail_test.sh`,
+  `tests/shell/wezterm_install_test.sh`, `tests/shell/wezterm_install_fail_test.sh`,
+  `tests/shell/herdr_install_test.sh`, `tests/shell/herdr_install_fail_test.sh`,
   `tests/shell/wsl_gui_tools_test.sh`, `tests/shell/lazygit_install_test.sh`,
   `tests/shell/starship_linux_install_test.sh`,
   `tests/shell/treesitter_cli_test.sh`, and `tests/shell/zsh_plugins_test.sh`.
@@ -1174,8 +1177,8 @@ save only**. The next plain `:w` formats normally. Implemented in
   but it cannot recompute adjacent SHA-256
   values or verify tag commit IDs; leave CI red until a human has reviewed the
   download/ref and updated the adjacent constant. The
-  `CHEZMOI_VERSION`, `STARSHIP_VERSION`, and
-  `TREE_SITTER_CLI_LINUX_VERSION` custom managers follow the lazygit shape:
+  `CHEZMOI_VERSION`, `STARSHIP_VERSION`, `TREE_SITTER_CLI_LINUX_VERSION`,
+  `WEZTERM_VERSION`, and `HERDR_VERSION` custom managers follow the lazygit shape:
   Renovate may bump the version constants, while their adjacent SHA-256 values
   remain context only. In
   `renovate.json`, direct-download SHA-256 values must be matched as context
@@ -1430,6 +1433,9 @@ non-Nix. The whole layer is opt-in; setup defaults are unchanged.
   is deliberately **no windows system**. Outputs: a packages-only `devShells`,
   a hermetic `checks.<system>.toolchain` (proves nixpkgs resolves the CLI
   toolchain), `formatter = nixpkgs-fmt`, and `darwinConfigurations."dotfiles"`.
+  The activation config is intentionally `aarch64-darwin` today; x86_64 Darwin
+  can evaluate dev shells/checks but is not a supported nix-darwin host target
+  until an Intel Mac proves that path.
 - **`nix flake check` in CI does NOT build the darwin toplevel.** It *evaluates*
   `darwinConfigurations.dotfiles` (catching config errors — it caught a
   `nixpkgs.hostPlatform` recursion and a null `home.homeDirectory` during
@@ -1445,24 +1451,30 @@ non-Nix. The whole layer is opt-in; setup defaults are unchanged.
   (GUI/vendor apps, never nixpkgs); brews = Herdr. nix-homebrew runs
   `mutableTaps = false` with the taps supplied as pinned inputs, and
   `homebrew.taps = builtins.attrNames config.nix-homebrew.taps`. `system.primaryUser`
-  + `users.users.<user>.home` are resolved from `$USER`.
-- **User resolution.** The flake reads `builtins.getEnv "USER"` with a `"runner"`
-  fallback so pure eval / `nix flake check` still evaluates; setup.sh runs
-  `darwin-rebuild switch --flake .#dotfiles --impure` so the real switch resolves
-  the real user. Do NOT wrap that switch in an outer `sudo` (modern nix-darwin
-  runs the privileged activation itself; an outer sudo would make `$USER` = root).
+  + `users.users.<user>.home` are resolved from `SUDO_USER`, then `USER`, then
+  the pure-eval placeholder `runner`.
+- **User resolution.** The flake reads `builtins.getEnv "SUDO_USER"` first,
+  falls back to `builtins.getEnv "USER"`, and uses `"runner"` only so pure eval /
+  `nix flake check` still evaluates. setup.sh runs
+  `sudo darwin-rebuild switch --flake .#dotfiles --impure`, so sudo may set
+  `USER=root` but `SUDO_USER` still resolves Homebrew/Home Manager to the real
+  invoking user. First-run bootstrap derives the locked rev from `flake.lock`
+  with Nix's JSON parser and runs
+  `sudo nix run github:nix-darwin/nix-darwin/<locked-rev>#darwin-rebuild -- ...`;
+  do not use the mutable `nix-darwin` registry alias.
 - **Home Manager is packages-only** (`nix/home/darwin.nix`): `home.packages` +
   the minimal `home.username`/`home.stateVersion`. `home.homeDirectory` is left
   to the nix-darwin HM integration (derived from `users.users.<user>.home`) to
   avoid a conflicting definition. No `home.file`, no `xdg.configFile`, no
-  `programs.<tool>`. Guarded at the SOURCE level by
-  `tests/static/nix_architecture_test.sh` (its `home.file`/`xdg.*File` regexes
-  require a trailing `= . " {` so documenting prose does not false-positive).
+  `programs.<tool>` other than `programs.home-manager`. Guarded at the SOURCE
+  level by `tests/static/nix_architecture_test.sh`, which allowlists only
+  `programs.home-manager` and bans `home.activation` outright.
 - **setup.sh integration is explicit + consent-gated.** `setup.sh --nix-darwin`
-  (macOS-only) is the ONLY path that runs `darwin-rebuild switch`; without the
-  flag setup never touches Nix. It is dry-run-safe (previews the command),
-  prompts unless `--all`, skips cleanly off-macOS or without nix, and is
-  WARN-non-fatal. Guarded by `tests/nix/setup_nix_darwin_test.sh`.
+  (macOS-only) is the ONLY path that runs `sudo darwin-rebuild switch`; without
+  the flag setup never touches Nix. It is dry-run-safe (previews the real sudo
+  command and the locked bootstrap ref), prompts unless `--all`, skips cleanly
+  off-macOS or without nix, and fails closed if the requested activation fails.
+  Guarded by `tests/nix/setup_nix_darwin_test.sh`.
 - **Linux/WSL Home Manager (standalone, packages-only).**
   `homeConfigurations."<arch>-linux"` (`nix/home/linux.nix` + the shared
   `nix/home/common.nix`) is the nix-owned CLI set for Linux/WSL, activated by
