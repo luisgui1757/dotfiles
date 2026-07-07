@@ -23,6 +23,9 @@ param(
 $ErrorActionPreference = 'Continue'
 $HackNerdFontVersion = 'v3.4.0'
 $HackNerdFontSha256 = '8ca33a60c791392d872b80d26c42f2bfa914a480f9eb2d7516d9f84373c36897'
+$ScoopInstallerCommit = 'b0ee913725139b816f9178163af0aecdba07a7ed'
+$ScoopInstallerSha256 = '48f6ea398b3a3fa26fae0093d37bd85b13e7eaa5d1d4a3e208408768408e35ae'
+$ScoopInstallerUrl = "https://raw.githubusercontent.com/ScoopInstaller/Install/$ScoopInstallerCommit/install.ps1"
 $WindowsTerminalVersion = 'v1.24.11321.0'
 $WindowsTerminalX64Sha256 = '7caef554147e5498ed1becdca73cdedb79fbc81f89032e46ae9b095c53433812'
 $VsBuildToolsBootstrapperUrl = 'https://aka.ms/vs/17/release/vs_BuildTools.exe'
@@ -160,21 +163,27 @@ function Install-Scoop {
     }
     Write-Host "Scoop is not installed. It is a userspace package manager that"
     Write-Host "carries tools missing from winget/choco (taplo, win32yank, etc.)."
-    if (-not (Ask "Install Scoop via the official one-liner?")) { return $false }
+    if (-not (Ask "Install Scoop via the pinned ScoopInstaller/Install bootstrap?")) { return $false }
     if ($DryRun) {
+        Write-Host ("  would: download ScoopInstaller/Install@{0} install.ps1" -f $ScoopInstallerCommit)
+        Write-Host ("  would: verify SHA-256 before execution (SHA-256 verified: {0})" -f $ScoopInstallerSha256)
         if (Test-IsElevated) {
-            Write-Host "  would: download get.scoop.sh, then run install.ps1 -RunAsAdmin"
+            Write-Host "  would: run verified install.ps1 -RunAsAdmin"
         } else {
-            Write-Host "  would: download get.scoop.sh, then run install.ps1"
+            Write-Host "  would: run verified install.ps1"
         }
         return $false
     }
     try {
-        # The official scoop bootstrap. RemoteSigned policy is needed for the
-        # script; it is set for the current process only.
+        # Pinned Scoop bootstrap. RemoteSigned policy is needed for the script;
+        # it is set for the current process only.
         Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process -Force
-        $installer = Join-Path $env:TEMP "scoop-install-$([guid]::NewGuid()).ps1"
-        Invoke-WebRequest -Uri 'https://get.scoop.sh' -OutFile $installer -UseBasicParsing -ErrorAction Stop
+        $installer = Join-Path ([IO.Path]::GetTempPath()) "scoop-install-$([guid]::NewGuid()).ps1"
+        Invoke-WebRequest -Uri $ScoopInstallerUrl -OutFile $installer -UseBasicParsing -ErrorAction Stop
+        if (-not (Test-FileSha256 $installer $ScoopInstallerSha256)) {
+            throw ("Scoop installer SHA-256 mismatch for ScoopInstaller/Install@{0}: expected {1}" -f $ScoopInstallerCommit, $ScoopInstallerSha256)
+        }
+        Write-Host ("  verified Scoop installer ScoopInstaller/Install@{0} SHA-256 {1}" -f $ScoopInstallerCommit, $ScoopInstallerSha256)
         if (Test-IsElevated) {
             # GitHub Windows runners are elevated. Scoop blocks elevated
             # bootstrap by default, so use the installer documented opt-in

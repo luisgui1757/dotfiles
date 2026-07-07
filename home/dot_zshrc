@@ -238,7 +238,7 @@ unfunction _dotfiles_source_first_readable 2>/dev/null || true
 
 # ---- Starship init (precompiled, like the PowerShell profile) ---------------
 # Re-generate when the toml is newer than the cached init script, so config
-# tweaks always take effect. Falls back to live init if starship is missing.
+# tweaks always take effect. Skips cleanly if starship is missing.
 if command -v starship >/dev/null 2>&1; then
   _starship_init="${HOME}/.cache/starship-init.zsh"
   _starship_toml="${STARSHIP_CONFIG:-${HOME}/.config/starship.toml}"

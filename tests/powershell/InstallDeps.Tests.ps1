@@ -190,7 +190,7 @@ Describe "install-deps.ps1" {
         Should -Invoke -CommandName choco -Times 0 -Exactly
     }
 
-    It "uses the documented elevated Scoop bootstrap path in dry run" {
+    It "uses the pinned verified elevated Scoop bootstrap path in dry run" {
         . $script:ImportInstallDepsForTest -DryRun
         Mock -CommandName Get-Command -MockWith { return $null } -ParameterFilter { $Name -eq 'scoop' }
         Mock -CommandName Test-IsElevated -MockWith { return $true }
@@ -198,6 +198,9 @@ Describe "install-deps.ps1" {
         # Capture the Write-Host (information) stream, not the boolean return value.
         $output = & { Install-Scoop } 6>&1 | Out-String
 
+        $output | Should -Match 'ScoopInstaller/Install@[0-9a-f]{40}'
+        $output | Should -Match 'SHA-256 verified: [0-9a-f]{64}'
+        $output | Should -Not -Match 'get\.scoop\.sh'
         $output | Should -Match '-RunAsAdmin'
     }
 

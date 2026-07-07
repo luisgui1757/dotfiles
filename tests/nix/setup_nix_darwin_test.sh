@@ -4,19 +4,25 @@
 # --nix-darwin --dry-run run only PREVIEWS (never switches); --nix-darwin on a
 # non-macOS host is skipped; --nix-darwin --all on macOS invokes the sudo
 # activation shape; and first-run bootstrap uses the flake.lock-pinned
-# nix-darwin rev, never the mutable registry alias.
+# nix-darwin rev + narHash, never the mutable registry alias.
 set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 WORK="$REPO_ROOT/tests/.cache/nix-darwin-setup-test"
 rm -rf "$WORK"
 mkdir -p "$WORK"
 trap 'rm -rf "$WORK"' EXIT
-LOCKED_NIX_DARWIN_REV="$(
+read -r LOCKED_NIX_DARWIN_REV LOCKED_NIX_DARWIN_NAR_HASH LOCKED_NIX_DARWIN_NAR_HASH_ENCODED < <(
     python3 - <<'PY' "$REPO_ROOT/flake.lock"
-import json, sys
-print(json.load(open(sys.argv[1], encoding="utf-8"))["nodes"]["nix-darwin"]["locked"]["rev"])
+import json
+import sys
+import urllib.parse
+
+locked = json.load(open(sys.argv[1], encoding="utf-8"))["nodes"]["nix-darwin"]["locked"]
+nar_hash = locked["narHash"]
+print(locked["rev"], nar_hash, urllib.parse.quote(nar_hash, safe="-._~"))
 PY
-)"
+)
+LOCKED_NIX_DARWIN_REF="github:nix-darwin/nix-darwin/$LOCKED_NIX_DARWIN_REV?narHash=$LOCKED_NIX_DARWIN_NAR_HASH_ENCODED#darwin-rebuild"
 
 enable_nix_path() {
     if ! command -v nix >/dev/null 2>&1 && [ -e /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh ]; then
@@ -41,7 +47,7 @@ PATH="/usr/bin:/bin"
 export PATH
 nix() {
     if [ "\${1:-}" = eval ]; then
-        printf '%s\n' "\$LOCKED_NIX_DARWIN_REV"
+        printf '%s\n%s\n' "\$LOCKED_NIX_DARWIN_REV" "$LOCKED_NIX_DARWIN_NAR_HASH"
         return 0
     fi
     [ "\${1:-}" = run ] && echo "nix run \$*" >> "\$CALLS"
@@ -83,7 +89,7 @@ assert_eq "--nix-darwin --all on macOS invokes sudo darwin-rebuild switch" \
     "sudo darwin-rebuild switch --flake $REPO_ROOT#dotfiles --impure" \
     "$(probe '--all --nix-darwin' Darwin installed)"
 assert_eq "--nix-darwin bootstrap uses locked nix-darwin rev" \
-    "sudo nix run github:nix-darwin/nix-darwin/$LOCKED_NIX_DARWIN_REV#darwin-rebuild -- switch --flake $REPO_ROOT#dotfiles --impure" \
+    "sudo nix run $LOCKED_NIX_DARWIN_REF -- switch --flake $REPO_ROOT#dotfiles --impure" \
     "$(probe '--all --nix-darwin' Darwin bootstrap)"
 
 dry_bin="$WORK/dry-bin"
@@ -91,7 +97,7 @@ mkdir -p "$dry_bin"
 cat > "$dry_bin/nix" <<EOF
 #!/usr/bin/env bash
 if [[ "\${1:-}" == "eval" ]]; then
-    printf '%s\n' "$LOCKED_NIX_DARWIN_REV"
+    printf '%s\n%s\n' "$LOCKED_NIX_DARWIN_REV" "$LOCKED_NIX_DARWIN_NAR_HASH"
     exit 0
 fi
 exit 0
@@ -108,11 +114,11 @@ dry_output="$(
 PATH="$old_path"
 export PATH
 if [[ "$dry_output" == *"sudo darwin-rebuild switch --flake $REPO_ROOT#dotfiles --impure"* ]] &&
-    [[ "$dry_output" == *"github:nix-darwin/nix-darwin/$LOCKED_NIX_DARWIN_REV#darwin-rebuild"* ]] &&
+    [[ "$dry_output" == *"$LOCKED_NIX_DARWIN_REF"* ]] &&
     [[ "$dry_output" != *"nix run nix-darwin"* ]]; then
-    echo "ok  : dry-run previews sudo activation and locked bootstrap ref"
+    echo "ok  : dry-run previews sudo activation and locked bootstrap ref with narHash"
 else
-    echo "FAIL: dry-run output did not show sudo activation with locked bootstrap ref"
+    echo "FAIL: dry-run output did not show sudo activation with locked bootstrap rev+narHash ref"
     printf '%s\n' "$dry_output"
     fail=1
 fi
@@ -130,7 +136,7 @@ if enable_nix_path; then
         pinned_nix_darwin_run_ref
     )"
     assert_eq "real Nix parser returns locked nix-darwin bootstrap ref" \
-        "github:nix-darwin/nix-darwin/$LOCKED_NIX_DARWIN_REV#darwin-rebuild" \
+        "$LOCKED_NIX_DARWIN_REF" \
         "$real_ref"
 else
     echo "ok  : real Nix parser check skipped (nix not installed)"

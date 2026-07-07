@@ -111,7 +111,8 @@ significant change to the relevant area.
 - [ ] **nix-darwin bootstrap/switch**, macOS: with Nix installed, run
       `./setup.sh --nix-darwin` (equivalent activation:
       `sudo darwin-rebuild switch --flake .#dotfiles --impure`; first-run setup
-      derives the locked `github:nix-darwin/nix-darwin/<rev>#darwin-rebuild`
+      derives the locked
+      `github:nix-darwin/nix-darwin/<rev>?narHash=<encoded-narHash>#darwin-rebuild`
       ref from `flake.lock`). Confirm activation uses sudo, sets
       `system.primaryUser` to the real invoking user via `SUDO_USER` (not
       `root`), installs the WezTerm + AeroSpace casks and the Herdr brew via
@@ -122,8 +123,8 @@ significant change to the relevant area.
       `./setup.sh --home-manager` (equivalent installed command:
       `home-manager switch --flake .#$(uname -m)-linux --impure`; first-run
       setup derives the locked
-      `github:nix-community/home-manager/<rev>#home-manager` ref from
-      `flake.lock`). Confirm the nix CLI set (ripgrep/fd/fzf/jq/lazygit/starship/
+      `github:nix-community/home-manager/<rev>?narHash=<encoded-narHash>#home-manager`
+      ref from `flake.lock`). Confirm the nix CLI set (ripgrep/fd/fzf/jq/lazygit/starship/
       zoxide) lands in `~/.nix-profile/bin` with NO root, and that `nvim` +
       `tree-sitter` are still the native install-deps binaries (NOT nix) so
       parser builds keep working.

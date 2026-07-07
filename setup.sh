@@ -554,34 +554,58 @@ run_update_mode() {
 
 # Read the committed flake.lock with Nix's JSON parser so first-run bootstrap
 # commands use the same pinned inputs as the repo flake.
-flake_lock_github_rev() {
-    local node="$1" owner="$2" repo="$3" expr rev
+flake_lock_github_metadata() {
+    local node="$1" owner="$2" repo="$3" expr metadata
     expr='let
   lock = builtins.fromJSON (builtins.readFile ./flake.lock);
   node = lock.nodes."'"$node"'".locked or {};
   owner = node.owner or "";
   repo = node.repo or "";
   rev = node.rev or "";
+  narHash = node.narHash or "";
 in
-  if owner == "'"$owner"'" && repo == "'"$repo"'" && rev != "" then rev
-  else throw "flake.lock node '"$node"' is not github:'"$owner"'/'"$repo"' with a locked rev"'
-    if ! rev="$(nix eval --impure --raw --expr "$expr" 2>/dev/null)"; then
-        echo "  FAIL: could not read locked $owner/$repo revision from flake.lock" >&2
+  if owner == "'"$owner"'" && repo == "'"$repo"'" && rev != "" && narHash != "" then rev + "\n" + narHash
+  else throw "flake.lock node '"$node"' is not github:'"$owner"'/'"$repo"' with a locked rev and narHash"'
+    if ! metadata="$(nix eval --impure --raw --expr "$expr" 2>/dev/null)"; then
+        echo "  FAIL: could not read locked $owner/$repo revision and narHash from flake.lock" >&2
         return 1
     fi
-    printf '%s\n' "$rev"
+    printf '%s\n' "$metadata"
+}
+
+flake_lock_github_rev() {
+    flake_lock_github_metadata "$@" | sed -n '1p'
+}
+
+flake_lock_github_nar_hash() {
+    flake_lock_github_metadata "$@" | sed -n '2p'
+}
+
+nix_flake_ref_query_encode() {
+    local value="$1"
+    value="${value//%/%25}"
+    value="${value//+/%2B}"
+    value="${value//\//%2F}"
+    value="${value//=/%3D}"
+    value="${value//#/%23}"
+    value="${value//&/%26}"
+    printf '%s\n' "$value"
 }
 
 pinned_nix_darwin_run_ref() {
-    local rev
+    local rev nar_hash
     rev="$(flake_lock_github_rev "nix-darwin" "nix-darwin" "nix-darwin")" || return 1
-    printf 'github:nix-darwin/nix-darwin/%s#darwin-rebuild\n' "$rev"
+    nar_hash="$(flake_lock_github_nar_hash "nix-darwin" "nix-darwin" "nix-darwin")" || return 1
+    printf 'github:nix-darwin/nix-darwin/%s?narHash=%s#darwin-rebuild\n' \
+        "$rev" "$(nix_flake_ref_query_encode "$nar_hash")"
 }
 
 pinned_home_manager_run_ref() {
-    local rev
+    local rev nar_hash
     rev="$(flake_lock_github_rev "home-manager" "nix-community" "home-manager")" || return 1
-    printf 'github:nix-community/home-manager/%s#home-manager\n' "$rev"
+    nar_hash="$(flake_lock_github_nar_hash "home-manager" "nix-community" "home-manager")" || return 1
+    printf 'github:nix-community/home-manager/%s?narHash=%s#home-manager\n' \
+        "$rev" "$(nix_flake_ref_query_encode "$nar_hash")"
 }
 
 # Optional, EXPLICIT opt-in: apply the Nix (nix-darwin) package layer. This is

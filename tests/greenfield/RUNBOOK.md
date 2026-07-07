@@ -13,8 +13,9 @@ What is automated vs manual:
   predictions, "does psmux freeze", VS Code theme/font. That is the checklist in
   Part 3 below. There is no way to script "is this glyph a tofu box".
 
-> Default target: these steps validate `main`. For PR validation, use the
-> branch override notes in each environment, then record the result in
+> Default target: these steps validate the checkout/ref you intentionally select.
+> For PR validation, use the commit/ref notes in each environment, then record the
+> result in
 > [LEDGER.md](LEDGER.md).
 
 ---
@@ -23,55 +24,66 @@ What is automated vs manual:
 
 ### Windows Sandbox
 
-The `.wsb` is **self-contained** -- it does spin-up + download + install +
-automated validation for you, and works from anywhere (no need to clone the repo
-or be on a specific Windows build first). Just **double-click
-`tests\greenfield\windows-sandbox.wsb`** (or from a PowerShell on the host:
-`explorer <path>\windows-sandbox.wsb`).
+The `.wsb` maps a local checkout read-only, then does spin-up + install +
+automated validation for you. First put the host checkout at the exact commit
+you intend to test:
 
-The Sandbox boots clean, its logon command **downloads the repo** to
-`%USERPROFILE%\dotfiles`, **enables Developer Mode + reduces Defender scanning
-for you** (one UAC prompt -- click **Yes**), runs `setup.ps1 -All`, then
-`validate.ps1`. Watch the auto-opened PowerShell window for `PASS:` lines and a
-final summary; logs are on the sandbox desktop.
+```powershell
+git fetch origin pull/<PR>/head
+git checkout --detach <full-40-character-sha>
+git rev-parse HEAD
+```
 
-Supply-chain boundary: the `.wsb` self-bootstrap intentionally executes the
-selected ref's `sandbox-bootstrap.ps1` inside a disposable Sandbox so the harness
-works without a preexisting checkout. This is a reviewed greenfield-only trust
-root, not the recommended public setup path; production setup guidance is
-`git clone` then run local `setup`.
+Then **double-click `tests\greenfield\windows-sandbox.wsb`** (or from a
+PowerShell on the host: `explorer <path>\windows-sandbox.wsb`). The checked-in
+relative `HostFolder` maps the repo root when launched from this file on Windows
+builds that support relative Sandbox mappings. If your host does not support
+that, edit `HostFolder` to the absolute path of the checkout already at the
+commit/ref you intend to test.
+
+The Sandbox boots clean, its logon command runs the checked-out local
+`sandbox-run.ps1`, **enables Developer Mode + reduces Defender scanning for you**
+(one UAC prompt -- click **Yes**), copies the mapped repo to
+`%USERPROFILE%\dotfiles`, runs `setup.ps1 -All`, then `validate.ps1`. Watch the
+auto-opened PowerShell window for `PASS:` lines and a final summary; logs are on
+the sandbox desktop.
+
+Supply-chain boundary: the `.wsb` path does not download raw `main`, does not
+use `[scriptblock]::Create`, and does not execute a remote script. It executes
+the local checkout you mapped intentionally.
 
 That single UAC prompt is the ONLY thing you click. You do NOT need to open
 Settings. (Background: the Neovim config is a symlink, which Windows only allows
 with Developer Mode on; the script flips that one registry key elevated, then
 runs setup non-elevated so Scoop still works.)
 
-To test a PR or branch, edit the `.wsb` logon command and change the `-Ref
-'main'` argument to the branch name. If the PR changes the bootstrap script
-itself, also change the raw GitHub URL branch segment so the Sandbox runs that
-version of `sandbox-bootstrap.ps1`. For more RAM, see "Speeding up the Sandbox"
-below.
+Optional self-contained path: after installing Git inside the Sandbox, run
+`tests\greenfield\sandbox-bootstrap.ps1 -CommitSha <full-40-character-sha>`.
+That helper fetches the exact commit, verifies `git rev-parse HEAD`, then runs
+the checked-out local `sandbox-run.ps1`. For more RAM, see "Speeding up the
+Sandbox" below.
 
 Then do Part 3 inside the sandbox (it is a full Windows desktop: open Windows
 Terminal, VS Code, psmux).
 
 #### Manual alternative (no `.wsb`)
 
-If you would rather drive it by hand -- open Windows Sandbox yourself, then an
-**admin** PowerShell inside it, and run:
+If you would rather drive it by hand -- open Windows Sandbox yourself, make Git
+available first, then in an **admin** PowerShell run:
 
 ```powershell
 # 1. PS 5.1 in the Sandbox defaults to old TLS; force 1.2 and allow scripts.
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 Set-ExecutionPolicy -Scope Process Bypass -Force
 
-# 2. Get the main branch as a ZIP (no git needed yet) and unpack it.
-#    For PR validation, replace both "main" path segments with the branch name.
-$zip = "$env:TEMP\dotfiles.zip"
-Invoke-WebRequest https://github.com/luisgui1757/dotfiles/archive/refs/heads/main.zip -OutFile $zip
-Expand-Archive $zip "$env:TEMP\df" -Force
-Move-Item "$env:TEMP\df\dotfiles-main" "$env:USERPROFILE\dotfiles" -Force
+# 2. Clone/fetch the exact full commit SHA you intend to test, then verify it.
+git clone https://github.com/luisgui1757/dotfiles "$env:USERPROFILE\dotfiles"
 Set-Location "$env:USERPROFILE\dotfiles"
+git fetch --depth 1 origin <full-40-character-sha>
+git checkout --detach FETCH_HEAD
+if ((git rev-parse HEAD).Trim() -ne '<full-40-character-sha>') {
+    throw 'checked-out commit did not match the requested SHA'
+}
 
 # 3. Install + apply everything. Admin is fine HERE (disposable sandbox): the
 #    same path the elevated windows-2025 CI runner uses -- Install-Scoop detects

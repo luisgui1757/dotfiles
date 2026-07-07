@@ -181,5 +181,19 @@ else
     echo "ok  : Nix bootstrap commands use locked flake refs, not mutable registry aliases"
 fi
 
+for snippet in \
+    'flake_lock_github_nar_hash' \
+    'nix_flake_ref_query_encode' \
+    '?narHash=%s#darwin-rebuild' \
+    '?narHash=%s#home-manager'; do
+    if ! grep -Fq "$snippet" setup.sh; then
+        echo "FAIL: setup.sh missing Nix bootstrap narHash guard snippet: $snippet"
+        fail=1
+    fi
+done
+if [[ "$fail" -eq 0 ]]; then
+    echo "ok  : Nix bootstrap refs include locked narHash query parameters"
+fi
+
 [[ "$fail" -eq 0 ]] || exit 1
 echo "all nix-architecture invariants OK"

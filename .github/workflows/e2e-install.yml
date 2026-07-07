@@ -157,6 +157,13 @@ jobs:
           command -v lazygit >/dev/null 2>&1 || fail "lazygit is not on PATH"
           command -v cmake >/dev/null 2>&1 || fail "cmake is not on PATH"
           command -v lsd >/dev/null 2>&1 || fail "lsd is not on PATH"
+          if [[ "${RUNNER_OS:-}" == "macOS" ]]; then
+            [[ -d /Applications/WezTerm.app || -d "$HOME/Applications/WezTerm.app" ]] \
+              || fail "WezTerm.app is missing after setup.sh --all requested it"
+            [[ -d /Applications/AeroSpace.app || -d "$HOME/Applications/AeroSpace.app" ]] \
+              || fail "AeroSpace.app is missing after setup.sh --all requested it"
+            command -v herdr >/dev/null 2>&1 || fail "herdr is not on PATH after setup.sh --all requested it"
+          fi
           nvim_line="$(nvim --version | head -n 1)"
           case "$nvim_line" in
             "NVIM v0.12"*|"NVIM v1."*) ;;
@@ -166,6 +173,7 @@ jobs:
           assert_dir_resolves "$HOME/.config/nvim" "$repo/nvim"
           assert_file_content "$HOME/.config/nvim/init.lua" "$repo/nvim/init.lua"
           assert_file_content "$HOME/.config/starship.toml" "$repo/starship/starship.toml"
+          assert_file_content "$HOME/.config/gh-dash/config.yml" "$repo/gh-dash/config.yml"
           assert_file_content "$HOME/.tmux.conf" "$repo/tmux/tmux.conf"
           assert_file_content "$HOME/.zshenv" "$repo/shells/zshenv"
           assert_file_content "$HOME/.zshrc" "$repo/shells/zshrc"
@@ -313,6 +321,7 @@ jobs:
           Assert-NvimSymlink -Path $nvimTarget -Expected (Join-Path $repo 'nvim')
           Assert-ContentEqual -Path (Join-Path $nvimTarget 'init.lua') -Expected (Join-Path $repo 'nvim\init.lua')
           Assert-ContentEqual -Path (Join-Path $env:USERPROFILE '.config\starship.toml') -Expected (Join-Path $repo 'starship\starship.toml')
+          Assert-ContentEqual -Path (Join-Path $env:USERPROFILE '.config\gh-dash\config.yml') -Expected (Join-Path $repo 'gh-dash\config.yml')
           Assert-ContentEqual -Path (Join-Path $env:USERPROFILE '.tmux.conf') -Expected (Join-Path $repo 'tmux\tmux.conf')
           Assert-ContentEqual -Path (Join-Path $env:USERPROFILE '.tmux.windows.conf') -Expected (Join-Path $repo 'tmux\tmux.windows.conf')
           Assert-ContentEqual -Path $PROFILE -Expected (Join-Path $repo 'shells\powershell_profile.ps1')

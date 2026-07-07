@@ -1021,11 +1021,13 @@ save only**. The next plain `:w` formats normally. Implemented in
   mode exits nonzero when a scoped refresh did not actually succeed. Present
   tools outside Scoop/winget/Chocolatey are reported as unmanaged and do not
   count as successful dotfiles-owned updates.
-- **Windows CI uses Scoop's documented elevated bootstrap.** GitHub-hosted
+- **Windows CI uses a pinned, verified elevated Scoop bootstrap.** GitHub-hosted
   `windows-2025` runners are elevated, and Scoop blocks elevated install by
-  default. `Install-Scoop` detects elevation and runs the official installer
-  with `-RunAsAdmin`, then adds the Scoop `shims` dir to the current process
-  PATH so the rest of `install-deps.ps1` can immediately use `scoop`.
+  default. `Install-Scoop` downloads `ScoopInstaller/Install` at the pinned
+  `$ScoopInstallerCommit`, verifies `$ScoopInstallerSha256`, runs the local temp
+  installer with `-RunAsAdmin` only when elevated, then adds the Scoop `shims`
+  dir to the current process PATH so the rest of `install-deps.ps1` can
+  immediately use `scoop`.
   `Install-Scoop` also ensures the `extras` and `nerd-fonts` buckets whenever
   Scoop exists, including pre-existing user installs. Every bucket add routes
   through `Add-ScoopBucketSafe`: idempotent; non-interactive via
@@ -1137,13 +1139,15 @@ save only**. The next plain `:w` formats normally. Implemented in
   not yet activated when `colorTheme` is first read (needs an Extensions reload /
   second launch); (4) a workspace `.vscode/settings.json` override. Confirm which
   profile is active and whether Sync is on before touching code again.
-- **Direct network executables are pinned or explicitly allowlisted.** New
-  installer code must prefer release artifacts with adjacent SHA-256
-  verification over fetched installer scripts. If a mutable bootstrap script is
-  unavoidable, it must be a named trust root with rationale in
-  `tests/static/supply_chain_remote_execution_test.sh`; the current installer
-  trust root is Scoop's official installer. Homebrew bootstrap is downloaded
-  from a pinned installer commit and SHA-256 verified before execution.
+- **Direct network executables are pinned and verified.** New installer code must
+  prefer release artifacts with adjacent SHA-256 verification over fetched
+  installer scripts. Bootstrap scripts are acceptable only when pinned to an
+  immutable commit and hash-verified before execution; current examples are the
+  Homebrew installer and Windows Scoop bootstrap. `install-deps.ps1` downloads
+  `ScoopInstaller/Install` at `$ScoopInstallerCommit`, verifies
+  `$ScoopInstallerSha256`, then executes the checked temp file. The static
+  scanner keeps only genuinely pinned+verified exceptions, including CI
+  cargo-binstall where the SHA-256 check immediately precedes execution.
   Recommended setup docs use `git clone` plus local `setup`, not raw remote
   setup script execution from the current default branch.
 - **Direct GitHub downloads are pinned and SHA-256 verified.** `install-deps.sh`
@@ -1153,9 +1157,10 @@ save only**. The next plain `:w` formats normally. Implemented in
   Linux binaries, and Hack Nerd Font zip before extraction;
   CI also verifies the pinned chezmoi Linux, macOS, and Windows release
   archives used by the parity jobs;
-  `install-deps.ps1` verifies the pinned Hack.zip before registering fonts and
-  the pinned Windows Terminal portable zip before extracting the fallback
-  install. POSIX helpers that unpack into `mktemp -d` install a cleanup trap
+  `install-deps.ps1` verifies the pinned Scoop installer before execution, the
+  pinned Hack.zip before registering fonts, and the pinned Windows Terminal
+  portable zip before extracting the fallback install. POSIX helpers that unpack
+  into `mktemp -d` install a cleanup trap
   immediately after creating the directory, so failure paths do not leak
   archives or partial extracts. A Hack.zip checksum mismatch records a `FAIL:`
   install marker and does not extract. A successful Windows font install broadcasts
@@ -1465,10 +1470,12 @@ non-Nix. The whole layer is opt-in; setup defaults are unchanged.
   `nix flake check` still evaluates. setup.sh runs
   `sudo darwin-rebuild switch --flake .#dotfiles --impure`, so sudo may set
   `USER=root` but `SUDO_USER` still resolves Homebrew/Home Manager to the real
-  invoking user. First-run bootstrap derives the locked rev from `flake.lock`
-  with Nix's JSON parser and runs
-  `sudo nix run github:nix-darwin/nix-darwin/<locked-rev>#darwin-rebuild -- ...`;
-  do not use the mutable `nix-darwin` registry alias.
+  invoking user. First-run bootstrap derives the locked rev and `narHash` from
+  `flake.lock` with Nix's JSON parser, URL-encodes the hash for the flake ref,
+  and runs
+  `sudo nix run github:nix-darwin/nix-darwin/<locked-rev>?narHash=<encoded-narHash>#darwin-rebuild -- ...`;
+  do not use the mutable `nix-darwin` registry alias or omit the locked
+  `narHash`.
 - **Home Manager is packages-only** (`nix/home/darwin.nix`): `home.packages` +
   the minimal `home.username`/`home.stateVersion`. `home.homeDirectory` is left
   to the nix-darwin HM integration (derived from `users.users.<user>.home`) to
@@ -1488,7 +1495,9 @@ non-Nix. The whole layer is opt-in; setup defaults are unchanged.
   `setup.sh --home-manager` (Linux-only, same opt-in/consent/dry-run contract as
   `--nix-darwin`). `programs.home-manager.enable` is the ONE allowed `programs.*`
   (it installs the standalone HM CLI). On WSL it writes ONLY to `~/.nix-profile`,
-  never `/mnt/c` — split-host preserved. **Native install-deps arms are RETAINED
+  never `/mnt/c` — split-host preserved. First-run bootstrap likewise uses
+  `github:nix-community/home-manager/<locked-rev>?narHash=<encoded-narHash>#home-manager`
+  from `flake.lock`, not a mutable registry alias. **Native install-deps arms are RETAINED
   as the default provisioning path**; the Nix package layer is additive/opt-in,
   proven by tests before anything is deleted. Guarded by
   `tests/nix/linux_home_test.sh` + `tests/nix/setup_home_manager_test.sh`.

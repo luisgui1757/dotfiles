@@ -1,28 +1,39 @@
 [CmdletBinding()]
-param([string]$Ref = 'main')
+param(
+    [Parameter(Mandatory)]
+    [ValidatePattern('^[0-9a-fA-F]{40}$')]
+    [string]$CommitSha,
+    [string]$Remote = 'https://github.com/luisgui1757/dotfiles.git'
+)
 
-# Self-contained Windows Sandbox greenfield bootstrap. windows-sandbox.wsb fetches
-# and runs THIS via its LogonCommand, so the sandbox does NOT depend on a mapped
-# folder. The mapped-folder approach is fragile: a relative HostFolder needs
-# Windows 11 22H2+, and the repo has to be cloned and the .wsb launched from
-# inside it -- when that did not hold, the sandbox opened to an empty PowerShell.
-# This downloads the repo itself and hands off to sandbox-run.ps1 -SkipCopy.
+# Optional self-contained Windows Sandbox greenfield bootstrap. The default
+# windows-sandbox.wsb uses a mapped local checkout so it never remote-evals a
+# mutable branch. If a mapped folder is impractical, run this helper only after
+# intentionally selecting a full commit SHA: it fetches that exact object, checks
+# out FETCH_HEAD, verifies git rev-parse HEAD equals the requested SHA, then
+# executes the checked-out local sandbox-run.ps1.
 $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 $repo = Join-Path $env:USERPROFILE 'dotfiles'
-$zip = Join-Path $env:TEMP 'dotfiles-greenfield.zip'
-$extract = Join-Path $env:TEMP 'dotfiles-greenfield-extract'
 
-Write-Host "greenfield sandbox: downloading the repo ($Ref)..."
-Invoke-WebRequest -Uri "https://github.com/luisgui1757/dotfiles/archive/refs/heads/$Ref.zip" -OutFile $zip -UseBasicParsing
-
-if (Test-Path -LiteralPath $extract) { Remove-Item -LiteralPath $extract -Recurse -Force }
-Expand-Archive -LiteralPath $zip -DestinationPath $extract -Force
-$inner = Get-ChildItem -LiteralPath $extract -Directory | Select-Object -First 1
-if (-not $inner) { throw "downloaded repo archive was empty" }
+if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+    throw 'git is required for commit-pinned sandbox bootstrap; use the mapped .wsb path or install Git first'
+}
 
 if (Test-Path -LiteralPath $repo) { Remove-Item -LiteralPath $repo -Recurse -Force }
-Move-Item -LiteralPath $inner.FullName -Destination $repo -Force
+New-Item -ItemType Directory -Path $repo -Force | Out-Null
+
+Write-Host "greenfield sandbox: fetching dotfiles commit $CommitSha..."
+git -C $repo init
+git -C $repo remote add origin $Remote
+git -C $repo fetch --depth 1 origin $CommitSha
+git -C $repo checkout --detach FETCH_HEAD
+
+$actual = (git -C $repo rev-parse HEAD).Trim()
+if ($actual -ne $CommitSha.ToLowerInvariant()) {
+    throw "fetched commit mismatch: expected $CommitSha, got $actual"
+}
+Write-Host "greenfield sandbox: verified git rev-parse HEAD = $actual"
 
 & (Join-Path $repo 'tests\greenfield\sandbox-run.ps1') -WorkRepo $repo -SkipCopy

@@ -396,6 +396,10 @@ function Assert-Part1Files {
         -ExpectedPath (Join-Path $script:RepoRoot 'starship\starship.toml') `
         -Label 'starship config'
     Assert-CopyModeFileMatches `
+        -ActualPath (Join-Path $Sandbox '.config\gh-dash\config.yml') `
+        -ExpectedPath (Join-Path $script:RepoRoot 'gh-dash\config.yml') `
+        -Label 'gh-dash config'
+    Assert-CopyModeFileMatches `
         -ActualPath (Join-Path $Sandbox '.config\lsd\config.yaml') `
         -ExpectedPath (Join-Path $script:RepoRoot 'lsd\config.yaml') `
         -Label 'lsd config'

@@ -69,19 +69,20 @@ Run from the repo on Windows:
 explorer .\tests\greenfield\windows-sandbox.wsb
 ```
 
-Double-clicking `windows-sandbox.wsb` is equivalent, and the `.wsb` is
-**self-contained** -- it works from anywhere without cloning the repo first. Its
-`LogonCommand` downloads the repo via `sandbox-bootstrap.ps1`, enables Developer
-Mode and reduces Defender scanning for you (one UAC prompt -- click **Yes**),
-runs `setup.ps1 -All`, rejects nonzero exit codes and `FAIL:` markers, runs
+Double-clicking `windows-sandbox.wsb` is equivalent. Its `LogonCommand` runs the
+checked-out local `sandbox-run.ps1` from a read-only mapped folder, enables
+Developer Mode and reduces Defender scanning for you (one UAC prompt -- click
+**Yes**), copies the mapped repo into the sandbox user profile, runs
+`setup.ps1 -All`, rejects nonzero exit codes and `FAIL:` markers, runs
 `validate.ps1`, and leaves logs on the sandbox desktop. That single UAC prompt is
 the only thing you click.
 
-Supply-chain boundary: the `.wsb` `LogonCommand` intentionally downloads and
-executes the selected ref's `sandbox-bootstrap.ps1` from GitHub because it must
-be self-contained and run inside a disposable Windows Sandbox. This is a manual
-greenfield trust root, not a production setup recommendation; public setup docs
-use `git clone` plus local `setup`.
+Supply-chain boundary: the `.wsb` path does **not** download raw `main`, does
+not use `[scriptblock]::Create`, and does not execute a remote script. It maps a
+local checkout that you intentionally put at the commit/ref under review. The
+relative `HostFolder` works only on Windows builds that support relative Sandbox
+mappings; otherwise edit `HostFolder` to the absolute path of the checkout you
+intend to test.
 
 Windows Sandbox starts with no winget and no Scoop. That is intentional: it
 exercises the real Scoop-first bootstrap path. The `setup.ps1` Scoop path does
@@ -91,14 +92,24 @@ seeds or merges the Rose Pine + Hack Nerd Font settings into the portable
 (unpackaged) WT settings path; the greenfield portable helper remains as an
 idempotent safety net.
 
-By default the Sandbox downloads `main`. To test a PR or branch, edit
-`windows-sandbox.wsb` and change the `-Ref 'main'` argument in the
-`LogonCommand` to the branch name. If the PR changes the bootstrap script
-itself, also change the raw GitHub URL branch segment so the Sandbox runs that
-version of `sandbox-bootstrap.ps1`. The Neovim directory symlink needs Developer
-Mode, which the bootstrap enables via that one UAC prompt; if you decline it,
-enable Developer Mode manually (Settings -> Privacy & security -> For
-developers) and re-run `cd $env:USERPROFILE\dotfiles; .\setup.ps1 -SkipDeps`.
+To test a PR or branch, first put the mapped checkout at the exact state you
+intend to validate and record the full SHA:
+
+```powershell
+git fetch origin pull/<PR>/head
+git checkout --detach <full-40-character-sha>
+git rev-parse HEAD
+```
+
+Then launch the `.wsb`. The Neovim directory symlink needs Developer Mode, which
+the Sandbox run enables via that one UAC prompt; if you decline it, enable
+Developer Mode manually (Settings -> Privacy & security -> For developers) and
+re-run `cd $env:USERPROFILE\dotfiles; .\setup.ps1 -SkipDeps`.
+
+Optional self-contained path: after installing Git inside the Sandbox, run
+`tests\greenfield\sandbox-bootstrap.ps1 -CommitSha <full-40-character-sha>`.
+That helper fetches the exact commit, verifies `git rev-parse HEAD`, then runs
+the checked-out local `sandbox-run.ps1`.
 
 Fallbacks:
 

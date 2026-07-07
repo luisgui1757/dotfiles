@@ -127,12 +127,13 @@ which activates the declarative Homebrew casks (WezTerm, AeroSpace) + Herdr brew
 and the nix-owned CLI package set. The flake resolves the real invoking user
 from `SUDO_USER` before `USER`, so Homebrew/Home Manager do not target `root`
 during sudo activation. First-run bootstrap is also pinned: setup derives the
-locked nix-darwin rev from `flake.lock` before running `sudo nix run
-github:nix-darwin/nix-darwin/<locked-rev>#darwin-rebuild -- ...`; it never uses
-the mutable `nix-darwin` registry alias. On Linux/WSL, `./setup.sh
+locked nix-darwin rev and `narHash` from `flake.lock` before running
+`sudo nix run github:nix-darwin/nix-darwin/<locked-rev>?narHash=<encoded-narHash>#darwin-rebuild -- ...`;
+it never uses the mutable `nix-darwin` registry alias. On Linux/WSL, `./setup.sh
 --home-manager` applies the standalone Home Manager package set
 (`home-manager switch --flake .#<arch>-linux`; first-run bootstrap uses the
-locked `github:nix-community/home-manager/<locked-rev>#home-manager` ref). WSL
+locked `github:nix-community/home-manager/<locked-rev>?narHash=<encoded-narHash>#home-manager`
+ref). WSL
 writes only to the Linux `~/.nix-profile`, never `/mnt/c`. Both keep the native
 install-deps arms as the default — the Nix layer is additive. **nvim and the
 tree-sitter CLI stay native** (ABI-coupled to nvim-treesitter parser builds;
@@ -655,25 +656,25 @@ update PRs are intentionally not configured.
 |---|---|---|
 | GitHub Actions | Managed, digest-pinned, labeled `github-actions` | Actions are repo-owned CI inputs with stable Renovate support. |
 | GitHub runner images | Managed, labeled `github-runners`, reviewed separately | `ubuntu-*`, `macos-*`, and `windows-*` bumps can change the supported CI platform, so they should not be mixed with ordinary Action bumps. |
-| Repo-pinned installer versions/refs | Managed, labeled `pinned-downloads`, never automerged | Neovim Linux tarballs, chezmoi CI release archives, lazygit Linux tarballs, Starship Linux tarballs, tree-sitter CLI Linux archives, WezTerm Ubuntu `.deb`, Herdr Linux binaries, Hack Nerd Font, Windows Terminal portable zip, Ubuntu Ghostty, zsh plugin refs, tmux/psmux plugin refs, the Homebrew installer commit, the Renovate validator package/runtime, and the CI `cargo-binstall` commit are explicit repo pins. |
+| Repo-pinned installer versions/refs | Managed, labeled `pinned-downloads`, never automerged | Neovim Linux tarballs, chezmoi CI release archives, lazygit Linux tarballs, Starship Linux tarballs, tree-sitter CLI Linux archives, WezTerm Ubuntu `.deb`, Herdr Linux binaries, Hack Nerd Font, Windows Terminal portable zip, Ubuntu Ghostty, zsh plugin refs, tmux/psmux plugin refs, the Homebrew installer commit, the Scoop installer commit, the Renovate validator package/runtime, and the CI `cargo-binstall` commit are explicit repo pins. |
 | Adjacent SHA-256 / commit constants | Not managed; matched only as regex context | Renovate can bump the version/ref but cannot recompute archive/script hashes or verify tag commit IDs. CI must fail until a human recomputes and reviews them. |
 | Package-manager catalogs | Not managed | Brew, apt, dnf, pacman, zypper, apk, Scoop, winget, and choco entries are package names/IDs, not repo version pins. Let the package manager resolve current versions. |
 | Neovim plugin and Mason tools | Not managed | `lazy-lock.json` is refreshed with Lazy and tested as editor behavior; Mason intentionally has no machine-pinned lockfile. |
 
-Direct network executables must either be pinned and verified before execution
-or appear in the reviewed static allowlist with a rationale. The remaining
-package-manager bootstrap trust root is Scoop's official installer on Windows;
-it is consent-gated and guarded by
-`tests/static/supply_chain_remote_execution_test.sh`. Homebrew bootstrap is
-downloaded from a pinned installer commit and SHA-256 verified before
-execution. Recommended setup docs use `git clone` plus local `setup`, not raw
-`curl | bash`/`iwr` execution of the current default branch.
+Direct network executables must be pinned and verified before execution, or be a
+reviewed exception whose verification is proved by the static scanner. Scoop
+bootstrap on Windows now downloads `ScoopInstaller/Install` from a pinned commit,
+verifies the installer SHA-256, then executes the local temp file (using
+`-RunAsAdmin` only for elevated CI). Homebrew bootstrap is downloaded from a
+pinned installer commit and SHA-256 verified before execution. Recommended setup
+docs use `git clone` plus local `setup`, not raw `curl | bash`/`iwr` execution of
+the current default branch.
 
 Direct-download SHA-256 values for Neovim tarballs, chezmoi CI release archives,
 lazygit tarballs, Starship tarballs, tree-sitter CLI archives, the WezTerm
 Ubuntu `.deb`, Herdr Linux binaries, Hack Nerd Font, the Windows Terminal
-portable zip, the Ubuntu Ghostty installer, Homebrew installer script, and the
-CI `cargo-binstall` installer script are
+portable zip, the Ubuntu Ghostty installer, Homebrew installer script, Scoop
+installer script, and the CI `cargo-binstall` installer script are
 intentionally human-reviewed. zsh plugin tag commits and tmux/psmux plugin
 commits are also human-reviewed because the installers verify the checked-out
 commit after cloning/fetching. Do not capture direct-download
@@ -838,12 +839,13 @@ stale; CI then fails verification until a human reviews the adjacent constant.
   fragment so Rose Pine and Hack Nerd Font are present before first launch. A
   bare `chezmoi apply` runs the packaged merge but does not create setup's
   backup or the portable seed/mirror.
-- **Windows CI installs Scoop through its documented elevated path.** GitHub
+- **Windows CI installs Scoop through a pinned, verified elevated path.** GitHub
   Windows runners are elevated, and Scoop blocks elevated bootstrap by default.
-  `install-deps.ps1` detects elevation and runs the official installer with
-  `-RunAsAdmin`, then refreshes the current-process Scoop shims path so later
-  installs can use `scoop` immediately. Existing Scoop installs also get the
-  `extras` and `nerd-fonts` buckets normalized before catalog installs.
+  `install-deps.ps1` downloads `ScoopInstaller/Install` at a pinned commit,
+  verifies the installer SHA-256, runs it with `-RunAsAdmin` only when elevated,
+  then refreshes the current-process Scoop shims path so later installs can use
+  `scoop` immediately. Existing Scoop installs also get the `extras` and
+  `nerd-fonts` buckets normalized before catalog installs.
   Chezmoi's Windows nvim directory symlink still uses the elevated/native
   CreateSymbolicLink path. For local machines, Developer Mode plus a normal
   PowerShell remains the recommended setup path.

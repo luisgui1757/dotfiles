@@ -39,7 +39,7 @@ repeatable instead of tribal.
   so the apply-script verifier compares exact set membership.
 - Post-fix audit hardening added regression coverage for POSIX uninstall
   dry-run immutability, mirrored chezmoi/Starship/tree-sitter pins,
-  required-check list duplication, and the Windows Sandbox bootstrap trust root.
+  required-check list duplication, and the Windows Sandbox bootstrap boundary.
 - The tmux/psmux Rose Pine bar is now ONE repo-owned generated artifact sourced
   on BOTH platforms (PRs #39 / #41): `tmux/psmux-rose-pine.ps1` renders
   `tmux/psmux-rose-pine.{main,moon,dawn}.conf`, and both POSIX tmux
@@ -148,7 +148,7 @@ Commit-by-commit status:
   `mutableTaps = false`); homebrew module (`autoUpdate = false`, `upgrade = false`,
   `cleanup = "check"`); casks WezTerm + AeroSpace; brews Herdr + selected CLI; Home
   Manager packages-only; consent-gated `sudo darwin-rebuild switch` in setup.sh
-  with first-run bootstrap pinned to the locked nix-darwin rev.
+  with first-run bootstrap pinned to the locked nix-darwin rev plus `narHash`.
 - **Commit 6 - Linux/WSL Home Manager packages-only — DONE.** HM standalone for
   native Linux + WSL userland (`homeConfigurations."<arch>-linux"`); packages
   only; `setup.sh --home-manager` opt-in; split-host WSL preserved (writes only
@@ -179,6 +179,19 @@ Commit-by-commit status:
   coverage for WezTerm/AeroSpace/Nix suites, Renovate managers for WezTerm +
   Herdr pins, Herdr direct-artifact provenance/update ownership, and setup-test
   robustness for bootstrap dispatch/sentinels/deferred-tool regexes.
+- **Integrated final hardening — DONE.** Accepted Codex/Fable supply-chain fixes
+  folded into this branch: Windows Scoop bootstrap now downloads
+  `ScoopInstaller/Install` from a pinned commit, verifies SHA-256, then executes
+  the local temp file while preserving elevated `-RunAsAdmin`; Windows Sandbox no
+  longer remote-evals raw `main` and instead runs a mapped local checkout (the
+  optional self-contained helper requires a full commit SHA and verifies
+  `git rev-parse HEAD`); the supply-chain static scanner removed the old
+  allowlists and proves the remaining cargo-binstall CI exception has immediate
+  SHA-256 verification; Nix first-run refs include both locked rev and locked
+  `narHash`; cheap guardrails now cover macOS vendor-tool e2e presence, Windows
+  gh-dash config apply, deterministic zsh vi-mode/fzf-tab behavior, cursor-hook
+  ordering before Starship, and the PowerShell psmux OnIdle no-EditMode reset
+  invariant.
 
 Each commit flips its own status to DONE in the same commit that lands it, per
 the repo's doc-discipline rule.
@@ -605,7 +618,8 @@ Canonical solution:
 
 ### 2. Mutable remote installer scripts still execute in first-run paths
 
-Status: fixed in `audit/full-roadmap-review-2026-06-18`.
+Status: fixed; final Scoop/Sandbox mutable trust-root removal folded on
+2026-07-07 in `feat/platform-nix-tooling-mega`.
 
 Evidence:
 
@@ -617,7 +631,15 @@ Evidence:
 - `install-deps.sh` no longer pipes the Starship installer into `sh`; native
   Linux/WSL without brew uses pinned Starship release archives with SHA-256
   verification, while Alpine uses its native package.
-- `install-deps.ps1:157` downloads `https://get.scoop.sh` and executes it.
+- `install-deps.ps1` no longer downloads `https://get.scoop.sh`; it downloads
+  `ScoopInstaller/Install` at a full commit SHA, verifies the installer
+  SHA-256, then executes the local temp file.
+- `tests/greenfield/windows-sandbox.wsb` no longer downloads raw `main` or
+  executes `[scriptblock]::Create(...)`; it maps a local checkout and runs the
+  checked-out `sandbox-run.ps1`.
+- `tests/greenfield/sandbox-bootstrap.ps1` no longer downloads branch ZIPs; the
+  optional self-contained path requires a full commit SHA, fetches that object,
+  verifies `git rev-parse HEAD`, then executes the checked-out local script.
 - CI no longer runs the Starship installer script as fallback; it downloads the
   pinned Starship release tarball and verifies SHA-256 before extraction.
 - CI no longer runs `get.chezmoi.io`; POSIX parity jobs use
@@ -632,29 +654,28 @@ Evidence:
 
 Risk:
 
-The repo has two supply-chain standards at once. Direct archives and some
-installer scripts are pinned and hash-checked, while package-manager/bootstrap
-scripts remain mutable trust roots. A compromised upstream script or transient
-server response becomes code execution during setup.
+Resolved: first-run executable downloads now use pinned artifacts or pinned
+installer scripts with SHA-256 verification before execution. The static scanner
+fails on future mutable remote-eval or unverified downloaded-script execution.
 
 Resolution:
 
 1. Repository policy now requires direct network executables to be pinned and
-   verified, or explicitly allowlisted with a rationale.
+   verified before execution; any static allowlist entry must itself be a
+   pinned+verified case with the verification proved by the test.
 2. Native Linux chezmoi moved from `get.chezmoi.io` script execution to a
    SHA-256-verified release artifact.
 3. The Starship curl installer fallback was replaced by SHA-256-verified
    release artifacts on native Linux/WSL without brew.
 4. `tests/static/supply_chain_remote_execution_test.sh` rejects new
-   `curl | sh`, `sh -c "$(curl ...)"`, raw `/tmp/*install*.sh` execution, and
-   PowerShell `scriptblock::Create` execution unless the exact line appears in
-   the reviewed allowlist.
+   `curl | sh`, `sh -c "$(curl ...)"`, raw `/tmp/*install*.sh` execution,
+   `Invoke-Expression` / `iex`, PowerShell `scriptblock::Create` execution, and
+   downloaded PowerShell script execution without an intervening SHA-256 check.
 5. CI Starship, tree-sitter CLI, and chezmoi installs now use SHA-256-verified
    release artifacts.
-6. The remaining mutable installer trust roots are Scoop bootstrap on Windows
-   (consent-gated package-manager bootstrap) and the documented disposable
-   Windows Sandbox self-bootstrap path; both are explicit in the static
-   allowlist.
+6. The previous mutable Scoop and Windows Sandbox trust roots were removed from
+   the static allowlist; only the pinned+verified cargo-binstall CI script
+   remains allowlisted, with immediate SHA-256 verification proved by the test.
 
 ## P1 - Greenfield Proof
 
@@ -664,23 +685,26 @@ Status: done.
 
 Evidence:
 
-- `tests/greenfield/windows-sandbox.wsb` now downloads the bootstrap from
-  `main` and passes `-Ref 'main'` by default.
-- `tests/greenfield/sandbox-bootstrap.ps1` now defaults `$Ref` to `main`.
+- `tests/greenfield/windows-sandbox.wsb` now maps a local checkout and executes
+  checked-out local repo code; it does not download raw `main`.
+- `tests/greenfield/sandbox-bootstrap.ps1` has no default branch; the optional
+  self-contained helper requires a full commit SHA and verifies
+  `git rev-parse HEAD` before executing the checked-out local script.
 - `tests/greenfield/README.md` and `tests/greenfield/RUNBOOK.md` document the
-  explicit PR/branch override path.
+  explicit PR/branch/commit selection path.
 - `tests/static/stale_greenfield_refs_test.sh` fails if the retired pilot
   branch name appears outside archived historical docs.
 
 Risk:
 
-Resolved: advertised clean-machine proofs now test `main` unless a reviewer
-explicitly opts into a PR/branch override.
+Resolved: advertised clean-machine proofs now test an intentionally selected
+local checkout or full commit SHA, never an implicit mutable branch.
 
 Canonical solution:
 
-1. DONE - Default every greenfield script and runbook path to `main`.
-2. DONE - Add an explicit `-Ref` or documented URL edit for PR validation.
+1. DONE - Removed implicit mutable `main` execution from the Sandbox path.
+2. DONE - Add an explicit full commit SHA / local checkout selection path for PR
+   validation.
 3. DONE - Add a cheap static test for the retired branch name outside archived
    historical docs.
 4. ENVIRONMENTAL - Run the Windows Sandbox path once on a Windows host and append
