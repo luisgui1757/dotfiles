@@ -236,6 +236,49 @@ that violates one of these, fix it instead of disabling the test.
       `PowerShell.OnIdle` re-apply also re-asserts these handlers but does NOT
       re-set EditMode (that would wipe PSFzf's Ctrl+R/T + Alt+C chords). Guarded
       by the vi-mode `It` blocks in `tests/powershell/Profile.Tests.ps1`.
+22. **Nix owns POSIX packages only; chezmoi owns every dotfile target; native
+    Windows stays non-Nix.** The Nix layer (nix-darwin + declarative Homebrew on
+    macOS, Home Manager standalone on Linux/WSL userland) is a *package* provider.
+    It never owns a config file. These five sub-rules are the load-bearing
+    boundaries, guarded statically by `tests/static/nix_architecture_test.sh` (and,
+    for the update-mode rule, `tests/shell/install_deps_update_test.sh`):
+    - **(a) chezmoi-only dotfile ownership.** Exactly one owner per path. Every
+      dotfile target on every OS is owned by chezmoi (the `home/` source tree).
+      No Nix file may write a dotfile that chezmoi manages — not zsh, nvim, tmux,
+      starship, wezterm, aerospace, lazygit, lsd, gh-dash, ghostty, powershell, or
+      any other config surface. If Nix and chezmoi ever co-own a path, that is the
+      bug.
+    - **(b) Home Manager / nix-darwin is packages-only.** No `home.file`, no
+      `xdg.configFile`, no `xdg.dataFile`, no `home.activation` that writes config,
+      and no `programs.<tool>.enable` config-generating module for a chezmoi-owned
+      tool (`programs.home-manager` is the only allowed `programs.*`). Home Manager
+      declares `home.packages` (plus the minimal `home.username` /
+      `home.homeDirectory` / `home.stateVersion`) and nothing that renders a
+      shell/editor/terminal config file. GUI / TCC-sensitive apps (WezTerm,
+      AeroSpace, Herdr) come from vendor channels (Homebrew casks / pinned
+      artifacts), never nixpkgs.
+    - **(c) native Windows is non-Nix.** Windows-host files are `setup.ps1` +
+      native package managers (Scoop/winget/choco) + chezmoi. Nix has no supported
+      native-Windows story; it applies to WSL2 *userland* only and must never
+      touch Windows-host paths under `/mnt/c`. No `.nix` file references a Windows
+      path (`/mnt/c`, `C:\`, `%USERPROFILE%`, `AppData`), and `setup.ps1` /
+      `install-deps.ps1` never invoke `nix`, `darwin-rebuild`, or `home-manager`.
+    - **(d) no remote-eval installer.** The repo never adds a `curl | sh`,
+      `irm | iex`, `Invoke-Expression`, or `nix-installer`/`install.determinate.systems`
+      pipe-to-shell path for Nix (or anything else). The *host* proving machine
+      installed Nix from the notarized Determinate `.pkg` (signature + SHA-256
+      verified) — that provenance-checked, non-piped install is a host operation,
+      not repo code. Repo-side Nix bootstrap docs use verified artifacts, never a
+      mutable remote script. (Also covered by
+      `tests/static/supply_chain_remote_execution_test.sh`.)
+    - **(e) Nix owner reporting in update mode.** When `--update` resolves a tool
+      whose executable lives under a Nix profile/store path
+      (`/nix/store`, `~/.nix-profile`, `/run/current-system/sw`,
+      `/etc/profiles/per-user`, or a `nix profile` link), it reports the truthful
+      `owner=nix` status in the same stable vocabulary as the other owners. It
+      must NOT run a blanket `nix profile upgrade '.*'` and must NOT silently
+      rewrite `flake.lock`; the pinned lock is bumped only by an explicit,
+      documented switch flag.
 
 ## Common workflows
 

@@ -74,7 +74,7 @@ Sequenced PRs (split for independent, revertable blast radius):
   zsh + PowerShell + both installers (cached, no-`Invoke-Expression` PowerShell
   init); `gh` + pinned `gh-dash` extension (`v4.25.0`) with a chezmoi-managed
   same-path config and Renovate / pin-consistency coverage.
-- **PR-2 `feat/vi-mode` - IN PROGRESS (this branch).** zsh (`bindkey -v`) +
+- **PR-2 `feat/vi-mode` - DONE (merged as #43).** zsh (`bindkey -v`) +
   PSReadLine (`-EditMode Vi`) command-line vi-mode with a full re-bind matrix
   that preserves the invariant-13 fzf-tab / history stack: vi mode is enabled
   BEFORE the completion/keybinding region (zsh) and BEFORE the key handlers
@@ -99,6 +99,62 @@ Sequenced PRs (split for independent, revertable blast radius):
 - **PR-7 `feat/nix-linux`** - Home Manager standalone on Ubuntu/WSL userland;
   per-tool apt / pinned-artifact -> nix handoff (nvim last, for ABI reasons);
   native install arms retire only after green e2e + greenfield-ledger evidence.
+
+### Mega-PR: `feat/platform-nix-tooling-mega` (2026-07-07)
+
+PR-3 through PR-7 are being delivered together in ONE branch/PR
+(`feat/platform-nix-tooling-mega`) because the terminal/tooling configs
+(WezTerm, AeroSpace, Herdr) are the concrete packages the Nix layers then own,
+and shipping them separately would mean the Nix casks/brews reference configs
+that do not exist yet. The proving host is this macOS machine: Nix was installed
+via the notarized Determinate `v3.21.2` `.pkg` (signature + SHA-256 verified, no
+remote-eval), so `flake.lock` and `nix flake check` are generated and verified
+for real rather than hand-written.
+
+Architecture ruling held for every phase: **chezmoi is the only owner of every
+dotfile target on every OS**; Home Manager / nix-darwin own **packages only** (no
+`home.file`, no `xdg.configFile`, no HM-generated shell/editor/terminal config);
+native Windows stays **non-Nix** (`setup.ps1` + native package managers + chezmoi;
+Nix touches WSL userland only, never `/mnt/c`). GUI / TCC-sensitive apps come
+from vendor channels (casks / pinned artifacts), never nixpkgs.
+
+Commit-by-commit status:
+
+- **Commit 1 - docs/status guardrail — DONE.** PR-2 marked DONE; this section
+  added; CLAUDE.md invariant 22 (chezmoi-only ownership, HM packages-only,
+  native-Windows-non-Nix, no-remote-eval installer, Nix owner reporting in update
+  mode); `tests/static/nix_architecture_test.sh` enforces the file-ownership
+  disjointness and no-Windows-path rules statically.
+- **Commit 2 - WezTerm — PLANNED.** Canonical `wezterm/wezterm.lua`, chezmoi
+  mirror, same-path deploy on POSIX + Windows (WSL-gated off like ghostty), Rose
+  Pine + transparency + Hack Nerd Font parity, shell = zsh (POSIX login shell) /
+  pwsh.exe (Windows), no tmux auto-launch. Packaging: brew cask (macOS),
+  Scoop/winget/choco (Windows), pinned official `.deb` with SHA-256 (native
+  Ubuntu). Tests: Lua smoke (stubbed `require`), parity row, no-auto-launch static
+  assertion, installer provenance.
+- **Commit 3 - AeroSpace + Herdr — PLANNED.** AeroSpace (macOS-only tap cask,
+  `start-at-login`, reserved-chord-safe keymap avoiding Alt-h/j/k/l and Alt-c),
+  `aerospace/aerospace.toml` + chezmoi mirror, TOML lint. Herdr (macOS/Linux only,
+  Homebrew/Linuxbrew formula; native Windows blocked by tests + docs).
+- **Commit 4 - Nix skeleton — PLANNED.** `flake.nix` + committed `flake.lock`
+  (zero ownership), devShell + `checks`, `nix flake check` CI on Ubuntu + macOS,
+  Renovate `nix` manager, disjointness static tests.
+- **Commit 5 - nix-darwin + declarative Homebrew — PLANNED.**
+  `darwinConfigurations` with `system.primaryUser`; nix-homebrew (pinned taps,
+  `mutableTaps = false`); homebrew module (`autoUpdate = false`, `upgrade = false`,
+  `cleanup = "check"`); casks WezTerm + AeroSpace; brews Herdr + selected CLI; Home
+  Manager packages-only; consent-gated `darwin-rebuild switch` in setup.sh.
+- **Commit 6 - Linux/WSL Home Manager packages-only — PLANNED.** HM standalone for
+  native Linux + WSL userland; packages only; split-host WSL preserved; native
+  install arms retained (nvim migration intentionally deferred with proof — see
+  the phase notes).
+- **Commit 7 - setup/update ownership integration — PLANNED.** Unix update
+  ownership recognizes Nix-owned tools (`owner=nix`); no blanket
+  `nix profile upgrade`; no silent `flake.lock` rewrite; explicit documented +
+  tested Nix switch flag.
+
+Each commit flips its own status to DONE in the same commit that lands it, per
+the repo's doc-discipline rule.
 
 ## P0 - Total Update Ownership Model
 
