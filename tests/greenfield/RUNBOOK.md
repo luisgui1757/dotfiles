@@ -134,6 +134,8 @@ ssh admin@$(tart ip dotfiles-macos)
 Inside the VM:
 
 ```bash
+# Install Nix first through a verified host-appropriate installer; this repo
+# intentionally does not run a pipe-to-shell Nix bootstrap.
 git clone https://github.com/luisgui1757/dotfiles ~/dotfiles
 cd ~/dotfiles
 git fetch --depth 1 origin <full-40-character-sha>
@@ -163,6 +165,8 @@ ssh <user>@$(tart ip dotfiles-linux)
 Inside the VM:
 
 ```bash
+# Install Nix first through a verified host-appropriate installer; this repo
+# intentionally does not run a pipe-to-shell Nix bootstrap.
 git clone https://github.com/luisgui1757/dotfiles ~/dotfiles
 cd ~/dotfiles
 git fetch --depth 1 origin <full-40-character-sha>

@@ -44,7 +44,7 @@ EOF
 
 chmod +x "$TMP_ROOT/brewbin/brew" "$TMP_ROOT/home/.linuxbrew/bin/nvim"
 
-output="$(HOME="$TMP_ROOT/home" SETUP_TEST_ROOT="$TMP_ROOT" PATH="$TMP_ROOT/brewbin:/usr/bin:/bin" bash "$TMP_ROOT/setup.sh" --skip-bootstrap --skip-agents </dev/null)"
+output="$(HOME="$TMP_ROOT/home" SETUP_TEST_ROOT="$TMP_ROOT" PATH="$TMP_ROOT/brewbin:/usr/bin:/bin" bash "$TMP_ROOT/setup.sh" --skip-deps --skip-bootstrap --skip-agents </dev/null)"
 
 [[ "$output" == *"Phase 3/6: restore Neovim plugins"* ]]
 [[ "$output" == *"Phase 4/6: install Tree-sitter parsers"* ]]

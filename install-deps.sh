@@ -41,6 +41,9 @@ FZF_TAB_COMMIT="d7e0234614dbe5369fdd760907d12c0e05a4dccc"
 ZSH_AUTOSUGGESTIONS_VERSION="v0.7.1"
 ZSH_AUTOSUGGESTIONS_COMMIT="e52ee8ca55bcc56a17c828767a3f98f22a68d4eb"
 GH_DASH_VERSION="v4.25.0"   # dlvhdr/gh-dash pinned gh-extension tag; mirror in install-deps.ps1 ($GhDashVersion)
+PI_CLI_PACKAGE="@earendil-works/pi-coding-agent"
+PI_CLI_VERSION="0.80.3"
+PI_CLI_INTEGRITY="sha512-TIggw9gCXpA+Ph7OjdTA7ka2NPwTVuPmy39KDSyUzaKq8VvHfMGR7vtRz4JB7Um/RMRblmzhu4p9tUCk6MTgGA=="
 TPM_COMMIT="e261deb1b47614eed3400089ce7197dc68acc4eb"
 # Functional tmux plugins (Omer-style set). The Rose Pine status bar is NOT a
 # plugin here -- it is a repo-owned generated config (tmux/psmux-rose-pine.ps1),
@@ -1665,6 +1668,69 @@ ensure_npm() {
     esac
 }
 
+pi_cli_node_ready() {
+    command -v node >/dev/null 2>&1 || return 1
+    node -e 'const [maj,min]=process.versions.node.split(".").map(Number); process.exit(maj > 22 || (maj === 22 && min >= 19) ? 0 : 1)' >/dev/null 2>&1
+}
+
+pi_cli_version() {
+    command -v pi >/dev/null 2>&1 || return 1
+    pi --version 2>/dev/null | awk 'NF { print $1; exit }'
+}
+
+verify_pi_cli_npm_integrity() {
+    local got
+    got="$(npm view "${PI_CLI_PACKAGE}@${PI_CLI_VERSION}" dist.integrity --silent 2>/dev/null | awk 'NF { print $1; exit }')"
+    if [[ "$got" != "$PI_CLI_INTEGRITY" ]]; then
+        printf "  FAIL: %-26s npm integrity mismatch for %s@%s\n" "pi" "$PI_CLI_PACKAGE" "$PI_CLI_VERSION" >&2
+        printf "        expected %s\n" "$PI_CLI_INTEGRITY" >&2
+        printf "        got      %s\n" "${got:-<empty>}" >&2
+        return 1
+    fi
+}
+
+install_pi_cli() {
+    local current node_version
+    current="$(pi_cli_version || true)"
+    if [[ "$current" == "$PI_CLI_VERSION" ]]; then
+        printf "  ok        %-26s already installed (%s)\n" "pi" "$PI_CLI_VERSION"
+        return 0
+    fi
+    if ! command -v npm >/dev/null 2>&1; then
+        printf "  skipped   %-26s npm is not installed\n" "pi"
+        return 0
+    fi
+    if ! pi_cli_node_ready; then
+        node_version="$(node --version 2>/dev/null || printf 'unknown')"
+        printf "  skipped   %-26s requires Node >= 22.19.0; current node is %s\n" "pi" "$node_version"
+        echo "            public POSIX setup supplies Node 24 through the Nix package layer"
+        return 0
+    fi
+    if ! ask "Install Pi CLI (${PI_CLI_PACKAGE}@${PI_CLI_VERSION}, npm integrity verified)?"; then
+        printf "  skipped   %-26s\n" "pi"
+        return 0
+    fi
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        echo "  would: npm view ${PI_CLI_PACKAGE}@${PI_CLI_VERSION} dist.integrity"
+        echo "         expect $PI_CLI_INTEGRITY"
+        echo "  would: npm install -g --prefix \"$HOME/.local\" ${PI_CLI_PACKAGE}@${PI_CLI_VERSION}"
+        return 0
+    fi
+    verify_pi_cli_npm_integrity || return 1
+    mkdir -p "$HOME/.local"
+    if ! npm install -g --prefix "$HOME/.local" "${PI_CLI_PACKAGE}@${PI_CLI_VERSION}"; then
+        printf "  FAIL: %-26s npm install failed for %s@%s\n" "pi" "$PI_CLI_PACKAGE" "$PI_CLI_VERSION" >&2
+        return 1
+    fi
+    ensure_local_bin_on_path
+    current="$(pi_cli_version || true)"
+    if [[ "$current" != "$PI_CLI_VERSION" ]]; then
+        printf "  FAIL: %-26s expected %s after install, got %s\n" "pi" "$PI_CLI_VERSION" "${current:-<missing>}" >&2
+        return 1
+    fi
+    printf "  installed %-26s %s\n" "pi" "$PI_CLI_VERSION"
+}
+
 install_chezmoi() {
     if have chezmoi && [[ "${DOTFILES_DIRECT_ARTIFACT_REINSTALL:-0}" != "1" ]]; then
         printf "  ok        %-26s already installed\n" "chezmoi"
@@ -2976,10 +3042,10 @@ pm_update() {
 # A resolved executable is Nix-owned when its command source (or its real path)
 # lives under a Nix store / profile path. Update mode reports these as
 # owner=nix and does NOT try to update them: Nix-owned tools are refreshed
-# through the OPT-IN Nix layer (setup.sh --nix-darwin / --home-manager, or a
-# reviewed flake.lock bump), never a blanket `nix profile upgrade` and never a
-# silent flake.lock rewrite. Every other tool keeps its existing per-manager
-# ownership -- this only fires when PATH actually resolves the tool from Nix.
+# through the enforced POSIX Nix layer (`setup.sh`, or a reviewed flake.lock
+# bump), never a blanket `nix profile upgrade` and never a silent flake.lock
+# rewrite. Every other tool keeps its existing per-manager ownership -- this
+# only fires when PATH actually resolves the tool from Nix.
 nix_owns_tool_source() {
     local source="$1" real
     [[ -n "$source" ]] || return 1
@@ -3018,7 +3084,7 @@ update_catalog_tool() {
     fi
 
     if nix_owns_tool_source "$source"; then
-        printf "  skipped   %-26s owner=nix reason=managed by the Nix layer (setup.sh --nix-darwin/--home-manager or a reviewed flake.lock bump) source=%s\n" "$tool" "$source"
+        printf "  skipped   %-26s owner=nix reason=managed by the Nix layer (setup.sh or a reviewed flake.lock bump) source=%s\n" "$tool" "$source"
         return 0
     fi
 
@@ -3732,6 +3798,7 @@ install_dependency_scan_items() {
         "code|command|code" \
         "python3|command|python3" \
         "node|command|node" \
+        "pi|command|pi" \
         "tree-sitter|command|tree-sitter" \
         "shellcheck|command|shellcheck" \
         "jq|command|jq" \
@@ -4023,6 +4090,7 @@ ensure_python_pip_venv
 install_pylatexenc_converter
 install node "needed by prettier and JS tooling"
 ensure_npm
+install_pi_cli
 install_tree_sitter_cli
 
 if is_wsl; then

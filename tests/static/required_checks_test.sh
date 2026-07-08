@@ -25,6 +25,19 @@ ruleset="$tmp/ruleset.txt"
     }
   ' .github/workflows/test.yml
 
+  awk '
+    /^[[:space:]]*os:[[:space:]]*\[/ {
+      line = $0
+      sub(/^[^[]*\[/, "", line)
+      sub(/\].*$/, "", line)
+      n = split(line, values, ",")
+      for (i = 1; i <= n; i++) {
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", values[i])
+        if (values[i] != "") print "nix flake check (" values[i] ")"
+      }
+    }
+  ' .github/workflows/nix.yml
+
   awk '/^[[:space:]]*- id:/ { print "e2e containers / " $3 }' \
     .github/workflows/e2e-install.yml
 

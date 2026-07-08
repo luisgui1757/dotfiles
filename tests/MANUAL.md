@@ -86,6 +86,9 @@ significant change to the relevant area.
       setup/install-deps after authenticating). Then `gh dash` renders the
       dashboard (My Pull Requests / Needs My Review / My Issues) with Nerd Font
       icons.
+- [ ] **Pi CLI**: `pi --version` prints `0.80.3` on macOS, Linux/WSL, and
+      Windows. Confirm `.pi/` session/auth state stays local and is not created
+      or modified by chezmoi.
 
 ## Command-line vi mode
 
@@ -106,13 +109,14 @@ significant change to the relevant area.
       the ListView history prediction is back, and the PSFzf `Ctrl+R` picker
       still works (the re-apply must NOT have wiped the fzf chords).
 
-## Nix layer (macOS opt-in)
+## Nix layer (enforced on macOS/Linux/WSL)
 
 - [ ] **`nix flake check`**: on a Nix host run `nix flake check` at the repo root
       — it evaluates `darwinConfigurations.dotfiles` (build skipped) and builds
       `checks.<system>.toolchain`, exit 0.
-- [ ] **nix-darwin bootstrap/switch**, macOS: with Nix installed, run
-      `./setup.sh --nix-darwin` (equivalent activation:
+- [ ] **nix-darwin bootstrap/switch**, macOS: on Apple silicon with Nix installed, run
+      `./setup.sh --all` (or the compatibility alias `./setup.sh --nix-darwin`;
+      equivalent activation:
       `sudo darwin-rebuild switch --flake .#dotfiles --impure`; first-run setup
       derives the locked
       `github:nix-darwin/nix-darwin/<rev>?narHash=<encoded-narHash>#darwin-rebuild`
@@ -122,16 +126,26 @@ significant change to the relevant area.
       declarative Homebrew (no `brew update`/`upgrade`; `cleanup = check` only
       reports drift), and puts the nix-owned CLI set on PATH from
       `~/.nix-profile` / the system profile.
-- [ ] **Home Manager (Linux/WSL)**: with Nix installed, run
-      `./setup.sh --home-manager` (equivalent installed command:
+      If Homebrew already existed, confirm nix-homebrew auto-migrated the
+      Homebrew repositories while keeping installed packages. If the old
+      `/opt/homebrew/Library/Taps` directory existed, confirm setup moved it to
+      a `Taps.dotfiles-pre-nix-*` backup and nix-homebrew replaced it with the
+      declarative pinned tap symlink. Confirm `brew tap-info nikitabobko/tap`
+      reports a trusted tap so Homebrew 5 can load the AeroSpace cask.
+      The `DOTFILES_NIX_DARWIN_HOSTED_CI=1` cleanup override is only for
+      GitHub's disposable macOS runner; do not use it for this real-host check.
+- [ ] **Home Manager (Linux/WSL)**: with Nix installed inside the Linux/WSL
+      environment, run
+      `./setup.sh --all` (or the compatibility alias `./setup.sh --home-manager`;
+      equivalent installed command:
       `home-manager switch --flake .#$(uname -m)-linux --impure`; first-run
       setup derives the locked
       `github:nix-community/home-manager/<rev>?narHash=<encoded-narHash>#home-manager`
-      ref from `flake.lock`). Confirm the nix CLI set (ripgrep/fd/fzf/jq/lazygit/starship/
-      zoxide) lands in `~/.nix-profile/bin` with NO root, and that `nvim` +
+      ref from `flake.lock`). Confirm the nix CLI set (ripgrep/fd/fzf/jq/lazygit/node/
+      npm/starship/zoxide) lands in `~/.nix-profile/bin` with NO root, and that `nvim` +
       `tree-sitter` are still the native install-deps binaries (NOT nix) so
       parser builds keep working.
-- [ ] **WSL split-host under Home Manager**: on WSL, after `--home-manager`,
+- [ ] **WSL split-host under Home Manager**: on WSL, after `./setup.sh --all`,
       confirm nothing was written under `/mnt/c` — Home Manager touches only the
       Linux `~/.nix-profile`; Windows Terminal/fonts/WezTerm stay Windows-host.
 - [ ] **Nix owns packages, chezmoi owns config**: after the switch, `~/.config`
@@ -174,7 +188,7 @@ significant change to the relevant area.
       compiler OK. Open a Python file and confirm `python` parser highlighting
       works.
 - [ ] **Fresh WSL Ubuntu**: on Windows first run
-      `.\setup.ps1 -All`, then inside WSL run
+      `.\setup.ps1 -All`, then inside WSL install Nix and run
       `./setup.sh --all` and `./tests/wsl/e2e.sh`. Confirm the script passes:
       Windows Terminal uses Hack Nerd Font, `win32yank` is reachable, lazygit is
       installed on both sides, zsh plugins are installed in WSL, nvim starts,

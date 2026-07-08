@@ -36,6 +36,9 @@ $PylatexencBuildBackendSha256 = '062d34222ad13e0cc312a4c02d73f059e86a4acbfbdea8f
 $PylatexencVersion = '2.10'
 $PylatexencSha256 = '3dd8fd84eb46dc30bee1e23eaab8d8fb5a7f507347b23e5f38ad9675c84f40d3'
 $GhDashVersion = 'v4.25.0'   # dlvhdr/gh-dash pinned gh-extension tag; mirror in install-deps.sh (GH_DASH_VERSION)
+$PiCliPackage = '@earendil-works/pi-coding-agent'
+$PiCliVersion = '0.80.3'
+$PiCliIntegrity = 'sha512-TIggw9gCXpA+Ph7OjdTA7ka2NPwTVuPmy39KDSyUzaKq8VvHfMGR7vtRz4JB7Um/RMRblmzhu4p9tUCk6MTgGA=='
 # psmux session plugin (resurrect only) is vendored from the psmux/psmux-plugins
 # monorepo at this immutable commit. We do NOT use PPM: it clones the monorepo
 # HEAD (unpinned) and rewrites managed config files. (psmux-continuum is blocked
@@ -349,6 +352,7 @@ $BinaryName = @{
     make        = 'make'
     cmake       = 'cmake'
     node        = 'node'
+    pi          = 'pi'
     'tree-sitter' = 'tree-sitter'
     python      = 'python'
     zig         = 'zig'
@@ -519,6 +523,7 @@ function Get-InstallDependencySpec {
         'pwsh',
         'python',
         'node',
+        'pi',
         'tree-sitter',
         'zig',
         'win32yank',
@@ -530,7 +535,7 @@ function Get-InstallDependencySpec {
     )
     $emitted = @{}
     foreach ($tool in $toolOrder) {
-        if (($tool -eq 'scoop') -or ($tool -eq 'herdr') -or ($tool -eq 'psmux') -or $Catalog.ContainsKey($tool)) {
+        if (($tool -eq 'scoop') -or ($tool -eq 'herdr') -or ($tool -eq 'pi') -or ($tool -eq 'psmux') -or $Catalog.ContainsKey($tool)) {
             $emitted[$tool] = $true
             [pscustomobject]@{
                 Tool = $tool
@@ -2632,6 +2637,104 @@ function Install-TreeSitterCli {
     $script:InstallFailures += [pscustomobject]@{ Tool='tree-sitter'; Pm='scoop/npm'; Pkg='tree-sitter-cli'; ExitCode=$LASTEXITCODE }
 }
 
+function Get-PiCliVersion {
+    if (-not (Get-Command pi -ErrorAction SilentlyContinue)) { return '' }
+    try {
+        $line = @(& pi --version 2>$null | Select-Object -First 1)
+        if ($line.Count -eq 0) { return '' }
+        return ([string]$line[0]).Trim()
+    } catch {
+        return ''
+    }
+}
+
+function Test-PiCliCurrent {
+    return ((Get-PiCliVersion) -eq $PiCliVersion)
+}
+
+function Test-PiCliNodeReady {
+    if (-not (Get-Command node -ErrorAction SilentlyContinue)) { return $false }
+    try {
+        $versionText = @(& node -p "process.versions.node" 2>$null | Select-Object -First 1)
+        if ($LASTEXITCODE -ne 0 -or $versionText.Count -eq 0) { return $false }
+        return ([version](([string]$versionText[0]).Trim()) -ge [version]'22.19.0')
+    } catch {
+        return $false
+    }
+}
+
+function Test-PiCliNpmIntegrity {
+    if (-not (Get-Command npm -ErrorAction SilentlyContinue)) { return $false }
+    try {
+        $got = @(& npm view "$PiCliPackage@$PiCliVersion" dist.integrity --silent 2>$null | Select-Object -First 1)
+        if ($LASTEXITCODE -ne 0 -or $got.Count -eq 0) { return $false }
+        return (([string]$got[0]).Trim() -eq $PiCliIntegrity)
+    } catch {
+        return $false
+    }
+}
+
+function Add-NpmGlobalPrefixToPath {
+    try {
+        $prefix = @(& npm prefix -g 2>$null | Select-Object -First 1)
+        if ($LASTEXITCODE -ne 0 -or $prefix.Count -eq 0) { return }
+        $dir = ([string]$prefix[0]).Trim()
+        if (-not [string]::IsNullOrWhiteSpace($dir) -and (Test-Path -LiteralPath $dir -PathType Container)) {
+            Add-DirectoryToUserPath -Directory $dir
+        }
+    } catch { }
+}
+
+function Install-PiCli {
+    if (Test-PiCliCurrent) {
+        Write-Host ("  ok        {0,-26} already installed ({1})" -f "pi", $PiCliVersion)
+        return
+    }
+    if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
+        Write-Host ("  FAIL: {0,-26} npm is required to install {1}@{2}" -f "pi", $PiCliPackage, $PiCliVersion)
+        $script:InstallFailures += [pscustomobject]@{ Tool = 'pi'; Pm = 'npm'; Pkg = "$PiCliPackage@$PiCliVersion"; ExitCode = 'npm-missing' }
+        return
+    }
+    if (-not (Test-PiCliNodeReady)) {
+        $nodeVersion = Get-CommandVersionString -CommandName 'node'
+        Write-Host ("  FAIL: {0,-26} requires Node >= 22.19.0; current node is {1}" -f "pi", $nodeVersion)
+        $script:InstallFailures += [pscustomobject]@{ Tool = 'pi'; Pm = 'npm'; Pkg = "$PiCliPackage@$PiCliVersion"; ExitCode = 'node-too-old' }
+        return
+    }
+    if (-not (Ask "Install Pi CLI ($PiCliPackage@$PiCliVersion, npm integrity verified)?")) {
+        Write-Host ("  skipped   {0,-26}" -f "pi")
+        return
+    }
+    if ($DryRun) {
+        Write-Host "  would:    npm view $PiCliPackage@$PiCliVersion dist.integrity"
+        Write-Host "             expect $PiCliIntegrity"
+        Write-Host "  would:    npm install -g $PiCliPackage@$PiCliVersion"
+        return
+    }
+    if (-not (Test-PiCliNpmIntegrity)) {
+        Write-Host ("  FAIL: {0,-26} npm integrity mismatch for {1}@{2}" -f "pi", $PiCliPackage, $PiCliVersion)
+        $script:InstallFailures += [pscustomobject]@{ Tool = 'pi'; Pm = 'npm'; Pkg = "$PiCliPackage@$PiCliVersion"; ExitCode = 'integrity' }
+        return
+    }
+    $rc = 1
+    try {
+        & npm install -g "$PiCliPackage@$PiCliVersion"
+        $rc = $LASTEXITCODE
+    } catch {
+        Write-Warning ("Pi CLI install failed: " + $_.Exception.Message)
+        $rc = 1
+    }
+    Add-NpmGlobalPrefixToPath
+    if ($rc -eq 0 -and (Test-PiCliCurrent)) {
+        Write-Host ("  installed {0,-26} {1}" -f "pi", $PiCliVersion)
+        return
+    }
+    $actual = Get-PiCliVersion
+    if ([string]::IsNullOrWhiteSpace($actual)) { $actual = '<missing>' }
+    Write-Host ("  FAIL: {0,-26} expected {1} after install, got {2}" -f "pi", $PiCliVersion, $actual)
+    $script:InstallFailures += [pscustomobject]@{ Tool = 'pi'; Pm = 'npm'; Pkg = "$PiCliPackage@$PiCliVersion"; ExitCode = $rc }
+}
+
 function Get-VsWherePath {
     $programFilesX86 = ${env:ProgramFiles(x86)}
     if ([string]::IsNullOrWhiteSpace($programFilesX86)) { return '' }
@@ -2922,7 +3025,7 @@ function Invoke-InstallDepsUpdateMode {
 
     Write-UnmanagedDependencySummary
     Write-Host ""
-    Write-Host "note: pinned binaries (Neovim/lazygit/tree-sitter Linux archives, Hack Nerd Font, Windows Terminal portable, Herdr Windows preview), PSFzf, plugins, and configs update via git pull and re-running setup."
+    Write-Host "note: pinned binaries (Neovim/lazygit/tree-sitter Linux archives, Hack Nerd Font, Windows Terminal portable, Herdr Windows preview), Pi CLI, PSFzf, plugins, and configs update via git pull and re-running setup."
 }
 
 function Exit-InstallDepsIfFailures {
@@ -3036,6 +3139,7 @@ Section "language tooling (for LSP / formatter back-ends)"
 Install-Python
 Install-PylatexencConverter
 Install-One node
+Install-PiCli
 Install-TreeSitterCli
 Install-One zig
 Install-VsBuildToolsWhenAll

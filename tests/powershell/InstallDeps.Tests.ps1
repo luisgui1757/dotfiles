@@ -7,6 +7,9 @@ BeforeAll {
     function choco {}
     function wt {}
     function gh {}
+    function node {}
+    function npm {}
+    function pi {}
 
     $script:ImportInstallDepsForTest = {
         param([switch]$DryRun)
@@ -532,6 +535,15 @@ Describe "install-deps.ps1" {
         $Catalog['lsd'].choco | Should -Be 'lsd'
     }
 
+    It "keeps every Windows catalog entry mapped to a binary name" {
+        . $script:ImportInstallDepsForTest
+
+        foreach ($tool in $Catalog.Keys) {
+            $BinaryName.ContainsKey($tool) | Should -BeTrue -Because "$tool must have a Get-Command binary mapping"
+            [string]::IsNullOrWhiteSpace([string]$BinaryName[$tool]) | Should -BeFalse -Because "$tool binary mapping must not be blank"
+        }
+    }
+
     It "registers cmake in the Windows package catalog" {
         . $script:ImportInstallDepsForTest
 
@@ -648,6 +660,92 @@ Describe "install-deps.ps1" {
         $script:InstallFailures[0].Pm | Should -Be 'winget/choco/bootstrapper'
         $script:InstallFailures[0].Pkg | Should -Be 'Microsoft.VisualStudio.Workload.VCTools'
         $script:InstallFailures[0].ExitCode | Should -Be 57
+    }
+
+    It "registers the Pi CLI as a pinned npm-backed dependency" {
+        . $script:ImportInstallDepsForTest
+
+        $BinaryName['pi'] | Should -Be 'pi'
+        @((Get-InstallDependencySpec) | Where-Object { $_.Tool -eq 'pi' }).Count | Should -Be 1
+        $PiCliPackage | Should -Be '@earendil-works/pi-coding-agent'
+        $PiCliVersion | Should -Be '0.80.3'
+        $PiCliIntegrity | Should -Match '^sha512-'
+    }
+
+    It "dry-runs the Pi CLI with the pinned npm package and integrity" {
+        . $script:ImportInstallDepsForTest -DryRun
+        Mock -CommandName Test-PiCliCurrent -MockWith { return $false }
+        Mock -CommandName Test-PiCliNodeReady -MockWith { return $true }
+        Mock -CommandName Get-Command -MockWith {
+            param([string]$Name)
+            if ($Name -in @('npm', 'node')) { return [pscustomobject]@{ Name = $Name; Source = $Name } }
+            return $null
+        }
+
+        $output = & { Install-PiCli } 6>&1 | Out-String
+
+        $output | Should -Match 'npm view @earendil-works/pi-coding-agent@0\.80\.3 dist\.integrity'
+        $output | Should -Match ([regex]::Escape($PiCliIntegrity))
+        $output | Should -Match 'npm install -g @earendil-works/pi-coding-agent@0\.80\.3'
+    }
+
+    It "fails closed before installing Pi CLI when npm integrity mismatches" {
+        . $script:ImportInstallDepsForTest
+        Mock -CommandName Test-PiCliCurrent -MockWith { return $false }
+        Mock -CommandName Test-PiCliNodeReady -MockWith { return $true }
+        Mock -CommandName Get-Command -MockWith {
+            param([string]$Name)
+            if ($Name -in @('npm', 'node')) { return [pscustomobject]@{ Name = $Name; Source = $Name } }
+            return $null
+        }
+        Mock -CommandName npm -MockWith {
+            $global:LASTEXITCODE = 0
+            return 'sha512-not-the-pin'
+        } -ParameterFilter { $args[0] -eq 'view' }
+        Mock -CommandName npm -MockWith { throw "npm install must not run after integrity mismatch" } -ParameterFilter { $args[0] -eq 'install' }
+
+        $output = & { Install-PiCli } 6>&1 | Out-String
+
+        $output | Should -Match 'FAIL: pi\s+npm integrity mismatch'
+        $script:InstallFailures.Count | Should -Be 1
+        $script:InstallFailures[0].Tool | Should -Be 'pi'
+        $script:InstallFailures[0].ExitCode | Should -Be 'integrity'
+    }
+
+    It "installs the Pi CLI with npm after integrity verification" {
+        . $script:ImportInstallDepsForTest
+        $script:PiInstalled = $false
+        $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("pi-cli-test-" + [System.Guid]::NewGuid())
+        try {
+            New-Item -ItemType Directory -Force -Path $tempRoot | Out-Null
+            Mock -CommandName Test-PiCliCurrent -MockWith { return $script:PiInstalled }
+            Mock -CommandName Test-PiCliNodeReady -MockWith { return $true }
+            Mock -CommandName Test-PiCliNpmIntegrity -MockWith { return $true }
+            Mock -CommandName Get-Command -MockWith {
+                param([string]$Name)
+                if ($Name -in @('npm', 'node')) { return [pscustomobject]@{ Name = $Name; Source = $Name } }
+                return $null
+            }
+            Mock -CommandName npm -MockWith {
+                $script:PiInstalled = $true
+                $global:LASTEXITCODE = 0
+            } -ParameterFilter { $args[0] -eq 'install' }
+            Mock -CommandName npm -MockWith {
+                $global:LASTEXITCODE = 0
+                return $tempRoot
+            } -ParameterFilter { $args[0] -eq 'prefix' }
+            Mock -CommandName Add-DirectoryToUserPath -MockWith { }
+
+            $output = & { Install-PiCli } 6>&1 | Out-String
+
+            $output | Should -Match 'installed\s+pi\s+0\.80\.3'
+            $script:InstallFailures.Count | Should -Be 0
+            Should -Invoke -CommandName Add-DirectoryToUserPath -Times 1 -Exactly -ParameterFilter {
+                $Directory -eq $tempRoot
+            }
+        } finally {
+            Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
+        }
     }
 
     It "registers Windows Terminal in the Windows package catalog" {

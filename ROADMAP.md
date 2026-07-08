@@ -97,10 +97,11 @@ Sequenced PRs (split for independent, revertable blast radius):
 - **PR-6 `feat/nix-darwin`** - macOS host config: `darwinConfigurations` +
   `system.primaryUser`; nix-homebrew (pinned taps, `mutableTaps = false`) +
   homebrew module (`cleanup = "check"`, no auto-update/upgrade); Home Manager
-  **packages only**; `--update` gains an `owner=nix` status.
+  **packages only**; public macOS setup applies it by default; `--update` gains
+  an `owner=nix` status.
 - **PR-7 `feat/nix-linux`** - Home Manager standalone on Ubuntu/WSL userland;
-  per-tool apt / pinned-artifact -> nix handoff (nvim last, for ABI reasons);
-  native install arms retire only after green e2e + greenfield-ledger evidence.
+  public Linux/WSL setup applies it by default; native/deferred install arms
+  remain for artifacts and regression evidence (nvim last, for ABI reasons).
 
 ### Mega-PR: `feat/platform-nix-tooling-mega` (2026-07-07)
 
@@ -109,7 +110,7 @@ PR-3 through PR-7 are being delivered together in ONE branch/PR
 (WezTerm, AeroSpace, Herdr) are the concrete packages the Nix layers then own,
 and shipping them separately would mean the Nix casks/brews reference configs
 that do not exist yet. The proving host is this macOS machine: Nix was installed
-via the notarized Determinate `v3.21.2` `.pkg` (signature + SHA-256 verified, no
+via the notarized Determinate package (signature + SHA-256 verified, no
 remote-eval), so `flake.lock` and `nix flake check` are generated and verified
 for real rather than hand-written.
 
@@ -152,17 +153,26 @@ Commit-by-commit status:
 - **Commit 5 - nix-darwin + declarative Homebrew — DONE.**
   `darwinConfigurations` with `system.primaryUser` resolved from `SUDO_USER` before
   `USER`; nix-homebrew (pinned taps,
-  `mutableTaps = false`); homebrew module (`autoUpdate = false`, `upgrade = false`,
+  `autoMigrate = true`, `mutableTaps = false`, `trust.taps = [ "nikitabobko/tap" ]` for the
+  AeroSpace cask); homebrew module (`autoUpdate = false`, `upgrade = false`,
   `cleanup = "check"`); casks WezTerm + AeroSpace; brews Herdr + selected CLI; Home
-  Manager packages-only; consent-gated `sudo darwin-rebuild switch` in setup.sh
-  with first-run bootstrap pinned to the locked nix-darwin rev plus `narHash`.
+  Manager packages-only; default `setup.sh` applies `sudo darwin-rebuild switch`
+  on macOS (prompted unless `--all`) with first-run bootstrap pinned to the
+  locked nix-darwin rev plus `narHash`.
+  Existing Homebrew installs are adopted with `autoMigrate = true`, and setup
+  moves pre-existing `Library/Taps` to a timestamped backup before activation so
+  `mutableTaps = false` can install the pinned declarative taps.
+  GitHub's hosted macOS e2e passes `DOTFILES_NIX_DARWIN_HOSTED_CI=1` to use
+  `cleanup = "none"` for that disposable activation only, because the runner
+  image ships many undeclared Brew packages; real hosts remain `cleanup = "check"`.
   The first real system activation remains manual-verification-pending in
   `tests/MANUAL.md`.
 - **Commit 6 - Linux/WSL Home Manager packages-only — DONE.** HM standalone for
   native Linux + WSL userland (`homeConfigurations."<arch>-linux"`); packages
-  only; `setup.sh --home-manager` opt-in; split-host WSL preserved (writes only
-  to `~/.nix-profile`, never `/mnt/c`); native install arms RETAINED as the
-  default. **nvim + the tree-sitter CLI are intentionally deferred with proof:**
+  only; default `setup.sh` applies Home Manager on Linux/WSL (prompted unless
+  `--all`); split-host WSL preserved (writes only to `~/.nix-profile`, never
+  `/mnt/c`); native install arms RETAINED for deferred/artifact provisioning and
+  regression proof. **nvim + the tree-sitter CLI are intentionally deferred with proof:**
   they are ABI-coupled (nvim-treesitter `main` compiles parsers whose ABI must
   match nvim's built-in libtree-sitter; the CLI is pinned to v0.26.9 — invariant
   19), so a nix nvim/tree-sitter shadowing the pinned native binaries would risk
@@ -178,8 +188,8 @@ Commit-by-commit status:
   layer …` (reusing the documented vocabulary, not a new status word). No blanket
   `nix profile upgrade` / `nix-env -u` / `nix flake update`; no silent
   `flake.lock` rewrite (lock bumps are reviewed Renovate PRs; the layer is
-  refreshed by the opt-in `setup.sh --nix-darwin` / `--home-manager` switches,
-  the explicit + tested Nix switch flags). Existing per-manager ownership is
+  refreshed by the enforced POSIX `setup.sh` switch, with `--nix-darwin` /
+  `--home-manager` kept as compatibility aliases). Existing per-manager ownership is
   preserved. Guarded by the new `nix-owned tool reports owner=nix` case in
   `install_deps_update_test.sh` + the blanket-upgrade guard in
   `nix_architecture_test.sh`.
@@ -203,6 +213,20 @@ Commit-by-commit status:
   gh-dash config apply, deterministic zsh vi-mode/fzf-tab behavior, cursor-hook
   ordering before Starship, and the PowerShell psmux OnIdle no-EditMode reset
   invariant.
+- **POSIX Nix enforcement hardening — DONE.** Public `setup.sh` now applies the
+  Nix package layer by default on macOS/Linux/WSL before Phase 1 native/deferred
+  installs; `--skip-deps` unconditionally skips that layer (even with
+  compatibility aliases) and logs the skip; dry-run previews missing-Nix /
+  unsupported-arch failures without aborting; the WSL2 canary and WSL
+  greenfield harness install Ubuntu's `nix-bin` package and enable flakes before
+  invoking setup. Intel macOS remains unsupported for activation and must use
+  `--skip-deps` plus manual provisioning until an x86_64-darwin host config
+  lands.
+- **Pi CLI provisioning — DONE.** Setup installs the Pi CLI on every OS as the
+  pinned npm package `@earendil-works/pi-coding-agent@0.80.3` after checking npm
+  `dist.integrity`. POSIX public setup gets Node 24 from the enforced Nix package
+  layer; Windows uses the native Node LTS catalog path. `.pi/` runtime state
+  remains local and unsynced.
 
 Each commit flips its own status to DONE in the same commit that lands it, per
 the repo's doc-discipline rule.

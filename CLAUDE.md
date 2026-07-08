@@ -12,7 +12,7 @@ the install script works, read this too.
 ## What this repo is
 
 Cross-platform dotfiles: Neovim (lazy.nvim), Starship, Ghostty, Windows
-Terminal, tmux, zshenv/zshrc, PowerShell profile, lazygit, `lsd`, and global
+Terminal, tmux, zshenv/zshrc, PowerShell profile, lazygit, `lsd`, Pi CLI, and global
 Polaris agent-policy bootstrap. Public installs go through `setup.sh` (macOS /
 Linux / WSL) or `setup.ps1` (Windows), which install dependencies, apply the
 chezmoi config layer, restore locked Neovim plugins, sync Mason tools, and
@@ -257,6 +257,9 @@ that violates one of these, fix it instead of disabling the test.
       shell/editor/terminal config file. GUI / TCC-sensitive apps (WezTerm,
       AeroSpace, Herdr) come from vendor channels (Homebrew casks / pinned
       artifacts, including the Windows Herdr preview `.exe`), never nixpkgs.
+      Node 24 is in this package-only set because the pinned Pi CLI npm package
+      needs a modern Node runtime; the Pi package itself remains npm-pinned until
+      nixpkgs catches up.
     - **(c) native Windows is non-Nix.** Windows-host files are `setup.ps1` +
       native package managers (Scoop/winget/choco) + chezmoi. Nix has no supported
       native-Windows story; it applies to WSL2 *userland* only and must never
@@ -284,7 +287,8 @@ that violates one of these, fix it instead of disabling the test.
       `nix profile upgrade`, `nix-env -u`, or `nix flake update`, and must NOT
       silently rewrite `flake.lock`; the pinned lock is bumped only by an
       explicit, reviewed PR (Renovate `nix` manager), and the Nix layer is
-      refreshed by the opt-in `setup.sh --nix-darwin` / `--home-manager` switch.
+      refreshed by the enforced POSIX `setup.sh` switch (or the compatibility
+      `--nix-darwin` / `--home-manager` aliases).
       Guarded by the `nix-owned tool reports owner=nix` case in
       `tests/shell/install_deps_update_test.sh` (which also proves update mode
       never shells out to `nix` for an owned tool) and the "no blanket nix
@@ -545,10 +549,13 @@ install paths, not symmetric container platforms:
   `setup.ps1 / windows-2025` run the real public setup entry points, apply
   configs through chezmoi in Phase 2, then rerun Lazy restore, Tree-sitter
   parser install, Mason headless sync, and the Polaris Phase 6/6 agent-policy
-  install. They explicitly fail if setup skips Phase 3-5, omits Phase 6/6,
-  emits a `FAIL:` marker, or Mason did not install expected tools. Windows e2e
+  install. The POSIX setup jobs install Nix first, apply the enforced
+  nix-darwin/Home Manager layer before native/deferred installs, and assert the
+  nix-owned CLI set resolves from a Nix profile/store path. They explicitly fail
+  if setup skips Phase 3-5, omits Phase 6/6, emits a `FAIL:` marker, or Mason
+  did not install expected tools. Windows e2e
   also asserts the new Windows tools that must leave PATH commands behind
-  (`zoxide`, `gh`, `wezterm`, `herdr`), so an installer that exits 0 but fails
+  (`zoxide`, `gh`, `wezterm`, `herdr`, `pi`), so an installer that exits 0 but fails
   its command probe cannot fake-green.
   must assert `%LOCALAPPDATA%\lazygit\config.yml`
   against `lazygit/config.windows.yml`, not the POSIX/default
@@ -585,10 +592,13 @@ install paths, not symmetric container platforms:
 - `setup.sh / WSL2 Ubuntu-24.04 (best-effort canary)` uses
   `Vampire/setup-wsl@v7.0.0`, but hosted runners cannot provide a reliably
   required nested-virtualization WSL2 gate. Keep this job non-required unless
-  the owner intentionally accepts that flake risk. The required WSL proxy is the
-  Linux Ubuntu container plus the existing `DOTFILES_FORCE_OS=wsl` bats coverage.
-  Full WSL host/guest validation is manual: run `./tests/wsl/e2e.sh` from inside
-  WSL after running `.\setup.ps1 -All` on Windows. Windows Terminal settings
+  the owner intentionally accepts that flake risk. The canary installs Ubuntu's
+  `nix-bin` package inside the distro and enables flakes before running the
+  enforced Home Manager path; that keeps the signal aligned with public setup.
+  The required WSL proxy is the Linux Ubuntu container plus the existing
+  `DOTFILES_FORCE_OS=wsl` bats coverage. Full WSL host/guest validation is
+  manual: install Nix inside WSL, run `./tests/wsl/e2e.sh` from inside WSL after
+  running `.\setup.ps1 -All` on Windows. Windows Terminal settings
   handling is default-on: packaged WT is merged when its settings file exists,
   and portable WT is seeded or merged at the unpackaged path when the packaged
   file is absent.
@@ -1196,9 +1206,9 @@ save only**. The next plain `:w` formats normally. Implemented in
   values or verify tag commit IDs; leave CI red until a human has reviewed the
   download/ref and updated the adjacent constant. The
   `CHEZMOI_VERSION`, `STARSHIP_VERSION`, `TREE_SITTER_CLI_LINUX_VERSION`,
-  `WEZTERM_VERSION`, and `HERDR_VERSION` custom managers follow the lazygit shape:
+  `WEZTERM_VERSION`, `HERDR_VERSION`, and `PI_CLI_VERSION` custom managers follow the lazygit shape:
   Renovate may bump the version constants, while their adjacent SHA-256 values
-  remain context only. In
+  or npm integrity values remain context only. In
   `renovate.json`, direct-download SHA-256 values must be matched as context
   only, not named `currentDigest`, otherwise Renovate will schedule same-version
   digest updates for checksums it cannot actually resolve.
@@ -1401,6 +1411,15 @@ save only**. The next plain `:w` formats normally. Implemented in
   row in `parity_gate.sh`); the config is applied regardless of auth — only the
   extension binary is auth-gated. Running the dashboard needs `gh auth login` —
   a manual, secret-bearing step this repo never automates or stores.
+- **Pi CLI is a pinned npm package, not synced `.pi/` state.** `install-deps.sh`
+  and `install-deps.ps1` install `@earendil-works/pi-coding-agent@0.80.3` after
+  verifying npm's `dist.integrity`
+  `sha512-TIggw9gCXpA+Ph7OjdTA7ka2NPwTVuPmy39KDSyUzaKq8VvHfMGR7vtRz4JB7Um/RMRblmzhu4p9tUCk6MTgGA==`.
+  POSIX public setup gets Node 24 from the enforced Nix package layer; Windows
+  gets Node through the native catalog. The CLI binary is provisioned on every
+  OS, but `.pi/` sessions, auth, and preferences remain machine-local. Renovate
+  may bump `PI_CLI_VERSION`, but the integrity constant is context-only and must
+  be recomputed/reviewed by a human.
 - **which-key.nvim is the only keymap-hint plugin.** `nvim/lua/plugins/which-key.lua`
   loads it on `event = "VeryLazy"` (never eager — only `rose-pine.lua` may load
   eagerly, invariant 7) with `opts = {}` and a `<leader>?` popup of buffer-local
@@ -1438,11 +1457,14 @@ save only**. The next plain `:w` formats normally. Implemented in
   source carries no raw ANSI escape byte (keeps the `.ps1` pure-ASCII
   invariant).
 
-## Nix layer (optional POSIX packages; chezmoi still owns every dotfile)
+## Nix layer (enforced POSIX packages; chezmoi still owns every dotfile)
 
 The `flake.nix` + committed `flake.lock` are the POSIX **package** layer. They own
 NO dotfiles — chezmoi does, on every OS (invariant 22). Native Windows is
-non-Nix. The whole layer is opt-in; setup defaults are unchanged.
+non-Nix. On macOS/Linux/WSL, public `setup.sh` applies this layer before native
+or deferred dependency provisioning and fails closed when `nix` is absent. The
+repo deliberately does not install Nix via a pipe-to-shell bootstrap; Nix is a
+host prerequisite.
 
 - **`flake.nix` structure.** `nixpkgs` (nixos-unstable, pinned by `flake.lock`),
   plus `nix-darwin`, `home-manager`, `nix-homebrew`, and the three Homebrew taps
@@ -1459,18 +1481,31 @@ non-Nix. The whole layer is opt-in; setup defaults are unchanged.
   `nixpkgs.hostPlatform` recursion and a null `home.homeDirectory` during
   development) but reports "(build skipped)", so CI never fetches the multi-GB
   Homebrew taps. `.github/workflows/nix.yml` runs `nix flake check`, the
-  `nix fmt --check`, and `tests/nix/run_all.sh` on Ubuntu + macOS. It is a
-  SEPARATE workflow from `test.yml` so it is not auto-derived into the required
-  check set (`required_checks_test.sh` parses only `test.yml` + `e2e-install.yml`).
+  `nix fmt --check`, and `tests/nix/run_all.sh` on Ubuntu + macOS. Those matrix
+  contexts are checked into the branch-protection sources because the POSIX
+  package layer is now enforced by public setup.
 - **nix-darwin (`nix/darwin/configuration.nix`).** `nix.enable = false` — the
   **Determinate** daemon owns Nix, so nix-darwin must not fight it. Declarative
   Homebrew: `onActivation` `autoUpdate = false`, `upgrade = false`,
   `cleanup = "check"` (report drift, never destroy); casks = WezTerm + AeroSpace
   (GUI/vendor apps, never nixpkgs); brews = Herdr. nix-homebrew runs
-  `mutableTaps = false` with the taps supplied as pinned inputs, and
-  `homebrew.taps = builtins.attrNames config.nix-homebrew.taps`. `system.primaryUser`
-  + `users.users.<user>.home` are resolved from `SUDO_USER`, then `USER`, then
-  the pure-eval placeholder `runner`.
+  `autoMigrate = true` (adopt an existing official-script Homebrew install while
+  keeping installed packages), `mutableTaps = false` with the taps supplied as
+  pinned inputs, `trust.taps = [ "nikitabobko/tap" ]` so Homebrew 5 can load
+  the AeroSpace personal-tap cask, and
+  `homebrew.taps = builtins.attrNames config.nix-homebrew.taps`.
+  `system.primaryUser` + `users.users.<user>.home` are resolved from
+  `SUDO_USER`, then `USER`, then the pure-eval placeholder `runner`.
+  setup.sh moves a pre-existing `/opt/homebrew/Library/Taps` directory to a
+  timestamped `Taps.dotfiles-pre-nix-*` backup before activation; otherwise
+  nix-homebrew's fully declarative `mutableTaps = false` mode fails closed on an
+  occupied tap root.
+  The only `cleanup = "none"` path is the explicit
+  `DOTFILES_NIX_DARWIN_HOSTED_CI=1` override passed by setup.sh on GitHub's
+  disposable macOS runner, whose preinstalled Brew surface is intentionally not
+  this repo's Brewfile. The predicate requires `GITHUB_ACTIONS=true`,
+  `RUNNER_ENVIRONMENT=github-hosted`, and `RUNNER_OS=macOS`; self-hosted Macs
+  are real hosts and must keep the strict `cleanup = "check"` drift report.
 - **User resolution.** The flake reads `builtins.getEnv "SUDO_USER"` first,
   falls back to `builtins.getEnv "USER"`, and uses `"runner"` only so pure eval /
   `nix flake check` still evaluates. setup.sh runs
@@ -1488,24 +1523,34 @@ non-Nix. The whole layer is opt-in; setup defaults are unchanged.
   avoid a conflicting definition. No `home.file`, no `xdg.configFile`, no
   `programs.<tool>` other than `programs.home-manager`. Guarded at the SOURCE
   level by `tests/static/nix_architecture_test.sh`, which allowlists only
-  `programs.home-manager` and bans `home.activation` outright.
-- **setup.sh integration is explicit + consent-gated.** `setup.sh --nix-darwin`
-  (macOS-only) is the ONLY path that runs `sudo darwin-rebuild switch`; without
-  the flag setup never touches Nix. It is dry-run-safe (previews the real sudo
-  command and the locked bootstrap ref), prompts unless `--all`, skips cleanly
-  off-macOS or without nix, and fails closed if the requested activation fails.
-  Guarded by `tests/nix/setup_nix_darwin_test.sh`.
+  `programs.home-manager` and bans `home.activation` outright. The shared
+  package list includes `nodejs_24` specifically so npm-backed Pi CLI
+  provisioning does not depend on a stale distro Node.
+- **setup.sh integration is enforced + consent-gated.** On macOS, `setup.sh`
+  applies nix-darwin by default before Phase 1 dependency provisioning.
+  `--nix-darwin` remains a compatibility alias, not the switch that makes Nix
+  active. It is dry-run-safe (previews the real sudo command and the locked
+  bootstrap ref when Nix is present, and previews the missing-Nix failure when it
+  is not), prompts unless `--all`, skips cleanly off-macOS, fails closed when
+  `nix` is missing on a real run, and fails closed if activation fails.
+  `--skip-deps` is the explicit already-provisioned escape and skips the Nix
+  package layer together with native/deferred dependency installs; compatibility
+  aliases do not override it. Public setup currently supports the aarch64-darwin
+  activation target only; x86_64 Darwin must use `--skip-deps` plus manual
+  provisioning until an Intel Mac path lands. Guarded by
+  `tests/nix/setup_nix_darwin_test.sh`.
 - **Linux/WSL Home Manager (standalone, packages-only).**
   `homeConfigurations."<arch>-linux"` (`nix/home/linux.nix` + the shared
   `nix/home/common.nix`) is the nix-owned CLI set for Linux/WSL, activated by
-  `setup.sh --home-manager` (Linux-only, same opt-in/consent/dry-run contract as
-  `--nix-darwin`). `programs.home-manager.enable` is the ONE allowed `programs.*`
+  `setup.sh` (Linux-only, same enforced/consent/dry-run contract as
+  nix-darwin). `--home-manager` remains a compatibility alias.
+  `programs.home-manager.enable` is the ONE allowed `programs.*`
   (it installs the standalone HM CLI). On WSL it writes ONLY to `~/.nix-profile`,
   never `/mnt/c` — split-host preserved. First-run bootstrap likewise uses
   `github:nix-community/home-manager/<locked-rev>?narHash=<encoded-narHash>#home-manager`
-  from `flake.lock`, not a mutable registry alias. **Native install-deps arms are RETAINED
-  as the default provisioning path**; the Nix package layer is additive/opt-in,
-  proven by tests before anything is deleted. Guarded by
+  from `flake.lock`, not a mutable registry alias. **Native install-deps arms are
+  RETAINED as deferred/artifact provisioning and regression fixtures**; the Nix
+  package layer is the public POSIX package plane. Guarded by
   `tests/nix/linux_home_test.sh` + `tests/nix/setup_home_manager_test.sh`.
 - **nvim + the tree-sitter CLI are DELIBERATELY NOT in the Nix package set
   (deferred, with proof).** nvim-treesitter `main` compiles parsers whose ABI

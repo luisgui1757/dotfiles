@@ -31,7 +31,26 @@ if [[ "${1:-}" == "shellenv" ]]; then
     printf 'export PATH="%s/fakebin:$PATH"\n' "$SETUP_TEST_ROOT"
 fi
 EOF
-chmod +x "$TMP_ROOT/install-deps.sh" "$TMP_ROOT/fakebin/chezmoi" "$TMP_ROOT/fakebin/brew"
+cat > "$TMP_ROOT/fakebin/uname" <<'EOF'
+#!/usr/bin/env bash
+case "${1:-}" in
+    -s) printf '%s\n' Linux ;;
+    -m) printf '%s\n' x86_64 ;;
+    *) command uname "$@" ;;
+esac
+EOF
+cat > "$TMP_ROOT/fakebin/nix" <<'EOF'
+#!/usr/bin/env bash
+if [[ "${1:-}" == "eval" ]]; then
+    printf '%s\n%s\n' "fake-home-manager-rev" "sha256-fake"
+fi
+EOF
+cat > "$TMP_ROOT/fakebin/home-manager" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+chmod +x "$TMP_ROOT/install-deps.sh" "$TMP_ROOT/fakebin/chezmoi" "$TMP_ROOT/fakebin/brew" \
+    "$TMP_ROOT/fakebin/uname" "$TMP_ROOT/fakebin/nix" "$TMP_ROOT/fakebin/home-manager"
 
 output="$(SETUP_TEST_ROOT="$TMP_ROOT" PATH="$TMP_ROOT/fakebin:/usr/bin:/bin" bash "$TMP_ROOT/setup.sh" --all --skip-nvim --skip-agents --experimental-wsl-gui 2>&1)"
 [[ "$output" == *"setup.sh: done"* ]]
