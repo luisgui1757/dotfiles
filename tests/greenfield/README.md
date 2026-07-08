@@ -6,6 +6,11 @@ container path. These harnesses are for reproducing those installs locally and
 for desktop checks CI cannot see, especially Windows Terminal, fonts, ConPTY,
 and VS Code rendering.
 
+For macOS, Linux, and WSL greenfield runs, install Nix on the guest before
+running `setup.sh --all`. The public POSIX setup path now applies nix-darwin /
+Home Manager first and fails closed when `nix` is missing; these harnesses do
+not bootstrap Nix with a remote script.
+
 Do not add these VM or desktop launchers to the CI matrix. They need an
 interactive desktop or local virtualization and can hang or fail headless. The
 shared validators here are factored so `.github/workflows/e2e-install.yml` could
@@ -146,9 +151,10 @@ Throwaway WSL distro path: run from Windows PowerShell:
 ```
 
 The script creates a uniquely named `dotfiles-greenfield-<timestamp>` Ubuntu
-WSL distro, copies the repo in, runs `./setup.sh --all`, runs
-`validate.sh`, and unregisters the distro on exit. Add `-Keep` to preserve the
-distro for debugging:
+WSL distro, installs Ubuntu's `nix-bin` package inside that distro, enables
+flakes, copies the repo in, runs `./setup.sh --all`, runs `validate.sh`, and
+unregisters the distro on exit. Add `-Keep` to preserve the distro for
+debugging:
 
 ```powershell
 .\tests\greenfield\wsl-greenfield.ps1 -Keep

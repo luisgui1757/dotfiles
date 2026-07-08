@@ -140,6 +140,17 @@ gh_dash_ps="$(ps_const GhDashVersion)"
 assert_eq "gh-dash tag (install-deps.sh == install-deps.ps1)" "$gh_dash_sh" "$gh_dash_ps"
 assert_contains "gh-dash tag (CLAUDE.md)" "CLAUDE.md" "$gh_dash_sh"
 
+# --- Pi CLI pinned npm package: install-deps.sh <-> install-deps.ps1 <-> docs
+pi_cli_version_sh="$(sh_const PI_CLI_VERSION)"
+pi_cli_integrity_sh="$(sh_const PI_CLI_INTEGRITY)"
+pi_cli_version_ps="$(ps_const PiCliVersion)"
+pi_cli_integrity_ps="$(ps_const PiCliIntegrity)"
+assert_eq "Pi CLI version (install-deps.sh == install-deps.ps1)" "$pi_cli_version_sh" "$pi_cli_version_ps"
+assert_eq "Pi CLI integrity (install-deps.sh == install-deps.ps1)" "$pi_cli_integrity_sh" "$pi_cli_integrity_ps"
+assert_contains "Pi CLI version (README.md)" "README.md" "$pi_cli_version_sh"
+assert_contains "Pi CLI version (CLAUDE.md)" "CLAUDE.md" "$pi_cli_version_sh"
+assert_contains "Pi CLI integrity (CLAUDE.md)" "CLAUDE.md" "$pi_cli_integrity_sh"
+
 # --- Polaris: setup.sh <-> setup.ps1 -----------------------------------------
 polaris_version_sh="$(setup_sh_const POLARIS_VERSION)"
 polaris_tag_sh="$(setup_sh_const POLARIS_TAG)"

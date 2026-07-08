@@ -3,10 +3,10 @@
 #
 # Local usage (from a checked-out copy):
 #   ./setup.sh                     interactive: dependency prompts, then config + sync
-#   ./setup.sh --all               non-interactive: install everything missing
+#   ./setup.sh --all               non-interactive: apply Nix package layer, then install everything missing
 #   ./setup.sh --update            update proven dependency tools/artifacts + Mason only
 #   ./setup.sh --dry-run           preview every step
-#   ./setup.sh --skip-deps         already have nvim/starship; just config+sync
+#   ./setup.sh --skip-deps         already provisioned; skip Nix + native deps
 #   ./setup.sh --skip-bootstrap    back-compat alias: skip config apply
 #   ./setup.sh --skip-config       already configured; just sync nvim
 #   ./setup.sh --skip-nvim         skip nvim plugin/parser/Mason sync
@@ -49,10 +49,10 @@ setup.sh -- one-shot end-to-end install for macOS / Linux / WSL.
 
 Local usage:
   ./setup.sh                     interactive: dependency prompts, then config + sync
-  ./setup.sh --all               non-interactive: install everything missing
+  ./setup.sh --all               non-interactive: apply Nix package layer, then install everything missing
   ./setup.sh --update            update proven dependency tools/artifacts + Mason only
   ./setup.sh --dry-run           preview every step
-  ./setup.sh --skip-deps         already installed; just config + sync
+  ./setup.sh --skip-deps         already provisioned; skip Nix + native deps
   ./setup.sh --skip-bootstrap    back-compat alias: skip config apply
   ./setup.sh --skip-config       already configured; just sync nvim
   ./setup.sh --skip-nvim         skip nvim plugin/parser/Mason sync
@@ -60,10 +60,8 @@ Local usage:
   ./setup.sh --best-effort       continue past plugin/LSP/Mason phase failures
   ./setup.sh --experimental-wsl-gui
                                 WSL opt-in: install/link Linux Ghostty + Linux fonts
-  ./setup.sh --nix-darwin        macOS opt-in: apply the nix-darwin package layer
-                                (declarative Homebrew casks/brews + nix CLI set)
-  ./setup.sh --home-manager      Linux/WSL opt-in: apply the Home Manager package
-                                layer (nix CLI set; native install arms untouched)
+  ./setup.sh --nix-darwin        compatibility alias; macOS setup applies nix-darwin by default
+  ./setup.sh --home-manager      compatibility alias; Linux/WSL setup applies Home Manager by default
 
 First run:
   git clone https://github.com/luisgui1757/dotfiles.git "${DOTFILES_DEST:-$HOME/dotfiles}"
@@ -178,7 +176,7 @@ phase() {
 }
 
 refresh_runtime_path() {
-    local brew_bin brew_env dir make_prefix gnubin
+    local brew_bin brew_env dir make_prefix gnubin nix_user
 
     [[ "$DRY_RUN" -eq 1 ]] && return 0
 
@@ -199,6 +197,18 @@ refresh_runtime_path() {
                 echo "  WARN: $brew_bin shellenv failed; leaving PATH unchanged for that Homebrew prefix" >&2
             fi
             break
+        fi
+    done
+
+    nix_user="${SUDO_USER:-${USER:-$(id -un 2>/dev/null || true)}}"
+    for dir in \
+        /nix/var/nix/profiles/default/bin \
+        /run/current-system/sw/bin \
+        ${nix_user:+"/etc/profiles/per-user/$nix_user/bin"} \
+        "$HOME/.nix-profile/bin" \
+        "$HOME/.local/state/nix/profile/bin"; do
+        if [[ -n "$dir" && -d "$dir" && ":$PATH:" != *":$dir:"* ]]; then
+            PATH="$dir:$PATH"
         fi
     done
 
@@ -608,24 +618,111 @@ pinned_home_manager_run_ref() {
         "$rev" "$(nix_flake_ref_query_encode "$nar_hash")"
 }
 
-# Optional, EXPLICIT opt-in: apply the Nix (nix-darwin) package layer. This is
-# NOT part of the default flow and never runs without --nix-darwin, so setup
-# defaults are unchanged. It activates declarative Homebrew (WezTerm/AeroSpace
-# casks, Herdr brew) and the nix-owned CLI package set on macOS. chezmoi still
-# owns every dotfile (invariant 22). --impure lets the flake resolve SUDO_USER
-# for system.primaryUser while sudo makes USER=root during activation.
+nix_darwin_hosted_ci_cleanup_override() {
+    [[ "${DOTFILES_TEST_GITHUB_ACTIONS:-}" == "1" ]] && return 0
+    [[ "${GITHUB_ACTIONS:-}" == "true" ]] || return 1
+    [[ "${DOTFILES_SETUP_SOURCE_ONLY_ACTIVE:-}" != "1" ]] || return 1
+    [[ "${RUNNER_ENVIRONMENT:-}" == "github-hosted" ]] || return 1
+    [[ "${RUNNER_OS:-}" == "macOS" ]]
+}
+
+sudo_nix_darwin_activation() {
+    if nix_darwin_hosted_ci_cleanup_override; then
+        sudo env DOTFILES_NIX_DARWIN_HOSTED_CI=1 "$@"
+    else
+        sudo "$@"
+    fi
+}
+
+nix_darwin_sudo_preview() {
+    if nix_darwin_hosted_ci_cleanup_override; then
+        printf 'sudo env DOTFILES_NIX_DARWIN_HOSTED_CI=1 %s' "$1"
+    else
+        printf 'sudo %s' "$1"
+    fi
+}
+
+nix_homebrew_library_dir() {
+    printf '%s\n' "${DOTFILES_HOMEBREW_LIBRARY:-/opt/homebrew/Library}"
+}
+
+prepare_nix_homebrew_declarative_taps() {
+    local library taps stamp backup_base backup i
+    library="$(nix_homebrew_library_dir)"
+    taps="$library/Taps"
+    [[ -e "$taps" && ! -L "$taps" ]] || return 0
+
+    stamp="${DOTFILES_TEST_TIMESTAMP:-$(date +%Y%m%d%H%M%S)}"
+    backup_base="$library/Taps.dotfiles-pre-nix-$stamp"
+    backup="$backup_base"
+    i=0
+    while [[ -e "$backup" ]]; do
+        i=$((i + 1))
+        backup="$backup_base.$i"
+    done
+
+    echo "  note      nix-homebrew mutableTaps=false needs to own $taps"
+    echo "            moving existing taps to $backup before activation."
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        echo "  would: sudo mv $taps $backup"
+        return 0
+    fi
+    if [[ "$ALL" -eq 0 ]]; then
+        if ! ask_yes_no_default_yes "Move existing Homebrew taps aside for declarative nix-homebrew?"; then
+            echo "  FAIL: nix-homebrew mutableTaps=false cannot activate while $taps exists." >&2
+            echo "        Move it aside or re-run with --skip-deps on an already provisioned host." >&2
+            return 1
+        fi
+    fi
+    if ! sudo mv "$taps" "$backup"; then
+        echo "  FAIL: could not move existing Homebrew taps from $taps to $backup." >&2
+        return 1
+    fi
+}
+
+# Required POSIX package layer: apply Nix (nix-darwin) on macOS before native
+# dependency provisioning. It activates declarative Homebrew (WezTerm/AeroSpace
+# casks, Herdr brew) and the nix-owned CLI package set. chezmoi still owns every
+# dotfile (invariant 22). --impure lets the flake resolve SUDO_USER for
+# system.primaryUser while sudo makes USER=root during activation.
 run_nix_darwin_switch() {
-    [[ "$NIX_DARWIN" -eq 1 ]] || return 0
+    local explicit=0
+    [[ "$NIX_DARWIN" -eq 1 ]] && explicit=1
     if [[ "$(uname -s)" != "Darwin" ]]; then
+        [[ "$explicit" -eq 1 ]] || return 0
         echo
         echo "skipped: --nix-darwin is macOS-only (nix-darwin has no Linux/Windows target)"
         return 0
     fi
-    phase "Optional: apply the Nix (nix-darwin) package layer"
-    if ! command -v nix >/dev/null 2>&1; then
-        echo "  skipped: nix is not installed. Install Nix first (e.g. the notarized"
-        echo "           Determinate pkg), then re-run: ./setup.sh --nix-darwin"
+    if [[ "$SKIP_DEPS" -eq 1 ]]; then
+        echo
+        echo "skipped: Nix package layer via --skip-deps"
         return 0
+    fi
+    phase "Required POSIX package layer: apply nix-darwin packages (macOS)"
+    case "$(uname -m)" in
+        arm64 | aarch64) ;;
+        *)
+            if [[ "$DRY_RUN" -eq 1 ]]; then
+                echo "  would fail: no supported nix-darwin activation config for arch $(uname -m)."
+                echo "              The current dotfiles activation host is aarch64-darwin."
+                return 0
+            fi
+            echo "  FAIL: no supported nix-darwin activation config for arch $(uname -m)."
+            echo "        The current dotfiles activation host is aarch64-darwin."
+            return 1
+            ;;
+    esac
+    if ! command -v nix >/dev/null 2>&1; then
+        if [[ "$DRY_RUN" -eq 1 ]]; then
+            echo "  would fail: Nix is required for macOS setup. Install Nix first"
+            echo "              (for example, the notarized Determinate installer)."
+            return 0
+        fi
+        echo "  FAIL: Nix is required for macOS setup. Install Nix first (for example,"
+        echo "        the notarized Determinate installer), then re-run ./setup.sh."
+        echo "        This repo deliberately does not add a pipe-to-shell Nix installer."
+        return 1
     fi
     local flake_ref="$SCRIPT_DIR#dotfiles" bootstrap_ref
     bootstrap_ref="$(pinned_nix_darwin_run_ref)" || return 1
@@ -633,58 +730,68 @@ run_nix_darwin_switch() {
     echo "  declarative Homebrew (WezTerm/AeroSpace casks, Herdr brew) + nix CLI set."
     echo "  It uses sudo for nix-darwin's upstream activation shape; flake user"
     echo "  resolution reads SUDO_USER so Homebrew/Home Manager target the real user."
+    if nix_darwin_hosted_ci_cleanup_override; then
+        echo "  GitHub-hosted macOS runner mode: Homebrew cleanup check is disabled for"
+        echo "  this disposable activation only because runner images preinstall Brew tools."
+    fi
     if [[ "$DRY_RUN" -eq 1 ]]; then
-        echo "  would: sudo darwin-rebuild switch --flake $flake_ref --impure"
-        echo "         (first-time bootstrap: sudo nix run $bootstrap_ref -- switch --flake $flake_ref --impure)"
+        echo "  would: $(nix_darwin_sudo_preview "darwin-rebuild") switch --flake $flake_ref --impure"
+        echo "         (first-time bootstrap: $(nix_darwin_sudo_preview "nix") run $bootstrap_ref -- switch --flake $flake_ref --impure)"
         return 0
     fi
     if [[ "$ALL" -eq 0 ]]; then
-        printf "  Apply nix-darwin now? [y/N] "
-        local reply=""
-        read -r reply || true
-        case "$reply" in
-            y | Y | yes | YES | Yes) ;;
-            *)
-                echo "  skipped nix-darwin apply"
-                return 0
-                ;;
-        esac
+        if ! ask_yes_no_default_yes "Apply the required nix-darwin package layer now?"; then
+            echo "  FAIL: macOS setup requires nix-darwin for package provisioning."
+            echo "        Re-run with --skip-deps only on a host that is already provisioned."
+            return 1
+        fi
     fi
+    prepare_nix_homebrew_declarative_taps || return 1
     if command -v darwin-rebuild >/dev/null 2>&1; then
-        if ! sudo darwin-rebuild switch --flake "$flake_ref" --impure; then
+        if ! sudo_nix_darwin_activation darwin-rebuild switch --flake "$flake_ref" --impure; then
             echo "  FAIL: nix-darwin activation failed; setup did not apply the requested Nix package layer." >&2
-            echo "        Re-run './setup.sh --nix-darwin' after fixing the activation error." >&2
+            echo "        Re-run './setup.sh' after fixing the activation error." >&2
             return 1
         fi
     else
         echo "  bootstrapping nix-darwin from flake.lock ($bootstrap_ref)..."
-        if ! sudo nix run "$bootstrap_ref" -- switch --flake "$flake_ref" --impure; then
+        if ! sudo_nix_darwin_activation nix run "$bootstrap_ref" -- switch --flake "$flake_ref" --impure; then
             echo "  FAIL: nix-darwin bootstrap activation failed; setup did not apply the requested Nix package layer." >&2
-            echo "        Re-run './setup.sh --nix-darwin' after fixing the activation error." >&2
+            echo "        Re-run './setup.sh' after fixing the activation error." >&2
             return 1
         fi
     fi
     echo "  ok        nix-darwin package layer applied"
 }
 
-# Optional, EXPLICIT opt-in: apply the Nix Home Manager package layer on
-# Linux/WSL. Like --nix-darwin, it never runs without --home-manager, so setup
-# defaults are unchanged and the native install arms in install-deps.sh stay the
-# default provisioning path. It installs the nix-owned CLI package set into the
+# Required POSIX package layer: apply Home Manager on Linux/WSL before native
+# dependency provisioning. It installs the nix-owned CLI package set into the
 # user profile (no root). On WSL it writes ONLY to the Linux ~/.nix-profile, so
 # the split-host model is preserved. --impure lets the flake resolve $USER.
 run_home_manager_switch() {
-    [[ "$HOME_MANAGER" -eq 1 ]] || return 0
+    local explicit=0
+    [[ "$HOME_MANAGER" -eq 1 ]] && explicit=1
     if [[ "$(uname -s)" != "Linux" ]]; then
+        [[ "$explicit" -eq 1 ]] || return 0
         echo
         echo "skipped: --home-manager is Linux/WSL-only (macOS uses --nix-darwin)"
         return 0
     fi
-    phase "Optional: apply the Nix Home Manager package layer (Linux/WSL)"
-    if ! command -v nix >/dev/null 2>&1; then
-        echo "  skipped: nix is not installed. Install Nix first, then re-run:"
-        echo "           ./setup.sh --home-manager"
+    if [[ "$SKIP_DEPS" -eq 1 ]]; then
+        echo
+        echo "skipped: Nix package layer via --skip-deps"
         return 0
+    fi
+    phase "Required POSIX package layer: apply Home Manager packages (Linux/WSL)"
+    if ! command -v nix >/dev/null 2>&1; then
+        if [[ "$DRY_RUN" -eq 1 ]]; then
+            echo "  would fail: Nix is required for Linux/WSL setup. Install Nix first."
+            return 0
+        fi
+        echo "  FAIL: Nix is required for Linux/WSL setup. Install Nix first, then"
+        echo "        re-run ./setup.sh. This repo deliberately does not add a"
+        echo "        pipe-to-shell Nix installer."
+        return 1
     fi
     local arch config_name flake_ref bootstrap_ref
     arch="$(uname -m)"
@@ -692,8 +799,8 @@ run_home_manager_switch() {
         x86_64 | amd64) config_name="x86_64-linux" ;;
         aarch64 | arm64) config_name="aarch64-linux" ;;
         *)
-            echo "  skipped: no Home Manager config for arch $arch"
-            return 0
+            echo "  FAIL: no supported Home Manager config for Linux arch $arch"
+            return 1
             ;;
     esac
     flake_ref="$SCRIPT_DIR#$config_name"
@@ -706,28 +813,23 @@ run_home_manager_switch() {
         return 0
     fi
     if [[ "$ALL" -eq 0 ]]; then
-        printf "  Apply Home Manager now? [y/N] "
-        local reply=""
-        read -r reply || true
-        case "$reply" in
-            y | Y | yes | YES | Yes) ;;
-            *)
-                echo "  skipped Home Manager apply"
-                return 0
-                ;;
-        esac
+        if ! ask_yes_no_default_yes "Apply the required Home Manager package layer now?"; then
+            echo "  FAIL: Linux/WSL setup requires Home Manager for package provisioning."
+            echo "        Re-run with --skip-deps only on a host that is already provisioned."
+            return 1
+        fi
     fi
     if command -v home-manager >/dev/null 2>&1; then
         if ! home-manager switch --flake "$flake_ref" --impure; then
             echo "  FAIL: Home Manager activation failed; setup did not apply the requested Nix package layer." >&2
-            echo "        Re-run './setup.sh --home-manager' after fixing the activation error." >&2
+            echo "        Re-run './setup.sh' after fixing the activation error." >&2
             return 1
         fi
     else
         echo "  bootstrapping Home Manager from flake.lock ($bootstrap_ref)..."
         if ! nix run "$bootstrap_ref" -- switch --flake "$flake_ref" --impure; then
             echo "  FAIL: Home Manager bootstrap activation failed; setup did not apply the requested Nix package layer." >&2
-            echo "        Re-run './setup.sh --home-manager' after fixing the activation error." >&2
+            echo "        Re-run './setup.sh' after fixing the activation error." >&2
             return 1
         fi
     fi
@@ -741,6 +843,7 @@ if [[ -z "${DOTFILES_SETUP_SOURCE_ONLY:-}" ]]; then
     refuse_nvim_self_link_if_needed
 fi
 if [[ -n "${DOTFILES_SETUP_SOURCE_ONLY:-}" ]]; then
+    DOTFILES_SETUP_SOURCE_ONLY_ACTIVE=1
     # shellcheck disable=SC2317  # the exit is reached only when executed, not sourced
     return 0 2>/dev/null || exit 0
 fi
@@ -749,6 +852,11 @@ if [[ "$UPDATE_MODE" -eq 1 ]]; then
     run_update_mode
     exit 0
 fi
+
+# ---- Required POSIX package layer --------------------------------------------
+run_nix_darwin_switch
+run_home_manager_switch
+refresh_runtime_path
 
 # ---- Phase 1: dependencies ---------------------------------------------------
 if [[ "$SKIP_DEPS" -eq 0 ]]; then
@@ -827,9 +935,6 @@ else
 fi
 
 run_polaris_agent_policy
-
-run_nix_darwin_switch
-run_home_manager_switch
 
 # ---- Summary -----------------------------------------------------------------
 echo

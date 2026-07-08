@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 # Assert the nix-darwin config renders the required declarative-Homebrew knobs
 # (the migration ruling): WezTerm + AeroSpace casks, Herdr brew, no auto
-# update/upgrade, cleanup = "check", mutableTaps = false, and Determinate owns
-# the daemon (nix.enable = false). Uses cross-platform pure `nix eval`; skips
-# gracefully when nix is not installed (matching the repo's optional-tool style).
+# update/upgrade, cleanup = "check" on real hosts, hosted-CI cleanup override,
+# autoMigrate = true, mutableTaps = false, and Determinate owns the daemon
+# (nix.enable = false).
+# Uses cross-platform pure `nix eval`; skips gracefully when nix is unavailable
+# in a local shell, while CI installs Nix and runs this as real enforcement
+# coverage.
 set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 cd "$REPO_ROOT"
@@ -46,9 +49,14 @@ brews="$(eval_json homebrew.brews | jq -r '[.[].name] | sort | join(",")')"
 assert_eq "declarative brews include herdr" "herdr" "$brews"
 
 assert_eq "homebrew cleanup = check (report drift, non-destructive)" '"check"' "$(eval_raw homebrew.onActivation.cleanup)"
+ci_cleanup="$(env DOTFILES_NIX_DARWIN_HOSTED_CI=1 nix eval --raw --impure "$cfg.homebrew.onActivation.cleanup" 2>/dev/null || true)"
+assert_eq "hosted CI disables Homebrew cleanup check for disposable runners" "none" "$ci_cleanup"
 assert_eq "homebrew autoUpdate disabled" 'false' "$(eval_raw homebrew.onActivation.autoUpdate)"
 assert_eq "homebrew upgrade disabled" 'false' "$(eval_raw homebrew.onActivation.upgrade)"
+assert_eq "nix-homebrew autoMigrate adopts existing Homebrew installs" 'true' "$(eval_raw nix-homebrew.autoMigrate)"
 assert_eq "nix-homebrew mutableTaps = false (pinned taps)" 'false' "$(eval_raw nix-homebrew.mutableTaps)"
+trusted_taps="$(eval_json nix-homebrew.trust.taps | jq -r 'sort | join(",")')"
+assert_eq "nix-homebrew trusts the pinned AeroSpace tap for Homebrew 5 cask loading" "nikitabobko/tap" "$trusted_taps"
 assert_eq "nix.enable = false (Determinate owns the daemon)" 'false' "$(eval_raw nix.enable)"
 assert_eq "system.primaryUser is set (placeholder in pure eval)" '"runner"' "$(eval_raw system.primaryUser)"
 
@@ -70,6 +78,13 @@ if [[ "${pkgcount:-0}" -ge 1 ]]; then
     echo "ok  : Home Manager (darwin) declares a non-empty home.packages set ($pkgcount)"
 else
     echo "FAIL: Home Manager (darwin) home.packages is empty ($pkgcount)"
+    fail=1
+fi
+names="$(nix eval --json "$hm.home.packages" --apply 'ps: map (p: p.pname or p.name or "") ps' 2>/dev/null | jq -r '.[]' 2>/dev/null || echo "")"
+if printf '%s\n' "$names" | grep -qx 'nodejs'; then
+    echo "ok  : Home Manager (darwin) includes nodejs (Node 24 runtime for pinned npm-backed Pi CLI)"
+else
+    echo "FAIL: Home Manager (darwin) does not include nodejs for the Pi CLI npm runtime"
     fail=1
 fi
 

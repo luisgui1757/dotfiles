@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# setup.sh --home-manager is an EXPLICIT, opt-in, dry-run-safe, Linux/WSL-only
-# step. Prove: the default flow never applies Home Manager (even with --all); a
-# --home-manager --dry-run run only PREVIEWS; --home-manager on macOS is skipped;
-# --home-manager --all on Linux invokes the switch; and first-run bootstrap uses
-# the flake.lock-pinned Home Manager rev + narHash, never the mutable registry alias.
+# setup.sh enforces the Home Manager package layer on Linux/WSL by default.
+# Prove: default --all invokes the switch; dry-run only PREVIEWS; --skip-deps is
+# the explicit already-provisioned escape even when paired with the compatibility
+# alias; macOS is skipped; and first-run bootstrap uses the flake.lock-pinned
+# Home Manager rev + narHash, never the mutable registry alias.
 set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 WORK="$REPO_ROOT/tests/.cache/home-manager-setup-test"
@@ -66,6 +66,60 @@ EOF
     if [[ -s "$WORK/calls" ]]; then cat "$WORK/calls"; else echo "NOCALL"; fi
 }
 
+probe_missing_nix() {
+    local script="$WORK/missing-nix.sh"
+    {
+        cat <<EOF
+set -uo pipefail
+PATH="/usr/bin:/bin"
+export PATH
+uname() { case "\${1:-}" in -m) echo x86_64 ;; *) echo Linux ;; esac; }
+DOTFILES_SETUP_SOURCE_ONLY=1 source "$REPO_ROOT/setup.sh" --all >/dev/null 2>&1
+run_home_manager_switch
+EOF
+    } > "$script"
+    bash "$script" 2>&1
+}
+
+probe_dry_run_missing_nix() {
+    local script="$WORK/dry-run-missing-nix.sh"
+    {
+        cat <<EOF
+set -uo pipefail
+PATH="/usr/bin:/bin"
+export PATH
+uname() { case "\${1:-}" in -m) echo x86_64 ;; *) echo Linux ;; esac; }
+DOTFILES_SETUP_SOURCE_ONLY=1 source "$REPO_ROOT/setup.sh" --all --dry-run >/dev/null 2>&1
+run_home_manager_switch
+EOF
+    } > "$script"
+    bash "$script" 2>&1
+}
+
+probe_decline() {
+    local script="$WORK/decline.sh"
+    {
+        cat <<EOF
+set -uo pipefail
+PATH="/usr/bin:/bin"
+export PATH
+nix() {
+    if [ "\${1:-}" = eval ]; then
+        printf '%s\n%s\n' "$LOCKED_HOME_MANAGER_REV" "$LOCKED_HOME_MANAGER_NAR_HASH"
+        return 0
+    fi
+    return 0
+}
+home-manager() { return 0; }
+uname() { case "\${1:-}" in -m) echo x86_64 ;; *) echo Linux ;; esac; }
+DOTFILES_SETUP_SOURCE_ONLY=1 source "$REPO_ROOT/setup.sh" >/dev/null 2>&1
+ALL=0
+run_home_manager_switch <<<"n"
+EOF
+    } > "$script"
+    bash "$script" 2>&1
+}
+
 fail=0
 assert_eq() {
     local desc="$1" expected="$2" actual="$3"
@@ -77,18 +131,50 @@ assert_eq() {
     fi
 }
 
-assert_eq "default flow (--all, no --home-manager) never applies Home Manager" \
-    NOCALL "$(probe '--all' Linux)"
-assert_eq "--home-manager --dry-run only previews (no switch)" \
-    NOCALL "$(probe '--all --dry-run --home-manager' Linux)"
+assert_eq "default flow (--all) applies Home Manager on Linux" \
+    "home-manager switch --flake $REPO_ROOT#x86_64-linux --impure" \
+    "$(probe '--all' Linux installed)"
+assert_eq "default dry-run only previews (no switch)" \
+    NOCALL "$(probe '--all --dry-run' Linux)"
+assert_eq "--skip-deps skips the default Nix layer for already-provisioned hosts" \
+    NOCALL "$(probe '--all --skip-deps' Linux)"
+assert_eq "--skip-deps still wins when paired with --home-manager" \
+    NOCALL "$(probe '--all --skip-deps --home-manager' Linux)"
 assert_eq "--home-manager on macOS is skipped (use --nix-darwin)" \
     NOCALL "$(probe '--all --home-manager' Darwin)"
-assert_eq "--home-manager --all on Linux invokes home-manager switch" \
+assert_eq "--home-manager compatibility alias still invokes home-manager switch" \
     "home-manager switch --flake $REPO_ROOT#x86_64-linux --impure" \
     "$(probe '--all --home-manager' Linux installed)"
-assert_eq "--home-manager bootstrap uses locked Home Manager rev+narHash" \
+assert_eq "default bootstrap uses locked Home Manager rev+narHash" \
     "nix run $LOCKED_HOME_MANAGER_REF -- switch --flake $REPO_ROOT#x86_64-linux --impure" \
-    "$(probe '--all --home-manager' Linux bootstrap)"
+    "$(probe '--all' Linux bootstrap)"
+
+missing_nix_output="$(probe_missing_nix)" && missing_nix_rc=0 || missing_nix_rc=$?
+if [[ "$missing_nix_rc" -ne 0 ]] && [[ "$missing_nix_output" == *"FAIL: Nix is required for Linux/WSL setup"* ]]; then
+    echo "ok  : Linux/WSL setup fails closed when Nix is missing"
+else
+    echo "FAIL: Linux/WSL setup did not fail closed when Nix was missing"
+    printf '%s\n' "$missing_nix_output"
+    fail=1
+fi
+
+dry_run_missing_nix_output="$(probe_dry_run_missing_nix)" && dry_run_missing_nix_rc=0 || dry_run_missing_nix_rc=$?
+if [[ "$dry_run_missing_nix_rc" -eq 0 ]] && [[ "$dry_run_missing_nix_output" == *"would fail: Nix is required for Linux/WSL setup"* ]]; then
+    echo "ok  : Linux/WSL dry-run previews missing-Nix failure without aborting"
+else
+    echo "FAIL: Linux/WSL dry-run without Nix did not preview cleanly"
+    printf '%s\n' "$dry_run_missing_nix_output"
+    fail=1
+fi
+
+decline_output="$(probe_decline)" && decline_rc=0 || decline_rc=$?
+if [[ "$decline_rc" -ne 0 ]] && [[ "$decline_output" == *"FAIL: Linux/WSL setup requires Home Manager"* ]]; then
+    echo "ok  : interactive decline fails closed on Linux/WSL"
+else
+    echo "FAIL: Linux/WSL interactive decline did not fail closed"
+    printf '%s\n' "$decline_output"
+    fail=1
+fi
 
 dry_bin="$WORK/dry-bin"
 mkdir -p "$dry_bin"
@@ -105,7 +191,7 @@ old_path="$PATH"
 PATH="$dry_bin:/usr/bin:/bin"
 export PATH
 dry_output="$(
-    DOTFILES_SETUP_SOURCE_ONLY=1 source "$REPO_ROOT/setup.sh" --all --dry-run --home-manager >/dev/null 2>&1
+    DOTFILES_SETUP_SOURCE_ONLY=1 source "$REPO_ROOT/setup.sh" --all --dry-run >/dev/null 2>&1
     uname() { if [[ "${1:-}" == "-m" ]]; then echo x86_64; else echo Linux; fi; }
     run_home_manager_switch
 )"
@@ -122,9 +208,17 @@ else
 fi
 
 if grep -Eq '^[[:space:]]*run_home_manager_switch[[:space:]]*$' "$REPO_ROOT/setup.sh"; then
-    echo "ok  : setup.sh dispatches the Home Manager opt-in function"
+    echo "ok  : setup.sh dispatches the required Home Manager function"
 else
     echo "FAIL: setup.sh no longer dispatches run_home_manager_switch"
+    fail=1
+fi
+dispatch_line="$(grep -nE '^[[:space:]]*run_home_manager_switch[[:space:]]*$' "$REPO_ROOT/setup.sh" | cut -d: -f1 | head -n1)"
+phase1_line="$(grep -nE 'Phase 1/6: install dependencies' "$REPO_ROOT/setup.sh" | cut -d: -f1 | head -n1)"
+if [[ -n "$dispatch_line" && -n "$phase1_line" && "$dispatch_line" -lt "$phase1_line" ]]; then
+    echo "ok  : Home Manager dispatch precedes Phase 1 dependency installation"
+else
+    echo "FAIL: Home Manager dispatch no longer precedes Phase 1"
     fail=1
 fi
 

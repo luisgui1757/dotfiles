@@ -331,6 +331,28 @@
     },
     {
       "customType": "regex",
+      "description": "Pi CLI npm package version (install-deps.sh). The adjacent npm integrity must be recomputed manually after Renovate bumps this.",
+      "managerFilePatterns": ["/^install-deps\\.sh$/"],
+      "matchStrings": [
+        "PI_CLI_VERSION=\"(?<currentValue>[^\"]+)\"\\s+PI_CLI_INTEGRITY=\"sha512-[^\"]+\""
+      ],
+      "depNameTemplate": "@earendil-works/pi-coding-agent",
+      "datasourceTemplate": "npm",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "description": "Pi CLI npm package version (install-deps.ps1). The adjacent npm integrity must be recomputed manually after Renovate bumps this.",
+      "managerFilePatterns": ["/^install-deps\\.ps1$/"],
+      "matchStrings": [
+        "\\$PiCliVersion\\s*=\\s*'(?<currentValue>[^']+)'\\s+\\$PiCliIntegrity\\s*=\\s*'sha512-[^']+'"
+      ],
+      "depNameTemplate": "@earendil-works/pi-coding-agent",
+      "datasourceTemplate": "npm",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
       "description": "cargo-binstall installer script commit pinned to the current main branch digest. The adjacent installer script SHA-256 must be recomputed manually after Renovate bumps this.",
       "managerFilePatterns": ["/^\\.github/workflows/test\\.yml$/"],
       "matchStrings": [

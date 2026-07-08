@@ -3,10 +3,10 @@
 Cross-platform terminal and editor setup for macOS, Linux, WSL, and Windows.
 The repo owns the daily shell/editor stack: Neovim, tmux/psmux, Starship, zsh,
 PowerShell, Ghostty, WezTerm, lazygit, `lsd`, `zoxide` smart-cd, the `gh` CLI with the
-`gh-dash` dashboard, Windows Terminal theming, locked plugin restore, LSP /
+`gh-dash` dashboard, the `pi` CLI, Windows Terminal theming, locked plugin restore, LSP /
 formatter provisioning, and global Polaris agent-policy bootstrap. It also provisions the `tree-sitter` CLI needed by
 `nvim-treesitter` main parser builds, plus AeroSpace (macOS tiling WM) and Herdr
-(agent multiplexer: macOS/Linux stable, Windows preview) as optional vendor-channel installs.
+(agent multiplexer: macOS/Linux stable, Windows preview) through vendor-channel installs.
 
 The public interface is intentionally small:
 
@@ -15,9 +15,9 @@ run setup -> install programs -> link configs -> restore Neovim plugins -> sync 
 ```
 
 For a fresh machine, run `setup`. The split is deliberate:
-`install-deps` installs programs and optional tooling; chezmoi owns the
-dotfiles/config layer in `home/`. The full setup scripts now apply configs
-through chezmoi.
+Nix is the enforced package layer on macOS/Linux/WSL; `install-deps` handles
+native/deferred tools and Windows packages; chezmoi owns the dotfiles/config
+layer in `home/`. The full setup scripts apply configs through chezmoi.
 
 Updates are deliberately two-track. The reproducible core is pinned in git:
 Neovim plugins (`nvim/lazy-lock.json`) and configs update with `git pull` and
@@ -32,12 +32,16 @@ installs repo-managed dependencies, links every config, then runs
 `:Lazy! restore`, a synchronous nvim-treesitter parser install, and
 `:MasonToolsInstallSync` before the first interactive Neovim launch.
 
-Git is the only hard prerequisite for remote setup because setup needs it to
-clone this repo. If Git is missing, the setup scripts print the first install
-command for the platform package manager.
+Git is required to clone this repo. On macOS/Linux/WSL, Nix is also required
+before `setup.sh` runs: setup applies the pinned nix-darwin/Home Manager layer
+first and fails closed if `nix` is missing. Install Nix through a verified
+installer for the host (for example Determinate's notarized macOS package or a
+reviewed Linux installer path); this repo deliberately does not add a
+pipe-to-shell Nix bootstrap.
 
 ```bash
 # mac / linux / wsl
+# prerequisite: install Nix first; setup will apply this repo's pinned flake
 git clone https://github.com/luisgui1757/dotfiles.git ~/dotfiles
 cd ~/dotfiles
 ./setup.sh --all
@@ -53,8 +57,9 @@ Set-Location $HOME\dotfiles
 
 For WSL, treat setup as split-host: run `.\setup.ps1 -All` on Windows so
 Windows Terminal, Hack Nerd Font, lazygit, and `win32yank` are installed on the
-rendering host, then run `./setup.sh --all` inside WSL for the Linux CLI/editor
-stack. Windows Terminal settings handling runs by default, and setup backs up
+rendering host, install Nix inside the WSL distro, then run `./setup.sh --all`
+inside WSL for the Linux CLI/editor stack. Windows Terminal settings handling
+runs by default, and setup backs up
 the pre-merge packaged file first when it exists. If Scoop, winget, and choco
 cannot register the MSIX app, setup falls back to a pinned
 SHA-256-verified portable WT zip. Portable WT reads the unpackaged settings
@@ -111,37 +116,63 @@ apply.
 ./setup.sh --update              # update proven tools/artifacts + Mason, no git/config/Lazy
 ./setup.sh --dry-run             # preview
 ./setup.sh --experimental-wsl-gui # WSL-only opt-in for Linux GUI terminal bits
-./setup.sh --nix-darwin          # macOS-only opt-in: apply the nix-darwin package layer
-./setup.sh --home-manager        # Linux/WSL-only opt-in: apply the Home Manager package layer
+./setup.sh --nix-darwin          # compatibility alias; macOS setup already applies nix-darwin
+./setup.sh --home-manager        # compatibility alias; Linux/WSL setup already applies Home Manager
 ./setup.sh --skip-config         # skip chezmoi config apply
 ./setup.sh --skip-agents         # skip global Polaris agent policy
 make setup                       # same as ./setup.sh, via the Makefile
 ```
 
-**Nix layer (optional, POSIX packages only).** `flake.nix` + a committed
-`flake.lock` provide a package layer (nix-darwin + declarative Homebrew + Home
-Manager on macOS). chezmoi still owns **every** dotfile; Nix owns no config.
-It is opt-in and off by default: `./setup.sh --nix-darwin` (macOS-only,
-consent-gated) runs `sudo darwin-rebuild switch --flake .#dotfiles --impure`,
-which activates the declarative Homebrew casks (WezTerm, AeroSpace) + Herdr brew
-and the nix-owned CLI package set. The flake resolves the real invoking user
-from `SUDO_USER` before `USER`, so Homebrew/Home Manager do not target `root`
-during sudo activation. First-run bootstrap is also pinned: setup derives the
-locked nix-darwin rev and `narHash` from `flake.lock` before running
+**Nix layer (required POSIX packages only).** `flake.nix` + a committed
+`flake.lock` provide the macOS/Linux/WSL package layer. macOS uses nix-darwin +
+declarative Homebrew + Home Manager; Linux/WSL uses standalone Home Manager.
+chezmoi still owns **every** dotfile; Nix owns no config. A normal `./setup.sh`
+or `./setup.sh --all` applies the matching package layer before native/deferred
+dependency provisioning. On macOS this runs
+`sudo darwin-rebuild switch --flake .#dotfiles --impure`, which activates the
+declarative Homebrew casks (WezTerm, AeroSpace) + Herdr brew and the nix-owned
+CLI package set. The flake resolves the real invoking user from `SUDO_USER`
+before `USER`, so Homebrew/Home Manager do not target `root` during sudo
+activation. First-run bootstrap is also pinned: setup derives the locked
+nix-darwin rev and `narHash` from `flake.lock` before running
 `sudo nix run github:nix-darwin/nix-darwin/<locked-rev>?narHash=<encoded-narHash>#darwin-rebuild -- ...`;
-it never uses the mutable `nix-darwin` registry alias. On Linux/WSL, `./setup.sh
---home-manager` applies the standalone Home Manager package set
-(`home-manager switch --flake .#<arch>-linux`; first-run bootstrap uses the
-locked `github:nix-community/home-manager/<locked-rev>?narHash=<encoded-narHash>#home-manager`
-ref). WSL
-writes only to the Linux `~/.nix-profile`, never `/mnt/c`. Both keep the native
-install-deps arms as the default — the Nix layer is additive. **nvim and the
+it never uses the mutable `nix-darwin` registry alias. On Linux/WSL, setup runs
+`home-manager switch --flake .#<arch>-linux --impure`; first-run bootstrap uses
+the locked
+`github:nix-community/home-manager/<locked-rev>?narHash=<encoded-narHash>#home-manager`
+ref. WSL writes only to the Linux `~/.nix-profile`, never `/mnt/c`.
+`--skip-deps` is the explicit already-provisioned escape hatch and skips the
+Nix package-layer application together with native/deferred dependency installs;
+the compatibility aliases `--nix-darwin` and `--home-manager` do not override
+that skip. Dry-run does not require Nix: on an unprovisioned POSIX host it
+previews that the real run would fail until Nix is installed.
+The Nix-owned CLI set includes Node 24 so the pinned npm-backed Pi CLI can run
+reproducibly on macOS/Linux/WSL while the `pi` package itself stays pinned by
+npm integrity until nixpkgs catches up.
+On real Macs, nix-darwin keeps `homebrew.onActivation.cleanup = "check"` so
+undeclared Brew drift aborts activation without uninstalling anything. The
+GitHub-hosted macOS setup job is the only exception: setup passes a
+repo-scoped `DOTFILES_NIX_DARWIN_HOSTED_CI=1` marker because runner images ship
+a large preinstalled Brew surface outside this dotfiles Brewfile. The marker is
+only automatic when Actions reports `RUNNER_ENVIRONMENT=github-hosted` and
+`RUNNER_OS=macOS`; self-hosted Macs keep the strict drift check.
+nix-homebrew uses `autoMigrate = true` so Macs that already have official-script
+Homebrew can be adopted by the declarative Nix layer; upstream's migration keeps
+installed packages while replacing the Homebrew repositories. Because this repo
+keeps `mutableTaps = false`, setup also moves any existing
+`/opt/homebrew/Library/Taps` directory to a timestamped
+`Taps.dotfiles-pre-nix-*` backup before activation so nix-homebrew can replace
+it with the pinned declarative tap symlink. The `nikitabobko/tap` tap is also
+explicitly trusted through nix-homebrew because Homebrew 5 refuses to load
+personal-tap casks, including AeroSpace, without a trust entry.
+**nvim and the
 tree-sitter CLI stay native** (ABI-coupled to nvim-treesitter parser builds;
 migrating them into a same-closure toolchain is a follow-up). Native Windows is
-non-Nix. `nix flake check` runs in CI (`.github/workflows/nix.yml`) on Ubuntu +
-macOS. The current `darwinConfigurations.dotfiles` activation target is
+non-Nix. `nix flake check` runs in required CI (`.github/workflows/nix.yml`) on
+Ubuntu + macOS. The current `darwinConfigurations.dotfiles` activation target is
 `aarch64-darwin`; x86_64 Darwin still gets dev shells/checks but no supported
-host activation config yet.
+host activation config yet, so public setup on Intel Macs fails closed unless
+you pass `--skip-deps` and provision packages manually.
 
 ```powershell
 .\setup.ps1
@@ -440,7 +471,9 @@ and whether `pwsh` is installed.
   Nix/nixpkgs GUI package.
 - AeroSpace (macOS-only i3-like tiling WM) installs from the official tap cask
   (`brew install --cask nikitabobko/tap/aerospace`), `start-at-login = true`,
-  chezmoi-owned config. Its keymap deliberately avoids the reserved chords:
+  chezmoi-owned config. The tap is a pinned nix-homebrew input and is explicitly
+  trusted so Homebrew 5 will load the cask. Its keymap deliberately avoids the
+  reserved chords:
   window focus/move live on `ctrl-alt(-shift)-h/j/k/l` so they never shadow
   Neovim's `<A-h/j/k/l>` window navigation, and nothing uses `Alt-c` (fzf-tab /
   PSFzf `cd`). On first launch grant it Accessibility permission (System Settings
@@ -483,6 +516,12 @@ and whether `pwsh` is installed.
   run the cached Polaris Bash installer with `--global --remove` on POSIX or
   from Git Bash on Windows. Project/team adoption is separate: run Polaris
   repo-local install or vendoring in that project and commit those files there.
+- Pi CLI is a provisioned binary, not synced runtime state. Setup installs
+  `@earendil-works/pi-coding-agent@0.80.3` from npm after verifying npm's
+  `dist.integrity`
+  `sha512-TIggw9gCXpA+Ph7OjdTA7ka2NPwTVuPmy39KDSyUzaKq8VvHfMGR7vtRz4JB7Um/RMRblmzhu4p9tUCk6MTgGA==`.
+  POSIX public setup gets Node 24 from Nix first; Windows uses the native Node
+  LTS catalog entry. Local `.pi/` sessions and preferences stay machine-local.
 - Notes / Obsidian support writes `export NOTES_VAULT=...` to
   `~/.zshrc.local` (gitignored, sourced by `zshrc`). Non-interactive runs skip
   the prompt, so set `NOTES_VAULT` yourself there.
@@ -554,11 +593,11 @@ The e2e jobs cover different install paths, not symmetric container platforms:
 
 | Check | What it proves |
 |---|---|
-| `e2e containers / ubuntu-24.04` | Clean `ubuntu:24.04`, non-root user, native `apt`, no Linuxbrew (`DOTFILES_SKIP_BREW_BOOTSTRAP=1`), then `install-deps.sh --all`, chezmoi config apply, tool assertions including `zoxide`, `gh`, WezTerm, and Herdr, Neovim >= 0.12, lazygit, zsh plugin files, config content assertions, and nvim directory realpath assertion. |
-| `setup.sh / ubuntu-24.04` | Full Unix setup on the hosted Ubuntu runner. This runner has Linuxbrew available, so it proves the Linuxbrew path that users may hit and asserts the new POSIX tool commands. |
-| `setup.sh / macos-15` | Full macOS setup through the real macOS hosted runner and Homebrew path. Docker cannot model macOS. |
-| `setup.ps1 / windows-2025` | Full Windows setup through the real Windows hosted runner, including Scoop/winget/choco behavior, PowerShell, symlinks, `zoxide`/`gh`/WezTerm/Herdr command probes, and Neovim restore/sync phases. Windows containers do not model the desktop/user-profile setup well. |
-| `setup.sh / WSL2 Ubuntu-24.04 (best-effort canary)` | Non-required WSL smoke signal. Hosted runners cannot provide reliable nested virtualization, so this is intentionally best-effort. |
+| `e2e containers / ubuntu-24.04` | Clean `ubuntu:24.04`, non-root user, native `apt`, no Linuxbrew (`DOTFILES_SKIP_BREW_BOOTSTRAP=1`), then `install-deps.sh --all`, chezmoi config apply, tool assertions including `zoxide`, `gh`, WezTerm, and Herdr, Neovim >= 0.12, lazygit, zsh plugin files, config content assertions, and nvim directory realpath assertion. This is the native installer regression fixture, not the public POSIX package-plane proof; Pi CLI is asserted in the public setup jobs where Nix supplies Node 24. |
+| `setup.sh / ubuntu-24.04` | Full public Unix setup on the hosted Ubuntu runner after installing Nix in CI: Home Manager first, then native/deferred installs, chezmoi, Lazy, Tree-sitter, Mason, and Polaris. It asserts the nix-owned CLI commands resolve from a Nix profile/store path. |
+| `setup.sh / macos-15` | Full public macOS setup through the real macOS hosted runner after installing Nix in CI: nix-darwin/declarative Homebrew first, then native/deferred installs, chezmoi, Lazy, Tree-sitter, Mason, and Polaris. Docker cannot model macOS. The hosted runner passes `DOTFILES_NIX_DARWIN_HOSTED_CI=1` so declarative Homebrew activation does not abort on GitHub's preinstalled Brew packages; real hosts keep `cleanup = "check"`. |
+| `setup.ps1 / windows-2025` | Full Windows setup through the real Windows hosted runner, including Scoop/winget/choco behavior, PowerShell, symlinks, `zoxide`/`gh`/WezTerm/Herdr/Pi CLI command probes, and Neovim restore/sync phases. Windows containers do not model the desktop/user-profile setup well. |
+| `setup.sh / WSL2 Ubuntu-24.04 (best-effort canary)` | Non-required WSL smoke signal. Hosted runners cannot provide reliable nested virtualization, so this is intentionally best-effort. The canary installs Ubuntu's `nix-bin` package inside the distro, enables flakes, then runs the same enforced Home Manager setup path as Linux. |
 
 After the Lazy restore, deterministic Tree-sitter parser install, and Mason sync, each
 `setup.sh`/`setup.ps1` job also
@@ -606,7 +645,8 @@ systems, while the required WSL proxy is the Ubuntu container plus the
 WSL config-template coverage. Do not add the WSL2 canary to
 required checks unless the owner explicitly accepts the flake risk.
 
-These e2e jobs fail if setup skips Phase 3-5, omits Phase 6/6, emits a precise
+These e2e jobs fail if setup skips Phase 3-5, omits Phase 6/6, leaves a
+Nix-owned POSIX CLI resolving outside a Nix profile/store path, emits a precise
 `FAIL:` marker, installs Neovim below 0.12, Lazy restore / Tree-sitter parser
 install / Mason sync exits nonzero, or expected Mason-installed binaries are
 missing. They do not blanket-fail on benign warning/deprecation text.
@@ -658,7 +698,7 @@ update PRs are intentionally not configured.
 |---|---|---|
 | GitHub Actions | Managed, digest-pinned, labeled `github-actions` | Actions are repo-owned CI inputs with stable Renovate support. |
 | GitHub runner images | Managed, labeled `github-runners`, reviewed separately | `ubuntu-*`, `macos-*`, and `windows-*` bumps can change the supported CI platform, so they should not be mixed with ordinary Action bumps. |
-| Repo-pinned installer versions/refs | Managed, labeled `pinned-downloads`, never automerged | Neovim Linux tarballs, chezmoi CI release archives, lazygit Linux tarballs, Starship Linux tarballs, tree-sitter CLI Linux archives, WezTerm Ubuntu `.deb`, Herdr Linux binaries, Herdr Windows preview `.exe`, Hack Nerd Font, Windows Terminal portable zip, Ubuntu Ghostty, zsh plugin refs, tmux/psmux plugin refs, the Homebrew installer commit, the Scoop installer commit, the Renovate validator package/runtime, and the CI `cargo-binstall` commit are explicit repo pins. |
+| Repo-pinned installer versions/refs | Managed, labeled `pinned-downloads`, never automerged | Neovim Linux tarballs, chezmoi CI release archives, lazygit Linux tarballs, Starship Linux tarballs, tree-sitter CLI Linux archives, WezTerm Ubuntu `.deb`, Herdr Linux binaries, Herdr Windows preview `.exe`, Hack Nerd Font, Windows Terminal portable zip, Ubuntu Ghostty, Pi CLI npm package, zsh plugin refs, tmux/psmux plugin refs, the Homebrew installer commit, the Scoop installer commit, the Renovate validator package/runtime, and the CI `cargo-binstall` commit are explicit repo pins. |
 | Adjacent SHA-256 / commit constants | Not managed; matched only as regex context | Renovate can bump the version/ref but cannot recompute archive/script hashes or verify tag commit IDs. CI must fail until a human recomputes and reviews them. |
 | Package-manager catalogs | Not managed | Brew, apt, dnf, pacman, zypper, apk, Scoop, winget, and choco entries are package names/IDs, not repo version pins. Let the package manager resolve current versions. |
 | Neovim plugin and Mason tools | Not managed | `lazy-lock.json` is refreshed with Lazy and tested as editor behavior; Mason intentionally has no machine-pinned lockfile. |
@@ -891,6 +931,11 @@ setup skips the extension cleanly (no error, because an unauthenticated install
 hits GitHub's anonymous rate limit); run `gh auth login`, then rerun `setup` /
 `install-deps` to pick it up. The token is machine-local and never stored in
 this repo.
+
+### Pi CLI
+
+Run `pi --version` to confirm setup installed the pinned Pi CLI. Setup installs
+the CLI only; `.pi/` runtime state remains local to each machine.
 
 ### Command-line vi mode
 

@@ -181,6 +181,20 @@ else
     echo "ok  : Nix bootstrap commands use locked flake refs, not mutable registry aliases"
 fi
 
+for f in .github/workflows/e2e-install.yml tests/greenfield/wsl-greenfield.ps1; do
+    if ! grep -Fq "nix-bin" "$f"; then
+        echo "FAIL: $f must install Ubuntu's nix-bin before WSL setup.sh validation"
+        fail=1
+    fi
+    if ! grep -Fq "experimental-features = nix-command flakes" "$f"; then
+        echo "FAIL: $f must enable Nix flakes before WSL setup.sh validation"
+        fail=1
+    fi
+done
+if [[ "$fail" -eq 0 ]]; then
+    echo "ok  : WSL validation surfaces provision Nix before setup.sh"
+fi
+
 for snippet in \
     'flake_lock_github_nar_hash' \
     'nix_flake_ref_query_encode' \

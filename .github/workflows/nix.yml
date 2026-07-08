@@ -1,10 +1,8 @@
 name: nix
 
-# Validates the Nix layer (flake.nix + committed flake.lock) on Ubuntu and
-# macOS. This is intentionally a SEPARATE workflow from test.yml so it is not
-# auto-derived into the required-status-check set (required_checks_test.sh reads
-# only test.yml + e2e-install.yml). Promote it to a required check later via
-# scripts/apply-repo-safeguards.sh if desired.
+# Validates the enforced POSIX Nix layer (flake.nix + committed flake.lock) on
+# Ubuntu and macOS. These matrix contexts are checked into the required-status
+# sources because setup.sh now depends on Nix for macOS/Linux/WSL provisioning.
 on:
   push:
     branches: [main]

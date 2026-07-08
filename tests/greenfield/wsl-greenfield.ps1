@@ -90,7 +90,10 @@ try {
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
-apt-get install -y --no-install-recommends bash sudo ca-certificates git rsync findutils coreutils procps passwd curl tar gzip unzip xz-utils
+apt-get install -y --no-install-recommends bash sudo ca-certificates git rsync findutils coreutils procps passwd curl tar gzip unzip xz-utils nix-bin
+mkdir -p /etc/nix
+printf '%s\n' 'experimental-features = nix-command flakes' > /etc/nix/nix.conf
+nix --version
 if ! id -u dotfiles >/dev/null 2>&1; then
     useradd -m -s /bin/bash dotfiles
 fi

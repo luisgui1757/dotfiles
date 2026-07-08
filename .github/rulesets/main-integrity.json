@@ -52,6 +52,14 @@
             "integration_id": 15368
           },
           {
+            "context": "nix flake check (ubuntu-24.04)",
+            "integration_id": 15368
+          },
+          {
+            "context": "nix flake check (macos-26)",
+            "integration_id": 15368
+          },
+          {
             "context": "e2e containers / ubuntu-24.04",
             "integration_id": 15368
           },

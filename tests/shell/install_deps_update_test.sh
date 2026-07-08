@@ -1165,7 +1165,7 @@ case_direct_artifact_stale_marker_refreshes_pin() {
 
 case_nix_owned_tool_reports_owner_nix() {
     # A tool whose command source resolves under a Nix store/profile is
-    # owner=nix and is NOT updated (refreshed via the opt-in Nix layer). Covers a
+    # owner=nix and is NOT updated (refreshed via the enforced Nix layer). Covers a
     # ~/.nix-profile source (matched directly) AND a plain source whose realpath
     # resolves into /nix/store. Proves update mode never shells out to `nix`.
     local root="$TMP_ROOT/nix-owned" nix_sentinel="$TMP_ROOT/nix-owned.nix-invoked"

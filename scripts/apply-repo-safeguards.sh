@@ -120,6 +120,8 @@ windows
 chezmoi-parity
 chezmoi-parity-macos
 chezmoi-parity-windows
+nix flake check (ubuntu-24.04)
+nix flake check (macos-26)
 e2e containers / ubuntu-24.04
 setup.sh / ubuntu-24.04
 setup.sh / macos-15
@@ -165,6 +167,8 @@ gh_api_json PUT "repos/$repo/branches/main/protection" <<'JSON' >/dev/null
       "chezmoi-parity",
       "chezmoi-parity-macos",
       "chezmoi-parity-windows",
+      "nix flake check (ubuntu-24.04)",
+      "nix flake check (macos-26)",
       "e2e containers / ubuntu-24.04",
       "setup.sh / ubuntu-24.04",
       "setup.sh / macos-15",

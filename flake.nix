@@ -79,7 +79,14 @@
               nix-homebrew = {
                 enable = true;
                 user = username;
+                autoMigrate = true;
                 mutableTaps = false;
+                trust.taps = [
+                  # Homebrew 5 refuses personal-tap casks unless the tap is
+                  # explicitly trusted. This is the documented AeroSpace trust
+                  # decision, and the tap itself is pinned as a flake input.
+                  "nikitabobko/tap"
+                ];
                 taps = {
                   "homebrew/homebrew-core" = inputs.homebrew-core;
                   "homebrew/homebrew-cask" = inputs.homebrew-cask;
@@ -98,7 +105,7 @@
         };
 
       # Standalone Home Manager for native Linux / WSL userland (packages only).
-      # Activated on the real host by setup.sh's consent-gated
+      # Activated on the real host by setup.sh's default POSIX package phase via
       # `home-manager switch --flake .#<arch>-linux` -- no root, WSL split-host
       # preserved (writes only to the Linux ~/.nix-profile, never /mnt/c).
       mkHome =
@@ -151,8 +158,8 @@
       formatter = forAllSystems (pkgs: pkgs.nixpkgs-fmt);
 
       # macOS host configuration: nix-darwin + declarative Homebrew + Home Manager
-      # (packages only). Activated on the real Mac by setup.sh's consent-gated
-      # `darwin-rebuild switch --flake .#dotfiles` (never in normal setup/update).
+      # (packages only). Activated on the real Mac by setup.sh's default POSIX
+      # package phase via `darwin-rebuild switch --flake .#dotfiles`.
       darwinConfigurations."dotfiles" = mkDarwin { username = resolvedUser; };
 
       # Native Linux / WSL userland package sets (Home Manager, packages only).

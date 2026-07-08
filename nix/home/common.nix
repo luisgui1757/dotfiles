@@ -12,8 +12,8 @@
   home.stateVersion = "25.05";
 
   # The nix-owned CLI package set. These are tools install-deps.sh otherwise
-  # provisions via the native package manager / Homebrew; a user who adopts the
-  # Nix layer gets them from nixpkgs instead. Vendor-channel apps
+  # provisions via the native package manager / Homebrew in legacy or direct
+  # install-deps paths; public POSIX setup gets them from nixpkgs. Vendor-channel apps
   # (WezTerm/AeroSpace/Herdr) come from Homebrew, not here.
   #
   # DELIBERATELY EXCLUDED (deferred, ABI-coupled to the still-native Neovim):
@@ -29,6 +29,7 @@
     fzf
     jq
     lazygit
+    nodejs_24
     starship
     zoxide
   ];
