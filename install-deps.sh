@@ -57,6 +57,26 @@ HACK_NERD_FONT_SHA256="8ca33a60c791392d872b80d26c42f2bfa914a480f9eb2d7516d9f8437
 # release assets over HTTPS at run time. Bump the version + SHA together.
 GHOSTTY_UBUNTU_VERSION="1.3.1-0-ppa2"
 GHOSTTY_UBUNTU_INSTALL_SHA256="7517776f6d862ec523e627840af4806e13385302f653ae9f7a86aa6d5af1cae5"
+# WezTerm on Ubuntu (amd64): pin + SHA-256 verify the OFFICIAL .deb from the
+# stable release. macOS uses the Homebrew cask; Windows uses install-deps.ps1's
+# catalog. arm64 Linux and non-Ubuntu hosts get manual guidance -- upstream did
+# not publish an arm64 .sha256 sidecar for this stable tag, so we do not pin a
+# checksum we cannot verify. The amd64 SHA below was verified against upstream's
+# published `wezterm-...Ubuntu22.04.deb.sha256` sidecar on 2026-07-07. Bump the
+# version + SHA together. (Windows installs WezTerm from the install-deps.ps1
+# catalog via winget/scoop/choco, so there is no Windows version pin to mirror.)
+WEZTERM_VERSION="20240203-110809-5046fc22"
+WEZTERM_DEB_AMD64_SHA256="86358dab5794a4fb63f7c91dd68d4fdc3da58faad648a58fc77d2bd51c7b0686"
+# Herdr (agent multiplexer). macOS + Linuxbrew use the canonical homebrew-core
+# formula (`brew install herdr`). Native Linux without brew installs the pinned
+# release binary, SHA-256 verified. Upstream publishes no checksum sidecar, so
+# these SHAs were computed from the pinned v0.7.1 assets on 2026-07-07 (bump the
+# version + both SHAs together). NOT the herdr.dev install.sh remote-eval path.
+# Native Windows uses install-deps.ps1's separate pinned, SHA-256-verified
+# preview .exe path, never the herdr.dev install.ps1 remote-eval path.
+HERDR_VERSION="v0.7.1"
+HERDR_LINUX_X86_64_SHA256="b965acaffc2c22f54b6e6c64af7cf8e98a3f4ac2622630a0599c67a4b9d8a654"
+HERDR_LINUX_ARM64_SHA256="3d757ac30c631e79dc45038c3ecc6423fe13a89f9cffa0f415aedd2c27f1576c"
 PYLATEXENC_BUILD_BACKEND_VERSION="80.9.0"
 PYLATEXENC_BUILD_BACKEND_SHA256="062d34222ad13e0cc312a4c02d73f059e86a4acbfbdea8f8f76b28c99f306922"
 PYLATEXENC_VERSION="2.10"
@@ -2080,6 +2100,42 @@ install_ghostty_macos() {
     brew install --cask ghostty || echo "  WARN: ghostty cask install failed"
 }
 
+install_wezterm_macos() {
+    if have wezterm; then
+        printf "  ok        %-26s already installed\n" "wezterm"
+        return
+    fi
+    if ! ask "Install WezTerm (terminal) via Homebrew cask?"; then
+        printf "  skipped   %-26s\n" "wezterm"
+        return
+    fi
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        echo "  would: brew install --cask wezterm"
+        return
+    fi
+    brew install --cask wezterm || echo "  WARN: wezterm cask install failed"
+}
+
+# AeroSpace: i3-like tiling WM, macOS only. Official tap cask (nikitabobko/tap).
+# NOT nixpkgs. Needs an Accessibility (TCC) grant on first launch -- unscriptable.
+install_aerospace_macos() {
+    if have aerospace; then
+        printf "  ok        %-26s already installed\n" "aerospace"
+        return
+    fi
+    if ! ask "Install AeroSpace (tiling WM, macOS) via Homebrew cask (nikitabobko/tap)?"; then
+        printf "  skipped   %-26s\n" "aerospace"
+        return
+    fi
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        echo "  would: brew install --cask nikitabobko/tap/aerospace"
+        return
+    fi
+    brew install --cask nikitabobko/tap/aerospace || echo "  WARN: aerospace cask install failed"
+    echo "  note: grant AeroSpace Accessibility permission (System Settings ->"
+    echo "        Privacy & Security -> Accessibility). This TCC grant is unscriptable."
+}
+
 # ---- Package-name resolution (Bash 3.2-safe, no associative arrays) ----------
 #
 # Table format: lines of "tool|brew|apt|dnf|pacman|zypper|apk".
@@ -2108,6 +2164,7 @@ tree-sitter|tree-sitter-cli|||||
 shellcheck|shellcheck|shellcheck|ShellCheck|shellcheck|ShellCheck|shellcheck
 jq|jq|jq|jq|jq|jq|jq
 gh|gh|gh|gh|github-cli|gh|github-cli
+herdr|herdr|||||
 bats|bats-core|bats|bats|bats|bats|bats
 hyperfine|hyperfine|hyperfine|hyperfine|hyperfine|hyperfine|hyperfine
 taplo|taplo|||taplo-cli||
@@ -2474,7 +2531,7 @@ direct_artifact_marker_value() {
 
 direct_artifact_supported_tool() {
     case "$1" in
-        nvim|lazygit|starship|tree-sitter|chezmoi) return 0 ;;
+        nvim|lazygit|starship|tree-sitter|chezmoi|herdr) return 0 ;;
         *) return 1 ;;
     esac
 }
@@ -2567,6 +2624,18 @@ direct_artifact_current_metadata() {
             DIRECT_ARTIFACT_SHA256="$CHEZMOI_LINUX_ARM64_SHA256"
             DIRECT_ARTIFACT_URL="https://github.com/twpayne/chezmoi/releases/download/${CHEZMOI_VERSION}/${asset}"
             ;;
+        herdr:x86_64|herdr:amd64)
+            asset="herdr-linux-x86_64"
+            DIRECT_ARTIFACT_VERSION="$HERDR_VERSION"
+            DIRECT_ARTIFACT_SHA256="$HERDR_LINUX_X86_64_SHA256"
+            DIRECT_ARTIFACT_URL="https://github.com/ogulcancelik/herdr/releases/download/${HERDR_VERSION}/${asset}"
+            ;;
+        herdr:aarch64|herdr:arm64)
+            asset="herdr-linux-aarch64"
+            DIRECT_ARTIFACT_VERSION="$HERDR_VERSION"
+            DIRECT_ARTIFACT_SHA256="$HERDR_LINUX_ARM64_SHA256"
+            DIRECT_ARTIFACT_URL="https://github.com/ogulcancelik/herdr/releases/download/${HERDR_VERSION}/${asset}"
+            ;;
         *) return 1 ;;
     esac
 }
@@ -2590,7 +2659,7 @@ direct_artifact_install_shape_allowed() {
                     "$binary_path" == "$user_binary" &&
                     "$install_root" == "$user_root" ]]
             ;;
-        tree-sitter|chezmoi)
+        tree-sitter|chezmoi|herdr)
             [[ "$command_path" == "$user_binary" &&
                 "$binary_path" == "$user_binary" &&
                 "$install_root" == "$user_root" ]]
@@ -2706,6 +2775,7 @@ refresh_direct_artifact() {
         starship) install_starship_linux || rc=$? ;;
         tree-sitter) install_tree_sitter_cli_linux || rc=$? ;;
         chezmoi) install_chezmoi || rc=$? ;;
+        herdr) install_herdr || rc=$? ;;
         *) rc=1 ;;
     esac
     YES_ALL="$old_yes"
@@ -2903,6 +2973,30 @@ pm_update() {
     scoped_update_status "$PM" "$tool" "$pkg" "$(update_tool_source "$tool" || true)"
 }
 
+# A resolved executable is Nix-owned when its command source (or its real path)
+# lives under a Nix store / profile path. Update mode reports these as
+# owner=nix and does NOT try to update them: Nix-owned tools are refreshed
+# through the OPT-IN Nix layer (setup.sh --nix-darwin / --home-manager, or a
+# reviewed flake.lock bump), never a blanket `nix profile upgrade` and never a
+# silent flake.lock rewrite. Every other tool keeps its existing per-manager
+# ownership -- this only fires when PATH actually resolves the tool from Nix.
+nix_owns_tool_source() {
+    local source="$1" real
+    [[ -n "$source" ]] || return 1
+    case "$source" in
+        /nix/store/* | *"/.nix-profile/"* | *"/.local/state/nix/profile/"* | /run/current-system/sw/* | /etc/profiles/per-user/* | /nix/var/nix/profiles/*)
+            return 0
+            ;;
+    esac
+    real="$(real_source_path "$source" 2>/dev/null || true)"
+    case "$real" in
+        /nix/store/* | /run/current-system/sw/* | /etc/profiles/per-user/*)
+            return 0
+            ;;
+    esac
+    return 1
+}
+
 update_catalog_tool() {
     local tool="$1" pkg source brew_rc native_pm native_pkg direct_rc hint
     [[ -n "$tool" ]] || return 0
@@ -2920,6 +3014,11 @@ update_catalog_tool() {
 
     if accepted_system_tool_source "$tool" "$source"; then
         printf "  system    %-26s source=%s\n" "$tool" "$source"
+        return 0
+    fi
+
+    if nix_owns_tool_source "$source"; then
+        printf "  skipped   %-26s owner=nix reason=managed by the Nix layer (setup.sh --nix-darwin/--home-manager or a reviewed flake.lock bump) source=%s\n" "$tool" "$source"
         return 0
     fi
 
@@ -3308,6 +3407,168 @@ install_ghostty_linux() {
     echo "              - snap:    sudo snap install ghostty --classic"
     echo "              - flatpak: search 'ghostty' on flathub"
     echo "              - source:  https://ghostty.org/docs/install/build"
+}
+
+# Download, SHA-256 verify, and install the pinned WezTerm .deb. We verify the
+# .deb before touching the package database (unlike a bare `apt install <url>`),
+# so an upstream change at the pinned tag fails closed. `apt-get install <file>`
+# resolves the GUI runtime deps in one step. require_downloader already ran.
+run_wezterm_deb_install() {
+    local url="$1" expected="$2" tmp deb rc=0
+    tmp="$(mktemp -d)"
+    trap 'rm -rf "$tmp"; trap - RETURN' RETURN
+    deb="$tmp/wezterm.deb"
+    if ! curl -fsSL -o "$deb" "$url"; then
+        echo "  FAIL: could not download WezTerm .deb"
+        rm -rf "$tmp"; return 1
+    fi
+    if ! verify_sha256 "$deb" "$expected"; then
+        echo "  FAIL: checksum mismatch for WezTerm .deb (pinned $WEZTERM_VERSION)"
+        echo "        upstream changed; review it, then bump WEZTERM_VERSION + SHA together"
+        rm -rf "$tmp"; return 1
+    fi
+    maybe_sudo apt-get install -y "$deb" || rc=$?
+    rm -rf "$tmp"
+    return "$rc"
+}
+
+# WezTerm: Homebrew cask is macOS-only, so Linux uses the official pinned .deb
+# (amd64 Ubuntu). Split-host WSL skips it unless the user opts into WSL GUI,
+# matching Ghostty's convention; native Linux may install it even from a
+# headless shell because package installation is not a runtime display probe.
+# arm64 Linux / non-Ubuntu get manual guidance.
+install_wezterm_linux() {
+    local url arch
+    if have wezterm; then
+        printf "  ok        %-26s already installed\n" "wezterm"
+        return
+    fi
+    if is_wsl && ! wsl_gui_opt_in; then
+        printf "  skipped   %-26s WSL uses the Windows-host terminal by default\n" "wezterm"
+        echo "            Linux WezTerm in WSL is experimental: re-run with --experimental-wsl-gui"
+        echo "            Windows host setup installs WezTerm via .\\setup.ps1 -All"
+        return
+    fi
+    if is_wsl && ! can_show_gui; then
+        printf "  skipped   %-26s WSL GUI display not detected\n" "wezterm"
+        echo "            --experimental-wsl-gui needs WSLg/X11/Wayland to be available"
+        return
+    fi
+    [[ "$PM" == "brew" ]] && printf "  skipped   %-26s Homebrew cask is macOS-only on Linux\n" "wezterm via brew"
+    arch="$(uname -m)"
+    if is_ubuntu && { [[ "$arch" == "x86_64" ]] || [[ "$arch" == "amd64" ]]; }; then
+        url="https://github.com/wezterm/wezterm/releases/download/${WEZTERM_VERSION}/wezterm-${WEZTERM_VERSION}.Ubuntu22.04.deb"
+        if ! ask "Install WezTerm via official Ubuntu .deb (pinned $WEZTERM_VERSION, SHA-256 verified)?"; then
+            printf "  skipped   %-26s\n" "wezterm"
+            return
+        fi
+        if [[ "$DRY_RUN" -eq 1 ]]; then
+            echo "  would: curl -fsSL $url"
+            echo "         verify sha256 $WEZTERM_DEB_AMD64_SHA256"
+            echo "         apt-get install -y <downloaded .deb>   (resolves GUI deps)"
+        else
+            require_downloader || return 1
+            if ! run_wezterm_deb_install "$url" "$WEZTERM_DEB_AMD64_SHA256"; then
+                echo "  FAIL: WezTerm .deb install failed"
+                return 1
+            fi
+        fi
+        return
+    fi
+    echo "  manual    wezterm is not auto-installed on this Linux host. Options:"
+    echo "              - ubuntu amd64: re-run for the verified pinned .deb"
+    echo "              - other:        https://wezterm.org/install/linux.html"
+    echo "              - flatpak:      flatpak install flathub org.wezfurlong.wezterm"
+}
+
+# Download, SHA-256 verify, and install the pinned Herdr Linux binary. We verify
+# the binary before installing it (unlike the herdr.dev install.sh remote-eval
+# path), so an upstream change at the pinned tag fails closed. require_downloader
+# already ran.
+run_herdr_linux_binary_install() {
+    local url="$1" expected="$2" dest="$3" tmp bin rc=0
+    tmp="$(mktemp -d)"
+    trap 'rm -rf "$tmp"; trap - RETURN' RETURN
+    bin="$tmp/herdr"
+    if ! curl -fsSL -o "$bin" "$url"; then
+        echo "  FAIL: could not download herdr binary"
+        rm -rf "$tmp"; return 1
+    fi
+    if ! verify_sha256 "$bin" "$expected"; then
+        echo "  FAIL: checksum mismatch for herdr $HERDR_VERSION"
+        echo "        upstream changed; review it, then bump HERDR_VERSION + SHA together"
+        rm -rf "$tmp"; return 1
+    fi
+    mkdir -p "$(dirname "$dest")"
+    cp "$bin" "$dest" && chmod 0755 "$dest" || rc=$?
+    rm -rf "$tmp"
+    return "$rc"
+}
+
+# Herdr: agent multiplexer. macOS + Linuxbrew use the canonical homebrew-core
+# formula; native Linux without brew uses the pinned, SHA-256-verified release
+# binary. Native Windows is handled separately by install-deps.ps1 with a pinned,
+# SHA-256-verified preview .exe.
+install_herdr() {
+    local arch asset expected url dest
+    if have herdr && [[ "${DOTFILES_DIRECT_ARTIFACT_REINSTALL:-0}" != "1" ]]; then
+        printf "  ok        %-26s already installed\n" "herdr"
+        return
+    fi
+    if [[ "$PM" == "brew" && "${DOTFILES_DIRECT_ARTIFACT_REINSTALL:-0}" != "1" ]]; then
+        if ! ask "Install Herdr (agent multiplexer) via Homebrew (brew install herdr)?"; then
+            printf "  skipped   %-26s\n" "herdr"
+            return
+        fi
+        if [[ "$DRY_RUN" -eq 1 ]]; then
+            echo "  would: brew install herdr"
+            return
+        fi
+        if ! brew install herdr; then
+            echo "  FAIL: herdr brew install failed"
+            return 1
+        fi
+        return
+    fi
+    if [[ "$(uname -s)" != "Linux" ]]; then
+        printf "  skipped   %-26s no Homebrew and not Linux\n" "herdr"
+        return
+    fi
+    arch="$(uname -m)"
+    case "$arch" in
+        x86_64 | amd64)
+            asset="herdr-linux-x86_64"
+            expected="$HERDR_LINUX_X86_64_SHA256"
+            ;;
+        aarch64 | arm64)
+            asset="herdr-linux-aarch64"
+            expected="$HERDR_LINUX_ARM64_SHA256"
+            ;;
+        *)
+            echo "  manual    herdr has no pinned Linux binary for arch $arch; see https://herdr.dev/docs/install/"
+            return
+            ;;
+    esac
+    url="https://github.com/ogulcancelik/herdr/releases/download/${HERDR_VERSION}/${asset}"
+    dest="$HOME/.local/bin/herdr"
+    if ! ask "Install Herdr (agent multiplexer) via pinned GitHub release ${HERDR_VERSION} binary (SHA-256 verified)?"; then
+        printf "  skipped   %-26s\n" "herdr"
+        return
+    fi
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        echo "  would: curl -fsSL $url"
+        echo "         verify sha256 $expected"
+        echo "         install -m 755 -> $dest"
+        return
+    fi
+    require_downloader || return 1
+    if ! run_herdr_linux_binary_install "$url" "$expected" "$dest"; then
+        echo "  FAIL: herdr binary install failed"
+        return 1
+    fi
+    write_direct_artifact_provenance "herdr" "$dest" "$dest" "$(dirname "$dest")" "$url" "$HERDR_VERSION" "$expected"
+    ensure_local_bin_on_path
+    printf "  installed %-26s -> %s\n" "herdr" "$dest"
 }
 
 # VS Code: brew cask on macOS; snap, then flatpak, then a manual hint on Linux.
@@ -3725,10 +3986,22 @@ set_default_shell_zsh   # make zsh the login shell so tmux/terminals launch it
 section "terminals (optional)"
 if [[ "$(uname -s)" == "Darwin" ]] && [[ "$PM" == "brew" ]]; then
     install_ghostty_macos
+    install_wezterm_macos
 elif [[ "$(uname -s)" == "Linux" ]]; then
     install_ghostty_linux
+    install_wezterm_linux
 fi
 setup_ghostty_maximize   # GNOME/X11 only: enforce Ghostty maximize via devilspie2 (opt-in)
+
+section "window manager (macOS, optional)"
+if [[ "$(uname -s)" == "Darwin" ]] && [[ "$PM" == "brew" ]]; then
+    install_aerospace_macos
+else
+    printf "  skipped   %-26s AeroSpace is macOS-only\n" "aerospace"
+fi
+
+section "agent multiplexer (optional): Herdr"
+install_herdr   # macOS/Linux; native Windows uses install-deps.ps1
 
 section "editor: VS Code (optional)"
 install_vscode

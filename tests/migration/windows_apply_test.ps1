@@ -396,6 +396,10 @@ function Assert-Part1Files {
         -ExpectedPath (Join-Path $script:RepoRoot 'starship\starship.toml') `
         -Label 'starship config'
     Assert-CopyModeFileMatches `
+        -ActualPath (Join-Path $Sandbox '.config\gh-dash\config.yml') `
+        -ExpectedPath (Join-Path $script:RepoRoot 'gh-dash\config.yml') `
+        -Label 'gh-dash config'
+    Assert-CopyModeFileMatches `
         -ActualPath (Join-Path $Sandbox '.config\lsd\config.yaml') `
         -ExpectedPath (Join-Path $script:RepoRoot 'lsd\config.yaml') `
         -Label 'lsd config'
@@ -403,6 +407,10 @@ function Assert-Part1Files {
         -ActualPath (Join-Path $Sandbox '.config\lsd\colors.yaml') `
         -ExpectedPath (Join-Path $script:RepoRoot 'lsd\colors.yaml') `
         -Label 'lsd colors'
+    Assert-CopyModeFileMatches `
+        -ActualPath (Join-Path $Sandbox '.config\wezterm\wezterm.lua') `
+        -ExpectedPath (Join-Path $script:RepoRoot 'wezterm\wezterm.lua') `
+        -Label 'wezterm config'
     Assert-CopyModeFileMatches `
         -ActualPath (Join-Path $Sandbox 'Documents\PowerShell\Microsoft.PowerShell_profile.ps1') `
         -ExpectedPath (Join-Path $script:RepoRoot 'shells\powershell_profile.ps1') `

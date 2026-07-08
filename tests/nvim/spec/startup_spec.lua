@@ -21,10 +21,12 @@ describe("startup time", function()
       table.insert(args, command)
     end
 
-    local result = vim.system(args, {
-      env = env,
-      text = true,
-    }):wait()
+    local result = vim
+      .system(args, {
+        env = env,
+        text = true,
+      })
+      :wait()
 
     assert.are.equal(
       0,
@@ -51,17 +53,19 @@ describe("startup time", function()
   end
 
   local function child_stdpath_data(env)
-    local result = vim.system({
-      vim.v.progpath,
-      "--headless",
-      "--clean",
-      "--cmd",
-      "lua io.stdout:write(vim.fn.stdpath('data'))",
-      "+qa",
-    }, {
-      env = env,
-      text = true,
-    }):wait()
+    local result = vim
+      .system({
+        vim.v.progpath,
+        "--headless",
+        "--clean",
+        "--cmd",
+        "lua io.stdout:write(vim.fn.stdpath('data'))",
+        "+qa",
+      }, {
+        env = env,
+        text = true,
+      })
+      :wait()
 
     assert.are.equal(
       0,
@@ -84,20 +88,172 @@ describe("startup time", function()
     return tostring(mtime.sec) .. ":" .. tostring(mtime.nsec)
   end
 
-  local function locked_plugin_names(repo_root)
+  local function locked_plugin_lock(repo_root)
     local lockfile = repo_root .. "/nvim/lazy-lock.json"
     local ok, lines = pcall(vim.fn.readfile, lockfile)
     assert.is_true(ok, "could not read " .. lockfile)
 
     local decoded_ok, lock = pcall(vim.json.decode, table.concat(lines, "\n"))
     assert.is_true(decoded_ok, "could not parse " .. lockfile)
+    return lock
+  end
 
+  local function locked_plugin_names(repo_root)
+    local lock = locked_plugin_lock(repo_root)
     local names = {}
     for name in pairs(lock) do
       table.insert(names, name)
     end
     table.sort(names)
     return names
+  end
+
+  local function plugin_name_for_repo(repo, spec)
+    if type(spec) == "table" and type(spec.name) == "string" then
+      return spec.name
+    end
+    return (repo:match("([^/]+)$") or repo):gsub("%.git$", "")
+  end
+
+  local function has_named_keys(spec)
+    for key in pairs(spec) do
+      if type(key) ~= "number" then
+        return true
+      end
+    end
+    return false
+  end
+
+  local function collect_plugin_sources(spec, sources)
+    if type(spec) == "string" then
+      if spec:find("/", 1, true) then
+        sources[plugin_name_for_repo(spec)] = spec
+      end
+      return
+    end
+
+    if type(spec) ~= "table" then
+      return
+    end
+
+    if type(spec[1]) == "string" and spec[1]:find("/", 1, true) and (#spec == 1 or has_named_keys(spec)) then
+      sources[plugin_name_for_repo(spec[1], spec)] = spec[1]
+      collect_plugin_sources(spec.dependencies, sources)
+      return
+    end
+
+    for _, child in ipairs(spec) do
+      collect_plugin_sources(child, sources)
+    end
+  end
+
+  local function locked_plugin_sources(repo_root)
+    local lock = locked_plugin_lock(repo_root)
+    local sources = {
+      ["lazy.nvim"] = "folke/lazy.nvim",
+    }
+
+    local plugin_files = vim.fn.glob(repo_root .. "/nvim/lua/plugins/*.lua", false, true)
+    table.sort(plugin_files)
+    for _, path in ipairs(plugin_files) do
+      local loaded, spec_or_err = pcall(dofile, path)
+      assert.is_true(loaded, "could not load plugin spec " .. path .. ": " .. tostring(spec_or_err))
+      collect_plugin_sources(spec_or_err, sources)
+    end
+
+    local names = {}
+    for name in pairs(lock) do
+      table.insert(names, name)
+    end
+    table.sort(names)
+    for _, name in ipairs(names) do
+      assert.is_not_nil(sources[name], "could not resolve plugin source for locked plugin " .. name)
+    end
+
+    return sources, lock, names
+  end
+
+  local function system_checked(args, context)
+    local result = vim.system(args, { text = true }):wait()
+    assert.are.equal(
+      0,
+      result.code,
+      table.concat({
+        context,
+        "cmd: " .. table.concat(args, " "),
+        "stdout: " .. tostring(result.stdout),
+        "stderr: " .. tostring(result.stderr),
+      }, "\n")
+    )
+    return result
+  end
+
+  local function git_head(path)
+    local result = vim.system({ "git", "-C", path, "rev-parse", "HEAD" }, { text = true }):wait()
+    if result.code ~= 0 then
+      return nil
+    end
+    return (result.stdout or ""):match("%S+")
+  end
+
+  local function checkout_plugin(plugin_root, name, repo, commit)
+    local path = plugin_root .. "/" .. name
+    if vim.fn.isdirectory(path) == 0 then
+      mkdir(plugin_root)
+      system_checked(
+        { "git", "clone", "--filter=blob:none", "https://github.com/" .. repo .. ".git", path },
+        "could not clone " .. name
+      )
+    end
+
+    assert.are.equal(1, vim.fn.isdirectory(path .. "/.git"), "plugin cache is not a git checkout: " .. path)
+    if git_head(path) ~= commit then
+      local checkout = vim.system({ "git", "-C", path, "checkout", "--detach", commit }, { text = true }):wait()
+      if checkout.code ~= 0 then
+        system_checked(
+          { "git", "-C", path, "fetch", "--filter=blob:none", "origin", commit },
+          "could not fetch locked commit for " .. name
+        )
+        system_checked(
+          { "git", "-C", path, "checkout", "--detach", commit },
+          "could not checkout locked commit for " .. name
+        )
+      end
+    end
+    assert.are.equal(commit, git_head(path), "plugin cache did not land on locked commit for " .. name)
+  end
+
+  local function prewarm_locked_plugin_checkouts(data_path, repo_root)
+    local sources, lock, names = locked_plugin_sources(repo_root)
+    local plugin_root = data_path .. "/lazy"
+    for _, name in ipairs(names) do
+      checkout_plugin(plugin_root, name, sources[name], lock[name].commit)
+    end
+  end
+
+  local function clear_startup_parser_outputs(data_path)
+    for _, child in ipairs({ "parser", "parser-info", "queries" }) do
+      pcall(vim.fn.delete, data_path .. "/site/" .. child, "rf")
+    end
+  end
+
+  local function startup_parser_outputs(data_path)
+    local outputs = {}
+    for _, pattern in ipairs({ "site/parser/*.so", "site/parser-info/*.revision", "site/queries/*" }) do
+      for _, path in ipairs(vim.fn.glob(data_path .. "/" .. pattern, false, true)) do
+        table.insert(outputs, path:gsub("^" .. vim.pesc(data_path .. "/"), ""))
+      end
+    end
+    table.sort(outputs)
+    return outputs
+  end
+
+  local function assert_no_parser_build_outputs(data_path, context)
+    assert.are.same(
+      {},
+      startup_parser_outputs(data_path),
+      context .. " must not run nvim-treesitter parser builds inside the startup benchmark"
+    )
   end
 
   local function missing_plugin_caches(data_path, repo_root)
@@ -112,7 +268,11 @@ describe("startup time", function()
 
   local function assert_plugin_cache(data_path, repo_root)
     local missing = missing_plugin_caches(data_path, repo_root)
-    assert.are.same({}, missing, "plugin prewarm did not install locked plugin cache(s): " .. table.concat(missing, ", "))
+    assert.are.same(
+      {},
+      missing,
+      "plugin prewarm did not install locked plugin cache(s): " .. table.concat(missing, ", ")
+    )
   end
 
   it("real init.lua completes under the OS-appropriate budget", function()
@@ -152,29 +312,21 @@ describe("startup time", function()
 
     local data_path = child_stdpath_data(env)
     local lazy_path = data_path .. "/lazy/lazy.nvim"
-    if vim.fn.isdirectory(lazy_path) == 0 then
-      run_real_init(env, run_root .. "/prewarm.log")
-    end
+    clear_startup_parser_outputs(data_path)
 
-    -- A cold Lazy cache can still be installing the plugin graph after lazy.nvim
-    -- itself exists. Do that work before measuring, otherwise the startup budget
-    -- test measures first-run network/build cost instead of warm real-init time.
-    -- Once the locked plugin graph is cached, skip the restore so ordinary test
-    -- runs do not contact remotes or measure dependency-management work.
-    if #missing_plugin_caches(data_path, repo_root) > 0 then
-      run_real_init(env, run_root .. "/prewarm-plugins.log", { "+Lazy! restore", "+qa" })
-    end
+    -- Preclone the locked plugin graph before running the real init. Calling
+    -- Lazy's installer/restore path here would also run plugin build hooks; for
+    -- nvim-treesitter main, :TSUpdate starts asynchronous compiler work that can
+    -- outlive the prewarm child and make the startup timing measure dependency
+    -- bootstrap load instead of warm real-init time.
+    prewarm_locked_plugin_checkouts(data_path, repo_root)
     assert_plugin_cache(data_path, repo_root)
+    assert_no_parser_build_outputs(data_path, "plugin cache prewarm")
 
     local lazy_mtime = mtime_id(lazy_path)
-    local skipped_second_prewarm = false
-    if vim.fn.isdirectory(lazy_path) == 0 then
-      run_real_init(env, run_root .. "/prewarm-second.log")
-    else
-      skipped_second_prewarm = true
-    end
-    assert.is_true(skipped_second_prewarm, "lazy prewarm skip path was not exercised")
-    assert.are.equal(lazy_mtime, mtime_id(lazy_path), "lazy.nvim cache changed during prewarm skip")
+    run_real_init(env, run_root .. "/prewarm.log")
+    assert.are.equal(lazy_mtime, mtime_id(lazy_path), "real-init prewarm changed the prewarmed lazy.nvim cache")
+    assert_no_parser_build_outputs(data_path, "real-init prewarm")
 
     local measurements = {}
     local fastest_ms
@@ -182,6 +334,7 @@ describe("startup time", function()
       local attempt_logfile = string.format("%s/startuptime-%d.log", run_root, attempt)
       run_real_init(env, attempt_logfile)
       assert.are.equal(lazy_mtime, mtime_id(lazy_path), "startup did not reuse the prewarmed lazy.nvim cache")
+      assert_no_parser_build_outputs(data_path, "startup measurement")
 
       local total_ms = parse_total_ms(attempt_logfile)
       assert.is_not_nil(total_ms, "could not parse startuptime log; logs kept at " .. run_root)

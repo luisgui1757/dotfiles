@@ -23,8 +23,13 @@ param(
 $ErrorActionPreference = 'Continue'
 $HackNerdFontVersion = 'v3.4.0'
 $HackNerdFontSha256 = '8ca33a60c791392d872b80d26c42f2bfa914a480f9eb2d7516d9f84373c36897'
+$ScoopInstallerCommit = 'b0ee913725139b816f9178163af0aecdba07a7ed'
+$ScoopInstallerSha256 = '48f6ea398b3a3fa26fae0093d37bd85b13e7eaa5d1d4a3e208408768408e35ae'
+$ScoopInstallerUrl = "https://raw.githubusercontent.com/ScoopInstaller/Install/$ScoopInstallerCommit/install.ps1"
 $WindowsTerminalVersion = 'v1.24.11321.0'
 $WindowsTerminalX64Sha256 = '7caef554147e5498ed1becdca73cdedb79fbc81f89032e46ae9b095c53433812'
+$HerdrWindowsPreviewVersion = 'preview-2026-07-07-f5354780e4ef'
+$HerdrWindowsX64Sha256 = '9b28eb0a3a55ca2ca9d47e96397544d2cbcca965d88a40b8bd8ccacfb61333ba'
 $VsBuildToolsBootstrapperUrl = 'https://aka.ms/vs/17/release/vs_BuildTools.exe'
 $PylatexencBuildBackendVersion = '80.9.0'
 $PylatexencBuildBackendSha256 = '062d34222ad13e0cc312a4c02d73f059e86a4acbfbdea8f8f76b28c99f306922'
@@ -160,21 +165,27 @@ function Install-Scoop {
     }
     Write-Host "Scoop is not installed. It is a userspace package manager that"
     Write-Host "carries tools missing from winget/choco (taplo, win32yank, etc.)."
-    if (-not (Ask "Install Scoop via the official one-liner?")) { return $false }
+    if (-not (Ask "Install Scoop via the pinned ScoopInstaller/Install bootstrap?")) { return $false }
     if ($DryRun) {
+        Write-Host ("  would: download ScoopInstaller/Install@{0} install.ps1" -f $ScoopInstallerCommit)
+        Write-Host ("  would: verify SHA-256 before execution (SHA-256 verified: {0})" -f $ScoopInstallerSha256)
         if (Test-IsElevated) {
-            Write-Host "  would: download get.scoop.sh, then run install.ps1 -RunAsAdmin"
+            Write-Host "  would: run verified install.ps1 -RunAsAdmin"
         } else {
-            Write-Host "  would: download get.scoop.sh, then run install.ps1"
+            Write-Host "  would: run verified install.ps1"
         }
         return $false
     }
     try {
-        # The official scoop bootstrap. RemoteSigned policy is needed for the
-        # script; it is set for the current process only.
+        # Pinned Scoop bootstrap. RemoteSigned policy is needed for the script;
+        # it is set for the current process only.
         Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process -Force
-        $installer = Join-Path $env:TEMP "scoop-install-$([guid]::NewGuid()).ps1"
-        Invoke-WebRequest -Uri 'https://get.scoop.sh' -OutFile $installer -UseBasicParsing -ErrorAction Stop
+        $installer = Join-Path ([IO.Path]::GetTempPath()) "scoop-install-$([guid]::NewGuid()).ps1"
+        Invoke-WebRequest -Uri $ScoopInstallerUrl -OutFile $installer -UseBasicParsing -ErrorAction Stop
+        if (-not (Test-FileSha256 $installer $ScoopInstallerSha256)) {
+            throw ("Scoop installer SHA-256 mismatch for ScoopInstaller/Install@{0}: expected {1}" -f $ScoopInstallerCommit, $ScoopInstallerSha256)
+        }
+        Write-Host ("  verified Scoop installer ScoopInstaller/Install@{0} SHA-256 {1}" -f $ScoopInstallerCommit, $ScoopInstallerSha256)
         if (Test-IsElevated) {
             # GitHub Windows runners are elevated. Scoop blocks elevated
             # bootstrap by default, so use the installer documented opt-in
@@ -299,6 +310,7 @@ $Catalog = @{
     chezmoi              = @{ winget = 'twpayne.chezmoi';                  choco = 'chezmoi';              scoop = 'chezmoi'              ; purpose = 'dotfiles config manager' }
     lazygit              = @{ winget = 'JesseDuffield.lazygit';            choco = 'lazygit';              scoop = 'lazygit'              ; purpose = 'terminal git UI' }
     wt                   = @{ winget = 'Microsoft.WindowsTerminal';        choco = 'microsoft-windows-terminal'; scoop = 'extras/windows-terminal'; purpose = 'Windows Terminal host for PowerShell and WSL' }
+    wezterm              = @{ winget = 'wez.wezterm';                      choco = 'wezterm';              scoop = 'extras/wezterm'       ; purpose = 'WezTerm GPU terminal (Rose Pine, Hack Nerd Font, pwsh)' }
     make                 = @{ winget = 'GnuWin32.Make';                    choco = 'make';                 scoop = 'make'                 ; purpose = 'plugin builds (LuaSnip jsregexp)' }
     cmake                = @{ winget = 'Kitware.CMake';                    choco = 'cmake';                scoop = 'cmake'                ; purpose = 'CMake CLI required by neocmakelsp and CMake projects' }
     pwsh                 = @{ winget = 'Microsoft.PowerShell';             choco = 'powershell-core';      scoop = 'pwsh'                 ; purpose = 'modern PowerShell 7' }
@@ -327,6 +339,8 @@ $BinaryName = @{
     chezmoi     = 'chezmoi'
     lazygit     = 'lazygit'
     wt          = 'wt'
+    wezterm     = 'wezterm'
+    herdr       = 'herdr'
     nvim        = 'nvim'
     pwsh        = 'pwsh'
     'win32yank' = 'win32yank'
@@ -500,6 +514,7 @@ function Get-InstallDependencySpec {
         'lazygit',
         'starship',
         'wt',
+        'herdr',
         'psmux',
         'pwsh',
         'python',
@@ -515,7 +530,7 @@ function Get-InstallDependencySpec {
     )
     $emitted = @{}
     foreach ($tool in $toolOrder) {
-        if (($tool -eq 'scoop') -or ($tool -eq 'psmux') -or $Catalog.ContainsKey($tool)) {
+        if (($tool -eq 'scoop') -or ($tool -eq 'herdr') -or ($tool -eq 'psmux') -or $Catalog.ContainsKey($tool)) {
             $emitted[$tool] = $true
             [pscustomobject]@{
                 Tool = $tool
@@ -2370,6 +2385,65 @@ function Install-WindowsTerminal {
     }
 }
 
+# ---- Herdr: native Windows preview, pinned direct artifact -------------------
+function Get-HerdrWindowsInstallRoot {
+    $base = if (-not [string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
+        $env:LOCALAPPDATA
+    } else {
+        Get-DotfilesDataRoot
+    }
+    return (Join-Path $base 'Programs\Herdr\bin')
+}
+
+function Install-HerdrWindowsPreview {
+    if (Test-Tool 'herdr') {
+        Write-Host ("  ok        {0,-26} already installed" -f "herdr")
+        return
+    }
+    if (-not (Ask "Install Herdr native Windows preview (pinned SHA-256 verified beta)?")) {
+        Write-Host ("  skipped   {0,-26}" -f "herdr")
+        return
+    }
+
+    $assetName = 'herdr-windows-x86_64.exe'
+    $assetUrl = "https://github.com/ogulcancelik/herdr/releases/download/$HerdrWindowsPreviewVersion/$assetName"
+    $installRoot = Get-HerdrWindowsInstallRoot
+    if ($DryRun) {
+        Write-Host ("  would:    download {0} ({1})" -f $assetName, $HerdrWindowsPreviewVersion)
+        Write-Host ("  would:    verify SHA-256 {0}, install as {1}, add to User PATH" -f $HerdrWindowsX64Sha256, (Join-Path $installRoot 'herdr.exe'))
+        return
+    }
+
+    $tmp = $null
+    try {
+        $tmp = New-Item -ItemType Directory -Force -Path (Join-Path ([IO.Path]::GetTempPath()) "herdr-windows-$([guid]::NewGuid())")
+        $download = Join-Path $tmp.FullName $assetName
+        Invoke-WebRequest -Uri $assetUrl -OutFile $download -UseBasicParsing -ErrorAction Stop
+        if (-not (Test-FileSha256 -Path $download -Expected $HerdrWindowsX64Sha256)) {
+            Write-Host "  FAIL: checksum mismatch for $assetName" -ForegroundColor Red
+            $script:InstallFailures += [pscustomobject]@{ Tool='herdr'; Pm='direct'; Pkg=$assetName; ExitCode='sha256' }
+            return
+        }
+
+        New-Item -ItemType Directory -Force -Path $installRoot | Out-Null
+        Copy-Item -LiteralPath $download -Destination (Join-Path $installRoot 'herdr.exe') -Force
+        Add-DirectoryToUserPath -Directory $installRoot
+
+        if (Test-Tool 'herdr') {
+            Write-Host ("  installed {0,-26} {1}" -f "herdr", $HerdrWindowsPreviewVersion)
+            return
+        }
+        throw "herdr.exe installed but herdr is not on PATH"
+    } catch {
+        Write-Warning ("Herdr Windows preview install failed: " + $_.Exception.Message)
+        $script:InstallFailures += [pscustomobject]@{ Tool='herdr'; Pm='direct'; Pkg=$assetName; ExitCode=$LASTEXITCODE }
+    } finally {
+        if ($tmp) {
+            Remove-Item -LiteralPath $tmp.FullName -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
 # ---- psmux: native Windows tmux (reads our existing tmux/tmux.conf) ---------
 # Symmetrical with the Unix tmux story. scoop is preferred (one custom bucket,
 # then a normal install); falls back to winget then choco. Not in the catalog
@@ -2848,7 +2922,7 @@ function Invoke-InstallDepsUpdateMode {
 
     Write-UnmanagedDependencySummary
     Write-Host ""
-    Write-Host "note: pinned binaries (Neovim/lazygit/tree-sitter Linux archives, Hack Nerd Font, Windows Terminal portable), PSFzf, plugins, and configs update via git pull and re-running setup."
+    Write-Host "note: pinned binaries (Neovim/lazygit/tree-sitter Linux archives, Hack Nerd Font, Windows Terminal portable, Herdr Windows preview), PSFzf, plugins, and configs update via git pull and re-running setup."
 }
 
 function Exit-InstallDepsIfFailures {
@@ -2856,7 +2930,7 @@ function Exit-InstallDepsIfFailures {
 
     Write-Host "install-deps: completed with $($script:InstallFailures.Count) FAILED install(s):"
     foreach ($f in $script:InstallFailures) {
-        Write-Host ("  FAIL  {0,-20} via {1,-8} pkg={2}  (exit {3})" -f $f.Tool, $f.Pm, $f.Pkg, $f.ExitCode) -ForegroundColor Red
+        Write-Host ("  FAIL: {0,-20} via {1,-8} pkg={2}  (exit {3})" -f $f.Tool, $f.Pm, $f.Pkg, $f.ExitCode) -ForegroundColor Red
     }
     Write-Host ""
     Write-Host "Re-run install-deps.ps1 after addressing the failures, or"
@@ -2942,6 +3016,12 @@ Install-One starship
 
 Section "terminal host"
 Install-WindowsTerminal
+
+Section "terminal (optional): WezTerm"
+Install-One wezterm
+
+Section "agent multiplexer (optional): Herdr Windows preview"
+Install-HerdrWindowsPreview
 
 Section "terminal multiplexer (psmux: tmux for native Windows, optional)"
 Install-Psmux

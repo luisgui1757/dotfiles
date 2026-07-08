@@ -2,10 +2,11 @@
 
 Cross-platform terminal and editor setup for macOS, Linux, WSL, and Windows.
 The repo owns the daily shell/editor stack: Neovim, tmux/psmux, Starship, zsh,
-PowerShell, Ghostty, lazygit, `lsd`, `zoxide` smart-cd, the `gh` CLI with the
+PowerShell, Ghostty, WezTerm, lazygit, `lsd`, `zoxide` smart-cd, the `gh` CLI with the
 `gh-dash` dashboard, Windows Terminal theming, locked plugin restore, LSP /
 formatter provisioning, and global Polaris agent-policy bootstrap. It also provisions the `tree-sitter` CLI needed by
-`nvim-treesitter` main parser builds.
+`nvim-treesitter` main parser builds, plus AeroSpace (macOS tiling WM) and Herdr
+(agent multiplexer: macOS/Linux stable, Windows preview) as optional vendor-channel installs.
 
 The public interface is intentionally small:
 
@@ -110,10 +111,37 @@ apply.
 ./setup.sh --update              # update proven tools/artifacts + Mason, no git/config/Lazy
 ./setup.sh --dry-run             # preview
 ./setup.sh --experimental-wsl-gui # WSL-only opt-in for Linux GUI terminal bits
+./setup.sh --nix-darwin          # macOS-only opt-in: apply the nix-darwin package layer
+./setup.sh --home-manager        # Linux/WSL-only opt-in: apply the Home Manager package layer
 ./setup.sh --skip-config         # skip chezmoi config apply
 ./setup.sh --skip-agents         # skip global Polaris agent policy
 make setup                       # same as ./setup.sh, via the Makefile
 ```
+
+**Nix layer (optional, POSIX packages only).** `flake.nix` + a committed
+`flake.lock` provide a package layer (nix-darwin + declarative Homebrew + Home
+Manager on macOS). chezmoi still owns **every** dotfile; Nix owns no config.
+It is opt-in and off by default: `./setup.sh --nix-darwin` (macOS-only,
+consent-gated) runs `sudo darwin-rebuild switch --flake .#dotfiles --impure`,
+which activates the declarative Homebrew casks (WezTerm, AeroSpace) + Herdr brew
+and the nix-owned CLI package set. The flake resolves the real invoking user
+from `SUDO_USER` before `USER`, so Homebrew/Home Manager do not target `root`
+during sudo activation. First-run bootstrap is also pinned: setup derives the
+locked nix-darwin rev and `narHash` from `flake.lock` before running
+`sudo nix run github:nix-darwin/nix-darwin/<locked-rev>?narHash=<encoded-narHash>#darwin-rebuild -- ...`;
+it never uses the mutable `nix-darwin` registry alias. On Linux/WSL, `./setup.sh
+--home-manager` applies the standalone Home Manager package set
+(`home-manager switch --flake .#<arch>-linux`; first-run bootstrap uses the
+locked `github:nix-community/home-manager/<locked-rev>?narHash=<encoded-narHash>#home-manager`
+ref). WSL
+writes only to the Linux `~/.nix-profile`, never `/mnt/c`. Both keep the native
+install-deps arms as the default — the Nix layer is additive. **nvim and the
+tree-sitter CLI stay native** (ABI-coupled to nvim-treesitter parser builds;
+migrating them into a same-closure toolchain is a follow-up). Native Windows is
+non-Nix. `nix flake check` runs in CI (`.github/workflows/nix.yml`) on Ubuntu +
+macOS. The current `darwinConfigurations.dotfiles` activation target is
+`aarch64-darwin`; x86_64 Darwin still gets dev shells/checks but no supported
+host activation config yet.
 
 ```powershell
 .\setup.ps1
@@ -237,6 +265,8 @@ symlink, and Windows Terminal remains a merge.
 | PowerShell | n/a | n/a | `Documents\PowerShell\Microsoft.PowerShell_profile.ps1` -> `shells\powershell_profile.ps1` |
 | tmux / psmux | `~/.tmux.conf` -> `tmux/tmux.conf`; `~/.tmux.posix.conf` -> `tmux/tmux.posix.conf` (POSIX clipboard + TPM functional plugins + generated Rose Pine bar); `~/.tmux.rose-pine.{main,moon,dawn}.conf` -> generated `tmux/psmux-rose-pine.{main,moon,dawn}.conf` (Omer-shaped Rose Pine bar, **shared** with Windows) | same | `%USERPROFILE%\.psmux.conf` -> `tmux\psmux.conf` (first psmux entrypoint, disables warm sessions, then flag-free source-files the Windows overlay); `%USERPROFILE%\.tmux.conf` -> `tmux\tmux.conf`; `%USERPROFILE%\.tmux.windows.conf` -> `tmux\tmux.windows.conf`; `%USERPROFILE%\.tmux.rose-pine.ps1` -> `tmux\psmux-rose-pine.ps1` (Rose Pine bar generator / manual live-switch helper); `%USERPROFILE%\.tmux.rose-pine.{main,moon,dawn}.conf` -> the same generated `tmux\psmux-rose-pine.{main,moon,dawn}.conf`; the POSIX overlay is **excluded** on Windows (its `if-shell` probes hang psmux); WSL uses the Unix path |
 | Ghostty | `~/Library/Application Support/com.mitchellh.ghostty/config` -> `ghostty/config` | native Linux links `~/.config/ghostty/config`; WSL links it only with `--experimental-wsl-gui` | n/a |
+| WezTerm | `~/.config/wezterm/wezterm.lua` -> `wezterm/wezterm.lua` | same; WSL links it only with `--experimental-wsl-gui` | `%USERPROFILE%\.config\wezterm\wezterm.lua` -> `wezterm\wezterm.lua` (copied) |
+| AeroSpace | `~/.config/aerospace/aerospace.toml` -> `aerospace/aerospace.toml` (macOS tiling WM; focus/move on `ctrl-alt(-shift)` to avoid nvim `<A-h/j/k/l>` and fzf `Alt-c`) | n/a (macOS-only) | n/a (macOS-only) |
 | lazygit | `~/Library/Application Support/lazygit/config.yml` -> `lazygit/config.yml` | `~/.config/lazygit/config.yml` -> `lazygit/config.yml` | `%LOCALAPPDATA%\lazygit\config.yml` -> `lazygit\config.windows.yml` |
 | lsd | `~/.config/lsd/{config.yaml,colors.yaml}` -> `lsd/{config.yaml,colors.yaml}` | same | `%USERPROFILE%\.config\lsd\{config.yaml,colors.yaml}` -> `lsd\{config.yaml,colors.yaml}` |
 | gh-dash | `~/.config/gh-dash/config.yml` -> `gh-dash/config.yml` | same | `%USERPROFILE%\.config\gh-dash\config.yml` -> `gh-dash\config.yml` |
@@ -359,8 +389,8 @@ and whether `pwsh` is installed.
   installed-binary SHA-256, matching `--version` output, and a repo-managed
   install shape: Neovim is `/usr/local/bin/nvim` pointing into
   `/opt/nvim-linux-*`; lazygit and Starship are `/usr/local/bin/<tool>` or
-  `~/.local/bin/<tool>`; tree-sitter and chezmoi are `~/.local/bin/<tool>`.
-  Shadow command paths, Brew-prefix symlinks that escape the Brew prefix,
+  `~/.local/bin/<tool>`; tree-sitter, chezmoi, and Herdr are
+  `~/.local/bin/<tool>`. Shadow command paths, Brew-prefix symlinks that escape the Brew prefix,
   unsupported artifact roots, and marker binaries outside the recorded install
   root are blocked provenance failures, not ownership. Output distinguishes
   `updated`, `current`, `system`, `unmanaged`,
@@ -400,6 +430,34 @@ and whether `pwsh` is installed.
   Native Linux uses Linux-specific Ghostty paths. WSL defaults to Windows
   Terminal on the Windows host; Linux Ghostty in WSL requires
   `--experimental-wsl-gui`.
+- WezTerm installs from the vendor channel per OS: `brew install --cask wezterm`
+  on macOS, the `wez.wezterm` Scoop/winget/choco catalog entry on Windows, and
+  the official pinned, SHA-256-verified `.deb` on amd64 Ubuntu. WezTerm is a GUI
+  terminal, but native Linux package installation does not require a display at
+  install time. Split-host WSL skips Linux WezTerm unless
+  `--experimental-wsl-gui` is set; arm64 Linux / non-Ubuntu get manual guidance.
+  The Rose Pine + Hack Nerd Font + transparency config is chezmoi-owned, never a
+  Nix/nixpkgs GUI package.
+- AeroSpace (macOS-only i3-like tiling WM) installs from the official tap cask
+  (`brew install --cask nikitabobko/tap/aerospace`), `start-at-login = true`,
+  chezmoi-owned config. Its keymap deliberately avoids the reserved chords:
+  window focus/move live on `ctrl-alt(-shift)-h/j/k/l` so they never shadow
+  Neovim's `<A-h/j/k/l>` window navigation, and nothing uses `Alt-c` (fzf-tab /
+  PSFzf `cd`). On first launch grant it Accessibility permission (System Settings
+  -> Privacy & Security -> Accessibility) — a TCC grant that cannot be scripted.
+  AeroSpace reads the XDG path this repo manages; a legacy `~/.aerospace.toml`
+  conflicts loudly with that model and should be removed or migrated before
+  judging the managed config. Not a Nix/nixpkgs package.
+- Herdr (agent multiplexer) installs on every host, but the channels differ:
+  `brew install herdr` (homebrew-core) on macOS and Linuxbrew, a pinned,
+  SHA-256-verified GitHub release binary on native Linux without brew, and a
+  pinned, SHA-256-verified **Windows preview** `.exe` under
+  `%LOCALAPPDATA%\Programs\Herdr\bin` on native Windows. The `herdr.dev`
+  remote-eval installers remain banned. Native-Linux Herdr writes the same
+  provenance marker as the other dotfiles-owned direct artifacts, so
+  `./setup.sh --update` can prove ownership and refresh only the repo-pinned
+  version. Windows Herdr is beta/ConPTY-backed, so runtime behavior remains a
+  manual checklist item before treating it as a daily driver.
 - WSL fonts are host-rendered in the supported path. Install and merge Windows
   Terminal from Windows (`.\setup.ps1 -All`; the merge is default-on); the WSL
   Linux fontconfig install is only for `--experimental-wsl-gui`.
@@ -460,7 +518,10 @@ promotion.
 
 Unix runs Neovim specs through `PlenaryBustedDirectory` with an explicit timeout
 so the startup-budget spec reports its own assertion instead of being killed by
-Plenary's default timeout.
+Plenary's default timeout. The startup-budget spec preclones the locked plugin
+checkouts into isolated XDG dirs before measuring warm production init; it must
+not invoke Lazy install/restore or leave nvim-treesitter parser outputs in that
+cache, because parser builds are setup/bootstrap work rather than startup work.
 
 Sub-targets skip themselves with a `skipped: <tool> not installed` message
 when their dependency tool is missing on the current machine. In CI, missing
@@ -493,10 +554,10 @@ The e2e jobs cover different install paths, not symmetric container platforms:
 
 | Check | What it proves |
 |---|---|
-| `e2e containers / ubuntu-24.04` | Clean `ubuntu:24.04`, non-root user, native `apt`, no Linuxbrew (`DOTFILES_SKIP_BREW_BOOTSTRAP=1`), then `install-deps.sh --all`, chezmoi config apply, tool assertions, Neovim >= 0.12, lazygit, zsh plugin files, config content assertions, and nvim directory realpath assertion. |
-| `setup.sh / ubuntu-24.04` | Full Unix setup on the hosted Ubuntu runner. This runner has Linuxbrew available, so it proves the Linuxbrew path that users may hit. |
+| `e2e containers / ubuntu-24.04` | Clean `ubuntu:24.04`, non-root user, native `apt`, no Linuxbrew (`DOTFILES_SKIP_BREW_BOOTSTRAP=1`), then `install-deps.sh --all`, chezmoi config apply, tool assertions including `zoxide`, `gh`, WezTerm, and Herdr, Neovim >= 0.12, lazygit, zsh plugin files, config content assertions, and nvim directory realpath assertion. |
+| `setup.sh / ubuntu-24.04` | Full Unix setup on the hosted Ubuntu runner. This runner has Linuxbrew available, so it proves the Linuxbrew path that users may hit and asserts the new POSIX tool commands. |
 | `setup.sh / macos-15` | Full macOS setup through the real macOS hosted runner and Homebrew path. Docker cannot model macOS. |
-| `setup.ps1 / windows-2025` | Full Windows setup through the real Windows hosted runner, including Scoop/winget/choco behavior, PowerShell, symlinks, and Neovim restore/sync phases. Windows containers do not model the desktop/user-profile setup well. |
+| `setup.ps1 / windows-2025` | Full Windows setup through the real Windows hosted runner, including Scoop/winget/choco behavior, PowerShell, symlinks, `zoxide`/`gh`/WezTerm/Herdr command probes, and Neovim restore/sync phases. Windows containers do not model the desktop/user-profile setup well. |
 | `setup.sh / WSL2 Ubuntu-24.04 (best-effort canary)` | Non-required WSL smoke signal. Hosted runners cannot provide reliable nested virtualization, so this is intentionally best-effort. |
 
 After the Lazy restore, deterministic Tree-sitter parser install, and Mason sync, each
@@ -597,23 +658,24 @@ update PRs are intentionally not configured.
 |---|---|---|
 | GitHub Actions | Managed, digest-pinned, labeled `github-actions` | Actions are repo-owned CI inputs with stable Renovate support. |
 | GitHub runner images | Managed, labeled `github-runners`, reviewed separately | `ubuntu-*`, `macos-*`, and `windows-*` bumps can change the supported CI platform, so they should not be mixed with ordinary Action bumps. |
-| Repo-pinned installer versions/refs | Managed, labeled `pinned-downloads`, never automerged | Neovim Linux tarballs, chezmoi CI release archives, lazygit Linux tarballs, Starship Linux tarballs, tree-sitter CLI Linux archives, Hack Nerd Font, Windows Terminal portable zip, Ubuntu Ghostty, zsh plugin refs, tmux/psmux plugin refs, the Homebrew installer commit, the Renovate validator package/runtime, and the CI `cargo-binstall` commit are explicit repo pins. |
+| Repo-pinned installer versions/refs | Managed, labeled `pinned-downloads`, never automerged | Neovim Linux tarballs, chezmoi CI release archives, lazygit Linux tarballs, Starship Linux tarballs, tree-sitter CLI Linux archives, WezTerm Ubuntu `.deb`, Herdr Linux binaries, Herdr Windows preview `.exe`, Hack Nerd Font, Windows Terminal portable zip, Ubuntu Ghostty, zsh plugin refs, tmux/psmux plugin refs, the Homebrew installer commit, the Scoop installer commit, the Renovate validator package/runtime, and the CI `cargo-binstall` commit are explicit repo pins. |
 | Adjacent SHA-256 / commit constants | Not managed; matched only as regex context | Renovate can bump the version/ref but cannot recompute archive/script hashes or verify tag commit IDs. CI must fail until a human recomputes and reviews them. |
 | Package-manager catalogs | Not managed | Brew, apt, dnf, pacman, zypper, apk, Scoop, winget, and choco entries are package names/IDs, not repo version pins. Let the package manager resolve current versions. |
 | Neovim plugin and Mason tools | Not managed | `lazy-lock.json` is refreshed with Lazy and tested as editor behavior; Mason intentionally has no machine-pinned lockfile. |
 
-Direct network executables must either be pinned and verified before execution
-or appear in the reviewed static allowlist with a rationale. The remaining
-package-manager bootstrap trust root is Scoop's official installer on Windows;
-it is consent-gated and guarded by
-`tests/static/supply_chain_remote_execution_test.sh`. Homebrew bootstrap is
-downloaded from a pinned installer commit and SHA-256 verified before
-execution. Recommended setup docs use `git clone` plus local `setup`, not raw
-`curl | bash`/`iwr` execution of the current default branch.
+Direct network executables must be pinned and verified before execution, or be a
+reviewed exception whose verification is proved by the static scanner. Scoop
+bootstrap on Windows now downloads `ScoopInstaller/Install` from a pinned commit,
+verifies the installer SHA-256, then executes the local temp file (using
+`-RunAsAdmin` only for elevated CI). Homebrew bootstrap is downloaded from a
+pinned installer commit and SHA-256 verified before execution. Recommended setup
+docs use `git clone` plus local `setup`, not raw `curl | bash`/`iwr` execution of
+the current default branch.
 
 Direct-download SHA-256 values for Neovim tarballs, chezmoi CI release archives,
-lazygit tarballs, Starship tarballs, tree-sitter CLI archives, Hack Nerd Font,
-the Windows Terminal portable zip, the Ubuntu Ghostty installer, Homebrew
+lazygit tarballs, Starship tarballs, tree-sitter CLI archives, the WezTerm
+Ubuntu `.deb`, Herdr Linux binaries, Herdr Windows preview `.exe`, Hack Nerd Font, the Windows Terminal
+portable zip, the Ubuntu Ghostty installer, Homebrew installer script, Scoop
 installer script, and the CI `cargo-binstall` installer script are
 intentionally human-reviewed. zsh plugin tag commits and tmux/psmux plugin
 commits are also human-reviewed because the installers verify the checked-out
@@ -779,12 +841,13 @@ stale; CI then fails verification until a human reviews the adjacent constant.
   fragment so Rose Pine and Hack Nerd Font are present before first launch. A
   bare `chezmoi apply` runs the packaged merge but does not create setup's
   backup or the portable seed/mirror.
-- **Windows CI installs Scoop through its documented elevated path.** GitHub
+- **Windows CI installs Scoop through a pinned, verified elevated path.** GitHub
   Windows runners are elevated, and Scoop blocks elevated bootstrap by default.
-  `install-deps.ps1` detects elevation and runs the official installer with
-  `-RunAsAdmin`, then refreshes the current-process Scoop shims path so later
-  installs can use `scoop` immediately. Existing Scoop installs also get the
-  `extras` and `nerd-fonts` buckets normalized before catalog installs.
+  `install-deps.ps1` downloads `ScoopInstaller/Install` at a pinned commit,
+  verifies the installer SHA-256, runs it with `-RunAsAdmin` only when elevated,
+  then refreshes the current-process Scoop shims path so later installs can use
+  `scoop` immediately. Existing Scoop installs also get the `extras` and
+  `nerd-fonts` buckets normalized before catalog installs.
   Chezmoi's Windows nvim directory symlink still uses the elevated/native
   CreateSymbolicLink path. For local machines, Developer Mode plus a normal
   PowerShell remains the recommended setup path.
@@ -876,7 +939,9 @@ git add nvim/lazy-lock.json   # tracked, not gitignored
 
 Setup and validation use `Lazy! restore` instead. Run `Lazy! sync` only when
 you intentionally want to refresh plugin pins and review the resulting lockfile
-diff.
+diff. The startup-budget spec is intentionally different: it preclones locked
+plugin checkouts without running Lazy build hooks so asynchronous parser builds
+cannot pollute the startup timing assertion.
 
 ### Updating Mason tools across machines
 

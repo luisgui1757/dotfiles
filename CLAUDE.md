@@ -236,6 +236,59 @@ that violates one of these, fix it instead of disabling the test.
       `PowerShell.OnIdle` re-apply also re-asserts these handlers but does NOT
       re-set EditMode (that would wipe PSFzf's Ctrl+R/T + Alt+C chords). Guarded
       by the vi-mode `It` blocks in `tests/powershell/Profile.Tests.ps1`.
+22. **Nix owns POSIX packages only; chezmoi owns every dotfile target; native
+    Windows stays non-Nix.** The Nix layer (nix-darwin + declarative Homebrew on
+    macOS, Home Manager standalone on Linux/WSL userland) is a *package* provider.
+    It never owns a config file. These five sub-rules are the load-bearing
+    boundaries, guarded statically by `tests/static/nix_architecture_test.sh` (and,
+    for the update-mode rule, `tests/shell/install_deps_update_test.sh`):
+    - **(a) chezmoi-only dotfile ownership.** Exactly one owner per path. Every
+      dotfile target on every OS is owned by chezmoi (the `home/` source tree).
+      No Nix file may write a dotfile that chezmoi manages — not zsh, nvim, tmux,
+      starship, wezterm, aerospace, lazygit, lsd, gh-dash, ghostty, powershell, or
+      any other config surface. If Nix and chezmoi ever co-own a path, that is the
+      bug.
+    - **(b) Home Manager / nix-darwin is packages-only.** No `home.file`, no
+      `xdg.configFile`, no `xdg.dataFile`, no `home.activation` at all, and no
+      `programs.*` module except `programs.home-manager` (the standalone HM CLI).
+      Home Manager
+      declares `home.packages` (plus the minimal `home.username` /
+      `home.homeDirectory` / `home.stateVersion`) and nothing that renders a
+      shell/editor/terminal config file. GUI / TCC-sensitive apps (WezTerm,
+      AeroSpace, Herdr) come from vendor channels (Homebrew casks / pinned
+      artifacts, including the Windows Herdr preview `.exe`), never nixpkgs.
+    - **(c) native Windows is non-Nix.** Windows-host files are `setup.ps1` +
+      native package managers (Scoop/winget/choco) + chezmoi. Nix has no supported
+      native-Windows story; it applies to WSL2 *userland* only and must never
+      touch Windows-host paths under `/mnt/c`. No `.nix` file references a Windows
+      path (`/mnt/c`, `C:\`, `%USERPROFILE%`, `AppData`), and `setup.ps1` /
+      `install-deps.ps1` never invoke `nix`, `darwin-rebuild`, or `home-manager`.
+    - **(d) no remote-eval installer.** The repo never adds a `curl | sh`,
+      `irm | iex`, `Invoke-Expression`, or `nix-installer`/`install.determinate.systems`
+      pipe-to-shell path for Nix (or anything else). The *host* proving machine
+      installed Nix from the notarized Determinate `.pkg` (signature + SHA-256
+      verified) — that provenance-checked, non-piped install is a host operation,
+      not repo code. Repo-side Nix bootstrap docs use verified artifacts, never a
+      mutable remote script. (Also covered by
+      `tests/static/supply_chain_remote_execution_test.sh`.)
+    - **(e) Nix owner reporting in update mode.** When `install-deps.sh --update`
+      resolves a tool whose command source (or its real path) lives under a Nix
+      profile/store path (`/nix/store`, `*/.nix-profile/*`,
+      `*/.local/state/nix/profile/*`, `/run/current-system/sw`,
+      `/etc/profiles/per-user`, `/nix/var/nix/profiles/*`), `nix_owns_tool_source`
+      reports it truthfully as `skipped … owner=nix reason=managed by the Nix
+      layer …` — reusing the documented `skipped` vocabulary (like the pacman
+      "explicit system upgrade" case), not a new status word. It fires only when
+      PATH actually resolves the tool from Nix, so every other tool keeps its
+      existing per-manager ownership. Update mode must NOT run a blanket
+      `nix profile upgrade`, `nix-env -u`, or `nix flake update`, and must NOT
+      silently rewrite `flake.lock`; the pinned lock is bumped only by an
+      explicit, reviewed PR (Renovate `nix` manager), and the Nix layer is
+      refreshed by the opt-in `setup.sh --nix-darwin` / `--home-manager` switch.
+      Guarded by the `nix-owned tool reports owner=nix` case in
+      `tests/shell/install_deps_update_test.sh` (which also proves update mode
+      never shells out to `nix` for an owned tool) and the "no blanket nix
+      upgrade / silent flake.lock rewrite" check in `nix_architecture_test.sh`.
 
 ## Common workflows
 
@@ -372,9 +425,13 @@ git add nvim/lazy-lock.json
 ```
 
 `lazy-lock.json` is tracked (NOT gitignored) — that's how every machine ends
-up on the same commits. Setup, e2e assertions, greenfield validators, and test
-prewarm paths must use `Lazy! restore`, not `Lazy! sync`; `sync` is only for
-intentional dependency maintenance that reviews and commits a lockfile diff.
+up on the same commits. Setup, e2e assertions, and greenfield validators must
+use `Lazy! restore`, not `Lazy! sync`; `sync` is only for intentional dependency
+maintenance that reviews and commits a lockfile diff. The startup-budget spec is
+the exception: it preclones the locked plugin checkouts into its isolated cache
+instead of invoking Lazy install/restore, because restore runs plugin build hooks
+and nvim-treesitter's `:TSUpdate` build starts compiler work that can outlive the
+prewarm child and pollute the startup measurement.
 
 ### Update Mason-installed tools across machines
 
@@ -408,12 +465,15 @@ its parent process can false-fail after all child specs passed when PowerShell
 native-command error promotion is enabled.
 
 On Unix, `tests/nvim/run.sh` uses `PlenaryBustedDirectory` with an explicit
-`timeout = 180000`. Keep that value explicit: `startup_spec.lua` prewarms a real
-production init under isolated XDG dirs, and Plenary's default 50s timeout can
-SIGTERM the child before the startup-budget assertion reports the actual
-problem. The startup budget itself is strict, but the spec measures up to three
-warm starts and accepts the fastest run; this filters scheduler/filesystem
-outliers while still failing a consistently slow production init.
+`timeout = 180000`. Keep that value explicit: `startup_spec.lua` preclones the
+locked plugin checkouts under isolated XDG dirs, prewarms a real production init,
+and Plenary's default 50s timeout can SIGTERM the child before the startup-budget
+assertion reports the actual problem. The startup spec must not invoke Lazy's
+install/restore path or leave nvim-treesitter parser outputs in its cache; those
+are dependency-bootstrap costs, not warm startup costs. The startup budget itself
+is strict, but the spec measures up to three warm starts and accepts the fastest
+run; this filters scheduler/filesystem outliers while still failing a
+consistently slow production init.
 
 Sub-targets **skip gracefully** when their tool isn't installed
 (`yamllint`/`editorconfig-checker`/`hyperfine`/`bats`/`ghostty`). The
@@ -468,7 +528,8 @@ install paths, not symmetric container platforms:
 - `e2e containers / ubuntu-24.04` runs an `ubuntu:24.04` container on an Ubuntu
   runner with `DOTFILES_SKIP_BREW_BOOTSTRAP=1`, creates a non-root user, runs
   real `install-deps.sh --all` (native `apt`, no Linuxbrew), then applies
-  configs with chezmoi and asserts tool presence, Neovim >= 0.12, lazygit, zsh
+  configs with chezmoi and asserts tool presence, including `zoxide`, `gh`,
+  WezTerm, and Herdr, Neovim >= 0.12, lazygit, zsh
   plugin files under `~/.local/share/dotfiles/zsh-plugins`, config content
   matching the repo sources, and the Neovim
   directory resolving into repo `nvim/`.
@@ -486,6 +547,9 @@ install paths, not symmetric container platforms:
   parser install, Mason headless sync, and the Polaris Phase 6/6 agent-policy
   install. They explicitly fail if setup skips Phase 3-5, omits Phase 6/6,
   emits a `FAIL:` marker, or Mason did not install expected tools. Windows e2e
+  also asserts the new Windows tools that must leave PATH commands behind
+  (`zoxide`, `gh`, `wezterm`, `herdr`), so an installer that exits 0 but fails
+  its command probe cannot fake-green.
   must assert `%LOCALAPPDATA%\lazygit\config.yml`
   against `lazygit/config.windows.yml`, not the POSIX/default
   `lazygit/config.yml`. After the full restore/sync they also run the
@@ -750,13 +814,13 @@ save only**. The next plain `:w` formats normally. Implemented in
   installed formula, and `brew list --formula <formula>` file ownership of the
   resolved executable; apt/dnf/zypper/pacman/apk require
   the manager's file-ownership proof for the resolved real path; repo-pinned
-  direct Linux artifacts (`nvim`, `lazygit`, `starship`, `tree-sitter`, and
-  `chezmoi`) are owned only when their durable marker matches the repo-pinned
+  direct Linux artifacts (`nvim`, `lazygit`, `starship`, `tree-sitter`,
+  `chezmoi`, and `herdr`) are owned only when their durable marker matches the repo-pinned
   version, URL, SHA-256, command path, binary path, install root, installed
   binary SHA-256, executable `--version` output, and supported install shape:
   Neovim is `/usr/local/bin/nvim` pointing into `/opt/nvim-linux-*`; lazygit and
-  Starship are `/usr/local/bin/<tool>` or `~/.local/bin/<tool>`; tree-sitter and
-  chezmoi are `~/.local/bin/<tool>`. A Brew-prefix command symlink that resolves
+  Starship are `/usr/local/bin/<tool>` or `~/.local/bin/<tool>`; tree-sitter,
+  chezmoi, and Herdr are `~/.local/bin/<tool>`. A Brew-prefix command symlink that resolves
   outside the Brew prefix is a blocked ownership contradiction, a shadow command
   path that resolves to the same binary is not ownership, an unsupported
   direct-artifact root is not ownership, and a marker binary outside the
@@ -961,11 +1025,13 @@ save only**. The next plain `:w` formats normally. Implemented in
   mode exits nonzero when a scoped refresh did not actually succeed. Present
   tools outside Scoop/winget/Chocolatey are reported as unmanaged and do not
   count as successful dotfiles-owned updates.
-- **Windows CI uses Scoop's documented elevated bootstrap.** GitHub-hosted
+- **Windows CI uses a pinned, verified elevated Scoop bootstrap.** GitHub-hosted
   `windows-2025` runners are elevated, and Scoop blocks elevated install by
-  default. `Install-Scoop` detects elevation and runs the official installer
-  with `-RunAsAdmin`, then adds the Scoop `shims` dir to the current process
-  PATH so the rest of `install-deps.ps1` can immediately use `scoop`.
+  default. `Install-Scoop` downloads `ScoopInstaller/Install` at the pinned
+  `$ScoopInstallerCommit`, verifies `$ScoopInstallerSha256`, runs the local temp
+  installer with `-RunAsAdmin` only when elevated, then adds the Scoop `shims`
+  dir to the current process PATH so the rest of `install-deps.ps1` can
+  immediately use `scoop`.
   `Install-Scoop` also ensures the `extras` and `nerd-fonts` buckets whenever
   Scoop exists, including pre-existing user installs. Every bucket add routes
   through `Add-ScoopBucketSafe`: idempotent; non-interactive via
@@ -1077,24 +1143,30 @@ save only**. The next plain `:w` formats normally. Implemented in
   not yet activated when `colorTheme` is first read (needs an Extensions reload /
   second launch); (4) a workspace `.vscode/settings.json` override. Confirm which
   profile is active and whether Sync is on before touching code again.
-- **Direct network executables are pinned or explicitly allowlisted.** New
-  installer code must prefer release artifacts with adjacent SHA-256
-  verification over fetched installer scripts. If a mutable bootstrap script is
-  unavoidable, it must be a named trust root with rationale in
-  `tests/static/supply_chain_remote_execution_test.sh`; the current installer
-  trust root is Scoop's official installer. Homebrew bootstrap is downloaded
-  from a pinned installer commit and SHA-256 verified before execution.
+- **Direct network executables are pinned and verified.** New installer code must
+  prefer release artifacts with adjacent SHA-256 verification over fetched
+  installer scripts. Bootstrap scripts are acceptable only when pinned to an
+  immutable commit and hash-verified before execution; current examples are the
+  Homebrew installer and Windows Scoop bootstrap. `install-deps.ps1` downloads
+  `ScoopInstaller/Install` at `$ScoopInstallerCommit`, verifies
+  `$ScoopInstallerSha256`, then executes the checked temp file. The static
+  scanner keeps only genuinely pinned+verified exceptions, including CI
+  cargo-binstall where the SHA-256 check immediately precedes execution.
   Recommended setup docs use `git clone` plus local `setup`, not raw remote
   setup script execution from the current default branch.
 - **Direct GitHub downloads are pinned and SHA-256 verified.** `install-deps.sh`
   verifies the pinned Homebrew installer script, Neovim Linux tarballs,
   native-Linux chezmoi tarballs, lazygit Linux tarballs, Starship Linux
-  tarballs, tree-sitter CLI Linux archives, and Hack Nerd Font zip before extraction;
+  tarballs, tree-sitter CLI Linux archives, the WezTerm Ubuntu `.deb`, Herdr
+  Linux binaries, the Herdr Windows preview `.exe`, and Hack Nerd Font zip before extraction;
   CI also verifies the pinned chezmoi Linux, macOS, and Windows release
   archives used by the parity jobs;
-  `install-deps.ps1` verifies the pinned Hack.zip before registering fonts and
-  the pinned Windows Terminal portable zip before extracting the fallback
-  install. POSIX helpers that unpack into `mktemp -d` install a cleanup trap
+  `install-deps.ps1` verifies the pinned Scoop installer before execution, the
+  pinned Hack.zip before registering fonts, the pinned Windows Terminal
+  portable zip before extracting the fallback install, and the pinned Herdr
+  Windows preview `.exe` before copying it into `%LOCALAPPDATA%\Programs\Herdr\bin`.
+  POSIX helpers that unpack
+  into `mktemp -d` install a cleanup trap
   immediately after creating the directory, so failure paths do not leak
   archives or partial extracts. A Hack.zip checksum mismatch records a `FAIL:`
   install marker and does not extract. A successful Windows font install broadcasts
@@ -1113,6 +1185,8 @@ save only**. The next plain `:w` formats normally. Implemented in
   Update the version and checksum constants together. zsh plugin refs are also
   pinned by tag plus expected commit; update both after reviewing a Renovate tag
   bump. Guarded by `tests/shell/ghostty_install_fail_test.sh`,
+  `tests/shell/wezterm_install_test.sh`, `tests/shell/wezterm_install_fail_test.sh`,
+  `tests/shell/herdr_install_test.sh`, `tests/shell/herdr_install_fail_test.sh`,
   `tests/shell/wsl_gui_tools_test.sh`, `tests/shell/lazygit_install_test.sh`,
   `tests/shell/starship_linux_install_test.sh`,
   `tests/shell/treesitter_cli_test.sh`, and `tests/shell/zsh_plugins_test.sh`.
@@ -1121,8 +1195,8 @@ save only**. The next plain `:w` formats normally. Implemented in
   but it cannot recompute adjacent SHA-256
   values or verify tag commit IDs; leave CI red until a human has reviewed the
   download/ref and updated the adjacent constant. The
-  `CHEZMOI_VERSION`, `STARSHIP_VERSION`, and
-  `TREE_SITTER_CLI_LINUX_VERSION` custom managers follow the lazygit shape:
+  `CHEZMOI_VERSION`, `STARSHIP_VERSION`, `TREE_SITTER_CLI_LINUX_VERSION`,
+  `WEZTERM_VERSION`, and `HERDR_VERSION` custom managers follow the lazygit shape:
   Renovate may bump the version constants, while their adjacent SHA-256 values
   remain context only. In
   `renovate.json`, direct-download SHA-256 values must be matched as context
@@ -1363,6 +1437,89 @@ save only**. The next plain `:w` formats normally. Implemented in
   5.1 and pwsh < 7.2); use `$PSStyle.Foreground.FromRgb(0xf6c177)` so the
   source carries no raw ANSI escape byte (keeps the `.ps1` pure-ASCII
   invariant).
+
+## Nix layer (optional POSIX packages; chezmoi still owns every dotfile)
+
+The `flake.nix` + committed `flake.lock` are the POSIX **package** layer. They own
+NO dotfiles — chezmoi does, on every OS (invariant 22). Native Windows is
+non-Nix. The whole layer is opt-in; setup defaults are unchanged.
+
+- **`flake.nix` structure.** `nixpkgs` (nixos-unstable, pinned by `flake.lock`),
+  plus `nix-darwin`, `home-manager`, `nix-homebrew`, and the three Homebrew taps
+  (`homebrew-core`, `homebrew-cask`, `nikitabobko/homebrew-tap`) as pinned
+  (`flake = false`) inputs. `systems` covers the four POSIX systems only — there
+  is deliberately **no windows system**. Outputs: a packages-only `devShells`,
+  a hermetic `checks.<system>.toolchain` (proves nixpkgs resolves the CLI
+  toolchain), `formatter = nixpkgs-fmt`, and `darwinConfigurations."dotfiles"`.
+  The activation config is intentionally `aarch64-darwin` today; x86_64 Darwin
+  can evaluate dev shells/checks but is not a supported nix-darwin host target
+  until an Intel Mac proves that path.
+- **`nix flake check` in CI does NOT build the darwin toplevel.** It *evaluates*
+  `darwinConfigurations.dotfiles` (catching config errors — it caught a
+  `nixpkgs.hostPlatform` recursion and a null `home.homeDirectory` during
+  development) but reports "(build skipped)", so CI never fetches the multi-GB
+  Homebrew taps. `.github/workflows/nix.yml` runs `nix flake check`, the
+  `nix fmt --check`, and `tests/nix/run_all.sh` on Ubuntu + macOS. It is a
+  SEPARATE workflow from `test.yml` so it is not auto-derived into the required
+  check set (`required_checks_test.sh` parses only `test.yml` + `e2e-install.yml`).
+- **nix-darwin (`nix/darwin/configuration.nix`).** `nix.enable = false` — the
+  **Determinate** daemon owns Nix, so nix-darwin must not fight it. Declarative
+  Homebrew: `onActivation` `autoUpdate = false`, `upgrade = false`,
+  `cleanup = "check"` (report drift, never destroy); casks = WezTerm + AeroSpace
+  (GUI/vendor apps, never nixpkgs); brews = Herdr. nix-homebrew runs
+  `mutableTaps = false` with the taps supplied as pinned inputs, and
+  `homebrew.taps = builtins.attrNames config.nix-homebrew.taps`. `system.primaryUser`
+  + `users.users.<user>.home` are resolved from `SUDO_USER`, then `USER`, then
+  the pure-eval placeholder `runner`.
+- **User resolution.** The flake reads `builtins.getEnv "SUDO_USER"` first,
+  falls back to `builtins.getEnv "USER"`, and uses `"runner"` only so pure eval /
+  `nix flake check` still evaluates. setup.sh runs
+  `sudo darwin-rebuild switch --flake .#dotfiles --impure`, so sudo may set
+  `USER=root` but `SUDO_USER` still resolves Homebrew/Home Manager to the real
+  invoking user. First-run bootstrap derives the locked rev and `narHash` from
+  `flake.lock` with Nix's JSON parser, URL-encodes the hash for the flake ref,
+  and runs
+  `sudo nix run github:nix-darwin/nix-darwin/<locked-rev>?narHash=<encoded-narHash>#darwin-rebuild -- ...`;
+  do not use the mutable `nix-darwin` registry alias or omit the locked
+  `narHash`.
+- **Home Manager is packages-only** (`nix/home/darwin.nix`): `home.packages` +
+  the minimal `home.username`/`home.stateVersion`. `home.homeDirectory` is left
+  to the nix-darwin HM integration (derived from `users.users.<user>.home`) to
+  avoid a conflicting definition. No `home.file`, no `xdg.configFile`, no
+  `programs.<tool>` other than `programs.home-manager`. Guarded at the SOURCE
+  level by `tests/static/nix_architecture_test.sh`, which allowlists only
+  `programs.home-manager` and bans `home.activation` outright.
+- **setup.sh integration is explicit + consent-gated.** `setup.sh --nix-darwin`
+  (macOS-only) is the ONLY path that runs `sudo darwin-rebuild switch`; without
+  the flag setup never touches Nix. It is dry-run-safe (previews the real sudo
+  command and the locked bootstrap ref), prompts unless `--all`, skips cleanly
+  off-macOS or without nix, and fails closed if the requested activation fails.
+  Guarded by `tests/nix/setup_nix_darwin_test.sh`.
+- **Linux/WSL Home Manager (standalone, packages-only).**
+  `homeConfigurations."<arch>-linux"` (`nix/home/linux.nix` + the shared
+  `nix/home/common.nix`) is the nix-owned CLI set for Linux/WSL, activated by
+  `setup.sh --home-manager` (Linux-only, same opt-in/consent/dry-run contract as
+  `--nix-darwin`). `programs.home-manager.enable` is the ONE allowed `programs.*`
+  (it installs the standalone HM CLI). On WSL it writes ONLY to `~/.nix-profile`,
+  never `/mnt/c` — split-host preserved. First-run bootstrap likewise uses
+  `github:nix-community/home-manager/<locked-rev>?narHash=<encoded-narHash>#home-manager`
+  from `flake.lock`, not a mutable registry alias. **Native install-deps arms are RETAINED
+  as the default provisioning path**; the Nix package layer is additive/opt-in,
+  proven by tests before anything is deleted. Guarded by
+  `tests/nix/linux_home_test.sh` + `tests/nix/setup_home_manager_test.sh`.
+- **nvim + the tree-sitter CLI are DELIBERATELY NOT in the Nix package set
+  (deferred, with proof).** nvim-treesitter `main` compiles parsers whose ABI
+  must match nvim's built-in libtree-sitter, and the repo pins the tree-sitter
+  CLI to `v0.26.9` precisely to keep that build reproducible (invariant 19). A
+  nix neovim / tree-sitter shadowing the pinned native binaries would risk the
+  `E5113` parser/ABI-mismatch class of bug. So `nix/home/common.nix` omits both;
+  they stay on the native install-deps path. Moving nvim into the SAME Nix
+  closure as its parser toolchain (nix nvim + nix tree-sitter CLI + nix compiler,
+  ABI-matched) is the follow-up — do not add `neovim`/`tree-sitter` to the HM
+  package set until that closure is proven.
+- **Renovate** owns `flake.lock` bumps via the `nix` manager (reviewed PRs). Do
+  NOT rewrite `flake.lock` silently in setup/update; a bump is always a PR.
+- **`--update` owner=nix** is Phase 7 (`tests/shell/install_deps_update_test.sh`).
 
 ## Login shell: zsh adoption (install-deps.sh)
 

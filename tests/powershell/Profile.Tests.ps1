@@ -244,6 +244,16 @@ exit 0
         $tail | Should -Match 'Set-PSReadLineKeyHandler\s+-Key UpArrow\s+-Function HistorySearchBackward\s+-ViMode Insert'
     }
 
+    It "does not reset EditMode from the psmux OnIdle block" {
+        $src = Get-Content -Raw -LiteralPath $script:Profile
+        $onIdleIdx = $src.IndexOf('PowerShell.OnIdle')
+        $psfzfIdx = $src.IndexOf('Set-PsFzfOption')
+        $onIdleIdx | Should -BeGreaterThan 0
+        $psfzfIdx | Should -BeGreaterThan $onIdleIdx
+        $onIdleBlock = $src.Substring($onIdleIdx, $psfzfIdx - $onIdleIdx)
+        $onIdleBlock | Should -Not -Match 'Set-PSReadLineOption\s+-EditMode'
+    }
+
     It "keeps the PSFzf chords and wires them after EditMode" {
         $src = Get-Content -Raw -LiteralPath $script:Profile
         $src | Should -Match 'PSReadlineChordProvider'

@@ -8,7 +8,7 @@
     ":semanticCommits",
     ":timezone(Etc/UTC)"
   ],
-  "enabledManagers": ["github-actions", "custom.regex"],
+  "enabledManagers": ["github-actions", "custom.regex", "nix"],
   "dependencyDashboard": true,
   "dependencyDashboardTitle": "Renovate dashboard",
   "schedule": ["before 06:00 on monday"],
@@ -107,6 +107,50 @@
       "depNameTemplate": "mkasberg/ghostty-ubuntu",
       "datasourceTemplate": "github-releases",
       "versioningTemplate": "loose"
+    },
+    {
+      "customType": "regex",
+      "description": "WezTerm Ubuntu .deb version. The adjacent .deb SHA-256 must be recomputed manually after Renovate bumps this.",
+      "managerFilePatterns": ["/^install-deps\\.sh$/"],
+      "matchStrings": [
+        "WEZTERM_VERSION=\"(?<currentValue>[^\"]+)\"\\s+WEZTERM_DEB_AMD64_SHA256=\"[a-f0-9]{64}\""
+      ],
+      "depNameTemplate": "wezterm/wezterm",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "loose"
+    },
+    {
+      "customType": "regex",
+      "description": "Herdr Linux x86_64 binary version. Adjacent Linux asset SHA-256 values must be recomputed manually after Renovate bumps this.",
+      "managerFilePatterns": ["/^install-deps\\.sh$/"],
+      "matchStrings": [
+        "HERDR_VERSION=\"(?<currentValue>v[^\"]+)\"\\s+HERDR_LINUX_X86_64_SHA256=\"[a-f0-9]{64}\""
+      ],
+      "depNameTemplate": "ogulcancelik/herdr",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "description": "Herdr Linux arm64 binary version. Adjacent Linux asset SHA-256 values must be recomputed manually after Renovate bumps this.",
+      "managerFilePatterns": ["/^install-deps\\.sh$/"],
+      "matchStrings": [
+        "HERDR_VERSION=\"(?<currentValue>v[^\"]+)\"(?:.|\\n)*?HERDR_LINUX_ARM64_SHA256=\"[a-f0-9]{64}\""
+      ],
+      "depNameTemplate": "ogulcancelik/herdr",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "description": "Herdr Windows preview binary tag. Adjacent Windows asset SHA-256 must be recomputed manually after Renovate bumps this.",
+      "managerFilePatterns": ["/^install-deps\\.ps1$/"],
+      "matchStrings": [
+        "\\$HerdrWindowsPreviewVersion\\s*=\\s*'(?<currentValue>preview-[^']+)'\\s+\\$HerdrWindowsX64Sha256\\s*=\\s*'[a-f0-9]{64}'"
+      ],
+      "depNameTemplate": "ogulcancelik/herdr",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "regex:^preview-(?<major>\\d{4})-(?<minor>\\d{2})-(?<patch>\\d{2})-(?<build>[0-9a-f]+)$"
     },
     {
       "customType": "regex",
@@ -339,6 +383,12 @@
       "matchDatasources": ["github-runners"],
       "groupName": "github runner images",
       "addLabels": ["github-runners"],
+      "automerge": false
+    },
+    {
+      "matchManagers": ["nix"],
+      "groupName": "nix flake inputs",
+      "addLabels": ["nix"],
       "automerge": false
     }
   ]

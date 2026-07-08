@@ -1163,6 +1163,60 @@ case_direct_artifact_stale_marker_refreshes_pin() {
     assert_contains "updated   lazygit" "$root.out" "stale direct artifact was not reported updated"
 }
 
+case_nix_owned_tool_reports_owner_nix() {
+    # A tool whose command source resolves under a Nix store/profile is
+    # owner=nix and is NOT updated (refreshed via the opt-in Nix layer). Covers a
+    # ~/.nix-profile source (matched directly) AND a plain source whose realpath
+    # resolves into /nix/store. Proves update mode never shells out to `nix`.
+    local root="$TMP_ROOT/nix-owned" nix_sentinel="$TMP_ROOT/nix-owned.nix-invoked"
+    local profbin="$root/home/.nix-profile/bin"
+    local wrapbin="$root/wrap/bin"
+    mkdir -p "$profbin" "$wrapbin"
+    mktool "$profbin/rg"
+    mktool "$wrapbin/jq"
+    PATH="$profbin:$wrapbin:/usr/bin:/bin"
+    export PATH
+    DRY_RUN=0
+    PM=brew
+    INSTALL_DEPS_UPDATE_TOOLS="rg
+jq"
+
+    real_source_path() {
+        case "$1" in
+            "$wrapbin/jq") printf '%s\n' "/nix/store/abc123-jq-1.7.1/bin/jq" ;;
+            *) printf '%s\n' "$1" ;;
+        esac
+    }
+    homebrew_bin() { return 1; }
+    native_linux_pm() { printf '%s\n' "unknown"; }
+    # If update mode ever shells out to nix for an owned tool, record it in a
+    # separate sentinel file so stdout capture cannot erase the evidence.
+    nix() { printf 'NIX_INVOKED %s\n' "$*" >> "$nix_sentinel"; return 0; }
+
+    # Direct path-form unit checks of the resolver.
+    local p
+    for p in \
+        "/nix/store/xxx/bin/rg" \
+        "/home/u/.nix-profile/bin/rg" \
+        "/Users/u/.nix-profile/bin/rg" \
+        "/etc/profiles/per-user/u/bin/rg" \
+        "/run/current-system/sw/bin/rg" \
+        "/home/u/.local/state/nix/profile/bin/rg"; do
+        nix_owns_tool_source "$p" || fail "nix_owns_tool_source should own $p"
+    done
+    for p in "/opt/homebrew/bin/rg" "/usr/bin/rg" "/home/u/.local/bin/rg" ""; do
+        if nix_owns_tool_source "$p"; then fail "nix_owns_tool_source wrongly owned '$p'"; fi
+    done
+
+    update_catalog_tools > "$root.out"
+    assert_contains "owner=nix reason=managed by the Nix layer" "$root.out" "nix-owned rg did not report the owner=nix reason"
+    grep -Eq "skipped[[:space:]]+rg[[:space:]].*owner=nix" "$root.out" || fail "nix-profile rg was not skipped as owner=nix"
+    grep -Eq "skipped[[:space:]]+jq[[:space:]].*owner=nix" "$root.out" || fail "/nix/store jq was not skipped as owner=nix"
+    [[ ! -e "$nix_sentinel" ]] || fail "update mode shelled out to nix for a nix-owned tool"
+    assert_not_contains "owner=brew" "$root.out" "nix-owned tool was mis-claimed by brew"
+}
+
+run_case "nix-owned tool reports owner=nix" case_nix_owned_tool_reports_owner_nix
 run_case "mixed Linuxbrew and apt" case_mixed_linuxbrew_and_apt
 run_case "Brew current" case_brew_current_does_not_upgrade
 run_case "Brew shadowed source" case_brew_shadowed_source_is_unmanaged

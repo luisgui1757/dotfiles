@@ -21,10 +21,12 @@ Documents
 {{- end }}
 {{- if ne .targetOS "darwin" }}
 Library
+.config/aerospace
 {{- end }}
 {{- if ne .targetOS "linux" }}
 .config/lazygit
 .config/ghostty
 {{- else if and .isWsl (not (get . "experimentalWslGui" | default false)) }}
 .config/ghostty
+.config/wezterm
 {{- end }}

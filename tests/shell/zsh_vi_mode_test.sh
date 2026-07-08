@@ -70,6 +70,20 @@ grep -Eq 'add-zle-hook-widget[[:space:]]+keymap-select[[:space:]]+_dotfiles_vi_c
 grep -Eq 'add-zle-hook-widget[[:space:]]+line-init[[:space:]]+_dotfiles_vi_cursor_shape' "$zshrc" \
     || fail "zshrc must register the vi cursor via add-zle-hook-widget line-init"
 
+awk '
+    /add-zle-hook-widget[[:space:]]+keymap-select[[:space:]]+_dotfiles_vi_cursor_shape/ { hook = NR }
+    /starship init zsh --print-full-init/ { starship = NR }
+    END {
+        if (!hook)     { print "missing cursor hook registration"; exit 1 }
+        if (!starship) { print "missing starship init"; exit 1 }
+        if (!(hook < starship)) {
+            print "cursor hook registration must precede starship init"
+            exit 1
+        }
+    }
+' "$zshrc" \
+    || fail "zshrc must register cursor hooks before starship init"
+
 # 8. chezmoi twin parity — the fast suite must catch a twin drift on its own.
 if ! diff -q "$zshrc" "$REPO_ROOT/home/dot_zshrc" >/dev/null; then
     fail "home/dot_zshrc is not byte-identical to shells/zshrc (chezmoi twin drift)"
@@ -79,23 +93,28 @@ echo "static: OK"
 
 # ---- Functional (live keymap inspection) -------------------------------------
 # Requires zsh. Sources the real zshrc under `zsh -i` and reads the LIVE keymaps.
-# Assertions are written to be robust to whether fzf / fzf-tab happen to be
-# installed on the host: fzf's integration rebinds viins Tab and Ctrl-R, but it
-# never touches the arrow keys or the vicmd Tab, so those stay deterministic.
+# Run two deterministic legs:
+#   1. no fzf on PATH -> native menu-select fallback owns Tab.
+#   2. fake fzf + repo-managed fzf-tab widget -> fzf may bind Tab first, then
+#      zshrc must reclaim Tab for fzf-tab in both vi keymaps.
 if ! command -v zsh >/dev/null 2>&1; then
     echo "skipped: zsh not installed (static assertions passed)"
     exit 0
 fi
 
 zsh_bin="$(command -v zsh)"
-TMP_HOME="$(mktemp -d)"
-trap 'rm -rf "$TMP_HOME"' EXIT
+TMP_ROOT="$(mktemp -d)"
+trap 'rm -rf "$TMP_ROOT"' EXIT
 
-# shellcheck disable=SC2016 # the single-quoted body is zsh code; $ must NOT
-# expand in bash. Only "$zshrc" (double-quoted) is interpolated by bash.
-probe="$(
-    HOME="$TMP_HOME" HOMEBREW_PREFIX='' "$zsh_bin" -i -c '
-        source '"$zshrc"' >/dev/null 2>&1
+run_probe() {
+    local home="$1" path_value="$2"
+    # shellcheck disable=SC2016 # the single-quoted body is zsh code; $ must NOT
+    # expand in bash. Only "$zshrc" (double-quoted) is interpolated by bash.
+    HOME="$home" HOMEBREW_PREFIX="$home/no-brew" DOTFILES_TEST_PATH="$path_value" "$zsh_bin" -i -c '
+        export PATH="$DOTFILES_TEST_PATH"
+        path=(${(s.:.)PATH})
+        rehash
+        source '"$zshrc"' >/dev/null 2>&1 || exit 1
         print -r -- "MAIN=$(bindkey -lL main)"
         print -r -- "KEYTIMEOUT=$KEYTIMEOUT"
         print -r -- "VIINS_UP=${${(z)$(bindkey -M viins "^[[A")}[2]}"
@@ -105,41 +124,78 @@ probe="$(
         print -r -- "VIINS_CR=${${(z)$(bindkey -M viins "^R")}[2]}"
         print -r -- "CURSOR_WIDGET=${widgets[_dotfiles_vi_cursor_shape]:-MISSING}"
     ' 2>/dev/null
-)"
-
-value_of() { # value_of <label>
-    printf '%s\n' "$probe" | grep -F "$1=" | head -1 | sed "s/^$1=//"
 }
 
-check_contains() { # check_contains <label> <expected-substring>
-    local got; got="$(value_of "$1")"
-    [[ -n "$got" ]] || fail "functional: no '$1=' in probe output"
-    [[ "$got" == *"$2"* ]] || fail "functional: $1 expected '*$2*', got '$got'"
+value_of() { # value_of <probe> <label>
+    printf '%s\n' "$1" | grep -F "$2=" | head -1 | sed "s/^$2=//"
 }
 
-check_in_set() { # check_in_set <label> <widget> [widget...]
-    local label="$1" got; shift
-    got="$(value_of "$label")"
-    [[ -n "$got" ]] || fail "functional: no '$label=' in probe output"
-    local w
-    for w in "$@"; do [[ "$got" == "$w" ]] && return 0; done
-    fail "functional: $label='$got' not in {$*}"
+check_contains() { # check_contains <leg> <probe> <label> <expected-substring>
+    local leg="$1" probe="$2" label="$3" expected="$4" got
+    got="$(value_of "$probe" "$label")"
+    [[ -n "$got" ]] || fail "functional/$leg: no '$label=' in probe output"
+    [[ "$got" == *"$expected"* ]] || fail "functional/$leg: $label expected '*$expected*', got '$got'"
 }
 
-# `bindkey -v` actually took: the main keymap is the vi insert map.
-check_contains "MAIN" "viins"
-check_contains "KEYTIMEOUT" "25"
-# Arrows are fzf-independent: prefix history search in both vi keymaps.
-check_contains "VIINS_UP" "up-line-or-beginning-search"
-check_contains "VICMD_UP" "up-line-or-beginning-search"
-# Tab still completes under vi mode. vicmd Tab is ours alone (fzf never rebinds
-# it); viins Tab is ours unless fzf/fzf-tab rebinds it to their completion widget.
-check_in_set "VICMD_TAB" menu-select fzf-tab-complete
-check_in_set "VIINS_TAB" menu-select fzf-tab-complete fzf-completion
-# Ctrl-R searches history: our fallback, or fzf's picker when fzf is present.
-check_in_set "VIINS_CR" history-incremental-search-backward fzf-history-widget
-# Cursor-shape widget is registered.
-check_contains "CURSOR_WIDGET" "_dotfiles_vi_cursor_shape"
+check_equals() { # check_equals <leg> <probe> <label> <expected>
+    local leg="$1" probe="$2" label="$3" expected="$4" got
+    got="$(value_of "$probe" "$label")"
+    [[ -n "$got" ]] || fail "functional/$leg: no '$label=' in probe output"
+    [[ "$got" == "$expected" ]] || fail "functional/$leg: $label expected '$expected', got '$got'"
+}
+
+common_checks() {
+    local leg="$1" probe="$2"
+    check_contains "$leg" "$probe" "MAIN" "viins"
+    check_contains "$leg" "$probe" "KEYTIMEOUT" "25"
+    check_equals "$leg" "$probe" "VIINS_UP" "up-line-or-beginning-search"
+    check_equals "$leg" "$probe" "VICMD_UP" "up-line-or-beginning-search"
+    check_contains "$leg" "$probe" "CURSOR_WIDGET" "_dotfiles_vi_cursor_shape"
+}
+
+NO_FZF_HOME="$TMP_ROOT/no-fzf-home"
+NO_FZF_BIN="$TMP_ROOT/no-fzf-bin"
+mkdir -p "$NO_FZF_HOME" "$NO_FZF_BIN"
+ln -s "$(command -v mkdir)" "$NO_FZF_BIN/mkdir"
+no_fzf_probe="$(run_probe "$NO_FZF_HOME" "$NO_FZF_BIN")" \
+    || fail "functional/no-fzf: zshrc failed to source"
+common_checks "no-fzf" "$no_fzf_probe"
+check_equals "no-fzf" "$no_fzf_probe" "VIINS_TAB" "menu-select"
+check_equals "no-fzf" "$no_fzf_probe" "VICMD_TAB" "menu-select"
+check_equals "no-fzf" "$no_fzf_probe" "VIINS_CR" "history-incremental-search-backward"
+
+FZF_HOME="$TMP_ROOT/with-fzf-home"
+FZF_BIN="$TMP_ROOT/fake-bin"
+mkdir -p "$FZF_HOME/.local/share/dotfiles/zsh-plugins/fzf-tab" "$FZF_BIN"
+ln -s "$(command -v mkdir)" "$FZF_BIN/mkdir"
+ln -s "$(command -v cat)" "$FZF_BIN/cat"
+cat > "$FZF_HOME/.local/share/dotfiles/zsh-plugins/fzf-tab/fzf-tab.plugin.zsh" <<'ZSH'
+fzf-tab-complete() { zle menu-select }
+zle -N fzf-tab-complete
+ZSH
+cat > "$FZF_BIN/fzf" <<'SH'
+#!/bin/sh
+if [ "${1:-}" = "--zsh" ]; then
+  cat <<'ZSH'
+fzf-completion() { zle menu-select }
+zle -N fzf-completion
+bindkey '^I' fzf-completion
+fzf-history-widget() { zle history-incremental-search-backward }
+zle -N fzf-history-widget
+bindkey -M viins '^R' fzf-history-widget
+bindkey -M vicmd '^R' fzf-history-widget
+ZSH
+  exit 0
+fi
+exit 0
+SH
+chmod +x "$FZF_BIN/fzf"
+with_fzf_probe="$(run_probe "$FZF_HOME" "$FZF_BIN")" \
+    || fail "functional/with-fzf-tab: zshrc failed to source"
+common_checks "with-fzf-tab" "$with_fzf_probe"
+check_equals "with-fzf-tab" "$with_fzf_probe" "VIINS_TAB" "fzf-tab-complete"
+check_equals "with-fzf-tab" "$with_fzf_probe" "VICMD_TAB" "fzf-tab-complete"
+check_equals "with-fzf-tab" "$with_fzf_probe" "VIINS_CR" "fzf-history-widget"
 
 echo "functional: OK"
 echo "OK"

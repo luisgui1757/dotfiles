@@ -119,6 +119,18 @@ jobs:
         run: |
           set -euo pipefail
           make test-nvim
+      - name: WezTerm smoke
+        run: |
+          set -euo pipefail
+          make test-wezterm
+      - name: AeroSpace static checks
+        run: |
+          set -euo pipefail
+          make test-aerospace
+      - name: Nix integration smoke
+        run: |
+          set -euo pipefail
+          make test-nix
 
   macos:
     runs-on: macos-26

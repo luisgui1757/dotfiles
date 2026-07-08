@@ -24,25 +24,19 @@ scan_files = [
 
 allowlist = {
     (
-        "install-deps.ps1",
-        "Invoke-WebRequest -Uri 'https://get.scoop.sh' -OutFile $installer -UseBasicParsing -ErrorAction Stop",
-    ): "Scoop is the Windows package-manager bootstrap trust root; consent-gated and documented.",
-    (
         ".github/workflows/test.yml",
         "bash /tmp/cargo-binstall.sh",
     ): "CI verifies the pinned cargo-binstall installer SHA-256 immediately before execution.",
-    (
-        "tests/greenfield/windows-sandbox.wsb",
-        """<Command>powershell.exe -NoExit -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; $bootstrap = irm 'https://raw.githubusercontent.com/luisgui1757/dotfiles/main/tests/greenfield/sandbox-bootstrap.ps1'; &amp; ([scriptblock]::Create($bootstrap)) -Ref 'main'"</Command>""",
-    ): "Disposable Windows Sandbox self-bootstrap trust root; documented for manual greenfield validation only.",
 }
 
 pattern_sources = [
-    r"\bcurl\b.*\|\s*(?:/bin/)?(?:ba)?sh\b",
+    r"\bcurl\b.*\|\s*(?:sudo\s+)?(?:/bin/)?(?:ba)?sh\b",
     r"\b(?:/bin/)?(?:ba)?sh\s+-c\s+\"\$\(curl\b",
     r"\b(?:/bin/)?(?:ba)?sh\s+/tmp/[^\"';&|<>]*install[^\"';&|<>]*\.sh\b",
     r"\[scriptblock\]::Create\s*\(",
-    r"\bInvoke-RestMethod\b.*\|\s*Invoke-Expression\b",
+    r"(^|[;&|=]\s*)Invoke-Expression\b",
+    r"(^|[;&|=]\s*)iex(?:\s|\(|$)",
+    r"\bInvoke-(?:RestMethod|WebRequest)\b.*\|\s*(?:Invoke-Expression|iex)\b",
 ]
 patterns = [re.compile(source, re.IGNORECASE) for source in pattern_sources]
 
@@ -64,6 +58,14 @@ def flag_line(path, line):
 
 failures = []
 seen_allowlist = set()
+
+for probe in (
+    "$r = Invoke-Expression $cmd",
+    "iex($x)",
+    "curl -fsSL https://example.invalid/install.sh | sudo bash",
+):
+    if not flag_line(pathlib.Path("probe.sh"), probe):
+        failures.append(f"supply-chain scanner failed to catch probe: {probe}")
 
 install_deps_sh = pathlib.Path("install-deps.sh").read_text(encoding="utf-8")
 required_install_deps_snippets = [
@@ -123,6 +125,38 @@ for banned in (
     if banned in workflow:
         failures.append(f".github/workflows/test.yml contains banned mutable installer pattern: {banned}")
 
+cargo_verify = 'printf \'%s  %s\\n\' "$CARGO_BINSTALL_INSTALLER_SHA256" /tmp/cargo-binstall.sh | sha256sum -c -'
+cargo_exec = "bash /tmp/cargo-binstall.sh"
+cargo_verify_idx = workflow.find(cargo_verify)
+cargo_exec_idx = workflow.find(cargo_exec)
+if cargo_verify_idx == -1 or cargo_exec_idx == -1 or cargo_verify_idx > cargo_exec_idx:
+    failures.append(".github/workflows/test.yml must verify cargo-binstall SHA-256 immediately before executing it")
+else:
+    between = workflow[cargo_verify_idx + len(cargo_verify):cargo_exec_idx].strip()
+    if between:
+        failures.append(".github/workflows/test.yml has commands between cargo-binstall SHA-256 verification and execution")
+
+install_deps_ps1 = pathlib.Path("install-deps.ps1").read_text(encoding="utf-8")
+required_install_deps_ps1_snippets = [
+    "$ScoopInstallerCommit = '",
+    "$ScoopInstallerSha256 = '",
+    '$ScoopInstallerUrl = "https://raw.githubusercontent.com/ScoopInstaller/Install/$ScoopInstallerCommit/install.ps1"',
+    'Invoke-WebRequest -Uri $ScoopInstallerUrl -OutFile $installer -UseBasicParsing -ErrorAction Stop',
+    'Test-FileSha256 $installer $ScoopInstallerSha256',
+    'verified Scoop installer ScoopInstaller/Install@',
+    '& $installer -RunAsAdmin',
+    '& $installer',
+]
+for snippet in required_install_deps_ps1_snippets:
+    if snippet not in install_deps_ps1:
+        failures.append(f"install-deps.ps1 missing pinned Scoop bootstrap guard snippet: {snippet}")
+for banned in (
+    "https://get.scoop.sh",
+    "Install Scoop via the official one-liner",
+):
+    if banned in install_deps_ps1:
+        failures.append(f"install-deps.ps1 contains banned mutable Scoop bootstrap pattern: {banned}")
+
 renovate_validator = pathlib.Path("scripts/validate-renovate.sh").read_text(encoding="utf-8")
 for snippet in (
     'RENOVATE_NODE_VERSION="',
@@ -176,7 +210,7 @@ for path in scan_files:
         if key in allowlist:
             seen_allowlist.add(key)
 
-scan_suffixes = {".ps1", ".sh", ".wsb", ".yaml", ".yml"}
+scan_suffixes = {".bat", ".cmd", ".ps1", ".psm1", ".sh", ".wsb", ".yaml", ".yml"}
 excluded_roots = {
     pathlib.Path(".git"),
     pathlib.Path("docs/archive"),
@@ -221,6 +255,16 @@ for path in scan_paths:
             continue
         if key not in allowlist:
             failures.append(f"{path}:{lineno}: unreviewed remote executable pattern: {normalized}")
+
+    if path.suffix.lower() == ".ps1":
+        text = "\n".join(lines)
+        for match in re.finditer(r"Invoke-WebRequest\b[^\n]*-OutFile\s+\$([A-Za-z_][A-Za-z0-9_]*)[^\n]*", text, re.IGNORECASE):
+            variable = match.group(1)
+            exec_match = re.search(rf"(?m)^\s*&\s+\${re.escape(variable)}(\s|$)", text[match.end():], re.IGNORECASE)
+            if exec_match and not re.search(rf"Test-FileSha256\s+\${re.escape(variable)}\b", text[match.end():match.end() + exec_match.start()], re.IGNORECASE):
+                failures.append(
+                    f"{path}: downloaded PowerShell script ${variable} is executed without an intervening Test-FileSha256 check"
+                )
 
 for key in sorted(set(allowlist) - seen_allowlist):
     failures.append(f"{key[0]}: allowlist entry no longer matches and should be removed: {key[1]}")

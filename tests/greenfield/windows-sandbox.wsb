@@ -7,11 +7,20 @@
        makes the sandbox fail to start.
   <MemoryInMB>16384</MemoryInMB>
   -->
-  <!-- Self-contained: no mapped folder. The logon command downloads the repo and
-       runs the greenfield flow, so double-clicking this .wsb works from anywhere
-       (a mapped HostFolder needed Win11 22H2+ AND the repo cloned at the right
-       spot). To test a PR or branch, change the -Ref value below. -->
+  <!-- Pinned/local execution: map the repo checkout you intentionally want to
+       test, then run the checked-out local sandbox-run.ps1. The relative
+       HostFolder maps the repo root when this file is launched from its tracked
+       location on a Windows build that supports relative .wsb mappings. If your
+       host does not support that, replace HostFolder with the absolute path to
+       a checkout already at the commit/ref you intend to test. -->
+  <MappedFolders>
+    <MappedFolder>
+      <HostFolder>..\..</HostFolder>
+      <SandboxFolder>C:\Users\WDAGUtilityAccount\Desktop\dotfiles-repo</SandboxFolder>
+      <ReadOnly>true</ReadOnly>
+    </MappedFolder>
+  </MappedFolders>
   <LogonCommand>
-    <Command>powershell.exe -NoExit -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; $bootstrap = irm 'https://raw.githubusercontent.com/luisgui1757/dotfiles/main/tests/greenfield/sandbox-bootstrap.ps1'; &amp; ([scriptblock]::Create($bootstrap)) -Ref 'main'"</Command>
+    <Command>powershell.exe -NoExit -NoProfile -ExecutionPolicy Bypass -File "C:\Users\WDAGUtilityAccount\Desktop\dotfiles-repo\tests\greenfield\sandbox-run.ps1" -MappedRepo "C:\Users\WDAGUtilityAccount\Desktop\dotfiles-repo"</Command>
   </LogonCommand>
 </Configuration>

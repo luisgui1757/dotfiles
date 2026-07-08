@@ -11,6 +11,19 @@ significant change to the relevant area.
 - [ ] **Ghostty**, any OS in light mode (e.g. fresh GNOME Ubuntu): STAYS Rose
       Pine dark -- it must NOT flip to the cream Rose Pine Dawn (theme is forced
       dark, not the adaptive dark:/light: split).
+- [ ] **WezTerm** visual parity, any OS (macOS cask / Windows catalog / amd64
+      Ubuntu .deb): opens **maximized** with Rose Pine dark, mild translucency
+      reads cleanly over a coloured wallpaper (opacity 0.95; macOS blur), font is
+      Hack Nerd at 13pt with ligatures, block cursor (no blink), and glyphs (e.g.
+      a starship prompt) render via the Hack Nerd / Symbols Nerd fallback. On
+      Windows a new window is `pwsh.exe`; on POSIX it is the login shell (zsh).
+      It must NOT auto-launch a multiplexer -- you get a bare shell.
+- [ ] **WezTerm** in light mode (e.g. fresh GNOME Ubuntu / macOS light): STAYS
+      Rose Pine dark, same forced-dark rule as Ghostty.
+- [ ] **psmux inside WezTerm** (Windows): open WezTerm, run `psmux`, confirm the
+      pane renders without a config-load freeze, no runaway `psmux.exe`/`conhost`
+      CPU, the generated Rose Pine bar draws, and `pwsh` prediction/MenuComplete
+      still work inside the pane (same smoke as psmux inside Windows Terminal).
 - [ ] **Windows Terminal**: rose-pine scheme applied; tabs use the
       configured theme; acrylic OFF on the body, ON in the tab row; a new tab
       opens `PowerShell 7` unless the user intentionally chose another default.
@@ -35,6 +48,29 @@ significant change to the relevant area.
       must not be clipped by the terminal edge.
 - [ ] **PowerShell Tab completion**: press Tab into MenuComplete; the selected
       item is light text on the Rose Pine overlay background.
+
+## Window manager / multiplexer (macOS + Linux)
+
+- [ ] **AeroSpace Accessibility (TCC) grant**, macOS: after
+      `brew install --cask nikitabobko/tap/aerospace` and launch, macOS prompts
+      for Accessibility — grant it (System Settings -> Privacy & Security ->
+      Accessibility -> AeroSpace ON). Confirm AeroSpace starts at login
+      (`start-at-login = true`) and tiles windows.
+- [ ] **AeroSpace reserved-chord safety**, macOS: with AeroSpace running, open a
+      terminal + nvim. `ctrl-alt-h/j/k/l` moves WM focus between windows;
+      **bare `Alt-h/j/k/l` still reaches nvim** (window nav) and is NOT captured
+      by AeroSpace; `Alt-c` still triggers fzf-tab / PSFzf `cd`. `alt-1..9`
+      switches workspaces; `alt-shift-1..9` moves the window; `ctrl-alt-f`
+      fullscreen; `ctrl-alt-shift-;` enters service mode (esc reloads config).
+- [ ] **Herdr session smoke**, all OSes: `herdr --version` prints the installed
+      version; start a session (`herdr`), confirm it opens panes and its
+      agent-state awareness works, then exit cleanly. On native Linux without
+      brew, confirm the binary is the pinned SHA-256-verified release
+      (`~/.local/bin/herdr`), not a remote-eval install. On native Windows,
+      confirm `herdr.exe` resolves from `%LOCALAPPDATA%\Programs\Herdr\bin`, not
+      `herdr.dev/install.ps1`; the Windows build is preview beta / ConPTY-backed,
+      so verify it does not freeze in Windows Terminal, WezTerm, or psmux before
+      treating it as a daily driver.
 
 ## Shell tooling
 
@@ -69,6 +105,41 @@ significant change to the relevant area.
       `Get-PSReadLineOption` still shows `EditMode = Vi`, `Tab` = MenuComplete,
       the ListView history prediction is back, and the PSFzf `Ctrl+R` picker
       still works (the re-apply must NOT have wiped the fzf chords).
+
+## Nix layer (macOS opt-in)
+
+- [ ] **`nix flake check`**: on a Nix host run `nix flake check` at the repo root
+      — it evaluates `darwinConfigurations.dotfiles` (build skipped) and builds
+      `checks.<system>.toolchain`, exit 0.
+- [ ] **nix-darwin bootstrap/switch**, macOS: with Nix installed, run
+      `./setup.sh --nix-darwin` (equivalent activation:
+      `sudo darwin-rebuild switch --flake .#dotfiles --impure`; first-run setup
+      derives the locked
+      `github:nix-darwin/nix-darwin/<rev>?narHash=<encoded-narHash>#darwin-rebuild`
+      ref from `flake.lock`). Confirm activation uses sudo, sets
+      `system.primaryUser` to the real invoking user via `SUDO_USER` (not
+      `root`), installs the WezTerm + AeroSpace casks and the Herdr brew via
+      declarative Homebrew (no `brew update`/`upgrade`; `cleanup = check` only
+      reports drift), and puts the nix-owned CLI set on PATH from
+      `~/.nix-profile` / the system profile.
+- [ ] **Home Manager (Linux/WSL)**: with Nix installed, run
+      `./setup.sh --home-manager` (equivalent installed command:
+      `home-manager switch --flake .#$(uname -m)-linux --impure`; first-run
+      setup derives the locked
+      `github:nix-community/home-manager/<rev>?narHash=<encoded-narHash>#home-manager`
+      ref from `flake.lock`). Confirm the nix CLI set (ripgrep/fd/fzf/jq/lazygit/starship/
+      zoxide) lands in `~/.nix-profile/bin` with NO root, and that `nvim` +
+      `tree-sitter` are still the native install-deps binaries (NOT nix) so
+      parser builds keep working.
+- [ ] **WSL split-host under Home Manager**: on WSL, after `--home-manager`,
+      confirm nothing was written under `/mnt/c` — Home Manager touches only the
+      Linux `~/.nix-profile`; Windows Terminal/fonts/WezTerm stay Windows-host.
+- [ ] **Nix owns packages, chezmoi owns config**: after the switch, `~/.config`
+      dotfiles (nvim, wezterm, aerospace, starship, zsh, tmux…) are still the
+      chezmoi symlinks/copies — the Nix switch must NOT have replaced or
+      duplicated any managed dotfile.
+- [ ] **flake.lock is not silently mutated**: a normal `./setup.sh` /
+      `./setup.sh --update` run leaves `git status` on `flake.lock` clean.
 
 ## Cross-OS clipboard round-trip
 
