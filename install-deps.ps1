@@ -28,6 +28,8 @@ $ScoopInstallerSha256 = '48f6ea398b3a3fa26fae0093d37bd85b13e7eaa5d1d4a3e20840876
 $ScoopInstallerUrl = "https://raw.githubusercontent.com/ScoopInstaller/Install/$ScoopInstallerCommit/install.ps1"
 $WindowsTerminalVersion = 'v1.24.11321.0'
 $WindowsTerminalX64Sha256 = '7caef554147e5498ed1becdca73cdedb79fbc81f89032e46ae9b095c53433812'
+$HerdrWindowsPreviewVersion = 'preview-2026-07-07-f5354780e4ef'
+$HerdrWindowsX64Sha256 = '9b28eb0a3a55ca2ca9d47e96397544d2cbcca965d88a40b8bd8ccacfb61333ba'
 $VsBuildToolsBootstrapperUrl = 'https://aka.ms/vs/17/release/vs_BuildTools.exe'
 $PylatexencBuildBackendVersion = '80.9.0'
 $PylatexencBuildBackendSha256 = '062d34222ad13e0cc312a4c02d73f059e86a4acbfbdea8f8f76b28c99f306922'
@@ -338,6 +340,7 @@ $BinaryName = @{
     lazygit     = 'lazygit'
     wt          = 'wt'
     wezterm     = 'wezterm'
+    herdr       = 'herdr'
     nvim        = 'nvim'
     pwsh        = 'pwsh'
     'win32yank' = 'win32yank'
@@ -511,6 +514,7 @@ function Get-InstallDependencySpec {
         'lazygit',
         'starship',
         'wt',
+        'herdr',
         'psmux',
         'pwsh',
         'python',
@@ -526,7 +530,7 @@ function Get-InstallDependencySpec {
     )
     $emitted = @{}
     foreach ($tool in $toolOrder) {
-        if (($tool -eq 'scoop') -or ($tool -eq 'psmux') -or $Catalog.ContainsKey($tool)) {
+        if (($tool -eq 'scoop') -or ($tool -eq 'herdr') -or ($tool -eq 'psmux') -or $Catalog.ContainsKey($tool)) {
             $emitted[$tool] = $true
             [pscustomobject]@{
                 Tool = $tool
@@ -2381,6 +2385,65 @@ function Install-WindowsTerminal {
     }
 }
 
+# ---- Herdr: native Windows preview, pinned direct artifact -------------------
+function Get-HerdrWindowsInstallRoot {
+    $base = if (-not [string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
+        $env:LOCALAPPDATA
+    } else {
+        Get-DotfilesDataRoot
+    }
+    return (Join-Path $base 'Programs\Herdr\bin')
+}
+
+function Install-HerdrWindowsPreview {
+    if (Test-Tool 'herdr') {
+        Write-Host ("  ok        {0,-26} already installed" -f "herdr")
+        return
+    }
+    if (-not (Ask "Install Herdr native Windows preview (pinned SHA-256 verified beta)?")) {
+        Write-Host ("  skipped   {0,-26}" -f "herdr")
+        return
+    }
+
+    $assetName = 'herdr-windows-x86_64.exe'
+    $assetUrl = "https://github.com/ogulcancelik/herdr/releases/download/$HerdrWindowsPreviewVersion/$assetName"
+    $installRoot = Get-HerdrWindowsInstallRoot
+    if ($DryRun) {
+        Write-Host ("  would:    download {0} ({1})" -f $assetName, $HerdrWindowsPreviewVersion)
+        Write-Host ("  would:    verify SHA-256 {0}, install as {1}, add to User PATH" -f $HerdrWindowsX64Sha256, (Join-Path $installRoot 'herdr.exe'))
+        return
+    }
+
+    $tmp = $null
+    try {
+        $tmp = New-Item -ItemType Directory -Force -Path (Join-Path ([IO.Path]::GetTempPath()) "herdr-windows-$([guid]::NewGuid())")
+        $download = Join-Path $tmp.FullName $assetName
+        Invoke-WebRequest -Uri $assetUrl -OutFile $download -UseBasicParsing -ErrorAction Stop
+        if (-not (Test-FileSha256 -Path $download -Expected $HerdrWindowsX64Sha256)) {
+            Write-Host "  FAIL: checksum mismatch for $assetName" -ForegroundColor Red
+            $script:InstallFailures += [pscustomobject]@{ Tool='herdr'; Pm='direct'; Pkg=$assetName; ExitCode='sha256' }
+            return
+        }
+
+        New-Item -ItemType Directory -Force -Path $installRoot | Out-Null
+        Copy-Item -LiteralPath $download -Destination (Join-Path $installRoot 'herdr.exe') -Force
+        Add-DirectoryToUserPath -Directory $installRoot
+
+        if (Test-Tool 'herdr') {
+            Write-Host ("  installed {0,-26} {1}" -f "herdr", $HerdrWindowsPreviewVersion)
+            return
+        }
+        throw "herdr.exe installed but herdr is not on PATH"
+    } catch {
+        Write-Warning ("Herdr Windows preview install failed: " + $_.Exception.Message)
+        $script:InstallFailures += [pscustomobject]@{ Tool='herdr'; Pm='direct'; Pkg=$assetName; ExitCode=$LASTEXITCODE }
+    } finally {
+        if ($tmp) {
+            Remove-Item -LiteralPath $tmp.FullName -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
 # ---- psmux: native Windows tmux (reads our existing tmux/tmux.conf) ---------
 # Symmetrical with the Unix tmux story. scoop is preferred (one custom bucket,
 # then a normal install); falls back to winget then choco. Not in the catalog
@@ -2859,7 +2922,7 @@ function Invoke-InstallDepsUpdateMode {
 
     Write-UnmanagedDependencySummary
     Write-Host ""
-    Write-Host "note: pinned binaries (Neovim/lazygit/tree-sitter Linux archives, Hack Nerd Font, Windows Terminal portable), PSFzf, plugins, and configs update via git pull and re-running setup."
+    Write-Host "note: pinned binaries (Neovim/lazygit/tree-sitter Linux archives, Hack Nerd Font, Windows Terminal portable, Herdr Windows preview), PSFzf, plugins, and configs update via git pull and re-running setup."
 }
 
 function Exit-InstallDepsIfFailures {
@@ -2957,10 +3020,8 @@ Install-WindowsTerminal
 Section "terminal (optional): WezTerm"
 Install-One wezterm
 
-# Herdr (agent multiplexer) is intentionally NOT installed on native Windows: its
-# stable channel is macOS/Linux only, and the native Windows build is preview-only
-# beta, installable only through a banned irm|iex remote-eval. macOS/Linux install
-# Herdr via install-deps.sh. Guarded by tests/static/herdr_windows_block_test.sh.
+Section "agent multiplexer (optional): Herdr Windows preview"
+Install-HerdrWindowsPreview
 
 Section "terminal multiplexer (psmux: tmux for native Windows, optional)"
 Install-Psmux

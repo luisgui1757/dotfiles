@@ -65,8 +65,8 @@ native Windows stays on `setup.ps1` + native package managers (Nix has no
 supported native-Windows story; WSL2 only). Ruling highlights: exactly one owner
 per path (Nix/Home Manager and chezmoi must never co-own a file); GUI /
 TCC-sensitive apps (AeroSpace, WezTerm, Herdr) come from vendor channels
-(casks / pinned artifacts), never nixpkgs; Herdr native Windows is preview-beta
-and stays off by default; no `Invoke-Expression` / `curl|sh` / `irm|iex`
+(casks / pinned artifacts), never nixpkgs; Herdr native Windows uses a pinned,
+SHA-256-verified preview `.exe`; no `Invoke-Expression` / `curl|sh` / `irm|iex`
 remote-eval installers.
 
 Sequenced PRs (split for independent, revertable blast radius):
@@ -89,8 +89,8 @@ Sequenced PRs (split for independent, revertable blast radius):
   `$Catalog`), Rose Pine + transparency + Hack Nerd Font parity, chezmoi-only
   config; not a Nix/nixpkgs GUI package.
 - **PR-4 `feat/aerospace-herdr`** - AeroSpace (macOS tap cask,
-  reserved-chord-safe keymap) + Herdr (macOS/Linux only; native Windows gated
-  off).
+  reserved-chord-safe keymap) + Herdr (macOS/Linux stable channels plus native
+  Windows pinned preview binary).
 - **PR-5 `feat/nix-skeleton`** - flake + committed `flake.lock` with ZERO
   ownership; `nix flake check` CI; disjointness test (Home Manager declares no
   file targets); Renovate `nix` manager.
@@ -139,11 +139,12 @@ Commit-by-commit status:
   `tests/MANUAL.md`.
 - **Commit 3 - AeroSpace + Herdr — DONE.** AeroSpace (macOS-only tap cask,
   `start-at-login`, reserved-chord-safe keymap avoiding Alt-h/j/k/l and Alt-c),
-  `aerospace/aerospace.toml` + chezmoi mirror, TOML lint. Herdr (macOS/Linux only,
-  Homebrew/Linuxbrew formula or pinned native-Linux binary with provenance-backed
-  update ownership; native Windows blocked by tests + docs). Herdr install
-  failures now emit `FAIL:` and the Linux/macOS e2e gates assert the command.
-  AeroSpace TCC / Accessibility and Herdr interactive-session behavior remain
+  `aerospace/aerospace.toml` + chezmoi mirror, TOML lint. Herdr (Homebrew /
+  Linuxbrew formula, pinned native-Linux binary with provenance-backed update
+  ownership, and pinned SHA-256-verified native-Windows preview `.exe` without
+  `herdr.dev` remote eval). Herdr install failures now emit `FAIL:` and the
+  Linux/macOS/Windows e2e gates assert the command. AeroSpace TCC /
+  Accessibility and Herdr interactive-session behavior remain
   manual-verification-pending in `tests/MANUAL.md`.
 - **Commit 4 - Nix skeleton — DONE.** `flake.nix` + committed `flake.lock`
   (zero ownership), devShell + `checks`, `nix flake check` CI on Ubuntu + macOS,

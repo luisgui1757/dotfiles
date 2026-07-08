@@ -143,6 +143,17 @@
     },
     {
       "customType": "regex",
+      "description": "Herdr Windows preview binary tag. Adjacent Windows asset SHA-256 must be recomputed manually after Renovate bumps this.",
+      "managerFilePatterns": ["/^install-deps\\.ps1$/"],
+      "matchStrings": [
+        "\\$HerdrWindowsPreviewVersion\\s*=\\s*'(?<currentValue>preview-[^']+)'\\s+\\$HerdrWindowsX64Sha256\\s*=\\s*'[a-f0-9]{64}'"
+      ],
+      "depNameTemplate": "ogulcancelik/herdr",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "regex:^preview-(?<major>\\d{4})-(?<minor>\\d{2})-(?<patch>\\d{2})-(?<build>[0-9a-f]+)$"
+    },
+    {
+      "customType": "regex",
       "description": "Homebrew installer script commit pinned to the current main branch digest. The adjacent installer script SHA-256 must be recomputed manually after Renovate bumps this.",
       "managerFilePatterns": ["/^install-deps\\.sh$/"],
       "matchStrings": [

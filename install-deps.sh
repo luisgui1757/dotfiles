@@ -72,8 +72,8 @@ WEZTERM_DEB_AMD64_SHA256="86358dab5794a4fb63f7c91dd68d4fdc3da58faad648a58fc77d2b
 # release binary, SHA-256 verified. Upstream publishes no checksum sidecar, so
 # these SHAs were computed from the pinned v0.7.1 assets on 2026-07-07 (bump the
 # version + both SHAs together). NOT the herdr.dev install.sh remote-eval path.
-# Native Windows Herdr is preview-only beta (irm|iex installer) and is
-# intentionally NOT installed by install-deps.ps1.
+# Native Windows uses install-deps.ps1's separate pinned, SHA-256-verified
+# preview .exe path, never the herdr.dev install.ps1 remote-eval path.
 HERDR_VERSION="v0.7.1"
 HERDR_LINUX_X86_64_SHA256="b965acaffc2c22f54b6e6c64af7cf8e98a3f4ac2622630a0599c67a4b9d8a654"
 HERDR_LINUX_ARM64_SHA256="3d757ac30c631e79dc45038c3ecc6423fe13a89f9cffa0f415aedd2c27f1576c"
@@ -3507,8 +3507,8 @@ run_herdr_linux_binary_install() {
 
 # Herdr: agent multiplexer. macOS + Linuxbrew use the canonical homebrew-core
 # formula; native Linux without brew uses the pinned, SHA-256-verified release
-# binary. macOS/Linux only -- native Windows Herdr is preview-only beta (and only
-# installable via a banned irm|iex remote-eval), so install-deps.ps1 omits it.
+# binary. Native Windows is handled separately by install-deps.ps1 with a pinned,
+# SHA-256-verified preview .exe.
 install_herdr() {
     local arch asset expected url dest
     if have herdr && [[ "${DOTFILES_DIRECT_ARTIFACT_REINSTALL:-0}" != "1" ]]; then
@@ -4001,7 +4001,7 @@ else
 fi
 
 section "agent multiplexer (optional): Herdr"
-install_herdr   # macOS/Linux only; native Windows Herdr is preview-beta and omitted
+install_herdr   # macOS/Linux; native Windows uses install-deps.ps1
 
 section "editor: VS Code (optional)"
 install_vscode

@@ -783,6 +783,90 @@ Describe "install-deps.ps1" {
         }
     }
 
+    It "registers Herdr Windows preview as a pinned direct artifact, not a package catalog tool" {
+        . $script:ImportInstallDepsForTest -DryRun
+
+        $Catalog.ContainsKey('herdr') | Should -BeFalse
+        $BinaryName['herdr'] | Should -Be 'herdr'
+        $HerdrWindowsPreviewVersion | Should -Match '^preview-\d{4}-\d{2}-\d{2}-[0-9a-f]{12}$'
+        $HerdrWindowsX64Sha256 | Should -Match '^[0-9a-f]{64}$'
+        @((Get-InstallDependencySpec) | Where-Object { $_.Tool -eq 'herdr' }).Count | Should -Be 1
+    }
+
+    It "dry-runs Herdr Windows preview without package managers or remote eval" {
+        . $script:ImportInstallDepsForTest -DryRun
+        Mock -CommandName Read-Host -MockWith { throw "Read-Host must not run under -DryRun" }
+        Mock -CommandName Test-Tool -MockWith { return $false } -ParameterFilter { $name -eq 'herdr' }
+
+        $output = & { Install-HerdrWindowsPreview } 6>&1 | Out-String
+
+        $output | Should -Match 'herdr-windows-x86_64\.exe'
+        $output | Should -Match ([regex]::Escape($HerdrWindowsPreviewVersion))
+        $output | Should -Match $HerdrWindowsX64Sha256
+        $output | Should -Not -Match 'herdr\.dev/install'
+        Should -Invoke -CommandName Read-Host -Times 0 -Exactly
+    }
+
+    It "fails closed when the Herdr Windows preview checksum mismatches" {
+        . $script:ImportInstallDepsForTest
+        Mock -CommandName Test-Tool -MockWith { return $false } -ParameterFilter { $name -eq 'herdr' }
+        Mock -CommandName Invoke-WebRequest -MockWith {
+            param($Uri, $OutFile)
+            [System.IO.File]::WriteAllText($OutFile, 'bad-exe')
+        }
+        Mock -CommandName Test-FileSha256 -MockWith { return $false }
+        Mock -CommandName Copy-Item -MockWith { throw "must not copy" }
+
+        $output = & { Install-HerdrWindowsPreview } 6>&1 | Out-String
+
+        $output | Should -Match 'FAIL: checksum mismatch for herdr-windows-x86_64\.exe'
+        $script:InstallFailures.Count | Should -Be 1
+        $script:InstallFailures[0].Tool | Should -Be 'herdr'
+        $script:InstallFailures[0].Pm | Should -Be 'direct'
+        $script:InstallFailures[0].Pkg | Should -Be 'herdr-windows-x86_64.exe'
+        $script:InstallFailures[0].ExitCode | Should -Be 'sha256'
+        Should -Invoke -CommandName Copy-Item -Times 0 -Exactly
+    }
+
+    It "installs the Herdr Windows preview after checksum verification" {
+        . $script:ImportInstallDepsForTest
+        $oldLocalAppData = $env:LOCALAPPDATA
+        $script:HerdrInstalled = $false
+        $script:AddedHerdrPath = $null
+        $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("herdr-windows-test-" + [System.Guid]::NewGuid())
+        try {
+            New-Item -ItemType Directory -Force -Path $tempRoot | Out-Null
+            $env:LOCALAPPDATA = $tempRoot
+            Mock -CommandName Test-Tool -MockWith { return $script:HerdrInstalled } -ParameterFilter { $name -eq 'herdr' }
+            Mock -CommandName Invoke-WebRequest -MockWith {
+                param($Uri, $OutFile)
+                [System.IO.File]::WriteAllText($OutFile, 'good-exe')
+            }
+            Mock -CommandName Test-FileSha256 -MockWith { return $true }
+            Mock -CommandName Add-DirectoryToUserPath -MockWith {
+                param($Directory)
+                $script:AddedHerdrPath = $Directory
+                $script:HerdrInstalled = Test-Path -LiteralPath (Join-Path $Directory 'herdr.exe') -PathType Leaf
+            }
+
+            $output = & { Install-HerdrWindowsPreview } 6>&1 | Out-String
+
+            $installRoot = Join-Path $tempRoot 'Programs\Herdr\bin'
+            Test-Path -LiteralPath (Join-Path $installRoot 'herdr.exe') -PathType Leaf | Should -BeTrue
+            $script:AddedHerdrPath | Should -Be $installRoot
+            $script:InstallFailures.Count | Should -Be 0
+            $output | Should -Match 'installed\s+herdr'
+            $output | Should -Match ([regex]::Escape($HerdrWindowsPreviewVersion))
+        } finally {
+            if ($null -eq $oldLocalAppData) {
+                Remove-Item Env:LOCALAPPDATA -ErrorAction SilentlyContinue
+            } else {
+                $env:LOCALAPPDATA = $oldLocalAppData
+            }
+            Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
     It "registers PowerShell 7 (pwsh) in the Windows package catalog" {
         . $script:ImportInstallDepsForTest
 

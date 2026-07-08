@@ -6,7 +6,7 @@ PowerShell, Ghostty, WezTerm, lazygit, `lsd`, `zoxide` smart-cd, the `gh` CLI wi
 `gh-dash` dashboard, Windows Terminal theming, locked plugin restore, LSP /
 formatter provisioning, and global Polaris agent-policy bootstrap. It also provisions the `tree-sitter` CLI needed by
 `nvim-treesitter` main parser builds, plus AeroSpace (macOS tiling WM) and Herdr
-(agent multiplexer, macOS/Linux) as optional vendor-channel installs.
+(agent multiplexer: macOS/Linux stable, Windows preview) as optional vendor-channel installs.
 
 The public interface is intentionally small:
 
@@ -448,14 +448,16 @@ and whether `pwsh` is installed.
   AeroSpace reads the XDG path this repo manages; a legacy `~/.aerospace.toml`
   conflicts loudly with that model and should be removed or migrated before
   judging the managed config. Not a Nix/nixpkgs package.
-- Herdr (agent multiplexer) installs on macOS/Linux only: `brew install herdr`
-  (homebrew-core) on macOS and Linuxbrew, or a pinned, SHA-256-verified GitHub
-  release binary on native Linux without brew (never the `herdr.dev` remote-eval
-  installer). Native-Linux Herdr writes the same provenance marker as the other
-  dotfiles-owned direct artifacts, so `./setup.sh --update` can prove ownership
-  and refresh only the repo-pinned version. Native Windows Herdr is preview-only
-  beta (installable only via an `irm | iex` remote-eval), so it is intentionally
-  not installed on Windows.
+- Herdr (agent multiplexer) installs on every host, but the channels differ:
+  `brew install herdr` (homebrew-core) on macOS and Linuxbrew, a pinned,
+  SHA-256-verified GitHub release binary on native Linux without brew, and a
+  pinned, SHA-256-verified **Windows preview** `.exe` under
+  `%LOCALAPPDATA%\Programs\Herdr\bin` on native Windows. The `herdr.dev`
+  remote-eval installers remain banned. Native-Linux Herdr writes the same
+  provenance marker as the other dotfiles-owned direct artifacts, so
+  `./setup.sh --update` can prove ownership and refresh only the repo-pinned
+  version. Windows Herdr is beta/ConPTY-backed, so runtime behavior remains a
+  manual checklist item before treating it as a daily driver.
 - WSL fonts are host-rendered in the supported path. Install and merge Windows
   Terminal from Windows (`.\setup.ps1 -All`; the merge is default-on); the WSL
   Linux fontconfig install is only for `--experimental-wsl-gui`.
@@ -555,7 +557,7 @@ The e2e jobs cover different install paths, not symmetric container platforms:
 | `e2e containers / ubuntu-24.04` | Clean `ubuntu:24.04`, non-root user, native `apt`, no Linuxbrew (`DOTFILES_SKIP_BREW_BOOTSTRAP=1`), then `install-deps.sh --all`, chezmoi config apply, tool assertions including `zoxide`, `gh`, WezTerm, and Herdr, Neovim >= 0.12, lazygit, zsh plugin files, config content assertions, and nvim directory realpath assertion. |
 | `setup.sh / ubuntu-24.04` | Full Unix setup on the hosted Ubuntu runner. This runner has Linuxbrew available, so it proves the Linuxbrew path that users may hit and asserts the new POSIX tool commands. |
 | `setup.sh / macos-15` | Full macOS setup through the real macOS hosted runner and Homebrew path. Docker cannot model macOS. |
-| `setup.ps1 / windows-2025` | Full Windows setup through the real Windows hosted runner, including Scoop/winget/choco behavior, PowerShell, symlinks, `zoxide`/`gh`/WezTerm command probes, and Neovim restore/sync phases. Windows containers do not model the desktop/user-profile setup well. |
+| `setup.ps1 / windows-2025` | Full Windows setup through the real Windows hosted runner, including Scoop/winget/choco behavior, PowerShell, symlinks, `zoxide`/`gh`/WezTerm/Herdr command probes, and Neovim restore/sync phases. Windows containers do not model the desktop/user-profile setup well. |
 | `setup.sh / WSL2 Ubuntu-24.04 (best-effort canary)` | Non-required WSL smoke signal. Hosted runners cannot provide reliable nested virtualization, so this is intentionally best-effort. |
 
 After the Lazy restore, deterministic Tree-sitter parser install, and Mason sync, each
@@ -656,7 +658,7 @@ update PRs are intentionally not configured.
 |---|---|---|
 | GitHub Actions | Managed, digest-pinned, labeled `github-actions` | Actions are repo-owned CI inputs with stable Renovate support. |
 | GitHub runner images | Managed, labeled `github-runners`, reviewed separately | `ubuntu-*`, `macos-*`, and `windows-*` bumps can change the supported CI platform, so they should not be mixed with ordinary Action bumps. |
-| Repo-pinned installer versions/refs | Managed, labeled `pinned-downloads`, never automerged | Neovim Linux tarballs, chezmoi CI release archives, lazygit Linux tarballs, Starship Linux tarballs, tree-sitter CLI Linux archives, WezTerm Ubuntu `.deb`, Herdr Linux binaries, Hack Nerd Font, Windows Terminal portable zip, Ubuntu Ghostty, zsh plugin refs, tmux/psmux plugin refs, the Homebrew installer commit, the Scoop installer commit, the Renovate validator package/runtime, and the CI `cargo-binstall` commit are explicit repo pins. |
+| Repo-pinned installer versions/refs | Managed, labeled `pinned-downloads`, never automerged | Neovim Linux tarballs, chezmoi CI release archives, lazygit Linux tarballs, Starship Linux tarballs, tree-sitter CLI Linux archives, WezTerm Ubuntu `.deb`, Herdr Linux binaries, Herdr Windows preview `.exe`, Hack Nerd Font, Windows Terminal portable zip, Ubuntu Ghostty, zsh plugin refs, tmux/psmux plugin refs, the Homebrew installer commit, the Scoop installer commit, the Renovate validator package/runtime, and the CI `cargo-binstall` commit are explicit repo pins. |
 | Adjacent SHA-256 / commit constants | Not managed; matched only as regex context | Renovate can bump the version/ref but cannot recompute archive/script hashes or verify tag commit IDs. CI must fail until a human recomputes and reviews them. |
 | Package-manager catalogs | Not managed | Brew, apt, dnf, pacman, zypper, apk, Scoop, winget, and choco entries are package names/IDs, not repo version pins. Let the package manager resolve current versions. |
 | Neovim plugin and Mason tools | Not managed | `lazy-lock.json` is refreshed with Lazy and tested as editor behavior; Mason intentionally has no machine-pinned lockfile. |
@@ -672,7 +674,7 @@ the current default branch.
 
 Direct-download SHA-256 values for Neovim tarballs, chezmoi CI release archives,
 lazygit tarballs, Starship tarballs, tree-sitter CLI archives, the WezTerm
-Ubuntu `.deb`, Herdr Linux binaries, Hack Nerd Font, the Windows Terminal
+Ubuntu `.deb`, Herdr Linux binaries, Herdr Windows preview `.exe`, Hack Nerd Font, the Windows Terminal
 portable zip, the Ubuntu Ghostty installer, Homebrew installer script, Scoop
 installer script, and the CI `cargo-binstall` installer script are
 intentionally human-reviewed. zsh plugin tag commits and tmux/psmux plugin

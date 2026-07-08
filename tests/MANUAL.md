@@ -62,12 +62,15 @@ significant change to the relevant area.
       by AeroSpace; `Alt-c` still triggers fzf-tab / PSFzf `cd`. `alt-1..9`
       switches workspaces; `alt-shift-1..9` moves the window; `ctrl-alt-f`
       fullscreen; `ctrl-alt-shift-;` enters service mode (esc reloads config).
-- [ ] **Herdr session smoke**, macOS/Linux: `herdr --version` prints the pinned
+- [ ] **Herdr session smoke**, all OSes: `herdr --version` prints the installed
       version; start a session (`herdr`), confirm it opens panes and its
       agent-state awareness works, then exit cleanly. On native Linux without
       brew, confirm the binary is the pinned SHA-256-verified release
-      (`~/.local/bin/herdr`), not a remote-eval install. Herdr must NOT be
-      present on native Windows.
+      (`~/.local/bin/herdr`), not a remote-eval install. On native Windows,
+      confirm `herdr.exe` resolves from `%LOCALAPPDATA%\Programs\Herdr\bin`, not
+      `herdr.dev/install.ps1`; the Windows build is preview beta / ConPTY-backed,
+      so verify it does not freeze in Windows Terminal, WezTerm, or psmux before
+      treating it as a daily driver.
 
 ## Shell tooling
 

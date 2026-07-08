@@ -256,7 +256,7 @@ that violates one of these, fix it instead of disabling the test.
       `home.homeDirectory` / `home.stateVersion`) and nothing that renders a
       shell/editor/terminal config file. GUI / TCC-sensitive apps (WezTerm,
       AeroSpace, Herdr) come from vendor channels (Homebrew casks / pinned
-      artifacts), never nixpkgs.
+      artifacts, including the Windows Herdr preview `.exe`), never nixpkgs.
     - **(c) native Windows is non-Nix.** Windows-host files are `setup.ps1` +
       native package managers (Scoop/winget/choco) + chezmoi. Nix has no supported
       native-Windows story; it applies to WSL2 *userland* only and must never
@@ -547,9 +547,9 @@ install paths, not symmetric container platforms:
   parser install, Mason headless sync, and the Polaris Phase 6/6 agent-policy
   install. They explicitly fail if setup skips Phase 3-5, omits Phase 6/6,
   emits a `FAIL:` marker, or Mason did not install expected tools. Windows e2e
-  also asserts the new Scoop/winget/choco catalog tools that must leave PATH
-  commands behind (`zoxide`, `gh`, `wezterm`), so an installer that exits 0 but
-  fails its command probe cannot fake-green.
+  also asserts the new Windows tools that must leave PATH commands behind
+  (`zoxide`, `gh`, `wezterm`, `herdr`), so an installer that exits 0 but fails
+  its command probe cannot fake-green.
   must assert `%LOCALAPPDATA%\lazygit\config.yml`
   against `lazygit/config.windows.yml`, not the POSIX/default
   `lazygit/config.yml`. After the full restore/sync they also run the
@@ -1158,12 +1158,14 @@ save only**. The next plain `:w` formats normally. Implemented in
   verifies the pinned Homebrew installer script, Neovim Linux tarballs,
   native-Linux chezmoi tarballs, lazygit Linux tarballs, Starship Linux
   tarballs, tree-sitter CLI Linux archives, the WezTerm Ubuntu `.deb`, Herdr
-  Linux binaries, and Hack Nerd Font zip before extraction;
+  Linux binaries, the Herdr Windows preview `.exe`, and Hack Nerd Font zip before extraction;
   CI also verifies the pinned chezmoi Linux, macOS, and Windows release
   archives used by the parity jobs;
   `install-deps.ps1` verifies the pinned Scoop installer before execution, the
-  pinned Hack.zip before registering fonts, and the pinned Windows Terminal
-  portable zip before extracting the fallback install. POSIX helpers that unpack
+  pinned Hack.zip before registering fonts, the pinned Windows Terminal
+  portable zip before extracting the fallback install, and the pinned Herdr
+  Windows preview `.exe` before copying it into `%LOCALAPPDATA%\Programs\Herdr\bin`.
+  POSIX helpers that unpack
   into `mktemp -d` install a cleanup trap
   immediately after creating the directory, so failure paths do not leak
   archives or partial extracts. A Hack.zip checksum mismatch records a `FAIL:`
