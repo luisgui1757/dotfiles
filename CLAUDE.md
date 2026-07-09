@@ -579,8 +579,9 @@ major; `tests/static/repo_policy_test.sh` enforces this.
   `tests/.cache` through conform.nvim's production route, requires the expected
   external formatter(s), fails on post-format LSP warnings/errors, then opens
   every language-matrix fixture, requires real Tree-sitter captures for
-  parser-backed rows, and proves syntax-only fallback rows have real Vim syntax
-  groups. Keep the LSP attach gate before the broad fixture-open gate; opening
+  parser-backed rows after explicitly starting and parsing the expected parser,
+  and proves syntax-only fallback rows have real Vim syntax groups. Keep the LSP
+  attach gate before the broad fixture-open gate; opening
   every fixture under the production config can start LSPs as collateral. After
   the explicit formatter/LSP gate, the smoke disables the tested LSP configs
   before opening the broad parser/syntax matrix so later non-LSP gates do not
@@ -976,7 +977,9 @@ save only**. The next plain `:w` formats normally. Implemented in
   syntax detection cover the long tail. `:Inspect` should show both
   `treesitter` captures and `syntax` groups for parser-backed fallback
   languages; syntax-only filetypes should show syntax groups without
-  Tree-sitter captures.
+  Tree-sitter captures. Test probes that call `vim.treesitter.start()` a second
+  time must preserve any non-empty buffer-local `syntax` value already restored
+  by production config; the second start clears it again.
   Filetypes with no supported nvim-treesitter parser, such as `.curlrc`, must be
   tested as syntax-only rows instead of inventing parser names, and Tier 2 must
   probe at least one meaningful syntax position for important syntax-only rows.

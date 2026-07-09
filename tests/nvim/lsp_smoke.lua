@@ -323,6 +323,49 @@ local ok, err = pcall(function()
     return false
   end
 
+  local function one_line_error(err)
+    return tostring(err):match("([^\r\n]+)") or "error"
+  end
+
+  local function treesitter_capture_ready(buf, parser)
+    if not parser or parser == "" then
+      return false, "missing expected parser name"
+    end
+
+    local syntax_before_start = vim.bo[buf].syntax
+    local start_ok, start_err = pcall(vim.treesitter.start, buf, parser)
+    if syntax_before_start ~= "" and vim.bo[buf].syntax == "" then
+      vim.bo[buf].syntax = syntax_before_start
+    end
+    if not start_ok then
+      return false, "vim.treesitter.start(" .. parser .. ") failed: " .. one_line_error(start_err)
+    end
+
+    local parser_ok, parser_obj = pcall(vim.treesitter.get_parser, buf, parser)
+    if not parser_ok then
+      return false, "vim.treesitter.get_parser(" .. parser .. ") failed: " .. one_line_error(parser_obj)
+    end
+
+    local parse_ok, parse_err = pcall(function()
+      parser_obj:parse()
+    end)
+    if not parse_ok then
+      return false, "Tree-sitter parse(" .. parser .. ") failed: " .. one_line_error(parse_err)
+    end
+
+    return has_treesitter_capture(buf), nil
+  end
+
+  local function wait_for_treesitter_capture(buf, parser, timeout_ms)
+    local last_err = nil
+    local captured = vim.wait(timeout_ms or 5000, function()
+      local ready, err = treesitter_capture_ready(buf, parser)
+      last_err = err
+      return ready
+    end, 50)
+    return captured, last_err
+  end
+
   local function same_list(actual, expected)
     if #actual ~= #expected then
       return false
@@ -710,13 +753,19 @@ local ok, err = pcall(function()
     elseif row.parser then
       -- macOS setup e2e can materialize some post-install parser captures
       -- noticeably later than the local unit gate after the full setup pass.
-      vim.wait(5000, function()
-        return has_treesitter_capture(0)
-      end, 50)
-      if has_treesitter_capture(0) then
+      -- Force the expected parser through the same start/parse boundary a real
+      -- buffer needs, then require visible highlight captures.
+      local captured, capture_err = wait_for_treesitter_capture(0, row.parser)
+      if captured then
         note(row.fixture .. ": opens as " .. row.filetype .. " with Tree-sitter captures")
       else
-        fail(row.fixture .. ": opened as " .. row.filetype .. " but no Tree-sitter captures were reported")
+        fail(
+          row.fixture
+            .. ": opened as "
+            .. row.filetype
+            .. " but no Tree-sitter captures were reported"
+            .. (capture_err and (" (" .. capture_err .. ")") or "")
+        )
       end
     else
       note(row.fixture .. ": opens as " .. row.filetype)
@@ -781,21 +830,21 @@ local ok, err = pcall(function()
   -- clears the buffer-local 'syntax' option when it starts; restore the built-in
   -- syntax file afterward so real buffers do not look like plain text.
   local syntax_fallback = {
-    { fixture = "sample.c", ft = "c", syntax = { 0, 0 }, treesitter = { 0, 0 } },
-    { fixture = "sample.cpp", ft = "cpp", syntax = { 0, 0 }, treesitter = { 0, 0 } },
+    { fixture = "sample.c", ft = "c", syntax = { 0, 0 }, parser = "c" },
+    { fixture = "sample.cpp", ft = "cpp", syntax = { 0, 0 }, parser = "cpp" },
     -- CMake arguments are the important syntax-only fallback case; command
     -- names still prove Tree-sitter is active.
-    { fixture = "CMakeLists.txt", ft = "cmake", syntax = { 1, 8 }, treesitter = { 1, 0 } },
-    { fixture = "sample.py", ft = "python", syntax = { 0, 0 }, treesitter = { 0, 0 } },
-    { fixture = "sample.rs", ft = "rust", syntax = { 0, 0 }, treesitter = { 0, 0 } },
-    { fixture = "sample.ps1", ft = "ps1", syntax = { 0, 0 }, treesitter = { 0, 0 } },
-    { fixture = "sample.sh", ft = "sh", syntax = { 1, 0 }, treesitter = { 1, 0 } },
-    { fixture = "sample.yaml", ft = "yaml", syntax = { 0, 0 }, treesitter = { 0, 0 } },
-    { fixture = "sample.json", ft = "json", syntax = { 0, 2 }, treesitter = { 0, 2 } },
-    { fixture = "sample.jsonc", ft = "jsonc", syntax = { 1, 2 }, treesitter = false },
-    { fixture = "sample.curlrc", ft = "conf", syntax = { 0, 6 }, treesitter = false },
-    { fixture = "sample.md", ft = "markdown", syntax = { 0, 0 }, treesitter = { 0, 0 } },
-    { fixture = "sample.bat", ft = "dosbatch", syntax = { 1, 0 }, treesitter = false },
+    { fixture = "CMakeLists.txt", ft = "cmake", syntax = { 1, 8 }, parser = "cmake" },
+    { fixture = "sample.py", ft = "python", syntax = { 0, 0 }, parser = "python" },
+    { fixture = "sample.rs", ft = "rust", syntax = { 0, 0 }, parser = "rust" },
+    { fixture = "sample.ps1", ft = "ps1", syntax = { 0, 0 }, parser = "powershell" },
+    { fixture = "sample.sh", ft = "sh", syntax = { 1, 0 }, parser = "bash" },
+    { fixture = "sample.yaml", ft = "yaml", syntax = { 0, 0 }, parser = "yaml" },
+    { fixture = "sample.json", ft = "json", syntax = { 0, 2 }, parser = "json" },
+    { fixture = "sample.jsonc", ft = "jsonc", syntax = { 1, 2 } },
+    { fixture = "sample.curlrc", ft = "conf", syntax = { 0, 6 } },
+    { fixture = "sample.md", ft = "markdown", syntax = { 0, 0 }, parser = "markdown" },
+    { fixture = "sample.bat", ft = "dosbatch", syntax = { 1, 0 } },
   }
   for _, row in ipairs(syntax_fallback) do
     local open_ok, open_err = pcall(vim.cmd.edit, vim.fn.fnameescape(fixtures .. row.fixture))
@@ -805,24 +854,31 @@ local ok, err = pcall(function()
       )
     else
       local buf = vim.api.nvim_get_current_buf()
+      local capture_err = nil
       vim.wait(5000, function()
         pcall(vim.cmd, "redraw")
         local syntax_ready = #vim.inspect_pos(buf, row.syntax[1], row.syntax[2]).syntax > 0
-        if not row.treesitter then
+        if not row.parser then
           return syntax_ready
         end
-        return syntax_ready and #vim.inspect_pos(buf, row.treesitter[1], row.treesitter[2]).treesitter > 0
+        local capture_ready
+        capture_ready, capture_err = treesitter_capture_ready(buf, row.parser)
+        return syntax_ready and capture_ready
       end, 50)
       local syntax_pos = vim.inspect_pos(buf, row.syntax[1], row.syntax[2])
-      local treesitter_pos = row.treesitter and vim.inspect_pos(buf, row.treesitter[1], row.treesitter[2])
+      local capture_ready = row.parser and has_treesitter_capture(buf)
       if vim.bo[buf].syntax ~= row.ft then
         fail(row.fixture .. ": syntax fallback not restored (got: " .. tostring(vim.bo[buf].syntax) .. ")")
       elseif #syntax_pos.syntax == 0 then
         fail(row.fixture .. ": syntax fallback restored but no syntax groups reported at probe position")
-      elseif row.treesitter and #treesitter_pos.treesitter == 0 then
-        fail(row.fixture .. ": syntax fallback present but Tree-sitter captures missing at probe position")
+      elseif row.parser and not capture_ready then
+        fail(
+          row.fixture
+            .. ": syntax fallback present but Tree-sitter captures missing"
+            .. (capture_err and (" (" .. capture_err .. ")") or "")
+        )
       else
-        note(row.fixture .. ": syntax fallback" .. (row.treesitter and " + Tree-sitter captures active" or " active"))
+        note(row.fixture .. ": syntax fallback" .. (row.parser and " + Tree-sitter captures active" or " active"))
       end
     end
     pcall(vim.cmd, "silent! bwipeout!")
