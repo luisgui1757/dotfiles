@@ -120,6 +120,24 @@ for workflow in pathlib.Path(".github/workflows").glob("*.yml"):
     if "permissions:\n  contents: read" not in text:
         fail(f"{workflow} must declare read-only contents permission")
 
+e2e_install = pathlib.Path(".github/workflows/e2e-install.yml").read_text(encoding="utf-8")
+cache_versions = re.findall(r"actions/cache@[0-9a-f]{40}\s+# v(\d+)(?:\.\d+)*", e2e_install)
+if len(cache_versions) != 2:
+    fail("e2e-install.yml must pin exactly two actions/cache steps with version comments")
+elif len(set(cache_versions)) != 1:
+    fail("e2e-install.yml setup.sh and setup.ps1 cache steps must use the same actions/cache major")
+else:
+    cache_major = cache_versions[0]
+    expected_cache_snippets = (
+        f"${{{{ runner.os }}}}-setup-sh-actions-cache-v{cache_major}-${{{{ hashFiles('nvim/lazy-lock.json', 'nvim/lua/plugins/**/*.lua') }}}}",
+        f"${{{{ runner.os }}}}-setup-sh-actions-cache-v{cache_major}-",
+        f"Windows-setup-ps1-actions-cache-v{cache_major}-${{{{ hashFiles('nvim/lazy-lock.json', 'nvim/lua/plugins/**/*.lua') }}}}",
+        f"Windows-setup-ps1-actions-cache-v{cache_major}-",
+    )
+    for snippet in expected_cache_snippets:
+        if snippet not in e2e_install:
+            fail(f"e2e-install.yml cache key/restore-key must include actions-cache-v{cache_major}: missing {snippet}")
+
 script = pathlib.Path("scripts/apply-repo-safeguards.sh")
 mode = os.stat(script).st_mode
 if not (mode & stat.S_IXUSR):

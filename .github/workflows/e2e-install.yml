@@ -74,7 +74,7 @@ jobs:
       - name: Install Nix (flakes enabled)
         uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22
 
-      - uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.cache/Homebrew
@@ -85,9 +85,9 @@ jobs:
             ~/Library/Caches/nvim
             ~/Library/Application Support/nvim/lazy
             ~/Library/Application Support/nvim/mason
-          key: ${{ runner.os }}-setup-sh-${{ hashFiles('nvim/lazy-lock.json', 'nvim/lua/plugins/**/*.lua') }}
+          key: ${{ runner.os }}-setup-sh-actions-cache-v6-${{ hashFiles('nvim/lazy-lock.json', 'nvim/lua/plugins/**/*.lua') }}
           restore-keys: |
-            ${{ runner.os }}-setup-sh-
+            ${{ runner.os }}-setup-sh-actions-cache-v6-
 
       - name: Run setup.sh end-to-end
         run: |
@@ -236,16 +236,16 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
-      - uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~\scoop\cache
             ~\AppData\Local\nvim-data\lazy
             ~\AppData\Local\nvim-data\mason
             ~\AppData\Local\nvim-data\site
-          key: Windows-setup-ps1-${{ hashFiles('nvim/lazy-lock.json', 'nvim/lua/plugins/**/*.lua') }}
+          key: Windows-setup-ps1-actions-cache-v6-${{ hashFiles('nvim/lazy-lock.json', 'nvim/lua/plugins/**/*.lua') }}
           restore-keys: |
-            Windows-setup-ps1-
+            Windows-setup-ps1-actions-cache-v6-
 
       - name: Run setup.ps1 end-to-end
         run: |

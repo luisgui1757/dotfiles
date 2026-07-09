@@ -99,4 +99,28 @@ describe("language smoke (Tier 1)", function()
     assert.is_truthy(src:find("local function wait_for_lsp_client", 1, true), "shared LSP wait helper missing")
     assert.is_nil(src:find("vim.wait(45000", 1, true), "raw attach timeout must not be duplicated")
   end)
+
+  it("Tier 2 starts and parses the expected parser before capture probes", function()
+    local src = lsp_smoke_source()
+    assert.is_truthy(
+      src:find("local function wait_for_treesitter_capture", 1, true),
+      "shared Tree-sitter capture wait helper missing"
+    )
+    assert.is_truthy(
+      src:find("pcall(vim.treesitter.start, buf, parser)", 1, true),
+      "Tier 2 must explicitly start the expected parser before checking captures"
+    )
+    assert.is_truthy(
+      src:find("syntax_before_start", 1, true),
+      "explicit Tree-sitter start must preserve production-restored syntax fallback"
+    )
+    assert.is_truthy(
+      src:find("parser_obj:parse()", 1, true),
+      "Tier 2 must explicitly parse the buffer before checking captures"
+    )
+    assert.is_truthy(
+      src:find("wait_for_treesitter_capture(0, row.parser)", 1, true),
+      "matrix runtime gate must use the shared parser/capture wait helper"
+    )
+  end)
 end)
