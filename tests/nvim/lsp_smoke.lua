@@ -299,12 +299,61 @@ local ok, err = pcall(function()
     require("lazy").load({ plugins = { "mason.nvim" } })
   end)
 
-  local function has_treesitter_capture(buf)
+  local function has_treesitter_highlight_query_capture(buf, parser, parser_obj, parsed_trees)
+    if not parser or parser == "" then
+      return false
+    end
+
+    local query_ok, query = pcall(vim.treesitter.query.get, parser, "highlights")
+    if (not query_ok or not query) and vim.treesitter.query.get_query then
+      query_ok, query = pcall(vim.treesitter.query.get_query, parser, "highlights")
+    end
+    if not query_ok or not query then
+      return false
+    end
+
+    local trees = parsed_trees
+    if not trees and parser_obj then
+      local parse_ok, parsed_or_err = pcall(function()
+        return parser_obj:parse()
+      end)
+      if parse_ok then
+        trees = parsed_or_err
+      end
+    end
+    if type(trees) ~= "table" or #trees == 0 then
+      return false
+    end
+
+    local line_count = vim.api.nvim_buf_line_count(buf)
+    local ok, found = pcall(function()
+      for _, tree in ipairs(trees) do
+        local root = tree and tree:root()
+        if root then
+          for _, node in query:iter_captures(root, buf, 0, line_count) do
+            local start_row, start_col, end_row, end_col = node:range()
+            if start_row < end_row or start_col < end_col then
+              local text = table.concat(vim.api.nvim_buf_get_text(buf, start_row, start_col, end_row, end_col, {}), "\n")
+              if text:match("%S") then
+                return true
+              end
+            end
+          end
+        end
+      end
+      return false
+    end)
+    return ok and found == true
+  end
+
+  local function has_treesitter_capture(buf, parser, parser_obj, parsed_trees)
     -- Headless nvim does not always materialize highlighter captures until a
     -- redraw. `vim.treesitter.get_parser()` can already succeed at that point,
     -- which proves parsing but not visible highlighting. Force the same redraw
     -- boundary a real UI crosses before asking `inspect_pos()` for highlight
-    -- captures.
+    -- captures. If a headless host still does not materialize `inspect_pos()`
+    -- captures after parse, fall back to directly iterating the same parser's
+    -- `highlights` query so the strict smoke still proves parser+query captures.
     pcall(vim.cmd, "redraw")
 
     local line_count = math.min(vim.api.nvim_buf_line_count(buf), 120)
@@ -320,7 +369,7 @@ local ok, err = pcall(function()
         end
       end
     end
-    return false
+    return has_treesitter_highlight_query_capture(buf, parser, parser_obj, parsed_trees)
   end
 
   local function one_line_error(err)
@@ -346,14 +395,15 @@ local ok, err = pcall(function()
       return false, "vim.treesitter.get_parser(" .. parser .. ") failed: " .. one_line_error(parser_obj)
     end
 
+    local parsed_trees
     local parse_ok, parse_err = pcall(function()
-      parser_obj:parse()
+      parsed_trees = parser_obj:parse()
     end)
     if not parse_ok then
       return false, "Tree-sitter parse(" .. parser .. ") failed: " .. one_line_error(parse_err)
     end
 
-    return has_treesitter_capture(buf), nil
+    return has_treesitter_capture(buf, parser, parser_obj, parsed_trees), nil
   end
 
   local function wait_for_treesitter_capture(buf, parser, timeout_ms)
@@ -866,7 +916,7 @@ local ok, err = pcall(function()
         return syntax_ready and capture_ready
       end, 50)
       local syntax_pos = vim.inspect_pos(buf, row.syntax[1], row.syntax[2])
-      local capture_ready = row.parser and has_treesitter_capture(buf)
+      local capture_ready = row.parser and has_treesitter_capture(buf, row.parser)
       if vim.bo[buf].syntax ~= row.ft then
         fail(row.fixture .. ": syntax fallback not restored (got: " .. tostring(vim.bo[buf].syntax) .. ")")
       elseif #syntax_pos.syntax == 0 then

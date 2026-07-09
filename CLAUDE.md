@@ -598,8 +598,10 @@ major; `tests/static/repo_policy_test.sh` enforces this.
   `tests/.cache` through conform.nvim's production route, requires the expected
   external formatter(s), fails on post-format LSP warnings/errors, then opens
   every language-matrix fixture, requires real Tree-sitter captures for
-  parser-backed rows after explicitly starting and parsing the expected parser,
-  and proves syntax-only fallback rows have real Vim syntax groups. Keep the LSP
+  parser-backed rows after explicitly starting and parsing the expected parser
+  (`inspect_pos()` first, direct highlight-query capture iteration as the
+  headless fallback), and proves syntax-only fallback rows have real Vim syntax
+  groups. Keep the LSP
   attach gate before the broad fixture-open gate; opening
   every fixture under the production config can start LSPs as collateral. After
   the explicit formatter/LSP gate, the smoke disables the tested LSP configs

@@ -649,7 +649,8 @@ through conform.nvim's production route with the expected external formatter(s)
 and produce no LSP warnings/errors afterward, (4) every language-matrix fixture
 opens with the expected filetype and every parser-backed row reports real
 Tree-sitter highlight captures after the smoke explicitly starts and parses the
-expected parser, and (5) the auto-started bundled filetypes keep
+expected parser, using `inspect_pos()` first and direct highlight-query capture
+iteration as the headless fallback, and (5) the auto-started bundled filetypes keep
 nvim-treesitter's `indentexpr`. The fast `make test-nvim` runs Tier 1
 (filetype + formatter + parser-list consistency per fixture), plus source-shape
 guards for formatter policy such as JSON-family Prettier trailing commas. Adding

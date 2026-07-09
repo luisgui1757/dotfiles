@@ -119,6 +119,14 @@ describe("language smoke (Tier 1)", function()
       "Tier 2 must explicitly parse the buffer before checking captures"
     )
     assert.is_truthy(
+      src:find('vim.treesitter.query.get, parser, "highlights"', 1, true),
+      "Tier 2 must fall back to direct highlight-query capture iteration when inspect_pos is empty"
+    )
+    assert.is_truthy(
+      src:find("query:iter_captures(root, buf, 0, line_count)", 1, true),
+      "Tier 2 must prove parser+query captures directly in headless hosts"
+    )
+    assert.is_truthy(
       src:find("wait_for_treesitter_capture(0, row.parser)", 1, true),
       "matrix runtime gate must use the shared parser/capture wait helper"
     )
