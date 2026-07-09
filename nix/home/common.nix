@@ -19,7 +19,7 @@
   # DELIBERATELY EXCLUDED (deferred, ABI-coupled to the still-native Neovim):
   # neovim and the tree-sitter CLI. nvim-treesitter `main` compiles parsers whose
   # ABI must match nvim's built-in libtree-sitter, and the repo pins the
-  # tree-sitter CLI (v0.26.9) precisely to keep that build reproducible. A nix
+  # tree-sitter CLI (v0.26.10) precisely to keep that build reproducible. A nix
   # neovim / tree-sitter shadowing the pinned native ones would risk an
   # E5113-class parser/ABI mismatch. Moving nvim into the same Nix closure as its
   # parser toolchain is a follow-up; see ROADMAP + CLAUDE.md invariant 19.

@@ -918,7 +918,7 @@ save only**. The next plain `:w` formats normally. Implemented in
   binary). The `PKG_TABLE` brew column for `tree-sitter` is therefore
   `tree-sitter-cli`, while `binaries_for` still probes for the `tree-sitter`
   binary. Native Linux/WSL installs a pinned `tree-sitter/tree-sitter` release
-  asset (v0.26.9) into `~/.local/bin` with SHA-256 verification. `install-deps.ps1` installs the CLI through the Scoop
+  asset (v0.26.10) into `~/.local/bin` with SHA-256 verification. `install-deps.ps1` installs the CLI through the Scoop
   `tree-sitter` manifest first and falls back to `npm install -g
   tree-sitter-cli` after Node is present. Windows compiler support is separate:
   `install-deps.ps1 -All` auto-installs Visual Studio 2022 Build Tools with the
@@ -1398,7 +1398,7 @@ save only**. The next plain `:w` formats normally. Implemented in
   catalogs (`PKG_TABLE`: `gh` on brew/apt/dnf/zypper, `github-cli` on
   pacman/apk; `$Catalog`: winget `GitHub.cli` / choco `gh` / scoop `gh`).
   gh-dash itself has no brew/apt/scoop package — it installs via
-  `gh extension install dlvhdr/gh-dash --pin <tag>`, pinned to `v4.25.0`
+  `gh extension install dlvhdr/gh-dash --pin <tag>`, pinned to `v4.25.1`
   (`GH_DASH_VERSION` in `install-deps.sh`, mirrored as `$GhDashVersion` in
   `install-deps.ps1`; a Renovate `github-releases` manager can bump the tag and
   `pin_consistency_test.sh` fails on sh/ps1/CLAUDE drift). The installers
@@ -1564,7 +1564,7 @@ host prerequisite.
 - **nvim + the tree-sitter CLI are DELIBERATELY NOT in the Nix package set
   (deferred, with proof).** nvim-treesitter `main` compiles parsers whose ABI
   must match nvim's built-in libtree-sitter, and the repo pins the tree-sitter
-  CLI to `v0.26.9` precisely to keep that build reproducible (invariant 19). A
+  CLI to `v0.26.10` precisely to keep that build reproducible (invariant 19). A
   nix neovim / tree-sitter shadowing the pinned native binaries would risk the
   `E5113` parser/ABI-mismatch class of bug. So `nix/home/common.nix` omits both;
   they stay on the native install-deps path. Moving nvim into the SAME Nix
