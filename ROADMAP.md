@@ -228,14 +228,16 @@ Commit-by-commit status:
   `dist.integrity`. POSIX public setup gets Node 24 from the enforced Nix package
   layer; Windows uses the native Node LTS catalog path. `.pi/` runtime state
   remains local and unsynced.
-- **Gold-standard gap close — DONE (2026-07-09).** Accepted install failures now
-  record and force nonzero setup/update exits; stdin/no-script-path setup fails
-  closed with clone-first instructions instead of clone-and-reinvoke; the VS
-  Build Tools bootstrapper must pass Authenticode Microsoft signer/chain
+- **Gold-standard gap close — IN PROGRESS (2026-07-09, PR #46).** Accepted
+  install failures record and force nonzero setup/update exits; stdin/no-script-path
+  setup fails closed with clone-first instructions instead of clone-and-reinvoke;
+  the VS Build Tools bootstrapper must pass Authenticode Microsoft signer/chain
   verification before execution; the WSL2 canary is split into a non-required
   scheduled/manual workflow; required-check sources align with `macos-26` and
   Nix contexts; Renovate custom-manager coverage and pin-consistency guards cover
-  the current mirrored/manual-reviewed pin surface.
+  the current mirrored/manual-reviewed pin surface. Remaining completion gate:
+  PR #46 live required checks must be green, and the owner must apply the
+  checked-in safeguards live for context-renaming changes.
 
 ### P2 Follow-up: Secondary Supply-chain Hardening
 

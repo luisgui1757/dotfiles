@@ -175,6 +175,19 @@ jobs:
             done
             fail "Mason did not install $tool into an expected mason/bin directory"
           }
+          resolve_ghostty_binary() {
+            local candidate
+            for candidate in \
+              "/Applications/Ghostty.app/Contents/MacOS/ghostty" \
+              "$HOME/Applications/Ghostty.app/Contents/MacOS/ghostty"; do
+              if [[ -x "$candidate" ]]; then
+                printf '%s\n' "$candidate"
+                return 0
+              fi
+            done
+            command -v ghostty
+          }
+          repo="$(pwd -P)"
           command -v nvim >/dev/null 2>&1 || fail "nvim is not on PATH"
           command -v lazygit >/dev/null 2>&1 || fail "lazygit is not on PATH"
           command -v cmake >/dev/null 2>&1 || fail "cmake is not on PATH"
@@ -187,8 +200,9 @@ jobs:
             assert_nix_owned_command "$cmd"
           done
           if [[ "${RUNNER_OS:-}" == "macOS" ]]; then
-            command -v ghostty >/dev/null 2>&1 || fail "ghostty is not on PATH after setup.sh --all requested it"
-            ghostty +validate-config "--config-file=$repo/ghostty/config" \
+            ghostty_bin="$(resolve_ghostty_binary)" \
+              || fail "Ghostty binary is missing after setup.sh --all requested it"
+            "$ghostty_bin" +validate-config --config-file="$repo/ghostty/config" \
               || fail "ghostty did not accept the managed config"
             [[ -d /Applications/WezTerm.app || -d "$HOME/Applications/WezTerm.app" ]] \
               || fail "WezTerm.app is missing after setup.sh --all requested it"
@@ -204,7 +218,6 @@ jobs:
             "NVIM v0.12"*|"NVIM v1."*) ;;
             *) fail "nvim version is below 0.12: $nvim_line" ;;
           esac
-          repo="$(pwd -P)"
           assert_dir_resolves "$HOME/.config/nvim" "$repo/nvim"
           assert_file_content "$HOME/.config/nvim/init.lua" "$repo/nvim/init.lua"
           assert_file_content "$HOME/.config/starship.toml" "$repo/starship/starship.toml"

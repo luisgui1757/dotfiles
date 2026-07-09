@@ -1059,10 +1059,13 @@ install_nvim_linux() {
             printf "  skipped   %-26s\n" "nvim"
             return
         fi
-        native_linux_pm_install apk neovim || {
-            echo "  WARN: nvim install failed; continuing"
+        local rc=0
+        native_linux_pm_install apk neovim || rc=$?
+        if [[ "$rc" -ne 0 ]]; then
+            record_install_failure "nvim" apk "neovim" "$rc"
+            echo "  FAIL: nvim apk install failed; continuing to collect install failures"
             return
-        }
+        fi
         if have nvim; then
             printf "  installed %-26s via apk\n" "nvim"
         fi
@@ -1146,10 +1149,13 @@ install_lazygit_linux() {
             printf "  skipped   %-26s\n" "lazygit"
             return
         fi
-        native_linux_pm_install apk lazygit || {
-            echo "  WARN: lazygit install failed; continuing"
+        local rc=0
+        native_linux_pm_install apk lazygit || rc=$?
+        if [[ "$rc" -ne 0 ]]; then
+            record_install_failure "lazygit" apk "lazygit" "$rc"
+            echo "  FAIL: lazygit apk install failed; continuing to collect install failures"
             return
-        }
+        fi
         if have lazygit; then
             printf "  installed %-26s via apk\n" "lazygit"
         fi
@@ -1263,10 +1269,13 @@ install_starship_linux() {
             printf "  skipped   %-26s\n" "starship"
             return
         fi
-        native_linux_pm_install apk starship || {
-            echo "  WARN: starship install failed; continuing"
+        local rc=0
+        native_linux_pm_install apk starship || rc=$?
+        if [[ "$rc" -ne 0 ]]; then
+            record_install_failure "starship" apk "starship" "$rc"
+            echo "  FAIL: starship apk install failed; continuing to collect install failures"
             return
-        }
+        fi
         if have starship; then
             printf "  installed %-26s via apk\n" "starship"
         fi
@@ -1483,8 +1492,12 @@ install_tree_sitter_cli() {
                 printf "  skipped   %-26s\n" "tree-sitter"
                 return
             fi
-            native_linux_pm_install apk tree-sitter || \
-                printf "  manual    %-26s apk add tree-sitter failed; install the musl tree-sitter CLI manually\n" "tree-sitter"
+            local rc=0
+            native_linux_pm_install apk tree-sitter || rc=$?
+            if [[ "$rc" -ne 0 ]]; then
+                record_install_failure "tree-sitter" apk "tree-sitter" "$rc"
+                printf "  FAIL: %-26s apk add tree-sitter failed; continuing to collect install failures\n" "tree-sitter" >&2
+            fi
             return
         fi
         install_tree_sitter_cli_linux
@@ -3561,8 +3574,11 @@ install_ghostty_linux() {
                 echo "         bash install.sh   (fetches + apt-installs the matching .deb)"
             else
                 require_downloader || return 1
-                if ! run_ghostty_ubuntu_installer "$ubuntu_url"; then
-                    echo "  WARN: Ubuntu ghostty installer failed; continuing"
+                local rc=0
+                run_ghostty_ubuntu_installer "$ubuntu_url" || rc=$?
+                if [[ "$rc" -ne 0 ]]; then
+                    record_install_failure "ghostty" apt "mkasberg/ghostty-ubuntu@$GHOSTTY_UBUNTU_VERSION" "$rc"
+                    echo "  FAIL: Ubuntu ghostty installer failed; continuing to collect install failures"
                 fi
             fi
             return
@@ -3573,7 +3589,12 @@ install_ghostty_linux() {
             if [[ "$DRY_RUN" -eq 1 ]]; then
                 echo "  would: sudo snap install ghostty --classic"
             else
-                maybe_sudo snap install ghostty --classic || echo "  WARN: snap install failed"
+                local rc=0
+                maybe_sudo snap install ghostty --classic || rc=$?
+                if [[ "$rc" -ne 0 ]]; then
+                    record_install_failure "ghostty" snap "ghostty --classic" "$rc"
+                    echo "  FAIL: snap install failed for ghostty; continuing to collect install failures"
+                fi
             fi
             return
         fi
@@ -3767,7 +3788,12 @@ install_vscode() {
             if [[ "$DRY_RUN" -eq 1 ]]; then
                 echo "  would: brew install --cask visual-studio-code"
             else
-                brew install --cask visual-studio-code || echo "  WARN: cask install failed"
+                local rc=0
+                brew install --cask visual-studio-code || rc=$?
+                if [[ "$rc" -ne 0 ]]; then
+                    record_install_failure "vscode" brew "cask:visual-studio-code" "$rc"
+                    echo "  FAIL: VS Code cask install failed; continuing to collect install failures"
+                fi
             fi
         fi
         return
@@ -3777,7 +3803,12 @@ install_vscode() {
             if [[ "$DRY_RUN" -eq 1 ]]; then
                 echo "  would: sudo snap install code --classic"
             else
-                maybe_sudo snap install code --classic || echo "  WARN: snap install failed"
+                local rc=0
+                maybe_sudo snap install code --classic || rc=$?
+                if [[ "$rc" -ne 0 ]]; then
+                    record_install_failure "vscode" snap "code --classic" "$rc"
+                    echo "  FAIL: VS Code snap install failed; continuing to collect install failures"
+                fi
             fi
             return
         fi
@@ -3786,7 +3817,12 @@ install_vscode() {
             if [[ "$DRY_RUN" -eq 1 ]]; then
                 echo "  would: flatpak install -y flathub com.visualstudio.code"
             else
-                flatpak install -y flathub com.visualstudio.code || echo "  WARN: flatpak install failed"
+                local rc=0
+                flatpak install -y flathub com.visualstudio.code || rc=$?
+                if [[ "$rc" -ne 0 ]]; then
+                    record_install_failure "vscode" flatpak "com.visualstudio.code" "$rc"
+                    echo "  FAIL: VS Code flatpak install failed; continuing to collect install failures"
+                fi
             fi
             return
         fi
@@ -3845,7 +3881,13 @@ setup_ghostty_maximize() {
         echo "         write $cfg/autostart/devilspie2.desktop, and start devilspie2"
         return 0
     fi
-    install_devilspie2_linux || echo "  WARN: devilspie2 install failed; install it via your package manager"
+    local rc=0 native_pm
+    native_pm="$(native_linux_pm)"
+    install_devilspie2_linux || rc=$?
+    if [[ "$rc" -ne 0 ]]; then
+        record_install_failure "devilspie2" "$native_pm" "devilspie2" "$rc"
+        echo "  FAIL: devilspie2 install failed; continuing to collect install failures"
+    fi
     mkdir -p "$cfg/devilspie2" "$cfg/autostart"
     ln -sfn "$rule" "$cfg/devilspie2/ghostty-maximize.lua"
     cat > "$cfg/autostart/devilspie2.desktop" <<'EOF'

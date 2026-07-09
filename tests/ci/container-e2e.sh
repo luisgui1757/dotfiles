@@ -94,14 +94,12 @@ if [[ "${1:-}" == "--as-user" ]]; then
     assert_tool_runs gh --version
     assert_tool_runs wezterm --version
     assert_tool_runs herdr --version
-    assert_tool_runs pi --version
 
     nvim_line="$(nvim --version | head -n 1)"
     case "$nvim_line" in
         "NVIM v0.12"* | "NVIM v1."*) ;;
         *) fail "nvim version is below 0.12: $nvim_line" ;;
     esac
-    [[ "$(pi --version)" == "0.80.3" ]] || fail "pi version is not pinned 0.80.3"
 
     assert_dir_resolves "$HOME/.config/nvim" "$repo/nvim"
     assert_file_content "$HOME/.config/nvim/init.lua" "$repo/nvim/init.lua"

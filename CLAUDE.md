@@ -537,8 +537,8 @@ and the compact form has ambiguous failure semantics.
 `tests/shell/lint.sh` runs ShellCheck per file. Production scripts stay strict;
 source-only test fixtures get a reviewed false-positive exclude only for
 dynamic `source` paths (`SC1091`), globals consumed by sourced installer/setup
-functions (`SC2034`), and indirectly invoked command stubs (`SC2329`). Do not
-move those excludes to production scripts.
+functions (`SC2034`), and indirectly invoked command stubs / code paths
+(`SC2317`, `SC2329`). Do not move those excludes to production scripts.
 
 `e2e-install.yml` is the required real-install gate. The jobs cover different
 install paths, not symmetric container platforms:
@@ -561,8 +561,10 @@ major; `tests/static/repo_policy_test.sh` enforces this.
   has Linuxbrew available, so the container is the only automated proof of the
   clean-image native `apt` path: pinned Neovim tarball install, pinned lazygit
   release install, fixed-root zsh plugin install, `fd-find` -> `fd` shim, and apt
-  fallbacks. Scope is intentionally **Ubuntu only** (the supported Linux/WSL2
-  proxy target).
+  fallbacks. It does not assert the Pi CLI because this path intentionally omits
+  the Nix package layer that provides Node 24; Pi is asserted in the Nix-backed
+  public setup jobs. Scope is intentionally **Ubuntu only** (the supported
+  Linux/WSL2 proxy target).
   Re-adding another distro requires both a matrix entry in `e2e-install.yml` and
   a matching root-prep branch in `tests/ci/container-e2e.sh`.
 - `setup.sh / ubuntu-24.04`, `setup.sh / macos-26`, and
@@ -577,7 +579,9 @@ major; `tests/static/repo_policy_test.sh` enforces this.
   also asserts the new Windows tools that must leave PATH commands behind
   (`zoxide`, `gh`, `wezterm`, `herdr`, `pi`), so an installer that exits 0 but fails
   its command probe cannot fake-green. The macOS job also runs Ghostty's real
-  `+validate-config` parser against the managed config after the cask install.
+  `+validate-config` parser against the managed config after the cask install,
+  resolving the app bundle binary first because the cask does not guarantee a
+  `ghostty` CLI on PATH.
   must assert `%LOCALAPPDATA%\lazygit\config.yml`
   against `lazygit/config.windows.yml`, not the POSIX/default
   `lazygit/config.yml`. After the full restore/sync they also run the
@@ -676,8 +680,9 @@ tags are intentionally paired with adjacent expected commits. After a Renovate
 bump, adjacent checksum/commit constants stay stale until a human
 recomputes/reviews them; CI verification must fail in the meantime. Do not model
 direct-download SHA-256 constants as Renovate `currentDigest` captures; in
-Renovate terms those are not datasource digests. Only the cargo-binstall git
-commit is captured as a digest.
+Renovate terms those are not datasource digests. Installer-script commit pins
+for Homebrew, Scoop, and CI cargo-binstall are the reviewed digest/currentDigest
+captures; their adjacent SHA-256 constants remain manual verification context.
 
 Several pins are also **mirrored across files** (nvim version/SHA in
 `install-deps.sh`, `test.yml`, and `tests/shell/install_nvim_linux{,_fail}_test.sh`;
@@ -887,6 +892,9 @@ save only**. The next plain `:w` formats normally. Implemented in
 - **Accepted dependency install failures are fatal.** `install-deps.sh` records
   selected package-manager/direct-install failures and exits nonzero after the
   run summary; dry-run previews and explicit/manual skips remain non-failures.
+  Accepted optional GUI/package paths still follow that contract: Ubuntu/snap
+  Ghostty, VS Code cask/snap/flatpak, devilspie2, and Alpine native package arms
+  record failures once the user accepted the install or `--all` selected it.
   `setup.ps1` must propagate `install-deps.ps1` nonzero exits in both normal
   Phase 1 and `-Update`; it must never finish with `exit 0` after a blocked
   dependency update. Preserve the Windows `$InstallFailures` summary contract
@@ -942,8 +950,9 @@ save only**. The next plain `:w` formats normally. Implemented in
   then falls back to Microsoft's official `vs_BuildTools.exe` bootstrapper with
   the same workload. Scoop does not carry VS Build Tools, so this is the
   deliberate exception to the Scoop-first catalog rule. The bootstrapper is
-  downloaded first, then must pass Authenticode verification with `Status=Valid`
-  and a Microsoft-owned signer/chain before `Start-Process` may run. A failed
+  downloaded first, then must pass Authenticode verification with `Status=Valid`,
+  a real `X509Chain` built from `SignerCertificate`, and Microsoft-owned signer
+  plus root/chain identity checks before `Start-Process` may run. A failed
   winget/choco pass is not final; a failed package-manager-plus-bootstrapper
   pass records an `InstallFailures` entry so `-All` cannot report success
   without MSVC.
@@ -1222,8 +1231,10 @@ save only**. The next plain `:w` formats normally. Implemented in
   The pinned script still fetches the matching `.deb` from that project's GitHub
   release assets over HTTPS at run time (per-codename×arch, so the `.deb` itself
   is not individually pinned — same trust model as the Homebrew installer).
-  A checksum mismatch fails closed: the installer is not run, a `FAIL:` marker
-  is emitted, and setup continues for real users while CI fails on the marker.
+  A checksum mismatch or installer failure fails closed: the installer is not
+  trusted/run on checksum mismatch, a `FAIL:` marker is emitted, the accepted
+  install failure is recorded, and setup continues for real users while CI fails
+  on the marker/final nonzero summary.
   Update the version and checksum constants together. zsh plugin refs are also
   pinned by tag plus expected commit; update both after reviewing a Renovate tag
   bump. Guarded by `tests/shell/ghostty_install_fail_test.sh`,

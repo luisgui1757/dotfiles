@@ -75,4 +75,29 @@ INSTALL_DEPS_SOURCE_ONLY=1 source "$REPO_ROOT/install-deps.sh"
         || { echo "FAIL: zsh plugin failure detail must name the git path"; exit 1; }
 )
 
+(
+    PM=apt
+    DRY_RUN=0
+    YES_ALL=1
+    INSTALL_FAILURES_COUNT=0
+    INSTALL_FAILURES_DETAIL=""
+
+    have() { return 1; }
+    is_wsl() { return 1; }
+    is_ubuntu() { return 0; }
+    require_downloader() { return 0; }
+    run_ghostty_ubuntu_installer() { return 43; }
+
+    out_file="$(mktemp)"
+    install_ghostty_linux >"$out_file" 2>&1
+    output="$(cat "$out_file")"
+
+    [[ "$INSTALL_FAILURES_COUNT" -eq 1 ]] \
+        || { echo "FAIL: Ubuntu ghostty installer failure must be recorded"; exit 1; }
+    [[ "$INSTALL_FAILURES_DETAIL" == *"ghostty via apt (mkasberg/ghostty-ubuntu@$GHOSTTY_UBUNTU_VERSION) exit=43"* ]] \
+        || { echo "FAIL: Ubuntu ghostty failure detail was not precise: $INSTALL_FAILURES_DETAIL"; exit 1; }
+    [[ "$output" == *"Ubuntu ghostty installer failed"* ]] \
+        || { echo "FAIL: Ubuntu ghostty failure output missing: $output"; exit 1; }
+)
+
 echo "OK"

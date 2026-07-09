@@ -2774,7 +2774,8 @@ function Get-VsBuildToolsInstallationPath {
 function Test-VsBuildToolsBootstrapperSignature {
     param(
         [Parameter(Mandatory = $true)][string]$Path,
-        [scriptblock]$SignatureGetter
+        [scriptblock]$SignatureGetter,
+        [scriptblock]$ChainBuilder
     )
 
     if (-not $SignatureGetter) {
@@ -2802,22 +2803,79 @@ function Test-VsBuildToolsBootstrapperSignature {
         Write-Warning "VS Build Tools bootstrapper has a Valid signature but no signer certificate."
         return $false
     }
+    if (-not ($signer -is [System.Security.Cryptography.X509Certificates.X509Certificate2])) {
+        Write-Warning "VS Build Tools bootstrapper signer certificate has an unexpected type."
+        return $false
+    }
 
-    $signerText = @([string]$signer.Subject, [string]$signer.Issuer) -join "`n"
-    $chainText = @()
-    if ($signature.Path) {
-        foreach ($cert in @($signature.Path)) {
-            if ($cert) {
-                $chainText += [string]$cert.Subject
-                $chainText += [string]$cert.Issuer
+    if (-not $ChainBuilder) {
+        $ChainBuilder = {
+            param([System.Security.Cryptography.X509Certificates.X509Certificate2]$SignerCertificate)
+
+            $chain = [System.Security.Cryptography.X509Certificates.X509Chain]::new()
+            $chain.ChainPolicy.RevocationMode = [System.Security.Cryptography.X509Certificates.X509RevocationMode]::NoCheck
+            $chain.ChainPolicy.RevocationFlag = [System.Security.Cryptography.X509Certificates.X509RevocationFlag]::ExcludeRoot
+            $chain.ChainPolicy.VerificationFlags = [System.Security.Cryptography.X509Certificates.X509VerificationFlags]::NoFlag
+            $ok = $chain.Build($SignerCertificate)
+            [pscustomobject]@{
+                IsValid = $ok
+                Certificates = @($chain.ChainElements | ForEach-Object { $_.Certificate })
+                Statuses = @($chain.ChainStatus | ForEach-Object { $_.StatusInformation })
             }
         }
     }
+
+    try {
+        $chainResult = & $ChainBuilder $signer
+    } catch {
+        Write-Warning ("VS Build Tools bootstrapper certificate chain validation failed: " + $_.Exception.Message)
+        return $false
+    }
+
+    $chainValid = $false
+    $chainCertificates = @()
+    $chainStatusText = ''
+    if ($chainResult -is [bool]) {
+        $chainValid = [bool]$chainResult
+    } elseif ($null -ne $chainResult) {
+        $properties = @($chainResult.PSObject.Properties.Name)
+        if ($properties -contains 'IsValid') {
+            $chainValid = [bool]$chainResult.IsValid
+        }
+        if ($properties -contains 'Certificates') {
+            $chainCertificates = @($chainResult.Certificates)
+        }
+        if ($properties -contains 'Statuses') {
+            $chainStatusText = (@($chainResult.Statuses) -join '; ')
+        }
+    }
+    if (-not $chainValid) {
+        if ([string]::IsNullOrWhiteSpace($chainStatusText)) {
+            $chainStatusText = 'unknown chain status'
+        }
+        Write-Warning "VS Build Tools bootstrapper certificate chain validation failed: $chainStatusText"
+        return $false
+    }
+    if ($chainCertificates.Count -eq 0) {
+        $chainCertificates = @($signer)
+    }
+
+    $signerText = @([string]$signer.Subject, [string]$signer.Issuer) -join "`n"
+    $chainText = @()
+    foreach ($cert in $chainCertificates) {
+        if ($cert) {
+            $chainText += [string]$cert.Subject
+            $chainText += [string]$cert.Issuer
+        }
+    }
+    $rootCertificate = $chainCertificates[-1]
+    $rootText = @([string]$rootCertificate.Subject, [string]$rootCertificate.Issuer) -join "`n"
     $allCertificateText = (@($signerText) + $chainText) -join "`n"
 
     $signerIsMicrosoft = $signerText -match '(?i)(CN|O)=Microsoft Corporation|Microsoft Corporation'
-    $chainIsMicrosoft = $allCertificateText -match '(?i)Microsoft (Code Signing PCA|Corporation|Root|Windows)'
-    if (-not ($signerIsMicrosoft -and $chainIsMicrosoft)) {
+    $chainIsMicrosoft = $allCertificateText -match '(?i)Microsoft (Code Signing PCA|Corporation|Root|Windows|Identity Verification)'
+    $rootIsMicrosoft = $rootText -match '(?i)Microsoft (Root|Corporation|Identity Verification)'
+    if (-not ($signerIsMicrosoft -and $chainIsMicrosoft -and $rootIsMicrosoft)) {
         Write-Warning "VS Build Tools bootstrapper signer/chain is not recognized as Microsoft-owned."
         return $false
     }
@@ -3237,3 +3295,4 @@ Write-Host "install-deps: done"
 if ($DryRun) { Write-Host "(dry run -- nothing was installed)" }
 Write-Host ""
 Write-Host "Next: run .\setup.ps1, or let setup.ps1 continue if it invoked this phase."
+exit 0

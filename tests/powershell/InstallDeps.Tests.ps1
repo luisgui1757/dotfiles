@@ -11,6 +11,22 @@ BeforeAll {
     function npm {}
     function pi {}
 
+    function Get-TestCertificate {
+        param([Parameter(Mandatory)][string]$Subject)
+
+        $rsa = [System.Security.Cryptography.RSA]::Create(2048)
+        $request = [System.Security.Cryptography.X509Certificates.CertificateRequest]::new(
+            $Subject,
+            $rsa,
+            [System.Security.Cryptography.HashAlgorithmName]::SHA256,
+            [System.Security.Cryptography.RSASignaturePadding]::Pkcs1
+        )
+        return $request.CreateSelfSigned(
+            [datetimeoffset]::UtcNow.AddDays(-1),
+            [datetimeoffset]::UtcNow.AddDays(1)
+        )
+    }
+
     $script:ImportInstallDepsForTest = {
         param([switch]$DryRun)
 
@@ -687,30 +703,46 @@ Describe "install-deps.ps1" {
 
     It "accepts only a valid Microsoft-owned VS Build Tools Authenticode signature" {
         . $script:ImportInstallDepsForTest
+        $microsoftCertificate = Get-TestCertificate 'CN=Microsoft Corporation, O=Microsoft Corporation, C=US'
+        $exampleCertificate = Get-TestCertificate 'CN=Example Publisher, O=Example Corp'
         $microsoftSignature = [pscustomobject]@{
             Status = 'Valid'
-            SignerCertificate = [pscustomobject]@{
-                Subject = 'CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US'
-                Issuer = 'CN=Microsoft Code Signing PCA 2011, O=Microsoft Corporation, C=US'
-            }
-            Path = @(
-                [pscustomobject]@{
-                    Subject = 'CN=Microsoft Code Signing PCA 2011, O=Microsoft Corporation, C=US'
-                    Issuer = 'CN=Microsoft Root Certificate Authority 2011, O=Microsoft Corporation, C=US'
-                }
-            )
+            SignerCertificate = $microsoftCertificate
         }
         $invalidSignature = [pscustomobject]@{
             Status = 'Valid'
-            SignerCertificate = [pscustomobject]@{
-                Subject = 'CN=Example Publisher, O=Example Corp'
-                Issuer = 'CN=Example Root'
+            SignerCertificate = $exampleCertificate
+        }
+        $validMicrosoftChain = {
+            param([System.Security.Cryptography.X509Certificates.X509Certificate2]$SignerCertificate)
+            [pscustomobject]@{
+                IsValid = $true
+                Certificates = @($SignerCertificate)
+                Statuses = @()
             }
-            Path = @()
         }
 
-        Test-VsBuildToolsBootstrapperSignature -Path 'C:\tmp\vs.exe' -SignatureGetter { $microsoftSignature } | Should -BeTrue
-        Test-VsBuildToolsBootstrapperSignature -Path 'C:\tmp\vs.exe' -SignatureGetter { $invalidSignature } | Should -BeFalse
+        Test-VsBuildToolsBootstrapperSignature -Path 'C:\tmp\vs.exe' -SignatureGetter { $microsoftSignature } -ChainBuilder $validMicrosoftChain | Should -BeTrue
+        Test-VsBuildToolsBootstrapperSignature -Path 'C:\tmp\vs.exe' -SignatureGetter { $invalidSignature } -ChainBuilder $validMicrosoftChain | Should -BeFalse
+    }
+
+    It "rejects VS Build Tools when real certificate chain validation fails" {
+        . $script:ImportInstallDepsForTest
+        $microsoftCertificate = Get-TestCertificate 'CN=Microsoft Corporation, O=Microsoft Corporation, C=US'
+        $microsoftSignature = [pscustomobject]@{
+            Status = 'Valid'
+            SignerCertificate = $microsoftCertificate
+        }
+        $failedChain = {
+            param([System.Security.Cryptography.X509Certificates.X509Certificate2]$SignerCertificate)
+            [pscustomobject]@{
+                IsValid = $false
+                Certificates = @($SignerCertificate)
+                Statuses = @('UntrustedRoot')
+            }
+        }
+
+        Test-VsBuildToolsBootstrapperSignature -Path 'C:\tmp\vs.exe' -SignatureGetter { $microsoftSignature } -ChainBuilder $failedChain | Should -BeFalse
     }
 
     It "registers the Pi CLI as a pinned npm-backed dependency" {
@@ -2344,6 +2376,27 @@ exit 0
         $output | Should -Match 'scoop manifest refresh failed'
         $output | Should -Match '(?m)^\s*FAIL: scoop\s+via scoop\s+pkg=manifest'
         $output | Should -Match 'install-deps: completed with 1 FAILED install'
+    }
+
+    It "exits zero on a clean dry-run despite stale ambient LASTEXITCODE" {
+        $pwsh = (Get-Command pwsh -ErrorAction Stop).Source
+        $installDepsPath = $script:InstallDeps.Replace("'", "''")
+        $command = @"
+function winget { `$global:LASTEXITCODE = 0 }
+`$global:LASTEXITCODE = 77
+& '$installDepsPath' -DryRun -All
+"@
+
+        $oldNativeCommandUseErrorActionPreference = $PSNativeCommandUseErrorActionPreference
+        try {
+            $PSNativeCommandUseErrorActionPreference = $false
+            $output = & $pwsh -NoProfile -ExecutionPolicy Bypass -Command $command *>&1 | Out-String
+        } finally {
+            $PSNativeCommandUseErrorActionPreference = $oldNativeCommandUseErrorActionPreference
+        }
+
+        $LASTEXITCODE | Should -Be 0
+        $output | Should -Match 'install-deps: done'
     }
 }
 

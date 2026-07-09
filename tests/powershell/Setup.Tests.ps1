@@ -855,6 +855,25 @@ Describe "setup.ps1 update mode" {
         Should -Invoke -CommandName Stop-SetupWithExitCode -Times 1 -Exactly -ParameterFilter { $ExitCode -eq 23 }
     }
 
+    It "ignores stale LASTEXITCODE before a successful normal dependency phase helper" {
+        Mock -CommandName Stop-SetupWithExitCode -MockWith {
+            param([int]$ExitCode)
+            throw "setup-exit:$ExitCode"
+        }
+        $global:LASTEXITCODE = 81
+        $depsRunner = {
+            param([string]$Path, [hashtable]$Arguments)
+            $null = $Path
+            $null = $Arguments
+        }
+
+        { Invoke-DependencyInstallerOrFail -Runner $depsRunner -Path 'C:\dotfiles\install-deps.ps1' -Arguments @{} } |
+            Should -Not -Throw
+
+        $LASTEXITCODE | Should -Be 0
+        Should -Invoke -CommandName Stop-SetupWithExitCode -Times 0 -Exactly
+    }
+
     It "propagates install-deps failures in Update mode before Mason update" {
         $root = Join-Path ([System.IO.Path]::GetTempPath()) 'setup-update-root'
         Mock -CommandName Stop-SetupWithExitCode -MockWith {

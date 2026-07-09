@@ -24,8 +24,9 @@ for f in "${sh_files[@]}"; do
             # runtime paths, set globals consumed by those sourced functions, and
             # override commands such as uname indirectly. Keep these test-only
             # false positives out of the lint signal; production scripts remain
-            # strict.
-            shellcheck --shell=bash --exclude=SC1091,SC2034,SC2329 "$f" || fail=1
+            # strict. SC2317 is the same source-only fixture class: command
+            # stubs are reached indirectly through sourced installer functions.
+            shellcheck --shell=bash --exclude=SC1091,SC2034,SC2317,SC2329 "$f" || fail=1
             ;;
         *)
             shellcheck --shell=bash "$f" || fail=1
