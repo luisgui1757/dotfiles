@@ -195,8 +195,9 @@ that violates one of these, fix it instead of disabling the test.
     rows. The preflight also rejects unexpected nvim-treesitter-managed
     install-output parser `.so` files under `stdpath('data')/site/parser`,
     rejects managed bundled query install-output directories, requires parser and
-    query install output for the non-bundled upstream dependency set (for example
-    PHP's paired `php_only` parser), and purges bundled parser/query overrides
+    query install output for the non-bundled upstream dependency set, requires
+    managed `highlights.scm` for explicit parser rows (for example PHP's paired
+    `php_only` parser can remain query-only), and purges bundled parser/query overrides
     after setup installs complete.
 20. **Repo text stays LF-only.** `.gitattributes` force-normalizes text files to
     LF so Windows checkouts do not CRLF-corrupt shell/WSL entry points, and
@@ -591,7 +592,8 @@ major; `tests/static/repo_policy_test.sh` enforces this.
   (`get_available()`/`get_available(4)` — the jsonc "unsupported language"
   catcher), synchronously bootstraps parser installs with the upstream waitable
   install task and requires it to return exactly `true`, requires every declared
-  parser `.so` output and query install-output directories to be present,
+  parser `.so` output and query install-output directories to be present, with
+  managed `highlights.scm` for explicit parser rows,
   rejects unexpected
   install-output parser `.so` files under `stdpath('data')/site/parser`, asserts
   each fixture's LSP attaches, formats realistic LSP-backed samples copied under
@@ -984,8 +986,9 @@ save only**. The next plain `:w` formats normally. Implemented in
   can expose temp-dir races such as `ENOTEMPTY` while compiling many grammars.
   When `DOTFILES_TREESITTER_SYNC_INSTALL=1`, pass `max_jobs = 1` and wait up to
   15 minutes; interactive installs keep upstream's faster default. Tier 2 then
-  checks `get_installed("parsers")` so a partial bootstrap fails at the parser
-  gate before later capture checks turn it into a vague highlighting failure.
+  checks `get_installed("parsers")` plus managed query output, including
+  `highlights.scm` for explicit parser rows, so a partial bootstrap fails at the
+  parser/query gate before later capture checks turn it into a vague highlighting failure.
 - **nvim-treesitter installer drift must not disable highlighting.** A stale
   lazy.nvim cache can keep `nvim-treesitter` on the frozen `master` API while
   this repo expects the `main` rewrite. In that state

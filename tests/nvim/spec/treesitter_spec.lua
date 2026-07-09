@@ -289,8 +289,10 @@ describe("treesitter main migration", function()
     )
     assert.is_truthy(
       src:match("local function remove_incomplete_parser_installs%(parser_dependencies%)")
-        and src:match('treesitter_config%.get_install_dir%("queries"%)'),
-      "parser auto-install must repair parser files that were installed without their query directories"
+        and src:match('treesitter_config%.get_install_dir%("queries"%)')
+        and src:match("highlights%.scm")
+        and src:match('vim%.fn%.delete, query_path, "rf"'),
+      "parser auto-install must repair parser files that were installed without complete query output"
     )
     assert.is_truthy(
       src:match("pcall%(nvim_treesitter%.install, treesitter_parsers, install_opts%)"),
@@ -317,6 +319,113 @@ describe("treesitter main migration", function()
       src:match("report_install_problem") and src:match("if sync_install then%s*error"),
       "synchronous parser bootstrap must fail nvim instead of warning when install cannot be proven"
     )
+  end)
+
+  it("purges explicit parser installs that are missing their managed highlight query", function()
+    local old_tree_sitter = package.loaded["nvim-treesitter"]
+    local old_tree_sitter_config = package.loaded["nvim-treesitter.config"]
+    local old_tree_sitter_parsers = package.loaded["nvim-treesitter.parsers"]
+    local old_sync = vim.env.DOTFILES_TREESITTER_SYNC_INSTALL
+    local old_notify = vim.notify
+    local old_executable = vim.fn.executable
+    local old_stdpath = vim.fn.stdpath
+    local old_get_runtime_file = vim.api.nvim_get_runtime_file
+    local temp_root = vim.fn.tempname()
+    local data_root = vim.fs.joinpath(temp_root, "nvim-data")
+    local parser_dir = vim.fs.joinpath(data_root, "site", "parser")
+    local parser_info_dir = vim.fs.joinpath(data_root, "site", "parser-info")
+    local query_dir = vim.fs.joinpath(data_root, "site", "queries")
+
+    vim.fn.mkdir(parser_dir, "p")
+    vim.fn.mkdir(parser_info_dir, "p")
+    vim.fn.mkdir(vim.fs.joinpath(query_dir, "r"), "p")
+    vim.fn.mkdir(vim.fs.joinpath(query_dir, "php_only"), "p")
+    vim.fn.writefile({ "parser" }, vim.fs.joinpath(parser_dir, "r.so"))
+    vim.fn.writefile({ "parser" }, vim.fs.joinpath(parser_dir, "php_only.so"))
+    vim.fn.writefile({ "revision" }, vim.fs.joinpath(parser_info_dir, "r.revision"))
+    vim.fn.writefile({ "revision" }, vim.fs.joinpath(parser_info_dir, "php_only.revision"))
+    vim.fn.writefile({ "; query-only dependency" }, vim.fs.joinpath(query_dir, "php_only", "locals.scm"))
+
+    package.loaded["nvim-treesitter"] = {
+      install = function()
+        return {
+          wait = function()
+            return true
+          end,
+        }
+      end,
+      indentexpr = function()
+        return 0
+      end,
+    }
+    package.loaded["nvim-treesitter.config"] = {
+      get_install_dir = function(name)
+        return vim.fs.joinpath(data_root, "site", name)
+      end,
+      norm_languages = function()
+        return { "r", "php_only" }
+      end,
+    }
+    package.loaded["nvim-treesitter.parsers"] = {
+      r = { install_info = {} },
+      php_only = { install_info = {} },
+    }
+    vim.env.DOTFILES_TREESITTER_SYNC_INSTALL = "1"
+    vim.notify = function() end
+    vim.fn.executable = function(name)
+      if name == "tree-sitter" then
+        return 1
+      end
+      return old_executable(name)
+    end
+    vim.fn.stdpath = function(name)
+      if name == "data" then
+        return data_root
+      end
+      return old_stdpath(name)
+    end
+    vim.api.nvim_get_runtime_file = function(pattern)
+      if pattern == "queries/r" then
+        return { vim.fs.joinpath(query_dir, "r") }
+      elseif pattern == "queries/php_only" then
+        return { vim.fs.joinpath(query_dir, "php_only") }
+      end
+      return {}
+    end
+
+    local ok, spec = pcall(dofile, repo_root .. "/nvim/lua/plugins/treesitter.lua")
+    local config_ok, config_err = false, nil
+    if ok then
+      config_ok, config_err = pcall(spec[1].config)
+    end
+
+    package.loaded["nvim-treesitter"] = old_tree_sitter
+    package.loaded["nvim-treesitter.config"] = old_tree_sitter_config
+    package.loaded["nvim-treesitter.parsers"] = old_tree_sitter_parsers
+    if old_sync == nil then
+      vim.env.DOTFILES_TREESITTER_SYNC_INSTALL = nil
+    else
+      vim.env.DOTFILES_TREESITTER_SYNC_INSTALL = old_sync
+    end
+    vim.notify = old_notify
+    vim.fn.executable = old_executable
+    vim.fn.stdpath = old_stdpath
+    vim.api.nvim_get_runtime_file = old_get_runtime_file
+
+    local explicit_parser_file = vim.uv.fs_stat(vim.fs.joinpath(parser_dir, "r.so"))
+    local explicit_parser_info = vim.uv.fs_stat(vim.fs.joinpath(parser_info_dir, "r.revision"))
+    local explicit_query_dir = vim.fn.isdirectory(vim.fs.joinpath(query_dir, "r"))
+    local dependency_parser_file = vim.uv.fs_stat(vim.fs.joinpath(parser_dir, "php_only.so"))
+    local dependency_query_dir = vim.fn.isdirectory(vim.fs.joinpath(query_dir, "php_only"))
+    vim.fn.delete(temp_root, "rf")
+
+    assert.is_true(ok)
+    assert.is_true(config_ok, tostring(config_err))
+    assert.is_nil(explicit_parser_file)
+    assert.is_nil(explicit_parser_info)
+    assert.are.equal(0, explicit_query_dir)
+    assert.is_not_nil(dependency_parser_file)
+    assert.are.equal(1, dependency_query_dir)
   end)
 
   it("errors in sync mode when the waitable parser install task reports false", function()

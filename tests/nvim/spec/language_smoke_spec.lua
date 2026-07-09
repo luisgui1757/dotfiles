@@ -88,6 +88,10 @@ describe("language smoke (Tier 1)", function()
       src:find("expected nvim-treesitter query install output missing", 1, true),
       "strict smoke must fail causally when parser queries are incomplete"
     )
+    assert.is_truthy(
+      src:find("expected nvim-treesitter highlight query output missing", 1, true),
+      "strict smoke must fail causally when explicit parser highlight queries are incomplete"
+    )
   end)
 
   it("Tier 2 uses one platform-aware LSP attach timeout helper", function()

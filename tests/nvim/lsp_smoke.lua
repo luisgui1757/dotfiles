@@ -201,6 +201,7 @@ local ok, err = pcall(function()
           fail("treesitter parser NOT supported by nvim-treesitter main: " .. p)
         end
       end
+      local explicit_parser_set = to_set(explicit_parsers)
 
       local expected_managed_parsers = {}
       local expected_managed_parser_set = {}
@@ -254,16 +255,24 @@ local ok, err = pcall(function()
 
       if cfg_ok and type(cfg.get_install_dir) == "function" then
         local missing_queries = {}
+        local missing_highlight_queries = {}
         local install_query_dir = cfg.get_install_dir("queries")
         for _, parser in ipairs(expected_managed_queries) do
-          if vim.fn.isdirectory(vim.fs.joinpath(install_query_dir, parser)) ~= 1 then
+          local parser_query_dir = vim.fs.joinpath(install_query_dir, parser)
+          if vim.fn.isdirectory(parser_query_dir) ~= 1 then
             table.insert(missing_queries, parser)
+          elseif
+            explicit_parser_set[parser] and vim.uv.fs_stat(vim.fs.joinpath(parser_query_dir, "highlights.scm")) == nil
+          then
+            table.insert(missing_highlight_queries, parser)
           end
         end
         if #missing_queries > 0 then
           fail("expected nvim-treesitter query install output missing: " .. table.concat(missing_queries, ", "))
+        elseif #missing_highlight_queries > 0 then
+          fail("expected nvim-treesitter highlight query output missing: " .. table.concat(missing_highlight_queries, ", "))
         else
-          note("all expected nvim-treesitter query install-output directories are present")
+          note("all expected nvim-treesitter query install-output directories/highlights are present")
         end
       end
 
