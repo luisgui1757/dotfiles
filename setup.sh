@@ -98,56 +98,30 @@ if [[ "$ALL" -eq 0 && "$DRY_RUN" -eq 0 && ! -t 0 ]]; then
     set -- "$@" --all
 fi
 
-# ---- Locate / clone the repo -------------------------------------------------
-# When run from stdin, BASH_SOURCE is empty and there is no script_dir. In that
-# case we clone the repo and re-exec ourselves from the clone so all downstream
-# paths resolve correctly.
+# ---- Locate the repo ---------------------------------------------------------
+# Piped/remote setup is intentionally disabled. Running from stdin would execute
+# mutable default-branch code before a local checkout exists, so setup fails
+# closed and tells the user how to clone first.
 SCRIPT_DIR=""
 if [[ -n "${BASH_SOURCE[0]:-}" ]] && [[ -f "${BASH_SOURCE[0]:-}" ]]; then
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 fi
 if [[ -z "$SCRIPT_DIR" ]] || [[ ! -d "$SCRIPT_DIR/home" ]]; then
     DEST="${DOTFILES_DEST:-$DEFAULT_DEST}"
-    if [[ "$UPDATE_MODE" -eq 1 ]]; then
-        if [[ -f "$DEST/setup.sh" && -d "$DEST/home" ]]; then
-            echo "setup.sh --update: using existing checkout at $DEST without git pull."
-            exec bash "$DEST/setup.sh" "$@"
-        fi
-        echo "setup.sh --update needs an existing checkout at $DEST; it does not clone or pull." >&2
-        exit 1
-    fi
-    # DryRun honor: announce what we'd clone and exit BEFORE any git op.
     if [[ "$DRY_RUN" -eq 1 ]]; then
-        echo "setup.sh (remote, dry-run): would clone $REPO_URL -> $DEST"
-        echo "                            then re-invoke ./setup.sh $* from there."
+        echo "setup.sh: no local checkout was detected; remote/piped setup is disabled."
+        echo "  Clone first, then run setup locally:"
+        echo "    git clone $REPO_URL \"$DEST\""
+        echo "    cd \"$DEST\""
+        echo "    ./setup.sh --all"
         echo "(dry run -- no clone, no install, no writes performed)"
-        exit 0
     fi
-    if ! command -v git >/dev/null 2>&1; then
-        git_hint="apt install git"
-        if [[ "$(uname -s)" == "Darwin" ]]; then
-            git_hint="brew install git"
-        fi
-        echo "setup.sh: git is the only prerequisite for remote setup, and it is required to clone the repo." >&2
-        echo "setup.sh: install git first: $git_hint" >&2
-        exit 1
-    fi
-    if [[ -d "$DEST/.git" ]]; then
-        echo "Repo already cloned at $DEST. Pulling latest."
-        if ! git -C "$DEST" pull --ff-only; then
-            echo "setup.sh: 'git pull --ff-only' failed in $DEST; refusing to run against a stale checkout." >&2
-            exit 1
-        fi
-    else
-        echo "Cloning $REPO_URL -> $DEST"
-        if ! git clone "$REPO_URL" "$DEST"; then
-            echo "setup.sh: 'git clone' of $REPO_URL failed; cannot continue." >&2
-            exit 1
-        fi
-    fi
-    echo
-    echo "Re-invoking setup.sh from the clone."
-    exec bash "$DEST/setup.sh" "$@"
+    echo "setup.sh must be run from a local clone. Remote/piped clone-and-reinvoke setup is disabled because it would execute mutable default-branch code." >&2
+    echo "Clone first, then run setup locally:" >&2
+    echo "  git clone $REPO_URL \"$DEST\"" >&2
+    echo "  cd \"$DEST\"" >&2
+    echo "  ./setup.sh --all" >&2
+    exit 1
 fi
 
 cd "$SCRIPT_DIR"

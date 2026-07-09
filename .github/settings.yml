@@ -25,7 +25,7 @@ branches:
           - nix flake check (macos-26)
           - e2e containers / ubuntu-24.04
           - setup.sh / ubuntu-24.04
-          - setup.sh / macos-15
+          - setup.sh / macos-26
           - setup.ps1 / windows-2025
       enforce_admins: true
       # The split repository rulesets in .github/rulesets are canonical. Classic

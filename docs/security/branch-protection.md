@@ -60,8 +60,9 @@ Expected live posture:
 - auto-merge disabled;
 - required checks are strict and include exactly:
   `ubuntu`, `macos`, `windows`, `chezmoi-parity`, `chezmoi-parity-macos`,
-  `chezmoi-parity-windows`, `e2e containers / ubuntu-24.04`,
-  `setup.sh / ubuntu-24.04`, `setup.sh / macos-15`, and
+  `chezmoi-parity-windows`, `nix flake check (ubuntu-24.04)`,
+  `nix flake check (macos-26)`, `e2e containers / ubuntu-24.04`,
+  `setup.sh / ubuntu-24.04`, `setup.sh / macos-26`, and
   `setup.ps1 / windows-2025` in both the integrity ruleset and classic fallback;
 - only `Protect main: review` and `Protect main: owner updates` have bypass actors;
 - each bypass actor is `luisgui1757` with `bypass_mode: pull_request`;

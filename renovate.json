@@ -166,6 +166,18 @@
     },
     {
       "customType": "regex",
+      "description": "Scoop installer script commit pinned to the current main branch digest. The adjacent installer script SHA-256 must be recomputed manually after Renovate bumps this.",
+      "managerFilePatterns": ["/^install-deps\\.ps1$/"],
+      "matchStrings": [
+        "\\$ScoopInstallerCommit\\s*=\\s*'(?<currentDigest>[a-f0-9]{40})'\\s+\\$ScoopInstallerSha256\\s*=\\s*'[a-f0-9]{64}'"
+      ],
+      "currentValueTemplate": "main",
+      "depNameTemplate": "ScoopInstaller/Install",
+      "packageNameTemplate": "https://github.com/ScoopInstaller/Install",
+      "datasourceTemplate": "git-refs"
+    },
+    {
+      "customType": "regex",
       "description": "chezmoi Linux x86_64 release version. Adjacent Linux asset SHA-256 values must be recomputed manually after Renovate bumps this.",
       "managerFilePatterns": ["/^install-deps\\.sh$/"],
       "matchStrings": [
@@ -251,6 +263,50 @@
       "depNameTemplate": "starship/starship",
       "datasourceTemplate": "github-releases",
       "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "description": "setuptools version for the pinned pylatexenc build backend on Unix. The adjacent wheel SHA-256 must be recomputed manually after Renovate bumps this.",
+      "managerFilePatterns": ["/^install-deps\\.sh$/"],
+      "matchStrings": [
+        "PYLATEXENC_BUILD_BACKEND_VERSION=\"(?<currentValue>[^\"]+)\"\\s+PYLATEXENC_BUILD_BACKEND_SHA256=\"[a-f0-9]{64}\""
+      ],
+      "depNameTemplate": "setuptools",
+      "datasourceTemplate": "pypi",
+      "versioningTemplate": "pep440"
+    },
+    {
+      "customType": "regex",
+      "description": "setuptools version for the pinned pylatexenc build backend on Windows. The adjacent wheel SHA-256 must be recomputed manually after Renovate bumps this.",
+      "managerFilePatterns": ["/^install-deps\\.ps1$/"],
+      "matchStrings": [
+        "\\$PylatexencBuildBackendVersion\\s*=\\s*'(?<currentValue>[^']+)'\\s+\\$PylatexencBuildBackendSha256\\s*=\\s*'[a-f0-9]{64}'"
+      ],
+      "depNameTemplate": "setuptools",
+      "datasourceTemplate": "pypi",
+      "versioningTemplate": "pep440"
+    },
+    {
+      "customType": "regex",
+      "description": "pylatexenc version for the latex2text converter on Unix. The adjacent source SHA-256 must be recomputed manually after Renovate bumps this.",
+      "managerFilePatterns": ["/^install-deps\\.sh$/"],
+      "matchStrings": [
+        "PYLATEXENC_VERSION=\"(?<currentValue>[^\"]+)\"\\s+PYLATEXENC_SHA256=\"[a-f0-9]{64}\""
+      ],
+      "depNameTemplate": "pylatexenc",
+      "datasourceTemplate": "pypi",
+      "versioningTemplate": "pep440"
+    },
+    {
+      "customType": "regex",
+      "description": "pylatexenc version for the latex2text converter on Windows. The adjacent source SHA-256 must be recomputed manually after Renovate bumps this.",
+      "managerFilePatterns": ["/^install-deps\\.ps1$/"],
+      "matchStrings": [
+        "\\$PylatexencVersion\\s*=\\s*'(?<currentValue>[^']+)'\\s+\\$PylatexencSha256\\s*=\\s*'[a-f0-9]{64}'"
+      ],
+      "depNameTemplate": "pylatexenc",
+      "datasourceTemplate": "pypi",
+      "versioningTemplate": "pep440"
     },
     {
       "customType": "regex",

@@ -577,7 +577,9 @@ function Get-CommandVersionString {
                 $ver = (Get-Item -LiteralPath $src).VersionInfo.ProductVersion
                 if (-not [string]::IsNullOrWhiteSpace($ver)) { return ([string]$ver).Trim() }
             }
-        } catch { }
+        } catch {
+            Write-Verbose ("Could not read Windows Terminal file version: " + $_.Exception.Message)
+        }
         return 'installed'
     }
 
@@ -1821,6 +1823,7 @@ function Install-HackNerdFont {
         Write-Host "             (you may need to restart your terminal to see them)"
     } catch {
         Write-Warning ("Hack Nerd Font install failed: " + $_.Exception.Message)
+        $script:InstallFailures += [pscustomobject]@{ Tool = 'Hack Nerd Font'; Pm = 'direct'; Pkg = 'Hack.zip'; ExitCode = 'exception' }
         Write-Host  "  manual    download Hack.zip from nerd-fonts releases and install via the Fonts control panel."
     } finally {
         if ($tmp) {
@@ -2273,6 +2276,7 @@ function Set-VSCodeTheme {
             return
         } catch {
             # Not strict JSON (e.g. trailing commas) -- fall through to the JSONC editor.
+            Write-Verbose ("VS Code settings strict JSON parse failed; using JSONC editor: " + $_.Exception.Message)
         }
     }
     $timestamp = Get-Date -Format 'yyyyMMddHHmmssfff'
@@ -2682,7 +2686,9 @@ function Add-NpmGlobalPrefixToPath {
         if (-not [string]::IsNullOrWhiteSpace($dir) -and (Test-Path -LiteralPath $dir -PathType Container)) {
             Add-DirectoryToUserPath -Directory $dir
         }
-    } catch { }
+    } catch {
+        Write-Verbose ("Could not add npm global prefix to PATH: " + $_.Exception.Message)
+    }
 }
 
 function Install-PiCli {
@@ -2765,6 +2771,60 @@ function Get-VsBuildToolsInstallationPath {
     return ''
 }
 
+function Test-VsBuildToolsBootstrapperSignature {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [scriptblock]$SignatureGetter
+    )
+
+    if (-not $SignatureGetter) {
+        $SignatureGetter = {
+            param([string]$CandidatePath)
+            Get-AuthenticodeSignature -FilePath $CandidatePath
+        }
+    }
+
+    try {
+        $signature = & $SignatureGetter $Path
+    } catch {
+        Write-Warning ("VS Build Tools bootstrapper signature check failed: " + $_.Exception.Message)
+        return $false
+    }
+
+    if ($null -eq $signature -or [string]$signature.Status -ne 'Valid') {
+        $status = if ($null -eq $signature) { 'missing' } else { [string]$signature.Status }
+        Write-Warning "VS Build Tools bootstrapper Authenticode status is $status, expected Valid."
+        return $false
+    }
+
+    $signer = $signature.SignerCertificate
+    if ($null -eq $signer) {
+        Write-Warning "VS Build Tools bootstrapper has a Valid signature but no signer certificate."
+        return $false
+    }
+
+    $signerText = @([string]$signer.Subject, [string]$signer.Issuer) -join "`n"
+    $chainText = @()
+    if ($signature.Path) {
+        foreach ($cert in @($signature.Path)) {
+            if ($cert) {
+                $chainText += [string]$cert.Subject
+                $chainText += [string]$cert.Issuer
+            }
+        }
+    }
+    $allCertificateText = (@($signerText) + $chainText) -join "`n"
+
+    $signerIsMicrosoft = $signerText -match '(?i)(CN|O)=Microsoft Corporation|Microsoft Corporation'
+    $chainIsMicrosoft = $allCertificateText -match '(?i)Microsoft (Code Signing PCA|Corporation|Root|Windows)'
+    if (-not ($signerIsMicrosoft -and $chainIsMicrosoft)) {
+        Write-Warning "VS Build Tools bootstrapper signer/chain is not recognized as Microsoft-owned."
+        return $false
+    }
+
+    return $true
+}
+
 function Install-VsBuildTools {
     $existingPath = Get-VsBuildToolsInstallationPath
     if (-not [string]::IsNullOrWhiteSpace($existingPath)) {
@@ -2778,6 +2838,7 @@ function Install-VsBuildTools {
         Write-Host "  would:    winget install --id $wingetId -e --accept-package-agreements --accept-source-agreements --override `"$override`""
         Write-Host "  would:    choco install -y visualstudio2022buildtools; choco install -y visualstudio2022-workload-vctools"
         Write-Host "  would:    download $VsBuildToolsBootstrapperUrl"
+        Write-Host "  would:    verify Authenticode signer and Microsoft-owned certificate chain"
         Write-Host "  would:    vs_BuildTools.exe $override"
         return
     }
@@ -2825,7 +2886,7 @@ function Install-VsBuildTools {
 function Install-VsBuildToolsFromBootstrapper {
     $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) ("dotfiles-vs-buildtools-" + [System.Guid]::NewGuid())
     $installer = Join-Path $tempDir 'vs_BuildTools.exe'
-    $args = @(
+    $bootstrapArgs = @(
         '--quiet',
         '--wait',
         '--norestart',
@@ -2837,12 +2898,15 @@ function Install-VsBuildToolsFromBootstrapper {
     try {
         New-Item -ItemType Directory -Force -Path $tempDir | Out-Null
         Invoke-WebRequest -Uri $VsBuildToolsBootstrapperUrl -OutFile $installer -UseBasicParsing -ErrorAction Stop
+        if (-not (Test-VsBuildToolsBootstrapperSignature -Path $installer)) {
+            return 1
+        }
 
-        $process = Start-Process -FilePath $installer -ArgumentList $args -Wait -PassThru
+        $process = Start-Process -FilePath $installer -ArgumentList $bootstrapArgs -Wait -PassThru
         $exitCode = [int]$process.ExitCode
         if ($exitCode -eq 740 -and -not (Test-IsElevated)) {
             Write-Host "  note      VS Build Tools requires elevation; requesting UAC for the Microsoft bootstrapper."
-            $process = Start-Process -FilePath $installer -ArgumentList $args -Wait -PassThru -Verb RunAs
+            $process = Start-Process -FilePath $installer -ArgumentList $bootstrapArgs -Wait -PassThru -Verb RunAs
             $exitCode = [int]$process.ExitCode
         }
         return $exitCode

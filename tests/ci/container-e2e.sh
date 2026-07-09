@@ -45,6 +45,12 @@ assert_dir_resolves() {
     [[ "$actual" == "$expected" ]] || fail "$1 resolves to $actual, expected $expected"
 }
 
+assert_tool_runs() {
+    local cmd="$1"; shift
+    command -v "$cmd" >/dev/null 2>&1 || fail "$cmd is not on PATH"
+    "$cmd" "$@" >/dev/null 2>&1 || fail "$cmd $* failed"
+}
+
 if [[ "${1:-}" == "--as-user" ]]; then
     cd "$HOME/dotfiles" || fail "repo copy missing at $HOME/dotfiles"
 
@@ -74,15 +80,28 @@ if [[ "${1:-}" == "--as-user" ]]; then
     run_and_capture "chezmoi apply" "$HOME/chezmoi-apply.log" \
         chezmoi --source "$repo/home" --no-tty --force apply
 
-    for cmd in nvim rg fd fzf tmux zsh git lazygit tree-sitter cmake lsd zoxide gh wezterm herdr; do
-        command -v "$cmd" >/dev/null 2>&1 || fail "$cmd is not on PATH"
-    done
+    assert_tool_runs rg --version
+    assert_tool_runs fd --version
+    assert_tool_runs fzf --version
+    assert_tool_runs tmux -V
+    assert_tool_runs zsh --version
+    assert_tool_runs git --version
+    assert_tool_runs lazygit --version
+    assert_tool_runs tree-sitter --version
+    assert_tool_runs cmake --version
+    assert_tool_runs lsd --version
+    assert_tool_runs zoxide --version
+    assert_tool_runs gh --version
+    assert_tool_runs wezterm --version
+    assert_tool_runs herdr --version
+    assert_tool_runs pi --version
 
     nvim_line="$(nvim --version | head -n 1)"
     case "$nvim_line" in
         "NVIM v0.12"* | "NVIM v1."*) ;;
         *) fail "nvim version is below 0.12: $nvim_line" ;;
     esac
+    [[ "$(pi --version)" == "0.80.3" ]] || fail "pi version is not pinned 0.80.3"
 
     assert_dir_resolves "$HOME/.config/nvim" "$repo/nvim"
     assert_file_content "$HOME/.config/nvim/init.lua" "$repo/nvim/init.lua"

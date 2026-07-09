@@ -2,7 +2,7 @@
 
 Status: **HISTORICAL REFERENCE.** This handoff records the investigation that
 rejected the "zig fixed tree-sitter" hypothesis. The current implementation has
-since moved beyond the original open-questions state: setup now has five phases
+since moved beyond the original open-questions state: setup now has six phases
 with an explicit synchronous Tree-sitter parser install phase, the sync path
 requires the waitable `nvim-treesitter` install task to return `true`, and the
 current canonical contract lives in `CLAUDE.md` plus `README.md`.

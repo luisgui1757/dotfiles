@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC1091,SC2329
 # setup.sh enforces the Home Manager package layer on Linux/WSL by default.
 # Prove: default --all invokes the switch; dry-run only PREVIEWS; --skip-deps is
 # the explicit already-provisioned escape even when paired with the compatibility

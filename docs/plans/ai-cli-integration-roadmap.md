@@ -1,6 +1,12 @@
 # Roadmap: AI-CLI integration (Polaris + Pi) into dotfiles
 
-Status: **PLANNED — not implemented.** Reconciled with a Codex 5.5 xhigh second
+Status: **SUPERSEDED HISTORICAL PLAN.** The shipped dotfiles/Polaris path now
+uses the pinned Polaris checkout plus the repo's current installer behavior.
+Do not follow the older "NO Git-Bash / NO cygpath" guidance below as current
+dotfiles implementation truth; verify against `setup.sh`, `setup.ps1`,
+`install-deps.sh`, `install-deps.ps1`, `README.md`, and `CLAUDE.md` instead.
+
+Originally planned as: **PLANNED — not implemented.** Reconciled with a Codex 5.5 xhigh second
 opinion (no vendor, no submodule, npm-only Pi, after the pilot migration branch merges) and
 then **superseding the Git-Bash mechanism** per the owner's call: instead of
 shelling Polaris's bash installer through Git-Bash on Windows, **Polaris gains a

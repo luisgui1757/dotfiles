@@ -98,9 +98,30 @@ for arg in "$@"; do
     esac
 done
 [[ "$EXPERIMENTAL_WSL_GUI" == "1" ]] || EXPERIMENTAL_WSL_GUI=0
+INSTALL_FAILURES_COUNT=0
+INSTALL_FAILURES_DETAIL=""
 
 # ---- Bash 3.2-safe helpers ---------------------------------------------------
 have() { command -v "$1" >/dev/null 2>&1; }
+
+record_install_failure() {
+    local tool="$1" manager="$2" pkg="$3" rc="${4:-1}"
+    [[ "$DRY_RUN" -eq 1 ]] && return 0
+    INSTALL_FAILURES_COUNT=$((INSTALL_FAILURES_COUNT + 1))
+    INSTALL_FAILURES_DETAIL="${INSTALL_FAILURES_DETAIL}  FAIL: ${tool} via ${manager} (${pkg}) exit=${rc}"$'\n'
+}
+
+exit_if_install_failures() {
+    if [[ "$INSTALL_FAILURES_COUNT" -eq 0 ]]; then
+        return 0
+    fi
+    echo
+    printf "install-deps: %s accepted install path(s) failed:\n" "$INSTALL_FAILURES_COUNT" >&2
+    printf "%s" "$INSTALL_FAILURES_DETAIL" >&2
+    echo "install-deps: failing so setup cannot report success after blocked dependency installs." >&2
+    exit 1
+}
+
 # Idempotently prepend ~/.local/bin to PATH for THIS process (pinned binaries,
 # pip --user, and chezmoi all land there). Safe to call repeatedly.
 ensure_local_bin_on_path() {
@@ -1505,8 +1526,13 @@ ensure_python_pip_venv() {
                 echo "  would:    apt-get install -y python3-venv python3-pip"
                 return
             fi
-            native_linux_pm_install apt python3-venv python3-pip \
-                || echo "  FAIL: python3-venv/python3-pip install failed (Mason PyPI tools will not build)"
+            if native_linux_pm_install apt python3-venv python3-pip; then
+                :
+            else
+                local rc=$?
+                record_install_failure "python venv/pip" apt "python3-venv python3-pip" "$rc"
+                echo "  FAIL: python3-venv/python3-pip install failed (Mason PyPI tools will not build)"
+            fi
             ;;
         dnf|zypper)
             if ! ask "Install python3-pip (Mason PyPI tools need it)?"; then
@@ -1517,8 +1543,13 @@ ensure_python_pip_venv() {
                 echo "  would:    install python3-pip"
                 return
             fi
-            native_linux_pm_install "$native_pm" python3-pip \
-                || echo "  WARN: python3-pip install failed; continuing"
+            if native_linux_pm_install "$native_pm" python3-pip; then
+                :
+            else
+                local rc=$?
+                record_install_failure "python venv/pip" "$native_pm" "python3-pip" "$rc"
+                echo "  FAIL: python3-pip install failed; continuing to collect install failures"
+            fi
             ;;
         *)
             printf "  manual    %-26s install your distro python3-venv + python3-pip\n" "python venv/pip"
@@ -1647,8 +1678,13 @@ ensure_npm() {
                 echo "  would:    apt-get install -y npm"
                 return
             fi
-            native_linux_pm_install apt npm \
-                || echo "  FAIL: npm install failed (Mason npm tools will not build)"
+            if native_linux_pm_install apt npm; then
+                :
+            else
+                local rc=$?
+                record_install_failure "npm" apt "npm" "$rc"
+                echo "  FAIL: npm install failed (Mason npm tools will not build)"
+            fi
             ;;
         dnf|pacman|zypper)
             if ! ask "Install npm (Mason npm tools need it)?"; then
@@ -1659,8 +1695,13 @@ ensure_npm() {
                 echo "  would:    install npm via $native_pm"
                 return
             fi
-            native_linux_pm_install "$native_pm" npm \
-                || echo "  WARN: npm install failed; continuing"
+            if native_linux_pm_install "$native_pm" npm; then
+                :
+            else
+                local rc=$?
+                record_install_failure "npm" "$native_pm" "npm" "$rc"
+                echo "  FAIL: npm install failed; continuing to collect install failures"
+            fi
             ;;
         *)
             printf "  manual    %-26s install your distro npm package\n" "npm"
@@ -1942,6 +1983,7 @@ install_zsh_plugins() {
         "$ZSH_AUTOSUGGESTIONS_COMMIT" \
         "zsh-autosuggestions.zsh" || rc=1
     if [[ "$rc" -ne 0 ]]; then
+        record_install_failure "zsh plugins" git "fzf-tab/zsh-autosuggestions" "$rc"
         printf "  FAIL: %-26s one or more pinned zsh plugins failed to install\n" "zsh plugins" >&2
     fi
     return 0
@@ -2010,6 +2052,8 @@ install_gh_dash_extension() {
             printf "  installed %-26s %s\n" "gh-dash" "$GH_DASH_VERSION"
         fi
     else
+        local rc=$?
+        record_install_failure "gh-dash" gh "dlvhdr/gh-dash@$GH_DASH_VERSION" "$rc"
         printf "  FAIL: %-26s gh extension install dlvhdr/gh-dash --pin %s failed\n" "gh-dash" "$GH_DASH_VERSION" >&2
     fi
     return 0
@@ -2163,7 +2207,13 @@ install_ghostty_macos() {
         echo "  would: brew install --cask ghostty"
         return
     fi
-    brew install --cask ghostty || echo "  WARN: ghostty cask install failed"
+    if brew install --cask ghostty; then
+        :
+    else
+        local rc=$?
+        record_install_failure "ghostty" brew "cask:ghostty" "$rc"
+        echo "  FAIL: ghostty cask install failed; continuing to collect install failures"
+    fi
 }
 
 install_wezterm_macos() {
@@ -2179,7 +2229,13 @@ install_wezterm_macos() {
         echo "  would: brew install --cask wezterm"
         return
     fi
-    brew install --cask wezterm || echo "  WARN: wezterm cask install failed"
+    if brew install --cask wezterm; then
+        :
+    else
+        local rc=$?
+        record_install_failure "wezterm" brew "cask:wezterm" "$rc"
+        echo "  FAIL: wezterm cask install failed; continuing to collect install failures"
+    fi
 }
 
 # AeroSpace: i3-like tiling WM, macOS only. Official tap cask (nikitabobko/tap).
@@ -2197,7 +2253,13 @@ install_aerospace_macos() {
         echo "  would: brew install --cask nikitabobko/tap/aerospace"
         return
     fi
-    brew install --cask nikitabobko/tap/aerospace || echo "  WARN: aerospace cask install failed"
+    if brew install --cask nikitabobko/tap/aerospace; then
+        :
+    else
+        local rc=$?
+        record_install_failure "aerospace" brew "cask:nikitabobko/tap/aerospace" "$rc"
+        echo "  FAIL: aerospace cask install failed; continuing to collect install failures"
+    fi
     echo "  note: grant AeroSpace Accessibility permission (System Settings ->"
     echo "        Privacy & Security -> Accessibility). This TCC grant is unscriptable."
 }
@@ -2231,7 +2293,6 @@ shellcheck|shellcheck|shellcheck|ShellCheck|shellcheck|ShellCheck|shellcheck
 jq|jq|jq|jq|jq|jq|jq
 gh|gh|gh|gh|github-cli|gh|github-cli
 herdr|herdr|||||
-bats|bats-core|bats|bats|bats|bats|bats
 hyperfine|hyperfine|hyperfine|hyperfine|hyperfine|hyperfine|hyperfine
 taplo|taplo|||taplo-cli||
 yamllint|yamllint|yamllint|yamllint|yamllint|yamllint|yamllint
@@ -3232,27 +3293,57 @@ install_c_toolchain_linux() {
     case "$native_pm" in
         apt)
             if ask "Install C compiler toolchain (build-essential)?"; then
-                native_linux_pm_install apt build-essential || echo "  WARN: C compiler install failed; continuing"
+                if native_linux_pm_install apt build-essential; then
+                    :
+                else
+                    local rc=$?
+                    record_install_failure "C compiler" apt "build-essential" "$rc"
+                    echo "  FAIL: C compiler install failed; continuing to collect install failures"
+                fi
             fi
             ;;
         dnf)
             if ask "Install C compiler toolchain (gcc gcc-c++ make)?"; then
-                native_linux_pm_install dnf gcc gcc-c++ make || echo "  WARN: C compiler install failed; continuing"
+                if native_linux_pm_install dnf gcc gcc-c++ make; then
+                    :
+                else
+                    local rc=$?
+                    record_install_failure "C compiler" dnf "gcc gcc-c++ make" "$rc"
+                    echo "  FAIL: C compiler install failed; continuing to collect install failures"
+                fi
             fi
             ;;
         pacman)
             if ask "Install C compiler toolchain (base-devel)?"; then
-                native_linux_pm_install pacman base-devel || echo "  WARN: C compiler install failed; continuing"
+                if native_linux_pm_install pacman base-devel; then
+                    :
+                else
+                    local rc=$?
+                    record_install_failure "C compiler" pacman "base-devel" "$rc"
+                    echo "  FAIL: C compiler install failed; continuing to collect install failures"
+                fi
             fi
             ;;
         zypper)
             if ask "Install C compiler toolchain (gcc gcc-c++ make)?"; then
-                native_linux_pm_install zypper gcc gcc-c++ make || echo "  WARN: C compiler install failed; continuing"
+                if native_linux_pm_install zypper gcc gcc-c++ make; then
+                    :
+                else
+                    local rc=$?
+                    record_install_failure "C compiler" zypper "gcc gcc-c++ make" "$rc"
+                    echo "  FAIL: C compiler install failed; continuing to collect install failures"
+                fi
             fi
             ;;
         apk)
             if ask "Install C compiler toolchain (build-base)?"; then
-                native_linux_pm_install apk build-base || echo "  WARN: C compiler install failed; continuing"
+                if native_linux_pm_install apk build-base; then
+                    :
+                else
+                    local rc=$?
+                    record_install_failure "C compiler" apk "build-base" "$rc"
+                    echo "  FAIL: C compiler install failed; continuing to collect install failures"
+                fi
             fi
             ;;
         *)
@@ -3296,7 +3387,13 @@ install() {
     fi
     if ask "Install $tool${purpose:+ ($purpose)}?"; then
         # shellcheck disable=SC2086  # $pkg may carry cask flags on brew
-        pm_install $pkg || echo "  WARN: $tool install failed; continuing"
+        if pm_install $pkg; then
+            :
+        else
+            local rc=$?
+            record_install_failure "$tool" "$PM" "$pkg" "$rc"
+            printf "  FAIL: %-26s install failed; continuing to collect install failures\n" "$tool" >&2
+        fi
         # Post-install fix for fd-find on apt (binary lands as 'fdfind',
         # not 'fd'). Telescope's find_files uses fd by default.
         if [[ "$tool" == "fd" ]] && [[ "$PM" == "apt" ]] && ! have fd && have fdfind; then
@@ -3341,7 +3438,13 @@ install_nerd_font() {
             if [[ "$DRY_RUN" -eq 1 ]]; then
                 echo "  would: brew install --cask font-hack-nerd-font"
             else
-                brew install --cask font-hack-nerd-font || echo "  WARN: cask install failed"
+                if brew install --cask font-hack-nerd-font; then
+                    :
+                else
+                    local rc=$?
+                    record_install_failure "Hack Nerd Font" brew "cask:font-hack-nerd-font" "$rc"
+                    echo "  FAIL: Hack Nerd Font cask install failed; continuing to collect install failures"
+                fi
             fi
         fi
         return
@@ -3350,13 +3453,17 @@ install_nerd_font() {
         printf "  skipped   %-26s\n" "Hack Nerd Font"
         return
     fi
-    require_downloader || return 1
+    if ! require_downloader; then
+        record_install_failure "Hack Nerd Font" direct "Hack.zip" "downloader"
+        return 0
+    fi
     if ! have_any unzip bsdtar; then
         echo "  need      unzip missing; installing extractor for Hack Nerd Font"
         install unzip "extract Hack Nerd Font archive"
         if [[ "$DRY_RUN" -ne 1 ]] && ! have_any unzip bsdtar; then
             echo "  FAIL: need 'unzip' or 'bsdtar' to extract the font archive"
-            return 1
+            record_install_failure "Hack Nerd Font" direct "Hack.zip" "missing-extractor"
+            return 0
         fi
     fi
     local url
@@ -3373,22 +3480,26 @@ install_nerd_font() {
     trap 'rm -rf "$tmp"; trap - RETURN' RETURN
     if ! curl -fL -o "$tmp/Hack.zip" "$url"; then
         echo "  FAIL: download failed; install Hack Nerd Font manually from nerd-fonts releases"
-        rm -rf "$tmp"; return 1
+        record_install_failure "Hack Nerd Font" direct "Hack.zip" "download"
+        rm -rf "$tmp"; return 0
     fi
     if ! verify_sha256 "$tmp/Hack.zip" "$HACK_NERD_FONT_SHA256"; then
         echo "  FAIL: checksum mismatch for Hack.zip"
-        rm -rf "$tmp"; return 1
+        record_install_failure "Hack Nerd Font" direct "Hack.zip" "sha256"
+        rm -rf "$tmp"; return 0
     fi
     mkdir -p "$font_dir"
     if have unzip; then
         if ! unzip -oq "$tmp/Hack.zip" -d "$font_dir"; then
             echo "  FAIL: could not extract Hack.zip"
-            return 1
+            record_install_failure "Hack Nerd Font" direct "Hack.zip" "extract"
+            return 0
         fi
     else
         if ! bsdtar -xf "$tmp/Hack.zip" -C "$font_dir"; then
             echo "  FAIL: could not extract Hack.zip"
-            return 1
+            record_install_failure "Hack Nerd Font" direct "Hack.zip" "extract"
+            return 0
         fi
     fi
     rm -rf "$tmp"
@@ -3802,7 +3913,6 @@ install_dependency_scan_items() {
         "tree-sitter|command|tree-sitter" \
         "shellcheck|command|shellcheck" \
         "jq|command|jq" \
-        "bats|command|bats" \
         "hyperfine|command|hyperfine" \
         "taplo|command|taplo" \
         "yamllint|command|yamllint" \
@@ -4107,7 +4217,6 @@ install shellcheck "shell script linter"
 install jq "JSON CLI, general-purpose tool used by many scripts"
 install gh "GitHub CLI (gh); also required by the gh-dash PR/issue dashboard"
 install_gh_dash_extension
-install bats "bats-core, for optional local shell tests"
 install hyperfine "starship prompt perf test"
 install taplo "TOML linter"
 install yamllint "YAML linter"
@@ -4116,6 +4225,7 @@ install editorconfig-checker
 section "notes / Obsidian vault (optional)"
 configure_notes_vault
 
+exit_if_install_failures
 echo
 echo "install-deps: done"
 if [[ "$DRY_RUN" -eq 1 ]]; then echo "(dry run -- nothing was installed)"; fi

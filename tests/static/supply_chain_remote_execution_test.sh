@@ -8,6 +8,7 @@ python3 - <<'PY'
 import pathlib
 import re
 import sys
+import os
 
 root = pathlib.Path(".")
 
@@ -213,12 +214,17 @@ for path in scan_files:
 scan_suffixes = {".bat", ".cmd", ".ps1", ".psm1", ".sh", ".wsb", ".yaml", ".yml"}
 excluded_roots = {
     pathlib.Path(".git"),
+    pathlib.Path(".claude"),
+    pathlib.Path(".codex"),
+    pathlib.Path(".pi"),
     pathlib.Path("docs/archive"),
+    pathlib.Path("docs/reviews"),
     pathlib.Path("node_modules"),
     pathlib.Path("tests/.cache"),
 }
 excluded_files = {
     pathlib.Path("tests/static/supply_chain_remote_execution_test.sh"),
+    pathlib.Path("tests/static/setup_local_only_test.sh"),
 }
 
 
@@ -229,14 +235,19 @@ def is_excluded(path):
     )
 
 
-scan_paths = sorted(
-    (
-        path
-        for path in root.rglob("*")
-        if path.is_file() and path.suffix in scan_suffixes
-    ),
-    key=lambda path: path.as_posix(),
-)
+scan_paths = []
+excluded_root_names = {path.as_posix() for path in excluded_roots}
+for dirpath, dirnames, filenames in os.walk(root):
+    current = pathlib.Path(dirpath)
+    dirnames[:] = [
+        dirname for dirname in dirnames
+        if (current / dirname).as_posix() not in excluded_root_names
+    ]
+    for filename in filenames:
+        path = current / filename
+        if path.suffix in scan_suffixes:
+            scan_paths.append(path)
+scan_paths = sorted(scan_paths, key=lambda path: path.as_posix())
 for path in scan_paths:
     if is_excluded(path):
         continue
@@ -260,10 +271,23 @@ for path in scan_paths:
         text = "\n".join(lines)
         for match in re.finditer(r"Invoke-WebRequest\b[^\n]*-OutFile\s+\$([A-Za-z_][A-Za-z0-9_]*)[^\n]*", text, re.IGNORECASE):
             variable = match.group(1)
-            exec_match = re.search(rf"(?m)^\s*&\s+\${re.escape(variable)}(\s|$)", text[match.end():], re.IGNORECASE)
-            if exec_match and not re.search(rf"Test-FileSha256\s+\${re.escape(variable)}\b", text[match.end():match.end() + exec_match.start()], re.IGNORECASE):
+            tail = text[match.end():]
+            exec_match = re.search(
+                rf"(?m)^\s*(?:&\s+\${re.escape(variable)}(\s|$)|Start-Process\b[^\n]*-FilePath\s+\${re.escape(variable)}\b)",
+                tail,
+                re.IGNORECASE,
+            )
+            if not exec_match:
+                continue
+            intervening = tail[:exec_match.start()]
+            verified = re.search(
+                rf"(?:Test-FileSha256\s+\${re.escape(variable)}\b|Test-[A-Za-z0-9]+Signature\b[^\n]*-Path\s+\${re.escape(variable)}\b|Get-AuthenticodeSignature\b[^\n]*-FilePath\s+\${re.escape(variable)}\b)",
+                intervening,
+                re.IGNORECASE,
+            )
+            if not verified:
                 failures.append(
-                    f"{path}: downloaded PowerShell script ${variable} is executed without an intervening Test-FileSha256 check"
+                    f"{path}: downloaded PowerShell payload ${variable} is executed without an intervening hash or signature check"
                 )
 
 for key in sorted(set(allowlist) - seen_allowlist):

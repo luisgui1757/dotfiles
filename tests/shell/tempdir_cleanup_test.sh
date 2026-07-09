@@ -70,9 +70,10 @@ YES_ALL=1
 DRY_RUN=0
 PM=apt
 install_nerd_font
+exit_if_install_failures
 BASH
 then
-    fail "install_nerd_font succeeded despite failing unzip"
+    fail "install_nerd_font final summary succeeded despite failing unzip"
 fi
 assert_tmp_empty "$font_root/tmp"
 

@@ -80,6 +80,36 @@ function Update-RuntimePath {
     $env:PATH = ($parts | Where-Object { $_ -and $seen.Add($_) }) -join ';'
 }
 
+function Stop-SetupWithExitCode {
+    param([int]$ExitCode)
+    exit $ExitCode
+}
+
+function Invoke-DependencyInstallerOrFail {
+    param(
+        [scriptblock]$Runner,
+        [string]$Path,
+        [hashtable]$Arguments,
+        [string]$Label = 'install-deps.ps1'
+    )
+
+    if (-not $Runner) {
+        $Runner = {
+            param([string]$InstallerPath, [hashtable]$InstallerArguments)
+            & $InstallerPath @InstallerArguments
+        }
+    }
+
+    $global:LASTEXITCODE = 0
+    & $Runner $Path $Arguments
+    $exitCode = $LASTEXITCODE
+    if ($null -eq $exitCode) { $exitCode = 0 }
+    if ([int]$exitCode -ne 0) {
+        Write-Host ("  FAIL: {0} exited {1}; setup cannot continue after dependency install failures." -f $Label, $exitCode) -ForegroundColor Red
+        Stop-SetupWithExitCode ([int]$exitCode)
+    }
+}
+
 function Get-VsWherePath {
     $programFilesX86 = ${env:ProgramFiles(x86)}
     if ([string]::IsNullOrWhiteSpace($programFilesX86)) { return '' }
@@ -169,55 +199,27 @@ if ((-not [Environment]::UserInteractive -or $inputRedirected -or $outputRedirec
     $PSBoundParameters['All'] = $true
 }
 
-# ---- Locate / clone the repo -------------------------------------------------
-# When piped from `irm | iex` there is no $PSCommandPath, so we clone and
-# re-invoke from the clone.
+# ---- Locate the repo ---------------------------------------------------------
+# Piped/remote setup is intentionally disabled. Running from stdin would execute
+# mutable default-branch code before a local checkout exists, so setup fails
+# closed and tells the user how to clone first.
 $ScriptDir = $null
 if ($PSCommandPath -and (Test-Path -LiteralPath $PSCommandPath)) {
     $ScriptDir = Split-Path -Parent $PSCommandPath
 }
 if (-not $ScriptDir -or -not (Test-Path (Join-Path $ScriptDir 'home'))) {
     $dest = if ($env:DOTFILES_DEST) { $env:DOTFILES_DEST } else { $DefaultDest }
-    if ($Update) {
-        $existingSetup = Join-Path $dest 'setup.ps1'
-        if ((Test-Path -LiteralPath $existingSetup -PathType Leaf) -and (Test-Path -LiteralPath (Join-Path $dest 'home') -PathType Container)) {
-            Write-Host "setup.ps1 -Update: using existing checkout at $dest without git pull."
-            & $existingSetup @PSBoundParameters
-            exit $LASTEXITCODE
-        }
-        Write-Error "setup.ps1 -Update needs an existing checkout at $dest; it does not clone or pull."
-        exit 1
-    }
-    # DryRun honor: announce what we would clone and exit BEFORE any git op.
     if ($DryRun) {
-        Write-Host "setup.ps1 (remote, dry-run): would clone $RepoUrl -> $dest"
-        Write-Host "                             then re-invoke .\setup.ps1 from there."
+        Write-Host "setup.ps1: no local checkout was detected; remote/piped setup is disabled."
+        Write-Host "  Clone first, then run setup locally:"
+        Write-Host "    git clone $RepoUrl `"$dest`""
+        Write-Host "    Set-Location `"$dest`""
+        Write-Host "    .\setup.ps1 -All"
         Write-Host "(dry run -- no clone, no install, no writes performed)"
-        exit 0
     }
-    if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
-        Write-Error "setup.ps1: git is the only prerequisite for remote setup, and it is required to clone the repo. Install git first: winget install Git.Git"
-        exit 1
-    }
-    if (Test-Path (Join-Path $dest '.git')) {
-        Write-Host "Repo already cloned at $dest. Pulling latest."
-        git -C $dest pull --ff-only
-        if ($LASTEXITCODE -ne 0) {
-            Write-Error "setup.ps1: 'git pull --ff-only' failed in $dest; refusing to run against a stale checkout."
-            exit 1
-        }
-    } else {
-        Write-Host "Cloning $RepoUrl -> $dest"
-        git clone $RepoUrl $dest
-        if ($LASTEXITCODE -ne 0) {
-            Write-Error "setup.ps1: 'git clone' of $RepoUrl failed; cannot continue."
-            exit 1
-        }
-    }
-    Write-Host ""
-    Write-Host "Re-invoking setup.ps1 from the clone."
-    & (Join-Path $dest 'setup.ps1') @PSBoundParameters
-    exit $LASTEXITCODE
+    Write-Error "setup.ps1 must be run from a local clone. Remote/piped clone-and-reinvoke setup is disabled because it would execute mutable default-branch code."
+    Write-Error "Clone first, then run setup locally: git clone $RepoUrl `"$dest`"; Set-Location `"$dest`"; .\setup.ps1 -All"
+    exit 1
 }
 
 Set-Location $ScriptDir
@@ -1408,7 +1410,11 @@ function Invoke-SetupUpdateMode {
         }
         $argsForDeps['Update'] = $true
         if ($IsDryRun) { $argsForDeps['DryRun'] = $true }
-        & $DependencyRunner (Join-Path $Root 'install-deps.ps1') $argsForDeps
+        Invoke-DependencyInstallerOrFail `
+            -Runner $DependencyRunner `
+            -Path (Join-Path $Root 'install-deps.ps1') `
+            -Arguments $argsForDeps `
+            -Label 'install-deps.ps1 -Update'
     } else {
         Write-Host ""
         Write-Host "skipped: update dependency phase via -SkipDeps"
@@ -1455,7 +1461,10 @@ if ($Update) {
 # ---- Phase 1: dependencies ---------------------------------------------------
 if (-not $SkipDeps) {
     Phase "Phase 1/6: install dependencies"
-    & (Join-Path $ScriptDir 'install-deps.ps1') @depsArgs
+    Invoke-DependencyInstallerOrFail `
+        -Path (Join-Path $ScriptDir 'install-deps.ps1') `
+        -Arguments $depsArgs `
+        -Label 'install-deps.ps1'
 } else {
     Write-Host ""
     Write-Host "skipped: Phase 1 (deps) via -SkipDeps"

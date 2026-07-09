@@ -197,7 +197,7 @@ current macOS host.
 
 True clean OS path: use a macOS VM on Apple Silicon through `tart`, UTM, or
 VMware Fusion, clone the repo, then run the same `--current-home` command. If no
-local VM is available, rely on the `setup.sh / macos-15` GitHub-hosted e2e job.
+local VM is available, rely on the `setup.sh / macos-26` GitHub-hosted e2e job.
 
 ## Manual visual checklist
 
