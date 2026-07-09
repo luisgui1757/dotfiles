@@ -31,6 +31,18 @@ aligned, and enables GitHub security alerts/security fixes where the plan
 supports them. If GitHub has duplicate rulesets with the same protected name,
 the script fails closed; delete the duplicate live ruleset before re-running it.
 
+## Context Renames
+
+Required-check context renames must be applied in the checked-in rulesets and
+then applied live before the rename PR merges. The integrity ruleset has no
+bypass actors, so a live ruleset that still requires an old context such as
+`setup.sh / macos-15` can block the renamed `setup.sh / macos-26` PR even when
+the workflow file and checked-in rulesets are correct. The owner command is:
+
+```bash
+scripts/apply-repo-safeguards.sh luisgui1757/dotfiles
+```
+
 ## Verify
 
 ```bash
@@ -60,8 +72,9 @@ Expected live posture:
 - auto-merge disabled;
 - required checks are strict and include exactly:
   `ubuntu`, `macos`, `windows`, `chezmoi-parity`, `chezmoi-parity-macos`,
-  `chezmoi-parity-windows`, `e2e containers / ubuntu-24.04`,
-  `setup.sh / ubuntu-24.04`, `setup.sh / macos-15`, and
+  `chezmoi-parity-windows`, `nix flake check (ubuntu-24.04)`,
+  `nix flake check (macos-26)`, `e2e containers / ubuntu-24.04`,
+  `setup.sh / ubuntu-24.04`, `setup.sh / macos-26`, and
   `setup.ps1 / windows-2025` in both the integrity ruleset and classic fallback;
 - only `Protect main: review` and `Protect main: owner updates` have bypass actors;
 - each bypass actor is `luisgui1757` with `bypass_mode: pull_request`;

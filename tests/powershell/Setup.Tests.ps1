@@ -838,6 +838,70 @@ Describe "setup.ps1 update mode" {
         $output | Should -Match '(?m)^\s*would:\s+nvim --headless \+MasonToolsUpdateSync \+qa[ \t]*$'
         Should -Invoke -CommandName Invoke-ChezmoiApplyPhase -Times 0 -Exactly
     }
+
+    It "propagates install-deps failures in normal dependency phase helper" {
+        Mock -CommandName Stop-SetupWithExitCode -MockWith {
+            param([int]$ExitCode)
+            throw "setup-exit:$ExitCode"
+        }
+        $depsRunner = {
+            param([string]$Path, [hashtable]$Arguments)
+            $global:LASTEXITCODE = 23
+        }
+
+        { Invoke-DependencyInstallerOrFail -Runner $depsRunner -Path 'C:\dotfiles\install-deps.ps1' -Arguments @{} } |
+            Should -Throw 'setup-exit:23'
+
+        Should -Invoke -CommandName Stop-SetupWithExitCode -Times 1 -Exactly -ParameterFilter { $ExitCode -eq 23 }
+    }
+
+    It "ignores stale LASTEXITCODE before a successful normal dependency phase helper" {
+        Mock -CommandName Stop-SetupWithExitCode -MockWith {
+            param([int]$ExitCode)
+            throw "setup-exit:$ExitCode"
+        }
+        $global:LASTEXITCODE = 81
+        $depsRunner = {
+            param([string]$Path, [hashtable]$Arguments)
+            $null = $Path
+            $null = $Arguments
+        }
+
+        { Invoke-DependencyInstallerOrFail -Runner $depsRunner -Path 'C:\dotfiles\install-deps.ps1' -Arguments @{} } |
+            Should -Not -Throw
+
+        $LASTEXITCODE | Should -Be 0
+        Should -Invoke -CommandName Stop-SetupWithExitCode -Times 0 -Exactly
+    }
+
+    It "propagates install-deps failures in Update mode before Mason update" {
+        $root = Join-Path ([System.IO.Path]::GetTempPath()) 'setup-update-root'
+        Mock -CommandName Stop-SetupWithExitCode -MockWith {
+            param([int]$ExitCode)
+            throw "setup-exit:$ExitCode"
+        }
+        $depsRunner = {
+            param([string]$Path, [hashtable]$Arguments)
+            $script:SetupUpdateDepsPath = $Path
+            $script:SetupUpdateDepsArgs = $Arguments
+            $global:LASTEXITCODE = 37
+        }
+        $nvimRunner = {
+            throw "Mason update must not run after dependency update failure"
+        }
+
+        {
+            Invoke-SetupUpdateMode `
+                -Root $root `
+                -DependencyArgs @{} `
+                -DependencyRunner $depsRunner `
+                -NvimRunner $nvimRunner
+        } | Should -Throw 'setup-exit:37'
+
+        $script:SetupUpdateDepsArgs['Update'] | Should -BeTrue
+        $script:SetupUpdateRuntimeRefreshed | Should -BeFalse
+        Should -Invoke -CommandName Stop-SetupWithExitCode -Times 1 -Exactly -ParameterFilter { $ExitCode -eq 37 }
+    }
 }
 
 Describe "setup.ps1 VS developer environment" {

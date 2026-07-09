@@ -45,6 +45,12 @@ assert_dir_resolves() {
     [[ "$actual" == "$expected" ]] || fail "$1 resolves to $actual, expected $expected"
 }
 
+assert_tool_runs() {
+    local cmd="$1"; shift
+    command -v "$cmd" >/dev/null 2>&1 || fail "$cmd is not on PATH"
+    "$cmd" "$@" >/dev/null 2>&1 || fail "$cmd $* failed"
+}
+
 if [[ "${1:-}" == "--as-user" ]]; then
     cd "$HOME/dotfiles" || fail "repo copy missing at $HOME/dotfiles"
 
@@ -74,9 +80,20 @@ if [[ "${1:-}" == "--as-user" ]]; then
     run_and_capture "chezmoi apply" "$HOME/chezmoi-apply.log" \
         chezmoi --source "$repo/home" --no-tty --force apply
 
-    for cmd in nvim rg fd fzf tmux zsh git lazygit tree-sitter cmake lsd zoxide gh wezterm herdr; do
-        command -v "$cmd" >/dev/null 2>&1 || fail "$cmd is not on PATH"
-    done
+    assert_tool_runs rg --version
+    assert_tool_runs fd --version
+    assert_tool_runs fzf --version
+    assert_tool_runs tmux -V
+    assert_tool_runs zsh --version
+    assert_tool_runs git --version
+    assert_tool_runs lazygit --version
+    assert_tool_runs tree-sitter --version
+    assert_tool_runs cmake --version
+    assert_tool_runs lsd --version
+    assert_tool_runs zoxide --version
+    assert_tool_runs gh --version
+    assert_tool_runs wezterm --version
+    assert_tool_runs herdr --version
 
     nvim_line="$(nvim --version | head -n 1)"
     case "$nvim_line" in

@@ -8,6 +8,7 @@ python3 - <<'PY'
 import pathlib
 import re
 import sys
+import os
 
 root = pathlib.Path(".")
 
@@ -56,6 +57,38 @@ def flag_line(path, line):
     return any(pattern.search(line) for pattern in patterns)
 
 
+def unverified_powershell_payload_executions(path, text):
+    path = pathlib.Path(path)
+    local_failures = []
+    download_pattern = re.compile(
+        r"Invoke-WebRequest\b[^\n]*-OutFile\s+\$([A-Za-z_][A-Za-z0-9_]*)[^\n]*",
+        re.IGNORECASE,
+    )
+    assignment_prefix = r"(?:\$(?:script:|global:|local:)?[A-Za-z_][A-Za-z0-9_]*\s*=\s*)?"
+    for match in download_pattern.finditer(text):
+        variable = match.group(1)
+        tail = text[match.end():]
+        variable_ref = re.escape(variable)
+        exec_match = re.search(
+            rf"(?m)^\s*{assignment_prefix}(?:&\s+\${variable_ref}\b(?:\s|$)|Start-Process\b[^\n]*-FilePath\s+\${variable_ref}\b)",
+            tail,
+            re.IGNORECASE,
+        )
+        if not exec_match:
+            continue
+        intervening = tail[:exec_match.start()]
+        verified = re.search(
+            rf"(?:Test-FileSha256\s+\${variable_ref}\b|Test-[A-Za-z0-9]+Signature\b[^\n]*-Path\s+\${variable_ref}\b|Get-AuthenticodeSignature\b[^\n]*-FilePath\s+\${variable_ref}\b)",
+            intervening,
+            re.IGNORECASE,
+        )
+        if not verified:
+            local_failures.append(
+                f"{path}: downloaded PowerShell payload ${variable} is executed without an intervening hash or signature check"
+            )
+    return local_failures
+
+
 failures = []
 seen_allowlist = set()
 
@@ -66,6 +99,40 @@ for probe in (
 ):
     if not flag_line(pathlib.Path("probe.sh"), probe):
         failures.append(f"supply-chain scanner failed to catch probe: {probe}")
+
+ps_payload_probes = [
+    (
+        "direct call",
+        "Invoke-WebRequest -Uri $Url -OutFile $installer\n& $installer\n",
+        True,
+    ),
+    (
+        "assignment-prefixed direct call",
+        "Invoke-WebRequest -Uri $Url -OutFile $installer\n$rc = & $installer -RunAsAdmin\n",
+        True,
+    ),
+    (
+        "start-process",
+        "Invoke-WebRequest -Uri $Url -OutFile $installer\nStart-Process -FilePath $installer -Wait\n",
+        True,
+    ),
+    (
+        "assignment-prefixed start-process",
+        "Invoke-WebRequest -Uri $Url -OutFile $installer\n$process = Start-Process -FilePath $installer -Wait -PassThru\n",
+        True,
+    ),
+    (
+        "verified assignment-prefixed start-process",
+        "Invoke-WebRequest -Uri $Url -OutFile $installer\nTest-VsBuildToolsBootstrapperSignature -Path $installer\n$process = Start-Process -FilePath $installer -Wait -PassThru\n",
+        False,
+    ),
+]
+for label, probe, should_fail in ps_payload_probes:
+    probe_failures = unverified_powershell_payload_executions(f"probe-{label}.ps1", probe)
+    if should_fail and not probe_failures:
+        failures.append(f"supply-chain scanner failed to catch PowerShell payload probe: {label}")
+    if not should_fail and probe_failures:
+        failures.append(f"supply-chain scanner rejected verified PowerShell payload probe: {label}")
 
 install_deps_sh = pathlib.Path("install-deps.sh").read_text(encoding="utf-8")
 required_install_deps_snippets = [
@@ -213,12 +280,17 @@ for path in scan_files:
 scan_suffixes = {".bat", ".cmd", ".ps1", ".psm1", ".sh", ".wsb", ".yaml", ".yml"}
 excluded_roots = {
     pathlib.Path(".git"),
+    pathlib.Path(".claude"),
+    pathlib.Path(".codex"),
+    pathlib.Path(".pi"),
     pathlib.Path("docs/archive"),
+    pathlib.Path("docs/reviews"),
     pathlib.Path("node_modules"),
     pathlib.Path("tests/.cache"),
 }
 excluded_files = {
     pathlib.Path("tests/static/supply_chain_remote_execution_test.sh"),
+    pathlib.Path("tests/static/setup_local_only_test.sh"),
 }
 
 
@@ -229,14 +301,19 @@ def is_excluded(path):
     )
 
 
-scan_paths = sorted(
-    (
-        path
-        for path in root.rglob("*")
-        if path.is_file() and path.suffix in scan_suffixes
-    ),
-    key=lambda path: path.as_posix(),
-)
+scan_paths = []
+excluded_root_names = {path.as_posix() for path in excluded_roots}
+for dirpath, dirnames, filenames in os.walk(root):
+    current = pathlib.Path(dirpath)
+    dirnames[:] = [
+        dirname for dirname in dirnames
+        if (current / dirname).as_posix() not in excluded_root_names
+    ]
+    for filename in filenames:
+        path = current / filename
+        if path.suffix in scan_suffixes:
+            scan_paths.append(path)
+scan_paths = sorted(scan_paths, key=lambda path: path.as_posix())
 for path in scan_paths:
     if is_excluded(path):
         continue
@@ -257,14 +334,7 @@ for path in scan_paths:
             failures.append(f"{path}:{lineno}: unreviewed remote executable pattern: {normalized}")
 
     if path.suffix.lower() == ".ps1":
-        text = "\n".join(lines)
-        for match in re.finditer(r"Invoke-WebRequest\b[^\n]*-OutFile\s+\$([A-Za-z_][A-Za-z0-9_]*)[^\n]*", text, re.IGNORECASE):
-            variable = match.group(1)
-            exec_match = re.search(rf"(?m)^\s*&\s+\${re.escape(variable)}(\s|$)", text[match.end():], re.IGNORECASE)
-            if exec_match and not re.search(rf"Test-FileSha256\s+\${re.escape(variable)}\b", text[match.end():match.end() + exec_match.start()], re.IGNORECASE):
-                failures.append(
-                    f"{path}: downloaded PowerShell script ${variable} is executed without an intervening Test-FileSha256 check"
-                )
+        failures.extend(unverified_powershell_payload_executions(path, "\n".join(lines)))
 
 for key in sorted(set(allowlist) - seen_allowlist):
     failures.append(f"{key[0]}: allowlist entry no longer matches and should be removed: {key[1]}")

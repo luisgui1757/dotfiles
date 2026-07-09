@@ -10,11 +10,24 @@ INSTALL_PS1="$REPO_ROOT/install-deps.ps1"
 
 fail=0
 
-herdr_dev_hits="$(grep -rniE 'herdr\.dev/install' "$REPO_ROOT" \
-    --include='*.sh' --include='*.ps1' --include='*.psm1' --include='*.cmd' --include='*.bat' \
-    --exclude='herdr_windows_preview_test.sh' \
-    --exclude-dir=.git --exclude-dir=.cache 2>/dev/null |
-    grep -vE '^[^:]+:[0-9]+:[[:space:]]*#' || true)"
+scan_files=()
+while IFS= read -r f; do scan_files+=("$f"); done < <(
+    find "$REPO_ROOT" \
+        \( -path "$REPO_ROOT/.git" \
+        -o -path "$REPO_ROOT/.claude" \
+        -o -path "$REPO_ROOT/.codex" \
+        -o -path "$REPO_ROOT/.pi" \
+        -o -path "$REPO_ROOT/tests/.cache" \
+        -o -path "$REPO_ROOT/docs/archive" \) -prune -o \
+        -type f \( -name '*.sh' -o -name '*.ps1' -o -name '*.psm1' -o -name '*.cmd' -o -name '*.bat' \) \
+        ! -name 'herdr_windows_preview_test.sh' \
+        -print | sort
+)
+herdr_dev_hits=""
+if [[ "${#scan_files[@]}" -gt 0 ]]; then
+    herdr_dev_hits="$(grep -HniE 'herdr\.dev/install' "${scan_files[@]}" 2>/dev/null |
+        grep -vE '^[^:]+:[0-9]+:[[:space:]]*#' || true)"
+fi
 if [[ -n "$herdr_dev_hits" ]]; then
     echo "FAIL: repo code references the herdr.dev remote-eval installer:"
     printf '%s\n' "$herdr_dev_hits" | sed 's/^/  /'

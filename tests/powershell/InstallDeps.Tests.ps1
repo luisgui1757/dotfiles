@@ -11,6 +11,22 @@ BeforeAll {
     function npm {}
     function pi {}
 
+    function Get-TestCertificate {
+        param([Parameter(Mandatory)][string]$Subject)
+
+        $rsa = [System.Security.Cryptography.RSA]::Create(2048)
+        $request = [System.Security.Cryptography.X509Certificates.CertificateRequest]::new(
+            $Subject,
+            $rsa,
+            [System.Security.Cryptography.HashAlgorithmName]::SHA256,
+            [System.Security.Cryptography.RSASignaturePadding]::Pkcs1
+        )
+        return $request.CreateSelfSigned(
+            [datetimeoffset]::UtcNow.AddDays(-1),
+            [datetimeoffset]::UtcNow.AddDays(1)
+        )
+    }
+
     $script:ImportInstallDepsForTest = {
         param([switch]$DryRun)
 
@@ -566,6 +582,7 @@ Describe "install-deps.ps1" {
         $output | Should -Match 'Microsoft\.VisualStudio\.2022\.BuildTools'
         $output | Should -Match 'Microsoft\.VisualStudio\.Workload\.VCTools'
         $output | Should -Match 'https://aka\.ms/vs/17/release/vs_BuildTools\.exe'
+        $output | Should -Match 'verify Authenticode signer'
         Should -Invoke -CommandName winget -Times 0 -Exactly
         Should -Invoke -CommandName choco -Times 0 -Exactly
     }
@@ -628,6 +645,7 @@ Describe "install-deps.ps1" {
             param($Uri)
             $script:BootstrapperUri = $Uri
         }
+        Mock -CommandName Test-VsBuildToolsBootstrapperSignature -MockWith { return $true }
         Mock -CommandName Start-Process -MockWith {
             param($FilePath, $ArgumentList)
             $script:BootstrapperArgs = @($ArgumentList)
@@ -642,6 +660,7 @@ Describe "install-deps.ps1" {
         ($script:BootstrapperArgs -join ' ') | Should -Match '--includeRecommended'
         $output | Should -Match 'Microsoft bootstrapper'
         $script:InstallFailures.Count | Should -Be 0
+        Should -Invoke -CommandName Test-VsBuildToolsBootstrapperSignature -Times 1 -Exactly
     }
 
     It "keeps VS Build Tools install failure best effort with a FAIL marker" {
@@ -650,6 +669,7 @@ Describe "install-deps.ps1" {
         Mock -CommandName winget -MockWith { $global:LASTEXITCODE = 55 }
         Mock -CommandName choco -MockWith { $global:LASTEXITCODE = 56 }
         Mock -CommandName Invoke-WebRequest -MockWith { }
+        Mock -CommandName Test-VsBuildToolsBootstrapperSignature -MockWith { return $true }
         Mock -CommandName Start-Process -MockWith { return [pscustomobject]@{ ExitCode = 57 } }
 
         $output = & { Install-VsBuildTools } 6>&1 | Out-String
@@ -660,6 +680,69 @@ Describe "install-deps.ps1" {
         $script:InstallFailures[0].Pm | Should -Be 'winget/choco/bootstrapper'
         $script:InstallFailures[0].Pkg | Should -Be 'Microsoft.VisualStudio.Workload.VCTools'
         $script:InstallFailures[0].ExitCode | Should -Be 57
+    }
+
+    It "does not run the VS Build Tools bootstrapper when Authenticode verification fails" {
+        . $script:ImportInstallDepsForTest
+        Mock -CommandName Get-VsBuildToolsInstallationPath -MockWith { return '' }
+        Mock -CommandName winget -MockWith { $global:LASTEXITCODE = 55 }
+        Mock -CommandName choco -MockWith { $global:LASTEXITCODE = 56 }
+        Mock -CommandName Invoke-WebRequest -MockWith { }
+        Mock -CommandName Test-VsBuildToolsBootstrapperSignature -MockWith { return $false }
+        Mock -CommandName Start-Process -MockWith { throw "Start-Process must not run before verification" }
+
+        $output = & { Install-VsBuildTools } 6>&1 | Out-String
+
+        $output | Should -Match 'FAIL: VS Build Tools install failed'
+        $script:InstallFailures.Count | Should -Be 1
+        $script:InstallFailures[0].Tool | Should -Be 'VS Build Tools'
+        $script:InstallFailures[0].Pm | Should -Be 'winget/choco/bootstrapper'
+        Should -Invoke -CommandName Start-Process -Times 0 -Exactly
+        Should -Invoke -CommandName Test-VsBuildToolsBootstrapperSignature -Times 1 -Exactly
+    }
+
+    It "accepts only a valid Microsoft-owned VS Build Tools Authenticode signature" {
+        . $script:ImportInstallDepsForTest
+        $microsoftCertificate = Get-TestCertificate 'CN=Microsoft Corporation, O=Microsoft Corporation, C=US'
+        $exampleCertificate = Get-TestCertificate 'CN=Example Publisher, O=Example Corp'
+        $microsoftSignature = [pscustomobject]@{
+            Status = 'Valid'
+            SignerCertificate = $microsoftCertificate
+        }
+        $invalidSignature = [pscustomobject]@{
+            Status = 'Valid'
+            SignerCertificate = $exampleCertificate
+        }
+        $validMicrosoftChain = {
+            param([System.Security.Cryptography.X509Certificates.X509Certificate2]$SignerCertificate)
+            [pscustomobject]@{
+                IsValid = $true
+                Certificates = @($SignerCertificate)
+                Statuses = @()
+            }
+        }
+
+        Test-VsBuildToolsBootstrapperSignature -Path 'C:\tmp\vs.exe' -SignatureGetter { $microsoftSignature } -ChainBuilder $validMicrosoftChain | Should -BeTrue
+        Test-VsBuildToolsBootstrapperSignature -Path 'C:\tmp\vs.exe' -SignatureGetter { $invalidSignature } -ChainBuilder $validMicrosoftChain | Should -BeFalse
+    }
+
+    It "rejects VS Build Tools when real certificate chain validation fails" {
+        . $script:ImportInstallDepsForTest
+        $microsoftCertificate = Get-TestCertificate 'CN=Microsoft Corporation, O=Microsoft Corporation, C=US'
+        $microsoftSignature = [pscustomobject]@{
+            Status = 'Valid'
+            SignerCertificate = $microsoftCertificate
+        }
+        $failedChain = {
+            param([System.Security.Cryptography.X509Certificates.X509Certificate2]$SignerCertificate)
+            [pscustomobject]@{
+                IsValid = $false
+                Certificates = @($SignerCertificate)
+                Statuses = @('UntrustedRoot')
+            }
+        }
+
+        Test-VsBuildToolsBootstrapperSignature -Path 'C:\tmp\vs.exe' -SignatureGetter { $microsoftSignature } -ChainBuilder $failedChain | Should -BeFalse
     }
 
     It "registers the Pi CLI as a pinned npm-backed dependency" {
@@ -810,7 +893,7 @@ Describe "install-deps.ps1" {
             Mock -CommandName Test-FileSha256 -MockWith { return $false }
             Mock -CommandName Expand-Archive -MockWith { throw "must not extract" }
 
-            $output = & { Install-HackNerdFont } 6>&1 | Out-String
+            $output = & { Install-HackNerdFont } *>&1 | Out-String
 
             $output | Should -Match 'FAIL: checksum mismatch for Hack\.zip'
             $script:InstallFailures.Count | Should -Be 1
@@ -822,6 +905,40 @@ Describe "install-deps.ps1" {
             Should -Invoke -CommandName Invoke-WebRequest -Times 1 -Exactly -ParameterFilter {
                 $ErrorAction -eq 'Stop'
             }
+        } finally {
+            if ($null -eq $oldTemp) {
+                Remove-Item Env:TEMP -ErrorAction SilentlyContinue
+            } else {
+                $env:TEMP = $oldTemp
+            }
+            Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    It "records Hack Nerd Font direct install exceptions in InstallFailures" {
+        . $script:ImportInstallDepsForTest
+        $oldTemp = $env:TEMP
+        $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("hack-nf-test-" + [System.Guid]::NewGuid())
+        try {
+            New-Item -ItemType Directory -Force -Path $tempRoot | Out-Null
+            $env:TEMP = $tempRoot
+            Mock -CommandName Get-HackNerdFontInstallScope -MockWith { return '' }
+            Mock -CommandName Get-Command -MockWith { return $null } -ParameterFilter { $Name -eq 'scoop' }
+            Mock -CommandName Invoke-WebRequest -MockWith {
+                param($Uri, $OutFile)
+                [System.IO.File]::WriteAllText($OutFile, 'good-zip')
+            }
+            Mock -CommandName Test-FileSha256 -MockWith { return $true }
+            Mock -CommandName Expand-Archive -MockWith { throw "extract failed" }
+
+            $output = & { Install-HackNerdFont } *>&1 | Out-String
+
+            $output | Should -Match 'Hack Nerd Font install failed'
+            $script:InstallFailures.Count | Should -Be 1
+            $script:InstallFailures[0].Tool | Should -Be 'Hack Nerd Font'
+            $script:InstallFailures[0].Pm | Should -Be 'direct'
+            $script:InstallFailures[0].Pkg | Should -Be 'Hack.zip'
+            $script:InstallFailures[0].ExitCode | Should -Be 'exception'
         } finally {
             if ($null -eq $oldTemp) {
                 Remove-Item Env:TEMP -ErrorAction SilentlyContinue
@@ -2259,6 +2376,27 @@ exit 0
         $output | Should -Match 'scoop manifest refresh failed'
         $output | Should -Match '(?m)^\s*FAIL: scoop\s+via scoop\s+pkg=manifest'
         $output | Should -Match 'install-deps: completed with 1 FAILED install'
+    }
+
+    It "exits zero on a clean dry-run despite stale ambient LASTEXITCODE" {
+        $pwsh = (Get-Command pwsh -ErrorAction Stop).Source
+        $installDepsPath = $script:InstallDeps.Replace("'", "''")
+        $command = @"
+function winget { `$global:LASTEXITCODE = 0 }
+`$global:LASTEXITCODE = 77
+& '$installDepsPath' -DryRun -All
+"@
+
+        $oldNativeCommandUseErrorActionPreference = $PSNativeCommandUseErrorActionPreference
+        try {
+            $PSNativeCommandUseErrorActionPreference = $false
+            $output = & $pwsh -NoProfile -ExecutionPolicy Bypass -Command $command *>&1 | Out-String
+        } finally {
+            $PSNativeCommandUseErrorActionPreference = $oldNativeCommandUseErrorActionPreference
+        }
+
+        $LASTEXITCODE | Should -Be 0
+        $output | Should -Match 'install-deps: done'
     }
 }
 

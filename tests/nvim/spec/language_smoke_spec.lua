@@ -88,6 +88,10 @@ describe("language smoke (Tier 1)", function()
       src:find("expected nvim-treesitter query install output missing", 1, true),
       "strict smoke must fail causally when parser queries are incomplete"
     )
+    assert.is_truthy(
+      src:find("expected nvim-treesitter highlight query output missing", 1, true),
+      "strict smoke must fail causally when explicit parser highlight queries are incomplete"
+    )
   end)
 
   it("Tier 2 uses one platform-aware LSP attach timeout helper", function()
@@ -117,6 +121,14 @@ describe("language smoke (Tier 1)", function()
     assert.is_truthy(
       src:find("parser_obj:parse()", 1, true),
       "Tier 2 must explicitly parse the buffer before checking captures"
+    )
+    assert.is_truthy(
+      src:find('vim.treesitter.query.get, parser, "highlights"', 1, true),
+      "Tier 2 must fall back to direct highlight-query capture iteration when inspect_pos is empty"
+    )
+    assert.is_truthy(
+      src:find("query:iter_captures(root, buf, 0, line_count)", 1, true),
+      "Tier 2 must prove parser+query captures directly in headless hosts"
     )
     assert.is_truthy(
       src:find("wait_for_treesitter_capture(0, row.parser)", 1, true),

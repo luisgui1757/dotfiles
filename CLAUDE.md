@@ -195,8 +195,9 @@ that violates one of these, fix it instead of disabling the test.
     rows. The preflight also rejects unexpected nvim-treesitter-managed
     install-output parser `.so` files under `stdpath('data')/site/parser`,
     rejects managed bundled query install-output directories, requires parser and
-    query install output for the non-bundled upstream dependency set (for example
-    PHP's paired `php_only` parser), and purges bundled parser/query overrides
+    query install output for the non-bundled upstream dependency set, requires
+    managed `highlights.scm` for explicit parser rows (for example PHP's paired
+    `php_only` parser can remain query-only), and purges bundled parser/query overrides
     after setup installs complete.
 20. **Repo text stays LF-only.** `.gitattributes` force-normalizes text files to
     LF so Windows checkouts do not CRLF-corrupt shell/WSL entry points, and
@@ -477,10 +478,14 @@ install/restore path or leave nvim-treesitter parser outputs in its cache; those
 are dependency-bootstrap costs, not warm startup costs. The startup budget itself
 is strict, but the spec measures up to three warm starts and accepts the fastest
 run; this filters scheduler/filesystem outliers while still failing a
-consistently slow production init.
+consistently slow production init. `startup_spec.lua` must keep its
+`[startup_spec]` stderr progress lines before plugin prewarm and each child init
+so a parent timeout leaves the run root and last long operation in logs. Cached
+plugin HEAD verification reads `.git/HEAD`/packed refs directly; do not replace
+that warm-cache path with one `git rev-parse` subprocess per plugin.
 
 Sub-targets **skip gracefully** when their tool isn't installed
-(`yamllint`/`editorconfig-checker`/`hyperfine`/`bats`/`ghostty`). The
+(`yamllint`/`editorconfig-checker`/`hyperfine`/`ghostty`). The
 ubuntu/macos/windows CI matrix in `.github/workflows/test.yml` installs
 everything, `chezmoi-parity`, `chezmoi-parity-macos`, and
 `chezmoi-parity-windows` install pinned chezmoi for the config-layer migration
@@ -502,6 +507,9 @@ ordinary `taplo` lint errors still fail.
 `tests/static/supply_chain_remote_execution_test.sh` must stay pure Python for
 the repository-wide scan; fast CI runs static tests before optional developer
 tools like ripgrep are installed.
+Repo-wide static scanners must explicitly prune generated/runtime trees such as
+`.git`, `.claude`, `.codex`, `.pi`, `tests/.cache`, and archived docs before
+walking files; Neovim tests clone real plugin repositories into `tests/.cache`.
 `tests/tmux/load_test.sh` must keep its own `tmux -S` socket path so tmux socket
 creation is hermetic and does not depend on host `/tmp/tmux-$UID` permissions.
 
@@ -517,7 +525,9 @@ When adding a new spec:
 `test.yml` remains the fast cross-platform suite and now also owns Renovate
 schema validation and the `chezmoi-parity` migration gate. Warnings are treated
 as failures where the tools expose them cleanly: shellcheck exits nonzero,
-PSScriptAnalyzer runs at `Warning,Error`, yamllint/parser checks are part of
+PSScriptAnalyzer scans the meaningful `.ps1` surface and fails on errors, new
+warning groups, or count increases beyond the reviewed installer/test-harness
+style baseline in `test.ps1`, yamllint/parser checks are part of
 `make test-static`, `scripts/validate-renovate.sh` fails when `npx` is missing
 under `CI=true`, and Windows CI treats missing test dependencies as fatal.
 PSGallery module installs in Windows CI use bounded retries for transient
@@ -525,6 +535,11 @@ gallery lookup failures; the final miss still fails the job.
 Shell tests use explicit `if`/`then` control flow for negative assertions; do not
 write `grep ... && fail || true` guards because Ubuntu ShellCheck flags `SC2015`
 and the compact form has ambiguous failure semantics.
+`tests/shell/lint.sh` runs ShellCheck per file. Production scripts stay strict;
+source-only test fixtures get a reviewed false-positive exclude only for
+dynamic `source` paths (`SC1091`), globals consumed by sourced installer/setup
+functions (`SC2034`), and indirectly invoked command stubs / code paths
+(`SC2317`, `SC2329`). Do not move those excludes to production scripts.
 
 `e2e-install.yml` is the required real-install gate. The jobs cover different
 install paths, not symmetric container platforms:
@@ -547,11 +562,13 @@ major; `tests/static/repo_policy_test.sh` enforces this.
   has Linuxbrew available, so the container is the only automated proof of the
   clean-image native `apt` path: pinned Neovim tarball install, pinned lazygit
   release install, fixed-root zsh plugin install, `fd-find` -> `fd` shim, and apt
-  fallbacks. Scope is intentionally **Ubuntu only** (the supported Linux/WSL2
-  proxy target).
+  fallbacks. It does not assert the Pi CLI because this path intentionally omits
+  the Nix package layer that provides Node 24; Pi is asserted in the Nix-backed
+  public setup jobs. Scope is intentionally **Ubuntu only** (the supported
+  Linux/WSL2 proxy target).
   Re-adding another distro requires both a matrix entry in `e2e-install.yml` and
   a matching root-prep branch in `tests/ci/container-e2e.sh`.
-- `setup.sh / ubuntu-24.04`, `setup.sh / macos-15`, and
+- `setup.sh / ubuntu-24.04`, `setup.sh / macos-26`, and
   `setup.ps1 / windows-2025` run the real public setup entry points, apply
   configs through chezmoi in Phase 2, then rerun Lazy restore, Tree-sitter
   parser install, Mason headless sync, and the Polaris Phase 6/6 agent-policy
@@ -562,7 +579,10 @@ major; `tests/static/repo_policy_test.sh` enforces this.
   did not install expected tools. Windows e2e
   also asserts the new Windows tools that must leave PATH commands behind
   (`zoxide`, `gh`, `wezterm`, `herdr`, `pi`), so an installer that exits 0 but fails
-  its command probe cannot fake-green.
+  its command probe cannot fake-green. The macOS job also runs Ghostty's real
+  `+validate-config` parser against the managed config after the cask install,
+  resolving the app bundle binary first because the cask does not guarantee a
+  `ghostty` CLI on PATH.
   must assert `%LOCALAPPDATA%\lazygit\config.yml`
   against `lazygit/config.windows.yml`, not the POSIX/default
   `lazygit/config.yml`. After the full restore/sync they also run the
@@ -572,15 +592,18 @@ major; `tests/static/repo_policy_test.sh` enforces this.
   (`get_available()`/`get_available(4)` — the jsonc "unsupported language"
   catcher), synchronously bootstraps parser installs with the upstream waitable
   install task and requires it to return exactly `true`, requires every declared
-  parser `.so` output and query install-output directories to be present,
+  parser `.so` output and query install-output directories to be present, with
+  managed `highlights.scm` for explicit parser rows,
   rejects unexpected
   install-output parser `.so` files under `stdpath('data')/site/parser`, asserts
   each fixture's LSP attaches, formats realistic LSP-backed samples copied under
   `tests/.cache` through conform.nvim's production route, requires the expected
   external formatter(s), fails on post-format LSP warnings/errors, then opens
   every language-matrix fixture, requires real Tree-sitter captures for
-  parser-backed rows after explicitly starting and parsing the expected parser,
-  and proves syntax-only fallback rows have real Vim syntax groups. Keep the LSP
+  parser-backed rows after explicitly starting and parsing the expected parser
+  (`inspect_pos()` first, direct highlight-query capture iteration as the
+  headless fallback), and proves syntax-only fallback rows have real Vim syntax
+  groups. Keep the LSP
   attach gate before the broad fixture-open gate; opening
   every fixture under the production config can start LSPs as collateral. After
   the explicit formatter/LSP gate, the smoke disables the tested LSP configs
@@ -596,14 +619,15 @@ major; `tests/static/repo_policy_test.sh` enforces this.
   install surface: Scoop/winget/choco, Developer Mode symlink behavior, font
   registration, and terminal profiles. Hosted macOS/Windows runners are the
   accepted representative fixtures for those OSes.
-- `setup.sh / WSL2 Ubuntu-24.04 (best-effort canary)` uses
-  `Vampire/setup-wsl@v7.0.0`, but hosted runners cannot provide a reliably
-  required nested-virtualization WSL2 gate. Keep this job non-required unless
-  the owner intentionally accepts that flake risk. The canary installs Ubuntu's
-  `nix-bin` package inside the distro and enables flakes before running the
-  enforced Home Manager path; that keeps the signal aligned with public setup.
+- `.github/workflows/wsl2-canary.yml` owns `setup.sh / WSL2 Ubuntu-24.04
+  (canary)`. It is scheduled/manual only, not part of PR required checks, because
+  hosted runners cannot provide a reliably required nested-virtualization WSL2
+  gate. Failures are visible in that workflow; do not hide the entire job behind
+  job-level `continue-on-error`. The canary installs Ubuntu's `nix-bin` package
+  inside the distro and enables flakes before running the enforced Home Manager
+  path; that keeps the signal aligned with public setup.
   The required WSL proxy is the Linux Ubuntu container plus the existing
-  `DOTFILES_FORCE_OS=wsl` bats coverage. Full WSL host/guest validation is
+  WSL config-template/static coverage. Full WSL host/guest validation is
   manual: install Nix inside WSL, run `./tests/wsl/e2e.sh` from inside WSL after
   running `.\setup.ps1 -All` on Windows. Windows Terminal settings
   handling is default-on: packaged WT is merged when its settings file exists,
@@ -660,8 +684,9 @@ tags are intentionally paired with adjacent expected commits. After a Renovate
 bump, adjacent checksum/commit constants stay stale until a human
 recomputes/reviews them; CI verification must fail in the meantime. Do not model
 direct-download SHA-256 constants as Renovate `currentDigest` captures; in
-Renovate terms those are not datasource digests. Only the cargo-binstall git
-commit is captured as a digest.
+Renovate terms those are not datasource digests. Installer-script commit pins
+for Homebrew, Scoop, and CI cargo-binstall are the reviewed digest/currentDigest
+captures; their adjacent SHA-256 constants remain manual verification context.
 
 Several pins are also **mirrored across files** (nvim version/SHA in
 `install-deps.sh`, `test.yml`, and `tests/shell/install_nvim_linux{,_fail}_test.sh`;
@@ -672,17 +697,10 @@ fails CI when any mirror disagrees. When you bump a pin, update every mirror and
 keep that test green.
 
 Validate `renovate.json` locally with Renovate's own schema validator, not just
-`jq`: `make validate-renovate`, or `make ci` for the full pre-PR bundle. That
-target runs Renovate under Node 24 because Renovate's `engines.node` supports
-the Node 24 LTS line; running the validator directly under an unsupported
-odd/current host Node such as 25.x emits `EBADENGINE`. Do not silence that
-warning with npm config. Switch runtimes or use the repo target, which shells
-into Node 24 before running:
-
-```bash
-npx --yes --package node@24.11.0 -- bash -c \
-  'npm exec --yes --package renovate@43.230.1 -- renovate-config-validator --strict renovate.json'
-```
+`jq`: run `scripts/validate-renovate.sh`, `make validate-renovate`, or `make ci`
+for the full pre-PR bundle. Do not hardcode transient Node/Renovate package
+versions in docs or prompts; the script owns the pinned runtime/package pair and
+keeps Renovate's engine requirements out of ad-hoc command examples.
 
 `tests/static/json_lint.sh` only checks JSON syntax. Its JSONC path strips `//`
 comments with a string-aware Python pass so URL values like `https://...` and
@@ -875,6 +893,16 @@ save only**. The next plain `:w` formats normally. Implemented in
   nonzero, while `unmanaged` exits successfully with the resolved source path.
   Do not use vague "present, but <manager> does not
   manage" wording.
+- **Accepted dependency install failures are fatal.** `install-deps.sh` records
+  selected package-manager/direct-install failures and exits nonzero after the
+  run summary; dry-run previews and explicit/manual skips remain non-failures.
+  Accepted optional GUI/package paths still follow that contract: Ubuntu/snap
+  Ghostty, VS Code cask/snap/flatpak, devilspie2, and Alpine native package arms
+  record failures once the user accepted the install or `--all` selected it.
+  `setup.ps1` must propagate `install-deps.ps1` nonzero exits in both normal
+  Phase 1 and `-Update`; it must never finish with `exit 0` after a blocked
+  dependency update. Preserve the Windows `$InstallFailures` summary contract
+  rather than weakening it into warning-only output.
 - **Polaris is setup Phase 6/6 and is opt-out, not experimental.** Full setup
   (`--all` / `-All`) applies Polaris `0.1.2` (`v0.1.2`) at commit
   `ecca742fa9ed1243a73981955850c1a8ef3e3b04` unless
@@ -925,9 +953,13 @@ save only**. The next plain `:w` formats normally. Implemented in
   `Microsoft.VisualStudio.Workload.VCTools` workload through winget or choco,
   then falls back to Microsoft's official `vs_BuildTools.exe` bootstrapper with
   the same workload. Scoop does not carry VS Build Tools, so this is the
-  deliberate exception to the Scoop-first catalog rule. A failed winget/choco
-  pass is not final; a failed package-manager-plus-bootstrapper pass records an
-  `InstallFailures` entry so `-All` cannot report success without MSVC.
+  deliberate exception to the Scoop-first catalog rule. The bootstrapper is
+  downloaded first, then must pass Authenticode verification with `Status=Valid`,
+  a real `X509Chain` built from `SignerCertificate`, and Microsoft-owned signer
+  plus root/chain identity checks before `Start-Process` may run. A failed
+  winget/choco pass is not final; a failed package-manager-plus-bootstrapper
+  pass records an `InstallFailures` entry so `-All` cannot report success
+  without MSVC.
   `setup.ps1` imports the VS DevShell into the current process before headless
   Tree-sitter parser installation, so `tree-sitter build` inherits `cl.exe`,
   `INCLUDE`, and `LIB`. Do not put the DevShell import in the PowerShell
@@ -940,7 +972,7 @@ save only**. The next plain `:w` formats normally. Implemented in
   LaTeX support needs the non-bundled `latex` parser (already in
   `treesitter_parsers`) and a converter executable. `install-deps.sh` creates
   `~/.local/share/dotfiles/python-tools/pylatexenc`, installs pinned
-  `setuptools` first, installs `pylatexenc==2.10` with pip `--require-hashes`
+  `setuptools==80.9.0` first, installs `pylatexenc==2.10` with pip `--require-hashes`
   and `--no-build-isolation`, and writes `~/.local/bin/latex2text`;
   interactive zsh prepends `~/.local/bin`. `install-deps.ps1` creates the same
   venv under
@@ -954,8 +986,9 @@ save only**. The next plain `:w` formats normally. Implemented in
   can expose temp-dir races such as `ENOTEMPTY` while compiling many grammars.
   When `DOTFILES_TREESITTER_SYNC_INSTALL=1`, pass `max_jobs = 1` and wait up to
   15 minutes; interactive installs keep upstream's faster default. Tier 2 then
-  checks `get_installed("parsers")` so a partial bootstrap fails at the parser
-  gate before later capture checks turn it into a vague highlighting failure.
+  checks `get_installed("parsers")` plus managed query output, including
+  `highlights.scm` for explicit parser rows, so a partial bootstrap fails at the
+  parser/query gate before later capture checks turn it into a vague highlighting failure.
 - **nvim-treesitter installer drift must not disable highlighting.** A stale
   lazy.nvim cache can keep `nvim-treesitter` on the frozen `master` API while
   this repo expects the `main` rewrite. In that state
@@ -1047,7 +1080,9 @@ save only**. The next plain `:w` formats normally. Implemented in
 - **Windows CI uses a pinned, verified elevated Scoop bootstrap.** GitHub-hosted
   `windows-2025` runners are elevated, and Scoop blocks elevated install by
   default. `Install-Scoop` downloads `ScoopInstaller/Install` at the pinned
-  `$ScoopInstallerCommit`, verifies `$ScoopInstallerSha256`, runs the local temp
+  `$ScoopInstallerCommit` (`b0ee913725139b816f9178163af0aecdba07a7ed`),
+  verifies `$ScoopInstallerSha256`
+  (`48f6ea398b3a3fa26fae0093d37bd85b13e7eaa5d1d4a3e208408768408e35ae`), runs the local temp
   installer with `-RunAsAdmin` only when elevated, then adds the Scoop `shims`
   dir to the current process PATH so the rest of `install-deps.ps1` can
   immediately use `scoop`.
@@ -1168,11 +1203,13 @@ save only**. The next plain `:w` formats normally. Implemented in
   immutable commit and hash-verified before execution; current examples are the
   Homebrew installer and Windows Scoop bootstrap. `install-deps.ps1` downloads
   `ScoopInstaller/Install` at `$ScoopInstallerCommit`, verifies
-  `$ScoopInstallerSha256`, then executes the checked temp file. The static
-  scanner keeps only genuinely pinned+verified exceptions, including CI
-  cargo-binstall where the SHA-256 check immediately precedes execution.
-  Recommended setup docs use `git clone` plus local `setup`, not raw remote
-  setup script execution from the current default branch.
+  `$ScoopInstallerSha256`, then executes the checked temp file. Microsoft's
+  moving `vs_BuildTools.exe` alias is the reviewed exception: it must pass
+  Authenticode `Status=Valid` plus Microsoft-owned signer/chain checks before
+  execution. The static scanner keeps only genuinely pinned+verified exceptions,
+  including CI cargo-binstall where the SHA-256 check immediately precedes
+  execution. Recommended setup docs use `git clone` plus local `setup`, not raw
+  remote setup script execution from the current default branch.
 - **Direct GitHub downloads are pinned and SHA-256 verified.** `install-deps.sh`
   verifies the pinned Homebrew installer script, Neovim Linux tarballs,
   native-Linux chezmoi tarballs, lazygit Linux tarballs, Starship Linux
@@ -1199,8 +1236,10 @@ save only**. The next plain `:w` formats normally. Implemented in
   The pinned script still fetches the matching `.deb` from that project's GitHub
   release assets over HTTPS at run time (per-codename×arch, so the `.deb` itself
   is not individually pinned — same trust model as the Homebrew installer).
-  A checksum mismatch fails closed: the installer is not run, a `FAIL:` marker
-  is emitted, and setup continues for real users while CI fails on the marker.
+  A checksum mismatch or installer failure fails closed: the installer is not
+  trusted/run on checksum mismatch, a `FAIL:` marker is emitted, the accepted
+  install failure is recorded, and setup continues for real users while CI fails
+  on the marker/final nonzero summary.
   Update the version and checksum constants together. zsh plugin refs are also
   pinned by tag plus expected commit; update both after reviewing a Renovate tag
   bump. Guarded by `tests/shell/ghostty_install_fail_test.sh`,

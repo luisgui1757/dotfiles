@@ -1,7 +1,7 @@
 # Dotfiles Roadmap
 
-Last audited: 2026-06-18 on branch `audit/full-roadmap-review-2026-06-18`.
-Baseline: `main` at `c3c22b7`.
+Last audited: 2026-07-09 on branch `fix/gold-standard-gap-close-2026-07-09`.
+Baseline: `main` at `6380d8a49d7f9586ea0225116cae2143d5c57d38`.
 
 This is the adversarial post-merge roadmap for the chezmoi migration and the
 current setup/CI surface. The goal is not "good enough"; the repo should have a
@@ -32,8 +32,9 @@ repeatable instead of tribal.
 - The active `Protect main: integrity` ruleset is active, strict, has no bypass
   actors, and requires `ubuntu`, `macos`, `windows`, `chezmoi-parity`,
   `chezmoi-parity-macos`, `chezmoi-parity-windows`,
+  `nix flake check (ubuntu-24.04)`, `nix flake check (macos-26)`,
   `e2e containers / ubuntu-24.04`, `setup.sh / ubuntu-24.04`,
-  `setup.sh / macos-15`, and `setup.ps1 / windows-2025`.
+  `setup.sh / macos-26`, and `setup.ps1 / windows-2025`.
 - Classic branch-protection fallback is strict and requires the same context
   set. GitHub returns those contexts in a different order than the ruleset API,
   so the apply-script verifier compares exact set membership.
@@ -55,7 +56,7 @@ repeatable instead of tribal.
   freshness, and the terminal-edge safety space for right-aligned prompt/status
   glyphs.
 
-## Nix + Tooling Migration (2026-07, in progress)
+## Nix + Tooling Migration (2026-07, DONE)
 
 An adversarial architecture review (2026-07-06) accepted, with required changes,
 a staged migration toward Nix-owned POSIX **packages** (nix-darwin + Home Manager
@@ -85,27 +86,27 @@ Sequenced PRs (split for independent, revertable blast radius):
   feedback; the psmux `OnIdle` re-apply also re-asserts the vi handlers. Recorded
   as CLAUDE.md invariant 21 and guarded by `tests/shell/zsh_vi_mode_test.sh` +
   new `Profile.Tests.ps1` vi-mode cases.
-- **PR-3 `feat/wezterm`** - WezTerm on all OSes (brew cask / pinned `.deb` /
+- **PR-3 `feat/wezterm` - DONE.** WezTerm on all OSes (brew cask / pinned `.deb` /
   `$Catalog`), Rose Pine + transparency + Hack Nerd Font parity, chezmoi-only
   config; not a Nix/nixpkgs GUI package.
-- **PR-4 `feat/aerospace-herdr`** - AeroSpace (macOS tap cask,
+- **PR-4 `feat/aerospace-herdr` - DONE.** AeroSpace (macOS tap cask,
   reserved-chord-safe keymap) + Herdr (macOS/Linux stable channels plus native
   Windows pinned preview binary).
-- **PR-5 `feat/nix-skeleton`** - flake + committed `flake.lock` with ZERO
+- **PR-5 `feat/nix-skeleton` - DONE.** flake + committed `flake.lock` with ZERO
   ownership; `nix flake check` CI; disjointness test (Home Manager declares no
   file targets); Renovate `nix` manager.
-- **PR-6 `feat/nix-darwin`** - macOS host config: `darwinConfigurations` +
+- **PR-6 `feat/nix-darwin` - DONE.** macOS host config: `darwinConfigurations` +
   `system.primaryUser`; nix-homebrew (pinned taps, `mutableTaps = false`) +
   homebrew module (`cleanup = "check"`, no auto-update/upgrade); Home Manager
   **packages only**; public macOS setup applies it by default; `--update` gains
   an `owner=nix` status.
-- **PR-7 `feat/nix-linux`** - Home Manager standalone on Ubuntu/WSL userland;
+- **PR-7 `feat/nix-linux` - DONE.** Home Manager standalone on Ubuntu/WSL userland;
   public Linux/WSL setup applies it by default; native/deferred install arms
   remain for artifacts and regression evidence (nvim last, for ABI reasons).
 
 ### Mega-PR: `feat/platform-nix-tooling-mega` (2026-07-07)
 
-PR-3 through PR-7 are being delivered together in ONE branch/PR
+PR-3 through PR-7 shipped together in ONE branch/PR
 (`feat/platform-nix-tooling-mega`) because the terminal/tooling configs
 (WezTerm, AeroSpace, Herdr) are the concrete packages the Nix layers then own,
 and shipping them separately would mean the Nix casks/brews reference configs
@@ -227,6 +228,48 @@ Commit-by-commit status:
   `dist.integrity`. POSIX public setup gets Node 24 from the enforced Nix package
   layer; Windows uses the native Node LTS catalog path. `.pi/` runtime state
   remains local and unsynced.
+- **Gold-standard gap close — IN PROGRESS (2026-07-09, PR #46).** Accepted
+  install failures record and force nonzero setup/update exits; stdin/no-script-path
+  setup fails closed with clone-first instructions instead of clone-and-reinvoke;
+  the VS Build Tools bootstrapper must pass Authenticode Microsoft signer/chain
+  verification before execution; the WSL2 canary is split into a non-required
+  scheduled/manual workflow; required-check sources align with `macos-26` and
+  Nix contexts; Renovate custom-manager coverage and pin-consistency guards cover
+  the current mirrored/manual-reviewed pin surface. Remaining completion gate:
+  PR #46 live required checks must be green, and the owner must apply the
+  checked-in safeguards live for context-renaming changes.
+
+### P2 Follow-up: Secondary Supply-chain Hardening
+
+Deferred from the 2026-07-09 gold-standard batch to avoid destabilizing the
+primary installer/CI fixes in the same branch:
+
+1. **Pi CLI verified tarball install**: replace request-A / install-request-B with
+   `npm pack`, verify the tarball integrity against `PI_CLI_INTEGRITY` /
+   `$PiCliIntegrity`, then install that verified tarball. Files:
+   `install-deps.sh`, `install-deps.ps1`, `tests/shell/pi_cli_test.sh`,
+   `tests/powershell/InstallDeps.Tests.ps1`.
+2. **zsh plugin quarantine-on-mismatch**: clone/fetch into a temp directory,
+   verify the expected commit, then move into place; if the chezmoi/onchange
+   verifier finds a mismatched payload, quarantine or remove it before failing.
+   Files: `install-deps.sh`,
+   `home/.chezmoiscripts/run_onchange_after_20-verify-zsh-plugin-pins.sh.tmpl`,
+   `tests/shell/zsh_plugins_test.sh`.
+3. **Windows tree-sitter npm fallback pin**: pin the npm fallback or mirror the
+   Linux pinned release-asset approach. Files: `install-deps.ps1`,
+   `tests/powershell/InstallDeps.Tests.ps1`.
+4. **gh-dash tag provenance**: verify the tag commit before installing/re-pinning,
+   or document gh extension tag resolution as an explicit reviewed exception.
+   Files: `install-deps.sh`, `install-deps.ps1`,
+   `tests/shell/gh_dash_extension_test.sh`,
+   `tests/powershell/InstallDeps.Tests.ps1`.
+5. **Ubuntu CI Microsoft repo package**: pin/verify the Microsoft package repo
+   `.deb` in `.github/workflows/test.yml`, or document it as CI-only risk with
+   least-privilege rationale and static guard coverage.
+
+Startup SIGTERM harness changes were not made in this branch because the failure
+was not reproduced; do not rewrite that test without a deterministic
+reproduction and diagnostics.
 
 Each commit flips its own status to DONE in the same commit that lands it, per
 the repo's doc-discipline rule.
@@ -457,7 +500,7 @@ ownership**:
    - Homebrew owns normal developer CLI catalog tools (`git`, `make`, `jq`,
      `nvim`, `cmake`, `rg`, `fd`, `fzf`, `lsd`, `chezmoi`, `lazygit`,
      `starship`, `tmux`, `python3`, `node`, `tree-sitter`, `shellcheck`,
-     `bats`, `hyperfine`, `taplo`, `yamllint`, and similar).
+     `hyperfine`, `taplo`, `yamllint`, and similar).
    - The repo manages Homebrew shellenv and any required PATH adoption. There
      should be no hidden manual `export PATH=...` step.
    - GNU Make's Homebrew `gnubin` path is required for this profile because

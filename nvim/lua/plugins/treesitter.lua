@@ -212,6 +212,10 @@ return {
       for _, lang in ipairs(nvim_bundled_parsers) do
         bundled_set[lang] = true
       end
+      local highlight_query_required_set = {}
+      for _, lang in ipairs(treesitter_parsers) do
+        highlight_query_required_set[lang] = true
+      end
 
       local function normalized_parser_dependencies()
         local config_ok, treesitter_config = pcall(require, "nvim-treesitter.config")
@@ -250,9 +254,13 @@ return {
             local parser_path = vim.fs.joinpath(parser_dir, parser .. ".so")
             local parser_info_path = vim.fs.joinpath(parser_info_dir, parser .. ".revision")
             local query_path = vim.fs.joinpath(query_dir, parser)
-            if vim.uv.fs_stat(parser_path) and not vim.uv.fs_stat(query_path) then
+            local has_query_dir = vim.uv.fs_stat(query_path)
+            local has_required_highlight_query = not highlight_query_required_set[parser]
+              or vim.uv.fs_stat(vim.fs.joinpath(query_path, "highlights.scm"))
+            if vim.uv.fs_stat(parser_path) and (not has_query_dir or not has_required_highlight_query) then
               pcall(vim.fn.delete, parser_path)
               pcall(vim.fn.delete, parser_info_path)
+              pcall(vim.fn.delete, query_path, "rf")
             end
           end
         end

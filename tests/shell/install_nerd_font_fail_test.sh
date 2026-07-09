@@ -63,13 +63,12 @@ verify_sha256() {
 YES_ALL=1
 DRY_RUN=0
 PM=apt
-if output="$(install_nerd_font 2>&1)"; then
-    echo "FAIL: install_nerd_font returned success after checksum failure" >&2
-    echo "$output" >&2
-    exit 1
-fi
+output_file="$TMP_ROOT/output.log"
+install_nerd_font >"$output_file" 2>&1
+output="$(cat "$output_file")"
 
 [[ "$output" == *"FAIL: checksum mismatch for Hack.zip"* ]]
+[[ "$INSTALL_FAILURES_COUNT" -eq 1 ]]
 grep -F "8ca33a60c791392d872b80d26c42f2bfa914a480f9eb2d7516d9f84373c36897" "$TMP_ROOT/sha.log" >/dev/null
 if [[ -e "$TMP_ROOT/unzip.log" ]]; then
     echo "FAIL: font extraction ran after checksum failure" >&2
@@ -79,5 +78,16 @@ if [[ -e "$XDG_DATA_HOME/fonts/HackNerdFont" ]]; then
     echo "FAIL: font directory was created after checksum failure" >&2
     exit 1
 fi
+set +e
+summary="$( ( exit_if_install_failures ) 2>&1 )"
+summary_rc=$?
+set -e
+if [[ "$summary_rc" -eq 0 ]]; then
+    echo "FAIL: final install failure summary returned success after checksum failure" >&2
+    echo "$summary" >&2
+    exit 1
+fi
+[[ "$summary" == *"install-deps: 1 accepted install path(s) failed:"* ]]
+[[ "$summary" == *"Hack Nerd Font via direct (Hack.zip) exit=sha256"* ]]
 
 echo "OK"

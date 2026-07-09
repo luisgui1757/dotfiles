@@ -1,4 +1,9 @@
 describe("startup time", function()
+  local function diag(message)
+    io.stderr:write("[startup_spec] " .. message .. "\n")
+    io.stderr:flush()
+  end
+
   local function mkdir(path)
     vim.fn.mkdir(path, "p")
   end
@@ -21,6 +26,7 @@ describe("startup time", function()
       table.insert(args, command)
     end
 
+    diag("running real init; startuptime log: " .. logfile)
     local result = vim
       .system(args, {
         env = env,
@@ -174,6 +180,7 @@ describe("startup time", function()
   end
 
   local function system_checked(args, context)
+    diag(context .. ": " .. table.concat(args, " "))
     local result = vim.system(args, { text = true }):wait()
     assert.are.equal(
       0,
@@ -188,18 +195,49 @@ describe("startup time", function()
     return result
   end
 
-  local function git_head(path)
-    local result = vim.system({ "git", "-C", path, "rev-parse", "HEAD" }, { text = true }):wait()
-    if result.code ~= 0 then
+  local function read_first_line(path)
+    local ok, lines = pcall(vim.fn.readfile, path)
+    if not ok or type(lines) ~= "table" then
       return nil
     end
-    return (result.stdout or ""):match("%S+")
+    return lines[1]
+  end
+
+  local function read_packed_ref(git_dir, ref)
+    local ok, lines = pcall(vim.fn.readfile, git_dir .. "/packed-refs")
+    if not ok or type(lines) ~= "table" then
+      return nil
+    end
+    for _, line in ipairs(lines) do
+      if line:sub(1, 1) ~= "#" and line:sub(1, 1) ~= "^" then
+        local sha, name = line:match("^([0-9a-fA-F]+)%s+(.+)$")
+        if name == ref then
+          return sha
+        end
+      end
+    end
+    return nil
+  end
+
+  local function git_head(path)
+    local git_dir = path .. "/.git"
+    local head = read_first_line(git_dir .. "/HEAD")
+    if not head then
+      return nil
+    end
+
+    local ref = head:match("^ref:%s*(.+)$")
+    if ref then
+      return read_first_line(git_dir .. "/" .. ref) or read_packed_ref(git_dir, ref)
+    end
+    return head:match("^[0-9a-fA-F]+$")
   end
 
   local function checkout_plugin(plugin_root, name, repo, commit)
     local path = plugin_root .. "/" .. name
     if vim.fn.isdirectory(path) == 0 then
       mkdir(plugin_root)
+      diag("cloning locked plugin " .. name .. " from " .. repo)
       system_checked(
         { "git", "clone", "--filter=blob:none", "https://github.com/" .. repo .. ".git", path },
         "could not clone " .. name
@@ -207,7 +245,10 @@ describe("startup time", function()
     end
 
     assert.are.equal(1, vim.fn.isdirectory(path .. "/.git"), "plugin cache is not a git checkout: " .. path)
-    if git_head(path) ~= commit then
+    diag("verifying locked plugin " .. name .. " at " .. path)
+    local current_head = git_head(path)
+    if current_head ~= commit then
+      diag("checking out locked plugin " .. name .. " @ " .. commit)
       local checkout = vim.system({ "git", "-C", path, "checkout", "--detach", commit }, { text = true }):wait()
       if checkout.code ~= 0 then
         system_checked(
@@ -220,12 +261,14 @@ describe("startup time", function()
         )
       end
     end
-    assert.are.equal(commit, git_head(path), "plugin cache did not land on locked commit for " .. name)
+    current_head = git_head(path)
+    assert.are.equal(commit, current_head, "plugin cache did not land on locked commit for " .. name)
   end
 
   local function prewarm_locked_plugin_checkouts(data_path, repo_root)
     local sources, lock, names = locked_plugin_sources(repo_root)
     local plugin_root = data_path .. "/lazy"
+    diag("prewarming " .. tostring(#names) .. " locked plugin checkout(s) under " .. plugin_root)
     for _, name in ipairs(names) do
       checkout_plugin(plugin_root, name, sources[name], lock[name].commit)
     end
@@ -289,6 +332,7 @@ describe("startup time", function()
     local shared_data = cache_root .. "/data"
     local run_root = cache_root .. "/" .. string.format("%d", vim.uv.hrtime())
     local localappdata = run_root .. "/localappdata"
+    diag("startup run root: " .. run_root)
 
     mkdir(shared_data)
     mkdir(run_root .. "/config")

@@ -1,4 +1,4 @@
-# Windows theming fixes - work order (pilot migration branch)
+# Windows theming fixes - archived work order (pilot migration branch)
 
 > **Temporary handoff doc.** Delete this file once the fixes below land + are
 > validated. Written 2026-06-12 by Claude (Opus 4.8), root-cause confirmed by

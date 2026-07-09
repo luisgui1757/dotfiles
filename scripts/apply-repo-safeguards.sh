@@ -124,7 +124,7 @@ nix flake check (ubuntu-24.04)
 nix flake check (macos-26)
 e2e containers / ubuntu-24.04
 setup.sh / ubuntu-24.04
-setup.sh / macos-15
+setup.sh / macos-26
 setup.ps1 / windows-2025
 EOF
 }
@@ -171,7 +171,7 @@ gh_api_json PUT "repos/$repo/branches/main/protection" <<'JSON' >/dev/null
       "nix flake check (macos-26)",
       "e2e containers / ubuntu-24.04",
       "setup.sh / ubuntu-24.04",
-      "setup.sh / macos-15",
+      "setup.sh / macos-26",
       "setup.ps1 / windows-2025"
     ]
   },

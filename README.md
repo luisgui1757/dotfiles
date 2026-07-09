@@ -31,6 +31,8 @@ Clone the repo first, then run the local setup entry point. `setup.{sh,ps1}`
 installs repo-managed dependencies, links every config, then runs
 `:Lazy! restore`, a synchronous nvim-treesitter parser install, and
 `:MasonToolsInstallSync` before the first interactive Neovim launch.
+Piped or stdin setup is intentionally disabled; if setup cannot prove it is
+running from a local checkout, it fails closed with clone-first instructions.
 
 Git is required to clone this repo. On macOS/Linux/WSL, Nix is also required
 before `setup.sh` runs: setup applies the pinned nix-darwin/Home Manager layer
@@ -191,10 +193,17 @@ Chezmoi is the config-only path. It manages dotfiles from `home/`; it does not
 install programs, fonts, VS Code, psmux, login shells, or other provisioning
 steps. Run `install-deps.sh` / `install-deps.ps1` or full `setup` for those.
 
-The remote one-liner works because `.chezmoiroot` points chezmoi at `home/`:
+The remote chezmoi one-liner is a mutable remote config-apply trust boundary
+because it asks chezmoi to fetch and apply the current default branch. It is not
+the quick usable setup path; prefer a local checkout, and pin the checkout to a
+reviewed commit/ref when you need reproducibility:
 
 ```bash
-chezmoi init --apply luisgui1757/dotfiles
+git clone https://github.com/luisgui1757/dotfiles.git ~/dotfiles
+cd ~/dotfiles
+git checkout <reviewed-commit-or-tag>
+chezmoi --source ./home init
+chezmoi --source ./home apply
 ```
 
 From an existing checkout, initialize once so `home/.chezmoi.toml.tmpl` writes
@@ -391,17 +400,22 @@ and whether `pwsh` is installed.
   `~/.local/bin` on native Linux/WSL, and Scoop with npm fallback on Windows.
   Windows `-All` also installs VS Build Tools so parser builds can find MSVC;
   after winget/choco failures it falls back to Microsoft's official
-  `vs_BuildTools.exe` bootstrapper with the same VCTools workload.
+  `vs_BuildTools.exe` bootstrapper with the same VCTools workload, but only
+  after Authenticode verifies a valid Microsoft-owned signer/chain.
 - Neovim Markdown rendering is owned by `render-markdown.nvim`. Setup already
   installs the explicit Tree-sitter parser matrix, including `latex`; it also
-  installs `latex2text` through a pinned, SHA-256-checked `pylatexenc` venv so
-  rendered Markdown equations work on fresh machines instead of depending on a
-  random host Python package.
+  installs `latex2text` through a pinned, SHA-256-checked venv
+  (`setuptools` 80.9.0, `pylatexenc` 2.10) so rendered Markdown equations work
+  on fresh machines instead of depending on a random host Python package.
 - `install-deps` prints a dependency pre-flight table before package-manager
   bootstrap and before the one-shot install prompt, showing the package manager
   itself, present/missing tools, best-effort versions, and the resulting
   skip/install action. The table is informational; the existing per-tool install
   logic still decides what actually runs.
+- Accepted install failures are fatal to setup. The installers continue long
+  enough to collect and summarize selected package-manager/direct-install
+  failures, but `setup.sh`, `setup.ps1`, and `setup.ps1 -Update` exit nonzero
+  afterward; dry-run previews and explicit/manual skips remain non-failures.
 - `setup.sh --update` and `setup.ps1 -Update` are scoped and manager-aware. They
   update only present catalog tools with proven per-tool ownership, then run an
   exact per-package or repo-pinned artifact refresh such as
@@ -545,6 +559,11 @@ make lint               # shellcheck everything
 ./tests/greenfield/docker-greenfield.sh # local clean Ubuntu container e2e
 ```
 
+`make lint` checks production shell scripts strictly. Source-only shell test
+fixtures get a reviewed shellcheck false-positive exclude for dynamic `source`
+paths, globals consumed by sourced installer functions, and indirectly invoked
+command stubs; other shellcheck findings still fail.
+
 ```powershell
 # windows
 .\test.ps1          # PSScriptAnalyzer + Pester + Nvim plenary busted
@@ -561,6 +580,8 @@ Plenary's default timeout. The startup-budget spec preclones the locked plugin
 checkouts into isolated XDG dirs before measuring warm production init; it must
 not invoke Lazy install/restore or leave nvim-treesitter parser outputs in that
 cache, because parser builds are setup/bootstrap work rather than startup work.
+It emits `[startup_spec]` progress lines before plugin prewarm and each child
+init so a parent timeout leaves the run root and last long operation in logs.
 
 Sub-targets skip themselves with a `skipped: <tool> not installed` message
 when their dependency tool is missing on the current machine. In CI, missing
@@ -575,14 +596,16 @@ post-install validators plus the manual desktop visual checklist.
 
 ## CI Merge Gate
 
-Pull requests are meant to be gated by two workflows:
+Pull requests are meant to be gated by three required workflow families:
 
 - `.github/workflows/test.yml` runs the static, shell, tmux,
   starship, Neovim, Windows Pester/PSScriptAnalyzer, Renovate schema, and
   `chezmoi-parity` suites. Warnings are treated as failures where the tools
-  expose them cleanly: shellcheck exits nonzero, PSScriptAnalyzer runs at
-  `Warning,Error`, Renovate validation fails if `npx` is missing under CI, and
-  YAML parsing/linting is part of `make test-static`. Windows PSGallery module
+  expose them cleanly: shellcheck exits nonzero, PSScriptAnalyzer scans the
+  meaningful `.ps1` surface and fails on errors, new warning groups, or count
+  increases beyond the reviewed installer/test-harness style baseline,
+  Renovate validation fails if `npx` is missing under CI, and YAML
+  parsing/linting is part of `make test-static`. Windows PSGallery module
   installs retry transient lookup failures, but missing test dependencies remain
   fatal.
 - `.github/workflows/e2e-install.yml` is the real install guarantee. It proves
@@ -591,16 +614,22 @@ Pull requests are meant to be gated by two workflows:
   `actions/cache` major version in their keys, so a cache-action major upgrade
   proves itself with a fresh archive instead of reusing one produced by the
   previous major.
+- `.github/workflows/nix.yml` validates the enforced POSIX Nix layer with
+  `nix flake check` on Ubuntu and macOS plus the checked-in Nix/setup
+  integration assertions.
+
+`.github/workflows/wsl2-canary.yml` is separate scheduled/manual coverage, not
+a PR-required workflow.
 
 The e2e jobs cover different install paths, not symmetric container platforms:
 
 | Check | What it proves |
 |---|---|
-| `e2e containers / ubuntu-24.04` | Clean `ubuntu:24.04`, non-root user, native `apt`, no Linuxbrew (`DOTFILES_SKIP_BREW_BOOTSTRAP=1`), then `install-deps.sh --all`, chezmoi config apply, tool assertions including `zoxide`, `gh`, WezTerm, and Herdr, Neovim >= 0.12, lazygit, zsh plugin files, config content assertions, and nvim directory realpath assertion. This is the native installer regression fixture, not the public POSIX package-plane proof; Pi CLI is asserted in the public setup jobs where Nix supplies Node 24. |
+| `e2e containers / ubuntu-24.04` | Clean `ubuntu:24.04`, non-root user, native `apt`, no Linuxbrew (`DOTFILES_SKIP_BREW_BOOTSTRAP=1`), then `install-deps.sh --all`, chezmoi config apply, executable/version probes including `zoxide`, `gh`, WezTerm, Herdr, Neovim >= 0.12, lazygit, zsh plugin files, config content assertions, and nvim directory realpath assertion. This is the native installer regression fixture, not the Nix-backed public POSIX package-plane proof; it does not assert Pi CLI because Node 24 comes from the Nix package layer. |
 | `setup.sh / ubuntu-24.04` | Full public Unix setup on the hosted Ubuntu runner after installing Nix in CI: Home Manager first, then native/deferred installs, chezmoi, Lazy, Tree-sitter, Mason, and Polaris. It asserts the nix-owned CLI commands resolve from a Nix profile/store path. |
-| `setup.sh / macos-15` | Full public macOS setup through the real macOS hosted runner after installing Nix in CI: nix-darwin/declarative Homebrew first, then native/deferred installs, chezmoi, Lazy, Tree-sitter, Mason, and Polaris. Docker cannot model macOS. The hosted runner passes `DOTFILES_NIX_DARWIN_HOSTED_CI=1` so declarative Homebrew activation does not abort on GitHub's preinstalled Brew packages; real hosts keep `cleanup = "check"`. |
+| `setup.sh / macos-26` | Full public macOS setup through the real macOS hosted runner after installing Nix in CI: nix-darwin/declarative Homebrew first, then native/deferred installs, Ghostty config validation via the app bundle binary, chezmoi, Lazy, Tree-sitter, Mason, and Polaris. Docker cannot model macOS. The hosted runner passes `DOTFILES_NIX_DARWIN_HOSTED_CI=1` so declarative Homebrew activation does not abort on GitHub's preinstalled Brew packages; real hosts keep `cleanup = "check"`. |
 | `setup.ps1 / windows-2025` | Full Windows setup through the real Windows hosted runner, including Scoop/winget/choco behavior, PowerShell, symlinks, `zoxide`/`gh`/WezTerm/Herdr/Pi CLI command probes, and Neovim restore/sync phases. Windows containers do not model the desktop/user-profile setup well. |
-| `setup.sh / WSL2 Ubuntu-24.04 (best-effort canary)` | Non-required WSL smoke signal. Hosted runners cannot provide reliable nested virtualization, so this is intentionally best-effort. The canary installs Ubuntu's `nix-bin` package inside the distro, enables flakes, then runs the same enforced Home Manager setup path as Linux. |
+| `setup.sh / WSL2 Ubuntu-24.04 (canary)` | Non-required scheduled/manual WSL smoke signal in `.github/workflows/wsl2-canary.yml`. Hosted runners cannot provide a reliable required nested-virtualization WSL2 gate. The canary installs Ubuntu's `nix-bin` package inside the distro, enables flakes, then runs the same enforced Home Manager setup path as Linux; failures are visible in that workflow and do not muddy the core e2e-install signal. |
 
 After the Lazy restore, deterministic Tree-sitter parser install, and Mason sync, each
 `setup.sh`/`setup.ps1` job also
@@ -610,7 +639,8 @@ bundled language remains on the runtimepath under `stdpath('data')`, and no
 managed nvim-treesitter query directory for a bundled language remains in the
 query install output, (1) every declared treesitter parser is one nvim-treesitter
 `main` supports, every expected parser `.so` and query directory is actually present in
-nvim-treesitter's installed output (including upstream paired parsers such as
+nvim-treesitter's installed output, and every explicit parser row has a managed
+`highlights.scm` query (including upstream paired parsers such as
 PHP's `php_only` and query-only dependencies), and no unexpected
 nvim-treesitter install-output parser `.so` is present under
 `stdpath('data')/site/parser` beyond the explicit list plus non-bundled upstream
@@ -620,7 +650,8 @@ through conform.nvim's production route with the expected external formatter(s)
 and produce no LSP warnings/errors afterward, (4) every language-matrix fixture
 opens with the expected filetype and every parser-backed row reports real
 Tree-sitter highlight captures after the smoke explicitly starts and parses the
-expected parser, and (5) the auto-started bundled filetypes keep
+expected parser, using `inspect_pos()` first and direct highlight-query capture
+iteration as the headless fallback, and (5) the auto-started bundled filetypes keep
 nvim-treesitter's `indentexpr`. The fast `make test-nvim` runs Tier 1
 (filetype + formatter + parser-list consistency per fixture), plus source-shape
 guards for formatter policy such as JSON-family Prettier trailing commas. Adding
@@ -702,19 +733,33 @@ update PRs are intentionally not configured.
 |---|---|---|
 | GitHub Actions | Managed, digest-pinned, labeled `github-actions` | Actions are repo-owned CI inputs with stable Renovate support. |
 | GitHub runner images | Managed, labeled `github-runners`, reviewed separately | `ubuntu-*`, `macos-*`, and `windows-*` bumps can change the supported CI platform, so they should not be mixed with ordinary Action bumps. |
-| Repo-pinned installer versions/refs | Managed, labeled `pinned-downloads`, never automerged | Neovim Linux tarballs, chezmoi CI release archives, lazygit Linux tarballs, Starship Linux tarballs, tree-sitter CLI Linux archives, WezTerm Ubuntu `.deb`, Herdr Linux binaries, Herdr Windows preview `.exe`, Hack Nerd Font, Windows Terminal portable zip, Ubuntu Ghostty, Pi CLI npm package, zsh plugin refs, tmux/psmux plugin refs, the Homebrew installer commit, the Scoop installer commit, the Renovate validator package/runtime, and the CI `cargo-binstall` commit are explicit repo pins. |
+| Repo-pinned installer versions/refs | Managed, labeled `pinned-downloads`, never automerged | Neovim Linux tarballs, chezmoi CI release archives, lazygit Linux tarballs, Starship Linux tarballs, tree-sitter CLI Linux archives, WezTerm Ubuntu `.deb`, Herdr Linux binaries, Herdr Windows preview `.exe`, Hack Nerd Font, Windows Terminal portable zip, Ubuntu Ghostty, Pi CLI npm package, zsh plugin refs, `setuptools`/`pylatexenc` converter pins, the Homebrew installer commit, the Scoop installer commit, the Renovate validator package/runtime, and the CI `cargo-binstall` commit are explicit repo pins. |
 | Adjacent SHA-256 / commit constants | Not managed; matched only as regex context | Renovate can bump the version/ref but cannot recompute archive/script hashes or verify tag commit IDs. CI must fail until a human recomputes and reviews them. |
 | Package-manager catalogs | Not managed | Brew, apt, dnf, pacman, zypper, apk, Scoop, winget, and choco entries are package names/IDs, not repo version pins. Let the package manager resolve current versions. |
 | Neovim plugin and Mason tools | Not managed | `lazy-lock.json` is refreshed with Lazy and tested as editor behavior; Mason intentionally has no machine-pinned lockfile. |
+
+Manual-review pin surfaces that Renovate may touch only partially:
+
+| Surface | Status |
+|---|---|
+| Polaris version/tag/commit | Manual-reviewed mirror between `setup.sh`, `setup.ps1`, README, CLAUDE, and `tests/static/pin_consistency_test.sh`. |
+| Scoop installer | Renovate can bump `ScoopInstaller/Install` commit `b0ee913725139b816f9178163af0aecdba07a7ed`; SHA `48f6ea398b3a3fa26fae0093d37bd85b13e7eaa5d1d4a3e208408768408e35ae` is human-reviewed. |
+| TPM/tmux plugin refs and psmux plugin ref | Commit pins are manual-reviewed and mirrored in docs/tests; Renovate does not recompute or prove tag commits. |
+| `setuptools`/`pylatexenc` | Renovate can bump versions; adjacent hashes remain human-reviewed. Current pins: `setuptools` 80.9.0, `pylatexenc` 2.10. |
+| Hack Nerd Font | Unix and Windows mirrors must stay identical; version/hash drift is caught by `pin_consistency_test.sh`. |
+| Pi CLI | Unix/Windows install pins and e2e assertions mirror version `0.80.3`; npm integrity is human-reviewed. |
 
 Direct network executables must be pinned and verified before execution, or be a
 reviewed exception whose verification is proved by the static scanner. Scoop
 bootstrap on Windows now downloads `ScoopInstaller/Install` from a pinned commit,
 verifies the installer SHA-256, then executes the local temp file (using
 `-RunAsAdmin` only for elevated CI). Homebrew bootstrap is downloaded from a
-pinned installer commit and SHA-256 verified before execution. Recommended setup
-docs use `git clone` plus local `setup`, not raw `curl | bash`/`iwr` execution of
-the current default branch.
+pinned installer commit and SHA-256 verified before execution. Microsoft's
+moving `vs_BuildTools.exe` alias is the reviewed exception: after download,
+`install-deps.ps1` requires a Valid Authenticode signature and Microsoft-owned
+signer/chain before `Start-Process`. Recommended setup docs use `git clone`
+plus local `setup`, not raw `curl | bash`/`iwr` execution of the current default
+branch.
 
 Direct-download SHA-256 values for Neovim tarballs, chezmoi CI release archives,
 lazygit tarballs, Starship tarballs, tree-sitter CLI archives, the WezTerm
@@ -1019,7 +1064,7 @@ MIT. See `LICENSE`.
 | `<leader>X` keymaps fire `\X` instead of `<Space>X` | mapleader set after lazy.setup somehow | restore the order in `nvim/init.lua` — leader **before** `require("lazy").setup` |
 | Formatter runs twice or shows two BufWritePre autocmds | someone added a second handler outside conform.nvim | `:lua print(#vim.api.nvim_get_autocmds({event="BufWritePre"}))` should be 1; if not, find the second autocmd and delete it |
 | Lazy/Tree-sitter/Mason says `No C compiler found` | WSL/Linux has `make` but no `cc`/`gcc`/`clang`; Tree-sitter parsers and some plugin builds compile native code | re-run `./setup.sh --skip-config` to install the Linux compiler toolchain, or on Ubuntu run `sudo apt-get update && sudo apt-get install -y build-essential`, then `./setup.sh --skip-deps --skip-config` |
-| Tree-sitter parser install reports temp-dir rename errors such as `ENOTEMPTY` | a previous or parallel parser build left a partial grammar cache | update this repo and rerun setup; setup/CI now serializes synchronous nvim-treesitter bootstrap installs and Tier 2 fails causally if any declared parser is missing |
+| Tree-sitter parser install reports temp-dir rename errors such as `ENOTEMPTY` | a previous or parallel parser build left a partial grammar/query cache | update this repo and rerun setup; setup/CI now serializes synchronous nvim-treesitter bootstrap installs, purges compiled parsers with incomplete managed query output, and Tier 2 fails causally if any declared parser or explicit highlight query is missing |
 | nvim treesitter parsers fail to compile on Windows / `cl.exe` not found | `nvim-treesitter` main builds parsers with the Rust `cc` crate, which needs MSVC env vars | run `.\setup.ps1 -All` to install VS Build Tools and let setup import the VS DevShell before parser installation; for ad-hoc `:TSUpdate`, open a "Developer PowerShell for VS" or rerun setup |
 | nvim syntax looks weak or files look plain text | Tree-sitter is inactive, or the hybrid built-in syntax fallback was not restored after Tree-sitter starts | update this repo, re-run setup, then check `:Inspect` on a token; parser-backed languages should show `treesitter` captures plus `syntax` groups, while `.bat` should show `syntax` groups |
 | Clipboard not crossing host on WSL | `win32yank.exe` not on PATH | install win32yank via scoop on Windows side, ensure WSL PATH picks it up |

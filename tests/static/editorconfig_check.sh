@@ -13,7 +13,7 @@ fi
 while IFS= read -r -d '' file; do
     editorconfig-checker "$file"
 done < <(find . \
-    \( -path './.git' -o -path './.claude' -o -path './tests/.cache' -o -path './home' \) -prune -o \
+    \( -path './.git' -o -path './.claude' -o -path './.codex' -o -path './.pi' -o -path './tests/.cache' -o -path './home' \) -prune -o \
     -type f \
     ! -name '.DS_Store' \
     ! -path './nvim/lazy-lock.json' \

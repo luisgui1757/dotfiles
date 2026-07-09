@@ -181,7 +181,7 @@ else
     echo "ok  : Nix bootstrap commands use locked flake refs, not mutable registry aliases"
 fi
 
-for f in .github/workflows/e2e-install.yml tests/greenfield/wsl-greenfield.ps1; do
+for f in .github/workflows/wsl2-canary.yml tests/greenfield/wsl-greenfield.ps1; do
     if ! grep -Fq "nix-bin" "$f"; then
         echo "FAIL: $f must install Ubuntu's nix-bin before WSL setup.sh validation"
         fail=1

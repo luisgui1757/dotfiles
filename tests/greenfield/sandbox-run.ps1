@@ -58,14 +58,30 @@ function Initialize-SandboxHost {
     if (Test-IsElevated) {
         New-Item -Path $key -Force | Out-Null
         New-ItemProperty -Path $key -Name $name -PropertyType DWord -Value 1 -Force | Out-Null
-        try { Set-MpPreference -DisableRealtimeMonitoring $true -ErrorAction Stop } catch {}
-        try { Add-MpPreference -ExclusionPath "$env:USERPROFILE\scoop", "$env:USERPROFILE\dotfiles", "$env:TEMP", "$env:LOCALAPPDATA" -ErrorAction Stop } catch {}
+        try {
+            Set-MpPreference -DisableRealtimeMonitoring $true -ErrorAction Stop
+        } catch {
+            Write-Verbose "Defender real-time scan reduction was not applied: $($_.Exception.Message)"
+        }
+        try {
+            Add-MpPreference -ExclusionPath "$env:USERPROFILE\scoop", "$env:USERPROFILE\dotfiles", "$env:TEMP", "$env:LOCALAPPDATA" -ErrorAction Stop
+        } catch {
+            Write-Verbose "Defender exclusion setup was not applied: $($_.Exception.Message)"
+        }
     } else {
         $elevatedCommands = @"
 New-Item -Path '$key' -Force | Out-Null
 New-ItemProperty -Path '$key' -Name '$name' -PropertyType DWord -Value 1 -Force | Out-Null
-try { Set-MpPreference -DisableRealtimeMonitoring `$true -ErrorAction Stop } catch {}
-try { Add-MpPreference -ExclusionPath "`$env:USERPROFILE\scoop","`$env:USERPROFILE\dotfiles","`$env:TEMP","`$env:LOCALAPPDATA" -ErrorAction Stop } catch {}
+try {
+    Set-MpPreference -DisableRealtimeMonitoring `$true -ErrorAction Stop
+} catch {
+    Write-Verbose "Defender real-time scan reduction was not applied: `$(`$_.Exception.Message)"
+}
+try {
+    Add-MpPreference -ExclusionPath "`$env:USERPROFILE\scoop","`$env:USERPROFILE\dotfiles","`$env:TEMP","`$env:LOCALAPPDATA" -ErrorAction Stop
+} catch {
+    Write-Verbose "Defender exclusion setup was not applied: `$(`$_.Exception.Message)"
+}
 "@
         $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($elevatedCommands))
         Start-Process -FilePath 'powershell.exe' -Verb RunAs -Wait -ArgumentList '-NoProfile', '-EncodedCommand', $encoded

@@ -20,11 +20,16 @@ greenfield runbook.
 | zshenv | `shells/zshenv`; `home/dot_zshenv` | POSIX: `~/.zshenv`; Windows: ignored | POSIX symlink via `mode = "symlink"`. |
 | zshrc | `shells/zshrc`; `home/dot_zshrc` | POSIX: `~/.zshrc`; Windows: ignored | POSIX symlink via `mode = "symlink"`. |
 | Ghostty | `ghostty/config`; `home/.chezmoitemplates/ghostty/config` | macOS: `~/Library/Application Support/com.mitchellh.ghostty/config`; Linux: `~/.config/ghostty/config`; Windows: n/a | Per-path POSIX `symlink_config.tmpl` entries into `.chezmoitemplates`. |
+| WezTerm | `wezterm/wezterm.lua`; `home/.chezmoitemplates/wezterm/wezterm.lua`; `home/dot_config/wezterm/wezterm.lua` | macOS/Linux/WSL GUI opt-in: `~/.config/wezterm/wezterm.lua`; Windows: `%USERPROFILE%\.config\wezterm\wezterm.lua` | POSIX path-specific symlinks; Windows copy. WSL skips Linux GUI terminal config unless setup passes the explicit GUI override. |
+| AeroSpace | `aerospace/aerospace.toml`; `home/dot_config/aerospace/aerospace.toml` | macOS: `~/.config/aerospace/aerospace.toml`; Linux/Windows: ignored | macOS symlink via `mode = "symlink"`. |
 | lazygit | `lazygit/config.yml`; `home/.chezmoitemplates/lazygit/config.yml` | macOS: `~/Library/Application Support/lazygit/config.yml`; Linux/WSL: `~/.config/lazygit/config.yml`; Windows: `%LOCALAPPDATA%\lazygit\config.yml` | POSIX path-specific symlinks; Windows rendered copy from the shared template. |
+| gh-dash | `gh-dash/config.yml`; `home/dot_config/gh-dash/config.yml` | macOS/Linux/WSL: `~/.config/gh-dash/config.yml`; Windows: `%USERPROFILE%\.config\gh-dash\config.yml` | POSIX symlink via `mode = "symlink"`; Windows copy via `mode = "file"`. |
 | lsd | `lsd/config.yaml`; `lsd/colors.yaml`; `home/dot_config/lsd/config.yaml`; `home/dot_config/lsd/colors.yaml` | macOS/Linux/WSL: `~/.config/lsd/{config.yaml,colors.yaml}`; Windows: `%USERPROFILE%\.config\lsd\{config.yaml,colors.yaml}` | POSIX symlink via `mode = "symlink"`; Windows copy via `mode = "file"`. The shell profiles own Rose Pine `LS_COLORS` for file/directory names, with `DOTFILES_LS_COLORS` as the explicit override; `colors.yaml` owns long-list metadata. |
 | tmux | `tmux/tmux.conf`; `home/dot_tmux.conf` | POSIX: `~/.tmux.conf`; Windows: `%USERPROFILE%\.tmux.conf` | POSIX symlink via `mode = "symlink"`; Windows copy via `mode = "file"`. |
 | tmux Windows overlay | `tmux/tmux.windows.conf`; `home/dot_tmux.windows.conf` | Windows: `%USERPROFILE%\.tmux.windows.conf`; POSIX: ignored | Windows copy only; `tmux.conf` sources it with `source-file -q`. |
 | tmux POSIX overlay | `tmux/tmux.posix.conf`; `home/dot_tmux.posix.conf` | POSIX: `~/.tmux.posix.conf`; Windows: ignored | POSIX symlink only. Holds the native-clipboard `if-shell` probes, which hang psmux at config-load time, so it is **never** deployed on Windows; `tmux.conf` sources it with `source-file -q`. |
+| psmux | `tmux/psmux.conf`; `home/dot_psmux.conf` | Windows: `%USERPROFILE%\.psmux.conf`; POSIX: ignored | Windows copy only. It is the first native-Windows multiplexer entrypoint and source-files the tmux Windows overlay. |
+| Generated Rose Pine tmux/psmux bar | `tmux/psmux-rose-pine.ps1`; generated `tmux/psmux-rose-pine.{main,moon,dawn}.conf`; `home/dot_tmux.rose-pine.ps1`; `home/dot_tmux.rose-pine.*.conf` | POSIX/Windows: `~/.tmux.rose-pine.{main,moon,dawn}.conf`; Windows also gets `~/.tmux.rose-pine.ps1` | Source generator plus checked generated configs; POSIX symlinks, Windows copies. |
 | Windows Terminal | `windows-terminal/settings.fragment.jsonc`; `home/.chezmoitemplates/windows-terminal/settings.fragment.jsonc` | Windows: `%LOCALAPPDATA%\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json` | `setup.ps1` backs up an existing pre-merge file, then `modify_settings.json.ps1.tmpl` performs the read-modify-write merge. chezmoi owns only the packaged target; after apply, `setup.ps1` mirrors that file to the unpackaged portable WT path (`%LOCALAPPDATA%\Microsoft\Windows Terminal\settings.json`), or -- when no packaged WT exists (e.g. Windows Sandbox / portable-only) -- seeds or merges the Rose Pine + Hack Nerd Font settings into it directly via the shared `merge-settings.ps1` helper. |
 | PowerShell profile | `shells/powershell_profile.ps1`; `home/Documents/PowerShell/Microsoft.PowerShell_profile.ps1` | Windows PS7: `%USERPROFILE%\Documents\PowerShell\Microsoft.PowerShell_profile.ps1`; Windows PowerShell 5.1 and POSIX pwsh profile paths stay out of chezmoi scope | Windows PS7 profile copy via `mode = "file"`. |
 | zsh plugins | `home/.chezmoiexternal.toml.tmpl`; `home/.chezmoiscripts/run_onchange_after_20-verify-zsh-plugin-pins.sh.tmpl` | POSIX: `~/.local/share/dotfiles/zsh-plugins/{fzf-tab,zsh-autosuggestions}`; Windows: ignored | Pinned `.chezmoiexternal` git repos plus `run_onchange_` exact-commit assertion. |
@@ -43,8 +48,12 @@ Provisioning stays in `install-deps`, not chezmoi run-scripts:
 - package installs from Unix `PKG_TABLE` and Windows `$Catalog`
 - psmux installation on Windows, including the hardened `Add-ScoopBucketSafe`
   bucket-add path in `install-deps.ps1`
-- the 5 pinned binary/font installers: Neovim Linux, lazygit Linux, Hack Nerd
-  Font, Ubuntu Ghostty, and win32yank
+- pinned binary/font/script installers and direct artifacts: Homebrew installer,
+  Neovim Linux, native-Linux chezmoi, lazygit Linux, Starship Linux,
+  tree-sitter CLI Linux, WezTerm Ubuntu `.deb`, Herdr Linux, Herdr Windows
+  preview, Hack Nerd Font, Windows Terminal portable zip, Ubuntu Ghostty, Scoop
+  installer, Pi CLI npm package/integrity, and pinned `setuptools`/`pylatexenc`
+  converter wheels/sdists
 - the zsh login-shell switch and domain-account fallback
 - devilspie2 package install, daemon rule, and autostart entry
 - VS Code install, `mvllow.rose-pine` extension install, and
@@ -142,19 +151,24 @@ broken repo-symlink still cleaned) is covered by
       `install-deps.sh` installs there, `shells/zshrc` sources there first, the
       verifier checks there, uninstall removes there, and parity tests assert
       that root under a hostile `XDG_DATA_HOME`.
-- [x] Live `main` protection requires `chezmoi-parity`,
-      `chezmoi-parity-macos`, and `chezmoi-parity-windows` as of 2026-06-18.
-      `scripts/apply-repo-safeguards.sh luisgui1757/dotfiles` applied and
-      verified the active integrity ruleset plus the classic branch-protection
-      fallback. The integrity ruleset is active, strict, and has no bypass
-      actors; the classic fallback is strict and has the same required context
-      set.
+- [x] Checked-in `main` protection sources require `ubuntu`, `macos`, `windows`,
+      `chezmoi-parity`, `chezmoi-parity-macos`, `chezmoi-parity-windows`,
+      `nix flake check (ubuntu-24.04)`, `nix flake check (macos-26)`,
+      `e2e containers / ubuntu-24.04`, `setup.sh / ubuntu-24.04`,
+      `setup.sh / macos-26`, and `setup.ps1 / windows-2025` as of
+      2026-07-09. Applying them live remains an owner/admin action through
+      `scripts/apply-repo-safeguards.sh luisgui1757/dotfiles`; the static
+      required-check alignment test keeps ruleset/settings/script mirrors in
+      sync.
 
 ### Open
 
-- [ ] N-green-runs counter for Wave C: `0 / 10` consecutive green Ubuntu parity
-      runs recorded in `tests/greenfield/LEDGER.md`. This counter remains owner
-      release evidence alongside green macOS/Windows parity arms.
+- [ ] Greenfield evidence remains intentionally sparse: `tests/greenfield/LEDGER.md`
+      still records no Windows Sandbox, WSL, macOS VM, or Linux VM clean-machine
+      run after the initial static docs guard. Do not count required CI as manual
+      desktop greenfield evidence. The old Wave C `0 / 10` Ubuntu parity counter
+      is no longer the current release gate; current CI proof is the required
+      parity/e2e/Nix workflow set plus any explicit ledger entries.
 - [ ] No secrets or `age` tier has been started.
 - [ ] The Windows PowerShell profile managed by chezmoi is the PowerShell 7
       path (`Documents\PowerShell\Microsoft.PowerShell_profile.ps1`). The

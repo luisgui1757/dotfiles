@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC1091,SC2329
 # setup.sh enforces the nix-darwin package layer on macOS by default. Prove:
 # default --all invokes the sudo activation shape; dry-run only PREVIEWS (never
 # switches); --skip-deps is the explicit already-provisioned escape even when

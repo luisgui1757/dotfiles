@@ -100,6 +100,29 @@ ps_const() { grep -E "^[[:space:]]*\\\$$1[[:space:]]*=" install-deps.ps1 | head 
 tpm_commit="$(sh_const TPM_COMMIT)"
 psmux_plugins_commit="$(ps_const PsmuxPluginsCommit)"
 
+# --- mirrored direct pins: install-deps.sh <-> install-deps.ps1 <-> docs ------
+assert_eq "Hack Nerd Font version (install-deps.sh == install-deps.ps1)" \
+    "$(sh_const HACK_NERD_FONT_VERSION)" "$(ps_const HackNerdFontVersion)"
+assert_eq "Hack Nerd Font SHA (install-deps.sh == install-deps.ps1)" \
+    "$(sh_const HACK_NERD_FONT_SHA256)" "$(ps_const HackNerdFontSha256)"
+assert_eq "pylatexenc build backend version (install-deps.sh == install-deps.ps1)" \
+    "$(sh_const PYLATEXENC_BUILD_BACKEND_VERSION)" "$(ps_const PylatexencBuildBackendVersion)"
+assert_eq "pylatexenc build backend SHA (install-deps.sh == install-deps.ps1)" \
+    "$(sh_const PYLATEXENC_BUILD_BACKEND_SHA256)" "$(ps_const PylatexencBuildBackendSha256)"
+assert_eq "pylatexenc version (install-deps.sh == install-deps.ps1)" \
+    "$(sh_const PYLATEXENC_VERSION)" "$(ps_const PylatexencVersion)"
+assert_eq "pylatexenc SHA (install-deps.sh == install-deps.ps1)" \
+    "$(sh_const PYLATEXENC_SHA256)" "$(ps_const PylatexencSha256)"
+
+scoop_installer_commit="$(ps_const ScoopInstallerCommit)"
+scoop_installer_sha="$(ps_const ScoopInstallerSha256)"
+for doc in README.md CLAUDE.md; do
+    assert_contains "Scoop installer commit ($doc)" "$doc" "$scoop_installer_commit"
+    assert_contains "Scoop installer SHA ($doc)" "$doc" "$scoop_installer_sha"
+    assert_contains "pylatexenc build backend version ($doc)" "$doc" "$(sh_const PYLATEXENC_BUILD_BACKEND_VERSION)"
+    assert_contains "pylatexenc version ($doc)" "$doc" "$(sh_const PYLATEXENC_VERSION)"
+done
+
 for pin_name in TPM_COMMIT TMUX_SENSIBLE_COMMIT TMUX_YANK_COMMIT TMUX_RESURRECT_COMMIT TMUX_CONTINUUM_COMMIT; do
     pin_value="$(sh_const "$pin_name")"
     if [[ ! "$pin_value" =~ ^[0-9a-f]{40}$ ]]; then

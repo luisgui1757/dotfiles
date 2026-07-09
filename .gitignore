@@ -13,3 +13,5 @@ tests/**/tmp/
 # This repo no longer ships a synced claude/ folder; preferences live here only
 # locally. Anything that lands in .claude/ is per-machine noise.
 .claude/
+.codex/
+.pi/
