@@ -150,7 +150,7 @@ Phase 3 sync.
 
 **Theoretical (no current repro, keep on the radar):** the async
 `nvim_treesitter.install(...)` racing headless `+qa`; CLI/parser version skew
-(Linux pins CLI v0.26.9, macOS/Windows take the package-manager version while the
+(Linux pins CLI v0.26.10, macOS/Windows take the package-manager version while the
 plugin commit is lockfile-pinned).
 
 **Guard verdict (agreed):** `f80e128` is the right *legibility* fix but not the

@@ -74,7 +74,7 @@ Sequenced PRs (split for independent, revertable blast radius):
 - **PR-1 `feat/ergonomics-core` - DONE (merged as #42).** No Nix, no vi-mode.
   Neovim `scrolloff = 16`; which-key.nvim (`<leader>?`, VeryLazy); zoxide across
   zsh + PowerShell + both installers (cached, no-`Invoke-Expression` PowerShell
-  init); `gh` + pinned `gh-dash` extension (`v4.25.0`) with a chezmoi-managed
+  init); `gh` + pinned `gh-dash` extension (`v4.25.1`) with a chezmoi-managed
   same-path config and Renovate / pin-consistency coverage.
 - **PR-2 `feat/vi-mode` - DONE (merged as #43).** zsh (`bindkey -v`) +
   PSReadLine (`-EditMode Vi`) command-line vi-mode with a full re-bind matrix
@@ -174,7 +174,7 @@ Commit-by-commit status:
   `/mnt/c`); native install arms RETAINED for deferred/artifact provisioning and
   regression proof. **nvim + the tree-sitter CLI are intentionally deferred with proof:**
   they are ABI-coupled (nvim-treesitter `main` compiles parsers whose ABI must
-  match nvim's built-in libtree-sitter; the CLI is pinned to v0.26.9 — invariant
+  match nvim's built-in libtree-sitter; the CLI is pinned to v0.26.10 — invariant
   19), so a nix nvim/tree-sitter shadowing the pinned native binaries would risk
   the E5113 parser/ABI mismatch. They stay native until nvim + its parser
   toolchain can move into one ABI-matched Nix closure (follow-up). Excluded from

@@ -93,8 +93,8 @@ DRY_RUN=0
 output="$(install_nvim_linux)"
 
 [[ "$output" == *"installed nvim"* ]]
-grep -F "https://github.com/neovim/neovim/releases/download/v0.12.3/nvim-linux-x86_64.tar.gz" "$TMP_ROOT/curl.log" >/dev/null
-grep -F "c441b547142860bf01bcce39e36cbed185c41112813e15443b16e5237750724d" "$TMP_ROOT/sha.log" >/dev/null
+grep -F "https://github.com/neovim/neovim/releases/download/v0.12.4/nvim-linux-x86_64.tar.gz" "$TMP_ROOT/curl.log" >/dev/null
+grep -F "012bf3fcac5ade43914df3f174668bf64d05e049a4f032a388c027b1ebd78628" "$TMP_ROOT/sha.log" >/dev/null
 grep -F -- "-xzf" "$TMP_ROOT/tar.log" >/dev/null
 grep -F -- "-C /opt" "$TMP_ROOT/tar.log" >/dev/null
 grep -F "/opt/nvim-linux-x86_64" "$TMP_ROOT/sudo.log" >/dev/null

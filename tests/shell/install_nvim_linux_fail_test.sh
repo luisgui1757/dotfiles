@@ -82,7 +82,7 @@ if output="$(install_nvim_linux 2>&1)"; then
 fi
 
 [[ "$output" == *"FAIL: checksum mismatch for nvim-linux-x86_64.tar.gz"* ]]
-grep -F "c441b547142860bf01bcce39e36cbed185c41112813e15443b16e5237750724d" "$TMP_ROOT/sha.log" >/dev/null
+grep -F "012bf3fcac5ade43914df3f174668bf64d05e049a4f032a388c027b1ebd78628" "$TMP_ROOT/sha.log" >/dev/null
 if [[ -e "$TMP_ROOT/tar.log" ]]; then
     echo "FAIL: extraction ran after checksum failure" >&2
     exit 1
