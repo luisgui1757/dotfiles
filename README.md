@@ -587,7 +587,10 @@ Pull requests are meant to be gated by two workflows:
   fatal.
 - `.github/workflows/e2e-install.yml` is the real install guarantee. It proves
   the public setup paths on fresh hosted runners and keeps one clean Ubuntu
-  container for the native `apt` branch.
+  container for the native `apt` branch. Its setup caches include the
+  `actions/cache` major version in their keys, so a cache-action major upgrade
+  proves itself with a fresh archive instead of reusing one produced by the
+  previous major.
 
 The e2e jobs cover different install paths, not symmetric container platforms:
 

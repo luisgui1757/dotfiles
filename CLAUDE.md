@@ -529,6 +529,12 @@ and the compact form has ambiguous failure semantics.
 `e2e-install.yml` is the required real-install gate. The jobs cover different
 install paths, not symmetric container platforms:
 
+The setup caches in this workflow include the pinned `actions/cache` major
+version in their keys. When Renovate bumps `actions/cache` across a major,
+update the cache-key major segment with it so the new action proves the install
+path from a fresh archive instead of inheriting state produced by the previous
+major; `tests/static/repo_policy_test.sh` enforces this.
+
 - `e2e containers / ubuntu-24.04` runs an `ubuntu:24.04` container on an Ubuntu
   runner with `DOTFILES_SKIP_BREW_BOOTSTRAP=1`, creates a non-root user, runs
   real `install-deps.sh --all` (native `apt`, no Linuxbrew), then applies

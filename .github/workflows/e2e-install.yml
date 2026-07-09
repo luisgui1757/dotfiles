@@ -85,9 +85,9 @@ jobs:
             ~/Library/Caches/nvim
             ~/Library/Application Support/nvim/lazy
             ~/Library/Application Support/nvim/mason
-          key: ${{ runner.os }}-setup-sh-${{ hashFiles('nvim/lazy-lock.json', 'nvim/lua/plugins/**/*.lua') }}
+          key: ${{ runner.os }}-setup-sh-actions-cache-v6-${{ hashFiles('nvim/lazy-lock.json', 'nvim/lua/plugins/**/*.lua') }}
           restore-keys: |
-            ${{ runner.os }}-setup-sh-
+            ${{ runner.os }}-setup-sh-actions-cache-v6-
 
       - name: Run setup.sh end-to-end
         run: |
@@ -243,9 +243,9 @@ jobs:
             ~\AppData\Local\nvim-data\lazy
             ~\AppData\Local\nvim-data\mason
             ~\AppData\Local\nvim-data\site
-          key: Windows-setup-ps1-${{ hashFiles('nvim/lazy-lock.json', 'nvim/lua/plugins/**/*.lua') }}
+          key: Windows-setup-ps1-actions-cache-v6-${{ hashFiles('nvim/lazy-lock.json', 'nvim/lua/plugins/**/*.lua') }}
           restore-keys: |
-            Windows-setup-ps1-
+            Windows-setup-ps1-actions-cache-v6-
 
       - name: Run setup.ps1 end-to-end
         run: |
