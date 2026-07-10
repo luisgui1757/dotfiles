@@ -19,6 +19,13 @@ when someone inspected it on that machine.
 - Packaged-plus-portable Windows Terminal preservation and independent uninstall
   recovery are automated in Pester but still await a real dual-install run; add
   an evidence row only after recording the exact SHA and environment.
+- The Windows hosted E2E now asserts Hack Nerd Font files and registry
+  registration, but no result is recorded until the exact PR-head run finishes.
+  Likewise, logical required-check artifacts are workflow plumbing, not a
+  greenfield environment entry.
+- Renovate schema/local extraction passed locally; hosted Dashboard ownership
+  remains pending until the bot reruns against the exact PR head. Do not record
+  a Dashboard row here as Intel, WSL, redirected-Windows, or desktop proof.
 
 ## Entry Template
 

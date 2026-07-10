@@ -27,8 +27,9 @@ if [[ ! -f "$IGNORE_TEMPLATE" ]]; then
 fi
 
 # Expected rendered ignore SET per OS. Dir-level gating: a wrong-OS bucket
-# (Library on non-darwin, AppData/Documents on non-windows, .config/{lazygit,
-# ghostty} off-linux, .zshenv/.zshrc/.config/nvim on windows) is ignored whole so
+# (Library on non-darwin, AppData/Documents in dedicated Windows overlays,
+# .config/{lazygit,ghostty} off-linux, .zshenv/.zshrc/.config/nvim on windows)
+# is ignored whole so
 # chezmoi never creates an empty wrong-OS parent dir. Bash 3.2-safe (no assoc
 # arrays / mapfile).
 expected_for() {
@@ -37,7 +38,7 @@ expected_for() {
         linux)     printf '%s\n' ".config/aerospace" ".psmux.conf" ".tmux.rose-pine.ps1" ".tmux.windows.conf" "AppData" "Documents" "Library" ;;
         linux-wsl) printf '%s\n' ".config/aerospace" ".config/ghostty" ".config/wezterm" ".psmux.conf" ".tmux.rose-pine.ps1" ".tmux.windows.conf" "AppData" "Documents" "Library" ;;
         linux-wsl-gui) printf '%s\n' ".config/aerospace" ".psmux.conf" ".tmux.rose-pine.ps1" ".tmux.windows.conf" "AppData" "Documents" "Library" ;;
-        windows)   printf '%s\n' ".config/aerospace" ".config/ghostty" ".config/lazygit" ".config/nvim" ".tmux.posix.conf" ".zshenv" ".zshrc" "Library" ;;
+        windows)   printf '%s\n' ".config/aerospace" ".config/ghostty" ".config/lazygit" ".config/nvim" ".tmux.posix.conf" ".zshenv" ".zshrc" "AppData" "Documents" "Library" ;;
         *)         fail "unsupported OS fixture: $1" ;;
     esac
 }

@@ -191,7 +191,10 @@ that violates one of these, fix it instead of disabling the test.
     `…/site`; the install prefix does not), and query-directory deletes are
     **scoped to nvim-treesitter's `get_install_dir("queries")` output**, which
     must also live under `stdpath('data')`. An unscoped delete would wipe
-    Neovim's OWN built-in runtime. `c` and `vim` are bundled but not
+    Neovim's OWN built-in runtime. Every managed removal goes through
+    `nvim/lua/util/checked_delete.lua`, checks `vim.fn.delete()`'s result, and
+    verifies absence; synchronous setup fails if a parser, parser-info, or query
+    path remains. `c` and `vim` are bundled but not
     auto-started, so the config starts them via
     `nvim_bundled_started_here = { "c", "vim" }`. See "Add a treesitter parser".
     Guarded by `treesitter_spec.lua`, `language_smoke_spec.lua`, and the Tier-2
@@ -327,6 +330,30 @@ that violates one of these, fix it instead of disabling the test.
     exact recovery instructions. Guarded by `setup_target_identity_test.sh`,
     `setup_nix_darwin_test.sh`, and both architecture evaluations in
     `darwin_config_test.sh`.
+25. **Windows setup uses application-consumed known folders, not fabricated
+    children of UserProfile.** Resolve UserProfile, LocalApplicationData,
+    Documents, and runtime `$PROFILE` independently. The main chezmoi source is
+    UserProfile-only; `windows/chezmoi-localappdata` and
+    `windows/chezmoi-documents` are explicit destination overlays with separate
+    persistent state. Post-apply checks cover nvim, lazygit, ConsoleHost, VS
+    Code, and ISE. Recognized conventional legacy targets migrate only after
+    successful publication; divergent legacy user data is preserved. Uninstall
+    enumerates the same three source states. Guarded by Setup/Uninstall Pester
+    and the Windows apply/round-trip migration suites.
+26. **PowerShell profiles run only for an actual interactive invocation.** The
+    guard executes before cache path construction and rejects
+    `-NonInteractive`, batch `-Command`/`-File`/encoded/stdin modes without
+    `-NoExit`, redirected stdin/stdout/stderr, CI, and unsupported hosts.
+    `[Environment]::UserInteractive` and host name are context, not a sufficient
+    invocation predicate. Normal ConsoleHost, VS Code, and ISE stay supported.
+27. **Required check identities migrate without renaming deadlock.**
+    `.github/check-identities.json` is stage metadata. During stage 1, legacy
+    runner-versioned checks remain required while stable logical jobs verify
+    exact per-OS proof artifacts bound to the same run and head SHA. Never make
+    a no-op check to manufacture green status, and never switch live contexts in
+    the emitting PR. Follow `docs/security/branch-protection.md`: observe the
+    logical checks on merged `main`, merge the checked-in context-switch PR
+    while legacy checks still gate it, then have the owner apply live safeguards.
 
 ## Common workflows
 
@@ -345,6 +372,12 @@ to lazy-loading (`event` / `cmd` / `keys` / `ft`). Only `rose-pine` may set
    (under the `mason-tool-installer` config block).
 3. Add the server name to `tests/nvim/spec/lsp_spec.lua`'s `required_servers`
    so the static-check catches a future accidental removal.
+
+For clangd, do not calculate a process-wide `--compile-commands-dir` from
+Neovim's startup cwd. Let each client discover `compile_commands.json` from its
+actual file/project ancestors (including `build/`).
+`clangd_projects_spec.lua` starts two real clients with different databases in
+one Neovim process and requires isolated roots, flags, and diagnostics.
 
 > **Headless-install gotcha:** `mason-tool-installer` is `event = "VeryLazy"`
 > (interactive auto-install via `run_on_start`) **and** registers its commands
@@ -564,9 +597,9 @@ When adding a new spec:
 `test.yml` remains the fast cross-platform suite and now also owns Renovate
 schema validation and the `chezmoi-parity` migration gate. Warnings are treated
 as failures where the tools expose them cleanly: shellcheck exits nonzero,
-PSScriptAnalyzer scans the meaningful `.ps1` surface and fails on errors, new
-warning groups, or count increases beyond the reviewed installer/test-harness
-style baseline in `test.ps1`, yamllint/parser checks are part of
+PSScriptAnalyzer scans the meaningful `.ps1` surface and fails on errors, exact
+group-count drift, or any change to the normalized
+script/rule/message/extent fingerprint in `test.ps1`; yamllint/parser checks are part of
 `make test-static`, `scripts/validate-renovate.sh` fails when `npx` is missing
 under `CI=true`, and Windows CI treats missing test dependencies as fatal.
 PSGallery module installs in Windows CI use bounded retries for transient
@@ -621,7 +654,8 @@ major; `tests/static/repo_policy_test.sh` enforces this.
   did not install expected tools. Windows e2e
   also asserts the new Windows tools that must leave PATH commands behind
   (`zoxide`, `gh`, `wezterm`, `herdr`, `pi`), so an installer that exits 0 but fails
-  its command probe cannot fake-green. The macOS jobs run Ghostty's real
+  its command probe cannot fake-green. Windows also requires Hack Nerd Font
+  files plus registry registration. The macOS jobs run Ghostty's real
   `+validate-config`, WezTerm's real config-loading `show-keys` path, and launch
   then query AeroSpace to prove the app consumed the managed config. This is
   automated runtime proof, not manual desktop visual proof. Scheduled/manual
@@ -669,7 +703,8 @@ major; `tests/static/repo_policy_test.sh` enforces this.
   gate. Failures are visible in that workflow; do not hide the entire job behind
   job-level `continue-on-error`. The canary installs Ubuntu's `nix-bin` package
   inside the distro and enables flakes before running the enforced Home Manager
-  path; that keeps the signal aligned with public setup.
+  path; it disables the WSL distro cache so scheduled/manual evidence is not
+  inherited. That keeps the signal aligned with public setup.
   The required WSL proxy is the Linux Ubuntu container plus the existing
   WSL config-template/static coverage. Full WSL host/guest validation is
   manual: install Nix inside WSL, run `./tests/wsl/e2e.sh` from inside WSL after
@@ -740,11 +775,16 @@ mirrors. `tests/static/pin_consistency_test.sh` is the canonical drift guard —
 fails CI when any mirror disagrees. When you bump a pin, update every mirror and
 keep that test green.
 
-Validate `renovate.json` locally with Renovate's own schema validator, not just
-`jq`: run `scripts/validate-renovate.sh`, `make validate-renovate`, or `make ci`
+Validate `renovate.json` locally with Renovate's own schema validator and local
+extract dry run, not just `jq`: run `scripts/validate-renovate.sh`, `make validate-renovate`, or `make ci`
 for the full pre-PR bundle. Do not hardcode transient Node/Renovate package
 versions in docs or prompts; the script owns the pinned runtime/package pair and
-keeps Renovate's engine requirements out of ad-hoc command examples.
+keeps Renovate's engine requirements out of ad-hoc command examples. The
+official extraction must equal `tests/static/renovate_expected_inventory.txt`;
+regex matchability alone is not evidence that Renovate owns the dependency.
+The beta Nix manager stays explicitly enabled, matrix runner labels use the
+`github-runners` datasource, Scoop follows upstream `master`, and
+`rebaseWhen = behind-base-branch` matches the strict-behind-main policy.
 
 `tests/static/json_lint.sh` only checks JSON syntax. Its JSONC path strips `//`
 comments with a string-aware Python pass so URL values like `https://...` and
@@ -831,19 +871,18 @@ save only**. The next plain `:w` formats normally. Implemented in
   implementation. `profiles.defaults` is
   replaced wholesale, so keys inside it (e.g. `scrollbarState`) need no
   merge-template change. The nvim tree is intentionally NOT
-  copied under `home/`: POSIX `home/dot_config/symlink_nvim.tmpl` and Windows
-  `home/AppData/Local/symlink_nvim.tmpl` both point at
-  `{{ .chezmoi.sourceDir }}/../nvim`, so managed targets resolve to the repo
-  top-level `nvim/` directory. Windows nvim is therefore still a
+  copied under `home/`: POSIX `home/dot_config/symlink_nvim.tmpl` and the
+  redirected-known-folder source `windows/chezmoi-localappdata/symlink_nvim.tmpl`
+  both point at the repo top-level `nvim/` directory. Windows nvim is therefore still a
   directory symlink and still needs Developer Mode or elevation; the
   no-Developer-Mode win applies to simple copied files. Do not use `exact_` for
   nvim; app runtime state lives outside `.config/nvim`, but user/plugin-added
   config files should not be deleted by chezmoi. `home/.chezmoiignore` must gate
-  whole wrong-OS directories to avoid empty parent dirs. The Windows PowerShell
-  7 profile path is managed at
-  `Documents/PowerShell/Microsoft.PowerShell_profile.ps1`; the Windows
-  PowerShell 5.1 profile path under `Documents/WindowsPowerShell/` is out of
-  scope because this repo is pwsh-first. POSIX pwsh profile management remains
+  whole wrong-OS directories to avoid empty parent dirs. Windows setup resolves
+  the actual LocalApplicationData and Documents known folders plus runtime
+  `$PROFILE`, then applies dedicated source states for nvim/lazygit and the
+  Console/VS Code/ISE PowerShell profiles. Never restore hardcoded
+  `home/AppData` or `home/Documents` targets. POSIX pwsh profile management remains
   outside the static chezmoi source tree because it depends on which host shell
   and `$PROFILE` path are available after `pwsh` is installed. WSL is gated
   through `home/.chezmoi.toml.tmpl`'s `isWsl` data value:

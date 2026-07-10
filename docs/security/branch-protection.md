@@ -34,15 +34,35 @@ the script fails closed; delete the duplicate live ruleset before re-running it.
 
 ## Context Renames
 
-Required-check context renames must be applied in the checked-in rulesets and
-then applied live before the rename PR merges. The integrity ruleset has no
-bypass actors, so a live ruleset that still requires an old context such as
-`setup.sh / macos-15` can block the renamed `setup.sh / macos-26` PR even when
-the workflow file and checked-in rulesets are correct. The owner command is:
+Never rename a required check in place. The integrity ruleset has no bypass
+actors, so removing an old context before the live setting changes deadlocks the
+PR; requiring a new context before GitHub has observed it creates the inverse
+deadlock. `.github/check-identities.json` records the transition.
+
+Stage 1 is this branch: legacy runner-versioned contexts remain required in all
+four safeguard sources, while workflows also emit stable per-OS logical checks.
+Each new check downloads the exact producer artifact and verifies the head SHA,
+run id/attempt, logical identity, and legacy producer through
+`scripts/ci-logical-proof.sh`; it is not a fake/no-op check.
+
+After this PR merges, use this exact sequence:
+
+1. Verify all six logical checks passed on the merged `main` SHA.
+2. Open a second PR changing `.github/check-identities.json` to the candidate
+   stage and updating `.github/settings.yml`,
+   `.github/rulesets/main-integrity.json`, and
+   `scripts/apply-repo-safeguards.sh` to `candidateRequired`. Do not remove the
+   legacy producer jobs; they still let the live legacy ruleset gate this PR.
+3. Merge that second PR only after the still-live legacy contexts pass.
+4. From updated `main`, have the owner apply the checked-in safeguards:
 
 ```bash
 scripts/apply-repo-safeguards.sh luisgui1757/dotfiles
 ```
+
+5. Verify both the integrity ruleset and classic fallback require the candidate
+   logical set. Runner labels can then change without renaming a required
+   context. No live ruleset mutation is authorized from the stage-1 PR.
 
 ## Verify
 
@@ -67,19 +87,24 @@ gh api repos/luisgui1757/dotfiles/actions/permissions \
   --jq '{enabled,allowed_actions,sha_pinning_required}'
 ```
 
-Expected live posture:
+Checked-in desired posture during stage 1 (the current live exception is called
+out immediately below):
 
 - merge commits disabled;
 - rebase merges disabled;
 - squash merges enabled;
 - auto-merge disabled;
-- Actions enabled with `sha_pinning_required: true`;
+- Actions enabled with `sha_pinning_required: true` after the owner applies the
+  post-merge safeguard update;
 - required checks are strict and include exactly:
   `ubuntu`, `macos`, `windows`, `chezmoi-parity`, `chezmoi-parity-macos`,
   `chezmoi-parity-windows`, `nix flake check (ubuntu-24.04)`,
   `nix flake check (macos-26)`, `e2e containers / ubuntu-24.04`,
   `setup.sh / ubuntu-24.04`, `setup.sh / macos-26`, and
   `setup.ps1 / windows-2025` in both the integrity ruleset and classic fallback;
+- the workflows additionally emit the six `candidateRequired` logical contexts
+  in `.github/check-identities.json`, but they are not live-required until the
+  second checked-in migration PR and owner apply above;
 - only `Protect main: review` and `Protect main: owner updates` have bypass actors;
 - each bypass actor is `luisgui1757` with `bypass_mode: pull_request`;
 - `Protect main: integrity` has no bypass actors.

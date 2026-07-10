@@ -13,54 +13,60 @@ safeguards_json="$tmp/safeguards-json.txt"
 safeguards_function="$tmp/safeguards-function.txt"
 ruleset="$tmp/ruleset.txt"
 
-{
-  awk '
-    /^jobs:/ { in_jobs = 1; next }
-    in_jobs && /^[^ ]/ { in_jobs = 0 }
-    in_jobs && /^  [A-Za-z0-9_-]+:$/ {
-      line = $0
-      sub(/^  /, "", line)
-      sub(/:$/, "", line)
-      print line
-    }
-  ' .github/workflows/test.yml
+jq -r '.currentRequired[]' .github/check-identities.json > "$expected"
 
-  awk '
-    /^[[:space:]]*os:[[:space:]]*\[/ {
-      line = $0
-      sub(/^[^[]*\[/, "", line)
-      sub(/\].*$/, "", line)
-      n = split(line, values, ",")
-      for (i = 1; i <= n; i++) {
-        gsub(/^[[:space:]]+|[[:space:]]+$/, "", values[i])
-        if (values[i] != "") print "nix flake check (" values[i] ")"
-      }
-    }
-  ' .github/workflows/nix.yml
+python3 - <<'PY'
+import json
+import pathlib
+import re
+import sys
 
-  awk '/^[[:space:]]*- id:/ { print "e2e containers / " $3 }' \
-    .github/workflows/e2e-install.yml
+metadata = json.loads(pathlib.Path(".github/check-identities.json").read_text(encoding="utf-8"))
+if metadata.get("schema") != 1 or metadata.get("stage") != "emit-stable-require-legacy":
+    raise SystemExit("FAIL: required-check migration metadata has an unsupported stage")
 
-  awk '
-    /^[[:space:]]*os:[[:space:]]*$/ { in_os = 1; next }
-    in_os && /^[[:space:]]*-[[:space:]]*/ {
-      line = $0
-      sub(/^[[:space:]]*-[[:space:]]*/, "", line)
-      print "setup.sh / " line
-      next
-    }
-    in_os && ! /^[[:space:]]*-[[:space:]]*/ { in_os = 0 }
-  ' .github/workflows/e2e-install.yml
+test_workflow = pathlib.Path(".github/workflows/test.yml").read_text(encoding="utf-8")
+test_jobs = test_workflow.split("\njobs:\n", 1)[1]
+stable_jobs = set(re.findall(r"(?m)^  ([A-Za-z0-9_-]+):\s*$", test_jobs))
+e2e = pathlib.Path(".github/workflows/e2e-install.yml").read_text(encoding="utf-8")
+nix = pathlib.Path(".github/workflows/nix.yml").read_text(encoding="utf-8")
 
-  awk '
-    /^[[:space:]]*name:[[:space:]]*setup\.ps1 \// {
-      line = $0
-      sub(/^[[:space:]]*name:[[:space:]]*/, "", line)
-      print line
-      exit
-    }
-  ' .github/workflows/e2e-install.yml
-} > "$expected"
+legacy = stable_jobs | set(re.findall(r"(?m)^\s+legacy_context:\s*(.+?)\s*$", e2e + "\n" + nix))
+current = set(metadata["currentRequired"])
+if legacy != current:
+    print("FAIL: emitted legacy check identities differ from currentRequired", file=sys.stderr)
+    print("missing:", sorted(current - legacy), file=sys.stderr)
+    print("extra:", sorted(legacy - current), file=sys.stderr)
+    raise SystemExit(1)
+
+e2e_logical = set(re.findall(r"(?m)^\s+- logical_context:\s*(.+?)\s*$", e2e))
+nix_logical_block = nix.split("\n  logical-proof:\n", 1)[1]
+nix_logical = {
+    f"nix flake check / {value}"
+    for value in re.findall(r"(?m)^\s+- logical:\s*(.+?)\s*$", nix_logical_block)
+}
+candidate = stable_jobs | e2e_logical | nix_logical
+expected_candidate = set(metadata["candidateRequired"])
+if candidate != expected_candidate:
+    print("FAIL: emitted logical identities differ from candidateRequired", file=sys.stderr)
+    print("missing:", sorted(expected_candidate - candidate), file=sys.stderr)
+    print("extra:", sorted(candidate - expected_candidate), file=sys.stderr)
+    raise SystemExit(1)
+
+replacements = {(item["legacy"], item["logical"]) for item in metadata["replacements"]}
+if {old for old, _ in replacements} != current - candidate:
+    raise SystemExit("FAIL: replacement metadata does not cover every legacy-only identity")
+if {new for _, new in replacements} != candidate - current:
+    raise SystemExit("FAIL: replacement metadata does not cover every logical-only identity")
+if len(replacements) != len(metadata["replacements"]):
+    raise SystemExit("FAIL: duplicate required-check replacement mapping")
+
+for workflow in (e2e, nix):
+    if "ci-logical-proof.sh emit" not in workflow or "ci-logical-proof.sh verify" not in workflow:
+        raise SystemExit("FAIL: logical checks are not bound to exact proof artifacts")
+
+print("OK: legacy and stable logical check identities are both emitted during stage 1")
+PY
 
 awk '
   /^[[:space:]]*contexts:[[:space:]]*$/ { in_contexts = 1; next }
@@ -106,22 +112,19 @@ for rule in data["rules"]:
 PY
 
 if ! diff -u "$expected" "$settings"; then
-    echo "FAIL: .github/settings.yml required checks are out of sync" >&2
+    echo "FAIL: .github/settings.yml required checks are out of sync with stage 1" >&2
     exit 1
 fi
-
 if ! diff -u "$expected" "$safeguards_json"; then
-    echo "FAIL: scripts/apply-repo-safeguards.sh JSON required checks are out of sync" >&2
+    echo "FAIL: safeguards JSON required checks are out of sync with stage 1" >&2
     exit 1
 fi
-
 if ! diff -u "$expected" "$safeguards_function"; then
-    echo "FAIL: scripts/apply-repo-safeguards.sh required_check_contexts is out of sync" >&2
+    echo "FAIL: safeguards required_check_contexts is out of sync with stage 1" >&2
     exit 1
 fi
-
 if ! diff -u "$expected" "$ruleset"; then
-    echo "FAIL: .github/rulesets/main-integrity.json required checks are out of sync" >&2
+    echo "FAIL: main-integrity ruleset required checks are out of sync with stage 1" >&2
     exit 1
 fi
 

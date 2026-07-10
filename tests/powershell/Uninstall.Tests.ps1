@@ -23,9 +23,17 @@ Describe 'uninstall.ps1 backup ordering and Windows Terminal recovery' {
         $env:LOCALAPPDATA = Join-Path $script:Root 'Redirected Local AppData'
         New-Item -ItemType Directory -Force -Path $env:LOCALAPPDATA | Out-Null
         . $script:ImportUninstallForTest
+        $script:OldWindowsIdentity = $script:WindowsIdentity
+        $script:WindowsIdentity = [pscustomobject]@{
+            UserProfile = $script:Root
+            LocalApplicationData = $env:LOCALAPPDATA
+            Documents = Join-Path $script:Root 'Redirected Documents'
+            RuntimeProfile = Join-Path $script:Root 'Redirected Documents\PowerShell\Microsoft.PowerShell_profile.ps1'
+        }
     }
 
     AfterEach {
+        $script:WindowsIdentity = $script:OldWindowsIdentity
         if ($null -eq $script:OldLocalAppData) { Remove-Item Env:LOCALAPPDATA -ErrorAction SilentlyContinue }
         else { $env:LOCALAPPDATA = $script:OldLocalAppData }
         if ($null -eq $script:OldUserProfile) { Remove-Item Env:USERPROFILE -ErrorAction SilentlyContinue }
@@ -119,5 +127,73 @@ Describe 'uninstall.ps1 backup ordering and Windows Terminal recovery' {
         Restore-WindowsTerminalSettingsBackups
         [IO.File]::ReadAllText($target) | Should -Be '{"current":true}'
         Test-Path -LiteralPath $backup | Should -BeTrue
+    }
+}
+
+Describe 'uninstall.ps1 chezmoi native verify semantics' {
+    BeforeEach {
+        . $script:ImportUninstallForTest
+        $script:NativeRoot = Join-Path ([IO.Path]::GetTempPath()) ('uninstall native ' + [Guid]::NewGuid())
+        $script:NativeSource = Join-Path $script:NativeRoot 'source with spaces'
+        $script:NativeHome = Join-Path $script:NativeRoot 'home with spaces'
+        $script:NativeState = Join-Path $script:NativeRoot 'state.db'
+        $script:NativeConfig = Join-Path $script:NativeRoot 'empty config.toml'
+        New-Item -ItemType Directory -Force -Path $script:NativeSource, $script:NativeHome | Out-Null
+        [IO.File]::WriteAllText((Join-Path $script:NativeSource 'dot_probe'), 'managed bytes')
+        [IO.File]::WriteAllText($script:NativeConfig, '')
+        $script:Chezmoi = (Get-Command chezmoi -ErrorAction Stop).Source
+        $script:NativeBaseArgs = @(
+            '--source', $script:NativeSource,
+            '--destination', $script:NativeHome,
+            '--persistent-state', $script:NativeState,
+            '--config', $script:NativeConfig,
+            '--config-format', 'toml'
+        )
+        $oldPreference = $PSNativeCommandUseErrorActionPreference
+        try {
+            $PSNativeCommandUseErrorActionPreference = $false
+            & $script:Chezmoi @script:NativeBaseArgs --no-tty --force apply
+            if ($LASTEXITCODE -ne 0) { throw 'could not create chezmoi verify fixture' }
+        } finally {
+            $PSNativeCommandUseErrorActionPreference = $oldPreference
+        }
+        $script:NativeTarget = Join-Path $script:NativeHome '.probe'
+    }
+
+    AfterEach {
+        Remove-Item -LiteralPath $script:NativeRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
+    It 'returns false for expected drift and restores native preference <Preference>' -TestCases @(
+        @{ Preference = $true },
+        @{ Preference = $false }
+    ) {
+        param([bool]$Preference)
+        $originalPreference = $PSNativeCommandUseErrorActionPreference
+        try {
+            $PSNativeCommandUseErrorActionPreference = $Preference
+            Test-ChezmoiTargetUnmodified -Target $script:NativeTarget -BaseArguments $script:NativeBaseArgs | Should -BeTrue
+            $PSNativeCommandUseErrorActionPreference | Should -Be $Preference
+
+            [IO.File]::WriteAllText($script:NativeTarget, 'user drift')
+            Test-ChezmoiTargetUnmodified -Target $script:NativeTarget -BaseArguments $script:NativeBaseArgs | Should -BeFalse
+            $PSNativeCommandUseErrorActionPreference | Should -Be $Preference
+        } finally {
+            $PSNativeCommandUseErrorActionPreference = $originalPreference
+        }
+    }
+
+    It 'keeps stderr-backed invocation failures fatal and restores preference' {
+        $originalPreference = $PSNativeCommandUseErrorActionPreference
+        try {
+            $PSNativeCommandUseErrorActionPreference = $true
+            $badArgs = @('--source', (Join-Path $script:NativeRoot 'missing source'))
+            {
+                Test-ChezmoiTargetUnmodified -Target $script:NativeTarget -BaseArguments $badArgs
+            } | Should -Throw '*verify invocation failed*missing source*'
+            $PSNativeCommandUseErrorActionPreference | Should -BeTrue
+        } finally {
+            $PSNativeCommandUseErrorActionPreference = $originalPreference
+        }
     }
 }

@@ -57,22 +57,42 @@ jobs:
             --volume "${{ github.workspace }}:/repo:ro" \
             "${{ matrix.image }}" \
             bash /repo/tests/ci/container-e2e.sh
+      - name: Emit stable logical proof
+        run: >-
+          bash scripts/ci-logical-proof.sh emit
+          "$RUNNER_TEMP/e2e-container-linux.env"
+          "e2e containers / linux"
+          "e2e containers / ubuntu-24.04"
+      - name: Publish stable logical proof
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: e2e-container-linux-logical-proof
+          path: ${{ runner.temp }}/e2e-container-linux.env
+          if-no-files-found: error
+          retention-days: 1
 
   setup-sh:
-    name: setup.sh / ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
+    name: setup.sh / ${{ matrix.runner }}
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
     strategy:
       fail-fast: false   # surface both OS results independently
       matrix:
-        os:
-          - ubuntu-24.04
-          - macos-26
         include:
+          - logical: linux
+            runner: ubuntu-24.04
+            legacy_context: setup.sh / ubuntu-24.04
+            publish_logical_proof: true
+          - logical: macos
+            runner: macos-26
+            legacy_context: setup.sh / macos-26
+            publish_logical_proof: true
           # Current GitHub-hosted Intel runtime proof. This is intentionally an
           # extra non-required lane; the public contract is not inferred from
           # cross-evaluation alone.
-          - os: macos-26-intel
+          - logical: macos-intel
+            runner: macos-26-intel
+            publish_logical_proof: false
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
@@ -284,6 +304,21 @@ jobs:
           # run_nvim_checked fails on the nonzero exit. The trailing +qa is
           # insurance if the probe ever leaves nvim alive.
           DOTFILES_LSP_SMOKE=strict run_nvim_checked lsp-smoke -u "$repo/nvim/init.lua" -c "luafile $repo/tests/nvim/lsp_smoke.lua" +qa
+      - name: Emit stable logical proof
+        if: success() && matrix.publish_logical_proof
+        run: >-
+          bash scripts/ci-logical-proof.sh emit
+          "$RUNNER_TEMP/setup-sh-${{ matrix.logical }}.env"
+          "setup.sh / ${{ matrix.logical }}"
+          "${{ matrix.legacy_context }}"
+      - name: Publish stable logical proof
+        if: success() && matrix.publish_logical_proof
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: setup-sh-${{ matrix.logical }}-logical-proof
+          path: ${{ runner.temp }}/setup-sh-${{ matrix.logical }}.env
+          if-no-files-found: error
+          retention-days: 1
 
   setup-ps1:
     name: setup.ps1 / windows-2025
@@ -419,6 +454,25 @@ jobs:
           if (-not (Get-Command pi -ErrorAction SilentlyContinue)) {
               throw 'pi is not on PATH'
           }
+          $userFontFiles = @(Get-ChildItem -LiteralPath (Join-Path $env:LOCALAPPDATA 'Microsoft\Windows\Fonts') -Filter 'Hack*Nerd*' -File -ErrorAction SilentlyContinue)
+          $systemFontFiles = @(Get-ChildItem -LiteralPath (Join-Path $env:WINDIR 'Fonts') -Filter 'Hack*Nerd*' -File -ErrorAction SilentlyContinue)
+          if (($userFontFiles.Count + $systemFontFiles.Count) -lt 1) {
+              throw 'Hack Nerd Font files are not installed in a Windows font directory'
+          }
+          $fontRegistration = @(foreach ($fontRegistryPath in @(
+                  'HKCU:\Software\Microsoft\Windows NT\CurrentVersion\Fonts',
+                  'HKLM:\Software\Microsoft\Windows NT\CurrentVersion\Fonts'
+              )) {
+              $registeredFonts = Get-ItemProperty -LiteralPath $fontRegistryPath -ErrorAction SilentlyContinue
+              if ($registeredFonts) {
+                  $registeredFonts.PSObject.Properties | Where-Object {
+                      $_.Name -match 'Hack.*Nerd' -or ([string]$_.Value) -match 'Hack.*Nerd'
+                  }
+              }
+          })
+          if (@($fontRegistration).Count -lt 1) {
+              throw 'Hack Nerd Font files exist but are not registered for application consumption'
+          }
           $piVersion = (& pi --version | Select-Object -First 1)
           if ($piVersion -ne '0.80.3') {
               throw "pi version is not pinned 0.80.3: $piVersion"
@@ -463,3 +517,56 @@ jobs:
           $env:DOTFILES_LSP_SMOKE = 'strict'
           Invoke-NvimChecked -Name lsp-smoke -NvimArgs @('-u', $initLua, '-c', "luafile $smokeLua", '+qa')
           Remove-Item Env:DOTFILES_LSP_SMOKE
+      - name: Emit stable logical proof
+        shell: bash
+        run: >-
+          bash scripts/ci-logical-proof.sh emit
+          "$RUNNER_TEMP/setup-ps1-windows.env"
+          "setup.ps1 / windows"
+          "setup.ps1 / windows-2025"
+      - name: Publish stable logical proof
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: setup-ps1-windows-logical-proof
+          path: ${{ runner.temp }}/setup-ps1-windows.env
+          if-no-files-found: error
+          retention-days: 1
+
+  logical-proof:
+    name: ${{ matrix.logical_context }}
+    if: always()
+    needs: [linux-container-install, setup-sh, setup-ps1]
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - logical_context: e2e containers / linux
+            legacy_context: e2e containers / ubuntu-24.04
+            artifact: e2e-container-linux-logical-proof
+            marker: e2e-container-linux.env
+          - logical_context: setup.sh / linux
+            legacy_context: setup.sh / ubuntu-24.04
+            artifact: setup-sh-linux-logical-proof
+            marker: setup-sh-linux.env
+          - logical_context: setup.sh / macos
+            legacy_context: setup.sh / macos-26
+            artifact: setup-sh-macos-logical-proof
+            marker: setup-sh-macos.env
+          - logical_context: setup.ps1 / windows
+            legacy_context: setup.ps1 / windows-2025
+            artifact: setup-ps1-windows-logical-proof
+            marker: setup-ps1-windows.env
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - name: Download exact OS proof
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ runner.temp }}/logical-proof
+      - name: Verify exact OS proof
+        run: >-
+          bash scripts/ci-logical-proof.sh verify
+          "$RUNNER_TEMP/logical-proof/${{ matrix.marker }}"
+          "${{ matrix.logical_context }}"
+          "${{ matrix.legacy_context }}"

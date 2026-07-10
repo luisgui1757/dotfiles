@@ -16,7 +16,7 @@ help:
 	@echo "  test-migration  — chezmoi template/parity/round-trip/oracle checks"
 	@echo "  test-nvim       — plenary busted suite under nvim --headless"
 	@echo "  test-shell      — shellcheck + zsh smoke + Esc-binding regression"
-	@echo "  test-starship   — render snapshot + perf budget (<25ms mean)"
+	@echo "  test-starship   — render snapshot + perf budget (80ms local / 150ms CI mean)"
 	@echo "  test-tmux       — load + option assertions"
 	@echo "  test-ghostty    — +validate-config + scheme grep (mac only)"
 	@echo "  test-wezterm    — Lua smoke (stubbed require) + no-multiplexer-autolaunch"

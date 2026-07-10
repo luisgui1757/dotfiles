@@ -186,3 +186,74 @@ status entries; history is never deleted or rewritten.
   chezmoi pin migration, and owner-applied/live Actions SHA policy after merge.
 - Implementation commit: pending creation of this cohesive supply-chain commit;
   an append-only identity entry will follow.
+
+## Final implementation classification — entry 2
+
+This entry supersedes the initial statuses above. “Fixed” describes the
+implemented behavior and local evidence, not a platform run that did not occur.
+The final batch hash is appended in a later identity entry after Git creates it.
+
+| ID | Final status | Evidence and implementation | Implementation commit | Focused tests | Documentation | Residual/manual proof |
+|---|---|---|---|---|---|---|
+| UGR-001 | ACCEPTED/FIXED | Reproduced forced packaged-to-portable mirroring; each packaged/Preview/portable target now merges from its own bytes with independent backup, staged validation, concurrent-change detection, atomic replace, rollback, and independent uninstall recovery. | `f1c9e2c` | 13 Setup WT transaction cases; 6 Uninstall ordering/recovery cases; Windows render/apply/round-trip oracles | README, Windows Terminal README, CLAUDE, ROADMAP, MIGRATION_STATUS | Real native-Windows divergent dual-install and uninstall run pending. |
+| UGR-002 | PARTIAL | Separate `aarch64-darwin`/`x86_64-darwin` outputs, exact normalized selection, and architecture-aware Homebrew/tap transaction are implemented; official `macos-26-intel` lane exists. | `1423a47` | Darwin config evaluation/selection, Homebrew state/migration/rollback/dry-run shell suites | README, CLAUDE, ROADMAP, MIGRATION_STATUS, MANUAL, greenfield ledger | Exact PR-head Intel runner result is required; cross-evaluation is not runtime proof. |
+| UGR-003 | ACCEPTED/FIXED | Lazy/Plenary require a full locked identity and prove Git/origin/HEAD/clean/worktree/entrypoint before runtimepath; sibling staging is locked, verified, atomic, rollback-safe, and cleaned. | `60dd01a` | `pinned_git_checkout_spec.lua` (9 behavioral cases) plus full Neovim specs | README troubleshooting, CLAUDE, ROADMAP | Cross-platform CI pending; no unproved path executed locally. |
+| UGR-004 | ACCEPTED/FIXED | Every recoverable POSIX main-flow installer crosses one accumulator boundary; later sentinel work and one nonzero summary are behavioral assertions. | `aa48aad` | `install_deps_failure_accumulator_test.sh`, strict shell suite | README, CLAUDE, ROADMAP, MIGRATION_STATUS | Real package-manager network failures remain CI/host evidence. |
+| UGR-005 | ACCEPTED/FIXED | POSIX/Windows use `npm pack`, require metadata and actual tarball SHA-512 SRI agreement, install only the verified local tarball, validate version, and clean every exit. | `aa48aad` | POSIX Pi network/metadata/partial/install/retry cases; PowerShell Pi SRI/lifecycle cases | README, CLAUDE, ROADMAP, MANUAL | Native-Windows install run pending. |
+| UGR-006 | ACCEPTED/FIXED | Shared serialized zsh publisher neutralizes unproved sourceable state, verifies sibling origin/commit/clean/file proof, atomically publishes, quarantines unsafe old data, and self-heals clean pin changes. | `aa48aad` | publisher oracle, concurrency, pin-change, failure-neutralization, chezmoi fingerprint cases | README, CLAUDE, ROADMAP, MIGRATION_STATUS, MANUAL | Real bare `chezmoi apply` pin transition pending. |
+| UGR-007 | ACCEPTED/FIXED | Exact Tree-sitter `0.26.10` predicate accepts compatible unmanaged binaries and repairs stale/partial/incompatible state from architecture-specific verified release bytes with rollback. | `aa48aad` | current/stale/partial/architecture/checksum/publication/dry-run Pester and pin consistency | README, CLAUDE, ROADMAP, MANUAL | Native-Windows runtime pending. |
+| UGR-008 | ACCEPTED/FIXED | Ubuntu CI verifies the exact Microsoft repository `.deb` SHA-256 before privileged `dpkg`; the generic scanner recognizes and self-tests download-to-root-package ordering. | `aa48aad` | privileged-package scanner positive/negative self-tests; static suite | security supply-chain docs, README, CLAUDE | Required Ubuntu CI result pending. |
+| UGR-009 | ACCEPTED/FIXED | gh-dash tag object and peeled commit are verified; Sandbox Terminal reuses production pin; every external `uses:` must be a full SHA; desired Actions SHA enforcement is checked in. | `aa48aad` | gh-dash moved-tag rejection, Sandbox/pin consistency, external-uses scanner self-tests | security supply-chain/branch protection, README, CLAUDE | Live `sha_pinning_required` was false and needs owner apply after merge. |
+| UGR-010 | ACCEPTED/FIXED | Setup/uninstall native chezmoi calls isolate the preference with `try/finally`, capture exit/stderr explicitly, treat silent verify exit 1 as drift, and keep invocation failures fatal. | final closure batch (hash pending) | Setup/Uninstall Pester under preference true/false, drift, stderr, spaces, backup paths | README, CLAUDE, MIGRATION_STATUS | Windows CI pending; local pwsh behavior passed. |
+| UGR-011 | PARTIAL | Fresh zsh sources canonical Home Manager session variables once, handles custom HOME/missing files/repeat sourcing, and the Linux E2E removes caller PATH injection. | `1423a47` | `home_manager_session_vars_test.sh`, Linux home tests | README, CLAUDE, ROADMAP, MANUAL | Exact native-Linux and WSL run results pending. |
+| UGR-012 | ACCEPTED/FIXED | Brew-less Darwin dry-run models post-bootstrap brew availability and previews every later phase without claiming installation. | `1423a47` | complete noninteractive Brew-less preview/failure-plan shell cases | README, CLAUDE, ROADMAP | Darwin CI dry-run pending. |
+| UGR-013 | ACCEPTED/FIXED | Tap migration is collision-checked and transactionally restores on activation/bootstrap/publication/signal failure, with explicit rollback-failure recovery. | `1423a47` | existing-rebuild/first-bootstrap/rollback/signal/collision cases | README, CLAUDE, ROADMAP, recovery docs, MANUAL | Real pre-existing-tap host injection remains manual. |
+| UGR-014 | ACCEPTED/FIXED | POSIX/Windows restore candidates validate filename timestamp and suffix, ignore mtime, and reject malformed/ambiguous sets before mutation. | `f1c9e2c` | POSIX files/dirs/opposing-mtime/collision/malformed; Windows equivalent Pester | README, CLAUDE, ROADMAP, MIGRATION_STATUS | Native-Windows uninstall run pending. |
+| UGR-015 | PARTIAL | POSIX has one account-record-backed identity/home; Windows independently resolves UserProfile, LocalApplicationData, Documents, and runtime profile, uses three source states, migrates recognized legacy shape after success, and post-checks consumers. | `1423a47` plus final closure batch (hash pending) | POSIX identity suite; 58 Setup/Uninstall Pester; Windows template/apply/round-trip/parity | README, CLAUDE invariants 24/25, MIGRATION_STATUS, MANUAL | Real redirected/OneDrive/alternate-drive Windows run and rollback pending. |
+| UGR-016 | ACCEPTED/FIXED | Profile guard evaluates real argv, I/O redirection, CI, user-interactive state, and supported host before any cache path; batch/credential-helper processes produce no output/work. | final closure batch (hash pending) | 30 Profile Pester cases including real subprocesses and normal host cases | README troubleshooting, CLAUDE invariant 26, MANUAL | Native-Windows host matrix pending; local pwsh subprocess proof passed. |
+| UGR-017 | ACCEPTED/FIXED | One data-root-scoped helper checks delete return and absence; parser, parser-info, and query cleanup fail synchronous setup on any partial removal and cannot reach built-in runtime. | final closure batch (hash pending) | 5 helper cases plus 18 Tree-sitter behavioral cases | README, CLAUDE invariant 19 | Cross-platform Neovim CI pending. |
+| UGR-018 | ACCEPTED/FIXED | Removed startup-cwd compile database override; each clangd client uses canonical ancestor/build discovery and its own LSP root. | final closure batch (hash pending) | real clangd two-project/one-session isolation test; 24 LSP specs | CLAUDE LSP workflow, MANUAL | Interactive two-project confirmation remains manual; real headless clangd proof passed locally. |
+| UGR-019 | PARTIAL | Nix beta manager explicitly enabled, Scoop branch live-verified as `master`, behind-base rebase restored, matrix runners use `github-runners`, and official Renovate local extraction must exactly equal 87 reviewed records. | final closure batch (hash pending) | regex matchability plus expected inventory; strict validator and official `--platform=local --dry-run=extract` passed | README, CLAUDE, ROADMAP, reconciliation | Hosted Dashboard/bot result pending after push; do not infer it from local extraction. |
+| UGR-020 | PARTIAL | Stage 1 emits six stable logical checks that verify exact per-OS proof artifacts bound to run/head while all legacy contexts remain required; no no-op check or live mutation. | final closure batch (hash pending) | marker tamper/missing/duplicate tests; workflow/metadata/current-vs-candidate alignment | README, CLAUDE invariant 27, branch-protection runbook, MIGRATION_STATUS | After merge: observe logical checks, merge context-switch PR, then owner applies live safeguards. |
+| UGR-021 | PARTIAL | Scheduled/manual setup caches are absent; WSL distro cache is disabled; macOS uses real WezTerm/AeroSpace/Ghostty consumers; Windows E2E asserts font files+registration; WSL stays non-required/fail-visible. | `1423a47` plus final closure batch (hash pending) | workflow/static cache contract, required-check alignment, E2E source assertions | README, CLAUDE, MANUAL, greenfield ledger | Intel, WSL, redirected Windows, Windows font E2E, and desktop GUI results pending; ledger has no fabricated rows. |
+| UGR-022 | ACCEPTED/FIXED | ROADMAP baseline is live main, PR #46 is truthful DONE/merged, Make help says 80ms local/150ms CI, README documents `--best-effort`/`--skip-nvim`, and live-vs-checked-in safeguard language is explicit. | closure commits including final batch (hash pending) | doc/static/help/required-check guards | README, CLAUDE, ROADMAP, MIGRATION_STATUS, security docs, ledgers | Statuses must be refreshed again after CI/live results. |
+| UGR-023 | ACCEPTED/FIXED | Starship cache publication is atomic/validated/rollback-safe; Polaris stages clean on failure/signal/retry; analyzer warnings have exact stable fingerprints; JSON traversal is NUL-safe; shell lint is strict; Nix ownership scanner catches nested/wrapped/imported bypasses while allowing system policy; direct-artifact compatible/stale/partial cases remain focused. | final closure batch (hash pending), with direct-artifact/shell-lint portions in `aa48aad` | Profile/Polaris/JSON path/Nix scanner self-tests, analyzer full entry point, direct-artifact update suites | README, CLAUDE, ROADMAP, MIGRATION_STATUS | Platform-specific CI remains pending. |
+
+## Explicit rejected/out-of-scope candidates — entry 1
+
+- Windows lsd relocation: REJECTED. The managed `%USERPROFILE%\.config\lsd`
+  path is an upstream-supported Windows location; no reproduced consumption bug
+  justified a persisted-path migration.
+- Native-Windows Nix, a required WSL canary, a symmetry devcontainer,
+  synchronized public-repo secrets, and CodeQL without a supported language
+  surface: OUT OF SCOPE by product/security contract; no implementation.
+- A blanket ban on nix-darwin `system.defaults`, `environment.etc`, or `launchd`:
+  REJECTED. The structural ownership scanner targets Home Manager dotfile
+  ownership options and its self-test explicitly permits legitimate system
+  policy surfaces.
+- Treating cache-dependent evidence as proof the underlying behavior is broken,
+  or weakening the multi-OS product contract to avoid a feasible fix: REJECTED.
+  Proof is labeled separately from behavior, and feasible platform paths remain.
+
+## Supply-chain implementation identity — entry 2
+
+- UGR-004 through UGR-009 implementation commit: `aa48aad`
+  (`fix(supply-chain): bind executable installer identities`). This supersedes
+  the pending identity in the earlier implementation entry without rewriting
+  its history.
+
+## Rejected-finding evidence — entry 2
+
+- Windows lsd relocation remains REJECTED after live upstream verification on
+  2026-07-10. `lsd-rs/lsd` default branch `main`, commit
+  `fecadf36235be734b3fd97c44e237f3a29eb1073`, `src/config_file.rs:169-188`
+  explicitly lists `%APPDATA%\lsd` and `%USERPROFILE%\.config\lsd` as the two
+  Windows config search locations. No consumption failure was reproduced, so a
+  persisted-target migration would add risk without fixing a defect.
+
+## Prior-review preservation — entry 1
+
+- Recovered `docs/reviews/2026-07-09-gold-standard-review.md` by reading
+  `stash@{0}^3` from the original checkout and adding the recovered bytes here.
+  No stash was popped, dropped, rewritten, or deleted; the original untracked
+  review prompts were left untouched.

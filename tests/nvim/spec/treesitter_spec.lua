@@ -159,11 +159,14 @@ describe("treesitter main migration", function()
       src:match('purge_managed_bundled_files%("parser/%*%.so"%)'),
       "must scan the runtimepath for stale bundled parser overrides"
     )
-    assert.is_truthy(src:match("vim%.fn%.delete"), "must delete stale bundled parser overrides")
+    assert.is_truthy(
+      src:match('require%("util%.checked_delete"%)%.managed'),
+      "must route stale parser cleanup through the checked managed-delete helper"
+    )
     assert.is_truthy(
       src:match("local function purge_managed_bundled_query_dirs%(%)")
         and src:match('treesitter_config%.get_install_dir%("queries"%)')
-        and src:match('vim%.fn%.delete, path, "rf"'),
+        and src:match('checked_delete_managed%(path, "rf"%)'),
       "must recursively delete managed stale bundled query directories as well as parser files"
     )
     -- CRITICAL safety: deletes MUST be scoped to stdpath('data'). Neovim ships
@@ -238,6 +241,24 @@ describe("treesitter main migration", function()
       config_ok, config_err = pcall(spec[1].config)
     end
 
+    local c_query_dir = vim.fn.isdirectory(vim.fs.joinpath(query_dir, "c"))
+    local lua_query_dir = vim.fn.isdirectory(vim.fs.joinpath(query_dir, "lua"))
+    local python_query_dir = vim.fn.isdirectory(vim.fs.joinpath(query_dir, "python"))
+
+    local failed_query_path = vim.fs.joinpath(query_dir, "c")
+    vim.fn.mkdir(failed_query_path, "p")
+    vim.fn.writefile({ "; cannot remove" }, vim.fs.joinpath(failed_query_path, "highlights.scm"))
+    local original_delete = vim.fn.delete
+    vim.fn.delete = function(path, mode)
+      if path == failed_query_path then
+        return -1
+      end
+      return original_delete(path, mode)
+    end
+    local cleanup_failure_ok, cleanup_failure_err = pcall(spec[1].config)
+    vim.fn.delete = original_delete
+    local failed_query_remains = vim.fn.isdirectory(failed_query_path)
+
     package.loaded["nvim-treesitter"] = old_tree_sitter
     package.loaded["nvim-treesitter.config"] = old_tree_sitter_config
     package.loaded["nvim-treesitter.parsers"] = old_tree_sitter_parsers
@@ -250,13 +271,13 @@ describe("treesitter main migration", function()
     vim.fn.executable = old_executable
     vim.fn.stdpath = old_stdpath
 
-    local c_query_dir = vim.fn.isdirectory(vim.fs.joinpath(query_dir, "c"))
-    local lua_query_dir = vim.fn.isdirectory(vim.fs.joinpath(query_dir, "lua"))
-    local python_query_dir = vim.fn.isdirectory(vim.fs.joinpath(query_dir, "python"))
     vim.fn.delete(temp_root, "rf")
 
     assert.is_true(ok)
     assert.is_true(config_ok, tostring(config_err))
+    assert.is_false(cleanup_failure_ok)
+    assert.matches("Tree%-sitter cleanup failed", tostring(cleanup_failure_err))
+    assert.are.equal(1, failed_query_remains)
     assert.are.equal(0, c_query_dir)
     assert.are.equal(0, lua_query_dir)
     assert.are.equal(1, python_query_dir)
@@ -291,7 +312,7 @@ describe("treesitter main migration", function()
       src:match("local function remove_incomplete_parser_installs%(parser_dependencies%)")
         and src:match('treesitter_config%.get_install_dir%("queries"%)')
         and src:match("highlights%.scm")
-        and src:match('vim%.fn%.delete, query_path, "rf"'),
+        and src:match('{ query_path, "rf" }'),
       "parser auto-install must repair parser files that were installed without complete query output"
     )
     assert.is_truthy(

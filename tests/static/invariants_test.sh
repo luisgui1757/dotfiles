@@ -53,12 +53,23 @@ check_absent "bare-Esc kill-whole-line bindkey gone (Meta prefix shadow)" \
 # The PowerShell profiles must never use remote-eval (Invoke-Expression / iex) to
 # wire tools like zoxide or starship. Their documented one-liners pipe a freshly
 # generated init straight into Invoke-Expression; this repo instead caches the
-# init to a file and dot-sources it (race-safe, no remote eval). Guards the
-# canonical profile and its deployed chezmoi twin.
+# init to a file and dot-sources it (race-safe, no remote eval). Windows
+# known-folder overlays symlink each supported host profile to this canonical file.
 check_absent "no Invoke-Expression/iex in PowerShell profiles (cached dot-source only)" \
     "Invoke-Expression|(^|[^[:alnum:]_])iex([^[:alnum:]_]|\$)" \
-    shells/powershell_profile.ps1 \
-    home/Documents/PowerShell/Microsoft.PowerShell_profile.ps1
+    shells/powershell_profile.ps1
+
+for profile_template in \
+    windows/chezmoi-documents/PowerShell/symlink_Microsoft.PowerShell_profile.ps1.tmpl \
+    windows/chezmoi-documents/PowerShell/symlink_Microsoft.VSCode_profile.ps1.tmpl \
+    windows/chezmoi-documents/WindowsPowerShell/symlink_Microsoft.PowerShell_profile.ps1.tmpl \
+    windows/chezmoi-documents/WindowsPowerShell/symlink_Microsoft.PowerShellISE_profile.ps1.tmpl; do
+    if [[ ! -f "$profile_template" ]] || ! grep -qF '\shells\powershell_profile.ps1' "$profile_template"; then
+        echo "FAIL: Windows profile overlay does not target the canonical profile: $profile_template"
+        fail=1
+    fi
+done
+[[ "$fail" -ne 0 ]] || echo "ok  : Windows known-folder overlays target the canonical PowerShell profile"
 
 # psmux freeze guard. The native-clipboard probes use `if-shell`, which spawns a
 # shell at config-LOAD time; under psmux/ConPTY on Windows that shell never

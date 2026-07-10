@@ -372,8 +372,21 @@ should_apply_agent_policy() {
     ask_yes_no_default_yes "Apply Polaris global agent rules?"
 }
 
-ensure_polaris_checkout() {
-    local checkout tmp
+ensure_polaris_checkout() (
+    local checkout tmp="" cleanup_rc=0
+    POLARIS_STAGE_DIR=""
+    trap '
+        cleanup_rc=$?
+        trap - EXIT HUP INT TERM
+        if [[ -n "${POLARIS_STAGE_DIR:-}" ]]; then
+            rm -rf "$POLARIS_STAGE_DIR"
+        fi
+        exit "$cleanup_rc"
+    ' EXIT
+    trap 'exit 129' HUP
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+
     checkout="$(polaris_checkout_dir)"
 
     if [[ -d "$checkout/.git" ]]; then
@@ -395,7 +408,7 @@ ensure_polaris_checkout() {
 
     mkdir -p "$POLARIS_CACHE_ROOT"
     tmp="$(mktemp -d "$POLARIS_CACHE_ROOT/.tmp.XXXXXX")"
-    trap 'rm -rf "$tmp"' RETURN
+    POLARIS_STAGE_DIR="$tmp"
 
     polaris_git clone "$POLARIS_REPO_URL" "$tmp"
     polaris_git -C "$tmp" checkout --detach "$POLARIS_REF"
@@ -404,9 +417,10 @@ ensure_polaris_checkout() {
     assert_polaris_checkout_clean "$tmp"
 
     mv "$tmp" "$checkout"
-    trap - RETURN
+    tmp=""
+    POLARIS_STAGE_DIR=""
     printf '%s\n' "$checkout"
-}
+)
 
 run_polaris_agent_policy() {
     local checkout installer

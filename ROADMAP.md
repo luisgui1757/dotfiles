@@ -245,7 +245,8 @@ Commit-by-commit status:
   `85375b2bdec9d3a998e8023a44b41d03a32f3eaa`; all twelve required checks passed,
   and checked-in/live required contexts were verified aligned afterward.
 
-- **Ultimate gold-standard closure — IN PROGRESS (2026-07-10).** UGR-003 is
+- **Ultimate gold-standard closure — IMPLEMENTED; staged/live proof pending
+  (2026-07-10).** UGR-003 is
   implemented: Lazy and Plenary require a valid full lock identity and prove
   origin, exact HEAD, cleanliness, worktree usability, and required files before
   runtimepath mutation. Repair is locked, staged, verified, and rollback-safe;
@@ -260,7 +261,17 @@ Commit-by-commit status:
   payloads prove immutable identities before publication; Windows Tree-sitter
   uses exact compatible release artifacts; the required Microsoft `.deb`,
   gh-dash peeled commit, Sandbox Terminal zip, external Action refs, and desired
-  Actions SHA-pinning safeguard are checked and documented.
+  Actions SHA-pinning safeguard are checked and documented. UGR-010 and the
+  Windows half of UGR-015 now isolate native chezmoi status and apply configs to
+  the real UserProfile, LocalApplicationData, Documents, and runtime `$PROFILE`
+  paths. UGR-016 through UGR-019 and UGR-023 close the PowerShell invocation,
+  checked Tree-sitter deletion, per-project clangd, Renovate inventory,
+  Starship/Polaris cleanup, diagnostic-identity, NUL-safe JSON, and structural
+  Nix-ownership gaps. UGR-020 is deliberately PARTIAL: this branch emits and
+  verifies stable logical checks while the legacy contexts remain required;
+  the checked-in/live switch happens only in the documented post-merge stage.
+  UGR-021 is PARTIAL until real Intel, WSL, redirected-Windows, and desktop runs
+  exist. No workflow definition is recorded as runtime proof.
 
 ### P2 Follow-up: Secondary Supply-chain Hardening
 

@@ -90,4 +90,15 @@ describe("LSP server coverage", function()
       "neocmake resolver must handle Windows' real neocmakelsp.exe binary"
     )
   end)
+
+  it("leaves compile-database discovery to each clangd project client", function()
+    assert.is_truthy(
+      src:find('local clangd_cmd = { "clangd", "--background-index", "--clang-tidy" }', 1, true),
+      "clangd must use a cwd-independent command"
+    )
+    assert.is_nil(
+      src:find("--compile-commands-dir", 1, true),
+      "a session-wide compile database override freezes clangd to one project"
+    )
+  end)
 end)

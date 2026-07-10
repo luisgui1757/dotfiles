@@ -33,6 +33,13 @@ significant change to the relevant area.
       state plus the managed fragment and receives its own verified backup.
       Run `uninstall.ps1 -All`; confirm both pre-setup backups restore and each
       displaced current file remains as `settings.json.uninstall-current.*`.
+- [ ] **Redirected Windows known folders**: redirect Documents and
+      LocalApplicationData to different real paths (include an alternate drive
+      and spaces), run `setup.ps1 -All`, then open Neovim, lazygit, ConsoleHost,
+      VS Code, and ISE. Confirm each consumes the managed target in the actual
+      known folder and no conventional `%USERPROFILE%\AppData\Local`/`Documents`
+      target was silently overwritten. Run `uninstall.ps1 -All` and verify the
+      same source states are removed or restored without guessing paths.
 - [ ] **Tmux status bar**: generated Rose Pine bar is at the top, includes the
       signal-bar segments (session, window list/current program, directory
       basename; no user/host/date/time duplication), segments are readable,
@@ -121,6 +128,11 @@ significant change to the relevant area.
       `Get-PSReadLineOption` still shows `EditMode = Vi`, `Tab` = MenuComplete,
       the ListView history prediction is back, and the PSFzf `Ctrl+R` picker
       still works (the re-apply must NOT have wiped the fzf chords).
+- [ ] **PowerShell invocation guard on Windows**: run the profile through
+      `pwsh -NonInteractive -Command`, a credential-helper-shaped `-Command`,
+      redirected stdin/stdout, and a CI subprocess. Confirm zero prompt output
+      and no Starship/zoxide cache writes. Then confirm normal ConsoleHost, VS
+      Code, and ISE sessions still load the prompt and bindings.
 
 ## Nix layer (enforced on macOS/Linux/WSL)
 
@@ -193,6 +205,11 @@ significant change to the relevant area.
 
 - [ ] **C++ workspace** with `compile_commands.json`: hover, go-to-def,
       and clang-tidy diagnostics work in a real CMake project.
+- [ ] **Two C++ workspaces in one Neovim session**: open projects whose compile
+      databases require different macros (one at the root, one under `build/`).
+      `:LspInfo` must show distinct clangd roots/clients and neither project may
+      inherit the other's flags. The automated spec uses the real clangd binary;
+      this row confirms the interactive workflow.
 - [ ] **Rust workspace**: `cargo check` runs on save (rust-analyzer
       `checkOnSave`); inlay hints don't break visual layout.
 - [ ] **Python with venv**: pyright picks up the venv interpreter

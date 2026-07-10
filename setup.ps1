@@ -46,9 +46,62 @@ $PolarisTag     = 'v0.1.2'
 $PolarisRef     = 'ecca742fa9ed1243a73981955850c1a8ef3e3b04'
 
 function Get-DefaultProfileRoot {
+    if ($env:OS -eq 'Windows_NT') {
+        $knownProfile = [Environment]::GetFolderPath([Environment+SpecialFolder]::UserProfile)
+        if ([string]::IsNullOrWhiteSpace($knownProfile)) {
+            throw 'Windows UserProfile known folder could not be resolved'
+        }
+        return $knownProfile
+    }
     if (-not [string]::IsNullOrWhiteSpace($env:USERPROFILE)) { return $env:USERPROFILE }
     if (-not [string]::IsNullOrWhiteSpace($env:HOME)) { return $env:HOME }
     return [Environment]::GetFolderPath([Environment+SpecialFolder]::UserProfile)
+}
+
+function Resolve-WindowsTargetIdentity {
+    param(
+        [scriptblock]$FolderResolver = {
+            param([string]$Name)
+            $folder = [Environment+SpecialFolder]([Enum]::Parse([Environment+SpecialFolder], $Name))
+            return [Environment]::GetFolderPath($folder)
+        },
+        [AllowEmptyString()] [string]$RuntimeProfile = ([string]$PROFILE)
+    )
+
+    $resolved = @{}
+    foreach ($name in 'UserProfile', 'LocalApplicationData', 'MyDocuments') {
+        $path = [string](& $FolderResolver $name)
+        $isWindowsAbsolute = $path -match '^(?:[A-Za-z]:[\\/]|\\\\)'
+        if ([string]::IsNullOrWhiteSpace($path) -or (-not [IO.Path]::IsPathRooted($path) -and -not $isWindowsAbsolute) -or
+            $path -match '^[A-Za-z]:[^\\/]') {
+            throw "Windows $name known folder is missing or not absolute: $path"
+        }
+        $resolved[$name] = if ($isWindowsAbsolute -and $env:OS -ne 'Windows_NT') {
+            ($path -replace '/', '\').TrimEnd('\')
+        } else { [IO.Path]::GetFullPath($path).TrimEnd('\', '/') }
+    }
+    $runtimeIsWindowsAbsolute = $RuntimeProfile -match '^(?:[A-Za-z]:[\\/]|\\\\)'
+    if ([string]::IsNullOrWhiteSpace($RuntimeProfile) -or
+        (-not [IO.Path]::IsPathRooted($RuntimeProfile) -and -not $runtimeIsWindowsAbsolute) -or
+        $RuntimeProfile -match '^[A-Za-z]:[^\\/]') {
+        throw "PowerShell runtime profile path is missing or not absolute: $RuntimeProfile"
+    }
+    return [pscustomobject]@{
+        UserProfile = $resolved.UserProfile
+        LocalApplicationData = $resolved.LocalApplicationData
+        Documents = $resolved.MyDocuments
+        RuntimeProfile = if ($runtimeIsWindowsAbsolute -and $env:OS -ne 'Windows_NT') {
+            $RuntimeProfile -replace '/', '\'
+        } else { [IO.Path]::GetFullPath($RuntimeProfile) }
+    }
+}
+
+function Get-WindowsLocalApplicationData {
+    if ($script:WindowsIdentity) { return $script:WindowsIdentity.LocalApplicationData }
+    if ($env:OS -eq 'Windows_NT') {
+        return [Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)
+    }
+    return $env:LOCALAPPDATA
 }
 
 function Get-ScoopRoot {
@@ -257,8 +310,9 @@ function Write-Step {
 }
 
 function Get-PolarisCacheRoot {
-    if (-not [string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
-        return (Join-Path $env:LOCALAPPDATA 'dotfiles\polaris')
+    $localAppData = Get-WindowsLocalApplicationData
+    if (-not [string]::IsNullOrWhiteSpace($localAppData)) {
+        return (Join-Path $localAppData 'dotfiles\polaris')
     }
     return (Join-Path (Get-DefaultProfileRoot) '.local\share\dotfiles\polaris')
 }
@@ -768,37 +822,84 @@ function Invoke-ChezmoiOrExit {
         [Parameter(Mandatory)] [string]$Label,
         [Parameter(Mandatory)] [string[]]$Arguments
     )
-    $global:LASTEXITCODE = 0
-    $baseArgs = $script:ChezmoiBaseArgs
-    $configArgs = $script:ChezmoiConfigArgs
-    & chezmoi @baseArgs @configArgs @Arguments
-    $rc = $LASTEXITCODE
-    if ($rc -ne 0) {
-        Write-Host ("  FAIL: $Label exited $rc") -ForegroundColor Red
-        exit $rc
+    $result = Invoke-ChezmoiNative -Arguments $Arguments -PassThroughOutput
+    if ($result.ExitCode -ne 0) {
+        Write-Host ("  FAIL: $Label exited $($result.ExitCode)") -ForegroundColor Red
+        exit $result.ExitCode
+    }
+}
+
+function Invoke-ChezmoiNative {
+    param(
+        [Parameter(Mandatory)] [string[]]$Arguments,
+        [switch]$PassThroughOutput,
+        [AllowNull()] [string]$InputText
+    )
+
+    $command = Get-Command chezmoi -CommandType Application -ErrorAction Stop | Select-Object -First 1
+    $baseArgs = @($script:ChezmoiBaseArgs)
+    $configArgs = @($script:ChezmoiConfigArgs)
+    $stderrPath = [IO.Path]::GetTempFileName()
+    $output = @()
+    $rc = 1
+    $oldNativePreference = $null
+    $hasNativePreference = Test-Path Variable:PSNativeCommandUseErrorActionPreference
+    try {
+        try {
+            if ($hasNativePreference) {
+                $oldNativePreference = $PSNativeCommandUseErrorActionPreference
+                $PSNativeCommandUseErrorActionPreference = $false
+            }
+            $global:LASTEXITCODE = 0
+            if ($PassThroughOutput) {
+                if ($PSBoundParameters.ContainsKey('InputText')) {
+                    $InputText | & $command.Source @baseArgs @configArgs @Arguments 2> $stderrPath | Out-Host
+                } else {
+                    & $command.Source @baseArgs @configArgs @Arguments 2> $stderrPath | Out-Host
+                }
+            } elseif ($PSBoundParameters.ContainsKey('InputText')) {
+                $output = @($InputText | & $command.Source @baseArgs @configArgs @Arguments 2> $stderrPath)
+            } else {
+                $output = @(& $command.Source @baseArgs @configArgs @Arguments 2> $stderrPath)
+            }
+            $rc = if ($null -eq $LASTEXITCODE) { 0 } else { [int]$LASTEXITCODE }
+        } finally {
+            if ($hasNativePreference) {
+                $PSNativeCommandUseErrorActionPreference = $oldNativePreference
+            }
+        }
+        $stderrText = [IO.File]::ReadAllText($stderrPath)
+        return [pscustomobject]@{
+            ExitCode = $rc
+            Output = @($output)
+            Stderr = $stderrText
+        }
+    } finally {
+        Remove-Item -LiteralPath $stderrPath -Force -ErrorAction SilentlyContinue
     }
 }
 
 function Invoke-ChezmoiOutput {
     param([Parameter(Mandatory)] [string[]]$Arguments)
-    $global:LASTEXITCODE = 0
-    $baseArgs = $script:ChezmoiBaseArgs
-    $configArgs = $script:ChezmoiConfigArgs
-    $output = & chezmoi @baseArgs @configArgs @Arguments
-    $rc = $LASTEXITCODE
-    if ($rc -ne 0) {
-        throw "chezmoi $($Arguments -join ' ') exited $rc"
+    $result = Invoke-ChezmoiNative -Arguments $Arguments
+    if ($result.ExitCode -ne 0) {
+        $detail = $result.Stderr.Trim()
+        if ($detail) { $detail = ": $detail" }
+        throw "chezmoi $($Arguments -join ' ') exited $($result.ExitCode)$detail"
     }
-    return @($output)
+    return @($result.Output)
 }
 
 function Test-ChezmoiVerify {
     param([Parameter(Mandatory)] [string]$Target)
-    $global:LASTEXITCODE = 0
-    $baseArgs = $script:ChezmoiBaseArgs
-    $configArgs = $script:ChezmoiConfigArgs
-    & chezmoi @baseArgs @configArgs verify $Target > $null 2> $null
-    return ($LASTEXITCODE -eq 0)
+    $result = Invoke-ChezmoiNative -Arguments @('verify', $Target)
+    if ($result.ExitCode -eq 0) { return $true }
+    if ($result.ExitCode -eq 1 -and $result.Output.Count -eq 0 -and [string]::IsNullOrWhiteSpace($result.Stderr)) {
+        return $false
+    }
+    $detail = $result.Stderr.Trim()
+    if (-not $detail) { $detail = 'no diagnostic text' }
+    throw "chezmoi verify invocation failed for ${Target}: exit $($result.ExitCode): $detail"
 }
 
 function Get-FullPathSafe {
@@ -980,11 +1081,11 @@ function Test-TargetAlreadyMatches {
 }
 
 function Get-WindowsTerminalSettingsPath {
-    return (Join-Path $env:LOCALAPPDATA 'Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json')
+    return (Join-Path (Get-WindowsLocalApplicationData) 'Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json')
 }
 
 function Get-WindowsTerminalUnpackagedSettingsPath {
-    return (Join-Path $env:LOCALAPPDATA 'Microsoft\Windows Terminal\settings.json')
+    return (Join-Path (Get-WindowsLocalApplicationData) 'Microsoft\Windows Terminal\settings.json')
 }
 
 function Get-WindowsTerminalSettingsFragmentPath {
@@ -996,7 +1097,8 @@ function Get-WindowsTerminalMergeHelperPath {
 }
 
 function Test-WindowsTerminalUnpackagedPresent {
-    if (-not $env:LOCALAPPDATA) {
+    $localAppData = Get-WindowsLocalApplicationData
+    if (-not $localAppData) {
         return $false
     }
 
@@ -1006,7 +1108,7 @@ function Test-WindowsTerminalUnpackagedPresent {
         return $true
     }
 
-    $portableRoot = Join-Path $env:LOCALAPPDATA 'Programs\WindowsTerminal'
+    $portableRoot = Join-Path $localAppData 'Programs\WindowsTerminal'
     foreach ($candidate in @(
             (Join-Path $portableRoot 'wt.exe'),
             (Join-Path $portableRoot 'WindowsTerminal.exe')
@@ -1334,9 +1436,10 @@ function Test-SamePath {
 }
 
 function Stop-NvimSelfLinkIfNeeded {
-    if (-not $env:LOCALAPPDATA) { return }
+    $localAppData = Get-WindowsLocalApplicationData
+    if (-not $localAppData) { return }
 
-    $nvimTarget = Join-Path $env:LOCALAPPDATA 'nvim'
+    $nvimTarget = Join-Path $localAppData 'nvim'
     $targetItem = Get-Item -LiteralPath $nvimTarget -Force -ErrorAction SilentlyContinue
     if (-not $targetItem) { return }
     # An existing SYMLINK/Junction is the normal already-installed case: it points
@@ -1403,13 +1506,149 @@ function Backup-PreexistingManagedTargets {
 function New-ChezmoiDryRunConfig {
     $tmp = New-TemporaryFile
     $templatePath = Join-Path $HomeSource '.chezmoi.toml.tmpl'
-    $baseArgs = $script:ChezmoiBaseArgs
-    $rendered = Get-Content -Raw -LiteralPath $templatePath | & chezmoi @baseArgs execute-template --init
-    if ($LASTEXITCODE -ne 0) {
-        throw "chezmoi execute-template --init failed while preparing dry-run config"
+    $template = Get-Content -Raw -LiteralPath $templatePath
+    $result = Invoke-ChezmoiNative -Arguments @('execute-template', '--init') -InputText $template
+    if ($result.ExitCode -ne 0) {
+        throw "chezmoi execute-template --init failed while preparing dry-run config: $($result.Stderr.Trim())"
     }
+    $rendered = @($result.Output) -join [Environment]::NewLine
     Set-Content -LiteralPath $tmp.FullName -Value $rendered -Encoding UTF8
     return $tmp.FullName
+}
+
+function Get-WindowsKnownFolderOverlays {
+    param([Parameter(Mandatory)] $Identity)
+    $stateRoot = Join-Path $Identity.LocalApplicationData 'dotfiles\chezmoi-state'
+    return @(
+        [pscustomobject]@{
+            Label = 'LocalApplicationData'
+            Source = Join-Path $ScriptDir 'windows\chezmoi-localappdata'
+            Destination = $Identity.LocalApplicationData
+            State = Join-Path $stateRoot 'localappdata.boltdb'
+        },
+        [pscustomobject]@{
+            Label = 'Documents profiles'
+            Source = Join-Path $ScriptDir 'windows\chezmoi-documents'
+            Destination = $Identity.Documents
+            State = Join-Path $stateRoot 'documents.boltdb'
+        }
+    )
+}
+
+function Assert-WindowsKnownFolderConsumption {
+    param([Parameter(Mandatory)] $Identity)
+
+    $nvimTarget = Join-Path $Identity.LocalApplicationData 'nvim'
+    $lazygitTarget = Join-Path $Identity.LocalApplicationData 'lazygit\config.yml'
+    $expectedNvim = Join-Path $ScriptDir 'nvim'
+    $expectedLazygit = Join-Path $ScriptDir 'lazygit\config.windows.yml'
+    if (-not (Test-SamePath (Get-RealExistingPath $nvimTarget) (Get-RealExistingPath $expectedNvim))) {
+        throw "Neovim does not consume the repo config through actual LocalApplicationData: $nvimTarget"
+    }
+    if (-not (Test-SamePath (Get-RealExistingPath $lazygitTarget) (Get-RealExistingPath $expectedLazygit)) -and
+        -not (Test-FileBytesEqual $lazygitTarget $expectedLazygit)) {
+        throw "lazygit does not consume the repo config through actual LocalApplicationData: $lazygitTarget"
+    }
+
+    $profileCandidates = @(
+        (Join-Path $Identity.Documents 'PowerShell\Microsoft.PowerShell_profile.ps1'),
+        (Join-Path $Identity.Documents 'PowerShell\Microsoft.VSCode_profile.ps1'),
+        (Join-Path $Identity.Documents 'WindowsPowerShell\Microsoft.PowerShell_profile.ps1'),
+        (Join-Path $Identity.Documents 'WindowsPowerShell\Microsoft.PowerShellISE_profile.ps1')
+    )
+    if (-not @($profileCandidates | Where-Object { Test-SamePath $_ $Identity.RuntimeProfile }).Count) {
+        throw "unsupported PowerShell host profile path: $($Identity.RuntimeProfile). Expected a supported profile under actual Documents."
+    }
+    $expectedProfile = Join-Path $ScriptDir 'shells\powershell_profile.ps1'
+    if (-not (Test-SamePath (Get-RealExistingPath $Identity.RuntimeProfile) (Get-RealExistingPath $expectedProfile)) -and
+        -not (Test-FileBytesEqual $Identity.RuntimeProfile $expectedProfile)) {
+        throw "the runtime PowerShell profile does not consume the repo profile: $($Identity.RuntimeProfile)"
+    }
+}
+
+function Move-LegacyWindowsKnownFolderTargets {
+    param(
+        [Parameter(Mandatory)] $Identity,
+        [bool]$IsDryRun = $DryRun
+    )
+
+    $legacyLocal = Join-Path $Identity.UserProfile 'AppData\Local'
+    $legacyDocuments = Join-Path $Identity.UserProfile 'Documents'
+    $plans = @(
+        [pscustomobject]@{
+            Legacy = Join-Path $legacyLocal 'nvim'
+            Actual = Join-Path $Identity.LocalApplicationData 'nvim'
+            Expected = Join-Path $ScriptDir 'nvim'
+            Directory = $true
+        },
+        [pscustomobject]@{
+            Legacy = Join-Path $legacyLocal 'lazygit\config.yml'
+            Actual = Join-Path $Identity.LocalApplicationData 'lazygit\config.yml'
+            Expected = Join-Path $ScriptDir 'lazygit\config.windows.yml'
+            Directory = $false
+        },
+        [pscustomobject]@{
+            Legacy = Join-Path $legacyDocuments 'PowerShell\Microsoft.PowerShell_profile.ps1'
+            Actual = Join-Path $Identity.Documents 'PowerShell\Microsoft.PowerShell_profile.ps1'
+            Expected = Join-Path $ScriptDir 'shells\powershell_profile.ps1'
+            Directory = $false
+        }
+    )
+    foreach ($plan in $plans) {
+        if (Test-SamePath $plan.Legacy $plan.Actual) { continue }
+        if (-not (Get-Item -LiteralPath $plan.Legacy -Force -ErrorAction SilentlyContinue)) { continue }
+        $owned = if ($plan.Directory) {
+            Test-SamePath (Get-RealExistingPath $plan.Legacy) (Get-RealExistingPath $plan.Expected)
+        } else {
+            (Test-SamePath (Get-RealExistingPath $plan.Legacy) (Get-RealExistingPath $plan.Expected)) -or
+                (Test-FileBytesEqual $plan.Legacy $plan.Expected)
+        }
+        if (-not $owned) {
+            Write-Warning "preserving divergent legacy target for manual migration: $($plan.Legacy)"
+            continue
+        }
+        $backup = Get-UniqueBackupPath "$($plan.Legacy).legacy.$Timestamp"
+        if ($IsDryRun) {
+            Write-Step "would    preserve legacy target $($plan.Legacy) -> $backup after known-folder apply"
+        } else {
+            Move-Item -LiteralPath $plan.Legacy -Destination $backup -ErrorAction Stop
+            Write-Step "migrated legacy target $($plan.Legacy) -> $backup"
+        }
+    }
+}
+
+function Invoke-WindowsKnownFolderOverlays {
+    param(
+        [Parameter(Mandatory)] $Identity,
+        [bool]$IsDryRun = $DryRun
+    )
+
+    $oldBaseArgs = $script:ChezmoiBaseArgs
+    $oldConfigArgs = $script:ChezmoiConfigArgs
+    $overlayConfig = Join-Path $ScriptDir 'windows\chezmoi-overlay.toml'
+    foreach ($overlay in @(Get-WindowsKnownFolderOverlays -Identity $Identity)) {
+        if (-not $IsDryRun) {
+            New-Item -ItemType Directory -Force -Path (Split-Path -Parent $overlay.State) | Out-Null
+        }
+        try {
+            $script:ChezmoiBaseArgs = @(
+                '--source', $overlay.Source,
+                '--destination', $overlay.Destination,
+                '--persistent-state', $overlay.State
+            )
+            $script:ChezmoiConfigArgs = @('--config', $overlayConfig, '--config-format', 'toml')
+            Backup-PreexistingManagedTargets
+            $arguments = if ($IsDryRun) { @('--dry-run', '--verbose', 'apply') } else { @('--no-tty', '--force', 'apply') }
+            Invoke-ChezmoiOrExit -Label "chezmoi $($overlay.Label) apply" -Arguments $arguments
+        } finally {
+            $script:ChezmoiBaseArgs = $oldBaseArgs
+            $script:ChezmoiConfigArgs = $oldConfigArgs
+        }
+    }
+    if (-not $IsDryRun) {
+        Assert-WindowsKnownFolderConsumption -Identity $Identity
+    }
+    Move-LegacyWindowsKnownFolderTargets -Identity $Identity -IsDryRun:$IsDryRun
 }
 
 function Invoke-ChezmoiApplyPhase {
@@ -1435,6 +1674,7 @@ function Invoke-ChezmoiApplyPhase {
             # modify_ target so no non-transactional write can precede it.
             $applyArgs = @('--dry-run', '--verbose', 'apply') + @(Get-ManagedConfigTargets -ExcludeWindowsTerminal)
             Invoke-ChezmoiOrExit -Label 'chezmoi dry-run apply' -Arguments $applyArgs
+            Invoke-WindowsKnownFolderOverlays -Identity $script:WindowsIdentity -IsDryRun $true
             Invoke-WindowsTerminalSettingsTransaction -IsDryRun $true
         } finally {
             Remove-Item -LiteralPath $dryRunConfig -Force -ErrorAction SilentlyContinue
@@ -1467,6 +1707,7 @@ function Invoke-ChezmoiApplyPhase {
     # template for config-layer parity, but setup never publishes through it.
     $realApplyArgs = @('--no-tty', '--force', 'apply') + @(Get-ManagedConfigTargets -ExcludeWindowsTerminal)
     Invoke-ChezmoiOrExit -Label 'chezmoi apply' -Arguments $realApplyArgs
+    Invoke-WindowsKnownFolderOverlays -Identity $script:WindowsIdentity
     Invoke-WindowsTerminalSettingsTransaction
 }
 
@@ -1476,13 +1717,23 @@ function Invoke-NvimCommandOrFail {
         [scriptblock]$Block,
         [bool]$IsBestEffort = $BestEffort
     )
-    # PowerShell 7.4+ defaults PSNativeCommandUseErrorActionPreference to true, which turns
-    # nvim/Mason stderr (e.g. clang-format installing) or a non-zero exit into a terminating
-    # NativeCommandError before we can inspect LASTEXITCODE. We do our own exit-code check
-    # below, so disable that promotion here (function-local; reverts on return).
-    $PSNativeCommandUseErrorActionPreference = $false
-    & $Block
-    $rc = $LASTEXITCODE
+    # Callers and CI can explicitly enable native error promotion. Isolate that
+    # preference while we inspect the nvim exit code ourselves, and always
+    # restore the caller setting even when the command throws.
+    $oldNativePreference = $null
+    $hasNativePreference = Test-Path Variable:PSNativeCommandUseErrorActionPreference
+    try {
+        if ($hasNativePreference) {
+            $oldNativePreference = $PSNativeCommandUseErrorActionPreference
+            $PSNativeCommandUseErrorActionPreference = $false
+        }
+        & $Block
+        $rc = if ($null -eq $LASTEXITCODE) { 0 } else { [int]$LASTEXITCODE }
+    } finally {
+        if ($hasNativePreference) {
+            $PSNativeCommandUseErrorActionPreference = $oldNativePreference
+        }
+    }
     if ($rc -ne 0) {
         if ($IsBestEffort) {
             Write-Warning ("  $Label exited $rc (continuing because -BestEffort is set)")
@@ -1625,6 +1876,8 @@ function Invoke-SetupUpdateMode {
 # helper functions without running install, config, or Neovim sync phases.
 if ($env:DOTFILES_SETUP_PS1_SOURCE_ONLY) { return }
 
+$script:WindowsIdentity = Resolve-WindowsTargetIdentity
+$script:ChezmoiBaseArgs = @('--source', $HomeSource, '--destination', $script:WindowsIdentity.UserProfile)
 Stop-NvimSelfLinkIfNeeded
 
 if ($Update) {

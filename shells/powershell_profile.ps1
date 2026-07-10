@@ -6,19 +6,54 @@
 # and inherit $PROFILE; any prompt/UX work here either wastes time or
 # leaks output that the parent tool tries to parse as command output.
 
-# ---- Fast bail-out for non-interactive hosts ---------------------------------
-# Credential helpers and pipe-driven invocations dont get a real console host.
-# When in doubt, do nothing -- the prompt UX has zero value in those cases.
-$interactive = $true
-try {
-    if (-not [Environment]::UserInteractive) {
-        $interactive = $false
+# ---- Fast bail-out for non-interactive invocations ----------------------------
+function Test-DotfilesInteractiveInvocation {
+    [CmdletBinding()]
+    param(
+        [bool]$UserInteractive = [Environment]::UserInteractive,
+        [string]$HostName = $Host.Name,
+        [string[]]$CommandLineArgs = [Environment]::GetCommandLineArgs(),
+        [bool]$InputRedirected = $(try { [Console]::IsInputRedirected } catch { $true }),
+        [bool]$OutputRedirected = $(try { [Console]::IsOutputRedirected } catch { $true }),
+        [bool]$ErrorRedirected = $(try { [Console]::IsErrorRedirected } catch { $true }),
+        [AllowEmptyString()] [string]$CIValue = $env:CI
+    )
+
+    if (-not $UserInteractive -or $InputRedirected -or $OutputRedirected -or $ErrorRedirected) {
+        return $false
     }
-    if ($interactive -and $Host.Name -notin @('ConsoleHost', 'Visual Studio Code Host', 'Windows PowerShell ISE Host')) {
-        $interactive = $false
+    if ($HostName -notin @('ConsoleHost', 'Visual Studio Code Host', 'Windows PowerShell ISE Host')) {
+        return $false
     }
-} catch {
-    $interactive = $false
+    if (-not [string]::IsNullOrWhiteSpace($CIValue) -and $CIValue -notmatch '^(?i:false|0|no)$') {
+        return $false
+    }
+
+    $hasNoExit = $false
+    $hasBatchSelector = $false
+    foreach ($argument in @($CommandLineArgs)) {
+        switch -Regex ([string]$argument) {
+            '^(?i:-noninteractive|-noni)$' { return $false }
+            '^(?i:-noexit|-noe)$' { $hasNoExit = $true; continue }
+            '^(?i:-command|-c|-encodedcommand|-e|-ec|-file|-f|-commandwithargs)$' {
+                $hasBatchSelector = $true
+                continue
+            }
+        }
+    }
+    if ($HostName -eq 'ConsoleHost' -and $hasBatchSelector -and -not $hasNoExit) {
+        return $false
+    }
+    return $true
+}
+
+# Tests can provide a deterministic invocation context before dot-sourcing the
+# profile; real shells do not define this variable and always use runtime data.
+$invocationContext = Get-Variable -Name DotfilesProfileInvocationContext -ValueOnly -ErrorAction SilentlyContinue
+$interactive = if ($invocationContext -is [hashtable]) {
+    Test-DotfilesInteractiveInvocation @invocationContext
+} else {
+    Test-DotfilesInteractiveInvocation
 }
 if (-not $interactive) { return }
 
@@ -52,6 +87,24 @@ $script:StarshipConfigPath = if ($env:STARSHIP_CONFIG) {
 }
 
 # ---- Precompile Starship init (idempotent; regenerates when toml is newer) ---
+function Test-StarshipInitScriptValid {
+    [CmdletBinding()]
+    param(
+        [string]$Path,
+        [AllowEmptyString()] [string]$Content
+    )
+
+    if ($PSBoundParameters.ContainsKey('Path')) {
+        if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $false }
+        try { $Content = [IO.File]::ReadAllText($Path) } catch { return $false }
+    }
+    if ([string]::IsNullOrWhiteSpace($Content)) { return $false }
+    $tokens = $null
+    $parseErrors = $null
+    [void][Management.Automation.Language.Parser]::ParseInput($Content, [ref]$tokens, [ref]$parseErrors)
+    return (@($parseErrors).Count -eq 0)
+}
+
 function Test-StarshipInitRegenerationNeeded {
     [CmdletBinding()]
     param(
@@ -59,7 +112,7 @@ function Test-StarshipInitRegenerationNeeded {
         [string]$ConfigPath = $script:StarshipConfigPath
     )
 
-    if (-not (Test-Path -LiteralPath $InitPath)) {
+    if (-not (Test-StarshipInitScriptValid -Path $InitPath)) {
         return $true
     }
     if (Test-Path -LiteralPath $ConfigPath) {
@@ -82,19 +135,44 @@ function Publish-StarshipInitScript {
         New-Item -ItemType Directory -Force -Path $initDir | Out-Null
     }
 
+    if (-not (Test-StarshipInitScriptValid -Content $Content)) {
+        throw 'Starship init cache content is empty or invalid PowerShell'
+    }
+
     $initLeaf = Split-Path -Leaf $InitPath
     $tempPath = Join-Path $initDir ("{0}.{1}.{2}.tmp" -f $initLeaf, $PID, [guid]::NewGuid().ToString('N'))
+    $rollbackPath = Join-Path $initDir ("{0}.{1}.{2}.rollback" -f $initLeaf, $PID, [guid]::NewGuid().ToString('N'))
+    $publishedOverExisting = $false
     try {
         [System.IO.File]::WriteAllText($tempPath, $Content, [System.Text.UTF8Encoding]::new($false))
-        Move-Item -LiteralPath $tempPath -Destination $InitPath -Force -ErrorAction Stop
+        if (Test-Path -LiteralPath $InitPath -PathType Leaf) {
+            [IO.File]::Replace($tempPath, $InitPath, $rollbackPath, $true)
+            $publishedOverExisting = $true
+        } else {
+            Move-Item -LiteralPath $tempPath -Destination $InitPath -ErrorAction Stop
+        }
+        if (-not (Test-StarshipInitScriptValid -Path $InitPath)) {
+            throw 'published Starship init cache failed validation'
+        }
+        Remove-Item -LiteralPath $rollbackPath -Force -ErrorAction SilentlyContinue
         return $true
     } catch {
         Write-Verbose $_.Exception.Message
+        if ($publishedOverExisting -and (Test-Path -LiteralPath $rollbackPath -PathType Leaf)) {
+            $failedPath = "$tempPath.failed"
+            try {
+                [IO.File]::Replace($rollbackPath, $InitPath, $failedPath, $true)
+            } finally {
+                Remove-Item -LiteralPath $failedPath -Force -ErrorAction SilentlyContinue
+            }
+        }
         Remove-Item -LiteralPath $tempPath -Force -ErrorAction SilentlyContinue
         if (Test-Path -LiteralPath $InitPath -PathType Leaf) {
             return $false
         }
         throw
+    } finally {
+        Remove-Item -LiteralPath $rollbackPath -Force -ErrorAction SilentlyContinue
     }
 }
 
@@ -102,15 +180,36 @@ function Confirm-StarshipInitScript {
     [CmdletBinding()]
     param(
         [string]$InitPath = $script:StarshipInitPath,
-        [string]$ConfigPath = $script:StarshipConfigPath
+        [string]$ConfigPath = $script:StarshipConfigPath,
+        [scriptblock]$Generator = { & starship init powershell --print-full-init }
     )
 
     if (Test-StarshipInitRegenerationNeeded -InitPath $InitPath -ConfigPath $ConfigPath) {
         Write-Verbose 'Generating precompiled Starship init script...'
-        $init = (& starship init powershell --print-full-init) -join [Environment]::NewLine
+        $oldNativePreference = $null
+        $hasNativePreference = Test-Path Variable:PSNativeCommandUseErrorActionPreference
+        try {
+            if ($hasNativePreference) {
+                $oldNativePreference = $PSNativeCommandUseErrorActionPreference
+                $PSNativeCommandUseErrorActionPreference = $false
+            }
+            $global:LASTEXITCODE = 0
+            $init = @(& $Generator) -join [Environment]::NewLine
+            $rc = if ($null -eq $LASTEXITCODE) { 0 } else { [int]$LASTEXITCODE }
+        } finally {
+            if ($hasNativePreference) {
+                $PSNativeCommandUseErrorActionPreference = $oldNativePreference
+            }
+        }
+        if ($rc -ne 0) {
+            throw "Starship init generation exited $rc; existing cache was preserved"
+        }
+        if (-not (Test-StarshipInitScriptValid -Content $init)) {
+            throw 'Starship init generation returned empty or invalid PowerShell; existing cache was preserved'
+        }
         $published = Publish-StarshipInitScript -InitPath $InitPath -Content $init
-        if (-not $published -and -not (Test-Path -LiteralPath $InitPath -PathType Leaf)) {
-            throw "Starship init cache could not be published"
+        if (-not $published) {
+            throw 'Starship init cache could not be published; existing cache was preserved'
         }
     }
 }

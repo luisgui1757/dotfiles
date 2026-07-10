@@ -1,6 +1,17 @@
 BeforeAll {
     $script:RepoRoot = (Resolve-Path "$PSScriptRoot/../..").Path
     $script:Profile  = Join-Path $script:RepoRoot "shells/powershell_profile.ps1"
+    $script:InteractiveProfileContext = @'
+$DotfilesProfileInvocationContext = @{
+    UserInteractive = $true
+    HostName = 'ConsoleHost'
+    CommandLineArgs = @('pwsh', '-NoExit')
+    InputRedirected = $false
+    OutputRedirected = $false
+    ErrorRedirected = $false
+    CIValue = ''
+}
+'@
 }
 
 Describe "PowerShell profile" {
@@ -42,12 +53,98 @@ Describe "PowerShell profile" {
         $src | Should -Not -Match 'function Ensure-StarshipInitScript'
     }
 
-    It "checks UserInteractive before host-name refinement" {
+    It "uses invocation, redirection, CI, and host checks before profile work" {
         $src = Get-Content -Raw -LiteralPath $script:Profile
-        $userInteractiveIndex = $src.IndexOf('[Environment]::UserInteractive')
-        $hostNameIndex = $src.IndexOf('$Host.Name')
-        $userInteractiveIndex | Should -BeGreaterOrEqual 0
-        $hostNameIndex | Should -BeGreaterThan $userInteractiveIndex
+        $guardIndex = $src.IndexOf('function Test-DotfilesInteractiveInvocation')
+        $cacheIndex = $src.IndexOf('$script:CacheDir')
+        $guardIndex | Should -BeGreaterOrEqual 0
+        $cacheIndex | Should -BeGreaterThan $guardIndex
+        $src | Should -Match '\[Environment\]::GetCommandLineArgs\(\)'
+        $src | Should -Match '\[Console\]::IsInputRedirected'
+        $src | Should -Match '\[Console\]::IsOutputRedirected'
+        $src | Should -Match '\[Console\]::IsErrorRedirected'
+        $src | Should -Match '\$env:CI'
+    }
+
+    It "classifies supported interactive hosts without accepting batch invocations" {
+        . $script:Profile
+        foreach ($hostName in 'ConsoleHost', 'Visual Studio Code Host', 'Windows PowerShell ISE Host') {
+            Test-DotfilesInteractiveInvocation -UserInteractive $true -HostName $hostName `
+                -CommandLineArgs @('pwsh') -InputRedirected $false -OutputRedirected $false `
+                -ErrorRedirected $false -CIValue '' | Should -BeTrue
+        }
+        Test-DotfilesInteractiveInvocation -UserInteractive $true -HostName 'ConsoleHost' `
+            -CommandLineArgs @('pwsh', '-NoExit', '-Command', 'prompt') -InputRedirected $false `
+            -OutputRedirected $false -ErrorRedirected $false -CIValue '' | Should -BeTrue
+        Test-DotfilesInteractiveInvocation -UserInteractive $true -HostName 'ConsoleHost' `
+            -CommandLineArgs @('pwsh', '-Command', 'git credential fill') -InputRedirected $false `
+            -OutputRedirected $false -ErrorRedirected $false -CIValue '' | Should -BeFalse
+    }
+
+    It "rejects noninteractive, redirected, CI, and unsupported invocation contexts" {
+        . $script:Profile
+        $base = @{
+            UserInteractive = $true
+            HostName = 'ConsoleHost'
+            CommandLineArgs = @('pwsh')
+            InputRedirected = $false
+            OutputRedirected = $false
+            ErrorRedirected = $false
+            CIValue = ''
+        }
+        foreach ($override in @(
+                @{ CommandLineArgs = @('pwsh', '-NonInteractive') },
+                @{ InputRedirected = $true },
+                @{ OutputRedirected = $true },
+                @{ ErrorRedirected = $true },
+                @{ CIValue = 'true' },
+                @{ HostName = 'ServerRemoteHost' }
+            )) {
+            $context = $base.Clone()
+            foreach ($key in $override.Keys) { $context[$key] = $override[$key] }
+            Test-DotfilesInteractiveInvocation @context | Should -BeFalse
+        }
+    }
+
+    It "does no output or profile-owned cache work in real noninteractive subprocesses" -TestCases @(
+        @{ Name = 'noninteractive'; Arguments = @('-NonInteractive', '-Command'); CIValue = '' },
+        @{ Name = 'credential-command'; Arguments = @('-Command'); CIValue = '' },
+        @{ Name = 'ci-command'; Arguments = @('-Command'); CIValue = 'true' }
+    ) {
+        param([string]$Name, [string[]]$Arguments, [string]$CIValue)
+        $pwshExe = (Get-Command pwsh -ErrorAction Stop).Source
+        $sandbox = Join-Path ([IO.Path]::GetTempPath()) ("profile guard $Name " + [Guid]::NewGuid())
+        $cache = Join-Path $sandbox 'cache must stay absent'
+        New-Item -ItemType Directory -Force -Path $sandbox | Out-Null
+        try {
+            $startInfo = [Diagnostics.ProcessStartInfo]::new()
+            $startInfo.FileName = $pwshExe
+            $startInfo.UseShellExecute = $false
+            $startInfo.RedirectStandardInput = $true
+            $startInfo.RedirectStandardOutput = $true
+            $startInfo.RedirectStandardError = $true
+            $startInfo.ArgumentList.Add('-NoLogo')
+            $startInfo.ArgumentList.Add('-NoProfile')
+            foreach ($argument in $Arguments) { $startInfo.ArgumentList.Add($argument) }
+            $startInfo.ArgumentList.Add(". '$($script:Profile.Replace("'", "''"))'")
+            $startInfo.Environment['LOCALAPPDATA'] = $cache
+            $startInfo.Environment['XDG_CACHE_HOME'] = $cache
+            $startInfo.Environment['CI'] = $CIValue
+            $process = [Diagnostics.Process]::Start($startInfo)
+            $process.StandardInput.Close()
+            $stdout = $process.StandardOutput.ReadToEnd()
+            $stderr = $process.StandardError.ReadToEnd()
+            $process.WaitForExit()
+
+            $process.ExitCode | Should -Be 0
+            $stdout | Should -BeNullOrEmpty
+            $stderr | Should -BeNullOrEmpty
+            Test-Path -LiteralPath (Join-Path $cache 'starship.ps1') | Should -BeFalse
+            Test-Path -LiteralPath (Join-Path $cache 'zoxide.ps1') | Should -BeFalse
+            Test-Path -LiteralPath (Join-Path $cache 'zoxide.ps1.version') | Should -BeFalse
+        } finally {
+            Remove-Item -LiteralPath $sandbox -Recurse -Force -ErrorAction SilentlyContinue
+        }
     }
 
     It "writes the starship init cache with UTF8 no-BOM encoding" {
@@ -59,9 +156,69 @@ Describe "PowerShell profile" {
     It "publishes the starship init cache atomically from a temp file" {
         $src = Get-Content -Raw -LiteralPath $script:Profile
         $src | Should -Match '"\{0\}\.\{1\}\.\{2\}\.tmp"\s+-f\s+\$initLeaf,\s+\$PID'
-        $src | Should -Match 'Move-Item\s+-LiteralPath\s+\$tempPath\s+-Destination\s+\$InitPath\s+-Force'
+        $src | Should -Match '\[IO\.File\]::Replace\(\$tempPath,\s*\$InitPath,\s*\$rollbackPath,\s*\$true\)'
+        $src | Should -Match 'Test-StarshipInitScriptValid\s+-Path\s+\$InitPath'
         $src | Should -Match 'function Import-StarshipInitScriptWithRetry'
         $src | Should -Match 'Start-Sleep\s+-Milliseconds\s+\$DelayMilliseconds'
+    }
+
+    It "repairs an invalid Starship cache and preserves old bytes on generation failure" {
+        $pwshExe = (Get-Command pwsh -ErrorAction Stop).Source
+        $profilePath = $script:Profile.Replace('"', '`"')
+        $sandbox = Join-Path ([IO.Path]::GetTempPath()) ('starship cache ' + [Guid]::NewGuid())
+        $scriptBlock = @"
+$($script:InteractiveProfileContext)
+`$env:PATH = ''
+. "$profilePath"
+`$root = '$($sandbox.Replace("'", "''"))'
+`$cache = Join-Path `$root 'starship.ps1'
+`$config = Join-Path `$root 'starship.toml'
+New-Item -ItemType Directory -Force -Path `$root | Out-Null
+[IO.File]::WriteAllText(`$cache, 'function broken {', [Text.UTF8Encoding]::new(`$false))
+Confirm-StarshipInitScript -InitPath `$cache -ConfigPath `$config -Generator {
+    `$global:LASTEXITCODE = 0
+    'function global:prompt { return "repaired" }'
+}
+if (-not (Test-StarshipInitScriptValid -Path `$cache)) { exit 10 }
+if ([IO.File]::ReadAllText(`$cache) -notmatch 'repaired') { exit 11 }
+
+`$preserved = [IO.File]::ReadAllBytes(`$cache)
+[IO.File]::WriteAllText(`$config, 'newer', [Text.UTF8Encoding]::new(`$false))
+(Get-Item -LiteralPath `$config).LastWriteTimeUtc = [DateTime]::UtcNow.AddMinutes(1)
+try {
+    Confirm-StarshipInitScript -InitPath `$cache -ConfigPath `$config -Generator {
+        `$global:LASTEXITCODE = 9
+        'function global:prompt { return "must-not-publish" }'
+    }
+    exit 12
+} catch {
+    if (`$_.Exception.Message -notmatch 'exited 9') { exit 13 }
+}
+`$after = [IO.File]::ReadAllBytes(`$cache)
+if (`$after.Length -ne `$preserved.Length) { exit 14 }
+for (`$i = 0; `$i -lt `$after.Length; `$i++) {
+    if (`$after[`$i] -ne `$preserved[`$i]) { exit 15 }
+}
+
+[IO.File]::WriteAllText(`$cache, 'function broken {', [Text.UTF8Encoding]::new(`$false))
+try {
+    Confirm-StarshipInitScript -InitPath `$cache -ConfigPath `$config -Generator {
+        `$global:LASTEXITCODE = 0
+        '   '
+    }
+    exit 16
+} catch {
+    if (`$_.Exception.Message -notmatch 'empty or invalid') { exit 17 }
+}
+if ([IO.File]::ReadAllText(`$cache) -ne 'function broken {') { exit 18 }
+exit 0
+"@
+        try {
+            & $pwshExe -NoLogo -NoProfile -Command $scriptBlock
+            $LASTEXITCODE | Should -Be 0
+        } finally {
+            Remove-Item -LiteralPath $sandbox -Recurse -Force -ErrorAction SilentlyContinue
+        }
     }
 
     It "caches the zoxide init without remote eval (no Invoke-Expression / iex)" {
@@ -143,6 +300,7 @@ Describe "PowerShell profile" {
         $scriptBlock = @"
 `$env:LS_COLORS = 'di=01;34:ex=01;32:fi=00'
 `$env:DOTFILES_LS_COLORS = `$null
+$($script:InteractiveProfileContext)
 . "$profilePath"
 if (`$env:LS_COLORS -notmatch 'di=38;2;246;193;119') {
     Write-Error "LS_COLORS did not use the Rose Pine directory color: `$env:LS_COLORS"
@@ -158,6 +316,7 @@ if (`$env:LS_COLORS -notmatch 'ow=38;2;246;193;119' -or `$env:LS_COLORS -notmatc
 }
 `$env:LS_COLORS = 'di=01;34:ex=01;32:fi=00'
 `$env:DOTFILES_LS_COLORS = 'di=38;2;1;2;3:ex=38;2;4;5;6'
+$($script:InteractiveProfileContext)
 . "$profilePath"
 if (`$env:LS_COLORS -ne `$env:DOTFILES_LS_COLORS) {
     Write-Error "DOTFILES_LS_COLORS was not honored: `$env:LS_COLORS"
@@ -183,6 +342,7 @@ function global:lsd { param([Parameter(ValueFromRemainingArguments = `$true)] [o
 foreach (`$name in 'ls', 'l', 'la', 'lla', 'lt') {
     Set-Alias -Name `$name -Value Get-Location -Scope Global -Force
 }
+$($script:InteractiveProfileContext)
 . "$profilePath"
 `$failures = @()
 foreach (`$name in 'ls', 'l', 'la', 'lla', 'lt') {
@@ -281,6 +441,7 @@ exit 0
 
         $profilePath = $script:Profile.Replace('"', '`"')
         $scriptBlock = @"
+$($script:InteractiveProfileContext)
 . "$profilePath"
 `$o = Get-PSReadLineOption
 if (`$o.EditMode -ne 'Vi') { Write-Error "EditMode=`$(`$o.EditMode)"; exit 1 }

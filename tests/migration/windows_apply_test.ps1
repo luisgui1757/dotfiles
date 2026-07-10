@@ -5,6 +5,9 @@ if (Get-Variable -Name PSNativeCommandUseErrorActionPreference -ErrorAction Sile
 
 $script:RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $script:SourceDir = Join-Path $script:RepoRoot 'home'
+$script:LocalAppDataSource = Join-Path $script:RepoRoot 'windows\chezmoi-localappdata'
+$script:DocumentsSource = Join-Path $script:RepoRoot 'windows\chezmoi-documents'
+$script:OverlayConfig = Join-Path $script:RepoRoot 'windows\chezmoi-overlay.toml'
 $script:Chezmoi = $null
 
 $script:UserProfileGuid = '{11111111-1111-1111-1111-111111111111}'
@@ -42,7 +45,8 @@ function Remove-TestSandbox {
 
 function Get-WtSettingsPath {
     param([Parameter(Mandatory)] [string]$Sandbox)
-    return (Join-Path $Sandbox 'AppData\Local\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json')
+    $null = $Sandbox
+    return (Join-Path $env:LOCALAPPDATA 'Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json')
 }
 
 function Invoke-WithSandboxEnv {
@@ -51,10 +55,11 @@ function Invoke-WithSandboxEnv {
         [Parameter(Mandatory)] [scriptblock]$Script
     )
 
-    $localAppData = Join-Path $Sandbox 'AppData\Local'
+    $localAppData = Join-Path $Sandbox 'Redirected Local AppData'
     $appData = Join-Path $Sandbox 'AppData\Roaming'
     $tempDir = Join-Path $Sandbox 'Temp'
-    $profilePath = Join-Path $Sandbox 'Documents\PowerShell\Microsoft.PowerShell_profile.ps1'
+    $documents = Join-Path $Sandbox 'OneDrive - Example\Documents'
+    $profilePath = Join-Path $documents 'PowerShell\Microsoft.PowerShell_profile.ps1'
     foreach ($dir in @($localAppData, $appData, $tempDir, (Split-Path -Parent $profilePath))) {
         New-Item -ItemType Directory -Force -Path $dir | Out-Null
     }
@@ -109,7 +114,11 @@ function Invoke-Chezmoi {
     # --force makes every change without prompting; --no-tty refuses to grab a
     # TTY. verify ignores both (it makes no changes), so it stays a strict
     # oracle: if the nvim symlink ever fails to round-trip, verify still fails.
-    Invoke-CheckedNative -FilePath $script:Chezmoi -Arguments (@('--source', $script:SourceDir, '--no-tty', '--force') + $Arguments)
+    Invoke-CheckedNative -FilePath $script:Chezmoi -Arguments (@(
+            '--source', $script:SourceDir,
+            '--destination', $env:USERPROFILE,
+            '--no-tty', '--force'
+        ) + $Arguments)
 }
 
 function Invoke-ChezmoiReapply {
@@ -122,7 +131,32 @@ function Invoke-ChezmoiReapply {
     # rather than being masked. This is the strict idempotency oracle the Unix
     # parity gate already has (it captures second-apply output and fails on
     # non-empty); this keeps the Windows arm honest too.
-    Invoke-CheckedNative -FilePath $script:Chezmoi -Arguments (@('--source', $script:SourceDir, '--no-tty') + $Arguments)
+    Invoke-CheckedNative -FilePath $script:Chezmoi -Arguments (@(
+            '--source', $script:SourceDir,
+            '--destination', $env:USERPROFILE,
+            '--no-tty'
+        ) + $Arguments)
+}
+
+function Invoke-ChezmoiOverlay {
+    param(
+        [Parameter(Mandatory)] [string]$Source,
+        [Parameter(Mandatory)] [string]$Destination,
+        [Parameter(Mandatory)] [string]$StateName,
+        [Parameter(Mandatory)] [string[]]$Arguments,
+        [switch]$Reapply
+    )
+    $state = Join-Path $env:TEMP "$StateName.boltdb"
+    $base = @(
+        '--source', $Source,
+        '--destination', $Destination,
+        '--persistent-state', $state,
+        '--config', $script:OverlayConfig,
+        '--config-format', 'toml',
+        '--no-tty'
+    )
+    if (-not $Reapply) { $base += '--force' }
+    Invoke-CheckedNative -FilePath $script:Chezmoi -Arguments ($base + $Arguments)
 }
 
 function Get-SingleItemTarget {
@@ -169,8 +203,9 @@ function Assert-CopyModeFileMatches {
 function Assert-NvimSymlinkMatchesRepo {
     param([Parameter(Mandatory)] [string]$Sandbox)
 
-    $nvimPath = Join-Path $Sandbox 'AppData\Local\nvim'
-    Assert-Condition (Test-Path -LiteralPath $nvimPath -PathType Container) 'nvim directory was not created under AppData\Local'
+    $null = $Sandbox
+    $nvimPath = Join-Path $env:LOCALAPPDATA 'nvim'
+    Assert-Condition (Test-Path -LiteralPath $nvimPath -PathType Container) 'nvim directory was not created under actual LocalApplicationData'
     $nvimItem = Get-Item -LiteralPath $nvimPath -Force
     Assert-Condition ($nvimItem.LinkType -eq 'SymbolicLink') 'nvim is not a symlink; expected Windows dir-symlink mode'
 
@@ -184,6 +219,19 @@ function Assert-NvimSymlinkMatchesRepo {
         -ActualPath (Join-Path $nvimPath 'init.lua') `
         -ExpectedPath (Join-Path $script:RepoRoot 'nvim\init.lua') `
         -Label 'nvim init.lua'
+}
+
+function Assert-SymlinkMatchesRepo {
+    param(
+        [Parameter(Mandatory)] [string]$ActualPath,
+        [Parameter(Mandatory)] [string]$ExpectedPath,
+        [Parameter(Mandatory)] [string]$Label
+    )
+    $item = Get-Item -LiteralPath $ActualPath -Force -ErrorAction Stop
+    Assert-Condition ($item.LinkType -eq 'SymbolicLink') "$Label is not a symlink"
+    $resolvedTarget = Get-CanonicalPath -Path (Get-SingleItemTarget -Item $item)
+    $expectedTarget = Get-CanonicalPath -Path $ExpectedPath
+    Assert-Condition ($resolvedTarget -eq $expectedTarget) "$Label target mismatch actual=$resolvedTarget expected=$expectedTarget"
 }
 
 function New-BaselineWtSettings {
@@ -269,8 +317,8 @@ function Assert-Part1Files {
     # a regression in the ignore rule can never silently reintroduce the freeze.
     Assert-Condition (-not (Test-Path -LiteralPath (Join-Path $Sandbox '.tmux.posix.conf'))) `
         '~/.tmux.posix.conf must NOT be deployed on Windows (psmux config-load freeze boundary)'
-    Assert-CopyModeFileMatches `
-        -ActualPath (Join-Path $Sandbox 'AppData\Local\lazygit\config.yml') `
+    Assert-SymlinkMatchesRepo `
+        -ActualPath (Join-Path $env:LOCALAPPDATA 'lazygit\config.yml') `
         -ExpectedPath (Join-Path $script:RepoRoot 'lazygit\config.windows.yml') `
         -Label 'lazygit config'
     Assert-CopyModeFileMatches `
@@ -293,11 +341,15 @@ function Assert-Part1Files {
         -ActualPath (Join-Path $Sandbox '.config\wezterm\wezterm.lua') `
         -ExpectedPath (Join-Path $script:RepoRoot 'wezterm\wezterm.lua') `
         -Label 'wezterm config'
-    Assert-CopyModeFileMatches `
-        -ActualPath (Join-Path $Sandbox 'Documents\PowerShell\Microsoft.PowerShell_profile.ps1') `
+    Assert-SymlinkMatchesRepo `
+        -ActualPath ([string]$PROFILE) `
         -ExpectedPath (Join-Path $script:RepoRoot 'shells\powershell_profile.ps1') `
         -Label 'PowerShell profile'
     Assert-NvimSymlinkMatchesRepo -Sandbox $Sandbox
+    Assert-Condition (-not (Test-Path -LiteralPath (Join-Path $Sandbox 'AppData\Local\nvim'))) `
+        'conventional LocalAppData target was created despite redirection'
+    Assert-Condition (-not (Test-Path -LiteralPath (Join-Path $Sandbox 'Documents\PowerShell\Microsoft.PowerShell_profile.ps1'))) `
+        'conventional Documents profile was created despite redirection'
 }
 
 function Invoke-Part1 {
@@ -308,12 +360,18 @@ function Invoke-Part1 {
             $settingsBefore = [IO.File]::ReadAllText($settingsPath)
             Invoke-Chezmoi -Arguments @('init')
             Invoke-Chezmoi -Arguments @('apply')
+            Invoke-ChezmoiOverlay -Source $script:LocalAppDataSource -Destination $env:LOCALAPPDATA -StateName 'localappdata' -Arguments @('apply')
+            Invoke-ChezmoiOverlay -Source $script:DocumentsSource -Destination (Split-Path -Parent (Split-Path -Parent ([string]$PROFILE))) -StateName 'documents' -Arguments @('apply')
             Assert-Part1Files -Sandbox $sandbox
             Assert-Condition ([IO.File]::ReadAllText($settingsPath) -eq $settingsBefore) `
                 'bare chezmoi apply changed Windows Terminal settings; setup.ps1 must own the transaction'
             # Second apply must be a prompt-free no-op (NO --force; see wrapper).
             Invoke-ChezmoiReapply -Arguments @('apply')
+            Invoke-ChezmoiOverlay -Source $script:LocalAppDataSource -Destination $env:LOCALAPPDATA -StateName 'localappdata' -Arguments @('apply') -Reapply
+            Invoke-ChezmoiOverlay -Source $script:DocumentsSource -Destination (Split-Path -Parent (Split-Path -Parent ([string]$PROFILE))) -StateName 'documents' -Arguments @('apply') -Reapply
             Invoke-Chezmoi -Arguments @('verify')
+            Invoke-ChezmoiOverlay -Source $script:LocalAppDataSource -Destination $env:LOCALAPPDATA -StateName 'localappdata' -Arguments @('verify') -Reapply
+            Invoke-ChezmoiOverlay -Source $script:DocumentsSource -Destination (Split-Path -Parent (Split-Path -Parent ([string]$PROFILE))) -StateName 'documents' -Arguments @('verify') -Reapply
         }
         Pass 'part 1 real apply smoke passed'
     } finally {

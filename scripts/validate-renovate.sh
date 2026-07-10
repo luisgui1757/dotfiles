@@ -5,7 +5,7 @@
 set -euo pipefail
 
 RENOVATE_NODE_VERSION="24.18.0"
-RENOVATE_VERSION="43.256.0"
+RENOVATE_VERSION="43.257.4"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 cd "$REPO_ROOT"
@@ -22,10 +22,23 @@ fi
 export NPM_CONFIG_CACHE="${NPM_CONFIG_CACHE:-${TMPDIR:-/tmp}/dotfiles-renovate-npm-cache}"
 export RENOVATE_NODE_VERSION RENOVATE_VERSION
 mkdir -p "$NPM_CONFIG_CACHE"
+renovate_tmp="$(mktemp -d)"
+trap 'rm -rf "$renovate_tmp"' EXIT HUP INT TERM
+export DOTFILES_RENOVATE_LOG="$renovate_tmp/extract.jsonl"
+export DOTFILES_RENOVATE_STDOUT="$renovate_tmp/extract.out"
 
 # shellcheck disable=SC2016 # expand node version inside the Node 24 subprocess.
 npx --yes --package "node@$RENOVATE_NODE_VERSION" -- bash -c '
 set -euo pipefail
 echo "renovate validator node: $(node -v)"
 npm exec --yes --package "renovate@$RENOVATE_VERSION" -- renovate-config-validator --strict renovate.json
+if ! LOG_LEVEL=debug LOG_FORMAT=json LOG_FILE="$DOTFILES_RENOVATE_LOG" \
+    npm exec --yes --package "renovate@$RENOVATE_VERSION" -- \
+    renovate --platform=local --dry-run=extract >"$DOTFILES_RENOVATE_STDOUT" 2>&1; then
+    cat "$DOTFILES_RENOVATE_STDOUT" >&2
+    exit 1
+fi
 '
+
+python3 scripts/validate-renovate-inventory.py \
+    "$DOTFILES_RENOVATE_LOG" tests/static/renovate_expected_inventory.txt

@@ -121,8 +121,11 @@ apply.
 ./setup.sh --experimental-wsl-gui # WSL-only opt-in for Linux GUI terminal bits
 ./setup.sh --nix-darwin          # compatibility alias; macOS setup already applies nix-darwin
 ./setup.sh --home-manager        # compatibility alias; Linux/WSL setup already applies Home Manager
+./setup.sh --skip-deps           # skip Nix + native/deferred dependency provisioning
 ./setup.sh --skip-config         # skip chezmoi config apply
+./setup.sh --skip-nvim           # skip Lazy/Tree-sitter/Mason phases
 ./setup.sh --skip-agents         # skip global Polaris agent policy
+./setup.sh --best-effort         # continue after nvim-phase failures; exit nonzero with summary
 make setup                       # same as ./setup.sh, via the Makefile
 ```
 
@@ -312,16 +315,17 @@ remains a symlink even though single-file configs are copies.
 ### Managed Configs
 
 The table below is the config layer. Full setup and config-only applies use the
-chezmoi source under `home/`. Mechanisms differ: POSIX chezmoi uses symlinks for
-single files, Windows chezmoi copies single files, Neovim remains a directory
-symlink, and Windows Terminal remains a merge.
+chezmoi source under `home/`, plus dedicated Windows known-folder source states.
+Mechanisms differ: POSIX uses symlinks; ordinary UserProfile Windows files are
+copies; redirected LocalApplicationData/Documents targets are symlink overlays;
+and Windows Terminal remains a merge.
 
 | Tool | macOS | Linux / WSL | Windows |
 |---|---|---|---|
 | Neovim | `~/.config/nvim` -> `nvim/` | `~/.config/nvim` -> `nvim/` | `%LOCALAPPDATA%\nvim` -> `nvim\` |
 | Starship | `~/.config/starship.toml` -> `starship/starship.toml` | same | `%USERPROFILE%\.config\starship.toml` -> `starship\starship.toml` |
 | zsh | `~/.zshenv` -> `shells/zshenv`; `~/.zshrc` -> `shells/zshrc` | same | n/a |
-| PowerShell | n/a | n/a | `Documents\PowerShell\Microsoft.PowerShell_profile.ps1` -> `shells\powershell_profile.ps1` |
+| PowerShell | n/a | n/a | actual runtime `$PROFILE` plus Console/VS Code/ISE host profiles under the real Documents known folder -> `shells\powershell_profile.ps1` |
 | tmux / psmux | `~/.tmux.conf` -> `tmux/tmux.conf`; `~/.tmux.posix.conf` -> `tmux/tmux.posix.conf` (POSIX clipboard + TPM functional plugins + generated Rose Pine bar); `~/.tmux.rose-pine.{main,moon,dawn}.conf` -> generated `tmux/psmux-rose-pine.{main,moon,dawn}.conf` (Omer-shaped Rose Pine bar, **shared** with Windows) | same | `%USERPROFILE%\.psmux.conf` -> `tmux\psmux.conf` (first psmux entrypoint, disables warm sessions, then flag-free source-files the Windows overlay); `%USERPROFILE%\.tmux.conf` -> `tmux\tmux.conf`; `%USERPROFILE%\.tmux.windows.conf` -> `tmux\tmux.windows.conf`; `%USERPROFILE%\.tmux.rose-pine.ps1` -> `tmux\psmux-rose-pine.ps1` (Rose Pine bar generator / manual live-switch helper); `%USERPROFILE%\.tmux.rose-pine.{main,moon,dawn}.conf` -> the same generated `tmux\psmux-rose-pine.{main,moon,dawn}.conf`; the POSIX overlay is **excluded** on Windows (its `if-shell` probes hang psmux); WSL uses the Unix path |
 | Ghostty | `~/Library/Application Support/com.mitchellh.ghostty/config` -> `ghostty/config` | native Linux links `~/.config/ghostty/config`; WSL links it only with `--experimental-wsl-gui` | n/a |
 | WezTerm | `~/.config/wezterm/wezterm.lua` -> `wezterm/wezterm.lua` | same; WSL links it only with `--experimental-wsl-gui` | `%USERPROFILE%\.config\wezterm\wezterm.lua` -> `wezterm\wezterm.lua` (copied) |
@@ -331,11 +335,14 @@ symlink, and Windows Terminal remains a merge.
 | gh-dash | `~/.config/gh-dash/config.yml` -> `gh-dash/config.yml` | same | `%USERPROFILE%\.config\gh-dash\config.yml` -> `gh-dash\config.yml` |
 | Windows Terminal | n/a | n/a | app installed by `setup.ps1` through Scoop/winget/choco, with a SHA-256-verified portable zip fallback; setup treats packaged and portable `settings.json` as independent targets, stages and validates both before publication, creates separate verified backups, detects concurrent changes through atomic replacement rollback bytes, and rolls the transaction back on failure; opt out with `-SkipWindowsTerminalMerge`; see [windows-terminal/README.md](windows-terminal/README.md) |
 
-Chezmoi manages the Windows PowerShell 7 profile path
-`Documents\PowerShell\Microsoft.PowerShell_profile.ps1`. The Windows
-PowerShell 5.1 profile path (`Documents\WindowsPowerShell\...`) and POSIX pwsh
-profile are host/provisioning-adjacent, because they depend on the host shell
-and whether `pwsh` is installed.
+Windows setup resolves UserProfile, LocalApplicationData, Documents, and the
+active host's `$PROFILE` independently through supported runtime/known-folder
+APIs. It applies the UserProfile source plus dedicated LocalApplicationData and
+Documents source states, then verifies the paths Neovim, lazygit, ConsoleHost,
+VS Code, and ISE consume. Redirected folders, alternate drives, and spaces are
+supported. Recognized conventional-path legacy targets are backed up only after
+the new targets publish; divergent legacy user data stays in place with a
+migration warning. POSIX pwsh profile management remains provisioning-adjacent.
 
 ### Platform Notes
 
@@ -590,7 +597,7 @@ Use the same top-level test command that CI uses for your OS:
 make help               # list targets
 make ci                 # full local pre-PR gate: test + Renovate + migration
 make test               # current-host fast suite
-make validate-renovate  # schema-check renovate.json under Renovate's Node 24
+make validate-renovate  # schema + official local extraction inventory under Node 24
 make lint               # shellcheck everything
 ./tests/wsl/e2e.sh      # manual WSL split-host validation from inside WSL
 ./tests/greenfield/docker-greenfield.sh # local clean Ubuntu container e2e
@@ -639,9 +646,10 @@ Pull requests are meant to be gated by three required workflow families:
   starship, Neovim, Windows Pester/PSScriptAnalyzer, Renovate schema, and
   `chezmoi-parity` suites. Warnings are treated as failures where the tools
   expose them cleanly: shellcheck exits nonzero, PSScriptAnalyzer scans the
-  meaningful `.ps1` surface and fails on errors, new warning groups, or count
-  increases beyond the reviewed installer/test-harness style baseline,
-  Renovate validation fails if `npx` is missing under CI, and YAML
+  meaningful `.ps1` surface and binds every reviewed warning to a normalized
+  script/rule/message/extent fingerprint (not filename/rule/count alone),
+  Renovate validation fails if `npx` is missing under CI or its official local
+  extraction differs from the checked-in dependency inventory, and YAML
   parsing/linting is part of `make test-static`. Windows PSGallery module
   installs retry transient lookup failures, but missing test dependencies remain
   fatal.
@@ -666,8 +674,8 @@ The e2e jobs cover different install paths, not symmetric container platforms:
 | `setup.sh / ubuntu-24.04` | Full public Unix setup on the hosted Ubuntu runner after installing Nix in CI: Home Manager first, a clean login/interactive zsh PATH proof, then native/deferred installs, chezmoi, Lazy, Tree-sitter, Mason, and Polaris. |
 | `setup.sh / macos-26` | Full public Apple Silicon setup through the hosted runner: architecture-matched nix-darwin/declarative Homebrew, native/deferred installs, real Ghostty/WezTerm/AeroSpace config consumption, chezmoi, Lazy, Tree-sitter, Mason, and Polaris. The hosted runner alone gets the cleanup override; real hosts keep `cleanup = "check"`. |
 | `setup.sh / macos-26-intel` | Additional non-required real Intel setup lane with the same full assertions. Its YAML presence is not evidence; only an actual run is. |
-| `setup.ps1 / windows-2025` | Full Windows setup through the real Windows hosted runner, including Scoop/winget/choco behavior, PowerShell, symlinks, `zoxide`/`gh`/WezTerm/Herdr/Pi CLI command probes, and Neovim restore/sync phases. Windows containers do not model the desktop/user-profile setup well. |
-| `setup.sh / WSL2 Ubuntu-24.04 (canary)` | Non-required scheduled/manual WSL smoke signal in `.github/workflows/wsl2-canary.yml`. Hosted runners cannot provide a reliable required nested-virtualization WSL2 gate. The canary installs Ubuntu's `nix-bin` package inside the distro, enables flakes, then runs the same enforced Home Manager setup path as Linux; failures are visible in that workflow and do not muddy the core e2e-install signal. |
+| `setup.ps1 / windows-2025` | Full Windows setup through the real Windows hosted runner, including Scoop/winget/choco behavior, PowerShell, symlinks, Hack Nerd Font file/registry consumption, `zoxide`/`gh`/WezTerm/Herdr/Pi CLI command probes, and Neovim restore/sync phases. Windows containers do not model the desktop/user-profile setup well. |
+| `setup.sh / WSL2 Ubuntu-24.04 (canary)` | Non-required scheduled/manual WSL smoke signal in `.github/workflows/wsl2-canary.yml`. Hosted runners cannot provide a reliable required nested-virtualization WSL2 gate. The canary disables the WSL distro cache, installs Ubuntu's `nix-bin`, enables flakes, then runs the enforced Home Manager setup path; failures stay visible and do not muddy the required e2e signal. |
 
 After the Lazy restore, deterministic Tree-sitter parser install, and Mason sync, each
 `setup.sh`/`setup.ps1` job also
@@ -750,6 +758,17 @@ Automation must not run as the owner account. Use a separate GitHub App or bot
 identity with branch/PR write access and no repository administration
 permission; otherwise GitHub sees the action as `luisgui1757`.
 
+Runner-versioned required contexts are in a staged migration. This branch keeps
+the twelve live/checked-in legacy contexts required and additionally emits six
+stable logical checks (`nix flake check / {linux,macos}`, `e2e containers /
+linux`, `setup.sh / {linux,macos}`, and `setup.ps1 / windows`). Each logical
+check verifies the exact OS proof marker's head SHA, workflow run, logical
+identity, and legacy producer; these are not no-op checks. After this PR merges
+and those checks pass on `main`, a follow-up PR may switch the four checked-in
+safeguard sources to `candidateRequired` in `.github/check-identities.json`.
+Only after that second PR merges should the owner apply the new live contexts.
+See [branch-protection.md](docs/security/branch-protection.md) for the exact order.
+
 Manual owner step:
 
 ```bash
@@ -764,8 +783,10 @@ live verification commands and deletion-risk note;
 [docs/security/supply-chain.md](docs/security/supply-chain.md) records the
 reviewed executable identities and scanners.
 
-Renovate is the version-update bot for GitHub Actions and repo-pinned
-version/ref constants. GitHub-native Dependabot security alerts and automated
+Renovate is the version-update bot for GitHub Actions, direct and matrix-held
+runner labels, Nix flake inputs, and repo-pinned version/ref constants. The beta
+Nix manager is explicitly enabled, Scoop tracks upstream `master`, and bot
+branches rebase whenever behind `main`. GitHub-native Dependabot security alerts and automated
 security fixes stay enabled through `.github/settings.yml`; Dependabot version
 update PRs are intentionally not configured.
 
@@ -777,6 +798,12 @@ update PRs are intentionally not configured.
 | Adjacent SHA-256 / commit constants | Not managed; matched only as regex context | Renovate can bump the version/ref but cannot recompute archive/script hashes or verify tag commit IDs. CI must fail until a human recomputes and reviews them. |
 | Package-manager catalogs | Not managed | Brew, apt, dnf, pacman, zypper, apk, Scoop, winget, and choco entries are package names/IDs, not repo version pins. Let the package manager resolve current versions. |
 | Neovim plugin and Mason tools | Not managed | `lazy-lock.json` is refreshed with Lazy and tested as editor behavior; Mason intentionally has no machine-pinned lockfile. |
+
+`make validate-renovate` runs Renovate's own strict schema validator and
+`--platform=local --dry-run=extract`, then compares the official extraction to
+`tests/static/renovate_expected_inventory.txt`. A custom regex merely matching
+some text is not ownership proof. Live Dashboard confirmation is separate and
+remains pending until the hosted bot reruns on the PR head.
 
 Manual-review pin surfaces that Renovate may touch only partially:
 
@@ -1140,6 +1167,7 @@ MIT. See `LICENSE`.
 | `setup.sh --update` says a tool is `blocked` | the source strongly implies supported ownership, but the package/provenance proof is contradictory or unsafe | repair or reinstall that manager package/artifact, then rerun update mode; dotfiles fails closed rather than guessing |
 | `setup.sh --update` still resolves `make` to `/usr/bin/make` after `brew install make` | Homebrew's GNU Make formula exposes `make` through `$(brew --prefix make)/libexec/gnubin` | rerun `./setup.sh --skip-config` or open a new shell after setup persists Homebrew shellenv; the managed shell block prepends the `gnubin` path when the formula is installed |
 | A fresh Linux/WSL zsh cannot find Home Manager tools | Home Manager's session variables were not generated or neither canonical profile path is readable | re-run `./setup.sh --all`, then start a new zsh. The managed zshrc sources `${XDG_STATE_HOME:-$HOME/.local/state}/nix/profiles/profile/etc/profile.d/hm-session-vars.sh`, falling back to `~/.nix-profile/etc/profile.d/hm-session-vars.sh`; no-Nix machines remain supported |
+| A CI/credential-helper PowerShell process prints prompt output or writes profile caches | an old profile used host name or `UserInteractive` as a proxy for an interactive invocation | update and re-apply this repo. The profile now returns before cache work when argv selects batch/noninteractive execution, any console stream is redirected, CI is set, or the host is unsupported; normal ConsoleHost, VS Code, and ISE remain interactive |
 | Mixed Linuxbrew and apt/dnf/pacman/zypper/apk tools update through different managers | update mode resolves ownership per executable source, not from one global active manager | this is expected: a Linuxbrew-owned `rg` can update through Brew while an apt-owned `/usr/bin/jq` updates through apt in the same run |
 | `setup.ps1 -Update` says a tool is `unmanaged` | the executable is present, but its command source is outside supported manager ownership | install or migrate that tool through Scoop, winget, or Chocolatey if you want dotfiles to own future updates; otherwise update that manually-installed copy outside dotfiles |
 | `setup.ps1 -Update` says a Scoop-owned tool is `blocked` | the command resolves through Scoop shims, but the shim metadata cannot prove the exact catalog package | repair or reinstall that Scoop package, then rerun update mode; dotfiles intentionally fails closed instead of updating a different manager's package |

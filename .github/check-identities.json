@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "stage": "emit-stable-require-legacy",
+  "currentRequired": [
+    "ubuntu",
+    "macos",
+    "windows",
+    "chezmoi-parity",
+    "chezmoi-parity-macos",
+    "chezmoi-parity-windows",
+    "nix flake check (ubuntu-24.04)",
+    "nix flake check (macos-26)",
+    "e2e containers / ubuntu-24.04",
+    "setup.sh / ubuntu-24.04",
+    "setup.sh / macos-26",
+    "setup.ps1 / windows-2025"
+  ],
+  "candidateRequired": [
+    "ubuntu",
+    "macos",
+    "windows",
+    "chezmoi-parity",
+    "chezmoi-parity-macos",
+    "chezmoi-parity-windows",
+    "nix flake check / linux",
+    "nix flake check / macos",
+    "e2e containers / linux",
+    "setup.sh / linux",
+    "setup.sh / macos",
+    "setup.ps1 / windows"
+  ],
+  "replacements": [
+    { "legacy": "nix flake check (ubuntu-24.04)", "logical": "nix flake check / linux" },
+    { "legacy": "nix flake check (macos-26)", "logical": "nix flake check / macos" },
+    { "legacy": "e2e containers / ubuntu-24.04", "logical": "e2e containers / linux" },
+    { "legacy": "setup.sh / ubuntu-24.04", "logical": "setup.sh / linux" },
+    { "legacy": "setup.sh / macos-26", "logical": "setup.sh / macos" },
+    { "legacy": "setup.ps1 / windows-2025", "logical": "setup.ps1 / windows" }
+  ]
+}

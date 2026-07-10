@@ -15,14 +15,14 @@ greenfield runbook.
 
 | Config | Source file(s) | Per-OS target(s) | Chezmoi mechanism |
 |---|---|---|---|
-| Neovim | `nvim/`; `home/dot_config/symlink_nvim.tmpl`; `home/AppData/Local/symlink_nvim.tmpl` | macOS/Linux: `~/.config/nvim`; Windows: `%LOCALAPPDATA%\nvim` | Directory symlink to repo `nvim/` on every OS. |
+| Neovim | `nvim/`; `home/dot_config/symlink_nvim.tmpl`; `windows/chezmoi-localappdata/symlink_nvim.tmpl` | macOS/Linux: `~/.config/nvim`; Windows: actual LocalApplicationData `nvim` | Directory symlink to repo `nvim/` on every OS; Windows uses the dedicated known-folder destination state. |
 | Starship | `starship/starship.toml`; `home/dot_config/starship.toml` | macOS/Linux: `~/.config/starship.toml`; Windows: `%USERPROFILE%\.config\starship.toml` | POSIX symlink via `mode = "symlink"`; Windows copy via `mode = "file"`. |
 | zshenv | `shells/zshenv`; `home/dot_zshenv` | POSIX: `~/.zshenv`; Windows: ignored | POSIX symlink via `mode = "symlink"`. |
 | zshrc | `shells/zshrc`; `home/dot_zshrc` | POSIX: `~/.zshrc`; Windows: ignored | POSIX symlink via `mode = "symlink"`. |
 | Ghostty | `ghostty/config`; `home/.chezmoitemplates/ghostty/config` | macOS: `~/Library/Application Support/com.mitchellh.ghostty/config`; Linux: `~/.config/ghostty/config`; Windows: n/a | Per-path POSIX `symlink_config.tmpl` entries into `.chezmoitemplates`. |
 | WezTerm | `wezterm/wezterm.lua`; `home/.chezmoitemplates/wezterm/wezterm.lua`; `home/dot_config/wezterm/wezterm.lua` | macOS/Linux/WSL GUI opt-in: `~/.config/wezterm/wezterm.lua`; Windows: `%USERPROFILE%\.config\wezterm\wezterm.lua` | POSIX path-specific symlinks; Windows copy. WSL skips Linux GUI terminal config unless setup passes the explicit GUI override. |
 | AeroSpace | `aerospace/aerospace.toml`; `home/dot_config/aerospace/aerospace.toml` | macOS: `~/.config/aerospace/aerospace.toml`; Linux/Windows: ignored | macOS symlink via `mode = "symlink"`. |
-| lazygit | `lazygit/config.yml`; `home/.chezmoitemplates/lazygit/config.yml` | macOS: `~/Library/Application Support/lazygit/config.yml`; Linux/WSL: `~/.config/lazygit/config.yml`; Windows: `%LOCALAPPDATA%\lazygit\config.yml` | POSIX path-specific symlinks; Windows rendered copy from the shared template. |
+| lazygit | `lazygit/config.yml`; `home/.chezmoitemplates/lazygit/config.yml`; `windows/chezmoi-localappdata/lazygit/symlink_config.yml.tmpl` | macOS: `~/Library/Application Support/lazygit/config.yml`; Linux/WSL: `~/.config/lazygit/config.yml`; Windows: actual LocalApplicationData `lazygit\config.yml` | POSIX path-specific symlinks; Windows known-folder symlink to the native config. |
 | gh-dash | `gh-dash/config.yml`; `home/dot_config/gh-dash/config.yml` | macOS/Linux/WSL: `~/.config/gh-dash/config.yml`; Windows: `%USERPROFILE%\.config\gh-dash\config.yml` | POSIX symlink via `mode = "symlink"`; Windows copy via `mode = "file"`. |
 | lsd | `lsd/config.yaml`; `lsd/colors.yaml`; `home/dot_config/lsd/config.yaml`; `home/dot_config/lsd/colors.yaml` | macOS/Linux/WSL: `~/.config/lsd/{config.yaml,colors.yaml}`; Windows: `%USERPROFILE%\.config\lsd\{config.yaml,colors.yaml}` | POSIX symlink via `mode = "symlink"`; Windows copy via `mode = "file"`. The shell profiles own Rose Pine `LS_COLORS` for file/directory names, with `DOTFILES_LS_COLORS` as the explicit override; `colors.yaml` owns long-list metadata. |
 | tmux | `tmux/tmux.conf`; `home/dot_tmux.conf` | POSIX: `~/.tmux.conf`; Windows: `%USERPROFILE%\.tmux.conf` | POSIX symlink via `mode = "symlink"`; Windows copy via `mode = "file"`. |
@@ -31,7 +31,7 @@ greenfield runbook.
 | psmux | `tmux/psmux.conf`; `home/dot_psmux.conf` | Windows: `%USERPROFILE%\.psmux.conf`; POSIX: ignored | Windows copy only. It is the first native-Windows multiplexer entrypoint and source-files the tmux Windows overlay. |
 | Generated Rose Pine tmux/psmux bar | `tmux/psmux-rose-pine.ps1`; generated `tmux/psmux-rose-pine.{main,moon,dawn}.conf`; `home/dot_tmux.rose-pine.ps1`; `home/dot_tmux.rose-pine.*.conf` | POSIX/Windows: `~/.tmux.rose-pine.{main,moon,dawn}.conf`; Windows also gets `~/.tmux.rose-pine.ps1` | Source generator plus checked generated configs; POSIX symlinks, Windows copies. |
 | Windows Terminal | `windows-terminal/settings.fragment.jsonc`; `home/.chezmoitemplates/windows-terminal/{settings.fragment.jsonc,merge-settings.ps1}` | Windows packaged + portable settings paths | `setup.ps1` is the only publisher. Chezmoi exposes no WT target. Setup independently merges each target's own state, stages beside the destination, validates all plans, creates separate verified backups, atomically publishes with concurrent-change detection, and rolls back the multi-target transaction on failure. |
-| PowerShell profile | `shells/powershell_profile.ps1`; `home/Documents/PowerShell/Microsoft.PowerShell_profile.ps1` | Windows PS7: `%USERPROFILE%\Documents\PowerShell\Microsoft.PowerShell_profile.ps1`; Windows PowerShell 5.1 and POSIX pwsh profile paths stay out of chezmoi scope | Windows PS7 profile copy via `mode = "file"`. |
+| PowerShell profiles | `shells/powershell_profile.ps1`; `windows/chezmoi-documents/{PowerShell,WindowsPowerShell}/symlink_*_profile.ps1.tmpl` | actual Documents known folder for ConsoleHost, VS Code, and ISE; active runtime `$PROFILE` must resolve to one of them | Dedicated Documents destination state; every supported host profile symlinks to the canonical source and setup post-checks consumption. |
 | zsh plugins | `scripts/ensure-pinned-zsh-plugin.sh`; `home/.chezmoiscripts/run_onchange_after_20-ensure-zsh-plugin-pins.sh.tmpl` | POSIX: `~/.local/share/dotfiles/zsh-plugins/{fzf-tab,zsh-autosuggestions}`; Windows: ignored | Install-deps and pin/helper changes in chezmoi share the serialized sibling-stage publisher. Unproved payloads are quarantined before fetch; only expected-origin, exact-HEAD, clean, tracked-entry-file checkouts publish atomically. Generic git-repo externals are intentionally absent. |
 
 The migration oracle is manifest-driven:
@@ -190,6 +190,23 @@ broken repo-symlink still cleaned) is covered by
       `scripts/apply-repo-safeguards.sh luisgui1757/dotfiles`; the static
       required-check alignment test keeps ruleset/settings/script mirrors in
       sync.
+- [x] Stable logical replacements for the six runner-versioned contexts are
+      emitted and bound to exact per-OS proof artifacts. Stage 1 intentionally
+      leaves legacy contexts required; `.github/check-identities.json` and
+      `docs/security/branch-protection.md` define the deadlock-free second PR
+      and owner-applied live switch. UGR-020 remains PARTIAL until that happens.
+- [x] Native Windows no longer derives LocalApplicationData or Documents from
+      UserProfile. Setup/uninstall share one validated known-folder identity,
+      apply separate UserProfile/LocalApplicationData/Documents chezmoi source
+      states, post-check application consumers, and preserve divergent legacy
+      conventional-path data. Redirected-folder runtime proof remains listed
+      below because this checkout is not that environment.
+- [x] PowerShell 7, VS Code, Windows PowerShell ConsoleHost, and ISE profile
+      targets are managed under the actual Documents known folder. The current
+      runtime `$PROFILE` must be one of those post-apply consumers.
+- [x] Packaged, Preview, and portable Windows Terminal target discovery follows
+      actual LocalApplicationData. Each existing target is an independent merge
+      and recovery transaction; none is mirrored from another installation.
 
 ### Open
 
@@ -204,19 +221,19 @@ broken repo-symlink still cleaned) is covered by
       is no longer the current release gate; current CI proof is the required
       parity/e2e/Nix workflow set plus any explicit ledger entries.
 - [ ] No secrets or `age` tier has been started.
-- [ ] The Windows PowerShell profile managed by chezmoi is the PowerShell 7
-      path (`Documents\PowerShell\Microsoft.PowerShell_profile.ps1`). The
-      Windows PowerShell 5.1 path (`Documents\WindowsPowerShell\...`) remains
-      out of scope because the repo is pwsh-first. Host-shell-specific
-      `$PROFILE` paths remain outside the static chezmoi tree.
 - [ ] The POSIX pwsh profile
       (`~/.config/powershell/Microsoft.PowerShell_profile.ps1`) is intentionally
       not migrated. It is install-gated and provisioning-adjacent, like VS Code.
-- [ ] Windows Terminal Preview and redirected `%LOCALAPPDATA%` remain Wave B.
+- [ ] Redirected Windows known-folder runtime confirmation is pending a real
+      Windows host with Documents and LocalApplicationData on alternate paths.
+      Pester and migration round-trip fixtures are implementation proof, not a
+      claim about a host run.
 - [ ] Full WSL parity is still not a required automated gate, but chezmoi now
       models WSL through the generated `isWsl` data value and skips Linux
       Ghostty by default. `setup.sh --experimental-wsl-gui` passes the
       `experimentalWslGui` data override so WSL Ghostty is managed only on the
       explicit GUI-terminal opt-in path.
-- [ ] zsh exact-pin checks re-assert when the pin script changes, not on manual
-      checkout drift. `refreshPeriod = "0"` means there is no automatic drift.
+- [ ] Out-of-band zsh checkout tampering is rechecked by the next setup or
+      pin-sensitive chezmoi apply; no background monitor is promised. Every
+      publisher/verifier path neutralizes an unproved sourceable payload before
+      it can fail.

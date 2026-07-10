@@ -24,7 +24,9 @@ jobs:
         with:
           distribution: Ubuntu-24.04
           wsl-version: 2
-          use-cache: "true"
+          # Scheduled/manual greenfield proof must not inherit a prebuilt WSL
+          # distro cache. Ordinary PR lanes retain their targeted caches.
+          use-cache: "false"
           update: "true"
           additional-packages: git ca-certificates curl bash sudo nix-bin
           wsl-shell-user: dotfiles

@@ -1,0 +1,2 @@
+# Deliberately empty: Windows known-folder overlays use explicit source,
+# destination, and persistent-state arguments from setup.ps1/uninstall.ps1.

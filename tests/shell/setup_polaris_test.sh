@@ -140,6 +140,19 @@ set -e
     || fail "untagged Polaris release artifact did not explain the tag refusal"
 [[ ! -e "$POLARIS_TEST_LOG" ]] \
     || fail "untagged Polaris release artifact executed the installer"
+if find "$POLARIS_CACHE_ROOT" -maxdepth 1 -name '.tmp.*' -print -quit 2>/dev/null | grep -q .; then
+    fail "failed Polaris validation left a staging directory"
+fi
+
+# The same cache root must be retryable after the external release identity is
+# corrected; no failed stage may strand the next run.
+git -C "$untagged_work" tag "$TEST_POLARIS_TAG" "$untagged_sha"
+run_polaris_agent_policy >/dev/null
+[[ -d "$POLARIS_CACHE_ROOT/$untagged_sha/.git" ]] \
+    || fail "Polaris retry did not publish the corrected verified checkout"
+if find "$POLARIS_CACHE_ROOT" -maxdepth 1 -name '.tmp.*' -print -quit 2>/dev/null | grep -q .; then
+    fail "successful Polaris retry left a staging directory"
+fi
 
 work="$TMP_ROOT/polaris-work"
 mkdir -p "$work/tools"
@@ -255,5 +268,37 @@ set -e
 after_worktree_count="$(wc -l < "$POLARIS_TEST_LOG" | tr -d ' ')"
 [[ "$after_worktree_count" == "$before_worktree_count" ]] \
     || fail "redirected core.worktree cache executed the installer"
+
+# A signal during the fetch must run the same cleanup path as an ordinary
+# failure. Override only the external git boundary and interrupt the function's
+# subshell after its same-parent staging directory exists.
+POLARIS_CACHE_ROOT="$TMP_ROOT/interrupted-cache"
+POLARIS_REF="1111111111111111111111111111111111111111"
+POLARIS_REPO_URL="$TMP_ROOT/interrupted-source"
+interrupt_started="$TMP_ROOT/interrupted-fetch-started"
+polaris_git() {
+    : > "$interrupt_started"
+    while :; do :; done
+}
+ensure_polaris_checkout > "$TMP_ROOT/interrupted.out" 2> "$TMP_ROOT/interrupted.err" &
+interrupt_pid=$!
+for _ in 1 2 3 4 5 6 7 8 9 10; do
+    [[ -e "$interrupt_started" ]] && break
+    sleep 0.1
+done
+[[ -e "$interrupt_started" ]] || fail "interrupted Polaris fixture did not reach fetch"
+trap_pid="$(pgrep -P "$interrupt_pid" | head -1 || true)"
+[[ -n "$trap_pid" ]] || trap_pid="$interrupt_pid"
+kill -TERM "$trap_pid"
+set +e
+wait "$interrupt_pid"
+interrupt_rc=$?
+set -e
+[[ "$interrupt_rc" -ne 0 ]] || fail "interrupted Polaris fetch returned success"
+if find "$POLARIS_CACHE_ROOT" -maxdepth 1 -name '.tmp.*' -print -quit 2>/dev/null | grep -q .; then
+    fail "interrupted Polaris fetch left a staging directory"
+fi
+[[ ! -e "$POLARIS_CACHE_ROOT/$POLARIS_REF" ]] \
+    || fail "interrupted Polaris fetch published an unverified checkout"
 
 echo "OK"

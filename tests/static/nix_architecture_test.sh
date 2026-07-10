@@ -18,9 +18,9 @@ fail=0
 
 # Collect every tracked-ish .nix file, excluding VCS and generated caches.
 nix_files=()
-while IFS= read -r f; do nix_files+=("$f"); done < <(
+while IFS= read -r -d '' f; do nix_files+=("$f"); done < <(
     find . \( -path './.git' -o -path './tests/.cache' \) -prune -o \
-        -type f -name '*.nix' -print | sort
+        -type f -name '*.nix' -print0
 )
 
 scan_nix() {
@@ -39,42 +39,6 @@ scan_nix() {
     fi
 }
 
-scan_programs_allowlist() {
-    local hits
-    if [[ "${#nix_files[@]}" -eq 0 ]]; then
-        echo "ok  : HM/darwin declares only allowed programs.* modules (no .nix files present yet)"
-        return
-    fi
-    hits="$(
-        python3 - "${nix_files[@]}" <<'PY'
-import pathlib
-import re
-import sys
-
-program_attr = re.compile(r'(?<![\w.])programs\.([A-Za-z0-9_-]+)')
-program_set = re.compile(r'(?<![\w.])programs\s*=')
-
-for raw in sys.argv[1:]:
-    path = pathlib.Path(raw)
-    for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
-        source = line.split("#", 1)[0]
-        for match in program_attr.finditer(source):
-            name = match.group(1)
-            if name != "home-manager":
-                print(f"{path}:{lineno}:{line}")
-        if program_set.search(source):
-            print(f"{path}:{lineno}:{line}")
-PY
-    )"
-    if [[ -n "${hits//[[:space:]]/}" ]]; then
-        echo "FAIL: HM/darwin declares a programs.* module outside the allowlist (only programs.home-manager is allowed)"
-        printf '%s\n' "$hits" | head -8 | sed 's/^/  /'
-        fail=1
-    else
-        echo "ok  : HM/darwin declares only allowed programs.* modules (programs.home-manager)"
-    fi
-}
-
 # ---------------------------------------------------------------------------
 # (a)+(b) Home Manager / nix-darwin is PACKAGES-ONLY. No dotfile ownership.
 #   - No home.file / xdg.configFile / xdg.dataFile / xdg.desktopEntries: those
@@ -84,16 +48,19 @@ PY
 #     and friends -- exactly the files chezmoi owns. programs.home-manager
 #     (which only manages HM itself) is the one allowed programs.* module.
 # ---------------------------------------------------------------------------
-# The trailing (\.|=|"|\{) requirement makes these match real attribute usage
-# (home.file."x" = ..., xdg.configFile.foo.text = ...) but NOT documenting prose
-# like "declares no home.file / xdg.configFile" in a comment.
-scan_nix "HM/darwin declares no home.file dotfiles (packages-only)" \
-    '(^|[^[:alnum:]_.])home\.file[[:space:]]*(\.|=|"|\{)'
-scan_nix "HM/darwin declares no xdg.configFile / xdg.dataFile / xdg.desktopEntries" \
-    '(^|[^[:alnum:]_.])xdg\.(configFile|dataFile|desktopEntries)[[:space:]]*(\.|=|"|\{)'
-scan_programs_allowlist
-scan_nix "HM/darwin declares no home.activation hooks (packages-only)" \
-    '(^|[^[:alnum:]_.])home\.activation[[:space:]]*(\.|=|"|\{)'
+if ! command -v python3 >/dev/null 2>&1; then
+    echo "FAIL: python3 is required for the structural Nix ownership guard"
+    fail=1
+elif ! python3 scripts/check-nix-dotfile-ownership.py --self-test; then
+    echo "FAIL: Nix ownership scanner self-test failed"
+    fail=1
+elif ! ownership_hits="$(python3 scripts/check-nix-dotfile-ownership.py "${nix_files[@]}" 2>&1)"; then
+    echo "FAIL: HM/darwin declares a dotfile-owning option outside chezmoi"
+    printf '%s\n' "$ownership_hits" | head -8 | sed 's/^/  /'
+    fail=1
+else
+    echo "ok  : structural scan rejects direct, nested, wrapped, and imported dotfile ownership"
+fi
 
 # ---------------------------------------------------------------------------
 # (c) native Windows is NON-NIX. Nix applies to WSL2 userland only, never to

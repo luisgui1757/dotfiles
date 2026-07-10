@@ -26,7 +26,7 @@ $script:ChezmoiCommandForContentTests = Get-Command chezmoi -ErrorAction Silentl
 Describe "setup.ps1 Test-TargetContentMatchesChezmoi copy-mode" -Skip:(-not $script:ChezmoiCommandForContentTests) {
     BeforeAll {
         $script:OldUserProfileForContentTest = $env:USERPROFILE
-        $script:ContentTestRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("setup-content-" + [System.Guid]::NewGuid())
+        $script:ContentTestRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("setup content " + [System.Guid]::NewGuid())
         $script:ContentTestSource = Join-Path $script:ContentTestRoot 'source'
         $script:ContentTestDest = Join-Path $script:ContentTestRoot 'dest'
         $script:ContentTestProfile = Join-Path $script:ContentTestRoot 'profile'
@@ -77,6 +77,39 @@ Describe "setup.ps1 Test-TargetContentMatchesChezmoi copy-mode" -Skip:(-not $scr
         [System.IO.File]::WriteAllBytes($script:ProbeTarget, [byte[]](0x64, 0x69, 0x66, 0x66, 0x0a))
 
         Test-TargetContentMatchesChezmoi $script:ProbeTarget | Should -BeFalse
+    }
+
+    It "treats verify drift as false and restores native preference <Preference>" -TestCases @(
+        @{ Preference = $true },
+        @{ Preference = $false }
+    ) {
+        param([bool]$Preference)
+        $originalPreference = $PSNativeCommandUseErrorActionPreference
+        try {
+            $PSNativeCommandUseErrorActionPreference = $Preference
+            Test-ChezmoiVerify $script:ProbeTarget | Should -BeTrue
+            $PSNativeCommandUseErrorActionPreference | Should -Be $Preference
+
+            [System.IO.File]::WriteAllText($script:ProbeTarget, 'divergent user bytes')
+            Test-ChezmoiVerify $script:ProbeTarget | Should -BeFalse
+            $PSNativeCommandUseErrorActionPreference | Should -Be $Preference
+        } finally {
+            $PSNativeCommandUseErrorActionPreference = $originalPreference
+        }
+    }
+
+    It "keeps real verify invocation failures fatal and restores native preference" {
+        $oldBaseArgs = $script:ChezmoiBaseArgs
+        $originalPreference = $PSNativeCommandUseErrorActionPreference
+        try {
+            $script:ChezmoiBaseArgs = @('--source', (Join-Path $script:ContentTestRoot 'missing source'))
+            $PSNativeCommandUseErrorActionPreference = $true
+            { Test-ChezmoiVerify $script:ProbeTarget } | Should -Throw '*verify invocation failed*missing source*'
+            $PSNativeCommandUseErrorActionPreference | Should -BeTrue
+        } finally {
+            $script:ChezmoiBaseArgs = $oldBaseArgs
+            $PSNativeCommandUseErrorActionPreference = $originalPreference
+        }
     }
 }
 
@@ -183,6 +216,140 @@ Describe "setup.ps1 source-only import" {
     }
 }
 
+Describe "setup.ps1 Windows known-folder identity" {
+    BeforeEach {
+        $script:KnownFolderOldUserProfile = $env:USERPROFILE
+        $script:KnownFolderOldLocalAppData = $env:LOCALAPPDATA
+        . $script:ImportSetupForTest
+    }
+
+    AfterEach {
+        if ($null -eq $script:KnownFolderOldUserProfile) { Remove-Item Env:USERPROFILE -ErrorAction SilentlyContinue }
+        else { $env:USERPROFILE = $script:KnownFolderOldUserProfile }
+        if ($null -eq $script:KnownFolderOldLocalAppData) { Remove-Item Env:LOCALAPPDATA -ErrorAction SilentlyContinue }
+        else { $env:LOCALAPPDATA = $script:KnownFolderOldLocalAppData }
+    }
+
+    It "resolves redirected folders, alternate drives, spaces, and runtime profile independently" {
+        $env:USERPROFILE = 'C:\Conventional User'
+        $env:LOCALAPPDATA = 'C:\Conventional User\AppData\Local'
+        $resolver = {
+            param([string]$Name)
+            switch ($Name) {
+                'UserProfile' { 'D:\Actual User With Spaces' }
+                'LocalApplicationData' { 'E:\Redirected Local Data' }
+                'MyDocuments' { 'F:\OneDrive - Example\Documents' }
+            }
+        }
+        $identity = Resolve-WindowsTargetIdentity -FolderResolver $resolver `
+            -RuntimeProfile 'F:\OneDrive - Example\Documents\PowerShell\Microsoft.VSCode_profile.ps1'
+
+        $identity.UserProfile | Should -Be 'D:\Actual User With Spaces'
+        $identity.LocalApplicationData | Should -Be 'E:\Redirected Local Data'
+        $identity.Documents | Should -Be 'F:\OneDrive - Example\Documents'
+        $identity.RuntimeProfile | Should -Be 'F:\OneDrive - Example\Documents\PowerShell\Microsoft.VSCode_profile.ps1'
+        $identity.UserProfile | Should -Not -Be $env:USERPROFILE
+        $identity.LocalApplicationData | Should -Not -Be $env:LOCALAPPDATA
+    }
+
+    It "rejects missing or relative known-folder and runtime-profile identities" {
+        $goodResolver = { param([string]$Name) "C:\$Name" }
+        { Resolve-WindowsTargetIdentity -FolderResolver { param($Name) if ($Name -eq 'MyDocuments') { '' } else { "C:\$Name" } } -RuntimeProfile 'C:\profile.ps1' } |
+            Should -Throw '*MyDocuments known folder*'
+        { Resolve-WindowsTargetIdentity -FolderResolver { param($Name) if ($Name -eq 'LocalApplicationData') { 'relative' } else { "C:\$Name" } } -RuntimeProfile 'C:\profile.ps1' } |
+            Should -Throw '*LocalApplicationData known folder*'
+        { Resolve-WindowsTargetIdentity -FolderResolver $goodResolver -RuntimeProfile 'relative-profile.ps1' } |
+            Should -Throw '*runtime profile path*'
+    }
+
+    It "maps each overlay to the actual application destination" {
+        $root = Join-Path ([IO.Path]::GetTempPath()) 'overlay mapping root'
+        $identity = [pscustomobject]@{
+            UserProfile = Join-Path $root 'Actual User'
+            LocalApplicationData = Join-Path $root 'Redirected Local Data'
+            Documents = Join-Path $root 'OneDrive Documents'
+            RuntimeProfile = Join-Path $root 'OneDrive Documents\PowerShell\Microsoft.PowerShell_profile.ps1'
+        }
+        $overlays = @(Get-WindowsKnownFolderOverlays -Identity $identity)
+
+        $overlays.Count | Should -Be 2
+        $overlays[0].Destination | Should -Be $identity.LocalApplicationData
+        $overlays[1].Destination | Should -Be $identity.Documents
+        $overlays[0].State | Should -Match 'localappdata\.boltdb$'
+        $overlays[1].State | Should -Match 'documents\.boltdb$'
+    }
+
+    It "post-checks actual Neovim, lazygit, Console, VS Code, and ISE consumers" {
+        $root = Join-Path ([IO.Path]::GetTempPath()) ('known folders ' + [Guid]::NewGuid())
+        $localAppData = Join-Path $root 'Redirected Local Data'
+        $documents = Join-Path $root 'OneDrive Documents'
+        $nvimTarget = Join-Path $localAppData 'nvim'
+        $lazygitTarget = Join-Path $localAppData 'lazygit\config.yml'
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $lazygitTarget) | Out-Null
+        if ($env:OS -eq 'Windows_NT') {
+            New-Item -ItemType Junction -Path $nvimTarget -Target (Join-Path $script:RepoRoot 'nvim') | Out-Null
+        } else {
+            New-Item -ItemType SymbolicLink -Path $nvimTarget -Target (Join-Path $script:RepoRoot 'nvim') | Out-Null
+        }
+        Copy-Item -LiteralPath (Join-Path $script:RepoRoot 'lazygit\config.windows.yml') -Destination $lazygitTarget
+        $profiles = @(
+            (Join-Path $documents 'PowerShell\Microsoft.PowerShell_profile.ps1'),
+            (Join-Path $documents 'PowerShell\Microsoft.VSCode_profile.ps1'),
+            (Join-Path $documents 'WindowsPowerShell\Microsoft.PowerShell_profile.ps1'),
+            (Join-Path $documents 'WindowsPowerShell\Microsoft.PowerShellISE_profile.ps1')
+        )
+        try {
+            foreach ($profilePath in $profiles) {
+                New-Item -ItemType Directory -Force -Path (Split-Path -Parent $profilePath) | Out-Null
+                Copy-Item -LiteralPath (Join-Path $script:RepoRoot 'shells\powershell_profile.ps1') -Destination $profilePath
+            }
+            foreach ($profilePath in $profiles) {
+                $identity = [pscustomobject]@{
+                    UserProfile = $root
+                    LocalApplicationData = $localAppData
+                    Documents = $documents
+                    RuntimeProfile = $profilePath
+                }
+                { Assert-WindowsKnownFolderConsumption -Identity $identity } | Should -Not -Throw
+            }
+        } finally {
+            Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    It "backs up recognized legacy-shape targets but preserves divergent legacy user data" {
+        $root = Join-Path ([IO.Path]::GetTempPath()) ('legacy shape ' + [Guid]::NewGuid())
+        $identity = [pscustomobject]@{
+            UserProfile = Join-Path $root 'User'
+            LocalApplicationData = Join-Path $root 'Redirected Local'
+            Documents = Join-Path $root 'Redirected Documents'
+            RuntimeProfile = Join-Path $root 'Redirected Documents\PowerShell\Microsoft.PowerShell_profile.ps1'
+        }
+        $legacyNvim = Join-Path $identity.UserProfile 'AppData\Local\nvim'
+        $legacyLazygit = Join-Path $identity.UserProfile 'AppData\Local\lazygit\config.yml'
+        $legacyProfile = Join-Path $identity.UserProfile 'Documents\PowerShell\Microsoft.PowerShell_profile.ps1'
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $legacyNvim), (Split-Path -Parent $legacyLazygit), (Split-Path -Parent $legacyProfile) | Out-Null
+        if ($env:OS -eq 'Windows_NT') {
+            New-Item -ItemType Junction -Path $legacyNvim -Target (Join-Path $script:RepoRoot 'nvim') | Out-Null
+        } else {
+            New-Item -ItemType SymbolicLink -Path $legacyNvim -Target (Join-Path $script:RepoRoot 'nvim') | Out-Null
+        }
+        Copy-Item -LiteralPath (Join-Path $script:RepoRoot 'lazygit\config.windows.yml') -Destination $legacyLazygit
+        [IO.File]::WriteAllText($legacyProfile, 'user-owned divergent profile')
+        try {
+            Move-LegacyWindowsKnownFolderTargets -Identity $identity -IsDryRun:$false
+
+            Test-Path -LiteralPath $legacyNvim | Should -BeFalse
+            Test-Path -LiteralPath $legacyLazygit | Should -BeFalse
+            @(Get-ChildItem -LiteralPath (Split-Path -Parent $legacyNvim) -Filter 'nvim.legacy.*').Count | Should -Be 1
+            @(Get-ChildItem -LiteralPath (Split-Path -Parent $legacyLazygit) -Filter 'config.yml.legacy.*').Count | Should -Be 1
+            [IO.File]::ReadAllText($legacyProfile) | Should -Be 'user-owned divergent profile'
+        } finally {
+            Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
 Describe "setup.ps1 Polaris agent policy" {
     BeforeEach {
         . $script:ImportSetupForTest
@@ -230,17 +397,23 @@ printf "%s\n" "$*" >> "$POLARIS_TEST_LOG"
     function script:Invoke-SetupTestPolarisPolicyChild {
         param(
             [Parameter(Mandatory)] [string]$Cache,
-            [Parameter(Mandatory)] [string]$Ref
+            [Parameter(Mandatory)] [string]$Ref,
+            [string]$RepoUrl = ''
         )
 
         $setupLiteral = $script:Setup.Replace("'", "''")
         $cacheLiteral = $Cache.Replace("'", "''")
         $refLiteral = $Ref.Replace("'", "''")
+        $repoArgument = if ([string]::IsNullOrWhiteSpace($RepoUrl)) {
+            ''
+        } else {
+            " -RepoUrl '$($RepoUrl.Replace("'", "''"))'"
+        }
         $probe = @"
 `$ErrorActionPreference = 'Stop'
 `$env:DOTFILES_SETUP_PS1_SOURCE_ONLY = '1'
 . '$setupLiteral' -All
-Invoke-PolarisAgentPolicy -AllMode:`$true -IsDryRun:`$false -Version '0.1.2' -Ref '$refLiteral' -CacheRoot '$cacheLiteral'
+Invoke-PolarisAgentPolicy -AllMode:`$true -IsDryRun:`$false -Version '0.1.2' -Ref '$refLiteral' -CacheRoot '$cacheLiteral'$repoArgument
 "@
         $oldNativePreference = $null
         $hasNativePreference = Test-Path Variable:PSNativeCommandUseErrorActionPreference
@@ -597,6 +770,30 @@ Invoke-PolarisAgentPolicy -AllMode:`$true -IsDryRun:`$false -Version '0.1.2' -Re
             } else {
                 $env:POLARIS_TEST_LOG = $oldLog
             }
+        }
+    }
+
+    It "cleans a failed Polaris stage and retries after release identity is repaired" {
+        $repo = New-SetupTestPolarisRepo -Name 'polaris-stage-retry-work'
+        & git -C $repo.Work tag -d $repo.Tag | Out-Null
+        $cache = Join-Path $script:PolarisTestRoot 'stage-retry-cache'
+        $oldLog = $env:POLARIS_TEST_LOG
+        try {
+            $env:POLARIS_TEST_LOG = Join-Path $script:PolarisTestRoot 'stage-retry-install.log'
+            $failed = Invoke-SetupTestPolarisPolicyChild -Cache $cache -Ref $repo.Sha -RepoUrl $repo.Work
+            $failed.ExitCode | Should -Not -Be 0
+            $failed.Output | Should -Match 'Polaris tag mismatch'
+            @(Get-ChildItem -LiteralPath $cache -Filter '.tmp.*' -Force -ErrorAction SilentlyContinue).Count | Should -Be 0
+            Test-Path -LiteralPath (Join-Path $cache $repo.Sha) | Should -BeFalse
+
+            & git -C $repo.Work tag $repo.Tag $repo.Sha
+            $retried = Invoke-SetupTestPolarisPolicyChild -Cache $cache -Ref $repo.Sha -RepoUrl $repo.Work
+            $retried.ExitCode | Should -Be 0
+            Test-Path -LiteralPath (Join-Path (Join-Path $cache $repo.Sha) '.git') | Should -BeTrue
+            @(Get-ChildItem -LiteralPath $cache -Filter '.tmp.*' -Force -ErrorAction SilentlyContinue).Count | Should -Be 0
+        } finally {
+            if ($null -eq $oldLog) { Remove-Item Env:POLARIS_TEST_LOG -ErrorAction SilentlyContinue }
+            else { $env:POLARIS_TEST_LOG = $oldLog }
         }
     }
 
@@ -992,9 +1189,17 @@ Describe "setup.ps1 transactional Windows Terminal merge" {
         $env:USERPROFILE = $script:FakeHome
         $env:LOCALAPPDATA = $script:FakeLocalAppData
         . $script:ImportSetupForTest
+        $script:OldWindowsIdentity = $script:WindowsIdentity
+        $script:WindowsIdentity = [pscustomobject]@{
+            UserProfile = $script:FakeHome
+            LocalApplicationData = $script:FakeLocalAppData
+            Documents = Join-Path $script:FakeHome 'Documents'
+            RuntimeProfile = Join-Path $script:FakeHome 'Documents\PowerShell\Microsoft.PowerShell_profile.ps1'
+        }
     }
 
     AfterEach {
+        $script:WindowsIdentity = $script:OldWindowsIdentity
         if ($null -eq $script:OldUserProfile) {
             Remove-Item Env:USERPROFILE -ErrorAction SilentlyContinue
         } else {

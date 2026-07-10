@@ -24,7 +24,53 @@ $script:Warnings = 0
 $script:DirsRemoved = 0
 $script:ExternalsRemoved = 0
 $script:DirCandidates = New-Object System.Collections.Generic.List[string]
+$script:ManagedTargetContexts = @{}
 $script:Timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+
+function Resolve-WindowsTargetIdentity {
+    param(
+        [scriptblock]$FolderResolver = {
+            param([string]$Name)
+            $folder = [Environment+SpecialFolder]([Enum]::Parse([Environment+SpecialFolder], $Name))
+            return [Environment]::GetFolderPath($folder)
+        },
+        [AllowEmptyString()] [string]$RuntimeProfile = ([string]$PROFILE)
+    )
+    $resolved = @{}
+    foreach ($name in 'UserProfile', 'LocalApplicationData', 'MyDocuments') {
+        $path = [string](& $FolderResolver $name)
+        $isWindowsAbsolute = $path -match '^(?:[A-Za-z]:[\\/]|\\\\)'
+        if ([string]::IsNullOrWhiteSpace($path) -or (-not [IO.Path]::IsPathRooted($path) -and -not $isWindowsAbsolute) -or
+            $path -match '^[A-Za-z]:[^\\/]') {
+            throw "Windows $name known folder is missing or not absolute: $path"
+        }
+        $resolved[$name] = if ($isWindowsAbsolute -and $env:OS -ne 'Windows_NT') {
+            ($path -replace '/', '\').TrimEnd('\')
+        } else { [IO.Path]::GetFullPath($path).TrimEnd('\', '/') }
+    }
+    $runtimeIsWindowsAbsolute = $RuntimeProfile -match '^(?:[A-Za-z]:[\\/]|\\\\)'
+    if ([string]::IsNullOrWhiteSpace($RuntimeProfile) -or
+        (-not [IO.Path]::IsPathRooted($RuntimeProfile) -and -not $runtimeIsWindowsAbsolute) -or
+        $RuntimeProfile -match '^[A-Za-z]:[^\\/]') {
+        throw "PowerShell runtime profile path is missing or not absolute: $RuntimeProfile"
+    }
+    return [pscustomobject]@{
+        UserProfile = $resolved.UserProfile
+        LocalApplicationData = $resolved.LocalApplicationData
+        Documents = $resolved.MyDocuments
+        RuntimeProfile = if ($runtimeIsWindowsAbsolute -and $env:OS -ne 'Windows_NT') {
+            $RuntimeProfile -replace '/', '\'
+        } else { [IO.Path]::GetFullPath($RuntimeProfile) }
+    }
+}
+
+function Get-WindowsLocalApplicationData {
+    if ($script:WindowsIdentity) { return $script:WindowsIdentity.LocalApplicationData }
+    if ($env:OS -eq 'Windows_NT') {
+        return [Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)
+    }
+    return $env:LOCALAPPDATA
+}
 
 function Write-SafeWarning {
     param([Parameter(Mandatory)] [string]$Message)
@@ -137,11 +183,25 @@ function Get-UniqueRecoveryPath {
 
 function Add-ParentDirs {
     param([Parameter(Mandatory)] [string]$Path)
-    $userHome = (Resolve-CanonicalPath -Path $env:USERPROFILE).TrimEnd('\', '/')
+    $roots = if ($script:WindowsIdentity) {
+        @(
+            $script:WindowsIdentity.UserProfile,
+            $script:WindowsIdentity.LocalApplicationData,
+            $script:WindowsIdentity.Documents
+        )
+    } else { @($env:USERPROFILE) }
+    $canonicalPath = (Resolve-CanonicalPath -Path $Path).TrimEnd('\', '/')
+    $owningRoot = @($roots | Where-Object {
+            $root = (Resolve-CanonicalPath -Path $_).TrimEnd('\', '/')
+            $canonicalPath.Equals($root, [StringComparison]::OrdinalIgnoreCase) -or
+                $canonicalPath.StartsWith($root + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)
+        } | Sort-Object Length -Descending | Select-Object -First 1)
+    if ($owningRoot.Count -eq 0) { return }
+    $owningRoot = (Resolve-CanonicalPath -Path $owningRoot[0]).TrimEnd('\', '/')
     $dir = Split-Path -Parent $Path
     while (-not [string]::IsNullOrWhiteSpace($dir)) {
         $canonical = (Resolve-CanonicalPath -Path $dir).TrimEnd('\', '/')
-        if ($canonical -eq $userHome) { break }
+        if ($canonical.Equals($owningRoot, [StringComparison]::OrdinalIgnoreCase)) { break }
         $script:DirCandidates.Add($dir)
         $next = Split-Path -Parent $dir
         if ($next -eq $dir) { break }
@@ -170,37 +230,83 @@ function Restore-BackupIfPresent {
     Write-Host "  restored  $Target <- $backup"
 }
 
+function Invoke-ChezmoiNative {
+    param([Parameter(Mandatory)] [string[]]$Arguments)
+
+    $command = $script:Chezmoi
+    if ([string]::IsNullOrWhiteSpace($command)) {
+        $command = (Get-Command chezmoi -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
+    }
+    $stderrPath = [IO.Path]::GetTempFileName()
+    $oldNativePreference = $null
+    $hasNativePreference = Test-Path Variable:PSNativeCommandUseErrorActionPreference
+    $output = @()
+    $rc = 1
+    try {
+        try {
+            if ($hasNativePreference) {
+                $oldNativePreference = $PSNativeCommandUseErrorActionPreference
+                $PSNativeCommandUseErrorActionPreference = $false
+            }
+            $global:LASTEXITCODE = 0
+            $output = @(& $command @Arguments 2> $stderrPath)
+            $rc = if ($null -eq $LASTEXITCODE) { 0 } else { [int]$LASTEXITCODE }
+        } finally {
+            if ($hasNativePreference) {
+                $PSNativeCommandUseErrorActionPreference = $oldNativePreference
+            }
+        }
+        return [pscustomobject]@{
+            ExitCode = $rc
+            Output = @($output)
+            Stderr = [IO.File]::ReadAllText($stderrPath)
+        }
+    } finally {
+        Remove-Item -LiteralPath $stderrPath -Force -ErrorAction SilentlyContinue
+    }
+}
+
 function Test-ChezmoiTargetUnmodified {
-    param([Parameter(Mandatory)] [string]$Target)
+    param(
+        [Parameter(Mandatory)] [string]$Target,
+        [string[]]$BaseArguments
+    )
     # "Is this on-disk file still byte-for-byte what chezmoi would write?" answered
     # by the chezmoi verify command (exit 0 = matches managed state, nonzero =
     # drifted). This deliberately avoids hashing a `chezmoi cat > tmp` capture:
     # native-command redirection in PowerShell can re-encode / CRLF-translate on
     # Windows, which would make an unmodified copy look modified and wrongly leave
-    # it behind. verify is byte-exact by the chezmoi logic itself with zero
-    # redirect surface. The try/catch keeps it safe even when
-    # $PSNativeCommandUseErrorActionPreference turns a nonzero (drifted) verify
-    # exit into a throw -> treat as modified and skip.
-    try {
-        & $Chezmoi --source $SourceDir --no-tty verify $Target *> $null
-        return ($LASTEXITCODE -eq 0)
-    } catch {
+    # it behind. verify is byte-exact by the chezmoi logic itself. Expected
+    # drift is a silent exit 1; stderr or any other nonzero result is an actual
+    # invocation failure and must stop uninstall instead of being misclassified.
+    if (-not $PSBoundParameters.ContainsKey('BaseArguments')) {
+        $BaseArguments = if ($script:ManagedTargetContexts.ContainsKey($Target)) {
+            @($script:ManagedTargetContexts[$Target])
+        } else { @('--source', $SourceDir) }
+    }
+    $result = Invoke-ChezmoiNative -Arguments (@($BaseArguments) + @('--no-tty', 'verify', $Target))
+    if ($result.ExitCode -eq 0) { return $true }
+    if ($result.ExitCode -eq 1 -and $result.Output.Count -eq 0 -and [string]::IsNullOrWhiteSpace($result.Stderr)) {
         return $false
     }
+    $detail = $result.Stderr.Trim()
+    if (-not $detail) { $detail = 'no diagnostic text' }
+    throw "chezmoi verify invocation failed for ${Target}: exit $($result.ExitCode): $detail"
 }
 
 function Test-WindowsTerminalSettingsPath {
     param([Parameter(Mandatory)] [string]$Path)
-    $normalized = $Path -replace '/', '\'
-    return ($normalized -like '*\AppData\Local\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json') -or
-        ($normalized -like '*\AppData\Local\Microsoft\Windows Terminal\settings.json')
+    return @((Get-WindowsTerminalRecoveryTargets) | Where-Object {
+            (Resolve-CanonicalPath $_).Equals((Resolve-CanonicalPath $Path), [StringComparison]::OrdinalIgnoreCase)
+        }).Count -gt 0
 }
 
 function Get-WindowsTerminalRecoveryTargets {
-    if (-not $env:LOCALAPPDATA) { return @() }
+    $localAppData = Get-WindowsLocalApplicationData
+    if (-not $localAppData) { return @() }
     return @(
-        (Join-Path $env:LOCALAPPDATA 'Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json'),
-        (Join-Path $env:LOCALAPPDATA 'Microsoft\Windows Terminal\settings.json')
+        (Join-Path $localAppData 'Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json'),
+        (Join-Path $localAppData 'Microsoft\Windows Terminal\settings.json')
     )
 }
 
@@ -344,12 +450,49 @@ function Get-ManagedTargets {
         throw "missing chezmoi source dir: $SourceDir"
     }
     $script:Chezmoi = (Get-Command chezmoi -ErrorAction Stop).Source
-    $output = & $Chezmoi --source $SourceDir managed --path-style absolute 2>&1
-    if ($LASTEXITCODE -ne 0) {
-        $text = ($output | Out-String).Trim()
-        throw "could not enumerate managed targets. Run 'chezmoi --source `"$SourceDir`" init' first for this HOME.`n$text"
+    $identity = $script:WindowsIdentity
+    $stateRoot = Join-Path $identity.LocalApplicationData 'dotfiles\chezmoi-state'
+    $overlayConfig = Join-Path $RepoRoot 'windows\chezmoi-overlay.toml'
+    $states = @(
+        [pscustomobject]@{
+            Label = 'profile root'
+            Arguments = @('--source', $SourceDir, '--destination', $identity.UserProfile)
+        },
+        [pscustomobject]@{
+            Label = 'LocalApplicationData'
+            Arguments = @(
+                '--source', (Join-Path $RepoRoot 'windows\chezmoi-localappdata'),
+                '--destination', $identity.LocalApplicationData,
+                '--persistent-state', (Join-Path $stateRoot 'localappdata.boltdb'),
+                '--config', $overlayConfig,
+                '--config-format', 'toml'
+            )
+        },
+        [pscustomobject]@{
+            Label = 'Documents profiles'
+            Arguments = @(
+                '--source', (Join-Path $RepoRoot 'windows\chezmoi-documents'),
+                '--destination', $identity.Documents,
+                '--persistent-state', (Join-Path $stateRoot 'documents.boltdb'),
+                '--config', $overlayConfig,
+                '--config-format', 'toml'
+            )
+        }
+    )
+    $targets = @()
+    foreach ($state in $states) {
+        $result = Invoke-ChezmoiNative -Arguments (@($state.Arguments) + @('managed', '--path-style', 'absolute'))
+        if ($result.ExitCode -ne 0) {
+            $text = $result.Stderr.Trim()
+            throw "could not enumerate $($state.Label) managed targets. Re-run setup.ps1 before uninstall.`n$text"
+        }
+        foreach ($target in @($result.Output | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) })) {
+            $target = [string]$target
+            $targets += $target
+            $script:ManagedTargetContexts[$target] = @($state.Arguments)
+        }
     }
-    return @($output | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | ForEach-Object { [string]$_ } | Sort-Object Length -Descending)
+    return @($targets | Sort-Object -Unique | Sort-Object Length -Descending)
 }
 
 function Remove-EmptyDirs {
@@ -398,7 +541,8 @@ function Remove-Externals {
         $script:Skipped++
         return
     }
-    $root = Join-Path $env:USERPROFILE '.local\share\dotfiles\zsh-plugins'
+    $profileRoot = if ($script:WindowsIdentity) { $script:WindowsIdentity.UserProfile } else { $env:USERPROFILE }
+    $root = Join-Path $profileRoot '.local\share\dotfiles\zsh-plugins'
     foreach ($name in @('fzf-tab', 'zsh-autosuggestions')) {
         $dir = Join-Path $root $name
         if (-not (Test-TargetExists -Path $dir)) { continue }
@@ -421,12 +565,12 @@ function Remove-Externals {
     }
 }
 
-if ($env:DOTFILES_UNINSTALL_PS1_SOURCE_ONLY -eq '1') { return }
+function Invoke-DotfilesUninstall {
+    param([Parameter(Mandatory)] $Identity)
+    $script:WindowsIdentity = $Identity
+    Write-Host "uninstall.ps1: repo=$RepoRoot source=$SourceDir dry-run=$DryRun restore-backups=$(-not $NoRestoreBackups)"
+    Write-Host
 
-Write-Host "uninstall.ps1: repo=$RepoRoot source=$SourceDir dry-run=$DryRun restore-backups=$(-not $NoRestoreBackups)"
-Write-Host
-
-try {
     $targets = @(Get-ManagedTargets)
     if ($targets.Count -gt 0 -and (Confirm-Category -Prompt 'Remove chezmoi-managed config targets?')) {
         foreach ($target in $targets) {
@@ -445,6 +589,12 @@ try {
     }
     Write-Host ("summary: removed={0} restored={1} dirs_removed={2} externals_removed={3} skipped={4} warnings={5}" -f `
         $script:Removed, $script:Restored, $script:DirsRemoved, $script:ExternalsRemoved, $script:Skipped, $script:Warnings)
+}
+
+if ($env:DOTFILES_UNINSTALL_PS1_SOURCE_ONLY -eq '1') { return }
+
+try {
+    Invoke-DotfilesUninstall -Identity (Resolve-WindowsTargetIdentity)
 } catch {
     Write-Host "FAIL: $($_.Exception.Message)"
     exit 1

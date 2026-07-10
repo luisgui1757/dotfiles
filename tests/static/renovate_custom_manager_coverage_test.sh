@@ -14,6 +14,11 @@ import sys
 with open("renovate.json", encoding="utf-8") as fh:
     config = json.load(fh)
 
+if config.get("nix", {}).get("enabled") is not True:
+    raise SystemExit("FAIL: Renovate's beta Nix manager is not explicitly enabled")
+if config.get("rebaseWhen") != "behind-base-branch":
+    raise SystemExit("FAIL: Renovate does not enforce the repository's behind-main policy")
+
 tracked_files = [pathlib.Path(path) for path in subprocess.check_output(["git", "ls-files"], text=True).splitlines()]
 failures = []
 
@@ -81,3 +86,8 @@ if failures:
 
 print("OK: every Renovate custom manager matches at least one tracked pin")
 PY
+
+if ! grep -Fq '"currentValueTemplate": "master"' renovate.json; then
+    echo "FAIL: ScoopInstaller/Install must track its live master branch" >&2
+    exit 1
+fi
