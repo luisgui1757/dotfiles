@@ -370,16 +370,19 @@ Commit-by-commit status:
   container (`29103732329` / `86399025475`). The original red job remains
   defect evidence rather than being waived.
 
-- **Cold-cache CMake LSP proof isolation — IMPLEMENTED; HOSTED PROOF
-  PENDING.** Merged-main cache-free run `29114125798` passed Ubuntu container,
+- **Cold-cache CMake LSP proof isolation — BRANCH-HEAD HOSTED PROOF PASSED;
+  MERGED-MAIN PROOF PENDING.** Merged-main cache-free run `29114125798` passed Ubuntu container,
   public Ubuntu, Intel, and Windows, but Apple Silicon job `86433246367`
   failed because the first neocmakelsp attach probe opened inside the shared
   repository fixture tree. The later isolated formatter/CMake project attached
   and accepted gersemi output in the same process. Strict smoke now gives every
   initial LSP attach probe its own minimal project root; the real server,
   production config, attach timeout, formatter, diagnostics, and capture gates
-  remain unchanged. A newer cache-free branch run must close this item before
-  the post-merge safeguard apply.
+  remain unchanged. Exact behavior head
+  `f097995b49a2189db327903a20743e7cb69ba665` passed cache-free run
+  `29120109175`: all four current producers and all four stable setup logical
+  proofs were green. A post-merge run on the resulting `main` SHA remains the
+  gate before owner-applied safeguards.
 
 - **Exact-head runtime dependency follow-up — PASSED.** Head
   `0c853d066362602f14dc251a6d3fbf3980102048`

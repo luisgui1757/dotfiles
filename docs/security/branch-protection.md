@@ -77,9 +77,11 @@ proofs. Merged-main run `29114125798` on PR #48 merge SHA
 CMake LSP project-isolation defect on Apple Silicon: the initial neocmakelsp
 probe timed out in the shared fixture tree while the later isolated formatter
 project attached in the same process. This PR repairs that boundary. Do not run
-the owner apply until the cache-free branch run and the post-merge run complete
-the four current setup producers, four setup logical checks, and two Nix
-logical checks.
+the owner apply until the post-merge run completes the four current setup
+producers, four setup logical checks, and two Nix logical checks. Exact behavior
+head `f097995b49a2189db327903a20743e7cb69ba665` already passed cache-free run
+`29120109175` with all four current producers and all four setup logical proofs;
+that is branch-head evidence, not permission to skip merged-main proof.
 
 ## Verify
 

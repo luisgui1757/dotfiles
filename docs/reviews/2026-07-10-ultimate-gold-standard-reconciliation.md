@@ -1065,3 +1065,55 @@ merged-main greenfield proof.
 - No native Windows, WSL, redirected-known-folder, desktop/TCC, or post-merge
   stable-safeguard proof ran locally. Intel is no longer a pending environment;
   it is outside the owner-directed product contract.
+
+## Exact lean behavior-head hosted proof — entry 29
+
+- Immutable behavior head:
+  `f097995b49a2189db327903a20743e7cb69ba665` on PR #49.
+- Generic/parity run
+  [`29120077646`](https://github.com/luisgui1757/dotfiles/actions/runs/29120077646)
+  passed `windows` `86452871259`, `macos` `86452871272`, `ubuntu`
+  `86452871309`, and parity jobs `86452871288`, `86452871295`, and
+  `86452871302`.
+- Nix run
+  [`29120077669`](https://github.com/luisgui1757/dotfiles/actions/runs/29120077669)
+  passed Apple Silicon `86452871102`, Ubuntu `86452871114`, and stable logical
+  proofs `86453448279` / `86453448216`.
+- Cached PR E2E run
+  [`29120077871`](https://github.com/luisgui1757/dotfiles/actions/runs/29120077871)
+  passed Apple Silicon `86452872089`, Ubuntu `86452872093`, Ubuntu container
+  `86452872094`, Windows `86452872252`, and stable logical jobs
+  `86457865643`, `86457865587`, `86457865572`, and `86457865570`. The cached
+  Windows producer took 27m31s but completed setup and post-install proof; its
+  duration was not relabeled as failure or waived.
+- Cache-free workflow-dispatch run
+  [`29120109175`](https://github.com/luisgui1757/dotfiles/actions/runs/29120109175)
+  skipped every broad cache and passed the four current producers: Ubuntu
+  container `86452977445` (2m33s), Ubuntu `86452977536` (7m28s), Apple Silicon
+  `86452977452` (8m44s), and Windows `86452977443` (15m56s). Stable logical
+  proofs `86455881986`, `86455881913`, `86455881923`, and `86455881943`
+  validated their exact artifacts. There was no Intel or WSL job.
+- This closes exact branch-head hosted proof for the isolated CMake LSP repair
+  and the lean current matrix. It does not claim merged-main, WSL, redirected
+  Windows, divergent dual Terminal, or desktop/TCC proof. This appended evidence
+  commit is a documentation-only descendant; its required checks must still pass.
+
+### Finding status amendments
+
+| ID | Status after entry 29 | Exact evidence | Remaining work |
+|---|---|---|---|
+| UGR-002 | REJECTED (superseded contract) | All hosted current-product workflows contain Apple Silicon and no Intel job; the exact platform guards passed in every generic/Nix/setup lane. | None; Intel is retired, not pending proof. |
+| UGR-020 | PARTIAL | All twelve still-live legacy contexts and all six stable logical contexts passed on the behavior head; checked-in sources target stable names and the live safeguards remain unchanged. | Merge, repeat cache-free/logical proof on exact merged main, then owner preflight/apply/readback. |
+| UGR-021 | PARTIAL | Cache-free run `29120109175` passed every current producer and logical setup proof on the exact behavior head, including the repaired Apple Silicon strict CMake path. | Merged-main confirmation plus real WSL, redirected Windows, dual Terminal, and desktop/TCC manual evidence. |
+| UGR-022 | ACCEPTED/FIXED | ROADMAP, MIGRATION_STATUS, MANUAL, greenfield ledger, branch-protection runbook, reconciliation, and PR body now distinguish behavior-head pass from pending merged-main/manual proof. | Refresh only the final documentation-head checks and post-merge results. |
+
+### Live relationship at entry 29
+
+- PR #49 was `MERGEABLE` and correctly `BLOCKED` for review while the behavior
+  head's required checks ran. All twelve live-required legacy checks passed.
+- Live integrity/review/owner-update rulesets, classic required contexts, and
+  Actions permissions were not mutated. `sha_pinning_required` remained false.
+- The exact post-merge owner sequence remains: cache-free merged-main dispatch,
+  verify all four setup producers + four setup logical + two Nix logical checks,
+  run `--preflight-only`, apply, then read back both safeguard layers and Actions
+  permissions.

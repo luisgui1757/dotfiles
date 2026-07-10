@@ -219,11 +219,14 @@ significant change to the relevant area.
       project root and neocmakelsp timed out before attach; the later isolated
       CMake formatter fixture attached and validated gersemi in the same process.
 - [ ] **Cache-free merged-main safeguard confirmation**: run
-      `e2e-install.yml` on this branch, then dispatch it again after this PR
-      merges. Require all four current producers (Ubuntu container, public
+      `e2e-install.yml` again after this PR merges. Exact behavior head
+      `f097995b49a2189db327903a20743e7cb69ba665` passed cache-free run
+      [`29120109175`](https://github.com/luisgui1757/dotfiles/actions/runs/29120109175):
+      all four current producers and all four setup logical proofs were green.
+      On merged `main`, require those same producers (Ubuntu container, public
       Ubuntu, Apple Silicon, Windows), the four setup logical proofs, and the
       two Nix logical proofs to pass before applying the checked-in stable
-      required contexts live. Record both runs here and in
+      required contexts live. Record that merged-main run here and in
       `tests/greenfield/LEDGER.md`; a documentation-only descendant does not
       replace the behavior-head run.
 - [ ] **Home Manager (Linux/WSL)**: with Nix installed inside the Linux/WSL

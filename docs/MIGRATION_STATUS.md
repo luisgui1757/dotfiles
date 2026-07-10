@@ -265,7 +265,9 @@ broken repo-symlink still cleaned) is covered by
       Apple Silicon, where the initial CMake LSP fixture shared a large project
       root and neocmakelsp timed out before attach; the later isolated CMake
       formatter fixture attached in the same process. The project-isolation
-      repair still needs a cache-free hosted run on this branch and merged main.
+      repair then passed cache-free branch-head run `29120109175` on exact SHA
+      `f097995b49a2189db327903a20743e7cb69ba665`: all four current producers
+      and four setup logical proofs were green. Merged-main confirmation remains.
       No Windows Sandbox, WSL, redirected-Windows, merged-main cache-free
       confirmation, or desktop visual run is claimed. Required CI is not manual
       desktop evidence. The old Wave C `0 / 10` Ubuntu parity counter is no
