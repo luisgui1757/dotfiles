@@ -635,3 +635,32 @@ pushed exact-head runs or manual environments.
   packaged-plus-portable Windows Terminal transaction/uninstall run, or manual
   desktop GUI proof. Those residuals remain open and are not inferred from the
   green job.
+
+## Runtime follow-up identity and local verification — entry 21
+
+- Behavioral implementation commit:
+  `f89f61c2dc33a99bbd5921fc4b6a577843aa5348` (`fix(ci): close
+  exact-head runtime regressions`). It binds the generic Ubuntu clangd runtime,
+  canonical standalone Home Manager session path, user-local post-install
+  consumer path, and honest AeroSpace TCC proof boundary to their focused tests
+  and documentation.
+- Focused PASS: `clangd_runtime_ci_test.sh`,
+  `macos_gui_runtime_ci_test.sh`, `linux_home_test.sh` for both Linux
+  architectures, Home Manager session-vars shell coverage, strict ShellCheck,
+  YAML lint, and `git diff --check`.
+- Full PASS: `nix flake check --print-build-logs` evaluated both Darwin and
+  Linux exported configurations and built the native toolchain check; it kept
+  the Intel support-window warning visible and honestly omitted incompatible
+  system builds. `make ci` ended `local pre-PR gate passed`, including strict
+  lint, all Neovim specs (real two-project clangd included), shell/static/Nix
+  suites, Renovate validator plus 89-record official extraction, and the full
+  migration/parity/oracle bundle. `bash -n` passed for all 134 repository shell
+  scripts outside generated caches.
+- The first `make ci` attempt failed only because the new static oracle's
+  literal workflow patterns triggered ShellCheck SC2016. The patterns were
+  rewritten with escaped expansion markers; no suppression or lint weakening
+  was added, and the complete gate then passed.
+- Hosted confirmation is not inferred from these local results. It requires the
+  exact pushed descendant on Ubuntu, Apple Silicon, Intel, and Windows; WSL,
+  redirected Windows, divergent dual Terminal state, and TCC-enabled AeroSpace
+  config consumption remain separate manual/runtime dependencies.
