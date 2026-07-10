@@ -84,8 +84,8 @@ status entries; history is never deleted or rewritten.
 - Residual/manual proof: actual Intel and WSL runs, manual desktop visual proof,
   and the Windows half of UGR-015. No ledger evidence row is claimed before a
   run exists.
-- Implementation commit: pending creation of this cohesive POSIX commit; an
-  append-only identity entry will follow.
+- Implementation commit: `1423a47` (`fix(posix): close architecture and
+  identity gaps`).
 
 ### UGR-021 — implementation entry 1
 
@@ -97,3 +97,35 @@ status entries; history is never deleted or rewritten.
   injection.
 - Remaining: Windows E2E font assertion, actual Intel/WSL/desktop run evidence,
   and any owner-recorded manual visual observations.
+
+### UGR-001 / UGR-014 — implementation entry 1
+
+- Status: FIXED, pending final full-gate and Windows-host confirmation.
+- Reproduction: baseline `Copy-WindowsTerminalSettingsForUnpackaged` performed a
+  forced full-file packaged-to-portable copy, backed up only packaged state, and
+  downgraded portable write failure to a warning. Both uninstallers selected
+  backups by mutable filesystem mtime.
+- Implementation: setup excludes WT from chezmoi publication and plans packaged
+  and portable targets from each target's own bytes. All outputs stage in their
+  destination directory and parse/byte-validate before per-target verified
+  backups or publication. Same-directory atomic replace captures the exact
+  pre-publication bytes, closing the final source-check race; a multi-target
+  failure rolls back prior publications. Named mutex serialization, cleanup,
+  dry-run, skip, retry, idempotency, and explicit unsafe-rollback recovery are
+  included. Bare chezmoi exposes no WT target.
+- Recovery: POSIX/Windows backup selection validates
+  `<target>.bak.<YYYYMMDD-HHMMSS>[.n]` and orders by filename timestamp plus
+  collision suffix, never mtime. Malformed candidates fail before target
+  removal. Windows uninstall validates both WT paths before restoring either,
+  atomically restores independent backups, and preserves displaced current
+  settings as `settings.json.uninstall-current.*`.
+- Focused tests: 13 transactional WT Pester cases; 6 Windows uninstall/order
+  Pester cases; `uninstall_backup_order_test.sh`; updated Windows render/apply/
+  round-trip oracles. Cases include packaged-only, portable-only, divergent
+  dual installs, missing targets, invalid JSON, stage/backup/publish failure,
+  both concurrency windows, collision, dry-run, skip, retry, repeated setup,
+  files/directories, opposing mtimes, malformed names, and dual restoration.
+- Documentation: README, `windows-terminal/README.md`, CLAUDE, ROADMAP,
+  MIGRATION_STATUS, and this ledger.
+- Implementation commit: pending creation of this cohesive data-safety commit;
+  an append-only identity entry will follow.

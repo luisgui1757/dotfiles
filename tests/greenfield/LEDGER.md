@@ -16,6 +16,9 @@ when someone inspected it on that machine.
 - WSL2, redirected Windows known folders, and desktop GUI/visual behavior still
   require their real environments. Workflow or harness presence does not count
   as a run.
+- Packaged-plus-portable Windows Terminal preservation and independent uninstall
+  recovery are automated in Pester but still await a real dual-install run; add
+  an evidence row only after recording the exact SHA and environment.
 
 ## Entry Template
 

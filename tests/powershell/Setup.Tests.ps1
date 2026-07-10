@@ -982,7 +982,7 @@ Describe "setup.ps1 VS developer environment" {
     }
 }
 
-Describe "setup.ps1 Windows Terminal backup" {
+Describe "setup.ps1 transactional Windows Terminal merge" {
     BeforeEach {
         $script:OldLocalAppData = $env:LOCALAPPDATA
         $script:OldUserProfile = $env:USERPROFILE
@@ -1008,144 +1008,211 @@ Describe "setup.ps1 Windows Terminal backup" {
         Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $script:FakeHome
     }
 
-    It "copies the pre-merge settings.json without moving it" {
-        $settings = Get-WindowsTerminalSettingsPath
-        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $settings) | Out-Null
-        $preMerge = '{"profiles":{"defaults":{},"list":[]},"actions":[]}'
-        [System.IO.File]::WriteAllText($settings, $preMerge, [System.Text.UTF8Encoding]::new($false))
+    It "merges packaged-only settings and backs up that target independently" {
+        $packaged = Get-WindowsTerminalSettingsPath
+        $portable = Get-WindowsTerminalUnpackagedSettingsPath
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $packaged) | Out-Null
+        $original = '{"defaultProfile":"{packaged}","profiles":{"defaults":{},"list":[{"guid":"{packaged}","name":"PackagedOnly"}]},"schemes":[{"name":"PackagedScheme"}],"actions":[{"command":"closeWindow","keys":"alt+f4"}]}'
+        [System.IO.File]::WriteAllText($packaged, $original, [System.Text.UTF8Encoding]::new($false))
 
-        Backup-WindowsTerminalSettings
+        Invoke-WindowsTerminalSettingsTransaction -IsPortablePresent $false
 
-        # The backup name uses the runtime $Timestamp; match by pattern rather
-        # than a fixed value (Pester scoping makes pinning $Timestamp unreliable).
-        $backups = @(Get-ChildItem -LiteralPath (Split-Path -Parent $settings) -Filter 'settings.json.bak.*' -ErrorAction SilentlyContinue)
-        Test-Path -LiteralPath $settings -PathType Leaf | Should -BeTrue   # original intact (copy, not move)
-        $backups.Count | Should -BeGreaterThan 0                            # a backup was created
-        [System.IO.File]::ReadAllText($settings) | Should -Be $preMerge
-        [System.IO.File]::ReadAllText($backups[0].FullName) | Should -Be $preMerge
-    }
-
-    It "does not create a backup when Windows Terminal merge is skipped" {
-        . $script:ImportSetupForTest -Parameters @{ All = $true; SkipWindowsTerminalMerge = $true }
-        $settings = Get-WindowsTerminalSettingsPath
-        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $settings) | Out-Null
-        [System.IO.File]::WriteAllText($settings, '{"profiles":{}}', [System.Text.UTF8Encoding]::new($false))
-
-        Backup-WindowsTerminalSettings
-
-        $backups = @(Get-ChildItem -LiteralPath (Split-Path -Parent $settings) -Filter 'settings.json.bak.*' -ErrorAction SilentlyContinue)
-        $backups.Count | Should -Be 0
-    }
-
-    It "mirrors packaged Windows Terminal settings to the unpackaged path" {
-        $settings = Get-WindowsTerminalSettingsPath
-        $unpackaged = Get-WindowsTerminalUnpackagedSettingsPath
-        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $settings) | Out-Null
-        $merged = '{"theme":"rose-pine","profiles":{"defaults":{"scrollbarState":"visible"}}}'
-        [System.IO.File]::WriteAllText($settings, $merged, [System.Text.UTF8Encoding]::new($false))
-
-        Copy-WindowsTerminalSettingsForUnpackaged
-
-        Test-Path -LiteralPath $unpackaged -PathType Leaf | Should -BeTrue
-        [System.IO.File]::ReadAllText($unpackaged) | Should -Be $merged
-    }
-
-    It "seeds unpackaged Windows Terminal settings from the fragment when packaged settings are absent" {
-        $settings = Get-WindowsTerminalSettingsPath
-        $unpackaged = Get-WindowsTerminalUnpackagedSettingsPath
-
-        Test-Path -LiteralPath $settings -PathType Leaf | Should -BeFalse
-        Copy-WindowsTerminalSettingsForUnpackaged -IsPortablePresent $true
-
-        Test-Path -LiteralPath $unpackaged -PathType Leaf | Should -BeTrue
-        $written = [System.IO.File]::ReadAllText($unpackaged) | ConvertFrom-Json
-        $written.theme | Should -Be 'rose-pine'
-        $written.profiles.defaults.colorScheme | Should -Be 'rose-pine'
-        $written.profiles.defaults.font.face | Should -Be 'Hack Nerd Font'
-        $written.defaultProfile | Should -Be $script:ManagedPwshProfileGuid
-        $pwshProfile = @($written.profiles.list | Where-Object { $_.guid -eq $script:ManagedPwshProfileGuid })
-        $pwshProfile.Count | Should -Be 1
-        $pwshProfile[0].commandline | Should -Be 'pwsh.exe'
-        @($written.schemes | Where-Object { $_.name -eq 'rose-pine' }).Count | Should -Be 1
-        @($written.themes | Where-Object { $_.name -eq 'rose-pine' }).Count | Should -Be 1
-    }
-
-    It "promotes the legacy Windows PowerShell default to the managed PowerShell 7 profile" {
-        $unpackaged = Get-WindowsTerminalUnpackagedSettingsPath
-        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $unpackaged) | Out-Null
-        $minimal = '{"defaultProfile":"{61c54bbd-c2c6-5271-96e7-009a87ff44bf}","profiles":{"defaults":{},"list":[{"guid":"{61c54bbd-c2c6-5271-96e7-009a87ff44bf}","name":"Windows PowerShell","commandline":"powershell.exe"}]},"schemes":[],"actions":[]}'
-        [System.IO.File]::WriteAllText($unpackaged, $minimal, [System.Text.UTF8Encoding]::new($false))
-
-        Copy-WindowsTerminalSettingsForUnpackaged -IsPortablePresent $true
-
-        $written = [System.IO.File]::ReadAllText($unpackaged) | ConvertFrom-Json
-        $written.defaultProfile | Should -Be $script:ManagedPwshProfileGuid
-        @($written.profiles.list | Where-Object { $_.guid -eq $script:LegacyWindowsPowerShellProfileGuid }).Count | Should -Be 1
-        $pwshProfile = @($written.profiles.list | Where-Object { $_.guid -eq $script:ManagedPwshProfileGuid })
-        $pwshProfile.Count | Should -Be 1
-        $pwshProfile[0].name | Should -Be 'PowerShell 7'
-        $pwshProfile[0].commandline | Should -Be 'pwsh.exe'
-    }
-
-    It "merges unpackaged Windows Terminal settings from the fragment and preserves user keys" {
-        $unpackaged = Get-WindowsTerminalUnpackagedSettingsPath
-        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $unpackaged) | Out-Null
-        $minimal = '{"defaultProfile":"{user}","profiles":{"defaults":{"font":{"face":"Consolas"}},"list":[{"guid":"{user}","name":"Keep"}]},"schemes":[{"name":"KeepScheme"}],"actions":[{"command":"closeWindow","keys":"alt+f4"}]}'
-        [System.IO.File]::WriteAllText($unpackaged, $minimal, [System.Text.UTF8Encoding]::new($false))
-
-        Copy-WindowsTerminalSettingsForUnpackaged -IsPortablePresent $true
-
-        $written = [System.IO.File]::ReadAllText($unpackaged) | ConvertFrom-Json
-        $written.defaultProfile | Should -Be '{user}'
-        @($written.profiles.list | Where-Object { $_.guid -eq '{user}' }).Count | Should -Be 1
-        @($written.profiles.list | Where-Object { $_.guid -eq $script:ManagedPwshProfileGuid }).Count | Should -Be 1
-        @($written.schemes | Where-Object { $_.name -eq 'KeepScheme' }).Count | Should -Be 1
+        Test-Path -LiteralPath $portable | Should -BeFalse
+        $written = [System.IO.File]::ReadAllText($packaged) | ConvertFrom-Json
+        @($written.profiles.list | Where-Object { $_.guid -eq '{packaged}' }).Count | Should -Be 1
+        @($written.schemes | Where-Object { $_.name -eq 'PackagedScheme' }).Count | Should -Be 1
         @($written.actions | Where-Object { $_.keys -eq 'alt+f4' }).Count | Should -Be 1
+        $backups = @(Get-ChildItem -LiteralPath (Split-Path -Parent $packaged) -Filter 'settings.json.bak.*')
+        $backups.Count | Should -Be 1
+        [System.IO.File]::ReadAllText($backups[0].FullName) | Should -Be $original
+    }
+
+    It "seeds portable-only settings from the fragment" {
+        $packaged = Get-WindowsTerminalSettingsPath
+        $portable = Get-WindowsTerminalUnpackagedSettingsPath
+
+        Invoke-WindowsTerminalSettingsTransaction -IsPortablePresent $true
+
+        Test-Path -LiteralPath $packaged | Should -BeFalse
+        Test-Path -LiteralPath $portable -PathType Leaf | Should -BeTrue
+        $written = [System.IO.File]::ReadAllText($portable) | ConvertFrom-Json
         $written.theme | Should -Be 'rose-pine'
         $written.profiles.defaults.colorScheme | Should -Be 'rose-pine'
         $written.profiles.defaults.font.face | Should -Be 'Hack Nerd Font'
+        $written.defaultProfile | Should -Be $script:ManagedPwshProfileGuid
+        $pwshProfile = @($written.profiles.list | Where-Object { $_.guid -eq $script:ManagedPwshProfileGuid })
+        $pwshProfile.Count | Should -Be 1
+        $pwshProfile[0].commandline | Should -Be 'pwsh.exe'
         @($written.schemes | Where-Object { $_.name -eq 'rose-pine' }).Count | Should -Be 1
         @($written.themes | Where-Object { $_.name -eq 'rose-pine' }).Count | Should -Be 1
     }
 
-    It "keeps setup best effort when the unpackaged Windows Terminal mirror fails" {
-        $settings = Get-WindowsTerminalSettingsPath
-        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $settings) | Out-Null
-        [System.IO.File]::WriteAllText($settings, '{"theme":"rose-pine"}', [System.Text.UTF8Encoding]::new($false))
-        Mock -CommandName Copy-Item -MockWith { throw "copy failed" }
+    It "preserves divergent packaged and portable state without mirroring either" {
+        $packaged = Get-WindowsTerminalSettingsPath
+        $portable = Get-WindowsTerminalUnpackagedSettingsPath
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $packaged), (Split-Path -Parent $portable) | Out-Null
+        $packagedOriginal = '{"defaultProfile":"{pkg}","profiles":{"defaults":{},"list":[{"guid":"{pkg}","name":"PackagedOnly"}]},"schemes":[{"name":"PackagedScheme"}],"actions":[{"command":"closeWindow","keys":"alt+f4"}]}'
+        $portableOriginal = '{"defaultProfile":"{port}","profiles":{"defaults":{},"list":[{"guid":"{port}","name":"PortableOnly"}]},"schemes":[{"name":"PortableScheme"}],"actions":[{"command":"newTab","keys":"ctrl+shift+9"}]}'
+        [System.IO.File]::WriteAllText($packaged, $packagedOriginal, [System.Text.UTF8Encoding]::new($false))
+        [System.IO.File]::WriteAllText($portable, $portableOriginal, [System.Text.UTF8Encoding]::new($false))
 
-        { Copy-WindowsTerminalSettingsForUnpackaged } | Should -Not -Throw
+        Invoke-WindowsTerminalSettingsTransaction -IsPortablePresent $true
+
+        $pkg = [System.IO.File]::ReadAllText($packaged) | ConvertFrom-Json
+        $port = [System.IO.File]::ReadAllText($portable) | ConvertFrom-Json
+        @($pkg.profiles.list | Where-Object { $_.guid -eq '{pkg}' }).Count | Should -Be 1
+        @($pkg.profiles.list | Where-Object { $_.guid -eq '{port}' }).Count | Should -Be 0
+        @($port.profiles.list | Where-Object { $_.guid -eq '{port}' }).Count | Should -Be 1
+        @($port.profiles.list | Where-Object { $_.guid -eq '{pkg}' }).Count | Should -Be 0
+        @(Get-ChildItem -LiteralPath (Split-Path -Parent $packaged) -Filter 'settings.json.bak.*').Count | Should -Be 1
+        @(Get-ChildItem -LiteralPath (Split-Path -Parent $portable) -Filter 'settings.json.bak.*').Count | Should -Be 1
     }
 
-    It "does not mirror unpackaged Windows Terminal settings during dry run" {
-        $settings = Get-WindowsTerminalSettingsPath
-        $unpackaged = Get-WindowsTerminalUnpackagedSettingsPath
-        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $settings) | Out-Null
-        [System.IO.File]::WriteAllText($settings, '{"theme":"rose-pine"}', [System.Text.UTF8Encoding]::new($false))
-
-        # Inject the switch directly -- Set-Variable -Scope Script does not reach
-        # the dot-sourced function reliably.
-        Copy-WindowsTerminalSettingsForUnpackaged -IsDryRun $true
-
-        Test-Path -LiteralPath $unpackaged -PathType Leaf | Should -BeFalse
+    It "does nothing when neither installation has a settings target" {
+        Invoke-WindowsTerminalSettingsTransaction -IsPortablePresent $false
+        Test-Path -LiteralPath (Get-WindowsTerminalSettingsPath) | Should -BeFalse
+        Test-Path -LiteralPath (Get-WindowsTerminalUnpackagedSettingsPath) | Should -BeFalse
     }
 
-    It "does not seed unpackaged Windows Terminal settings during dry run" {
-        $unpackaged = Get-WindowsTerminalUnpackagedSettingsPath
+    It "fails invalid JSON before changing either target" {
+        $packaged = Get-WindowsTerminalSettingsPath
+        $portable = Get-WindowsTerminalUnpackagedSettingsPath
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $packaged), (Split-Path -Parent $portable) | Out-Null
+        [System.IO.File]::WriteAllText($packaged, '{invalid', [System.Text.UTF8Encoding]::new($false))
+        $portableOriginal = '{"profiles":{"defaults":{},"list":[]},"actions":[]}'
+        [System.IO.File]::WriteAllText($portable, $portableOriginal, [System.Text.UTF8Encoding]::new($false))
 
-        Copy-WindowsTerminalSettingsForUnpackaged -IsDryRun $true -IsPortablePresent $true
+        { Invoke-WindowsTerminalSettingsTransaction -IsPortablePresent $true } | Should -Throw
 
-        Test-Path -LiteralPath $unpackaged -PathType Leaf | Should -BeFalse
+        [System.IO.File]::ReadAllText($packaged) | Should -Be '{invalid'
+        [System.IO.File]::ReadAllText($portable) | Should -Be $portableOriginal
+        @(Get-ChildItem -LiteralPath $script:FakeHome -Recurse -Force | Where-Object { $_.Name -match 'dotfiles-(stage|rollback)' }).Count | Should -Be 0
     }
 
-    It "does not mirror unpackaged Windows Terminal settings when the merge is skipped" {
-        $settings = Get-WindowsTerminalSettingsPath
-        $unpackaged = Get-WindowsTerminalUnpackagedSettingsPath
-        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $settings) | Out-Null
-        [System.IO.File]::WriteAllText($settings, '{"theme":"rose-pine"}', [System.Text.UTF8Encoding]::new($false))
+    It "fails closed and cleans staging when the staged write fails" {
+        $packaged = Get-WindowsTerminalSettingsPath
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $packaged) | Out-Null
+        $original = '{"profiles":{"defaults":{},"list":[]},"actions":[]}'
+        [System.IO.File]::WriteAllText($packaged, $original, [System.Text.UTF8Encoding]::new($false))
+        Mock -CommandName Write-WindowsTerminalSettingsJson -MockWith { throw 'write failed' }
 
-        Copy-WindowsTerminalSettingsForUnpackaged -IsSkipMerge $true
+        { Invoke-WindowsTerminalSettingsTransaction -IsPortablePresent $false } | Should -Throw
+        [System.IO.File]::ReadAllText($packaged) | Should -Be $original
+        @(Get-ChildItem -LiteralPath $script:FakeHome -Recurse -Force | Where-Object { $_.Name -match 'dotfiles-(stage|rollback)' }).Count | Should -Be 0
+    }
 
-        Test-Path -LiteralPath $unpackaged -PathType Leaf | Should -BeFalse
+    It "fails setup when backup creation fails and keeps the original" {
+        $packaged = Get-WindowsTerminalSettingsPath
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $packaged) | Out-Null
+        $original = '{"profiles":{"defaults":{},"list":[]},"actions":[]}'
+        [System.IO.File]::WriteAllText($packaged, $original, [System.Text.UTF8Encoding]::new($false))
+        Mock -CommandName Copy-Item -MockWith { throw 'backup failed' }
+
+        { Invoke-WindowsTerminalSettingsTransaction -IsPortablePresent $false } | Should -Throw
+        [System.IO.File]::ReadAllText($packaged) | Should -Be $original
+    }
+
+    It "rolls back an earlier target when later publication fails" {
+        $packaged = Get-WindowsTerminalSettingsPath
+        $portable = Get-WindowsTerminalUnpackagedSettingsPath
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $packaged), (Split-Path -Parent $portable) | Out-Null
+        $packagedOriginal = '{"profiles":{"defaults":{},"list":[{"guid":"{pkg}","name":"Pkg"}]},"actions":[]}'
+        $portableOriginal = '{"profiles":{"defaults":{},"list":[{"guid":"{port}","name":"Port"}]},"actions":[]}'
+        [System.IO.File]::WriteAllText($packaged, $packagedOriginal, [System.Text.UTF8Encoding]::new($false))
+        [System.IO.File]::WriteAllText($portable, $portableOriginal, [System.Text.UTF8Encoding]::new($false))
+        $script:WtPublishCalls = 0
+        Mock -CommandName Publish-WindowsTerminalSettingsStage -MockWith {
+            param($StagePath, $TargetPath, $RollbackPath, $TargetExisted)
+            $script:WtPublishCalls++
+            if ($script:WtPublishCalls -eq 1) {
+                [System.IO.File]::Replace($StagePath, $TargetPath, $RollbackPath)
+                return
+            }
+            throw 'publish failed'
+        }
+
+        { Invoke-WindowsTerminalSettingsTransaction -IsPortablePresent $true } | Should -Throw
+
+        [System.IO.File]::ReadAllText($packaged) | Should -Be $packagedOriginal
+        [System.IO.File]::ReadAllText($portable) | Should -Be $portableOriginal
+        @(Get-ChildItem -LiteralPath $script:FakeHome -Recurse -Force | Where-Object { $_.Name -match 'dotfiles-(stage|rollback)' }).Count | Should -Be 0
+    }
+
+    It "detects a change before publication without overwriting it" {
+        $packaged = Get-WindowsTerminalSettingsPath
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $packaged) | Out-Null
+        $original = '{"profiles":{"defaults":{},"list":[]},"actions":[]}'
+        $concurrent = '{"profiles":{"defaults":{},"list":[{"guid":"{new}","name":"Concurrent"}]},"actions":[]}'
+        [System.IO.File]::WriteAllText($packaged, $original, [System.Text.UTF8Encoding]::new($false))
+        $hook = { param($plans) [System.IO.File]::WriteAllText($plans[0].Target, $concurrent, [System.Text.UTF8Encoding]::new($false)) }
+
+        { Invoke-WindowsTerminalSettingsTransaction -IsPortablePresent $false -BeforePublish $hook } | Should -Throw
+
+        [System.IO.File]::ReadAllText($packaged) | Should -Be $concurrent
+        @(Get-ChildItem -LiteralPath $script:FakeHome -Recurse -Force | Where-Object { $_.Name -match 'dotfiles-(stage|rollback)' }).Count | Should -Be 0
+    }
+
+    It "uses File.Replace rollback bytes to close the final publication race" {
+        $packaged = Get-WindowsTerminalSettingsPath
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $packaged) | Out-Null
+        $original = '{"profiles":{"defaults":{},"list":[]},"actions":[]}'
+        $concurrent = '{"profiles":{"defaults":{},"list":[{"guid":"{race}","name":"Race"}]},"actions":[]}'
+        [System.IO.File]::WriteAllText($packaged, $original, [System.Text.UTF8Encoding]::new($false))
+        Mock -CommandName Publish-WindowsTerminalSettingsStage -MockWith {
+            param($StagePath, $TargetPath, $RollbackPath, $TargetExisted)
+            [System.IO.File]::WriteAllText($TargetPath, $concurrent, [System.Text.UTF8Encoding]::new($false))
+            [System.IO.File]::Replace($StagePath, $TargetPath, $RollbackPath)
+        }
+
+        { Invoke-WindowsTerminalSettingsTransaction -IsPortablePresent $false } | Should -Throw
+        [System.IO.File]::ReadAllText($packaged) | Should -Be $concurrent
+    }
+
+    It "uses a collision suffix without overwriting an earlier backup" {
+        $packaged = Get-WindowsTerminalSettingsPath
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $packaged) | Out-Null
+        $original = '{"profiles":{"defaults":{},"list":[]},"actions":[]}'
+        [System.IO.File]::WriteAllText($packaged, $original, [System.Text.UTF8Encoding]::new($false))
+        $collision = "$packaged.bak.$Timestamp"
+        [System.IO.File]::WriteAllText($collision, 'older-backup', [System.Text.UTF8Encoding]::new($false))
+
+        Invoke-WindowsTerminalSettingsTransaction -IsPortablePresent $false
+
+        [System.IO.File]::ReadAllText($collision) | Should -Be 'older-backup'
+        [System.IO.File]::ReadAllText("$collision.1") | Should -Be $original
+    }
+
+    It "is write-free in dry-run and skip modes" {
+        $packaged = Get-WindowsTerminalSettingsPath
+        $portable = Get-WindowsTerminalUnpackagedSettingsPath
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $packaged) | Out-Null
+        $original = '{"profiles":{"defaults":{},"list":[]},"actions":[]}'
+        [System.IO.File]::WriteAllText($packaged, $original, [System.Text.UTF8Encoding]::new($false))
+
+        Invoke-WindowsTerminalSettingsTransaction -IsDryRun $true -IsPortablePresent $true
+        Invoke-WindowsTerminalSettingsTransaction -IsSkipMerge $true -IsPortablePresent $true
+
+        [System.IO.File]::ReadAllText($packaged) | Should -Be $original
+        Test-Path -LiteralPath $portable | Should -BeFalse
+        @(Get-ChildItem -LiteralPath $script:FakeHome -Recurse -Force | Where-Object { $_.Name -match '(settings\.json\.bak|dotfiles-(stage|rollback))' }).Count | Should -Be 0
+    }
+
+    It "retries from a concurrently updated original and then becomes idempotent" {
+        $packaged = Get-WindowsTerminalSettingsPath
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $packaged) | Out-Null
+        $original = '{"profiles":{"defaults":{},"list":[]},"actions":[]}'
+        $retrySource = '{"profiles":{"defaults":{},"list":[{"guid":"{retry}","name":"RetrySource"}]},"actions":[]}'
+        [System.IO.File]::WriteAllText($packaged, $original, [System.Text.UTF8Encoding]::new($false))
+        $hook = { param($plans) [System.IO.File]::WriteAllText($plans[0].Target, $retrySource, [System.Text.UTF8Encoding]::new($false)) }
+        { Invoke-WindowsTerminalSettingsTransaction -IsPortablePresent $false -BeforePublish $hook } | Should -Throw
+
+        Invoke-WindowsTerminalSettingsTransaction -IsPortablePresent $false
+        $afterFirstSuccess = [System.IO.File]::ReadAllText($packaged)
+        $backupCount = @(Get-ChildItem -LiteralPath (Split-Path -Parent $packaged) -Filter 'settings.json.bak.*').Count
+        Invoke-WindowsTerminalSettingsTransaction -IsPortablePresent $false
+
+        ([System.IO.File]::ReadAllText($packaged) | ConvertFrom-Json).profiles.list.name | Should -Contain 'RetrySource'
+        [System.IO.File]::ReadAllText($packaged) | Should -Be $afterFirstSuccess
+        @(Get-ChildItem -LiteralPath (Split-Path -Parent $packaged) -Filter 'settings.json.bak.*').Count | Should -Be $backupCount
     }
 }

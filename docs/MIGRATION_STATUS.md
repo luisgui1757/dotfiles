@@ -30,7 +30,7 @@ greenfield runbook.
 | tmux POSIX overlay | `tmux/tmux.posix.conf`; `home/dot_tmux.posix.conf` | POSIX: `~/.tmux.posix.conf`; Windows: ignored | POSIX symlink only. Holds the native-clipboard `if-shell` probes, which hang psmux at config-load time, so it is **never** deployed on Windows; `tmux.conf` sources it with `source-file -q`. |
 | psmux | `tmux/psmux.conf`; `home/dot_psmux.conf` | Windows: `%USERPROFILE%\.psmux.conf`; POSIX: ignored | Windows copy only. It is the first native-Windows multiplexer entrypoint and source-files the tmux Windows overlay. |
 | Generated Rose Pine tmux/psmux bar | `tmux/psmux-rose-pine.ps1`; generated `tmux/psmux-rose-pine.{main,moon,dawn}.conf`; `home/dot_tmux.rose-pine.ps1`; `home/dot_tmux.rose-pine.*.conf` | POSIX/Windows: `~/.tmux.rose-pine.{main,moon,dawn}.conf`; Windows also gets `~/.tmux.rose-pine.ps1` | Source generator plus checked generated configs; POSIX symlinks, Windows copies. |
-| Windows Terminal | `windows-terminal/settings.fragment.jsonc`; `home/.chezmoitemplates/windows-terminal/settings.fragment.jsonc` | Windows: `%LOCALAPPDATA%\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json` | `setup.ps1` backs up an existing pre-merge file, then `modify_settings.json.ps1.tmpl` performs the read-modify-write merge. chezmoi owns only the packaged target; after apply, `setup.ps1` mirrors that file to the unpackaged portable WT path (`%LOCALAPPDATA%\Microsoft\Windows Terminal\settings.json`), or -- when no packaged WT exists (e.g. Windows Sandbox / portable-only) -- seeds or merges the Rose Pine + Hack Nerd Font settings into it directly via the shared `merge-settings.ps1` helper. |
+| Windows Terminal | `windows-terminal/settings.fragment.jsonc`; `home/.chezmoitemplates/windows-terminal/{settings.fragment.jsonc,merge-settings.ps1}` | Windows packaged + portable settings paths | `setup.ps1` is the only publisher. Chezmoi exposes no WT target. Setup independently merges each target's own state, stages beside the destination, validates all plans, creates separate verified backups, atomically publishes with concurrent-change detection, and rolls back the multi-target transaction on failure. |
 | PowerShell profile | `shells/powershell_profile.ps1`; `home/Documents/PowerShell/Microsoft.PowerShell_profile.ps1` | Windows PS7: `%USERPROFILE%\Documents\PowerShell\Microsoft.PowerShell_profile.ps1`; Windows PowerShell 5.1 and POSIX pwsh profile paths stay out of chezmoi scope | Windows PS7 profile copy via `mode = "file"`. |
 | zsh plugins | `home/.chezmoiexternal.toml.tmpl`; `home/.chezmoiscripts/run_onchange_after_20-verify-zsh-plugin-pins.sh.tmpl` | POSIX: `~/.local/share/dotfiles/zsh-plugins/{fzf-tab,zsh-autosuggestions}`; Windows: ignored | Pinned `.chezmoiexternal` git repos plus `run_onchange_` exact-commit assertion. |
 
@@ -82,9 +82,11 @@ then remove only targets they can prove are repo-owned:
   chezmoi's own logic, with none of the stdout-redirect encoding/CRLF pitfalls a
   `cat`-and-hash comparison would hit on Windows). User-modified files warn and
   stay in place.
-- Bootstrap-style backups named `<target>.bak.<timestamp>` are restored after
-  a target is removed. Pass `--no-restore-backups` / `-NoRestoreBackups` to
-  skip restoration.
+- Bootstrap-style backups named `<target>.bak.<YYYYMMDD-HHMMSS>[.n]` are
+  restored after a target is removed. Selection uses the validated filename
+  timestamp plus numeric collision suffix, never filesystem mtime; malformed or
+  ambiguous candidates fail before removal. Pass `--no-restore-backups` /
+  `-NoRestoreBackups` to skip restoration.
 - The zsh plugin externals under
   `~/.local/share/dotfiles/zsh-plugins/{fzf-tab,zsh-autosuggestions}`
   are removed unless `--keep-externals` / `-KeepExternals` is passed. A checkout
@@ -92,9 +94,10 @@ then remove only targets they can prove are repo-owned:
   verified) is kept even under `--all`; pass `--force-externals` /
   `-ForceExternals` to remove it anyway. This protects in-place edits to the
   vendored plugin clones from being lost.
-- Windows Terminal `settings.json` is never deleted. The merge is idempotent
-  but not invertible, so the scripts warn and print the newest matching backup
-  path when present.
+- Windows Terminal `settings.json` is never deleted. `uninstall.ps1` validates
+  both packaged/portable candidate sets and backup JSON before restoring either,
+  atomically restores the selected pre-setup bytes, and preserves the displaced
+  current file as `settings.json.uninstall-current.<timestamp>[.n]`.
 
 Both scripts support dry-run and non-interactive flags:
 `--dry-run --all --keep-externals --no-restore-backups --force-externals` on
@@ -108,6 +111,17 @@ broken repo-symlink still cleaned) is covered by
 ## Owner sign-off / known caveats
 
 ### Resolved
+
+- [x] Packaged and portable Windows Terminal settings are independent
+      user-owned merge transactions. The old full-file mirror and best-effort
+      warning path are removed. Setup stages/validates all outputs, backs up
+      each divergent target, detects concurrent changes through atomic rollback
+      bytes, fails setup on any unsafe operation, and supports dry-run, skip,
+      retry, idempotency, and independent uninstall restoration.
+- [x] POSIX and Windows uninstall choose backups from validated filename
+      timestamps/collision suffixes instead of mtime. Opposing mtime order,
+      files/directories, collisions, malformed names, and pre-mutation failure
+      are covered by shell and Pester tests.
 
 - [x] POSIX setup now resolves one authoritative non-root target account and
       account-record home before Nix, Home Manager, chezmoi, or native setup.

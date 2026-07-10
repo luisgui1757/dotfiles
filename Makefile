@@ -77,6 +77,7 @@ test-migration:
 	@PATH="$$HOME/.local/bin:$$PATH" bash tests/migration/parity_gate.sh
 	@PATH="$$HOME/.local/bin:$$PATH" bash tests/migration/greenfield_roundtrip.sh
 	@PATH="$$HOME/.local/bin:$$PATH" bash tests/migration/uninstall_safety_test.sh
+	@PATH="$$HOME/.local/bin:$$PATH" bash tests/migration/uninstall_backup_order_test.sh
 	@PATH="$$HOME/.local/bin:$$PATH" bash tests/migration/windows_render_test.sh
 	@PATH="$$HOME/.local/bin:$$PATH" bash tests/migration/oracle_test.sh
 

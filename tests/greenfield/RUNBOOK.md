@@ -260,6 +260,11 @@ proves.
 
 ### Windows Terminal (Windows only)
 
+When both packaged and portable installations exist, add a different throwaway
+profile/scheme/action to each before setup. After setup, confirm neither target
+acquired the other's throwaway state and each has an independent
+`settings.json.bak.<timestamp>[.n]` recovery file.
+
 WT first tries scoop/winget/choco. In **Windows Sandbox** those MSIX-backed
 installs fail because Sandbox cannot register MSIX, so `install-deps.ps1`
 falls back to the pinned portable build. The `.wsb` path also keeps the

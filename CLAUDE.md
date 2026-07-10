@@ -148,14 +148,13 @@ that violates one of these, fix it instead of disabling the test.
     MSIX-backed installs do not put `wt` on PATH, `Install-WindowsTerminal`
     falls back to the pinned portable GitHub release zip and verifies SHA-256
     before extraction. The app install and settings merge are separate code
-    paths (`install-deps.ps1` vs chezmoi's `modify_` entry), and setup runs the
+    paths (`install-deps.ps1` vs setup's transaction), and setup runs the
     merge by default. Opt out with `-SkipWindowsTerminalMerge`;
-    `-MergeWindowsTerminal` is a retained no-op alias. The packaged `modify_`
-    target still emits nothing on blank stdin so a bare `chezmoi apply` does not
-    fabricate Store WT settings, but setup also handles portable WT after apply:
-    it mirrors the packaged file when present, or seeds/merges the unpackaged
-    path from `windows-terminal/settings.fragment.jsonc` when packaged settings
-    are absent and portable WT is detected. The merge adds a fixed PowerShell 7
+    `-MergeWindowsTerminal` is a retained no-op alias. Chezmoi exposes no WT
+    target: it cannot provide the required backup/concurrency/atomicity contract.
+    Setup treats packaged and portable files independently, never mirrors one
+    over the other, and seeds the portable path only when portable WT is
+    detected. The merge adds a fixed PowerShell 7
     profile (`pwsh.exe`) and promotes an empty or built-in Windows PowerShell 5.1
     `defaultProfile` to that profile; a custom user default is preserved.
 16. **tmux uppercase `H`/`L` are window swaps.** Lowercase `h`/`l` stay pane
@@ -773,18 +772,17 @@ save only**. The next plain `:w` formats normally. Implemented in
   missing-git errors name the canonical first install command (`brew install
   git`, `apt install git`, or `winget install Git.Git`).
 - The Windows installer does NOT symlink `settings.json` for Windows Terminal:
-  WT rewrites that file on launch. `setup.ps1` Phase 2 copies an existing
-  pre-merge file to `settings.json.bak.<timestamp>` before running chezmoi apply,
-  unless `-SkipWindowsTerminalMerge` is passed. Chezmoi's `modify_` entry then
-  merges the user-owned keys by default; a bare `chezmoi apply` performs the
-  merge but does not create setup's backup. After a real non-dry-run apply,
-  setup also best-effort copies the merged MSIX settings file to the unpackaged
-  portable-WT path `%LOCALAPPDATA%\Microsoft\Windows Terminal\settings.json`.
-  If the MSIX settings file is absent but portable WT is detected, setup seeds
-  or merges that unpackaged file directly from
-  `windows-terminal/settings.fragment.jsonc`. Both portable paths are skipped
-  when `-SkipWindowsTerminalMerge` is passed. Store WT ignores the unpackaged
-  file. The managed WT profile is an explicit fixed-GUID `pwsh.exe` profile
+  WT rewrites that file on launch. `setup.ps1` Phase 2 excludes WT from chezmoi
+  publication, then builds one independent plan for each existing packaged and
+  existing/detected portable target. It stages in the destination directory,
+  parses and byte-validates all results, makes a verified collision-safe backup
+  for each divergent existing target, detects source changes both before and
+  inside atomic `File.Replace`, and rolls already-published targets back as a
+  group on failure. Missing Store settings stay absent; missing portable
+  settings are seeded only when portable WT is detected. No target is ever a
+  full-file mirror of the other. Backup/parse/stage/publication/unsafe-rollback
+  failure is fatal with recovery paths. `-SkipWindowsTerminalMerge` is fully
+  write-free. The managed WT profile is an explicit fixed-GUID `pwsh.exe` profile
   named `PowerShell 7`; do not rely on WT's dynamic PowerShell 7 profile GUID
   being present. Do not backport the theme/profile to Windows PowerShell 5.1:
   this repo installs/configures PS7 and 5.1 lacks the PSReadLine ListView and
@@ -813,19 +811,17 @@ save only**. The next plain `:w` formats normally. Implemented in
   Developer Mode or elevation. Same-path config files use managed source copies; path-divergent
   lazygit and Ghostty configs use `.chezmoitemplates/**` plus POSIX
   `symlink_*.tmpl` wrappers and Windows rendered `.tmpl` copies where
-  applicable. Windows Terminal is a `modify_` read-modify-write merge, not a
-  symlink or fragment-only replacement. WT opens **maximized** (`launchMode`,
+  applicable. Windows Terminal is a setup-owned transactional merge, not a
+  chezmoi target, symlink, or fragment-only replacement. WT opens **maximized** (`launchMode`,
   not fullscreen) with a **visible** scrollbar (`scrollbarState` in
   `profiles.defaults`) and defaults to the fixed `PowerShell 7` profile only
   when `defaultProfile` is empty or still the built-in Windows PowerShell 5.1
   default; a custom default is left alone. Adding a new unconditional top-level
-  scalar fragment key requires FOUR edits in lockstep or the
-  `windows_apply_test.ps1` deep-compare fails: the fragment (+ its
-  `home/.chezmoitemplates` mirror),
-  `home/.chezmoitemplates/windows-terminal/merge-settings.ps1`, the test mirror
-  `Invoke-ExpectedWindowsTerminalMergeOnly`, and `$script:ManagedGlobals`.
-  Conditional keys like `defaultProfile` need the same helper/test mirror but are
-  intentionally excluded from `$script:ManagedGlobals`. `profiles.defaults` is
+  scalar fragment key requires the canonical fragment plus chezmoi template
+  mirror and `home/.chezmoitemplates/windows-terminal/merge-settings.ps1` to
+  change together. Pester's transaction cases and `windows_render_test.sh`
+  exercise the production helper directly; do not reintroduce a parallel test
+  implementation. `profiles.defaults` is
   replaced wholesale, so keys inside it (e.g. `scrollbarState`) need no
   merge-template change. The nvim tree is intentionally NOT
   copied under `home/`: POSIX `home/dot_config/symlink_nvim.tmpl` and Windows
@@ -1060,10 +1056,12 @@ save only**. The next plain `:w` formats normally. Implemented in
 - **`uninstall.sh` / `uninstall.ps1` are greenfield teardown tools, not purge.**
   They enumerate targets with `chezmoi --source <repo>/home managed --path-style
   absolute`, remove only repo-owned symlinks or byte-identical Windows
-  copy-mode files, restore newest bootstrap-style `<target>.bak.<timestamp>`
-  backups by default, and leave chezmoi's own config/state alone. Windows
-  Terminal `settings.json` is never deleted because the merge is idempotent but
-  not invertible; use the printed backup path for manual restore if needed.
+  copy-mode files, restore bootstrap-style `<target>.bak.<timestamp>[.n]`
+  backups by validated filename timestamp/collision order (never mtime), and
+  leave chezmoi's own config/state alone. Malformed or ambiguous candidates fail
+  before target removal. Windows restores packaged and portable WT backups only
+  after validating both paths, atomically preserves the displaced current file
+  as `settings.json.uninstall-current.*`, and honors `-NoRestoreBackups`.
   Dry-run mode must also leave empty external parent directories in place; it
   prints `would:` lines only and does not prune `~/.local/share/dotfiles`.
 - **Starship binary install paths differ by OS.** Homebrew owns

@@ -27,6 +27,12 @@ significant change to the relevant area.
 - [ ] **Windows Terminal**: rose-pine scheme applied; tabs use the
       configured theme; acrylic OFF on the body, ON in the tab row; a new tab
       opens `PowerShell 7` unless the user intentionally chose another default.
+- [ ] **Windows Terminal dual-install preservation**: give packaged and portable
+      settings different custom profiles, schemes, actions, and defaults; run
+      `setup.ps1 -SkipDeps -SkipNvim`. Confirm each retains only its own custom
+      state plus the managed fragment and receives its own verified backup.
+      Run `uninstall.ps1 -All`; confirm both pre-setup backups restore and each
+      displaced current file remains as `settings.json.uninstall-current.*`.
 - [ ] **Tmux status bar**: generated Rose Pine bar is at the top, includes the
       signal-bar segments (session, window list/current program, directory
       basename; no user/host/date/time duplication), segments are readable,

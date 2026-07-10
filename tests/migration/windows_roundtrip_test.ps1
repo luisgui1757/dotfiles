@@ -142,8 +142,8 @@ try {
 
             $wtSettings = Get-WtSettingsPath -Sandbox $sandbox
             New-Item -ItemType Directory -Force -Path (Split-Path -Parent $wtSettings) | Out-Null
-            '{"profiles":{"defaults":{},"list":[]},"actions":[],"schemes":[],"themes":[]}' |
-                Set-Content -LiteralPath $wtSettings -Encoding utf8
+            $wtOriginal = '{"profiles":{"defaults":{},"list":[]},"actions":[],"schemes":[],"themes":[]}'
+            $wtOriginal | Set-Content -LiteralPath $wtSettings -Encoding utf8
             Copy-Item -LiteralPath $wtSettings -Destination "$wtSettings.bak.20000101-000000" -Force
             Pass 'pre-seeded Windows copy target and WT backup'
 
@@ -166,6 +166,12 @@ try {
             Assert-CopyModeFilePresent -Path (Join-Path $sandbox 'Documents\PowerShell\Microsoft.PowerShell_profile.ps1')
             Assert-NvimSymlinkPresent -Sandbox $sandbox
             Pass 'managed Windows entries present after apply'
+
+            # setup.ps1, not bare chezmoi, owns the WT transaction. Model its
+            # post-merge current state so uninstall must restore the independent
+            # pre-setup backup while preserving these current bytes.
+            '{"theme":"rose-pine","profiles":{"defaults":{},"list":[]},"actions":[],"schemes":[],"themes":[]}' |
+                Set-Content -LiteralPath $wtSettings -Encoding utf8
 
             # Adversarial: a USER-MODIFIED copy must be preserved. uninstall.ps1
             # removes a Windows copy only when `chezmoi verify` says it still
@@ -191,8 +197,12 @@ try {
             Assert-Condition (-not (Test-Path -LiteralPath (Join-Path $sandbox 'Documents\PowerShell\Microsoft.PowerShell_profile.ps1'))) 'PowerShell profile copy was not removed'
             Assert-Condition (-not (Test-Path -LiteralPath (Join-Path $sandbox 'AppData\Local\nvim'))) 'nvim symlink was not removed'
             Assert-Condition (Test-Path -LiteralPath $wtSettings) 'WT settings.json should not be deleted'
-            Assert-Condition (Test-Path -LiteralPath "$wtSettings.bak.20000101-000000") 'WT settings backup should remain available'
-            Pass 'managed entries removed, backup restored, WT left intact'
+            Assert-Condition (-not (Test-Path -LiteralPath "$wtSettings.bak.20000101-000000")) 'selected WT backup should be consumed by restoration'
+            Assert-Condition ((Get-Content -Raw -LiteralPath $wtSettings).TrimEnd("`r", "`n") -eq $wtOriginal) 'WT pre-setup backup was not restored'
+            $preservedWt = @(Get-ChildItem -LiteralPath (Split-Path -Parent $wtSettings) -Filter 'settings.json.uninstall-current.*')
+            Assert-Condition ($preservedWt.Count -eq 1) 'pre-uninstall WT settings were not preserved independently'
+            Assert-Condition ((Get-Content -Raw -LiteralPath $preservedWt[0].FullName) -match 'rose-pine') 'preserved pre-uninstall WT settings do not contain the managed merge'
+            Pass 'managed entries removed and WT backup restored without discarding current settings'
 
             # *>&1 (not 2>&1): uninstall.ps1 prints "nothing to remove" via
             # Write-Host (information stream 6); 2>&1 only merges the error stream,

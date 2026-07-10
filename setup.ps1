@@ -1047,6 +1047,22 @@ function Write-WindowsTerminalSettingsJson {
     [System.IO.File]::WriteAllText($SettingsPath, $Json, [System.Text.UTF8Encoding]::new($false))
 }
 
+function Get-WindowsTerminalContentSha256 {
+    param([Parameter(Mandatory)] [string]$Content)
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $bytes = [System.Text.UTF8Encoding]::new($false).GetBytes($Content)
+        return ([BitConverter]::ToString($sha.ComputeHash($bytes))).Replace('-', '')
+    } finally {
+        $sha.Dispose()
+    }
+}
+
+function Get-WindowsTerminalFileSha256 {
+    param([Parameter(Mandatory)] [string]$Path)
+    return (Get-FileHash -LiteralPath $Path -Algorithm SHA256 -ErrorAction Stop).Hash
+}
+
 function Merge-WindowsTerminalFragmentFile {
     param(
         [Parameter(Mandatory)] [string]$SettingsPath,
@@ -1072,59 +1088,238 @@ function Merge-WindowsTerminalFragmentFile {
     return ($fragment | ConvertTo-Json -Depth 100)
 }
 
-function Copy-WindowsTerminalSettingsForUnpackaged {
-    # Params default to the script switches but are overridable so tests can drive
-    # the dry-run / skip paths directly -- Pester `Set-Variable -Scope Script` does
-    # NOT reliably override how a dot-sourced function reads a script variable.
+function Get-WindowsTerminalMergeTargets {
+    param(
+        [bool]$IsPortablePresent = (Test-WindowsTerminalUnpackagedPresent)
+    )
+    $packagedSettings = Get-WindowsTerminalSettingsPath
+    if (Test-Path -LiteralPath $packagedSettings -PathType Leaf) {
+        Write-Output $packagedSettings
+    }
+    $unpackagedSettings = Get-WindowsTerminalUnpackagedSettingsPath
+    if ((Test-Path -LiteralPath $unpackagedSettings -PathType Leaf) -or $IsPortablePresent) {
+        Write-Output $unpackagedSettings
+    }
+}
+
+function New-WindowsTerminalMergePlan {
+    param(
+        [Parameter(Mandatory)] [string]$SettingsPath,
+        [Parameter(Mandatory)] [string]$FragmentPath,
+        [bool]$IsDryRun = $false
+    )
+    $stagePath = $null
+    try {
+        $existed = Test-Path -LiteralPath $SettingsPath -PathType Leaf
+        $sourceHash = if ($existed) { Get-WindowsTerminalFileSha256 -Path $SettingsPath } else { $null }
+        $json = Merge-WindowsTerminalFragmentFile -SettingsPath $SettingsPath -FragmentPath $FragmentPath
+        # Parse the exact staged representation before any backup or publication.
+        $null = $json | ConvertFrom-Json -ErrorAction Stop
+        $stageHash = Get-WindowsTerminalContentSha256 -Content $json
+        $changed = (-not $existed) -or ($stageHash -ne $sourceHash)
+        if ($changed -and -not $IsDryRun) {
+            $settingsDir = Split-Path -Parent $SettingsPath
+            if (-not (Test-Path -LiteralPath $settingsDir -PathType Container)) {
+                New-Item -ItemType Directory -Force -Path $settingsDir -ErrorAction Stop | Out-Null
+            }
+            $stagePath = Join-Path $settingsDir ('.{0}.dotfiles-stage.{1}.tmp' -f (Split-Path -Leaf $SettingsPath), [Guid]::NewGuid().ToString('N'))
+            Write-WindowsTerminalSettingsJson -SettingsPath $stagePath -Json $json
+            $null = ([System.IO.File]::ReadAllText($stagePath) | ConvertFrom-Json -ErrorAction Stop)
+            if ((Get-WindowsTerminalFileSha256 -Path $stagePath) -ne $stageHash) {
+                throw "staged Windows Terminal settings did not match the validated merge output: $stagePath"
+            }
+        }
+        return [pscustomobject]@{
+            Target = $SettingsPath
+            Existed = [bool]$existed
+            SourceHash = $sourceHash
+            StageHash = $stageHash
+            StagePath = $stagePath
+            Changed = [bool]$changed
+            BackupPath = $null
+            RollbackPath = $null
+            Published = $false
+            RecoveryRequired = $false
+        }
+    } catch {
+        if ($stagePath) { Remove-Item -LiteralPath $stagePath -Force -ErrorAction SilentlyContinue }
+        throw
+    }
+}
+
+function Backup-WindowsTerminalMergePlan {
+    param([Parameter(Mandatory)] $Plan)
+    if (-not $Plan.Changed -or -not $Plan.Existed) { return }
+    if (-not (Test-Path -LiteralPath $Plan.Target -PathType Leaf) -or
+        (Get-WindowsTerminalFileSha256 -Path $Plan.Target) -ne $Plan.SourceHash) {
+        throw "Windows Terminal settings changed while the merge was staged: $($Plan.Target)"
+    }
+    $backup = Get-UniqueBackupPath "$($Plan.Target).bak.$Timestamp"
+    Copy-Item -LiteralPath $Plan.Target -Destination $backup -ErrorAction Stop
+    if ((Get-WindowsTerminalFileSha256 -Path $backup) -ne $Plan.SourceHash) {
+        Remove-Item -LiteralPath $backup -Force -ErrorAction SilentlyContinue
+        throw "Windows Terminal backup verification failed: $backup"
+    }
+    $Plan.BackupPath = $backup
+    Write-Step "backed up $($Plan.Target) -> $backup"
+}
+
+function Test-WindowsTerminalMergePlanSourceUnchanged {
+    param([Parameter(Mandatory)] $Plan)
+    if ($Plan.Existed) {
+        return (Test-Path -LiteralPath $Plan.Target -PathType Leaf) -and
+            ((Get-WindowsTerminalFileSha256 -Path $Plan.Target) -eq $Plan.SourceHash)
+    }
+    return (-not (Test-Path -LiteralPath $Plan.Target))
+}
+
+function Publish-WindowsTerminalSettingsStage {
+    param(
+        [Parameter(Mandatory)] [string]$StagePath,
+        [Parameter(Mandatory)] [string]$TargetPath,
+        [AllowNull()] [string]$RollbackPath,
+        [Parameter(Mandatory)] [bool]$TargetExisted
+    )
+    if ($TargetExisted) {
+        [System.IO.File]::Replace($StagePath, $TargetPath, $RollbackPath)
+    } else {
+        [System.IO.File]::Move($StagePath, $TargetPath)
+    }
+}
+
+function Restore-WindowsTerminalMergePlan {
+    param([Parameter(Mandatory)] $Plan)
+    if (-not $Plan.Published) { return $true }
+    try {
+        if (-not (Test-Path -LiteralPath $Plan.Target -PathType Leaf) -or
+            (Get-WindowsTerminalFileSha256 -Path $Plan.Target) -ne $Plan.StageHash) {
+            $Plan.RecoveryRequired = $true
+            return $false
+        }
+        if ($Plan.Existed) {
+            if (-not (Test-Path -LiteralPath $Plan.RollbackPath -PathType Leaf)) {
+                $Plan.RecoveryRequired = $true
+                return $false
+            }
+            $failedOutput = Get-UniqueBackupPath "$($Plan.Target).dotfiles-failed.$Timestamp"
+            [System.IO.File]::Replace($Plan.RollbackPath, $Plan.Target, $failedOutput)
+            Remove-Item -LiteralPath $failedOutput -Force -ErrorAction SilentlyContinue
+        } else {
+            Remove-Item -LiteralPath $Plan.Target -Force -ErrorAction Stop
+        }
+        $Plan.Published = $false
+        return $true
+    } catch {
+        $Plan.RecoveryRequired = $true
+        return $false
+    }
+}
+
+function Invoke-WindowsTerminalSettingsTransaction {
+    # Parameters are explicit so Pester can drive dry-run/skip/presence without
+    # relying on dot-source scope behavior. BeforePublish is a deterministic
+    # concurrency injection seam; production never supplies it.
     param(
         [bool]$IsDryRun = $DryRun,
         [bool]$IsSkipMerge = $SkipWindowsTerminalMerge,
-        [bool]$IsPortablePresent = (Test-WindowsTerminalUnpackagedPresent)
+        [bool]$IsPortablePresent = (Test-WindowsTerminalUnpackagedPresent),
+        [scriptblock]$BeforePublish
     )
-    if ($IsSkipMerge) { return }
-
-    $packagedSettings = Get-WindowsTerminalSettingsPath
-    $unpackagedSettings = Get-WindowsTerminalUnpackagedSettingsPath
-
-    if (Test-Path -LiteralPath $packagedSettings -PathType Leaf) {
-        if ($IsDryRun) {
-            Write-Step "would    mirror Windows Terminal settings to unpackaged path"
-            return
-        }
-        try {
-            $unpackagedDir = Split-Path -Parent $unpackagedSettings
-            if (-not (Test-Path -LiteralPath $unpackagedDir -PathType Container)) {
-                New-Item -ItemType Directory -Force -Path $unpackagedDir | Out-Null
-            }
-            Copy-Item -LiteralPath $packagedSettings -Destination $unpackagedSettings -Force -ErrorAction Stop
-            Write-Step "mirrored Windows Terminal settings to unpackaged path"
-        } catch {
-            Write-Warning ("Could not mirror Windows Terminal settings to unpackaged path: " + $_.Exception.Message)
-        }
+    if ($IsSkipMerge) {
+        Write-Step "skip     Windows Terminal settings merge via -SkipWindowsTerminalMerge"
         return
     }
 
-    if (-not $IsPortablePresent) { return }
+    $fragmentPath = Get-WindowsTerminalSettingsFragmentPath
+    if (-not (Test-Path -LiteralPath $fragmentPath -PathType Leaf)) {
+        throw "Windows Terminal settings fragment is missing: $fragmentPath"
+    }
+    $targets = @(Get-WindowsTerminalMergeTargets -IsPortablePresent $IsPortablePresent)
+    if ($targets.Count -eq 0) { return }
 
+    $mutexMaterial = (($targets | ForEach-Object { [IO.Path]::GetFullPath($_).ToLowerInvariant() }) -join '|')
+    $mutexName = 'Dotfiles.WindowsTerminal.Settings.' + (Get-WindowsTerminalContentSha256 -Content $mutexMaterial)
+    $mutex = New-Object System.Threading.Mutex($false, $mutexName)
+    $acquired = $false
+    $plans = @()
+    $completed = $false
     try {
-        $fragmentPath = Get-WindowsTerminalSettingsFragmentPath
-        if (-not (Test-Path -LiteralPath $fragmentPath -PathType Leaf)) {
-            throw "Windows Terminal settings fragment is missing: $fragmentPath"
+        try {
+            $acquired = $mutex.WaitOne([TimeSpan]::FromSeconds(30))
+        } catch [System.Threading.AbandonedMutexException] {
+            $acquired = $true
         }
-        $action = if (Test-Path -LiteralPath $unpackagedSettings -PathType Leaf) { 'merge' } else { 'seed' }
+        if (-not $acquired) {
+            throw "timed out waiting for another Windows Terminal settings transaction"
+        }
+
+        foreach ($target in $targets) {
+            $plans += New-WindowsTerminalMergePlan -SettingsPath $target -FragmentPath $fragmentPath -IsDryRun $IsDryRun
+        }
+        foreach ($plan in $plans) {
+            if (-not $plan.Changed) {
+                Write-Step "ok       Windows Terminal settings already merged: $($plan.Target)"
+                continue
+            }
+            if ($IsDryRun) {
+                if ($plan.Existed) { Write-Step "would    backup $($plan.Target); then merge atomically" }
+                else { Write-Step "would    seed Windows Terminal settings atomically: $($plan.Target)" }
+            } else {
+                Backup-WindowsTerminalMergePlan -Plan $plan
+            }
+        }
         if ($IsDryRun) {
-            Write-Step ("would    {0} Windows Terminal unpackaged settings from fragment" -f $action)
+            $completed = $true
             return
         }
-        $json = Merge-WindowsTerminalFragmentFile -SettingsPath $unpackagedSettings -FragmentPath $fragmentPath
-        Write-WindowsTerminalSettingsJson -SettingsPath $unpackagedSettings -Json $json
-        if ($action -eq 'seed') {
-            Write-Step "seeded Windows Terminal unpackaged settings from fragment"
-        } else {
-            Write-Step "merged Windows Terminal unpackaged settings from fragment"
+        if ($BeforePublish) { & $BeforePublish $plans }
+        foreach ($plan in $plans) {
+            if (-not $plan.Changed) { continue }
+            if (-not (Test-WindowsTerminalMergePlanSourceUnchanged -Plan $plan)) {
+                throw "Windows Terminal settings changed concurrently before publication: $($plan.Target)"
+            }
+            if ($plan.Existed) {
+                $plan.RollbackPath = Join-Path (Split-Path -Parent $plan.Target) ('.{0}.dotfiles-rollback.{1}.tmp' -f (Split-Path -Leaf $plan.Target), [Guid]::NewGuid().ToString('N'))
+            }
+            Publish-WindowsTerminalSettingsStage -StagePath $plan.StagePath -TargetPath $plan.Target -RollbackPath $plan.RollbackPath -TargetExisted $plan.Existed
+            $plan.Published = $true
+
+            # File.Replace atomically captures the exact pre-publication bytes.
+            # Comparing that rollback file closes the final check/replace race.
+            if ($plan.Existed -and (Get-WindowsTerminalFileSha256 -Path $plan.RollbackPath) -ne $plan.SourceHash) {
+                $null = Restore-WindowsTerminalMergePlan -Plan $plan
+                throw "Windows Terminal settings changed concurrently during publication: $($plan.Target)"
+            }
+            if ((Get-WindowsTerminalFileSha256 -Path $plan.Target) -ne $plan.StageHash) {
+                throw "published Windows Terminal settings failed byte validation: $($plan.Target)"
+            }
+            $null = ([System.IO.File]::ReadAllText($plan.Target) | ConvertFrom-Json -ErrorAction Stop)
+            Write-Step "merged   Windows Terminal settings atomically: $($plan.Target)"
         }
+        $completed = $true
     } catch {
-        Write-Warning ("Could not seed or merge Windows Terminal unpackaged settings: " + $_.Exception.Message)
+        $cause = $_.Exception.Message
+        $recovery = @()
+        for ($i = $plans.Count - 1; $i -ge 0; $i--) {
+            $plan = $plans[$i]
+            if (-not (Restore-WindowsTerminalMergePlan -Plan $plan)) {
+                $paths = @($plan.BackupPath, $plan.RollbackPath) | Where-Object { $_ }
+                $recovery += "$($plan.Target) (recovery: $($paths -join ', '))"
+            }
+        }
+        if ($recovery.Count -gt 0) {
+            throw "Windows Terminal settings transaction failed: $cause. Automatic rollback was unsafe or failed for: $($recovery -join '; '). Preserve those files and restore deliberately before retrying."
+        }
+        throw "Windows Terminal settings transaction failed: $cause. Every published target was restored; fix the error and retry setup."
+    } finally {
+        foreach ($plan in $plans) {
+            if ($plan.StagePath) { Remove-Item -LiteralPath $plan.StagePath -Force -ErrorAction SilentlyContinue }
+            if ($completed -and $plan.RollbackPath) {
+                Remove-Item -LiteralPath $plan.RollbackPath -Force -ErrorAction SilentlyContinue
+            }
+        }
+        if ($acquired) { $mutex.ReleaseMutex() }
+        $mutex.Dispose()
     }
 }
 
@@ -1178,21 +1373,6 @@ function Get-ManagedConfigTargets {
         $targets = @($targets | Where-Object { -not (Test-SamePath $_ $wtSettings) })
     }
     return $targets
-}
-
-function Backup-WindowsTerminalSettings {
-    if ($SkipWindowsTerminalMerge) { return }
-
-    $settings = Get-WindowsTerminalSettingsPath
-    if (-not (Test-Path -LiteralPath $settings -PathType Leaf)) { return }
-
-    $backup = Get-UniqueBackupPath "$settings.bak.$Timestamp"
-    if ($DryRun) {
-        Write-Step "backup   $settings -> $backup; then Windows Terminal merge"
-    } else {
-        Copy-Item -LiteralPath $settings -Destination $backup -Force
-        Write-Step "backed up $settings -> $backup"
-    }
 }
 
 function Backup-PreexistingManagedTargets {
@@ -1250,15 +1430,12 @@ function Invoke-ChezmoiApplyPhase {
         $dryRunConfig = New-ChezmoiDryRunConfig
         $script:ChezmoiConfigArgs = @('--config', $dryRunConfig, '--config-format', 'toml')
         try {
-            Backup-WindowsTerminalSettings
             Backup-PreexistingManagedTargets
-            $applyArgs = @('--dry-run', '--verbose', 'apply')
-            if ($SkipWindowsTerminalMerge) {
-                Write-Step "skip     Windows Terminal settings merge via -SkipWindowsTerminalMerge"
-                $applyArgs += @(Get-ManagedConfigTargets -ExcludeWindowsTerminal)
-            }
+            # setup owns the transactional WT write. Exclude the direct chezmoi
+            # modify_ target so no non-transactional write can precede it.
+            $applyArgs = @('--dry-run', '--verbose', 'apply') + @(Get-ManagedConfigTargets -ExcludeWindowsTerminal)
             Invoke-ChezmoiOrExit -Label 'chezmoi dry-run apply' -Arguments $applyArgs
-            Copy-WindowsTerminalSettingsForUnpackaged -IsDryRun $true
+            Invoke-WindowsTerminalSettingsTransaction -IsDryRun $true
         } finally {
             Remove-Item -LiteralPath $dryRunConfig -Force -ErrorAction SilentlyContinue
             $script:ChezmoiConfigArgs = @()
@@ -1285,15 +1462,12 @@ function Invoke-ChezmoiApplyPhase {
     }
 
     Invoke-ChezmoiOrExit -Label 'chezmoi init' -Arguments @('init')
-    Backup-WindowsTerminalSettings
     Backup-PreexistingManagedTargets
-    $realApplyArgs = @('--no-tty', '--force', 'apply')
-    if ($SkipWindowsTerminalMerge) {
-        Write-Step "skip     Windows Terminal settings merge via -SkipWindowsTerminalMerge"
-        $realApplyArgs += @(Get-ManagedConfigTargets -ExcludeWindowsTerminal)
-    }
+    # setup owns the transactional WT write. Bare chezmoi keeps the merge
+    # template for config-layer parity, but setup never publishes through it.
+    $realApplyArgs = @('--no-tty', '--force', 'apply') + @(Get-ManagedConfigTargets -ExcludeWindowsTerminal)
     Invoke-ChezmoiOrExit -Label 'chezmoi apply' -Arguments $realApplyArgs
-    Copy-WindowsTerminalSettingsForUnpackaged
+    Invoke-WindowsTerminalSettingsTransaction
 }
 
 function Invoke-NvimCommandOrFail {

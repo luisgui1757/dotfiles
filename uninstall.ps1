@@ -24,6 +24,7 @@ $script:Warnings = 0
 $script:DirsRemoved = 0
 $script:ExternalsRemoved = 0
 $script:DirCandidates = New-Object System.Collections.Generic.List[string]
+$script:Timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 
 function Write-SafeWarning {
     param([Parameter(Mandatory)] [string]$Message)
@@ -85,11 +86,53 @@ function Get-NewestBackup {
     $parent = Split-Path -Parent $Target
     $leaf = Split-Path -Leaf $Target
     if (-not (Test-Path -LiteralPath $parent)) { return $null }
-    $backups = @(Get-ChildItem -LiteralPath $parent -Force -ErrorAction SilentlyContinue |
-        Where-Object { $_.Name -like "$leaf.bak.*" } |
-        Sort-Object LastWriteTimeUtc -Descending)
-    if ($backups.Count -eq 0) { return $null }
-    return $backups[0].FullName
+    $prefix = "$leaf.bak."
+    $candidates = @(Get-ChildItem -LiteralPath $parent -Force -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase) })
+    if ($candidates.Count -eq 0) { return $null }
+
+    $parsed = @()
+    foreach ($candidate in $candidates) {
+        $suffix = $candidate.Name.Substring($prefix.Length)
+        $match = [regex]::Match($suffix, '^(?<timestamp>[0-9]{8}-[0-9]{6})(?:\.(?<collision>[1-9][0-9]*))?$')
+        $timestamp = [DateTime]::MinValue
+        $collision = 0
+        $validTimestamp = $match.Success -and [DateTime]::TryParseExact(
+            $match.Groups['timestamp'].Value,
+            'yyyyMMdd-HHmmss',
+            [Globalization.CultureInfo]::InvariantCulture,
+            [Globalization.DateTimeStyles]::None,
+            [ref]$timestamp
+        )
+        $validCollision = (-not $match.Success) -or (-not $match.Groups['collision'].Success) -or
+            ([int]::TryParse($match.Groups['collision'].Value, [ref]$collision) -and $collision -gt 0)
+        if (-not $match.Success -or -not $validTimestamp -or -not $validCollision) {
+            throw "malformed backup candidate for ${Target}: $($candidate.FullName). Expected $leaf.bak.YYYYMMDD-HHMMSS[.positive-collision]."
+        }
+        $parsed += [pscustomobject]@{
+            Path = $candidate.FullName
+            Timestamp = $timestamp
+            Collision = $collision
+        }
+    }
+    $ordered = @($parsed | Sort-Object Timestamp, Collision -Descending)
+    if ($ordered.Count -gt 1 -and
+        $ordered[0].Timestamp -eq $ordered[1].Timestamp -and
+        $ordered[0].Collision -eq $ordered[1].Collision) {
+        throw "ambiguous backup candidates for ${Target}: $($ordered[0].Path), $($ordered[1].Path)"
+    }
+    return $ordered[0].Path
+}
+
+function Get-UniqueRecoveryPath {
+    param([Parameter(Mandatory)] [string]$Base)
+    $candidate = $Base
+    $index = 0
+    while (Test-TargetExists -Path $candidate) {
+        $index++
+        $candidate = "$Base.$index"
+    }
+    return $candidate
 }
 
 function Add-ParentDirs {
@@ -149,7 +192,82 @@ function Test-ChezmoiTargetUnmodified {
 function Test-WindowsTerminalSettingsPath {
     param([Parameter(Mandatory)] [string]$Path)
     $normalized = $Path -replace '/', '\'
-    return ($normalized -like '*\AppData\Local\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json')
+    return ($normalized -like '*\AppData\Local\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json') -or
+        ($normalized -like '*\AppData\Local\Microsoft\Windows Terminal\settings.json')
+}
+
+function Get-WindowsTerminalRecoveryTargets {
+    if (-not $env:LOCALAPPDATA) { return @() }
+    return @(
+        (Join-Path $env:LOCALAPPDATA 'Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json'),
+        (Join-Path $env:LOCALAPPDATA 'Microsoft\Windows Terminal\settings.json')
+    )
+}
+
+function Restore-WindowsTerminalSettingsBackups {
+    if ($NoRestoreBackups) { return }
+    $plans = @()
+    # Validate every candidate name and backup JSON before touching either path.
+    foreach ($target in @(Get-WindowsTerminalRecoveryTargets)) {
+        $backup = Get-NewestBackup -Target $target
+        if (-not $backup) { continue }
+        $null = ([IO.File]::ReadAllText($backup) | ConvertFrom-Json -ErrorAction Stop)
+        $plans += [pscustomobject]@{
+            Target = $target
+            Backup = $backup
+            BackupHash = (Get-FileHash -LiteralPath $backup -Algorithm SHA256 -ErrorAction Stop).Hash
+            CurrentHash = if (Test-Path -LiteralPath $target -PathType Leaf) {
+                (Get-FileHash -LiteralPath $target -Algorithm SHA256 -ErrorAction Stop).Hash
+            } else { $null }
+        }
+    }
+    if ($plans.Count -eq 0) { return }
+    if (-not (Confirm-Category -Prompt 'Restore pre-setup Windows Terminal settings from validated backups?')) {
+        $script:Skipped++
+        return
+    }
+
+    foreach ($plan in $plans) {
+        if ($plan.CurrentHash -and $plan.CurrentHash -eq $plan.BackupHash) {
+            Write-Host "  unchanged  $($plan.Target) already matches $($plan.Backup)"
+            continue
+        }
+        $preserved = if ($plan.CurrentHash) {
+            Get-UniqueRecoveryPath -Base "$($plan.Target).uninstall-current.$script:Timestamp"
+        } else { $null }
+        if ($DryRun) {
+            if ($preserved) {
+                Write-Host "  would: atomically restore $($plan.Backup) -> $($plan.Target); preserve current as $preserved"
+            } else {
+                Write-Host "  would: restore $($plan.Backup) -> $($plan.Target)"
+            }
+            continue
+        }
+
+        try {
+            if ($preserved) {
+                [IO.File]::Replace($plan.Backup, $plan.Target, $preserved)
+            } else {
+                $parent = Split-Path -Parent $plan.Target
+                if (-not (Test-Path -LiteralPath $parent -PathType Container)) {
+                    New-Item -ItemType Directory -Force -Path $parent | Out-Null
+                }
+                [IO.File]::Move($plan.Backup, $plan.Target)
+            }
+            if ((Get-FileHash -LiteralPath $plan.Target -Algorithm SHA256 -ErrorAction Stop).Hash -ne $plan.BackupHash) {
+                throw "restored bytes did not match the selected backup"
+            }
+            if ($preserved -and
+                (Get-FileHash -LiteralPath $preserved -Algorithm SHA256 -ErrorAction Stop).Hash -ne $plan.CurrentHash) {
+                throw "preserved current settings failed byte validation"
+            }
+            $script:Restored++
+            Write-Host "  restored  $($plan.Target) <- $($plan.Backup)"
+            if ($preserved) { Write-Host "             pre-uninstall settings preserved at $preserved" }
+        } catch {
+            throw "Windows Terminal restoration failed for $($plan.Target): $($_.Exception.Message). Backup=$($plan.Backup) preserved-current=$preserved"
+        }
+    }
 }
 
 function Test-ExternalPath {
@@ -165,12 +283,8 @@ function Remove-ManagedTarget {
     if (Test-ExternalPath -Path $Target) { return }
 
     if (Test-WindowsTerminalSettingsPath -Path $Target) {
-        if (Test-TargetExists -Path $Target) {
-            Write-SafeWarning "leaving Windows Terminal settings.json untouched: $Target"
-            Write-Host "      WT merge is idempotent but not invertible; restore manually from backup if needed."
-            $backup = Get-NewestBackup -Target $Target
-            if ($backup) { Write-Host "      newest backup: $backup" }
-        }
+        # Both packaged and portable recovery are handled together after the
+        # ordinary chezmoi target pass so candidate validation is all-or-none.
         return
     }
 
@@ -307,6 +421,8 @@ function Remove-Externals {
     }
 }
 
+if ($env:DOTFILES_UNINSTALL_PS1_SOURCE_ONLY -eq '1') { return }
+
 Write-Host "uninstall.ps1: repo=$RepoRoot source=$SourceDir dry-run=$DryRun restore-backups=$(-not $NoRestoreBackups)"
 Write-Host
 
@@ -320,6 +436,7 @@ try {
         $script:Skipped++
     }
     if (-not $DryRun) { Remove-EmptyDirs }
+    Restore-WindowsTerminalSettingsBackups
     Remove-Externals
 
     Write-Host

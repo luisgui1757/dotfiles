@@ -105,15 +105,71 @@ target_exists() {
 }
 
 newest_backup() {
-    local target="$1" newest="" candidate
+    local target="$1" newest="" candidate suffix timestamp collision
+    local newest_timestamp="" newest_collision="0" malformed=0 ambiguous=0
+    local LC_ALL=C
     for candidate in "$target".bak.*; do
         target_exists "$candidate" || continue
-        if [[ -z "$newest" || "$candidate" -nt "$newest" ]]; then
+        suffix="${candidate#"$target.bak."}"
+        if [[ ! "$suffix" =~ ^([0-9]{8}-[0-9]{6})(\.([1-9][0-9]*))?$ ]]; then
+            echo "FAIL: malformed backup candidate for $target: $candidate" >&2
+            malformed=1
+            continue
+        fi
+        timestamp="${BASH_REMATCH[1]}"
+        collision="${BASH_REMATCH[3]:-0}"
+        if ! valid_backup_timestamp "$timestamp"; then
+            echo "FAIL: malformed backup timestamp for $target: $candidate" >&2
+            malformed=1
+            continue
+        fi
+        if [[ -z "$newest" || "$timestamp" > "$newest_timestamp" ]] ||
+            { [[ "$timestamp" == "$newest_timestamp" ]] && numeric_string_gt "$collision" "$newest_collision"; }; then
             newest="$candidate"
+            newest_timestamp="$timestamp"
+            newest_collision="$collision"
+            ambiguous=0
+        elif [[ "$timestamp" == "$newest_timestamp" && "$collision" == "$newest_collision" ]]; then
+            ambiguous=1
         fi
     done
+    [[ "$malformed" -eq 0 ]] || return 2
+    if [[ "$ambiguous" -eq 1 ]]; then
+        echo "FAIL: ambiguous backup candidates for $target at $newest_timestamp collision $newest_collision" >&2
+        return 2
+    fi
     [[ -n "$newest" ]] || return 1
     printf '%s\n' "$newest"
+}
+
+numeric_string_gt() {
+    local left="$1" right="$2"
+    if [[ "${#left}" -ne "${#right}" ]]; then
+        [[ "${#left}" -gt "${#right}" ]]
+    else
+        [[ "$left" > "$right" ]]
+    fi
+}
+
+valid_backup_timestamp() {
+    local value="$1" year month day hour minute second max_day
+    year=$((10#${value:0:4}))
+    month=$((10#${value:4:2}))
+    day=$((10#${value:6:2}))
+    hour=$((10#${value:9:2}))
+    minute=$((10#${value:11:2}))
+    second=$((10#${value:13:2}))
+    [[ "$year" -ge 1 && "$month" -ge 1 && "$month" -le 12 &&
+        "$hour" -le 23 && "$minute" -le 59 && "$second" -le 59 ]] || return 1
+    case "$month" in
+        1|3|5|7|8|10|12) max_day=31 ;;
+        4|6|9|11) max_day=30 ;;
+        2)
+            max_day=28
+            if (( year % 400 == 0 || (year % 4 == 0 && year % 100 != 0) )); then max_day=29; fi
+            ;;
+    esac
+    [[ "$day" -ge 1 && "$day" -le "$max_day" ]]
 }
 
 record_parent_dirs() {
@@ -129,9 +185,8 @@ record_parent_dirs() {
 }
 
 restore_backup_if_present() {
-    local target="$1" backup
+    local target="$1" backup="${2:-}"
     [[ "$RESTORE_BACKUPS" -eq 1 ]] || return 0
-    backup="$(newest_backup "$target" 2>/dev/null || true)"
     [[ -n "$backup" ]] || return 0
     if [[ "$DRY_RUN" -eq 1 ]]; then
         # Accurate preview: in a real run the target was just removed, so the
@@ -204,20 +259,35 @@ EOF
 }
 
 remove_managed_target() {
-    local target="$1" link_target
+    local target="$1" link_target backup="" backup_rc=0
     is_external_path "$target" && return 0
 
     if is_windows_terminal_settings "$target"; then
         if target_exists "$target"; then
             warn "leaving Windows Terminal settings.json untouched: $target"
             echo "      WT merge is idempotent but not invertible; restore manually from backup if needed."
-            newest_backup "$target" 2>/dev/null | sed 's/^/      newest backup: /' || true
+            if backup="$(newest_backup "$target")"; then
+                printf '      newest backup: %s\n' "$backup"
+            else
+                backup_rc=$?
+                [[ "$backup_rc" -eq 1 ]] || return "$backup_rc"
+            fi
         fi
         return 0
     fi
 
     if ! target_exists "$target"; then
         return 0
+    fi
+
+    if [[ "$RESTORE_BACKUPS" -eq 1 ]]; then
+        if backup="$(newest_backup "$target")"; then
+            :
+        else
+            backup_rc=$?
+            if [[ "$backup_rc" -ne 1 ]]; then return "$backup_rc"; fi
+            backup=""
+        fi
     fi
 
     if [[ -L "$target" ]]; then
@@ -231,7 +301,7 @@ remove_managed_target() {
                 echo "  removed   $target"
             fi
             record_parent_dirs "$target"
-            restore_backup_if_present "$target"
+            restore_backup_if_present "$target" "$backup"
             return 0
         fi
         warn "skipping symlink outside repo: $target -> $link_target"
@@ -307,6 +377,10 @@ remove_externals() {
         rmdir "$root" "$HOME/.local/share/dotfiles" 2>/dev/null || true
     fi
 }
+
+if [[ "${DOTFILES_UNINSTALL_SOURCE_ONLY:-}" == "1" ]]; then
+    return 0 2>/dev/null || exit 0
+fi
 
 echo "uninstall: repo=$REPO_ROOT source=$SOURCE_DIR dry-run=$DRY_RUN restore-backups=$RESTORE_BACKUPS"
 echo

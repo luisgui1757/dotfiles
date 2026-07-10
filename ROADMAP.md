@@ -252,7 +252,10 @@ Commit-by-commit status:
   behavioral coverage replaces the former grep-only claim. UGR-002, UGR-011,
   UGR-012, UGR-013, and the POSIX half of UGR-015 are implemented with focused
   architecture, identity, session, dry-run, and rollback tests; Intel/WSL real
-  host proof remains explicitly pending.
+  host proof remains explicitly pending. UGR-001 and UGR-014 are implemented:
+  packaged/portable WT state is independently transactionally merged and
+  recovered, while uninstall backup selection is filename-keyed and fails
+  closed on malformed candidates.
 
 ### P2 Follow-up: Secondary Supply-chain Hardening
 
