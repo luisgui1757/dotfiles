@@ -984,3 +984,84 @@ merged-main greenfield proof.
 - This evidence entry is a documentation-only descendant of the immutable
   behavior head above. Required checks must still pass on the final PR head;
   the behavior-head cache-free result is not relabeled as a docs-head run.
+
+## Lean platform and stable-safeguard cutover — entry 28
+
+- Base and live `main` SHA:
+  `f104bf066e4af7d4d707fe22ba36600711f1ae14` (PR #48 merge). `origin/main`
+  still resolved to that SHA immediately before push preparation; no open PR
+  existed.
+- Cache-free merged-main run
+  [`29114125798`](https://github.com/luisgui1757/dotfiles/actions/runs/29114125798)
+  passed Ubuntu container `86433246345`, public Ubuntu `86433246387`, native
+  Windows `86433246309`, historical Intel `86433246315`, and their reachable
+  logical proofs. Apple Silicon `86433246367` failed because the first strict
+  neocmakelsp probe shared the large fixture tree and did not attach within 45
+  seconds; the later isolated formatter CMake project attached and accepted
+  gersemi output in the same process. Commit `d6b4ec6` gives every initial LSP
+  probe a distinct minimal project root and adds behavioral project-isolation
+  coverage without weakening the real server, attach, formatting, diagnostic,
+  or capture gates.
+- Owner direction supersedes the earlier Intel support requirement. Commit
+  `a112fe2` makes Apple Silicon the only Darwin contract, removes the Intel
+  flake output, selector, runners, and Intel-only Nix action, and fails x86_64
+  setup before Nix/Homebrew activation with migration guidance. Historical
+  Intel ledger rows remain append-only; they are not current support.
+- The hosted WSL2 canary is retired in `a112fe2`. Its only scheduled run
+  [`29072773410`](https://github.com/luisgui1757/dotfiles/actions/runs/29072773410)
+  and manual rerun
+  [`29114215045`](https://github.com/luisgui1757/dotfiles/actions/runs/29114215045)
+  reached real WSL2 but stalled before setup output and required cancellation.
+  [GitHub documents hosted nested virtualization as experimental and officially
+  unsupported](https://docs.github.com/en/actions/concepts/runners/github-hosted-runners).
+  Linux with fabricated WSL environment variables is rejected as
+  fake proof. The real throwaway-distro and split-host manual harnesses remain.
+- Commit `b378e60` switches all four checked-in safeguard mirrors to the stable
+  logical identities while workflows retain legacy producers so the still-live
+  legacy rules can gate this PR. The apply script now refuses to mutate unless
+  its checkout is exact live `main`, safeguard sources are clean, and every
+  stable context succeeded on that SHA; `--preflight-only` proves the same
+  boundary without writes. Live safeguards were not changed.
+
+### Finding status amendments
+
+| ID | Status after entry 28 | Exact evidence | Remaining work |
+|---|---|---|---|
+| UGR-002 | REJECTED (superseded contract) | Explicit owner direction retires Intel; `a112fe2` removes every active Intel configuration/lane and adds exact fail-closed selection/evaluation guards. | None. Historical Intel results remain evidence only. |
+| UGR-011 | PARTIAL | Native Linux clean-session proof remains green; the real WSL harness is preserved and no Linux proxy is mislabeled as WSL. | Run the manual throwaway WSL harness on a supported real Windows/WSL2 host. |
+| UGR-020 | PARTIAL | `b378e60` completes the checked-in stable-context cutover and its exact-main/check-success preflight; legacy producer names remain emitted. | After merge, pass cache-free plus all six logical checks on the exact merged SHA, then owner runs preflight/apply/readback. |
+| UGR-021 | PARTIAL | Cache-free merged-main run `29114125798` exposed the CMake proof defect fixed by `d6b4ec6`; unreliable hosted WSL runs are recorded and the workflow is retired. | Branch-head and merged-main cache-free proof; real WSL, redirected Windows, dual Terminal, and desktop/TCC evidence remain manual. |
+| UGR-022 | ACCEPTED/FIXED | README, CLAUDE, ROADMAP, MIGRATION_STATUS, MANUAL, greenfield docs/ledger, security docs, and this append-only reconciliation state the lean platform and checked-in/live split truthfully. | Refresh exact PR/check/live status after push and after merge. |
+
+### Local verification at entry 28
+
+| Gate | Result |
+|---|---|
+| `git diff --check` | PASS |
+| `bash -n` over tracked `*.sh` | PASS, 135 scripts |
+| `make lint` | PASS after replacing the retired workflow's obsolete one-item guard loop; no suppression |
+| `bash tests/static/run_all.sh` | PASS; the final tree also repeated static coverage through both umbrella targets |
+| `bash tests/shell/run_all.sh` | PASS |
+| `make test-migration` | PASS: template, parity, round-trip, uninstall, Windows render, and sourceable-payload oracle |
+| `pwsh -NoLogo -NoProfile -File ./test.ps1` | PASS: PSScriptAnalyzer and 234 Pester cases, 0 failed, 0 skipped; Neovim entry point also returned 0 |
+| Windows Terminal focused Pester cases | PASS inside the 234-case entry point: independent targets, invalid JSON, write/backup/publication/concurrency/collision/dry-run/skip/retry/idempotency and dual-path uninstall |
+| `make test-nvim` | PASS, including locked bootstrap, LSP project isolation, checked deletion, 316 language assertions, and real two-project clangd |
+| `make test` | PASS |
+| `make validate-renovate` | PASS: official validator and exact 82-record local extraction |
+| `nix flake check --print-build-logs` | PASS on Apple Silicon; both Apple-Silicon Darwin attributes evaluated and the local toolchain check built; incompatible Linux builds were reported as not run locally |
+| `make ci` | PASS, ending `local pre-PR gate passed` |
+| Public-content audit | PASS: no tracked private local path, credential-shaped addition, or private key; Gitleaks 8.30.1 found no leak in the three implementation commits or uncommitted verification correction |
+
+### Live relationship at entry 28
+
+- Integrity ruleset `17363189`, review ruleset `17363190`, owner-update ruleset
+  `17363555`, and classic protection remain active. Classic protection is strict
+  on the exact twelve legacy contexts. Actions is enabled with
+  `allowed_actions:all` and `sha_pinning_required:false`.
+- Checked-in desired state uses the twelve stable/general contexts (six generic
+  or parity names plus six stable logical names) and
+  `sha_pinning_required:true`. This is a deliberate post-merge owner action,
+  not a claim about live GitHub.
+- No native Windows, WSL, redirected-known-folder, desktop/TCC, or post-merge
+  stable-safeguard proof ran locally. Intel is no longer a pending environment;
+  it is outside the owner-directed product contract.

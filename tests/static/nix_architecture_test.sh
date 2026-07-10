@@ -148,16 +148,15 @@ else
     echo "ok  : Nix bootstrap commands use locked flake refs, not mutable registry aliases"
 fi
 
-for f in tests/greenfield/wsl-greenfield.ps1; do
-    if ! grep -Fq "nix-bin" "$f"; then
-        echo "FAIL: $f must install Ubuntu's nix-bin before WSL setup.sh validation"
-        fail=1
-    fi
-    if ! grep -Fq "experimental-features = nix-command flakes" "$f"; then
-        echo "FAIL: $f must enable Nix flakes before WSL setup.sh validation"
-        fail=1
-    fi
-done
+wsl_harness=tests/greenfield/wsl-greenfield.ps1
+if ! grep -Fq "nix-bin" "$wsl_harness"; then
+    echo "FAIL: $wsl_harness must install Ubuntu's nix-bin before WSL setup.sh validation"
+    fail=1
+fi
+if ! grep -Fq "experimental-features = nix-command flakes" "$wsl_harness"; then
+    echo "FAIL: $wsl_harness must enable Nix flakes before WSL setup.sh validation"
+    fail=1
+fi
 if [[ "$fail" -eq 0 ]]; then
     echo "ok  : manual WSL validation surface provisions Nix before setup.sh"
 fi
