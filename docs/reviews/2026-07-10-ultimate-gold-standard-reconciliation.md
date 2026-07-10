@@ -318,3 +318,17 @@ this entry and are not recorded as greenfield evidence.
   handled match, drift, and invocation-error paths leave `LASTEXITCODE=0` while
   retaining their true/false/throw contract. Focused and full rerun results and
   the repair commit identity follow in later append-only entries.
+
+## PR #47 repair identity and local verification — entry 6
+
+- Implementation commit: `d8ac735` (`fix(ci): repair cross-host verification
+  contracts`).
+- Focused PASS: full `install-deps.sh --dry-run --all` dependency scan;
+  `install_dependency_table_test.sh`; accumulator regression; strict ShellCheck;
+  PowerShell parser; and Setup/Uninstall Pester 58 passed / 0 failed / 0 skipped.
+- Full PASS: `pwsh -NoLogo -NoProfile -File ./test.ps1` matched the analyzer
+  fingerprint, passed all 231 Pester tests, and ran every Neovim spec file;
+  `make ci` ended with `local pre-PR gate passed`.
+- Remote rerun remains pending at this entry. The earlier failing checks are
+  retained above as evidence and must be superseded by green exact-head runs,
+  not manually rerun on the obsolete head.
