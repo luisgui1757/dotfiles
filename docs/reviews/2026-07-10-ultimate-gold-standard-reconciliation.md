@@ -492,3 +492,51 @@ pushed exact-head runs or manual environments.
   entry 12. It remains pending until PR #47 executes this commit (or a later
   documentation-only descendant) on Ubuntu, macOS Apple Silicon, macOS Intel,
   and Windows.
+
+## Exact-head cross-platform reconciliation — entry 15
+
+- Exact head: `7a446c31def84bdef6da11b23dab21f79ca13336`.
+  Twelve checks passed, including all three Nix evaluations, generic macOS and
+  Windows, all three chezmoi parity jobs, and the Ubuntu container. Four primary
+  jobs failed and therefore the staged logical proof jobs correctly failed too.
+- Required Ubuntu failed only in `zsh_plugins_test.sh`: the preview did not print
+  either reviewed tag, but bare `[[ ... ]]` assertions had been ineffective on
+  local Bash 3.2 and became real failures on modern Bash. Preview now states
+  reviewed tag plus exact commit; every assertion has an explicit portable
+  failure branch. The focused test passes on Bash 3.2 and Ubuntu 24.04.
+- Required Ubuntu setup completed all six phases, then its clean login zsh could
+  not resolve Home Manager `rg`. The pinned Home Manager source explicitly
+  documents a third canonical
+  `/etc/profiles/per-user/$USER/etc/profile.d/hm-session-vars.sh` location.
+  Managed zsh now checks that path using `id -un` after the XDG and legacy
+  per-home paths. Focused custom-HOME/idempotence/no-profile coverage passes;
+  exact hosted proof remains pending.
+- Non-required Intel setup installed upstream Nix on a real x86_64 host, built
+  the selected `dotfiles-x86_64` configuration, and reached activation.
+  nix-darwin then refused the runner's unrecognized `/etc/bashrc` and
+  `/etc/zshrc`, exactly instructing `.before-nix-darwin` preservation. First
+  bootstrap now preflights both backup names, moves neither on collision,
+  preserves both before activation, restores both on ordinary/partial/signal
+  failure, and quarantines generated replacements. Focused success, collision,
+  partial-move, rollback, signal, and retry tests pass.
+- Required Apple Silicon setup completed all phases but emitted two false
+  Homebrew failure markers. nix-darwin selected
+  `/run/current-system/sw/bin/brew`; its valid `shellenv` activated
+  `/opt/homebrew/bin/brew`. Those paths name one installation, so pathname
+  equality was the wrong predicate. Setup now proves canonical prefix plus
+  repository for selected and active commands, persists the reported native
+  prefix, and retains transactional environment restoration. Wrapper/native,
+  empty, mismatch, command failure, partial evaluation, and retry regressions
+  pass. A required Brew-less macOS bootstrap/activation failure now reaches the
+  consolidated nonzero summary before any package install instead of degrading
+  to an unexplained unknown-manager exit.
+- Required Windows setup installed the exact Tree-sitter artifact successfully,
+  then `chezmoi apply` exited 1. The PowerShell adapter had captured stderr but
+  failed to print it, so that run cannot prove a more specific root. The main
+  source already exposes no WT target; setup now applies it without an absolute
+  Windows target selector list and prints captured native stderr on failure.
+  The Pester apply-boundary oracle passes. A new native rerun is required and
+  any remaining diagnostic will be treated as a new root cause.
+- Implementation commit identity, complete local gates, and replacement hosted
+  results follow append-only. None of these repairs is yet claimed as hosted
+  proof from local execution.

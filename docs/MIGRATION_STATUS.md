@@ -129,15 +129,19 @@ broken repo-symlink still cleaned) is covered by
       `/Users/<user>` or `/home/<user>`, and threads the validated values through
       the flake/sudo boundary. Darwin has separate aarch64 and x86_64 activation
       configurations; Homebrew paths follow the actual repository/architecture.
+      First nix-darwin bootstrap collision-checks and preserves existing
+      `/etc/bashrc` and `/etc/zshrc` as `.before-nix-darwin`, rolling both back
+      on failure/interruption while retaining failed generated output.
 - [x] nix-homebrew tap migration is transactional. Existing taps move to a
       collision-safe backup, and installed/bootstrap activation failure or an
       interruption quarantines the failed replacement and restores the old
       state. A rollback failure leaves the backup intact and prints exact manual
       recovery rather than guessing.
 - [x] Fresh Linux/WSL zsh startup consumes Home Manager's canonical session-vars
-      file once, with the legacy profile path as fallback and no-Nix hosts
-      guarded. Brew-less macOS dry-run now previews all later phases instead of
-      aborting after the bootstrap plan.
+      file once from the XDG profile, `~/.nix-profile`, or the
+      system-integrated `/etc/profiles/per-user/<effective-user>` profile, with
+      no-Nix hosts guarded. Brew-less macOS dry-run now previews all later
+      phases instead of aborting after the bootstrap plan.
 
 - [x] Windows `nvim` directory-symlink round-trip is fixed in commit `eed6690`.
       The Windows template renders a clean, backslash, no-`..` absolute path

@@ -331,7 +331,11 @@ that violates one of these, fix it instead of disabling the test.
     it for Intel. Homebrew's Library/Taps root follows its repository or the
     architecture default. Tap migration is transactional: activation,
     bootstrap, or interruption failure restores the original tree or emits
-    exact recovery instructions. Guarded by `setup_target_identity_test.sh`,
+    exact recovery instructions. First nix-darwin bootstrap also preflights and
+    preserves existing `/etc/bashrc` and `/etc/zshrc` at their documented
+    `.before-nix-darwin` paths; collisions fail before either move, and
+    activation failure/interruption quarantines generated replacements before
+    restoring both originals. Guarded by `setup_target_identity_test.sh`,
     `setup_nix_darwin_test.sh`, and both architecture evaluations in
     `darwin_config_test.sh`. CI uses the pinned Determinate action where that
     project supports the host; Intel lanes explicitly select full-SHA-pinned
@@ -349,7 +353,10 @@ that violates one of these, fix it instead of disabling the test.
     Code, and ISE. Path proof resolves both directory symlinks and Windows
     junctions before comparing ownership. Recognized conventional legacy
     targets migrate only after successful publication; divergent legacy user
-    data is preserved. Uninstall enumerates the same three source states.
+    data is preserved. The main source exposes no Windows Terminal target, so
+    setup applies it without absolute target selectors and then runs the
+    dedicated WT transaction. Native stderr is retained on apply failure.
+    Uninstall enumerates the same three source states.
     Guarded by Setup/Uninstall Pester and the Windows apply/round-trip migration
     suites.
 26. **PowerShell profiles run only for an actual interactive invocation.** The
@@ -834,10 +841,15 @@ save only**. The next plain `:w` formats normally. Implemented in
   chezmoi config/expected files and must clean them on failure; Homebrew
   `shellenv` output is evaled only after the `brew shellenv` command succeeds.
   Empty output is Homebrew's valid idempotent result when its bin/sbin already
-  lead PATH, so setup accepts it only after proving `command -v brew` is the
-  exact selected installation; empty output cannot bootstrap a missing PATH.
+  lead PATH, so setup accepts it only after the selected and active commands
+  prove one canonical prefix and repository. Executable pathname equality is
+  insufficient because nix-darwin's `/run/current-system/sw` wrapper correctly
+  activates the matching architecture-native Homebrew entrypoint. Empty output
+  cannot bootstrap a missing PATH.
   Failed evaluation or executable proof restores the prior PATH and Homebrew
-  environment variables before printing recovery instructions.
+  environment variables before printing recovery instructions. Because macOS
+  has no alternate package manager, a required bootstrap/activation failure is
+  summarized and aborts before any package install is attempted.
 - `setup.ps1` runs a symlink-privilege pre-flight before chezmoi apply because
   the Windows Neovim target is still a directory symlink: dry-run warns and
   skips the probe; real runs print elevated/Developer Mode state plus the
@@ -1672,7 +1684,10 @@ host prerequisite.
   inert `runner` placeholder. setup.sh discovers Homebrew's repository or uses
   its architecture default, moves a pre-existing `Library/Taps` directory to a
   collision-safe timestamped backup, and restores it transactionally on
-  activation/bootstrap/interruption failure.
+  activation/bootstrap/interruption failure. First bootstrap likewise moves
+  existing `/etc/bashrc` and `/etc/zshrc` only to collision-free
+  `.before-nix-darwin` backups; failed/interrupted activation restores the old
+  files and preserves generated replacements for diagnosis.
   The only `cleanup = "none"` path is the explicit
   `DOTFILES_NIX_DARWIN_HOSTED_CI=1` override passed by setup.sh on GitHub's
   disposable macOS runner, whose preinstalled Brew surface is intentionally not
@@ -1721,8 +1736,9 @@ host prerequisite.
   `programs.home-manager.enable` is the ONE allowed `programs.*`
   (it installs the standalone HM CLI). On WSL it writes ONLY to `~/.nix-profile`,
   never `/mnt/c` — split-host preserved. Managed zsh sources Home Manager's
-  canonical session-vars file once, with the legacy profile path as fallback,
-  so fresh shells see Nix-owned tools and no-Nix hosts remain harmless.
+  canonical session-vars file once from the XDG profile, `~/.nix-profile`, or
+  `/etc/profiles/per-user/<effective-user>` in that order, so standalone and
+  system-integrated profiles work while no-Nix hosts remain harmless.
   First-run bootstrap likewise uses
   `github:nix-community/home-manager/<locked-rev>?narHash=<encoded-narHash>#home-manager`
   from `flake.lock`, not a mutable registry alias. **Native install-deps arms are

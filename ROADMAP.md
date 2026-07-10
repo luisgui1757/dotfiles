@@ -287,8 +287,20 @@ Commit-by-commit status:
   Pester oracle rejects any non-`.exe` validation path. Intel CI now explicitly
   uses full-SHA upstream-Nix installation after the real lane proved current
   Determinate Nix no longer supports x86_64-darwin hosts; the action's hidden
-  last-release fallback is not treated as a platform contract. No workflow
-  definition is recorded as runtime proof.
+  last-release fallback is not treated as a platform contract. The next exact
+  head (`7a446c31def84bdef6da11b23dab21f79ca13336`) supplied further runtime
+  evidence: modern Ubuntu Bash exposed ineffective bare-`[[` tag assertions;
+  Linux Home Manager installed its session file under the documented
+  system-integrated profile; Intel reached a real x86_64 build but nix-darwin
+  refused unpreserved `/etc/bashrc` and `/etc/zshrc`; and Apple Silicon exposed
+  the valid nix-darwin-wrapper/native-Homebrew split. The fixes now state both
+  zsh tag and commit in preview output, check every assertion portably, source
+  all three official Home Manager profile locations, migrate the two system
+  shell files transactionally, and prove Homebrew by prefix/repository. Windows
+  apply failures now retain native stderr, and the target-free WT design lets
+  the main source apply without non-portable absolute target selectors. Hosted
+  confirmation remains pending a newer exact head. No workflow definition is
+  recorded as runtime proof.
 
 - **Intel Darwin package-plane sunset — OPEN, deadline 2026-12-31.** Nixpkgs
   26.05 is the final supported `x86_64-darwin` release; 26.11 removes package

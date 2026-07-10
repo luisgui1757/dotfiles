@@ -413,6 +413,83 @@ EOF
     bash "$script"
 }
 
+probe_shell_rc_migration() {
+    local mode="$1" script="$WORK/shell-rc-$1.sh" etc_dir="$WORK/etc-$1"
+    rm -rf "$etc_dir"
+    mkdir -p "$etc_dir"
+    printf '%s\n' original-bash > "$etc_dir/bashrc"
+    printf '%s\n' original-zsh > "$etc_dir/zshrc"
+    if [[ "$mode" == "collision" ]]; then
+        printf '%s\n' older-backup > "$etc_dir/bashrc.before-nix-darwin"
+    fi
+    cat > "$script" <<EOF
+set -uo pipefail
+DOTFILES_SETUP_SOURCE_ONLY=1 source "$REPO_ROOT/setup.sh" --all >/dev/null 2>&1
+DOTFILES_TEST_NIX_DARWIN_ETC_DIR="$etc_dir"
+DOTFILES_TEST_TIMESTAMP=20260710000000
+export DOTFILES_TEST_NIX_DARWIN_ETC_DIR DOTFILES_TEST_TIMESTAMP
+sudo() {
+    if [[ "$mode" == "partial-move" && "\${1:-}" == mv && "\${2:-}" == "$etc_dir/zshrc" ]]; then
+        return 1
+    fi
+    command "\$@"
+}
+case "$mode" in
+    success)
+        prepare_nix_darwin_shell_rc_migration
+        printf '%s\n' managed-bash > "$etc_dir/bashrc"
+        printf '%s\n' managed-zsh > "$etc_dir/zshrc"
+        complete_nix_darwin_shell_rc_migration
+        [[ "\$(cat "$etc_dir/bashrc.before-nix-darwin")" == original-bash ]]
+        [[ "\$(cat "$etc_dir/zshrc.before-nix-darwin")" == original-zsh ]]
+        [[ "\$(cat "$etc_dir/bashrc")" == managed-bash ]]
+        [[ "\$(cat "$etc_dir/zshrc")" == managed-zsh ]]
+        ;;
+    rollback)
+        prepare_nix_darwin_shell_rc_migration
+        printf '%s\n' managed-bash > "$etc_dir/bashrc"
+        printf '%s\n' managed-zsh > "$etc_dir/zshrc"
+        rollback_nix_darwin_shell_rc_migration
+        [[ "\$(cat "$etc_dir/bashrc")" == original-bash ]]
+        [[ "\$(cat "$etc_dir/zshrc")" == original-zsh ]]
+        [[ "\$(cat "$etc_dir/bashrc.dotfiles-failed-20260710000000")" == managed-bash ]]
+        [[ "\$(cat "$etc_dir/zshrc.dotfiles-failed-20260710000000")" == managed-zsh ]]
+        [[ ! -e "$etc_dir/bashrc.before-nix-darwin" ]]
+        [[ ! -e "$etc_dir/zshrc.before-nix-darwin" ]]
+        ;;
+    collision)
+        output="\$(prepare_nix_darwin_shell_rc_migration 2>&1)" && exit 1
+        [[ "\$(cat "$etc_dir/bashrc")" == original-bash ]]
+        [[ "\$(cat "$etc_dir/bashrc.before-nix-darwin")" == older-backup ]]
+        [[ "\$(cat "$etc_dir/zshrc")" == original-zsh ]]
+        [[ "\$output" == *"neither was changed"* ]]
+        ;;
+    partial-move)
+        prepare_nix_darwin_shell_rc_migration >/dev/null 2>&1 && exit 1
+        [[ "\$(cat "$etc_dir/bashrc")" == original-bash ]]
+        [[ "\$(cat "$etc_dir/zshrc")" == original-zsh ]]
+        [[ ! -e "$etc_dir/bashrc.before-nix-darwin" ]]
+        [[ ! -e "$etc_dir/zshrc.before-nix-darwin" ]]
+        ;;
+    signal)
+        prepare_nix_darwin_shell_rc_migration >/dev/null
+        printf '%s\n' managed-bash > "$etc_dir/bashrc"
+        printf '%s\n' managed-zsh > "$etc_dir/zshrc"
+        nix_homebrew_activation_interrupted TERM
+        ;;
+esac
+EOF
+    if [[ "$mode" == "signal" ]]; then
+        bash "$script" >/dev/null 2>&1 && return 1
+        [[ "$(cat "$etc_dir/bashrc")" == original-bash ]] &&
+            [[ "$(cat "$etc_dir/zshrc")" == original-zsh ]] &&
+            [[ "$(cat "$etc_dir/bashrc.dotfiles-failed-20260710000000")" == managed-bash ]] &&
+            [[ "$(cat "$etc_dir/zshrc.dotfiles-failed-20260710000000")" == managed-zsh ]]
+        return
+    fi
+    bash "$script"
+}
+
 fail=0
 assert_eq() {
     local desc="$1" expected="$2" actual="$3"
@@ -540,6 +617,36 @@ if probe_taps_rollback_failure; then
     echo "ok  : rollback failure preserves backup and emits exact recovery"
 else
     echo "FAIL: rollback failure was not explicit or did not preserve backup"
+    fail=1
+fi
+if probe_shell_rc_migration success; then
+    echo "ok  : first bootstrap preserves both system shell files for nix-darwin"
+else
+    echo "FAIL: first-bootstrap shell-file migration did not preserve originals"
+    fail=1
+fi
+if probe_shell_rc_migration rollback; then
+    echo "ok  : failed first bootstrap restores both system shell files and quarantines output"
+else
+    echo "FAIL: failed first bootstrap did not roll system shell files back transactionally"
+    fail=1
+fi
+if probe_shell_rc_migration collision; then
+    echo "ok  : pre-existing nix-darwin backup collision fails before either shell file moves"
+else
+    echo "FAIL: nix-darwin shell-file backup collision was destructive or ambiguous"
+    fail=1
+fi
+if probe_shell_rc_migration partial-move; then
+    echo "ok  : partial shell-file migration failure restores the first move"
+else
+    echo "FAIL: partial nix-darwin shell-file migration was not rolled back"
+    fail=1
+fi
+if probe_shell_rc_migration signal; then
+    echo "ok  : interrupted first bootstrap restores both system shell files"
+else
+    echo "FAIL: interrupted first bootstrap did not restore system shell files"
     fail=1
 fi
 

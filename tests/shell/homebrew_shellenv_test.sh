@@ -22,6 +22,10 @@ if [[ "\${1:-}" == "shellenv" ]]; then
     printf 'export PATH="%s/bin:\$PATH"\n' "$prefix"
 elif [[ "\${1:-}" == "--prefix" && "\${2:-}" == "make" ]]; then
     printf '%s\n' "$prefix/opt/make"
+elif [[ "\${1:-}" == "--prefix" ]]; then
+    printf '%s\n' "$prefix"
+elif [[ "\${1:-}" == "--repository" ]]; then
+    printf '%s\n' "$prefix"
 fi
 EOF
 chmod +x "$prefix/bin/brew"
@@ -57,6 +61,10 @@ if [[ "\${1:-}" == "shellenv" ]]; then
     exit 0
 elif [[ "\${1:-}" == "--prefix" && "\${2:-}" == "make" ]]; then
     printf '%s\n' "$prefix/opt/make"
+elif [[ "\${1:-}" == "--prefix" ]]; then
+    printf '%s\n' "$prefix"
+elif [[ "\${1:-}" == "--repository" ]]; then
+    printf '%s\n' "$prefix"
 fi
 EOF
 chmod +x "$prefix/bin/brew"
@@ -73,6 +81,10 @@ if [[ "\${1:-}" == "shellenv" ]]; then
     printf 'export PATH="%s/bin:\$PATH"\n' "$prefix"
 elif [[ "\${1:-}" == "--prefix" && "\${2:-}" == "make" ]]; then
     printf '%s\n' "$prefix/opt/make"
+elif [[ "\${1:-}" == "--prefix" ]]; then
+    printf '%s\n' "$prefix"
+elif [[ "\${1:-}" == "--repository" ]]; then
+    printf '%s\n' "$prefix"
 fi
 EOF
 chmod +x "$prefix/bin/brew"
@@ -109,11 +121,40 @@ env -i HOME="$HOME" PATH="/usr/bin:/bin" bash -c 'source "$HOME/.bashrc"; [[ "$H
 # shellcheck disable=SC2016
 env -i HOME="$HOME" PATH="/usr/bin:/bin" bash -c 'source "$HOME/.bashrc"; [[ ":$PATH:" == *":$HOME/.linuxbrew/opt/make/libexec/gnubin:"* ]]'
 
+# nix-darwin intentionally exposes a /run/current-system/sw wrapper whose
+# shellenv activates the architecture-native Homebrew entrypoint. Different
+# executable paths are valid only when prefix + repository prove one install.
+wrapper="$WORK/wrapper/bin/brew"
+actual="$WORK/actual/bin/brew"
+mkdir -p "$(dirname "$wrapper")" "$(dirname "$actual")"
+cat > "$wrapper" <<EOF
+#!/usr/bin/env bash
+case "\${1:-}" in
+    shellenv) printf 'export PATH="%s/bin:\$PATH"\n' "$(dirname "$(dirname "$actual")")" ;;
+    --prefix|--repository) printf '%s\n' "$prefix" ;;
+esac
+EOF
+cat > "$actual" <<EOF
+#!/usr/bin/env bash
+case "\${1:-}" in
+    --prefix|--repository) printf '%s\n' "$prefix" ;;
+esac
+EOF
+chmod +x "$wrapper" "$actual"
+homebrew_bin() { printf '%s\n' "$wrapper"; }
+PATH=/usr/bin:/bin
+enable_homebrew_for_current_shell
+[[ "$(command -v brew)" == "$actual" ]] \
+    || fail "same-installation Homebrew wrapper did not activate its native entrypoint"
+homebrew_bin() { printf '%s\n' "$prefix/bin/brew"; }
+
 cat > "$prefix/bin/brew" <<'EOF'
 #!/usr/bin/env bash
 if [[ "${1:-}" == shellenv ]]; then
     echo 'export PATH="/untrusted-partial-shellenv:$PATH"'
     exit 9
+elif [[ "${1:-}" == --prefix || "${1:-}" == --repository ]]; then
+    printf '%s\n' '/untrusted-homebrew'
 fi
 EOF
 chmod +x "$prefix/bin/brew"
@@ -130,6 +171,8 @@ if [[ "${1:-}" == shellenv ]]; then
     printf '%s\n' 'export PATH="/partial-eval:$PATH"'
     printf '%s\n' 'export HOMEBREW_PREFIX="/partial-prefix"'
     printf '%s\n' 'false'
+elif [[ "${1:-}" == --prefix || "${1:-}" == --repository ]]; then
+    printf '%s\n' '/partial-prefix'
 fi
 EOF
 chmod +x "$prefix/bin/brew"
@@ -145,12 +188,39 @@ grep -F 'prior environment was restored' "$WORK/eval.err" >/dev/null \
 
 cat > "$prefix/bin/brew" <<'EOF'
 #!/usr/bin/env bash
-[[ "${1:-}" == shellenv ]] && exit 0
+if [[ "${1:-}" == shellenv ]]; then
+    exit 0
+elif [[ "${1:-}" == --prefix || "${1:-}" == --repository ]]; then
+    printf '%s\n' '/selected-but-inactive'
+fi
 EOF
 chmod +x "$prefix/bin/brew"
 PATH=/usr/bin:/bin
 if enable_homebrew_for_current_shell >/dev/null 2>&1; then
     fail "empty brew shellenv was accepted without an active selected brew"
 fi
+
+# macOS has no alternate package manager. A declined or failed bootstrap is an
+# explicit precondition failure that reaches the consolidated summary instead
+# of degrading to an unexplained `unknown` manager.
+(
+    PM=brew_missing
+    DRY_RUN=0
+    INSTALL_FAILURES_COUNT=0
+    INSTALL_FAILURES_DETAIL=""
+    maybe_install_brew() { return 1; }
+
+    if bootstrap_package_manager; then
+        fail "failed required macOS Homebrew bootstrap was accepted"
+    fi
+    record_install_failure "Homebrew bootstrap/activation" brew shellenv 1
+    set +e
+    summary="$(exit_if_install_failures 2>&1)"
+    summary_rc=$?
+    set -e
+    [[ "$summary_rc" -ne 0 ]] || fail "failed Homebrew precondition summary exited zero"
+    [[ "$summary" == *"Homebrew bootstrap/activation via brew (shellenv)"* ]] \
+        || fail "failed Homebrew precondition was absent from the consolidated summary"
+)
 
 echo "OK"

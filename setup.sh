@@ -40,6 +40,8 @@ NIX_DARWIN=0
 HOME_MANAGER=0
 NIX_HOMEBREW_TAPS_PATH=""
 NIX_HOMEBREW_TAPS_BACKUP=""
+NIX_DARWIN_RC_SOURCES=()
+NIX_DARWIN_RC_BACKUPS=()
 POLARIS_REPO_URL="https://github.com/luisgui1757/polaris.git"
 POLARIS_VERSION="0.1.2"
 POLARIS_TAG="v0.1.2"
@@ -828,12 +830,148 @@ rollback_nix_homebrew_declarative_taps() {
     NIX_HOMEBREW_TAPS_BACKUP=""
 }
 
+nix_darwin_etc_dir() {
+    local etc_dir="/etc"
+    # The override is a source-only oracle seam. A production environment
+    # cannot redirect privileged shell-file migration away from /etc.
+    if [[ "${DOTFILES_SETUP_SOURCE_ONLY_ACTIVE:-}" == "1" ]]; then
+        if [[ -n "${DOTFILES_TEST_NIX_DARWIN_ETC_DIR:-}" ]]; then
+            etc_dir="$DOTFILES_TEST_NIX_DARWIN_ETC_DIR"
+        else
+            # Source-only probes must never inspect or move the host's real
+            # privileged files merely because they exercise activation logic.
+            etc_dir="/nonexistent/dotfiles-source-only-etc"
+        fi
+    fi
+    if [[ "$etc_dir" != /* ]]; then
+        echo "  FAIL: nix-darwin etc directory is not absolute: $etc_dir" >&2
+        return 1
+    fi
+    printf '%s\n' "${etc_dir%/}"
+}
+
+preview_nix_darwin_shell_rc_migration() {
+    local etc_dir source backup name
+    etc_dir="$(nix_darwin_etc_dir)" || return 1
+    for name in bashrc zshrc; do
+        source="$etc_dir/$name"
+        backup="$source.before-nix-darwin"
+        [[ -e "$source" || -L "$source" ]] || continue
+        if [[ -e "$backup" || -L "$backup" ]]; then
+            echo "  would fail: cannot preserve $source because $backup already exists."
+        else
+            echo "  would: sudo mv $source $backup before first nix-darwin activation"
+        fi
+    done
+}
+
+prepare_nix_darwin_shell_rc_migration() {
+    local etc_dir source backup name i
+    etc_dir="$(nix_darwin_etc_dir)" || return 1
+    NIX_DARWIN_RC_SOURCES=()
+    NIX_DARWIN_RC_BACKUPS=()
+
+    # Preflight both paths before moving either one. nix-darwin deliberately
+    # refuses unrecognized /etc files and documents the exact
+    # .before-nix-darwin backup shape; never overwrite an earlier backup.
+    for name in bashrc zshrc; do
+        source="$etc_dir/$name"
+        backup="$source.before-nix-darwin"
+        [[ -e "$source" || -L "$source" ]] || continue
+        if [[ -e "$backup" || -L "$backup" ]]; then
+            echo "  FAIL: first nix-darwin bootstrap must preserve $source, but backup $backup already exists." >&2
+            echo "        Compare both files and resolve the collision before retrying; neither was changed." >&2
+            return 1
+        fi
+    done
+
+    for name in bashrc zshrc; do
+        source="$etc_dir/$name"
+        backup="$source.before-nix-darwin"
+        [[ -e "$source" || -L "$source" ]] || continue
+        i="${#NIX_DARWIN_RC_SOURCES[@]}"
+        NIX_DARWIN_RC_SOURCES[i]="$source"
+        NIX_DARWIN_RC_BACKUPS[i]="$backup"
+        if ! sudo mv "$source" "$backup"; then
+            echo "  FAIL: could not preserve $source at $backup before nix-darwin bootstrap." >&2
+            if ! rollback_nix_darwin_shell_rc_migration; then
+                echo "        Partial shell-file rollback failed; follow the recovery instructions above." >&2
+            fi
+            return 1
+        fi
+        echo "  backup    pre-nix-darwin shell file $source -> $backup"
+    done
+}
+
+rollback_nix_darwin_shell_rc_migration() {
+    local i source backup failed_base failed suffix rc=0
+    i=$((${#NIX_DARWIN_RC_SOURCES[@]} - 1))
+    while [[ "$i" -ge 0 ]]; do
+        source="${NIX_DARWIN_RC_SOURCES[$i]}"
+        backup="${NIX_DARWIN_RC_BACKUPS[$i]}"
+        if [[ ! -e "$backup" && ! -L "$backup" ]]; then
+            if [[ ! -e "$source" && ! -L "$source" ]]; then
+                echo "  FAIL: shell-file rollback is missing both $source and $backup." >&2
+                echo "        Restore $source from a known-good backup before retrying." >&2
+                rc=1
+            fi
+            i=$((i - 1))
+            continue
+        fi
+        if [[ -e "$source" || -L "$source" ]]; then
+            failed_base="$source.dotfiles-failed-${DOTFILES_TEST_TIMESTAMP:-$(date +%Y%m%d%H%M%S)}"
+            failed="$failed_base"
+            suffix=0
+            while [[ -e "$failed" || -L "$failed" ]]; do
+                suffix=$((suffix + 1))
+                failed="$failed_base.$suffix"
+            done
+            if ! sudo mv "$source" "$failed"; then
+                echo "  FAIL: could not quarantine failed nix-darwin output at $source." >&2
+                echo "        Original content remains safe at $backup; move the replacement aside and restore it manually." >&2
+                rc=1
+                i=$((i - 1))
+                continue
+            fi
+            echo "  note      failed nix-darwin shell output preserved at $failed"
+        fi
+        if ! sudo mv "$backup" "$source"; then
+            echo "  FAIL: could not restore pre-nix-darwin shell file $backup -> $source." >&2
+            echo "        Restore it manually with: sudo mv '$backup' '$source'" >&2
+            rc=1
+        else
+            echo "  restored  pre-nix-darwin shell file $source"
+        fi
+        i=$((i - 1))
+    done
+    if [[ "$rc" -eq 0 ]]; then
+        NIX_DARWIN_RC_SOURCES=()
+        NIX_DARWIN_RC_BACKUPS=()
+    fi
+    return "$rc"
+}
+
+complete_nix_darwin_shell_rc_migration() {
+    local backup
+    if [[ "${#NIX_DARWIN_RC_BACKUPS[@]}" -gt 0 ]]; then
+        for backup in "${NIX_DARWIN_RC_BACKUPS[@]}"; do
+            echo "  backup    pre-nix-darwin shell file retained at $backup"
+        done
+    fi
+    NIX_DARWIN_RC_SOURCES=()
+    NIX_DARWIN_RC_BACKUPS=()
+}
+
 nix_homebrew_activation_interrupted() {
-    local signal="$1" rc=130
+    local signal="$1" rc=130 rollback_failed=0
     [[ "$signal" == "TERM" ]] && rc=143
     trap - INT TERM
-    echo "  FAIL: nix-darwin activation interrupted by $signal; restoring pre-activation taps." >&2
-    rollback_nix_homebrew_declarative_taps || true
+    echo "  FAIL: nix-darwin activation interrupted by $signal; restoring pre-activation state." >&2
+    rollback_nix_darwin_shell_rc_migration || rollback_failed=1
+    rollback_nix_homebrew_declarative_taps || rollback_failed=1
+    if [[ "$rollback_failed" -ne 0 ]]; then
+        echo "        Automatic rollback was incomplete; follow the recovery instructions above before retrying." >&2
+    fi
     exit "$rc"
 }
 
@@ -901,6 +1039,9 @@ run_nix_darwin_switch() {
     if [[ "$DRY_RUN" -eq 1 ]]; then
         echo "  would: $(nix_darwin_sudo_preview "darwin-rebuild") switch --flake $flake_ref --impure"
         echo "         (first-time bootstrap: $(nix_darwin_sudo_preview "nix") run $bootstrap_ref -- switch --flake $flake_ref --impure)"
+        if ! command -v darwin-rebuild >/dev/null 2>&1; then
+            preview_nix_darwin_shell_rc_migration
+        fi
         return 0
     fi
     if [[ "$ALL" -eq 0 ]]; then
@@ -920,6 +1061,9 @@ run_nix_darwin_switch() {
         if ! sudo_nix_darwin_activation darwin-rebuild switch --flake "$flake_ref" --impure; then
             trap - INT TERM
             echo "  FAIL: nix-darwin activation failed; setup did not apply the requested Nix package layer." >&2
+            if ! rollback_nix_darwin_shell_rc_migration; then
+                echo "        Shell-file rollback also failed; follow the recovery instructions above before retrying." >&2
+            fi
             if ! rollback_nix_homebrew_declarative_taps; then
                 echo "        Tap rollback also failed; follow the recovery instructions above before retrying." >&2
             fi
@@ -928,9 +1072,19 @@ run_nix_darwin_switch() {
         fi
     else
         echo "  bootstrapping nix-darwin from flake.lock ($bootstrap_ref)..."
+        if ! prepare_nix_darwin_shell_rc_migration; then
+            trap - INT TERM
+            if ! rollback_nix_homebrew_declarative_taps; then
+                echo "        Tap rollback also failed; follow the recovery instructions above before retrying." >&2
+            fi
+            return 1
+        fi
         if ! sudo_nix_darwin_activation nix run "$bootstrap_ref" -- switch --flake "$flake_ref" --impure; then
             trap - INT TERM
             echo "  FAIL: nix-darwin bootstrap activation failed; setup did not apply the requested Nix package layer." >&2
+            if ! rollback_nix_darwin_shell_rc_migration; then
+                echo "        Shell-file rollback also failed; follow the recovery instructions above before retrying." >&2
+            fi
             if ! rollback_nix_homebrew_declarative_taps; then
                 echo "        Tap rollback also failed; follow the recovery instructions above before retrying." >&2
             fi
@@ -939,6 +1093,7 @@ run_nix_darwin_switch() {
         fi
     fi
     trap - INT TERM
+    complete_nix_darwin_shell_rc_migration
     complete_nix_homebrew_tap_transaction
     echo "  ok        nix-darwin package layer applied"
 }

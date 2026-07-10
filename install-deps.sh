@@ -235,7 +235,8 @@ homebrew_bin() {
 }
 
 enable_homebrew_for_current_shell() {
-    local brew_bin brew_env active_brew expected_brew
+    local brew_bin brew_env active_brew
+    local expected_prefix expected_repository active_prefix active_repository
     local old_path="$PATH" old_manpath="${MANPATH-}" old_infopath="${INFOPATH-}"
     local old_prefix="${HOMEBREW_PREFIX-}" old_cellar="${HOMEBREW_CELLAR-}"
     local old_repository="${HOMEBREW_REPOSITORY-}"
@@ -243,6 +244,18 @@ enable_homebrew_for_current_shell() {
     local had_prefix="${HOMEBREW_PREFIX+x}" had_cellar="${HOMEBREW_CELLAR+x}"
     local had_repository="${HOMEBREW_REPOSITORY+x}"
     brew_bin="$(homebrew_bin)" || return 1
+    expected_prefix="$("$brew_bin" --prefix 2>/dev/null)" || {
+        echo "  FAIL: $brew_bin did not report its Homebrew prefix; PATH is unchanged" >&2
+        return 1
+    }
+    expected_repository="$("$brew_bin" --repository 2>/dev/null)" || {
+        echo "  FAIL: $brew_bin did not report its Homebrew repository; PATH is unchanged" >&2
+        return 1
+    }
+    if [[ "$expected_prefix" != /* || "$expected_repository" != /* ]]; then
+        echo "  FAIL: $brew_bin reported a non-absolute Homebrew identity; PATH is unchanged" >&2
+        return 1
+    fi
     if ! brew_env="$("$brew_bin" shellenv)"; then
         echo "  FAIL: $brew_bin shellenv failed; PATH is unchanged" >&2
         return 1
@@ -263,8 +276,20 @@ enable_homebrew_for_current_shell() {
     fi
     hash -r 2>/dev/null || true
     active_brew="$(command -v brew 2>/dev/null || true)"
-    expected_brew="$(real_source_path "$brew_bin")"
-    if [[ -z "$active_brew" ]] || [[ "$(real_source_path "$active_brew")" != "$expected_brew" ]]; then
+    active_prefix=""
+    active_repository=""
+    if [[ -n "$active_brew" ]]; then
+        active_prefix="$("$active_brew" --prefix 2>/dev/null || true)"
+        active_repository="$("$active_brew" --repository 2>/dev/null || true)"
+    fi
+    # nix-darwin exposes brew through /run/current-system/sw while `brew
+    # shellenv` correctly activates the architecture-native /opt/homebrew or
+    # /usr/local entrypoint. Prove both commands address the same installation
+    # by canonical prefix + repository instead of requiring the wrapper and
+    # activated executable to have the same pathname.
+    if [[ -z "$active_brew" || -z "$active_prefix" || -z "$active_repository" ]] ||
+        [[ "$(real_source_path "$active_prefix")" != "$(real_source_path "$expected_prefix")" ]] ||
+        [[ "$(real_source_path "$active_repository")" != "$(real_source_path "$expected_repository")" ]]; then
         PATH="$old_path"; export PATH
         if [[ -n "$had_manpath" ]]; then MANPATH="$old_manpath"; export MANPATH; else unset MANPATH; fi
         if [[ -n "$had_infopath" ]]; then INFOPATH="$old_infopath"; export INFOPATH; else unset INFOPATH; fi
@@ -272,7 +297,7 @@ enable_homebrew_for_current_shell() {
         if [[ -n "$had_cellar" ]]; then HOMEBREW_CELLAR="$old_cellar"; export HOMEBREW_CELLAR; else unset HOMEBREW_CELLAR; fi
         if [[ -n "$had_repository" ]]; then HOMEBREW_REPOSITORY="$old_repository"; export HOMEBREW_REPOSITORY; else unset HOMEBREW_REPOSITORY; fi
         hash -r 2>/dev/null || true
-        echo "  FAIL: $brew_bin shellenv did not activate the selected Homebrew executable; the prior environment was restored. Remove the PATH shadow and retry." >&2
+        echo "  FAIL: $brew_bin shellenv did not activate the selected Homebrew installation; the prior environment was restored. Remove the PATH shadow and retry." >&2
         return 1
     fi
     enable_homebrew_make_gnubin_for_current_shell "$brew_bin" || true
@@ -296,7 +321,14 @@ persist_homebrew_shellenv() {
     local tmp block_tmp rc
     local rcs
     brew_bin="$(homebrew_bin)" || return 0
-    brew_prefix="${brew_bin%/bin/brew}"
+    brew_prefix="$("$brew_bin" --prefix 2>/dev/null)" || {
+        echo "  FAIL: $brew_bin did not report the Homebrew prefix; shell startup files are unchanged" >&2
+        return 1
+    }
+    if [[ "$brew_prefix" != /* ]]; then
+        echo "  FAIL: $brew_bin reported a non-absolute Homebrew prefix; shell startup files are unchanged" >&2
+        return 1
+    fi
     marker="# >>> dotfiles: Homebrew shellenv >>>"
     end_marker="# <<< dotfiles: Homebrew shellenv <<<"
     block="$(cat <<EOF
@@ -506,35 +538,52 @@ maybe_install_brew() {
         rm -rf "$tmp"
         # Plumb brew into THIS shell so subsequent installs use it, then make
         # future zsh/bash sessions find it without manual Homebrew "Next steps".
-        enable_homebrew_for_current_shell || true
-        persist_homebrew_shellenv
+        if ! enable_homebrew_for_current_shell; then
+            return 1
+        fi
+        if ! persist_homebrew_shellenv; then
+            return 1
+        fi
         return 0
     fi
     return 1
 }
 
 bootstrap_package_manager() {
+    local homebrew_activated=0
     if [[ "$PM" == "brew" ]]; then
-        enable_homebrew_for_current_shell || true
-        persist_homebrew_shellenv
+        if ! enable_homebrew_for_current_shell; then
+            return 1
+        fi
+        if ! persist_homebrew_shellenv; then
+            return 1
+        fi
+        homebrew_activated=1
     elif [[ "$PM" == "brew_missing" ]]; then
         if maybe_install_brew; then
             if [[ "$DRY_RUN" -eq 1 ]]; then PM="brew"; else PM="$(detect_pm)"; fi
+            homebrew_activated=1
         else
-            PM="unknown"
+            return 1
         fi
     elif [[ "$(uname -s)" == "Linux" ]]; then
         echo "Detected $PM as the system package manager."
-        if maybe_install_brew; then PM="$(detect_pm)"; fi
+        if maybe_install_brew; then
+            PM="$(detect_pm)"
+            homebrew_activated=1
+        fi
     fi
 
     if [[ "$PM" == "brew" ]]; then
         if [[ "$DRY_RUN" -eq 1 ]]; then
             echo "  plan      Homebrew-dependent phases continue after the previewed bootstrap"
-        else
-            enable_homebrew_for_current_shell || true
+        elif [[ "$homebrew_activated" -eq 0 ]]; then
+            if ! enable_homebrew_for_current_shell; then
+                return 1
+            fi
         fi
     fi
+    return 0
 }
 
 # ---- Login shell: adopt zsh (chsh) -------------------------------------------
@@ -2065,7 +2114,7 @@ install_zsh_plugin_repo() {
 
     if [[ "$DRY_RUN" -eq 1 ]]; then
         echo "  would: neutralize any unproved $target payload"
-        echo "         fetch exact commit $expected_commit from $repo into a sibling stage"
+        echo "         fetch reviewed ref $ref at exact commit $expected_commit from $repo into a sibling stage"
         echo "         prove origin/HEAD/cleanliness/$plugin_file, then publish atomically"
         return 0
     fi
@@ -3411,12 +3460,12 @@ run_update_mode() {
     echo "install-deps: update mode OS=$OS_LABEL  detected package manager=$PM  dry-run=$DRY_RUN"
     echo
 
-    if [[ "$PM" == "brew" ]]; then
-        enable_homebrew_for_current_shell || true
+    local rc=0
+    if [[ "$PM" == "brew" ]] && ! enable_homebrew_for_current_shell; then
+        rc=1
     fi
 
-    update_catalog_tools
-    local rc=$?
+    update_catalog_tools || rc=1
     echo
     echo "note: repo pins, PSFzf, plugins, and configs update via git pull and re-running setup; dotfiles-owned Linux artifacts refresh only when provenance proves ownership."
     return "$rc"
@@ -4298,7 +4347,11 @@ fi
 # Bootstrap brew only after the pre-flight table and one-shot prompt. Re-detect
 # after a real bootstrap; dry-run models Brew as available for every later
 # preview phase without claiming that the bootstrap already happened.
-bootstrap_package_manager
+if ! bootstrap_package_manager; then
+    record_install_failure "Homebrew bootstrap/activation" brew shellenv 1
+    echo "  FAIL: Homebrew bootstrap/activation is an unrecoverable package-manager precondition; no package installs were attempted." >&2
+    exit_if_install_failures
+fi
 
 if [[ "$PM" == "unknown" ]]; then
     echo "install-deps: no supported package manager found." >&2

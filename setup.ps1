@@ -826,6 +826,10 @@ function Invoke-ChezmoiOrExit {
     )
     $result = Invoke-ChezmoiNative -Arguments $Arguments -PassThroughOutput
     if ($result.ExitCode -ne 0) {
+        $detail = $result.Stderr.TrimEnd()
+        if (-not [string]::IsNullOrWhiteSpace($detail)) {
+            Write-Output $detail
+        }
         Write-Host ("  FAIL: $Label exited $($result.ExitCode)") -ForegroundColor Red
         exit $result.ExitCode
     }
@@ -1675,9 +1679,10 @@ function Invoke-ChezmoiApplyPhase {
         $script:ChezmoiConfigArgs = @('--config', $dryRunConfig, '--config-format', 'toml')
         try {
             Backup-PreexistingManagedTargets
-            # setup owns the transactional WT write. Exclude the direct chezmoi
-            # modify_ target so no non-transactional write can precede it.
-            $applyArgs = @('--dry-run', '--verbose', 'apply') + @(Get-ManagedConfigTargets -ExcludeWindowsTerminal)
+            # setup owns Windows Terminal publication, and the main chezmoi
+            # source exposes no WT target. Apply the complete source directly;
+            # absolute Windows target lists are not a portable chezmoi selector.
+            $applyArgs = @('--dry-run', '--verbose', 'apply')
             Invoke-ChezmoiOrExit -Label 'chezmoi dry-run apply' -Arguments $applyArgs
             Invoke-WindowsKnownFolderOverlays -Identity $script:WindowsIdentity -IsDryRun $true
             Invoke-WindowsTerminalSettingsTransaction -IsDryRun $true
@@ -1708,9 +1713,9 @@ function Invoke-ChezmoiApplyPhase {
 
     Invoke-ChezmoiOrExit -Label 'chezmoi init' -Arguments @('init')
     Backup-PreexistingManagedTargets
-    # setup owns the transactional WT write. Bare chezmoi keeps the merge
-    # template for config-layer parity, but setup never publishes through it.
-    $realApplyArgs = @('--no-tty', '--force', 'apply') + @(Get-ManagedConfigTargets -ExcludeWindowsTerminal)
+    # setup owns the transactional WT write. The main source has no WT target,
+    # so a full apply cannot publish it before the transaction below.
+    $realApplyArgs = @('--no-tty', '--force', 'apply')
     Invoke-ChezmoiOrExit -Label 'chezmoi apply' -Arguments $realApplyArgs
     Invoke-WindowsKnownFolderOverlays -Identity $script:WindowsIdentity
     Invoke-WindowsTerminalSettingsTransaction

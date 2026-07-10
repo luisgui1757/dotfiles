@@ -116,6 +116,76 @@ Describe "setup.ps1 Test-TargetContentMatchesChezmoi copy-mode" -Skip:(-not $scr
     }
 }
 
+Describe "setup.ps1 main chezmoi apply boundary" {
+    BeforeEach {
+        . $script:ImportSetupForTest
+        $script:ApplyBoundaryOldIdentity = $script:WindowsIdentity
+        $script:DryRun = $false
+        $script:WindowsIdentity = [pscustomobject]@{
+            UserProfile = 'C:\User'
+            LocalApplicationData = 'D:\Local Data'
+            Documents = 'E:\Documents'
+            RuntimeProfile = 'E:\Documents\PowerShell\Microsoft.PowerShell_profile.ps1'
+        }
+        Mock -CommandName Get-Command -ParameterFilter { $Name -eq 'chezmoi' } -MockWith {
+            [pscustomobject]@{ Source = 'C:\tools\chezmoi.exe' }
+        }
+        Mock -CommandName Test-CanCreateSymlinks -MockWith { $true }
+        Mock -CommandName Backup-PreexistingManagedTargets
+        Mock -CommandName Invoke-WindowsKnownFolderOverlays
+        Mock -CommandName Invoke-WindowsTerminalSettingsTransaction
+        Mock -CommandName Invoke-ChezmoiOrExit
+    }
+
+    AfterEach {
+        $script:WindowsIdentity = $script:ApplyBoundaryOldIdentity
+    }
+
+    It "applies the complete source without non-portable absolute target selectors" {
+        Invoke-ChezmoiApplyPhase
+
+        Should -Invoke Invoke-ChezmoiOrExit -Times 1 -ParameterFilter {
+            $Label -eq 'chezmoi apply' -and
+            ($Arguments -join '|') -eq '--no-tty|--force|apply'
+        }
+    }
+}
+
+Describe "setup.ps1 native chezmoi failure reporting" {
+    It "surfaces captured stderr and preserves the native exit code" {
+        $probe = Join-Path ([System.IO.Path]::GetTempPath()) ("setup-chezmoi-failure-" + [System.Guid]::NewGuid() + ".ps1")
+        $probeContent = (@'
+$env:DOTFILES_SETUP_PS1_SOURCE_ONLY = '1'
+. '__SETUP_PATH__'
+function Invoke-ChezmoiNative {
+    param([string[]]$Arguments, [switch]$PassThroughOutput)
+    [pscustomobject]@{
+        ExitCode = 23
+        Stderr = 'fatal chezmoi detail from redirected stderr'
+        Output = @()
+    }
+}
+Invoke-ChezmoiOrExit -Label 'chezmoi apply' -Arguments @('apply')
+'@).Replace('__SETUP_PATH__', $script:Setup.Replace("'", "''"))
+        [System.IO.File]::WriteAllText($probe, $probeContent, [System.Text.UTF8Encoding]::new($false))
+
+        $originalPreference = $PSNativeCommandUseErrorActionPreference
+        try {
+            $PSNativeCommandUseErrorActionPreference = $false
+            $currentPowerShell = (Get-Process -Id $PID).Path
+            $output = & $currentPowerShell -NoLogo -NoProfile -File $probe 2>&1
+            $exitCode = $LASTEXITCODE
+        } finally {
+            $PSNativeCommandUseErrorActionPreference = $originalPreference
+            Remove-Item -LiteralPath $probe -Force -ErrorAction SilentlyContinue
+        }
+
+        $exitCode | Should -Be 23
+        ($output | Out-String) | Should -Match 'fatal chezmoi detail from redirected stderr'
+        ($output | Out-String) | Should -Match 'FAIL: chezmoi apply exited 23'
+    }
+}
+
 Describe "setup.ps1 Update-RuntimePath" {
     BeforeEach {
         $script:OldPath = $env:PATH

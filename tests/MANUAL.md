@@ -153,6 +153,12 @@ significant change to the relevant area.
       declarative Homebrew (no `brew update`/`upgrade`; `cleanup = check` only
       reports drift), and puts the nix-owned CLI set on PATH from
       `~/.nix-profile` / the system profile.
+      On a first bootstrap with existing `/etc/bashrc` or `/etc/zshrc`, confirm
+      setup retains their exact bytes at `.before-nix-darwin`; an injected
+      activation failure/interruption must restore both originals and preserve
+      generated replacements at collision-safe `.dotfiles-failed-*` paths. A
+      pre-existing `.before-nix-darwin` collision must move neither file and
+      must print explicit compare/resolve/retry guidance.
       If Homebrew already existed, confirm nix-homebrew auto-migrated the
       Homebrew repositories while keeping installed packages. If the old
       architecture-correct `Library/Taps` directory existed, confirm setup moved
@@ -185,7 +191,9 @@ significant change to the relevant area.
       PATH injection, run `env -i HOME="$HOME" USER="$USER" PATH=/usr/bin:/bin
       TERM=xterm zsh -l -i -c 'command -v rg'`. Confirm it resolves through a
       Nix profile/store path. Repeat with a custom home containing spaces and
-      with neither session-vars file present (the latter must remain harmless).
+      with the XDG, `~/.nix-profile`, and
+      `/etc/profiles/per-user/$(id -un)` session-vars locations individually.
+      With none present, startup must remain harmless.
 - [ ] **WSL split-host under Home Manager**: on WSL, after `./setup.sh --all`,
       confirm nothing was written under `/mnt/c` — Home Manager touches only the
       Linux `~/.nix-profile`; Windows Terminal/fonts/WezTerm stay Windows-host.

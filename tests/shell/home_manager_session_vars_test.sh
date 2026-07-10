@@ -55,6 +55,15 @@ rm -f "$HOME_DIR/.nix-profile/etc/profile.d/hm-session-vars.sh"
 no_nix="$(run_zsh -f -c "source \"\$1\" >/dev/null 2>&1 && ! command -v hm-owned-tool >/dev/null 2>&1 && printf safe" zsh "$REPO_ROOT/shells/zshrc")"
 [[ "$no_nix" == safe ]] || { echo "FAIL: missing HM profiles were not harmless"; exit 1; }
 
+# The pinned Home Manager source documents this third canonical location for
+# profiles integrated with a system configuration. Use the effective account
+# identity, never an unvalidated ambient USER path component.
+grep -F "/etc/profiles/per-user/\$_dotfiles_hm_user/etc/profile.d/hm-session-vars.sh" \
+    "$REPO_ROOT/shells/zshrc" >/dev/null \
+    || { echo "FAIL: system-integrated Home Manager profile fallback is missing"; exit 1; }
+grep -F "_dotfiles_hm_user=\"\$(id -un 2>/dev/null)\"" "$REPO_ROOT/shells/zshrc" >/dev/null \
+    || { echo "FAIL: Home Manager system profile is not keyed by effective account identity"; exit 1; }
+
 cmp -s "$REPO_ROOT/shells/zshrc" "$REPO_ROOT/home/dot_zshrc" || {
     echo "FAIL: chezmoi zshrc twin drifted"
     exit 1

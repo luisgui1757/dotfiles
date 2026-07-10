@@ -14,12 +14,18 @@ YES_ALL=1
 DRY_RUN=1
 
 out="$(install_zsh_plugins)"
-[[ "$out" == *"fzf-tab.git"* ]]
-[[ "$out" == *"$FZF_TAB_VERSION"* ]]
-[[ "$out" == *"$FZF_TAB_COMMIT"* ]]
-[[ "$out" == *"zsh-autosuggestions.git"* ]]
-[[ "$out" == *"$ZSH_AUTOSUGGESTIONS_VERSION"* ]]
-[[ "$out" == *"$ZSH_AUTOSUGGESTIONS_COMMIT"* ]]
+[[ "$out" == *"fzf-tab.git"* ]] \
+    || { echo "FAIL: zsh plugin dry-run omitted the fzf-tab origin"; exit 1; }
+[[ "$out" == *"$FZF_TAB_VERSION"* ]] \
+    || { echo "FAIL: zsh plugin dry-run omitted the fzf-tab reviewed ref"; exit 1; }
+[[ "$out" == *"$FZF_TAB_COMMIT"* ]] \
+    || { echo "FAIL: zsh plugin dry-run omitted the fzf-tab exact commit"; exit 1; }
+[[ "$out" == *"zsh-autosuggestions.git"* ]] \
+    || { echo "FAIL: zsh plugin dry-run omitted the autosuggestions origin"; exit 1; }
+[[ "$out" == *"$ZSH_AUTOSUGGESTIONS_VERSION"* ]] \
+    || { echo "FAIL: zsh plugin dry-run omitted the autosuggestions reviewed ref"; exit 1; }
+[[ "$out" == *"$ZSH_AUTOSUGGESTIONS_COMMIT"* ]] \
+    || { echo "FAIL: zsh plugin dry-run omitted the autosuggestions exact commit"; exit 1; }
 
 # A failing pinned-plugin install must (1) still attempt BOTH plugins, (2) surface
 # a FAIL: marker so CI catches it (the old `|| true` swallowed it and reported

@@ -148,14 +148,20 @@ fabricated homes. First-run bootstrap is also pinned: setup derives the locked
 nix-darwin rev and `narHash` from `flake.lock` before running
 `sudo env DOTFILES_TARGET_USER=... DOTFILES_TARGET_HOME=... nix run
 github:nix-darwin/nix-darwin/<locked-rev>?narHash=<encoded-narHash>#darwin-rebuild -- ...`;
-it never uses the mutable `nix-darwin` registry alias. On Linux/WSL, setup runs
+it never uses the mutable `nix-darwin` registry alias. On first bootstrap,
+pre-existing `/etc/bashrc` and `/etc/zshrc` are moved only to nix-darwin's
+documented `.before-nix-darwin` names after both backup paths pass a collision
+preflight. Activation failure or interruption quarantines any generated
+replacement and restores both originals; success retains the backups for
+nix-darwin recovery/uninstall. On Linux/WSL, setup runs
 `home-manager switch --flake .#<arch>-linux --impure`; first-run bootstrap uses
 the locked
 `github:nix-community/home-manager/<locked-rev>?narHash=<encoded-narHash>#home-manager`
 ref. WSL writes only to the Linux `~/.nix-profile`, never `/mnt/c`. Fresh
 Linux/WSL zsh sessions source Home Manager's canonical `hm-session-vars.sh`
-when present, with the legacy profile location as fallback, so Nix-owned tools
-resolve without caller-injected PATH state.
+from the XDG Nix profile, `~/.nix-profile`, or the system-integrated
+`/etc/profiles/per-user/<effective-user>` profile, in that order, so Nix-owned
+tools resolve without caller-injected PATH state.
 `--skip-deps` is the explicit already-provisioned escape hatch and skips the
 Nix package-layer application together with native/deferred dependency installs;
 the compatibility aliases `--nix-darwin` and `--home-manager` do not override
@@ -483,9 +489,14 @@ migration warning. POSIX pwsh profile management remains provisioning-adjacent.
   `libexec/gnubin` path when the `make` formula is installed, so Brew-owned
   `make` does not require a manual export. Homebrew may intentionally emit no
   `shellenv` output when its bin/sbin already lead PATH; setup accepts that
-  idempotent result only when the selected brew is already the exact resolved
-  executable. Failed evaluation or executable proof restores the current
-  shell's prior PATH/Homebrew variables and fails with retry instructions. On
+  idempotent result only when the selected and resolved commands prove the same
+  canonical Homebrew prefix and repository. This deliberately supports a
+  nix-darwin `/run/current-system/sw/bin/brew` wrapper activating the matching
+  architecture-native `/opt/homebrew` or `/usr/local` entrypoint without
+  accepting a different installation. Failed evaluation or identity proof restores the current
+  shell's prior PATH/Homebrew variables and fails with retry instructions. A
+  required macOS bootstrap/activation failure prints the consolidated failure
+  summary before any package install is attempted. On
   Windows, Scoop-owned tools are
   detected from shim metadata before package-list fallback; corrupt Scoop shims
   are `blocked`; winget and Chocolatey require both package-list ownership and a
@@ -1146,7 +1157,8 @@ MIT. See `LICENSE`.
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | Neovim stops before loading Lazy with a lockfile/cache identity error | `lazy-lock.json` is missing, malformed, incomplete, has a non-40-hex commit or invalid branch; or the cached `lazy.nvim` checkout is dirty, at the wrong commit, from the wrong origin, missing locked default-branch metadata, non-Git, or partial | restore the tracked `nvim/lazy-lock.json` and restart Neovim. Startup repairs the cache through a verified staging checkout and never executes an unproved path. If publication fails, fix the destination permissions named in the error and retry |
-| setup reports a Homebrew `shellenv` failure even though `brew` already resolves | the selected Homebrew executable is not the same installation PATH resolves, or `shellenv` exited nonzero; empty stdout alone is a normal Homebrew idempotence signal | inspect `command -v brew` and the exact path in the error. Repair the shadowing PATH or Homebrew installation, then rerun setup; setup never treats empty output as bootstrap proof when brew is absent |
+| setup reports a Homebrew `shellenv` failure even though `brew` already resolves | the selected command and PATH-resolved command report different Homebrew prefixes/repositories, or `shellenv` exited nonzero; empty stdout alone is a normal Homebrew idempotence signal | compare `brew --prefix` and `brew --repository` through both entrypoints named in the error. Repair the shadowing PATH or Homebrew installation, then rerun setup; a nix-darwin wrapper and native brew path are accepted only when those identities match |
+| first nix-darwin setup reports an existing `.before-nix-darwin` backup | setup found both an unmanaged `/etc/bashrc` or `/etc/zshrc` and an older backup, so choosing either would risk user/system data | compare the two files and resolve the collision deliberately, then rerun. Setup moves neither shell file until both backup destinations are clear and restores both if activation fails |
 | `<leader>X` keymaps fire `\X` instead of `<Space>X` | mapleader set after lazy.setup somehow | restore the order in `nvim/init.lua` — leader **before** `require("lazy").setup` |
 | Formatter runs twice or shows two BufWritePre autocmds | someone added a second handler outside conform.nvim | `:lua print(#vim.api.nvim_get_autocmds({event="BufWritePre"}))` should be 1; if not, find the second autocmd and delete it |
 | Lazy/Tree-sitter/Mason says `No C compiler found` | WSL/Linux has `make` but no `cc`/`gcc`/`clang`; Tree-sitter parsers and some plugin builds compile native code | re-run `./setup.sh --skip-config` to install the Linux compiler toolchain, or on Ubuntu run `sudo apt-get update && sudo apt-get install -y build-essential`, then `./setup.sh --skip-deps --skip-config` |
@@ -1182,7 +1194,7 @@ MIT. See `LICENSE`.
 | `setup.sh --update` says a tool is `unmanaged` | the executable is present, but no supported Unix owner proves ownership of the resolved command source | use it as-is and update it outside dotfiles, or intentionally migrate it to Homebrew/Linuxbrew, the native package manager, or a dotfiles-provenanced direct artifact |
 | `setup.sh --update` says a tool is `blocked` | the source strongly implies supported ownership, but the package/provenance proof is contradictory or unsafe | repair or reinstall that manager package/artifact, then rerun update mode; dotfiles fails closed rather than guessing |
 | `setup.sh --update` still resolves `make` to `/usr/bin/make` after `brew install make` | Homebrew's GNU Make formula exposes `make` through `$(brew --prefix make)/libexec/gnubin` | rerun `./setup.sh --skip-config` or open a new shell after setup persists Homebrew shellenv; the managed shell block prepends the `gnubin` path when the formula is installed |
-| A fresh Linux/WSL zsh cannot find Home Manager tools | Home Manager's session variables were not generated or neither canonical profile path is readable | re-run `./setup.sh --all`, then start a new zsh. The managed zshrc sources `${XDG_STATE_HOME:-$HOME/.local/state}/nix/profiles/profile/etc/profile.d/hm-session-vars.sh`, falling back to `~/.nix-profile/etc/profile.d/hm-session-vars.sh`; no-Nix machines remain supported |
+| A fresh Linux/WSL zsh cannot find Home Manager tools | Home Manager's session variables were not generated or none of its canonical profile paths is readable | re-run `./setup.sh --all`, then start a new zsh. The managed zshrc checks `${XDG_STATE_HOME:-$HOME/.local/state}/nix/profiles/profile`, `~/.nix-profile`, then `/etc/profiles/per-user/$(id -un)` for `etc/profile.d/hm-session-vars.sh`; no-Nix machines remain supported |
 | A CI/credential-helper PowerShell process prints prompt output or writes profile caches | an old profile used host name or `UserInteractive` as a proxy for an interactive invocation | update and re-apply this repo. The profile now returns before cache work when argv selects batch/noninteractive execution, any console stream is redirected, CI is set, or the host is unsupported; normal ConsoleHost, VS Code, and ISE remain interactive |
 | Mixed Linuxbrew and apt/dnf/pacman/zypper/apk tools update through different managers | update mode resolves ownership per executable source, not from one global active manager | this is expected: a Linuxbrew-owned `rg` can update through Brew while an apt-owned `/usr/bin/jq` updates through apt in the same run |
 | `setup.ps1 -Update` says a tool is `unmanaged` | the executable is present, but its command source is outside supported manager ownership | install or migrate that tool through Scoop, winget, or Chocolatey if you want dotfiles to own future updates; otherwise update that manually-installed copy outside dotfiles |
