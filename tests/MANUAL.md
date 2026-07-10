@@ -188,7 +188,7 @@ significant change to the relevant area.
       Intel-darwin release and remains supported only through 2026-12-31; keep
       its warning visible and track the required post-26.05 package-plane
       migration separately.
-- [ ] **Cache-free full setup proof**: workflow-dispatch run
+- [x] **Cache-free exact behavior-head full setup proof**: workflow-dispatch run
       [`29096335827`](https://github.com/luisgui1757/dotfiles/actions/runs/29096335827)
       on merged-main SHA `5e3e7c6d93c400d67f6160c6f8f09be56aac10d3`
       skipped the broad install/plugin caches in every setup job. Attempt 1
@@ -206,8 +206,20 @@ significant change to the relevant area.
       lost Astro captures and Intel lost GraphQL captures because ordinary
       headless plugin config still started an interactive asynchronous install.
       That path is now blocked outside a UI or the explicit synchronous phase.
-      Require every producer and all logical proofs to pass on a newer exact
-      head before checking this row.
+      Exact behavior head `e5cf3e23299cbb42a157c307f2a7259979fcada0`
+      then passed
+      [`29103732329`](https://github.com/luisgui1757/dotfiles/actions/runs/29103732329)
+      with caches skipped: Ubuntu container `86399025475`, public Ubuntu
+      `86399025519`, Apple Silicon `86399025503`, Intel `86399025491`, native
+      Windows `86399025722`, and all four setup logical proofs were green.
+      This checks the exact branch behavior; it is not WSL, redirected Windows,
+      divergent dual Terminal, or desktop/TCC evidence.
+- [ ] **Cache-free merged-main safeguard confirmation**: after PR #48 merges,
+      dispatch `e2e-install.yml` on the resulting `main` SHA. Require all five
+      producers, the four setup logical proofs, and the two Nix logical proofs
+      to pass before opening the stage-two context-switch PR. Record that
+      merged-main SHA and run here and in `tests/greenfield/LEDGER.md`; a
+      documentation-only descendant does not replace the behavior-head run.
 - [ ] **Home Manager (Linux/WSL)**: with Nix installed inside the Linux/WSL
       environment, run
       `./setup.sh --all` (or the compatibility alias `./setup.sh --home-manager`;

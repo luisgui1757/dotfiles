@@ -933,3 +933,54 @@ merged-main greenfield proof.
 - This test-only correction does not promote the earlier cache-free run to
   exact-final-head evidence. Push it, let the PR workflows restart, and dispatch
   a new cache-free run on the resulting immutable head.
+
+## Exact repaired behavior-head hosted closure — entry 27
+
+- Exact repaired behavior head:
+  `e5cf3e23299cbb42a157c307f2a7259979fcada0`.
+- Cache-free workflow-dispatch run:
+  [`29103732329`](https://github.com/luisgui1757/dotfiles/actions/runs/29103732329),
+  completed successfully with every broad cache step skipped. Producers passed:
+  Ubuntu container `86399025475` (3m17s), public Ubuntu `86399025519` (7m53s),
+  Apple Silicon `86399025503` (10m33s), Intel `86399025491` (17m06s), and
+  native Windows `86399025722` (16m44s). Stable setup logical proofs passed:
+  container/Linux `86403118150`, setup/Linux `86403118145`, setup/macOS
+  `86403118099`, and setup/Windows `86403118074`.
+- Final behavior-head PR workflows also passed. Generic/parity run
+  `29103728407` closed the Ubuntu fixture correction and passed Ubuntu, macOS,
+  Windows, and all three parity jobs. Nix run `29103728279` passed Ubuntu,
+  Apple Silicon, Intel, and logical Linux/macOS. E2E run `29103728188` passed
+  all five producers and all four stable setup logical proofs. Every one of the
+  12 live-required legacy contexts and all six candidate logical contexts was
+  green on the same SHA.
+- The cache-free Ubuntu container installed through the exact verified Ghostty
+  package path; the prior mutable-installer failure did not recur. Apple
+  Silicon, Intel, Ubuntu, and Windows strict parser/capture assertions all
+  passed; neither the waited build callback nor ordinary headless config
+  launched overlapping parser publication.
+- This is exact automated branch-head evidence for the conventional GitHub
+  environments. It is not a merged-main run and does not claim WSL, redirected
+  Windows, divergent dual Windows Terminal state, owner-host tap rollback, or
+  desktop GUI/TCC behavior.
+
+### Finding status amendments
+
+| ID | Status after entry 27 | Exact evidence | Remaining work |
+|---|---|---|---|
+| UGR-004 | ACCEPTED/FIXED | Both PR container `86398980438` and cache-free container `86399025475` passed the exact Ghostty package path; generic Ubuntu `86398854097` passed the corrected failure/fallback suite. | Normal third-party outage behavior remains external runtime evidence. |
+| UGR-020 | PARTIAL | All 12 legacy and all six candidate logical contexts passed on repaired behavior head `e5cf3e23299cbb42a157c307f2a7259979fcada0`; live safeguards remain unchanged. | Merge PR #48, repeat cache-free/logical proof on its merged-main SHA, then open and merge the separate context-switch PR before owner-applied safeguards. |
+| UGR-021 | PARTIAL | Cache-free run `29103732329` passed all five producers and all four setup logical proofs on the exact repaired behavior head; the same SHA passed both Nix logical proofs in `29103728279`. | Merged-main confirmation plus WSL, redirected Windows, dual Terminal, and desktop/TCC evidence remain. |
+
+### Live relationship at entry 27
+
+- Integrity ruleset `17363189` and classic branch protection still require the
+  exact 12 legacy contexts with strict behind-main enforcement; all passed.
+- Review ruleset `17363190` still requires one code-owner approval, last-push
+  approval, stale-review dismissal, and thread resolution. PR #48 is
+  `MERGEABLE` but correctly `BLOCKED` with `REVIEW_REQUIRED`.
+- Owner-update ruleset `17363555` remains active. Actions remains enabled with
+  `sha_pinning_required:false`; the checked-in desired value remains true for
+  the later owner-applied stage. No live safeguard was mutated.
+- This evidence entry is a documentation-only descendant of the immutable
+  behavior head above. Required checks must still pass on the final PR head;
+  the behavior-head cache-free result is not relabeled as a docs-head run.

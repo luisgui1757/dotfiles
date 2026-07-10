@@ -258,9 +258,12 @@ broken repo-symlink still cleaned) is covered by
       missing Astro captures on Ubuntu and GraphQL captures on Intel. These are
       recorded as partial/failed evidence, not promoted to a green run; the
       implementation now blocks interactive auto-install in ordinary headless
-      processes as well as waiting on the build callback.
-      No Windows Sandbox, WSL, redirected-Windows, successful cache-free full
-      matrix, or desktop visual run is claimed. Required CI is not manual
+      processes as well as waiting on the build callback. Exact behavior head
+      `e5cf3e23299cbb42a157c307f2a7259979fcada0` subsequently passed cache-free
+      run `29103732329` across Ubuntu container, public Ubuntu, Apple Silicon,
+      Intel, native Windows, and all four setup logical proofs.
+      No Windows Sandbox, WSL, redirected-Windows, merged-main cache-free
+      confirmation, or desktop visual run is claimed. Required CI is not manual
       desktop evidence. The old Wave C `0 / 10` Ubuntu parity counter is no
       longer the current release gate; current CI proof is the required
       parity/e2e/Nix workflow set plus explicit ledger entries.

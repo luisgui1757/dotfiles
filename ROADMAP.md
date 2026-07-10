@@ -314,8 +314,9 @@ Commit-by-commit status:
   Silicon/Intel/Windows, and all six stable logical proof jobs. No workflow
   definition is recorded as runtime proof; only those completed runs are.
 
-- **Cache-free Tree-sitter restore/bootstrap boundary — REPAIR IMPLEMENTED,
-  HOSTED PROOF PENDING.** The first manual cache-free merged-main run
+- **Cache-free Tree-sitter restore/bootstrap boundary — BRANCH-HEAD PROOF
+  PASSED; MERGED-MAIN CONFIRMATION PENDING.** The first manual cache-free
+  merged-main run
   (`29096335827`, attempt 1, SHA `5e3e7c6d93c400d67f6160c6f8f09be56aac10d3`)
   proved that command-form Lazy `build = ":TSUpdate"` returned while its parser
   compilers were still running. Phase 4 then overlapped that unfinished work;
@@ -338,10 +339,16 @@ Commit-by-commit status:
   declared-parser install before Phase 4. Ordinary headless config loads now
   skip that path; only a real UI or the explicit synchronous Phase 4 flag may
   install. The new behavioral test failed on the branch head and passes after
-  this second root-cause fix. A newer cache-free hosted run is still required.
+  this second root-cause fix. Exact behavior head
+  `e5cf3e23299cbb42a157c307f2a7259979fcada0` then passed cache-free run
+  `29103732329`: Ubuntu container, public Ubuntu, Apple Silicon, Intel, native
+  Windows, and all four setup logical proofs were green. UGR-021 remains
+  PARTIAL only because the context-switch sequence still requires the same
+  proof on the later merged-main SHA and the separate manual environments.
 
-- **Cache-free Ghostty artifact provenance — REPAIR IMPLEMENTED, HOSTED RETRY
-  PENDING.** PR #48's first Ubuntu container job (`29100012131` /
+- **Cache-free Ghostty artifact provenance — BRANCH-HEAD PROOF PASSED;
+  MERGED-MAIN CONFIRMATION PENDING.** PR #48's first Ubuntu container job
+  (`29100012131` /
   `86386173483`) reproduced a second cache-free dependency: the checksum-pinned
   `mkasberg/ghostty-ubuntu` script queried unauthenticated mutable
   `releases/latest`, then exited under `set -e` when no asset URL was returned.
@@ -351,8 +358,11 @@ Commit-by-commit status:
   SHA-256 values and exact package metadata before privileged apt, validates the
   installed version/command, cleans staging on every path, and prints recovery
   guidance after state-changing failures. Success/failure/mapping tests and the
-  generalized privileged-package scanner bind the contract. A new hosted
-  Ubuntu container result is required; the red job is evidence, not waived.
+  generalized privileged-package scanner bind the contract. Exact behavior
+  head `e5cf3e23299cbb42a157c307f2a7259979fcada0` passed both the cached PR
+  Ubuntu container (`29103728188` / `86398980438`) and cache-free Ubuntu
+  container (`29103732329` / `86399025475`). The original red job remains
+  defect evidence rather than being waived.
 
 - **Exact-head runtime dependency follow-up — PASSED.** Head
   `0c853d066362602f14dc251a6d3fbf3980102048`
