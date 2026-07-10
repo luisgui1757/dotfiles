@@ -354,6 +354,14 @@ that violates one of these, fix it instead of disabling the test.
     the emitting PR. Follow `docs/security/branch-protection.md`: observe the
     logical checks on merged `main`, merge the checked-in context-switch PR
     while legacy checks still gate it, then have the owner apply live safeguards.
+28. **Handled native PowerShell status never escapes its adapter.** Setup and
+    uninstall chezmoi helpers temporarily disable native error promotion,
+    capture stdout/stderr and the exact exit code, restore the caller preference,
+    and reset global `LASTEXITCODE` after producing the explicit result object.
+    Expected verify drift is returned as false; actual invocation failures still
+    throw. This prevents an otherwise-successful script or GitHub `pwsh` step
+    from inheriting a handled exit 1. Guarded under both preference states by
+    Setup/Uninstall Pester and the Windows round-trip entry point.
 
 ## Common workflows
 
@@ -908,7 +916,9 @@ save only**. The next plain `:w` formats normally. Implemented in
   package-manager row (`scoop` on Windows, detected POSIX manager on Unix),
   uses the same presence checks as the installer, best-effort `--version`
   probes, and still leaves all actual install/skip decisions to the existing
-  per-tool functions.
+  per-tool functions. Identity-sensitive entries must pass the complete
+  predicate shape: zsh plugins include target, expected origin, pinned commit,
+  and required entry file even during the read-only table scan.
 - **`--update` is a scoped drift-edge refresh, not a repo update.**
   `setup.sh --update` / `setup.ps1 -Update` run only `install-deps --update`
   and `nvim --headless +MasonToolsUpdateSync +qa`. The Mason command is

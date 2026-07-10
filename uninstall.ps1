@@ -263,6 +263,9 @@ function Invoke-ChezmoiNative {
         }
     } finally {
         Remove-Item -LiteralPath $stderrPath -Force -ErrorAction SilentlyContinue
+        # Callers consume ExitCode explicitly. Do not leak a handled verify
+        # drift into the surrounding PowerShell/GitHub process exit contract.
+        $global:LASTEXITCODE = 0
     }
 }
 

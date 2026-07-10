@@ -4113,8 +4113,8 @@ install_scan_present() {
             root="$(zsh_plugin_root)"
             fzf_tab_dir="$root/fzf-tab"
             autosuggestions_dir="$root/zsh-autosuggestions"
-            zsh_plugin_ok "$fzf_tab_dir" "$FZF_TAB_COMMIT" "fzf-tab.plugin.zsh" &&
-                zsh_plugin_ok "$autosuggestions_dir" "$ZSH_AUTOSUGGESTIONS_COMMIT" "zsh-autosuggestions.zsh"
+            zsh_plugin_ok "$fzf_tab_dir" "https://github.com/Aloxaf/fzf-tab.git" "$FZF_TAB_COMMIT" "fzf-tab.plugin.zsh" &&
+                zsh_plugin_ok "$autosuggestions_dir" "https://github.com/zsh-users/zsh-autosuggestions.git" "$ZSH_AUTOSUGGESTIONS_COMMIT" "zsh-autosuggestions.zsh"
             ;;
         tmux-plugins)
             local root tpm_dir

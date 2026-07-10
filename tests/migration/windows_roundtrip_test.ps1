@@ -275,3 +275,7 @@ try {
     }
     exit 1
 }
+
+# The test handles expected native verify drift internally. Make the successful
+# entry-point contract explicit so the GitHub pwsh wrapper cannot inherit it.
+exit 0

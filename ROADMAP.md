@@ -271,7 +271,10 @@ Commit-by-commit status:
   verifies stable logical checks while the legacy contexts remain required;
   the checked-in/live switch happens only in the documented post-merge stage.
   UGR-021 is PARTIAL until real Intel, WSL, redirected-Windows, and desktop runs
-  exist. No workflow definition is recorded as runtime proof.
+  exist. The first PR run exposed and fixed two cross-host integration defects:
+  the POSIX dependency-table zsh scan now passes the complete origin/commit/file
+  identity, and handled Windows chezmoi drift no longer leaks a native exit code
+  into the CI step. No workflow definition is recorded as runtime proof.
 
 ### P2 Follow-up: Secondary Supply-chain Hardening
 

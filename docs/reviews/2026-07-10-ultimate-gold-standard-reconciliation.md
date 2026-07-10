@@ -298,3 +298,23 @@ Local macOS execution is not native-Windows, WSL2, Intel-macOS, redirected-known
 folder, or desktop-GUI runtime proof. Those environments, the exact PR-head CI
 results, and hosted Renovate Dashboard ownership remain unavailable/pending at
 this entry and are not recorded as greenfield evidence.
+
+## PR #47 required-check repair — entry 5
+
+- Exact failing head: `5d8772fb817cc73ef5ad9b27a43566050e8de0b7`.
+- Reproduced CI failures: required `ubuntu` and `e2e containers / ubuntu-24.04`
+  both failed at `install-deps.sh:2007` because the dependency-table
+  `zsh-plugins` presence scan retained the pre-hardening three-argument call and
+  omitted expected origin. Required `chezmoi-parity-windows` completed every
+  round-trip assertion successfully, then GitHub failed the step because a
+  handled verify-drift exit 1 remained in global `LASTEXITCODE`.
+- Root fixes: both dependency-table plugin probes now pass target, origin,
+  commit, and required file. Setup/uninstall native adapters still return the
+  captured exit explicitly but neutralize global native status after restoring
+  the caller preference; the Windows round-trip entry point also declares
+  explicit success only after every assertion completes.
+- Regression tests: `install_dependency_table_test.sh` checks both complete zsh
+  identities and fails on arity/origin drift. Setup/Uninstall Pester now asserts
+  handled match, drift, and invocation-error paths leave `LASTEXITCODE=0` while
+  retaining their true/false/throw contract. Focused and full rerun results and
+  the repair commit identity follow in later append-only entries.

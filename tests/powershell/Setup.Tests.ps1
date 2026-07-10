@@ -89,10 +89,12 @@ Describe "setup.ps1 Test-TargetContentMatchesChezmoi copy-mode" -Skip:(-not $scr
             $PSNativeCommandUseErrorActionPreference = $Preference
             Test-ChezmoiVerify $script:ProbeTarget | Should -BeTrue
             $PSNativeCommandUseErrorActionPreference | Should -Be $Preference
+            $LASTEXITCODE | Should -Be 0
 
             [System.IO.File]::WriteAllText($script:ProbeTarget, 'divergent user bytes')
             Test-ChezmoiVerify $script:ProbeTarget | Should -BeFalse
             $PSNativeCommandUseErrorActionPreference | Should -Be $Preference
+            $LASTEXITCODE | Should -Be 0
         } finally {
             $PSNativeCommandUseErrorActionPreference = $originalPreference
         }
@@ -106,6 +108,7 @@ Describe "setup.ps1 Test-TargetContentMatchesChezmoi copy-mode" -Skip:(-not $scr
             $PSNativeCommandUseErrorActionPreference = $true
             { Test-ChezmoiVerify $script:ProbeTarget } | Should -Throw '*verify invocation failed*missing source*'
             $PSNativeCommandUseErrorActionPreference | Should -BeTrue
+            $LASTEXITCODE | Should -Be 0
         } finally {
             $script:ChezmoiBaseArgs = $oldBaseArgs
             $PSNativeCommandUseErrorActionPreference = $originalPreference

@@ -174,10 +174,12 @@ Describe 'uninstall.ps1 chezmoi native verify semantics' {
             $PSNativeCommandUseErrorActionPreference = $Preference
             Test-ChezmoiTargetUnmodified -Target $script:NativeTarget -BaseArguments $script:NativeBaseArgs | Should -BeTrue
             $PSNativeCommandUseErrorActionPreference | Should -Be $Preference
+            $LASTEXITCODE | Should -Be 0
 
             [IO.File]::WriteAllText($script:NativeTarget, 'user drift')
             Test-ChezmoiTargetUnmodified -Target $script:NativeTarget -BaseArguments $script:NativeBaseArgs | Should -BeFalse
             $PSNativeCommandUseErrorActionPreference | Should -Be $Preference
+            $LASTEXITCODE | Should -Be 0
         } finally {
             $PSNativeCommandUseErrorActionPreference = $originalPreference
         }
@@ -192,6 +194,7 @@ Describe 'uninstall.ps1 chezmoi native verify semantics' {
                 Test-ChezmoiTargetUnmodified -Target $script:NativeTarget -BaseArguments $badArgs
             } | Should -Throw '*verify invocation failed*missing source*'
             $PSNativeCommandUseErrorActionPreference | Should -BeTrue
+            $LASTEXITCODE | Should -Be 0
         } finally {
             $PSNativeCommandUseErrorActionPreference = $originalPreference
         }
