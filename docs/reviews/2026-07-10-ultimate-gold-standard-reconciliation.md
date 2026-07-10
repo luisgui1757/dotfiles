@@ -257,3 +257,44 @@ The final batch hash is appended in a later identity entry after Git creates it.
   `stash@{0}^3` from the original checkout and adding the recovered bytes here.
   No stash was popped, dropped, rewritten, or deleted; the original untracked
   review prompts were left untouched.
+
+## Priority 2/3 implementation identity — entry 3
+
+- UGR-010, the Windows half of UGR-015, UGR-016 through UGR-023, and their
+  focused tests/documentation were committed as `eac92bc`
+  (`fix(platform): close lifecycle and proof gaps`). This immutable identity
+  supersedes every “final closure batch (hash pending)” cell above; the status
+  and residual-proof classifications themselves remain unchanged.
+
+## Local verification — entry 4
+
+Executed on 2026-07-10 against `eac92bc` in the clean macOS worktree. This
+documentation-only result entry was appended afterward:
+
+| Command / suite | Result |
+|---|---|
+| `git diff --check` | PASS |
+| `bash -n` over every tracked `*.sh` | PASS, 130 scripts |
+| `make lint` | PASS, strict ShellCheck including `shells/zshrc` |
+| `bash tests/static/run_all.sh` | PASS |
+| `bash tests/shell/run_all.sh` | PASS |
+| `make test-migration` | PASS: templates, parity, greenfield round-trip, uninstall safety/order, Windows render, and zsh publisher/drift oracle |
+| PowerShell parser (`tests/static/ps1_parse.sh`) | PASS for every tracked PowerShell surface |
+| `pwsh -NoLogo -NoProfile -File ./test.ps1` | PASS: analyzer exact fingerprint, Pester 231 passed / 0 failed / 0 skipped, and all 17 Neovim spec files exited 0 |
+| Focused Windows Terminal Pester filter | PASS: 19 passed / 0 failed / 0 skipped (13 setup transaction plus 6 uninstall/recovery cases) |
+| `make test-nvim` | PASS, including locked bootstrap, checked deletion, and real two-project clangd isolation |
+| `make validate-renovate` | PASS: Renovate 43.257.4 validator and official local extraction exactly matched 87 reviewed records |
+| `nix flake check` | PASS on the aarch64-darwin host; incompatible-system builds were omitted by Nix, while both Darwin architectures and both Linux Home Manager shapes were separately evaluated by the Nix suites |
+| `make test` | PASS |
+| `make ci` | PASS (`local pre-PR gate passed`) |
+
+An earlier pre-final shell-suite run correctly failed on two new ShellCheck
+diagnostics. The ambiguous logical-marker expression was rewritten as explicit
+control flow, and the Polaris trap-only helper became an inline EXIT transaction;
+the focused tests, strict lint, full shell suite, `make test`, and `make ci` all
+passed afterward. No suppression or weakened test was added.
+
+Local macOS execution is not native-Windows, WSL2, Intel-macOS, redirected-known-
+folder, or desktop-GUI runtime proof. Those environments, the exact PR-head CI
+results, and hosted Renovate Dashboard ownership remain unavailable/pending at
+this entry and are not recorded as greenfield evidence.
