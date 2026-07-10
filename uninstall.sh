@@ -379,7 +379,7 @@ remove_externals() {
 }
 
 if [[ "${DOTFILES_UNINSTALL_SOURCE_ONLY:-}" == "1" ]]; then
-    return 0 2>/dev/null || exit 0
+    return 0
 fi
 
 echo "uninstall: repo=$REPO_ROOT source=$SOURCE_DIR dry-run=$DRY_RUN restore-backups=$RESTORE_BACKUPS"

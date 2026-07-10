@@ -50,12 +50,20 @@ if grep -F 'XDG_DATA_HOME' "$zshrc" | grep -F 'zsh-plugins' >/dev/null; then
     echo "FAIL: zshrc must not make the zsh plugin root depend on XDG_DATA_HOME"
     exit 1
 fi
-grep -F '[".local/share/dotfiles/zsh-plugins/fzf-tab"]' "$REPO_ROOT/home/.chezmoiexternal.toml.tmpl" >/dev/null \
-    || { echo "FAIL: chezmoi externals must install fzf-tab under the fixed root"; exit 1; }
+if grep -F 'type = "git-repo"' "$REPO_ROOT/home/.chezmoiexternal.toml.tmpl" >/dev/null; then
+    echo "FAIL: generic chezmoi git-repo externals must not publish sourceable zsh payloads"
+    exit 1
+fi
+ensure_template="$REPO_ROOT/home/.chezmoiscripts/run_onchange_after_20-ensure-zsh-plugin-pins.sh.tmpl"
 # shellcheck disable=SC2016 # literal template syntax is intentional.
-grep -F 'root="$HOME/.local/share/dotfiles/zsh-plugins"' \
-    "$REPO_ROOT/home/.chezmoiscripts/run_onchange_after_20-verify-zsh-plugin-pins.sh.tmpl" >/dev/null \
-    || { echo "FAIL: zsh pin verifier must check the fixed plugin root"; exit 1; }
+grep -F 'root="$HOME/.local/share/dotfiles/zsh-plugins"' "$ensure_template" >/dev/null \
+    || { echo "FAIL: checked publisher must use the fixed plugin root"; exit 1; }
+grep -F 'scripts/ensure-pinned-zsh-plugin.sh' "$ensure_template" >/dev/null \
+    || { echo "FAIL: chezmoi must call the canonical staged publisher"; exit 1; }
+grep -F "$FZF_TAB_COMMIT" "$ensure_template" >/dev/null \
+    || { echo "FAIL: chezmoi fzf-tab commit pin drift"; exit 1; }
+grep -F "$ZSH_AUTOSUGGESTIONS_COMMIT" "$ensure_template" >/dev/null \
+    || { echo "FAIL: chezmoi autosuggestions commit pin drift"; exit 1; }
 # zsh-autosuggestions (inline gray history) is sourced for prediction.
 grep -F 'zsh-autosuggestions/zsh-autosuggestions.zsh' "$zshrc" >/dev/null
 

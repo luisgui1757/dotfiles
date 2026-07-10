@@ -33,6 +33,7 @@ env:
   STARSHIP_LINUX_X86_64_SHA256: 321f0dd7af8340a5f2e6a8fec6538a04f617486f9ec70d878f91c09cd8deef22
   TREE_SITTER_CLI_LINUX_VERSION: v0.26.10
   TREE_SITTER_CLI_LINUX_X86_64_SHA256: 5aca1172aae08050d0d1184046377d850c04065205185ebafde361afff8d9f62
+  POWERSHELL_REPO_DEB_SHA256: c13f01ac7c3001b51a9281d40dde666db5e037e05512840c319832f7852bfec4
 
 jobs:
   ubuntu:
@@ -78,8 +79,8 @@ jobs:
           export PATH="$HOME/.local/bin:$PATH"
 
           # PowerShell so tests/static/ps1_parse.sh catches .ps1 syntax regressions.
-          source /etc/os-release
-          curl -fsSL "https://packages.microsoft.com/config/ubuntu/${VERSION_ID}/packages-microsoft-prod.deb" -o /tmp/packages-microsoft-prod.deb
+          curl -fsSL "https://packages.microsoft.com/config/ubuntu/24.04/packages-microsoft-prod.deb" -o /tmp/packages-microsoft-prod.deb
+          printf '%s  %s\n' "$POWERSHELL_REPO_DEB_SHA256" /tmp/packages-microsoft-prod.deb | sha256sum -c -
           sudo dpkg -i /tmp/packages-microsoft-prod.deb
           rm /tmp/packages-microsoft-prod.deb
           sudo apt-get update

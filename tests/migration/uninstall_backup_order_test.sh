@@ -10,7 +10,10 @@ HOME="$WORK/Home With Spaces"
 export HOME
 trap 'rm -rf "$WORK"' EXIT
 
-DOTFILES_UNINSTALL_SOURCE_ONLY=1 source "$REPO_ROOT/uninstall.sh"
+original_dir="$PWD"
+cd "$REPO_ROOT"
+DOTFILES_UNINSTALL_SOURCE_ONLY=1 source ./uninstall.sh
+cd "$original_dir"
 trap 'rm -f "$DIR_CANDIDATES_FILE"; rm -rf "$WORK"' EXIT
 
 fail() { echo "FAIL: $*" >&2; exit 1; }

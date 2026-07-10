@@ -166,7 +166,7 @@ account_home_directory() {
             command -v dscl >/dev/null 2>&1 || return 1
             record="$(dscl . -read "/Users/$user" NFSHomeDirectory 2>/dev/null)" || return 1
             home="${record#NFSHomeDirectory:}"
-            home="${home#${home%%[![:space:]]*}}"
+            home="${home#"${home%%[![:space:]]*}"}"
             ;;
         Linux)
             if command -v getent >/dev/null 2>&1; then

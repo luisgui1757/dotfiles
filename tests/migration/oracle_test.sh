@@ -7,7 +7,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 SRC="$REPO_ROOT/home"
-VERIFY_ZSH_PINS_TMPL="$SRC/.chezmoiscripts/run_onchange_after_20-verify-zsh-plugin-pins.sh.tmpl"
+ENSURE_ZSH_PINS_TMPL="$SRC/.chezmoiscripts/run_onchange_after_20-ensure-zsh-plugin-pins.sh.tmpl"
 
 fail() {
     echo "FAIL: $*" >&2
@@ -64,11 +64,12 @@ apply_clean_home() {
     env HOME="$home" chezmoi --source "$SRC" apply
 }
 
-render_commit_assert() {
-    local dest="$1"
-    chezmoi --source "$SRC" execute-template --override-data '{"targetOS":"linux"}' \
-        < "$VERIFY_ZSH_PINS_TMPL" > "$dest"
-    [[ -s "$dest" ]] || fail "commit-assert template rendered empty"
+render_zsh_pin_ensurer() {
+    local dest="$1" home="$2"
+    env HOME="$home" chezmoi --source "$SRC" execute-template \
+        --override-data '{"targetOS":"linux"}' \
+        < "$ENSURE_ZSH_PINS_TMPL" > "$dest"
+    [[ -s "$dest" ]] || fail "zsh pin ensurer template rendered empty"
 }
 
 print_log() {
@@ -101,44 +102,32 @@ trap 'rm -rf "$COMMIT_HOME" "$VERIFY_HOME" "$WORK"' EXIT
 export XDG_DATA_HOME="$WORK/xdg-data"
 
 apply_clean_home "$COMMIT_HOME"
-pass "commit-assert oracle fixture applied cleanly"
+pass "checked-publisher oracle fixture applied cleanly"
 
 fzf_tab_dir="$COMMIT_HOME/.local/share/dotfiles/zsh-plugins/fzf-tab"
 [[ -d "$fzf_tab_dir/.git" ]] || \
     fail "fzf-tab checkout missing at $fzf_tab_dir"
 
 pinned_head="$(git_head "$fzf_tab_dir")"
-fzf_tab_ref="$(git -C "$fzf_tab_dir" describe --exact-match --tags HEAD 2>/dev/null || true)"
-[[ -n "$fzf_tab_ref" ]] || \
-    fail "fzf-tab HEAD is not at a tag; cannot deepen a known pinned ref"
-if ! git -C "$fzf_tab_dir" rev-parse --verify HEAD~1 >/dev/null 2>&1; then
-    git -C "$fzf_tab_dir" fetch --deepen=1 origin "$fzf_tab_ref" >/dev/null 2>&1 || \
-        fail "could not deepen fzf-tab checkout to find a different real commit"
-fi
-bad_head="$(git -C "$fzf_tab_dir" rev-parse --verify HEAD~1)" || \
-    fail "could not resolve fzf-tab HEAD~1 after deepen"
-[[ "$bad_head" != "$pinned_head" ]] || \
-    fail "fzf-tab alternate commit unexpectedly equals pinned HEAD"
-git -C "$fzf_tab_dir" checkout --detach "$bad_head" >/dev/null 2>&1 || \
-    fail "could not corrupt fzf-tab checkout to $bad_head"
-pass "commit-assert oracle corrupted fzf-tab HEAD"
+git -C "$fzf_tab_dir" config user.name oracle
+git -C "$fzf_tab_dir" config user.email oracle@example.invalid
+printf '%s\n' 'sourceable wrong payload' > "$fzf_tab_dir/fzf-tab.plugin.zsh"
+git -C "$fzf_tab_dir" add fzf-tab.plugin.zsh
+git -C "$fzf_tab_dir" commit -qm 'oracle wrong payload'
+bad_head="$(git_head "$fzf_tab_dir")"
+[[ "$bad_head" != "$pinned_head" ]] || fail "oracle failed to create a wrong fzf-tab HEAD"
+pass "checked-publisher oracle created a sourceable wrong fzf-tab HEAD"
 
-commit_assert="$WORK/verify-zsh-plugin-pins.sh"
-commit_assert_log="$WORK/verify-zsh-plugin-pins.log"
-render_commit_assert "$commit_assert"
-
-commit_assert_rc=0
-env HOME="$COMMIT_HOME" bash "$commit_assert" > "$commit_assert_log" 2>&1 || \
-    commit_assert_rc=$?
-if [[ "$commit_assert_rc" -eq 0 ]]; then
-    print_log "$commit_assert_log"
-    fail "commit-assert accepted a bad fzf-tab pin"
-fi
-if ! grep -Fq "FAIL: fzf-tab HEAD" "$commit_assert_log"; then
-    print_log "$commit_assert_log"
-    fail "commit-assert failed without the fzf-tab FAIL line"
-fi
-pass "commit-assert fires on a bad fzf-tab pin"
+ensure_script="$WORK/ensure-zsh-plugin-pins.sh"
+render_zsh_pin_ensurer "$ensure_script" "$COMMIT_HOME"
+env HOME="$COMMIT_HOME" bash "$ensure_script"
+[[ "$(git_head "$fzf_tab_dir")" == "$pinned_head" ]] || \
+    fail "chezmoi pin verifier did not self-heal the exact fzf-tab pin"
+[[ "$(cat "$fzf_tab_dir/fzf-tab.plugin.zsh")" != 'sourceable wrong payload' ]] || \
+    fail "bare chezmoi apply left the wrong executable payload sourceable"
+[[ -z "$(git -C "$fzf_tab_dir" status --porcelain --untracked-files=all --ignored)" ]] || \
+    fail "self-healed fzf-tab checkout is not clean"
+pass "chezmoi pin verifier neutralizes and self-heals a wrong zsh plugin payload"
 
 apply_clean_home "$VERIFY_HOME"
 pass "verify oracle fixture applied cleanly"

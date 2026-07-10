@@ -127,13 +127,21 @@ BeforeAll {
             }
             if ($a.Count -ge 3 -and $a[0] -eq 'extension' -and $a[1] -eq 'remove') {
                 $script:GhCalls += ('remove ' + (($a[2..($a.Count - 1)]) -join ' '))
-                $global:LASTEXITCODE = 0
+                $global:LASTEXITCODE = $script:GhRemoveRc
                 return
             }
             if ($a.Count -ge 3 -and $a[0] -eq 'extension' -and $a[1] -eq 'install') {
                 $script:GhCalls += ('install ' + (($a[2..($a.Count - 1)]) -join ' '))
                 $global:LASTEXITCODE = $script:GhInstallRc
                 return
+            }
+            if ($a.Count -ge 2 -and $a[0] -eq 'api' -and $a[1] -match '/git/ref/tags/') {
+                $global:LASTEXITCODE = $script:GhApiRc
+                return $script:GhTagObjectResult
+            }
+            if ($a.Count -ge 2 -and $a[0] -eq 'api' -and $a[1] -match '/git/tags/') {
+                $global:LASTEXITCODE = $script:GhApiRc
+                return $script:GhPeeledCommitResult
             }
             $global:LASTEXITCODE = 0
         }
@@ -532,13 +540,16 @@ Describe "install-deps.ps1" {
         Should -Invoke -CommandName wt -Times 0 -Exactly
     }
 
-    It "registers tree-sitter in the Windows package catalog" {
+    It "keeps tree-sitter out of mutable package catalogs and pins release bytes" {
         . $script:ImportInstallDepsForTest
 
-        $Catalog.ContainsKey('tree-sitter') | Should -BeTrue
+        $Catalog.ContainsKey('tree-sitter') | Should -BeFalse
         $BinaryName['tree-sitter'] | Should -Be 'tree-sitter'
-        $Catalog['tree-sitter'].scoop | Should -Be 'tree-sitter'
-        $Catalog['tree-sitter'].purpose | Should -Match 'nvim-treesitter main'
+        $TreeSitterCliVersion | Should -Be 'v0.26.10'
+        $TreeSitterCliWindowsX64Sha256 | Should -Match '^[0-9a-f]{64}$'
+        $TreeSitterCliWindowsArm64Sha256 | Should -Match '^[0-9a-f]{64}$'
+        $TreeSitterCliWindowsX86Sha256 | Should -Match '^[0-9a-f]{64}$'
+        @((Get-InstallDependencySpec) | Where-Object { $_.Tool -eq 'tree-sitter' }).Count | Should -Be 1
     }
 
     It "registers lsd in the Windows package catalog" {
@@ -755,7 +766,7 @@ Describe "install-deps.ps1" {
         $PiCliIntegrity | Should -Match '^sha512-'
     }
 
-    It "dry-runs the Pi CLI with the pinned npm package and integrity" {
+    It "dry-runs the Pi CLI as a packed, byte-verified local tarball" {
         . $script:ImportInstallDepsForTest -DryRun
         Mock -CommandName Test-PiCliCurrent -MockWith { return $false }
         Mock -CommandName Test-PiCliNodeReady -MockWith { return $true }
@@ -767,12 +778,127 @@ Describe "install-deps.ps1" {
 
         $output = & { Install-PiCli } 6>&1 | Out-String
 
-        $output | Should -Match 'npm view @earendil-works/pi-coding-agent@0\.80\.3 dist\.integrity'
+        $output | Should -Match 'npm pack --ignore-scripts --json --pack-destination <temp> @earendil-works/pi-coding-agent@0\.80\.3'
         $output | Should -Match ([regex]::Escape($PiCliIntegrity))
-        $output | Should -Match 'npm install -g @earendil-works/pi-coding-agent@0\.80\.3'
+        $output | Should -Match 'npm install -g <verified-local-tarball>'
     }
 
-    It "fails closed before installing Pi CLI when npm integrity mismatches" {
+    It "validates Pi tarball bytes independently against SHA-512 SRI" {
+        . $script:ImportInstallDepsForTest
+        $path = Join-Path $TestDrive 'pi.tgz'
+        [System.IO.File]::WriteAllText($path, 'known package bytes')
+        $sha = [System.Security.Cryptography.SHA512]::Create()
+        try {
+            $sri = 'sha512-' + [Convert]::ToBase64String($sha.ComputeHash([System.IO.File]::ReadAllBytes($path)))
+        } finally {
+            $sha.Dispose()
+        }
+
+        Test-PiCliTarballIntegrity -Path $path -ExpectedIntegrity $sri | Should -BeTrue
+        [System.IO.File]::AppendAllText($path, 'tampered')
+        Test-PiCliTarballIntegrity -Path $path -ExpectedIntegrity $sri | Should -BeFalse
+        Test-PiCliTarballIntegrity -Path $path -ExpectedIntegrity 'sha256-not-supported' | Should -BeFalse
+    }
+
+    It "rejects Pi pack metadata disagreement and cleans temporary state" {
+        . $script:ImportInstallDepsForTest
+        $tempRoot = Join-Path $TestDrive 'pi metadata temp'
+        $oldTempRoot = $env:DOTFILES_PI_CLI_TEMP_ROOT
+        try {
+            $env:DOTFILES_PI_CLI_TEMP_ROOT = $tempRoot
+            Mock -CommandName Invoke-PiCliNpm -MockWith {
+                param([string[]]$Arguments, [string]$StderrPath)
+                if ($Arguments[0] -eq 'install') { throw 'install must not run after metadata mismatch' }
+                $packDir = $Arguments[4]
+                [System.IO.File]::WriteAllText((Join-Path $packDir 'pi.tgz'), 'bytes')
+                $json = @([pscustomobject]@{ filename = 'pi.tgz'; integrity = 'sha512-not-the-pin' }) | ConvertTo-Json -Compress
+                return [pscustomobject]@{ Output = @($json); ExitCode = 0 }
+            }
+
+            { Invoke-PiCliVerifiedTarballInstall } | Should -Throw '*metadata integrity mismatch*'
+            @(Get-ChildItem -LiteralPath $tempRoot -Force -ErrorAction SilentlyContinue).Count | Should -Be 0
+        } finally {
+            $env:DOTFILES_PI_CLI_TEMP_ROOT = $oldTempRoot
+        }
+    }
+
+    It "rejects partial Pi tarballs before install and cleans temporary state" {
+        . $script:ImportInstallDepsForTest
+        $tempRoot = Join-Path $TestDrive 'pi partial temp'
+        $oldTempRoot = $env:DOTFILES_PI_CLI_TEMP_ROOT
+        try {
+            $env:DOTFILES_PI_CLI_TEMP_ROOT = $tempRoot
+            Mock -CommandName Invoke-PiCliNpm -MockWith {
+                param([string[]]$Arguments, [string]$StderrPath)
+                if ($Arguments[0] -eq 'install') { throw 'install must not run after byte mismatch' }
+                $packDir = $Arguments[4]
+                [System.IO.File]::WriteAllText((Join-Path $packDir 'pi.tgz'), 'partial')
+                $json = @([pscustomobject]@{ filename = 'pi.tgz'; integrity = $PiCliIntegrity }) | ConvertTo-Json -Compress
+                return [pscustomobject]@{ Output = @($json); ExitCode = 0 }
+            }
+
+            { Invoke-PiCliVerifiedTarballInstall } | Should -Throw '*tarball bytes do not match pinned SRI*'
+            @(Get-ChildItem -LiteralPath $tempRoot -Force -ErrorAction SilentlyContinue).Count | Should -Be 0
+        } finally {
+            $env:DOTFILES_PI_CLI_TEMP_ROOT = $oldTempRoot
+        }
+    }
+
+    It "installs only the verified local Pi tarball and cleans on success" {
+        . $script:ImportInstallDepsForTest
+        $tempRoot = Join-Path $TestDrive 'pi success temp'
+        $oldTempRoot = $env:DOTFILES_PI_CLI_TEMP_ROOT
+        $script:InstalledPiTarball = ''
+        try {
+            $env:DOTFILES_PI_CLI_TEMP_ROOT = $tempRoot
+            Mock -CommandName Test-PiCliTarballIntegrity -MockWith { return $true }
+            Mock -CommandName Invoke-PiCliNpm -MockWith {
+                param([string[]]$Arguments, [string]$StderrPath)
+                if ($Arguments[0] -eq 'pack') {
+                    $packDir = $Arguments[4]
+                    [System.IO.File]::WriteAllText((Join-Path $packDir 'pi.tgz'), 'verified bytes')
+                    $json = @([pscustomobject]@{ filename = 'pi.tgz'; integrity = $PiCliIntegrity }) | ConvertTo-Json -Compress
+                    return [pscustomobject]@{ Output = @($json); ExitCode = 0 }
+                }
+                $script:InstalledPiTarball = $Arguments[2]
+                return [pscustomobject]@{ Output = @(); ExitCode = 0 }
+            }
+
+            Invoke-PiCliVerifiedTarballInstall
+
+            $script:InstalledPiTarball | Should -Match 'dotfiles-pi-[0-9a-f]+[\\/]pi\.tgz$'
+            @(Get-ChildItem -LiteralPath $tempRoot -Force -ErrorAction SilentlyContinue).Count | Should -Be 0
+        } finally {
+            $env:DOTFILES_PI_CLI_TEMP_ROOT = $oldTempRoot
+        }
+    }
+
+    It "cleans Pi pack state when verified-local-tarball installation fails" {
+        . $script:ImportInstallDepsForTest
+        $tempRoot = Join-Path $TestDrive 'pi install failure temp'
+        $oldTempRoot = $env:DOTFILES_PI_CLI_TEMP_ROOT
+        try {
+            $env:DOTFILES_PI_CLI_TEMP_ROOT = $tempRoot
+            Mock -CommandName Test-PiCliTarballIntegrity -MockWith { return $true }
+            Mock -CommandName Invoke-PiCliNpm -MockWith {
+                param([string[]]$Arguments, [string]$StderrPath)
+                if ($Arguments[0] -eq 'pack') {
+                    $packDir = $Arguments[4]
+                    [System.IO.File]::WriteAllText((Join-Path $packDir 'pi.tgz'), 'verified bytes')
+                    $json = @([pscustomobject]@{ filename = 'pi.tgz'; integrity = $PiCliIntegrity }) | ConvertTo-Json -Compress
+                    return [pscustomobject]@{ Output = @($json); ExitCode = 0 }
+                }
+                return [pscustomobject]@{ Output = @(); ExitCode = 61 }
+            }
+
+            { Invoke-PiCliVerifiedTarballInstall } | Should -Throw '*verified local tarball*pi.tgz*exit 61*'
+            @(Get-ChildItem -LiteralPath $tempRoot -Force -ErrorAction SilentlyContinue).Count | Should -Be 0
+        } finally {
+            $env:DOTFILES_PI_CLI_TEMP_ROOT = $oldTempRoot
+        }
+    }
+
+    It "records one Pi failure when pack or local-tarball install fails" {
         . $script:ImportInstallDepsForTest
         Mock -CommandName Test-PiCliCurrent -MockWith { return $false }
         Mock -CommandName Test-PiCliNodeReady -MockWith { return $true }
@@ -781,54 +907,166 @@ Describe "install-deps.ps1" {
             if ($Name -in @('npm', 'node')) { return [pscustomobject]@{ Name = $Name; Source = $Name } }
             return $null
         }
-        Mock -CommandName npm -MockWith {
-            $global:LASTEXITCODE = 0
-            return 'sha512-not-the-pin'
-        } -ParameterFilter { $args[0] -eq 'view' }
-        Mock -CommandName npm -MockWith { throw "npm install must not run after integrity mismatch" } -ParameterFilter { $args[0] -eq 'install' }
+        Mock -CommandName Invoke-PiCliVerifiedTarballInstall -MockWith { throw 'npm pack network failure' }
 
         $output = & { Install-PiCli } 6>&1 | Out-String
 
-        $output | Should -Match 'FAIL: pi\s+npm integrity mismatch'
+        $output | Should -Match 'npm pack network failure'
         $script:InstallFailures.Count | Should -Be 1
         $script:InstallFailures[0].Tool | Should -Be 'pi'
-        $script:InstallFailures[0].ExitCode | Should -Be 'integrity'
     }
 
-    It "installs the Pi CLI with npm after integrity verification" {
+    It "reuses a current Pi install without packing again" {
         . $script:ImportInstallDepsForTest
-        $script:PiInstalled = $false
-        $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("pi-cli-test-" + [System.Guid]::NewGuid())
+        Mock -CommandName Test-PiCliCurrent -MockWith { return $true }
+        Mock -CommandName Invoke-PiCliVerifiedTarballInstall -MockWith { throw 'must not repack a current Pi install' }
+
+        $output = & { Install-PiCli } 6>&1 | Out-String
+
+        $output | Should -Match 'already installed \(0\.80\.3\)'
+        Should -Invoke -CommandName Invoke-PiCliVerifiedTarballInstall -Times 0 -Exactly
+    }
+
+    It "maps every supported Windows tree-sitter architecture to pinned bytes" {
+        . $script:ImportInstallDepsForTest
+
+        (Get-TreeSitterWindowsArtifact -Architecture x64).Name | Should -Be 'tree-sitter-cli-windows-x64.zip'
+        (Get-TreeSitterWindowsArtifact -Architecture x64).Sha256 | Should -Be $TreeSitterCliWindowsX64Sha256
+        (Get-TreeSitterWindowsArtifact -Architecture arm64).Sha256 | Should -Be $TreeSitterCliWindowsArm64Sha256
+        (Get-TreeSitterWindowsArtifact -Architecture x86).Sha256 | Should -Be $TreeSitterCliWindowsX86Sha256
+        { Get-TreeSitterWindowsArtifact -Architecture riscv64 } | Should -Throw '*unsupported Windows architecture*'
+    }
+
+    It "accepts a compatible unmanaged tree-sitter without replacing it" {
+        . $script:ImportInstallDepsForTest
+        Mock -CommandName Get-TreeSitterCliVersion -MockWith { return '0.26.10' }
+        Mock -CommandName Invoke-WebRequest -MockWith { throw 'compatible install must not download' }
+
+        $output = & { Install-TreeSitterCli } 6>&1 | Out-String
+
+        $output | Should -Match 'compatible 0\.26\.10'
+        Should -Invoke -CommandName Invoke-WebRequest -Times 0 -Exactly
+        $script:InstallFailures.Count | Should -Be 0
+    }
+
+    It "repairs a stale or partial tree-sitter with the verified release artifact" {
+        . $script:ImportInstallDepsForTest
+        $localAppData = Join-Path $TestDrive 'Redirected Local AppData'
+        $installRoot = Join-Path (Join-Path $localAppData 'dotfiles') 'bin'
+        New-Item -ItemType Directory -Force -Path $installRoot | Out-Null
+        $target = Join-Path $installRoot 'tree-sitter.exe'
+        [System.IO.File]::WriteAllText($target, 'stale executable')
+        $oldOverride = $env:DOTFILES_LOCAL_APP_DATA_OVERRIDE
+        $script:TreeSitterPathPublished = $false
         try {
-            New-Item -ItemType Directory -Force -Path $tempRoot | Out-Null
-            Mock -CommandName Test-PiCliCurrent -MockWith { return $script:PiInstalled }
-            Mock -CommandName Test-PiCliNodeReady -MockWith { return $true }
-            Mock -CommandName Test-PiCliNpmIntegrity -MockWith { return $true }
-            Mock -CommandName Get-Command -MockWith {
-                param([string]$Name)
-                if ($Name -in @('npm', 'node')) { return [pscustomobject]@{ Name = $Name; Source = $Name } }
-                return $null
+            $env:DOTFILES_LOCAL_APP_DATA_OVERRIDE = $localAppData
+            Mock -CommandName Get-TreeSitterCliVersion -MockWith {
+                param([string]$Path)
+                if (-not [string]::IsNullOrWhiteSpace($Path)) { return '0.26.10' }
+                if ($script:TreeSitterPathPublished) { return '0.26.10' }
+                return '0.25.0'
             }
-            Mock -CommandName npm -MockWith {
-                $script:PiInstalled = $true
-                $global:LASTEXITCODE = 0
-            } -ParameterFilter { $args[0] -eq 'install' }
-            Mock -CommandName npm -MockWith {
-                $global:LASTEXITCODE = 0
-                return $tempRoot
-            } -ParameterFilter { $args[0] -eq 'prefix' }
-            Mock -CommandName Add-DirectoryToUserPath -MockWith { }
+            Mock -CommandName Invoke-WebRequest -MockWith {
+                param($Uri, $OutFile)
+                [System.IO.File]::WriteAllText($OutFile, 'zip')
+            }
+            Mock -CommandName Test-FileSha256 -MockWith { return $true }
+            Mock -CommandName Expand-Archive -MockWith {
+                param($LiteralPath, $DestinationPath)
+                New-Item -ItemType Directory -Force -Path $DestinationPath | Out-Null
+                [System.IO.File]::WriteAllText((Join-Path $DestinationPath 'tree-sitter.exe'), 'exact executable')
+            }
+            Mock -CommandName Add-DirectoryToUserPath -MockWith { $script:TreeSitterPathPublished = $true }
 
-            $output = & { Install-PiCli } 6>&1 | Out-String
+            $output = & { Install-TreeSitterCli } 6>&1 | Out-String
 
-            $output | Should -Match 'installed\s+pi\s+0\.80\.3'
+            $output | Should -Match 'installed\s+tree-sitter\s+v0\.26\.10'
+            [System.IO.File]::ReadAllText($target) | Should -Be 'exact executable'
+            @(Get-ChildItem -LiteralPath $installRoot -Filter '.tree-sitter.exe.*' -Force).Count | Should -Be 0
             $script:InstallFailures.Count | Should -Be 0
-            Should -Invoke -CommandName Add-DirectoryToUserPath -Times 1 -Exactly -ParameterFilter {
-                $Directory -eq $tempRoot
-            }
+            Should -Invoke -CommandName Invoke-WebRequest -Times 1 -Exactly
         } finally {
-            Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
+            $env:DOTFILES_LOCAL_APP_DATA_OVERRIDE = $oldOverride
         }
+    }
+
+    It "preserves the old managed tree-sitter when post-publication setup fails" {
+        . $script:ImportInstallDepsForTest
+        $localAppData = Join-Path $TestDrive 'rollback Local AppData'
+        $installRoot = Join-Path (Join-Path $localAppData 'dotfiles') 'bin'
+        New-Item -ItemType Directory -Force -Path $installRoot | Out-Null
+        $target = Join-Path $installRoot 'tree-sitter.exe'
+        [System.IO.File]::WriteAllText($target, 'old valid executable')
+        $oldOverride = $env:DOTFILES_LOCAL_APP_DATA_OVERRIDE
+        try {
+            $env:DOTFILES_LOCAL_APP_DATA_OVERRIDE = $localAppData
+            Mock -CommandName Get-TreeSitterCliVersion -MockWith {
+                param([string]$Path)
+                if (-not [string]::IsNullOrWhiteSpace($Path)) { return '0.26.10' }
+                return '0.25.0'
+            }
+            Mock -CommandName Invoke-WebRequest -MockWith {
+                param($Uri, $OutFile)
+                [System.IO.File]::WriteAllText($OutFile, 'zip')
+            }
+            Mock -CommandName Test-FileSha256 -MockWith { return $true }
+            Mock -CommandName Expand-Archive -MockWith {
+                param($LiteralPath, $DestinationPath)
+                New-Item -ItemType Directory -Force -Path $DestinationPath | Out-Null
+                [System.IO.File]::WriteAllText((Join-Path $DestinationPath 'tree-sitter.exe'), 'new executable')
+            }
+            Mock -CommandName Add-DirectoryToUserPath -MockWith { throw 'injected PATH publication failure' }
+
+            Install-TreeSitterCli
+
+            [System.IO.File]::ReadAllText($target) | Should -Be 'old valid executable'
+            $script:InstallFailures.Count | Should -Be 1
+            $script:InstallFailures[0].Tool | Should -Be 'tree-sitter'
+        } finally {
+            $env:DOTFILES_LOCAL_APP_DATA_OVERRIDE = $oldOverride
+        }
+    }
+
+    It "fails checksum validation without changing an existing tree-sitter" {
+        . $script:ImportInstallDepsForTest
+        $localAppData = Join-Path $TestDrive 'checksum Local AppData'
+        $installRoot = Join-Path (Join-Path $localAppData 'dotfiles') 'bin'
+        New-Item -ItemType Directory -Force -Path $installRoot | Out-Null
+        $target = Join-Path $installRoot 'tree-sitter.exe'
+        [System.IO.File]::WriteAllText($target, 'old executable')
+        $oldOverride = $env:DOTFILES_LOCAL_APP_DATA_OVERRIDE
+        try {
+            $env:DOTFILES_LOCAL_APP_DATA_OVERRIDE = $localAppData
+            Mock -CommandName Get-TreeSitterCliVersion -MockWith { return '0.25.0' }
+            Mock -CommandName Invoke-WebRequest -MockWith {
+                param($Uri, $OutFile)
+                [System.IO.File]::WriteAllText($OutFile, 'wrong zip')
+            }
+            Mock -CommandName Test-FileSha256 -MockWith { return $false }
+            Mock -CommandName Expand-Archive -MockWith { throw 'must not extract checksum mismatch' }
+
+            Install-TreeSitterCli
+
+            [System.IO.File]::ReadAllText($target) | Should -Be 'old executable'
+            $script:InstallFailures.Count | Should -Be 1
+            Should -Invoke -CommandName Expand-Archive -Times 0 -Exactly
+        } finally {
+            $env:DOTFILES_LOCAL_APP_DATA_OVERRIDE = $oldOverride
+        }
+    }
+
+    It "dry-runs the exact tree-sitter artifact without invoking npm or Scoop" {
+        . $script:ImportInstallDepsForTest -DryRun
+        Mock -CommandName Get-TreeSitterCliVersion -MockWith { return '' }
+        Mock -CommandName npm -MockWith { throw 'npm fallback must not run' }
+        Mock -CommandName scoop -MockWith { throw 'Scoop tree-sitter must not run' }
+
+        $output = & { Install-TreeSitterCli } 6>&1 | Out-String
+
+        $output | Should -Match 'tree-sitter-cli-windows-(x64|arm64|x86)\.zip'
+        $output | Should -Match 'SHA-256 [0-9a-f]{64}'
+        Should -Invoke -CommandName npm -Times 0 -Exactly
+        Should -Invoke -CommandName scoop -Times 0 -Exactly
     }
 
     It "registers Windows Terminal in the Windows package catalog" {
@@ -2884,6 +3122,10 @@ Describe "Install-GhDashExtension" {
         $script:GhListRc = 0
         $script:GhListOut = @()
         $script:GhInstallRc = 0
+        $script:GhRemoveRc = 0
+        $script:GhApiRc = 0
+        $script:GhTagObjectResult = 'e6ebbd7e83e30161b9192ce3339972d2c8269e7f'
+        $script:GhPeeledCommitResult = '49f37e4832956c57bf52d4ea8b1b1e5c0f863700'
         $script:GhCalls = @()
     }
 
@@ -2910,13 +3152,14 @@ Describe "Install-GhDashExtension" {
         . $script:ImportInstallDepsForTest -DryRun
         Set-GhDashMock
         $out = (Install-GhDashExtension 6>&1 | Out-String)
-        $out | Should -Match ([regex]::Escape("gh extension install dlvhdr/gh-dash --pin $GhDashVersion"))
+        $out | Should -Match ([regex]::Escape("tag object $GhDashTagObject peels to $GhDashCommit"))
+        $out | Should -Match ([regex]::Escape("gh extension install dlvhdr/gh-dash --pin $GhDashCommit"))
         $script:GhCalls.Count | Should -Be 0
     }
 
     It "is idempotent when installed at the expected pin" {
         . $script:ImportInstallDepsForTest
-        $script:GhListOut = @("gh dash`tdlvhdr/gh-dash`t$GhDashVersion")
+        $script:GhListOut = @("gh dash`tdlvhdr/gh-dash`t$GhDashCommit")
         Set-GhDashMock
         $out = (Install-GhDashExtension 6>&1 | Out-String)
         $out | Should -Match 'already installed'
@@ -2930,7 +3173,7 @@ Describe "Install-GhDashExtension" {
         Set-GhDashMock
         Install-GhDashExtension
         ($script:GhCalls -join "`n") | Should -Match 'remove dash'
-        ($script:GhCalls -join "`n") | Should -Match ([regex]::Escape("install dlvhdr/gh-dash --pin $GhDashVersion"))
+        ($script:GhCalls -join "`n") | Should -Match ([regex]::Escape("install dlvhdr/gh-dash --pin $GhDashCommit"))
         $script:InstallFailures.Count | Should -Be 0
     }
 
@@ -2941,6 +3184,18 @@ Describe "Install-GhDashExtension" {
         Install-GhDashExtension
         $script:InstallFailures.Count | Should -Be 1
         $script:InstallFailures[0].Tool | Should -Be 'gh-dash'
+    }
+
+    It "rejects a moved gh-dash tag before extension mutation" {
+        . $script:ImportInstallDepsForTest
+        $script:GhTagObjectResult = 'deadbeef'
+        Set-GhDashMock
+
+        $out = (Install-GhDashExtension 6>&1 | Out-String)
+
+        $out | Should -Match 'tag object mismatch'
+        $script:InstallFailures.Count | Should -Be 1
+        $script:GhCalls.Count | Should -Be 0
     }
 
     It "does not leak a nonzero LASTEXITCODE from native gh probes (PSNativeCommandUseErrorActionPreference)" {

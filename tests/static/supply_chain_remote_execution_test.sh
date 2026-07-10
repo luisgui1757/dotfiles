@@ -89,6 +89,43 @@ def unverified_powershell_payload_executions(path, text):
     return local_failures
 
 
+def unverified_privileged_package_installs(path, text):
+    """Require an independent digest between download and privileged install."""
+    local_failures = []
+    download_pattern = re.compile(
+        r"(?m)^\s*curl\b[^\n]*(?:-o|--output)\s+[\"']?([^\s\"']+)",
+        re.IGNORECASE,
+    )
+    privileged_prefix = re.compile(
+        r"\bsudo\s+(?:dpkg\s+-i|rpm\s+(?:-i|--install)|apt(?:-get)?\s+install|installer\s+-pkg)\b",
+        re.IGNORECASE,
+    )
+    digest_tool = re.compile(r"\b(?:sha256sum|shasum\s+-a\s+256)\b", re.IGNORECASE)
+    for download in download_pattern.finditer(text):
+        artifact = download.group(1)
+        tail = text[download.end():]
+        install = None
+        for candidate in privileged_prefix.finditer(tail):
+            line_end = tail.find("\n", candidate.start())
+            if line_end == -1:
+                line_end = len(tail)
+            if artifact in tail[candidate.start():line_end]:
+                install = candidate
+                break
+        if install is None:
+            continue
+        intervening = tail[:install.start()]
+        verified = any(
+            artifact in line and digest_tool.search(line)
+            for line in intervening.splitlines()
+        )
+        if not verified:
+            local_failures.append(
+                f"{path}: downloaded package {artifact} reaches privileged installation without an intervening SHA-256 check"
+            )
+    return local_failures
+
+
 failures = []
 seen_allowlist = set()
 
@@ -134,6 +171,25 @@ for label, probe, should_fail in ps_payload_probes:
     if not should_fail and probe_failures:
         failures.append(f"supply-chain scanner rejected verified PowerShell payload probe: {label}")
 
+privileged_package_probes = [
+    (
+        "unverified deb",
+        "curl -fsSL https://example.invalid/pkg.deb -o /tmp/pkg.deb\nsudo dpkg -i /tmp/pkg.deb\n",
+        True,
+    ),
+    (
+        "verified deb",
+        "curl -fsSL https://example.invalid/pkg.deb -o /tmp/pkg.deb\nprintf '%s  %s\\n' \"$PIN\" /tmp/pkg.deb | sha256sum -c -\nsudo dpkg -i /tmp/pkg.deb\n",
+        False,
+    ),
+]
+for label, probe, should_fail in privileged_package_probes:
+    probe_failures = unverified_privileged_package_installs(f"probe-{label}.sh", probe)
+    if should_fail and not probe_failures:
+        failures.append(f"supply-chain scanner failed to catch privileged package probe: {label}")
+    if not should_fail and probe_failures:
+        failures.append(f"supply-chain scanner rejected verified privileged package probe: {label}")
+
 install_deps_sh = pathlib.Path("install-deps.sh").read_text(encoding="utf-8")
 required_install_deps_snippets = [
     'HOMEBREW_INSTALL_COMMIT="',
@@ -178,6 +234,8 @@ required_workflow_snippets = [
     "tree-sitter-cli-linux-x64.zip",
     "sudo install -m 0755 /tmp/tree-sitter-cli/tree-sitter /usr/local/bin/tree-sitter",
     "Get-FileHash -Algorithm SHA256 -LiteralPath $zip",
+    "POWERSHELL_REPO_DEB_SHA256:",
+    'printf \'%s  %s\\n\' "$POWERSHELL_REPO_DEB_SHA256" /tmp/packages-microsoft-prod.deb | sha256sum -c -',
 ]
 for snippet in required_workflow_snippets:
     if snippet not in workflow:
@@ -254,6 +312,23 @@ else:
     ):
         if snippet not in helper_text:
             failures.append(f"scripts/install-pinned-chezmoi.sh missing guard snippet: {snippet}")
+
+wt_greenfield = pathlib.Path("tests/greenfield/install-wt-portable.ps1").read_text(encoding="utf-8")
+for snippet in (
+    ". $installDeps",
+    "$WindowsTerminalVersion",
+    "$WindowsTerminalX64Sha256",
+    "Test-FileSha256 -Path $zip -Expected $WindowsTerminalX64Sha256",
+    "[IO.Directory]::Move($stage, $destination)",
+):
+    if snippet not in wt_greenfield:
+        failures.append(f"Windows Sandbox Terminal helper missing production-pin/transaction guard: {snippet}")
+for banned in (
+    "/releases/latest",
+    "Copy-Item -LiteralPath $managed",
+):
+    if banned in wt_greenfield:
+        failures.append(f"Windows Sandbox Terminal helper contains mutable/destructive pattern: {banned}")
 
 setup_doc_files = [
     pathlib.Path("README.md"),
@@ -335,6 +410,7 @@ for path in scan_paths:
 
     if path.suffix.lower() == ".ps1":
         failures.extend(unverified_powershell_payload_executions(path, "\n".join(lines)))
+    failures.extend(unverified_privileged_package_installs(path, "\n".join(lines)))
 
 for key in sorted(set(allowlist) - seen_allowlist):
     failures.append(f"{key[0]}: allowlist entry no longer matches and should be removed: {key[1]}")

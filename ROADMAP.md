@@ -255,35 +255,35 @@ Commit-by-commit status:
   host proof remains explicitly pending. UGR-001 and UGR-014 are implemented:
   packaged/portable WT state is independently transactionally merged and
   recovered, while uninstall backup selection is filename-keyed and fails
-  closed on malformed candidates.
+  closed on malformed candidates. UGR-004 through UGR-009 are implemented:
+  recoverable installs share the summary boundary; Pi and zsh executable
+  payloads prove immutable identities before publication; Windows Tree-sitter
+  uses exact compatible release artifacts; the required Microsoft `.deb`,
+  gh-dash peeled commit, Sandbox Terminal zip, external Action refs, and desired
+  Actions SHA-pinning safeguard are checked and documented.
 
 ### P2 Follow-up: Secondary Supply-chain Hardening
 
 Reconciled by the 2026-07-10 ultimate closure branch; each item is marked DONE
 only with its implementation, tests, and documentation:
 
-1. **Pi CLI verified tarball install**: replace request-A / install-request-B with
-   `npm pack`, verify the tarball integrity against `PI_CLI_INTEGRITY` /
-   `$PiCliIntegrity`, then install that verified tarball. Files:
-   `install-deps.sh`, `install-deps.ps1`, `tests/shell/pi_cli_test.sh`,
-   `tests/powershell/InstallDeps.Tests.ps1`.
-2. **zsh plugin quarantine-on-mismatch**: clone/fetch into a temp directory,
-   verify the expected commit, then move into place; if the chezmoi/onchange
-   verifier finds a mismatched payload, quarantine or remove it before failing.
-   Files: `install-deps.sh`,
-   `home/.chezmoiscripts/run_onchange_after_20-verify-zsh-plugin-pins.sh.tmpl`,
-   `tests/shell/zsh_plugins_test.sh`.
-3. **Windows tree-sitter npm fallback pin**: pin the npm fallback or mirror the
-   Linux pinned release-asset approach. Files: `install-deps.ps1`,
-   `tests/powershell/InstallDeps.Tests.ps1`.
-4. **gh-dash tag provenance**: verify the tag commit before installing/re-pinning,
-   or document gh extension tag resolution as an explicit reviewed exception.
-   Files: `install-deps.sh`, `install-deps.ps1`,
-   `tests/shell/gh_dash_extension_test.sh`,
-   `tests/powershell/InstallDeps.Tests.ps1`.
-5. **Ubuntu CI Microsoft repo package**: pin/verify the Microsoft package repo
-   `.deb` in `.github/workflows/test.yml`, or document it as CI-only risk with
-   least-privilege rationale and static guard coverage.
+1. **Pi CLI verified tarball install — DONE.** POSIX and Windows use `npm pack`,
+   require pack metadata and actual tarball bytes to match the mirrored SRI,
+   install only the local verified tarball, and clean temp state on every exit.
+2. **zsh plugin quarantine-on-mismatch — DONE.** The shared serialized
+   publisher neutralizes unproved executable payloads, verifies a sibling exact
+   checkout, publishes atomically, preserves unsafe quarantines, and lets bare
+   chezmoi self-heal legitimate pin changes.
+3. **Windows Tree-sitter compatibility pin — DONE.** Mutable Scoop/npm fallback
+   ownership is removed; exact `0.26.10` compatibility and the reviewed
+   x64/arm64/x86 release zip hashes gate transactional publication.
+4. **gh-dash tag provenance — DONE.** Tag `v4.25.1` is verified through its
+   annotated object to peeled commit
+   `49f37e4832956c57bf52d4ea8b1b1e5c0f863700`, and installation pins that commit.
+5. **Ubuntu CI Microsoft repo package — DONE.** Ubuntu 24.04 downloads the exact
+   configuration `.deb`, checks reviewed SHA-256
+   `c13f01ac7c3001b51a9281d40dde666db5e037e05512840c319832f7852bfec4`,
+   then invokes `sudo dpkg`; the general scanner self-tests this ordering.
 
 Startup SIGTERM harness changes were not made in this branch because the failure
 was not reproduced; do not rewrite that test without a deterministic
@@ -934,9 +934,9 @@ Canonical solution:
 ### 8. zsh plugin root semantics split between XDG-aware runtime and fixed chezmoi paths
 
 Status: done. The canonical contract is fixed
-`~/.local/share/dotfiles/zsh-plugins`; install-deps, runtime, chezmoi externals,
-pin verification, uninstall, greenfield validation, container/WSL validation,
-and parity fixtures now use or assert that root.
+`~/.local/share/dotfiles/zsh-plugins`; install-deps, runtime, the checked
+publisher, uninstall, greenfield validation, container/WSL validation, and
+parity fixtures now use or assert that root.
 
 Evidence:
 
@@ -944,11 +944,11 @@ Evidence:
   `$HOME/.local/share/dotfiles/zsh-plugins` root.
 - `install-deps.sh` installs zsh plugins into the fixed
   `$HOME/.local/share/dotfiles/zsh-plugins` root.
-- `home/.chezmoiexternal.toml.tmpl:4` and
-  `home/.chezmoiexternal.toml.tmpl:11` install chezmoi externals to fixed
-  `.local/share` paths.
-- `home/.chezmoiscripts/run_onchange_after_20-verify-zsh-plugin-pins.sh.tmpl:5`
-  through line 6 verify the fixed `.local/share` path.
+- `home/.chezmoiexternal.toml.tmpl` deliberately exposes no executable
+  `git-repo` target.
+- `home/.chezmoiscripts/run_onchange_after_20-ensure-zsh-plugin-pins.sh.tmpl`
+  invokes the canonical staged publisher against the fixed `.local/share` path
+  whenever pins or the embedded publisher identity change.
 - `uninstall.sh:176` through `uninstall.sh:179` and `uninstall.ps1:155` through
   `uninstall.ps1:160` only classify fixed `.local/share` externals.
 - `tests/migration/parity_gate.sh`, `tests/migration/oracle_test.sh`,

@@ -129,3 +129,60 @@ status entries; history is never deleted or rewritten.
   MIGRATION_STATUS, and this ledger.
 - Implementation commit: pending creation of this cohesive data-safety commit;
   an append-only identity entry will follow.
+
+### UGR-001 / UGR-014 — implementation commit identity
+
+- Implementation commit: `f1c9e2c` (`fix(windows): make terminal settings
+  transactional`).
+
+### UGR-004 through UGR-009 — implementation entry 1
+
+- Status: UGR-004, UGR-005, UGR-006, UGR-007, UGR-008, and UGR-009 FIXED,
+  pending final full gates and native-Windows CI. The checked-in Actions
+  SHA-pinning safeguard is implemented but pending owner application after
+  merge; no live setting was changed.
+- UGR-004: every recoverable POSIX main-flow install crosses
+  `run_install_step`. It absorbs `set -e`, records a nonzero callee only when
+  the callee did not already record a precise failure, continues to a later
+  sentinel, prints one consolidated summary, and exits nonzero. The audit
+  covers catalog installs plus Neovim, chezmoi, lazygit, Starship, tmux/zsh
+  plugins, Ghostty/WezTerm, Herdr, Pi, Tree-sitter, pylatexenc, fonts, and GUI
+  paths.
+- UGR-005: POSIX and Windows run `npm pack`, validate the single pack metadata
+  identity and actual tarball SHA-512 bytes against the mirrored SRI, and pass
+  only that verified local tarball to npm install. Unique temp state is cleaned
+  on mismatch, network/install failure, interruption, success, and retry.
+- UGR-006: generic zsh git-repo externals are removed. Install-deps and a
+  pin/helper-sensitive chezmoi `run_onchange` script call one serialized publisher that neutralizes an
+  unproved sourceable target, fetches the exact commit into a same-parent
+  sibling, proves origin/HEAD/cleanliness/worktree/tracked regular entry file,
+  and publishes atomically. Clean pin changes self-heal; unsafe prior payloads
+  remain quarantined for recovery.
+- UGR-007: Windows Tree-sitter no longer accepts mutable Scoop/npm fallback
+  results. Existing compatible `0.26.10` commands remain untouched; stale,
+  partial, or incompatible state repairs through architecture-specific,
+  SHA-256-verified `v0.26.10` release archives with pre/post version proof and
+  rollback-safe publication under the LocalApplicationData known folder.
+- UGR-008: required Ubuntu CI pins the Ubuntu 24.04 Microsoft repository `.deb`
+  SHA-256 before `sudo dpkg -i`. The supply-chain scanner self-tests and enforces
+  download-to-privileged-package verification ordering.
+- UGR-009: gh-dash `v4.25.1` is paired with annotated tag object
+  `e6ebbd7e83e30161b9192ce3339972d2c8269e7f` and peeled commit
+  `49f37e4832956c57bf52d4ea8b1b1e5c0f863700`; installers verify the mapping and
+  pin the commit. The Sandbox Terminal helper imports the production
+  version/hash, publishes transactionally, and never queries latest or mirrors
+  packaged settings. All external Actions uses are full-SHA scanned. The
+  safeguard script requests `sha_pinning_required=true`; live was observed
+  false and remains untouched.
+- Focused tests: POSIX Pi tarball/network/metadata/partial/install/cleanup/retry;
+  PowerShell Pi SRI and lifecycle; zsh failure neutralization/self-heal/
+  concurrency; failure-accumulator sentinel; Windows Tree-sitter architecture,
+  compatible/stale/partial/checksum/rollback/dry-run cases; gh-dash moved-tag
+  rejection; privileged-package and Actions scanner self-tests; PowerShell
+  parser and pin consistency.
+- Documentation: README, CLAUDE, ROADMAP, MIGRATION_STATUS, security supply-chain
+  identities, branch-protection live/desired truth, MANUAL, and this ledger.
+- Residual/manual proof: native Windows install and rollback, a real bare
+  chezmoi pin migration, and owner-applied/live Actions SHA policy after merge.
+- Implementation commit: pending creation of this cohesive supply-chain commit;
+  an append-only identity entry will follow.

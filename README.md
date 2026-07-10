@@ -431,9 +431,11 @@ and whether `pwsh` is installed.
   itself, present/missing tools, best-effort versions, and the resulting
   skip/install action. The table is informational; the existing per-tool install
   logic still decides what actually runs.
-- Accepted install failures are fatal to setup. The installers continue long
-  enough to collect and summarize selected package-manager/direct-install
-  failures, but `setup.sh`, `setup.ps1`, and `setup.ps1 -Update` exit nonzero
+- Accepted install failures are fatal to setup. Every recoverable POSIX install
+  step runs through one accumulator boundary: an early archive, downloader,
+  package-manager, plugin, Pi, or converter failure is recorded exactly once,
+  independent later installs still run, and the consolidated summary exits
+  nonzero. `setup.sh`, `setup.ps1`, and `setup.ps1 -Update` exit nonzero
   afterward; dry-run previews and explicit/manual skips remain non-failures.
 - `setup.sh --update` and `setup.ps1 -Update` are scoped and manager-aware. They
   update only present catalog tools with proven per-tool ownership, then run an
@@ -476,6 +478,13 @@ and whether `pwsh` is installed.
   `fzf-tab` and `zsh-autosuggestions` live under
   `~/.local/share/dotfiles/zsh-plugins`. `zshrc` sources those copies first and
   falls back to Homebrew/system paths only when the managed copy is missing.
+  Install-deps and the pin/helper-sensitive chezmoi `run_onchange` path share a
+  checked publisher: it
+  serializes concurrent starts, quarantines an unproved payload before any
+  fetch, stages the exact commit beside the target, proves origin, HEAD,
+  cleanliness, worktree identity, and the tracked plugin entry file, then
+  publishes atomically. A clean old pin self-heals; dirty/wrong-origin/partial
+  payloads remain quarantined for recovery and are never left sourceable.
   Completion is `fzf-tab` (an fzf-driven fuzzy Tab menu over native `compinit`)
   — it loads *after* `compinit` and *before*
   `zsh-autosuggestions`, and reclaims Tab after fzf's own key-bindings. This is
@@ -550,11 +559,20 @@ and whether `pwsh` is installed.
   from Git Bash on Windows. Project/team adoption is separate: run Polaris
   repo-local install or vendoring in that project and commit those files there.
 - Pi CLI is a provisioned binary, not synced runtime state. Setup installs
-  `@earendil-works/pi-coding-agent@0.80.3` from npm after verifying npm's
-  `dist.integrity`
+  `@earendil-works/pi-coding-agent@0.80.3` by running `npm pack`, requiring the
+  pack metadata and the actual tarball SHA-512 bytes to match the reviewed SRI,
+  then passing only that verified local tarball to `npm install`. Temporary
+  pack state is removed on success, mismatch, failure, interruption, and retry.
+  The reviewed SRI is
   `sha512-TIggw9gCXpA+Ph7OjdTA7ka2NPwTVuPmy39KDSyUzaKq8VvHfMGR7vtRz4JB7Um/RMRblmzhu4p9tUCk6MTgGA==`.
   POSIX public setup gets Node 24 from Nix first; Windows uses the native Node
   LTS catalog entry. Local `.pi/` sessions and preferences stay machine-local.
+- Native Windows accepts an existing Tree-sitter CLI only when `tree-sitter
+  --version` is exactly `0.26.10`. Missing, stale, partial, or incompatible
+  commands are repaired from the architecture-specific `v0.26.10` GitHub
+  release zip after SHA-256 verification; the executable is validated before
+  and after atomic publication under the real LocalApplicationData known folder.
+  Scoop/npm are not allowed to silently supply a different parser-build ABI.
 - Notes / Obsidian support writes `export NOTES_VAULT=...` to
   `~/.zshrc.local` (gitignored, sourced by `zshrc`). Non-interactive runs skip
   the prompt, so set `NOTES_VAULT` yourself there.
@@ -741,8 +759,10 @@ scripts/apply-repo-safeguards.sh luisgui1757/dotfiles
 with an authenticated `gh` that has repository admin permission. Do this after
 the required checks have appeared at least once on GitHub, otherwise protection
 may reference check names GitHub has not seen yet. See
-[docs/security/branch-protection.md](docs/security/branch-protection.md) for
-the live verification commands and deletion-risk note.
+[docs/security/branch-protection.md](docs/security/branch-protection.md) has the
+live verification commands and deletion-risk note;
+[docs/security/supply-chain.md](docs/security/supply-chain.md) records the
+reviewed executable identities and scanners.
 
 Renovate is the version-update bot for GitHub Actions and repo-pinned
 version/ref constants. GitHub-native Dependabot security alerts and automated
@@ -753,7 +773,7 @@ update PRs are intentionally not configured.
 |---|---|---|
 | GitHub Actions | Managed, digest-pinned, labeled `github-actions` | Actions are repo-owned CI inputs with stable Renovate support. |
 | GitHub runner images | Managed, labeled `github-runners`, reviewed separately | `ubuntu-*`, `macos-*`, and `windows-*` bumps can change the supported CI platform, so they should not be mixed with ordinary Action bumps. |
-| Repo-pinned installer versions/refs | Managed, labeled `pinned-downloads`, never automerged | Neovim Linux tarballs, chezmoi CI release archives, lazygit Linux tarballs, Starship Linux tarballs, tree-sitter CLI Linux archives, WezTerm Ubuntu `.deb`, Herdr Linux binaries, Herdr Windows preview `.exe`, Hack Nerd Font, Windows Terminal portable zip, Ubuntu Ghostty, Pi CLI npm package, zsh plugin refs, `setuptools`/`pylatexenc` converter pins, the Homebrew installer commit, the Scoop installer commit, the Renovate validator package/runtime, and the CI `cargo-binstall` commit are explicit repo pins. |
+| Repo-pinned installer versions/refs | Managed, labeled `pinned-downloads`, never automerged | Neovim Linux tarballs, chezmoi CI release archives, lazygit Linux tarballs, Starship Linux tarballs, Tree-sitter CLI Linux/Windows archives, WezTerm Ubuntu `.deb`, Herdr Linux binaries, Herdr Windows preview `.exe`, Hack Nerd Font, Windows Terminal portable zip, Ubuntu Ghostty, Pi CLI npm package, zsh plugin refs, `setuptools`/`pylatexenc` converter pins, the Homebrew installer commit, the Scoop installer commit, the Renovate validator package/runtime, the Ubuntu Microsoft-repository `.deb`, and the CI `cargo-binstall` commit are explicit repo pins. |
 | Adjacent SHA-256 / commit constants | Not managed; matched only as regex context | Renovate can bump the version/ref but cannot recompute archive/script hashes or verify tag commit IDs. CI must fail until a human recomputes and reviews them. |
 | Package-manager catalogs | Not managed | Brew, apt, dnf, pacman, zypper, apk, Scoop, winget, and choco entries are package names/IDs, not repo version pins. Let the package manager resolve current versions. |
 | Neovim plugin and Mason tools | Not managed | `lazy-lock.json` is refreshed with Lazy and tested as editor behavior; Mason intentionally has no machine-pinned lockfile. |
@@ -767,7 +787,8 @@ Manual-review pin surfaces that Renovate may touch only partially:
 | TPM/tmux plugin refs and psmux plugin ref | Commit pins are manual-reviewed and mirrored in docs/tests; Renovate does not recompute or prove tag commits. |
 | `setuptools`/`pylatexenc` | Renovate can bump versions; adjacent hashes remain human-reviewed. Current pins: `setuptools` 80.9.0, `pylatexenc` 2.10. |
 | Hack Nerd Font | Unix and Windows mirrors must stay identical; version/hash drift is caught by `pin_consistency_test.sh`. |
-| Pi CLI | Unix/Windows install pins and e2e assertions mirror version `0.80.3`; npm integrity is human-reviewed. |
+| Pi CLI | Unix/Windows install pins and e2e assertions mirror version `0.80.3`; the npm-pack metadata and downloaded tarball bytes must both match the human-reviewed SRI. |
+| gh-dash | Tag `v4.25.1`, annotated tag object `e6ebbd7e83e30161b9192ce3339972d2c8269e7f`, and peeled commit `49f37e4832956c57bf52d4ea8b1b1e5c0f863700` are mirrored; installers verify the tag mapping and pin the extension to the commit. |
 
 Direct network executables must be pinned and verified before execution, or be a
 reviewed exception whose verification is proved by the static scanner. Scoop
@@ -784,7 +805,8 @@ branch.
 Direct-download SHA-256 values for Neovim tarballs, chezmoi CI release archives,
 lazygit tarballs, Starship tarballs, tree-sitter CLI archives, the WezTerm
 Ubuntu `.deb`, Herdr Linux binaries, Herdr Windows preview `.exe`, Hack Nerd Font, the Windows Terminal
-portable zip, the Ubuntu Ghostty installer, Homebrew installer script, Scoop
+portable zip, the Ubuntu Ghostty installer, the Ubuntu 24.04 Microsoft
+repository `.deb`, Homebrew installer script, Scoop
 installer script, and the CI `cargo-binstall` installer script are
 intentionally human-reviewed. zsh plugin tag commits and tmux/psmux plugin
 commits are also human-reviewed because the installers verify the checked-out
@@ -994,13 +1016,18 @@ extension, and it only works once you have authenticated — so setup installs t
 extension only **after** `gh auth login`. If you have not authenticated yet,
 setup skips the extension cleanly (no error, because an unauthenticated install
 hits GitHub's anonymous rate limit); run `gh auth login`, then rerun `setup` /
-`install-deps` to pick it up. The token is machine-local and never stored in
-this repo.
+`install-deps` to pick it up. Before mutation, setup verifies that tag `v4.25.1`
+still has annotated tag object `e6ebbd7e83e30161b9192ce3339972d2c8269e7f`
+and peels to commit `49f37e4832956c57bf52d4ea8b1b1e5c0f863700`, then installs by that immutable
+commit rather than the tag. The token is machine-local and never stored in this
+repo.
 
 ### Pi CLI
 
-Run `pi --version` to confirm setup installed the pinned Pi CLI. Setup installs
-the CLI only; `.pi/` runtime state remains local to each machine.
+Run `pi --version` to confirm setup installed the pinned Pi CLI. The installer
+packs the exact version, verifies the tarball bytes against the pinned SRI, and
+installs only that local tarball. Setup installs the CLI only; `.pi/` runtime
+state remains local to each machine.
 
 ### Command-line vi mode
 

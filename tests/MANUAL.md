@@ -91,10 +91,17 @@ significant change to the relevant area.
       `gh auth login` (setup skips it cleanly when unauthenticated — rerun
       setup/install-deps after authenticating). Then `gh dash` renders the
       dashboard (My Pull Requests / Needs My Review / My Issues) with Nerd Font
-      icons.
+      icons, and `gh extension list` identifies commit
+      `49f37e4832956c57bf52d4ea8b1b1e5c0f863700`.
 - [ ] **Pi CLI**: `pi --version` prints `0.80.3` on macOS, Linux/WSL, and
       Windows. Confirm `.pi/` session/auth state stays local and is not created
       or modified by chezmoi.
+- [ ] **Windows Tree-sitter CLI**: `tree-sitter --version` prints exactly
+      `0.26.10`. A compatible unmanaged executable remains untouched; after a
+      stale unmanaged fixture, the verified dotfiles executable wins PATH.
+- [ ] **Zsh plugin pin recovery**: bare `chezmoi apply` self-heals a clean old
+      pin. With a dirty/wrong fixture and network disabled, it fails with the
+      fixed source path absent and prints a preserved quarantine path.
 
 ## Command-line vi mode
 

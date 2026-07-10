@@ -19,6 +19,11 @@ while IFS= read -r f; do sh_files+=("$f"); done < <(
 fail=0
 for f in "${sh_files[@]}"; do
     case "$f" in
+        ./tests/migration/uninstall_backup_order_test.sh)
+            # This test deliberately imports uninstall's recovery functions;
+            # follow that literal source so globals are checked at their uses.
+            shellcheck --external-sources --shell=bash "$f" || fail=1
+            ;;
         ./tests/shell/*_test.sh|./tests/nix/setup_home_manager_test.sh|./tests/nix/setup_nix_darwin_test.sh)
             # Source-only fixtures intentionally source setup/install scripts via
             # runtime paths, set globals consumed by those sourced functions, and
@@ -26,7 +31,8 @@ for f in "${sh_files[@]}"; do
             # false positives out of the lint signal; production scripts remain
             # strict. SC2317 is the same source-only fixture class: command
             # stubs are reached indirectly through sourced installer functions.
-            shellcheck --shell=bash --exclude=SC1091,SC2034,SC2317,SC2329 "$f" || fail=1
+            shellcheck --shell=bash \
+                --exclude=SC1091,SC2034,SC2317,SC2329 "$f" || fail=1
             ;;
         *)
             shellcheck --shell=bash "$f" || fail=1
@@ -35,7 +41,8 @@ for f in "${sh_files[@]}"; do
 done
 [[ "$fail" -eq 0 ]] || exit 1
 
-# zshrc — best-effort under bash shell-check; warnings only.
-shellcheck --shell=bash --severity=warning shells/zshrc || true
+# zshrc uses the portable shell subset accepted by both zsh and ShellCheck's
+# Bash parser. Any diagnostic is a real gate failure; no best-effort escape.
+shellcheck --shell=bash shells/zshrc
 
 echo "lint OK"

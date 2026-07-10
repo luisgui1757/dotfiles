@@ -32,7 +32,7 @@ greenfield runbook.
 | Generated Rose Pine tmux/psmux bar | `tmux/psmux-rose-pine.ps1`; generated `tmux/psmux-rose-pine.{main,moon,dawn}.conf`; `home/dot_tmux.rose-pine.ps1`; `home/dot_tmux.rose-pine.*.conf` | POSIX/Windows: `~/.tmux.rose-pine.{main,moon,dawn}.conf`; Windows also gets `~/.tmux.rose-pine.ps1` | Source generator plus checked generated configs; POSIX symlinks, Windows copies. |
 | Windows Terminal | `windows-terminal/settings.fragment.jsonc`; `home/.chezmoitemplates/windows-terminal/{settings.fragment.jsonc,merge-settings.ps1}` | Windows packaged + portable settings paths | `setup.ps1` is the only publisher. Chezmoi exposes no WT target. Setup independently merges each target's own state, stages beside the destination, validates all plans, creates separate verified backups, atomically publishes with concurrent-change detection, and rolls back the multi-target transaction on failure. |
 | PowerShell profile | `shells/powershell_profile.ps1`; `home/Documents/PowerShell/Microsoft.PowerShell_profile.ps1` | Windows PS7: `%USERPROFILE%\Documents\PowerShell\Microsoft.PowerShell_profile.ps1`; Windows PowerShell 5.1 and POSIX pwsh profile paths stay out of chezmoi scope | Windows PS7 profile copy via `mode = "file"`. |
-| zsh plugins | `home/.chezmoiexternal.toml.tmpl`; `home/.chezmoiscripts/run_onchange_after_20-verify-zsh-plugin-pins.sh.tmpl` | POSIX: `~/.local/share/dotfiles/zsh-plugins/{fzf-tab,zsh-autosuggestions}`; Windows: ignored | Pinned `.chezmoiexternal` git repos plus `run_onchange_` exact-commit assertion. |
+| zsh plugins | `scripts/ensure-pinned-zsh-plugin.sh`; `home/.chezmoiscripts/run_onchange_after_20-ensure-zsh-plugin-pins.sh.tmpl` | POSIX: `~/.local/share/dotfiles/zsh-plugins/{fzf-tab,zsh-autosuggestions}`; Windows: ignored | Install-deps and pin/helper changes in chezmoi share the serialized sibling-stage publisher. Unproved payloads are quarantined before fetch; only expected-origin, exact-HEAD, clean, tracked-entry-file checkouts publish atomically. Generic git-repo externals are intentionally absent. |
 
 The migration oracle is manifest-driven:
 `tests/migration/parity_gate.sh`, `tests/migration/oracle_test.sh`, and
@@ -50,9 +50,9 @@ Provisioning stays in `install-deps`, not chezmoi run-scripts:
   bucket-add path in `install-deps.ps1`
 - pinned binary/font/script installers and direct artifacts: Homebrew installer,
   Neovim Linux, native-Linux chezmoi, lazygit Linux, Starship Linux,
-  tree-sitter CLI Linux, WezTerm Ubuntu `.deb`, Herdr Linux, Herdr Windows
+  tree-sitter CLI Linux/Windows, WezTerm Ubuntu `.deb`, Herdr Linux, Herdr Windows
   preview, Hack Nerd Font, Windows Terminal portable zip, Ubuntu Ghostty, Scoop
-  installer, Pi CLI npm package/integrity, and pinned `setuptools`/`pylatexenc`
+  installer, Pi CLI packed-tarball SRI, and pinned `setuptools`/`pylatexenc`
   converter wheels/sdists
 - the zsh login-shell switch and domain-account fallback
 - devilspie2 package install, daemon rule, and autostart entry

@@ -95,8 +95,10 @@ not require admin. Windows Terminal still cannot be registered as MSIX in
 Sandbox, so the real installer falls back to pinned portable WT, and `setup.ps1`
 transactionally seeds or merges the Rose Pine + Hack Nerd Font settings into
 that portable target's own state; it never mirrors packaged settings. The
-greenfield portable helper remains as an
-idempotent safety net.
+greenfield helper is an idempotent safety net that imports the production
+version/hash, transactionally publishes the portable directory, never queries
+`releases/latest`, and then lets a second setup config phase own the settings
+merge.
 
 To test a PR or branch, first put the mapped checkout at the exact state you
 intend to validate and record the full SHA:

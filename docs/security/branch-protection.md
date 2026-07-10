@@ -27,7 +27,8 @@ scripts/apply-repo-safeguards.sh luisgui1757/dotfiles
 
 The script sets squash-only repository settings, keeps auto-merge disabled,
 upserts the three rulesets, keeps the classic branch protection fallback
-aligned, and enables GitHub security alerts/security fixes where the plan
+aligned, requires full-SHA external GitHub Actions references at the repository
+policy layer, and enables GitHub security alerts/security fixes where the plan
 supports them. If GitHub has duplicate rulesets with the same protected name,
 the script fails closed; delete the duplicate live ruleset before re-running it.
 
@@ -62,6 +63,8 @@ gh api "repos/luisgui1757/dotfiles/rulesets/$integrity_id" \
 gh api repos/luisgui1757/dotfiles/branches/main/protection/required_status_checks \
   --jq '{strict,contexts}'
 gh api repos/luisgui1757/dotfiles --jq '{allow_merge_commit,allow_squash_merge,allow_rebase_merge,allow_auto_merge,delete_branch_on_merge}'
+gh api repos/luisgui1757/dotfiles/actions/permissions \
+  --jq '{enabled,allowed_actions,sha_pinning_required}'
 ```
 
 Expected live posture:
@@ -70,6 +73,7 @@ Expected live posture:
 - rebase merges disabled;
 - squash merges enabled;
 - auto-merge disabled;
+- Actions enabled with `sha_pinning_required: true`;
 - required checks are strict and include exactly:
   `ubuntu`, `macos`, `windows`, `chezmoi-parity`, `chezmoi-parity-macos`,
   `chezmoi-parity-windows`, `nix flake check (ubuntu-24.04)`,
@@ -79,6 +83,12 @@ Expected live posture:
 - only `Protect main: review` and `Protect main: owner updates` have bypass actors;
 - each bypass actor is `luisgui1757` with `bypass_mode: pull_request`;
 - `Protect main: integrity` has no bypass actors.
+
+Checked-in versus live truth matters: at the start of the 2026-07-10 closure
+branch, the live Actions permissions endpoint reported
+`sha_pinning_required: false`. The branch updates the desired safeguard script
+but does not apply it. The owner must run the apply command after merge; until
+then this item is pending live confirmation, not an already-active safeguard.
 
 GitHub does not let pull request authors approve their own pull requests. Owner
 authored PRs can use the owner review bypass, but only after the non-bypass

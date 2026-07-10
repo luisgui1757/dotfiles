@@ -132,7 +132,14 @@ that violates one of these, fix it instead of disabling the test.
     root is fixed at `~/.local/share/dotfiles/zsh-plugins`; do not make it
     depend on `XDG_DATA_HOME` unless every producer, verifier, runtime source,
     uninstall path, and parity test changes together. Up/Down do prefix history
-    search (PowerShell `HistorySearch` parity). Do NOT swap in an always-on
+    search. Plugin publication is owned by
+    `scripts/ensure-pinned-zsh-plugin.sh`, called by install-deps and the
+    pin/helper-sensitive chezmoi `run_onchange` script. It neutralizes any unproved sourceable target,
+    stages the exact commit in the same parent, proves expected origin, HEAD,
+    clean/usable worktree, and tracked regular entry file, then atomically
+    publishes under a serialized lock. Never restore generic chezmoi
+    `git-repo` externals for executable zsh payloads.
+    PowerShell uses `HistorySearch` parity. Do NOT swap in an always-on
     as-you-type completion-list plugin — that paradigm rebinds Ctrl-R, fights
     `zsh-autosuggestions`, and is slow; fzf-tab + autosuggestions is the
     quiet-until-Tab PowerShell-PSReadLine analog and is the chosen design. Keep
@@ -928,8 +935,13 @@ save only**. The next plain `:w` formats normally. Implemented in
   Do not use vague "present, but <manager> does not
   manage" wording.
 - **Accepted dependency install failures are fatal.** `install-deps.sh` records
-  selected package-manager/direct-install failures and exits nonzero after the
-  run summary; dry-run previews and explicit/manual skips remain non-failures.
+  package-manager/direct-install failures and exits nonzero after the run
+  summary; every recoverable main-flow install goes through `run_install_step`,
+  which prevents `set -e` from bypassing later independent work and records a
+  nonzero callee exactly once when the callee did not already record a more
+  precise failure. Dry-run previews and explicit/manual skips remain
+  non-failures. Immediate exit is reserved for documented unsafe preconditions
+  such as an unsupported package-manager boundary.
   Accepted optional GUI/package paths still follow that contract: Ubuntu/snap
   Ghostty, VS Code cask/snap/flatpak, devilspie2, and Alpine native package arms
   record failures once the user accepted the install or `--all` selected it.
@@ -1255,7 +1267,8 @@ save only**. The next plain `:w` formats normally. Implemented in
   archives used by the parity jobs;
   `install-deps.ps1` verifies the pinned Scoop installer before execution, the
   pinned Hack.zip before registering fonts, the pinned Windows Terminal
-  portable zip before extracting the fallback install, and the pinned Herdr
+  portable zip before extracting the fallback install, the exact compatible
+  Tree-sitter CLI release before transactional publication, and the pinned Herdr
   Windows preview `.exe` before copying it into `%LOCALAPPDATA%\Programs\Herdr\bin`.
   POSIX helpers that unpack
   into `mktemp -d` install a cleanup trap
@@ -1472,8 +1485,11 @@ save only**. The next plain `:w` formats normally. Implemented in
 - **gh-dash is a pinned gh CLI extension, not a package.** `gh` is in both
   catalogs (`PKG_TABLE`: `gh` on brew/apt/dnf/zypper, `github-cli` on
   pacman/apk; `$Catalog`: winget `GitHub.cli` / choco `gh` / scoop `gh`).
-  gh-dash itself has no brew/apt/scoop package — it installs via
-  `gh extension install dlvhdr/gh-dash --pin <tag>`, pinned to `v4.25.1`
+  gh-dash itself has no brew/apt/scoop package. Tag `v4.25.1` is paired with
+  annotated tag object `e6ebbd7e83e30161b9192ce3339972d2c8269e7f` and peeled
+  commit `49f37e4832956c57bf52d4ea8b1b1e5c0f863700`; both installers verify that
+  remote mapping before mutation and run
+  `gh extension install dlvhdr/gh-dash --pin 49f37e4832956c57bf52d4ea8b1b1e5c0f863700`
   (`GH_DASH_VERSION` in `install-deps.sh`, mirrored as `$GhDashVersion` in
   `install-deps.ps1`; a Renovate `github-releases` manager can bump the tag and
   `pin_consistency_test.sh` fails on sh/ps1/CLAUDE drift). The installers
@@ -1482,7 +1498,7 @@ save only**. The next plain `:w` formats normally. Implemented in
   `gh extension install` hits GitHub's anonymous API rate limit and fails, so
   when unauthenticated they skip cleanly (NOT a FAIL) and tell the user to run
   `gh auth login` and rerun. They verify the *installed* pin (not mere presence)
-  and re-pin (`gh extension remove dash` + install) on mismatch; they are
+  and re-pin (`gh extension remove dash` + commit install) on mismatch; they are
   consent-gated, dry-run-safe, and emit-FAIL-and-continue only on an
   *authenticated* install failure (non-critical, like the zsh plugins). In
   PowerShell the read-only `gh` probes go through `Invoke-GhProbe`, which resets
@@ -1496,10 +1512,13 @@ save only**. The next plain `:w` formats normally. Implemented in
   extension binary is auth-gated. Running the dashboard needs `gh auth login` —
   a manual, secret-bearing step this repo never automates or stores.
 - **Pi CLI is a pinned npm package, not synced `.pi/` state.** `install-deps.sh`
-  and `install-deps.ps1` install `@earendil-works/pi-coding-agent@0.80.3` after
-  verifying npm's `dist.integrity`
-  `sha512-TIggw9gCXpA+Ph7OjdTA7ka2NPwTVuPmy39KDSyUzaKq8VvHfMGR7vtRz4JB7Um/RMRblmzhu4p9tUCk6MTgGA==`.
-  POSIX public setup gets Node 24 from the enforced Nix package layer; Windows
+  and `install-deps.ps1` run `npm pack --ignore-scripts --json` for
+  `@earendil-works/pi-coding-agent@0.80.3`, require both reported metadata and
+  independently hashed tarball bytes to match
+  `sha512-TIggw9gCXpA+Ph7OjdTA7ka2NPwTVuPmy39KDSyUzaKq8VvHfMGR7vtRz4JB7Um/RMRblmzhu4p9tUCk6MTgGA==`
+  and install only the verified local tarball. Pack state is scoped to a unique
+  temp directory and cleaned through return/signal/finally paths. POSIX public
+  setup gets Node 24 from the enforced Nix package layer; Windows
   gets Node through the native catalog. The CLI binary is provisioned on every
   OS, but `.pi/` sessions, auth, and preferences remain machine-local. Renovate
   may bump `PI_CLI_VERSION`, but the integrity constant is context-only and must

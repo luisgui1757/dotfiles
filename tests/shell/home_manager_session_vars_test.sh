@@ -37,22 +37,22 @@ run_zsh() {
 
 for mode in '-i' '-l -i'; do
     # shellcheck disable=SC2086
-    output="$(run_zsh $mode -c 'printf "%s|%s|%s\n" "$DOTFILES_HM_SOURCE" "$DOTFILES_HM_SOURCE_COUNT" "$(command -v hm-owned-tool)"' 2>/dev/null)"
+    output="$(run_zsh $mode -c "printf '%s|%s|%s\\n' \"\$DOTFILES_HM_SOURCE\" \"\$DOTFILES_HM_SOURCE_COUNT\" \"\$(command -v hm-owned-tool)\"" 2>/dev/null)"
     [[ "$output" == "canonical|1|$HOME_DIR/nix-bin/hm-owned-tool" ]] || {
         echo "FAIL: fresh zsh mode [$mode] did not consume canonical HM state: $output"
         exit 1
     }
 done
 
-repeat="$(run_zsh -f -c 'source "$1" >/dev/null 2>&1; source "$1" >/dev/null 2>&1; printf "%s|%s" "$DOTFILES_HM_SOURCE" "$DOTFILES_HM_SOURCE_COUNT"' zsh "$REPO_ROOT/shells/zshrc")"
+repeat="$(run_zsh -f -c "source \"\$1\" >/dev/null 2>&1; source \"\$1\" >/dev/null 2>&1; printf '%s|%s' \"\$DOTFILES_HM_SOURCE\" \"\$DOTFILES_HM_SOURCE_COUNT\"" zsh "$REPO_ROOT/shells/zshrc")"
 [[ "$repeat" == 'canonical|1' ]] || { echo "FAIL: repeated zshrc sourcing re-sourced HM state: $repeat"; exit 1; }
 
 rm -f "$STATE_DIR/nix/profiles/profile/etc/profile.d/hm-session-vars.sh"
-legacy="$(run_zsh -f -c 'source "$1" >/dev/null 2>&1; printf %s "$DOTFILES_HM_SOURCE"' zsh "$REPO_ROOT/shells/zshrc")"
+legacy="$(run_zsh -f -c "source \"\$1\" >/dev/null 2>&1; printf %s \"\$DOTFILES_HM_SOURCE\"" zsh "$REPO_ROOT/shells/zshrc")"
 [[ "$legacy" == legacy ]] || { echo "FAIL: legacy HM session-vars fallback was not sourced"; exit 1; }
 
 rm -f "$HOME_DIR/.nix-profile/etc/profile.d/hm-session-vars.sh"
-no_nix="$(run_zsh -f -c 'source "$1" >/dev/null 2>&1 && ! command -v hm-owned-tool >/dev/null 2>&1 && printf safe' zsh "$REPO_ROOT/shells/zshrc")"
+no_nix="$(run_zsh -f -c "source \"\$1\" >/dev/null 2>&1 && ! command -v hm-owned-tool >/dev/null 2>&1 && printf safe" zsh "$REPO_ROOT/shells/zshrc")"
 [[ "$no_nix" == safe ]] || { echo "FAIL: missing HM profiles were not harmless"; exit 1; }
 
 cmp -s "$REPO_ROOT/shells/zshrc" "$REPO_ROOT/home/dot_zshrc" || {

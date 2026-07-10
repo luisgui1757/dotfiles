@@ -46,6 +46,13 @@ sh_const() { grep -E "^$1=" install-deps.sh | head -1 | cut -d'"' -f2; }
 yml_const() { awk -v key="$1" '$1 == key ":" { print $2; exit }' .github/workflows/test.yml; }
 setup_sh_const() { grep -E "^$1=" setup.sh | head -1 | cut -d'"' -f2; }
 setup_ps_const() { grep -E "^[[:space:]]*\\\$$1[[:space:]]*=" setup.ps1 | head -1 | cut -d"'" -f2; }
+file_sha256() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$1" | awk '{print $1}'
+    else
+        shasum -a 256 "$1" | awk '{print $1}'
+    fi
+}
 
 # --- nvim Linux: install-deps.sh <-> test.yml <-> the two install tests -------
 nvim_ver_sh="$(sh_const NVIM_LINUX_VERSION)"
@@ -78,18 +85,22 @@ assert_eq "tree-sitter version (install-deps.sh == test.yml)" \
 assert_eq "tree-sitter x86_64 SHA (install-deps.sh == test.yml)" \
     "$(sh_const TREE_SITTER_CLI_LINUX_X86_64_SHA256)" "$(yml_const TREE_SITTER_CLI_LINUX_X86_64_SHA256)"
 
-# --- zsh plugins: install-deps.sh <-> chezmoi external (tag) <-> verify (commit)
-ext_tag() { grep -A4 "$1" home/.chezmoiexternal.toml.tmpl | grep -oE '"v[0-9][0-9.]*"' | tr -d '"' | head -1; }
-verify_commit() { grep -oE "$1 [0-9a-f]{40}" home/.chezmoiscripts/run_onchange_after_20-verify-zsh-plugin-pins.sh.tmpl | awk '{print $2}' | head -1; }
+# --- zsh plugins: installers <-> checked chezmoi publisher -------------------
+zsh_ensure_file="home/.chezmoiscripts/run_onchange_after_20-ensure-zsh-plugin-pins.sh.tmpl"
+ensure_tag() { awk -v name="$1-pin:" '$2 == name { print $3; exit }' "$zsh_ensure_file"; }
+ensure_commit() { awk -v name="$1-pin:" '$2 == name { print $4; exit }' "$zsh_ensure_file"; }
+publisher_sha="$(grep -oE 'publisher-sha256: [0-9a-f]{64}' "$zsh_ensure_file" | awk '{print $2}')"
+assert_eq "zsh publisher implementation SHA (script == chezmoi trigger)" \
+    "$(file_sha256 scripts/ensure-pinned-zsh-plugin.sh)" "$publisher_sha"
 
-assert_eq "fzf-tab tag (install-deps.sh == chezmoi external)" \
-    "$(sh_const FZF_TAB_VERSION)" "$(ext_tag 'Aloxaf/fzf-tab.git')"
-assert_eq "fzf-tab commit (install-deps.sh == verify script)" \
-    "$(sh_const FZF_TAB_COMMIT)" "$(verify_commit 'fzf-tab')"
-assert_eq "zsh-autosuggestions tag (install-deps.sh == chezmoi external)" \
-    "$(sh_const ZSH_AUTOSUGGESTIONS_VERSION)" "$(ext_tag 'zsh-users/zsh-autosuggestions.git')"
-assert_eq "zsh-autosuggestions commit (install-deps.sh == verify script)" \
-    "$(sh_const ZSH_AUTOSUGGESTIONS_COMMIT)" "$(verify_commit 'zsh-autosuggestions')"
+assert_eq "fzf-tab tag (install-deps.sh == chezmoi publisher)" \
+    "$(sh_const FZF_TAB_VERSION)" "$(ensure_tag 'fzf-tab')"
+assert_eq "fzf-tab commit (install-deps.sh == chezmoi publisher)" \
+    "$(sh_const FZF_TAB_COMMIT)" "$(ensure_commit 'fzf-tab')"
+assert_eq "zsh-autosuggestions tag (install-deps.sh == chezmoi publisher)" \
+    "$(sh_const ZSH_AUTOSUGGESTIONS_VERSION)" "$(ensure_tag 'zsh-autosuggestions')"
+assert_eq "zsh-autosuggestions commit (install-deps.sh == chezmoi publisher)" \
+    "$(sh_const ZSH_AUTOSUGGESTIONS_COMMIT)" "$(ensure_commit 'zsh-autosuggestions')"
 
 # --- tmux/psmux plugin pins: installers <-> docs ------------------------------
 # POSIX: TPM + the functional plugins (sensible/yank/resurrect/continuum) in
@@ -99,6 +110,8 @@ assert_eq "zsh-autosuggestions commit (install-deps.sh == verify script)" \
 ps_const() { grep -E "^[[:space:]]*\\\$$1[[:space:]]*=" install-deps.ps1 | head -1 | cut -d"'" -f2; }
 tpm_commit="$(sh_const TPM_COMMIT)"
 psmux_plugins_commit="$(ps_const PsmuxPluginsCommit)"
+assert_eq "tree-sitter version (POSIX == Windows)" \
+    "$(sh_const TREE_SITTER_CLI_LINUX_VERSION)" "$(ps_const TreeSitterCliVersion)"
 
 # --- mirrored direct pins: install-deps.sh <-> install-deps.ps1 <-> docs ------
 assert_eq "Hack Nerd Font version (install-deps.sh == install-deps.ps1)" \
@@ -161,7 +174,12 @@ done
 gh_dash_sh="$(sh_const GH_DASH_VERSION)"
 gh_dash_ps="$(ps_const GhDashVersion)"
 assert_eq "gh-dash tag (install-deps.sh == install-deps.ps1)" "$gh_dash_sh" "$gh_dash_ps"
+assert_eq "gh-dash tag object (install-deps.sh == install-deps.ps1)" \
+    "$(sh_const GH_DASH_TAG_OBJECT)" "$(ps_const GhDashTagObject)"
+assert_eq "gh-dash peeled commit (install-deps.sh == install-deps.ps1)" \
+    "$(sh_const GH_DASH_COMMIT)" "$(ps_const GhDashCommit)"
 assert_contains "gh-dash tag (CLAUDE.md)" "CLAUDE.md" "$gh_dash_sh"
+assert_contains "gh-dash peeled commit (CLAUDE.md)" "CLAUDE.md" "$(sh_const GH_DASH_COMMIT)"
 
 # --- Pi CLI pinned npm package: install-deps.sh <-> install-deps.ps1 <-> docs
 pi_cli_version_sh="$(sh_const PI_CLI_VERSION)"
