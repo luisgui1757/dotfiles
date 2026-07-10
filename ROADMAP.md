@@ -230,9 +230,10 @@ Commit-by-commit status:
   greenfield harness install Ubuntu's `nix-bin` package and enable flakes before
   invoking setup. The ultimate closure added exact aarch64/x86_64 Darwin host
   configurations, authoritative account/home resolution, transactionally
-  rolled-back tap migration, and Home Manager session-vars startup. Intel
-  cross-evaluation passes; real `macos-26-intel` runtime proof remains pending
-  until the added non-required lane completes.
+  rolled-back tap migration, and Home Manager session-vars startup. Exact head
+  `f4b63953f2f982702a685358b09e89bae2d78fdd` passed both the real
+  `macos-26-intel` Nix and full setup lanes; WSL remains separate manual/runtime
+  proof.
 - **Pi CLI provisioning — DONE.** Setup installs the Pi CLI on every OS as the
   pinned npm package `@earendil-works/pi-coding-agent@0.80.3` after checking npm
   `dist.integrity`. POSIX public setup gets Node 24 from the enforced Nix package
@@ -249,15 +250,17 @@ Commit-by-commit status:
   `85375b2bdec9d3a998e8023a44b41d03a32f3eaa`; all twelve required checks passed,
   and checked-in/live required contexts were verified aligned afterward.
 
-- **Ultimate gold-standard closure — IMPLEMENTED; staged/live proof pending
+- **Ultimate gold-standard closure — IMPLEMENTED; exact hosted matrix passed,
+  staged owner/manual proof remains
   (2026-07-10).** UGR-003 is
   implemented: Lazy and Plenary require a valid full lock identity and prove
   origin, exact HEAD, cleanliness, worktree usability, and required files before
   runtimepath mutation. Repair is locked, staged, verified, and rollback-safe;
   behavioral coverage replaces the former grep-only claim. UGR-002, UGR-011,
   UGR-012, UGR-013, and the POSIX half of UGR-015 are implemented with focused
-  architecture, identity, session, dry-run, and rollback tests; Intel/WSL real
-  host proof remains explicitly pending. UGR-001 and UGR-014 are implemented:
+  architecture, identity, session, dry-run, and rollback tests; Intel hosted
+  runtime proof passed and WSL real-host proof remains explicitly pending.
+  UGR-001 and UGR-014 are implemented:
   packaged/portable WT state is independently transactionally merged and
   recovered, while uninstall backup selection is filename-keyed and fails
   closed on malformed candidates. UGR-004 through UGR-009 are implemented:
@@ -274,8 +277,10 @@ Commit-by-commit status:
   Nix-ownership gaps. UGR-020 is deliberately PARTIAL: this branch emits and
   verifies stable logical checks while the legacy contexts remain required;
   the checked-in/live switch happens only in the documented post-merge stage.
-  UGR-021 is PARTIAL until real Intel, WSL, redirected-Windows, and desktop runs
-  exist. The first PR run exposed and fixed two cross-host integration defects:
+  UGR-021 is PARTIAL until real WSL, redirected-Windows, cache-free scheduled or
+  manual, and desktop runs exist. The exact-head Intel and conventional Windows
+  font-consumption lanes passed. The first PR run exposed and fixed two
+  cross-host integration defects:
   the POSIX dependency-table zsh scan now passes the complete origin/commit/file
   identity, and handled Windows chezmoi drift no longer leaks a native exit code
   into the CI step. The next Ubuntu run also proved Renovate's optional
@@ -302,38 +307,47 @@ Commit-by-commit status:
   all three official Home Manager profile locations, migrate the two system
   shell files transactionally, and prove Homebrew by prefix/repository. Windows
   apply failures now retain native stderr, and the target-free WT design lets
-  the main source apply without non-portable absolute target selectors. Hosted
-  confirmation remains pending a newer exact head. No workflow definition is
-  recorded as runtime proof.
+  the main source apply without non-portable absolute target selectors. Exact
+  head `f4b63953f2f982702a685358b09e89bae2d78fdd` subsequently passed all three
+  workflow runs: generic Ubuntu/macOS/Windows and parity, Nix Ubuntu/Apple
+  Silicon/Intel, the Ubuntu container, public setup on Ubuntu/Apple
+  Silicon/Intel/Windows, and all six stable logical proof jobs. No workflow
+  definition is recorded as runtime proof; only those completed runs are.
 
-- **Exact-head runtime dependency follow-up — FIXED LOCALLY, HOSTED RERUN
-  PENDING.** Head `0c853d066362602f14dc251a6d3fbf3980102048`
+- **Exact-head runtime dependency follow-up — PASSED.** Head
+  `0c853d066362602f14dc251a6d3fbf3980102048`
   reached the real two-project clangd spec on Ubuntu and failed closed because
   the generic test lane had never installed `clangd`; all preceding Neovim
   specs passed. The lane now installs Ubuntu's distro clangd and a static
-  contract test binds that provisioning to the real-client spec. Only the next
-  hosted run can promote the runtime result to passed.
+  contract test binds that provisioning to the real-client spec. Exact head
+  `f4b63953f2f982702a685358b09e89bae2d78fdd`, run `29092384006`, job
+  `86360593114`, passed the real two-project one-session spec (1/1, 0 failed).
 
-- **Exact-head Home Manager session-path follow-up — FIXED LOCALLY, HOSTED
-  RERUN PENDING.** Head `0c853d066362602f14dc251a6d3fbf3980102048`
+- **Exact-head Home Manager session-path follow-up — PASSED ON NATIVE LINUX;
+  WSL PENDING.** Head `0c853d066362602f14dc251a6d3fbf3980102048`
   proved that merely finding `hm-session-vars.sh` was insufficient: the pinned
   standalone configuration had an empty `home.sessionPath`, so its generated
   file could not put profile-owned `rg` on a clean shell PATH. Linux Home
   Manager now exports its evaluated `home.profileDirectory/bin` through
-  `home.sessionPath`; both architecture evaluations bind the exact value.
+  `home.sessionPath`; both architecture evaluations bind the exact value. Exact
+  head `f4b63953f2f982702a685358b09e89bae2d78fdd`, run `29092384014`, job
+  `86360593139`, passed the native-Linux clean login proof. WSL is not inferred.
 
-- **Exact-head native-Linux login-shell oracle — FIXED LOCALLY, HOSTED RERUN
-  PENDING.** Head `28006783a5112bfa3af3b0deb2f59fbf9f457a4e`
+- **Exact-head native-Linux login-shell oracle — PASSED.** Head
+  `28006783a5112bfa3af3b0deb2f59fbf9f457a4e`
   completed Home Manager and all six setup phases, then failed before session
   state was exercised: fresh Ubuntu reported zsh missing, setup installed and
   selected `/home/linuxbrew/.linuxbrew/bin/zsh`, but the assertion invoked the
   nonexistent `/usr/bin/zsh` and discarded stderr. The proof now resolves one
   effective-account record, requires its shell to be executable zsh, executes
   that exact login shell from a caller-empty environment, and prints captured
-  diagnostics on failure.
+  diagnostics on failure. Exact head
+  `f4b63953f2f982702a685358b09e89bae2d78fdd`, run `29092384014`, job
+  `86360593139`, completed all six phases and passed that post-install oracle.
 
 - **Exact-head native Windows setup — PASSED.** Head
-  `0c853d066362602f14dc251a6d3fbf3980102048`, run `29090161175`, completed
+  `f4b63953f2f982702a685358b09e89bae2d78fdd`, run `29092384014`, job
+  `86360593122`, completed
   all six public setup phases and the required post-install checks on
   `windows-2025`. It installed and validated the exact Tree-sitter `0.26.10`
   release artifact, installed Hack Nerd Font files and proved registry

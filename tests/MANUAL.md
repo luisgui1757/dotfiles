@@ -177,13 +177,17 @@ significant change to the relevant area.
       reports a trusted tap so Homebrew 5 can load the AeroSpace cask.
       The `DOTFILES_NIX_DARWIN_HOSTED_CI=1` cleanup override is only for
       GitHub's disposable macOS runner; do not use it for this real-host check.
-- [ ] **Intel macOS runtime proof is pending**: the branch adds official
-      `macos-26-intel` Nix/setup lanes, but do not mark this row complete until
-      the exact PR head has a green real runner result. Cross-evaluation is not
-      runtime proof. Nixpkgs 26.05 is the final Intel-darwin release and remains
-      supported only through 2026-12-31; keep its warning visible and track the
-      required post-26.05 package-plane migration separately from this current
-      host proof.
+- [x] **Intel macOS hosted runtime proof**: exact head
+      `f4b63953f2f982702a685358b09e89bae2d78fdd` passed the real
+      `macos-26-intel` Nix job (`29092384007` / `86360593091`) and full setup job
+      (`29092384014` / `86360593153`). The x86_64 host installed upstream Nix
+      2.34.8, selected only `dotfiles-x86_64`, completed nix-darwin and all six
+      setup phases, and passed post-install plus the 257-check language smoke.
+      This is runtime proof, not cross-evaluation. The PR lane restored caches
+      and had no user-granted TCC desktop session. Nixpkgs 26.05 is the final
+      Intel-darwin release and remains supported only through 2026-12-31; keep
+      its warning visible and track the required post-26.05 package-plane
+      migration separately.
 - [ ] **Home Manager (Linux/WSL)**: with Nix installed inside the Linux/WSL
       environment, run
       `./setup.sh --all` (or the compatibility alias `./setup.sh --home-manager`;
@@ -202,6 +206,10 @@ significant change to the relevant area.
       with the XDG, `~/.nix-profile`, and
       `/etc/profiles/per-user/$(id -un)` session-vars locations individually.
       With none present, startup must remain harmless.
+      Exact head `f4b63953f2f982702a685358b09e89bae2d78fdd` passed the
+      hosted native-Linux account-record login-shell proof in run `29092384014`,
+      job `86360593139`; this row stays open for WSL and the real custom-HOME
+      permutations.
 - [ ] **WSL split-host under Home Manager**: on WSL, after `./setup.sh --all`,
       confirm nothing was written under `/mnt/c` — Home Manager touches only the
       Linux `~/.nix-profile`; Windows Terminal/fonts/WezTerm stay Windows-host.

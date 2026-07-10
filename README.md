@@ -199,9 +199,11 @@ non-Nix. `nix flake check` runs in required CI (`.github/workflows/nix.yml`) on
 Ubuntu + Apple Silicon macOS, with an additional non-required
 `macos-26-intel` lane. The flake exports explicit `dotfiles-aarch64` and
 `dotfiles-x86_64` configurations; the legacy `dotfiles` alias deliberately
-remains Apple Silicon and setup never selects it for Intel. Intel runtime proof
-remains pending until the hosted Intel lane actually completes; cross-evaluation
-alone is not runtime proof. Determinate Nix has dropped Intel-host support, so
+remains Apple Silicon and setup never selects it for Intel. Exact head
+`f4b63953f2f982702a685358b09e89bae2d78fdd` passed both the real Intel Nix
+and full setup lanes (`29092384007` / `86360593091` and `29092384014` /
+`86360593153`); the claim is runtime evidence, not cross-evaluation.
+Determinate Nix has dropped Intel-host support, so
 the Intel CI lanes explicitly use full-SHA-pinned `cachix/install-nix-action`
 `v31.10.7` to install upstream Nix 2.34.8 from its versioned official release;
 other hosted lanes retain the pinned Determinate action. Nixpkgs 26.05 is the
@@ -699,7 +701,7 @@ The e2e jobs cover different install paths, not symmetric container platforms:
 | `e2e containers / ubuntu-24.04` | Clean `ubuntu:24.04`, non-root user, native `apt`, no Linuxbrew (`DOTFILES_SKIP_BREW_BOOTSTRAP=1`), then `install-deps.sh --all`, chezmoi config apply, executable/version probes including `zoxide`, `gh`, WezTerm, Herdr, Neovim >= 0.12, lazygit, zsh plugin files, config content assertions, and nvim directory realpath assertion. This is the native installer regression fixture, not the Nix-backed public POSIX package-plane proof; it does not assert Pi CLI because Node 24 comes from the Nix package layer. |
 | `setup.sh / ubuntu-24.04` | Full public Unix setup on the hosted Ubuntu runner after installing Nix in CI: Home Manager first, then native/deferred installs, chezmoi, Lazy, Tree-sitter, Mason, and Polaris. Its clean login/interactive PATH proof resolves the effective account's actual login zsh from the account database; this matters because fresh Ubuntu has no `/usr/bin/zsh` and setup selects Linuxbrew zsh. The shell must resolve `rg` from Nix with no caller PATH injection. |
 | `setup.sh / macos-26` | Full public Apple Silicon setup through the hosted runner: architecture-matched nix-darwin/declarative Homebrew, native/deferred installs, real Ghostty/WezTerm config consumption, installed AeroSpace app/CLI identity agreement, chezmoi, Lazy, Tree-sitter, Mason, and Polaris. AeroSpace waits for a user-granted Accessibility permission before parsing user config or starting its CLI server, so managed-config consumption remains explicit TCC-enabled desktop proof in `tests/MANUAL.md`; hosted CI does not pretend to prove it. The hosted runner alone gets the cleanup override; real hosts keep `cleanup = "check"`. |
-| `setup.sh / macos-26-intel` | Additional non-required real Intel setup lane with the same full assertions. Its YAML presence is not evidence; only an actual run is. |
+| `setup.sh / macos-26-intel` | Additional non-required real Intel setup lane with the same full assertions. Exact head `f4b63953f2f982702a685358b09e89bae2d78fdd` passed it on a real x86_64 runner; future YAML presence alone remains non-evidence. |
 | `setup.ps1 / windows-2025` | Full Windows setup through the real Windows hosted runner, including Scoop/winget/choco behavior, PowerShell, symlinks, Hack Nerd Font file/registry consumption, `zoxide`/`gh`/WezTerm/Herdr/Pi CLI command probes, and Neovim restore/sync phases. Windows containers do not model the desktop/user-profile setup well. |
 | `setup.sh / WSL2 Ubuntu-24.04 (canary)` | Non-required scheduled/manual WSL smoke signal in `.github/workflows/wsl2-canary.yml`. Hosted runners cannot provide a reliable required nested-virtualization WSL2 gate. The canary disables the WSL distro cache, installs Ubuntu's `nix-bin`, enables flakes, then runs the enforced Home Manager setup path; failures stay visible and do not muddy the required e2e signal. |
 

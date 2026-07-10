@@ -694,3 +694,76 @@ pushed exact-head runs or manual environments.
   created. The direct invocation of ShellCheck on the whole YAML document and
   raw default-profile `yamllint` were rejected as invalid test commands; the
   repository-aware equivalents above are the evidence.
+
+## Exact behavior-head closure — entry 23
+
+This entry is the final authoritative classification for the implemented
+behavior. It supersedes every earlier pending runtime classification without
+rewriting that history.
+
+- Base: `85375b2bdec9d3a998e8023a44b41d03a32f3eaa`.
+- Exact behavior head:
+  `f4b63953f2f982702a685358b09e89bae2d78fdd`.
+- Hosted runs: generic/parity `29092384006`, Nix `29092384007`, and public
+  setup/e2e `29092384014` all completed successfully.
+- Runtime evidence: real Ubuntu completed Home Manager and all six phases, used
+  the account-record Linuxbrew zsh under `env -i`, resolved Nix-owned `rg`, and
+  passed the 257-check smoke. Real Intel installed upstream Nix 2.34.8, selected
+  `dotfiles-x86_64`, kept the Nixpkgs 26.05 sunset warning visible, completed
+  nix-darwin plus all six phases, and passed the same post-install smoke. Apple
+  Silicon and native Windows completed their full public setup paths. The
+  generic Ubuntu job passed the real two-project clangd isolation spec (1/1,
+  zero failures).
+- Proof boundary: PR setup caches were enabled. These runs are hosted runtime
+  evidence, not cache-free scheduled/manual, WSL, redirected-Windows,
+  divergent-dual-Terminal, owner-host tap rollback, or desktop GUI/TCC proof.
+
+### Finding-by-finding final status
+
+| ID | Final status | Evidence and implementation commit(s) | Focused/full tests | Documentation | Residual/manual proof |
+|---|---|---|---|---|---|
+| UGR-001 | ACCEPTED/FIXED | Reproduced destructive packaged-to-portable mirroring. `f1c9e2c` makes every Terminal installation an independent staged, validated, concurrency-checked, atomic merge/recovery target. | 19 focused Setup/Uninstall Pester cases plus Windows render/apply/round-trip oracles; native Windows workflows green. | README, Windows Terminal README, CLAUDE, ROADMAP, MIGRATION_STATUS, this ledger. | Real divergent packaged+portable install and dual uninstall restoration remain manual. |
+| UGR-002 | ACCEPTED/FIXED | `1423a47` exports and exactly selects both Darwin architectures; `d2e2149`, `bd46346`, and `f89f61c` close the real Intel installer/bootstrap/consumer regressions. Intel Nix job `86360593091` and setup job `86360593153` passed. | Both Darwin evaluations, selection/unsupported-arch, Homebrew/tap transaction/dry-run suites; real Intel Nix/setup and 257 smoke passed. | README, CLAUDE, ROADMAP, MIGRATION_STATUS, MANUAL, greenfield ledger. | Nixpkgs 26.05 support ends 2026-12-31; owner-host taps and desktop GUI remain manual. |
+| UGR-003 | ACCEPTED/FIXED | `60dd01a` requires locked full-SHA proof of Git/origin/HEAD/clean/worktree/entrypoint before Lazy or Plenary reaches runtimepath, with locked sibling repair and rollback. | 9 behavioral bootstrap cases, all Neovim specs, generic Ubuntu/macOS/Windows green. | README troubleshooting, CLAUDE, ROADMAP, this ledger. | None beyond normal cross-host operation; no unproved path was executed by tests. |
+| UGR-004 | ACCEPTED/FIXED | `aa48aad` routes every recoverable POSIX main-flow installer through one failure accumulator and preserves later sentinel work plus one nonzero summary. | Failure injection for all artifact/catalog families; full shell/static and Ubuntu container/setup green. | README, CLAUDE, ROADMAP, MIGRATION_STATUS. | Real third-party outage behavior is necessarily host/network evidence. |
+| UGR-005 | ACCEPTED/FIXED | `aa48aad` makes POSIX and Windows install only a locally packed tarball whose bytes match the pinned SRI, then validates version and cleans every exit. | POSIX and Pester mismatch/network/partial/install/cleanup/retry cases; native Windows and POSIX setup green. | README, CLAUDE, ROADMAP, MANUAL, pin docs. | None for the conventional hosted paths; local Pi auth/session state remains intentionally unmanaged. |
+| UGR-006 | ACCEPTED/FIXED | `aa48aad` neutralizes unproved sourceable payloads, verifies same-parent staging, publishes atomically, quarantines bad state, and self-heals legitimate pin changes. | Oracle, concurrency, pin-change, failure-neutralization, and chezmoi fingerprint cases. | README, CLAUDE, ROADMAP, MIGRATION_STATUS, MANUAL. | A real offline bare-chezmoi pin transition remains manual. |
+| UGR-007 | ACCEPTED/FIXED | `aa48aad` defines exact Tree-sitter 0.26.10 compatibility and repairs only stale/partial/incompatible state from architecture-specific verified release bytes. | Current/stale/partial/unmanaged/architecture/checksum/publication/dry-run Pester plus pin consistency; native setup passed. | README, CLAUDE, ROADMAP, MANUAL. | None for the hosted x64 path; ARM/x86 Windows runtime remains environment-specific. |
+| UGR-008 | ACCEPTED/FIXED | `aa48aad` verifies the exact Microsoft repository `.deb` before privileged `dpkg` and extends the generic remote-to-root execution scanner. | Positive/negative scanner self-tests; required Ubuntu generic/setup jobs passed. | Supply-chain security doc, README, CLAUDE. | None. |
+| UGR-009 | ACCEPTED/FIXED | `aa48aad` binds gh-dash tag object to peeled commit, reuses the production Terminal pin in Sandbox, full-SHA-scans every external action, and checks in desired SHA enforcement. | Moved-tag rejection, Sandbox/pin consistency, action scanner self-tests. | Supply-chain and branch-protection docs, README, CLAUDE. | Live `sha_pinning_required` remains false; owner applies only after the staged ruleset migration. |
+| UGR-010 | ACCEPTED/FIXED | `eac92bc` isolates native-command preference with `try/finally`, distinguishes expected drift from invocation failure, and preserves explicit stderr/exit handling. | Setup/Uninstall Pester under both preference states, drift, stderr, spaces, backup creation/restoration; Windows workflows green. | README, CLAUDE, MIGRATION_STATUS. | None for tested hosts. |
+| UGR-011 | PARTIAL | `1423a47` adds canonical Home Manager session-vars sourcing, `f89f61c` exports the evaluated profile bin, and `8a09cf3` executes the actual account-record zsh. Native Linux job `86360593139` passed. | Custom HOME, missing profiles, repeated sourcing, both Linux evaluations, exact hosted clean-login proof. | README, CLAUDE, ROADMAP, MIGRATION_STATUS, MANUAL, greenfield ledger. | Real WSL userland proof remains required; native Linux is proven. |
+| UGR-012 | ACCEPTED/FIXED | `1423a47` models post-bootstrap brew availability during dry-run and continues all later phases without claiming installation. | Complete Brew-less Darwin preview, noninteractive, retry, and failure-plan cases; macOS workflows green. | README, CLAUDE, ROADMAP. | None. |
+| UGR-013 | ACCEPTED/FIXED | `1423a47` makes tap migration transactional across activation/bootstrap/publication/signals, with collision and rollback-failure recovery; `bd46346` adds shell-file bootstrap rollback exposed by Intel. | Existing-rebuild and first-bootstrap branches, collision, partial move, signal, rollback failure, retry. | README, CLAUDE, ROADMAP, recovery docs, MANUAL. | Failure injection against a real owner host with existing taps remains manual. |
+| UGR-014 | ACCEPTED/FIXED | `f1c9e2c` selects only validated filename timestamps/collision suffixes and fails on malformed or ambiguous candidates, never mtime. | POSIX files/directories/opposing mtimes/collisions/malformed plus Windows equivalent Pester. | README, CLAUDE, ROADMAP, MIGRATION_STATUS. | Real Windows dual-target restoration is covered by UGR-001's manual row. |
+| UGR-015 | PARTIAL | `1423a47` establishes one POSIX account/home boundary; `eac92bc` resolves Windows UserProfile, LocalApplicationData, Documents, and runtime profiles with legacy migration and post-consumption checks. | POSIX identity suite; 58 Setup/Uninstall Pester cases; Windows template/apply/round-trip/parity; conventional Windows workflows green. | README, CLAUDE invariants 24/25, MIGRATION_STATUS, MANUAL. | Real redirected/OneDrive/alternate-drive Windows migration and rollback remain required. |
+| UGR-016 | ACCEPTED/FIXED | `eac92bc` guards on real argv, redirected I/O, CI, user-interactive state, and supported hosts before cache/filesystem work. | 30 Profile Pester cases including real subprocesses, preference states, and normal host behavior; Windows workflow green. | README troubleshooting, CLAUDE invariant 26, MANUAL. | Interactive VS Code/ISE visual confirmation remains manual but does not block the fail-closed implementation. |
+| UGR-017 | ACCEPTED/FIXED | `eac92bc` centralizes data-root-scoped deletion, checks return plus absence, and fails synchronous cleanup without touching built-in runtime paths. | 5 checked-delete and 18 Tree-sitter behavioral cases; all Neovim specs green on Ubuntu/macOS/Windows. | README, CLAUDE invariant 19. | None. |
+| UGR-018 | ACCEPTED/FIXED | `eac92bc` removes startup-cwd compile-database freezing; `f89f61c` provisions real clangd in CI. | Real two-project/one-session spec passed on Ubuntu (job `86360593114`), plus 24 LSP specs. | CLAUDE LSP workflow, ROADMAP, MANUAL. | Interactive editor confirmation remains manual; runtime client isolation is automated and passed. |
+| UGR-019 | PARTIAL | `eac92bc` enables the Nix manager, corrects Scoop to `master`, restores behind-base rebasing, exposes matrix runners, and validates an exact 89-record official extraction. | Regex matchability, expected inventory, official validator, and local dry-run extraction passed. | README, CLAUDE, ROADMAP, this ledger. | Dashboard #7 last reran against default branch at 2026-07-10 12:05 UTC and still shows old no-Nix/Scoop-main state; post-merge bot proof is pending. |
+| UGR-020 | PARTIAL | `eac92bc` implements deadlock-free stage 1: six stable logical checks verify exact artifact/run/head proof while all 12 legacy required contexts remain. All six logical jobs passed on behavior head. | Marker tamper/missing/duplicate tests, workflow metadata/alignment, and live logical jobs `86361159946`, `86361159987`, `86363763769`, `86363763779`, `86363763791`, `86363763792`. | README, CLAUDE invariant 27, branch-protection runbook, MIGRATION_STATUS. | After merge: observe default-branch logical checks, merge a context-switch PR, then owner applies live safeguards. |
+| UGR-021 | PARTIAL | `1423a47`, `eac92bc`, and `f89f61c` make scheduled/manual setup cache-free, keep WSL fail-visible/non-required, add real binary checks where credible, assert Windows fonts, and state AeroSpace TCC unavailability honestly. | Cache contract, GUI/runtime source guards, required-check alignment; exact hosted Ubuntu/ARM/Intel/Windows setup passed. | README, CLAUDE, MANUAL, greenfield ledger. | Cache-free scheduled/manual, WSL, redirected Windows, dual Terminal, and desktop/TCC visual runs remain required; PR-cache results are not promoted. |
+| UGR-022 | ACCEPTED/FIXED | `5d8772f` and append-only follow-ups repair the main baseline, PR #46 state, timing claim, setup flags, safeguards truth, and every status changed by this implementation. | Documentation/static/help/required-check guards and full `make ci`. | README, CLAUDE, ROADMAP, MIGRATION_STATUS, MANUAL, security docs, both ledgers. | Future statuses must be updated after the staged safeguards PRs and manual runs. |
+| UGR-023 | ACCEPTED/FIXED | `eac92bc` plus `aa48aad` make Starship cache and Polaris staging transactional, analyzer identities exact, JSON traversal NUL-safe, shell lint strict, Nix ownership structural, and direct-artifact updates compatibility-aware. | Profile/Polaris/JSON-path/Nix-scanner/analyzer/direct-artifact tests; full local and hosted gates green. | README, CLAUDE, ROADMAP, MIGRATION_STATUS. | None beyond the platform/manual rows already named. |
+
+### Verification classification
+
+| Classification | Exact result |
+|---|---|
+| Passed locally | `git diff --check`; Bash syntax over 134 tracked shell scripts; repository shell lint; `tests/static/run_all.sh`; `tests/shell/run_all.sh`; migration/parity/round-trip/uninstall/oracle bundle; PSScriptAnalyzer plus 234/234 Pester and all 17 Neovim spec files through `test.ps1`; focused Windows Terminal Pester 19/19; `make test-nvim`; `make test`; `make validate-renovate` with 89 exact records; `nix flake check --print-build-logs`; `make ci`. |
+| Passed hosted on behavior head | All six generic/parity jobs in run `29092384006`; all three architecture Nix jobs and two stable logical Nix jobs in `29092384007`; Ubuntu container, Ubuntu/Apple-Silicon/Intel/Windows setup, and four stable logical setup jobs in `29092384014`. |
+| Skipped intentionally | Local Nix omitted incompatible-system builds while still evaluating every exported configuration; the WSL canary was not made a required PR check. |
+| Unavailable | Local native-Windows, WSL2, Intel hardware, redirected known folders, divergent dual Terminal, and user-granted desktop TCC/visual execution. Hosted AeroSpace config consumption was explicitly classified unavailable rather than passed. |
+| Pending live/manual | Renovate default-branch bot result; cache-free scheduled/manual lanes; WSL; redirected Windows; dual Terminal recovery; owner-host tap rollback; desktop GUI/TCC; stage-2 ruleset migration. |
+
+### Live repository relationship at the behavior head
+
+- `origin/main` remained
+  `85375b2bdec9d3a998e8023a44b41d03a32f3eaa`; PR #47 was the only open PR.
+- The active integrity ruleset still required the exact 12 legacy contexts and
+  strict behind-main status. Every one passed on the behavior head.
+- The active review ruleset still required one code-owner/last-push approval and
+  thread resolution. The PR was `MERGEABLE` but correctly `BLOCKED` pending
+  independent review.
+- Live Actions policy remained `sha_pinning_required:false`; the checked-in
+  target is true. No live safeguard was mutated.

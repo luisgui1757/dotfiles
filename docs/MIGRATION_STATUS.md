@@ -224,8 +224,9 @@ broken repo-symlink still cleaned) is covered by
 - [x] Lazy's detached executable bootstrap now proves locked default-branch
       metadata anchored to the same immutable commit. This preserves fail-closed
       execution while allowing Lazy's own lock writer to identify its branch.
-- [x] Native `windows-2025` public setup passed on PR head
-      `0c853d066362602f14dc251a6d3fbf3980102048` (run `29090161175`): all six
+- [x] Native `windows-2025` public setup passed again on exact PR head
+      `f4b63953f2f982702a685358b09e89bae2d78fdd` (run `29092384014`, job
+      `86360593122`): all six
       phases, exact Tree-sitter `0.26.10`, Hack Nerd Font file and registry
       consumption, Pi `0.80.3`, and the strict 257-check Neovim language smoke.
       This does not close the redirected-folder or dual-Windows-Terminal manual
@@ -233,21 +234,25 @@ broken repo-symlink still cleaned) is covered by
 
 ### Open
 
-- [ ] Intel macOS runtime confirmation is pending the exact PR-head
-      `macos-26-intel` Nix/setup runs. Both configurations cross-evaluate and
-      setup selection is behaviorally tested, but those are not runtime proof.
+- [x] Intel macOS runtime confirmation passed on exact PR head
+      `f4b63953f2f982702a685358b09e89bae2d78fdd`: the real
+      `macos-26-intel` Nix job (`29092384007` / `86360593091`) and full setup
+      job (`29092384014` / `86360593153`) both passed. Cross-evaluation is no
+      longer being used as the runtime claim.
 - [ ] Nixpkgs 26.05 is the final `x86_64-darwin` release and is supported only
       through 2026-12-31. Before that date, migrate Intel's package plane to a
       still-supported mechanism without narrowing the public macOS contract or
       moving chezmoi-owned dotfiles into the package layer. The warning remains
       intentionally unsuppressed.
 
-- [ ] Greenfield evidence remains intentionally sparse: `tests/greenfield/LEDGER.md`
-      still records no Windows Sandbox, WSL, macOS VM, or Linux VM clean-machine
-      run after the initial static docs guard. Do not count required CI as manual
-      desktop greenfield evidence. The old Wave C `0 / 10` Ubuntu parity counter
-      is no longer the current release gate; current CI proof is the required
-      parity/e2e/Nix workflow set plus any explicit ledger entries.
+- [ ] Greenfield/manual evidence remains intentionally bounded:
+      `tests/greenfield/LEDGER.md` now records exact-head hosted Ubuntu, Apple
+      Silicon, Intel, and Windows automated runs, but their PR caches were
+      enabled. No Windows Sandbox, WSL, redirected-Windows, cache-free
+      scheduled/manual, or desktop visual run is claimed. Required CI is not
+      manual desktop evidence. The old Wave C `0 / 10` Ubuntu parity counter is
+      no longer the current release gate; current CI proof is the required
+      parity/e2e/Nix workflow set plus explicit ledger entries.
 - [ ] No secrets or `age` tier has been started.
 - [ ] The POSIX pwsh profile
       (`~/.config/powershell/Microsoft.PowerShell_profile.ps1`) is intentionally
