@@ -98,6 +98,7 @@ local ok, err = pcall(function()
   local script = vim.fn.resolve(debug.getinfo(1, "S").source:sub(2))
   local repo_root = vim.fn.fnamemodify(script, ":h:h:h") -- tests/nvim/lsp_smoke.lua -> repo root
   local matrix = dofile(repo_root .. "/tests/nvim/language_matrix.lua")
+  local lsp_smoke_projects = dofile(repo_root .. "/tests/nvim/lsp_smoke_projects.lua")
   local fixtures = repo_root .. "/tests/nvim/fixtures/"
 
   -- The bundled-parser purge runs in nvim-treesitter's `config` (on plugin load,
@@ -502,7 +503,15 @@ local ok, err = pcall(function()
         .. "/mason/bin on PATH)"
     )
   end
-  for _, row in ipairs(matrix) do
+  local attach_root = repo_root .. "/tests/.cache/lsp-smoke-attach"
+  if vim.fn.isdirectory(attach_root) == 1 and vim.fn.delete(attach_root, "rf") ~= 0 then
+    fail("could not clean the isolated LSP attach root: " .. attach_root)
+  end
+  if vim.fn.mkdir(attach_root, "p") ~= 1 and vim.fn.isdirectory(attach_root) ~= 1 then
+    fail("could not create the isolated LSP attach root: " .. attach_root)
+  end
+
+  for index, row in ipairs(matrix) do
     if row.lsp then
       local skip, gated_fail
       if row.lsp_gated then
@@ -526,6 +535,16 @@ local ok, err = pcall(function()
       elseif skip then
         note(row.fixture .. " [" .. row.lsp .. "]: skipped (" .. skip .. ")")
       else
+        local prepare_ok, isolated_fixture = pcall(lsp_smoke_projects.prepare, {
+          root = attach_root,
+          fixtures = fixtures,
+          fixture = row.fixture,
+          lsp = row.lsp,
+          index = index,
+        })
+        if not prepare_ok then
+          fail(row.fixture .. " [" .. row.lsp .. "]: could not isolate project: " .. tostring(isolated_fixture))
+        end
         -- Opening a fixture must NOT raise. The treesitter HIGHLIGHT query error
         -- that used to fire during BufReadPost (nvim 0.12 bundled lua highlights
         -- query vs nvim-treesitter main's older parser -> E5113) is fixed
@@ -533,7 +552,10 @@ local ok, err = pcall(function()
         -- nvim-treesitter, so the matched built-in query is in effect. A raise
         -- here now means that regression is back -- record it as a failure, but
         -- still pcall-isolate it so one bad fixture does not abort the probe.
-        local open_ok, open_err = pcall(vim.cmd.edit, vim.fn.fnameescape(fixtures .. row.fixture))
+        local open_ok, open_err = false, "isolated fixture preparation failed"
+        if prepare_ok then
+          open_ok, open_err = pcall(vim.cmd.edit, vim.fn.fnameescape(isolated_fixture))
+        end
         if not open_ok then
           fail(
             row.fixture

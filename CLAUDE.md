@@ -723,7 +723,12 @@ major; `tests/static/repo_policy_test.sh` enforces this.
   every fixture under the production config can start LSPs as collateral. After
   the explicit formatter/LSP gate, the smoke disables the tested LSP configs
   before opening the broad parser/syntax matrix so later non-LSP gates do not
-  leave unrelated language servers alive.
+  leave unrelated language servers alive. Each initial LSP attach probe is
+  copied into its own minimal project root under `tests/.cache`; never open the
+  shared fixture directory as an LSP project. The shared directory contains
+  more than one hundred unrelated language fixtures and made neocmakelsp's
+  cold-start attach timing depend on repository-wide scanning even though the
+  later isolated formatter project attached successfully.
   Non-gated servers are strict on every OS; `powershell_es` is
   enforced only on Windows (pwsh + the PSES bundle) and skips cleanly on Unix.
   The fast `make test-nvim` runs Tier 1 only
