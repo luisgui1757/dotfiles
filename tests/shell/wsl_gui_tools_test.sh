@@ -18,9 +18,14 @@ DRY_RUN=1
 PM=brew
 CODE_PRESENT=0
 UBUNTU=1
+NATIVE_PM=apt
 
 is_ubuntu() {
     [[ "$UBUNTU" -eq 1 ]]
+}
+
+native_linux_pm() {
+    printf '%s\n' "$NATIVE_PM"
 }
 
 have() {
@@ -73,6 +78,7 @@ ghostty_out="$(install_ghostty_linux)"
 [[ "$ghostty_out" != *"install.sh"* ]] || { echo "FAIL: executable Ghostty installer remains" >&2; exit 1; }
 
 UBUNTU=0
+NATIVE_PM=unknown
 ghostty_out="$(install_ghostty_linux)"
 [[ "$ghostty_out" == *"sudo snap install ghostty --classic"* ]]
 
