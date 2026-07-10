@@ -192,20 +192,21 @@ broken repo-symlink still cleaned) is covered by
       `install-deps.sh` installs there, `shells/zshrc` sources there first, the
       verifier checks there, uninstall removes there, and parity tests assert
       that root under a hostile `XDG_DATA_HOME`.
-- [x] Checked-in `main` protection sources require `ubuntu`, `macos`, `windows`,
-      `chezmoi-parity`, `chezmoi-parity-macos`, `chezmoi-parity-windows`,
-      `nix flake check (ubuntu-24.04)`, `nix flake check (macos-26)`,
-      `e2e containers / ubuntu-24.04`, `setup.sh / ubuntu-24.04`,
-      `setup.sh / macos-26`, and `setup.ps1 / windows-2025` as of
-      2026-07-09. Applying them live remains an owner/admin action through
-      `scripts/apply-repo-safeguards.sh luisgui1757/dotfiles`; the static
-      required-check alignment test keeps ruleset/settings/script mirrors in
-      sync.
+- [x] The four checked-in protection sources now require `ubuntu`, `macos`,
+      `windows`, `chezmoi-parity`, `chezmoi-parity-macos`,
+      `chezmoi-parity-windows`, `nix flake check / linux`,
+      `nix flake check / macos`, `e2e containers / linux`, `setup.sh / linux`,
+      `setup.sh / macos`, and `setup.ps1 / windows`. The static alignment test
+      binds ruleset, settings, apply function, and API payload to that exact set.
 - [x] Stable logical replacements for the six runner-versioned contexts are
-      emitted and bound to exact per-OS proof artifacts. Stage 1 intentionally
-      leaves legacy contexts required; `.github/check-identities.json` and
-      `docs/security/branch-protection.md` define the deadlock-free second PR
-      and owner-applied live switch. UGR-020 remains PARTIAL until that happens.
+      emitted and bound to exact per-OS proof artifacts. Legacy producer names
+      remain emitted so the currently live legacy safeguards can gate this
+      cutover PR. `.github/check-identities.json` and
+      `docs/security/branch-protection.md` define the post-merge cache-free gate
+      and owner-applied live switch. The apply script itself refuses to mutate
+      unless its checkout is exact live main, safeguard sources are clean, and
+      every stable context succeeded on that SHA. UGR-020 remains PARTIAL until
+      that live apply and readback succeed.
 - [x] Native Windows no longer derives LocalApplicationData or Documents from
       UserProfile. Setup/uninstall share one validated known-folder identity,
       apply separate UserProfile/LocalApplicationData/Documents chezmoi source

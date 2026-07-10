@@ -797,26 +797,29 @@ Automation must not run as the owner account. Use a separate GitHub App or bot
 identity with branch/PR write access and no repository administration
 permission; otherwise GitHub sees the action as `luisgui1757`.
 
-Runner-versioned required contexts are in a staged migration. This branch keeps
-the twelve live/checked-in legacy contexts required and additionally emits six
-stable logical checks (`nix flake check / {linux,macos}`, `e2e containers /
-linux`, `setup.sh / {linux,macos}`, and `setup.ps1 / windows`). Each logical
-check verifies the exact OS proof marker's head SHA, workflow run, logical
-identity, and legacy producer; these are not no-op checks. After this PR merges
-and those checks pass on `main`, a follow-up PR may switch the four checked-in
-safeguard sources to `candidateRequired` in `.github/check-identities.json`.
-Only after that second PR merges should the owner apply the new live contexts.
-See [branch-protection.md](docs/security/branch-protection.md) for the exact order.
+Runner-versioned required contexts are in their final staged migration. This PR
+switches all four checked-in safeguard sources to six stable logical checks
+(`nix flake check / {linux,macos}`, `e2e containers / linux`, `setup.sh /
+{linux,macos}`, and `setup.ps1 / windows`) while workflows continue emitting
+the six legacy producer names. Each logical check verifies the exact OS proof
+marker's head SHA, workflow run, logical identity, and legacy producer; these
+are not no-op checks. Live GitHub remains on the legacy set so it can gate this
+PR safely. Only after this PR merges and the cache-free producers plus all six
+logical checks pass on that exact `main` SHA should the owner apply the checked-in
+stable contexts. See [branch-protection.md](docs/security/branch-protection.md)
+for the exact order.
 
 Manual owner step:
 
 ```bash
+scripts/apply-repo-safeguards.sh --preflight-only luisgui1757/dotfiles
 scripts/apply-repo-safeguards.sh luisgui1757/dotfiles
 ```
 
-with an authenticated `gh` that has repository admin permission. Do this after
-the required checks have appeared at least once on GitHub, otherwise protection
-may reference check names GitHub has not seen yet. See
+with an authenticated `gh` that has repository admin permission. Do this only
+after the post-merge cache-free and logical proof gate passes. The apply command
+repeats the preflight and refuses a non-main SHA, dirty safeguard sources, or a
+missing successful stable context before its first mutation. See
 [docs/security/branch-protection.md](docs/security/branch-protection.md) has the
 live verification commands and deletion-risk note;
 [docs/security/supply-chain.md](docs/security/supply-chain.md) records the

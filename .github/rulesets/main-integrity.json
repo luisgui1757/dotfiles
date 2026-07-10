@@ -52,27 +52,27 @@
             "integration_id": 15368
           },
           {
-            "context": "nix flake check (ubuntu-24.04)",
+            "context": "nix flake check / linux",
             "integration_id": 15368
           },
           {
-            "context": "nix flake check (macos-26)",
+            "context": "nix flake check / macos",
             "integration_id": 15368
           },
           {
-            "context": "e2e containers / ubuntu-24.04",
+            "context": "e2e containers / linux",
             "integration_id": 15368
           },
           {
-            "context": "setup.sh / ubuntu-24.04",
+            "context": "setup.sh / linux",
             "integration_id": 15368
           },
           {
-            "context": "setup.sh / macos-26",
+            "context": "setup.sh / macos",
             "integration_id": 15368
           },
           {
-            "context": "setup.ps1 / windows-2025",
+            "context": "setup.ps1 / windows",
             "integration_id": 15368
           }
         ]

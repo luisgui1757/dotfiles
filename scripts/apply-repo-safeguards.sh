@@ -4,7 +4,7 @@ set -euo pipefail
 
 usage() {
     cat <<'EOF'
-apply-repo-safeguards.sh [owner/repo]
+apply-repo-safeguards.sh [--preflight-only] [owner/repo]
 
 Applies the repository safeguard posture:
   - squash-only PR merges
@@ -20,12 +20,21 @@ Applies the repository safeguard posture:
 
 Requires an authenticated GitHub CLI with repository admin permission:
   gh auth login
+
+--preflight-only verifies that this checkout is the exact live main SHA and all
+required checks succeeded there, without changing repository state.
 EOF
 }
 
 if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     usage
     exit 0
+fi
+
+preflight_only=0
+if [[ "${1:-}" == "--preflight-only" ]]; then
+    preflight_only=1
+    shift
 fi
 
 if ! command -v gh >/dev/null 2>&1; then
@@ -121,12 +130,12 @@ windows
 chezmoi-parity
 chezmoi-parity-macos
 chezmoi-parity-windows
-nix flake check (ubuntu-24.04)
-nix flake check (macos-26)
-e2e containers / ubuntu-24.04
-setup.sh / ubuntu-24.04
-setup.sh / macos-26
-setup.ps1 / windows-2025
+nix flake check / linux
+nix flake check / macos
+e2e containers / linux
+setup.sh / linux
+setup.sh / macos
+setup.ps1 / windows
 EOF
 }
 
@@ -143,6 +152,56 @@ verify_required_contexts() {
     fi
     rm -f "$tmp_expected" "$tmp_actual"
 }
+
+verify_successful_required_contexts() {
+    local actual="$1" tmp_expected tmp_actual missing
+    tmp_expected="$(mktemp)"
+    tmp_actual="$(mktemp)"
+    required_check_contexts | LC_ALL=C sort -u > "$tmp_expected"
+    printf '%s\n' "$actual" | awk 'NF' | LC_ALL=C sort -u > "$tmp_actual"
+    missing="$(comm -23 "$tmp_expected" "$tmp_actual")"
+    rm -f "$tmp_expected" "$tmp_actual"
+    if [[ -n "$missing" ]]; then
+        echo "FAIL: live main is missing successful required checks:" >&2
+        printf '  %s\n' "$missing" >&2
+        return 1
+    fi
+}
+
+preflight_safeguard_apply() {
+    local local_head live_main_sha successful_contexts
+    local_head="$(git -C "$repo_root" rev-parse HEAD)"
+    live_main_sha="$(gh api "repos/$repo/commits/main" --jq .sha)"
+    if [[ "$local_head" != "$live_main_sha" ]]; then
+        echo "FAIL: safeguard checkout HEAD $local_head is not live main $live_main_sha." >&2
+        echo "      Pull main and rerun only after its required checks pass." >&2
+        return 1
+    fi
+    if ! git -C "$repo_root" diff --quiet -- \
+        .github/check-identities.json \
+        .github/settings.yml \
+        .github/rulesets \
+        scripts/apply-repo-safeguards.sh || \
+        ! git -C "$repo_root" diff --cached --quiet -- \
+        .github/check-identities.json \
+        .github/settings.yml \
+        .github/rulesets \
+        scripts/apply-repo-safeguards.sh; then
+        echo "FAIL: safeguard sources differ from the exact live main commit." >&2
+        echo "      Restore or commit the intended sources through a reviewed PR first." >&2
+        return 1
+    fi
+    successful_contexts="$(gh api --paginate \
+        "repos/$repo/commits/$live_main_sha/check-runs?per_page=100" \
+        --jq '.check_runs[] | select(.status == "completed" and .conclusion == "success") | .name')"
+    verify_successful_required_contexts "$successful_contexts"
+}
+
+preflight_safeguard_apply
+if [[ "$preflight_only" -eq 1 ]]; then
+    echo "Safeguard preflight passed for live main; no repository state changed."
+    exit 0
+fi
 
 echo "Applying repository safeguards to $repo"
 
@@ -173,12 +232,12 @@ gh_api_json PUT "repos/$repo/branches/main/protection" <<'JSON' >/dev/null
       "chezmoi-parity",
       "chezmoi-parity-macos",
       "chezmoi-parity-windows",
-      "nix flake check (ubuntu-24.04)",
-      "nix flake check (macos-26)",
-      "e2e containers / ubuntu-24.04",
-      "setup.sh / ubuntu-24.04",
-      "setup.sh / macos-26",
-      "setup.ps1 / windows-2025"
+      "nix flake check / linux",
+      "nix flake check / macos",
+      "e2e containers / linux",
+      "setup.sh / linux",
+      "setup.sh / macos",
+      "setup.ps1 / windows"
     ]
   },
   "enforce_admins": true,

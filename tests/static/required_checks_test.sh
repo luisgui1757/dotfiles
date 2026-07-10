@@ -13,7 +13,7 @@ safeguards_json="$tmp/safeguards-json.txt"
 safeguards_function="$tmp/safeguards-function.txt"
 ruleset="$tmp/ruleset.txt"
 
-jq -r '.currentRequired[]' .github/check-identities.json > "$expected"
+jq -r '.required[]' .github/check-identities.json > "$expected"
 
 python3 - <<'PY'
 import json
@@ -22,7 +22,7 @@ import re
 import sys
 
 metadata = json.loads(pathlib.Path(".github/check-identities.json").read_text(encoding="utf-8"))
-if metadata.get("schema") != 1 or metadata.get("stage") != "emit-stable-require-legacy":
+if metadata.get("schema") != 2 or metadata.get("stage") != "stable-required-live-apply-pending":
     raise SystemExit("FAIL: required-check migration metadata has an unsupported stage")
 
 test_workflow = pathlib.Path(".github/workflows/test.yml").read_text(encoding="utf-8")
@@ -32,11 +32,11 @@ e2e = pathlib.Path(".github/workflows/e2e-install.yml").read_text(encoding="utf-
 nix = pathlib.Path(".github/workflows/nix.yml").read_text(encoding="utf-8")
 
 legacy = stable_jobs | set(re.findall(r"(?m)^\s+legacy_context:\s*(.+?)\s*$", e2e + "\n" + nix))
-current = set(metadata["currentRequired"])
-if legacy != current:
-    print("FAIL: emitted legacy check identities differ from currentRequired", file=sys.stderr)
-    print("missing:", sorted(current - legacy), file=sys.stderr)
-    print("extra:", sorted(legacy - current), file=sys.stderr)
+expected_legacy = set(metadata["legacyEmitted"])
+if legacy != expected_legacy:
+    print("FAIL: emitted legacy check identities differ from legacyEmitted", file=sys.stderr)
+    print("missing:", sorted(expected_legacy - legacy), file=sys.stderr)
+    print("extra:", sorted(legacy - expected_legacy), file=sys.stderr)
     raise SystemExit(1)
 
 e2e_logical = set(re.findall(r"(?m)^\s+- logical_context:\s*(.+?)\s*$", e2e))
@@ -45,18 +45,18 @@ nix_logical = {
     f"nix flake check / {value}"
     for value in re.findall(r"(?m)^\s+- logical:\s*(.+?)\s*$", nix_logical_block)
 }
-candidate = stable_jobs | e2e_logical | nix_logical
-expected_candidate = set(metadata["candidateRequired"])
-if candidate != expected_candidate:
-    print("FAIL: emitted logical identities differ from candidateRequired", file=sys.stderr)
-    print("missing:", sorted(expected_candidate - candidate), file=sys.stderr)
-    print("extra:", sorted(candidate - expected_candidate), file=sys.stderr)
+required = stable_jobs | e2e_logical | nix_logical
+expected_required = set(metadata["required"])
+if required != expected_required:
+    print("FAIL: emitted logical identities differ from required", file=sys.stderr)
+    print("missing:", sorted(expected_required - required), file=sys.stderr)
+    print("extra:", sorted(required - expected_required), file=sys.stderr)
     raise SystemExit(1)
 
 replacements = {(item["legacy"], item["logical"]) for item in metadata["replacements"]}
-if {old for old, _ in replacements} != current - candidate:
+if {old for old, _ in replacements} != expected_legacy - required:
     raise SystemExit("FAIL: replacement metadata does not cover every legacy-only identity")
-if {new for _, new in replacements} != candidate - current:
+if {new for _, new in replacements} != required - expected_legacy:
     raise SystemExit("FAIL: replacement metadata does not cover every logical-only identity")
 if len(replacements) != len(metadata["replacements"]):
     raise SystemExit("FAIL: duplicate required-check replacement mapping")
@@ -65,7 +65,7 @@ for workflow in (e2e, nix):
     if "ci-logical-proof.sh emit" not in workflow or "ci-logical-proof.sh verify" not in workflow:
         raise SystemExit("FAIL: logical checks are not bound to exact proof artifacts")
 
-print("OK: legacy and stable logical check identities are both emitted during stage 1")
+print("OK: stable required identities are emitted while legacy producers remain available for the live transition")
 PY
 
 awk '
@@ -112,19 +112,19 @@ for rule in data["rules"]:
 PY
 
 if ! diff -u "$expected" "$settings"; then
-    echo "FAIL: .github/settings.yml required checks are out of sync with stage 1" >&2
+    echo "FAIL: .github/settings.yml required checks are out of sync with the stable target" >&2
     exit 1
 fi
 if ! diff -u "$expected" "$safeguards_json"; then
-    echo "FAIL: safeguards JSON required checks are out of sync with stage 1" >&2
+    echo "FAIL: safeguards JSON required checks are out of sync with the stable target" >&2
     exit 1
 fi
 if ! diff -u "$expected" "$safeguards_function"; then
-    echo "FAIL: safeguards required_check_contexts is out of sync with stage 1" >&2
+    echo "FAIL: safeguards required_check_contexts is out of sync with the stable target" >&2
     exit 1
 fi
 if ! diff -u "$expected" "$ruleset"; then
-    echo "FAIL: main-integrity ruleset required checks are out of sync with stage 1" >&2
+    echo "FAIL: main-integrity ruleset required checks are out of sync with the stable target" >&2
     exit 1
 fi
 

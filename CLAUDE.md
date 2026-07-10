@@ -361,13 +361,17 @@ that violates one of these, fix it instead of disabling the test.
     `[Environment]::UserInteractive` and host name are context, not a sufficient
     invocation predicate. Normal ConsoleHost, VS Code, and ISE stay supported.
 27. **Required check identities migrate without renaming deadlock.**
-    `.github/check-identities.json` is stage metadata. During stage 1, legacy
-    runner-versioned checks remain required while stable logical jobs verify
-    exact per-OS proof artifacts bound to the same run and head SHA. Never make
-    a no-op check to manufacture green status, and never switch live contexts in
-    the emitting PR. Follow `docs/security/branch-protection.md`: observe the
-    logical checks on merged `main`, merge the checked-in context-switch PR
-    while legacy checks still gate it, then have the owner apply live safeguards.
+    `.github/check-identities.json` records the stable target and still-emitted
+    legacy producers. The four checked-in safeguard sources require stable
+    logical jobs that verify exact per-OS proof artifacts bound to the same run
+    and head SHA; workflows retain legacy producer names until live cutover.
+    Never make a no-op check to manufacture green status, and never switch live
+    contexts from the cutover PR. Follow `docs/security/branch-protection.md`:
+    merge while live legacy checks still gate, pass cache-free plus all logical
+    checks on the exact merged `main` SHA, then have the owner run
+    `--preflight-only`, apply, and verify the checked-in safeguards. The apply
+    command repeats that exact-main/clean-source/successful-context preflight
+    before its first mutation.
 28. **Handled native PowerShell status never escapes its adapter.** Setup and
     uninstall chezmoi helpers temporarily disable native error promotion,
     capture stdout/stderr and the exact exit code, restore the caller preference,

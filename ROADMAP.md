@@ -273,9 +273,12 @@ Commit-by-commit status:
   paths. UGR-016 through UGR-019 and UGR-023 close the PowerShell invocation,
   checked Tree-sitter deletion, per-project clangd, Renovate inventory,
   Starship/Polaris cleanup, diagnostic-identity, NUL-safe JSON, and structural
-  Nix-ownership gaps. UGR-020 is deliberately PARTIAL: this branch emits and
-  verifies stable logical checks while the legacy contexts remain required;
-  the checked-in/live switch happens only in the documented post-merge stage.
+  Nix-ownership gaps. UGR-020 is deliberately PARTIAL: this cutover switches
+  every checked-in safeguard source to stable logical checks while retaining
+  legacy producers for the still-live rules; the live owner apply happens only
+  after the documented merged-main cache-free gate. The apply script now
+  enforces exact live-main HEAD, clean safeguard sources, and successful stable
+  contexts before its first mutation.
   UGR-021 is PARTIAL until real WSL, redirected-Windows, cache-free scheduled or
   manual, and desktop runs exist. Historical Intel and current conventional
   Windows font-consumption lanes passed. The first PR run exposed and fixed two
@@ -344,8 +347,10 @@ Commit-by-commit status:
   `e5cf3e23299cbb42a157c307f2a7259979fcada0` then passed cache-free run
   `29103732329`: Ubuntu container, public Ubuntu, Apple Silicon, Intel, native
   Windows, and all four setup logical proofs were green. UGR-021 remains
-  PARTIAL only because the context-switch sequence still requires the same
-  proof on the later merged-main SHA and the separate manual environments.
+  PARTIAL because merged-main run `29114125798` exposed the separate CMake LSP
+  project-isolation defect now repaired on this branch, and because the manual
+  environments remain outstanding. The checked-in stable-context cutover is in
+  this PR; owner live apply still waits for the repaired merged-main proof.
 
 - **Cache-free Ghostty artifact provenance — BRANCH-HEAD PROOF PASSED;
   MERGED-MAIN CONFIRMATION PENDING.** PR #48's first Ubuntu container job

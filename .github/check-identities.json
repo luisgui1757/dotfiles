@@ -1,7 +1,7 @@
 {
-  "schema": 1,
-  "stage": "emit-stable-require-legacy",
-  "currentRequired": [
+  "schema": 2,
+  "stage": "stable-required-live-apply-pending",
+  "legacyEmitted": [
     "ubuntu",
     "macos",
     "windows",
@@ -15,7 +15,7 @@
     "setup.sh / macos-26",
     "setup.ps1 / windows-2025"
   ],
-  "candidateRequired": [
+  "required": [
     "ubuntu",
     "macos",
     "windows",

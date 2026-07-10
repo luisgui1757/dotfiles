@@ -29,8 +29,12 @@ The script sets squash-only repository settings, keeps auto-merge disabled,
 upserts the three rulesets, keeps the classic branch protection fallback
 aligned, requires full-SHA external GitHub Actions references at the repository
 policy layer, and enables GitHub security alerts/security fixes where the plan
-supports them. If GitHub has duplicate rulesets with the same protected name,
-the script fails closed; delete the duplicate live ruleset before re-running it.
+supports them. Before its first mutation it requires the checkout HEAD to equal
+live `main`, requires the safeguard sources to be clean, and requires every
+stable context to have succeeded on that exact SHA. Use `--preflight-only` to
+exercise those checks without changing GitHub. If GitHub has duplicate rulesets
+with the same protected name, the script fails closed; delete the duplicate
+live ruleset before re-running it.
 
 ## Context Renames
 
@@ -39,44 +43,43 @@ actors, so removing an old context before the live setting changes deadlocks the
 PR; requiring a new context before GitHub has observed it creates the inverse
 deadlock. `.github/check-identities.json` records the transition.
 
-Stage 1 is this branch: legacy runner-versioned contexts remain required in all
-four safeguard sources, while workflows also emit stable per-OS logical checks.
-Each new check downloads the exact producer artifact and verifies the head SHA,
-run id/attempt, logical identity, and legacy producer through
-`scripts/ci-logical-proof.sh`; it is not a fake/no-op check.
+This PR is the checked-in cutover stage. All four safeguard sources name the
+stable per-OS logical checks, while workflows continue to emit both the legacy
+runner-versioned producers and stable checks. Each stable check downloads the
+exact producer artifact and verifies the head SHA, run id/attempt, logical
+identity, and legacy producer through `scripts/ci-logical-proof.sh`; it is not a
+fake/no-op check. Because live GitHub remains on the legacy set, those producer
+jobs continue to gate this PR without a rename deadlock.
 
 After this PR merges, use this exact sequence:
 
-1. Verify all six logical checks passed on the merged `main` SHA.
-2. Open a second PR changing `.github/check-identities.json` to the candidate
-   stage and updating `.github/settings.yml`,
-   `.github/rulesets/main-integrity.json`, and
-   `scripts/apply-repo-safeguards.sh` to `candidateRequired`. Do not remove the
-   legacy producer jobs; they still let the live legacy ruleset gate this PR.
-3. Merge that second PR only after the still-live legacy contexts pass.
-4. From updated `main`, have the owner apply the checked-in safeguards:
+1. Dispatch cache-free `e2e-install.yml` on the exact merged `main` SHA and
+   require the four current producers plus all four stable setup logical checks
+   to pass. Require the two stable Nix logical checks on that same merged SHA.
+2. Verify live GitHub still requires the legacy set before making any mutation.
+3. From that exact updated `main`, have the owner run the no-write preflight,
+   then apply the checked-in safeguards:
 
 ```bash
+scripts/apply-repo-safeguards.sh --preflight-only luisgui1757/dotfiles
 scripts/apply-repo-safeguards.sh luisgui1757/dotfiles
 ```
 
-5. Verify both the integrity ruleset and classic fallback require the candidate
+4. Verify both the integrity ruleset and classic fallback require the stable
    logical set. Runner labels can then change without renaming a required
-   context. No live ruleset mutation is authorized from the stage-1 PR.
+   context. No live ruleset mutation is authorized from this PR.
 
-The 2026-07-10 cache-free merged-main run `29096335827` is an explicit gate on
-step 2. Its first attempt exposed an asynchronous nvim-treesitter build race in
-the Apple Silicon producer, so the logical macOS proof was not green. Do not
-open or apply the context-switch stage until the waitable-update plus headless
-auto-install repair is merged and all six logical checks pass on that newer
-merged-main SHA. Branch-head run `29100106370` disproved the first,
-build-hook-only patch; neither that run nor a rerun of an older SHA can prove
-the complete repaired behavior. Exact repaired behavior head
+Exact repaired behavior head
 `e5cf3e23299cbb42a157c307f2a7259979fcada0` passed cache-free run
-`29103732329`, including every producer and all four setup logical proofs. That
-closes branch-head proof but does not relax step 2: merge the repair, rerun on
-its merged-main SHA, and require all six setup-plus-Nix logical checks before
-opening the context-switch PR.
+`29103732329`, including every then-current producer and all four setup logical
+proofs. Merged-main run `29114125798` on PR #48 merge SHA
+`f104bf066e4af7d4d707fe22ba36600711f1ae14` then exposed a separate strict
+CMake LSP project-isolation defect on Apple Silicon: the initial neocmakelsp
+probe timed out in the shared fixture tree while the later isolated formatter
+project attached in the same process. This PR repairs that boundary. Do not run
+the owner apply until the cache-free branch run and the post-merge run complete
+the four current setup producers, four setup logical checks, and two Nix
+logical checks.
 
 ## Verify
 
@@ -101,7 +104,7 @@ gh api repos/luisgui1757/dotfiles/actions/permissions \
   --jq '{enabled,allowed_actions,sha_pinning_required}'
 ```
 
-Checked-in desired posture during stage 1 (the current live exception is called
+Checked-in desired posture during the cutover (the current live exception is called
 out immediately below):
 
 - merge commits disabled;
@@ -112,22 +115,23 @@ out immediately below):
   post-merge safeguard update;
 - required checks are strict and include exactly:
   `ubuntu`, `macos`, `windows`, `chezmoi-parity`, `chezmoi-parity-macos`,
-  `chezmoi-parity-windows`, `nix flake check (ubuntu-24.04)`,
-  `nix flake check (macos-26)`, `e2e containers / ubuntu-24.04`,
-  `setup.sh / ubuntu-24.04`, `setup.sh / macos-26`, and
-  `setup.ps1 / windows-2025` in both the integrity ruleset and classic fallback;
-- the workflows additionally emit the six `candidateRequired` logical contexts
-  in `.github/check-identities.json`, but they are not live-required until the
-  second checked-in migration PR and owner apply above;
+  `chezmoi-parity-windows`, `nix flake check / linux`,
+  `nix flake check / macos`, `e2e containers / linux`, `setup.sh / linux`,
+  `setup.sh / macos`, and `setup.ps1 / windows` in both the integrity ruleset
+  and classic fallback;
+- the workflows continue emitting the six replaced legacy producer contexts in
+  `.github/check-identities.json` until the live owner apply is verified;
 - only `Protect main: review` and `Protect main: owner updates` have bypass actors;
 - each bypass actor is `luisgui1757` with `bypass_mode: pull_request`;
 - `Protect main: integrity` has no bypass actors.
 
 Checked-in versus live truth matters: at the start of the 2026-07-10 closure
 branch, the live Actions permissions endpoint reported
-`sha_pinning_required: false`. The branch updates the desired safeguard script
-but does not apply it. The owner must run the apply command after merge; until
-then this item is pending live confirmation, not an already-active safeguard.
+`sha_pinning_required: false`, and live required contexts were the twelve legacy
+names. The branch updates the desired safeguard sources but does not apply them.
+The owner must run the apply command only after the merged-main proof above;
+until then both the SHA policy and stable-context cutover are pending live
+confirmation, not already-active safeguards.
 
 GitHub does not let pull request authors approve their own pull requests. Owner
 authored PRs can use the owner review bypass, but only after the non-bypass

@@ -21,12 +21,12 @@ branches:
           - chezmoi-parity
           - chezmoi-parity-macos
           - chezmoi-parity-windows
-          - nix flake check (ubuntu-24.04)
-          - nix flake check (macos-26)
-          - e2e containers / ubuntu-24.04
-          - setup.sh / ubuntu-24.04
-          - setup.sh / macos-26
-          - setup.ps1 / windows-2025
+          - nix flake check / linux
+          - nix flake check / macos
+          - e2e containers / linux
+          - setup.sh / linux
+          - setup.sh / macos
+          - setup.ps1 / windows
       enforce_admins: true
       # The split repository rulesets in .github/rulesets are canonical. Classic
       # branch protection stays as a fallback, but it cannot model "owner may
