@@ -129,10 +129,10 @@ elif len(set(cache_versions)) != 1:
 else:
     cache_major = cache_versions[0]
     expected_cache_snippets = (
-        f"${{{{ runner.os }}}}-setup-sh-actions-cache-v{cache_major}-${{{{ hashFiles('nvim/lazy-lock.json', 'nvim/lua/plugins/**/*.lua') }}}}",
-        f"${{{{ runner.os }}}}-setup-sh-actions-cache-v{cache_major}-",
-        f"Windows-setup-ps1-actions-cache-v{cache_major}-${{{{ hashFiles('nvim/lazy-lock.json', 'nvim/lua/plugins/**/*.lua') }}}}",
-        f"Windows-setup-ps1-actions-cache-v{cache_major}-",
+        f"${{{{ runner.os }}}}-${{{{ runner.arch }}}}-setup-sh-actions-cache-v{cache_major}-${{{{ hashFiles('nvim/lazy-lock.json', 'nvim/lua/plugins/**/*.lua') }}}}",
+        f"${{{{ runner.os }}}}-${{{{ runner.arch }}}}-setup-sh-actions-cache-v{cache_major}-",
+        f"Windows-${{{{ runner.arch }}}}-setup-ps1-actions-cache-v{cache_major}-${{{{ hashFiles('nvim/lazy-lock.json', 'nvim/lua/plugins/**/*.lua') }}}}",
+        f"Windows-${{{{ runner.arch }}}}-setup-ps1-actions-cache-v{cache_major}-",
     )
     for snippet in expected_cache_snippets:
         if snippet not in e2e_install:
