@@ -678,7 +678,11 @@ major; `tests/static/repo_policy_test.sh` enforces this.
   nix-darwin/Home Manager layer before native/deferred installs, and assert the
   nix-owned CLI set resolves from a Nix profile/store path. The Linux job first
   proves a clean login/interactive zsh resolves Nix-owned `rg` through Home
-  Manager session state with no CI PATH injection. They explicitly fail
+  Manager session state with no CI PATH injection. That proof resolves the
+  effective account's login shell from the account record and executes that
+  exact zsh; never hardcode `/usr/bin/zsh`, because the supported fresh-Ubuntu
+  path installs and selects Linuxbrew zsh. Login-shell stderr is retained on
+  failure so a missing shell cannot masquerade as broken session state. They explicitly fail
   if setup skips Phase 3-5, omits Phase 6/6, emits a `FAIL:` marker, or Mason
   did not install expected tools. Windows e2e
   also asserts the new Windows tools that must leave PATH commands behind

@@ -64,6 +64,24 @@ grep -F "/etc/profiles/per-user/\$_dotfiles_hm_user/etc/profile.d/hm-session-var
 grep -F "_dotfiles_hm_user=\"\$(id -un 2>/dev/null)\"" "$REPO_ROOT/shells/zshrc" >/dev/null \
     || { echo "FAIL: Home Manager system profile is not keyed by effective account identity"; exit 1; }
 
+# The hosted native-Linux proof must execute the login zsh that setup actually
+# selected from the account record. Ubuntu starts without /usr/bin/zsh and the
+# public installer legitimately selects Linuxbrew zsh, so hardcoding a path
+# would fail before testing Home Manager state.
+workflow="$REPO_ROOT/.github/workflows/e2e-install.yml"
+grep -F "fresh_zsh_user=\"\$(id -un)\"" "$workflow" >/dev/null \
+    || { echo "FAIL: native-Linux proof does not resolve the effective account"; exit 1; }
+grep -F "getent passwd \"\$fresh_zsh_user\"" "$workflow" >/dev/null \
+    || { echo "FAIL: native-Linux proof does not resolve the account-record shell"; exit 1; }
+grep -F "\"\$fresh_zsh_login_shell\" -l -i -c" "$workflow" >/dev/null \
+    || { echo "FAIL: native-Linux proof does not execute the resolved login zsh"; exit 1; }
+if grep -F '/usr/bin/zsh -l -i' "$workflow" >/dev/null; then
+    echo "FAIL: native-Linux proof hardcodes a zsh path instead of the account record"
+    exit 1
+fi
+grep -F "cat \"\$fresh_zsh_stderr\" >&2" "$workflow" >/dev/null \
+    || { echo "FAIL: native-Linux proof discards login-shell diagnostics"; exit 1; }
+
 cmp -s "$REPO_ROOT/shells/zshrc" "$REPO_ROOT/home/dot_zshrc" || {
     echo "FAIL: chezmoi zshrc twin drifted"
     exit 1

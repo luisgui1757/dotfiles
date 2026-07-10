@@ -664,3 +664,25 @@ pushed exact-head runs or manual environments.
   exact pushed descendant on Ubuntu, Apple Silicon, Intel, and Windows; WSL,
   redirected Windows, divergent dual Terminal state, and TCC-enabled AeroSpace
   config consumption remain separate manual/runtime dependencies.
+
+## Native-Linux login-shell oracle correction — entry 22
+
+- Exact head `28006783a5112bfa3af3b0deb2f59fbf9f457a4e`, run
+  `29091430087`, job `86357442860`, completed Home Manager activation and all
+  six public setup phases. Its post-install shell check then failed with the
+  same high-level message as the prior run.
+- The new run disproved the prior root-cause attribution. Setup's own dependency
+  table recorded zsh missing, installed
+  `/home/linuxbrew/.linuxbrew/bin/zsh`, and changed the account login shell to
+  that path. The assertion nevertheless invoked `/usr/bin/zsh`, which did not
+  exist, and redirected the decisive diagnostic to `/dev/null`. It never
+  exercised `hm-session-vars.sh` or `rg` resolution.
+- The oracle now resolves the effective account with `id -un`, requires exactly
+  one `getent passwd` record, requires that record's shell be executable zsh,
+  and runs that exact shell as login+interactive under `env -i`. Stderr is
+  captured and printed on failure, stdout must be one nonempty command path,
+  and the resolved executable must still land in `/nix/store`.
+- `home_manager_session_vars_test.sh` binds the workflow to the account record,
+  rejects the old hardcoded path, and requires preserved failure diagnostics.
+  The canonical Home Manager session-path configuration remains necessary and
+  unchanged. Hosted behavior confirmation requires the next exact-head run.

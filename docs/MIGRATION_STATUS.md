@@ -145,6 +145,9 @@ broken repo-symlink still cleaned) is covered by
       Nix-owned tools without caller PATH injection. Brew-less macOS dry-run
       now previews all later phases instead of aborting after the bootstrap
       plan.
+      Native-Linux CI resolves and executes the effective account's actual
+      login zsh from the account database; it does not assume `/usr/bin/zsh`
+      exists after setup selected a platform-specific shell.
 
 - [x] Windows `nvim` directory-symlink round-trip is fixed in commit `eed6690`.
       The Windows template renders a clean, backslash, no-`..` absolute path

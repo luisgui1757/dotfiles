@@ -322,6 +322,16 @@ Commit-by-commit status:
   Manager now exports its evaluated `home.profileDirectory/bin` through
   `home.sessionPath`; both architecture evaluations bind the exact value.
 
+- **Exact-head native-Linux login-shell oracle — FIXED LOCALLY, HOSTED RERUN
+  PENDING.** Head `28006783a5112bfa3af3b0deb2f59fbf9f457a4e`
+  completed Home Manager and all six setup phases, then failed before session
+  state was exercised: fresh Ubuntu reported zsh missing, setup installed and
+  selected `/home/linuxbrew/.linuxbrew/bin/zsh`, but the assertion invoked the
+  nonexistent `/usr/bin/zsh` and discarded stderr. The proof now resolves one
+  effective-account record, requires its shell to be executable zsh, executes
+  that exact login shell from a caller-empty environment, and prints captured
+  diagnostics on failure.
+
 - **Exact-head native Windows setup — PASSED.** Head
   `0c853d066362602f14dc251a6d3fbf3980102048`, run `29090161175`, completed
   all six public setup phases and the required post-install checks on

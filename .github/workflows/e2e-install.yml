@@ -242,9 +242,24 @@ jobs:
           }
           repo="$(pwd -P)"
           if [[ "${RUNNER_OS:-}" == "Linux" ]]; then
-            fresh_zsh_rg="$(env -i HOME="$HOME" USER="${USER:-runner}" PATH=/usr/bin:/bin TERM=dumb \
-              /usr/bin/zsh -l -i -c 'command -v rg' 2>/dev/null)" \
-              || fail "fresh Linux login/interactive zsh did not resolve Home Manager rg"
+            fresh_zsh_user="$(id -un)" || fail "could not resolve the effective Linux account"
+            fresh_zsh_login_shell="$(getent passwd "$fresh_zsh_user" \
+              | awk -F: -v user="$fresh_zsh_user" '$1 == user { shell = $7; count++ } END { if (count != 1) exit 1; print shell }')" \
+              || fail "could not resolve one account-record login shell for $fresh_zsh_user"
+            [[ "${fresh_zsh_login_shell##*/}" == zsh && -x "$fresh_zsh_login_shell" ]] \
+              || fail "account-record login shell is not an executable zsh: $fresh_zsh_login_shell"
+            fresh_zsh_stderr="$RUNNER_TEMP/fresh-login-zsh.stderr"
+            set +e
+            fresh_zsh_rg="$(env -i HOME="$HOME" USER="$fresh_zsh_user" PATH=/usr/bin:/bin TERM=dumb \
+              "$fresh_zsh_login_shell" -l -i -c 'command -v rg' 2>"$fresh_zsh_stderr")"
+            fresh_zsh_rc=$?
+            set -e
+            if [[ "$fresh_zsh_rc" -ne 0 ]]; then
+              cat "$fresh_zsh_stderr" >&2
+              fail "fresh Linux login/interactive zsh did not resolve Home Manager rg (shell=$fresh_zsh_login_shell exit=$fresh_zsh_rc)"
+            fi
+            [[ -n "$fresh_zsh_rg" && "$fresh_zsh_rg" != *$'\n'* ]] \
+              || fail "fresh Linux zsh emitted an invalid rg command path: $fresh_zsh_rg"
             fresh_zsh_rg_real="$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$fresh_zsh_rg")"
             [[ "$fresh_zsh_rg_real" == /nix/store/* ]] \
               || fail "fresh Linux zsh resolved rg outside Nix (source=$fresh_zsh_rg real=$fresh_zsh_rg_real)"
