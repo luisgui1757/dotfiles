@@ -906,3 +906,30 @@ merged-main greenfield proof.
   amd64 asset on the pushed head.
 - WSL, redirected Windows, divergent dual Windows Terminal state, owner-host tap
   rollback, and desktop GUI/TCC proof remain unclaimed.
+
+## Ubuntu shell-fixture environment correction — entry 26
+
+- PR #48 generic Ubuntu run `29102957625`, job `86396205735`, passed every
+  shell case through `wsl_gui_tools_test.sh`; that test then exited before its
+  `OK`, and `make test-shell` reported failure. Its final scenario set only the
+  mocked `is_ubuntu` result to false but left `native_linux_pm` ambient. On the
+  macOS development host the ambient result was `unknown`; on Ubuntu CI it was
+  `apt`, so production's intentional plain-Debian apt routing correctly kept
+  selecting the test's mocked reviewed `.deb` instead of reaching the scenario's
+  intended non-apt Snap fallback.
+- Alternative-cause check: both the PR Ubuntu container job `86396205982` and
+  cache-free Ubuntu container job `86396379773` passed the real native apt
+  setup, and the dedicated Ghostty mapping/success/failure cases passed inside
+  the failed generic job. The red context was therefore fixture dependence on
+  the host package manager, not a product-path failure.
+- Test repair commit:
+  `addd0efecbfea869f98804d5055f37d47e5b9793` (`test(shell): isolate Ghostty
+  fallback fixture`). The fixture now supplies its native package manager
+  explicitly: `apt` for the reviewed Debian-family branch and `unknown` for the
+  non-apt fallback branch. It no longer inherits the executor OS.
+- Focused and aggregate local PASS on the corrected tree:
+  `wsl_gui_tools_test.sh`, complete `make test-shell`, strict shell lint,
+  `git diff --check`, and `make ci` ending `local pre-PR gate passed`.
+- This test-only correction does not promote the earlier cache-free run to
+  exact-final-head evidence. Push it, let the PR workflows restart, and dispatch
+  a new cache-free run on the resulting immutable head.
