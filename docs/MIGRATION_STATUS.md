@@ -51,7 +51,8 @@ Provisioning stays in `install-deps`, not chezmoi run-scripts:
 - pinned binary/font/script installers and direct artifacts: Homebrew installer,
   Neovim Linux, native-Linux chezmoi, lazygit Linux, Starship Linux,
   tree-sitter CLI Linux/Windows, WezTerm Ubuntu `.deb`, Herdr Linux, Herdr Windows
-  preview, Hack Nerd Font, Windows Terminal portable zip, Ubuntu Ghostty, Scoop
+  preview, Hack Nerd Font, Windows Terminal portable zip, exact Ghostty
+  Debian-family `.deb` assets, Scoop
   installer, Pi CLI packed-tarball SRI, and pinned `setuptools`/`pylatexenc`
   converter wheels/sdists
 - the zsh login-shell switch and domain-account fallback
@@ -247,11 +248,24 @@ broken repo-symlink still cleaned) is covered by
 
 - [ ] Greenfield/manual evidence remains intentionally bounded:
       `tests/greenfield/LEDGER.md` now records exact-head hosted Ubuntu, Apple
-      Silicon, Intel, and Windows automated runs, but their PR caches were
-      enabled. No Windows Sandbox, WSL, redirected-Windows, cache-free
-      scheduled/manual, or desktop visual run is claimed. Required CI is not
-      manual desktop evidence. The old Wave C `0 / 10` Ubuntu parity counter is
-      no longer the current release gate; current CI proof is the required
+      Silicon, Intel, and Windows automated runs. Manual cache-free run
+      `29096335827` skipped every broad cache; attempt 1 passed Ubuntu,
+      container, and Windows but exposed a real asynchronous nvim-treesitter
+      build race on Apple Silicon while Intel independently hit transient DNS.
+      Attempt 2 on the same unrepaired SHA passed Apple Silicon but failed the
+      Intel neocmake attach assertion. Branch-head run `29100106370` then passed
+      Apple Silicon but exposed remaining headless async parser installs via
+      missing Astro captures on Ubuntu and GraphQL captures on Intel. These are
+      recorded as partial/failed evidence, not promoted to a green run; the
+      implementation now blocks interactive auto-install in ordinary headless
+      processes as well as waiting on the build callback. Exact behavior head
+      `e5cf3e23299cbb42a157c307f2a7259979fcada0` subsequently passed cache-free
+      run `29103732329` across Ubuntu container, public Ubuntu, Apple Silicon,
+      Intel, native Windows, and all four setup logical proofs.
+      No Windows Sandbox, WSL, redirected-Windows, merged-main cache-free
+      confirmation, or desktop visual run is claimed. Required CI is not manual
+      desktop evidence. The old Wave C `0 / 10` Ubuntu parity counter is no
+      longer the current release gate; current CI proof is the required
       parity/e2e/Nix workflow set plus explicit ledger entries.
 - [ ] No secrets or `age` tier has been started.
 - [ ] The POSIX pwsh profile

@@ -85,6 +85,28 @@ assert_eq "tree-sitter version (install-deps.sh == test.yml)" \
 assert_eq "tree-sitter x86_64 SHA (install-deps.sh == test.yml)" \
     "$(sh_const TREE_SITTER_CLI_LINUX_X86_64_SHA256)" "$(yml_const TREE_SITTER_CLI_LINUX_X86_64_SHA256)"
 
+# --- Ghostty exact Debian package pins: source <-> tests <-> security ledger --
+ghostty_version="$(sh_const GHOSTTY_UBUNTU_VERSION)"
+assert_contains "Ghostty release version (install test)" "tests/shell/ghostty_install_test.sh" "${ghostty_version/-0-/-0.}"
+assert_contains "Ghostty release version (security ledger)" "docs/security/supply-chain.md" "$ghostty_version"
+for pin_name in \
+    GHOSTTY_UBUNTU_AMD64_2404_SHA256 \
+    GHOSTTY_UBUNTU_ARM64_2404_SHA256 \
+    GHOSTTY_UBUNTU_AMD64_2510_SHA256 \
+    GHOSTTY_UBUNTU_ARM64_2510_SHA256 \
+    GHOSTTY_DEBIAN_AMD64_TRIXIE_SHA256 \
+    GHOSTTY_DEBIAN_ARM64_TRIXIE_SHA256
+do
+    pin_value="$(sh_const "$pin_name")"
+    if [[ ! "$pin_value" =~ ^[0-9a-f]{64}$ ]]; then
+        echo "FAIL: $pin_name must be a 64-character lowercase SHA-256, got '$pin_value'"
+        fail=1
+        continue
+    fi
+    assert_contains "$pin_name (install test)" "tests/shell/ghostty_install_test.sh" "$pin_value"
+    assert_contains "$pin_name (security ledger)" "docs/security/supply-chain.md" "$pin_value"
+done
+
 # --- zsh plugins: installers <-> checked chezmoi publisher -------------------
 zsh_ensure_file="home/.chezmoiscripts/run_onchange_after_20-ensure-zsh-plugin-pins.sh.tmpl"
 ensure_tag() { awk -v name="$1-pin:" '$2 == name { print $3; exit }' "$zsh_ensure_file"; }

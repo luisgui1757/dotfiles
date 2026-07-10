@@ -18,9 +18,14 @@ DRY_RUN=1
 PM=brew
 CODE_PRESENT=0
 UBUNTU=1
+NATIVE_PM=apt
 
 is_ubuntu() {
     [[ "$UBUNTU" -eq 1 ]]
+}
+
+native_linux_pm() {
+    printf '%s\n' "$NATIVE_PM"
 }
 
 have() {
@@ -54,14 +59,26 @@ ghostty_out="$(install_ghostty_linux)"
 [[ "$ghostty_out" == *"WSL uses Windows Terminal by default"* ]]
 
 EXPERIMENTAL_WSL_GUI=1
+expected_ghostty_asset="ghostty_1.3.1-0.ppa2_amd64_24.04.deb"
+expected_ghostty_sha="$GHOSTTY_UBUNTU_AMD64_2404_SHA256"
+expected_ghostty_url="https://github.com/mkasberg/ghostty-ubuntu/releases/download/${GHOSTTY_UBUNTU_VERSION}/${expected_ghostty_asset}"
+resolve_ghostty_deb_asset() {
+    GHOSTTY_DEB_ASSET="$expected_ghostty_asset"
+    GHOSTTY_DEB_SHA256="$expected_ghostty_sha"
+    GHOSTTY_DEB_ARCH=amd64
+    GHOSTTY_DEB_URL="$expected_ghostty_url"
+}
 ghostty_out="$(install_ghostty_linux)"
 [[ "$ghostty_out" == *"Homebrew formula is macOS-only on Linux"* ]]
-# Installer must be pinned (not HEAD) and SHA-256 verified before running.
-[[ "$ghostty_out" == *"ghostty-ubuntu/${GHOSTTY_UBUNTU_VERSION}/install.sh"* ]]
-[[ "$ghostty_out" == *"verify sha256 ${GHOSTTY_UBUNTU_INSTALL_SHA256}"* ]]
-[[ "$ghostty_out" != *"/HEAD/install.sh"* ]]
+# Exact .deb bytes must be pinned and verified; no mutable latest lookup or
+# executable installer script remains in the path.
+[[ "$ghostty_out" == *"${expected_ghostty_url}"* ]] || { echo "FAIL: pinned Ghostty .deb URL missing" >&2; exit 1; }
+[[ "$ghostty_out" == *"verify sha256 ${expected_ghostty_sha}"* ]] || { echo "FAIL: Ghostty .deb digest preview missing" >&2; exit 1; }
+[[ "$ghostty_out" != *"releases/latest"* ]] || { echo "FAIL: mutable Ghostty latest lookup remains" >&2; exit 1; }
+[[ "$ghostty_out" != *"install.sh"* ]] || { echo "FAIL: executable Ghostty installer remains" >&2; exit 1; }
 
 UBUNTU=0
+NATIVE_PM=unknown
 ghostty_out="$(install_ghostty_linux)"
 [[ "$ghostty_out" == *"sudo snap install ghostty --classic"* ]]
 

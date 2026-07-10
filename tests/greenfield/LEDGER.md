@@ -11,12 +11,17 @@ when someone inspected it on that machine.
 | 2026-07-10 | GitHub-hosted macOS 26 Apple Silicon | `f4b63953f2f982702a685358b09e89bae2d78fdd` | [Nix job 86360593055](https://github.com/luisgui1757/dotfiles/actions/runs/29092384007/job/86360593055), [setup job 86360593136](https://github.com/luisgui1757/dotfiles/actions/runs/29092384014/job/86360593136) | Pass | Not run | Architecture-matched nix-darwin, all six setup phases, real Ghostty/WezTerm validation, AeroSpace app/CLI identity, and the 257-check smoke passed. AeroSpace managed-config consumption was explicitly unavailable without a user-granted TCC desktop session. PR caches were enabled. |
 | 2026-07-10 | GitHub-hosted macOS 26 Intel (`macos-26-intel`) | `f4b63953f2f982702a685358b09e89bae2d78fdd` | [Nix job 86360593091](https://github.com/luisgui1757/dotfiles/actions/runs/29092384007/job/86360593091), [setup job 86360593153](https://github.com/luisgui1757/dotfiles/actions/runs/29092384014/job/86360593153) | Pass | Not run | Real x86_64 host installed upstream Nix 2.34.8, selected only `dotfiles-x86_64`, completed nix-darwin and all six setup phases, then passed post-install and 257 language checks. The Nixpkgs 26.05 Intel sunset warning remained visible. This PR lane restored caches and is not TCC/visual or post-2026-12-31 package-plane proof. |
 | 2026-07-10 | GitHub-hosted Windows 2025 | `f4b63953f2f982702a685358b09e89bae2d78fdd` | [generic job 86360593205](https://github.com/luisgui1757/dotfiles/actions/runs/29092384006/job/86360593205), [setup job 86360593122](https://github.com/luisgui1757/dotfiles/actions/runs/29092384014/job/86360593122) | Pass | Not run | Native PowerShell setup completed all six phases and post-install assertions, including exact Tree-sitter 0.26.10, Pi 0.80.3, Hack Nerd Font files plus registry consumption, Polaris, and the 257-check smoke. This conventional known-folder run is not redirected-folder, dual-Windows-Terminal, uninstall-restoration, or desktop visual proof. |
+| 2026-07-10 | GitHub-hosted cache-free setup matrix | `5e3e7c6d93c400d67f6160c6f8f09be56aac10d3` | [workflow-dispatch run 29096335827, attempt 1](https://github.com/luisgui1757/dotfiles/actions/runs/29096335827) | Partial / fail | Not run | Every broad cache step was skipped. Ubuntu container job `86373717048`, public Ubuntu job `86373717119`, and native Windows job `86373717139` passed. Apple Silicon job `86373717142` failed strict smoke after an asynchronous Lazy Tree-sitter update overlapped Phase 4 (98/99 languages; Pascal had no captures). Intel job `86373717122` independently failed on transient `api.github.com` DNS and restored original shell files/taps. This is defect-discovery evidence, not a successful cache-free full-matrix claim. |
+| 2026-07-10 | GitHub-hosted cache-free macOS retry | `5e3e7c6d93c400d67f6160c6f8f09be56aac10d3` | [workflow-dispatch run 29096335827, attempt 2](https://github.com/luisgui1757/dotfiles/actions/runs/29096335827) | Partial / fail | Not run | The Apple Silicon producer `86378834721` and logical macOS job `86382233846` passed on the unrepaired SHA. Intel producer `86378834701` installed 99/99 parsers but failed strict smoke because the original CMake fixture's neocmake client did not attach within 45 seconds; its later formatter CMake fixture did attach. The retry shows the first race is timing-dependent but cannot validate code absent from this SHA, and the full cache-free matrix remains open. |
+| 2026-07-10 | GitHub-hosted cache-free PR #48 branch head | `1f03199f9d420e534bfade544ae7d74f1cfb002a` | [workflow-dispatch run 29100106370](https://github.com/luisgui1757/dotfiles/actions/runs/29100106370) | Partial / fail | Not run | Every broad cache step was skipped. Ubuntu container `86386489280`, Apple Silicon `86386489300`, Windows `86386489334`, and their logical proof jobs passed. Public Ubuntu `86386489336` failed because Astro had no captures; Intel `86386489380` failed because GraphQL had no captures. Logs showed the waited build callback finish, then Lazy restore's separately loaded plugin config start the interactive async declared-parser install before Phase 4. This disproved the build-hook-only repair; a newer head also blocks async auto-install in ordinary headless processes. |
+| 2026-07-10 | GitHub-hosted cache-free PR #48 repaired behavior head | `e5cf3e23299cbb42a157c307f2a7259979fcada0` | [workflow-dispatch run 29103732329](https://github.com/luisgui1757/dotfiles/actions/runs/29103732329) | Pass | Not run | Every broad cache step was skipped. Ubuntu container `86399025475` (3m17s), public Ubuntu `86399025519` (7m53s), Apple Silicon `86399025503` (10m33s), Intel `86399025491` (17m06s), and native Windows `86399025722` (16m44s) passed setup plus strict post-install assertions. Logical setup proofs `86403118150`, `86403118145`, `86403118099`, and `86403118074` passed. This is exact branch-head automated proof for conventional hosted paths, not merged-main, WSL, redirected Windows, divergent dual Terminal, or desktop/TCC proof. |
 
 ## Pending proof (not evidence entries)
 
-- Intel macOS hosted Nix and full setup proof is recorded above. A cache-free
-  scheduled/manual run, a real owner host with pre-existing taps, and desktop
-  GUI/TCC observations remain separate evidence.
+- Intel macOS hosted Nix and full setup proof is recorded above. The first
+  cache-free manual run is also recorded, but failed and therefore does not
+  close the cache-free matrix row. A real owner host with pre-existing taps and
+  desktop GUI/TCC observations remain separate evidence.
 - WSL2, redirected Windows known folders, and desktop GUI/visual behavior still
   require their real environments. Workflow or harness presence does not count
   as a run.
@@ -26,9 +31,10 @@ when someone inspected it on that machine.
 - The Windows hosted E2E result above proves Hack Nerd Font files and registry
   registration on a conventional hosted profile. Logical check artifacts remain
   workflow plumbing, not an additional greenfield environment entry.
-- Renovate schema/local extraction passed locally; hosted Dashboard ownership
-  remains pending until the bot reruns against the exact PR head. Do not record
-  a Dashboard row here as Intel, WSL, redirected-Windows, or desktop proof.
+- Renovate schema/local extraction passed locally; Dashboard #7 reran against
+  merged `main` at 2026-07-10 13:17 UTC and now lists the reviewed Nix, runner,
+  and Scoop inventory. Do not record that bot result here as Intel, WSL,
+  redirected-Windows, or desktop proof.
 
 ## Entry Template
 

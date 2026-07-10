@@ -135,17 +135,23 @@ done
     is_wsl() { return 1; }
     is_ubuntu() { return 0; }
     require_downloader() { return 0; }
-    run_ghostty_ubuntu_installer() { return 43; }
+    resolve_ghostty_deb_asset() {
+        GHOSTTY_DEB_ASSET="ghostty-test.deb"
+        GHOSTTY_DEB_SHA256="test-sha"
+        GHOSTTY_DEB_ARCH=amd64
+        GHOSTTY_DEB_URL="https://example.invalid/ghostty-test.deb"
+    }
+    install_verified_ghostty_deb() { return 43; }
 
     out_file="$(mktemp)"
     install_ghostty_linux >"$out_file" 2>&1
     output="$(cat "$out_file")"
 
     [[ "$INSTALL_FAILURES_COUNT" -eq 1 ]] \
-        || { echo "FAIL: Ubuntu ghostty installer failure must be recorded"; exit 1; }
+        || { echo "FAIL: Ubuntu ghostty package failure must be recorded"; exit 1; }
     [[ "$INSTALL_FAILURES_DETAIL" == *"ghostty via apt (mkasberg/ghostty-ubuntu@$GHOSTTY_UBUNTU_VERSION) exit=43"* ]] \
         || { echo "FAIL: Ubuntu ghostty failure detail was not precise: $INSTALL_FAILURES_DETAIL"; exit 1; }
-    [[ "$output" == *"Ubuntu ghostty installer failed"* ]] \
+    [[ "$output" == *"verified Debian-family Ghostty package install failed"* ]] \
         || { echo "FAIL: Ubuntu ghostty failure output missing: $output"; exit 1; }
 )
 

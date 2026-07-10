@@ -188,6 +188,38 @@ significant change to the relevant area.
       Intel-darwin release and remains supported only through 2026-12-31; keep
       its warning visible and track the required post-26.05 package-plane
       migration separately.
+- [x] **Cache-free exact behavior-head full setup proof**: workflow-dispatch run
+      [`29096335827`](https://github.com/luisgui1757/dotfiles/actions/runs/29096335827)
+      on merged-main SHA `5e3e7c6d93c400d67f6160c6f8f09be56aac10d3`
+      skipped the broad install/plugin caches in every setup job. Attempt 1
+      passed the Ubuntu container, public Ubuntu setup, and native Windows
+      setup. Apple Silicon exposed an asynchronous Lazy Tree-sitter update
+      overlapping Phase 4 (98/99 languages; Pascal had no captures), and Intel
+      hit a separate transient GitHub DNS failure after restoring its original
+      shell files and taps. Attempt 2 on the same unrepaired SHA passed Apple
+      Silicon but failed Intel because the original CMake fixture's neocmake
+      client did not attach within 45 seconds, even though the later formatter
+      CMake fixture did attach. Rerun this exact cache-free workflow after the
+      waitable-update repair merges. Branch-head cache-free run
+      [`29100106370`](https://github.com/luisgui1757/dotfiles/actions/runs/29100106370)
+      proved the first repair incomplete: Apple Silicon passed, while Ubuntu
+      lost Astro captures and Intel lost GraphQL captures because ordinary
+      headless plugin config still started an interactive asynchronous install.
+      That path is now blocked outside a UI or the explicit synchronous phase.
+      Exact behavior head `e5cf3e23299cbb42a157c307f2a7259979fcada0`
+      then passed
+      [`29103732329`](https://github.com/luisgui1757/dotfiles/actions/runs/29103732329)
+      with caches skipped: Ubuntu container `86399025475`, public Ubuntu
+      `86399025519`, Apple Silicon `86399025503`, Intel `86399025491`, native
+      Windows `86399025722`, and all four setup logical proofs were green.
+      This checks the exact branch behavior; it is not WSL, redirected Windows,
+      divergent dual Terminal, or desktop/TCC evidence.
+- [ ] **Cache-free merged-main safeguard confirmation**: after PR #48 merges,
+      dispatch `e2e-install.yml` on the resulting `main` SHA. Require all five
+      producers, the four setup logical proofs, and the two Nix logical proofs
+      to pass before opening the stage-two context-switch PR. Record that
+      merged-main SHA and run here and in `tests/greenfield/LEDGER.md`; a
+      documentation-only descendant does not replace the behavior-head run.
 - [ ] **Home Manager (Linux/WSL)**: with Nix installed inside the Linux/WSL
       environment, run
       `./setup.sh --all` (or the compatibility alias `./setup.sh --home-manager`;
@@ -263,6 +295,13 @@ significant change to the relevant area.
       Windows Terminal uses Hack Nerd Font, `win32yank` is reachable, lazygit is
       installed on both sides, zsh plugins are installed in WSL, nvim starts,
       tmux starts, and clipboard from WSL -> Windows round-trips.
+- [ ] **Ghostty exact Debian package consumption**: on a supported Ubuntu
+      24.04/25.10 or Debian trixie amd64/arm64 host without Ghostty, run
+      `./install-deps.sh --all`. Confirm setup prints the pinned
+      `mkasberg/ghostty-ubuntu@1.3.1-0-ppa2` asset identity, `dpkg-query -W
+      -f='${Version}' ghostty` returns `1.3.1-0~ppa2`, and `ghostty --version`
+      succeeds. This remains manual for distro/architecture pairs not exercised
+      by the hosted Ubuntu container.
 - [ ] **WSL experimental GUI opt-in only**: if testing Linux Ghostty under WSLg /
       X11, run `./setup.sh --experimental-wsl-gui`; otherwise confirm
       `~/.config/ghostty/config` is not linked by default in WSL.

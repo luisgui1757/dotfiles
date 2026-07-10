@@ -10,13 +10,16 @@ proof for the direct-artifact paths below.
 | Windows Tree-sitter CLI | `v0.26.10`; x64 `e378c57f5de3e698058997489e69a027551dc05a09c6ff51e42ffab6ea5d5b6b`; arm64 `d30a6a6986a0fdbdb3a6c0f0e23dc6e6719e133f73dee7c65cf73839a458bced`; x86 `404a1cd17eacb76368db782859bc60521e66e16693572f52383690c554d2c3bd` | Architecture-specific release zip hash plus executable version validation before and after atomic publication. |
 | gh-dash | tag `v4.25.1`; tag object `e6ebbd7e83e30161b9192ce3339972d2c8269e7f`; peeled commit `49f37e4832956c57bf52d4ea8b1b1e5c0f863700` | Remote tag mapping is checked, then `gh extension install --pin` receives the commit. |
 | Ubuntu PowerShell repository config | Ubuntu 24.04 `packages-microsoft-prod.deb`, SHA-256 `c13f01ac7c3001b51a9281d40dde666db5e037e05512840c319832f7852bfec4` | Required CI verifies the downloaded file immediately before `sudo dpkg -i`. |
+| Ghostty Debian-family packages | `mkasberg/ghostty-ubuntu` `1.3.1-0-ppa2`; Ubuntu 24.04 amd64 `478d440153ef544426418efc7d6d8901715359f452c46be29071901a94b8cd47`, arm64 `91063815b6ce3d834d59714b4ad0310f744448b6716836d035b3d331d1923363`; Ubuntu 25.10 amd64 `793bde1c31163d8e1d12ea939c8b941f7908170e57bbf19b121434a0f6621c59`, arm64 `c6a4fd4fd786b4bdea42036650ef1724f535c4b636329f488f7ece36820d3d6b`; Debian trixie amd64 `9fda8e418d7a7f58149ba3ba823a255d6b80f8bb5431b3bd7e912ff597715b2e`, arm64 `73f384e62c419d7a7809d686bf579fea5e23f52742b34f70c74d6adf0e72f8ab` | Setup maps reviewed distro/architecture pairs to one release URL, verifies SHA-256 and exact dpkg package/architecture/version metadata before privileged apt, then validates installed version plus command. The upstream script and its mutable `releases/latest` lookup are never executed. |
 | Windows Terminal Sandbox helper | Production `v1.24.11321.0` x64 portable zip, SHA-256 `7caef554147e5498ed1becdca73cdedb79fbc81f89032e46ae9b095c53433812` | The helper imports the production pin, verifies it, transactionally publishes the portable tree, and delegates settings to setup. It never queries `releases/latest` or mirrors packaged settings. |
 | Zsh plugins | fzf-tab `d7e0234614dbe5369fdd760907d12c0e05a4dccc`; zsh-autosuggestions `e52ee8ca55bcc56a17c828767a3f98f22a68d4eb` | One publisher quarantines unproved sourceable paths, fetches the exact commit into a sibling stage, verifies origin/HEAD/cleanliness/tracked entry file, and atomically publishes. |
 | Intel macOS CI Nix bootstrap | `cachix/install-nix-action` `v31.10.7`, commit `a49548c11d9846ad46ecc0115273879b045f001c` | Only `macos-intel` selects this full-SHA action. Its reviewed composite installs upstream Nix `2.34.8` from a versioned `releases.nixos.org` URL; non-Intel lanes retain the pinned Determinate action. |
 
 `tests/static/supply_chain_remote_execution_test.sh` rejects remote-eval
 patterns, unchecked downloaded PowerShell executables, and downloads that flow
-to privileged package installation without an intervening SHA-256 check.
+to privileged package installation without an intervening SHA-256 check. Its
+privileged-flow model includes the repository's `maybe_sudo` and
+`verify_sha256` helpers, with positive and negative self-tests.
 `tests/static/repo_policy_test.sh` requires every external GitHub Actions
 `uses:` reference to be a full lowercase 40-hex commit SHA.
 

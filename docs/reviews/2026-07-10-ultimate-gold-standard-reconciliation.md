@@ -767,3 +767,220 @@ rewriting that history.
   independent review.
 - Live Actions policy remained `sha_pinning_required:false`; the checked-in
   target is true. No live safeguard was mutated.
+
+## Post-merge cache-free reconciliation — entry 24
+
+This append-only entry records the first agreed follow-up after PR #47 merged.
+It does not rewrite the exact behavior-head closure above.
+
+- Merged-main base:
+  `5e3e7c6d93c400d67f6160c6f8f09be56aac10d3` (PR #47 squash merge).
+- Manual cache-free workflow-dispatch run:
+  [`29096335827`](https://github.com/luisgui1757/dotfiles/actions/runs/29096335827).
+  Every broad install/plugin cache step was skipped.
+- Attempt 1: Ubuntu container `86373717048`, public Ubuntu `86373717119`, and
+  native Windows `86373717139` passed. Apple Silicon `86373717142` failed the
+  strict smoke after Lazy reported the nvim-treesitter build complete while
+  compiler output continued; only 98/99 languages completed and Pascal had no
+  captures. Intel `86373717122` independently failed transient
+  `api.github.com` DNS resolution and restored the original system shell files
+  and Homebrew taps.
+- Attempt 2, same unrepaired SHA: Apple Silicon `86378834721` and logical macOS
+  `86382233846` passed. Intel `86378834701` installed 99/99 parsers but failed
+  because the original CMake fixture's neocmake client did not attach within 45
+  seconds; the later formatter CMake fixture did attach. This timing-dependent
+  retry does not validate code absent from that SHA and leaves the full
+  cache-free matrix open.
+- Alternative hypothesis check: Neovim `0.12.4`, Tree-sitter CLI `0.26.10`,
+  locked nvim-treesitter commit
+  `4916d6592ede8c07973490d9322f187e07dfefac`, and locked Pascal revision
+  `042119eca2e18a60e56317fb06ee3ba5c32cb447` built successfully in a separate
+  clean runtime and produced ten captures. Deterministic Pascal parser/query
+  incompatibility was therefore rejected; the hosted log's overlapping
+  publication is the reproduced cause.
+- Behavioral repair commit:
+  `fc22028d2a9ba5ddddb8343ba64fc7d208c8fee7`. The Lazy build hook now bypasses
+  the command load trigger, calls nvim-treesitter's waitable update API with
+  `max_jobs = 1`, waits up to 15 minutes, and requires exactly `true` before
+  restore can advance. Phase 4 remains the explicit complete parser install.
+- Focused regression: the two new Tree-sitter behaviors first failed against
+  command-form `build = ":TSUpdate"`, then passed after the repair. Final
+  Tree-sitter spec result was 20 passed, 0 failed; `make test-nvim` passed.
+- Full local proof on the identical behavioral tree: `git diff --check`; Bash
+  syntax for every tracked shell script; repository shell lint;
+  `tests/static/run_all.sh`; `tests/shell/run_all.sh`; PowerShell parsing and
+  234/234 Pester with 0 skipped plus all 17 Neovim specs through `test.ps1`;
+  `make test-migration`; `make test`; `make validate-renovate` with exactly 89
+  records; `nix flake check --print-build-logs`; and `make ci` ending
+  `local pre-PR gate passed`.
+
+### Finding status amendments
+
+| ID | Status after entry 24 | Exact evidence | Remaining work |
+|---|---|---|---|
+| UGR-019 | ACCEPTED/FIXED | Dashboard #7 reran against merged `main` at 2026-07-10 13:17 UTC and now exposes the `nix` manager inventory, `macos 26-intel` runner labels, and `ScoopInstaller/Install master`; no lookup-problem section remains. Local official extraction remains exactly 89 reviewed records. | Normal future Renovate operation only; do not turn this bot result into greenfield host evidence. |
+| UGR-020 | PARTIAL | Stage 1 logical checks exist, but cache-free merged-main run `29096335827` did not produce a fully green matrix. The active integrity ruleset and classic fallback remain strict on the exact 12 legacy contexts. | Merge the repair, pass all six logical checks on its merged-main SHA, then open the separate checked-in context-switch PR. Only after that PR merges may the owner apply live safeguards. |
+| UGR-021 | PARTIAL | The cache-free lane ran and exposed a real asynchronous Tree-sitter publication race. Commit `fc22028d2a9ba5ddddb8343ba64fc7d208c8fee7` repairs the boundary with behavioral proof. | A workflow-dispatch run on the repair's merged-main SHA must pass every producer and logical check. WSL, redirected Windows, dual Terminal, and desktop/TCC proof remain separate. |
+
+### Live safeguard boundary after entry 24
+
+- Integrity ruleset `17363189` and the classic fallback still require the exact
+  12 legacy contexts with strict behind-main enforcement.
+- Actions remains enabled with `sha_pinning_required:false`; checked-in desired
+  state remains true for the later owner-applied migration.
+- No ruleset, classic protection setting, or Actions policy was mutated by this
+  follow-up.
+
+## Branch-head cache-free second-root repair — entry 25
+
+This append-only entry records evidence discovered after entry 24 and the
+corresponding behavioral repair. It does not promote a branch run to
+merged-main greenfield proof.
+
+- PR #48's first required Ubuntu container job, run `29100012131`, job
+  `86386173483`, failed while installing Ghostty. The repo had authenticated the
+  bytes of upstream `install.sh`, but that reviewed script then queried mutable
+  `releases/latest`, selected a release asset at runtime, downloaded an
+  unchecked `.deb`, and passed it to privileged apt. The immediate empty lookup
+  exposed the reliability defect; the unchecked package-to-root flow was the
+  more serious provenance defect.
+- The first cache-free PR-branch run,
+  [`29100106370`](https://github.com/luisgui1757/dotfiles/actions/runs/29100106370),
+  exercised exact head `1f03199f9d420e534bfade544ae7d74f1cfb002a` with broad
+  caches disabled. Ubuntu container, Apple Silicon, and Windows producers
+  passed. Public Ubuntu lost Astro captures and Intel lost GraphQL captures.
+  Their logs showed the waited nvim-treesitter build callback complete, then a
+  separate ordinary headless Lazy config load start the interactive
+  asynchronous declared-parser installer before Phase 4. This disproved the
+  build-hook-only repair rather than being rerun away.
+- Behavioral repair commit:
+  `93ce7fecd92a06583ac7b4211dfe2e1c169dac53` (`fix(setup): close
+  cache-free install races`). Ordinary headless Neovim config loads now refuse
+  the interactive asynchronous parser-install path; only a real UI or the
+  explicit synchronous Phase 4 flag can start declared-parser installation.
+  The already-waited, serialized Lazy build callback remains in force.
+- The same commit removes execution of the Ghostty installer script. Setup now
+  maps only reviewed Ubuntu 24.04, Ubuntu 25.10, and Debian trixie
+  `amd64`/`arm64` identities to an exact release URL. It verifies nonempty bytes,
+  one of six pinned SHA-256 values, `Package=ghostty`, exact architecture, and
+  dpkg version `1.3.1-0~ppa2` before privileged apt; it then verifies the
+  installed version and command. Private staging is checked, signal-cleaned,
+  and removed on every exit. Failures before apt preserve the host; apt or
+  post-publication failures emit explicit package-manager recovery guidance and
+  enter the consolidated failure summary exactly once.
+- Independent artifact review downloaded all six release assets and recomputed
+  their SHA-256 values. Each matched the committed constant. `dpkg-deb` control
+  inspection also matched package name, architecture, and exact version for all
+  six. This is byte/metadata review, not a claim that every distro/architecture
+  package was installed on real hardware.
+- Focused PASS: Tree-sitter 21/21 (including the new real-headless no-async
+  behavior); Ghostty mapping/success and staging/download/digest/metadata/apt/
+  publication failure suites; failure accumulation; WSL preview; temporary
+  cleanup; pin consistency; generalized privileged-package scanner self-tests;
+  strict shell lint; and `git diff --check`.
+- Full local PASS on the behavioral tree: Bash syntax over all 134 tracked shell
+  scripts; `tests/static/run_all.sh`; `tests/shell/run_all.sh`; PowerShell parse
+  and PSScriptAnalyzer plus 234/234 Pester with zero skips and all 17 Neovim
+  specs via `test.ps1`; `make test-migration`; `make test-nvim`; `make test`;
+  `make validate-renovate` with the exact 89-record official inventory;
+  `nix flake check --print-build-logs`; and `make ci` ending `local pre-PR gate
+  passed`. Nix retained the explicit x86_64-darwin support-window warning and
+  reported incompatible local systems as omitted rather than tested.
+
+### Finding status amendments
+
+| ID | Status after entry 25 | Exact evidence | Remaining work |
+|---|---|---|---|
+| UGR-004 | ACCEPTED/FIXED | The pre-existing accumulator correctly converted Ghostty's recoverable installer failure into a final nonzero summary; commit `93ce7fecd92a06583ac7b4211dfe2e1c169dac53` replaces the mutable nested installer and adds staging/precondition/failure injection without a bare `set -e` escape. | Hosted exact-head confirmation remains part of UGR-021; real third-party outages remain external evidence. |
+| UGR-008 | ACCEPTED/FIXED | The general download-to-privileged-package scanner now recognizes the repo's `maybe_sudo` and `verify_sha256` helpers and carries positive/negative self-tests; the exact Ghostty flow is required by the scanner and package tests. | None for static coverage; real package consumption is listed separately in MANUAL. |
+| UGR-020 | PARTIAL | Stage 1 remains intact and all legacy plus logical identities are still emitted. The prior cache-free runs are failed evidence, so stage 2 is not yet safe. | Push this repair, pass its PR checks and a cache-free exact-head matrix, merge it, then require a newer merged-main logical matrix before opening the context-switch PR. |
+| UGR-021 | PARTIAL | Cache-free execution found and drove both the second Tree-sitter repair and exact Ghostty package provenance. Local proof is complete for commit `93ce7fecd92a06583ac7b4211dfe2e1c169dac53`. | Every producer and logical job must pass on a new cache-free run of the pushed repair head, then again on its merged-main SHA. WSL, redirected Windows, dual Terminal, and desktop/TCC proof remain separate. |
+
+### Safeguard and manual-proof boundary after entry 25
+
+- The active integrity ruleset and classic fallback still require the exact 12
+  legacy contexts. No live ruleset, branch protection, or Actions setting was
+  changed.
+- A real supported Debian-family Ghostty install remains unchecked in
+  `tests/MANUAL.md`; the hosted Ubuntu container will exercise the Ubuntu 24.04
+  amd64 asset on the pushed head.
+- WSL, redirected Windows, divergent dual Windows Terminal state, owner-host tap
+  rollback, and desktop GUI/TCC proof remain unclaimed.
+
+## Ubuntu shell-fixture environment correction — entry 26
+
+- PR #48 generic Ubuntu run `29102957625`, job `86396205735`, passed every
+  shell case through `wsl_gui_tools_test.sh`; that test then exited before its
+  `OK`, and `make test-shell` reported failure. Its final scenario set only the
+  mocked `is_ubuntu` result to false but left `native_linux_pm` ambient. On the
+  macOS development host the ambient result was `unknown`; on Ubuntu CI it was
+  `apt`, so production's intentional plain-Debian apt routing correctly kept
+  selecting the test's mocked reviewed `.deb` instead of reaching the scenario's
+  intended non-apt Snap fallback.
+- Alternative-cause check: both the PR Ubuntu container job `86396205982` and
+  cache-free Ubuntu container job `86396379773` passed the real native apt
+  setup, and the dedicated Ghostty mapping/success/failure cases passed inside
+  the failed generic job. The red context was therefore fixture dependence on
+  the host package manager, not a product-path failure.
+- Test repair commit:
+  `addd0efecbfea869f98804d5055f37d47e5b9793` (`test(shell): isolate Ghostty
+  fallback fixture`). The fixture now supplies its native package manager
+  explicitly: `apt` for the reviewed Debian-family branch and `unknown` for the
+  non-apt fallback branch. It no longer inherits the executor OS.
+- Focused and aggregate local PASS on the corrected tree:
+  `wsl_gui_tools_test.sh`, complete `make test-shell`, strict shell lint,
+  `git diff --check`, and `make ci` ending `local pre-PR gate passed`.
+- This test-only correction does not promote the earlier cache-free run to
+  exact-final-head evidence. Push it, let the PR workflows restart, and dispatch
+  a new cache-free run on the resulting immutable head.
+
+## Exact repaired behavior-head hosted closure — entry 27
+
+- Exact repaired behavior head:
+  `e5cf3e23299cbb42a157c307f2a7259979fcada0`.
+- Cache-free workflow-dispatch run:
+  [`29103732329`](https://github.com/luisgui1757/dotfiles/actions/runs/29103732329),
+  completed successfully with every broad cache step skipped. Producers passed:
+  Ubuntu container `86399025475` (3m17s), public Ubuntu `86399025519` (7m53s),
+  Apple Silicon `86399025503` (10m33s), Intel `86399025491` (17m06s), and
+  native Windows `86399025722` (16m44s). Stable setup logical proofs passed:
+  container/Linux `86403118150`, setup/Linux `86403118145`, setup/macOS
+  `86403118099`, and setup/Windows `86403118074`.
+- Final behavior-head PR workflows also passed. Generic/parity run
+  `29103728407` closed the Ubuntu fixture correction and passed Ubuntu, macOS,
+  Windows, and all three parity jobs. Nix run `29103728279` passed Ubuntu,
+  Apple Silicon, Intel, and logical Linux/macOS. E2E run `29103728188` passed
+  all five producers and all four stable setup logical proofs. Every one of the
+  12 live-required legacy contexts and all six candidate logical contexts was
+  green on the same SHA.
+- The cache-free Ubuntu container installed through the exact verified Ghostty
+  package path; the prior mutable-installer failure did not recur. Apple
+  Silicon, Intel, Ubuntu, and Windows strict parser/capture assertions all
+  passed; neither the waited build callback nor ordinary headless config
+  launched overlapping parser publication.
+- This is exact automated branch-head evidence for the conventional GitHub
+  environments. It is not a merged-main run and does not claim WSL, redirected
+  Windows, divergent dual Windows Terminal state, owner-host tap rollback, or
+  desktop GUI/TCC behavior.
+
+### Finding status amendments
+
+| ID | Status after entry 27 | Exact evidence | Remaining work |
+|---|---|---|---|
+| UGR-004 | ACCEPTED/FIXED | Both PR container `86398980438` and cache-free container `86399025475` passed the exact Ghostty package path; generic Ubuntu `86398854097` passed the corrected failure/fallback suite. | Normal third-party outage behavior remains external runtime evidence. |
+| UGR-020 | PARTIAL | All 12 legacy and all six candidate logical contexts passed on repaired behavior head `e5cf3e23299cbb42a157c307f2a7259979fcada0`; live safeguards remain unchanged. | Merge PR #48, repeat cache-free/logical proof on its merged-main SHA, then open and merge the separate context-switch PR before owner-applied safeguards. |
+| UGR-021 | PARTIAL | Cache-free run `29103732329` passed all five producers and all four setup logical proofs on the exact repaired behavior head; the same SHA passed both Nix logical proofs in `29103728279`. | Merged-main confirmation plus WSL, redirected Windows, dual Terminal, and desktop/TCC evidence remain. |
+
+### Live relationship at entry 27
+
+- Integrity ruleset `17363189` and classic branch protection still require the
+  exact 12 legacy contexts with strict behind-main enforcement; all passed.
+- Review ruleset `17363190` still requires one code-owner approval, last-push
+  approval, stale-review dismissal, and thread resolution. PR #48 is
+  `MERGEABLE` but correctly `BLOCKED` with `REVIEW_REQUIRED`.
+- Owner-update ruleset `17363555` remains active. Actions remains enabled with
+  `sha_pinning_required:false`; the checked-in desired value remains true for
+  the later owner-applied stage. No live safeguard was mutated.
+- This evidence entry is a documentation-only descendant of the immutable
+  behavior head above. Required checks must still pass on the final PR head;
+  the behavior-head cache-free result is not relabeled as a docs-head run.

@@ -64,6 +64,20 @@ scripts/apply-repo-safeguards.sh luisgui1757/dotfiles
    logical set. Runner labels can then change without renaming a required
    context. No live ruleset mutation is authorized from the stage-1 PR.
 
+The 2026-07-10 cache-free merged-main run `29096335827` is an explicit gate on
+step 2. Its first attempt exposed an asynchronous nvim-treesitter build race in
+the Apple Silicon producer, so the logical macOS proof was not green. Do not
+open or apply the context-switch stage until the waitable-update plus headless
+auto-install repair is merged and all six logical checks pass on that newer
+merged-main SHA. Branch-head run `29100106370` disproved the first,
+build-hook-only patch; neither that run nor a rerun of an older SHA can prove
+the complete repaired behavior. Exact repaired behavior head
+`e5cf3e23299cbb42a157c307f2a7259979fcada0` passed cache-free run
+`29103732329`, including every producer and all four setup logical proofs. That
+closes branch-head proof but does not relax step 2: merge the repair, rerun on
+its merged-main SHA, and require all six setup-plus-Nix logical checks before
+opening the context-switch PR.
+
 ## Verify
 
 ```bash

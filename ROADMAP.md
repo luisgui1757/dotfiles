@@ -314,6 +314,56 @@ Commit-by-commit status:
   Silicon/Intel/Windows, and all six stable logical proof jobs. No workflow
   definition is recorded as runtime proof; only those completed runs are.
 
+- **Cache-free Tree-sitter restore/bootstrap boundary — BRANCH-HEAD PROOF
+  PASSED; MERGED-MAIN CONFIRMATION PENDING.** The first manual cache-free
+  merged-main run
+  (`29096335827`, attempt 1, SHA `5e3e7c6d93c400d67f6160c6f8f09be56aac10d3`)
+  proved that command-form Lazy `build = ":TSUpdate"` returned while its parser
+  compilers were still running. Phase 4 then overlapped that unfinished work;
+  the Apple Silicon lane installed only 98/99 languages and Pascal produced no
+  captures. The locked Pascal parser/query pair passed a separate clean build,
+  disproving deterministic incompatibility. The build hook now uses
+  nvim-treesitter's waitable update task, serializes work, and fails unless the
+  task completes successfully before Lazy restore returns. Behavioral tests
+  prove both the wait boundary and fail-closed completion. UGR-021 and the
+  stage-2 UGR-020 safeguard cutover remain PARTIAL until this repair merges and
+  the cache-free logical macOS proof passes on merged `main`. Attempt 2 on the
+  same unrepaired SHA passed Apple Silicon but failed Intel when the original
+  CMake fixture's neocmake client did not attach within 45 seconds (the later
+  formatter CMake fixture did attach); that retry is additional failed evidence,
+  not repaired-head proof. The first branch-head cache-free run
+  (`29100106370`, SHA `1f03199f9d420e534bfade544ae7d74f1cfb002a`)
+  then disproved the narrower build-hook-only repair: Apple Silicon passed, but
+  Ubuntu lost Astro captures and Intel lost GraphQL captures. Their logs showed
+  Lazy restore itself loaded plugin config and launched the interactive async
+  declared-parser install before Phase 4. Ordinary headless config loads now
+  skip that path; only a real UI or the explicit synchronous Phase 4 flag may
+  install. The new behavioral test failed on the branch head and passes after
+  this second root-cause fix. Exact behavior head
+  `e5cf3e23299cbb42a157c307f2a7259979fcada0` then passed cache-free run
+  `29103732329`: Ubuntu container, public Ubuntu, Apple Silicon, Intel, native
+  Windows, and all four setup logical proofs were green. UGR-021 remains
+  PARTIAL only because the context-switch sequence still requires the same
+  proof on the later merged-main SHA and the separate manual environments.
+
+- **Cache-free Ghostty artifact provenance — BRANCH-HEAD PROOF PASSED;
+  MERGED-MAIN CONFIRMATION PENDING.** PR #48's first Ubuntu container job
+  (`29100012131` /
+  `86386173483`) reproduced a second cache-free dependency: the checksum-pinned
+  `mkasberg/ghostty-ubuntu` script queried unauthenticated mutable
+  `releases/latest`, then exited under `set -e` when no asset URL was returned.
+  More importantly, any successful lookup would have installed unchecked `.deb`
+  bytes as root. The script path is removed. Setup now selects one exact
+  distro/architecture release asset, verifies one of six independently reviewed
+  SHA-256 values and exact package metadata before privileged apt, validates the
+  installed version/command, cleans staging on every path, and prints recovery
+  guidance after state-changing failures. Success/failure/mapping tests and the
+  generalized privileged-package scanner bind the contract. Exact behavior
+  head `e5cf3e23299cbb42a157c307f2a7259979fcada0` passed both the cached PR
+  Ubuntu container (`29103728188` / `86398980438`) and cache-free Ubuntu
+  container (`29103732329` / `86399025475`). The original red job remains
+  defect evidence rather than being waived.
+
 - **Exact-head runtime dependency follow-up — PASSED.** Head
   `0c853d066362602f14dc251a6d3fbf3980102048`
   reached the real two-project clangd spec on Ubuntu and failed closed because
@@ -847,7 +897,7 @@ Evidence:
 - Recommended setup docs no longer use raw `curl | bash`/`iwr` execution of the
   current default branch; they use `git clone` plus local `setup`.
 - The repo already has stronger patterns for other downloads, for example
-  Ghostty script verification in `install-deps.sh`, Hack font verification in
+  exact Ghostty `.deb` verification in `install-deps.sh`, Hack font verification in
   `install-deps.ps1`, and Windows Terminal portable verification in
   `install-deps.ps1`.
 

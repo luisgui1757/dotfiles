@@ -294,11 +294,25 @@ malformed candidates fail before removal/restoration.
 ```text
 setup -> install-deps                 phase 1: programs and optional tools
       -> chezmoi apply                phase 2: config layer with pre-apply backups
-      -> nvim "+Lazy! restore" +qa    phase 3: plugins from lazy-lock.json
+      -> nvim "+Lazy! restore" +qa    phase 3: plugins from lazy-lock.json;
+                                            parser-update build tasks must finish
       -> nvim +DOTFILES_TREESITTER_SYNC_INSTALL  phase 4: Tree-sitter parsers
       -> nvim "+MasonToolsInstallSync" +qa        phase 5: LSP servers and formatters
       -> Polaris global install       phase 6: per-user agent policy
 ```
+
+The nvim-treesitter Lazy build hook calls the upstream waitable update API,
+serializes parser builds, and requires successful completion before Phase 3 can
+return. A command-form `:TSUpdate` is asynchronous and must not be used as that
+build hook: it is also a Lazy command trigger whose plugin config starts the
+declared-parser install asynchronously. On a cold cache either task can leave
+compilers publishing parsers while Phase 4 starts its explicit synchronous
+install. Phase 4 remains the complete declared-parser bootstrap and proof
+boundary. Plugin config also refuses to start its interactive asynchronous
+auto-install path in an ordinary headless process; only a real UI session or
+the explicit synchronous Phase 4 flag may start declared-parser installation.
+That prevents Lazy restore, Mason, and smoke validators from creating separate
+compiler tasks around the proof phase.
 
 Pass `--all` / `-All` for explicit non-interactive installs (Y to every setup
 prompt).
@@ -535,9 +549,14 @@ migration warning. POSIX pwsh profile management remains provisioning-adjacent.
   `/usr/local/bin/lazygit`, or falls back to `~/.local/bin/lazygit` when sudo is
   unavailable.
 - macOS installs Ghostty through `brew install --cask ghostty` when selected.
-  Native Linux uses Linux-specific Ghostty paths. WSL defaults to Windows
-  Terminal on the Windows host; Linux Ghostty in WSL requires
-  `--experimental-wsl-gui`.
+  Supported Debian-family native Linux resolves the exact pinned
+  `mkasberg/ghostty-ubuntu` release asset for distro and architecture, verifies
+  its reviewed SHA-256 plus `Package`/`Architecture`/`Version` metadata,
+  installs only that local `.deb`, and validates the installed dpkg version and
+  command. It never executes the upstream installer, whose mutable
+  `releases/latest` lookup does not bind the downloaded package bytes. WSL
+  defaults to Windows Terminal on the Windows host; Linux Ghostty in WSL
+  requires `--experimental-wsl-gui`.
 - WezTerm installs from the vendor channel per OS: `brew install --cask wezterm`
   on macOS, the `wez.wezterm` Scoop/winget/choco catalog entry on Windows, and
   the official pinned, SHA-256-verified `.deb` on amd64 Ubuntu. WezTerm is a GUI
@@ -822,7 +841,7 @@ update PRs are intentionally not configured.
 |---|---|---|
 | GitHub Actions | Managed, digest-pinned, labeled `github-actions` | Actions are repo-owned CI inputs with stable Renovate support. |
 | GitHub runner images | Managed, labeled `github-runners`, reviewed separately | `ubuntu-*`, `macos-*`, and `windows-*` bumps can change the supported CI platform, so they should not be mixed with ordinary Action bumps. |
-| Repo-pinned installer versions/refs | Managed, labeled `pinned-downloads`, never automerged | Neovim Linux tarballs, chezmoi CI release archives, lazygit Linux tarballs, Starship Linux tarballs, Tree-sitter CLI Linux/Windows archives, WezTerm Ubuntu `.deb`, Herdr Linux binaries, Herdr Windows preview `.exe`, Hack Nerd Font, Windows Terminal portable zip, Ubuntu Ghostty, Pi CLI npm package, zsh plugin refs, `setuptools`/`pylatexenc` converter pins, the Homebrew installer commit, the Scoop installer commit, the Renovate validator package/runtime, the Ubuntu Microsoft-repository `.deb`, and the CI `cargo-binstall` commit are explicit repo pins. |
+| Repo-pinned installer versions/refs | Managed, labeled `pinned-downloads`, never automerged | Neovim Linux tarballs, chezmoi CI release archives, lazygit Linux tarballs, Starship Linux tarballs, Tree-sitter CLI Linux/Windows archives, WezTerm Ubuntu `.deb`, Herdr Linux binaries, Herdr Windows preview `.exe`, Hack Nerd Font, Windows Terminal portable zip, Ghostty distro/architecture `.deb` assets, Pi CLI npm package, zsh plugin refs, `setuptools`/`pylatexenc` converter pins, the Homebrew installer commit, the Scoop installer commit, the Renovate validator package/runtime, the Ubuntu Microsoft-repository `.deb`, and the CI `cargo-binstall` commit are explicit repo pins. |
 | Adjacent SHA-256 / commit constants | Not managed; matched only as regex context | Renovate can bump the version/ref but cannot recompute archive/script hashes or verify tag commit IDs. CI must fail until a human recomputes and reviews them. |
 | Package-manager catalogs | Not managed | Brew, apt, dnf, pacman, zypper, apk, Scoop, winget, and choco entries are package names/IDs, not repo version pins. Let the package manager resolve current versions. |
 | Neovim plugin and Mason tools | Not managed | `lazy-lock.json` is refreshed with Lazy and tested as editor behavior; Mason intentionally has no machine-pinned lockfile. |
@@ -831,8 +850,10 @@ update PRs are intentionally not configured.
 `--platform=local --dry-run=extract`, captures its JSON stdout directly, then
 compares the official extraction to
 `tests/static/renovate_expected_inventory.txt`. A custom regex merely matching
-some text is not ownership proof. Live Dashboard confirmation is separate and
-remains pending until the hosted bot reruns on the PR head.
+some text is not ownership proof. Dashboard #7 reran against merged `main` at
+2026-07-10 13:17 UTC and exposed the reviewed Nix, runner, and Scoop `master`
+inventory without lookup problems; future config changes require a fresh bot
+result rather than inheriting that claim.
 
 Manual-review pin surfaces that Renovate may touch only partially:
 
@@ -861,7 +882,7 @@ branch.
 Direct-download SHA-256 values for Neovim tarballs, chezmoi CI release archives,
 lazygit tarballs, Starship tarballs, tree-sitter CLI archives, the WezTerm
 Ubuntu `.deb`, Herdr Linux binaries, Herdr Windows preview `.exe`, Hack Nerd Font, the Windows Terminal
-portable zip, the Ubuntu Ghostty installer, the Ubuntu 24.04 Microsoft
+portable zip, the Ghostty Debian-family `.deb` assets, the Ubuntu 24.04 Microsoft
 repository `.deb`, Homebrew installer script, Scoop
 installer script, and the CI `cargo-binstall` installer script are
 intentionally human-reviewed. zsh plugin tag commits and tmux/psmux plugin
@@ -1133,8 +1154,8 @@ git add nvim/lazy-lock.json   # tracked, not gitignored
 Setup and validation use `Lazy! restore` instead. Run `Lazy! sync` only when
 you intentionally want to refresh plugin pins and review the resulting lockfile
 diff. The startup-budget spec is intentionally different: it preclones locked
-plugin checkouts without running Lazy build hooks so asynchronous parser builds
-cannot pollute the startup timing assertion.
+plugin checkouts without running Lazy build hooks so the checked, waitable
+parser compilation does not pollute the startup timing assertion.
 
 ### Updating Mason tools across machines
 
@@ -1166,7 +1187,7 @@ MIT. See `LICENSE`.
 | `<leader>X` keymaps fire `\X` instead of `<Space>X` | mapleader set after lazy.setup somehow | restore the order in `nvim/init.lua` — leader **before** `require("lazy").setup` |
 | Formatter runs twice or shows two BufWritePre autocmds | someone added a second handler outside conform.nvim | `:lua print(#vim.api.nvim_get_autocmds({event="BufWritePre"}))` should be 1; if not, find the second autocmd and delete it |
 | Lazy/Tree-sitter/Mason says `No C compiler found` | WSL/Linux has `make` but no `cc`/`gcc`/`clang`; Tree-sitter parsers and some plugin builds compile native code | re-run `./setup.sh --skip-config` to install the Linux compiler toolchain, or on Ubuntu run `sudo apt-get update && sudo apt-get install -y build-essential`, then `./setup.sh --skip-deps --skip-config` |
-| Tree-sitter parser install reports temp-dir rename errors such as `ENOTEMPTY` | a previous or parallel parser build left a partial grammar/query cache | update this repo and rerun setup; setup/CI now serializes synchronous nvim-treesitter bootstrap installs, purges compiled parsers with incomplete managed query output, and Tier 2 fails causally if any declared parser or explicit highlight query is missing |
+| Tree-sitter parser install reports temp-dir rename errors such as `ENOTEMPTY`, or a cold setup reports a parser with no captures | a previous/parallel parser build left partial grammar/query output, or an older command-form Lazy `:TSUpdate` returned before its compiler tasks finished | update this repo and rerun setup; both the Lazy update hook and explicit bootstrap now serialize and wait for their upstream tasks, incomplete managed output is purged, and Tier 2 fails causally if any declared parser or explicit highlight query is missing |
 | nvim treesitter parsers fail to compile on Windows / `cl.exe` not found | `nvim-treesitter` main builds parsers with the Rust `cc` crate, which needs MSVC env vars | run `.\setup.ps1 -All` to install VS Build Tools and let setup import the VS DevShell before parser installation; for ad-hoc `:TSUpdate`, open a "Developer PowerShell for VS" or rerun setup |
 | Windows setup says the verified Tree-sitter executable failed staged version validation | an older installer used a sibling stage name with characters after `.exe`, so Windows would not dispatch it as a native executable | update this repo and rerun `.\setup.ps1 -All`; the verified same-parent stage now ends in `.exe`, is version-checked before atomic publication, and cleans on retry |
 | nvim syntax looks weak or files look plain text | Tree-sitter is inactive, or the hybrid built-in syntax fallback was not restored after Tree-sitter starts | update this repo, re-run setup, then check `:Inspect` on a token; parser-backed languages should show `treesitter` captures plus `syntax` groups, while `.bat` should show `syntax` groups |

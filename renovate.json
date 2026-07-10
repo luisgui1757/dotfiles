@@ -102,10 +102,10 @@
     },
     {
       "customType": "regex",
-      "description": "Ubuntu Ghostty installer version. The installer SHA-256 must be recomputed manually after Renovate bumps this.",
+      "description": "Ubuntu Ghostty release version. Every adjacent distro/architecture .deb SHA-256 must be recomputed manually after Renovate bumps this.",
       "managerFilePatterns": ["/^install-deps\\.sh$/"],
       "matchStrings": [
-        "GHOSTTY_UBUNTU_VERSION=\"(?<currentValue>[^\"]+)\"\\s+GHOSTTY_UBUNTU_INSTALL_SHA256=\"[a-f0-9]{64}\""
+        "GHOSTTY_UBUNTU_VERSION=\"(?<currentValue>[^\"]+)\"\\s+GHOSTTY_UBUNTU_AMD64_2404_SHA256=\"[a-f0-9]{64}\""
       ],
       "depNameTemplate": "mkasberg/ghostty-ubuntu",
       "datasourceTemplate": "github-releases",

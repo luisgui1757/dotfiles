@@ -449,6 +449,52 @@ describe("treesitter main migration", function()
     assert.are.equal(1, dependency_query_dir)
   end)
 
+  it("does not start an asynchronous parser install in a headless non-sync process", function()
+    local old_tree_sitter = package.loaded["nvim-treesitter"]
+    local old_sync = vim.env.DOTFILES_TREESITTER_SYNC_INSTALL
+    local old_notify = vim.notify
+    local old_executable = vim.fn.executable
+    local install_calls = 0
+
+    assert.are.equal(0, #vim.api.nvim_list_uis(), "this regression requires the real headless runtime")
+    package.loaded["nvim-treesitter"] = {
+      install = function()
+        install_calls = install_calls + 1
+        return {}
+      end,
+      indentexpr = function()
+        return 0
+      end,
+    }
+    vim.env.DOTFILES_TREESITTER_SYNC_INSTALL = nil
+    vim.notify = function() end
+    vim.fn.executable = function(name)
+      if name == "tree-sitter" then
+        return 1
+      end
+      return old_executable(name)
+    end
+
+    local ok, spec = pcall(dofile, repo_root .. "/nvim/lua/plugins/treesitter.lua")
+    local config_ok, config_err = false, nil
+    if ok then
+      config_ok, config_err = pcall(spec[1].config)
+    end
+
+    package.loaded["nvim-treesitter"] = old_tree_sitter
+    if old_sync == nil then
+      vim.env.DOTFILES_TREESITTER_SYNC_INSTALL = nil
+    else
+      vim.env.DOTFILES_TREESITTER_SYNC_INSTALL = old_sync
+    end
+    vim.notify = old_notify
+    vim.fn.executable = old_executable
+
+    assert.is_true(ok)
+    assert.is_true(config_ok, tostring(config_err))
+    assert.are.equal(0, install_calls, "headless restore/smoke started parser work outside Phase 4")
+  end)
+
   it("errors in sync mode when the waitable parser install task reports false", function()
     local old_tree_sitter = package.loaded["nvim-treesitter"]
     local old_tree_sitter_config = package.loaded["nvim-treesitter.config"]
@@ -611,8 +657,58 @@ describe("treesitter main migration", function()
     )
   end)
 
-  it("keeps the documented main-branch TSUpdate build and command triggers", function()
-    assert.is_truthy(src:match('build%s*=%s*":TSUpdate"'), "upstream main docs still recommend TSUpdate as build")
+  it("waits for the parser-update build task before lazy.nvim can advance", function()
+    local old_tree_sitter = package.loaded["nvim-treesitter"]
+    local received_languages
+    local received_options
+    local waited_timeout
+    package.loaded["nvim-treesitter"] = {
+      update = function(languages, options)
+        received_languages = languages
+        received_options = options
+        return {
+          wait = function(_, timeout)
+            waited_timeout = timeout
+            return true
+          end,
+        }
+      end,
+    }
+
+    local ok, err = pcall(function()
+      local spec = dofile(repo_root .. "/nvim/lua/plugins/treesitter.lua")
+      assert.is_function(spec[1].build, "build must be a checked callback, not asynchronous :TSUpdate")
+      spec[1].build()
+    end)
+    package.loaded["nvim-treesitter"] = old_tree_sitter
+
+    assert.is_true(ok, tostring(err))
+    assert.is_nil(received_languages, "build updates only the already-installed parser set")
+    assert.are.same({ max_jobs = 1, summary = true }, received_options)
+    assert.are.equal(900000, waited_timeout, "build returned before the upstream update task completed")
+  end)
+
+  it("fails the parser-update build when completion cannot be proved", function()
+    local old_tree_sitter = package.loaded["nvim-treesitter"]
+    package.loaded["nvim-treesitter"] = {
+      update = function()
+        return {
+          wait = function()
+            return false
+          end,
+        }
+      end,
+    }
+
+    local spec = dofile(repo_root .. "/nvim/lua/plugins/treesitter.lua")
+    local ok, err = pcall(spec[1].build)
+    package.loaded["nvim-treesitter"] = old_tree_sitter
+
+    assert.is_false(ok)
+    assert.matches("parser update failed", tostring(err), nil, true)
+  end)
+
+  it("keeps every main-branch Tree-sitter command trigger", function()
     for _, command in ipairs({ "TSInstall", "TSInstallFromGrammar", "TSUpdate", "TSUninstall", "TSLog" }) do
       assert.is_truthy(src:match('"' .. command .. '"'), command .. " command trigger missing")
     end
