@@ -540,3 +540,26 @@ pushed exact-head runs or manual environments.
 - Implementation commit identity, complete local gates, and replacement hosted
   results follow append-only. None of these repairs is yet claimed as hosted
   proof from local execution.
+
+## Repair identity and local verification — entry 16
+
+- Behavioral repair commit:
+  `bd46346f9630b359d26efd909525c9c35356f478` (`fix(ci): reconcile
+  exact-head platform evidence`). This commit contains the implementation,
+  focused regressions, and contemporaneous README/CLAUDE/ROADMAP/status/manual
+  updates described in entry 15.
+- Passed on macOS aarch64: `git diff --check`; `bash -n` over all 132 tracked
+  shell scripts; `make lint`; `bash tests/static/run_all.sh`;
+  `bash tests/shell/run_all.sh`; `make test-migration`; the full PowerShell
+  `test.ps1` entry point (PSScriptAnalyzer, 234/234 Pester tests, and all
+  Neovim specs); focused Setup Pester (52/52, including the Windows Terminal
+  transaction and native-stderr subprocess); `make test-nvim`; `make test`;
+  `make validate-renovate` (official validator plus 89 extracted dependency
+  records); `nix flake check`; and `make ci`.
+- The local Nix check evaluated both exported Darwin configurations and passed
+  the native aarch64 check. Nix explicitly omitted incompatible-system builds,
+  so this is configuration evidence, not Intel/Linux runtime proof.
+- Hosted proof remains pending for the documentation-only descendant that
+  contains this entry. WSL, redirected Windows known folders, desktop GUI
+  behavior, and live Renovate ownership remain separate manual/live evidence
+  requirements; no cache-backed or static result is promoted to those claims.
