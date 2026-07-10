@@ -767,3 +767,66 @@ rewriting that history.
   independent review.
 - Live Actions policy remained `sha_pinning_required:false`; the checked-in
   target is true. No live safeguard was mutated.
+
+## Post-merge cache-free reconciliation — entry 24
+
+This append-only entry records the first agreed follow-up after PR #47 merged.
+It does not rewrite the exact behavior-head closure above.
+
+- Merged-main base:
+  `5e3e7c6d93c400d67f6160c6f8f09be56aac10d3` (PR #47 squash merge).
+- Manual cache-free workflow-dispatch run:
+  [`29096335827`](https://github.com/luisgui1757/dotfiles/actions/runs/29096335827).
+  Every broad install/plugin cache step was skipped.
+- Attempt 1: Ubuntu container `86373717048`, public Ubuntu `86373717119`, and
+  native Windows `86373717139` passed. Apple Silicon `86373717142` failed the
+  strict smoke after Lazy reported the nvim-treesitter build complete while
+  compiler output continued; only 98/99 languages completed and Pascal had no
+  captures. Intel `86373717122` independently failed transient
+  `api.github.com` DNS resolution and restored the original system shell files
+  and Homebrew taps.
+- Attempt 2, same unrepaired SHA: Apple Silicon `86378834721` and logical macOS
+  `86382233846` passed. Intel `86378834701` installed 99/99 parsers but failed
+  because the original CMake fixture's neocmake client did not attach within 45
+  seconds; the later formatter CMake fixture did attach. This timing-dependent
+  retry does not validate code absent from that SHA and leaves the full
+  cache-free matrix open.
+- Alternative hypothesis check: Neovim `0.12.4`, Tree-sitter CLI `0.26.10`,
+  locked nvim-treesitter commit
+  `4916d6592ede8c07973490d9322f187e07dfefac`, and locked Pascal revision
+  `042119eca2e18a60e56317fb06ee3ba5c32cb447` built successfully in a separate
+  clean runtime and produced ten captures. Deterministic Pascal parser/query
+  incompatibility was therefore rejected; the hosted log's overlapping
+  publication is the reproduced cause.
+- Behavioral repair commit:
+  `fc22028d2a9ba5ddddb8343ba64fc7d208c8fee7`. The Lazy build hook now bypasses
+  the command load trigger, calls nvim-treesitter's waitable update API with
+  `max_jobs = 1`, waits up to 15 minutes, and requires exactly `true` before
+  restore can advance. Phase 4 remains the explicit complete parser install.
+- Focused regression: the two new Tree-sitter behaviors first failed against
+  command-form `build = ":TSUpdate"`, then passed after the repair. Final
+  Tree-sitter spec result was 20 passed, 0 failed; `make test-nvim` passed.
+- Full local proof on the identical behavioral tree: `git diff --check`; Bash
+  syntax for every tracked shell script; repository shell lint;
+  `tests/static/run_all.sh`; `tests/shell/run_all.sh`; PowerShell parsing and
+  234/234 Pester with 0 skipped plus all 17 Neovim specs through `test.ps1`;
+  `make test-migration`; `make test`; `make validate-renovate` with exactly 89
+  records; `nix flake check --print-build-logs`; and `make ci` ending
+  `local pre-PR gate passed`.
+
+### Finding status amendments
+
+| ID | Status after entry 24 | Exact evidence | Remaining work |
+|---|---|---|---|
+| UGR-019 | ACCEPTED/FIXED | Dashboard #7 reran against merged `main` at 2026-07-10 13:17 UTC and now exposes the `nix` manager inventory, `macos 26-intel` runner labels, and `ScoopInstaller/Install master`; no lookup-problem section remains. Local official extraction remains exactly 89 reviewed records. | Normal future Renovate operation only; do not turn this bot result into greenfield host evidence. |
+| UGR-020 | PARTIAL | Stage 1 logical checks exist, but cache-free merged-main run `29096335827` did not produce a fully green matrix. The active integrity ruleset and classic fallback remain strict on the exact 12 legacy contexts. | Merge the repair, pass all six logical checks on its merged-main SHA, then open the separate checked-in context-switch PR. Only after that PR merges may the owner apply live safeguards. |
+| UGR-021 | PARTIAL | The cache-free lane ran and exposed a real asynchronous Tree-sitter publication race. Commit `fc22028d2a9ba5ddddb8343ba64fc7d208c8fee7` repairs the boundary with behavioral proof. | A workflow-dispatch run on the repair's merged-main SHA must pass every producer and logical check. WSL, redirected Windows, dual Terminal, and desktop/TCC proof remain separate. |
+
+### Live safeguard boundary after entry 24
+
+- Integrity ruleset `17363189` and the classic fallback still require the exact
+  12 legacy contexts with strict behind-main enforcement.
+- Actions remains enabled with `sha_pinning_required:false`; checked-in desired
+  state remains true for the later owner-applied migration.
+- No ruleset, classic protection setting, or Actions policy was mutated by this
+  follow-up.
