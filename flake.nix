@@ -53,24 +53,31 @@
       ];
       forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f nixpkgs.legacyPackages.${system});
 
-      # The proving host's user is resolved impurely at switch time. sudo-based
-      # nix-darwin activation leaves USER=root, so prefer SUDO_USER when present,
-      # then USER, and keep runner only for pure eval / CI.
+      # setup.sh resolves and validates the target account/home at the public
+      # boundary, then exports these two values for impure activation. Pure eval
+      # keeps an inert runner placeholder so every configuration remains
+      # evaluable without fabricating a real host path.
       resolvedUser =
         let
-          sudoUser = builtins.getEnv "SUDO_USER";
-          user = builtins.getEnv "USER";
+          targetUser = builtins.getEnv "DOTFILES_TARGET_USER";
         in
-        if sudoUser != "" then sudoUser else if user != "" then user else "runner";
+        if targetUser != "" then targetUser else "runner";
+
+      resolvedHome = fallback:
+        let
+          targetHome = builtins.getEnv "DOTFILES_TARGET_HOME";
+        in
+        if targetHome != "" then targetHome else fallback;
 
       mkDarwin =
         { username
-        , system ? "aarch64-darwin"
+        , userHome
+        , system
         ,
         }:
         nix-darwin.lib.darwinSystem {
           inherit system;
-          specialArgs = { inherit inputs username; };
+          specialArgs = { inherit inputs username userHome; };
           modules = [
             ./nix/darwin/configuration.nix
             nix-homebrew.darwinModules.nix-homebrew
@@ -97,7 +104,10 @@
               home-manager = {
                 useGlobalPkgs = true;
                 useUserPackages = true;
-                extraSpecialArgs = { inherit username; };
+                extraSpecialArgs = {
+                  inherit username;
+                  homeDirectory = userHome;
+                };
                 users.${username} = import ./nix/home/darwin.nix;
               };
             }
@@ -108,11 +118,13 @@
       # Activated on the real host by setup.sh's default POSIX package phase via
       # `home-manager switch --flake .#<arch>-linux` -- no root, WSL split-host
       # preserved (writes only to the Linux ~/.nix-profile, never /mnt/c).
-      mkHome =
-        system:
+      mkHome = system: homeDirectory:
         home-manager.lib.homeManagerConfiguration {
           pkgs = nixpkgs.legacyPackages.${system};
-          extraSpecialArgs = { username = resolvedUser; };
+          extraSpecialArgs = {
+            username = resolvedUser;
+            inherit homeDirectory;
+          };
           modules = [ ./nix/home/linux.nix ];
         };
     in
@@ -157,16 +169,32 @@
 
       formatter = forAllSystems (pkgs: pkgs.nixpkgs-fmt);
 
-      # macOS host configuration: nix-darwin + declarative Homebrew + Home Manager
-      # (packages only). Activated on the real Mac by setup.sh's default POSIX
-      # package phase via `darwin-rebuild switch --flake .#dotfiles`.
-      darwinConfigurations."dotfiles" = mkDarwin { username = resolvedUser; };
+      # Architecture-specific macOS hosts. setup.sh normalizes uname and selects
+      # exactly one; the compatibility alias deliberately remains Apple Silicon
+      # for older explicit invocations and is never selected for Intel.
+      darwinConfigurations = {
+        "dotfiles-aarch64" = mkDarwin {
+          username = resolvedUser;
+          userHome = resolvedHome "/Users/runner";
+          system = "aarch64-darwin";
+        };
+        "dotfiles-x86_64" = mkDarwin {
+          username = resolvedUser;
+          userHome = resolvedHome "/Users/runner";
+          system = "x86_64-darwin";
+        };
+        "dotfiles" = mkDarwin {
+          username = resolvedUser;
+          userHome = resolvedHome "/Users/runner";
+          system = "aarch64-darwin";
+        };
+      };
 
       # Native Linux / WSL userland package sets (Home Manager, packages only).
       # Keyed by arch so setup.sh can `home-manager switch --flake .#$(uname -m)-linux`.
       homeConfigurations = {
-        "x86_64-linux" = mkHome "x86_64-linux";
-        "aarch64-linux" = mkHome "aarch64-linux";
+        "x86_64-linux" = mkHome "x86_64-linux" (resolvedHome "/home/runner");
+        "aarch64-linux" = mkHome "aarch64-linux" (resolvedHome "/home/runner");
       };
     };
 }

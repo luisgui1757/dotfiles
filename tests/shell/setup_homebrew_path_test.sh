@@ -31,6 +31,27 @@ elif [[ "${1:-}" == "--prefix" && "${2:-}" == "make" ]]; then
     printf '%s\n' "$HOME/.linuxbrew/opt/make"
 fi
 EOF
+cat > "$TMP_ROOT/brewbin/uname" <<'EOF'
+#!/usr/bin/env bash
+case "${1:-}" in
+    -s) echo Linux ;;
+    -m) echo x86_64 ;;
+    *) command /usr/bin/uname "$@" ;;
+esac
+EOF
+cat > "$TMP_ROOT/brewbin/id" <<'EOF'
+#!/usr/bin/env bash
+case "${1:-}" in
+    -u) echo 1000 ;;
+    -un) echo tester ;;
+    *) exit 1 ;;
+esac
+EOF
+cat > "$TMP_ROOT/brewbin/getent" <<EOF
+#!/usr/bin/env bash
+[[ "\${1:-}" == passwd && "\${2:-}" == tester ]] || exit 1
+printf '%s\n' 'tester:x:1000:1000:Test User:$TMP_ROOT/home:/bin/zsh'
+EOF
 
 cat > "$TMP_ROOT/home/.linuxbrew/bin/nvim" <<'EOF'
 #!/usr/bin/env bash
@@ -42,7 +63,9 @@ printf 'PATH=%s\n' "$PATH" >> "$SETUP_TEST_ROOT/nvim.log"
 printf '%s\n' "$*" >> "$SETUP_TEST_ROOT/nvim.log"
 EOF
 
-chmod +x "$TMP_ROOT/brewbin/brew" "$TMP_ROOT/home/.linuxbrew/bin/nvim"
+chmod +x "$TMP_ROOT/brewbin/brew" "$TMP_ROOT/brewbin/uname" \
+    "$TMP_ROOT/brewbin/id" "$TMP_ROOT/brewbin/getent" \
+    "$TMP_ROOT/home/.linuxbrew/bin/nvim"
 
 output="$(HOME="$TMP_ROOT/home" SETUP_TEST_ROOT="$TMP_ROOT" PATH="$TMP_ROOT/brewbin:/usr/bin:/bin" bash "$TMP_ROOT/setup.sh" --skip-deps --skip-bootstrap --skip-agents </dev/null)"
 

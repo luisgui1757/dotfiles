@@ -130,24 +130,35 @@ make setup                       # same as ./setup.sh, via the Makefile
 declarative Homebrew + Home Manager; Linux/WSL uses standalone Home Manager.
 chezmoi still owns **every** dotfile; Nix owns no config. A normal `./setup.sh`
 or `./setup.sh --all` applies the matching package layer before native/deferred
-dependency provisioning. On macOS this runs
-`sudo darwin-rebuild switch --flake .#dotfiles --impure`, which activates the
+dependency provisioning. On macOS setup normalizes `uname -m` and runs only the
+matching `sudo env DOTFILES_TARGET_USER=... DOTFILES_TARGET_HOME=...
+darwin-rebuild switch --flake .#dotfiles-aarch64 --impure` or
+`.#dotfiles-x86_64` activation, which activates the
 declarative Homebrew casks (WezTerm, AeroSpace) + Herdr brew and the nix-owned
-CLI package set. The flake resolves the real invoking user from `SUDO_USER`
-before `USER`, so Homebrew/Home Manager do not target `root` during sudo
-activation. First-run bootstrap is also pinned: setup derives the locked
+CLI package set. Before any phase, setup rejects root/ambiguous invocation and
+resolves one invoking account plus its authoritative account-record home. It
+requires ambient `HOME` to resolve to that same directory and passes
+`DOTFILES_TARGET_USER` / `DOTFILES_TARGET_HOME` explicitly through sudo, so
+Nix, Home Manager, chezmoi, and native setup cannot split across users or
+fabricated homes. First-run bootstrap is also pinned: setup derives the locked
 nix-darwin rev and `narHash` from `flake.lock` before running
-`sudo nix run github:nix-darwin/nix-darwin/<locked-rev>?narHash=<encoded-narHash>#darwin-rebuild -- ...`;
+`sudo env DOTFILES_TARGET_USER=... DOTFILES_TARGET_HOME=... nix run
+github:nix-darwin/nix-darwin/<locked-rev>?narHash=<encoded-narHash>#darwin-rebuild -- ...`;
 it never uses the mutable `nix-darwin` registry alias. On Linux/WSL, setup runs
 `home-manager switch --flake .#<arch>-linux --impure`; first-run bootstrap uses
 the locked
 `github:nix-community/home-manager/<locked-rev>?narHash=<encoded-narHash>#home-manager`
-ref. WSL writes only to the Linux `~/.nix-profile`, never `/mnt/c`.
+ref. WSL writes only to the Linux `~/.nix-profile`, never `/mnt/c`. Fresh
+Linux/WSL zsh sessions source Home Manager's canonical `hm-session-vars.sh`
+when present, with the legacy profile location as fallback, so Nix-owned tools
+resolve without caller-injected PATH state.
 `--skip-deps` is the explicit already-provisioned escape hatch and skips the
 Nix package-layer application together with native/deferred dependency installs;
 the compatibility aliases `--nix-darwin` and `--home-manager` do not override
 that skip. Dry-run does not require Nix: on an unprovisioned POSIX host it
-previews that the real run would fail until Nix is installed.
+previews that the real run would fail until Nix is installed. On a Brew-less
+Mac, it previews the verified Homebrew bootstrap, then continues every later
+Brew-backed preview phase without claiming the bootstrap already happened.
 The Nix-owned CLI set includes Node 24 so the pinned npm-backed Pi CLI can run
 reproducibly on macOS/Linux/WSL while the `pi` package itself stays pinned by
 npm integrity until nixpkgs catches up.
@@ -161,20 +172,24 @@ only automatic when Actions reports `RUNNER_ENVIRONMENT=github-hosted` and
 nix-homebrew uses `autoMigrate = true` so Macs that already have official-script
 Homebrew can be adopted by the declarative Nix layer; upstream's migration keeps
 installed packages while replacing the Homebrew repositories. Because this repo
-keeps `mutableTaps = false`, setup also moves any existing
-`/opt/homebrew/Library/Taps` directory to a timestamped
-`Taps.dotfiles-pre-nix-*` backup before activation so nix-homebrew can replace
-it with the pinned declarative tap symlink. The `nikitabobko/tap` tap is also
+keeps `mutableTaps = false`, setup moves an existing architecture-correct tap
+directory (`/opt/homebrew/Library/Taps` on Apple Silicon or
+`/usr/local/Homebrew/Library/Taps` on Intel) to a unique timestamped backup.
+Activation, bootstrap, or interruption failure quarantines any replacement and
+restores the original taps; rollback failure prints exact manual recovery. On
+success the backup remains available. The `nikitabobko/tap` tap is also
 explicitly trusted through nix-homebrew because Homebrew 5 refuses to load
 personal-tap casks, including AeroSpace, without a trust entry.
 **nvim and the
 tree-sitter CLI stay native** (ABI-coupled to nvim-treesitter parser builds;
 migrating them into a same-closure toolchain is a follow-up). Native Windows is
 non-Nix. `nix flake check` runs in required CI (`.github/workflows/nix.yml`) on
-Ubuntu + macOS. The current `darwinConfigurations.dotfiles` activation target is
-`aarch64-darwin`; x86_64 Darwin still gets dev shells/checks but no supported
-host activation config yet, so public setup on Intel Macs fails closed unless
-you pass `--skip-deps` and provision packages manually.
+Ubuntu + Apple Silicon macOS, with an additional non-required
+`macos-26-intel` lane. The flake exports explicit `dotfiles-aarch64` and
+`dotfiles-x86_64` configurations; the legacy `dotfiles` alias deliberately
+remains Apple Silicon and setup never selects it for Intel. Intel runtime proof
+remains pending until the hosted Intel lane actually completes; cross-evaluation
+alone is not runtime proof.
 
 ```powershell
 .\setup.ps1
@@ -626,8 +641,9 @@ The e2e jobs cover different install paths, not symmetric container platforms:
 | Check | What it proves |
 |---|---|
 | `e2e containers / ubuntu-24.04` | Clean `ubuntu:24.04`, non-root user, native `apt`, no Linuxbrew (`DOTFILES_SKIP_BREW_BOOTSTRAP=1`), then `install-deps.sh --all`, chezmoi config apply, executable/version probes including `zoxide`, `gh`, WezTerm, Herdr, Neovim >= 0.12, lazygit, zsh plugin files, config content assertions, and nvim directory realpath assertion. This is the native installer regression fixture, not the Nix-backed public POSIX package-plane proof; it does not assert Pi CLI because Node 24 comes from the Nix package layer. |
-| `setup.sh / ubuntu-24.04` | Full public Unix setup on the hosted Ubuntu runner after installing Nix in CI: Home Manager first, then native/deferred installs, chezmoi, Lazy, Tree-sitter, Mason, and Polaris. It asserts the nix-owned CLI commands resolve from a Nix profile/store path. |
-| `setup.sh / macos-26` | Full public macOS setup through the real macOS hosted runner after installing Nix in CI: nix-darwin/declarative Homebrew first, then native/deferred installs, Ghostty config validation via the app bundle binary, chezmoi, Lazy, Tree-sitter, Mason, and Polaris. Docker cannot model macOS. The hosted runner passes `DOTFILES_NIX_DARWIN_HOSTED_CI=1` so declarative Homebrew activation does not abort on GitHub's preinstalled Brew packages; real hosts keep `cleanup = "check"`. |
+| `setup.sh / ubuntu-24.04` | Full public Unix setup on the hosted Ubuntu runner after installing Nix in CI: Home Manager first, a clean login/interactive zsh PATH proof, then native/deferred installs, chezmoi, Lazy, Tree-sitter, Mason, and Polaris. |
+| `setup.sh / macos-26` | Full public Apple Silicon setup through the hosted runner: architecture-matched nix-darwin/declarative Homebrew, native/deferred installs, real Ghostty/WezTerm/AeroSpace config consumption, chezmoi, Lazy, Tree-sitter, Mason, and Polaris. The hosted runner alone gets the cleanup override; real hosts keep `cleanup = "check"`. |
+| `setup.sh / macos-26-intel` | Additional non-required real Intel setup lane with the same full assertions. Its YAML presence is not evidence; only an actual run is. |
 | `setup.ps1 / windows-2025` | Full Windows setup through the real Windows hosted runner, including Scoop/winget/choco behavior, PowerShell, symlinks, `zoxide`/`gh`/WezTerm/Herdr/Pi CLI command probes, and Neovim restore/sync phases. Windows containers do not model the desktop/user-profile setup well. |
 | `setup.sh / WSL2 Ubuntu-24.04 (canary)` | Non-required scheduled/manual WSL smoke signal in `.github/workflows/wsl2-canary.yml`. Hosted runners cannot provide a reliable required nested-virtualization WSL2 gate. The canary installs Ubuntu's `nix-bin` package inside the distro, enables flakes, then runs the same enforced Home Manager setup path as Linux; failures are visible in that workflow and do not muddy the core e2e-install signal. |
 
@@ -1096,6 +1112,7 @@ MIT. See `LICENSE`.
 | `setup.sh --update` says a tool is `unmanaged` | the executable is present, but no supported Unix owner proves ownership of the resolved command source | use it as-is and update it outside dotfiles, or intentionally migrate it to Homebrew/Linuxbrew, the native package manager, or a dotfiles-provenanced direct artifact |
 | `setup.sh --update` says a tool is `blocked` | the source strongly implies supported ownership, but the package/provenance proof is contradictory or unsafe | repair or reinstall that manager package/artifact, then rerun update mode; dotfiles fails closed rather than guessing |
 | `setup.sh --update` still resolves `make` to `/usr/bin/make` after `brew install make` | Homebrew's GNU Make formula exposes `make` through `$(brew --prefix make)/libexec/gnubin` | rerun `./setup.sh --skip-config` or open a new shell after setup persists Homebrew shellenv; the managed shell block prepends the `gnubin` path when the formula is installed |
+| A fresh Linux/WSL zsh cannot find Home Manager tools | Home Manager's session variables were not generated or neither canonical profile path is readable | re-run `./setup.sh --all`, then start a new zsh. The managed zshrc sources `${XDG_STATE_HOME:-$HOME/.local/state}/nix/profiles/profile/etc/profile.d/hm-session-vars.sh`, falling back to `~/.nix-profile/etc/profile.d/hm-session-vars.sh`; no-Nix machines remain supported |
 | Mixed Linuxbrew and apt/dnf/pacman/zypper/apk tools update through different managers | update mode resolves ownership per executable source, not from one global active manager | this is expected: a Linuxbrew-owned `rg` can update through Brew while an apt-owned `/usr/bin/jq` updates through apt in the same run |
 | `setup.ps1 -Update` says a tool is `unmanaged` | the executable is present, but its command source is outside supported manager ownership | install or migrate that tool through Scoop, winget, or Chocolatey if you want dotfiles to own future updates; otherwise update that manually-installed copy outside dotfiles |
 | `setup.ps1 -Update` says a Scoop-owned tool is `blocked` | the command resolves through Scoop shims, but the shim metadata cannot prove the exact catalog package | repair or reinstall that Scoop package, then rerun update mode; dotfiles intentionally fails closed instead of updating a different manager's package |

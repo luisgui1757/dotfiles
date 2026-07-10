@@ -109,6 +109,22 @@ broken repo-symlink still cleaned) is covered by
 
 ### Resolved
 
+- [x] POSIX setup now resolves one authoritative non-root target account and
+      account-record home before Nix, Home Manager, chezmoi, or native setup.
+      It rejects a mismatched ambient `HOME` instead of fabricating
+      `/Users/<user>` or `/home/<user>`, and threads the validated values through
+      the flake/sudo boundary. Darwin has separate aarch64 and x86_64 activation
+      configurations; Homebrew paths follow the actual repository/architecture.
+- [x] nix-homebrew tap migration is transactional. Existing taps move to a
+      collision-safe backup, and installed/bootstrap activation failure or an
+      interruption quarantines the failed replacement and restores the old
+      state. A rollback failure leaves the backup intact and prints exact manual
+      recovery rather than guessing.
+- [x] Fresh Linux/WSL zsh startup consumes Home Manager's canonical session-vars
+      file once, with the legacy profile path as fallback and no-Nix hosts
+      guarded. Brew-less macOS dry-run now previews all later phases instead of
+      aborting after the bootstrap plan.
+
 - [x] Windows `nvim` directory-symlink round-trip is fixed in commit `eed6690`.
       The Windows template renders a clean, backslash, no-`..` absolute path
       into repo `nvim/`, so `chezmoi verify` no longer reports perpetual drift.
@@ -162,6 +178,10 @@ broken repo-symlink still cleaned) is covered by
       sync.
 
 ### Open
+
+- [ ] Intel macOS runtime confirmation is pending the exact PR-head
+      `macos-26-intel` Nix/setup runs. Both configurations cross-evaluate and
+      setup selection is behaviorally tested, but those are not runtime proof.
 
 - [ ] Greenfield evidence remains intentionally sparse: `tests/greenfield/LEDGER.md`
       still records no Windows Sandbox, WSL, macOS VM, or Linux VM clean-machine

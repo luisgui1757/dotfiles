@@ -153,8 +153,9 @@ Commit-by-commit status:
   (zero ownership), devShell + `checks`, `nix flake check` CI on Ubuntu + macOS,
   Renovate `nix` manager, disjointness static tests.
 - **Commit 5 - nix-darwin + declarative Homebrew — DONE.**
-  `darwinConfigurations` with `system.primaryUser` resolved from `SUDO_USER` before
-  `USER`; nix-homebrew (pinned taps,
+  Architecture-specific `darwinConfigurations` with `system.primaryUser` and
+  home resolved once by setup from the authoritative target account;
+  nix-homebrew (pinned taps,
   `autoMigrate = true`, `mutableTaps = false`, `trust.taps = [ "nikitabobko/tap" ]` for the
   AeroSpace cask); homebrew module (`autoUpdate = false`, `upgrade = false`,
   `cleanup = "check"`); casks WezTerm + AeroSpace; brews Herdr + selected CLI; Home
@@ -162,8 +163,9 @@ Commit-by-commit status:
   on macOS (prompted unless `--all`) with first-run bootstrap pinned to the
   locked nix-darwin rev plus `narHash`.
   Existing Homebrew installs are adopted with `autoMigrate = true`, and setup
-  moves pre-existing `Library/Taps` to a timestamped backup before activation so
-  `mutableTaps = false` can install the pinned declarative taps.
+  transactionally moves architecture-correct `Library/Taps` to a timestamped
+  backup before activation so `mutableTaps = false` can install the pinned taps;
+  activation/bootstrap/interruption failure restores the original.
   GitHub's hosted macOS e2e passes `DOTFILES_NIX_DARWIN_HOSTED_CI=1` to use
   `cleanup = "none"` for that disposable activation only, because the runner
   image ships many undeclared Brew packages; real hosts remain `cleanup = "check"`.
@@ -219,11 +221,14 @@ Commit-by-commit status:
   Nix package layer by default on macOS/Linux/WSL before Phase 1 native/deferred
   installs; `--skip-deps` unconditionally skips that layer (even with
   compatibility aliases) and logs the skip; dry-run previews missing-Nix /
-  unsupported-arch failures without aborting; the WSL2 canary and WSL
+  unsupported-arch failures without aborting and Brew-less Darwin continues
+  through every Brew-backed preview phase; the WSL2 canary and WSL
   greenfield harness install Ubuntu's `nix-bin` package and enable flakes before
-  invoking setup. Intel macOS remains unsupported for activation and must use
-  `--skip-deps` plus manual provisioning until an x86_64-darwin host config
-  lands.
+  invoking setup. The ultimate closure added exact aarch64/x86_64 Darwin host
+  configurations, authoritative account/home resolution, transactionally
+  rolled-back tap migration, and Home Manager session-vars startup. Intel
+  cross-evaluation passes; real `macos-26-intel` runtime proof remains pending
+  until the added non-required lane completes.
 - **Pi CLI provisioning — DONE.** Setup installs the Pi CLI on every OS as the
   pinned npm package `@earendil-works/pi-coding-agent@0.80.3` after checking npm
   `dist.integrity`. POSIX public setup gets Node 24 from the enforced Nix package
@@ -244,7 +249,10 @@ Commit-by-commit status:
   implemented: Lazy and Plenary require a valid full lock identity and prove
   origin, exact HEAD, cleanliness, worktree usability, and required files before
   runtimepath mutation. Repair is locked, staged, verified, and rollback-safe;
-  behavioral coverage replaces the former grep-only claim.
+  behavioral coverage replaces the former grep-only claim. UGR-002, UGR-011,
+  UGR-012, UGR-013, and the POSIX half of UGR-015 are implemented with focused
+  architecture, identity, session, dry-run, and rollback tests; Intel/WSL real
+  host proof remains explicitly pending.
 
 ### P2 Follow-up: Secondary Supply-chain Hardening
 

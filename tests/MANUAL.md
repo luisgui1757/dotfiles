@@ -114,26 +114,34 @@ significant change to the relevant area.
 - [ ] **`nix flake check`**: on a Nix host run `nix flake check` at the repo root
       — it evaluates `darwinConfigurations.dotfiles` (build skipped) and builds
       `checks.<system>.toolchain`, exit 0.
-- [ ] **nix-darwin bootstrap/switch**, macOS: on Apple silicon with Nix installed, run
+- [ ] **nix-darwin bootstrap/switch**, macOS: on Apple Silicon and Intel with Nix installed, run
       `./setup.sh --all` (or the compatibility alias `./setup.sh --nix-darwin`;
       equivalent activation:
-      `sudo darwin-rebuild switch --flake .#dotfiles --impure`; first-run setup
+      `sudo env DOTFILES_TARGET_USER="$USER" DOTFILES_TARGET_HOME="$HOME"
+      darwin-rebuild switch --flake .#dotfiles-aarch64 --impure` or
+      `.#dotfiles-x86_64` as appropriate; first-run setup
       derives the locked
       `github:nix-darwin/nix-darwin/<rev>?narHash=<encoded-narHash>#darwin-rebuild`
-      ref from `flake.lock`). Confirm activation uses sudo, sets
-      `system.primaryUser` to the real invoking user via `SUDO_USER` (not
-      `root`), installs the WezTerm + AeroSpace casks and the Herdr brew via
+      ref from `flake.lock`). Confirm activation uses sudo but targets the
+      setup-validated real invoking user/home via `DOTFILES_TARGET_*` (not
+      `root` or a fabricated home), installs the WezTerm + AeroSpace casks and the Herdr brew via
       declarative Homebrew (no `brew update`/`upgrade`; `cleanup = check` only
       reports drift), and puts the nix-owned CLI set on PATH from
       `~/.nix-profile` / the system profile.
       If Homebrew already existed, confirm nix-homebrew auto-migrated the
       Homebrew repositories while keeping installed packages. If the old
-      `/opt/homebrew/Library/Taps` directory existed, confirm setup moved it to
-      a `Taps.dotfiles-pre-nix-*` backup and nix-homebrew replaced it with the
-      declarative pinned tap symlink. Confirm `brew tap-info nikitabobko/tap`
+      architecture-correct `Library/Taps` directory existed, confirm setup moved
+      it to a `Taps.dotfiles-pre-nix-*` backup and nix-homebrew replaced it with
+      the declarative pinned tap symlink. Inject/fix an activation failure and
+      confirm the original taps return before retrying. Confirm
+      `brew tap-info nikitabobko/tap`
       reports a trusted tap so Homebrew 5 can load the AeroSpace cask.
       The `DOTFILES_NIX_DARWIN_HOSTED_CI=1` cleanup override is only for
       GitHub's disposable macOS runner; do not use it for this real-host check.
+- [ ] **Intel macOS runtime proof is pending**: the branch adds official
+      `macos-26-intel` Nix/setup lanes, but do not mark this row complete until
+      the exact PR head has a green real runner result. Cross-evaluation is not
+      runtime proof.
 - [ ] **Home Manager (Linux/WSL)**: with Nix installed inside the Linux/WSL
       environment, run
       `./setup.sh --all` (or the compatibility alias `./setup.sh --home-manager`;
@@ -145,6 +153,11 @@ significant change to the relevant area.
       npm/starship/zoxide) lands in `~/.nix-profile/bin` with NO root, and that `nvim` +
       `tree-sitter` are still the native install-deps binaries (NOT nix) so
       parser builds keep working.
+- [ ] **Fresh Home Manager zsh session**, native Linux and WSL: with no caller
+      PATH injection, run `env -i HOME="$HOME" USER="$USER" PATH=/usr/bin:/bin
+      TERM=xterm zsh -l -i -c 'command -v rg'`. Confirm it resolves through a
+      Nix profile/store path. Repeat with a custom home containing spaces and
+      with neither session-vars file present (the latter must remain harmless).
 - [ ] **WSL split-host under Home Manager**: on WSL, after `./setup.sh --all`,
       confirm nothing was written under `/mnt/c` — Home Manager touches only the
       Linux `~/.nix-profile`; Windows Terminal/fonts/WezTerm stay Windows-host.

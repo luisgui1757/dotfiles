@@ -51,3 +51,49 @@ status entries; history is never deleted or rewritten.
   and this ledger.
 - Residual/manual proof: full `make test-nvim` and cross-platform CI remain to
   run after the complete branch is assembled.
+
+### UGR-003 — implementation commit identity
+
+- Implementation commit: `60dd01a` (`fix(nvim): prove locked plugin checkouts
+  before execution`).
+
+### UGR-002 / UGR-011 / UGR-012 / UGR-013 / UGR-015 — POSIX implementation entry 1
+
+- Status: UGR-002 FIXED pending the real Intel lane result; UGR-011 FIXED with
+  real WSL proof pending; UGR-012 FIXED; UGR-013 FIXED; UGR-015 PARTIAL because
+  the Windows known-folder half remains.
+- Reproduction/evidence: baseline setup selected only aarch64 Darwin and rejected
+  x86_64; the flake derived homes from usernames; zsh did not source Home Manager
+  session state; Brew-less dry-run returned failure from the previewed bootstrap;
+  and the tap pre-move had no rollback path.
+- Implementation: separate aarch64/x86_64 Darwin outputs and exact normalized
+  selection; one authoritative non-root account/home boundary threaded through
+  Nix and sudo; architecture/repository-aware Homebrew paths; collision-safe tap
+  backup with activation/bootstrap/signal rollback; one-shot canonical Home
+  Manager session-vars startup; complete Brew-less dry-run package-manager plan.
+- Focused tests: `setup_nix_darwin_test.sh`, `darwin_config_test.sh`,
+  `linux_home_test.sh`, `setup_target_identity_test.sh`,
+  `home_manager_session_vars_test.sh`, `brewless_darwin_dry_run_test.sh`, and
+  `homebrew_shellenv_test.sh`.
+- CI/proof surface: added non-required `macos-26-intel` Nix and full setup lanes;
+  scheduled/manual setup lanes are cache-free; Linux proves fresh zsh state with
+  no PATH injection; macOS invokes real Ghostty, WezTerm, and AeroSpace config
+  consumers.
+- Documentation: README, CLAUDE invariant 24, ROADMAP, MIGRATION_STATUS,
+  MANUAL, greenfield pending-proof section, and this ledger.
+- Residual/manual proof: actual Intel and WSL runs, manual desktop visual proof,
+  and the Windows half of UGR-015. No ledger evidence row is claimed before a
+  run exists.
+- Implementation commit: pending creation of this cohesive POSIX commit; an
+  append-only identity entry will follow.
+
+### UGR-021 — implementation entry 1
+
+- Status: PARTIAL.
+- Implemented here: broad setup caches run only for pull requests and are keyed
+  by OS plus architecture; scheduled/manual clean-install lanes are cache-free.
+  macOS setup validates configs through the real Ghostty, WezTerm, and AeroSpace
+  binaries, and Linux checks a fresh Home Manager-backed zsh without PATH
+  injection.
+- Remaining: Windows E2E font assertion, actual Intel/WSL/desktop run evidence,
+  and any owner-recorded manual visual observations.

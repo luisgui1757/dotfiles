@@ -8,6 +8,15 @@ when someone inspected it on that machine.
 |---|---|---|---|---|---|---|
 | 2026-06-18 | Static docs guard | `audit/full-roadmap-review-2026-06-18` | `bash tests/static/stale_greenfield_refs_test.sh` | Pass | Not applicable | Ledger created; no Windows Sandbox, WSL, macOS VM, or Linux VM greenfield run recorded by this docs/static update. |
 
+## Pending proof (not evidence entries)
+
+- Intel macOS: wait for the exact ultimate-closure PR head to complete the
+  non-required `macos-26-intel` Nix and full setup lanes; record the run URL,
+  SHA, image, and result here only after it occurs.
+- WSL2, redirected Windows known folders, and desktop GUI/visual behavior still
+  require their real environments. Workflow or harness presence does not count
+  as a run.
+
 ## Entry Template
 
 | Date | Environment | Ref / SHA | Command or path | Automated result | Manual visual result | Notes |

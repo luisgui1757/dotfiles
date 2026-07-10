@@ -306,6 +306,21 @@ that violates one of these, fix it instead of disabling the test.
     `require("lazy")` occur only after that proof. Guarded behaviorally by
     `tests/nvim/spec/pinned_git_checkout_spec.lua`; do not replace this with
     grep-only evidence or a mutable `git clone` directly into the live cache.
+24. **POSIX setup has one validated target identity and architecture.** Public
+    `setup.sh` runs as the target non-root account. At the boundary it reads the
+    real account record (`dscl` on macOS, `getent`/`/etc/passwd` on Linux),
+    requires canonicalized `HOME` to identify that same existing directory, and
+    exports `DOTFILES_TARGET_USER` + `DOTFILES_TARGET_HOME`. Nix, Home Manager,
+    chezmoi, Polaris, and native setup consume those values; never fabricate a
+    home from a username or fall back to root. Darwin setup normalizes
+    `uname -m` and selects only `dotfiles-aarch64` or `dotfiles-x86_64`; the
+    compatibility `dotfiles` alias stays Apple Silicon and setup never selects
+    it for Intel. Homebrew's Library/Taps root follows its repository or the
+    architecture default. Tap migration is transactional: activation,
+    bootstrap, or interruption failure restores the original tree or emits
+    exact recovery instructions. Guarded by `setup_target_identity_test.sh`,
+    `setup_nix_darwin_test.sh`, and both architecture evaluations in
+    `darwin_config_test.sh`.
 
 ## Common workflows
 
@@ -586,21 +601,26 @@ major; `tests/static/repo_policy_test.sh` enforces this.
   Linux/WSL2 proxy target).
   Re-adding another distro requires both a matrix entry in `e2e-install.yml` and
   a matching root-prep branch in `tests/ci/container-e2e.sh`.
-- `setup.sh / ubuntu-24.04`, `setup.sh / macos-26`, and
+- `setup.sh / ubuntu-24.04`, `setup.sh / macos-26`, the additional non-required
+  `setup.sh / macos-26-intel` lane, and
   `setup.ps1 / windows-2025` run the real public setup entry points, apply
   configs through chezmoi in Phase 2, then rerun Lazy restore, Tree-sitter
   parser install, Mason headless sync, and the Polaris Phase 6/6 agent-policy
   install. The POSIX setup jobs install Nix first, apply the enforced
   nix-darwin/Home Manager layer before native/deferred installs, and assert the
-  nix-owned CLI set resolves from a Nix profile/store path. They explicitly fail
+  nix-owned CLI set resolves from a Nix profile/store path. The Linux job first
+  proves a clean login/interactive zsh resolves Nix-owned `rg` through Home
+  Manager session state with no CI PATH injection. They explicitly fail
   if setup skips Phase 3-5, omits Phase 6/6, emits a `FAIL:` marker, or Mason
   did not install expected tools. Windows e2e
   also asserts the new Windows tools that must leave PATH commands behind
   (`zoxide`, `gh`, `wezterm`, `herdr`, `pi`), so an installer that exits 0 but fails
-  its command probe cannot fake-green. The macOS job also runs Ghostty's real
-  `+validate-config` parser against the managed config after the cask install,
-  resolving the app bundle binary first because the cask does not guarantee a
-  `ghostty` CLI on PATH.
+  its command probe cannot fake-green. The macOS jobs run Ghostty's real
+  `+validate-config`, WezTerm's real config-loading `show-keys` path, and launch
+  then query AeroSpace to prove the app consumed the managed config. This is
+  automated runtime proof, not manual desktop visual proof. Scheduled/manual
+  clean-install runs skip broad install/plugin caches; PR runs retain
+  architecture-keyed caches.
   must assert `%LOCALAPPDATA%\lazygit\config.yml`
   against `lazygit/config.windows.yml`, not the POSIX/default
   `lazygit/config.yml`. After the full restore/sync they also run the
@@ -1538,10 +1558,9 @@ host prerequisite.
   (`flake = false`) inputs. `systems` covers the four POSIX systems only — there
   is deliberately **no windows system**. Outputs: a packages-only `devShells`,
   a hermetic `checks.<system>.toolchain` (proves nixpkgs resolves the CLI
-  toolchain), `formatter = nixpkgs-fmt`, and `darwinConfigurations."dotfiles"`.
-  The activation config is intentionally `aarch64-darwin` today; x86_64 Darwin
-  can evaluate dev shells/checks but is not a supported nix-darwin host target
-  until an Intel Mac proves that path.
+  toolchain), `formatter = nixpkgs-fmt`, and explicit
+  `darwinConfigurations."dotfiles-aarch64"` / `"dotfiles-x86_64"`. The
+  compatibility `"dotfiles"` alias deliberately remains Apple Silicon.
 - **`nix flake check` in CI does NOT build the darwin toplevel.** It *evaluates*
   `darwinConfigurations.dotfiles` (catching config errors — it caught a
   `nixpkgs.hostPlatform` recursion and a null `home.homeDirectory` during
@@ -1560,27 +1579,26 @@ host prerequisite.
   pinned inputs, `trust.taps = [ "nikitabobko/tap" ]` so Homebrew 5 can load
   the AeroSpace personal-tap cask, and
   `homebrew.taps = builtins.attrNames config.nix-homebrew.taps`.
-  `system.primaryUser` + `users.users.<user>.home` are resolved from
-  `SUDO_USER`, then `USER`, then the pure-eval placeholder `runner`.
-  setup.sh moves a pre-existing `/opt/homebrew/Library/Taps` directory to a
-  timestamped `Taps.dotfiles-pre-nix-*` backup before activation; otherwise
-  nix-homebrew's fully declarative `mutableTaps = false` mode fails closed on an
-  occupied tap root.
+  `system.primaryUser` + `users.users.<user>.home` come from setup's validated
+  `DOTFILES_TARGET_USER` / `DOTFILES_TARGET_HOME`; pure evaluation alone uses an
+  inert `runner` placeholder. setup.sh discovers Homebrew's repository or uses
+  its architecture default, moves a pre-existing `Library/Taps` directory to a
+  collision-safe timestamped backup, and restores it transactionally on
+  activation/bootstrap/interruption failure.
   The only `cleanup = "none"` path is the explicit
   `DOTFILES_NIX_DARWIN_HOSTED_CI=1` override passed by setup.sh on GitHub's
   disposable macOS runner, whose preinstalled Brew surface is intentionally not
   this repo's Brewfile. The predicate requires `GITHUB_ACTIONS=true`,
   `RUNNER_ENVIRONMENT=github-hosted`, and `RUNNER_OS=macOS`; self-hosted Macs
   are real hosts and must keep the strict `cleanup = "check"` drift report.
-- **User resolution.** The flake reads `builtins.getEnv "SUDO_USER"` first,
-  falls back to `builtins.getEnv "USER"`, and uses `"runner"` only so pure eval /
-  `nix flake check` still evaluates. setup.sh runs
-  `sudo darwin-rebuild switch --flake .#dotfiles --impure`, so sudo may set
-  `USER=root` but `SUDO_USER` still resolves Homebrew/Home Manager to the real
-  invoking user. First-run bootstrap derives the locked rev and `narHash` from
+- **User resolution.** setup.sh resolves one actual non-root account and account
+  home before any install phase, requires `HOME` to identify the same directory,
+  and passes both variables through `sudo env`. The flake ignores ambient
+  `SUDO_USER`/`USER`; `"runner"` exists only so pure `nix flake check`
+  evaluates. First-run bootstrap derives the locked rev and `narHash` from
   `flake.lock` with Nix's JSON parser, URL-encodes the hash for the flake ref,
   and runs
-  `sudo nix run github:nix-darwin/nix-darwin/<locked-rev>?narHash=<encoded-narHash>#darwin-rebuild -- ...`;
+  `sudo env DOTFILES_TARGET_USER=... DOTFILES_TARGET_HOME=... nix run github:nix-darwin/nix-darwin/<locked-rev>?narHash=<encoded-narHash>#darwin-rebuild -- ...`;
   do not use the mutable `nix-darwin` registry alias or omit the locked
   `narHash`.
 - **Home Manager is packages-only** (`nix/home/darwin.nix`): `home.packages` +
@@ -1601,9 +1619,11 @@ host prerequisite.
   `nix` is missing on a real run, and fails closed if activation fails.
   `--skip-deps` is the explicit already-provisioned escape and skips the Nix
   package layer together with native/deferred dependency installs; compatibility
-  aliases do not override it. Public setup currently supports the aarch64-darwin
-  activation target only; x86_64 Darwin must use `--skip-deps` plus manual
-  provisioning until an Intel Mac path lands. Guarded by
+  aliases do not override it. Public setup selects exactly one
+  architecture-specific Darwin configuration; unsupported architectures fail
+  before activation. Apple Silicon and Intel both evaluate in Nix tests, while
+  the additional `macos-26-intel` lane is runtime evidence only after a real
+  green run. Guarded by
   `tests/nix/setup_nix_darwin_test.sh`.
 - **Linux/WSL Home Manager (standalone, packages-only).**
   `homeConfigurations."<arch>-linux"` (`nix/home/linux.nix` + the shared
@@ -1612,7 +1632,10 @@ host prerequisite.
   nix-darwin). `--home-manager` remains a compatibility alias.
   `programs.home-manager.enable` is the ONE allowed `programs.*`
   (it installs the standalone HM CLI). On WSL it writes ONLY to `~/.nix-profile`,
-  never `/mnt/c` — split-host preserved. First-run bootstrap likewise uses
+  never `/mnt/c` — split-host preserved. Managed zsh sources Home Manager's
+  canonical session-vars file once, with the legacy profile path as fallback,
+  so fresh shells see Nix-owned tools and no-Nix hosts remain harmless.
+  First-run bootstrap likewise uses
   `github:nix-community/home-manager/<locked-rev>?narHash=<encoded-narHash>#home-manager`
   from `flake.lock`, not a mutable registry alias. **Native install-deps arms are
   RETAINED as deferred/artifact provisioning and regression fixtures**; the Nix

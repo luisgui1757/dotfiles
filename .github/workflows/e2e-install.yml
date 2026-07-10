@@ -68,6 +68,11 @@ jobs:
         os:
           - ubuntu-24.04
           - macos-26
+        include:
+          # Current GitHub-hosted Intel runtime proof. This is intentionally an
+          # extra non-required lane; the public contract is not inferred from
+          # cross-evaluation alone.
+          - os: macos-26-intel
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
@@ -75,6 +80,7 @@ jobs:
         uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22
 
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: github.event_name == 'pull_request'
         with:
           path: |
             ~/.cache/Homebrew
@@ -85,9 +91,9 @@ jobs:
             ~/Library/Caches/nvim
             ~/Library/Application Support/nvim/lazy
             ~/Library/Application Support/nvim/mason
-          key: ${{ runner.os }}-setup-sh-actions-cache-v6-${{ hashFiles('nvim/lazy-lock.json', 'nvim/lua/plugins/**/*.lua') }}
+          key: ${{ runner.os }}-${{ runner.arch }}-setup-sh-actions-cache-v6-${{ hashFiles('nvim/lazy-lock.json', 'nvim/lua/plugins/**/*.lua') }}
           restore-keys: |
-            ${{ runner.os }}-setup-sh-actions-cache-v6-
+            ${{ runner.os }}-${{ runner.arch }}-setup-sh-actions-cache-v6-
 
       - name: Run setup.sh end-to-end
         run: |
@@ -187,7 +193,28 @@ jobs:
             done
             command -v ghostty
           }
+          resolve_wezterm_binary() {
+            local candidate
+            for candidate in \
+              "$(command -v wezterm 2>/dev/null || true)" \
+              "/Applications/WezTerm.app/Contents/MacOS/wezterm" \
+              "$HOME/Applications/WezTerm.app/Contents/MacOS/wezterm"; do
+              if [[ -n "$candidate" && -x "$candidate" ]]; then
+                printf '%s\n' "$candidate"
+                return 0
+              fi
+            done
+            return 1
+          }
           repo="$(pwd -P)"
+          if [[ "${RUNNER_OS:-}" == "Linux" ]]; then
+            fresh_zsh_rg="$(env -i HOME="$HOME" USER="${USER:-runner}" PATH=/usr/bin:/bin TERM=dumb \
+              /usr/bin/zsh -l -i -c 'command -v rg' 2>/dev/null)" \
+              || fail "fresh Linux login/interactive zsh did not resolve Home Manager rg"
+            fresh_zsh_rg_real="$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$fresh_zsh_rg")"
+            [[ "$fresh_zsh_rg_real" == /nix/store/* ]] \
+              || fail "fresh Linux zsh resolved rg outside Nix (source=$fresh_zsh_rg real=$fresh_zsh_rg_real)"
+          fi
           command -v nvim >/dev/null 2>&1 || fail "nvim is not on PATH"
           command -v lazygit >/dev/null 2>&1 || fail "lazygit is not on PATH"
           command -v cmake >/dev/null 2>&1 || fail "cmake is not on PATH"
@@ -209,10 +236,26 @@ jobs:
             [[ -d /Applications/AeroSpace.app || -d "$HOME/Applications/AeroSpace.app" ]] \
               || fail "AeroSpace.app is missing after setup.sh --all requested it"
             command -v herdr >/dev/null 2>&1 || fail "herdr is not on PATH after setup.sh --all requested it"
+            command -v aerospace >/dev/null 2>&1 || fail "AeroSpace CLI is missing after cask installation"
+            open -gja AeroSpace || fail "AeroSpace app could not be launched for config validation"
+            aerospace_config=""
+            for _ in 1 2 3 4 5 6 7 8 9 10; do
+              aerospace_config="$(aerospace config --config-path 2>/dev/null || true)"
+              [[ -n "$aerospace_config" ]] && break
+              sleep 1
+            done
+            [[ -n "$aerospace_config" ]] || fail "AeroSpace did not expose its loaded config path"
+            aerospace_config_real="$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$aerospace_config")"
+            [[ "$aerospace_config_real" == "$repo/aerospace/aerospace.toml" ]] \
+              || fail "AeroSpace loaded $aerospace_config instead of the managed config"
+            osascript -e 'tell application "AeroSpace" to quit' >/dev/null 2>&1 || true
           elif [[ "${RUNNER_OS:-}" == "Linux" ]]; then
             command -v wezterm >/dev/null 2>&1 || fail "wezterm is not on PATH after setup.sh --all requested it"
             command -v herdr >/dev/null 2>&1 || fail "herdr is not on PATH after setup.sh --all requested it"
           fi
+          wezterm_bin="$(resolve_wezterm_binary)" || fail "WezTerm binary is missing"
+          "$wezterm_bin" --config-file "$repo/wezterm/wezterm.lua" show-keys >/dev/null \
+            || fail "WezTerm real binary rejected the managed config"
           nvim_line="$(nvim --version | head -n 1)"
           case "$nvim_line" in
             "NVIM v0.12"*|"NVIM v1."*) ;;
@@ -253,15 +296,16 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: github.event_name == 'pull_request'
         with:
           path: |
             ~\scoop\cache
             ~\AppData\Local\nvim-data\lazy
             ~\AppData\Local\nvim-data\mason
             ~\AppData\Local\nvim-data\site
-          key: Windows-setup-ps1-actions-cache-v6-${{ hashFiles('nvim/lazy-lock.json', 'nvim/lua/plugins/**/*.lua') }}
+          key: Windows-${{ runner.arch }}-setup-ps1-actions-cache-v6-${{ hashFiles('nvim/lazy-lock.json', 'nvim/lua/plugins/**/*.lua') }}
           restore-keys: |
-            Windows-setup-ps1-actions-cache-v6-
+            Windows-${{ runner.arch }}-setup-ps1-actions-cache-v6-
 
       - name: Run setup.ps1 end-to-end
         run: |

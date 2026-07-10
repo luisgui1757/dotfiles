@@ -46,6 +46,11 @@ for arch in x86_64-linux aarch64-linux; do
             fail=1
             ;;
     esac
+
+    custom_home="$(env DOTFILES_TARGET_USER=alice DOTFILES_TARGET_HOME='/srv/homes/Alice Example' \
+        nix eval --raw --impure "$cfg.home.homeDirectory" 2>/dev/null || true)"
+    assert_eq "$arch uses the setup-validated home without /home fabrication" \
+        "/srv/homes/Alice Example" "$custom_home"
     case "$homedir" in
         /mnt/c/* | *:* )
             echo "FAIL: $arch homeDirectory points at a Windows-host path ($homedir)"

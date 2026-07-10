@@ -208,9 +208,13 @@ homebrew_bin() {
 }
 
 enable_homebrew_for_current_shell() {
-    local brew_bin
+    local brew_bin brew_env
     brew_bin="$(homebrew_bin)" || return 1
-    eval "$("$brew_bin" shellenv)"
+    if ! brew_env="$("$brew_bin" shellenv)" || [[ -z "$brew_env" ]]; then
+        echo "  FAIL: $brew_bin shellenv did not produce a usable environment; PATH is unchanged" >&2
+        return 1
+    fi
+    eval "$brew_env"
     enable_homebrew_make_gnubin_for_current_shell "$brew_bin" || true
     hash -r 2>/dev/null || true
 }
@@ -419,7 +423,7 @@ maybe_install_brew() {
             echo "  would: curl -fsSL $url -o /tmp/homebrew-install.sh"
             echo "         verify sha256 $HOMEBREW_INSTALL_SHA256"
             echo "         /bin/bash /tmp/homebrew-install.sh"
-            return 1
+            return 0
         fi
         require_downloader || return 1
         tmp="$(mktemp -d)"
@@ -447,6 +451,30 @@ maybe_install_brew() {
         return 0
     fi
     return 1
+}
+
+bootstrap_package_manager() {
+    if [[ "$PM" == "brew" ]]; then
+        enable_homebrew_for_current_shell || true
+        persist_homebrew_shellenv
+    elif [[ "$PM" == "brew_missing" ]]; then
+        if maybe_install_brew; then
+            if [[ "$DRY_RUN" -eq 1 ]]; then PM="brew"; else PM="$(detect_pm)"; fi
+        else
+            PM="unknown"
+        fi
+    elif [[ "$(uname -s)" == "Linux" ]]; then
+        echo "Detected $PM as the system package manager."
+        if maybe_install_brew; then PM="$(detect_pm)"; fi
+    fi
+
+    if [[ "$PM" == "brew" ]]; then
+        if [[ "$DRY_RUN" -eq 1 ]]; then
+            echo "  plan      Homebrew-dependent phases continue after the previewed bootstrap"
+        else
+            enable_homebrew_for_current_shell || true
+        fi
+    fi
 }
 
 # ---- Login shell: adopt zsh (chsh) -------------------------------------------
@@ -4148,21 +4176,9 @@ if [[ "$YES_ALL" -ne 1 && "$DRY_RUN" -ne 1 && -t 0 ]]; then
 fi
 
 # Bootstrap brew only after the pre-flight table and one-shot prompt. Re-detect
-# after bootstrap so the per-tool installers see the manager that now exists.
-if [[ "$PM" == "brew" ]]; then
-    enable_homebrew_for_current_shell || true
-    persist_homebrew_shellenv
-elif [[ "$PM" == "brew_missing" ]]; then
-    if maybe_install_brew; then PM="$(detect_pm)"
-    else PM="unknown"; fi
-elif [[ "$(uname -s)" == "Linux" ]]; then
-    echo "Detected $PM as the system package manager."
-    if maybe_install_brew; then PM="$(detect_pm)"; fi
-fi
-
-if [[ "$PM" == "brew" ]]; then
-    enable_homebrew_for_current_shell || true
-fi
+# after a real bootstrap; dry-run models Brew as available for every later
+# preview phase without claiming that the bootstrap already happened.
+bootstrap_package_manager
 
 if [[ "$PM" == "unknown" ]]; then
     echo "install-deps: no supported package manager found." >&2

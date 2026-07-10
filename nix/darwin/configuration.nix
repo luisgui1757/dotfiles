@@ -5,6 +5,7 @@
 { config
 , pkgs
 , username
+, userHome
 , ...
 }:
 let
@@ -28,7 +29,7 @@ in
   # Tell nix-darwin the primary user's home so the Home Manager integration can
   # derive home.homeDirectory (we do NOT create/manage the account -- it already
   # exists on the real Mac; this only supplies the path metadata).
-  users.users.${username}.home = "/Users/${username}";
+  users.users.${username}.home = userHome;
 
   # Declarative Homebrew. GUI / TCC-sensitive apps come from vendor channels
   # (casks / a pinned tap), never nixpkgs -- see the migration ruling.

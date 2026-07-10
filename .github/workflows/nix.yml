@@ -23,6 +23,11 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-24.04, macos-26]
+        include:
+          # Non-required runtime proof for the public Intel activation path.
+          # Keep it outside the required-context os list until the staged check
+          # migration in UGR-020 has completed.
+          - os: macos-26-intel
     runs-on: ${{ matrix.os }}
     timeout-minutes: 25
     steps:

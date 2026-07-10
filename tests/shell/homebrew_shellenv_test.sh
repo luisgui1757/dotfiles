@@ -79,4 +79,28 @@ env -i HOME="$HOME" PATH="/usr/bin:/bin" bash -c 'source "$HOME/.bashrc"; [[ "$H
 # shellcheck disable=SC2016
 env -i HOME="$HOME" PATH="/usr/bin:/bin" bash -c 'source "$HOME/.bashrc"; [[ ":$PATH:" == *":$HOME/.linuxbrew/opt/make/libexec/gnubin:"* ]]'
 
+cat > "$prefix/bin/brew" <<'EOF'
+#!/usr/bin/env bash
+if [[ "${1:-}" == shellenv ]]; then
+    echo 'export PATH="/untrusted-partial-shellenv:$PATH"'
+    exit 9
+fi
+EOF
+chmod +x "$prefix/bin/brew"
+PATH=/usr/bin:/bin
+if enable_homebrew_for_current_shell >/dev/null 2>&1; then
+    fail "failed brew shellenv was accepted"
+fi
+[[ ":$PATH:" != *":/untrusted-partial-shellenv:"* ]] \
+    || fail "partial failed shellenv output was evaluated"
+
+cat > "$prefix/bin/brew" <<'EOF'
+#!/usr/bin/env bash
+[[ "${1:-}" == shellenv ]] && exit 0
+EOF
+chmod +x "$prefix/bin/brew"
+if enable_homebrew_for_current_shell >/dev/null 2>&1; then
+    fail "empty brew shellenv was accepted"
+fi
+
 echo "OK"
