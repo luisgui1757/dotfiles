@@ -319,31 +319,26 @@ that violates one of these, fix it instead of disabling the test.
     that remote branch at the same locked commit while keeping HEAD detached.
     Lazy needs that metadata to serialize its lock; the branch tip never becomes
     executable authority.
-24. **POSIX setup has one validated target identity and architecture.** Public
+24. **POSIX setup has one validated target identity and supported architecture.** Public
     `setup.sh` runs as the target non-root account. At the boundary it reads the
     real account record (`dscl` on macOS, `getent`/`/etc/passwd` on Linux),
     requires canonicalized `HOME` to identify that same existing directory, and
     exports `DOTFILES_TARGET_USER` + `DOTFILES_TARGET_HOME`. Nix, Home Manager,
     chezmoi, Polaris, and native setup consume those values; never fabricate a
-    home from a username or fall back to root. Darwin setup normalizes
-    `uname -m` and selects only `dotfiles-aarch64` or `dotfiles-x86_64`; the
-    compatibility `dotfiles` alias stays Apple Silicon and setup never selects
-    it for Intel. Homebrew's Library/Taps root follows its repository or the
-    architecture default. Tap migration is transactional: activation,
+    home from a username or fall back to root. Darwin setup accepts only Apple
+    Silicon, selects `dotfiles-aarch64`, and rejects Intel before Nix/Homebrew
+    activation with migration guidance. The compatibility `dotfiles` alias is
+    also Apple Silicon; no Intel Darwin system/configuration is exported.
+    Homebrew's Library/Taps root follows its repository or `/opt/homebrew`.
+    Tap migration is transactional: activation,
     bootstrap, or interruption failure restores the original tree or emits
     exact recovery instructions. First nix-darwin bootstrap also preflights and
     preserves existing `/etc/bashrc` and `/etc/zshrc` at their documented
     `.before-nix-darwin` paths; collisions fail before either move, and
     activation failure/interruption quarantines generated replacements before
     restoring both originals. Guarded by `setup_target_identity_test.sh`,
-    `setup_nix_darwin_test.sh`, and both architecture evaluations in
-    `darwin_config_test.sh`. CI uses the pinned Determinate action where that
-    project supports the host; Intel lanes explicitly select full-SHA-pinned
-    `cachix/install-nix-action` and upstream Nix because current Determinate Nix
-    dropped x86_64-darwin host support. Nixpkgs 26.05 supports Intel Darwin only
-    through 2026-12-31 and 26.11 removes it. Do not set
-    `allowDeprecatedx86_64Darwin` to hide this warning; keep the sunset visible
-    and migrate Intel's package plane before the supported release expires.
+    `setup_nix_darwin_test.sh`, `darwin_config_test.sh`, and
+    `darwin_platform_contract_test.sh`.
 25. **Windows setup uses application-consumed known folders, not fabricated
     children of UserProfile.** Resolve UserProfile, LocalApplicationData,
     Documents, and runtime `$PROFILE` independently. The main chezmoi source is
@@ -669,8 +664,7 @@ major; `tests/static/repo_policy_test.sh` enforces this.
   Linux/WSL2 proxy target).
   Re-adding another distro requires both a matrix entry in `e2e-install.yml` and
   a matching root-prep branch in `tests/ci/container-e2e.sh`.
-- `setup.sh / ubuntu-24.04`, `setup.sh / macos-26`, the additional non-required
-  `setup.sh / macos-26-intel` lane, and
+- `setup.sh / ubuntu-24.04`, `setup.sh / macos-26`, and
   `setup.ps1 / windows-2025` run the real public setup entry points, apply
   configs through chezmoi in Phase 2, then rerun Lazy restore, Tree-sitter
   parser install, Mason headless sync, and the Polaris Phase 6/6 agent-policy
@@ -739,16 +733,14 @@ major; `tests/static/repo_policy_test.sh` enforces this.
   install surface: Scoop/winget/choco, Developer Mode symlink behavior, font
   registration, and terminal profiles. Hosted macOS/Windows runners are the
   accepted representative fixtures for those OSes.
-- `.github/workflows/wsl2-canary.yml` owns `setup.sh / WSL2 Ubuntu-24.04
-  (canary)`. It is scheduled/manual only, not part of PR required checks, because
-  hosted runners cannot provide a reliably required nested-virtualization WSL2
-  gate. Failures are visible in that workflow; do not hide the entire job behind
-  job-level `continue-on-error`. The canary installs Ubuntu's `nix-bin` package
-  inside the distro and enables flakes before running the enforced Home Manager
-  path; it disables the WSL distro cache so scheduled/manual evidence is not
-  inherited. That keeps the signal aligned with public setup.
-  The required WSL proxy is the Linux Ubuntu container plus the existing
-  WSL config-template/static coverage. Full WSL host/guest validation is
+- There is no hosted WSL workflow. [GitHub documents nested virtualization on
+  hosted runners as technically possible but not officially supported](https://docs.github.com/en/actions/concepts/runners/github-hosted-runners). The
+  retired optional WSL2 canary's only scheduled run and a manual rerun both
+  reached WSL2 but hung before setup evidence because its action-created user
+  had no noninteractive sudo path. Do not replace it with Linux plus fabricated
+  WSL environment variables or make an unsupported nested-virtualization job a
+  required context. Linux CI and WSL config/static tests are proxies, not WSL
+  runtime proof. Full WSL host/guest validation is
   manual: install Nix inside WSL, run `./tests/wsl/e2e.sh` from inside WSL after
   running `.\setup.ps1 -All` on Windows. Windows Terminal settings
   handling is default-on: packaged WT is merged when its settings file exists,
@@ -784,8 +776,8 @@ credentials, not owner-account, admin, or `delete_repo` capable tokens.
 
 Run `scripts/apply-repo-safeguards.sh luisgui1757/dotfiles` after changing the
 rulesets, then verify the live posture with the commands in
-`docs/security/branch-protection.md`. Do not add the WSL2 canary to required
-checks unless asked. If live GitHub has duplicate rulesets with the same
+`docs/security/branch-protection.md`. Do not recreate a hosted WSL2 canary or
+claim Linux proxy coverage as WSL runtime proof. If live GitHub has duplicate rulesets with the same
 protected name, the script fails closed instead of choosing one; delete the
 duplicate live ruleset and re-run.
 
@@ -1686,12 +1678,13 @@ host prerequisite.
 - **`flake.nix` structure.** `nixpkgs` (nixos-unstable, pinned by `flake.lock`),
   plus `nix-darwin`, `home-manager`, `nix-homebrew`, and the three Homebrew taps
   (`homebrew-core`, `homebrew-cask`, `nikitabobko/homebrew-tap`) as pinned
-  (`flake = false`) inputs. `systems` covers the four POSIX systems only — there
+  (`flake = false`) inputs. `systems` covers Apple Silicon Darwin plus both
+  Linux architectures — there
   is deliberately **no windows system**. Outputs: a packages-only `devShells`,
   a hermetic `checks.<system>.toolchain` (proves nixpkgs resolves the CLI
   toolchain), `formatter = nixpkgs-fmt`, and explicit
-  `darwinConfigurations."dotfiles-aarch64"` / `"dotfiles-x86_64"`. The
-  compatibility `"dotfiles"` alias deliberately remains Apple Silicon.
+  `darwinConfigurations."dotfiles-aarch64"`. The compatibility `"dotfiles"`
+  alias is also Apple Silicon; Intel Darwin is not exported.
 - **`nix flake check` in CI does NOT build the darwin toplevel.** It *evaluates*
   `darwinConfigurations.dotfiles` (catching config errors — it caught a
   `nixpkgs.hostPlatform` recursion and a null `home.homeDirectory` during
@@ -1753,11 +1746,9 @@ host prerequisite.
   `nix` is missing on a real run, and fails closed if activation fails.
   `--skip-deps` is the explicit already-provisioned escape and skips the Nix
   package layer together with native/deferred dependency installs; compatibility
-  aliases do not override it. Public setup selects exactly one
-  architecture-specific Darwin configuration; unsupported architectures fail
-  before activation. Apple Silicon and Intel both evaluate in Nix tests, while
-  the additional `macos-26-intel` lane is runtime evidence only after a real
-  green run. Guarded by
+  aliases do not override it. Public setup selects the Apple Silicon Darwin
+  configuration; Intel and other unsupported architectures fail before
+  activation. Guarded by
   `tests/nix/setup_nix_darwin_test.sh`.
 - **Linux/WSL Home Manager (standalone, packages-only).**
   `homeConfigurations."<arch>-linux"` (`nix/home/linux.nix` + the shared

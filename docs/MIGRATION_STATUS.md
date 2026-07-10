@@ -235,20 +235,18 @@ broken repo-symlink still cleaned) is covered by
 
 ### Open
 
-- [x] Intel macOS runtime confirmation passed on exact PR head
-      `f4b63953f2f982702a685358b09e89bae2d78fdd`: the real
-      `macos-26-intel` Nix job (`29092384007` / `86360593091`) and full setup
-      job (`29092384014` / `86360593153`) both passed. Cross-evaluation is no
-      longer being used as the runtime claim.
-- [ ] Nixpkgs 26.05 is the final `x86_64-darwin` release and is supported only
-      through 2026-12-31. Before that date, migrate Intel's package plane to a
-      still-supported mechanism without narrowing the public macOS contract or
-      moving chezmoi-owned dotfiles into the package layer. The warning remains
-      intentionally unsuppressed.
+- [x] Intel macOS is retired by explicit owner direction. Apple Silicon is the
+      sole current Darwin contract; the flake, setup selector, CI matrices, and
+      tests contain no Intel configuration. Setup rejects x86_64 before
+      Nix/Homebrew activation and prints migration guidance. The historical
+      exact-head Intel runs (`29092384007` / `86360593091` and `29092384014` /
+      `86360593153`) remain in the append-only ledger but are not current
+      support or pending proof. The former Nixpkgs 26.05 migration deadline is
+      therefore closed rather than carried as stale work.
 
 - [ ] Greenfield/manual evidence remains intentionally bounded:
       `tests/greenfield/LEDGER.md` now records exact-head hosted Ubuntu, Apple
-      Silicon, Intel, and Windows automated runs. Manual cache-free run
+      Silicon, historical Intel, and Windows automated runs. Manual cache-free run
       `29096335827` skipped every broad cache; attempt 1 passed Ubuntu,
       container, and Windows but exposed a real asynchronous nvim-treesitter
       build race on Apple Silicon while Intel independently hit transient DNS.
@@ -261,7 +259,12 @@ broken repo-symlink still cleaned) is covered by
       processes as well as waiting on the build callback. Exact behavior head
       `e5cf3e23299cbb42a157c307f2a7259979fcada0` subsequently passed cache-free
       run `29103732329` across Ubuntu container, public Ubuntu, Apple Silicon,
-      Intel, native Windows, and all four setup logical proofs.
+      historical Intel, native Windows, and all four setup logical proofs.
+      Merged-main run `29114125798` then passed every current producer except
+      Apple Silicon, where the initial CMake LSP fixture shared a large project
+      root and neocmakelsp timed out before attach; the later isolated CMake
+      formatter fixture attached in the same process. The project-isolation
+      repair still needs a cache-free hosted run on this branch and merged main.
       No Windows Sandbox, WSL, redirected-Windows, merged-main cache-free
       confirmation, or desktop visual run is claimed. Required CI is not manual
       desktop evidence. The old Wave C `0 / 10` Ubuntu parity counter is no
@@ -275,11 +278,13 @@ broken repo-symlink still cleaned) is covered by
       Windows host with Documents and LocalApplicationData on alternate paths.
       Pester and migration round-trip fixtures are implementation proof, not a
       claim about a host run.
-- [ ] Full WSL parity is still not a required automated gate, but chezmoi now
-      models WSL through the generated `isWsl` data value and skips Linux
-      Ghostty by default. `setup.sh --experimental-wsl-gui` passes the
-      `experimentalWslGui` data override so WSL Ghostty is managed only on the
-      explicit GUI-terminal opt-in path.
+- [ ] Full WSL runtime parity remains manual. The optional hosted canary was
+      retired after scheduled run `29072773410` and manual run `29114215045`
+      both reached WSL2 but stalled before setup evidence; GitHub does not
+      officially support the nested-virtualization dependency. Chezmoi still
+      models WSL through generated `isWsl`, skips Linux Ghostty by default, and
+      honors `--experimental-wsl-gui`. The real throwaway-distro and split-host
+      harnesses remain the proof path; Linux CI/static coverage is only a proxy.
 - [ ] Out-of-band zsh checkout tampering is rechecked by the next setup or
       pin-sensitive chezmoi apply; no background monitor is promised. Every
       publisher/verifier path neutralizes an unproved sourceable payload before

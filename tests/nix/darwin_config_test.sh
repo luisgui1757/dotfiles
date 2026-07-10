@@ -60,16 +60,12 @@ assert_eq "nix-homebrew trusts the pinned AeroSpace tap for Homebrew 5 cask load
 assert_eq "nix.enable = false (Determinate owns the daemon)" 'false' "$(eval_raw nix.enable)"
 assert_eq "system.primaryUser is set (placeholder in pure eval)" '"runner"' "$(eval_raw system.primaryUser)"
 
-for config_name in dotfiles-aarch64 dotfiles-x86_64; do
-    case "$config_name" in
-        dotfiles-aarch64) expected_system=aarch64-darwin ;;
-        dotfiles-x86_64) expected_system=x86_64-darwin ;;
-    esac
-    actual_system="$(nix eval --raw ".#darwinConfigurations.\"$config_name\".pkgs.stdenv.hostPlatform.system" 2>/dev/null || true)"
-    assert_eq "$config_name evaluates only its declared Darwin architecture" "$expected_system" "$actual_system"
-done
+actual_system="$(nix eval --raw '.#darwinConfigurations.dotfiles-aarch64.pkgs.stdenv.hostPlatform.system' 2>/dev/null || true)"
+assert_eq "dotfiles-aarch64 evaluates only Apple Silicon" "aarch64-darwin" "$actual_system"
 alias_system="$(nix eval --raw '.#darwinConfigurations.dotfiles.pkgs.stdenv.hostPlatform.system' 2>/dev/null || true)"
 assert_eq "compatibility alias deliberately remains Apple Silicon" "aarch64-darwin" "$alias_system"
+config_names="$(nix eval --json '.#darwinConfigurations' --apply 'configs: builtins.attrNames configs' 2>/dev/null | jq -r 'sort | join(",")' || true)"
+assert_eq "Darwin exports contain no retired Intel configuration" "dotfiles,dotfiles-aarch64" "$config_names"
 
 target_cfg='.#darwinConfigurations.dotfiles-aarch64.config'
 target_user="$(env DOTFILES_TARGET_USER=alice DOTFILES_TARGET_HOME='/Users/Alice Example' \

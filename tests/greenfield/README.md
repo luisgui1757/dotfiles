@@ -147,6 +147,12 @@ This is the clean native `apt` proof: non-root user, no Linuxbrew bootstrap,
 real `install-deps.sh --all`, chezmoi apply, and the existing container
 assertions.
 
+There is deliberately no hosted WSL workflow. [GitHub documents nested
+virtualization on hosted runners as technically possible but not officially
+supported](https://docs.github.com/en/actions/concepts/runners/github-hosted-runners), and both real canary attempts stalled before setup evidence. Do not
+substitute Linux plus WSL-shaped environment variables; that would not exercise
+the Windows host/WSL guest boundary. Use the throwaway distro path below.
+
 Throwaway WSL distro path: run from Windows PowerShell:
 
 ```powershell

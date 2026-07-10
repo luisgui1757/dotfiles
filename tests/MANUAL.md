@@ -147,12 +147,11 @@ significant change to the relevant area.
 - [ ] **`nix flake check`**: on a Nix host run `nix flake check` at the repo root
       — it evaluates `darwinConfigurations.dotfiles` (build skipped) and builds
       `checks.<system>.toolchain`, exit 0.
-- [ ] **nix-darwin bootstrap/switch**, macOS: on Apple Silicon and Intel with Nix installed, run
+- [ ] **nix-darwin bootstrap/switch**, Apple Silicon macOS: with Nix installed, run
       `./setup.sh --all` (or the compatibility alias `./setup.sh --nix-darwin`;
       equivalent activation:
       `sudo env DOTFILES_TARGET_USER="$USER" DOTFILES_TARGET_HOME="$HOME"
-      darwin-rebuild switch --flake .#dotfiles-aarch64 --impure` or
-      `.#dotfiles-x86_64` as appropriate; first-run setup
+      darwin-rebuild switch --flake .#dotfiles-aarch64 --impure`; first-run setup
       derives the locked
       `github:nix-darwin/nix-darwin/<rev>?narHash=<encoded-narHash>#darwin-rebuild`
       ref from `flake.lock`). Confirm activation uses sudo but targets the
@@ -177,17 +176,16 @@ significant change to the relevant area.
       reports a trusted tap so Homebrew 5 can load the AeroSpace cask.
       The `DOTFILES_NIX_DARWIN_HOSTED_CI=1` cleanup override is only for
       GitHub's disposable macOS runner; do not use it for this real-host check.
-- [x] **Intel macOS hosted runtime proof**: exact head
+- [x] **Historical Intel macOS hosted runtime proof (platform retired)**: exact head
       `f4b63953f2f982702a685358b09e89bae2d78fdd` passed the real
       `macos-26-intel` Nix job (`29092384007` / `86360593091`) and full setup job
       (`29092384014` / `86360593153`). The x86_64 host installed upstream Nix
       2.34.8, selected only `dotfiles-x86_64`, completed nix-darwin and all six
       setup phases, and passed post-install plus the 257-check language smoke.
-      This is runtime proof, not cross-evaluation. The PR lane restored caches
-      and had no user-granted TCC desktop session. Nixpkgs 26.05 is the final
-      Intel-darwin release and remains supported only through 2026-12-31; keep
-      its warning visible and track the required post-26.05 package-plane
-      migration separately.
+      This was runtime proof, not cross-evaluation. The PR lane restored caches
+      and had no user-granted TCC desktop session. Intel support is now retired
+      by explicit owner direction, so this append-only historical result is not
+      a current support claim or an open package-plane migration.
 - [x] **Cache-free exact behavior-head full setup proof**: workflow-dispatch run
       [`29096335827`](https://github.com/luisgui1757/dotfiles/actions/runs/29096335827)
       on merged-main SHA `5e3e7c6d93c400d67f6160c6f8f09be56aac10d3`
@@ -213,13 +211,21 @@ significant change to the relevant area.
       `86399025519`, Apple Silicon `86399025503`, Intel `86399025491`, native
       Windows `86399025722`, and all four setup logical proofs were green.
       This checks the exact branch behavior; it is not WSL, redirected Windows,
-      divergent dual Terminal, or desktop/TCC evidence.
-- [ ] **Cache-free merged-main safeguard confirmation**: after PR #48 merges,
-      dispatch `e2e-install.yml` on the resulting `main` SHA. Require all five
-      producers, the four setup logical proofs, and the two Nix logical proofs
-      to pass before opening the stage-two context-switch PR. Record that
-      merged-main SHA and run here and in `tests/greenfield/LEDGER.md`; a
-      documentation-only descendant does not replace the behavior-head run.
+      divergent dual Terminal, or desktop/TCC evidence. Merged-main run
+      [`29114125798`](https://github.com/luisgui1757/dotfiles/actions/runs/29114125798)
+      on PR #48 merge SHA `f104bf066e4af7d4d707fe22ba36600711f1ae14`
+      passed Ubuntu container, public Ubuntu, historical Intel, and Windows but
+      failed Apple Silicon because the initial CMake LSP fixture shared a large
+      project root and neocmakelsp timed out before attach; the later isolated
+      CMake formatter fixture attached and validated gersemi in the same process.
+- [ ] **Cache-free merged-main safeguard confirmation**: run
+      `e2e-install.yml` on this branch, then dispatch it again after this PR
+      merges. Require all four current producers (Ubuntu container, public
+      Ubuntu, Apple Silicon, Windows), the four setup logical proofs, and the
+      two Nix logical proofs to pass before applying the checked-in stable
+      required contexts live. Record both runs here and in
+      `tests/greenfield/LEDGER.md`; a documentation-only descendant does not
+      replace the behavior-head run.
 - [ ] **Home Manager (Linux/WSL)**: with Nix installed inside the Linux/WSL
       environment, run
       `./setup.sh --all` (or the compatibility alias `./setup.sh --home-manager`;
@@ -242,6 +248,11 @@ significant change to the relevant area.
       hosted native-Linux account-record login-shell proof in run `29092384014`,
       job `86360593139`; this row stays open for WSL and the real custom-HOME
       permutations.
+- [x] **Hosted WSL2 canary disposition**: scheduled run `29072773410` and
+      manual rerun `29114215045` both reached WSL2 but stalled before setup
+      evidence and were cancelled. GitHub does not officially support the
+      required hosted nested virtualization, so the optional workflow is
+      retired. This closes the unreliable pipeline, not WSL runtime proof.
 - [ ] **WSL split-host under Home Manager**: on WSL, after `./setup.sh --all`,
       confirm nothing was written under `/mnt/c` — Home Manager touches only the
       Linux `~/.nix-profile`; Windows Terminal/fonts/WezTerm stay Windows-host.

@@ -2,14 +2,12 @@
 github-actions|.github/workflows/e2e-install.yml|github-runners|ubuntu|2
 github-actions|.github/workflows/e2e-install.yml|github-runners|windows|1
 github-actions|.github/workflows/e2e-install.yml|github-tags|DeterminateSystems/nix-installer-action|1
-github-actions|.github/workflows/e2e-install.yml|github-tags|cachix/install-nix-action|1
 github-actions|.github/workflows/e2e-install.yml|github-tags|actions/cache|2
 github-actions|.github/workflows/e2e-install.yml|github-tags|actions/checkout|4
 github-actions|.github/workflows/e2e-install.yml|github-tags|actions/download-artifact|1
 github-actions|.github/workflows/e2e-install.yml|github-tags|actions/upload-artifact|3
 github-actions|.github/workflows/nix.yml|github-runners|ubuntu|1
 github-actions|.github/workflows/nix.yml|github-tags|DeterminateSystems/nix-installer-action|1
-github-actions|.github/workflows/nix.yml|github-tags|cachix/install-nix-action|1
 github-actions|.github/workflows/nix.yml|github-tags|actions/checkout|2
 github-actions|.github/workflows/nix.yml|github-tags|actions/download-artifact|1
 github-actions|.github/workflows/nix.yml|github-tags|actions/upload-artifact|1
@@ -18,9 +16,6 @@ github-actions|.github/workflows/test.yml|github-runners|ubuntu|2
 github-actions|.github/workflows/test.yml|github-runners|windows|2
 github-actions|.github/workflows/test.yml|github-tags|DeterminateSystems/nix-installer-action|2
 github-actions|.github/workflows/test.yml|github-tags|actions/checkout|6
-github-actions|.github/workflows/wsl2-canary.yml|github-runners|windows|1
-github-actions|.github/workflows/wsl2-canary.yml|github-tags|Vampire/setup-wsl|1
-github-actions|.github/workflows/wsl2-canary.yml|github-tags|actions/checkout|1
 nix|flake.nix|git-refs|home-manager|1
 nix|flake.nix|git-refs|homebrew-cask|1
 nix|flake.nix|git-refs|homebrew-core|1
@@ -28,9 +23,9 @@ nix|flake.nix|git-refs|homebrew-nikitabobko|1
 nix|flake.nix|git-refs|nix-darwin|1
 nix|flake.nix|git-refs|nix-homebrew|1
 nix|flake.nix|git-refs|nixpkgs|1
-regex|.github/workflows/e2e-install.yml|github-runners|macos|2
+regex|.github/workflows/e2e-install.yml|github-runners|macos|1
 regex|.github/workflows/e2e-install.yml|github-runners|ubuntu|1
-regex|.github/workflows/nix.yml|github-runners|macos|2
+regex|.github/workflows/nix.yml|github-runners|macos|1
 regex|.github/workflows/nix.yml|github-runners|ubuntu|1
 regex|.github/workflows/test.yml|git-refs|cargo-bins/cargo-binstall|1
 regex|.github/workflows/test.yml|github-releases|neovim/neovim|1

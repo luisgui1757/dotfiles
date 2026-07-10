@@ -47,7 +47,6 @@
       # package managers + chezmoi -- there is deliberately no windows system.
       systems = [
         "aarch64-darwin"
-        "x86_64-darwin"
         "aarch64-linux"
         "x86_64-linux"
       ];
@@ -169,19 +168,13 @@
 
       formatter = forAllSystems (pkgs: pkgs.nixpkgs-fmt);
 
-      # Architecture-specific macOS hosts. setup.sh normalizes uname and selects
-      # exactly one; the compatibility alias deliberately remains Apple Silicon
-      # for older explicit invocations and is never selected for Intel.
+      # Apple Silicon is the only supported macOS host. Keep the explicit name
+      # plus the compatibility alias for existing ARM invocations.
       darwinConfigurations = {
         "dotfiles-aarch64" = mkDarwin {
           username = resolvedUser;
           userHome = resolvedHome "/Users/runner";
           system = "aarch64-darwin";
-        };
-        "dotfiles-x86_64" = mkDarwin {
-          username = resolvedUser;
-          userHome = resolvedHome "/Users/runner";
-          system = "x86_64-darwin";
         };
         "dotfiles" = mkDarwin {
           username = resolvedUser;

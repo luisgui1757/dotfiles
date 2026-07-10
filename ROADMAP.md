@@ -226,14 +226,12 @@ Commit-by-commit status:
   installs; `--skip-deps` unconditionally skips that layer (even with
   compatibility aliases) and logs the skip; dry-run previews missing-Nix /
   unsupported-arch failures without aborting and Brew-less Darwin continues
-  through every Brew-backed preview phase; the WSL2 canary and WSL
-  greenfield harness install Ubuntu's `nix-bin` package and enable flakes before
-  invoking setup. The ultimate closure added exact aarch64/x86_64 Darwin host
-  configurations, authoritative account/home resolution, transactionally
-  rolled-back tap migration, and Home Manager session-vars startup. Exact head
-  `f4b63953f2f982702a685358b09e89bae2d78fdd` passed both the real
-  `macos-26-intel` Nix and full setup lanes; WSL remains separate manual/runtime
-  proof.
+  through every Brew-backed preview phase; the manual WSL greenfield harness
+  installs Ubuntu's `nix-bin` package and enables flakes before invoking setup.
+  The ultimate closure added authoritative account/home resolution,
+  transactionally rolled-back tap migration, and Home Manager session-vars
+  startup. Apple Silicon is the only current Darwin contract; Intel evidence is
+  retained in the append-only ledger as historical proof, not current support.
 - **Pi CLI provisioning — DONE.** Setup installs the Pi CLI on every OS as the
   pinned npm package `@earendil-works/pi-coding-agent@0.80.3` after checking npm
   `dist.integrity`. POSIX public setup gets Node 24 from the enforced Nix package
@@ -243,8 +241,8 @@ Commit-by-commit status:
   install failures record and force nonzero setup/update exits; stdin/no-script-path
   setup fails closed with clone-first instructions instead of clone-and-reinvoke;
   the VS Build Tools bootstrapper must pass Authenticode Microsoft signer/chain
-  verification before execution; the WSL2 canary is split into a non-required
-  scheduled/manual workflow; required-check sources align with `macos-26` and
+  verification before execution; the then-current WSL2 canary was split into a
+  non-required scheduled/manual workflow; required-check sources align with `macos-26` and
   Nix contexts; Renovate custom-manager coverage and pin-consistency guards cover
   the current mirrored/manual-reviewed pin surface. PR #46 merged as
   `85375b2bdec9d3a998e8023a44b41d03a32f3eaa`; all twelve required checks passed,
@@ -258,8 +256,9 @@ Commit-by-commit status:
   runtimepath mutation. Repair is locked, staged, verified, and rollback-safe;
   behavioral coverage replaces the former grep-only claim. UGR-002, UGR-011,
   UGR-012, UGR-013, and the POSIX half of UGR-015 are implemented with focused
-  architecture, identity, session, dry-run, and rollback tests; Intel hosted
-  runtime proof passed and WSL real-host proof remains explicitly pending.
+  architecture, identity, session, dry-run, and rollback tests. The owner later
+  retired the Intel product contract; WSL real-host proof remains explicitly
+  pending.
   UGR-001 and UGR-014 are implemented:
   packaged/portable WT state is independently transactionally merged and
   recovered, while uninstall backup selection is filename-keyed and fails
@@ -278,8 +277,8 @@ Commit-by-commit status:
   verifies stable logical checks while the legacy contexts remain required;
   the checked-in/live switch happens only in the documented post-merge stage.
   UGR-021 is PARTIAL until real WSL, redirected-Windows, cache-free scheduled or
-  manual, and desktop runs exist. The exact-head Intel and conventional Windows
-  font-consumption lanes passed. The first PR run exposed and fixed two
+  manual, and desktop runs exist. Historical Intel and current conventional
+  Windows font-consumption lanes passed. The first PR run exposed and fixed two
   cross-host integration defects:
   the POSIX dependency-table zsh scan now passes the complete origin/commit/file
   identity, and handled Windows chezmoi drift no longer leaks a native exit code
@@ -293,7 +292,7 @@ Commit-by-commit status:
   asset so native drift cases run with zero platform-dependent skips. The real
   Windows setup lane also proved an executable-stage filename must end in
   `.exe`; Tree-sitter publication now preserves that loader contract and its
-  Pester oracle rejects any non-`.exe` validation path. Intel CI now explicitly
+  Pester oracle rejects any non-`.exe` validation path. Historical Intel CI explicitly
   uses full-SHA upstream-Nix installation after the real lane proved current
   Determinate Nix no longer supports x86_64-darwin hosts; the action's hidden
   last-release fallback is not treated as a platform contract. The next exact
@@ -311,7 +310,9 @@ Commit-by-commit status:
   head `f4b63953f2f982702a685358b09e89bae2d78fdd` subsequently passed all three
   workflow runs: generic Ubuntu/macOS/Windows and parity, Nix Ubuntu/Apple
   Silicon/Intel, the Ubuntu container, public setup on Ubuntu/Apple
-  Silicon/Intel/Windows, and all six stable logical proof jobs. No workflow
+  Silicon/Intel/Windows, and all six stable logical proof jobs. Those Intel
+  results predate the owner-directed retirement and are not a current support
+  claim. No workflow
   definition is recorded as runtime proof; only those completed runs are.
 
 - **Cache-free Tree-sitter restore/bootstrap boundary — BRANCH-HEAD PROOF
@@ -417,14 +418,21 @@ Commit-by-commit status:
   Windows hosted evidence, not redirected-known-folder, divergent Windows
   Terminal, uninstall-restoration, or desktop visual proof.
 
-- **Intel Darwin package-plane sunset — OPEN, deadline 2026-12-31.** Nixpkgs
-  26.05 is the final supported `x86_64-darwin` release; 26.11 removes package
-  builds and source-build support. This closure implements and tests the current
-  supported path without suppressing its deprecation warning. Before 26.05
-  reaches end of support, replace Intel's Nixpkgs package plane with a reviewed
-  supported mechanism while preserving the same chezmoi ownership and exact
-  architecture-selection contracts. This future deadline does not invalidate a
-  green 26.05 Intel run today, and must not be “fixed” by narrowing macOS to ARM.
+- **Intel Darwin product retirement — DONE by owner direction (2026-07-10).**
+  Apple Silicon is the sole macOS contract. The flake, setup selector, CI
+  matrices, installer actions, tests, and public documentation export no Intel
+  configuration. `setup.sh` rejects x86_64 before Nix/Homebrew activation and
+  prints migration guidance. Historical Intel runs remain in append-only
+  evidence; they do not keep the retired platform live.
+
+- **Hosted WSL2 canary retirement — DONE (2026-07-10).** The only scheduled
+  run (`29072773410` / `86297630493`) and a manual rerun (`29114215045` /
+  `86433541987`) both reached real WSL2 but stalled before setup evidence and
+  required cancellation. GitHub documents nested virtualization on hosted
+  runners as technically possible but not officially supported. The optional
+  workflow is removed instead of emitting an unreliable signal or fake
+  Linux-with-WSL-environment proof. WSL product support and the real throwaway
+  WSL/manual split-host harnesses remain; runtime proof is explicitly manual.
 
 ### P2 Follow-up: Secondary Supply-chain Hardening
 

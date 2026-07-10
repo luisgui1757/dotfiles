@@ -752,7 +752,10 @@ nix_homebrew_library_dir() {
     }
     case "$arch" in
         aarch64) printf '%s\n' /opt/homebrew/Library ;;
-        x86_64) printf '%s\n' /usr/local/Homebrew/Library ;;
+        *)
+            echo "  FAIL: Homebrew tap migration is supported only on Apple Silicon macOS." >&2
+            return 1
+            ;;
     esac
 }
 
@@ -1011,10 +1014,24 @@ run_nix_darwin_switch() {
             echo "  FAIL: no supported nix-darwin activation config for arch $(uname -m)."
             return 1
     }
-    case "$arch" in
-        aarch64) config_name="dotfiles-aarch64" ;;
-        x86_64) config_name="dotfiles-x86_64" ;;
-    esac
+    if [[ "$arch" != "aarch64" ]]; then
+        if [[ "$arch" == "x86_64" ]]; then
+            if [[ "$DRY_RUN" -eq 1 ]]; then
+                echo "  would fail: Intel macOS support is retired; this repo supports Apple Silicon only."
+                return 0
+            fi
+            echo "  FAIL: Intel macOS support is retired; this repo supports Apple Silicon only." >&2
+            echo "        Keep this checkout on its current revision or migrate the host before rerunning setup." >&2
+            return 1
+        fi
+        if [[ "$DRY_RUN" -eq 1 ]]; then
+            echo "  would fail: no supported nix-darwin activation config for arch $(uname -m)."
+            return 0
+        fi
+        echo "  FAIL: no supported nix-darwin activation config for arch $(uname -m)." >&2
+        return 1
+    fi
+    config_name="dotfiles-aarch64"
     if ! command -v nix >/dev/null 2>&1; then
         if [[ "$DRY_RUN" -eq 1 ]]; then
             echo "  would fail: Nix is required for macOS setup. Install Nix first"

@@ -1,6 +1,7 @@
 # Dotfiles
 
-Cross-platform terminal and editor setup for macOS, Linux, WSL, and Windows.
+Cross-platform terminal and editor setup for Apple Silicon macOS, Linux, WSL,
+and Windows.
 The repo owns the daily shell/editor stack: Neovim, tmux/psmux, Starship, zsh,
 PowerShell, Ghostty, WezTerm, lazygit, `lsd`, `zoxide` smart-cd, the `gh` CLI with the
 `gh-dash` dashboard, the `pi` CLI, Windows Terminal theming, locked plugin restore, LSP /
@@ -42,7 +43,7 @@ reviewed Linux installer path); this repo deliberately does not add a
 pipe-to-shell Nix bootstrap.
 
 ```bash
-# mac / linux / wsl
+# Apple Silicon mac / linux / wsl
 # prerequisite: install Nix first; setup will apply this repo's pinned flake
 git clone https://github.com/luisgui1757/dotfiles.git ~/dotfiles
 cd ~/dotfiles
@@ -135,11 +136,12 @@ declarative Homebrew + Home Manager; Linux/WSL uses standalone Home Manager.
 chezmoi still owns **every** dotfile; Nix owns no config. A normal `./setup.sh`
 or `./setup.sh --all` applies the matching package layer before native/deferred
 dependency provisioning. On macOS setup normalizes `uname -m` and runs only the
-matching `sudo env DOTFILES_TARGET_USER=... DOTFILES_TARGET_HOME=...
-darwin-rebuild switch --flake .#dotfiles-aarch64 --impure` or
-`.#dotfiles-x86_64` activation, which activates the
+Apple Silicon `sudo env DOTFILES_TARGET_USER=... DOTFILES_TARGET_HOME=...
+darwin-rebuild switch --flake .#dotfiles-aarch64 --impure` activation, which activates the
 declarative Homebrew casks (WezTerm, AeroSpace) + Herdr brew and the nix-owned
-CLI package set. Before any phase, setup rejects root/ambiguous invocation and
+CLI package set. Intel macOS is intentionally retired: setup fails closed before
+Nix/Homebrew activation and tells the user to keep the checkout on its current
+revision or migrate the host. Before any phase, setup rejects root/ambiguous invocation and
 resolves one invoking account plus its authoritative account-record home. It
 requires ambient `HOME` to resolve to that same directory and passes
 `DOTFILES_TARGET_USER` / `DOTFILES_TARGET_HOME` explicitly through sudo, so
@@ -185,8 +187,7 @@ nix-homebrew uses `autoMigrate = true` so Macs that already have official-script
 Homebrew can be adopted by the declarative Nix layer; upstream's migration keeps
 installed packages while replacing the Homebrew repositories. Because this repo
 keeps `mutableTaps = false`, setup moves an existing architecture-correct tap
-directory (`/opt/homebrew/Library/Taps` on Apple Silicon or
-`/usr/local/Homebrew/Library/Taps` on Intel) to a unique timestamped backup.
+directory (`/opt/homebrew/Library/Taps`) to a unique timestamped backup.
 Activation, bootstrap, or interruption failure quarantines any replacement and
 restores the original taps; rollback failure prints exact manual recovery. On
 success the backup remains available. The `nikitabobko/tap` tap is also
@@ -196,21 +197,10 @@ personal-tap casks, including AeroSpace, without a trust entry.
 tree-sitter CLI stay native** (ABI-coupled to nvim-treesitter parser builds;
 migrating them into a same-closure toolchain is a follow-up). Native Windows is
 non-Nix. `nix flake check` runs in required CI (`.github/workflows/nix.yml`) on
-Ubuntu + Apple Silicon macOS, with an additional non-required
-`macos-26-intel` lane. The flake exports explicit `dotfiles-aarch64` and
-`dotfiles-x86_64` configurations; the legacy `dotfiles` alias deliberately
-remains Apple Silicon and setup never selects it for Intel. Exact head
-`f4b63953f2f982702a685358b09e89bae2d78fdd` passed both the real Intel Nix
-and full setup lanes (`29092384007` / `86360593091` and `29092384014` /
-`86360593153`); the claim is runtime evidence, not cross-evaluation.
-Determinate Nix has dropped Intel-host support, so
-the Intel CI lanes explicitly use full-SHA-pinned `cachix/install-nix-action`
-`v31.10.7` to install upstream Nix 2.34.8 from its versioned official release;
-other hosted lanes retain the pinned Determinate action. Nixpkgs 26.05 is the
-last `x86_64-darwin` release and remains supported through 2026-12-31. The repo
-keeps that warning visible (no `allowDeprecatedx86_64Darwin` suppression); a
-post-26.05 Intel package-plane migration is required before that support window
-closes.
+Ubuntu + Apple Silicon macOS. The flake exports `dotfiles-aarch64` plus the
+Apple-Silicon compatibility alias `dotfiles`; it exports no Intel Darwin system
+or configuration. Historical Intel results remain in the append-only evidence
+ledger but are not a current support claim.
 
 ```powershell
 .\setup.ps1
@@ -710,8 +700,12 @@ Pull requests are meant to be gated by three required workflow families:
   `nix flake check` on Ubuntu and macOS plus the checked-in Nix/setup
   integration assertions.
 
-`.github/workflows/wsl2-canary.yml` is separate scheduled/manual coverage, not
-a PR-required workflow.
+There is no hosted WSL workflow. [GitHub states that nested virtualization on
+hosted runners is technically possible but not officially supported](https://docs.github.com/en/actions/concepts/runners/github-hosted-runners), and the
+former optional WSL2 canary twice hung until cancellation without producing
+setup evidence. A Linux container with WSL-shaped environment variables would
+be fake proof, so WSL remains supported through the real throwaway-distro and
+split-host manual harnesses in `tests/greenfield/` and `tests/wsl/`.
 
 The e2e jobs cover different install paths, not symmetric container platforms:
 
@@ -720,9 +714,7 @@ The e2e jobs cover different install paths, not symmetric container platforms:
 | `e2e containers / ubuntu-24.04` | Clean `ubuntu:24.04`, non-root user, native `apt`, no Linuxbrew (`DOTFILES_SKIP_BREW_BOOTSTRAP=1`), then `install-deps.sh --all`, chezmoi config apply, executable/version probes including `zoxide`, `gh`, WezTerm, Herdr, Neovim >= 0.12, lazygit, zsh plugin files, config content assertions, and nvim directory realpath assertion. This is the native installer regression fixture, not the Nix-backed public POSIX package-plane proof; it does not assert Pi CLI because Node 24 comes from the Nix package layer. |
 | `setup.sh / ubuntu-24.04` | Full public Unix setup on the hosted Ubuntu runner after installing Nix in CI: Home Manager first, then native/deferred installs, chezmoi, Lazy, Tree-sitter, Mason, and Polaris. Its clean login/interactive PATH proof resolves the effective account's actual login zsh from the account database; this matters because fresh Ubuntu has no `/usr/bin/zsh` and setup selects Linuxbrew zsh. The shell must resolve `rg` from Nix with no caller PATH injection. |
 | `setup.sh / macos-26` | Full public Apple Silicon setup through the hosted runner: architecture-matched nix-darwin/declarative Homebrew, native/deferred installs, real Ghostty/WezTerm config consumption, installed AeroSpace app/CLI identity agreement, chezmoi, Lazy, Tree-sitter, Mason, and Polaris. AeroSpace waits for a user-granted Accessibility permission before parsing user config or starting its CLI server, so managed-config consumption remains explicit TCC-enabled desktop proof in `tests/MANUAL.md`; hosted CI does not pretend to prove it. The hosted runner alone gets the cleanup override; real hosts keep `cleanup = "check"`. |
-| `setup.sh / macos-26-intel` | Additional non-required real Intel setup lane with the same full assertions. Exact head `f4b63953f2f982702a685358b09e89bae2d78fdd` passed it on a real x86_64 runner; future YAML presence alone remains non-evidence. |
 | `setup.ps1 / windows-2025` | Full Windows setup through the real Windows hosted runner, including Scoop/winget/choco behavior, PowerShell, symlinks, Hack Nerd Font file/registry consumption, `zoxide`/`gh`/WezTerm/Herdr/Pi CLI command probes, and Neovim restore/sync phases. Windows containers do not model the desktop/user-profile setup well. |
-| `setup.sh / WSL2 Ubuntu-24.04 (canary)` | Non-required scheduled/manual WSL smoke signal in `.github/workflows/wsl2-canary.yml`. Hosted runners cannot provide a reliable required nested-virtualization WSL2 gate. The canary disables the WSL distro cache, installs Ubuntu's `nix-bin`, enables flakes, then runs the enforced Home Manager setup path; failures stay visible and do not muddy the required e2e signal. |
 
 After the Lazy restore, deterministic Tree-sitter parser install, and Mason sync, each
 `setup.sh`/`setup.ps1` job also
@@ -770,8 +762,8 @@ tarball install, pinned lazygit release install, zsh plugin install, `fd-find`
 container to add for symmetry. That asymmetry is accepted: hosted macOS and
 Windows runners are the closest representative fixtures for those operating
 systems, while the required WSL proxy is the Ubuntu container plus the
-WSL config-template coverage. Do not add the WSL2 canary to
-required checks unless the owner explicitly accepts the flake risk.
+WSL config-template coverage. Those checks do not claim WSL runtime proof; use
+the real manual throwaway-distro harness for that boundary.
 
 These e2e jobs fail if setup skips Phase 3-5, omits Phase 6/6, leaves a
 Nix-owned POSIX CLI resolving outside a Nix profile/store path, emits a precise

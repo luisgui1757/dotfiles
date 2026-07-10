@@ -4,8 +4,8 @@
 # default --all invokes the sudo activation shape; dry-run only PREVIEWS (never
 # switches); --skip-deps is the explicit already-provisioned escape even when
 # paired with the compatibility alias; non-macOS hosts are skipped; Apple
-# Silicon and Intel select distinct configurations; unsupported architectures
-# fail closed; tap migration rolls back transactionally; and first-run bootstrap
+# Silicon selects the only configuration; retired Intel and unsupported
+# architectures fail closed; tap migration rolls back transactionally; and first-run bootstrap
 # uses the flake.lock-pinned nix-darwin rev + narHash, never a mutable alias.
 set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
@@ -120,6 +120,7 @@ EOF
 }
 
 probe_unsupported_darwin_arch() {
+    local fake_arch="${1:-ppc64}"
     local script="$WORK/unsupported-darwin-arch.sh"
     {
         cat <<EOF
@@ -135,7 +136,7 @@ nix() {
 }
 sudo() { return 0; }
 darwin-rebuild() { return 0; }
-uname() { case "\${1:-}" in -m) echo ppc64 ;; *) echo Darwin ;; esac; }
+uname() { case "\${1:-}" in -m) echo "$fake_arch" ;; *) echo Darwin ;; esac; }
 DOTFILES_TARGET_USER=tester
 DOTFILES_TARGET_HOME=/Users/tester
 export DOTFILES_TARGET_USER DOTFILES_TARGET_HOME
@@ -530,9 +531,14 @@ assert_eq "default bootstrap uses locked nix-darwin rev" \
 assert_eq "GitHub-hosted macOS bootstrap passes the cleanup-check override through sudo" \
     "sudo env DOTFILES_TARGET_USER=tester DOTFILES_TARGET_HOME=/Users/tester DOTFILES_NIX_DARWIN_HOSTED_CI=1 nix run $LOCKED_NIX_DARWIN_REF -- switch --flake $REPO_ROOT#dotfiles-aarch64 --impure" \
     "$(probe '--all' Darwin bootstrap arm64 1)"
-assert_eq "Intel macOS selects only the x86_64 configuration" \
-    "sudo env DOTFILES_TARGET_USER=tester DOTFILES_TARGET_HOME=/Users/tester darwin-rebuild switch --flake $REPO_ROOT#dotfiles-x86_64 --impure" \
-    "$(probe '--all' Darwin installed x86_64)"
+retired_intel_output="$(probe_unsupported_darwin_arch x86_64)" && retired_intel_rc=0 || retired_intel_rc=$?
+if [[ "$retired_intel_rc" -ne 0 ]] && [[ "$retired_intel_output" == *"FAIL: Intel macOS support is retired; this repo supports Apple Silicon only."* ]] && [[ "$retired_intel_output" == *"migrate the host before rerunning setup"* ]]; then
+    echo "ok  : retired Intel macOS fails closed with migration guidance"
+else
+    echo "FAIL: retired Intel macOS did not fail closed with migration guidance"
+    printf '%s\n' "$retired_intel_output"
+    fail=1
+fi
 
 missing_nix_output="$(probe_missing_nix)" && missing_nix_rc=0 || missing_nix_rc=$?
 if [[ "$missing_nix_rc" -ne 0 ]] && [[ "$missing_nix_output" == *"FAIL: Nix is required for macOS setup"* ]]; then
@@ -543,7 +549,7 @@ else
     fail=1
 fi
 
-unsupported_arch_output="$(probe_unsupported_darwin_arch)" && unsupported_arch_rc=0 || unsupported_arch_rc=$?
+unsupported_arch_output="$(probe_unsupported_darwin_arch ppc64)" && unsupported_arch_rc=0 || unsupported_arch_rc=$?
 if [[ "$unsupported_arch_rc" -ne 0 ]] && [[ "$unsupported_arch_output" == *"FAIL: no supported nix-darwin activation config for arch ppc64"* ]]; then
     echo "ok  : unsupported macOS architecture fails closed before activation"
 else
@@ -594,11 +600,10 @@ else
     echo "FAIL: interrupted activation did not restore original taps"
     fail=1
 fi
-if probe_homebrew_library arm64 /opt/homebrew/Library && \
-    probe_homebrew_library x86_64 /usr/local/Homebrew/Library; then
-    echo "ok  : default Homebrew library paths follow Darwin architecture"
+if probe_homebrew_library arm64 /opt/homebrew/Library; then
+    echo "ok  : default Homebrew library path is Apple Silicon native"
 else
-    echo "FAIL: default Homebrew library paths are not architecture-aware"
+    echo "FAIL: default Homebrew library path is not Apple Silicon native"
     fail=1
 fi
 if probe_existing_homebrew_repository; then

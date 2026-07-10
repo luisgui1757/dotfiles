@@ -148,7 +148,7 @@ else
     echo "ok  : Nix bootstrap commands use locked flake refs, not mutable registry aliases"
 fi
 
-for f in .github/workflows/wsl2-canary.yml tests/greenfield/wsl-greenfield.ps1; do
+for f in tests/greenfield/wsl-greenfield.ps1; do
     if ! grep -Fq "nix-bin" "$f"; then
         echo "FAIL: $f must install Ubuntu's nix-bin before WSL setup.sh validation"
         fail=1
@@ -159,7 +159,7 @@ for f in .github/workflows/wsl2-canary.yml tests/greenfield/wsl-greenfield.ps1; 
     fi
 done
 if [[ "$fail" -eq 0 ]]; then
-    echo "ok  : WSL validation surfaces provision Nix before setup.sh"
+    echo "ok  : manual WSL validation surface provisions Nix before setup.sh"
 fi
 
 for snippet in \
