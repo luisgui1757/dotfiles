@@ -8,7 +8,8 @@ fail() { echo "FAIL: $1"; exit 1; }
 
 WORK="$REPO_ROOT/tests/.cache/homebrew-shellenv-test"
 rm -rf "$WORK"
-mkdir -p "$WORK/home/.linuxbrew/bin" "$WORK/home/.linuxbrew/opt/make/libexec/gnubin"
+mkdir -p "$WORK/home/.linuxbrew/bin" "$WORK/home/.linuxbrew/sbin" \
+    "$WORK/home/.linuxbrew/opt/make/libexec/gnubin"
 trap 'rm -rf "$WORK"' EXIT
 
 export HOME="$WORK/home"
@@ -46,6 +47,35 @@ case ":$PATH:" in
     *":$prefix/opt/make/libexec/gnubin:"*) ;;
     *) fail "Homebrew make gnubin was not added to the current PATH" ;;
 esac
+
+# Homebrew's documented idempotent state is successful shellenv with empty
+# stdout when bin/sbin are already first. It must be accepted only because the
+# selected brew is already the command this shell resolves.
+cat > "$prefix/bin/brew" <<EOF
+#!/usr/bin/env bash
+if [[ "\${1:-}" == "shellenv" ]]; then
+    exit 0
+elif [[ "\${1:-}" == "--prefix" && "\${2:-}" == "make" ]]; then
+    printf '%s\n' "$prefix/opt/make"
+fi
+EOF
+chmod +x "$prefix/bin/brew"
+PATH="$prefix/bin:$prefix/sbin:/usr/bin:/bin"
+enable_homebrew_for_current_shell
+[[ "$(command -v brew)" == "$prefix/bin/brew" ]] \
+    || fail "valid empty shellenv did not preserve the selected brew"
+
+# Restore an emitting shellenv for the fresh-shell persistence assertions.
+cat > "$prefix/bin/brew" <<EOF
+#!/usr/bin/env bash
+if [[ "\${1:-}" == "shellenv" ]]; then
+    printf 'export HOMEBREW_PREFIX="%s"\n' "$prefix"
+    printf 'export PATH="%s/bin:\$PATH"\n' "$prefix"
+elif [[ "\${1:-}" == "--prefix" && "\${2:-}" == "make" ]]; then
+    printf '%s\n' "$prefix/opt/make"
+fi
+EOF
+chmod +x "$prefix/bin/brew"
 
 cat > "$HOME/.bashrc" <<EOF
 # user content before managed block
@@ -96,11 +126,31 @@ fi
 
 cat > "$prefix/bin/brew" <<'EOF'
 #!/usr/bin/env bash
+if [[ "${1:-}" == shellenv ]]; then
+    printf '%s\n' 'export PATH="/partial-eval:$PATH"'
+    printf '%s\n' 'export HOMEBREW_PREFIX="/partial-prefix"'
+    printf '%s\n' 'false'
+fi
+EOF
+chmod +x "$prefix/bin/brew"
+PATH=/usr/bin:/bin
+unset HOMEBREW_PREFIX
+if enable_homebrew_for_current_shell >/dev/null 2>"$WORK/eval.err"; then
+    fail "partially failing shellenv evaluation was accepted"
+fi
+[[ "$PATH" == /usr/bin:/bin ]] || fail "failed shellenv evaluation did not restore PATH"
+[[ -z "${HOMEBREW_PREFIX+x}" ]] || fail "failed shellenv evaluation did not restore an unset Homebrew variable"
+grep -F 'prior environment was restored' "$WORK/eval.err" >/dev/null \
+    || fail "failed shellenv evaluation omitted recovery evidence"
+
+cat > "$prefix/bin/brew" <<'EOF'
+#!/usr/bin/env bash
 [[ "${1:-}" == shellenv ]] && exit 0
 EOF
 chmod +x "$prefix/bin/brew"
+PATH=/usr/bin:/bin
 if enable_homebrew_for_current_shell >/dev/null 2>&1; then
-    fail "empty brew shellenv was accepted"
+    fail "empty brew shellenv was accepted without an active selected brew"
 fi
 
 echo "OK"

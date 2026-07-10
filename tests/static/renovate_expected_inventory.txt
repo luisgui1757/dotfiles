@@ -2,12 +2,14 @@
 github-actions|.github/workflows/e2e-install.yml|github-runners|ubuntu|2
 github-actions|.github/workflows/e2e-install.yml|github-runners|windows|1
 github-actions|.github/workflows/e2e-install.yml|github-tags|DeterminateSystems/nix-installer-action|1
+github-actions|.github/workflows/e2e-install.yml|github-tags|cachix/install-nix-action|1
 github-actions|.github/workflows/e2e-install.yml|github-tags|actions/cache|2
 github-actions|.github/workflows/e2e-install.yml|github-tags|actions/checkout|4
 github-actions|.github/workflows/e2e-install.yml|github-tags|actions/download-artifact|1
 github-actions|.github/workflows/e2e-install.yml|github-tags|actions/upload-artifact|3
 github-actions|.github/workflows/nix.yml|github-runners|ubuntu|1
 github-actions|.github/workflows/nix.yml|github-tags|DeterminateSystems/nix-installer-action|1
+github-actions|.github/workflows/nix.yml|github-tags|cachix/install-nix-action|1
 github-actions|.github/workflows/nix.yml|github-tags|actions/checkout|2
 github-actions|.github/workflows/nix.yml|github-tags|actions/download-artifact|1
 github-actions|.github/workflows/nix.yml|github-tags|actions/upload-artifact|1

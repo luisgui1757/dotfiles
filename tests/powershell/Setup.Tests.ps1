@@ -179,7 +179,7 @@ Describe "setup.ps1 Update-RuntimePath" {
         @($parts | Where-Object { $_ -eq $fakeOne }).Count | Should -Be 1
     }
 
-    It "falls back to HOME when USERPROFILE and SCOOP are absent" {
+    It "uses the resolved profile root when SCOOP is absent" {
         Remove-Item Env:SCOOP -ErrorAction SilentlyContinue
         Remove-Item Env:USERPROFILE -ErrorAction SilentlyContinue
         $env:HOME = $script:FakeHome
@@ -188,11 +188,24 @@ Describe "setup.ps1 Update-RuntimePath" {
         $fakeOne = Join-Path $script:FakeHome 'one'
         $env:PATH = "$fakeOne;$fakeOne"
 
-        Update-RuntimePath
+        Update-RuntimePath -ProfileRootResolver { $script:FakeHome }
 
         $parts = $env:PATH -split ';'
         $parts[0] | Should -Be $shimDir
         @($parts | Where-Object { $_ -eq $fakeOne }).Count | Should -Be 1
+    }
+
+    It "uses the platform's canonical profile source when environment variables are absent" {
+        Remove-Item Env:SCOOP -ErrorAction SilentlyContinue
+        Remove-Item Env:USERPROFILE -ErrorAction SilentlyContinue
+        $env:HOME = $script:FakeHome
+
+        if ($env:OS -eq 'Windows_NT') {
+            Get-DefaultProfileRoot | Should -Be ([Environment]::GetFolderPath([Environment+SpecialFolder]::UserProfile))
+            Get-DefaultProfileRoot | Should -Not -Be $script:FakeHome
+        } else {
+            Get-DefaultProfileRoot | Should -Be $script:FakeHome
+        }
     }
 }
 

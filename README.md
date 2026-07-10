@@ -193,7 +193,14 @@ Ubuntu + Apple Silicon macOS, with an additional non-required
 `dotfiles-x86_64` configurations; the legacy `dotfiles` alias deliberately
 remains Apple Silicon and setup never selects it for Intel. Intel runtime proof
 remains pending until the hosted Intel lane actually completes; cross-evaluation
-alone is not runtime proof.
+alone is not runtime proof. Determinate Nix has dropped Intel-host support, so
+the Intel CI lanes explicitly use full-SHA-pinned `cachix/install-nix-action`
+`v31.10.7` to install upstream Nix 2.34.8 from its versioned official release;
+other hosted lanes retain the pinned Determinate action. Nixpkgs 26.05 is the
+last `x86_64-darwin` release and remains supported through 2026-12-31. The repo
+keeps that warning visible (no `allowDeprecatedx86_64Darwin` suppression); a
+post-26.05 Intel package-plane migration is required before that support window
+closes.
 
 ```powershell
 .\setup.ps1
@@ -340,7 +347,8 @@ active host's `$PROFILE` independently through supported runtime/known-folder
 APIs. It applies the UserProfile source plus dedicated LocalApplicationData and
 Documents source states, then verifies the paths Neovim, lazygit, ConsoleHost,
 VS Code, and ISE consume. Redirected folders, alternate drives, and spaces are
-supported. Recognized conventional-path legacy targets are backed up only after
+supported. Directory ownership checks resolve both symbolic links and Windows
+junctions. Recognized conventional-path legacy targets are backed up only after
 the new targets publish; divergent legacy user data stays in place with a
 migration warning. POSIX pwsh profile management remains provisioning-adjacent.
 
@@ -473,7 +481,12 @@ migration warning. POSIX pwsh profile management remains provisioning-adjacent.
   that still resolve from `/usr/bin` get an unmanaged line with a Homebrew
   migration hint. Setup also persists Homebrew shellenv and Homebrew GNU Make's
   `libexec/gnubin` path when the `make` formula is installed, so Brew-owned
-  `make` does not require a manual export. On Windows, Scoop-owned tools are
+  `make` does not require a manual export. Homebrew may intentionally emit no
+  `shellenv` output when its bin/sbin already lead PATH; setup accepts that
+  idempotent result only when the selected brew is already the exact resolved
+  executable. Failed evaluation or executable proof restores the current
+  shell's prior PATH/Homebrew variables and fails with retry instructions. On
+  Windows, Scoop-owned tools are
   detected from shim metadata before package-list fallback; corrupt Scoop shims
   are `blocked`; winget and Chocolatey require both package-list ownership and a
   command source under that manager's supported install roots, so a manual
@@ -800,7 +813,8 @@ update PRs are intentionally not configured.
 | Neovim plugin and Mason tools | Not managed | `lazy-lock.json` is refreshed with Lazy and tested as editor behavior; Mason intentionally has no machine-pinned lockfile. |
 
 `make validate-renovate` runs Renovate's own strict schema validator and
-`--platform=local --dry-run=extract`, then compares the official extraction to
+`--platform=local --dry-run=extract`, captures its JSON stdout directly, then
+compares the official extraction to
 `tests/static/renovate_expected_inventory.txt`. A custom regex merely matching
 some text is not ownership proof. Live Dashboard confirmation is separate and
 remains pending until the hosted bot reruns on the PR head.
@@ -1131,12 +1145,14 @@ MIT. See `LICENSE`.
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| Neovim stops before loading Lazy with a lockfile/cache identity error | `lazy-lock.json` is missing, malformed, incomplete, or non-40-hex; or the cached `lazy.nvim` checkout is dirty, at the wrong commit, from the wrong origin, non-Git, or partial | restore the tracked `nvim/lazy-lock.json` and restart Neovim. Startup repairs the cache through a verified staging checkout and never executes an unproved path. If publication fails, fix the destination permissions named in the error and retry |
+| Neovim stops before loading Lazy with a lockfile/cache identity error | `lazy-lock.json` is missing, malformed, incomplete, has a non-40-hex commit or invalid branch; or the cached `lazy.nvim` checkout is dirty, at the wrong commit, from the wrong origin, missing locked default-branch metadata, non-Git, or partial | restore the tracked `nvim/lazy-lock.json` and restart Neovim. Startup repairs the cache through a verified staging checkout and never executes an unproved path. If publication fails, fix the destination permissions named in the error and retry |
+| setup reports a Homebrew `shellenv` failure even though `brew` already resolves | the selected Homebrew executable is not the same installation PATH resolves, or `shellenv` exited nonzero; empty stdout alone is a normal Homebrew idempotence signal | inspect `command -v brew` and the exact path in the error. Repair the shadowing PATH or Homebrew installation, then rerun setup; setup never treats empty output as bootstrap proof when brew is absent |
 | `<leader>X` keymaps fire `\X` instead of `<Space>X` | mapleader set after lazy.setup somehow | restore the order in `nvim/init.lua` — leader **before** `require("lazy").setup` |
 | Formatter runs twice or shows two BufWritePre autocmds | someone added a second handler outside conform.nvim | `:lua print(#vim.api.nvim_get_autocmds({event="BufWritePre"}))` should be 1; if not, find the second autocmd and delete it |
 | Lazy/Tree-sitter/Mason says `No C compiler found` | WSL/Linux has `make` but no `cc`/`gcc`/`clang`; Tree-sitter parsers and some plugin builds compile native code | re-run `./setup.sh --skip-config` to install the Linux compiler toolchain, or on Ubuntu run `sudo apt-get update && sudo apt-get install -y build-essential`, then `./setup.sh --skip-deps --skip-config` |
 | Tree-sitter parser install reports temp-dir rename errors such as `ENOTEMPTY` | a previous or parallel parser build left a partial grammar/query cache | update this repo and rerun setup; setup/CI now serializes synchronous nvim-treesitter bootstrap installs, purges compiled parsers with incomplete managed query output, and Tier 2 fails causally if any declared parser or explicit highlight query is missing |
 | nvim treesitter parsers fail to compile on Windows / `cl.exe` not found | `nvim-treesitter` main builds parsers with the Rust `cc` crate, which needs MSVC env vars | run `.\setup.ps1 -All` to install VS Build Tools and let setup import the VS DevShell before parser installation; for ad-hoc `:TSUpdate`, open a "Developer PowerShell for VS" or rerun setup |
+| Windows setup says the verified Tree-sitter executable failed staged version validation | an older installer used a sibling stage name with characters after `.exe`, so Windows would not dispatch it as a native executable | update this repo and rerun `.\setup.ps1 -All`; the verified same-parent stage now ends in `.exe`, is version-checked before atomic publication, and cleans on retry |
 | nvim syntax looks weak or files look plain text | Tree-sitter is inactive, or the hybrid built-in syntax fallback was not restored after Tree-sitter starts | update this repo, re-run setup, then check `:Inspect` on a token; parser-backed languages should show `treesitter` captures plus `syntax` groups, while `.bat` should show `syntax` groups |
 | Clipboard not crossing host on WSL | `win32yank.exe` not on PATH | install win32yank via scoop on Windows side, ensure WSL PATH picks it up |
 | Starship prompt missing in the PowerShell window you ran setup in (but it works in psmux / a new window) | that shell loaded `$PROFILE` **before** setup put starship on PATH; the profile skips starship when `Get-Command starship` finds nothing | open a **new** PowerShell window, or run `. $PROFILE` in the current one — newly-installed tools are not on an already-open shell's PATH |

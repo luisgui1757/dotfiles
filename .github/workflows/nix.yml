@@ -40,8 +40,12 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
-      - name: Install Nix (flakes enabled)
+      - name: Install Determinate Nix (flakes enabled)
+        if: matrix.logical != 'macos-intel'
         uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22
+      - name: Install upstream Nix on Intel (flakes enabled)
+        if: matrix.logical == 'macos-intel'
+        uses: cachix/install-nix-action@a49548c11d9846ad46ecc0115273879b045f001c # v31.10.7
       - name: nix flake check
         run: nix flake check --print-build-logs
       - name: nix files are nixpkgs-fmt formatted

@@ -43,10 +43,12 @@ describe("pinned Git checkout", function()
     git("-C", remote, "add", "lua/example/init.lua")
     git("-C", remote, "commit", "--quiet", "-m", "fixture")
     expected_commit = git("-C", remote, "rev-parse", "HEAD")
+    local expected_branch = git("-C", remote, "symbolic-ref", "--short", "HEAD")
     opts = {
       target = root .. "/cache/example.nvim",
       url = "file://" .. remote,
       commit = expected_commit,
+      branch = expected_branch,
       required_file = "lua/example/init.lua",
       lock_timeout_ms = 2000,
     }
@@ -81,12 +83,32 @@ describe("pinned Git checkout", function()
     assert.has_error(function()
       checkout.locked_commit(lockfile, "example.nvim")
     end, "required plugin lock entry has an invalid 40-hex commit: example.nvim")
+
+    write(lockfile, { '{"example.nvim":{"branch":"main","commit":"' .. expected_commit .. '"}}' })
+    local commit, branch = checkout.locked_identity(lockfile, "example.nvim")
+    assert.are.equal(expected_commit, commit)
+    assert.are.equal("main", branch)
+
+    write(lockfile, { '{"example.nvim":{"commit":"' .. expected_commit .. '"}}' })
+    assert.has_error(function()
+      checkout.locked_identity(lockfile, "example.nvim")
+    end, "required plugin lock entry has an invalid branch: example.nvim")
+
+    write(lockfile, { '{"example.nvim":{"branch":"../unsafe","commit":"' .. expected_commit .. '"}}' })
+    assert.has_error(function()
+      checkout.locked_identity(lockfile, "example.nvim")
+    end, "required plugin lock entry has an invalid branch: example.nvim")
   end)
 
   it("creates and proves an absent cache before returning it", function()
     assert.are.equal(opts.target, checkout.ensure(opts))
     local valid, reason = checkout.verify(opts)
     assert.is_true(valid, reason)
+    assert.are.equal(
+      "refs/remotes/origin/" .. opts.branch,
+      git("-C", opts.target, "symbolic-ref", "refs/remotes/origin/HEAD")
+    )
+    assert.are.equal(expected_commit, git("-C", opts.target, "rev-parse", "refs/remotes/origin/" .. opts.branch))
   end)
 
   it("reuses a verified cache without init, fetch, or checkout", function()
@@ -95,7 +117,13 @@ describe("pinned Git checkout", function()
     local observed = vim.tbl_extend("force", opts, {
       run_command = function(args)
         local command = table.concat(args, " ")
-        if command:match(" init ") or command:match(" fetch ") or command:match(" checkout ") then
+        if
+          command:match(" init ")
+          or command:match(" fetch ")
+          or command:match(" checkout ")
+          or command:match(" update%-ref ")
+          or command:match(" symbolic%-ref refs/remotes/origin/HEAD refs/remotes/origin/")
+        then
           table.insert(mutating, command)
         end
         return run(args)
@@ -196,7 +224,7 @@ describe("pinned Git checkout", function()
 
   it("keeps runtimepath and require after the production identity proof", function()
     local source = table.concat(vim.fn.readfile(_G.TEST_REPO_ROOT .. "/nvim/init.lua"), "\n")
-    local lock_index = assert(source:find("pinned_checkout.locked_commit", 1, true))
+    local lock_index = assert(source:find("pinned_checkout.locked_identity", 1, true))
     local ensure_index = assert(source:find("pinned_checkout.ensure", 1, true))
     local runtime_index = assert(source:find("vim.opt.rtp:prepend", 1, true))
     local require_index = assert(source:find('require("lazy").setup', 1, true))

@@ -154,14 +154,15 @@ done
 
 if [[ ! -f nvim/lua/util/pinned_git_checkout.lua \
     || ! -f tests/nvim/spec/pinned_git_checkout_spec.lua ]] \
-    || ! grep -q 'pinned_checkout.locked_commit.*"lazy.nvim"' nvim/init.lua \
+    || ! grep -q 'pinned_checkout.locked_identity.*"lazy.nvim"' nvim/init.lua \
     || ! grep -q 'pinned_checkout.ensure' nvim/init.lua \
+    || ! grep -q 'branch = lazy_branch' nvim/init.lua \
     || ! grep -q 'required_file = "lua/lazy/init.lua"' nvim/init.lua \
     || grep -q 'git.*clone' nvim/init.lua; then
     echo "FAIL: lazy.nvim bootstrap must use the behavioral fail-closed pinned checkout helper"
     fail=1
 else
-    echo "ok  : lazy.nvim bootstrap uses behavioral lock/origin/HEAD/cleanliness proof"
+    echo "ok  : lazy.nvim bootstrap uses behavioral lock/branch/origin/HEAD/cleanliness proof"
 fi
 
 if lazy_sync_hits=$(grep -rnF '+Lazy! sync' \

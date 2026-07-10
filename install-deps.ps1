@@ -2715,7 +2715,10 @@ function Install-TreeSitterCli {
             }
 
             New-Item -ItemType Directory -Force -Path $installRoot | Out-Null
-            $stage = Join-Path $installRoot (".tree-sitter.exe.stage." + [guid]::NewGuid().ToString('N'))
+            # Windows selects the native image loader from the final extension.
+            # A name such as `.tree-sitter.exe.stage.<id>` is verified bytes but
+            # is not executable; keep the sibling stage name ending in `.exe`.
+            $stage = Join-Path $installRoot (".tree-sitter.stage." + [guid]::NewGuid().ToString('N') + '.exe')
             $rollback = Join-Path $installRoot (".tree-sitter.exe.rollback." + [guid]::NewGuid().ToString('N'))
             $hadTarget = Test-Path -LiteralPath $target -PathType Leaf
             $published = $false

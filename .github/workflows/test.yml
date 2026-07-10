@@ -237,6 +237,37 @@ jobs:
             Add-Content -Path $env:GITHUB_PATH -Value (Split-Path -Parent $nvim.Source)
           }
           nvim --version | Select-Object -First 1
+
+          # The Pester suite exercises real chezmoi drift/exit semantics. Install
+          # the same immutable Windows asset used by the parity lane so those
+          # behavioral tests never become platform-dependent skips.
+          $chezmoiBin = Join-Path $env:RUNNER_TEMP 'pinned-chezmoi'
+          $chezmoiTemp = Join-Path $env:RUNNER_TEMP "chezmoi-test-$([guid]::NewGuid())"
+          New-Item -ItemType Directory -Force -Path $chezmoiBin, $chezmoiTemp | Out-Null
+          try {
+            $version = $env:CHEZMOI_VERSION.TrimStart('v')
+            $asset = "chezmoi_${version}_windows_amd64.zip"
+            $zip = Join-Path $chezmoiTemp $asset
+            $extract = Join-Path $chezmoiTemp 'extract'
+            Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/twpayne/chezmoi/releases/download/$env:CHEZMOI_VERSION/$asset" -OutFile $zip
+            $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $zip).Hash.ToLowerInvariant()
+            if ($actual -ne $env:CHEZMOI_WINDOWS_X86_64_SHA256) {
+              throw "checksum mismatch for ${asset}: got $actual expected $env:CHEZMOI_WINDOWS_X86_64_SHA256"
+            }
+            Expand-Archive -Path $zip -DestinationPath $extract -Force
+            $chezmoi = Get-ChildItem -Path $extract -Filter 'chezmoi.exe' -File -Recurse | Select-Object -First 1
+            if (-not $chezmoi) { throw "chezmoi.exe missing from $asset" }
+            Copy-Item -LiteralPath $chezmoi.FullName -Destination (Join-Path $chezmoiBin 'chezmoi.exe') -Force
+          } finally {
+            Remove-Item -LiteralPath $chezmoiTemp -Recurse -Force -ErrorAction SilentlyContinue
+          }
+          $chezmoiVersion = (& (Join-Path $chezmoiBin 'chezmoi.exe') --version) -join "`n"
+          if ($chezmoiVersion -notmatch [regex]::Escape($env:CHEZMOI_VERSION)) {
+            throw "chezmoi version output does not include $env:CHEZMOI_VERSION"
+          }
+          Add-Content -Path $env:GITHUB_PATH -Value $chezmoiBin
+          $env:PATH = "$chezmoiBin;$env:PATH"
+
           Import-Module Pester -MinimumVersion 5.0.0 -Force
           Import-Module PSScriptAnalyzer -Force
           Get-Module Pester, PSScriptAnalyzer | Format-Table Name,Version,Path -AutoSize

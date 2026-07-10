@@ -12,6 +12,7 @@ proof for the direct-artifact paths below.
 | Ubuntu PowerShell repository config | Ubuntu 24.04 `packages-microsoft-prod.deb`, SHA-256 `c13f01ac7c3001b51a9281d40dde666db5e037e05512840c319832f7852bfec4` | Required CI verifies the downloaded file immediately before `sudo dpkg -i`. |
 | Windows Terminal Sandbox helper | Production `v1.24.11321.0` x64 portable zip, SHA-256 `7caef554147e5498ed1becdca73cdedb79fbc81f89032e46ae9b095c53433812` | The helper imports the production pin, verifies it, transactionally publishes the portable tree, and delegates settings to setup. It never queries `releases/latest` or mirrors packaged settings. |
 | Zsh plugins | fzf-tab `d7e0234614dbe5369fdd760907d12c0e05a4dccc`; zsh-autosuggestions `e52ee8ca55bcc56a17c828767a3f98f22a68d4eb` | One publisher quarantines unproved sourceable paths, fetches the exact commit into a sibling stage, verifies origin/HEAD/cleanliness/tracked entry file, and atomically publishes. |
+| Intel macOS CI Nix bootstrap | `cachix/install-nix-action` `v31.10.7`, commit `a49548c11d9846ad46ecc0115273879b045f001c` | Only `macos-intel` selects this full-SHA action. Its reviewed composite installs upstream Nix `2.34.8` from a versioned `releases.nixos.org` URL; non-Intel lanes retain the pinned Determinate action. |
 
 `tests/static/supply_chain_remote_execution_test.sh` rejects remote-eval
 patterns, unchecked downloaded PowerShell executables, and downloads that flow

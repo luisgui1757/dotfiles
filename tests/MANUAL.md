@@ -166,7 +166,10 @@ significant change to the relevant area.
 - [ ] **Intel macOS runtime proof is pending**: the branch adds official
       `macos-26-intel` Nix/setup lanes, but do not mark this row complete until
       the exact PR head has a green real runner result. Cross-evaluation is not
-      runtime proof.
+      runtime proof. Nixpkgs 26.05 is the final Intel-darwin release and remains
+      supported only through 2026-12-31; keep its warning visible and track the
+      required post-26.05 package-plane migration separately from this current
+      host proof.
 - [ ] **Home Manager (Linux/WSL)**: with Nix installed inside the Linux/WSL
       environment, run
       `./setup.sh --all` (or the compatibility alias `./setup.sh --home-manager`;

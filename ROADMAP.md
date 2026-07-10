@@ -274,7 +274,30 @@ Commit-by-commit status:
   exist. The first PR run exposed and fixed two cross-host integration defects:
   the POSIX dependency-table zsh scan now passes the complete origin/commit/file
   identity, and handled Windows chezmoi drift no longer leaks a native exit code
-  into the CI step. No workflow definition is recorded as runtime proof.
+  into the CI step. The next Ubuntu run also proved Renovate's optional
+  `LOG_FILE` transport can be absent after exit 0; inventory validation now
+  consumes JSON stdout and fails explicitly if no proof is emitted. The setup
+  lanes then reproduced Homebrew's valid empty idempotent `shellenv` output and
+  Lazy's need for proved default-branch metadata on a detached bootstrap; both
+  boundaries now have behavioral regressions. Windows path proof now resolves
+  junctions, and the generic Windows suite installs the exact verified chezmoi
+  asset so native drift cases run with zero platform-dependent skips. The real
+  Windows setup lane also proved an executable-stage filename must end in
+  `.exe`; Tree-sitter publication now preserves that loader contract and its
+  Pester oracle rejects any non-`.exe` validation path. Intel CI now explicitly
+  uses full-SHA upstream-Nix installation after the real lane proved current
+  Determinate Nix no longer supports x86_64-darwin hosts; the action's hidden
+  last-release fallback is not treated as a platform contract. No workflow
+  definition is recorded as runtime proof.
+
+- **Intel Darwin package-plane sunset — OPEN, deadline 2026-12-31.** Nixpkgs
+  26.05 is the final supported `x86_64-darwin` release; 26.11 removes package
+  builds and source-build support. This closure implements and tests the current
+  supported path without suppressing its deprecation warning. Before 26.05
+  reaches end of support, replace Intel's Nixpkgs package plane with a reviewed
+  supported mechanism while preserving the same chezmoi ownership and exact
+  architecture-selection contracts. This future deadline does not invalidate a
+  green 26.05 Intel run today, and must not be “fixed” by narrowing macOS to ARM.
 
 ### P2 Follow-up: Secondary Supply-chain Hardening
 

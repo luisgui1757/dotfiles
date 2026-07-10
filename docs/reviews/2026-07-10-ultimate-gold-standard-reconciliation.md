@@ -332,3 +332,152 @@ this entry and are not recorded as greenfield evidence.
 - Remote rerun remains pending at this entry. The earlier failing checks are
   retained above as evidence and must be superseded by green exact-head runs,
   not manually rerun on the obsolete head.
+
+## PR #47 Ubuntu Renovate transport repair — entry 7
+
+- Exact failing head: `4e198f5f3278dc4daded670b81fa461b6336514a`.
+- Required `ubuntu` progressed past the zsh scan and then failed because
+  Renovate's official local extract returned success without creating the
+  optional `LOG_FILE`; inventory validation therefore saw no proof file.
+- Root fix: run the official extract with JSON logging and capture its stdout as
+  the reviewed evidence stream. Stderr remains diagnostic-only. A successful
+  command that emits an empty JSON stream now fails explicitly before the
+  inventory parser.
+- Regression: `renovate_validation_transport_test.sh` stubs a successful,
+  output-free extract and proves it fails with the precise missing-proof error;
+  the real `make validate-renovate` must still match all 87 inventory records.
+  Focused/full results and immutable commit identity follow append-only.
+
+## PR #47 setup and Windows integration repair — entry 8
+
+- Exact failing head: `4e198f5f3278dc4daded670b81fa461b6336514a`.
+- Required Ubuntu and macOS setup reproduced Homebrew's documented idempotent
+  behavior: `brew shellenv` exits 0 with empty stdout when its bin/sbin already
+  lead PATH. Setup incorrectly recorded that valid existing state as failure.
+  It now evaluates only successful nonempty output and accepts empty output only
+  after canonical executable proof; empty output with brew absent still fails.
+- The same setup logs exposed a distinct Lazy restore assertion. The verified
+  lazy.nvim checkout was intentionally detached, but its shallow exact-commit
+  fetch had no `origin/HEAD`, so Lazy could not serialize a branch into its lock.
+  Staging now records and proves the locked branch remote ref and symbolic
+  origin HEAD at the exact locked commit before publication. The checkout stays
+  detached and no branch tip is trusted for execution.
+- Required Windows reproduced canonicalization and proof-environment defects:
+  `Get-RealExistingPath` handled symbolic links but not directory junctions, so
+  valid redirected Neovim targets appeared divergent; the generic suite also
+  lacked the real chezmoi executable needed by its native drift tests. Junctions
+  now resolve through their targets, and CI installs the exact existing
+  version/checksum-pinned Windows chezmoi asset before Pester.
+- Focused PASS on macOS: Homebrew shellenv regression; full Neovim suite; fresh
+  isolated production `Lazy! restore` with 30 locked plugins and no assertion;
+  Setup/Uninstall Pester 59 passed / 0 failed / 0 skipped; supply-chain scanner,
+  pin consistency, YAML lint; Renovate empty-transport oracle and real inventory
+  extraction (87 exact records). Native Windows junction proof and exact-head
+  setup results remain pending until the pushed CI rerun.
+- Implementation commit identity and full-gate/exact-head results follow in the
+  next append-only entry.
+
+## PR #47 Windows Tree-sitter stage repair — entry 9
+
+- Exact failing head: `4e198f5f3278dc4daded670b81fa461b6336514a`;
+  `setup.ps1 / windows-2025` downloaded and checksum-verified the exact
+  Tree-sitter `v0.26.10` archive, validated its extracted `tree-sitter.exe`, then
+  failed only after copying those bytes to `.tree-sitter.exe.stage.<guid>`.
+- Root cause: Windows dispatches a native executable by its final extension.
+  The suffix after `.exe` made the same bytes non-executable, so the staged
+  version proof returned empty. This was a publication-shape bug, not an asset,
+  checksum, ABI, or version-predicate mismatch.
+- Root fix: the same-parent transactional stage is now
+  `.tree-sitter.stage.<guid>.exe`; exact-version validation still occurs before
+  atomic replace/move and after publication, with the old target retained or
+  restored on failure.
+- Regression: the stale/partial repair oracle now records every staged/source/
+  target validation path and returns incompatible for any path whose final
+  extension is not `.exe`, reproducing the old failure boundary. Native Windows
+  rerun evidence remains pending until this repair is pushed.
+
+## PR #47 explicit Intel Nix installer selection — entry 10
+
+- Exact observed head: `4e198f5f3278dc4daded670b81fa461b6336514a`.
+  The real `macos-26-intel` setup lane launched on an x86_64 GitHub host and
+  reached nix-darwin/Homebrew/editor setup. Its Determinate action post-step
+  reported that current Determinate Nix no longer supports Intel hosts and had
+  automatically pinned the last compatible installer as a temporary fallback.
+- Official/current reconciliation: GitHub still offers `macos-26-intel`; Nix's
+  upstream installer supports multi-user macOS; current Determinate documents
+  Apple Silicon, not Intel, as its supported macOS host. Intel is therefore a
+  genuine platform-specific bootstrap difference, not grounds to narrow the
+  product contract.
+- Implementation: Intel matrix rows alone select
+  `cachix/install-nix-action@a49548c11d9846ad46ecc0115273879b045f001c`
+  (`v31.10.7`), whose reviewed composite pins upstream Nix `2.34.8` at a
+  versioned `releases.nixos.org` URL. Other rows retain the full-SHA Determinate
+  action. A static oracle proves both conditions in both workflows; the general
+  external-action SHA scanner and Renovate inventory cover the new dependency.
+- This mechanism is implemented but not runtime proof. A green exact final-head
+  Intel setup and flake run are still required before UGR-002 can be classified
+  fully proved.
+
+## Intel Darwin support-window evidence — entry 11
+
+- Local `nix flake check --print-build-logs` passed after evaluating both Darwin
+  configurations, but emitted Nixpkgs' official warning that 26.05 is the final
+  `x86_64-darwin` release. Official release notes state package/platform support
+  continues until 26.05 reaches end of support on 2026-12-31; 26.11 will not
+  build or support Intel Darwin packages from source.
+- Final classification implication: UGR-002's current macOS 26 Intel path is a
+  feasible supported implementation today and must still receive exact-head
+  runtime proof. It also carries a dated residual: migrate Intel's package plane
+  before 2026-12-31 without narrowing the public macOS contract.
+- No warning suppression was added. `intel_nix_installer_test.sh` rejects
+  `allowDeprecatedx86_64Darwin` so future work cannot manufacture a quieter
+  green run while the support deadline is being ignored.
+
+## Final repair local verification — entry 12
+
+Executed on 2026-07-10 in the isolated macOS repair worktree after the
+Renovate, Homebrew, Lazy, Windows junction/chezmoi, Tree-sitter stage, and Intel
+Nix installer changes. The implementation commit identity follows append-only
+after Git creates it.
+
+| Command / suite | Result |
+|---|---|
+| `git diff --check` | PASS |
+| `bash -n` over every repository `*.sh` | PASS, 132 scripts |
+| repository shell lint (`make lint`) | PASS, strict ShellCheck |
+| `bash tests/static/run_all.sh` | PASS, including action SHA, Intel installer, Nix ownership, supply-chain, pin, workflow, JSON/TOML/YAML, and invariant guards |
+| `bash tests/shell/run_all.sh` | PASS, including Homebrew empty-output and Renovate empty-transport regressions |
+| `make test-migration` | PASS: template, parity, round-trip, uninstall safety/order, Windows render, checked zsh publisher, and verify-drift oracle |
+| PowerShell parser (`tests/static/ps1_parse.sh`) | PASS for every tracked PowerShell surface |
+| `pwsh -NoLogo -NoProfile -File ./test.ps1` | PASS: analyzer exact fingerprint, Pester 232 passed / 0 failed / 0 skipped, all 17 Neovim spec files exited 0 |
+| Focused Windows Terminal Pester filter | PASS: 19 passed / 0 failed / 0 skipped |
+| `make test-nvim` | PASS, including 9 locked-checkout, 5 checked-delete, and real two-project clangd cases |
+| Fresh isolated production `nvim --headless "+Lazy! restore" "+qa"` | PASS with a clean XDG/HOME tree; no lock assertion or init/command callback error |
+| `make validate-renovate` | PASS: strict validator plus official local extraction exactly matched 89 reviewed records |
+| `nix flake check --print-build-logs` | PASS on aarch64-darwin; both Darwin configurations evaluated, host check reused cache, incompatible systems were honestly reported as omitted, and the Intel 26.05 support warning remains visible |
+| `make test` | PASS |
+| `make ci` | PASS, ended `local pre-PR gate passed` |
+
+The initial combined static run failed only because the invariant still required
+the superseded `locked_commit` call string. It was strengthened to require
+`locked_identity` plus `branch = lazy_branch`; static, test, and CI gates then
+passed. No skip, allowlist, suppression, or weakened assertion was added.
+
+These local results are not native-Windows junction/Tree-sitter proof, real
+Intel proof for the new upstream-Nix action, WSL2, redirected known-folder,
+desktop-GUI, or hosted Renovate Dashboard proof. Those remain pending the
+pushed exact-head runs or manual environments.
+
+## Homebrew failure-state hardening — entry 13
+
+- Before commit, the shellenv repair received one final transactional audit.
+  Syntax/command failure during evaluated shellenv output or failure to activate
+  the selected brew now restores the exact prior PATH, MANPATH, INFOPATH,
+  HOMEBREW_PREFIX, HOMEBREW_CELLAR, and HOMEBREW_REPOSITORY set/unset state,
+  clears the command hash, and prints an explicit repair/retry instruction.
+- The focused fixture injects output that mutates PATH and HOMEBREW_PREFIX before
+  executing `false`; setup must reject it, restore both prior states, and emit
+  recovery evidence. This complements the nonzero-command, valid-empty, and
+  empty-without-active-brew cases recorded above.
+- Post-hardening `make ci` passed again and ended `local pre-PR gate passed`;
+  strict ShellCheck and the focused Homebrew regression also passed directly.

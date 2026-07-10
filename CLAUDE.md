@@ -315,6 +315,10 @@ that violates one of these, fix it instead of disabling the test.
     `require("lazy")` occur only after that proof. Guarded behaviorally by
     `tests/nvim/spec/pinned_git_checkout_spec.lua`; do not replace this with
     grep-only evidence or a mutable `git clone` directly into the live cache.
+    For lazy.nvim, validate the locked branch name and prove `origin/HEAD` plus
+    that remote branch at the same locked commit while keeping HEAD detached.
+    Lazy needs that metadata to serialize its lock; the branch tip never becomes
+    executable authority.
 24. **POSIX setup has one validated target identity and architecture.** Public
     `setup.sh` runs as the target non-root account. At the boundary it reads the
     real account record (`dscl` on macOS, `getent`/`/etc/passwd` on Linux),
@@ -329,17 +333,25 @@ that violates one of these, fix it instead of disabling the test.
     bootstrap, or interruption failure restores the original tree or emits
     exact recovery instructions. Guarded by `setup_target_identity_test.sh`,
     `setup_nix_darwin_test.sh`, and both architecture evaluations in
-    `darwin_config_test.sh`.
+    `darwin_config_test.sh`. CI uses the pinned Determinate action where that
+    project supports the host; Intel lanes explicitly select full-SHA-pinned
+    `cachix/install-nix-action` and upstream Nix because current Determinate Nix
+    dropped x86_64-darwin host support. Nixpkgs 26.05 supports Intel Darwin only
+    through 2026-12-31 and 26.11 removes it. Do not set
+    `allowDeprecatedx86_64Darwin` to hide this warning; keep the sunset visible
+    and migrate Intel's package plane before the supported release expires.
 25. **Windows setup uses application-consumed known folders, not fabricated
     children of UserProfile.** Resolve UserProfile, LocalApplicationData,
     Documents, and runtime `$PROFILE` independently. The main chezmoi source is
     UserProfile-only; `windows/chezmoi-localappdata` and
     `windows/chezmoi-documents` are explicit destination overlays with separate
     persistent state. Post-apply checks cover nvim, lazygit, ConsoleHost, VS
-    Code, and ISE. Recognized conventional legacy targets migrate only after
-    successful publication; divergent legacy user data is preserved. Uninstall
-    enumerates the same three source states. Guarded by Setup/Uninstall Pester
-    and the Windows apply/round-trip migration suites.
+    Code, and ISE. Path proof resolves both directory symlinks and Windows
+    junctions before comparing ownership. Recognized conventional legacy
+    targets migrate only after successful publication; divergent legacy user
+    data is preserved. Uninstall enumerates the same three source states.
+    Guarded by Setup/Uninstall Pester and the Windows apply/round-trip migration
+    suites.
 26. **PowerShell profiles run only for an actual interactive invocation.** The
     guard executes before cache path construction and rejects
     `-NonInteractive`, batch `-Command`/`-File`/encoded/stdin modes without
@@ -793,6 +805,9 @@ regex matchability alone is not evidence that Renovate owns the dependency.
 The beta Nix manager stays explicitly enabled, matrix runner labels use the
 `github-runners` datasource, Scoop follows upstream `master`, and
 `rebaseWhen = behind-base-branch` matches the strict-behind-main policy.
+Capture the local extract's JSON stdout directly; `LOG_FILE` is optional logger
+transport and did not materialize on a hosted Ubuntu run even though Renovate
+exited 0. An empty successful extraction must fail before inventory comparison.
 
 `tests/static/json_lint.sh` only checks JSON syntax. Its JSONC path strips `//`
 comments with a string-aware Python pass so URL values like `https://...` and
@@ -818,6 +833,11 @@ save only**. The next plain `:w` formats normally. Implemented in
   alias for `--skip-config` / `-SkipConfig`. POSIX dry-run renders temporary
   chezmoi config/expected files and must clean them on failure; Homebrew
   `shellenv` output is evaled only after the `brew shellenv` command succeeds.
+  Empty output is Homebrew's valid idempotent result when its bin/sbin already
+  lead PATH, so setup accepts it only after proving `command -v brew` is the
+  exact selected installation; empty output cannot bootstrap a missing PATH.
+  Failed evaluation or executable proof restores the prior PATH and Homebrew
+  environment variables before printing recovery instructions.
 - `setup.ps1` runs a symlink-privilege pre-flight before chezmoi apply because
   the Windows Neovim target is still a directory symlink: dry-run warns and
   skips the probe; real runs print elevated/Developer Mode state plus the
@@ -1317,7 +1337,9 @@ save only**. The next plain `:w` formats normally. Implemented in
   `install-deps.ps1` verifies the pinned Scoop installer before execution, the
   pinned Hack.zip before registering fonts, the pinned Windows Terminal
   portable zip before extracting the fallback install, the exact compatible
-  Tree-sitter CLI release before transactional publication, and the pinned Herdr
+  Tree-sitter CLI release before transactional publication (including a
+  same-parent stage whose filename still ends in `.exe` so Windows can execute
+  the staged proof), and the pinned Herdr
   Windows preview `.exe` before copying it into `%LOCALAPPDATA%\Programs\Herdr\bin`.
   POSIX helpers that unpack
   into `mktemp -d` install a cleanup trap

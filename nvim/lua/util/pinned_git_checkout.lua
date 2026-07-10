@@ -109,7 +109,19 @@ local function unique_sibling(path, suffix)
   return candidate
 end
 
-function M.locked_commit(lockfile, name)
+local function valid_branch_name(branch)
+  return type(branch) == "string"
+    and branch ~= ""
+    and branch:match("^[%w%._/-]+$") ~= nil
+    and not branch:match("^[-/.]")
+    and not branch:match("[/.]$")
+    and not branch:find("..", 1, true)
+    and not branch:find("//", 1, true)
+    and not branch:find("@{", 1, true)
+    and not branch:match("%.lock$")
+end
+
+function M.locked_identity(lockfile, name)
   local ok, lines = pcall(vim.fn.readfile, lockfile)
   if not ok or type(lines) ~= "table" or #lines == 0 then
     error("required plugin lockfile is missing or empty: " .. lockfile, 0)
@@ -127,7 +139,16 @@ function M.locked_commit(lockfile, name)
   if type(commit) ~= "string" or not commit:match("^[0-9a-fA-F]+$") or #commit ~= 40 then
     error("required plugin lock entry has an invalid 40-hex commit: " .. name, 0)
   end
-  return commit:lower()
+  local branch = lock[name].branch
+  if not valid_branch_name(branch) then
+    error("required plugin lock entry has an invalid branch: " .. name, 0)
+  end
+  return commit:lower(), branch
+end
+
+function M.locked_commit(lockfile, name)
+  local commit = M.locked_identity(lockfile, name)
+  return commit
 end
 
 function M.verify(opts)
@@ -173,6 +194,19 @@ function M.verify(opts)
   head, reason = probe("HEAD probe", "rev-parse", "HEAD")
   if not head or head:lower() ~= expected_commit then
     return false, reason or ("checkout HEAD mismatch: " .. tostring(head))
+  end
+  if opts.branch then
+    local remote_head
+    remote_head, reason = probe("origin HEAD probe", "symbolic-ref", "refs/remotes/origin/HEAD")
+    local expected_ref = "refs/remotes/origin/" .. opts.branch
+    if not remote_head or remote_head ~= expected_ref then
+      return false, reason or ("checkout origin HEAD mismatch: " .. tostring(remote_head))
+    end
+    local remote_commit
+    remote_commit, reason = probe("origin branch probe", "rev-parse", "--verify", expected_ref .. "^{commit}")
+    if not remote_commit or remote_commit:lower() ~= expected_commit then
+      return false, reason or ("checkout origin branch mismatch: " .. tostring(remote_commit))
+    end
   end
   local clean
   clean, reason = probe("cleanliness probe", "status", "--porcelain=v1", "--untracked-files=all")
@@ -226,6 +260,9 @@ function M.ensure(opts)
   if not opts.commit:match("^[0-9a-f]+$") or #opts.commit ~= 40 then
     error("checkout commit must be a full 40-hex identity", 0)
   end
+  if opts.branch ~= nil and not valid_branch_name(opts.branch) then
+    error("checkout branch must be a valid locked branch name", 0)
+  end
 
   local valid = M.verify(opts)
   if valid then
@@ -259,6 +296,15 @@ function M.ensure(opts)
       git_args("-C", stage, "fetch", "--depth", "1", "--filter=blob:none", "origin", opts.commit)
     )
     run_checked(opts, "git checkout locked commit", git_args("-C", stage, "checkout", "--detach", opts.commit))
+    if opts.branch then
+      local remote_ref = "refs/remotes/origin/" .. opts.branch
+      run_checked(opts, "git record locked origin branch", git_args("-C", stage, "update-ref", remote_ref, opts.commit))
+      run_checked(
+        opts,
+        "git record locked origin HEAD",
+        git_args("-C", stage, "symbolic-ref", "refs/remotes/origin/HEAD", remote_ref)
+      )
+    end
 
     local staged_valid, staged_reason = M.verify(vim.tbl_extend("force", opts, { target = stage }))
     if not staged_valid then

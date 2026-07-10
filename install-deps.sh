@@ -235,13 +235,46 @@ homebrew_bin() {
 }
 
 enable_homebrew_for_current_shell() {
-    local brew_bin brew_env
+    local brew_bin brew_env active_brew expected_brew
+    local old_path="$PATH" old_manpath="${MANPATH-}" old_infopath="${INFOPATH-}"
+    local old_prefix="${HOMEBREW_PREFIX-}" old_cellar="${HOMEBREW_CELLAR-}"
+    local old_repository="${HOMEBREW_REPOSITORY-}"
+    local had_manpath="${MANPATH+x}" had_infopath="${INFOPATH+x}"
+    local had_prefix="${HOMEBREW_PREFIX+x}" had_cellar="${HOMEBREW_CELLAR+x}"
+    local had_repository="${HOMEBREW_REPOSITORY+x}"
     brew_bin="$(homebrew_bin)" || return 1
-    if ! brew_env="$("$brew_bin" shellenv)" || [[ -z "$brew_env" ]]; then
-        echo "  FAIL: $brew_bin shellenv did not produce a usable environment; PATH is unchanged" >&2
+    if ! brew_env="$("$brew_bin" shellenv)"; then
+        echo "  FAIL: $brew_bin shellenv failed; PATH is unchanged" >&2
         return 1
     fi
-    eval "$brew_env"
+    # Homebrew intentionally emits no output when its bin/sbin entries are
+    # already first in PATH. Empty stdout is therefore valid only when the
+    # selected brew is already the executable this shell resolves.
+    if [[ -n "$brew_env" ]] && ! eval "$brew_env"; then
+        PATH="$old_path"; export PATH
+        if [[ -n "$had_manpath" ]]; then MANPATH="$old_manpath"; export MANPATH; else unset MANPATH; fi
+        if [[ -n "$had_infopath" ]]; then INFOPATH="$old_infopath"; export INFOPATH; else unset INFOPATH; fi
+        if [[ -n "$had_prefix" ]]; then HOMEBREW_PREFIX="$old_prefix"; export HOMEBREW_PREFIX; else unset HOMEBREW_PREFIX; fi
+        if [[ -n "$had_cellar" ]]; then HOMEBREW_CELLAR="$old_cellar"; export HOMEBREW_CELLAR; else unset HOMEBREW_CELLAR; fi
+        if [[ -n "$had_repository" ]]; then HOMEBREW_REPOSITORY="$old_repository"; export HOMEBREW_REPOSITORY; else unset HOMEBREW_REPOSITORY; fi
+        hash -r 2>/dev/null || true
+        echo "  FAIL: $brew_bin shellenv output could not be evaluated; the prior environment was restored. Repair Homebrew and retry." >&2
+        return 1
+    fi
+    hash -r 2>/dev/null || true
+    active_brew="$(command -v brew 2>/dev/null || true)"
+    expected_brew="$(real_source_path "$brew_bin")"
+    if [[ -z "$active_brew" ]] || [[ "$(real_source_path "$active_brew")" != "$expected_brew" ]]; then
+        PATH="$old_path"; export PATH
+        if [[ -n "$had_manpath" ]]; then MANPATH="$old_manpath"; export MANPATH; else unset MANPATH; fi
+        if [[ -n "$had_infopath" ]]; then INFOPATH="$old_infopath"; export INFOPATH; else unset INFOPATH; fi
+        if [[ -n "$had_prefix" ]]; then HOMEBREW_PREFIX="$old_prefix"; export HOMEBREW_PREFIX; else unset HOMEBREW_PREFIX; fi
+        if [[ -n "$had_cellar" ]]; then HOMEBREW_CELLAR="$old_cellar"; export HOMEBREW_CELLAR; else unset HOMEBREW_CELLAR; fi
+        if [[ -n "$had_repository" ]]; then HOMEBREW_REPOSITORY="$old_repository"; export HOMEBREW_REPOSITORY; else unset HOMEBREW_REPOSITORY; fi
+        hash -r 2>/dev/null || true
+        echo "  FAIL: $brew_bin shellenv did not activate the selected Homebrew executable; the prior environment was restored. Remove the PATH shadow and retry." >&2
+        return 1
+    fi
     enable_homebrew_make_gnubin_for_current_shell "$brew_bin" || true
     hash -r 2>/dev/null || true
 }

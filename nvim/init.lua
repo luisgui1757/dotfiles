@@ -10,17 +10,20 @@ end
 
 local pinned_checkout = require("util.pinned_git_checkout")
 local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
-local lazy_commit = pinned_checkout.locked_commit(config_dir() .. "/lazy-lock.json", "lazy.nvim")
+local lockfile = config_dir() .. "/lazy-lock.json"
+local lazy_commit, lazy_branch = pinned_checkout.locked_identity(lockfile, "lazy.nvim")
 pinned_checkout.ensure({
   target = lazypath,
   url = "https://github.com/folke/lazy.nvim.git",
   commit = lazy_commit,
+  branch = lazy_branch,
   required_file = "lua/lazy/init.lua",
 })
 vim.opt.rtp:prepend(lazypath)
 
 require("vim-options")
 require("lazy").setup({
+  lockfile = lockfile,
   spec = { { import = "plugins" } },
   change_detection = { notify = false },
   performance = {

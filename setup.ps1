@@ -105,8 +105,9 @@ function Get-WindowsLocalApplicationData {
 }
 
 function Get-ScoopRoot {
+    param([scriptblock]$ProfileRootResolver = { Get-DefaultProfileRoot })
     if (-not [string]::IsNullOrWhiteSpace($env:SCOOP)) { return $env:SCOOP }
-    $profileRoot = Get-DefaultProfileRoot
+    $profileRoot = [string](& $ProfileRootResolver)
     if ([string]::IsNullOrWhiteSpace($profileRoot)) { return '' }
     return (Join-Path $profileRoot 'scoop')
 }
@@ -116,8 +117,9 @@ $DefaultDest = Join-Path (Get-DefaultProfileRoot) 'dotfiles'
 # Rebuild PATH from registry values plus Scoop shims, then de-duplicate.
 # This differs from setup.sh, which evaluates brew shellenv and appends Unix bin dirs.
 function Update-RuntimePath {
+    param([scriptblock]$ProfileRootResolver = { Get-DefaultProfileRoot })
     $parts = @()
-    $scoopRoot = Get-ScoopRoot
+    $scoopRoot = Get-ScoopRoot -ProfileRootResolver $ProfileRootResolver
     if (-not [string]::IsNullOrWhiteSpace($scoopRoot)) {
         $shimDir = Join-Path $scoopRoot 'shims'
         if (Test-Path -LiteralPath $shimDir) {
@@ -921,7 +923,7 @@ function Get-RealExistingPath {
     if ($null -eq $item) { return $null }
 
     $linkType = if ($item.PSObject.Properties.Name -contains 'LinkType') { $item.LinkType } else { $null }
-    if ($linkType -eq 'SymbolicLink') {
+    if ($linkType -in @('SymbolicLink', 'Junction')) {
         $linkTarget = @($item.Target)[0]
         if ($linkTarget) {
             if (-not [IO.Path]::IsPathRooted($linkTarget)) {

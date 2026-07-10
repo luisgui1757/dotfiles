@@ -960,9 +960,14 @@ Describe "install-deps.ps1" {
         $script:TreeSitterPathPublished = $false
         try {
             $env:DOTFILES_LOCAL_APP_DATA_OVERRIDE = $localAppData
+            $script:TreeSitterValidatedPaths = @()
             Mock -CommandName Get-TreeSitterCliVersion -MockWith {
                 param([string]$Path)
-                if (-not [string]::IsNullOrWhiteSpace($Path)) { return '0.26.10' }
+                if (-not [string]::IsNullOrWhiteSpace($Path)) {
+                    $script:TreeSitterValidatedPaths += $Path
+                    if ([IO.Path]::GetExtension($Path) -ne '.exe') { return '' }
+                    return '0.26.10'
+                }
                 if ($script:TreeSitterPathPublished) { return '0.26.10' }
                 return '0.25.0'
             }
@@ -983,6 +988,7 @@ Describe "install-deps.ps1" {
             $output | Should -Match 'installed\s+tree-sitter\s+v0\.26\.10'
             [System.IO.File]::ReadAllText($target) | Should -Be 'exact executable'
             @(Get-ChildItem -LiteralPath $installRoot -Filter '.tree-sitter.exe.*' -Force).Count | Should -Be 0
+            @($script:TreeSitterValidatedPaths | Where-Object { [IO.Path]::GetExtension($_) -ne '.exe' }).Count | Should -Be 0
             $script:InstallFailures.Count | Should -Be 0
             Should -Invoke -CommandName Invoke-WebRequest -Times 1 -Exactly
         } finally {

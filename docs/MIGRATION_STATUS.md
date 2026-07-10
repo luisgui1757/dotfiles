@@ -207,12 +207,24 @@ broken repo-symlink still cleaned) is covered by
 - [x] Packaged, Preview, and portable Windows Terminal target discovery follows
       actual LocalApplicationData. Each existing target is an independent merge
       and recovery transaction; none is mirrored from another installation.
+- [x] Windows known-folder post-apply and legacy-shape ownership checks resolve
+      both symbolic links and junctions before comparing canonical targets. The
+      cross-platform Windows test job installs the exact checksum-pinned
+      chezmoi release so expected-drift tests execute instead of skipping.
+- [x] Lazy's detached executable bootstrap now proves locked default-branch
+      metadata anchored to the same immutable commit. This preserves fail-closed
+      execution while allowing Lazy's own lock writer to identify its branch.
 
 ### Open
 
 - [ ] Intel macOS runtime confirmation is pending the exact PR-head
       `macos-26-intel` Nix/setup runs. Both configurations cross-evaluate and
       setup selection is behaviorally tested, but those are not runtime proof.
+- [ ] Nixpkgs 26.05 is the final `x86_64-darwin` release and is supported only
+      through 2026-12-31. Before that date, migrate Intel's package plane to a
+      still-supported mechanism without narrowing the public macOS contract or
+      moving chezmoi-owned dotfiles into the package layer. The warning remains
+      intentionally unsuppressed.
 
 - [ ] Greenfield evidence remains intentionally sparse: `tests/greenfield/LEDGER.md`
       still records no Windows Sandbox, WSL, macOS VM, or Linux VM clean-machine
