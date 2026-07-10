@@ -140,8 +140,11 @@ broken repo-symlink still cleaned) is covered by
 - [x] Fresh Linux/WSL zsh startup consumes Home Manager's canonical session-vars
       file once from the XDG profile, `~/.nix-profile`, or the
       system-integrated `/etc/profiles/per-user/<effective-user>` profile, with
-      no-Nix hosts guarded. Brew-less macOS dry-run now previews all later
-      phases instead of aborting after the bootstrap plan.
+      no-Nix hosts guarded. Standalone Linux sets `home.sessionPath` from the
+      evaluated Home Manager profile directory, so the sourced file exports
+      Nix-owned tools without caller PATH injection. Brew-less macOS dry-run
+      now previews all later phases instead of aborting after the bootstrap
+      plan.
 
 - [x] Windows `nvim` directory-symlink round-trip is fixed in commit `eed6690`.
       The Windows template renders a clean, backslash, no-`..` absolute path
@@ -218,6 +221,12 @@ broken repo-symlink still cleaned) is covered by
 - [x] Lazy's detached executable bootstrap now proves locked default-branch
       metadata anchored to the same immutable commit. This preserves fail-closed
       execution while allowing Lazy's own lock writer to identify its branch.
+- [x] Native `windows-2025` public setup passed on PR head
+      `0c853d066362602f14dc251a6d3fbf3980102048` (run `29090161175`): all six
+      phases, exact Tree-sitter `0.26.10`, Hack Nerd Font file and registry
+      consumption, Pi `0.80.3`, and the strict 257-check Neovim language smoke.
+      This does not close the redirected-folder or dual-Windows-Terminal manual
+      rows below.
 
 ### Open
 

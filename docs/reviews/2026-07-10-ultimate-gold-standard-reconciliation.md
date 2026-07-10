@@ -563,3 +563,75 @@ pushed exact-head runs or manual environments.
   contains this entry. WSL, redirected Windows known folders, desktop GUI
   behavior, and live Renovate ownership remain separate manual/live evidence
   requirements; no cache-backed or static result is promoted to those claims.
+
+## Generic Ubuntu clangd runtime dependency — entry 17
+
+- Exact head `0c853d066362602f14dc251a6d3fbf3980102048`, run
+  `29090161177`, job `86353322008`, passed install, static, Renovate,
+  shellcheck, shell, Starship, and tmux phases. Neovim then passed the locked
+  bootstrap and checked-delete specs but failed the two-project clangd spec at
+  its explicit real-binary precondition: `vim.fn.executable("clangd") == 0`.
+- This disproves neither the per-client clangd implementation nor its local
+  runtime result. It proves the generic Ubuntu lane omitted the real runtime
+  dependency, so it could not own the claimed cross-platform proof.
+- The Ubuntu lane now installs the distro `clangd` package before Neovim tests.
+  `clangd_runtime_ci_test.sh` binds that provisioning to the spec's real-binary
+  and distinct-client assertions. Static/focused local results follow in the
+  implementation commit; hosted runtime confirmation remains pending a rerun.
+
+## Canonical Home Manager session path — entry 18
+
+- Exact head `0c853d066362602f14dc251a6d3fbf3980102048`, run
+  `29090161175`, job `86353321538`, completed Home Manager activation and all
+  six setup phases without a setup `FAIL:` marker. Its post-install clean
+  `env -i ... zsh -l -i -c 'command -v rg'` assertion still failed.
+- The pinned Home Manager source evaluates `home.profileDirectory` to
+  `/home/runner/.nix-profile`, but this repository evaluated
+  `home.sessionPath` to `[]`. Therefore the canonical `hm-session-vars.sh`
+  existed yet did not export the profile `bin`; adding another lookup path in
+  zsh could not make `rg` resolvable from a caller-stripped PATH.
+- Standalone Linux Home Manager now sets `home.sessionPath` to the evaluated
+  `home.profileDirectory/bin`. This keeps chezmoi as the only zshrc owner while
+  making Home Manager's canonical session-vars file carry its own package path.
+  Both Linux architecture evaluations assert the exact relationship. Hosted
+  clean-login confirmation remains pending the next run.
+
+## Hosted AeroSpace proof boundary and Intel Pi path — entry 19
+
+- Exact head `0c853d066362602f14dc251a6d3fbf3980102048`, run
+  `29090161175`: Apple Silicon completed setup and reached only the AeroSpace
+  query, which returned no config path; Intel completed setup but failed earlier
+  because the separate post-install shell omitted `~/.local/bin`, where the
+  verified Pi tarball installation had published `pi` successfully.
+- The pinned AeroSpace cask is `0.21.1-Beta`. Its tag peels to upstream commit
+  `cfd4eab235b254ff5f1a1b9180a3997ae060162a`; that exact source calls
+  `waitForAccessibilityPermission_nonCancellable()` before both user-config
+  parsing and `startUnixSocketServer()`. The wait loop exits only after
+  `AXIsProcessTrusted*` succeeds. Therefore a headless hosted launch cannot
+  validate config consumption and must not be represented as runtime proof.
+- Hosted macOS now invokes the installed app and CLI and requires their
+  version/hash identities to agree, then prints an explicit `UNAVAILABLE`
+  classification for TCC-backed config consumption. The real managed-path and
+  warning-as-error reload checks remain in `tests/MANUAL.md` for a user-granted
+  desktop session. Ghostty and WezTerm retain their real binary config checks.
+- The post-install shell now prepends `~/.local/bin`, matching the managed zsh
+  consumer path, before validating verified user-local artifacts such as Pi.
+  `macos_gui_runtime_ci_test.sh` rejects both the old false AeroSpace claim and
+  future loss of the consumer path. Exact hosted confirmation remains pending.
+
+## Native Windows exact-head result — entry 20
+
+- Exact head `0c853d066362602f14dc251a6d3fbf3980102048`, run
+  `29090161175`, job `86353321527`, and its stable logical proof job both
+  passed on `windows-2025`.
+- The public setup completed phases 1-6 and emitted no `FAIL:` marker. Runtime
+  assertions accepted the checksum-verified Tree-sitter `0.26.10` release
+  artifact, installed Hack Nerd Font files and found their application-visible
+  registry registration, accepted Pi `0.80.3`, restored Lazy, built the parser
+  set, synchronized Mason, verified Polaris, and completed the strict
+  257-check Neovim LSP/parser/formatter smoke.
+- This is native Windows hosted proof for those conventional-path assertions.
+  It is not a redirected Documents/LocalApplicationData run, a divergent
+  packaged-plus-portable Windows Terminal transaction/uninstall run, or manual
+  desktop GUI proof. Those residuals remain open and are not inferred from the
+  green job.

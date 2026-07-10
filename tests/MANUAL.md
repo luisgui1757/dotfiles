@@ -69,6 +69,14 @@ significant change to the relevant area.
       for Accessibility — grant it (System Settings -> Privacy & Security ->
       Accessibility -> AeroSpace ON). Confirm AeroSpace starts at login
       (`start-at-login = true`) and tiles windows.
+- [ ] **AeroSpace managed-config consumption**, macOS with the TCC grant above:
+      run `aerospace config --config-path` and confirm its resolved path is the
+      chezmoi-managed `~/.config/aerospace/aerospace.toml` target and its bytes
+      match `aerospace/aerospace.toml`. Then run
+      `aerospace reload-config --no-gui --dry-run --warnings-as-errors` and
+      require exit 0 with no diagnostics. This remains manual because the app
+      waits for Accessibility before parsing user config or starting its CLI
+      server; a GitHub-hosted macOS runner has no user-granted TCC session.
 - [ ] **AeroSpace reserved-chord safety**, macOS: with AeroSpace running, open a
       terminal + nvim. `ctrl-alt-h/j/k/l` moves WM focus between windows;
       **bare `Alt-h/j/k/l` still reaches nvim** (window nav) and is NOT captured

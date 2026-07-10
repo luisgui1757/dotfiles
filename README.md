@@ -161,7 +161,9 @@ ref. WSL writes only to the Linux `~/.nix-profile`, never `/mnt/c`. Fresh
 Linux/WSL zsh sessions source Home Manager's canonical `hm-session-vars.sh`
 from the XDG Nix profile, `~/.nix-profile`, or the system-integrated
 `/etc/profiles/per-user/<effective-user>` profile, in that order, so Nix-owned
-tools resolve without caller-injected PATH state.
+tools resolve without caller-injected PATH state. The standalone Linux Home
+Manager configuration places its evaluated profile `bin` in
+`home.sessionPath`, which makes `hm-session-vars.sh` export the path itself.
 `--skip-deps` is the explicit already-provisioned escape hatch and skips the
 Nix package-layer application together with native/deferred dependency installs;
 the compatibility aliases `--nix-darwin` and `--home-manager` do not override
@@ -696,7 +698,7 @@ The e2e jobs cover different install paths, not symmetric container platforms:
 |---|---|
 | `e2e containers / ubuntu-24.04` | Clean `ubuntu:24.04`, non-root user, native `apt`, no Linuxbrew (`DOTFILES_SKIP_BREW_BOOTSTRAP=1`), then `install-deps.sh --all`, chezmoi config apply, executable/version probes including `zoxide`, `gh`, WezTerm, Herdr, Neovim >= 0.12, lazygit, zsh plugin files, config content assertions, and nvim directory realpath assertion. This is the native installer regression fixture, not the Nix-backed public POSIX package-plane proof; it does not assert Pi CLI because Node 24 comes from the Nix package layer. |
 | `setup.sh / ubuntu-24.04` | Full public Unix setup on the hosted Ubuntu runner after installing Nix in CI: Home Manager first, a clean login/interactive zsh PATH proof, then native/deferred installs, chezmoi, Lazy, Tree-sitter, Mason, and Polaris. |
-| `setup.sh / macos-26` | Full public Apple Silicon setup through the hosted runner: architecture-matched nix-darwin/declarative Homebrew, native/deferred installs, real Ghostty/WezTerm/AeroSpace config consumption, chezmoi, Lazy, Tree-sitter, Mason, and Polaris. The hosted runner alone gets the cleanup override; real hosts keep `cleanup = "check"`. |
+| `setup.sh / macos-26` | Full public Apple Silicon setup through the hosted runner: architecture-matched nix-darwin/declarative Homebrew, native/deferred installs, real Ghostty/WezTerm config consumption, installed AeroSpace app/CLI identity agreement, chezmoi, Lazy, Tree-sitter, Mason, and Polaris. AeroSpace waits for a user-granted Accessibility permission before parsing user config or starting its CLI server, so managed-config consumption remains explicit TCC-enabled desktop proof in `tests/MANUAL.md`; hosted CI does not pretend to prove it. The hosted runner alone gets the cleanup override; real hosts keep `cleanup = "check"`. |
 | `setup.sh / macos-26-intel` | Additional non-required real Intel setup lane with the same full assertions. Its YAML presence is not evidence; only an actual run is. |
 | `setup.ps1 / windows-2025` | Full Windows setup through the real Windows hosted runner, including Scoop/winget/choco behavior, PowerShell, symlinks, Hack Nerd Font file/registry consumption, `zoxide`/`gh`/WezTerm/Herdr/Pi CLI command probes, and Neovim restore/sync phases. Windows containers do not model the desktop/user-profile setup well. |
 | `setup.sh / WSL2 Ubuntu-24.04 (canary)` | Non-required scheduled/manual WSL smoke signal in `.github/workflows/wsl2-canary.yml`. Hosted runners cannot provide a reliable required nested-virtualization WSL2 gate. The canary disables the WSL distro cache, installs Ubuntu's `nix-bin`, enables flakes, then runs the enforced Home Manager setup path; failures stay visible and do not muddy the required e2e signal. |

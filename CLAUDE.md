@@ -404,7 +404,9 @@ For clangd, do not calculate a process-wide `--compile-commands-dir` from
 Neovim's startup cwd. Let each client discover `compile_commands.json` from its
 actual file/project ancestors (including `build/`).
 `clangd_projects_spec.lua` starts two real clients with different databases in
-one Neovim process and requires isolated roots, flags, and diagnostics.
+one Neovim process and requires isolated roots, flags, and diagnostics. The
+generic Ubuntu test lane installs the distro `clangd` package explicitly; the
+spec fails when the real binary is absent rather than substituting static proof.
 
 > **Headless-install gotcha:** `mason-tool-installer` is `event = "VeryLazy"`
 > (interactive auto-install via `run_on_start`) **and** registers its commands
@@ -683,9 +685,13 @@ major; `tests/static/repo_policy_test.sh` enforces this.
   (`zoxide`, `gh`, `wezterm`, `herdr`, `pi`), so an installer that exits 0 but fails
   its command probe cannot fake-green. Windows also requires Hack Nerd Font
   files plus registry registration. The macOS jobs run Ghostty's real
-  `+validate-config`, WezTerm's real config-loading `show-keys` path, and launch
-  then query AeroSpace to prove the app consumed the managed config. This is
-  automated runtime proof, not manual desktop visual proof. Scheduled/manual
+  `+validate-config` and WezTerm's real config-loading `show-keys` path. They
+  also invoke the installed AeroSpace app and CLI binaries and require their
+  version/hash identities to agree. AeroSpace itself waits for a user-granted
+  Accessibility permission before it parses user config or starts the CLI
+  server, so hosted CI reports config-consumption proof unavailable and leaves
+  that exact TCC-enabled desktop check in `tests/MANUAL.md`; it must not claim
+  runtime config proof from a headless launch. Scheduled/manual
   clean-install runs skip broad install/plugin caches; PR runs retain
   architecture-keyed caches.
   must assert `%LOCALAPPDATA%\lazygit\config.yml`
@@ -1738,7 +1744,10 @@ host prerequisite.
   never `/mnt/c` — split-host preserved. Managed zsh sources Home Manager's
   canonical session-vars file once from the XDG profile, `~/.nix-profile`, or
   `/etc/profiles/per-user/<effective-user>` in that order, so standalone and
-  system-integrated profiles work while no-Nix hosts remain harmless.
+  system-integrated profiles work while no-Nix hosts remain harmless. The
+  standalone Linux configuration sets `home.sessionPath` to its evaluated
+  `home.profileDirectory/bin`, so that canonical file—not caller PATH
+  injection—exports the Nix-owned CLI path.
   First-run bootstrap likewise uses
   `github:nix-community/home-manager/<locked-rev>?narHash=<encoded-narHash>#home-manager`
   from `flake.lock`, not a mutable registry alias. **Native install-deps arms are

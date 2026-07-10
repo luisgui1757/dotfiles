@@ -149,6 +149,10 @@ Commit-by-commit status:
   Linux/macOS/Windows e2e gates assert the command. AeroSpace TCC /
   Accessibility and Herdr interactive-session behavior remain
   manual-verification-pending in `tests/MANUAL.md`.
+  Hosted macOS additionally proves the real AeroSpace app and CLI binaries have
+  one version/hash identity, but does not call that config-consumption proof:
+  the pinned app waits for the user's Accessibility grant before parsing the
+  managed file or starting its CLI server.
 - **Commit 4 - Nix skeleton — DONE.** `flake.nix` + committed `flake.lock`
   (zero ownership), devShell + `checks`, `nix flake check` CI on Ubuntu + macOS,
   Renovate `nix` manager, disjointness static tests.
@@ -301,6 +305,32 @@ Commit-by-commit status:
   the main source apply without non-portable absolute target selectors. Hosted
   confirmation remains pending a newer exact head. No workflow definition is
   recorded as runtime proof.
+
+- **Exact-head runtime dependency follow-up — FIXED LOCALLY, HOSTED RERUN
+  PENDING.** Head `0c853d066362602f14dc251a6d3fbf3980102048`
+  reached the real two-project clangd spec on Ubuntu and failed closed because
+  the generic test lane had never installed `clangd`; all preceding Neovim
+  specs passed. The lane now installs Ubuntu's distro clangd and a static
+  contract test binds that provisioning to the real-client spec. Only the next
+  hosted run can promote the runtime result to passed.
+
+- **Exact-head Home Manager session-path follow-up — FIXED LOCALLY, HOSTED
+  RERUN PENDING.** Head `0c853d066362602f14dc251a6d3fbf3980102048`
+  proved that merely finding `hm-session-vars.sh` was insufficient: the pinned
+  standalone configuration had an empty `home.sessionPath`, so its generated
+  file could not put profile-owned `rg` on a clean shell PATH. Linux Home
+  Manager now exports its evaluated `home.profileDirectory/bin` through
+  `home.sessionPath`; both architecture evaluations bind the exact value.
+
+- **Exact-head native Windows setup — PASSED.** Head
+  `0c853d066362602f14dc251a6d3fbf3980102048`, run `29090161175`, completed
+  all six public setup phases and the required post-install checks on
+  `windows-2025`. It installed and validated the exact Tree-sitter `0.26.10`
+  release artifact, installed Hack Nerd Font files and proved registry
+  registration, validated Pi `0.80.3`, restored plugins/parsers/Mason, and
+  passed the strict 257-check LSP/parser/formatter smoke. This is real native
+  Windows hosted evidence, not redirected-known-folder, divergent Windows
+  Terminal, uninstall-restoration, or desktop visual proof.
 
 - **Intel Darwin package-plane sunset — OPEN, deadline 2026-12-31.** Nixpkgs
   26.05 is the final supported `x86_64-darwin` release; 26.11 removes package

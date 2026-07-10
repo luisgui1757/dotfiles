@@ -161,6 +161,11 @@ jobs:
           for p in /nix/var/nix/profiles/default /run/current-system/sw ${nix_user:+"/etc/profiles/per-user/$nix_user"} "$HOME/.nix-profile" "$HOME/.local/state/nix/profile"; do
             [ -d "$p/bin" ] && PATH="$p/bin:$PATH"
           done
+          # install-deps publishes verified user-local artifacts (including Pi)
+          # here. A new managed zsh prepends the same consumer path; this CI
+          # step is a separate non-login shell and must model it explicitly.
+          [ ! -d "$HOME/.local/bin" ] || PATH="$HOME/.local/bin:$PATH"
+          export PATH
           fail() { echo "FAIL: $*" >&2; exit 1; }
           assert_file_content() {
             local path="$1" expected="$2"
@@ -266,18 +271,20 @@ jobs:
               || fail "AeroSpace.app is missing after setup.sh --all requested it"
             command -v herdr >/dev/null 2>&1 || fail "herdr is not on PATH after setup.sh --all requested it"
             command -v aerospace >/dev/null 2>&1 || fail "AeroSpace CLI is missing after cask installation"
-            open -gja AeroSpace || fail "AeroSpace app could not be launched for config validation"
-            aerospace_config=""
-            for _ in 1 2 3 4 5 6 7 8 9 10; do
-              aerospace_config="$(aerospace config --config-path 2>/dev/null || true)"
-              [[ -n "$aerospace_config" ]] && break
-              sleep 1
-            done
-            [[ -n "$aerospace_config" ]] || fail "AeroSpace did not expose its loaded config path"
-            aerospace_config_real="$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$aerospace_config")"
-            [[ "$aerospace_config_real" == "$repo/aerospace/aerospace.toml" ]] \
-              || fail "AeroSpace loaded $aerospace_config instead of the managed config"
-            osascript -e 'tell application "AeroSpace" to quit' >/dev/null 2>&1 || true
+            if [[ -x /Applications/AeroSpace.app/Contents/MacOS/AeroSpace ]]; then
+              aerospace_app_bin=/Applications/AeroSpace.app/Contents/MacOS/AeroSpace
+            else
+              aerospace_app_bin="$HOME/Applications/AeroSpace.app/Contents/MacOS/AeroSpace"
+            fi
+            [[ -x "$aerospace_app_bin" ]] || fail "AeroSpace app executable is missing"
+            aerospace_app_identity="$("$aerospace_app_bin" --version)" \
+              || fail "AeroSpace app identity probe failed"
+            aerospace_cli_identity="$(aerospace --version 2>&1)" \
+              || fail "AeroSpace CLI identity probe failed"
+            printf '%s\n' "$aerospace_cli_identity" \
+              | grep -F "aerospace CLI client version: $aerospace_app_identity" >/dev/null \
+              || fail "AeroSpace app and CLI identities differ"
+            echo "UNAVAILABLE: AeroSpace config-consumption runtime proof requires a user-granted Accessibility (TCC) desktop session; GitHub-hosted macOS cannot provide that grant. See tests/MANUAL.md."
           elif [[ "${RUNNER_OS:-}" == "Linux" ]]; then
             command -v wezterm >/dev/null 2>&1 || fail "wezterm is not on PATH after setup.sh --all requested it"
             command -v herdr >/dev/null 2>&1 || fail "herdr is not on PATH after setup.sh --all requested it"
