@@ -294,6 +294,18 @@ that violates one of these, fix it instead of disabling the test.
       `tests/shell/install_deps_update_test.sh` (which also proves update mode
       never shells out to `nix` for an owned tool) and the "no blanket nix
       upgrade / silent flake.lock rewrite" check in `nix_architecture_test.sh`.
+23. **Executable plugin caches are proved before runtime use.** Production
+    `lazy.nvim` and the Plenary test bootstrap both use
+    `nvim/lua/util/pinned_git_checkout.lua`. A full 40-hex lock entry is a hard
+    precondition before network access. An existing cache is accepted only
+    after proving a usable Git worktree, the expected origin, exact locked HEAD,
+    a clean tracked/untracked state, and the required Lua entrypoint. Repairs
+    fetch the locked commit into a same-parent staging checkout under an atomic
+    lock, verify it, preserve the previous checkout until publication succeeds,
+    and clean lock/staging state on failure. Runtimepath mutation and
+    `require("lazy")` occur only after that proof. Guarded behaviorally by
+    `tests/nvim/spec/pinned_git_checkout_spec.lua`; do not replace this with
+    grep-only evidence or a mutable `git clone` directly into the live cache.
 
 ## Common workflows
 
@@ -437,6 +449,12 @@ the exception: it preclones the locked plugin checkouts into its isolated cache
 instead of invoking Lazy install/restore, because restore runs plugin build hooks
 and nvim-treesitter's `:TSUpdate` build starts compiler work that can outlive the
 prewarm child and pollute the startup measurement.
+
+A missing, empty, malformed, incomplete, or non-40-hex lock entry is fatal
+before any plugin fetch or execution. If a cache is dirty, at the wrong commit,
+from the wrong origin, not a Git repository, or missing its required entrypoint,
+startup repairs it transactionally from the locked identity. Do not hand-edit a
+live cache to recover; fix/restore `nvim/lazy-lock.json` and restart Neovim.
 
 ### Update Mason-installed tools across machines
 

@@ -1061,6 +1061,7 @@ MIT. See `LICENSE`.
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
+| Neovim stops before loading Lazy with a lockfile/cache identity error | `lazy-lock.json` is missing, malformed, incomplete, or non-40-hex; or the cached `lazy.nvim` checkout is dirty, at the wrong commit, from the wrong origin, non-Git, or partial | restore the tracked `nvim/lazy-lock.json` and restart Neovim. Startup repairs the cache through a verified staging checkout and never executes an unproved path. If publication fails, fix the destination permissions named in the error and retry |
 | `<leader>X` keymaps fire `\X` instead of `<Space>X` | mapleader set after lazy.setup somehow | restore the order in `nvim/init.lua` — leader **before** `require("lazy").setup` |
 | Formatter runs twice or shows two BufWritePre autocmds | someone added a second handler outside conform.nvim | `:lua print(#vim.api.nvim_get_autocmds({event="BufWritePre"}))` should be 1; if not, find the second autocmd and delete it |
 | Lazy/Tree-sitter/Mason says `No C compiler found` | WSL/Linux has `make` but no `cc`/`gcc`/`clang`; Tree-sitter parsers and some plugin builds compile native code | re-run `./setup.sh --skip-config` to install the Linux compiler toolchain, or on Ubuntu run `sudo apt-get update && sudo apt-get install -y build-essential`, then `./setup.sh --skip-deps --skip-config` |

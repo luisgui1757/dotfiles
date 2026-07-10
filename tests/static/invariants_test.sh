@@ -141,13 +141,16 @@ for stale in mason-lspconfig.nvim none-ls.nvim CopilotChat.nvim copilot.vim nui.
     fi
 done
 
-if ! grep -q 'lazy-lock\.json' nvim/init.lua \
-    || ! grep -q 'locked_plugin_commit("lazy.nvim")' nvim/init.lua \
-    || ! grep -q '"checkout", "--detach", lazy_commit' nvim/init.lua; then
-    echo "FAIL: lazy.nvim bootstrap must pin itself to nvim/lazy-lock.json"
+if [[ ! -f nvim/lua/util/pinned_git_checkout.lua \
+    || ! -f tests/nvim/spec/pinned_git_checkout_spec.lua ]] \
+    || ! grep -q 'pinned_checkout.locked_commit.*"lazy.nvim"' nvim/init.lua \
+    || ! grep -q 'pinned_checkout.ensure' nvim/init.lua \
+    || ! grep -q 'required_file = "lua/lazy/init.lua"' nvim/init.lua \
+    || grep -q 'git.*clone' nvim/init.lua; then
+    echo "FAIL: lazy.nvim bootstrap must use the behavioral fail-closed pinned checkout helper"
     fail=1
 else
-    echo "ok  : lazy.nvim bootstrap is lockfile-pinned"
+    echo "ok  : lazy.nvim bootstrap uses behavioral lock/origin/HEAD/cleanliness proof"
 fi
 
 if lazy_sync_hits=$(grep -rnF '+Lazy! sync' \
@@ -161,13 +164,14 @@ else
     echo "ok  : setup and validation paths restore lazy-lock.json instead of syncing upstream"
 fi
 
-if ! grep -q 'lazy-lock\.json' tests/nvim/minimal_init.lua \
-    || ! grep -q 'locked_plugin_commit("plenary.nvim")' tests/nvim/minimal_init.lua \
-    || ! grep -q '"checkout", "--detach", plenary_commit' tests/nvim/minimal_init.lua; then
-    echo "FAIL: plenary test harness must pin itself to nvim/lazy-lock.json"
+if ! grep -q 'pinned_checkout.locked_commit.*"plenary.nvim"' tests/nvim/minimal_init.lua \
+    || ! grep -q 'pinned_checkout.ensure' tests/nvim/minimal_init.lua \
+    || ! grep -q 'required_file = "lua/plenary/init.lua"' tests/nvim/minimal_init.lua \
+    || grep -q 'git.*clone' tests/nvim/minimal_init.lua; then
+    echo "FAIL: plenary test harness must use the behavioral fail-closed pinned checkout helper"
     fail=1
 else
-    echo "ok  : plenary test harness is lockfile-pinned"
+    echo "ok  : plenary test harness uses the shared pinned checkout proof"
 fi
 
 if ! grep -Fq -- "-path './tests/.cache'" tests/static/editorconfig_check.sh \

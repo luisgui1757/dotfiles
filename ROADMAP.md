@@ -1,7 +1,8 @@
 # Dotfiles Roadmap
 
-Last audited: 2026-07-09 on branch `fix/gold-standard-gap-close-2026-07-09`.
-Baseline: `main` at `6380d8a49d7f9586ea0225116cae2143d5c57d38`.
+Last audited: 2026-07-10 on branch
+`fix/ultimate-gold-standard-close-2026-07-10`.
+Baseline: `main` at `85375b2bdec9d3a998e8023a44b41d03a32f3eaa`.
 
 This is the adversarial post-merge roadmap for the chezmoi migration and the
 current setup/CI surface. The goal is not "good enough"; the repo should have a
@@ -228,21 +229,27 @@ Commit-by-commit status:
   `dist.integrity`. POSIX public setup gets Node 24 from the enforced Nix package
   layer; Windows uses the native Node LTS catalog path. `.pi/` runtime state
   remains local and unsynced.
-- **Gold-standard gap close — IN PROGRESS (2026-07-09, PR #46).** Accepted
+- **Gold-standard gap close — DONE (2026-07-09, PR #46).** Accepted
   install failures record and force nonzero setup/update exits; stdin/no-script-path
   setup fails closed with clone-first instructions instead of clone-and-reinvoke;
   the VS Build Tools bootstrapper must pass Authenticode Microsoft signer/chain
   verification before execution; the WSL2 canary is split into a non-required
   scheduled/manual workflow; required-check sources align with `macos-26` and
   Nix contexts; Renovate custom-manager coverage and pin-consistency guards cover
-  the current mirrored/manual-reviewed pin surface. Remaining completion gate:
-  PR #46 live required checks must be green, and the owner must apply the
-  checked-in safeguards live for context-renaming changes.
+  the current mirrored/manual-reviewed pin surface. PR #46 merged as
+  `85375b2bdec9d3a998e8023a44b41d03a32f3eaa`; all twelve required checks passed,
+  and checked-in/live required contexts were verified aligned afterward.
+
+- **Ultimate gold-standard closure — IN PROGRESS (2026-07-10).** UGR-003 is
+  implemented: Lazy and Plenary require a valid full lock identity and prove
+  origin, exact HEAD, cleanliness, worktree usability, and required files before
+  runtimepath mutation. Repair is locked, staged, verified, and rollback-safe;
+  behavioral coverage replaces the former grep-only claim.
 
 ### P2 Follow-up: Secondary Supply-chain Hardening
 
-Deferred from the 2026-07-09 gold-standard batch to avoid destabilizing the
-primary installer/CI fixes in the same branch:
+Reconciled by the 2026-07-10 ultimate closure branch; each item is marked DONE
+only with its implementation, tests, and documentation:
 
 1. **Pi CLI verified tarball install**: replace request-A / install-request-B with
    `npm pack`, verify the tarball integrity against `PI_CLI_INTEGRITY` /
