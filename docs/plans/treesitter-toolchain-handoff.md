@@ -7,6 +7,17 @@ with an explicit synchronous Tree-sitter parser install phase, the sync path
 requires the waitable `nvim-treesitter` install task to return `true`, and the
 current canonical contract lives in `CLAUDE.md` plus `README.md`.
 
+**2026-07-10 cache-free correction:** merged-main workflow-dispatch run
+`29096335827` disproved the historical assumption that Phase 4 alone made the
+boundary safe. Lazy's command-form `build = ":TSUpdate"` returned before its
+compiler tasks finished, so Phase 4 overlapped unfinished parser publication
+and the strict smoke found Pascal without captures after only 98/99 languages
+completed. The current build hook instead invokes the upstream waitable update
+API with `max_jobs = 1`, waits up to 15 minutes, and requires exactly `true`
+before Lazy restore can advance. The explicit Phase 4 install remains the
+complete declared-parser proof. Older statements below that say the
+command-form build remains safe are superseded historical evidence.
+
 Keep this document for provenance, but do not treat the older open-item tables
 below as the live roadmap without first checking the current installer, tests,
 and docs.
@@ -116,10 +127,13 @@ source before treating any line as still open.
    before the Phase 4 parser install. Candidate: a guard in setup.sh that, when nvim is on
    PATH but `tree-sitter` is not, emits a clear FAIL/skip instead of letting the parser
    install dump the ENOENT spam.
-3. **Async compile vs `+qa`.** Superseded for the dedicated parser phase: Phase 4
-   sets `DOTFILES_TREESITTER_SYNC_INSTALL=1`, waits on the install task, and treats
-   a non-`true` result as failure. Lazy's own `build = ":TSUpdate"` remains a plugin
-   update hook; Phase 4 is the canonical parser proof.
+3. **Async compile vs `+qa`.** The dedicated Phase 4 already set
+   `DOTFILES_TREESITTER_SYNC_INSTALL=1`, waited on the install task, and treated
+   a non-`true` result as failure. The separate command-form Lazy
+   `build = ":TSUpdate"` was later proven unsafe by cache-free run `29096335827`
+   because it could outlive Phase 3 and overlap Phase 4. It has been superseded
+   by a checked, serialized, waitable update callback; Phase 4 remains the
+   complete declared-parser proof.
 4. **Guard is one-shot.** Under lazy, `config` runs once; if the guard fires (CLI absent),
    there is no in-session recovery — the user must fix PATH and restart nvim (or run
    `:TSUpdate`). The message says so, but a `:checkhealth` entry could make it discoverable.

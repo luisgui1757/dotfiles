@@ -247,11 +247,17 @@ broken repo-symlink still cleaned) is covered by
 
 - [ ] Greenfield/manual evidence remains intentionally bounded:
       `tests/greenfield/LEDGER.md` now records exact-head hosted Ubuntu, Apple
-      Silicon, Intel, and Windows automated runs, but their PR caches were
-      enabled. No Windows Sandbox, WSL, redirected-Windows, cache-free
-      scheduled/manual, or desktop visual run is claimed. Required CI is not
-      manual desktop evidence. The old Wave C `0 / 10` Ubuntu parity counter is
-      no longer the current release gate; current CI proof is the required
+      Silicon, Intel, and Windows automated runs. Manual cache-free run
+      `29096335827` skipped every broad cache; attempt 1 passed Ubuntu,
+      container, and Windows but exposed a real asynchronous nvim-treesitter
+      build race on Apple Silicon while Intel independently hit transient DNS.
+      Attempt 2 on the same unrepaired SHA passed Apple Silicon but failed the
+      Intel neocmake attach assertion. Both are recorded as partial/failed
+      evidence, not promoted to a green run.
+      No Windows Sandbox, WSL, redirected-Windows, successful cache-free full
+      matrix, or desktop visual run is claimed. Required CI is not manual
+      desktop evidence. The old Wave C `0 / 10` Ubuntu parity counter is no
+      longer the current release gate; current CI proof is the required
       parity/e2e/Nix workflow set plus explicit ledger entries.
 - [ ] No secrets or `age` tier has been started.
 - [ ] The POSIX pwsh profile

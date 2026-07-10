@@ -294,11 +294,21 @@ malformed candidates fail before removal/restoration.
 ```text
 setup -> install-deps                 phase 1: programs and optional tools
       -> chezmoi apply                phase 2: config layer with pre-apply backups
-      -> nvim "+Lazy! restore" +qa    phase 3: plugins from lazy-lock.json
+      -> nvim "+Lazy! restore" +qa    phase 3: plugins from lazy-lock.json;
+                                            parser-update build tasks must finish
       -> nvim +DOTFILES_TREESITTER_SYNC_INSTALL  phase 4: Tree-sitter parsers
       -> nvim "+MasonToolsInstallSync" +qa        phase 5: LSP servers and formatters
       -> Polaris global install       phase 6: per-user agent policy
 ```
+
+The nvim-treesitter Lazy build hook calls the upstream waitable update API,
+serializes parser builds, and requires successful completion before Phase 3 can
+return. A command-form `:TSUpdate` is asynchronous and must not be used as that
+build hook: it is also a Lazy command trigger whose plugin config starts the
+declared-parser install asynchronously. On a cold cache either task can leave
+compilers publishing parsers while Phase 4 starts its explicit synchronous
+install. Phase 4 remains the complete declared-parser bootstrap and proof
+boundary.
 
 Pass `--all` / `-All` for explicit non-interactive installs (Y to every setup
 prompt).
@@ -1133,8 +1143,8 @@ git add nvim/lazy-lock.json   # tracked, not gitignored
 Setup and validation use `Lazy! restore` instead. Run `Lazy! sync` only when
 you intentionally want to refresh plugin pins and review the resulting lockfile
 diff. The startup-budget spec is intentionally different: it preclones locked
-plugin checkouts without running Lazy build hooks so asynchronous parser builds
-cannot pollute the startup timing assertion.
+plugin checkouts without running Lazy build hooks so the checked, waitable
+parser compilation does not pollute the startup timing assertion.
 
 ### Updating Mason tools across machines
 
@@ -1166,7 +1176,7 @@ MIT. See `LICENSE`.
 | `<leader>X` keymaps fire `\X` instead of `<Space>X` | mapleader set after lazy.setup somehow | restore the order in `nvim/init.lua` — leader **before** `require("lazy").setup` |
 | Formatter runs twice or shows two BufWritePre autocmds | someone added a second handler outside conform.nvim | `:lua print(#vim.api.nvim_get_autocmds({event="BufWritePre"}))` should be 1; if not, find the second autocmd and delete it |
 | Lazy/Tree-sitter/Mason says `No C compiler found` | WSL/Linux has `make` but no `cc`/`gcc`/`clang`; Tree-sitter parsers and some plugin builds compile native code | re-run `./setup.sh --skip-config` to install the Linux compiler toolchain, or on Ubuntu run `sudo apt-get update && sudo apt-get install -y build-essential`, then `./setup.sh --skip-deps --skip-config` |
-| Tree-sitter parser install reports temp-dir rename errors such as `ENOTEMPTY` | a previous or parallel parser build left a partial grammar/query cache | update this repo and rerun setup; setup/CI now serializes synchronous nvim-treesitter bootstrap installs, purges compiled parsers with incomplete managed query output, and Tier 2 fails causally if any declared parser or explicit highlight query is missing |
+| Tree-sitter parser install reports temp-dir rename errors such as `ENOTEMPTY`, or a cold setup reports a parser with no captures | a previous/parallel parser build left partial grammar/query output, or an older command-form Lazy `:TSUpdate` returned before its compiler tasks finished | update this repo and rerun setup; both the Lazy update hook and explicit bootstrap now serialize and wait for their upstream tasks, incomplete managed output is purged, and Tier 2 fails causally if any declared parser or explicit highlight query is missing |
 | nvim treesitter parsers fail to compile on Windows / `cl.exe` not found | `nvim-treesitter` main builds parsers with the Rust `cc` crate, which needs MSVC env vars | run `.\setup.ps1 -All` to install VS Build Tools and let setup import the VS DevShell before parser installation; for ad-hoc `:TSUpdate`, open a "Developer PowerShell for VS" or rerun setup |
 | Windows setup says the verified Tree-sitter executable failed staged version validation | an older installer used a sibling stage name with characters after `.exe`, so Windows would not dispatch it as a native executable | update this repo and rerun `.\setup.ps1 -All`; the verified same-parent stage now ends in `.exe`, is version-checked before atomic publication, and cleans on retry |
 | nvim syntax looks weak or files look plain text | Tree-sitter is inactive, or the hybrid built-in syntax fallback was not restored after Tree-sitter starts | update this repo, re-run setup, then check `:Inspect` on a token; parser-backed languages should show `treesitter` captures plus `syntax` groups, while `.bat` should show `syntax` groups |

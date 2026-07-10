@@ -188,6 +188,20 @@ significant change to the relevant area.
       Intel-darwin release and remains supported only through 2026-12-31; keep
       its warning visible and track the required post-26.05 package-plane
       migration separately.
+- [ ] **Cache-free full setup proof**: workflow-dispatch run
+      [`29096335827`](https://github.com/luisgui1757/dotfiles/actions/runs/29096335827)
+      on merged-main SHA `5e3e7c6d93c400d67f6160c6f8f09be56aac10d3`
+      skipped the broad install/plugin caches in every setup job. Attempt 1
+      passed the Ubuntu container, public Ubuntu setup, and native Windows
+      setup. Apple Silicon exposed an asynchronous Lazy Tree-sitter update
+      overlapping Phase 4 (98/99 languages; Pascal had no captures), and Intel
+      hit a separate transient GitHub DNS failure after restoring its original
+      shell files and taps. Attempt 2 on the same unrepaired SHA passed Apple
+      Silicon but failed Intel because the original CMake fixture's neocmake
+      client did not attach within 45 seconds, even though the later formatter
+      CMake fixture did attach. Rerun this exact cache-free workflow after the
+      waitable-update repair merges; require both logical macOS proofs and every
+      producer job to pass before checking this row.
 - [ ] **Home Manager (Linux/WSL)**: with Nix installed inside the Linux/WSL
       environment, run
       `./setup.sh --all` (or the compatibility alias `./setup.sh --home-manager`;

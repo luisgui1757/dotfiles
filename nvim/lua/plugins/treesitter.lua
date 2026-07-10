@@ -188,11 +188,33 @@ local function runtime_syntax_for_filetype(buf, filetype)
   return nil
 end
 
+local function update_installed_parsers_for_build()
+  local nvim_treesitter = require("nvim-treesitter")
+  if type(nvim_treesitter.update) ~= "function" then
+    error("nvim-treesitter update API is unavailable; restore the locked plugin and retry", 0)
+  end
+
+  -- :TSUpdate is also a Lazy command trigger: loading the plugin runs config(),
+  -- whose interactive path starts the full declared-parser install without
+  -- waiting, and the command's own update task is asynchronous too. Lazy can
+  -- therefore mark the build complete while compilers are still publishing
+  -- parser files, then let a cold setup start Phase 4 against unfinished state.
+  -- Use the upstream waitable API directly (without the command trigger) and
+  -- serialize it so no parser build can outlive the plugin-restore boundary.
+  local task = nvim_treesitter.update(nil, { max_jobs = 1, summary = true })
+  if type(task) ~= "table" or type(task.wait) ~= "function" then
+    error("nvim-treesitter parser update did not return a waitable task", 0)
+  end
+  if task:wait(900000) ~= true then
+    error("nvim-treesitter parser update failed; see the parser build errors above", 0)
+  end
+end
+
 return {
   {
     "nvim-treesitter/nvim-treesitter",
     branch = "main",
-    build = ":TSUpdate",
+    build = update_installed_parsers_for_build,
     cmd = { "TSInstall", "TSInstallFromGrammar", "TSUpdate", "TSUninstall", "TSLog" },
     event = { "BufReadPre", "BufNewFile" },
     config = function()

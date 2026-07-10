@@ -530,8 +530,8 @@ use `Lazy! restore`, not `Lazy! sync`; `sync` is only for intentional dependency
 maintenance that reviews and commits a lockfile diff. The startup-budget spec is
 the exception: it preclones the locked plugin checkouts into its isolated cache
 instead of invoking Lazy install/restore, because restore runs plugin build hooks
-and nvim-treesitter's `:TSUpdate` build starts compiler work that can outlive the
-prewarm child and pollute the startup measurement.
+and the checked, waitable nvim-treesitter update can legitimately spend minutes
+compiling parsers, which is outside a startup measurement.
 
 A missing, empty, malformed, incomplete, or non-40-hex lock entry is fatal
 before any plugin fetch or execution. If a cache is dirty, at the wrong commit,
@@ -1121,6 +1121,13 @@ save only**. The next plain `:w` formats normally. Implemented in
   nvim-treesitter `main` defaults to high parallelism for interactive installs.
   That is not the setup/CI contract: hosted runners restore parser caches and
   can expose temp-dir races such as `ENOTEMPTY` while compiling many grammars.
+  Lazy's nvim-treesitter build callback must call the upstream waitable update
+  API with `max_jobs = 1`, wait up to 15 minutes, and require exactly `true`
+  before Lazy restore returns. Never replace it with command-form `:TSUpdate`:
+  the command is also a Lazy load trigger whose config starts the declared
+  parser install asynchronously, and its update task is asynchronous too.
+  Either can return while compilers are still publishing parser/query output,
+  racing the next setup phase.
   When `DOTFILES_TREESITTER_SYNC_INSTALL=1`, pass `max_jobs = 1` and wait up to
   15 minutes; interactive installs keep upstream's faster default. Tier 2 then
   checks `get_installed("parsers")` plus managed query output, including
