@@ -56,12 +56,20 @@ TMUX_RESURRECT_COMMIT="cff343cf9e81983d3da0c8562b01616f12e8d548"
 TMUX_CONTINUUM_COMMIT="0698e8f4b17d6454c71bf5212895ec055c578da0"
 HACK_NERD_FONT_VERSION="v3.4.0"
 HACK_NERD_FONT_SHA256="8ca33a60c791392d872b80d26c42f2bfa914a480f9eb2d7516d9f84373c36897"
-# Ghostty on Ubuntu: we pin + SHA-256 verify the mkasberg/ghostty-ubuntu
-# installer SCRIPT (one version + one checksum, like the Neovim / Hack pins).
-# The script itself fetches the matching .deb from the same project's GitHub
-# release assets over HTTPS at run time. Bump the version + SHA together.
+# Ghostty on Debian-family hosts: install only exact mkasberg/ghostty-ubuntu
+# release assets whose bytes and package metadata are reviewed here. The
+# upstream install.sh queries mutable releases/latest and downloads an
+# unchecked .deb, so it is deliberately not executed. Bump the version and all
+# applicable architecture/distro hashes together.
 GHOSTTY_UBUNTU_VERSION="1.3.1-0-ppa2"
-GHOSTTY_UBUNTU_INSTALL_SHA256="7517776f6d862ec523e627840af4806e13385302f653ae9f7a86aa6d5af1cae5"
+GHOSTTY_UBUNTU_AMD64_2404_SHA256="478d440153ef544426418efc7d6d8901715359f452c46be29071901a94b8cd47"
+GHOSTTY_UBUNTU_ARM64_2404_SHA256="91063815b6ce3d834d59714b4ad0310f744448b6716836d035b3d331d1923363"
+GHOSTTY_UBUNTU_AMD64_2510_SHA256="793bde1c31163d8e1d12ea939c8b941f7908170e57bbf19b121434a0f6621c59"
+GHOSTTY_UBUNTU_ARM64_2510_SHA256="c6a4fd4fd786b4bdea42036650ef1724f535c4b636329f488f7ece36820d3d6b"
+GHOSTTY_DEBIAN_AMD64_TRIXIE_SHA256="9fda8e418d7a7f58149ba3ba823a255d6b80f8bb5431b3bd7e912ff597715b2e"
+GHOSTTY_DEBIAN_ARM64_TRIXIE_SHA256="73f384e62c419d7a7809d686bf579fea5e23f52742b34f70c74d6adf0e72f8ab"
+GHOSTTY_UBUNTU_ASSET_VERSION="${GHOSTTY_UBUNTU_VERSION/-0-/-0.}"
+GHOSTTY_UBUNTU_PACKAGE_VERSION="${GHOSTTY_UBUNTU_VERSION/-0-/-0~}"
 # WezTerm on Ubuntu (amd64): pin + SHA-256 verify the OFFICIAL .deb from the
 # stable release. macOS uses the Homebrew cask; Windows uses install-deps.ps1's
 # catalog. arm64 Linux and non-Ubuntu hosts get manual guidance -- upstream did
@@ -197,11 +205,24 @@ binaries_for() {
 is_wsl() { grep -qiE 'microsoft|wsl' /proc/version 2>/dev/null; }
 can_show_gui() { [[ -n "${DISPLAY:-}" || -n "${WAYLAND_DISPLAY:-}" ]]; }
 wsl_gui_opt_in() { [[ "${EXPERIMENTAL_WSL_GUI:-0}" == "1" ]]; }
+os_release_value() {
+    local key="$1"
+    [[ -r /etc/os-release ]] || return 1
+    awk -F= -v key="$key" '
+        $1 == key {
+            value = substr($0, index($0, "=") + 1)
+            sub(/^"/, "", value)
+            sub(/"$/, "", value)
+            print value
+            exit
+        }
+    ' /etc/os-release
+}
 is_ubuntu() {
     local id="" id_like=""
     if [[ -r /etc/os-release ]]; then
-        id="$(awk -F= '$1=="ID"{gsub(/"/, "", $2); print $2; exit}' /etc/os-release 2>/dev/null || true)"
-        id_like="$(awk -F= '$1=="ID_LIKE"{gsub(/"/, "", $2); print $2; exit}' /etc/os-release 2>/dev/null || true)"
+        id="$(os_release_value ID 2>/dev/null || true)"
+        id_like="$(os_release_value ID_LIKE 2>/dev/null || true)"
     fi
     [[ "$id" == "ubuntu" ]] && return 0
     case " $id_like " in
@@ -3719,34 +3740,145 @@ install_nerd_font() {
     printf "  installed %-26s -> %s\n" "Hack Nerd Font" "$font_dir"
 }
 
-# Download, SHA-256 verify, and run the pinned ghostty-ubuntu installer. We
-# verify the installer SCRIPT before executing it (unlike a bare `curl | bash`),
-# so an upstream change at the pinned tag fails closed instead of running blind.
-# Caller must have already passed require_downloader (curl is used below).
-run_ghostty_ubuntu_installer() {
-    local url="$1" tmp script rc=0
-    tmp="$(mktemp -d)"
-    trap 'rm -rf "$tmp"; trap - RETURN' RETURN
-    script="$tmp/ghostty-ubuntu-install.sh"
-    if ! curl -fsSL -o "$script" "$url"; then
-        echo "  FAIL: could not download ghostty installer"
-        rm -rf "$tmp"; return 1
+# Select the exact reviewed release asset for the Debian-family mappings
+# supported by the pinned upstream release. Return 2 for an unsupported
+# distro/architecture combination, and 1 when host identity cannot be read.
+resolve_ghostty_deb_asset() {
+    local arch id version_id ubuntu_version_id version_codename
+    local ubuntu_codename debian_codename target="" sha=""
+
+    GHOSTTY_DEB_ARCH=""
+    GHOSTTY_DEB_ASSET=""
+    GHOSTTY_DEB_SHA256=""
+    GHOSTTY_DEB_URL=""
+
+    if ! arch="$(dpkg --print-architecture 2>/dev/null)" || [[ -z "$arch" ]]; then
+        echo "  FAIL: could not resolve dpkg architecture for the pinned Ghostty package" >&2
+        return 1
     fi
-    if ! verify_sha256 "$script" "$GHOSTTY_UBUNTU_INSTALL_SHA256"; then
-        echo "  FAIL: checksum mismatch for ghostty install.sh (pinned $GHOSTTY_UBUNTU_VERSION)"
-        echo "        upstream changed; review it, then bump GHOSTTY_UBUNTU_VERSION + SHA together"
-        rm -rf "$tmp"; return 1
-    fi
-    /bin/bash "$script" || rc=$?
-    rm -rf "$tmp"
-    return "$rc"
+    case "$arch" in
+        amd64|arm64) ;;
+        *) return 2 ;;
+    esac
+
+    id="$(os_release_value ID 2>/dev/null || true)"
+    version_id="$(os_release_value VERSION_ID 2>/dev/null || true)"
+    ubuntu_version_id="$(os_release_value UBUNTU_VERSION_ID 2>/dev/null || true)"
+    version_codename="$(os_release_value VERSION_CODENAME 2>/dev/null || true)"
+    ubuntu_codename="$(os_release_value UBUNTU_CODENAME 2>/dev/null || true)"
+    debian_codename="$(os_release_value DEBIAN_CODENAME 2>/dev/null || true)"
+    [[ -n "$id" ]] || {
+        echo "  FAIL: could not resolve distro identity for the pinned Ghostty package" >&2
+        return 1
+    }
+
+    case "$id" in
+        ubuntu|pop|tuxedo|neon)
+            target="$version_id"
+            ;;
+        elementary)
+            target="$ubuntu_version_id"
+            ;;
+        debian)
+            [[ "$version_codename" == "trixie" ]] && target="trixie"
+            ;;
+        kali)
+            [[ "${version_id%%.*}" == "2025" ]] && target="trixie"
+            ;;
+        sparky)
+            [[ "$version_id" == "8" ]] && target="trixie"
+            ;;
+        linuxmint|zorin)
+            if [[ "$debian_codename" == "trixie" ]]; then
+                target="trixie"
+            elif [[ "$ubuntu_codename" == "noble" ]]; then
+                target="24.04"
+            elif [[ "$ubuntu_codename" == "questing" ]]; then
+                target="25.10"
+            fi
+            ;;
+        *)
+            case "$ubuntu_version_id" in
+                24.04|25.10) target="$ubuntu_version_id" ;;
+            esac
+            ;;
+    esac
+
+    case "${arch}_${target}" in
+        amd64_24.04) sha="$GHOSTTY_UBUNTU_AMD64_2404_SHA256" ;;
+        arm64_24.04) sha="$GHOSTTY_UBUNTU_ARM64_2404_SHA256" ;;
+        amd64_25.10) sha="$GHOSTTY_UBUNTU_AMD64_2510_SHA256" ;;
+        arm64_25.10) sha="$GHOSTTY_UBUNTU_ARM64_2510_SHA256" ;;
+        amd64_trixie) sha="$GHOSTTY_DEBIAN_AMD64_TRIXIE_SHA256" ;;
+        arm64_trixie) sha="$GHOSTTY_DEBIAN_ARM64_TRIXIE_SHA256" ;;
+        *) return 2 ;;
+    esac
+
+    GHOSTTY_DEB_ARCH="$arch"
+    GHOSTTY_DEB_ASSET="ghostty_${GHOSTTY_UBUNTU_ASSET_VERSION}_${arch}_${target}.deb"
+    GHOSTTY_DEB_SHA256="$sha"
+    GHOSTTY_DEB_URL="https://github.com/mkasberg/ghostty-ubuntu/releases/download/${GHOSTTY_UBUNTU_VERSION}/${GHOSTTY_DEB_ASSET}"
+    return 0
+}
+
+# Download the selected immutable asset, prove its bytes and package identity,
+# install only that local file, then verify the package manager consumed the
+# expected version. Caller must already have passed require_downloader.
+install_verified_ghostty_deb() {
+    local url="$1" asset="$2" expected_sha="$3" expected_arch="$4"
+    local tmp deb package architecture version installed_version
+    (
+        if ! tmp="$(mktemp -d)" || [[ -z "$tmp" ]]; then
+            echo "  FAIL: could not create private staging for the pinned Ghostty package"
+            return 1
+        fi
+        trap 'rm -rf "$tmp"' EXIT
+        trap 'exit 129' HUP
+        trap 'exit 130' INT
+        trap 'exit 143' TERM
+        deb="$tmp/$asset"
+
+        if ! curl -fsSL --retry 3 --retry-delay 1 -o "$deb" "$url"; then
+            echo "  FAIL: could not download pinned Ghostty .deb from $url"
+            return 1
+        fi
+        if [[ ! -s "$deb" ]] || ! verify_sha256 "$deb" "$expected_sha"; then
+            echo "  FAIL: checksum mismatch for $asset"
+            echo "        expected reviewed mkasberg/ghostty-ubuntu@$GHOSTTY_UBUNTU_VERSION bytes; package was not installed"
+            return 1
+        fi
+        if ! have dpkg-deb; then
+            echo "  FAIL: dpkg-deb is required to validate the pinned Ghostty package before installation"
+            return 1
+        fi
+        package="$(dpkg-deb --field "$deb" Package 2>/dev/null || true)"
+        architecture="$(dpkg-deb --field "$deb" Architecture 2>/dev/null || true)"
+        version="$(dpkg-deb --field "$deb" Version 2>/dev/null || true)"
+        if [[ "$package" != "ghostty" || "$architecture" != "$expected_arch" || "$version" != "$GHOSTTY_UBUNTU_PACKAGE_VERSION" ]]; then
+            echo "  FAIL: unexpected package metadata for $asset"
+            echo "        expected Package=ghostty Architecture=$expected_arch Version=$GHOSTTY_UBUNTU_PACKAGE_VERSION"
+            echo "        received Package=${package:-<missing>} Architecture=${architecture:-<missing>} Version=${version:-<missing>}"
+            return 1
+        fi
+        if ! maybe_sudo apt-get install -y "$deb"; then
+            echo "  FAIL: could not install verified Ghostty package $asset"
+            echo "        repair apt with 'sudo apt-get -f install', then rerun setup"
+            return 1
+        fi
+        installed_version="$(dpkg-query -W -f='${Version}' ghostty 2>/dev/null || true)"
+        if [[ "$installed_version" != "$GHOSTTY_UBUNTU_PACKAGE_VERSION" ]] || ! have ghostty; then
+            echo "  FAIL: Ghostty publication could not be validated after installing $asset"
+            echo "        Remove the package with 'sudo apt-get remove ghostty', then rerun setup"
+            return 1
+        fi
+        printf "  installed %-26s %s (%s)\n" "ghostty" "$GHOSTTY_UBUNTU_PACKAGE_VERSION" "$expected_arch"
+    )
 }
 
 # Ghostty: Linux packaging varies. Homebrew's Ghostty formula is macOS-only,
 # so Linux/WSL should prefer distro/community packages or manual install guidance.
 install_ghostty_linux() {
-    local ubuntu_url
-    ubuntu_url="https://raw.githubusercontent.com/mkasberg/ghostty-ubuntu/${GHOSTTY_UBUNTU_VERSION}/install.sh"
+    local resolve_rc=0 native_pm
     if have ghostty; then
         printf "  ok        %-26s already installed\n" "ghostty"
         return
@@ -3763,19 +3895,32 @@ install_ghostty_linux() {
         return
     fi
     [[ "$PM" == "brew" ]] && printf "  skipped   %-26s Homebrew formula is macOS-only on Linux\n" "ghostty via brew"
-    if is_ubuntu; then
-        if ask "Install ghostty via Ubuntu .deb installer (mkasberg/ghostty-ubuntu, pinned $GHOSTTY_UBUNTU_VERSION)?"; then
+    native_pm="$(native_linux_pm 2>/dev/null || true)"
+    if is_ubuntu || [[ "$native_pm" == "apt" ]]; then
+        resolve_ghostty_deb_asset || resolve_rc=$?
+        if [[ "$resolve_rc" -eq 2 ]]; then
+            printf "  manual    %-26s no reviewed %s asset for this distro/architecture\n" "ghostty" "$GHOSTTY_UBUNTU_VERSION"
+            echo "            see https://github.com/mkasberg/ghostty-ubuntu/releases/tag/$GHOSTTY_UBUNTU_VERSION"
+            return
+        elif [[ "$resolve_rc" -ne 0 ]]; then
+            record_install_failure "ghostty" apt "mkasberg/ghostty-ubuntu@$GHOSTTY_UBUNTU_VERSION" "$resolve_rc"
+            echo "  FAIL: Ghostty package identity resolution failed; continuing to collect install failures"
+            return
+        fi
+        if ask "Install ghostty from verified mkasberg/ghostty-ubuntu $GHOSTTY_UBUNTU_VERSION package bytes?"; then
             if [[ "$DRY_RUN" -eq 1 ]]; then
-                echo "  would: curl -fsSL $ubuntu_url"
-                echo "         verify sha256 $GHOSTTY_UBUNTU_INSTALL_SHA256"
-                echo "         bash install.sh   (fetches + apt-installs the matching .deb)"
+                echo "  would: curl -fsSL $GHOSTTY_DEB_URL -o /tmp/$GHOSTTY_DEB_ASSET"
+                echo "         verify sha256 $GHOSTTY_DEB_SHA256"
+                echo "         validate Package=ghostty Architecture=$GHOSTTY_DEB_ARCH Version=$GHOSTTY_UBUNTU_PACKAGE_VERSION"
+                echo "         sudo apt-get install -y /tmp/$GHOSTTY_DEB_ASSET"
             else
                 require_downloader || return 1
                 local rc=0
-                run_ghostty_ubuntu_installer "$ubuntu_url" || rc=$?
+                install_verified_ghostty_deb \
+                    "$GHOSTTY_DEB_URL" "$GHOSTTY_DEB_ASSET" "$GHOSTTY_DEB_SHA256" "$GHOSTTY_DEB_ARCH" || rc=$?
                 if [[ "$rc" -ne 0 ]]; then
                     record_install_failure "ghostty" apt "mkasberg/ghostty-ubuntu@$GHOSTTY_UBUNTU_VERSION" "$rc"
-                    echo "  FAIL: Ubuntu ghostty installer failed; continuing to collect install failures"
+                    echo "  FAIL: verified Debian-family Ghostty package install failed; continuing to collect install failures"
                 fi
             fi
             return

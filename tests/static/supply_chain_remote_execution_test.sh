@@ -93,14 +93,14 @@ def unverified_privileged_package_installs(path, text):
     """Require an independent digest between download and privileged install."""
     local_failures = []
     download_pattern = re.compile(
-        r"(?m)^\s*curl\b[^\n]*(?:-o|--output)\s+[\"']?([^\s\"']+)",
+        r"(?m)^\s*(?:if\s+!\s+)?curl\b[^\n]*(?:-o|--output)\s+[\"']?([^\s\"']+)",
         re.IGNORECASE,
     )
     privileged_prefix = re.compile(
-        r"\bsudo\s+(?:dpkg\s+-i|rpm\s+(?:-i|--install)|apt(?:-get)?\s+install|installer\s+-pkg)\b",
+        r"\b(?:sudo|maybe_sudo)\s+(?:dpkg\s+-i|rpm\s+(?:-i|--install)|apt(?:-get)?\s+install|installer\s+-pkg)\b",
         re.IGNORECASE,
     )
-    digest_tool = re.compile(r"\b(?:sha256sum|shasum\s+-a\s+256)\b", re.IGNORECASE)
+    digest_tool = re.compile(r"\b(?:sha256sum|shasum\s+-a\s+256|verify_sha256)\b", re.IGNORECASE)
     for download in download_pattern.finditer(text):
         artifact = download.group(1)
         tail = text[download.end():]
@@ -182,6 +182,16 @@ privileged_package_probes = [
         "curl -fsSL https://example.invalid/pkg.deb -o /tmp/pkg.deb\nprintf '%s  %s\\n' \"$PIN\" /tmp/pkg.deb | sha256sum -c -\nsudo dpkg -i /tmp/pkg.deb\n",
         False,
     ),
+    (
+        "unverified helper deb",
+        "curl -fsSL https://example.invalid/pkg.deb -o \"$deb\"\nmaybe_sudo apt-get install -y \"$deb\"\n",
+        True,
+    ),
+    (
+        "verified helper deb",
+        "if ! curl -fsSL https://example.invalid/pkg.deb -o \"$deb\"; then exit 1; fi\nverify_sha256 \"$deb\" \"$PIN\"\nif ! maybe_sudo apt-get install -y \"$deb\"; then exit 1; fi\n",
+        False,
+    ),
 ]
 for label, probe, should_fail in privileged_package_probes:
     probe_failures = unverified_privileged_package_installs(f"probe-{label}.sh", probe)
@@ -205,6 +215,15 @@ required_install_deps_snippets = [
     'STARSHIP_LINUX_ARM64_SHA256="',
     'url="https://github.com/starship/starship/releases/download/${STARSHIP_VERSION}/${asset}"',
     'verify_sha256 "$tarball" "$expected"',
+    'GHOSTTY_UBUNTU_AMD64_2404_SHA256="',
+    'GHOSTTY_UBUNTU_ARM64_2404_SHA256="',
+    'GHOSTTY_UBUNTU_AMD64_2510_SHA256="',
+    'GHOSTTY_UBUNTU_ARM64_2510_SHA256="',
+    'GHOSTTY_DEBIAN_AMD64_TRIXIE_SHA256="',
+    'GHOSTTY_DEBIAN_ARM64_TRIXIE_SHA256="',
+    'GHOSTTY_DEB_URL="https://github.com/mkasberg/ghostty-ubuntu/releases/download/${GHOSTTY_UBUNTU_VERSION}/${GHOSTTY_DEB_ASSET}"',
+    'verify_sha256 "$deb" "$expected_sha"',
+    'maybe_sudo apt-get install -y "$deb"',
 ]
 for snippet in required_install_deps_snippets:
     if snippet not in install_deps_sh:
@@ -215,6 +234,8 @@ for banned in (
     "sh -c \"$(curl -fsLS get.chezmoi.io)\"",
     "curl -fsSL https://starship.rs/install.sh | sh",
     "curl -fsSL $ubuntu_url | bash",
+    "/releases/latest",
+    "ghostty-ubuntu-install.sh",
 ):
     if banned in install_deps_sh:
         failures.append(f"install-deps.sh contains banned mutable installer pattern: {banned}")

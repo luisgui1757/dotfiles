@@ -220,6 +220,8 @@ return {
     config = function()
       local nvim_treesitter = require("nvim-treesitter")
       local sync_install = vim.env.DOTFILES_TREESITTER_SYNC_INSTALL == "1"
+      local headless = #vim.api.nvim_list_uis() == 0
+      local install_requested = sync_install or not headless
 
       local function report_install_problem(message)
         if sync_install then
@@ -390,11 +392,11 @@ return {
       -- that never sourced brew shellenv, or before setup finished installing
       -- it), main emits a separate ENOENT error for EVERY parser. Guard on the
       -- CLI so a missing toolchain surfaces ONE actionable message instead of a
-      -- wall of errors. setup installs it (macOS: brew; Linux/WSL: pinned
-      -- release in install-deps.sh; Windows: install-deps.ps1 -All) and then
-      -- forces DOTFILES_TREESITTER_SYNC_INSTALL=1 so parser installation blocks
-      -- on install(...):wait(...). Interactive sessions keep the async path.
-      if vim.fn.executable("tree-sitter") == 1 then
+      -- wall of errors. Never auto-install from an ordinary headless process:
+      -- Lazy restore, Mason, and smoke validators otherwise launch asynchronous
+      -- compiler work outside Phase 4. setup forces the sync flag only for its
+      -- explicit parser phase; UI sessions retain the interactive async path.
+      if install_requested and vim.fn.executable("tree-sitter") == 1 then
         if type(nvim_treesitter.install) == "function" then
           local install_opts = nil
           if sync_install then
@@ -447,7 +449,7 @@ return {
               .. "Existing parsers will still be started when available."
           )
         end
-      else
+      elseif install_requested then
         report_install_problem(
           "nvim-treesitter: 'tree-sitter' CLI not found on PATH; parsers were not compiled. "
             .. "Install it (macOS: brew install tree-sitter-cli; Linux/WSL: run the dotfiles setup; "

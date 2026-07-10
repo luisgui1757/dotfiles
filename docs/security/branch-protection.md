@@ -67,9 +67,11 @@ scripts/apply-repo-safeguards.sh luisgui1757/dotfiles
 The 2026-07-10 cache-free merged-main run `29096335827` is an explicit gate on
 step 2. Its first attempt exposed an asynchronous nvim-treesitter build race in
 the Apple Silicon producer, so the logical macOS proof was not green. Do not
-open or apply the context-switch stage until the waitable-update repair is
-merged and all six logical checks pass on that newer merged-main SHA. A rerun of
-the old SHA cannot prove the repaired behavior.
+open or apply the context-switch stage until the waitable-update plus headless
+auto-install repair is merged and all six logical checks pass on that newer
+merged-main SHA. Branch-head run `29100106370` disproved the first,
+build-hook-only patch; neither that run nor a rerun of an older SHA can prove
+the complete repaired behavior.
 
 ## Verify
 

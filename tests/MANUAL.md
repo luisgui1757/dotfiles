@@ -200,8 +200,14 @@ significant change to the relevant area.
       Silicon but failed Intel because the original CMake fixture's neocmake
       client did not attach within 45 seconds, even though the later formatter
       CMake fixture did attach. Rerun this exact cache-free workflow after the
-      waitable-update repair merges; require both logical macOS proofs and every
-      producer job to pass before checking this row.
+      waitable-update repair merges. Branch-head cache-free run
+      [`29100106370`](https://github.com/luisgui1757/dotfiles/actions/runs/29100106370)
+      proved the first repair incomplete: Apple Silicon passed, while Ubuntu
+      lost Astro captures and Intel lost GraphQL captures because ordinary
+      headless plugin config still started an interactive asynchronous install.
+      That path is now blocked outside a UI or the explicit synchronous phase.
+      Require every producer and all logical proofs to pass on a newer exact
+      head before checking this row.
 - [ ] **Home Manager (Linux/WSL)**: with Nix installed inside the Linux/WSL
       environment, run
       `./setup.sh --all` (or the compatibility alias `./setup.sh --home-manager`;
@@ -277,6 +283,13 @@ significant change to the relevant area.
       Windows Terminal uses Hack Nerd Font, `win32yank` is reachable, lazygit is
       installed on both sides, zsh plugins are installed in WSL, nvim starts,
       tmux starts, and clipboard from WSL -> Windows round-trips.
+- [ ] **Ghostty exact Debian package consumption**: on a supported Ubuntu
+      24.04/25.10 or Debian trixie amd64/arm64 host without Ghostty, run
+      `./install-deps.sh --all`. Confirm setup prints the pinned
+      `mkasberg/ghostty-ubuntu@1.3.1-0-ppa2` asset identity, `dpkg-query -W
+      -f='${Version}' ghostty` returns `1.3.1-0~ppa2`, and `ghostty --version`
+      succeeds. This remains manual for distro/architecture pairs not exercised
+      by the hosted Ubuntu container.
 - [ ] **WSL experimental GUI opt-in only**: if testing Linux Ghostty under WSLg /
       X11, run `./setup.sh --experimental-wsl-gui`; otherwise confirm
       `~/.config/ghostty/config` is not linked by default in WSL.

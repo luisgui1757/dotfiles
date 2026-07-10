@@ -15,8 +15,13 @@ and the strict smoke found Pascal without captures after only 98/99 languages
 completed. The current build hook instead invokes the upstream waitable update
 API with `max_jobs = 1`, waits up to 15 minutes, and requires exactly `true`
 before Lazy restore can advance. The explicit Phase 4 install remains the
-complete declared-parser proof. Older statements below that say the
-command-form build remains safe are superseded historical evidence.
+complete declared-parser proof. Branch-head cache-free run `29100106370` then
+showed that Lazy restore can load plugin config independently of the build
+command; its interactive auto-install also escaped into Phase 4. Current config
+therefore starts that path only with a real UI or the explicit synchronous
+Phase 4 flag. Ordinary headless Lazy/Mason/smoke processes never start declared
+parser compilers. Older statements below that say the command-form build or
+Phase 4 alone remains safe are superseded historical evidence.
 
 Keep this document for provenance, but do not treat the older open-item tables
 below as the live roadmap without first checking the current installer, tests,

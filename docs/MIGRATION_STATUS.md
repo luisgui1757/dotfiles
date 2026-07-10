@@ -51,7 +51,8 @@ Provisioning stays in `install-deps`, not chezmoi run-scripts:
 - pinned binary/font/script installers and direct artifacts: Homebrew installer,
   Neovim Linux, native-Linux chezmoi, lazygit Linux, Starship Linux,
   tree-sitter CLI Linux/Windows, WezTerm Ubuntu `.deb`, Herdr Linux, Herdr Windows
-  preview, Hack Nerd Font, Windows Terminal portable zip, Ubuntu Ghostty, Scoop
+  preview, Hack Nerd Font, Windows Terminal portable zip, exact Ghostty
+  Debian-family `.deb` assets, Scoop
   installer, Pi CLI packed-tarball SRI, and pinned `setuptools`/`pylatexenc`
   converter wheels/sdists
 - the zsh login-shell switch and domain-account fallback
@@ -252,8 +253,12 @@ broken repo-symlink still cleaned) is covered by
       container, and Windows but exposed a real asynchronous nvim-treesitter
       build race on Apple Silicon while Intel independently hit transient DNS.
       Attempt 2 on the same unrepaired SHA passed Apple Silicon but failed the
-      Intel neocmake attach assertion. Both are recorded as partial/failed
-      evidence, not promoted to a green run.
+      Intel neocmake attach assertion. Branch-head run `29100106370` then passed
+      Apple Silicon but exposed remaining headless async parser installs via
+      missing Astro captures on Ubuntu and GraphQL captures on Intel. These are
+      recorded as partial/failed evidence, not promoted to a green run; the
+      implementation now blocks interactive auto-install in ordinary headless
+      processes as well as waiting on the build callback.
       No Windows Sandbox, WSL, redirected-Windows, successful cache-free full
       matrix, or desktop visual run is claimed. Required CI is not manual
       desktop evidence. The old Wave C `0 / 10` Ubuntu parity counter is no

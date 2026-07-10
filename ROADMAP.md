@@ -330,7 +330,29 @@ Commit-by-commit status:
   same unrepaired SHA passed Apple Silicon but failed Intel when the original
   CMake fixture's neocmake client did not attach within 45 seconds (the later
   formatter CMake fixture did attach); that retry is additional failed evidence,
-  not repaired-head proof.
+  not repaired-head proof. The first branch-head cache-free run
+  (`29100106370`, SHA `1f03199f9d420e534bfade544ae7d74f1cfb002a`)
+  then disproved the narrower build-hook-only repair: Apple Silicon passed, but
+  Ubuntu lost Astro captures and Intel lost GraphQL captures. Their logs showed
+  Lazy restore itself loaded plugin config and launched the interactive async
+  declared-parser install before Phase 4. Ordinary headless config loads now
+  skip that path; only a real UI or the explicit synchronous Phase 4 flag may
+  install. The new behavioral test failed on the branch head and passes after
+  this second root-cause fix. A newer cache-free hosted run is still required.
+
+- **Cache-free Ghostty artifact provenance — REPAIR IMPLEMENTED, HOSTED RETRY
+  PENDING.** PR #48's first Ubuntu container job (`29100012131` /
+  `86386173483`) reproduced a second cache-free dependency: the checksum-pinned
+  `mkasberg/ghostty-ubuntu` script queried unauthenticated mutable
+  `releases/latest`, then exited under `set -e` when no asset URL was returned.
+  More importantly, any successful lookup would have installed unchecked `.deb`
+  bytes as root. The script path is removed. Setup now selects one exact
+  distro/architecture release asset, verifies one of six independently reviewed
+  SHA-256 values and exact package metadata before privileged apt, validates the
+  installed version/command, cleans staging on every path, and prints recovery
+  guidance after state-changing failures. Success/failure/mapping tests and the
+  generalized privileged-package scanner bind the contract. A new hosted
+  Ubuntu container result is required; the red job is evidence, not waived.
 
 - **Exact-head runtime dependency follow-up — PASSED.** Head
   `0c853d066362602f14dc251a6d3fbf3980102048`
@@ -865,7 +887,7 @@ Evidence:
 - Recommended setup docs no longer use raw `curl | bash`/`iwr` execution of the
   current default branch; they use `git clone` plus local `setup`.
 - The repo already has stronger patterns for other downloads, for example
-  Ghostty script verification in `install-deps.sh`, Hack font verification in
+  exact Ghostty `.deb` verification in `install-deps.sh`, Hack font verification in
   `install-deps.ps1`, and Windows Terminal portable verification in
   `install-deps.ps1`.
 

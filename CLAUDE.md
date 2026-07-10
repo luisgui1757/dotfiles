@@ -1128,6 +1128,11 @@ save only**. The next plain `:w` formats normally. Implemented in
   parser install asynchronously, and its update task is asynchronous too.
   Either can return while compilers are still publishing parser/query output,
   racing the next setup phase.
+  In addition, ordinary headless config loads must not start the interactive
+  async auto-install path. Only a real UI session or
+  `DOTFILES_TREESITTER_SYNC_INSTALL=1` may call the declared-parser installer;
+  this keeps Lazy restore, Mason, and smoke validators from creating work
+  outside Phase 4.
   When `DOTFILES_TREESITTER_SYNC_INSTALL=1`, pass `max_jobs = 1` and wait up to
   15 minutes; interactive installs keep upstream's faster default. Tier 2 then
   checks `get_installed("parsers")` plus managed query output, including
@@ -1378,20 +1383,24 @@ save only**. The next plain `:w` formats normally. Implemented in
   `WM_FONTCHANGE` best-effort so Windows Terminal can re-enumerate fonts without
   making setup depend on that notification. The CI workflows also pin and
   verify their direct GitHub downloads.
-  This extends to the **Ubuntu Ghostty installer**: `install_ghostty_linux`
-  pins `mkasberg/ghostty-ubuntu`'s `install.sh` to `GHOSTTY_UBUNTU_VERSION` and
-  SHA-256 verifies the script (`GHOSTTY_UBUNTU_INSTALL_SHA256`) before running
-  it (`run_ghostty_ubuntu_installer`) — NOT a bare `curl … | bash` of `HEAD`.
-  The pinned script still fetches the matching `.deb` from that project's GitHub
-  release assets over HTTPS at run time (per-codename×arch, so the `.deb` itself
-  is not individually pinned — same trust model as the Homebrew installer).
-  A checksum mismatch or installer failure fails closed: the installer is not
-  trusted/run on checksum mismatch, a `FAIL:` marker is emitted, the accepted
-  install failure is recorded, and setup continues for real users while CI fails
-  on the marker/final nonzero summary.
-  Update the version and checksum constants together. zsh plugin refs are also
+  This extends to **Ghostty Debian packages**: never execute
+  `mkasberg/ghostty-ubuntu`'s `install.sh`. Even at a pinned script tag it queries
+  mutable `releases/latest` and downloads a `.deb` whose bytes are not bound to
+  the reviewed script. `resolve_ghostty_deb_asset` instead maps the reviewed
+  Debian-family distro versions and `amd64`/`arm64` architecture to one exact
+  release asset and adjacent SHA-256. `install_verified_ghostty_deb` verifies
+  nonempty bytes, `Package=ghostty`, exact architecture, and exact dpkg version
+  before passing only that local file to privileged apt; it then proves the
+  installed dpkg version and executable. Download, digest, metadata, apt, and
+  post-install failures clean staging, enter the one install-failure summary,
+  and print recovery instructions where apt may have changed state. The static
+  privileged-package scanner understands `maybe_sudo` plus the shared
+  `verify_sha256` helper and self-tests both unverified and verified flows.
+  Update the release version and all applicable distro/architecture checksum
+  constants together. zsh plugin refs are also
   pinned by tag plus expected commit; update both after reviewing a Renovate tag
-  bump. Guarded by `tests/shell/ghostty_install_fail_test.sh`,
+  bump. Guarded by `tests/shell/ghostty_install_test.sh`,
+  `tests/shell/ghostty_install_fail_test.sh`,
   `tests/shell/wezterm_install_test.sh`, `tests/shell/wezterm_install_fail_test.sh`,
   `tests/shell/herdr_install_test.sh`, `tests/shell/herdr_install_fail_test.sh`,
   `tests/shell/wsl_gui_tools_test.sh`, `tests/shell/lazygit_install_test.sh`,

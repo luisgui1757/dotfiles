@@ -449,6 +449,52 @@ describe("treesitter main migration", function()
     assert.are.equal(1, dependency_query_dir)
   end)
 
+  it("does not start an asynchronous parser install in a headless non-sync process", function()
+    local old_tree_sitter = package.loaded["nvim-treesitter"]
+    local old_sync = vim.env.DOTFILES_TREESITTER_SYNC_INSTALL
+    local old_notify = vim.notify
+    local old_executable = vim.fn.executable
+    local install_calls = 0
+
+    assert.are.equal(0, #vim.api.nvim_list_uis(), "this regression requires the real headless runtime")
+    package.loaded["nvim-treesitter"] = {
+      install = function()
+        install_calls = install_calls + 1
+        return {}
+      end,
+      indentexpr = function()
+        return 0
+      end,
+    }
+    vim.env.DOTFILES_TREESITTER_SYNC_INSTALL = nil
+    vim.notify = function() end
+    vim.fn.executable = function(name)
+      if name == "tree-sitter" then
+        return 1
+      end
+      return old_executable(name)
+    end
+
+    local ok, spec = pcall(dofile, repo_root .. "/nvim/lua/plugins/treesitter.lua")
+    local config_ok, config_err = false, nil
+    if ok then
+      config_ok, config_err = pcall(spec[1].config)
+    end
+
+    package.loaded["nvim-treesitter"] = old_tree_sitter
+    if old_sync == nil then
+      vim.env.DOTFILES_TREESITTER_SYNC_INSTALL = nil
+    else
+      vim.env.DOTFILES_TREESITTER_SYNC_INSTALL = old_sync
+    end
+    vim.notify = old_notify
+    vim.fn.executable = old_executable
+
+    assert.is_true(ok)
+    assert.is_true(config_ok, tostring(config_err))
+    assert.are.equal(0, install_calls, "headless restore/smoke started parser work outside Phase 4")
+  end)
+
   it("errors in sync mode when the waitable parser install task reports false", function()
     local old_tree_sitter = package.loaded["nvim-treesitter"]
     local old_tree_sitter_config = package.loaded["nvim-treesitter.config"]

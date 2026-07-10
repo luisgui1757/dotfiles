@@ -308,7 +308,11 @@ build hook: it is also a Lazy command trigger whose plugin config starts the
 declared-parser install asynchronously. On a cold cache either task can leave
 compilers publishing parsers while Phase 4 starts its explicit synchronous
 install. Phase 4 remains the complete declared-parser bootstrap and proof
-boundary.
+boundary. Plugin config also refuses to start its interactive asynchronous
+auto-install path in an ordinary headless process; only a real UI session or
+the explicit synchronous Phase 4 flag may start declared-parser installation.
+That prevents Lazy restore, Mason, and smoke validators from creating separate
+compiler tasks around the proof phase.
 
 Pass `--all` / `-All` for explicit non-interactive installs (Y to every setup
 prompt).
@@ -545,9 +549,14 @@ migration warning. POSIX pwsh profile management remains provisioning-adjacent.
   `/usr/local/bin/lazygit`, or falls back to `~/.local/bin/lazygit` when sudo is
   unavailable.
 - macOS installs Ghostty through `brew install --cask ghostty` when selected.
-  Native Linux uses Linux-specific Ghostty paths. WSL defaults to Windows
-  Terminal on the Windows host; Linux Ghostty in WSL requires
-  `--experimental-wsl-gui`.
+  Supported Debian-family native Linux resolves the exact pinned
+  `mkasberg/ghostty-ubuntu` release asset for distro and architecture, verifies
+  its reviewed SHA-256 plus `Package`/`Architecture`/`Version` metadata,
+  installs only that local `.deb`, and validates the installed dpkg version and
+  command. It never executes the upstream installer, whose mutable
+  `releases/latest` lookup does not bind the downloaded package bytes. WSL
+  defaults to Windows Terminal on the Windows host; Linux Ghostty in WSL
+  requires `--experimental-wsl-gui`.
 - WezTerm installs from the vendor channel per OS: `brew install --cask wezterm`
   on macOS, the `wez.wezterm` Scoop/winget/choco catalog entry on Windows, and
   the official pinned, SHA-256-verified `.deb` on amd64 Ubuntu. WezTerm is a GUI
@@ -832,7 +841,7 @@ update PRs are intentionally not configured.
 |---|---|---|
 | GitHub Actions | Managed, digest-pinned, labeled `github-actions` | Actions are repo-owned CI inputs with stable Renovate support. |
 | GitHub runner images | Managed, labeled `github-runners`, reviewed separately | `ubuntu-*`, `macos-*`, and `windows-*` bumps can change the supported CI platform, so they should not be mixed with ordinary Action bumps. |
-| Repo-pinned installer versions/refs | Managed, labeled `pinned-downloads`, never automerged | Neovim Linux tarballs, chezmoi CI release archives, lazygit Linux tarballs, Starship Linux tarballs, Tree-sitter CLI Linux/Windows archives, WezTerm Ubuntu `.deb`, Herdr Linux binaries, Herdr Windows preview `.exe`, Hack Nerd Font, Windows Terminal portable zip, Ubuntu Ghostty, Pi CLI npm package, zsh plugin refs, `setuptools`/`pylatexenc` converter pins, the Homebrew installer commit, the Scoop installer commit, the Renovate validator package/runtime, the Ubuntu Microsoft-repository `.deb`, and the CI `cargo-binstall` commit are explicit repo pins. |
+| Repo-pinned installer versions/refs | Managed, labeled `pinned-downloads`, never automerged | Neovim Linux tarballs, chezmoi CI release archives, lazygit Linux tarballs, Starship Linux tarballs, Tree-sitter CLI Linux/Windows archives, WezTerm Ubuntu `.deb`, Herdr Linux binaries, Herdr Windows preview `.exe`, Hack Nerd Font, Windows Terminal portable zip, Ghostty distro/architecture `.deb` assets, Pi CLI npm package, zsh plugin refs, `setuptools`/`pylatexenc` converter pins, the Homebrew installer commit, the Scoop installer commit, the Renovate validator package/runtime, the Ubuntu Microsoft-repository `.deb`, and the CI `cargo-binstall` commit are explicit repo pins. |
 | Adjacent SHA-256 / commit constants | Not managed; matched only as regex context | Renovate can bump the version/ref but cannot recompute archive/script hashes or verify tag commit IDs. CI must fail until a human recomputes and reviews them. |
 | Package-manager catalogs | Not managed | Brew, apt, dnf, pacman, zypper, apk, Scoop, winget, and choco entries are package names/IDs, not repo version pins. Let the package manager resolve current versions. |
 | Neovim plugin and Mason tools | Not managed | `lazy-lock.json` is refreshed with Lazy and tested as editor behavior; Mason intentionally has no machine-pinned lockfile. |
@@ -841,8 +850,10 @@ update PRs are intentionally not configured.
 `--platform=local --dry-run=extract`, captures its JSON stdout directly, then
 compares the official extraction to
 `tests/static/renovate_expected_inventory.txt`. A custom regex merely matching
-some text is not ownership proof. Live Dashboard confirmation is separate and
-remains pending until the hosted bot reruns on the PR head.
+some text is not ownership proof. Dashboard #7 reran against merged `main` at
+2026-07-10 13:17 UTC and exposed the reviewed Nix, runner, and Scoop `master`
+inventory without lookup problems; future config changes require a fresh bot
+result rather than inheriting that claim.
 
 Manual-review pin surfaces that Renovate may touch only partially:
 
@@ -871,7 +882,7 @@ branch.
 Direct-download SHA-256 values for Neovim tarballs, chezmoi CI release archives,
 lazygit tarballs, Starship tarballs, tree-sitter CLI archives, the WezTerm
 Ubuntu `.deb`, Herdr Linux binaries, Herdr Windows preview `.exe`, Hack Nerd Font, the Windows Terminal
-portable zip, the Ubuntu Ghostty installer, the Ubuntu 24.04 Microsoft
+portable zip, the Ghostty Debian-family `.deb` assets, the Ubuntu 24.04 Microsoft
 repository `.deb`, Homebrew installer script, Scoop
 installer script, and the CI `cargo-binstall` installer script are
 intentionally human-reviewed. zsh plugin tag commits and tmux/psmux plugin
