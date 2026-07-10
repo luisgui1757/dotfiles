@@ -481,3 +481,14 @@ pushed exact-head runs or manual environments.
   empty-without-active-brew cases recorded above.
 - Post-hardening `make ci` passed again and ended `local pre-PR gate passed`;
   strict ShellCheck and the focused Homebrew regression also passed directly.
+
+## Final repair implementation identity — entry 14
+
+- Implementation commit: `d2e2149bc2c41eb9c38eaae8afe77912397b4386`
+  (`fix(ci): close live cross-platform regressions`).
+- The commit binds the entry 7-13 repairs, their focused regressions, and their
+  Markdown contract updates into one immutable behavioral identity.
+- Exact-head hosted verification is not inferred from the local PASS results in
+  entry 12. It remains pending until PR #47 executes this commit (or a later
+  documentation-only descendant) on Ubuntu, macOS Apple Silicon, macOS Intel,
+  and Windows.
