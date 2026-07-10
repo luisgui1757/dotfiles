@@ -830,3 +830,79 @@ It does not rewrite the exact behavior-head closure above.
   state remains true for the later owner-applied migration.
 - No ruleset, classic protection setting, or Actions policy was mutated by this
   follow-up.
+
+## Branch-head cache-free second-root repair — entry 25
+
+This append-only entry records evidence discovered after entry 24 and the
+corresponding behavioral repair. It does not promote a branch run to
+merged-main greenfield proof.
+
+- PR #48's first required Ubuntu container job, run `29100012131`, job
+  `86386173483`, failed while installing Ghostty. The repo had authenticated the
+  bytes of upstream `install.sh`, but that reviewed script then queried mutable
+  `releases/latest`, selected a release asset at runtime, downloaded an
+  unchecked `.deb`, and passed it to privileged apt. The immediate empty lookup
+  exposed the reliability defect; the unchecked package-to-root flow was the
+  more serious provenance defect.
+- The first cache-free PR-branch run,
+  [`29100106370`](https://github.com/luisgui1757/dotfiles/actions/runs/29100106370),
+  exercised exact head `1f03199f9d420e534bfade544ae7d74f1cfb002a` with broad
+  caches disabled. Ubuntu container, Apple Silicon, and Windows producers
+  passed. Public Ubuntu lost Astro captures and Intel lost GraphQL captures.
+  Their logs showed the waited nvim-treesitter build callback complete, then a
+  separate ordinary headless Lazy config load start the interactive
+  asynchronous declared-parser installer before Phase 4. This disproved the
+  build-hook-only repair rather than being rerun away.
+- Behavioral repair commit:
+  `93ce7fecd92a06583ac7b4211dfe2e1c169dac53` (`fix(setup): close
+  cache-free install races`). Ordinary headless Neovim config loads now refuse
+  the interactive asynchronous parser-install path; only a real UI or the
+  explicit synchronous Phase 4 flag can start declared-parser installation.
+  The already-waited, serialized Lazy build callback remains in force.
+- The same commit removes execution of the Ghostty installer script. Setup now
+  maps only reviewed Ubuntu 24.04, Ubuntu 25.10, and Debian trixie
+  `amd64`/`arm64` identities to an exact release URL. It verifies nonempty bytes,
+  one of six pinned SHA-256 values, `Package=ghostty`, exact architecture, and
+  dpkg version `1.3.1-0~ppa2` before privileged apt; it then verifies the
+  installed version and command. Private staging is checked, signal-cleaned,
+  and removed on every exit. Failures before apt preserve the host; apt or
+  post-publication failures emit explicit package-manager recovery guidance and
+  enter the consolidated failure summary exactly once.
+- Independent artifact review downloaded all six release assets and recomputed
+  their SHA-256 values. Each matched the committed constant. `dpkg-deb` control
+  inspection also matched package name, architecture, and exact version for all
+  six. This is byte/metadata review, not a claim that every distro/architecture
+  package was installed on real hardware.
+- Focused PASS: Tree-sitter 21/21 (including the new real-headless no-async
+  behavior); Ghostty mapping/success and staging/download/digest/metadata/apt/
+  publication failure suites; failure accumulation; WSL preview; temporary
+  cleanup; pin consistency; generalized privileged-package scanner self-tests;
+  strict shell lint; and `git diff --check`.
+- Full local PASS on the behavioral tree: Bash syntax over all 134 tracked shell
+  scripts; `tests/static/run_all.sh`; `tests/shell/run_all.sh`; PowerShell parse
+  and PSScriptAnalyzer plus 234/234 Pester with zero skips and all 17 Neovim
+  specs via `test.ps1`; `make test-migration`; `make test-nvim`; `make test`;
+  `make validate-renovate` with the exact 89-record official inventory;
+  `nix flake check --print-build-logs`; and `make ci` ending `local pre-PR gate
+  passed`. Nix retained the explicit x86_64-darwin support-window warning and
+  reported incompatible local systems as omitted rather than tested.
+
+### Finding status amendments
+
+| ID | Status after entry 25 | Exact evidence | Remaining work |
+|---|---|---|---|
+| UGR-004 | ACCEPTED/FIXED | The pre-existing accumulator correctly converted Ghostty's recoverable installer failure into a final nonzero summary; commit `93ce7fecd92a06583ac7b4211dfe2e1c169dac53` replaces the mutable nested installer and adds staging/precondition/failure injection without a bare `set -e` escape. | Hosted exact-head confirmation remains part of UGR-021; real third-party outages remain external evidence. |
+| UGR-008 | ACCEPTED/FIXED | The general download-to-privileged-package scanner now recognizes the repo's `maybe_sudo` and `verify_sha256` helpers and carries positive/negative self-tests; the exact Ghostty flow is required by the scanner and package tests. | None for static coverage; real package consumption is listed separately in MANUAL. |
+| UGR-020 | PARTIAL | Stage 1 remains intact and all legacy plus logical identities are still emitted. The prior cache-free runs are failed evidence, so stage 2 is not yet safe. | Push this repair, pass its PR checks and a cache-free exact-head matrix, merge it, then require a newer merged-main logical matrix before opening the context-switch PR. |
+| UGR-021 | PARTIAL | Cache-free execution found and drove both the second Tree-sitter repair and exact Ghostty package provenance. Local proof is complete for commit `93ce7fecd92a06583ac7b4211dfe2e1c169dac53`. | Every producer and logical job must pass on a new cache-free run of the pushed repair head, then again on its merged-main SHA. WSL, redirected Windows, dual Terminal, and desktop/TCC proof remain separate. |
+
+### Safeguard and manual-proof boundary after entry 25
+
+- The active integrity ruleset and classic fallback still require the exact 12
+  legacy contexts. No live ruleset, branch protection, or Actions setting was
+  changed.
+- A real supported Debian-family Ghostty install remains unchecked in
+  `tests/MANUAL.md`; the hosted Ubuntu container will exercise the Ubuntu 24.04
+  amd64 asset on the pushed head.
+- WSL, redirected Windows, divergent dual Windows Terminal state, owner-host tap
+  rollback, and desktop GUI/TCC proof remain unclaimed.
