@@ -686,3 +686,11 @@ pushed exact-head runs or manual environments.
   rejects the old hardcoded path, and requires preserved failure diagnostics.
   The canonical Home Manager session-path configuration remains necessary and
   unchanged. Hosted behavior confirmation requires the next exact-head run.
+- Implementation commit: `8a09cf3`. Focused proof passed via
+  `bash tests/shell/home_manager_session_vars_test.sh`; repository YAML lint,
+  full shell lint, policy/check-identity tests, `git diff --check`, Bash syntax
+  over all 134 tracked shell scripts, and the complete `make ci` pre-PR gate
+  also passed on the identical implementation tree before the commit was
+  created. The direct invocation of ShellCheck on the whole YAML document and
+  raw default-profile `yamllint` were rejected as invalid test commands; the
+  repository-aware equivalents above are the evidence.
