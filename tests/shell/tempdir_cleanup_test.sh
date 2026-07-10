@@ -15,13 +15,18 @@ fail() {
 awk '
     /mktemp -d/ {
         line = $0
-        if ((getline nextline) <= 0 || nextline !~ /trap .*rm -rf "\$tmp".*RETURN/) {
+        found = 0
+        for (i = 0; i < 4; i++) {
+            if ((getline nextline) <= 0) break
+            if (nextline ~ /trap .*rm -rf "\$tmp".*(RETURN|EXIT)/) found = 1
+        }
+        if (!found) {
             print "missing cleanup trap after: " line
             failed = 1
         }
     }
     END { exit failed }
-' "$REPO_ROOT/install-deps.sh" || fail "not every mktemp -d site installs a RETURN cleanup trap"
+' "$REPO_ROOT/install-deps.sh" || fail "not every mktemp -d site installs a RETURN/EXIT cleanup trap"
 
 assert_tmp_empty() {
     local dir="$1" leaked

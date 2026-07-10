@@ -41,6 +41,8 @@ FZF_TAB_COMMIT="d7e0234614dbe5369fdd760907d12c0e05a4dccc"
 ZSH_AUTOSUGGESTIONS_VERSION="v0.7.1"
 ZSH_AUTOSUGGESTIONS_COMMIT="e52ee8ca55bcc56a17c828767a3f98f22a68d4eb"
 GH_DASH_VERSION="v4.25.1"   # dlvhdr/gh-dash pinned gh-extension tag; mirror in install-deps.ps1 ($GhDashVersion)
+GH_DASH_TAG_OBJECT="e6ebbd7e83e30161b9192ce3339972d2c8269e7f"
+GH_DASH_COMMIT="49f37e4832956c57bf52d4ea8b1b1e5c0f863700"
 PI_CLI_PACKAGE="@earendil-works/pi-coding-agent"
 PI_CLI_VERSION="0.80.3"
 PI_CLI_INTEGRITY="sha512-TIggw9gCXpA+Ph7OjdTA7ka2NPwTVuPmy39KDSyUzaKq8VvHfMGR7vtRz4JB7Um/RMRblmzhu4p9tUCk6MTgGA=="
@@ -109,6 +111,31 @@ record_install_failure() {
     [[ "$DRY_RUN" -eq 1 ]] && return 0
     INSTALL_FAILURES_COUNT=$((INSTALL_FAILURES_COUNT + 1))
     INSTALL_FAILURES_DETAIL="${INSTALL_FAILURES_DETAIL}  FAIL: ${tool} via ${manager} (${pkg}) exit=${rc}"$'\n'
+}
+
+# Run one recoverable install step without letting `set -e` bypass the final
+# consolidated summary. A callee may already record a more precise failure; in
+# that case the before/after count prevents a duplicate entry. Preconditions
+# that make the whole installer unsafe (unsupported package manager, invalid
+# invocation) remain explicit immediate exits outside this wrapper.
+run_install_step() {
+    local tool="$1" manager="$2" pkg="$3"
+    shift 3
+    local before="$INSTALL_FAILURES_COUNT" rc=0
+    "$@" || rc=$?
+    if [[ "$rc" -ne 0 ]]; then
+        if [[ "$INSTALL_FAILURES_COUNT" -eq "$before" ]]; then
+            record_install_failure "$tool" "$manager" "$pkg" "$rc"
+        fi
+        printf "  FAIL: %-26s recoverable install step failed; continuing to collect install failures\n" "$tool" >&2
+    fi
+    return 0
+}
+
+run_catalog_install() {
+    local tool="$1" purpose="${2:-}" pkg
+    pkg="$(pkg_for "$tool")"
+    run_install_step "$tool" "${PM:-unknown}" "${pkg:-unavailable}" install "$tool" "$purpose"
 }
 
 exit_if_install_failures() {
@@ -208,9 +235,71 @@ homebrew_bin() {
 }
 
 enable_homebrew_for_current_shell() {
-    local brew_bin
+    local brew_bin brew_env active_brew
+    local expected_prefix expected_repository active_prefix active_repository
+    local old_path="$PATH" old_manpath="${MANPATH-}" old_infopath="${INFOPATH-}"
+    local old_prefix="${HOMEBREW_PREFIX-}" old_cellar="${HOMEBREW_CELLAR-}"
+    local old_repository="${HOMEBREW_REPOSITORY-}"
+    local had_manpath="${MANPATH+x}" had_infopath="${INFOPATH+x}"
+    local had_prefix="${HOMEBREW_PREFIX+x}" had_cellar="${HOMEBREW_CELLAR+x}"
+    local had_repository="${HOMEBREW_REPOSITORY+x}"
     brew_bin="$(homebrew_bin)" || return 1
-    eval "$("$brew_bin" shellenv)"
+    expected_prefix="$("$brew_bin" --prefix 2>/dev/null)" || {
+        echo "  FAIL: $brew_bin did not report its Homebrew prefix; PATH is unchanged" >&2
+        return 1
+    }
+    expected_repository="$("$brew_bin" --repository 2>/dev/null)" || {
+        echo "  FAIL: $brew_bin did not report its Homebrew repository; PATH is unchanged" >&2
+        return 1
+    }
+    if [[ "$expected_prefix" != /* || "$expected_repository" != /* ]]; then
+        echo "  FAIL: $brew_bin reported a non-absolute Homebrew identity; PATH is unchanged" >&2
+        return 1
+    fi
+    if ! brew_env="$("$brew_bin" shellenv)"; then
+        echo "  FAIL: $brew_bin shellenv failed; PATH is unchanged" >&2
+        return 1
+    fi
+    # Homebrew intentionally emits no output when its bin/sbin entries are
+    # already first in PATH. Empty stdout is therefore valid only when the
+    # selected brew is already the executable this shell resolves.
+    if [[ -n "$brew_env" ]] && ! eval "$brew_env"; then
+        PATH="$old_path"; export PATH
+        if [[ -n "$had_manpath" ]]; then MANPATH="$old_manpath"; export MANPATH; else unset MANPATH; fi
+        if [[ -n "$had_infopath" ]]; then INFOPATH="$old_infopath"; export INFOPATH; else unset INFOPATH; fi
+        if [[ -n "$had_prefix" ]]; then HOMEBREW_PREFIX="$old_prefix"; export HOMEBREW_PREFIX; else unset HOMEBREW_PREFIX; fi
+        if [[ -n "$had_cellar" ]]; then HOMEBREW_CELLAR="$old_cellar"; export HOMEBREW_CELLAR; else unset HOMEBREW_CELLAR; fi
+        if [[ -n "$had_repository" ]]; then HOMEBREW_REPOSITORY="$old_repository"; export HOMEBREW_REPOSITORY; else unset HOMEBREW_REPOSITORY; fi
+        hash -r 2>/dev/null || true
+        echo "  FAIL: $brew_bin shellenv output could not be evaluated; the prior environment was restored. Repair Homebrew and retry." >&2
+        return 1
+    fi
+    hash -r 2>/dev/null || true
+    active_brew="$(command -v brew 2>/dev/null || true)"
+    active_prefix=""
+    active_repository=""
+    if [[ -n "$active_brew" ]]; then
+        active_prefix="$("$active_brew" --prefix 2>/dev/null || true)"
+        active_repository="$("$active_brew" --repository 2>/dev/null || true)"
+    fi
+    # nix-darwin exposes brew through /run/current-system/sw while `brew
+    # shellenv` correctly activates the architecture-native /opt/homebrew or
+    # /usr/local entrypoint. Prove both commands address the same installation
+    # by canonical prefix + repository instead of requiring the wrapper and
+    # activated executable to have the same pathname.
+    if [[ -z "$active_brew" || -z "$active_prefix" || -z "$active_repository" ]] ||
+        [[ "$(real_source_path "$active_prefix")" != "$(real_source_path "$expected_prefix")" ]] ||
+        [[ "$(real_source_path "$active_repository")" != "$(real_source_path "$expected_repository")" ]]; then
+        PATH="$old_path"; export PATH
+        if [[ -n "$had_manpath" ]]; then MANPATH="$old_manpath"; export MANPATH; else unset MANPATH; fi
+        if [[ -n "$had_infopath" ]]; then INFOPATH="$old_infopath"; export INFOPATH; else unset INFOPATH; fi
+        if [[ -n "$had_prefix" ]]; then HOMEBREW_PREFIX="$old_prefix"; export HOMEBREW_PREFIX; else unset HOMEBREW_PREFIX; fi
+        if [[ -n "$had_cellar" ]]; then HOMEBREW_CELLAR="$old_cellar"; export HOMEBREW_CELLAR; else unset HOMEBREW_CELLAR; fi
+        if [[ -n "$had_repository" ]]; then HOMEBREW_REPOSITORY="$old_repository"; export HOMEBREW_REPOSITORY; else unset HOMEBREW_REPOSITORY; fi
+        hash -r 2>/dev/null || true
+        echo "  FAIL: $brew_bin shellenv did not activate the selected Homebrew installation; the prior environment was restored. Remove the PATH shadow and retry." >&2
+        return 1
+    fi
     enable_homebrew_make_gnubin_for_current_shell "$brew_bin" || true
     hash -r 2>/dev/null || true
 }
@@ -232,7 +321,14 @@ persist_homebrew_shellenv() {
     local tmp block_tmp rc
     local rcs
     brew_bin="$(homebrew_bin)" || return 0
-    brew_prefix="${brew_bin%/bin/brew}"
+    brew_prefix="$("$brew_bin" --prefix 2>/dev/null)" || {
+        echo "  FAIL: $brew_bin did not report the Homebrew prefix; shell startup files are unchanged" >&2
+        return 1
+    }
+    if [[ "$brew_prefix" != /* ]]; then
+        echo "  FAIL: $brew_bin reported a non-absolute Homebrew prefix; shell startup files are unchanged" >&2
+        return 1
+    fi
     marker="# >>> dotfiles: Homebrew shellenv >>>"
     end_marker="# <<< dotfiles: Homebrew shellenv <<<"
     block="$(cat <<EOF
@@ -419,7 +515,7 @@ maybe_install_brew() {
             echo "  would: curl -fsSL $url -o /tmp/homebrew-install.sh"
             echo "         verify sha256 $HOMEBREW_INSTALL_SHA256"
             echo "         /bin/bash /tmp/homebrew-install.sh"
-            return 1
+            return 0
         fi
         require_downloader || return 1
         tmp="$(mktemp -d)"
@@ -442,11 +538,52 @@ maybe_install_brew() {
         rm -rf "$tmp"
         # Plumb brew into THIS shell so subsequent installs use it, then make
         # future zsh/bash sessions find it without manual Homebrew "Next steps".
-        enable_homebrew_for_current_shell || true
-        persist_homebrew_shellenv
+        if ! enable_homebrew_for_current_shell; then
+            return 1
+        fi
+        if ! persist_homebrew_shellenv; then
+            return 1
+        fi
         return 0
     fi
     return 1
+}
+
+bootstrap_package_manager() {
+    local homebrew_activated=0
+    if [[ "$PM" == "brew" ]]; then
+        if ! enable_homebrew_for_current_shell; then
+            return 1
+        fi
+        if ! persist_homebrew_shellenv; then
+            return 1
+        fi
+        homebrew_activated=1
+    elif [[ "$PM" == "brew_missing" ]]; then
+        if maybe_install_brew; then
+            if [[ "$DRY_RUN" -eq 1 ]]; then PM="brew"; else PM="$(detect_pm)"; fi
+            homebrew_activated=1
+        else
+            return 1
+        fi
+    elif [[ "$(uname -s)" == "Linux" ]]; then
+        echo "Detected $PM as the system package manager."
+        if maybe_install_brew; then
+            PM="$(detect_pm)"
+            homebrew_activated=1
+        fi
+    fi
+
+    if [[ "$PM" == "brew" ]]; then
+        if [[ "$DRY_RUN" -eq 1 ]]; then
+            echo "  plan      Homebrew-dependent phases continue after the previewed bootstrap"
+        elif [[ "$homebrew_activated" -eq 0 ]]; then
+            if ! enable_homebrew_for_current_shell; then
+                return 1
+            fi
+        fi
+    fi
+    return 0
 }
 
 # ---- Login shell: adopt zsh (chsh) -------------------------------------------
@@ -1732,15 +1869,73 @@ pi_cli_version() {
     pi --version 2>/dev/null | awk 'NF { print $1; exit }'
 }
 
-verify_pi_cli_npm_integrity() {
-    local got
-    got="$(npm view "${PI_CLI_PACKAGE}@${PI_CLI_VERSION}" dist.integrity --silent 2>/dev/null | awk 'NF { print $1; exit }')"
-    if [[ "$got" != "$PI_CLI_INTEGRITY" ]]; then
-        printf "  FAIL: %-26s npm integrity mismatch for %s@%s\n" "pi" "$PI_CLI_PACKAGE" "$PI_CLI_VERSION" >&2
-        printf "        expected %s\n" "$PI_CLI_INTEGRITY" >&2
-        printf "        got      %s\n" "${got:-<empty>}" >&2
-        return 1
-    fi
+verify_pi_cli_tarball_sri() {
+    local tarball="$1" expected="$2"
+    node - "$tarball" "$expected" <<'NODE'
+const crypto = require('crypto');
+const fs = require('fs');
+const path = process.argv[2];
+const expected = process.argv[3];
+const match = /^(sha512)-([A-Za-z0-9+/]+={0,2})$/.exec(expected || '');
+if (!match) process.exit(2);
+const bytes = fs.readFileSync(path);
+if (bytes.length === 0) process.exit(3);
+const want = Buffer.from(match[2], 'base64');
+const got = crypto.createHash(match[1]).update(bytes).digest();
+process.exit(want.length === got.length && crypto.timingSafeEqual(want, got) ? 0 : 1);
+NODE
+}
+
+install_pi_cli_verified_tarball() {
+    local spec tmp pack_json metadata filename reported tarball
+    spec="${PI_CLI_PACKAGE}@${PI_CLI_VERSION}"
+    tmp="$(mktemp -d "${TMPDIR:-/tmp}/dotfiles-pi.XXXXXX")" || return 1
+    (
+        trap 'rm -rf "$tmp"' EXIT
+        trap 'exit 129' HUP
+        trap 'exit 130' INT
+        trap 'exit 143' TERM
+
+        pack_json="$tmp/npm-pack.json"
+        if ! npm pack --ignore-scripts --json --pack-destination "$tmp" "$spec" > "$pack_json"; then
+            printf "  FAIL: %-26s npm pack failed for %s\n" "pi" "$spec" >&2
+            return 1
+        fi
+
+        metadata="$tmp/pack-metadata.tsv"
+        if ! node - "$pack_json" > "$metadata" <<'NODE'
+const fs = require('fs');
+const path = require('path');
+const parsed = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+if (!Array.isArray(parsed) || parsed.length !== 1) process.exit(2);
+const filename = parsed[0] && parsed[0].filename;
+const integrity = parsed[0] && parsed[0].integrity;
+if (typeof filename !== 'string' || path.basename(filename) !== filename ||
+    typeof integrity !== 'string' || /[\t\r\n]/.test(filename + integrity)) process.exit(3);
+process.stdout.write(filename + '\t' + integrity + '\n');
+NODE
+        then
+            printf "  FAIL: %-26s npm pack returned invalid metadata for %s\n" "pi" "$spec" >&2
+            return 1
+        fi
+        IFS=$'\t' read -r filename reported < "$metadata"
+        if [[ "$reported" != "$PI_CLI_INTEGRITY" ]]; then
+            printf "  FAIL: %-26s npm pack metadata integrity mismatch for %s\n" "pi" "$spec" >&2
+            printf "        expected %s\n" "$PI_CLI_INTEGRITY" >&2
+            printf "        got      %s\n" "${reported:-<empty>}" >&2
+            return 1
+        fi
+
+        tarball="$tmp/$filename"
+        if [[ ! -s "$tarball" ]] || ! verify_pi_cli_tarball_sri "$tarball" "$PI_CLI_INTEGRITY"; then
+            printf "  FAIL: %-26s packed tarball bytes do not match pinned SRI for %s\n" "pi" "$spec" >&2
+            return 1
+        fi
+        if ! npm install -g --prefix "$HOME/.local" "$tarball"; then
+            printf "  FAIL: %-26s npm install failed for verified local tarball %s\n" "pi" "$filename" >&2
+            return 1
+        fi
+    )
 }
 
 install_pi_cli() {
@@ -1760,22 +1955,18 @@ install_pi_cli() {
         echo "            public POSIX setup supplies Node 24 through the Nix package layer"
         return 0
     fi
-    if ! ask "Install Pi CLI (${PI_CLI_PACKAGE}@${PI_CLI_VERSION}, npm integrity verified)?"; then
+    if ! ask "Install Pi CLI (${PI_CLI_PACKAGE}@${PI_CLI_VERSION}, packed tarball SRI verified)?"; then
         printf "  skipped   %-26s\n" "pi"
         return 0
     fi
     if [[ "$DRY_RUN" -eq 1 ]]; then
-        echo "  would: npm view ${PI_CLI_PACKAGE}@${PI_CLI_VERSION} dist.integrity"
-        echo "         expect $PI_CLI_INTEGRITY"
-        echo "  would: npm install -g --prefix \"$HOME/.local\" ${PI_CLI_PACKAGE}@${PI_CLI_VERSION}"
+        echo "  would: npm pack --ignore-scripts --json --pack-destination <temp> ${PI_CLI_PACKAGE}@${PI_CLI_VERSION}"
+        echo "         require pack metadata integrity and tarball bytes to match $PI_CLI_INTEGRITY"
+        echo "  would: npm install -g --prefix \"$HOME/.local\" <verified-local-tarball>"
         return 0
     fi
-    verify_pi_cli_npm_integrity || return 1
     mkdir -p "$HOME/.local"
-    if ! npm install -g --prefix "$HOME/.local" "${PI_CLI_PACKAGE}@${PI_CLI_VERSION}"; then
-        printf "  FAIL: %-26s npm install failed for %s@%s\n" "pi" "$PI_CLI_PACKAGE" "$PI_CLI_VERSION" >&2
-        return 1
-    fi
+    install_pi_cli_verified_tarball || return 1
     ensure_local_bin_on_path
     current="$(pi_cli_version || true)"
     if [[ "$current" != "$PI_CLI_VERSION" ]]; then
@@ -1887,28 +2078,44 @@ zsh_plugin_root() {
     printf '%s\n' "$HOME/.local/share/dotfiles/zsh-plugins"
 }
 
+zsh_plugin_git() {
+    env GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null \
+        GIT_TERMINAL_PROMPT=0 GCM_INTERACTIVE=Never \
+        git -c core.hooksPath=/dev/null -c core.fsmonitor=false \
+        -c core.untrackedCache=false -c credential.helper= "$@"
+}
+
 zsh_plugin_ok() {
-    local target="$1" expected_commit="$2" plugin_file="$3" current
+    local target="$1" repo="$2" expected_commit="$3" plugin_file="$4"
+    local current origin root status
     [[ -d "$target/.git" ]] || return 1
-    [[ -r "$target/$plugin_file" ]] || return 1
-    current="$(git -C "$target" rev-parse HEAD 2>/dev/null || true)"
-    [[ "$current" == "$expected_commit" ]]
+    [[ -f "$target/$plugin_file" && ! -L "$target/$plugin_file" ]] || return 1
+    root="$(zsh_plugin_git -C "$target" rev-parse --show-toplevel 2>/dev/null)" || return 1
+    [[ -n "$root" && "$(cd "$root" && pwd -P)" == "$(cd "$target" && pwd -P)" ]] || return 1
+    origin="$(zsh_plugin_git -C "$target" remote get-url origin 2>/dev/null)" || return 1
+    [[ "${origin%.git}" == "${repo%.git}" ]] || return 1
+    current="$(zsh_plugin_git -C "$target" rev-parse --verify HEAD 2>/dev/null)" || return 1
+    [[ "$current" == "$expected_commit" ]] || return 1
+    zsh_plugin_git -C "$target" ls-files --error-unmatch -- "$plugin_file" >/dev/null 2>&1 || return 1
+    status="$(zsh_plugin_git -C "$target" status --porcelain=v1 --untracked-files=all --ignored 2>/dev/null)" || return 1
+    [[ -z "$status" ]]
 }
 
 install_zsh_plugin_repo() {
     local name="$1" repo="$2" ref="$3" expected_commit="$4" plugin_file="$5"
-    local root target backup current
+    local root target repo_root helper
     root="$(zsh_plugin_root)"
     target="$root/$name"
 
-    if zsh_plugin_ok "$target" "$expected_commit" "$plugin_file"; then
+    if zsh_plugin_ok "$target" "$repo" "$expected_commit" "$plugin_file"; then
         printf "  ok        %-26s %s\n" "$name" "$ref"
         return 0
     fi
 
     if [[ "$DRY_RUN" -eq 1 ]]; then
-        echo "  would: git clone --depth 1 --branch $ref $repo $target"
-        echo "         verify git commit $expected_commit"
+        echo "  would: neutralize any unproved $target payload"
+        echo "         fetch reviewed ref $ref at exact commit $expected_commit from $repo into a sibling stage"
+        echo "         prove origin/HEAD/cleanliness/$plugin_file, then publish atomically"
         return 0
     fi
     if ! have git; then
@@ -1916,44 +2123,13 @@ install_zsh_plugin_repo() {
         return 1
     fi
 
-    mkdir -p "$root"
-    if [[ -e "$target" && ! -d "$target/.git" ]]; then
-        backup="$(unique_backup_path "$target")"
-        mv "$target" "$backup"
-        printf "  backup    %-26s %s\n" "$name" "$backup"
-    fi
-
-    if [[ ! -d "$target/.git" ]]; then
-        git clone --depth 1 --branch "$ref" "$repo" "$target" >/dev/null 2>&1 || {
-            printf "  WARN: could not clone %-18s from %s\n" "$name" "$repo"
-            return 1
-        }
-    else
-        if git -C "$target" remote get-url origin >/dev/null 2>&1; then
-            git -C "$target" remote set-url origin "$repo"
-        else
-            git -C "$target" remote add origin "$repo"
-        fi
-        git -C "$target" fetch --depth 1 origin "refs/tags/$ref:refs/tags/$ref" >/dev/null 2>&1 || {
-            printf "  WARN: could not fetch %-18s tag %s\n" "$name" "$ref"
-            return 1
-        }
-        git -C "$target" checkout --force "$expected_commit" >/dev/null 2>&1 || {
-            printf "  WARN: could not checkout %-18s commit %s\n" "$name" "$expected_commit"
-            return 1
-        }
-    fi
-
-    current="$(git -C "$target" rev-parse HEAD 2>/dev/null || true)"
-    if [[ "$current" != "$expected_commit" ]]; then
-        printf "  FAIL: %-26s got commit %s, expected %s\n" "$name" "${current:-unknown}" "$expected_commit"
+    repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+    helper="$repo_root/scripts/ensure-pinned-zsh-plugin.sh"
+    if [[ ! -r "$helper" ]]; then
+        printf "  FAIL: %-26s publisher helper missing: %s\n" "$name" "$helper" >&2
         return 1
     fi
-    if [[ ! -r "$target/$plugin_file" ]]; then
-        printf "  FAIL: %-26s missing %s\n" "$name" "$plugin_file"
-        return 1
-    fi
-    printf "  installed %-26s %s\n" "$name" "$ref"
+    /bin/bash "$helper" "$name" "$repo" "$ref" "$expected_commit" "$plugin_file" "$target"
 }
 
 install_zsh_plugins() {
@@ -1964,8 +2140,8 @@ install_zsh_plugins() {
     fzf_tab_dir="$root/fzf-tab"
     autosuggestions_dir="$root/zsh-autosuggestions"
 
-    if zsh_plugin_ok "$fzf_tab_dir" "$FZF_TAB_COMMIT" "fzf-tab.plugin.zsh" &&
-        zsh_plugin_ok "$autosuggestions_dir" "$ZSH_AUTOSUGGESTIONS_COMMIT" "zsh-autosuggestions.zsh"; then
+    if zsh_plugin_ok "$fzf_tab_dir" "https://github.com/Aloxaf/fzf-tab.git" "$FZF_TAB_COMMIT" "fzf-tab.plugin.zsh" &&
+        zsh_plugin_ok "$autosuggestions_dir" "https://github.com/zsh-users/zsh-autosuggestions.git" "$ZSH_AUTOSUGGESTIONS_COMMIT" "zsh-autosuggestions.zsh"; then
         printf "  ok        %-26s pinned refs already installed\n" "zsh plugins"
         return 0
     fi
@@ -2029,8 +2205,8 @@ install_gh_dash_extension() {
     if printf '%s\n' "$list" | grep -q 'dlvhdr/gh-dash'; then
         installed_ver="$(printf '%s\n' "$list" \
             | awk '{ for (i = 1; i <= NF; i++) if ($i == "dlvhdr/gh-dash") { print $(i + 1); exit } }')"
-        if [[ -n "$installed_ver" && "v${installed_ver#v}" == "$GH_DASH_VERSION" ]]; then
-            printf "  ok        %-26s already installed (pinned %s)\n" "gh-dash" "$GH_DASH_VERSION"
+        if [[ "$installed_ver" == "$GH_DASH_COMMIT" ]]; then
+            printf "  ok        %-26s already installed (%s -> %s)\n" "gh-dash" "$GH_DASH_VERSION" "$GH_DASH_COMMIT"
             return 0
         fi
         reinstall=1
@@ -2047,27 +2223,48 @@ install_gh_dash_extension() {
         return 0
     fi
     if [[ "$DRY_RUN" -eq 1 ]]; then
+        echo "  would: verify $GH_DASH_VERSION tag object $GH_DASH_TAG_OBJECT peels to $GH_DASH_COMMIT"
         if [[ "$reinstall" -eq 1 ]]; then
-            echo "  would: gh extension remove dash && gh extension install dlvhdr/gh-dash --pin $GH_DASH_VERSION"
+            echo "  would: gh extension remove dash && gh extension install dlvhdr/gh-dash --pin $GH_DASH_COMMIT"
         else
-            echo "  would: gh extension install dlvhdr/gh-dash --pin $GH_DASH_VERSION"
+            echo "  would: gh extension install dlvhdr/gh-dash --pin $GH_DASH_COMMIT"
         fi
         return 0
     fi
 
-    if [[ "$reinstall" -eq 1 ]]; then
-        gh extension remove dash >/dev/null 2>&1 || true
+    local tag_object peeled_commit
+    tag_object="$(gh api "repos/dlvhdr/gh-dash/git/ref/tags/$GH_DASH_VERSION" --jq .object.sha 2>/dev/null || true)"
+    if [[ "$tag_object" != "$GH_DASH_TAG_OBJECT" ]]; then
+        record_install_failure "gh-dash" gh "dlvhdr/gh-dash@$GH_DASH_VERSION" tag-object
+        printf "  FAIL: %-26s tag object mismatch: got %s expected %s\n" "gh-dash" "${tag_object:-<empty>}" "$GH_DASH_TAG_OBJECT" >&2
+        return 0
     fi
-    if gh extension install dlvhdr/gh-dash --pin "$GH_DASH_VERSION"; then
+    peeled_commit="$(gh api "repos/dlvhdr/gh-dash/git/tags/$tag_object" --jq .object.sha 2>/dev/null || true)"
+    if [[ "$peeled_commit" != "$GH_DASH_COMMIT" ]]; then
+        record_install_failure "gh-dash" gh "dlvhdr/gh-dash@$GH_DASH_VERSION" peeled-commit
+        printf "  FAIL: %-26s peeled commit mismatch: got %s expected %s\n" "gh-dash" "${peeled_commit:-<empty>}" "$GH_DASH_COMMIT" >&2
+        return 0
+    fi
+
+    if [[ "$reinstall" -eq 1 ]]; then
+        local remove_rc=0
+        gh extension remove dash >/dev/null 2>&1 || remove_rc=$?
+        if [[ "$remove_rc" -ne 0 ]]; then
+            record_install_failure "gh-dash" gh remove:dash "$remove_rc"
+            printf "  FAIL: %-26s could not remove the mismatched extension\n" "gh-dash" >&2
+            return 0
+        fi
+    fi
+    if gh extension install dlvhdr/gh-dash --pin "$GH_DASH_COMMIT"; then
         if [[ "$reinstall" -eq 1 ]]; then
-            printf "  installed %-26s %s (re-pinned)\n" "gh-dash" "$GH_DASH_VERSION"
+            printf "  installed %-26s %s -> %s (re-pinned)\n" "gh-dash" "$GH_DASH_VERSION" "$GH_DASH_COMMIT"
         else
-            printf "  installed %-26s %s\n" "gh-dash" "$GH_DASH_VERSION"
+            printf "  installed %-26s %s -> %s\n" "gh-dash" "$GH_DASH_VERSION" "$GH_DASH_COMMIT"
         fi
     else
         local rc=$?
-        record_install_failure "gh-dash" gh "dlvhdr/gh-dash@$GH_DASH_VERSION" "$rc"
-        printf "  FAIL: %-26s gh extension install dlvhdr/gh-dash --pin %s failed\n" "gh-dash" "$GH_DASH_VERSION" >&2
+        record_install_failure "gh-dash" gh "dlvhdr/gh-dash@$GH_DASH_COMMIT" "$rc"
+        printf "  FAIL: %-26s gh extension install dlvhdr/gh-dash --pin %s failed\n" "gh-dash" "$GH_DASH_COMMIT" >&2
     fi
     return 0
 }
@@ -3263,12 +3460,12 @@ run_update_mode() {
     echo "install-deps: update mode OS=$OS_LABEL  detected package manager=$PM  dry-run=$DRY_RUN"
     echo
 
-    if [[ "$PM" == "brew" ]]; then
-        enable_homebrew_for_current_shell || true
+    local rc=0
+    if [[ "$PM" == "brew" ]] && ! enable_homebrew_for_current_shell; then
+        rc=1
     fi
 
-    update_catalog_tools
-    local rc=$?
+    update_catalog_tools || rc=1
     echo
     echo "note: repo pins, PSFzf, plugins, and configs update via git pull and re-running setup; dotfiles-owned Linux artifacts refresh only when provenance proves ownership."
     return "$rc"
@@ -3998,8 +4195,8 @@ install_scan_present() {
             root="$(zsh_plugin_root)"
             fzf_tab_dir="$root/fzf-tab"
             autosuggestions_dir="$root/zsh-autosuggestions"
-            zsh_plugin_ok "$fzf_tab_dir" "$FZF_TAB_COMMIT" "fzf-tab.plugin.zsh" &&
-                zsh_plugin_ok "$autosuggestions_dir" "$ZSH_AUTOSUGGESTIONS_COMMIT" "zsh-autosuggestions.zsh"
+            zsh_plugin_ok "$fzf_tab_dir" "https://github.com/Aloxaf/fzf-tab.git" "$FZF_TAB_COMMIT" "fzf-tab.plugin.zsh" &&
+                zsh_plugin_ok "$autosuggestions_dir" "https://github.com/zsh-users/zsh-autosuggestions.git" "$ZSH_AUTOSUGGESTIONS_COMMIT" "zsh-autosuggestions.zsh"
             ;;
         tmux-plugins)
             local root tpm_dir
@@ -4148,20 +4345,12 @@ if [[ "$YES_ALL" -ne 1 && "$DRY_RUN" -ne 1 && -t 0 ]]; then
 fi
 
 # Bootstrap brew only after the pre-flight table and one-shot prompt. Re-detect
-# after bootstrap so the per-tool installers see the manager that now exists.
-if [[ "$PM" == "brew" ]]; then
-    enable_homebrew_for_current_shell || true
-    persist_homebrew_shellenv
-elif [[ "$PM" == "brew_missing" ]]; then
-    if maybe_install_brew; then PM="$(detect_pm)"
-    else PM="unknown"; fi
-elif [[ "$(uname -s)" == "Linux" ]]; then
-    echo "Detected $PM as the system package manager."
-    if maybe_install_brew; then PM="$(detect_pm)"; fi
-fi
-
-if [[ "$PM" == "brew" ]]; then
-    enable_homebrew_for_current_shell || true
+# after a real bootstrap; dry-run models Brew as available for every later
+# preview phase without claiming that the bootstrap already happened.
+if ! bootstrap_package_manager; then
+    record_install_failure "Homebrew bootstrap/activation" brew shellenv 1
+    echo "  FAIL: Homebrew bootstrap/activation is an unrecoverable package-manager precondition; no package installs were attempted." >&2
+    exit_if_install_failures
 fi
 
 if [[ "$PM" == "unknown" ]]; then
@@ -4175,56 +4364,56 @@ fi
 section() { echo; echo "== $1 =="; }
 
 section "core editor stack"
-install git "version control, required by lazy.nvim"
+run_catalog_install git "version control, required by lazy.nvim"
 if [[ "$(uname -s)" == "Linux" && "$PM" != "brew" ]]; then
-    install_nvim_linux
+    run_install_step nvim direct "$NVIM_LINUX_VERSION" install_nvim_linux
 else
-    install nvim "Neovim 0.12+, the editor"
+    run_catalog_install nvim "Neovim 0.12+, the editor"
 fi
-install make "needed for some plugin builds (notably LuaSnip jsregexp)"
-install cmake "CMake CLI required by neocmakelsp and CMake projects"
-install_c_toolchain_linux
-install rg "ripgrep, powers Telescope live_grep"
-install fd "fd, powers Telescope find_files"
-install fzf "fuzzy finder: Ctrl-R history, Ctrl-T files, Alt-C cd (zsh wiring in shells/zshrc)"
-install lsd "modern ls replacement with colors, icons, and tree view"
-install zoxide "smarter cd: z <dir> jumps by frecency, zi picks interactively (zsh/pwsh wiring in shell profiles)"
-install_chezmoi
-install_lazygit
+run_catalog_install make "needed for some plugin builds (notably LuaSnip jsregexp)"
+run_catalog_install cmake "CMake CLI required by neocmakelsp and CMake projects"
+run_install_step "C compiler" "$(native_linux_pm)" toolchain install_c_toolchain_linux
+run_catalog_install rg "ripgrep, powers Telescope live_grep"
+run_catalog_install fd "fd, powers Telescope find_files"
+run_catalog_install fzf "fuzzy finder: Ctrl-R history, Ctrl-T files, Alt-C cd (zsh wiring in shells/zshrc)"
+run_catalog_install lsd "modern ls replacement with colors, icons, and tree view"
+run_catalog_install zoxide "smarter cd: z <dir> jumps by frecency, zi picks interactively (zsh/pwsh wiring in shell profiles)"
+run_install_step chezmoi direct "$CHEZMOI_VERSION" install_chezmoi
+run_install_step lazygit direct "$LAZYGIT_LINUX_VERSION" install_lazygit
 
 section "prompt"
-install_starship
+run_install_step starship direct "$STARSHIP_VERSION" install_starship
 
 section "terminal multiplexer + shell"
-install tmux
-install_tmux_plugins
-install zsh
-install_zsh_plugins
+run_catalog_install tmux
+run_install_step "tmux plugins" git pinned-commits install_tmux_plugins
+run_catalog_install zsh
+run_install_step "zsh plugins" git pinned-commits install_zsh_plugins
 set_default_shell_zsh   # make zsh the login shell so tmux/terminals launch it
 
 section "terminals (optional)"
 if [[ "$(uname -s)" == "Darwin" ]] && [[ "$PM" == "brew" ]]; then
-    install_ghostty_macos
-    install_wezterm_macos
+    run_install_step ghostty brew cask:ghostty install_ghostty_macos
+    run_install_step wezterm brew cask:wezterm install_wezterm_macos
 elif [[ "$(uname -s)" == "Linux" ]]; then
-    install_ghostty_linux
-    install_wezterm_linux
+    run_install_step ghostty direct "$GHOSTTY_UBUNTU_VERSION" install_ghostty_linux
+    run_install_step wezterm direct "$WEZTERM_VERSION" install_wezterm_linux
 fi
-setup_ghostty_maximize   # GNOME/X11 only: enforce Ghostty maximize via devilspie2 (opt-in)
+run_install_step devilspie2 "$(native_linux_pm)" devilspie2 setup_ghostty_maximize
 
 section "window manager (macOS, optional)"
 if [[ "$(uname -s)" == "Darwin" ]] && [[ "$PM" == "brew" ]]; then
-    install_aerospace_macos
+    run_install_step aerospace brew cask:nikitabobko/tap/aerospace install_aerospace_macos
 else
     printf "  skipped   %-26s AeroSpace is macOS-only\n" "aerospace"
 fi
 
 section "agent multiplexer (optional): Herdr"
-install_herdr   # macOS/Linux; native Windows uses install-deps.ps1
+run_install_step herdr direct "$HERDR_VERSION" install_herdr
 
 section "editor: VS Code (optional)"
-install_vscode
-configure_vscode_rose_pine
+run_install_step vscode "${PM:-unknown}" catalog install_vscode
+run_install_step "vscode theme" config rose-pine configure_vscode_rose_pine
 
 section "fonts"
 if is_wsl && ! wsl_gui_opt_in; then
@@ -4232,37 +4421,37 @@ if is_wsl && ! wsl_gui_opt_in; then
     echo "            Run Windows setup with -MergeWindowsTerminal so Windows Terminal uses Hack Nerd Font."
     echo "            Linux fontconfig install is experimental: ./setup.sh --experimental-wsl-gui"
 else
-    install fc-cache "font config (needed to install Hack Nerd Font on Linux)"
-    install_nerd_font
+    run_catalog_install fc-cache "font config (needed to install Hack Nerd Font on Linux)"
+    run_install_step "Hack Nerd Font" direct Hack.zip install_nerd_font
 fi
 
 section "language tooling (for LSP / formatter back-ends)"
-install python3 "needed by pyright"
-ensure_python_pip_venv
-install_pylatexenc_converter
-install node "needed by prettier and JS tooling"
-ensure_npm
-install_pi_cli
-install_tree_sitter_cli
+run_catalog_install python3 "needed by pyright"
+run_install_step "python venv/pip" "$(native_linux_pm)" python3-venv ensure_python_pip_venv
+run_install_step latex2text direct "pylatexenc@$PYLATEXENC_VERSION" install_pylatexenc_converter
+run_catalog_install node "needed by prettier and JS tooling"
+run_install_step npm "$(native_linux_pm)" npm ensure_npm
+run_install_step pi npm "$PI_CLI_PACKAGE@$PI_CLI_VERSION" install_pi_cli
+run_install_step tree-sitter direct "$TREE_SITTER_CLI_LINUX_VERSION" install_tree_sitter_cli
 
 if is_wsl; then
     section "WSL clipboard bridge"
     check_wsl_clipboard
 elif [[ "$(uname -s)" == "Linux" ]]; then
     section "Linux clipboard helpers"
-    install xclip "X11 clipboard"
-    install wl-copy "Wayland clipboard"
+    run_catalog_install xclip "X11 clipboard"
+    run_catalog_install wl-copy "Wayland clipboard"
 fi
 
 section "developer / test dependencies (optional)"
-install shellcheck "shell script linter"
-install jq "JSON CLI, general-purpose tool used by many scripts"
-install gh "GitHub CLI (gh); also required by the gh-dash PR/issue dashboard"
-install_gh_dash_extension
-install hyperfine "starship prompt perf test"
-install taplo "TOML linter"
-install yamllint "YAML linter"
-install editorconfig-checker
+run_catalog_install shellcheck "shell script linter"
+run_catalog_install jq "JSON CLI, general-purpose tool used by many scripts"
+run_catalog_install gh "GitHub CLI (gh); also required by the gh-dash PR/issue dashboard"
+run_install_step gh-dash gh "dlvhdr/gh-dash@$GH_DASH_VERSION" install_gh_dash_extension
+run_catalog_install hyperfine "starship prompt perf test"
+run_catalog_install taplo "TOML linter"
+run_catalog_install yamllint "YAML linter"
+run_catalog_install editorconfig-checker
 
 section "notes / Obsidian vault (optional)"
 configure_notes_vault

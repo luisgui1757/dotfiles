@@ -15,6 +15,7 @@ Applies the repository safeguard posture:
       * Protect main: review (owner-only pull-request bypass for review rules)
       * Protect main: owner updates (only owner can update main through PRs)
   - classic main branch protection fallback with required CI checks
+  - GitHub Actions requires full commit-SHA pinning for external actions
   - best-effort GitHub security extras where the plan supports them
 
 Requires an authenticated GitHub CLI with repository admin permission:
@@ -152,6 +153,11 @@ gh_api PATCH "repos/$repo" \
     -F allow_auto_merge=false \
     -F delete_branch_on_merge=true >/dev/null
 
+gh_api PUT "repos/$repo/actions/permissions" \
+    -F enabled=true \
+    -f allowed_actions=all \
+    -F sha_pinning_required=true >/dev/null
+
 upsert_ruleset "Protect main: integrity" "$integrity_ruleset"
 upsert_ruleset "Protect main: review" "$review_ruleset"
 upsert_ruleset "Protect main: owner updates" "$owner_updates_ruleset"
@@ -248,5 +254,8 @@ require_live_value "classic branch-protection strict required-status policy" "$c
 
 classic_required_contexts="$(gh api "repos/$repo/branches/main/protection/required_status_checks" --jq '.contexts[]')"
 verify_required_contexts "classic branch-protection fallback" "$classic_required_contexts"
+
+actions_sha_pinning="$(gh api "repos/$repo/actions/permissions" --jq '.sha_pinning_required')"
+require_live_value "Actions SHA pinning policy" "$actions_sha_pinning" "true"
 
 echo "Repository safeguards applied and verified. Re-run safely any time."

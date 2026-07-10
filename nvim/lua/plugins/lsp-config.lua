@@ -73,32 +73,11 @@ return {
       -- NOTE: format-on-save lives in conform.nvim, NOT here.
       -- Don't add a BufWritePre formatter here or it will race conform.
 
-      -- clangd: look for compile_commands.json in fixed root-relative locations.
-      -- Avoid the recursive `o/**` glob — it traversed huge build trees on
-      -- every first buffer open. clangd already auto-discovers ancestors
-      -- of the file's directory, so this just nudges the *workspace* root.
-      -- NOTE (deferred): this probes RELATIVE paths at config-load, i.e. relative
-      -- to nvim's startup cwd and frozen for the session -- correct for the common
-      -- `cd project && nvim` case but stale across projects. A proper per-root fix
-      -- (compute --compile-commands-dir from the resolved root, or rely on a
-      -- project `.clangd`) needs a real C project to validate and is intentionally
-      -- left out of the audit PR rather than shipped unverified.
-      local function get_clangd_cmd()
-        local cmd = { "clangd", "--background-index", "--clang-tidy" }
-        local fixed_candidates = {
-          "compile_commands.json",
-          "build/compile_commands.json",
-          "out/compile_commands.json",
-          ".cache/clangd/compile_commands.json",
-        }
-        for _, rel in ipairs(fixed_candidates) do
-          if vim.uv.fs_stat(rel) then
-            table.insert(cmd, "--compile-commands-dir=" .. vim.fn.fnamemodify(rel, ":h"))
-            break
-          end
-        end
-        return cmd
-      end
+      -- Do not force one global compilation-database directory. clangd discovers a database
+      -- per active file by searching its ancestors and build/ subdirectories;
+      -- a process-wide override would freeze every client to the startup cwd and
+      -- leak one project's flags into another project opened in the same session.
+      local clangd_cmd = { "clangd", "--background-index", "--clang-tidy" }
 
       local function get_neocmake_cmd()
         local exe = "neocmakelsp"
@@ -116,7 +95,7 @@ return {
       end
 
       vim.lsp.config("clangd", {
-        cmd = get_clangd_cmd(),
+        cmd = clangd_cmd,
         capabilities = capabilities,
         root_markers = { "compile_commands.json", ".clangd", "CMakeLists.txt", ".git" },
       })

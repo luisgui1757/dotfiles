@@ -38,6 +38,10 @@ BEST_EFFORT=0
 EXPERIMENTAL_WSL_GUI=0
 NIX_DARWIN=0
 HOME_MANAGER=0
+NIX_HOMEBREW_TAPS_PATH=""
+NIX_HOMEBREW_TAPS_BACKUP=""
+NIX_DARWIN_RC_SOURCES=()
+NIX_DARWIN_RC_BACKUPS=()
 POLARIS_REPO_URL="https://github.com/luisgui1757/polaris.git"
 POLARIS_VERSION="0.1.2"
 POLARIS_TAG="v0.1.2"
@@ -149,6 +153,98 @@ phase() {
     echo "================================================================"
 }
 
+normalize_machine_arch() {
+    case "$1" in
+        arm64 | aarch64) printf '%s\n' aarch64 ;;
+        x86_64 | amd64) printf '%s\n' x86_64 ;;
+        *) return 1 ;;
+    esac
+}
+
+account_home_directory() {
+    local user="$1" record record_user home=""
+    case "$(uname -s)" in
+        Darwin)
+            command -v dscl >/dev/null 2>&1 || return 1
+            record="$(dscl . -read "/Users/$user" NFSHomeDirectory 2>/dev/null)" || return 1
+            home="${record#NFSHomeDirectory:}"
+            home="${home#"${home%%[![:space:]]*}"}"
+            ;;
+        Linux)
+            if command -v getent >/dev/null 2>&1; then
+                record="$(getent passwd "$user" 2>/dev/null)" || return 1
+            elif [[ -r /etc/passwd ]]; then
+                record="$(awk -F: -v wanted="$user" '$1 == wanted { print; exit }' /etc/passwd)"
+            fi
+            [[ -n "$record" ]] || return 1
+            case "$record" in *$'\n'*) return 1 ;; esac
+            record_user="${record%%:*}"
+            [[ "$record_user" == "$user" ]] || return 1
+            home="$(printf '%s\n' "$record" | awk -F: '{ print $6 }')"
+            ;;
+        *) return 1 ;;
+    esac
+    [[ "$home" == /* && "$home" != "/" && "$home" != *$'\n'* ]] || return 1
+    printf '%s\n' "$home"
+}
+
+resolve_target_identity() {
+    local uid user account_home env_home_real account_home_real
+    uid="$(id -u 2>/dev/null)" || {
+        echo "  FAIL: could not resolve the invoking POSIX user id." >&2
+        return 1
+    }
+    case "$uid" in
+        ''|*[!0-9]*)
+            echo "  FAIL: invoking POSIX user id is not numeric: $uid" >&2
+            return 1
+            ;;
+    esac
+    if [[ "$uid" -eq 0 ]]; then
+        echo "  FAIL: do not run setup.sh itself as root or through sudo." >&2
+        echo "        Run it as the target user; setup invokes sudo only for the bounded system steps." >&2
+        return 1
+    fi
+    user="$(id -un 2>/dev/null)" || {
+        echo "  FAIL: could not resolve the invoking POSIX username." >&2
+        return 1
+    }
+    case "$user" in
+        ''|root|*/*|*:*|*' '*|*$'\t'*|*$'\r'*|*$'\n'*)
+        echo "  FAIL: refusing ambiguous target username: ${user:-<empty>}" >&2
+        return 1
+        ;;
+    esac
+    account_home="$(account_home_directory "$user")" || {
+        echo "  FAIL: could not resolve the authoritative home directory for $user." >&2
+        echo "        Check the local/directory-service account record, then re-run setup." >&2
+        return 1
+    }
+    if [[ ! -d "$account_home" ]]; then
+        echo "  FAIL: the resolved home directory does not exist: $account_home" >&2
+        return 1
+    fi
+    if [[ -z "${HOME:-}" || ! -d "$HOME" ]]; then
+        echo "  FAIL: HOME is unset or not a directory; resolved account home is $account_home" >&2
+        return 1
+    fi
+    env_home_real="$(cd "$HOME" && pwd -P)"
+    account_home_real="$(cd "$account_home" && pwd -P)"
+    if [[ "$env_home_real" != "$account_home_real" ]]; then
+        echo "  FAIL: HOME targets $env_home_real but account $user resolves to $account_home_real." >&2
+        echo "        Refusing to split Nix, chezmoi, and setup across different homes." >&2
+        return 1
+    fi
+
+    DOTFILES_TARGET_USER="$user"
+    DOTFILES_TARGET_HOME="$account_home"
+    export DOTFILES_TARGET_USER DOTFILES_TARGET_HOME
+    HOME="$account_home"
+    export HOME
+    DEFAULT_DEST="$HOME/dotfiles"
+    POLARIS_CACHE_ROOT="$HOME/.local/share/dotfiles/polaris"
+}
+
 refresh_runtime_path() {
     local brew_bin brew_env dir make_prefix gnubin nix_user
 
@@ -174,7 +270,7 @@ refresh_runtime_path() {
         fi
     done
 
-    nix_user="${SUDO_USER:-${USER:-$(id -un 2>/dev/null || true)}}"
+    nix_user="${DOTFILES_TARGET_USER:-$(id -un 2>/dev/null || true)}"
     for dir in \
         /nix/var/nix/profiles/default/bin \
         /run/current-system/sw/bin \
@@ -278,8 +374,21 @@ should_apply_agent_policy() {
     ask_yes_no_default_yes "Apply Polaris global agent rules?"
 }
 
-ensure_polaris_checkout() {
-    local checkout tmp
+ensure_polaris_checkout() (
+    local checkout tmp="" cleanup_rc=0
+    POLARIS_STAGE_DIR=""
+    trap '
+        cleanup_rc=$?
+        trap - EXIT HUP INT TERM
+        if [[ -n "${POLARIS_STAGE_DIR:-}" ]]; then
+            rm -rf "$POLARIS_STAGE_DIR"
+        fi
+        exit "$cleanup_rc"
+    ' EXIT
+    trap 'exit 129' HUP
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+
     checkout="$(polaris_checkout_dir)"
 
     if [[ -d "$checkout/.git" ]]; then
@@ -301,7 +410,7 @@ ensure_polaris_checkout() {
 
     mkdir -p "$POLARIS_CACHE_ROOT"
     tmp="$(mktemp -d "$POLARIS_CACHE_ROOT/.tmp.XXXXXX")"
-    trap 'rm -rf "$tmp"' RETURN
+    POLARIS_STAGE_DIR="$tmp"
 
     polaris_git clone "$POLARIS_REPO_URL" "$tmp"
     polaris_git -C "$tmp" checkout --detach "$POLARIS_REF"
@@ -310,9 +419,10 @@ ensure_polaris_checkout() {
     assert_polaris_checkout_clean "$tmp"
 
     mv "$tmp" "$checkout"
-    trap - RETURN
+    tmp=""
+    POLARIS_STAGE_DIR=""
     printf '%s\n' "$checkout"
-}
+)
 
 run_polaris_agent_policy() {
     local checkout installer
@@ -601,28 +711,56 @@ nix_darwin_hosted_ci_cleanup_override() {
 }
 
 sudo_nix_darwin_activation() {
+    local target_user="${DOTFILES_TARGET_USER:-}" target_home="${DOTFILES_TARGET_HOME:-}"
+    if [[ -z "$target_user" || -z "$target_home" ]]; then
+        echo "  FAIL: validated target identity is missing before nix-darwin activation." >&2
+        return 1
+    fi
     if nix_darwin_hosted_ci_cleanup_override; then
-        sudo env DOTFILES_NIX_DARWIN_HOSTED_CI=1 "$@"
+        sudo env DOTFILES_TARGET_USER="$target_user" DOTFILES_TARGET_HOME="$target_home" \
+            DOTFILES_NIX_DARWIN_HOSTED_CI=1 "$@"
     else
-        sudo "$@"
+        sudo env DOTFILES_TARGET_USER="$target_user" DOTFILES_TARGET_HOME="$target_home" "$@"
     fi
 }
 
 nix_darwin_sudo_preview() {
+    local target_user="${DOTFILES_TARGET_USER:-<resolved-user>}"
+    local target_home="${DOTFILES_TARGET_HOME:-<resolved-home>}"
+    printf 'sudo env DOTFILES_TARGET_USER=%q DOTFILES_TARGET_HOME=%q ' "$target_user" "$target_home"
     if nix_darwin_hosted_ci_cleanup_override; then
-        printf 'sudo env DOTFILES_NIX_DARWIN_HOSTED_CI=1 %s' "$1"
+        printf 'DOTFILES_NIX_DARWIN_HOSTED_CI=1 %s' "$1"
     else
-        printf 'sudo %s' "$1"
+        printf '%s' "$1"
     fi
 }
 
 nix_homebrew_library_dir() {
-    printf '%s\n' "${DOTFILES_HOMEBREW_LIBRARY:-/opt/homebrew/Library}"
+    local arch brew_bin repository
+    if [[ -n "${DOTFILES_HOMEBREW_LIBRARY:-}" ]]; then
+        printf '%s\n' "$DOTFILES_HOMEBREW_LIBRARY"
+        return 0
+    fi
+    brew_bin="$(command -v brew 2>/dev/null || true)"
+    if [[ -n "$brew_bin" ]] && repository="$("$brew_bin" --repository 2>/dev/null)" && [[ "$repository" == /* ]]; then
+        printf '%s/Library\n' "${repository%/}"
+        return 0
+    fi
+    arch="$(normalize_machine_arch "$(uname -m)")" || {
+        echo "  FAIL: cannot resolve the Homebrew library for unsupported architecture $(uname -m)." >&2
+        return 1
+    }
+    case "$arch" in
+        aarch64) printf '%s\n' /opt/homebrew/Library ;;
+        x86_64) printf '%s\n' /usr/local/Homebrew/Library ;;
+    esac
 }
 
 prepare_nix_homebrew_declarative_taps() {
     local library taps stamp backup_base backup i
-    library="$(nix_homebrew_library_dir)"
+    NIX_HOMEBREW_TAPS_PATH=""
+    NIX_HOMEBREW_TAPS_BACKUP=""
+    library="$(nix_homebrew_library_dir)" || return 1
     taps="$library/Taps"
     [[ -e "$taps" && ! -L "$taps" ]] || return 0
 
@@ -648,19 +786,210 @@ prepare_nix_homebrew_declarative_taps() {
             return 1
         fi
     fi
+    NIX_HOMEBREW_TAPS_PATH="$taps"
+    NIX_HOMEBREW_TAPS_BACKUP="$backup"
     if ! sudo mv "$taps" "$backup"; then
+        NIX_HOMEBREW_TAPS_PATH=""
+        NIX_HOMEBREW_TAPS_BACKUP=""
         echo "  FAIL: could not move existing Homebrew taps from $taps to $backup." >&2
         return 1
     fi
 }
 
+rollback_nix_homebrew_declarative_taps() {
+    local taps="$NIX_HOMEBREW_TAPS_PATH" backup="$NIX_HOMEBREW_TAPS_BACKUP"
+    local stamp failed_base failed i=0
+    [[ -n "$taps" && -n "$backup" ]] || return 0
+    if [[ ! -e "$backup" && ! -L "$backup" ]]; then
+        echo "  FAIL: tap rollback backup is missing: $backup" >&2
+        echo "        Preserve $taps and restore the backup manually before retrying." >&2
+        return 1
+    fi
+    if [[ -e "$taps" || -L "$taps" ]]; then
+        stamp="${DOTFILES_TEST_TIMESTAMP:-$(date +%Y%m%d%H%M%S)}"
+        failed_base="$taps.dotfiles-failed-$stamp"
+        failed="$failed_base"
+        while [[ -e "$failed" || -L "$failed" ]]; do
+            i=$((i + 1))
+            failed="$failed_base.$i"
+        done
+        if ! sudo mv "$taps" "$failed"; then
+            echo "  FAIL: activation failed and rollback could not move the replacement taps at $taps." >&2
+            echo "        Original taps remain safe at $backup; move the replacement aside, then restore them." >&2
+            return 1
+        fi
+        echo "  note      failed activation taps preserved at $failed"
+    fi
+    if ! sudo mv "$backup" "$taps"; then
+        echo "  FAIL: activation failed and automatic tap rollback could not restore $backup." >&2
+        echo "        Restore it manually with: sudo mv '$backup' '$taps'" >&2
+        return 1
+    fi
+    echo "  restored  pre-activation Homebrew taps from $backup"
+    NIX_HOMEBREW_TAPS_PATH=""
+    NIX_HOMEBREW_TAPS_BACKUP=""
+}
+
+nix_darwin_etc_dir() {
+    local etc_dir="/etc"
+    # The override is a source-only oracle seam. A production environment
+    # cannot redirect privileged shell-file migration away from /etc.
+    if [[ "${DOTFILES_SETUP_SOURCE_ONLY_ACTIVE:-}" == "1" ]]; then
+        if [[ -n "${DOTFILES_TEST_NIX_DARWIN_ETC_DIR:-}" ]]; then
+            etc_dir="$DOTFILES_TEST_NIX_DARWIN_ETC_DIR"
+        else
+            # Source-only probes must never inspect or move the host's real
+            # privileged files merely because they exercise activation logic.
+            etc_dir="/nonexistent/dotfiles-source-only-etc"
+        fi
+    fi
+    if [[ "$etc_dir" != /* ]]; then
+        echo "  FAIL: nix-darwin etc directory is not absolute: $etc_dir" >&2
+        return 1
+    fi
+    printf '%s\n' "${etc_dir%/}"
+}
+
+preview_nix_darwin_shell_rc_migration() {
+    local etc_dir source backup name
+    etc_dir="$(nix_darwin_etc_dir)" || return 1
+    for name in bashrc zshrc; do
+        source="$etc_dir/$name"
+        backup="$source.before-nix-darwin"
+        [[ -e "$source" || -L "$source" ]] || continue
+        if [[ -e "$backup" || -L "$backup" ]]; then
+            echo "  would fail: cannot preserve $source because $backup already exists."
+        else
+            echo "  would: sudo mv $source $backup before first nix-darwin activation"
+        fi
+    done
+}
+
+prepare_nix_darwin_shell_rc_migration() {
+    local etc_dir source backup name i
+    etc_dir="$(nix_darwin_etc_dir)" || return 1
+    NIX_DARWIN_RC_SOURCES=()
+    NIX_DARWIN_RC_BACKUPS=()
+
+    # Preflight both paths before moving either one. nix-darwin deliberately
+    # refuses unrecognized /etc files and documents the exact
+    # .before-nix-darwin backup shape; never overwrite an earlier backup.
+    for name in bashrc zshrc; do
+        source="$etc_dir/$name"
+        backup="$source.before-nix-darwin"
+        [[ -e "$source" || -L "$source" ]] || continue
+        if [[ -e "$backup" || -L "$backup" ]]; then
+            echo "  FAIL: first nix-darwin bootstrap must preserve $source, but backup $backup already exists." >&2
+            echo "        Compare both files and resolve the collision before retrying; neither was changed." >&2
+            return 1
+        fi
+    done
+
+    for name in bashrc zshrc; do
+        source="$etc_dir/$name"
+        backup="$source.before-nix-darwin"
+        [[ -e "$source" || -L "$source" ]] || continue
+        i="${#NIX_DARWIN_RC_SOURCES[@]}"
+        NIX_DARWIN_RC_SOURCES[i]="$source"
+        NIX_DARWIN_RC_BACKUPS[i]="$backup"
+        if ! sudo mv "$source" "$backup"; then
+            echo "  FAIL: could not preserve $source at $backup before nix-darwin bootstrap." >&2
+            if ! rollback_nix_darwin_shell_rc_migration; then
+                echo "        Partial shell-file rollback failed; follow the recovery instructions above." >&2
+            fi
+            return 1
+        fi
+        echo "  backup    pre-nix-darwin shell file $source -> $backup"
+    done
+}
+
+rollback_nix_darwin_shell_rc_migration() {
+    local i source backup failed_base failed suffix rc=0
+    i=$((${#NIX_DARWIN_RC_SOURCES[@]} - 1))
+    while [[ "$i" -ge 0 ]]; do
+        source="${NIX_DARWIN_RC_SOURCES[$i]}"
+        backup="${NIX_DARWIN_RC_BACKUPS[$i]}"
+        if [[ ! -e "$backup" && ! -L "$backup" ]]; then
+            if [[ ! -e "$source" && ! -L "$source" ]]; then
+                echo "  FAIL: shell-file rollback is missing both $source and $backup." >&2
+                echo "        Restore $source from a known-good backup before retrying." >&2
+                rc=1
+            fi
+            i=$((i - 1))
+            continue
+        fi
+        if [[ -e "$source" || -L "$source" ]]; then
+            failed_base="$source.dotfiles-failed-${DOTFILES_TEST_TIMESTAMP:-$(date +%Y%m%d%H%M%S)}"
+            failed="$failed_base"
+            suffix=0
+            while [[ -e "$failed" || -L "$failed" ]]; do
+                suffix=$((suffix + 1))
+                failed="$failed_base.$suffix"
+            done
+            if ! sudo mv "$source" "$failed"; then
+                echo "  FAIL: could not quarantine failed nix-darwin output at $source." >&2
+                echo "        Original content remains safe at $backup; move the replacement aside and restore it manually." >&2
+                rc=1
+                i=$((i - 1))
+                continue
+            fi
+            echo "  note      failed nix-darwin shell output preserved at $failed"
+        fi
+        if ! sudo mv "$backup" "$source"; then
+            echo "  FAIL: could not restore pre-nix-darwin shell file $backup -> $source." >&2
+            echo "        Restore it manually with: sudo mv '$backup' '$source'" >&2
+            rc=1
+        else
+            echo "  restored  pre-nix-darwin shell file $source"
+        fi
+        i=$((i - 1))
+    done
+    if [[ "$rc" -eq 0 ]]; then
+        NIX_DARWIN_RC_SOURCES=()
+        NIX_DARWIN_RC_BACKUPS=()
+    fi
+    return "$rc"
+}
+
+complete_nix_darwin_shell_rc_migration() {
+    local backup
+    if [[ "${#NIX_DARWIN_RC_BACKUPS[@]}" -gt 0 ]]; then
+        for backup in "${NIX_DARWIN_RC_BACKUPS[@]}"; do
+            echo "  backup    pre-nix-darwin shell file retained at $backup"
+        done
+    fi
+    NIX_DARWIN_RC_SOURCES=()
+    NIX_DARWIN_RC_BACKUPS=()
+}
+
+nix_homebrew_activation_interrupted() {
+    local signal="$1" rc=130 rollback_failed=0
+    [[ "$signal" == "TERM" ]] && rc=143
+    trap - INT TERM
+    echo "  FAIL: nix-darwin activation interrupted by $signal; restoring pre-activation state." >&2
+    rollback_nix_darwin_shell_rc_migration || rollback_failed=1
+    rollback_nix_homebrew_declarative_taps || rollback_failed=1
+    if [[ "$rollback_failed" -ne 0 ]]; then
+        echo "        Automatic rollback was incomplete; follow the recovery instructions above before retrying." >&2
+    fi
+    exit "$rc"
+}
+
+complete_nix_homebrew_tap_transaction() {
+    if [[ -n "$NIX_HOMEBREW_TAPS_BACKUP" ]]; then
+        echo "  backup    pre-activation Homebrew taps retained at $NIX_HOMEBREW_TAPS_BACKUP"
+    fi
+    NIX_HOMEBREW_TAPS_PATH=""
+    NIX_HOMEBREW_TAPS_BACKUP=""
+}
+
 # Required POSIX package layer: apply Nix (nix-darwin) on macOS before native
 # dependency provisioning. It activates declarative Homebrew (WezTerm/AeroSpace
 # casks, Herdr brew) and the nix-owned CLI package set. chezmoi still owns every
-# dotfile (invariant 22). --impure lets the flake resolve SUDO_USER for
-# system.primaryUser while sudo makes USER=root during activation.
+# dotfile (invariant 22). setup resolves one authoritative target user/home and
+# passes both through sudo explicitly for impure flake evaluation.
 run_nix_darwin_switch() {
-    local explicit=0
+    local explicit=0 arch config_name flake_ref bootstrap_ref
     [[ "$NIX_DARWIN" -eq 1 ]] && explicit=1
     if [[ "$(uname -s)" != "Darwin" ]]; then
         [[ "$explicit" -eq 1 ]] || return 0
@@ -674,18 +1003,17 @@ run_nix_darwin_switch() {
         return 0
     fi
     phase "Required POSIX package layer: apply nix-darwin packages (macOS)"
-    case "$(uname -m)" in
-        arm64 | aarch64) ;;
-        *)
+    arch="$(normalize_machine_arch "$(uname -m)")" || {
             if [[ "$DRY_RUN" -eq 1 ]]; then
                 echo "  would fail: no supported nix-darwin activation config for arch $(uname -m)."
-                echo "              The current dotfiles activation host is aarch64-darwin."
                 return 0
             fi
             echo "  FAIL: no supported nix-darwin activation config for arch $(uname -m)."
-            echo "        The current dotfiles activation host is aarch64-darwin."
             return 1
-            ;;
+    }
+    case "$arch" in
+        aarch64) config_name="dotfiles-aarch64" ;;
+        x86_64) config_name="dotfiles-x86_64" ;;
     esac
     if ! command -v nix >/dev/null 2>&1; then
         if [[ "$DRY_RUN" -eq 1 ]]; then
@@ -698,12 +1026,12 @@ run_nix_darwin_switch() {
         echo "        This repo deliberately does not add a pipe-to-shell Nix installer."
         return 1
     fi
-    local flake_ref="$SCRIPT_DIR#dotfiles" bootstrap_ref
+    flake_ref="$SCRIPT_DIR#$config_name"
     bootstrap_ref="$(pinned_nix_darwin_run_ref)" || return 1
-    echo "  Runs 'sudo darwin-rebuild switch --flake $flake_ref --impure':"
+    echo "  Runs '$(nix_darwin_sudo_preview "darwin-rebuild") switch --flake $flake_ref --impure':"
     echo "  declarative Homebrew (WezTerm/AeroSpace casks, Herdr brew) + nix CLI set."
-    echo "  It uses sudo for nix-darwin's upstream activation shape; flake user"
-    echo "  resolution reads SUDO_USER so Homebrew/Home Manager target the real user."
+    echo "  It uses sudo for nix-darwin's upstream activation shape while passing"
+    echo "  the setup-validated target user/home explicitly through the boundary."
     if nix_darwin_hosted_ci_cleanup_override; then
         echo "  GitHub-hosted macOS runner mode: Homebrew cleanup check is disabled for"
         echo "  this disposable activation only because runner images preinstall Brew tools."
@@ -711,6 +1039,9 @@ run_nix_darwin_switch() {
     if [[ "$DRY_RUN" -eq 1 ]]; then
         echo "  would: $(nix_darwin_sudo_preview "darwin-rebuild") switch --flake $flake_ref --impure"
         echo "         (first-time bootstrap: $(nix_darwin_sudo_preview "nix") run $bootstrap_ref -- switch --flake $flake_ref --impure)"
+        if ! command -v darwin-rebuild >/dev/null 2>&1; then
+            preview_nix_darwin_shell_rc_migration
+        fi
         return 0
     fi
     if [[ "$ALL" -eq 0 ]]; then
@@ -720,21 +1051,50 @@ run_nix_darwin_switch() {
             return 1
         fi
     fi
-    prepare_nix_homebrew_declarative_taps || return 1
+    trap 'nix_homebrew_activation_interrupted INT' INT
+    trap 'nix_homebrew_activation_interrupted TERM' TERM
+    if ! prepare_nix_homebrew_declarative_taps; then
+        trap - INT TERM
+        return 1
+    fi
     if command -v darwin-rebuild >/dev/null 2>&1; then
         if ! sudo_nix_darwin_activation darwin-rebuild switch --flake "$flake_ref" --impure; then
+            trap - INT TERM
             echo "  FAIL: nix-darwin activation failed; setup did not apply the requested Nix package layer." >&2
+            if ! rollback_nix_darwin_shell_rc_migration; then
+                echo "        Shell-file rollback also failed; follow the recovery instructions above before retrying." >&2
+            fi
+            if ! rollback_nix_homebrew_declarative_taps; then
+                echo "        Tap rollback also failed; follow the recovery instructions above before retrying." >&2
+            fi
             echo "        Re-run './setup.sh' after fixing the activation error." >&2
             return 1
         fi
     else
         echo "  bootstrapping nix-darwin from flake.lock ($bootstrap_ref)..."
+        if ! prepare_nix_darwin_shell_rc_migration; then
+            trap - INT TERM
+            if ! rollback_nix_homebrew_declarative_taps; then
+                echo "        Tap rollback also failed; follow the recovery instructions above before retrying." >&2
+            fi
+            return 1
+        fi
         if ! sudo_nix_darwin_activation nix run "$bootstrap_ref" -- switch --flake "$flake_ref" --impure; then
+            trap - INT TERM
             echo "  FAIL: nix-darwin bootstrap activation failed; setup did not apply the requested Nix package layer." >&2
+            if ! rollback_nix_darwin_shell_rc_migration; then
+                echo "        Shell-file rollback also failed; follow the recovery instructions above before retrying." >&2
+            fi
+            if ! rollback_nix_homebrew_declarative_taps; then
+                echo "        Tap rollback also failed; follow the recovery instructions above before retrying." >&2
+            fi
             echo "        Re-run './setup.sh' after fixing the activation error." >&2
             return 1
         fi
     fi
+    trap - INT TERM
+    complete_nix_darwin_shell_rc_migration
+    complete_nix_homebrew_tap_transaction
     echo "  ok        nix-darwin package layer applied"
 }
 
@@ -814,6 +1174,7 @@ run_home_manager_switch() {
 # functions (phase, refresh_runtime_path) without running the install phases, so
 # tests can exercise refresh_runtime_path in isolation. Unset in normal runs.
 if [[ -z "${DOTFILES_SETUP_SOURCE_ONLY:-}" ]]; then
+    resolve_target_identity
     refuse_nvim_self_link_if_needed
 fi
 if [[ -n "${DOTFILES_SETUP_SOURCE_ONLY:-}" ]]; then

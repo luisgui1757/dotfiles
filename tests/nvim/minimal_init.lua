@@ -26,49 +26,17 @@ vim.g.maplocalleader = " "
 -- Add the repo's nvim/ tree (init.lua's stdpath-config equivalent).
 vim.opt.runtimepath:prepend(repo_root .. "/nvim")
 
--- Plenary lives under XDG_DATA_HOME/lazy/plenary.nvim once lazy has cloned it.
--- For headless tests we keep plenary in a fixed cache dir under the repo so
--- the suite doesn't depend on a populated lazy data dir.
-local function locked_plugin_commit(name)
-  local lockfile = repo_root .. "/nvim/lazy-lock.json"
-  local ok, lines = pcall(vim.fn.readfile, lockfile)
-  if not ok or not lines or #lines == 0 then
-    return nil
-  end
-
-  local decoded_ok, lock = pcall(vim.json.decode, table.concat(lines, "\n"))
-  if not decoded_ok or type(lock) ~= "table" or type(lock[name]) ~= "table" then
-    return nil
-  end
-  return lock[name].commit
-end
-
-local function git_checked(args)
-  vim.fn.system(args)
-  if vim.v.shell_error ~= 0 then
-    error("git failed: " .. table.concat(args, " "))
-  end
-end
-
+-- Plenary is executable test infrastructure, so it uses the same fail-closed
+-- identity proof and transactional cache publication as production lazy.nvim.
+local pinned_checkout = require("util.pinned_git_checkout")
 local plenary_dir = repo_root .. "/tests/.cache/plenary.nvim"
-if vim.fn.isdirectory(plenary_dir) == 0 then
-  vim.fn.mkdir(vim.fn.fnamemodify(plenary_dir, ":h"), "p")
-  git_checked({
-    "git",
-    "clone",
-    "--filter=blob:none",
-    "https://github.com/nvim-lua/plenary.nvim.git",
-    plenary_dir,
-  })
-end
-local plenary_commit = locked_plugin_commit("plenary.nvim")
-if plenary_commit and vim.fn.isdirectory(plenary_dir .. "/.git") == 1 then
-  local current = vim.fn.systemlist({ "git", "-C", plenary_dir, "rev-parse", "HEAD" })[1]
-  if current ~= plenary_commit then
-    git_checked({ "git", "-C", plenary_dir, "fetch", "--filter=blob:none", "origin", plenary_commit })
-    git_checked({ "git", "-C", plenary_dir, "checkout", "--detach", plenary_commit })
-  end
-end
+local plenary_commit = pinned_checkout.locked_commit(repo_root .. "/nvim/lazy-lock.json", "plenary.nvim")
+pinned_checkout.ensure({
+  target = plenary_dir,
+  url = "https://github.com/nvim-lua/plenary.nvim.git",
+  commit = plenary_commit,
+  required_file = "lua/plenary/init.lua",
+})
 vim.opt.runtimepath:prepend(plenary_dir)
 -- Explicitly source plenary's plugin file (plain `-u` doesn't auto-source
 -- plugin/*.vim when --noplugin was passed by PlenaryBustedDirectory).

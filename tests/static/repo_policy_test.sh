@@ -37,6 +37,24 @@ def pull_request_rule(ruleset):
     return {}
 
 
+def external_action_ref(line):
+    match = re.search(r"\buses:\s*([^@\s]+)@([^\s#]+)", line)
+    if not match or match.group(1).startswith("./"):
+        return None
+    return match.group(1), match.group(2)
+
+
+for probe, should_fail in (
+    ("uses: actions/checkout@v4", True),
+    ("uses: owner/action@0123456789abcdef0123456789abcdef01234567 # v1", False),
+    ("uses: ./local-action", False),
+):
+    parsed = external_action_ref(probe)
+    invalid = bool(parsed and not re.fullmatch(r"[0-9a-f]{40}", parsed[1]))
+    if invalid != should_fail:
+        fail(f"external Actions SHA scanner self-test failed for: {probe}")
+
+
 integrity = load_json(".github/rulesets/main-integrity.json")
 review = load_json(".github/rulesets/main-review.json")
 owner_updates = load_json(".github/rulesets/main-owner-updates.json")
@@ -119,6 +137,10 @@ for workflow in pathlib.Path(".github/workflows").glob("*.yml"):
         fail(f"{workflow} must not use pull_request_target")
     if "permissions:\n  contents: read" not in text:
         fail(f"{workflow} must declare read-only contents permission")
+    for line_number, line in enumerate(text.splitlines(), start=1):
+        parsed = external_action_ref(line)
+        if parsed and not re.fullmatch(r"[0-9a-f]{40}", parsed[1]):
+            fail(f"{workflow}:{line_number} external action {parsed[0]} must use a full lowercase 40-hex commit SHA")
 
 e2e_install = pathlib.Path(".github/workflows/e2e-install.yml").read_text(encoding="utf-8")
 cache_versions = re.findall(r"actions/cache@[0-9a-f]{40}\s+# v(\d+)(?:\.\d+)*", e2e_install)
@@ -129,10 +151,10 @@ elif len(set(cache_versions)) != 1:
 else:
     cache_major = cache_versions[0]
     expected_cache_snippets = (
-        f"${{{{ runner.os }}}}-setup-sh-actions-cache-v{cache_major}-${{{{ hashFiles('nvim/lazy-lock.json', 'nvim/lua/plugins/**/*.lua') }}}}",
-        f"${{{{ runner.os }}}}-setup-sh-actions-cache-v{cache_major}-",
-        f"Windows-setup-ps1-actions-cache-v{cache_major}-${{{{ hashFiles('nvim/lazy-lock.json', 'nvim/lua/plugins/**/*.lua') }}}}",
-        f"Windows-setup-ps1-actions-cache-v{cache_major}-",
+        f"${{{{ runner.os }}}}-${{{{ runner.arch }}}}-setup-sh-actions-cache-v{cache_major}-${{{{ hashFiles('nvim/lazy-lock.json', 'nvim/lua/plugins/**/*.lua') }}}}",
+        f"${{{{ runner.os }}}}-${{{{ runner.arch }}}}-setup-sh-actions-cache-v{cache_major}-",
+        f"Windows-${{{{ runner.arch }}}}-setup-ps1-actions-cache-v{cache_major}-${{{{ hashFiles('nvim/lazy-lock.json', 'nvim/lua/plugins/**/*.lua') }}}}",
+        f"Windows-${{{{ runner.arch }}}}-setup-ps1-actions-cache-v{cache_major}-",
     )
     for snippet in expected_cache_snippets:
         if snippet not in e2e_install:
@@ -153,6 +175,8 @@ for snippet in (
     'require_live_value "integrity bypass actor count" "$integrity_bypass_count" "0"',
     'require_live_value "review bypass actor" "$review_bypass" "User:139752288:pull_request"',
     'require_live_value "owner-updates bypass actor" "$owner_updates_bypass" "User:139752288:pull_request"',
+    '-F sha_pinning_required=true',
+    'require_live_value "Actions SHA pinning policy" "$actions_sha_pinning" "true"',
 ):
     if snippet not in script_text:
         fail(f"apply-repo-safeguards.sh missing {snippet}")

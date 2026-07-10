@@ -93,9 +93,12 @@ Windows Sandbox starts with no winget and no Scoop. That is intentional: it
 exercises the real Scoop-first bootstrap path. The `setup.ps1` Scoop path does
 not require admin. Windows Terminal still cannot be registered as MSIX in
 Sandbox, so the real installer falls back to pinned portable WT, and `setup.ps1`
-seeds or merges the Rose Pine + Hack Nerd Font settings into the portable
-(unpackaged) WT settings path; the greenfield portable helper remains as an
-idempotent safety net.
+transactionally seeds or merges the Rose Pine + Hack Nerd Font settings into
+that portable target's own state; it never mirrors packaged settings. The
+greenfield helper is an idempotent safety net that imports the production
+version/hash, transactionally publishes the portable directory, never queries
+`releases/latest`, and then lets a second setup config phase own the settings
+merge.
 
 To test a PR or branch, first put the mapped checkout at the exact state you
 intend to validate and record the full SHA:

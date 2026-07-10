@@ -32,6 +32,55 @@ INSTALL_DEPS_SOURCE_ONLY=1 source "$REPO_ROOT/install-deps.sh"
         || { echo "FAIL: final failure summary must explain the blocked install"; exit 1; }
 )
 
+# A direct-artifact failure must not trip `set -e`: later independent work runs,
+# the failure is recorded exactly once, and the final summary remains nonzero.
+(
+    DRY_RUN=0
+    INSTALL_FAILURES_COUNT=0
+    INSTALL_FAILURES_DETAIL=""
+    sentinel="$(mktemp)"
+    rm -f "$sentinel"
+    trap 'rm -f "$sentinel"' EXIT
+
+    fail_early_artifact() { return 47; }
+    run_later_install() { printf '%s\n' reached > "$sentinel"; }
+
+    run_install_step wezterm direct pinned-deb fail_early_artifact
+    run_install_step later test sentinel run_later_install
+
+    [[ -f "$sentinel" ]] \
+        || { echo "FAIL: early artifact failure prevented the later sentinel install"; exit 1; }
+    [[ "$INSTALL_FAILURES_COUNT" -eq 1 ]] \
+        || { echo "FAIL: wrapper must record the early failure exactly once"; exit 1; }
+    [[ "$(printf '%s' "$INSTALL_FAILURES_DETAIL" | grep -c 'wezterm via direct')" -eq 1 ]] \
+        || { echo "FAIL: wrapper duplicated or lost the early failure detail"; exit 1; }
+
+    set +e
+    summary="$( ( exit_if_install_failures ) 2>&1 )"
+    summary_rc=$?
+    set -e
+    [[ "$summary_rc" -ne 0 && "$summary" == *"wezterm via direct"* ]] \
+        || { echo "FAIL: consolidated summary did not report the injected failure"; exit 1; }
+)
+
+# Every bare main-flow path called out by UGR-004 must pass through the same
+# wrapper; focused function tests cover their path-specific failure details.
+for snippet in \
+    'run_install_step nvim direct' \
+    'run_install_step chezmoi direct' \
+    'run_install_step lazygit direct' \
+    'run_install_step starship direct' \
+    'run_install_step "tmux plugins" git' \
+    'run_install_step ghostty direct' \
+    'run_install_step wezterm direct' \
+    'run_install_step herdr direct' \
+    'run_install_step latex2text direct' \
+    'run_install_step pi npm' \
+    'run_install_step tree-sitter direct'; do
+    grep -F "$snippet" "$REPO_ROOT/install-deps.sh" >/dev/null \
+        || { echo "FAIL: main flow bypasses run_install_step for: $snippet"; exit 1; }
+done
+
 (
     DRY_RUN=1
     INSTALL_FAILURES_COUNT=0

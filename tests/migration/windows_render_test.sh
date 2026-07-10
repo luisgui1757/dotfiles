@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
-# Render the remaining Windows .ps1.tmpl template for targetOS=windows, parse it
-# with PowerShell, and exercise the WT modify_ filter. Closes the coverage gap
-# where tests/static/ps1_parse.sh only globs *.ps1 (never .ps1.tmpl), so the WT
-# template could be syntactically broken while the POSIX parity arm stays green.
+# Parse and exercise the shared Windows Terminal merge policy without exposing
+# a non-transactional chezmoi target. setup.ps1 owns staging/backup/publication;
+# this oracle proves the pure merge policy still preserves user data.
 # Skips gracefully when pwsh is absent (matches the repo's tool policy); the
 # chezmoi-parity CI job runs on ubuntu-latest, which ships pwsh.
 set -euo pipefail
@@ -19,22 +18,27 @@ if ! command -v pwsh >/dev/null 2>&1; then
     exit 0
 fi
 
-WT_TMPL="$SRC/AppData/Local/Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/LocalState/modify_settings.json.ps1.tmpl"
+WT_HELPER="$SRC/.chezmoitemplates/windows-terminal/merge-settings.ps1"
+WT_FRAGMENT="$REPO_ROOT/windows-terminal/settings.fragment.jsonc"
 
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
-# 1) Render the Windows-only WT modify_ template for targetOS=windows. Inject the
-#    OS with --override-data (the documented data-override flag) against the real
-#    home/ source, so the WT modify_ resolves its `template "windows-terminal/..."`
-#    from home/.chezmoitemplates. (A hand-built fixture source proved
-#    environment-sensitive in CI; --override-data is the deterministic mechanism.)
-render_windows() {
-    chezmoi --source "$SRC" execute-template --override-data '{"targetOS":"windows"}' < "$1"
+# 1) Build a test-only stdin harness around the production pure merge helper.
+cat > "$work/merge-settings.ps1" <<'PS'
+param(
+    [Parameter(Mandatory)] [string]$Helper,
+    [Parameter(Mandatory)] [string]$Fragment
+)
+$ErrorActionPreference = 'Stop'
+. $Helper
+$current = ConvertFrom-WindowsTerminalJsonc -Jsonc ([Console]::In.ReadToEnd())
+$fragmentObject = ConvertFrom-WindowsTerminalJsonc -Jsonc ([IO.File]::ReadAllText($Fragment))
+Merge-WindowsTerminalSettingsObject -Current $current -Fragment $fragmentObject | ConvertTo-Json -Depth 100
+PS
+run_merge() {
+    pwsh -NoLogo -NoProfile -File "$work/merge-settings.ps1" -Helper "$WT_HELPER" -Fragment "$WT_FRAGMENT"
 }
-render_windows "$WT_TMPL" > "$work/modify-settings.ps1"
-[[ -s "$work/modify-settings.ps1" ]] || fail "WT modify template rendered empty for targetOS=windows"
-pass "Windows WT modify_ template renders non-empty for targetOS=windows"
 
 # 2) Parse the rendered script with PowerShell (catches .ps1.tmpl breakage).
 cat > "$work/parse.ps1" <<'PS'
@@ -52,9 +56,9 @@ foreach ($f in $Files) {
 if ($failed) { exit 1 }
 PS
 pwsh -NoLogo -NoProfile -File "$work/parse.ps1" \
-    "$work/modify-settings.ps1" \
-    || fail "rendered Windows .ps1.tmpl failed PowerShell parse"
-pass "rendered Windows WT modify_ template parses cleanly under PowerShell"
+    "$WT_HELPER" "$work/merge-settings.ps1" \
+    || fail "Windows Terminal merge helper/harness failed PowerShell parse"
+pass "Windows Terminal pure merge helper parses cleanly under PowerShell"
 
 # 3) WT modify_ filter: a seeded settings.json gains the managed keys AND keeps
 #    the user's keys.
@@ -74,10 +78,10 @@ if (-not ($m.actions | Where-Object { $_.keys -eq 'alt+f4' })) { throw 'user act
 if ($m.PSObject.Properties.Name -contains '$schema') { throw 'fragment $schema propagated' }
 PS
 seeded='{"defaultProfile":"{u}","theme":"legacyLight","profiles":{"defaults":{},"list":[{"guid":"{u}","name":"U"}]},"schemes":[{"name":"MyScheme"}],"actions":[{"command":"closeWindow","keys":"alt+f4"}]}'
-printf '%s' "$seeded" | pwsh -NoLogo -NoProfile -File "$work/modify-settings.ps1" \
+printf '%s' "$seeded" | run_merge \
     | pwsh -NoLogo -NoProfile -File "$work/assert-merge.ps1" \
     || fail "WT modify_ merge did not preserve user keys + apply managed keys"
-pass "WT modify_ merges managed keys and preserves user data (no \$schema propagated)"
+pass "WT policy merges managed keys and preserves user data (no \$schema propagated)"
 
 # 4) WT modify_ promotes the built-in Windows PowerShell default to the managed
 #    PowerShell 7 profile, without deleting the built-in profile.
@@ -90,16 +94,16 @@ if (-not ($m.profiles.list | Where-Object { $_.guid -eq $managedPwshProfileGuid 
 if (-not ($m.profiles.list | Where-Object { $_.guid -eq $legacyWindowsPowerShellGuid })) { throw 'legacy Windows PowerShell profile dropped' }
 PS
 legacy_seed='{"defaultProfile":"{61c54bbd-c2c6-5271-96e7-009a87ff44bf}","profiles":{"defaults":{},"list":[{"guid":"{61c54bbd-c2c6-5271-96e7-009a87ff44bf}","name":"Windows PowerShell","commandline":"powershell.exe"}]},"schemes":[],"actions":[]}'
-printf '%s' "$legacy_seed" | pwsh -NoLogo -NoProfile -File "$work/modify-settings.ps1" \
+printf '%s' "$legacy_seed" | run_merge \
     | pwsh -NoLogo -NoProfile -File "$work/assert-pwsh-default.ps1" \
     || fail "WT modify_ did not promote the legacy Windows PowerShell default"
-pass "WT modify_ promotes the legacy default to managed PowerShell 7"
+pass "WT policy promotes the legacy default to managed PowerShell 7"
 
-# 5) Empty stdin (WT never launched) must emit NOTHING so chezmoi does not
-#    fabricate a settings.json.
-empty_out="$(printf '' | pwsh -NoLogo -NoProfile -File "$work/modify-settings.ps1")" \
-    || fail "WT modify_ errored on empty stdin"
-if [[ -n "${empty_out//[[:space:]]/}" ]]; then
-    fail "WT modify_ must emit nothing on empty stdin (WT-never-launched parity); got: $empty_out"
+# 5) Chezmoi must not expose a Windows Terminal settings target. setup.ps1 owns
+#    both packaged and portable publication transactions.
+managed="$(chezmoi --source "$SRC" managed --path-style absolute --override-data '{"targetOS":"windows"}')" \
+    || fail "chezmoi could not enumerate Windows targets"
+if printf '%s\n' "$managed" | grep -E 'Microsoft\.WindowsTerminal_8wekyb3d8bbwe/LocalState/settings\.json$' >/dev/null; then
+    fail "chezmoi still exposes a non-transactional Windows Terminal target"
 fi
-pass "WT modify_ emits nothing on empty stdin (no fabricated settings.json)"
+pass "chezmoi leaves Windows Terminal publication exclusively to setup.ps1"

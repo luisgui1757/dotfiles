@@ -14,8 +14,8 @@ grep -q "maximize()" "$rule" || fail "rule does not call maximize()"
 
 # install-deps must define AND call the opt-in setup.
 grep -q '^setup_ghostty_maximize()' "$REPO_ROOT/install-deps.sh" || fail "setup_ghostty_maximize() not defined in install-deps.sh"
-grep -qE '^setup_ghostty_maximize($|[[:space:]])' "$REPO_ROOT/install-deps.sh" \
-    || fail "setup_ghostty_maximize is never called in install-deps.sh"
+grep -qF "run_install_step devilspie2 \"\$(native_linux_pm)\" devilspie2 setup_ghostty_maximize" "$REPO_ROOT/install-deps.sh" \
+    || fail "setup_ghostty_maximize is not routed through the failure accumulator"
 
 INSTALL_DEPS_SOURCE_ONLY=1 source "$REPO_ROOT/install-deps.sh"
 

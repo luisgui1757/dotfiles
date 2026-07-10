@@ -33,6 +33,7 @@ env:
   STARSHIP_LINUX_X86_64_SHA256: 321f0dd7af8340a5f2e6a8fec6538a04f617486f9ec70d878f91c09cd8deef22
   TREE_SITTER_CLI_LINUX_VERSION: v0.26.10
   TREE_SITTER_CLI_LINUX_X86_64_SHA256: 5aca1172aae08050d0d1184046377d850c04065205185ebafde361afff8d9f62
+  POWERSHELL_REPO_DEB_SHA256: c13f01ac7c3001b51a9281d40dde666db5e037e05512840c319832f7852bfec4
 
 jobs:
   ubuntu:
@@ -54,7 +55,9 @@ jobs:
         run: |
           set -euxo pipefail
           sudo apt-get update
-          sudo apt-get install -y ca-certificates curl shellcheck tmux zsh python3-pip unzip
+          # clangd is a test runtime dependency: clangd_projects_spec.lua starts
+          # two real clients and deliberately refuses static/mock proof.
+          sudo apt-get install -y ca-certificates clangd curl shellcheck tmux zsh python3-pip unzip
           curl -fsSL "https://github.com/starship/starship/releases/download/${STARSHIP_VERSION}/starship-x86_64-unknown-linux-gnu.tar.gz" -o /tmp/starship.tar.gz
           printf '%s  %s\n' "$STARSHIP_LINUX_X86_64_SHA256" /tmp/starship.tar.gz | sha256sum -c -
           sudo tar -xzf /tmp/starship.tar.gz -C /usr/local/bin starship
@@ -78,8 +81,8 @@ jobs:
           export PATH="$HOME/.local/bin:$PATH"
 
           # PowerShell so tests/static/ps1_parse.sh catches .ps1 syntax regressions.
-          source /etc/os-release
-          curl -fsSL "https://packages.microsoft.com/config/ubuntu/${VERSION_ID}/packages-microsoft-prod.deb" -o /tmp/packages-microsoft-prod.deb
+          curl -fsSL "https://packages.microsoft.com/config/ubuntu/24.04/packages-microsoft-prod.deb" -o /tmp/packages-microsoft-prod.deb
+          printf '%s  %s\n' "$POWERSHELL_REPO_DEB_SHA256" /tmp/packages-microsoft-prod.deb | sha256sum -c -
           sudo dpkg -i /tmp/packages-microsoft-prod.deb
           rm /tmp/packages-microsoft-prod.deb
           sudo apt-get update
@@ -236,6 +239,37 @@ jobs:
             Add-Content -Path $env:GITHUB_PATH -Value (Split-Path -Parent $nvim.Source)
           }
           nvim --version | Select-Object -First 1
+
+          # The Pester suite exercises real chezmoi drift/exit semantics. Install
+          # the same immutable Windows asset used by the parity lane so those
+          # behavioral tests never become platform-dependent skips.
+          $chezmoiBin = Join-Path $env:RUNNER_TEMP 'pinned-chezmoi'
+          $chezmoiTemp = Join-Path $env:RUNNER_TEMP "chezmoi-test-$([guid]::NewGuid())"
+          New-Item -ItemType Directory -Force -Path $chezmoiBin, $chezmoiTemp | Out-Null
+          try {
+            $version = $env:CHEZMOI_VERSION.TrimStart('v')
+            $asset = "chezmoi_${version}_windows_amd64.zip"
+            $zip = Join-Path $chezmoiTemp $asset
+            $extract = Join-Path $chezmoiTemp 'extract'
+            Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/twpayne/chezmoi/releases/download/$env:CHEZMOI_VERSION/$asset" -OutFile $zip
+            $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $zip).Hash.ToLowerInvariant()
+            if ($actual -ne $env:CHEZMOI_WINDOWS_X86_64_SHA256) {
+              throw "checksum mismatch for ${asset}: got $actual expected $env:CHEZMOI_WINDOWS_X86_64_SHA256"
+            }
+            Expand-Archive -Path $zip -DestinationPath $extract -Force
+            $chezmoi = Get-ChildItem -Path $extract -Filter 'chezmoi.exe' -File -Recurse | Select-Object -First 1
+            if (-not $chezmoi) { throw "chezmoi.exe missing from $asset" }
+            Copy-Item -LiteralPath $chezmoi.FullName -Destination (Join-Path $chezmoiBin 'chezmoi.exe') -Force
+          } finally {
+            Remove-Item -LiteralPath $chezmoiTemp -Recurse -Force -ErrorAction SilentlyContinue
+          }
+          $chezmoiVersion = (& (Join-Path $chezmoiBin 'chezmoi.exe') --version) -join "`n"
+          if ($chezmoiVersion -notmatch [regex]::Escape($env:CHEZMOI_VERSION)) {
+            throw "chezmoi version output does not include $env:CHEZMOI_VERSION"
+          }
+          Add-Content -Path $env:GITHUB_PATH -Value $chezmoiBin
+          $env:PATH = "$chezmoiBin;$env:PATH"
+
           Import-Module Pester -MinimumVersion 5.0.0 -Force
           Import-Module PSScriptAnalyzer -Force
           Get-Module Pester, PSScriptAnalyzer | Format-Table Name,Version,Path -AutoSize

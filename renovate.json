@@ -1,6 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "description": "Renovate owns GitHub Actions and repo-pinned version/ref constants only. Direct-download SHA-256 values must still be recomputed and reviewed by a human after version/ref bumps.",
+  "description": "Renovate owns GitHub Actions, runner labels, Nix inputs, and repo-pinned version/ref constants. Direct-download SHA-256 values must still be recomputed and reviewed by a human after version/ref bumps.",
   "extends": [
     "config:recommended",
     "helpers:pinGitHubActionDigests",
@@ -16,12 +16,15 @@
   "prHourlyLimit": 2,
   "labels": ["dependencies"],
   "automerge": false,
-  "rebaseWhen": "conflicted",
+  "rebaseWhen": "behind-base-branch",
   "vulnerabilityAlerts": {
     "enabled": false
   },
   "lockFileMaintenance": {
     "enabled": false
+  },
+  "nix": {
+    "enabled": true
   },
   "ignorePaths": [
     "**/node_modules/**",
@@ -166,12 +169,12 @@
     },
     {
       "customType": "regex",
-      "description": "Scoop installer script commit pinned to the current main branch digest. The adjacent installer script SHA-256 must be recomputed manually after Renovate bumps this.",
+      "description": "Scoop installer script commit pinned to the upstream master branch digest. The adjacent installer script SHA-256 must be recomputed manually after Renovate bumps this.",
       "managerFilePatterns": ["/^install-deps\\.ps1$/"],
       "matchStrings": [
         "\\$ScoopInstallerCommit\\s*=\\s*'(?<currentDigest>[a-f0-9]{40})'\\s+\\$ScoopInstallerSha256\\s*=\\s*'[a-f0-9]{64}'"
       ],
-      "currentValueTemplate": "main",
+      "currentValueTemplate": "master",
       "depNameTemplate": "ScoopInstaller/Install",
       "packageNameTemplate": "https://github.com/ScoopInstaller/Install",
       "datasourceTemplate": "git-refs"
@@ -440,6 +443,16 @@
       "depNameTemplate": "renovate",
       "datasourceTemplate": "npm",
       "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "description": "GitHub runner labels stored in matrix include entries, which the built-in manager cannot extract through matrix variables.",
+      "managerFilePatterns": ["/^\\.github/workflows/(?:nix|e2e-install)\\.yml$/"],
+      "matchStrings": [
+        "runner:\\s*(?<depName>ubuntu|macos|windows)-(?<currentValue>[^\\s#]+)"
+      ],
+      "datasourceTemplate": "github-runners",
+      "versioningTemplate": "docker"
     }
   ],
   "packageRules": [
@@ -458,6 +471,13 @@
     },
     {
       "matchManagers": ["github-actions"],
+      "matchDatasources": ["github-runners"],
+      "groupName": "github runner images",
+      "addLabels": ["github-runners"],
+      "automerge": false
+    },
+    {
+      "matchManagers": ["custom.regex"],
       "matchDatasources": ["github-runners"],
       "groupName": "github runner images",
       "addLabels": ["github-runners"],

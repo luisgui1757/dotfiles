@@ -260,14 +260,21 @@ proves.
 
 ### Windows Terminal (Windows only)
 
+When both packaged and portable installations exist, add a different throwaway
+profile/scheme/action to each before setup. After setup, confirm neither target
+acquired the other's throwaway state and each has an independent
+`settings.json.bak.<timestamp>[.n]` recovery file.
+
 WT first tries scoop/winget/choco. In **Windows Sandbox** those MSIX-backed
 installs fail because Sandbox cannot register MSIX, so `install-deps.ps1`
 falls back to the pinned portable build. The `.wsb` path also keeps the
-idempotent portable helper as a safety net; on the manual path you can re-run it
-yourself:
+idempotent portable helper as a safety net. It reuses the production pin and
+does not copy packaged settings; rerun setup config after a manual helper
+install so setup independently merges the portable target:
 
 ```powershell
 .\tests\greenfield\install-wt-portable.ps1 -Launch
+.\setup.ps1 -All -SkipDeps -SkipNvim -SkipAgents
 ```
 
 | Run | Expect | Proves |

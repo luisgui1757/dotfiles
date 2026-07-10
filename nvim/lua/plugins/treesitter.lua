@@ -208,6 +208,26 @@ return {
         end)
       end
 
+      -- Every nvim-treesitter cleanup is constrained to stdpath("data"). A
+      -- successful vim.fn.delete() return is not sufficient proof: verify the
+      -- path is absent as well, because permission and partial directory
+      -- failures can leave executable parser/query payloads behind.
+      local managed_data_root = vim.fs.normalize(vim.fn.stdpath("data")):gsub("/$", "")
+      local managed_data_prefix = managed_data_root .. "/"
+      local function checked_delete_managed(path, mode)
+        local deleted, delete_error = require("util.checked_delete").managed(path, mode, managed_data_root)
+        if not deleted then
+          return "Tree-sitter " .. delete_error
+        end
+        return nil
+      end
+
+      local function report_cleanup_failures(failures)
+        if #failures > 0 then
+          report_install_problem(table.concat(failures, "; "))
+        end
+      end
+
       local bundled_set = {}
       for _, lang in ipairs(nvim_bundled_parsers) do
         bundled_set[lang] = true
@@ -247,6 +267,7 @@ return {
         local parser_dir = treesitter_config.get_install_dir("parser")
         local parser_info_dir = treesitter_config.get_install_dir("parser-info")
         local query_dir = treesitter_config.get_install_dir("queries")
+        local cleanup_failures = {}
         for _, parser in ipairs(parser_dependencies or {}) do
           local parser_config = parser_configs[parser]
           local has_runtime_queries = #vim.api.nvim_get_runtime_file("queries/" .. parser, false) > 0
@@ -258,12 +279,20 @@ return {
             local has_required_highlight_query = not highlight_query_required_set[parser]
               or vim.uv.fs_stat(vim.fs.joinpath(query_path, "highlights.scm"))
             if vim.uv.fs_stat(parser_path) and (not has_query_dir or not has_required_highlight_query) then
-              pcall(vim.fn.delete, parser_path)
-              pcall(vim.fn.delete, parser_info_path)
-              pcall(vim.fn.delete, query_path, "rf")
+              for _, cleanup in ipairs({
+                { parser_path },
+                { parser_info_path },
+                { query_path, "rf" },
+              }) do
+                local cleanup_error = checked_delete_managed(cleanup[1], cleanup[2])
+                if cleanup_error then
+                  table.insert(cleanup_failures, cleanup_error)
+                end
+              end
             end
           end
         end
+        report_cleanup_failures(cleanup_failures)
       end
 
       -- Purge any stale nvim-treesitter parser for a Neovim-bundled language.
@@ -282,14 +311,18 @@ return {
       -- parsers. nvim-treesitter installs only under stdpath('data') (its
       -- `site/parser`, `site/queries`, and lazy plugin dir all live there); the
       -- built-in prefix does not. So scope every delete to stdpath('data').
-      local managed_data_dir = vim.fs.normalize(vim.fn.stdpath("data")) .. "/"
       local function purge_managed_bundled_files(pattern)
+        local cleanup_failures = {}
         for _, path in ipairs(vim.api.nvim_get_runtime_file(pattern, true)) do
           local name = vim.fn.fnamemodify(path, ":t"):gsub("%.so$", ""):gsub("%.revision$", "")
-          if bundled_set[name] and vim.startswith(vim.fs.normalize(path), managed_data_dir) then
-            pcall(vim.fn.delete, path)
+          if bundled_set[name] and vim.startswith(vim.fs.normalize(path), managed_data_prefix) then
+            local cleanup_error = checked_delete_managed(path)
+            if cleanup_error then
+              table.insert(cleanup_failures, cleanup_error)
+            end
           end
         end
+        report_cleanup_failures(cleanup_failures)
       end
 
       local function managed_query_install_dir()
@@ -305,15 +338,20 @@ return {
 
       local function purge_managed_bundled_query_dirs()
         local query_dir = vim.fs.normalize(managed_query_install_dir())
-        if not vim.startswith(query_dir .. "/", managed_data_dir) then
+        if not vim.startswith(query_dir .. "/", managed_data_prefix) then
           return
         end
+        local cleanup_failures = {}
         for _, lang in ipairs(nvim_bundled_parsers) do
           local path = vim.fs.joinpath(query_dir, lang)
           if vim.fn.isdirectory(path) == 1 then
-            pcall(vim.fn.delete, path, "rf")
+            local cleanup_error = checked_delete_managed(path, "rf")
+            if cleanup_error then
+              table.insert(cleanup_failures, cleanup_error)
+            end
           end
         end
+        report_cleanup_failures(cleanup_failures)
       end
 
       purge_managed_bundled_files("parser/*.so")

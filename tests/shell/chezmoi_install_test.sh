@@ -121,7 +121,7 @@ workflow_version="$(awk '/^[[:space:]]*CHEZMOI_VERSION:/{print $2; exit}' "$REPO
 
 grep -qF 'chezmoi|chezmoi|||||' "$REPO_ROOT/install-deps.sh" \
     || fail "PKG_TABLE is missing the brew chezmoi row"
-grep -qE '^install_chezmoi$' "$REPO_ROOT/install-deps.sh" \
-    || fail "install-deps.sh no longer calls install_chezmoi"
+grep -qF "run_install_step chezmoi direct \"\$CHEZMOI_VERSION\" install_chezmoi" "$REPO_ROOT/install-deps.sh" \
+    || fail "install-deps.sh no longer routes install_chezmoi through the failure accumulator"
 
 echo "OK"

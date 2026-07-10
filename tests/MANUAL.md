@@ -27,6 +27,19 @@ significant change to the relevant area.
 - [ ] **Windows Terminal**: rose-pine scheme applied; tabs use the
       configured theme; acrylic OFF on the body, ON in the tab row; a new tab
       opens `PowerShell 7` unless the user intentionally chose another default.
+- [ ] **Windows Terminal dual-install preservation**: give packaged and portable
+      settings different custom profiles, schemes, actions, and defaults; run
+      `setup.ps1 -SkipDeps -SkipNvim`. Confirm each retains only its own custom
+      state plus the managed fragment and receives its own verified backup.
+      Run `uninstall.ps1 -All`; confirm both pre-setup backups restore and each
+      displaced current file remains as `settings.json.uninstall-current.*`.
+- [ ] **Redirected Windows known folders**: redirect Documents and
+      LocalApplicationData to different real paths (include an alternate drive
+      and spaces), run `setup.ps1 -All`, then open Neovim, lazygit, ConsoleHost,
+      VS Code, and ISE. Confirm each consumes the managed target in the actual
+      known folder and no conventional `%USERPROFILE%\AppData\Local`/`Documents`
+      target was silently overwritten. Run `uninstall.ps1 -All` and verify the
+      same source states are removed or restored without guessing paths.
 - [ ] **Tmux status bar**: generated Rose Pine bar is at the top, includes the
       signal-bar segments (session, window list/current program, directory
       basename; no user/host/date/time duplication), segments are readable,
@@ -56,6 +69,14 @@ significant change to the relevant area.
       for Accessibility — grant it (System Settings -> Privacy & Security ->
       Accessibility -> AeroSpace ON). Confirm AeroSpace starts at login
       (`start-at-login = true`) and tiles windows.
+- [ ] **AeroSpace managed-config consumption**, macOS with the TCC grant above:
+      run `aerospace config --config-path` and confirm its resolved path is the
+      chezmoi-managed `~/.config/aerospace/aerospace.toml` target and its bytes
+      match `aerospace/aerospace.toml`. Then run
+      `aerospace reload-config --no-gui --dry-run --warnings-as-errors` and
+      require exit 0 with no diagnostics. This remains manual because the app
+      waits for Accessibility before parsing user config or starting its CLI
+      server; a GitHub-hosted macOS runner has no user-granted TCC session.
 - [ ] **AeroSpace reserved-chord safety**, macOS: with AeroSpace running, open a
       terminal + nvim. `ctrl-alt-h/j/k/l` moves WM focus between windows;
       **bare `Alt-h/j/k/l` still reaches nvim** (window nav) and is NOT captured
@@ -85,10 +106,17 @@ significant change to the relevant area.
       `gh auth login` (setup skips it cleanly when unauthenticated — rerun
       setup/install-deps after authenticating). Then `gh dash` renders the
       dashboard (My Pull Requests / Needs My Review / My Issues) with Nerd Font
-      icons.
+      icons, and `gh extension list` identifies commit
+      `49f37e4832956c57bf52d4ea8b1b1e5c0f863700`.
 - [ ] **Pi CLI**: `pi --version` prints `0.80.3` on macOS, Linux/WSL, and
       Windows. Confirm `.pi/` session/auth state stays local and is not created
       or modified by chezmoi.
+- [ ] **Windows Tree-sitter CLI**: `tree-sitter --version` prints exactly
+      `0.26.10`. A compatible unmanaged executable remains untouched; after a
+      stale unmanaged fixture, the verified dotfiles executable wins PATH.
+- [ ] **Zsh plugin pin recovery**: bare `chezmoi apply` self-heals a clean old
+      pin. With a dirty/wrong fixture and network disabled, it fails with the
+      fixed source path absent and prints a preserved quarantine path.
 
 ## Command-line vi mode
 
@@ -108,32 +136,58 @@ significant change to the relevant area.
       `Get-PSReadLineOption` still shows `EditMode = Vi`, `Tab` = MenuComplete,
       the ListView history prediction is back, and the PSFzf `Ctrl+R` picker
       still works (the re-apply must NOT have wiped the fzf chords).
+- [ ] **PowerShell invocation guard on Windows**: run the profile through
+      `pwsh -NonInteractive -Command`, a credential-helper-shaped `-Command`,
+      redirected stdin/stdout, and a CI subprocess. Confirm zero prompt output
+      and no Starship/zoxide cache writes. Then confirm normal ConsoleHost, VS
+      Code, and ISE sessions still load the prompt and bindings.
 
 ## Nix layer (enforced on macOS/Linux/WSL)
 
 - [ ] **`nix flake check`**: on a Nix host run `nix flake check` at the repo root
       — it evaluates `darwinConfigurations.dotfiles` (build skipped) and builds
       `checks.<system>.toolchain`, exit 0.
-- [ ] **nix-darwin bootstrap/switch**, macOS: on Apple silicon with Nix installed, run
+- [ ] **nix-darwin bootstrap/switch**, macOS: on Apple Silicon and Intel with Nix installed, run
       `./setup.sh --all` (or the compatibility alias `./setup.sh --nix-darwin`;
       equivalent activation:
-      `sudo darwin-rebuild switch --flake .#dotfiles --impure`; first-run setup
+      `sudo env DOTFILES_TARGET_USER="$USER" DOTFILES_TARGET_HOME="$HOME"
+      darwin-rebuild switch --flake .#dotfiles-aarch64 --impure` or
+      `.#dotfiles-x86_64` as appropriate; first-run setup
       derives the locked
       `github:nix-darwin/nix-darwin/<rev>?narHash=<encoded-narHash>#darwin-rebuild`
-      ref from `flake.lock`). Confirm activation uses sudo, sets
-      `system.primaryUser` to the real invoking user via `SUDO_USER` (not
-      `root`), installs the WezTerm + AeroSpace casks and the Herdr brew via
+      ref from `flake.lock`). Confirm activation uses sudo but targets the
+      setup-validated real invoking user/home via `DOTFILES_TARGET_*` (not
+      `root` or a fabricated home), installs the WezTerm + AeroSpace casks and the Herdr brew via
       declarative Homebrew (no `brew update`/`upgrade`; `cleanup = check` only
       reports drift), and puts the nix-owned CLI set on PATH from
       `~/.nix-profile` / the system profile.
+      On a first bootstrap with existing `/etc/bashrc` or `/etc/zshrc`, confirm
+      setup retains their exact bytes at `.before-nix-darwin`; an injected
+      activation failure/interruption must restore both originals and preserve
+      generated replacements at collision-safe `.dotfiles-failed-*` paths. A
+      pre-existing `.before-nix-darwin` collision must move neither file and
+      must print explicit compare/resolve/retry guidance.
       If Homebrew already existed, confirm nix-homebrew auto-migrated the
       Homebrew repositories while keeping installed packages. If the old
-      `/opt/homebrew/Library/Taps` directory existed, confirm setup moved it to
-      a `Taps.dotfiles-pre-nix-*` backup and nix-homebrew replaced it with the
-      declarative pinned tap symlink. Confirm `brew tap-info nikitabobko/tap`
+      architecture-correct `Library/Taps` directory existed, confirm setup moved
+      it to a `Taps.dotfiles-pre-nix-*` backup and nix-homebrew replaced it with
+      the declarative pinned tap symlink. Inject/fix an activation failure and
+      confirm the original taps return before retrying. Confirm
+      `brew tap-info nikitabobko/tap`
       reports a trusted tap so Homebrew 5 can load the AeroSpace cask.
       The `DOTFILES_NIX_DARWIN_HOSTED_CI=1` cleanup override is only for
       GitHub's disposable macOS runner; do not use it for this real-host check.
+- [x] **Intel macOS hosted runtime proof**: exact head
+      `f4b63953f2f982702a685358b09e89bae2d78fdd` passed the real
+      `macos-26-intel` Nix job (`29092384007` / `86360593091`) and full setup job
+      (`29092384014` / `86360593153`). The x86_64 host installed upstream Nix
+      2.34.8, selected only `dotfiles-x86_64`, completed nix-darwin and all six
+      setup phases, and passed post-install plus the 257-check language smoke.
+      This is runtime proof, not cross-evaluation. The PR lane restored caches
+      and had no user-granted TCC desktop session. Nixpkgs 26.05 is the final
+      Intel-darwin release and remains supported only through 2026-12-31; keep
+      its warning visible and track the required post-26.05 package-plane
+      migration separately.
 - [ ] **Home Manager (Linux/WSL)**: with Nix installed inside the Linux/WSL
       environment, run
       `./setup.sh --all` (or the compatibility alias `./setup.sh --home-manager`;
@@ -145,6 +199,17 @@ significant change to the relevant area.
       npm/starship/zoxide) lands in `~/.nix-profile/bin` with NO root, and that `nvim` +
       `tree-sitter` are still the native install-deps binaries (NOT nix) so
       parser builds keep working.
+- [ ] **Fresh Home Manager zsh session**, native Linux and WSL: with no caller
+      PATH injection, run `env -i HOME="$HOME" USER="$USER" PATH=/usr/bin:/bin
+      TERM=xterm zsh -l -i -c 'command -v rg'`. Confirm it resolves through a
+      Nix profile/store path. Repeat with a custom home containing spaces and
+      with the XDG, `~/.nix-profile`, and
+      `/etc/profiles/per-user/$(id -un)` session-vars locations individually.
+      With none present, startup must remain harmless.
+      Exact head `f4b63953f2f982702a685358b09e89bae2d78fdd` passed the
+      hosted native-Linux account-record login-shell proof in run `29092384014`,
+      job `86360593139`; this row stays open for WSL and the real custom-HOME
+      permutations.
 - [ ] **WSL split-host under Home Manager**: on WSL, after `./setup.sh --all`,
       confirm nothing was written under `/mnt/c` — Home Manager touches only the
       Linux `~/.nix-profile`; Windows Terminal/fonts/WezTerm stay Windows-host.
@@ -167,6 +232,11 @@ significant change to the relevant area.
 
 - [ ] **C++ workspace** with `compile_commands.json`: hover, go-to-def,
       and clang-tidy diagnostics work in a real CMake project.
+- [ ] **Two C++ workspaces in one Neovim session**: open projects whose compile
+      databases require different macros (one at the root, one under `build/`).
+      `:LspInfo` must show distinct clangd roots/clients and neither project may
+      inherit the other's flags. The automated spec uses the real clangd binary;
+      this row confirms the interactive workflow.
 - [ ] **Rust workspace**: `cargo check` runs on save (rust-analyzer
       `checkOnSave`); inlay hints don't break visual layout.
 - [ ] **Python with venv**: pyright picks up the venv interpreter

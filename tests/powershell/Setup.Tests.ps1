@@ -26,7 +26,7 @@ $script:ChezmoiCommandForContentTests = Get-Command chezmoi -ErrorAction Silentl
 Describe "setup.ps1 Test-TargetContentMatchesChezmoi copy-mode" -Skip:(-not $script:ChezmoiCommandForContentTests) {
     BeforeAll {
         $script:OldUserProfileForContentTest = $env:USERPROFILE
-        $script:ContentTestRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("setup-content-" + [System.Guid]::NewGuid())
+        $script:ContentTestRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("setup content " + [System.Guid]::NewGuid())
         $script:ContentTestSource = Join-Path $script:ContentTestRoot 'source'
         $script:ContentTestDest = Join-Path $script:ContentTestRoot 'dest'
         $script:ContentTestProfile = Join-Path $script:ContentTestRoot 'profile'
@@ -77,6 +77,112 @@ Describe "setup.ps1 Test-TargetContentMatchesChezmoi copy-mode" -Skip:(-not $scr
         [System.IO.File]::WriteAllBytes($script:ProbeTarget, [byte[]](0x64, 0x69, 0x66, 0x66, 0x0a))
 
         Test-TargetContentMatchesChezmoi $script:ProbeTarget | Should -BeFalse
+    }
+
+    It "treats verify drift as false and restores native preference <Preference>" -TestCases @(
+        @{ Preference = $true },
+        @{ Preference = $false }
+    ) {
+        param([bool]$Preference)
+        $originalPreference = $PSNativeCommandUseErrorActionPreference
+        try {
+            $PSNativeCommandUseErrorActionPreference = $Preference
+            Test-ChezmoiVerify $script:ProbeTarget | Should -BeTrue
+            $PSNativeCommandUseErrorActionPreference | Should -Be $Preference
+            $LASTEXITCODE | Should -Be 0
+
+            [System.IO.File]::WriteAllText($script:ProbeTarget, 'divergent user bytes')
+            Test-ChezmoiVerify $script:ProbeTarget | Should -BeFalse
+            $PSNativeCommandUseErrorActionPreference | Should -Be $Preference
+            $LASTEXITCODE | Should -Be 0
+        } finally {
+            $PSNativeCommandUseErrorActionPreference = $originalPreference
+        }
+    }
+
+    It "keeps real verify invocation failures fatal and restores native preference" {
+        $oldBaseArgs = $script:ChezmoiBaseArgs
+        $originalPreference = $PSNativeCommandUseErrorActionPreference
+        try {
+            $script:ChezmoiBaseArgs = @('--source', (Join-Path $script:ContentTestRoot 'missing source'))
+            $PSNativeCommandUseErrorActionPreference = $true
+            { Test-ChezmoiVerify $script:ProbeTarget } | Should -Throw '*verify invocation failed*missing source*'
+            $PSNativeCommandUseErrorActionPreference | Should -BeTrue
+            $LASTEXITCODE | Should -Be 0
+        } finally {
+            $script:ChezmoiBaseArgs = $oldBaseArgs
+            $PSNativeCommandUseErrorActionPreference = $originalPreference
+        }
+    }
+}
+
+Describe "setup.ps1 main chezmoi apply boundary" {
+    BeforeEach {
+        . $script:ImportSetupForTest
+        $script:ApplyBoundaryOldIdentity = $script:WindowsIdentity
+        $script:DryRun = $false
+        $script:WindowsIdentity = [pscustomobject]@{
+            UserProfile = 'C:\User'
+            LocalApplicationData = 'D:\Local Data'
+            Documents = 'E:\Documents'
+            RuntimeProfile = 'E:\Documents\PowerShell\Microsoft.PowerShell_profile.ps1'
+        }
+        Mock -CommandName Get-Command -ParameterFilter { $Name -eq 'chezmoi' } -MockWith {
+            [pscustomobject]@{ Source = 'C:\tools\chezmoi.exe' }
+        }
+        Mock -CommandName Test-CanCreateSymlinks -MockWith { $true }
+        Mock -CommandName Backup-PreexistingManagedTargets
+        Mock -CommandName Invoke-WindowsKnownFolderOverlays
+        Mock -CommandName Invoke-WindowsTerminalSettingsTransaction
+        Mock -CommandName Invoke-ChezmoiOrExit
+    }
+
+    AfterEach {
+        $script:WindowsIdentity = $script:ApplyBoundaryOldIdentity
+    }
+
+    It "applies the complete source without non-portable absolute target selectors" {
+        Invoke-ChezmoiApplyPhase
+
+        Should -Invoke Invoke-ChezmoiOrExit -Times 1 -ParameterFilter {
+            $Label -eq 'chezmoi apply' -and
+            ($Arguments -join '|') -eq '--no-tty|--force|apply'
+        }
+    }
+}
+
+Describe "setup.ps1 native chezmoi failure reporting" {
+    It "surfaces captured stderr and preserves the native exit code" {
+        $probe = Join-Path ([System.IO.Path]::GetTempPath()) ("setup-chezmoi-failure-" + [System.Guid]::NewGuid() + ".ps1")
+        $probeContent = (@'
+$env:DOTFILES_SETUP_PS1_SOURCE_ONLY = '1'
+. '__SETUP_PATH__'
+function Invoke-ChezmoiNative {
+    param([string[]]$Arguments, [switch]$PassThroughOutput)
+    [pscustomobject]@{
+        ExitCode = 23
+        Stderr = 'fatal chezmoi detail from redirected stderr'
+        Output = @()
+    }
+}
+Invoke-ChezmoiOrExit -Label 'chezmoi apply' -Arguments @('apply')
+'@).Replace('__SETUP_PATH__', $script:Setup.Replace("'", "''"))
+        [System.IO.File]::WriteAllText($probe, $probeContent, [System.Text.UTF8Encoding]::new($false))
+
+        $originalPreference = $PSNativeCommandUseErrorActionPreference
+        try {
+            $PSNativeCommandUseErrorActionPreference = $false
+            $currentPowerShell = (Get-Process -Id $PID).Path
+            $output = & $currentPowerShell -NoLogo -NoProfile -File $probe 2>&1
+            $exitCode = $LASTEXITCODE
+        } finally {
+            $PSNativeCommandUseErrorActionPreference = $originalPreference
+            Remove-Item -LiteralPath $probe -Force -ErrorAction SilentlyContinue
+        }
+
+        $exitCode | Should -Be 23
+        ($output | Out-String) | Should -Match 'fatal chezmoi detail from redirected stderr'
+        ($output | Out-String) | Should -Match 'FAIL: chezmoi apply exited 23'
     }
 }
 
@@ -143,7 +249,7 @@ Describe "setup.ps1 Update-RuntimePath" {
         @($parts | Where-Object { $_ -eq $fakeOne }).Count | Should -Be 1
     }
 
-    It "falls back to HOME when USERPROFILE and SCOOP are absent" {
+    It "uses the resolved profile root when SCOOP is absent" {
         Remove-Item Env:SCOOP -ErrorAction SilentlyContinue
         Remove-Item Env:USERPROFILE -ErrorAction SilentlyContinue
         $env:HOME = $script:FakeHome
@@ -152,11 +258,24 @@ Describe "setup.ps1 Update-RuntimePath" {
         $fakeOne = Join-Path $script:FakeHome 'one'
         $env:PATH = "$fakeOne;$fakeOne"
 
-        Update-RuntimePath
+        Update-RuntimePath -ProfileRootResolver { $script:FakeHome }
 
         $parts = $env:PATH -split ';'
         $parts[0] | Should -Be $shimDir
         @($parts | Where-Object { $_ -eq $fakeOne }).Count | Should -Be 1
+    }
+
+    It "uses the platform's canonical profile source when environment variables are absent" {
+        Remove-Item Env:SCOOP -ErrorAction SilentlyContinue
+        Remove-Item Env:USERPROFILE -ErrorAction SilentlyContinue
+        $env:HOME = $script:FakeHome
+
+        if ($env:OS -eq 'Windows_NT') {
+            Get-DefaultProfileRoot | Should -Be ([Environment]::GetFolderPath([Environment+SpecialFolder]::UserProfile))
+            Get-DefaultProfileRoot | Should -Not -Be $script:FakeHome
+        } else {
+            Get-DefaultProfileRoot | Should -Be $script:FakeHome
+        }
     }
 }
 
@@ -179,6 +298,140 @@ Describe "setup.ps1 source-only import" {
             } else {
                 $env:USERPROFILE = $oldUserProfile
             }
+        }
+    }
+}
+
+Describe "setup.ps1 Windows known-folder identity" {
+    BeforeEach {
+        $script:KnownFolderOldUserProfile = $env:USERPROFILE
+        $script:KnownFolderOldLocalAppData = $env:LOCALAPPDATA
+        . $script:ImportSetupForTest
+    }
+
+    AfterEach {
+        if ($null -eq $script:KnownFolderOldUserProfile) { Remove-Item Env:USERPROFILE -ErrorAction SilentlyContinue }
+        else { $env:USERPROFILE = $script:KnownFolderOldUserProfile }
+        if ($null -eq $script:KnownFolderOldLocalAppData) { Remove-Item Env:LOCALAPPDATA -ErrorAction SilentlyContinue }
+        else { $env:LOCALAPPDATA = $script:KnownFolderOldLocalAppData }
+    }
+
+    It "resolves redirected folders, alternate drives, spaces, and runtime profile independently" {
+        $env:USERPROFILE = 'C:\Conventional User'
+        $env:LOCALAPPDATA = 'C:\Conventional User\AppData\Local'
+        $resolver = {
+            param([string]$Name)
+            switch ($Name) {
+                'UserProfile' { 'D:\Actual User With Spaces' }
+                'LocalApplicationData' { 'E:\Redirected Local Data' }
+                'MyDocuments' { 'F:\OneDrive - Example\Documents' }
+            }
+        }
+        $identity = Resolve-WindowsTargetIdentity -FolderResolver $resolver `
+            -RuntimeProfile 'F:\OneDrive - Example\Documents\PowerShell\Microsoft.VSCode_profile.ps1'
+
+        $identity.UserProfile | Should -Be 'D:\Actual User With Spaces'
+        $identity.LocalApplicationData | Should -Be 'E:\Redirected Local Data'
+        $identity.Documents | Should -Be 'F:\OneDrive - Example\Documents'
+        $identity.RuntimeProfile | Should -Be 'F:\OneDrive - Example\Documents\PowerShell\Microsoft.VSCode_profile.ps1'
+        $identity.UserProfile | Should -Not -Be $env:USERPROFILE
+        $identity.LocalApplicationData | Should -Not -Be $env:LOCALAPPDATA
+    }
+
+    It "rejects missing or relative known-folder and runtime-profile identities" {
+        $goodResolver = { param([string]$Name) "C:\$Name" }
+        { Resolve-WindowsTargetIdentity -FolderResolver { param($Name) if ($Name -eq 'MyDocuments') { '' } else { "C:\$Name" } } -RuntimeProfile 'C:\profile.ps1' } |
+            Should -Throw '*MyDocuments known folder*'
+        { Resolve-WindowsTargetIdentity -FolderResolver { param($Name) if ($Name -eq 'LocalApplicationData') { 'relative' } else { "C:\$Name" } } -RuntimeProfile 'C:\profile.ps1' } |
+            Should -Throw '*LocalApplicationData known folder*'
+        { Resolve-WindowsTargetIdentity -FolderResolver $goodResolver -RuntimeProfile 'relative-profile.ps1' } |
+            Should -Throw '*runtime profile path*'
+    }
+
+    It "maps each overlay to the actual application destination" {
+        $root = Join-Path ([IO.Path]::GetTempPath()) 'overlay mapping root'
+        $identity = [pscustomobject]@{
+            UserProfile = Join-Path $root 'Actual User'
+            LocalApplicationData = Join-Path $root 'Redirected Local Data'
+            Documents = Join-Path $root 'OneDrive Documents'
+            RuntimeProfile = Join-Path $root 'OneDrive Documents\PowerShell\Microsoft.PowerShell_profile.ps1'
+        }
+        $overlays = @(Get-WindowsKnownFolderOverlays -Identity $identity)
+
+        $overlays.Count | Should -Be 2
+        $overlays[0].Destination | Should -Be $identity.LocalApplicationData
+        $overlays[1].Destination | Should -Be $identity.Documents
+        $overlays[0].State | Should -Match 'localappdata\.boltdb$'
+        $overlays[1].State | Should -Match 'documents\.boltdb$'
+    }
+
+    It "post-checks actual Neovim, lazygit, Console, VS Code, and ISE consumers" {
+        $root = Join-Path ([IO.Path]::GetTempPath()) ('known folders ' + [Guid]::NewGuid())
+        $localAppData = Join-Path $root 'Redirected Local Data'
+        $documents = Join-Path $root 'OneDrive Documents'
+        $nvimTarget = Join-Path $localAppData 'nvim'
+        $lazygitTarget = Join-Path $localAppData 'lazygit\config.yml'
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $lazygitTarget) | Out-Null
+        if ($env:OS -eq 'Windows_NT') {
+            New-Item -ItemType Junction -Path $nvimTarget -Target (Join-Path $script:RepoRoot 'nvim') | Out-Null
+        } else {
+            New-Item -ItemType SymbolicLink -Path $nvimTarget -Target (Join-Path $script:RepoRoot 'nvim') | Out-Null
+        }
+        Copy-Item -LiteralPath (Join-Path $script:RepoRoot 'lazygit\config.windows.yml') -Destination $lazygitTarget
+        $profiles = @(
+            (Join-Path $documents 'PowerShell\Microsoft.PowerShell_profile.ps1'),
+            (Join-Path $documents 'PowerShell\Microsoft.VSCode_profile.ps1'),
+            (Join-Path $documents 'WindowsPowerShell\Microsoft.PowerShell_profile.ps1'),
+            (Join-Path $documents 'WindowsPowerShell\Microsoft.PowerShellISE_profile.ps1')
+        )
+        try {
+            foreach ($profilePath in $profiles) {
+                New-Item -ItemType Directory -Force -Path (Split-Path -Parent $profilePath) | Out-Null
+                Copy-Item -LiteralPath (Join-Path $script:RepoRoot 'shells\powershell_profile.ps1') -Destination $profilePath
+            }
+            foreach ($profilePath in $profiles) {
+                $identity = [pscustomobject]@{
+                    UserProfile = $root
+                    LocalApplicationData = $localAppData
+                    Documents = $documents
+                    RuntimeProfile = $profilePath
+                }
+                { Assert-WindowsKnownFolderConsumption -Identity $identity } | Should -Not -Throw
+            }
+        } finally {
+            Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    It "backs up recognized legacy-shape targets but preserves divergent legacy user data" {
+        $root = Join-Path ([IO.Path]::GetTempPath()) ('legacy shape ' + [Guid]::NewGuid())
+        $identity = [pscustomobject]@{
+            UserProfile = Join-Path $root 'User'
+            LocalApplicationData = Join-Path $root 'Redirected Local'
+            Documents = Join-Path $root 'Redirected Documents'
+            RuntimeProfile = Join-Path $root 'Redirected Documents\PowerShell\Microsoft.PowerShell_profile.ps1'
+        }
+        $legacyNvim = Join-Path $identity.UserProfile 'AppData\Local\nvim'
+        $legacyLazygit = Join-Path $identity.UserProfile 'AppData\Local\lazygit\config.yml'
+        $legacyProfile = Join-Path $identity.UserProfile 'Documents\PowerShell\Microsoft.PowerShell_profile.ps1'
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $legacyNvim), (Split-Path -Parent $legacyLazygit), (Split-Path -Parent $legacyProfile) | Out-Null
+        if ($env:OS -eq 'Windows_NT') {
+            New-Item -ItemType Junction -Path $legacyNvim -Target (Join-Path $script:RepoRoot 'nvim') | Out-Null
+        } else {
+            New-Item -ItemType SymbolicLink -Path $legacyNvim -Target (Join-Path $script:RepoRoot 'nvim') | Out-Null
+        }
+        Copy-Item -LiteralPath (Join-Path $script:RepoRoot 'lazygit\config.windows.yml') -Destination $legacyLazygit
+        [IO.File]::WriteAllText($legacyProfile, 'user-owned divergent profile')
+        try {
+            Move-LegacyWindowsKnownFolderTargets -Identity $identity -IsDryRun:$false
+
+            Test-Path -LiteralPath $legacyNvim | Should -BeFalse
+            Test-Path -LiteralPath $legacyLazygit | Should -BeFalse
+            @(Get-ChildItem -LiteralPath (Split-Path -Parent $legacyNvim) -Filter 'nvim.legacy.*').Count | Should -Be 1
+            @(Get-ChildItem -LiteralPath (Split-Path -Parent $legacyLazygit) -Filter 'config.yml.legacy.*').Count | Should -Be 1
+            [IO.File]::ReadAllText($legacyProfile) | Should -Be 'user-owned divergent profile'
+        } finally {
+            Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue
         }
     }
 }
@@ -230,17 +483,23 @@ printf "%s\n" "$*" >> "$POLARIS_TEST_LOG"
     function script:Invoke-SetupTestPolarisPolicyChild {
         param(
             [Parameter(Mandatory)] [string]$Cache,
-            [Parameter(Mandatory)] [string]$Ref
+            [Parameter(Mandatory)] [string]$Ref,
+            [string]$RepoUrl = ''
         )
 
         $setupLiteral = $script:Setup.Replace("'", "''")
         $cacheLiteral = $Cache.Replace("'", "''")
         $refLiteral = $Ref.Replace("'", "''")
+        $repoArgument = if ([string]::IsNullOrWhiteSpace($RepoUrl)) {
+            ''
+        } else {
+            " -RepoUrl '$($RepoUrl.Replace("'", "''"))'"
+        }
         $probe = @"
 `$ErrorActionPreference = 'Stop'
 `$env:DOTFILES_SETUP_PS1_SOURCE_ONLY = '1'
 . '$setupLiteral' -All
-Invoke-PolarisAgentPolicy -AllMode:`$true -IsDryRun:`$false -Version '0.1.2' -Ref '$refLiteral' -CacheRoot '$cacheLiteral'
+Invoke-PolarisAgentPolicy -AllMode:`$true -IsDryRun:`$false -Version '0.1.2' -Ref '$refLiteral' -CacheRoot '$cacheLiteral'$repoArgument
 "@
         $oldNativePreference = $null
         $hasNativePreference = Test-Path Variable:PSNativeCommandUseErrorActionPreference
@@ -597,6 +856,30 @@ Invoke-PolarisAgentPolicy -AllMode:`$true -IsDryRun:`$false -Version '0.1.2' -Re
             } else {
                 $env:POLARIS_TEST_LOG = $oldLog
             }
+        }
+    }
+
+    It "cleans a failed Polaris stage and retries after release identity is repaired" {
+        $repo = New-SetupTestPolarisRepo -Name 'polaris-stage-retry-work'
+        & git -C $repo.Work tag -d $repo.Tag | Out-Null
+        $cache = Join-Path $script:PolarisTestRoot 'stage-retry-cache'
+        $oldLog = $env:POLARIS_TEST_LOG
+        try {
+            $env:POLARIS_TEST_LOG = Join-Path $script:PolarisTestRoot 'stage-retry-install.log'
+            $failed = Invoke-SetupTestPolarisPolicyChild -Cache $cache -Ref $repo.Sha -RepoUrl $repo.Work
+            $failed.ExitCode | Should -Not -Be 0
+            $failed.Output | Should -Match 'Polaris tag mismatch'
+            @(Get-ChildItem -LiteralPath $cache -Filter '.tmp.*' -Force -ErrorAction SilentlyContinue).Count | Should -Be 0
+            Test-Path -LiteralPath (Join-Path $cache $repo.Sha) | Should -BeFalse
+
+            & git -C $repo.Work tag $repo.Tag $repo.Sha
+            $retried = Invoke-SetupTestPolarisPolicyChild -Cache $cache -Ref $repo.Sha -RepoUrl $repo.Work
+            $retried.ExitCode | Should -Be 0
+            Test-Path -LiteralPath (Join-Path (Join-Path $cache $repo.Sha) '.git') | Should -BeTrue
+            @(Get-ChildItem -LiteralPath $cache -Filter '.tmp.*' -Force -ErrorAction SilentlyContinue).Count | Should -Be 0
+        } finally {
+            if ($null -eq $oldLog) { Remove-Item Env:POLARIS_TEST_LOG -ErrorAction SilentlyContinue }
+            else { $env:POLARIS_TEST_LOG = $oldLog }
         }
     }
 
@@ -982,7 +1265,7 @@ Describe "setup.ps1 VS developer environment" {
     }
 }
 
-Describe "setup.ps1 Windows Terminal backup" {
+Describe "setup.ps1 transactional Windows Terminal merge" {
     BeforeEach {
         $script:OldLocalAppData = $env:LOCALAPPDATA
         $script:OldUserProfile = $env:USERPROFILE
@@ -992,9 +1275,17 @@ Describe "setup.ps1 Windows Terminal backup" {
         $env:USERPROFILE = $script:FakeHome
         $env:LOCALAPPDATA = $script:FakeLocalAppData
         . $script:ImportSetupForTest
+        $script:OldWindowsIdentity = $script:WindowsIdentity
+        $script:WindowsIdentity = [pscustomobject]@{
+            UserProfile = $script:FakeHome
+            LocalApplicationData = $script:FakeLocalAppData
+            Documents = Join-Path $script:FakeHome 'Documents'
+            RuntimeProfile = Join-Path $script:FakeHome 'Documents\PowerShell\Microsoft.PowerShell_profile.ps1'
+        }
     }
 
     AfterEach {
+        $script:WindowsIdentity = $script:OldWindowsIdentity
         if ($null -eq $script:OldUserProfile) {
             Remove-Item Env:USERPROFILE -ErrorAction SilentlyContinue
         } else {
@@ -1008,144 +1299,211 @@ Describe "setup.ps1 Windows Terminal backup" {
         Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $script:FakeHome
     }
 
-    It "copies the pre-merge settings.json without moving it" {
-        $settings = Get-WindowsTerminalSettingsPath
-        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $settings) | Out-Null
-        $preMerge = '{"profiles":{"defaults":{},"list":[]},"actions":[]}'
-        [System.IO.File]::WriteAllText($settings, $preMerge, [System.Text.UTF8Encoding]::new($false))
+    It "merges packaged-only settings and backs up that target independently" {
+        $packaged = Get-WindowsTerminalSettingsPath
+        $portable = Get-WindowsTerminalUnpackagedSettingsPath
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $packaged) | Out-Null
+        $original = '{"defaultProfile":"{packaged}","profiles":{"defaults":{},"list":[{"guid":"{packaged}","name":"PackagedOnly"}]},"schemes":[{"name":"PackagedScheme"}],"actions":[{"command":"closeWindow","keys":"alt+f4"}]}'
+        [System.IO.File]::WriteAllText($packaged, $original, [System.Text.UTF8Encoding]::new($false))
 
-        Backup-WindowsTerminalSettings
+        Invoke-WindowsTerminalSettingsTransaction -IsPortablePresent $false
 
-        # The backup name uses the runtime $Timestamp; match by pattern rather
-        # than a fixed value (Pester scoping makes pinning $Timestamp unreliable).
-        $backups = @(Get-ChildItem -LiteralPath (Split-Path -Parent $settings) -Filter 'settings.json.bak.*' -ErrorAction SilentlyContinue)
-        Test-Path -LiteralPath $settings -PathType Leaf | Should -BeTrue   # original intact (copy, not move)
-        $backups.Count | Should -BeGreaterThan 0                            # a backup was created
-        [System.IO.File]::ReadAllText($settings) | Should -Be $preMerge
-        [System.IO.File]::ReadAllText($backups[0].FullName) | Should -Be $preMerge
-    }
-
-    It "does not create a backup when Windows Terminal merge is skipped" {
-        . $script:ImportSetupForTest -Parameters @{ All = $true; SkipWindowsTerminalMerge = $true }
-        $settings = Get-WindowsTerminalSettingsPath
-        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $settings) | Out-Null
-        [System.IO.File]::WriteAllText($settings, '{"profiles":{}}', [System.Text.UTF8Encoding]::new($false))
-
-        Backup-WindowsTerminalSettings
-
-        $backups = @(Get-ChildItem -LiteralPath (Split-Path -Parent $settings) -Filter 'settings.json.bak.*' -ErrorAction SilentlyContinue)
-        $backups.Count | Should -Be 0
-    }
-
-    It "mirrors packaged Windows Terminal settings to the unpackaged path" {
-        $settings = Get-WindowsTerminalSettingsPath
-        $unpackaged = Get-WindowsTerminalUnpackagedSettingsPath
-        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $settings) | Out-Null
-        $merged = '{"theme":"rose-pine","profiles":{"defaults":{"scrollbarState":"visible"}}}'
-        [System.IO.File]::WriteAllText($settings, $merged, [System.Text.UTF8Encoding]::new($false))
-
-        Copy-WindowsTerminalSettingsForUnpackaged
-
-        Test-Path -LiteralPath $unpackaged -PathType Leaf | Should -BeTrue
-        [System.IO.File]::ReadAllText($unpackaged) | Should -Be $merged
-    }
-
-    It "seeds unpackaged Windows Terminal settings from the fragment when packaged settings are absent" {
-        $settings = Get-WindowsTerminalSettingsPath
-        $unpackaged = Get-WindowsTerminalUnpackagedSettingsPath
-
-        Test-Path -LiteralPath $settings -PathType Leaf | Should -BeFalse
-        Copy-WindowsTerminalSettingsForUnpackaged -IsPortablePresent $true
-
-        Test-Path -LiteralPath $unpackaged -PathType Leaf | Should -BeTrue
-        $written = [System.IO.File]::ReadAllText($unpackaged) | ConvertFrom-Json
-        $written.theme | Should -Be 'rose-pine'
-        $written.profiles.defaults.colorScheme | Should -Be 'rose-pine'
-        $written.profiles.defaults.font.face | Should -Be 'Hack Nerd Font'
-        $written.defaultProfile | Should -Be $script:ManagedPwshProfileGuid
-        $pwshProfile = @($written.profiles.list | Where-Object { $_.guid -eq $script:ManagedPwshProfileGuid })
-        $pwshProfile.Count | Should -Be 1
-        $pwshProfile[0].commandline | Should -Be 'pwsh.exe'
-        @($written.schemes | Where-Object { $_.name -eq 'rose-pine' }).Count | Should -Be 1
-        @($written.themes | Where-Object { $_.name -eq 'rose-pine' }).Count | Should -Be 1
-    }
-
-    It "promotes the legacy Windows PowerShell default to the managed PowerShell 7 profile" {
-        $unpackaged = Get-WindowsTerminalUnpackagedSettingsPath
-        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $unpackaged) | Out-Null
-        $minimal = '{"defaultProfile":"{61c54bbd-c2c6-5271-96e7-009a87ff44bf}","profiles":{"defaults":{},"list":[{"guid":"{61c54bbd-c2c6-5271-96e7-009a87ff44bf}","name":"Windows PowerShell","commandline":"powershell.exe"}]},"schemes":[],"actions":[]}'
-        [System.IO.File]::WriteAllText($unpackaged, $minimal, [System.Text.UTF8Encoding]::new($false))
-
-        Copy-WindowsTerminalSettingsForUnpackaged -IsPortablePresent $true
-
-        $written = [System.IO.File]::ReadAllText($unpackaged) | ConvertFrom-Json
-        $written.defaultProfile | Should -Be $script:ManagedPwshProfileGuid
-        @($written.profiles.list | Where-Object { $_.guid -eq $script:LegacyWindowsPowerShellProfileGuid }).Count | Should -Be 1
-        $pwshProfile = @($written.profiles.list | Where-Object { $_.guid -eq $script:ManagedPwshProfileGuid })
-        $pwshProfile.Count | Should -Be 1
-        $pwshProfile[0].name | Should -Be 'PowerShell 7'
-        $pwshProfile[0].commandline | Should -Be 'pwsh.exe'
-    }
-
-    It "merges unpackaged Windows Terminal settings from the fragment and preserves user keys" {
-        $unpackaged = Get-WindowsTerminalUnpackagedSettingsPath
-        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $unpackaged) | Out-Null
-        $minimal = '{"defaultProfile":"{user}","profiles":{"defaults":{"font":{"face":"Consolas"}},"list":[{"guid":"{user}","name":"Keep"}]},"schemes":[{"name":"KeepScheme"}],"actions":[{"command":"closeWindow","keys":"alt+f4"}]}'
-        [System.IO.File]::WriteAllText($unpackaged, $minimal, [System.Text.UTF8Encoding]::new($false))
-
-        Copy-WindowsTerminalSettingsForUnpackaged -IsPortablePresent $true
-
-        $written = [System.IO.File]::ReadAllText($unpackaged) | ConvertFrom-Json
-        $written.defaultProfile | Should -Be '{user}'
-        @($written.profiles.list | Where-Object { $_.guid -eq '{user}' }).Count | Should -Be 1
-        @($written.profiles.list | Where-Object { $_.guid -eq $script:ManagedPwshProfileGuid }).Count | Should -Be 1
-        @($written.schemes | Where-Object { $_.name -eq 'KeepScheme' }).Count | Should -Be 1
+        Test-Path -LiteralPath $portable | Should -BeFalse
+        $written = [System.IO.File]::ReadAllText($packaged) | ConvertFrom-Json
+        @($written.profiles.list | Where-Object { $_.guid -eq '{packaged}' }).Count | Should -Be 1
+        @($written.schemes | Where-Object { $_.name -eq 'PackagedScheme' }).Count | Should -Be 1
         @($written.actions | Where-Object { $_.keys -eq 'alt+f4' }).Count | Should -Be 1
+        $backups = @(Get-ChildItem -LiteralPath (Split-Path -Parent $packaged) -Filter 'settings.json.bak.*')
+        $backups.Count | Should -Be 1
+        [System.IO.File]::ReadAllText($backups[0].FullName) | Should -Be $original
+    }
+
+    It "seeds portable-only settings from the fragment" {
+        $packaged = Get-WindowsTerminalSettingsPath
+        $portable = Get-WindowsTerminalUnpackagedSettingsPath
+
+        Invoke-WindowsTerminalSettingsTransaction -IsPortablePresent $true
+
+        Test-Path -LiteralPath $packaged | Should -BeFalse
+        Test-Path -LiteralPath $portable -PathType Leaf | Should -BeTrue
+        $written = [System.IO.File]::ReadAllText($portable) | ConvertFrom-Json
         $written.theme | Should -Be 'rose-pine'
         $written.profiles.defaults.colorScheme | Should -Be 'rose-pine'
         $written.profiles.defaults.font.face | Should -Be 'Hack Nerd Font'
+        $written.defaultProfile | Should -Be $script:ManagedPwshProfileGuid
+        $pwshProfile = @($written.profiles.list | Where-Object { $_.guid -eq $script:ManagedPwshProfileGuid })
+        $pwshProfile.Count | Should -Be 1
+        $pwshProfile[0].commandline | Should -Be 'pwsh.exe'
         @($written.schemes | Where-Object { $_.name -eq 'rose-pine' }).Count | Should -Be 1
         @($written.themes | Where-Object { $_.name -eq 'rose-pine' }).Count | Should -Be 1
     }
 
-    It "keeps setup best effort when the unpackaged Windows Terminal mirror fails" {
-        $settings = Get-WindowsTerminalSettingsPath
-        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $settings) | Out-Null
-        [System.IO.File]::WriteAllText($settings, '{"theme":"rose-pine"}', [System.Text.UTF8Encoding]::new($false))
-        Mock -CommandName Copy-Item -MockWith { throw "copy failed" }
+    It "preserves divergent packaged and portable state without mirroring either" {
+        $packaged = Get-WindowsTerminalSettingsPath
+        $portable = Get-WindowsTerminalUnpackagedSettingsPath
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $packaged), (Split-Path -Parent $portable) | Out-Null
+        $packagedOriginal = '{"defaultProfile":"{pkg}","profiles":{"defaults":{},"list":[{"guid":"{pkg}","name":"PackagedOnly"}]},"schemes":[{"name":"PackagedScheme"}],"actions":[{"command":"closeWindow","keys":"alt+f4"}]}'
+        $portableOriginal = '{"defaultProfile":"{port}","profiles":{"defaults":{},"list":[{"guid":"{port}","name":"PortableOnly"}]},"schemes":[{"name":"PortableScheme"}],"actions":[{"command":"newTab","keys":"ctrl+shift+9"}]}'
+        [System.IO.File]::WriteAllText($packaged, $packagedOriginal, [System.Text.UTF8Encoding]::new($false))
+        [System.IO.File]::WriteAllText($portable, $portableOriginal, [System.Text.UTF8Encoding]::new($false))
 
-        { Copy-WindowsTerminalSettingsForUnpackaged } | Should -Not -Throw
+        Invoke-WindowsTerminalSettingsTransaction -IsPortablePresent $true
+
+        $pkg = [System.IO.File]::ReadAllText($packaged) | ConvertFrom-Json
+        $port = [System.IO.File]::ReadAllText($portable) | ConvertFrom-Json
+        @($pkg.profiles.list | Where-Object { $_.guid -eq '{pkg}' }).Count | Should -Be 1
+        @($pkg.profiles.list | Where-Object { $_.guid -eq '{port}' }).Count | Should -Be 0
+        @($port.profiles.list | Where-Object { $_.guid -eq '{port}' }).Count | Should -Be 1
+        @($port.profiles.list | Where-Object { $_.guid -eq '{pkg}' }).Count | Should -Be 0
+        @(Get-ChildItem -LiteralPath (Split-Path -Parent $packaged) -Filter 'settings.json.bak.*').Count | Should -Be 1
+        @(Get-ChildItem -LiteralPath (Split-Path -Parent $portable) -Filter 'settings.json.bak.*').Count | Should -Be 1
     }
 
-    It "does not mirror unpackaged Windows Terminal settings during dry run" {
-        $settings = Get-WindowsTerminalSettingsPath
-        $unpackaged = Get-WindowsTerminalUnpackagedSettingsPath
-        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $settings) | Out-Null
-        [System.IO.File]::WriteAllText($settings, '{"theme":"rose-pine"}', [System.Text.UTF8Encoding]::new($false))
-
-        # Inject the switch directly -- Set-Variable -Scope Script does not reach
-        # the dot-sourced function reliably.
-        Copy-WindowsTerminalSettingsForUnpackaged -IsDryRun $true
-
-        Test-Path -LiteralPath $unpackaged -PathType Leaf | Should -BeFalse
+    It "does nothing when neither installation has a settings target" {
+        Invoke-WindowsTerminalSettingsTransaction -IsPortablePresent $false
+        Test-Path -LiteralPath (Get-WindowsTerminalSettingsPath) | Should -BeFalse
+        Test-Path -LiteralPath (Get-WindowsTerminalUnpackagedSettingsPath) | Should -BeFalse
     }
 
-    It "does not seed unpackaged Windows Terminal settings during dry run" {
-        $unpackaged = Get-WindowsTerminalUnpackagedSettingsPath
+    It "fails invalid JSON before changing either target" {
+        $packaged = Get-WindowsTerminalSettingsPath
+        $portable = Get-WindowsTerminalUnpackagedSettingsPath
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $packaged), (Split-Path -Parent $portable) | Out-Null
+        [System.IO.File]::WriteAllText($packaged, '{invalid', [System.Text.UTF8Encoding]::new($false))
+        $portableOriginal = '{"profiles":{"defaults":{},"list":[]},"actions":[]}'
+        [System.IO.File]::WriteAllText($portable, $portableOriginal, [System.Text.UTF8Encoding]::new($false))
 
-        Copy-WindowsTerminalSettingsForUnpackaged -IsDryRun $true -IsPortablePresent $true
+        { Invoke-WindowsTerminalSettingsTransaction -IsPortablePresent $true } | Should -Throw
 
-        Test-Path -LiteralPath $unpackaged -PathType Leaf | Should -BeFalse
+        [System.IO.File]::ReadAllText($packaged) | Should -Be '{invalid'
+        [System.IO.File]::ReadAllText($portable) | Should -Be $portableOriginal
+        @(Get-ChildItem -LiteralPath $script:FakeHome -Recurse -Force | Where-Object { $_.Name -match 'dotfiles-(stage|rollback)' }).Count | Should -Be 0
     }
 
-    It "does not mirror unpackaged Windows Terminal settings when the merge is skipped" {
-        $settings = Get-WindowsTerminalSettingsPath
-        $unpackaged = Get-WindowsTerminalUnpackagedSettingsPath
-        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $settings) | Out-Null
-        [System.IO.File]::WriteAllText($settings, '{"theme":"rose-pine"}', [System.Text.UTF8Encoding]::new($false))
+    It "fails closed and cleans staging when the staged write fails" {
+        $packaged = Get-WindowsTerminalSettingsPath
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $packaged) | Out-Null
+        $original = '{"profiles":{"defaults":{},"list":[]},"actions":[]}'
+        [System.IO.File]::WriteAllText($packaged, $original, [System.Text.UTF8Encoding]::new($false))
+        Mock -CommandName Write-WindowsTerminalSettingsJson -MockWith { throw 'write failed' }
 
-        Copy-WindowsTerminalSettingsForUnpackaged -IsSkipMerge $true
+        { Invoke-WindowsTerminalSettingsTransaction -IsPortablePresent $false } | Should -Throw
+        [System.IO.File]::ReadAllText($packaged) | Should -Be $original
+        @(Get-ChildItem -LiteralPath $script:FakeHome -Recurse -Force | Where-Object { $_.Name -match 'dotfiles-(stage|rollback)' }).Count | Should -Be 0
+    }
 
-        Test-Path -LiteralPath $unpackaged -PathType Leaf | Should -BeFalse
+    It "fails setup when backup creation fails and keeps the original" {
+        $packaged = Get-WindowsTerminalSettingsPath
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $packaged) | Out-Null
+        $original = '{"profiles":{"defaults":{},"list":[]},"actions":[]}'
+        [System.IO.File]::WriteAllText($packaged, $original, [System.Text.UTF8Encoding]::new($false))
+        Mock -CommandName Copy-Item -MockWith { throw 'backup failed' }
+
+        { Invoke-WindowsTerminalSettingsTransaction -IsPortablePresent $false } | Should -Throw
+        [System.IO.File]::ReadAllText($packaged) | Should -Be $original
+    }
+
+    It "rolls back an earlier target when later publication fails" {
+        $packaged = Get-WindowsTerminalSettingsPath
+        $portable = Get-WindowsTerminalUnpackagedSettingsPath
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $packaged), (Split-Path -Parent $portable) | Out-Null
+        $packagedOriginal = '{"profiles":{"defaults":{},"list":[{"guid":"{pkg}","name":"Pkg"}]},"actions":[]}'
+        $portableOriginal = '{"profiles":{"defaults":{},"list":[{"guid":"{port}","name":"Port"}]},"actions":[]}'
+        [System.IO.File]::WriteAllText($packaged, $packagedOriginal, [System.Text.UTF8Encoding]::new($false))
+        [System.IO.File]::WriteAllText($portable, $portableOriginal, [System.Text.UTF8Encoding]::new($false))
+        $script:WtPublishCalls = 0
+        Mock -CommandName Publish-WindowsTerminalSettingsStage -MockWith {
+            param($StagePath, $TargetPath, $RollbackPath, $TargetExisted)
+            $script:WtPublishCalls++
+            if ($script:WtPublishCalls -eq 1) {
+                [System.IO.File]::Replace($StagePath, $TargetPath, $RollbackPath)
+                return
+            }
+            throw 'publish failed'
+        }
+
+        { Invoke-WindowsTerminalSettingsTransaction -IsPortablePresent $true } | Should -Throw
+
+        [System.IO.File]::ReadAllText($packaged) | Should -Be $packagedOriginal
+        [System.IO.File]::ReadAllText($portable) | Should -Be $portableOriginal
+        @(Get-ChildItem -LiteralPath $script:FakeHome -Recurse -Force | Where-Object { $_.Name -match 'dotfiles-(stage|rollback)' }).Count | Should -Be 0
+    }
+
+    It "detects a change before publication without overwriting it" {
+        $packaged = Get-WindowsTerminalSettingsPath
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $packaged) | Out-Null
+        $original = '{"profiles":{"defaults":{},"list":[]},"actions":[]}'
+        $concurrent = '{"profiles":{"defaults":{},"list":[{"guid":"{new}","name":"Concurrent"}]},"actions":[]}'
+        [System.IO.File]::WriteAllText($packaged, $original, [System.Text.UTF8Encoding]::new($false))
+        $hook = { param($plans) [System.IO.File]::WriteAllText($plans[0].Target, $concurrent, [System.Text.UTF8Encoding]::new($false)) }
+
+        { Invoke-WindowsTerminalSettingsTransaction -IsPortablePresent $false -BeforePublish $hook } | Should -Throw
+
+        [System.IO.File]::ReadAllText($packaged) | Should -Be $concurrent
+        @(Get-ChildItem -LiteralPath $script:FakeHome -Recurse -Force | Where-Object { $_.Name -match 'dotfiles-(stage|rollback)' }).Count | Should -Be 0
+    }
+
+    It "uses File.Replace rollback bytes to close the final publication race" {
+        $packaged = Get-WindowsTerminalSettingsPath
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $packaged) | Out-Null
+        $original = '{"profiles":{"defaults":{},"list":[]},"actions":[]}'
+        $concurrent = '{"profiles":{"defaults":{},"list":[{"guid":"{race}","name":"Race"}]},"actions":[]}'
+        [System.IO.File]::WriteAllText($packaged, $original, [System.Text.UTF8Encoding]::new($false))
+        Mock -CommandName Publish-WindowsTerminalSettingsStage -MockWith {
+            param($StagePath, $TargetPath, $RollbackPath, $TargetExisted)
+            [System.IO.File]::WriteAllText($TargetPath, $concurrent, [System.Text.UTF8Encoding]::new($false))
+            [System.IO.File]::Replace($StagePath, $TargetPath, $RollbackPath)
+        }
+
+        { Invoke-WindowsTerminalSettingsTransaction -IsPortablePresent $false } | Should -Throw
+        [System.IO.File]::ReadAllText($packaged) | Should -Be $concurrent
+    }
+
+    It "uses a collision suffix without overwriting an earlier backup" {
+        $packaged = Get-WindowsTerminalSettingsPath
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $packaged) | Out-Null
+        $original = '{"profiles":{"defaults":{},"list":[]},"actions":[]}'
+        [System.IO.File]::WriteAllText($packaged, $original, [System.Text.UTF8Encoding]::new($false))
+        $collision = "$packaged.bak.$Timestamp"
+        [System.IO.File]::WriteAllText($collision, 'older-backup', [System.Text.UTF8Encoding]::new($false))
+
+        Invoke-WindowsTerminalSettingsTransaction -IsPortablePresent $false
+
+        [System.IO.File]::ReadAllText($collision) | Should -Be 'older-backup'
+        [System.IO.File]::ReadAllText("$collision.1") | Should -Be $original
+    }
+
+    It "is write-free in dry-run and skip modes" {
+        $packaged = Get-WindowsTerminalSettingsPath
+        $portable = Get-WindowsTerminalUnpackagedSettingsPath
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $packaged) | Out-Null
+        $original = '{"profiles":{"defaults":{},"list":[]},"actions":[]}'
+        [System.IO.File]::WriteAllText($packaged, $original, [System.Text.UTF8Encoding]::new($false))
+
+        Invoke-WindowsTerminalSettingsTransaction -IsDryRun $true -IsPortablePresent $true
+        Invoke-WindowsTerminalSettingsTransaction -IsSkipMerge $true -IsPortablePresent $true
+
+        [System.IO.File]::ReadAllText($packaged) | Should -Be $original
+        Test-Path -LiteralPath $portable | Should -BeFalse
+        @(Get-ChildItem -LiteralPath $script:FakeHome -Recurse -Force | Where-Object { $_.Name -match '(settings\.json\.bak|dotfiles-(stage|rollback))' }).Count | Should -Be 0
+    }
+
+    It "retries from a concurrently updated original and then becomes idempotent" {
+        $packaged = Get-WindowsTerminalSettingsPath
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $packaged) | Out-Null
+        $original = '{"profiles":{"defaults":{},"list":[]},"actions":[]}'
+        $retrySource = '{"profiles":{"defaults":{},"list":[{"guid":"{retry}","name":"RetrySource"}]},"actions":[]}'
+        [System.IO.File]::WriteAllText($packaged, $original, [System.Text.UTF8Encoding]::new($false))
+        $hook = { param($plans) [System.IO.File]::WriteAllText($plans[0].Target, $retrySource, [System.Text.UTF8Encoding]::new($false)) }
+        { Invoke-WindowsTerminalSettingsTransaction -IsPortablePresent $false -BeforePublish $hook } | Should -Throw
+
+        Invoke-WindowsTerminalSettingsTransaction -IsPortablePresent $false
+        $afterFirstSuccess = [System.IO.File]::ReadAllText($packaged)
+        $backupCount = @(Get-ChildItem -LiteralPath (Split-Path -Parent $packaged) -Filter 'settings.json.bak.*').Count
+        Invoke-WindowsTerminalSettingsTransaction -IsPortablePresent $false
+
+        ([System.IO.File]::ReadAllText($packaged) | ConvertFrom-Json).profiles.list.name | Should -Contain 'RetrySource'
+        [System.IO.File]::ReadAllText($packaged) | Should -Be $afterFirstSuccess
+        @(Get-ChildItem -LiteralPath (Split-Path -Parent $packaged) -Filter 'settings.json.bak.*').Count | Should -Be $backupCount
     }
 }

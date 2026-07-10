@@ -51,6 +51,28 @@ case "$args" in
 esac
 EOF
 chmod +x "$TMP_ROOT/bin/chezmoi"
+cat > "$TMP_ROOT/bin/uname" <<'EOF'
+#!/usr/bin/env bash
+case "${1:-}" in
+    -s) echo Linux ;;
+    -m) echo x86_64 ;;
+    *) command /usr/bin/uname "$@" ;;
+esac
+EOF
+cat > "$TMP_ROOT/bin/id" <<'EOF'
+#!/usr/bin/env bash
+case "${1:-}" in
+    -u) echo 1000 ;;
+    -un) echo tester ;;
+    *) exit 1 ;;
+esac
+EOF
+cat > "$TMP_ROOT/bin/getent" <<EOF
+#!/usr/bin/env bash
+[[ "\${1:-}" == passwd && "\${2:-}" == tester ]] || exit 1
+printf '%s\n' 'tester:x:1000:1000:Test User:$TMP_ROOT/home:/bin/zsh'
+EOF
+chmod +x "$TMP_ROOT/bin/uname" "$TMP_ROOT/bin/id" "$TMP_ROOT/bin/getent"
 
 set +e
 HOME="$TMP_ROOT/home" TMPDIR="$TMP_ROOT/tmp" PATH="$TMP_ROOT/bin:/usr/bin:/bin" \

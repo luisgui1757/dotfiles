@@ -15,14 +15,14 @@ greenfield runbook.
 
 | Config | Source file(s) | Per-OS target(s) | Chezmoi mechanism |
 |---|---|---|---|
-| Neovim | `nvim/`; `home/dot_config/symlink_nvim.tmpl`; `home/AppData/Local/symlink_nvim.tmpl` | macOS/Linux: `~/.config/nvim`; Windows: `%LOCALAPPDATA%\nvim` | Directory symlink to repo `nvim/` on every OS. |
+| Neovim | `nvim/`; `home/dot_config/symlink_nvim.tmpl`; `windows/chezmoi-localappdata/symlink_nvim.tmpl` | macOS/Linux: `~/.config/nvim`; Windows: actual LocalApplicationData `nvim` | Directory symlink to repo `nvim/` on every OS; Windows uses the dedicated known-folder destination state. |
 | Starship | `starship/starship.toml`; `home/dot_config/starship.toml` | macOS/Linux: `~/.config/starship.toml`; Windows: `%USERPROFILE%\.config\starship.toml` | POSIX symlink via `mode = "symlink"`; Windows copy via `mode = "file"`. |
 | zshenv | `shells/zshenv`; `home/dot_zshenv` | POSIX: `~/.zshenv`; Windows: ignored | POSIX symlink via `mode = "symlink"`. |
 | zshrc | `shells/zshrc`; `home/dot_zshrc` | POSIX: `~/.zshrc`; Windows: ignored | POSIX symlink via `mode = "symlink"`. |
 | Ghostty | `ghostty/config`; `home/.chezmoitemplates/ghostty/config` | macOS: `~/Library/Application Support/com.mitchellh.ghostty/config`; Linux: `~/.config/ghostty/config`; Windows: n/a | Per-path POSIX `symlink_config.tmpl` entries into `.chezmoitemplates`. |
 | WezTerm | `wezterm/wezterm.lua`; `home/.chezmoitemplates/wezterm/wezterm.lua`; `home/dot_config/wezterm/wezterm.lua` | macOS/Linux/WSL GUI opt-in: `~/.config/wezterm/wezterm.lua`; Windows: `%USERPROFILE%\.config\wezterm\wezterm.lua` | POSIX path-specific symlinks; Windows copy. WSL skips Linux GUI terminal config unless setup passes the explicit GUI override. |
 | AeroSpace | `aerospace/aerospace.toml`; `home/dot_config/aerospace/aerospace.toml` | macOS: `~/.config/aerospace/aerospace.toml`; Linux/Windows: ignored | macOS symlink via `mode = "symlink"`. |
-| lazygit | `lazygit/config.yml`; `home/.chezmoitemplates/lazygit/config.yml` | macOS: `~/Library/Application Support/lazygit/config.yml`; Linux/WSL: `~/.config/lazygit/config.yml`; Windows: `%LOCALAPPDATA%\lazygit\config.yml` | POSIX path-specific symlinks; Windows rendered copy from the shared template. |
+| lazygit | `lazygit/config.yml`; `home/.chezmoitemplates/lazygit/config.yml`; `windows/chezmoi-localappdata/lazygit/symlink_config.yml.tmpl` | macOS: `~/Library/Application Support/lazygit/config.yml`; Linux/WSL: `~/.config/lazygit/config.yml`; Windows: actual LocalApplicationData `lazygit\config.yml` | POSIX path-specific symlinks; Windows known-folder symlink to the native config. |
 | gh-dash | `gh-dash/config.yml`; `home/dot_config/gh-dash/config.yml` | macOS/Linux/WSL: `~/.config/gh-dash/config.yml`; Windows: `%USERPROFILE%\.config\gh-dash\config.yml` | POSIX symlink via `mode = "symlink"`; Windows copy via `mode = "file"`. |
 | lsd | `lsd/config.yaml`; `lsd/colors.yaml`; `home/dot_config/lsd/config.yaml`; `home/dot_config/lsd/colors.yaml` | macOS/Linux/WSL: `~/.config/lsd/{config.yaml,colors.yaml}`; Windows: `%USERPROFILE%\.config\lsd\{config.yaml,colors.yaml}` | POSIX symlink via `mode = "symlink"`; Windows copy via `mode = "file"`. The shell profiles own Rose Pine `LS_COLORS` for file/directory names, with `DOTFILES_LS_COLORS` as the explicit override; `colors.yaml` owns long-list metadata. |
 | tmux | `tmux/tmux.conf`; `home/dot_tmux.conf` | POSIX: `~/.tmux.conf`; Windows: `%USERPROFILE%\.tmux.conf` | POSIX symlink via `mode = "symlink"`; Windows copy via `mode = "file"`. |
@@ -30,9 +30,9 @@ greenfield runbook.
 | tmux POSIX overlay | `tmux/tmux.posix.conf`; `home/dot_tmux.posix.conf` | POSIX: `~/.tmux.posix.conf`; Windows: ignored | POSIX symlink only. Holds the native-clipboard `if-shell` probes, which hang psmux at config-load time, so it is **never** deployed on Windows; `tmux.conf` sources it with `source-file -q`. |
 | psmux | `tmux/psmux.conf`; `home/dot_psmux.conf` | Windows: `%USERPROFILE%\.psmux.conf`; POSIX: ignored | Windows copy only. It is the first native-Windows multiplexer entrypoint and source-files the tmux Windows overlay. |
 | Generated Rose Pine tmux/psmux bar | `tmux/psmux-rose-pine.ps1`; generated `tmux/psmux-rose-pine.{main,moon,dawn}.conf`; `home/dot_tmux.rose-pine.ps1`; `home/dot_tmux.rose-pine.*.conf` | POSIX/Windows: `~/.tmux.rose-pine.{main,moon,dawn}.conf`; Windows also gets `~/.tmux.rose-pine.ps1` | Source generator plus checked generated configs; POSIX symlinks, Windows copies. |
-| Windows Terminal | `windows-terminal/settings.fragment.jsonc`; `home/.chezmoitemplates/windows-terminal/settings.fragment.jsonc` | Windows: `%LOCALAPPDATA%\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json` | `setup.ps1` backs up an existing pre-merge file, then `modify_settings.json.ps1.tmpl` performs the read-modify-write merge. chezmoi owns only the packaged target; after apply, `setup.ps1` mirrors that file to the unpackaged portable WT path (`%LOCALAPPDATA%\Microsoft\Windows Terminal\settings.json`), or -- when no packaged WT exists (e.g. Windows Sandbox / portable-only) -- seeds or merges the Rose Pine + Hack Nerd Font settings into it directly via the shared `merge-settings.ps1` helper. |
-| PowerShell profile | `shells/powershell_profile.ps1`; `home/Documents/PowerShell/Microsoft.PowerShell_profile.ps1` | Windows PS7: `%USERPROFILE%\Documents\PowerShell\Microsoft.PowerShell_profile.ps1`; Windows PowerShell 5.1 and POSIX pwsh profile paths stay out of chezmoi scope | Windows PS7 profile copy via `mode = "file"`. |
-| zsh plugins | `home/.chezmoiexternal.toml.tmpl`; `home/.chezmoiscripts/run_onchange_after_20-verify-zsh-plugin-pins.sh.tmpl` | POSIX: `~/.local/share/dotfiles/zsh-plugins/{fzf-tab,zsh-autosuggestions}`; Windows: ignored | Pinned `.chezmoiexternal` git repos plus `run_onchange_` exact-commit assertion. |
+| Windows Terminal | `windows-terminal/settings.fragment.jsonc`; `home/.chezmoitemplates/windows-terminal/{settings.fragment.jsonc,merge-settings.ps1}` | Windows packaged + portable settings paths | `setup.ps1` is the only publisher. Chezmoi exposes no WT target. Setup independently merges each target's own state, stages beside the destination, validates all plans, creates separate verified backups, atomically publishes with concurrent-change detection, and rolls back the multi-target transaction on failure. |
+| PowerShell profiles | `shells/powershell_profile.ps1`; `windows/chezmoi-documents/{PowerShell,WindowsPowerShell}/symlink_*_profile.ps1.tmpl` | actual Documents known folder for ConsoleHost, VS Code, and ISE; active runtime `$PROFILE` must resolve to one of them | Dedicated Documents destination state; every supported host profile symlinks to the canonical source and setup post-checks consumption. |
+| zsh plugins | `scripts/ensure-pinned-zsh-plugin.sh`; `home/.chezmoiscripts/run_onchange_after_20-ensure-zsh-plugin-pins.sh.tmpl` | POSIX: `~/.local/share/dotfiles/zsh-plugins/{fzf-tab,zsh-autosuggestions}`; Windows: ignored | Install-deps and pin/helper changes in chezmoi share the serialized sibling-stage publisher. Unproved payloads are quarantined before fetch; only expected-origin, exact-HEAD, clean, tracked-entry-file checkouts publish atomically. Generic git-repo externals are intentionally absent. |
 
 The migration oracle is manifest-driven:
 `tests/migration/parity_gate.sh`, `tests/migration/oracle_test.sh`, and
@@ -50,9 +50,9 @@ Provisioning stays in `install-deps`, not chezmoi run-scripts:
   bucket-add path in `install-deps.ps1`
 - pinned binary/font/script installers and direct artifacts: Homebrew installer,
   Neovim Linux, native-Linux chezmoi, lazygit Linux, Starship Linux,
-  tree-sitter CLI Linux, WezTerm Ubuntu `.deb`, Herdr Linux, Herdr Windows
+  tree-sitter CLI Linux/Windows, WezTerm Ubuntu `.deb`, Herdr Linux, Herdr Windows
   preview, Hack Nerd Font, Windows Terminal portable zip, Ubuntu Ghostty, Scoop
-  installer, Pi CLI npm package/integrity, and pinned `setuptools`/`pylatexenc`
+  installer, Pi CLI packed-tarball SRI, and pinned `setuptools`/`pylatexenc`
   converter wheels/sdists
 - the zsh login-shell switch and domain-account fallback
 - devilspie2 package install, daemon rule, and autostart entry
@@ -82,9 +82,11 @@ then remove only targets they can prove are repo-owned:
   chezmoi's own logic, with none of the stdout-redirect encoding/CRLF pitfalls a
   `cat`-and-hash comparison would hit on Windows). User-modified files warn and
   stay in place.
-- Bootstrap-style backups named `<target>.bak.<timestamp>` are restored after
-  a target is removed. Pass `--no-restore-backups` / `-NoRestoreBackups` to
-  skip restoration.
+- Bootstrap-style backups named `<target>.bak.<YYYYMMDD-HHMMSS>[.n]` are
+  restored after a target is removed. Selection uses the validated filename
+  timestamp plus numeric collision suffix, never filesystem mtime; malformed or
+  ambiguous candidates fail before removal. Pass `--no-restore-backups` /
+  `-NoRestoreBackups` to skip restoration.
 - The zsh plugin externals under
   `~/.local/share/dotfiles/zsh-plugins/{fzf-tab,zsh-autosuggestions}`
   are removed unless `--keep-externals` / `-KeepExternals` is passed. A checkout
@@ -92,9 +94,10 @@ then remove only targets they can prove are repo-owned:
   verified) is kept even under `--all`; pass `--force-externals` /
   `-ForceExternals` to remove it anyway. This protects in-place edits to the
   vendored plugin clones from being lost.
-- Windows Terminal `settings.json` is never deleted. The merge is idempotent
-  but not invertible, so the scripts warn and print the newest matching backup
-  path when present.
+- Windows Terminal `settings.json` is never deleted. `uninstall.ps1` validates
+  both packaged/portable candidate sets and backup JSON before restoring either,
+  atomically restores the selected pre-setup bytes, and preserves the displaced
+  current file as `settings.json.uninstall-current.<timestamp>[.n]`.
 
 Both scripts support dry-run and non-interactive flags:
 `--dry-run --all --keep-externals --no-restore-backups --force-externals` on
@@ -108,6 +111,43 @@ broken repo-symlink still cleaned) is covered by
 ## Owner sign-off / known caveats
 
 ### Resolved
+
+- [x] Packaged and portable Windows Terminal settings are independent
+      user-owned merge transactions. The old full-file mirror and best-effort
+      warning path are removed. Setup stages/validates all outputs, backs up
+      each divergent target, detects concurrent changes through atomic rollback
+      bytes, fails setup on any unsafe operation, and supports dry-run, skip,
+      retry, idempotency, and independent uninstall restoration.
+- [x] POSIX and Windows uninstall choose backups from validated filename
+      timestamps/collision suffixes instead of mtime. Opposing mtime order,
+      files/directories, collisions, malformed names, and pre-mutation failure
+      are covered by shell and Pester tests.
+
+- [x] POSIX setup now resolves one authoritative non-root target account and
+      account-record home before Nix, Home Manager, chezmoi, or native setup.
+      It rejects a mismatched ambient `HOME` instead of fabricating
+      `/Users/<user>` or `/home/<user>`, and threads the validated values through
+      the flake/sudo boundary. Darwin has separate aarch64 and x86_64 activation
+      configurations; Homebrew paths follow the actual repository/architecture.
+      First nix-darwin bootstrap collision-checks and preserves existing
+      `/etc/bashrc` and `/etc/zshrc` as `.before-nix-darwin`, rolling both back
+      on failure/interruption while retaining failed generated output.
+- [x] nix-homebrew tap migration is transactional. Existing taps move to a
+      collision-safe backup, and installed/bootstrap activation failure or an
+      interruption quarantines the failed replacement and restores the old
+      state. A rollback failure leaves the backup intact and prints exact manual
+      recovery rather than guessing.
+- [x] Fresh Linux/WSL zsh startup consumes Home Manager's canonical session-vars
+      file once from the XDG profile, `~/.nix-profile`, or the
+      system-integrated `/etc/profiles/per-user/<effective-user>` profile, with
+      no-Nix hosts guarded. Standalone Linux sets `home.sessionPath` from the
+      evaluated Home Manager profile directory, so the sourced file exports
+      Nix-owned tools without caller PATH injection. Brew-less macOS dry-run
+      now previews all later phases instead of aborting after the bootstrap
+      plan.
+      Native-Linux CI resolves and executes the effective account's actual
+      login zsh from the account database; it does not assume `/usr/bin/zsh`
+      exists after setup selected a platform-specific shell.
 
 - [x] Windows `nvim` directory-symlink round-trip is fixed in commit `eed6690`.
       The Windows template renders a clean, backslash, no-`..` absolute path
@@ -160,29 +200,73 @@ broken repo-symlink still cleaned) is covered by
       `scripts/apply-repo-safeguards.sh luisgui1757/dotfiles`; the static
       required-check alignment test keeps ruleset/settings/script mirrors in
       sync.
+- [x] Stable logical replacements for the six runner-versioned contexts are
+      emitted and bound to exact per-OS proof artifacts. Stage 1 intentionally
+      leaves legacy contexts required; `.github/check-identities.json` and
+      `docs/security/branch-protection.md` define the deadlock-free second PR
+      and owner-applied live switch. UGR-020 remains PARTIAL until that happens.
+- [x] Native Windows no longer derives LocalApplicationData or Documents from
+      UserProfile. Setup/uninstall share one validated known-folder identity,
+      apply separate UserProfile/LocalApplicationData/Documents chezmoi source
+      states, post-check application consumers, and preserve divergent legacy
+      conventional-path data. Redirected-folder runtime proof remains listed
+      below because this checkout is not that environment.
+- [x] PowerShell 7, VS Code, Windows PowerShell ConsoleHost, and ISE profile
+      targets are managed under the actual Documents known folder. The current
+      runtime `$PROFILE` must be one of those post-apply consumers.
+- [x] Packaged, Preview, and portable Windows Terminal target discovery follows
+      actual LocalApplicationData. Each existing target is an independent merge
+      and recovery transaction; none is mirrored from another installation.
+- [x] Windows known-folder post-apply and legacy-shape ownership checks resolve
+      both symbolic links and junctions before comparing canonical targets. The
+      cross-platform Windows test job installs the exact checksum-pinned
+      chezmoi release so expected-drift tests execute instead of skipping.
+- [x] Lazy's detached executable bootstrap now proves locked default-branch
+      metadata anchored to the same immutable commit. This preserves fail-closed
+      execution while allowing Lazy's own lock writer to identify its branch.
+- [x] Native `windows-2025` public setup passed again on exact PR head
+      `f4b63953f2f982702a685358b09e89bae2d78fdd` (run `29092384014`, job
+      `86360593122`): all six
+      phases, exact Tree-sitter `0.26.10`, Hack Nerd Font file and registry
+      consumption, Pi `0.80.3`, and the strict 257-check Neovim language smoke.
+      This does not close the redirected-folder or dual-Windows-Terminal manual
+      rows below.
 
 ### Open
 
-- [ ] Greenfield evidence remains intentionally sparse: `tests/greenfield/LEDGER.md`
-      still records no Windows Sandbox, WSL, macOS VM, or Linux VM clean-machine
-      run after the initial static docs guard. Do not count required CI as manual
-      desktop greenfield evidence. The old Wave C `0 / 10` Ubuntu parity counter
-      is no longer the current release gate; current CI proof is the required
-      parity/e2e/Nix workflow set plus any explicit ledger entries.
+- [x] Intel macOS runtime confirmation passed on exact PR head
+      `f4b63953f2f982702a685358b09e89bae2d78fdd`: the real
+      `macos-26-intel` Nix job (`29092384007` / `86360593091`) and full setup
+      job (`29092384014` / `86360593153`) both passed. Cross-evaluation is no
+      longer being used as the runtime claim.
+- [ ] Nixpkgs 26.05 is the final `x86_64-darwin` release and is supported only
+      through 2026-12-31. Before that date, migrate Intel's package plane to a
+      still-supported mechanism without narrowing the public macOS contract or
+      moving chezmoi-owned dotfiles into the package layer. The warning remains
+      intentionally unsuppressed.
+
+- [ ] Greenfield/manual evidence remains intentionally bounded:
+      `tests/greenfield/LEDGER.md` now records exact-head hosted Ubuntu, Apple
+      Silicon, Intel, and Windows automated runs, but their PR caches were
+      enabled. No Windows Sandbox, WSL, redirected-Windows, cache-free
+      scheduled/manual, or desktop visual run is claimed. Required CI is not
+      manual desktop evidence. The old Wave C `0 / 10` Ubuntu parity counter is
+      no longer the current release gate; current CI proof is the required
+      parity/e2e/Nix workflow set plus explicit ledger entries.
 - [ ] No secrets or `age` tier has been started.
-- [ ] The Windows PowerShell profile managed by chezmoi is the PowerShell 7
-      path (`Documents\PowerShell\Microsoft.PowerShell_profile.ps1`). The
-      Windows PowerShell 5.1 path (`Documents\WindowsPowerShell\...`) remains
-      out of scope because the repo is pwsh-first. Host-shell-specific
-      `$PROFILE` paths remain outside the static chezmoi tree.
 - [ ] The POSIX pwsh profile
       (`~/.config/powershell/Microsoft.PowerShell_profile.ps1`) is intentionally
       not migrated. It is install-gated and provisioning-adjacent, like VS Code.
-- [ ] Windows Terminal Preview and redirected `%LOCALAPPDATA%` remain Wave B.
+- [ ] Redirected Windows known-folder runtime confirmation is pending a real
+      Windows host with Documents and LocalApplicationData on alternate paths.
+      Pester and migration round-trip fixtures are implementation proof, not a
+      claim about a host run.
 - [ ] Full WSL parity is still not a required automated gate, but chezmoi now
       models WSL through the generated `isWsl` data value and skips Linux
       Ghostty by default. `setup.sh --experimental-wsl-gui` passes the
       `experimentalWslGui` data override so WSL Ghostty is managed only on the
       explicit GUI-terminal opt-in path.
-- [ ] zsh exact-pin checks re-assert when the pin script changes, not on manual
-      checkout drift. `refreshPeriod = "0"` means there is no automatic drift.
+- [ ] Out-of-band zsh checkout tampering is rechecked by the next setup or
+      pin-sensitive chezmoi apply; no background monitor is promised. Every
+      publisher/verifier path neutralizes an unproved sourceable payload before
+      it can fail.

@@ -20,6 +20,27 @@ if [[ -n "$_dotfiles_locale" ]]; then
 fi
 unset _dotfiles_locale
 
+# ---- Home Manager session state (Linux/WSL; harmless without Nix) -----------
+# Home Manager writes this canonical session-vars file; source at most one copy
+# before PATH setup so fresh login and interactive shells see Nix-owned tools.
+if [[ -z "${__HM_SESS_VARS_SOURCED:-}" ]]; then
+  _dotfiles_hm_user="$(id -un 2>/dev/null)"
+  case "$_dotfiles_hm_user" in
+    ""|*/*) _dotfiles_hm_user="" ;;
+  esac
+  for _dotfiles_hm_session_vars in \
+    "${XDG_STATE_HOME:-$HOME/.local/state}/nix/profiles/profile/etc/profile.d/hm-session-vars.sh" \
+    "$HOME/.nix-profile/etc/profile.d/hm-session-vars.sh" \
+    "${_dotfiles_hm_user:+/etc/profiles/per-user/$_dotfiles_hm_user/etc/profile.d/hm-session-vars.sh}"; do
+    [[ -n "$_dotfiles_hm_session_vars" ]] || continue
+    if [[ -r "$_dotfiles_hm_session_vars" ]]; then
+      source "$_dotfiles_hm_session_vars"
+      break
+    fi
+  done
+  unset _dotfiles_hm_session_vars _dotfiles_hm_user
+fi
+
 # ---- Homebrew detection (mac + linuxbrew) ------------------------------------
 # $HOMEBREW_PREFIX is set by `brew shellenv`; if not in the environment yet,
 # probe common locations rather than failing.

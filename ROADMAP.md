@@ -1,7 +1,8 @@
 # Dotfiles Roadmap
 
-Last audited: 2026-07-09 on branch `fix/gold-standard-gap-close-2026-07-09`.
-Baseline: `main` at `6380d8a49d7f9586ea0225116cae2143d5c57d38`.
+Last audited: 2026-07-10 on branch
+`fix/ultimate-gold-standard-close-2026-07-10`.
+Baseline: `main` at `85375b2bdec9d3a998e8023a44b41d03a32f3eaa`.
 
 This is the adversarial post-merge roadmap for the chezmoi migration and the
 current setup/CI surface. The goal is not "good enough"; the repo should have a
@@ -148,12 +149,17 @@ Commit-by-commit status:
   Linux/macOS/Windows e2e gates assert the command. AeroSpace TCC /
   Accessibility and Herdr interactive-session behavior remain
   manual-verification-pending in `tests/MANUAL.md`.
+  Hosted macOS additionally proves the real AeroSpace app and CLI binaries have
+  one version/hash identity, but does not call that config-consumption proof:
+  the pinned app waits for the user's Accessibility grant before parsing the
+  managed file or starting its CLI server.
 - **Commit 4 - Nix skeleton — DONE.** `flake.nix` + committed `flake.lock`
   (zero ownership), devShell + `checks`, `nix flake check` CI on Ubuntu + macOS,
   Renovate `nix` manager, disjointness static tests.
 - **Commit 5 - nix-darwin + declarative Homebrew — DONE.**
-  `darwinConfigurations` with `system.primaryUser` resolved from `SUDO_USER` before
-  `USER`; nix-homebrew (pinned taps,
+  Architecture-specific `darwinConfigurations` with `system.primaryUser` and
+  home resolved once by setup from the authoritative target account;
+  nix-homebrew (pinned taps,
   `autoMigrate = true`, `mutableTaps = false`, `trust.taps = [ "nikitabobko/tap" ]` for the
   AeroSpace cask); homebrew module (`autoUpdate = false`, `upgrade = false`,
   `cleanup = "check"`); casks WezTerm + AeroSpace; brews Herdr + selected CLI; Home
@@ -161,8 +167,9 @@ Commit-by-commit status:
   on macOS (prompted unless `--all`) with first-run bootstrap pinned to the
   locked nix-darwin rev plus `narHash`.
   Existing Homebrew installs are adopted with `autoMigrate = true`, and setup
-  moves pre-existing `Library/Taps` to a timestamped backup before activation so
-  `mutableTaps = false` can install the pinned declarative taps.
+  transactionally moves architecture-correct `Library/Taps` to a timestamped
+  backup before activation so `mutableTaps = false` can install the pinned taps;
+  activation/bootstrap/interruption failure restores the original.
   GitHub's hosted macOS e2e passes `DOTFILES_NIX_DARWIN_HOSTED_CI=1` to use
   `cleanup = "none"` for that disposable activation only, because the runner
   image ships many undeclared Brew packages; real hosts remain `cleanup = "check"`.
@@ -218,54 +225,168 @@ Commit-by-commit status:
   Nix package layer by default on macOS/Linux/WSL before Phase 1 native/deferred
   installs; `--skip-deps` unconditionally skips that layer (even with
   compatibility aliases) and logs the skip; dry-run previews missing-Nix /
-  unsupported-arch failures without aborting; the WSL2 canary and WSL
+  unsupported-arch failures without aborting and Brew-less Darwin continues
+  through every Brew-backed preview phase; the WSL2 canary and WSL
   greenfield harness install Ubuntu's `nix-bin` package and enable flakes before
-  invoking setup. Intel macOS remains unsupported for activation and must use
-  `--skip-deps` plus manual provisioning until an x86_64-darwin host config
-  lands.
+  invoking setup. The ultimate closure added exact aarch64/x86_64 Darwin host
+  configurations, authoritative account/home resolution, transactionally
+  rolled-back tap migration, and Home Manager session-vars startup. Exact head
+  `f4b63953f2f982702a685358b09e89bae2d78fdd` passed both the real
+  `macos-26-intel` Nix and full setup lanes; WSL remains separate manual/runtime
+  proof.
 - **Pi CLI provisioning — DONE.** Setup installs the Pi CLI on every OS as the
   pinned npm package `@earendil-works/pi-coding-agent@0.80.3` after checking npm
   `dist.integrity`. POSIX public setup gets Node 24 from the enforced Nix package
   layer; Windows uses the native Node LTS catalog path. `.pi/` runtime state
   remains local and unsynced.
-- **Gold-standard gap close — IN PROGRESS (2026-07-09, PR #46).** Accepted
+- **Gold-standard gap close — DONE (2026-07-09, PR #46).** Accepted
   install failures record and force nonzero setup/update exits; stdin/no-script-path
   setup fails closed with clone-first instructions instead of clone-and-reinvoke;
   the VS Build Tools bootstrapper must pass Authenticode Microsoft signer/chain
   verification before execution; the WSL2 canary is split into a non-required
   scheduled/manual workflow; required-check sources align with `macos-26` and
   Nix contexts; Renovate custom-manager coverage and pin-consistency guards cover
-  the current mirrored/manual-reviewed pin surface. Remaining completion gate:
-  PR #46 live required checks must be green, and the owner must apply the
-  checked-in safeguards live for context-renaming changes.
+  the current mirrored/manual-reviewed pin surface. PR #46 merged as
+  `85375b2bdec9d3a998e8023a44b41d03a32f3eaa`; all twelve required checks passed,
+  and checked-in/live required contexts were verified aligned afterward.
+
+- **Ultimate gold-standard closure — IMPLEMENTED; exact hosted matrix passed,
+  staged owner/manual proof remains
+  (2026-07-10).** UGR-003 is
+  implemented: Lazy and Plenary require a valid full lock identity and prove
+  origin, exact HEAD, cleanliness, worktree usability, and required files before
+  runtimepath mutation. Repair is locked, staged, verified, and rollback-safe;
+  behavioral coverage replaces the former grep-only claim. UGR-002, UGR-011,
+  UGR-012, UGR-013, and the POSIX half of UGR-015 are implemented with focused
+  architecture, identity, session, dry-run, and rollback tests; Intel hosted
+  runtime proof passed and WSL real-host proof remains explicitly pending.
+  UGR-001 and UGR-014 are implemented:
+  packaged/portable WT state is independently transactionally merged and
+  recovered, while uninstall backup selection is filename-keyed and fails
+  closed on malformed candidates. UGR-004 through UGR-009 are implemented:
+  recoverable installs share the summary boundary; Pi and zsh executable
+  payloads prove immutable identities before publication; Windows Tree-sitter
+  uses exact compatible release artifacts; the required Microsoft `.deb`,
+  gh-dash peeled commit, Sandbox Terminal zip, external Action refs, and desired
+  Actions SHA-pinning safeguard are checked and documented. UGR-010 and the
+  Windows half of UGR-015 now isolate native chezmoi status and apply configs to
+  the real UserProfile, LocalApplicationData, Documents, and runtime `$PROFILE`
+  paths. UGR-016 through UGR-019 and UGR-023 close the PowerShell invocation,
+  checked Tree-sitter deletion, per-project clangd, Renovate inventory,
+  Starship/Polaris cleanup, diagnostic-identity, NUL-safe JSON, and structural
+  Nix-ownership gaps. UGR-020 is deliberately PARTIAL: this branch emits and
+  verifies stable logical checks while the legacy contexts remain required;
+  the checked-in/live switch happens only in the documented post-merge stage.
+  UGR-021 is PARTIAL until real WSL, redirected-Windows, cache-free scheduled or
+  manual, and desktop runs exist. The exact-head Intel and conventional Windows
+  font-consumption lanes passed. The first PR run exposed and fixed two
+  cross-host integration defects:
+  the POSIX dependency-table zsh scan now passes the complete origin/commit/file
+  identity, and handled Windows chezmoi drift no longer leaks a native exit code
+  into the CI step. The next Ubuntu run also proved Renovate's optional
+  `LOG_FILE` transport can be absent after exit 0; inventory validation now
+  consumes JSON stdout and fails explicitly if no proof is emitted. The setup
+  lanes then reproduced Homebrew's valid empty idempotent `shellenv` output and
+  Lazy's need for proved default-branch metadata on a detached bootstrap; both
+  boundaries now have behavioral regressions. Windows path proof now resolves
+  junctions, and the generic Windows suite installs the exact verified chezmoi
+  asset so native drift cases run with zero platform-dependent skips. The real
+  Windows setup lane also proved an executable-stage filename must end in
+  `.exe`; Tree-sitter publication now preserves that loader contract and its
+  Pester oracle rejects any non-`.exe` validation path. Intel CI now explicitly
+  uses full-SHA upstream-Nix installation after the real lane proved current
+  Determinate Nix no longer supports x86_64-darwin hosts; the action's hidden
+  last-release fallback is not treated as a platform contract. The next exact
+  head (`7a446c31def84bdef6da11b23dab21f79ca13336`) supplied further runtime
+  evidence: modern Ubuntu Bash exposed ineffective bare-`[[` tag assertions;
+  Linux Home Manager installed its session file under the documented
+  system-integrated profile; Intel reached a real x86_64 build but nix-darwin
+  refused unpreserved `/etc/bashrc` and `/etc/zshrc`; and Apple Silicon exposed
+  the valid nix-darwin-wrapper/native-Homebrew split. The fixes now state both
+  zsh tag and commit in preview output, check every assertion portably, source
+  all three official Home Manager profile locations, migrate the two system
+  shell files transactionally, and prove Homebrew by prefix/repository. Windows
+  apply failures now retain native stderr, and the target-free WT design lets
+  the main source apply without non-portable absolute target selectors. Exact
+  head `f4b63953f2f982702a685358b09e89bae2d78fdd` subsequently passed all three
+  workflow runs: generic Ubuntu/macOS/Windows and parity, Nix Ubuntu/Apple
+  Silicon/Intel, the Ubuntu container, public setup on Ubuntu/Apple
+  Silicon/Intel/Windows, and all six stable logical proof jobs. No workflow
+  definition is recorded as runtime proof; only those completed runs are.
+
+- **Exact-head runtime dependency follow-up — PASSED.** Head
+  `0c853d066362602f14dc251a6d3fbf3980102048`
+  reached the real two-project clangd spec on Ubuntu and failed closed because
+  the generic test lane had never installed `clangd`; all preceding Neovim
+  specs passed. The lane now installs Ubuntu's distro clangd and a static
+  contract test binds that provisioning to the real-client spec. Exact head
+  `f4b63953f2f982702a685358b09e89bae2d78fdd`, run `29092384006`, job
+  `86360593114`, passed the real two-project one-session spec (1/1, 0 failed).
+
+- **Exact-head Home Manager session-path follow-up — PASSED ON NATIVE LINUX;
+  WSL PENDING.** Head `0c853d066362602f14dc251a6d3fbf3980102048`
+  proved that merely finding `hm-session-vars.sh` was insufficient: the pinned
+  standalone configuration had an empty `home.sessionPath`, so its generated
+  file could not put profile-owned `rg` on a clean shell PATH. Linux Home
+  Manager now exports its evaluated `home.profileDirectory/bin` through
+  `home.sessionPath`; both architecture evaluations bind the exact value. Exact
+  head `f4b63953f2f982702a685358b09e89bae2d78fdd`, run `29092384014`, job
+  `86360593139`, passed the native-Linux clean login proof. WSL is not inferred.
+
+- **Exact-head native-Linux login-shell oracle — PASSED.** Head
+  `28006783a5112bfa3af3b0deb2f59fbf9f457a4e`
+  completed Home Manager and all six setup phases, then failed before session
+  state was exercised: fresh Ubuntu reported zsh missing, setup installed and
+  selected `/home/linuxbrew/.linuxbrew/bin/zsh`, but the assertion invoked the
+  nonexistent `/usr/bin/zsh` and discarded stderr. The proof now resolves one
+  effective-account record, requires its shell to be executable zsh, executes
+  that exact login shell from a caller-empty environment, and prints captured
+  diagnostics on failure. Exact head
+  `f4b63953f2f982702a685358b09e89bae2d78fdd`, run `29092384014`, job
+  `86360593139`, completed all six phases and passed that post-install oracle.
+
+- **Exact-head native Windows setup — PASSED.** Head
+  `f4b63953f2f982702a685358b09e89bae2d78fdd`, run `29092384014`, job
+  `86360593122`, completed
+  all six public setup phases and the required post-install checks on
+  `windows-2025`. It installed and validated the exact Tree-sitter `0.26.10`
+  release artifact, installed Hack Nerd Font files and proved registry
+  registration, validated Pi `0.80.3`, restored plugins/parsers/Mason, and
+  passed the strict 257-check LSP/parser/formatter smoke. This is real native
+  Windows hosted evidence, not redirected-known-folder, divergent Windows
+  Terminal, uninstall-restoration, or desktop visual proof.
+
+- **Intel Darwin package-plane sunset — OPEN, deadline 2026-12-31.** Nixpkgs
+  26.05 is the final supported `x86_64-darwin` release; 26.11 removes package
+  builds and source-build support. This closure implements and tests the current
+  supported path without suppressing its deprecation warning. Before 26.05
+  reaches end of support, replace Intel's Nixpkgs package plane with a reviewed
+  supported mechanism while preserving the same chezmoi ownership and exact
+  architecture-selection contracts. This future deadline does not invalidate a
+  green 26.05 Intel run today, and must not be “fixed” by narrowing macOS to ARM.
 
 ### P2 Follow-up: Secondary Supply-chain Hardening
 
-Deferred from the 2026-07-09 gold-standard batch to avoid destabilizing the
-primary installer/CI fixes in the same branch:
+Reconciled by the 2026-07-10 ultimate closure branch; each item is marked DONE
+only with its implementation, tests, and documentation:
 
-1. **Pi CLI verified tarball install**: replace request-A / install-request-B with
-   `npm pack`, verify the tarball integrity against `PI_CLI_INTEGRITY` /
-   `$PiCliIntegrity`, then install that verified tarball. Files:
-   `install-deps.sh`, `install-deps.ps1`, `tests/shell/pi_cli_test.sh`,
-   `tests/powershell/InstallDeps.Tests.ps1`.
-2. **zsh plugin quarantine-on-mismatch**: clone/fetch into a temp directory,
-   verify the expected commit, then move into place; if the chezmoi/onchange
-   verifier finds a mismatched payload, quarantine or remove it before failing.
-   Files: `install-deps.sh`,
-   `home/.chezmoiscripts/run_onchange_after_20-verify-zsh-plugin-pins.sh.tmpl`,
-   `tests/shell/zsh_plugins_test.sh`.
-3. **Windows tree-sitter npm fallback pin**: pin the npm fallback or mirror the
-   Linux pinned release-asset approach. Files: `install-deps.ps1`,
-   `tests/powershell/InstallDeps.Tests.ps1`.
-4. **gh-dash tag provenance**: verify the tag commit before installing/re-pinning,
-   or document gh extension tag resolution as an explicit reviewed exception.
-   Files: `install-deps.sh`, `install-deps.ps1`,
-   `tests/shell/gh_dash_extension_test.sh`,
-   `tests/powershell/InstallDeps.Tests.ps1`.
-5. **Ubuntu CI Microsoft repo package**: pin/verify the Microsoft package repo
-   `.deb` in `.github/workflows/test.yml`, or document it as CI-only risk with
-   least-privilege rationale and static guard coverage.
+1. **Pi CLI verified tarball install — DONE.** POSIX and Windows use `npm pack`,
+   require pack metadata and actual tarball bytes to match the mirrored SRI,
+   install only the local verified tarball, and clean temp state on every exit.
+2. **zsh plugin quarantine-on-mismatch — DONE.** The shared serialized
+   publisher neutralizes unproved executable payloads, verifies a sibling exact
+   checkout, publishes atomically, preserves unsafe quarantines, and lets bare
+   chezmoi self-heal legitimate pin changes.
+3. **Windows Tree-sitter compatibility pin — DONE.** Mutable Scoop/npm fallback
+   ownership is removed; exact `0.26.10` compatibility and the reviewed
+   x64/arm64/x86 release zip hashes gate transactional publication.
+4. **gh-dash tag provenance — DONE.** Tag `v4.25.1` is verified through its
+   annotated object to peeled commit
+   `49f37e4832956c57bf52d4ea8b1b1e5c0f863700`, and installation pins that commit.
+5. **Ubuntu CI Microsoft repo package — DONE.** Ubuntu 24.04 downloads the exact
+   configuration `.deb`, checks reviewed SHA-256
+   `c13f01ac7c3001b51a9281d40dde666db5e037e05512840c319832f7852bfec4`,
+   then invokes `sudo dpkg`; the general scanner self-tests this ordering.
 
 Startup SIGTERM harness changes were not made in this branch because the failure
 was not reproduced; do not rewrite that test without a deterministic
@@ -916,9 +1037,9 @@ Canonical solution:
 ### 8. zsh plugin root semantics split between XDG-aware runtime and fixed chezmoi paths
 
 Status: done. The canonical contract is fixed
-`~/.local/share/dotfiles/zsh-plugins`; install-deps, runtime, chezmoi externals,
-pin verification, uninstall, greenfield validation, container/WSL validation,
-and parity fixtures now use or assert that root.
+`~/.local/share/dotfiles/zsh-plugins`; install-deps, runtime, the checked
+publisher, uninstall, greenfield validation, container/WSL validation, and
+parity fixtures now use or assert that root.
 
 Evidence:
 
@@ -926,11 +1047,11 @@ Evidence:
   `$HOME/.local/share/dotfiles/zsh-plugins` root.
 - `install-deps.sh` installs zsh plugins into the fixed
   `$HOME/.local/share/dotfiles/zsh-plugins` root.
-- `home/.chezmoiexternal.toml.tmpl:4` and
-  `home/.chezmoiexternal.toml.tmpl:11` install chezmoi externals to fixed
-  `.local/share` paths.
-- `home/.chezmoiscripts/run_onchange_after_20-verify-zsh-plugin-pins.sh.tmpl:5`
-  through line 6 verify the fixed `.local/share` path.
+- `home/.chezmoiexternal.toml.tmpl` deliberately exposes no executable
+  `git-repo` target.
+- `home/.chezmoiscripts/run_onchange_after_20-ensure-zsh-plugin-pins.sh.tmpl`
+  invokes the canonical staged publisher against the fixed `.local/share` path
+  whenever pins or the embedded publisher identity change.
 - `uninstall.sh:176` through `uninstall.sh:179` and `uninstall.ps1:155` through
   `uninstall.ps1:160` only classify fixed `.local/share` externals.
 - `tests/migration/parity_gate.sh`, `tests/migration/oracle_test.sh`,

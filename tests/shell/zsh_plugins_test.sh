@@ -14,12 +14,18 @@ YES_ALL=1
 DRY_RUN=1
 
 out="$(install_zsh_plugins)"
-[[ "$out" == *"fzf-tab.git"* ]]
-[[ "$out" == *"$FZF_TAB_VERSION"* ]]
-[[ "$out" == *"$FZF_TAB_COMMIT"* ]]
-[[ "$out" == *"zsh-autosuggestions.git"* ]]
-[[ "$out" == *"$ZSH_AUTOSUGGESTIONS_VERSION"* ]]
-[[ "$out" == *"$ZSH_AUTOSUGGESTIONS_COMMIT"* ]]
+[[ "$out" == *"fzf-tab.git"* ]] \
+    || { echo "FAIL: zsh plugin dry-run omitted the fzf-tab origin"; exit 1; }
+[[ "$out" == *"$FZF_TAB_VERSION"* ]] \
+    || { echo "FAIL: zsh plugin dry-run omitted the fzf-tab reviewed ref"; exit 1; }
+[[ "$out" == *"$FZF_TAB_COMMIT"* ]] \
+    || { echo "FAIL: zsh plugin dry-run omitted the fzf-tab exact commit"; exit 1; }
+[[ "$out" == *"zsh-autosuggestions.git"* ]] \
+    || { echo "FAIL: zsh plugin dry-run omitted the autosuggestions origin"; exit 1; }
+[[ "$out" == *"$ZSH_AUTOSUGGESTIONS_VERSION"* ]] \
+    || { echo "FAIL: zsh plugin dry-run omitted the autosuggestions reviewed ref"; exit 1; }
+[[ "$out" == *"$ZSH_AUTOSUGGESTIONS_COMMIT"* ]] \
+    || { echo "FAIL: zsh plugin dry-run omitted the autosuggestions exact commit"; exit 1; }
 
 # A failing pinned-plugin install must (1) still attempt BOTH plugins, (2) surface
 # a FAIL: marker so CI catches it (the old `|| true` swallowed it and reported
@@ -50,12 +56,20 @@ if grep -F 'XDG_DATA_HOME' "$zshrc" | grep -F 'zsh-plugins' >/dev/null; then
     echo "FAIL: zshrc must not make the zsh plugin root depend on XDG_DATA_HOME"
     exit 1
 fi
-grep -F '[".local/share/dotfiles/zsh-plugins/fzf-tab"]' "$REPO_ROOT/home/.chezmoiexternal.toml.tmpl" >/dev/null \
-    || { echo "FAIL: chezmoi externals must install fzf-tab under the fixed root"; exit 1; }
+if grep -F 'type = "git-repo"' "$REPO_ROOT/home/.chezmoiexternal.toml.tmpl" >/dev/null; then
+    echo "FAIL: generic chezmoi git-repo externals must not publish sourceable zsh payloads"
+    exit 1
+fi
+ensure_template="$REPO_ROOT/home/.chezmoiscripts/run_onchange_after_20-ensure-zsh-plugin-pins.sh.tmpl"
 # shellcheck disable=SC2016 # literal template syntax is intentional.
-grep -F 'root="$HOME/.local/share/dotfiles/zsh-plugins"' \
-    "$REPO_ROOT/home/.chezmoiscripts/run_onchange_after_20-verify-zsh-plugin-pins.sh.tmpl" >/dev/null \
-    || { echo "FAIL: zsh pin verifier must check the fixed plugin root"; exit 1; }
+grep -F 'root="$HOME/.local/share/dotfiles/zsh-plugins"' "$ensure_template" >/dev/null \
+    || { echo "FAIL: checked publisher must use the fixed plugin root"; exit 1; }
+grep -F 'scripts/ensure-pinned-zsh-plugin.sh' "$ensure_template" >/dev/null \
+    || { echo "FAIL: chezmoi must call the canonical staged publisher"; exit 1; }
+grep -F "$FZF_TAB_COMMIT" "$ensure_template" >/dev/null \
+    || { echo "FAIL: chezmoi fzf-tab commit pin drift"; exit 1; }
+grep -F "$ZSH_AUTOSUGGESTIONS_COMMIT" "$ensure_template" >/dev/null \
+    || { echo "FAIL: chezmoi autosuggestions commit pin drift"; exit 1; }
 # zsh-autosuggestions (inline gray history) is sourced for prediction.
 grep -F 'zsh-autosuggestions/zsh-autosuggestions.zsh' "$zshrc" >/dev/null
 

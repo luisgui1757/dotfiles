@@ -46,14 +46,68 @@ $PolarisTag     = 'v0.1.2'
 $PolarisRef     = 'ecca742fa9ed1243a73981955850c1a8ef3e3b04'
 
 function Get-DefaultProfileRoot {
+    if ($env:OS -eq 'Windows_NT') {
+        $knownProfile = [Environment]::GetFolderPath([Environment+SpecialFolder]::UserProfile)
+        if ([string]::IsNullOrWhiteSpace($knownProfile)) {
+            throw 'Windows UserProfile known folder could not be resolved'
+        }
+        return $knownProfile
+    }
     if (-not [string]::IsNullOrWhiteSpace($env:USERPROFILE)) { return $env:USERPROFILE }
     if (-not [string]::IsNullOrWhiteSpace($env:HOME)) { return $env:HOME }
     return [Environment]::GetFolderPath([Environment+SpecialFolder]::UserProfile)
 }
 
+function Resolve-WindowsTargetIdentity {
+    param(
+        [scriptblock]$FolderResolver = {
+            param([string]$Name)
+            $folder = [Environment+SpecialFolder]([Enum]::Parse([Environment+SpecialFolder], $Name))
+            return [Environment]::GetFolderPath($folder)
+        },
+        [AllowEmptyString()] [string]$RuntimeProfile = ([string]$PROFILE)
+    )
+
+    $resolved = @{}
+    foreach ($name in 'UserProfile', 'LocalApplicationData', 'MyDocuments') {
+        $path = [string](& $FolderResolver $name)
+        $isWindowsAbsolute = $path -match '^(?:[A-Za-z]:[\\/]|\\\\)'
+        if ([string]::IsNullOrWhiteSpace($path) -or (-not [IO.Path]::IsPathRooted($path) -and -not $isWindowsAbsolute) -or
+            $path -match '^[A-Za-z]:[^\\/]') {
+            throw "Windows $name known folder is missing or not absolute: $path"
+        }
+        $resolved[$name] = if ($isWindowsAbsolute -and $env:OS -ne 'Windows_NT') {
+            ($path -replace '/', '\').TrimEnd('\')
+        } else { [IO.Path]::GetFullPath($path).TrimEnd('\', '/') }
+    }
+    $runtimeIsWindowsAbsolute = $RuntimeProfile -match '^(?:[A-Za-z]:[\\/]|\\\\)'
+    if ([string]::IsNullOrWhiteSpace($RuntimeProfile) -or
+        (-not [IO.Path]::IsPathRooted($RuntimeProfile) -and -not $runtimeIsWindowsAbsolute) -or
+        $RuntimeProfile -match '^[A-Za-z]:[^\\/]') {
+        throw "PowerShell runtime profile path is missing or not absolute: $RuntimeProfile"
+    }
+    return [pscustomobject]@{
+        UserProfile = $resolved.UserProfile
+        LocalApplicationData = $resolved.LocalApplicationData
+        Documents = $resolved.MyDocuments
+        RuntimeProfile = if ($runtimeIsWindowsAbsolute -and $env:OS -ne 'Windows_NT') {
+            $RuntimeProfile -replace '/', '\'
+        } else { [IO.Path]::GetFullPath($RuntimeProfile) }
+    }
+}
+
+function Get-WindowsLocalApplicationData {
+    if ($script:WindowsIdentity) { return $script:WindowsIdentity.LocalApplicationData }
+    if ($env:OS -eq 'Windows_NT') {
+        return [Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)
+    }
+    return $env:LOCALAPPDATA
+}
+
 function Get-ScoopRoot {
+    param([scriptblock]$ProfileRootResolver = { Get-DefaultProfileRoot })
     if (-not [string]::IsNullOrWhiteSpace($env:SCOOP)) { return $env:SCOOP }
-    $profileRoot = Get-DefaultProfileRoot
+    $profileRoot = [string](& $ProfileRootResolver)
     if ([string]::IsNullOrWhiteSpace($profileRoot)) { return '' }
     return (Join-Path $profileRoot 'scoop')
 }
@@ -63,8 +117,9 @@ $DefaultDest = Join-Path (Get-DefaultProfileRoot) 'dotfiles'
 # Rebuild PATH from registry values plus Scoop shims, then de-duplicate.
 # This differs from setup.sh, which evaluates brew shellenv and appends Unix bin dirs.
 function Update-RuntimePath {
+    param([scriptblock]$ProfileRootResolver = { Get-DefaultProfileRoot })
     $parts = @()
-    $scoopRoot = Get-ScoopRoot
+    $scoopRoot = Get-ScoopRoot -ProfileRootResolver $ProfileRootResolver
     if (-not [string]::IsNullOrWhiteSpace($scoopRoot)) {
         $shimDir = Join-Path $scoopRoot 'shims'
         if (Test-Path -LiteralPath $shimDir) {
@@ -257,8 +312,9 @@ function Write-Step {
 }
 
 function Get-PolarisCacheRoot {
-    if (-not [string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
-        return (Join-Path $env:LOCALAPPDATA 'dotfiles\polaris')
+    $localAppData = Get-WindowsLocalApplicationData
+    if (-not [string]::IsNullOrWhiteSpace($localAppData)) {
+        return (Join-Path $localAppData 'dotfiles\polaris')
     }
     return (Join-Path (Get-DefaultProfileRoot) '.local\share\dotfiles\polaris')
 }
@@ -768,37 +824,91 @@ function Invoke-ChezmoiOrExit {
         [Parameter(Mandatory)] [string]$Label,
         [Parameter(Mandatory)] [string[]]$Arguments
     )
-    $global:LASTEXITCODE = 0
-    $baseArgs = $script:ChezmoiBaseArgs
-    $configArgs = $script:ChezmoiConfigArgs
-    & chezmoi @baseArgs @configArgs @Arguments
-    $rc = $LASTEXITCODE
-    if ($rc -ne 0) {
-        Write-Host ("  FAIL: $Label exited $rc") -ForegroundColor Red
-        exit $rc
+    $result = Invoke-ChezmoiNative -Arguments $Arguments -PassThroughOutput
+    if ($result.ExitCode -ne 0) {
+        $detail = $result.Stderr.TrimEnd()
+        if (-not [string]::IsNullOrWhiteSpace($detail)) {
+            Write-Output $detail
+        }
+        Write-Host ("  FAIL: $Label exited $($result.ExitCode)") -ForegroundColor Red
+        exit $result.ExitCode
+    }
+}
+
+function Invoke-ChezmoiNative {
+    param(
+        [Parameter(Mandatory)] [string[]]$Arguments,
+        [switch]$PassThroughOutput,
+        [AllowNull()] [string]$InputText
+    )
+
+    $command = Get-Command chezmoi -CommandType Application -ErrorAction Stop | Select-Object -First 1
+    $baseArgs = @($script:ChezmoiBaseArgs)
+    $configArgs = @($script:ChezmoiConfigArgs)
+    $stderrPath = [IO.Path]::GetTempFileName()
+    $output = @()
+    $rc = 1
+    $oldNativePreference = $null
+    $hasNativePreference = Test-Path Variable:PSNativeCommandUseErrorActionPreference
+    try {
+        try {
+            if ($hasNativePreference) {
+                $oldNativePreference = $PSNativeCommandUseErrorActionPreference
+                $PSNativeCommandUseErrorActionPreference = $false
+            }
+            $global:LASTEXITCODE = 0
+            if ($PassThroughOutput) {
+                if ($PSBoundParameters.ContainsKey('InputText')) {
+                    $InputText | & $command.Source @baseArgs @configArgs @Arguments 2> $stderrPath | Out-Host
+                } else {
+                    & $command.Source @baseArgs @configArgs @Arguments 2> $stderrPath | Out-Host
+                }
+            } elseif ($PSBoundParameters.ContainsKey('InputText')) {
+                $output = @($InputText | & $command.Source @baseArgs @configArgs @Arguments 2> $stderrPath)
+            } else {
+                $output = @(& $command.Source @baseArgs @configArgs @Arguments 2> $stderrPath)
+            }
+            $rc = if ($null -eq $LASTEXITCODE) { 0 } else { [int]$LASTEXITCODE }
+        } finally {
+            if ($hasNativePreference) {
+                $PSNativeCommandUseErrorActionPreference = $oldNativePreference
+            }
+        }
+        $stderrText = [IO.File]::ReadAllText($stderrPath)
+        return [pscustomobject]@{
+            ExitCode = $rc
+            Output = @($output)
+            Stderr = $stderrText
+        }
+    } finally {
+        Remove-Item -LiteralPath $stderrPath -Force -ErrorAction SilentlyContinue
+        # Callers consume ExitCode explicitly. Do not leak a handled verify
+        # drift into the surrounding PowerShell/GitHub process exit contract.
+        $global:LASTEXITCODE = 0
     }
 }
 
 function Invoke-ChezmoiOutput {
     param([Parameter(Mandatory)] [string[]]$Arguments)
-    $global:LASTEXITCODE = 0
-    $baseArgs = $script:ChezmoiBaseArgs
-    $configArgs = $script:ChezmoiConfigArgs
-    $output = & chezmoi @baseArgs @configArgs @Arguments
-    $rc = $LASTEXITCODE
-    if ($rc -ne 0) {
-        throw "chezmoi $($Arguments -join ' ') exited $rc"
+    $result = Invoke-ChezmoiNative -Arguments $Arguments
+    if ($result.ExitCode -ne 0) {
+        $detail = $result.Stderr.Trim()
+        if ($detail) { $detail = ": $detail" }
+        throw "chezmoi $($Arguments -join ' ') exited $($result.ExitCode)$detail"
     }
-    return @($output)
+    return @($result.Output)
 }
 
 function Test-ChezmoiVerify {
     param([Parameter(Mandatory)] [string]$Target)
-    $global:LASTEXITCODE = 0
-    $baseArgs = $script:ChezmoiBaseArgs
-    $configArgs = $script:ChezmoiConfigArgs
-    & chezmoi @baseArgs @configArgs verify $Target > $null 2> $null
-    return ($LASTEXITCODE -eq 0)
+    $result = Invoke-ChezmoiNative -Arguments @('verify', $Target)
+    if ($result.ExitCode -eq 0) { return $true }
+    if ($result.ExitCode -eq 1 -and $result.Output.Count -eq 0 -and [string]::IsNullOrWhiteSpace($result.Stderr)) {
+        return $false
+    }
+    $detail = $result.Stderr.Trim()
+    if (-not $detail) { $detail = 'no diagnostic text' }
+    throw "chezmoi verify invocation failed for ${Target}: exit $($result.ExitCode): $detail"
 }
 
 function Get-FullPathSafe {
@@ -817,7 +927,7 @@ function Get-RealExistingPath {
     if ($null -eq $item) { return $null }
 
     $linkType = if ($item.PSObject.Properties.Name -contains 'LinkType') { $item.LinkType } else { $null }
-    if ($linkType -eq 'SymbolicLink') {
+    if ($linkType -in @('SymbolicLink', 'Junction')) {
         $linkTarget = @($item.Target)[0]
         if ($linkTarget) {
             if (-not [IO.Path]::IsPathRooted($linkTarget)) {
@@ -980,11 +1090,11 @@ function Test-TargetAlreadyMatches {
 }
 
 function Get-WindowsTerminalSettingsPath {
-    return (Join-Path $env:LOCALAPPDATA 'Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json')
+    return (Join-Path (Get-WindowsLocalApplicationData) 'Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json')
 }
 
 function Get-WindowsTerminalUnpackagedSettingsPath {
-    return (Join-Path $env:LOCALAPPDATA 'Microsoft\Windows Terminal\settings.json')
+    return (Join-Path (Get-WindowsLocalApplicationData) 'Microsoft\Windows Terminal\settings.json')
 }
 
 function Get-WindowsTerminalSettingsFragmentPath {
@@ -996,7 +1106,8 @@ function Get-WindowsTerminalMergeHelperPath {
 }
 
 function Test-WindowsTerminalUnpackagedPresent {
-    if (-not $env:LOCALAPPDATA) {
+    $localAppData = Get-WindowsLocalApplicationData
+    if (-not $localAppData) {
         return $false
     }
 
@@ -1006,7 +1117,7 @@ function Test-WindowsTerminalUnpackagedPresent {
         return $true
     }
 
-    $portableRoot = Join-Path $env:LOCALAPPDATA 'Programs\WindowsTerminal'
+    $portableRoot = Join-Path $localAppData 'Programs\WindowsTerminal'
     foreach ($candidate in @(
             (Join-Path $portableRoot 'wt.exe'),
             (Join-Path $portableRoot 'WindowsTerminal.exe')
@@ -1047,6 +1158,22 @@ function Write-WindowsTerminalSettingsJson {
     [System.IO.File]::WriteAllText($SettingsPath, $Json, [System.Text.UTF8Encoding]::new($false))
 }
 
+function Get-WindowsTerminalContentSha256 {
+    param([Parameter(Mandatory)] [string]$Content)
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $bytes = [System.Text.UTF8Encoding]::new($false).GetBytes($Content)
+        return ([BitConverter]::ToString($sha.ComputeHash($bytes))).Replace('-', '')
+    } finally {
+        $sha.Dispose()
+    }
+}
+
+function Get-WindowsTerminalFileSha256 {
+    param([Parameter(Mandatory)] [string]$Path)
+    return (Get-FileHash -LiteralPath $Path -Algorithm SHA256 -ErrorAction Stop).Hash
+}
+
 function Merge-WindowsTerminalFragmentFile {
     param(
         [Parameter(Mandatory)] [string]$SettingsPath,
@@ -1072,59 +1199,238 @@ function Merge-WindowsTerminalFragmentFile {
     return ($fragment | ConvertTo-Json -Depth 100)
 }
 
-function Copy-WindowsTerminalSettingsForUnpackaged {
-    # Params default to the script switches but are overridable so tests can drive
-    # the dry-run / skip paths directly -- Pester `Set-Variable -Scope Script` does
-    # NOT reliably override how a dot-sourced function reads a script variable.
+function Get-WindowsTerminalMergeTargets {
+    param(
+        [bool]$IsPortablePresent = (Test-WindowsTerminalUnpackagedPresent)
+    )
+    $packagedSettings = Get-WindowsTerminalSettingsPath
+    if (Test-Path -LiteralPath $packagedSettings -PathType Leaf) {
+        Write-Output $packagedSettings
+    }
+    $unpackagedSettings = Get-WindowsTerminalUnpackagedSettingsPath
+    if ((Test-Path -LiteralPath $unpackagedSettings -PathType Leaf) -or $IsPortablePresent) {
+        Write-Output $unpackagedSettings
+    }
+}
+
+function New-WindowsTerminalMergePlan {
+    param(
+        [Parameter(Mandatory)] [string]$SettingsPath,
+        [Parameter(Mandatory)] [string]$FragmentPath,
+        [bool]$IsDryRun = $false
+    )
+    $stagePath = $null
+    try {
+        $existed = Test-Path -LiteralPath $SettingsPath -PathType Leaf
+        $sourceHash = if ($existed) { Get-WindowsTerminalFileSha256 -Path $SettingsPath } else { $null }
+        $json = Merge-WindowsTerminalFragmentFile -SettingsPath $SettingsPath -FragmentPath $FragmentPath
+        # Parse the exact staged representation before any backup or publication.
+        $null = $json | ConvertFrom-Json -ErrorAction Stop
+        $stageHash = Get-WindowsTerminalContentSha256 -Content $json
+        $changed = (-not $existed) -or ($stageHash -ne $sourceHash)
+        if ($changed -and -not $IsDryRun) {
+            $settingsDir = Split-Path -Parent $SettingsPath
+            if (-not (Test-Path -LiteralPath $settingsDir -PathType Container)) {
+                New-Item -ItemType Directory -Force -Path $settingsDir -ErrorAction Stop | Out-Null
+            }
+            $stagePath = Join-Path $settingsDir ('.{0}.dotfiles-stage.{1}.tmp' -f (Split-Path -Leaf $SettingsPath), [Guid]::NewGuid().ToString('N'))
+            Write-WindowsTerminalSettingsJson -SettingsPath $stagePath -Json $json
+            $null = ([System.IO.File]::ReadAllText($stagePath) | ConvertFrom-Json -ErrorAction Stop)
+            if ((Get-WindowsTerminalFileSha256 -Path $stagePath) -ne $stageHash) {
+                throw "staged Windows Terminal settings did not match the validated merge output: $stagePath"
+            }
+        }
+        return [pscustomobject]@{
+            Target = $SettingsPath
+            Existed = [bool]$existed
+            SourceHash = $sourceHash
+            StageHash = $stageHash
+            StagePath = $stagePath
+            Changed = [bool]$changed
+            BackupPath = $null
+            RollbackPath = $null
+            Published = $false
+            RecoveryRequired = $false
+        }
+    } catch {
+        if ($stagePath) { Remove-Item -LiteralPath $stagePath -Force -ErrorAction SilentlyContinue }
+        throw
+    }
+}
+
+function Backup-WindowsTerminalMergePlan {
+    param([Parameter(Mandatory)] $Plan)
+    if (-not $Plan.Changed -or -not $Plan.Existed) { return }
+    if (-not (Test-Path -LiteralPath $Plan.Target -PathType Leaf) -or
+        (Get-WindowsTerminalFileSha256 -Path $Plan.Target) -ne $Plan.SourceHash) {
+        throw "Windows Terminal settings changed while the merge was staged: $($Plan.Target)"
+    }
+    $backup = Get-UniqueBackupPath "$($Plan.Target).bak.$Timestamp"
+    Copy-Item -LiteralPath $Plan.Target -Destination $backup -ErrorAction Stop
+    if ((Get-WindowsTerminalFileSha256 -Path $backup) -ne $Plan.SourceHash) {
+        Remove-Item -LiteralPath $backup -Force -ErrorAction SilentlyContinue
+        throw "Windows Terminal backup verification failed: $backup"
+    }
+    $Plan.BackupPath = $backup
+    Write-Step "backed up $($Plan.Target) -> $backup"
+}
+
+function Test-WindowsTerminalMergePlanSourceUnchanged {
+    param([Parameter(Mandatory)] $Plan)
+    if ($Plan.Existed) {
+        return (Test-Path -LiteralPath $Plan.Target -PathType Leaf) -and
+            ((Get-WindowsTerminalFileSha256 -Path $Plan.Target) -eq $Plan.SourceHash)
+    }
+    return (-not (Test-Path -LiteralPath $Plan.Target))
+}
+
+function Publish-WindowsTerminalSettingsStage {
+    param(
+        [Parameter(Mandatory)] [string]$StagePath,
+        [Parameter(Mandatory)] [string]$TargetPath,
+        [AllowNull()] [string]$RollbackPath,
+        [Parameter(Mandatory)] [bool]$TargetExisted
+    )
+    if ($TargetExisted) {
+        [System.IO.File]::Replace($StagePath, $TargetPath, $RollbackPath)
+    } else {
+        [System.IO.File]::Move($StagePath, $TargetPath)
+    }
+}
+
+function Restore-WindowsTerminalMergePlan {
+    param([Parameter(Mandatory)] $Plan)
+    if (-not $Plan.Published) { return $true }
+    try {
+        if (-not (Test-Path -LiteralPath $Plan.Target -PathType Leaf) -or
+            (Get-WindowsTerminalFileSha256 -Path $Plan.Target) -ne $Plan.StageHash) {
+            $Plan.RecoveryRequired = $true
+            return $false
+        }
+        if ($Plan.Existed) {
+            if (-not (Test-Path -LiteralPath $Plan.RollbackPath -PathType Leaf)) {
+                $Plan.RecoveryRequired = $true
+                return $false
+            }
+            $failedOutput = Get-UniqueBackupPath "$($Plan.Target).dotfiles-failed.$Timestamp"
+            [System.IO.File]::Replace($Plan.RollbackPath, $Plan.Target, $failedOutput)
+            Remove-Item -LiteralPath $failedOutput -Force -ErrorAction SilentlyContinue
+        } else {
+            Remove-Item -LiteralPath $Plan.Target -Force -ErrorAction Stop
+        }
+        $Plan.Published = $false
+        return $true
+    } catch {
+        $Plan.RecoveryRequired = $true
+        return $false
+    }
+}
+
+function Invoke-WindowsTerminalSettingsTransaction {
+    # Parameters are explicit so Pester can drive dry-run/skip/presence without
+    # relying on dot-source scope behavior. BeforePublish is a deterministic
+    # concurrency injection seam; production never supplies it.
     param(
         [bool]$IsDryRun = $DryRun,
         [bool]$IsSkipMerge = $SkipWindowsTerminalMerge,
-        [bool]$IsPortablePresent = (Test-WindowsTerminalUnpackagedPresent)
+        [bool]$IsPortablePresent = (Test-WindowsTerminalUnpackagedPresent),
+        [scriptblock]$BeforePublish
     )
-    if ($IsSkipMerge) { return }
-
-    $packagedSettings = Get-WindowsTerminalSettingsPath
-    $unpackagedSettings = Get-WindowsTerminalUnpackagedSettingsPath
-
-    if (Test-Path -LiteralPath $packagedSettings -PathType Leaf) {
-        if ($IsDryRun) {
-            Write-Step "would    mirror Windows Terminal settings to unpackaged path"
-            return
-        }
-        try {
-            $unpackagedDir = Split-Path -Parent $unpackagedSettings
-            if (-not (Test-Path -LiteralPath $unpackagedDir -PathType Container)) {
-                New-Item -ItemType Directory -Force -Path $unpackagedDir | Out-Null
-            }
-            Copy-Item -LiteralPath $packagedSettings -Destination $unpackagedSettings -Force -ErrorAction Stop
-            Write-Step "mirrored Windows Terminal settings to unpackaged path"
-        } catch {
-            Write-Warning ("Could not mirror Windows Terminal settings to unpackaged path: " + $_.Exception.Message)
-        }
+    if ($IsSkipMerge) {
+        Write-Step "skip     Windows Terminal settings merge via -SkipWindowsTerminalMerge"
         return
     }
 
-    if (-not $IsPortablePresent) { return }
+    $fragmentPath = Get-WindowsTerminalSettingsFragmentPath
+    if (-not (Test-Path -LiteralPath $fragmentPath -PathType Leaf)) {
+        throw "Windows Terminal settings fragment is missing: $fragmentPath"
+    }
+    $targets = @(Get-WindowsTerminalMergeTargets -IsPortablePresent $IsPortablePresent)
+    if ($targets.Count -eq 0) { return }
 
+    $mutexMaterial = (($targets | ForEach-Object { [IO.Path]::GetFullPath($_).ToLowerInvariant() }) -join '|')
+    $mutexName = 'Dotfiles.WindowsTerminal.Settings.' + (Get-WindowsTerminalContentSha256 -Content $mutexMaterial)
+    $mutex = New-Object System.Threading.Mutex($false, $mutexName)
+    $acquired = $false
+    $plans = @()
+    $completed = $false
     try {
-        $fragmentPath = Get-WindowsTerminalSettingsFragmentPath
-        if (-not (Test-Path -LiteralPath $fragmentPath -PathType Leaf)) {
-            throw "Windows Terminal settings fragment is missing: $fragmentPath"
+        try {
+            $acquired = $mutex.WaitOne([TimeSpan]::FromSeconds(30))
+        } catch [System.Threading.AbandonedMutexException] {
+            $acquired = $true
         }
-        $action = if (Test-Path -LiteralPath $unpackagedSettings -PathType Leaf) { 'merge' } else { 'seed' }
+        if (-not $acquired) {
+            throw "timed out waiting for another Windows Terminal settings transaction"
+        }
+
+        foreach ($target in $targets) {
+            $plans += New-WindowsTerminalMergePlan -SettingsPath $target -FragmentPath $fragmentPath -IsDryRun $IsDryRun
+        }
+        foreach ($plan in $plans) {
+            if (-not $plan.Changed) {
+                Write-Step "ok       Windows Terminal settings already merged: $($plan.Target)"
+                continue
+            }
+            if ($IsDryRun) {
+                if ($plan.Existed) { Write-Step "would    backup $($plan.Target); then merge atomically" }
+                else { Write-Step "would    seed Windows Terminal settings atomically: $($plan.Target)" }
+            } else {
+                Backup-WindowsTerminalMergePlan -Plan $plan
+            }
+        }
         if ($IsDryRun) {
-            Write-Step ("would    {0} Windows Terminal unpackaged settings from fragment" -f $action)
+            $completed = $true
             return
         }
-        $json = Merge-WindowsTerminalFragmentFile -SettingsPath $unpackagedSettings -FragmentPath $fragmentPath
-        Write-WindowsTerminalSettingsJson -SettingsPath $unpackagedSettings -Json $json
-        if ($action -eq 'seed') {
-            Write-Step "seeded Windows Terminal unpackaged settings from fragment"
-        } else {
-            Write-Step "merged Windows Terminal unpackaged settings from fragment"
+        if ($BeforePublish) { & $BeforePublish $plans }
+        foreach ($plan in $plans) {
+            if (-not $plan.Changed) { continue }
+            if (-not (Test-WindowsTerminalMergePlanSourceUnchanged -Plan $plan)) {
+                throw "Windows Terminal settings changed concurrently before publication: $($plan.Target)"
+            }
+            if ($plan.Existed) {
+                $plan.RollbackPath = Join-Path (Split-Path -Parent $plan.Target) ('.{0}.dotfiles-rollback.{1}.tmp' -f (Split-Path -Leaf $plan.Target), [Guid]::NewGuid().ToString('N'))
+            }
+            Publish-WindowsTerminalSettingsStage -StagePath $plan.StagePath -TargetPath $plan.Target -RollbackPath $plan.RollbackPath -TargetExisted $plan.Existed
+            $plan.Published = $true
+
+            # File.Replace atomically captures the exact pre-publication bytes.
+            # Comparing that rollback file closes the final check/replace race.
+            if ($plan.Existed -and (Get-WindowsTerminalFileSha256 -Path $plan.RollbackPath) -ne $plan.SourceHash) {
+                $null = Restore-WindowsTerminalMergePlan -Plan $plan
+                throw "Windows Terminal settings changed concurrently during publication: $($plan.Target)"
+            }
+            if ((Get-WindowsTerminalFileSha256 -Path $plan.Target) -ne $plan.StageHash) {
+                throw "published Windows Terminal settings failed byte validation: $($plan.Target)"
+            }
+            $null = ([System.IO.File]::ReadAllText($plan.Target) | ConvertFrom-Json -ErrorAction Stop)
+            Write-Step "merged   Windows Terminal settings atomically: $($plan.Target)"
         }
+        $completed = $true
     } catch {
-        Write-Warning ("Could not seed or merge Windows Terminal unpackaged settings: " + $_.Exception.Message)
+        $cause = $_.Exception.Message
+        $recovery = @()
+        for ($i = $plans.Count - 1; $i -ge 0; $i--) {
+            $plan = $plans[$i]
+            if (-not (Restore-WindowsTerminalMergePlan -Plan $plan)) {
+                $paths = @($plan.BackupPath, $plan.RollbackPath) | Where-Object { $_ }
+                $recovery += "$($plan.Target) (recovery: $($paths -join ', '))"
+            }
+        }
+        if ($recovery.Count -gt 0) {
+            throw "Windows Terminal settings transaction failed: $cause. Automatic rollback was unsafe or failed for: $($recovery -join '; '). Preserve those files and restore deliberately before retrying."
+        }
+        throw "Windows Terminal settings transaction failed: $cause. Every published target was restored; fix the error and retry setup."
+    } finally {
+        foreach ($plan in $plans) {
+            if ($plan.StagePath) { Remove-Item -LiteralPath $plan.StagePath -Force -ErrorAction SilentlyContinue }
+            if ($completed -and $plan.RollbackPath) {
+                Remove-Item -LiteralPath $plan.RollbackPath -Force -ErrorAction SilentlyContinue
+            }
+        }
+        if ($acquired) { $mutex.ReleaseMutex() }
+        $mutex.Dispose()
     }
 }
 
@@ -1139,9 +1445,10 @@ function Test-SamePath {
 }
 
 function Stop-NvimSelfLinkIfNeeded {
-    if (-not $env:LOCALAPPDATA) { return }
+    $localAppData = Get-WindowsLocalApplicationData
+    if (-not $localAppData) { return }
 
-    $nvimTarget = Join-Path $env:LOCALAPPDATA 'nvim'
+    $nvimTarget = Join-Path $localAppData 'nvim'
     $targetItem = Get-Item -LiteralPath $nvimTarget -Force -ErrorAction SilentlyContinue
     if (-not $targetItem) { return }
     # An existing SYMLINK/Junction is the normal already-installed case: it points
@@ -1180,21 +1487,6 @@ function Get-ManagedConfigTargets {
     return $targets
 }
 
-function Backup-WindowsTerminalSettings {
-    if ($SkipWindowsTerminalMerge) { return }
-
-    $settings = Get-WindowsTerminalSettingsPath
-    if (-not (Test-Path -LiteralPath $settings -PathType Leaf)) { return }
-
-    $backup = Get-UniqueBackupPath "$settings.bak.$Timestamp"
-    if ($DryRun) {
-        Write-Step "backup   $settings -> $backup; then Windows Terminal merge"
-    } else {
-        Copy-Item -LiteralPath $settings -Destination $backup -Force
-        Write-Step "backed up $settings -> $backup"
-    }
-}
-
 function Backup-PreexistingManagedTargets {
     $targets = @(Get-ManagedConfigTargets -ExcludeWindowsTerminal)
     if ($targets.Count -eq 0) {
@@ -1223,13 +1515,149 @@ function Backup-PreexistingManagedTargets {
 function New-ChezmoiDryRunConfig {
     $tmp = New-TemporaryFile
     $templatePath = Join-Path $HomeSource '.chezmoi.toml.tmpl'
-    $baseArgs = $script:ChezmoiBaseArgs
-    $rendered = Get-Content -Raw -LiteralPath $templatePath | & chezmoi @baseArgs execute-template --init
-    if ($LASTEXITCODE -ne 0) {
-        throw "chezmoi execute-template --init failed while preparing dry-run config"
+    $template = Get-Content -Raw -LiteralPath $templatePath
+    $result = Invoke-ChezmoiNative -Arguments @('execute-template', '--init') -InputText $template
+    if ($result.ExitCode -ne 0) {
+        throw "chezmoi execute-template --init failed while preparing dry-run config: $($result.Stderr.Trim())"
     }
+    $rendered = @($result.Output) -join [Environment]::NewLine
     Set-Content -LiteralPath $tmp.FullName -Value $rendered -Encoding UTF8
     return $tmp.FullName
+}
+
+function Get-WindowsKnownFolderOverlays {
+    param([Parameter(Mandatory)] $Identity)
+    $stateRoot = Join-Path $Identity.LocalApplicationData 'dotfiles\chezmoi-state'
+    return @(
+        [pscustomobject]@{
+            Label = 'LocalApplicationData'
+            Source = Join-Path $ScriptDir 'windows\chezmoi-localappdata'
+            Destination = $Identity.LocalApplicationData
+            State = Join-Path $stateRoot 'localappdata.boltdb'
+        },
+        [pscustomobject]@{
+            Label = 'Documents profiles'
+            Source = Join-Path $ScriptDir 'windows\chezmoi-documents'
+            Destination = $Identity.Documents
+            State = Join-Path $stateRoot 'documents.boltdb'
+        }
+    )
+}
+
+function Assert-WindowsKnownFolderConsumption {
+    param([Parameter(Mandatory)] $Identity)
+
+    $nvimTarget = Join-Path $Identity.LocalApplicationData 'nvim'
+    $lazygitTarget = Join-Path $Identity.LocalApplicationData 'lazygit\config.yml'
+    $expectedNvim = Join-Path $ScriptDir 'nvim'
+    $expectedLazygit = Join-Path $ScriptDir 'lazygit\config.windows.yml'
+    if (-not (Test-SamePath (Get-RealExistingPath $nvimTarget) (Get-RealExistingPath $expectedNvim))) {
+        throw "Neovim does not consume the repo config through actual LocalApplicationData: $nvimTarget"
+    }
+    if (-not (Test-SamePath (Get-RealExistingPath $lazygitTarget) (Get-RealExistingPath $expectedLazygit)) -and
+        -not (Test-FileBytesEqual $lazygitTarget $expectedLazygit)) {
+        throw "lazygit does not consume the repo config through actual LocalApplicationData: $lazygitTarget"
+    }
+
+    $profileCandidates = @(
+        (Join-Path $Identity.Documents 'PowerShell\Microsoft.PowerShell_profile.ps1'),
+        (Join-Path $Identity.Documents 'PowerShell\Microsoft.VSCode_profile.ps1'),
+        (Join-Path $Identity.Documents 'WindowsPowerShell\Microsoft.PowerShell_profile.ps1'),
+        (Join-Path $Identity.Documents 'WindowsPowerShell\Microsoft.PowerShellISE_profile.ps1')
+    )
+    if (-not @($profileCandidates | Where-Object { Test-SamePath $_ $Identity.RuntimeProfile }).Count) {
+        throw "unsupported PowerShell host profile path: $($Identity.RuntimeProfile). Expected a supported profile under actual Documents."
+    }
+    $expectedProfile = Join-Path $ScriptDir 'shells\powershell_profile.ps1'
+    if (-not (Test-SamePath (Get-RealExistingPath $Identity.RuntimeProfile) (Get-RealExistingPath $expectedProfile)) -and
+        -not (Test-FileBytesEqual $Identity.RuntimeProfile $expectedProfile)) {
+        throw "the runtime PowerShell profile does not consume the repo profile: $($Identity.RuntimeProfile)"
+    }
+}
+
+function Move-LegacyWindowsKnownFolderTargets {
+    param(
+        [Parameter(Mandatory)] $Identity,
+        [bool]$IsDryRun = $DryRun
+    )
+
+    $legacyLocal = Join-Path $Identity.UserProfile 'AppData\Local'
+    $legacyDocuments = Join-Path $Identity.UserProfile 'Documents'
+    $plans = @(
+        [pscustomobject]@{
+            Legacy = Join-Path $legacyLocal 'nvim'
+            Actual = Join-Path $Identity.LocalApplicationData 'nvim'
+            Expected = Join-Path $ScriptDir 'nvim'
+            Directory = $true
+        },
+        [pscustomobject]@{
+            Legacy = Join-Path $legacyLocal 'lazygit\config.yml'
+            Actual = Join-Path $Identity.LocalApplicationData 'lazygit\config.yml'
+            Expected = Join-Path $ScriptDir 'lazygit\config.windows.yml'
+            Directory = $false
+        },
+        [pscustomobject]@{
+            Legacy = Join-Path $legacyDocuments 'PowerShell\Microsoft.PowerShell_profile.ps1'
+            Actual = Join-Path $Identity.Documents 'PowerShell\Microsoft.PowerShell_profile.ps1'
+            Expected = Join-Path $ScriptDir 'shells\powershell_profile.ps1'
+            Directory = $false
+        }
+    )
+    foreach ($plan in $plans) {
+        if (Test-SamePath $plan.Legacy $plan.Actual) { continue }
+        if (-not (Get-Item -LiteralPath $plan.Legacy -Force -ErrorAction SilentlyContinue)) { continue }
+        $owned = if ($plan.Directory) {
+            Test-SamePath (Get-RealExistingPath $plan.Legacy) (Get-RealExistingPath $plan.Expected)
+        } else {
+            (Test-SamePath (Get-RealExistingPath $plan.Legacy) (Get-RealExistingPath $plan.Expected)) -or
+                (Test-FileBytesEqual $plan.Legacy $plan.Expected)
+        }
+        if (-not $owned) {
+            Write-Warning "preserving divergent legacy target for manual migration: $($plan.Legacy)"
+            continue
+        }
+        $backup = Get-UniqueBackupPath "$($plan.Legacy).legacy.$Timestamp"
+        if ($IsDryRun) {
+            Write-Step "would    preserve legacy target $($plan.Legacy) -> $backup after known-folder apply"
+        } else {
+            Move-Item -LiteralPath $plan.Legacy -Destination $backup -ErrorAction Stop
+            Write-Step "migrated legacy target $($plan.Legacy) -> $backup"
+        }
+    }
+}
+
+function Invoke-WindowsKnownFolderOverlays {
+    param(
+        [Parameter(Mandatory)] $Identity,
+        [bool]$IsDryRun = $DryRun
+    )
+
+    $oldBaseArgs = $script:ChezmoiBaseArgs
+    $oldConfigArgs = $script:ChezmoiConfigArgs
+    $overlayConfig = Join-Path $ScriptDir 'windows\chezmoi-overlay.toml'
+    foreach ($overlay in @(Get-WindowsKnownFolderOverlays -Identity $Identity)) {
+        if (-not $IsDryRun) {
+            New-Item -ItemType Directory -Force -Path (Split-Path -Parent $overlay.State) | Out-Null
+        }
+        try {
+            $script:ChezmoiBaseArgs = @(
+                '--source', $overlay.Source,
+                '--destination', $overlay.Destination,
+                '--persistent-state', $overlay.State
+            )
+            $script:ChezmoiConfigArgs = @('--config', $overlayConfig, '--config-format', 'toml')
+            Backup-PreexistingManagedTargets
+            $arguments = if ($IsDryRun) { @('--dry-run', '--verbose', 'apply') } else { @('--no-tty', '--force', 'apply') }
+            Invoke-ChezmoiOrExit -Label "chezmoi $($overlay.Label) apply" -Arguments $arguments
+        } finally {
+            $script:ChezmoiBaseArgs = $oldBaseArgs
+            $script:ChezmoiConfigArgs = $oldConfigArgs
+        }
+    }
+    if (-not $IsDryRun) {
+        Assert-WindowsKnownFolderConsumption -Identity $Identity
+    }
+    Move-LegacyWindowsKnownFolderTargets -Identity $Identity -IsDryRun:$IsDryRun
 }
 
 function Invoke-ChezmoiApplyPhase {
@@ -1250,15 +1678,14 @@ function Invoke-ChezmoiApplyPhase {
         $dryRunConfig = New-ChezmoiDryRunConfig
         $script:ChezmoiConfigArgs = @('--config', $dryRunConfig, '--config-format', 'toml')
         try {
-            Backup-WindowsTerminalSettings
             Backup-PreexistingManagedTargets
+            # setup owns Windows Terminal publication, and the main chezmoi
+            # source exposes no WT target. Apply the complete source directly;
+            # absolute Windows target lists are not a portable chezmoi selector.
             $applyArgs = @('--dry-run', '--verbose', 'apply')
-            if ($SkipWindowsTerminalMerge) {
-                Write-Step "skip     Windows Terminal settings merge via -SkipWindowsTerminalMerge"
-                $applyArgs += @(Get-ManagedConfigTargets -ExcludeWindowsTerminal)
-            }
             Invoke-ChezmoiOrExit -Label 'chezmoi dry-run apply' -Arguments $applyArgs
-            Copy-WindowsTerminalSettingsForUnpackaged -IsDryRun $true
+            Invoke-WindowsKnownFolderOverlays -Identity $script:WindowsIdentity -IsDryRun $true
+            Invoke-WindowsTerminalSettingsTransaction -IsDryRun $true
         } finally {
             Remove-Item -LiteralPath $dryRunConfig -Force -ErrorAction SilentlyContinue
             $script:ChezmoiConfigArgs = @()
@@ -1285,15 +1712,13 @@ function Invoke-ChezmoiApplyPhase {
     }
 
     Invoke-ChezmoiOrExit -Label 'chezmoi init' -Arguments @('init')
-    Backup-WindowsTerminalSettings
     Backup-PreexistingManagedTargets
+    # setup owns the transactional WT write. The main source has no WT target,
+    # so a full apply cannot publish it before the transaction below.
     $realApplyArgs = @('--no-tty', '--force', 'apply')
-    if ($SkipWindowsTerminalMerge) {
-        Write-Step "skip     Windows Terminal settings merge via -SkipWindowsTerminalMerge"
-        $realApplyArgs += @(Get-ManagedConfigTargets -ExcludeWindowsTerminal)
-    }
     Invoke-ChezmoiOrExit -Label 'chezmoi apply' -Arguments $realApplyArgs
-    Copy-WindowsTerminalSettingsForUnpackaged
+    Invoke-WindowsKnownFolderOverlays -Identity $script:WindowsIdentity
+    Invoke-WindowsTerminalSettingsTransaction
 }
 
 function Invoke-NvimCommandOrFail {
@@ -1302,13 +1727,23 @@ function Invoke-NvimCommandOrFail {
         [scriptblock]$Block,
         [bool]$IsBestEffort = $BestEffort
     )
-    # PowerShell 7.4+ defaults PSNativeCommandUseErrorActionPreference to true, which turns
-    # nvim/Mason stderr (e.g. clang-format installing) or a non-zero exit into a terminating
-    # NativeCommandError before we can inspect LASTEXITCODE. We do our own exit-code check
-    # below, so disable that promotion here (function-local; reverts on return).
-    $PSNativeCommandUseErrorActionPreference = $false
-    & $Block
-    $rc = $LASTEXITCODE
+    # Callers and CI can explicitly enable native error promotion. Isolate that
+    # preference while we inspect the nvim exit code ourselves, and always
+    # restore the caller setting even when the command throws.
+    $oldNativePreference = $null
+    $hasNativePreference = Test-Path Variable:PSNativeCommandUseErrorActionPreference
+    try {
+        if ($hasNativePreference) {
+            $oldNativePreference = $PSNativeCommandUseErrorActionPreference
+            $PSNativeCommandUseErrorActionPreference = $false
+        }
+        & $Block
+        $rc = if ($null -eq $LASTEXITCODE) { 0 } else { [int]$LASTEXITCODE }
+    } finally {
+        if ($hasNativePreference) {
+            $PSNativeCommandUseErrorActionPreference = $oldNativePreference
+        }
+    }
     if ($rc -ne 0) {
         if ($IsBestEffort) {
             Write-Warning ("  $Label exited $rc (continuing because -BestEffort is set)")
@@ -1451,6 +1886,8 @@ function Invoke-SetupUpdateMode {
 # helper functions without running install, config, or Neovim sync phases.
 if ($env:DOTFILES_SETUP_PS1_SOURCE_ONLY) { return }
 
+$script:WindowsIdentity = Resolve-WindowsTargetIdentity
+$script:ChezmoiBaseArgs = @('--source', $HomeSource, '--destination', $script:WindowsIdentity.UserProfile)
 Stop-NvimSelfLinkIfNeeded
 
 if ($Update) {

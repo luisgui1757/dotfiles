@@ -16,7 +16,7 @@ help:
 	@echo "  test-migration  — chezmoi template/parity/round-trip/oracle checks"
 	@echo "  test-nvim       — plenary busted suite under nvim --headless"
 	@echo "  test-shell      — shellcheck + zsh smoke + Esc-binding regression"
-	@echo "  test-starship   — render snapshot + perf budget (<25ms mean)"
+	@echo "  test-starship   — render snapshot + perf budget (80ms local / 150ms CI mean)"
 	@echo "  test-tmux       — load + option assertions"
 	@echo "  test-ghostty    — +validate-config + scheme grep (mac only)"
 	@echo "  test-wezterm    — Lua smoke (stubbed require) + no-multiplexer-autolaunch"
@@ -77,6 +77,7 @@ test-migration:
 	@PATH="$$HOME/.local/bin:$$PATH" bash tests/migration/parity_gate.sh
 	@PATH="$$HOME/.local/bin:$$PATH" bash tests/migration/greenfield_roundtrip.sh
 	@PATH="$$HOME/.local/bin:$$PATH" bash tests/migration/uninstall_safety_test.sh
+	@PATH="$$HOME/.local/bin:$$PATH" bash tests/migration/uninstall_backup_order_test.sh
 	@PATH="$$HOME/.local/bin:$$PATH" bash tests/migration/windows_render_test.sh
 	@PATH="$$HOME/.local/bin:$$PATH" bash tests/migration/oracle_test.sh
 

@@ -76,6 +76,7 @@ pass "broken repo-pointing symlink removed"
 apply
 ext2="$HOME/.local/share/dotfiles/zsh-plugins/zsh-autosuggestions"
 [[ -d "$ext2" ]] || fail "external missing for scenario D: $ext2"
+mkdir -p "$ext2/.git/info"
 printf 'my-cache\n' > "$ext2/.git/info/exclude"
 printf 'user cache data\n' > "$ext2/my-cache"
 "$REPO_ROOT/uninstall.sh" --all >/dev/null 2>&1 || fail "uninstall (scenario D) failed"

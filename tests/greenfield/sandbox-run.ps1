@@ -154,6 +154,11 @@ Invoke-SetupAndCheck -Repo $WorkRepo -Log $setupLog
 Write-Host "greenfield sandbox: ensuring Windows Terminal (portable build)"
 try {
     & (Join-Path $WorkRepo 'tests\greenfield\install-wt-portable.ps1')
+    Write-Host "greenfield sandbox: re-running config phase so setup owns the portable settings merge"
+    & (Join-Path $WorkRepo 'setup.ps1') -All -SkipDeps -SkipNvim -SkipAgents
+    if ($LASTEXITCODE -ne 0) {
+        throw "portable Windows Terminal config phase exited $LASTEXITCODE"
+    }
 } catch {
     Write-Host "greenfield sandbox: portable Windows Terminal install failed (continuing): $($_.Exception.Message)" -ForegroundColor Yellow
 }

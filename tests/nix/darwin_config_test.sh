@@ -60,12 +60,27 @@ assert_eq "nix-homebrew trusts the pinned AeroSpace tap for Homebrew 5 cask load
 assert_eq "nix.enable = false (Determinate owns the daemon)" 'false' "$(eval_raw nix.enable)"
 assert_eq "system.primaryUser is set (placeholder in pure eval)" '"runner"' "$(eval_raw system.primaryUser)"
 
-sudo_primary_user="$(env SUDO_USER=alice USER=root nix eval --raw --impure "$cfg.system.primaryUser" 2>/dev/null || true)"
-assert_eq "SUDO_USER wins over USER=root for darwin primary user" "alice" "$sudo_primary_user"
-sudo_home="$(env SUDO_USER=alice USER=root nix eval --raw --impure "$cfg.users.users.alice.home" 2>/dev/null || true)"
-assert_eq "SUDO_USER drives darwin user home" "/Users/alice" "$sudo_home"
-sudo_hm_user="$(env SUDO_USER=alice USER=root nix eval --raw --impure "$cfg.home-manager.users.alice.home.username" 2>/dev/null || true)"
-assert_eq "SUDO_USER drives Home Manager user" "alice" "$sudo_hm_user"
+for config_name in dotfiles-aarch64 dotfiles-x86_64; do
+    case "$config_name" in
+        dotfiles-aarch64) expected_system=aarch64-darwin ;;
+        dotfiles-x86_64) expected_system=x86_64-darwin ;;
+    esac
+    actual_system="$(nix eval --raw ".#darwinConfigurations.\"$config_name\".pkgs.stdenv.hostPlatform.system" 2>/dev/null || true)"
+    assert_eq "$config_name evaluates only its declared Darwin architecture" "$expected_system" "$actual_system"
+done
+alias_system="$(nix eval --raw '.#darwinConfigurations.dotfiles.pkgs.stdenv.hostPlatform.system' 2>/dev/null || true)"
+assert_eq "compatibility alias deliberately remains Apple Silicon" "aarch64-darwin" "$alias_system"
+
+target_cfg='.#darwinConfigurations.dotfiles-aarch64.config'
+target_user="$(env DOTFILES_TARGET_USER=alice DOTFILES_TARGET_HOME='/Users/Alice Example' \
+    SUDO_USER=wrong USER=root nix eval --raw --impure "$target_cfg.system.primaryUser" 2>/dev/null || true)"
+assert_eq "validated setup target overrides ambient sudo/user identities" "alice" "$target_user"
+target_home="$(env DOTFILES_TARGET_USER=alice DOTFILES_TARGET_HOME='/Users/Alice Example' \
+    SUDO_USER=wrong USER=root nix eval --raw --impure "$target_cfg.users.users.alice.home" 2>/dev/null || true)"
+assert_eq "validated target home supports spaces without fabrication" "/Users/Alice Example" "$target_home"
+target_hm_user="$(env DOTFILES_TARGET_USER=alice DOTFILES_TARGET_HOME='/Users/Alice Example' \
+    SUDO_USER=wrong USER=root nix eval --raw --impure "$target_cfg.home-manager.users.alice.home.username" 2>/dev/null || true)"
+assert_eq "validated target identity drives Home Manager" "alice" "$target_hm_user"
 
 # Home Manager on darwin is packages-only: the user's home.packages is a
 # non-empty list. (The stronger "our source declares NO home.file / xdg.configFile

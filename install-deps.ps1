@@ -36,9 +36,15 @@ $PylatexencBuildBackendSha256 = '062d34222ad13e0cc312a4c02d73f059e86a4acbfbdea8f
 $PylatexencVersion = '2.10'
 $PylatexencSha256 = '3dd8fd84eb46dc30bee1e23eaab8d8fb5a7f507347b23e5f38ad9675c84f40d3'
 $GhDashVersion = 'v4.25.1'   # dlvhdr/gh-dash pinned gh-extension tag; mirror in install-deps.sh (GH_DASH_VERSION)
+$GhDashTagObject = 'e6ebbd7e83e30161b9192ce3339972d2c8269e7f'
+$GhDashCommit = '49f37e4832956c57bf52d4ea8b1b1e5c0f863700'
 $PiCliPackage = '@earendil-works/pi-coding-agent'
 $PiCliVersion = '0.80.3'
 $PiCliIntegrity = 'sha512-TIggw9gCXpA+Ph7OjdTA7ka2NPwTVuPmy39KDSyUzaKq8VvHfMGR7vtRz4JB7Um/RMRblmzhu4p9tUCk6MTgGA=='
+$TreeSitterCliVersion = 'v0.26.10'
+$TreeSitterCliWindowsX64Sha256 = 'e378c57f5de3e698058997489e69a027551dc05a09c6ff51e42ffab6ea5d5b6b'
+$TreeSitterCliWindowsArm64Sha256 = 'd30a6a6986a0fdbdb3a6c0f0e23dc6e6719e133f73dee7c65cf73839a458bced'
+$TreeSitterCliWindowsX86Sha256 = '404a1cd17eacb76368db782859bc60521e66e16693572f52383690c554d2c3bd'
 # psmux session plugin (resurrect only) is vendored from the psmux/psmux-plugins
 # monorepo at this immutable commit. We do NOT use PPM: it clones the monorepo
 # HEAD (unpinned) and rewrites managed config files. (psmux-continuum is blocked
@@ -319,7 +325,6 @@ $Catalog = @{
     pwsh                 = @{ winget = 'Microsoft.PowerShell';             choco = 'powershell-core';      scoop = 'pwsh'                 ; purpose = 'modern PowerShell 7' }
     'win32yank'          = @{ winget = '';                                 choco = 'win32yank';            scoop = 'win32yank'            ; purpose = 'clipboard bridge for WSL nvim' }
     node                 = @{ winget = 'OpenJS.NodeJS.LTS';                choco = 'nodejs-lts';           scoop = 'nodejs-lts'           ; purpose = 'prettier + JS tooling' }
-    'tree-sitter'        = @{                                               scoop = 'tree-sitter'           ; purpose = 'nvim-treesitter main: parser generate/build CLI' }
     python               = @{ winget = 'Python.Python.3.12';               choco = 'python';               scoop = 'python'               ; purpose = 'pyright + tooling' }
     zig                  = @{ winget = 'zig.zig';                          choco = 'zig';                  scoop = 'zig'                  ; purpose = 'C compiler for the LuaSnip jsregexp build' }
     jq                   = @{ winget = 'jqlang.jq';                        choco = 'jq';                   scoop = 'jq'                   ; purpose = 'general-purpose JSON CLI' }
@@ -535,7 +540,8 @@ function Get-InstallDependencySpec {
     )
     $emitted = @{}
     foreach ($tool in $toolOrder) {
-        if (($tool -eq 'scoop') -or ($tool -eq 'herdr') -or ($tool -eq 'pi') -or ($tool -eq 'psmux') -or $Catalog.ContainsKey($tool)) {
+        if (($tool -eq 'scoop') -or ($tool -eq 'herdr') -or ($tool -eq 'pi') -or
+            ($tool -eq 'psmux') -or ($tool -eq 'tree-sitter') -or $Catalog.ContainsKey($tool)) {
             $emitted[$tool] = $true
             [pscustomobject]@{
                 Tool = $tool
@@ -2607,38 +2613,155 @@ function Install-PsmuxPlugins {
     }
 }
 
+function Get-TreeSitterCliVersion {
+    param([string]$Path = '')
+
+    $executable = $Path
+    if ([string]::IsNullOrWhiteSpace($executable)) {
+        $command = Get-Command tree-sitter -ErrorAction SilentlyContinue | Select-Object -First 1
+        if (-not $command) { return '' }
+        $executable = if ($command.PSObject.Properties.Name -contains 'Source') { $command.Source } else { $command.Path }
+    }
+    if ([string]::IsNullOrWhiteSpace($executable)) { return '' }
+
+    $hasNativePreference = $null -ne (Get-Variable -Name PSNativeCommandUseErrorActionPreference -ErrorAction SilentlyContinue)
+    $oldNativePreference = if ($hasNativePreference) { $PSNativeCommandUseErrorActionPreference } else { $null }
+    try {
+        if ($hasNativePreference) { $PSNativeCommandUseErrorActionPreference = $false }
+        $lines = @(& $executable --version 2>$null)
+        $exitCode = $LASTEXITCODE
+    } catch {
+        return ''
+    } finally {
+        if ($hasNativePreference) { $PSNativeCommandUseErrorActionPreference = $oldNativePreference }
+    }
+    if ($exitCode -ne 0) { return '' }
+    foreach ($line in $lines) {
+        if ([string]$line -match '(?:^|\s)([0-9]+\.[0-9]+\.[0-9]+)(?:\s|$)') { return $Matches[1] }
+    }
+    return ''
+}
+
+function Test-TreeSitterCliCompatible {
+    param([string]$Path = '')
+    return ((Get-TreeSitterCliVersion -Path $Path) -eq $TreeSitterCliVersion.TrimStart('v'))
+}
+
+function Get-TreeSitterWindowsArtifact {
+    param([string]$Architecture = [string][System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture)
+    switch ($Architecture.ToLowerInvariant()) {
+        'x64'   { $assetArch = 'x64';   $sha = $TreeSitterCliWindowsX64Sha256 }
+        'arm64' { $assetArch = 'arm64'; $sha = $TreeSitterCliWindowsArm64Sha256 }
+        'x86'   { $assetArch = 'x86';   $sha = $TreeSitterCliWindowsX86Sha256 }
+        default { throw "unsupported Windows architecture for tree-sitter CLI: $Architecture" }
+    }
+    $name = "tree-sitter-cli-windows-$assetArch.zip"
+    return [pscustomobject]@{
+        Name = $name
+        Sha256 = $sha
+        Url = "https://github.com/tree-sitter/tree-sitter/releases/download/$TreeSitterCliVersion/$name"
+    }
+}
+
+function Get-TreeSitterWindowsInstallRoot {
+    $localAppData = if (-not [string]::IsNullOrWhiteSpace($env:DOTFILES_LOCAL_APP_DATA_OVERRIDE)) {
+        $env:DOTFILES_LOCAL_APP_DATA_OVERRIDE
+    } else {
+        [Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)
+    }
+    if ([string]::IsNullOrWhiteSpace($localAppData)) {
+        throw 'Windows LocalApplicationData known folder could not be resolved'
+    }
+    return (Join-Path (Join-Path $localAppData 'dotfiles') 'bin')
+}
+
 function Install-TreeSitterCli {
-    if (Test-Tool 'tree-sitter') {
-        Write-Host ("  ok        {0,-26} already installed" -f "tree-sitter")
+    $currentVersion = Get-TreeSitterCliVersion
+    if ($currentVersion -eq $TreeSitterCliVersion.TrimStart('v')) {
+        Write-Host ("  ok        {0,-26} compatible {1}" -f "tree-sitter", $currentVersion)
         return
     }
-    if (-not (Ask "Install tree-sitter CLI (nvim-treesitter main parser builds)?")) {
+    if (-not [string]::IsNullOrWhiteSpace($currentVersion)) {
+        Write-Host ("  repair    {0,-26} incompatible {1}; require {2}" -f "tree-sitter", $currentVersion, $TreeSitterCliVersion.TrimStart('v'))
+    }
+    if (-not (Ask "Install exact tree-sitter CLI $TreeSitterCliVersion (nvim-treesitter ABI-compatible release)?")) {
         Write-Host ("  skipped   {0,-26}" -f "tree-sitter")
         return
     }
-    if ($DryRun) {
-        Write-Host "  would:    scoop install tree-sitter"
-        Write-Host "  would:    npm install -g tree-sitter-cli   (fallback if package managers do not provide tree-sitter)"
-        return
+
+    try {
+        $artifact = Get-TreeSitterWindowsArtifact
+        $installRoot = Get-TreeSitterWindowsInstallRoot
+        $target = Join-Path $installRoot 'tree-sitter.exe'
+        if ($DryRun) {
+            Write-Host ("  would:    download {0}, verify SHA-256 {1}" -f $artifact.Url, $artifact.Sha256)
+            Write-Host ("  would:    validate tree-sitter {0}, atomically publish {1}, add its directory to User PATH" -f $TreeSitterCliVersion.TrimStart('v'), $target)
+            return
+        }
+
+        $tmp = New-Item -ItemType Directory -Force -Path (Join-Path ([IO.Path]::GetTempPath()) "tree-sitter-windows-$([guid]::NewGuid())")
+        try {
+            $zip = Join-Path $tmp.FullName $artifact.Name
+            $extractRoot = Join-Path $tmp.FullName 'extract'
+            Invoke-WebRequest -Uri $artifact.Url -OutFile $zip -UseBasicParsing -ErrorAction Stop
+            if (-not (Test-FileSha256 -Path $zip -Expected $artifact.Sha256)) {
+                throw "checksum mismatch for $($artifact.Name)"
+            }
+            Expand-Archive -LiteralPath $zip -DestinationPath $extractRoot -Force
+            $source = @(Get-ChildItem -LiteralPath $extractRoot -Filter 'tree-sitter.exe' -File -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1)
+            if ($source.Count -ne 1) { throw "archive $($artifact.Name) did not contain one tree-sitter.exe" }
+            if (-not (Test-TreeSitterCliCompatible -Path $source[0].FullName)) {
+                throw "verified archive executable is not tree-sitter $($TreeSitterCliVersion.TrimStart('v'))"
+            }
+
+            New-Item -ItemType Directory -Force -Path $installRoot | Out-Null
+            # Windows selects the native image loader from the final extension.
+            # A name such as `.tree-sitter.exe.stage.<id>` is verified bytes but
+            # is not executable; keep the sibling stage name ending in `.exe`.
+            $stage = Join-Path $installRoot (".tree-sitter.stage." + [guid]::NewGuid().ToString('N') + '.exe')
+            $rollback = Join-Path $installRoot (".tree-sitter.exe.rollback." + [guid]::NewGuid().ToString('N'))
+            $hadTarget = Test-Path -LiteralPath $target -PathType Leaf
+            $published = $false
+            try {
+                Copy-Item -LiteralPath $source[0].FullName -Destination $stage -Force
+                if (-not (Test-TreeSitterCliCompatible -Path $stage)) { throw 'staged tree-sitter executable failed version validation' }
+                if ($hadTarget) {
+                    [System.IO.File]::Replace($stage, $target, $rollback, $true)
+                } else {
+                    [System.IO.File]::Move($stage, $target)
+                }
+                $published = $true
+                if (-not (Test-TreeSitterCliCompatible -Path $target)) { throw 'published tree-sitter executable failed version validation' }
+                Add-DirectoryToUserPath -Directory $installRoot
+                if (-not (Test-TreeSitterCliCompatible)) { throw 'published tree-sitter executable is not the command resolved on PATH' }
+                Remove-Item -LiteralPath $rollback -Force -ErrorAction SilentlyContinue
+            } catch {
+                $cause = $_.Exception.Message
+                if ($published) {
+                    try {
+                        if ($hadTarget -and (Test-Path -LiteralPath $rollback -PathType Leaf)) {
+                            $failedPublication = Join-Path $installRoot (".tree-sitter.exe.failed." + [guid]::NewGuid().ToString('N'))
+                            [System.IO.File]::Replace($rollback, $target, $failedPublication, $true)
+                            Remove-Item -LiteralPath $failedPublication -Force -ErrorAction SilentlyContinue
+                        } elseif (-not $hadTarget -and (Test-Path -LiteralPath $target -PathType Leaf)) {
+                            Remove-Item -LiteralPath $target -Force
+                        }
+                    } catch {
+                        throw "$cause. Automatic rollback failed: $($_.Exception.Message). Preserve $rollback and restore it to $target before retrying."
+                    }
+                }
+                throw $cause
+            } finally {
+                Remove-Item -LiteralPath $stage -Force -ErrorAction SilentlyContinue
+            }
+        } finally {
+            Remove-Item -LiteralPath $tmp.FullName -Recurse -Force -ErrorAction SilentlyContinue
+        }
+        Write-Host ("  installed {0,-26} {1} (verified release artifact)" -f "tree-sitter", $TreeSitterCliVersion)
+    } catch {
+        Write-Warning ("tree-sitter CLI install failed: " + $_.Exception.Message)
+        $script:InstallFailures += [pscustomobject]@{ Tool='tree-sitter'; Pm='direct'; Pkg=$TreeSitterCliVersion; ExitCode=1 }
     }
-
-    Install-One 'tree-sitter' -SkipPrompt -NoRecordFailure
-    if (Test-Tool 'tree-sitter') { return }
-
-    if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
-        Write-Warning "npm is not on PATH; cannot use npm tree-sitter-cli fallback"
-        $script:InstallFailures += [pscustomobject]@{ Tool='tree-sitter'; Pm='scoop/npm'; Pkg='tree-sitter-cli'; ExitCode='npm-missing' }
-        return
-    }
-
-    npm install -g tree-sitter-cli
-    if ($LASTEXITCODE -eq 0 -and (Test-Tool 'tree-sitter')) {
-        Write-Host ("  installed {0,-26} via npm" -f "tree-sitter")
-        return
-    }
-
-    Write-Warning "npm install of tree-sitter-cli failed or tree-sitter is still not on PATH"
-    $script:InstallFailures += [pscustomobject]@{ Tool='tree-sitter'; Pm='scoop/npm'; Pkg='tree-sitter-cli'; ExitCode=$LASTEXITCODE }
 }
 
 function Get-PiCliVersion {
@@ -2667,14 +2790,98 @@ function Test-PiCliNodeReady {
     }
 }
 
-function Test-PiCliNpmIntegrity {
-    if (-not (Get-Command npm -ErrorAction SilentlyContinue)) { return $false }
+function Test-PiCliTarballIntegrity {
+    param(
+        [Parameter(Mandatory)][string]$Path,
+        [Parameter(Mandatory)][string]$ExpectedIntegrity
+    )
+
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $false }
+    $bytes = [System.IO.File]::ReadAllBytes($Path)
+    if ($bytes.Length -eq 0) { return $false }
+    $parts = $ExpectedIntegrity.Split('-', 2)
+    if ($parts.Count -ne 2 -or $parts[0] -ne 'sha512') { return $false }
     try {
-        $got = @(& npm view "$PiCliPackage@$PiCliVersion" dist.integrity --silent 2>$null | Select-Object -First 1)
-        if ($LASTEXITCODE -ne 0 -or $got.Count -eq 0) { return $false }
-        return (([string]$got[0]).Trim() -eq $PiCliIntegrity)
+        $expected = [Convert]::FromBase64String($parts[1])
     } catch {
         return $false
+    }
+    $sha = [System.Security.Cryptography.SHA512]::Create()
+    try {
+        $actual = $sha.ComputeHash($bytes)
+    } finally {
+        $sha.Dispose()
+    }
+    if ($actual.Length -ne $expected.Length) { return $false }
+    $difference = 0
+    for ($i = 0; $i -lt $actual.Length; $i++) {
+        $difference = $difference -bor ($actual[$i] -bxor $expected[$i])
+    }
+    return ($difference -eq 0)
+}
+
+function Invoke-PiCliNpm {
+    param(
+        [Parameter(Mandatory)][string[]]$Arguments,
+        [Parameter(Mandatory)][string]$StderrPath
+    )
+
+    $hasNativePreference = $null -ne (Get-Variable -Name PSNativeCommandUseErrorActionPreference -ErrorAction SilentlyContinue)
+    $oldNativePreference = if ($hasNativePreference) { $PSNativeCommandUseErrorActionPreference } else { $null }
+    try {
+        if ($hasNativePreference) { $PSNativeCommandUseErrorActionPreference = $false }
+        $output = @(& npm @Arguments 2> $StderrPath)
+        $exitCode = $LASTEXITCODE
+        return [pscustomobject]@{ Output = $output; ExitCode = $exitCode }
+    } catch {
+        [System.IO.File]::AppendAllText($StderrPath, $_.Exception.Message + [Environment]::NewLine)
+        return [pscustomobject]@{ Output = @(); ExitCode = 1 }
+    } finally {
+        if ($hasNativePreference) { $PSNativeCommandUseErrorActionPreference = $oldNativePreference }
+    }
+}
+
+function Invoke-PiCliVerifiedTarballInstall {
+    $tempParent = if (-not [string]::IsNullOrWhiteSpace($env:DOTFILES_PI_CLI_TEMP_ROOT)) {
+        $env:DOTFILES_PI_CLI_TEMP_ROOT
+    } else {
+        [System.IO.Path]::GetTempPath()
+    }
+    New-Item -ItemType Directory -Force -Path $tempParent | Out-Null
+    $tempDir = Join-Path $tempParent ("dotfiles-pi-" + [System.Guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $tempDir | Out-Null
+    $stderrPath = Join-Path $tempDir 'npm.stderr.log'
+    try {
+        $spec = "$PiCliPackage@$PiCliVersion"
+        $pack = Invoke-PiCliNpm -Arguments @('pack', '--ignore-scripts', '--json', '--pack-destination', $tempDir, $spec) -StderrPath $stderrPath
+        if ($pack.ExitCode -ne 0) {
+            throw "npm pack failed for $spec (exit $($pack.ExitCode))"
+        }
+        try {
+            $metadata = @(($pack.Output -join [Environment]::NewLine) | ConvertFrom-Json -ErrorAction Stop)
+        } catch {
+            throw "npm pack returned invalid JSON metadata for ${spec}: $($_.Exception.Message)"
+        }
+        if ($metadata.Count -ne 1) { throw "npm pack returned $($metadata.Count) entries for $spec; expected exactly one" }
+        $filename = [string]$metadata[0].filename
+        $reportedIntegrity = [string]$metadata[0].integrity
+        if ([string]::IsNullOrWhiteSpace($filename) -or [System.IO.Path]::GetFileName($filename) -ne $filename) {
+            throw "npm pack returned an unsafe tarball filename for $spec"
+        }
+        if ($reportedIntegrity -ne $PiCliIntegrity) {
+            throw "npm pack metadata integrity mismatch for $spec; expected $PiCliIntegrity, got $reportedIntegrity"
+        }
+        $tarball = Join-Path $tempDir $filename
+        if (-not (Test-PiCliTarballIntegrity -Path $tarball -ExpectedIntegrity $PiCliIntegrity)) {
+            throw "packed tarball bytes do not match pinned SRI for $spec"
+        }
+
+        $install = Invoke-PiCliNpm -Arguments @('install', '-g', $tarball) -StderrPath $stderrPath
+        if ($install.ExitCode -ne 0) {
+            throw "npm install failed for verified local tarball $filename (exit $($install.ExitCode))"
+        }
+    } finally {
+        Remove-Item -LiteralPath $tempDir -Recurse -Force -ErrorAction SilentlyContinue
     }
 }
 
@@ -2707,30 +2914,25 @@ function Install-PiCli {
         $script:InstallFailures += [pscustomobject]@{ Tool = 'pi'; Pm = 'npm'; Pkg = "$PiCliPackage@$PiCliVersion"; ExitCode = 'node-too-old' }
         return
     }
-    if (-not (Ask "Install Pi CLI ($PiCliPackage@$PiCliVersion, npm integrity verified)?")) {
+    if (-not (Ask "Install Pi CLI ($PiCliPackage@$PiCliVersion, packed tarball SRI verified)?")) {
         Write-Host ("  skipped   {0,-26}" -f "pi")
         return
     }
     if ($DryRun) {
-        Write-Host "  would:    npm view $PiCliPackage@$PiCliVersion dist.integrity"
-        Write-Host "             expect $PiCliIntegrity"
-        Write-Host "  would:    npm install -g $PiCliPackage@$PiCliVersion"
-        return
-    }
-    if (-not (Test-PiCliNpmIntegrity)) {
-        Write-Host ("  FAIL: {0,-26} npm integrity mismatch for {1}@{2}" -f "pi", $PiCliPackage, $PiCliVersion)
-        $script:InstallFailures += [pscustomobject]@{ Tool = 'pi'; Pm = 'npm'; Pkg = "$PiCliPackage@$PiCliVersion"; ExitCode = 'integrity' }
+        Write-Host "  would:    npm pack --ignore-scripts --json --pack-destination <temp> $PiCliPackage@$PiCliVersion"
+        Write-Host "             require metadata integrity and tarball bytes to match $PiCliIntegrity"
+        Write-Host "  would:    npm install -g <verified-local-tarball>"
         return
     }
     $rc = 1
     try {
-        & npm install -g "$PiCliPackage@$PiCliVersion"
-        $rc = $LASTEXITCODE
+        Invoke-PiCliVerifiedTarballInstall
+        $rc = 0
     } catch {
-        Write-Warning ("Pi CLI install failed: " + $_.Exception.Message)
+        Write-Host ("  FAIL: {0,-26} {1}" -f "pi", $_.Exception.Message)
         $rc = 1
     }
-    Add-NpmGlobalPrefixToPath
+    if ($rc -eq 0) { Add-NpmGlobalPrefixToPath }
     if ($rc -eq 0 -and (Test-PiCliCurrent)) {
         Write-Host ("  installed {0,-26} {1}" -f "pi", $PiCliVersion)
         return
@@ -3020,23 +3222,30 @@ function Install-PSFzf {
 function Invoke-GhProbe {
     # Runs `gh <args>` as a NON-FATAL probe: returns an object with .Ok (native
     # exit 0) and .Output (stdout lines). It never throws and never leaks a
-    # nonzero $LASTEXITCODE into the caller/script exit. This matters under
-    # $PSNativeCommandUseErrorActionPreference (default $true on pwsh 7.4+):
-    # a leftover nonzero exit code from a read-only probe like `gh auth status`
+    # nonzero $LASTEXITCODE into the caller/script exit. Callers and CI may
+    # explicitly enable $PSNativeCommandUseErrorActionPreference; a leftover
+    # nonzero exit code from a read-only probe like `gh auth status`
     # or `gh extension list` would otherwise become the exit code of the script
     # (the observed "install-deps: done" then exit 1 in dry-run).
     param([Parameter(Mandatory)][string[]]$GhArgs)
     $out = @()
     $ok = $false
+    $exitCode = 1
+    $hasNativePreference = $null -ne (Get-Variable -Name PSNativeCommandUseErrorActionPreference -ErrorAction SilentlyContinue)
+    $oldNativePreference = if ($hasNativePreference) { $PSNativeCommandUseErrorActionPreference } else { $null }
     try {
+        if ($hasNativePreference) { $PSNativeCommandUseErrorActionPreference = $false }
         $out = @(& gh @GhArgs 2>$null)
-        $ok = ($LASTEXITCODE -eq 0)
+        $exitCode = $LASTEXITCODE
+        $ok = ($exitCode -eq 0)
     } catch {
         $ok = $false
+        $exitCode = 1
     } finally {
+        if ($hasNativePreference) { $PSNativeCommandUseErrorActionPreference = $oldNativePreference }
         $global:LASTEXITCODE = 0
     }
-    [pscustomobject]@{ Ok = $ok; Output = $out }
+    [pscustomobject]@{ Ok = $ok; Output = $out; ExitCode = $exitCode }
 }
 
 function Install-GhDashExtension {
@@ -3064,10 +3273,9 @@ function Install-GhDashExtension {
     $line = @($list | Where-Object { $_ -match 'dlvhdr/gh-dash' }) | Select-Object -First 1
     $reinstall = $false
     if ($line) {
-        $expected = [regex]::Escape($GhDashVersion)
-        $expectedNoV = [regex]::Escape($GhDashVersion.TrimStart('v'))
-        if (($line -match "\b$expected\b") -or ($line -match "\b$expectedNoV\b")) {
-            Write-Host ("  ok        {0,-26} already installed (pinned {1})" -f "gh-dash", $GhDashVersion)
+        $expectedCommit = [regex]::Escape($GhDashCommit)
+        if ($line -match "\b$expectedCommit\b") {
+            Write-Host ("  ok        {0,-26} already installed ({1} -> {2})" -f "gh-dash", $GhDashVersion, $GhDashCommit)
             return
         }
         $reinstall = $true
@@ -3079,32 +3287,43 @@ function Install-GhDashExtension {
         return
     }
     if ($DryRun) {
+        Write-Host "  would: verify $GhDashVersion tag object $GhDashTagObject peels to $GhDashCommit"
         if ($reinstall) {
-            Write-Host "  would: gh extension remove dash; gh extension install dlvhdr/gh-dash --pin $GhDashVersion"
+            Write-Host "  would: gh extension remove dash; gh extension install dlvhdr/gh-dash --pin $GhDashCommit"
         } else {
-            Write-Host "  would: gh extension install dlvhdr/gh-dash --pin $GhDashVersion"
+            Write-Host "  would: gh extension install dlvhdr/gh-dash --pin $GhDashCommit"
         }
         return
     }
 
+    $tagProbe = Invoke-GhProbe -GhArgs @('api', "repos/dlvhdr/gh-dash/git/ref/tags/$GhDashVersion", '--jq', '.object.sha')
+    $tagObject = if ($tagProbe.Output.Count -gt 0) { ([string]$tagProbe.Output[0]).Trim() } else { '' }
+    if (-not $tagProbe.Ok -or $tagObject -ne $GhDashTagObject) {
+        Write-Host ("  FAIL: {0,-26} tag object mismatch: got {1}, expected {2}" -f 'gh-dash', $(if ($tagObject) { $tagObject } else { '<empty>' }), $GhDashTagObject)
+        $script:InstallFailures += [pscustomobject]@{ Tool = 'gh-dash'; Pm = 'gh-extension'; Pkg = "dlvhdr/gh-dash@$GhDashVersion"; ExitCode = 'tag-object' }
+        return
+    }
+    $peelProbe = Invoke-GhProbe -GhArgs @('api', "repos/dlvhdr/gh-dash/git/tags/$tagObject", '--jq', '.object.sha')
+    $peeledCommit = if ($peelProbe.Output.Count -gt 0) { ([string]$peelProbe.Output[0]).Trim() } else { '' }
+    if (-not $peelProbe.Ok -or $peeledCommit -ne $GhDashCommit) {
+        Write-Host ("  FAIL: {0,-26} peeled commit mismatch: got {1}, expected {2}" -f 'gh-dash', $(if ($peeledCommit) { $peeledCommit } else { '<empty>' }), $GhDashCommit)
+        $script:InstallFailures += [pscustomobject]@{ Tool = 'gh-dash'; Pm = 'gh-extension'; Pkg = "dlvhdr/gh-dash@$GhDashVersion"; ExitCode = 'peeled-commit' }
+        return
+    }
+
     if ($reinstall) {
-        Invoke-GhProbe -GhArgs @('extension', 'remove', 'dash') | Out-Null
+        $remove = Invoke-GhProbe -GhArgs @('extension', 'remove', 'dash')
+        if (-not $remove.Ok) {
+            $script:InstallFailures += [pscustomobject]@{ Tool = 'gh-dash'; Pm = 'gh-extension'; Pkg = 'remove:dash'; ExitCode = $remove.ExitCode }
+            return
+        }
     }
-    $rc = 1
-    try {
-        & gh extension install dlvhdr/gh-dash --pin $GhDashVersion
-        $rc = $LASTEXITCODE
-    } catch {
-        Write-Warning ("gh-dash install failed: " + $_.Exception.Message)
-        $rc = 1
-    } finally {
-        $global:LASTEXITCODE = 0
-    }
-    if ($rc -eq 0) {
+    $installProbe = Invoke-GhProbe -GhArgs @('extension', 'install', 'dlvhdr/gh-dash', '--pin', $GhDashCommit)
+    if ($installProbe.Ok) {
         $suffix = if ($reinstall) { " (re-pinned)" } else { "" }
-        Write-Host ("  installed {0,-26} {1}{2}" -f "gh-dash", $GhDashVersion, $suffix)
+        Write-Host ("  installed {0,-26} {1} -> {2}{3}" -f "gh-dash", $GhDashVersion, $GhDashCommit, $suffix)
     } else {
-        $script:InstallFailures += [pscustomobject]@{ Tool = 'gh-dash'; Pm = 'gh-extension'; Pkg = "dlvhdr/gh-dash@$GhDashVersion"; ExitCode = $rc }
+        $script:InstallFailures += [pscustomobject]@{ Tool = 'gh-dash'; Pm = 'gh-extension'; Pkg = "dlvhdr/gh-dash@$GhDashCommit"; ExitCode = $installProbe.ExitCode }
     }
 }
 

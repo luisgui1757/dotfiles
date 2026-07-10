@@ -53,12 +53,23 @@ check_absent "bare-Esc kill-whole-line bindkey gone (Meta prefix shadow)" \
 # The PowerShell profiles must never use remote-eval (Invoke-Expression / iex) to
 # wire tools like zoxide or starship. Their documented one-liners pipe a freshly
 # generated init straight into Invoke-Expression; this repo instead caches the
-# init to a file and dot-sources it (race-safe, no remote eval). Guards the
-# canonical profile and its deployed chezmoi twin.
+# init to a file and dot-sources it (race-safe, no remote eval). Windows
+# known-folder overlays symlink each supported host profile to this canonical file.
 check_absent "no Invoke-Expression/iex in PowerShell profiles (cached dot-source only)" \
     "Invoke-Expression|(^|[^[:alnum:]_])iex([^[:alnum:]_]|\$)" \
-    shells/powershell_profile.ps1 \
-    home/Documents/PowerShell/Microsoft.PowerShell_profile.ps1
+    shells/powershell_profile.ps1
+
+for profile_template in \
+    windows/chezmoi-documents/PowerShell/symlink_Microsoft.PowerShell_profile.ps1.tmpl \
+    windows/chezmoi-documents/PowerShell/symlink_Microsoft.VSCode_profile.ps1.tmpl \
+    windows/chezmoi-documents/WindowsPowerShell/symlink_Microsoft.PowerShell_profile.ps1.tmpl \
+    windows/chezmoi-documents/WindowsPowerShell/symlink_Microsoft.PowerShellISE_profile.ps1.tmpl; do
+    if [[ ! -f "$profile_template" ]] || ! grep -qF '\shells\powershell_profile.ps1' "$profile_template"; then
+        echo "FAIL: Windows profile overlay does not target the canonical profile: $profile_template"
+        fail=1
+    fi
+done
+[[ "$fail" -ne 0 ]] || echo "ok  : Windows known-folder overlays target the canonical PowerShell profile"
 
 # psmux freeze guard. The native-clipboard probes use `if-shell`, which spawns a
 # shell at config-LOAD time; under psmux/ConPTY on Windows that shell never
@@ -141,13 +152,17 @@ for stale in mason-lspconfig.nvim none-ls.nvim CopilotChat.nvim copilot.vim nui.
     fi
 done
 
-if ! grep -q 'lazy-lock\.json' nvim/init.lua \
-    || ! grep -q 'locked_plugin_commit("lazy.nvim")' nvim/init.lua \
-    || ! grep -q '"checkout", "--detach", lazy_commit' nvim/init.lua; then
-    echo "FAIL: lazy.nvim bootstrap must pin itself to nvim/lazy-lock.json"
+if [[ ! -f nvim/lua/util/pinned_git_checkout.lua \
+    || ! -f tests/nvim/spec/pinned_git_checkout_spec.lua ]] \
+    || ! grep -q 'pinned_checkout.locked_identity.*"lazy.nvim"' nvim/init.lua \
+    || ! grep -q 'pinned_checkout.ensure' nvim/init.lua \
+    || ! grep -q 'branch = lazy_branch' nvim/init.lua \
+    || ! grep -q 'required_file = "lua/lazy/init.lua"' nvim/init.lua \
+    || grep -q 'git.*clone' nvim/init.lua; then
+    echo "FAIL: lazy.nvim bootstrap must use the behavioral fail-closed pinned checkout helper"
     fail=1
 else
-    echo "ok  : lazy.nvim bootstrap is lockfile-pinned"
+    echo "ok  : lazy.nvim bootstrap uses behavioral lock/branch/origin/HEAD/cleanliness proof"
 fi
 
 if lazy_sync_hits=$(grep -rnF '+Lazy! sync' \
@@ -161,13 +176,14 @@ else
     echo "ok  : setup and validation paths restore lazy-lock.json instead of syncing upstream"
 fi
 
-if ! grep -q 'lazy-lock\.json' tests/nvim/minimal_init.lua \
-    || ! grep -q 'locked_plugin_commit("plenary.nvim")' tests/nvim/minimal_init.lua \
-    || ! grep -q '"checkout", "--detach", plenary_commit' tests/nvim/minimal_init.lua; then
-    echo "FAIL: plenary test harness must pin itself to nvim/lazy-lock.json"
+if ! grep -q 'pinned_checkout.locked_commit.*"plenary.nvim"' tests/nvim/minimal_init.lua \
+    || ! grep -q 'pinned_checkout.ensure' tests/nvim/minimal_init.lua \
+    || ! grep -q 'required_file = "lua/plenary/init.lua"' tests/nvim/minimal_init.lua \
+    || grep -q 'git.*clone' tests/nvim/minimal_init.lua; then
+    echo "FAIL: plenary test harness must use the behavioral fail-closed pinned checkout helper"
     fail=1
 else
-    echo "ok  : plenary test harness is lockfile-pinned"
+    echo "ok  : plenary test harness uses the shared pinned checkout proof"
 fi
 
 if ! grep -Fq -- "-path './tests/.cache'" tests/static/editorconfig_check.sh \

@@ -50,4 +50,31 @@ printf '%s\n' "$output" | grep -Eq '^missing-tool[[:space:]]+missing[[:space:]]+
 printf '%s\n' "$output" | grep -F '1 present, 2 missing' >/dev/null \
     || fail "summary count missing or wrong"
 
+# The real dependency-table scan must pass the complete immutable identity to
+# the hardened zsh predicate. The old three-argument call failed under `set -u`
+# before any install work on a fresh Linux runner.
+(
+    checked=0
+    zsh_plugin_ok() {
+        [[ "$#" -eq 4 ]] || fail "zsh plugin scan passed $# identity fields; expected 4"
+        case "${1##*/}" in
+            fzf-tab)
+                [[ "$2" == "https://github.com/Aloxaf/fzf-tab.git" && "$3" == "$FZF_TAB_COMMIT" && "$4" == "fzf-tab.plugin.zsh" ]] \
+                    || fail "fzf-tab scan identity mismatch"
+                ;;
+            zsh-autosuggestions)
+                [[ "$2" == "https://github.com/zsh-users/zsh-autosuggestions.git" && "$3" == "$ZSH_AUTOSUGGESTIONS_COMMIT" && "$4" == "zsh-autosuggestions.zsh" ]] \
+                    || fail "zsh-autosuggestions scan identity mismatch"
+                ;;
+            *) fail "unexpected zsh plugin scan target: $1" ;;
+        esac
+        checked=$((checked + 1))
+        return 0
+    }
+
+    install_scan_present "zsh plugins" zsh-plugins \
+        || fail "complete zsh plugin identities were not accepted"
+    [[ "$checked" -eq 2 ]] || fail "dependency scan did not verify both zsh plugins"
+)
+
 echo "OK"

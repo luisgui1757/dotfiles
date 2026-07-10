@@ -1,0 +1,65 @@
+{{- if ne .targetOS "windows" -}}
+{{- $publisher := joinPath .chezmoi.sourceDir ".." "scripts" "ensure-pinned-zsh-plugin.sh" -}}
+{{- $root := joinPath .chezmoi.homeDir ".local" "share" "dotfiles" "zsh-plugins" -}}
+{{- $marker := joinPath .chezmoi.homeDir ".local" "state" "dotfiles" "zsh-plugin-publisher.initialized" -}}
+{{- $fzfTarget := joinPath $root "fzf-tab" -}}
+{{- $autosuggestionsTarget := joinPath $root "zsh-autosuggestions" -}}
+#!/usr/bin/env bash
+set -euo pipefail
+
+# publisher-sha256: 981907c8b8f13ba108f0852d600eb72c50fb849df131e3a3307d830d9f6e50e1
+# fzf-tab-pin: v1.3.0 d7e0234614dbe5369fdd760907d12c0e05a4dccc
+# zsh-autosuggestions-pin: v0.7.1 e52ee8ca55bcc56a17c828767a3f98f22a68d4eb
+# fzf-tab-state: {{ output "env" "DOTFILES_PINNED_GIT_CHECK_ONLY=1" (printf "DOTFILES_PINNED_GIT_BOOTSTRAP_MARKER=%s" $marker) "/bin/bash" $publisher "fzf-tab" "https://github.com/Aloxaf/fzf-tab.git" "v1.3.0" "d7e0234614dbe5369fdd760907d12c0e05a4dccc" "fzf-tab.plugin.zsh" $fzfTarget | trim }}
+# zsh-autosuggestions-state: {{ output "env" "DOTFILES_PINNED_GIT_CHECK_ONLY=1" (printf "DOTFILES_PINNED_GIT_BOOTSTRAP_MARKER=%s" $marker) "/bin/bash" $publisher "zsh-autosuggestions" "https://github.com/zsh-users/zsh-autosuggestions.git" "v0.7.1" "e52ee8ca55bcc56a17c828767a3f98f22a68d4eb" "zsh-autosuggestions.zsh" $autosuggestionsTarget | trim }}
+# The checked hash is embedded so a publisher implementation change changes the
+# rendered run_onchange content and triggers revalidation. Verified live-state
+# fingerprints make a later missing or mismatched checkout trigger self-heal;
+# the marker makes the first successful apply converge without a redundant run.
+# The publisher serializes concurrent applies and never leaves an unproved
+# payload at the path sourced by zshrc.
+source_dir={{ .chezmoi.sourceDir | quote }}
+repo_root="$(cd "$source_dir/.." && pwd -P)"
+publisher="$repo_root/scripts/ensure-pinned-zsh-plugin.sh"
+root="$HOME/.local/share/dotfiles/zsh-plugins"
+marker="$HOME/.local/state/dotfiles/zsh-plugin-publisher.initialized"
+marker_tmp=""
+
+cleanup() {
+    rc=$?
+    trap - EXIT HUP INT TERM
+    [[ -z "$marker_tmp" ]] || rm -f "$marker_tmp"
+    exit "$rc"
+}
+trap cleanup EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+if [[ ! -r "$publisher" ]]; then
+    echo "FAIL: pinned zsh plugin publisher is missing: $publisher" >&2
+    exit 1
+fi
+
+/bin/bash "$publisher" \
+    "fzf-tab" \
+    "https://github.com/Aloxaf/fzf-tab.git" \
+    "v1.3.0" \
+    "d7e0234614dbe5369fdd760907d12c0e05a4dccc" \
+    "fzf-tab.plugin.zsh" \
+    "$root/fzf-tab"
+/bin/bash "$publisher" \
+    "zsh-autosuggestions" \
+    "https://github.com/zsh-users/zsh-autosuggestions.git" \
+    "v0.7.1" \
+    "e52ee8ca55bcc56a17c828767a3f98f22a68d4eb" \
+    "zsh-autosuggestions.zsh" \
+    "$root/zsh-autosuggestions"
+
+umask 077
+mkdir -p "$(dirname "$marker")"
+marker_tmp="${marker}.tmp.$$"
+printf '%s\n' 'verified pinned zsh plugin publisher initialized' > "$marker_tmp"
+mv "$marker_tmp" "$marker"
+marker_tmp=""
+{{- end -}}

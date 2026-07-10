@@ -6,12 +6,14 @@
        ghostty is also ignored unless .experimentalWslGui is true -- the terminal
        is a Windows-host responsibility by default; lazygit stays managed on
        WSL. */ -}}
+{{- /* Windows LocalAppData and Documents can be redirected to unrelated drives.
+       setup.ps1 manages them through dedicated chezmoi destination roots. */ -}}
+AppData
+Documents
 {{- if ne .targetOS "windows" }}
 .psmux.conf
 .tmux.windows.conf
 .tmux.rose-pine.ps1
-AppData
-Documents
 {{- end }}
 {{- if eq .targetOS "windows" }}
 .zshenv

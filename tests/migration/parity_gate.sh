@@ -68,7 +68,7 @@ zshrc|config-file|.zshrc|.zshrc|shells/zshrc|home/dot_zshrc
 ghostty config|config-file|Library/Application Support/com.mitchellh.ghostty/config|.config/ghostty/config|ghostty/config|home/.chezmoitemplates/ghostty/config
 wezterm config|config-file|.config/wezterm/wezterm.lua|.config/wezterm/wezterm.lua|wezterm/wezterm.lua|home/dot_config/wezterm/wezterm.lua
 aerospace config|config-file|.config/aerospace/aerospace.toml||aerospace/aerospace.toml|home/dot_config/aerospace/aerospace.toml
-powershell profile|config-file|||shells/powershell_profile.ps1|home/Documents/PowerShell/Microsoft.PowerShell_profile.ps1
+powershell profile|config-file|||shells/powershell_profile.ps1|
 EOF
 }
 

@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
-# shellcheck disable=SC1091,SC2030,SC2031
-# Unit tests for the pinned Pi CLI npm installer. The real package is installed
-# from npm by setup; these tests stub node/npm so no network or global install runs.
+# shellcheck disable=SC1091,SC2030,SC2031,SC2329
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
@@ -14,61 +12,104 @@ rm -rf "$TMP_ROOT"
 mkdir -p "$TMP_ROOT"
 trap 'rm -rf "$TMP_ROOT"' EXIT
 
-write_node_stub() {
-    local dir="$1" ready="${2:-1}"
-    cat > "$dir/node" <<EOF
-#!/usr/bin/env bash
-if [[ "\${1:-}" == "--version" ]]; then
-    printf '%s\n' "${ready:+v24.11.0}"
-    exit 0
-fi
-if [[ "\${1:-}" == "-e" ]]; then
-    exit $([[ "$ready" == "1" ]] && echo 0 || echo 1)
-fi
-exit 0
-EOF
-    chmod +x "$dir/node"
+payload_sri() {
+    node -e 'const h=require("crypto").createHash("sha512"); process.stdin.on("data", d => h.update(d)); process.stdin.on("end", () => process.stdout.write("sha512-" + h.digest("base64")))'
 }
+
+VERIFIED_PAYLOAD='verified pi package tarball bytes'
+TEST_SRI="$(printf '%s' "$VERIFIED_PAYLOAD" | payload_sri)"
 
 write_npm_stub() {
-    local dir="$1" integrity="$2"
+    local dir="$1"
     cat > "$dir/npm" <<'EOF'
 #!/usr/bin/env bash
-case "${1:-} ${2:-}" in
-    "view @earendil-works/pi-coding-agent@0.80.3")
-        printf '%s\n' "${PI_TEST_INTEGRITY:-}"
-        exit 0
+set -u
+printf '%s\n' "$*" >> "${PI_TEST_LOG:?}"
+case "${1:-}" in
+    pack)
+        [[ "${PI_TEST_MODE:-success}" != "network-fail" ]] || exit 51
+        [[ "${PI_TEST_MODE:-success}" != "interrupt" ]] || exit 130
+        dest=""
+        shift
+        while [[ "$#" -gt 0 ]]; do
+            if [[ "$1" == "--pack-destination" ]]; then
+                shift
+                dest="$1"
+                break
+            fi
+            shift
+        done
+        [[ -n "$dest" ]] || exit 52
+        filename='earendil-works-pi-coding-agent-0.80.3.tgz'
+        if [[ "${PI_TEST_MODE:-success}" == "partial" ]]; then
+            printf '%s' 'partial tarball' > "$dest/$filename"
+        else
+            printf '%s' "${PI_TEST_PAYLOAD:?}" > "$dest/$filename"
+        fi
+        reported="${PI_TEST_REPORTED_INTEGRITY:?}"
+        printf '[{"filename":"%s","integrity":"%s"}]\n' "$filename" "$reported"
         ;;
-    "install -g")
-        printf '%s\n' "$*" >> "${PI_TEST_LOG:?}"
+    install)
+        [[ "${PI_TEST_MODE:-success}" != "install-fail" ]] || exit 61
+        tarball="${@: -1}"
+        [[ -s "$tarball" ]] || exit 62
         mkdir -p "$HOME/.local/bin"
-        cat > "$HOME/.local/bin/pi" <<'EOS'
+        cat > "$HOME/.local/bin/pi" <<EOS
 #!/usr/bin/env bash
-printf '%s\n' "0.80.3"
+printf '%s\n' "${PI_TEST_INSTALLED_VERSION:-0.80.3}"
 EOS
         chmod +x "$HOME/.local/bin/pi"
-        exit 0
         ;;
-    "prefix -g")
-        printf '%s\n' "$HOME/.local/bin"
-        exit 0
+    *)
+        printf 'unexpected npm args: %s\n' "$*" >&2
+        exit 2
         ;;
 esac
-printf 'unexpected npm args: %s\n' "$*" >&2
-exit 2
 EOF
     chmod +x "$dir/npm"
-    PI_TEST_INTEGRITY="$integrity"; export PI_TEST_INTEGRITY
 }
 
-# --- 1. Already at the pinned version -> idempotent, no npm call -------------
+assert_no_pi_temp_dirs() {
+    local root="$1"
+    if find "$root" -maxdepth 1 -type d -name 'dotfiles-pi.*' -print | grep -q .; then
+        fail "Pi temporary directories leaked under $root"
+    fi
+}
+
+run_case() {
+    local name="$1" mode="$2" reported="$3" installed_version="${4:-0.80.3}"
+    local home="$TMP_ROOT/$name-home" bin="$TMP_ROOT/$name-bin" tmp="$TMP_ROOT/$name-tmp"
+    mkdir -p "$home" "$bin" "$tmp"
+    write_npm_stub "$bin"
+    (
+        HOME="$home"; export HOME
+        TMPDIR="$tmp"; export TMPDIR
+        PATH="$bin:$PATH"; export PATH
+        PI_TEST_LOG="$TMP_ROOT/$name.log"; export PI_TEST_LOG
+        PI_TEST_MODE="$mode"; export PI_TEST_MODE
+        PI_TEST_PAYLOAD="$VERIFIED_PAYLOAD"; export PI_TEST_PAYLOAD
+        PI_TEST_REPORTED_INTEGRITY="$reported"; export PI_TEST_REPORTED_INTEGRITY
+        PI_TEST_INSTALLED_VERSION="$installed_version"; export PI_TEST_INSTALLED_VERSION
+        PI_CLI_INTEGRITY="$TEST_SRI"
+        YES_ALL=1
+        DRY_RUN=0
+        pi_cli_node_ready() { return 0; }
+        pi_cli_version() {
+            [[ -x "$HOME/.local/bin/pi" ]] || return 1
+            "$HOME/.local/bin/pi" --version 2>/dev/null | awk 'NF { print $1; exit }'
+        }
+        install_pi_cli
+    )
+}
+
+# Already-current execution is idempotent and never calls npm.
 (
     HOME="$TMP_ROOT/current-home"; export HOME
     bin="$TMP_ROOT/current-bin"; mkdir -p "$bin" "$HOME"
     PATH="$bin:$PATH"; export PATH
     cat > "$bin/pi" <<'EOF'
 #!/usr/bin/env bash
-printf '%s\n' "0.80.3"
+printf '%s\n' '0.80.3'
 EOF
     chmod +x "$bin/pi"
     cat > "$bin/npm" <<'EOF'
@@ -78,55 +119,89 @@ EOF
     chmod +x "$bin/npm"
     YES_ALL=1; DRY_RUN=0
     out="$(install_pi_cli 2>&1)"
-    [[ "$out" == *"already installed (0.80.3)"* ]] || fail "current pi must be idempotent; got: $out"
+    [[ "$out" == *"already installed (0.80.3)"* ]] || fail "current Pi must be idempotent; got: $out"
 )
 
-# --- 2. Dry-run prints pinned package + expected integrity -------------------
+# Dry-run describes pack, byte verification, and local-tarball install.
 (
     HOME="$TMP_ROOT/dry-home"; export HOME
     bin="$TMP_ROOT/dry-bin"; mkdir -p "$bin" "$HOME"
     PATH="$bin:$PATH"; export PATH
-    write_node_stub "$bin" 1
-    write_npm_stub "$bin" "$PI_CLI_INTEGRITY"
+    write_npm_stub "$bin"
+    PI_TEST_LOG="$TMP_ROOT/dry.log"; export PI_TEST_LOG
     YES_ALL=1; DRY_RUN=1
+    pi_cli_node_ready() { return 0; }
+    pi_cli_version() { return 1; }
     out="$(install_pi_cli 2>&1)"
-    [[ "$out" == *"npm view ${PI_CLI_PACKAGE}@${PI_CLI_VERSION} dist.integrity"* ]] || fail "dry-run missing integrity probe; got: $out"
-    [[ "$out" == *"$PI_CLI_INTEGRITY"* ]] || fail "dry-run missing expected integrity; got: $out"
-    [[ "$out" == *"npm install -g --prefix"* && "$out" == *"${PI_CLI_PACKAGE}@${PI_CLI_VERSION}"* ]] || fail "dry-run missing pinned install; got: $out"
+    [[ "$out" == *"npm pack --ignore-scripts --json"* ]] || fail "dry-run missing npm pack; got: $out"
+    [[ "$out" == *"tarball bytes"*"$PI_CLI_INTEGRITY"* ]] || fail "dry-run missing byte-bound SRI; got: $out"
+    [[ "$out" == *"npm install -g --prefix"*"<verified-local-tarball>"* ]] || fail "dry-run missing local tarball install; got: $out"
+    [[ ! -e "$PI_TEST_LOG" ]] || fail "dry-run invoked npm"
 )
 
-# --- 3. Integrity mismatch fails before npm install --------------------------
-(
-    HOME="$TMP_ROOT/mismatch-home"; export HOME
-    bin="$TMP_ROOT/mismatch-bin"; mkdir -p "$bin" "$HOME"
-    PATH="$bin:$PATH"; export PATH
-    log="$TMP_ROOT/mismatch.log"; PI_TEST_LOG="$log"; export PI_TEST_LOG
-    write_node_stub "$bin" 1
-    write_npm_stub "$bin" "sha512-not-the-pin"
-    YES_ALL=1; DRY_RUN=0
+# Independently exercise the SRI verifier with known bytes.
+known="$TMP_ROOT/known.tgz"
+printf '%s' "$VERIFIED_PAYLOAD" > "$known"
+verify_pi_cli_tarball_sri "$known" "$TEST_SRI" || fail "known tarball SRI was rejected"
+printf 'x' >> "$known"
+if verify_pi_cli_tarball_sri "$known" "$TEST_SRI"; then
+    fail "modified tarball passed the pinned SRI"
+fi
+
+# Network/interruption failures clean partial temporary state.
+for mode in network-fail interrupt; do
     set +e
-    out="$(install_pi_cli 2>&1)"
+    run_case "$mode" "$mode" "$TEST_SRI" >/dev/null 2>&1
     rc=$?
     set -e
-    [[ "$rc" -ne 0 ]] || fail "integrity mismatch must return nonzero"
-    [[ "$out" == *"integrity mismatch"* ]] || fail "integrity mismatch output missing; got: $out"
-    [[ ! -e "$log" ]] || fail "npm install ran despite integrity mismatch: $(cat "$log")"
-)
+    [[ "$rc" -ne 0 ]] || fail "$mode unexpectedly succeeded"
+    assert_no_pi_temp_dirs "$TMP_ROOT/$mode-tmp"
+done
 
-# --- 4. Verified install writes ~/.local/bin/pi and verifies the version ------
+# Registry metadata must agree with the reviewed SRI before installation.
+set +e
+metadata_out="$(run_case metadata-mismatch success sha512-AAAAAAAA 2>&1)"
+metadata_rc=$?
+set -e
+[[ "$metadata_rc" -ne 0 ]] || fail "metadata/tarball disagreement unexpectedly succeeded"
+[[ "$metadata_out" == *"metadata integrity mismatch"* ]] || fail "metadata mismatch diagnostic missing: $metadata_out"
+! grep -q '^install ' "$TMP_ROOT/metadata-mismatch.log" || fail "install ran after metadata mismatch"
+assert_no_pi_temp_dirs "$TMP_ROOT/metadata-mismatch-tmp"
+
+# A partial tarball that claims the right metadata SRI still fails byte proof.
+set +e
+partial_out="$(run_case partial partial "$TEST_SRI" 2>&1)"
+partial_rc=$?
+set -e
+[[ "$partial_rc" -ne 0 ]] || fail "partial tarball unexpectedly succeeded"
+[[ "$partial_out" == *"tarball bytes do not match pinned SRI"* ]] || fail "partial tarball diagnostic missing: $partial_out"
+! grep -q '^install ' "$TMP_ROOT/partial.log" || fail "install ran after partial tarball"
+assert_no_pi_temp_dirs "$TMP_ROOT/partial-tmp"
+
+# A verified local tarball is the only install input; failures still clean temp.
+set +e
+install_fail_out="$(run_case install-fail install-fail "$TEST_SRI" 2>&1)"
+install_fail_rc=$?
+set -e
+[[ "$install_fail_rc" -ne 0 ]] || fail "npm install failure unexpectedly succeeded"
+[[ "$install_fail_out" == *"verified local tarball"* ]] || fail "local-tarball install failure diagnostic missing"
+assert_no_pi_temp_dirs "$TMP_ROOT/install-fail-tmp"
+
+# Success installs from the verified temporary tarball and repeated setup reuses
+# the validated installed version without another pack/download.
+run_case success success "$TEST_SRI" >/dev/null
+grep -E '^install -g --prefix .*/dotfiles-pi\.[^/]*/earendil-works-pi-coding-agent-0\.80\.3\.tgz$' "$TMP_ROOT/success.log" >/dev/null \
+    || fail "npm install did not receive the verified local tarball: $(cat "$TMP_ROOT/success.log")"
+assert_no_pi_temp_dirs "$TMP_ROOT/success-tmp"
 (
-    HOME="$TMP_ROOT/install-home"; export HOME
-    bin="$TMP_ROOT/install-bin"; mkdir -p "$bin" "$HOME"
-    PATH="$bin:$PATH"; export PATH
-    log="$TMP_ROOT/install.log"; PI_TEST_LOG="$log"; export PI_TEST_LOG
-    write_node_stub "$bin" 1
-    write_npm_stub "$bin" "$PI_CLI_INTEGRITY"
+    HOME="$TMP_ROOT/success-home"; export HOME
+    bin="$TMP_ROOT/success-bin"; PATH="$bin:$HOME/.local/bin:$PATH"; export PATH
+    PI_TEST_LOG="$TMP_ROOT/success.log"; export PI_TEST_LOG
+    before="$(wc -l < "$PI_TEST_LOG" | tr -d ' ')"
     YES_ALL=1; DRY_RUN=0
-    out="$(install_pi_cli 2>&1)"
-    [[ "$out" == *"installed"*"0.80.3"* ]] || fail "install success missing; got: $out"
-    [[ -x "$HOME/.local/bin/pi" ]] || fail "install did not publish ~/.local/bin/pi"
-    grep -F "install -g --prefix $HOME/.local ${PI_CLI_PACKAGE}@${PI_CLI_VERSION}" "$log" >/dev/null \
-        || fail "npm install args wrong: $(cat "$log")"
+    install_pi_cli >/dev/null
+    after="$(wc -l < "$PI_TEST_LOG" | tr -d ' ')"
+    [[ "$after" == "$before" ]] || fail "repeated Pi setup repacked an already-current install"
 )
 
 echo "OK"

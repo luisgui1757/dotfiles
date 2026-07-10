@@ -18,20 +18,79 @@ concurrency:
 
 jobs:
   flake-check:
-    name: nix flake check
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-26]
-    runs-on: ${{ matrix.os }}
+        include:
+          - logical: linux
+            runner: ubuntu-24.04
+            legacy_context: nix flake check (ubuntu-24.04)
+            publish_logical_proof: true
+          - logical: macos
+            runner: macos-26
+            legacy_context: nix flake check (macos-26)
+            publish_logical_proof: true
+          # Non-required runtime proof for the public Intel activation path.
+          # Its result stays independent from the staged required-check migration.
+          - logical: macos-intel
+            runner: macos-26-intel
+            publish_logical_proof: false
+    name: nix flake check (${{ matrix.runner }})
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
-      - name: Install Nix (flakes enabled)
+      - name: Install Determinate Nix (flakes enabled)
+        if: matrix.logical != 'macos-intel'
         uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22
+      - name: Install upstream Nix on Intel (flakes enabled)
+        if: matrix.logical == 'macos-intel'
+        uses: cachix/install-nix-action@a49548c11d9846ad46ecc0115273879b045f001c # v31.10.7
       - name: nix flake check
         run: nix flake check --print-build-logs
       - name: nix files are nixpkgs-fmt formatted
         run: nix fmt -- --check flake.nix nix/
       - name: nix-darwin + setup integration assertions
         run: bash tests/nix/run_all.sh
+      - name: Emit stable logical proof
+        if: success() && matrix.publish_logical_proof
+        run: >-
+          bash scripts/ci-logical-proof.sh emit
+          "$RUNNER_TEMP/nix-${{ matrix.logical }}.env"
+          "nix flake check / ${{ matrix.logical }}"
+          "${{ matrix.legacy_context }}"
+      - name: Publish stable logical proof
+        if: success() && matrix.publish_logical_proof
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: nix-${{ matrix.logical }}-logical-proof
+          path: ${{ runner.temp }}/nix-${{ matrix.logical }}.env
+          if-no-files-found: error
+          retention-days: 1
+
+  logical-proof:
+    name: nix flake check / ${{ matrix.logical }}
+    if: always()
+    needs: flake-check
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - logical: linux
+            legacy_context: nix flake check (ubuntu-24.04)
+          - logical: macos
+            legacy_context: nix flake check (macos-26)
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - name: Download exact OS proof
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: nix-${{ matrix.logical }}-logical-proof
+          path: ${{ runner.temp }}/logical-proof
+      - name: Verify exact OS proof
+        run: >-
+          bash scripts/ci-logical-proof.sh verify
+          "$RUNNER_TEMP/logical-proof/nix-${{ matrix.logical }}.env"
+          "nix flake check / ${{ matrix.logical }}"
+          "${{ matrix.legacy_context }}"

@@ -46,6 +46,11 @@ for arch in x86_64-linux aarch64-linux; do
             fail=1
             ;;
     esac
+
+    custom_home="$(env DOTFILES_TARGET_USER=alice DOTFILES_TARGET_HOME='/srv/homes/Alice Example' \
+        nix eval --raw --impure "$cfg.home.homeDirectory" 2>/dev/null || true)"
+    assert_eq "$arch uses the setup-validated home without /home fabrication" \
+        "/srv/homes/Alice Example" "$custom_home"
     case "$homedir" in
         /mnt/c/* | *:* )
             echo "FAIL: $arch homeDirectory points at a Windows-host path ($homedir)"
@@ -56,6 +61,11 @@ for arch in x86_64-linux aarch64-linux; do
 
     assert_eq "$arch enables the standalone programs.home-manager CLI" \
         'true' "$(nix eval "$cfg.programs.home-manager.enable" 2>/dev/null)"
+
+    profile_dir="$(nix eval --raw "$cfg.home.profileDirectory" 2>/dev/null || echo "")"
+    session_path="$(nix eval --json "$cfg.home.sessionPath" 2>/dev/null | jq -r 'if length == 1 then .[0] else "" end' 2>/dev/null || echo "")"
+    assert_eq "$arch canonical HM session vars export the active profile bin" \
+        "$profile_dir/bin" "$session_path"
 
     # nvim + the tree-sitter CLI are ABI-coupled to nvim-treesitter parser builds
     # and are intentionally DEFERRED (stay native). Prove they are NOT in the set.

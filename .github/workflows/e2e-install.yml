@@ -57,24 +57,59 @@ jobs:
             --volume "${{ github.workspace }}:/repo:ro" \
             "${{ matrix.image }}" \
             bash /repo/tests/ci/container-e2e.sh
+      - name: Emit stable logical proof
+        run: >-
+          bash scripts/ci-logical-proof.sh emit
+          "$RUNNER_TEMP/e2e-container-linux.env"
+          "e2e containers / linux"
+          "e2e containers / ubuntu-24.04"
+      - name: Publish stable logical proof
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: e2e-container-linux-logical-proof
+          path: ${{ runner.temp }}/e2e-container-linux.env
+          if-no-files-found: error
+          retention-days: 1
 
   setup-sh:
-    name: setup.sh / ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
+    name: setup.sh / ${{ matrix.runner }}
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
     strategy:
       fail-fast: false   # surface both OS results independently
       matrix:
-        os:
-          - ubuntu-24.04
-          - macos-26
+        include:
+          - logical: linux
+            runner: ubuntu-24.04
+            legacy_context: setup.sh / ubuntu-24.04
+            publish_logical_proof: true
+          - logical: macos
+            runner: macos-26
+            legacy_context: setup.sh / macos-26
+            publish_logical_proof: true
+          # Current GitHub-hosted Intel runtime proof. This is intentionally an
+          # extra non-required lane; the public contract is not inferred from
+          # cross-evaluation alone.
+          - logical: macos-intel
+            runner: macos-26-intel
+            publish_logical_proof: false
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
-      - name: Install Nix (flakes enabled)
+      - name: Install Determinate Nix (flakes enabled)
+        if: matrix.logical != 'macos-intel'
         uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22
 
+      # Determinate Nix no longer supports Intel hosts. Use the current
+      # full-SHA-pinned Cachix action, which installs upstream Nix 2.34.8 from
+      # its versioned releases.nixos.org URL, instead of relying on a hidden
+      # fallback to Determinate's last Intel release.
+      - name: Install upstream Nix on Intel (flakes enabled)
+        if: matrix.logical == 'macos-intel'
+        uses: cachix/install-nix-action@a49548c11d9846ad46ecc0115273879b045f001c # v31.10.7
+
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: github.event_name == 'pull_request'
         with:
           path: |
             ~/.cache/Homebrew
@@ -85,9 +120,9 @@ jobs:
             ~/Library/Caches/nvim
             ~/Library/Application Support/nvim/lazy
             ~/Library/Application Support/nvim/mason
-          key: ${{ runner.os }}-setup-sh-actions-cache-v6-${{ hashFiles('nvim/lazy-lock.json', 'nvim/lua/plugins/**/*.lua') }}
+          key: ${{ runner.os }}-${{ runner.arch }}-setup-sh-actions-cache-v6-${{ hashFiles('nvim/lazy-lock.json', 'nvim/lua/plugins/**/*.lua') }}
           restore-keys: |
-            ${{ runner.os }}-setup-sh-actions-cache-v6-
+            ${{ runner.os }}-${{ runner.arch }}-setup-sh-actions-cache-v6-
 
       - name: Run setup.sh end-to-end
         run: |
@@ -126,6 +161,11 @@ jobs:
           for p in /nix/var/nix/profiles/default /run/current-system/sw ${nix_user:+"/etc/profiles/per-user/$nix_user"} "$HOME/.nix-profile" "$HOME/.local/state/nix/profile"; do
             [ -d "$p/bin" ] && PATH="$p/bin:$PATH"
           done
+          # install-deps publishes verified user-local artifacts (including Pi)
+          # here. A new managed zsh prepends the same consumer path; this CI
+          # step is a separate non-login shell and must model it explicitly.
+          [ ! -d "$HOME/.local/bin" ] || PATH="$HOME/.local/bin:$PATH"
+          export PATH
           fail() { echo "FAIL: $*" >&2; exit 1; }
           assert_file_content() {
             local path="$1" expected="$2"
@@ -187,7 +227,43 @@ jobs:
             done
             command -v ghostty
           }
+          resolve_wezterm_binary() {
+            local candidate
+            for candidate in \
+              "$(command -v wezterm 2>/dev/null || true)" \
+              "/Applications/WezTerm.app/Contents/MacOS/wezterm" \
+              "$HOME/Applications/WezTerm.app/Contents/MacOS/wezterm"; do
+              if [[ -n "$candidate" && -x "$candidate" ]]; then
+                printf '%s\n' "$candidate"
+                return 0
+              fi
+            done
+            return 1
+          }
           repo="$(pwd -P)"
+          if [[ "${RUNNER_OS:-}" == "Linux" ]]; then
+            fresh_zsh_user="$(id -un)" || fail "could not resolve the effective Linux account"
+            fresh_zsh_login_shell="$(getent passwd "$fresh_zsh_user" \
+              | awk -F: -v user="$fresh_zsh_user" '$1 == user { shell = $7; count++ } END { if (count != 1) exit 1; print shell }')" \
+              || fail "could not resolve one account-record login shell for $fresh_zsh_user"
+            [[ "${fresh_zsh_login_shell##*/}" == zsh && -x "$fresh_zsh_login_shell" ]] \
+              || fail "account-record login shell is not an executable zsh: $fresh_zsh_login_shell"
+            fresh_zsh_stderr="$RUNNER_TEMP/fresh-login-zsh.stderr"
+            set +e
+            fresh_zsh_rg="$(env -i HOME="$HOME" USER="$fresh_zsh_user" PATH=/usr/bin:/bin TERM=dumb \
+              "$fresh_zsh_login_shell" -l -i -c 'command -v rg' 2>"$fresh_zsh_stderr")"
+            fresh_zsh_rc=$?
+            set -e
+            if [[ "$fresh_zsh_rc" -ne 0 ]]; then
+              cat "$fresh_zsh_stderr" >&2
+              fail "fresh Linux login/interactive zsh did not resolve Home Manager rg (shell=$fresh_zsh_login_shell exit=$fresh_zsh_rc)"
+            fi
+            [[ -n "$fresh_zsh_rg" && "$fresh_zsh_rg" != *$'\n'* ]] \
+              || fail "fresh Linux zsh emitted an invalid rg command path: $fresh_zsh_rg"
+            fresh_zsh_rg_real="$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$fresh_zsh_rg")"
+            [[ "$fresh_zsh_rg_real" == /nix/store/* ]] \
+              || fail "fresh Linux zsh resolved rg outside Nix (source=$fresh_zsh_rg real=$fresh_zsh_rg_real)"
+          fi
           command -v nvim >/dev/null 2>&1 || fail "nvim is not on PATH"
           command -v lazygit >/dev/null 2>&1 || fail "lazygit is not on PATH"
           command -v cmake >/dev/null 2>&1 || fail "cmake is not on PATH"
@@ -209,10 +285,28 @@ jobs:
             [[ -d /Applications/AeroSpace.app || -d "$HOME/Applications/AeroSpace.app" ]] \
               || fail "AeroSpace.app is missing after setup.sh --all requested it"
             command -v herdr >/dev/null 2>&1 || fail "herdr is not on PATH after setup.sh --all requested it"
+            command -v aerospace >/dev/null 2>&1 || fail "AeroSpace CLI is missing after cask installation"
+            if [[ -x /Applications/AeroSpace.app/Contents/MacOS/AeroSpace ]]; then
+              aerospace_app_bin=/Applications/AeroSpace.app/Contents/MacOS/AeroSpace
+            else
+              aerospace_app_bin="$HOME/Applications/AeroSpace.app/Contents/MacOS/AeroSpace"
+            fi
+            [[ -x "$aerospace_app_bin" ]] || fail "AeroSpace app executable is missing"
+            aerospace_app_identity="$("$aerospace_app_bin" --version)" \
+              || fail "AeroSpace app identity probe failed"
+            aerospace_cli_identity="$(aerospace --version 2>&1)" \
+              || fail "AeroSpace CLI identity probe failed"
+            printf '%s\n' "$aerospace_cli_identity" \
+              | grep -F "aerospace CLI client version: $aerospace_app_identity" >/dev/null \
+              || fail "AeroSpace app and CLI identities differ"
+            echo "UNAVAILABLE: AeroSpace config-consumption runtime proof requires a user-granted Accessibility (TCC) desktop session; GitHub-hosted macOS cannot provide that grant. See tests/MANUAL.md."
           elif [[ "${RUNNER_OS:-}" == "Linux" ]]; then
             command -v wezterm >/dev/null 2>&1 || fail "wezterm is not on PATH after setup.sh --all requested it"
             command -v herdr >/dev/null 2>&1 || fail "herdr is not on PATH after setup.sh --all requested it"
           fi
+          wezterm_bin="$(resolve_wezterm_binary)" || fail "WezTerm binary is missing"
+          "$wezterm_bin" --config-file "$repo/wezterm/wezterm.lua" show-keys >/dev/null \
+            || fail "WezTerm real binary rejected the managed config"
           nvim_line="$(nvim --version | head -n 1)"
           case "$nvim_line" in
             "NVIM v0.12"*|"NVIM v1."*) ;;
@@ -241,6 +335,21 @@ jobs:
           # run_nvim_checked fails on the nonzero exit. The trailing +qa is
           # insurance if the probe ever leaves nvim alive.
           DOTFILES_LSP_SMOKE=strict run_nvim_checked lsp-smoke -u "$repo/nvim/init.lua" -c "luafile $repo/tests/nvim/lsp_smoke.lua" +qa
+      - name: Emit stable logical proof
+        if: success() && matrix.publish_logical_proof
+        run: >-
+          bash scripts/ci-logical-proof.sh emit
+          "$RUNNER_TEMP/setup-sh-${{ matrix.logical }}.env"
+          "setup.sh / ${{ matrix.logical }}"
+          "${{ matrix.legacy_context }}"
+      - name: Publish stable logical proof
+        if: success() && matrix.publish_logical_proof
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: setup-sh-${{ matrix.logical }}-logical-proof
+          path: ${{ runner.temp }}/setup-sh-${{ matrix.logical }}.env
+          if-no-files-found: error
+          retention-days: 1
 
   setup-ps1:
     name: setup.ps1 / windows-2025
@@ -253,15 +362,16 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: github.event_name == 'pull_request'
         with:
           path: |
             ~\scoop\cache
             ~\AppData\Local\nvim-data\lazy
             ~\AppData\Local\nvim-data\mason
             ~\AppData\Local\nvim-data\site
-          key: Windows-setup-ps1-actions-cache-v6-${{ hashFiles('nvim/lazy-lock.json', 'nvim/lua/plugins/**/*.lua') }}
+          key: Windows-${{ runner.arch }}-setup-ps1-actions-cache-v6-${{ hashFiles('nvim/lazy-lock.json', 'nvim/lua/plugins/**/*.lua') }}
           restore-keys: |
-            Windows-setup-ps1-actions-cache-v6-
+            Windows-${{ runner.arch }}-setup-ps1-actions-cache-v6-
 
       - name: Run setup.ps1 end-to-end
         run: |
@@ -375,6 +485,25 @@ jobs:
           if (-not (Get-Command pi -ErrorAction SilentlyContinue)) {
               throw 'pi is not on PATH'
           }
+          $userFontFiles = @(Get-ChildItem -LiteralPath (Join-Path $env:LOCALAPPDATA 'Microsoft\Windows\Fonts') -Filter 'Hack*Nerd*' -File -ErrorAction SilentlyContinue)
+          $systemFontFiles = @(Get-ChildItem -LiteralPath (Join-Path $env:WINDIR 'Fonts') -Filter 'Hack*Nerd*' -File -ErrorAction SilentlyContinue)
+          if (($userFontFiles.Count + $systemFontFiles.Count) -lt 1) {
+              throw 'Hack Nerd Font files are not installed in a Windows font directory'
+          }
+          $fontRegistration = @(foreach ($fontRegistryPath in @(
+                  'HKCU:\Software\Microsoft\Windows NT\CurrentVersion\Fonts',
+                  'HKLM:\Software\Microsoft\Windows NT\CurrentVersion\Fonts'
+              )) {
+              $registeredFonts = Get-ItemProperty -LiteralPath $fontRegistryPath -ErrorAction SilentlyContinue
+              if ($registeredFonts) {
+                  $registeredFonts.PSObject.Properties | Where-Object {
+                      $_.Name -match 'Hack.*Nerd' -or ([string]$_.Value) -match 'Hack.*Nerd'
+                  }
+              }
+          })
+          if (@($fontRegistration).Count -lt 1) {
+              throw 'Hack Nerd Font files exist but are not registered for application consumption'
+          }
           $piVersion = (& pi --version | Select-Object -First 1)
           if ($piVersion -ne '0.80.3') {
               throw "pi version is not pinned 0.80.3: $piVersion"
@@ -419,3 +548,56 @@ jobs:
           $env:DOTFILES_LSP_SMOKE = 'strict'
           Invoke-NvimChecked -Name lsp-smoke -NvimArgs @('-u', $initLua, '-c', "luafile $smokeLua", '+qa')
           Remove-Item Env:DOTFILES_LSP_SMOKE
+      - name: Emit stable logical proof
+        shell: bash
+        run: >-
+          bash scripts/ci-logical-proof.sh emit
+          "$RUNNER_TEMP/setup-ps1-windows.env"
+          "setup.ps1 / windows"
+          "setup.ps1 / windows-2025"
+      - name: Publish stable logical proof
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: setup-ps1-windows-logical-proof
+          path: ${{ runner.temp }}/setup-ps1-windows.env
+          if-no-files-found: error
+          retention-days: 1
+
+  logical-proof:
+    name: ${{ matrix.logical_context }}
+    if: always()
+    needs: [linux-container-install, setup-sh, setup-ps1]
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - logical_context: e2e containers / linux
+            legacy_context: e2e containers / ubuntu-24.04
+            artifact: e2e-container-linux-logical-proof
+            marker: e2e-container-linux.env
+          - logical_context: setup.sh / linux
+            legacy_context: setup.sh / ubuntu-24.04
+            artifact: setup-sh-linux-logical-proof
+            marker: setup-sh-linux.env
+          - logical_context: setup.sh / macos
+            legacy_context: setup.sh / macos-26
+            artifact: setup-sh-macos-logical-proof
+            marker: setup-sh-macos.env
+          - logical_context: setup.ps1 / windows
+            legacy_context: setup.ps1 / windows-2025
+            artifact: setup-ps1-windows-logical-proof
+            marker: setup-ps1-windows.env
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - name: Download exact OS proof
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ runner.temp }}/logical-proof
+      - name: Verify exact OS proof
+        run: >-
+          bash scripts/ci-logical-proof.sh verify
+          "$RUNNER_TEMP/logical-proof/${{ matrix.marker }}"
+          "${{ matrix.logical_context }}"
+          "${{ matrix.legacy_context }}"

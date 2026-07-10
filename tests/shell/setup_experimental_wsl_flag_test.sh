@@ -49,8 +49,18 @@ cat > "$TMP_ROOT/fakebin/home-manager" <<'EOF'
 #!/usr/bin/env bash
 exit 0
 EOF
+cat > "$TMP_ROOT/fakebin/id" <<'EOF'
+#!/usr/bin/env bash
+case "${1:-}" in -u) echo 1000 ;; -un) echo tester ;; *) exit 1 ;; esac
+EOF
+cat > "$TMP_ROOT/fakebin/getent" <<EOF
+#!/usr/bin/env bash
+[[ "\${1:-}" == passwd && "\${2:-}" == tester ]] || exit 1
+printf '%s\n' 'tester:x:1000:1000:Test User:$HOME:/bin/zsh'
+EOF
 chmod +x "$TMP_ROOT/install-deps.sh" "$TMP_ROOT/fakebin/chezmoi" "$TMP_ROOT/fakebin/brew" \
-    "$TMP_ROOT/fakebin/uname" "$TMP_ROOT/fakebin/nix" "$TMP_ROOT/fakebin/home-manager"
+    "$TMP_ROOT/fakebin/uname" "$TMP_ROOT/fakebin/nix" "$TMP_ROOT/fakebin/home-manager" \
+    "$TMP_ROOT/fakebin/id" "$TMP_ROOT/fakebin/getent"
 
 output="$(SETUP_TEST_ROOT="$TMP_ROOT" PATH="$TMP_ROOT/fakebin:/usr/bin:/bin" bash "$TMP_ROOT/setup.sh" --all --skip-nvim --skip-agents --experimental-wsl-gui 2>&1)"
 [[ "$output" == *"setup.sh: done"* ]]
