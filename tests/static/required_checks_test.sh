@@ -8,7 +8,6 @@ tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
 expected="$tmp/expected.txt"
-settings="$tmp/settings.txt"
 safeguards_function="$tmp/safeguards-function.txt"
 ruleset="$tmp/ruleset.txt"
 
@@ -77,16 +76,10 @@ for required_call in (
 print("OK: stable required identities are emitted while legacy producers remain available for the live transition")
 PY
 
-awk '
-  /^[[:space:]]*contexts:[[:space:]]*$/ { in_contexts = 1; next }
-  in_contexts && /^[[:space:]]*-[[:space:]]*/ {
-    line = $0
-    sub(/^[[:space:]]*-[[:space:]]*/, "", line)
-    print line
-    next
-  }
-  in_contexts && ! /^[[:space:]]*-[[:space:]]*/ { in_contexts = 0 }
-' .github/settings.yml > "$settings"
+if grep -Eq '^branches:[[:space:]]*$' .github/settings.yml; then
+    echo "FAIL: Probot Settings must not own branch protection during or after the transactional cutover" >&2
+    exit 1
+fi
 
 awk '
   /^required_check_contexts\(\) \{/ { in_fn = 1; next }
@@ -109,10 +102,6 @@ for rule in data["rules"]:
         break
 PY
 
-if ! diff -u "$expected" "$settings"; then
-    echo "FAIL: .github/settings.yml required checks are out of sync with the stable target" >&2
-    exit 1
-fi
 if ! diff -u "$expected" "$safeguards_function"; then
     echo "FAIL: safeguards required_check_contexts is out of sync with the stable target" >&2
     exit 1

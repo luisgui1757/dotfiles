@@ -1290,3 +1290,34 @@ merged-main greenfield proof.
 |---|---|---|---|
 | UGR-020 | PARTIAL | Recovery and public-posture gaps are repaired with behavioral zero-write failure cases and frozen-byte publication; the stable-context transition remains staged only. | Exact-head CI and independent re-review; after merge, merged-main cache-free proof followed by owner preflight/apply/readback. |
 | UGR-022 | ACCEPTED/FIXED | README, CLAUDE, ROADMAP, MIGRATION_STATUS, security runbooks, and this ledger now state the exact public-preflight and recovery contract; the stale active-Intel sentence is corrected. | Refresh PR-body and exact-head evidence after push. |
+
+## Probot branch-protection ownership correction — entry 35
+
+- A second review called the checked-in `.github/settings.yml` stable contexts
+  advisory-only because the Settings app installation could not be observed
+  through the available read-only token. That uncertainty is not an acceptable
+  cutover dependency. The file explicitly declared itself Probot-synced, and
+  the app documents that default-branch changes are applied automatically.
+  Upstream commit
+  [`3629848d090115df71f6d5cf431561e67077ee27`](https://github.com/repository-settings/app/blob/3629848d090115df71f6d5cf431561e67077ee27/lib/settings.js#L24-L36)
+  confirms that branch processing occurs only when a `branches` key exists.
+- `.github/settings.yml` now contains repository-level settings only and
+  deliberately omits `branches`. The owner-run safeguard transaction is the
+  sole checked-in writer for integrity and classic required-check cutover. This
+  prevents a default-branch Settings app sync from moving classic protection to
+  stable names while the integrity ruleset remains legacy, a mixed stage that
+  would otherwise strand the fail-closed preflight until manual recovery.
+- `required_checks_test.sh` and `repo_policy_test.sh` reject any future top-level
+  `branches` block in `.github/settings.yml` while continuing to prove the
+  stable identities agree across metadata, the integrity ruleset, the apply
+  function, and its narrow API payload. Focused required-check, repository
+  policy, and YAML lint cases pass. README, CLAUDE, ROADMAP,
+  MIGRATION_STATUS, and the branch-protection runbook record the single-writer
+  boundary. No live repository setting was read-write or changed.
+
+### Finding status amendments
+
+| ID | Status after entry 35 | Exact evidence | Remaining work |
+|---|---|---|---|
+| UGR-020 | PARTIAL | The staged required-check cutover now has one transactional writer; Probot cannot race classic protection on merge. Recovery/public-posture repairs remain behaviorally covered. | Exact-head CI and independent re-review; after merge, exact merged-main cache-free proof followed by owner preflight/apply/readback. |
+| UGR-022 | ACCEPTED/FIXED | Current safeguard ownership and default-branch app behavior are documented consistently, without relying on an unverifiable installation assumption. | Append exact repaired-head and post-merge results only after they occur. |

@@ -775,10 +775,13 @@ missing. They do not blanket-fail on benign warning/deprecation text.
 
 The canonical main-branch safeguards are the three checked-in repository rulesets
 under `.github/rulesets/`, applied live with
-`scripts/apply-repo-safeguards.sh`. `.github/settings.yml` remains a classic
-branch-protection fallback for the Probot Settings app, but it cannot model the
-key policy split: owner review bypass is allowed, CI bypass is not, and only the
-owner may update `main`.
+`scripts/apply-repo-safeguards.sh`. `.github/settings.yml` deliberately limits
+the Probot Settings app to repository-level settings; it does not contain a
+`branches` section. This prevents a default-branch sync from racing the
+transactional script and creating a mixed classic/ruleset cutover stage. The
+script owns the classic fallback required-check transition because Probot
+cannot model the key policy split: owner review bypass is allowed, CI bypass is
+not, and only the owner may update `main`.
 
 | Layer | Bypass actors | What it protects |
 |---|---:|---|
@@ -798,7 +801,7 @@ identity with branch/PR write access and no repository administration
 permission; otherwise GitHub sees the action as `luisgui1757`.
 
 Runner-versioned required contexts are in their final staged migration. This PR
-switches all four checked-in safeguard sources to six stable logical checks
+switches the checked-in required-check sources to six stable logical checks
 (`nix flake check / {linux,macos}`, `e2e containers / linux`, `setup.sh /
 {linux,macos}`, and `setup.ps1 / windows`) while workflows continue emitting
 the six legacy producer names. Each logical check verifies the exact OS proof

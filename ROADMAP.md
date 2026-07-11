@@ -274,19 +274,21 @@ Commit-by-commit status:
   checked Tree-sitter deletion, per-project clangd, Renovate inventory,
   Starship/Polaris cleanup, diagnostic-identity, NUL-safe JSON, and structural
   Nix-ownership gaps. UGR-020 is deliberately PARTIAL: this cutover switches
-  every checked-in safeguard source to stable logical checks while retaining
-  legacy producers for the still-live rules; the live owner apply happens only
-  after the documented merged-main cache-free gate. Logical proof schema 2
-  records both the PR source head and GitHub's actually executed synthetic merge
-  SHA instead of mislabeling the latter as the head. The apply script now
-  completes and repeats the whole read-only boundary before its first mutation:
+  every checked-in required-check source to stable logical checks while
+  retaining legacy producers for the still-live rules; the live owner apply
+  happens only after the documented merged-main cache-free gate. Logical proof
+  schema 2 records both the PR source head and GitHub's actually executed
+  synthetic merge SHA instead of mislabeling the latter as the head. The apply
+  script now completes and repeats the whole read-only boundary before its first mutation:
   exact branch/repo/main identity, clean sources, unique/exact legacy live
   policy, public visibility, GitHub-Actions app/workflow/event/run provenance,
   and cache-free E2E proof. It snapshots and rolls back the three changed
   resources on failure and retains a tested explicit recovery path. Recovery
   freezes every consumed snapshot file, rejects incomplete, altered,
   cross-stage, wrong-ruleset, bypass/condition, and full-classic-policy drift
-  before any write, and publishes only the validated frozen bytes.
+  before any write, and publishes only the validated frozen bytes. Probot
+  Settings now owns repository-level settings only; omitting its `branches`
+  key prevents a default-branch sync from racing the owner-run cutover.
   UGR-021 is PARTIAL until real WSL, redirected-Windows, cache-free scheduled or
   manual, and desktop runs exist. Historical Intel and current conventional
   Windows font-consumption lanes passed. The first PR run exposed and fixed two

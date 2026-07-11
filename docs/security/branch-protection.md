@@ -1,8 +1,9 @@
 # Branch Protection
 
 This public repository protects `main` with three active GitHub repository
-rulesets plus the classic branch-protection fallback in `.github/settings.yml`.
-The split is intentional:
+rulesets plus a classic branch-protection fallback. Both required-check layers
+are transitioned by `scripts/apply-repo-safeguards.sh`; `.github/settings.yml`
+intentionally does not own branch protection. The split is intentional:
 
 | Layer | Bypass actors | Purpose |
 |---|---:|---|
@@ -54,6 +55,14 @@ Actions SHA pinning, the integrity required-check set, and the classic required
 checks. Unchanged merge, review, owner-update, and security policy is verified,
 not rewritten.
 
+The Probot Settings app synchronizes `.github/settings.yml` after changes reach
+the default branch. Its upstream implementation processes branch settings only
+when a `branches` key is present ([reviewed source at
+`3629848d090115df71f6d5cf431561e67077ee27`](https://github.com/repository-settings/app/blob/3629848d090115df71f6d5cf431561e67077ee27/lib/settings.js#L24-L36)).
+This repository deliberately omits that key. Otherwise the app could apply the
+future classic contexts immediately after merge, before the owner-run ruleset
+transaction, leaving a mixed stage that the fail-closed preflight would reject.
+
 Immediately before mutation, the script stores the complete recovery material
 under `.git/dotfiles-safeguards/recovery.*` with private permissions. Any
 mutation or readback failure automatically restores all three changed resources
@@ -84,9 +93,10 @@ actors, so removing an old context before the live setting changes deadlocks the
 PR; requiring a new context before GitHub has observed it creates the inverse
 deadlock. `.github/check-identities.json` records the transition.
 
-This PR is the checked-in cutover stage. All four safeguard sources name the
-stable per-OS logical checks, while workflows continue to emit both the legacy
-runner-versioned producers and stable checks. Each stable check downloads the
+This PR is the checked-in cutover stage. The ruleset, required-check metadata,
+and transactional apply path name the stable per-OS logical checks, while
+workflows continue to emit both the legacy runner-versioned producers and
+stable checks. Each stable check downloads the
 exact producer artifact and verifies the source head SHA, actually executed
 SHA, run id/attempt, logical identity, and legacy producer through
 `scripts/ci-logical-proof.sh`; it is not a fake/no-op check. GitHub executes a

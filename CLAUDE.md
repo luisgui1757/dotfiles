@@ -362,7 +362,7 @@ that violates one of these, fix it instead of disabling the test.
     invocation predicate. Normal ConsoleHost, VS Code, and ISE stay supported.
 27. **Required check identities migrate without renaming deadlock.**
     `.github/check-identities.json` records the stable target and still-emitted
-    legacy producers. The four checked-in safeguard sources require stable
+    legacy producers. The checked-in required-check sources require stable
     logical jobs that verify exact per-OS proof artifacts bound to the same run,
     PR source head, and actually executed SHA. On `pull_request`, the executed
     SHA is GitHub's synthetic merge commit; it must never be mislabeled as the
@@ -760,9 +760,13 @@ Local clean-machine harnesses live in `tests/greenfield/README.md`; keep them
 manual VM/Sandbox tools and do not add them to the headless CI matrix.
 
 Main-branch safeguards are canonical in `.github/rulesets/` and applied live by
-`scripts/apply-repo-safeguards.sh`. `.github/settings.yml` is only the classic
-branch-protection fallback for the Probot Settings app; it cannot model the
-required split where owner bypass applies to review/update rules but not CI.
+`scripts/apply-repo-safeguards.sh`. `.github/settings.yml` deliberately contains
+only repository-level settings: the Probot Settings app must not race the
+transactional script by applying classic branch-protection changes when a
+cutover commit reaches the default branch. The script owns both the integrity
+ruleset and classic fallback required-check transition because Probot cannot
+model the required split where owner bypass applies to review/update rules but
+not CI.
 
 - `Protect main: integrity` has no bypass actors. It requires pull requests,
   strict required checks, current `main`, squash-only merges, linear history, no

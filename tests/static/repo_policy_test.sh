@@ -126,10 +126,12 @@ for snippet in (
     "allow_squash_merge: true",
     "allow_rebase_merge: false",
     "delete_branch_on_merge: true",
-    "required_pull_request_reviews: null",
+    "Branch protection is deliberately absent",
 ):
     if snippet not in settings:
         fail(f".github/settings.yml missing {snippet}")
+if re.search(r"(?m)^branches:\s*$", settings):
+    fail(".github/settings.yml must not let Probot race the transactional branch-protection cutover")
 
 for workflow in pathlib.Path(".github/workflows").glob("*.yml"):
     text = workflow.read_text(encoding="utf-8")

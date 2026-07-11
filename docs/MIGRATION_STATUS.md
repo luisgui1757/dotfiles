@@ -193,12 +193,15 @@ broken repo-symlink still cleaned) is covered by
       `install-deps.sh` installs there, `shells/zshrc` sources there first, the
       verifier checks there, uninstall removes there, and parity tests assert
       that root under a hostile `XDG_DATA_HOME`.
-- [x] The four checked-in protection sources now require `ubuntu`, `macos`,
+- [x] The checked-in ruleset, required-check metadata, and transactional apply
+      path now require `ubuntu`, `macos`,
       `windows`, `chezmoi-parity`, `chezmoi-parity-macos`,
       `chezmoi-parity-windows`, `nix flake check / linux`,
       `nix flake check / macos`, `e2e containers / linux`, `setup.sh / linux`,
       `setup.sh / macos`, and `setup.ps1 / windows`. The static alignment test
-      binds ruleset, settings, apply function, and API payload to that exact set.
+      binds the ruleset, apply function, and API payload to that exact set.
+      `.github/settings.yml` intentionally omits branch protection so the
+      Probot Settings app cannot race the owner-run transaction on merge.
 - [x] Stable logical replacements for the six runner-versioned contexts are
       emitted and bound to exact per-OS proof artifacts. Marker schema 2 binds
       the PR source head separately from GitHub's actually executed synthetic
