@@ -1176,3 +1176,49 @@ merged-main greenfield proof.
 |---|---|---|---|
 | UGR-020 | PARTIAL | Both re-review defects are repaired with behavioral failure-injection coverage: truthful dual-SHA proof schema plus complete zero-write preflight and transactional recovery. | Re-run exact-head CI and independent review; after merge, record the exact merged-main cache-free/provenance gate, then owner applies and reads back the live stable posture. |
 | UGR-022 | ACCEPTED/FIXED | README, CLAUDE, ROADMAP, MIGRATION_STATUS, MANUAL, supply-chain and branch-protection runbooks, and this append-only ledger now state the actual preflight/mutation/recovery contract. | Append final-head and post-merge live evidence only after those runs occur. |
+
+## PR #49 re-review repair verification — entry 32
+
+- Commit `54c03fd0ffddece073bc056b8ec992218253e0b1` implements and tests
+  logical-proof schema 2. Pull-request jobs bind both the source head and the
+  synthetic merge commit they executed; push and dispatch jobs bind the same
+  commit in both fields.
+- Commit `ffb5558c7bc16f795e03891df6f5521fd6a427cf` implements and tests the
+  safeguard transaction. Every repository, branch, live-policy, ruleset,
+  workflow, job, app, event, and cache-free requirement is read and validated
+  before the first write. The three cutover resources are snapshotted under
+  private Git metadata, narrowly mutated, read back, and automatically restored
+  on failure or interruption.
+- The real `--preflight-only` entry point was exercised from the PR branch and
+  rejected it before any mutation because it was not checked out as exact live
+  `main`. Live GitHub safeguards were not changed during implementation or
+  verification.
+
+### Local verification at entry 32
+
+| Gate | Result |
+|---|---|
+| `git diff --check f104bf066e4af7d4d707fe22ba36600711f1ae14..HEAD` | PASS |
+| `bash -n` over tracked `*.sh` | PASS, 135 scripts |
+| `make lint` | PASS |
+| `bash tests/static/run_all.sh` | PASS, including the safeguard transaction, required identities, provenance, and policy scanners |
+| `bash tests/shell/run_all.sh` | PASS, including distinct PR source/executed identities, dispatch identity, drift, missing-input, and obsolete-schema failures |
+| `make test-migration` | PASS: template, parity, round-trip, uninstall, Windows render, and sourceable-payload oracle |
+| `pwsh -NoLogo -NoProfile -File ./test.ps1` | PASS: PSScriptAnalyzer clean; Pester 234 passed, 0 failed, 0 skipped; Neovim entry point returned 0 |
+| `make test-nvim` | PASS, including pinned bootstrap, checked Tree-sitter deletion, 316 language assertions, and two-project clangd isolation |
+| `make test` | PASS |
+| `make validate-renovate` | PASS: official validator and exactly 82 reviewed dependency records |
+| `bash tests/nix/run_all.sh` | PASS |
+| `nix flake check --print-build-logs` | PASS on Apple Silicon; incompatible Linux derivations were not claimed as local proof |
+| `make ci` | PASS, ending `local pre-PR gate passed` |
+| Gitleaks 8.30.1, full PR range `f104bf0..ffb5558` | PASS: seven commits, no leaks |
+| Gitleaks 8.30.1, clean tracked archives | The base and repaired head each contain the same two `generic-api-key` Windows Terminal fragment false positives at the same paths and lines; no finding was added |
+| Added private-path audit | PASS: no local owner home path; the four non-example email-shaped values are the documented public `actions@github.com` app identity |
+
+### Finding status amendments
+
+| ID | Status after entry 32 | Exact evidence | Remaining work |
+|---|---|---|---|
+| UGR-020 | PARTIAL | Both implementation commits and every focused/local aggregate gate passed; live policy remains unchanged and legacy producers still gate the PR. | Independent review and exact-head hosted workflows; after merge, exact merged-main cache-free proof followed by owner preflight/apply/readback. |
+| UGR-021 | PARTIAL | No cache or environment result was relabeled: branch-head cache-free proof remains recorded, while this repair received local behavioral proof only. | Exact repaired-head hosted proof, merged-main cache-free proof, and the documented real WSL/redirected-Windows/dual-Terminal/desktop manual runs. |
+| UGR-022 | ACCEPTED/FIXED | All behavior, runbook, recovery, security, roadmap, migration, manual, and reconciliation descriptions match the repaired implementation and measured local results. | Append exact repaired-head and post-merge live results only after they occur. |
