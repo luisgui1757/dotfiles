@@ -1446,3 +1446,39 @@ recorded only after the repaired head is pushed and those events complete.
 | UGR-020 | PARTIAL | The transaction, recovery schema, semantic Probot exclusion, and logical-proof regression gaps are repaired and locally green; the live transition remains staged only. | Push the exact repaired head, require all hosted checks and independent re-review, then after merge obtain exact merged-main cache-free proof before owner preflight/apply/readback. |
 | UGR-021 | PARTIAL | No local result is relabeled as WSL, redirected Windows, dual-Terminal, desktop/TCC, or merged-main cache-free evidence. | Complete the documented live/manual environments after merge. |
 | UGR-022 | ACCEPTED/FIXED | README, CLAUDE, ROADMAP, MIGRATION_STATUS, manual instructions, security runbooks, workflow dependencies, tests, and this append-only entry describe the repaired boundary. | Append exact pushed-head hosted/artifact/live-readback evidence only after it exists. |
+
+## Final transaction-hardening hosted proof — entry 39
+
+- Exact pushed source head
+  `a9fef7dfac7f0f6832b57433fe2a5cff4b144d2c` passed all 18 emitted
+  checks. Generic/parity passed in
+  [`29163663315`](https://github.com/luisgui1757/dotfiles/actions/runs/29163663315),
+  both Nix producers and both stable Nix checks passed in
+  [`29163663329`](https://github.com/luisgui1757/dotfiles/actions/runs/29163663329),
+  and all four E2E producers plus all four stable E2E checks passed in
+  [`29163663344`](https://github.com/luisgui1757/dotfiles/actions/runs/29163663344).
+  Every check-run was emitted exactly once by GitHub Actions app `15368`; all
+  three runs were `pull_request`, attempt 1, on that exact source head.
+- All six downloaded schema-2 markers passed the checked-in verifier. They bind
+  `source_head_sha=a9fef7dfac7f0f6832b57433fe2a5cff4b144d2c` to
+  `executed_sha=f4a63197bbfd43c1de7c0d73fb1dffa47cfdad44`, with exact run
+  ID, attempt, logical context, and legacy context. The executed commit is the
+  live `refs/pull/49/merge`; its ordered parents are exact base
+  `f104bf066e4af7d4d707fe22ba36600711f1ae14` and that exact source
+  head. Gitleaks 8.30.1 found no secret in the six artifacts.
+- Final read-only live inspection still reports a public repository, three
+  unique active rulesets, the exact 12 legacy required contexts from app
+  `15368` in both integrity and classic protection, strict classic checks, no
+  integrity bypass, and `sha_pinning_required:false`. Review and owner-update
+  bypass remain limited to owner `139752288` in pull-request mode. No push,
+  workflow, test, artifact download, or PR operation applied the staged
+  cutover. The E2E PR run used ordinary PR caches and is not the pending
+  merged-main cache-free proof.
+
+### Finding status amendments
+
+| ID | Status after entry 39 | Exact evidence | Remaining work |
+|---|---|---|---|
+| UGR-020 | PARTIAL | The repaired transaction head passed all legacy and stable checks; all six dual-SHA markers and unchanged live policy were independently read back. | Independent final review; after merge, exact merged-main cache-free proof followed by owner preflight/apply/readback. |
+| UGR-021 | PARTIAL | Exact-head hosted Ubuntu, Apple Silicon, Windows, container, Nix, generic/parity, and logical proof are green without relabeling ordinary PR caches as clean-install proof. | Merged-main cache-free proof plus real WSL, redirected-Windows, dual-Terminal, and desktop/TCC manual runs. |
+| UGR-022 | ACCEPTED/FIXED | The append-only ledger records the accepted defects, canonical implementation, local gates, exact hosted runs, dual identities, artifact scan, and unchanged live posture. | Append merged-main/live-apply evidence only after those events occur. |
