@@ -9,7 +9,6 @@ trap 'rm -rf "$tmp"' EXIT
 
 expected="$tmp/expected.txt"
 settings="$tmp/settings.txt"
-safeguards_json="$tmp/safeguards-json.txt"
 safeguards_function="$tmp/safeguards-function.txt"
 ruleset="$tmp/ruleset.txt"
 
@@ -67,6 +66,14 @@ for workflow in (e2e, nix):
     if "DOTFILES_SOURCE_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}" not in workflow:
         raise SystemExit("FAIL: logical proof workflow does not distinguish PR source head from executed SHA")
 
+safeguards = pathlib.Path("scripts/apply-repo-safeguards.sh").read_text(encoding="utf-8")
+for required_call in (
+    "build_classic_payload required_check_contexts",
+    "build_classic_state required_check_contexts",
+):
+    if required_call not in safeguards:
+        raise SystemExit(f"FAIL: safeguard apply no longer derives the classic stable set through {required_call}")
+
 print("OK: stable required identities are emitted while legacy producers remain available for the live transition")
 PY
 
@@ -80,17 +87,6 @@ awk '
   }
   in_contexts && ! /^[[:space:]]*-[[:space:]]*/ { in_contexts = 0 }
 ' .github/settings.yml > "$settings"
-
-awk '
-  /"contexts": \[/ { in_contexts = 1; next }
-  in_contexts && /^[[:space:]]*\]/ { in_contexts = 0; next }
-  in_contexts {
-    line = $0
-    sub(/^[[:space:]]*"/, "", line)
-    sub(/",?[[:space:]]*$/, "", line)
-    if (line != "") print line
-  }
-' scripts/apply-repo-safeguards.sh > "$safeguards_json"
 
 awk '
   /^required_check_contexts\(\) \{/ { in_fn = 1; next }
@@ -115,10 +111,6 @@ PY
 
 if ! diff -u "$expected" "$settings"; then
     echo "FAIL: .github/settings.yml required checks are out of sync with the stable target" >&2
-    exit 1
-fi
-if ! diff -u "$expected" "$safeguards_json"; then
-    echo "FAIL: safeguards JSON required checks are out of sync with the stable target" >&2
     exit 1
 fi
 if ! diff -u "$expected" "$safeguards_function"; then

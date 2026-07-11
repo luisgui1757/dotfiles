@@ -25,5 +25,7 @@ privileged-flow model includes the repository's `maybe_sudo` and
 The checked-in safeguard script also requests repository-level Actions SHA
 pinning. At the start of the 2026-07-10 closure branch the live API reported
 `sha_pinning_required: false`; this branch does not mutate live settings. After
-merge, the owner must run `scripts/apply-repo-safeguards.sh
-luisgui1757/dotfiles` and verify the live value becomes `true`.
+merge and exact cache-free proof, the owner must run the script's no-write
+preflight and apply. It accepts only the expected legacy-to-stable transition,
+captures the old Actions/integrity/classic state before writing, restores all
+three on failure, and verifies the live value becomes `true`.

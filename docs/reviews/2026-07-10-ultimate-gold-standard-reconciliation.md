@@ -1143,3 +1143,36 @@ merged-main greenfield proof.
 |---|---|---|---|
 | UGR-020 | PARTIAL | Stable proof artifacts now distinguish the source head from the executed merge result and fail closed on either mismatch. | Complete the separate safeguard preflight/rollback repair, re-run exact-head workflows, merge, then perform merged-main cache-free proof and the owner-applied live cutover. |
 | UGR-022 | ACCEPTED/FIXED | README, CLAUDE, ROADMAP, MIGRATION_STATUS, the safeguard runbook, and this append-only entry now describe GitHub pull-request execution truthfully. | Revalidate the final implementation head and append live results. |
+
+## Independent PR #49 safeguard correction — entry 31
+
+- The same independent review reproduced a second defect at immutable head
+  `8c0bfb268592830d7213e4d3113d7bf61eb47101`. The old preflight returned before
+  checking ruleset uniqueness or the expected live policy. The script then
+  patched repository merge settings and Actions permissions before
+  `upsert_ruleset` detected a duplicate ruleset. A later failure could therefore
+  leave partial live mutation, and the runbook's suggested rerun/reapply path was
+  not a rollback because it contained only the new desired payloads.
+- The repair commit `fix(safeguards): preflight and recover the live cutover`
+  makes every decision read-only before the first write. It validates exact
+  local branch/origin/live-main identity, clean reviewed sources, the exact
+  three active rulesets and complete legacy-or-stable policy stage, GitHub
+  Actions app `15368`, exact test/Nix/E2E workflow events and run identities,
+  every expected job, and skipped broad caches. A second full readback detects
+  concurrent change before mutation.
+- Only the three resources that differ in this transition are written: Actions
+  SHA pinning, the integrity required-check set, and classic required checks.
+  Their old payloads are stored with private permissions under Git metadata.
+  Apply/readback failure or interruption automatically restores and verifies all
+  three; incomplete rollback prints an exact, tested `--restore` command.
+  Failure-injection tests cover wrong branch/remote, duplicate rulesets,
+  unexpected contexts, dirty sources, wrong app/event/cache provenance,
+  successful apply, repeated write-free apply, manual restore, partial apply
+  rollback, and rollback-failure recovery.
+
+### Finding status amendments
+
+| ID | Status after entry 31 | Exact evidence | Remaining work |
+|---|---|---|---|
+| UGR-020 | PARTIAL | Both re-review defects are repaired with behavioral failure-injection coverage: truthful dual-SHA proof schema plus complete zero-write preflight and transactional recovery. | Re-run exact-head CI and independent review; after merge, record the exact merged-main cache-free/provenance gate, then owner applies and reads back the live stable posture. |
+| UGR-022 | ACCEPTED/FIXED | README, CLAUDE, ROADMAP, MIGRATION_STATUS, MANUAL, supply-chain and branch-protection runbooks, and this append-only ledger now state the actual preflight/mutation/recovery contract. | Append final-head and post-merge live evidence only after those runs occur. |

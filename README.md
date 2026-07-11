@@ -819,11 +819,14 @@ scripts/apply-repo-safeguards.sh luisgui1757/dotfiles
 ```
 
 with an authenticated `gh` that has repository admin permission. Do this only
-after the post-merge cache-free and logical proof gate passes. The apply command
-repeats the preflight and refuses a non-main SHA, dirty safeguard sources, or a
-missing successful stable context before its first mutation. See
-[docs/security/branch-protection.md](docs/security/branch-protection.md) has the
-live verification commands and deletion-risk note;
+after the post-merge cache-free and logical proof gate passes. Before any live
+write, the apply command repeats the complete preflight: exact local/main/origin
+identity, clean reviewed sources, exact legacy live posture, unique rulesets,
+GitHub Actions app/workflow/event/run provenance, and skipped broad caches. It
+captures a private recovery snapshot, mutates only the three cutover resources,
+and automatically restores the previous stage if apply or readback fails. See
+[docs/security/branch-protection.md](docs/security/branch-protection.md) for the
+exact validation, recovery command, and live verification sequence;
 [docs/security/supply-chain.md](docs/security/supply-chain.md) records the
 reviewed executable identities and scanners.
 

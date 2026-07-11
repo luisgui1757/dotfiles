@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# The mock gh command is invoked indirectly by the production script.
+# shellcheck disable=SC2034,SC2317,SC2329
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
@@ -6,11 +8,15 @@ WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
 fixture="$WORK/repo"
-mkdir -p "$fixture/scripts" "$fixture/.github"
+mkdir -p "$fixture/scripts" "$fixture/.github/rulesets" "$fixture/.github/workflows"
 cp "$REPO_ROOT/scripts/apply-repo-safeguards.sh" "$fixture/scripts/"
+cp "$REPO_ROOT/scripts/ci-logical-proof.sh" "$fixture/scripts/"
 cp "$REPO_ROOT/.github/check-identities.json" "$fixture/.github/"
 cp "$REPO_ROOT/.github/settings.yml" "$fixture/.github/"
-cp -R "$REPO_ROOT/.github/rulesets" "$fixture/.github/"
+cp "$REPO_ROOT/.github/rulesets/"*.json "$fixture/.github/rulesets/"
+cp "$REPO_ROOT/.github/workflows/e2e-install.yml" "$fixture/.github/workflows/"
+cp "$REPO_ROOT/.github/workflows/nix.yml" "$fixture/.github/workflows/"
+cp "$REPO_ROOT/.github/workflows/test.yml" "$fixture/.github/workflows/"
 (
     cd "$fixture"
     git init -q
@@ -18,86 +24,453 @@ cp -R "$REPO_ROOT/.github/rulesets" "$fixture/.github/"
     git config user.email test@example.invalid
     git add .
     git commit -qm fixture
+    git branch -M main
+    git remote add origin https://github.com/owner/repo.git
 )
 fixture_head="$(git -C "$fixture" rev-parse HEAD)"
 
+legacy_contexts_json="$(jq -c '.legacyEmitted' "$fixture/.github/check-identities.json")"
+stable_contexts_json="$(jq -c '.required' "$fixture/.github/check-identities.json")"
+
+write_classic_state() {
+    local contexts="$1" output="$2"
+    jq -n --argjson contexts "$contexts" '{
+      required_status_checks: {
+        strict: true,
+        contexts: $contexts,
+        checks: ($contexts | map({context: ., app_id: 15368}))
+      },
+      enforce_admins: {enabled: true},
+      required_pull_request_reviews: null,
+      restrictions: null,
+      required_linear_history: {enabled: true},
+      allow_force_pushes: {enabled: false},
+      allow_deletions: {enabled: false},
+      required_conversation_resolution: {enabled: true},
+      required_signatures: {enabled: false},
+      block_creations: {enabled: false},
+      lock_branch: {enabled: false},
+      allow_fork_syncing: {enabled: false}
+    }' > "$output"
+}
+
+write_jobs() {
+    local output="$1"
+    shift
+    printf '%s\n' "$@" | jq -Rn '
+      [inputs | {name: ., status: "completed", conclusion: "success", steps: []}]
+      | {jobs: .}
+    ' > "$output"
+}
+
+make_state() {
+    local state="$1"
+    mkdir -p "$state"
+    jq -n --arg sha "$fixture_head" '{sha: $sha}' > "$state/live-main.json"
+    jq -n '{
+      full_name: "owner/repo",
+      default_branch: "main",
+      allow_merge_commit: false,
+      allow_squash_merge: true,
+      allow_rebase_merge: false,
+      allow_auto_merge: false,
+      delete_branch_on_merge: true,
+      security_and_analysis: {
+        dependabot_security_updates: {status: "enabled"},
+        secret_scanning: {status: "enabled"},
+        secret_scanning_push_protection: {status: "enabled"}
+      }
+    }' > "$state/repository.json"
+    jq -n '{enabled: true, allowed_actions: "all", sha_pinning_required: false}' > "$state/actions.json"
+    jq --slurpfile identities "$fixture/.github/check-identities.json" '
+      (.rules[] | select(.type == "required_status_checks").parameters.required_status_checks) =
+        ($identities[0].legacyEmitted | map({context: ., integration_id: 15368}))
+    ' "$fixture/.github/rulesets/main-integrity.json" > "$state/integrity.json"
+    cp "$fixture/.github/rulesets/main-review.json" "$state/review.json"
+    cp "$fixture/.github/rulesets/main-owner-updates.json" "$state/owner.json"
+    jq -n '{
+      rulesets: [
+        {id: 101, name: "Protect main: integrity", source: "owner/repo", source_type: "Repository", target: "branch", enforcement: "active"},
+        {id: 102, name: "Protect main: review", source: "owner/repo", source_type: "Repository", target: "branch", enforcement: "active"},
+        {id: 103, name: "Protect main: owner updates", source: "owner/repo", source_type: "Repository", target: "branch", enforcement: "active"}
+      ]
+    } | .rulesets' > "$state/rulesets.json"
+    write_classic_state "$legacy_contexts_json" "$state/classic.json"
+
+    jq -n --arg sha "$fixture_head" '{workflow_runs: [{
+      id: 201, run_number: 1, event: "push", status: "completed", conclusion: "success",
+      head_branch: "main", head_sha: $sha, path: ".github/workflows/test.yml",
+      repository: {full_name: "owner/repo"}
+    }]}' > "$state/test-runs.json"
+    jq -n --arg sha "$fixture_head" '{workflow_runs: [{
+      id: 202, run_number: 1, event: "push", status: "completed", conclusion: "success",
+      head_branch: "main", head_sha: $sha, path: ".github/workflows/nix.yml",
+      repository: {full_name: "owner/repo"}
+    }]}' > "$state/nix-runs.json"
+    jq -n --arg sha "$fixture_head" '{workflow_runs: [{
+      id: 203, run_number: 1, event: "workflow_dispatch", status: "completed", conclusion: "success",
+      head_branch: "main", head_sha: $sha, path: ".github/workflows/e2e-install.yml",
+      repository: {full_name: "owner/repo"}
+    }]}' > "$state/e2e-install-runs.json"
+
+    write_jobs "$state/test-jobs.json" \
+        ubuntu macos windows chezmoi-parity chezmoi-parity-macos chezmoi-parity-windows
+    write_jobs "$state/nix-jobs.json" \
+        "nix flake check (ubuntu-24.04)" "nix flake check (macos-26)" \
+        "nix flake check / linux" "nix flake check / macos"
+    write_jobs "$state/e2e-jobs.json" \
+        "e2e containers / ubuntu-24.04" "setup.sh / ubuntu-24.04" \
+        "setup.sh / macos-26" "setup.ps1 / windows-2025" \
+        "e2e containers / linux" "setup.sh / linux" \
+        "setup.sh / macos" "setup.ps1 / windows"
+    jq '
+      .jobs |= map(
+        if (.name == "setup.sh / ubuntu-24.04" or
+            .name == "setup.sh / macos-26" or
+            .name == "setup.ps1 / windows-2025")
+        then .steps = [{name: "PR-only cache: fixture", conclusion: "skipped"}]
+        else . end)
+    ' "$state/e2e-jobs.json" > "$state/e2e-jobs.tmp"
+    mv "$state/e2e-jobs.tmp" "$state/e2e-jobs.json"
+
+    {
+        printf '%s\n' ubuntu macos windows chezmoi-parity chezmoi-parity-macos chezmoi-parity-windows \
+            | jq -Rn '[inputs | {name: ., run_id: 201}]'
+        printf '%s\n' "nix flake check (ubuntu-24.04)" "nix flake check (macos-26)" \
+            "nix flake check / linux" "nix flake check / macos" \
+            | jq -Rn '[inputs | {name: ., run_id: 202}]'
+        printf '%s\n' "e2e containers / ubuntu-24.04" "setup.sh / ubuntu-24.04" \
+            "setup.sh / macos-26" "setup.ps1 / windows-2025" \
+            "e2e containers / linux" "setup.sh / linux" "setup.sh / macos" "setup.ps1 / windows" \
+            | jq -Rn '[inputs | {name: ., run_id: 203}]'
+    } | jq -s --arg repo owner/repo '
+      add | {check_runs: map({
+        name,
+        status: "completed",
+        conclusion: "success",
+        app: {id: 15368, slug: "github-actions"},
+        details_url: ("https://github.com/" + $repo + "/actions/runs/" + (.run_id | tostring) + "/job/1")
+      })}
+    ' > "$state/check-runs.json"
+}
+
+base_state="$WORK/base-state"
+make_state "$base_state"
+
 mkdir -p "$WORK/bin"
-cat > "$WORK/bin/gh" <<'EOF'
+cat > "$WORK/bin/gh" <<'MOCK_GH'
 #!/usr/bin/env bash
 set -euo pipefail
+
 if [[ "${1:-}" == "auth" && "${2:-}" == "status" ]]; then
     exit 0
 fi
-if [[ "${1:-}" == "api" && "${2:-}" == "repos/owner/repo/commits/main" ]]; then
-    printf '%s\n' "$TEST_LIVE_SHA"
+if [[ "${1:-}" == "repo" && "${2:-}" == "view" ]]; then
+    printf '%s\n' owner/repo
     exit 0
 fi
-if [[ "${1:-}" == "api" && "${2:-}" == "--paginate" && "${3:-}" == repos/owner/repo/commits/*/check-runs* ]]; then
-    printf '%s\n' "$TEST_CONTEXTS"
+[[ "${1:-}" == "api" ]] || { echo "unexpected gh command: $*" >&2; exit 91; }
+shift
+
+method=GET
+path=""
+input=""
+jq_filter=""
+while [[ "$#" -gt 0 ]]; do
+    case "$1" in
+        -X)
+            method="$2"
+            shift 2
+            ;;
+        --input)
+            input="$2"
+            shift 2
+            ;;
+        --jq)
+            jq_filter="$2"
+            shift 2
+            ;;
+        --silent)
+            shift
+            ;;
+        -*)
+            shift
+            ;;
+        *)
+            if [[ -z "$path" ]]; then path="$1"; fi
+            shift
+            ;;
+    esac
+done
+
+state="${TEST_STATE_DIR:?}"
+mutation_log="${TEST_MUTATION_LOG:?}"
+
+if [[ "$method" == "GET" && "$path" == "repos/owner/repo" && -n "${TEST_MUTATE_BEFORE_SECOND_CAPTURE:-}" ]]; then
+    read_count=0
+    if [[ -f "$state/repository-read-count" ]]; then
+        read_count="$(cat "$state/repository-read-count")"
+    fi
+    read_count=$((read_count + 1))
+    printf '%s\n' "$read_count" > "$state/repository-read-count"
+    if [[ "$read_count" -eq 2 ]]; then
+        jq '.delete_branch_on_merge = false' "$state/repository.json" > "$state/repository.tmp"
+        mv "$state/repository.tmp" "$state/repository.json"
+    fi
+fi
+
+if [[ "$method" != "GET" ]]; then
+    printf '%s %s\n' "$method" "$path" >> "$mutation_log"
+    if [[ -n "${TEST_FAIL_ONCE_PATH:-}" && "$path" == "$TEST_FAIL_ONCE_PATH" && ! -e "$state/failure-used" ]]; then
+        : > "$state/failure-used"
+        exit 90
+    fi
+    if [[ -n "${TEST_FAIL_AFTER_PATH:-}" && -e "$state/failure-used" && "$path" == "$TEST_FAIL_AFTER_PATH" ]]; then
+        exit 92
+    fi
+    case "$path" in
+        repos/owner/repo/actions/permissions)
+            cp "$input" "$state/actions.json"
+            ;;
+        repos/owner/repo/rulesets/101)
+            cp "$input" "$state/integrity.json"
+            ;;
+        repos/owner/repo/branches/main/protection/required_status_checks)
+            jq --slurpfile required "$input" \
+                '.required_status_checks = $required[0]' \
+                "$state/classic.json" > "$state/classic.tmp"
+            mv "$state/classic.tmp" "$state/classic.json"
+            ;;
+        *)
+            echo "unexpected mutation: $method $path" >&2
+            exit 93
+            ;;
+    esac
+    printf '{}\n'
     exit 0
 fi
-printf '%s\n' "$*" >> "$TEST_MUTATION_LOG"
-echo "unexpected gh invocation: $*" >&2
-exit 91
-EOF
+
+case "$path" in
+    repos/owner/repo) file="$state/repository.json" ;;
+    repos/owner/repo/commits/main) file="$state/live-main.json" ;;
+    'repos/owner/repo/rulesets?includes_parents=false') file="$state/rulesets.json" ;;
+    repos/owner/repo/rulesets/101) file="$state/integrity.json" ;;
+    repos/owner/repo/rulesets/102) file="$state/review.json" ;;
+    repos/owner/repo/rulesets/103) file="$state/owner.json" ;;
+    repos/owner/repo/branches/main/protection) file="$state/classic.json" ;;
+    repos/owner/repo/actions/permissions) file="$state/actions.json" ;;
+    repos/owner/repo/vulnerability-alerts|repos/owner/repo/automated-security-fixes) exit 0 ;;
+    repos/owner/repo/commits/*/check-runs*) file="$state/check-runs.json" ;;
+    repos/owner/repo/actions/workflows/test.yml/runs*) file="$state/test-runs.json" ;;
+    repos/owner/repo/actions/workflows/nix.yml/runs*) file="$state/nix-runs.json" ;;
+    repos/owner/repo/actions/workflows/e2e-install.yml/runs*) file="$state/e2e-install-runs.json" ;;
+    repos/owner/repo/actions/runs/201/jobs*) file="$state/test-jobs.json" ;;
+    repos/owner/repo/actions/runs/202/jobs*) file="$state/nix-jobs.json" ;;
+    repos/owner/repo/actions/runs/203/jobs*) file="$state/e2e-jobs.json" ;;
+    *) echo "unexpected read: $path" >&2; exit 94 ;;
+esac
+
+if [[ -n "$jq_filter" ]]; then
+    jq -r "$jq_filter" "$file"
+else
+    cat "$file"
+fi
+MOCK_GH
 chmod +x "$WORK/bin/gh"
 
-required_contexts="$(jq -r '.required[]' "$fixture/.github/check-identities.json")"
-mutation_log="$WORK/mutations.log"
+new_case_state() {
+    local name="$1" state
+    state="$WORK/state-$name"
+    cp -R "$base_state" "$state"
+    printf '%s\n' "$state"
+}
 
-run_preflight() {
-    TEST_LIVE_SHA="$1" \
-    TEST_CONTEXTS="$2" \
+run_safeguards() {
+    local state="$1" mutation_log="$2"
+    shift 2
+    TEST_STATE_DIR="$state" \
     TEST_MUTATION_LOG="$mutation_log" \
     PATH="$WORK/bin:$PATH" \
-        "$fixture/scripts/apply-repo-safeguards.sh" --preflight-only owner/repo
+        "$fixture/scripts/apply-repo-safeguards.sh" "$@" owner/repo
 }
 
-output="$(run_preflight "$fixture_head" "$required_contexts")"
-grep -F "Safeguard preflight passed for live main; no repository state changed." <<<"$output" >/dev/null
-[[ ! -s "$mutation_log" ]] || {
-    echo "FAIL: preflight-only invoked a mutating GitHub API" >&2
+expect_failure() {
+    local expected="$1"
+    shift
+    local output rc
+    set +e
+    output="$("$@" 2>&1)"
+    rc=$?
+    set -e
+    [[ "$rc" -ne 0 ]] || {
+        echo "FAIL: command unexpectedly succeeded: $*" >&2
+        exit 1
+    }
+    grep -F "$expected" <<<"$output" >/dev/null || {
+        echo "FAIL: expected failure text not found: $expected" >&2
+        printf '%s\n' "$output" >&2
+        exit 1
+    }
+}
+
+mutation_log="$WORK/mutations.log"
+: > "$mutation_log"
+state="$(new_case_state preflight)"
+output="$(run_safeguards "$state" "$mutation_log" --preflight-only)"
+grep -F "no local snapshot or live state changed" <<<"$output" >/dev/null
+[[ ! -s "$mutation_log" ]] || { echo "FAIL: preflight-only mutated live state" >&2; exit 1; }
+[[ ! -e "$fixture/.git/dotfiles-safeguards" ]] || { echo "FAIL: preflight-only created a recovery snapshot" >&2; exit 1; }
+echo "ok  : exact legacy live posture and provenance pass without mutation"
+
+git -C "$fixture" switch -qc topic
+state="$(new_case_state wrong-branch)"
+expect_failure "requires the checked-out local branch to be main" \
+    run_safeguards "$state" "$mutation_log" --preflight-only
+git -C "$fixture" switch -q main
+git -C "$fixture" remote set-url origin https://github.com/other/repo.git
+state="$(new_case_state wrong-remote)"
+expect_failure "checkout origin is not the requested" \
+    run_safeguards "$state" "$mutation_log" --preflight-only
+git -C "$fixture" remote set-url origin https://github.com/owner/repo.git
+[[ ! -s "$mutation_log" ]] || { echo "FAIL: identity failure mutated live state" >&2; exit 1; }
+echo "ok  : wrong branch and remote identity fail before mutation"
+
+state="$(new_case_state duplicate-ruleset)"
+jq '. + [.[0]]' "$state/rulesets.json" > "$state/rulesets.tmp"
+mv "$state/rulesets.tmp" "$state/rulesets.json"
+expect_failure "exact three unique active repository rulesets" \
+    run_safeguards "$state" "$mutation_log" --preflight-only
+echo "ok  : duplicate rulesets fail before mutation"
+
+state="$(new_case_state wrong-app)"
+jq '(.check_runs[] | select(.name == "setup.sh / linux").app.id) = 999' \
+    "$state/check-runs.json" > "$state/check-runs.tmp"
+mv "$state/check-runs.tmp" "$state/check-runs.json"
+expect_failure "not uniquely bound to GitHub Actions app 15368" \
+    run_safeguards "$state" "$mutation_log" --preflight-only
+
+state="$(new_case_state wrong-event)"
+jq '.workflow_runs[0].event = "pull_request"' "$state/e2e-install-runs.json" > "$state/e2e.tmp"
+mv "$state/e2e.tmp" "$state/e2e-install-runs.json"
+expect_failure "no successful .github/workflows/e2e-install.yml run with allowed event provenance" \
+    run_safeguards "$state" "$mutation_log" --preflight-only
+
+state="$(new_case_state cached-e2e)"
+jq '(.jobs[] | select(.name == "setup.sh / linux") | .steps) = [{name: "PR-only cache: fixture", conclusion: "success"}]' \
+    "$state/e2e-jobs.json" > "$state/e2e.tmp"
+mv "$state/e2e.tmp" "$state/e2e-jobs.json"
+expect_failure "did not skip every broad actions/cache step" \
+    run_safeguards "$state" "$mutation_log" --preflight-only
+[[ ! -s "$mutation_log" ]] || { echo "FAIL: provenance failure mutated live state" >&2; exit 1; }
+echo "ok  : wrong app, event, and cache provenance fail before mutation"
+
+state="$(new_case_state unexpected-contexts)"
+jq 'del(.required_status_checks.contexts[-1], .required_status_checks.checks[-1])' \
+    "$state/classic.json" > "$state/classic.tmp"
+mv "$state/classic.tmp" "$state/classic.json"
+expect_failure "not one exact, internally consistent legacy-or-stable stage" \
+    run_safeguards "$state" "$mutation_log" --preflight-only
+
+cp "$fixture/.github/settings.yml" "$WORK/settings.backup"
+printf '\n# unreviewed\n' >> "$fixture/.github/settings.yml"
+state="$(new_case_state dirty-source)"
+expect_failure "reviewed safeguard/proof sources differ from exact live main" \
+    run_safeguards "$state" "$mutation_log" --preflight-only
+cp "$WORK/settings.backup" "$fixture/.github/settings.yml"
+[[ ! -s "$mutation_log" ]] || { echo "FAIL: live/source drift mutated live state" >&2; exit 1; }
+echo "ok  : unexpected live contexts and dirty reviewed sources fail before mutation"
+
+state="$(new_case_state concurrent-change)"
+: > "$mutation_log"
+TEST_MUTATE_BEFORE_SECOND_CAPTURE=1 \
+    expect_failure "live repository/merge/security settings differ" \
+    run_safeguards "$state" "$mutation_log"
+[[ ! -s "$mutation_log" ]] || { echo "FAIL: concurrent preflight change was detected after mutation" >&2; exit 1; }
+echo "ok  : second full read detects concurrent live change before mutation"
+
+state="$(new_case_state apply)"
+: > "$mutation_log"
+output="$(run_safeguards "$state" "$mutation_log")"
+grep -F "Repository safeguards applied and verified." <<<"$output" >/dev/null
+[[ "$(wc -l < "$mutation_log" | tr -d ' ')" == "3" ]] || {
+    echo "FAIL: apply did not limit mutation to exactly three resources" >&2
+    cat "$mutation_log" >&2
     exit 1
 }
-echo "ok  : exact live main with all stable checks passes without mutation"
+grep -Fx "PATCH repos/owner/repo/branches/main/protection/required_status_checks" "$mutation_log" >/dev/null || {
+    echo "FAIL: apply did not use the narrow classic status-check endpoint" >&2
+    exit 1
+}
+jq -e '.sha_pinning_required == true' "$state/actions.json" >/dev/null
+jq -e '[.rules[] | select(.type == "required_status_checks") | .parameters.required_status_checks[].context] | index("setup.sh / linux") != null' \
+    "$state/integrity.json" >/dev/null
+jq -e '.required_status_checks.contexts | index("setup.sh / linux") != null' "$state/classic.json" >/dev/null
+jq -e '
+  .required_signatures.enabled == false
+  and .block_creations.enabled == false
+  and .lock_branch.enabled == false
+  and .allow_fork_syncing.enabled == false
+' "$state/classic.json" >/dev/null
+snapshot="$(find "$fixture/.git/dotfiles-safeguards" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+[[ -f "$snapshot/manifest.json" && -f "$snapshot/RECOVERY.txt" ]] || {
+    echo "FAIL: apply did not retain a complete recovery snapshot" >&2
+    exit 1
+}
+echo "ok  : apply snapshots then mutates only the three reviewed cutover resources"
 
-missing_contexts="$(printf '%s\n' "$required_contexts" | sed '$d')"
+: > "$mutation_log"
+output="$(run_safeguards "$state" "$mutation_log")"
+grep -F "already match the stable checked-in posture" <<<"$output" >/dev/null
+[[ ! -s "$mutation_log" ]] || { echo "FAIL: repeated stable apply mutated live state" >&2; exit 1; }
+echo "ok  : repeated stable apply is verified and write-free"
+
+corrupt_snapshot="$WORK/corrupt-snapshot"
+cp -R "$snapshot" "$corrupt_snapshot"
+jq '.repository = "other/repo"' "$corrupt_snapshot/manifest.json" > "$corrupt_snapshot/manifest.tmp"
+mv "$corrupt_snapshot/manifest.tmp" "$corrupt_snapshot/manifest.json"
+: > "$mutation_log"
+expect_failure "recovery snapshot belongs to other/repo" \
+    run_safeguards "$state" "$mutation_log" --restore "$corrupt_snapshot"
+[[ ! -s "$mutation_log" ]] || { echo "FAIL: mismatched recovery snapshot mutated live state" >&2; exit 1; }
+echo "ok  : mismatched recovery snapshot fails validation before mutation"
+
+: > "$mutation_log"
+run_safeguards "$state" "$mutation_log" --restore "$snapshot" >/dev/null
+jq -e '.sha_pinning_required == false' "$state/actions.json" >/dev/null
+jq -e '.required_status_checks.contexts == $legacy' --argjson legacy "$legacy_contexts_json" "$state/classic.json" >/dev/null
+echo "ok  : explicit recovery restores and verifies the complete prior cutover state"
+
+state="$(new_case_state automatic-rollback)"
+: > "$mutation_log"
 set +e
-output="$(run_preflight "$fixture_head" "$missing_contexts" 2>&1)"
+output="$(TEST_FAIL_ONCE_PATH='repos/owner/repo/branches/main/protection/required_status_checks' \
+    run_safeguards "$state" "$mutation_log" 2>&1)"
 rc=$?
 set -e
-[[ "$rc" -ne 0 ]] || {
-    echo "FAIL: missing stable check passed preflight" >&2
-    exit 1
-}
-grep -F "setup.ps1 / windows" <<<"$output" >/dev/null
-echo "ok  : missing stable check fails before mutation"
+[[ "$rc" -ne 0 ]] || { echo "FAIL: injected apply failure succeeded" >&2; exit 1; }
+grep -F "previous three-resource cutover state was restored" <<<"$output" >/dev/null
+jq -e '.sha_pinning_required == false' "$state/actions.json" >/dev/null
+jq -e '.required_status_checks.contexts == $legacy' --argjson legacy "$legacy_contexts_json" "$state/classic.json" >/dev/null
+echo "ok  : partial apply failure automatically restores the prior valid state"
 
+state="$(new_case_state rollback-failure)"
+: > "$mutation_log"
 set +e
-output="$(run_preflight 0000000000000000000000000000000000000000 "$required_contexts" 2>&1)"
+output="$(TEST_FAIL_ONCE_PATH='repos/owner/repo/branches/main/protection/required_status_checks' \
+    TEST_FAIL_AFTER_PATH='repos/owner/repo/actions/permissions' \
+    run_safeguards "$state" "$mutation_log" 2>&1)"
 rc=$?
 set -e
-[[ "$rc" -ne 0 ]] || {
-    echo "FAIL: non-main checkout passed preflight" >&2
+[[ "$rc" -ne 0 ]] || { echo "FAIL: injected rollback failure succeeded" >&2; exit 1; }
+grep -F "RECOVERY REQUIRED:" <<<"$output" >/dev/null
+recovery_snapshot="$(find "$fixture/.git/dotfiles-safeguards" -mindepth 1 -maxdepth 1 -type d -newer "$snapshot" | tail -n 1)"
+[[ -n "$recovery_snapshot" && -f "$recovery_snapshot/RECOVERY.txt" ]] || {
+    echo "FAIL: rollback failure did not retain exact recovery material" >&2
     exit 1
 }
-grep -F "is not live main" <<<"$output" >/dev/null
-echo "ok  : checkout not at live main fails before mutation"
+: > "$mutation_log"
+run_safeguards "$state" "$mutation_log" --restore "$recovery_snapshot" >/dev/null
+jq -e '.sha_pinning_required == false' "$state/actions.json" >/dev/null
+echo "ok  : rollback failure is explicit and the retained snapshot recovers on retry"
 
-printf '\n# local unreviewed mutation\n' >> "$fixture/.github/settings.yml"
-set +e
-output="$(run_preflight "$fixture_head" "$required_contexts" 2>&1)"
-rc=$?
-set -e
-[[ "$rc" -ne 0 ]] || {
-    echo "FAIL: dirty safeguard sources passed preflight" >&2
-    exit 1
-}
-grep -F "safeguard sources differ from the exact live main commit" <<<"$output" >/dev/null
-echo "ok  : dirty safeguard source fails before mutation"
-
-[[ ! -s "$mutation_log" ]] || {
-    echo "FAIL: a failed preflight invoked a mutating GitHub API" >&2
-    exit 1
-}
-echo "all repository safeguard preflight behaviors OK"
+echo "all repository safeguard preflight and transaction behaviors OK"

@@ -228,7 +228,12 @@ significant change to the relevant area.
       two Nix logical proofs to pass before applying the checked-in stable
       required contexts live. Record that merged-main run here and in
       `tests/greenfield/LEDGER.md`; a documentation-only descendant does not
-      replace the behavior-head run.
+      replace the behavior-head run. Then run the no-write safeguard preflight;
+      it must identify that exact cache-free E2E dispatch, the Nix/test run
+      provenance, GitHub Actions app `15368`, and the exact legacy live posture.
+      Retain the apply command's `.git/dotfiles-safeguards/recovery.*` snapshot
+      until the stable-context/SHA-policy readback has been independently
+      reviewed.
 - [ ] **Home Manager (Linux/WSL)**: with Nix installed inside the Linux/WSL
       environment, run
       `./setup.sh --all` (or the compatibility alias `./setup.sh --home-manager`;

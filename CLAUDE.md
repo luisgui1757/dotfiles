@@ -371,9 +371,12 @@ that violates one of these, fix it instead of disabling the test.
     contexts from the cutover PR. Follow `docs/security/branch-protection.md`:
     merge while live legacy checks still gate, pass cache-free plus all logical
     checks on the exact merged `main` SHA, then have the owner run
-    `--preflight-only`, apply, and verify the checked-in safeguards. The apply
-    command repeats that exact-main/clean-source/successful-context preflight
-    before its first mutation.
+    `--preflight-only`, apply, and verify the checked-in safeguards. Before its
+    first mutation the apply command twice verifies exact branch/repository/main
+    identity, clean sources, unique and exact legacy live policy, GitHub Actions
+    app/workflow/event/run provenance, and cache-free E2E evidence. It snapshots
+    the three changed resources, rolls all three back on apply/readback failure,
+    and retains an exact `--restore` path when recovery needs owner action.
 28. **Handled native PowerShell status never escapes its adapter.** Setup and
     uninstall chezmoi helpers temporarily disable native error promotion,
     capture stdout/stderr and the exact exit code, restore the caller preference,
@@ -780,12 +783,14 @@ integrity ruleset's required checks. Repository deletion is outside branch
 protection for a personal repo; routine agents should use least-privilege
 credentials, not owner-account, admin, or `delete_repo` capable tokens.
 
-Run `scripts/apply-repo-safeguards.sh luisgui1757/dotfiles` after changing the
-rulesets, then verify the live posture with the commands in
-`docs/security/branch-protection.md`. Do not recreate a hosted WSL2 canary or
-claim Linux proxy coverage as WSL runtime proof. If live GitHub has duplicate rulesets with the same
-protected name, the script fails closed instead of choosing one; delete the
-duplicate live ruleset and re-run.
+The current stable-context cutover is applied only through
+`scripts/apply-repo-safeguards.sh` after its merged-main proof and no-write
+preflight. The script refuses unexpected live drift rather than acting as an
+unreviewed general reconciler, mutates only Actions SHA pinning plus integrity
+and classic required checks, and keeps a verified recovery snapshot. Follow the
+commands and `--restore` recovery path in `docs/security/branch-protection.md`.
+Do not recreate a hosted WSL2 canary or claim Linux proxy coverage as WSL
+runtime proof.
 
 `renovate.json` owns GitHub Actions version updates and repo-pinned version/ref
 constants. Dependabot version-update PRs are intentionally disabled; GitHub

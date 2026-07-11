@@ -279,8 +279,11 @@ Commit-by-commit status:
   after the documented merged-main cache-free gate. Logical proof schema 2
   records both the PR source head and GitHub's actually executed synthetic merge
   SHA instead of mislabeling the latter as the head. The apply script now
-  enforces exact live-main HEAD, clean safeguard sources, and successful stable
-  contexts before its first mutation.
+  completes and repeats the whole read-only boundary before its first mutation:
+  exact branch/repo/main identity, clean sources, unique/exact legacy live
+  policy, GitHub-Actions app/workflow/event/run provenance, and cache-free E2E
+  proof. It snapshots and rolls back the three changed resources on failure and
+  retains a tested explicit recovery path.
   UGR-021 is PARTIAL until real WSL, redirected-Windows, cache-free scheduled or
   manual, and desktop runs exist. Historical Intel and current conventional
   Windows font-consumption lanes passed. The first PR run exposed and fixed two

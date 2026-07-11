@@ -1,69 +1,102 @@
 #!/usr/bin/env bash
-# Applies the public-repo safeguards documented in docs/security/branch-protection.md.
+# Applies the reviewed stable-check cutover documented in
+# docs/security/branch-protection.md. Every live read and proof gate completes
+# before the first mutation. The three changed resources are snapshotted and
+# automatically restored if application or readback fails.
 set -euo pipefail
 
 usage() {
     cat <<'EOF'
 apply-repo-safeguards.sh [--preflight-only] [owner/repo]
+apply-repo-safeguards.sh --restore <snapshot-directory> [owner/repo]
 
-Applies the repository safeguard posture:
-  - squash-only PR merges
-  - delete branches on merge
-  - auto-merge disabled
-  - three active main-branch rulesets:
-      * Protect main: integrity (no bypass; required PR, strict CI, no delete/force)
-      * Protect main: review (owner-only pull-request bypass for review rules)
-      * Protect main: owner updates (only owner can update main through PRs)
-  - classic main branch protection fallback with required CI checks
-  - GitHub Actions requires full commit-SHA pinning for external actions
-  - best-effort GitHub security extras where the plan supports them
+The normal path verifies the complete expected live posture, exact live main,
+reviewed local sources, unique rulesets, and exact GitHub Actions run provenance
+before changing only:
+  - Actions full-SHA pinning
+  - Protect main: integrity required checks
+  - classic main required checks
 
-Requires an authenticated GitHub CLI with repository admin permission:
-  gh auth login
+Before the first mutation it saves a private recovery snapshot under this
+checkout's Git metadata. Any apply/readback failure attempts automatic rollback
+and prints the exact --restore command for manual recovery.
 
---preflight-only verifies that this checkout is the exact live main SHA and all
-required checks succeeded there, without changing repository state.
+--preflight-only performs every read-only check without creating a persistent
+snapshot or changing live repository state.
 EOF
 }
 
-if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
-    usage
-    exit 0
-fi
-
 preflight_only=0
-if [[ "${1:-}" == "--preflight-only" ]]; then
-    preflight_only=1
-    shift
+restore_dir=""
+while [[ "$#" -gt 0 ]]; do
+    case "$1" in
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        --preflight-only)
+            [[ -z "$restore_dir" ]] || { echo "FAIL: --preflight-only and --restore are mutually exclusive" >&2; exit 2; }
+            preflight_only=1
+            shift
+            ;;
+        --restore)
+            [[ "$preflight_only" -eq 0 && -z "$restore_dir" && "$#" -ge 2 ]] || {
+                echo "FAIL: --restore requires one snapshot directory and cannot be combined with --preflight-only" >&2
+                exit 2
+            }
+            restore_dir="$2"
+            shift 2
+            ;;
+        --*)
+            echo "FAIL: unknown option: $1" >&2
+            usage >&2
+            exit 2
+            ;;
+        *)
+            break
+            ;;
+    esac
+done
+
+if [[ "$#" -gt 1 ]]; then
+    echo "FAIL: expected at most one owner/repo argument" >&2
+    exit 2
 fi
 
-if ! command -v gh >/dev/null 2>&1; then
-    echo "FAIL: gh is required. Install GitHub CLI and run gh auth login." >&2
-    exit 1
-fi
-
+for command_name in gh git jq; do
+    if ! command -v "$command_name" >/dev/null 2>&1; then
+        echo "FAIL: $command_name is required." >&2
+        exit 1
+    fi
+done
 gh auth status >/dev/null
 
 repo="${1:-${GITHUB_REPOSITORY:-}}"
 if [[ -z "$repo" ]]; then
     repo="$(gh repo view --json nameWithOwner --jq .nameWithOwner)"
 fi
-if [[ "$repo" != */* ]]; then
-    echo "FAIL: repository must be owner/repo, got: $repo" >&2
+if [[ ! "$repo" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
+    echo "FAIL: repository must be a literal owner/repo, got an invalid value." >&2
     exit 2
 fi
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+check_identities="$repo_root/.github/check-identities.json"
 integrity_ruleset="$repo_root/.github/rulesets/main-integrity.json"
 review_ruleset="$repo_root/.github/rulesets/main-review.json"
 owner_updates_ruleset="$repo_root/.github/rulesets/main-owner-updates.json"
+github_actions_app_id=15368
 
-for f in "$integrity_ruleset" "$review_ruleset" "$owner_updates_ruleset"; do
-    if [[ ! -f "$f" ]]; then
-        echo "FAIL: missing ruleset file: $f" >&2
-        exit 3
+preflight_dir=""
+recovery_dir=""
+transaction_active=0
+exit_handler_active=0
+
+cleanup_preflight() {
+    if [[ -n "$preflight_dir" && -d "$preflight_dir" ]]; then
+        rm -rf "$preflight_dir"
     fi
-done
+}
 
 gh_api() {
     local method="$1" path="$2"
@@ -72,54 +105,48 @@ gh_api() {
     gh api -X "$method" "$path" "$@"
 }
 
-gh_api_json() {
-    local method="$1" path="$2"
-    echo "+ gh api -X $method $path --input -"
-    gh api -X "$method" "$path" --input -
-}
-
 gh_api_json_file() {
     local method="$1" path="$2" file="$3"
     echo "+ gh api -X $method $path --input $file"
     gh api -X "$method" "$path" --input "$file"
 }
 
-try_gh_api() {
-    local desc="$1"
-    shift
-    if ! "$@"; then
-        echo "note: could not apply optional safeguard: $desc" >&2
-    fi
+canonicalize_json() {
+    jq -S '
+      def sort_arrays:
+        walk(if type == "array" then sort_by(tojson) else . end);
+      sort_arrays
+    ' "$1"
 }
 
-ruleset_id_by_name() {
-    local name="$1" ids count
-    ids="$(gh api "repos/$repo/rulesets?includes_parents=false" \
-        --jq ".[] | select(.name == \"$name\") | .id")"
-    count="$(awk 'NF { count++ } END { print count + 0 }' <<<"$ids")"
-    if [[ "$count" -gt 1 ]]; then
-        echo "FAIL: found $count rulesets named '$name'; delete duplicates before applying safeguards." >&2
-        return 1
-    fi
-    printf '%s\n' "$ids"
-}
-
-upsert_ruleset() {
-    local name="$1" file="$2" id
-    id="$(ruleset_id_by_name "$name")"
-    if [[ -n "$id" ]]; then
-        gh_api_json_file PUT "repos/$repo/rulesets/$id" "$file" >/dev/null
+json_equal() {
+    local left="$1" right="$2" left_canonical right_canonical rc
+    left_canonical="$(mktemp)"
+    right_canonical="$(mktemp)"
+    canonicalize_json "$left" > "$left_canonical"
+    canonicalize_json "$right" > "$right_canonical"
+    if cmp -s "$left_canonical" "$right_canonical"; then
+        rc=0
     else
-        gh_api_json_file POST "repos/$repo/rulesets" "$file" >/dev/null
+        rc=1
     fi
+    rm -f "$left_canonical" "$right_canonical"
+    return "$rc"
 }
 
-require_live_value() {
-    local desc="$1" actual="$2" expected="$3"
-    if [[ "$actual" != "$expected" ]]; then
-        echo "FAIL: $desc is '$actual', expected '$expected'" >&2
-        exit 4
+require_json_equal() {
+    local desc="$1" actual="$2" expected="$3" actual_canonical expected_canonical
+    if json_equal "$actual" "$expected"; then
+        return 0
     fi
+    actual_canonical="$(mktemp)"
+    expected_canonical="$(mktemp)"
+    canonicalize_json "$actual" > "$actual_canonical"
+    canonicalize_json "$expected" > "$expected_canonical"
+    echo "FAIL: unexpected live $desc; refusing to mutate." >&2
+    diff -u "$expected_canonical" "$actual_canonical" >&2 || true
+    rm -f "$actual_canonical" "$expected_canonical"
+    return 1
 }
 
 required_check_contexts() {
@@ -139,182 +166,608 @@ setup.ps1 / windows
 EOF
 }
 
-verify_required_contexts() {
-    local desc="$1" actual="$2" tmp_expected tmp_actual
-    tmp_expected="$(mktemp)"
-    tmp_actual="$(mktemp)"
-    required_check_contexts | LC_ALL=C sort > "$tmp_expected"
-    printf '%s\n' "$actual" | LC_ALL=C sort > "$tmp_actual"
-    if ! diff -u "$tmp_expected" "$tmp_actual"; then
-        rm -f "$tmp_expected" "$tmp_actual"
-        echo "FAIL: $desc required status checks differ from the canonical list" >&2
-        exit 4
-    fi
-    rm -f "$tmp_expected" "$tmp_actual"
+legacy_check_contexts() {
+    jq -r '.legacyEmitted[]' "$check_identities"
 }
 
-verify_successful_required_contexts() {
-    local actual="$1" tmp_expected tmp_actual missing
-    tmp_expected="$(mktemp)"
-    tmp_actual="$(mktemp)"
-    required_check_contexts | LC_ALL=C sort -u > "$tmp_expected"
-    printf '%s\n' "$actual" | awk 'NF' | LC_ALL=C sort -u > "$tmp_actual"
-    missing="$(comm -23 "$tmp_expected" "$tmp_actual")"
-    rm -f "$tmp_expected" "$tmp_actual"
-    if [[ -n "$missing" ]]; then
-        echo "FAIL: live main is missing successful required checks:" >&2
-        printf '  %s\n' "$missing" >&2
+test_workflow_contexts() {
+    cat <<'EOF'
+ubuntu
+macos
+windows
+chezmoi-parity
+chezmoi-parity-macos
+chezmoi-parity-windows
+EOF
+}
+
+nix_workflow_contexts() {
+    cat <<'EOF'
+nix flake check (ubuntu-24.04)
+nix flake check (macos-26)
+nix flake check / linux
+nix flake check / macos
+EOF
+}
+
+e2e_workflow_contexts() {
+    cat <<'EOF'
+e2e containers / ubuntu-24.04
+setup.sh / ubuntu-24.04
+setup.sh / macos-26
+setup.ps1 / windows-2025
+e2e containers / linux
+setup.sh / linux
+setup.sh / macos
+setup.ps1 / windows
+EOF
+}
+
+contexts_json() {
+    "$1" | jq -R . | jq -s .
+}
+
+build_classic_payload() {
+    local contexts
+    contexts="$(contexts_json "$1")"
+    jq -n --argjson contexts "$contexts" --argjson app_id "$github_actions_app_id" '{
+      strict: true,
+      contexts: $contexts,
+      checks: ($contexts | map({context: ., app_id: $app_id}))
+    }'
+}
+
+build_classic_state() {
+    local contexts
+    contexts="$(contexts_json "$1")"
+    jq -n --argjson contexts "$contexts" --argjson app_id "$github_actions_app_id" '{
+      required_status_checks: {
+        strict: true,
+        contexts: ($contexts | sort),
+        checks: ($contexts | map({context: ., app_id: $app_id}) | sort_by(.context))
+      },
+      enforce_admins: true,
+      required_pull_request_reviews: null,
+      restrictions: null,
+      required_linear_history: true,
+      allow_force_pushes: false,
+      allow_deletions: false,
+      required_conversation_resolution: true,
+      required_signatures: false,
+      block_creations: false,
+      lock_branch: false,
+      allow_fork_syncing: false
+    }'
+}
+
+normalize_classic_state() {
+    jq '{
+      required_status_checks: {
+        strict: .required_status_checks.strict,
+        contexts: (.required_status_checks.contexts | sort),
+        checks: (.required_status_checks.checks | map({context, app_id}) | sort_by(.context))
+      },
+      enforce_admins: .enforce_admins.enabled,
+      required_pull_request_reviews,
+      restrictions,
+      required_linear_history: .required_linear_history.enabled,
+      allow_force_pushes: .allow_force_pushes.enabled,
+      allow_deletions: .allow_deletions.enabled,
+      required_conversation_resolution: .required_conversation_resolution.enabled,
+      required_signatures: .required_signatures.enabled,
+      block_creations: .block_creations.enabled,
+      lock_branch: .lock_branch.enabled,
+      allow_fork_syncing: .allow_fork_syncing.enabled
+    }' "$1"
+}
+
+classic_restore_payload() {
+    jq '.required_status_checks | {
+      strict,
+      contexts,
+      checks: (.checks | map({context, app_id}))
+    }' "$1"
+}
+
+normalize_ruleset() {
+    jq '
+      {name, target, enforcement, bypass_actors, conditions, rules}
+      | del(.rules[].parameters.required_reviewers?)
+    ' "$1" | canonicalize_json /dev/stdin
+}
+
+ruleset_restore_payload() {
+    jq '
+      {name, target, enforcement, bypass_actors, conditions, rules}
+      | del(.rules[].parameters.required_reviewers?)
+    ' "$1"
+}
+
+ruleset_id_by_name() {
+    local name="$1" ids count
+    ids="$(gh api "repos/$repo/rulesets?includes_parents=false" \
+        --jq ".[] | select(.name == \"$name\") | .id")"
+    count="$(awk 'NF { count++ } END { print count + 0 }' <<<"$ids")"
+    if [[ "$count" -ne 1 ]]; then
+        echo "FAIL: found $count rulesets named '$name'; expected exactly one before applying safeguards." >&2
         return 1
     fi
+    printf '%s\n' "$ids"
 }
 
-preflight_safeguard_apply() {
-    local local_head live_main_sha successful_contexts
+normalize_remote_repo() {
+    local remote="$1" normalized
+    case "$remote" in
+        https://github.com/*)
+            normalized="${remote#https://github.com/}"
+            ;;
+        git@github.com:*)
+            normalized="${remote#git@github.com:}"
+            ;;
+        ssh://git@github.com/*)
+            normalized="${remote#ssh://git@github.com/}"
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+    normalized="${normalized%.git}"
+    [[ "$normalized" == "$repo" ]]
+}
+
+verify_local_boundary() {
+    local local_branch local_head local_main live_main_sha origin_url dirty
+    local_branch="$(git -C "$repo_root" symbolic-ref -q --short HEAD || true)"
+    [[ "$local_branch" == "main" ]] || {
+        echo "FAIL: safeguard apply requires the checked-out local branch to be main; got '${local_branch:-detached}'" >&2
+        return 1
+    }
+    origin_url="$(git -C "$repo_root" remote get-url origin 2>/dev/null || true)"
+    if ! normalize_remote_repo "$origin_url"; then
+        echo "FAIL: checkout origin is not the requested github.com/$repo repository." >&2
+        return 1
+    fi
     local_head="$(git -C "$repo_root" rev-parse HEAD)"
-    live_main_sha="$(gh api "repos/$repo/commits/main" --jq .sha)"
+    local_main="$(git -C "$repo_root" rev-parse refs/heads/main)"
+    live_main_sha="$(jq -r .sha "$preflight_dir/live-main.json")"
+    if [[ "$local_head" != "$local_main" ]]; then
+        echo "FAIL: checked-out HEAD $local_head is not the local main ref $local_main." >&2
+        return 1
+    fi
     if [[ "$local_head" != "$live_main_sha" ]]; then
-        echo "FAIL: safeguard checkout HEAD $local_head is not live main $live_main_sha." >&2
-        echo "      Pull main and rerun only after its required checks pass." >&2
+        echo "FAIL: local main/HEAD $local_head is not exact live main $live_main_sha." >&2
+        echo "      Fetch and update main, then rerun only after its proof workflows pass." >&2
         return 1
     fi
-    if ! git -C "$repo_root" diff --quiet -- \
+
+    dirty="$(git -C "$repo_root" status --porcelain=v1 --untracked-files=all -- \
         .github/check-identities.json \
         .github/settings.yml \
         .github/rulesets \
-        scripts/apply-repo-safeguards.sh || \
-        ! git -C "$repo_root" diff --cached --quiet -- \
-        .github/check-identities.json \
-        .github/settings.yml \
-        .github/rulesets \
-        scripts/apply-repo-safeguards.sh; then
-        echo "FAIL: safeguard sources differ from the exact live main commit." >&2
-        echo "      Restore or commit the intended sources through a reviewed PR first." >&2
+        .github/workflows/e2e-install.yml \
+        .github/workflows/nix.yml \
+        .github/workflows/test.yml \
+        scripts/apply-repo-safeguards.sh \
+        scripts/ci-logical-proof.sh)"
+    if [[ -n "$dirty" ]]; then
+        echo "FAIL: reviewed safeguard/proof sources differ from exact live main." >&2
+        printf '%s\n' "$dirty" >&2
         return 1
     fi
-    successful_contexts="$(gh api --paginate \
-        "repos/$repo/commits/$live_main_sha/check-runs?per_page=100" \
-        --jq '.check_runs[] | select(.status == "completed" and .conclusion == "success") | .name')"
-    verify_successful_required_contexts "$successful_contexts"
 }
 
-preflight_safeguard_apply
-if [[ "$preflight_only" -eq 1 ]]; then
-    echo "Safeguard preflight passed for live main; no repository state changed."
+select_workflow_run() {
+    local workflow_file="$1" workflow_path="$2" allowed_events="$3" output="$4"
+    local runs_file="$preflight_dir/${workflow_file%.yml}-runs.json"
+    gh api "repos/$repo/actions/workflows/$workflow_file/runs?branch=main&per_page=100" > "$runs_file"
+    if ! jq -e \
+        --arg repo "$repo" \
+        --arg sha "$(jq -r .sha "$preflight_dir/live-main.json")" \
+        --arg path "$workflow_path" \
+        --argjson events "$allowed_events" '
+          [.workflow_runs[]
+            | select(.repository.full_name == $repo)
+            | select(.head_branch == "main" and .head_sha == $sha)
+            | select(.path == $path)
+            | select(.status == "completed" and .conclusion == "success")
+            | select(.event as $event | $events | index($event))]
+          | sort_by(.run_number // .id)
+          | reverse
+          | .[0] // empty
+        ' "$runs_file" > "$output"; then
+        echo "FAIL: no successful $workflow_path run with allowed event provenance exists on exact live main." >&2
+        return 1
+    fi
+}
+
+verify_workflow_jobs() {
+    local desc="$1" run_file="$2" context_function="$3" require_cache_free="$4"
+    local run_id jobs_file expected_file context count prefix
+    run_id="$(jq -r .id "$run_file")"
+    jobs_file="$preflight_dir/${desc}-jobs.json"
+    expected_file="$preflight_dir/${desc}-expected-contexts.txt"
+    gh api "repos/$repo/actions/runs/$run_id/jobs?per_page=100" > "$jobs_file"
+    "$context_function" > "$expected_file"
+    while IFS= read -r context; do
+        count="$(jq --arg name "$context" '[.jobs[] | select(.name == $name and .status == "completed" and .conclusion == "success")] | length' "$jobs_file")"
+        if [[ "$count" -ne 1 ]]; then
+            echo "FAIL: $desc run $run_id has $count successful jobs named '$context'; expected exactly one." >&2
+            return 1
+        fi
+        prefix="https://github.com/$repo/actions/runs/$run_id/job/"
+        count="$(jq --arg name "$context" --arg prefix "$prefix" --argjson app_id "$github_actions_app_id" '
+          [.check_runs[]
+            | select(.name == $name)
+            | select(.status == "completed" and .conclusion == "success")
+            | select(.app.id == $app_id and .app.slug == "github-actions")
+            | select(.details_url | startswith($prefix))]
+          | length
+        ' "$preflight_dir/check-runs.json")"
+        if [[ "$count" -ne 1 ]]; then
+            echo "FAIL: '$context' is not uniquely bound to GitHub Actions app $github_actions_app_id and $desc run $run_id." >&2
+            return 1
+        fi
+    done < "$expected_file"
+
+    if [[ "$require_cache_free" -eq 1 ]]; then
+        if ! jq -e '
+          [.jobs[].steps[]? | select(.name | startswith("PR-only cache:"))] as $cache_steps
+          | ($cache_steps | length) == 3
+          and all($cache_steps[]; .conclusion == "skipped")
+        ' "$jobs_file" >/dev/null; then
+            echo "FAIL: $desc run $run_id did not skip every broad actions/cache step." >&2
+            return 1
+        fi
+    fi
+}
+
+capture_and_validate_live_state() {
+    local target_dir="$1" previous_preflight="$preflight_dir"
+    local integrity_id review_id owner_updates_id stage
+    local live_integrity_normalized expected_integrity_normalized expected_legacy_integrity_normalized
+    local live_review_normalized expected_review_normalized
+    local live_owner_normalized expected_owner_normalized
+    local live_classic_state expected_legacy_classic expected_stable_classic
+    preflight_dir="$target_dir"
+
+    gh api "repos/$repo" > "$preflight_dir/repository.json"
+    if [[ "$(jq -r .full_name "$preflight_dir/repository.json")" != "$repo" ]]; then
+        echo "FAIL: GitHub resolved a different repository than $repo." >&2
+        return 1
+    fi
+    if ! jq -e '
+      .default_branch == "main"
+      and .allow_merge_commit == false
+      and .allow_squash_merge == true
+      and .allow_rebase_merge == false
+      and .allow_auto_merge == false
+      and .delete_branch_on_merge == true
+      and .security_and_analysis.dependabot_security_updates.status == "enabled"
+      and .security_and_analysis.secret_scanning.status == "enabled"
+      and .security_and_analysis.secret_scanning_push_protection.status == "enabled"
+    ' "$preflight_dir/repository.json" >/dev/null; then
+        echo "FAIL: live repository/merge/security settings differ from the reviewed public-repo posture." >&2
+        return 1
+    fi
+    jq '{
+      full_name,
+      default_branch,
+      allow_merge_commit,
+      allow_squash_merge,
+      allow_rebase_merge,
+      allow_auto_merge,
+      delete_branch_on_merge,
+      security_and_analysis: {
+        dependabot_security_updates: .security_and_analysis.dependabot_security_updates.status,
+        secret_scanning: .security_and_analysis.secret_scanning.status,
+        secret_scanning_push_protection: .security_and_analysis.secret_scanning_push_protection.status
+      }
+    }' "$preflight_dir/repository.json" > "$preflight_dir/repository-state.json"
+    gh api "repos/$repo/commits/main" > "$preflight_dir/live-main.json"
+    verify_local_boundary
+
+    gh api "repos/$repo/rulesets?includes_parents=false" > "$preflight_dir/rulesets.json"
+    if ! jq -e --arg repo "$repo" '
+      length == 3
+      and ([.[].name] | sort) == (["Protect main: integrity", "Protect main: owner updates", "Protect main: review"] | sort)
+      and all(.[]; .source == $repo and .source_type == "Repository" and .target == "branch" and .enforcement == "active")
+    ' "$preflight_dir/rulesets.json" >/dev/null; then
+        echo "FAIL: live rulesets are not the exact three unique active repository rulesets." >&2
+        return 1
+    fi
+    jq 'map({id, name, source, source_type, target, enforcement}) | sort_by(.name)' \
+        "$preflight_dir/rulesets.json" > "$preflight_dir/rulesets-state.json"
+    integrity_id="$(ruleset_id_by_name "Protect main: integrity")"
+    review_id="$(ruleset_id_by_name "Protect main: review")"
+    owner_updates_id="$(ruleset_id_by_name "Protect main: owner updates")"
+    gh api "repos/$repo/rulesets/$integrity_id" > "$preflight_dir/integrity-live.json"
+    gh api "repos/$repo/rulesets/$review_id" > "$preflight_dir/review-live.json"
+    gh api "repos/$repo/rulesets/$owner_updates_id" > "$preflight_dir/owner-updates-live.json"
+
+    jq --slurpfile identities "$check_identities" '
+      (.rules[] | select(.type == "required_status_checks").parameters.required_status_checks) =
+        ($identities[0].legacyEmitted | map({context: ., integration_id: 15368}))
+    ' "$integrity_ruleset" > "$preflight_dir/integrity-legacy-expected.json"
+    normalize_ruleset "$preflight_dir/integrity-live.json" > "$preflight_dir/integrity-live-normalized.json"
+    normalize_ruleset "$integrity_ruleset" > "$preflight_dir/integrity-stable-normalized.json"
+    normalize_ruleset "$preflight_dir/integrity-legacy-expected.json" > "$preflight_dir/integrity-legacy-normalized.json"
+    live_integrity_normalized="$preflight_dir/integrity-live-normalized.json"
+    expected_integrity_normalized="$preflight_dir/integrity-stable-normalized.json"
+    expected_legacy_integrity_normalized="$preflight_dir/integrity-legacy-normalized.json"
+
+    normalize_ruleset "$preflight_dir/review-live.json" > "$preflight_dir/review-live-normalized.json"
+    normalize_ruleset "$review_ruleset" > "$preflight_dir/review-expected-normalized.json"
+    live_review_normalized="$preflight_dir/review-live-normalized.json"
+    expected_review_normalized="$preflight_dir/review-expected-normalized.json"
+    require_json_equal "review ruleset" "$live_review_normalized" "$expected_review_normalized"
+
+    normalize_ruleset "$preflight_dir/owner-updates-live.json" > "$preflight_dir/owner-live-normalized.json"
+    normalize_ruleset "$owner_updates_ruleset" > "$preflight_dir/owner-expected-normalized.json"
+    live_owner_normalized="$preflight_dir/owner-live-normalized.json"
+    expected_owner_normalized="$preflight_dir/owner-expected-normalized.json"
+    require_json_equal "owner-updates ruleset" "$live_owner_normalized" "$expected_owner_normalized"
+
+    gh api "repos/$repo/branches/main/protection" > "$preflight_dir/classic-live.json"
+    normalize_classic_state "$preflight_dir/classic-live.json" > "$preflight_dir/classic-live-state.json"
+    build_classic_state legacy_check_contexts > "$preflight_dir/classic-legacy-state.json"
+    build_classic_state required_check_contexts > "$preflight_dir/classic-stable-state.json"
+    live_classic_state="$preflight_dir/classic-live-state.json"
+    expected_legacy_classic="$preflight_dir/classic-legacy-state.json"
+    expected_stable_classic="$preflight_dir/classic-stable-state.json"
+
+    if json_equal "$live_integrity_normalized" "$expected_legacy_integrity_normalized" && \
+        json_equal "$live_classic_state" "$expected_legacy_classic"; then
+        stage="legacy"
+    elif json_equal "$live_integrity_normalized" "$expected_integrity_normalized" && \
+        json_equal "$live_classic_state" "$expected_stable_classic"; then
+        stage="stable"
+    else
+        echo "FAIL: integrity and classic protection are not one exact, internally consistent legacy-or-stable stage." >&2
+        return 1
+    fi
+    printf '%s\n' "$stage" > "$preflight_dir/stage"
+
+    gh api "repos/$repo/actions/permissions" > "$preflight_dir/actions-live.json"
+    if ! jq -e '.enabled == true and .allowed_actions == "all"' "$preflight_dir/actions-live.json" >/dev/null; then
+        echo "FAIL: live Actions enabled/allowed posture is unexpected." >&2
+        return 1
+    fi
+    if [[ "$stage" == "legacy" ]]; then
+        jq -e '.sha_pinning_required == false' "$preflight_dir/actions-live.json" >/dev/null || {
+            echo "FAIL: legacy required contexts must coincide with sha_pinning_required=false before this cutover." >&2
+            return 1
+        }
+    else
+        jq -e '.sha_pinning_required == true' "$preflight_dir/actions-live.json" >/dev/null || {
+            echo "FAIL: stable required contexts must coincide with sha_pinning_required=true." >&2
+            return 1
+        }
+    fi
+
+    gh api --silent "repos/$repo/vulnerability-alerts" >/dev/null || {
+        echo "FAIL: vulnerability alerts are not enabled or could not be verified." >&2
+        return 1
+    }
+    gh api --silent "repos/$repo/automated-security-fixes" >/dev/null || {
+        echo "FAIL: automated security fixes are not enabled or could not be verified." >&2
+        return 1
+    }
+
+    gh api "repos/$repo/commits/$(jq -r .sha "$preflight_dir/live-main.json")/check-runs?per_page=100" > "$preflight_dir/check-runs.json"
+    select_workflow_run test.yml .github/workflows/test.yml '["push", "workflow_dispatch"]' "$preflight_dir/test-run.json"
+    select_workflow_run nix.yml .github/workflows/nix.yml '["push", "workflow_dispatch"]' "$preflight_dir/nix-run.json"
+    select_workflow_run e2e-install.yml .github/workflows/e2e-install.yml '["workflow_dispatch"]' "$preflight_dir/e2e-run.json"
+    verify_workflow_jobs test "$preflight_dir/test-run.json" test_workflow_contexts 0
+    verify_workflow_jobs nix "$preflight_dir/nix-run.json" nix_workflow_contexts 0
+    verify_workflow_jobs e2e "$preflight_dir/e2e-run.json" e2e_workflow_contexts 1
+
+    ruleset_restore_payload "$preflight_dir/integrity-live.json" > "$preflight_dir/integrity-restore.json"
+    classic_restore_payload "$preflight_dir/classic-live.json" > "$preflight_dir/classic-restore.json"
+    jq '{enabled, allowed_actions, sha_pinning_required}' "$preflight_dir/actions-live.json" > "$preflight_dir/actions-restore.json"
+    jq -n \
+        --arg repo "$repo" \
+        --arg live_main_sha "$(jq -r .sha "$preflight_dir/live-main.json")" \
+        --arg stage "$stage" \
+        --argjson integrity_ruleset_id "$integrity_id" \
+        --argjson test_run_id "$(jq -r .id "$preflight_dir/test-run.json")" \
+        --argjson nix_run_id "$(jq -r .id "$preflight_dir/nix-run.json")" \
+        --argjson e2e_run_id "$(jq -r .id "$preflight_dir/e2e-run.json")" \
+        '{schema: 1, repository: $repo, live_main_sha: $live_main_sha, stage: $stage,
+          integrity_ruleset_id: $integrity_ruleset_id,
+          proof_runs: {test: $test_run_id, nix: $nix_run_id, e2e_cache_free: $e2e_run_id}}' \
+        > "$preflight_dir/manifest.json"
+
+    preflight_dir="$previous_preflight"
+}
+
+verify_snapshot_unchanged() {
+    local verify_dir file
+    verify_dir="$(mktemp -d)"
+    capture_and_validate_live_state "$verify_dir"
+    for file in \
+        manifest.json \
+        repository-state.json \
+        rulesets-state.json \
+        integrity-live-normalized.json \
+        review-live-normalized.json \
+        owner-live-normalized.json \
+        classic-live-state.json \
+        actions-restore.json; do
+        if ! json_equal "$verify_dir/$file" "$recovery_dir/$file"; then
+            rm -rf "$verify_dir"
+            echo "FAIL: live safeguard/proof state changed after preflight and snapshot; no mutation was attempted." >&2
+            return 1
+        fi
+    done
+    rm -rf "$verify_dir"
+}
+
+restore_snapshot() {
+    local snapshot="$1" manifest_repo integrity_id failures=0 verify_dir
+    for file in manifest.json actions-restore.json integrity-restore.json classic-restore.json; do
+        [[ -f "$snapshot/$file" && ! -L "$snapshot/$file" ]] || {
+            echo "FAIL: recovery snapshot has a missing or unsafe $file: $snapshot" >&2
+            return 1
+        }
+    done
+    if ! jq -e '
+      .schema == 1
+      and (.repository | type == "string")
+      and (.live_main_sha | test("^[0-9a-f]{40}$"))
+      and (.stage == "legacy" or .stage == "stable")
+      and (.integrity_ruleset_id | type == "number")
+    ' "$snapshot/manifest.json" >/dev/null || \
+        ! jq -e '
+          .enabled == true
+          and .allowed_actions == "all"
+          and (.sha_pinning_required | type == "boolean")
+        ' "$snapshot/actions-restore.json" >/dev/null || \
+        ! jq -e '
+          .name == "Protect main: integrity"
+          and .target == "branch"
+          and .enforcement == "active"
+          and (.rules | type == "array")
+        ' "$snapshot/integrity-restore.json" >/dev/null || \
+        ! jq -e --argjson app_id "$github_actions_app_id" '
+          (.strict | type == "boolean")
+          and (.contexts | type == "array" and length > 0 and length == (unique | length))
+          and (.checks | type == "array")
+          and ((.contexts | sort) == (.checks | map(.context) | sort))
+          and all(.checks[]; .app_id == $app_id)
+        ' "$snapshot/classic-restore.json" >/dev/null; then
+        echo "FAIL: recovery snapshot schema or payload validation failed: $snapshot" >&2
+        return 1
+    fi
+    manifest_repo="$(jq -r .repository "$snapshot/manifest.json")"
+    [[ "$manifest_repo" == "$repo" ]] || {
+        echo "FAIL: recovery snapshot belongs to $manifest_repo, not $repo" >&2
+        return 1
+    }
+    integrity_id="$(jq -r .integrity_ruleset_id "$snapshot/manifest.json")"
+    echo "Restoring repository safeguards from $snapshot" >&2
+    set +e
+    gh_api_json_file PATCH "repos/$repo/branches/main/protection/required_status_checks" "$snapshot/classic-restore.json" >/dev/null || failures=1
+    gh_api_json_file PUT "repos/$repo/rulesets/$integrity_id" "$snapshot/integrity-restore.json" >/dev/null || failures=1
+    gh_api_json_file PUT "repos/$repo/actions/permissions" "$snapshot/actions-restore.json" >/dev/null || failures=1
+    set -e
+    if [[ "$failures" -ne 0 ]]; then
+        echo "FAIL: safeguard rollback was incomplete." >&2
+        echo "      Retry: $0 --restore '$snapshot' '$repo'" >&2
+        return 1
+    fi
+
+    verify_dir="$(mktemp -d)"
+    gh api "repos/$repo/actions/permissions" > "$verify_dir/actions.json"
+    gh api "repos/$repo/rulesets/$integrity_id" > "$verify_dir/integrity.json"
+    gh api "repos/$repo/branches/main/protection" > "$verify_dir/classic.json"
+    jq '{enabled, allowed_actions, sha_pinning_required}' "$verify_dir/actions.json" > "$verify_dir/actions-state.json"
+    normalize_ruleset "$verify_dir/integrity.json" > "$verify_dir/integrity-state.json"
+    normalize_ruleset "$snapshot/integrity-restore.json" > "$verify_dir/integrity-snapshot.json"
+    normalize_classic_state "$verify_dir/classic.json" > "$verify_dir/classic-state.json"
+    normalize_classic_state "$snapshot/classic-live.json" > "$verify_dir/classic-snapshot.json"
+    if ! json_equal "$verify_dir/actions-state.json" "$snapshot/actions-restore.json" || \
+        ! json_equal "$verify_dir/integrity-state.json" "$verify_dir/integrity-snapshot.json" || \
+        ! json_equal "$verify_dir/classic-state.json" "$verify_dir/classic-snapshot.json"; then
+        failures=1
+    fi
+    rm -rf "$verify_dir"
+    if [[ "$failures" -ne 0 ]]; then
+        echo "FAIL: rollback API calls returned success but readback differs from the snapshot." >&2
+        echo "      Retry: $0 --restore '$snapshot' '$repo'" >&2
+        return 1
+    fi
+    echo "Repository safeguard cutover resources restored and verified from $snapshot" >&2
+}
+
+handle_exit() {
+    local rc=$? rollback_rc=0
+    if [[ "$exit_handler_active" -eq 1 ]]; then
+        exit "$rc"
+    fi
+    exit_handler_active=1
+    trap - EXIT HUP INT TERM
+    if [[ "$transaction_active" -eq 1 && -n "$recovery_dir" ]]; then
+        echo "Safeguard apply failed after live mutation; attempting automatic rollback." >&2
+        restore_snapshot "$recovery_dir" || rollback_rc=$?
+        if [[ "$rollback_rc" -ne 0 ]]; then
+            echo "RECOVERY REQUIRED: $0 --restore '$recovery_dir' '$repo'" >&2
+        else
+            echo "The previous three-resource cutover state was restored. Snapshot retained: $recovery_dir" >&2
+        fi
+    fi
+    cleanup_preflight
+    exit "$rc"
+}
+
+trap handle_exit EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+if [[ -n "$restore_dir" ]]; then
+    restore_dir="$(cd "$restore_dir" 2>/dev/null && pwd -P)" || {
+        echo "FAIL: recovery snapshot directory does not exist." >&2
+        exit 2
+    }
+    restore_snapshot "$restore_dir"
+    transaction_active=0
+    echo "Repository safeguard cutover resources restored and verified."
     exit 0
 fi
 
-echo "Applying repository safeguards to $repo"
+for file in "$check_identities" "$integrity_ruleset" "$review_ruleset" "$owner_updates_ruleset"; do
+    [[ -f "$file" ]] || { echo "FAIL: missing safeguard source: $file" >&2; exit 3; }
+done
 
-gh_api PATCH "repos/$repo" \
-    -F allow_merge_commit=false \
-    -F allow_squash_merge=true \
-    -F allow_rebase_merge=false \
-    -F allow_auto_merge=false \
-    -F delete_branch_on_merge=true >/dev/null
-
-gh_api PUT "repos/$repo/actions/permissions" \
-    -F enabled=true \
-    -f allowed_actions=all \
-    -F sha_pinning_required=true >/dev/null
-
-upsert_ruleset "Protect main: integrity" "$integrity_ruleset"
-upsert_ruleset "Protect main: review" "$review_ruleset"
-upsert_ruleset "Protect main: owner updates" "$owner_updates_ruleset"
-
-gh_api_json PUT "repos/$repo/branches/main/protection" <<'JSON' >/dev/null
-{
-  "required_status_checks": {
-    "strict": true,
-    "contexts": [
-      "ubuntu",
-      "macos",
-      "windows",
-      "chezmoi-parity",
-      "chezmoi-parity-macos",
-      "chezmoi-parity-windows",
-      "nix flake check / linux",
-      "nix flake check / macos",
-      "e2e containers / linux",
-      "setup.sh / linux",
-      "setup.sh / macos",
-      "setup.ps1 / windows"
-    ]
-  },
-  "enforce_admins": true,
-  "required_pull_request_reviews": null,
-  "restrictions": null,
-  "required_linear_history": true,
-  "allow_force_pushes": false,
-  "allow_deletions": false,
-  "required_conversation_resolution": true
-}
-JSON
-
-try_gh_api "vulnerability alerts" \
-    gh_api PUT "repos/$repo/vulnerability-alerts" --silent
-try_gh_api "automated security fixes" \
-    gh_api PUT "repos/$repo/automated-security-fixes" --silent
-try_gh_api "secret scanning and push protection" \
-    gh_api_json PATCH "repos/$repo" <<'JSON'
-{
-  "security_and_analysis": {
-    "secret_scanning": {
-      "status": "enabled"
-    },
-    "secret_scanning_push_protection": {
-      "status": "enabled"
-    }
-  }
-}
-JSON
-
-repo_settings="$(gh api "repos/$repo" \
-    --jq '[.allow_merge_commit, .allow_squash_merge, .allow_rebase_merge, .allow_auto_merge, .delete_branch_on_merge] | @tsv')"
-IFS=$'\t' read -r merge_allowed squash_allowed rebase_allowed auto_merge_allowed delete_branch_on_merge <<<"$repo_settings"
-require_live_value "allow_merge_commit" "$merge_allowed" "false"
-require_live_value "allow_squash_merge" "$squash_allowed" "true"
-require_live_value "allow_rebase_merge" "$rebase_allowed" "false"
-require_live_value "allow_auto_merge" "$auto_merge_allowed" "false"
-require_live_value "delete_branch_on_merge" "$delete_branch_on_merge" "true"
-
-integrity_id="$(ruleset_id_by_name "Protect main: integrity")"
-review_id="$(ruleset_id_by_name "Protect main: review")"
-owner_updates_id="$(ruleset_id_by_name "Protect main: owner updates")"
-if [[ -z "$integrity_id" || -z "$review_id" || -z "$owner_updates_id" ]]; then
-    echo "FAIL: expected rulesets were not found after apply" >&2
-    exit 5
+preflight_dir="$(mktemp -d)"
+capture_and_validate_live_state "$preflight_dir"
+stage="$(cat "$preflight_dir/stage")"
+if [[ "$preflight_only" -eq 1 ]]; then
+    echo "Safeguard preflight passed for exact live main in '$stage' stage; no local snapshot or live state changed."
+    exit 0
 fi
 
-integrity_bypass_count="$(gh api "repos/$repo/rulesets/$integrity_id" --jq '.bypass_actors | length')"
-require_live_value "integrity bypass actor count" "$integrity_bypass_count" "0"
+if [[ "$stage" == "stable" ]]; then
+    echo "Repository safeguards already match the stable checked-in posture; no mutation was needed."
+    exit 0
+fi
 
-integrity_strict="$(gh api "repos/$repo/rulesets/$integrity_id" \
-    --jq '.rules[] | select(.type == "required_status_checks") | .parameters.strict_required_status_checks_policy')"
-require_live_value "integrity strict required-status policy" "$integrity_strict" "true"
+git_metadata_path="$(git -C "$repo_root" rev-parse --git-path dotfiles-safeguards)"
+case "$git_metadata_path" in
+    /*) ;;
+    *) git_metadata_path="$repo_root/$git_metadata_path" ;;
+esac
+mkdir -p "$git_metadata_path"
+chmod 700 "$git_metadata_path"
+recovery_dir="$(mktemp -d "$git_metadata_path/recovery.XXXXXX")"
+cp -R "$preflight_dir/." "$recovery_dir/"
+chmod -R go-rwx "$recovery_dir"
+printf '%s\n' \
+    "This directory is the pre-mutation recovery snapshot for $repo." \
+    "Restore with:" \
+    "$0 --restore '$recovery_dir' '$repo'" \
+    > "$recovery_dir/RECOVERY.txt"
+verify_snapshot_unchanged
 
-integrity_required_contexts="$(gh api "repos/$repo/rulesets/$integrity_id" \
-    --jq '.rules[] | select(.type == "required_status_checks") | .parameters.required_status_checks[].context')"
-verify_required_contexts "integrity ruleset" "$integrity_required_contexts"
+build_classic_payload required_check_contexts > "$preflight_dir/classic-desired.json"
+jq -n '{enabled: true, allowed_actions: "all", sha_pinning_required: true}' > "$preflight_dir/actions-desired.json"
 
-review_bypass="$(gh api "repos/$repo/rulesets/$review_id" \
-    --jq '.bypass_actors[] | "\(.actor_type):\(.actor_id):\(.bypass_mode)"')"
-require_live_value "review bypass actor" "$review_bypass" "User:139752288:pull_request"
+echo "Applying stable required-check and SHA-pinning safeguards to $repo"
+echo "Recovery snapshot: $recovery_dir"
+transaction_active=1
+gh_api_json_file PUT "repos/$repo/actions/permissions" "$preflight_dir/actions-desired.json" >/dev/null
+gh_api_json_file PUT "repos/$repo/rulesets/$(jq -r .integrity_ruleset_id "$preflight_dir/manifest.json")" "$integrity_ruleset" >/dev/null
+gh_api_json_file PATCH "repos/$repo/branches/main/protection/required_status_checks" "$preflight_dir/classic-desired.json" >/dev/null
 
-owner_updates_bypass="$(gh api "repos/$repo/rulesets/$owner_updates_id" \
-    --jq '.bypass_actors[] | "\(.actor_type):\(.actor_id):\(.bypass_mode)"')"
-require_live_value "owner-updates bypass actor" "$owner_updates_bypass" "User:139752288:pull_request"
+postflight_dir="$(mktemp -d)"
+capture_and_validate_live_state "$postflight_dir"
+if [[ "$(cat "$postflight_dir/stage")" != "stable" ]]; then
+    rm -rf "$postflight_dir"
+    echo "FAIL: post-apply readback did not reach the stable stage." >&2
+    exit 5
+fi
+rm -rf "$postflight_dir"
+transaction_active=0
 
-owner_updates_rule="$(gh api "repos/$repo/rulesets/$owner_updates_id" \
-    --jq '.rules[] | select(.type == "update") | (.parameters.update_allows_fetch_and_merge // false)')"
-require_live_value "owner-updates fetch-and-merge exception" "$owner_updates_rule" "false"
-
-classic_strict="$(gh api "repos/$repo/branches/main/protection/required_status_checks" --jq '.strict')"
-require_live_value "classic branch-protection strict required-status policy" "$classic_strict" "true"
-
-classic_required_contexts="$(gh api "repos/$repo/branches/main/protection/required_status_checks" --jq '.contexts[]')"
-verify_required_contexts "classic branch-protection fallback" "$classic_required_contexts"
-
-actions_sha_pinning="$(gh api "repos/$repo/actions/permissions" --jq '.sha_pinning_required')"
-require_live_value "Actions SHA pinning policy" "$actions_sha_pinning" "true"
-
-echo "Repository safeguards applied and verified. Re-run safely any time."
+echo "Repository safeguards applied and verified."
+echo "Pre-change recovery snapshot retained at: $recovery_dir"

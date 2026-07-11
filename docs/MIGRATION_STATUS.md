@@ -205,10 +205,14 @@ broken repo-symlink still cleaned) is covered by
       Legacy producer names remain emitted so the currently live legacy
       safeguards can gate this cutover PR. `.github/check-identities.json` and
       `docs/security/branch-protection.md` define the post-merge cache-free gate
-      and owner-applied live switch. The apply script itself refuses to mutate
-      unless its checkout is exact live main, safeguard sources are clean, and
-      every stable context succeeded on that SHA. UGR-020 remains PARTIAL until
-      that live apply and readback succeed.
+      and owner-applied live switch. The apply script now completes and repeats
+      a full read-only preflight before mutation: exact branch/repo/main and
+      clean sources, exact legacy live policy, unique rulesets, exact
+      GitHub-Actions app/workflow/event/run provenance, and cache-free E2E
+      evidence. It snapshots and transactionally restores the three cutover
+      resources on failure, with a tested explicit `--restore` retry. UGR-020
+      remains PARTIAL until the merged-main proof, live apply, and readback
+      succeed.
 - [x] Native Windows no longer derives LocalApplicationData or Documents from
       UserProfile. Setup/uninstall share one validated known-folder identity,
       apply separate UserProfile/LocalApplicationData/Documents chezmoi source

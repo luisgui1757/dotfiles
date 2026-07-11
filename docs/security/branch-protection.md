@@ -19,22 +19,53 @@ update `main`.
 
 ## Apply
 
-After changing `.github/rulesets/*.json`, run:
+This cutover is deliberately narrower than a general "make live look like the
+files" reconciler. After the merged-main proof below, run the complete no-write
+preflight first, then the owner-authorized apply:
 
 ```bash
+scripts/apply-repo-safeguards.sh --preflight-only luisgui1757/dotfiles
 scripts/apply-repo-safeguards.sh luisgui1757/dotfiles
 ```
 
-The script sets squash-only repository settings, keeps auto-merge disabled,
-upserts the three rulesets, keeps the classic branch protection fallback
-aligned, requires full-SHA external GitHub Actions references at the repository
-policy layer, and enables GitHub security alerts/security fixes where the plan
-supports them. Before its first mutation it requires the checkout HEAD to equal
-live `main`, requires the safeguard sources to be clean, and requires every
-stable context to have succeeded on that exact SHA. Use `--preflight-only` to
-exercise those checks without changing GitHub. If GitHub has duplicate rulesets
-with the same protected name, the script fails closed; delete the duplicate
-live ruleset before re-running it.
+Before its first mutation, the script completes one read-only preflight and a
+second concurrency readback. It requires all of the following:
+
+- local branch `main`, exact live-main HEAD, and an `origin` that resolves to
+  `github.com/luisgui1757/dotfiles`;
+- clean reviewed safeguard, workflow, and logical-proof sources;
+- exactly the three named active repository rulesets, with the review and
+  owner-update payloads already identical to the reviewed files;
+- integrity ruleset, classic protection, and Actions permissions in one
+  internally consistent legacy stage (first apply) or stable stage (idempotent
+  rerun), never a partial mix;
+- the reviewed squash-only merge and public security posture;
+- successful `test.yml` and `nix.yml` push/manual runs plus an
+  `e2e-install.yml` workflow-dispatch run on the exact live-main SHA;
+- every expected producer/logical job supplied by GitHub Actions app `15368`,
+  with every broad `actions/cache` step skipped in the E2E dispatch.
+
+Unexpected live drift, duplicate/missing rulesets, wrong repository/branch,
+wrong check app/run/event, cached E2E evidence, source changes, or concurrent
+preflight changes abort with zero live writes. The apply then changes only
+Actions SHA pinning, the integrity required-check set, and the classic required
+checks. Unchanged merge, review, owner-update, and security policy is verified,
+not rewritten.
+
+Immediately before mutation, the script stores the complete recovery material
+under `.git/dotfiles-safeguards/recovery.*` with private permissions. Any
+mutation or readback failure automatically restores all three changed resources
+and verifies the old stage. The snapshot remains available even after success.
+If automatic rollback cannot complete, use the exact path printed by the
+failure:
+
+```bash
+scripts/apply-repo-safeguards.sh --restore '/exact/snapshot/path' luisgui1757/dotfiles
+```
+
+Do not guess through unexpected drift or delete a duplicate blindly. Inspect the
+live discrepancy and recovery snapshot, correct it through an independently
+reviewed change, and rerun the no-write preflight.
 
 ## Context Renames
 
@@ -60,9 +91,12 @@ After this PR merges, use this exact sequence:
 1. Dispatch cache-free `e2e-install.yml` on the exact merged `main` SHA and
    require the four current producers plus all four stable setup logical checks
    to pass. Require the two stable Nix logical checks on that same merged SHA.
-2. Verify live GitHub still requires the legacy set before making any mutation.
-3. From that exact updated `main`, have the owner run the no-write preflight,
-   then apply the checked-in safeguards:
+2. From an exact clean local `main` whose `origin` is this repository, have the
+   owner run the no-write preflight. It independently verifies the legacy live
+   set, complete live posture, exact workflow/run/app provenance, and cache-free
+   E2E evidence before returning success.
+3. Apply the checked-in stable cutover. Retain the printed recovery snapshot
+   until independent readback/review is complete:
 
 ```bash
 scripts/apply-repo-safeguards.sh --preflight-only luisgui1757/dotfiles
@@ -70,8 +104,10 @@ scripts/apply-repo-safeguards.sh luisgui1757/dotfiles
 ```
 
 4. Verify both the integrity ruleset and classic fallback require the stable
-   logical set. Runner labels can then change without renaming a required
-   context. No live ruleset mutation is authorized from this PR.
+   logical set and Actions reports `sha_pinning_required:true`. Runner labels
+   can then change without renaming a required context. If readback fails, the
+   script restores the prior legacy stage automatically or prints the exact
+   `--restore` command. No live mutation is authorized from this PR itself.
 
 Exact repaired behavior head
 `e5cf3e23299cbb42a157c307f2a7259979fcada0` passed cache-free run

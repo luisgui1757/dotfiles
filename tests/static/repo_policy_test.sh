@@ -159,6 +159,14 @@ else:
     for snippet in expected_cache_snippets:
         if snippet not in e2e_install:
             fail(f"e2e-install.yml cache key/restore-key must include actions-cache-v{cache_major}: missing {snippet}")
+cache_contracts = re.findall(
+    r'- name: "PR-only cache: [^"]+"\n'
+    r"\s+uses: actions/cache@[0-9a-f]{40}\s+# v\d+(?:\.\d+)*\n"
+    r"\s+if: github\.event_name == 'pull_request'",
+    e2e_install,
+)
+if len(cache_contracts) != 2:
+    fail("every e2e actions/cache step must use a PR-only cache name and exact pull_request guard")
 
 script = pathlib.Path("scripts/apply-repo-safeguards.sh")
 mode = os.stat(script).st_mode
@@ -166,20 +174,29 @@ if not (mode & stat.S_IXUSR):
     fail("scripts/apply-repo-safeguards.sh must be executable")
 script_text = script.read_text(encoding="utf-8")
 for snippet in (
-    "-F allow_squash_merge=true",
-    "-F allow_rebase_merge=false",
-    "-F allow_auto_merge=false",
-    'upsert_ruleset "Protect main: integrity"',
-    'upsert_ruleset "Protect main: review"',
-    'upsert_ruleset "Protect main: owner updates"',
-    'require_live_value "integrity bypass actor count" "$integrity_bypass_count" "0"',
-    'require_live_value "review bypass actor" "$review_bypass" "User:139752288:pull_request"',
-    'require_live_value "owner-updates bypass actor" "$owner_updates_bypass" "User:139752288:pull_request"',
-    '-F sha_pinning_required=true',
-    'require_live_value "Actions SHA pinning policy" "$actions_sha_pinning" "true"',
+    "github_actions_app_id=15368",
+    "verify_local_boundary",
+    "verify_snapshot_unchanged",
+    "restore_snapshot()",
+    "transaction_active=1",
+    'select_workflow_run test.yml .github/workflows/test.yml',
+    'select_workflow_run nix.yml .github/workflows/nix.yml',
+    'select_workflow_run e2e-install.yml .github/workflows/e2e-install.yml',
+    'gh_api_json_file PUT "repos/$repo/actions/permissions"',
+    'gh_api_json_file PUT "repos/$repo/rulesets/',
+    'gh_api_json_file PATCH "repos/$repo/branches/main/protection/required_status_checks"',
+    "RECOVERY REQUIRED:",
 ):
     if snippet not in script_text:
         fail(f"apply-repo-safeguards.sh missing {snippet}")
+for forbidden in (
+    "upsert_ruleset",
+    "try_gh_api",
+    'gh_api PATCH "repos/$repo"',
+    'gh_api_json_file PUT "repos/$repo/branches/main/protection"',
+):
+    if forbidden in script_text:
+        fail(f"apply-repo-safeguards.sh retains unsafe broad mutation path: {forbidden}")
 
 install_deps = pathlib.Path("install-deps.ps1").read_text(encoding="utf-8")
 if "function Add-ScoopBucketSafe" not in install_deps:
