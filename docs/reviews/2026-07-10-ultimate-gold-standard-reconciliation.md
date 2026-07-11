@@ -1387,3 +1387,62 @@ recorded only after the repaired head is pushed and those events complete.
 | UGR-020 | PARTIAL | The repaired source head passed every legacy and stable check; marker identities and live unchanged policy were independently read back. | Independent re-review; after merge, exact merged-main cache-free proof followed by owner preflight/apply/readback. |
 | UGR-021 | PARTIAL | Exact-head hosted Ubuntu, Apple Silicon, Windows, container, Nix, generic/parity, and logical proof is green without relabeling ordinary caches as clean-install proof. | Merged-main cache-free proof plus real WSL, redirected-Windows, dual-Terminal, and desktop/TCC manual runs. |
 | UGR-022 | ACCEPTED/FIXED | The append-only ledger now records the actual repaired-head runs, dual identities, artifact scan, and unchanged live posture. | Append merged-main/live-apply evidence only after those events occur. |
+
+## Final PR #49 transaction-input hardening — entry 38
+
+- Independent review of immutable source head
+  `95dfe6efb7d94c9dae482a013e5bcd72f326b8e3` reproduced four additional
+  fail-closed defects despite all 18 hosted checks being green. Apply read the
+  integrity payload from the mutable checkout after its first live write;
+  restore accepted a full-classic snapshot missing a required nullable field;
+  the Probot ownership tests recognized only one multiline `branches:` spelling;
+  and a failed second capture leaked the first temporary directory. These are
+  accepted defects, not waived P3 observations.
+- Commit `0084620ead67c7d7fd1e1fcb98db93bafe5895ec` closes the complete class:
+  after the second capture, apply freezes check metadata, integrity, manifest,
+  classic, and Actions inputs from the exact committed tree in one private
+  read-only transaction directory, cross-validates the set, and gives every API
+  write only those files. Recovery requires every consumed full-classic key,
+  freezes all snapshot bytes, loads expected policy from the manifest's captured
+  commit only while it is still live `main`, and rejects moved/unavailable,
+  malformed, symlinked, altered-app, narrow/full, or cross-stage material before
+  any write. Capture directories are caller-owned and cleaned on every exit;
+  recovery snapshots are pruned on pre-mutation failure and retained once a
+  mutation may have occurred.
+- The Settings ownership guard now parses YAML with bounded Ruby/Psych input.
+  Block, inline-array, inline-map, null, direct-alias, and merge-alias top-level
+  `branches` fixtures all fail, while nested prose/data remains valid. The CI
+  jobs install Ruby explicitly. Logical-proof coverage now also pins run-ID,
+  attempt, executed-SHA, run-identity, and empty-context rejection. The unused
+  generic mutation helper is removed, and restore distinguishes readback failure
+  from a successful-but-different readback.
+- Implementation and verification ran only in a disposable exact-head clone.
+  The stale primary checkout, its three stashes, its untracked review files, and
+  live GitHub safeguards were not changed.
+
+### Local verification
+
+| Check | Exact result |
+|---|---|
+| `git diff --check` | PASS |
+| `bash -n` over repository `*.sh` | PASS: 136/136 |
+| Focused safeguard transaction suite | PASS: frozen apply inputs; complete classic schema; symlink/malformed/app-ID/narrow-full/moved-policy rejection; zero-write cleanup; restore/readback/rollback/retry/idempotency |
+| Semantic Settings YAML suite | PASS: all top-level block/inline/null/alias shapes rejected |
+| Logical-proof identity suite | PASS: source/executed SHA, run ID/attempt, context, schema, missing/duplicate, and emit-time validation |
+| `bash tests/static/run_all.sh` | PASS |
+| `bash tests/shell/run_all.sh` | PASS |
+| `make lint` | PASS |
+| `make test-migration` | PASS |
+| `pwsh -NoLogo -NoProfile -File ./test.ps1` | PASS: PSScriptAnalyzer clean; Pester 234 passed, 0 failed/skipped; Neovim entry point returned 0 |
+| `make validate-renovate` | PASS: official validator and exactly 82 reviewed records |
+| `bash tests/nix/run_all.sh` | PASS |
+| `nix flake check --print-build-logs` | PASS on Apple Silicon; incompatible Linux systems were omitted, not claimed as local runtime proof |
+| `make ci` | PASS: ended `local pre-PR gate passed` |
+
+### Finding status amendments
+
+| ID | Status after entry 38 | Exact evidence | Remaining work |
+|---|---|---|---|
+| UGR-020 | PARTIAL | The transaction, recovery schema, semantic Probot exclusion, and logical-proof regression gaps are repaired and locally green; the live transition remains staged only. | Push the exact repaired head, require all hosted checks and independent re-review, then after merge obtain exact merged-main cache-free proof before owner preflight/apply/readback. |
+| UGR-021 | PARTIAL | No local result is relabeled as WSL, redirected Windows, dual-Terminal, desktop/TCC, or merged-main cache-free evidence. | Complete the documented live/manual environments after merge. |
+| UGR-022 | ACCEPTED/FIXED | README, CLAUDE, ROADMAP, MIGRATION_STATUS, manual instructions, security runbooks, workflow dependencies, tests, and this append-only entry describe the repaired boundary. | Append exact pushed-head hosted/artifact/live-readback evidence only after it exists. |
