@@ -355,7 +355,14 @@ Commit-by-commit status:
   PARTIAL because merged-main run `29114125798` exposed the separate CMake LSP
   project-isolation defect now repaired on this branch, and because the manual
   environments remain outstanding. The checked-in stable-context cutover is in
-  this PR; owner live apply still waits for the repaired merged-main proof.
+  this PR. Repaired PR head
+  `4dbdb959674f5a062cffe44daae242318f4c1b67` passed generic/parity run
+  `29140112029`, Nix run `29140112035`, and cached E2E run `29140112030`: all
+  12 live-required contexts and all six stable logical contexts were green.
+  The six schema-2 artifacts bind that source head to the executed synthetic
+  merge commit and passed a separate leak scan. This is exact repaired-head
+  proof, not cache-free merged-main proof; owner live apply still waits for the
+  latter.
 
 - **Cache-free Ghostty artifact provenance — BRANCH-HEAD PROOF PASSED;
   MERGED-MAIN CONFIRMATION PENDING.** PR #48's first Ubuntu container job

@@ -1222,3 +1222,34 @@ merged-main greenfield proof.
 | UGR-020 | PARTIAL | Both implementation commits and every focused/local aggregate gate passed; live policy remains unchanged and legacy producers still gate the PR. | Independent review and exact-head hosted workflows; after merge, exact merged-main cache-free proof followed by owner preflight/apply/readback. |
 | UGR-021 | PARTIAL | No cache or environment result was relabeled: branch-head cache-free proof remains recorded, while this repair received local behavioral proof only. | Exact repaired-head hosted proof, merged-main cache-free proof, and the documented real WSL/redirected-Windows/dual-Terminal/desktop manual runs. |
 | UGR-022 | ACCEPTED/FIXED | All behavior, runbook, recovery, security, roadmap, migration, manual, and reconciliation descriptions match the repaired implementation and measured local results. | Append exact repaired-head and post-merge live results only after they occur. |
+
+## PR #49 repaired-head hosted proof — entry 33
+
+- Exact source head `4dbdb959674f5a062cffe44daae242318f4c1b67`
+  passed all 18 emitted checks. The six generic/parity checks passed in
+  [`29140112029`](https://github.com/luisgui1757/dotfiles/actions/runs/29140112029),
+  both legacy Nix producers and both stable Nix checks passed in
+  [`29140112035`](https://github.com/luisgui1757/dotfiles/actions/runs/29140112035),
+  and all four E2E producers plus four stable setup checks passed in
+  [`29140112030`](https://github.com/luisgui1757/dotfiles/actions/runs/29140112030).
+  Every check-run was emitted by GitHub Actions app `15368`.
+- All six downloaded logical markers use schema 2. They record
+  `source_head_sha=4dbdb959674f5a062cffe44daae242318f4c1b67` and
+  `executed_sha=0397ad36194e86c91b3a3aace5f0028885c03e7e`. The executed
+  commit's two parents are exact base
+  `f104bf066e4af7d4d707fe22ba36600711f1ae14` and that exact source head.
+  Consumers in the same runs verified both identities, run ID/attempt, and the
+  matching legacy/logical context pair.
+- Gitleaks 8.30.1 found no leak in the downloaded Nix or E2E proof artifacts.
+  The PR E2E cache steps ran normally; this result is intentionally not called
+  cache-free proof. Live integrity/classic safeguards remain on the 12 legacy
+  contexts, Actions SHA pinning remains false, and no implementation or test
+  command mutated those live settings.
+
+### Finding status amendments
+
+| ID | Status after entry 33 | Exact evidence | Remaining work |
+|---|---|---|---|
+| UGR-020 | PARTIAL | The repaired implementation head passed all 12 live-required and all six stable checks, and its schema-2 artifacts prove source/executed identity truthfully. | Independent re-review; after merge, exact merged-main cache-free/provenance proof followed by owner preflight/apply/readback. |
+| UGR-021 | PARTIAL | Exact repaired-head Ubuntu, Apple Silicon, Windows, container, generic/parity, Nix, and stable logical proof is green. The run used ordinary PR caches and therefore does not satisfy the merged-main cache-free gate. | Merged-main cache-free proof plus the documented real WSL, redirected-Windows, dual-Terminal, and desktop/TCC manual runs. |
+| UGR-022 | ACCEPTED/FIXED | ROADMAP, MIGRATION_STATUS, the PR body, and this append-only ledger now record the repaired-head hosted result without promoting it to cache-free or post-merge proof. | Append merged-main/live-apply evidence only after those events occur. |

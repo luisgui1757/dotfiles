@@ -212,7 +212,12 @@ broken repo-symlink still cleaned) is covered by
       evidence. It snapshots and transactionally restores the three cutover
       resources on failure, with a tested explicit `--restore` retry. UGR-020
       remains PARTIAL until the merged-main proof, live apply, and readback
-      succeed.
+      succeed. Repaired PR head
+      `4dbdb959674f5a062cffe44daae242318f4c1b67` passed all 12 legacy-required
+      and six stable logical contexts in runs `29140112029`, `29140112035`, and
+      `29140112030`; all six downloaded schema-2 markers bound that source head
+      to the executed synthetic merge SHA. The PR E2E run used ordinary PR
+      caches, so it is not promoted to the pending merged-main cache-free gate.
 - [x] Native Windows no longer derives LocalApplicationData or Documents from
       UserProfile. Setup/uninstall share one validated known-folder identity,
       apply separate UserProfile/LocalApplicationData/Documents chezmoi source
