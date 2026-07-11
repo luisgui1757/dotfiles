@@ -1355,3 +1355,35 @@ merged-main greenfield proof.
 
 Hosted exact-head checks, logical marker downloads, and final live readback are
 recorded only after the repaired head is pushed and those events complete.
+
+## Repaired-head hosted proof and live readback — entry 37
+
+- Exact source head `dc13b7b81b45e0c6de8008e17fc890742391b882`
+  passed all 18 emitted checks. Generic/parity passed in
+  [`29149010795`](https://github.com/luisgui1757/dotfiles/actions/runs/29149010795),
+  both Nix producers and both stable Nix checks passed in
+  [`29149010866`](https://github.com/luisgui1757/dotfiles/actions/runs/29149010866),
+  and all four E2E producers plus all four stable setup checks passed in
+  [`29149010801`](https://github.com/luisgui1757/dotfiles/actions/runs/29149010801).
+  Every check-run was emitted by GitHub Actions app `15368`.
+- All six downloaded markers passed the checked-in schema-2 verifier. They bind
+  `source_head_sha=dc13b7b81b45e0c6de8008e17fc890742391b882`
+  to `executed_sha=763f810a8eb20879f9dd4edf776eb95a258b9a44`,
+  with exact run ID/attempt and legacy/logical pair. The executed commit is the
+  live `refs/pull/49/merge`; its parents are exact base
+  `f104bf066e4af7d4d707fe22ba36600711f1ae14` and that exact source head.
+  Gitleaks found no secret in the six artifacts.
+- Final read-only live inspection still reports a public repository, the exact
+  12 legacy required contexts with GitHub Actions identity `15368` in both the
+  integrity ruleset and classic fallback, strict classic checks, no integrity
+  bypass, and `sha_pinning_required:false`. No test, push, workflow, or PR-body
+  operation applied the staged cutover. The E2E PR run used ordinary caches and
+  is not the pending merged-main cache-free proof.
+
+### Finding status amendments
+
+| ID | Status after entry 37 | Exact evidence | Remaining work |
+|---|---|---|---|
+| UGR-020 | PARTIAL | The repaired source head passed every legacy and stable check; marker identities and live unchanged policy were independently read back. | Independent re-review; after merge, exact merged-main cache-free proof followed by owner preflight/apply/readback. |
+| UGR-021 | PARTIAL | Exact-head hosted Ubuntu, Apple Silicon, Windows, container, Nix, generic/parity, and logical proof is green without relabeling ordinary caches as clean-install proof. | Merged-main cache-free proof plus real WSL, redirected-Windows, dual-Terminal, and desktop/TCC manual runs. |
+| UGR-022 | ACCEPTED/FIXED | The append-only ledger now records the actual repaired-head runs, dual identities, artifact scan, and unchanged live posture. | Append merged-main/live-apply evidence only after those events occur. |
