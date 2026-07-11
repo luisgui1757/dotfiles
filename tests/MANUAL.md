@@ -232,8 +232,9 @@ significant change to the relevant area.
       it must identify that exact cache-free E2E dispatch, the Nix/test run
       provenance, GitHub Actions app `15368`, and the exact legacy live posture.
       Retain the apply command's `.git/dotfiles-safeguards/recovery.*` snapshot
-      until the stable-context/SHA-policy readback has been independently
-      reviewed.
+      after mutation begins until the stable-context/SHA-policy readback has
+      been independently reviewed. A pre-mutation failure must leave neither
+      that recovery directory nor any temporary capture behind.
 - [ ] **Home Manager (Linux/WSL)**: with Nix installed inside the Linux/WSL
       environment, run
       `./setup.sh --all` (or the compatibility alias `./setup.sh --home-manager`;

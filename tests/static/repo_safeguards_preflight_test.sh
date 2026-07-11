@@ -252,11 +252,25 @@ if [[ "$method" != "GET" ]]; then
         mv "$TEST_MUTATE_SNAPSHOT_AFTER_FIRST_WRITE/integrity-restore.tmp" \
             "$TEST_MUTATE_SNAPSHOT_AFTER_FIRST_WRITE/integrity-restore.json"
     fi
+    if [[ -n "${TEST_MUTATE_APPLY_SOURCE_AFTER_FIRST_WRITE:-}" && ! -e "$state/apply-source-mutated" ]]; then
+        : > "$state/apply-source-mutated"
+        jq '
+          (.rules[] | select(.type == "required_status_checks") |
+            .parameters.required_status_checks) =
+          [{context: "unreviewed-after-validation", integration_id: 15368}]
+        ' "$TEST_MUTATE_APPLY_SOURCE_AFTER_FIRST_WRITE" \
+            > "$TEST_MUTATE_APPLY_SOURCE_AFTER_FIRST_WRITE.tmp"
+        mv "$TEST_MUTATE_APPLY_SOURCE_AFTER_FIRST_WRITE.tmp" \
+            "$TEST_MUTATE_APPLY_SOURCE_AFTER_FIRST_WRITE"
+    fi
     case "$path" in
         repos/owner/repo/actions/permissions)
             cp "$input" "$state/actions.json"
             ;;
         repos/owner/repo/rulesets/101)
+            if [[ -n "${TEST_CAPTURE_INTEGRITY_INPUT:-}" && ! -e "$TEST_CAPTURE_INTEGRITY_INPUT" ]]; then
+                cp "$input" "$TEST_CAPTURE_INTEGRITY_INPUT"
+            fi
             cp "$input" "$state/integrity.json"
             ;;
         repos/owner/repo/branches/main/protection/required_status_checks)
@@ -424,6 +438,55 @@ TEST_MUTATE_BEFORE_SECOND_CAPTURE=1 \
 [[ ! -s "$mutation_log" ]] || { echo "FAIL: concurrent preflight change was detected after mutation" >&2; exit 1; }
 echo "ok  : second full read detects concurrent live change before mutation"
 
+state="$(new_case_state failed-second-capture-cleanup)"
+: > "$mutation_log"
+capture_tmp="$WORK/capture-tmp"
+mkdir -p "$capture_tmp"
+saved_tmpdir="${TMPDIR-}"
+export TMPDIR="$capture_tmp"
+TEST_PRIVATE_BEFORE_SECOND_CAPTURE=1 \
+    expect_failure "public-repo posture" \
+    run_safeguards "$state" "$mutation_log"
+if [[ -n "$saved_tmpdir" ]]; then
+    export TMPDIR="$saved_tmpdir"
+else
+    unset TMPDIR
+fi
+[[ ! -s "$mutation_log" ]] || {
+    echo "FAIL: failed second capture mutated live state" >&2
+    exit 1
+}
+[[ -z "$(find "$capture_tmp" -mindepth 1 -maxdepth 1 -print -quit)" ]] || {
+    echo "FAIL: failed second capture leaked a temporary directory" >&2
+    find "$capture_tmp" -mindepth 1 -maxdepth 1 -print >&2
+    exit 1
+}
+[[ -z "$(find "$fixture/.git/dotfiles-safeguards" -mindepth 1 -maxdepth 1 -type d -print -quit 2>/dev/null)" ]] || {
+    echo "FAIL: pre-mutation failure retained an orphan recovery snapshot" >&2
+    exit 1
+}
+echo "ok  : failed second capture cleans temporary and pre-mutation recovery state"
+
+state="$(new_case_state frozen-apply-source)"
+: > "$mutation_log"
+cp "$fixture/.github/rulesets/main-integrity.json" "$WORK/integrity-source.backup"
+TEST_MUTATE_APPLY_SOURCE_AFTER_FIRST_WRITE="$fixture/.github/rulesets/main-integrity.json" \
+TEST_CAPTURE_INTEGRITY_INPUT="$WORK/published-integrity.json" \
+    expect_failure "reviewed safeguard/proof sources differ from exact live main" \
+    run_safeguards "$state" "$mutation_log"
+cp "$WORK/integrity-source.backup" "$fixture/.github/rulesets/main-integrity.json"
+jq -e '
+  [.rules[] | select(.type == "required_status_checks") |
+    .parameters.required_status_checks[].context] == $stable
+' --argjson stable "$stable_contexts_json" "$WORK/published-integrity.json" >/dev/null
+jq -e '.sha_pinning_required == false' "$state/actions.json" >/dev/null
+jq -e '
+  [.rules[] | select(.type == "required_status_checks") |
+    .parameters.required_status_checks[].context] == $legacy
+' --argjson legacy "$legacy_contexts_json" "$state/integrity.json" >/dev/null
+rm -rf "$fixture/.git/dotfiles-safeguards"
+echo "ok  : apply publishes only frozen committed integrity bytes after validation"
+
 state="$(new_case_state apply)"
 : > "$mutation_log"
 output="$(run_safeguards "$state" "$mutation_log")"
@@ -447,12 +510,72 @@ jq -e '
   and .lock_branch.enabled == false
   and .allow_fork_syncing.enabled == false
 ' "$state/classic.json" >/dev/null
-snapshot="$(find "$fixture/.git/dotfiles-safeguards" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+snapshot="$(awk -F': ' '/^Recovery snapshot:/ { print $2 }' <<<"$output")"
 [[ -f "$snapshot/manifest.json" && -f "$snapshot/RECOVERY.txt" ]] || {
     echo "FAIL: apply did not retain a complete recovery snapshot" >&2
     exit 1
 }
 echo "ok  : apply snapshots then mutates only the three reviewed cutover resources"
+
+for missing_classic_key in \
+    required_status_checks \
+    enforce_admins \
+    required_pull_request_reviews \
+    restrictions \
+    required_linear_history \
+    allow_force_pushes \
+    allow_deletions \
+    required_conversation_resolution \
+    required_signatures \
+    block_creations \
+    lock_branch \
+    allow_fork_syncing; do
+    incomplete_classic_snapshot="$WORK/incomplete-classic-${missing_classic_key}-snapshot"
+    cp -R "$snapshot" "$incomplete_classic_snapshot"
+    jq --arg key "$missing_classic_key" 'del(.[$key])' \
+        "$incomplete_classic_snapshot/classic-live.json" \
+        > "$incomplete_classic_snapshot/classic-live.tmp"
+    mv "$incomplete_classic_snapshot/classic-live.tmp" \
+        "$incomplete_classic_snapshot/classic-live.json"
+    expect_restore_rejected_without_mutation \
+        "schema or payload validation failed" "$state" "$incomplete_classic_snapshot"
+done
+
+symlink_snapshot="$WORK/symlink-snapshot"
+cp -R "$snapshot" "$symlink_snapshot"
+rm "$symlink_snapshot/actions-restore.json"
+ln -s "$snapshot/actions-restore.json" "$symlink_snapshot/actions-restore.json"
+expect_restore_rejected_without_mutation \
+    "missing or unsafe actions-restore.json" "$state" "$symlink_snapshot"
+
+altered_integration_snapshot="$WORK/altered-integration-snapshot"
+cp -R "$snapshot" "$altered_integration_snapshot"
+jq '
+  (.rules[] | select(.type == "required_status_checks") |
+    .parameters.required_status_checks[0].integration_id) = 999
+' "$altered_integration_snapshot/integrity-restore.json" \
+    > "$altered_integration_snapshot/integrity-restore.tmp"
+mv "$altered_integration_snapshot/integrity-restore.tmp" \
+    "$altered_integration_snapshot/integrity-restore.json"
+expect_restore_rejected_without_mutation \
+    "policy does not match manifest stage" "$state" "$altered_integration_snapshot"
+
+narrow_mismatch_snapshot="$WORK/narrow-mismatch-snapshot"
+cp -R "$snapshot" "$narrow_mismatch_snapshot"
+jq 'del(.contexts[-1], .checks[-1])' \
+    "$narrow_mismatch_snapshot/classic-restore.json" \
+    > "$narrow_mismatch_snapshot/classic-restore.tmp"
+mv "$narrow_mismatch_snapshot/classic-restore.tmp" \
+    "$narrow_mismatch_snapshot/classic-restore.json"
+expect_restore_rejected_without_mutation \
+    "policy does not match manifest stage" "$state" "$narrow_mismatch_snapshot"
+
+malformed_snapshot="$WORK/malformed-snapshot"
+cp -R "$snapshot" "$malformed_snapshot"
+printf '{malformed\n' > "$malformed_snapshot/actions-restore.json"
+expect_restore_rejected_without_mutation \
+    "schema or payload validation failed" "$state" "$malformed_snapshot"
+echo "ok  : every consumed classic key and adversarial recovery shape fails before mutation"
 
 altered_context_snapshot="$WORK/altered-context-snapshot"
 cp -R "$snapshot" "$altered_context_snapshot"
@@ -534,6 +657,25 @@ jq '.integrity_ruleset_id = 102' "$altered_id_snapshot/manifest.json" \
 mv "$altered_id_snapshot/manifest.tmp" "$altered_id_snapshot/manifest.json"
 expect_restore_rejected_without_mutation \
     "integrity ruleset ID does not match" "$state" "$altered_id_snapshot"
+
+unavailable_policy_snapshot="$WORK/unavailable-policy-snapshot"
+cp -R "$snapshot" "$unavailable_policy_snapshot"
+jq '.live_main_sha = "ffffffffffffffffffffffffffffffffffffffff"' \
+    "$unavailable_policy_snapshot/manifest.json" \
+    > "$unavailable_policy_snapshot/manifest.tmp"
+mv "$unavailable_policy_snapshot/manifest.tmp" \
+    "$unavailable_policy_snapshot/manifest.json"
+expect_restore_rejected_without_mutation \
+    "policy commit does not match current live main" "$state" "$unavailable_policy_snapshot"
+unavailable_policy_state="$(new_case_state unavailable-policy-commit)"
+jq '.sha = "ffffffffffffffffffffffffffffffffffffffff"' \
+    "$unavailable_policy_state/live-main.json" \
+    > "$unavailable_policy_state/live-main.tmp"
+mv "$unavailable_policy_state/live-main.tmp" \
+    "$unavailable_policy_state/live-main.json"
+expect_restore_rejected_without_mutation \
+    "committed policy source is unavailable" \
+    "$unavailable_policy_state" "$unavailable_policy_snapshot"
 echo "ok  : incomplete, altered, and cross-stage recovery snapshots fail before mutation"
 
 private_state="$(new_case_state private-repository)"
@@ -601,7 +743,7 @@ output="$(TEST_FAIL_READ_AFTER_MUTATION_PATH='repos/owner/repo/actions/permissio
 rc=$?
 set -e
 [[ "$rc" -ne 0 ]] || { echo "FAIL: injected restore readback failure succeeded" >&2; exit 1; }
-grep -F "readback differs from the snapshot" <<<"$output" >/dev/null
+grep -F "verification readback failed" <<<"$output" >/dev/null
 grep -F "Retry:" <<<"$output" >/dev/null
 [[ "$(wc -l < "$mutation_log" | tr -d ' ')" == "3" ]] || {
     echo "FAIL: restore readback failure did not occur after exactly three writes" >&2

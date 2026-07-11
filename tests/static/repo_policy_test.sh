@@ -4,6 +4,12 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 cd "$REPO_ROOT"
 
+command -v ruby >/dev/null 2>&1 || {
+    echo "FAIL: ruby is required for semantic .github/settings.yml policy checks" >&2
+    exit 1
+}
+ruby tests/static/assert_no_probot_branches.rb .github/settings.yml
+
 python3 - <<'PY'
 import json
 import os
@@ -130,9 +136,6 @@ for snippet in (
 ):
     if snippet not in settings:
         fail(f".github/settings.yml missing {snippet}")
-if re.search(r"(?m)^branches:\s*$", settings):
-    fail(".github/settings.yml must not let Probot race the transactional branch-protection cutover")
-
 for workflow in pathlib.Path(".github/workflows").glob("*.yml"):
     text = workflow.read_text(encoding="utf-8")
     if "pull_request_target:" in text:
@@ -184,17 +187,19 @@ for snippet in (
     '.visibility == "public"',
     "classic-live.json",
     'frozen="$(mktemp -d)"',
+    "prepare_transaction_payloads",
     '"$frozen/integrity-restore.json"',
     '"$frozen/classic-restore.json"',
     '"$frozen/actions-restore.json"',
     "policy does not match manifest stage",
     "transaction_active=1",
-    'select_workflow_run test.yml .github/workflows/test.yml',
-    'select_workflow_run nix.yml .github/workflows/nix.yml',
-    'select_workflow_run e2e-install.yml .github/workflows/e2e-install.yml',
-    'gh_api_json_file PUT "repos/$repo/actions/permissions"',
+    'select_workflow_run "$capture_dir" test.yml .github/workflows/test.yml',
+    'select_workflow_run "$capture_dir" nix.yml .github/workflows/nix.yml',
+    'select_workflow_run "$capture_dir" e2e-install.yml .github/workflows/e2e-install.yml',
+    'gh_api_json_file PUT "repos/$repo/actions/permissions" "$transaction_dir/actions-desired.json"',
     'gh_api_json_file PUT "repos/$repo/rulesets/',
-    'gh_api_json_file PATCH "repos/$repo/branches/main/protection/required_status_checks"',
+    '"$transaction_dir/integrity-desired.json"',
+    'gh_api_json_file PATCH "repos/$repo/branches/main/protection/required_status_checks" "$transaction_dir/classic-desired.json"',
     "RECOVERY REQUIRED:",
 ):
     if snippet not in script_text:
@@ -207,6 +212,7 @@ for forbidden in (
     'gh_api_json_file PUT "repos/$repo/rulesets/$integrity_id" "$snapshot/',
     'gh_api_json_file PATCH "repos/$repo/branches/main/protection/required_status_checks" "$snapshot/',
     'gh_api_json_file PUT "repos/$repo/actions/permissions" "$snapshot/',
+    'gh_api_json_file PUT "repos/$repo/rulesets/$(jq -r .integrity_ruleset_id "$preflight_dir/manifest.json")" "$integrity_ruleset"',
 ):
     if forbidden in script_text:
         fail(f"apply-repo-safeguards.sh retains unsafe broad mutation path: {forbidden}")

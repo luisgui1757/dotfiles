@@ -284,11 +284,17 @@ Commit-by-commit status:
   policy, public visibility, GitHub-Actions app/workflow/event/run provenance,
   and cache-free E2E proof. It snapshots and rolls back the three changed
   resources on failure and retains a tested explicit recovery path. Recovery
-  freezes every consumed snapshot file, rejects incomplete, altered,
-  cross-stage, wrong-ruleset, bypass/condition, and full-classic-policy drift
-  before any write, and publishes only the validated frozen bytes. Probot
-  Settings now owns repository-level settings only; omitting its `branches`
-  key prevents a default-branch sync from racing the owner-run cutover.
+  freezes every consumed snapshot file, requires the complete classic shape,
+  rejects incomplete, altered, cross-stage, wrong-ruleset, bypass/condition, and
+  full-classic-policy drift before any write, and publishes only the validated
+  frozen bytes against policy from the manifest's still-live captured commit.
+  Apply separately freezes every desired write from exact
+  committed objects after the second capture, so a later checkout mutation
+  cannot change publication. Capture directories clean on every exit and
+  pre-mutation recovery snapshots are pruned. Probot Settings now owns
+  repository-level settings only; a semantic YAML guard—not a presentation-
+  specific regex—proves that every top-level `branches` form is absent and
+  prevents a default-branch sync from racing the owner-run cutover.
   UGR-021 is PARTIAL until real WSL, redirected-Windows, cache-free scheduled or
   manual, and desktop runs exist. Historical Intel and current conventional
   Windows font-consumption lanes passed. The first PR run exposed and fixed two

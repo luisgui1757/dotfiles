@@ -214,10 +214,16 @@ broken repo-symlink still cleaned) is covered by
       public visibility, clean sources, exact legacy live policy, unique
       rulesets, exact GitHub-Actions app/workflow/event/run provenance, and
       cache-free E2E evidence. It snapshots and transactionally restores the
-      three cutover resources on failure. Restore freezes every consumed file,
-      validates exact manifest-stage Actions/integrity/classic policy and live
-      ruleset identity, and rejects incomplete, altered, or cross-stage recovery
-      material before writing, with a tested explicit `--restore` retry. UGR-020
+      three cutover resources on failure. After the second capture, apply freezes
+      every desired payload from exact committed objects and publishes only that
+      private read-only set. Restore freezes every consumed file, requires every
+      full-classic field, validates exact manifest-stage
+      Actions/integrity/classic policy and live ruleset identity, and rejects
+      incomplete, altered, or cross-stage recovery material before writing, with
+      expected policy loaded from the manifest's still-live captured commit and
+      a tested explicit `--restore` retry. Temporary captures clean up on every
+      exit, pre-mutation snapshots are pruned, and semantic YAML tests prevent
+      any top-level Probot `branches` shape. UGR-020
       remains PARTIAL until the merged-main proof, live apply, and readback
       succeed. Repaired PR head
       `4dbdb959674f5a062cffe44daae242318f4c1b67` passed all 12 legacy-required

@@ -57,7 +57,7 @@ jobs:
           sudo apt-get update
           # clangd is a test runtime dependency: clangd_projects_spec.lua starts
           # two real clients and deliberately refuses static/mock proof.
-          sudo apt-get install -y ca-certificates clangd curl shellcheck tmux zsh python3-pip unzip
+          sudo apt-get install -y ca-certificates clangd curl ruby shellcheck tmux zsh python3-pip unzip
           curl -fsSL "https://github.com/starship/starship/releases/download/${STARSHIP_VERSION}/starship-x86_64-unknown-linux-gnu.tar.gz" -o /tmp/starship.tar.gz
           printf '%s  %s\n' "$STARSHIP_LINUX_X86_64_SHA256" /tmp/starship.tar.gz | sha256sum -c -
           sudo tar -xzf /tmp/starship.tar.gz -C /usr/local/bin starship
@@ -155,7 +155,8 @@ jobs:
       - name: Install deps
         run: |
           set -euxo pipefail
-          brew install shellcheck neovim tmux starship tree-sitter-cli taplo hyperfine yamllint editorconfig-checker
+          brew install ruby shellcheck neovim tmux starship tree-sitter-cli taplo hyperfine yamllint editorconfig-checker
+          echo "$(brew --prefix ruby)/bin" >> "$GITHUB_PATH"
       - name: Make test (full matrix)
         run: |
           set -euo pipefail

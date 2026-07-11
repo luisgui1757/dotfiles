@@ -632,8 +632,9 @@ schema validation and the `chezmoi-parity` migration gate. Warnings are treated
 as failures where the tools expose them cleanly: shellcheck exits nonzero,
 PSScriptAnalyzer scans the meaningful `.ps1` surface and fails on errors, exact
 group-count drift, or any change to the normalized
-script/rule/message/extent fingerprint in `test.ps1`; yamllint/parser checks are part of
-`make test-static`, `scripts/validate-renovate.sh` fails when `npx` is missing
+script/rule/message/extent fingerprint in `test.ps1`; yamllint plus the
+Ruby/Psych semantic Settings policy are part of `make test-static`,
+`scripts/validate-renovate.sh` fails when `npx` is missing
 under `CI=true`, and Windows CI treats missing test dependencies as fatal.
 PSGallery module installs in Windows CI use bounded retries for transient
 gallery lookup failures; the final miss still fails the job.
@@ -766,7 +767,8 @@ transactional script by applying classic branch-protection changes when a
 cutover commit reaches the default branch. The script owns both the integrity
 ruleset and classic fallback required-check transition because Probot cannot
 model the required split where owner bypass applies to review/update rules but
-not CI.
+not CI. Enforce that absence by parsing YAML and rejecting the top-level
+`branches` key in every semantic form; a line regex is not a policy boundary.
 
 - `Protect main: integrity` has no bypass actors. It requires pull requests,
   strict required checks, current `main`, squash-only merges, linear history, no
@@ -795,10 +797,17 @@ and classic required checks, and keeps a verified recovery snapshot. Both
 preflight captures require public repository visibility. Recovery must freeze
 all consumed snapshot files before validation, bind their exact legacy/stable
 contexts, app IDs, ruleset identity, bypass/branch policy, Actions pinning, and
-full classic state to the manifest, then write and verify only those frozen
-bytes. Missing, altered, or cross-stage recovery material must fail before
-mutation, and changes to the retained source after freezing must not influence
-publication. Follow the commands and `--restore` recovery path in
+complete classic state—including required nullable keys—to the manifest, then
+write and verify only those frozen bytes. Expected recovery policy comes from
+the manifest's exact captured Git commit, never the current worktree, and that
+commit must still be live `main`. After the second live capture, apply
+must also rebuild every desired write and its metadata from exact committed
+objects in one private read-only transaction directory; no later write may read
+the mutable checkout. Missing, altered, or cross-stage recovery material must
+fail before mutation. Every temporary capture is caller-owned and cleaned on
+all exits; a persistent recovery snapshot is pruned on pre-mutation failure and
+retained once mutation begins or apply succeeds. Follow the commands and
+`--restore` recovery path in
 `docs/security/branch-protection.md`.
 Do not recreate a hosted WSL2 canary or claim Linux proxy coverage as WSL
 runtime proof.

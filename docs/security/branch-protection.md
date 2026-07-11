@@ -53,7 +53,8 @@ wrong check app/run/event, cached E2E evidence, source changes, or concurrent
 preflight changes abort with zero live writes. The apply then changes only
 Actions SHA pinning, the integrity required-check set, and the classic required
 checks. Unchanged merge, review, owner-update, and security policy is verified,
-not rewritten.
+not rewritten. Every capture directory is caller-owned and removed on success,
+failure, or interruption; a failed second capture cannot hide the first.
 
 The Probot Settings app synchronizes `.github/settings.yml` after changes reach
 the default branch. Its upstream implementation processes branch settings only
@@ -62,6 +63,9 @@ when a `branches` key is present ([reviewed source at
 This repository deliberately omits that key. Otherwise the app could apply the
 future classic contexts immediately after merge, before the owner-run ruleset
 transaction, leaving a mixed stage that the fail-closed preflight would reject.
+The guard parses YAML and rejects a top-level `branches` key even when it is an
+inline array/map, `null`, or an alias. Regex matching of one presentation is not
+considered proof that Probot lacks branch ownership.
 
 Immediately before mutation, the script stores the complete recovery material
 under `.git/dotfiles-safeguards/recovery.*` with private permissions. Any
@@ -70,13 +74,24 @@ and verifies the old stage. Before any restore write, it requires every consumed
 snapshot file, copies those bytes into a private temporary directory, and
 validates the frozen set against the manifest's exact legacy/stable stage:
 Actions pinning, integrity contexts and app IDs, unique live ruleset identity,
-bypass actors, branch conditions, full classic policy, and the narrow classic
-restore payload. Missing, malformed, altered, cross-stage, wrong-target, or
+bypass actors, branch conditions, every consumed full-classic key (including
+explicit nullable review/restriction fields), and the narrow classic restore
+payload. Missing, malformed, incomplete, altered, cross-stage, wrong-target, or
 internally inconsistent source bytes fail with zero writes; changes to the
-retained source after freezing cannot affect publication. Restore publishes and
-verifies only the frozen validated bytes. The original snapshot remains
-available even after success. If automatic rollback cannot complete, use the
-exact path printed by the failure:
+retained source after freezing cannot affect publication. The expected
+legacy/stable policy is loaded from the manifest's exact captured Git commit;
+that commit must still be live `main`, and a moved or unavailable commit fails
+before mutation. Restore publishes and verifies only the frozen validated bytes.
+
+Apply has the same publication boundary. After the second live capture, it reads
+the check metadata and integrity source from exact committed Git objects, checks
+the worktree still matches, derives the classic and Actions payloads, validates
+the manifest and all cross-file identities, then makes the transaction directory
+read-only. All three API writes consume only those files; no post-validation
+write reads a checkout path. A snapshot created before that boundary is deleted
+if apply aborts without a live write. Once mutation begins—or apply succeeds—the
+original snapshot remains available for independent readback and recovery. If
+automatic rollback cannot complete, use the exact path printed by the failure:
 
 ```bash
 scripts/apply-repo-safeguards.sh --restore '/exact/snapshot/path' luisgui1757/dotfiles

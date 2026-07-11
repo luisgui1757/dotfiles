@@ -64,6 +64,14 @@ TEST_EXECUTED_SHA="4444444444444444444444444444444444444444" \
     run_proof verify "$marker" "setup.sh / linux" "setup.sh / ubuntu-24.04"
 echo "ok  : executed-SHA drift fails verification"
 
+TEST_RUN_ID=54321 \
+    expect_failure "belongs to a different workflow run" \
+    run_proof verify "$marker" "setup.sh / linux" "setup.sh / ubuntu-24.04"
+TEST_RUN_ATTEMPT=3 \
+    expect_failure "belongs to a different workflow run" \
+    run_proof verify "$marker" "setup.sh / linux" "setup.sh / ubuntu-24.04"
+echo "ok  : run-id and run-attempt replay drift fail verification"
+
 missing_source_marker="$WORK/missing-source.env"
 TEST_SOURCE_HEAD_SHA="" expect_failure "DOTFILES_SOURCE_HEAD_SHA is not a full commit identity" \
     run_proof emit "$missing_source_marker" "setup.sh / linux" "setup.sh / ubuntu-24.04"
@@ -72,6 +80,29 @@ TEST_SOURCE_HEAD_SHA="" expect_failure "DOTFILES_SOURCE_HEAD_SHA is not a full c
     exit 1
 }
 echo "ok  : missing source head fails before publication"
+
+missing_executed_marker="$WORK/missing-executed.env"
+TEST_EXECUTED_SHA="" expect_failure "GITHUB_SHA is not a full executed commit identity" \
+    run_proof emit "$missing_executed_marker" "setup.sh / linux" "setup.sh / ubuntu-24.04"
+[[ ! -e "$missing_executed_marker" ]] || {
+    echo "FAIL: invalid executed identity published a marker" >&2
+    exit 1
+}
+missing_run_marker="$WORK/missing-run.env"
+TEST_RUN_ID="" expect_failure "GitHub run identity is unavailable" \
+    run_proof emit "$missing_run_marker" "setup.sh / linux" "setup.sh / ubuntu-24.04"
+[[ ! -e "$missing_run_marker" ]] || {
+    echo "FAIL: missing run identity published a marker" >&2
+    exit 1
+}
+empty_context_marker="$WORK/empty-context.env"
+expect_failure "proof identities must be nonempty single-line values" \
+    run_proof emit "$empty_context_marker" "" "setup.sh / ubuntu-24.04"
+[[ ! -e "$empty_context_marker" ]] || {
+    echo "FAIL: empty logical identity published a marker" >&2
+    exit 1
+}
+echo "ok  : invalid emit-time executed, run, and context identities fail before publication"
 
 schema_one_marker="$WORK/schema-one.env"
 sed 's/^schema=2$/schema=1/' "$marker" > "$schema_one_marker"

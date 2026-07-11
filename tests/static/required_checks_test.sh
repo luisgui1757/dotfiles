@@ -67,8 +67,9 @@ for workflow in (e2e, nix):
 
 safeguards = pathlib.Path("scripts/apply-repo-safeguards.sh").read_text(encoding="utf-8")
 for required_call in (
-    "build_classic_payload required_check_contexts",
+    "build_classic_payload_from_file",
     "build_classic_state required_check_contexts",
+    "git -C \"$repo_root\" show HEAD:.github/rulesets/main-integrity.json",
 ):
     if required_call not in safeguards:
         raise SystemExit(f"FAIL: safeguard apply no longer derives the classic stable set through {required_call}")
@@ -76,10 +77,11 @@ for required_call in (
 print("OK: stable required identities are emitted while legacy producers remain available for the live transition")
 PY
 
-if grep -Eq '^branches:[[:space:]]*$' .github/settings.yml; then
-    echo "FAIL: Probot Settings must not own branch protection during or after the transactional cutover" >&2
+command -v ruby >/dev/null 2>&1 || {
+    echo "FAIL: ruby is required for semantic .github/settings.yml policy checks" >&2
     exit 1
-fi
+}
+ruby tests/static/assert_no_probot_branches.rb .github/settings.yml
 
 awk '
   /^required_check_contexts\(\) \{/ { in_fn = 1; next }

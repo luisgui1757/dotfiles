@@ -30,6 +30,10 @@ preflight and apply. It accepts only the expected legacy-to-stable transition,
 requires public repository visibility, captures the old
 Actions/integrity/classic state before writing, and restores all three on
 failure. Restore freezes and exact-policy-validates every consumed snapshot file
+against the manifest's captured Git commit—which must still be live `main`—
 before publishing only those bytes; incomplete, altered, or cross-stage recovery
-material cannot reach a live write. The apply verifies the live value becomes
-`true`.
+material cannot reach a live write.
+Apply likewise derives every desired payload
+from exact committed objects after the second live capture, freezes the complete
+set in a private read-only directory, and never publishes mutable checkout
+bytes. The apply verifies the live value becomes `true`.

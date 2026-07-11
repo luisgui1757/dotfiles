@@ -687,7 +687,8 @@ Pull requests are meant to be gated by three required workflow families:
   script/rule/message/extent fingerprint (not filename/rule/count alone),
   Renovate validation fails if `npx` is missing under CI or its official local
   extraction differs from the checked-in dependency inventory, and YAML
-  parsing/linting is part of `make test-static`. Windows PSGallery module
+  parsing/linting—including the Ruby/Psych semantic Settings policy—is part of
+  `make test-static`. Windows PSGallery module
   installs retry transient lookup failures, but missing test dependencies remain
   fatal.
 - `.github/workflows/e2e-install.yml` is the real install guarantee. It proves
@@ -781,7 +782,9 @@ the Probot Settings app to repository-level settings; it does not contain a
 transactional script and creating a mixed classic/ruleset cutover stage. The
 script owns the classic fallback required-check transition because Probot
 cannot model the key policy split: owner review bypass is allowed, CI bypass is
-not, and only the owner may update `main`.
+not, and only the owner may update `main`. A semantic YAML policy test rejects
+the top-level key in block, inline, null, and alias forms; line-oriented text
+matching is not accepted as proof of ownership isolation.
 
 | Layer | Bypass actors | What it protects |
 |---|---:|---|
@@ -829,11 +832,18 @@ live posture, unique rulesets, GitHub Actions app/workflow/event/run provenance,
 and skipped broad caches. It captures a private recovery snapshot and, before
 restoration, freezes every consumed file and validates its exact manifest stage,
 contexts, app IDs, ruleset identity, bypass/branch policy, Actions pinning, and
-full classic state. Missing, altered, or cross-stage recovery material fails
-before any write; changes to the retained source after
-freezing cannot alter the bytes that are published. Apply mutates only the three
-cutover resources and automatically restores the previous stage if apply or
-readback fails. See
+complete classic state, including every nullable-but-required field. Restore
+derives its expected policy from the exact captured commit, not mutable current
+worktree bytes, and requires that commit still be live `main`. After the second
+preflight capture, apply independently freezes the committed check
+metadata, integrity payload, manifest, classic payload, and Actions payload in a
+private read-only transaction directory and publishes only those validated
+files. Worktree changes after validation therefore cannot influence a later
+write. Missing, malformed, altered, or cross-stage recovery material fails
+before any write; failed captures clean every temporary directory, and a
+recovery snapshot is retained only after mutation begins or a verified apply
+succeeds. Apply mutates only the three cutover resources and automatically
+restores the previous stage if apply or readback fails. See
 [docs/security/branch-protection.md](docs/security/branch-protection.md) for the
 exact validation, recovery command, and live verification sequence;
 [docs/security/supply-chain.md](docs/security/supply-chain.md) records the

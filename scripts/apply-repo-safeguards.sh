@@ -87,22 +87,35 @@ review_ruleset="$repo_root/.github/rulesets/main-review.json"
 owner_updates_ruleset="$repo_root/.github/rulesets/main-owner-updates.json"
 github_actions_app_id=15368
 
+temporary_dirs=()
 preflight_dir=""
+postflight_dir=""
 recovery_dir=""
+transaction_dir=""
 transaction_active=0
+recovery_retained=0
 exit_handler_active=0
 
-cleanup_preflight() {
-    if [[ -n "$preflight_dir" && -d "$preflight_dir" ]]; then
-        rm -rf "$preflight_dir"
-    fi
+create_private_temp_dir() {
+    local result_name="$1" created temp_root
+    temp_root="${TMPDIR:-/tmp}"
+    created="$(mktemp -d "$temp_root/dotfiles-safeguards.XXXXXX")"
+    chmod 700 "$created"
+    temporary_dirs[${#temporary_dirs[@]}]="$created"
+    printf -v "$result_name" '%s' "$created"
 }
 
-gh_api() {
-    local method="$1" path="$2"
-    shift 2
-    echo "+ gh api -X $method $path $*"
-    gh api -X "$method" "$path" "$@"
+cleanup_temporary_dirs() {
+    local directory
+    if [[ "${#temporary_dirs[@]}" -eq 0 ]]; then
+        return 0
+    fi
+    for directory in "${temporary_dirs[@]}"; do
+        if [[ -n "$directory" && -d "$directory" ]]; then
+            chmod -R u+w "$directory" 2>/dev/null || true
+            rm -rf "$directory"
+        fi
+    done
 }
 
 gh_api_json_file() {
@@ -207,9 +220,23 @@ contexts_json() {
     "$1" | jq -R . | jq -s .
 }
 
+contexts_file_json() {
+    jq -R . "$1" | jq -s .
+}
+
 build_classic_payload() {
     local contexts
     contexts="$(contexts_json "$1")"
+    jq -n --argjson contexts "$contexts" --argjson app_id "$github_actions_app_id" '{
+      strict: true,
+      contexts: $contexts,
+      checks: ($contexts | map({context: ., app_id: $app_id}))
+    }'
+}
+
+build_classic_payload_from_file() {
+    local contexts
+    contexts="$(contexts_file_json "$1")"
     jq -n --argjson contexts "$contexts" --argjson app_id "$github_actions_app_id" '{
       strict: true,
       contexts: $contexts,
@@ -259,6 +286,44 @@ normalize_classic_state() {
       lock_branch: .lock_branch.enabled,
       allow_fork_syncing: .allow_fork_syncing.enabled
     }' "$1"
+}
+
+validate_classic_live_schema() {
+    jq -e '
+      type == "object"
+      and has("required_status_checks")
+      and has("enforce_admins")
+      and has("required_pull_request_reviews")
+      and has("restrictions")
+      and has("required_linear_history")
+      and has("allow_force_pushes")
+      and has("allow_deletions")
+      and has("required_conversation_resolution")
+      and has("required_signatures")
+      and has("block_creations")
+      and has("lock_branch")
+      and has("allow_fork_syncing")
+      and (.required_status_checks | type == "object")
+      and (.required_status_checks.strict | type == "boolean")
+      and (.required_status_checks.contexts | type == "array")
+      and all(.required_status_checks.contexts[]; type == "string" and length > 0)
+      and (.required_status_checks.checks | type == "array")
+      and all(.required_status_checks.checks[];
+        type == "object"
+        and (.context | type == "string" and length > 0)
+        and (.app_id | type == "number"))
+      and (.enforce_admins.enabled | type == "boolean")
+      and .required_pull_request_reviews == null
+      and .restrictions == null
+      and (.required_linear_history.enabled | type == "boolean")
+      and (.allow_force_pushes.enabled | type == "boolean")
+      and (.allow_deletions.enabled | type == "boolean")
+      and (.required_conversation_resolution.enabled | type == "boolean")
+      and (.required_signatures.enabled | type == "boolean")
+      and (.block_creations.enabled | type == "boolean")
+      and (.lock_branch.enabled | type == "boolean")
+      and (.allow_fork_syncing.enabled | type == "boolean")
+    ' "$1" >/dev/null
 }
 
 classic_restore_payload() {
@@ -316,7 +381,7 @@ normalize_remote_repo() {
 }
 
 verify_local_boundary() {
-    local local_branch local_head local_main live_main_sha origin_url dirty
+    local capture_dir="$1" local_branch local_head local_main live_main_sha origin_url dirty
     local_branch="$(git -C "$repo_root" symbolic-ref -q --short HEAD || true)"
     [[ "$local_branch" == "main" ]] || {
         echo "FAIL: safeguard apply requires the checked-out local branch to be main; got '${local_branch:-detached}'" >&2
@@ -329,7 +394,7 @@ verify_local_boundary() {
     fi
     local_head="$(git -C "$repo_root" rev-parse HEAD)"
     local_main="$(git -C "$repo_root" rev-parse refs/heads/main)"
-    live_main_sha="$(jq -r .sha "$preflight_dir/live-main.json")"
+    live_main_sha="$(jq -r .sha "$capture_dir/live-main.json")"
     if [[ "$local_head" != "$local_main" ]]; then
         echo "FAIL: checked-out HEAD $local_head is not the local main ref $local_main." >&2
         return 1
@@ -357,12 +422,12 @@ verify_local_boundary() {
 }
 
 select_workflow_run() {
-    local workflow_file="$1" workflow_path="$2" allowed_events="$3" output="$4"
-    local runs_file="$preflight_dir/${workflow_file%.yml}-runs.json"
+    local capture_dir="$1" workflow_file="$2" workflow_path="$3" allowed_events="$4" output="$5"
+    local runs_file="$capture_dir/${workflow_file%.yml}-runs.json"
     gh api "repos/$repo/actions/workflows/$workflow_file/runs?branch=main&per_page=100" > "$runs_file"
     if ! jq -e \
         --arg repo "$repo" \
-        --arg sha "$(jq -r .sha "$preflight_dir/live-main.json")" \
+        --arg sha "$(jq -r .sha "$capture_dir/live-main.json")" \
         --arg path "$workflow_path" \
         --argjson events "$allowed_events" '
           [.workflow_runs[]
@@ -381,11 +446,11 @@ select_workflow_run() {
 }
 
 verify_workflow_jobs() {
-    local desc="$1" run_file="$2" context_function="$3" require_cache_free="$4"
+    local capture_dir="$1" desc="$2" run_file="$3" context_function="$4" require_cache_free="$5"
     local run_id jobs_file expected_file context count prefix
     run_id="$(jq -r .id "$run_file")"
-    jobs_file="$preflight_dir/${desc}-jobs.json"
-    expected_file="$preflight_dir/${desc}-expected-contexts.txt"
+    jobs_file="$capture_dir/${desc}-jobs.json"
+    expected_file="$capture_dir/${desc}-expected-contexts.txt"
     gh api "repos/$repo/actions/runs/$run_id/jobs?per_page=100" > "$jobs_file"
     "$context_function" > "$expected_file"
     while IFS= read -r context; do
@@ -402,7 +467,7 @@ verify_workflow_jobs() {
             | select(.app.id == $app_id and .app.slug == "github-actions")
             | select(.details_url | startswith($prefix))]
           | length
-        ' "$preflight_dir/check-runs.json")"
+        ' "$capture_dir/check-runs.json")"
         if [[ "$count" -ne 1 ]]; then
             echo "FAIL: '$context' is not uniquely bound to GitHub Actions app $github_actions_app_id and $desc run $run_id." >&2
             return 1
@@ -422,16 +487,14 @@ verify_workflow_jobs() {
 }
 
 capture_and_validate_live_state() {
-    local target_dir="$1" previous_preflight="$preflight_dir"
+    local capture_dir="$1"
     local integrity_id review_id owner_updates_id stage
     local live_integrity_normalized expected_integrity_normalized expected_legacy_integrity_normalized
     local live_review_normalized expected_review_normalized
     local live_owner_normalized expected_owner_normalized
     local live_classic_state expected_legacy_classic expected_stable_classic
-    preflight_dir="$target_dir"
-
-    gh api "repos/$repo" > "$preflight_dir/repository.json"
-    if [[ "$(jq -r .full_name "$preflight_dir/repository.json")" != "$repo" ]]; then
+    gh api "repos/$repo" > "$capture_dir/repository.json"
+    if [[ "$(jq -r .full_name "$capture_dir/repository.json")" != "$repo" ]]; then
         echo "FAIL: GitHub resolved a different repository than $repo." >&2
         return 1
     fi
@@ -447,7 +510,7 @@ capture_and_validate_live_state() {
       and .security_and_analysis.dependabot_security_updates.status == "enabled"
       and .security_and_analysis.secret_scanning.status == "enabled"
       and .security_and_analysis.secret_scanning_push_protection.status == "enabled"
-    ' "$preflight_dir/repository.json" >/dev/null; then
+    ' "$capture_dir/repository.json" >/dev/null; then
         echo "FAIL: live repository/merge/security settings differ from the reviewed public-repo posture." >&2
         return 1
     fi
@@ -466,58 +529,62 @@ capture_and_validate_live_state() {
         secret_scanning: .security_and_analysis.secret_scanning.status,
         secret_scanning_push_protection: .security_and_analysis.secret_scanning_push_protection.status
       }
-    }' "$preflight_dir/repository.json" > "$preflight_dir/repository-state.json"
-    gh api "repos/$repo/commits/main" > "$preflight_dir/live-main.json"
-    verify_local_boundary
+    }' "$capture_dir/repository.json" > "$capture_dir/repository-state.json"
+    gh api "repos/$repo/commits/main" > "$capture_dir/live-main.json"
+    verify_local_boundary "$capture_dir"
 
-    gh api "repos/$repo/rulesets?includes_parents=false" > "$preflight_dir/rulesets.json"
+    gh api "repos/$repo/rulesets?includes_parents=false" > "$capture_dir/rulesets.json"
     if ! jq -e --arg repo "$repo" '
       length == 3
       and ([.[].name] | sort) == (["Protect main: integrity", "Protect main: owner updates", "Protect main: review"] | sort)
       and all(.[]; .source == $repo and .source_type == "Repository" and .target == "branch" and .enforcement == "active")
-    ' "$preflight_dir/rulesets.json" >/dev/null; then
+    ' "$capture_dir/rulesets.json" >/dev/null; then
         echo "FAIL: live rulesets are not the exact three unique active repository rulesets." >&2
         return 1
     fi
     jq 'map({id, name, source, source_type, target, enforcement}) | sort_by(.name)' \
-        "$preflight_dir/rulesets.json" > "$preflight_dir/rulesets-state.json"
+        "$capture_dir/rulesets.json" > "$capture_dir/rulesets-state.json"
     integrity_id="$(ruleset_id_by_name "Protect main: integrity")"
     review_id="$(ruleset_id_by_name "Protect main: review")"
     owner_updates_id="$(ruleset_id_by_name "Protect main: owner updates")"
-    gh api "repos/$repo/rulesets/$integrity_id" > "$preflight_dir/integrity-live.json"
-    gh api "repos/$repo/rulesets/$review_id" > "$preflight_dir/review-live.json"
-    gh api "repos/$repo/rulesets/$owner_updates_id" > "$preflight_dir/owner-updates-live.json"
+    gh api "repos/$repo/rulesets/$integrity_id" > "$capture_dir/integrity-live.json"
+    gh api "repos/$repo/rulesets/$review_id" > "$capture_dir/review-live.json"
+    gh api "repos/$repo/rulesets/$owner_updates_id" > "$capture_dir/owner-updates-live.json"
 
     jq --slurpfile identities "$check_identities" '
       (.rules[] | select(.type == "required_status_checks").parameters.required_status_checks) =
         ($identities[0].legacyEmitted | map({context: ., integration_id: 15368}))
-    ' "$integrity_ruleset" > "$preflight_dir/integrity-legacy-expected.json"
-    normalize_ruleset "$preflight_dir/integrity-live.json" > "$preflight_dir/integrity-live-normalized.json"
-    normalize_ruleset "$integrity_ruleset" > "$preflight_dir/integrity-stable-normalized.json"
-    normalize_ruleset "$preflight_dir/integrity-legacy-expected.json" > "$preflight_dir/integrity-legacy-normalized.json"
-    live_integrity_normalized="$preflight_dir/integrity-live-normalized.json"
-    expected_integrity_normalized="$preflight_dir/integrity-stable-normalized.json"
-    expected_legacy_integrity_normalized="$preflight_dir/integrity-legacy-normalized.json"
+    ' "$integrity_ruleset" > "$capture_dir/integrity-legacy-expected.json"
+    normalize_ruleset "$capture_dir/integrity-live.json" > "$capture_dir/integrity-live-normalized.json"
+    normalize_ruleset "$integrity_ruleset" > "$capture_dir/integrity-stable-normalized.json"
+    normalize_ruleset "$capture_dir/integrity-legacy-expected.json" > "$capture_dir/integrity-legacy-normalized.json"
+    live_integrity_normalized="$capture_dir/integrity-live-normalized.json"
+    expected_integrity_normalized="$capture_dir/integrity-stable-normalized.json"
+    expected_legacy_integrity_normalized="$capture_dir/integrity-legacy-normalized.json"
 
-    normalize_ruleset "$preflight_dir/review-live.json" > "$preflight_dir/review-live-normalized.json"
-    normalize_ruleset "$review_ruleset" > "$preflight_dir/review-expected-normalized.json"
-    live_review_normalized="$preflight_dir/review-live-normalized.json"
-    expected_review_normalized="$preflight_dir/review-expected-normalized.json"
+    normalize_ruleset "$capture_dir/review-live.json" > "$capture_dir/review-live-normalized.json"
+    normalize_ruleset "$review_ruleset" > "$capture_dir/review-expected-normalized.json"
+    live_review_normalized="$capture_dir/review-live-normalized.json"
+    expected_review_normalized="$capture_dir/review-expected-normalized.json"
     require_json_equal "review ruleset" "$live_review_normalized" "$expected_review_normalized"
 
-    normalize_ruleset "$preflight_dir/owner-updates-live.json" > "$preflight_dir/owner-live-normalized.json"
-    normalize_ruleset "$owner_updates_ruleset" > "$preflight_dir/owner-expected-normalized.json"
-    live_owner_normalized="$preflight_dir/owner-live-normalized.json"
-    expected_owner_normalized="$preflight_dir/owner-expected-normalized.json"
+    normalize_ruleset "$capture_dir/owner-updates-live.json" > "$capture_dir/owner-live-normalized.json"
+    normalize_ruleset "$owner_updates_ruleset" > "$capture_dir/owner-expected-normalized.json"
+    live_owner_normalized="$capture_dir/owner-live-normalized.json"
+    expected_owner_normalized="$capture_dir/owner-expected-normalized.json"
     require_json_equal "owner-updates ruleset" "$live_owner_normalized" "$expected_owner_normalized"
 
-    gh api "repos/$repo/branches/main/protection" > "$preflight_dir/classic-live.json"
-    normalize_classic_state "$preflight_dir/classic-live.json" > "$preflight_dir/classic-live-state.json"
-    build_classic_state legacy_check_contexts > "$preflight_dir/classic-legacy-state.json"
-    build_classic_state required_check_contexts > "$preflight_dir/classic-stable-state.json"
-    live_classic_state="$preflight_dir/classic-live-state.json"
-    expected_legacy_classic="$preflight_dir/classic-legacy-state.json"
-    expected_stable_classic="$preflight_dir/classic-stable-state.json"
+    gh api "repos/$repo/branches/main/protection" > "$capture_dir/classic-live.json"
+    if ! validate_classic_live_schema "$capture_dir/classic-live.json"; then
+        echo "FAIL: live classic branch protection is incomplete or malformed." >&2
+        return 1
+    fi
+    normalize_classic_state "$capture_dir/classic-live.json" > "$capture_dir/classic-live-state.json"
+    build_classic_state legacy_check_contexts > "$capture_dir/classic-legacy-state.json"
+    build_classic_state required_check_contexts > "$capture_dir/classic-stable-state.json"
+    live_classic_state="$capture_dir/classic-live-state.json"
+    expected_legacy_classic="$capture_dir/classic-legacy-state.json"
+    expected_stable_classic="$capture_dir/classic-stable-state.json"
 
     if json_equal "$live_integrity_normalized" "$expected_legacy_integrity_normalized" && \
         json_equal "$live_classic_state" "$expected_legacy_classic"; then
@@ -529,20 +596,20 @@ capture_and_validate_live_state() {
         echo "FAIL: integrity and classic protection are not one exact, internally consistent legacy-or-stable stage." >&2
         return 1
     fi
-    printf '%s\n' "$stage" > "$preflight_dir/stage"
+    printf '%s\n' "$stage" > "$capture_dir/stage"
 
-    gh api "repos/$repo/actions/permissions" > "$preflight_dir/actions-live.json"
-    if ! jq -e '.enabled == true and .allowed_actions == "all"' "$preflight_dir/actions-live.json" >/dev/null; then
+    gh api "repos/$repo/actions/permissions" > "$capture_dir/actions-live.json"
+    if ! jq -e '.enabled == true and .allowed_actions == "all"' "$capture_dir/actions-live.json" >/dev/null; then
         echo "FAIL: live Actions enabled/allowed posture is unexpected." >&2
         return 1
     fi
     if [[ "$stage" == "legacy" ]]; then
-        jq -e '.sha_pinning_required == false' "$preflight_dir/actions-live.json" >/dev/null || {
+        jq -e '.sha_pinning_required == false' "$capture_dir/actions-live.json" >/dev/null || {
             echo "FAIL: legacy required contexts must coincide with sha_pinning_required=false before this cutover." >&2
             return 1
         }
     else
-        jq -e '.sha_pinning_required == true' "$preflight_dir/actions-live.json" >/dev/null || {
+        jq -e '.sha_pinning_required == true' "$capture_dir/actions-live.json" >/dev/null || {
             echo "FAIL: stable required contexts must coincide with sha_pinning_required=true." >&2
             return 1
         }
@@ -557,36 +624,34 @@ capture_and_validate_live_state() {
         return 1
     }
 
-    gh api "repos/$repo/commits/$(jq -r .sha "$preflight_dir/live-main.json")/check-runs?per_page=100" > "$preflight_dir/check-runs.json"
-    select_workflow_run test.yml .github/workflows/test.yml '["push", "workflow_dispatch"]' "$preflight_dir/test-run.json"
-    select_workflow_run nix.yml .github/workflows/nix.yml '["push", "workflow_dispatch"]' "$preflight_dir/nix-run.json"
-    select_workflow_run e2e-install.yml .github/workflows/e2e-install.yml '["workflow_dispatch"]' "$preflight_dir/e2e-run.json"
-    verify_workflow_jobs test "$preflight_dir/test-run.json" test_workflow_contexts 0
-    verify_workflow_jobs nix "$preflight_dir/nix-run.json" nix_workflow_contexts 0
-    verify_workflow_jobs e2e "$preflight_dir/e2e-run.json" e2e_workflow_contexts 1
+    gh api "repos/$repo/commits/$(jq -r .sha "$capture_dir/live-main.json")/check-runs?per_page=100" > "$capture_dir/check-runs.json"
+    select_workflow_run "$capture_dir" test.yml .github/workflows/test.yml '["push", "workflow_dispatch"]' "$capture_dir/test-run.json"
+    select_workflow_run "$capture_dir" nix.yml .github/workflows/nix.yml '["push", "workflow_dispatch"]' "$capture_dir/nix-run.json"
+    select_workflow_run "$capture_dir" e2e-install.yml .github/workflows/e2e-install.yml '["workflow_dispatch"]' "$capture_dir/e2e-run.json"
+    verify_workflow_jobs "$capture_dir" test "$capture_dir/test-run.json" test_workflow_contexts 0
+    verify_workflow_jobs "$capture_dir" nix "$capture_dir/nix-run.json" nix_workflow_contexts 0
+    verify_workflow_jobs "$capture_dir" e2e "$capture_dir/e2e-run.json" e2e_workflow_contexts 1
 
-    ruleset_restore_payload "$preflight_dir/integrity-live.json" > "$preflight_dir/integrity-restore.json"
-    classic_restore_payload "$preflight_dir/classic-live.json" > "$preflight_dir/classic-restore.json"
-    jq '{enabled, allowed_actions, sha_pinning_required}' "$preflight_dir/actions-live.json" > "$preflight_dir/actions-restore.json"
+    ruleset_restore_payload "$capture_dir/integrity-live.json" > "$capture_dir/integrity-restore.json"
+    classic_restore_payload "$capture_dir/classic-live.json" > "$capture_dir/classic-restore.json"
+    jq '{enabled, allowed_actions, sha_pinning_required}' "$capture_dir/actions-live.json" > "$capture_dir/actions-restore.json"
     jq -n \
         --arg repo "$repo" \
-        --arg live_main_sha "$(jq -r .sha "$preflight_dir/live-main.json")" \
+        --arg live_main_sha "$(jq -r .sha "$capture_dir/live-main.json")" \
         --arg stage "$stage" \
         --argjson integrity_ruleset_id "$integrity_id" \
-        --argjson test_run_id "$(jq -r .id "$preflight_dir/test-run.json")" \
-        --argjson nix_run_id "$(jq -r .id "$preflight_dir/nix-run.json")" \
-        --argjson e2e_run_id "$(jq -r .id "$preflight_dir/e2e-run.json")" \
+        --argjson test_run_id "$(jq -r .id "$capture_dir/test-run.json")" \
+        --argjson nix_run_id "$(jq -r .id "$capture_dir/nix-run.json")" \
+        --argjson e2e_run_id "$(jq -r .id "$capture_dir/e2e-run.json")" \
         '{schema: 1, repository: $repo, live_main_sha: $live_main_sha, stage: $stage,
           integrity_ruleset_id: $integrity_ruleset_id,
           proof_runs: {test: $test_run_id, nix: $nix_run_id, e2e_cache_free: $e2e_run_id}}' \
-        > "$preflight_dir/manifest.json"
-
-    preflight_dir="$previous_preflight"
+        > "$capture_dir/manifest.json"
 }
 
 verify_snapshot_unchanged() {
     local verify_dir file
-    verify_dir="$(mktemp -d)"
+    create_private_temp_dir verify_dir
     capture_and_validate_live_state "$verify_dir"
     for file in \
         manifest.json \
@@ -598,7 +663,6 @@ verify_snapshot_unchanged() {
         classic-live-state.json \
         actions-restore.json; do
         if ! json_equal "$verify_dir/$file" "$recovery_dir/$file"; then
-            rm -rf "$verify_dir"
             echo "FAIL: live safeguard/proof state changed after preflight and snapshot; no mutation was attempted." >&2
             return 1
         fi
@@ -606,9 +670,124 @@ verify_snapshot_unchanged() {
     rm -rf "$verify_dir"
 }
 
+prepare_transaction_payloads() {
+    local file
+    create_private_temp_dir transaction_dir
+
+    for file in \
+        manifest.json \
+        actions-restore.json \
+        integrity-restore.json \
+        classic-restore.json \
+        classic-live.json; do
+        [[ -f "$recovery_dir/$file" && ! -L "$recovery_dir/$file" ]] || {
+            echo "FAIL: generated recovery snapshot is incomplete or unsafe: $file" >&2
+            return 1
+        }
+    done
+
+    git -C "$repo_root" show HEAD:.github/check-identities.json \
+        > "$transaction_dir/check-identities.json"
+    git -C "$repo_root" show HEAD:.github/rulesets/main-integrity.json \
+        > "$transaction_dir/integrity-desired.json"
+    cp "$recovery_dir/manifest.json" "$transaction_dir/manifest.json"
+
+    if ! cmp -s "$check_identities" "$transaction_dir/check-identities.json" || \
+        ! cmp -s "$integrity_ruleset" "$transaction_dir/integrity-desired.json"; then
+        echo "FAIL: reviewed safeguard sources changed while transaction inputs were frozen." >&2
+        return 1
+    fi
+    if ! jq -e '
+      type == "object"
+      and (keys | sort) == (["legacyEmitted", "replacements", "required", "schema", "stage"] | sort)
+      and .schema == 2
+      and .stage == "stable-required-live-apply-pending"
+      and (.legacyEmitted | type == "array" and length > 0 and length == (unique | length))
+      and all(.legacyEmitted[]; type == "string" and length > 0)
+      and (.required | type == "array" and length > 0 and length == (unique | length))
+      and all(.required[]; type == "string" and length > 0)
+      and (.replacements | type == "array" and length > 0 and length == (unique | length))
+      and all(.replacements[];
+        type == "object"
+        and (keys | sort) == (["legacy", "logical"] | sort)
+        and (.legacy | type == "string" and length > 0)
+        and (.logical | type == "string" and length > 0))
+    ' "$transaction_dir/check-identities.json" >/dev/null; then
+        echo "FAIL: frozen required-check metadata is malformed." >&2
+        return 1
+    fi
+
+    jq -r '.required[]' "$transaction_dir/check-identities.json" \
+        > "$transaction_dir/required-contexts.txt"
+    required_check_contexts > "$transaction_dir/required-contexts-expected.txt"
+    if ! cmp -s "$transaction_dir/required-contexts.txt" \
+        "$transaction_dir/required-contexts-expected.txt"; then
+        echo "FAIL: frozen required-check metadata differs from the reviewed transaction contract." >&2
+        return 1
+    fi
+    if ! jq -e --slurpfile identities "$transaction_dir/check-identities.json" \
+        --argjson app_id "$github_actions_app_id" '
+      type == "object"
+      and .name == "Protect main: integrity"
+      and .target == "branch"
+      and .enforcement == "active"
+      and .bypass_actors == []
+      and .conditions.ref_name.include == ["refs/heads/main"]
+      and ([.rules[] | select(.type == "required_status_checks")] | length) == 1
+      and ([.rules[] | select(.type == "required_status_checks")][0].parameters |
+        .strict_required_status_checks_policy == true
+        and .do_not_enforce_on_create == false
+        and .required_status_checks ==
+          ($identities[0].required | map({context: ., integration_id: $app_id})))
+    ' "$transaction_dir/integrity-desired.json" >/dev/null; then
+        echo "FAIL: frozen integrity payload does not match the reviewed stable contexts and app identity." >&2
+        return 1
+    fi
+    normalize_ruleset "$transaction_dir/integrity-desired.json" \
+        > "$transaction_dir/integrity-desired-normalized.json"
+    if ! json_equal "$transaction_dir/integrity-desired-normalized.json" \
+        "$preflight_dir/integrity-stable-normalized.json"; then
+        echo "FAIL: frozen integrity payload differs from the preflighted stable posture." >&2
+        return 1
+    fi
+
+    build_classic_payload_from_file "$transaction_dir/required-contexts.txt" \
+        > "$transaction_dir/classic-desired.json"
+    jq -n '{enabled: true, allowed_actions: "all", sha_pinning_required: true}' \
+        > "$transaction_dir/actions-desired.json"
+    if ! jq -e --arg repo "$repo" \
+        --arg sha "$(git -C "$repo_root" rev-parse HEAD)" '
+      type == "object"
+      and .schema == 1
+      and .repository == $repo
+      and .live_main_sha == $sha
+      and .stage == "legacy"
+      and (.integrity_ruleset_id | type == "number" and . > 0 and floor == .)
+    ' "$transaction_dir/manifest.json" >/dev/null; then
+        echo "FAIL: frozen transaction manifest is not the exact legacy-to-stable target." >&2
+        return 1
+    fi
+    if ! jq -e --argjson app_id "$github_actions_app_id" '
+      type == "object"
+      and (keys | sort) == (["checks", "contexts", "strict"] | sort)
+      and .strict == true
+      and (.contexts | type == "array" and length > 0 and length == (unique | length))
+      and (.checks | type == "array")
+      and ((.checks | length) == (.contexts | length))
+      and ((.contexts | sort) == (.checks | map(.context) | sort))
+      and all(.checks[]; .app_id == $app_id)
+    ' "$transaction_dir/classic-desired.json" >/dev/null; then
+        echo "FAIL: frozen classic payload is malformed." >&2
+        return 1
+    fi
+
+    chmod 400 "$transaction_dir"/*
+    chmod 500 "$transaction_dir"
+}
+
 restore_snapshot() (
-    local snapshot="$1" frozen file manifest_repo stage integrity_id
-    local contexts_function expected_pin failures=0 verify_dir
+    local snapshot="$1" frozen file manifest_repo policy_sha stage integrity_id
+    local contexts_function expected_pin failures=0 readback_error=0 readback_mismatch=0 verify_dir
     for file in \
         manifest.json \
         actions-restore.json \
@@ -623,7 +802,7 @@ restore_snapshot() (
 
     frozen="$(mktemp -d)"
     chmod 700 "$frozen"
-    trap 'rm -rf "$frozen"; if [[ -n "$verify_dir" ]]; then rm -rf "$verify_dir"; fi' EXIT
+    trap 'chmod -R u+w "$frozen" 2>/dev/null || true; rm -rf "$frozen"; if [[ -n "$verify_dir" ]]; then rm -rf "$verify_dir"; fi' EXIT
     for file in \
         manifest.json \
         actions-restore.json \
@@ -679,21 +858,7 @@ restore_snapshot() (
           and ((.contexts | sort) == (.checks | map(.context) | sort))
           and all(.checks[]; .app_id == $app_id)
         ' "$frozen/classic-restore.json" >/dev/null || \
-        ! jq -e '
-          type == "object"
-          and (.required_status_checks.strict | type == "boolean")
-          and (.required_status_checks.contexts | type == "array")
-          and (.required_status_checks.checks | type == "array")
-          and (.enforce_admins.enabled | type == "boolean")
-          and (.required_linear_history.enabled | type == "boolean")
-          and (.allow_force_pushes.enabled | type == "boolean")
-          and (.allow_deletions.enabled | type == "boolean")
-          and (.required_conversation_resolution.enabled | type == "boolean")
-          and (.required_signatures.enabled | type == "boolean")
-          and (.block_creations.enabled | type == "boolean")
-          and (.lock_branch.enabled | type == "boolean")
-          and (.allow_fork_syncing.enabled | type == "boolean")
-        ' "$frozen/classic-live.json" >/dev/null; then
+        ! validate_classic_live_schema "$frozen/classic-live.json"; then
         echo "FAIL: recovery snapshot schema or payload validation failed: $snapshot" >&2
         return 1
     fi
@@ -702,6 +867,20 @@ restore_snapshot() (
         echo "FAIL: recovery snapshot belongs to $manifest_repo, not $repo" >&2
         return 1
     }
+    policy_sha="$(jq -r .live_main_sha "$frozen/manifest.json")"
+    if ! gh api "repos/$repo/commits/main" > "$frozen/live-main-current.json" || \
+        [[ "$(jq -r .sha "$frozen/live-main-current.json")" != "$policy_sha" ]]; then
+        echo "FAIL: recovery snapshot policy commit does not match current live main: $policy_sha" >&2
+        return 1
+    fi
+    if ! git -C "$repo_root" cat-file -e "$policy_sha^{commit}" 2>/dev/null || \
+        ! git -C "$repo_root" show "$policy_sha:.github/check-identities.json" \
+            > "$frozen/check-identities-reviewed.json" || \
+        ! git -C "$repo_root" show "$policy_sha:.github/rulesets/main-integrity.json" \
+            > "$frozen/integrity-reviewed.json"; then
+        echo "FAIL: recovery snapshot's committed policy source is unavailable: $policy_sha" >&2
+        return 1
+    fi
     stage="$(jq -r .stage "$frozen/manifest.json")"
     integrity_id="$(jq -r .integrity_ruleset_id "$frozen/manifest.json")"
     if ! gh api "repos/$repo/rulesets?includes_parents=false" \
@@ -727,16 +906,16 @@ restore_snapshot() (
     if [[ "$stage" == "legacy" ]]; then
         contexts_function=legacy_check_contexts
         expected_pin=false
-        jq --slurpfile identities "$check_identities" '
+        jq --slurpfile identities "$frozen/check-identities-reviewed.json" '
           (.rules[] | select(.type == "required_status_checks").parameters.required_status_checks) =
             ($identities[0].legacyEmitted | map({context: ., integration_id: 15368}))
-        ' "$integrity_ruleset" > "$frozen/integrity-stage-source.json"
+        ' "$frozen/integrity-reviewed.json" > "$frozen/integrity-stage-source.json"
         ruleset_restore_payload "$frozen/integrity-stage-source.json" \
             > "$frozen/integrity-expected.json"
     else
         contexts_function=required_check_contexts
         expected_pin=true
-        ruleset_restore_payload "$integrity_ruleset" > "$frozen/integrity-expected.json"
+        ruleset_restore_payload "$frozen/integrity-reviewed.json" > "$frozen/integrity-expected.json"
     fi
     build_classic_payload "$contexts_function" > "$frozen/classic-expected.json"
     build_classic_state "$contexts_function" > "$frozen/classic-state-expected.json"
@@ -756,6 +935,9 @@ restore_snapshot() (
         return 1
     fi
 
+    chmod 400 "$frozen"/*
+    chmod 500 "$frozen"
+
     echo "Restoring repository safeguards from $snapshot" >&2
     set +e
     gh_api_json_file PATCH "repos/$repo/branches/main/protection/required_status_checks" "$frozen/classic-restore.json" >/dev/null || failures=1
@@ -770,20 +952,20 @@ restore_snapshot() (
 
     verify_dir="$(mktemp -d)"
     set +e
-    gh api "repos/$repo/actions/permissions" > "$verify_dir/actions.json" || failures=1
-    gh api "repos/$repo/rulesets/$integrity_id" > "$verify_dir/integrity.json" || failures=1
-    gh api "repos/$repo/branches/main/protection" > "$verify_dir/classic.json" || failures=1
+    gh api "repos/$repo/actions/permissions" > "$verify_dir/actions.json" || { failures=1; readback_error=1; }
+    gh api "repos/$repo/rulesets/$integrity_id" > "$verify_dir/integrity.json" || { failures=1; readback_error=1; }
+    gh api "repos/$repo/branches/main/protection" > "$verify_dir/classic.json" || { failures=1; readback_error=1; }
     if [[ "$failures" -eq 0 ]]; then
         jq '{enabled, allowed_actions, sha_pinning_required}' "$verify_dir/actions.json" \
-            > "$verify_dir/actions-state.json" || failures=1
+            > "$verify_dir/actions-state.json" || { failures=1; readback_error=1; }
         normalize_ruleset "$verify_dir/integrity.json" \
-            > "$verify_dir/integrity-state.json" || failures=1
+            > "$verify_dir/integrity-state.json" || { failures=1; readback_error=1; }
         normalize_ruleset "$frozen/integrity-restore.json" \
-            > "$verify_dir/integrity-snapshot.json" || failures=1
+            > "$verify_dir/integrity-snapshot.json" || { failures=1; readback_error=1; }
         normalize_classic_state "$verify_dir/classic.json" \
-            > "$verify_dir/classic-state.json" || failures=1
+            > "$verify_dir/classic-state.json" || { failures=1; readback_error=1; }
         normalize_classic_state "$frozen/classic-live.json" \
-            > "$verify_dir/classic-snapshot.json" || failures=1
+            > "$verify_dir/classic-snapshot.json" || { failures=1; readback_error=1; }
     fi
     if [[ "$failures" -eq 0 ]] && { \
         ! json_equal "$verify_dir/actions-state.json" "$frozen/actions-restore.json" || \
@@ -791,12 +973,19 @@ restore_snapshot() (
         ! json_equal "$verify_dir/classic-state.json" "$verify_dir/classic-snapshot.json"; \
     }; then
         failures=1
+        readback_mismatch=1
     fi
     set -e
     rm -rf "$verify_dir"
     verify_dir=""
     if [[ "$failures" -ne 0 ]]; then
-        echo "FAIL: rollback API calls returned success but readback differs from the snapshot." >&2
+        if [[ "$readback_error" -ne 0 ]]; then
+            echo "FAIL: rollback writes completed but verification readback failed." >&2
+        elif [[ "$readback_mismatch" -ne 0 ]]; then
+            echo "FAIL: rollback API calls returned success but readback differs from the snapshot." >&2
+        else
+            echo "FAIL: rollback verification failed for an unknown reason." >&2
+        fi
         echo "      Retry: $0 --restore '$snapshot' '$repo'" >&2
         return 1
     fi
@@ -819,7 +1008,10 @@ handle_exit() {
             echo "The previous three-resource cutover state was restored. Snapshot retained: $recovery_dir" >&2
         fi
     fi
-    cleanup_preflight
+    if [[ "$recovery_retained" -eq 0 && -n "$recovery_dir" && -d "$recovery_dir" ]]; then
+        rm -rf "$recovery_dir"
+    fi
+    cleanup_temporary_dirs
     exit "$rc"
 }
 
@@ -843,7 +1035,7 @@ for file in "$check_identities" "$integrity_ruleset" "$review_ruleset" "$owner_u
     [[ -f "$file" ]] || { echo "FAIL: missing safeguard source: $file" >&2; exit 3; }
 done
 
-preflight_dir="$(mktemp -d)"
+create_private_temp_dir preflight_dir
 capture_and_validate_live_state "$preflight_dir"
 stage="$(cat "$preflight_dir/stage")"
 if [[ "$preflight_only" -eq 1 ]]; then
@@ -872,18 +1064,17 @@ printf '%s\n' \
     "$0 --restore '$recovery_dir' '$repo'" \
     > "$recovery_dir/RECOVERY.txt"
 verify_snapshot_unchanged
-
-build_classic_payload required_check_contexts > "$preflight_dir/classic-desired.json"
-jq -n '{enabled: true, allowed_actions: "all", sha_pinning_required: true}' > "$preflight_dir/actions-desired.json"
+prepare_transaction_payloads
 
 echo "Applying stable required-check and SHA-pinning safeguards to $repo"
 echo "Recovery snapshot: $recovery_dir"
 transaction_active=1
-gh_api_json_file PUT "repos/$repo/actions/permissions" "$preflight_dir/actions-desired.json" >/dev/null
-gh_api_json_file PUT "repos/$repo/rulesets/$(jq -r .integrity_ruleset_id "$preflight_dir/manifest.json")" "$integrity_ruleset" >/dev/null
-gh_api_json_file PATCH "repos/$repo/branches/main/protection/required_status_checks" "$preflight_dir/classic-desired.json" >/dev/null
+recovery_retained=1
+gh_api_json_file PUT "repos/$repo/actions/permissions" "$transaction_dir/actions-desired.json" >/dev/null
+gh_api_json_file PUT "repos/$repo/rulesets/$(jq -r .integrity_ruleset_id "$transaction_dir/manifest.json")" "$transaction_dir/integrity-desired.json" >/dev/null
+gh_api_json_file PATCH "repos/$repo/branches/main/protection/required_status_checks" "$transaction_dir/classic-desired.json" >/dev/null
 
-postflight_dir="$(mktemp -d)"
+create_private_temp_dir postflight_dir
 capture_and_validate_live_state "$postflight_dir"
 if [[ "$(cat "$postflight_dir/stage")" != "stable" ]]; then
     rm -rf "$postflight_dir"
