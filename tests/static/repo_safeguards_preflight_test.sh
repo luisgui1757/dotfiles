@@ -69,6 +69,8 @@ make_state() {
     jq -n --arg sha "$fixture_head" '{sha: $sha}' > "$state/live-main.json"
     jq -n '{
       full_name: "owner/repo",
+      private: false,
+      visibility: "public",
       default_branch: "main",
       allow_merge_commit: false,
       allow_squash_merge: true,
@@ -206,7 +208,14 @@ done
 state="${TEST_STATE_DIR:?}"
 mutation_log="${TEST_MUTATION_LOG:?}"
 
-if [[ "$method" == "GET" && "$path" == "repos/owner/repo" && -n "${TEST_MUTATE_BEFORE_SECOND_CAPTURE:-}" ]]; then
+if [[ "$method" == "GET" && -n "${TEST_FAIL_READ_AFTER_MUTATION_PATH:-}" &&
+      "$path" == "$TEST_FAIL_READ_AFTER_MUTATION_PATH" && -s "$mutation_log" ]]; then
+    exit 95
+fi
+
+if [[ "$method" == "GET" && "$path" == "repos/owner/repo" &&
+      ( -n "${TEST_MUTATE_BEFORE_SECOND_CAPTURE:-}" ||
+        -n "${TEST_PRIVATE_BEFORE_SECOND_CAPTURE:-}" ) ]]; then
     read_count=0
     if [[ -f "$state/repository-read-count" ]]; then
         read_count="$(cat "$state/repository-read-count")"
@@ -214,7 +223,11 @@ if [[ "$method" == "GET" && "$path" == "repos/owner/repo" && -n "${TEST_MUTATE_B
     read_count=$((read_count + 1))
     printf '%s\n' "$read_count" > "$state/repository-read-count"
     if [[ "$read_count" -eq 2 ]]; then
-        jq '.delete_branch_on_merge = false' "$state/repository.json" > "$state/repository.tmp"
+        if [[ -n "${TEST_MUTATE_BEFORE_SECOND_CAPTURE:-}" ]]; then
+            jq '.delete_branch_on_merge = false' "$state/repository.json" > "$state/repository.tmp"
+        else
+            jq '.private = true | .visibility = "private"' "$state/repository.json" > "$state/repository.tmp"
+        fi
         mv "$state/repository.tmp" "$state/repository.json"
     fi
 fi
@@ -227,6 +240,17 @@ if [[ "$method" != "GET" ]]; then
     fi
     if [[ -n "${TEST_FAIL_AFTER_PATH:-}" && -e "$state/failure-used" && "$path" == "$TEST_FAIL_AFTER_PATH" ]]; then
         exit 92
+    fi
+    if [[ -n "${TEST_MUTATE_SNAPSHOT_AFTER_FIRST_WRITE:-}" && ! -e "$state/snapshot-mutated" ]]; then
+        : > "$state/snapshot-mutated"
+        jq '
+          (.rules[] | select(.type == "required_status_checks") |
+            .parameters.required_status_checks) =
+          [{context: "unreviewed-after-validation", integration_id: 15368}]
+        ' "$TEST_MUTATE_SNAPSHOT_AFTER_FIRST_WRITE/integrity-restore.json" \
+            > "$TEST_MUTATE_SNAPSHOT_AFTER_FIRST_WRITE/integrity-restore.tmp"
+        mv "$TEST_MUTATE_SNAPSHOT_AFTER_FIRST_WRITE/integrity-restore.tmp" \
+            "$TEST_MUTATE_SNAPSHOT_AFTER_FIRST_WRITE/integrity-restore.json"
     fi
     case "$path" in
         repos/owner/repo/actions/permissions)
@@ -309,6 +333,18 @@ expect_failure() {
     grep -F "$expected" <<<"$output" >/dev/null || {
         echo "FAIL: expected failure text not found: $expected" >&2
         printf '%s\n' "$output" >&2
+        exit 1
+    }
+}
+
+expect_restore_rejected_without_mutation() {
+    local expected="$1" state="$2" snapshot="$3"
+    : > "$mutation_log"
+    expect_failure "$expected" \
+        run_safeguards "$state" "$mutation_log" --restore "$snapshot"
+    [[ ! -s "$mutation_log" ]] || {
+        echo "FAIL: invalid recovery material mutated live state: $snapshot" >&2
+        cat "$mutation_log" >&2
         exit 1
     }
 }
@@ -418,6 +454,105 @@ snapshot="$(find "$fixture/.git/dotfiles-safeguards" -mindepth 1 -maxdepth 1 -ty
 }
 echo "ok  : apply snapshots then mutates only the three reviewed cutover resources"
 
+altered_context_snapshot="$WORK/altered-context-snapshot"
+cp -R "$snapshot" "$altered_context_snapshot"
+jq '
+  (.rules[] | select(.type == "required_status_checks") |
+    .parameters.required_status_checks) =
+  [{context: "unreviewed-context", integration_id: 15368}]
+' "$altered_context_snapshot/integrity-restore.json" \
+    > "$altered_context_snapshot/integrity-restore.tmp"
+mv "$altered_context_snapshot/integrity-restore.tmp" \
+    "$altered_context_snapshot/integrity-restore.json"
+expect_restore_rejected_without_mutation \
+    "policy does not match manifest stage" "$state" "$altered_context_snapshot"
+
+for missing_file in \
+    manifest.json \
+    actions-restore.json \
+    integrity-restore.json \
+    classic-restore.json \
+    classic-live.json; do
+    incomplete_snapshot="$WORK/incomplete-${missing_file%.json}-snapshot"
+    cp -R "$snapshot" "$incomplete_snapshot"
+    rm "$incomplete_snapshot/$missing_file"
+    expect_restore_rejected_without_mutation \
+        "missing or unsafe $missing_file" "$state" "$incomplete_snapshot"
+done
+
+altered_bypass_snapshot="$WORK/altered-bypass-snapshot"
+cp -R "$snapshot" "$altered_bypass_snapshot"
+jq '.bypass_actors = [{actor_id: 1, actor_type: "RepositoryRole", bypass_mode: "always"}]' \
+    "$altered_bypass_snapshot/integrity-restore.json" \
+    > "$altered_bypass_snapshot/integrity-restore.tmp"
+mv "$altered_bypass_snapshot/integrity-restore.tmp" \
+    "$altered_bypass_snapshot/integrity-restore.json"
+expect_restore_rejected_without_mutation \
+    "policy does not match manifest stage" "$state" "$altered_bypass_snapshot"
+
+altered_condition_snapshot="$WORK/altered-condition-snapshot"
+cp -R "$snapshot" "$altered_condition_snapshot"
+jq '.conditions.ref_name.include = ["refs/heads/other"]' \
+    "$altered_condition_snapshot/integrity-restore.json" \
+    > "$altered_condition_snapshot/integrity-restore.tmp"
+mv "$altered_condition_snapshot/integrity-restore.tmp" \
+    "$altered_condition_snapshot/integrity-restore.json"
+expect_restore_rejected_without_mutation \
+    "policy does not match manifest stage" "$state" "$altered_condition_snapshot"
+
+cross_stage_snapshot="$WORK/cross-stage-snapshot"
+cp -R "$snapshot" "$cross_stage_snapshot"
+jq '.stage = "stable"' "$cross_stage_snapshot/manifest.json" \
+    > "$cross_stage_snapshot/manifest.tmp"
+mv "$cross_stage_snapshot/manifest.tmp" "$cross_stage_snapshot/manifest.json"
+expect_restore_rejected_without_mutation \
+    "policy does not match manifest stage" "$state" "$cross_stage_snapshot"
+
+altered_actions_snapshot="$WORK/altered-actions-snapshot"
+cp -R "$snapshot" "$altered_actions_snapshot"
+jq '.sha_pinning_required = true' "$altered_actions_snapshot/actions-restore.json" \
+    > "$altered_actions_snapshot/actions-restore.tmp"
+mv "$altered_actions_snapshot/actions-restore.tmp" \
+    "$altered_actions_snapshot/actions-restore.json"
+expect_restore_rejected_without_mutation \
+    "policy does not match manifest stage" "$state" "$altered_actions_snapshot"
+
+altered_classic_snapshot="$WORK/altered-classic-snapshot"
+cp -R "$snapshot" "$altered_classic_snapshot"
+jq '.required_linear_history.enabled = false' \
+    "$altered_classic_snapshot/classic-live.json" \
+    > "$altered_classic_snapshot/classic-live.tmp"
+mv "$altered_classic_snapshot/classic-live.tmp" \
+    "$altered_classic_snapshot/classic-live.json"
+expect_restore_rejected_without_mutation \
+    "policy does not match manifest stage" "$state" "$altered_classic_snapshot"
+
+altered_id_snapshot="$WORK/altered-id-snapshot"
+cp -R "$snapshot" "$altered_id_snapshot"
+jq '.integrity_ruleset_id = 102' "$altered_id_snapshot/manifest.json" \
+    > "$altered_id_snapshot/manifest.tmp"
+mv "$altered_id_snapshot/manifest.tmp" "$altered_id_snapshot/manifest.json"
+expect_restore_rejected_without_mutation \
+    "integrity ruleset ID does not match" "$state" "$altered_id_snapshot"
+echo "ok  : incomplete, altered, and cross-stage recovery snapshots fail before mutation"
+
+private_state="$(new_case_state private-repository)"
+jq '.private = true | .visibility = "private"' \
+    "$private_state/repository.json" > "$private_state/repository.tmp"
+mv "$private_state/repository.tmp" "$private_state/repository.json"
+expect_failure "public-repo posture" \
+    run_safeguards "$private_state" "$mutation_log" --preflight-only
+
+private_state="$(new_case_state concurrent-private-repository)"
+TEST_PRIVATE_BEFORE_SECOND_CAPTURE=1 \
+    expect_failure "public-repo posture" \
+    run_safeguards "$private_state" "$mutation_log"
+[[ ! -s "$mutation_log" ]] || {
+    echo "FAIL: private repository posture was detected after mutation" >&2
+    exit 1
+}
+echo "ok  : private visibility and public-to-private concurrent drift fail before mutation"
+
 : > "$mutation_log"
 output="$(run_safeguards "$state" "$mutation_log")"
 grep -F "already match the stable checked-in posture" <<<"$output" >/dev/null
@@ -434,11 +569,45 @@ expect_failure "recovery snapshot belongs to other/repo" \
 [[ ! -s "$mutation_log" ]] || { echo "FAIL: mismatched recovery snapshot mutated live state" >&2; exit 1; }
 echo "ok  : mismatched recovery snapshot fails validation before mutation"
 
+frozen_snapshot="$WORK/frozen-snapshot"
+cp -R "$snapshot" "$frozen_snapshot"
+: > "$mutation_log"
+TEST_MUTATE_SNAPSHOT_AFTER_FIRST_WRITE="$frozen_snapshot" \
+    run_safeguards "$state" "$mutation_log" --restore "$frozen_snapshot" >/dev/null
+jq -e '
+  [.rules[] | select(.type == "required_status_checks") |
+    .parameters.required_status_checks[].context] == $legacy
+' --argjson legacy "$legacy_contexts_json" "$state/integrity.json" >/dev/null
+echo "ok  : restore writes only private frozen bytes after validation"
+
 : > "$mutation_log"
 run_safeguards "$state" "$mutation_log" --restore "$snapshot" >/dev/null
 jq -e '.sha_pinning_required == false' "$state/actions.json" >/dev/null
 jq -e '.required_status_checks.contexts == $legacy' --argjson legacy "$legacy_contexts_json" "$state/classic.json" >/dev/null
 echo "ok  : explicit recovery restores and verifies the complete prior cutover state"
+
+readback_state="$(new_case_state restore-readback-failure)"
+: > "$mutation_log"
+output="$(run_safeguards "$readback_state" "$mutation_log")"
+readback_snapshot="$(awk -F': ' '/^Recovery snapshot:/ { print $2 }' <<<"$output")"
+[[ -n "$readback_snapshot" && -d "$readback_snapshot" ]] || {
+    echo "FAIL: could not identify recovery snapshot for readback failure test" >&2
+    exit 1
+}
+: > "$mutation_log"
+set +e
+output="$(TEST_FAIL_READ_AFTER_MUTATION_PATH='repos/owner/repo/actions/permissions' \
+    run_safeguards "$readback_state" "$mutation_log" --restore "$readback_snapshot" 2>&1)"
+rc=$?
+set -e
+[[ "$rc" -ne 0 ]] || { echo "FAIL: injected restore readback failure succeeded" >&2; exit 1; }
+grep -F "readback differs from the snapshot" <<<"$output" >/dev/null
+grep -F "Retry:" <<<"$output" >/dev/null
+[[ "$(wc -l < "$mutation_log" | tr -d ' ')" == "3" ]] || {
+    echo "FAIL: restore readback failure did not occur after exactly three writes" >&2
+    exit 1
+}
+echo "ok  : restore readback failure is explicit and retains the retry path"
 
 state="$(new_case_state automatic-rollback)"
 : > "$mutation_log"

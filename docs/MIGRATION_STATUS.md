@@ -128,8 +128,9 @@ broken repo-symlink still cleaned) is covered by
       account-record home before Nix, Home Manager, chezmoi, or native setup.
       It rejects a mismatched ambient `HOME` instead of fabricating
       `/Users/<user>` or `/home/<user>`, and threads the validated values through
-      the flake/sudo boundary. Darwin has separate aarch64 and x86_64 activation
-      configurations; Homebrew paths follow the actual repository/architecture.
+      the flake/sudo boundary. Darwin activation is Apple-Silicon-only;
+      unsupported x86_64 fails before activation with migration guidance, and
+      Homebrew paths follow the actual Apple Silicon repository.
       First nix-darwin bootstrap collision-checks and preserves existing
       `/etc/bashrc` and `/etc/zshrc` as `.before-nix-darwin`, rolling both back
       on failure/interruption while retaining failed generated output.
@@ -207,10 +208,13 @@ broken repo-symlink still cleaned) is covered by
       `docs/security/branch-protection.md` define the post-merge cache-free gate
       and owner-applied live switch. The apply script now completes and repeats
       a full read-only preflight before mutation: exact branch/repo/main and
-      clean sources, exact legacy live policy, unique rulesets, exact
-      GitHub-Actions app/workflow/event/run provenance, and cache-free E2E
-      evidence. It snapshots and transactionally restores the three cutover
-      resources on failure, with a tested explicit `--restore` retry. UGR-020
+      public visibility, clean sources, exact legacy live policy, unique
+      rulesets, exact GitHub-Actions app/workflow/event/run provenance, and
+      cache-free E2E evidence. It snapshots and transactionally restores the
+      three cutover resources on failure. Restore freezes every consumed file,
+      validates exact manifest-stage Actions/integrity/classic policy and live
+      ruleset identity, and rejects incomplete, altered, or cross-stage recovery
+      material before writing, with a tested explicit `--restore` retry. UGR-020
       remains PARTIAL until the merged-main proof, live apply, and readback
       succeed. Repaired PR head
       `4dbdb959674f5a062cffe44daae242318f4c1b67` passed all 12 legacy-required

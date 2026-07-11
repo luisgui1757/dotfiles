@@ -178,6 +178,14 @@ for snippet in (
     "verify_local_boundary",
     "verify_snapshot_unchanged",
     "restore_snapshot()",
+    '.private == false',
+    '.visibility == "public"',
+    "classic-live.json",
+    'frozen="$(mktemp -d)"',
+    '"$frozen/integrity-restore.json"',
+    '"$frozen/classic-restore.json"',
+    '"$frozen/actions-restore.json"',
+    "policy does not match manifest stage",
     "transaction_active=1",
     'select_workflow_run test.yml .github/workflows/test.yml',
     'select_workflow_run nix.yml .github/workflows/nix.yml',
@@ -194,6 +202,9 @@ for forbidden in (
     "try_gh_api",
     'gh_api PATCH "repos/$repo"',
     'gh_api_json_file PUT "repos/$repo/branches/main/protection"',
+    'gh_api_json_file PUT "repos/$repo/rulesets/$integrity_id" "$snapshot/',
+    'gh_api_json_file PATCH "repos/$repo/branches/main/protection/required_status_checks" "$snapshot/',
+    'gh_api_json_file PUT "repos/$repo/actions/permissions" "$snapshot/',
 ):
     if forbidden in script_text:
         fail(f"apply-repo-safeguards.sh retains unsafe broad mutation path: {forbidden}")

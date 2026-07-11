@@ -1253,3 +1253,40 @@ merged-main greenfield proof.
 | UGR-020 | PARTIAL | The repaired implementation head passed all 12 live-required and all six stable checks, and its schema-2 artifacts prove source/executed identity truthfully. | Independent re-review; after merge, exact merged-main cache-free/provenance proof followed by owner preflight/apply/readback. |
 | UGR-021 | PARTIAL | Exact repaired-head Ubuntu, Apple Silicon, Windows, container, generic/parity, Nix, and stable logical proof is green. The run used ordinary PR caches and therefore does not satisfy the merged-main cache-free gate. | Merged-main cache-free proof plus the documented real WSL, redirected-Windows, dual-Terminal, and desktop/TCC manual runs. |
 | UGR-022 | ACCEPTED/FIXED | ROADMAP, MIGRATION_STATUS, the PR body, and this append-only ledger now record the repaired-head hosted result without promoting it to cache-free or post-merge proof. | Append merged-main/live-apply evidence only after those events occur. |
+
+## Independent PR #49 recovery/public-posture correction — entry 34
+
+- Independent review of immutable head
+  `998e3f19c38a827185261bdbb0d7aeee7def24a0` reproduced two additional
+  fail-closed defects. Explicit restore accepted an altered integrity context
+  and verified the unreviewed payload against itself. Removing
+  `classic-live.json` allowed all three restore writes before post-write
+  verification failed. Separately, a fixture with `private:true` and
+  `visibility:private` passed the preflight described as the public-repository
+  posture. These are accepted defects; private snapshot permissions and the
+  repository's currently public live value do not disprove corruption,
+  incompleteness, or concurrent visibility drift.
+- The recovery repair requires all five consumed files before mutation, freezes
+  them in a private temporary directory, and derives the only acceptable
+  Actions, integrity, classic restore, and full classic state from the
+  manifest's exact legacy/stable stage. It validates exact contexts, GitHub
+  Actions app IDs, unique live integrity ruleset identity, bypass actors, branch
+  conditions, and unrelated classic protections, then writes and verifies only
+  frozen bytes. Failure cases cover every missing file, altered context,
+  bypass, branch condition, cross-stage manifest/Actions data, altered classic
+  state, wrong ruleset ID, and mutation of the retained source snapshot after
+  validation.
+- Both preflight captures now require `private:false` and
+  `visibility:public`, and the concurrent-state fingerprint includes both
+  fields. Behavioral cases reject initial private state and a public-to-private
+  second-read transition with zero writes.
+- `docs/MIGRATION_STATUS.md` no longer claims a current Intel activation
+  configuration. Current activation is Apple-Silicon-only; historical Intel
+  evidence remains append-only and explicitly retired.
+
+### Finding status amendments
+
+| ID | Status after entry 34 | Exact evidence | Remaining work |
+|---|---|---|---|
+| UGR-020 | PARTIAL | Recovery and public-posture gaps are repaired with behavioral zero-write failure cases and frozen-byte publication; the stable-context transition remains staged only. | Exact-head CI and independent re-review; after merge, merged-main cache-free proof followed by owner preflight/apply/readback. |
+| UGR-022 | ACCEPTED/FIXED | README, CLAUDE, ROADMAP, MIGRATION_STATUS, security runbooks, and this ledger now state the exact public-preflight and recovery contract; the stale active-Intel sentence is corrected. | Refresh PR-body and exact-head evidence after push. |

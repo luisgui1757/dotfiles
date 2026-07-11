@@ -27,5 +27,9 @@ pinning. At the start of the 2026-07-10 closure branch the live API reported
 `sha_pinning_required: false`; this branch does not mutate live settings. After
 merge and exact cache-free proof, the owner must run the script's no-write
 preflight and apply. It accepts only the expected legacy-to-stable transition,
-captures the old Actions/integrity/classic state before writing, restores all
-three on failure, and verifies the live value becomes `true`.
+requires public repository visibility, captures the old
+Actions/integrity/classic state before writing, and restores all three on
+failure. Restore freezes and exact-policy-validates every consumed snapshot file
+before publishing only those bytes; incomplete, altered, or cross-stage recovery
+material cannot reach a live write. The apply verifies the live value becomes
+`true`.

@@ -33,6 +33,8 @@ second concurrency readback. It requires all of the following:
 
 - local branch `main`, exact live-main HEAD, and an `origin` that resolves to
   `github.com/luisgui1757/dotfiles`;
+- repository visibility is explicitly public (`private:false`,
+  `visibility:public`) in both preflight captures;
 - clean reviewed safeguard, workflow, and logical-proof sources;
 - exactly the three named active repository rulesets, with the review and
   owner-update payloads already identical to the reviewed files;
@@ -55,9 +57,17 @@ not rewritten.
 Immediately before mutation, the script stores the complete recovery material
 under `.git/dotfiles-safeguards/recovery.*` with private permissions. Any
 mutation or readback failure automatically restores all three changed resources
-and verifies the old stage. The snapshot remains available even after success.
-If automatic rollback cannot complete, use the exact path printed by the
-failure:
+and verifies the old stage. Before any restore write, it requires every consumed
+snapshot file, copies those bytes into a private temporary directory, and
+validates the frozen set against the manifest's exact legacy/stable stage:
+Actions pinning, integrity contexts and app IDs, unique live ruleset identity,
+bypass actors, branch conditions, full classic policy, and the narrow classic
+restore payload. Missing, malformed, altered, cross-stage, wrong-target, or
+internally inconsistent source bytes fail with zero writes; changes to the
+retained source after freezing cannot affect publication. Restore publishes and
+verifies only the frozen validated bytes. The original snapshot remains
+available even after success. If automatic rollback cannot complete, use the
+exact path printed by the failure:
 
 ```bash
 scripts/apply-repo-safeguards.sh --restore '/exact/snapshot/path' luisgui1757/dotfiles

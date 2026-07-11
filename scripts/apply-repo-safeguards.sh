@@ -436,7 +436,9 @@ capture_and_validate_live_state() {
         return 1
     fi
     if ! jq -e '
-      .default_branch == "main"
+      .private == false
+      and .visibility == "public"
+      and .default_branch == "main"
       and .allow_merge_commit == false
       and .allow_squash_merge == true
       and .allow_rebase_merge == false
@@ -451,6 +453,8 @@ capture_and_validate_live_state() {
     fi
     jq '{
       full_name,
+      private,
+      visibility,
       default_branch,
       allow_merge_commit,
       allow_squash_merge,
@@ -602,53 +606,161 @@ verify_snapshot_unchanged() {
     rm -rf "$verify_dir"
 }
 
-restore_snapshot() {
-    local snapshot="$1" manifest_repo integrity_id failures=0 verify_dir
-    for file in manifest.json actions-restore.json integrity-restore.json classic-restore.json; do
+restore_snapshot() (
+    local snapshot="$1" frozen file manifest_repo stage integrity_id
+    local contexts_function expected_pin failures=0 verify_dir
+    for file in \
+        manifest.json \
+        actions-restore.json \
+        integrity-restore.json \
+        classic-restore.json \
+        classic-live.json; do
         [[ -f "$snapshot/$file" && ! -L "$snapshot/$file" ]] || {
             echo "FAIL: recovery snapshot has a missing or unsafe $file: $snapshot" >&2
             return 1
         }
     done
+
+    frozen="$(mktemp -d)"
+    chmod 700 "$frozen"
+    trap 'rm -rf "$frozen"; if [[ -n "$verify_dir" ]]; then rm -rf "$verify_dir"; fi' EXIT
+    for file in \
+        manifest.json \
+        actions-restore.json \
+        integrity-restore.json \
+        classic-restore.json \
+        classic-live.json; do
+        if ! cp "$snapshot/$file" "$frozen/$file"; then
+            echo "FAIL: could not freeze recovery snapshot file before validation: $snapshot/$file" >&2
+            return 1
+        fi
+    done
+    chmod -R go-rwx "$frozen"
+
     if ! jq -e '
-      .schema == 1
+      type == "object"
+      and (keys | sort) == ([
+        "integrity_ruleset_id", "live_main_sha", "proof_runs",
+        "repository", "schema", "stage"
+      ] | sort)
+      and .schema == 1
       and (.repository | type == "string")
       and (.live_main_sha | test("^[0-9a-f]{40}$"))
       and (.stage == "legacy" or .stage == "stable")
-      and (.integrity_ruleset_id | type == "number")
-    ' "$snapshot/manifest.json" >/dev/null || \
+      and ((.integrity_ruleset_id | type) == "number")
+      and (.integrity_ruleset_id > 0)
+      and ((.integrity_ruleset_id | floor) == .integrity_ruleset_id)
+      and (.proof_runs | type == "object")
+      and (.proof_runs | keys | sort) == (["e2e_cache_free", "nix", "test"] | sort)
+      and all(.proof_runs[]; type == "number" and . > 0 and floor == .)
+    ' "$frozen/manifest.json" >/dev/null || \
         ! jq -e '
-          .enabled == true
+          type == "object"
+          and (keys | sort) == (["allowed_actions", "enabled", "sha_pinning_required"] | sort)
+          and .enabled == true
           and .allowed_actions == "all"
           and (.sha_pinning_required | type == "boolean")
-        ' "$snapshot/actions-restore.json" >/dev/null || \
+        ' "$frozen/actions-restore.json" >/dev/null || \
         ! jq -e '
-          .name == "Protect main: integrity"
+          type == "object"
+          and .name == "Protect main: integrity"
           and .target == "branch"
           and .enforcement == "active"
+          and (.bypass_actors | type == "array")
+          and (.conditions | type == "object")
           and (.rules | type == "array")
-        ' "$snapshot/integrity-restore.json" >/dev/null || \
+        ' "$frozen/integrity-restore.json" >/dev/null || \
         ! jq -e --argjson app_id "$github_actions_app_id" '
-          (.strict | type == "boolean")
+          type == "object"
+          and (keys | sort) == (["checks", "contexts", "strict"] | sort)
+          and (.strict | type == "boolean")
           and (.contexts | type == "array" and length > 0 and length == (unique | length))
           and (.checks | type == "array")
           and ((.contexts | sort) == (.checks | map(.context) | sort))
           and all(.checks[]; .app_id == $app_id)
-        ' "$snapshot/classic-restore.json" >/dev/null; then
+        ' "$frozen/classic-restore.json" >/dev/null || \
+        ! jq -e '
+          type == "object"
+          and (.required_status_checks.strict | type == "boolean")
+          and (.required_status_checks.contexts | type == "array")
+          and (.required_status_checks.checks | type == "array")
+          and (.enforce_admins.enabled | type == "boolean")
+          and (.required_linear_history.enabled | type == "boolean")
+          and (.allow_force_pushes.enabled | type == "boolean")
+          and (.allow_deletions.enabled | type == "boolean")
+          and (.required_conversation_resolution.enabled | type == "boolean")
+          and (.required_signatures.enabled | type == "boolean")
+          and (.block_creations.enabled | type == "boolean")
+          and (.lock_branch.enabled | type == "boolean")
+          and (.allow_fork_syncing.enabled | type == "boolean")
+        ' "$frozen/classic-live.json" >/dev/null; then
         echo "FAIL: recovery snapshot schema or payload validation failed: $snapshot" >&2
         return 1
     fi
-    manifest_repo="$(jq -r .repository "$snapshot/manifest.json")"
+    manifest_repo="$(jq -r .repository "$frozen/manifest.json")"
     [[ "$manifest_repo" == "$repo" ]] || {
         echo "FAIL: recovery snapshot belongs to $manifest_repo, not $repo" >&2
         return 1
     }
-    integrity_id="$(jq -r .integrity_ruleset_id "$snapshot/manifest.json")"
+    stage="$(jq -r .stage "$frozen/manifest.json")"
+    integrity_id="$(jq -r .integrity_ruleset_id "$frozen/manifest.json")"
+    if ! gh api "repos/$repo/rulesets?includes_parents=false" \
+        > "$frozen/live-rulesets.json"; then
+        echo "FAIL: could not verify the live integrity ruleset identity before recovery." >&2
+        return 1
+    fi
+    if ! jq -e \
+        --arg repo "$repo" \
+        --argjson integrity_id "$integrity_id" '
+          [.[] | select(.name == "Protect main: integrity")] as $matches
+          | ($matches | length) == 1
+          and $matches[0].id == $integrity_id
+          and $matches[0].source == $repo
+          and $matches[0].source_type == "Repository"
+          and $matches[0].target == "branch"
+          and $matches[0].enforcement == "active"
+        ' "$frozen/live-rulesets.json" >/dev/null; then
+        echo "FAIL: recovery snapshot integrity ruleset ID does not match the unique live integrity ruleset." >&2
+        return 1
+    fi
+
+    if [[ "$stage" == "legacy" ]]; then
+        contexts_function=legacy_check_contexts
+        expected_pin=false
+        jq --slurpfile identities "$check_identities" '
+          (.rules[] | select(.type == "required_status_checks").parameters.required_status_checks) =
+            ($identities[0].legacyEmitted | map({context: ., integration_id: 15368}))
+        ' "$integrity_ruleset" > "$frozen/integrity-stage-source.json"
+        ruleset_restore_payload "$frozen/integrity-stage-source.json" \
+            > "$frozen/integrity-expected.json"
+    else
+        contexts_function=required_check_contexts
+        expected_pin=true
+        ruleset_restore_payload "$integrity_ruleset" > "$frozen/integrity-expected.json"
+    fi
+    build_classic_payload "$contexts_function" > "$frozen/classic-expected.json"
+    build_classic_state "$contexts_function" > "$frozen/classic-state-expected.json"
+    jq -n --argjson pin "$expected_pin" \
+        '{enabled: true, allowed_actions: "all", sha_pinning_required: $pin}' \
+        > "$frozen/actions-expected.json"
+    if ! normalize_classic_state "$frozen/classic-live.json" \
+        > "$frozen/classic-live-state.json" || \
+        ! classic_restore_payload "$frozen/classic-live.json" \
+        > "$frozen/classic-from-live.json" || \
+        ! json_equal "$frozen/actions-restore.json" "$frozen/actions-expected.json" || \
+        ! json_equal "$frozen/integrity-restore.json" "$frozen/integrity-expected.json" || \
+        ! json_equal "$frozen/classic-restore.json" "$frozen/classic-expected.json" || \
+        ! json_equal "$frozen/classic-live-state.json" "$frozen/classic-state-expected.json" || \
+        ! json_equal "$frozen/classic-from-live.json" "$frozen/classic-restore.json"; then
+        echo "FAIL: recovery snapshot policy does not match manifest stage '$stage': $snapshot" >&2
+        return 1
+    fi
+
     echo "Restoring repository safeguards from $snapshot" >&2
     set +e
-    gh_api_json_file PATCH "repos/$repo/branches/main/protection/required_status_checks" "$snapshot/classic-restore.json" >/dev/null || failures=1
-    gh_api_json_file PUT "repos/$repo/rulesets/$integrity_id" "$snapshot/integrity-restore.json" >/dev/null || failures=1
-    gh_api_json_file PUT "repos/$repo/actions/permissions" "$snapshot/actions-restore.json" >/dev/null || failures=1
+    gh_api_json_file PATCH "repos/$repo/branches/main/protection/required_status_checks" "$frozen/classic-restore.json" >/dev/null || failures=1
+    gh_api_json_file PUT "repos/$repo/rulesets/$integrity_id" "$frozen/integrity-restore.json" >/dev/null || failures=1
+    gh_api_json_file PUT "repos/$repo/actions/permissions" "$frozen/actions-restore.json" >/dev/null || failures=1
     set -e
     if [[ "$failures" -ne 0 ]]; then
         echo "FAIL: safeguard rollback was incomplete." >&2
@@ -657,27 +769,39 @@ restore_snapshot() {
     fi
 
     verify_dir="$(mktemp -d)"
-    gh api "repos/$repo/actions/permissions" > "$verify_dir/actions.json"
-    gh api "repos/$repo/rulesets/$integrity_id" > "$verify_dir/integrity.json"
-    gh api "repos/$repo/branches/main/protection" > "$verify_dir/classic.json"
-    jq '{enabled, allowed_actions, sha_pinning_required}' "$verify_dir/actions.json" > "$verify_dir/actions-state.json"
-    normalize_ruleset "$verify_dir/integrity.json" > "$verify_dir/integrity-state.json"
-    normalize_ruleset "$snapshot/integrity-restore.json" > "$verify_dir/integrity-snapshot.json"
-    normalize_classic_state "$verify_dir/classic.json" > "$verify_dir/classic-state.json"
-    normalize_classic_state "$snapshot/classic-live.json" > "$verify_dir/classic-snapshot.json"
-    if ! json_equal "$verify_dir/actions-state.json" "$snapshot/actions-restore.json" || \
+    set +e
+    gh api "repos/$repo/actions/permissions" > "$verify_dir/actions.json" || failures=1
+    gh api "repos/$repo/rulesets/$integrity_id" > "$verify_dir/integrity.json" || failures=1
+    gh api "repos/$repo/branches/main/protection" > "$verify_dir/classic.json" || failures=1
+    if [[ "$failures" -eq 0 ]]; then
+        jq '{enabled, allowed_actions, sha_pinning_required}' "$verify_dir/actions.json" \
+            > "$verify_dir/actions-state.json" || failures=1
+        normalize_ruleset "$verify_dir/integrity.json" \
+            > "$verify_dir/integrity-state.json" || failures=1
+        normalize_ruleset "$frozen/integrity-restore.json" \
+            > "$verify_dir/integrity-snapshot.json" || failures=1
+        normalize_classic_state "$verify_dir/classic.json" \
+            > "$verify_dir/classic-state.json" || failures=1
+        normalize_classic_state "$frozen/classic-live.json" \
+            > "$verify_dir/classic-snapshot.json" || failures=1
+    fi
+    if [[ "$failures" -eq 0 ]] && { \
+        ! json_equal "$verify_dir/actions-state.json" "$frozen/actions-restore.json" || \
         ! json_equal "$verify_dir/integrity-state.json" "$verify_dir/integrity-snapshot.json" || \
-        ! json_equal "$verify_dir/classic-state.json" "$verify_dir/classic-snapshot.json"; then
+        ! json_equal "$verify_dir/classic-state.json" "$verify_dir/classic-snapshot.json"; \
+    }; then
         failures=1
     fi
+    set -e
     rm -rf "$verify_dir"
+    verify_dir=""
     if [[ "$failures" -ne 0 ]]; then
         echo "FAIL: rollback API calls returned success but readback differs from the snapshot." >&2
         echo "      Retry: $0 --restore '$snapshot' '$repo'" >&2
         return 1
     fi
     echo "Repository safeguard cutover resources restored and verified from $snapshot" >&2
-}
+)
 
 handle_exit() {
     local rc=$? rollback_rc=0

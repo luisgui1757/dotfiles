@@ -787,8 +787,15 @@ The current stable-context cutover is applied only through
 `scripts/apply-repo-safeguards.sh` after its merged-main proof and no-write
 preflight. The script refuses unexpected live drift rather than acting as an
 unreviewed general reconciler, mutates only Actions SHA pinning plus integrity
-and classic required checks, and keeps a verified recovery snapshot. Follow the
-commands and `--restore` recovery path in `docs/security/branch-protection.md`.
+and classic required checks, and keeps a verified recovery snapshot. Both
+preflight captures require public repository visibility. Recovery must freeze
+all consumed snapshot files before validation, bind their exact legacy/stable
+contexts, app IDs, ruleset identity, bypass/branch policy, Actions pinning, and
+full classic state to the manifest, then write and verify only those frozen
+bytes. Missing, altered, or cross-stage recovery material must fail before
+mutation, and changes to the retained source after freezing must not influence
+publication. Follow the commands and `--restore` recovery path in
+`docs/security/branch-protection.md`.
 Do not recreate a hosted WSL2 canary or claim Linux proxy coverage as WSL
 runtime proof.
 

@@ -281,9 +281,12 @@ Commit-by-commit status:
   SHA instead of mislabeling the latter as the head. The apply script now
   completes and repeats the whole read-only boundary before its first mutation:
   exact branch/repo/main identity, clean sources, unique/exact legacy live
-  policy, GitHub-Actions app/workflow/event/run provenance, and cache-free E2E
-  proof. It snapshots and rolls back the three changed resources on failure and
-  retains a tested explicit recovery path.
+  policy, public visibility, GitHub-Actions app/workflow/event/run provenance,
+  and cache-free E2E proof. It snapshots and rolls back the three changed
+  resources on failure and retains a tested explicit recovery path. Recovery
+  freezes every consumed snapshot file, rejects incomplete, altered,
+  cross-stage, wrong-ruleset, bypass/condition, and full-classic-policy drift
+  before any write, and publishes only the validated frozen bytes.
   UGR-021 is PARTIAL until real WSL, redirected-Windows, cache-free scheduled or
   manual, and desktop runs exist. Historical Intel and current conventional
   Windows font-consumption lanes passed. The first PR run exposed and fixed two
