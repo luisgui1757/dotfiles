@@ -1321,3 +1321,37 @@ merged-main greenfield proof.
 |---|---|---|---|
 | UGR-020 | PARTIAL | The staged required-check cutover now has one transactional writer; Probot cannot race classic protection on merge. Recovery/public-posture repairs remain behaviorally covered. | Exact-head CI and independent re-review; after merge, exact merged-main cache-free proof followed by owner preflight/apply/readback. |
 | UGR-022 | ACCEPTED/FIXED | Current safeguard ownership and default-branch app behavior are documented consistently, without relying on an unverifiable installation assumption. | Append exact repaired-head and post-merge results only after they occur. |
+
+## Final local verification for entries 34–35 — entry 36
+
+- Recovery/public-visibility implementation commit:
+  `dfef60c6626de8feb8498cce7edb678a73dcec69`.
+- Single-writer/Probot implementation commit:
+  `374b3b84cf16371497fb8c78996244625b4db628`.
+- The primary checkout, stashes, untracked review prompts, real HOME, and live
+  GitHub safeguards were not modified. Verification ran in a disposable clone
+  on Apple Silicon macOS.
+
+| Check | Exact local result |
+|---|---|
+| `git diff --check` | PASS |
+| `bash -n` over tracked shell scripts | PASS: 135/135 |
+| `make lint` | PASS |
+| Focused safeguard transaction suite | PASS: incomplete/altered/cross-stage restore, frozen-byte publication, public/private drift, rollback, retry, and idempotency |
+| Focused required-check/repository-policy/YAML suites | PASS: Probot branch ownership absent; canonical stable identities remain aligned |
+| `bash tests/static/run_all.sh` | PASS |
+| `bash tests/shell/run_all.sh` | PASS |
+| `make test-migration` | PASS |
+| `pwsh -NoLogo -NoProfile -File ./test.ps1` | PASS: PSScriptAnalyzer clean; Pester 234 passed, 0 failed, 0 skipped; Neovim entry point returned 0 |
+| `make test-nvim` | PASS, including pinned bootstrap, checked Tree-sitter deletion, and real two-project clangd isolation |
+| `make test` | PASS |
+| `make validate-renovate` | PASS: official validator and exactly 82 reviewed dependency records |
+| `bash tests/nix/run_all.sh` | PASS |
+| `nix flake check --print-build-logs` | PASS on Apple Silicon; incompatible Linux systems were omitted, not claimed as runtime proof |
+| `make ci` | PASS: final behavior head ended `local pre-PR gate passed` |
+| Gitleaks 8.30.1, full PR range `f104bf0..374b3b8` | PASS: 11 commits, no leaks |
+| Gitleaks 8.30.1, clean tracked archives | Base and repaired head contain the same two `generic-api-key` Windows Terminal fragment false positives at the same two paths and line 49; no finding was added |
+| Added private-identifier audit | PASS: no local owner home path or private email; matches are only public GitHub transport/app identities and `example.invalid` test data |
+
+Hosted exact-head checks, logical marker downloads, and final live readback are
+recorded only after the repaired head is pushed and those events complete.
