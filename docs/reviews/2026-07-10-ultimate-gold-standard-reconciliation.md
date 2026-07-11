@@ -1117,3 +1117,29 @@ merged-main greenfield proof.
   verify all four setup producers + four setup logical + two Nix logical checks,
   run `--preflight-only`, apply, then read back both safeguard layers and Actions
   permissions.
+
+## Independent PR #49 re-review correction — entry 30
+
+- Independent review of immutable head
+  `8c0bfb268592830d7213e4d3113d7bf61eb47101` downloaded the final-head logical
+  artifacts and disproved their documented head field. Pull-request run
+  `29121873434` reported PR source head `8c0bfb268592830d7213e4d3113d7bf61eb47101`
+  through the workflow API, while its marker stored
+  `head_sha=39316a5b385a6b69bf1332ffd19ab8329024621b`. The latter is GitHub's synthetic
+  merge of base `f104bf066e4af7d4d707fe22ba36600711f1ae14` and that PR head, as required by
+  the official `pull_request` event model. The producer work was real, but the
+  durable field and documentation were false.
+- The repair commit `fix(ci): bind logical proofs to source and executed SHAs`
+  introduces marker schema 2. It records `source_head_sha` from
+  `github.event.pull_request.head.sha || github.sha` and `executed_sha` from
+  `GITHUB_SHA`, and verifies both in the consumer job. Behavioral shell coverage
+  proves distinct pull-request identities, equal dispatch/push identities,
+  drift rejection, missing-source rejection before publication, and obsolete
+  schema rejection.
+
+### Finding status amendments
+
+| ID | Status after entry 30 | Exact evidence | Remaining work |
+|---|---|---|---|
+| UGR-020 | PARTIAL | Stable proof artifacts now distinguish the source head from the executed merge result and fail closed on either mismatch. | Complete the separate safeguard preflight/rollback repair, re-run exact-head workflows, merge, then perform merged-main cache-free proof and the owner-applied live cutover. |
+| UGR-022 | ACCEPTED/FIXED | README, CLAUDE, ROADMAP, MIGRATION_STATUS, the safeguard runbook, and this append-only entry now describe GitHub pull-request execution truthfully. | Revalidate the final implementation head and append live results. |

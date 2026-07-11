@@ -46,10 +46,14 @@ deadlock. `.github/check-identities.json` records the transition.
 This PR is the checked-in cutover stage. All four safeguard sources name the
 stable per-OS logical checks, while workflows continue to emit both the legacy
 runner-versioned producers and stable checks. Each stable check downloads the
-exact producer artifact and verifies the head SHA, run id/attempt, logical
-identity, and legacy producer through `scripts/ci-logical-proof.sh`; it is not a
-fake/no-op check. Because live GitHub remains on the legacy set, those producer
-jobs continue to gate this PR without a rename deadlock.
+exact producer artifact and verifies the source head SHA, actually executed
+SHA, run id/attempt, logical identity, and legacy producer through
+`scripts/ci-logical-proof.sh`; it is not a fake/no-op check. GitHub executes a
+synthetic merge commit for `pull_request`, so schema 2 records that commit
+separately from `github.event.pull_request.head.sha`. On push, schedule, and
+workflow dispatch the two identities normally match. Because live GitHub
+remains on the legacy set, those producer jobs continue to gate this PR without
+a rename deadlock.
 
 After this PR merges, use this exact sequence:
 

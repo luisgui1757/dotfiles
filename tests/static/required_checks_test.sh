@@ -64,6 +64,8 @@ if len(replacements) != len(metadata["replacements"]):
 for workflow in (e2e, nix):
     if "ci-logical-proof.sh emit" not in workflow or "ci-logical-proof.sh verify" not in workflow:
         raise SystemExit("FAIL: logical checks are not bound to exact proof artifacts")
+    if "DOTFILES_SOURCE_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}" not in workflow:
+        raise SystemExit("FAIL: logical proof workflow does not distinguish PR source head from executed SHA")
 
 print("OK: stable required identities are emitted while legacy producers remain available for the live transition")
 PY

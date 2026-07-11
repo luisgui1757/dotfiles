@@ -802,12 +802,14 @@ switches all four checked-in safeguard sources to six stable logical checks
 (`nix flake check / {linux,macos}`, `e2e containers / linux`, `setup.sh /
 {linux,macos}`, and `setup.ps1 / windows`) while workflows continue emitting
 the six legacy producer names. Each logical check verifies the exact OS proof
-marker's head SHA, workflow run, logical identity, and legacy producer; these
-are not no-op checks. Live GitHub remains on the legacy set so it can gate this
-PR safely. Only after this PR merges and the cache-free producers plus all six
-logical checks pass on that exact `main` SHA should the owner apply the checked-in
-stable contexts. See [branch-protection.md](docs/security/branch-protection.md)
-for the exact order.
+marker's source head SHA, actually executed SHA, workflow run, logical identity,
+and legacy producer; these are not no-op checks. Pull-request jobs execute
+GitHub's synthetic merge result, so the artifact records that commit separately
+from the PR branch head. Live GitHub remains on the legacy set so it can gate
+this PR safely. Only after this PR merges and the cache-free producers plus all
+six logical checks pass on that exact `main` SHA should the owner apply the
+checked-in stable contexts. See
+[branch-protection.md](docs/security/branch-protection.md) for the exact order.
 
 Manual owner step:
 

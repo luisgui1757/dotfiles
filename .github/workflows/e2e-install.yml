@@ -20,6 +20,9 @@ defaults:
 env:
   HOMEBREW_NO_AUTO_UPDATE: "1"
   HOMEBREW_NO_INSTALL_CLEANUP: "1"
+  # pull_request executes GitHub's synthetic merge commit; preserve the source
+  # branch identity separately so logical proof artifacts bind both identities.
+  DOTFILES_SOURCE_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
 jobs:
   linux-container-install:

@@ -199,9 +199,11 @@ broken repo-symlink still cleaned) is covered by
       `setup.sh / macos`, and `setup.ps1 / windows`. The static alignment test
       binds ruleset, settings, apply function, and API payload to that exact set.
 - [x] Stable logical replacements for the six runner-versioned contexts are
-      emitted and bound to exact per-OS proof artifacts. Legacy producer names
-      remain emitted so the currently live legacy safeguards can gate this
-      cutover PR. `.github/check-identities.json` and
+      emitted and bound to exact per-OS proof artifacts. Marker schema 2 binds
+      the PR source head separately from GitHub's actually executed synthetic
+      merge SHA; push/dispatch proofs truthfully record equal identities.
+      Legacy producer names remain emitted so the currently live legacy
+      safeguards can gate this cutover PR. `.github/check-identities.json` and
       `docs/security/branch-protection.md` define the post-merge cache-free gate
       and owner-applied live switch. The apply script itself refuses to mutate
       unless its checkout is exact live main, safeguard sources are clean, and

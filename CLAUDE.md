@@ -363,8 +363,10 @@ that violates one of these, fix it instead of disabling the test.
 27. **Required check identities migrate without renaming deadlock.**
     `.github/check-identities.json` records the stable target and still-emitted
     legacy producers. The four checked-in safeguard sources require stable
-    logical jobs that verify exact per-OS proof artifacts bound to the same run
-    and head SHA; workflows retain legacy producer names until live cutover.
+    logical jobs that verify exact per-OS proof artifacts bound to the same run,
+    PR source head, and actually executed SHA. On `pull_request`, the executed
+    SHA is GitHub's synthetic merge commit; it must never be mislabeled as the
+    source head. Workflows retain legacy producer names until live cutover.
     Never make a no-op check to manufacture green status, and never switch live
     contexts from the cutover PR. Follow `docs/security/branch-protection.md`:
     merge while live legacy checks still gate, pass cache-free plus all logical

@@ -276,7 +276,9 @@ Commit-by-commit status:
   Nix-ownership gaps. UGR-020 is deliberately PARTIAL: this cutover switches
   every checked-in safeguard source to stable logical checks while retaining
   legacy producers for the still-live rules; the live owner apply happens only
-  after the documented merged-main cache-free gate. The apply script now
+  after the documented merged-main cache-free gate. Logical proof schema 2
+  records both the PR source head and GitHub's actually executed synthetic merge
+  SHA instead of mislabeling the latter as the head. The apply script now
   enforces exact live-main HEAD, clean safeguard sources, and successful stable
   contexts before its first mutation.
   UGR-021 is PARTIAL until real WSL, redirected-Windows, cache-free scheduled or

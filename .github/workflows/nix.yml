@@ -12,6 +12,11 @@ on:
 permissions:
   contents: read
 
+env:
+  # pull_request executes GitHub's synthetic merge commit; preserve the source
+  # branch identity separately so logical proof artifacts bind both identities.
+  DOTFILES_SOURCE_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
