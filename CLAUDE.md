@@ -423,6 +423,17 @@ that violates one of these, fix it instead of disabling the test.
     including tests, docs, cache constants, and historical prose.
     `tests/static/sentinel_naming_test.sh` reconstructs the retired token at
     runtime so the guard itself does not violate the zero-residue contract.
+31. **GitHub-native security is checked in and applied in migration order.**
+    `scripts/apply-github-security.sh` owns private vulnerability reporting,
+    immutable releases, CodeQL default setup for exactly Actions + Python with
+    default queries, and the non-bypassable CodeQL rule in
+    `Protect main: integrity`. The rule blocks ordinary errors and
+    high-or-higher security alerts, and publication requires successful Actions
+    and Python analyses on exact live `main`. Apply the stable required-context
+    cutover first; only then merge/apply the security policy. The scripts fail
+    closed across a mixed stage. Shell, PowerShell, Lua, and Nix remain outside
+    CodeQL coverage and keep their focused CI authority. Guarded by
+    `tests/static/github_security_policy_test.sh` and `repo_policy_test.sh`.
 
 ## Common workflows
 
@@ -825,6 +836,11 @@ not CI. Enforce that absence by parsing YAML and rejecting the top-level
 - Repository settings are squash-only. Merge commits and rebase merges are
   disabled, squash merges are enabled, branches are deleted after merge, and
   repo-level auto-merge stays disabled.
+- GitHub security settings are applied separately by
+  `scripts/apply-github-security.sh`: private vulnerability reporting,
+  immutable releases, and CodeQL default setup for Actions + Python. After
+  exact-main analyses pass, the integrity ruleset requires CodeQL errors and
+  high-or-higher security alerts to be resolved before merge.
 
 GitHub does not let pull request authors approve their own pull requests. Owner
 authored PRs can use the owner review bypass, but they still cannot bypass the
@@ -856,6 +872,15 @@ retained once mutation begins or apply succeeds. Follow the commands and
 `docs/security/branch-protection.md`.
 Do not recreate a hosted WSL2 canary or claim Linux proxy coverage as WSL
 runtime proof.
+
+The GitHub-security apply must follow, never precede, the stable-context
+cutover. It accepts only exact clean `main`, verifies successful Actions and
+Python CodeQL analyses for that SHA, snapshots the prior integrity ruleset, and
+publishes only the checked-in CodeQL rule. If CodeQL is not yet configured, it
+enables the exact default setup and stops before ruleset mutation so the initial
+scan cannot be bypassed. GitHub Code Quality and advanced generic/validity
+secret scanning are unavailable to this user-owned Pro repository and must not
+be documented as active.
 
 `renovate.json` owns GitHub Actions version updates and repo-pinned version/ref
 constants. Dependabot version-update PRs are intentionally disabled; GitHub

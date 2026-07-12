@@ -18,6 +18,61 @@ normal protected-branch path. The owner-updates ruleset is separate so
 least-privilege automation can write branches and PRs without being able to
 update `main`.
 
+## GitHub security and quality
+
+GitHub-native security controls use a separate fail-closed apply path from the
+required-check rename transaction:
+
+```bash
+scripts/apply-github-security.sh --preflight-only luisgui1757/dotfiles
+scripts/apply-github-security.sh luisgui1757/dotfiles
+```
+
+The reviewed posture enables private vulnerability reporting, immutable
+releases, and CodeQL default setup with the default query suite for exactly
+GitHub Actions and Python. Actions analysis covers the repository's workflow
+security boundary; Python covers the two real repository scripts without
+turning fixture-only C/C++/Java/Rust/etc. files into misleading product-code
+coverage. Shell, PowerShell, Lua, and Nix are not CodeQL-supported languages, so
+their existing focused CI remains authoritative.
+
+`Protect main: integrity` requires CodeQL with no bypass. It blocks ordinary
+error-level alerts and security alerts rated high or critical. The apply script
+will not publish that rule until successful Actions and Python analyses exist
+for the exact live `main` SHA. If CodeQL must first be enabled or reconfigured,
+the script requests the dynamic setup run, stops without changing the ruleset,
+and requires a rerun after both analyses pass.
+
+The ruleset change gets a private recovery snapshot under
+`.git/dotfiles-github-security/recovery.*`. A write/readback failure restores
+and verifies the previous integrity payload. Manual recovery uses the exact
+path printed by the failed command:
+
+```bash
+scripts/apply-github-security.sh --restore '/exact/snapshot/path' luisgui1757/dotfiles
+```
+
+Rollout order is load-bearing: merge the stable-context cutover PR, complete
+its merged-main proof, and run `apply-repo-safeguards.sh` first. Only then merge
+the GitHub-security PR and run `apply-github-security.sh`. Before the stable
+cutover is live, the security branch's integrity payload intentionally differs
+in both required contexts and CodeQL policy, so either apply path must fail
+closed rather than guess across the two migrations.
+
+Provider secret scanning, push protection, Dependabot alerts, and automated
+security fixes remain enabled. `SECURITY.md` directs researchers to GitHub's
+private reporting form. GitHub Code Quality, non-provider secret patterns,
+secret validity checks, and organization security configurations are not part
+of this user-owned GitHub Pro posture: GitHub currently limits those products
+to organization-owned Team/Enterprise or Secret Protection plans.
+
+Live enablement was verified on 2026-07-12 at `main`
+`f104bf066e4af7d4d707fe22ba36600711f1ae14`: dynamic CodeQL run
+`29179559750` passed both Actions and Python with zero findings, private
+vulnerability reporting is enabled, and immutable releases are enabled. The
+CodeQL merge rule is intentionally not live until the stable-context cutover
+and this checked-in follow-up merge complete in the order above.
+
 ## Apply
 
 This cutover is deliberately narrower than a general "make live look like the
@@ -190,6 +245,12 @@ gh api repos/luisgui1757/dotfiles/branches/main/protection/required_status_check
 gh api repos/luisgui1757/dotfiles --jq '{allow_merge_commit,allow_squash_merge,allow_rebase_merge,allow_auto_merge,delete_branch_on_merge}'
 gh api repos/luisgui1757/dotfiles/actions/permissions \
   --jq '{enabled,allowed_actions,sha_pinning_required}'
+gh api repos/luisgui1757/dotfiles/private-vulnerability-reporting
+gh api repos/luisgui1757/dotfiles/immutable-releases
+gh api repos/luisgui1757/dotfiles/code-scanning/default-setup \
+  --jq '{state,languages,query_suite,schedule}'
+gh api 'repos/luisgui1757/dotfiles/code-scanning/analyses?ref=refs/heads/main&tool_name=CodeQL' \
+  --jq 'map({commit_sha,category,error,results_count})'
 ```
 
 Checked-in desired posture during the cutover (the current live exception is called
@@ -212,6 +273,9 @@ out immediately below):
 - only `Protect main: review` and `Protect main: owner updates` have bypass actors;
 - each bypass actor is `luisgui1757` with `bypass_mode: pull_request`;
 - `Protect main: integrity` has no bypass actors.
+- private vulnerability reporting and immutable releases are enabled;
+- CodeQL default setup scans exactly Actions and Python with default queries;
+- the integrity ruleset blocks CodeQL errors and high-or-higher security alerts.
 
 Checked-in versus live truth matters: at the start of the 2026-07-10 closure
 branch, the live Actions permissions endpoint reported
