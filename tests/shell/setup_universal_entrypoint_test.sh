@@ -52,6 +52,14 @@ DRY_RUN=1
 ALL=1
 SETUP_UNIVERSAL_TEST_ROOT="$WORK"
 export HOME PATH SETUP_UNIVERSAL_TEST_ROOT
+activate_nix_profile() {
+    local profile="$HOME/.nix-profile/etc/profile.d/nix.sh"
+    [[ -f "$profile" ]] || return 1
+    # Fixture boundary: the real helper/profile contract has separate tests.
+    # shellcheck disable=SC1090
+    source "$profile"
+    [[ "$(command -v nix)" == "$fake_bin/nix" ]]
+}
 ensure_nix_prerequisite >/dev/null
 [[ "$NIX_PREREQUISITE_DRY_RUN_PLANNED" -eq 1 && ! -e "$WORK/nix-helper.args" ]] ||
     fail "fresh dry-run did not preview Nix bootstrap without invoking it"
