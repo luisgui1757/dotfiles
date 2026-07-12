@@ -1895,3 +1895,68 @@ safeguard mutation, or merged-main cache-free proof is claimed by this entry.
 No pushed-head hosted result, logical artifact, review, approval, merge, release
 tag, live safeguard mutation, or merged-main cache-free proof is claimed by this
 entry.
+
+## Universal setup entrypoint and update reconciliation — entry 48
+
+- Behavior commit `56e7703f00983f4a26b245a6ca6e3a2d0adf34c7` makes
+  `setup.sh --all` and `setup.ps1 -All` the sole normal installation and
+  supported v0.1.0 migration commands from an exact release checkout. POSIX
+  setup installs and activates the release-pinned, checksum-verified Nix
+  prerequisite when absent. Both entrypoints detect exact live v0.1.0
+  ownership, invoke the existing digest-bound side-by-side transaction, resume
+  an `applied` recovery at validated acceptance, retain recovery evidence, and
+  continue the ordinary idempotent setup phases.
+- `--update` / `-Update` now performs that same complete reconciliation before
+  the existing proven-owner dependency and synchronous Mason refresh.
+  `--upgrade` / `-Upgrade` is an alias. Neither spelling fetches Git, follows a
+  moving branch, performs a blanket package-manager upgrade, or rewrites a
+  repository lock.
+- Pending recovery discovery is fail-closed: only regular, exactly framed
+  scalar inputs are consumed; invalid, incomplete, unsafe, or conflicting
+  recoveries cannot start a second migration. Explicit
+  `DOTFILES_V0_1_CHECKOUT` overrides still pass exact tag-object/commit checks
+  and the migrator's full clean-tree, remote, identity, and historical-state
+  preflight.
+- The first full exact-v0.1 migration run exposed a real recursive-discovery
+  defect: a standalone migrator invoked its frozen new-release setup while the
+  old config was still live. Both migrators now mark that nested execution as
+  an active release transaction, so frozen setup cannot recursively start a
+  second migration. The exact historical migration harness reproduces the old
+  boundary and now passes through apply, failure rollback, interruption,
+  recovery tamper rejection, success, and acceptance.
+- Documentation, roadmap, migration status, release notes, greenfield guidance,
+  and manual evidence rows now describe the same public interface. The
+  annotated v0.2.0 tag and required real-host rows remain release gates; this
+  entry does not direct users to an unpublished tag or moving `main`.
+
+### Local verification
+
+| Check | Exact result |
+|---|---|
+| `git diff --check` and `bash -n` over tracked `*.sh` | PASS: no diff errors; 142/142 shell scripts parsed |
+| `make lint` | PASS: strict shell lint |
+| `bash tests/shell/setup_universal_entrypoint_test.sh` | PASS: verified Nix bootstrap preview/install activation, update aliasing/order, v0.1 apply/accept/resume, and malformed/unsafe recovery refusal |
+| Focused `Setup.Tests.ps1` | PASS: 62 passed, 0 failed/skipped, including Windows setup-owned apply/accept/resume and exact recovery framing |
+| `make test-migration` | PASS: exact peeled v0.1.0 POSIX migration, frozen nested-setup recursion guard, rollback, retry boundaries, and config parity |
+| `pwsh -NoLogo -NoProfile -File ./test.ps1` | PASS: exact analyzer baseline, 263 Pester passed with zero failed/skipped, and all Neovim specs |
+| `bash tests/static/run_all.sh` and `bash tests/shell/run_all.sh` | PASS |
+| `bash tests/nix/run_all.sh` | PASS |
+| `make validate-renovate` | PASS: 83 reviewed dependency records |
+| `nix flake check --print-build-logs` | PASS on Apple Silicon; incompatible Linux systems omitted, not promoted to runtime proof |
+| `make ci` | PASS: ended `local pre-PR gate passed` |
+| Gitleaks `886025c491a456ce5e9cfb2c84575bffce3f7199..56e7703f00983f4a26b245a6ca6e3a2d0adf34c7` | PASS: one commit, no leaks |
+| `bash tests/static/sentinel_naming_test.sh` | PASS: Sentinel remains the sole tracked agent-policy product name |
+
+### Finding status amendments
+
+| ID | Status after entry 48 | Exact evidence | Remaining work |
+|---|---|---|---|
+| UGR-011 | PARTIAL | WSL guest setup now owns verified Nix bootstrap and uses the same one-command entrypoint without relabeling Linux CI as WSL proof. | Real WSL2 Windows-host plus Linux-guest install/migration/retry run. |
+| UGR-020 | PARTIAL | Universal setup preserves the exact release transaction and does not mutate live repository safeguards. | Existing merged-main cache-free and owner cutover evidence. |
+| UGR-021 | PARTIAL | Fresh and historical setup orchestration is locally green; no real-host or final-tag row is fabricated. | Exact tagged Apple Silicon/Linux/Windows/WSL and redirected/three-variant Windows evidence. |
+| UGR-022 | ACCEPTED/FIXED | README, CLAUDE, roadmap, migration status, upgrade/release docs, greenfield/manual guidance, and this ledger agree on setup-all and update/upgrade semantics. | Append final hosted/tag/manual evidence only when it exists. |
+| UGR-023 | ACCEPTED/FIXED | Focused shell/PowerShell recovery-shape and nested-migration regression tests fail closed and pass in the full gate. | None beyond the release/manual rows above. |
+
+No pushed-head hosted result, logical artifact, review, approval, merge, release
+tag, live safeguard mutation, or merged-main cache-free proof is claimed by this
+entry.

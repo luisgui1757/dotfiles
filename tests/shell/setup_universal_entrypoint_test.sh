@@ -121,6 +121,19 @@ fi
 grep -F 'migration recovery identity is incomplete or unsafe' "$WORK/malformed-recovery.out" >/dev/null ||
     fail "malformed recovery failure did not identify the recovery boundary"
 
+rm -rf "$pending"
+real_recovery="$WORK/real-recovery"
+mkdir -p "$real_recovery"
+printf '%s\n' applied > "$real_recovery/stage"
+printf '%s\n' "$SCRIPT_DIR" > "$real_recovery/new-checkout"
+printf '%s\n' "$WORK/old-release" > "$real_recovery/old-checkout"
+ln -s "$real_recovery" "$XDG_STATE_HOME/dotfiles/migrations/v0.1.0-to-v0.2.0.symlink"
+if maybe_complete_v0_1_upgrade > "$WORK/symlink-recovery.out" 2>&1; then
+    fail "setup accepted a symlinked migration recovery directory"
+fi
+grep -F 'migration recovery path is not a real directory' "$WORK/symlink-recovery.out" >/dev/null ||
+    fail "symlinked recovery failure did not identify the directory boundary"
+
 sentinel_line="$(grep -nE '^[[:space:]]*run_sentinel_agent_policy[[:space:]]*$' "$REPO_ROOT/setup.sh" | tail -n1 | cut -d: -f1)"
 update_line="$(grep -nE '^[[:space:]]*run_update_mode[[:space:]]*$' "$REPO_ROOT/setup.sh" | tail -n1 | cut -d: -f1)"
 phase1_line="$(grep -n 'Phase 1/6: install dependencies' "$REPO_ROOT/setup.sh" | tail -n1 | cut -d: -f1)"
