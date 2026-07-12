@@ -1960,3 +1960,42 @@ entry.
 No pushed-head hosted result, logical artifact, review, approval, merge, release
 tag, live safeguard mutation, or merged-main cache-free proof is claimed by this
 entry.
+
+## Universal setup hosted-gate repair — entry 49
+
+- Initial pushed head `1663f0affdcc4d256cc26a520b5e53b639804e89`
+  produced two real hosted failures in Test run
+  [`29194538792`](https://github.com/luisgui1757/dotfiles/actions/runs/29194538792).
+  Ubuntu job `86655036690` reached the new universal-entrypoint regression with
+  a runner-provisioned `/usr/bin/nix`; the fixture incorrectly inferred that
+  restricting `PATH` alone represented a missing-Nix host. Windows job
+  `86655036708` completed all 264 Pester tests with zero failures/skips, then
+  correctly failed because the analyzer baseline still expected 93 setup
+  progress warnings instead of the exact new 101-warning surface.
+- Repair commit `63f6cceaca1f39a7f6dd36191dbe2434750a0799`
+  makes the Nix bootstrap fixture own its profile-activation system boundary,
+  so its missing-to-installed transition is deterministic whether or not the
+  host already has Nix. Production prerequisite behavior is unchanged.
+- The PowerShell analyzer baseline now binds 101 reviewed
+  `setup.ps1` `PSAvoidUsingWriteHost` progress diagnostics and exact warning
+  fingerprint
+  `ce7e7ae0f8e35956809322b1ce6f055e8878640f1197fa5ebc601d87ba84afaa`.
+  No analyzer rule, path, warning, or test was suppressed.
+
+### Repair verification
+
+| Check | Exact result |
+|---|---|
+| `bash tests/shell/setup_universal_entrypoint_test.sh` | PASS with ambient Nix present; fixture still proves dry-run is write-free and real mode invokes/activates its verified helper |
+| `make lint` | PASS |
+| `pwsh -NoLogo -NoProfile -File ./test.ps1` | PASS locally: exact 101-warning analyzer baseline/fingerprint, 263 Pester passed with zero failed/skipped, and all Neovim specs |
+| Gitleaks `886025c491a456ce5e9cfb2c84575bffce3f7199..63f6cceaca1f39a7f6dd36191dbe2434750a0799` | PASS: three commits, no leaks |
+| `bash tests/static/sentinel_naming_test.sh` | PASS |
+
+Entry 48's first-head statement that the exact analyzer baseline passed is
+superseded by this measured failure and repair. Historical local Pester and all
+other green evidence remain valid; repaired-head hosted evidence is not claimed
+until the new head runs.
+
+No review, approval, merge, release tag, live safeguard mutation, or
+merged-main cache-free proof is claimed by this entry.
