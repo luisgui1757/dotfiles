@@ -1720,3 +1720,47 @@ this entry.
 | UGR-020 | PARTIAL | All 18 transition checks and six dual-SHA artifacts are green on the exact repaired head; live cutover remains intentionally unapplied. | Independent final review; after merge, merged-main cache-free proof and owner preflight/apply/readback. |
 | UGR-021 | PARTIAL | Exact-head hosted Linux, Apple Silicon, Windows, container, Nix, generic/parity, security, and logical proof are green without relabeling PR caches as clean-install proof. | Merged-main cache-free proof plus real WSL, redirected-Windows, dual-Terminal, owner-host migration, and desktop/TCC rows. |
 | UGR-022 | ACCEPTED/FIXED | Roadmap, migration status, manual matrix, greenfield ledger, and this append-only entry now record both failed discovery heads and the exact repaired hosted proof. | Append final tag, merged-main, live-apply, and manual evidence only when it exists. |
+
+## Apple-Silicon-only product-surface closure — entry 44
+
+- Owner direction removed the remaining dedicated Intel macOS product surface.
+  `scripts/install-pinned-chezmoi.sh` no longer selects or downloads a Darwin
+  x86_64 archive, and `.github/workflows/test.yml` no longer carries its
+  checksum. `setup.sh`, the checksum-verified Nix prerequisite, and the exact
+  v0.1.0 release migrator now share a generic Apple-Silicon-only boundary
+  instead of an Intel-specific branch or migration path.
+- Current user-facing README, upgrade, release, and supply-chain documentation
+  contains no Intel-specific procedure or retained-support guidance. It states
+  only the positive Apple Silicon contract. The roadmap, migration status, and
+  canonical agent guide are synchronized with that behavior.
+- `tests/static/darwin_platform_contract_test.sh` scans every active Darwin
+  product surface for removed outputs, runners, installer selectors, checksums,
+  and user-facing wording. Its executable negative fixture supplies a Darwin
+  x86_64 machine identity to the real pinned chezmoi installer and proves a
+  failure at the platform boundary before download or publication. Historical
+  hosted rows remain untouched in append-only ledgers; they are evidence, not a
+  product path.
+
+### Local verification
+
+| Check | Exact result |
+|---|---|
+| `bash tests/static/darwin_platform_contract_test.sh` | PASS: active-product scan clean; real pinned chezmoi helper rejected Darwin x86_64 before download/publication |
+| `bash tests/nix/setup_nix_darwin_test.sh` | PASS: Apple Silicon selection and generic unsupported-architecture failure remain fail-closed before activation |
+| `bash tests/nix/darwin_config_test.sh` | PASS: only `dotfiles` and `dotfiles-aarch64`, both `aarch64-darwin` |
+| `bash tests/static/release_upgrade_test.sh` | PASS: exact-tag upgrade identity, recovery, and documentation contract remains complete |
+| `pwsh -NoLogo -NoProfile -File ./test.ps1` | PASS: PSScriptAnalyzer, 249 Pester passed with zero failed/skipped, and all Neovim specs |
+| `nix flake check --print-build-logs` | PASS on Apple Silicon; incompatible Linux systems reported as omitted, not runtime proof |
+| `make ci` | PASS: ended `local pre-PR gate passed` |
+| `git diff --check` and changed-shell `bash -n` | PASS |
+
+No pushed-head hosted result, review, approval, merge, release tag, live
+safeguard mutation, or merged-main cache-free proof is claimed by this entry.
+
+### Finding status amendments
+
+| ID | Status after entry 44 | Exact evidence | Remaining work |
+|---|---|---|---|
+| UGR-002 | REJECTED (superseded contract) | Apple Silicon is the only active Darwin output, runner, pinned installer artifact, setup target, release migration, and current documentation path. The generic boundary rejects every other macOS architecture before mutation. | None; historical rows remain evidence only. |
+| UGR-020 | PARTIAL | The safeguard and release transaction contracts remain green through the full local gate; this architecture closure does not apply live safeguards. | Final pushed-head checks/artifacts and independent review; after merge, merged-main cache-free proof and owner preflight/apply/readback. |
+| UGR-022 | ACCEPTED/FIXED | README, CLAUDE, roadmap, migration status, upgrade/release/supply-chain docs, tests, and this append-only entry describe the same Apple-Silicon-only product contract. | Append pushed/tag/manual evidence only after it exists. |

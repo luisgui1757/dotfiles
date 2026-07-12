@@ -78,7 +78,7 @@ canonical v0.2.0 path is now side-by-side and exact-tag-only:
 The release remains gated on real Apple Silicon owner-host, WSL split-host,
 redirected Windows, and divergent dual-Terminal executions. Until the annotated
 v0.2.0 tag and those release rows exist, v0.1.0 users are told to remain on
-v0.1.0. Intel macOS remains retired, not pending proof.
+v0.1.0. No non-Apple-Silicon macOS migration path is shipped or pending proof.
 
 ## install-deps owns (provisioning -- deliberately NOT in chezmoi)
 
@@ -299,14 +299,13 @@ broken repo-symlink still cleaned) is covered by
 
 ### Open
 
-- [x] Intel macOS is retired by explicit owner direction. Apple Silicon is the
-      sole current Darwin contract; the flake, setup selector, CI matrices, and
-      tests contain no Intel configuration. Setup rejects x86_64 before
-      Nix/Homebrew activation and prints migration guidance. The historical
-      exact-head Intel runs (`29092384007` / `86360593091` and `29092384014` /
-      `86360593153`) remain in the append-only ledger but are not current
-      support or pending proof. The former Nixpkgs 26.05 migration deadline is
-      therefore closed rather than carried as stale work.
+- [x] Apple Silicon is the sole current Darwin contract by explicit owner
+      direction. The flake, setup selector, CI matrices, pinned installers,
+      migration tool, tests, and current user documentation contain no alternate
+      macOS architecture path. The generic platform boundary rejects every
+      other architecture before Nix/Homebrew activation. Historical host runs
+      remain only in append-only evidence and are not current support or pending
+      proof.
 
 - [ ] Greenfield/manual evidence remains intentionally bounded:
       `tests/greenfield/LEDGER.md` now records exact-head hosted Ubuntu, Apple

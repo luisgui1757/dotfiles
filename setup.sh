@@ -1023,7 +1023,7 @@ complete_nix_homebrew_tap_transaction() {
 # dotfile (invariant 22). setup resolves one authoritative target user/home and
 # passes both through sudo explicitly for impure flake evaluation.
 run_nix_darwin_switch() {
-    local explicit=0 arch config_name flake_ref bootstrap_ref
+    local explicit=0 arch raw_arch config_name flake_ref bootstrap_ref
     [[ "$NIX_DARWIN" -eq 1 ]] && explicit=1
     if [[ "$(uname -s)" != "Darwin" ]]; then
         [[ "$explicit" -eq 1 ]] || return 0
@@ -1037,31 +1037,18 @@ run_nix_darwin_switch() {
         return 0
     fi
     phase "Required POSIX package layer: apply nix-darwin packages (macOS)"
-    arch="$(normalize_machine_arch "$(uname -m)")" || {
+    raw_arch="$(uname -m)"
+    case "$raw_arch" in
+        arm64|aarch64) arch="aarch64" ;;
+        *)
             if [[ "$DRY_RUN" -eq 1 ]]; then
-                echo "  would fail: no supported nix-darwin activation config for arch $(uname -m)."
+                echo "  would fail: macOS setup requires Apple Silicon (arm64); detected $raw_arch."
                 return 0
             fi
-            echo "  FAIL: no supported nix-darwin activation config for arch $(uname -m)."
+            echo "  FAIL: macOS setup requires Apple Silicon (arm64); detected $raw_arch." >&2
             return 1
-    }
-    if [[ "$arch" != "aarch64" ]]; then
-        if [[ "$arch" == "x86_64" ]]; then
-            if [[ "$DRY_RUN" -eq 1 ]]; then
-                echo "  would fail: Intel macOS support is retired; this repo supports Apple Silicon only."
-                return 0
-            fi
-            echo "  FAIL: Intel macOS support is retired; this repo supports Apple Silicon only." >&2
-            echo "        Keep this checkout on its current revision or migrate the host before rerunning setup." >&2
-            return 1
-        fi
-        if [[ "$DRY_RUN" -eq 1 ]]; then
-            echo "  would fail: no supported nix-darwin activation config for arch $(uname -m)."
-            return 0
-        fi
-        echo "  FAIL: no supported nix-darwin activation config for arch $(uname -m)." >&2
-        return 1
-    fi
+            ;;
+    esac
     config_name="dotfiles-aarch64"
     if ! command -v nix >/dev/null 2>&1; then
         if [[ "$DRY_RUN" -eq 1 ]]; then

@@ -301,7 +301,7 @@ platform_preflight() {
     case "$os" in
         Darwin)
             [[ "$arch" == "arm64" || "$arch" == "aarch64" ]] || {
-                fail "Intel macOS is retired; keep v0.1.0 on this host or migrate to Apple Silicon."
+                fail "the v0.2.0 macOS upgrade requires Apple Silicon (arm64); detected $arch."
                 return 1
             }
             require_command brew || return 1

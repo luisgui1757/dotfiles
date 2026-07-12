@@ -458,12 +458,12 @@ Commit-by-commit status:
   Windows hosted evidence, not redirected-known-folder, divergent Windows
   Terminal, uninstall-restoration, or desktop visual proof.
 
-- **Intel Darwin product retirement — DONE by owner direction (2026-07-10).**
-  Apple Silicon is the sole macOS contract. The flake, setup selector, CI
-  matrices, installer actions, tests, and public documentation export no Intel
-  configuration. `setup.sh` rejects x86_64 before Nix/Homebrew activation and
-  prints migration guidance. Historical Intel runs remain in append-only
-  evidence; they do not keep the retired platform live.
+- **Apple-Silicon-only macOS contract — DONE by owner direction (2026-07-12).**
+  The flake, setup selector, CI matrices, pinned installers, migration tool,
+  tests, and current public documentation ship only the Apple Silicon path.
+  Every other macOS architecture fails through the generic platform boundary
+  before Nix/Homebrew activation. Historical host results remain in append-only
+  evidence only; they do not define a product path.
 
 - **Hosted WSL2 canary retirement — DONE (2026-07-10).** The only scheduled
   run (`29072773410` / `86297630493`) and a manual rerun (`29114215045` /
@@ -1212,9 +1212,9 @@ Evidence:
   acceptance. Windows Pester proves frozen release-tree validation, complete Terminal recovery,
   all-target concurrency rejection, known-folder boundary validation, private
   ACL policy, and provider-boundary verification.
-- `docs/UPGRADING.md` and `docs/releases/v0.2.0.md` define the per-platform
-  commands, unsupported Intel outcome, WSL ordering, Nix provenance, and
-  release evidence gate.
+- `docs/UPGRADING.md` and `docs/releases/v0.2.0.md` define the supported
+  per-platform commands, Apple-Silicon-only macOS boundary, WSL ordering, Nix
+  provenance, and release evidence gate.
 
 Canonical solution:
 

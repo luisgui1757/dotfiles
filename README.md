@@ -99,8 +99,8 @@ retain the exact v0.1.0 checkout, clone v0.2.0 separately, run the read-only
 preflight, apply the transactional migration, verify, and explicitly accept or
 rollback from the printed private recovery directory. Apple Silicon macOS and
 Linux/WSL include Nix-generation rollback; Windows independently recovers
-known-folder config and exact packaged/portable Terminal bytes. Intel macOS is
-retired and stays on v0.1.0 or migrates to Apple Silicon.
+known-folder config and exact packaged/portable Terminal bytes. macOS migration
+is available only on Apple Silicon.
 Every platform publishes and rolls back only from digest-bound release trees in
 that private directory; full post-acceptance setup later repoints config to the
 retained v0.2.0 checkout.
@@ -138,9 +138,8 @@ dependency provisioning. On macOS setup normalizes `uname -m` and runs only the
 Apple Silicon `sudo env DOTFILES_TARGET_USER=... DOTFILES_TARGET_HOME=...
 darwin-rebuild switch --flake .#dotfiles-aarch64 --impure` activation, which activates the
 declarative Homebrew casks (WezTerm, AeroSpace) + Herdr brew and the nix-owned
-CLI package set. Intel macOS is intentionally retired: setup fails closed before
-Nix/Homebrew activation and tells the user to keep the checkout on its current
-revision or migrate the host. Before any phase, setup rejects root/ambiguous invocation and
+CLI package set. Any other macOS architecture fails closed before Nix/Homebrew
+activation. Before any phase, setup rejects root/ambiguous invocation and
 resolves one invoking account plus its authoritative account-record home. It
 requires ambient `HOME` to resolve to that same directory and passes
 `DOTFILES_TARGET_USER` / `DOTFILES_TARGET_HOME` explicitly through sudo, so
@@ -203,9 +202,9 @@ tree-sitter CLI stay native** (ABI-coupled to nvim-treesitter parser builds;
 migrating them into a same-closure toolchain is a follow-up). Native Windows is
 non-Nix. `nix flake check` runs in required CI (`.github/workflows/nix.yml`) on
 Ubuntu + Apple Silicon macOS. The flake exports `dotfiles-aarch64` plus the
-Apple-Silicon compatibility alias `dotfiles`; it exports no Intel Darwin system
-or configuration. Historical Intel results remain in the append-only evidence
-ledger but are not a current support claim.
+Apple-Silicon compatibility alias `dotfiles`; no other Darwin system or
+configuration is exported. Historical platform results remain in the
+append-only evidence ledger and are not a current support claim.
 
 ```powershell
 .\setup.ps1

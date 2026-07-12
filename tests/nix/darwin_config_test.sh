@@ -65,7 +65,7 @@ assert_eq "dotfiles-aarch64 evaluates only Apple Silicon" "aarch64-darwin" "$act
 alias_system="$(nix eval --raw '.#darwinConfigurations.dotfiles.pkgs.stdenv.hostPlatform.system' 2>/dev/null || true)"
 assert_eq "compatibility alias deliberately remains Apple Silicon" "aarch64-darwin" "$alias_system"
 config_names="$(nix eval --json '.#darwinConfigurations' --apply 'configs: builtins.attrNames configs' 2>/dev/null | jq -r 'sort | join(",")' || true)"
-assert_eq "Darwin exports contain no retired Intel configuration" "dotfiles,dotfiles-aarch64" "$config_names"
+assert_eq "Darwin exports contain only Apple Silicon configurations" "dotfiles,dotfiles-aarch64" "$config_names"
 
 target_cfg='.#darwinConfigurations.dotfiles-aarch64.config'
 target_user="$(env DOTFILES_TARGET_USER=alice DOTFILES_TARGET_HOME='/Users/Alice Example' \

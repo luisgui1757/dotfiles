@@ -326,9 +326,9 @@ that violates one of these, fix it instead of disabling the test.
     exports `DOTFILES_TARGET_USER` + `DOTFILES_TARGET_HOME`. Nix, Home Manager,
     chezmoi, Polaris, and native setup consume those values; never fabricate a
     home from a username or fall back to root. Darwin setup accepts only Apple
-    Silicon, selects `dotfiles-aarch64`, and rejects Intel before Nix/Homebrew
-    activation with migration guidance. The compatibility `dotfiles` alias is
-    also Apple Silicon; no Intel Darwin system/configuration is exported.
+    Silicon, selects `dotfiles-aarch64`, and rejects every other architecture
+    before Nix/Homebrew activation. The compatibility `dotfiles` alias is also
+    Apple Silicon; no other Darwin system/configuration is exported.
     Homebrew's Library/Taps root follows its repository or `/opt/homebrew`.
     Tap migration is transactional: activation,
     bootstrap, or interruption failure restores the original tree or emits
@@ -1741,7 +1741,7 @@ host prerequisite.
   a hermetic `checks.<system>.toolchain` (proves nixpkgs resolves the CLI
   toolchain), `formatter = nixpkgs-fmt`, and explicit
   `darwinConfigurations."dotfiles-aarch64"`. The compatibility `"dotfiles"`
-  alias is also Apple Silicon; Intel Darwin is not exported.
+  alias is also Apple Silicon; no other Darwin configuration is exported.
 - **`nix flake check` in CI does NOT build the darwin toplevel.** It *evaluates*
   `darwinConfigurations.dotfiles` (catching config errors — it caught a
   `nixpkgs.hostPlatform` recursion and a null `home.homeDirectory` during
@@ -1809,8 +1809,7 @@ host prerequisite.
   transaction also passes `--skip-config-scripts`, which limits chezmoi to
   files/symlinks; normal setup still runs reviewed run scripts. Config apply
   creates managed target parents without relying on Phase 1. Public setup selects the Apple Silicon Darwin
-  configuration; Intel and other unsupported architectures fail before
-  activation. Guarded by
+  configuration; every other architecture fails before activation. Guarded by
   `tests/nix/setup_nix_darwin_test.sh`.
 - **Linux/WSL Home Manager (standalone, packages-only).**
   `homeConfigurations."<arch>-linux"` (`nix/home/linux.nix` + the shared

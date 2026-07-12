@@ -97,7 +97,7 @@ case "$os:$arch" in
         install_mode="--daemon"
         ;;
     Darwin:*)
-        echo "FAIL: Intel macOS is retired; Nix is not installed by this release." >&2
+        echo "FAIL: the macOS Nix prerequisite requires Apple Silicon (arm64); detected $arch." >&2
         exit 1
         ;;
     Linux:x86_64|Linux:amd64)

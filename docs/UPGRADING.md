@@ -136,13 +136,6 @@ If later additive provisioning fails, the
 accepted Nix/config core remains verified; fix the reported provider and rerun.
 Setup never performs a blanket package-manager upgrade.
 
-### Intel macOS
-
-Intel macOS is retired in v0.2.0. The installer and migration fail before Nix,
-Homebrew, or config mutation. Keep that machine on the immutable `v0.1.0`
-release, or migrate the account and retained v0.1.0 checkout to Apple Silicon.
-Intel is unsupported, not a pending proof lane.
-
 ### Native Linux x86_64 or aarch64
 
 After the Nix prerequisite, run:
