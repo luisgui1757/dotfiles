@@ -232,6 +232,21 @@ if [[ "$method" == "GET" && "$path" == "repos/owner/repo" &&
     fi
 fi
 
+if [[ "$method" == "GET" && "$path" == "repos/owner/repo/rulesets?includes_parents=false" &&
+      -n "${TEST_MUTATE_APPLY_SOURCE_AFTER_POSTFLIGHT_BOUNDARY:-}" &&
+      -s "$mutation_log" && ! -e "$state/postflight-source-mutated" ]]; then
+    : > "$state/postflight-source-mutated"
+    jq '
+      (.rules[] | select(.type == "required_status_checks") |
+        .parameters.required_status_checks) =
+      [{context: "postflight-worktree-only-context", integration_id: 15368}]
+    ' \
+        "$TEST_MUTATE_APPLY_SOURCE_AFTER_POSTFLIGHT_BOUNDARY" \
+        > "$TEST_MUTATE_APPLY_SOURCE_AFTER_POSTFLIGHT_BOUNDARY.tmp"
+    mv "$TEST_MUTATE_APPLY_SOURCE_AFTER_POSTFLIGHT_BOUNDARY.tmp" \
+        "$TEST_MUTATE_APPLY_SOURCE_AFTER_POSTFLIGHT_BOUNDARY"
+fi
+
 if [[ "$method" != "GET" ]]; then
     printf '%s %s\n' "$method" "$path" >> "$mutation_log"
     if [[ -n "${TEST_FAIL_ONCE_PATH:-}" && "$path" == "$TEST_FAIL_ONCE_PATH" && ! -e "$state/failure-used" ]]; then
@@ -486,6 +501,26 @@ jq -e '
 ' --argjson legacy "$legacy_contexts_json" "$state/integrity.json" >/dev/null
 rm -rf "$fixture/.git/dotfiles-safeguards"
 echo "ok  : apply publishes only frozen committed integrity bytes after validation"
+
+state="$(new_case_state frozen-postflight-expectations)"
+: > "$mutation_log"
+cp "$fixture/.github/rulesets/main-integrity.json" "$WORK/postflight-integrity.backup"
+TEST_MUTATE_APPLY_SOURCE_AFTER_POSTFLIGHT_BOUNDARY="$fixture/.github/rulesets/main-integrity.json" \
+    expect_failure "reviewed safeguard/proof sources differ from exact live main" \
+    run_safeguards "$state" "$mutation_log"
+cp "$WORK/postflight-integrity.backup" "$fixture/.github/rulesets/main-integrity.json"
+jq -e '.sha_pinning_required == false' "$state/actions.json" >/dev/null
+jq -e '
+  [.rules[] | select(.type == "required_status_checks") |
+    .parameters.required_status_checks[].context] == $legacy
+' --argjson legacy "$legacy_contexts_json" "$state/integrity.json" >/dev/null
+[[ "$(wc -l < "$mutation_log" | tr -d ' ')" == "6" ]] || {
+    echo "FAIL: postflight source drift did not trigger one apply plus one rollback" >&2
+    cat "$mutation_log" >&2
+    exit 1
+}
+rm -rf "$fixture/.git/dotfiles-safeguards"
+echo "ok  : postflight expectations stay frozen after the local-boundary check"
 
 state="$(new_case_state apply)"
 : > "$mutation_log"

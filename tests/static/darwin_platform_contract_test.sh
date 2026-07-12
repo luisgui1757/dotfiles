@@ -10,8 +10,12 @@ from pathlib import Path
 active = {
     "flake.nix": Path("flake.nix").read_text(encoding="utf-8"),
     "setup.sh": Path("setup.sh").read_text(encoding="utf-8"),
+    "setup.ps1": Path("setup.ps1").read_text(encoding="utf-8"),
+    "POSIX dependencies": Path("install-deps.sh").read_text(encoding="utf-8"),
+    "Windows dependencies": Path("install-deps.ps1").read_text(encoding="utf-8"),
     "Nix prerequisite installer": Path("scripts/install-nix-prerequisite.sh").read_text(encoding="utf-8"),
     "release migrator": Path("scripts/upgrade-v0.1.0.sh").read_text(encoding="utf-8"),
+    "Windows release migrator": Path("scripts/upgrade-v0.1.0.ps1").read_text(encoding="utf-8"),
     "pinned chezmoi installer": Path("scripts/install-pinned-chezmoi.sh").read_text(encoding="utf-8"),
     "test workflow": Path(".github/workflows/test.yml").read_text(encoding="utf-8"),
     "nix workflow": Path(".github/workflows/nix.yml").read_text(encoding="utf-8"),
@@ -20,7 +24,10 @@ active = {
     "upgrade guide": Path("docs/UPGRADING.md").read_text(encoding="utf-8"),
     "release notes": Path("docs/releases/v0.2.0.md").read_text(encoding="utf-8"),
     "supply-chain guide": Path("docs/security/supply-chain.md").read_text(encoding="utf-8"),
+    "safeguard guide": Path("docs/security/branch-protection.md").read_text(encoding="utf-8"),
 }
+for path in sorted(Path("nix").rglob("*.nix")):
+    active[f"Nix module {path}"] = path.read_text(encoding="utf-8")
 
 for name, text in active.items():
     for retired in (

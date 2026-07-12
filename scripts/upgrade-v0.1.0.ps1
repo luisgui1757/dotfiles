@@ -551,30 +551,40 @@ function Get-ValidatedFrozenReleaseState {
 function Save-WindowsTerminalRecovery {
     param([Parameter(Mandatory)] [string]$Recovery)
     $fragment = & $script:SetupLibraryModule { Get-WindowsTerminalSettingsFragmentPath }
+    $portablePresent = & $script:SetupLibraryModule {
+        param($LocalApplicationData)
+        Test-WindowsTerminalUnpackagedPresent -LocalApplicationData $LocalApplicationData
+    } $script:WindowsIdentity.LocalApplicationData
     $targets = @(& $script:SetupLibraryModule {
-            Get-WindowsTerminalSettingsPath
-            Get-WindowsTerminalUnpackagedSettingsPath
-        })
+            param($LocalApplicationData, $PortablePresent)
+            Get-DotfilesWindowsTerminalTargets -LocalApplicationData $LocalApplicationData `
+                -IncludeAbsent -PortablePresent $PortablePresent
+        } $script:WindowsIdentity.LocalApplicationData $portablePresent)
     $entries = @()
     $index = 0
     foreach ($target in $targets) {
-        $existed = Test-Path -LiteralPath $target -PathType Leaf
-        $expectedJson = & $script:SetupLibraryModule {
-            param($SettingsPath, $FragmentPath)
-            Merge-WindowsTerminalFragmentFile -SettingsPath $SettingsPath -FragmentPath $FragmentPath
-        } $target $fragment
-        $expectedSha = (& $script:SetupLibraryModule {
-                param($Content)
-                Get-WindowsTerminalContentSha256 -Content $Content
-            } $expectedJson).ToLowerInvariant()
+        $expectedPresent = [bool]($target.Existed -or ($target.Kind -eq 'Portable' -and $portablePresent))
+        $expectedSha = ''
+        if ($expectedPresent) {
+            $expectedJson = & $script:SetupLibraryModule {
+                param($SettingsPath, $FragmentPath)
+                Merge-WindowsTerminalFragmentFile -SettingsPath $SettingsPath -FragmentPath $FragmentPath
+            } $target.Path $fragment
+            $expectedSha = (& $script:SetupLibraryModule {
+                    param($Content)
+                    Get-WindowsTerminalContentSha256 -Content $Content
+                } $expectedJson).ToLowerInvariant()
+        }
         $backupName = "wt-$index.before"
-        if ($existed) {
-            Copy-Item -LiteralPath $target -Destination (Join-Path $Recovery $backupName)
+        if ($target.Existed) {
+            Copy-Item -LiteralPath $target.Path -Destination (Join-Path $Recovery $backupName)
         }
         $entries += [pscustomobject]@{
-            Path = $target
-            Existed = $existed
-            BeforeSha = Get-FileSha256OrEmpty -Path $target
+            Kind = $target.Kind
+            Path = $target.Path
+            Existed = [bool]$target.Existed
+            BeforeSha = Get-FileSha256OrEmpty -Path $target.Path
+            ExpectedPresent = $expectedPresent
             ExpectedSha = $expectedSha
             Backup = $backupName
         }
@@ -699,28 +709,37 @@ function Publish-ExactContent {
 function Get-ValidatedWindowsTerminalRecovery {
     param(
         [Parameter(Mandatory)] [string]$Recovery,
-        [Parameter(Mandatory)] [string[]]$ExpectedPaths
+        [Parameter(Mandatory)] [object[]]$ExpectedTargets
     )
     $manifestPath = Join-Path $Recovery 'windows-terminal.json'
     Assert-RegularFile -Path $manifestPath
     $entries = @([IO.File]::ReadAllText($manifestPath) | ConvertFrom-Json -ErrorAction Stop)
-    if ($entries.Count -ne 2 -or $ExpectedPaths.Count -ne 2) {
-        throw 'Windows Terminal recovery must contain exactly two targets'
+    if ($entries.Count -ne 3 -or $ExpectedTargets.Count -ne 3) {
+        throw 'Windows Terminal recovery must contain exactly three targets'
     }
     $validated = @()
-    for ($index = 0; $index -lt 2; $index++) {
+    for ($index = 0; $index -lt 3; $index++) {
         $entry = $entries[$index]
         $propertyNames = @($entry.PSObject.Properties.Name | Sort-Object)
-        if (($propertyNames -join ',') -ne 'Backup,BeforeSha,Existed,ExpectedSha,Path') {
+        if (($propertyNames -join ',') -ne 'Backup,BeforeSha,Existed,ExpectedPresent,ExpectedSha,Kind,Path') {
             throw "Windows Terminal recovery entry $index has an unexpected schema"
         }
-        if ($entry.Existed -isnot [bool] -or [string]$entry.Path -ine $ExpectedPaths[$index]) {
+        $expectedTarget = $ExpectedTargets[$index]
+        if ($entry.Existed -isnot [bool] -or $entry.ExpectedPresent -isnot [bool] -or
+            [string]$entry.Kind -cne [string]$expectedTarget.Kind -or
+            [string]$entry.Path -ine [string]$expectedTarget.Path) {
             throw "Windows Terminal recovery entry $index has an invalid identity"
         }
         $beforeSha = [string]$entry.BeforeSha
         $expectedSha = [string]$entry.ExpectedSha
         $backupName = [string]$entry.Backup
-        if ($expectedSha -notmatch '^[0-9a-f]{64}$' -or $backupName -ne "wt-$index.before") {
+        $validExpected = if ($entry.ExpectedPresent) {
+            $expectedSha -match '^[0-9a-f]{64}$'
+        } else {
+            $expectedSha -eq ''
+        }
+        if (-not $validExpected -or $backupName -ne "wt-$index.before" -or
+            ($entry.Existed -and -not $entry.ExpectedPresent)) {
             throw "Windows Terminal recovery entry $index has invalid hashes or backup identity"
         }
         $backupBytes = [byte[]]@()
@@ -739,17 +758,21 @@ function Get-ValidatedWindowsTerminalRecovery {
         }
         $currentSha = Get-FileSha256OrEmpty -Path ([string]$entry.Path)
         $allowedCurrent = if ($entry.Existed) {
-            $currentSha -eq $beforeSha -or $currentSha -eq $expectedSha
-        } else {
+            $currentSha -eq $beforeSha -or ($entry.ExpectedPresent -and $currentSha -eq $expectedSha)
+        } elseif ($entry.ExpectedPresent) {
             $currentSha -eq '' -or $currentSha -eq $expectedSha
+        } else {
+            $currentSha -eq ''
         }
         if (-not $allowedCurrent) {
             throw "Windows Terminal settings changed outside this migration: $($entry.Path)"
         }
         $validated += [pscustomobject]@{
             Path = [string]$entry.Path
+            Kind = [string]$entry.Kind
             Existed = [bool]$entry.Existed
             BeforeSha = $beforeSha
+            ExpectedPresent = [bool]$entry.ExpectedPresent
             ExpectedSha = $expectedSha
             BackupBytes = $backupBytes
         }
@@ -762,11 +785,12 @@ function Restore-WindowsTerminalState {
     foreach ($entry in $entries) {
         $currentSha = Get-FileSha256OrEmpty -Path $entry.Path
         if ($entry.Existed) {
-            if (-not $currentSha -or ($currentSha -ne $entry.BeforeSha -and $currentSha -ne $entry.ExpectedSha)) {
+            if (-not $currentSha -or ($currentSha -ne $entry.BeforeSha -and
+                    (-not $entry.ExpectedPresent -or $currentSha -ne $entry.ExpectedSha))) {
                 throw "Windows Terminal settings changed concurrently; refusing recovery: $($entry.Path)"
             }
         } elseif ($currentSha) {
-            if ($currentSha -ne $entry.ExpectedSha) {
+            if (-not $entry.ExpectedPresent -or $currentSha -ne $entry.ExpectedSha) {
                 throw "new Windows Terminal settings changed concurrently; refusing removal: $($entry.Path)"
             }
         }
@@ -777,6 +801,21 @@ function Restore-WindowsTerminalState {
             Publish-ExactContent -Bytes $entry.BackupBytes -Target $entry.Path
         } elseif ($currentSha) {
             Remove-Item -LiteralPath $entry.Path -Force
+        }
+    }
+}
+
+function Confirm-WindowsTerminalExpectedState {
+    param([Parameter(Mandatory)] [object[]]$Entries)
+    foreach ($entry in $Entries) {
+        $currentSha = Get-FileSha256OrEmpty -Path $entry.Path
+        $matchesExpectedState = if ($entry.ExpectedPresent) {
+            $currentSha -and $currentSha -eq $entry.ExpectedSha
+        } else {
+            -not $currentSha
+        }
+        if (-not $matchesExpectedState) {
+            throw "Windows Terminal target is not in its expected post-migration state: $($entry.Path)"
         }
     }
 }
@@ -880,11 +919,12 @@ function Get-RecoveryState {
         throw 'known-folder state root does not match the recovery identity'
     }
     Assert-KnownFolderStateBoundary -StateRoot $knownFolderStateRoot
-    $expectedTerminalPaths = @(& $script:SetupLibraryModule {
-            Get-WindowsTerminalSettingsPath
-            Get-WindowsTerminalUnpackagedSettingsPath
-        })
-    $terminalRecovery = @(Get-ValidatedWindowsTerminalRecovery -Recovery $recovery -ExpectedPaths $expectedTerminalPaths)
+    $expectedTerminalTargets = @(& $script:SetupLibraryModule {
+            param($LocalApplicationData)
+            Get-DotfilesWindowsTerminalTargets -LocalApplicationData $LocalApplicationData -IncludeAbsent
+        } $script:WindowsIdentity.LocalApplicationData)
+    $terminalRecovery = @(Get-ValidatedWindowsTerminalRecovery -Recovery $recovery `
+            -ExpectedTargets $expectedTerminalTargets)
     return [pscustomobject]@{
         Recovery = $recovery
         OldCheckout = $oldCheckout
@@ -967,6 +1007,7 @@ function Invoke-UpgradeAccept {
     if (-not (Test-NewConfig -NewCheckout $state.NewSource)) {
         throw 'v0.2.0 config verification failed; retain both checkouts and recovery material'
     }
+    Confirm-WindowsTerminalExpectedState -Entries $state.TerminalRecovery
     Save-RecoveryStage -Recovery $state.Recovery -Stage accepted
     Write-Information 'Migration core accepted. Keep v0.1.0 until full v0.2.0 setup finalizes retained conventional targets.' -InformationAction Continue
     Write-Information 'Run full v0.2.0 setup now; archive v0.1.0 only after it succeeds.' -InformationAction Continue
@@ -997,6 +1038,8 @@ function Invoke-UpgradeApply {
         if (-not (Test-NewConfig -NewCheckout $frozen.NewSource)) {
             throw 'v0.2.0 config verification failed'
         }
+        $state = Get-RecoveryState -RecoveryPath $recovery
+        Confirm-WindowsTerminalExpectedState -Entries $state.TerminalRecovery
         Save-RecoveryStage -Recovery $recovery -Stage applied
         $transactionActive = $false
     } catch {

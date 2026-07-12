@@ -260,7 +260,7 @@ Commit-by-commit status:
   retired the Intel product contract; WSL real-host proof remains explicitly
   pending.
   UGR-001 and UGR-014 are implemented:
-  packaged/portable WT state is independently transactionally merged and
+  stable packaged/Preview/portable WT state is independently transactionally merged and
   recovered, while uninstall backup selection is filename-keyed and fails
   closed on malformed candidates. UGR-004 through UGR-009 are implemented:
   recoverable installs share the summary boundary; Pi and zsh executable
@@ -1231,7 +1231,7 @@ Canonical solution:
 3. DONE - Separate reversible Nix/config migration from additive native tools.
 4. DONE - Pin the exact peeled v0.1.0 fixture and failure boundaries in CI.
 5. PENDING LIVE - Record Apple Silicon owner-host, real WSL2, redirected
-   Windows, divergent dual-Terminal, and exact tagged v0.2.0 release runs before
+   Windows, divergent stable packaged/Preview/portable Terminal, and exact tagged v0.2.0 release runs before
    publication.
 
 ## Disproved Or Non-Blocking Assumptions

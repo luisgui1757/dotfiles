@@ -159,8 +159,10 @@ that violates one of these, fix it instead of disabling the test.
     merge by default. Opt out with `-SkipWindowsTerminalMerge`;
     `-MergeWindowsTerminal` is a retained no-op alias. Chezmoi exposes no WT
     target: it cannot provide the required backup/concurrency/atomicity contract.
-    Setup treats packaged and portable files independently, never mirrors one
-    over the other, and seeds the portable path only when portable WT is
+    One shared validated enumerator defines stable packaged, Preview packaged,
+    and portable settings identities for setup, release migration, recovery,
+    and uninstall. Setup treats all selected files independently, never mirrors
+    one over another, and seeds the portable path only when portable WT is
     detected. The merge adds a fixed PowerShell 7
     profile (`pwsh.exe`) and promotes an empty or built-in Windows PowerShell 5.1
     `defaultProfile` to that profile; a custom user default is preserved.
@@ -395,8 +397,9 @@ that violates one of these, fix it instead of disabling the test.
     trees, and uses only those frozen sources for Nix/config publication and
     rollback; post-validation checkout changes cannot affect a write.
     Windows recovery likewise archives both exact commits beneath its protected
-    ACL and binds setup, readback, uninstall, and rollback to those validated
-    trees rather than either retained checkout.
+    ACL, records all three canonical Terminal identities and their expected
+    presence/hash state, and binds setup, acceptance, uninstall, and rollback to
+    those validated trees rather than either retained checkout.
     The reversible core runs only Nix activation plus config files/links on POSIX
     (`--skip-native-deps --skip-config-scripts --skip-nvim --skip-agents`) and config/known-folder/
     Terminal publication on Windows
@@ -929,8 +932,9 @@ save only**. The next plain `:w` formats normally. Implemented in
   git`, `apt install git`, or `winget install Git.Git`).
 - The Windows installer does NOT symlink `settings.json` for Windows Terminal:
   WT rewrites that file on launch. `setup.ps1` Phase 2 excludes WT from chezmoi
-  publication, then builds one independent plan for each existing packaged and
-  existing/detected portable target. It stages in the destination directory,
+  publication, then builds one independent plan for each existing stable
+  packaged and Preview packaged target plus each existing/detected portable
+  target. It stages in the destination directory,
   parses and byte-validates all results, makes a verified collision-safe backup
   for each divergent existing target, detects source changes both before and
   inside atomic `File.Replace`, and rolls already-published targets back as a
@@ -1234,8 +1238,9 @@ save only**. The next plain `:w` formats normally. Implemented in
   copy-mode files, restore bootstrap-style `<target>.bak.<timestamp>[.n]`
   backups by validated filename timestamp/collision order (never mtime), and
   leave chezmoi's own config/state alone. Malformed or ambiguous candidates fail
-  before target removal. Windows restores packaged and portable WT backups only
-  after validating both paths, atomically preserves the displaced current file
+  before target removal. Windows restores stable packaged, Preview packaged,
+  and portable WT backups only after validating all three canonical paths,
+  atomically preserves the displaced current file
   as `settings.json.uninstall-current.*`, and honors `-NoRestoreBackups`.
   Dry-run mode must also leave empty external parent directories in place; it
   prints `would:` lines only and does not prune `~/.local/share/dotfiles`.

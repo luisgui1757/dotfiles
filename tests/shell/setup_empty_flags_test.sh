@@ -6,13 +6,20 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 
-out=$(/bin/bash "$REPO_ROOT/setup.sh" --skip-deps --skip-bootstrap --skip-nvim --skip-agents 2>&1)
-rc=$?
+if out=$(/bin/bash "$REPO_ROOT/setup.sh" --skip-deps --skip-bootstrap --skip-nvim --skip-agents 2>&1); then
+    rc=0
+else
+    rc=$?
+fi
 if [[ "$rc" -ne 0 ]]; then
-    echo "FAIL: setup.sh --skip-* exited $rc"; echo "$out"; exit 1
+    echo "FAIL: setup.sh --skip-* exited $rc"
+    echo "$out"
+    exit 1
 fi
 if grep -qi 'unbound variable' <<<"$out"; then
-    echo "FAIL: nounset error in setup.sh on empty flag array"; echo "$out"; exit 1
+    echo "FAIL: nounset error in setup.sh on empty flag array"
+    echo "$out"
+    exit 1
 fi
 
 echo "OK"

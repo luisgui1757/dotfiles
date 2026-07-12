@@ -41,6 +41,20 @@ Describe 'uninstall.ps1 backup ordering and Windows Terminal recovery' {
         Remove-Item -LiteralPath $script:Root -Recurse -Force -ErrorAction SilentlyContinue
     }
 
+    It 'enumerates stable packaged, Preview packaged, and portable targets' {
+        $targets = @(Get-WindowsTerminalRecoveryTargets)
+
+        $targets.Count | Should -Be 3
+        $targets[0] | Should -Match 'Microsoft\.WindowsTerminal_8wekyb3d8bbwe'
+        $targets[1] | Should -Match 'Microsoft\.WindowsTerminalPreview_8wekyb3d8bbwe'
+        $targets[2] | Should -Match 'Microsoft[\\/]Windows Terminal'
+    }
+
+    It 'rejects a relative LocalApplicationData boundary before enumerating targets' {
+        { Get-DotfilesWindowsTerminalTargetDefinitions -LocalApplicationData 'relative\profile' } |
+            Should -Throw '*missing or not absolute*'
+    }
+
     It 'selects filename timestamp and collision suffix instead of mtime' {
         $target = Join-Path $script:Root 'config with spaces.json'
         $old = "$target.bak.20260101-010101"
@@ -73,41 +87,50 @@ Describe 'uninstall.ps1 backup ordering and Windows Terminal recovery' {
         { Get-NewestBackup -Target $target } | Should -Throw '*malformed backup candidate*'
     }
 
-    It 'restores packaged and portable settings independently while preserving current bytes' {
+    It 'restores packaged, Preview, and portable settings independently while preserving current bytes' {
         $targets = @(Get-WindowsTerminalRecoveryTargets)
         $packaged = $targets[0]
-        $portable = $targets[1]
-        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $packaged), (Split-Path -Parent $portable) | Out-Null
+        $preview = $targets[1]
+        $portable = $targets[2]
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $packaged), `
+            (Split-Path -Parent $preview), (Split-Path -Parent $portable) | Out-Null
         [IO.File]::WriteAllText($packaged, '{"current":"packaged"}')
+        [IO.File]::WriteAllText($preview, '{"current":"preview"}')
         [IO.File]::WriteAllText($portable, '{"current":"portable"}')
         $packagedBackup = "$packaged.bak.20260202-020202.1"
+        $previewBackup = "$preview.bak.20260203-020202"
         $portableBackup = "$portable.bak.20260303-030303"
         [IO.File]::WriteAllText($packagedBackup, '{"before":"packaged"}')
+        [IO.File]::WriteAllText($previewBackup, '{"before":"preview"}')
         [IO.File]::WriteAllText($portableBackup, '{"before":"portable"}')
         (Get-Item $packagedBackup).LastWriteTimeUtc = [DateTime]::UtcNow.AddYears(-2)
 
         Restore-WindowsTerminalSettingsBackups
 
         [IO.File]::ReadAllText($packaged) | Should -Be '{"before":"packaged"}'
+        [IO.File]::ReadAllText($preview) | Should -Be '{"before":"preview"}'
         [IO.File]::ReadAllText($portable) | Should -Be '{"before":"portable"}'
         @(Get-ChildItem -LiteralPath (Split-Path -Parent $packaged) -Filter 'settings.json.uninstall-current.*').Count | Should -Be 1
+        @(Get-ChildItem -LiteralPath (Split-Path -Parent $preview) -Filter 'settings.json.uninstall-current.*').Count | Should -Be 1
         @(Get-ChildItem -LiteralPath (Split-Path -Parent $portable) -Filter 'settings.json.uninstall-current.*').Count | Should -Be 1
         [IO.File]::ReadAllText(@(Get-ChildItem -LiteralPath (Split-Path -Parent $packaged) -Filter 'settings.json.uninstall-current.*')[0].FullName) | Should -Be '{"current":"packaged"}'
+        [IO.File]::ReadAllText(@(Get-ChildItem -LiteralPath (Split-Path -Parent $preview) -Filter 'settings.json.uninstall-current.*')[0].FullName) | Should -Be '{"current":"preview"}'
         [IO.File]::ReadAllText(@(Get-ChildItem -LiteralPath (Split-Path -Parent $portable) -Filter 'settings.json.uninstall-current.*')[0].FullName) | Should -Be '{"current":"portable"}'
     }
 
-    It 'validates both paths before restoring either one' {
+    It 'validates all three paths before restoring any one' {
         $targets = @(Get-WindowsTerminalRecoveryTargets)
         foreach ($target in $targets) {
             New-Item -ItemType Directory -Force -Path (Split-Path -Parent $target) | Out-Null
             [IO.File]::WriteAllText($target, '{"current":true}')
             [IO.File]::WriteAllText("$target.bak.20260101-010101", '{"before":true}')
         }
-        [IO.File]::WriteAllText("$($targets[1]).bak.latest", '{"bad":true}')
+        [IO.File]::WriteAllText("$($targets[2]).bak.latest", '{"bad":true}')
 
         { Restore-WindowsTerminalSettingsBackups } | Should -Throw '*malformed backup candidate*'
         [IO.File]::ReadAllText($targets[0]) | Should -Be '{"current":true}'
         [IO.File]::ReadAllText($targets[1]) | Should -Be '{"current":true}'
+        [IO.File]::ReadAllText($targets[2]) | Should -Be '{"current":true}'
     }
 
     It 'is write-free in dry-run and honors NoRestoreBackups' {

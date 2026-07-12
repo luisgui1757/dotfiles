@@ -1382,34 +1382,65 @@ Describe "setup.ps1 transactional Windows Terminal merge" {
         @($written.themes | Where-Object { $_.name -eq 'rose-pine' }).Count | Should -Be 1
     }
 
-    It "preserves divergent packaged and portable state without mirroring either" {
+    It "merges Preview-only settings as an independent target" {
         $packaged = Get-WindowsTerminalSettingsPath
+        $preview = Get-WindowsTerminalPreviewSettingsPath
         $portable = Get-WindowsTerminalUnpackagedSettingsPath
-        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $packaged), (Split-Path -Parent $portable) | Out-Null
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $preview) | Out-Null
+        $original = '{"defaultProfile":"{preview}","profiles":{"defaults":{},"list":[{"guid":"{preview}","name":"PreviewOnly"}]},"schemes":[{"name":"PreviewScheme"}],"actions":[{"command":"closeWindow","keys":"alt+f4"}]}'
+        [System.IO.File]::WriteAllText($preview, $original, [System.Text.UTF8Encoding]::new($false))
+
+        Invoke-WindowsTerminalSettingsTransaction -IsPortablePresent $false
+
+        Test-Path -LiteralPath $packaged | Should -BeFalse
+        Test-Path -LiteralPath $portable | Should -BeFalse
+        $written = [System.IO.File]::ReadAllText($preview) | ConvertFrom-Json
+        @($written.profiles.list | Where-Object { $_.guid -eq '{preview}' }).Count | Should -Be 1
+        @($written.schemes | Where-Object { $_.name -eq 'PreviewScheme' }).Count | Should -Be 1
+        @($written.actions | Where-Object { $_.keys -eq 'alt+f4' }).Count | Should -Be 1
+        $backups = @(Get-ChildItem -LiteralPath (Split-Path -Parent $preview) -Filter 'settings.json.bak.*')
+        $backups.Count | Should -Be 1
+        [System.IO.File]::ReadAllText($backups[0].FullName) | Should -Be $original
+    }
+
+    It "preserves divergent packaged, Preview, and portable state without mirroring variants" {
+        $packaged = Get-WindowsTerminalSettingsPath
+        $preview = Get-WindowsTerminalPreviewSettingsPath
+        $portable = Get-WindowsTerminalUnpackagedSettingsPath
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $packaged), `
+            (Split-Path -Parent $preview), (Split-Path -Parent $portable) | Out-Null
         $packagedOriginal = '{"defaultProfile":"{pkg}","profiles":{"defaults":{},"list":[{"guid":"{pkg}","name":"PackagedOnly"}]},"schemes":[{"name":"PackagedScheme"}],"actions":[{"command":"closeWindow","keys":"alt+f4"}]}'
+        $previewOriginal = '{"defaultProfile":"{pre}","profiles":{"defaults":{},"list":[{"guid":"{pre}","name":"PreviewOnly"}]},"schemes":[{"name":"PreviewScheme"}],"actions":[{"command":"newTab","keys":"ctrl+shift+8"}]}'
         $portableOriginal = '{"defaultProfile":"{port}","profiles":{"defaults":{},"list":[{"guid":"{port}","name":"PortableOnly"}]},"schemes":[{"name":"PortableScheme"}],"actions":[{"command":"newTab","keys":"ctrl+shift+9"}]}'
         [System.IO.File]::WriteAllText($packaged, $packagedOriginal, [System.Text.UTF8Encoding]::new($false))
+        [System.IO.File]::WriteAllText($preview, $previewOriginal, [System.Text.UTF8Encoding]::new($false))
         [System.IO.File]::WriteAllText($portable, $portableOriginal, [System.Text.UTF8Encoding]::new($false))
 
         Invoke-WindowsTerminalSettingsTransaction -IsPortablePresent $true
 
         $pkg = [System.IO.File]::ReadAllText($packaged) | ConvertFrom-Json
+        $pre = [System.IO.File]::ReadAllText($preview) | ConvertFrom-Json
         $port = [System.IO.File]::ReadAllText($portable) | ConvertFrom-Json
         @($pkg.profiles.list | Where-Object { $_.guid -eq '{pkg}' }).Count | Should -Be 1
+        @($pkg.profiles.list | Where-Object { $_.guid -in @('{pre}', '{port}') }).Count | Should -Be 0
+        @($pre.profiles.list | Where-Object { $_.guid -eq '{pre}' }).Count | Should -Be 1
+        @($pre.profiles.list | Where-Object { $_.guid -in @('{pkg}', '{port}') }).Count | Should -Be 0
         @($pkg.profiles.list | Where-Object { $_.guid -eq '{port}' }).Count | Should -Be 0
         @($port.profiles.list | Where-Object { $_.guid -eq '{port}' }).Count | Should -Be 1
-        @($port.profiles.list | Where-Object { $_.guid -eq '{pkg}' }).Count | Should -Be 0
+        @($port.profiles.list | Where-Object { $_.guid -in @('{pkg}', '{pre}') }).Count | Should -Be 0
         @(Get-ChildItem -LiteralPath (Split-Path -Parent $packaged) -Filter 'settings.json.bak.*').Count | Should -Be 1
+        @(Get-ChildItem -LiteralPath (Split-Path -Parent $preview) -Filter 'settings.json.bak.*').Count | Should -Be 1
         @(Get-ChildItem -LiteralPath (Split-Path -Parent $portable) -Filter 'settings.json.bak.*').Count | Should -Be 1
     }
 
     It "does nothing when neither installation has a settings target" {
         Invoke-WindowsTerminalSettingsTransaction -IsPortablePresent $false
         Test-Path -LiteralPath (Get-WindowsTerminalSettingsPath) | Should -BeFalse
+        Test-Path -LiteralPath (Get-WindowsTerminalPreviewSettingsPath) | Should -BeFalse
         Test-Path -LiteralPath (Get-WindowsTerminalUnpackagedSettingsPath) | Should -BeFalse
     }
 
-    It "fails invalid JSON before changing either target" {
+    It "fails invalid JSON before changing any selected target" {
         $packaged = Get-WindowsTerminalSettingsPath
         $portable = Get-WindowsTerminalUnpackagedSettingsPath
         New-Item -ItemType Directory -Force -Path (Split-Path -Parent $packaged), (Split-Path -Parent $portable) | Out-Null

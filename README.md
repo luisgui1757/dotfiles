@@ -69,7 +69,7 @@ Windows Terminal, Hack Nerd Font, lazygit, and `win32yank` are installed on the
 rendering host, install Nix inside the WSL distro, then run `./setup.sh --all`
 inside WSL for the Linux CLI/editor stack. Windows Terminal settings handling
 runs by default, and setup independently stages, validates, backs up, and
-atomically merges each existing packaged/portable target. If Scoop, winget, and choco
+atomically merges each existing packaged, Preview, and portable target. If Scoop, winget, and choco
 cannot register the MSIX app, setup falls back to a pinned
 SHA-256-verified portable WT zip. Portable WT reads the unpackaged settings
 path, so portable WT is merged from its own current settings (or seeded only
@@ -99,7 +99,7 @@ retain the exact v0.1.0 checkout, clone v0.2.0 separately, run the read-only
 preflight, apply the transactional migration, verify, and explicitly accept or
 rollback from the printed private recovery directory. Apple Silicon macOS and
 Linux/WSL include Nix-generation rollback; Windows independently recovers
-known-folder config and exact packaged/portable Terminal bytes. macOS migration
+known-folder config and exact packaged/Preview/portable Terminal bytes. macOS migration
 is available only on Apple Silicon.
 Every platform publishes and rolls back only from digest-bound release trees in
 that private directory; full post-acceptance setup later repoints config to the
@@ -276,7 +276,7 @@ the newest validated `<target>.bak.<timestamp>[.n]` backup by filename order,
 and leave chezmoi's own
 state/config alone. Dry-run mode prints the planned removals without deleting
 files or pruning empty external parent directories. Windows Terminal settings
-are not deleted: validated packaged/portable backups restore independently, and
+are not deleted: validated packaged/Preview/portable backups restore independently, and
 the displaced current file is preserved as `settings.json.uninstall-current.*`.
 Backup selection uses the filename timestamp/collision suffix, never mtime;
 malformed candidates fail before removal/restoration.
@@ -358,7 +358,7 @@ and Windows Terminal remains a merge.
 | lazygit | `~/Library/Application Support/lazygit/config.yml` -> `lazygit/config.yml` | `~/.config/lazygit/config.yml` -> `lazygit/config.yml` | `%LOCALAPPDATA%\lazygit\config.yml` -> `lazygit\config.windows.yml` |
 | lsd | `~/.config/lsd/{config.yaml,colors.yaml}` -> `lsd/{config.yaml,colors.yaml}` | same | `%USERPROFILE%\.config\lsd\{config.yaml,colors.yaml}` -> `lsd\{config.yaml,colors.yaml}` |
 | gh-dash | `~/.config/gh-dash/config.yml` -> `gh-dash/config.yml` | same | `%USERPROFILE%\.config\gh-dash\config.yml` -> `gh-dash\config.yml` |
-| Windows Terminal | n/a | n/a | app installed by `setup.ps1` through Scoop/winget/choco, with a SHA-256-verified portable zip fallback; setup treats packaged and portable `settings.json` as independent targets, stages and validates both before publication, creates separate verified backups, detects concurrent changes through atomic replacement rollback bytes, and rolls the transaction back on failure; opt out with `-SkipWindowsTerminalMerge`; see [windows-terminal/README.md](windows-terminal/README.md) |
+| Windows Terminal | n/a | n/a | app installed by `setup.ps1` through Scoop/winget/choco, with a SHA-256-verified portable zip fallback; one validated enumerator identifies stable packaged, Preview packaged, and portable `settings.json` targets for setup, migration, recovery, and uninstall; setup stages and validates all selected targets before publication, creates separate verified backups, detects concurrent changes through atomic replacement rollback bytes, and rolls the group back on failure; opt out with `-SkipWindowsTerminalMerge`; see [windows-terminal/README.md](windows-terminal/README.md) |
 
 Windows setup resolves UserProfile, LocalApplicationData, Documents, and the
 active host's `$PROFILE` independently through supported runtime/known-folder
@@ -1061,7 +1061,8 @@ stale; CI then fails verification until a human reviews the adjacent constant.
   `-MergeWindowsTerminal` remains accepted as a no-op alias for older commands.
 - **Windows Terminal settings.json is NOT symlinked** because WT auto-rewrites
   it. Only the user-owned keys live in `settings.fragment.jsonc`; setup reads
-  each packaged/portable target independently, stages and validates every
+  each stable packaged, Preview packaged, and portable target independently,
+  stages and validates every
   result, makes a verified per-target backup, then atomically publishes. It
   updates keys by identity, adds a fixed `PowerShell 7` profile (`pwsh.exe`), promotes an empty or
   Windows PowerShell 5.1 `defaultProfile` to that profile, and resets a
@@ -1240,7 +1241,7 @@ MIT. See `LICENSE`.
 | A `wt --version` window popped up during `setup.ps1 -All` | the dependency version table ran `<tool> --version`, and `wt --version` opens a Windows Terminal window instead of printing | fixed — `Get-CommandVersionString` never runs `wt --version`; it reads the file version (or shows `installed`) |
 | Ghostty doesn't open maximized | `window-save-state = always` restored an old geometry over `maximize` (macOS only) | `ghostty/config` uses `window-save-state = default` (not `always`) with `maximize = true`; `always` lets the saved size win |
 | Ghostty doesn't load the config | wrong path, or WSL default skip | the install path is `~/Library/Application Support/com.mitchellh.ghostty/config` on macOS and `~/.config/ghostty/config` on native Linux. WSL only links Linux Ghostty config after `./setup.sh --experimental-wsl-gui`; otherwise use Windows Terminal |
-| Windows Terminal lost a profile after merge | WT rewrote one installation's file after setup, or an older pre-transactional setup was used | inspect that installation's independent `<settings.json>.bak.<YYYYMMDD-HHMMSS>[.n]` backups; `uninstall.ps1` validates filename order and JSON, restores packaged and portable targets independently, and preserves the displaced current file for recovery |
+| Windows Terminal lost a profile after merge | WT rewrote one installation's file after setup, or an older pre-transactional setup was used | inspect that installation's independent `<settings.json>.bak.<YYYYMMDD-HHMMSS>[.n]` backups; `uninstall.ps1` validates every stable packaged, Preview packaged, and portable candidate before mutation, restores each target independently, and preserves the displaced current file for recovery |
 | `setup.ps1` errors "cannot create symbolic links" | Developer Mode off and not elevated | `setup.ps1` reports your *elevated* + *Developer Mode* state before chezmoi apply. Enable Developer Mode (Settings -> Privacy & security -> For developers, no admin, recommended) **then** `.\setup.ps1 -SkipDeps`; OR run just the config phase elevated with `.\setup.ps1 -SkipDeps -SkipNvim`, then return to a normal shell for `.\setup.ps1 -SkipDeps -SkipConfig`. Don't elevate the dependency-install run because Scoop refuses admin installs |
 | Ghostty won't open maximized on Linux/GNOME | `maximize = true` is a hint the WM may ignore (GNOME Mutter often does) | on **X11**, `install-deps` offers a devilspie2 setup through the native Linux package manager, even when Linuxbrew is the main CLI manager; the rule is keyed on `com.mitchellh.ghostty`. Wayland needs a GNOME Shell extension instead |
 | `install-deps.ps1`: winget `No package found matching input criteria` (exit `-1978335212`) | winget source/catalog flakiness | install-deps now **prefers scoop** and falls back across managers per tool -- accept the scoop bootstrap when offered and re-run; VS Build Tools has no Scoop package, so it falls through to choco and then Microsoft's official bootstrapper |

@@ -93,7 +93,12 @@ the check metadata and integrity source from exact committed Git objects, checks
 the worktree still matches, derives the classic and Actions payloads, validates
 the manifest and all cross-file identities, then makes the transaction directory
 read-only. All three API writes consume only those files; no post-validation
-write reads a checkout path. A snapshot created before that boundary is deleted
+write reads a checkout path. Postflight derives integrity, classic, review, and
+owner expectations only from that read-only transaction and compares unchanged
+repository/ruleset state with the frozen second capture. It then repeats the
+local exact-main/clean-source boundary check after readback, closing the interval
+between the first postflight boundary check and expectation construction. A
+snapshot created before that boundary is deleted
 if apply aborts without a live write. Once mutation begins—or apply succeeds—the
 original snapshot remains available for independent readback and recovery. If
 automatic rollback cannot complete, use the exact path printed by the failure:

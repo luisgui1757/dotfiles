@@ -282,6 +282,12 @@ if (-not $ScriptDir -or -not (Test-Path (Join-Path $ScriptDir 'home'))) {
 
 Set-Location $ScriptDir
 
+$WindowsTerminalTargetsLibrary = Join-Path $ScriptDir 'scripts\windows-terminal-targets.ps1'
+if (-not (Test-Path -LiteralPath $WindowsTerminalTargetsLibrary -PathType Leaf)) {
+    throw "Windows Terminal target library is missing: $WindowsTerminalTargetsLibrary"
+}
+. $WindowsTerminalTargetsLibrary
+
 # ---- Forward flags to sub-scripts --------------------------------------------
 # Hashtable splatting (not array) so switches bind by NAME. Array splatting
 # passes elements as positional args, which switch parameters cannot accept;
@@ -1081,11 +1087,18 @@ function Test-TargetAlreadyMatches {
 }
 
 function Get-WindowsTerminalSettingsPath {
-    return (Join-Path (Get-WindowsLocalApplicationData) 'Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json')
+    return (Get-DotfilesWindowsTerminalTargetDefinition `
+            -LocalApplicationData (Get-WindowsLocalApplicationData) -Kind Packaged).Path
+}
+
+function Get-WindowsTerminalPreviewSettingsPath {
+    return (Get-DotfilesWindowsTerminalTargetDefinition `
+            -LocalApplicationData (Get-WindowsLocalApplicationData) -Kind Preview).Path
 }
 
 function Get-WindowsTerminalUnpackagedSettingsPath {
-    return (Join-Path (Get-WindowsLocalApplicationData) 'Microsoft\Windows Terminal\settings.json')
+    return (Get-DotfilesWindowsTerminalTargetDefinition `
+            -LocalApplicationData (Get-WindowsLocalApplicationData) -Kind Portable).Path
 }
 
 function Get-WindowsTerminalSettingsFragmentPath {
@@ -1097,12 +1110,14 @@ function Get-WindowsTerminalMergeHelperPath {
 }
 
 function Test-WindowsTerminalUnpackagedPresent {
-    $localAppData = Get-WindowsLocalApplicationData
+    param([string]$LocalApplicationData = (Get-WindowsLocalApplicationData))
+    $localAppData = $LocalApplicationData
     if (-not $localAppData) {
         return $false
     }
 
-    $unpackagedSettings = Get-WindowsTerminalUnpackagedSettingsPath
+    $unpackagedSettings = (Get-DotfilesWindowsTerminalTargetDefinition `
+            -LocalApplicationData $localAppData -Kind Portable).Path
     $unpackagedDir = Split-Path -Parent $unpackagedSettings
     if (Test-Path -LiteralPath $unpackagedDir -PathType Container) {
         return $true
@@ -1194,13 +1209,10 @@ function Get-WindowsTerminalMergeTargets {
     param(
         [bool]$IsPortablePresent = (Test-WindowsTerminalUnpackagedPresent)
     )
-    $packagedSettings = Get-WindowsTerminalSettingsPath
-    if (Test-Path -LiteralPath $packagedSettings -PathType Leaf) {
-        Write-Output $packagedSettings
-    }
-    $unpackagedSettings = Get-WindowsTerminalUnpackagedSettingsPath
-    if ((Test-Path -LiteralPath $unpackagedSettings -PathType Leaf) -or $IsPortablePresent) {
-        Write-Output $unpackagedSettings
+    foreach ($target in @(Get-DotfilesWindowsTerminalTargets `
+            -LocalApplicationData (Get-WindowsLocalApplicationData) `
+            -PortablePresent $IsPortablePresent)) {
+        Write-Output $target.Path
     }
 }
 

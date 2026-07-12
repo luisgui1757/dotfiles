@@ -15,7 +15,11 @@ Packaged Store/MSIX Windows Terminal:
 %LOCALAPPDATA%\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json
 ```
 
-(For the WT Preview the package is `Microsoft.WindowsTerminalPreview_8wekyb3d8bbwe`.)
+Preview Store/MSIX Windows Terminal:
+
+```
+%LOCALAPPDATA%\Packages\Microsoft.WindowsTerminalPreview_8wekyb3d8bbwe\LocalState\settings.json
+```
 
 Portable unpackaged Windows Terminal:
 
@@ -75,23 +79,25 @@ rewrites its own `settings.json`.
 `-MergeWindowsTerminal` switch is still accepted on `setup.ps1` as a no-op
 alias for older commands.
 
-Packaged and portable settings are never mirrored. For every existing packaged
-target and every existing/detected portable target, setup reads that target's
-own current JSON, merges the fragment, and stages the result beside the
-destination. It parses and byte-validates every staged output before touching
-either target. Every divergent pre-existing target receives its own verified,
+Stable packaged, Preview packaged, and portable settings are never mirrored.
+`scripts/windows-terminal-targets.ps1` is the single validated identity source
+used by setup, release migration/recovery, and uninstall. For every existing
+MSIX target and every existing/detected portable target, setup reads that
+target's own current JSON, merges the fragment, and stages the result beside
+the destination. It parses and byte-validates every staged output before
+touching any target. Every divergent pre-existing target receives its own verified,
 collision-safe `settings.json.bak.<timestamp>[.n]` copy.
 
 Publication uses same-directory atomic replacement. The replacement operation
 captures the exact pre-publication bytes in a transient rollback file; setup
 compares that file with the staged source identity to detect even a change in
-the final check/replace window. If either target fails backup, validation, or
+the final check/replace window. If any target fails backup, validation, or
 publication, already-published targets roll back as a group. An unsafe rollback
 fails setup with the exact persistent/rollback paths needed for manual recovery.
 Stages and completed rollback files are cleaned on success and failure, and a
 named transaction mutex serializes concurrent setup runs. A missing Store/MSIX
 settings file stays absent; a missing portable file is seeded only when portable
-WT is actually detected. Repeated setup is a no-op once both independent merges
+WT is actually detected. Repeated setup is a no-op once all selected independent merges
 already match.
 
 The merge initializes missing `profiles` containers and preserves custom
@@ -101,12 +107,12 @@ Windows PowerShell default is promoted to the fixed `PowerShell 7` profile.
 Bare `chezmoi apply` deliberately has no Windows Terminal target because it
 cannot provide setup's backup/concurrency/atomic-publication contract.
 
-`uninstall.ps1 -All` validates backup filenames and JSON for both paths before
-restoring either. It orders by the filename timestamp plus collision suffix,
+`uninstall.ps1 -All` validates backup filenames and JSON for all three canonical
+paths before restoring any target. It orders by the filename timestamp plus collision suffix,
 never filesystem mtime, atomically restores the selected pre-setup backup, and
 preserves the displaced current settings as
 `settings.json.uninstall-current.<timestamp>[.n]`. Use
-`-NoRestoreBackups` to leave both paths untouched.
+`-NoRestoreBackups` to leave every path untouched.
 
 For WSL, this is the supported terminal/font path: run
 `.\setup.ps1 -All` on Windows, then `./setup.sh --all` inside WSL. The WSL setup

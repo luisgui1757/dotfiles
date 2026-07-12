@@ -32,7 +32,7 @@ whether any user data changed.
 - [ ] **Windows conventional known folders:** exact v0.1.0 checkout with
       divergent copy-mode files and nvim link. Apply from exact v0.2.0, fail
       after Terminal/config publication, and prove exact old config plus
-      packaged/portable Terminal bytes return before retry. After recovery is
+      stable packaged/Preview/portable Terminal bytes return before retry. After recovery is
       captured, alter or temporarily move both retained checkouts and prove
       apply/rollback still consume only the frozen release trees.
 - [ ] **Windows redirected/OneDrive/alternate drive:** repeat with Documents,
@@ -68,11 +68,12 @@ whether any user data changed.
 - [ ] **Windows Terminal**: rose-pine scheme applied; tabs use the
       configured theme; acrylic OFF on the body, ON in the tab row; a new tab
       opens `PowerShell 7` unless the user intentionally chose another default.
-- [ ] **Windows Terminal dual-install preservation**: give packaged and portable
-      settings different custom profiles, schemes, actions, and defaults; run
+- [ ] **Windows Terminal three-variant preservation**: give stable packaged,
+      Preview packaged, and portable settings different custom profiles,
+      schemes, actions, and defaults; run
       `setup.ps1 -SkipDeps -SkipNvim`. Confirm each retains only its own custom
       state plus the managed fragment and receives its own verified backup.
-      Run `uninstall.ps1 -All`; confirm both pre-setup backups restore and each
+      Run `uninstall.ps1 -All`; confirm all pre-setup backups restore and each
       displaced current file remains as `settings.json.uninstall-current.*`.
 - [ ] **Redirected Windows known folders**: redirect Documents and
       LocalApplicationData to different real paths (include an alternate drive
@@ -252,7 +253,8 @@ whether any user data changed.
       `86399025519`, Apple Silicon `86399025503`, Intel `86399025491`, native
       Windows `86399025722`, and all four setup logical proofs were green.
       This checks the exact branch behavior; it is not WSL, redirected Windows,
-      divergent dual Terminal, or desktop/TCC evidence. Merged-main run
+      divergent stable packaged/Preview/portable Terminal, or desktop/TCC
+      evidence. Merged-main run
       [`29114125798`](https://github.com/luisgui1757/dotfiles/actions/runs/29114125798)
       on PR #48 merge SHA `f104bf066e4af7d4d707fe22ba36600711f1ae14`
       passed Ubuntu container, public Ubuntu, historical Intel, and Windows but

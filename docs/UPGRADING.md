@@ -190,11 +190,15 @@ This phase intentionally passes `-SkipDeps`, `-SkipNvim`, `-SkipAgents`, and
 `-SkipConfigScripts`: dependency installation, executable caches, agent policy,
 and chezmoi run scripts are not mixed into config recovery. The private
 LocalApplicationData recovery folder
-uses a protected ACL; it captures exact packaged and portable Windows Terminal
+uses a protected ACL; it captures the exact stable packaged, Preview packaged,
+and portable Windows Terminal
 bytes plus digest-bound trees extracted from both exact release commits. Apply,
 verification, uninstall, and rollback consume only those frozen trees; edits or
 loss of either checkout after recovery capture cannot alter a transaction
-write. Both Terminal targets validate before either restore write, and the old
+write. All three canonical Terminal identities validate before any restore
+write. Expected presence and post-migration hashes are recorded independently,
+so explicit acceptance fails if a selected variant is absent, still has its
+pre-migration bytes, or changed externally. The old
 checkout remains required for acceptance. Conventional v0.1 known-folder
 targets remain in place while rollback authority is open; rollback removes only
 the two transaction-created chezmoi state databases. Current setup resolves
@@ -255,7 +259,7 @@ Do not publish v0.2.0 or direct v0.1.0 users here until all of these are true:
   Silicon and Linux, including post-activation rollback and interruption;
 - the Windows Pester frozen-source/recovery suite and native Windows exact-tag
   upgrade pass;
-- real WSL host/guest, redirected Windows, divergent packaged/portable
+- real WSL host/guest, redirected Windows, divergent stable packaged/Preview/portable
   Terminal, and Apple Silicon owner-host migrations are recorded in
   `tests/MANUAL.md` and the append-only review ledger;
 - the full release gate and public-secret scan pass on the tagged tree.

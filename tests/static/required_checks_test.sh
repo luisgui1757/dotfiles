@@ -68,11 +68,16 @@ for workflow in (e2e, nix):
 safeguards = pathlib.Path("scripts/apply-repo-safeguards.sh").read_text(encoding="utf-8")
 for required_call in (
     "build_classic_payload_from_file",
-    "build_classic_state required_check_contexts",
+    "build_classic_state_from_file",
+    "git -C \"$repo_root\" show HEAD:.github/check-identities.json",
     "git -C \"$repo_root\" show HEAD:.github/rulesets/main-integrity.json",
+    "git -C \"$repo_root\" show HEAD:.github/rulesets/main-review.json",
+    "git -C \"$repo_root\" show HEAD:.github/rulesets/main-owner-updates.json",
+    'capture_and_validate_live_state "$postflight_dir" "$transaction_dir"',
+    'verify_local_boundary "$postflight_dir"',
 ):
     if required_call not in safeguards:
-        raise SystemExit(f"FAIL: safeguard apply no longer derives the classic stable set through {required_call}")
+        raise SystemExit(f"FAIL: safeguard apply lost a frozen policy/readback boundary: {required_call}")
 
 print("OK: stable required identities are emitted while legacy producers remain available for the live transition")
 PY

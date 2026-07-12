@@ -92,6 +92,7 @@ preflight_dir=""
 postflight_dir=""
 recovery_dir=""
 transaction_dir=""
+second_capture_dir=""
 transaction_active=0
 recovery_retained=0
 exit_handler_active=0
@@ -510,12 +511,26 @@ verify_workflow_jobs() {
 }
 
 capture_and_validate_live_state() {
-    local capture_dir="$1"
+    local capture_dir="$1" policy_dir="${2:-}"
     local integrity_id review_id owner_updates_id stage
+    local identities_source="$check_identities" integrity_source="$integrity_ruleset"
+    local review_source="$review_ruleset" owner_source="$owner_updates_ruleset"
     local live_integrity_normalized expected_integrity_normalized expected_legacy_integrity_normalized
     local live_review_normalized expected_review_normalized
     local live_owner_normalized expected_owner_normalized
     local live_classic_state expected_legacy_classic expected_stable_classic
+    if [[ -n "$policy_dir" ]]; then
+        for file in check-identities.json integrity-desired.json review-expected.json owner-expected.json; do
+            [[ -f "$policy_dir/$file" && ! -L "$policy_dir/$file" ]] || {
+                echo "FAIL: frozen postflight policy is incomplete or unsafe: $file" >&2
+                return 1
+            }
+        done
+        identities_source="$policy_dir/check-identities.json"
+        integrity_source="$policy_dir/integrity-desired.json"
+        review_source="$policy_dir/review-expected.json"
+        owner_source="$policy_dir/owner-expected.json"
+    fi
     gh api "repos/$repo" > "$capture_dir/repository.json"
     if [[ "$(jq -r .full_name "$capture_dir/repository.json")" != "$repo" ]]; then
         echo "FAIL: GitHub resolved a different repository than $repo." >&2
@@ -574,25 +589,25 @@ capture_and_validate_live_state() {
     gh api "repos/$repo/rulesets/$review_id" > "$capture_dir/review-live.json"
     gh api "repos/$repo/rulesets/$owner_updates_id" > "$capture_dir/owner-updates-live.json"
 
-    jq --slurpfile identities "$check_identities" '
+    jq --slurpfile identities "$identities_source" '
       (.rules[] | select(.type == "required_status_checks").parameters.required_status_checks) =
         ($identities[0].legacyEmitted | map({context: ., integration_id: 15368}))
-    ' "$integrity_ruleset" > "$capture_dir/integrity-legacy-expected.json"
+    ' "$integrity_source" > "$capture_dir/integrity-legacy-expected.json"
     normalize_ruleset "$capture_dir/integrity-live.json" > "$capture_dir/integrity-live-normalized.json"
-    normalize_ruleset "$integrity_ruleset" > "$capture_dir/integrity-stable-normalized.json"
+    normalize_ruleset "$integrity_source" > "$capture_dir/integrity-stable-normalized.json"
     normalize_ruleset "$capture_dir/integrity-legacy-expected.json" > "$capture_dir/integrity-legacy-normalized.json"
     live_integrity_normalized="$capture_dir/integrity-live-normalized.json"
     expected_integrity_normalized="$capture_dir/integrity-stable-normalized.json"
     expected_legacy_integrity_normalized="$capture_dir/integrity-legacy-normalized.json"
 
     normalize_ruleset "$capture_dir/review-live.json" > "$capture_dir/review-live-normalized.json"
-    normalize_ruleset "$review_ruleset" > "$capture_dir/review-expected-normalized.json"
+    normalize_ruleset "$review_source" > "$capture_dir/review-expected-normalized.json"
     live_review_normalized="$capture_dir/review-live-normalized.json"
     expected_review_normalized="$capture_dir/review-expected-normalized.json"
     require_json_equal "review ruleset" "$live_review_normalized" "$expected_review_normalized"
 
     normalize_ruleset "$capture_dir/owner-updates-live.json" > "$capture_dir/owner-live-normalized.json"
-    normalize_ruleset "$owner_updates_ruleset" > "$capture_dir/owner-expected-normalized.json"
+    normalize_ruleset "$owner_source" > "$capture_dir/owner-expected-normalized.json"
     live_owner_normalized="$capture_dir/owner-live-normalized.json"
     expected_owner_normalized="$capture_dir/owner-expected-normalized.json"
     require_json_equal "owner-updates ruleset" "$live_owner_normalized" "$expected_owner_normalized"
@@ -603,8 +618,10 @@ capture_and_validate_live_state() {
         return 1
     fi
     normalize_classic_state "$capture_dir/classic-live.json" > "$capture_dir/classic-live-state.json"
-    build_classic_state legacy_check_contexts > "$capture_dir/classic-legacy-state.json"
-    build_classic_state required_check_contexts > "$capture_dir/classic-stable-state.json"
+    jq -r '.legacyEmitted[]' "$identities_source" > "$capture_dir/legacy-contexts.txt"
+    jq -r '.required[]' "$identities_source" > "$capture_dir/stable-contexts.txt"
+    build_classic_state_from_file "$capture_dir/legacy-contexts.txt" > "$capture_dir/classic-legacy-state.json"
+    build_classic_state_from_file "$capture_dir/stable-contexts.txt" > "$capture_dir/classic-stable-state.json"
     live_classic_state="$capture_dir/classic-live-state.json"
     expected_legacy_classic="$capture_dir/classic-legacy-state.json"
     expected_stable_classic="$capture_dir/classic-stable-state.json"
@@ -690,7 +707,7 @@ verify_snapshot_unchanged() {
             return 1
         fi
     done
-    rm -rf "$verify_dir"
+    second_capture_dir="$verify_dir"
 }
 
 prepare_transaction_payloads() {
@@ -713,10 +730,16 @@ prepare_transaction_payloads() {
         > "$transaction_dir/check-identities.json"
     git -C "$repo_root" show HEAD:.github/rulesets/main-integrity.json \
         > "$transaction_dir/integrity-desired.json"
+    git -C "$repo_root" show HEAD:.github/rulesets/main-review.json \
+        > "$transaction_dir/review-expected.json"
+    git -C "$repo_root" show HEAD:.github/rulesets/main-owner-updates.json \
+        > "$transaction_dir/owner-expected.json"
     cp "$recovery_dir/manifest.json" "$transaction_dir/manifest.json"
 
     if ! cmp -s "$check_identities" "$transaction_dir/check-identities.json" || \
-        ! cmp -s "$integrity_ruleset" "$transaction_dir/integrity-desired.json"; then
+        ! cmp -s "$integrity_ruleset" "$transaction_dir/integrity-desired.json" || \
+        ! cmp -s "$review_ruleset" "$transaction_dir/review-expected.json" || \
+        ! cmp -s "$owner_updates_ruleset" "$transaction_dir/owner-expected.json"; then
         echo "FAIL: reviewed safeguard sources changed while transaction inputs were frozen." >&2
         return 1
     fi
@@ -773,6 +796,22 @@ prepare_transaction_payloads() {
         echo "FAIL: frozen integrity payload differs from the preflighted stable posture." >&2
         return 1
     fi
+    normalize_ruleset "$transaction_dir/review-expected.json" \
+        > "$transaction_dir/review-expected-normalized.json"
+    normalize_ruleset "$transaction_dir/owner-expected.json" \
+        > "$transaction_dir/owner-expected-normalized.json"
+    if [[ -z "$second_capture_dir" ]] || \
+        ! json_equal "$transaction_dir/review-expected-normalized.json" \
+            "$second_capture_dir/review-live-normalized.json" || \
+        ! json_equal "$transaction_dir/owner-expected-normalized.json" \
+            "$second_capture_dir/owner-live-normalized.json"; then
+        echo "FAIL: frozen unchanged ruleset expectations differ from the second live capture." >&2
+        return 1
+    fi
+    cp "$second_capture_dir/repository-state.json" \
+        "$transaction_dir/repository-state-expected.json"
+    cp "$second_capture_dir/rulesets-state.json" \
+        "$transaction_dir/rulesets-state-expected.json"
 
     build_classic_payload_from_file "$transaction_dir/required-contexts.txt" \
         > "$transaction_dir/classic-desired.json"
@@ -1151,12 +1190,25 @@ gh_api_json_file PUT "repos/$repo/rulesets/$(jq -r .integrity_ruleset_id "$trans
 gh_api_json_file PATCH "repos/$repo/branches/main/protection/required_status_checks" "$transaction_dir/classic-desired.json" >/dev/null
 
 create_private_temp_dir postflight_dir
-capture_and_validate_live_state "$postflight_dir"
+capture_and_validate_live_state "$postflight_dir" "$transaction_dir"
 if [[ "$(cat "$postflight_dir/stage")" != "stable" ]]; then
     rm -rf "$postflight_dir"
     echo "FAIL: post-apply readback did not reach the stable stage." >&2
     exit 5
 fi
+for state_file in repository-state rulesets-state review-live-normalized owner-live-normalized; do
+    expected_file="$transaction_dir/${state_file}-expected.json"
+    if [[ "$state_file" == "review-live-normalized" ]]; then
+        expected_file="$transaction_dir/review-expected-normalized.json"
+    elif [[ "$state_file" == "owner-live-normalized" ]]; then
+        expected_file="$transaction_dir/owner-expected-normalized.json"
+    fi
+    if ! json_equal "$postflight_dir/$state_file.json" "$expected_file"; then
+        echo "FAIL: post-apply unchanged $state_file state differs from the frozen second capture." >&2
+        exit 5
+    fi
+done
+verify_local_boundary "$postflight_dir"
 rm -rf "$postflight_dir"
 transaction_active=0
 
