@@ -794,7 +794,7 @@ matching is not accepted as proof of ownership isolation.
 
 | Layer | Bypass actors | What it protects |
 |---|---:|---|
-| `Protect main: integrity` | none | Requires pull requests, strict required checks, current `main`, squash-only merges, linear history, no branch deletion, and no non-fast-forward updates. |
+| `Protect main: integrity` | none | Requires pull requests, strict required checks, CodeQL merge protection, current `main`, squash-only merges, linear history, no branch deletion, and no non-fast-forward updates. |
 | `Protect main: review` | `luisgui1757` on pull requests only | Requires one approval, CODEOWNER review, stale-review dismissal, last-push approval, and resolved review threads without allowing CI bypass. |
 | `Protect main: owner updates` | `luisgui1757` on pull requests only | Allows only the owner to update `main`; automation can open PRs but cannot merge them. |
 | Classic branch protection fallback | none | Keeps required checks, enforced admins, conversation resolution, linear history, no force pushes, and no branch deletion if rulesets are not applied. |
@@ -808,6 +808,20 @@ after the non-bypass integrity layer has passed.
 Automation must not run as the owner account. Use a separate GitHub App or bot
 identity with branch/PR write access and no repository administration
 permission; otherwise GitHub sees the action as `luisgui1757`.
+
+GitHub-native security is also checked in rather than left as UI-only state.
+`scripts/apply-github-security.sh` enables private vulnerability reporting,
+immutable releases, and CodeQL default setup for GitHub Actions plus the real
+Python scripts. After both analyses pass on exact live `main`, it adds the
+non-bypassable CodeQL rule to `Protect main: integrity`, blocking error-level
+findings and high/critical security alerts. Suspected vulnerabilities must be
+reported through the private process in [SECURITY.md](SECURITY.md), not a public
+issue.
+
+GitHub Code Quality and the advanced non-provider/validity secret-scanning
+options are not included in a user-owned GitHub Pro repository. They require an
+organization-owned Team/Enterprise or Secret Protection plan; the repository
+does not pretend those unavailable controls are active.
 
 Runner-versioned required contexts are in their final staged migration. This PR
 switches the checked-in required-check sources to six stable logical checks
@@ -854,6 +868,18 @@ restores the previous stage if apply or readback fails. See
 exact validation, recovery command, and live verification sequence;
 [docs/security/supply-chain.md](docs/security/supply-chain.md) records the
 reviewed executable identities and scanners.
+
+After that stable-context transaction is applied and verified, merge the
+security-policy change and run:
+
+```bash
+scripts/apply-github-security.sh --preflight-only luisgui1757/dotfiles
+scripts/apply-github-security.sh luisgui1757/dotfiles
+```
+
+The ordering is mandatory: the security script compares the live integrity
+ruleset to the already-applied stable-context payload before it adds CodeQL
+merge protection.
 
 Renovate is the version-update bot for GitHub Actions, direct and matrix-held
 runner labels, Nix flake inputs, and repo-pinned version/ref constants. The beta

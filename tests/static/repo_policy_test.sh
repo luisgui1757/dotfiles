@@ -87,13 +87,26 @@ if owner_updates.get("bypass_actors", []) != expected_bypass:
     fail("owner-updates ruleset must have only the owner pull_request bypass")
 
 integrity_rules = rule_types(integrity)
-for required in ("pull_request", "required_status_checks", "required_linear_history", "deletion", "non_fast_forward"):
+for required in ("pull_request", "required_status_checks", "code_scanning", "required_linear_history", "deletion", "non_fast_forward"):
     if required not in integrity_rules:
         fail(f"integrity ruleset is missing {required}")
 if "required_status_checks" in rule_types(review):
     fail("review ruleset must not contain required_status_checks")
 if rule_types(owner_updates) != {"update"}:
     fail("owner-updates ruleset must contain only the update rule")
+
+code_scanning_rules = [rule for rule in integrity["rules"] if rule["type"] == "code_scanning"]
+expected_code_scanning_tools = [
+    {
+        "tool": "CodeQL",
+        "alerts_threshold": "errors",
+        "security_alerts_threshold": "high_or_higher",
+    }
+]
+if len(code_scanning_rules) != 1:
+    fail("integrity ruleset must contain exactly one code_scanning rule")
+elif code_scanning_rules[0].get("parameters", {}).get("code_scanning_tools") != expected_code_scanning_tools:
+    fail("integrity CodeQL rule must block errors and high-or-higher security alerts")
 
 integrity_pr = pull_request_rule(integrity)
 review_pr = pull_request_rule(review)
