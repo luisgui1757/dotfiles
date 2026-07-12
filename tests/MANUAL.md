@@ -259,6 +259,14 @@ whether any user data changed.
       failed Apple Silicon because the initial CMake LSP fixture shared a large
       project root and neocmakelsp timed out before attach; the later isolated
       CMake formatter fixture attached and validated gersemi in the same process.
+      PR-head run
+      [`29180481941`](https://github.com/luisgui1757/dotfiles/actions/runs/29180481941)
+      later proved that two separate client lifecycles remained timing-dependent
+      even after project isolation: the initial CMake client attached, but the
+      formatter-only restart did not. Strict smoke now formats and checks the
+      realistic CMake sample on the already-attached isolated client. Three
+      repeated strict Apple-Silicon runs passed 257/257 checks; final hosted
+      repaired-head proof is still required and is not claimed by this local row.
 - [ ] **Cache-free merged-main safeguard confirmation**: run
       `e2e-install.yml` again after this PR merges. Exact behavior head
       `f097995b49a2189db327903a20743e7cb69ba665` passed cache-free run

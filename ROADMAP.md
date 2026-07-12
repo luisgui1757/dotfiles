@@ -404,8 +404,14 @@ Commit-by-commit status:
   remain unchanged. Exact behavior head
   `f097995b49a2189db327903a20743e7cb69ba665` passed cache-free run
   `29120109175`: all four current producers and all four stable setup logical
-  proofs were green. A post-merge run on the resulting `main` SHA remains the
-  gate before owner-applied safeguards.
+  proofs were green. Later PR-head run `29180481941` exposed a second redundant
+  neocmakelsp lifecycle in the formatter gate: the first isolated CMake client
+  attached, then the formatter-only restart timed out. The smoke now formats,
+  saves, and checks diagnostics on the already-attached isolated client; three
+  repeated strict Apple-Silicon runs passed all 257 checks without increasing
+  the attach timeout. Final hosted repaired-head proof remains pending. A
+  post-merge run on the resulting `main` SHA remains the gate before
+  owner-applied safeguards.
 
 - **Exact-head runtime dependency follow-up — PASSED.** Head
   `0c853d066362602f14dc251a6d3fbf3980102048`

@@ -488,7 +488,89 @@ local ok, err = pcall(function()
     end, 200)
   end
 
-  -- (2) LSP attach. Non-gated servers must attach on every OS. powershell_es is
+  local formatter_lsp_samples = {
+    ["sample.lua"] = { source = "formatter_lsp/sample.lua", formatters = { "stylua" } },
+    ["sample.py"] = { source = "formatter_lsp/sample.py", formatters = { "ruff_fix", "ruff_format" } },
+    ["sample.c"] = { source = "formatter_lsp/sample.c", formatters = { "clang_format" } },
+    ["sample.cpp"] = { source = "formatter_lsp/sample.cpp", formatters = { "clang_format" } },
+    ["sample.rs"] = { source = "formatter_lsp/sample.rs", formatters = { "rustfmt" } },
+    ["CMakeLists.txt"] = { source = "formatter_lsp/CMakeLists.txt", formatters = { "gersemi" } },
+    ["sample.bash"] = { source = "formatter_lsp/sample.bash", formatters = { "shfmt" } },
+    ["sample.zsh"] = { source = "formatter_lsp/sample.zsh", formatters = { "shfmt" } },
+    ["sample.json"] = { source = "formatter_lsp/sample.json", formatters = { "prettier" } },
+    ["sample.jsonc"] = { source = "formatter_lsp/sample.jsonc", formatters = { "prettier" } },
+    ["sample.yaml"] = { source = "formatter_lsp/sample.yaml", formatters = { "prettier" } },
+  }
+
+  local conform_ok, conform = pcall(require, "conform")
+  if not conform_ok then
+    fail("formatter/LSP compatibility: require('conform') failed: " .. tostring(conform))
+  end
+
+  local function verify_formatter_lsp(sample, buf, lsp)
+    local formatters, uses_lsp = conform.list_formatters_to_run(buf)
+    local formatter_names = {}
+    local unavailable = {}
+    for _, formatter in ipairs(formatters) do
+      table.insert(formatter_names, formatter.name)
+      if not formatter.available then
+        table.insert(unavailable, formatter.name)
+      end
+    end
+    if not same_list(formatter_names, sample.formatters) then
+      fail(
+        sample.source
+          .. ": expected conform formatter(s) "
+          .. table.concat(sample.formatters, ",")
+          .. ", got "
+          .. table.concat(formatter_names, ",")
+      )
+    elseif #unavailable > 0 then
+      fail(sample.source .. ": formatter(s) unavailable: " .. table.concat(unavailable, ","))
+    elseif uses_lsp then
+      fail(sample.source .. ": conform would use LSP formatting despite an external formatter mapping")
+    else
+      local format_call_ok, format_ok, format_err = pcall(conform.format, {
+        bufnr = buf,
+        async = false,
+        lsp_format = "fallback",
+        timeout_ms = 10000,
+      })
+      if not format_call_ok then
+        fail(sample.source .. ": conform format raised: " .. tostring(format_ok))
+      elseif format_ok == false then
+        fail(sample.source .. ": conform format failed: " .. tostring(format_err))
+      else
+        -- This gate already invoked conform explicitly. Persist the temp buffer
+        -- without letting the normal BufWritePre hook run a second pass.
+        vim.b[buf].skip_format_on_save = true
+        local save_ok, save_err = pcall(vim.cmd.write)
+        if not save_ok then
+          fail(sample.source .. ": could not write formatted temp file: " .. tostring(save_err))
+        else
+          local diagnostics = wait_for_serious_diagnostics_to_settle(buf)
+          if #diagnostics > 0 then
+            fail(sample.source .. ": LSP warning/error after conform formatting: " .. render_diagnostics(diagnostics))
+          else
+            note(
+              sample.source
+                .. " ["
+                .. lsp
+                .. "]: conform "
+                .. table.concat(sample.formatters, "+")
+                .. " output accepted by LSP"
+            )
+          end
+        end
+      end
+    end
+  end
+
+  -- (2) LSP attach and formatter compatibility. Each formatter sample uses the
+  -- same isolated project and client lifecycle as its attachment proof. Starting
+  -- a second client for the same server added no coverage and made headless
+  -- neocmakelsp restarts timing-dependent on hosted macOS runners.
+  -- Non-gated servers must attach on every OS. powershell_es is
   -- a Windows target (lsp-config enables it only with pwsh + the PSES bundle):
   -- enforce it only on Windows, and skip cleanly elsewhere -- a legitimately
   -- absent runtime is never a failure, even under strict. This is what keeps the
@@ -535,10 +617,11 @@ local ok, err = pcall(function()
       elseif skip then
         note(row.fixture .. " [" .. row.lsp .. "]: skipped (" .. skip .. ")")
       else
+        local formatter_sample = formatter_lsp_samples[row.fixture]
         local prepare_ok, isolated_fixture = pcall(lsp_smoke_projects.prepare, {
           root = attach_root,
           fixtures = fixtures,
-          fixture = row.fixture,
+          fixture = formatter_sample and formatter_sample.source or row.fixture,
           lsp = row.lsp,
           index = index,
         })
@@ -562,6 +645,14 @@ local ok, err = pcall(function()
               .. ": open raised (treesitter highlight regression?): "
               .. (tostring(open_err):match("([^\r\n]+)") or "error")
           )
+        elseif vim.bo.filetype ~= row.filetype then
+          fail(
+            row.fixture
+              .. ": expected filetype "
+              .. row.filetype
+              .. " in isolated LSP/formatter gate, got "
+              .. tostring(vim.bo.filetype)
+          )
         end
         local buf = vim.api.nvim_get_current_buf()
         local attached = wait_for_lsp_client(buf, row.lsp)
@@ -571,6 +662,9 @@ local ok, err = pcall(function()
         -- nvim-treesitter), so a non-attach is now a real LSP/Mason regression.
         if attached then
           note(row.fixture .. " [" .. row.lsp .. "]: attached")
+          if formatter_sample and conform_ok then
+            verify_formatter_lsp(formatter_sample, buf, row.lsp)
+          end
         else
           fail(
             row.fixture
@@ -586,209 +680,6 @@ local ok, err = pcall(function()
         if not stopped then
           fail(row.fixture .. ": LSP clients did not stop after attach gate: " .. lingering)
         end
-      end
-    end
-  end
-
-  -- (3) Formatter/LSP compatibility. Conform owns format-on-save, but the
-  -- output still has to satisfy the language server's parser/schema rules. Use
-  -- separate fixture copies under tests/.cache so the smoke can format real files
-  -- without mutating tracked fixtures.
-  local formatter_lsp_samples = {
-    {
-      source = "formatter_lsp/sample.lua",
-      target = "sample.lua",
-      ft = "lua",
-      lsp = "lua_ls",
-      formatters = { "stylua" },
-    },
-    {
-      source = "formatter_lsp/sample.py",
-      target = "sample.py",
-      ft = "python",
-      lsp = "pyright",
-      formatters = { "ruff_fix", "ruff_format" },
-    },
-    {
-      source = "formatter_lsp/sample.c",
-      target = "sample.c",
-      ft = "c",
-      lsp = "clangd",
-      formatters = { "clang_format" },
-    },
-    {
-      source = "formatter_lsp/sample.cpp",
-      target = "sample.cpp",
-      ft = "cpp",
-      lsp = "clangd",
-      formatters = { "clang_format" },
-    },
-    {
-      source = "formatter_lsp/sample.rs",
-      target = "sample.rs",
-      ft = "rust",
-      lsp = "rust_analyzer",
-      formatters = { "rustfmt" },
-    },
-    {
-      source = "formatter_lsp/CMakeLists.txt",
-      target = "cmake/CMakeLists.txt",
-      ft = "cmake",
-      lsp = "neocmake",
-      formatters = { "gersemi" },
-    },
-    {
-      source = "formatter_lsp/sample.bash",
-      target = "sample.bash",
-      ft = "sh",
-      lsp = "bashls",
-      formatters = { "shfmt" },
-    },
-    {
-      source = "formatter_lsp/sample.zsh",
-      target = "sample.zsh",
-      ft = "zsh",
-      lsp = "bashls",
-      formatters = { "shfmt" },
-    },
-    {
-      source = "formatter_lsp/sample.json",
-      target = "sample.json",
-      ft = "json",
-      lsp = "jsonls",
-      formatters = { "prettier" },
-    },
-    {
-      source = "formatter_lsp/sample.jsonc",
-      target = "sample.jsonc",
-      ft = "jsonc",
-      lsp = "jsonls",
-      formatters = { "prettier" },
-    },
-    {
-      source = "formatter_lsp/sample.yaml",
-      target = "sample.yaml",
-      ft = "yaml",
-      lsp = "yamlls",
-      formatters = { "prettier" },
-    },
-  }
-  local compat_root = repo_root .. "/tests/.cache/lsp-smoke-formatters"
-  vim.fn.delete(compat_root, "rf")
-  vim.fn.mkdir(compat_root, "p")
-  local conform_ok, conform = pcall(require, "conform")
-  if not conform_ok then
-    fail("formatter/LSP compatibility: require('conform') failed: " .. tostring(conform))
-  else
-    for _, sample in ipairs(formatter_lsp_samples) do
-      local source_path = fixtures .. sample.source
-      local target_path = compat_root .. "/" .. sample.target
-      vim.fn.mkdir(vim.fn.fnamemodify(target_path, ":h"), "p")
-      local read_ok, lines = pcall(vim.fn.readfile, source_path)
-      if not read_ok then
-        fail(sample.source .. ": could not read formatter/LSP fixture: " .. tostring(lines))
-      else
-        local write_ok, write_err = pcall(vim.fn.writefile, lines, target_path)
-        if not write_ok then
-          fail(sample.source .. ": could not write formatter/LSP temp file: " .. tostring(write_err))
-        else
-          local open_ok, open_err = pcall(vim.cmd.edit, vim.fn.fnameescape(target_path))
-          if not open_ok then
-            fail(
-              sample.source
-                .. ": open raised in formatter/LSP gate: "
-                .. (tostring(open_err):match("([^\r\n]+)") or "error")
-            )
-          elseif vim.bo.filetype ~= sample.ft then
-            fail(
-              sample.source
-                .. ": expected filetype "
-                .. sample.ft
-                .. " in formatter/LSP gate, got "
-                .. tostring(vim.bo.filetype)
-            )
-          else
-            local buf = vim.api.nvim_get_current_buf()
-            local attached = wait_for_lsp_client(buf, sample.lsp)
-            if not attached then
-              fail(
-                sample.source
-                  .. " ["
-                  .. sample.lsp
-                  .. "]: did NOT attach within "
-                  .. tostring(math.floor(lsp_attach_timeout_ms / 1000))
-                  .. "s in formatter/LSP gate"
-              )
-            else
-              local formatters, uses_lsp = conform.list_formatters_to_run(buf)
-              local formatter_names = {}
-              local unavailable = {}
-              for _, formatter in ipairs(formatters) do
-                table.insert(formatter_names, formatter.name)
-                if not formatter.available then
-                  table.insert(unavailable, formatter.name)
-                end
-              end
-              if not same_list(formatter_names, sample.formatters) then
-                fail(
-                  sample.source
-                    .. ": expected conform formatter(s) "
-                    .. table.concat(sample.formatters, ",")
-                    .. ", got "
-                    .. table.concat(formatter_names, ",")
-                )
-              elseif #unavailable > 0 then
-                fail(sample.source .. ": formatter(s) unavailable: " .. table.concat(unavailable, ","))
-              elseif uses_lsp then
-                fail(sample.source .. ": conform would use LSP formatting despite an external formatter mapping")
-              else
-                local format_call_ok, format_ok, format_err = pcall(conform.format, {
-                  bufnr = buf,
-                  async = false,
-                  lsp_format = "fallback",
-                  timeout_ms = 10000,
-                })
-                if not format_call_ok then
-                  fail(sample.source .. ": conform format raised: " .. tostring(format_ok))
-                elseif format_ok == false then
-                  fail(sample.source .. ": conform format failed: " .. tostring(format_err))
-                else
-                  -- This gate already invoked conform explicitly. Persist the
-                  -- temp buffer without letting the normal BufWritePre hook run
-                  -- a second formatter pass over the same sample.
-                  vim.b[buf].skip_format_on_save = true
-                  local save_ok, save_err = pcall(vim.cmd.write)
-                  if not save_ok then
-                    fail(sample.source .. ": could not write formatted temp file: " .. tostring(save_err))
-                  else
-                    local diagnostics = wait_for_serious_diagnostics_to_settle(buf)
-                    if #diagnostics > 0 then
-                      fail(
-                        sample.source
-                          .. ": LSP warning/error after conform formatting: "
-                          .. render_diagnostics(diagnostics)
-                      )
-                    else
-                      note(
-                        sample.source
-                          .. " ["
-                          .. sample.lsp
-                          .. "]: conform "
-                          .. table.concat(sample.formatters, "+")
-                          .. " output accepted by LSP"
-                      )
-                    end
-                  end
-                end
-              end
-            end
-          end
-        end
-      end
-      pcall(vim.cmd, "silent! bwipeout!")
-      local stopped, lingering = stop_all_lsp_clients()
-      if not stopped then
-        fail(sample.source .. ": LSP clients did not stop after formatter/LSP gate: " .. lingering)
       end
     end
   end

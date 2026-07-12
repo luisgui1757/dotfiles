@@ -1606,3 +1606,71 @@ cache-free proof is claimed by this entry.
 | UGR-020 | PARTIAL | Captured-commit safeguard restore and release recovery reject altered/cross-source material before mutation; all local transaction gates pass. | Exact pushed-head review; after merge, merged-main cache-free proof and owner preflight/apply/readback. |
 | UGR-021 | PARTIAL | Exact historical Linux/macOS fixture modes are failure- and signal-injected without relabeling mocks as owner-host or WSL proof. | Real Apple Silicon owner host, WSL2, native aarch64, redirected/dual-Terminal Windows, desktop/TCC, and merged-main rows. |
 | UGR-022 | ACCEPTED/FIXED | README, upgrading/release docs, setup flags, roadmap, status, manual matrix, security docs, and this ledger describe the exact release and recovery boundaries. | Append pushed/hosted/tag/manual evidence only when it exists. |
+
+## First hosted release-migration pass and strict-LSP lifecycle repair — entry 42
+
+- Exact pushed source head
+  `9da0ee63c1423efae660e50680404fb6df7db1e3` produced real mixed hosted
+  evidence rather than a green claim. Nix run
+  [`29180481911`](https://github.com/luisgui1757/dotfiles/actions/runs/29180481911)
+  passed both producers and both logical checks. Test run
+  [`29180481912`](https://github.com/luisgui1757/dotfiles/actions/runs/29180481912)
+  passed five jobs but failed Ubuntu `chezmoi-parity` job `86617021397` in the
+  exact v0.1.0 fixture: direct historical chezmoi publication could not create
+  a Ghostty target whose parent directory did not yet exist. The fixture now
+  derives every exact historical managed file/symlink target after `chezmoi
+  init` and creates only those parents before applying v0.1.0. A disposable
+  Ubuntu 24.04 x86_64 container using pinned chezmoi 2.71.0 and its reviewed
+  SHA-256 then passed the complete in-place rejection, preflight, drift,
+  activation/config failure, rollback, altered recovery, TERM, retry, and
+  acceptance sequence. The Darwin fixture remained green.
+- E2E run
+  [`29180481941`](https://github.com/luisgui1757/dotfiles/actions/runs/29180481941)
+  passed Ubuntu container `86617021374`, Ubuntu setup `86617021396`, Windows
+  setup `86617021378`, and their logical proofs. Apple Silicon job
+  `86617021389` completed setup and attached the first isolated neocmake client,
+  then timed out starting a second formatter-only neocmake client; its logical
+  check correctly failed because no proof artifact existed. This is not a
+  product setup failure and is not waived as a retry: the strict smoke still
+  had two independent client lifecycles for one CMake behavior proof.
+- The canonical test repair keeps every real assertion while removing the
+  redundant lifecycle. Each realistic formatter fixture is now copied into the
+  same minimal project used for its attachment probe; after that client
+  attaches, the smoke requires the exact Conform formatter set, runs the
+  formatter, writes the result, waits for diagnostics, and rejects warnings or
+  errors before stopping the client. No timeout increased and no server,
+  formatter, save, diagnostic, parser, capture, or syntax gate was skipped.
+  Tier-1 coverage pins the single attach-wait call site and same-project
+  formatter invocation. Three repeated strict Apple-Silicon runs from an
+  isolated clone of the installed runtime passed all 257 checks, including
+  neocmake plus gersemi, on every run. The first aggregate run correctly
+  rejected an over-broad new source assertion that counted the helper
+  declaration as a call; the assertion was narrowed to the actual assignment,
+  its focused 317-case spec passed, and the complete gate then passed.
+
+### Focused repair verification
+
+| Check | Exact result |
+|---|---|
+| `bash tests/migration/v0_1_upgrade_test.sh` | PASS: full exact Linux release transaction |
+| Disposable Ubuntu 24.04 x86_64 exact-release fixture | PASS with pinned/verified chezmoi 2.71.0; reproduces the formerly missing historical parent before running all recovery cases |
+| `make test-nvim` | PASS, including the single-lifecycle Tier-1 regression assertion |
+| Strict production LSP smoke repeated three times | PASS: 257/257 each run; real neocmake attach and gersemi/diagnostic proof, isolated HOME/data copy |
+| `TEST_UPGRADE_PLATFORM=Darwin bash tests/migration/v0_1_upgrade_test.sh` | PASS: full exact Apple-Silicon/nix-darwin fixture transaction |
+| `pwsh -NoLogo -NoProfile -File ./test.ps1` | PASS: analyzer fingerprint, 249/249 Pester, all Neovim specs |
+| `nix flake check --print-build-logs` | PASS on Apple Silicon; incompatible Linux systems omitted, not claimed as runtime proof |
+| `make ci` | PASS: ended `local pre-PR gate passed` after the focused assertion correction |
+| `git diff --check` | PASS |
+
+No final repaired-head hosted result, logical artifact, immutable v0.2.0 tag,
+merge, live safeguard mutation, or merged-main cache-free proof is claimed by
+this entry.
+
+### Finding status amendments
+
+| ID | Status after entry 42 | Exact evidence | Remaining work |
+|---|---|---|---|
+| UGR-018 | ACCEPTED/FIXED | Strict LSP attach and formatter compatibility now share one isolated project/client lifecycle; three repeated real-tool runs passed without a timeout increase. | Require the final pushed-head macOS producer and logical proof to pass. Interactive confirmation remains optional. |
+| UGR-020 | PARTIAL | The release/safeguard implementation remains locally green; first hosted Nix proof passed, while unrelated failed jobs correctly blocked complete PR proof. | Final repaired-head checks/artifacts and independent review; after merge, merged-main cache-free proof and owner preflight/apply/readback. |
+| UGR-021 | PARTIAL | The failed hosted rows are recorded exactly; no partial run is promoted to green and no local/container result is relabeled as WSL, redirected Windows, dual Terminal, desktop/TCC, or merged-main evidence. | Final repaired-head hosted proof plus the existing real/manual environments. |
+| UGR-022 | ACCEPTED/FIXED | CLAUDE, roadmap, migration status, manual matrix, greenfield ledger, and this append-only entry describe both hosted failures and their causal repairs. | Append final hosted/tag/manual evidence only when it exists. |

@@ -276,6 +276,12 @@ mkdir -p \
     "$HOME/Library/Application Support/lazygit"
 
 "$REAL_CHEZMOI" --source "$old_checkout/home" --destination "$HOME" init
+while IFS= read -r historical_target; do
+    [[ -n "$historical_target" ]] || continue
+    mkdir -p "$(dirname "$historical_target")"
+done < <("$REAL_CHEZMOI" --source "$old_checkout/home" --destination "$HOME" \
+    managed --path-style absolute --include files,symlinks)
+
 "$REAL_CHEZMOI" --source "$old_checkout/home" --destination "$HOME" \
     --no-tty --force apply --include files,symlinks
 old_hash="$(shasum -a 256 "$HOME/.zshrc" | awk '{print $1}')"

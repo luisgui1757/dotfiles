@@ -330,7 +330,13 @@ broken repo-symlink still cleaned) is covered by
       formatter fixture attached in the same process. The project-isolation
       repair then passed cache-free branch-head run `29120109175` on exact SHA
       `f097995b49a2189db327903a20743e7cb69ba665`: all four current producers
-      and four setup logical proofs were green. Merged-main confirmation remains.
+      and four setup logical proofs were green. PR-head run `29180481941` later
+      exposed the remaining duplicate lifecycle in the opposite order: the
+      isolated CMake attachment passed, then a second formatter-only
+      neocmakelsp start timed out. Attachment and realistic gersemi formatting
+      now share one isolated client lifecycle; three repeated strict
+      Apple-Silicon runs passed all 257 checks. Final hosted repaired-head and
+      merged-main confirmation remain.
       No Windows Sandbox, WSL, redirected-Windows, merged-main cache-free
       confirmation, or desktop visual run is claimed. Required CI is not manual
       desktop evidence. The old Wave C `0 / 10` Ubuntu parity counter is no

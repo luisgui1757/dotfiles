@@ -737,24 +737,28 @@ major; `tests/static/repo_policy_test.sh` enforces this.
   managed `highlights.scm` for explicit parser rows,
   rejects unexpected
   install-output parser `.so` files under `stdpath('data')/site/parser`, asserts
-  each fixture's LSP attaches, formats realistic LSP-backed samples copied under
-  `tests/.cache` through conform.nvim's production route, requires the expected
+  each fixture's LSP attaches, formats realistic LSP-backed samples copied into
+  that same isolated project and client lifecycle under `tests/.cache` through
+  conform.nvim's production route, requires the expected
   external formatter(s), fails on post-format LSP warnings/errors, then opens
   every language-matrix fixture, requires real Tree-sitter captures for
   parser-backed rows after explicitly starting and parsing the expected parser
   (`inspect_pos()` first, direct highlight-query capture iteration as the
   headless fallback), and proves syntax-only fallback rows have real Vim syntax
   groups. Keep the LSP
-  attach gate before the broad fixture-open gate; opening
+  combined attach/formatter gate before the broad fixture-open gate; opening
   every fixture under the production config can start LSPs as collateral. After
-  the explicit formatter/LSP gate, the smoke disables the tested LSP configs
+  the explicit LSP/formatter gate, the smoke disables the tested LSP configs
   before opening the broad parser/syntax matrix so later non-LSP gates do not
-  leave unrelated language servers alive. Each initial LSP attach probe is
+  leave unrelated language servers alive. Each LSP attach probe is
   copied into its own minimal project root under `tests/.cache`; never open the
   shared fixture directory as an LSP project. The shared directory contains
   more than one hundred unrelated language fixtures and made neocmakelsp's
-  cold-start attach timing depend on repository-wide scanning even though the
-  later isolated formatter project attached successfully.
+  cold-start attach timing depend on repository-wide scanning. Never add a
+  second formatter-only client lifecycle after an attachment proof: hosted
+  macOS exposed timing-dependent neocmakelsp restart behavior even though the
+  first isolated client attached. Format and diagnose the realistic sample on
+  that already-attached isolated client instead.
   Non-gated servers are strict on every OS; `powershell_es` is
   enforced only on Windows (pwsh + the PSES bundle) and skips cleanly on Unix.
   The fast `make test-nvim` runs Tier 1 only
