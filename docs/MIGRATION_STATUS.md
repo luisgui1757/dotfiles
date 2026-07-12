@@ -41,6 +41,45 @@ Windows `chezmoi-parity*` CI jobs. Static linters intentionally exclude
 `home/`; the parity gate validates managed copies against the canonical
 top-level sources instead.
 
+## Versioned v0.1.0 release migration
+
+`v0.1.0` is a chezmoi release, not a pre-chezmoi install. Its POSIX targets are
+live symlinks into the source checkout, so the former README `git pull` path was
+unsafe: it could publish new bytes before current setup reached backup. The
+canonical v0.2.0 path is now side-by-side and exact-tag-only:
+
+- `scripts/upgrade-v0.1.0.sh` handles Apple Silicon macOS, native Linux, and
+  WSL guest state. It validates both official annotated releases, the target
+  account/home, Nix, clean trees, and exact historical config before mutation;
+  captures private package/config recovery plus digest-bound exact-commit
+  source trees; applies only Nix plus config
+  files/links while deferring chezmoi run scripts; and
+  automatically removes the first nix-darwin/Home Manager activation and
+  reapplies v0.1.0 on later failure or interruption.
+- `scripts/upgrade-v0.1.0.ps1` handles native Windows without Nix. It applies
+  config files/symlinks with dependencies, Neovim caches, agent policy, and
+  chezmoi run scripts skipped; resolves actual known folders; freezes both
+  exact release trees plus packaged and portable Terminal recovery bytes under a
+  protected ACL, publishes and rolls back only from those trees, retains
+  conventional v0.1 targets until acceptance, removes only transaction-created
+  overlay state on rollback, and validates both paths before either restore write.
+- `scripts/install-nix-prerequisite.sh` installs only checksum-reviewed upstream
+  Nix 2.34.0 release archives and refuses non-release checkouts. No downloaded
+  bytes execute before the platform SHA-256 matches.
+- `tests/migration/v0_1_upgrade_test.sh` materializes the exact peeled v0.1.0
+  commit, proves in-place/dirty paths fail before mutation, runs the real setup
+  config/backup path, injects a failure after Home Manager/config publication,
+  proves later checkout drift cannot change publication, rejects altered
+  recovery payloads, and proves exact rollback, retry, and
+  acceptance. Windows Pester pins digest-bound release trees, complete/frozen Terminal recovery,
+  all-target concurrency rejection, known-folder state validation, and the
+  pre-migration command-provider boundary.
+
+The release remains gated on real Apple Silicon owner-host, WSL split-host,
+redirected Windows, and divergent dual-Terminal executions. Until the annotated
+v0.2.0 tag and those release rows exist, v0.1.0 users are told to remain on
+v0.1.0. Intel macOS remains retired, not pending proof.
+
 ## install-deps owns (provisioning -- deliberately NOT in chezmoi)
 
 Provisioning stays in `install-deps`, not chezmoi run-scripts:

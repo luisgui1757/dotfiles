@@ -267,6 +267,29 @@ build_classic_state() {
     }'
 }
 
+build_classic_state_from_file() {
+    local contexts
+    contexts="$(contexts_file_json "$1")"
+    jq -n --argjson contexts "$contexts" --argjson app_id "$github_actions_app_id" '{
+      required_status_checks: {
+        strict: true,
+        contexts: ($contexts | sort),
+        checks: ($contexts | map({context: ., app_id: $app_id}) | sort_by(.context))
+      },
+      enforce_admins: true,
+      required_pull_request_reviews: null,
+      restrictions: null,
+      required_linear_history: true,
+      allow_force_pushes: false,
+      allow_deletions: false,
+      required_conversation_resolution: true,
+      required_signatures: false,
+      block_creations: false,
+      lock_branch: false,
+      allow_fork_syncing: false
+    }'
+}
+
 normalize_classic_state() {
     jq '{
       required_status_checks: {
@@ -787,7 +810,7 @@ prepare_transaction_payloads() {
 
 restore_snapshot() (
     local snapshot="$1" frozen file manifest_repo policy_sha stage integrity_id
-    local contexts_function expected_pin failures=0 readback_error=0 readback_mismatch=0 verify_dir
+    local expected_pin failures=0 readback_error=0 readback_mismatch=0 verify_dir
     for file in \
         manifest.json \
         actions-restore.json \
@@ -881,6 +904,53 @@ restore_snapshot() (
         echo "FAIL: recovery snapshot's committed policy source is unavailable: $policy_sha" >&2
         return 1
     fi
+    if ! jq -e '
+      . as $root
+      | type == "object"
+      and (keys | sort) == ([
+        "legacyEmitted", "replacements", "required", "schema", "stage"
+      ] | sort)
+      and .schema == 2
+      and .stage == "stable-required-live-apply-pending"
+      and (.legacyEmitted | type == "array" and length > 0 and length == (unique | length))
+      and all(.legacyEmitted[]; type == "string" and length > 0)
+      and (.required | type == "array" and length > 0 and length == (unique | length))
+      and all(.required[]; type == "string" and length > 0)
+      and (.replacements | type == "array" and length > 0 and length == (unique | length))
+      and all(.replacements[];
+        type == "object"
+        and (keys | sort) == (["legacy", "logical"] | sort)
+        and (.legacy | type == "string" and length > 0)
+        and (.logical | type == "string" and length > 0))
+      and ((.replacements | map(.legacy)) | length == (unique | length))
+      and ((.replacements | map(.logical)) | length == (unique | length))
+      and (.replacements | all(
+        (.legacy as $legacy | $legacy | IN($root.legacyEmitted[]))
+        and (.logical as $logical | $logical | IN($root.required[]))))
+      and ((.legacyEmitted - (.replacements | map(.legacy)) | sort) ==
+        (.required - (.replacements | map(.logical)) | sort))
+    ' "$frozen/check-identities-reviewed.json" >/dev/null; then
+        echo "FAIL: recovery snapshot's committed check identity source is malformed: $policy_sha" >&2
+        return 1
+    fi
+    if ! jq -e --slurpfile identities "$frozen/check-identities-reviewed.json" \
+        --argjson app_id "$github_actions_app_id" '
+      type == "object"
+      and .name == "Protect main: integrity"
+      and .target == "branch"
+      and .enforcement == "active"
+      and .bypass_actors == []
+      and .conditions.ref_name.include == ["refs/heads/main"]
+      and ([.rules[] | select(.type == "required_status_checks")] | length) == 1
+      and ([.rules[] | select(.type == "required_status_checks")][0].parameters |
+        .strict_required_status_checks_policy == true
+        and .do_not_enforce_on_create == false
+        and .required_status_checks ==
+          ($identities[0].required | map({context: ., integration_id: $app_id})))
+    ' "$frozen/integrity-reviewed.json" >/dev/null; then
+        echo "FAIL: recovery snapshot's committed integrity and check identity sources disagree: $policy_sha" >&2
+        return 1
+    fi
     stage="$(jq -r .stage "$frozen/manifest.json")"
     integrity_id="$(jq -r .integrity_ruleset_id "$frozen/manifest.json")"
     if ! gh api "repos/$repo/rulesets?includes_parents=false" \
@@ -904,21 +974,27 @@ restore_snapshot() (
     fi
 
     if [[ "$stage" == "legacy" ]]; then
-        contexts_function=legacy_check_contexts
         expected_pin=false
-        jq --slurpfile identities "$frozen/check-identities-reviewed.json" '
+        jq -r '.legacyEmitted[]' "$frozen/check-identities-reviewed.json" \
+            > "$frozen/stage-contexts.txt"
+        jq --slurpfile identities "$frozen/check-identities-reviewed.json" \
+            --argjson app_id "$github_actions_app_id" '
           (.rules[] | select(.type == "required_status_checks").parameters.required_status_checks) =
-            ($identities[0].legacyEmitted | map({context: ., integration_id: 15368}))
+            ($identities[0].legacyEmitted | map({context: ., integration_id: $app_id}))
         ' "$frozen/integrity-reviewed.json" > "$frozen/integrity-stage-source.json"
         ruleset_restore_payload "$frozen/integrity-stage-source.json" \
             > "$frozen/integrity-expected.json"
     else
-        contexts_function=required_check_contexts
         expected_pin=true
-        ruleset_restore_payload "$frozen/integrity-reviewed.json" > "$frozen/integrity-expected.json"
+        jq -r '.required[]' "$frozen/check-identities-reviewed.json" \
+            > "$frozen/stage-contexts.txt"
+        ruleset_restore_payload "$frozen/integrity-reviewed.json" \
+            > "$frozen/integrity-expected.json"
     fi
-    build_classic_payload "$contexts_function" > "$frozen/classic-expected.json"
-    build_classic_state "$contexts_function" > "$frozen/classic-state-expected.json"
+    build_classic_payload_from_file "$frozen/stage-contexts.txt" \
+        > "$frozen/classic-expected.json"
+    build_classic_state_from_file "$frozen/stage-contexts.txt" \
+        > "$frozen/classic-state-expected.json"
     jq -n --argjson pin "$expected_pin" \
         '{enabled: true, allowed_actions: "all", sha_pinning_required: $pin}' \
         > "$frozen/actions-expected.json"

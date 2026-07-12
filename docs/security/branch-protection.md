@@ -81,7 +81,12 @@ internally inconsistent source bytes fail with zero writes; changes to the
 retained source after freezing cannot affect publication. The expected
 legacy/stable policy is loaded from the manifest's exact captured Git commit;
 that commit must still be live `main`, and a moved or unavailable commit fails
-before mutation. Restore publishes and verifies only the frozen validated bytes.
+before mutation. Integrity and full/narrow classic expectations are rebuilt
+from that same captured `check-identities.json`; restore never calls a
+worktree-backed context helper. A coherently altered classic snapshot matching
+the running checkout therefore fails before all three writes instead of
+creating a captured-integrity/worktree-classic mixed stage. Restore publishes
+and verifies only the frozen validated bytes.
 
 Apply has the same publication boundary. After the second live capture, it reads
 the check metadata and integrity source from exact committed Git objects, checks

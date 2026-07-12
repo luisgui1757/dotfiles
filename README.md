@@ -20,9 +20,10 @@ Nix is the enforced package layer on macOS/Linux/WSL; `install-deps` handles
 native/deferred tools and Windows packages; chezmoi owns the dotfiles/config
 layer in `home/`. The full setup scripts apply configs through chezmoi.
 
-Updates are deliberately two-track. The reproducible core is pinned in git:
-Neovim plugins (`nvim/lazy-lock.json`) and configs update with `git pull` and
-then re-running setup. The drift-tolerant edge is package-manager CLI tools,
+Updates are deliberately two-track. The reproducible core is pinned to an
+immutable reviewed release: Neovim plugins (`nvim/lazy-lock.json`) and configs
+change through the versioned side-by-side upgrade, then setup. The
+drift-tolerant edge is package-manager CLI tools,
 proven dotfiles-owned direct artifacts on Unix, and Mason LSPs; refresh only
 that edge with `./setup.sh --update` or `.\setup.ps1 -Update`.
 
@@ -37,23 +38,28 @@ running from a local checkout, it fails closed with clone-first instructions.
 
 Git is required to clone this repo. On macOS/Linux/WSL, Nix is also required
 before `setup.sh` runs: setup applies the pinned nix-darwin/Home Manager layer
-first and fails closed if `nix` is missing. Install Nix through a verified
-installer for the host (for example Determinate's notarized macOS package or a
-reviewed Linux installer path); this repo deliberately does not add a
-pipe-to-shell Nix bootstrap.
+first and fails closed if `nix` is missing. Published v0.2.0 checkouts include
+`scripts/install-nix-prerequisite.sh`, which downloads the official upstream
+Nix 2.34.0 release and verifies the platform SHA-256 before extraction or
+execution. The helper and the versioned upgrade tools refuse branches, moving
+`main`, lightweight tags, dirty checkouts, and non-official release identities;
+this repo has no pipe-to-shell Nix bootstrap.
 
 ```bash
-# Apple Silicon mac / linux / wsl
-# prerequisite: install Nix first; setup will apply this repo's pinned flake
-git clone https://github.com/luisgui1757/dotfiles.git ~/dotfiles
+# Apple Silicon mac / linux / wsl, after the annotated v0.2.0 release exists
+git clone --branch v0.2.0 --single-branch \
+  https://github.com/luisgui1757/dotfiles.git ~/dotfiles
 cd ~/dotfiles
+./scripts/install-nix-prerequisite.sh --install
 ./setup.sh --all
 ```
 
 ```powershell
-# windows -- enable Developer Mode, then run from a normal PowerShell
+# windows, after the annotated v0.2.0 release exists
+# enable Developer Mode, then run from a normal PowerShell
 # Settings -> Privacy & security -> For developers -> Developer Mode = On
-git clone https://github.com/luisgui1757/dotfiles.git $HOME\dotfiles
+git clone --branch v0.2.0 --single-branch `
+  https://github.com/luisgui1757/dotfiles.git $HOME\dotfiles
 Set-Location $HOME\dotfiles
 .\setup.ps1 -All
 ```
@@ -81,36 +87,27 @@ elevated PowerShell with `.\setup.ps1 -SkipDeps -SkipNvim`, then return to a
 normal shell for `.\setup.ps1 -SkipDeps -SkipConfig`. Do not elevate the whole
 dependency-install run; Scoop refuses admin installs.
 
-### Upgrading from a pre-chezmoi install
+### Upgrading from v0.1.0
 
-If you already ran an older (pre-chezmoi) version, just re-run setup — it now
-applies the config layer through chezmoi and is backwards-safe:
+`v0.1.0` is already chezmoi-based and its POSIX config is linked into the
+checkout. **Do not run `git pull` in that checkout.** Changing it in place can
+change live config before recovery exists.
 
-```bash
-git -C ~/dotfiles pull        # or %USERPROFILE%\dotfiles on Windows
-./setup.sh --all              # macOS / Linux / WSL
-```
+Remain on v0.1.0 until the annotated v0.2.0 release is published. Then follow
+the versioned, side-by-side procedure in [docs/UPGRADING.md](docs/UPGRADING.md):
+retain the exact v0.1.0 checkout, clone v0.2.0 separately, run the read-only
+preflight, apply the transactional migration, verify, and explicitly accept or
+rollback from the printed private recovery directory. Apple Silicon macOS and
+Linux/WSL include Nix-generation rollback; Windows independently recovers
+known-folder config and exact packaged/portable Terminal bytes. Intel macOS is
+retired and stays on v0.1.0 or migrates to Apple Silicon.
+Every platform publishes and rolls back only from digest-bound release trees in
+that private directory; full post-acceptance setup later repoints config to the
+retained v0.2.0 checkout.
 
-```powershell
-.\setup.ps1 -All              # Windows
-```
-
-Setup installs chezmoi if missing, then **backs up any pre-chezmoi config that
-differs** to `<file>.bak.<timestamp>` before chezmoi writes the managed version
-(a pre-existing file or symlink whose content already matches is left as-is — no
-junk backup). Each Windows Terminal `settings.json` is independently backed up
-and atomically merged in place;
-VS Code `settings.json` is edited in place with your comments preserved. Nothing
-is deleted. On Windows, if you ran an older psmux that froze on the previous
-`tmux.conf`, clear orphaned processes once after upgrading:
-
-```powershell
-Remove-Item -LiteralPath "$HOME\.tmux.posix.conf" -Force -ErrorAction SilentlyContinue
-taskkill /F /T /IM psmux.exe   # then reopen Windows Terminal
-```
-
-Restart Windows Terminal and VS Code afterward so the fonts/theme/launch mode
-apply.
+`./setup.sh --update` and `.\setup.ps1 -Update` are package/Mason refreshes,
+not release migrations: they do not fetch Git, activate the versioned config,
+or perform the Nix ownership transition.
 
 ### Existing Checkout
 
@@ -123,7 +120,9 @@ apply.
 ./setup.sh --nix-darwin          # compatibility alias; macOS setup already applies nix-darwin
 ./setup.sh --home-manager        # compatibility alias; Linux/WSL setup already applies Home Manager
 ./setup.sh --skip-deps           # skip Nix + native/deferred dependency provisioning
+./setup.sh --skip-native-deps    # keep Nix/config; skip native/deferred dependencies
 ./setup.sh --skip-config         # skip chezmoi config apply
+./setup.sh --skip-config-scripts # apply config files/links; defer chezmoi run scripts
 ./setup.sh --skip-nvim           # skip Lazy/Tree-sitter/Mason phases
 ./setup.sh --skip-agents         # skip global Polaris agent policy
 ./setup.sh --best-effort         # continue after nvim-phase failures; exit nonzero with summary
@@ -169,7 +168,13 @@ Manager configuration places its evaluated profile `bin` in
 `--skip-deps` is the explicit already-provisioned escape hatch and skips the
 Nix package-layer application together with native/deferred dependency installs;
 the compatibility aliases `--nix-darwin` and `--home-manager` do not override
-that skip. Dry-run does not require Nix: on an unprovisioned POSIX host it
+that skip. `--skip-native-deps` is the narrower release-migration boundary: it
+still applies Nix and config but leaves native/deferred tools untouched for
+coordinated rollback. The versioned migration pairs it with
+`--skip-config-scripts`, so plugin publication and every other chezmoi run
+script remain outside that reversible core; normal setup does not use that
+flag. Config apply creates required parent directories itself rather than
+depending on native provisioning. Dry-run does not require Nix: on an unprovisioned POSIX host it
 previews that the real run would fail until Nix is installed. On a Brew-less
 Mac, it previews the verified Homebrew bootstrap, then continues every later
 Brew-backed preview phase without claiming the bootstrap already happened.
@@ -860,7 +865,7 @@ update PRs are intentionally not configured.
 |---|---|---|
 | GitHub Actions | Managed, digest-pinned, labeled `github-actions` | Actions are repo-owned CI inputs with stable Renovate support. |
 | GitHub runner images | Managed, labeled `github-runners`, reviewed separately | `ubuntu-*`, `macos-*`, and `windows-*` bumps can change the supported CI platform, so they should not be mixed with ordinary Action bumps. |
-| Repo-pinned installer versions/refs | Managed, labeled `pinned-downloads`, never automerged | Neovim Linux tarballs, chezmoi CI release archives, lazygit Linux tarballs, Starship Linux tarballs, Tree-sitter CLI Linux/Windows archives, WezTerm Ubuntu `.deb`, Herdr Linux binaries, Herdr Windows preview `.exe`, Hack Nerd Font, Windows Terminal portable zip, Ghostty distro/architecture `.deb` assets, Pi CLI npm package, zsh plugin refs, `setuptools`/`pylatexenc` converter pins, the Homebrew installer commit, the Scoop installer commit, the Renovate validator package/runtime, the Ubuntu Microsoft-repository `.deb`, and the CI `cargo-binstall` commit are explicit repo pins. |
+| Repo-pinned installer versions/refs | Managed, labeled `pinned-downloads`, never automerged | The v0.2.0 Nix prerequisite tarballs, Neovim Linux tarballs, chezmoi CI release archives, lazygit Linux tarballs, Starship Linux tarballs, Tree-sitter CLI Linux/Windows archives, WezTerm Ubuntu `.deb`, Herdr Linux binaries, Herdr Windows preview `.exe`, Hack Nerd Font, Windows Terminal portable zip, Ghostty distro/architecture `.deb` assets, Pi CLI npm package, zsh plugin refs, `setuptools`/`pylatexenc` converter pins, the Homebrew installer commit, the Scoop installer commit, the Renovate validator package/runtime, the Ubuntu Microsoft-repository `.deb`, and the CI `cargo-binstall` commit are explicit repo pins. |
 | Adjacent SHA-256 / commit constants | Not managed; matched only as regex context | Renovate can bump the version/ref but cannot recompute archive/script hashes or verify tag commit IDs. CI must fail until a human recomputes and reviews them. |
 | Package-manager catalogs | Not managed | Brew, apt, dnf, pacman, zypper, apk, Scoop, winget, and choco entries are package names/IDs, not repo version pins. Let the package manager resolve current versions. |
 | Neovim plugin and Mason tools | Not managed | `lazy-lock.json` is refreshed with Lazy and tested as editor behavior; Mason intentionally has no machine-pinned lockfile. |
@@ -898,7 +903,7 @@ signer/chain before `Start-Process`. Recommended setup docs use `git clone`
 plus local `setup`, not raw `curl | bash`/`iwr` execution of the current default
 branch.
 
-Direct-download SHA-256 values for Neovim tarballs, chezmoi CI release archives,
+Direct-download SHA-256 values for the upstream Nix prerequisite, Neovim tarballs, chezmoi CI release archives,
 lazygit tarballs, Starship tarballs, tree-sitter CLI archives, the WezTerm
 Ubuntu `.deb`, Herdr Linux binaries, Herdr Windows preview `.exe`, Hack Nerd Font, the Windows Terminal
 portable zip, the Ghostty Debian-family `.deb` assets, the Ubuntu 24.04 Microsoft
@@ -1184,13 +1189,17 @@ nvim --headless "+MasonToolsUpdateSync" +qa
 
 Run on each machine; there's no machine-pinned lockfile for Mason itself.
 
-### Switching machines mid-session
+### Reproducing the same release on another machine
 
 ```bash
-git -C ~/dotfiles pull          # sync configs
+git clone --branch v0.2.0 --single-branch \
+  https://github.com/luisgui1757/dotfiles.git ~/dotfiles
 nvim --headless "+Lazy! restore" +qa  # match plugin commits
 make test                       # verify the new state
 ```
+
+Use `docs/UPGRADING.md` when the release version changes. A moving-branch pull
+is not a release migration.
 
 ## License
 

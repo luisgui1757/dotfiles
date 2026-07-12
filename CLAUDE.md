@@ -385,6 +385,28 @@ that violates one of these, fix it instead of disabling the test.
     throw. This prevents an otherwise-successful script or GitHub `pwsh` step
     from inheriting a handled exit 1. Guarded under both preference states by
     Setup/Uninstall Pester and the Windows round-trip entry point.
+29. **Published release upgrades are exact-tag, side-by-side transactions.**
+    v0.1.0 is already chezmoi-based; its POSIX targets are live checkout
+    symlinks, so `git pull` or switching that checkout before setup crosses the
+    backup boundary. Never publish an in-place v0.1.0 migration. The v0.2.0
+    tools require separate clean official annotated-tag checkouts, exact
+    historical config, authoritative target identity, and private recovery.
+    POSIX recovery archives both exact commits, validates digest-bound read-only
+    trees, and uses only those frozen sources for Nix/config publication and
+    rollback; post-validation checkout changes cannot affect a write.
+    Windows recovery likewise archives both exact commits beneath its protected
+    ACL and binds setup, readback, uninstall, and rollback to those validated
+    trees rather than either retained checkout.
+    The reversible core runs only Nix activation plus config files/links on POSIX
+    (`--skip-native-deps --skip-config-scripts --skip-nvim --skip-agents`) and config/known-folder/
+    Terminal publication on Windows
+    (`-SkipDeps -SkipNvim -SkipAgents -SkipConfigScripts`), while conventional
+    v0.1 known-folder targets stay in place until acceptance. Chezmoi run scripts and
+    additive native provisioning happen only after acceptance. Failure or interruption removes the first
+    nix-darwin/Home Manager activation and restores v0.1.0, or restores exact
+    Windows Terminal bytes and old Windows config. Keep both checkouts until
+    explicit verified acceptance. `--update` / `-Update` are never release
+    migrations. The source of truth is `docs/UPGRADING.md`.
 
 ## Common workflows
 
@@ -1777,7 +1799,12 @@ host prerequisite.
   `nix` is missing on a real run, and fails closed if activation fails.
   `--skip-deps` is the explicit already-provisioned escape and skips the Nix
   package layer together with native/deferred dependency installs; compatibility
-  aliases do not override it. Public setup selects the Apple Silicon Darwin
+  aliases do not override it. `--skip-native-deps` is narrower: Nix/config
+  remain active while native/deferred Phase 1 is skipped, solely so the
+  versioned release transaction has a complete rollback boundary. That
+  transaction also passes `--skip-config-scripts`, which limits chezmoi to
+  files/symlinks; normal setup still runs reviewed run scripts. Config apply
+  creates managed target parents without relying on Phase 1. Public setup selects the Apple Silicon Darwin
   configuration; Intel and other unsupported architectures fail before
   activation. Guarded by
   `tests/nix/setup_nix_darwin_test.sh`.

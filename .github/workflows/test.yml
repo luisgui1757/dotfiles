@@ -41,6 +41,8 @@ jobs:
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          fetch-depth: 0
       - name: Install Nix (flakes enabled)
         uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22
       - name: Dogfood install-deps dry run
@@ -142,6 +144,8 @@ jobs:
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          fetch-depth: 0
       - name: Install Nix (flakes enabled)
         uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22
       - name: Dogfood install-deps dry run
@@ -286,6 +290,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          fetch-depth: 0
       - name: Install deps
         run: |
           set -euxo pipefail
@@ -306,6 +312,10 @@ jobs:
         run: |
           set -euo pipefail
           PATH="$HOME/.local/bin:$PATH" bash tests/migration/greenfield_roundtrip.sh
+      - name: Exact v0.1.0 release migration
+        run: |
+          set -euo pipefail
+          PATH="$HOME/.local/bin:$PATH" bash tests/migration/v0_1_upgrade_test.sh
       - name: Uninstall safety (adversarial)
         run: |
           set -euo pipefail
@@ -327,6 +337,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          fetch-depth: 0
       - name: Install chezmoi
         run: |
           set -euxo pipefail
@@ -347,6 +359,12 @@ jobs:
         run: |
           set -euo pipefail
           PATH="$HOME/.local/bin:$PATH" bash tests/migration/greenfield_roundtrip.sh
+      - name: Exact v0.1.0 release migration
+        env:
+          TEST_UPGRADE_PLATFORM: Darwin
+        run: |
+          set -euo pipefail
+          PATH="$HOME/.local/bin:$PATH" bash tests/migration/v0_1_upgrade_test.sh
       - name: Uninstall safety (adversarial)
         run: |
           set -euo pipefail

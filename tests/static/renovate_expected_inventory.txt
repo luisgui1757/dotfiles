@@ -56,5 +56,6 @@ regex|install-deps.sh|github-tags|zsh-users/zsh-autosuggestions|1
 regex|install-deps.sh|npm|@earendil-works/pi-coding-agent|1
 regex|install-deps.sh|pypi|pylatexenc|1
 regex|install-deps.sh|pypi|setuptools|1
+regex|scripts/install-nix-prerequisite.sh|github-releases|NixOS/nix|1
 regex|scripts/validate-renovate.sh|npm|node|1
 regex|scripts/validate-renovate.sh|npm|renovate|1

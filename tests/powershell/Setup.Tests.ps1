@@ -139,6 +139,7 @@ Describe "setup.ps1 main chezmoi apply boundary" {
 
     AfterEach {
         $script:WindowsIdentity = $script:ApplyBoundaryOldIdentity
+        $script:DryRun = $false
     }
 
     It "applies the complete source without non-portable absolute target selectors" {
@@ -147,6 +148,32 @@ Describe "setup.ps1 main chezmoi apply boundary" {
         Should -Invoke Invoke-ChezmoiOrExit -Times 1 -ParameterFilter {
             $Label -eq 'chezmoi apply' -and
             ($Arguments -join '|') -eq '--no-tty|--force|apply'
+        }
+    }
+
+    It "limits release migration apply to files and symlinks without init" {
+        Invoke-ChezmoiApplyPhase -ExcludeScripts $true
+
+        Should -Invoke Invoke-ChezmoiOrExit -Times 0 -ParameterFilter {
+            $Label -eq 'chezmoi init'
+        }
+        Should -Invoke Invoke-ChezmoiOrExit -Times 1 -ParameterFilter {
+            $Label -eq 'chezmoi apply' -and
+            ($Arguments -join '|') -eq '--no-tty|--force|apply|--include|files,symlinks'
+        }
+    }
+
+    It "keeps the files and symlinks boundary in release migration previews" {
+        Mock -CommandName New-ChezmoiDryRunConfig -MockWith { 'C:\temporary\chezmoi.toml' }
+
+        Invoke-ChezmoiApplyPhase -ExcludeScripts $true -IsDryRun $true
+
+        Should -Invoke Invoke-ChezmoiOrExit -Times 1 -ParameterFilter {
+            $Label -eq 'chezmoi dry-run apply' -and
+            ($Arguments -join '|') -eq '--dry-run|--verbose|apply|--include|files,symlinks'
+        }
+        Should -Invoke Invoke-WindowsKnownFolderOverlays -Times 1 -ParameterFilter {
+            $IsDryRun -and $ExcludeScripts
         }
     }
 }
@@ -430,6 +457,27 @@ Describe "setup.ps1 Windows known-folder identity" {
             @(Get-ChildItem -LiteralPath (Split-Path -Parent $legacyNvim) -Filter 'nvim.legacy.*').Count | Should -Be 1
             @(Get-ChildItem -LiteralPath (Split-Path -Parent $legacyLazygit) -Filter 'config.yml.legacy.*').Count | Should -Be 1
             [IO.File]::ReadAllText($legacyProfile) | Should -Be 'user-owned divergent profile'
+        } finally {
+            Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    It "retains conventional v0.1 targets while release rollback authority is open" {
+        $root = Join-Path ([IO.Path]::GetTempPath()) ('legacy retained ' + [Guid]::NewGuid())
+        $identity = [pscustomobject]@{
+            UserProfile = Join-Path $root 'User'
+            LocalApplicationData = Join-Path $root 'Redirected Local'
+            Documents = Join-Path $root 'Redirected Documents'
+            RuntimeProfile = Join-Path $root 'Redirected Documents\PowerShell\Microsoft.PowerShell_profile.ps1'
+        }
+        $legacyLazygit = Join-Path $identity.UserProfile 'AppData\Local\lazygit\config.yml'
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $legacyLazygit) | Out-Null
+        Copy-Item -LiteralPath (Join-Path $script:RepoRoot 'lazygit\config.windows.yml') -Destination $legacyLazygit
+        try {
+            Move-LegacyWindowsKnownFolderTargets -Identity $identity -IsDryRun:$false -IsSuppressed:$true
+
+            Test-Path -LiteralPath $legacyLazygit -PathType Leaf | Should -BeTrue
+            @(Get-ChildItem -LiteralPath (Split-Path -Parent $legacyLazygit) -Filter 'config.yml.legacy.*').Count | Should -Be 0
         } finally {
             Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue
         }
@@ -1084,7 +1132,7 @@ Describe "setup.ps1 update mode" {
         $script:SetupUpdateRuntimeRefreshed | Should -BeTrue
         $output | Should -Match 'Update 1/2'
         $output | Should -Match 'Update 2/2'
-        $output | Should -Match 'Plugins \(lazy-lock\.json\), pinned binaries, and configs update via `git pull` then re-run setup'
+        $output | Should -Match 'Plugins \(lazy-lock\.json\), pinned binaries, and configs update through a reviewed release migration'
         $output | Should -Not -Match 'chezmoi|Lazy restore|Lazy sync|Tree-sitter|MasonToolsInstallSync'
         Should -Invoke -CommandName Invoke-ChezmoiApplyPhase -Times 0 -Exactly
     }

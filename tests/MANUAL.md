@@ -4,6 +4,47 @@ The automated suite covers the deterministic surface. Some things only
 make sense to verify by eye — keep this checklist alongside any
 significant change to the relevant area.
 
+## v0.1.0 to v0.2.0 release upgrade
+
+Use throwaway users/VMs seeded from the exact annotated v0.1.0 release. Follow
+`docs/UPGRADING.md`; never use `main` or update the old checkout in place.
+For every row, inject an interruption after package activation and after config
+publication, run the printed rollback, retry, then verify and accept. Record the
+old/new tag objects, peeled commits, recovery path, provider inventory, and
+whether any user data changed.
+
+- [ ] **Apple Silicon owner-host:** begin with v0.1.0 Homebrew formulae/casks,
+      real taps, no Nix, divergent config, and backup-name collisions. Install
+      Nix with the checksum-verified release helper; require read-only
+      preflight; apply; prove failed nix-darwin/later config paths restore old
+      taps, `/etc` shell files, v0.1.0 config, and provider precedence. On
+      success verify apps/TCC separately before acceptance.
+- [ ] **Native Linux x86_64:** seed a representative native-package/Linuxbrew/
+      direct-artifact v0.1.0 host. Prove Home Manager activation, login PATH,
+      later failure uninstall, exact old symlink restoration, retry, and
+      acceptance without removing native packages.
+- [ ] **Native Linux aarch64:** repeat on a real aarch64 host; configuration
+      evaluation or an emulated filesystem is not runtime proof.
+- [ ] **WSL2 split host:** leave the Windows recovery unaccepted while applying
+      the guest. Interrupt after host success and after guest activation; prove
+      guest-first then host rollback. Run `tests/wsl/e2e.sh`; accept guest first
+      and host second only after both verify.
+- [ ] **Windows conventional known folders:** exact v0.1.0 checkout with
+      divergent copy-mode files and nvim link. Apply from exact v0.2.0, fail
+      after Terminal/config publication, and prove exact old config plus
+      packaged/portable Terminal bytes return before retry. After recovery is
+      captured, alter or temporarily move both retained checkouts and prove
+      apply/rollback still consume only the frozen release trees.
+- [ ] **Windows redirected/OneDrive/alternate drive:** repeat with Documents,
+      LocalApplicationData, and runtime `$PROFILE` on independent real paths.
+      Include divergent packaged, Preview, and portable Terminal installations;
+      no conventional path may be guessed or overwritten.
+- [ ] **Release acceptance:** on the final annotated v0.2.0 tag, run the full
+      local/hosted gates and public-secret scan, record the tag object and peeled
+      commit, then confirm the release document contains no branch command or
+      placeholder identity. Until every required row is accepted, keep v0.1.0
+      as the only user-facing release.
+
 ## Visual / GUI
 
 - [ ] **Ghostty**, mac: opens with Rose Pine dark, translucent background

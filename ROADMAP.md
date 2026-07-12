@@ -1172,6 +1172,51 @@ DONE - Removed XDG support from `install-deps.sh`'s `zsh_plugin_root()` so the
 installer uses the same fixed `~/.local/share/dotfiles/zsh-plugins` path as
 every other zsh plugin surface.
 
+## P1 - v0.1.0 Release Upgrade
+
+### 9. The published in-place upgrade crossed the config backup boundary
+
+Status: implementation done; release evidence in progress.
+
+Evidence:
+
+- Exact v0.1.0 POSIX config uses checkout-backed chezmoi symlinks. Updating that
+  checkout changed live bytes before current setup could back them up.
+- `scripts/upgrade-v0.1.0.sh` and `.ps1` now require clean, separate official
+  annotated v0.1.0/v0.2.0 checkouts and retain v0.1.0 until acceptance.
+- POSIX apply and rollback consume digest-bound, read-only exact-commit trees
+  inside private recovery; post-validation checkout drift cannot change a
+  package/config write.
+- Windows apply, readback, uninstall, and rollback consume digest-bound
+  exact-commit trees beneath the protected recovery ACL; retained-checkout drift
+  cannot change a config or Terminal transaction write.
+- POSIX migration applies only Nix plus config files/links; chezmoi run scripts,
+  native/deferred packages, editor caches, and agent policy stay outside the
+  reversible transaction. Windows applies only config, known-folder overlays,
+  and independently recoverable Terminal state; dependencies, Neovim caches,
+  agent policy, and chezmoi run scripts are explicitly skipped.
+- The exact-tag POSIX harness runs the real setup backup/config path in Linux
+  and Apple-Silicon/nix-darwin fixture modes. It proves dirty/in-place
+  rejection, read-only preflight, post-activation failure, TERM handling,
+  frozen-source publication, altered-recovery rejection, automatic
+  package/config rollback, retry, and
+  acceptance. Windows Pester proves frozen release-tree validation, complete Terminal recovery,
+  all-target concurrency rejection, known-folder boundary validation, private
+  ACL policy, and provider-boundary verification.
+- `docs/UPGRADING.md` and `docs/releases/v0.2.0.md` define the per-platform
+  commands, unsupported Intel outcome, WSL ordering, Nix provenance, and
+  release evidence gate.
+
+Canonical solution:
+
+1. DONE - Remove every moving-branch/in-place v0.1.0 instruction.
+2. DONE - Add exact-tag side-by-side preflight, apply, rollback, and acceptance.
+3. DONE - Separate reversible Nix/config migration from additive native tools.
+4. DONE - Pin the exact peeled v0.1.0 fixture and failure boundaries in CI.
+5. PENDING LIVE - Record Apple Silicon owner-host, real WSL2, redirected
+   Windows, divergent dual-Terminal, and exact tagged v0.2.0 release runs before
+   publication.
+
 ## Disproved Or Non-Blocking Assumptions
 
 - Shell, zsh, and PowerShell syntax are not current blockers:

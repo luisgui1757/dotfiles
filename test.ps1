@@ -83,6 +83,7 @@ Invoke-Step 'PSScriptAnalyzer' {
     $analyzerPaths = @(
         'install-deps.ps1',
         'setup.ps1',
+        'scripts/upgrade-v0.1.0.ps1',
         'uninstall.ps1',
         'test.ps1',
         'shells/powershell_profile.ps1',
@@ -104,7 +105,7 @@ Invoke-Step 'PSScriptAnalyzer' {
     # per rule group; the fingerprint below additionally binds the exact stable
     # script/rule/message/extent identities, so one warning cannot silently
     # replace another while preserving a filename/rule/count total.
-    $analyzerWarningFingerprint = '09e821b25e271474f8d15f103b4412839a0cdb7e9662e84cb91b682003d8995c'
+    $analyzerWarningFingerprint = '1ca7e2f50a9e7e7fbe999197c2ef3bb66f6f3833a481ede9fc667dbba6b7b5b8'
     $analyzerWarningBaseline = @{
         'dot_tmux.rose-pine.ps1, PSAvoidUsingWriteHost'                               = @{ Count = 1; Reason = 'generated tmux theme status output' }
         'install-deps.ps1, PSAvoidUsingWriteHost'                                     = @{ Count = 165; Reason = 'interactive installer progress output' }

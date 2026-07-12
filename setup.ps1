@@ -12,6 +12,8 @@
 #   .\setup.ps1 -SkipAgents      skip global Polaris agent-policy install
 #   .\setup.ps1 -BestEffort      continue past plugin/LSP/Mason phase failures
 #   .\setup.ps1 -SkipWindowsTerminalMerge   config+sync but leave WT settings.json untouched
+#   .\setup.ps1 -SkipLegacyKnownFolderMigration   retain v0.1 conventional targets during release rollback window
+#   .\setup.ps1 -SkipConfigScripts   apply only chezmoi files/symlinks; release-migration boundary
 #   .\setup.ps1 -MergeWindowsTerminal        (no-op alias; the WT rose-pine merge is now default-on)
 #
 # First run (no checkout yet):
@@ -34,6 +36,8 @@ param(
     [switch]$SkipAgents,
     [switch]$MergeWindowsTerminal,   # back-compat no-op: WT merge is now default-on
     [switch]$SkipWindowsTerminalMerge,
+    [switch]$SkipLegacyKnownFolderMigration,
+    [switch]$SkipConfigScripts,
     [switch]$BestEffort
 )
 
@@ -1578,8 +1582,14 @@ function Assert-WindowsKnownFolderConsumption {
 function Move-LegacyWindowsKnownFolderTargets {
     param(
         [Parameter(Mandatory)] $Identity,
-        [bool]$IsDryRun = $DryRun
+        [bool]$IsDryRun = $DryRun,
+        [bool]$IsSuppressed = $SkipLegacyKnownFolderMigration
     )
+
+    if ($IsSuppressed) {
+        Write-Step 'retain    v0.1.0 conventional known-folder targets until release acceptance'
+        return
+    }
 
     $legacyLocal = Join-Path $Identity.UserProfile 'AppData\Local'
     $legacyDocuments = Join-Path $Identity.UserProfile 'Documents'
@@ -1629,7 +1639,8 @@ function Move-LegacyWindowsKnownFolderTargets {
 function Invoke-WindowsKnownFolderOverlays {
     param(
         [Parameter(Mandatory)] $Identity,
-        [bool]$IsDryRun = $DryRun
+        [bool]$IsDryRun = $DryRun,
+        [bool]$ExcludeScripts = $SkipConfigScripts
     )
 
     $oldBaseArgs = $script:ChezmoiBaseArgs
@@ -1647,7 +1658,12 @@ function Invoke-WindowsKnownFolderOverlays {
             )
             $script:ChezmoiConfigArgs = @('--config', $overlayConfig, '--config-format', 'toml')
             Backup-PreexistingManagedTargets
-            $arguments = if ($IsDryRun) { @('--dry-run', '--verbose', 'apply') } else { @('--no-tty', '--force', 'apply') }
+            $arguments = if ($IsDryRun) {
+                @('--dry-run', '--verbose', 'apply')
+            } else {
+                @('--no-tty', '--force', 'apply')
+            }
+            if ($ExcludeScripts) { $arguments += @('--include', 'files,symlinks') }
             Invoke-ChezmoiOrExit -Label "chezmoi $($overlay.Label) apply" -Arguments $arguments
         } finally {
             $script:ChezmoiBaseArgs = $oldBaseArgs
@@ -1661,8 +1677,12 @@ function Invoke-WindowsKnownFolderOverlays {
 }
 
 function Invoke-ChezmoiApplyPhase {
+    param(
+        [bool]$ExcludeScripts = $SkipConfigScripts,
+        [bool]$IsDryRun = $DryRun
+    )
     if (-not (Get-Command chezmoi -ErrorAction SilentlyContinue)) {
-        if ($DryRun) {
+        if ($IsDryRun) {
             # The dogfood dry-run runs BEFORE Phase 1 installs chezmoi; preview
             # rather than fail (a real run has chezmoi on PATH after Phase 1).
             Write-Step "would    chezmoi (installed in Phase 1) backs up divergent configs, then 'chezmoi apply'"
@@ -1673,7 +1693,7 @@ function Invoke-ChezmoiApplyPhase {
         exit 1
     }
 
-    if ($DryRun) {
+    if ($IsDryRun) {
         Write-Warning "DryRun: skipping symlink-privilege probe"
         $dryRunConfig = New-ChezmoiDryRunConfig
         $script:ChezmoiConfigArgs = @('--config', $dryRunConfig, '--config-format', 'toml')
@@ -1683,8 +1703,10 @@ function Invoke-ChezmoiApplyPhase {
             # source exposes no WT target. Apply the complete source directly;
             # absolute Windows target lists are not a portable chezmoi selector.
             $applyArgs = @('--dry-run', '--verbose', 'apply')
+            if ($ExcludeScripts) { $applyArgs += @('--include', 'files,symlinks') }
             Invoke-ChezmoiOrExit -Label 'chezmoi dry-run apply' -Arguments $applyArgs
-            Invoke-WindowsKnownFolderOverlays -Identity $script:WindowsIdentity -IsDryRun $true
+            Invoke-WindowsKnownFolderOverlays -Identity $script:WindowsIdentity `
+                -IsDryRun $true -ExcludeScripts:$ExcludeScripts
             Invoke-WindowsTerminalSettingsTransaction -IsDryRun $true
         } finally {
             Remove-Item -LiteralPath $dryRunConfig -Force -ErrorAction SilentlyContinue
@@ -1711,13 +1733,17 @@ function Invoke-ChezmoiApplyPhase {
         exit 1
     }
 
-    Invoke-ChezmoiOrExit -Label 'chezmoi init' -Arguments @('init')
+    if (-not $ExcludeScripts) {
+        Invoke-ChezmoiOrExit -Label 'chezmoi init' -Arguments @('init')
+    }
     Backup-PreexistingManagedTargets
     # setup owns the transactional WT write. The main source has no WT target,
     # so a full apply cannot publish it before the transaction below.
     $realApplyArgs = @('--no-tty', '--force', 'apply')
+    if ($ExcludeScripts) { $realApplyArgs += @('--include', 'files,symlinks') }
     Invoke-ChezmoiOrExit -Label 'chezmoi apply' -Arguments $realApplyArgs
-    Invoke-WindowsKnownFolderOverlays -Identity $script:WindowsIdentity
+    Invoke-WindowsKnownFolderOverlays -Identity $script:WindowsIdentity `
+        -ExcludeScripts:$ExcludeScripts
     Invoke-WindowsTerminalSettingsTransaction
 }
 
@@ -1874,7 +1900,7 @@ function Invoke-SetupUpdateMode {
     }
 
     Write-Host ""
-    Write-Host 'Plugins (lazy-lock.json), pinned binaries, and configs update via `git pull` then re-run setup; `:Lazy update` re-pins plugins (a repo change).'
+    Write-Host 'Plugins (lazy-lock.json), pinned binaries, and configs update through a reviewed release migration; `:Lazy update` re-pins plugins (a repo change).'
     Write-Host ""
     Write-Host "================================================================"
     Write-Host "==  setup.ps1: update done"

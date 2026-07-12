@@ -1482,3 +1482,127 @@ recorded only after the repaired head is pushed and those events complete.
 | UGR-020 | PARTIAL | The repaired transaction head passed all legacy and stable checks; all six dual-SHA markers and unchanged live policy were independently read back. | Independent final review; after merge, exact merged-main cache-free proof followed by owner preflight/apply/readback. |
 | UGR-021 | PARTIAL | Exact-head hosted Ubuntu, Apple Silicon, Windows, container, Nix, generic/parity, and logical proof are green without relabeling ordinary PR caches as clean-install proof. | Merged-main cache-free proof plus real WSL, redirected-Windows, dual-Terminal, and desktop/TCC manual runs. |
 | UGR-022 | ACCEPTED/FIXED | The append-only ledger records the accepted defects, canonical implementation, local gates, exact hosted runs, dual identities, artifact scan, and unchanged live posture. | Append merged-main/live-apply evidence only after those events occur. |
+
+## Captured-policy restore and v0.1.0 release migration — entry 40
+
+- Independent review of exact source head
+  `fcec13763a2d51f8787dcf0be85937e94495c38e` reproduced two P1 defects despite
+  a green repository gate. Safeguard restore derived classic expectations from
+  the running checkout while integrity expectations came from the manifest
+  commit, permitting a coherent worktree/classic snapshot alteration to publish
+  a mixed stage. Separately, the README told v0.1.0 users to update their
+  checkout before setup, but v0.1.0 is already chezmoi-based and POSIX targets
+  are live checkout symlinks; exact macOS/Linux reproduction changed live config
+  before backup and produced no old-byte backup.
+- Both are accepted contract defects. Restore now validates the captured
+  `check-identities.json`, derives legacy/stable integrity and full/narrow
+  classic policy from that single captured file, and never invokes a
+  worktree-backed context helper. Legacy and stable adversarial fixtures mutate
+  the running checkout/script and snapshot classic state coherently; both fail
+  before any API write.
+- Release upgrades are now exact-tag, side-by-side transactions. POSIX and
+  Windows tools require clean official annotated v0.1.0/v0.2.0 checkouts,
+  retained historical config, authoritative target identity, and private
+  recovery until acceptance. Both tools archive the exact release commits and
+  bind publication, verification, and rollback to validated frozen trees rather
+  than the mutable retained checkouts. POSIX applies only Nix plus config and
+  removes the first nix-darwin/Home Manager activation on later failure. Windows remains
+  non-Nix, applies config with dependencies skipped, freezes exact packaged and
+  portable Terminal recovery bytes under a protected ACL, retains conventional
+  v0.1 known-folder targets while rollback is open, removes only created overlay
+  state on rollback, and validates both targets before either restore write. Native/deferred package provisioning is
+  deliberately outside the reversible release transaction; Windows also skips
+  Neovim caches, agent policy, and chezmoi run scripts.
+- The Nix prerequisite is a versioned, checksum-verified upstream Nix 2.34.0
+  archive for the three supported POSIX systems. No downloaded archive is
+  extracted or executed before its reviewed SHA-256 matches; Intel macOS fails
+  before download. README, upgrading/release docs, CLAUDE invariants, roadmap,
+  migration status, supply-chain policy, manual evidence rows, and this ledger
+  now distinguish v0.1.0 from pre-chezmoi history and prohibit moving-branch
+  release instructions.
+
+### Focused behavior proof
+
+| Check | Exact result |
+|---|---|
+| Captured-policy safeguard suite | PASS: legacy and stable worktree/classic drift reject with zero writes; existing restore/apply/readback/rollback/retry/idempotency cases remain green |
+| Exact v0.1.0 POSIX fixture | PASS: exact tag/inventory, in-place and dirty rejection, write-free preflight, post-activation exit 42, automatic Home Manager/config rollback, retry, and explicit acceptance |
+| Windows upgrade Pester | PASS on non-Windows logic host: 4 recovery cases, 0 failed/skipped; native protected-ACL case is defined only for the Windows runner |
+| Release-upgrade static policy | PASS: historical identities/inventory, v0.2.0 tag contract, rollback phase split, Nix hashes, CI reach, and no moving-branch/placeholder documentation |
+
+### Finding status amendments
+
+| ID | Status after entry 40 | Exact evidence | Remaining work |
+|---|---|---|---|
+| UGR-020 | PARTIAL | Safeguard restore now has one captured-commit policy source for integrity and classic, with legacy/stable zero-write attacks covered. | Full gate, exact pushed-head independent review, then merged-main cache-free proof and owner preflight/apply/readback. |
+| UGR-021 | PARTIAL | Exact historical POSIX migration is automated and failure-injected without relabeling it as owner-host, WSL, or redirected-Windows proof. | Apple Silicon owner-host, real WSL2, native aarch64, redirected/dual-Terminal Windows, desktop/TCC, and merged-main rows. |
+| UGR-022 | ACCEPTED/FIXED | The unsafe README command and pre-chezmoi misclassification are removed; versioned migration, provenance, rollback, unsupported Intel, and release gates are discoverable. | Append final local/hosted/tag/manual evidence only after it occurs. |
+
+## Release-upgrade recovery closure and final local gate — entry 41
+
+- The release migration now keeps chezmoi run scripts outside its reversible
+  core with `--skip-config-scripts`; only Nix activation and backed-up config
+  files/links publish before acceptance. The exact historical harness runs the
+  real setup backup/config path, proves the old zsh link is retained as a
+  collision-safe backup before publication, and confirms no deferred plugin
+  publisher ran. Setup creates required managed-target parents itself; rollback
+  prunes only transaction-created parents that remain empty.
+- POSIX recovery has a private exact-file digest manifest and validates every
+  scalar, stage, checkout/tag/origin/cleanliness boundary, target inventory,
+  absent-parent inventory, flake lock, Nix provider, and command-provider
+  inventory before its first rollback write. Coherently altered target and
+  lock payloads plus an invalid stage all reject without changing live config.
+  Every publication and rollback source is a digest-bound exact tree beneath
+  private recovery. A coherent post-validation checkout mutation cannot change
+  published or restored bytes. Both injected exit 42 and a real
+  post-publication TERM restore v0.1.0 and remove the first
+  Home Manager or nix-darwin activation.
+- The macOS fixture selects the Apple-Silicon/nix-darwin branch, locked
+  bootstrap and uninstaller, config backup, and deferred-script boundary while
+  mocking privileged `/etc`, Homebrew, and Nix effects. It is automated proof,
+  not the still-required real owner-host row. Linux exercises the locked Home
+  Manager bootstrap/uninstall branch. Hosted workflow jobs select the matching
+  fixture mode and fetch the exact v0.1.0 tag history.
+- Windows recovery now validates its complete known-folder state boundary
+  before uninstall, requires the recovery script/provider/RECOVERY material,
+  verifies the exact pre-migration provider boundary after rollback, and
+  enforces an owner/System/Administrators-only protected ACL. It archives both
+  exact commits, digest-validates those source trees, and runs setup, readback,
+  uninstall, and rollback only from recovery. Terminal recovery remains
+  all-target-validated before either write. The native ACL case is defined for
+  the Windows runner; non-Windows Pester covers twelve recovery and failure
+  cases. Its setup call explicitly skips dependencies, Neovim caches, agent
+  policy, and chezmoi run scripts so the reversible boundary contains only
+  config files/symlinks, known-folder overlays, and Terminal settings.
+- The analyzer baseline changed only because the existing setup update-message
+  `Write-Host` extent now points users to reviewed release migration instead of
+  `git pull`. Old/new analyzer identity comparison found no new warning group
+  or count; the reviewed fingerprint is now
+  `1ca7e2f50a9e7e7fbe999197c2ef3bb66f6f3833a481ede9fc667dbba6b7b5b8`.
+
+### Final local verification
+
+| Check | Exact result |
+|---|---|
+| `git diff --check` and shell syntax/lint | PASS; no whitespace errors; changed shell scripts parse; repository lint green |
+| `bash tests/static/run_all.sh` | PASS, including captured-policy safeguards and release-upgrade policy |
+| `bash tests/shell/run_all.sh` | PASS, including dual-SHA proof and setup flag behavior |
+| `make test-migration` | PASS, including exact v0.1.0 apply/failure/TERM/rollback/retry/acceptance and the existing parity/uninstall/oracle bundle |
+| `TEST_UPGRADE_PLATFORM=Darwin bash tests/migration/v0_1_upgrade_test.sh` | PASS: Apple-Silicon/nix-darwin fixture mode |
+| `pwsh -NoLogo -NoProfile -File ./test.ps1` | PASS: exact analyzer fingerprint, 249 Pester passed with zero failed/skipped locally, and all Neovim specs |
+| `make validate-renovate` | PASS: official validator and exactly 83 reviewed dependency records |
+| `bash tests/nix/run_all.sh` | PASS |
+| `nix flake check --print-build-logs` | PASS on Apple Silicon; incompatible Linux systems were reported as omitted, not runtime proof |
+| `make ci` | PASS: ended `local pre-PR gate passed` |
+
+No real Windows/WSL/redirected-folder/dual-Terminal/owner-host migration, final
+v0.2.0 tag, push, hosted result, merge, live safeguard mutation, or merged-main
+cache-free proof is claimed by this entry.
+
+### Finding status amendments
+
+| ID | Status after entry 41 | Exact evidence | Remaining work |
+|---|---|---|---|
+| UGR-020 | PARTIAL | Captured-commit safeguard restore and release recovery reject altered/cross-source material before mutation; all local transaction gates pass. | Exact pushed-head review; after merge, merged-main cache-free proof and owner preflight/apply/readback. |
+| UGR-021 | PARTIAL | Exact historical Linux/macOS fixture modes are failure- and signal-injected without relabeling mocks as owner-host or WSL proof. | Real Apple Silicon owner host, WSL2, native aarch64, redirected/dual-Terminal Windows, desktop/TCC, and merged-main rows. |
+| UGR-022 | ACCEPTED/FIXED | README, upgrading/release docs, setup flags, roadmap, status, manual matrix, security docs, and this ledger describe the exact release and recovery boundaries. | Append pushed/hosted/tag/manual evidence only when it exists. |

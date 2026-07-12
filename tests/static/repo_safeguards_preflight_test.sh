@@ -517,6 +517,64 @@ snapshot="$(awk -F': ' '/^Recovery snapshot:/ { print $2 }' <<<"$output")"
 }
 echo "ok  : apply snapshots then mutates only the three reviewed cutover resources"
 
+legacy_worktree_drift_snapshot="$WORK/legacy-worktree-drift-snapshot"
+cp -R "$snapshot" "$legacy_worktree_drift_snapshot"
+cp "$fixture/.github/check-identities.json" "$WORK/check-identities.backup"
+jq '.legacyEmitted = ["worktree-only-legacy-context"]' \
+    "$fixture/.github/check-identities.json" \
+    > "$fixture/.github/check-identities.tmp"
+mv "$fixture/.github/check-identities.tmp" \
+    "$fixture/.github/check-identities.json"
+write_classic_state '["worktree-only-legacy-context"]' \
+    "$legacy_worktree_drift_snapshot/classic-live.json"
+jq '.required_status_checks' \
+    "$legacy_worktree_drift_snapshot/classic-live.json" \
+    > "$legacy_worktree_drift_snapshot/classic-restore.json"
+expect_restore_rejected_without_mutation \
+    "policy does not match manifest stage" "$state" \
+    "$legacy_worktree_drift_snapshot"
+cp "$WORK/check-identities.backup" "$fixture/.github/check-identities.json"
+
+stable_worktree_drift_snapshot="$WORK/stable-worktree-drift-snapshot"
+cp -R "$snapshot" "$stable_worktree_drift_snapshot"
+jq '.stage = "stable"' "$stable_worktree_drift_snapshot/manifest.json" \
+    > "$stable_worktree_drift_snapshot/manifest.tmp"
+mv "$stable_worktree_drift_snapshot/manifest.tmp" \
+    "$stable_worktree_drift_snapshot/manifest.json"
+jq '.sha_pinning_required = true' \
+    "$stable_worktree_drift_snapshot/actions-restore.json" \
+    > "$stable_worktree_drift_snapshot/actions-restore.tmp"
+mv "$stable_worktree_drift_snapshot/actions-restore.tmp" \
+    "$stable_worktree_drift_snapshot/actions-restore.json"
+cp "$fixture/.github/rulesets/main-integrity.json" \
+    "$stable_worktree_drift_snapshot/integrity-restore.json"
+write_classic_state '["worktree-only-stable-context"]' \
+    "$stable_worktree_drift_snapshot/classic-live.json"
+jq '.required_status_checks' \
+    "$stable_worktree_drift_snapshot/classic-live.json" \
+    > "$stable_worktree_drift_snapshot/classic-restore.json"
+cp "$fixture/scripts/apply-repo-safeguards.sh" "$WORK/safeguards-script.backup"
+python3 - "$fixture/scripts/apply-repo-safeguards.sh" <<'PY'
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+text = path.read_text()
+start = text.index("required_check_contexts() {")
+end = text.index("\n}\n", start) + len("\n}\n")
+replacement = """required_check_contexts() {
+    printf '%s\\n' worktree-only-stable-context
+}
+"""
+path.write_text(text[:start] + replacement + text[end:])
+PY
+expect_restore_rejected_without_mutation \
+    "policy does not match manifest stage" "$state" \
+    "$stable_worktree_drift_snapshot"
+cp "$WORK/safeguards-script.backup" \
+    "$fixture/scripts/apply-repo-safeguards.sh"
+echo "ok  : restore derives legacy and stable policy only from the manifest commit"
+
 for missing_classic_key in \
     required_status_checks \
     enforce_admins \

@@ -7,8 +7,11 @@
 #   ./setup.sh --update            update proven dependency tools/artifacts + Mason only
 #   ./setup.sh --dry-run           preview every step
 #   ./setup.sh --skip-deps         already provisioned; skip Nix + native deps
+#   ./setup.sh --skip-native-deps  keep Nix activation; skip native/deferred deps
 #   ./setup.sh --skip-bootstrap    back-compat alias: skip config apply
 #   ./setup.sh --skip-config       already configured; just sync nvim
+#   ./setup.sh --skip-config-scripts
+#                                  apply files/links without chezmoi run scripts
 #   ./setup.sh --skip-nvim         skip nvim plugin/parser/Mason sync
 #   ./setup.sh --skip-agents       skip global Polaris agent-policy install
 #   ./setup.sh --experimental-wsl-gui
@@ -31,7 +34,9 @@ ALL=0
 DRY_RUN=0
 UPDATE_MODE=0
 SKIP_DEPS=0
+SKIP_NATIVE_DEPS=0
 SKIP_BOOTSTRAP=0
+SKIP_CONFIG_SCRIPTS=0
 SKIP_NVIM=0
 SKIP_AGENTS=0
 BEST_EFFORT=0
@@ -57,8 +62,11 @@ Local usage:
   ./setup.sh --update            update proven dependency tools/artifacts + Mason only
   ./setup.sh --dry-run           preview every step
   ./setup.sh --skip-deps         already provisioned; skip Nix + native deps
+  ./setup.sh --skip-native-deps  apply Nix/config but skip native/deferred deps
   ./setup.sh --skip-bootstrap    back-compat alias: skip config apply
   ./setup.sh --skip-config       already configured; just sync nvim
+  ./setup.sh --skip-config-scripts
+                                apply files/links without chezmoi run scripts
   ./setup.sh --skip-nvim         skip nvim plugin/parser/Mason sync
   ./setup.sh --skip-agents       skip global Polaris agent-policy install
   ./setup.sh --best-effort       continue past plugin/LSP/Mason phase failures
@@ -80,8 +88,12 @@ for arg in "$@"; do
         --dry-run)        DRY_RUN=1 ;;
         --update)         UPDATE_MODE=1 ;;
         --skip-deps)      SKIP_DEPS=1 ;;
+        --skip-native-deps)
+                          SKIP_NATIVE_DEPS=1 ;;
         --skip-bootstrap|--skip-config)
                           SKIP_BOOTSTRAP=1 ;;
+        --skip-config-scripts)
+                          SKIP_CONFIG_SCRIPTS=1 ;;
         --skip-nvim)      SKIP_NVIM=1 ;;
         --skip-agents)    SKIP_AGENTS=1 ;;
         --best-effort)    BEST_EFFORT=1 ;;
@@ -141,9 +153,13 @@ CHEZMOI_SOURCE="$SCRIPT_DIR/home"
 CHEZMOI_BASE_ARGS=(--source "$CHEZMOI_SOURCE")
 CHEZMOI_CONFIG_ARGS=()
 CHEZMOI_DATA_ARGS=()
+CHEZMOI_APPLY_ARGS=()
 TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
 if [[ "$EXPERIMENTAL_WSL_GUI" -eq 1 ]]; then
     CHEZMOI_DATA_ARGS+=(--override-data '{"experimentalWslGui":true}')
+fi
+if [[ "$SKIP_CONFIG_SCRIPTS" -eq 1 ]]; then
+    CHEZMOI_APPLY_ARGS+=(--include "files,symlinks")
 fi
 
 phase() {
@@ -592,6 +608,21 @@ backup_preexisting_managed_targets() {
     done <<<"$managed_output"
 }
 
+ensure_managed_target_parents() {
+    local managed_output target parent
+    [[ "$DRY_RUN" -eq 0 ]] || return 0
+    managed_output="$(run_chezmoi managed --path-style absolute --include files,symlinks)"
+    while IFS= read -r target; do
+        [[ -n "$target" ]] || continue
+        parent="$(dirname "$target")"
+        if [[ -e "$parent" && ! -d "$parent" ]]; then
+            echo "  FAIL: managed target parent is not a directory: $parent" >&2
+            return 1
+        fi
+        mkdir -p "$parent"
+    done <<<"$managed_output"
+}
+
 run_or_fail() {
     local label="$1"; shift
     if "$@"; then return 0; fi
@@ -611,12 +642,12 @@ cleanup_chezmoi_dry_config() {
 }
 
 run_update_mode() {
-    if [[ "$SKIP_DEPS" -eq 0 ]]; then
+    if [[ "$SKIP_DEPS" -eq 0 && "$SKIP_NATIVE_DEPS" -eq 0 ]]; then
         phase "Update 1/2: update proven dependency tools and artifacts"
         bash "$SCRIPT_DIR/install-deps.sh" ${DEPS_FLAGS[@]+"${DEPS_FLAGS[@]}"}
     else
         echo
-        echo "skipped: update dependency phase via --skip-deps"
+        echo "skipped: update dependency phase via --skip-deps/--skip-native-deps"
     fi
 
     refresh_runtime_path
@@ -636,7 +667,7 @@ run_update_mode() {
     fi
 
     echo
-    echo "Plugins (lazy-lock.json), pinned binaries, and configs update via \`git pull\` then re-run setup; \`:Lazy update\` re-pins plugins (a repo change)."
+    echo "Plugins (lazy-lock.json), pinned binaries, and configs update through a reviewed release migration; \`:Lazy update\` re-pins plugins (a repo change)."
     echo
     echo "================================================================"
     echo "==  setup.sh: update done"
@@ -1211,12 +1242,12 @@ run_home_manager_switch
 refresh_runtime_path
 
 # ---- Phase 1: dependencies ---------------------------------------------------
-if [[ "$SKIP_DEPS" -eq 0 ]]; then
+if [[ "$SKIP_DEPS" -eq 0 && "$SKIP_NATIVE_DEPS" -eq 0 ]]; then
     phase "Phase 1/6: install dependencies"
     bash "$SCRIPT_DIR/install-deps.sh" ${DEPS_FLAGS[@]+"${DEPS_FLAGS[@]}"}
 else
     echo
-    echo "skipped: Phase 1 (deps) via --skip-deps"
+    echo "skipped: Phase 1 (native/deferred deps) via --skip-deps/--skip-native-deps"
 fi
 refresh_runtime_path
 
@@ -1240,13 +1271,20 @@ if [[ "$SKIP_BOOTSTRAP" -eq 0 ]]; then
         render_chezmoi_config_template "$CHEZMOI_DRY_CONFIG"
         CHEZMOI_CONFIG_ARGS=(--config "$CHEZMOI_DRY_CONFIG" --config-format toml)
         backup_preexisting_managed_targets
-        run_chezmoi --dry-run --verbose apply
+        run_chezmoi --dry-run --verbose apply \
+            ${CHEZMOI_APPLY_ARGS[@]+"${CHEZMOI_APPLY_ARGS[@]}"}
         cleanup_chezmoi_dry_config
         trap - EXIT
     else
-        chezmoi "${CHEZMOI_BASE_ARGS[@]}" init
+        if [[ "$SKIP_CONFIG_SCRIPTS" -eq 1 ]]; then
+            echo "  retain    existing chezmoi state; frozen release source is read-only"
+        else
+            chezmoi "${CHEZMOI_BASE_ARGS[@]}" init
+        fi
         backup_preexisting_managed_targets
-        run_chezmoi --no-tty --force apply
+        ensure_managed_target_parents
+        run_chezmoi --no-tty --force apply \
+            ${CHEZMOI_APPLY_ARGS[@]+"${CHEZMOI_APPLY_ARGS[@]}"}
     fi
 else
     echo

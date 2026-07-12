@@ -51,7 +51,18 @@ if printf '%s\n' "$output" | grep -Eq 'chezmoi|Lazy(!| sync)|Tree-sitter|MasonTo
     echo "$output"
     fail "setup update touched config, Lazy, Tree-sitter, or Mason install paths"
 fi
-printf '%s\n' "$output" | grep -F "Plugins (lazy-lock.json), pinned binaries, and configs update via \`git pull\` then re-run setup" >/dev/null \
+printf '%s\n' "$output" | grep -F "Plugins (lazy-lock.json), pinned binaries, and configs update through a reviewed release migration" >/dev/null \
     || fail "closing note for pinned core updates was missing"
+
+rm -f "$TMP_ROOT/install-deps.args" "$TMP_ROOT/nvim.args"
+SKIP_NATIVE_DEPS=1
+SKIP_NVIM=1
+output="$(run_update_mode 2>&1)"
+[[ ! -e "$TMP_ROOT/install-deps.args" ]] ||
+    fail "--skip-native-deps still invoked install-deps.sh"
+[[ ! -e "$TMP_ROOT/nvim.args" ]] ||
+    fail "--skip-nvim still invoked Mason update"
+printf '%s\n' "$output" | grep -F "skipped: update dependency phase via --skip-deps/--skip-native-deps" >/dev/null ||
+    fail "native-dependency skip boundary was not reported"
 
 echo "OK"

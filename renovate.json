@@ -36,6 +36,17 @@
   "customManagers": [
     {
       "customType": "regex",
+      "description": "Upstream Nix prerequisite release. Every adjacent platform SHA-256 must be recomputed manually after Renovate bumps this.",
+      "managerFilePatterns": ["/^scripts/install-nix-prerequisite\\.sh$/"],
+      "matchStrings": [
+        "nix_version=\"(?<currentValue>[^\"]+)\"(?:.|\\n)*?expected_sha256=\"[a-f0-9]{64}\""
+      ],
+      "depNameTemplate": "NixOS/nix",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
       "description": "Neovim Linux x86_64 tarball version. The adjacent SHA-256 must be recomputed manually after Renovate bumps this.",
       "managerFilePatterns": ["/^install-deps\\.sh$/"],
       "matchStrings": [
