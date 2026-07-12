@@ -523,11 +523,12 @@ present command from the executable source to a supported owner before taking
 action. This covers real machines where Homebrew/Linuxbrew, native Linux
 package managers, repo-pinned direct artifacts, and OS-vendor tools coexist.
 
-The ubiquitous uncompromised canonical gold-standard is **per-tool proven
-ownership**:
+The ubiquitous uncompromised canonical gold-standard is **full release
+reconciliation followed by per-tool proven update ownership**:
 
-- `--update` is a dependency drift-edge refresh, not a repo update and not
-  machine-wide package maintenance.
+- `--update` first runs the same idempotent install/migration reconciliation as
+  `--all`, then enters the dependency drift-edge refresh. It remains neither a
+  repo fetch nor machine-wide package maintenance.
 - `--update` updates every present dotfiles dependency that dotfiles can prove
   is owned by a supported owner.
 - Ownership is resolved from the command the shell will actually execute, not
@@ -881,8 +882,8 @@ The shipped tests prove behavior, not just branches:
 ### Non-Goals
 
 - Do not make `--update` run repo `git pull`.
-- Do not make `--update` run `chezmoi apply`.
-- Do not make `--update` run Lazy plugin update or rewrite `lazy-lock.json`.
+- Do not make `--update` run Lazy's upstream update or rewrite
+  `lazy-lock.json`; full reconciliation restores the reviewed lock instead.
 - Do not run blanket package-manager upgrades.
 - Do not auto-trust third-party Homebrew taps.
 - Do not adopt Homebrew zsh unless login-shell migration is designed as its own
@@ -1201,6 +1202,12 @@ Evidence:
   checkout changed live bytes before current setup could back them up.
 - `scripts/upgrade-v0.1.0.sh` and `.ps1` now require clean, separate official
   annotated v0.1.0/v0.2.0 checkouts and retain v0.1.0 until acceptance.
+- The public `setup.sh --all` / `setup.ps1 -All` entrypoints now discover exact
+  live v0.1.0 ownership, invoke and verify those transactions, resume a pending
+  applied recovery, accept under the explicit non-interactive all-mode
+  contract, retain recovery evidence, and continue full setup. POSIX setup also
+  bootstraps the verified Nix prerequisite itself. Update mode runs the same
+  reconciliation before its scoped refresh, with upgrade as an alias.
 - POSIX apply and rollback consume digest-bound, read-only exact-commit trees
   inside private recovery; post-validation checkout drift cannot change a
   package/config write.
@@ -1230,7 +1237,9 @@ Canonical solution:
 2. DONE - Add exact-tag side-by-side preflight, apply, rollback, and acceptance.
 3. DONE - Separate reversible Nix/config migration from additive native tools.
 4. DONE - Pin the exact peeled v0.1.0 fixture and failure boundaries in CI.
-5. PENDING LIVE - Record Apple Silicon owner-host, real WSL2, redirected
+5. DONE - Make setup the sole normal install/migration/update orchestrator while
+   preserving exact-tag acquisition and the existing recovery transaction.
+6. PENDING LIVE - Record Apple Silicon owner-host, real WSL2, redirected
    Windows, divergent stable packaged/Preview/portable Terminal, and exact tagged v0.2.0 release runs before
    publication.
 

@@ -1027,10 +1027,20 @@ function Invoke-UpgradeApply {
         Save-RecoveryStage -Recovery $recovery -Stage applying
         $mutationBegan = $true
         $transactionActive = $true
-        $setup = Invoke-PowerShellScript -Path (Join-Path $frozen.NewSource 'setup.ps1') -Arguments @(
-            '-All', '-SkipDeps', '-SkipNvim', '-SkipAgents', '-SkipConfigScripts',
-            '-SkipLegacyKnownFolderMigration'
-        )
+        $oldMigrationMarker = $env:DOTFILES_RELEASE_MIGRATION_ACTIVE
+        try {
+            $env:DOTFILES_RELEASE_MIGRATION_ACTIVE = '1'
+            $setup = Invoke-PowerShellScript -Path (Join-Path $frozen.NewSource 'setup.ps1') -Arguments @(
+                '-All', '-SkipDeps', '-SkipNvim', '-SkipAgents', '-SkipConfigScripts',
+                '-SkipLegacyKnownFolderMigration'
+            )
+        } finally {
+            if ($null -eq $oldMigrationMarker) {
+                Remove-Item Env:DOTFILES_RELEASE_MIGRATION_ACTIVE -ErrorAction SilentlyContinue
+            } else {
+                $env:DOTFILES_RELEASE_MIGRATION_ACTIVE = $oldMigrationMarker
+            }
+        }
         $setupExitCode = $setup.ExitCode
         if ($setupExitCode -ne 0) {
             throw "v0.2.0 setup exited $setupExitCode"

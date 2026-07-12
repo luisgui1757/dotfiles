@@ -280,11 +280,11 @@ that violates one of these, fix it instead of disabling the test.
       `install-deps.ps1` never invoke `nix`, `darwin-rebuild`, or `home-manager`.
     - **(d) no remote-eval installer.** The repo never adds a `curl | sh`,
       `irm | iex`, `Invoke-Expression`, or `nix-installer`/`install.determinate.systems`
-      pipe-to-shell path for Nix (or anything else). The *host* proving machine
-      installed Nix from the notarized Determinate `.pkg` (signature + SHA-256
-      verified) — that provenance-checked, non-piped install is a host operation,
-      not repo code. Repo-side Nix bootstrap docs use verified artifacts, never a
-      mutable remote script. (Also covered by
+      pipe-to-shell path for Nix (or anything else). Public setup invokes only
+      `scripts/install-nix-prerequisite.sh`, which requires the exact official
+      annotated release, downloads the pinned upstream Nix archive, verifies its
+      platform SHA-256 and archive paths, and executes only those verified local
+      bytes. (Also covered by
       `tests/static/supply_chain_remote_execution_test.sh`.)
     - **(e) Nix owner reporting in update mode.** When `install-deps.sh --update`
       resolves a tool whose command source (or its real path) lives under a Nix
@@ -403,13 +403,21 @@ that violates one of these, fix it instead of disabling the test.
     The reversible core runs only Nix activation plus config files/links on POSIX
     (`--skip-native-deps --skip-config-scripts --skip-nvim --skip-agents`) and config/known-folder/
     Terminal publication on Windows
-    (`-SkipDeps -SkipNvim -SkipAgents -SkipConfigScripts`), while conventional
+    (`-SkipDeps -SkipNvim -SkipAgents -SkipConfigScripts`). Both migrators mark
+    their frozen nested setup so it cannot recursively
+    rediscover the still-live v0.1.0 installation. Conventional
     v0.1 known-folder targets stay in place until acceptance. Chezmoi run scripts and
     additive native provisioning happen only after acceptance. Failure or interruption removes the first
     nix-darwin/Home Manager activation and restores v0.1.0, or restores exact
-    Windows Terminal bytes and old Windows config. Keep both checkouts until
-    explicit verified acceptance. `--update` / `-Update` are never release
-    migrations. The source of truth is `docs/UPGRADING.md`.
+    Windows Terminal bytes and old Windows config. Keep both checkouts through
+    verified acceptance. Public setup is the normal orchestrator: `--all` /
+    `-All` detects exact live v0.1.0, invokes and validates this transaction,
+    resumes an already-applied recovery, accepts the verified core under the
+    explicit non-interactive contract, retains its recovery evidence, and
+    completes ordinary setup. `--update` / `-Update` performs that same
+    reconciliation before its scoped refresh; upgrade is an alias. The
+    standalone migrators remain operator recovery interfaces. The source of
+    truth is `docs/UPGRADING.md`.
 30. **Sentinel is the sole agent-policy product name in the repository.** The
     pre-rename name must never return in a tracked repository path or file,
     including tests, docs, cache constants, and historical prose.
@@ -785,8 +793,9 @@ major; `tests/static/repo_policy_test.sh` enforces this.
   WSL environment variables or make an unsupported nested-virtualization job a
   required context. Linux CI and WSL config/static tests are proxies, not WSL
   runtime proof. Full WSL host/guest validation is
-  manual: install Nix inside WSL, run `./tests/wsl/e2e.sh` from inside WSL after
-  running `.\setup.ps1 -All` on Windows. Windows Terminal settings
+  manual: run `./setup.sh --all` in WSL (which installs verified Nix when
+  missing), then run `./tests/wsl/e2e.sh` after running `.\setup.ps1 -All` on
+  Windows. Windows Terminal settings
   handling is default-on: packaged WT is merged when its settings file exists,
   and portable WT is seeded or merged at the unpackaged path when the packaged
   file is absent.
@@ -1026,13 +1035,18 @@ save only**. The next plain `:w` formats normally. Implemented in
   per-tool functions. Identity-sensitive entries must pass the complete
   predicate shape: zsh plugins include target, expected origin, pinned commit,
   and required entry file even during the read-only table scan.
-- **`--update` is a scoped drift-edge refresh, not a repo update.**
-  `setup.sh --update` / `setup.ps1 -Update` run only `install-deps --update`
-  and `nvim --headless +MasonToolsUpdateSync +qa`. The Mason command is
+- **`--update` is full reconciliation followed by a scoped drift-edge refresh,
+  not a repo fetch.** `setup.sh --update` / `setup.ps1 -Update` first run the
+  same install-or-migrate path as all mode: verified Nix bootstrap when needed,
+  the pinned package layer, missing native/deferred dependencies, config apply,
+  Lazy restore, synchronous parser installation, Mason install, and Sentinel.
+  They then run `install-deps --update` and
+  `nvim --headless +MasonToolsUpdateSync +qa`. The Mason update command is
   synchronous on purpose; the async update command can let headless Neovim exit
   while package installs are still running, which Mason reports as aborted
-  installs. Update mode still skips git pull, chezmoi apply, Lazy restore, Lazy
-  sync, and Lazy update. `install-deps --update` updates only present catalog
+  installs. Update mode still never runs git pull, Lazy sync, Lazy update,
+  blanket package-manager upgrades, or lockfile rewrites. `--upgrade` /
+  `-Upgrade` is an alias. `install-deps --update` updates only present catalog
   tools after proving ownership from the executable source, then runs a scoped
   per-package manager or repo-pinned artifact command (`brew upgrade <formula>`,
   native Linux package-specific upgrade commands, Windows `scoop update <pkg>`
@@ -1742,10 +1756,10 @@ save only**. The next plain `:w` formats normally. Implemented in
 
 The `flake.nix` + committed `flake.lock` are the POSIX **package** layer. They own
 NO dotfiles — chezmoi does, on every OS (invariant 22). Native Windows is
-non-Nix. On macOS/Linux/WSL, public `setup.sh` applies this layer before native
-or deferred dependency provisioning and fails closed when `nix` is absent. The
-repo deliberately does not install Nix via a pipe-to-shell bootstrap; Nix is a
-host prerequisite.
+non-Nix. On macOS/Linux/WSL, public `setup.sh` ensures the release-pinned,
+checksum-verified Nix prerequisite and applies this layer before native or
+deferred dependency provisioning. The repo never installs Nix through a
+pipe-to-shell bootstrap.
 
 - **`flake.nix` structure.** `nixpkgs` (nixos-unstable, pinned by `flake.lock`),
   plus `nix-darwin`, `home-manager`, `nix-homebrew`, and the three Homebrew taps
@@ -1812,10 +1826,10 @@ host prerequisite.
 - **setup.sh integration is enforced + consent-gated.** On macOS, `setup.sh`
   applies nix-darwin by default before Phase 1 dependency provisioning.
   `--nix-darwin` remains a compatibility alias, not the switch that makes Nix
-  active. It is dry-run-safe (previews the real sudo command and the locked
-  bootstrap ref when Nix is present, and previews the missing-Nix failure when it
-  is not), prompts unless `--all`, skips cleanly off-macOS, fails closed when
-  `nix` is missing on a real run, and fails closed if activation fails.
+  active. It is dry-run-safe (previews verified prerequisite installation when
+  Nix is absent, then the real sudo command and locked bootstrap ref), prompts
+  unless `--all`, skips cleanly off-macOS, and fails closed if prerequisite
+  installation, verification, or activation fails.
   `--skip-deps` is the explicit already-provisioned escape and skips the Nix
   package layer together with native/deferred dependency installs; compatibility
   aliases do not override it. `--skip-native-deps` is narrower: Nix/config

@@ -80,6 +80,25 @@ done
 grep -F 'nix_version="2.34.0"' scripts/install-nix-prerequisite.sh >/dev/null ||
     fail "Nix prerequisite version drifted"
 
+grep -Eq '^[[:space:]]*ensure_nix_prerequisite[[:space:]]*$' setup.sh ||
+    fail "POSIX setup does not own verified Nix prerequisite installation"
+grep -Eq '^[[:space:]]*maybe_complete_v0_1_upgrade[[:space:]]*$' setup.sh ||
+    fail "POSIX setup does not own v0.1.0 migration orchestration"
+grep -F 'DOTFILES_RELEASE_MIGRATION_ACTIVE=1' setup.sh >/dev/null ||
+    fail "POSIX setup does not guard nested migration setup from recursion"
+grep -F 'DOTFILES_RELEASE_MIGRATION_ACTIVE=1' scripts/upgrade-v0.1.0.sh >/dev/null ||
+    fail "POSIX migrator does not guard its frozen setup from recursive migration"
+grep -F "DOTFILES_RELEASE_MIGRATION_ACTIVE = '1'" scripts/upgrade-v0.1.0.ps1 >/dev/null ||
+    fail "Windows migrator does not guard its frozen setup from recursive migration"
+grep -F 'Invoke-SetupV01Migration -Identity' setup.ps1 >/dev/null ||
+    fail "Windows setup does not own v0.1.0 migration orchestration"
+grep -F "[Alias('Upgrade')] [switch]\$Update" setup.ps1 >/dev/null ||
+    fail "Windows setup does not retain Upgrade as an Update alias"
+grep -F -- '--update|--upgrade)' setup.sh >/dev/null ||
+    fail "POSIX setup does not retain upgrade as an update alias"
+grep -F 'setup_universal_entrypoint_test.sh' < <(find tests/shell -maxdepth 1 -type f -print) >/dev/null ||
+    fail "universal setup orchestration regression is missing"
+
 grep -F 'tests/migration/v0_1_upgrade_test.sh' Makefile >/dev/null ||
     fail "exact historical upgrade test is not in the local gate"
 grep -F "'scripts/upgrade-v0.1.0.ps1'" test.ps1 >/dev/null ||
@@ -101,7 +120,11 @@ fi
 # shellcheck disable=SC2016
 grep -F '`v0.1.0` is already chezmoi-based' README.md >/dev/null ||
     fail "README still misclassifies v0.1.0"
-grep -F 'scripts/install-nix-prerequisite.sh --install' docs/UPGRADING.md >/dev/null ||
-    fail "upgrade guide does not provide the checksum-verified Nix prerequisite"
+grep -F './setup.sh --all' docs/UPGRADING.md >/dev/null ||
+    fail "upgrade guide does not make POSIX setup the normal migration entry point"
+grep -F '.\setup.ps1 -All' docs/UPGRADING.md >/dev/null ||
+    fail "upgrade guide does not make Windows setup the normal migration entry point"
+grep -F 'setup bootstraps Nix' README.md >/dev/null ||
+    fail "README does not state that POSIX setup owns Nix bootstrap"
 
 echo "release upgrade identities, rollback boundaries, evidence, and documentation OK"

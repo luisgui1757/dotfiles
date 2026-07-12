@@ -134,13 +134,13 @@ ssh admin@$(tart ip dotfiles-macos)
 Inside the VM:
 
 ```bash
-# Install Nix first through a verified host-appropriate installer; this repo
-# intentionally does not run a pipe-to-shell Nix bootstrap.
 git clone https://github.com/luisgui1757/dotfiles ~/dotfiles
 cd ~/dotfiles
 git fetch --depth 1 origin <full-40-character-sha>
 git checkout --detach FETCH_HEAD
 test "$(git rev-parse HEAD)" = "<full-40-character-sha>"
+# PR/main commits are not published releases, so provision Nix through the
+# trusted VM image or another independently verified method before this step.
 ./setup.sh --all
 ./tests/greenfield/validate.sh
 ```
@@ -165,13 +165,13 @@ ssh <user>@$(tart ip dotfiles-linux)
 Inside the VM:
 
 ```bash
-# Install Nix first through a verified host-appropriate installer; this repo
-# intentionally does not run a pipe-to-shell Nix bootstrap.
 git clone https://github.com/luisgui1757/dotfiles ~/dotfiles
 cd ~/dotfiles
 git fetch --depth 1 origin <full-40-character-sha>
 git checkout --detach FETCH_HEAD
 test "$(git rev-parse HEAD)" = "<full-40-character-sha>"
+# PR/main commits are not published releases, so provision Nix through the
+# trusted VM image or another independently verified method before this step.
 ./setup.sh --all
 ./tests/greenfield/validate.sh
 ```

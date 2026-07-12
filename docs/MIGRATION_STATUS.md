@@ -48,6 +48,15 @@ live symlinks into the source checkout, so the former README `git pull` path was
 unsafe: it could publish new bytes before current setup reached backup. The
 canonical v0.2.0 path is now side-by-side and exact-tag-only:
 
+- `setup.sh --all` and `setup.ps1 -All` are the sole normal user entrypoints.
+  They discover exact live v0.1.0 ownership, invoke the platform transaction,
+  resume an already-applied recovery at validation/acceptance, retain private
+  recovery evidence, and continue through full idempotent setup. POSIX setup
+  also invokes the checksum-reviewed Nix prerequisite helper when Nix is absent.
+  `--update` / `-Update` runs this complete reconciliation before its scoped
+  proven-owner dependency and Mason refresh; `--upgrade` / `-Upgrade` is an
+  alias.
+
 - `scripts/upgrade-v0.1.0.sh` handles Apple Silicon macOS, native Linux, and
   WSL guest state. It validates both official annotated releases, the target
   account/home, Nix, clean trees, and exact historical config before mutation;
@@ -65,8 +74,8 @@ canonical v0.2.0 path is now side-by-side and exact-tag-only:
   overlay state on rollback, and validates all three canonical Terminal paths
   before any restore write.
 - `scripts/install-nix-prerequisite.sh` installs only checksum-reviewed upstream
-  Nix 2.34.0 release archives and refuses non-release checkouts. No downloaded
-  bytes execute before the platform SHA-256 matches.
+  Nix 2.34.0 release archives and refuses non-release checkouts. Setup owns its
+  invocation; no downloaded bytes execute before the platform SHA-256 matches.
 - `tests/migration/v0_1_upgrade_test.sh` materializes the exact peeled v0.1.0
   commit, proves in-place/dirty paths fail before mutation, runs the real setup
   config/backup path, injects a failure after Home Manager/config publication,

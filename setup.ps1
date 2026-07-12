@@ -2,8 +2,9 @@
 #
 # Local usage (from a checked-out copy):
 #   .\setup.ps1                  interactive: dependency prompts, then config + sync
-#   .\setup.ps1 -All             non-interactive: install everything missing
-#   .\setup.ps1 -Update          update package-manager tools + Mason only
+#   .\setup.ps1 -All             non-interactive: install or migrate, then reconcile everything
+#   .\setup.ps1 -Update          reconcile the release, then refresh proven tools + Mason
+#   .\setup.ps1 -Upgrade         alias for -Update
 #   .\setup.ps1 -DryRun          preview every step
 #   .\setup.ps1 -SkipDeps        already have nvim/starship; just config+sync
 #   .\setup.ps1 -SkipBootstrap   back-compat alias: skip config apply
@@ -17,7 +18,7 @@
 #   .\setup.ps1 -MergeWindowsTerminal        (no-op alias; the WT rose-pine merge is now default-on)
 #
 # First run (no checkout yet):
-#   git clone https://github.com/luisgui1757/dotfiles.git "$env:USERPROFILE\dotfiles"
+#   git clone --branch v0.2.0 --single-branch https://github.com/luisgui1757/dotfiles.git "$env:USERPROFILE\dotfiles"
 #   Set-Location "$env:USERPROFILE\dotfiles"
 #   .\setup.ps1 -All
 #
@@ -27,7 +28,7 @@
 [CmdletBinding()]
 param(
     [switch]$All,
-    [switch]$Update,
+    [Alias('Upgrade')] [switch]$Update,
     [switch]$DryRun,
     [switch]$SkipDeps,
     [switch]$SkipBootstrap,
@@ -44,9 +45,13 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $RepoUrl        = 'https://github.com/luisgui1757/dotfiles.git'
+$ReleaseTag     = 'v0.2.0'
 $SentinelRepoUrl = 'https://github.com/luisgui1757/sentinel.git'
 $SentinelVersion = '0.1.2'
 $SentinelRef     = 'ecafffa858666343c1639f996d177f460163e93e'
+$V01Commit       = '015617362830280bf85c7142e69d0681d376d453'
+$V01TagObject    = 'a3b4d6d7b6d289959cac68d76faec96219b3e310'
+$script:CompletedV01Recovery = ''
 
 function Get-DefaultProfileRoot {
     if ($env:OS -eq 'Windows_NT') {
@@ -168,6 +173,217 @@ function Invoke-DependencyInstallerOrFail {
     }
 }
 
+function Get-ReleaseGitValue {
+    param(
+        [Parameter(Mandatory)] [string]$Checkout,
+        [Parameter(Mandatory)] [string[]]$Arguments,
+        [scriptblock]$Runner
+    )
+    if (-not $Runner) {
+        $Runner = {
+            param([string]$Path, [string[]]$GitArguments)
+            $git = (Get-Command git -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
+            $oldNativePreference = $null
+            $hasNativePreference = Test-Path Variable:PSNativeCommandUseErrorActionPreference
+            try {
+                if ($hasNativePreference) {
+                    $oldNativePreference = $PSNativeCommandUseErrorActionPreference
+                    $PSNativeCommandUseErrorActionPreference = $false
+                }
+                $global:LASTEXITCODE = 0
+                $output = @(& $git -C $Path `
+                        -c core.fsmonitor=false `
+                        -c core.untrackedCache=false `
+                        -c core.hooksPath=NUL @GitArguments 2>$null)
+                if ($LASTEXITCODE -ne 0) { return '' }
+                return [string]($output | Select-Object -First 1)
+            } finally {
+                if ($hasNativePreference) {
+                    $PSNativeCommandUseErrorActionPreference = $oldNativePreference
+                }
+                $global:LASTEXITCODE = 0
+            }
+        }
+    }
+    return [string](& $Runner $Checkout $Arguments)
+}
+
+function Test-ExactV01Checkout {
+    param(
+        [Parameter(Mandatory)] [string]$Path,
+        [scriptblock]$GitRunner
+    )
+    if (-not (Test-Path -LiteralPath $Path -PathType Container)) { return $false }
+    $item = Get-Item -LiteralPath $Path -Force
+    if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) { return $false }
+    $canonical = [IO.Path]::GetFullPath($item.FullName)
+    $head = Get-ReleaseGitValue -Checkout $canonical -Arguments @('rev-parse', '--verify', 'HEAD^{commit}') -Runner $GitRunner
+    $tag = Get-ReleaseGitValue -Checkout $canonical -Arguments @('rev-parse', '--verify', 'refs/tags/v0.1.0') -Runner $GitRunner
+    return ($head -eq $V01Commit -and $tag -eq $V01TagObject)
+}
+
+function Get-V01CheckoutFromLiveConfig {
+    param(
+        [Parameter(Mandatory)] [pscustomobject]$Identity,
+        [scriptblock]$GitRunner
+    )
+    $nvimPath = Join-Path $Identity.LocalApplicationData 'nvim'
+    if (-not (Test-Path -LiteralPath $nvimPath)) { return '' }
+    $item = Get-Item -LiteralPath $nvimPath -Force
+    if (-not ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) { return '' }
+    $target = @($item.Target) | Select-Object -First 1
+    if ([string]::IsNullOrWhiteSpace([string]$target)) { return '' }
+    $targetPath = [string]$target
+    if (-not [IO.Path]::IsPathFullyQualified($targetPath)) {
+        $targetPath = Join-Path (Split-Path -Parent $nvimPath) $targetPath
+    }
+    $candidate = [IO.Path]::GetFullPath((Split-Path -Parent $targetPath))
+    if (Test-ExactV01Checkout -Path $candidate -GitRunner $GitRunner) {
+        return $candidate
+    }
+    return ''
+}
+
+function Read-SetupRecoveryScalar {
+    param([Parameter(Mandatory)] [string]$Path)
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { throw "recovery file is missing: $Path" }
+    $item = Get-Item -LiteralPath $Path -Force
+    if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw "recovery file is unsafe: $Path" }
+    $raw = [IO.File]::ReadAllText($item.FullName)
+    if ($raw -notmatch '\A[^\r\n]+\r?\n\z') {
+        throw "recovery scalar is malformed: $Path"
+    }
+    return $raw.TrimEnd("`r", "`n")
+}
+
+function Get-PendingV01Recovery {
+    param(
+        [Parameter(Mandatory)] [pscustomobject]$Identity,
+        [string]$CurrentCheckout = $ScriptDir
+    )
+    $root = Join-Path (Join-Path $Identity.LocalApplicationData 'dotfiles') 'migrations'
+    if (-not (Test-Path -LiteralPath $root -PathType Container)) { return $null }
+    $active = @()
+    $rolledBack = @()
+    foreach ($directory in @(Get-ChildItem -LiteralPath $root -Force -Filter 'v0.1.0-to-v0.2.0.*' -ErrorAction SilentlyContinue)) {
+        if (-not $directory.PSIsContainer -or ($directory.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+            throw "migration recovery path is not a real directory: $($directory.FullName)"
+        }
+        try {
+            $stage = Read-SetupRecoveryScalar -Path (Join-Path $directory.FullName 'stage')
+            $newCheckout = Read-SetupRecoveryScalar -Path (Join-Path $directory.FullName 'new-checkout')
+            $oldCheckout = Read-SetupRecoveryScalar -Path (Join-Path $directory.FullName 'old-checkout')
+        } catch {
+            throw "migration recovery identity is incomplete or unsafe: $($directory.FullName): $($_.Exception.Message)"
+        }
+        if ([IO.Path]::GetFullPath($newCheckout) -ine [IO.Path]::GetFullPath($CurrentCheckout)) { continue }
+        $record = [pscustomobject]@{
+            Recovery = $directory.FullName
+            Stage = $stage
+            OldCheckout = $oldCheckout
+        }
+        if ($stage -in @('prepared', 'applying', 'applied', 'rolling-back', 'recovery-required')) {
+            $active += $record
+        } elseif ($stage -eq 'rolled-back') {
+            $rolledBack += $record
+        } elseif ($stage -ne 'accepted') {
+            throw "migration recovery stage is invalid: $($directory.FullName) ($stage)"
+        }
+    }
+    if ($active.Count -gt 1) {
+        throw "multiple unfinished v0.1.0 migrations target this checkout: $($active.Recovery -join ', ')"
+    }
+    if ($active.Count -eq 1) { return $active[0] }
+    $oldPaths = @($rolledBack.OldCheckout | Sort-Object -Unique)
+    if ($oldPaths.Count -gt 1) {
+        throw 'rolled-back migrations disagree about the v0.1.0 checkout'
+    }
+    if ($oldPaths.Count -eq 1) {
+        return [pscustomobject]@{ Recovery = ''; Stage = 'rolled-back'; OldCheckout = $oldPaths[0] }
+    }
+    return $null
+}
+
+function Invoke-SetupV01Migration {
+    param(
+        [Parameter(Mandatory)] [pscustomobject]$Identity,
+        [bool]$AllMode = $All,
+        [bool]$IsDryRun = $DryRun,
+        [scriptblock]$MigrationRunner,
+        [scriptblock]$GitRunner,
+        [scriptblock]$Prompt = { (Read-Host 'Migrate the detected v0.1.0 installation and continue? [Y/n]') -notmatch '^(?:n|no)$' }
+    )
+    if ($env:DOTFILES_RELEASE_MIGRATION_ACTIVE) { return }
+    if ($SkipDeps) { return }
+    $upgradeScript = Join-Path $ScriptDir 'scripts\upgrade-v0.1.0.ps1'
+    if (-not $MigrationRunner) {
+        $MigrationRunner = {
+            param([string]$Mode, [string]$Argument)
+            $oldMarker = $env:DOTFILES_RELEASE_MIGRATION_ACTIVE
+            try {
+                $env:DOTFILES_RELEASE_MIGRATION_ACTIVE = '1'
+                if ($Mode -eq 'Apply') {
+                    & $upgradeScript -Apply -OldCheckout $Argument 6>&1
+                } elseif ($Mode -eq 'Accept') {
+                    & $upgradeScript -Accept $Argument 6>&1
+                } else {
+                    throw "unsupported setup migration mode: $Mode"
+                }
+            } finally {
+                if ($null -eq $oldMarker) {
+                    Remove-Item Env:DOTFILES_RELEASE_MIGRATION_ACTIVE -ErrorAction SilentlyContinue
+                } else {
+                    $env:DOTFILES_RELEASE_MIGRATION_ACTIVE = $oldMarker
+                }
+            }
+        }
+    }
+
+    $pending = Get-PendingV01Recovery -Identity $Identity
+    if ($pending -and $pending.Stage -eq 'applied') {
+        if ($IsDryRun) {
+            Write-Host "  would: verify and accept the pending v0.1.0 migration at $($pending.Recovery)"
+            return
+        }
+        @(& $MigrationRunner 'Accept' $pending.Recovery) | ForEach-Object { Write-Host ([string]$_) }
+        $script:CompletedV01Recovery = $pending.Recovery
+        return
+    }
+    if ($pending -and $pending.Stage -in @('prepared', 'applying', 'rolling-back', 'recovery-required')) {
+        throw "unfinished v0.1.0 migration requires recovery first: pwsh -NoProfile -File `"$(Join-Path $pending.Recovery 'upgrade-v0.1.0.ps1')`" -Rollback `"$($pending.Recovery)`""
+    }
+
+    $oldCheckout = if ($env:DOTFILES_V0_1_CHECKOUT) {
+        if (-not (Test-ExactV01Checkout -Path $env:DOTFILES_V0_1_CHECKOUT -GitRunner $GitRunner)) {
+            throw "DOTFILES_V0_1_CHECKOUT is not the exact v0.1.0 checkout: $env:DOTFILES_V0_1_CHECKOUT"
+        }
+        [IO.Path]::GetFullPath($env:DOTFILES_V0_1_CHECKOUT)
+    } elseif ($pending -and $pending.Stage -eq 'rolled-back') {
+        $pending.OldCheckout
+    } else {
+        Get-V01CheckoutFromLiveConfig -Identity $Identity -GitRunner $GitRunner
+    }
+    if ([string]::IsNullOrWhiteSpace($oldCheckout)) { return }
+    if ($IsDryRun) {
+        Write-Host "  would: transactionally migrate exact v0.1.0 state from $oldCheckout"
+        return
+    }
+    if (-not $AllMode -and -not (& $Prompt)) {
+        throw "v0.1.0 was retained unchanged at $oldCheckout"
+    }
+    $output = @(& $MigrationRunner 'Apply' $oldCheckout)
+    $output | ForEach-Object { Write-Host ([string]$_) }
+    $recoveryLines = @($output | ForEach-Object { [string]$_ } | Where-Object { $_ -match '^Recovery directory: ' })
+    if ($recoveryLines.Count -ne 1) { throw 'migration succeeded without one recovery identity' }
+    $recovery = $recoveryLines[0].Substring('Recovery directory: '.Length)
+    if (-not (Test-Path -LiteralPath $recovery -PathType Container)) {
+        throw "migration recovery directory is missing: $recovery"
+    }
+    @(& $MigrationRunner 'Accept' $recovery) | ForEach-Object { Write-Host ([string]$_) }
+    $script:CompletedV01Recovery = $recovery
+    Write-Host "  accepted  verified v0.1.0 core migration; recovery retained at $recovery"
+}
+
 function Get-VsWherePath {
     $programFilesX86 = ${env:ProgramFiles(x86)}
     if ([string]::IsNullOrWhiteSpace($programFilesX86)) { return '' }
@@ -256,6 +472,10 @@ if ((-not [Environment]::UserInteractive -or $inputRedirected -or $outputRedirec
     $All = $true
     $PSBoundParameters['All'] = $true
 }
+if ($Update) {
+    $All = $true
+    $PSBoundParameters['All'] = $true
+}
 
 # ---- Locate the repo ---------------------------------------------------------
 # Piped/remote setup is intentionally disabled. Running from stdin would execute
@@ -270,13 +490,13 @@ if (-not $ScriptDir -or -not (Test-Path (Join-Path $ScriptDir 'home'))) {
     if ($DryRun) {
         Write-Host "setup.ps1: no local checkout was detected; remote/piped setup is disabled."
         Write-Host "  Clone first, then run setup locally:"
-        Write-Host "    git clone $RepoUrl `"$dest`""
+        Write-Host "    git clone --branch $ReleaseTag --single-branch $RepoUrl `"$dest`""
         Write-Host "    Set-Location `"$dest`""
         Write-Host "    .\setup.ps1 -All"
         Write-Host "(dry run -- no clone, no install, no writes performed)"
     }
     Write-Error "setup.ps1 must be run from a local clone. Remote/piped clone-and-reinvoke setup is disabled because it would execute mutable default-branch code."
-    Write-Error "Clone first, then run setup locally: git clone $RepoUrl `"$dest`"; Set-Location `"$dest`"; .\setup.ps1 -All"
+    Write-Error "Clone first, then run setup locally: git clone --branch $ReleaseTag --single-branch $RepoUrl `"$dest`"; Set-Location `"$dest`"; .\setup.ps1 -All"
     exit 1
 }
 
@@ -295,7 +515,6 @@ if (-not (Test-Path -LiteralPath $WindowsTerminalTargetsLibrary -PathType Leaf))
 # invoked install-deps.ps1 with -All in CI.
 $depsArgs = @{}
 if ($All)    { $depsArgs['All']    = $true }
-if ($Update) { $depsArgs['Update'] = $true }
 if ($DryRun) { $depsArgs['DryRun'] = $true }
 
 # WT settings merge is now a DEFAULT config step (opt-out, not opt-in).
@@ -1899,7 +2118,7 @@ function Invoke-SetupUpdateMode {
     }
 
     Write-Host ""
-    Write-Host 'Plugins (lazy-lock.json), pinned binaries, and configs update through a reviewed release migration; `:Lazy update` re-pins plugins (a repo change).'
+    Write-Host 'The checked-out release, pinned plugins, configs, and missing tools were reconciled before this scoped refresh.'
     Write-Host ""
     Write-Host "================================================================"
     Write-Host "==  setup.ps1: update done"
@@ -1914,11 +2133,7 @@ if ($env:DOTFILES_SETUP_PS1_SOURCE_ONLY) { return }
 $script:WindowsIdentity = Resolve-WindowsTargetIdentity
 $script:ChezmoiBaseArgs = @('--source', $HomeSource, '--destination', $script:WindowsIdentity.UserProfile)
 Stop-NvimSelfLinkIfNeeded
-
-if ($Update) {
-    Invoke-SetupUpdateMode
-    exit 0
-}
+Invoke-SetupV01Migration -Identity $script:WindowsIdentity
 
 # ---- Phase 1: dependencies ---------------------------------------------------
 if (-not $SkipDeps) {
@@ -1958,6 +2173,10 @@ Invoke-NvimSyncPhases
 
 Invoke-SentinelAgentPolicy
 
+if ($Update) {
+    Invoke-SetupUpdateMode
+}
+
 # ---- Summary -----------------------------------------------------------------
 Write-Host ""
 Write-Host "================================================================"
@@ -1965,6 +2184,10 @@ Write-Host "==  setup.ps1: done"
 Write-Host "================================================================"
 Write-Host ""
 Write-Host "Repo:    $ScriptDir"
+if (-not [string]::IsNullOrWhiteSpace($script:CompletedV01Recovery)) {
+    Write-Host "Upgrade: v0.1.0 migrated and verified; recovery retained at"
+    Write-Host "         $($script:CompletedV01Recovery)"
+}
 Write-Host "Try it:  nvim  (then <Space>fg for live grep, :wnf to save w/o format)"
 Write-Host ""
 Write-Host "Note:    open a NEW PowerShell window so starship + newly-installed"

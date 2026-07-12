@@ -3,8 +3,9 @@
 #
 # Local usage (from a checked-out copy):
 #   ./setup.sh                     interactive: dependency prompts, then config + sync
-#   ./setup.sh --all               non-interactive: apply Nix package layer, then install everything missing
-#   ./setup.sh --update            update proven dependency tools/artifacts + Mason only
+#   ./setup.sh --all               non-interactive: install or migrate, then reconcile everything
+#   ./setup.sh --update            reconcile the release, then refresh proven tools + Mason
+#   ./setup.sh --upgrade           alias for --update
 #   ./setup.sh --dry-run           preview every step
 #   ./setup.sh --skip-deps         already provisioned; skip Nix + native deps
 #   ./setup.sh --skip-native-deps  keep Nix activation; skip native/deferred deps
@@ -18,7 +19,7 @@
 #                                  WSL opt-in: install/link Linux GUI terminal bits
 #
 # First run (no checkout yet):
-#   git clone https://github.com/luisgui1757/dotfiles.git "${DOTFILES_DEST:-$HOME/dotfiles}"
+#   git clone --branch v0.2.0 --single-branch https://github.com/luisgui1757/dotfiles.git "${DOTFILES_DEST:-$HOME/dotfiles}"
 #   cd "${DOTFILES_DEST:-$HOME/dotfiles}"
 #   ./setup.sh --all
 #
@@ -28,6 +29,7 @@
 set -euo pipefail
 
 REPO_URL="https://github.com/luisgui1757/dotfiles.git"
+RELEASE_TAG="v0.2.0"
 DEFAULT_DEST="$HOME/dotfiles"
 
 ALL=0
@@ -51,14 +53,22 @@ SENTINEL_REPO_URL="https://github.com/luisgui1757/sentinel.git"
 SENTINEL_VERSION="0.1.2"
 SENTINEL_REF="ecafffa858666343c1639f996d177f460163e93e"
 SENTINEL_CACHE_ROOT="$HOME/.local/share/dotfiles/sentinel"
+V0_1_COMMIT="015617362830280bf85c7142e69d0681d376d453"
+V0_1_TAG_OBJECT="a3b4d6d7b6d289959cac68d76faec96219b3e310"
+V0_1_RECOVERY_PATH=""
+V0_1_RECOVERY_STAGE=""
+V0_1_RECOVERY_OLD_CHECKOUT=""
+COMPLETED_V0_1_RECOVERY=""
+NIX_PREREQUISITE_DRY_RUN_PLANNED=0
 usage() {
     cat <<'EOF'
 setup.sh -- one-shot end-to-end install for macOS / Linux / WSL.
 
 Local usage:
   ./setup.sh                     interactive: dependency prompts, then config + sync
-  ./setup.sh --all               non-interactive: apply Nix package layer, then install everything missing
-  ./setup.sh --update            update proven dependency tools/artifacts + Mason only
+  ./setup.sh --all               non-interactive: install or migrate, then reconcile everything
+  ./setup.sh --update            reconcile the release, then refresh proven tools + Mason
+  ./setup.sh --upgrade           alias for --update
   ./setup.sh --dry-run           preview every step
   ./setup.sh --skip-deps         already provisioned; skip Nix + native deps
   ./setup.sh --skip-native-deps  apply Nix/config but skip native/deferred deps
@@ -75,7 +85,7 @@ Local usage:
   ./setup.sh --home-manager      compatibility alias; Linux/WSL setup applies Home Manager by default
 
 First run:
-  git clone https://github.com/luisgui1757/dotfiles.git "${DOTFILES_DEST:-$HOME/dotfiles}"
+  git clone --branch v0.2.0 --single-branch https://github.com/luisgui1757/dotfiles.git "${DOTFILES_DEST:-$HOME/dotfiles}"
   cd "${DOTFILES_DEST:-$HOME/dotfiles}"
   ./setup.sh --all
 EOF
@@ -85,7 +95,8 @@ for arg in "$@"; do
     case "$arg" in
         --all|-y)         ALL=1 ;;
         --dry-run)        DRY_RUN=1 ;;
-        --update)         UPDATE_MODE=1 ;;
+        --update|--upgrade)
+                          UPDATE_MODE=1; ALL=1 ;;
         --skip-deps)      SKIP_DEPS=1 ;;
         --skip-native-deps)
                           SKIP_NATIVE_DEPS=1 ;;
@@ -126,14 +137,14 @@ if [[ -z "$SCRIPT_DIR" ]] || [[ ! -d "$SCRIPT_DIR/home" ]]; then
     if [[ "$DRY_RUN" -eq 1 ]]; then
         echo "setup.sh: no local checkout was detected; remote/piped setup is disabled."
         echo "  Clone first, then run setup locally:"
-        echo "    git clone $REPO_URL \"$DEST\""
+        echo "    git clone --branch $RELEASE_TAG --single-branch $REPO_URL \"$DEST\""
         echo "    cd \"$DEST\""
         echo "    ./setup.sh --all"
         echo "(dry run -- no clone, no install, no writes performed)"
     fi
     echo "setup.sh must be run from a local clone. Remote/piped clone-and-reinvoke setup is disabled because it would execute mutable default-branch code." >&2
     echo "Clone first, then run setup locally:" >&2
-    echo "  git clone $REPO_URL \"$DEST\"" >&2
+    echo "  git clone --branch $RELEASE_TAG --single-branch $REPO_URL \"$DEST\"" >&2
     echo "  cd \"$DEST\"" >&2
     echo "  ./setup.sh --all" >&2
     exit 1
@@ -144,7 +155,6 @@ cd "$SCRIPT_DIR"
 # ---- Forward flags to sub-scripts --------------------------------------------
 DEPS_FLAGS=()
 [[ "$ALL" -eq 1 ]]      && DEPS_FLAGS+=(--all)
-[[ "$UPDATE_MODE" -eq 1 ]] && DEPS_FLAGS+=(--update)
 [[ "$DRY_RUN" -eq 1 ]]  && DEPS_FLAGS+=(--dry-run)
 [[ "$EXPERIMENTAL_WSL_GUI" -eq 1 ]] && DEPS_FLAGS+=(--experimental-wsl-gui)
 
@@ -174,6 +184,262 @@ normalize_machine_arch() {
         x86_64 | amd64) printf '%s\n' x86_64 ;;
         *) return 1 ;;
     esac
+}
+
+release_git() {
+    local checkout="$1"
+    shift
+    GIT_CONFIG_NOSYSTEM=1 \
+    GIT_CONFIG_SYSTEM=/dev/null \
+    GIT_CONFIG_GLOBAL=/dev/null \
+    GIT_CONFIG_COUNT=0 \
+    GIT_CONFIG_PARAMETERS='' \
+    GIT_TEMPLATE_DIR='' \
+        git -C "$checkout" \
+        -c core.fsmonitor=false \
+        -c core.untrackedCache=false \
+        -c core.hooksPath=/dev/null \
+        -c init.templateDir= \
+        "$@"
+}
+
+activate_nix_profile() {
+    local profile
+    command -v nix >/dev/null 2>&1 && return 0
+    for profile in \
+        /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh \
+        "$HOME/.nix-profile/etc/profile.d/nix.sh"; do
+        if [[ -f "$profile" ]]; then
+            # Both paths are fixed outputs of the verified upstream installer.
+            # shellcheck disable=SC1090
+            source "$profile"
+            command -v nix >/dev/null 2>&1 && return 0
+        fi
+    done
+    return 1
+}
+
+ensure_nix_prerequisite() {
+    local helper="$SCRIPT_DIR/scripts/install-nix-prerequisite.sh"
+    [[ "$SKIP_DEPS" -eq 0 ]] || return 0
+    if activate_nix_profile; then
+        nix --version >/dev/null
+        nix store ping >/dev/null
+        return 0
+    fi
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        NIX_PREREQUISITE_DRY_RUN_PLANNED=1
+        echo "  would: install and verify the release-pinned Nix prerequisite"
+        return 0
+    fi
+    [[ -f "$helper" && ! -L "$helper" && -x "$helper" ]] || {
+        echo "  FAIL: verified Nix prerequisite helper is missing or unsafe: $helper" >&2
+        return 1
+    }
+    if [[ "$ALL" -eq 0 && -t 0 ]] &&
+        ! ask_yes_no_default_yes "Install the required verified Nix prerequisite?"; then
+        echo "  FAIL: setup requires Nix on macOS/Linux/WSL." >&2
+        return 1
+    fi
+    "$helper" --install
+    activate_nix_profile || {
+        echo "  FAIL: Nix installation returned success but setup cannot activate it." >&2
+        return 1
+    }
+    nix --version >/dev/null
+    nix store ping >/dev/null
+    echo "  ok        Nix prerequisite installed and active"
+}
+
+canonical_checkout_directory() {
+    local path="$1"
+    [[ -d "$path" && ! -L "$path" ]] || return 1
+    (cd "$path" && pwd -P)
+}
+
+exact_v0_1_checkout() {
+    local candidate="$1" head tag_object
+    candidate="$(canonical_checkout_directory "$candidate" 2>/dev/null)" || return 1
+    head="$(release_git "$candidate" rev-parse --verify 'HEAD^{commit}' 2>/dev/null || true)"
+    tag_object="$(release_git "$candidate" rev-parse --verify refs/tags/v0.1.0 2>/dev/null || true)"
+    [[ "$head" == "$V0_1_COMMIT" && "$tag_object" == "$V0_1_TAG_OBJECT" ]]
+}
+
+symlink_target_absolute() {
+    local link="$1" target parent
+    [[ -L "$link" ]] || return 1
+    target="$(readlink "$link")" || return 1
+    if [[ "$target" == /* ]]; then
+        printf '%s\n' "$target"
+        return 0
+    fi
+    parent="$(cd "$(dirname "$link")" && pwd -P)" || return 1
+    printf '%s/%s\n' "$parent" "$target"
+}
+
+v0_1_candidate_from_live_config() {
+    local target parent candidate
+    if target="$(symlink_target_absolute "$HOME/.config/nvim" 2>/dev/null)" &&
+        [[ -d "$target" ]]; then
+        candidate="$(dirname "$(cd "$target" && pwd -P)")"
+        exact_v0_1_checkout "$candidate" && {
+            canonical_checkout_directory "$candidate"
+            return 0
+        }
+    fi
+    if target="$(symlink_target_absolute "$HOME/.zshrc" 2>/dev/null)" &&
+        [[ -e "$target" ]]; then
+        parent="$(cd "$(dirname "$target")" && pwd -P)"
+        if [[ "$(basename "$parent")" == home ]]; then
+            candidate="$(dirname "$parent")"
+            exact_v0_1_checkout "$candidate" && {
+                canonical_checkout_directory "$candidate"
+                return 0
+            }
+        fi
+    fi
+    return 1
+}
+
+read_setup_recovery_scalar() {
+    local file="$1"
+    [[ -f "$file" && ! -L "$file" ]] || return 1
+    python3 -c '
+import pathlib, sys
+raw = pathlib.Path(sys.argv[1]).read_bytes()
+if (not raw.endswith(b"\n") or raw.count(b"\n") != 1 or b"\r" in raw
+        or b"\0" in raw or len(raw) == 1):
+    raise SystemExit(1)
+sys.stdout.buffer.write(raw[:-1])
+' "$file"
+}
+
+load_pending_v0_1_recovery() {
+    local root directory stage new_checkout old_checkout
+    local -a active=() rolled_back=()
+    V0_1_RECOVERY_PATH=""
+    V0_1_RECOVERY_STAGE=""
+    V0_1_RECOVERY_OLD_CHECKOUT=""
+    root="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/migrations"
+    [[ -d "$root" && ! -L "$root" ]] || return 0
+    while IFS= read -r -d '' directory; do
+        [[ -d "$directory" && ! -L "$directory" ]] || {
+            echo "  FAIL: migration recovery path is not a real directory: $directory" >&2
+            return 1
+        }
+        if ! stage="$(read_setup_recovery_scalar "$directory/stage")" ||
+            ! new_checkout="$(read_setup_recovery_scalar "$directory/new-checkout")" ||
+            ! old_checkout="$(read_setup_recovery_scalar "$directory/old-checkout")"; then
+            echo "  FAIL: migration recovery identity is incomplete or unsafe: $directory" >&2
+            return 1
+        fi
+        [[ "$new_checkout" == "$SCRIPT_DIR" ]] || continue
+        case "$stage" in
+            prepared|applying|applied|rolling-back|recovery-required)
+                active+=("$directory")
+                ;;
+            rolled-back)
+                rolled_back+=("$old_checkout")
+                ;;
+            accepted)
+                ;;
+            *)
+                echo "  FAIL: migration recovery stage is invalid: $directory ($stage)" >&2
+                return 1
+                ;;
+        esac
+    done < <(find "$root" -mindepth 1 -maxdepth 1 \
+        -name 'v0.1.0-to-v0.2.0.*' -print0)
+    if [[ "${#active[@]}" -gt 1 ]]; then
+        echo "  FAIL: multiple unfinished v0.1.0 migrations target this checkout." >&2
+        printf '        %s\n' "${active[@]}" >&2
+        return 1
+    fi
+    if [[ "${#active[@]}" -eq 1 ]]; then
+        V0_1_RECOVERY_PATH="${active[0]}"
+        V0_1_RECOVERY_STAGE="$(read_setup_recovery_scalar "$V0_1_RECOVERY_PATH/stage")"
+        V0_1_RECOVERY_OLD_CHECKOUT="$(read_setup_recovery_scalar "$V0_1_RECOVERY_PATH/old-checkout")"
+        return 0
+    fi
+    if [[ "${#rolled_back[@]}" -gt 0 ]]; then
+        local unique=""
+        for old_checkout in "${rolled_back[@]}"; do
+            if [[ -z "$unique" ]]; then
+                unique="$old_checkout"
+            elif [[ "$unique" != "$old_checkout" ]]; then
+                echo "  FAIL: rolled-back migrations disagree about the v0.1.0 checkout." >&2
+                return 1
+            fi
+        done
+        V0_1_RECOVERY_STAGE="rolled-back"
+        V0_1_RECOVERY_OLD_CHECKOUT="$unique"
+    fi
+}
+
+run_v0_1_migrator() {
+    local mode="$1" argument="$2"
+    DOTFILES_RELEASE_MIGRATION_ACTIVE=1 \
+        "$SCRIPT_DIR/scripts/upgrade-v0.1.0.sh" "$mode" "$argument"
+}
+
+maybe_complete_v0_1_upgrade() {
+    local old_checkout="" output recovery count
+    [[ -z "${DOTFILES_RELEASE_MIGRATION_ACTIVE:-}" ]] || return 0
+    [[ "$SKIP_DEPS" -eq 0 ]] || return 0
+    load_pending_v0_1_recovery || return 1
+    case "$V0_1_RECOVERY_STAGE" in
+        applied)
+            if [[ "$DRY_RUN" -eq 1 ]]; then
+                echo "  would: verify and accept the pending v0.1.0 migration at $V0_1_RECOVERY_PATH"
+                return 0
+            fi
+            run_v0_1_migrator --accept "$V0_1_RECOVERY_PATH"
+            COMPLETED_V0_1_RECOVERY="$V0_1_RECOVERY_PATH"
+            return 0
+            ;;
+        prepared|applying|rolling-back|recovery-required)
+            echo "  FAIL: unfinished v0.1.0 migration requires recovery first: $V0_1_RECOVERY_PATH" >&2
+            echo "        $V0_1_RECOVERY_PATH/upgrade-v0.1.0.sh --rollback '$V0_1_RECOVERY_PATH'" >&2
+            return 1
+            ;;
+        rolled-back)
+            old_checkout="$V0_1_RECOVERY_OLD_CHECKOUT"
+            ;;
+    esac
+    if [[ -n "${DOTFILES_V0_1_CHECKOUT:-}" ]]; then
+        exact_v0_1_checkout "$DOTFILES_V0_1_CHECKOUT" || {
+            echo "  FAIL: DOTFILES_V0_1_CHECKOUT is not the exact v0.1.0 checkout: $DOTFILES_V0_1_CHECKOUT" >&2
+            return 1
+        }
+        old_checkout="$(canonical_checkout_directory "$DOTFILES_V0_1_CHECKOUT")"
+    elif [[ -z "$old_checkout" ]]; then
+        old_checkout="$(v0_1_candidate_from_live_config 2>/dev/null || true)"
+    fi
+    [[ -n "$old_checkout" ]] || return 0
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        echo "  would: transactionally migrate exact v0.1.0 state from $old_checkout"
+        return 0
+    fi
+    if [[ "$ALL" -eq 0 && -t 0 ]] &&
+        ! ask_yes_no_default_yes "Migrate the detected v0.1.0 installation and continue?"; then
+        echo "  retained  v0.1.0 unchanged at $old_checkout"
+        return 1
+    fi
+    output="$(run_v0_1_migrator --apply "$old_checkout" 2>&1)" || {
+        local rc=$?
+        printf '%s\n' "$output" >&2
+        return "$rc"
+    }
+    printf '%s\n' "$output"
+    recovery="$(printf '%s\n' "$output" | awk -F': ' '/^Recovery directory:/ { print $2 }')"
+    count="$(printf '%s\n' "$output" | grep -c '^Recovery directory:' || true)"
+    [[ "$count" -eq 1 && -n "$recovery" && -d "$recovery" && ! -L "$recovery" ]] || {
+        echo "  FAIL: migration succeeded without one valid recovery identity." >&2
+        return 1
+    }
+    run_v0_1_migrator --accept "$recovery"
+    COMPLETED_V0_1_RECOVERY="$recovery"
+    echo "  accepted  verified v0.1.0 core migration; recovery retained at $recovery"
 }
 
 account_home_directory() {
@@ -633,9 +899,13 @@ cleanup_chezmoi_dry_config() {
 }
 
 run_update_mode() {
+    local update_flags=(--update)
+    if [[ "${#DEPS_FLAGS[@]}" -gt 0 ]]; then
+        update_flags=("${DEPS_FLAGS[@]}" --update)
+    fi
     if [[ "$SKIP_DEPS" -eq 0 && "$SKIP_NATIVE_DEPS" -eq 0 ]]; then
-        phase "Update 1/2: update proven dependency tools and artifacts"
-        bash "$SCRIPT_DIR/install-deps.sh" ${DEPS_FLAGS[@]+"${DEPS_FLAGS[@]}"}
+        phase "Update 1/2: refresh proven dependency tools and artifacts"
+        bash "$SCRIPT_DIR/install-deps.sh" "${update_flags[@]}"
     else
         echo
         echo "skipped: update dependency phase via --skip-deps/--skip-native-deps"
@@ -658,7 +928,7 @@ run_update_mode() {
     fi
 
     echo
-    echo "Plugins (lazy-lock.json), pinned binaries, and configs update through a reviewed release migration; \`:Lazy update\` re-pins plugins (a repo change)."
+    echo "The checked-out release, pinned plugins, configs, Nix layer, and missing tools were reconciled before this scoped refresh."
     echo
     echo "================================================================"
     echo "==  setup.sh: update done"
@@ -1043,6 +1313,10 @@ run_nix_darwin_switch() {
     config_name="dotfiles-aarch64"
     if ! command -v nix >/dev/null 2>&1; then
         if [[ "$DRY_RUN" -eq 1 ]]; then
+            if [[ "$NIX_PREREQUISITE_DRY_RUN_PLANNED" -eq 1 ]]; then
+                echo "  would: activate locked nix-darwin after setup installs the verified Nix prerequisite"
+                return 0
+            fi
             echo "  would fail: Nix is required for macOS setup. Install Nix first"
             echo "              (for example, the notarized Determinate installer)."
             return 0
@@ -1145,6 +1419,10 @@ run_home_manager_switch() {
     phase "Required POSIX package layer: apply Home Manager packages (Linux/WSL)"
     if ! command -v nix >/dev/null 2>&1; then
         if [[ "$DRY_RUN" -eq 1 ]]; then
+            if [[ "$NIX_PREREQUISITE_DRY_RUN_PLANNED" -eq 1 ]]; then
+                echo "  would: activate locked Home Manager after setup installs the verified Nix prerequisite"
+                return 0
+            fi
             echo "  would fail: Nix is required for Linux/WSL setup. Install Nix first."
             return 0
         fi
@@ -1202,16 +1480,13 @@ run_home_manager_switch() {
 if [[ -z "${DOTFILES_SETUP_SOURCE_ONLY:-}" ]]; then
     resolve_target_identity
     refuse_nvim_self_link_if_needed
+    ensure_nix_prerequisite
+    maybe_complete_v0_1_upgrade
 fi
 if [[ -n "${DOTFILES_SETUP_SOURCE_ONLY:-}" ]]; then
     DOTFILES_SETUP_SOURCE_ONLY_ACTIVE=1
     # shellcheck disable=SC2317  # the exit is reached only when executed, not sourced
     return 0 2>/dev/null || exit 0
-fi
-
-if [[ "$UPDATE_MODE" -eq 1 ]]; then
-    run_update_mode
-    exit 0
 fi
 
 # ---- Required POSIX package layer --------------------------------------------
@@ -1304,6 +1579,10 @@ fi
 
 run_sentinel_agent_policy
 
+if [[ "$UPDATE_MODE" -eq 1 ]]; then
+    run_update_mode
+fi
+
 # ---- Summary -----------------------------------------------------------------
 echo
 echo "================================================================"
@@ -1311,6 +1590,10 @@ echo "==  setup.sh: done"
 echo "================================================================"
 echo
 echo "Repo:    $SCRIPT_DIR"
+if [[ -n "$COMPLETED_V0_1_RECOVERY" ]]; then
+    echo "Upgrade: v0.1.0 migrated and verified; recovery retained at"
+    echo "         $COMPLETED_V0_1_RECOVERY"
+fi
 if [[ "$DRY_RUN" -eq 0 ]]; then
     echo
     echo "IMPORTANT: open a NEW terminal before using the tools. This shell predates"

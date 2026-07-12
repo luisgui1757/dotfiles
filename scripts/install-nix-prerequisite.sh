@@ -179,4 +179,4 @@ command -v nix >/dev/null 2>&1 || {
 }
 nix --version
 nix store ping >/dev/null
-echo "Nix prerequisite installed and verified. Open a new shell before migration preflight."
+echo "Nix prerequisite installed and verified; setup may continue in this shell."

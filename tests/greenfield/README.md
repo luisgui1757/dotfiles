@@ -6,10 +6,13 @@ container path. These harnesses are for reproducing those installs locally and
 for desktop checks CI cannot see, especially Windows Terminal, fonts, ConPTY,
 and VS Code rendering.
 
-For macOS, Linux, and WSL greenfield runs, install Nix on the guest before
-running `setup.sh --all`. The public POSIX setup path now applies nix-darwin /
-Home Manager first and fails closed when `nix` is missing; these harnesses do
-not bootstrap Nix with a remote script.
+For macOS, Linux, and WSL greenfield runs, invoke `setup.sh --all` directly
+from the exact release checkout. The public POSIX setup path installs the
+release-pinned, checksum-verified Nix prerequisite when it is missing, then
+applies nix-darwin / Home Manager. It never uses a remote script pipeline.
+Pre-release PR/main validation is different: because the prerequisite helper
+correctly rejects an untagged commit, provision Nix through the trusted VM
+image or another separately verified host method before testing that commit.
 
 Do not add these VM or desktop launchers to the CI matrix. They need an
 interactive desktop or local virtualization and can hang or fail headless. The
