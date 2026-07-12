@@ -387,6 +387,18 @@ grep -F "no local snapshot or live state changed" <<<"$output" >/dev/null
 [[ ! -e "$fixture/.git/dotfiles-safeguards" ]] || { echo "FAIL: preflight-only created a recovery snapshot" >&2; exit 1; }
 echo "ok  : exact legacy live posture and provenance pass without mutation"
 
+state="$(new_case_state omitted-disabled-classic-sections)"
+jq 'del(.required_pull_request_reviews, .restrictions)' \
+    "$state/classic.json" > "$state/classic.tmp"
+mv "$state/classic.tmp" "$state/classic.json"
+output="$(run_safeguards "$state" "$mutation_log" --preflight-only)"
+grep -F "no local snapshot or live state changed" <<<"$output" >/dev/null
+[[ ! -s "$mutation_log" ]] || {
+    echo "FAIL: omitted disabled classic sections caused preflight mutation" >&2
+    exit 1
+}
+echo "ok  : GitHub-omitted disabled review and restriction sections normalize to null"
+
 git -C "$fixture" switch -qc topic
 state="$(new_case_state wrong-branch)"
 expect_failure "requires the checked-out local branch to be main" \
@@ -613,8 +625,6 @@ echo "ok  : restore derives legacy and stable policy only from the manifest comm
 for missing_classic_key in \
     required_status_checks \
     enforce_admins \
-    required_pull_request_reviews \
-    restrictions \
     required_linear_history \
     allow_force_pushes \
     allow_deletions \
@@ -632,6 +642,18 @@ for missing_classic_key in \
         "$incomplete_classic_snapshot/classic-live.json"
     expect_restore_rejected_without_mutation \
         "schema or payload validation failed" "$state" "$incomplete_classic_snapshot"
+done
+
+for enabled_classic_key in required_pull_request_reviews restrictions; do
+    enabled_classic_snapshot="$WORK/enabled-classic-${enabled_classic_key}-snapshot"
+    cp -R "$snapshot" "$enabled_classic_snapshot"
+    jq --arg key "$enabled_classic_key" '.[$key] = {enabled: true}' \
+        "$enabled_classic_snapshot/classic-live.json" \
+        > "$enabled_classic_snapshot/classic-live.tmp"
+    mv "$enabled_classic_snapshot/classic-live.tmp" \
+        "$enabled_classic_snapshot/classic-live.json"
+    expect_restore_rejected_without_mutation \
+        "schema or payload validation failed" "$state" "$enabled_classic_snapshot"
 done
 
 symlink_snapshot="$WORK/symlink-snapshot"
@@ -668,7 +690,7 @@ cp -R "$snapshot" "$malformed_snapshot"
 printf '{malformed\n' > "$malformed_snapshot/actions-restore.json"
 expect_restore_rejected_without_mutation \
     "schema or payload validation failed" "$state" "$malformed_snapshot"
-echo "ok  : every consumed classic key and adversarial recovery shape fails before mutation"
+echo "ok  : required classic keys, enabled optional policy, and adversarial recovery shapes fail before mutation"
 
 altered_context_snapshot="$WORK/altered-context-snapshot"
 cp -R "$snapshot" "$altered_context_snapshot"
