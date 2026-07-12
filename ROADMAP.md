@@ -409,7 +409,10 @@ Commit-by-commit status:
   attached, then the formatter-only restart timed out. The smoke now formats,
   saves, and checks diagnostics on the already-attached isolated client; three
   repeated strict Apple-Silicon runs passed all 257 checks without increasing
-  the attach timeout. Final hosted repaired-head proof remains pending. A
+  the attach timeout. Exact repaired behavior head
+  `d744948cdccc51f3d79e45aa78f82c46445df0c6` then passed PR E2E run
+  `29181215803`: all four producers and logical proofs were green, including
+  Apple Silicon's real neocmake plus gersemi gate. A
   post-merge run on the resulting `main` SHA remains the gate before
   owner-applied safeguards.
 

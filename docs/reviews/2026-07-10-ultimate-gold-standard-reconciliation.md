@@ -1674,3 +1674,49 @@ this entry.
 | UGR-020 | PARTIAL | The release/safeguard implementation remains locally green; first hosted Nix proof passed, while unrelated failed jobs correctly blocked complete PR proof. | Final repaired-head checks/artifacts and independent review; after merge, merged-main cache-free proof and owner preflight/apply/readback. |
 | UGR-021 | PARTIAL | The failed hosted rows are recorded exactly; no partial run is promoted to green and no local/container result is relabeled as WSL, redirected Windows, dual Terminal, desktop/TCC, or merged-main evidence. | Final repaired-head hosted proof plus the existing real/manual environments. |
 | UGR-022 | ACCEPTED/FIXED | CLAUDE, roadmap, migration status, manual matrix, greenfield ledger, and this append-only entry describe both hosted failures and their causal repairs. | Append final hosted/tag/manual evidence only when it exists. |
+
+## Repaired release-migration and strict-LSP hosted proof — entry 43
+
+- Exact repaired behavior head
+  `d744948cdccc51f3d79e45aa78f82c46445df0c6` passed every transition check.
+  Generic/parity run
+  [`29181215799`](https://github.com/luisgui1757/dotfiles/actions/runs/29181215799)
+  passed all six jobs, including the formerly failing Ubuntu exact-v0.1.0
+  fixture. Nix run
+  [`29181215800`](https://github.com/luisgui1757/dotfiles/actions/runs/29181215800)
+  passed both real producers and both logical checks. E2E run
+  [`29181215803`](https://github.com/luisgui1757/dotfiles/actions/runs/29181215803)
+  passed Ubuntu container `86619065292`, Ubuntu setup `86619065299`, Apple
+  Silicon `86619065302`, Windows `86619065296`, and logical proofs
+  `86619772805`, `86619772768`, `86619772795`, and `86619772770`. The Apple
+  Silicon producer completed the combined real neocmake attachment plus
+  gersemi/save/diagnostic assertion that failed before the lifecycle repair.
+- The head has 21 unique completed successful check-runs: the 18 expected
+  legacy/stable transition checks plus successful CodeQL default-setup checks
+  `Analyze (actions)`, `Analyze (python)`, and `CodeQL`. No failed, skipped,
+  pending, duplicate-name, or non-success result remained. The 18 transition
+  checks and both Analyze checks came from GitHub Actions app `15368`; the
+  aggregate CodeQL check came from app `57789`.
+- All six downloaded schema-2 markers passed the checked-in verifier. Artifact
+  IDs `8256458379` and `8256474189` belong to Nix run `29181215800`; IDs
+  `8256477160`, `8256494635`, `8256523247`, and `8256530035` belong to E2E run
+  `29181215803`. Every marker binds source head `d744948…` to executed synthetic
+  merge `048052bf7bfdb957ec91e94d4127a5efb6f47c68`, attempt 1, with exact
+  run/logical/legacy identity. The merge commit is GitHub-authored with ordered
+  parents base `f104bf066e4af7d4d707fe22ba36600711f1ae14` then source head
+  `d744948…`.
+- Final read-only PR inspection still showed OPEN, non-draft, MERGEABLE, and
+  policy BLOCKED only with `REVIEW_REQUIRED`; base, head, branch names, and live
+  `main` remained exact. Gitleaks 8.30.1 scanned all 18 base-to-head commits and
+  approximately 405 KB with zero findings. This PR run used ordinary PR caches;
+  it is not the pending merged-main cache-free proof. No review, approval,
+  merge, release tag, live safeguard mutation, or v0.2.0 publication occurred.
+
+### Finding status amendments
+
+| ID | Status after entry 43 | Exact evidence | Remaining work |
+|---|---|---|---|
+| UGR-018 | ACCEPTED/FIXED | The combined isolated attach/formatter lifecycle passed three repeated local strict runs and the exact Apple-Silicon hosted producer. | Optional interactive confirmation only. |
+| UGR-020 | PARTIAL | All 18 transition checks and six dual-SHA artifacts are green on the exact repaired head; live cutover remains intentionally unapplied. | Independent final review; after merge, merged-main cache-free proof and owner preflight/apply/readback. |
+| UGR-021 | PARTIAL | Exact-head hosted Linux, Apple Silicon, Windows, container, Nix, generic/parity, security, and logical proof are green without relabeling PR caches as clean-install proof. | Merged-main cache-free proof plus real WSL, redirected-Windows, dual-Terminal, owner-host migration, and desktop/TCC rows. |
+| UGR-022 | ACCEPTED/FIXED | Roadmap, migration status, manual matrix, greenfield ledger, and this append-only entry now record both failed discovery heads and the exact repaired hosted proof. | Append final tag, merged-main, live-apply, and manual evidence only when it exists. |

@@ -265,8 +265,11 @@ whether any user data changed.
       even after project isolation: the initial CMake client attached, but the
       formatter-only restart did not. Strict smoke now formats and checks the
       realistic CMake sample on the already-attached isolated client. Three
-      repeated strict Apple-Silicon runs passed 257/257 checks; final hosted
-      repaired-head proof is still required and is not claimed by this local row.
+      repeated strict Apple-Silicon runs passed 257/257 checks. Exact repaired
+      head `d744948cdccc51f3d79e45aa78f82c46445df0c6` then passed hosted E2E
+      [`29181215803`](https://github.com/luisgui1757/dotfiles/actions/runs/29181215803),
+      including all four producers and all four logical proof jobs. This PR run
+      restored ordinary caches and is not the pending merged-main cache-free row.
 - [ ] **Cache-free merged-main safeguard confirmation**: run
       `e2e-install.yml` again after this PR merges. Exact behavior head
       `f097995b49a2189db327903a20743e7cb69ba665` passed cache-free run

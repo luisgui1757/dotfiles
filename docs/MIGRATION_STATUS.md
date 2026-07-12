@@ -335,8 +335,10 @@ broken repo-symlink still cleaned) is covered by
       isolated CMake attachment passed, then a second formatter-only
       neocmakelsp start timed out. Attachment and realistic gersemi formatting
       now share one isolated client lifecycle; three repeated strict
-      Apple-Silicon runs passed all 257 checks. Final hosted repaired-head and
-      merged-main confirmation remain.
+      Apple-Silicon runs passed all 257 checks. Exact repaired head
+      `d744948cdccc51f3d79e45aa78f82c46445df0c6` then passed E2E run
+      `29181215803`, including all four producers and logical proofs. Merged-main
+      confirmation remains.
       No Windows Sandbox, WSL, redirected-Windows, merged-main cache-free
       confirmation, or desktop visual run is claimed. Required CI is not manual
       desktop evidence. The old Wave C `0 / 10` Ubuntu parity counter is no
