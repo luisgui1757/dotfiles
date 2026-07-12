@@ -5,7 +5,7 @@ and Windows.
 The repo owns the daily shell/editor stack: Neovim, tmux/psmux, Starship, zsh,
 PowerShell, Ghostty, WezTerm, lazygit, `lsd`, `zoxide` smart-cd, the `gh` CLI with the
 `gh-dash` dashboard, the `pi` CLI, Windows Terminal theming, locked plugin restore, LSP /
-formatter provisioning, and global Polaris agent-policy bootstrap. It also provisions the `tree-sitter` CLI needed by
+formatter provisioning, and global Sentinel agent-policy bootstrap. It also provisions the `tree-sitter` CLI needed by
 `nvim-treesitter` main parser builds, plus AeroSpace (macOS tiling WM) and Herdr
 (agent multiplexer: macOS/Linux stable, Windows preview) through vendor-channel installs.
 
@@ -124,7 +124,7 @@ or perform the Nix ownership transition.
 ./setup.sh --skip-config         # skip chezmoi config apply
 ./setup.sh --skip-config-scripts # apply config files/links; defer chezmoi run scripts
 ./setup.sh --skip-nvim           # skip Lazy/Tree-sitter/Mason phases
-./setup.sh --skip-agents         # skip global Polaris agent policy
+./setup.sh --skip-agents         # skip global Sentinel agent policy
 ./setup.sh --best-effort         # continue after nvim-phase failures; exit nonzero with summary
 make setup                       # same as ./setup.sh, via the Makefile
 ```
@@ -292,7 +292,7 @@ setup -> install-deps                 phase 1: programs and optional tools
                                             parser-update build tasks must finish
       -> nvim +DOTFILES_TREESITTER_SYNC_INSTALL  phase 4: Tree-sitter parsers
       -> nvim "+MasonToolsInstallSync" +qa        phase 5: LSP servers and formatters
-      -> Polaris global install       phase 6: per-user agent policy
+      -> Sentinel global install       phase 6: per-user agent policy
 ```
 
 The nvim-treesitter Lazy build hook calls the upstream waitable update API,
@@ -315,7 +315,7 @@ requested, it defaults to all and prints `note: no TTY detected; running with
 --all` (or `-All`). An interactive run (no all flag) can still ask the
 dependency installer's **"install EVERYTHING without further prompts? [Y/n]"**
 question; answer `Y` to pull the tool catalog in one go, or `n` to choose per
-tool. Phase 6 then asks **"Apply Polaris global agent rules? [Y/n]"** unless
+tool. Phase 6 then asks **"Apply Sentinel global agent rules? [Y/n]"** unless
 `--all` / `-All`, `--dry-run` / `-DryRun`, or `--skip-agents` / `-SkipAgents`
 already made that decision.
 Add `--dry-run` / `-DryRun` to preview every step without touching disk.
@@ -587,24 +587,26 @@ migration warning. POSIX pwsh profile management remains provisioning-adjacent.
 - VS Code is optional. On WSL, use Windows VS Code plus `code .` for Remote -
   WSL, or use a Linux GUI build when WSLg / X11 is available. Rosé Pine setup
   follows whatever `code` CLI is on PATH.
-- Polaris agent policy is a supported setup phase, not a synced dotfile. `setup`
-  pins Polaris `0.1.2` (`v0.1.2`) at commit
-  `ecca742fa9ed1243a73981955850c1a8ef3e3b04`,
-  caches that checkout under `~/.local/share/dotfiles/polaris/<commit>` on
-  POSIX and `%LOCALAPPDATA%\dotfiles\polaris\<commit>` on Windows, verifies that
-  `v0.1.2` peels to the pinned commit plus the checkout `VERSION`, and runs
-  every Polaris Git operation with
+- Sentinel agent policy is a supported setup phase, not a synced dotfile. `setup`
+  pins Sentinel's renamed `0.1.2` tree at exact commit
+  `ecafffa858666343c1639f996d177f460163e93e`,
+  caches that checkout under `~/.local/share/dotfiles/sentinel/<commit>` on
+  POSIX and `%LOCALAPPDATA%\dotfiles\sentinel\<commit>` on Windows, verifies that
+  exact commit plus the checkout `VERSION`, and runs every Sentinel Git operation with
   system/global/env config, templates, hooks, and executable Git config features
-  disabled, then runs Polaris' Bash global installer and global check
+  disabled, then runs Sentinel's Bash global installer and global check
   (`tools/install --global`, then `--global --check`; Windows uses a validated
   Git Bash with `cygpath`, not WSL bash or another PATH-only Bash).
+  The published `v0.1.2` tag predates the repository rename and is deliberately
+  not treated as the renamed tree's identity; the exact commit is the immutable
+  authority until Sentinel publishes a tag containing that tree.
   The global installer writes the per-user AI entrypoints for Codex
   (`~/.codex/AGENTS.md`), Claude Code (`~/.claude/CLAUDE.md`), opencode
   (`~/.config/opencode/AGENTS.md`), and Pi CLI (`~/.pi/agent/AGENTS.md`);
   Copilot has no reliable global file path, so user-wide Copilot instructions
   remain a manual VS Code/github.com profile step. To remove the global blocks,
-  run the cached Polaris Bash installer with `--global --remove` on POSIX or
-  from Git Bash on Windows. Project/team adoption is separate: run Polaris
+  run the cached Sentinel Bash installer with `--global --remove` on POSIX or
+  from Git Bash on Windows. Project/team adoption is separate: run Sentinel
   repo-local install or vendoring in that project and commit those files there.
 - Pi CLI is a provisioned binary, not synced runtime state. Setup installs
   `@earendil-works/pi-coding-agent@0.80.3` by running `npm pack`, requiring the
@@ -717,8 +719,8 @@ The e2e jobs cover different install paths, not symmetric container platforms:
 | Check | What it proves |
 |---|---|
 | `e2e containers / ubuntu-24.04` | Clean `ubuntu:24.04`, non-root user, native `apt`, no Linuxbrew (`DOTFILES_SKIP_BREW_BOOTSTRAP=1`), then `install-deps.sh --all`, chezmoi config apply, executable/version probes including `zoxide`, `gh`, WezTerm, Herdr, Neovim >= 0.12, lazygit, zsh plugin files, config content assertions, and nvim directory realpath assertion. This is the native installer regression fixture, not the Nix-backed public POSIX package-plane proof; it does not assert Pi CLI because Node 24 comes from the Nix package layer. |
-| `setup.sh / ubuntu-24.04` | Full public Unix setup on the hosted Ubuntu runner after installing Nix in CI: Home Manager first, then native/deferred installs, chezmoi, Lazy, Tree-sitter, Mason, and Polaris. Its clean login/interactive PATH proof resolves the effective account's actual login zsh from the account database; this matters because fresh Ubuntu has no `/usr/bin/zsh` and setup selects Linuxbrew zsh. The shell must resolve `rg` from Nix with no caller PATH injection. |
-| `setup.sh / macos-26` | Full public Apple Silicon setup through the hosted runner: architecture-matched nix-darwin/declarative Homebrew, native/deferred installs, real Ghostty/WezTerm config consumption, installed AeroSpace app/CLI identity agreement, chezmoi, Lazy, Tree-sitter, Mason, and Polaris. AeroSpace waits for a user-granted Accessibility permission before parsing user config or starting its CLI server, so managed-config consumption remains explicit TCC-enabled desktop proof in `tests/MANUAL.md`; hosted CI does not pretend to prove it. The hosted runner alone gets the cleanup override; real hosts keep `cleanup = "check"`. |
+| `setup.sh / ubuntu-24.04` | Full public Unix setup on the hosted Ubuntu runner after installing Nix in CI: Home Manager first, then native/deferred installs, chezmoi, Lazy, Tree-sitter, Mason, and Sentinel. Its clean login/interactive PATH proof resolves the effective account's actual login zsh from the account database; this matters because fresh Ubuntu has no `/usr/bin/zsh` and setup selects Linuxbrew zsh. The shell must resolve `rg` from Nix with no caller PATH injection. |
+| `setup.sh / macos-26` | Full public Apple Silicon setup through the hosted runner: architecture-matched nix-darwin/declarative Homebrew, native/deferred installs, real Ghostty/WezTerm config consumption, installed AeroSpace app/CLI identity agreement, chezmoi, Lazy, Tree-sitter, Mason, and Sentinel. AeroSpace waits for a user-granted Accessibility permission before parsing user config or starting its CLI server, so managed-config consumption remains explicit TCC-enabled desktop proof in `tests/MANUAL.md`; hosted CI does not pretend to prove it. The hosted runner alone gets the cleanup override; real hosts keep `cleanup = "check"`. |
 | `setup.ps1 / windows-2025` | Full Windows setup through the real Windows hosted runner, including Scoop/winget/choco behavior, PowerShell, symlinks, Hack Nerd Font file/registry consumption, `zoxide`/`gh`/WezTerm/Herdr/Pi CLI command probes, and Neovim restore/sync phases. Windows containers do not model the desktop/user-profile setup well. |
 
 After the Lazy restore, deterministic Tree-sitter parser install, and Mason sync, each
@@ -882,7 +884,7 @@ Manual-review pin surfaces that Renovate may touch only partially:
 
 | Surface | Status |
 |---|---|
-| Polaris version/tag/commit | Manual-reviewed mirror between `setup.sh`, `setup.ps1`, README, CLAUDE, and `tests/static/pin_consistency_test.sh`. |
+| Sentinel version/commit | Manual-reviewed mirror between `setup.sh`, `setup.ps1`, README, CLAUDE, and `tests/static/pin_consistency_test.sh`. The current renamed tree is exact-commit pinned because the published `v0.1.2` tag predates it. |
 | Scoop installer | Renovate can bump `ScoopInstaller/Install` commit `b0ee913725139b816f9178163af0aecdba07a7ed`; SHA `48f6ea398b3a3fa26fae0093d37bd85b13e7eaa5d1d4a3e208408768408e35ae` is human-reviewed. |
 | TPM/tmux plugin refs and psmux plugin ref | Commit pins are manual-reviewed and mirrored in docs/tests; Renovate does not recompute or prove tag commits. |
 | `setuptools`/`pylatexenc` | Renovate can bump versions; adjacent hashes remain human-reviewed. Current pins: `setuptools` 80.9.0, `pylatexenc` 2.10. |
@@ -953,9 +955,9 @@ stale; CI then fails verification until a human reviews the adjacent constant.
 - **chezmoi is the config-layer path, not the provisioning path.** Do not move
   package installs, binary/font installers, login-shell changes, VS Code,
   devilspie2, or distro-manager policy out of `install-deps`.
-- **Polaris is global agent policy, not a dotfile mirror.** Setup installs it
-  from a pinned, version-checked upstream checkout and lets Polaris own its
-  managed global entrypoint blocks. This repo does not vendor Polaris core or
+- **Sentinel is global agent policy, not a dotfile mirror.** Setup installs it
+  from a pinned, version-checked upstream checkout and lets Sentinel own its
+  managed global entrypoint blocks. This repo does not vendor Sentinel core or
   sync agent runtime state.
 - **Rose Pine everywhere it can render.** Nvim, lualine, foreground-only
   Starship, tmux/psmux, `lsd`, ghostty, Windows Terminal, PSReadLine — same

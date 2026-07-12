@@ -13,7 +13,7 @@ the install script works, read this too.
 
 Cross-platform dotfiles: Neovim (lazy.nvim), Starship, Ghostty, Windows
 Terminal, tmux, zshenv/zshrc, PowerShell profile, lazygit, `lsd`, Pi CLI, and global
-Polaris agent-policy bootstrap. Public installs go through `setup.sh` (macOS /
+Sentinel agent-policy bootstrap. Public installs go through `setup.sh` (macOS /
 Linux / WSL) or `setup.ps1` (Windows), which install dependencies, apply the
 chezmoi config layer, restore locked Neovim plugins, sync Mason tools, and
 apply global agent policy. The repo can live anywhere — `~/dotfiles/`,
@@ -29,7 +29,7 @@ must stay byte-identical where the parity manifest says so; update both in the
 same change.
 
 Agent runtime state and preferences are intentionally **NOT** synced through
-this repo. The supported agent surface is setup's global Polaris policy phase;
+this repo. The supported agent surface is setup's global Sentinel policy phase;
 local agent preference folders such as `.claude/`, `.codex/`, `.pi/`, sessions,
 auth files, and package caches stay per machine.
 
@@ -324,7 +324,7 @@ that violates one of these, fix it instead of disabling the test.
     real account record (`dscl` on macOS, `getent`/`/etc/passwd` on Linux),
     requires canonicalized `HOME` to identify that same existing directory, and
     exports `DOTFILES_TARGET_USER` + `DOTFILES_TARGET_HOME`. Nix, Home Manager,
-    chezmoi, Polaris, and native setup consume those values; never fabricate a
+    chezmoi, Sentinel, and native setup consume those values; never fabricate a
     home from a username or fall back to root. Darwin setup accepts only Apple
     Silicon, selects `dotfiles-aarch64`, and rejects every other architecture
     before Nix/Homebrew activation. The compatibility `dotfiles` alias is also
@@ -407,6 +407,11 @@ that violates one of these, fix it instead of disabling the test.
     Windows Terminal bytes and old Windows config. Keep both checkouts until
     explicit verified acceptance. `--update` / `-Update` are never release
     migrations. The source of truth is `docs/UPGRADING.md`.
+30. **Sentinel is the sole agent-policy product name in the repository.** The
+    pre-rename name must never return in a tracked repository path or file,
+    including tests, docs, cache constants, and historical prose.
+    `tests/static/sentinel_naming_test.sh` reconstructs the retired token at
+    runtime so the guard itself does not violate the zero-residue contract.
 
 ## Common workflows
 
@@ -699,7 +704,7 @@ major; `tests/static/repo_policy_test.sh` enforces this.
 - `setup.sh / ubuntu-24.04`, `setup.sh / macos-26`, and
   `setup.ps1 / windows-2025` run the real public setup entry points, apply
   configs through chezmoi in Phase 2, then rerun Lazy restore, Tree-sitter
-  parser install, Mason headless sync, and the Polaris Phase 6/6 agent-policy
+  parser install, Mason headless sync, and the Sentinel Phase 6/6 agent-policy
   install. The POSIX setup jobs install Nix first, apply the enforced
   nix-darwin/Home Manager layer before native/deferred installs, and assert the
   nix-owned CLI set resolves from a Nix profile/store path. The Linux job first
@@ -1094,23 +1099,24 @@ save only**. The next plain `:w` formats normally. Implemented in
   Phase 1 and `-Update`; it must never finish with `exit 0` after a blocked
   dependency update. Preserve the Windows `$InstallFailures` summary contract
   rather than weakening it into warning-only output.
-- **Polaris is setup Phase 6/6 and is opt-out, not experimental.** Full setup
-  (`--all` / `-All`) applies Polaris `0.1.2` (`v0.1.2`) at commit
-  `ecca742fa9ed1243a73981955850c1a8ef3e3b04` unless
+- **Sentinel is setup Phase 6/6 and is opt-out, not experimental.** Full setup
+  (`--all` / `-All`) applies Sentinel's renamed `0.1.2` tree at exact commit
+  `ecafffa858666343c1639f996d177f460163e93e` unless
   `--skip-agents` / `-SkipAgents` is passed. Interactive setup asks
-  `Apply Polaris global agent rules? [Y/n]`. The setup phase clones Polaris into
-  a dotfiles-owned cache (`~/.local/share/dotfiles/polaris/<commit>` on POSIX,
-  `%LOCALAPPDATA%\dotfiles\polaris\<commit>` on Windows), verifies the checkout
-  tag, commit, and `VERSION`, and performs all Polaris Git operations with
+  `Apply Sentinel global agent rules? [Y/n]`. The setup phase clones Sentinel into
+  a dotfiles-owned cache (`~/.local/share/dotfiles/sentinel/<commit>` on POSIX,
+  `%LOCALAPPDATA%\dotfiles\sentinel\<commit>` on Windows), verifies the checkout
+  commit and `VERSION`, and performs all Sentinel Git operations with
   system, global, environment-injected config, templates, hooks, and executable
-  Git config features disabled. It then runs Polaris' Bash global installer
+  Git config features disabled. It then runs Sentinel's Bash global installer
   (`tools/install --global`), then runs its global check. Windows setup invokes
   the same Bash installer through a validated Git Bash (`cygpath` must be
   present) with Git Bash's POSIX-only PATH for the `0.1.2` pin; do not use
-  Polaris `tools/install.ps1` for global installs unless a newer Polaris pin
-  proves the PowerShell path in CI. Do not inline or reimplement Polaris
-  rendering here. Project/team Polaris adoption is a separate repo-local install
-  or vendoring decision.
+  Sentinel `tools/install.ps1` for global installs unless a newer Sentinel pin
+  proves the PowerShell path in CI. Do not inline or reimplement Sentinel
+  rendering here. Project/team Sentinel adoption is a separate repo-local install
+  or vendoring decision. The published `v0.1.2` tag predates the repository
+  rename, so it must not be asserted as the renamed tree's identity.
 - **A C compiler is installed so LuaSnip can build `jsregexp`.** Without one,
   the nvim Lazy build prints "No C compiler found" and `jsregexp` is skipped
   (LuaSnip still works, minus JS-regex snippet transforms). POSIX installs the
@@ -1472,24 +1478,26 @@ save only**. The next plain `:w` formats normally. Implemented in
   `renovate.json`, direct-download SHA-256 values must be matched as context
   only, not named `currentDigest`, otherwise Renovate will schedule same-version
   digest updates for checksums it cannot actually resolve.
-- **Polaris is pinned by immutable Git tag + commit + `VERSION`, not a moving
-  branch.** Setup may clone from GitHub, but it must checkout the exact
-  `POLARIS_REF`, assert that `POLARIS_TAG` peels to that commit, assert
-  `POLARIS_VERSION`, reject dirty cached worktrees, and run only the installer
+- **Sentinel is pinned by immutable Git commit + `VERSION`, never a moving
+  branch or a mismatched tag.** Setup may clone from GitHub, but it must checkout
+  the exact `SENTINEL_REF`, assert `SENTINEL_VERSION`, reject dirty cached
+  worktrees, and run only the installer
   from that verified checkout. Clone, checkout, and cache validation must all
-  use the Polaris Git wrapper: do not trust mutable system,
+  use the Sentinel Git wrapper: do not trust mutable system,
   global, environment-injected, template, hook, or `.git/config` state. Cache
   validation must force the intended cache path with `--git-dir`/`--work-tree`
   semantics and disable executable Git config features such as `core.fsmonitor`,
   so `core.worktree` redirection or fsmonitor hooks cannot run or hide modified
-  files before the installer executes. Updating Polaris means changing the tag,
-  commit, and version constants together, updating README/CLAUDE references, and
+  files before the installer executes. The current renamed tree has no matching
+  release tag, so the exact commit is the immutable authority; never claim a tag
+  until it resolves to the selected commit. Updating Sentinel means changing the
+  commit and version constants together, updating README/CLAUDE references, and
   keeping shell/Pester/static pin tests green.
-- **Dependency installers own the "install EVERYTHING?" prompt; Polaris owns a
+- **Dependency installers own the "install EVERYTHING?" prompt; Sentinel owns a
   separate global-policy prompt.** Interactive runs that didn't pass
   `--all`/`-All` can get the dependency prompt; answering yes flips
   `YES_ALL`/`$All` for dependency prompts. Phase 6 asks
-  `Apply Polaris global agent rules? [Y/n]` unless `--all`/`-All`,
+  `Apply Sentinel global agent rules? [Y/n]` unless `--all`/`-All`,
   `--dry-run`/`-DryRun`, no tty/user interaction, or `--skip-agents` /
   `-SkipAgents` already made that decision.
 - **Windows symlink pre-flight reports WHY symlinks fail and how to fix it.**

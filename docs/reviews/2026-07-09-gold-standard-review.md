@@ -367,7 +367,7 @@ is destructive, secret-leaking, or a false merge gate.
     invariant + `windows_conf_test.sh`.
   - `docs/plans/ai-cli-integration-roadmap.md:3-8,219` — live-looking "PLANNED"
     doc mandating "NO Git-Bash, NO cygpath", the exact opposite of the shipped,
-    CLAUDE-mandated Polaris mechanism.
+    CLAUDE-mandated Sentinel mechanism.
 - Proof: `.github/rulesets/main-integrity.json` context list; git log
   (#42-#45); `tmux/tmux.windows.conf:11-12`; `setup.sh:42-44` vs the plan's
   stale pins.
@@ -397,7 +397,7 @@ is destructive, secret-leaking, or a false merge gate.
 - Multi-location check: `Invoke-ChezmoiOrExit`/`Invoke-ChezmoiOutput` share the
   exposure (degrades diagnostics only — still fail-closed).
 - Recommended fix: wrap the verify call like `uninstall.ps1`, or toggle the
-  preference inside the chezmoi helpers as the Polaris wrappers already do.
+  preference inside the chezmoi helpers as the Sentinel wrappers already do.
 - Test/doc updates required: `Setup.Tests.ps1` case with a drifted target under
   the strict preference.
 - Confidence: high (mechanism), medium (field frequency).
@@ -508,12 +508,12 @@ is destructive, secret-leaking, or a false merge gate.
   recorded-failure-continue uniformly while still exiting nonzero.
   Confidence: high (behavior), medium (desirability).
 
-#### DF-CGS-024 [P3] Polaris clone failure leaks temp dirs into the persistent cache root
+#### DF-CGS-024 [P3] Sentinel clone failure leaks temp dirs into the persistent cache root
 
 - Location: `setup.sh:329-333` — RETURN trap does not fire when `set -e` exits
-  the command-substitution subshell; `~/.local/share/dotfiles/polaris/.tmp.*`
+  the command-substitution subshell; `~/.local/share/dotfiles/sentinel/.tmp.*`
   accumulates (never OS-cleaned, unlike `/tmp`).
-- Fix: sweep `.tmp.*` at entry of `ensure_polaris_checkout` or EXIT-trap a
+- Fix: sweep `.tmp.*` at entry of `ensure_sentinel_checkout` or EXIT-trap a
   subshell scope. Confidence: high.
 
 #### DF-CGS-025 [P3] Assorted verified code/test nits
@@ -616,7 +616,7 @@ is destructive, secret-leaking, or a false merge gate.
   cases.
 - **Supply-chain posture overall**: every other download pin+SHA-verified
   before use; no `curl | sh` / `Invoke-Expression` anywhere (byte-scanned);
-  the Polaris pipeline (hostile-git-config isolation, tag-peel + VERSION +
+  the Sentinel pipeline (hostile-git-config isolation, tag-peel + VERSION +
   clean-worktree asserts) is genuinely gold-standard; the scanner self-tests
   its own regexes.
 - **Migration/parity gate**: an actual oracle — per-OS symlink+byte parity,
@@ -685,7 +685,7 @@ is destructive, secret-leaking, or a false merge gate.
   digest pinning for `ubuntu:24.04`.
 - **Deliberately leave manual** (correctly so today): `lazy-lock.json` plugins
   (Lazy-refreshed, behavior-tested), Mason tools (no lockfile by design),
-  Polaris tag/commit/VERSION (must move together), VS BuildTools (unpinnable
+  Sentinel tag/commit/VERSION (must move together), VS BuildTools (unpinnable
   alias — the fix is signature verification, not Renovate), PSFzf (PSGallery
   floating, documented), and all adjacent SHA-256/commit constants
   (human-reviewed by policy — the red-until-recomputed contract demonstrably
@@ -774,7 +774,7 @@ periodic cache-free run above.
 7. **Platform correctness follow-ups**
    (DF-CGS-008/-009/-015/-018/-024/-026/-027/-028): verify-then-fix Windows lsd
    path, zshrc Nix PATH, `Test-ChezmoiVerify` hardening, macOS dry-run preview,
-   Polaris temp sweep, invariant-22 guard tightening, external-bump self-heal,
+   Sentinel temp sweep, invariant-22 guard tightening, external-bump self-heal,
    `$PROFILE` redirect probe.
 
 ## Gold-standard scorecard

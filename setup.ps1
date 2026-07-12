@@ -9,7 +9,7 @@
 #   .\setup.ps1 -SkipBootstrap   back-compat alias: skip config apply
 #   .\setup.ps1 -SkipConfig      already configured; just sync nvim
 #   .\setup.ps1 -SkipNvim        skip nvim plugin/parser/Mason sync
-#   .\setup.ps1 -SkipAgents      skip global Polaris agent-policy install
+#   .\setup.ps1 -SkipAgents      skip global Sentinel agent-policy install
 #   .\setup.ps1 -BestEffort      continue past plugin/LSP/Mason phase failures
 #   .\setup.ps1 -SkipWindowsTerminalMerge   config+sync but leave WT settings.json untouched
 #   .\setup.ps1 -SkipLegacyKnownFolderMigration   retain v0.1 conventional targets during release rollback window
@@ -44,10 +44,9 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $RepoUrl        = 'https://github.com/luisgui1757/dotfiles.git'
-$PolarisRepoUrl = 'https://github.com/luisgui1757/polaris.git'
-$PolarisVersion = '0.1.2'
-$PolarisTag     = 'v0.1.2'
-$PolarisRef     = 'ecca742fa9ed1243a73981955850c1a8ef3e3b04'
+$SentinelRepoUrl = 'https://github.com/luisgui1757/sentinel.git'
+$SentinelVersion = '0.1.2'
+$SentinelRef     = 'ecafffa858666343c1639f996d177f460163e93e'
 
 function Get-DefaultProfileRoot {
     if ($env:OS -eq 'Windows_NT') {
@@ -315,23 +314,23 @@ function Write-Step {
     Write-Host "  $Message"
 }
 
-function Get-PolarisCacheRoot {
+function Get-SentinelCacheRoot {
     $localAppData = Get-WindowsLocalApplicationData
     if (-not [string]::IsNullOrWhiteSpace($localAppData)) {
-        return (Join-Path $localAppData 'dotfiles\polaris')
+        return (Join-Path $localAppData 'dotfiles\sentinel')
     }
-    return (Join-Path (Get-DefaultProfileRoot) '.local\share\dotfiles\polaris')
+    return (Join-Path (Get-DefaultProfileRoot) '.local\share\dotfiles\sentinel')
 }
 
-function Get-PolarisCheckoutPath {
+function Get-SentinelCheckoutPath {
     param(
-        [string]$CacheRoot = (Get-PolarisCacheRoot),
-        [string]$Ref = $PolarisRef
+        [string]$CacheRoot = (Get-SentinelCacheRoot),
+        [string]$Ref = $SentinelRef
     )
     return (Join-Path $CacheRoot $Ref)
 }
 
-function Invoke-PolarisGit {
+function Invoke-SentinelGit {
     param(
         [Parameter(Mandatory)] [string[]]$Arguments,
         [switch]$SuppressStderr
@@ -395,7 +394,7 @@ function Invoke-PolarisGit {
     }
 }
 
-function Invoke-PolarisCacheGit {
+function Invoke-SentinelCacheGit {
     param(
         [Parameter(Mandatory)] [string]$Checkout,
         [Parameter(Mandatory)] [string[]]$Arguments
@@ -403,13 +402,13 @@ function Invoke-PolarisCacheGit {
 
     $gitDir = Join-Path $Checkout '.git'
     $gitArgs = @("--git-dir=$gitDir", "--work-tree=$Checkout") + $Arguments
-    return Invoke-PolarisGit -Arguments $gitArgs -SuppressStderr
+    return Invoke-SentinelGit -Arguments $gitArgs -SuppressStderr
 }
 
-function Assert-PolarisCheckoutClean {
+function Assert-SentinelCheckoutClean {
     param([Parameter(Mandatory)] [string]$Checkout)
 
-    $result = Invoke-PolarisCacheGit -Checkout $Checkout -Arguments @(
+    $result = Invoke-SentinelCacheGit -Checkout $Checkout -Arguments @(
         'status',
         '--porcelain=v1',
         '--untracked-files=all',
@@ -417,12 +416,12 @@ function Assert-PolarisCheckoutClean {
     )
     $status = @($result.Output)
     if ($result.ExitCode -ne 0) {
-        Write-Host "  FAIL: could not inspect Polaris cache worktree: $Checkout" -ForegroundColor Red
+        Write-Host "  FAIL: could not inspect Sentinel cache worktree: $Checkout" -ForegroundColor Red
         exit 1
     }
 
     if ($status.Count -gt 0) {
-        Write-Host "  FAIL: Polaris cache has local changes; refusing to execute it: $Checkout" -ForegroundColor Red
+        Write-Host "  FAIL: Sentinel cache has local changes; refusing to execute it: $Checkout" -ForegroundColor Red
         foreach ($line in $status) {
             Write-Host "        $line" -ForegroundColor Yellow
         }
@@ -431,39 +430,29 @@ function Assert-PolarisCheckoutClean {
     }
 }
 
-function Assert-PolarisReleaseArtifact {
+function Assert-SentinelArtifact {
     param(
         [Parameter(Mandatory)] [string]$Checkout,
         [Parameter(Mandatory)] [string]$Version,
-        [Parameter(Mandatory)] [string]$Tag,
         [Parameter(Mandatory)] [string]$Ref
     )
 
-    $headResult = Invoke-PolarisCacheGit -Checkout $Checkout -Arguments @('rev-parse', '--verify', 'HEAD^{commit}')
+    $headResult = Invoke-SentinelCacheGit -Checkout $Checkout -Arguments @('rev-parse', '--verify', 'HEAD^{commit}')
     $head = ([string]($headResult.Output -join '')).Trim()
     if ($headResult.ExitCode -ne 0 -or $head -ne $Ref) {
-        Write-Host "  FAIL: Polaris cache is not at the pinned commit: $Checkout" -ForegroundColor Red
+        Write-Host "  FAIL: Sentinel cache is not at the pinned commit: $Checkout" -ForegroundColor Red
         Write-Host "        expected $Ref, found $head" -ForegroundColor Yellow
         exit 1
     }
 
-    $tagResult = Invoke-PolarisCacheGit -Checkout $Checkout -Arguments @('rev-parse', '--verify', "refs/tags/$Tag^{commit}")
-    $tagHead = ([string]($tagResult.Output -join '')).Trim()
-    if ($tagResult.ExitCode -ne 0 -or $tagHead -ne $Ref) {
-        Write-Host "  FAIL: Polaris tag mismatch for $Tag in $Checkout" -ForegroundColor Red
-        Write-Host "        expected tag to point at $Ref, found $tagHead" -ForegroundColor Yellow
-        Write-Host "        Remove this cache directory and rerun setup to fetch the pinned release artifact again." -ForegroundColor Yellow
-        exit 1
-    }
-
-    $actualVersion = Get-PolarisVersionFromCheckout -Checkout $Checkout
+    $actualVersion = Get-SentinelVersionFromCheckout -Checkout $Checkout
     if ($actualVersion -ne $Version) {
-        Write-Host "  FAIL: Polaris cache VERSION mismatch: expected $Version, found $actualVersion" -ForegroundColor Red
+        Write-Host "  FAIL: Sentinel cache VERSION mismatch: expected $Version, found $actualVersion" -ForegroundColor Red
         exit 1
     }
 }
 
-function Test-PolarisGitBashCommand {
+function Test-SentinelGitBashCommand {
     param([string]$Candidate)
 
     if ([string]::IsNullOrWhiteSpace($Candidate)) { return $false }
@@ -485,7 +474,7 @@ function Test-PolarisGitBashCommand {
     }
 }
 
-function Get-PolarisBashCommand {
+function Get-SentinelBashCommand {
     if ($env:OS -ne 'Windows_NT') {
         $bash = Get-Command bash -ErrorAction SilentlyContinue
         if ($bash) { return $bash.Source }
@@ -511,18 +500,18 @@ function Get-PolarisBashCommand {
     )
 
     foreach ($candidate in $candidates) {
-        if (Test-PolarisGitBashCommand -Candidate $candidate) { return $candidate }
+        if (Test-SentinelGitBashCommand -Candidate $candidate) { return $candidate }
     }
 
     $bash = Get-Command bash -ErrorAction SilentlyContinue
-    if ($bash -and (Test-PolarisGitBashCommand -Candidate $bash.Source)) {
+    if ($bash -and (Test-SentinelGitBashCommand -Candidate $bash.Source)) {
         return $bash.Source
     }
 
     return $null
 }
 
-function ConvertTo-PolarisBashPath {
+function ConvertTo-SentinelBashPath {
     param(
         [Parameter(Mandatory)] [string]$Bash,
         [Parameter(Mandatory)] [string]$Path
@@ -568,24 +557,24 @@ function Test-ShouldApplyAgentPolicy {
             Read-Host "  $Message [Y/n]"
         }
     }
-    $answer = [string](& $Prompt 'Apply Polaris global agent rules?')
+    $answer = [string](& $Prompt 'Apply Sentinel global agent rules?')
     return ([string]::IsNullOrWhiteSpace($answer) -or $answer -match '^(?i:y|yes)$')
 }
 
-function Get-PolarisVersionFromCheckout {
+function Get-SentinelVersionFromCheckout {
     param([Parameter(Mandatory)] [string]$Checkout)
     $versionPath = Join-Path $Checkout 'VERSION'
     if (-not (Test-Path -LiteralPath $versionPath -PathType Leaf)) { return '' }
     return ([System.IO.File]::ReadAllText($versionPath).Trim())
 }
 
-function Invoke-PolarisGitChecked {
+function Invoke-SentinelGitChecked {
     param(
         [Parameter(Mandatory)] [string[]]$Arguments,
         [Parameter(Mandatory)] [string]$Label
     )
 
-    $result = Invoke-PolarisGit -Arguments $Arguments
+    $result = Invoke-SentinelGit -Arguments $Arguments
     if ($result.ExitCode -ne 0) {
         Write-Host ("  FAIL: {0} exited {1}" -f $Label, $result.ExitCode) -ForegroundColor Red
         exit $result.ExitCode
@@ -593,40 +582,39 @@ function Invoke-PolarisGitChecked {
     return @($result.Output)
 }
 
-function Ensure-PolarisCheckout {
+function Ensure-SentinelCheckout {
     param(
-        [string]$RepoUrl = $PolarisRepoUrl,
-        [string]$Version = $PolarisVersion,
-        [string]$Tag = $PolarisTag,
-        [string]$Ref = $PolarisRef,
-        [string]$CacheRoot = (Get-PolarisCacheRoot)
+        [string]$RepoUrl = $SentinelRepoUrl,
+        [string]$Version = $SentinelVersion,
+        [string]$Ref = $SentinelRef,
+        [string]$CacheRoot = (Get-SentinelCacheRoot)
     )
 
-    $checkout = Get-PolarisCheckoutPath -CacheRoot $CacheRoot -Ref $Ref
+    $checkout = Get-SentinelCheckoutPath -CacheRoot $CacheRoot -Ref $Ref
     if (Test-Path -LiteralPath (Join-Path $checkout '.git') -PathType Container) {
-        Assert-PolarisReleaseArtifact -Checkout $checkout -Version $Version -Tag $Tag -Ref $Ref
-        Assert-PolarisCheckoutClean -Checkout $checkout
+        Assert-SentinelArtifact -Checkout $checkout -Version $Version -Ref $Ref
+        Assert-SentinelCheckoutClean -Checkout $checkout
         return $checkout
     }
 
     if (Test-Path -LiteralPath $checkout) {
-        Write-Host "  FAIL: Polaris cache path exists but is not a git checkout: $checkout" -ForegroundColor Red
+        Write-Host "  FAIL: Sentinel cache path exists but is not a git checkout: $checkout" -ForegroundColor Red
         exit 1
     }
 
     if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
-        Write-Host "  FAIL: git is required to fetch Polaris. Re-run without -SkipDeps, or install git first." -ForegroundColor Red
+        Write-Host "  FAIL: git is required to fetch Sentinel. Re-run without -SkipDeps, or install git first." -ForegroundColor Red
         exit 1
     }
 
     New-Item -ItemType Directory -Force -Path $CacheRoot | Out-Null
     $tmp = Join-Path $CacheRoot ('.tmp.' + [guid]::NewGuid().ToString('N'))
     try {
-        Invoke-PolarisGitChecked -Label 'git clone Polaris' -Arguments @('clone', $RepoUrl, $tmp)
-        Invoke-PolarisGitChecked -Label 'git checkout Polaris pin' -Arguments @('-C', $tmp, 'checkout', '--detach', $Ref)
+        Invoke-SentinelGitChecked -Label 'git clone Sentinel' -Arguments @('clone', $RepoUrl, $tmp)
+        Invoke-SentinelGitChecked -Label 'git checkout Sentinel pin' -Arguments @('-C', $tmp, 'checkout', '--detach', $Ref)
 
-        Assert-PolarisReleaseArtifact -Checkout $tmp -Version $Version -Tag $Tag -Ref $Ref
-        Assert-PolarisCheckoutClean -Checkout $tmp
+        Assert-SentinelArtifact -Checkout $tmp -Version $Version -Ref $Ref
+        Assert-SentinelCheckoutClean -Checkout $tmp
 
         Move-Item -LiteralPath $tmp -Destination $checkout
         return $checkout
@@ -635,7 +623,7 @@ function Ensure-PolarisCheckout {
     }
 }
 
-function Invoke-PolarisInstallChecked {
+function Invoke-SentinelInstallChecked {
     param(
         [Parameter(Mandatory)] [string]$Bash,
         [Parameter(Mandatory)] [string]$Checkout,
@@ -643,10 +631,10 @@ function Invoke-PolarisInstallChecked {
         [Parameter(Mandatory)] [string]$Label
     )
 
-    $bashCheckout = ConvertTo-PolarisBashPath -Bash $Bash -Path $Checkout
+    $bashCheckout = ConvertTo-SentinelBashPath -Bash $Bash -Path $Checkout
     $bashCommand = if ($env:OS -eq 'Windows_NT') {
         # Keep Git Bash on its POSIX userland. A Windows-native jq.exe in PATH
-        # emits CRLF records, which the Polaris Bash manifest reader treats
+        # emits CRLF records, which the Sentinel Bash manifest reader treats
         # as literal path bytes and then fails to find core/*.md.
         'export PATH=/usr/bin:/bin; cd "$1"; shift; exec bash tools/install "$@"'
     } else {
@@ -672,16 +660,15 @@ function Invoke-PolarisInstallChecked {
     }
 }
 
-function Invoke-PolarisAgentPolicy {
+function Invoke-SentinelAgentPolicy {
     param(
         [bool]$SkipAgentsPhase = $SkipAgents,
         [bool]$AllMode = $All,
         [bool]$IsDryRun = $DryRun,
-        [string]$RepoUrl = $PolarisRepoUrl,
-        [string]$Version = $PolarisVersion,
-        [string]$Tag = $PolarisTag,
-        [string]$Ref = $PolarisRef,
-        [string]$CacheRoot = (Get-PolarisCacheRoot),
+        [string]$RepoUrl = $SentinelRepoUrl,
+        [string]$Version = $SentinelVersion,
+        [string]$Ref = $SentinelRef,
+        [string]$CacheRoot = (Get-SentinelCacheRoot),
         [scriptblock]$Prompt
     )
 
@@ -697,29 +684,29 @@ function Invoke-PolarisAgentPolicy {
         return
     }
 
-    Phase "Phase 6/6: apply global agent policy (Polaris)"
-    $checkout = Get-PolarisCheckoutPath -CacheRoot $CacheRoot -Ref $Ref
+    Phase "Phase 6/6: apply global agent policy (Sentinel)"
+    $checkout = Get-SentinelCheckoutPath -CacheRoot $CacheRoot -Ref $Ref
     if ($IsDryRun) {
-        Write-Step "would    clone/fetch Polaris $Version ($Tag @ $Ref)"
+        Write-Step "would    clone/fetch Sentinel $Version (@ $Ref)"
         Write-Step "         into $checkout"
-        Write-Step "would    run Polaris tools/install --global, then --global --check"
+        Write-Step "would    run Sentinel tools/install --global, then --global --check"
         return
     }
 
-    $checkout = Ensure-PolarisCheckout -RepoUrl $RepoUrl -Version $Version -Tag $Tag -Ref $Ref -CacheRoot $CacheRoot
+    $checkout = Ensure-SentinelCheckout -RepoUrl $RepoUrl -Version $Version -Ref $Ref -CacheRoot $CacheRoot
     $installer = Join-Path $checkout 'tools\install'
     if (-not (Test-Path -LiteralPath $installer -PathType Leaf)) {
-        Write-Host "  FAIL: Polaris installer missing: $installer" -ForegroundColor Red
+        Write-Host "  FAIL: Sentinel installer missing: $installer" -ForegroundColor Red
         exit 1
     }
-    $bash = Get-PolarisBashCommand
+    $bash = Get-SentinelBashCommand
     if (-not $bash) {
-        Write-Host "  FAIL: bash is required to run the Polaris global installer. Install Git for Windows first." -ForegroundColor Red
+        Write-Host "  FAIL: bash is required to run the Sentinel global installer. Install Git for Windows first." -ForegroundColor Red
         exit 1
     }
 
-    Invoke-PolarisInstallChecked -Bash $bash -Checkout $checkout -Arguments @('--global') -Label 'Polaris global install'
-    Invoke-PolarisInstallChecked -Bash $bash -Checkout $checkout -Arguments @('--global', '--check') -Label 'Polaris global check'
+    Invoke-SentinelInstallChecked -Bash $bash -Checkout $checkout -Arguments @('--global') -Label 'Sentinel global install'
+    Invoke-SentinelInstallChecked -Bash $bash -Checkout $checkout -Arguments @('--global', '--check') -Label 'Sentinel global check'
 }
 
 function Get-UniqueBackupPath {
@@ -1957,7 +1944,7 @@ if (-not ($SkipBootstrap -or $SkipConfig)) {
 # you accept a partial install and will run :Lazy / :Mason interactively).
 Invoke-NvimSyncPhases
 
-Invoke-PolarisAgentPolicy
+Invoke-SentinelAgentPolicy
 
 # ---- Summary -----------------------------------------------------------------
 Write-Host ""

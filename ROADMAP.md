@@ -1,8 +1,8 @@
 # Dotfiles Roadmap
 
-Last audited: 2026-07-10 on branch
-`fix/ultimate-gold-standard-close-2026-07-10`.
-Baseline: `main` at `85375b2bdec9d3a998e8023a44b41d03a32f3eaa`.
+Last audited: 2026-07-12 on branch
+`fix/lean-platform-final-cutover-2026-07-10`.
+Baseline: `main` at `f104bf066e4af7d4d707fe22ba36600711f1ae14`.
 
 This is the adversarial post-merge roadmap for the chezmoi migration and the
 current setup/CI surface. The goal is not "good enough"; the repo should have a
@@ -272,7 +272,7 @@ Commit-by-commit status:
   the real UserProfile, LocalApplicationData, Documents, and runtime `$PROFILE`
   paths. UGR-016 through UGR-019 and UGR-023 close the PowerShell invocation,
   checked Tree-sitter deletion, per-project clangd, Renovate inventory,
-  Starship/Polaris cleanup, diagnostic-identity, NUL-safe JSON, and structural
+  Starship/Sentinel cleanup, diagnostic-identity, NUL-safe JSON, and structural
   Nix-ownership gaps. UGR-020 is deliberately PARTIAL: this cutover switches
   every checked-in required-check source to stable logical checks while
   retaining legacy producers for the still-live rules; the live owner apply
@@ -464,6 +464,14 @@ Commit-by-commit status:
   Every other macOS architecture fails through the generic platform boundary
   before Nix/Homebrew activation. Historical host results remain in append-only
   evidence only; they do not define a product path.
+
+- **Sentinel rename cutover — DONE (2026-07-12).** Both setup entry points now
+  clone `luisgui1757/sentinel` into Sentinel-only cache paths, detach at exact
+  commit `ecafffa858666343c1639f996d177f460163e93e`, validate `VERSION=0.1.2`,
+  and run the renamed Bash installer/check contract. The published `v0.1.2` tag
+  predates the rename, so it is not used as false identity evidence. Shell,
+  PowerShell, pin-consistency, and repository-wide naming tests guard the exact
+  commit and require zero pre-rename product-name residue in paths or content.
 
 - **Hosted WSL2 canary retirement — DONE (2026-07-10).** The only scheduled
   run (`29072773410` / `86297630493`) and a manual rerun (`29114215045` /

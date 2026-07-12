@@ -28,7 +28,7 @@ valid_case() (
     [[ "$DOTFILES_TARGET_HOME" == "$WORK/Real Home" ]]
     [[ "$HOME" == "$WORK/Real Home" ]]
     [[ "$DEFAULT_DEST" == "$WORK/Real Home/dotfiles" ]]
-    [[ "$POLARIS_CACHE_ROOT" == "$WORK/Real Home/.local/share/dotfiles/polaris" ]]
+    [[ "$SENTINEL_CACHE_ROOT" == "$WORK/Real Home/.local/share/dotfiles/sentinel" ]]
 )
 valid_case || fail "validated account/home with spaces and a canonical HOME link was rejected"
 

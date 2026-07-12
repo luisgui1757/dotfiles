@@ -217,7 +217,7 @@ The final batch hash is appended in a later identity entry after Git creates it.
 | UGR-020 | PARTIAL | Stage 1 emits six stable logical checks that verify exact per-OS proof artifacts bound to run/head while all legacy contexts remain required; no no-op check or live mutation. | final closure batch (hash pending) | marker tamper/missing/duplicate tests; workflow/metadata/current-vs-candidate alignment | README, CLAUDE invariant 27, branch-protection runbook, MIGRATION_STATUS | After merge: observe logical checks, merge context-switch PR, then owner applies live safeguards. |
 | UGR-021 | PARTIAL | Scheduled/manual setup caches are absent; WSL distro cache is disabled; macOS uses real WezTerm/AeroSpace/Ghostty consumers; Windows E2E asserts font files+registration; WSL stays non-required/fail-visible. | `1423a47` plus final closure batch (hash pending) | workflow/static cache contract, required-check alignment, E2E source assertions | README, CLAUDE, MANUAL, greenfield ledger | Intel, WSL, redirected Windows, Windows font E2E, and desktop GUI results pending; ledger has no fabricated rows. |
 | UGR-022 | ACCEPTED/FIXED | ROADMAP baseline is live main, PR #46 is truthful DONE/merged, Make help says 80ms local/150ms CI, README documents `--best-effort`/`--skip-nvim`, and live-vs-checked-in safeguard language is explicit. | closure commits including final batch (hash pending) | doc/static/help/required-check guards | README, CLAUDE, ROADMAP, MIGRATION_STATUS, security docs, ledgers | Statuses must be refreshed again after CI/live results. |
-| UGR-023 | ACCEPTED/FIXED | Starship cache publication is atomic/validated/rollback-safe; Polaris stages clean on failure/signal/retry; analyzer warnings have exact stable fingerprints; JSON traversal is NUL-safe; shell lint is strict; Nix ownership scanner catches nested/wrapped/imported bypasses while allowing system policy; direct-artifact compatible/stale/partial cases remain focused. | final closure batch (hash pending), with direct-artifact/shell-lint portions in `aa48aad` | Profile/Polaris/JSON path/Nix scanner self-tests, analyzer full entry point, direct-artifact update suites | README, CLAUDE, ROADMAP, MIGRATION_STATUS | Platform-specific CI remains pending. |
+| UGR-023 | ACCEPTED/FIXED | Starship cache publication is atomic/validated/rollback-safe; Sentinel stages clean on failure/signal/retry; analyzer warnings have exact stable fingerprints; JSON traversal is NUL-safe; shell lint is strict; Nix ownership scanner catches nested/wrapped/imported bypasses while allowing system policy; direct-artifact compatible/stale/partial cases remain focused. | final closure batch (hash pending), with direct-artifact/shell-lint portions in `aa48aad` | Profile/Sentinel/JSON path/Nix scanner self-tests, analyzer full entry point, direct-artifact update suites | README, CLAUDE, ROADMAP, MIGRATION_STATUS | Platform-specific CI remains pending. |
 
 ## Explicit rejected/out-of-scope candidates — entry 1
 
@@ -290,7 +290,7 @@ documentation-only result entry was appended afterward:
 
 An earlier pre-final shell-suite run correctly failed on two new ShellCheck
 diagnostics. The ambiguous logical-marker expression was rewritten as explicit
-control flow, and the Polaris trap-only helper became an inline EXIT transaction;
+control flow, and the Sentinel trap-only helper became an inline EXIT transaction;
 the focused tests, strict lint, full shell suite, `make test`, and `make ci` all
 passed afterward. No suppression or weakened test was added.
 
@@ -628,7 +628,7 @@ pushed exact-head runs or manual environments.
   assertions accepted the checksum-verified Tree-sitter `0.26.10` release
   artifact, installed Hack Nerd Font files and found their application-visible
   registry registration, accepted Pi `0.80.3`, restored Lazy, built the parser
-  set, synchronized Mason, verified Polaris, and completed the strict
+  set, synchronized Mason, verified Sentinel, and completed the strict
   257-check Neovim LSP/parser/formatter smoke.
 - This is native Windows hosted proof for those conventional-path assertions.
   It is not a redirected Documents/LocalApplicationData run, a divergent
@@ -744,7 +744,7 @@ rewriting that history.
 | UGR-020 | PARTIAL | `eac92bc` implements deadlock-free stage 1: six stable logical checks verify exact artifact/run/head proof while all 12 legacy required contexts remain. All six logical jobs passed on behavior head. | Marker tamper/missing/duplicate tests, workflow metadata/alignment, and live logical jobs `86361159946`, `86361159987`, `86363763769`, `86363763779`, `86363763791`, `86363763792`. | README, CLAUDE invariant 27, branch-protection runbook, MIGRATION_STATUS. | After merge: observe default-branch logical checks, merge a context-switch PR, then owner applies live safeguards. |
 | UGR-021 | PARTIAL | `1423a47`, `eac92bc`, and `f89f61c` make scheduled/manual setup cache-free, keep WSL fail-visible/non-required, add real binary checks where credible, assert Windows fonts, and state AeroSpace TCC unavailability honestly. | Cache contract, GUI/runtime source guards, required-check alignment; exact hosted Ubuntu/ARM/Intel/Windows setup passed. | README, CLAUDE, MANUAL, greenfield ledger. | Cache-free scheduled/manual, WSL, redirected Windows, dual Terminal, and desktop/TCC visual runs remain required; PR-cache results are not promoted. |
 | UGR-022 | ACCEPTED/FIXED | `5d8772f` and append-only follow-ups repair the main baseline, PR #46 state, timing claim, setup flags, safeguards truth, and every status changed by this implementation. | Documentation/static/help/required-check guards and full `make ci`. | README, CLAUDE, ROADMAP, MIGRATION_STATUS, MANUAL, security docs, both ledgers. | Future statuses must be updated after the staged safeguards PRs and manual runs. |
-| UGR-023 | ACCEPTED/FIXED | `eac92bc` plus `aa48aad` make Starship cache and Polaris staging transactional, analyzer identities exact, JSON traversal NUL-safe, shell lint strict, Nix ownership structural, and direct-artifact updates compatibility-aware. | Profile/Polaris/JSON-path/Nix-scanner/analyzer/direct-artifact tests; full local and hosted gates green. | README, CLAUDE, ROADMAP, MIGRATION_STATUS. | None beyond the platform/manual rows already named. |
+| UGR-023 | ACCEPTED/FIXED | `eac92bc` plus `aa48aad` make Starship cache and Sentinel staging transactional, analyzer identities exact, JSON traversal NUL-safe, shell lint strict, Nix ownership structural, and direct-artifact updates compatibility-aware. | Profile/Sentinel/JSON-path/Nix-scanner/analyzer/direct-artifact tests; full local and hosted gates green. | README, CLAUDE, ROADMAP, MIGRATION_STATUS. | None beyond the platform/manual rows already named. |
 
 ### Verification classification
 
@@ -1764,3 +1764,39 @@ safeguard mutation, or merged-main cache-free proof is claimed by this entry.
 | UGR-002 | REJECTED (superseded contract) | Apple Silicon is the only active Darwin output, runner, pinned installer artifact, setup target, release migration, and current documentation path. The generic boundary rejects every other macOS architecture before mutation. | None; historical rows remain evidence only. |
 | UGR-020 | PARTIAL | The safeguard and release transaction contracts remain green through the full local gate; this architecture closure does not apply live safeguards. | Final pushed-head checks/artifacts and independent review; after merge, merged-main cache-free proof and owner preflight/apply/readback. |
 | UGR-022 | ACCEPTED/FIXED | README, CLAUDE, roadmap, migration status, upgrade/release/supply-chain docs, tests, and this append-only entry describe the same Apple-Silicon-only product contract. | Append pushed/tag/manual evidence only after it exists. |
+
+## Sentinel repository rename cutover — entry 45
+
+- The canonical upstream is now the public repository
+  `https://github.com/luisgui1757/sentinel`. Its renamed default-branch tree is
+  exact commit `ecafffa858666343c1639f996d177f460163e93e` and declares
+  `VERSION=0.1.2`. The published `v0.1.2` tag still peels to the pre-rename
+  commit `ecca742fa9ed1243a73981955850c1a8ef3e3b04`; setup therefore pins the
+  renamed commit plus `VERSION` and does not manufacture a false tag mapping.
+- Both setup entry points, their cache roots, functions, variables, prompts,
+  diagnostics, mock repositories, pin mirrors, and tests use Sentinel
+  exclusively. The shell test path is now
+  `tests/shell/setup_sentinel_test.sh`. Current and historical tracked prose was
+  normalized to the sole product name so the committed tree has no retired-name
+  residue while Git history continues to retain the original evidence.
+- `tests/static/sentinel_naming_test.sh` reconstructs the retired token only at
+  runtime and scans every tracked path and regular-file payload
+  case-insensitively. The guard therefore proves zero residue without embedding
+  the forbidden token in its own source.
+
+### Local verification
+
+| Check | Exact result |
+|---|---|
+| Real isolated-HOME Sentinel setup | PASS: cloned `luisgui1757/sentinel`, detached at `ecafffa858666343c1639f996d177f460163e93e`, validated `VERSION=0.1.2`, installed and checked four global entrypoints, and found zero retired-name hits in the checkout or rendered blocks |
+| `bash tests/shell/setup_sentinel_test.sh` | PASS: immutable checkout, hostile Git config isolation, dirty/untracked/ignored/core.worktree refusal, wrong-version fail-closed behavior, retry cleanup, and interruption cleanup |
+| Focused `Setup.Tests.ps1` | PASS: 55 passed, 0 failed/skipped |
+| `bash tests/static/pin_consistency_test.sh` | PASS: POSIX/Windows/docs mirror version `0.1.2` and exact commit `ecafffa858666343c1639f996d177f460163e93e` |
+| `bash tests/static/sentinel_naming_test.sh` | PASS: Sentinel is the sole tracked agent-policy product name |
+| `make ci` | PASS: complete local pre-PR gate, including 83 reviewed Renovate records |
+| `nix flake check --print-build-logs` | PASS on Apple Silicon; incompatible Linux systems were omitted, not promoted to runtime proof |
+| `git diff --check` | PASS |
+
+No pushed-head hosted result, review, approval, merge, matching Sentinel release
+tag, live safeguard mutation, or merged-main cache-free proof is claimed by this
+entry.
