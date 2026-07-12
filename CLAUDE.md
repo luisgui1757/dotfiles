@@ -831,8 +831,10 @@ and classic required checks, and keeps a verified recovery snapshot. Both
 preflight captures require public repository visibility. Recovery must freeze
 all consumed snapshot files before validation, bind their exact legacy/stable
 contexts, app IDs, ruleset identity, bypass/branch policy, Actions pinning, and
-complete classic state—including required nullable keys—to the manifest, then
-write and verify only those frozen bytes. Expected recovery policy comes from
+complete classic state—including disabled review/restriction sections that
+GitHub may omit or return as `null`—to the manifest, while rejecting any
+non-null policy, then write and verify only those frozen bytes. Expected
+recovery policy comes from
 the manifest's exact captured Git commit, never the current worktree, and that
 commit must still be live `main`. After the second live capture, apply
 must also rebuild every desired write and its metadata from exact committed

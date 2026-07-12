@@ -317,8 +317,6 @@ validate_classic_live_schema() {
       type == "object"
       and has("required_status_checks")
       and has("enforce_admins")
-      and has("required_pull_request_reviews")
-      and has("restrictions")
       and has("required_linear_history")
       and has("allow_force_pushes")
       and has("allow_deletions")
@@ -337,8 +335,8 @@ validate_classic_live_schema() {
         and (.context | type == "string" and length > 0)
         and (.app_id | type == "number"))
       and (.enforce_admins.enabled | type == "boolean")
-      and .required_pull_request_reviews == null
-      and .restrictions == null
+      and .required_pull_request_reviews? == null
+      and .restrictions? == null
       and (.required_linear_history.enabled | type == "boolean")
       and (.allow_force_pushes.enabled | type == "boolean")
       and (.allow_deletions.enabled | type == "boolean")

@@ -74,9 +74,10 @@ and verifies the old stage. Before any restore write, it requires every consumed
 snapshot file, copies those bytes into a private temporary directory, and
 validates the frozen set against the manifest's exact legacy/stable stage:
 Actions pinning, integrity contexts and app IDs, unique live ruleset identity,
-bypass actors, branch conditions, every consumed full-classic key (including
-explicit nullable review/restriction fields), and the narrow classic restore
-payload. Missing, malformed, incomplete, altered, cross-stage, wrong-target, or
+bypass actors, branch conditions, every consumed full-classic key, disabled
+review/restriction sections normalized from either GitHub-omitted keys or
+explicit `null`, and the narrow classic restore payload. Missing, malformed,
+enabled optional policy, incomplete, altered, cross-stage, wrong-target, or
 internally inconsistent source bytes fail with zero writes; changes to the
 retained source after freezing cannot affect publication. The expected
 legacy/stable policy is loaded from the manifest's exact captured Git commit;
