@@ -27,7 +27,7 @@ EOF
 chmod +x "$TMP_ROOT/fakebin/nvim"
 
 SCRIPT_DIR="$TMP_ROOT/repo"
-DEPS_FLAGS=(--update)
+DEPS_FLAGS=()
 DRY_RUN=0
 SKIP_DEPS=0
 SKIP_NVIM=0
@@ -51,8 +51,8 @@ if printf '%s\n' "$output" | grep -Eq 'chezmoi|Lazy(!| sync)|Tree-sitter|MasonTo
     echo "$output"
     fail "setup update touched config, Lazy, Tree-sitter, or Mason install paths"
 fi
-printf '%s\n' "$output" | grep -F "Plugins (lazy-lock.json), pinned binaries, and configs update through a reviewed release migration" >/dev/null \
-    || fail "closing note for pinned core updates was missing"
+printf '%s\n' "$output" | grep -F "checked-out release, pinned plugins, configs, Nix layer, and missing tools were reconciled" >/dev/null \
+    || fail "closing note for the preceding full reconciliation was missing"
 
 rm -f "$TMP_ROOT/install-deps.args" "$TMP_ROOT/nvim.args"
 SKIP_NATIVE_DEPS=1

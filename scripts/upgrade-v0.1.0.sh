@@ -1047,8 +1047,9 @@ perform_apply() {
     fi
     preparing_recovery=""
     transaction_active=1
-    "$active_recovery/new-release/setup.sh" --all --skip-native-deps --skip-config-scripts \
-        --skip-nvim --skip-agents
+    DOTFILES_RELEASE_MIGRATION_ACTIVE=1 \
+        "$active_recovery/new-release/setup.sh" --all --skip-native-deps \
+        --skip-config-scripts --skip-nvim --skip-agents
     verify_new_state "$active_recovery" "$active_recovery/new-release" "$os"
     set_stage "$active_recovery" applied
     transaction_active=0

@@ -8,27 +8,30 @@ significant change to the relevant area.
 
 Use throwaway users/VMs seeded from the exact annotated v0.1.0 release. Follow
 `docs/UPGRADING.md`; never use `main` or update the old checkout in place.
-For every row, inject an interruption after package activation and after config
-publication, run the printed rollback, retry, then verify and accept. Record the
-old/new tag objects, peeled commits, recovery path, provider inventory, and
-whether any user data changed.
+For every row, the normal success path must be only `setup --all` / `setup -All`
+from the exact new release checkout. Separately inject an interruption after
+package activation and after config publication through the operator migrator,
+run the printed rollback, then prove rerunning setup resumes or retries safely.
+Also run setup update/upgrade once. Record the old/new tag objects, peeled
+commits, recovery path, provider inventory, and whether any user data changed.
 
 - [ ] **Apple Silicon owner-host:** begin with v0.1.0 Homebrew formulae/casks,
       real taps, no Nix, divergent config, and backup-name collisions. Install
-      Nix with the checksum-verified release helper; require read-only
-      preflight; apply; prove failed nix-darwin/later config paths restore old
+      Nix through setup's checksum-verified helper; prove failed
+      nix-darwin/later config paths restore old
       taps, `/etc` shell files, v0.1.0 config, and provider precedence. On
-      success verify apps/TCC separately before acceptance.
+      success verify setup accepted the core, retained recovery, repointed
+      config, and completed apps/TCC provisioning.
 - [ ] **Native Linux x86_64:** seed a representative native-package/Linuxbrew/
       direct-artifact v0.1.0 host. Prove Home Manager activation, login PATH,
       later failure uninstall, exact old symlink restoration, retry, and
       acceptance without removing native packages.
 - [ ] **Native Linux aarch64:** repeat on a real aarch64 host; configuration
       evaluation or an emulated filesystem is not runtime proof.
-- [ ] **WSL2 split host:** leave the Windows recovery unaccepted while applying
-      the guest. Interrupt after host success and after guest activation; prove
-      guest-first then host rollback. Run `tests/wsl/e2e.sh`; accept guest first
-      and host second only after both verify.
+- [ ] **WSL2 split host:** run only setup on Windows and setup in the guest.
+      Interrupt each platform transaction independently, prove its automatic
+      rollback/retry, then run `tests/wsl/e2e.sh` after both setup invocations
+      succeed.
 - [ ] **Windows conventional known folders:** exact v0.1.0 checkout with
       divergent copy-mode files and nvim link. Apply from exact v0.2.0, fail
       after Terminal/config publication, and prove exact old config plus
@@ -41,9 +44,10 @@ whether any user data changed.
       no conventional path may be guessed or overwritten.
 - [ ] **Release acceptance:** on the final annotated v0.2.0 tag, run the full
       local/hosted gates and public-secret scan, record the tag object and peeled
-      commit, then confirm the release document contains no branch command or
-      placeholder identity. Until every required row is accepted, keep v0.1.0
-      as the only user-facing release.
+      commit, prove fresh and v0.1.0 machines both need only setup all, then
+      confirm the release document contains no branch command or placeholder
+      identity. Until every required row is accepted, keep v0.1.0 as the only
+      user-facing release.
 
 ## Visual / GUI
 
@@ -364,7 +368,7 @@ whether any user data changed.
       compiler OK. Open a Python file and confirm `python` parser highlighting
       works.
 - [ ] **Fresh WSL Ubuntu**: on Windows first run
-      `.\setup.ps1 -All`, then inside WSL install Nix and run
+      `.\setup.ps1 -All`, then inside WSL run
       `./setup.sh --all` and `./tests/wsl/e2e.sh`. Confirm the script passes:
       Windows Terminal uses Hack Nerd Font, `win32yank` is reachable, lazygit is
       installed on both sides, zsh plugins are installed in WSL, nvim starts,

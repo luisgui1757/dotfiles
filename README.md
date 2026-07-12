@@ -9,23 +9,24 @@ formatter provisioning, and global Sentinel agent-policy bootstrap. It also prov
 `nvim-treesitter` main parser builds, plus AeroSpace (macOS tiling WM) and Herdr
 (agent multiplexer: macOS/Linux stable, Windows preview) through vendor-channel installs.
 
-The public interface is intentionally small:
+The public interface is intentionally small. After cloning an exact release,
+fresh installs and supported historical migrations use the same command:
 
 ```text
-run setup -> install programs -> link configs -> restore Neovim plugins -> sync Mason tools
+setup --all -> bootstrap prerequisites -> migrate if needed -> reconcile the full release
 ```
 
-For a fresh machine, run `setup`. The split is deliberate:
+For a fresh machine or a machine still carrying exact v0.1.0 state, run
+`./setup.sh --all` or `.\setup.ps1 -All`. The split behind that entry point is deliberate:
 Nix is the enforced package layer on macOS/Linux/WSL; `install-deps` handles
 native/deferred tools and Windows packages; chezmoi owns the dotfiles/config
 layer in `home/`. The full setup scripts apply configs through chezmoi.
 
-Updates are deliberately two-track. The reproducible core is pinned to an
-immutable reviewed release: Neovim plugins (`nvim/lazy-lock.json`) and configs
-change through the versioned side-by-side upgrade, then setup. The
-drift-tolerant edge is package-manager CLI tools,
-proven dotfiles-owned direct artifacts on Unix, and Mason LSPs; refresh only
-that edge with `./setup.sh --update` or `.\setup.ps1 -Update`.
+`--update` / `-Update` first reconciles the complete checked-out release—Nix,
+missing tools, config, locked plugins, parsers, Mason, and Sentinel—then refreshes
+only the proven drift-tolerant package/Mason edge. `--upgrade` / `-Upgrade` is
+an alias. Neither spelling fetches a moving branch or rewrites repository pins;
+clone the next exact annotated release beside the old checkout first.
 
 ## Quick Start
 
@@ -36,12 +37,10 @@ installs repo-managed dependencies, links every config, then runs
 Piped or stdin setup is intentionally disabled; if setup cannot prove it is
 running from a local checkout, it fails closed with clone-first instructions.
 
-Git is required to clone this repo. On macOS/Linux/WSL, Nix is also required
-before `setup.sh` runs: setup applies the pinned nix-darwin/Home Manager layer
-first and fails closed if `nix` is missing. Published v0.2.0 checkouts include
-`scripts/install-nix-prerequisite.sh`, which downloads the official upstream
-Nix 2.34.0 release and verifies the platform SHA-256 before extraction or
-execution. The helper and the versioned upgrade tools refuse branches, moving
+Git is required to clone this repo. On macOS/Linux/WSL, setup bootstraps Nix
+when it is missing by calling the release-pinned prerequisite helper itself.
+That helper downloads the official upstream Nix 2.34.0 release and verifies the
+platform SHA-256 before extraction or execution. The helper and the versioned upgrade tools refuse branches, moving
 `main`, lightweight tags, dirty checkouts, and non-official release identities;
 this repo has no pipe-to-shell Nix bootstrap.
 
@@ -50,7 +49,6 @@ this repo has no pipe-to-shell Nix bootstrap.
 git clone --branch v0.2.0 --single-branch \
   https://github.com/luisgui1757/dotfiles.git ~/dotfiles
 cd ~/dotfiles
-./scripts/install-nix-prerequisite.sh --install
 ./setup.sh --all
 ```
 
@@ -66,8 +64,9 @@ Set-Location $HOME\dotfiles
 
 For WSL, treat setup as split-host: run `.\setup.ps1 -All` on Windows so
 Windows Terminal, Hack Nerd Font, lazygit, and `win32yank` are installed on the
-rendering host, install Nix inside the WSL distro, then run `./setup.sh --all`
-inside WSL for the Linux CLI/editor stack. Windows Terminal settings handling
+rendering host, then run `./setup.sh --all` from the exact release checkout
+inside the WSL home for the Linux CLI/editor stack; setup installs Nix there
+when it is missing. Windows Terminal settings handling
 runs by default, and setup independently stages, validates, backs up, and
 atomically merges each existing packaged, Preview, and portable target. If Scoop, winget, and choco
 cannot register the MSIX app, setup falls back to a pinned
@@ -93,28 +92,28 @@ dependency-install run; Scoop refuses admin installs.
 checkout. **Do not run `git pull` in that checkout.** Changing it in place can
 change live config before recovery exists.
 
-Remain on v0.1.0 until the annotated v0.2.0 release is published. Then follow
-the versioned, side-by-side procedure in [docs/UPGRADING.md](docs/UPGRADING.md):
-retain the exact v0.1.0 checkout, clone v0.2.0 separately, run the read-only
-preflight, apply the transactional migration, verify, and explicitly accept or
-rollback from the printed private recovery directory. Apple Silicon macOS and
-Linux/WSL include Nix-generation rollback; Windows independently recovers
-known-folder config and exact packaged/Preview/portable Terminal bytes. macOS migration
-is available only on Apple Silicon.
-Every platform publishes and rolls back only from digest-bound release trees in
-that private directory; full post-acceptance setup later repoints config to the
-retained v0.2.0 checkout.
+Remain on v0.1.0 until the annotated v0.2.0 release is published. Then retain
+the exact old checkout, clone v0.2.0 beside it, and run only `./setup.sh --all`
+or `.\setup.ps1 -All` from the new checkout. Setup detects the live exact-v0.1.0
+owner, installs Nix on POSIX when needed, runs the existing digest-bound
+transaction, verifies and accepts its reversible core, retains private recovery,
+then completes additive provisioning and repoints config to v0.2.0. A pending
+`applied` recovery resumes at acceptance; an unsafe/incomplete recovery fails
+closed with its exact rollback command. If the old checkout is not discoverable
+from the live config, set `DOTFILES_V0_1_CHECKOUT` to its real path for that same
+setup invocation. macOS migration is available only on Apple Silicon.
 
-`./setup.sh --update` and `.\setup.ps1 -Update` are package/Mason refreshes,
-not release migrations: they do not fetch Git, activate the versioned config,
-or perform the Nix ownership transition.
+The manual preflight/apply/rollback/accept commands remain available in
+[docs/UPGRADING.md](docs/UPGRADING.md) for diagnosis and operator-controlled
+recovery, but they are no longer the normal user path.
 
 ### Existing Checkout
 
 ```bash
 ./setup.sh                       # Y/n per dep, end-to-end
-./setup.sh --all                 # non-interactive
-./setup.sh --update              # update proven tools/artifacts + Mason, no git/config/Lazy
+./setup.sh --all                 # install or migrate, then reconcile everything
+./setup.sh --update              # full reconciliation + proven tool/Mason refresh
+./setup.sh --upgrade             # alias for --update
 ./setup.sh --dry-run             # preview
 ./setup.sh --experimental-wsl-gui # WSL-only opt-in for Linux GUI terminal bits
 ./setup.sh --nix-darwin          # compatibility alias; macOS setup already applies nix-darwin
@@ -210,6 +209,7 @@ append-only evidence ledger and are not a current support claim.
 .\setup.ps1
 .\setup.ps1 -All
 .\setup.ps1 -Update
+.\setup.ps1 -Upgrade  # alias for -Update
 .\setup.ps1 -DryRun
 .\setup.ps1 -SkipConfig
 .\setup.ps1 -SkipAgents
@@ -320,14 +320,13 @@ tool. Phase 6 then asks **"Apply Sentinel global agent rules? [Y/n]"** unless
 already made that decision.
 Add `--dry-run` / `-DryRun` to preview every step without touching disk.
 Pass `--skip-agents` / `-SkipAgents` to leave global AI-agent entrypoints alone.
-Pass `--update` / `-Update` from an existing checkout to run only the
-drift-edge refresh: scoped package-manager updates for present catalog tools,
-Unix direct-artifact refreshes only when dotfiles provenance proves ownership,
-then `nvim --headless +MasonToolsUpdateSync +qa`. The synchronous Mason command
-keeps headless Neovim alive until package installs finish. It deliberately skips
-`git pull`, `chezmoi apply`, `:Lazy restore`, synchronous Tree-sitter parser
-bootstrap, `:Lazy sync`, and `:Lazy update`; the last two can change
-`lazy-lock.json` and are therefore repo updates, not machine refreshes.
+Pass `--update` / `-Update` from an exact release checkout to run the same
+install-or-migrate and full-reconciliation path as all mode, followed by scoped
+package-manager/direct-artifact updates for proven present tools and
+`MasonToolsUpdateSync`. `--upgrade` / `-Upgrade` is an alias. Update never runs
+`git pull`, follows a moving branch, performs a blanket package-manager upgrade,
+rewrites `flake.lock`, or runs `:Lazy update`; repository pins change only in a
+reviewed release.
 
 Every script is safe to rerun. Pre-existing non-symlink targets are backed up to
 `<target>.bak.<timestamp>` with collision-proof suffixes (`.1`, `.2`, ...).
@@ -470,8 +469,9 @@ migration warning. POSIX pwsh profile management remains provisioning-adjacent.
   independent later installs still run, and the consolidated summary exits
   nonzero. `setup.sh`, `setup.ps1`, and `setup.ps1 -Update` exit nonzero
   afterward; dry-run previews and explicit/manual skips remain non-failures.
-- `setup.sh --update` and `setup.ps1 -Update` are scoped and manager-aware. They
-  update only present catalog tools with proven per-tool ownership, then run an
+- `setup.sh --update` and `setup.ps1 -Update` first run the same idempotent full
+  release reconciliation as all mode, then enter a scoped, manager-aware refresh.
+  The refresh updates only present catalog tools with proven per-tool ownership, then runs an
   exact per-package or repo-pinned artifact refresh such as
   `brew upgrade <formula>`, `apt-get install --only-upgrade <pkg>`,
   `scoop update <pkg>`, `winget upgrade --id <id> -e`, or
@@ -1196,7 +1196,8 @@ Run on each machine; there's no machine-pinned lockfile for Mason itself.
 ```bash
 git clone --branch v0.2.0 --single-branch \
   https://github.com/luisgui1757/dotfiles.git ~/dotfiles
-nvim --headless "+Lazy! restore" +qa  # match plugin commits
+cd ~/dotfiles
+./setup.sh --all                 # prerequisites + packages + config + locked plugins
 make test                       # verify the new state
 ```
 

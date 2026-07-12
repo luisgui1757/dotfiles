@@ -19,5 +19,8 @@ fi
 if grep -F 'interactive: one prompt' <<<"$out" >/dev/null; then
     echo "FAIL: setup.sh help still claims a single interactive prompt"; echo "$out"; exit 1
 fi
+if ! grep -F './setup.sh --upgrade' <<<"$out" >/dev/null; then
+    echo "FAIL: setup.sh help does not advertise the update alias"; echo "$out"; exit 1
+fi
 
 echo "OK"

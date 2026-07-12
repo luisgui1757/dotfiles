@@ -1080,6 +1080,131 @@ Invoke-SentinelAgentPolicy -AllMode:`$true -IsDryRun:`$false -Version '0.1.2' -R
     }
 }
 
+Describe "setup.ps1 universal install and migration entrypoint" {
+    BeforeEach {
+        . $script:ImportSetupForTest
+        $script:UniversalRoot = Join-Path ([IO.Path]::GetTempPath()) ('setup universal ' + [Guid]::NewGuid())
+        $script:UniversalLocal = Join-Path $script:UniversalRoot 'Local Data'
+        $script:UniversalOld = Join-Path $script:UniversalRoot 'dotfiles-v0.1.0'
+        $script:UniversalRecovery = Join-Path $script:UniversalRoot 'recovery'
+        New-Item -ItemType Directory -Force -Path $script:UniversalLocal, $script:UniversalOld, $script:UniversalRecovery | Out-Null
+        $script:UniversalIdentity = [pscustomobject]@{
+            UserProfile = (Join-Path $script:UniversalRoot 'User')
+            LocalApplicationData = $script:UniversalLocal
+            Documents = (Join-Path $script:UniversalRoot 'Documents')
+            RuntimeProfile = (Join-Path $script:UniversalRoot 'Documents\PowerShell\Microsoft.PowerShell_profile.ps1')
+        }
+        $script:UniversalCalls = @()
+        $script:UniversalOldOverride = $env:DOTFILES_V0_1_CHECKOUT
+        $env:DOTFILES_V0_1_CHECKOUT = $script:UniversalOld
+        $script:CompletedV01Recovery = ''
+    }
+
+    AfterEach {
+        if ($null -eq $script:UniversalOldOverride) {
+            Remove-Item Env:DOTFILES_V0_1_CHECKOUT -ErrorAction SilentlyContinue
+        } else {
+            $env:DOTFILES_V0_1_CHECKOUT = $script:UniversalOldOverride
+        }
+        Remove-Item -LiteralPath $script:UniversalRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
+    It "accepts Upgrade as an alias for Update and makes update non-interactive" {
+        (Get-Command $script:Setup).Parameters['Update'].Aliases | Should -Contain 'Upgrade'
+
+        . $script:ImportSetupForTest -Parameters @{ Update = $true }
+
+        $Update | Should -BeTrue
+        $All | Should -BeTrue
+        $depsArgs.ContainsKey('Update') | Should -BeFalse
+        $depsArgs['All'] | Should -BeTrue
+    }
+
+    It "applies then accepts an exact v0.1.0 installation from setup All" {
+        $gitRunner = {
+            param([string]$Path, [string[]]$Arguments)
+            $null = $Path
+            if (($Arguments -join ' ') -match 'HEAD\^\{commit\}') { return $V01Commit }
+            return $V01TagObject
+        }
+        $migrationRunner = {
+            param([string]$Mode, [string]$Argument)
+            $script:UniversalCalls += "$Mode|$Argument"
+            if ($Mode -eq 'Apply') { return "Recovery directory: $($script:UniversalRecovery)" }
+            return 'accepted fixture migration'
+        }
+
+        Invoke-SetupV01Migration `
+            -Identity $script:UniversalIdentity `
+            -AllMode $true `
+            -MigrationRunner $migrationRunner `
+            -GitRunner $gitRunner
+
+        $script:UniversalCalls | Should -Be @(
+            "Apply|$($script:UniversalOld)",
+            "Accept|$($script:UniversalRecovery)"
+        )
+        $script:CompletedV01Recovery | Should -Be $script:UniversalRecovery
+    }
+
+    It "resumes an already-applied migration at acceptance" {
+        Remove-Item Env:DOTFILES_V0_1_CHECKOUT -ErrorAction SilentlyContinue
+        $pending = Join-Path (Join-Path (Join-Path $script:UniversalLocal 'dotfiles') 'migrations') 'v0.1.0-to-v0.2.0.pending'
+        New-Item -ItemType Directory -Force -Path $pending | Out-Null
+        [IO.File]::WriteAllText((Join-Path $pending 'stage'), "applied`n")
+        [IO.File]::WriteAllText((Join-Path $pending 'new-checkout'), "$ScriptDir`n")
+        [IO.File]::WriteAllText((Join-Path $pending 'old-checkout'), "$($script:UniversalOld)`n")
+        $migrationRunner = {
+            param([string]$Mode, [string]$Argument)
+            $script:UniversalCalls += "$Mode|$Argument"
+            return 'accepted pending migration'
+        }
+
+        Invoke-SetupV01Migration `
+            -Identity $script:UniversalIdentity `
+            -AllMode $true `
+            -MigrationRunner $migrationRunner
+
+        $script:UniversalCalls | Should -Be @("Accept|$pending")
+        $script:CompletedV01Recovery | Should -Be $pending
+    }
+
+    It "refuses to cross an unfinished recovery-required boundary" {
+        Remove-Item Env:DOTFILES_V0_1_CHECKOUT -ErrorAction SilentlyContinue
+        $pending = Join-Path (Join-Path (Join-Path $script:UniversalLocal 'dotfiles') 'migrations') 'v0.1.0-to-v0.2.0.pending'
+        New-Item -ItemType Directory -Force -Path $pending | Out-Null
+        [IO.File]::WriteAllText((Join-Path $pending 'stage'), "recovery-required`n")
+        [IO.File]::WriteAllText((Join-Path $pending 'new-checkout'), "$ScriptDir`n")
+        [IO.File]::WriteAllText((Join-Path $pending 'old-checkout'), "$($script:UniversalOld)`n")
+
+        { Invoke-SetupV01Migration -Identity $script:UniversalIdentity -AllMode $true } |
+            Should -Throw '*unfinished v0.1.0 migration requires recovery first*'
+    }
+
+    It "rejects malformed pending recovery instead of starting another migration" {
+        Remove-Item Env:DOTFILES_V0_1_CHECKOUT -ErrorAction SilentlyContinue
+        $pending = Join-Path (Join-Path (Join-Path $script:UniversalLocal 'dotfiles') 'migrations') 'v0.1.0-to-v0.2.0.invalid'
+        New-Item -ItemType Directory -Force -Path $pending | Out-Null
+        [IO.File]::WriteAllText((Join-Path $pending 'stage'), "applied`n")
+        [IO.File]::WriteAllText((Join-Path $pending 'new-checkout'), "$ScriptDir`n")
+
+        { Invoke-SetupV01Migration -Identity $script:UniversalIdentity -AllMode $true } |
+            Should -Throw '*migration recovery identity is incomplete or unsafe*'
+    }
+
+    It "rejects a pending recovery scalar without exact newline framing" {
+        Remove-Item Env:DOTFILES_V0_1_CHECKOUT -ErrorAction SilentlyContinue
+        $pending = Join-Path (Join-Path (Join-Path $script:UniversalLocal 'dotfiles') 'migrations') 'v0.1.0-to-v0.2.0.invalid'
+        New-Item -ItemType Directory -Force -Path $pending | Out-Null
+        [IO.File]::WriteAllText((Join-Path $pending 'stage'), 'applied')
+        [IO.File]::WriteAllText((Join-Path $pending 'new-checkout'), "$ScriptDir`n")
+        [IO.File]::WriteAllText((Join-Path $pending 'old-checkout'), "$($script:UniversalOld)`n")
+
+        { Invoke-SetupV01Migration -Identity $script:UniversalIdentity -AllMode $true } |
+            Should -Throw '*migration recovery identity is incomplete or unsafe*'
+    }
+}
+
 Describe "setup.ps1 update mode" {
     BeforeEach {
         . $script:ImportSetupForTest
@@ -1128,7 +1253,7 @@ Describe "setup.ps1 update mode" {
         $script:SetupUpdateRuntimeRefreshed | Should -BeTrue
         $output | Should -Match 'Update 1/2'
         $output | Should -Match 'Update 2/2'
-        $output | Should -Match 'Plugins \(lazy-lock\.json\), pinned binaries, and configs update through a reviewed release migration'
+        $output | Should -Match 'checked-out release, pinned plugins, configs, and missing tools were reconciled'
         $output | Should -Not -Match 'chezmoi|Lazy restore|Lazy sync|Tree-sitter|MasonToolsInstallSync'
         Should -Invoke -CommandName Invoke-ChezmoiApplyPhase -Times 0 -Exactly
     }
