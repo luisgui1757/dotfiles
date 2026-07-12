@@ -105,7 +105,7 @@ Invoke-Step 'PSScriptAnalyzer' {
     # per rule group; the fingerprint below additionally binds the exact stable
     # script/rule/message/extent identities, so one warning cannot silently
     # replace another while preserving a filename/rule/count total.
-    $analyzerWarningFingerprint = '1ca7e2f50a9e7e7fbe999197c2ef3bb66f6f3833a481ede9fc667dbba6b7b5b8'
+    $analyzerWarningFingerprint = 'bcc1ab1021d43f70770a1af90d803077bca5ff1d9c023abe94646e544865bf8d'
     $analyzerWarningBaseline = @{
         'dot_tmux.rose-pine.ps1, PSAvoidUsingWriteHost'                               = @{ Count = 1; Reason = 'generated tmux theme status output' }
         'install-deps.ps1, PSAvoidUsingWriteHost'                                     = @{ Count = 165; Reason = 'interactive installer progress output' }
@@ -130,7 +130,7 @@ Invoke-Step 'PSScriptAnalyzer' {
         'sandbox-run.ps1, PSAvoidUsingWriteHost'                                      = @{ Count = 15; Reason = 'greenfield harness progress output' }
         'sandbox-run.ps1, PSUseShouldProcessForStateChangingFunctions'                = @{ Count = 1; Reason = 'sandbox harness setup helper' }
         'sandbox-run.ps1, PSUseSingularNouns'                                         = @{ Count = 1; Reason = 'sandbox harness helper name' }
-        'setup.ps1, PSAvoidUsingWriteHost'                                            = @{ Count = 96; Reason = 'interactive setup progress output' }
+        'setup.ps1, PSAvoidUsingWriteHost'                                            = @{ Count = 93; Reason = 'interactive setup progress output' }
         'setup.ps1, PSUseApprovedVerbs'                                               = @{ Count = 1; Reason = 'established setup helper name' }
         'setup.ps1, PSUseShouldProcessForStateChangingFunctions'                      = @{ Count = 7; Reason = 'setup entry points are explicitly invoked' }
         'setup.ps1, PSUseSingularNouns'                                               = @{ Count = 9; Reason = 'established setup helper names' }

@@ -1800,3 +1800,29 @@ safeguard mutation, or merged-main cache-free proof is claimed by this entry.
 No pushed-head hosted result, review, approval, merge, matching Sentinel release
 tag, live safeguard mutation, or merged-main cache-free proof is claimed by this
 entry.
+
+## Sentinel Windows analyzer-baseline repair — entry 46
+
+- Commit `c7160db6ffd42522ae5c2d313164ca258dadcdff` reached the hosted Test
+  workflow in run
+  [`29186835212`](https://github.com/luisgui1757/dotfiles/actions/runs/29186835212).
+  Windows job `86634390599` completed all 250 Pester tests successfully, including
+  the Sentinel setup cases, then failed only because the exact
+  PSScriptAnalyzer baseline still expected three diagnostics removed with the
+  obsolete tag-refusal branch.
+- Recomputing the analyzer result from the complete tracked PowerShell set
+  produced zero errors, 93 `setup.ps1` `PSAvoidUsingWriteHost` warnings, and
+  exact warning fingerprint
+  `bcc1ab1021d43f70770a1af90d803077bca5ff1d9c023abe94646e544865bf8d`.
+  `test.ps1` now binds that exact result; no warning category was suppressed or
+  excluded.
+
+### Local verification
+
+| Check | Exact result |
+|---|---|
+| `pwsh -NoLogo -NoProfile -File ./test.ps1` | PASS: exact analyzer baseline, 249 Pester passed with zero failed/skipped, and all Neovim specs |
+| Exact analyzer recomputation | PASS: zero errors, 93 setup progress warnings, fingerprint `bcc1ab1021d43f70770a1af90d803077bca5ff1d9c023abe94646e544865bf8d` |
+
+No repaired-head hosted result, review, approval, merge, release tag, live
+safeguard mutation, or merged-main cache-free proof is claimed by this entry.
