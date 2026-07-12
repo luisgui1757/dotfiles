@@ -1826,3 +1826,72 @@ entry.
 
 No repaired-head hosted result, review, approval, merge, release tag, live
 safeguard mutation, or merged-main cache-free proof is claimed by this entry.
+
+## Three-variant Terminal and frozen-postflight closure — entry 47
+
+- Independent reviews of stale head `bc2124290e8b3860fb56fcbf40c0899ff30027a5`
+  disagreed about Windows Terminal Preview and safeguard postflight. The active
+  product contract was decisive: current migration/manual documentation already
+  required stable packaged, Preview packaged, and portable Terminal discovery,
+  while production setup, migration recovery, and uninstall still enumerated
+  only two paths. Behavior commit
+  `10736d3004823867abe861f67f728d1fe174c6d2` closes that gap through one
+  schema-validated target enumerator shared by setup, release migration,
+  rollback/retry, acceptance, and uninstall.
+- Windows recovery now records `Kind`, canonical `Path`, original existence and
+  hash, expected publication presence and hash, and a per-target backup identity
+  for all three targets. Recovery remains permissive only while deciding whether
+  rollback/retry is safe. Apply completion and explicit acceptance have a
+  separate strict boundary: every expected target must equal its exact expected
+  hash and every expected-absent target must remain absent before the migration
+  can become `applied` or `accepted`. Pre-migration, missing, mixed, and external
+  bytes cannot close rollback authority.
+- Safeguard apply now freezes check identities plus integrity, review, and owner
+  ruleset policy from exact committed objects. Postflight derives integrity,
+  classic, review, and owner expectations only from that read-only transaction,
+  compares repository/ruleset state with the frozen second capture, and repeats
+  the exact-main/clean-source boundary after readback. The deterministic
+  after-boundary source mutation case performs the three apply writes, detects
+  drift without consuming it as policy, and performs the three-resource
+  rollback.
+- The Apple-Silicon-only static guard now covers both setup entry points, both
+  dependency installers, both release migrators, the safeguard guide, and every
+  Nix module. The empty-flag shell regression now captures a nonzero setup exit
+  before printing its diagnostic instead of letting `set -e` make that message
+  unreachable.
+- Historical verification totals remain historical. The current behavior tree
+  has 141 tracked shell scripts and all 141 parse. Local `test.ps1` now discovers
+  and passes 257 Pester cases with zero failed/skipped; entry 46's hosted 250-case
+  result remains exact for its older head. A new hosted total is not claimed
+  until the final pushed head runs. The earlier UGR-004 evidence citation named
+  a nonexistent `install_deps_failure_accumulator_test.sh`; the actual passing
+  regression is `tests/shell/install_failure_accumulation_test.sh`.
+
+### Local verification
+
+| Check | Exact result |
+|---|---|
+| `git diff --check` and `bash -n` over tracked `*.sh` | PASS: no diff errors; 141/141 shell scripts parsed |
+| `make lint` | PASS: strict shell lint |
+| `bash tests/static/run_all.sh` | PASS, including the three-resource safeguard transaction, frozen postflight mutation, semantic Probot, required-check, release, Apple-Silicon-only, provenance, and Sentinel naming guards |
+| `bash tests/shell/run_all.sh` | PASS, including reachable empty-array diagnostics and dual-SHA logical proof |
+| `pwsh -NoLogo -NoProfile -File ./test.ps1` | PASS: exact analyzer baseline, 257 Pester passed with zero failed/skipped, and all Neovim specs |
+| Focused Setup/Upgrade/Uninstall Pester | PASS: 83 cases; Preview-only, divergent three-variant, schema identity, exact acceptance, and all-before-any uninstall recovery included |
+| `bash tests/static/repo_safeguards_preflight_test.sh` | PASS: complete apply/restore/rollback suite including after-postflight-boundary source mutation |
+| `make ci` | PASS: ended `local pre-PR gate passed` |
+| `nix flake check --print-build-logs` | PASS on Apple Silicon; incompatible Linux systems omitted, not promoted to runtime proof |
+
+### Finding status amendments
+
+| ID | Status after entry 47 | Exact evidence | Remaining work |
+|---|---|---|---|
+| UGR-001 | ACCEPTED/FIXED | One canonical enumerator and the setup/migration/uninstall transactions cover stable packaged, Preview packaged, and portable targets independently; acceptance requires exact expected state. | Real three-variant native-Windows apply/rollback/uninstall remains a v0.2.0 release row. |
+| UGR-002 | REJECTED (superseded contract) | The expanded active-surface guard passes and only Apple Silicon remains a current macOS product path. | None; historical rows remain evidence only. |
+| UGR-015 | PARTIAL | Redirected-path logic plus three-variant identity/recovery is automated and green. | Real redirected/OneDrive/alternate-drive Windows plus three installed variants. |
+| UGR-020 | PARTIAL | Postflight expectations and unchanged surfaces are transaction-frozen; deterministic late local drift rolls back all three writes. | Final hosted proof; after merge, exact-main cache-free proof and owner preflight/apply/readback. |
+| UGR-021 | PARTIAL | Local implementation/failure injection is complete without promoting it to real WSL, redirected Windows, three-variant Windows, desktop/TCC, or merged-main evidence. | Existing real/manual and post-merge rows. |
+| UGR-022 | ACCEPTED/FIXED | README, CLAUDE, roadmap, migration status, upgrade/release/security docs, manual matrix, and this ledger now state the same three-target and frozen-readback contracts with current local counts. | Append final hosted/tag/manual evidence only when it exists. |
+
+No pushed-head hosted result, logical artifact, review, approval, merge, release
+tag, live safeguard mutation, or merged-main cache-free proof is claimed by this
+entry.
