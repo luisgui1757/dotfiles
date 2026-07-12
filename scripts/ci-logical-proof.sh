@@ -13,13 +13,19 @@ valid_text() {
 }
 
 emit_marker() (
-    local marker="$1" logical="$2" legacy="$3" temp
+    local marker="$1" logical="$2" legacy="$3" temp source_head_sha executed_sha
     if ! valid_text "$logical" || ! valid_text "$legacy"; then
         echo "FAIL: proof identities must be nonempty single-line values" >&2
         exit 1
     fi
-    [[ "${GITHUB_SHA:-}" =~ ^[0-9a-f]{40}$ ]] || {
-        echo "FAIL: GITHUB_SHA is not a full commit identity" >&2
+    source_head_sha="${DOTFILES_SOURCE_HEAD_SHA:-}"
+    executed_sha="${GITHUB_SHA:-}"
+    [[ "$source_head_sha" =~ ^[0-9a-f]{40}$ ]] || {
+        echo "FAIL: DOTFILES_SOURCE_HEAD_SHA is not a full commit identity" >&2
+        exit 1
+    }
+    [[ "$executed_sha" =~ ^[0-9a-f]{40}$ ]] || {
+        echo "FAIL: GITHUB_SHA is not a full executed commit identity" >&2
         exit 1
     }
     [[ "${GITHUB_RUN_ID:-}" =~ ^[0-9]+$ && "${GITHUB_RUN_ATTEMPT:-}" =~ ^[0-9]+$ ]] || {
@@ -31,8 +37,9 @@ emit_marker() (
     trap 'rm -f "$temp"' EXIT HUP INT TERM
     umask 077
     {
-        printf 'schema=1\n'
-        printf 'head_sha=%s\n' "$GITHUB_SHA"
+        printf 'schema=2\n'
+        printf 'source_head_sha=%s\n' "$source_head_sha"
+        printf 'executed_sha=%s\n' "$executed_sha"
         printf 'run_id=%s\n' "$GITHUB_RUN_ID"
         printf 'run_attempt=%s\n' "$GITHUB_RUN_ATTEMPT"
         printf 'logical_context=%s\n' "$logical"
@@ -44,13 +51,15 @@ emit_marker() (
 
 verify_marker() {
     local marker="$1" expected_logical="$2" expected_legacy="$3"
-    local schema="" head_sha="" run_id="" run_attempt="" logical="" legacy="" seen="" key value
+    local schema="" source_head_sha="" executed_sha="" run_id="" run_attempt=""
+    local logical="" legacy="" seen="" key value
     [[ -f "$marker" ]] || { echo "FAIL: logical proof marker is missing: $marker" >&2; return 1; }
     while IFS='=' read -r key value; do
         case " $seen " in *" $key "*) echo "FAIL: duplicate proof field: $key" >&2; return 1 ;; esac
         case "$key" in
             schema) schema="$value" ;;
-            head_sha) head_sha="$value" ;;
+            source_head_sha) source_head_sha="$value" ;;
+            executed_sha) executed_sha="$value" ;;
             run_id) run_id="$value" ;;
             run_attempt) run_attempt="$value" ;;
             logical_context) logical="$value" ;;
@@ -60,9 +69,13 @@ verify_marker() {
         seen="$seen $key"
     done < "$marker"
 
-    [[ "$schema" == "1" ]] || { echo "FAIL: unsupported logical proof schema" >&2; return 1; }
-    [[ "$head_sha" == "${GITHUB_SHA:-}" && "$head_sha" =~ ^[0-9a-f]{40}$ ]] || {
-        echo "FAIL: logical proof does not bind the current head SHA" >&2
+    [[ "$schema" == "2" ]] || { echo "FAIL: unsupported logical proof schema" >&2; return 1; }
+    [[ "$source_head_sha" == "${DOTFILES_SOURCE_HEAD_SHA:-}" && "$source_head_sha" =~ ^[0-9a-f]{40}$ ]] || {
+        echo "FAIL: logical proof does not bind the current source head SHA" >&2
+        return 1
+    }
+    [[ "$executed_sha" == "${GITHUB_SHA:-}" && "$executed_sha" =~ ^[0-9a-f]{40}$ ]] || {
+        echo "FAIL: logical proof does not bind the current executed SHA" >&2
         return 1
     }
     [[ "$run_id" == "${GITHUB_RUN_ID:-}" && "$run_attempt" == "${GITHUB_RUN_ATTEMPT:-}" ]] || {

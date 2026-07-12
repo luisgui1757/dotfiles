@@ -12,6 +12,11 @@ on:
 permissions:
   contents: read
 
+env:
+  # pull_request executes GitHub's synthetic merge commit; preserve the source
+  # branch identity separately so logical proof artifacts bind both identities.
+  DOTFILES_SOURCE_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -30,22 +35,13 @@ jobs:
             runner: macos-26
             legacy_context: nix flake check (macos-26)
             publish_logical_proof: true
-          # Non-required runtime proof for the public Intel activation path.
-          # Its result stays independent from the staged required-check migration.
-          - logical: macos-intel
-            runner: macos-26-intel
-            publish_logical_proof: false
     name: nix flake check (${{ matrix.runner }})
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
       - name: Install Determinate Nix (flakes enabled)
-        if: matrix.logical != 'macos-intel'
         uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22
-      - name: Install upstream Nix on Intel (flakes enabled)
-        if: matrix.logical == 'macos-intel'
-        uses: cachix/install-nix-action@a49548c11d9846ad46ecc0115273879b045f001c # v31.10.7
       - name: nix flake check
         run: nix flake check --print-build-logs
       - name: nix files are nixpkgs-fmt formatted

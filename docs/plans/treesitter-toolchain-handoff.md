@@ -50,7 +50,7 @@ ENOENT: no such file or directory (cmd): 'tree-sitter'`. The hypothesis to test 
 
 | OS | `tree-sitter` CLI | C compiler (cc crate) | On PATH for the headless setup via |
 |---|---|---|---|
-| **macOS** | `brew install tree-sitter-cli` — the logical tool remains `tree-sitter`, but the Homebrew formula is `tree-sitter-cli` because `tree-sitter` no longer ships the CLI binary | cc/clang from Xcode CLT | `setup.sh` `refresh_runtime_path` runs `eval "$(brew shellenv)"` → `/opt/homebrew/bin` (ARM) / `/usr/local/bin` (Intel) |
+| **macOS (Apple Silicon)** | `brew install tree-sitter-cli` — the logical tool remains `tree-sitter`, but the Homebrew formula is `tree-sitter-cli` because `tree-sitter` no longer ships the CLI binary | cc/clang from Xcode CLT | `setup.sh` `refresh_runtime_path` runs `eval "$(brew shellenv)"` → `/opt/homebrew/bin` |
 | **Linux/WSL** | pinned GitHub release binary, SHA-256 verified, into `~/.local/bin` — `install_tree_sitter_cli_linux` (`install-deps.sh:1048`), constants `TREE_SITTER_CLI_LINUX_*` (`:29-31`). Alpine → `apk` (`:1147`) | `build-essential`/`gcc` (`install-deps.sh:1583-1599`) | `refresh_runtime_path` adds `$HOME/.local/bin` |
 | **Windows** | scoop `tree-sitter` (catalog `:258`) via `Install-TreeSitterCli` (`install-deps.ps1:1290`); **npm `tree-sitter-cli` fallback** (`:1314`) records a FAIL marker if npm is missing (`:1310`) | **MSVC / VS Build Tools (VCTools)** — `Install-VsBuildTools` (`install-deps.ps1:1354`), `Install-VsBuildToolsWhenAll` (`:1397`, called `:1571`) | `setup.ps1` `Enter-VsDeveloperEnvironment` (`:89`) imports the VS DevShell before `Invoke-NvimSyncPhases` (`:869`, called `:1017`) so `cl.exe` resolves |
 

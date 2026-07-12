@@ -4,6 +4,47 @@ The automated suite covers the deterministic surface. Some things only
 make sense to verify by eye — keep this checklist alongside any
 significant change to the relevant area.
 
+## v0.1.0 to v0.2.0 release upgrade
+
+Use throwaway users/VMs seeded from the exact annotated v0.1.0 release. Follow
+`docs/UPGRADING.md`; never use `main` or update the old checkout in place.
+For every row, inject an interruption after package activation and after config
+publication, run the printed rollback, retry, then verify and accept. Record the
+old/new tag objects, peeled commits, recovery path, provider inventory, and
+whether any user data changed.
+
+- [ ] **Apple Silicon owner-host:** begin with v0.1.0 Homebrew formulae/casks,
+      real taps, no Nix, divergent config, and backup-name collisions. Install
+      Nix with the checksum-verified release helper; require read-only
+      preflight; apply; prove failed nix-darwin/later config paths restore old
+      taps, `/etc` shell files, v0.1.0 config, and provider precedence. On
+      success verify apps/TCC separately before acceptance.
+- [ ] **Native Linux x86_64:** seed a representative native-package/Linuxbrew/
+      direct-artifact v0.1.0 host. Prove Home Manager activation, login PATH,
+      later failure uninstall, exact old symlink restoration, retry, and
+      acceptance without removing native packages.
+- [ ] **Native Linux aarch64:** repeat on a real aarch64 host; configuration
+      evaluation or an emulated filesystem is not runtime proof.
+- [ ] **WSL2 split host:** leave the Windows recovery unaccepted while applying
+      the guest. Interrupt after host success and after guest activation; prove
+      guest-first then host rollback. Run `tests/wsl/e2e.sh`; accept guest first
+      and host second only after both verify.
+- [ ] **Windows conventional known folders:** exact v0.1.0 checkout with
+      divergent copy-mode files and nvim link. Apply from exact v0.2.0, fail
+      after Terminal/config publication, and prove exact old config plus
+      stable packaged/Preview/portable Terminal bytes return before retry. After recovery is
+      captured, alter or temporarily move both retained checkouts and prove
+      apply/rollback still consume only the frozen release trees.
+- [ ] **Windows redirected/OneDrive/alternate drive:** repeat with Documents,
+      LocalApplicationData, and runtime `$PROFILE` on independent real paths.
+      Include divergent packaged, Preview, and portable Terminal installations;
+      no conventional path may be guessed or overwritten.
+- [ ] **Release acceptance:** on the final annotated v0.2.0 tag, run the full
+      local/hosted gates and public-secret scan, record the tag object and peeled
+      commit, then confirm the release document contains no branch command or
+      placeholder identity. Until every required row is accepted, keep v0.1.0
+      as the only user-facing release.
+
 ## Visual / GUI
 
 - [ ] **Ghostty**, mac: opens with Rose Pine dark, translucent background
@@ -27,11 +68,12 @@ significant change to the relevant area.
 - [ ] **Windows Terminal**: rose-pine scheme applied; tabs use the
       configured theme; acrylic OFF on the body, ON in the tab row; a new tab
       opens `PowerShell 7` unless the user intentionally chose another default.
-- [ ] **Windows Terminal dual-install preservation**: give packaged and portable
-      settings different custom profiles, schemes, actions, and defaults; run
+- [ ] **Windows Terminal three-variant preservation**: give stable packaged,
+      Preview packaged, and portable settings different custom profiles,
+      schemes, actions, and defaults; run
       `setup.ps1 -SkipDeps -SkipNvim`. Confirm each retains only its own custom
       state plus the managed fragment and receives its own verified backup.
-      Run `uninstall.ps1 -All`; confirm both pre-setup backups restore and each
+      Run `uninstall.ps1 -All`; confirm all pre-setup backups restore and each
       displaced current file remains as `settings.json.uninstall-current.*`.
 - [ ] **Redirected Windows known folders**: redirect Documents and
       LocalApplicationData to different real paths (include an alternate drive
@@ -147,12 +189,11 @@ significant change to the relevant area.
 - [ ] **`nix flake check`**: on a Nix host run `nix flake check` at the repo root
       — it evaluates `darwinConfigurations.dotfiles` (build skipped) and builds
       `checks.<system>.toolchain`, exit 0.
-- [ ] **nix-darwin bootstrap/switch**, macOS: on Apple Silicon and Intel with Nix installed, run
+- [ ] **nix-darwin bootstrap/switch**, Apple Silicon macOS: with Nix installed, run
       `./setup.sh --all` (or the compatibility alias `./setup.sh --nix-darwin`;
       equivalent activation:
       `sudo env DOTFILES_TARGET_USER="$USER" DOTFILES_TARGET_HOME="$HOME"
-      darwin-rebuild switch --flake .#dotfiles-aarch64 --impure` or
-      `.#dotfiles-x86_64` as appropriate; first-run setup
+      darwin-rebuild switch --flake .#dotfiles-aarch64 --impure`; first-run setup
       derives the locked
       `github:nix-darwin/nix-darwin/<rev>?narHash=<encoded-narHash>#darwin-rebuild`
       ref from `flake.lock`). Confirm activation uses sudo but targets the
@@ -177,17 +218,16 @@ significant change to the relevant area.
       reports a trusted tap so Homebrew 5 can load the AeroSpace cask.
       The `DOTFILES_NIX_DARWIN_HOSTED_CI=1` cleanup override is only for
       GitHub's disposable macOS runner; do not use it for this real-host check.
-- [x] **Intel macOS hosted runtime proof**: exact head
+- [x] **Historical Intel macOS hosted runtime proof (platform retired)**: exact head
       `f4b63953f2f982702a685358b09e89bae2d78fdd` passed the real
       `macos-26-intel` Nix job (`29092384007` / `86360593091`) and full setup job
       (`29092384014` / `86360593153`). The x86_64 host installed upstream Nix
       2.34.8, selected only `dotfiles-x86_64`, completed nix-darwin and all six
       setup phases, and passed post-install plus the 257-check language smoke.
-      This is runtime proof, not cross-evaluation. The PR lane restored caches
-      and had no user-granted TCC desktop session. Nixpkgs 26.05 is the final
-      Intel-darwin release and remains supported only through 2026-12-31; keep
-      its warning visible and track the required post-26.05 package-plane
-      migration separately.
+      This was runtime proof, not cross-evaluation. The PR lane restored caches
+      and had no user-granted TCC desktop session. Intel support is now retired
+      by explicit owner direction, so this append-only historical result is not
+      a current support claim or an open package-plane migration.
 - [x] **Cache-free exact behavior-head full setup proof**: workflow-dispatch run
       [`29096335827`](https://github.com/luisgui1757/dotfiles/actions/runs/29096335827)
       on merged-main SHA `5e3e7c6d93c400d67f6160c6f8f09be56aac10d3`
@@ -213,13 +253,42 @@ significant change to the relevant area.
       `86399025519`, Apple Silicon `86399025503`, Intel `86399025491`, native
       Windows `86399025722`, and all four setup logical proofs were green.
       This checks the exact branch behavior; it is not WSL, redirected Windows,
-      divergent dual Terminal, or desktop/TCC evidence.
-- [ ] **Cache-free merged-main safeguard confirmation**: after PR #48 merges,
-      dispatch `e2e-install.yml` on the resulting `main` SHA. Require all five
-      producers, the four setup logical proofs, and the two Nix logical proofs
-      to pass before opening the stage-two context-switch PR. Record that
-      merged-main SHA and run here and in `tests/greenfield/LEDGER.md`; a
-      documentation-only descendant does not replace the behavior-head run.
+      divergent stable packaged/Preview/portable Terminal, or desktop/TCC
+      evidence. Merged-main run
+      [`29114125798`](https://github.com/luisgui1757/dotfiles/actions/runs/29114125798)
+      on PR #48 merge SHA `f104bf066e4af7d4d707fe22ba36600711f1ae14`
+      passed Ubuntu container, public Ubuntu, historical Intel, and Windows but
+      failed Apple Silicon because the initial CMake LSP fixture shared a large
+      project root and neocmakelsp timed out before attach; the later isolated
+      CMake formatter fixture attached and validated gersemi in the same process.
+      PR-head run
+      [`29180481941`](https://github.com/luisgui1757/dotfiles/actions/runs/29180481941)
+      later proved that two separate client lifecycles remained timing-dependent
+      even after project isolation: the initial CMake client attached, but the
+      formatter-only restart did not. Strict smoke now formats and checks the
+      realistic CMake sample on the already-attached isolated client. Three
+      repeated strict Apple-Silicon runs passed 257/257 checks. Exact repaired
+      head `d744948cdccc51f3d79e45aa78f82c46445df0c6` then passed hosted E2E
+      [`29181215803`](https://github.com/luisgui1757/dotfiles/actions/runs/29181215803),
+      including all four producers and all four logical proof jobs. This PR run
+      restored ordinary caches and is not the pending merged-main cache-free row.
+- [ ] **Cache-free merged-main safeguard confirmation**: run
+      `e2e-install.yml` again after this PR merges. Exact behavior head
+      `f097995b49a2189db327903a20743e7cb69ba665` passed cache-free run
+      [`29120109175`](https://github.com/luisgui1757/dotfiles/actions/runs/29120109175):
+      all four current producers and all four setup logical proofs were green.
+      On merged `main`, require those same producers (Ubuntu container, public
+      Ubuntu, Apple Silicon, Windows), the four setup logical proofs, and the
+      two Nix logical proofs to pass before applying the checked-in stable
+      required contexts live. Record that merged-main run here and in
+      `tests/greenfield/LEDGER.md`; a documentation-only descendant does not
+      replace the behavior-head run. Then run the no-write safeguard preflight;
+      it must identify that exact cache-free E2E dispatch, the Nix/test run
+      provenance, GitHub Actions app `15368`, and the exact legacy live posture.
+      Retain the apply command's `.git/dotfiles-safeguards/recovery.*` snapshot
+      after mutation begins until the stable-context/SHA-policy readback has
+      been independently reviewed. A pre-mutation failure must leave neither
+      that recovery directory nor any temporary capture behind.
 - [ ] **Home Manager (Linux/WSL)**: with Nix installed inside the Linux/WSL
       environment, run
       `./setup.sh --all` (or the compatibility alias `./setup.sh --home-manager`;
@@ -242,6 +311,11 @@ significant change to the relevant area.
       hosted native-Linux account-record login-shell proof in run `29092384014`,
       job `86360593139`; this row stays open for WSL and the real custom-HOME
       permutations.
+- [x] **Hosted WSL2 canary disposition**: scheduled run `29072773410` and
+      manual rerun `29114215045` both reached WSL2 but stalled before setup
+      evidence and were cancelled. GitHub does not officially support the
+      required hosted nested virtualization, so the optional workflow is
+      retired. This closes the unreliable pipeline, not WSL runtime proof.
 - [ ] **WSL split-host under Home Manager**: on WSL, after `./setup.sh --all`,
       confirm nothing was written under `/mnt/c` — Home Manager touches only the
       Linux `~/.nix-profile`; Windows Terminal/fonts/WezTerm stay Windows-host.

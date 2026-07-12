@@ -1,10 +1,11 @@
 # Dotfiles
 
-Cross-platform terminal and editor setup for macOS, Linux, WSL, and Windows.
+Cross-platform terminal and editor setup for Apple Silicon macOS, Linux, WSL,
+and Windows.
 The repo owns the daily shell/editor stack: Neovim, tmux/psmux, Starship, zsh,
 PowerShell, Ghostty, WezTerm, lazygit, `lsd`, `zoxide` smart-cd, the `gh` CLI with the
 `gh-dash` dashboard, the `pi` CLI, Windows Terminal theming, locked plugin restore, LSP /
-formatter provisioning, and global Polaris agent-policy bootstrap. It also provisions the `tree-sitter` CLI needed by
+formatter provisioning, and global Sentinel agent-policy bootstrap. It also provisions the `tree-sitter` CLI needed by
 `nvim-treesitter` main parser builds, plus AeroSpace (macOS tiling WM) and Herdr
 (agent multiplexer: macOS/Linux stable, Windows preview) through vendor-channel installs.
 
@@ -19,9 +20,10 @@ Nix is the enforced package layer on macOS/Linux/WSL; `install-deps` handles
 native/deferred tools and Windows packages; chezmoi owns the dotfiles/config
 layer in `home/`. The full setup scripts apply configs through chezmoi.
 
-Updates are deliberately two-track. The reproducible core is pinned in git:
-Neovim plugins (`nvim/lazy-lock.json`) and configs update with `git pull` and
-then re-running setup. The drift-tolerant edge is package-manager CLI tools,
+Updates are deliberately two-track. The reproducible core is pinned to an
+immutable reviewed release: Neovim plugins (`nvim/lazy-lock.json`) and configs
+change through the versioned side-by-side upgrade, then setup. The
+drift-tolerant edge is package-manager CLI tools,
 proven dotfiles-owned direct artifacts on Unix, and Mason LSPs; refresh only
 that edge with `./setup.sh --update` or `.\setup.ps1 -Update`.
 
@@ -36,23 +38,28 @@ running from a local checkout, it fails closed with clone-first instructions.
 
 Git is required to clone this repo. On macOS/Linux/WSL, Nix is also required
 before `setup.sh` runs: setup applies the pinned nix-darwin/Home Manager layer
-first and fails closed if `nix` is missing. Install Nix through a verified
-installer for the host (for example Determinate's notarized macOS package or a
-reviewed Linux installer path); this repo deliberately does not add a
-pipe-to-shell Nix bootstrap.
+first and fails closed if `nix` is missing. Published v0.2.0 checkouts include
+`scripts/install-nix-prerequisite.sh`, which downloads the official upstream
+Nix 2.34.0 release and verifies the platform SHA-256 before extraction or
+execution. The helper and the versioned upgrade tools refuse branches, moving
+`main`, lightweight tags, dirty checkouts, and non-official release identities;
+this repo has no pipe-to-shell Nix bootstrap.
 
 ```bash
-# mac / linux / wsl
-# prerequisite: install Nix first; setup will apply this repo's pinned flake
-git clone https://github.com/luisgui1757/dotfiles.git ~/dotfiles
+# Apple Silicon mac / linux / wsl, after the annotated v0.2.0 release exists
+git clone --branch v0.2.0 --single-branch \
+  https://github.com/luisgui1757/dotfiles.git ~/dotfiles
 cd ~/dotfiles
+./scripts/install-nix-prerequisite.sh --install
 ./setup.sh --all
 ```
 
 ```powershell
-# windows -- enable Developer Mode, then run from a normal PowerShell
+# windows, after the annotated v0.2.0 release exists
+# enable Developer Mode, then run from a normal PowerShell
 # Settings -> Privacy & security -> For developers -> Developer Mode = On
-git clone https://github.com/luisgui1757/dotfiles.git $HOME\dotfiles
+git clone --branch v0.2.0 --single-branch `
+  https://github.com/luisgui1757/dotfiles.git $HOME\dotfiles
 Set-Location $HOME\dotfiles
 .\setup.ps1 -All
 ```
@@ -62,7 +69,7 @@ Windows Terminal, Hack Nerd Font, lazygit, and `win32yank` are installed on the
 rendering host, install Nix inside the WSL distro, then run `./setup.sh --all`
 inside WSL for the Linux CLI/editor stack. Windows Terminal settings handling
 runs by default, and setup independently stages, validates, backs up, and
-atomically merges each existing packaged/portable target. If Scoop, winget, and choco
+atomically merges each existing packaged, Preview, and portable target. If Scoop, winget, and choco
 cannot register the MSIX app, setup falls back to a pinned
 SHA-256-verified portable WT zip. Portable WT reads the unpackaged settings
 path, so portable WT is merged from its own current settings (or seeded only
@@ -80,36 +87,27 @@ elevated PowerShell with `.\setup.ps1 -SkipDeps -SkipNvim`, then return to a
 normal shell for `.\setup.ps1 -SkipDeps -SkipConfig`. Do not elevate the whole
 dependency-install run; Scoop refuses admin installs.
 
-### Upgrading from a pre-chezmoi install
+### Upgrading from v0.1.0
 
-If you already ran an older (pre-chezmoi) version, just re-run setup — it now
-applies the config layer through chezmoi and is backwards-safe:
+`v0.1.0` is already chezmoi-based and its POSIX config is linked into the
+checkout. **Do not run `git pull` in that checkout.** Changing it in place can
+change live config before recovery exists.
 
-```bash
-git -C ~/dotfiles pull        # or %USERPROFILE%\dotfiles on Windows
-./setup.sh --all              # macOS / Linux / WSL
-```
+Remain on v0.1.0 until the annotated v0.2.0 release is published. Then follow
+the versioned, side-by-side procedure in [docs/UPGRADING.md](docs/UPGRADING.md):
+retain the exact v0.1.0 checkout, clone v0.2.0 separately, run the read-only
+preflight, apply the transactional migration, verify, and explicitly accept or
+rollback from the printed private recovery directory. Apple Silicon macOS and
+Linux/WSL include Nix-generation rollback; Windows independently recovers
+known-folder config and exact packaged/Preview/portable Terminal bytes. macOS migration
+is available only on Apple Silicon.
+Every platform publishes and rolls back only from digest-bound release trees in
+that private directory; full post-acceptance setup later repoints config to the
+retained v0.2.0 checkout.
 
-```powershell
-.\setup.ps1 -All              # Windows
-```
-
-Setup installs chezmoi if missing, then **backs up any pre-chezmoi config that
-differs** to `<file>.bak.<timestamp>` before chezmoi writes the managed version
-(a pre-existing file or symlink whose content already matches is left as-is — no
-junk backup). Each Windows Terminal `settings.json` is independently backed up
-and atomically merged in place;
-VS Code `settings.json` is edited in place with your comments preserved. Nothing
-is deleted. On Windows, if you ran an older psmux that froze on the previous
-`tmux.conf`, clear orphaned processes once after upgrading:
-
-```powershell
-Remove-Item -LiteralPath "$HOME\.tmux.posix.conf" -Force -ErrorAction SilentlyContinue
-taskkill /F /T /IM psmux.exe   # then reopen Windows Terminal
-```
-
-Restart Windows Terminal and VS Code afterward so the fonts/theme/launch mode
-apply.
+`./setup.sh --update` and `.\setup.ps1 -Update` are package/Mason refreshes,
+not release migrations: they do not fetch Git, activate the versioned config,
+or perform the Nix ownership transition.
 
 ### Existing Checkout
 
@@ -122,9 +120,11 @@ apply.
 ./setup.sh --nix-darwin          # compatibility alias; macOS setup already applies nix-darwin
 ./setup.sh --home-manager        # compatibility alias; Linux/WSL setup already applies Home Manager
 ./setup.sh --skip-deps           # skip Nix + native/deferred dependency provisioning
+./setup.sh --skip-native-deps    # keep Nix/config; skip native/deferred dependencies
 ./setup.sh --skip-config         # skip chezmoi config apply
+./setup.sh --skip-config-scripts # apply config files/links; defer chezmoi run scripts
 ./setup.sh --skip-nvim           # skip Lazy/Tree-sitter/Mason phases
-./setup.sh --skip-agents         # skip global Polaris agent policy
+./setup.sh --skip-agents         # skip global Sentinel agent policy
 ./setup.sh --best-effort         # continue after nvim-phase failures; exit nonzero with summary
 make setup                       # same as ./setup.sh, via the Makefile
 ```
@@ -135,11 +135,11 @@ declarative Homebrew + Home Manager; Linux/WSL uses standalone Home Manager.
 chezmoi still owns **every** dotfile; Nix owns no config. A normal `./setup.sh`
 or `./setup.sh --all` applies the matching package layer before native/deferred
 dependency provisioning. On macOS setup normalizes `uname -m` and runs only the
-matching `sudo env DOTFILES_TARGET_USER=... DOTFILES_TARGET_HOME=...
-darwin-rebuild switch --flake .#dotfiles-aarch64 --impure` or
-`.#dotfiles-x86_64` activation, which activates the
+Apple Silicon `sudo env DOTFILES_TARGET_USER=... DOTFILES_TARGET_HOME=...
+darwin-rebuild switch --flake .#dotfiles-aarch64 --impure` activation, which activates the
 declarative Homebrew casks (WezTerm, AeroSpace) + Herdr brew and the nix-owned
-CLI package set. Before any phase, setup rejects root/ambiguous invocation and
+CLI package set. Any other macOS architecture fails closed before Nix/Homebrew
+activation. Before any phase, setup rejects root/ambiguous invocation and
 resolves one invoking account plus its authoritative account-record home. It
 requires ambient `HOME` to resolve to that same directory and passes
 `DOTFILES_TARGET_USER` / `DOTFILES_TARGET_HOME` explicitly through sudo, so
@@ -167,7 +167,13 @@ Manager configuration places its evaluated profile `bin` in
 `--skip-deps` is the explicit already-provisioned escape hatch and skips the
 Nix package-layer application together with native/deferred dependency installs;
 the compatibility aliases `--nix-darwin` and `--home-manager` do not override
-that skip. Dry-run does not require Nix: on an unprovisioned POSIX host it
+that skip. `--skip-native-deps` is the narrower release-migration boundary: it
+still applies Nix and config but leaves native/deferred tools untouched for
+coordinated rollback. The versioned migration pairs it with
+`--skip-config-scripts`, so plugin publication and every other chezmoi run
+script remain outside that reversible core; normal setup does not use that
+flag. Config apply creates required parent directories itself rather than
+depending on native provisioning. Dry-run does not require Nix: on an unprovisioned POSIX host it
 previews that the real run would fail until Nix is installed. On a Brew-less
 Mac, it previews the verified Homebrew bootstrap, then continues every later
 Brew-backed preview phase without claiming the bootstrap already happened.
@@ -185,8 +191,7 @@ nix-homebrew uses `autoMigrate = true` so Macs that already have official-script
 Homebrew can be adopted by the declarative Nix layer; upstream's migration keeps
 installed packages while replacing the Homebrew repositories. Because this repo
 keeps `mutableTaps = false`, setup moves an existing architecture-correct tap
-directory (`/opt/homebrew/Library/Taps` on Apple Silicon or
-`/usr/local/Homebrew/Library/Taps` on Intel) to a unique timestamped backup.
+directory (`/opt/homebrew/Library/Taps`) to a unique timestamped backup.
 Activation, bootstrap, or interruption failure quarantines any replacement and
 restores the original taps; rollback failure prints exact manual recovery. On
 success the backup remains available. The `nikitabobko/tap` tap is also
@@ -196,21 +201,10 @@ personal-tap casks, including AeroSpace, without a trust entry.
 tree-sitter CLI stay native** (ABI-coupled to nvim-treesitter parser builds;
 migrating them into a same-closure toolchain is a follow-up). Native Windows is
 non-Nix. `nix flake check` runs in required CI (`.github/workflows/nix.yml`) on
-Ubuntu + Apple Silicon macOS, with an additional non-required
-`macos-26-intel` lane. The flake exports explicit `dotfiles-aarch64` and
-`dotfiles-x86_64` configurations; the legacy `dotfiles` alias deliberately
-remains Apple Silicon and setup never selects it for Intel. Exact head
-`f4b63953f2f982702a685358b09e89bae2d78fdd` passed both the real Intel Nix
-and full setup lanes (`29092384007` / `86360593091` and `29092384014` /
-`86360593153`); the claim is runtime evidence, not cross-evaluation.
-Determinate Nix has dropped Intel-host support, so
-the Intel CI lanes explicitly use full-SHA-pinned `cachix/install-nix-action`
-`v31.10.7` to install upstream Nix 2.34.8 from its versioned official release;
-other hosted lanes retain the pinned Determinate action. Nixpkgs 26.05 is the
-last `x86_64-darwin` release and remains supported through 2026-12-31. The repo
-keeps that warning visible (no `allowDeprecatedx86_64Darwin` suppression); a
-post-26.05 Intel package-plane migration is required before that support window
-closes.
+Ubuntu + Apple Silicon macOS. The flake exports `dotfiles-aarch64` plus the
+Apple-Silicon compatibility alias `dotfiles`; no other Darwin system or
+configuration is exported. Historical platform results remain in the
+append-only evidence ledger and are not a current support claim.
 
 ```powershell
 .\setup.ps1
@@ -282,7 +276,7 @@ the newest validated `<target>.bak.<timestamp>[.n]` backup by filename order,
 and leave chezmoi's own
 state/config alone. Dry-run mode prints the planned removals without deleting
 files or pruning empty external parent directories. Windows Terminal settings
-are not deleted: validated packaged/portable backups restore independently, and
+are not deleted: validated packaged/Preview/portable backups restore independently, and
 the displaced current file is preserved as `settings.json.uninstall-current.*`.
 Backup selection uses the filename timestamp/collision suffix, never mtime;
 malformed candidates fail before removal/restoration.
@@ -298,7 +292,7 @@ setup -> install-deps                 phase 1: programs and optional tools
                                             parser-update build tasks must finish
       -> nvim +DOTFILES_TREESITTER_SYNC_INSTALL  phase 4: Tree-sitter parsers
       -> nvim "+MasonToolsInstallSync" +qa        phase 5: LSP servers and formatters
-      -> Polaris global install       phase 6: per-user agent policy
+      -> Sentinel global install       phase 6: per-user agent policy
 ```
 
 The nvim-treesitter Lazy build hook calls the upstream waitable update API,
@@ -321,7 +315,7 @@ requested, it defaults to all and prints `note: no TTY detected; running with
 --all` (or `-All`). An interactive run (no all flag) can still ask the
 dependency installer's **"install EVERYTHING without further prompts? [Y/n]"**
 question; answer `Y` to pull the tool catalog in one go, or `n` to choose per
-tool. Phase 6 then asks **"Apply Polaris global agent rules? [Y/n]"** unless
+tool. Phase 6 then asks **"Apply Sentinel global agent rules? [Y/n]"** unless
 `--all` / `-All`, `--dry-run` / `-DryRun`, or `--skip-agents` / `-SkipAgents`
 already made that decision.
 Add `--dry-run` / `-DryRun` to preview every step without touching disk.
@@ -364,7 +358,7 @@ and Windows Terminal remains a merge.
 | lazygit | `~/Library/Application Support/lazygit/config.yml` -> `lazygit/config.yml` | `~/.config/lazygit/config.yml` -> `lazygit/config.yml` | `%LOCALAPPDATA%\lazygit\config.yml` -> `lazygit\config.windows.yml` |
 | lsd | `~/.config/lsd/{config.yaml,colors.yaml}` -> `lsd/{config.yaml,colors.yaml}` | same | `%USERPROFILE%\.config\lsd\{config.yaml,colors.yaml}` -> `lsd\{config.yaml,colors.yaml}` |
 | gh-dash | `~/.config/gh-dash/config.yml` -> `gh-dash/config.yml` | same | `%USERPROFILE%\.config\gh-dash\config.yml` -> `gh-dash\config.yml` |
-| Windows Terminal | n/a | n/a | app installed by `setup.ps1` through Scoop/winget/choco, with a SHA-256-verified portable zip fallback; setup treats packaged and portable `settings.json` as independent targets, stages and validates both before publication, creates separate verified backups, detects concurrent changes through atomic replacement rollback bytes, and rolls the transaction back on failure; opt out with `-SkipWindowsTerminalMerge`; see [windows-terminal/README.md](windows-terminal/README.md) |
+| Windows Terminal | n/a | n/a | app installed by `setup.ps1` through Scoop/winget/choco, with a SHA-256-verified portable zip fallback; one validated enumerator identifies stable packaged, Preview packaged, and portable `settings.json` targets for setup, migration, recovery, and uninstall; setup stages and validates all selected targets before publication, creates separate verified backups, detects concurrent changes through atomic replacement rollback bytes, and rolls the group back on failure; opt out with `-SkipWindowsTerminalMerge`; see [windows-terminal/README.md](windows-terminal/README.md) |
 
 Windows setup resolves UserProfile, LocalApplicationData, Documents, and the
 active host's `$PROFILE` independently through supported runtime/known-folder
@@ -593,24 +587,26 @@ migration warning. POSIX pwsh profile management remains provisioning-adjacent.
 - VS Code is optional. On WSL, use Windows VS Code plus `code .` for Remote -
   WSL, or use a Linux GUI build when WSLg / X11 is available. Rosé Pine setup
   follows whatever `code` CLI is on PATH.
-- Polaris agent policy is a supported setup phase, not a synced dotfile. `setup`
-  pins Polaris `0.1.2` (`v0.1.2`) at commit
-  `ecca742fa9ed1243a73981955850c1a8ef3e3b04`,
-  caches that checkout under `~/.local/share/dotfiles/polaris/<commit>` on
-  POSIX and `%LOCALAPPDATA%\dotfiles\polaris\<commit>` on Windows, verifies that
-  `v0.1.2` peels to the pinned commit plus the checkout `VERSION`, and runs
-  every Polaris Git operation with
+- Sentinel agent policy is a supported setup phase, not a synced dotfile. `setup`
+  pins Sentinel's renamed `0.1.2` tree at exact commit
+  `ecafffa858666343c1639f996d177f460163e93e`,
+  caches that checkout under `~/.local/share/dotfiles/sentinel/<commit>` on
+  POSIX and `%LOCALAPPDATA%\dotfiles\sentinel\<commit>` on Windows, verifies that
+  exact commit plus the checkout `VERSION`, and runs every Sentinel Git operation with
   system/global/env config, templates, hooks, and executable Git config features
-  disabled, then runs Polaris' Bash global installer and global check
+  disabled, then runs Sentinel's Bash global installer and global check
   (`tools/install --global`, then `--global --check`; Windows uses a validated
   Git Bash with `cygpath`, not WSL bash or another PATH-only Bash).
+  The published `v0.1.2` tag predates the repository rename and is deliberately
+  not treated as the renamed tree's identity; the exact commit is the immutable
+  authority until Sentinel publishes a tag containing that tree.
   The global installer writes the per-user AI entrypoints for Codex
   (`~/.codex/AGENTS.md`), Claude Code (`~/.claude/CLAUDE.md`), opencode
   (`~/.config/opencode/AGENTS.md`), and Pi CLI (`~/.pi/agent/AGENTS.md`);
   Copilot has no reliable global file path, so user-wide Copilot instructions
   remain a manual VS Code/github.com profile step. To remove the global blocks,
-  run the cached Polaris Bash installer with `--global --remove` on POSIX or
-  from Git Bash on Windows. Project/team adoption is separate: run Polaris
+  run the cached Sentinel Bash installer with `--global --remove` on POSIX or
+  from Git Bash on Windows. Project/team adoption is separate: run Sentinel
   repo-local install or vendoring in that project and commit those files there.
 - Pi CLI is a provisioned binary, not synced runtime state. Setup installs
   `@earendil-works/pi-coding-agent@0.80.3` by running `npm pack`, requiring the
@@ -697,7 +693,8 @@ Pull requests are meant to be gated by three required workflow families:
   script/rule/message/extent fingerprint (not filename/rule/count alone),
   Renovate validation fails if `npx` is missing under CI or its official local
   extraction differs from the checked-in dependency inventory, and YAML
-  parsing/linting is part of `make test-static`. Windows PSGallery module
+  parsing/linting—including the Ruby/Psych semantic Settings policy—is part of
+  `make test-static`. Windows PSGallery module
   installs retry transient lookup failures, but missing test dependencies remain
   fatal.
 - `.github/workflows/e2e-install.yml` is the real install guarantee. It proves
@@ -710,19 +707,21 @@ Pull requests are meant to be gated by three required workflow families:
   `nix flake check` on Ubuntu and macOS plus the checked-in Nix/setup
   integration assertions.
 
-`.github/workflows/wsl2-canary.yml` is separate scheduled/manual coverage, not
-a PR-required workflow.
+There is no hosted WSL workflow. [GitHub states that nested virtualization on
+hosted runners is technically possible but not officially supported](https://docs.github.com/en/actions/concepts/runners/github-hosted-runners), and the
+former optional WSL2 canary twice hung until cancellation without producing
+setup evidence. A Linux container with WSL-shaped environment variables would
+be fake proof, so WSL remains supported through the real throwaway-distro and
+split-host manual harnesses in `tests/greenfield/` and `tests/wsl/`.
 
 The e2e jobs cover different install paths, not symmetric container platforms:
 
 | Check | What it proves |
 |---|---|
 | `e2e containers / ubuntu-24.04` | Clean `ubuntu:24.04`, non-root user, native `apt`, no Linuxbrew (`DOTFILES_SKIP_BREW_BOOTSTRAP=1`), then `install-deps.sh --all`, chezmoi config apply, executable/version probes including `zoxide`, `gh`, WezTerm, Herdr, Neovim >= 0.12, lazygit, zsh plugin files, config content assertions, and nvim directory realpath assertion. This is the native installer regression fixture, not the Nix-backed public POSIX package-plane proof; it does not assert Pi CLI because Node 24 comes from the Nix package layer. |
-| `setup.sh / ubuntu-24.04` | Full public Unix setup on the hosted Ubuntu runner after installing Nix in CI: Home Manager first, then native/deferred installs, chezmoi, Lazy, Tree-sitter, Mason, and Polaris. Its clean login/interactive PATH proof resolves the effective account's actual login zsh from the account database; this matters because fresh Ubuntu has no `/usr/bin/zsh` and setup selects Linuxbrew zsh. The shell must resolve `rg` from Nix with no caller PATH injection. |
-| `setup.sh / macos-26` | Full public Apple Silicon setup through the hosted runner: architecture-matched nix-darwin/declarative Homebrew, native/deferred installs, real Ghostty/WezTerm config consumption, installed AeroSpace app/CLI identity agreement, chezmoi, Lazy, Tree-sitter, Mason, and Polaris. AeroSpace waits for a user-granted Accessibility permission before parsing user config or starting its CLI server, so managed-config consumption remains explicit TCC-enabled desktop proof in `tests/MANUAL.md`; hosted CI does not pretend to prove it. The hosted runner alone gets the cleanup override; real hosts keep `cleanup = "check"`. |
-| `setup.sh / macos-26-intel` | Additional non-required real Intel setup lane with the same full assertions. Exact head `f4b63953f2f982702a685358b09e89bae2d78fdd` passed it on a real x86_64 runner; future YAML presence alone remains non-evidence. |
+| `setup.sh / ubuntu-24.04` | Full public Unix setup on the hosted Ubuntu runner after installing Nix in CI: Home Manager first, then native/deferred installs, chezmoi, Lazy, Tree-sitter, Mason, and Sentinel. Its clean login/interactive PATH proof resolves the effective account's actual login zsh from the account database; this matters because fresh Ubuntu has no `/usr/bin/zsh` and setup selects Linuxbrew zsh. The shell must resolve `rg` from Nix with no caller PATH injection. |
+| `setup.sh / macos-26` | Full public Apple Silicon setup through the hosted runner: architecture-matched nix-darwin/declarative Homebrew, native/deferred installs, real Ghostty/WezTerm config consumption, installed AeroSpace app/CLI identity agreement, chezmoi, Lazy, Tree-sitter, Mason, and Sentinel. AeroSpace waits for a user-granted Accessibility permission before parsing user config or starting its CLI server, so managed-config consumption remains explicit TCC-enabled desktop proof in `tests/MANUAL.md`; hosted CI does not pretend to prove it. The hosted runner alone gets the cleanup override; real hosts keep `cleanup = "check"`. |
 | `setup.ps1 / windows-2025` | Full Windows setup through the real Windows hosted runner, including Scoop/winget/choco behavior, PowerShell, symlinks, Hack Nerd Font file/registry consumption, `zoxide`/`gh`/WezTerm/Herdr/Pi CLI command probes, and Neovim restore/sync phases. Windows containers do not model the desktop/user-profile setup well. |
-| `setup.sh / WSL2 Ubuntu-24.04 (canary)` | Non-required scheduled/manual WSL smoke signal in `.github/workflows/wsl2-canary.yml`. Hosted runners cannot provide a reliable required nested-virtualization WSL2 gate. The canary disables the WSL distro cache, installs Ubuntu's `nix-bin`, enables flakes, then runs the enforced Home Manager setup path; failures stay visible and do not muddy the required e2e signal. |
 
 After the Lazy restore, deterministic Tree-sitter parser install, and Mason sync, each
 `setup.sh`/`setup.ps1` job also
@@ -770,8 +769,8 @@ tarball install, pinned lazygit release install, zsh plugin install, `fd-find`
 container to add for symmetry. That asymmetry is accepted: hosted macOS and
 Windows runners are the closest representative fixtures for those operating
 systems, while the required WSL proxy is the Ubuntu container plus the
-WSL config-template coverage. Do not add the WSL2 canary to
-required checks unless the owner explicitly accepts the flake risk.
+WSL config-template coverage. Those checks do not claim WSL runtime proof; use
+the real manual throwaway-distro harness for that boundary.
 
 These e2e jobs fail if setup skips Phase 3-5, omits Phase 6/6, leaves a
 Nix-owned POSIX CLI resolving outside a Nix profile/store path, emits a precise
@@ -783,10 +782,15 @@ missing. They do not blanket-fail on benign warning/deprecation text.
 
 The canonical main-branch safeguards are the three checked-in repository rulesets
 under `.github/rulesets/`, applied live with
-`scripts/apply-repo-safeguards.sh`. `.github/settings.yml` remains a classic
-branch-protection fallback for the Probot Settings app, but it cannot model the
-key policy split: owner review bypass is allowed, CI bypass is not, and only the
-owner may update `main`.
+`scripts/apply-repo-safeguards.sh`. `.github/settings.yml` deliberately limits
+the Probot Settings app to repository-level settings; it does not contain a
+`branches` section. This prevents a default-branch sync from racing the
+transactional script and creating a mixed classic/ruleset cutover stage. The
+script owns the classic fallback required-check transition because Probot
+cannot model the key policy split: owner review bypass is allowed, CI bypass is
+not, and only the owner may update `main`. A semantic YAML policy test rejects
+the top-level key in block, inline, null, and alias forms; line-oriented text
+matching is not accepted as proof of ownership isolation.
 
 | Layer | Bypass actors | What it protects |
 |---|---:|---|
@@ -805,28 +809,49 @@ Automation must not run as the owner account. Use a separate GitHub App or bot
 identity with branch/PR write access and no repository administration
 permission; otherwise GitHub sees the action as `luisgui1757`.
 
-Runner-versioned required contexts are in a staged migration. This branch keeps
-the twelve live/checked-in legacy contexts required and additionally emits six
-stable logical checks (`nix flake check / {linux,macos}`, `e2e containers /
-linux`, `setup.sh / {linux,macos}`, and `setup.ps1 / windows`). Each logical
-check verifies the exact OS proof marker's head SHA, workflow run, logical
-identity, and legacy producer; these are not no-op checks. After this PR merges
-and those checks pass on `main`, a follow-up PR may switch the four checked-in
-safeguard sources to `candidateRequired` in `.github/check-identities.json`.
-Only after that second PR merges should the owner apply the new live contexts.
-See [branch-protection.md](docs/security/branch-protection.md) for the exact order.
+Runner-versioned required contexts are in their final staged migration. This PR
+switches the checked-in required-check sources to six stable logical checks
+(`nix flake check / {linux,macos}`, `e2e containers / linux`, `setup.sh /
+{linux,macos}`, and `setup.ps1 / windows`) while workflows continue emitting
+the six legacy producer names. Each logical check verifies the exact OS proof
+marker's source head SHA, actually executed SHA, workflow run, logical identity,
+and legacy producer; these are not no-op checks. Pull-request jobs execute
+GitHub's synthetic merge result, so the artifact records that commit separately
+from the PR branch head. Live GitHub remains on the legacy set so it can gate
+this PR safely. Only after this PR merges and the cache-free producers plus all
+six logical checks pass on that exact `main` SHA should the owner apply the
+checked-in stable contexts. See
+[branch-protection.md](docs/security/branch-protection.md) for the exact order.
 
 Manual owner step:
 
 ```bash
+scripts/apply-repo-safeguards.sh --preflight-only luisgui1757/dotfiles
 scripts/apply-repo-safeguards.sh luisgui1757/dotfiles
 ```
 
-with an authenticated `gh` that has repository admin permission. Do this after
-the required checks have appeared at least once on GitHub, otherwise protection
-may reference check names GitHub has not seen yet. See
-[docs/security/branch-protection.md](docs/security/branch-protection.md) has the
-live verification commands and deletion-risk note;
+with an authenticated `gh` that has repository admin permission. Do this only
+after the post-merge cache-free and logical proof gate passes. Before any live
+write, the apply command repeats the complete preflight: exact local/main/origin
+identity, public repository visibility, clean reviewed sources, exact legacy
+live posture, unique rulesets, GitHub Actions app/workflow/event/run provenance,
+and skipped broad caches. It captures a private recovery snapshot and, before
+restoration, freezes every consumed file and validates its exact manifest stage,
+contexts, app IDs, ruleset identity, bypass/branch policy, Actions pinning, and
+complete classic state, including every nullable-but-required field. Restore
+derives its expected policy from the exact captured commit, not mutable current
+worktree bytes, and requires that commit still be live `main`. After the second
+preflight capture, apply independently freezes the committed check
+metadata, integrity payload, manifest, classic payload, and Actions payload in a
+private read-only transaction directory and publishes only those validated
+files. Worktree changes after validation therefore cannot influence a later
+write. Missing, malformed, altered, or cross-stage recovery material fails
+before any write; failed captures clean every temporary directory, and a
+recovery snapshot is retained only after mutation begins or a verified apply
+succeeds. Apply mutates only the three cutover resources and automatically
+restores the previous stage if apply or readback fails. See
+[docs/security/branch-protection.md](docs/security/branch-protection.md) for the
+exact validation, recovery command, and live verification sequence;
 [docs/security/supply-chain.md](docs/security/supply-chain.md) records the
 reviewed executable identities and scanners.
 
@@ -841,7 +866,7 @@ update PRs are intentionally not configured.
 |---|---|---|
 | GitHub Actions | Managed, digest-pinned, labeled `github-actions` | Actions are repo-owned CI inputs with stable Renovate support. |
 | GitHub runner images | Managed, labeled `github-runners`, reviewed separately | `ubuntu-*`, `macos-*`, and `windows-*` bumps can change the supported CI platform, so they should not be mixed with ordinary Action bumps. |
-| Repo-pinned installer versions/refs | Managed, labeled `pinned-downloads`, never automerged | Neovim Linux tarballs, chezmoi CI release archives, lazygit Linux tarballs, Starship Linux tarballs, Tree-sitter CLI Linux/Windows archives, WezTerm Ubuntu `.deb`, Herdr Linux binaries, Herdr Windows preview `.exe`, Hack Nerd Font, Windows Terminal portable zip, Ghostty distro/architecture `.deb` assets, Pi CLI npm package, zsh plugin refs, `setuptools`/`pylatexenc` converter pins, the Homebrew installer commit, the Scoop installer commit, the Renovate validator package/runtime, the Ubuntu Microsoft-repository `.deb`, and the CI `cargo-binstall` commit are explicit repo pins. |
+| Repo-pinned installer versions/refs | Managed, labeled `pinned-downloads`, never automerged | The v0.2.0 Nix prerequisite tarballs, Neovim Linux tarballs, chezmoi CI release archives, lazygit Linux tarballs, Starship Linux tarballs, Tree-sitter CLI Linux/Windows archives, WezTerm Ubuntu `.deb`, Herdr Linux binaries, Herdr Windows preview `.exe`, Hack Nerd Font, Windows Terminal portable zip, Ghostty distro/architecture `.deb` assets, Pi CLI npm package, zsh plugin refs, `setuptools`/`pylatexenc` converter pins, the Homebrew installer commit, the Scoop installer commit, the Renovate validator package/runtime, the Ubuntu Microsoft-repository `.deb`, and the CI `cargo-binstall` commit are explicit repo pins. |
 | Adjacent SHA-256 / commit constants | Not managed; matched only as regex context | Renovate can bump the version/ref but cannot recompute archive/script hashes or verify tag commit IDs. CI must fail until a human recomputes and reviews them. |
 | Package-manager catalogs | Not managed | Brew, apt, dnf, pacman, zypper, apk, Scoop, winget, and choco entries are package names/IDs, not repo version pins. Let the package manager resolve current versions. |
 | Neovim plugin and Mason tools | Not managed | `lazy-lock.json` is refreshed with Lazy and tested as editor behavior; Mason intentionally has no machine-pinned lockfile. |
@@ -859,7 +884,7 @@ Manual-review pin surfaces that Renovate may touch only partially:
 
 | Surface | Status |
 |---|---|
-| Polaris version/tag/commit | Manual-reviewed mirror between `setup.sh`, `setup.ps1`, README, CLAUDE, and `tests/static/pin_consistency_test.sh`. |
+| Sentinel version/commit | Manual-reviewed mirror between `setup.sh`, `setup.ps1`, README, CLAUDE, and `tests/static/pin_consistency_test.sh`. The current renamed tree is exact-commit pinned because the published `v0.1.2` tag predates it. |
 | Scoop installer | Renovate can bump `ScoopInstaller/Install` commit `b0ee913725139b816f9178163af0aecdba07a7ed`; SHA `48f6ea398b3a3fa26fae0093d37bd85b13e7eaa5d1d4a3e208408768408e35ae` is human-reviewed. |
 | TPM/tmux plugin refs and psmux plugin ref | Commit pins are manual-reviewed and mirrored in docs/tests; Renovate does not recompute or prove tag commits. |
 | `setuptools`/`pylatexenc` | Renovate can bump versions; adjacent hashes remain human-reviewed. Current pins: `setuptools` 80.9.0, `pylatexenc` 2.10. |
@@ -879,7 +904,7 @@ signer/chain before `Start-Process`. Recommended setup docs use `git clone`
 plus local `setup`, not raw `curl | bash`/`iwr` execution of the current default
 branch.
 
-Direct-download SHA-256 values for Neovim tarballs, chezmoi CI release archives,
+Direct-download SHA-256 values for the upstream Nix prerequisite, Neovim tarballs, chezmoi CI release archives,
 lazygit tarballs, Starship tarballs, tree-sitter CLI archives, the WezTerm
 Ubuntu `.deb`, Herdr Linux binaries, Herdr Windows preview `.exe`, Hack Nerd Font, the Windows Terminal
 portable zip, the Ghostty Debian-family `.deb` assets, the Ubuntu 24.04 Microsoft
@@ -930,9 +955,9 @@ stale; CI then fails verification until a human reviews the adjacent constant.
 - **chezmoi is the config-layer path, not the provisioning path.** Do not move
   package installs, binary/font installers, login-shell changes, VS Code,
   devilspie2, or distro-manager policy out of `install-deps`.
-- **Polaris is global agent policy, not a dotfile mirror.** Setup installs it
-  from a pinned, version-checked upstream checkout and lets Polaris own its
-  managed global entrypoint blocks. This repo does not vendor Polaris core or
+- **Sentinel is global agent policy, not a dotfile mirror.** Setup installs it
+  from a pinned, version-checked upstream checkout and lets Sentinel own its
+  managed global entrypoint blocks. This repo does not vendor Sentinel core or
   sync agent runtime state.
 - **Rose Pine everywhere it can render.** Nvim, lualine, foreground-only
   Starship, tmux/psmux, `lsd`, ghostty, Windows Terminal, PSReadLine — same
@@ -1036,7 +1061,8 @@ stale; CI then fails verification until a human reviews the adjacent constant.
   `-MergeWindowsTerminal` remains accepted as a no-op alias for older commands.
 - **Windows Terminal settings.json is NOT symlinked** because WT auto-rewrites
   it. Only the user-owned keys live in `settings.fragment.jsonc`; setup reads
-  each packaged/portable target independently, stages and validates every
+  each stable packaged, Preview packaged, and portable target independently,
+  stages and validates every
   result, makes a verified per-target backup, then atomically publishes. It
   updates keys by identity, adds a fixed `PowerShell 7` profile (`pwsh.exe`), promotes an empty or
   Windows PowerShell 5.1 `defaultProfile` to that profile, and resets a
@@ -1165,13 +1191,17 @@ nvim --headless "+MasonToolsUpdateSync" +qa
 
 Run on each machine; there's no machine-pinned lockfile for Mason itself.
 
-### Switching machines mid-session
+### Reproducing the same release on another machine
 
 ```bash
-git -C ~/dotfiles pull          # sync configs
+git clone --branch v0.2.0 --single-branch \
+  https://github.com/luisgui1757/dotfiles.git ~/dotfiles
 nvim --headless "+Lazy! restore" +qa  # match plugin commits
 make test                       # verify the new state
 ```
+
+Use `docs/UPGRADING.md` when the release version changes. A moving-branch pull
+is not a release migration.
 
 ## License
 
@@ -1211,7 +1241,7 @@ MIT. See `LICENSE`.
 | A `wt --version` window popped up during `setup.ps1 -All` | the dependency version table ran `<tool> --version`, and `wt --version` opens a Windows Terminal window instead of printing | fixed — `Get-CommandVersionString` never runs `wt --version`; it reads the file version (or shows `installed`) |
 | Ghostty doesn't open maximized | `window-save-state = always` restored an old geometry over `maximize` (macOS only) | `ghostty/config` uses `window-save-state = default` (not `always`) with `maximize = true`; `always` lets the saved size win |
 | Ghostty doesn't load the config | wrong path, or WSL default skip | the install path is `~/Library/Application Support/com.mitchellh.ghostty/config` on macOS and `~/.config/ghostty/config` on native Linux. WSL only links Linux Ghostty config after `./setup.sh --experimental-wsl-gui`; otherwise use Windows Terminal |
-| Windows Terminal lost a profile after merge | WT rewrote one installation's file after setup, or an older pre-transactional setup was used | inspect that installation's independent `<settings.json>.bak.<YYYYMMDD-HHMMSS>[.n]` backups; `uninstall.ps1` validates filename order and JSON, restores packaged and portable targets independently, and preserves the displaced current file for recovery |
+| Windows Terminal lost a profile after merge | WT rewrote one installation's file after setup, or an older pre-transactional setup was used | inspect that installation's independent `<settings.json>.bak.<YYYYMMDD-HHMMSS>[.n]` backups; `uninstall.ps1` validates every stable packaged, Preview packaged, and portable candidate before mutation, restores each target independently, and preserves the displaced current file for recovery |
 | `setup.ps1` errors "cannot create symbolic links" | Developer Mode off and not elevated | `setup.ps1` reports your *elevated* + *Developer Mode* state before chezmoi apply. Enable Developer Mode (Settings -> Privacy & security -> For developers, no admin, recommended) **then** `.\setup.ps1 -SkipDeps`; OR run just the config phase elevated with `.\setup.ps1 -SkipDeps -SkipNvim`, then return to a normal shell for `.\setup.ps1 -SkipDeps -SkipConfig`. Don't elevate the dependency-install run because Scoop refuses admin installs |
 | Ghostty won't open maximized on Linux/GNOME | `maximize = true` is a hint the WM may ignore (GNOME Mutter often does) | on **X11**, `install-deps` offers a devilspie2 setup through the native Linux package manager, even when Linuxbrew is the main CLI manager; the rule is keyed on `com.mitchellh.ghostty`. Wayland needs a GNOME Shell extension instead |
 | `install-deps.ps1`: winget `No package found matching input criteria` (exit `-1978335212`) | winget source/catalog flakiness | install-deps now **prefers scoop** and falls back across managers per tool -- accept the scoop bootstrap when offered and re-run; VS Build Tools has no Scoop package, so it falls through to choco and then Microsoft's official bootstrapper |

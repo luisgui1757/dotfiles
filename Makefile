@@ -73,6 +73,7 @@ test: test-static lint test-nvim test-shell test-starship test-tmux test-ghostty
 	@echo "=== test summary: see individual sub-target output above ==="
 
 test-migration:
+	@PATH="$$HOME/.local/bin:$$PATH" bash tests/migration/v0_1_upgrade_test.sh
 	@PATH="$$HOME/.local/bin:$$PATH" bash tests/migration/template_test.sh
 	@PATH="$$HOME/.local/bin:$$PATH" bash tests/migration/parity_gate.sh
 	@PATH="$$HOME/.local/bin:$$PATH" bash tests/migration/greenfield_roundtrip.sh

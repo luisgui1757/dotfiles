@@ -1,5 +1,6 @@
 # Synced by the Probot Settings app: https://probot.github.io/apps/settings/
-# Alternative one-shot path: scripts/apply-repo-safeguards.sh
+# Repository-level settings only. Branch protection is deliberately absent:
+# scripts/apply-repo-safeguards.sh owns its transactional cutover and recovery.
 
 repository:
   allow_merge_commit: false
@@ -8,33 +9,3 @@ repository:
   delete_branch_on_merge: true
   enable_automated_security_fixes: true
   enable_vulnerability_alerts: true
-
-branches:
-  - name: main
-    protection:
-      required_status_checks:
-        strict: true
-        contexts:
-          - ubuntu
-          - macos
-          - windows
-          - chezmoi-parity
-          - chezmoi-parity-macos
-          - chezmoi-parity-windows
-          - nix flake check (ubuntu-24.04)
-          - nix flake check (macos-26)
-          - e2e containers / ubuntu-24.04
-          - setup.sh / ubuntu-24.04
-          - setup.sh / macos-26
-          - setup.ps1 / windows-2025
-      enforce_admins: true
-      # The split repository rulesets in .github/rulesets are canonical. Classic
-      # branch protection stays as a fallback, but it cannot model "owner may
-      # bypass review while nobody may bypass CI", so do not add required reviews
-      # here.
-      required_pull_request_reviews: null
-      required_linear_history: true
-      required_conversation_resolution: true
-      restrictions: null
-      allow_force_pushes: false
-      allow_deletions: false

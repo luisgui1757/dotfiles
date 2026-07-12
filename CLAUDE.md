@@ -13,7 +13,7 @@ the install script works, read this too.
 
 Cross-platform dotfiles: Neovim (lazy.nvim), Starship, Ghostty, Windows
 Terminal, tmux, zshenv/zshrc, PowerShell profile, lazygit, `lsd`, Pi CLI, and global
-Polaris agent-policy bootstrap. Public installs go through `setup.sh` (macOS /
+Sentinel agent-policy bootstrap. Public installs go through `setup.sh` (macOS /
 Linux / WSL) or `setup.ps1` (Windows), which install dependencies, apply the
 chezmoi config layer, restore locked Neovim plugins, sync Mason tools, and
 apply global agent policy. The repo can live anywhere — `~/dotfiles/`,
@@ -29,7 +29,7 @@ must stay byte-identical where the parity manifest says so; update both in the
 same change.
 
 Agent runtime state and preferences are intentionally **NOT** synced through
-this repo. The supported agent surface is setup's global Polaris policy phase;
+this repo. The supported agent surface is setup's global Sentinel policy phase;
 local agent preference folders such as `.claude/`, `.codex/`, `.pi/`, sessions,
 auth files, and package caches stay per machine.
 
@@ -159,8 +159,10 @@ that violates one of these, fix it instead of disabling the test.
     merge by default. Opt out with `-SkipWindowsTerminalMerge`;
     `-MergeWindowsTerminal` is a retained no-op alias. Chezmoi exposes no WT
     target: it cannot provide the required backup/concurrency/atomicity contract.
-    Setup treats packaged and portable files independently, never mirrors one
-    over the other, and seeds the portable path only when portable WT is
+    One shared validated enumerator defines stable packaged, Preview packaged,
+    and portable settings identities for setup, release migration, recovery,
+    and uninstall. Setup treats all selected files independently, never mirrors
+    one over another, and seeds the portable path only when portable WT is
     detected. The merge adds a fixed PowerShell 7
     profile (`pwsh.exe`) and promotes an empty or built-in Windows PowerShell 5.1
     `defaultProfile` to that profile; a custom user default is preserved.
@@ -319,31 +321,26 @@ that violates one of these, fix it instead of disabling the test.
     that remote branch at the same locked commit while keeping HEAD detached.
     Lazy needs that metadata to serialize its lock; the branch tip never becomes
     executable authority.
-24. **POSIX setup has one validated target identity and architecture.** Public
+24. **POSIX setup has one validated target identity and supported architecture.** Public
     `setup.sh` runs as the target non-root account. At the boundary it reads the
     real account record (`dscl` on macOS, `getent`/`/etc/passwd` on Linux),
     requires canonicalized `HOME` to identify that same existing directory, and
     exports `DOTFILES_TARGET_USER` + `DOTFILES_TARGET_HOME`. Nix, Home Manager,
-    chezmoi, Polaris, and native setup consume those values; never fabricate a
-    home from a username or fall back to root. Darwin setup normalizes
-    `uname -m` and selects only `dotfiles-aarch64` or `dotfiles-x86_64`; the
-    compatibility `dotfiles` alias stays Apple Silicon and setup never selects
-    it for Intel. Homebrew's Library/Taps root follows its repository or the
-    architecture default. Tap migration is transactional: activation,
+    chezmoi, Sentinel, and native setup consume those values; never fabricate a
+    home from a username or fall back to root. Darwin setup accepts only Apple
+    Silicon, selects `dotfiles-aarch64`, and rejects every other architecture
+    before Nix/Homebrew activation. The compatibility `dotfiles` alias is also
+    Apple Silicon; no other Darwin system/configuration is exported.
+    Homebrew's Library/Taps root follows its repository or `/opt/homebrew`.
+    Tap migration is transactional: activation,
     bootstrap, or interruption failure restores the original tree or emits
     exact recovery instructions. First nix-darwin bootstrap also preflights and
     preserves existing `/etc/bashrc` and `/etc/zshrc` at their documented
     `.before-nix-darwin` paths; collisions fail before either move, and
     activation failure/interruption quarantines generated replacements before
     restoring both originals. Guarded by `setup_target_identity_test.sh`,
-    `setup_nix_darwin_test.sh`, and both architecture evaluations in
-    `darwin_config_test.sh`. CI uses the pinned Determinate action where that
-    project supports the host; Intel lanes explicitly select full-SHA-pinned
-    `cachix/install-nix-action` and upstream Nix because current Determinate Nix
-    dropped x86_64-darwin host support. Nixpkgs 26.05 supports Intel Darwin only
-    through 2026-12-31 and 26.11 removes it. Do not set
-    `allowDeprecatedx86_64Darwin` to hide this warning; keep the sunset visible
-    and migrate Intel's package plane before the supported release expires.
+    `setup_nix_darwin_test.sh`, `darwin_config_test.sh`, and
+    `darwin_platform_contract_test.sh`.
 25. **Windows setup uses application-consumed known folders, not fabricated
     children of UserProfile.** Resolve UserProfile, LocalApplicationData,
     Documents, and runtime `$PROFILE` independently. The main chezmoi source is
@@ -366,13 +363,22 @@ that violates one of these, fix it instead of disabling the test.
     `[Environment]::UserInteractive` and host name are context, not a sufficient
     invocation predicate. Normal ConsoleHost, VS Code, and ISE stay supported.
 27. **Required check identities migrate without renaming deadlock.**
-    `.github/check-identities.json` is stage metadata. During stage 1, legacy
-    runner-versioned checks remain required while stable logical jobs verify
-    exact per-OS proof artifacts bound to the same run and head SHA. Never make
-    a no-op check to manufacture green status, and never switch live contexts in
-    the emitting PR. Follow `docs/security/branch-protection.md`: observe the
-    logical checks on merged `main`, merge the checked-in context-switch PR
-    while legacy checks still gate it, then have the owner apply live safeguards.
+    `.github/check-identities.json` records the stable target and still-emitted
+    legacy producers. The checked-in required-check sources require stable
+    logical jobs that verify exact per-OS proof artifacts bound to the same run,
+    PR source head, and actually executed SHA. On `pull_request`, the executed
+    SHA is GitHub's synthetic merge commit; it must never be mislabeled as the
+    source head. Workflows retain legacy producer names until live cutover.
+    Never make a no-op check to manufacture green status, and never switch live
+    contexts from the cutover PR. Follow `docs/security/branch-protection.md`:
+    merge while live legacy checks still gate, pass cache-free plus all logical
+    checks on the exact merged `main` SHA, then have the owner run
+    `--preflight-only`, apply, and verify the checked-in safeguards. Before its
+    first mutation the apply command twice verifies exact branch/repository/main
+    identity, clean sources, unique and exact legacy live policy, GitHub Actions
+    app/workflow/event/run provenance, and cache-free E2E evidence. It snapshots
+    the three changed resources, rolls all three back on apply/readback failure,
+    and retains an exact `--restore` path when recovery needs owner action.
 28. **Handled native PowerShell status never escapes its adapter.** Setup and
     uninstall chezmoi helpers temporarily disable native error promotion,
     capture stdout/stderr and the exact exit code, restore the caller preference,
@@ -381,6 +387,34 @@ that violates one of these, fix it instead of disabling the test.
     throw. This prevents an otherwise-successful script or GitHub `pwsh` step
     from inheriting a handled exit 1. Guarded under both preference states by
     Setup/Uninstall Pester and the Windows round-trip entry point.
+29. **Published release upgrades are exact-tag, side-by-side transactions.**
+    v0.1.0 is already chezmoi-based; its POSIX targets are live checkout
+    symlinks, so `git pull` or switching that checkout before setup crosses the
+    backup boundary. Never publish an in-place v0.1.0 migration. The v0.2.0
+    tools require separate clean official annotated-tag checkouts, exact
+    historical config, authoritative target identity, and private recovery.
+    POSIX recovery archives both exact commits, validates digest-bound read-only
+    trees, and uses only those frozen sources for Nix/config publication and
+    rollback; post-validation checkout changes cannot affect a write.
+    Windows recovery likewise archives both exact commits beneath its protected
+    ACL, records all three canonical Terminal identities and their expected
+    presence/hash state, and binds setup, acceptance, uninstall, and rollback to
+    those validated trees rather than either retained checkout.
+    The reversible core runs only Nix activation plus config files/links on POSIX
+    (`--skip-native-deps --skip-config-scripts --skip-nvim --skip-agents`) and config/known-folder/
+    Terminal publication on Windows
+    (`-SkipDeps -SkipNvim -SkipAgents -SkipConfigScripts`), while conventional
+    v0.1 known-folder targets stay in place until acceptance. Chezmoi run scripts and
+    additive native provisioning happen only after acceptance. Failure or interruption removes the first
+    nix-darwin/Home Manager activation and restores v0.1.0, or restores exact
+    Windows Terminal bytes and old Windows config. Keep both checkouts until
+    explicit verified acceptance. `--update` / `-Update` are never release
+    migrations. The source of truth is `docs/UPGRADING.md`.
+30. **Sentinel is the sole agent-policy product name in the repository.** The
+    pre-rename name must never return in a tracked repository path or file,
+    including tests, docs, cache constants, and historical prose.
+    `tests/static/sentinel_naming_test.sh` reconstructs the retired token at
+    runtime so the guard itself does not violate the zero-residue contract.
 
 ## Common workflows
 
@@ -628,8 +662,9 @@ schema validation and the `chezmoi-parity` migration gate. Warnings are treated
 as failures where the tools expose them cleanly: shellcheck exits nonzero,
 PSScriptAnalyzer scans the meaningful `.ps1` surface and fails on errors, exact
 group-count drift, or any change to the normalized
-script/rule/message/extent fingerprint in `test.ps1`; yamllint/parser checks are part of
-`make test-static`, `scripts/validate-renovate.sh` fails when `npx` is missing
+script/rule/message/extent fingerprint in `test.ps1`; yamllint plus the
+Ruby/Psych semantic Settings policy are part of `make test-static`,
+`scripts/validate-renovate.sh` fails when `npx` is missing
 under `CI=true`, and Windows CI treats missing test dependencies as fatal.
 PSGallery module installs in Windows CI use bounded retries for transient
 gallery lookup failures; the final miss still fails the job.
@@ -669,11 +704,10 @@ major; `tests/static/repo_policy_test.sh` enforces this.
   Linux/WSL2 proxy target).
   Re-adding another distro requires both a matrix entry in `e2e-install.yml` and
   a matching root-prep branch in `tests/ci/container-e2e.sh`.
-- `setup.sh / ubuntu-24.04`, `setup.sh / macos-26`, the additional non-required
-  `setup.sh / macos-26-intel` lane, and
+- `setup.sh / ubuntu-24.04`, `setup.sh / macos-26`, and
   `setup.ps1 / windows-2025` run the real public setup entry points, apply
   configs through chezmoi in Phase 2, then rerun Lazy restore, Tree-sitter
-  parser install, Mason headless sync, and the Polaris Phase 6/6 agent-policy
+  parser install, Mason headless sync, and the Sentinel Phase 6/6 agent-policy
   install. The POSIX setup jobs install Nix first, apply the enforced
   nix-darwin/Home Manager layer before native/deferred installs, and assert the
   nix-owned CLI set resolves from a Nix profile/store path. The Linux job first
@@ -711,19 +745,28 @@ major; `tests/static/repo_policy_test.sh` enforces this.
   managed `highlights.scm` for explicit parser rows,
   rejects unexpected
   install-output parser `.so` files under `stdpath('data')/site/parser`, asserts
-  each fixture's LSP attaches, formats realistic LSP-backed samples copied under
-  `tests/.cache` through conform.nvim's production route, requires the expected
+  each fixture's LSP attaches, formats realistic LSP-backed samples copied into
+  that same isolated project and client lifecycle under `tests/.cache` through
+  conform.nvim's production route, requires the expected
   external formatter(s), fails on post-format LSP warnings/errors, then opens
   every language-matrix fixture, requires real Tree-sitter captures for
   parser-backed rows after explicitly starting and parsing the expected parser
   (`inspect_pos()` first, direct highlight-query capture iteration as the
   headless fallback), and proves syntax-only fallback rows have real Vim syntax
   groups. Keep the LSP
-  attach gate before the broad fixture-open gate; opening
+  combined attach/formatter gate before the broad fixture-open gate; opening
   every fixture under the production config can start LSPs as collateral. After
-  the explicit formatter/LSP gate, the smoke disables the tested LSP configs
+  the explicit LSP/formatter gate, the smoke disables the tested LSP configs
   before opening the broad parser/syntax matrix so later non-LSP gates do not
-  leave unrelated language servers alive.
+  leave unrelated language servers alive. Each LSP attach probe is
+  copied into its own minimal project root under `tests/.cache`; never open the
+  shared fixture directory as an LSP project. The shared directory contains
+  more than one hundred unrelated language fixtures and made neocmakelsp's
+  cold-start attach timing depend on repository-wide scanning. Never add a
+  second formatter-only client lifecycle after an attachment proof: hosted
+  macOS exposed timing-dependent neocmakelsp restart behavior even though the
+  first isolated client attached. Format and diagnose the realistic sample on
+  that already-attached isolated client instead.
   Non-gated servers are strict on every OS; `powershell_es` is
   enforced only on Windows (pwsh + the PSES bundle) and skips cleanly on Unix.
   The fast `make test-nvim` runs Tier 1 only
@@ -734,16 +777,14 @@ major; `tests/static/repo_policy_test.sh` enforces this.
   install surface: Scoop/winget/choco, Developer Mode symlink behavior, font
   registration, and terminal profiles. Hosted macOS/Windows runners are the
   accepted representative fixtures for those OSes.
-- `.github/workflows/wsl2-canary.yml` owns `setup.sh / WSL2 Ubuntu-24.04
-  (canary)`. It is scheduled/manual only, not part of PR required checks, because
-  hosted runners cannot provide a reliably required nested-virtualization WSL2
-  gate. Failures are visible in that workflow; do not hide the entire job behind
-  job-level `continue-on-error`. The canary installs Ubuntu's `nix-bin` package
-  inside the distro and enables flakes before running the enforced Home Manager
-  path; it disables the WSL distro cache so scheduled/manual evidence is not
-  inherited. That keeps the signal aligned with public setup.
-  The required WSL proxy is the Linux Ubuntu container plus the existing
-  WSL config-template/static coverage. Full WSL host/guest validation is
+- There is no hosted WSL workflow. [GitHub documents nested virtualization on
+  hosted runners as technically possible but not officially supported](https://docs.github.com/en/actions/concepts/runners/github-hosted-runners). The
+  retired optional WSL2 canary's only scheduled run and a manual rerun both
+  reached WSL2 but hung before setup evidence because its action-created user
+  had no noninteractive sudo path. Do not replace it with Linux plus fabricated
+  WSL environment variables or make an unsupported nested-virtualization job a
+  required context. Linux CI and WSL config/static tests are proxies, not WSL
+  runtime proof. Full WSL host/guest validation is
   manual: install Nix inside WSL, run `./tests/wsl/e2e.sh` from inside WSL after
   running `.\setup.ps1 -All` on Windows. Windows Terminal settings
   handling is default-on: packaged WT is merged when its settings file exists,
@@ -754,9 +795,14 @@ Local clean-machine harnesses live in `tests/greenfield/README.md`; keep them
 manual VM/Sandbox tools and do not add them to the headless CI matrix.
 
 Main-branch safeguards are canonical in `.github/rulesets/` and applied live by
-`scripts/apply-repo-safeguards.sh`. `.github/settings.yml` is only the classic
-branch-protection fallback for the Probot Settings app; it cannot model the
-required split where owner bypass applies to review/update rules but not CI.
+`scripts/apply-repo-safeguards.sh`. `.github/settings.yml` deliberately contains
+only repository-level settings: the Probot Settings app must not race the
+transactional script by applying classic branch-protection changes when a
+cutover commit reaches the default branch. The script owns both the integrity
+ruleset and classic fallback required-check transition because Probot cannot
+model the required split where owner bypass applies to review/update rules but
+not CI. Enforce that absence by parsing YAML and rejecting the top-level
+`branches` key in every semantic form; a line regex is not a policy boundary.
 
 - `Protect main: integrity` has no bypass actors. It requires pull requests,
   strict required checks, current `main`, squash-only merges, linear history, no
@@ -777,12 +823,28 @@ integrity ruleset's required checks. Repository deletion is outside branch
 protection for a personal repo; routine agents should use least-privilege
 credentials, not owner-account, admin, or `delete_repo` capable tokens.
 
-Run `scripts/apply-repo-safeguards.sh luisgui1757/dotfiles` after changing the
-rulesets, then verify the live posture with the commands in
-`docs/security/branch-protection.md`. Do not add the WSL2 canary to required
-checks unless asked. If live GitHub has duplicate rulesets with the same
-protected name, the script fails closed instead of choosing one; delete the
-duplicate live ruleset and re-run.
+The current stable-context cutover is applied only through
+`scripts/apply-repo-safeguards.sh` after its merged-main proof and no-write
+preflight. The script refuses unexpected live drift rather than acting as an
+unreviewed general reconciler, mutates only Actions SHA pinning plus integrity
+and classic required checks, and keeps a verified recovery snapshot. Both
+preflight captures require public repository visibility. Recovery must freeze
+all consumed snapshot files before validation, bind their exact legacy/stable
+contexts, app IDs, ruleset identity, bypass/branch policy, Actions pinning, and
+complete classic state—including required nullable keys—to the manifest, then
+write and verify only those frozen bytes. Expected recovery policy comes from
+the manifest's exact captured Git commit, never the current worktree, and that
+commit must still be live `main`. After the second live capture, apply
+must also rebuild every desired write and its metadata from exact committed
+objects in one private read-only transaction directory; no later write may read
+the mutable checkout. Missing, altered, or cross-stage recovery material must
+fail before mutation. Every temporary capture is caller-owned and cleaned on
+all exits; a persistent recovery snapshot is pruned on pre-mutation failure and
+retained once mutation begins or apply succeeds. Follow the commands and
+`--restore` recovery path in
+`docs/security/branch-protection.md`.
+Do not recreate a hosted WSL2 canary or claim Linux proxy coverage as WSL
+runtime proof.
 
 `renovate.json` owns GitHub Actions version updates and repo-pinned version/ref
 constants. Dependabot version-update PRs are intentionally disabled; GitHub
@@ -870,8 +932,9 @@ save only**. The next plain `:w` formats normally. Implemented in
   git`, `apt install git`, or `winget install Git.Git`).
 - The Windows installer does NOT symlink `settings.json` for Windows Terminal:
   WT rewrites that file on launch. `setup.ps1` Phase 2 excludes WT from chezmoi
-  publication, then builds one independent plan for each existing packaged and
-  existing/detected portable target. It stages in the destination directory,
+  publication, then builds one independent plan for each existing stable
+  packaged and Preview packaged target plus each existing/detected portable
+  target. It stages in the destination directory,
   parses and byte-validates all results, makes a verified collision-safe backup
   for each divergent existing target, detects source changes both before and
   inside atomic `File.Replace`, and rolls already-published targets back as a
@@ -1040,23 +1103,24 @@ save only**. The next plain `:w` formats normally. Implemented in
   Phase 1 and `-Update`; it must never finish with `exit 0` after a blocked
   dependency update. Preserve the Windows `$InstallFailures` summary contract
   rather than weakening it into warning-only output.
-- **Polaris is setup Phase 6/6 and is opt-out, not experimental.** Full setup
-  (`--all` / `-All`) applies Polaris `0.1.2` (`v0.1.2`) at commit
-  `ecca742fa9ed1243a73981955850c1a8ef3e3b04` unless
+- **Sentinel is setup Phase 6/6 and is opt-out, not experimental.** Full setup
+  (`--all` / `-All`) applies Sentinel's renamed `0.1.2` tree at exact commit
+  `ecafffa858666343c1639f996d177f460163e93e` unless
   `--skip-agents` / `-SkipAgents` is passed. Interactive setup asks
-  `Apply Polaris global agent rules? [Y/n]`. The setup phase clones Polaris into
-  a dotfiles-owned cache (`~/.local/share/dotfiles/polaris/<commit>` on POSIX,
-  `%LOCALAPPDATA%\dotfiles\polaris\<commit>` on Windows), verifies the checkout
-  tag, commit, and `VERSION`, and performs all Polaris Git operations with
+  `Apply Sentinel global agent rules? [Y/n]`. The setup phase clones Sentinel into
+  a dotfiles-owned cache (`~/.local/share/dotfiles/sentinel/<commit>` on POSIX,
+  `%LOCALAPPDATA%\dotfiles\sentinel\<commit>` on Windows), verifies the checkout
+  commit and `VERSION`, and performs all Sentinel Git operations with
   system, global, environment-injected config, templates, hooks, and executable
-  Git config features disabled. It then runs Polaris' Bash global installer
+  Git config features disabled. It then runs Sentinel's Bash global installer
   (`tools/install --global`), then runs its global check. Windows setup invokes
   the same Bash installer through a validated Git Bash (`cygpath` must be
   present) with Git Bash's POSIX-only PATH for the `0.1.2` pin; do not use
-  Polaris `tools/install.ps1` for global installs unless a newer Polaris pin
-  proves the PowerShell path in CI. Do not inline or reimplement Polaris
-  rendering here. Project/team Polaris adoption is a separate repo-local install
-  or vendoring decision.
+  Sentinel `tools/install.ps1` for global installs unless a newer Sentinel pin
+  proves the PowerShell path in CI. Do not inline or reimplement Sentinel
+  rendering here. Project/team Sentinel adoption is a separate repo-local install
+  or vendoring decision. The published `v0.1.2` tag predates the repository
+  rename, so it must not be asserted as the renamed tree's identity.
 - **A C compiler is installed so LuaSnip can build `jsregexp`.** Without one,
   the nvim Lazy build prints "No C compiler found" and `jsregexp` is skipped
   (LuaSnip still works, minus JS-regex snippet transforms). POSIX installs the
@@ -1174,8 +1238,9 @@ save only**. The next plain `:w` formats normally. Implemented in
   copy-mode files, restore bootstrap-style `<target>.bak.<timestamp>[.n]`
   backups by validated filename timestamp/collision order (never mtime), and
   leave chezmoi's own config/state alone. Malformed or ambiguous candidates fail
-  before target removal. Windows restores packaged and portable WT backups only
-  after validating both paths, atomically preserves the displaced current file
+  before target removal. Windows restores stable packaged, Preview packaged,
+  and portable WT backups only after validating all three canonical paths,
+  atomically preserves the displaced current file
   as `settings.json.uninstall-current.*`, and honors `-NoRestoreBackups`.
   Dry-run mode must also leave empty external parent directories in place; it
   prints `would:` lines only and does not prune `~/.local/share/dotfiles`.
@@ -1418,24 +1483,26 @@ save only**. The next plain `:w` formats normally. Implemented in
   `renovate.json`, direct-download SHA-256 values must be matched as context
   only, not named `currentDigest`, otherwise Renovate will schedule same-version
   digest updates for checksums it cannot actually resolve.
-- **Polaris is pinned by immutable Git tag + commit + `VERSION`, not a moving
-  branch.** Setup may clone from GitHub, but it must checkout the exact
-  `POLARIS_REF`, assert that `POLARIS_TAG` peels to that commit, assert
-  `POLARIS_VERSION`, reject dirty cached worktrees, and run only the installer
+- **Sentinel is pinned by immutable Git commit + `VERSION`, never a moving
+  branch or a mismatched tag.** Setup may clone from GitHub, but it must checkout
+  the exact `SENTINEL_REF`, assert `SENTINEL_VERSION`, reject dirty cached
+  worktrees, and run only the installer
   from that verified checkout. Clone, checkout, and cache validation must all
-  use the Polaris Git wrapper: do not trust mutable system,
+  use the Sentinel Git wrapper: do not trust mutable system,
   global, environment-injected, template, hook, or `.git/config` state. Cache
   validation must force the intended cache path with `--git-dir`/`--work-tree`
   semantics and disable executable Git config features such as `core.fsmonitor`,
   so `core.worktree` redirection or fsmonitor hooks cannot run or hide modified
-  files before the installer executes. Updating Polaris means changing the tag,
-  commit, and version constants together, updating README/CLAUDE references, and
+  files before the installer executes. The current renamed tree has no matching
+  release tag, so the exact commit is the immutable authority; never claim a tag
+  until it resolves to the selected commit. Updating Sentinel means changing the
+  commit and version constants together, updating README/CLAUDE references, and
   keeping shell/Pester/static pin tests green.
-- **Dependency installers own the "install EVERYTHING?" prompt; Polaris owns a
+- **Dependency installers own the "install EVERYTHING?" prompt; Sentinel owns a
   separate global-policy prompt.** Interactive runs that didn't pass
   `--all`/`-All` can get the dependency prompt; answering yes flips
   `YES_ALL`/`$All` for dependency prompts. Phase 6 asks
-  `Apply Polaris global agent rules? [Y/n]` unless `--all`/`-All`,
+  `Apply Sentinel global agent rules? [Y/n]` unless `--all`/`-All`,
   `--dry-run`/`-DryRun`, no tty/user interaction, or `--skip-agents` /
   `-SkipAgents` already made that decision.
 - **Windows symlink pre-flight reports WHY symlinks fail and how to fix it.**
@@ -1681,12 +1748,13 @@ host prerequisite.
 - **`flake.nix` structure.** `nixpkgs` (nixos-unstable, pinned by `flake.lock`),
   plus `nix-darwin`, `home-manager`, `nix-homebrew`, and the three Homebrew taps
   (`homebrew-core`, `homebrew-cask`, `nikitabobko/homebrew-tap`) as pinned
-  (`flake = false`) inputs. `systems` covers the four POSIX systems only — there
+  (`flake = false`) inputs. `systems` covers Apple Silicon Darwin plus both
+  Linux architectures — there
   is deliberately **no windows system**. Outputs: a packages-only `devShells`,
   a hermetic `checks.<system>.toolchain` (proves nixpkgs resolves the CLI
   toolchain), `formatter = nixpkgs-fmt`, and explicit
-  `darwinConfigurations."dotfiles-aarch64"` / `"dotfiles-x86_64"`. The
-  compatibility `"dotfiles"` alias deliberately remains Apple Silicon.
+  `darwinConfigurations."dotfiles-aarch64"`. The compatibility `"dotfiles"`
+  alias is also Apple Silicon; no other Darwin configuration is exported.
 - **`nix flake check` in CI does NOT build the darwin toplevel.** It *evaluates*
   `darwinConfigurations.dotfiles` (catching config errors — it caught a
   `nixpkgs.hostPlatform` recursion and a null `home.homeDirectory` during
@@ -1748,11 +1816,13 @@ host prerequisite.
   `nix` is missing on a real run, and fails closed if activation fails.
   `--skip-deps` is the explicit already-provisioned escape and skips the Nix
   package layer together with native/deferred dependency installs; compatibility
-  aliases do not override it. Public setup selects exactly one
-  architecture-specific Darwin configuration; unsupported architectures fail
-  before activation. Apple Silicon and Intel both evaluate in Nix tests, while
-  the additional `macos-26-intel` lane is runtime evidence only after a real
-  green run. Guarded by
+  aliases do not override it. `--skip-native-deps` is narrower: Nix/config
+  remain active while native/deferred Phase 1 is skipped, solely so the
+  versioned release transaction has a complete rollback boundary. That
+  transaction also passes `--skip-config-scripts`, which limits chezmoi to
+  files/symlinks; normal setup still runs reviewed run scripts. Config apply
+  creates managed target parents without relying on Phase 1. Public setup selects the Apple Silicon Darwin
+  configuration; every other architecture fails before activation. Guarded by
   `tests/nix/setup_nix_darwin_test.sh`.
 - **Linux/WSL Home Manager (standalone, packages-only).**
   `homeConfigurations."<arch>-linux"` (`nix/home/linux.nix` + the shared

@@ -30,7 +30,7 @@ greenfield runbook.
 | tmux POSIX overlay | `tmux/tmux.posix.conf`; `home/dot_tmux.posix.conf` | POSIX: `~/.tmux.posix.conf`; Windows: ignored | POSIX symlink only. Holds the native-clipboard `if-shell` probes, which hang psmux at config-load time, so it is **never** deployed on Windows; `tmux.conf` sources it with `source-file -q`. |
 | psmux | `tmux/psmux.conf`; `home/dot_psmux.conf` | Windows: `%USERPROFILE%\.psmux.conf`; POSIX: ignored | Windows copy only. It is the first native-Windows multiplexer entrypoint and source-files the tmux Windows overlay. |
 | Generated Rose Pine tmux/psmux bar | `tmux/psmux-rose-pine.ps1`; generated `tmux/psmux-rose-pine.{main,moon,dawn}.conf`; `home/dot_tmux.rose-pine.ps1`; `home/dot_tmux.rose-pine.*.conf` | POSIX/Windows: `~/.tmux.rose-pine.{main,moon,dawn}.conf`; Windows also gets `~/.tmux.rose-pine.ps1` | Source generator plus checked generated configs; POSIX symlinks, Windows copies. |
-| Windows Terminal | `windows-terminal/settings.fragment.jsonc`; `home/.chezmoitemplates/windows-terminal/{settings.fragment.jsonc,merge-settings.ps1}` | Windows packaged + portable settings paths | `setup.ps1` is the only publisher. Chezmoi exposes no WT target. Setup independently merges each target's own state, stages beside the destination, validates all plans, creates separate verified backups, atomically publishes with concurrent-change detection, and rolls back the multi-target transaction on failure. |
+| Windows Terminal | `windows-terminal/settings.fragment.jsonc`; `home/.chezmoitemplates/windows-terminal/{settings.fragment.jsonc,merge-settings.ps1}`; `scripts/windows-terminal-targets.ps1` | Windows stable packaged + Preview packaged + portable settings paths | `setup.ps1` is the only publisher. Chezmoi exposes no WT target. One validated enumerator is shared by setup, release migration/recovery, and uninstall. Setup independently merges each selected target's own state, stages beside the destination, validates all plans, creates separate verified backups, atomically publishes with concurrent-change detection, and rolls back the multi-target transaction on failure. |
 | PowerShell profiles | `shells/powershell_profile.ps1`; `windows/chezmoi-documents/{PowerShell,WindowsPowerShell}/symlink_*_profile.ps1.tmpl` | actual Documents known folder for ConsoleHost, VS Code, and ISE; active runtime `$PROFILE` must resolve to one of them | Dedicated Documents destination state; every supported host profile symlinks to the canonical source and setup post-checks consumption. |
 | zsh plugins | `scripts/ensure-pinned-zsh-plugin.sh`; `home/.chezmoiscripts/run_onchange_after_20-ensure-zsh-plugin-pins.sh.tmpl` | POSIX: `~/.local/share/dotfiles/zsh-plugins/{fzf-tab,zsh-autosuggestions}`; Windows: ignored | Install-deps and pin/helper changes in chezmoi share the serialized sibling-stage publisher. Unproved payloads are quarantined before fetch; only expected-origin, exact-HEAD, clean, tracked-entry-file checkouts publish atomically. Generic git-repo externals are intentionally absent. |
 
@@ -40,6 +40,47 @@ The migration oracle is manifest-driven:
 Windows `chezmoi-parity*` CI jobs. Static linters intentionally exclude
 `home/`; the parity gate validates managed copies against the canonical
 top-level sources instead.
+
+## Versioned v0.1.0 release migration
+
+`v0.1.0` is a chezmoi release, not a pre-chezmoi install. Its POSIX targets are
+live symlinks into the source checkout, so the former README `git pull` path was
+unsafe: it could publish new bytes before current setup reached backup. The
+canonical v0.2.0 path is now side-by-side and exact-tag-only:
+
+- `scripts/upgrade-v0.1.0.sh` handles Apple Silicon macOS, native Linux, and
+  WSL guest state. It validates both official annotated releases, the target
+  account/home, Nix, clean trees, and exact historical config before mutation;
+  captures private package/config recovery plus digest-bound exact-commit
+  source trees; applies only Nix plus config
+  files/links while deferring chezmoi run scripts; and
+  automatically removes the first nix-darwin/Home Manager activation and
+  reapplies v0.1.0 on later failure or interruption.
+- `scripts/upgrade-v0.1.0.ps1` handles native Windows without Nix. It applies
+  config files/symlinks with dependencies, Neovim caches, agent policy, and
+  chezmoi run scripts skipped; resolves actual known folders; freezes both
+  exact release trees plus stable packaged, Preview packaged, and portable Terminal recovery bytes under a
+  protected ACL, publishes and rolls back only from those trees, retains
+  conventional v0.1 targets until acceptance, removes only transaction-created
+  overlay state on rollback, and validates all three canonical Terminal paths
+  before any restore write.
+- `scripts/install-nix-prerequisite.sh` installs only checksum-reviewed upstream
+  Nix 2.34.0 release archives and refuses non-release checkouts. No downloaded
+  bytes execute before the platform SHA-256 matches.
+- `tests/migration/v0_1_upgrade_test.sh` materializes the exact peeled v0.1.0
+  commit, proves in-place/dirty paths fail before mutation, runs the real setup
+  config/backup path, injects a failure after Home Manager/config publication,
+  proves later checkout drift cannot change publication, rejects altered
+  recovery payloads, and proves exact rollback, retry, and
+  acceptance. Windows Pester pins digest-bound release trees, complete/frozen Terminal recovery,
+  all-target concurrency rejection, known-folder state validation, and the
+  pre-migration command-provider boundary.
+
+The release remains gated on real Apple Silicon owner-host, WSL split-host,
+redirected Windows, and divergent stable packaged/Preview/portable Terminal
+executions. Until the annotated
+v0.2.0 tag and those release rows exist, v0.1.0 users are told to remain on
+v0.1.0. No non-Apple-Silicon macOS migration path is shipped or pending proof.
 
 ## install-deps owns (provisioning -- deliberately NOT in chezmoi)
 
@@ -96,7 +137,8 @@ then remove only targets they can prove are repo-owned:
   `-ForceExternals` to remove it anyway. This protects in-place edits to the
   vendored plugin clones from being lost.
 - Windows Terminal `settings.json` is never deleted. `uninstall.ps1` validates
-  both packaged/portable candidate sets and backup JSON before restoring either,
+  stable packaged, Preview packaged, and portable candidate sets plus backup
+  JSON before restoring any target,
   atomically restores the selected pre-setup bytes, and preserves the displaced
   current file as `settings.json.uninstall-current.<timestamp>[.n]`.
 
@@ -113,7 +155,7 @@ broken repo-symlink still cleaned) is covered by
 
 ### Resolved
 
-- [x] Packaged and portable Windows Terminal settings are independent
+- [x] Stable packaged, Preview packaged, and portable Windows Terminal settings are independent
       user-owned merge transactions. The old full-file mirror and best-effort
       warning path are removed. Setup stages/validates all outputs, backs up
       each divergent target, detects concurrent changes through atomic rollback
@@ -128,8 +170,9 @@ broken repo-symlink still cleaned) is covered by
       account-record home before Nix, Home Manager, chezmoi, or native setup.
       It rejects a mismatched ambient `HOME` instead of fabricating
       `/Users/<user>` or `/home/<user>`, and threads the validated values through
-      the flake/sudo boundary. Darwin has separate aarch64 and x86_64 activation
-      configurations; Homebrew paths follow the actual repository/architecture.
+      the flake/sudo boundary. Darwin activation is Apple-Silicon-only;
+      unsupported x86_64 fails before activation with migration guidance, and
+      Homebrew paths follow the actual Apple Silicon repository.
       First nix-darwin bootstrap collision-checks and preserves existing
       `/etc/bashrc` and `/etc/zshrc` as `.before-nix-darwin`, rolling both back
       on failure/interruption while retaining failed generated output.
@@ -192,20 +235,44 @@ broken repo-symlink still cleaned) is covered by
       `install-deps.sh` installs there, `shells/zshrc` sources there first, the
       verifier checks there, uninstall removes there, and parity tests assert
       that root under a hostile `XDG_DATA_HOME`.
-- [x] Checked-in `main` protection sources require `ubuntu`, `macos`, `windows`,
-      `chezmoi-parity`, `chezmoi-parity-macos`, `chezmoi-parity-windows`,
-      `nix flake check (ubuntu-24.04)`, `nix flake check (macos-26)`,
-      `e2e containers / ubuntu-24.04`, `setup.sh / ubuntu-24.04`,
-      `setup.sh / macos-26`, and `setup.ps1 / windows-2025` as of
-      2026-07-09. Applying them live remains an owner/admin action through
-      `scripts/apply-repo-safeguards.sh luisgui1757/dotfiles`; the static
-      required-check alignment test keeps ruleset/settings/script mirrors in
-      sync.
+- [x] The checked-in ruleset, required-check metadata, and transactional apply
+      path now require `ubuntu`, `macos`,
+      `windows`, `chezmoi-parity`, `chezmoi-parity-macos`,
+      `chezmoi-parity-windows`, `nix flake check / linux`,
+      `nix flake check / macos`, `e2e containers / linux`, `setup.sh / linux`,
+      `setup.sh / macos`, and `setup.ps1 / windows`. The static alignment test
+      binds the ruleset, apply function, and API payload to that exact set.
+      `.github/settings.yml` intentionally omits branch protection so the
+      Probot Settings app cannot race the owner-run transaction on merge.
 - [x] Stable logical replacements for the six runner-versioned contexts are
-      emitted and bound to exact per-OS proof artifacts. Stage 1 intentionally
-      leaves legacy contexts required; `.github/check-identities.json` and
-      `docs/security/branch-protection.md` define the deadlock-free second PR
-      and owner-applied live switch. UGR-020 remains PARTIAL until that happens.
+      emitted and bound to exact per-OS proof artifacts. Marker schema 2 binds
+      the PR source head separately from GitHub's actually executed synthetic
+      merge SHA; push/dispatch proofs truthfully record equal identities.
+      Legacy producer names remain emitted so the currently live legacy
+      safeguards can gate this cutover PR. `.github/check-identities.json` and
+      `docs/security/branch-protection.md` define the post-merge cache-free gate
+      and owner-applied live switch. The apply script now completes and repeats
+      a full read-only preflight before mutation: exact branch/repo/main and
+      public visibility, clean sources, exact legacy live policy, unique
+      rulesets, exact GitHub-Actions app/workflow/event/run provenance, and
+      cache-free E2E evidence. It snapshots and transactionally restores the
+      three cutover resources on failure. After the second capture, apply freezes
+      every desired payload from exact committed objects and publishes only that
+      private read-only set. Restore freezes every consumed file, requires every
+      full-classic field, validates exact manifest-stage
+      Actions/integrity/classic policy and live ruleset identity, and rejects
+      incomplete, altered, or cross-stage recovery material before writing, with
+      expected policy loaded from the manifest's still-live captured commit and
+      a tested explicit `--restore` retry. Temporary captures clean up on every
+      exit, pre-mutation snapshots are pruned, and semantic YAML tests prevent
+      any top-level Probot `branches` shape. UGR-020
+      remains PARTIAL until the merged-main proof, live apply, and readback
+      succeed. Repaired PR head
+      `4dbdb959674f5a062cffe44daae242318f4c1b67` passed all 12 legacy-required
+      and six stable logical contexts in runs `29140112029`, `29140112035`, and
+      `29140112030`; all six downloaded schema-2 markers bound that source head
+      to the executed synthetic merge SHA. The PR E2E run used ordinary PR
+      caches, so it is not promoted to the pending merged-main cache-free gate.
 - [x] Native Windows no longer derives LocalApplicationData or Documents from
       UserProfile. Setup/uninstall share one validated known-folder identity,
       apply separate UserProfile/LocalApplicationData/Documents chezmoi source
@@ -230,25 +297,22 @@ broken repo-symlink still cleaned) is covered by
       `86360593122`): all six
       phases, exact Tree-sitter `0.26.10`, Hack Nerd Font file and registry
       consumption, Pi `0.80.3`, and the strict 257-check Neovim language smoke.
-      This does not close the redirected-folder or dual-Windows-Terminal manual
+      This does not close the redirected-folder or three-variant Windows Terminal manual
       rows below.
 
 ### Open
 
-- [x] Intel macOS runtime confirmation passed on exact PR head
-      `f4b63953f2f982702a685358b09e89bae2d78fdd`: the real
-      `macos-26-intel` Nix job (`29092384007` / `86360593091`) and full setup
-      job (`29092384014` / `86360593153`) both passed. Cross-evaluation is no
-      longer being used as the runtime claim.
-- [ ] Nixpkgs 26.05 is the final `x86_64-darwin` release and is supported only
-      through 2026-12-31. Before that date, migrate Intel's package plane to a
-      still-supported mechanism without narrowing the public macOS contract or
-      moving chezmoi-owned dotfiles into the package layer. The warning remains
-      intentionally unsuppressed.
+- [x] Apple Silicon is the sole current Darwin contract by explicit owner
+      direction. The flake, setup selector, CI matrices, pinned installers,
+      migration tool, tests, and current user documentation contain no alternate
+      macOS architecture path. The generic platform boundary rejects every
+      other architecture before Nix/Homebrew activation. Historical host runs
+      remain only in append-only evidence and are not current support or pending
+      proof.
 
 - [ ] Greenfield/manual evidence remains intentionally bounded:
       `tests/greenfield/LEDGER.md` now records exact-head hosted Ubuntu, Apple
-      Silicon, Intel, and Windows automated runs. Manual cache-free run
+      Silicon, historical Intel, and Windows automated runs. Manual cache-free run
       `29096335827` skipped every broad cache; attempt 1 passed Ubuntu,
       container, and Windows but exposed a real asynchronous nvim-treesitter
       build race on Apple Silicon while Intel independently hit transient DNS.
@@ -261,7 +325,22 @@ broken repo-symlink still cleaned) is covered by
       processes as well as waiting on the build callback. Exact behavior head
       `e5cf3e23299cbb42a157c307f2a7259979fcada0` subsequently passed cache-free
       run `29103732329` across Ubuntu container, public Ubuntu, Apple Silicon,
-      Intel, native Windows, and all four setup logical proofs.
+      historical Intel, native Windows, and all four setup logical proofs.
+      Merged-main run `29114125798` then passed every current producer except
+      Apple Silicon, where the initial CMake LSP fixture shared a large project
+      root and neocmakelsp timed out before attach; the later isolated CMake
+      formatter fixture attached in the same process. The project-isolation
+      repair then passed cache-free branch-head run `29120109175` on exact SHA
+      `f097995b49a2189db327903a20743e7cb69ba665`: all four current producers
+      and four setup logical proofs were green. PR-head run `29180481941` later
+      exposed the remaining duplicate lifecycle in the opposite order: the
+      isolated CMake attachment passed, then a second formatter-only
+      neocmakelsp start timed out. Attachment and realistic gersemi formatting
+      now share one isolated client lifecycle; three repeated strict
+      Apple-Silicon runs passed all 257 checks. Exact repaired head
+      `d744948cdccc51f3d79e45aa78f82c46445df0c6` then passed E2E run
+      `29181215803`, including all four producers and logical proofs. Merged-main
+      confirmation remains.
       No Windows Sandbox, WSL, redirected-Windows, merged-main cache-free
       confirmation, or desktop visual run is claimed. Required CI is not manual
       desktop evidence. The old Wave C `0 / 10` Ubuntu parity counter is no
@@ -275,11 +354,13 @@ broken repo-symlink still cleaned) is covered by
       Windows host with Documents and LocalApplicationData on alternate paths.
       Pester and migration round-trip fixtures are implementation proof, not a
       claim about a host run.
-- [ ] Full WSL parity is still not a required automated gate, but chezmoi now
-      models WSL through the generated `isWsl` data value and skips Linux
-      Ghostty by default. `setup.sh --experimental-wsl-gui` passes the
-      `experimentalWslGui` data override so WSL Ghostty is managed only on the
-      explicit GUI-terminal opt-in path.
+- [ ] Full WSL runtime parity remains manual. The optional hosted canary was
+      retired after scheduled run `29072773410` and manual run `29114215045`
+      both reached WSL2 but stalled before setup evidence; GitHub does not
+      officially support the nested-virtualization dependency. Chezmoi still
+      models WSL through generated `isWsl`, skips Linux Ghostty by default, and
+      honors `--experimental-wsl-gui`. The real throwaway-distro and split-host
+      harnesses remain the proof path; Linux CI/static coverage is only a proxy.
 - [ ] Out-of-band zsh checkout tampering is rechecked by the next setup or
       pin-sensitive chezmoi apply; no background monitor is promised. Every
       publisher/verifier path neutralizes an unproved sourceable payload before

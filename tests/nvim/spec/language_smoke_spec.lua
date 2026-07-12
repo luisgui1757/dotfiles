@@ -104,6 +104,21 @@ describe("language smoke (Tier 1)", function()
     assert.is_nil(src:find("vim.wait(45000", 1, true), "raw attach timeout must not be duplicated")
   end)
 
+  it("Tier 2 proves formatting inside the isolated LSP attachment lifecycle", function()
+    local src = lsp_smoke_source()
+    local _, attach_wait_calls = src:gsub("local attached = wait_for_lsp_client%(buf, ", "")
+    assert.are.equal(1, attach_wait_calls, "formatter proof must not restart each language server in a second gate")
+    assert.is_truthy(
+      src:find("fixture = formatter_sample and formatter_sample.source or row.fixture", 1, true),
+      "formatter fixtures must use the same isolated project preparation as attachment fixtures"
+    )
+    assert.is_truthy(
+      src:find("verify_formatter_lsp(formatter_sample, buf, row.lsp)", 1, true),
+      "formatter compatibility must run against the already-attached isolated client"
+    )
+    assert.is_nil(src:find("lsp-smoke-formatters", 1, true), "the redundant formatter-only client lifecycle returned")
+  end)
+
   it("Tier 2 starts and parses the expected parser before capture probes", function()
     local src = lsp_smoke_source()
     assert.is_truthy(

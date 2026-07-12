@@ -17,11 +17,6 @@ case "$(uname -s):$(uname -m)" in
         arch="arm64"
         expected="${CHEZMOI_LINUX_ARM64_SHA256:?CHEZMOI_LINUX_ARM64_SHA256 is required}"
         ;;
-    Darwin:x86_64|Darwin:amd64)
-        os="darwin"
-        arch="amd64"
-        expected="${CHEZMOI_DARWIN_X86_64_SHA256:?CHEZMOI_DARWIN_X86_64_SHA256 is required}"
-        ;;
     Darwin:arm64|Darwin:aarch64)
         os="darwin"
         arch="arm64"

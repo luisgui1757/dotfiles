@@ -139,6 +139,7 @@ Describe "setup.ps1 main chezmoi apply boundary" {
 
     AfterEach {
         $script:WindowsIdentity = $script:ApplyBoundaryOldIdentity
+        $script:DryRun = $false
     }
 
     It "applies the complete source without non-portable absolute target selectors" {
@@ -147,6 +148,32 @@ Describe "setup.ps1 main chezmoi apply boundary" {
         Should -Invoke Invoke-ChezmoiOrExit -Times 1 -ParameterFilter {
             $Label -eq 'chezmoi apply' -and
             ($Arguments -join '|') -eq '--no-tty|--force|apply'
+        }
+    }
+
+    It "limits release migration apply to files and symlinks without init" {
+        Invoke-ChezmoiApplyPhase -ExcludeScripts $true
+
+        Should -Invoke Invoke-ChezmoiOrExit -Times 0 -ParameterFilter {
+            $Label -eq 'chezmoi init'
+        }
+        Should -Invoke Invoke-ChezmoiOrExit -Times 1 -ParameterFilter {
+            $Label -eq 'chezmoi apply' -and
+            ($Arguments -join '|') -eq '--no-tty|--force|apply|--include|files,symlinks'
+        }
+    }
+
+    It "keeps the files and symlinks boundary in release migration previews" {
+        Mock -CommandName New-ChezmoiDryRunConfig -MockWith { 'C:\temporary\chezmoi.toml' }
+
+        Invoke-ChezmoiApplyPhase -ExcludeScripts $true -IsDryRun $true
+
+        Should -Invoke Invoke-ChezmoiOrExit -Times 1 -ParameterFilter {
+            $Label -eq 'chezmoi dry-run apply' -and
+            ($Arguments -join '|') -eq '--dry-run|--verbose|apply|--include|files,symlinks'
+        }
+        Should -Invoke Invoke-WindowsKnownFolderOverlays -Times 1 -ParameterFilter {
+            $IsDryRun -and $ExcludeScripts
         }
     }
 }
@@ -434,53 +461,73 @@ Describe "setup.ps1 Windows known-folder identity" {
             Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue
         }
     }
+
+    It "retains conventional v0.1 targets while release rollback authority is open" {
+        $root = Join-Path ([IO.Path]::GetTempPath()) ('legacy retained ' + [Guid]::NewGuid())
+        $identity = [pscustomobject]@{
+            UserProfile = Join-Path $root 'User'
+            LocalApplicationData = Join-Path $root 'Redirected Local'
+            Documents = Join-Path $root 'Redirected Documents'
+            RuntimeProfile = Join-Path $root 'Redirected Documents\PowerShell\Microsoft.PowerShell_profile.ps1'
+        }
+        $legacyLazygit = Join-Path $identity.UserProfile 'AppData\Local\lazygit\config.yml'
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $legacyLazygit) | Out-Null
+        Copy-Item -LiteralPath (Join-Path $script:RepoRoot 'lazygit\config.windows.yml') -Destination $legacyLazygit
+        try {
+            Move-LegacyWindowsKnownFolderTargets -Identity $identity -IsDryRun:$false -IsSuppressed:$true
+
+            Test-Path -LiteralPath $legacyLazygit -PathType Leaf | Should -BeTrue
+            @(Get-ChildItem -LiteralPath (Split-Path -Parent $legacyLazygit) -Filter 'config.yml.legacy.*').Count | Should -Be 0
+        } finally {
+            Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
 }
 
-Describe "setup.ps1 Polaris agent policy" {
+Describe "setup.ps1 Sentinel agent policy" {
     BeforeEach {
         . $script:ImportSetupForTest
-        $script:PolarisTestRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("setup-polaris-" + [System.Guid]::NewGuid())
-        New-Item -ItemType Directory -Force -Path $script:PolarisTestRoot | Out-Null
+        $script:SentinelTestRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("setup-sentinel-" + [System.Guid]::NewGuid())
+        New-Item -ItemType Directory -Force -Path $script:SentinelTestRoot | Out-Null
     }
 
     AfterEach {
-        Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $script:PolarisTestRoot
+        Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $script:SentinelTestRoot
     }
 
-    function script:New-SetupTestPolarisRepo {
+    function script:New-SetupTestSentinelRepo {
         param(
-            [string]$Name = ('polaris-work-' + [System.Guid]::NewGuid().ToString('N')),
+            [string]$Name = ('sentinel-work-' + [System.Guid]::NewGuid().ToString('N')),
+            [string]$Version = '0.1.2',
             [string]$Installer = @'
 #!/usr/bin/env bash
-printf "%s\n" "$*" >> "$POLARIS_TEST_LOG"
+printf "%s\n" "$*" >> "$SENTINEL_TEST_LOG"
 '@
         )
 
-        $work = Join-Path $script:PolarisTestRoot $Name
+        $work = Join-Path $script:SentinelTestRoot $Name
         $tools = Join-Path $work 'tools'
         New-Item -ItemType Directory -Force -Path $tools | Out-Null
         & git -C $work init -q
         & git -C $work config user.name 'Dotfiles Test'
         & git -C $work config user.email 'dotfiles@example.invalid'
-        [System.IO.File]::WriteAllText((Join-Path $work 'VERSION'), "0.1.2`n", [System.Text.UTF8Encoding]::new($false))
+        [System.IO.File]::WriteAllText((Join-Path $work 'VERSION'), "$Version`n", [System.Text.UTF8Encoding]::new($false))
         $installerPath = Join-Path $tools 'install'
         [System.IO.File]::WriteAllText($installerPath, $Installer, [System.Text.UTF8Encoding]::new($false))
         if ($env:OS -ne 'Windows_NT') {
             & chmod +x $installerPath
         }
         & git -C $work add VERSION tools/install
-        & git -C $work commit -q -m 'fake polaris'
+        & git -C $work commit -q -m 'fake sentinel'
         $sha = (& git -C $work rev-parse HEAD).Trim()
-        & git -C $work tag 'v0.1.2' $sha
         return [pscustomobject]@{
             Work = $work
             Installer = $installerPath
             Sha = $sha
-            Tag = 'v0.1.2'
         }
     }
 
-    function script:Invoke-SetupTestPolarisPolicyChild {
+    function script:Invoke-SetupTestSentinelPolicyChild {
         param(
             [Parameter(Mandatory)] [string]$Cache,
             [Parameter(Mandatory)] [string]$Ref,
@@ -499,7 +546,7 @@ printf "%s\n" "$*" >> "$POLARIS_TEST_LOG"
 `$ErrorActionPreference = 'Stop'
 `$env:DOTFILES_SETUP_PS1_SOURCE_ONLY = '1'
 . '$setupLiteral' -All
-Invoke-PolarisAgentPolicy -AllMode:`$true -IsDryRun:`$false -Version '0.1.2' -Ref '$refLiteral' -CacheRoot '$cacheLiteral'$repoArgument
+Invoke-SentinelAgentPolicy -AllMode:`$true -IsDryRun:`$false -Version '0.1.2' -Ref '$refLiteral' -CacheRoot '$cacheLiteral'$repoArgument
 "@
         $oldNativePreference = $null
         $hasNativePreference = Test-Path Variable:PSNativeCommandUseErrorActionPreference
@@ -521,10 +568,10 @@ Invoke-PolarisAgentPolicy -AllMode:`$true -IsDryRun:`$false -Version '0.1.2' -Re
         }
     }
 
-    It "previews the pinned Polaris global install in dry-run mode" {
-        $cache = Join-Path $script:PolarisTestRoot 'cache'
+    It "previews the pinned Sentinel global install in dry-run mode" {
+        $cache = Join-Path $script:SentinelTestRoot 'cache'
         $output = & {
-            Invoke-PolarisAgentPolicy `
+            Invoke-SentinelAgentPolicy `
                 -AllMode:$true `
                 -IsDryRun:$true `
                 -Version '0.1.2' `
@@ -532,16 +579,16 @@ Invoke-PolarisAgentPolicy -AllMode:`$true -IsDryRun:`$false -Version '0.1.2' -Re
                 -CacheRoot $cache
         } 6>&1 | Out-String
 
-        $output | Should -Match 'Phase 6/6: apply global agent policy \(Polaris\)'
-        $output | Should -Match 'would\s+clone/fetch Polaris 0\.1\.2'
-        $output | Should -Match 'v0\.1\.2'
+        $output | Should -Match 'Phase 6/6: apply global agent policy \(Sentinel\)'
+        $output | Should -Match 'would\s+clone/fetch Sentinel 0\.1\.2'
+        $output | Should -Match '489dcc6f991ddcff63c460a433e983264dc54cf7'
         $output | Should -Match 'tools/install --global'
         Test-Path -LiteralPath $cache | Should -BeFalse
     }
 
     It "honors -SkipAgents" {
         $output = & {
-            Invoke-PolarisAgentPolicy -SkipAgentsPhase:$true -AllMode:$true
+            Invoke-SentinelAgentPolicy -SkipAgentsPhase:$true -AllMode:$true
         } 6>&1 | Out-String
 
         $output | Should -Match 'skipped: Phase 6/6 \(agent policy\) via -SkipAgents'
@@ -565,9 +612,9 @@ Invoke-PolarisAgentPolicy -AllMode:`$true -IsDryRun:`$false -Version '0.1.2' -Re
         $oldOs = $env:OS
         try {
             $env:OS = 'Windows_NT'
-            $gitRoot = Join-Path $script:PolarisTestRoot 'Git'
-            $script:ExpectedPolarisGitBash = Join-Path $gitRoot 'bin\bash.exe'
-            $pathBash = Join-Path $script:PolarisTestRoot 'System32\bash.exe'
+            $gitRoot = Join-Path $script:SentinelTestRoot 'Git'
+            $script:ExpectedSentinelGitBash = Join-Path $gitRoot 'bin\bash.exe'
+            $pathBash = Join-Path $script:SentinelTestRoot 'System32\bash.exe'
 
             Mock -CommandName Get-Command -MockWith {
                 param([string]$Name)
@@ -579,14 +626,14 @@ Invoke-PolarisAgentPolicy -AllMode:`$true -IsDryRun:`$false -Version '0.1.2' -Re
                 }
                 return $null
             }
-            Mock -CommandName Test-PolarisGitBashCommand -MockWith {
+            Mock -CommandName Test-SentinelGitBashCommand -MockWith {
                 param([string]$Candidate)
-                return ($Candidate -eq $script:ExpectedPolarisGitBash)
+                return ($Candidate -eq $script:ExpectedSentinelGitBash)
             }
 
-            Get-PolarisBashCommand | Should -Be $script:ExpectedPolarisGitBash
+            Get-SentinelBashCommand | Should -Be $script:ExpectedSentinelGitBash
         } finally {
-            Remove-Variable -Name ExpectedPolarisGitBash -Scope Script -ErrorAction SilentlyContinue
+            Remove-Variable -Name ExpectedSentinelGitBash -Scope Script -ErrorAction SilentlyContinue
             if ($null -eq $oldOs) {
                 Remove-Item Env:OS -ErrorAction SilentlyContinue
             } else {
@@ -599,7 +646,7 @@ Invoke-PolarisAgentPolicy -AllMode:`$true -IsDryRun:`$false -Version '0.1.2' -Re
         $oldOs = $env:OS
         try {
             $env:OS = 'Windows_NT'
-            $pathBash = Join-Path $script:PolarisTestRoot 'System32\bash.exe'
+            $pathBash = Join-Path $script:SentinelTestRoot 'System32\bash.exe'
 
             Mock -CommandName Get-Command -MockWith {
                 param([string]$Name)
@@ -608,9 +655,9 @@ Invoke-PolarisAgentPolicy -AllMode:`$true -IsDryRun:`$false -Version '0.1.2' -Re
                 }
                 return $null
             }
-            Mock -CommandName Test-PolarisGitBashCommand -MockWith { return $false }
+            Mock -CommandName Test-SentinelGitBashCommand -MockWith { return $false }
 
-            Get-PolarisBashCommand | Should -BeNullOrEmpty
+            Get-SentinelBashCommand | Should -BeNullOrEmpty
         } finally {
             if ($null -eq $oldOs) {
                 Remove-Item Env:OS -ErrorAction SilentlyContinue
@@ -620,8 +667,8 @@ Invoke-PolarisAgentPolicy -AllMode:`$true -IsDryRun:`$false -Version '0.1.2' -Re
         }
     }
 
-    It "runs the pinned Polaris installer and global check from a verified checkout" {
-        $work = Join-Path $script:PolarisTestRoot 'polaris-work'
+    It "runs the pinned Sentinel installer and global check from a verified checkout" {
+        $work = Join-Path $script:SentinelTestRoot 'sentinel-work'
         $tools = Join-Path $work 'tools'
         New-Item -ItemType Directory -Force -Path $tools | Out-Null
         & git -C $work init -q
@@ -631,29 +678,28 @@ Invoke-PolarisAgentPolicy -AllMode:`$true -IsDryRun:`$false -Version '0.1.2' -Re
         $installer = Join-Path $tools 'install'
         [System.IO.File]::WriteAllText($installer, @'
 #!/usr/bin/env bash
-printf "PATH=%s\n" "$PATH" >> "$POLARIS_TEST_LOG"
-printf "%s\n" "$*" >> "$POLARIS_TEST_LOG"
+printf "PATH=%s\n" "$PATH" >> "$SENTINEL_TEST_LOG"
+printf "%s\n" "$*" >> "$SENTINEL_TEST_LOG"
 '@, [System.Text.UTF8Encoding]::new($false))
         & git -C $work add VERSION tools/install
-        & git -C $work commit -q -m 'fake polaris'
+        & git -C $work commit -q -m 'fake sentinel'
         $sha = (& git -C $work rev-parse HEAD).Trim()
-        & git -C $work tag 'v0.1.2' $sha
 
-        $cache = Join-Path $script:PolarisTestRoot 'cache'
+        $cache = Join-Path $script:SentinelTestRoot 'cache'
         New-Item -ItemType Directory -Force -Path $cache | Out-Null
         Move-Item -LiteralPath $work -Destination (Join-Path $cache $sha)
 
-        $oldLog = $env:POLARIS_TEST_LOG
+        $oldLog = $env:SENTINEL_TEST_LOG
         try {
-            $env:POLARIS_TEST_LOG = Join-Path $script:PolarisTestRoot 'polaris-install.log'
-            Invoke-PolarisAgentPolicy `
+            $env:SENTINEL_TEST_LOG = Join-Path $script:SentinelTestRoot 'sentinel-install.log'
+            Invoke-SentinelAgentPolicy `
                 -AllMode:$true `
                 -IsDryRun:$false `
                 -Version '0.1.2' `
                 -Ref $sha `
                 -CacheRoot $cache
 
-            $calls = Get-Content -LiteralPath $env:POLARIS_TEST_LOG
+            $calls = Get-Content -LiteralPath $env:SENTINEL_TEST_LOG
             $calls | Should -Contain '--global'
             $calls | Should -Contain '--global --check'
             if ($env:OS -eq 'Windows_NT') {
@@ -661,17 +707,17 @@ printf "%s\n" "$*" >> "$POLARIS_TEST_LOG"
             }
         } finally {
             if ($null -eq $oldLog) {
-                Remove-Item Env:POLARIS_TEST_LOG -ErrorAction SilentlyContinue
+                Remove-Item Env:SENTINEL_TEST_LOG -ErrorAction SilentlyContinue
             } else {
-                $env:POLARIS_TEST_LOG = $oldLog
+                $env:SENTINEL_TEST_LOG = $oldLog
             }
         }
     }
 
-    It "fetches Polaris without executing ambient Git config or template hooks" {
-        $repo = New-SetupTestPolarisRepo -Name 'polaris-fresh-work'
-        $cache = Join-Path $script:PolarisTestRoot 'fresh-cache'
-        $oldLog = $env:POLARIS_TEST_LOG
+    It "fetches Sentinel without executing ambient Git config or template hooks" {
+        $repo = New-SetupTestSentinelRepo -Name 'sentinel-fresh-work'
+        $cache = Join-Path $script:SentinelTestRoot 'fresh-cache'
+        $oldLog = $env:SENTINEL_TEST_LOG
         $gitEnvNames = @(
             'GIT_CONFIG_GLOBAL',
             'GIT_CONFIG_COUNT',
@@ -684,27 +730,27 @@ printf "%s\n" "$*" >> "$POLARIS_TEST_LOG"
             $savedEnv[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
         }
 
-        $globalMarker = Join-Path $script:PolarisTestRoot 'fresh-global-fsmonitor-ran'
-        $envMarker = Join-Path $script:PolarisTestRoot 'fresh-env-fsmonitor-ran'
-        $templateMarker = Join-Path $script:PolarisTestRoot 'fresh-template-post-checkout-ran'
+        $globalMarker = Join-Path $script:SentinelTestRoot 'fresh-global-fsmonitor-ran'
+        $envMarker = Join-Path $script:SentinelTestRoot 'fresh-env-fsmonitor-ran'
+        $templateMarker = Join-Path $script:SentinelTestRoot 'fresh-template-post-checkout-ran'
         if ($env:OS -eq 'Windows_NT') {
-            $globalFsmonitor = Join-Path $script:PolarisTestRoot 'fresh-global-fsmonitor.cmd'
-            $envFsmonitor = Join-Path $script:PolarisTestRoot 'fresh-env-fsmonitor.cmd'
+            $globalFsmonitor = Join-Path $script:SentinelTestRoot 'fresh-global-fsmonitor.cmd'
+            $envFsmonitor = Join-Path $script:SentinelTestRoot 'fresh-env-fsmonitor.cmd'
             [System.IO.File]::WriteAllText($globalFsmonitor, "@echo off`r`necho ran> `"$globalMarker`"`r`nexit /b 0`r`n", [System.Text.UTF8Encoding]::new($false))
             [System.IO.File]::WriteAllText($envFsmonitor, "@echo off`r`necho ran> `"$envMarker`"`r`nexit /b 0`r`n", [System.Text.UTF8Encoding]::new($false))
         } else {
-            $globalFsmonitor = Join-Path $script:PolarisTestRoot 'fresh-global-fsmonitor'
-            $envFsmonitor = Join-Path $script:PolarisTestRoot 'fresh-env-fsmonitor'
+            $globalFsmonitor = Join-Path $script:SentinelTestRoot 'fresh-global-fsmonitor'
+            $envFsmonitor = Join-Path $script:SentinelTestRoot 'fresh-env-fsmonitor'
             [System.IO.File]::WriteAllText($globalFsmonitor, "#!/usr/bin/env bash`nprintf ran > '$globalMarker'`nexit 0`n", [System.Text.UTF8Encoding]::new($false))
             [System.IO.File]::WriteAllText($envFsmonitor, "#!/usr/bin/env bash`nprintf ran > '$envMarker'`nexit 0`n", [System.Text.UTF8Encoding]::new($false))
             & chmod +x $globalFsmonitor $envFsmonitor
         }
 
-        $globalConfig = Join-Path $script:PolarisTestRoot 'fresh-hostile.gitconfig'
+        $globalConfig = Join-Path $script:SentinelTestRoot 'fresh-hostile.gitconfig'
         $globalFsmonitorForGit = $globalFsmonitor -replace '\\', '/'
         [System.IO.File]::WriteAllText($globalConfig, "[core]`n`tfsmonitor = $globalFsmonitorForGit`n", [System.Text.UTF8Encoding]::new($false))
 
-        $templateDir = Join-Path $script:PolarisTestRoot 'fresh-template'
+        $templateDir = Join-Path $script:SentinelTestRoot 'fresh-template'
         $templateHooks = Join-Path $templateDir 'hooks'
         New-Item -ItemType Directory -Force -Path $templateHooks | Out-Null
         $templateMarkerForGit = $templateMarker -replace '\\', '/'
@@ -715,14 +761,14 @@ printf "%s\n" "$*" >> "$POLARIS_TEST_LOG"
         }
 
         try {
-            $env:POLARIS_TEST_LOG = Join-Path $script:PolarisTestRoot 'fresh-polaris-install.log'
+            $env:SENTINEL_TEST_LOG = Join-Path $script:SentinelTestRoot 'fresh-sentinel-install.log'
             [Environment]::SetEnvironmentVariable('GIT_CONFIG_GLOBAL', $globalConfig, 'Process')
             [Environment]::SetEnvironmentVariable('GIT_CONFIG_COUNT', '1', 'Process')
             [Environment]::SetEnvironmentVariable('GIT_CONFIG_KEY_0', 'core.fsmonitor', 'Process')
             [Environment]::SetEnvironmentVariable('GIT_CONFIG_VALUE_0', ($envFsmonitor -replace '\\', '/'), 'Process')
             [Environment]::SetEnvironmentVariable('GIT_TEMPLATE_DIR', $templateDir, 'Process')
 
-            Invoke-PolarisAgentPolicy `
+            Invoke-SentinelAgentPolicy `
                 -AllMode:$true `
                 -IsDryRun:$false `
                 -Version '0.1.2' `
@@ -733,7 +779,7 @@ printf "%s\n" "$*" >> "$POLARIS_TEST_LOG"
             Test-Path -LiteralPath $globalMarker | Should -BeFalse
             Test-Path -LiteralPath $envMarker | Should -BeFalse
             Test-Path -LiteralPath $templateMarker | Should -BeFalse
-            $calls = Get-Content -LiteralPath $env:POLARIS_TEST_LOG
+            $calls = Get-Content -LiteralPath $env:SENTINEL_TEST_LOG
             $calls | Should -Contain '--global'
             $calls | Should -Contain '--global --check'
         } finally {
@@ -741,15 +787,15 @@ printf "%s\n" "$*" >> "$POLARIS_TEST_LOG"
                 [Environment]::SetEnvironmentVariable($name, $savedEnv[$name], 'Process')
             }
             if ($null -eq $oldLog) {
-                Remove-Item Env:POLARIS_TEST_LOG -ErrorAction SilentlyContinue
+                Remove-Item Env:SENTINEL_TEST_LOG -ErrorAction SilentlyContinue
             } else {
-                $env:POLARIS_TEST_LOG = $oldLog
+                $env:SENTINEL_TEST_LOG = $oldLog
             }
         }
     }
 
-    It "rejects a dirty verified Polaris checkout before running the installer" {
-        $work = Join-Path $script:PolarisTestRoot 'polaris-work'
+    It "rejects a dirty verified Sentinel checkout before running the installer" {
+        $work = Join-Path $script:SentinelTestRoot 'sentinel-work'
         $tools = Join-Path $work 'tools'
         New-Item -ItemType Directory -Force -Path $tools | Out-Null
         & git -C $work init -q
@@ -759,21 +805,20 @@ printf "%s\n" "$*" >> "$POLARIS_TEST_LOG"
         $installer = Join-Path $tools 'install'
         [System.IO.File]::WriteAllText($installer, @'
 #!/usr/bin/env bash
-printf "%s\n" "$*" >> "$POLARIS_TEST_LOG"
+printf "%s\n" "$*" >> "$SENTINEL_TEST_LOG"
 '@, [System.Text.UTF8Encoding]::new($false))
         & git -C $work add VERSION tools/install
-        & git -C $work commit -q -m 'fake polaris'
+        & git -C $work commit -q -m 'fake sentinel'
         $sha = (& git -C $work rev-parse HEAD).Trim()
-        & git -C $work tag 'v0.1.2' $sha
 
         Add-Content -LiteralPath $installer -Value '# dirty cache regression'
-        $cache = Join-Path $script:PolarisTestRoot 'cache'
+        $cache = Join-Path $script:SentinelTestRoot 'cache'
         New-Item -ItemType Directory -Force -Path $cache | Out-Null
         Move-Item -LiteralPath $work -Destination (Join-Path $cache $sha)
 
-        $oldLog = $env:POLARIS_TEST_LOG
+        $oldLog = $env:SENTINEL_TEST_LOG
         try {
-            $env:POLARIS_TEST_LOG = Join-Path $script:PolarisTestRoot 'dirty-install.log'
+            $env:SENTINEL_TEST_LOG = Join-Path $script:SentinelTestRoot 'dirty-install.log'
             $setupLiteral = $script:Setup.Replace("'", "''")
             $cacheLiteral = $cache.Replace("'", "''")
             $shaLiteral = $sha.Replace("'", "''")
@@ -781,7 +826,7 @@ printf "%s\n" "$*" >> "$POLARIS_TEST_LOG"
 `$ErrorActionPreference = 'Stop'
 `$env:DOTFILES_SETUP_PS1_SOURCE_ONLY = '1'
 . '$setupLiteral' -All
-Invoke-PolarisAgentPolicy -AllMode:`$true -IsDryRun:`$false -Version '0.1.2' -Ref '$shaLiteral' -CacheRoot '$cacheLiteral'
+Invoke-SentinelAgentPolicy -AllMode:`$true -IsDryRun:`$false -Version '0.1.2' -Ref '$shaLiteral' -CacheRoot '$cacheLiteral'
 "@
             $oldNativePreference = $null
             $hasNativePreference = Test-Path Variable:PSNativeCommandUseErrorActionPreference
@@ -799,93 +844,94 @@ Invoke-PolarisAgentPolicy -AllMode:`$true -IsDryRun:`$false -Version '0.1.2' -Re
             }
 
             $rc | Should -Not -Be 0
-            $output | Should -Match 'Polaris cache has local changes'
-            Test-Path -LiteralPath $env:POLARIS_TEST_LOG | Should -BeFalse
+            $output | Should -Match 'Sentinel cache has local changes'
+            Test-Path -LiteralPath $env:SENTINEL_TEST_LOG | Should -BeFalse
         } finally {
             if ($null -eq $oldLog) {
-                Remove-Item Env:POLARIS_TEST_LOG -ErrorAction SilentlyContinue
+                Remove-Item Env:SENTINEL_TEST_LOG -ErrorAction SilentlyContinue
             } else {
-                $env:POLARIS_TEST_LOG = $oldLog
+                $env:SENTINEL_TEST_LOG = $oldLog
             }
         }
     }
 
-    It "rejects an untracked file in a verified Polaris checkout before running the installer" {
-        $repo = New-SetupTestPolarisRepo -Name 'polaris-untracked-work'
-        $cache = Join-Path $script:PolarisTestRoot 'cache'
+    It "rejects an untracked file in a verified Sentinel checkout before running the installer" {
+        $repo = New-SetupTestSentinelRepo -Name 'sentinel-untracked-work'
+        $cache = Join-Path $script:SentinelTestRoot 'cache'
         New-Item -ItemType Directory -Force -Path $cache | Out-Null
         $checkout = Join-Path $cache $repo.Sha
         Move-Item -LiteralPath $repo.Work -Destination $checkout
         [System.IO.File]::WriteAllText((Join-Path $checkout 'UNTRACKED'), "dirty`n", [System.Text.UTF8Encoding]::new($false))
 
-        $oldLog = $env:POLARIS_TEST_LOG
+        $oldLog = $env:SENTINEL_TEST_LOG
         try {
-            $env:POLARIS_TEST_LOG = Join-Path $script:PolarisTestRoot 'untracked-install.log'
-            $result = Invoke-SetupTestPolarisPolicyChild -Cache $cache -Ref $repo.Sha
+            $env:SENTINEL_TEST_LOG = Join-Path $script:SentinelTestRoot 'untracked-install.log'
+            $result = Invoke-SetupTestSentinelPolicyChild -Cache $cache -Ref $repo.Sha
 
             $result.ExitCode | Should -Not -Be 0
-            $result.Output | Should -Match 'Polaris cache has local changes'
-            Test-Path -LiteralPath $env:POLARIS_TEST_LOG | Should -BeFalse
+            $result.Output | Should -Match 'Sentinel cache has local changes'
+            Test-Path -LiteralPath $env:SENTINEL_TEST_LOG | Should -BeFalse
         } finally {
             if ($null -eq $oldLog) {
-                Remove-Item Env:POLARIS_TEST_LOG -ErrorAction SilentlyContinue
+                Remove-Item Env:SENTINEL_TEST_LOG -ErrorAction SilentlyContinue
             } else {
-                $env:POLARIS_TEST_LOG = $oldLog
+                $env:SENTINEL_TEST_LOG = $oldLog
             }
         }
     }
 
-    It "rejects a cached Polaris checkout whose release tag is missing" {
-        $repo = New-SetupTestPolarisRepo -Name 'polaris-untagged-work'
-        & git -C $repo.Work tag -d $repo.Tag | Out-Null
-        $cache = Join-Path $script:PolarisTestRoot 'cache'
+    It "rejects a cached Sentinel checkout whose VERSION is wrong" {
+        $repo = New-SetupTestSentinelRepo -Name 'sentinel-wrong-version-work' -Version '0.1.1'
+        $cache = Join-Path $script:SentinelTestRoot 'cache'
         New-Item -ItemType Directory -Force -Path $cache | Out-Null
         Move-Item -LiteralPath $repo.Work -Destination (Join-Path $cache $repo.Sha)
 
-        $oldLog = $env:POLARIS_TEST_LOG
+        $oldLog = $env:SENTINEL_TEST_LOG
         try {
-            $env:POLARIS_TEST_LOG = Join-Path $script:PolarisTestRoot 'untagged-install.log'
-            $result = Invoke-SetupTestPolarisPolicyChild -Cache $cache -Ref $repo.Sha
+            $env:SENTINEL_TEST_LOG = Join-Path $script:SentinelTestRoot 'wrong-version-install.log'
+            $result = Invoke-SetupTestSentinelPolicyChild -Cache $cache -Ref $repo.Sha
 
             $result.ExitCode | Should -Not -Be 0
-            $result.Output | Should -Match 'Polaris tag mismatch'
-            Test-Path -LiteralPath $env:POLARIS_TEST_LOG | Should -BeFalse
+            $result.Output | Should -Match 'Sentinel cache VERSION mismatch'
+            Test-Path -LiteralPath $env:SENTINEL_TEST_LOG | Should -BeFalse
         } finally {
             if ($null -eq $oldLog) {
-                Remove-Item Env:POLARIS_TEST_LOG -ErrorAction SilentlyContinue
+                Remove-Item Env:SENTINEL_TEST_LOG -ErrorAction SilentlyContinue
             } else {
-                $env:POLARIS_TEST_LOG = $oldLog
+                $env:SENTINEL_TEST_LOG = $oldLog
             }
         }
     }
 
-    It "cleans a failed Polaris stage and retries after release identity is repaired" {
-        $repo = New-SetupTestPolarisRepo -Name 'polaris-stage-retry-work'
-        & git -C $repo.Work tag -d $repo.Tag | Out-Null
-        $cache = Join-Path $script:PolarisTestRoot 'stage-retry-cache'
-        $oldLog = $env:POLARIS_TEST_LOG
+    It "cleans a failed Sentinel stage and retries after artifact identity is repaired" {
+        $repo = New-SetupTestSentinelRepo -Name 'sentinel-stage-retry-work' -Version '0.1.1'
+        $cache = Join-Path $script:SentinelTestRoot 'stage-retry-cache'
+        $oldLog = $env:SENTINEL_TEST_LOG
         try {
-            $env:POLARIS_TEST_LOG = Join-Path $script:PolarisTestRoot 'stage-retry-install.log'
-            $failed = Invoke-SetupTestPolarisPolicyChild -Cache $cache -Ref $repo.Sha -RepoUrl $repo.Work
+            $env:SENTINEL_TEST_LOG = Join-Path $script:SentinelTestRoot 'stage-retry-install.log'
+            $failed = Invoke-SetupTestSentinelPolicyChild -Cache $cache -Ref $repo.Sha -RepoUrl $repo.Work
             $failed.ExitCode | Should -Not -Be 0
-            $failed.Output | Should -Match 'Polaris tag mismatch'
+            $failed.Output | Should -Match 'Sentinel cache VERSION mismatch'
             @(Get-ChildItem -LiteralPath $cache -Filter '.tmp.*' -Force -ErrorAction SilentlyContinue).Count | Should -Be 0
             Test-Path -LiteralPath (Join-Path $cache $repo.Sha) | Should -BeFalse
 
-            & git -C $repo.Work tag $repo.Tag $repo.Sha
-            $retried = Invoke-SetupTestPolarisPolicyChild -Cache $cache -Ref $repo.Sha -RepoUrl $repo.Work
+            [System.IO.File]::WriteAllText((Join-Path $repo.Work 'VERSION'), "0.1.2`n", [System.Text.UTF8Encoding]::new($false))
+            & git -C $repo.Work add VERSION
+            & git -C $repo.Work commit -q -m 'repair fake sentinel version'
+            $correctedSha = (& git -C $repo.Work rev-parse HEAD).Trim()
+            $retried = Invoke-SetupTestSentinelPolicyChild -Cache $cache -Ref $correctedSha -RepoUrl $repo.Work
             $retried.ExitCode | Should -Be 0
-            Test-Path -LiteralPath (Join-Path (Join-Path $cache $repo.Sha) '.git') | Should -BeTrue
+            Test-Path -LiteralPath (Join-Path (Join-Path $cache $correctedSha) '.git') | Should -BeTrue
             @(Get-ChildItem -LiteralPath $cache -Filter '.tmp.*' -Force -ErrorAction SilentlyContinue).Count | Should -Be 0
         } finally {
-            if ($null -eq $oldLog) { Remove-Item Env:POLARIS_TEST_LOG -ErrorAction SilentlyContinue }
-            else { $env:POLARIS_TEST_LOG = $oldLog }
+            if ($null -eq $oldLog) { Remove-Item Env:SENTINEL_TEST_LOG -ErrorAction SilentlyContinue }
+            else { $env:SENTINEL_TEST_LOG = $oldLog }
         }
     }
 
-    It "rejects an ignored file in a verified Polaris checkout before running the installer" {
-        $repo = New-SetupTestPolarisRepo -Name 'polaris-ignored-work'
-        $cache = Join-Path $script:PolarisTestRoot 'cache'
+    It "rejects an ignored file in a verified Sentinel checkout before running the installer" {
+        $repo = New-SetupTestSentinelRepo -Name 'sentinel-ignored-work'
+        $cache = Join-Path $script:SentinelTestRoot 'cache'
         New-Item -ItemType Directory -Force -Path $cache | Out-Null
         $checkout = Join-Path $cache $repo.Sha
         Move-Item -LiteralPath $repo.Work -Destination $checkout
@@ -894,25 +940,25 @@ Invoke-PolarisAgentPolicy -AllMode:`$true -IsDryRun:`$false -Version '0.1.2' -Re
         Add-Content -LiteralPath (Join-Path $gitInfo 'exclude') -Value 'IGNORED'
         [System.IO.File]::WriteAllText((Join-Path $checkout 'IGNORED'), "dirty`n", [System.Text.UTF8Encoding]::new($false))
 
-        $oldLog = $env:POLARIS_TEST_LOG
+        $oldLog = $env:SENTINEL_TEST_LOG
         try {
-            $env:POLARIS_TEST_LOG = Join-Path $script:PolarisTestRoot 'ignored-install.log'
-            $result = Invoke-SetupTestPolarisPolicyChild -Cache $cache -Ref $repo.Sha
+            $env:SENTINEL_TEST_LOG = Join-Path $script:SentinelTestRoot 'ignored-install.log'
+            $result = Invoke-SetupTestSentinelPolicyChild -Cache $cache -Ref $repo.Sha
 
             $result.ExitCode | Should -Not -Be 0
-            $result.Output | Should -Match 'Polaris cache has local changes'
-            Test-Path -LiteralPath $env:POLARIS_TEST_LOG | Should -BeFalse
+            $result.Output | Should -Match 'Sentinel cache has local changes'
+            Test-Path -LiteralPath $env:SENTINEL_TEST_LOG | Should -BeFalse
         } finally {
             if ($null -eq $oldLog) {
-                Remove-Item Env:POLARIS_TEST_LOG -ErrorAction SilentlyContinue
+                Remove-Item Env:SENTINEL_TEST_LOG -ErrorAction SilentlyContinue
             } else {
-                $env:POLARIS_TEST_LOG = $oldLog
+                $env:SENTINEL_TEST_LOG = $oldLog
             }
         }
     }
 
-    It "does not execute a Polaris cache core.fsmonitor command during validation" {
-        $work = Join-Path $script:PolarisTestRoot 'polaris-work'
+    It "does not execute a Sentinel cache core.fsmonitor command during validation" {
+        $work = Join-Path $script:SentinelTestRoot 'sentinel-work'
         $tools = Join-Path $work 'tools'
         New-Item -ItemType Directory -Force -Path $tools | Out-Null
         & git -C $work init -q
@@ -922,32 +968,31 @@ Invoke-PolarisAgentPolicy -AllMode:`$true -IsDryRun:`$false -Version '0.1.2' -Re
         $installer = Join-Path $tools 'install'
         [System.IO.File]::WriteAllText($installer, @'
 #!/usr/bin/env bash
-printf "%s\n" "$*" >> "$POLARIS_TEST_LOG"
+printf "%s\n" "$*" >> "$SENTINEL_TEST_LOG"
 '@, [System.Text.UTF8Encoding]::new($false))
         & git -C $work add VERSION tools/install
-        & git -C $work commit -q -m 'fake polaris'
+        & git -C $work commit -q -m 'fake sentinel'
         $sha = (& git -C $work rev-parse HEAD).Trim()
-        & git -C $work tag 'v0.1.2' $sha
 
-        $cache = Join-Path $script:PolarisTestRoot 'cache'
+        $cache = Join-Path $script:SentinelTestRoot 'cache'
         New-Item -ItemType Directory -Force -Path $cache | Out-Null
         Move-Item -LiteralPath $work -Destination (Join-Path $cache $sha)
         $checkout = Join-Path $cache $sha
-        $marker = Join-Path $script:PolarisTestRoot 'fsmonitor-ran'
+        $marker = Join-Path $script:SentinelTestRoot 'fsmonitor-ran'
         if ($env:OS -eq 'Windows_NT') {
-            $fsmonitor = Join-Path $script:PolarisTestRoot 'fsmonitor.cmd'
+            $fsmonitor = Join-Path $script:SentinelTestRoot 'fsmonitor.cmd'
             [System.IO.File]::WriteAllText($fsmonitor, "@echo off`r`necho ran> `"$marker`"`r`nexit /b 0`r`n", [System.Text.UTF8Encoding]::new($false))
         } else {
-            $fsmonitor = Join-Path $script:PolarisTestRoot 'fsmonitor'
+            $fsmonitor = Join-Path $script:SentinelTestRoot 'fsmonitor'
             [System.IO.File]::WriteAllText($fsmonitor, "#!/usr/bin/env bash`nprintf ran > '$marker'`nexit 0`n", [System.Text.UTF8Encoding]::new($false))
             & chmod +x $fsmonitor
         }
         & git -C $checkout config core.fsmonitor $fsmonitor
 
-        $oldLog = $env:POLARIS_TEST_LOG
+        $oldLog = $env:SENTINEL_TEST_LOG
         try {
-            $env:POLARIS_TEST_LOG = Join-Path $script:PolarisTestRoot 'fsmonitor-install.log'
-            Invoke-PolarisAgentPolicy `
+            $env:SENTINEL_TEST_LOG = Join-Path $script:SentinelTestRoot 'fsmonitor-install.log'
+            Invoke-SentinelAgentPolicy `
                 -AllMode:$true `
                 -IsDryRun:$false `
                 -Version '0.1.2' `
@@ -955,20 +1000,20 @@ printf "%s\n" "$*" >> "$POLARIS_TEST_LOG"
                 -CacheRoot $cache
 
             Test-Path -LiteralPath $marker | Should -BeFalse
-            $calls = Get-Content -LiteralPath $env:POLARIS_TEST_LOG
+            $calls = Get-Content -LiteralPath $env:SENTINEL_TEST_LOG
             $calls | Should -Contain '--global'
             $calls | Should -Contain '--global --check'
         } finally {
             if ($null -eq $oldLog) {
-                Remove-Item Env:POLARIS_TEST_LOG -ErrorAction SilentlyContinue
+                Remove-Item Env:SENTINEL_TEST_LOG -ErrorAction SilentlyContinue
             } else {
-                $env:POLARIS_TEST_LOG = $oldLog
+                $env:SENTINEL_TEST_LOG = $oldLog
             }
         }
     }
 
     It "rejects a cache whose core.worktree points at a clean alternate tree" {
-        $work = Join-Path $script:PolarisTestRoot 'polaris-work'
+        $work = Join-Path $script:SentinelTestRoot 'sentinel-work'
         $tools = Join-Path $work 'tools'
         New-Item -ItemType Directory -Force -Path $tools | Out-Null
         & git -C $work init -q
@@ -978,26 +1023,25 @@ printf "%s\n" "$*" >> "$POLARIS_TEST_LOG"
         $installer = Join-Path $tools 'install'
         [System.IO.File]::WriteAllText($installer, "#!/usr/bin/env bash`nexit 0`n", [System.Text.UTF8Encoding]::new($false))
         & git -C $work add VERSION tools/install
-        & git -C $work commit -q -m 'fake polaris'
+        & git -C $work commit -q -m 'fake sentinel'
         $sha = (& git -C $work rev-parse HEAD).Trim()
-        & git -C $work tag 'v0.1.2' $sha
 
-        $cleanWorktree = Join-Path $script:PolarisTestRoot 'clean-worktree'
+        $cleanWorktree = Join-Path $script:SentinelTestRoot 'clean-worktree'
         New-Item -ItemType Directory -Force -Path (Join-Path $cleanWorktree 'tools') | Out-Null
         Copy-Item -LiteralPath (Join-Path $work 'VERSION') -Destination (Join-Path $cleanWorktree 'VERSION')
         Copy-Item -LiteralPath $installer -Destination (Join-Path (Join-Path $cleanWorktree 'tools') 'install')
 
-        $marker = Join-Path $script:PolarisTestRoot 'core-worktree-dirty-installer-ran'
+        $marker = Join-Path $script:SentinelTestRoot 'core-worktree-dirty-installer-ran'
         [System.IO.File]::WriteAllText($installer, "#!/usr/bin/env bash`nprintf ran > '$marker'`n", [System.Text.UTF8Encoding]::new($false))
         & git -C $work config core.worktree $cleanWorktree
 
-        $cache = Join-Path $script:PolarisTestRoot 'cache'
+        $cache = Join-Path $script:SentinelTestRoot 'cache'
         New-Item -ItemType Directory -Force -Path $cache | Out-Null
         Move-Item -LiteralPath $work -Destination (Join-Path $cache $sha)
 
-        $oldLog = $env:POLARIS_TEST_LOG
+        $oldLog = $env:SENTINEL_TEST_LOG
         try {
-            $env:POLARIS_TEST_LOG = Join-Path $script:PolarisTestRoot 'core-worktree-install.log'
+            $env:SENTINEL_TEST_LOG = Join-Path $script:SentinelTestRoot 'core-worktree-install.log'
             $setupLiteral = $script:Setup.Replace("'", "''")
             $cacheLiteral = $cache.Replace("'", "''")
             $shaLiteral = $sha.Replace("'", "''")
@@ -1005,7 +1049,7 @@ printf "%s\n" "$*" >> "$POLARIS_TEST_LOG"
 `$ErrorActionPreference = 'Stop'
 `$env:DOTFILES_SETUP_PS1_SOURCE_ONLY = '1'
 . '$setupLiteral' -All
-Invoke-PolarisAgentPolicy -AllMode:`$true -IsDryRun:`$false -Version '0.1.2' -Ref '$shaLiteral' -CacheRoot '$cacheLiteral'
+Invoke-SentinelAgentPolicy -AllMode:`$true -IsDryRun:`$false -Version '0.1.2' -Ref '$shaLiteral' -CacheRoot '$cacheLiteral'
 "@
             $oldNativePreference = $null
             $hasNativePreference = Test-Path Variable:PSNativeCommandUseErrorActionPreference
@@ -1023,14 +1067,14 @@ Invoke-PolarisAgentPolicy -AllMode:`$true -IsDryRun:`$false -Version '0.1.2' -Re
             }
 
             $rc | Should -Not -Be 0
-            $output | Should -Match 'Polaris cache has local changes'
+            $output | Should -Match 'Sentinel cache has local changes'
             Test-Path -LiteralPath $marker | Should -BeFalse
-            Test-Path -LiteralPath $env:POLARIS_TEST_LOG | Should -BeFalse
+            Test-Path -LiteralPath $env:SENTINEL_TEST_LOG | Should -BeFalse
         } finally {
             if ($null -eq $oldLog) {
-                Remove-Item Env:POLARIS_TEST_LOG -ErrorAction SilentlyContinue
+                Remove-Item Env:SENTINEL_TEST_LOG -ErrorAction SilentlyContinue
             } else {
-                $env:POLARIS_TEST_LOG = $oldLog
+                $env:SENTINEL_TEST_LOG = $oldLog
             }
         }
     }
@@ -1084,7 +1128,7 @@ Describe "setup.ps1 update mode" {
         $script:SetupUpdateRuntimeRefreshed | Should -BeTrue
         $output | Should -Match 'Update 1/2'
         $output | Should -Match 'Update 2/2'
-        $output | Should -Match 'Plugins \(lazy-lock\.json\), pinned binaries, and configs update via `git pull` then re-run setup'
+        $output | Should -Match 'Plugins \(lazy-lock\.json\), pinned binaries, and configs update through a reviewed release migration'
         $output | Should -Not -Match 'chezmoi|Lazy restore|Lazy sync|Tree-sitter|MasonToolsInstallSync'
         Should -Invoke -CommandName Invoke-ChezmoiApplyPhase -Times 0 -Exactly
     }
@@ -1338,34 +1382,65 @@ Describe "setup.ps1 transactional Windows Terminal merge" {
         @($written.themes | Where-Object { $_.name -eq 'rose-pine' }).Count | Should -Be 1
     }
 
-    It "preserves divergent packaged and portable state without mirroring either" {
+    It "merges Preview-only settings as an independent target" {
         $packaged = Get-WindowsTerminalSettingsPath
+        $preview = Get-WindowsTerminalPreviewSettingsPath
         $portable = Get-WindowsTerminalUnpackagedSettingsPath
-        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $packaged), (Split-Path -Parent $portable) | Out-Null
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $preview) | Out-Null
+        $original = '{"defaultProfile":"{preview}","profiles":{"defaults":{},"list":[{"guid":"{preview}","name":"PreviewOnly"}]},"schemes":[{"name":"PreviewScheme"}],"actions":[{"command":"closeWindow","keys":"alt+f4"}]}'
+        [System.IO.File]::WriteAllText($preview, $original, [System.Text.UTF8Encoding]::new($false))
+
+        Invoke-WindowsTerminalSettingsTransaction -IsPortablePresent $false
+
+        Test-Path -LiteralPath $packaged | Should -BeFalse
+        Test-Path -LiteralPath $portable | Should -BeFalse
+        $written = [System.IO.File]::ReadAllText($preview) | ConvertFrom-Json
+        @($written.profiles.list | Where-Object { $_.guid -eq '{preview}' }).Count | Should -Be 1
+        @($written.schemes | Where-Object { $_.name -eq 'PreviewScheme' }).Count | Should -Be 1
+        @($written.actions | Where-Object { $_.keys -eq 'alt+f4' }).Count | Should -Be 1
+        $backups = @(Get-ChildItem -LiteralPath (Split-Path -Parent $preview) -Filter 'settings.json.bak.*')
+        $backups.Count | Should -Be 1
+        [System.IO.File]::ReadAllText($backups[0].FullName) | Should -Be $original
+    }
+
+    It "preserves divergent packaged, Preview, and portable state without mirroring variants" {
+        $packaged = Get-WindowsTerminalSettingsPath
+        $preview = Get-WindowsTerminalPreviewSettingsPath
+        $portable = Get-WindowsTerminalUnpackagedSettingsPath
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $packaged), `
+            (Split-Path -Parent $preview), (Split-Path -Parent $portable) | Out-Null
         $packagedOriginal = '{"defaultProfile":"{pkg}","profiles":{"defaults":{},"list":[{"guid":"{pkg}","name":"PackagedOnly"}]},"schemes":[{"name":"PackagedScheme"}],"actions":[{"command":"closeWindow","keys":"alt+f4"}]}'
+        $previewOriginal = '{"defaultProfile":"{pre}","profiles":{"defaults":{},"list":[{"guid":"{pre}","name":"PreviewOnly"}]},"schemes":[{"name":"PreviewScheme"}],"actions":[{"command":"newTab","keys":"ctrl+shift+8"}]}'
         $portableOriginal = '{"defaultProfile":"{port}","profiles":{"defaults":{},"list":[{"guid":"{port}","name":"PortableOnly"}]},"schemes":[{"name":"PortableScheme"}],"actions":[{"command":"newTab","keys":"ctrl+shift+9"}]}'
         [System.IO.File]::WriteAllText($packaged, $packagedOriginal, [System.Text.UTF8Encoding]::new($false))
+        [System.IO.File]::WriteAllText($preview, $previewOriginal, [System.Text.UTF8Encoding]::new($false))
         [System.IO.File]::WriteAllText($portable, $portableOriginal, [System.Text.UTF8Encoding]::new($false))
 
         Invoke-WindowsTerminalSettingsTransaction -IsPortablePresent $true
 
         $pkg = [System.IO.File]::ReadAllText($packaged) | ConvertFrom-Json
+        $pre = [System.IO.File]::ReadAllText($preview) | ConvertFrom-Json
         $port = [System.IO.File]::ReadAllText($portable) | ConvertFrom-Json
         @($pkg.profiles.list | Where-Object { $_.guid -eq '{pkg}' }).Count | Should -Be 1
+        @($pkg.profiles.list | Where-Object { $_.guid -in @('{pre}', '{port}') }).Count | Should -Be 0
+        @($pre.profiles.list | Where-Object { $_.guid -eq '{pre}' }).Count | Should -Be 1
+        @($pre.profiles.list | Where-Object { $_.guid -in @('{pkg}', '{port}') }).Count | Should -Be 0
         @($pkg.profiles.list | Where-Object { $_.guid -eq '{port}' }).Count | Should -Be 0
         @($port.profiles.list | Where-Object { $_.guid -eq '{port}' }).Count | Should -Be 1
-        @($port.profiles.list | Where-Object { $_.guid -eq '{pkg}' }).Count | Should -Be 0
+        @($port.profiles.list | Where-Object { $_.guid -in @('{pkg}', '{pre}') }).Count | Should -Be 0
         @(Get-ChildItem -LiteralPath (Split-Path -Parent $packaged) -Filter 'settings.json.bak.*').Count | Should -Be 1
+        @(Get-ChildItem -LiteralPath (Split-Path -Parent $preview) -Filter 'settings.json.bak.*').Count | Should -Be 1
         @(Get-ChildItem -LiteralPath (Split-Path -Parent $portable) -Filter 'settings.json.bak.*').Count | Should -Be 1
     }
 
     It "does nothing when neither installation has a settings target" {
         Invoke-WindowsTerminalSettingsTransaction -IsPortablePresent $false
         Test-Path -LiteralPath (Get-WindowsTerminalSettingsPath) | Should -BeFalse
+        Test-Path -LiteralPath (Get-WindowsTerminalPreviewSettingsPath) | Should -BeFalse
         Test-Path -LiteralPath (Get-WindowsTerminalUnpackagedSettingsPath) | Should -BeFalse
     }
 
-    It "fails invalid JSON before changing either target" {
+    It "fails invalid JSON before changing any selected target" {
         $packaged = Get-WindowsTerminalSettingsPath
         $portable = Get-WindowsTerminalUnpackagedSettingsPath
         New-Item -ItemType Directory -Force -Path (Split-Path -Parent $packaged), (Split-Path -Parent $portable) | Out-Null

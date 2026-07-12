@@ -1,0 +1,107 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
+OLD_COMMIT="015617362830280bf85c7142e69d0681d376d453"
+OLD_TAG_OBJECT="a3b4d6d7b6d289959cac68d76faec96219b3e310"
+cd "$REPO_ROOT"
+
+fail() {
+    echo "FAIL: $*" >&2
+    exit 1
+}
+
+[[ "$(git rev-parse 'v0.1.0^{commit}')" == "$OLD_COMMIT" ]] ||
+    fail "v0.1.0 peeled commit drifted"
+[[ "$(git rev-parse v0.1.0)" == "$OLD_TAG_OBJECT" ]] ||
+    fail "v0.1.0 annotated tag object drifted"
+git ls-tree -r --name-only "$OLD_COMMIT" home |
+    cmp -s - tests/fixtures/v0.1.0-home-inventory.txt ||
+    fail "exact v0.1.0 home source inventory drifted"
+
+for script in \
+    scripts/install-nix-prerequisite.sh \
+    scripts/upgrade-v0.1.0.sh; do
+    [[ -x "$script" ]] || fail "$script must be executable"
+done
+[[ -f scripts/upgrade-v0.1.0.ps1 ]] || fail "Windows release migrator is missing"
+
+grep -F 'new_tag="v0.2.0"' scripts/upgrade-v0.1.0.sh >/dev/null ||
+    fail "POSIX migration does not require v0.2.0"
+grep -F "\$script:NewTag = 'v0.2.0'" scripts/upgrade-v0.1.0.ps1 >/dev/null ||
+    fail "Windows migration does not require v0.2.0"
+grep -F 'release_tag="v0.2.0"' scripts/install-nix-prerequisite.sh >/dev/null ||
+    fail "Nix prerequisite installer does not require v0.2.0"
+
+for identity in "$OLD_COMMIT" "$OLD_TAG_OBJECT"; do
+    grep -F "$identity" scripts/upgrade-v0.1.0.sh >/dev/null ||
+        fail "POSIX migration lost historical identity $identity"
+    grep -F "$identity" scripts/upgrade-v0.1.0.ps1 >/dev/null ||
+        fail "Windows migration lost historical identity $identity"
+done
+
+for flag in --skip-native-deps --skip-config-scripts --skip-nvim --skip-agents; do
+    grep -F -- "$flag" scripts/upgrade-v0.1.0.sh >/dev/null ||
+        fail "POSIX migration is missing its reversible setup boundary: $flag"
+done
+grep -F -- '--skip-native-deps)' setup.sh >/dev/null ||
+    fail "setup does not expose the release migration native-dependency boundary"
+grep -F -- '--skip-config-scripts)' setup.sh >/dev/null ||
+    fail "setup does not expose the release migration chezmoi-script boundary"
+grep -F "'-All', '-SkipDeps'" scripts/upgrade-v0.1.0.ps1 >/dev/null ||
+    fail "Windows migration can mutate packages inside its config recovery boundary"
+for flag in '-SkipNvim' '-SkipAgents' '-SkipConfigScripts'; do
+    grep -F "'$flag'" scripts/upgrade-v0.1.0.ps1 >/dev/null ||
+        fail "Windows migration is missing its reversible setup boundary: $flag"
+done
+grep -F "[switch]\$SkipConfigScripts" setup.ps1 >/dev/null ||
+    fail "Windows setup does not expose the files/symlinks-only migration boundary"
+grep -F "'-SkipLegacyKnownFolderMigration'" scripts/upgrade-v0.1.0.ps1 >/dev/null ||
+    fail "Windows migration can move v0.1 known-folder targets before acceptance"
+for frozen_contract in \
+    'Save-FrozenReleaseState -Recovery' \
+    "Join-Path \$frozen.NewSource 'setup.ps1'" \
+    "\$old = \$state.OldSource" \
+    "\$new = \$state.NewSource"; do
+    grep -F "$frozen_contract" scripts/upgrade-v0.1.0.ps1 >/dev/null ||
+        fail "Windows migration lost its frozen-source boundary: $frozen_contract"
+done
+if grep -F "Join-Path \$preflight.NewCheckout 'setup.ps1'" scripts/upgrade-v0.1.0.ps1 >/dev/null; then
+    fail "Windows migration still publishes from the mutable release checkout"
+fi
+
+for hash in \
+    47cb78c9fdc7b630dbbb9a89869c8e8bcd8c9eb17be036fba18585120693a4c1 \
+    5676b0887f1274e62edd175b6611af49aa8170c69c16877aa9bc6cebceb19855 \
+    cfddd4008b57a71464a16d5232cba79b1c76ae9dc81bbf71b4972b0118bc29c5; do
+    grep -F "$hash" scripts/install-nix-prerequisite.sh >/dev/null ||
+        fail "reviewed Nix release hash is missing: $hash"
+done
+grep -F 'nix_version="2.34.0"' scripts/install-nix-prerequisite.sh >/dev/null ||
+    fail "Nix prerequisite version drifted"
+
+grep -F 'tests/migration/v0_1_upgrade_test.sh' Makefile >/dev/null ||
+    fail "exact historical upgrade test is not in the local gate"
+grep -F "'scripts/upgrade-v0.1.0.ps1'" test.ps1 >/dev/null ||
+    fail "Windows migration script is outside analyzer coverage"
+[[ "$(grep -c 'Exact v0.1.0 release migration' .github/workflows/test.yml)" -eq 2 ]] ||
+    fail "exact historical migration must run on hosted Linux and Apple Silicon"
+
+for document in README.md docs/UPGRADING.md docs/releases/v0.2.0.md; do
+    [[ -f "$document" ]] || fail "release documentation is missing: $document"
+done
+if grep -F 'git -C ~/dotfiles pull' README.md >/dev/null; then
+    fail "README still publishes the unsafe in-place v0.1.0 command"
+fi
+if grep -R -E '<post-Nix-release-tag>|<next-release>|git (pull|checkout).*main' \
+    README.md docs/UPGRADING.md docs/releases/v0.2.0.md >/dev/null; then
+    fail "release documentation contains a moving branch or release placeholder"
+fi
+# Literal Markdown assertion.
+# shellcheck disable=SC2016
+grep -F '`v0.1.0` is already chezmoi-based' README.md >/dev/null ||
+    fail "README still misclassifies v0.1.0"
+grep -F 'scripts/install-nix-prerequisite.sh --install' docs/UPGRADING.md >/dev/null ||
+    fail "upgrade guide does not provide the checksum-verified Nix prerequisite"
+
+echo "release upgrade identities, rollback boundaries, evidence, and documentation OK"

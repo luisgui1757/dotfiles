@@ -217,7 +217,7 @@ The final batch hash is appended in a later identity entry after Git creates it.
 | UGR-020 | PARTIAL | Stage 1 emits six stable logical checks that verify exact per-OS proof artifacts bound to run/head while all legacy contexts remain required; no no-op check or live mutation. | final closure batch (hash pending) | marker tamper/missing/duplicate tests; workflow/metadata/current-vs-candidate alignment | README, CLAUDE invariant 27, branch-protection runbook, MIGRATION_STATUS | After merge: observe logical checks, merge context-switch PR, then owner applies live safeguards. |
 | UGR-021 | PARTIAL | Scheduled/manual setup caches are absent; WSL distro cache is disabled; macOS uses real WezTerm/AeroSpace/Ghostty consumers; Windows E2E asserts font files+registration; WSL stays non-required/fail-visible. | `1423a47` plus final closure batch (hash pending) | workflow/static cache contract, required-check alignment, E2E source assertions | README, CLAUDE, MANUAL, greenfield ledger | Intel, WSL, redirected Windows, Windows font E2E, and desktop GUI results pending; ledger has no fabricated rows. |
 | UGR-022 | ACCEPTED/FIXED | ROADMAP baseline is live main, PR #46 is truthful DONE/merged, Make help says 80ms local/150ms CI, README documents `--best-effort`/`--skip-nvim`, and live-vs-checked-in safeguard language is explicit. | closure commits including final batch (hash pending) | doc/static/help/required-check guards | README, CLAUDE, ROADMAP, MIGRATION_STATUS, security docs, ledgers | Statuses must be refreshed again after CI/live results. |
-| UGR-023 | ACCEPTED/FIXED | Starship cache publication is atomic/validated/rollback-safe; Polaris stages clean on failure/signal/retry; analyzer warnings have exact stable fingerprints; JSON traversal is NUL-safe; shell lint is strict; Nix ownership scanner catches nested/wrapped/imported bypasses while allowing system policy; direct-artifact compatible/stale/partial cases remain focused. | final closure batch (hash pending), with direct-artifact/shell-lint portions in `aa48aad` | Profile/Polaris/JSON path/Nix scanner self-tests, analyzer full entry point, direct-artifact update suites | README, CLAUDE, ROADMAP, MIGRATION_STATUS | Platform-specific CI remains pending. |
+| UGR-023 | ACCEPTED/FIXED | Starship cache publication is atomic/validated/rollback-safe; Sentinel stages clean on failure/signal/retry; analyzer warnings have exact stable fingerprints; JSON traversal is NUL-safe; shell lint is strict; Nix ownership scanner catches nested/wrapped/imported bypasses while allowing system policy; direct-artifact compatible/stale/partial cases remain focused. | final closure batch (hash pending), with direct-artifact/shell-lint portions in `aa48aad` | Profile/Sentinel/JSON path/Nix scanner self-tests, analyzer full entry point, direct-artifact update suites | README, CLAUDE, ROADMAP, MIGRATION_STATUS | Platform-specific CI remains pending. |
 
 ## Explicit rejected/out-of-scope candidates — entry 1
 
@@ -290,7 +290,7 @@ documentation-only result entry was appended afterward:
 
 An earlier pre-final shell-suite run correctly failed on two new ShellCheck
 diagnostics. The ambiguous logical-marker expression was rewritten as explicit
-control flow, and the Polaris trap-only helper became an inline EXIT transaction;
+control flow, and the Sentinel trap-only helper became an inline EXIT transaction;
 the focused tests, strict lint, full shell suite, `make test`, and `make ci` all
 passed afterward. No suppression or weakened test was added.
 
@@ -628,7 +628,7 @@ pushed exact-head runs or manual environments.
   assertions accepted the checksum-verified Tree-sitter `0.26.10` release
   artifact, installed Hack Nerd Font files and found their application-visible
   registry registration, accepted Pi `0.80.3`, restored Lazy, built the parser
-  set, synchronized Mason, verified Polaris, and completed the strict
+  set, synchronized Mason, verified Sentinel, and completed the strict
   257-check Neovim LSP/parser/formatter smoke.
 - This is native Windows hosted proof for those conventional-path assertions.
   It is not a redirected Documents/LocalApplicationData run, a divergent
@@ -744,7 +744,7 @@ rewriting that history.
 | UGR-020 | PARTIAL | `eac92bc` implements deadlock-free stage 1: six stable logical checks verify exact artifact/run/head proof while all 12 legacy required contexts remain. All six logical jobs passed on behavior head. | Marker tamper/missing/duplicate tests, workflow metadata/alignment, and live logical jobs `86361159946`, `86361159987`, `86363763769`, `86363763779`, `86363763791`, `86363763792`. | README, CLAUDE invariant 27, branch-protection runbook, MIGRATION_STATUS. | After merge: observe default-branch logical checks, merge a context-switch PR, then owner applies live safeguards. |
 | UGR-021 | PARTIAL | `1423a47`, `eac92bc`, and `f89f61c` make scheduled/manual setup cache-free, keep WSL fail-visible/non-required, add real binary checks where credible, assert Windows fonts, and state AeroSpace TCC unavailability honestly. | Cache contract, GUI/runtime source guards, required-check alignment; exact hosted Ubuntu/ARM/Intel/Windows setup passed. | README, CLAUDE, MANUAL, greenfield ledger. | Cache-free scheduled/manual, WSL, redirected Windows, dual Terminal, and desktop/TCC visual runs remain required; PR-cache results are not promoted. |
 | UGR-022 | ACCEPTED/FIXED | `5d8772f` and append-only follow-ups repair the main baseline, PR #46 state, timing claim, setup flags, safeguards truth, and every status changed by this implementation. | Documentation/static/help/required-check guards and full `make ci`. | README, CLAUDE, ROADMAP, MIGRATION_STATUS, MANUAL, security docs, both ledgers. | Future statuses must be updated after the staged safeguards PRs and manual runs. |
-| UGR-023 | ACCEPTED/FIXED | `eac92bc` plus `aa48aad` make Starship cache and Polaris staging transactional, analyzer identities exact, JSON traversal NUL-safe, shell lint strict, Nix ownership structural, and direct-artifact updates compatibility-aware. | Profile/Polaris/JSON-path/Nix-scanner/analyzer/direct-artifact tests; full local and hosted gates green. | README, CLAUDE, ROADMAP, MIGRATION_STATUS. | None beyond the platform/manual rows already named. |
+| UGR-023 | ACCEPTED/FIXED | `eac92bc` plus `aa48aad` make Starship cache and Sentinel staging transactional, analyzer identities exact, JSON traversal NUL-safe, shell lint strict, Nix ownership structural, and direct-artifact updates compatibility-aware. | Profile/Sentinel/JSON-path/Nix-scanner/analyzer/direct-artifact tests; full local and hosted gates green. | README, CLAUDE, ROADMAP, MIGRATION_STATUS. | None beyond the platform/manual rows already named. |
 
 ### Verification classification
 
@@ -984,3 +984,914 @@ merged-main greenfield proof.
 - This evidence entry is a documentation-only descendant of the immutable
   behavior head above. Required checks must still pass on the final PR head;
   the behavior-head cache-free result is not relabeled as a docs-head run.
+
+## Lean platform and stable-safeguard cutover — entry 28
+
+- Base and live `main` SHA:
+  `f104bf066e4af7d4d707fe22ba36600711f1ae14` (PR #48 merge). `origin/main`
+  still resolved to that SHA immediately before push preparation; no open PR
+  existed.
+- Cache-free merged-main run
+  [`29114125798`](https://github.com/luisgui1757/dotfiles/actions/runs/29114125798)
+  passed Ubuntu container `86433246345`, public Ubuntu `86433246387`, native
+  Windows `86433246309`, historical Intel `86433246315`, and their reachable
+  logical proofs. Apple Silicon `86433246367` failed because the first strict
+  neocmakelsp probe shared the large fixture tree and did not attach within 45
+  seconds; the later isolated formatter CMake project attached and accepted
+  gersemi output in the same process. Commit `d6b4ec6` gives every initial LSP
+  probe a distinct minimal project root and adds behavioral project-isolation
+  coverage without weakening the real server, attach, formatting, diagnostic,
+  or capture gates.
+- Owner direction supersedes the earlier Intel support requirement. Commit
+  `a112fe2` makes Apple Silicon the only Darwin contract, removes the Intel
+  flake output, selector, runners, and Intel-only Nix action, and fails x86_64
+  setup before Nix/Homebrew activation with migration guidance. Historical
+  Intel ledger rows remain append-only; they are not current support.
+- The hosted WSL2 canary is retired in `a112fe2`. Its only scheduled run
+  [`29072773410`](https://github.com/luisgui1757/dotfiles/actions/runs/29072773410)
+  and manual rerun
+  [`29114215045`](https://github.com/luisgui1757/dotfiles/actions/runs/29114215045)
+  reached real WSL2 but stalled before setup output and required cancellation.
+  [GitHub documents hosted nested virtualization as experimental and officially
+  unsupported](https://docs.github.com/en/actions/concepts/runners/github-hosted-runners).
+  Linux with fabricated WSL environment variables is rejected as
+  fake proof. The real throwaway-distro and split-host manual harnesses remain.
+- Commit `b378e60` switches all four checked-in safeguard mirrors to the stable
+  logical identities while workflows retain legacy producers so the still-live
+  legacy rules can gate this PR. The apply script now refuses to mutate unless
+  its checkout is exact live `main`, safeguard sources are clean, and every
+  stable context succeeded on that SHA; `--preflight-only` proves the same
+  boundary without writes. Live safeguards were not changed.
+
+### Finding status amendments
+
+| ID | Status after entry 28 | Exact evidence | Remaining work |
+|---|---|---|---|
+| UGR-002 | REJECTED (superseded contract) | Explicit owner direction retires Intel; `a112fe2` removes every active Intel configuration/lane and adds exact fail-closed selection/evaluation guards. | None. Historical Intel results remain evidence only. |
+| UGR-011 | PARTIAL | Native Linux clean-session proof remains green; the real WSL harness is preserved and no Linux proxy is mislabeled as WSL. | Run the manual throwaway WSL harness on a supported real Windows/WSL2 host. |
+| UGR-020 | PARTIAL | `b378e60` completes the checked-in stable-context cutover and its exact-main/check-success preflight; legacy producer names remain emitted. | After merge, pass cache-free plus all six logical checks on the exact merged SHA, then owner runs preflight/apply/readback. |
+| UGR-021 | PARTIAL | Cache-free merged-main run `29114125798` exposed the CMake proof defect fixed by `d6b4ec6`; unreliable hosted WSL runs are recorded and the workflow is retired. | Branch-head and merged-main cache-free proof; real WSL, redirected Windows, dual Terminal, and desktop/TCC evidence remain manual. |
+| UGR-022 | ACCEPTED/FIXED | README, CLAUDE, ROADMAP, MIGRATION_STATUS, MANUAL, greenfield docs/ledger, security docs, and this append-only reconciliation state the lean platform and checked-in/live split truthfully. | Refresh exact PR/check/live status after push and after merge. |
+
+### Local verification at entry 28
+
+| Gate | Result |
+|---|---|
+| `git diff --check` | PASS |
+| `bash -n` over tracked `*.sh` | PASS, 135 scripts |
+| `make lint` | PASS after replacing the retired workflow's obsolete one-item guard loop; no suppression |
+| `bash tests/static/run_all.sh` | PASS; the final tree also repeated static coverage through both umbrella targets |
+| `bash tests/shell/run_all.sh` | PASS |
+| `make test-migration` | PASS: template, parity, round-trip, uninstall, Windows render, and sourceable-payload oracle |
+| `pwsh -NoLogo -NoProfile -File ./test.ps1` | PASS: PSScriptAnalyzer and 234 Pester cases, 0 failed, 0 skipped; Neovim entry point also returned 0 |
+| Windows Terminal focused Pester cases | PASS inside the 234-case entry point: independent targets, invalid JSON, write/backup/publication/concurrency/collision/dry-run/skip/retry/idempotency and dual-path uninstall |
+| `make test-nvim` | PASS, including locked bootstrap, LSP project isolation, checked deletion, 316 language assertions, and real two-project clangd |
+| `make test` | PASS |
+| `make validate-renovate` | PASS: official validator and exact 82-record local extraction |
+| `nix flake check --print-build-logs` | PASS on Apple Silicon; both Apple-Silicon Darwin attributes evaluated and the local toolchain check built; incompatible Linux builds were reported as not run locally |
+| `make ci` | PASS, ending `local pre-PR gate passed` |
+| Public-content audit | PASS: no tracked private local path, credential-shaped addition, or private key; Gitleaks 8.30.1 found no leak in the three implementation commits or uncommitted verification correction |
+
+### Live relationship at entry 28
+
+- Integrity ruleset `17363189`, review ruleset `17363190`, owner-update ruleset
+  `17363555`, and classic protection remain active. Classic protection is strict
+  on the exact twelve legacy contexts. Actions is enabled with
+  `allowed_actions:all` and `sha_pinning_required:false`.
+- Checked-in desired state uses the twelve stable/general contexts (six generic
+  or parity names plus six stable logical names) and
+  `sha_pinning_required:true`. This is a deliberate post-merge owner action,
+  not a claim about live GitHub.
+- No native Windows, WSL, redirected-known-folder, desktop/TCC, or post-merge
+  stable-safeguard proof ran locally. Intel is no longer a pending environment;
+  it is outside the owner-directed product contract.
+
+## Exact lean behavior-head hosted proof — entry 29
+
+- Immutable behavior head:
+  `f097995b49a2189db327903a20743e7cb69ba665` on PR #49.
+- Generic/parity run
+  [`29120077646`](https://github.com/luisgui1757/dotfiles/actions/runs/29120077646)
+  passed `windows` `86452871259`, `macos` `86452871272`, `ubuntu`
+  `86452871309`, and parity jobs `86452871288`, `86452871295`, and
+  `86452871302`.
+- Nix run
+  [`29120077669`](https://github.com/luisgui1757/dotfiles/actions/runs/29120077669)
+  passed Apple Silicon `86452871102`, Ubuntu `86452871114`, and stable logical
+  proofs `86453448279` / `86453448216`.
+- Cached PR E2E run
+  [`29120077871`](https://github.com/luisgui1757/dotfiles/actions/runs/29120077871)
+  passed Apple Silicon `86452872089`, Ubuntu `86452872093`, Ubuntu container
+  `86452872094`, Windows `86452872252`, and stable logical jobs
+  `86457865643`, `86457865587`, `86457865572`, and `86457865570`. The cached
+  Windows producer took 27m31s but completed setup and post-install proof; its
+  duration was not relabeled as failure or waived.
+- Cache-free workflow-dispatch run
+  [`29120109175`](https://github.com/luisgui1757/dotfiles/actions/runs/29120109175)
+  skipped every broad cache and passed the four current producers: Ubuntu
+  container `86452977445` (2m33s), Ubuntu `86452977536` (7m28s), Apple Silicon
+  `86452977452` (8m44s), and Windows `86452977443` (15m56s). Stable logical
+  proofs `86455881986`, `86455881913`, `86455881923`, and `86455881943`
+  validated their exact artifacts. There was no Intel or WSL job.
+- This closes exact branch-head hosted proof for the isolated CMake LSP repair
+  and the lean current matrix. It does not claim merged-main, WSL, redirected
+  Windows, divergent dual Terminal, or desktop/TCC proof. This appended evidence
+  commit is a documentation-only descendant; its required checks must still pass.
+
+### Finding status amendments
+
+| ID | Status after entry 29 | Exact evidence | Remaining work |
+|---|---|---|---|
+| UGR-002 | REJECTED (superseded contract) | All hosted current-product workflows contain Apple Silicon and no Intel job; the exact platform guards passed in every generic/Nix/setup lane. | None; Intel is retired, not pending proof. |
+| UGR-020 | PARTIAL | All twelve still-live legacy contexts and all six stable logical contexts passed on the behavior head; checked-in sources target stable names and the live safeguards remain unchanged. | Merge, repeat cache-free/logical proof on exact merged main, then owner preflight/apply/readback. |
+| UGR-021 | PARTIAL | Cache-free run `29120109175` passed every current producer and logical setup proof on the exact behavior head, including the repaired Apple Silicon strict CMake path. | Merged-main confirmation plus real WSL, redirected Windows, dual Terminal, and desktop/TCC manual evidence. |
+| UGR-022 | ACCEPTED/FIXED | ROADMAP, MIGRATION_STATUS, MANUAL, greenfield ledger, branch-protection runbook, reconciliation, and PR body now distinguish behavior-head pass from pending merged-main/manual proof. | Refresh only the final documentation-head checks and post-merge results. |
+
+### Live relationship at entry 29
+
+- PR #49 was `MERGEABLE` and correctly `BLOCKED` for review while the behavior
+  head's required checks ran. All twelve live-required legacy checks passed.
+- Live integrity/review/owner-update rulesets, classic required contexts, and
+  Actions permissions were not mutated. `sha_pinning_required` remained false.
+- The exact post-merge owner sequence remains: cache-free merged-main dispatch,
+  verify all four setup producers + four setup logical + two Nix logical checks,
+  run `--preflight-only`, apply, then read back both safeguard layers and Actions
+  permissions.
+
+## Independent PR #49 re-review correction — entry 30
+
+- Independent review of immutable head
+  `8c0bfb268592830d7213e4d3113d7bf61eb47101` downloaded the final-head logical
+  artifacts and disproved their documented head field. Pull-request run
+  `29121873434` reported PR source head `8c0bfb268592830d7213e4d3113d7bf61eb47101`
+  through the workflow API, while its marker stored
+  `head_sha=39316a5b385a6b69bf1332ffd19ab8329024621b`. The latter is GitHub's synthetic
+  merge of base `f104bf066e4af7d4d707fe22ba36600711f1ae14` and that PR head, as required by
+  the official `pull_request` event model. The producer work was real, but the
+  durable field and documentation were false.
+- The repair commit `fix(ci): bind logical proofs to source and executed SHAs`
+  introduces marker schema 2. It records `source_head_sha` from
+  `github.event.pull_request.head.sha || github.sha` and `executed_sha` from
+  `GITHUB_SHA`, and verifies both in the consumer job. Behavioral shell coverage
+  proves distinct pull-request identities, equal dispatch/push identities,
+  drift rejection, missing-source rejection before publication, and obsolete
+  schema rejection.
+
+### Finding status amendments
+
+| ID | Status after entry 30 | Exact evidence | Remaining work |
+|---|---|---|---|
+| UGR-020 | PARTIAL | Stable proof artifacts now distinguish the source head from the executed merge result and fail closed on either mismatch. | Complete the separate safeguard preflight/rollback repair, re-run exact-head workflows, merge, then perform merged-main cache-free proof and the owner-applied live cutover. |
+| UGR-022 | ACCEPTED/FIXED | README, CLAUDE, ROADMAP, MIGRATION_STATUS, the safeguard runbook, and this append-only entry now describe GitHub pull-request execution truthfully. | Revalidate the final implementation head and append live results. |
+
+## Independent PR #49 safeguard correction — entry 31
+
+- The same independent review reproduced a second defect at immutable head
+  `8c0bfb268592830d7213e4d3113d7bf61eb47101`. The old preflight returned before
+  checking ruleset uniqueness or the expected live policy. The script then
+  patched repository merge settings and Actions permissions before
+  `upsert_ruleset` detected a duplicate ruleset. A later failure could therefore
+  leave partial live mutation, and the runbook's suggested rerun/reapply path was
+  not a rollback because it contained only the new desired payloads.
+- The repair commit `fix(safeguards): preflight and recover the live cutover`
+  makes every decision read-only before the first write. It validates exact
+  local branch/origin/live-main identity, clean reviewed sources, the exact
+  three active rulesets and complete legacy-or-stable policy stage, GitHub
+  Actions app `15368`, exact test/Nix/E2E workflow events and run identities,
+  every expected job, and skipped broad caches. A second full readback detects
+  concurrent change before mutation.
+- Only the three resources that differ in this transition are written: Actions
+  SHA pinning, the integrity required-check set, and classic required checks.
+  Their old payloads are stored with private permissions under Git metadata.
+  Apply/readback failure or interruption automatically restores and verifies all
+  three; incomplete rollback prints an exact, tested `--restore` command.
+  Failure-injection tests cover wrong branch/remote, duplicate rulesets,
+  unexpected contexts, dirty sources, wrong app/event/cache provenance,
+  successful apply, repeated write-free apply, manual restore, partial apply
+  rollback, and rollback-failure recovery.
+
+### Finding status amendments
+
+| ID | Status after entry 31 | Exact evidence | Remaining work |
+|---|---|---|---|
+| UGR-020 | PARTIAL | Both re-review defects are repaired with behavioral failure-injection coverage: truthful dual-SHA proof schema plus complete zero-write preflight and transactional recovery. | Re-run exact-head CI and independent review; after merge, record the exact merged-main cache-free/provenance gate, then owner applies and reads back the live stable posture. |
+| UGR-022 | ACCEPTED/FIXED | README, CLAUDE, ROADMAP, MIGRATION_STATUS, MANUAL, supply-chain and branch-protection runbooks, and this append-only ledger now state the actual preflight/mutation/recovery contract. | Append final-head and post-merge live evidence only after those runs occur. |
+
+## PR #49 re-review repair verification — entry 32
+
+- Commit `54c03fd0ffddece073bc056b8ec992218253e0b1` implements and tests
+  logical-proof schema 2. Pull-request jobs bind both the source head and the
+  synthetic merge commit they executed; push and dispatch jobs bind the same
+  commit in both fields.
+- Commit `ffb5558c7bc16f795e03891df6f5521fd6a427cf` implements and tests the
+  safeguard transaction. Every repository, branch, live-policy, ruleset,
+  workflow, job, app, event, and cache-free requirement is read and validated
+  before the first write. The three cutover resources are snapshotted under
+  private Git metadata, narrowly mutated, read back, and automatically restored
+  on failure or interruption.
+- The real `--preflight-only` entry point was exercised from the PR branch and
+  rejected it before any mutation because it was not checked out as exact live
+  `main`. Live GitHub safeguards were not changed during implementation or
+  verification.
+
+### Local verification at entry 32
+
+| Gate | Result |
+|---|---|
+| `git diff --check f104bf066e4af7d4d707fe22ba36600711f1ae14..HEAD` | PASS |
+| `bash -n` over tracked `*.sh` | PASS, 135 scripts |
+| `make lint` | PASS |
+| `bash tests/static/run_all.sh` | PASS, including the safeguard transaction, required identities, provenance, and policy scanners |
+| `bash tests/shell/run_all.sh` | PASS, including distinct PR source/executed identities, dispatch identity, drift, missing-input, and obsolete-schema failures |
+| `make test-migration` | PASS: template, parity, round-trip, uninstall, Windows render, and sourceable-payload oracle |
+| `pwsh -NoLogo -NoProfile -File ./test.ps1` | PASS: PSScriptAnalyzer clean; Pester 234 passed, 0 failed, 0 skipped; Neovim entry point returned 0 |
+| `make test-nvim` | PASS, including pinned bootstrap, checked Tree-sitter deletion, 316 language assertions, and two-project clangd isolation |
+| `make test` | PASS |
+| `make validate-renovate` | PASS: official validator and exactly 82 reviewed dependency records |
+| `bash tests/nix/run_all.sh` | PASS |
+| `nix flake check --print-build-logs` | PASS on Apple Silicon; incompatible Linux derivations were not claimed as local proof |
+| `make ci` | PASS, ending `local pre-PR gate passed` |
+| Gitleaks 8.30.1, full PR range `f104bf0..ffb5558` | PASS: seven commits, no leaks |
+| Gitleaks 8.30.1, clean tracked archives | The base and repaired head each contain the same two `generic-api-key` Windows Terminal fragment false positives at the same paths and lines; no finding was added |
+| Added private-path audit | PASS: no local owner home path; the four non-example email-shaped values are the documented public `actions@github.com` app identity |
+
+### Finding status amendments
+
+| ID | Status after entry 32 | Exact evidence | Remaining work |
+|---|---|---|---|
+| UGR-020 | PARTIAL | Both implementation commits and every focused/local aggregate gate passed; live policy remains unchanged and legacy producers still gate the PR. | Independent review and exact-head hosted workflows; after merge, exact merged-main cache-free proof followed by owner preflight/apply/readback. |
+| UGR-021 | PARTIAL | No cache or environment result was relabeled: branch-head cache-free proof remains recorded, while this repair received local behavioral proof only. | Exact repaired-head hosted proof, merged-main cache-free proof, and the documented real WSL/redirected-Windows/dual-Terminal/desktop manual runs. |
+| UGR-022 | ACCEPTED/FIXED | All behavior, runbook, recovery, security, roadmap, migration, manual, and reconciliation descriptions match the repaired implementation and measured local results. | Append exact repaired-head and post-merge live results only after they occur. |
+
+## PR #49 repaired-head hosted proof — entry 33
+
+- Exact source head `4dbdb959674f5a062cffe44daae242318f4c1b67`
+  passed all 18 emitted checks. The six generic/parity checks passed in
+  [`29140112029`](https://github.com/luisgui1757/dotfiles/actions/runs/29140112029),
+  both legacy Nix producers and both stable Nix checks passed in
+  [`29140112035`](https://github.com/luisgui1757/dotfiles/actions/runs/29140112035),
+  and all four E2E producers plus four stable setup checks passed in
+  [`29140112030`](https://github.com/luisgui1757/dotfiles/actions/runs/29140112030).
+  Every check-run was emitted by GitHub Actions app `15368`.
+- All six downloaded logical markers use schema 2. They record
+  `source_head_sha=4dbdb959674f5a062cffe44daae242318f4c1b67` and
+  `executed_sha=0397ad36194e86c91b3a3aace5f0028885c03e7e`. The executed
+  commit's two parents are exact base
+  `f104bf066e4af7d4d707fe22ba36600711f1ae14` and that exact source head.
+  Consumers in the same runs verified both identities, run ID/attempt, and the
+  matching legacy/logical context pair.
+- Gitleaks 8.30.1 found no leak in the downloaded Nix or E2E proof artifacts.
+  The PR E2E cache steps ran normally; this result is intentionally not called
+  cache-free proof. Live integrity/classic safeguards remain on the 12 legacy
+  contexts, Actions SHA pinning remains false, and no implementation or test
+  command mutated those live settings.
+
+### Finding status amendments
+
+| ID | Status after entry 33 | Exact evidence | Remaining work |
+|---|---|---|---|
+| UGR-020 | PARTIAL | The repaired implementation head passed all 12 live-required and all six stable checks, and its schema-2 artifacts prove source/executed identity truthfully. | Independent re-review; after merge, exact merged-main cache-free/provenance proof followed by owner preflight/apply/readback. |
+| UGR-021 | PARTIAL | Exact repaired-head Ubuntu, Apple Silicon, Windows, container, generic/parity, Nix, and stable logical proof is green. The run used ordinary PR caches and therefore does not satisfy the merged-main cache-free gate. | Merged-main cache-free proof plus the documented real WSL, redirected-Windows, dual-Terminal, and desktop/TCC manual runs. |
+| UGR-022 | ACCEPTED/FIXED | ROADMAP, MIGRATION_STATUS, the PR body, and this append-only ledger now record the repaired-head hosted result without promoting it to cache-free or post-merge proof. | Append merged-main/live-apply evidence only after those events occur. |
+
+## Independent PR #49 recovery/public-posture correction — entry 34
+
+- Independent review of immutable head
+  `998e3f19c38a827185261bdbb0d7aeee7def24a0` reproduced two additional
+  fail-closed defects. Explicit restore accepted an altered integrity context
+  and verified the unreviewed payload against itself. Removing
+  `classic-live.json` allowed all three restore writes before post-write
+  verification failed. Separately, a fixture with `private:true` and
+  `visibility:private` passed the preflight described as the public-repository
+  posture. These are accepted defects; private snapshot permissions and the
+  repository's currently public live value do not disprove corruption,
+  incompleteness, or concurrent visibility drift.
+- The recovery repair requires all five consumed files before mutation, freezes
+  them in a private temporary directory, and derives the only acceptable
+  Actions, integrity, classic restore, and full classic state from the
+  manifest's exact legacy/stable stage. It validates exact contexts, GitHub
+  Actions app IDs, unique live integrity ruleset identity, bypass actors, branch
+  conditions, and unrelated classic protections, then writes and verifies only
+  frozen bytes. Failure cases cover every missing file, altered context,
+  bypass, branch condition, cross-stage manifest/Actions data, altered classic
+  state, wrong ruleset ID, and mutation of the retained source snapshot after
+  validation.
+- Both preflight captures now require `private:false` and
+  `visibility:public`, and the concurrent-state fingerprint includes both
+  fields. Behavioral cases reject initial private state and a public-to-private
+  second-read transition with zero writes.
+- `docs/MIGRATION_STATUS.md` no longer claims a current Intel activation
+  configuration. Current activation is Apple-Silicon-only; historical Intel
+  evidence remains append-only and explicitly retired.
+
+### Finding status amendments
+
+| ID | Status after entry 34 | Exact evidence | Remaining work |
+|---|---|---|---|
+| UGR-020 | PARTIAL | Recovery and public-posture gaps are repaired with behavioral zero-write failure cases and frozen-byte publication; the stable-context transition remains staged only. | Exact-head CI and independent re-review; after merge, merged-main cache-free proof followed by owner preflight/apply/readback. |
+| UGR-022 | ACCEPTED/FIXED | README, CLAUDE, ROADMAP, MIGRATION_STATUS, security runbooks, and this ledger now state the exact public-preflight and recovery contract; the stale active-Intel sentence is corrected. | Refresh PR-body and exact-head evidence after push. |
+
+## Probot branch-protection ownership correction — entry 35
+
+- A second review called the checked-in `.github/settings.yml` stable contexts
+  advisory-only because the Settings app installation could not be observed
+  through the available read-only token. That uncertainty is not an acceptable
+  cutover dependency. The file explicitly declared itself Probot-synced, and
+  the app documents that default-branch changes are applied automatically.
+  Upstream commit
+  [`3629848d090115df71f6d5cf431561e67077ee27`](https://github.com/repository-settings/app/blob/3629848d090115df71f6d5cf431561e67077ee27/lib/settings.js#L24-L36)
+  confirms that branch processing occurs only when a `branches` key exists.
+- `.github/settings.yml` now contains repository-level settings only and
+  deliberately omits `branches`. The owner-run safeguard transaction is the
+  sole checked-in writer for integrity and classic required-check cutover. This
+  prevents a default-branch Settings app sync from moving classic protection to
+  stable names while the integrity ruleset remains legacy, a mixed stage that
+  would otherwise strand the fail-closed preflight until manual recovery.
+- `required_checks_test.sh` and `repo_policy_test.sh` reject any future top-level
+  `branches` block in `.github/settings.yml` while continuing to prove the
+  stable identities agree across metadata, the integrity ruleset, the apply
+  function, and its narrow API payload. Focused required-check, repository
+  policy, and YAML lint cases pass. README, CLAUDE, ROADMAP,
+  MIGRATION_STATUS, and the branch-protection runbook record the single-writer
+  boundary. No live repository setting was read-write or changed.
+
+### Finding status amendments
+
+| ID | Status after entry 35 | Exact evidence | Remaining work |
+|---|---|---|---|
+| UGR-020 | PARTIAL | The staged required-check cutover now has one transactional writer; Probot cannot race classic protection on merge. Recovery/public-posture repairs remain behaviorally covered. | Exact-head CI and independent re-review; after merge, exact merged-main cache-free proof followed by owner preflight/apply/readback. |
+| UGR-022 | ACCEPTED/FIXED | Current safeguard ownership and default-branch app behavior are documented consistently, without relying on an unverifiable installation assumption. | Append exact repaired-head and post-merge results only after they occur. |
+
+## Final local verification for entries 34–35 — entry 36
+
+- Recovery/public-visibility implementation commit:
+  `dfef60c6626de8feb8498cce7edb678a73dcec69`.
+- Single-writer/Probot implementation commit:
+  `374b3b84cf16371497fb8c78996244625b4db628`.
+- The primary checkout, stashes, untracked review prompts, real HOME, and live
+  GitHub safeguards were not modified. Verification ran in a disposable clone
+  on Apple Silicon macOS.
+
+| Check | Exact local result |
+|---|---|
+| `git diff --check` | PASS |
+| `bash -n` over tracked shell scripts | PASS: 135/135 |
+| `make lint` | PASS |
+| Focused safeguard transaction suite | PASS: incomplete/altered/cross-stage restore, frozen-byte publication, public/private drift, rollback, retry, and idempotency |
+| Focused required-check/repository-policy/YAML suites | PASS: Probot branch ownership absent; canonical stable identities remain aligned |
+| `bash tests/static/run_all.sh` | PASS |
+| `bash tests/shell/run_all.sh` | PASS |
+| `make test-migration` | PASS |
+| `pwsh -NoLogo -NoProfile -File ./test.ps1` | PASS: PSScriptAnalyzer clean; Pester 234 passed, 0 failed, 0 skipped; Neovim entry point returned 0 |
+| `make test-nvim` | PASS, including pinned bootstrap, checked Tree-sitter deletion, and real two-project clangd isolation |
+| `make test` | PASS |
+| `make validate-renovate` | PASS: official validator and exactly 82 reviewed dependency records |
+| `bash tests/nix/run_all.sh` | PASS |
+| `nix flake check --print-build-logs` | PASS on Apple Silicon; incompatible Linux systems were omitted, not claimed as runtime proof |
+| `make ci` | PASS: final behavior head ended `local pre-PR gate passed` |
+| Gitleaks 8.30.1, full PR range `f104bf0..374b3b8` | PASS: 11 commits, no leaks |
+| Gitleaks 8.30.1, clean tracked archives | Base and repaired head contain the same two `generic-api-key` Windows Terminal fragment false positives at the same two paths and line 49; no finding was added |
+| Added private-identifier audit | PASS: no local owner home path or private email; matches are only public GitHub transport/app identities and `example.invalid` test data |
+
+Hosted exact-head checks, logical marker downloads, and final live readback are
+recorded only after the repaired head is pushed and those events complete.
+
+## Repaired-head hosted proof and live readback — entry 37
+
+- Exact source head `dc13b7b81b45e0c6de8008e17fc890742391b882`
+  passed all 18 emitted checks. Generic/parity passed in
+  [`29149010795`](https://github.com/luisgui1757/dotfiles/actions/runs/29149010795),
+  both Nix producers and both stable Nix checks passed in
+  [`29149010866`](https://github.com/luisgui1757/dotfiles/actions/runs/29149010866),
+  and all four E2E producers plus all four stable setup checks passed in
+  [`29149010801`](https://github.com/luisgui1757/dotfiles/actions/runs/29149010801).
+  Every check-run was emitted by GitHub Actions app `15368`.
+- All six downloaded markers passed the checked-in schema-2 verifier. They bind
+  `source_head_sha=dc13b7b81b45e0c6de8008e17fc890742391b882`
+  to `executed_sha=763f810a8eb20879f9dd4edf776eb95a258b9a44`,
+  with exact run ID/attempt and legacy/logical pair. The executed commit is the
+  live `refs/pull/49/merge`; its parents are exact base
+  `f104bf066e4af7d4d707fe22ba36600711f1ae14` and that exact source head.
+  Gitleaks found no secret in the six artifacts.
+- Final read-only live inspection still reports a public repository, the exact
+  12 legacy required contexts with GitHub Actions identity `15368` in both the
+  integrity ruleset and classic fallback, strict classic checks, no integrity
+  bypass, and `sha_pinning_required:false`. No test, push, workflow, or PR-body
+  operation applied the staged cutover. The E2E PR run used ordinary caches and
+  is not the pending merged-main cache-free proof.
+
+### Finding status amendments
+
+| ID | Status after entry 37 | Exact evidence | Remaining work |
+|---|---|---|---|
+| UGR-020 | PARTIAL | The repaired source head passed every legacy and stable check; marker identities and live unchanged policy were independently read back. | Independent re-review; after merge, exact merged-main cache-free proof followed by owner preflight/apply/readback. |
+| UGR-021 | PARTIAL | Exact-head hosted Ubuntu, Apple Silicon, Windows, container, Nix, generic/parity, and logical proof is green without relabeling ordinary caches as clean-install proof. | Merged-main cache-free proof plus real WSL, redirected-Windows, dual-Terminal, and desktop/TCC manual runs. |
+| UGR-022 | ACCEPTED/FIXED | The append-only ledger now records the actual repaired-head runs, dual identities, artifact scan, and unchanged live posture. | Append merged-main/live-apply evidence only after those events occur. |
+
+## Final PR #49 transaction-input hardening — entry 38
+
+- Independent review of immutable source head
+  `95dfe6efb7d94c9dae482a013e5bcd72f326b8e3` reproduced four additional
+  fail-closed defects despite all 18 hosted checks being green. Apply read the
+  integrity payload from the mutable checkout after its first live write;
+  restore accepted a full-classic snapshot missing a required nullable field;
+  the Probot ownership tests recognized only one multiline `branches:` spelling;
+  and a failed second capture leaked the first temporary directory. These are
+  accepted defects, not waived P3 observations.
+- Commit `0084620ead67c7d7fd1e1fcb98db93bafe5895ec` closes the complete class:
+  after the second capture, apply freezes check metadata, integrity, manifest,
+  classic, and Actions inputs from the exact committed tree in one private
+  read-only transaction directory, cross-validates the set, and gives every API
+  write only those files. Recovery requires every consumed full-classic key,
+  freezes all snapshot bytes, loads expected policy from the manifest's captured
+  commit only while it is still live `main`, and rejects moved/unavailable,
+  malformed, symlinked, altered-app, narrow/full, or cross-stage material before
+  any write. Capture directories are caller-owned and cleaned on every exit;
+  recovery snapshots are pruned on pre-mutation failure and retained once a
+  mutation may have occurred.
+- The Settings ownership guard now parses YAML with bounded Ruby/Psych input.
+  Block, inline-array, inline-map, null, direct-alias, and merge-alias top-level
+  `branches` fixtures all fail, while nested prose/data remains valid. The CI
+  jobs install Ruby explicitly. Logical-proof coverage now also pins run-ID,
+  attempt, executed-SHA, run-identity, and empty-context rejection. The unused
+  generic mutation helper is removed, and restore distinguishes readback failure
+  from a successful-but-different readback.
+- Implementation and verification ran only in a disposable exact-head clone.
+  The stale primary checkout, its three stashes, its untracked review files, and
+  live GitHub safeguards were not changed.
+
+### Local verification
+
+| Check | Exact result |
+|---|---|
+| `git diff --check` | PASS |
+| `bash -n` over repository `*.sh` | PASS: 136/136 |
+| Focused safeguard transaction suite | PASS: frozen apply inputs; complete classic schema; symlink/malformed/app-ID/narrow-full/moved-policy rejection; zero-write cleanup; restore/readback/rollback/retry/idempotency |
+| Semantic Settings YAML suite | PASS: all top-level block/inline/null/alias shapes rejected |
+| Logical-proof identity suite | PASS: source/executed SHA, run ID/attempt, context, schema, missing/duplicate, and emit-time validation |
+| `bash tests/static/run_all.sh` | PASS |
+| `bash tests/shell/run_all.sh` | PASS |
+| `make lint` | PASS |
+| `make test-migration` | PASS |
+| `pwsh -NoLogo -NoProfile -File ./test.ps1` | PASS: PSScriptAnalyzer clean; Pester 234 passed, 0 failed/skipped; Neovim entry point returned 0 |
+| `make validate-renovate` | PASS: official validator and exactly 82 reviewed records |
+| `bash tests/nix/run_all.sh` | PASS |
+| `nix flake check --print-build-logs` | PASS on Apple Silicon; incompatible Linux systems were omitted, not claimed as local runtime proof |
+| `make ci` | PASS: ended `local pre-PR gate passed` |
+
+### Finding status amendments
+
+| ID | Status after entry 38 | Exact evidence | Remaining work |
+|---|---|---|---|
+| UGR-020 | PARTIAL | The transaction, recovery schema, semantic Probot exclusion, and logical-proof regression gaps are repaired and locally green; the live transition remains staged only. | Push the exact repaired head, require all hosted checks and independent re-review, then after merge obtain exact merged-main cache-free proof before owner preflight/apply/readback. |
+| UGR-021 | PARTIAL | No local result is relabeled as WSL, redirected Windows, dual-Terminal, desktop/TCC, or merged-main cache-free evidence. | Complete the documented live/manual environments after merge. |
+| UGR-022 | ACCEPTED/FIXED | README, CLAUDE, ROADMAP, MIGRATION_STATUS, manual instructions, security runbooks, workflow dependencies, tests, and this append-only entry describe the repaired boundary. | Append exact pushed-head hosted/artifact/live-readback evidence only after it exists. |
+
+## Final transaction-hardening hosted proof — entry 39
+
+- Exact pushed source head
+  `a9fef7dfac7f0f6832b57433fe2a5cff4b144d2c` passed all 18 emitted
+  checks. Generic/parity passed in
+  [`29163663315`](https://github.com/luisgui1757/dotfiles/actions/runs/29163663315),
+  both Nix producers and both stable Nix checks passed in
+  [`29163663329`](https://github.com/luisgui1757/dotfiles/actions/runs/29163663329),
+  and all four E2E producers plus all four stable E2E checks passed in
+  [`29163663344`](https://github.com/luisgui1757/dotfiles/actions/runs/29163663344).
+  Every check-run was emitted exactly once by GitHub Actions app `15368`; all
+  three runs were `pull_request`, attempt 1, on that exact source head.
+- All six downloaded schema-2 markers passed the checked-in verifier. They bind
+  `source_head_sha=a9fef7dfac7f0f6832b57433fe2a5cff4b144d2c` to
+  `executed_sha=f4a63197bbfd43c1de7c0d73fb1dffa47cfdad44`, with exact run
+  ID, attempt, logical context, and legacy context. The executed commit is the
+  live `refs/pull/49/merge`; its ordered parents are exact base
+  `f104bf066e4af7d4d707fe22ba36600711f1ae14` and that exact source
+  head. Gitleaks 8.30.1 found no secret in the six artifacts.
+- Final read-only live inspection still reports a public repository, three
+  unique active rulesets, the exact 12 legacy required contexts from app
+  `15368` in both integrity and classic protection, strict classic checks, no
+  integrity bypass, and `sha_pinning_required:false`. Review and owner-update
+  bypass remain limited to owner `139752288` in pull-request mode. No push,
+  workflow, test, artifact download, or PR operation applied the staged
+  cutover. The E2E PR run used ordinary PR caches and is not the pending
+  merged-main cache-free proof.
+
+### Finding status amendments
+
+| ID | Status after entry 39 | Exact evidence | Remaining work |
+|---|---|---|---|
+| UGR-020 | PARTIAL | The repaired transaction head passed all legacy and stable checks; all six dual-SHA markers and unchanged live policy were independently read back. | Independent final review; after merge, exact merged-main cache-free proof followed by owner preflight/apply/readback. |
+| UGR-021 | PARTIAL | Exact-head hosted Ubuntu, Apple Silicon, Windows, container, Nix, generic/parity, and logical proof are green without relabeling ordinary PR caches as clean-install proof. | Merged-main cache-free proof plus real WSL, redirected-Windows, dual-Terminal, and desktop/TCC manual runs. |
+| UGR-022 | ACCEPTED/FIXED | The append-only ledger records the accepted defects, canonical implementation, local gates, exact hosted runs, dual identities, artifact scan, and unchanged live posture. | Append merged-main/live-apply evidence only after those events occur. |
+
+## Captured-policy restore and v0.1.0 release migration — entry 40
+
+- Independent review of exact source head
+  `fcec13763a2d51f8787dcf0be85937e94495c38e` reproduced two P1 defects despite
+  a green repository gate. Safeguard restore derived classic expectations from
+  the running checkout while integrity expectations came from the manifest
+  commit, permitting a coherent worktree/classic snapshot alteration to publish
+  a mixed stage. Separately, the README told v0.1.0 users to update their
+  checkout before setup, but v0.1.0 is already chezmoi-based and POSIX targets
+  are live checkout symlinks; exact macOS/Linux reproduction changed live config
+  before backup and produced no old-byte backup.
+- Both are accepted contract defects. Restore now validates the captured
+  `check-identities.json`, derives legacy/stable integrity and full/narrow
+  classic policy from that single captured file, and never invokes a
+  worktree-backed context helper. Legacy and stable adversarial fixtures mutate
+  the running checkout/script and snapshot classic state coherently; both fail
+  before any API write.
+- Release upgrades are now exact-tag, side-by-side transactions. POSIX and
+  Windows tools require clean official annotated v0.1.0/v0.2.0 checkouts,
+  retained historical config, authoritative target identity, and private
+  recovery until acceptance. Both tools archive the exact release commits and
+  bind publication, verification, and rollback to validated frozen trees rather
+  than the mutable retained checkouts. POSIX applies only Nix plus config and
+  removes the first nix-darwin/Home Manager activation on later failure. Windows remains
+  non-Nix, applies config with dependencies skipped, freezes exact packaged and
+  portable Terminal recovery bytes under a protected ACL, retains conventional
+  v0.1 known-folder targets while rollback is open, removes only created overlay
+  state on rollback, and validates both targets before either restore write. Native/deferred package provisioning is
+  deliberately outside the reversible release transaction; Windows also skips
+  Neovim caches, agent policy, and chezmoi run scripts.
+- The Nix prerequisite is a versioned, checksum-verified upstream Nix 2.34.0
+  archive for the three supported POSIX systems. No downloaded archive is
+  extracted or executed before its reviewed SHA-256 matches; Intel macOS fails
+  before download. README, upgrading/release docs, CLAUDE invariants, roadmap,
+  migration status, supply-chain policy, manual evidence rows, and this ledger
+  now distinguish v0.1.0 from pre-chezmoi history and prohibit moving-branch
+  release instructions.
+
+### Focused behavior proof
+
+| Check | Exact result |
+|---|---|
+| Captured-policy safeguard suite | PASS: legacy and stable worktree/classic drift reject with zero writes; existing restore/apply/readback/rollback/retry/idempotency cases remain green |
+| Exact v0.1.0 POSIX fixture | PASS: exact tag/inventory, in-place and dirty rejection, write-free preflight, post-activation exit 42, automatic Home Manager/config rollback, retry, and explicit acceptance |
+| Windows upgrade Pester | PASS on non-Windows logic host: 4 recovery cases, 0 failed/skipped; native protected-ACL case is defined only for the Windows runner |
+| Release-upgrade static policy | PASS: historical identities/inventory, v0.2.0 tag contract, rollback phase split, Nix hashes, CI reach, and no moving-branch/placeholder documentation |
+
+### Finding status amendments
+
+| ID | Status after entry 40 | Exact evidence | Remaining work |
+|---|---|---|---|
+| UGR-020 | PARTIAL | Safeguard restore now has one captured-commit policy source for integrity and classic, with legacy/stable zero-write attacks covered. | Full gate, exact pushed-head independent review, then merged-main cache-free proof and owner preflight/apply/readback. |
+| UGR-021 | PARTIAL | Exact historical POSIX migration is automated and failure-injected without relabeling it as owner-host, WSL, or redirected-Windows proof. | Apple Silicon owner-host, real WSL2, native aarch64, redirected/dual-Terminal Windows, desktop/TCC, and merged-main rows. |
+| UGR-022 | ACCEPTED/FIXED | The unsafe README command and pre-chezmoi misclassification are removed; versioned migration, provenance, rollback, unsupported Intel, and release gates are discoverable. | Append final local/hosted/tag/manual evidence only after it occurs. |
+
+## Release-upgrade recovery closure and final local gate — entry 41
+
+- The release migration now keeps chezmoi run scripts outside its reversible
+  core with `--skip-config-scripts`; only Nix activation and backed-up config
+  files/links publish before acceptance. The exact historical harness runs the
+  real setup backup/config path, proves the old zsh link is retained as a
+  collision-safe backup before publication, and confirms no deferred plugin
+  publisher ran. Setup creates required managed-target parents itself; rollback
+  prunes only transaction-created parents that remain empty.
+- POSIX recovery has a private exact-file digest manifest and validates every
+  scalar, stage, checkout/tag/origin/cleanliness boundary, target inventory,
+  absent-parent inventory, flake lock, Nix provider, and command-provider
+  inventory before its first rollback write. Coherently altered target and
+  lock payloads plus an invalid stage all reject without changing live config.
+  Every publication and rollback source is a digest-bound exact tree beneath
+  private recovery. A coherent post-validation checkout mutation cannot change
+  published or restored bytes. Both injected exit 42 and a real
+  post-publication TERM restore v0.1.0 and remove the first
+  Home Manager or nix-darwin activation.
+- The macOS fixture selects the Apple-Silicon/nix-darwin branch, locked
+  bootstrap and uninstaller, config backup, and deferred-script boundary while
+  mocking privileged `/etc`, Homebrew, and Nix effects. It is automated proof,
+  not the still-required real owner-host row. Linux exercises the locked Home
+  Manager bootstrap/uninstall branch. Hosted workflow jobs select the matching
+  fixture mode and fetch the exact v0.1.0 tag history.
+- Windows recovery now validates its complete known-folder state boundary
+  before uninstall, requires the recovery script/provider/RECOVERY material,
+  verifies the exact pre-migration provider boundary after rollback, and
+  enforces an owner/System/Administrators-only protected ACL. It archives both
+  exact commits, digest-validates those source trees, and runs setup, readback,
+  uninstall, and rollback only from recovery. Terminal recovery remains
+  all-target-validated before either write. The native ACL case is defined for
+  the Windows runner; non-Windows Pester covers twelve recovery and failure
+  cases. Its setup call explicitly skips dependencies, Neovim caches, agent
+  policy, and chezmoi run scripts so the reversible boundary contains only
+  config files/symlinks, known-folder overlays, and Terminal settings.
+- The analyzer baseline changed only because the existing setup update-message
+  `Write-Host` extent now points users to reviewed release migration instead of
+  `git pull`. Old/new analyzer identity comparison found no new warning group
+  or count; the reviewed fingerprint is now
+  `1ca7e2f50a9e7e7fbe999197c2ef3bb66f6f3833a481ede9fc667dbba6b7b5b8`.
+
+### Final local verification
+
+| Check | Exact result |
+|---|---|
+| `git diff --check` and shell syntax/lint | PASS; no whitespace errors; changed shell scripts parse; repository lint green |
+| `bash tests/static/run_all.sh` | PASS, including captured-policy safeguards and release-upgrade policy |
+| `bash tests/shell/run_all.sh` | PASS, including dual-SHA proof and setup flag behavior |
+| `make test-migration` | PASS, including exact v0.1.0 apply/failure/TERM/rollback/retry/acceptance and the existing parity/uninstall/oracle bundle |
+| `TEST_UPGRADE_PLATFORM=Darwin bash tests/migration/v0_1_upgrade_test.sh` | PASS: Apple-Silicon/nix-darwin fixture mode |
+| `pwsh -NoLogo -NoProfile -File ./test.ps1` | PASS: exact analyzer fingerprint, 249 Pester passed with zero failed/skipped locally, and all Neovim specs |
+| `make validate-renovate` | PASS: official validator and exactly 83 reviewed dependency records |
+| `bash tests/nix/run_all.sh` | PASS |
+| `nix flake check --print-build-logs` | PASS on Apple Silicon; incompatible Linux systems were reported as omitted, not runtime proof |
+| `make ci` | PASS: ended `local pre-PR gate passed` |
+
+No real Windows/WSL/redirected-folder/dual-Terminal/owner-host migration, final
+v0.2.0 tag, push, hosted result, merge, live safeguard mutation, or merged-main
+cache-free proof is claimed by this entry.
+
+### Finding status amendments
+
+| ID | Status after entry 41 | Exact evidence | Remaining work |
+|---|---|---|---|
+| UGR-020 | PARTIAL | Captured-commit safeguard restore and release recovery reject altered/cross-source material before mutation; all local transaction gates pass. | Exact pushed-head review; after merge, merged-main cache-free proof and owner preflight/apply/readback. |
+| UGR-021 | PARTIAL | Exact historical Linux/macOS fixture modes are failure- and signal-injected without relabeling mocks as owner-host or WSL proof. | Real Apple Silicon owner host, WSL2, native aarch64, redirected/dual-Terminal Windows, desktop/TCC, and merged-main rows. |
+| UGR-022 | ACCEPTED/FIXED | README, upgrading/release docs, setup flags, roadmap, status, manual matrix, security docs, and this ledger describe the exact release and recovery boundaries. | Append pushed/hosted/tag/manual evidence only when it exists. |
+
+## First hosted release-migration pass and strict-LSP lifecycle repair — entry 42
+
+- Exact pushed source head
+  `9da0ee63c1423efae660e50680404fb6df7db1e3` produced real mixed hosted
+  evidence rather than a green claim. Nix run
+  [`29180481911`](https://github.com/luisgui1757/dotfiles/actions/runs/29180481911)
+  passed both producers and both logical checks. Test run
+  [`29180481912`](https://github.com/luisgui1757/dotfiles/actions/runs/29180481912)
+  passed five jobs but failed Ubuntu `chezmoi-parity` job `86617021397` in the
+  exact v0.1.0 fixture: direct historical chezmoi publication could not create
+  a Ghostty target whose parent directory did not yet exist. The fixture now
+  derives every exact historical managed file/symlink target after `chezmoi
+  init` and creates only those parents before applying v0.1.0. A disposable
+  Ubuntu 24.04 x86_64 container using pinned chezmoi 2.71.0 and its reviewed
+  SHA-256 then passed the complete in-place rejection, preflight, drift,
+  activation/config failure, rollback, altered recovery, TERM, retry, and
+  acceptance sequence. The Darwin fixture remained green.
+- E2E run
+  [`29180481941`](https://github.com/luisgui1757/dotfiles/actions/runs/29180481941)
+  passed Ubuntu container `86617021374`, Ubuntu setup `86617021396`, Windows
+  setup `86617021378`, and their logical proofs. Apple Silicon job
+  `86617021389` completed setup and attached the first isolated neocmake client,
+  then timed out starting a second formatter-only neocmake client; its logical
+  check correctly failed because no proof artifact existed. This is not a
+  product setup failure and is not waived as a retry: the strict smoke still
+  had two independent client lifecycles for one CMake behavior proof.
+- The canonical test repair keeps every real assertion while removing the
+  redundant lifecycle. Each realistic formatter fixture is now copied into the
+  same minimal project used for its attachment probe; after that client
+  attaches, the smoke requires the exact Conform formatter set, runs the
+  formatter, writes the result, waits for diagnostics, and rejects warnings or
+  errors before stopping the client. No timeout increased and no server,
+  formatter, save, diagnostic, parser, capture, or syntax gate was skipped.
+  Tier-1 coverage pins the single attach-wait call site and same-project
+  formatter invocation. Three repeated strict Apple-Silicon runs from an
+  isolated clone of the installed runtime passed all 257 checks, including
+  neocmake plus gersemi, on every run. The first aggregate run correctly
+  rejected an over-broad new source assertion that counted the helper
+  declaration as a call; the assertion was narrowed to the actual assignment,
+  its focused 317-case spec passed, and the complete gate then passed.
+
+### Focused repair verification
+
+| Check | Exact result |
+|---|---|
+| `bash tests/migration/v0_1_upgrade_test.sh` | PASS: full exact Linux release transaction |
+| Disposable Ubuntu 24.04 x86_64 exact-release fixture | PASS with pinned/verified chezmoi 2.71.0; reproduces the formerly missing historical parent before running all recovery cases |
+| `make test-nvim` | PASS, including the single-lifecycle Tier-1 regression assertion |
+| Strict production LSP smoke repeated three times | PASS: 257/257 each run; real neocmake attach and gersemi/diagnostic proof, isolated HOME/data copy |
+| `TEST_UPGRADE_PLATFORM=Darwin bash tests/migration/v0_1_upgrade_test.sh` | PASS: full exact Apple-Silicon/nix-darwin fixture transaction |
+| `pwsh -NoLogo -NoProfile -File ./test.ps1` | PASS: analyzer fingerprint, 249/249 Pester, all Neovim specs |
+| `nix flake check --print-build-logs` | PASS on Apple Silicon; incompatible Linux systems omitted, not claimed as runtime proof |
+| `make ci` | PASS: ended `local pre-PR gate passed` after the focused assertion correction |
+| `git diff --check` | PASS |
+
+No final repaired-head hosted result, logical artifact, immutable v0.2.0 tag,
+merge, live safeguard mutation, or merged-main cache-free proof is claimed by
+this entry.
+
+### Finding status amendments
+
+| ID | Status after entry 42 | Exact evidence | Remaining work |
+|---|---|---|---|
+| UGR-018 | ACCEPTED/FIXED | Strict LSP attach and formatter compatibility now share one isolated project/client lifecycle; three repeated real-tool runs passed without a timeout increase. | Require the final pushed-head macOS producer and logical proof to pass. Interactive confirmation remains optional. |
+| UGR-020 | PARTIAL | The release/safeguard implementation remains locally green; first hosted Nix proof passed, while unrelated failed jobs correctly blocked complete PR proof. | Final repaired-head checks/artifacts and independent review; after merge, merged-main cache-free proof and owner preflight/apply/readback. |
+| UGR-021 | PARTIAL | The failed hosted rows are recorded exactly; no partial run is promoted to green and no local/container result is relabeled as WSL, redirected Windows, dual Terminal, desktop/TCC, or merged-main evidence. | Final repaired-head hosted proof plus the existing real/manual environments. |
+| UGR-022 | ACCEPTED/FIXED | CLAUDE, roadmap, migration status, manual matrix, greenfield ledger, and this append-only entry describe both hosted failures and their causal repairs. | Append final hosted/tag/manual evidence only when it exists. |
+
+## Repaired release-migration and strict-LSP hosted proof — entry 43
+
+- Exact repaired behavior head
+  `d744948cdccc51f3d79e45aa78f82c46445df0c6` passed every transition check.
+  Generic/parity run
+  [`29181215799`](https://github.com/luisgui1757/dotfiles/actions/runs/29181215799)
+  passed all six jobs, including the formerly failing Ubuntu exact-v0.1.0
+  fixture. Nix run
+  [`29181215800`](https://github.com/luisgui1757/dotfiles/actions/runs/29181215800)
+  passed both real producers and both logical checks. E2E run
+  [`29181215803`](https://github.com/luisgui1757/dotfiles/actions/runs/29181215803)
+  passed Ubuntu container `86619065292`, Ubuntu setup `86619065299`, Apple
+  Silicon `86619065302`, Windows `86619065296`, and logical proofs
+  `86619772805`, `86619772768`, `86619772795`, and `86619772770`. The Apple
+  Silicon producer completed the combined real neocmake attachment plus
+  gersemi/save/diagnostic assertion that failed before the lifecycle repair.
+- The head has 21 unique completed successful check-runs: the 18 expected
+  legacy/stable transition checks plus successful CodeQL default-setup checks
+  `Analyze (actions)`, `Analyze (python)`, and `CodeQL`. No failed, skipped,
+  pending, duplicate-name, or non-success result remained. The 18 transition
+  checks and both Analyze checks came from GitHub Actions app `15368`; the
+  aggregate CodeQL check came from app `57789`.
+- All six downloaded schema-2 markers passed the checked-in verifier. Artifact
+  IDs `8256458379` and `8256474189` belong to Nix run `29181215800`; IDs
+  `8256477160`, `8256494635`, `8256523247`, and `8256530035` belong to E2E run
+  `29181215803`. Every marker binds source head `d744948…` to executed synthetic
+  merge `048052bf7bfdb957ec91e94d4127a5efb6f47c68`, attempt 1, with exact
+  run/logical/legacy identity. The merge commit is GitHub-authored with ordered
+  parents base `f104bf066e4af7d4d707fe22ba36600711f1ae14` then source head
+  `d744948…`.
+- Final read-only PR inspection still showed OPEN, non-draft, MERGEABLE, and
+  policy BLOCKED only with `REVIEW_REQUIRED`; base, head, branch names, and live
+  `main` remained exact. Gitleaks 8.30.1 scanned all 18 base-to-head commits and
+  approximately 405 KB with zero findings. This PR run used ordinary PR caches;
+  it is not the pending merged-main cache-free proof. No review, approval,
+  merge, release tag, live safeguard mutation, or v0.2.0 publication occurred.
+
+### Finding status amendments
+
+| ID | Status after entry 43 | Exact evidence | Remaining work |
+|---|---|---|---|
+| UGR-018 | ACCEPTED/FIXED | The combined isolated attach/formatter lifecycle passed three repeated local strict runs and the exact Apple-Silicon hosted producer. | Optional interactive confirmation only. |
+| UGR-020 | PARTIAL | All 18 transition checks and six dual-SHA artifacts are green on the exact repaired head; live cutover remains intentionally unapplied. | Independent final review; after merge, merged-main cache-free proof and owner preflight/apply/readback. |
+| UGR-021 | PARTIAL | Exact-head hosted Linux, Apple Silicon, Windows, container, Nix, generic/parity, security, and logical proof are green without relabeling PR caches as clean-install proof. | Merged-main cache-free proof plus real WSL, redirected-Windows, dual-Terminal, owner-host migration, and desktop/TCC rows. |
+| UGR-022 | ACCEPTED/FIXED | Roadmap, migration status, manual matrix, greenfield ledger, and this append-only entry now record both failed discovery heads and the exact repaired hosted proof. | Append final tag, merged-main, live-apply, and manual evidence only when it exists. |
+
+## Apple-Silicon-only product-surface closure — entry 44
+
+- Owner direction removed the remaining dedicated Intel macOS product surface.
+  `scripts/install-pinned-chezmoi.sh` no longer selects or downloads a Darwin
+  x86_64 archive, and `.github/workflows/test.yml` no longer carries its
+  checksum. `setup.sh`, the checksum-verified Nix prerequisite, and the exact
+  v0.1.0 release migrator now share a generic Apple-Silicon-only boundary
+  instead of an Intel-specific branch or migration path.
+- Current user-facing README, upgrade, release, and supply-chain documentation
+  contains no Intel-specific procedure or retained-support guidance. It states
+  only the positive Apple Silicon contract. The roadmap, migration status, and
+  canonical agent guide are synchronized with that behavior.
+- `tests/static/darwin_platform_contract_test.sh` scans every active Darwin
+  product surface for removed outputs, runners, installer selectors, checksums,
+  and user-facing wording. Its executable negative fixture supplies a Darwin
+  x86_64 machine identity to the real pinned chezmoi installer and proves a
+  failure at the platform boundary before download or publication. Historical
+  hosted rows remain untouched in append-only ledgers; they are evidence, not a
+  product path.
+
+### Local verification
+
+| Check | Exact result |
+|---|---|
+| `bash tests/static/darwin_platform_contract_test.sh` | PASS: active-product scan clean; real pinned chezmoi helper rejected Darwin x86_64 before download/publication |
+| `bash tests/nix/setup_nix_darwin_test.sh` | PASS: Apple Silicon selection and generic unsupported-architecture failure remain fail-closed before activation |
+| `bash tests/nix/darwin_config_test.sh` | PASS: only `dotfiles` and `dotfiles-aarch64`, both `aarch64-darwin` |
+| `bash tests/static/release_upgrade_test.sh` | PASS: exact-tag upgrade identity, recovery, and documentation contract remains complete |
+| `pwsh -NoLogo -NoProfile -File ./test.ps1` | PASS: PSScriptAnalyzer, 249 Pester passed with zero failed/skipped, and all Neovim specs |
+| `nix flake check --print-build-logs` | PASS on Apple Silicon; incompatible Linux systems reported as omitted, not runtime proof |
+| `make ci` | PASS: ended `local pre-PR gate passed` |
+| `git diff --check` and changed-shell `bash -n` | PASS |
+
+No pushed-head hosted result, review, approval, merge, release tag, live
+safeguard mutation, or merged-main cache-free proof is claimed by this entry.
+
+### Finding status amendments
+
+| ID | Status after entry 44 | Exact evidence | Remaining work |
+|---|---|---|---|
+| UGR-002 | REJECTED (superseded contract) | Apple Silicon is the only active Darwin output, runner, pinned installer artifact, setup target, release migration, and current documentation path. The generic boundary rejects every other macOS architecture before mutation. | None; historical rows remain evidence only. |
+| UGR-020 | PARTIAL | The safeguard and release transaction contracts remain green through the full local gate; this architecture closure does not apply live safeguards. | Final pushed-head checks/artifacts and independent review; after merge, merged-main cache-free proof and owner preflight/apply/readback. |
+| UGR-022 | ACCEPTED/FIXED | README, CLAUDE, roadmap, migration status, upgrade/release/supply-chain docs, tests, and this append-only entry describe the same Apple-Silicon-only product contract. | Append pushed/tag/manual evidence only after it exists. |
+
+## Sentinel repository rename cutover — entry 45
+
+- The canonical upstream is now the public repository
+  `https://github.com/luisgui1757/sentinel`. Its renamed default-branch tree is
+  exact commit `ecafffa858666343c1639f996d177f460163e93e` and declares
+  `VERSION=0.1.2`. The published `v0.1.2` tag still peels to the pre-rename
+  commit `ecca742fa9ed1243a73981955850c1a8ef3e3b04`; setup therefore pins the
+  renamed commit plus `VERSION` and does not manufacture a false tag mapping.
+- Both setup entry points, their cache roots, functions, variables, prompts,
+  diagnostics, mock repositories, pin mirrors, and tests use Sentinel
+  exclusively. The shell test path is now
+  `tests/shell/setup_sentinel_test.sh`. Current and historical tracked prose was
+  normalized to the sole product name so the committed tree has no retired-name
+  residue while Git history continues to retain the original evidence.
+- `tests/static/sentinel_naming_test.sh` reconstructs the retired token only at
+  runtime and scans every tracked path and regular-file payload
+  case-insensitively. The guard therefore proves zero residue without embedding
+  the forbidden token in its own source.
+
+### Local verification
+
+| Check | Exact result |
+|---|---|
+| Real isolated-HOME Sentinel setup | PASS: cloned `luisgui1757/sentinel`, detached at `ecafffa858666343c1639f996d177f460163e93e`, validated `VERSION=0.1.2`, installed and checked four global entrypoints, and found zero retired-name hits in the checkout or rendered blocks |
+| `bash tests/shell/setup_sentinel_test.sh` | PASS: immutable checkout, hostile Git config isolation, dirty/untracked/ignored/core.worktree refusal, wrong-version fail-closed behavior, retry cleanup, and interruption cleanup |
+| Focused `Setup.Tests.ps1` | PASS: 55 passed, 0 failed/skipped |
+| `bash tests/static/pin_consistency_test.sh` | PASS: POSIX/Windows/docs mirror version `0.1.2` and exact commit `ecafffa858666343c1639f996d177f460163e93e` |
+| `bash tests/static/sentinel_naming_test.sh` | PASS: Sentinel is the sole tracked agent-policy product name |
+| `make ci` | PASS: complete local pre-PR gate, including 83 reviewed Renovate records |
+| `nix flake check --print-build-logs` | PASS on Apple Silicon; incompatible Linux systems were omitted, not promoted to runtime proof |
+| `git diff --check` | PASS |
+
+No pushed-head hosted result, review, approval, merge, matching Sentinel release
+tag, live safeguard mutation, or merged-main cache-free proof is claimed by this
+entry.
+
+## Sentinel Windows analyzer-baseline repair — entry 46
+
+- Commit `c7160db6ffd42522ae5c2d313164ca258dadcdff` reached the hosted Test
+  workflow in run
+  [`29186835212`](https://github.com/luisgui1757/dotfiles/actions/runs/29186835212).
+  Windows job `86634390599` completed all 250 Pester tests successfully, including
+  the Sentinel setup cases, then failed only because the exact
+  PSScriptAnalyzer baseline still expected three diagnostics removed with the
+  obsolete tag-refusal branch.
+- Recomputing the analyzer result from the complete tracked PowerShell set
+  produced zero errors, 93 `setup.ps1` `PSAvoidUsingWriteHost` warnings, and
+  exact warning fingerprint
+  `bcc1ab1021d43f70770a1af90d803077bca5ff1d9c023abe94646e544865bf8d`.
+  `test.ps1` now binds that exact result; no warning category was suppressed or
+  excluded.
+
+### Local verification
+
+| Check | Exact result |
+|---|---|
+| `pwsh -NoLogo -NoProfile -File ./test.ps1` | PASS: exact analyzer baseline, 249 Pester passed with zero failed/skipped, and all Neovim specs |
+| Exact analyzer recomputation | PASS: zero errors, 93 setup progress warnings, fingerprint `bcc1ab1021d43f70770a1af90d803077bca5ff1d9c023abe94646e544865bf8d` |
+
+No repaired-head hosted result, review, approval, merge, release tag, live
+safeguard mutation, or merged-main cache-free proof is claimed by this entry.
+
+## Three-variant Terminal and frozen-postflight closure — entry 47
+
+- Independent reviews of stale head `bc2124290e8b3860fb56fcbf40c0899ff30027a5`
+  disagreed about Windows Terminal Preview and safeguard postflight. The active
+  product contract was decisive: current migration/manual documentation already
+  required stable packaged, Preview packaged, and portable Terminal discovery,
+  while production setup, migration recovery, and uninstall still enumerated
+  only two paths. Behavior commit
+  `10736d3004823867abe861f67f728d1fe174c6d2` closes that gap through one
+  schema-validated target enumerator shared by setup, release migration,
+  rollback/retry, acceptance, and uninstall.
+- Windows recovery now records `Kind`, canonical `Path`, original existence and
+  hash, expected publication presence and hash, and a per-target backup identity
+  for all three targets. Recovery remains permissive only while deciding whether
+  rollback/retry is safe. Apply completion and explicit acceptance have a
+  separate strict boundary: every expected target must equal its exact expected
+  hash and every expected-absent target must remain absent before the migration
+  can become `applied` or `accepted`. Pre-migration, missing, mixed, and external
+  bytes cannot close rollback authority.
+- Safeguard apply now freezes check identities plus integrity, review, and owner
+  ruleset policy from exact committed objects. Postflight derives integrity,
+  classic, review, and owner expectations only from that read-only transaction,
+  compares repository/ruleset state with the frozen second capture, and repeats
+  the exact-main/clean-source boundary after readback. The deterministic
+  after-boundary source mutation case performs the three apply writes, detects
+  drift without consuming it as policy, and performs the three-resource
+  rollback.
+- The Apple-Silicon-only static guard now covers both setup entry points, both
+  dependency installers, both release migrators, the safeguard guide, and every
+  Nix module. The empty-flag shell regression now captures a nonzero setup exit
+  before printing its diagnostic instead of letting `set -e` make that message
+  unreachable.
+- Historical verification totals remain historical. The current behavior tree
+  has 141 tracked shell scripts and all 141 parse. Local `test.ps1` now discovers
+  and passes 257 Pester cases with zero failed/skipped; entry 46's hosted 250-case
+  result remains exact for its older head. A new hosted total is not claimed
+  until the final pushed head runs. The earlier UGR-004 evidence citation named
+  a nonexistent `install_deps_failure_accumulator_test.sh`; the actual passing
+  regression is `tests/shell/install_failure_accumulation_test.sh`.
+
+### Local verification
+
+| Check | Exact result |
+|---|---|
+| `git diff --check` and `bash -n` over tracked `*.sh` | PASS: no diff errors; 141/141 shell scripts parsed |
+| `make lint` | PASS: strict shell lint |
+| `bash tests/static/run_all.sh` | PASS, including the three-resource safeguard transaction, frozen postflight mutation, semantic Probot, required-check, release, Apple-Silicon-only, provenance, and Sentinel naming guards |
+| `bash tests/shell/run_all.sh` | PASS, including reachable empty-array diagnostics and dual-SHA logical proof |
+| `pwsh -NoLogo -NoProfile -File ./test.ps1` | PASS: exact analyzer baseline, 257 Pester passed with zero failed/skipped, and all Neovim specs |
+| Focused Setup/Upgrade/Uninstall Pester | PASS: 83 cases; Preview-only, divergent three-variant, schema identity, exact acceptance, and all-before-any uninstall recovery included |
+| `bash tests/static/repo_safeguards_preflight_test.sh` | PASS: complete apply/restore/rollback suite including after-postflight-boundary source mutation |
+| `make ci` | PASS: ended `local pre-PR gate passed` |
+| `nix flake check --print-build-logs` | PASS on Apple Silicon; incompatible Linux systems omitted, not promoted to runtime proof |
+
+### Finding status amendments
+
+| ID | Status after entry 47 | Exact evidence | Remaining work |
+|---|---|---|---|
+| UGR-001 | ACCEPTED/FIXED | One canonical enumerator and the setup/migration/uninstall transactions cover stable packaged, Preview packaged, and portable targets independently; acceptance requires exact expected state. | Real three-variant native-Windows apply/rollback/uninstall remains a v0.2.0 release row. |
+| UGR-002 | REJECTED (superseded contract) | The expanded active-surface guard passes and only Apple Silicon remains a current macOS product path. | None; historical rows remain evidence only. |
+| UGR-015 | PARTIAL | Redirected-path logic plus three-variant identity/recovery is automated and green. | Real redirected/OneDrive/alternate-drive Windows plus three installed variants. |
+| UGR-020 | PARTIAL | Postflight expectations and unchanged surfaces are transaction-frozen; deterministic late local drift rolls back all three writes. | Final hosted proof; after merge, exact-main cache-free proof and owner preflight/apply/readback. |
+| UGR-021 | PARTIAL | Local implementation/failure injection is complete without promoting it to real WSL, redirected Windows, three-variant Windows, desktop/TCC, or merged-main evidence. | Existing real/manual and post-merge rows. |
+| UGR-022 | ACCEPTED/FIXED | README, CLAUDE, roadmap, migration status, upgrade/release/security docs, manual matrix, and this ledger now state the same three-target and frozen-readback contracts with current local counts. | Append final hosted/tag/manual evidence only when it exists. |
+
+No pushed-head hosted result, logical artifact, review, approval, merge, release
+tag, live safeguard mutation, or merged-main cache-free proof is claimed by this
+entry.

@@ -17,6 +17,12 @@ $RepoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $SourceDir = Join-Path $RepoRoot 'home'
 $Chezmoi = $null
 
+$WindowsTerminalTargetsLibrary = Join-Path $RepoRoot 'scripts\windows-terminal-targets.ps1'
+if (-not (Test-Path -LiteralPath $WindowsTerminalTargetsLibrary -PathType Leaf)) {
+    throw "Windows Terminal target library is missing: $WindowsTerminalTargetsLibrary"
+}
+. $WindowsTerminalTargetsLibrary
+
 $script:Removed = 0
 $script:Restored = 0
 $script:Skipped = 0
@@ -307,10 +313,8 @@ function Test-WindowsTerminalSettingsPath {
 function Get-WindowsTerminalRecoveryTargets {
     $localAppData = Get-WindowsLocalApplicationData
     if (-not $localAppData) { return @() }
-    return @(
-        (Join-Path $localAppData 'Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json'),
-        (Join-Path $localAppData 'Microsoft\Windows Terminal\settings.json')
-    )
+    return @(Get-DotfilesWindowsTerminalTargets -LocalApplicationData $localAppData -IncludeAbsent |
+        ForEach-Object { $_.Path })
 }
 
 function Restore-WindowsTerminalSettingsBackups {
@@ -392,8 +396,8 @@ function Remove-ManagedTarget {
     if (Test-ExternalPath -Path $Target) { return }
 
     if (Test-WindowsTerminalSettingsPath -Path $Target) {
-        # Both packaged and portable recovery are handled together after the
-        # ordinary chezmoi target pass so candidate validation is all-or-none.
+        # Stable packaged, Preview packaged, and portable recovery is handled
+        # after the ordinary chezmoi pass so validation remains all-or-none.
         return
     }
 

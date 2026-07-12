@@ -7,10 +7,13 @@
 #   ./setup.sh --update            update proven dependency tools/artifacts + Mason only
 #   ./setup.sh --dry-run           preview every step
 #   ./setup.sh --skip-deps         already provisioned; skip Nix + native deps
+#   ./setup.sh --skip-native-deps  keep Nix activation; skip native/deferred deps
 #   ./setup.sh --skip-bootstrap    back-compat alias: skip config apply
 #   ./setup.sh --skip-config       already configured; just sync nvim
+#   ./setup.sh --skip-config-scripts
+#                                  apply files/links without chezmoi run scripts
 #   ./setup.sh --skip-nvim         skip nvim plugin/parser/Mason sync
-#   ./setup.sh --skip-agents       skip global Polaris agent-policy install
+#   ./setup.sh --skip-agents       skip global Sentinel agent-policy install
 #   ./setup.sh --experimental-wsl-gui
 #                                  WSL opt-in: install/link Linux GUI terminal bits
 #
@@ -31,7 +34,9 @@ ALL=0
 DRY_RUN=0
 UPDATE_MODE=0
 SKIP_DEPS=0
+SKIP_NATIVE_DEPS=0
 SKIP_BOOTSTRAP=0
+SKIP_CONFIG_SCRIPTS=0
 SKIP_NVIM=0
 SKIP_AGENTS=0
 BEST_EFFORT=0
@@ -42,11 +47,10 @@ NIX_HOMEBREW_TAPS_PATH=""
 NIX_HOMEBREW_TAPS_BACKUP=""
 NIX_DARWIN_RC_SOURCES=()
 NIX_DARWIN_RC_BACKUPS=()
-POLARIS_REPO_URL="https://github.com/luisgui1757/polaris.git"
-POLARIS_VERSION="0.1.2"
-POLARIS_TAG="v0.1.2"
-POLARIS_REF="ecca742fa9ed1243a73981955850c1a8ef3e3b04"
-POLARIS_CACHE_ROOT="$HOME/.local/share/dotfiles/polaris"
+SENTINEL_REPO_URL="https://github.com/luisgui1757/sentinel.git"
+SENTINEL_VERSION="0.1.2"
+SENTINEL_REF="ecafffa858666343c1639f996d177f460163e93e"
+SENTINEL_CACHE_ROOT="$HOME/.local/share/dotfiles/sentinel"
 usage() {
     cat <<'EOF'
 setup.sh -- one-shot end-to-end install for macOS / Linux / WSL.
@@ -57,10 +61,13 @@ Local usage:
   ./setup.sh --update            update proven dependency tools/artifacts + Mason only
   ./setup.sh --dry-run           preview every step
   ./setup.sh --skip-deps         already provisioned; skip Nix + native deps
+  ./setup.sh --skip-native-deps  apply Nix/config but skip native/deferred deps
   ./setup.sh --skip-bootstrap    back-compat alias: skip config apply
   ./setup.sh --skip-config       already configured; just sync nvim
+  ./setup.sh --skip-config-scripts
+                                apply files/links without chezmoi run scripts
   ./setup.sh --skip-nvim         skip nvim plugin/parser/Mason sync
-  ./setup.sh --skip-agents       skip global Polaris agent-policy install
+  ./setup.sh --skip-agents       skip global Sentinel agent-policy install
   ./setup.sh --best-effort       continue past plugin/LSP/Mason phase failures
   ./setup.sh --experimental-wsl-gui
                                 WSL opt-in: install/link Linux Ghostty + Linux fonts
@@ -80,8 +87,12 @@ for arg in "$@"; do
         --dry-run)        DRY_RUN=1 ;;
         --update)         UPDATE_MODE=1 ;;
         --skip-deps)      SKIP_DEPS=1 ;;
+        --skip-native-deps)
+                          SKIP_NATIVE_DEPS=1 ;;
         --skip-bootstrap|--skip-config)
                           SKIP_BOOTSTRAP=1 ;;
+        --skip-config-scripts)
+                          SKIP_CONFIG_SCRIPTS=1 ;;
         --skip-nvim)      SKIP_NVIM=1 ;;
         --skip-agents)    SKIP_AGENTS=1 ;;
         --best-effort)    BEST_EFFORT=1 ;;
@@ -141,9 +152,13 @@ CHEZMOI_SOURCE="$SCRIPT_DIR/home"
 CHEZMOI_BASE_ARGS=(--source "$CHEZMOI_SOURCE")
 CHEZMOI_CONFIG_ARGS=()
 CHEZMOI_DATA_ARGS=()
+CHEZMOI_APPLY_ARGS=()
 TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
 if [[ "$EXPERIMENTAL_WSL_GUI" -eq 1 ]]; then
     CHEZMOI_DATA_ARGS+=(--override-data '{"experimentalWslGui":true}')
+fi
+if [[ "$SKIP_CONFIG_SCRIPTS" -eq 1 ]]; then
+    CHEZMOI_APPLY_ARGS+=(--include "files,symlinks")
 fi
 
 phase() {
@@ -242,7 +257,7 @@ resolve_target_identity() {
     HOME="$account_home"
     export HOME
     DEFAULT_DEST="$HOME/dotfiles"
-    POLARIS_CACHE_ROOT="$HOME/.local/share/dotfiles/polaris"
+    SENTINEL_CACHE_ROOT="$HOME/.local/share/dotfiles/sentinel"
 }
 
 refresh_runtime_path() {
@@ -291,11 +306,11 @@ refresh_runtime_path() {
     hash -r 2>/dev/null || true
 }
 
-polaris_checkout_dir() {
-    printf '%s/%s\n' "$POLARIS_CACHE_ROOT" "$POLARIS_REF"
+sentinel_checkout_dir() {
+    printf '%s/%s\n' "$SENTINEL_CACHE_ROOT" "$SENTINEL_REF"
 }
 
-polaris_git() {
+sentinel_git() {
     GIT_CONFIG_NOSYSTEM=1 \
     GIT_CONFIG_SYSTEM=/dev/null \
     GIT_CONFIG_GLOBAL=/dev/null \
@@ -310,49 +325,41 @@ polaris_git() {
         "$@"
 }
 
-polaris_cache_git() {
+sentinel_cache_git() {
     local checkout="$1"
     shift
-    polaris_git --git-dir="$checkout/.git" --work-tree="$checkout" "$@"
+    sentinel_git --git-dir="$checkout/.git" --work-tree="$checkout" "$@"
 }
 
-assert_polaris_checkout_clean() {
+assert_sentinel_checkout_clean() {
     local checkout="$1" status
 
-    if ! status="$(polaris_cache_git "$checkout" status --porcelain=v1 --untracked-files=all --ignored=matching 2>/dev/null)"; then
-        echo "  FAIL: could not inspect Polaris cache worktree: $checkout" >&2
+    if ! status="$(sentinel_cache_git "$checkout" status --porcelain=v1 --untracked-files=all --ignored=matching 2>/dev/null)"; then
+        echo "  FAIL: could not inspect Sentinel cache worktree: $checkout" >&2
         exit 1
     fi
 
     if [[ -n "$status" ]]; then
-        echo "  FAIL: Polaris cache has local changes; refusing to execute it: $checkout" >&2
+        echo "  FAIL: Sentinel cache has local changes; refusing to execute it: $checkout" >&2
         printf '%s\n' "$status" | sed 's/^/        /' >&2
         echo "        Remove this cache directory and rerun setup to fetch the pinned checkout again." >&2
         exit 1
     fi
 }
 
-assert_polaris_release_artifact() {
-    local checkout="$1" version="$2" tag="$3" ref="$4" head tag_head checkout_version
+assert_sentinel_artifact() {
+    local checkout="$1" version="$2" ref="$3" head checkout_version
 
-    head="$(polaris_cache_git "$checkout" rev-parse --verify 'HEAD^{commit}' 2>/dev/null || true)"
+    head="$(sentinel_cache_git "$checkout" rev-parse --verify 'HEAD^{commit}' 2>/dev/null || true)"
     if [[ "$head" != "$ref" ]]; then
-        echo "  FAIL: Polaris cache is not at the pinned commit: $checkout" >&2
+        echo "  FAIL: Sentinel cache is not at the pinned commit: $checkout" >&2
         echo "        expected $ref, found ${head:-unknown}" >&2
-        exit 1
-    fi
-
-    tag_head="$(polaris_cache_git "$checkout" rev-parse --verify "refs/tags/$tag^{commit}" 2>/dev/null || true)"
-    if [[ "$tag_head" != "$ref" ]]; then
-        echo "  FAIL: Polaris tag mismatch for $tag in $checkout" >&2
-        echo "        expected tag to point at $ref, found ${tag_head:-missing}" >&2
-        echo "        Remove this cache directory and rerun setup to fetch the pinned release artifact again." >&2
         exit 1
     fi
 
     checkout_version="$(tr -d '[:space:]' < "$checkout/VERSION" 2>/dev/null || true)"
     if [[ "$checkout_version" != "$version" ]]; then
-        echo "  FAIL: Polaris cache VERSION mismatch: expected $version, found ${checkout_version:-missing}" >&2
+        echo "  FAIL: Sentinel cache VERSION mismatch: expected $version, found ${checkout_version:-missing}" >&2
         exit 1
     fi
 }
@@ -371,17 +378,17 @@ should_apply_agent_policy() {
     [[ "$SKIP_AGENTS" -eq 0 ]] || return 1
     [[ "$ALL" -eq 1 || "$DRY_RUN" -eq 1 ]] && return 0
     [[ -t 0 ]] || return 0
-    ask_yes_no_default_yes "Apply Polaris global agent rules?"
+    ask_yes_no_default_yes "Apply Sentinel global agent rules?"
 }
 
-ensure_polaris_checkout() (
+ensure_sentinel_checkout() (
     local checkout tmp="" cleanup_rc=0
-    POLARIS_STAGE_DIR=""
+    SENTINEL_STAGE_DIR=""
     trap '
         cleanup_rc=$?
         trap - EXIT HUP INT TERM
-        if [[ -n "${POLARIS_STAGE_DIR:-}" ]]; then
-            rm -rf "$POLARIS_STAGE_DIR"
+        if [[ -n "${SENTINEL_STAGE_DIR:-}" ]]; then
+            rm -rf "$SENTINEL_STAGE_DIR"
         fi
         exit "$cleanup_rc"
     ' EXIT
@@ -389,42 +396,42 @@ ensure_polaris_checkout() (
     trap 'exit 130' INT
     trap 'exit 143' TERM
 
-    checkout="$(polaris_checkout_dir)"
+    checkout="$(sentinel_checkout_dir)"
 
     if [[ -d "$checkout/.git" ]]; then
-        assert_polaris_release_artifact "$checkout" "$POLARIS_VERSION" "$POLARIS_TAG" "$POLARIS_REF"
-        assert_polaris_checkout_clean "$checkout"
+        assert_sentinel_artifact "$checkout" "$SENTINEL_VERSION" "$SENTINEL_REF"
+        assert_sentinel_checkout_clean "$checkout"
         printf '%s\n' "$checkout"
         return 0
     fi
 
     if [[ -e "$checkout" || -L "$checkout" ]]; then
-        echo "  FAIL: Polaris cache path exists but is not a git checkout: $checkout" >&2
+        echo "  FAIL: Sentinel cache path exists but is not a git checkout: $checkout" >&2
         exit 1
     fi
 
     if ! command -v git >/dev/null 2>&1; then
-        echo "  FAIL: git is required to fetch Polaris. Re-run without --skip-deps, or install git first." >&2
+        echo "  FAIL: git is required to fetch Sentinel. Re-run without --skip-deps, or install git first." >&2
         exit 1
     fi
 
-    mkdir -p "$POLARIS_CACHE_ROOT"
-    tmp="$(mktemp -d "$POLARIS_CACHE_ROOT/.tmp.XXXXXX")"
-    POLARIS_STAGE_DIR="$tmp"
+    mkdir -p "$SENTINEL_CACHE_ROOT"
+    tmp="$(mktemp -d "$SENTINEL_CACHE_ROOT/.tmp.XXXXXX")"
+    SENTINEL_STAGE_DIR="$tmp"
 
-    polaris_git clone "$POLARIS_REPO_URL" "$tmp"
-    polaris_git -C "$tmp" checkout --detach "$POLARIS_REF"
+    sentinel_git clone "$SENTINEL_REPO_URL" "$tmp"
+    sentinel_git -C "$tmp" checkout --detach "$SENTINEL_REF"
 
-    assert_polaris_release_artifact "$tmp" "$POLARIS_VERSION" "$POLARIS_TAG" "$POLARIS_REF"
-    assert_polaris_checkout_clean "$tmp"
+    assert_sentinel_artifact "$tmp" "$SENTINEL_VERSION" "$SENTINEL_REF"
+    assert_sentinel_checkout_clean "$tmp"
 
     mv "$tmp" "$checkout"
     tmp=""
-    POLARIS_STAGE_DIR=""
+    SENTINEL_STAGE_DIR=""
     printf '%s\n' "$checkout"
 )
 
-run_polaris_agent_policy() {
+run_sentinel_agent_policy() {
     local checkout installer
 
     if [[ "$SKIP_AGENTS" -eq 1 ]]; then
@@ -439,18 +446,18 @@ run_polaris_agent_policy() {
         return 0
     fi
 
-    phase "Phase 6/6: apply global agent policy (Polaris)"
+    phase "Phase 6/6: apply global agent policy (Sentinel)"
     if [[ "$DRY_RUN" -eq 1 ]]; then
-        echo "  would: clone/fetch Polaris $POLARIS_VERSION ($POLARIS_TAG @ $POLARIS_REF)"
-        echo "         into $(polaris_checkout_dir)"
-        echo "  would: run Polaris tools/install --global, then --global --check"
+        echo "  would: clone/fetch Sentinel $SENTINEL_VERSION (@ $SENTINEL_REF)"
+        echo "         into $(sentinel_checkout_dir)"
+        echo "  would: run Sentinel tools/install --global, then --global --check"
         return 0
     fi
 
-    checkout="$(ensure_polaris_checkout)"
+    checkout="$(ensure_sentinel_checkout)"
     installer="$checkout/tools/install"
     if [[ ! -x "$installer" ]]; then
-        echo "  FAIL: Polaris installer missing or not executable: $installer" >&2
+        echo "  FAIL: Sentinel installer missing or not executable: $installer" >&2
         exit 1
     fi
 
@@ -592,6 +599,21 @@ backup_preexisting_managed_targets() {
     done <<<"$managed_output"
 }
 
+ensure_managed_target_parents() {
+    local managed_output target parent
+    [[ "$DRY_RUN" -eq 0 ]] || return 0
+    managed_output="$(run_chezmoi managed --path-style absolute --include files,symlinks)"
+    while IFS= read -r target; do
+        [[ -n "$target" ]] || continue
+        parent="$(dirname "$target")"
+        if [[ -e "$parent" && ! -d "$parent" ]]; then
+            echo "  FAIL: managed target parent is not a directory: $parent" >&2
+            return 1
+        fi
+        mkdir -p "$parent"
+    done <<<"$managed_output"
+}
+
 run_or_fail() {
     local label="$1"; shift
     if "$@"; then return 0; fi
@@ -611,12 +633,12 @@ cleanup_chezmoi_dry_config() {
 }
 
 run_update_mode() {
-    if [[ "$SKIP_DEPS" -eq 0 ]]; then
+    if [[ "$SKIP_DEPS" -eq 0 && "$SKIP_NATIVE_DEPS" -eq 0 ]]; then
         phase "Update 1/2: update proven dependency tools and artifacts"
         bash "$SCRIPT_DIR/install-deps.sh" ${DEPS_FLAGS[@]+"${DEPS_FLAGS[@]}"}
     else
         echo
-        echo "skipped: update dependency phase via --skip-deps"
+        echo "skipped: update dependency phase via --skip-deps/--skip-native-deps"
     fi
 
     refresh_runtime_path
@@ -636,7 +658,7 @@ run_update_mode() {
     fi
 
     echo
-    echo "Plugins (lazy-lock.json), pinned binaries, and configs update via \`git pull\` then re-run setup; \`:Lazy update\` re-pins plugins (a repo change)."
+    echo "Plugins (lazy-lock.json), pinned binaries, and configs update through a reviewed release migration; \`:Lazy update\` re-pins plugins (a repo change)."
     echo
     echo "================================================================"
     echo "==  setup.sh: update done"
@@ -752,7 +774,10 @@ nix_homebrew_library_dir() {
     }
     case "$arch" in
         aarch64) printf '%s\n' /opt/homebrew/Library ;;
-        x86_64) printf '%s\n' /usr/local/Homebrew/Library ;;
+        *)
+            echo "  FAIL: Homebrew tap migration is supported only on Apple Silicon macOS." >&2
+            return 1
+            ;;
     esac
 }
 
@@ -989,7 +1014,7 @@ complete_nix_homebrew_tap_transaction() {
 # dotfile (invariant 22). setup resolves one authoritative target user/home and
 # passes both through sudo explicitly for impure flake evaluation.
 run_nix_darwin_switch() {
-    local explicit=0 arch config_name flake_ref bootstrap_ref
+    local explicit=0 arch raw_arch config_name flake_ref bootstrap_ref
     [[ "$NIX_DARWIN" -eq 1 ]] && explicit=1
     if [[ "$(uname -s)" != "Darwin" ]]; then
         [[ "$explicit" -eq 1 ]] || return 0
@@ -1003,18 +1028,19 @@ run_nix_darwin_switch() {
         return 0
     fi
     phase "Required POSIX package layer: apply nix-darwin packages (macOS)"
-    arch="$(normalize_machine_arch "$(uname -m)")" || {
+    raw_arch="$(uname -m)"
+    case "$raw_arch" in
+        arm64|aarch64) arch="aarch64" ;;
+        *)
             if [[ "$DRY_RUN" -eq 1 ]]; then
-                echo "  would fail: no supported nix-darwin activation config for arch $(uname -m)."
+                echo "  would fail: macOS setup requires Apple Silicon (arm64); detected $raw_arch."
                 return 0
             fi
-            echo "  FAIL: no supported nix-darwin activation config for arch $(uname -m)."
+            echo "  FAIL: macOS setup requires Apple Silicon (arm64); detected $raw_arch." >&2
             return 1
-    }
-    case "$arch" in
-        aarch64) config_name="dotfiles-aarch64" ;;
-        x86_64) config_name="dotfiles-x86_64" ;;
+            ;;
     esac
+    config_name="dotfiles-aarch64"
     if ! command -v nix >/dev/null 2>&1; then
         if [[ "$DRY_RUN" -eq 1 ]]; then
             echo "  would fail: Nix is required for macOS setup. Install Nix first"
@@ -1194,12 +1220,12 @@ run_home_manager_switch
 refresh_runtime_path
 
 # ---- Phase 1: dependencies ---------------------------------------------------
-if [[ "$SKIP_DEPS" -eq 0 ]]; then
+if [[ "$SKIP_DEPS" -eq 0 && "$SKIP_NATIVE_DEPS" -eq 0 ]]; then
     phase "Phase 1/6: install dependencies"
     bash "$SCRIPT_DIR/install-deps.sh" ${DEPS_FLAGS[@]+"${DEPS_FLAGS[@]}"}
 else
     echo
-    echo "skipped: Phase 1 (deps) via --skip-deps"
+    echo "skipped: Phase 1 (native/deferred deps) via --skip-deps/--skip-native-deps"
 fi
 refresh_runtime_path
 
@@ -1223,13 +1249,20 @@ if [[ "$SKIP_BOOTSTRAP" -eq 0 ]]; then
         render_chezmoi_config_template "$CHEZMOI_DRY_CONFIG"
         CHEZMOI_CONFIG_ARGS=(--config "$CHEZMOI_DRY_CONFIG" --config-format toml)
         backup_preexisting_managed_targets
-        run_chezmoi --dry-run --verbose apply
+        run_chezmoi --dry-run --verbose apply \
+            ${CHEZMOI_APPLY_ARGS[@]+"${CHEZMOI_APPLY_ARGS[@]}"}
         cleanup_chezmoi_dry_config
         trap - EXIT
     else
-        chezmoi "${CHEZMOI_BASE_ARGS[@]}" init
+        if [[ "$SKIP_CONFIG_SCRIPTS" -eq 1 ]]; then
+            echo "  retain    existing chezmoi state; frozen release source is read-only"
+        else
+            chezmoi "${CHEZMOI_BASE_ARGS[@]}" init
+        fi
         backup_preexisting_managed_targets
-        run_chezmoi --no-tty --force apply
+        ensure_managed_target_parents
+        run_chezmoi --no-tty --force apply \
+            ${CHEZMOI_APPLY_ARGS[@]+"${CHEZMOI_APPLY_ARGS[@]}"}
     fi
 else
     echo
@@ -1269,7 +1302,7 @@ else
     echo "skipped: Phase 3-5 (nvim plugins/parsers/tools) via --skip-nvim"
 fi
 
-run_polaris_agent_policy
+run_sentinel_agent_policy
 
 # ---- Summary -----------------------------------------------------------------
 echo

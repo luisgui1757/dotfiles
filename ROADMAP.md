@@ -1,8 +1,8 @@
 # Dotfiles Roadmap
 
-Last audited: 2026-07-10 on branch
-`fix/ultimate-gold-standard-close-2026-07-10`.
-Baseline: `main` at `85375b2bdec9d3a998e8023a44b41d03a32f3eaa`.
+Last audited: 2026-07-12 on branch
+`fix/lean-platform-final-cutover-2026-07-10`.
+Baseline: `main` at `f104bf066e4af7d4d707fe22ba36600711f1ae14`.
 
 This is the adversarial post-merge roadmap for the chezmoi migration and the
 current setup/CI surface. The goal is not "good enough"; the repo should have a
@@ -226,14 +226,12 @@ Commit-by-commit status:
   installs; `--skip-deps` unconditionally skips that layer (even with
   compatibility aliases) and logs the skip; dry-run previews missing-Nix /
   unsupported-arch failures without aborting and Brew-less Darwin continues
-  through every Brew-backed preview phase; the WSL2 canary and WSL
-  greenfield harness install Ubuntu's `nix-bin` package and enable flakes before
-  invoking setup. The ultimate closure added exact aarch64/x86_64 Darwin host
-  configurations, authoritative account/home resolution, transactionally
-  rolled-back tap migration, and Home Manager session-vars startup. Exact head
-  `f4b63953f2f982702a685358b09e89bae2d78fdd` passed both the real
-  `macos-26-intel` Nix and full setup lanes; WSL remains separate manual/runtime
-  proof.
+  through every Brew-backed preview phase; the manual WSL greenfield harness
+  installs Ubuntu's `nix-bin` package and enables flakes before invoking setup.
+  The ultimate closure added authoritative account/home resolution,
+  transactionally rolled-back tap migration, and Home Manager session-vars
+  startup. Apple Silicon is the only current Darwin contract; Intel evidence is
+  retained in the append-only ledger as historical proof, not current support.
 - **Pi CLI provisioning — DONE.** Setup installs the Pi CLI on every OS as the
   pinned npm package `@earendil-works/pi-coding-agent@0.80.3` after checking npm
   `dist.integrity`. POSIX public setup gets Node 24 from the enforced Nix package
@@ -243,8 +241,8 @@ Commit-by-commit status:
   install failures record and force nonzero setup/update exits; stdin/no-script-path
   setup fails closed with clone-first instructions instead of clone-and-reinvoke;
   the VS Build Tools bootstrapper must pass Authenticode Microsoft signer/chain
-  verification before execution; the WSL2 canary is split into a non-required
-  scheduled/manual workflow; required-check sources align with `macos-26` and
+  verification before execution; the then-current WSL2 canary was split into a
+  non-required scheduled/manual workflow; required-check sources align with `macos-26` and
   Nix contexts; Renovate custom-manager coverage and pin-consistency guards cover
   the current mirrored/manual-reviewed pin surface. PR #46 merged as
   `85375b2bdec9d3a998e8023a44b41d03a32f3eaa`; all twelve required checks passed,
@@ -258,10 +256,11 @@ Commit-by-commit status:
   runtimepath mutation. Repair is locked, staged, verified, and rollback-safe;
   behavioral coverage replaces the former grep-only claim. UGR-002, UGR-011,
   UGR-012, UGR-013, and the POSIX half of UGR-015 are implemented with focused
-  architecture, identity, session, dry-run, and rollback tests; Intel hosted
-  runtime proof passed and WSL real-host proof remains explicitly pending.
+  architecture, identity, session, dry-run, and rollback tests. The owner later
+  retired the Intel product contract; WSL real-host proof remains explicitly
+  pending.
   UGR-001 and UGR-014 are implemented:
-  packaged/portable WT state is independently transactionally merged and
+  stable packaged/Preview/portable WT state is independently transactionally merged and
   recovered, while uninstall backup selection is filename-keyed and fails
   closed on malformed candidates. UGR-004 through UGR-009 are implemented:
   recoverable installs share the summary boundary; Pi and zsh executable
@@ -273,13 +272,32 @@ Commit-by-commit status:
   the real UserProfile, LocalApplicationData, Documents, and runtime `$PROFILE`
   paths. UGR-016 through UGR-019 and UGR-023 close the PowerShell invocation,
   checked Tree-sitter deletion, per-project clangd, Renovate inventory,
-  Starship/Polaris cleanup, diagnostic-identity, NUL-safe JSON, and structural
-  Nix-ownership gaps. UGR-020 is deliberately PARTIAL: this branch emits and
-  verifies stable logical checks while the legacy contexts remain required;
-  the checked-in/live switch happens only in the documented post-merge stage.
+  Starship/Sentinel cleanup, diagnostic-identity, NUL-safe JSON, and structural
+  Nix-ownership gaps. UGR-020 is deliberately PARTIAL: this cutover switches
+  every checked-in required-check source to stable logical checks while
+  retaining legacy producers for the still-live rules; the live owner apply
+  happens only after the documented merged-main cache-free gate. Logical proof
+  schema 2 records both the PR source head and GitHub's actually executed
+  synthetic merge SHA instead of mislabeling the latter as the head. The apply
+  script now completes and repeats the whole read-only boundary before its first mutation:
+  exact branch/repo/main identity, clean sources, unique/exact legacy live
+  policy, public visibility, GitHub-Actions app/workflow/event/run provenance,
+  and cache-free E2E proof. It snapshots and rolls back the three changed
+  resources on failure and retains a tested explicit recovery path. Recovery
+  freezes every consumed snapshot file, requires the complete classic shape,
+  rejects incomplete, altered, cross-stage, wrong-ruleset, bypass/condition, and
+  full-classic-policy drift before any write, and publishes only the validated
+  frozen bytes against policy from the manifest's still-live captured commit.
+  Apply separately freezes every desired write from exact
+  committed objects after the second capture, so a later checkout mutation
+  cannot change publication. Capture directories clean on every exit and
+  pre-mutation recovery snapshots are pruned. Probot Settings now owns
+  repository-level settings only; a semantic YAML guard—not a presentation-
+  specific regex—proves that every top-level `branches` form is absent and
+  prevents a default-branch sync from racing the owner-run cutover.
   UGR-021 is PARTIAL until real WSL, redirected-Windows, cache-free scheduled or
-  manual, and desktop runs exist. The exact-head Intel and conventional Windows
-  font-consumption lanes passed. The first PR run exposed and fixed two
+  manual, and desktop runs exist. Historical Intel and current conventional
+  Windows font-consumption lanes passed. The first PR run exposed and fixed two
   cross-host integration defects:
   the POSIX dependency-table zsh scan now passes the complete origin/commit/file
   identity, and handled Windows chezmoi drift no longer leaks a native exit code
@@ -293,7 +311,7 @@ Commit-by-commit status:
   asset so native drift cases run with zero platform-dependent skips. The real
   Windows setup lane also proved an executable-stage filename must end in
   `.exe`; Tree-sitter publication now preserves that loader contract and its
-  Pester oracle rejects any non-`.exe` validation path. Intel CI now explicitly
+  Pester oracle rejects any non-`.exe` validation path. Historical Intel CI explicitly
   uses full-SHA upstream-Nix installation after the real lane proved current
   Determinate Nix no longer supports x86_64-darwin hosts; the action's hidden
   last-release fallback is not treated as a platform contract. The next exact
@@ -311,7 +329,9 @@ Commit-by-commit status:
   head `f4b63953f2f982702a685358b09e89bae2d78fdd` subsequently passed all three
   workflow runs: generic Ubuntu/macOS/Windows and parity, Nix Ubuntu/Apple
   Silicon/Intel, the Ubuntu container, public setup on Ubuntu/Apple
-  Silicon/Intel/Windows, and all six stable logical proof jobs. No workflow
+  Silicon/Intel/Windows, and all six stable logical proof jobs. Those Intel
+  results predate the owner-directed retirement and are not a current support
+  claim. No workflow
   definition is recorded as runtime proof; only those completed runs are.
 
 - **Cache-free Tree-sitter restore/bootstrap boundary — BRANCH-HEAD PROOF
@@ -343,8 +363,17 @@ Commit-by-commit status:
   `e5cf3e23299cbb42a157c307f2a7259979fcada0` then passed cache-free run
   `29103732329`: Ubuntu container, public Ubuntu, Apple Silicon, Intel, native
   Windows, and all four setup logical proofs were green. UGR-021 remains
-  PARTIAL only because the context-switch sequence still requires the same
-  proof on the later merged-main SHA and the separate manual environments.
+  PARTIAL because merged-main run `29114125798` exposed the separate CMake LSP
+  project-isolation defect now repaired on this branch, and because the manual
+  environments remain outstanding. The checked-in stable-context cutover is in
+  this PR. Repaired PR head
+  `4dbdb959674f5a062cffe44daae242318f4c1b67` passed generic/parity run
+  `29140112029`, Nix run `29140112035`, and cached E2E run `29140112030`: all
+  12 live-required contexts and all six stable logical contexts were green.
+  The six schema-2 artifacts bind that source head to the executed synthetic
+  merge commit and passed a separate leak scan. This is exact repaired-head
+  proof, not cache-free merged-main proof; owner live apply still waits for the
+  latter.
 
 - **Cache-free Ghostty artifact provenance — BRANCH-HEAD PROOF PASSED;
   MERGED-MAIN CONFIRMATION PENDING.** PR #48's first Ubuntu container job
@@ -363,6 +392,29 @@ Commit-by-commit status:
   Ubuntu container (`29103728188` / `86398980438`) and cache-free Ubuntu
   container (`29103732329` / `86399025475`). The original red job remains
   defect evidence rather than being waived.
+
+- **Cold-cache CMake LSP proof isolation — BRANCH-HEAD HOSTED PROOF PASSED;
+  MERGED-MAIN PROOF PENDING.** Merged-main cache-free run `29114125798` passed Ubuntu container,
+  public Ubuntu, Intel, and Windows, but Apple Silicon job `86433246367`
+  failed because the first neocmakelsp attach probe opened inside the shared
+  repository fixture tree. The later isolated formatter/CMake project attached
+  and accepted gersemi output in the same process. Strict smoke now gives every
+  initial LSP attach probe its own minimal project root; the real server,
+  production config, attach timeout, formatter, diagnostics, and capture gates
+  remain unchanged. Exact behavior head
+  `f097995b49a2189db327903a20743e7cb69ba665` passed cache-free run
+  `29120109175`: all four current producers and all four stable setup logical
+  proofs were green. Later PR-head run `29180481941` exposed a second redundant
+  neocmakelsp lifecycle in the formatter gate: the first isolated CMake client
+  attached, then the formatter-only restart timed out. The smoke now formats,
+  saves, and checks diagnostics on the already-attached isolated client; three
+  repeated strict Apple-Silicon runs passed all 257 checks without increasing
+  the attach timeout. Exact repaired behavior head
+  `d744948cdccc51f3d79e45aa78f82c46445df0c6` then passed PR E2E run
+  `29181215803`: all four producers and logical proofs were green, including
+  Apple Silicon's real neocmake plus gersemi gate. A
+  post-merge run on the resulting `main` SHA remains the gate before
+  owner-applied safeguards.
 
 - **Exact-head runtime dependency follow-up — PASSED.** Head
   `0c853d066362602f14dc251a6d3fbf3980102048`
@@ -406,14 +458,29 @@ Commit-by-commit status:
   Windows hosted evidence, not redirected-known-folder, divergent Windows
   Terminal, uninstall-restoration, or desktop visual proof.
 
-- **Intel Darwin package-plane sunset — OPEN, deadline 2026-12-31.** Nixpkgs
-  26.05 is the final supported `x86_64-darwin` release; 26.11 removes package
-  builds and source-build support. This closure implements and tests the current
-  supported path without suppressing its deprecation warning. Before 26.05
-  reaches end of support, replace Intel's Nixpkgs package plane with a reviewed
-  supported mechanism while preserving the same chezmoi ownership and exact
-  architecture-selection contracts. This future deadline does not invalidate a
-  green 26.05 Intel run today, and must not be “fixed” by narrowing macOS to ARM.
+- **Apple-Silicon-only macOS contract — DONE by owner direction (2026-07-12).**
+  The flake, setup selector, CI matrices, pinned installers, migration tool,
+  tests, and current public documentation ship only the Apple Silicon path.
+  Every other macOS architecture fails through the generic platform boundary
+  before Nix/Homebrew activation. Historical host results remain in append-only
+  evidence only; they do not define a product path.
+
+- **Sentinel rename cutover — DONE (2026-07-12).** Both setup entry points now
+  clone `luisgui1757/sentinel` into Sentinel-only cache paths, detach at exact
+  commit `ecafffa858666343c1639f996d177f460163e93e`, validate `VERSION=0.1.2`,
+  and run the renamed Bash installer/check contract. The published `v0.1.2` tag
+  predates the rename, so it is not used as false identity evidence. Shell,
+  PowerShell, pin-consistency, and repository-wide naming tests guard the exact
+  commit and require zero pre-rename product-name residue in paths or content.
+
+- **Hosted WSL2 canary retirement — DONE (2026-07-10).** The only scheduled
+  run (`29072773410` / `86297630493`) and a manual rerun (`29114215045` /
+  `86433541987`) both reached real WSL2 but stalled before setup evidence and
+  required cancellation. GitHub documents nested virtualization on hosted
+  runners as technically possible but not officially supported. The optional
+  workflow is removed instead of emitting an unreliable signal or fake
+  Linux-with-WSL-environment proof. WSL product support and the real throwaway
+  WSL/manual split-host harnesses remain; runtime proof is explicitly manual.
 
 ### P2 Follow-up: Secondary Supply-chain Hardening
 
@@ -1121,6 +1188,51 @@ Canonical solution:
 DONE - Removed XDG support from `install-deps.sh`'s `zsh_plugin_root()` so the
 installer uses the same fixed `~/.local/share/dotfiles/zsh-plugins` path as
 every other zsh plugin surface.
+
+## P1 - v0.1.0 Release Upgrade
+
+### 9. The published in-place upgrade crossed the config backup boundary
+
+Status: implementation done; release evidence in progress.
+
+Evidence:
+
+- Exact v0.1.0 POSIX config uses checkout-backed chezmoi symlinks. Updating that
+  checkout changed live bytes before current setup could back them up.
+- `scripts/upgrade-v0.1.0.sh` and `.ps1` now require clean, separate official
+  annotated v0.1.0/v0.2.0 checkouts and retain v0.1.0 until acceptance.
+- POSIX apply and rollback consume digest-bound, read-only exact-commit trees
+  inside private recovery; post-validation checkout drift cannot change a
+  package/config write.
+- Windows apply, readback, uninstall, and rollback consume digest-bound
+  exact-commit trees beneath the protected recovery ACL; retained-checkout drift
+  cannot change a config or Terminal transaction write.
+- POSIX migration applies only Nix plus config files/links; chezmoi run scripts,
+  native/deferred packages, editor caches, and agent policy stay outside the
+  reversible transaction. Windows applies only config, known-folder overlays,
+  and independently recoverable Terminal state; dependencies, Neovim caches,
+  agent policy, and chezmoi run scripts are explicitly skipped.
+- The exact-tag POSIX harness runs the real setup backup/config path in Linux
+  and Apple-Silicon/nix-darwin fixture modes. It proves dirty/in-place
+  rejection, read-only preflight, post-activation failure, TERM handling,
+  frozen-source publication, altered-recovery rejection, automatic
+  package/config rollback, retry, and
+  acceptance. Windows Pester proves frozen release-tree validation, complete Terminal recovery,
+  all-target concurrency rejection, known-folder boundary validation, private
+  ACL policy, and provider-boundary verification.
+- `docs/UPGRADING.md` and `docs/releases/v0.2.0.md` define the supported
+  per-platform commands, Apple-Silicon-only macOS boundary, WSL ordering, Nix
+  provenance, and release evidence gate.
+
+Canonical solution:
+
+1. DONE - Remove every moving-branch/in-place v0.1.0 instruction.
+2. DONE - Add exact-tag side-by-side preflight, apply, rollback, and acceptance.
+3. DONE - Separate reversible Nix/config migration from additive native tools.
+4. DONE - Pin the exact peeled v0.1.0 fixture and failure boundaries in CI.
+5. PENDING LIVE - Record Apple Silicon owner-host, real WSL2, redirected
+   Windows, divergent stable packaged/Preview/portable Terminal, and exact tagged v0.2.0 release runs before
+   publication.
 
 ## Disproved Or Non-Blocking Assumptions
 

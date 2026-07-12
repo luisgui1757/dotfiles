@@ -214,34 +214,23 @@ assert_contains "Pi CLI version (README.md)" "README.md" "$pi_cli_version_sh"
 assert_contains "Pi CLI version (CLAUDE.md)" "CLAUDE.md" "$pi_cli_version_sh"
 assert_contains "Pi CLI integrity (CLAUDE.md)" "CLAUDE.md" "$pi_cli_integrity_sh"
 
-# --- Polaris: setup.sh <-> setup.ps1 -----------------------------------------
-polaris_version_sh="$(setup_sh_const POLARIS_VERSION)"
-polaris_tag_sh="$(setup_sh_const POLARIS_TAG)"
-polaris_ref_sh="$(setup_sh_const POLARIS_REF)"
-polaris_version_ps="$(setup_ps_const PolarisVersion)"
-polaris_tag_ps="$(setup_ps_const PolarisTag)"
-polaris_ref_ps="$(setup_ps_const PolarisRef)"
+# --- Sentinel: setup.sh <-> setup.ps1 -----------------------------------------
+sentinel_version_sh="$(setup_sh_const SENTINEL_VERSION)"
+sentinel_ref_sh="$(setup_sh_const SENTINEL_REF)"
+sentinel_version_ps="$(setup_ps_const SentinelVersion)"
+sentinel_ref_ps="$(setup_ps_const SentinelRef)"
 
-assert_eq "Polaris version (setup.sh == setup.ps1)" "$polaris_version_sh" "$polaris_version_ps"
-assert_eq "Polaris tag (setup.sh == setup.ps1)" "$polaris_tag_sh" "$polaris_tag_ps"
-assert_eq "Polaris commit (setup.sh == setup.ps1)" "$polaris_ref_sh" "$polaris_ref_ps"
-assert_contains "Polaris version (README.md)" "README.md" "$polaris_version_sh"
-assert_contains "Polaris tag (README.md)" "README.md" "$polaris_tag_sh"
-assert_contains "Polaris commit (README.md)" "README.md" "$polaris_ref_sh"
-assert_contains "Polaris version (CLAUDE.md)" "CLAUDE.md" "$polaris_version_sh"
-assert_contains "Polaris tag (CLAUDE.md)" "CLAUDE.md" "$polaris_tag_sh"
-assert_contains "Polaris commit (CLAUDE.md)" "CLAUDE.md" "$polaris_ref_sh"
-if [[ "$polaris_tag_sh" != "v$polaris_version_sh" ]]; then
-    echo "FAIL: Polaris tag must match version as v<version>, got version '$polaris_version_sh' and tag '$polaris_tag_sh'"
+assert_eq "Sentinel version (setup.sh == setup.ps1)" "$sentinel_version_sh" "$sentinel_version_ps"
+assert_eq "Sentinel commit (setup.sh == setup.ps1)" "$sentinel_ref_sh" "$sentinel_ref_ps"
+assert_contains "Sentinel version (README.md)" "README.md" "$sentinel_version_sh"
+assert_contains "Sentinel commit (README.md)" "README.md" "$sentinel_ref_sh"
+assert_contains "Sentinel version (CLAUDE.md)" "CLAUDE.md" "$sentinel_version_sh"
+assert_contains "Sentinel commit (CLAUDE.md)" "CLAUDE.md" "$sentinel_ref_sh"
+if [[ ! "$sentinel_ref_sh" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "FAIL: Sentinel ref must be an immutable 40-character lowercase commit SHA, got '$sentinel_ref_sh'"
     fail=1
 else
-    echo "ok  : Polaris tag matches version"
-fi
-if [[ ! "$polaris_ref_sh" =~ ^[0-9a-f]{40}$ ]]; then
-    echo "FAIL: Polaris ref must be an immutable 40-character lowercase commit SHA, got '$polaris_ref_sh'"
-    fail=1
-else
-    echo "ok  : Polaris ref is immutable commit SHA"
+    echo "ok  : Sentinel ref is immutable commit SHA"
 fi
 
 if [[ "$fail" -ne 0 ]]; then

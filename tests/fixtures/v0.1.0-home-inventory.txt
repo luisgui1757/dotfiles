@@ -1,0 +1,32 @@
+home/.chezmoi.toml.tmpl
+home/.chezmoiexternal.toml.tmpl
+home/.chezmoiignore
+home/.chezmoiscripts/run_onchange_after_20-verify-zsh-plugin-pins.sh.tmpl
+home/.chezmoitemplates/ghostty/config
+home/.chezmoitemplates/lazygit/config.windows.yml
+home/.chezmoitemplates/lazygit/config.yml
+home/.chezmoitemplates/windows-terminal/merge-settings.ps1
+home/.chezmoitemplates/windows-terminal/settings.fragment.jsonc
+home/AppData/Local/Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/LocalState/modify_settings.json.ps1.tmpl
+home/AppData/Local/lazygit/config.yml.tmpl
+home/AppData/Local/symlink_nvim.tmpl
+home/Documents/PowerShell/Microsoft.PowerShell_profile.ps1
+home/Library/Application Support/com.mitchellh.ghostty/symlink_config.tmpl
+home/Library/Application Support/lazygit/symlink_config.yml.tmpl
+home/dot_config/gh-dash/config.yml
+home/dot_config/ghostty/symlink_config.tmpl
+home/dot_config/lazygit/symlink_config.yml.tmpl
+home/dot_config/lsd/colors.yaml
+home/dot_config/lsd/config.yaml
+home/dot_config/starship.toml
+home/dot_config/symlink_nvim.tmpl
+home/dot_psmux.conf
+home/dot_tmux.conf
+home/dot_tmux.posix.conf
+home/dot_tmux.rose-pine.dawn.conf
+home/dot_tmux.rose-pine.main.conf
+home/dot_tmux.rose-pine.moon.conf
+home/dot_tmux.rose-pine.ps1
+home/dot_tmux.windows.conf
+home/dot_zshenv
+home/dot_zshrc

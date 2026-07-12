@@ -20,6 +20,9 @@ defaults:
 env:
   HOMEBREW_NO_AUTO_UPDATE: "1"
   HOMEBREW_NO_INSTALL_CLEANUP: "1"
+  # pull_request executes GitHub's synthetic merge commit; preserve the source
+  # branch identity separately so logical proof artifacts bind both identities.
+  DOTFILES_SOURCE_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
 jobs:
   linux-container-install:
@@ -87,28 +90,14 @@ jobs:
             runner: macos-26
             legacy_context: setup.sh / macos-26
             publish_logical_proof: true
-          # Current GitHub-hosted Intel runtime proof. This is intentionally an
-          # extra non-required lane; the public contract is not inferred from
-          # cross-evaluation alone.
-          - logical: macos-intel
-            runner: macos-26-intel
-            publish_logical_proof: false
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
       - name: Install Determinate Nix (flakes enabled)
-        if: matrix.logical != 'macos-intel'
         uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22
 
-      # Determinate Nix no longer supports Intel hosts. Use the current
-      # full-SHA-pinned Cachix action, which installs upstream Nix 2.34.8 from
-      # its versioned releases.nixos.org URL, instead of relying on a hidden
-      # fallback to Determinate's last Intel release.
-      - name: Install upstream Nix on Intel (flakes enabled)
-        if: matrix.logical == 'macos-intel'
-        uses: cachix/install-nix-action@a49548c11d9846ad46ecc0115273879b045f001c # v31.10.7
-
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      - name: "PR-only cache: POSIX setup"
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         if: github.event_name == 'pull_request'
         with:
           path: |
@@ -361,7 +350,8 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      - name: "PR-only cache: Windows setup"
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         if: github.event_name == 'pull_request'
         with:
           path: |
