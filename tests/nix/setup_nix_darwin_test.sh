@@ -251,11 +251,80 @@ probe_migrates_only_legacy_nix_taps() {
         "$taps_dir/homebrew/homebrew-core" \
         "$taps_dir/homebrew/homebrew-cask" \
         "$taps_dir/nikitabobko/homebrew-tap" \
+        "$taps_dir/nikitabobko/homebrew-tap.dotfiles-failed-old/.git" \
         "$taps_dir/cirruslabs/homebrew-cli/.git"
     printf '%s\n' nix-copy > "$taps_dir/homebrew/homebrew-core/marker"
     printf '%s\n' nix-copy > "$taps_dir/homebrew/homebrew-cask/marker"
     printf '%s\n' nix-copy > "$taps_dir/nikitabobko/homebrew-tap/marker"
-    printf '%s\n' user-tap > "$taps_dir/cirruslabs/homebrew-cli/marker"
+    printf '%s\n' prior-failed-clone > "$taps_dir/nikitabobko/homebrew-tap.dotfiles-failed-old/marker"
+printf '%s\n' user-tap > "$taps_dir/cirruslabs/homebrew-cli/marker"
+    cat > "$script" <<EOF
+set -uo pipefail
+taps_dir="$taps_dir"
+sudo() {
+    if [[ "\${1:-}" == -H ]]; then shift; fi
+    if [[ "\${1:-}" == env ]]; then
+        shift
+        while [[ "\${1:-}" == *=* ]]; do export "\$1"; shift; done
+    fi
+    "\$@"
+}
+uname() { case "\${1:-}" in -m) echo arm64 ;; *) echo Darwin ;; esac; }
+nix() {
+    if [[ "\${1:-}" == eval ]]; then
+        printf '%s\n%s\n' "$LOCKED_NIX_DARWIN_REV" "$LOCKED_NIX_DARWIN_NAR_HASH"
+    fi
+}
+activation_count=0
+darwin-rebuild() {
+    activation_count=\$((activation_count + 1))
+    transaction_root="\$taps_dir.dotfiles-transaction-20260713000000"
+    if [[ "\$activation_count" -eq 1 ]]; then
+        [[ "\$(cat "\$transaction_root/original/homebrew/homebrew-core/marker")" == nix-copy ]] || return 1
+        [[ "\$(cat "\$transaction_root/original/homebrew/homebrew-cask/marker")" == nix-copy ]] || return 1
+        [[ "\$(cat "\$transaction_root/original/nikitabobko/homebrew-tap/marker")" == nix-copy ]] || return 1
+    else
+        [[ ! -e "\$transaction_root" ]] || return 1
+    fi
+    if find "\$taps_dir" -maxdepth 2 \( -name '*.dotfiles-pre-user-taps-*' -o -name '*.dotfiles-failed-*' \) -print -quit | grep -q .; then
+        return 1
+    fi
+    mkdir -p "\$taps_dir/nikitabobko/homebrew-tap/.git"
+    printf '%s\n' user-clone > "\$taps_dir/nikitabobko/homebrew-tap/marker"
+}
+DOTFILES_TARGET_USER=tester
+DOTFILES_TARGET_HOME=/Users/tester
+DOTFILES_TEST_NIX_HOMEBREW_TAPS_DIR="\$taps_dir"
+DOTFILES_TEST_NIX_HOMEBREW_LEGACY_TAPS=1
+export DOTFILES_TARGET_USER DOTFILES_TARGET_HOME
+export DOTFILES_TEST_NIX_HOMEBREW_TAPS_DIR DOTFILES_TEST_NIX_HOMEBREW_LEGACY_TAPS
+DOTFILES_SETUP_SOURCE_ONLY=1 source "$REPO_ROOT/setup.sh" --all >/dev/null 2>&1
+TIMESTAMP=20260713000000
+run_nix_darwin_switch >/dev/null
+[[ ! -e "\$taps_dir/homebrew/homebrew-core" ]] || exit 1
+[[ ! -e "\$taps_dir/homebrew/homebrew-cask" ]] || exit 1
+[[ "\$(cat "\$taps_dir/nikitabobko/homebrew-tap/marker")" == user-clone ]] || exit 1
+[[ "\$(cat "\$taps_dir/cirruslabs/homebrew-cli/marker")" == user-tap ]] || exit 1
+[[ "\$(cat "\$taps_dir.dotfiles-recovery-20260713000000/nikitabobko/homebrew-tap.dotfiles-failed-old/marker")" == prior-failed-clone ]] || exit 1
+[[ ! -e "\$taps_dir.dotfiles-transaction-20260713000000" ]] || exit 1
+if find "\$taps_dir" -maxdepth 2 \( -name '*.dotfiles-pre-user-taps-*' -o -name '*.dotfiles-failed-*' \) -print -quit | grep -q .; then exit 1; fi
+run_nix_darwin_switch >/dev/null
+[[ "\$(cat "\$taps_dir/nikitabobko/homebrew-tap/marker")" == user-clone ]] || exit 1
+[[ "\$(cat "\$taps_dir/cirruslabs/homebrew-cli/marker")" == user-tap ]] || exit 1
+EOF
+    bash "$script"
+}
+
+probe_legacy_nix_tap_failure_quarantine() {
+    local script="$WORK/fail-legacy-taps.sh" taps_dir="$WORK/fail-legacy-taps/Library/Taps"
+    rm -rf "$taps_dir" "$taps_dir".dotfiles-*
+    mkdir -p \
+        "$taps_dir/homebrew/homebrew-core" \
+        "$taps_dir/homebrew/homebrew-cask" \
+        "$taps_dir/nikitabobko/homebrew-tap"
+    printf '%s\n' original-core > "$taps_dir/homebrew/homebrew-core/marker"
+    printf '%s\n' original-cask > "$taps_dir/homebrew/homebrew-cask/marker"
+    printf '%s\n' original-aerospace > "$taps_dir/nikitabobko/homebrew-tap/marker"
     cat > "$script" <<EOF
 set -uo pipefail
 taps_dir="$taps_dir"
@@ -275,7 +344,8 @@ nix() {
 }
 darwin-rebuild() {
     mkdir -p "\$taps_dir/nikitabobko/homebrew-tap/.git"
-    printf '%s\n' user-clone > "\$taps_dir/nikitabobko/homebrew-tap/marker"
+    printf '%s\n' failed-user-clone > "\$taps_dir/nikitabobko/homebrew-tap/marker"
+    return 1
 }
 DOTFILES_TARGET_USER=tester
 DOTFILES_TARGET_HOME=/Users/tester
@@ -284,15 +354,15 @@ DOTFILES_TEST_NIX_HOMEBREW_LEGACY_TAPS=1
 export DOTFILES_TARGET_USER DOTFILES_TARGET_HOME
 export DOTFILES_TEST_NIX_HOMEBREW_TAPS_DIR DOTFILES_TEST_NIX_HOMEBREW_LEGACY_TAPS
 DOTFILES_SETUP_SOURCE_ONLY=1 source "$REPO_ROOT/setup.sh" --all >/dev/null 2>&1
-run_nix_darwin_switch >/dev/null
-[[ ! -e "\$taps_dir/homebrew/homebrew-core" ]]
-[[ ! -e "\$taps_dir/homebrew/homebrew-cask" ]]
-[[ "\$(cat "\$taps_dir/nikitabobko/homebrew-tap/marker")" == user-clone ]]
-[[ "\$(cat "\$taps_dir/cirruslabs/homebrew-cli/marker")" == user-tap ]]
-! find "\$taps_dir" -name '*.dotfiles-pre-user-taps-*' -print -quit | grep -q .
-run_nix_darwin_switch >/dev/null
-[[ "\$(cat "\$taps_dir/nikitabobko/homebrew-tap/marker")" == user-clone ]]
-[[ "\$(cat "\$taps_dir/cirruslabs/homebrew-cli/marker")" == user-tap ]]
+TIMESTAMP=20260713000000
+run_nix_darwin_switch >/dev/null 2>&1 && exit 1
+[[ "\$(cat "\$taps_dir/homebrew/homebrew-core/marker")" == original-core ]] || exit 1
+[[ "\$(cat "\$taps_dir/homebrew/homebrew-cask/marker")" == original-cask ]] || exit 1
+[[ "\$(cat "\$taps_dir/nikitabobko/homebrew-tap/marker")" == original-aerospace ]] || exit 1
+failed_root="\$taps_dir.dotfiles-transaction-20260713000000"
+[[ "\$(cat "\$failed_root/failed/nikitabobko/homebrew-tap/marker")" == failed-user-clone ]] || exit 1
+[[ ! -e "\$failed_root/original" ]] || exit 1
+if find "\$taps_dir" -maxdepth 2 \( -name '*.dotfiles-pre-user-taps-*' -o -name '*.dotfiles-failed-*' \) -print -quit | grep -q .; then exit 1; fi
 EOF
     bash "$script"
 }
@@ -472,9 +542,15 @@ else
     fail=1
 fi
 if probe_migrates_only_legacy_nix_taps; then
-    echo "ok  : legacy root-owned tap snapshots migrate once without touching user taps"
+    echo "ok  : legacy tap transaction and prior recovery artifacts stay outside scanned Taps"
 else
     echo "FAIL: scoped legacy Homebrew tap migration was not idempotent"
+    fail=1
+fi
+if probe_legacy_nix_tap_failure_quarantine; then
+    echo "ok  : failed tap replacement is preserved outside scanned Taps before rollback"
+else
+    echo "FAIL: failed tap rollback left a Homebrew-visible duplicate tap"
     fail=1
 fi
 if probe_shell_rc_migration success; then

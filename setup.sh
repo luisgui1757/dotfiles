@@ -49,6 +49,7 @@ NIX_DARWIN_RC_SOURCES=()
 NIX_DARWIN_RC_BACKUPS=()
 NIX_HOMEBREW_LEGACY_TAPS=()
 NIX_HOMEBREW_LEGACY_BACKUPS=()
+NIX_HOMEBREW_LEGACY_TRANSACTION_ROOT=""
 SENTINEL_REPO_URL="https://github.com/luisgui1757/sentinel.git"
 SENTINEL_VERSION="0.1.2"
 SENTINEL_REF="ecafffa858666343c1639f996d177f460163e93e"
@@ -1087,6 +1088,48 @@ legacy_nix_homebrew_tap_paths() {
         "nikitabobko/homebrew-tap"
 }
 
+legacy_nix_homebrew_in_tree_artifacts() {
+    local taps_dir="$1" rel tap artifact
+    while IFS= read -r rel; do
+        tap="$taps_dir/$rel"
+        for artifact in \
+            "$tap".dotfiles-pre-user-taps-* \
+            "$tap".dotfiles-failed-*; do
+            [[ -e "$artifact" || -L "$artifact" ]] || continue
+            printf '%s\n' "$artifact"
+        done
+    done < <(legacy_nix_homebrew_tap_paths)
+}
+
+relocate_legacy_nix_homebrew_in_tree_artifacts() {
+    local taps_dir="$1" artifact rel recovery_root="" destination
+    while IFS= read -r artifact; do
+        if [[ -z "$recovery_root" ]]; then
+            recovery_root="$(unique_backup "${taps_dir}.dotfiles-recovery-$TIMESTAMP")"
+        fi
+        rel="${artifact#"$taps_dir"/}"
+        destination="$recovery_root/$rel"
+        if ! sudo mkdir -p "$(dirname "$destination")"; then
+            echo "  FAIL: could not create external Homebrew tap recovery directory." >&2
+            return 1
+        fi
+        if ! sudo mv "$artifact" "$destination"; then
+            echo "  FAIL: could not move Homebrew-scanned recovery artifact outside $taps_dir: $artifact" >&2
+            return 1
+        fi
+        echo "  recover   Homebrew tap artifact moved outside scanned Taps: $destination"
+    done < <(legacy_nix_homebrew_in_tree_artifacts "$taps_dir")
+}
+
+legacy_nix_homebrew_transaction_root_is_safe() {
+    local taps_dir="$1" root="$2"
+    [[ -n "$root" ]] || return 1
+    case "$root" in
+        "$taps_dir".dotfiles-transaction-*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
 legacy_nix_homebrew_tap_is_generated() {
     local tap="$1" owner
     [[ -d "$tap" && ! -L "$tap" && ! -e "$tap/.git" ]] || return 1
@@ -1099,8 +1142,11 @@ legacy_nix_homebrew_tap_is_generated() {
 }
 
 preview_legacy_nix_homebrew_tap_migration() {
-    local taps_dir rel tap
+    local taps_dir rel tap artifact
     taps_dir="$(nix_homebrew_taps_dir)" || return 1
+    while IFS= read -r artifact; do
+        echo "  would: move Homebrew-scanned recovery artifact outside Taps: $artifact"
+    done < <(legacy_nix_homebrew_in_tree_artifacts "$taps_dir")
     while IFS= read -r rel; do
         tap="$taps_dir/$rel"
         if legacy_nix_homebrew_tap_is_generated "$tap"; then
@@ -1110,28 +1156,47 @@ preview_legacy_nix_homebrew_tap_migration() {
 }
 
 prepare_legacy_nix_homebrew_tap_migration() {
-    local taps_dir rel tap backup i
+    local taps_dir rel tap backup i found=0
     taps_dir="$(nix_homebrew_taps_dir)" || return 1
     NIX_HOMEBREW_LEGACY_TAPS=()
     NIX_HOMEBREW_LEGACY_BACKUPS=()
+    NIX_HOMEBREW_LEGACY_TRANSACTION_ROOT=""
+
+    # Older setup versions stored transaction paths under Library/Taps, where
+    # Homebrew interpreted them as real taps. Move only those exact setup-owned
+    # artifact shapes outside the scanned directory before asking Brew to run.
+    relocate_legacy_nix_homebrew_in_tree_artifacts "$taps_dir" || return 1
 
     # Preflight every exact legacy path before moving any. An ordinary user tap
     # is a Git checkout and never matches this root-owned, non-Git snapshot
-    # shape, so unrelated taps remain outside the transaction.
+    # shape, so unrelated taps remain outside the transaction. Transaction
+    # storage is a sibling of Taps because every child directory can be parsed
+    # as a tap by Homebrew.
     while IFS= read -r rel; do
         tap="$taps_dir/$rel"
         legacy_nix_homebrew_tap_is_generated "$tap" || continue
-        backup="$tap.dotfiles-pre-user-taps-$TIMESTAMP"
-        if [[ -e "$backup" || -L "$backup" ]]; then
-            echo "  FAIL: legacy Homebrew tap migration backup already exists: $backup" >&2
-            return 1
-        fi
+        found=1
     done < <(legacy_nix_homebrew_tap_paths)
+    [[ "$found" -eq 1 ]] || return 0
+
+    NIX_HOMEBREW_LEGACY_TRANSACTION_ROOT="$(
+        unique_backup "${taps_dir}.dotfiles-transaction-$TIMESTAMP"
+    )"
+    if ! sudo mkdir -p "$NIX_HOMEBREW_LEGACY_TRANSACTION_ROOT/original"; then
+        echo "  FAIL: could not create external Homebrew tap transaction directory." >&2
+        NIX_HOMEBREW_LEGACY_TRANSACTION_ROOT=""
+        return 1
+    fi
 
     while IFS= read -r rel; do
         tap="$taps_dir/$rel"
         legacy_nix_homebrew_tap_is_generated "$tap" || continue
-        backup="$tap.dotfiles-pre-user-taps-$TIMESTAMP"
+        backup="$NIX_HOMEBREW_LEGACY_TRANSACTION_ROOT/original/$rel"
+        if ! sudo mkdir -p "$(dirname "$backup")"; then
+            echo "  FAIL: could not prepare external backup path for $tap." >&2
+            rollback_legacy_nix_homebrew_tap_migration || true
+            return 1
+        fi
         i="${#NIX_HOMEBREW_LEGACY_TAPS[@]}"
         NIX_HOMEBREW_LEGACY_TAPS[i]="$tap"
         NIX_HOMEBREW_LEGACY_BACKUPS[i]="$backup"
@@ -1145,25 +1210,41 @@ prepare_legacy_nix_homebrew_tap_migration() {
 }
 
 rollback_legacy_nix_homebrew_tap_migration() {
-    local i tap backup failed rc=0
+    local taps_dir root rel i tap backup failed rc=0 replacement_preserved=0
+    taps_dir="$(nix_homebrew_taps_dir)" || return 1
+    root="$NIX_HOMEBREW_LEGACY_TRANSACTION_ROOT"
+    if [[ -n "$root" ]] && ! legacy_nix_homebrew_transaction_root_is_safe "$taps_dir" "$root"; then
+        echo "  FAIL: refusing unsafe legacy tap rollback root: $root" >&2
+        return 1
+    fi
     i=$((${#NIX_HOMEBREW_LEGACY_TAPS[@]} - 1))
     while [[ "$i" -ge 0 ]]; do
         tap="${NIX_HOMEBREW_LEGACY_TAPS[$i]}"
         backup="${NIX_HOMEBREW_LEGACY_BACKUPS[$i]}"
         if [[ ! -e "$backup" && ! -L "$backup" ]]; then
-            echo "  FAIL: legacy Homebrew tap rollback is missing $backup." >&2
-            rc=1
+            if [[ ! -e "$tap" && ! -L "$tap" ]]; then
+                echo "  FAIL: legacy Homebrew tap rollback is missing both $tap and $backup." >&2
+                rc=1
+            fi
             i=$((i - 1))
             continue
         fi
         if [[ -e "$tap" || -L "$tap" ]]; then
-            failed="$(unique_backup "$tap.dotfiles-failed-${DOTFILES_TEST_TIMESTAMP:-$(date +%Y%m%d%H%M%S)}")"
+            rel="${tap#"$taps_dir"/}"
+            failed="$(unique_backup "$root/failed/$rel")"
+            if ! sudo mkdir -p "$(dirname "$failed")"; then
+                echo "  FAIL: could not create external failed-tap quarantine for $tap." >&2
+                rc=1
+                i=$((i - 1))
+                continue
+            fi
             if ! sudo mv "$tap" "$failed"; then
                 echo "  FAIL: could not quarantine replacement Homebrew tap $tap." >&2
                 rc=1
                 i=$((i - 1))
                 continue
             fi
+            replacement_preserved=1
             echo "  note      failed replacement Homebrew tap preserved at $failed"
         fi
         if ! sudo mv "$backup" "$tap"; then
@@ -1174,35 +1255,54 @@ rollback_legacy_nix_homebrew_tap_migration() {
         fi
         i=$((i - 1))
     done
+    if [[ "$rc" -eq 0 && -n "$root" ]]; then
+        if [[ "$replacement_preserved" -eq 1 ]]; then
+            if sudo rm -rf "$root/original"; then
+                echo "  recovery  failed Homebrew tap output retained outside scanned Taps at $root"
+            else
+                echo "  FAIL: restored taps, but could not prune original snapshots at $root/original." >&2
+                rc=1
+            fi
+        elif ! sudo rm -rf "$root"; then
+            echo "  FAIL: restored taps, but could not remove empty transaction root $root." >&2
+            rc=1
+        fi
+    fi
     if [[ "$rc" -eq 0 ]]; then
         NIX_HOMEBREW_LEGACY_TAPS=()
         NIX_HOMEBREW_LEGACY_BACKUPS=()
+        NIX_HOMEBREW_LEGACY_TRANSACTION_ROOT=""
     fi
     return "$rc"
 }
 
 complete_legacy_nix_homebrew_tap_migration() {
-    local i tap backup
+    local taps_dir root backup i
+    taps_dir="$(nix_homebrew_taps_dir)" || return 1
+    root="$NIX_HOMEBREW_LEGACY_TRANSACTION_ROOT"
+    [[ -z "$root" ]] && return 0
+    if ! legacy_nix_homebrew_transaction_root_is_safe "$taps_dir" "$root"; then
+        echo "  FAIL: refusing unsafe legacy tap transaction cleanup: $root" >&2
+        return 1
+    fi
     for ((i = 0; i < ${#NIX_HOMEBREW_LEGACY_TAPS[@]}; i++)); do
-        tap="${NIX_HOMEBREW_LEGACY_TAPS[$i]}"
         backup="${NIX_HOMEBREW_LEGACY_BACKUPS[$i]}"
         case "$backup" in
-            "$tap".dotfiles-pre-user-taps-*) ;;
+            "$root"/original/*) ;;
             *)
                 echo "  FAIL: refusing unsafe legacy tap backup cleanup: $backup" >&2
-                continue
+                return 1
                 ;;
         esac
-        if [[ -e "$backup" || -L "$backup" ]]; then
-            if sudo rm -rf "$backup"; then
-                echo "  clean     removed migrated legacy tap snapshot $backup"
-            else
-                echo "  note      legacy tap snapshot retained for manual inspection: $backup" >&2
-            fi
-        fi
     done
+    if sudo rm -rf "$root"; then
+        echo "  clean     removed migrated legacy tap snapshots outside scanned Taps: $root"
+    else
+        echo "  note      legacy tap snapshots retained outside scanned Taps for inspection: $root" >&2
+    fi
     NIX_HOMEBREW_LEGACY_TAPS=()
     NIX_HOMEBREW_LEGACY_BACKUPS=()
+    NIX_HOMEBREW_LEGACY_TRANSACTION_ROOT=""
 }
 
 preview_nix_darwin_shell_rc_migration() {
@@ -1391,8 +1491,8 @@ run_nix_darwin_switch() {
     echo "  the setup-validated target user/home explicitly through the boundary."
     if [[ "$DRY_RUN" -eq 1 ]]; then
         echo "  would: $(nix_darwin_sudo_preview "${rebuild_command:-darwin-rebuild}") switch --flake $flake_ref --impure"
-        echo "         (first-time bootstrap: $(nix_darwin_sudo_preview "nix") run $bootstrap_ref -- switch --flake $flake_ref --impure)"
         if [[ -z "$rebuild_command" ]]; then
+            echo "         (first-time bootstrap: $(nix_darwin_sudo_preview "nix") run $bootstrap_ref -- switch --flake $flake_ref --impure)"
             preview_nix_darwin_shell_rc_migration
         fi
         preview_legacy_nix_homebrew_tap_migration

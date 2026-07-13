@@ -225,6 +225,13 @@ commits, recovery path, provider inventory, and whether any user data changed.
       `nikitabobko/tap` checkout is owned by the target user. Confirm
       `brew tap-info nikitabobko/tap`
       reports a trusted tap so Homebrew 5 can load the AeroSpace cask.
+      Run `./tests/macos_owner_lifecycle.sh` from a clean committed checkout for
+      the canonical owner-host cycle: install, update, config uninstall,
+      reinstall, final update, and full greenfield validation. The runner must
+      report no setup-created transaction/recovery directory below
+      `Library/Taps`, an idempotent second uninstall, and no removed pre-existing
+      Homebrew formula, cask, or unrelated tap. The sudo prompt belongs to the
+      invoking terminal; do not pipe credentials into the runner or its log.
 - [x] **Historical Intel macOS hosted runtime proof (platform retired)**: exact head
       `f4b63953f2f982702a685358b09e89bae2d78fdd` passed the real
       `macos-26-intel` Nix job (`29092384007` / `86360593091`) and full setup job

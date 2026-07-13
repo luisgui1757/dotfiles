@@ -194,7 +194,11 @@ broken repo-symlink still cleaned) is covered by
       generated Brewfile. setup never moves the whole `Library/Taps` directory;
       it transactionally migrates only the three exact root-owned, non-Git tap
       snapshots created by the retired pinned-tap shape and never selects an
-      unrelated user tap.
+      unrelated user tap. Transaction, failure, and recovery snapshots live
+      beside `Library/Taps`, never below Homebrew's live-tap scan root. Setup
+      automatically relocates the exact in-tree artifact names produced by the
+      broken predecessor before retry. `tests/macos_owner_lifecycle.sh` is the
+      destructive real-host install/update/uninstall/reinstall validation path.
 - [x] Fresh Linux/WSL zsh startup consumes Home Manager's canonical session-vars
       file once from the XDG profile, `~/.nix-profile`, or the
       system-integrated `/etc/profiles/per-user/<effective-user>` profile, with

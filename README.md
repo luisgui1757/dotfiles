@@ -198,6 +198,11 @@ Homebrew recreates the required AeroSpace tap normally. Unrelated taps such as
 Cirrus are never selected. The `nikitabobko/tap` tap is explicitly trusted
 through nix-homebrew because Homebrew 5 refuses to load personal-tap casks,
 including AeroSpace, without a trust entry.
+Tap transaction and diagnostic snapshots always live beside
+`Library/Taps`, never below it: Homebrew enumerates directories below `Taps` as
+live taps. Setup also recognizes the exact in-tree recovery names emitted by
+the short-lived broken migration and moves them to an external recovery root
+before activation, so retry needs no manual `brew untap` or filesystem cleanup.
 **nvim and the
 tree-sitter CLI stay native** (ABI-coupled to nvim-treesitter parser builds;
 migrating them into a same-closure toolchain is a follow-up). Native Windows is
@@ -280,6 +285,14 @@ state/config alone. Dry-run mode prints the planned removals without deleting
 files or pruning empty external parent directories. Windows Terminal settings
 are not deleted: validated packaged/Preview/portable backups restore independently, and
 the displaced current file is preserved as `settings.json.uninstall-current.*`.
+
+For a destructive Apple Silicon owner-host smoke, run
+`./tests/macos_owner_lifecycle.sh` from a clean committed checkout. It prompts
+for sudo in the terminal once, then exercises install, update, config uninstall,
+reinstall, and final update; verifies the second uninstall is a no-op; and
+proves pre-existing Homebrew formulae, casks, and unrelated taps were not
+removed. POSIX uninstall intentionally removes the config layer, not Nix or
+Homebrew packages.
 Backup selection uses the filename timestamp/collision suffix, never mtime;
 malformed candidates fail before removal/restoration.
 

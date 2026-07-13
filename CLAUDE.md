@@ -337,7 +337,11 @@ that violates one of these, fix it instead of disabling the test.
     contents during root activation. setup never moves or replaces the whole
     `Library/Taps` directory; it has one scoped migration for the three exact
     root-owned, non-Git snapshots produced by the retired configuration and
-    never selects unrelated user taps. First
+    never selects unrelated user taps. Transaction, failure, and recovery
+    snapshots must be siblings of `Library/Taps`, never descendants: Homebrew
+    enumerates descendant directories as taps. Setup relocates the exact
+    descendant recovery names produced by the short-lived broken migration
+    before activation, without selecting unrelated names. First
     nix-darwin bootstrap also preflights and preserves existing `/etc/bashrc`
     and `/etc/zshrc` at their documented `.before-nix-darwin` paths; collisions
     fail before either move, and activation failure/interruption quarantines
@@ -1846,9 +1850,12 @@ pipe-to-shell bootstrap.
   `DOTFILES_TARGET_USER` / `DOTFILES_TARGET_HOME`; pure evaluation alone uses an
   inert `runner` placeholder. On hosts that ran the retired pinned-tap shape,
   setup transactionally moves only the three exact root-owned, non-Git snapshots
-  aside; activation recreates the required third-party tap as the target user,
-  failure restores the snapshots, and success removes their backups. Every
-  unrelated tap/package remains untouched. First bootstrap moves
+  to a transaction root beside `Library/Taps`; activation recreates the required
+  third-party tap as the target user, failure restores the snapshots while
+  retaining failed output outside Homebrew's scan tree, and success removes the
+  transaction root. Exact in-tree recovery artifacts emitted by the broken
+  predecessor are automatically relocated to an external recovery root before
+  activation. Every unrelated tap/package remains untouched. First bootstrap moves
   existing `/etc/bashrc` and `/etc/zshrc` only to collision-free
   `.before-nix-darwin` backups; failed/interrupted activation restores the old
   files and preserves generated replacements for diagnosis. A retry in the
@@ -1858,6 +1865,13 @@ pipe-to-shell bootstrap.
   `/etc/static/bashrc` and `/etc/static/zshrc` are treated as nix-darwin-managed
   and their retained recovery backups remain untouched; an unmanaged source
   plus an existing backup continues to fail closed.
+  `tests/macos_owner_lifecycle.sh` is the real Apple Silicon lifecycle smoke:
+  from a clean committed checkout it performs install, update, config uninstall,
+  reinstall, final update, and full greenfield validation under one
+  terminal-owned sudo credential. It requires an idempotent uninstall retry and
+  proves no pre-existing Homebrew formula, cask, or unrelated tap disappeared.
+  Uninstall deliberately exercises the documented config teardown; the
+  Nix/Homebrew package layer remains installed.
   The mixed-ownership cleanup/tap contract is identical on real Macs and hosted
   CI; no environment marker weakens or changes it.
 - **User resolution.** setup.sh resolves one actual non-root account and account

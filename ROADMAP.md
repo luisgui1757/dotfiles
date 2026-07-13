@@ -175,7 +175,12 @@ Commit-by-commit status:
   user. A scoped one-time transaction migrates only the three root-owned,
   non-Git snapshots created by the retired pinned-tap shape; unrelated user
   taps/packages are preserved, no whole-`Library/Taps` migration occurs, and CI
-  uses the same contract.
+  uses the same contract. Transaction/recovery roots are siblings of
+  `Library/Taps`, because descendants are live Homebrew tap candidates; setup
+  auto-relocates the exact descendant artifacts emitted by the short-lived
+  broken migration before retry. A checked-in owner-host lifecycle runner now
+  covers install, update, config uninstall, reinstall, final update, package/tap
+  preservation, and full validation.
   The first real system activation remains manual-verification-pending in
   `tests/MANUAL.md`.
 - **Commit 6 - Linux/WSL Home Manager packages-only — DONE.** HM standalone for

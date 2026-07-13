@@ -2039,3 +2039,49 @@ merged-main cache-free proof is claimed by this entry.
 No pushed-head hosted result, privileged retry, review, approval, merge,
 release tag, live safeguard mutation, or merged-main cache-free proof is claimed
 by this entry.
+
+## Homebrew tap scan-boundary repair — entry 51
+
+- The next real Apple Silicon owner-host retry reached nix-darwin activation and
+  disproved entry 50's remaining assumption about tap rollback storage.
+  Setup staged the retired root-owned `nikitabobko/homebrew-tap` snapshot as
+  `nikitabobko/homebrew-tap.dotfiles-pre-user-taps-*` below
+  `Library/Taps`. Homebrew enumerated that diagnostic directory as another live
+  tap, then failed because `aerospace` existed in both it and the replacement
+  `nikitabobko/tap` checkout.
+- Rollback restored all three original root-owned snapshots but retained the
+  failed replacement as `homebrew-tap.dotfiles-failed-*` under the same scan
+  root, so a plain retry would reproduce duplicate-tap discovery. This was a
+  setup-owned transaction-boundary defect, not a pre-existing Tart/Cirrus
+  package conflict and not a reason to uninstall user packages.
+- Setup now stores original snapshots, failed replacements, and diagnostic
+  recovery trees beside `Library/Taps`, never below it. Before a new migration,
+  it recognizes only the exact three tap paths plus exact recovery suffixes
+  emitted by the broken predecessor and relocates those artifacts outside the
+  scan tree. Unrelated tap names and the whole `Library/Taps` directory remain
+  outside the selector.
+- The failure regression proves restored originals plus failed replacement
+  retention outside the scan tree. The retry regression seeds an old in-tree
+  artifact, proves automatic external relocation, proves every activation-time
+  backup is external, proves success removes the transaction root, and proves a
+  second activation is idempotent.
+- `tests/macos_owner_lifecycle.sh` is now the canonical destructive host smoke:
+  install, update, config uninstall, reinstall, final update, final full
+  greenfield validation, and before/after Homebrew inventory preservation. It
+  keeps the password prompt on the owner's terminal and logs no credential.
+
+### Repair verification
+
+| Check | Exact result |
+|---|---|
+| `bash -n setup.sh tests/nix/setup_nix_darwin_test.sh tests/macos_owner_lifecycle.sh` | PASS |
+| `/opt/homebrew/bin/shellcheck setup.sh tests/nix/setup_nix_darwin_test.sh tests/macos_owner_lifecycle.sh` | PASS |
+| `bash tests/nix/setup_nix_darwin_test.sh` | PASS, including external transaction, prior-artifact recovery, failed-output quarantine, and second-run idempotency cases |
+| Real-host `./setup.sh --all --dry-run` | PASS: selected `/run/current-system/sw/bin/darwin-rebuild`, scheduled the exact stale failed-tap artifact for external relocation, and selected only the three retired root-owned snapshots |
+| `make ci` | PASS: ended `local pre-PR gate passed` on the complete repaired behavior/documentation tree |
+| Full owner-host lifecycle runner | PENDING until this repaired committed head is invoked from the owner's terminal |
+
+UGR-013 remains ACCEPTED/FIXED at the code/regression level, but the real
+owner-host lifecycle row remains pending. No pushed-head hosted result,
+privileged lifecycle result, review, approval, merge, release tag, live
+safeguard mutation, or merged-main cache-free proof is claimed by this entry.

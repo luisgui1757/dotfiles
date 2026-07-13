@@ -174,6 +174,11 @@ runs a blanket package-manager upgrade, `git pull`, `nix flake update`, or
 is safe in the terminal that performed first activation: setup resolves the
 installed current-system `darwin-rebuild` outside stale `PATH` and recognizes
 nix-darwin's `/etc/static` shell links plus retained backups as managed state.
+Legacy Homebrew tap migration state is also retry-safe: setup keeps transaction
+and failed-output roots beside `Library/Taps`, where Homebrew cannot enumerate
+them as additional taps, and automatically relocates the exact in-tree recovery
+names created by the broken predecessor. Do not manually untap or delete those
+artifacts before retrying setup.
 
 To move to a newer dotfiles release, clone that exact annotated tag beside the
 current checkout and run its setup update command. The new checkout, not Git
