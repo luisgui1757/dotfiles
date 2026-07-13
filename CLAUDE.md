@@ -95,6 +95,11 @@ that violates one of these, fix it instead of disabling the test.
    old config raced two handlers with different timeouts.
 9. **`vim.b.skip_format_on_save` controls `:WNF`.** If you add another
    format-on-save path, it MUST check this flag (see `nvim/lua/plugins/conform.lua`).
+   Normal save formatting stays synchronous and uses the same bounded 10-second
+   timeout as the strict formatter/LSP smoke. The former 3-second ceiling
+   repeatedly killed cold Windows Node/Prettier processes. Do not replace this
+   with asynchronous after-save formatting: `:w` must publish the formatted
+   bytes, while `:WNF` remains the explicit one-save escape hatch.
 10. **The four deleted dead files must stay deleted:**
     `nvim/lua/plugins.lua`, `nvim/lua/plugins/ai.lua`,
     `nvim/lua/plugins/avante.lua`, `nvim/lua/plugins/none-ls.lua`.

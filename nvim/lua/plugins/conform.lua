@@ -34,7 +34,7 @@ return {
       if vim.b[bufnr].skip_format_on_save then
         return
       end
-      return { timeout_ms = 3000, lsp_format = "fallback" }
+      return { timeout_ms = 10000, lsp_format = "fallback" }
     end,
     formatters = {
       prettier = {

@@ -1048,8 +1048,10 @@ stale; CI then fails verification until a human reviews the adjacent constant.
   prior LSP-attach autocmd + null-ls duo eliminates a real race condition
   with different timeouts. Formatter output must still stay inside the LSP's
   parser/schema rules; Tier 2 proves this by formatting realistic samples and
-  failing on post-format LSP warnings/errors. `:WNF` (or `:wnf`) skips
-  formatting for one save.
+  failing on post-format LSP warnings/errors. Save formatting is synchronous
+  and bounded at 10 seconds, matching that strict formatter smoke window so a
+  cold Windows Node/Prettier process is not killed by the old 3-second ceiling.
+  `:WNF` (or `:wnf`) skips formatting for one save.
 - **Mason installs LSP servers + formatters via mason-tool-installer.** No
   `mason-lspconfig` — redundant on nvim 0.11 with `vim.lsp.enable`.
 - **DAP launches stay generic.** The shared browser launch defaults to
