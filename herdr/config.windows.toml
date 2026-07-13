@@ -1,0 +1,11 @@
+# Managed by dotfiles. Native Windows must use PowerShell 7 so Herdr panes load
+# the same profile, PSReadLine ListView predictions, and history as the normal
+# Windows Terminal pwsh profile.
+onboarding = false
+
+[terminal]
+default_shell = "pwsh.exe"
+
+[theme]
+name = "rose-pine"
+auto_switch = false

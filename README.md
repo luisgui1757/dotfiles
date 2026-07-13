@@ -377,7 +377,7 @@ symlink overlays; and Windows Terminal remains a merge.
 | Ghostty | `~/Library/Application Support/com.mitchellh.ghostty/config` -> `ghostty/config` (lazy 1 GiB per-surface scrollback byte budget) | native Linux links the same `~/.config/ghostty/config`; WSL links it only with `--experimental-wsl-gui` | n/a |
 | WezTerm | `~/.config/wezterm/wezterm.lua` -> `wezterm/wezterm.lua` (5,000,000 scrollback lines per tab) | same; WSL links it only with `--experimental-wsl-gui` | `%USERPROFILE%\.config\wezterm\wezterm.lua` -> `wezterm\wezterm.lua` (copied; same 5,000,000-line budget) |
 | AeroSpace | `~/.config/aerospace/aerospace.toml` -> `aerospace/aerospace.toml` (macOS tiling WM; focus/move on `ctrl-alt(-shift)` to avoid nvim `<A-h/j/k/l>` and fzf `Alt-c`) | n/a (macOS-only) | n/a (macOS-only) |
-| Herdr | `~/.config/herdr/config.toml` -> `herdr/config.toml` (built-in `rose-pine`, forced dark) | same | actual roaming `%APPDATA%\herdr\config.toml` -> `herdr\config.toml` |
+| Herdr | `~/.config/herdr/config.toml` -> `herdr/config.toml` (built-in `rose-pine`, forced dark) | same | actual roaming `%APPDATA%\herdr\config.toml` -> `herdr\config.windows.toml` (same theme plus `pwsh.exe` as the pane shell) |
 | lazygit | `~/Library/Application Support/lazygit/config.yml` -> `lazygit/config.yml` | `~/.config/lazygit/config.yml` -> `lazygit/config.yml` | `%LOCALAPPDATA%\lazygit\config.yml` -> `lazygit\config.windows.yml` |
 | lsd | `~/.config/lsd/{config.yaml,colors.yaml}` -> `lsd/{config.yaml,colors.yaml}` | same | `%USERPROFILE%\.config\lsd\{config.yaml,colors.yaml}` -> `lsd\{config.yaml,colors.yaml}` |
 | gh-dash | `~/.config/gh-dash/config.yml` -> `gh-dash/config.yml` | same | `%USERPROFILE%\.config\gh-dash\config.yml` -> `gh-dash\config.yml` |
@@ -612,9 +612,14 @@ POSIX pwsh profile management remains provisioning-adjacent.
   `./setup.sh --update` can prove ownership and refresh only the repo-pinned
   version. Chezmoi also installs the same deterministic config on every host:
   Herdr's built-in `rose-pine` theme with onboarding and automatic light/dark
-  switching disabled. Windows consumes it from its independently resolved
-  roaming `%APPDATA%` folder. Windows Herdr is beta/ConPTY-backed, so runtime
-  behavior remains a manual checklist item before treating it as a daily driver.
+  switching disabled. Windows consumes its platform config from the
+  independently resolved roaming `%APPDATA%` folder and explicitly launches
+  `pwsh.exe`; this keeps new panes on the managed PowerShell 7 profile and the
+  same PSReadLine ListView/history experience as Windows Terminal instead of
+  falling back to Windows PowerShell 5.1. Existing panes retain their original
+  shell and must be recreated after this setting changes. Windows Herdr is
+  beta/ConPTY-backed, so runtime behavior remains a manual checklist item before
+  treating it as a daily driver.
 - WSL fonts are host-rendered in the supported path. Install and merge Windows
   Terminal from Windows (`.\setup.ps1 -All`; the merge is default-on); the WSL
   Linux fontconfig install is only for `--experimental-wsl-gui`.
@@ -991,7 +996,7 @@ stale; CI then fails verification until a human reviews the adjacent constant.
 ├── shells/                # zshenv + zshrc + powershell_profile.ps1
 ├── tmux/                  # tmux.conf (Rose Pine, vi-mode, true-color)
 ├── ghostty/               # config (Rose Pine, Hack Nerd, Ghostty-tuned)
-├── herdr/                 # config.toml (forced built-in Rose Pine theme)
+├── herdr/                 # POSIX/Windows configs (Rose Pine; Windows uses pwsh)
 ├── windows-terminal/      # settings.fragment.jsonc + merge README
 ├── home/                  # chezmoi source tree for the config layer
 ├── tests/                 # automated test tree

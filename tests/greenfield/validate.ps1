@@ -282,6 +282,7 @@ Assert-ContentEqual -Path (Join-Path $env:USERPROFILE '.tmux.rose-pine.moon.conf
 Assert-ContentEqual -Path (Join-Path $env:USERPROFILE '.tmux.rose-pine.dawn.conf') -Expected (Join-Path $Repo 'tmux\psmux-rose-pine.dawn.conf')
 Assert-ContentEqual -Path (Join-Path $env:USERPROFILE 'Documents\PowerShell\Microsoft.PowerShell_profile.ps1') -Expected (Join-Path $Repo 'shells\powershell_profile.ps1')
 Assert-ContentEqual -Path (Join-Path $env:LOCALAPPDATA 'lazygit\config.yml') -Expected (Join-Path $Repo 'lazygit\config.windows.yml')
+Assert-ContentEqual -Path (Join-Path $env:APPDATA 'herdr\config.toml') -Expected (Join-Path $Repo 'herdr\config.windows.toml')
 Assert-WindowsTerminalPortableSettings
 
 Assert-ChezmoiVerify

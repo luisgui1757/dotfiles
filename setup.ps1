@@ -1786,7 +1786,7 @@ function Assert-WindowsKnownFolderConsumption {
     $herdrTarget = Join-Path $Identity.ApplicationData 'herdr\config.toml'
     $expectedNvim = Join-Path $ScriptDir 'nvim'
     $expectedLazygit = Join-Path $ScriptDir 'lazygit\config.windows.yml'
-    $expectedHerdr = Join-Path $ScriptDir 'herdr\config.toml'
+    $expectedHerdr = Join-Path $ScriptDir 'herdr\config.windows.toml'
     if (-not (Test-SamePath (Get-RealExistingPath $nvimTarget) (Get-RealExistingPath $expectedNvim))) {
         throw "Neovim does not consume the repo config through actual LocalApplicationData: $nvimTarget"
     }

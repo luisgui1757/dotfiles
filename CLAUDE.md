@@ -587,8 +587,8 @@ Surfaces that consume these: nvim (rose-pine plugin defaults), lualine
 (theme="rose-pine"), starship.toml (`[palettes.rose-pine]`), tmux.conf (hex
 literals in status/borders), ghostty/config (`theme = Rose Pine` -- forced dark
 on every platform, NOT the adaptive `dark:,light:` split, to match the dark
-stack), herdr/config.toml (built-in `rose-pine`, forced with
-`auto_switch = false`),
+stack), herdr/config.toml + herdr/config.windows.toml (built-in `rose-pine`,
+forced with `auto_switch = false`; Windows alone selects `pwsh.exe`),
 windows-terminal/settings.fragment.jsonc (`schemes` + `themes`),
 shells/powershell_profile.ps1 (PSReadLine `-Colors` for syntax, `Selection`,
 the version-gated prediction colors, and `$PSStyle.FileInfo.Directory` for `ls`
@@ -1666,6 +1666,14 @@ save only**. The next plain `:w` formats normally. Implemented in
   prior loads):
   `Remove-Item -LiteralPath "$HOME\.tmux.posix.conf" -Force -ErrorAction SilentlyContinue; taskkill /F /T /IM psmux.exe`
   then reopen the terminal.
+- **Herdr + PSReadLine: Windows must select PowerShell 7 explicitly.** Herdr's
+  unset Windows pane shell falls back to Windows PowerShell, which has a
+  different profile/history store and cannot provide the configured PSReadLine
+  ListView experience. `herdr/config.windows.toml` must keep
+  `terminal.default_shell = "pwsh.exe"`; do not add that setting to the shared
+  POSIX config because it would replace the user's normal Unix shell. Herdr
+  keeps the shell of existing panes, so recreate panes (or stop/restart the
+  session) after changing this startup setting.
 - **psmux + PSReadLine: Windows-only overlay, two settings.** psmux's default
   shell is **cmd**, not pwsh — which is the *real* reason "history prediction"
   and `MenuComplete` looked broken inside panes: PSReadLine was never loaded.

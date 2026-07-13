@@ -135,7 +135,12 @@ commits, recovery path, provider inventory, and whether any user data changed.
       version; start a session (`herdr`), confirm it opens panes and its
       agent-state awareness works, confirm the UI uses dark Rose Pine, then exit
       cleanly. Confirm the managed config is `~/.config/herdr/config.toml` on
-      POSIX and the real `%APPDATA%\herdr\config.toml` on Windows. On native Linux without
+      POSIX and the real `%APPDATA%\herdr\config.toml` on Windows. On Windows,
+      create a fresh pane and confirm `(Get-Process -Id $PID).Name` is `pwsh`,
+      `$PROFILE` resolves below the managed PowerShell Documents path, and prior
+      PowerShell 7 commands appear in the PSReadLine ListView prediction menu.
+      Existing panes retain their old shell and are not valid evidence after a
+      config change. On native Linux without
       brew, confirm the binary is the pinned SHA-256-verified release
       (`~/.local/bin/herdr`), not a remote-eval install. On native Windows,
       confirm `herdr.exe` resolves from `%LOCALAPPDATA%\Programs\Herdr\bin`, not

@@ -324,7 +324,7 @@ function Assert-Part1Files {
         -Label 'lazygit config'
     Assert-SymlinkMatchesRepo `
         -ActualPath (Join-Path $env:APPDATA 'herdr\config.toml') `
-        -ExpectedPath (Join-Path $script:RepoRoot 'herdr\config.toml') `
+        -ExpectedPath (Join-Path $script:RepoRoot 'herdr\config.windows.toml') `
         -Label 'Herdr config'
     Assert-CopyModeFileMatches `
         -ActualPath (Join-Path $Sandbox '.config\starship.toml') `

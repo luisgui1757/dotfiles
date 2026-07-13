@@ -415,7 +415,7 @@ Describe "setup.ps1 Windows known-folder identity" {
             New-Item -ItemType SymbolicLink -Path $nvimTarget -Target (Join-Path $script:RepoRoot 'nvim') | Out-Null
         }
         Copy-Item -LiteralPath (Join-Path $script:RepoRoot 'lazygit\config.windows.yml') -Destination $lazygitTarget
-        Copy-Item -LiteralPath (Join-Path $script:RepoRoot 'herdr\config.toml') -Destination $herdrTarget
+        Copy-Item -LiteralPath (Join-Path $script:RepoRoot 'herdr\config.windows.toml') -Destination $herdrTarget
         $profiles = @(
             (Join-Path $documents 'PowerShell\Microsoft.PowerShell_profile.ps1'),
             (Join-Path $documents 'PowerShell\Microsoft.VSCode_profile.ps1'),

@@ -2216,3 +2216,42 @@ mutation, or merged-main cache-free proof is claimed by this entry.
 The repaired pushed-head hosted result remains pending. No completed macOS
 lifecycle, approval, merge, release tag, live safeguard mutation, or
 merged-main cache-free proof is claimed by this entry.
+
+## Windows Herdr PowerShell-profile closure — entry 55
+
+- The owner observed that native-Windows Herdr panes had no prior-command
+  ListView predictions and treated previously used commands as new. This was
+  not a Windows Terminal history-size defect: the pinned Herdr preview source
+  at `f5354780e4ef` hardcodes `powershell.exe` when
+  `terminal.default_shell` is empty. Windows PowerShell and PowerShell 7 use
+  different profile/history roots, and Windows PowerShell cannot provide the
+  managed PSReadLine ListView experience.
+- Windows now consumes `herdr/config.windows.toml` through the independently
+  resolved roaming ApplicationData overlay. It retains forced built-in Rose
+  Pine and explicitly selects `pwsh.exe`. POSIX continues consuming
+  `herdr/config.toml` without a shell override, so macOS/Linux preserve the
+  user's normal shell. The pinned Herdr source recognizes `pwsh.exe` as an
+  interactive PowerShell pane and injects its normal `-NoExit` prompt
+  integration without `-NoProfile`, allowing the managed PowerShell 7 profile
+  to load.
+- Setup consumption checks, Windows migration assertions, the greenfield
+  validator, and the static Herdr invariant now bind the Windows destination to
+  the Windows config and require `pwsh.exe`. Documentation calls out Herdr's
+  startup boundary: existing panes retain their original shell and must be
+  recreated before manual validation.
+
+### Closure verification
+
+| Check | Exact result |
+|---|---|
+| Pinned upstream source inspection (`ogulcancelik/herdr@f5354780e4ef`) | PASS: empty Windows shell resolves to `powershell.exe`; configured `pwsh.exe` is recognized as an interactive PowerShell shell |
+| `bash tests/static/herdr_theme_test.sh` | PASS: both configs force Rose Pine; POSIX has no shell override; Windows requires `pwsh.exe` and the ApplicationData overlay targets it |
+| `bash tests/migration/template_test.sh` and `bash tests/migration/windows_render_test.sh` | PASS: all OS ignore renders and Windows Terminal ownership/render contracts remain clean |
+| Focused `tests/powershell/Setup.Tests.ps1` | PASS: 63 passed, 0 failed/skipped, including the exact Windows Herdr consumer check |
+| `pwsh -NoLogo -NoProfile -File ./test.ps1` | PASS: exact analyzer identity, 265 Pester passed with zero failed/skipped, and all 18 Neovim specs exited 0 |
+| `PATH=/opt/homebrew/bin:$PATH make ci` | PASS: ended `local pre-PR gate passed` on the complete behavior, tests, and documentation tree |
+
+Native-Windows fresh-pane visual/history confirmation and the full Apple
+Silicon owner lifecycle remain pending. No final pushed-head hosted result,
+approval, merge, release tag, live safeguard mutation, or merged-main
+cache-free proof is claimed by this entry.
