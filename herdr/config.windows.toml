@@ -6,6 +6,13 @@ onboarding = false
 [terminal]
 default_shell = "pwsh.exe"
 
+[keys]
+# Match tmux's prefix+w mental model: open Herdr's full workspace/tab/pane
+# navigator, where Up/Down selects an entry and Enter focuses it. Keep prefix+g
+# as an alias; the narrower workspace-only picker is redundant with this tree.
+workspace_picker = ""
+goto = ["prefix+w", "prefix+g"]
+
 [theme]
 name = "rose-pine"
 auto_switch = false

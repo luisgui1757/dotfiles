@@ -593,7 +593,8 @@ Surfaces that consume these: nvim (rose-pine plugin defaults), lualine
 literals in status/borders), ghostty/config (`theme = Rose Pine` -- forced dark
 on every platform, NOT the adaptive `dark:,light:` split, to match the dark
 stack), herdr/config.toml + herdr/config.windows.toml (built-in `rose-pine`,
-forced with `auto_switch = false`; Windows alone selects `pwsh.exe`),
+forced with `auto_switch = false`; both map `prefix+w` and `prefix+g` to the
+full workspace/tab/pane navigator; Windows alone selects `pwsh.exe`),
 windows-terminal/settings.fragment.jsonc (`schemes` + `themes`),
 shells/powershell_profile.ps1 (PSReadLine `-Colors` for syntax, `Selection`,
 the version-gated prediction colors, and `$PSStyle.FileInfo.Directory` for `ls`
@@ -1684,6 +1685,13 @@ save only**. The next plain `:w` formats normally. Implemented in
   POSIX config because it would replace the user's normal Unix shell. Herdr
   keeps the shell of existing panes, so recreate panes (or stop/restart the
   session) after changing this startup setting.
+- **Herdr `prefix+w` is the full navigator on every host.** Upstream's default
+  `prefix+w` opens only workspace navigate mode, which appears inert with one
+  workspace and does not match tmux's session/window/pane tree. The managed
+  configs disable `workspace_picker` and bind both `prefix+w` and the upstream
+  `prefix+g` alias to `goto`, Herdr's searchable workspace/tab/pane navigator;
+  Up/Down selects and Enter focuses. Named Herdr sessions remain separate server
+  namespaces and cannot be listed inside another session's navigator.
 - **psmux + PSReadLine: Windows-only overlay, two settings.** psmux's default
   shell is **cmd**, not pwsh — which is the *real* reason "history prediction"
   and `MenuComplete` looked broken inside panes: PSReadLine was never loaded.

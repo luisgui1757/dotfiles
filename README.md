@@ -377,7 +377,7 @@ symlink overlays; and Windows Terminal remains a merge.
 | Ghostty | `~/Library/Application Support/com.mitchellh.ghostty/config` -> `ghostty/config` (lazy 1 GiB per-surface scrollback byte budget) | native Linux links the same `~/.config/ghostty/config`; WSL links it only with `--experimental-wsl-gui` | n/a |
 | WezTerm | `~/.config/wezterm/wezterm.lua` -> `wezterm/wezterm.lua` (5,000,000 scrollback lines per tab) | same; WSL links it only with `--experimental-wsl-gui` | `%USERPROFILE%\.config\wezterm\wezterm.lua` -> `wezterm\wezterm.lua` (copied; same 5,000,000-line budget) |
 | AeroSpace | `~/.config/aerospace/aerospace.toml` -> `aerospace/aerospace.toml` (macOS tiling WM; focus/move on `ctrl-alt(-shift)` to avoid nvim `<A-h/j/k/l>` and fzf `Alt-c`) | n/a (macOS-only) | n/a (macOS-only) |
-| Herdr | `~/.config/herdr/config.toml` -> `herdr/config.toml` (built-in `rose-pine`, forced dark) | same | actual roaming `%APPDATA%\herdr\config.toml` -> `herdr\config.windows.toml` (same theme plus `pwsh.exe` as the pane shell) |
+| Herdr | `~/.config/herdr/config.toml` -> `herdr/config.toml` (built-in `rose-pine`, forced dark; `C-b w`/`C-b g` opens the full workspace/tab/pane navigator) | same | actual roaming `%APPDATA%\herdr\config.toml` -> `herdr\config.windows.toml` (same theme/navigation plus `pwsh.exe` as the pane shell) |
 | lazygit | `~/Library/Application Support/lazygit/config.yml` -> `lazygit/config.yml` | `~/.config/lazygit/config.yml` -> `lazygit/config.yml` | `%LOCALAPPDATA%\lazygit\config.yml` -> `lazygit\config.windows.yml` |
 | lsd | `~/.config/lsd/{config.yaml,colors.yaml}` -> `lsd/{config.yaml,colors.yaml}` | same | `%USERPROFILE%\.config\lsd\{config.yaml,colors.yaml}` -> `lsd\{config.yaml,colors.yaml}` |
 | gh-dash | `~/.config/gh-dash/config.yml` -> `gh-dash/config.yml` | same | `%USERPROFILE%\.config\gh-dash\config.yml` -> `gh-dash\config.yml` |
@@ -621,7 +621,11 @@ POSIX pwsh profile management remains provisioning-adjacent.
   `pwsh.exe`; this keeps new panes on the managed PowerShell 7 profile and the
   same PSReadLine ListView/history experience as Windows Terminal instead of
   falling back to Windows PowerShell 5.1. Existing panes retain their original
-  shell and must be recreated after this setting changes. Windows Herdr is
+  shell and must be recreated after this setting changes. On every host,
+  `Ctrl+B`, then `w` (or `g`) opens Herdr's full workspace/tab/pane navigator;
+  use Up/Down and Enter to select. Named Herdr sessions are separate server
+  namespaces, so they are attached from the shell rather than listed inside
+  another session's navigator. Windows Herdr is
   beta/ConPTY-backed, so runtime behavior remains a manual checklist item before
   treating it as a daily driver.
 - WSL fonts are host-rendered in the supported path. Install and merge Windows

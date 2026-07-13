@@ -133,7 +133,9 @@ commits, recovery path, provider inventory, and whether any user data changed.
       fullscreen; `ctrl-alt-shift-;` enters service mode (esc reloads config).
 - [ ] **Herdr session smoke**, all OSes: `herdr --version` prints the installed
       version; start a session (`herdr`), confirm it opens panes and its
-      agent-state awareness works, confirm the UI uses dark Rose Pine, then exit
+      agent-state awareness works, confirm the UI uses dark Rose Pine, then
+      press `Ctrl+B`, `w`, use Up/Down to select a workspace/tab/pane, and Enter
+      to focus it (`Ctrl+B`, `g` is the same full-navigator alias), then exit
       cleanly. Confirm the managed config is `~/.config/herdr/config.toml` on
       POSIX and the real `%APPDATA%\herdr\config.toml` on Windows. On Windows,
       create a fresh pane and confirm `(Get-Process -Id $PID).Name` is `pwsh`,

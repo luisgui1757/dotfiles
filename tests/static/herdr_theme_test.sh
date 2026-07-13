@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Herdr must consume the same forced-dark Rose Pine theme on POSIX and through
-# Windows' independently redirected roaming ApplicationData known folder.
+# Herdr must consume the same tmux-style full navigator and forced-dark Rose
+# Pine theme on POSIX and through Windows' roaming ApplicationData folder.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
@@ -31,6 +31,11 @@ for path in paths:
         raise SystemExit(f"Herdr theme.name must be rose-pine in {path}")
     if theme.get("auto_switch") is not False:
         raise SystemExit(f"Herdr theme.auto_switch must be false in {path}")
+    keys = config.get("keys", {})
+    if keys.get("workspace_picker") != "":
+        raise SystemExit(f"Herdr workspace-only picker must be disabled in {path}")
+    if keys.get("goto") != ["prefix+w", "prefix+g"]:
+        raise SystemExit(f"Herdr full navigator must own prefix+w and prefix+g in {path}")
 
 if configs[0].get("terminal", {}).get("default_shell") is not None:
     raise SystemExit("POSIX Herdr config must preserve the platform shell default")
@@ -55,4 +60,4 @@ for script in setup.ps1 uninstall.ps1; do
         fail "$script does not use the Herdr overlay state boundary"
 done
 
-echo "all Herdr Rose Pine theme and Windows pwsh invariants OK"
+echo "all Herdr navigation, Rose Pine theme, and Windows pwsh invariants OK"
