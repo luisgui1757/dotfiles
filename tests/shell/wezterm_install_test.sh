@@ -37,12 +37,14 @@ verify_sha256() {
 
 maybe_sudo() {
     printf '%s\n' "$*" >> "$TMP_ROOT/apt.log"
-    [[ "${1:-}" == "apt-get" && "${2:-}" == "install" && "${3:-}" == "-y" && -f "${4:-}" ]]
+    [[ "${1:-}" == "env" && "${2:-}" == "DEBIAN_FRONTEND=noninteractive" \
+        && "${3:-}" == "apt-get" && "${4:-}" == "install" \
+        && "${5:-}" == "-y" && -f "${6:-}" ]]
 }
 
 run_wezterm_deb_install "https://example.invalid/wezterm.deb" "$WEZTERM_DEB_AMD64_SHA256"
 grep -F "$WEZTERM_DEB_AMD64_SHA256" "$TMP_ROOT/sha.log" >/dev/null
-grep -E '^apt-get install -y .*/wezterm\.deb$' "$TMP_ROOT/apt.log" >/dev/null
+grep -E '^env DEBIAN_FRONTEND=noninteractive apt-get install -y .*/wezterm\.deb$' "$TMP_ROOT/apt.log" >/dev/null
 
 YES_ALL=1
 DRY_RUN=1

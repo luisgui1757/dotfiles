@@ -112,7 +112,7 @@ EOF
     }
     maybe_sudo() {
         printf '%s\n' "$*" >> "$COMMAND_LOG"
-        if [[ "$*" == "apt-get install -y --only-upgrade jq" ]]; then
+        if [[ "$*" == *"apt-get install -y --only-upgrade jq" ]]; then
             jq_version="2.0"
         fi
         return 0

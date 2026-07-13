@@ -1414,6 +1414,13 @@ save only**. The next plain `:w` formats normally. Implemented in
   unreachable third-party PPA, an expired repo key, a transient mirror outage)
   would short-circuit the `&&` and skip the install entirely, even for packages
   already in the local apt cache. Guarded by `tests/shell/apt_update_resilience_test.sh`.
+- **Every production apt mutation is explicitly noninteractive.** Route apt
+  update/install/upgrade calls through `apt_get_noninteractive`, which invokes
+  `sudo env DEBIAN_FRONTEND=noninteractive apt-get ...` so the setting survives
+  sudo's environment filtering. This prevents transitive debconf packages such
+  as `tzdata` from blocking `setup.sh --all`; keep the verified Ghostty and
+  WezTerm `.deb` paths on the same boundary. Guarded by the apt resilience and
+  pinned `.deb` install tests.
 - **Alpine installs Neovim through `apk`.** The official Neovim Linux tarball
   targets glibc systems, so Alpine uses its native `neovim` package instead;
   e2e still enforces the repo's Neovim >= 0.12 floor.

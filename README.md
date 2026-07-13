@@ -401,6 +401,10 @@ migration warning. POSIX pwsh profile management remains provisioning-adjacent.
 - `install-deps` provisions chezmoi itself: Homebrew on macOS/Linuxbrew,
   a pinned SHA-256-verified GitHub release archive on native Linux without
   brew, and the Scoop-first catalog on Windows.
+- Native Debian-family installs run every apt update/install/upgrade with an
+  explicit noninteractive debconf frontend after the sudo boundary. Therefore
+  `./setup.sh --all` does not stop for transitive package questions such as
+  `tzdata` timezone selection.
 - `install-deps` provisions Starship through Homebrew on macOS/Linuxbrew,
   Alpine's native package on Alpine, and a pinned SHA-256-verified Starship
   GitHub release archive on other native Linux/WSL hosts.

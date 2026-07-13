@@ -498,6 +498,13 @@ maybe_sudo() {
     return 1
 }
 
+# Debian-family package installs must stay unattended even when a dependency
+# (notably tzdata) has debconf questions. Put the environment assignment after
+# sudo so it survives sudo's environment filtering for ordinary users.
+apt_get_noninteractive() {
+    maybe_sudo env DEBIAN_FRONTEND=noninteractive apt-get "$@"
+}
+
 # ---- OS / package-manager detection ------------------------------------------
 detect_pm() {
     if homebrew_bin >/dev/null 2>&1; then echo brew; return; fi
@@ -2581,8 +2588,8 @@ pm_install() {
     fi
     case "$PM" in
         brew)   brew install "${pkgs[@]}" ;;
-        apt)    maybe_sudo apt-get update -qq || echo "  WARN: apt-get update failed; installing from the existing apt cache" >&2
-                maybe_sudo apt-get install -y "${pkgs[@]}" ;;
+        apt)    apt_get_noninteractive update -qq || echo "  WARN: apt-get update failed; installing from the existing apt cache" >&2
+                apt_get_noninteractive install -y "${pkgs[@]}" ;;
         dnf)    maybe_sudo dnf install -y "${pkgs[@]}" ;;
         pacman) maybe_sudo pacman -S --noconfirm "${pkgs[@]}" ;;
         zypper) maybe_sudo zypper install -y "${pkgs[@]}" ;;
@@ -2602,8 +2609,8 @@ native_linux_pm_install() {
         echo "  would: $native_pm install ${pkgs[*]}"; return 0
     fi
     case "$native_pm" in
-        apt)    maybe_sudo apt-get update -qq || echo "  WARN: apt-get update failed; installing from the existing apt cache" >&2
-                maybe_sudo apt-get install -y "${pkgs[@]}" ;;
+        apt)    apt_get_noninteractive update -qq || echo "  WARN: apt-get update failed; installing from the existing apt cache" >&2
+                apt_get_noninteractive install -y "${pkgs[@]}" ;;
         dnf)    maybe_sudo dnf install -y "${pkgs[@]}" ;;
         pacman) maybe_sudo pacman -S --noconfirm --needed "${pkgs[@]}" ;;
         zypper) maybe_sudo zypper install -y "${pkgs[@]}" ;;
@@ -3183,7 +3190,7 @@ apt_refresh_metadata_once() {
         return "$APT_UPDATE_REFRESH_OK"
     fi
     APT_UPDATE_REFRESHED=1
-    if maybe_sudo apt-get update -qq; then
+    if apt_get_noninteractive update -qq; then
         APT_UPDATE_REFRESH_OK=0
     else
         APT_UPDATE_REFRESH_OK=1
@@ -3270,7 +3277,7 @@ scoped_update_status() {
                 printf "  current   %-26s owner=apt package=%s source=%s\n" "$tool" "$pkg" "$source"
                 return 0
             fi
-            if maybe_sudo apt-get install -y --only-upgrade "$pkg"; then
+            if apt_get_noninteractive install -y --only-upgrade "$pkg"; then
                 after="$(apt_installed_version "$pkg")"
                 if [[ -n "$before" && -n "$after" && "$before" != "$after" ]]; then
                     printf "  updated   %-26s owner=apt package=%s source=%s\n" "$tool" "$pkg" "$source"
@@ -3914,7 +3921,7 @@ install_verified_ghostty_deb() {
             echo "        received Package=${package:-<missing>} Architecture=${architecture:-<missing>} Version=${version:-<missing>}"
             return 1
         fi
-        if ! maybe_sudo apt-get install -y "$deb"; then
+        if ! apt_get_noninteractive install -y "$deb"; then
             echo "  FAIL: could not install verified Ghostty package $asset"
             echo "        repair apt with 'sudo apt-get -f install', then rerun setup"
             return 1
@@ -4021,7 +4028,7 @@ run_wezterm_deb_install() {
         echo "        upstream changed; review it, then bump WEZTERM_VERSION + SHA together"
         rm -rf "$tmp"; return 1
     fi
-    maybe_sudo apt-get install -y "$deb" || rc=$?
+    apt_get_noninteractive install -y "$deb" || rc=$?
     rm -rf "$tmp"
     return "$rc"
 }

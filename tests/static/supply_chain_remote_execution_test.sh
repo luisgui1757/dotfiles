@@ -97,7 +97,7 @@ def unverified_privileged_package_installs(path, text):
         re.IGNORECASE,
     )
     privileged_prefix = re.compile(
-        r"\b(?:sudo|maybe_sudo)\s+(?:dpkg\s+-i|rpm\s+(?:-i|--install)|apt(?:-get)?\s+install|installer\s+-pkg)\b",
+        r"\b(?:(?:sudo|maybe_sudo)\s+(?:dpkg\s+-i|rpm\s+(?:-i|--install)|apt(?:-get)?\s+install|installer\s+-pkg)|apt_get_noninteractive\s+install)\b",
         re.IGNORECASE,
     )
     digest_tool = re.compile(r"\b(?:sha256sum|shasum\s+-a\s+256|verify_sha256)\b", re.IGNORECASE)
@@ -192,6 +192,16 @@ privileged_package_probes = [
         "if ! curl -fsSL https://example.invalid/pkg.deb -o \"$deb\"; then exit 1; fi\nverify_sha256 \"$deb\" \"$PIN\"\nif ! maybe_sudo apt-get install -y \"$deb\"; then exit 1; fi\n",
         False,
     ),
+    (
+        "unverified noninteractive helper deb",
+        "curl -fsSL https://example.invalid/pkg.deb -o \"$deb\"\napt_get_noninteractive install -y \"$deb\"\n",
+        True,
+    ),
+    (
+        "verified noninteractive helper deb",
+        "if ! curl -fsSL https://example.invalid/pkg.deb -o \"$deb\"; then exit 1; fi\nverify_sha256 \"$deb\" \"$PIN\"\nif ! apt_get_noninteractive install -y \"$deb\"; then exit 1; fi\n",
+        False,
+    ),
 ]
 for label, probe, should_fail in privileged_package_probes:
     probe_failures = unverified_privileged_package_installs(f"probe-{label}.sh", probe)
@@ -223,7 +233,9 @@ required_install_deps_snippets = [
     'GHOSTTY_DEBIAN_ARM64_TRIXIE_SHA256="',
     'GHOSTTY_DEB_URL="https://github.com/mkasberg/ghostty-ubuntu/releases/download/${GHOSTTY_UBUNTU_VERSION}/${GHOSTTY_DEB_ASSET}"',
     'verify_sha256 "$deb" "$expected_sha"',
-    'maybe_sudo apt-get install -y "$deb"',
+    'apt_get_noninteractive() {',
+    'maybe_sudo env DEBIAN_FRONTEND=noninteractive apt-get "$@"',
+    'apt_get_noninteractive install -y "$deb"',
 ]
 for snippet in required_install_deps_snippets:
     if snippet not in install_deps_sh:

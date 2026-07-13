@@ -162,7 +162,9 @@ setup/update/config-uninstall/reinstall/update path as a non-root user. The
 bundle avoids copying `.git` through Docker Desktop's bind-mounted macOS
 filesystem, which can return `Resource deadlock avoided` for worktree metadata.
 The lifecycle checks idempotent uninstall, performs full validation, and proves
-no pre-existing native package was removed.
+no pre-existing native package was removed. It also exercises the production
+noninteractive apt boundary; an unattended run must never open a debconf prompt
+for transitive dependencies such as `tzdata`.
 
 There is deliberately no hosted WSL workflow. [GitHub documents nested
 virtualization on hosted runners as technically possible but not officially
