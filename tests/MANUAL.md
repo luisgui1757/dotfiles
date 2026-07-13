@@ -212,6 +212,11 @@ commits, recovery path, provider inventory, and whether any user data changed.
       generated replacements at collision-safe `.dotfiles-failed-*` paths. A
       pre-existing `.before-nix-darwin` collision must move neither file and
       must print explicit compare/resolve/retry guidance.
+      Without opening a new terminal after first activation, rerun
+      `./setup.sh --all`. Confirm setup uses the installed
+      `/run/current-system/sw/bin/darwin-rebuild`, does not print the bootstrap
+      message, and leaves the `/etc/static/{bashrc,zshrc}` links and both
+      `.before-nix-darwin` recovery files unchanged.
       If Homebrew already existed, confirm nix-homebrew auto-migrated the
       Homebrew repositories while keeping installed packages. If the old
       `Library/Taps` contains an unrelated user tap, confirm setup leaves that

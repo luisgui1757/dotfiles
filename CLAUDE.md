@@ -341,7 +341,10 @@ that violates one of these, fix it instead of disabling the test.
     nix-darwin bootstrap also preflights and preserves existing `/etc/bashrc`
     and `/etc/zshrc` at their documented `.before-nix-darwin` paths; collisions
     fail before either move, and activation failure/interruption quarantines
-    generated replacements before restoring both originals. Guarded by
+    generated replacements before restoring both originals. Repeated setup from
+    a pre-activation shell resolves the installed `/run/current-system` rebuild
+    command outside stale `PATH`; exact `/etc/static/{bashrc,zshrc}` links are
+    already-managed state, so retained backups are not collisions. Guarded by
     `setup_target_identity_test.sh`,
     `setup_nix_darwin_test.sh`, `darwin_config_test.sh`, and
     `darwin_platform_contract_test.sh`.
@@ -1848,7 +1851,13 @@ pipe-to-shell bootstrap.
   unrelated tap/package remains untouched. First bootstrap moves
   existing `/etc/bashrc` and `/etc/zshrc` only to collision-free
   `.before-nix-darwin` backups; failed/interrupted activation restores the old
-  files and preserves generated replacements for diagnosis.
+  files and preserves generated replacements for diagnosis. A retry in the
+  terminal that launched first activation resolves the current-system
+  `darwin-rebuild` by its installed absolute path even though that shell's
+  `PATH` is stale. If bootstrap fallback is still required, exact links to
+  `/etc/static/bashrc` and `/etc/static/zshrc` are treated as nix-darwin-managed
+  and their retained recovery backups remain untouched; an unmanaged source
+  plus an existing backup continues to fail closed.
   The mixed-ownership cleanup/tap contract is identical on real Macs and hosted
   CI; no environment marker weakens or changes it.
 - **User resolution.** setup.sh resolves one actual non-root account and account

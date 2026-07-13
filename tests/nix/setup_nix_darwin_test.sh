@@ -5,8 +5,9 @@
 # switches); --skip-deps is the explicit already-provisioned escape even when
 # paired with the compatibility alias; non-macOS hosts are skipped; Apple
 # Silicon selects the only configuration; every other architecture fails
-# closed; existing user Homebrew taps survive repeated activation; and first-run
-# bootstrap uses the flake.lock-pinned nix-darwin rev + narHash, never a mutable alias.
+# closed; existing user Homebrew taps survive repeated activation; a shell with
+# stale PATH reuses the installed system generation; and first-run bootstrap
+# uses the flake.lock-pinned nix-darwin rev + narHash, never a mutable alias.
 set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 WORK="$REPO_ROOT/tests/.cache/nix-darwin-setup-test"
@@ -195,6 +196,54 @@ EOF
     bash "$script"
 }
 
+probe_stale_path_after_activation() {
+    local script="$WORK/stale-path-after-activation.sh"
+    local etc_dir="$WORK/stale-path-etc"
+    local rebuild="$WORK/current-system/sw/bin/darwin-rebuild"
+    rm -rf "$etc_dir" "$(dirname "$(dirname "$rebuild")")"
+    mkdir -p "$etc_dir/static" "$(dirname "$rebuild")"
+    printf '%s\n' managed-bash > "$etc_dir/static/bashrc"
+    printf '%s\n' managed-zsh > "$etc_dir/static/zshrc"
+    ln -s "$etc_dir/static/bashrc" "$etc_dir/bashrc"
+    ln -s "$etc_dir/static/zshrc" "$etc_dir/zshrc"
+    printf '%s\n' original-bash > "$etc_dir/bashrc.before-nix-darwin"
+    printf '%s\n' original-zsh > "$etc_dir/zshrc.before-nix-darwin"
+    cat > "$rebuild" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+    chmod +x "$rebuild"
+    cat > "$script" <<EOF
+set -uo pipefail
+CALLS="$WORK/stale-path-calls"
+: > "\$CALLS"
+PATH="/usr/bin:/bin"
+export PATH
+sudo() { printf 'sudo'; printf ' %s' "\$@"; printf '\n'; }
+uname() { case "\${1:-}" in -m) echo arm64 ;; *) echo Darwin ;; esac; }
+nix() {
+    if [[ "\${1:-}" == eval ]]; then
+        printf '%s\n%s\n' "$LOCKED_NIX_DARWIN_REV" "$LOCKED_NIX_DARWIN_NAR_HASH"
+    fi
+}
+DOTFILES_TARGET_USER=tester
+DOTFILES_TARGET_HOME=/Users/tester
+DOTFILES_TEST_NIX_DARWIN_REBUILD="$rebuild"
+DOTFILES_TEST_NIX_DARWIN_ETC_DIR="$etc_dir"
+export DOTFILES_TARGET_USER DOTFILES_TARGET_HOME
+export DOTFILES_TEST_NIX_DARWIN_REBUILD DOTFILES_TEST_NIX_DARWIN_ETC_DIR
+DOTFILES_SETUP_SOURCE_ONLY=1 source "$REPO_ROOT/setup.sh" --all >/dev/null 2>&1
+output="\$(run_nix_darwin_switch)"
+[[ "\$output" == *"sudo -H env DOTFILES_TARGET_USER=tester DOTFILES_TARGET_HOME=/Users/tester $rebuild switch --flake $REPO_ROOT#dotfiles-aarch64 --impure"* ]]
+[[ "\$output" != *"bootstrapping nix-darwin"* ]]
+[[ "\$(readlink "$etc_dir/bashrc")" == "$etc_dir/static/bashrc" ]]
+[[ "\$(readlink "$etc_dir/zshrc")" == "$etc_dir/static/zshrc" ]]
+[[ "\$(cat "$etc_dir/bashrc.before-nix-darwin")" == original-bash ]]
+[[ "\$(cat "$etc_dir/zshrc.before-nix-darwin")" == original-zsh ]]
+EOF
+    bash "$script"
+}
+
 probe_migrates_only_legacy_nix_taps() {
     local script="$WORK/migrate-legacy-taps.sh" taps_dir="$WORK/legacy-taps/Library/Taps"
     rm -rf "$taps_dir"
@@ -256,6 +305,15 @@ probe_shell_rc_migration() {
     printf '%s\n' original-zsh > "$etc_dir/zshrc"
     if [[ "$mode" == "collision" ]]; then
         printf '%s\n' older-backup > "$etc_dir/bashrc.before-nix-darwin"
+    elif [[ "$mode" == "managed-rerun" ]]; then
+        mkdir -p "$etc_dir/static"
+        printf '%s\n' managed-bash > "$etc_dir/static/bashrc"
+        printf '%s\n' managed-zsh > "$etc_dir/static/zshrc"
+        rm "$etc_dir/bashrc" "$etc_dir/zshrc"
+        ln -s "$etc_dir/static/bashrc" "$etc_dir/bashrc"
+        ln -s "$etc_dir/static/zshrc" "$etc_dir/zshrc"
+        printf '%s\n' original-bash > "$etc_dir/bashrc.before-nix-darwin"
+        printf '%s\n' original-zsh > "$etc_dir/zshrc.before-nix-darwin"
     fi
     cat > "$script" <<EOF
 set -uo pipefail
@@ -298,6 +356,18 @@ case "$mode" in
         [[ "\$(cat "$etc_dir/bashrc.before-nix-darwin")" == older-backup ]]
         [[ "\$(cat "$etc_dir/zshrc")" == original-zsh ]]
         [[ "\$output" == *"neither was changed"* ]]
+        ;;
+    managed-rerun)
+        output="\$(preview_nix_darwin_shell_rc_migration)"
+        [[ "\$output" == *"retain nix-darwin-managed $etc_dir/bashrc"* ]]
+        [[ "\$output" == *"retain nix-darwin-managed $etc_dir/zshrc"* ]]
+        prepare_nix_darwin_shell_rc_migration
+        [[ -z "\${NIX_DARWIN_RC_SOURCES[*]-}" ]]
+        [[ -z "\${NIX_DARWIN_RC_BACKUPS[*]-}" ]]
+        [[ "\$(readlink "$etc_dir/bashrc")" == "$etc_dir/static/bashrc" ]]
+        [[ "\$(readlink "$etc_dir/zshrc")" == "$etc_dir/static/zshrc" ]]
+        [[ "\$(cat "$etc_dir/bashrc.before-nix-darwin")" == original-bash ]]
+        [[ "\$(cat "$etc_dir/zshrc.before-nix-darwin")" == original-zsh ]]
         ;;
     partial-move)
         prepare_nix_darwin_shell_rc_migration >/dev/null 2>&1 && exit 1
@@ -395,6 +465,12 @@ else
     echo "FAIL: setup moved or altered a user-owned Homebrew tap"
     fail=1
 fi
+if probe_stale_path_after_activation; then
+    echo "ok  : stale pre-activation PATH reuses the installed nix-darwin generation"
+else
+    echo "FAIL: stale PATH incorrectly re-entered first nix-darwin bootstrap"
+    fail=1
+fi
 if probe_migrates_only_legacy_nix_taps; then
     echo "ok  : legacy root-owned tap snapshots migrate once without touching user taps"
 else
@@ -417,6 +493,12 @@ if probe_shell_rc_migration collision; then
     echo "ok  : pre-existing nix-darwin backup collision fails before either shell file moves"
 else
     echo "FAIL: nix-darwin shell-file backup collision was destructive or ambiguous"
+    fail=1
+fi
+if probe_shell_rc_migration managed-rerun; then
+    echo "ok  : managed shell links and retained recovery backups are idempotent"
+else
+    echo "FAIL: repeated bootstrap rejected nix-darwin-managed shell files"
     fail=1
 fi
 if probe_shell_rc_migration partial-move; then

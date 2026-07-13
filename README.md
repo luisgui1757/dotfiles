@@ -152,7 +152,10 @@ pre-existing `/etc/bashrc` and `/etc/zshrc` are moved only to nix-darwin's
 documented `.before-nix-darwin` names after both backup paths pass a collision
 preflight. Activation failure or interruption quarantines any generated
 replacement and restores both originals; success retains the backups for
-nix-darwin recovery/uninstall. On Linux/WSL, setup runs
+nix-darwin recovery/uninstall. A retry from the same pre-activation terminal
+resolves the installed `/run/current-system` rebuild command even before that
+terminal's `PATH` is refreshed; nix-darwin-managed `/etc/static` links and their
+retained backups are recognized as the normal idempotent state. On Linux/WSL, setup runs
 `home-manager switch --flake .#<arch>-linux --impure`; first-run bootstrap uses
 the locked
 `github:nix-community/home-manager/<locked-rev>?narHash=<encoded-narHash>#home-manager`
@@ -1242,6 +1245,7 @@ MIT. See `LICENSE`.
 | Neovim stops before loading Lazy with a lockfile/cache identity error | `lazy-lock.json` is missing, malformed, incomplete, has a non-40-hex commit or invalid branch; or the cached `lazy.nvim` checkout is dirty, at the wrong commit, from the wrong origin, missing locked default-branch metadata, non-Git, or partial | restore the tracked `nvim/lazy-lock.json` and restart Neovim. Startup repairs the cache through a verified staging checkout and never executes an unproved path. If publication fails, fix the destination permissions named in the error and retry |
 | setup reports a Homebrew `shellenv` failure even though `brew` already resolves | the selected command and PATH-resolved command report different Homebrew prefixes/repositories, or `shellenv` exited nonzero; empty stdout alone is a normal Homebrew idempotence signal | compare `brew --prefix` and `brew --repository` through both entrypoints named in the error. Repair the shadowing PATH or Homebrew installation, then rerun setup; a nix-darwin wrapper and native brew path are accepted only when those identities match |
 | first nix-darwin setup reports an existing `.before-nix-darwin` backup | setup found both an unmanaged `/etc/bashrc` or `/etc/zshrc` and an older backup, so choosing either would risk user/system data | compare the two files and resolve the collision deliberately, then rerun. Setup moves neither shell file until both backup destinations are clear and restores both if activation fails |
+| setup says it is bootstrapping nix-darwin again immediately after a successful activation | the checkout predates the retry fix, so the still-open terminal cannot see the new system profile on `PATH` and setup mistakes the retry for first bootstrap | update the checkout and rerun setup. Current setup resolves `/run/current-system/sw/bin/darwin-rebuild` directly and accepts the managed `/etc/static` shell links without touching their recovery backups |
 | `<leader>X` keymaps fire `\X` instead of `<Space>X` | mapleader set after lazy.setup somehow | restore the order in `nvim/init.lua` — leader **before** `require("lazy").setup` |
 | Formatter runs twice or shows two BufWritePre autocmds | someone added a second handler outside conform.nvim | `:lua print(#vim.api.nvim_get_autocmds({event="BufWritePre"}))` should be 1; if not, find the second autocmd and delete it |
 | Lazy/Tree-sitter/Mason says `No C compiler found` | WSL/Linux has `make` but no `cc`/`gcc`/`clang`; Tree-sitter parsers and some plugin builds compile native code | re-run `./setup.sh --skip-config` to install the Linux compiler toolchain, or on Ubuntu run `sudo apt-get update && sudo apt-get install -y build-essential`, then `./setup.sh --skip-deps --skip-config` |

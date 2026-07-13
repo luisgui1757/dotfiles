@@ -1002,6 +1002,40 @@ nix_darwin_sudo_preview() {
     printf '%s' "$1"
 }
 
+nix_darwin_rebuild_command() {
+    local candidate
+    if candidate="$(command -v darwin-rebuild 2>/dev/null)" && [[ -n "$candidate" ]]; then
+        printf '%s\n' "$candidate"
+        return 0
+    fi
+
+    # Source-only tests must not inherit an installed host generation. Their
+    # explicit executable seam models the stale-PATH post-activation state.
+    if [[ "${DOTFILES_SETUP_SOURCE_ONLY_ACTIVE:-}" == "1" ]]; then
+        candidate="${DOTFILES_TEST_NIX_DARWIN_REBUILD:-}"
+        [[ -z "$candidate" ]] && return 1
+        if [[ "$candidate" != /* || ! -x "$candidate" ]]; then
+            echo "  FAIL: nix-darwin rebuild test path must be an absolute executable: $candidate" >&2
+            return 1
+        fi
+        printf '%s\n' "$candidate"
+        return 0
+    fi
+
+    # A shell opened before the first successful activation does not yet have
+    # /run/current-system/sw/bin on PATH. Resolve the installed generation
+    # directly so an ordinary retry cannot be misclassified as first bootstrap.
+    for candidate in \
+        /run/current-system/sw/bin/darwin-rebuild \
+        /nix/var/nix/profiles/system/sw/bin/darwin-rebuild; do
+        if [[ -x "$candidate" ]]; then
+            printf '%s\n' "$candidate"
+            return 0
+        fi
+    done
+    return 1
+}
+
 nix_darwin_etc_dir() {
     local etc_dir="/etc"
     # The override is a source-only oracle seam. A production environment
@@ -1036,6 +1070,14 @@ nix_homebrew_taps_dir() {
         return 1
     }
     printf '%s\n' "${taps_dir%/}"
+}
+
+nix_darwin_shell_rc_is_managed() {
+    local etc_dir="$1" name="$2" source expected
+    source="$etc_dir/$name"
+    expected="$etc_dir/static/$name"
+    [[ -L "$source" ]] || return 1
+    [[ "$(readlink "$source" 2>/dev/null || true)" == "$expected" ]]
 }
 
 legacy_nix_homebrew_tap_paths() {
@@ -1170,7 +1212,9 @@ preview_nix_darwin_shell_rc_migration() {
         source="$etc_dir/$name"
         backup="$source.before-nix-darwin"
         [[ -e "$source" || -L "$source" ]] || continue
-        if [[ -e "$backup" || -L "$backup" ]]; then
+        if nix_darwin_shell_rc_is_managed "$etc_dir" "$name"; then
+            echo "  would: retain nix-darwin-managed $source and its existing recovery backup"
+        elif [[ -e "$backup" || -L "$backup" ]]; then
             echo "  would fail: cannot preserve $source because $backup already exists."
         else
             echo "  would: sudo mv $source $backup before first nix-darwin activation"
@@ -1191,6 +1235,7 @@ prepare_nix_darwin_shell_rc_migration() {
         source="$etc_dir/$name"
         backup="$source.before-nix-darwin"
         [[ -e "$source" || -L "$source" ]] || continue
+        nix_darwin_shell_rc_is_managed "$etc_dir" "$name" && continue
         if [[ -e "$backup" || -L "$backup" ]]; then
             echo "  FAIL: first nix-darwin bootstrap must preserve $source, but backup $backup already exists." >&2
             echo "        Compare both files and resolve the collision before retrying; neither was changed." >&2
@@ -1202,6 +1247,7 @@ prepare_nix_darwin_shell_rc_migration() {
         source="$etc_dir/$name"
         backup="$source.before-nix-darwin"
         [[ -e "$source" || -L "$source" ]] || continue
+        nix_darwin_shell_rc_is_managed "$etc_dir" "$name" && continue
         i="${#NIX_DARWIN_RC_SOURCES[@]}"
         NIX_DARWIN_RC_SOURCES[i]="$source"
         NIX_DARWIN_RC_BACKUPS[i]="$backup"
@@ -1294,7 +1340,7 @@ nix_darwin_activation_interrupted() {
 # dotfile (invariant 22). setup resolves one authoritative target user/home and
 # passes both through sudo explicitly for impure flake evaluation.
 run_nix_darwin_switch() {
-    local explicit=0 arch raw_arch config_name flake_ref bootstrap_ref
+    local explicit=0 arch raw_arch config_name flake_ref bootstrap_ref rebuild_command=""
     [[ "$NIX_DARWIN" -eq 1 ]] && explicit=1
     if [[ "$(uname -s)" != "Darwin" ]]; then
         [[ "$explicit" -eq 1 ]] || return 0
@@ -1338,14 +1384,15 @@ run_nix_darwin_switch() {
     fi
     flake_ref="$SCRIPT_DIR#$config_name"
     bootstrap_ref="$(pinned_nix_darwin_run_ref)" || return 1
-    echo "  Runs '$(nix_darwin_sudo_preview "darwin-rebuild") switch --flake $flake_ref --impure':"
+    rebuild_command="$(nix_darwin_rebuild_command)" || rebuild_command=""
+    echo "  Runs '$(nix_darwin_sudo_preview "${rebuild_command:-darwin-rebuild}") switch --flake $flake_ref --impure':"
     echo "  declarative Homebrew (WezTerm/AeroSpace casks, Herdr brew) + nix CLI set."
     echo "  It uses sudo for nix-darwin's upstream activation shape while passing"
     echo "  the setup-validated target user/home explicitly through the boundary."
     if [[ "$DRY_RUN" -eq 1 ]]; then
-        echo "  would: $(nix_darwin_sudo_preview "darwin-rebuild") switch --flake $flake_ref --impure"
+        echo "  would: $(nix_darwin_sudo_preview "${rebuild_command:-darwin-rebuild}") switch --flake $flake_ref --impure"
         echo "         (first-time bootstrap: $(nix_darwin_sudo_preview "nix") run $bootstrap_ref -- switch --flake $flake_ref --impure)"
-        if ! command -v darwin-rebuild >/dev/null 2>&1; then
+        if [[ -z "$rebuild_command" ]]; then
             preview_nix_darwin_shell_rc_migration
         fi
         preview_legacy_nix_homebrew_tap_migration
@@ -1364,8 +1411,8 @@ run_nix_darwin_switch() {
         trap - INT TERM
         return 1
     fi
-    if command -v darwin-rebuild >/dev/null 2>&1; then
-        if ! sudo_nix_darwin_activation darwin-rebuild switch --flake "$flake_ref" --impure; then
+    if [[ -n "$rebuild_command" ]]; then
+        if ! sudo_nix_darwin_activation "$rebuild_command" switch --flake "$flake_ref" --impure; then
             trap - INT TERM
             echo "  FAIL: nix-darwin activation failed; setup did not apply the requested Nix package layer." >&2
             if ! rollback_nix_darwin_shell_rc_migration; then

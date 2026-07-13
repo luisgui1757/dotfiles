@@ -184,7 +184,10 @@ broken repo-symlink still cleaned) is covered by
       Homebrew paths follow the actual Apple Silicon repository.
       First nix-darwin bootstrap collision-checks and preserves existing
       `/etc/bashrc` and `/etc/zshrc` as `.before-nix-darwin`, rolling both back
-      on failure/interruption while retaining failed generated output.
+      on failure/interruption while retaining failed generated output. A retry
+      from the terminal that performed first activation resolves the installed
+      current-system rebuild command outside stale `PATH`; exact `/etc/static`
+      shell links and retained backups are accepted as already-managed state.
 - [x] nix-homebrew uses mixed tap/package ownership. `mutableTaps = true` with
       no Nix-managed tap contents leaves every tap clone owned by target-user
       Homebrew, while `cleanup = "none"` preserves formulae/casks outside the

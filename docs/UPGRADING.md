@@ -170,7 +170,10 @@ Update first runs the same install/migration/idempotent reconciliation as all
 mode. It then performs only scoped updates for present tools whose package or
 direct-artifact ownership is proven, plus synchronous Mason updates. It never
 runs a blanket package-manager upgrade, `git pull`, `nix flake update`, or
-`:Lazy update`, and it never rewrites repository lockfiles.
+`:Lazy update`, and it never rewrites repository lockfiles. On macOS the retry
+is safe in the terminal that performed first activation: setup resolves the
+installed current-system `darwin-rebuild` outside stale `PATH` and recognizes
+nix-darwin's `/etc/static` shell links plus retained backups as managed state.
 
 To move to a newer dotfiles release, clone that exact annotated tag beside the
 current checkout and run its setup update command. The new checkout, not Git

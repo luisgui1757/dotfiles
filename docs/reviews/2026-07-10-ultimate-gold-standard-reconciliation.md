@@ -1999,3 +1999,43 @@ until the new head runs.
 
 No review, approval, merge, release tag, live safeguard mutation, or
 merged-main cache-free proof is claimed by this entry.
+
+## nix-darwin stale-PATH retry repair — entry 50
+
+- A real Apple Silicon owner-host retry after the first successful nix-darwin
+  activation failed before a second activation. The still-open terminal could
+  not resolve `darwin-rebuild` on `PATH`, so setup incorrectly re-entered first
+  bootstrap and rejected the legitimate retained
+  `/etc/{bashrc,zshrc}.before-nix-darwin` recovery files. The Homebrew tap
+  transaction rolled back all three staged legacy snapshots, so the failure was
+  explicit and left no partial tap migration.
+- Current host state proved the alternative explanation false: nix-darwin was
+  installed at `/run/current-system/sw/bin/darwin-rebuild`, `/etc/bashrc` and
+  `/etc/zshrc` were exact links to `/etc/static/{bashrc,zshrc}`, and both
+  original recovery files remained intact. This was an idempotency defect in
+  setup discovery, not a user-created backup collision.
+- Setup now resolves the installed current-system or system-profile rebuild
+  command after ordinary `PATH` lookup. First-bootstrap shell migration skips
+  only exact nix-darwin `/etc/static` links; unmanaged sources with occupied
+  backup names still fail before either file moves. Rollback continues to own
+  only shell files moved by the current invocation.
+- Automated coverage reproduces the owner-host shape with a stale `PATH`, an
+  installed absolute rebuild command, managed shell links, and retained
+  backups. It also directly proves managed-link retry idempotency while keeping
+  the prior collision, partial-move, failure, signal, and rollback cases.
+
+### Repair verification
+
+| Check | Exact result |
+|---|---|
+| Restricted-`PATH` real-host `./setup.sh --all --dry-run` | PASS: selected `/run/current-system/sw/bin/darwin-rebuild`; no bootstrap migration was selected |
+| `bash tests/nix/setup_nix_darwin_test.sh` | PASS: stale-PATH installed-generation and managed-link retry regressions plus all prior nix-darwin cases |
+| `bash tests/nix/run_all.sh` | PASS |
+| `/opt/homebrew/bin/shellcheck setup.sh tests/nix/setup_nix_darwin_test.sh` | PASS |
+| `git diff --check` and Bash parse checks | PASS |
+| `make ci` | PASS: ended `local pre-PR gate passed` |
+| Privileged owner-host retry | PENDING: sudo credential expired; no password was requested or captured by automation |
+
+No pushed-head hosted result, privileged retry, review, approval, merge,
+release tag, live safeguard mutation, or merged-main cache-free proof is claimed
+by this entry.

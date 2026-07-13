@@ -101,7 +101,9 @@ Sequenced PRs (split for independent, revertable blast radius):
   nix-homebrew (`mutableTaps = true`, target-user-owned tap clones) + homebrew module
   (`cleanup = "none"`, no auto-update/upgrade); Home Manager **packages only**;
   public macOS setup applies it by default; `--update` gains an `owner=nix`
-  status.
+  status. Repeated setup also resolves the installed current-system rebuild
+  command outside a pre-activation shell's stale `PATH` and treats exact
+  `/etc/static` shell links plus retained backups as managed state.
 - **PR-7 `feat/nix-linux` - DONE.** Home Manager standalone on Ubuntu/WSL userland;
   public Linux/WSL setup applies it by default; native/deferred install arms
   remain for artifacts and regression evidence (nvim last, for ABI reasons).
