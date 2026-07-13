@@ -96,11 +96,12 @@ Sequenced PRs (split for independent, revertable blast radius):
 - **PR-5 `feat/nix-skeleton` - DONE.** flake + committed `flake.lock` with ZERO
   ownership; `nix flake check` CI; disjointness test (Home Manager declares no
   file targets); Renovate `nix` manager.
-- **PR-6 `feat/nix-darwin` - DONE.** macOS host config: `darwinConfigurations` +
-  `system.primaryUser`; nix-homebrew (pinned taps, `mutableTaps = false`) +
-  homebrew module (`cleanup = "check"`, no auto-update/upgrade); Home Manager
-  **packages only**; public macOS setup applies it by default; `--update` gains
-  an `owner=nix` status.
+- **PR-6 `feat/nix-darwin` - DONE (mixed-ownership correction 2026-07-13).**
+  macOS host config: `darwinConfigurations` + `system.primaryUser`;
+  nix-homebrew (pinned repo taps, `mutableTaps = true`) + homebrew module
+  (`cleanup = "none"`, no auto-update/upgrade); Home Manager **packages only**;
+  public macOS setup applies it by default; `--update` gains an `owner=nix`
+  status.
 - **PR-7 `feat/nix-linux` - DONE.** Home Manager standalone on Ubuntu/WSL userland;
   public Linux/WSL setup applies it by default; native/deferred install arms
   remain for artifacts and regression evidence (nvim last, for ABI reasons).
@@ -159,20 +160,17 @@ Commit-by-commit status:
 - **Commit 5 - nix-darwin + declarative Homebrew — DONE.**
   Architecture-specific `darwinConfigurations` with `system.primaryUser` and
   home resolved once by setup from the authoritative target account;
-  nix-homebrew (pinned taps,
-  `autoMigrate = true`, `mutableTaps = false`, `trust.taps = [ "nikitabobko/tap" ]` for the
+  nix-homebrew (pinned repo taps,
+  `autoMigrate = true`, `mutableTaps = true`, `trust.taps = [ "nikitabobko/tap" ]` for the
   AeroSpace cask); homebrew module (`autoUpdate = false`, `upgrade = false`,
-  `cleanup = "check"`); casks WezTerm + AeroSpace; brews Herdr + selected CLI; Home
+  `cleanup = "none"`); casks WezTerm + AeroSpace; brews Herdr + selected CLI; Home
   Manager packages-only; default `setup.sh` applies `sudo darwin-rebuild switch`
   on macOS (prompted unless `--all`) with first-run bootstrap pinned to the
   locked nix-darwin rev plus `narHash`.
-  Existing Homebrew installs are adopted with `autoMigrate = true`, and setup
-  transactionally moves architecture-correct `Library/Taps` to a timestamped
-  backup before activation so `mutableTaps = false` can install the pinned taps;
-  activation/bootstrap/interruption failure restores the original.
-  GitHub's hosted macOS e2e passes `DOTFILES_NIX_DARWIN_HOSTED_CI=1` to use
-  `cleanup = "none"` for that disposable activation only, because the runner
-  image ships many undeclared Brew packages; real hosts remain `cleanup = "check"`.
+  Existing Homebrew installs are adopted with `autoMigrate = true`. The
+  2026-07-13 correction made Homebrew explicitly mixed ownership: activation
+  refreshes pinned repo taps in place, preserves unrelated user taps/packages,
+  performs no whole-`Library/Taps` migration, and uses the same contract in CI.
   The first real system activation remains manual-verification-pending in
   `tests/MANUAL.md`.
 - **Commit 6 - Linux/WSL Home Manager packages-only — DONE.** HM standalone for
@@ -229,9 +227,10 @@ Commit-by-commit status:
   through every Brew-backed preview phase; the manual WSL greenfield harness
   installs Ubuntu's `nix-bin` package and enables flakes before invoking setup.
   The ultimate closure added authoritative account/home resolution,
-  transactionally rolled-back tap migration, and Home Manager session-vars
-  startup. Apple Silicon is the only current Darwin contract; Intel evidence is
-  retained in the append-only ledger as historical proof, not current support.
+  mixed-ownership tap preservation (superseding the earlier tap migration), and
+  Home Manager session-vars startup. Apple Silicon is the only current Darwin
+  contract; Intel evidence is retained in the append-only ledger as historical
+  proof, not current support.
 - **Pi CLI provisioning — DONE.** Setup installs the Pi CLI on every OS as the
   pinned npm package `@earendil-works/pi-coding-agent@0.80.3` after checking npm
   `dist.integrity`. POSIX public setup gets Node 24 from the enforced Nix package

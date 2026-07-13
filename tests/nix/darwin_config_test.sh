@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Assert the nix-darwin config renders the required declarative-Homebrew knobs
 # (the migration ruling): WezTerm + AeroSpace casks, Herdr brew, no auto
-# update/upgrade, cleanup = "check" on real hosts, hosted-CI cleanup override,
-# autoMigrate = true, mutableTaps = false, and Determinate owns the daemon
+# update/upgrade, cleanup = "none" for mixed package ownership, autoMigrate =
+# true, mutableTaps = true for mixed tap ownership, and Determinate owns the daemon
 # (nix.enable = false).
 # Uses cross-platform pure `nix eval`; skips gracefully when nix is unavailable
 # in a local shell, while CI installs Nix and runs this as real enforcement
@@ -48,15 +48,23 @@ assert_eq "declarative casks are aerospace + wezterm (vendor channel, not nixpkg
 brews="$(eval_json homebrew.brews | jq -r '[.[].name] | sort | join(",")')"
 assert_eq "declarative brews include herdr" "herdr" "$brews"
 
-assert_eq "homebrew cleanup = check (report drift, non-destructive)" '"check"' "$(eval_raw homebrew.onActivation.cleanup)"
-ci_cleanup="$(env DOTFILES_NIX_DARWIN_HOSTED_CI=1 nix eval --raw --impure "$cfg.homebrew.onActivation.cleanup" 2>/dev/null || true)"
-assert_eq "hosted CI disables Homebrew cleanup check for disposable runners" "none" "$ci_cleanup"
+assert_eq "homebrew cleanup = none (preserve mixed-ownership packages)" '"none"' "$(eval_raw homebrew.onActivation.cleanup)"
 assert_eq "homebrew autoUpdate disabled" 'false' "$(eval_raw homebrew.onActivation.autoUpdate)"
 assert_eq "homebrew upgrade disabled" 'false' "$(eval_raw homebrew.onActivation.upgrade)"
 assert_eq "nix-homebrew autoMigrate adopts existing Homebrew installs" 'true' "$(eval_raw nix-homebrew.autoMigrate)"
-assert_eq "nix-homebrew mutableTaps = false (pinned taps)" 'false' "$(eval_raw nix-homebrew.mutableTaps)"
+assert_eq "nix-homebrew mutableTaps = true (pinned repo taps coexist with user taps)" 'true' "$(eval_raw nix-homebrew.mutableTaps)"
 trusted_taps="$(eval_json nix-homebrew.trust.taps | jq -r 'sort | join(",")')"
 assert_eq "nix-homebrew trusts the pinned AeroSpace tap for Homebrew 5 cask loading" "nikitabobko/tap" "$trusted_taps"
+declared_taps="$(eval_json homebrew.taps | jq -r '[.[].name] | sort | join(",")')"
+assert_eq "nix-darwin installs exactly the repo-declared pinned taps" \
+    "homebrew/homebrew-cask,homebrew/homebrew-core,nikitabobko/homebrew-tap" "$declared_taps"
+activation_checks="$(nix eval --raw "$cfg.system.activationScripts.checks.text" 2>/dev/null || true)"
+if [[ "$activation_checks" == *"brew bundle"*" cleanup"* ]]; then
+    echo "FAIL: nix-darwin activation still rejects mixed-ownership Homebrew packages"
+    fail=1
+else
+    echo "ok  : activation has no whole-Brewfile cleanup rejection"
+fi
 assert_eq "nix.enable = false (Determinate owns the daemon)" 'false' "$(eval_raw nix.enable)"
 assert_eq "system.primaryUser is set (placeholder in pure eval)" '"runner"' "$(eval_raw system.primaryUser)"
 

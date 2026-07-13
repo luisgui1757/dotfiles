@@ -396,6 +396,8 @@ capture_mac_state() {
     write_private_file "$recovery/brew-repository" "$brew_repository"
     brew list --formula --versions | LC_ALL=C sort > "$recovery/brew-formulae.before"
     brew list --cask --versions | LC_ALL=C sort > "$recovery/brew-casks.before"
+    # Compatibility evidence for recovery directories created by releases that
+    # predate mixed Homebrew tap ownership. Current setup creates no new backup.
     find "$library" -mindepth 1 -maxdepth 1 -type d \
         -name 'Taps.dotfiles-pre-nix-*' -print 2>/dev/null | LC_ALL=C sort \
         > "$recovery/tap-backups.before"
@@ -626,6 +628,8 @@ restore_mac_taps() {
     local recovery="$1" repository library current candidate_count candidate quarantine
     repository="$loaded_brew_repository"
     library="$repository/Library"
+    # Restore only a legacy tap-migration backup created during this upgrade.
+    # With mutable taps, current setup creates none and this returns unchanged.
     current="$recovery/tap-backups.current"
     find "$library" -mindepth 1 -maxdepth 1 -type d \
         -name 'Taps.dotfiles-pre-nix-*' -print 2>/dev/null | LC_ALL=C sort > "$current"

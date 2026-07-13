@@ -8,9 +8,6 @@
 , userHome
 , ...
 }:
-let
-  hostedCiHomebrewCleanup = builtins.getEnv "DOTFILES_NIX_DARWIN_HOSTED_CI" == "1";
-in
 {
   # Determinate Systems owns the Nix daemon on the proving host, so nix-darwin
   # must NOT try to manage Nix itself (that would fight the Determinate daemon).
@@ -40,15 +37,14 @@ in
       # Never mutate the world implicitly: no `brew update`, no `brew upgrade`.
       autoUpdate = false;
       upgrade = false;
-      # Report drift (uninstall-what-is-not-declared) WITHOUT destroying it.
-      # GitHub's hosted macOS images ship a large preinstalled Brew surface, so
-      # setup.sh passes DOTFILES_NIX_DARWIN_HOSTED_CI=1 only for that disposable
-      # activation path. Real hosts keep the strict drift check.
-      cleanup = if hostedCiHomebrewCleanup then "none" else "check";
+      # Homebrew is a mixed-ownership package plane: nix-darwin installs the
+      # repo-declared subset, while install-deps and the user may own additional
+      # formulae/casks. Never reject or remove those unrelated packages.
+      cleanup = "none";
     };
 
-    # With nix-homebrew mutableTaps=false, the declared taps are the pinned flake
-    # inputs; mirror them here so the homebrew module does not try to re-tap.
+    # The declared taps are pinned flake inputs; mirror them here so the Homebrew
+    # module consumes the same repo-owned subset while unrelated taps coexist.
     taps = builtins.attrNames config.nix-homebrew.taps;
 
     casks = [

@@ -179,23 +179,19 @@ Brew-backed preview phase without claiming the bootstrap already happened.
 The Nix-owned CLI set includes Node 24 so the pinned npm-backed Pi CLI can run
 reproducibly on macOS/Linux/WSL while the `pi` package itself stays pinned by
 npm integrity until nixpkgs catches up.
-On real Macs, nix-darwin keeps `homebrew.onActivation.cleanup = "check"` so
-undeclared Brew drift aborts activation without uninstalling anything. The
-GitHub-hosted macOS setup job is the only exception: setup passes a
-repo-scoped `DOTFILES_NIX_DARWIN_HOSTED_CI=1` marker because runner images ship
-a large preinstalled Brew surface outside this dotfiles Brewfile. The marker is
-only automatic when Actions reports `RUNNER_ENVIRONMENT=github-hosted` and
-`RUNNER_OS=macOS`; self-hosted Macs keep the strict drift check.
+Homebrew is intentionally mixed ownership on macOS. nix-darwin installs the
+repo-declared subset with `homebrew.onActivation.cleanup = "none"`; it never
+rejects or removes extra formulae/casks installed by `install-deps.sh` or the
+user. The same non-destructive contract applies on real Macs and hosted CI, so
+there is no environment-only cleanup bypass.
 nix-homebrew uses `autoMigrate = true` so Macs that already have official-script
 Homebrew can be adopted by the declarative Nix layer; upstream's migration keeps
-installed packages while replacing the Homebrew repositories. Because this repo
-keeps `mutableTaps = false`, setup moves an existing architecture-correct tap
-directory (`/opt/homebrew/Library/Taps`) to a unique timestamped backup.
-Activation, bootstrap, or interruption failure quarantines any replacement and
-restores the original taps; rollback failure prints exact manual recovery. On
-success the backup remains available. The `nikitabobko/tap` tap is also
-explicitly trusted through nix-homebrew because Homebrew 5 refuses to load
-personal-tap casks, including AeroSpace, without a trust entry.
+installed packages while replacing the Homebrew repository. `mutableTaps = true`
+lets the pinned repo taps coexist with unrelated user taps: activation refreshes
+the repo-declared tap contents from `flake.lock` without moving or replacing the
+whole `Library/Taps` directory. The `nikitabobko/tap` tap is explicitly trusted
+through nix-homebrew because Homebrew 5 refuses to load personal-tap casks,
+including AeroSpace, without a trust entry.
 **nvim and the
 tree-sitter CLI stay native** (ABI-coupled to nvim-treesitter parser builds;
 migrating them into a same-closure toolchain is a follow-up). Native Windows is
@@ -720,7 +716,7 @@ The e2e jobs cover different install paths, not symmetric container platforms:
 |---|---|
 | `e2e containers / ubuntu-24.04` | Clean `ubuntu:24.04`, non-root user, native `apt`, no Linuxbrew (`DOTFILES_SKIP_BREW_BOOTSTRAP=1`), then `install-deps.sh --all`, chezmoi config apply, executable/version probes including `zoxide`, `gh`, WezTerm, Herdr, Neovim >= 0.12, lazygit, zsh plugin files, config content assertions, and nvim directory realpath assertion. This is the native installer regression fixture, not the Nix-backed public POSIX package-plane proof; it does not assert Pi CLI because Node 24 comes from the Nix package layer. |
 | `setup.sh / ubuntu-24.04` | Full public Unix setup on the hosted Ubuntu runner after installing Nix in CI: Home Manager first, then native/deferred installs, chezmoi, Lazy, Tree-sitter, Mason, and Sentinel. Its clean login/interactive PATH proof resolves the effective account's actual login zsh from the account database; this matters because fresh Ubuntu has no `/usr/bin/zsh` and setup selects Linuxbrew zsh. The shell must resolve `rg` from Nix with no caller PATH injection. |
-| `setup.sh / macos-26` | Full public Apple Silicon setup through the hosted runner: architecture-matched nix-darwin/declarative Homebrew, native/deferred installs, real Ghostty/WezTerm config consumption, installed AeroSpace app/CLI identity agreement, chezmoi, Lazy, Tree-sitter, Mason, and Sentinel. AeroSpace waits for a user-granted Accessibility permission before parsing user config or starting its CLI server, so managed-config consumption remains explicit TCC-enabled desktop proof in `tests/MANUAL.md`; hosted CI does not pretend to prove it. The hosted runner alone gets the cleanup override; real hosts keep `cleanup = "check"`. |
+| `setup.sh / macos-26` | Full public Apple Silicon setup through the hosted runner: architecture-matched nix-darwin/declarative Homebrew, native/deferred installs, real Ghostty/WezTerm config consumption, installed AeroSpace app/CLI identity agreement, chezmoi, Lazy, Tree-sitter, Mason, and Sentinel. AeroSpace waits for a user-granted Accessibility permission before parsing user config or starting the CLI server, so managed-config consumption remains explicit TCC-enabled desktop proof in `tests/MANUAL.md`; hosted CI does not pretend to prove it. Hosted and real Macs share the same mixed-ownership Homebrew contract: declared packages/taps are applied while unrelated user state is preserved. |
 | `setup.ps1 / windows-2025` | Full Windows setup through the real Windows hosted runner, including Scoop/winget/choco behavior, PowerShell, symlinks, Hack Nerd Font file/registry consumption, `zoxide`/`gh`/WezTerm/Herdr/Pi CLI command probes, and Neovim restore/sync phases. Windows containers do not model the desktop/user-profile setup well. |
 
 After the Lazy restore, deterministic Tree-sitter parser install, and Mason sync, each

@@ -17,9 +17,10 @@
     };
     nix-homebrew.url = "github:zhaofengli/nix-homebrew";
 
-    # Homebrew taps pinned as (non-flake) inputs so nix-homebrew can run with
-    # mutableTaps = false (reproducible, no implicit tap mutation). These are the
-    # source repos for the declarative casks/brews (WezTerm, AeroSpace, Herdr).
+    # Homebrew taps pinned as (non-flake) inputs. nix-homebrew refreshes these
+    # repo-declared taps from the lock while allowing unrelated user taps to
+    # coexist. These are the source repos for the declarative casks/brews
+    # (WezTerm, AeroSpace, Herdr).
     homebrew-core = {
       url = "github:homebrew/homebrew-core";
       flake = false;
@@ -86,7 +87,9 @@
                 enable = true;
                 user = username;
                 autoMigrate = true;
-                mutableTaps = false;
+                # Homebrew is intentionally mixed ownership: the repo pins the
+                # taps it consumes, while install-deps and the user may add taps.
+                mutableTaps = true;
                 trust.taps = [
                   # Homebrew 5 refuses personal-tap casks unless the tap is
                   # explicitly trusted. This is the documented AeroSpace trust

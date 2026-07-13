@@ -203,8 +203,8 @@ commits, recovery path, provider inventory, and whether any user data changed.
       ref from `flake.lock`). Confirm activation uses sudo but targets the
       setup-validated real invoking user/home via `DOTFILES_TARGET_*` (not
       `root` or a fabricated home), installs the WezTerm + AeroSpace casks and the Herdr brew via
-      declarative Homebrew (no `brew update`/`upgrade`; `cleanup = check` only
-      reports drift), and puts the nix-owned CLI set on PATH from
+      declarative Homebrew (no `brew update`/`upgrade`; `cleanup = none`
+      preserves mixed-ownership packages), and puts the nix-owned CLI set on PATH from
       `~/.nix-profile` / the system profile.
       On a first bootstrap with existing `/etc/bashrc` or `/etc/zshrc`, confirm
       setup retains their exact bytes at `.before-nix-darwin`; an injected
@@ -214,14 +214,10 @@ commits, recovery path, provider inventory, and whether any user data changed.
       must print explicit compare/resolve/retry guidance.
       If Homebrew already existed, confirm nix-homebrew auto-migrated the
       Homebrew repositories while keeping installed packages. If the old
-      architecture-correct `Library/Taps` directory existed, confirm setup moved
-      it to a `Taps.dotfiles-pre-nix-*` backup and nix-homebrew replaced it with
-      the declarative pinned tap symlink. Inject/fix an activation failure and
-      confirm the original taps return before retrying. Confirm
-      `brew tap-info nikitabobko/tap`
+      `Library/Taps` contains an unrelated user tap, confirm setup leaves that
+      tap installed across two runs while refreshing the repo-declared pinned
+      taps. Confirm `brew tap-info nikitabobko/tap`
       reports a trusted tap so Homebrew 5 can load the AeroSpace cask.
-      The `DOTFILES_NIX_DARWIN_HOSTED_CI=1` cleanup override is only for
-      GitHub's disposable macOS runner; do not use it for this real-host check.
 - [x] **Historical Intel macOS hosted runtime proof (platform retired)**: exact head
       `f4b63953f2f982702a685358b09e89bae2d78fdd` passed the real
       `macos-26-intel` Nix job (`29092384007` / `86360593091`) and full setup job

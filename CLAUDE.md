@@ -331,14 +331,15 @@ that violates one of these, fix it instead of disabling the test.
     Silicon, selects `dotfiles-aarch64`, and rejects every other architecture
     before Nix/Homebrew activation. The compatibility `dotfiles` alias is also
     Apple Silicon; no other Darwin system/configuration is exported.
-    Homebrew's Library/Taps root follows its repository or `/opt/homebrew`.
-    Tap migration is transactional: activation,
-    bootstrap, or interruption failure restores the original tree or emits
-    exact recovery instructions. First nix-darwin bootstrap also preflights and
-    preserves existing `/etc/bashrc` and `/etc/zshrc` at their documented
-    `.before-nix-darwin` paths; collisions fail before either move, and
-    activation failure/interruption quarantines generated replacements before
-    restoring both originals. Guarded by `setup_target_identity_test.sh`,
+    Homebrew is mixed ownership: nix-darwin applies the declared subset with
+    `cleanup = "none"`, and `mutableTaps = true` refreshes the pinned repo taps
+    while preserving additional user formulae, casks, and taps. setup never
+    moves or replaces the whole Homebrew `Library/Taps` directory. First
+    nix-darwin bootstrap also preflights and preserves existing `/etc/bashrc`
+    and `/etc/zshrc` at their documented `.before-nix-darwin` paths; collisions
+    fail before either move, and activation failure/interruption quarantines
+    generated replacements before restoring both originals. Guarded by
+    `setup_target_identity_test.sh`,
     `setup_nix_darwin_test.sh`, `darwin_config_test.sh`, and
     `darwin_platform_contract_test.sh`.
 25. **Windows setup uses application-consumed known folders, not fabricated
@@ -1807,28 +1808,24 @@ pipe-to-shell bootstrap.
 - **nix-darwin (`nix/darwin/configuration.nix`).** `nix.enable = false` — the
   **Determinate** daemon owns Nix, so nix-darwin must not fight it. Declarative
   Homebrew: `onActivation` `autoUpdate = false`, `upgrade = false`,
-  `cleanup = "check"` (report drift, never destroy); casks = WezTerm + AeroSpace
+  `cleanup = "none"` (preserve mixed-ownership packages); casks = WezTerm + AeroSpace
   (GUI/vendor apps, never nixpkgs); brews = Herdr. nix-homebrew runs
   `autoMigrate = true` (adopt an existing official-script Homebrew install while
-  keeping installed packages), `mutableTaps = false` with the taps supplied as
-  pinned inputs, `trust.taps = [ "nikitabobko/tap" ]` so Homebrew 5 can load
-  the AeroSpace personal-tap cask, and
+  keeping installed packages), `mutableTaps = true` so the taps supplied as
+  pinned inputs coexist with unrelated user taps,
+  `trust.taps = [ "nikitabobko/tap" ]` so Homebrew 5 can load the AeroSpace
+  personal-tap cask, and
   `homebrew.taps = builtins.attrNames config.nix-homebrew.taps`.
   `system.primaryUser` + `users.users.<user>.home` come from setup's validated
   `DOTFILES_TARGET_USER` / `DOTFILES_TARGET_HOME`; pure evaluation alone uses an
-  inert `runner` placeholder. setup.sh discovers Homebrew's repository or uses
-  its architecture default, moves a pre-existing `Library/Taps` directory to a
-  collision-safe timestamped backup, and restores it transactionally on
-  activation/bootstrap/interruption failure. First bootstrap likewise moves
+  inert `runner` placeholder. Activation refreshes the declared pinned tap
+  directories in place and leaves every unrelated tap/package untouched; setup
+  performs no whole-`Library/Taps` migration. First bootstrap moves
   existing `/etc/bashrc` and `/etc/zshrc` only to collision-free
   `.before-nix-darwin` backups; failed/interrupted activation restores the old
   files and preserves generated replacements for diagnosis.
-  The only `cleanup = "none"` path is the explicit
-  `DOTFILES_NIX_DARWIN_HOSTED_CI=1` override passed by setup.sh on GitHub's
-  disposable macOS runner, whose preinstalled Brew surface is intentionally not
-  this repo's Brewfile. The predicate requires `GITHUB_ACTIONS=true`,
-  `RUNNER_ENVIRONMENT=github-hosted`, and `RUNNER_OS=macOS`; self-hosted Macs
-  are real hosts and must keep the strict `cleanup = "check"` drift report.
+  The mixed-ownership cleanup/tap contract is identical on real Macs and hosted
+  CI; no environment marker weakens or changes it.
 - **User resolution.** setup.sh resolves one actual non-root account and account
   home before any install phase, requires `HOME` to identify the same directory,
   and passes both variables through `sudo env`. The flake ignores ambient

@@ -45,8 +45,6 @@ BEST_EFFORT=0
 EXPERIMENTAL_WSL_GUI=0
 NIX_DARWIN=0
 HOME_MANAGER=0
-NIX_HOMEBREW_TAPS_PATH=""
-NIX_HOMEBREW_TAPS_BACKUP=""
 NIX_DARWIN_RC_SOURCES=()
 NIX_DARWIN_RC_BACKUPS=()
 SENTINEL_REPO_URL="https://github.com/luisgui1757/sentinel.git"
@@ -176,14 +174,6 @@ phase() {
     echo "================================================================"
     echo "==  $1"
     echo "================================================================"
-}
-
-normalize_machine_arch() {
-    case "$1" in
-        arm64 | aarch64) printf '%s\n' aarch64 ;;
-        x86_64 | amd64) printf '%s\n' x86_64 ;;
-        *) return 1 ;;
-    esac
 }
 
 release_git() {
@@ -994,135 +984,20 @@ pinned_home_manager_run_ref() {
         "$rev" "$(nix_flake_ref_query_encode "$nar_hash")"
 }
 
-nix_darwin_hosted_ci_cleanup_override() {
-    [[ "${DOTFILES_TEST_GITHUB_ACTIONS:-}" == "1" ]] && return 0
-    [[ "${GITHUB_ACTIONS:-}" == "true" ]] || return 1
-    [[ "${DOTFILES_SETUP_SOURCE_ONLY_ACTIVE:-}" != "1" ]] || return 1
-    [[ "${RUNNER_ENVIRONMENT:-}" == "github-hosted" ]] || return 1
-    [[ "${RUNNER_OS:-}" == "macOS" ]]
-}
-
 sudo_nix_darwin_activation() {
     local target_user="${DOTFILES_TARGET_USER:-}" target_home="${DOTFILES_TARGET_HOME:-}"
     if [[ -z "$target_user" || -z "$target_home" ]]; then
         echo "  FAIL: validated target identity is missing before nix-darwin activation." >&2
         return 1
     fi
-    if nix_darwin_hosted_ci_cleanup_override; then
-        sudo env DOTFILES_TARGET_USER="$target_user" DOTFILES_TARGET_HOME="$target_home" \
-            DOTFILES_NIX_DARWIN_HOSTED_CI=1 "$@"
-    else
-        sudo env DOTFILES_TARGET_USER="$target_user" DOTFILES_TARGET_HOME="$target_home" "$@"
-    fi
+    sudo env DOTFILES_TARGET_USER="$target_user" DOTFILES_TARGET_HOME="$target_home" "$@"
 }
 
 nix_darwin_sudo_preview() {
     local target_user="${DOTFILES_TARGET_USER:-<resolved-user>}"
     local target_home="${DOTFILES_TARGET_HOME:-<resolved-home>}"
     printf 'sudo env DOTFILES_TARGET_USER=%q DOTFILES_TARGET_HOME=%q ' "$target_user" "$target_home"
-    if nix_darwin_hosted_ci_cleanup_override; then
-        printf 'DOTFILES_NIX_DARWIN_HOSTED_CI=1 %s' "$1"
-    else
-        printf '%s' "$1"
-    fi
-}
-
-nix_homebrew_library_dir() {
-    local arch brew_bin repository
-    if [[ -n "${DOTFILES_HOMEBREW_LIBRARY:-}" ]]; then
-        printf '%s\n' "$DOTFILES_HOMEBREW_LIBRARY"
-        return 0
-    fi
-    brew_bin="$(command -v brew 2>/dev/null || true)"
-    if [[ -n "$brew_bin" ]] && repository="$("$brew_bin" --repository 2>/dev/null)" && [[ "$repository" == /* ]]; then
-        printf '%s/Library\n' "${repository%/}"
-        return 0
-    fi
-    arch="$(normalize_machine_arch "$(uname -m)")" || {
-        echo "  FAIL: cannot resolve the Homebrew library for unsupported architecture $(uname -m)." >&2
-        return 1
-    }
-    case "$arch" in
-        aarch64) printf '%s\n' /opt/homebrew/Library ;;
-        *)
-            echo "  FAIL: Homebrew tap migration is supported only on Apple Silicon macOS." >&2
-            return 1
-            ;;
-    esac
-}
-
-prepare_nix_homebrew_declarative_taps() {
-    local library taps stamp backup_base backup i
-    NIX_HOMEBREW_TAPS_PATH=""
-    NIX_HOMEBREW_TAPS_BACKUP=""
-    library="$(nix_homebrew_library_dir)" || return 1
-    taps="$library/Taps"
-    [[ -e "$taps" && ! -L "$taps" ]] || return 0
-
-    stamp="${DOTFILES_TEST_TIMESTAMP:-$(date +%Y%m%d%H%M%S)}"
-    backup_base="$library/Taps.dotfiles-pre-nix-$stamp"
-    backup="$backup_base"
-    i=0
-    while [[ -e "$backup" ]]; do
-        i=$((i + 1))
-        backup="$backup_base.$i"
-    done
-
-    echo "  note      nix-homebrew mutableTaps=false needs to own $taps"
-    echo "            moving existing taps to $backup before activation."
-    if [[ "$DRY_RUN" -eq 1 ]]; then
-        echo "  would: sudo mv $taps $backup"
-        return 0
-    fi
-    if [[ "$ALL" -eq 0 ]]; then
-        if ! ask_yes_no_default_yes "Move existing Homebrew taps aside for declarative nix-homebrew?"; then
-            echo "  FAIL: nix-homebrew mutableTaps=false cannot activate while $taps exists." >&2
-            echo "        Move it aside or re-run with --skip-deps on an already provisioned host." >&2
-            return 1
-        fi
-    fi
-    NIX_HOMEBREW_TAPS_PATH="$taps"
-    NIX_HOMEBREW_TAPS_BACKUP="$backup"
-    if ! sudo mv "$taps" "$backup"; then
-        NIX_HOMEBREW_TAPS_PATH=""
-        NIX_HOMEBREW_TAPS_BACKUP=""
-        echo "  FAIL: could not move existing Homebrew taps from $taps to $backup." >&2
-        return 1
-    fi
-}
-
-rollback_nix_homebrew_declarative_taps() {
-    local taps="$NIX_HOMEBREW_TAPS_PATH" backup="$NIX_HOMEBREW_TAPS_BACKUP"
-    local stamp failed_base failed i=0
-    [[ -n "$taps" && -n "$backup" ]] || return 0
-    if [[ ! -e "$backup" && ! -L "$backup" ]]; then
-        echo "  FAIL: tap rollback backup is missing: $backup" >&2
-        echo "        Preserve $taps and restore the backup manually before retrying." >&2
-        return 1
-    fi
-    if [[ -e "$taps" || -L "$taps" ]]; then
-        stamp="${DOTFILES_TEST_TIMESTAMP:-$(date +%Y%m%d%H%M%S)}"
-        failed_base="$taps.dotfiles-failed-$stamp"
-        failed="$failed_base"
-        while [[ -e "$failed" || -L "$failed" ]]; do
-            i=$((i + 1))
-            failed="$failed_base.$i"
-        done
-        if ! sudo mv "$taps" "$failed"; then
-            echo "  FAIL: activation failed and rollback could not move the replacement taps at $taps." >&2
-            echo "        Original taps remain safe at $backup; move the replacement aside, then restore them." >&2
-            return 1
-        fi
-        echo "  note      failed activation taps preserved at $failed"
-    fi
-    if ! sudo mv "$backup" "$taps"; then
-        echo "  FAIL: activation failed and automatic tap rollback could not restore $backup." >&2
-        echo "        Restore it manually with: sudo mv '$backup' '$taps'" >&2
-        return 1
-    fi
-    echo "  restored  pre-activation Homebrew taps from $backup"
-    NIX_HOMEBREW_TAPS_PATH=""
-    NIX_HOMEBREW_TAPS_BACKUP=""
+    printf '%s' "$1"
 }
 
 nix_darwin_etc_dir() {
@@ -1257,25 +1132,16 @@ complete_nix_darwin_shell_rc_migration() {
     NIX_DARWIN_RC_BACKUPS=()
 }
 
-nix_homebrew_activation_interrupted() {
+nix_darwin_activation_interrupted() {
     local signal="$1" rc=130 rollback_failed=0
     [[ "$signal" == "TERM" ]] && rc=143
     trap - INT TERM
     echo "  FAIL: nix-darwin activation interrupted by $signal; restoring pre-activation state." >&2
     rollback_nix_darwin_shell_rc_migration || rollback_failed=1
-    rollback_nix_homebrew_declarative_taps || rollback_failed=1
     if [[ "$rollback_failed" -ne 0 ]]; then
         echo "        Automatic rollback was incomplete; follow the recovery instructions above before retrying." >&2
     fi
     exit "$rc"
-}
-
-complete_nix_homebrew_tap_transaction() {
-    if [[ -n "$NIX_HOMEBREW_TAPS_BACKUP" ]]; then
-        echo "  backup    pre-activation Homebrew taps retained at $NIX_HOMEBREW_TAPS_BACKUP"
-    fi
-    NIX_HOMEBREW_TAPS_PATH=""
-    NIX_HOMEBREW_TAPS_BACKUP=""
 }
 
 # Required POSIX package layer: apply Nix (nix-darwin) on macOS before native
@@ -1332,10 +1198,6 @@ run_nix_darwin_switch() {
     echo "  declarative Homebrew (WezTerm/AeroSpace casks, Herdr brew) + nix CLI set."
     echo "  It uses sudo for nix-darwin's upstream activation shape while passing"
     echo "  the setup-validated target user/home explicitly through the boundary."
-    if nix_darwin_hosted_ci_cleanup_override; then
-        echo "  GitHub-hosted macOS runner mode: Homebrew cleanup check is disabled for"
-        echo "  this disposable activation only because runner images preinstall Brew tools."
-    fi
     if [[ "$DRY_RUN" -eq 1 ]]; then
         echo "  would: $(nix_darwin_sudo_preview "darwin-rebuild") switch --flake $flake_ref --impure"
         echo "         (first-time bootstrap: $(nix_darwin_sudo_preview "nix") run $bootstrap_ref -- switch --flake $flake_ref --impure)"
@@ -1351,21 +1213,14 @@ run_nix_darwin_switch() {
             return 1
         fi
     fi
-    trap 'nix_homebrew_activation_interrupted INT' INT
-    trap 'nix_homebrew_activation_interrupted TERM' TERM
-    if ! prepare_nix_homebrew_declarative_taps; then
-        trap - INT TERM
-        return 1
-    fi
+    trap 'nix_darwin_activation_interrupted INT' INT
+    trap 'nix_darwin_activation_interrupted TERM' TERM
     if command -v darwin-rebuild >/dev/null 2>&1; then
         if ! sudo_nix_darwin_activation darwin-rebuild switch --flake "$flake_ref" --impure; then
             trap - INT TERM
             echo "  FAIL: nix-darwin activation failed; setup did not apply the requested Nix package layer." >&2
             if ! rollback_nix_darwin_shell_rc_migration; then
                 echo "        Shell-file rollback also failed; follow the recovery instructions above before retrying." >&2
-            fi
-            if ! rollback_nix_homebrew_declarative_taps; then
-                echo "        Tap rollback also failed; follow the recovery instructions above before retrying." >&2
             fi
             echo "        Re-run './setup.sh' after fixing the activation error." >&2
             return 1
@@ -1374,9 +1229,6 @@ run_nix_darwin_switch() {
         echo "  bootstrapping nix-darwin from flake.lock ($bootstrap_ref)..."
         if ! prepare_nix_darwin_shell_rc_migration; then
             trap - INT TERM
-            if ! rollback_nix_homebrew_declarative_taps; then
-                echo "        Tap rollback also failed; follow the recovery instructions above before retrying." >&2
-            fi
             return 1
         fi
         if ! sudo_nix_darwin_activation nix run "$bootstrap_ref" -- switch --flake "$flake_ref" --impure; then
@@ -1385,16 +1237,12 @@ run_nix_darwin_switch() {
             if ! rollback_nix_darwin_shell_rc_migration; then
                 echo "        Shell-file rollback also failed; follow the recovery instructions above before retrying." >&2
             fi
-            if ! rollback_nix_homebrew_declarative_taps; then
-                echo "        Tap rollback also failed; follow the recovery instructions above before retrying." >&2
-            fi
             echo "        Re-run './setup.sh' after fixing the activation error." >&2
             return 1
         fi
     fi
     trap - INT TERM
     complete_nix_darwin_shell_rc_migration
-    complete_nix_homebrew_tap_transaction
     echo "  ok        nix-darwin package layer applied"
 }
 

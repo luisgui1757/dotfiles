@@ -5,8 +5,8 @@
 # switches); --skip-deps is the explicit already-provisioned escape even when
 # paired with the compatibility alias; non-macOS hosts are skipped; Apple
 # Silicon selects the only configuration; every other architecture fails
-# closed; tap migration rolls back transactionally; and first-run bootstrap
-# uses the flake.lock-pinned nix-darwin rev + narHash, never a mutable alias.
+# closed; existing user Homebrew taps survive repeated activation; and first-run
+# bootstrap uses the flake.lock-pinned nix-darwin rev + narHash, never a mutable alias.
 set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 WORK="$REPO_ROOT/tests/.cache/nix-darwin-setup-test"
@@ -37,7 +37,7 @@ enable_nix_path() {
 
 # probe <setup-args> <fake-uname-os> <installed|bootstrap> -> echoes attempted commands.
 probe() {
-    local setup_args="$1" fake_os="$2" mode="${3:-installed}" fake_arch="${4:-arm64}" github_actions="${5:-0}"
+    local setup_args="$1" fake_os="$2" mode="${3:-installed}" fake_arch="${4:-arm64}"
     local script="$WORK/probe.sh"
     : > "$WORK/calls"
     {
@@ -50,12 +50,6 @@ export PATH
 DOTFILES_TARGET_USER=tester
 DOTFILES_TARGET_HOME=/Users/tester
 export DOTFILES_TARGET_USER DOTFILES_TARGET_HOME
-DOTFILES_HOMEBREW_LIBRARY="$WORK/probe-homebrew/Library"
-mkdir -p "\$DOTFILES_HOMEBREW_LIBRARY"
-export DOTFILES_HOMEBREW_LIBRARY
-if [ "$github_actions" = "1" ]; then
-    export DOTFILES_TEST_GITHUB_ACTIONS=1
-fi
 nix() {
     if [ "\${1:-}" = eval ]; then
         printf '%s\n%s\n' "\$LOCKED_NIX_DARWIN_REV" "$LOCKED_NIX_DARWIN_NAR_HASH"
@@ -77,30 +71,6 @@ EOF
     } > "$script"
     bash "$script" || true
     if [[ -s "$WORK/calls" ]]; then cat "$WORK/calls"; else echo "NOCALL"; fi
-}
-
-cleanup_override_probe() {
-    local github_actions="$1" runner_environment="$2" runner_os="$3" test_override="${4:-0}"
-    local script="$WORK/cleanup-override-probe.sh"
-    cat > "$script" <<EOF
-set -uo pipefail
-DOTFILES_SETUP_SOURCE_ONLY=1 source "$REPO_ROOT/setup.sh" --all >/dev/null 2>&1
-unset DOTFILES_SETUP_SOURCE_ONLY_ACTIVE
-export GITHUB_ACTIONS="$github_actions"
-export RUNNER_ENVIRONMENT="$runner_environment"
-export RUNNER_OS="$runner_os"
-if [ "$test_override" = "1" ]; then
-    export DOTFILES_TEST_GITHUB_ACTIONS=1
-else
-    unset DOTFILES_TEST_GITHUB_ACTIONS
-fi
-if nix_darwin_hosted_ci_cleanup_override; then
-    echo override-on
-else
-    echo override-off
-fi
-EOF
-    bash "$script"
 }
 
 probe_missing_nix() {
@@ -188,42 +158,13 @@ EOF
     bash "$script" 2>&1
 }
 
-probe_taps_migration() {
-    local script="$WORK/taps-migration.sh"
-    local library="$WORK/homebrew/Library"
-    rm -rf "$WORK/homebrew"
-    mkdir -p "$library/Taps/homebrew/homebrew-core"
-    {
-        cat <<EOF
+probe_preserves_user_taps() {
+    local script="$WORK/preserve-user-taps.sh" marker="$WORK/homebrew/Library/Taps/cirruslabs/homebrew-cli/tart.rb"
+    mkdir -p "$(dirname "$marker")"
+    printf '%s\n' '# user-owned tap marker' > "$marker"
+    cat > "$script" <<EOF
 set -uo pipefail
-sudo() {
-    if [[ "\${1:-}" == env ]]; then
-        shift
-        while [[ "\${1:-}" == *=* ]]; do export "\$1"; shift; done
-    fi
-    "\$@"
-}
-DOTFILES_SETUP_SOURCE_ONLY=1 source "$REPO_ROOT/setup.sh" --all >/dev/null 2>&1
-ALL=1
-DRY_RUN=0
-DOTFILES_HOMEBREW_LIBRARY="$library"
-DOTFILES_TEST_TIMESTAMP=20260708000000
-prepare_nix_homebrew_declarative_taps >/dev/null
-[[ ! -e "$library/Taps" && -d "$library/Taps.dotfiles-pre-nix-20260708000000.1/homebrew/homebrew-core" ]]
-EOF
-    } > "$script"
-    mkdir -p "$library/Taps.dotfiles-pre-nix-20260708000000"
-    bash "$script" 2>&1
-}
-
-probe_taps_rollback() {
-    local mode="$1" script="$WORK/taps-rollback-$1.sh"
-    local library="$WORK/homebrew-rollback-$1/Library"
-    rm -rf "${library%/Library}"
-    mkdir -p "$library/Taps/homebrew/homebrew-core"
-    {
-        cat <<EOF
-set -uo pipefail
+marker="$marker"
 sudo() {
     if [[ "\${1:-}" == env ]]; then
         shift
@@ -232,184 +173,21 @@ sudo() {
     "\$@"
 }
 uname() { case "\${1:-}" in -m) echo arm64 ;; *) echo Darwin ;; esac; }
-DOTFILES_SETUP_SOURCE_ONLY=1 source "$REPO_ROOT/setup.sh" --all >/dev/null 2>&1
-ALL=1
-DRY_RUN=0
-DOTFILES_TARGET_USER=tester
-DOTFILES_TARGET_HOME=/Users/tester
-DOTFILES_HOMEBREW_LIBRARY="$library"
-DOTFILES_TEST_TIMESTAMP=20260708000001
-export DOTFILES_TARGET_USER DOTFILES_TARGET_HOME DOTFILES_HOMEBREW_LIBRARY
 nix() {
-    if [ "\${1:-}" = eval ]; then
-        printf '%s\n%s\n' "$LOCKED_NIX_DARWIN_REV" "$LOCKED_NIX_DARWIN_NAR_HASH"
-        return 0
-    fi
-    mkdir -p "$library/Taps/replacement"
-    return 1
-}
-EOF
-        if [[ "$mode" == "installed" ]]; then
-            cat <<EOF
-darwin-rebuild() {
-    mkdir -p "$library/Taps/replacement"
-    return 1
-}
-EOF
-        fi
-        cat <<EOF
-run_nix_darwin_switch >/dev/null 2>&1 && rc=0 || rc=\$?
-[[ "\$rc" -ne 0 ]] || { echo 'activation unexpectedly succeeded'; exit 1; }
-[[ -d "$library/Taps/homebrew/homebrew-core" ]] || { echo 'original taps missing after rollback'; find "$library" -maxdepth 3 -print; exit 1; }
-[[ ! -e "$library/Taps.dotfiles-pre-nix-20260708000001" ]] || { echo 'backup was not consumed by rollback'; exit 1; }
-[[ -d "$library/Taps.dotfiles-failed-20260708000001/replacement" ]] || { echo 'failed replacement was not quarantined'; find "$library" -maxdepth 3 -print; exit 1; }
-EOF
-    } > "$script"
-    bash "$script" 2>&1
-}
-
-probe_taps_signal_rollback() {
-    local script="$WORK/taps-signal-rollback.sh"
-    local library="$WORK/homebrew-signal/Library"
-    rm -rf "${library%/Library}"
-    mkdir -p "$library/Taps/homebrew/homebrew-core"
-    cat > "$script" <<EOF
-set -uo pipefail
-sudo() {
-    if [[ "\${1:-}" == env ]]; then
-        shift
-        while [[ "\${1:-}" == *=* ]]; do export "\$1"; shift; done
-    fi
-    "\$@"
-}
-uname() { case "\${1:-}" in -m) echo arm64 ;; *) echo Darwin ;; esac; }
-DOTFILES_SETUP_SOURCE_ONLY=1 source "$REPO_ROOT/setup.sh" --all >/dev/null 2>&1
-ALL=1
-DRY_RUN=0
-DOTFILES_TARGET_USER=tester
-DOTFILES_TARGET_HOME=/Users/tester
-DOTFILES_HOMEBREW_LIBRARY="$library"
-DOTFILES_TEST_TIMESTAMP=20260708000002
-export DOTFILES_TARGET_USER DOTFILES_TARGET_HOME DOTFILES_HOMEBREW_LIBRARY
-nix() {
-    if [ "\${1:-}" = eval ]; then
+    if [[ "\${1:-}" == eval ]]; then
         printf '%s\n%s\n' "$LOCKED_NIX_DARWIN_REV" "$LOCKED_NIX_DARWIN_NAR_HASH"
     fi
 }
-darwin-rebuild() {
-    mkdir -p "$library/Taps/replacement"
-    kill -TERM \$\$
-}
-run_nix_darwin_switch
-EOF
-    bash "$script" >/dev/null 2>&1 && return 1
-    [[ -d "$library/Taps/homebrew/homebrew-core" ]]
-}
-
-probe_homebrew_library() {
-    local arch="$1" expected="$2" script
-    script="$WORK/homebrew-library-$arch.sh"
-    cat > "$script" <<EOF
-set -uo pipefail
-PATH=/usr/bin:/bin
-export PATH
-uname() { case "\${1:-}" in -m) echo "$arch" ;; *) echo Darwin ;; esac; }
-DOTFILES_SETUP_SOURCE_ONLY=1 source "$REPO_ROOT/setup.sh" >/dev/null 2>&1
-[[ "\$(nix_homebrew_library_dir)" == "$expected" ]]
-EOF
-    bash "$script"
-}
-
-probe_existing_homebrew_repository() {
-    local script="$WORK/homebrew-existing-repository.sh"
-    local repository="$WORK/Brew Repository"
-    mkdir -p "$repository/Library"
-    cat > "$script" <<EOF
-set -uo pipefail
-brew() { [[ "\${1:-}" == --repository ]] && printf '%s\n' "$repository"; }
-DOTFILES_SETUP_SOURCE_ONLY=1 source "$REPO_ROOT/setup.sh" >/dev/null 2>&1
-[[ "\$(nix_homebrew_library_dir)" == "$repository/Library" ]]
-EOF
-    bash "$script"
-}
-
-probe_taps_retry() {
-    local script="$WORK/taps-retry.sh" library="$WORK/homebrew-retry/Library"
-    rm -rf "${library%/Library}"
-    mkdir -p "$library/Taps/homebrew/homebrew-core"
-    cat > "$script" <<EOF
-set -uo pipefail
-sudo() {
-    if [[ "\${1:-}" == env ]]; then
-        shift
-        while [[ "\${1:-}" == *=* ]]; do export "\$1"; shift; done
-    fi
-    "\$@"
-}
-uname() { case "\${1:-}" in -m) echo arm64 ;; *) echo Darwin ;; esac; }
-DOTFILES_SETUP_SOURCE_ONLY=1 source "$REPO_ROOT/setup.sh" --all >/dev/null 2>&1
-ALL=1
-DRY_RUN=0
+darwin-rebuild() { [[ -f "\$marker" ]]; }
 DOTFILES_TARGET_USER=tester
 DOTFILES_TARGET_HOME=/Users/tester
-DOTFILES_HOMEBREW_LIBRARY="$library"
-DOTFILES_TEST_TIMESTAMP=20260708000003
-export DOTFILES_TARGET_USER DOTFILES_TARGET_HOME DOTFILES_HOMEBREW_LIBRARY
-nix() {
-    if [ "\${1:-}" = eval ]; then
-        printf '%s\n%s\n' "$LOCKED_NIX_DARWIN_REV" "$LOCKED_NIX_DARWIN_NAR_HASH"
-    fi
-}
-attempt=0
-darwin-rebuild() {
-    attempt=\$((attempt + 1))
-    mkdir -p "$library/Taps/replacement"
-    [[ "\$attempt" -gt 1 ]]
-}
-run_nix_darwin_switch >/dev/null 2>&1 && exit 1 || true
-[[ -d "$library/Taps/homebrew/homebrew-core" ]]
-run_nix_darwin_switch >/dev/null 2>&1
-[[ -d "$library/Taps/replacement" ]]
-[[ -d "$library/Taps.dotfiles-pre-nix-20260708000003/homebrew/homebrew-core" ]]
-EOF
-    bash "$script"
-}
-
-probe_taps_rollback_failure() {
-    local script="$WORK/taps-rollback-failure.sh" library="$WORK/homebrew-rollback-failure/Library"
-    rm -rf "${library%/Library}"
-    mkdir -p "$library/Taps/homebrew/homebrew-core"
-    cat > "$script" <<EOF
-set -uo pipefail
-sudo() {
-    if [[ "\${1:-}" == env ]]; then
-        shift
-        while [[ "\${1:-}" == *=* ]]; do export "\$1"; shift; done
-    fi
-    if [[ "\${1:-}" == mv && "\${2:-}" == *Taps.dotfiles-pre-nix-* && "\${3:-}" == "$library/Taps" ]]; then
-        return 1
-    fi
-    "\$@"
-}
-uname() { case "\${1:-}" in -m) echo arm64 ;; *) echo Darwin ;; esac; }
+export DOTFILES_TARGET_USER DOTFILES_TARGET_HOME
 DOTFILES_SETUP_SOURCE_ONLY=1 source "$REPO_ROOT/setup.sh" --all >/dev/null 2>&1
-ALL=1
-DRY_RUN=0
-DOTFILES_TARGET_USER=tester
-DOTFILES_TARGET_HOME=/Users/tester
-DOTFILES_HOMEBREW_LIBRARY="$library"
-DOTFILES_TEST_TIMESTAMP=20260708000004
-export DOTFILES_TARGET_USER DOTFILES_TARGET_HOME DOTFILES_HOMEBREW_LIBRARY
-nix() {
-    if [ "\${1:-}" = eval ]; then
-        printf '%s\n%s\n' "$LOCKED_NIX_DARWIN_REV" "$LOCKED_NIX_DARWIN_NAR_HASH"
-    fi
-}
-darwin-rebuild() { mkdir -p "$library/Taps/replacement"; return 1; }
-output="\$(run_nix_darwin_switch 2>&1)" && rc=0 || rc=\$?
-[[ "\$rc" -ne 0 ]]
-[[ -d "$library/Taps.dotfiles-pre-nix-20260708000004/homebrew/homebrew-core" ]]
-[[ "\$output" == *"Restore it manually with:"* ]]
+! declare -F prepare_nix_homebrew_declarative_taps >/dev/null
+! declare -F rollback_nix_homebrew_declarative_taps >/dev/null
+run_nix_darwin_switch >/dev/null
+run_nix_darwin_switch >/dev/null
+[[ "\$(cat "\$marker")" == '# user-owned tap marker' ]]
 EOF
     bash "$script"
 }
@@ -476,7 +254,7 @@ case "$mode" in
         prepare_nix_darwin_shell_rc_migration >/dev/null
         printf '%s\n' managed-bash > "$etc_dir/bashrc"
         printf '%s\n' managed-zsh > "$etc_dir/zshrc"
-        nix_homebrew_activation_interrupted TERM
+        nix_darwin_activation_interrupted TERM
         ;;
 esac
 EOF
@@ -516,21 +294,9 @@ assert_eq "--nix-darwin on a non-macOS host is skipped" \
 assert_eq "--nix-darwin compatibility alias still invokes sudo darwin-rebuild switch" \
     "sudo env DOTFILES_TARGET_USER=tester DOTFILES_TARGET_HOME=/Users/tester darwin-rebuild switch --flake $REPO_ROOT#dotfiles-aarch64 --impure" \
     "$(probe '--all --nix-darwin' Darwin installed)"
-assert_eq "GitHub-hosted macOS activation passes the cleanup-check override through sudo" \
-    "sudo env DOTFILES_TARGET_USER=tester DOTFILES_TARGET_HOME=/Users/tester DOTFILES_NIX_DARWIN_HOSTED_CI=1 darwin-rebuild switch --flake $REPO_ROOT#dotfiles-aarch64 --impure" \
-    "$(probe '--all' Darwin installed arm64 1)"
-assert_eq "cleanup override is limited to GitHub-hosted macOS runners" \
-    override-on "$(cleanup_override_probe true github-hosted macOS)"
-assert_eq "self-hosted macOS runners keep Homebrew cleanup = check" \
-    override-off "$(cleanup_override_probe true self-hosted macOS)"
-assert_eq "GitHub-hosted non-macOS runners do not request the darwin cleanup override" \
-    override-off "$(cleanup_override_probe true github-hosted Linux)"
 assert_eq "default bootstrap uses locked nix-darwin rev" \
     "sudo env DOTFILES_TARGET_USER=tester DOTFILES_TARGET_HOME=/Users/tester nix run $LOCKED_NIX_DARWIN_REF -- switch --flake $REPO_ROOT#dotfiles-aarch64 --impure" \
     "$(probe '--all' Darwin bootstrap)"
-assert_eq "GitHub-hosted macOS bootstrap passes the cleanup-check override through sudo" \
-    "sudo env DOTFILES_TARGET_USER=tester DOTFILES_TARGET_HOME=/Users/tester DOTFILES_NIX_DARWIN_HOSTED_CI=1 nix run $LOCKED_NIX_DARWIN_REF -- switch --flake $REPO_ROOT#dotfiles-aarch64 --impure" \
-    "$(probe '--all' Darwin bootstrap arm64 1)"
 missing_nix_output="$(probe_missing_nix)" && missing_nix_rc=0 || missing_nix_rc=$?
 if [[ "$missing_nix_rc" -ne 0 ]] && [[ "$missing_nix_output" == *"FAIL: Nix is required for macOS setup"* ]]; then
     echo "ok  : macOS setup fails closed when Nix is missing"
@@ -567,52 +333,10 @@ else
     fail=1
 fi
 
-if probe_taps_migration >/dev/null; then
-    echo "ok  : tap backup collision selects a distinct timestamp suffix"
+if probe_preserves_user_taps; then
+    echo "ok  : repeated nix-darwin activation preserves an unrelated user tap"
 else
-    echo "FAIL: existing Homebrew taps were not migrated before nix-homebrew activation"
-    fail=1
-fi
-if probe_taps_rollback installed; then
-    echo "ok  : installed darwin-rebuild activation failure restores original taps"
-else
-    echo "FAIL: installed darwin-rebuild activation failure did not restore original taps"
-    fail=1
-fi
-if probe_taps_rollback bootstrap; then
-    echo "ok  : first-bootstrap activation failure restores original taps"
-else
-    echo "FAIL: first-bootstrap activation failure did not restore original taps"
-    fail=1
-fi
-if probe_taps_signal_rollback; then
-    echo "ok  : interrupted activation restores original taps"
-else
-    echo "FAIL: interrupted activation did not restore original taps"
-    fail=1
-fi
-if probe_homebrew_library arm64 /opt/homebrew/Library; then
-    echo "ok  : default Homebrew library path is Apple Silicon native"
-else
-    echo "FAIL: default Homebrew library path is not Apple Silicon native"
-    fail=1
-fi
-if probe_existing_homebrew_repository; then
-    echo "ok  : existing Homebrew repository path with spaces drives Library discovery"
-else
-    echo "FAIL: existing Homebrew repository was ignored"
-    fail=1
-fi
-if probe_taps_retry; then
-    echo "ok  : activation retry succeeds after transactional rollback"
-else
-    echo "FAIL: activation retry did not recover cleanly"
-    fail=1
-fi
-if probe_taps_rollback_failure; then
-    echo "ok  : rollback failure preserves backup and emits exact recovery"
-else
-    echo "FAIL: rollback failure was not explicit or did not preserve backup"
+    echo "FAIL: setup moved or altered a user-owned Homebrew tap"
     fail=1
 fi
 if probe_shell_rc_migration success; then
