@@ -14,6 +14,17 @@ while IFS= read -r base_image; do
 done < <(sed -n 's/^FROM \([^ ]*\)\( AS [^ ]*\)\{0,1\}$/\1/p' "$dockerfile")
 echo "ok  : Linux lifecycle container bases are immutable digest pins"
 
+docker_driver="$REPO_ROOT/tests/greenfield/docker-linux-owner-lifecycle.sh"
+container_driver="$REPO_ROOT/tests/ci/linux-owner-lifecycle-container.sh"
+grep -F "git -C \"\$REPO_ROOT\" bundle create \"\$bundle\" HEAD" "$docker_driver" >/dev/null ||
+    fail "Linux lifecycle driver must export the exact committed HEAD as a Git bundle"
+grep -F "[[ \"\$actual_head\" == \"\$expected_head\" ]]" "$container_driver" >/dev/null ||
+    fail "Linux lifecycle container must verify the bundled checkout commit"
+if grep -F -- "--volume \"\$REPO_ROOT:/repo:ro\"" "$docker_driver" >/dev/null; then
+    fail "Linux lifecycle must not copy Docker Desktop's bind-mounted .git directory"
+fi
+echo "ok  : Linux lifecycle transports and verifies an exact-HEAD Git bundle"
+
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 fake_bin="$WORK/bin"

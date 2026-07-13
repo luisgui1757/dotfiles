@@ -13,6 +13,7 @@ RUN apt-get update \
     && printf '%s\n' 'experimental-features = nix-command flakes' 'sandbox = false' > /etc/nix/nix.conf
 
 COPY --from=nix --chown=dotfiles:dotfiles /nix /nix
+COPY --chown=root:root tests/ci/linux-owner-lifecycle-container.sh /usr/local/bin/dotfiles-linux-owner-lifecycle-container
 
 ENV NIX_REMOTE=local
 ENV PATH=/nix/var/nix/profiles/default/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
