@@ -261,6 +261,22 @@ function Test-PathListContains {
     return $false
 }
 
+function Get-PathListWithDirectoryFirst {
+    param([string]$PathValue, [Parameter(Mandatory)][string]$Directory)
+    $needle = Normalize-PathListEntry $Directory
+    if (-not $needle) { throw 'PATH directory must not be empty' }
+
+    $parts = [Collections.Generic.List[string]]::new()
+    $parts.Add($Directory)
+    foreach ($part in ($PathValue -split ';')) {
+        $trimmed = $part.Trim()
+        if ([string]::IsNullOrWhiteSpace($trimmed)) { continue }
+        if ((Normalize-PathListEntry $trimmed).Equals($needle, [StringComparison]::OrdinalIgnoreCase)) { continue }
+        $parts.Add($trimmed)
+    }
+    return ($parts -join ';')
+}
+
 function Add-DirectoryToUserPath {
     param([Parameter(Mandatory)][string]$Directory)
     $full = [IO.Path]::GetFullPath($Directory)
@@ -268,13 +284,11 @@ function Add-DirectoryToUserPath {
         throw "PATH directory does not exist: $full"
     }
 
-    if (-not (Test-PathListContains -PathValue $env:PATH -Directory $full)) {
-        $env:PATH = "$full;$env:PATH"
-    }
+    $env:PATH = Get-PathListWithDirectoryFirst -PathValue $env:PATH -Directory $full
 
     $userPath = [Environment]::GetEnvironmentVariable('PATH', 'User')
-    if (-not (Test-PathListContains -PathValue $userPath -Directory $full)) {
-        $newUserPath = if ([string]::IsNullOrWhiteSpace($userPath)) { $full } else { "$userPath;$full" }
+    $newUserPath = Get-PathListWithDirectoryFirst -PathValue $userPath -Directory $full
+    if (-not $newUserPath.Equals([string]$userPath, [StringComparison]::OrdinalIgnoreCase)) {
         [Environment]::SetEnvironmentVariable('PATH', $newUserPath, 'User')
     }
 }

@@ -937,6 +937,21 @@ Describe "install-deps.ps1" {
         { Get-TreeSitterWindowsArtifact -Architecture riscv64 } | Should -Throw '*unsupported Windows architecture*'
     }
 
+    It "promotes an owned Windows PATH directory once without removing other entries" {
+        . $script:ImportInstallDepsForTest
+        $managed = Join-Path $TestDrive 'managed bin'
+        $shadow = Join-Path $TestDrive 'shadow bin'
+        $other = Join-Path $TestDrive 'other bin'
+        $pathValue = "$shadow;$managed\;$other;$managed"
+
+        $parts = @((Get-PathListWithDirectoryFirst -PathValue $pathValue -Directory $managed) -split ';')
+
+        $parts | Should -HaveCount 3
+        $parts[0] | Should -Be $managed
+        $parts[1] | Should -Be $shadow
+        $parts[2] | Should -Be $other
+    }
+
     It "accepts a compatible unmanaged tree-sitter without replacing it" {
         . $script:ImportInstallDepsForTest
         Mock -CommandName Get-TreeSitterCliVersion -MockWith { return '0.26.10' }
@@ -949,17 +964,20 @@ Describe "install-deps.ps1" {
         $script:InstallFailures.Count | Should -Be 0
     }
 
-    It "repairs a stale or partial tree-sitter with the verified release artifact" {
+    It "repairs tree-sitter when the existing managed PATH entry is shadowed" {
         . $script:ImportInstallDepsForTest
         $localAppData = Join-Path $TestDrive 'Redirected Local AppData'
         $installRoot = Join-Path (Join-Path $localAppData 'dotfiles') 'bin'
+        $shadowRoot = Join-Path $TestDrive 'older tree-sitter bin'
         New-Item -ItemType Directory -Force -Path $installRoot | Out-Null
+        New-Item -ItemType Directory -Force -Path $shadowRoot | Out-Null
         $target = Join-Path $installRoot 'tree-sitter.exe'
         [System.IO.File]::WriteAllText($target, 'stale executable')
         $oldOverride = $env:DOTFILES_LOCAL_APP_DATA_OVERRIDE
-        $script:TreeSitterPathPublished = $false
+        $oldPath = $env:PATH
         try {
             $env:DOTFILES_LOCAL_APP_DATA_OVERRIDE = $localAppData
+            $env:PATH = "$shadowRoot;$installRoot"
             $script:TreeSitterValidatedPaths = @()
             Mock -CommandName Get-TreeSitterCliVersion -MockWith {
                 param([string]$Path)
@@ -968,7 +986,10 @@ Describe "install-deps.ps1" {
                     if ([IO.Path]::GetExtension($Path) -ne '.exe') { return '' }
                     return '0.26.10'
                 }
-                if ($script:TreeSitterPathPublished) { return '0.26.10' }
+                $firstPath = Normalize-PathListEntry (($env:PATH -split ';')[0])
+                if ($firstPath.Equals((Normalize-PathListEntry $installRoot), [StringComparison]::OrdinalIgnoreCase)) {
+                    return '0.26.10'
+                }
                 return '0.25.0'
             }
             Mock -CommandName Invoke-WebRequest -MockWith {
@@ -981,7 +1002,6 @@ Describe "install-deps.ps1" {
                 New-Item -ItemType Directory -Force -Path $DestinationPath | Out-Null
                 [System.IO.File]::WriteAllText((Join-Path $DestinationPath 'tree-sitter.exe'), 'exact executable')
             }
-            Mock -CommandName Add-DirectoryToUserPath -MockWith { $script:TreeSitterPathPublished = $true }
 
             $output = & { Install-TreeSitterCli } 6>&1 | Out-String
 
@@ -992,6 +1012,7 @@ Describe "install-deps.ps1" {
             $script:InstallFailures.Count | Should -Be 0
             Should -Invoke -CommandName Invoke-WebRequest -Times 1 -Exactly
         } finally {
+            $env:PATH = $oldPath
             $env:DOTFILES_LOCAL_APP_DATA_OVERRIDE = $oldOverride
         }
     }

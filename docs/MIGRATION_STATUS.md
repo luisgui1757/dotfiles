@@ -99,6 +99,9 @@ Provisioning stays in `install-deps`, not chezmoi run-scripts:
 - package installs from Unix `PKG_TABLE` and Windows `$Catalog`
 - psmux installation on Windows, including the hardened `Add-ScoopBucketSafe`
   bucket-add path in `install-deps.ps1`
+- Windows direct-artifact bin directories are de-duplicated and promoted to the
+  front of process and User `PATH`, so an already-listed but shadowed managed
+  Tree-sitter installation self-repairs without uninstalling the older tool
 - pinned binary/font/script installers and direct artifacts: Homebrew installer,
   Neovim Linux, native-Linux chezmoi, lazygit Linux, Starship Linux,
   tree-sitter CLI Linux/Windows, WezTerm Ubuntu `.deb`, Herdr Linux, Herdr Windows

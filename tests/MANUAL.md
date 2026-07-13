@@ -169,6 +169,9 @@ commits, recovery path, provider inventory, and whether any user data changed.
 - [ ] **Windows Tree-sitter CLI**: `tree-sitter --version` prints exactly
       `0.26.10`. A compatible unmanaged executable remains untouched; after a
       stale unmanaged fixture, the verified dotfiles executable wins PATH.
+      Repeat with `%LOCALAPPDATA%\dotfiles\bin` already present behind the stale
+      command; setup must promote it once, preserve every other PATH entry, and
+      finish without the publication warning.
 - [ ] **Zsh plugin pin recovery**: bare `chezmoi apply` self-heals a clean old
       pin. With a dirty/wrong fixture and network disabled, it fails with the
       fixed source path absent and prints a preserved quarantine path.

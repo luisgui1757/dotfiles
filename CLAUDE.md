@@ -1534,6 +1534,11 @@ save only**. The next plain `:w` formats normally. Implemented in
   same-parent stage whose filename still ends in `.exe` so Windows can execute
   the staged proof), and the pinned Herdr
   Windows preview `.exe` before copying it into `%LOCALAPPDATA%\Programs\Herdr\bin`.
+  Windows direct-artifact publication must put the owned bin directory first
+  in both process and User `PATH`, de-duplicating an existing later entry. This
+  preserves an incompatible preinstalled tool while ensuring the verified
+  artifact actually wins command resolution; mere PATH membership is not a
+  publication proof.
   On macOS, Hack Nerd Font presence accepts either fontconfig discovery or the
   exact `font-hack-nerd-font` Homebrew cask receipt. The receipt is authoritative
   before `fc-list` has indexed Apple's font directories and prevents a repeated

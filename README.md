@@ -477,7 +477,11 @@ POSIX pwsh profile management remains provisioning-adjacent.
   project toolchain it drives.
 - `install-deps` provisions the `tree-sitter` CLI for `nvim-treesitter` main:
   Homebrew on macOS/Linuxbrew, a pinned SHA-256-verified GitHub release into
-  `~/.local/bin` on native Linux/WSL, and Scoop with npm fallback on Windows.
+  `~/.local/bin` on native Linux/WSL, and the exact SHA-256-verified Windows
+  release into `%LOCALAPPDATA%\dotfiles\bin`. Windows places that owned
+  directory first in both the running process and User `PATH`, even when the
+  directory was already present later in the list; an incompatible shadowing
+  install remains installed but no longer wins command resolution.
   Windows `-All` also installs VS Build Tools so parser builds can find MSVC;
   after winget/choco failures it falls back to Microsoft's official
   `vs_BuildTools.exe` bootstrapper with the same VCTools workload, but only

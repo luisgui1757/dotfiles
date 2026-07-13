@@ -2255,3 +2255,37 @@ Native-Windows fresh-pane visual/history confirmation and the full Apple
 Silicon owner lifecycle remain pending. No final pushed-head hosted result,
 approval, merge, release tag, live safeguard mutation, or merged-main
 cache-free proof is claimed by this entry.
+
+## Windows Tree-sitter PATH-publication closure — entry 56
+
+- The owner observed accepted native-Windows Tree-sitter installation ending
+  with `published tree-sitter executable is not the command resolved on PATH`
+  and setup exit 1. The pinned archive, staged executable, and final managed
+  executable had already passed exact-version and checksum validation; command
+  discovery still selected an incompatible executable earlier in `PATH`.
+- Root cause: `Add-DirectoryToUserPath` prepended a newly absent directory to
+  the process path, but treated an existing later entry as complete and
+  appended new entries to persistent User `PATH`. A prior failed/retried setup
+  or older managed directory could therefore remain permanently shadowed.
+- Windows direct-artifact publication now de-duplicates the owned directory and
+  promotes it to the front of both current-process and User `PATH`. Other PATH
+  entries and the shadowing preinstalled tool remain intact; the verified
+  dotfiles artifact wins resolution without package-manager cleanup.
+- The existing transactional Tree-sitter test now reproduces the real state:
+  an incompatible command first, the managed bin already second, and a stale
+  managed target. It failed with the owner's exact warning before the repair
+  and passes only when publication reorders PATH and resolves version 0.26.10.
+
+### Repair verification
+
+| Check | Exact result |
+|---|---|
+| Focused Tree-sitter shadow-PATH regression before repair | EXPECTED FAIL: exact publication warning reproduced; 0 passed, 1 failed |
+| Same focused regression after repair | PASS: 1 passed, 0 failed; exact verified artifact installed and resolved |
+| Full `tests/powershell/InstallDeps.Tests.ps1` | PASS: 123 passed, 0 failed/skipped, including PATH order/de-duplication and transactional rollback cases |
+| `pwsh -NoLogo -NoProfile -File ./test.ps1` | PASS: PSScriptAnalyzer, 266 Pester tests, and all 18 Neovim specs |
+| `PATH=/opt/homebrew/bin:$PATH make ci` | PASS: ended `local pre-PR gate passed` |
+
+Pushed-head hosted and native-Windows rerun proof remain pending. No completed
+Apple Silicon owner lifecycle, approval, merge, release tag, live safeguard
+mutation, or merged-main cache-free proof is claimed by this entry.
