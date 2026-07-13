@@ -296,7 +296,8 @@ for sudo in the terminal once, then exercises install, update, config uninstall,
 reinstall, and final update; verifies the second uninstall is a no-op; and
 proves pre-existing Homebrew formulae, casks, and unrelated taps were not
 removed. POSIX uninstall intentionally removes the config layer, not Nix or
-Homebrew packages.
+Homebrew packages. Its tap checks use `brew --prefix` because nix-homebrew's
+managed implementation repository is intentionally not the installed-tap root.
 Backup selection uses the filename timestamp/collision suffix, never mtime;
 malformed candidates fail before removal/restoration.
 

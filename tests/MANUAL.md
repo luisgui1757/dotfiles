@@ -232,6 +232,9 @@ commits, recovery path, provider inventory, and whether any user data changed.
       `Library/Taps`, an idempotent second uninstall, and no removed pre-existing
       Homebrew formula, cask, or unrelated tap. The sudo prompt belongs to the
       invoking terminal; do not pipe credentials into the runner or its log.
+      Tap filesystem assertions must resolve `Library/Taps` below
+      `brew --prefix`; nix-homebrew's `brew --repository` points at the managed
+      implementation and is not the tap-install root.
       Run once from a shell where the Nix daemon profile guard is already set
       but `/nix/var/nix/profiles/default/bin` is absent from `PATH`; setup must
       re-adopt the installed Nix binary and must not invoke the prerequisite

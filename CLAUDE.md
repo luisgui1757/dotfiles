@@ -1876,6 +1876,10 @@ pipe-to-shell bootstrap.
   reinstall, final update, and full greenfield validation under one
   terminal-owned sudo credential. It requires an idempotent uninstall retry and
   proves no pre-existing Homebrew formula, cask, or unrelated tap disappeared.
+  Tap assertions derive `Library/Taps` from `brew --prefix`, never
+  `brew --repository`: nix-homebrew deliberately points the repository at
+  `.homebrew-is-managed-by-nix` while installed tap clones remain under the
+  prefix.
   Uninstall deliberately exercises the documented config teardown; the
   Nix/Homebrew package layer remains installed.
   The mixed-ownership cleanup/tap contract is identical on real Macs and hosted

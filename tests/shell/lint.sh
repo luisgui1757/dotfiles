@@ -24,7 +24,7 @@ for f in "${sh_files[@]}"; do
             # follow that literal source so globals are checked at their uses.
             shellcheck --external-sources --shell=bash "$f" || fail=1
             ;;
-        ./tests/shell/*_test.sh|./tests/nix/setup_home_manager_test.sh|./tests/nix/setup_nix_darwin_test.sh)
+        ./tests/shell/*_test.sh|./tests/nix/setup_home_manager_test.sh|./tests/nix/setup_nix_darwin_test.sh|./tests/nix/macos_owner_lifecycle_test.sh)
             # Source-only fixtures intentionally source setup/install scripts via
             # runtime paths, set globals consumed by those sourced functions, and
             # override commands such as uname indirectly. Keep these test-only

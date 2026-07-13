@@ -100,7 +100,7 @@ assert_homebrew_preserved() {
 
 assert_no_scanned_tap_artifacts() {
     local taps_dir artifact tap_output
-    taps_dir="$($BREW --repository)/Library/Taps"
+    taps_dir="$($BREW --prefix)/Library/Taps"
     artifact="$(find "$taps_dir" -mindepth 2 -maxdepth 2 \
         \( -name '*.dotfiles-pre-user-taps-*' -o -name '*.dotfiles-failed-*' \) \
         -print -quit 2>/dev/null || true)"
@@ -115,7 +115,7 @@ assert_no_scanned_tap_artifacts() {
 
 assert_tap_ownership() {
     local taps_dir rel path owner
-    taps_dir="$($BREW --repository)/Library/Taps"
+    taps_dir="$($BREW --prefix)/Library/Taps"
     for rel in \
         homebrew/homebrew-core \
         homebrew/homebrew-cask \
@@ -211,5 +211,9 @@ main() {
     run_phase "final full greenfield validation" "$REPO_ROOT/tests/greenfield/validate.sh"
     assert_homebrew_preserved
 }
+
+if [[ -n "${DOTFILES_MACOS_OWNER_LIFECYCLE_SOURCE_ONLY:-}" ]]; then
+    return 0
+fi
 
 main "$@"

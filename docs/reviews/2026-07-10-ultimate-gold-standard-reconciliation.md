@@ -2106,6 +2106,13 @@ safeguard mutation, or merged-main cache-free proof is claimed by this entry.
 - A focused regression sets the profile guard, removes Nix from `PATH`, and
   requires canonical profile recovery without invoking the prerequisite helper.
   A real stale-PATH dry-run reaches installed nix-darwin normally.
+- The first post-repair lifecycle install at `3e937f2` then completed all six
+  setup phases in 17 seconds. Its post-install assertion—not setup—failed by
+  deriving `Library/Taps` from `brew --repository`. Under nix-homebrew that
+  repository is `.homebrew-is-managed-by-nix`; live tap clones remain below
+  `brew --prefix`. The runner now uses the prefix, and a fake managed-repository
+  regression proves both correct discovery and rejection of an in-prefix
+  `.dotfiles-failed-*` artifact.
 - Separately, the owner ran ordinary `./setup.sh --all` successfully at
   `a3fc2f5`: all six phases completed. Live readback found the active
   current-system rebuild command, target-user-owned `nikitabobko/tap`, and no
@@ -2122,6 +2129,9 @@ safeguard mutation, or merged-main cache-free proof is claimed by this entry.
 | `bash tests/shell/setup_universal_entrypoint_test.sh` | PASS: guarded canonical-profile recovery plus existing bootstrap/migration cases |
 | Stale-PATH `./setup.sh --all --dry-run` | PASS: Nix store and installed current-system rebuild resolved without prerequisite reinstall |
 | `make ci` | PASS: ended `local pre-PR gate passed` on the guarded-profile recovery tree |
+| Owner lifecycle phase 1 at `3e937f2` | PASS: all six setup phases completed in 17 seconds; runner then failed its incorrect repository-derived tap assertion |
+| `bash tests/nix/macos_owner_lifecycle_test.sh` | PASS: prefix/repository split and in-prefix recovery-artifact rejection |
+| `make ci` after the lifecycle tap-root correction | PASS: ended `local pre-PR gate passed` |
 | Full lifecycle on the new recovery head | PENDING |
 
 The complete install/update/uninstall/reinstall/update row remains pending. No
