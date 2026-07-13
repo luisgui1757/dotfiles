@@ -17,9 +17,6 @@ github-actions|.github/workflows/test.yml|github-runners|windows|2
 github-actions|.github/workflows/test.yml|github-tags|DeterminateSystems/nix-installer-action|2
 github-actions|.github/workflows/test.yml|github-tags|actions/checkout|6
 nix|flake.nix|git-refs|home-manager|1
-nix|flake.nix|git-refs|homebrew-cask|1
-nix|flake.nix|git-refs|homebrew-core|1
-nix|flake.nix|git-refs|homebrew-nikitabobko|1
 nix|flake.nix|git-refs|nix-darwin|1
 nix|flake.nix|git-refs|nix-homebrew|1
 nix|flake.nix|git-refs|nixpkgs|1

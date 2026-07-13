@@ -166,6 +166,9 @@ probe_preserves_user_taps() {
 set -uo pipefail
 marker="$marker"
 sudo() {
+    if [[ "\${1:-}" == -H ]]; then
+        shift
+    fi
     if [[ "\${1:-}" == env ]]; then
         shift
         while [[ "\${1:-}" == *=* ]]; do export "\$1"; shift; done
@@ -188,6 +191,59 @@ DOTFILES_SETUP_SOURCE_ONLY=1 source "$REPO_ROOT/setup.sh" --all >/dev/null 2>&1
 run_nix_darwin_switch >/dev/null
 run_nix_darwin_switch >/dev/null
 [[ "\$(cat "\$marker")" == '# user-owned tap marker' ]]
+EOF
+    bash "$script"
+}
+
+probe_migrates_only_legacy_nix_taps() {
+    local script="$WORK/migrate-legacy-taps.sh" taps_dir="$WORK/legacy-taps/Library/Taps"
+    rm -rf "$taps_dir"
+    mkdir -p \
+        "$taps_dir/homebrew/homebrew-core" \
+        "$taps_dir/homebrew/homebrew-cask" \
+        "$taps_dir/nikitabobko/homebrew-tap" \
+        "$taps_dir/cirruslabs/homebrew-cli/.git"
+    printf '%s\n' nix-copy > "$taps_dir/homebrew/homebrew-core/marker"
+    printf '%s\n' nix-copy > "$taps_dir/homebrew/homebrew-cask/marker"
+    printf '%s\n' nix-copy > "$taps_dir/nikitabobko/homebrew-tap/marker"
+    printf '%s\n' user-tap > "$taps_dir/cirruslabs/homebrew-cli/marker"
+    cat > "$script" <<EOF
+set -uo pipefail
+taps_dir="$taps_dir"
+sudo() {
+    if [[ "\${1:-}" == -H ]]; then shift; fi
+    if [[ "\${1:-}" == env ]]; then
+        shift
+        while [[ "\${1:-}" == *=* ]]; do export "\$1"; shift; done
+    fi
+    "\$@"
+}
+uname() { case "\${1:-}" in -m) echo arm64 ;; *) echo Darwin ;; esac; }
+nix() {
+    if [[ "\${1:-}" == eval ]]; then
+        printf '%s\n%s\n' "$LOCKED_NIX_DARWIN_REV" "$LOCKED_NIX_DARWIN_NAR_HASH"
+    fi
+}
+darwin-rebuild() {
+    mkdir -p "\$taps_dir/nikitabobko/homebrew-tap/.git"
+    printf '%s\n' user-clone > "\$taps_dir/nikitabobko/homebrew-tap/marker"
+}
+DOTFILES_TARGET_USER=tester
+DOTFILES_TARGET_HOME=/Users/tester
+DOTFILES_TEST_NIX_HOMEBREW_TAPS_DIR="\$taps_dir"
+DOTFILES_TEST_NIX_HOMEBREW_LEGACY_TAPS=1
+export DOTFILES_TARGET_USER DOTFILES_TARGET_HOME
+export DOTFILES_TEST_NIX_HOMEBREW_TAPS_DIR DOTFILES_TEST_NIX_HOMEBREW_LEGACY_TAPS
+DOTFILES_SETUP_SOURCE_ONLY=1 source "$REPO_ROOT/setup.sh" --all >/dev/null 2>&1
+run_nix_darwin_switch >/dev/null
+[[ ! -e "\$taps_dir/homebrew/homebrew-core" ]]
+[[ ! -e "\$taps_dir/homebrew/homebrew-cask" ]]
+[[ "\$(cat "\$taps_dir/nikitabobko/homebrew-tap/marker")" == user-clone ]]
+[[ "\$(cat "\$taps_dir/cirruslabs/homebrew-cli/marker")" == user-tap ]]
+! find "\$taps_dir" -name '*.dotfiles-pre-user-taps-*' -print -quit | grep -q .
+run_nix_darwin_switch >/dev/null
+[[ "\$(cat "\$taps_dir/nikitabobko/homebrew-tap/marker")" == user-clone ]]
+[[ "\$(cat "\$taps_dir/cirruslabs/homebrew-cli/marker")" == user-tap ]]
 EOF
     bash "$script"
 }
@@ -281,7 +337,7 @@ assert_eq() {
 }
 
 assert_eq "default flow (--all) applies nix-darwin on macOS" \
-    "sudo env DOTFILES_TARGET_USER=tester DOTFILES_TARGET_HOME=/Users/tester darwin-rebuild switch --flake $REPO_ROOT#dotfiles-aarch64 --impure" \
+    "sudo -H env DOTFILES_TARGET_USER=tester DOTFILES_TARGET_HOME=/Users/tester darwin-rebuild switch --flake $REPO_ROOT#dotfiles-aarch64 --impure" \
     "$(probe '--all' Darwin installed)"
 assert_eq "default dry-run only previews (no switch)" \
     NOCALL "$(probe '--all --dry-run' Darwin)"
@@ -292,10 +348,10 @@ assert_eq "--skip-deps still wins when paired with --nix-darwin" \
 assert_eq "--nix-darwin on a non-macOS host is skipped" \
     NOCALL "$(probe '--all --nix-darwin' Linux)"
 assert_eq "--nix-darwin compatibility alias still invokes sudo darwin-rebuild switch" \
-    "sudo env DOTFILES_TARGET_USER=tester DOTFILES_TARGET_HOME=/Users/tester darwin-rebuild switch --flake $REPO_ROOT#dotfiles-aarch64 --impure" \
+    "sudo -H env DOTFILES_TARGET_USER=tester DOTFILES_TARGET_HOME=/Users/tester darwin-rebuild switch --flake $REPO_ROOT#dotfiles-aarch64 --impure" \
     "$(probe '--all --nix-darwin' Darwin installed)"
 assert_eq "default bootstrap uses locked nix-darwin rev" \
-    "sudo env DOTFILES_TARGET_USER=tester DOTFILES_TARGET_HOME=/Users/tester nix run $LOCKED_NIX_DARWIN_REF -- switch --flake $REPO_ROOT#dotfiles-aarch64 --impure" \
+    "sudo -H env DOTFILES_TARGET_USER=tester DOTFILES_TARGET_HOME=/Users/tester nix run $LOCKED_NIX_DARWIN_REF -- switch --flake $REPO_ROOT#dotfiles-aarch64 --impure" \
     "$(probe '--all' Darwin bootstrap)"
 missing_nix_output="$(probe_missing_nix)" && missing_nix_rc=0 || missing_nix_rc=$?
 if [[ "$missing_nix_rc" -ne 0 ]] && [[ "$missing_nix_output" == *"FAIL: Nix is required for macOS setup"* ]]; then
@@ -337,6 +393,12 @@ if probe_preserves_user_taps; then
     echo "ok  : repeated nix-darwin activation preserves an unrelated user tap"
 else
     echo "FAIL: setup moved or altered a user-owned Homebrew tap"
+    fail=1
+fi
+if probe_migrates_only_legacy_nix_taps; then
+    echo "ok  : legacy root-owned tap snapshots migrate once without touching user taps"
+else
+    echo "FAIL: scoped legacy Homebrew tap migration was not idempotent"
     fail=1
 fi
 if probe_shell_rc_migration success; then
@@ -404,7 +466,7 @@ else
 fi
 PATH="$old_path"
 export PATH
-if [[ "$dry_output" == *"sudo env DOTFILES_TARGET_USER="* ]] &&
+if [[ "$dry_output" == *"sudo -H env DOTFILES_TARGET_USER="* ]] &&
     [[ "$dry_output" == *"darwin-rebuild switch --flake $REPO_ROOT#dotfiles-aarch64 --impure"* ]] &&
     [[ "$dry_output" == *"$LOCKED_NIX_DARWIN_REF"* ]] &&
     [[ "$dry_output" != *"nix run nix-darwin"* ]]; then

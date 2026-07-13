@@ -3266,15 +3266,18 @@ function Install-GhDashExtension {
         return
     }
 
-    # Verify the *installed* pin, not merely presence -- a mismatched pin must be
-    # re-pinned (remove+install), because a plain install of an already-present
-    # extension errors.
+    # gh-dash is a binary extension, so the gh --pin contract accepts a release
+    # tag (commit refs are for script extensions). Verify the reviewed annotated
+    # tag -> commit mapping before installation, then pass the tag to gh.
+    # Verify the *installed* tag, not merely presence -- a mismatched release
+    # must be re-pinned (remove+install), because a plain install of an
+    # already-present extension errors.
     $list = (Invoke-GhProbe -GhArgs @('extension', 'list')).Output
     $line = @($list | Where-Object { $_ -match 'dlvhdr/gh-dash' }) | Select-Object -First 1
     $reinstall = $false
     if ($line) {
-        $expectedCommit = [regex]::Escape($GhDashCommit)
-        if ($line -match "\b$expectedCommit\b") {
+        $expectedVersion = [regex]::Escape($GhDashVersion)
+        if ($line -match "\b$expectedVersion\b") {
             Write-Host ("  ok        {0,-26} already installed ({1} -> {2})" -f "gh-dash", $GhDashVersion, $GhDashCommit)
             return
         }
@@ -3289,9 +3292,9 @@ function Install-GhDashExtension {
     if ($DryRun) {
         Write-Host "  would: verify $GhDashVersion tag object $GhDashTagObject peels to $GhDashCommit"
         if ($reinstall) {
-            Write-Host "  would: gh extension remove dash; gh extension install dlvhdr/gh-dash --pin $GhDashCommit"
+            Write-Host "  would: gh extension remove dash; gh extension install dlvhdr/gh-dash --pin $GhDashVersion"
         } else {
-            Write-Host "  would: gh extension install dlvhdr/gh-dash --pin $GhDashCommit"
+            Write-Host "  would: gh extension install dlvhdr/gh-dash --pin $GhDashVersion"
         }
         return
     }
@@ -3318,12 +3321,12 @@ function Install-GhDashExtension {
             return
         }
     }
-    $installProbe = Invoke-GhProbe -GhArgs @('extension', 'install', 'dlvhdr/gh-dash', '--pin', $GhDashCommit)
+    $installProbe = Invoke-GhProbe -GhArgs @('extension', 'install', 'dlvhdr/gh-dash', '--pin', $GhDashVersion)
     if ($installProbe.Ok) {
         $suffix = if ($reinstall) { " (re-pinned)" } else { "" }
         Write-Host ("  installed {0,-26} {1} -> {2}{3}" -f "gh-dash", $GhDashVersion, $GhDashCommit, $suffix)
     } else {
-        $script:InstallFailures += [pscustomobject]@{ Tool = 'gh-dash'; Pm = 'gh-extension'; Pkg = "dlvhdr/gh-dash@$GhDashCommit"; ExitCode = $installProbe.ExitCode }
+        $script:InstallFailures += [pscustomobject]@{ Tool = 'gh-dash'; Pm = 'gh-extension'; Pkg = "dlvhdr/gh-dash@$GhDashVersion"; ExitCode = $installProbe.ExitCode }
     }
 }
 

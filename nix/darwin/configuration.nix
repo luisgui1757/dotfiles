@@ -2,8 +2,7 @@
 # chezmoi owns every dotfile target (CLAUDE.md invariant 22). This module wires
 # declarative Homebrew for the GUI/vendor apps (WezTerm, AeroSpace casks) and the
 # Herdr brew; the nix-owned CLI package set lives in Home Manager (nix/home/darwin.nix).
-{ config
-, pkgs
+{ pkgs
 , username
 , userHome
 , ...
@@ -29,7 +28,7 @@
   users.users.${username}.home = userHome;
 
   # Declarative Homebrew. GUI / TCC-sensitive apps come from vendor channels
-  # (casks / a pinned tap), never nixpkgs -- see the migration ruling.
+  # (casks / the trusted AeroSpace tap), never nixpkgs -- see the migration ruling.
   homebrew = {
     enable = true;
 
@@ -43,9 +42,10 @@
       cleanup = "none";
     };
 
-    # The declared taps are pinned flake inputs; mirror them here so the Homebrew
-    # module consumes the same repo-owned subset while unrelated taps coexist.
-    taps = builtins.attrNames config.nix-homebrew.taps;
+    # Homebrew owns mutable tap clones as the target user. nix-homebrew pins the
+    # Homebrew implementation but does not copy tap trees during root activation;
+    # copied trees are root-owned and make ordinary brew update/install noisy.
+    taps = [ "nikitabobko/tap" ];
 
     casks = [
       "wezterm"

@@ -196,7 +196,7 @@ commits, recovery path, provider inventory, and whether any user data changed.
 - [ ] **nix-darwin bootstrap/switch**, Apple Silicon macOS: with Nix installed, run
       `./setup.sh --all` (or the compatibility alias `./setup.sh --nix-darwin`;
       equivalent activation:
-      `sudo env DOTFILES_TARGET_USER="$USER" DOTFILES_TARGET_HOME="$HOME"
+      `sudo -H env DOTFILES_TARGET_USER="$USER" DOTFILES_TARGET_HOME="$HOME"
       darwin-rebuild switch --flake .#dotfiles-aarch64 --impure`; first-run setup
       derives the locked
       `github:nix-darwin/nix-darwin/<rev>?narHash=<encoded-narHash>#darwin-rebuild`
@@ -215,8 +215,10 @@ commits, recovery path, provider inventory, and whether any user data changed.
       If Homebrew already existed, confirm nix-homebrew auto-migrated the
       Homebrew repositories while keeping installed packages. If the old
       `Library/Taps` contains an unrelated user tap, confirm setup leaves that
-      tap installed across two runs while refreshing the repo-declared pinned
-      taps. Confirm `brew tap-info nikitabobko/tap`
+      tap installed across two runs. If the retired root-owned pinned-tap shape
+      exists, confirm setup migrates only those three snapshots and the resulting
+      `nikitabobko/tap` checkout is owned by the target user. Confirm
+      `brew tap-info nikitabobko/tap`
       reports a trusted tap so Homebrew 5 can load the AeroSpace cask.
 - [x] **Historical Intel macOS hosted runtime proof (platform retired)**: exact head
       `f4b63953f2f982702a685358b09e89bae2d78fdd` passed the real

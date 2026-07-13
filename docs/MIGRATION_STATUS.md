@@ -185,11 +185,13 @@ broken repo-symlink still cleaned) is covered by
       First nix-darwin bootstrap collision-checks and preserves existing
       `/etc/bashrc` and `/etc/zshrc` as `.before-nix-darwin`, rolling both back
       on failure/interruption while retaining failed generated output.
-- [x] nix-homebrew uses mixed tap/package ownership. `mutableTaps = true`
-      refreshes the pinned repo taps while preserving unrelated user taps, and
-      `cleanup = "none"` preserves formulae/casks outside the generated Brewfile.
-      setup no longer moves the whole `Library/Taps` directory, so activation is
-      non-destructive and repeatable without a tap rollback/manual cleanup path.
+- [x] nix-homebrew uses mixed tap/package ownership. `mutableTaps = true` with
+      no Nix-managed tap contents leaves every tap clone owned by target-user
+      Homebrew, while `cleanup = "none"` preserves formulae/casks outside the
+      generated Brewfile. setup never moves the whole `Library/Taps` directory;
+      it transactionally migrates only the three exact root-owned, non-Git tap
+      snapshots created by the retired pinned-tap shape and never selects an
+      unrelated user tap.
 - [x] Fresh Linux/WSL zsh startup consumes Home Manager's canonical session-vars
       file once from the XDG profile, `~/.nix-profile`, or the
       system-integrated `/etc/profiles/per-user/<effective-user>` profile, with

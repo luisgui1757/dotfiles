@@ -36,7 +36,7 @@ cat > "$fake_bin/nix" <<'NIX'
 #!/usr/bin/env bash
 case "${1:-}" in
     --version) echo 'nix (fixture) 2.34.0' ;;
-    store) [[ "${2:-}" == ping ]] ;;
+    store) [[ "${2:-}" == info ]] ;;
     *) exit 91 ;;
 esac
 NIX

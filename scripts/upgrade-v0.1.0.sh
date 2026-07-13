@@ -351,7 +351,7 @@ run_preflight() {
     assert_target_identity "$os" || return 1
     platform_preflight "$os" || return 1
     nix --version >/dev/null || return 1
-    nix store ping >/dev/null || return 1
+    nix store info >/dev/null || return 1
     verify_old_config "$old_checkout" || {
         fail "live config does not exactly match the retained v0.1.0 checkout; no mutation was attempted."
         return 1

@@ -332,9 +332,12 @@ that violates one of these, fix it instead of disabling the test.
     before Nix/Homebrew activation. The compatibility `dotfiles` alias is also
     Apple Silicon; no other Darwin system/configuration is exported.
     Homebrew is mixed ownership: nix-darwin applies the declared subset with
-    `cleanup = "none"`, and `mutableTaps = true` refreshes the pinned repo taps
-    while preserving additional user formulae, casks, and taps. setup never
-    moves or replaces the whole Homebrew `Library/Taps` directory. First
+    `cleanup = "none"`, while `mutableTaps = true` leaves every tap clone owned
+    by target-user Homebrew. nix-homebrew pins Homebrew itself but copies no tap
+    contents during root activation. setup never moves or replaces the whole
+    `Library/Taps` directory; it has one scoped migration for the three exact
+    root-owned, non-Git snapshots produced by the retired configuration and
+    never selects unrelated user taps. First
     nix-darwin bootstrap also preflights and preserves existing `/etc/bashrc`
     and `/etc/zshrc` at their documented `.before-nix-darwin` paths; collisions
     fail before either move, and activation failure/interruption quarantines
@@ -696,6 +699,15 @@ source-only test fixtures get a reviewed false-positive exclude only for
 dynamic `source` paths (`SC1091`), globals consumed by sourced installer/setup
 functions (`SC2034`), and indirectly invoked command stubs / code paths
 (`SC2317`, `SC2329`). Do not move those excludes to production scripts.
+Fixtures that source the real shell configuration must also suppress host Home
+Manager session state (`__HM_SESS_VARS_SOURCED=1`) when testing a synthetic
+`PATH` and reset manager variables inside the interactive command; `/etc/zshrc`
+runs before `zsh -i -c`, so a provisioned `/etc/profiles/per-user/<user>` or
+Homebrew shellenv can silently reintroduce host tools and invalidate
+absence-path assertions.
+Installer fixtures that exercise a missing or direct-artifact path must likewise
+establish their synthetic `PATH` before calling the install function; a tool
+installed on the developer host must not turn a positive fixture into a skip.
 
 `e2e-install.yml` is the required real-install gate. The jobs cover different
 install paths, not symmetric container platforms:
@@ -1084,7 +1096,10 @@ save only**. The next plain `:w` formats normally. Implemented in
   active-manager pass: Homebrew/Linuxbrew requires the PATH-visible command path
   and its resolved executable target to stay under `brew --prefix`, the
   installed formula, and `brew list --formula <formula>` file ownership of the
-  resolved executable; apt/dnf/zypper/pacman/apk require
+  resolved executable. The catalog formula is only the install default: when a
+  different installed versioned formula owns the active Cellar target (for
+  example `python@3.14` instead of `python@3.12`), update mode verifies that
+  formula's receipt and updates the actual owner. apt/dnf/zypper/pacman/apk require
   the manager's file-ownership proof for the resolved real path; repo-pinned
   direct Linux artifacts (`nvim`, `lazygit`, `starship`, `tree-sitter`,
   `chezmoi`, and `herdr`) are owned only when their durable marker matches the repo-pinned
@@ -1482,6 +1497,13 @@ save only**. The next plain `:w` formats normally. Implemented in
   same-parent stage whose filename still ends in `.exe` so Windows can execute
   the staged proof), and the pinned Herdr
   Windows preview `.exe` before copying it into `%LOCALAPPDATA%\Programs\Herdr\bin`.
+  On macOS, Hack Nerd Font presence accepts either fontconfig discovery or the
+  exact `font-hack-nerd-font` Homebrew cask receipt. The receipt is authoritative
+  before `fc-list` has indexed Apple's font directories and prevents a repeated
+  setup from needlessly reinstalling the already-present cask.
+  The same install-mode rule applies to Ghostty, WezTerm, and AeroSpace: either
+  their command or exact Homebrew cask receipt proves presence. `--all` installs
+  missing apps and never turns an existing receipt into an implicit upgrade.
   POSIX helpers that unpack
   into `mktemp -d` install a cleanup trap
   immediately after creating the directory, so failure paths do not leak
@@ -1707,7 +1729,8 @@ save only**. The next plain `:w` formats normally. Implemented in
   annotated tag object `e6ebbd7e83e30161b9192ce3339972d2c8269e7f` and peeled
   commit `49f37e4832956c57bf52d4ea8b1b1e5c0f863700`; both installers verify that
   remote mapping before mutation and run
-  `gh extension install dlvhdr/gh-dash --pin 49f37e4832956c57bf52d4ea8b1b1e5c0f863700`
+  `gh extension install dlvhdr/gh-dash --pin v4.25.1`. gh requires a release
+  tag for binary extensions; commit refs are accepted only for script extensions.
   (`GH_DASH_VERSION` in `install-deps.sh`, mirrored as `$GhDashVersion` in
   `install-deps.ps1`; a Renovate `github-releases` manager can bump the tag and
   `pin_consistency_test.sh` fails on sh/ps1/CLAUDE drift). The installers
@@ -1788,9 +1811,10 @@ deferred dependency provisioning. The repo never installs Nix through a
 pipe-to-shell bootstrap.
 
 - **`flake.nix` structure.** `nixpkgs` (nixos-unstable, pinned by `flake.lock`),
-  plus `nix-darwin`, `home-manager`, `nix-homebrew`, and the three Homebrew taps
-  (`homebrew-core`, `homebrew-cask`, `nikitabobko/homebrew-tap`) as pinned
-  (`flake = false`) inputs. `systems` covers Apple Silicon Darwin plus both
+  plus `nix-darwin`, `home-manager`, and `nix-homebrew`. Tap repositories are
+  deliberately not flake inputs: Homebrew owns mutable tap clones as the target
+  user, avoiding root-owned copies that ordinary `brew update` cannot maintain.
+  `systems` covers Apple Silicon Darwin plus both
   Linux architectures — there
   is deliberately **no windows system**. Outputs: a packages-only `devShells`,
   a hermetic `checks.<system>.toolchain` (proves nixpkgs resolves the CLI
@@ -1811,16 +1835,17 @@ pipe-to-shell bootstrap.
   `cleanup = "none"` (preserve mixed-ownership packages); casks = WezTerm + AeroSpace
   (GUI/vendor apps, never nixpkgs); brews = Herdr. nix-homebrew runs
   `autoMigrate = true` (adopt an existing official-script Homebrew install while
-  keeping installed packages), `mutableTaps = true` so the taps supplied as
-  pinned inputs coexist with unrelated user taps,
+  keeping installed packages), `mutableTaps = true` with an empty
+  `nix-homebrew.taps` set so Homebrew owns every tap clone as the target user,
   `trust.taps = [ "nikitabobko/tap" ]` so Homebrew 5 can load the AeroSpace
-  personal-tap cask, and
-  `homebrew.taps = builtins.attrNames config.nix-homebrew.taps`.
+  personal-tap cask, and `homebrew.taps = [ "nikitabobko/tap" ]`.
   `system.primaryUser` + `users.users.<user>.home` come from setup's validated
   `DOTFILES_TARGET_USER` / `DOTFILES_TARGET_HOME`; pure evaluation alone uses an
-  inert `runner` placeholder. Activation refreshes the declared pinned tap
-  directories in place and leaves every unrelated tap/package untouched; setup
-  performs no whole-`Library/Taps` migration. First bootstrap moves
+  inert `runner` placeholder. On hosts that ran the retired pinned-tap shape,
+  setup transactionally moves only the three exact root-owned, non-Git snapshots
+  aside; activation recreates the required third-party tap as the target user,
+  failure restores the snapshots, and success removes their backups. Every
+  unrelated tap/package remains untouched. First bootstrap moves
   existing `/etc/bashrc` and `/etc/zshrc` only to collision-free
   `.before-nix-darwin` backups; failed/interrupted activation restores the old
   files and preserves generated replacements for diagnosis.
@@ -1828,12 +1853,14 @@ pipe-to-shell bootstrap.
   CI; no environment marker weakens or changes it.
 - **User resolution.** setup.sh resolves one actual non-root account and account
   home before any install phase, requires `HOME` to identify the same directory,
-  and passes both variables through `sudo env`. The flake ignores ambient
+  and passes both variables through `sudo -H env`. The flake ignores ambient
   `SUDO_USER`/`USER`; `"runner"` exists only so pure `nix flake check`
-  evaluates. First-run bootstrap derives the locked rev and `narHash` from
+  evaluates. The sudo boundary uses `sudo -H` so Nix sees root's home while the
+  target identity continues to flow only through the validated variables.
+  First-run bootstrap derives the locked rev and `narHash` from
   `flake.lock` with Nix's JSON parser, URL-encodes the hash for the flake ref,
   and runs
-  `sudo env DOTFILES_TARGET_USER=... DOTFILES_TARGET_HOME=... nix run github:nix-darwin/nix-darwin/<locked-rev>?narHash=<encoded-narHash>#darwin-rebuild -- ...`;
+  `sudo -H env DOTFILES_TARGET_USER=... DOTFILES_TARGET_HOME=... nix run github:nix-darwin/nix-darwin/<locked-rev>?narHash=<encoded-narHash>#darwin-rebuild -- ...`;
   do not use the mutable `nix-darwin` registry alias or omit the locked
   `narHash`.
 - **Home Manager is packages-only** (`nix/home/darwin.nix`): `home.packages` +

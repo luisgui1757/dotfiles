@@ -134,7 +134,7 @@ declarative Homebrew + Home Manager; Linux/WSL uses standalone Home Manager.
 chezmoi still owns **every** dotfile; Nix owns no config. A normal `./setup.sh`
 or `./setup.sh --all` applies the matching package layer before native/deferred
 dependency provisioning. On macOS setup normalizes `uname -m` and runs only the
-Apple Silicon `sudo env DOTFILES_TARGET_USER=... DOTFILES_TARGET_HOME=...
+Apple Silicon `sudo -H env DOTFILES_TARGET_USER=... DOTFILES_TARGET_HOME=...
 darwin-rebuild switch --flake .#dotfiles-aarch64 --impure` activation, which activates the
 declarative Homebrew casks (WezTerm, AeroSpace) + Herdr brew and the nix-owned
 CLI package set. Any other macOS architecture fails closed before Nix/Homebrew
@@ -145,7 +145,7 @@ requires ambient `HOME` to resolve to that same directory and passes
 Nix, Home Manager, chezmoi, and native setup cannot split across users or
 fabricated homes. First-run bootstrap is also pinned: setup derives the locked
 nix-darwin rev and `narHash` from `flake.lock` before running
-`sudo env DOTFILES_TARGET_USER=... DOTFILES_TARGET_HOME=... nix run
+`sudo -H env DOTFILES_TARGET_USER=... DOTFILES_TARGET_HOME=... nix run
 github:nix-darwin/nix-darwin/<locked-rev>?narHash=<encoded-narHash>#darwin-rebuild -- ...`;
 it never uses the mutable `nix-darwin` registry alias. On first bootstrap,
 pre-existing `/etc/bashrc` and `/etc/zshrc` are moved only to nix-darwin's
@@ -187,9 +187,12 @@ there is no environment-only cleanup bypass.
 nix-homebrew uses `autoMigrate = true` so Macs that already have official-script
 Homebrew can be adopted by the declarative Nix layer; upstream's migration keeps
 installed packages while replacing the Homebrew repository. `mutableTaps = true`
-lets the pinned repo taps coexist with unrelated user taps: activation refreshes
-the repo-declared tap contents from `flake.lock` without moving or replacing the
-whole `Library/Taps` directory. The `nikitabobko/tap` tap is explicitly trusted
+keeps every tap clone owned and updated by Homebrew as the target user; nix-homebrew
+pins the Homebrew implementation but deliberately copies no tap trees during root
+activation. A one-time scoped migration removes only the three recognizable
+root-owned, non-Git tap snapshots produced by the earlier configuration, then
+Homebrew recreates the required AeroSpace tap normally. Unrelated taps such as
+Cirrus are never selected. The `nikitabobko/tap` tap is explicitly trusted
 through nix-homebrew because Homebrew 5 refuses to load personal-tap casks,
 including AeroSpace, without a trust entry.
 **nvim and the
@@ -477,7 +480,9 @@ migration warning. POSIX pwsh profile management remains provisioning-adjacent.
   from the executable source: Homebrew/Linuxbrew requires the PATH-visible
   command path and its resolved executable target to stay under `brew --prefix`,
   plus an installed formula and `brew list --formula <formula>` file ownership
-  of the resolved executable; native Linux managers require file ownership proof
+  of the resolved executable. The catalog formula is the install default, not an
+  ownership guess: an active versioned formula such as `python@3.14` is resolved
+  from its Cellar target and receipt before a scoped update. Native Linux managers require file ownership proof
   (`dpkg-query -S`, `rpm -qf`, `pacman -Qo`, or `apk info --who-owns`);
   dotfiles-owned Linux artifacts require a durable provenance marker with the
   expected version, URL, SHA-256, command path, binary path, install root,
@@ -557,8 +562,8 @@ migration warning. POSIX pwsh profile management remains provisioning-adjacent.
   Nix/nixpkgs GUI package.
 - AeroSpace (macOS-only i3-like tiling WM) installs from the official tap cask
   (`brew install --cask nikitabobko/tap/aerospace`), `start-at-login = true`,
-  chezmoi-owned config. The tap is a pinned nix-homebrew input and is explicitly
-  trusted so Homebrew 5 will load the cask. Its keymap deliberately avoids the
+  chezmoi-owned config. The Homebrew-owned tap is explicitly trusted so Homebrew
+  5 will load the cask. Its keymap deliberately avoids the
   reserved chords:
   window focus/move live on `ctrl-alt(-shift)-h/j/k/l` so they never shadow
   Neovim's `<A-h/j/k/l>` window navigation, and nothing uses `Alt-c` (fzf-tab /
@@ -716,7 +721,7 @@ The e2e jobs cover different install paths, not symmetric container platforms:
 |---|---|
 | `e2e containers / ubuntu-24.04` | Clean `ubuntu:24.04`, non-root user, native `apt`, no Linuxbrew (`DOTFILES_SKIP_BREW_BOOTSTRAP=1`), then `install-deps.sh --all`, chezmoi config apply, executable/version probes including `zoxide`, `gh`, WezTerm, Herdr, Neovim >= 0.12, lazygit, zsh plugin files, config content assertions, and nvim directory realpath assertion. This is the native installer regression fixture, not the Nix-backed public POSIX package-plane proof; it does not assert Pi CLI because Node 24 comes from the Nix package layer. |
 | `setup.sh / ubuntu-24.04` | Full public Unix setup on the hosted Ubuntu runner after installing Nix in CI: Home Manager first, then native/deferred installs, chezmoi, Lazy, Tree-sitter, Mason, and Sentinel. Its clean login/interactive PATH proof resolves the effective account's actual login zsh from the account database; this matters because fresh Ubuntu has no `/usr/bin/zsh` and setup selects Linuxbrew zsh. The shell must resolve `rg` from Nix with no caller PATH injection. |
-| `setup.sh / macos-26` | Full public Apple Silicon setup through the hosted runner: architecture-matched nix-darwin/declarative Homebrew, native/deferred installs, real Ghostty/WezTerm config consumption, installed AeroSpace app/CLI identity agreement, chezmoi, Lazy, Tree-sitter, Mason, and Sentinel. AeroSpace waits for a user-granted Accessibility permission before parsing user config or starting the CLI server, so managed-config consumption remains explicit TCC-enabled desktop proof in `tests/MANUAL.md`; hosted CI does not pretend to prove it. Hosted and real Macs share the same mixed-ownership Homebrew contract: declared packages/taps are applied while unrelated user state is preserved. |
+| `setup.sh / macos-26` | Full public Apple Silicon setup through the hosted runner: architecture-matched nix-darwin/declarative Homebrew, native/deferred installs, real Ghostty/WezTerm config consumption, installed AeroSpace app/CLI identity agreement, chezmoi, Lazy, Tree-sitter, Mason, and Sentinel. AeroSpace waits for a user-granted Accessibility permission before parsing user config or starting the CLI server, so managed-config consumption remains explicit TCC-enabled desktop proof in `tests/MANUAL.md`; hosted CI does not pretend to prove it. Hosted and real Macs share the same mixed-ownership Homebrew contract: declared packages are applied, tap clones stay target-user-owned, and unrelated user state is preserved. |
 | `setup.ps1 / windows-2025` | Full Windows setup through the real Windows hosted runner, including Scoop/winget/choco behavior, PowerShell, symlinks, Hack Nerd Font file/registry consumption, `zoxide`/`gh`/WezTerm/Herdr/Pi CLI command probes, and Neovim restore/sync phases. Windows containers do not model the desktop/user-profile setup well. |
 
 After the Lazy restore, deterministic Tree-sitter parser install, and Mason sync, each
@@ -912,7 +917,7 @@ Manual-review pin surfaces that Renovate may touch only partially:
 | `setuptools`/`pylatexenc` | Renovate can bump versions; adjacent hashes remain human-reviewed. Current pins: `setuptools` 80.9.0, `pylatexenc` 2.10. |
 | Hack Nerd Font | Unix and Windows mirrors must stay identical; version/hash drift is caught by `pin_consistency_test.sh`. |
 | Pi CLI | Unix/Windows install pins and e2e assertions mirror version `0.80.3`; the npm-pack metadata and downloaded tarball bytes must both match the human-reviewed SRI. |
-| gh-dash | Tag `v4.25.1`, annotated tag object `e6ebbd7e83e30161b9192ce3339972d2c8269e7f`, and peeled commit `49f37e4832956c57bf52d4ea8b1b1e5c0f863700` are mirrored; installers verify the tag mapping and pin the extension to the commit. |
+| gh-dash | Tag `v4.25.1`, annotated tag object `e6ebbd7e83e30161b9192ce3339972d2c8269e7f`, and peeled commit `49f37e4832956c57bf52d4ea8b1b1e5c0f863700` are mirrored; installers verify the tag mapping and pass the release tag required by `gh extension install --pin` for binary extensions. |
 
 Direct network executables must be pinned and verified before execution, or be a
 reviewed exception whose verification is proved by the static scanner. Scoop

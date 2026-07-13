@@ -71,13 +71,13 @@ gh() {
     out="$(install_gh_dash_extension)"
     [[ "$out" == *"tag object $GH_DASH_TAG_OBJECT peels to $GH_DASH_COMMIT"* ]] \
         || fail "dry-run must expose the reviewed tag-to-commit identity; got: $out"
-    [[ "$out" == *"would: gh extension install dlvhdr/gh-dash --pin $GH_DASH_COMMIT"* ]] \
+    [[ "$out" == *"would: gh extension install dlvhdr/gh-dash --pin $GH_DASH_VERSION"* ]] \
         || fail "authenticated+missing dry-run must print the pinned install command; got: $out"
 )
 
 # --- 4. authenticated, installed at the expected pin -> idempotent ok ---------
 (
-    AUTH_RC=0; EXT_LIST="gh dash  dlvhdr/gh-dash  $GH_DASH_COMMIT"; DRY_RUN=0; YES_ALL=1
+    AUTH_RC=0; EXT_LIST="gh dash  dlvhdr/gh-dash  $GH_DASH_VERSION"; DRY_RUN=0; YES_ALL=1
     out="$(install_gh_dash_extension)"
     [[ "$out" == *"ok"* && "$out" == *"already installed"* ]] \
         || fail "matching pin must be idempotent ok; got: $out"
@@ -92,7 +92,7 @@ gh() {
         || fail "wrong pin must re-pin; got: $out"
     grep -q "remove dash" "$CALL_LOG" \
         || fail "wrong pin must remove the old extension first; log: $(cat "$CALL_LOG")"
-    grep -q "install dlvhdr/gh-dash --pin $GH_DASH_COMMIT" "$CALL_LOG" \
+    grep -q "install dlvhdr/gh-dash --pin $GH_DASH_VERSION" "$CALL_LOG" \
         || fail "wrong pin must reinstall at the expected pin; log: $(cat "$CALL_LOG")"
     rm -f "$CALL_LOG"
 )

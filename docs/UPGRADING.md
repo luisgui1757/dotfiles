@@ -100,7 +100,7 @@ prints its exact rollback command instead of starting another transaction.
 After success, open a new login shell and verify:
 
 ```bash
-nix store ping
+nix store info
 command -v rg fd fzf jq lazygit node starship zoxide nvim
 chezmoi --source ~/dotfiles-v0.2.0/home --destination "$HOME" \
   verify --include files,symlinks

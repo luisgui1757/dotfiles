@@ -179,6 +179,9 @@ BREW
 cat > "$bin/sudo" <<'SUDO'
 #!/usr/bin/env bash
 set -euo pipefail
+if [[ "${1:-}" == "-H" ]]; then
+    shift
+fi
 if [[ "${1:-}" == "env" ]]; then
     shift
     exec env "$@"
@@ -202,7 +205,7 @@ case "${1:-}" in
         echo 'nix (fixture) 2.34.0'
         ;;
     store)
-        [[ "${2:-}" == "ping" ]]
+        [[ "${2:-}" == "info" ]]
         ;;
     eval)
         printf '%s\n%s\n' \

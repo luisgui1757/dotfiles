@@ -8,7 +8,7 @@ mkdir -p "$TMP_ROOT"
 trap 'rm -rf "$TMP_ROOT"' EXIT
 
 cp "$REPO_ROOT/setup.sh" "$TMP_ROOT/setup.sh"
-mkdir -p "$TMP_ROOT/home" "$TMP_ROOT/fakebin"
+mkdir -p "$TMP_ROOT/home/.local/state/nix/profile/bin" "$TMP_ROOT/fakebin"
 cat > "$TMP_ROOT/install-deps.sh" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -56,13 +56,15 @@ EOF
 cat > "$TMP_ROOT/fakebin/getent" <<EOF
 #!/usr/bin/env bash
 [[ "\${1:-}" == passwd && "\${2:-}" == tester ]] || exit 1
-printf '%s\n' 'tester:x:1000:1000:Test User:$HOME:/bin/zsh'
+printf '%s\n' 'tester:x:1000:1000:Test User:$TMP_ROOT/home:/bin/zsh'
 EOF
 chmod +x "$TMP_ROOT/install-deps.sh" "$TMP_ROOT/fakebin/chezmoi" "$TMP_ROOT/fakebin/brew" \
     "$TMP_ROOT/fakebin/uname" "$TMP_ROOT/fakebin/nix" "$TMP_ROOT/fakebin/home-manager" \
     "$TMP_ROOT/fakebin/id" "$TMP_ROOT/fakebin/getent"
+ln -s "$TMP_ROOT/fakebin/chezmoi" "$TMP_ROOT/home/.local/state/nix/profile/bin/chezmoi"
+ln -s "$TMP_ROOT/fakebin/brew" "$TMP_ROOT/home/.local/state/nix/profile/bin/brew"
 
-output="$(SETUP_TEST_ROOT="$TMP_ROOT" PATH="$TMP_ROOT/fakebin:/usr/bin:/bin" bash "$TMP_ROOT/setup.sh" --all --skip-nvim --skip-agents --experimental-wsl-gui 2>&1)"
+output="$(HOME="$TMP_ROOT/home" SETUP_TEST_ROOT="$TMP_ROOT" PATH="$TMP_ROOT/fakebin:/usr/bin:/bin" bash "$TMP_ROOT/setup.sh" --all --skip-nvim --skip-agents --experimental-wsl-gui 2>&1)"
 [[ "$output" == *"setup.sh: done"* ]]
 grep -Fx -- "--experimental-wsl-gui" "$TMP_ROOT/deps.args" >/dev/null
 grep -Fx -- "1" "$TMP_ROOT/deps.env" >/dev/null

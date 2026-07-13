@@ -2,7 +2,7 @@
 # Assert the nix-darwin config renders the required declarative-Homebrew knobs
 # (the migration ruling): WezTerm + AeroSpace casks, Herdr brew, no auto
 # update/upgrade, cleanup = "none" for mixed package ownership, autoMigrate =
-# true, mutableTaps = true for mixed tap ownership, and Determinate owns the daemon
+# true, mutableTaps = true with user-owned tap clones, and Determinate owns the daemon
 # (nix.enable = false).
 # Uses cross-platform pure `nix eval`; skips gracefully when nix is unavailable
 # in a local shell, while CI installs Nix and runs this as real enforcement
@@ -52,12 +52,14 @@ assert_eq "homebrew cleanup = none (preserve mixed-ownership packages)" '"none"'
 assert_eq "homebrew autoUpdate disabled" 'false' "$(eval_raw homebrew.onActivation.autoUpdate)"
 assert_eq "homebrew upgrade disabled" 'false' "$(eval_raw homebrew.onActivation.upgrade)"
 assert_eq "nix-homebrew autoMigrate adopts existing Homebrew installs" 'true' "$(eval_raw nix-homebrew.autoMigrate)"
-assert_eq "nix-homebrew mutableTaps = true (pinned repo taps coexist with user taps)" 'true' "$(eval_raw nix-homebrew.mutableTaps)"
+assert_eq "nix-homebrew mutableTaps = true (Homebrew owns target-user tap clones)" 'true' "$(eval_raw nix-homebrew.mutableTaps)"
 trusted_taps="$(eval_json nix-homebrew.trust.taps | jq -r 'sort | join(",")')"
-assert_eq "nix-homebrew trusts the pinned AeroSpace tap for Homebrew 5 cask loading" "nikitabobko/tap" "$trusted_taps"
+assert_eq "nix-homebrew trusts the AeroSpace tap for Homebrew 5 cask loading" "nikitabobko/tap" "$trusted_taps"
+nix_managed_taps="$(eval_json nix-homebrew.taps | jq -r 'keys | sort | join(",")')"
+assert_eq "nix-homebrew copies no root-owned tap trees" "" "$nix_managed_taps"
 declared_taps="$(eval_json homebrew.taps | jq -r '[.[].name] | sort | join(",")')"
-assert_eq "nix-darwin installs exactly the repo-declared pinned taps" \
-    "homebrew/homebrew-cask,homebrew/homebrew-core,nikitabobko/homebrew-tap" "$declared_taps"
+assert_eq "nix-darwin asks target-user Homebrew for only the required third-party tap" \
+    "nikitabobko/tap" "$declared_taps"
 activation_checks="$(nix eval --raw "$cfg.system.activationScripts.checks.text" 2>/dev/null || true)"
 if [[ "$activation_checks" == *"brew bundle"*" cleanup"* ]]; then
     echo "FAIL: nix-darwin activation still rejects mixed-ownership Homebrew packages"

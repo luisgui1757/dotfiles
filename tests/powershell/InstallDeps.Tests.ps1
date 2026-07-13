@@ -3159,13 +3159,13 @@ Describe "Install-GhDashExtension" {
         Set-GhDashMock
         $out = (Install-GhDashExtension 6>&1 | Out-String)
         $out | Should -Match ([regex]::Escape("tag object $GhDashTagObject peels to $GhDashCommit"))
-        $out | Should -Match ([regex]::Escape("gh extension install dlvhdr/gh-dash --pin $GhDashCommit"))
+        $out | Should -Match ([regex]::Escape("gh extension install dlvhdr/gh-dash --pin $GhDashVersion"))
         $script:GhCalls.Count | Should -Be 0
     }
 
     It "is idempotent when installed at the expected pin" {
         . $script:ImportInstallDepsForTest
-        $script:GhListOut = @("gh dash`tdlvhdr/gh-dash`t$GhDashCommit")
+        $script:GhListOut = @("gh dash`tdlvhdr/gh-dash`t$GhDashVersion")
         Set-GhDashMock
         $out = (Install-GhDashExtension 6>&1 | Out-String)
         $out | Should -Match 'already installed'
@@ -3179,7 +3179,7 @@ Describe "Install-GhDashExtension" {
         Set-GhDashMock
         Install-GhDashExtension
         ($script:GhCalls -join "`n") | Should -Match 'remove dash'
-        ($script:GhCalls -join "`n") | Should -Match ([regex]::Escape("install dlvhdr/gh-dash --pin $GhDashCommit"))
+        ($script:GhCalls -join "`n") | Should -Match ([regex]::Escape("install dlvhdr/gh-dash --pin $GhDashVersion"))
         $script:InstallFailures.Count | Should -Be 0
     }
 

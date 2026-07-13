@@ -4,7 +4,8 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 TMP_ROOT="$REPO_ROOT/tests/.cache/setup-homebrew-path-test"
 rm -rf "$TMP_ROOT"
-mkdir -p "$TMP_ROOT/home/.linuxbrew/bin" "$TMP_ROOT/home/.linuxbrew/opt/make/libexec/gnubin" "$TMP_ROOT/brewbin" "$TMP_ROOT/home"
+mkdir -p "$TMP_ROOT/home/.linuxbrew/bin" "$TMP_ROOT/home/.linuxbrew/opt/make/libexec/gnubin" \
+    "$TMP_ROOT/home/.local/state/nix/profile/bin" "$TMP_ROOT/brewbin" "$TMP_ROOT/home"
 trap 'rm -rf "$TMP_ROOT"' EXIT
 
 cp "$REPO_ROOT/setup.sh" "$TMP_ROOT/setup.sh"
@@ -66,6 +67,11 @@ EOF
 chmod +x "$TMP_ROOT/brewbin/brew" "$TMP_ROOT/brewbin/uname" \
     "$TMP_ROOT/brewbin/id" "$TMP_ROOT/brewbin/getent" \
     "$TMP_ROOT/home/.linuxbrew/bin/nvim"
+# A provisioned macOS test host has an absolute /run/current-system profile.
+# The fake user's final Nix-profile entry must keep the fixture nvim ahead of
+# that host path while the gnubin assertion still proves Brew shellenv ran.
+ln -s "$TMP_ROOT/home/.linuxbrew/bin/nvim" "$TMP_ROOT/home/.local/state/nix/profile/bin/nvim"
+ln -s "$TMP_ROOT/brewbin/brew" "$TMP_ROOT/home/.local/state/nix/profile/bin/brew"
 
 output="$(HOME="$TMP_ROOT/home" SETUP_TEST_ROOT="$TMP_ROOT" PATH="$TMP_ROOT/brewbin:/usr/bin:/bin" bash "$TMP_ROOT/setup.sh" --skip-deps --skip-bootstrap --skip-agents </dev/null)"
 

@@ -83,7 +83,7 @@ remote_commit="$(printf '%s\n' "$remote_refs" | awk -v ref="refs/tags/$release_t
 
 if command -v nix >/dev/null 2>&1; then
     nix --version
-    nix store ping >/dev/null
+    nix store info >/dev/null
     echo "Nix is already usable; no installation was attempted."
     exit 0
 fi
@@ -178,5 +178,5 @@ command -v nix >/dev/null 2>&1 || {
     exit 1
 }
 nix --version
-nix store ping >/dev/null
+nix store info >/dev/null
 echo "Nix prerequisite installed and verified; setup may continue in this shell."

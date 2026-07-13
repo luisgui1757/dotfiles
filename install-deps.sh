@@ -2218,15 +2218,18 @@ install_gh_dash_extension() {
         return 0
     fi
 
-    # Verify the *installed* pin, not merely presence -- an extension pinned to a
-    # different tag must be re-pinned, and a plain `gh extension install` of an
-    # already-present extension errors, so a mismatch takes the remove+install path.
+    # gh-dash is a binary extension, so gh's --pin contract accepts a release
+    # tag (commit refs are for script extensions). Verify the reviewed annotated
+    # tag -> commit mapping before installation, then pass the tag to gh.
+    # Verify the *installed* tag, not merely presence -- a different release
+    # must be re-pinned, and a plain install of an already-present extension
+    # errors, so a mismatch takes the remove+install path.
     local list installed_ver reinstall=0
     list="$(gh extension list 2>/dev/null || true)"
     if printf '%s\n' "$list" | grep -q 'dlvhdr/gh-dash'; then
         installed_ver="$(printf '%s\n' "$list" \
             | awk '{ for (i = 1; i <= NF; i++) if ($i == "dlvhdr/gh-dash") { print $(i + 1); exit } }')"
-        if [[ "$installed_ver" == "$GH_DASH_COMMIT" ]]; then
+        if [[ "$installed_ver" == "$GH_DASH_VERSION" ]]; then
             printf "  ok        %-26s already installed (%s -> %s)\n" "gh-dash" "$GH_DASH_VERSION" "$GH_DASH_COMMIT"
             return 0
         fi
@@ -2246,9 +2249,9 @@ install_gh_dash_extension() {
     if [[ "$DRY_RUN" -eq 1 ]]; then
         echo "  would: verify $GH_DASH_VERSION tag object $GH_DASH_TAG_OBJECT peels to $GH_DASH_COMMIT"
         if [[ "$reinstall" -eq 1 ]]; then
-            echo "  would: gh extension remove dash && gh extension install dlvhdr/gh-dash --pin $GH_DASH_COMMIT"
+            echo "  would: gh extension remove dash && gh extension install dlvhdr/gh-dash --pin $GH_DASH_VERSION"
         else
-            echo "  would: gh extension install dlvhdr/gh-dash --pin $GH_DASH_COMMIT"
+            echo "  would: gh extension install dlvhdr/gh-dash --pin $GH_DASH_VERSION"
         fi
         return 0
     fi
@@ -2276,7 +2279,7 @@ install_gh_dash_extension() {
             return 0
         fi
     fi
-    if gh extension install dlvhdr/gh-dash --pin "$GH_DASH_COMMIT"; then
+    if gh extension install dlvhdr/gh-dash --pin "$GH_DASH_VERSION"; then
         if [[ "$reinstall" -eq 1 ]]; then
             printf "  installed %-26s %s -> %s (re-pinned)\n" "gh-dash" "$GH_DASH_VERSION" "$GH_DASH_COMMIT"
         else
@@ -2284,8 +2287,8 @@ install_gh_dash_extension() {
         fi
     else
         local rc=$?
-        record_install_failure "gh-dash" gh "dlvhdr/gh-dash@$GH_DASH_COMMIT" "$rc"
-        printf "  FAIL: %-26s gh extension install dlvhdr/gh-dash --pin %s failed\n" "gh-dash" "$GH_DASH_COMMIT" >&2
+        record_install_failure "gh-dash" gh "dlvhdr/gh-dash@$GH_DASH_VERSION" "$rc"
+        printf "  FAIL: %-26s gh extension install dlvhdr/gh-dash --pin %s failed\n" "gh-dash" "$GH_DASH_VERSION" >&2
     fi
     return 0
 }
@@ -2425,8 +2428,13 @@ install_tmux_plugins() {
     return "$rc"
 }
 
+homebrew_cask_installed() {
+    local cask="$1"
+    brew list --cask --versions "$cask" >/dev/null 2>&1
+}
+
 install_ghostty_macos() {
-    if have ghostty; then
+    if have ghostty || homebrew_cask_installed ghostty; then
         printf "  ok        %-26s already installed\n" "ghostty"
         return
     fi
@@ -2448,7 +2456,7 @@ install_ghostty_macos() {
 }
 
 install_wezterm_macos() {
-    if have wezterm; then
+    if have wezterm || homebrew_cask_installed wezterm; then
         printf "  ok        %-26s already installed\n" "wezterm"
         return
     fi
@@ -2472,7 +2480,7 @@ install_wezterm_macos() {
 # AeroSpace: i3-like tiling WM, macOS only. Official tap cask (nikitabobko/tap).
 # NOT nixpkgs. Needs an Accessibility (TCC) grant on first launch -- unscriptable.
 install_aerospace_macos() {
-    if have aerospace; then
+    if have aerospace || homebrew_cask_installed aerospace; then
         printf "  ok        %-26s already installed\n" "aerospace"
         return
     fi
@@ -2757,6 +2765,28 @@ brew_claims_tool_source() {
         return 2
     fi
     return 1
+}
+
+brew_formula_owning_tool_source() {
+    local source="$1" prefix cellar real_source source_physical relative formula
+    prefix="$(brew_prefix)"
+    cellar="$(brew --cellar 2>/dev/null || true)"
+    [[ -n "$source" && -n "$prefix" && -n "$cellar" ]] || return 1
+    [[ "$cellar" == /* ]] || return 1
+    cellar="$(real_source_path "$cellar")"
+    source_physical="$(physical_path "$source")"
+    if ! path_under "$source" "$prefix" && ! path_under "$source_physical" "$(real_source_path "$prefix")"; then
+        return 1
+    fi
+    real_source="$(real_source_path "$source")"
+    path_under "$real_source" "$cellar" || return 1
+    relative="${real_source#"${cellar%/}/"}"
+    [[ "$relative" == */* ]] || return 1
+    formula="${relative%%/*}"
+    [[ -n "$formula" ]] || return 1
+    pm_pkg_installed brew "$formula" || return 1
+    brew_formula_owns_tool_source "$formula" "$source" || return 1
+    printf '%s\n' "$formula"
 }
 
 dpkg_claims_tool_source() {
@@ -3356,7 +3386,7 @@ nix_owns_tool_source() {
 }
 
 update_catalog_tool() {
-    local tool="$1" pkg source brew_rc native_pm native_pkg direct_rc hint
+    local tool="$1" pkg source brew_rc brew_owner_pkg native_pm native_pkg direct_rc hint
     [[ -n "$tool" ]] || return 0
 
     if ! update_tool_present "$tool"; then
@@ -3389,6 +3419,15 @@ update_catalog_tool() {
         fi
         if [[ "$brew_rc" -eq 0 ]]; then
             scoped_update_status brew "$tool" "$pkg" "$source"
+            return $?
+        fi
+        # The catalog package is the install default, not proof that it owns an
+        # already-present executable. Versioned formulae such as python@3.14
+        # can legitimately own the active command while python@3.12 remains
+        # installed. Resolve that ownership from the executable's real Cellar
+        # path and verify it against Homebrew's receipt before updating.
+        if brew_owner_pkg="$(brew_formula_owning_tool_source "$source")"; then
+            scoped_update_status brew "$tool" "$brew_owner_pkg" "$source"
             return $?
         fi
         if [[ "$brew_rc" -eq 2 ]]; then
@@ -3659,8 +3698,23 @@ install() {
     fi
 }
 
-install_nerd_font() {
+hack_nerd_font_installed() {
     if fc-list 2>/dev/null | grep -qi "hack.*nerd"; then
+        return 0
+    fi
+    # Homebrew's cask receipt is authoritative on macOS even before fontconfig
+    # has indexed Apple's font directories. This keeps repeated setup runs from
+    # trying to reinstall an already-present cask (and from triggering an
+    # unnecessary Brew update).
+    if [[ "$(uname -s)" == "Darwin" ]] && [[ "$PM" == "brew" ]]; then
+        brew list --cask --versions font-hack-nerd-font >/dev/null 2>&1
+        return $?
+    fi
+    return 1
+}
+
+install_nerd_font() {
+    if hack_nerd_font_installed; then
         printf "  ok        %-26s already installed\n" "Hack Nerd Font"
         return
     fi
@@ -4303,7 +4357,7 @@ install_dependency_scan_items() {
         "editorconfig-checker|command|editorconfig-checker"
 
     if [[ "$(uname -s)" == "Darwin" && ( "$PM" == "brew" || "$PM" == "brew_missing" ) ]]; then
-        printf '%s\n' "ghostty|command|ghostty"
+        printf '%s\n' "ghostty|macos-cask|ghostty"
     elif [[ "$(uname -s)" == "Linux" ]]; then
         if ! is_wsl || wsl_gui_opt_in; then
             printf '%s\n' "ghostty|command|ghostty"
@@ -4322,7 +4376,7 @@ install_dependency_scan_items() {
 }
 
 install_scan_present() {
-    local tool="$1" kind="$2" bins
+    local tool="$1" kind="$2" version_bin="${3:-}" bins
     case "$kind" in
         command)
             bins="$(binaries_for "$tool")"
@@ -4333,7 +4387,10 @@ install_scan_present() {
             have_c_compiler
             ;;
         font)
-            fc-list 2>/dev/null | grep -qi "hack.*nerd"
+            hack_nerd_font_installed
+            ;;
+        macos-cask)
+            have "$tool" || homebrew_cask_installed "$version_bin"
             ;;
         zsh-plugins)
             local root fzf_tab_dir autosuggestions_dir
@@ -4362,6 +4419,10 @@ install_scan_present() {
 install_scan_version() {
     local tool="$1" kind="$2" version_bin="${3:-}" bins candidate first_line
     case "$kind" in
+        macos-cask)
+            brew list --cask --versions "$version_bin" 2>/dev/null | sed -n '1p'
+            return
+            ;;
         font)
             printf '%s\n' "-"
             return
@@ -4421,7 +4482,7 @@ scan_install_dependencies() {
         status="missing"
         version="-"
         action="install"
-        if install_scan_present "$tool" "$kind"; then
+        if install_scan_present "$tool" "$kind" "$version_bin"; then
             status="present"
             version="$(install_scan_version "$tool" "$kind" "$version_bin")"
             action="skip"

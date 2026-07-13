@@ -175,5 +175,13 @@ if [[ "$fail" -eq 0 ]]; then
     echo "ok  : Nix bootstrap refs include locked narHash query parameters"
 fi
 
+if grep -Fq 'nix store ping' \
+    setup.sh scripts/install-nix-prerequisite.sh scripts/upgrade-v0.1.0.sh docs/UPGRADING.md; then
+    echo "FAIL: deprecated nix store ping alias remains on the supported setup/upgrade surface"
+    fail=1
+else
+    echo "ok  : supported setup/upgrade surfaces use nix store info"
+fi
+
 [[ "$fail" -eq 0 ]] || exit 1
 echo "all nix-architecture invariants OK"

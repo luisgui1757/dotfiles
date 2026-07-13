@@ -98,7 +98,7 @@ Sequenced PRs (split for independent, revertable blast radius):
   file targets); Renovate `nix` manager.
 - **PR-6 `feat/nix-darwin` - DONE (mixed-ownership correction 2026-07-13).**
   macOS host config: `darwinConfigurations` + `system.primaryUser`;
-  nix-homebrew (pinned repo taps, `mutableTaps = true`) + homebrew module
+  nix-homebrew (`mutableTaps = true`, target-user-owned tap clones) + homebrew module
   (`cleanup = "none"`, no auto-update/upgrade); Home Manager **packages only**;
   public macOS setup applies it by default; `--update` gains an `owner=nix`
   status.
@@ -160,7 +160,7 @@ Commit-by-commit status:
 - **Commit 5 - nix-darwin + declarative Homebrew — DONE.**
   Architecture-specific `darwinConfigurations` with `system.primaryUser` and
   home resolved once by setup from the authoritative target account;
-  nix-homebrew (pinned repo taps,
+  nix-homebrew (target-user-owned tap clones,
   `autoMigrate = true`, `mutableTaps = true`, `trust.taps = [ "nikitabobko/tap" ]` for the
   AeroSpace cask); homebrew module (`autoUpdate = false`, `upgrade = false`,
   `cleanup = "none"`); casks WezTerm + AeroSpace; brews Herdr + selected CLI; Home
@@ -169,8 +169,11 @@ Commit-by-commit status:
   locked nix-darwin rev plus `narHash`.
   Existing Homebrew installs are adopted with `autoMigrate = true`. The
   2026-07-13 correction made Homebrew explicitly mixed ownership: activation
-  refreshes pinned repo taps in place, preserves unrelated user taps/packages,
-  performs no whole-`Library/Taps` migration, and uses the same contract in CI.
+  applies declared packages while Homebrew owns mutable tap clones as the target
+  user. A scoped one-time transaction migrates only the three root-owned,
+  non-Git snapshots created by the retired pinned-tap shape; unrelated user
+  taps/packages are preserved, no whole-`Library/Taps` migration occurs, and CI
+  uses the same contract.
   The first real system activation remains manual-verification-pending in
   `tests/MANUAL.md`.
 - **Commit 6 - Linux/WSL Home Manager packages-only — DONE.** HM standalone for
@@ -555,7 +558,9 @@ reconciliation followed by per-tool proven update ownership**:
 - Homebrew/Linuxbrew ownership requires the PATH-visible command path and its
   resolved executable target to stay under `brew --prefix`, an installed
   formula, and `brew list --formula <formula>` file ownership of the resolved
-  executable. Formula-list presence alone cannot claim `/usr/bin`, another
+  executable. The catalog formula remains the install default; an active
+  versioned formula is instead resolved from its Cellar target and verified
+  receipt before update. Formula-list presence alone cannot claim `/usr/bin`, another
   shadowing path, a Brew-prefix symlink that resolves outside the Brew prefix,
   or an unrelated file under the Brew prefix.
 - Native Linux ownership is source-proven through `dpkg-query -S`, `rpm -qf`,
@@ -593,7 +598,7 @@ reconciliation followed by per-tool proven update ownership**:
   `Latest Version`, and empty `Info`/`Missing Dependencies`.
 - Regression coverage lives in `tests/shell/install_deps_update_test.sh` for
   mixed Linuxbrew/apt dispatch, Homebrew `current`, shadowed Homebrew tools,
-  Brew-prefix contradictions, Brew-prefix symlink escapes, external shadow
+  versioned-formula ownership, Brew-prefix contradictions, Brew-prefix symlink escapes, external shadow
   symlinks to Brew, apt `current`, pacman skip semantics, macOS system zsh,
   direct-artifact current/unmarked/blocked/refresh behavior, command-path
   shadowing, install-root mismatches, and unsupported direct-artifact install

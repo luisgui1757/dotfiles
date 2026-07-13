@@ -294,6 +294,54 @@ EOF
     assert_not_contains "brew upgrade ripgrep" "$COMMAND_LOG" "Brew file-ownership mismatch attempted an upgrade"
 }
 
+case_brew_active_versioned_formula_owns_source() {
+    local root="$TMP_ROOT/brew-versioned-owner" brew_prefix="$TMP_ROOT/brew-versioned-owner/homebrew"
+    local test_cellar python_bin
+    test_cellar="$brew_prefix/Cellar"
+    python_bin="$test_cellar/python@3.14/3.14.5/bin/python3"
+    mkdir -p "$brew_prefix/bin" "$(dirname "$python_bin")"
+    mktool "$python_bin"
+    ln -s "$python_bin" "$brew_prefix/bin/python3"
+    PATH="$brew_prefix/bin:/usr/bin:/bin"
+    export PATH
+    DRY_RUN=0
+    PM=brew
+    INSTALL_DEPS_UPDATE_TOOLS="python3"
+
+    uname() {
+        case "${1:-}" in
+            -s) printf '%s\n' "Darwin" ;;
+            -m) printf '%s\n' "arm64" ;;
+            *) command uname "$@" ;;
+        esac
+    }
+    native_linux_pm() { printf '%s\n' "unknown"; }
+    homebrew_bin() { printf '%s\n' "$brew_prefix/bin/brew"; }
+    cat > "$brew_prefix/bin/brew" <<EOF
+#!/usr/bin/env bash
+if [[ "\${1:-}" == "--prefix" ]]; then
+    printf '%s\n' "$brew_prefix"
+fi
+EOF
+    chmod +x "$brew_prefix/bin/brew"
+    brew() {
+        printf 'brew %s\n' "$*" >> "$COMMAND_LOG"
+        case "$*" in
+            "--cellar") printf '%s\n' "$test_cellar" ;;
+            "list --formula python@3.12") printf '%s\n' "$test_cellar/python@3.12/3.12.13/bin/python3.12" ;;
+            "list --formula python@3.14") printf '%s\n' "$python_bin" ;;
+            "outdated --formula --quiet python@3.14") return 0 ;;
+            *) return 1 ;;
+        esac
+    }
+
+    update_catalog_tools > "$root.out"
+
+    assert_contains "current   python3" "$root.out" "active versioned Python formula was not accepted"
+    assert_contains "owner=brew package=python@3.14 source=$brew_prefix/bin/python3" "$root.out" "active versioned Python owner was not reported"
+    assert_not_contains "brew upgrade python@3.12" "$COMMAND_LOG" "install-default Python formula was updated instead of the active owner"
+}
+
 case_brew_prefix_symlink_to_external_blocks() {
     local root="$TMP_ROOT/brew-prefix-escape" brew_prefix="$TMP_ROOT/brew-prefix-escape/homebrew" external="$TMP_ROOT/brew-prefix-escape/external"
     mkdir -p "$brew_prefix/bin" "$external"
@@ -1222,6 +1270,7 @@ run_case "Brew current" case_brew_current_does_not_upgrade
 run_case "Brew shadowed source" case_brew_shadowed_source_is_unmanaged
 run_case "Brew prefix without formula" case_brew_prefix_without_formula_blocks
 run_case "Brew formula without file ownership" case_brew_formula_without_file_ownership_blocks
+run_case "Brew active versioned formula owner" case_brew_active_versioned_formula_owns_source
 run_case "Brew prefix symlink escape" case_brew_prefix_symlink_to_external_blocks
 run_case "Brew external symlink to prefix" case_brew_external_symlink_to_prefix_is_unmanaged
 run_case "Brew outdated probe failure" case_brew_outdated_probe_failure_blocks
