@@ -180,7 +180,10 @@ Commit-by-commit status:
   auto-relocates the exact descendant artifacts emitted by the short-lived
   broken migration before retry. A checked-in owner-host lifecycle runner now
   covers install, update, config uninstall, reinstall, final update, package/tap
-  preservation, and full validation.
+  preservation, and full validation. Its first real invocation also exposed a
+  stale login-shell PATH: setup now directly re-adopts an existing canonical
+  Nix profile binary when Homebrew path refresh occurs after the upstream
+  already-sourced guard, rather than attempting a second Nix installation.
   The first real system activation remains manual-verification-pending in
   `tests/MANUAL.md`.
 - **Commit 6 - Linux/WSL Home Manager packages-only — DONE.** HM standalone for

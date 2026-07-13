@@ -232,6 +232,10 @@ commits, recovery path, provider inventory, and whether any user data changed.
       `Library/Taps`, an idempotent second uninstall, and no removed pre-existing
       Homebrew formula, cask, or unrelated tap. The sudo prompt belongs to the
       invoking terminal; do not pipe credentials into the runner or its log.
+      Run once from a shell where the Nix daemon profile guard is already set
+      but `/nix/var/nix/profiles/default/bin` is absent from `PATH`; setup must
+      re-adopt the installed Nix binary and must not invoke the prerequisite
+      installer.
 - [x] **Historical Intel macOS hosted runtime proof (platform retired)**: exact head
       `f4b63953f2f982702a685358b09e89bae2d78fdd` passed the real
       `macos-26-intel` Nix job (`29092384007` / `86360593091`) and full setup job

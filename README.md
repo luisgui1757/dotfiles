@@ -203,6 +203,10 @@ Tap transaction and diagnostic snapshots always live beside
 live taps. Setup also recognizes the exact in-tree recovery names emitted by
 the short-lived broken migration and moves them to an external recovery root
 before activation, so retry needs no manual `brew untap` or filesystem cleanup.
+Setup also re-adopts the canonical daemon or user Nix profile binary directly
+when Homebrew's `path_helper` refresh has removed Nix from `PATH` after the
+upstream profile's already-sourced guard was set; it does not misclassify that
+stale-shell state as a missing Nix installation.
 **nvim and the
 tree-sitter CLI stay native** (ABI-coupled to nvim-treesitter parser builds;
 migrating them into a same-closure toolchain is a follow-up). Native Windows is

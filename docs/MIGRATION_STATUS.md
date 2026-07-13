@@ -199,6 +199,9 @@ broken repo-symlink still cleaned) is covered by
       automatically relocates the exact in-tree artifact names produced by the
       broken predecessor before retry. `tests/macos_owner_lifecycle.sh` is the
       destructive real-host install/update/uninstall/reinstall validation path.
+      Setup prerequisite discovery also recovers a canonical daemon/user Nix
+      profile binary when it is present but an already-guarded login profile no
+      longer exports it after Homebrew path refresh.
 - [x] Fresh Linux/WSL zsh startup consumes Home Manager's canonical session-vars
       file once from the XDG profile, `~/.nix-profile`, or the
       system-integrated `/etc/profiles/per-user/<effective-user>` profile, with

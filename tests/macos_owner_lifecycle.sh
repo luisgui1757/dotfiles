@@ -63,7 +63,7 @@ refresh_runtime_path() {
     done
     [[ -n "${BREW:-}" ]] || fail "Homebrew is required on the owner host"
 
-    PATH="/run/current-system/sw/bin:$HOME/.nix-profile/bin:$PATH"
+    PATH="/run/current-system/sw/bin:$HOME/.nix-profile/bin:/nix/var/nix/profiles/default/bin:$PATH"
     export PATH
 }
 
@@ -123,7 +123,7 @@ assert_tap_ownership() {
         path="$taps_dir/$rel"
         [[ -e "$path" ]] || continue
         owner="$(stat -f '%Su' "$path")"
-        [[ "$owner" == "$USER" ]] || fail "Homebrew tap is not target-user owned: $path ($owner)"
+        [[ "$owner" == "$(id -un)" ]] || fail "Homebrew tap is not target-user owned: $path ($owner)"
     done
     [[ -d "$taps_dir/nikitabobko/homebrew-tap" ]] || fail "nikitabobko/tap checkout is missing"
     echo "PASS: installed Homebrew tap checkouts are target-user owned"

@@ -348,7 +348,10 @@ that violates one of these, fix it instead of disabling the test.
     generated replacements before restoring both originals. Repeated setup from
     a pre-activation shell resolves the installed `/run/current-system` rebuild
     command outside stale `PATH`; exact `/etc/static/{bashrc,zshrc}` links are
-    already-managed state, so retained backups are not collisions. Guarded by
+    already-managed state, so retained backups are not collisions. If
+    Homebrew's `path_helper` removes Nix after the upstream profile's sourced
+    guard was set, setup directly re-adopts the canonical daemon/user profile
+    binary instead of trying to reinstall Nix. Guarded by
     `setup_target_identity_test.sh`,
     `setup_nix_darwin_test.sh`, `darwin_config_test.sh`, and
     `darwin_platform_contract_test.sh`.
@@ -1861,7 +1864,10 @@ pipe-to-shell bootstrap.
   files and preserves generated replacements for diagnosis. A retry in the
   terminal that launched first activation resolves the current-system
   `darwin-rebuild` by its installed absolute path even though that shell's
-  `PATH` is stale. If bootstrap fallback is still required, exact links to
+  `PATH` is stale. Nix prerequisite discovery also recovers
+  `/nix/var/nix/profiles/default/bin/nix` or `~/.nix-profile/bin/nix` directly
+  when a Homebrew `path_helper` refresh removed Nix after the upstream profile
+  guard was set. If bootstrap fallback is still required, exact links to
   `/etc/static/bashrc` and `/etc/static/zshrc` are treated as nix-darwin-managed
   and their retained recovery backups remain untouched; an unmanaged source
   plus an existing backup continues to fail closed.

@@ -197,8 +197,23 @@ release_git() {
 }
 
 activate_nix_profile() {
-    local profile
+    local profile nix_bin nix_bin_dir
     command -v nix >/dev/null 2>&1 && return 0
+
+    # A login shell may already have sourced nix-daemon.sh, after which
+    # Homebrew's path_helper can replace PATH while the upstream profile guard
+    # remains set. Re-sourcing then correctly no-ops. Recover the two canonical
+    # profile binaries directly before asking the guarded scripts to run.
+    for nix_bin in \
+        /nix/var/nix/profiles/default/bin/nix \
+        "$HOME/.nix-profile/bin/nix"; do
+        [[ -x "$nix_bin" ]] || continue
+        nix_bin_dir="$(dirname "$nix_bin")"
+        PATH="$nix_bin_dir:$PATH"
+        export PATH
+        command -v nix >/dev/null 2>&1 && return 0
+    done
+
     for profile in \
         /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh \
         "$HOME/.nix-profile/etc/profile.d/nix.sh"; do

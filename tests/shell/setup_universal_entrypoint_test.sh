@@ -22,7 +22,40 @@ state="$({
 home="$WORK/home"
 fake_repo="$WORK/repo"
 fake_bin="$WORK/bin"
-mkdir -p "$home/.nix-profile/etc/profile.d" "$fake_repo/scripts" "$fake_bin"
+mkdir -p "$home/.nix-profile/bin" "$home/.nix-profile/etc/profile.d" "$fake_repo/scripts" "$fake_bin"
+cat > "$home/.nix-profile/bin/nix" <<'PROFILE_NIX'
+#!/usr/bin/env bash
+case "${1:-}" in
+    --version) echo 'nix (profile fixture) 2.34.0' ;;
+    store) [[ "${2:-}" == info ]] ;;
+    *) exit 90 ;;
+esac
+PROFILE_NIX
+chmod +x "$home/.nix-profile/bin/nix"
+
+old_home="$HOME"
+old_path="$PATH"
+old_nix_profile_guard="${__ETC_PROFILE_NIX_SOURCED-}"
+old_nix_profile_guard_set="${__ETC_PROFILE_NIX_SOURCED+x}"
+HOME="$home"
+PATH="/usr/bin:/bin"
+__ETC_PROFILE_NIX_SOURCED=1
+export HOME PATH __ETC_PROFILE_NIX_SOURCED
+activate_nix_profile
+case "$(command -v nix)" in
+    /nix/var/nix/profiles/default/bin/nix|"$home/.nix-profile/bin/nix") ;;
+    *) fail "setup did not recover a canonical Nix profile binary after guarded profile sourcing" ;;
+esac
+HOME="$old_home"
+PATH="$old_path"
+export HOME PATH
+if [[ -n "$old_nix_profile_guard_set" ]]; then
+    __ETC_PROFILE_NIX_SOURCED="$old_nix_profile_guard"
+    export __ETC_PROFILE_NIX_SOURCED
+else
+    unset __ETC_PROFILE_NIX_SOURCED
+fi
+
 cat > "$fake_repo/scripts/install-nix-prerequisite.sh" <<'HELPER'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -42,8 +75,6 @@ esac
 NIX
 chmod +x "$fake_repo/scripts/install-nix-prerequisite.sh" "$fake_bin/nix"
 
-old_home="$HOME"
-old_path="$PATH"
 HOME="$home"
 PATH="/usr/bin:/bin"
 SCRIPT_DIR="$fake_repo"

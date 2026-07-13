@@ -179,6 +179,10 @@ and failed-output roots beside `Library/Taps`, where Homebrew cannot enumerate
 them as additional taps, and automatically relocates the exact in-tree recovery
 names created by the broken predecessor. Do not manually untap or delete those
 artifacts before retrying setup.
+If the same login shell already sourced the Nix daemon profile and a later
+Homebrew `path_helper` refresh removed Nix from `PATH`, setup re-adopts the
+canonical daemon/user profile binary directly. Do not reinstall Nix or unset
+the upstream profile guard manually.
 
 To move to a newer dotfiles release, clone that exact annotated tag beside the
 current checkout and run its setup update command. The new checkout, not Git

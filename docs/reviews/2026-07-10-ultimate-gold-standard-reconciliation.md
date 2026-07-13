@@ -2085,3 +2085,46 @@ UGR-013 remains ACCEPTED/FIXED at the code/regression level, but the real
 owner-host lifecycle row remains pending. No pushed-head hosted result,
 privileged lifecycle result, review, approval, merge, release tag, live
 safeguard mutation, or merged-main cache-free proof is claimed by this entry.
+
+## Guarded Nix-profile PATH recovery — entry 52
+
+- The first committed owner-host lifecycle invocation at
+  `a3fc2f5040fa40434c10580502a115e261062403` stopped before nix-darwin with
+  Git's `fatal: Needed a single revision`. A second ordinary run repeated it,
+  so retry was stopped and the lifecycle was instrumented.
+- The exact trace proved setup saw no `nix` on `PATH`, then sourced
+  `/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh`. The login shell
+  had already set that profile's sourced guard, so the source correctly no-op'd.
+  Setup then misclassified installed Nix as absent, invoked the prerequisite
+  installer, and that release-only helper rejected the untagged development
+  branch at its tag revision check. This was not a corrupt repository or a
+  failed nix-darwin/Homebrew activation.
+- The environment shape is valid: Homebrew's `path_helper` refresh can replace
+  `PATH` after the Nix profile guard is set. Setup now checks the canonical
+  daemon and user profile binaries directly before sourcing guarded profile
+  scripts. The lifecycle runner also carries the daemon profile bin explicitly.
+- A focused regression sets the profile guard, removes Nix from `PATH`, and
+  requires canonical profile recovery without invoking the prerequisite helper.
+  A real stale-PATH dry-run reaches installed nix-darwin normally.
+- Separately, the owner ran ordinary `./setup.sh --all` successfully at
+  `a3fc2f5`: all six phases completed. Live readback found the active
+  current-system rebuild command, target-user-owned `nikitabobko/tap`, and no
+  setup recovery artifact under Homebrew's scanned `Library/Taps`. This proves
+  the repaired tap boundary's install path, but not yet the complete lifecycle.
+
+### Repair verification
+
+| Check | Exact result |
+|---|---|
+| Instrumented owner-host lifecycle at `a3fc2f5` | FAIL before mutation: installed Nix was absent from stale PATH and guarded profile sourcing no-op'd |
+| Owner-terminal `./setup.sh --all` at `a3fc2f5` | PASS: nix-darwin plus all six setup phases completed |
+| Live tap/system readback after install | PASS: current-system rebuild executable, `nikitabobko/tap` target-user owned, no `.dotfiles-*` tap enumerated or stored below `Library/Taps` |
+| `bash tests/shell/setup_universal_entrypoint_test.sh` | PASS: guarded canonical-profile recovery plus existing bootstrap/migration cases |
+| Stale-PATH `./setup.sh --all --dry-run` | PASS: Nix store and installed current-system rebuild resolved without prerequisite reinstall |
+| `make ci` | PASS: ended `local pre-PR gate passed` on the guarded-profile recovery tree |
+| Full lifecycle on the new recovery head | PENDING |
+
+The complete install/update/uninstall/reinstall/update row remains pending. No
+pushed-head hosted result, completed lifecycle, review, approval, merge, release
+tag, live safeguard mutation, or merged-main cache-free proof is claimed by this
+entry.
