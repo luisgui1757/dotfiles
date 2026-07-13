@@ -2186,3 +2186,33 @@ entry.
 No physical-Linux, WSL, Windows desktop, Herdr visual-session, completed macOS
 lifecycle, final pushed-head hosted, approval, merge, release tag, safeguard
 mutation, or merged-main cache-free proof is claimed by this entry.
+
+## PowerShell analyzer identity closure — entry 54
+
+- Pushed head `0e5f48bdc32e9cb5b32a1cac26f16ce281b8f816` reached the
+  Windows `test.ps1` entry point in hosted Test run
+  [`29233944017`](https://github.com/luisgui1757/dotfiles/actions/runs/29233944017).
+  PSScriptAnalyzer 1.25.0 retained every reviewed rule/path/count group but
+  rejected the stale exact identity fingerprint: expected `5630775a...f090`,
+  actual `284a5c26...718a`. The runner then passed all 266 Pester tests and
+  invoked every Neovim spec; the job's final exit 1 was the correctly retained
+  analyzer failure, not a Neovim failure.
+- The stale fingerprint predated this branch's later reviewed changes to
+  warning extents in `setup.ps1` and related PowerShell surfaces, including the
+  fail-closed Mason command text. Recomputing with the same analyzer version on
+  macOS produced the same `284a5c26ff6986b5bb4805367417a09958e5bea39de25edfefc14487c175718a`
+  identity as Windows. The baseline is refreshed to that exact reviewed
+  identity without changing a rule, scanned path, group count, diagnostic, or
+  suppression.
+
+### Repair verification
+
+| Check | Exact result |
+|---|---|
+| Hosted Windows `test.ps1` at `0e5f48b` before repair | FAIL: exact analyzer identity mismatch; Pester 266 passed, 0 failed/skipped; all 18 Neovim specs were invoked |
+| Local PSScriptAnalyzer 1.25.0 recomputation | PASS: exact rule/path/count groups retained; independently produced fingerprint `284a5c26ff6986b5bb4805367417a09958e5bea39de25edfefc14487c175718a` |
+| `pwsh -NoLogo -NoProfile -File ./test.ps1` after repair | PASS: analyzer exact fingerprint, 265 Pester passed with zero failed/skipped, and all 18 Neovim specs exited 0 |
+
+The repaired pushed-head hosted result remains pending. No completed macOS
+lifecycle, approval, merge, release tag, live safeguard mutation, or
+merged-main cache-free proof is claimed by this entry.
