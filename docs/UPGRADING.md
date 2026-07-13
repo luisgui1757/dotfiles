@@ -130,8 +130,8 @@ protected recovery folder, and completes packages, config repointing, Neovim,
 and Sentinel.
 
 The same command covers conventional, redirected, OneDrive, and alternate-drive
-known folders because UserProfile, LocalApplicationData, Documents, and the
-runtime PowerShell profile are resolved independently.
+known folders because UserProfile, LocalApplicationData, ApplicationData,
+Documents, and the runtime PowerShell profile are resolved independently.
 
 After success, open Neovim, lazygit, PowerShell, and every installed Windows
 Terminal variant. Keep the old checkout and protected recovery folder until

@@ -124,6 +124,7 @@ Describe "setup.ps1 main chezmoi apply boundary" {
         $script:WindowsIdentity = [pscustomobject]@{
             UserProfile = 'C:\User'
             LocalApplicationData = 'D:\Local Data'
+            ApplicationData = 'D:\Roaming Data'
             Documents = 'E:\Documents'
             RuntimeProfile = 'E:\Documents\PowerShell\Microsoft.PowerShell_profile.ps1'
         }
@@ -351,6 +352,7 @@ Describe "setup.ps1 Windows known-folder identity" {
             switch ($Name) {
                 'UserProfile' { 'D:\Actual User With Spaces' }
                 'LocalApplicationData' { 'E:\Redirected Local Data' }
+                'ApplicationData' { 'G:\Redirected Roaming Data' }
                 'MyDocuments' { 'F:\OneDrive - Example\Documents' }
             }
         }
@@ -359,6 +361,7 @@ Describe "setup.ps1 Windows known-folder identity" {
 
         $identity.UserProfile | Should -Be 'D:\Actual User With Spaces'
         $identity.LocalApplicationData | Should -Be 'E:\Redirected Local Data'
+        $identity.ApplicationData | Should -Be 'G:\Redirected Roaming Data'
         $identity.Documents | Should -Be 'F:\OneDrive - Example\Documents'
         $identity.RuntimeProfile | Should -Be 'F:\OneDrive - Example\Documents\PowerShell\Microsoft.VSCode_profile.ps1'
         $identity.UserProfile | Should -Not -Be $env:USERPROFILE
@@ -371,6 +374,8 @@ Describe "setup.ps1 Windows known-folder identity" {
             Should -Throw '*MyDocuments known folder*'
         { Resolve-WindowsTargetIdentity -FolderResolver { param($Name) if ($Name -eq 'LocalApplicationData') { 'relative' } else { "C:\$Name" } } -RuntimeProfile 'C:\profile.ps1' } |
             Should -Throw '*LocalApplicationData known folder*'
+        { Resolve-WindowsTargetIdentity -FolderResolver { param($Name) if ($Name -eq 'ApplicationData') { 'relative' } else { "C:\$Name" } } -RuntimeProfile 'C:\profile.ps1' } |
+            Should -Throw '*ApplicationData known folder*'
         { Resolve-WindowsTargetIdentity -FolderResolver $goodResolver -RuntimeProfile 'relative-profile.ps1' } |
             Should -Throw '*runtime profile path*'
     }
@@ -380,31 +385,37 @@ Describe "setup.ps1 Windows known-folder identity" {
         $identity = [pscustomobject]@{
             UserProfile = Join-Path $root 'Actual User'
             LocalApplicationData = Join-Path $root 'Redirected Local Data'
+            ApplicationData = Join-Path $root 'Redirected Roaming Data'
             Documents = Join-Path $root 'OneDrive Documents'
             RuntimeProfile = Join-Path $root 'OneDrive Documents\PowerShell\Microsoft.PowerShell_profile.ps1'
         }
         $overlays = @(Get-WindowsKnownFolderOverlays -Identity $identity)
 
-        $overlays.Count | Should -Be 2
+        $overlays.Count | Should -Be 3
         $overlays[0].Destination | Should -Be $identity.LocalApplicationData
-        $overlays[1].Destination | Should -Be $identity.Documents
+        $overlays[1].Destination | Should -Be $identity.ApplicationData
+        $overlays[2].Destination | Should -Be $identity.Documents
         $overlays[0].State | Should -Match 'localappdata\.boltdb$'
-        $overlays[1].State | Should -Match 'documents\.boltdb$'
+        $overlays[1].State | Should -Match 'appdata\.boltdb$'
+        $overlays[2].State | Should -Match 'documents\.boltdb$'
     }
 
-    It "post-checks actual Neovim, lazygit, Console, VS Code, and ISE consumers" {
+    It "post-checks actual Neovim, lazygit, Herdr, Console, VS Code, and ISE consumers" {
         $root = Join-Path ([IO.Path]::GetTempPath()) ('known folders ' + [Guid]::NewGuid())
         $localAppData = Join-Path $root 'Redirected Local Data'
+        $appData = Join-Path $root 'Redirected Roaming Data'
         $documents = Join-Path $root 'OneDrive Documents'
         $nvimTarget = Join-Path $localAppData 'nvim'
         $lazygitTarget = Join-Path $localAppData 'lazygit\config.yml'
-        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $lazygitTarget) | Out-Null
+        $herdrTarget = Join-Path $appData 'herdr\config.toml'
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $lazygitTarget), (Split-Path -Parent $herdrTarget) | Out-Null
         if ($env:OS -eq 'Windows_NT') {
             New-Item -ItemType Junction -Path $nvimTarget -Target (Join-Path $script:RepoRoot 'nvim') | Out-Null
         } else {
             New-Item -ItemType SymbolicLink -Path $nvimTarget -Target (Join-Path $script:RepoRoot 'nvim') | Out-Null
         }
         Copy-Item -LiteralPath (Join-Path $script:RepoRoot 'lazygit\config.windows.yml') -Destination $lazygitTarget
+        Copy-Item -LiteralPath (Join-Path $script:RepoRoot 'herdr\config.toml') -Destination $herdrTarget
         $profiles = @(
             (Join-Path $documents 'PowerShell\Microsoft.PowerShell_profile.ps1'),
             (Join-Path $documents 'PowerShell\Microsoft.VSCode_profile.ps1'),
@@ -420,6 +431,7 @@ Describe "setup.ps1 Windows known-folder identity" {
                 $identity = [pscustomobject]@{
                     UserProfile = $root
                     LocalApplicationData = $localAppData
+                    ApplicationData = $appData
                     Documents = $documents
                     RuntimeProfile = $profilePath
                 }
@@ -435,6 +447,7 @@ Describe "setup.ps1 Windows known-folder identity" {
         $identity = [pscustomobject]@{
             UserProfile = Join-Path $root 'User'
             LocalApplicationData = Join-Path $root 'Redirected Local'
+            ApplicationData = Join-Path $root 'Redirected Roaming'
             Documents = Join-Path $root 'Redirected Documents'
             RuntimeProfile = Join-Path $root 'Redirected Documents\PowerShell\Microsoft.PowerShell_profile.ps1'
         }
@@ -467,6 +480,7 @@ Describe "setup.ps1 Windows known-folder identity" {
         $identity = [pscustomobject]@{
             UserProfile = Join-Path $root 'User'
             LocalApplicationData = Join-Path $root 'Redirected Local'
+            ApplicationData = Join-Path $root 'Redirected Roaming'
             Documents = Join-Path $root 'Redirected Documents'
             RuntimeProfile = Join-Path $root 'Redirected Documents\PowerShell\Microsoft.PowerShell_profile.ps1'
         }
@@ -1091,6 +1105,7 @@ Describe "setup.ps1 universal install and migration entrypoint" {
         $script:UniversalIdentity = [pscustomobject]@{
             UserProfile = (Join-Path $script:UniversalRoot 'User')
             LocalApplicationData = $script:UniversalLocal
+            ApplicationData = (Join-Path $script:UniversalRoot 'Roaming')
             Documents = (Join-Path $script:UniversalRoot 'Documents')
             RuntimeProfile = (Join-Path $script:UniversalRoot 'Documents\PowerShell\Microsoft.PowerShell_profile.ps1')
         }
@@ -1448,6 +1463,7 @@ Describe "setup.ps1 transactional Windows Terminal merge" {
         $script:WindowsIdentity = [pscustomobject]@{
             UserProfile = $script:FakeHome
             LocalApplicationData = $script:FakeLocalAppData
+            ApplicationData = Join-Path $script:FakeHome 'AppData\Roaming'
             Documents = Join-Path $script:FakeHome 'Documents'
             RuntimeProfile = Join-Path $script:FakeHome 'Documents\PowerShell\Microsoft.PowerShell_profile.ps1'
         }

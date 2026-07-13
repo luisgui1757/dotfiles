@@ -39,7 +39,8 @@ commits, recovery path, provider inventory, and whether any user data changed.
       captured, alter or temporarily move both retained checkouts and prove
       apply/rollback still consume only the frozen release trees.
 - [ ] **Windows redirected/OneDrive/alternate drive:** repeat with Documents,
-      LocalApplicationData, and runtime `$PROFILE` on independent real paths.
+      LocalApplicationData, ApplicationData, and runtime `$PROFILE` on
+      independent real paths.
       Include divergent packaged, Preview, Canary, and portable Terminal installations;
       no conventional path may be guessed or overwritten.
 - [ ] **Release acceptance:** on the final annotated v0.2.0 tag, run the full
@@ -79,13 +80,14 @@ commits, recovery path, provider inventory, and whether any user data changed.
       state plus the managed fragment and receives its own verified backup.
       Run `uninstall.ps1 -All`; confirm all pre-setup backups restore and each
       displaced current file remains as `settings.json.uninstall-current.*`.
-- [ ] **Redirected Windows known folders**: redirect Documents and
-      LocalApplicationData to different real paths (include an alternate drive
-      and spaces), run `setup.ps1 -All`, then open Neovim, lazygit, ConsoleHost,
-      VS Code, and ISE. Confirm each consumes the managed target in the actual
-      known folder and no conventional `%USERPROFILE%\AppData\Local`/`Documents`
-      target was silently overwritten. Run `uninstall.ps1 -All` and verify the
-      same source states are removed or restored without guessing paths.
+- [ ] **Redirected Windows known folders**: redirect Documents,
+      LocalApplicationData, and roaming ApplicationData to different real paths
+      (include an alternate drive and spaces), run `setup.ps1 -All`, then open
+      Neovim, lazygit, Herdr, ConsoleHost, VS Code, and ISE. Confirm each consumes
+      the managed target in the actual known folder and no conventional
+      `%USERPROFILE%\AppData`/`Documents` target was silently overwritten. Run
+      `uninstall.ps1 -All` and verify the same source states are removed or
+      restored without guessing paths.
 - [ ] **Tmux status bar**: generated Rose Pine bar is at the top, includes the
       signal-bar segments (session, window list/current program, directory
       basename; no user/host/date/time duplication), segments are readable,
@@ -131,7 +133,9 @@ commits, recovery path, provider inventory, and whether any user data changed.
       fullscreen; `ctrl-alt-shift-;` enters service mode (esc reloads config).
 - [ ] **Herdr session smoke**, all OSes: `herdr --version` prints the installed
       version; start a session (`herdr`), confirm it opens panes and its
-      agent-state awareness works, then exit cleanly. On native Linux without
+      agent-state awareness works, confirm the UI uses dark Rose Pine, then exit
+      cleanly. Confirm the managed config is `~/.config/herdr/config.toml` on
+      POSIX and the real `%APPDATA%\herdr\config.toml` on Windows. On native Linux without
       brew, confirm the binary is the pinned SHA-256-verified release
       (`~/.local/bin/herdr`), not a remote-eval install. On native Windows,
       confirm `herdr.exe` resolves from `%LOCALAPPDATA%\Programs\Herdr\bin`, not

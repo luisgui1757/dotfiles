@@ -126,6 +126,7 @@ Describe 'v0.1.0 to v0.2.0 Windows release migration recovery' {
         $script:WindowsIdentity = [pscustomobject]@{
             UserProfile = $script:Root
             LocalApplicationData = $localAppData
+            ApplicationData = Join-Path $script:Root 'Roaming App Data'
             Documents = Join-Path $script:Root 'Documents'
             RuntimeProfile = Join-Path $script:Root 'Documents/PowerShell/Microsoft.PowerShell_profile.ps1'
         }
@@ -264,10 +265,11 @@ Describe 'v0.1.0 to v0.2.0 Windows release migration recovery' {
         { Confirm-WindowsTerminalExpectedState -Entries $entries } | Should -Not -Throw
     }
 
-    It 'removes only the two transaction-created known-folder state files' {
+    It 'removes only the three transaction-created known-folder state files' {
         $stateRoot = Join-Path $script:Root 'known folder state'
         New-Item -ItemType Directory -Force -Path $stateRoot | Out-Null
         [IO.File]::WriteAllText((Join-Path $stateRoot 'localappdata.boltdb'), 'local')
+        [IO.File]::WriteAllText((Join-Path $stateRoot 'appdata.boltdb'), 'roaming')
         [IO.File]::WriteAllText((Join-Path $stateRoot 'documents.boltdb'), 'documents')
 
         Restore-KnownFolderStateBoundary -StateRoot $stateRoot

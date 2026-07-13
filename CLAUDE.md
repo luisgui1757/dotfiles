@@ -43,6 +43,7 @@ auth files, and package caches stay per machine.
 ├── shells/                zshenv + zshrc + powershell_profile.ps1
 ├── tmux/                  tmux.conf (Rose Pine, vi-mode, OSC52 clipboard)
 ├── ghostty/               config (Rose Pine, Hack Nerd, tuned for tmux)
+├── herdr/                 config.toml (forced built-in Rose Pine theme)
 ├── windows-terminal/      settings.fragment.jsonc + merge README
 ├── lazygit/               config.yml + config.windows.yml (J/K + Windows Ctrl-G)
 ├── home/                  chezmoi source tree for the config layer
@@ -357,17 +358,18 @@ that violates one of these, fix it instead of disabling the test.
     `darwin_platform_contract_test.sh`.
 25. **Windows setup uses application-consumed known folders, not fabricated
     children of UserProfile.** Resolve UserProfile, LocalApplicationData,
-    Documents, and runtime `$PROFILE` independently. The main chezmoi source is
-    UserProfile-only; `windows/chezmoi-localappdata` and
-    `windows/chezmoi-documents` are explicit destination overlays with separate
-    persistent state. Post-apply checks cover nvim, lazygit, ConsoleHost, VS
-    Code, and ISE. Path proof resolves both directory symlinks and Windows
+    ApplicationData, Documents, and runtime `$PROFILE` independently. The main
+    chezmoi source is UserProfile-only; `windows/chezmoi-localappdata`,
+    `windows/chezmoi-appdata`, and `windows/chezmoi-documents` are explicit
+    destination overlays with separate persistent state. Post-apply checks
+    cover nvim, lazygit, Herdr, ConsoleHost, VS Code, and ISE. Path proof
+    resolves both directory symlinks and Windows
     junctions before comparing ownership. Recognized conventional legacy
     targets migrate only after successful publication; divergent legacy user
     data is preserved. The main source exposes no Windows Terminal target, so
     setup applies it without absolute target selectors and then runs the
     dedicated WT transaction. Native stderr is retained on apply failure.
-    Uninstall enumerates the same three source states.
+    Uninstall enumerates the same four source states.
     Guarded by Setup/Uninstall Pester and the Windows apply/round-trip migration
     suites.
 26. **PowerShell profiles run only for an actual interactive invocation.** The
@@ -585,7 +587,8 @@ Surfaces that consume these: nvim (rose-pine plugin defaults), lualine
 (theme="rose-pine"), starship.toml (`[palettes.rose-pine]`), tmux.conf (hex
 literals in status/borders), ghostty/config (`theme = Rose Pine` -- forced dark
 on every platform, NOT the adaptive `dark:,light:` split, to match the dark
-stack),
+stack), herdr/config.toml (built-in `rose-pine`, forced with
+`auto_switch = false`),
 windows-terminal/settings.fragment.jsonc (`schemes` + `themes`),
 shells/powershell_profile.ps1 (PSReadLine `-Colors` for syntax, `Selection`,
 the version-gated prediction colors, and `$PSStyle.FileInfo.Directory` for `ls`
@@ -1059,10 +1062,11 @@ save only**. The next plain `:w` formats normally. Implemented in
   nvim; app runtime state lives outside `.config/nvim`, but user/plugin-added
   config files should not be deleted by chezmoi. `home/.chezmoiignore` must gate
   whole wrong-OS directories to avoid empty parent dirs. Windows setup resolves
-  the actual LocalApplicationData and Documents known folders plus runtime
-  `$PROFILE`, then applies dedicated source states for nvim/lazygit and the
-  Console/VS Code/ISE PowerShell profiles. Never restore hardcoded
-  `home/AppData` or `home/Documents` targets. POSIX pwsh profile management remains
+  the actual LocalApplicationData, ApplicationData, and Documents known folders
+  plus runtime `$PROFILE`, then applies dedicated source states for
+  nvim/lazygit, Herdr, and the Console/VS Code/ISE PowerShell profiles. Never
+  restore hardcoded `home/AppData` or `home/Documents` targets. POSIX pwsh
+  profile management remains
   outside the static chezmoi source tree because it depends on which host shell
   and `$PROFILE` path are available after `pwsh` is installed. WSL is gated
   through `home/.chezmoi.toml.tmpl`'s `isWsl` data value:
@@ -1141,9 +1145,11 @@ save only**. The next plain `:w` formats normally. Implemented in
   updates would violate Arch's explicit full-system-upgrade model. `/bin/zsh` on
   macOS is `system`. Normal macOS developer tools that still resolve from
   `/usr/bin` are `unmanaged` with a Homebrew migration hint. Setup owns the
-  Homebrew shellenv block and Homebrew GNU Make `libexec/gnubin` PATH adoption
-  when the `make` formula is installed; do not document a hidden manual export
-  step instead. Scoop ownership must use shim metadata as the first proof layer:
+  Homebrew shellenv block, Homebrew GNU Make `libexec/gnubin` PATH adoption when
+  the `make` formula is installed, and `brew completions link` reconciliation
+  after Homebrew activation in both install and update mode; do not document a
+  hidden manual repair step instead. Scoop ownership must use shim metadata as
+  the first proof layer:
   a command source under `...\scoop\shims` must parse the sibling `.shim` target
   and match `...\scoop\apps\<catalog-package>\...` before any package-list
   fallback. A resolved command source outside Scoop must not be claimed by
@@ -1563,6 +1569,7 @@ save only**. The next plain `:w` formats normally. Implemented in
   `tests/shell/ghostty_install_fail_test.sh`,
   `tests/shell/wezterm_install_test.sh`, `tests/shell/wezterm_install_fail_test.sh`,
   `tests/shell/herdr_install_test.sh`, `tests/shell/herdr_install_fail_test.sh`,
+  `tests/shell/homebrew_completions_test.sh`,
   `tests/shell/wsl_gui_tools_test.sh`, `tests/shell/lazygit_install_test.sh`,
   `tests/shell/starship_linux_install_test.sh`,
   `tests/shell/treesitter_cli_test.sh`, and `tests/shell/zsh_plugins_test.sh`.

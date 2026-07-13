@@ -364,8 +364,8 @@ remains a symlink even though single-file configs are copies.
 The table below is the config layer. Full setup and config-only applies use the
 chezmoi source under `home/`, plus dedicated Windows known-folder source states.
 Mechanisms differ: POSIX uses symlinks; ordinary UserProfile Windows files are
-copies; redirected LocalApplicationData/Documents targets are symlink overlays;
-and Windows Terminal remains a merge.
+copies; redirected LocalApplicationData/ApplicationData/Documents targets are
+symlink overlays; and Windows Terminal remains a merge.
 
 | Tool | macOS | Linux / WSL | Windows |
 |---|---|---|---|
@@ -377,20 +377,22 @@ and Windows Terminal remains a merge.
 | Ghostty | `~/Library/Application Support/com.mitchellh.ghostty/config` -> `ghostty/config` (lazy 1 GiB per-surface scrollback byte budget) | native Linux links the same `~/.config/ghostty/config`; WSL links it only with `--experimental-wsl-gui` | n/a |
 | WezTerm | `~/.config/wezterm/wezterm.lua` -> `wezterm/wezterm.lua` (5,000,000 scrollback lines per tab) | same; WSL links it only with `--experimental-wsl-gui` | `%USERPROFILE%\.config\wezterm\wezterm.lua` -> `wezterm\wezterm.lua` (copied; same 5,000,000-line budget) |
 | AeroSpace | `~/.config/aerospace/aerospace.toml` -> `aerospace/aerospace.toml` (macOS tiling WM; focus/move on `ctrl-alt(-shift)` to avoid nvim `<A-h/j/k/l>` and fzf `Alt-c`) | n/a (macOS-only) | n/a (macOS-only) |
+| Herdr | `~/.config/herdr/config.toml` -> `herdr/config.toml` (built-in `rose-pine`, forced dark) | same | actual roaming `%APPDATA%\herdr\config.toml` -> `herdr\config.toml` |
 | lazygit | `~/Library/Application Support/lazygit/config.yml` -> `lazygit/config.yml` | `~/.config/lazygit/config.yml` -> `lazygit/config.yml` | `%LOCALAPPDATA%\lazygit\config.yml` -> `lazygit\config.windows.yml` |
 | lsd | `~/.config/lsd/{config.yaml,colors.yaml}` -> `lsd/{config.yaml,colors.yaml}` | same | `%USERPROFILE%\.config\lsd\{config.yaml,colors.yaml}` -> `lsd\{config.yaml,colors.yaml}` |
 | gh-dash | `~/.config/gh-dash/config.yml` -> `gh-dash/config.yml` | same | `%USERPROFILE%\.config\gh-dash\config.yml` -> `gh-dash\config.yml` |
 | Windows Terminal | n/a | n/a | app installed by `setup.ps1` through Scoop/winget/choco, with a SHA-256-verified portable zip fallback; one validated enumerator identifies stable packaged, Preview, Canary, and portable `settings.json` targets for setup, migration, recovery, and uninstall; all profiles receive WT's hard maximum of 32,767 history lines; setup stages and validates all selected targets before publication, creates separate verified backups, detects concurrent changes through atomic replacement rollback bytes, and rolls the group back on failure; opt out with `-SkipWindowsTerminalMerge`; see [windows-terminal/README.md](windows-terminal/README.md) |
 
-Windows setup resolves UserProfile, LocalApplicationData, Documents, and the
-active host's `$PROFILE` independently through supported runtime/known-folder
-APIs. It applies the UserProfile source plus dedicated LocalApplicationData and
-Documents source states, then verifies the paths Neovim, lazygit, ConsoleHost,
-VS Code, and ISE consume. Redirected folders, alternate drives, and spaces are
-supported. Directory ownership checks resolve both symbolic links and Windows
-junctions. Recognized conventional-path legacy targets are backed up only after
-the new targets publish; divergent legacy user data stays in place with a
-migration warning. POSIX pwsh profile management remains provisioning-adjacent.
+Windows setup resolves UserProfile, LocalApplicationData, ApplicationData,
+Documents, and the active host's `$PROFILE` independently through supported
+runtime/known-folder APIs. It applies the UserProfile source plus dedicated
+LocalApplicationData, ApplicationData, and Documents source states, then
+verifies the paths Neovim, lazygit, Herdr, ConsoleHost, VS Code, and ISE consume.
+Redirected folders, alternate drives, and spaces are supported. Directory
+ownership checks resolve both symbolic links and Windows junctions. Recognized
+conventional-path legacy targets are backed up only after the new targets
+publish; divergent legacy user data stays in place with a migration warning.
+POSIX pwsh profile management remains provisioning-adjacent.
 
 ### Platform Notes
 
@@ -608,8 +610,11 @@ migration warning. POSIX pwsh profile management remains provisioning-adjacent.
   remote-eval installers remain banned. Native-Linux Herdr writes the same
   provenance marker as the other dotfiles-owned direct artifacts, so
   `./setup.sh --update` can prove ownership and refresh only the repo-pinned
-  version. Windows Herdr is beta/ConPTY-backed, so runtime behavior remains a
-  manual checklist item before treating it as a daily driver.
+  version. Chezmoi also installs the same deterministic config on every host:
+  Herdr's built-in `rose-pine` theme with onboarding and automatic light/dark
+  switching disabled. Windows consumes it from its independently resolved
+  roaming `%APPDATA%` folder. Windows Herdr is beta/ConPTY-backed, so runtime
+  behavior remains a manual checklist item before treating it as a daily driver.
 - WSL fonts are host-rendered in the supported path. Install and merge Windows
   Terminal from Windows (`.\setup.ps1 -All`; the merge is default-on); the WSL
   Linux fontconfig install is only for `--experimental-wsl-gui`.
@@ -986,6 +991,7 @@ stale; CI then fails verification until a human reviews the adjacent constant.
 ├── shells/                # zshenv + zshrc + powershell_profile.ps1
 ├── tmux/                  # tmux.conf (Rose Pine, vi-mode, true-color)
 ├── ghostty/               # config (Rose Pine, Hack Nerd, Ghostty-tuned)
+├── herdr/                 # config.toml (forced built-in Rose Pine theme)
 ├── windows-terminal/      # settings.fragment.jsonc + merge README
 ├── home/                  # chezmoi source tree for the config layer
 ├── tests/                 # automated test tree
@@ -1017,7 +1023,7 @@ stale; CI then fails verification until a human reviews the adjacent constant.
   managed global entrypoint blocks. This repo does not vendor Sentinel core or
   sync agent runtime state.
 - **Rose Pine everywhere it can render.** Nvim, lualine, foreground-only
-  Starship, tmux/psmux, `lsd`, ghostty, Windows Terminal, PSReadLine — same
+  Starship, tmux/psmux, `lsd`, ghostty, Herdr, Windows Terminal, PSReadLine — same
   palette across the stack. tmux and psmux share ONE repo-owned generated Rose
   Pine bar (`tmux/psmux-rose-pine.ps1` -> `psmux-rose-pine.{main,moon,dawn}.conf`,
   sourced on both), so the bar is byte-identical; TPM (POSIX) and the vendored
@@ -1274,6 +1280,7 @@ MIT. See `LICENSE`.
 |---|---|---|
 | Neovim stops before loading Lazy with a lockfile/cache identity error | `lazy-lock.json` is missing, malformed, incomplete, has a non-40-hex commit or invalid branch; or the cached `lazy.nvim` checkout is dirty, at the wrong commit, from the wrong origin, missing locked default-branch metadata, non-Git, or partial | restore the tracked `nvim/lazy-lock.json` and restart Neovim. Startup repairs the cache through a verified staging checkout and never executes an unproved path. If publication fails, fix the destination permissions named in the error and retry |
 | setup reports a Homebrew `shellenv` failure even though `brew` already resolves | the selected command and PATH-resolved command report different Homebrew prefixes/repositories, or `shellenv` exited nonzero; empty stdout alone is a normal Homebrew idempotence signal | compare `brew --prefix` and `brew --repository` through both entrypoints named in the error. Repair the shadowing PATH or Homebrew installation, then rerun setup; a nix-darwin wrapper and native brew path are accepted only when those identities match |
+| a new zsh prints `compinit: no such file or directory: .../_brew` | Homebrew's completion symlink survived a tap/repository migration but its target did not | update this repo and rerun setup or `./setup.sh --update`; both paths now run Homebrew's idempotent `brew completions link` reconciliation and fail visibly if Homebrew cannot repair its own completion surface |
 | first nix-darwin setup reports an existing `.before-nix-darwin` backup | setup found both an unmanaged `/etc/bashrc` or `/etc/zshrc` and an older backup, so choosing either would risk user/system data | compare the two files and resolve the collision deliberately, then rerun. Setup moves neither shell file until both backup destinations are clear and restores both if activation fails |
 | setup says it is bootstrapping nix-darwin again immediately after a successful activation | the checkout predates the retry fix, so the still-open terminal cannot see the new system profile on `PATH` and setup mistakes the retry for first bootstrap | update the checkout and rerun setup. Current setup resolves `/run/current-system/sw/bin/darwin-rebuild` directly and accepts the managed `/etc/static` shell links without touching their recovery backups |
 | `<leader>X` keymaps fire `\X` instead of `<Space>X` | mapleader set after lazy.setup somehow | restore the order in `nvim/init.lua` — leader **before** `require("lazy").setup` |

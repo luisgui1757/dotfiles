@@ -6,6 +6,7 @@ if (Get-Variable -Name PSNativeCommandUseErrorActionPreference -ErrorAction Sile
 $script:RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $script:SourceDir = Join-Path $script:RepoRoot 'home'
 $script:LocalAppDataSource = Join-Path $script:RepoRoot 'windows\chezmoi-localappdata'
+$script:AppDataSource = Join-Path $script:RepoRoot 'windows\chezmoi-appdata'
 $script:DocumentsSource = Join-Path $script:RepoRoot 'windows\chezmoi-documents'
 $script:OverlayConfig = Join-Path $script:RepoRoot 'windows\chezmoi-overlay.toml'
 $script:Chezmoi = $null
@@ -321,6 +322,10 @@ function Assert-Part1Files {
         -ActualPath (Join-Path $env:LOCALAPPDATA 'lazygit\config.yml') `
         -ExpectedPath (Join-Path $script:RepoRoot 'lazygit\config.windows.yml') `
         -Label 'lazygit config'
+    Assert-SymlinkMatchesRepo `
+        -ActualPath (Join-Path $env:APPDATA 'herdr\config.toml') `
+        -ExpectedPath (Join-Path $script:RepoRoot 'herdr\config.toml') `
+        -Label 'Herdr config'
     Assert-CopyModeFileMatches `
         -ActualPath (Join-Path $Sandbox '.config\starship.toml') `
         -ExpectedPath (Join-Path $script:RepoRoot 'starship\starship.toml') `
@@ -348,6 +353,8 @@ function Assert-Part1Files {
     Assert-NvimSymlinkMatchesRepo -Sandbox $Sandbox
     Assert-Condition (-not (Test-Path -LiteralPath (Join-Path $Sandbox 'AppData\Local\nvim'))) `
         'conventional LocalAppData target was created despite redirection'
+    Assert-Condition (-not (Test-Path -LiteralPath (Join-Path $Sandbox '.config\herdr\config.toml'))) `
+        'POSIX Herdr config path was created on Windows'
     Assert-Condition (-not (Test-Path -LiteralPath (Join-Path $Sandbox 'Documents\PowerShell\Microsoft.PowerShell_profile.ps1'))) `
         'conventional Documents profile was created despite redirection'
 }
@@ -361,6 +368,7 @@ function Invoke-Part1 {
             Invoke-Chezmoi -Arguments @('init')
             Invoke-Chezmoi -Arguments @('apply')
             Invoke-ChezmoiOverlay -Source $script:LocalAppDataSource -Destination $env:LOCALAPPDATA -StateName 'localappdata' -Arguments @('apply')
+            Invoke-ChezmoiOverlay -Source $script:AppDataSource -Destination $env:APPDATA -StateName 'appdata' -Arguments @('apply')
             Invoke-ChezmoiOverlay -Source $script:DocumentsSource -Destination (Split-Path -Parent (Split-Path -Parent ([string]$PROFILE))) -StateName 'documents' -Arguments @('apply')
             Assert-Part1Files -Sandbox $sandbox
             Assert-Condition ([IO.File]::ReadAllText($settingsPath) -eq $settingsBefore) `
@@ -368,9 +376,11 @@ function Invoke-Part1 {
             # Second apply must be a prompt-free no-op (NO --force; see wrapper).
             Invoke-ChezmoiReapply -Arguments @('apply')
             Invoke-ChezmoiOverlay -Source $script:LocalAppDataSource -Destination $env:LOCALAPPDATA -StateName 'localappdata' -Arguments @('apply') -Reapply
+            Invoke-ChezmoiOverlay -Source $script:AppDataSource -Destination $env:APPDATA -StateName 'appdata' -Arguments @('apply') -Reapply
             Invoke-ChezmoiOverlay -Source $script:DocumentsSource -Destination (Split-Path -Parent (Split-Path -Parent ([string]$PROFILE))) -StateName 'documents' -Arguments @('apply') -Reapply
             Invoke-Chezmoi -Arguments @('verify')
             Invoke-ChezmoiOverlay -Source $script:LocalAppDataSource -Destination $env:LOCALAPPDATA -StateName 'localappdata' -Arguments @('verify') -Reapply
+            Invoke-ChezmoiOverlay -Source $script:AppDataSource -Destination $env:APPDATA -StateName 'appdata' -Arguments @('verify') -Reapply
             Invoke-ChezmoiOverlay -Source $script:DocumentsSource -Destination (Split-Path -Parent (Split-Path -Parent ([string]$PROFILE))) -StateName 'documents' -Arguments @('verify') -Reapply
         }
         Pass 'part 1 real apply smoke passed'

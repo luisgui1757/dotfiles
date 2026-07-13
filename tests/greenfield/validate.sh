@@ -271,6 +271,7 @@ assert_posix_managed_configs() {
     assert_file_content "$HOME/.config/gh-dash/config.yml" "$REPO_ROOT/gh-dash/config.yml"
     assert_file_content "$HOME/.config/lsd/config.yaml" "$REPO_ROOT/lsd/config.yaml"
     assert_file_content "$HOME/.config/lsd/colors.yaml" "$REPO_ROOT/lsd/colors.yaml"
+    assert_file_content "$HOME/.config/herdr/config.toml" "$REPO_ROOT/herdr/config.toml"
     assert_file_content "$HOME/.tmux.conf" "$REPO_ROOT/tmux/tmux.conf"
     assert_file_content "$HOME/.tmux.posix.conf" "$REPO_ROOT/tmux/tmux.posix.conf"
     assert_file_content "$HOME/.zshenv" "$REPO_ROOT/shells/zshenv"
@@ -297,7 +298,7 @@ main() {
     if [[ "$CONFIG_ONLY" -eq 1 ]]; then
         skip_check "full setup tool checks skipped by --config-only"
     else
-        for cmd in git nvim rg fd fzf tmux zsh lazygit starship chezmoi tree-sitter cmake lsd; do
+        for cmd in git nvim rg fd fzf tmux zsh lazygit starship chezmoi tree-sitter cmake lsd herdr; do
             require_cmd "$cmd"
         done
         if [[ "$(uname -s)" == "Linux" ]]; then

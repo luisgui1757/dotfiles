@@ -27,6 +27,7 @@ Describe 'uninstall.ps1 backup ordering and Windows Terminal recovery' {
         $script:WindowsIdentity = [pscustomobject]@{
             UserProfile = $script:Root
             LocalApplicationData = $env:LOCALAPPDATA
+            ApplicationData = Join-Path $script:Root 'Redirected Roaming AppData'
             Documents = Join-Path $script:Root 'Redirected Documents'
             RuntimeProfile = Join-Path $script:Root 'Redirected Documents\PowerShell\Microsoft.PowerShell_profile.ps1'
         }
@@ -54,6 +55,14 @@ Describe 'uninstall.ps1 backup ordering and Windows Terminal recovery' {
     It 'rejects a relative LocalApplicationData boundary before enumerating targets' {
         { Get-DotfilesWindowsTerminalTargetDefinitions -LocalApplicationData 'relative\profile' } |
             Should -Throw '*missing or not absolute*'
+    }
+
+    It 'tracks empty Herdr parents inside the independently resolved ApplicationData boundary' {
+        $herdrDir = Join-Path $script:WindowsIdentity.ApplicationData 'herdr'
+
+        Add-ParentDirs -Path (Join-Path $herdrDir 'config.toml')
+
+        $script:DirCandidates | Should -Contain $herdrDir
     }
 
     It 'selects filename timestamp and collision suffix instead of mtime' {

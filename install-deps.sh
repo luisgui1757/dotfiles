@@ -325,6 +325,24 @@ enable_homebrew_for_current_shell() {
     hash -r 2>/dev/null || true
 }
 
+# Homebrew owns the completion symlinks consumed by zsh/bash. Package/tap
+# migrations can leave those links pointing at a removed repository checkout,
+# which makes every new shell print compinit errors even though brew itself
+# works. Let Homebrew reconcile its own completion surface after activation;
+# the command is idempotent on both macOS and Linuxbrew.
+link_homebrew_completions() {
+    [[ "$PM" == "brew" ]] || return 0
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        echo "  would: brew completions link"
+        return 0
+    fi
+    if ! brew completions link >/dev/null; then
+        echo "  FAIL: Homebrew could not link its shell completions; repair Homebrew and retry." >&2
+        return 1
+    fi
+    printf "  ok        %-26s linked\n" "Homebrew completions"
+}
+
 enable_homebrew_make_gnubin_for_current_shell() {
     local brew_bin="$1" make_prefix gnubin
     make_prefix="$("$brew_bin" --prefix make 2>/dev/null || true)"
@@ -3530,6 +3548,8 @@ run_update_mode() {
     local rc=0
     if [[ "$PM" == "brew" ]] && ! enable_homebrew_for_current_shell; then
         rc=1
+    elif [[ "$PM" == "brew" ]] && ! link_homebrew_completions; then
+        rc=1
     fi
 
     update_catalog_tools || rc=1
@@ -4563,6 +4583,12 @@ fi
 if ! bootstrap_package_manager; then
     record_install_failure "Homebrew bootstrap/activation" brew shellenv 1
     echo "  FAIL: Homebrew bootstrap/activation is an unrecoverable package-manager precondition; no package installs were attempted." >&2
+    exit_if_install_failures
+fi
+
+if ! link_homebrew_completions; then
+    record_install_failure "Homebrew completions" brew "completions link" 1
+    echo "  FAIL: Homebrew completion linking is an unrecoverable shell-startup precondition; no package installs were attempted." >&2
     exit_if_install_failures
 fi
 

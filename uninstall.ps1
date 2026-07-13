@@ -43,7 +43,7 @@ function Resolve-WindowsTargetIdentity {
         [AllowEmptyString()] [string]$RuntimeProfile = ([string]$PROFILE)
     )
     $resolved = @{}
-    foreach ($name in 'UserProfile', 'LocalApplicationData', 'MyDocuments') {
+    foreach ($name in 'UserProfile', 'LocalApplicationData', 'ApplicationData', 'MyDocuments') {
         $path = [string](& $FolderResolver $name)
         $isWindowsAbsolute = $path -match '^(?:[A-Za-z]:[\\/]|\\\\)'
         if ([string]::IsNullOrWhiteSpace($path) -or (-not [IO.Path]::IsPathRooted($path) -and -not $isWindowsAbsolute) -or
@@ -63,6 +63,7 @@ function Resolve-WindowsTargetIdentity {
     return [pscustomobject]@{
         UserProfile = $resolved.UserProfile
         LocalApplicationData = $resolved.LocalApplicationData
+        ApplicationData = $resolved.ApplicationData
         Documents = $resolved.MyDocuments
         RuntimeProfile = if ($runtimeIsWindowsAbsolute -and $env:OS -ne 'Windows_NT') {
             $RuntimeProfile -replace '/', '\'
@@ -193,6 +194,7 @@ function Add-ParentDirs {
         @(
             $script:WindowsIdentity.UserProfile,
             $script:WindowsIdentity.LocalApplicationData,
+            $script:WindowsIdentity.ApplicationData,
             $script:WindowsIdentity.Documents
         )
     } else { @($env:USERPROFILE) }
@@ -471,6 +473,16 @@ function Get-ManagedTargets {
                 '--source', (Join-Path $RepoRoot 'windows\chezmoi-localappdata'),
                 '--destination', $identity.LocalApplicationData,
                 '--persistent-state', (Join-Path $stateRoot 'localappdata.boltdb'),
+                '--config', $overlayConfig,
+                '--config-format', 'toml'
+            )
+        },
+        [pscustomobject]@{
+            Label = 'ApplicationData'
+            Arguments = @(
+                '--source', (Join-Path $RepoRoot 'windows\chezmoi-appdata'),
+                '--destination', $identity.ApplicationData,
+                '--persistent-state', (Join-Path $stateRoot 'appdata.boltdb'),
                 '--config', $overlayConfig,
                 '--config-format', 'toml'
             )

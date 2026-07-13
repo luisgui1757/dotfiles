@@ -77,7 +77,7 @@ function Resolve-WindowsTargetIdentity {
     )
 
     $resolved = @{}
-    foreach ($name in 'UserProfile', 'LocalApplicationData', 'MyDocuments') {
+    foreach ($name in 'UserProfile', 'LocalApplicationData', 'ApplicationData', 'MyDocuments') {
         $path = [string](& $FolderResolver $name)
         $isWindowsAbsolute = $path -match '^(?:[A-Za-z]:[\\/]|\\\\)'
         if ([string]::IsNullOrWhiteSpace($path) -or (-not [IO.Path]::IsPathRooted($path) -and -not $isWindowsAbsolute) -or
@@ -97,6 +97,7 @@ function Resolve-WindowsTargetIdentity {
     return [pscustomobject]@{
         UserProfile = $resolved.UserProfile
         LocalApplicationData = $resolved.LocalApplicationData
+        ApplicationData = $resolved.ApplicationData
         Documents = $resolved.MyDocuments
         RuntimeProfile = if ($runtimeIsWindowsAbsolute -and $env:OS -ne 'Windows_NT') {
             $RuntimeProfile -replace '/', '\'
@@ -1763,6 +1764,12 @@ function Get-WindowsKnownFolderOverlays {
             State = Join-Path $stateRoot 'localappdata.boltdb'
         },
         [pscustomobject]@{
+            Label = 'ApplicationData'
+            Source = Join-Path $ScriptDir 'windows\chezmoi-appdata'
+            Destination = $Identity.ApplicationData
+            State = Join-Path $stateRoot 'appdata.boltdb'
+        },
+        [pscustomobject]@{
             Label = 'Documents profiles'
             Source = Join-Path $ScriptDir 'windows\chezmoi-documents'
             Destination = $Identity.Documents
@@ -1776,14 +1783,20 @@ function Assert-WindowsKnownFolderConsumption {
 
     $nvimTarget = Join-Path $Identity.LocalApplicationData 'nvim'
     $lazygitTarget = Join-Path $Identity.LocalApplicationData 'lazygit\config.yml'
+    $herdrTarget = Join-Path $Identity.ApplicationData 'herdr\config.toml'
     $expectedNvim = Join-Path $ScriptDir 'nvim'
     $expectedLazygit = Join-Path $ScriptDir 'lazygit\config.windows.yml'
+    $expectedHerdr = Join-Path $ScriptDir 'herdr\config.toml'
     if (-not (Test-SamePath (Get-RealExistingPath $nvimTarget) (Get-RealExistingPath $expectedNvim))) {
         throw "Neovim does not consume the repo config through actual LocalApplicationData: $nvimTarget"
     }
     if (-not (Test-SamePath (Get-RealExistingPath $lazygitTarget) (Get-RealExistingPath $expectedLazygit)) -and
         -not (Test-FileBytesEqual $lazygitTarget $expectedLazygit)) {
         throw "lazygit does not consume the repo config through actual LocalApplicationData: $lazygitTarget"
+    }
+    if (-not (Test-SamePath (Get-RealExistingPath $herdrTarget) (Get-RealExistingPath $expectedHerdr)) -and
+        -not (Test-FileBytesEqual $herdrTarget $expectedHerdr)) {
+        throw "Herdr does not consume the repo config through actual ApplicationData: $herdrTarget"
     }
 
     $profileCandidates = @(

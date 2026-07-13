@@ -92,7 +92,9 @@ Sequenced PRs (split for independent, revertable blast radius):
   config; not a Nix/nixpkgs GUI package.
 - **PR-4 `feat/aerospace-herdr` - DONE.** AeroSpace (macOS tap cask,
   reserved-chord-safe keymap) + Herdr (macOS/Linux stable channels plus native
-  Windows pinned preview binary).
+  Windows pinned preview binary). Herdr now consumes one chezmoi-managed,
+  forced-dark built-in Rose Pine config on POSIX and from Windows' real roaming
+  ApplicationData known folder.
 - **PR-5 `feat/nix-skeleton` - DONE.** flake + committed `flake.lock` with ZERO
   ownership; `nix flake check` CI; disjointness test (Home Manager declares no
   file targets); Renovate `nix` manager.
@@ -149,7 +151,9 @@ Commit-by-commit status:
   Linuxbrew formula, pinned native-Linux binary with provenance-backed update
   ownership, and pinned SHA-256-verified native-Windows preview `.exe` without
   `herdr.dev` remote eval). Herdr install failures now emit `FAIL:` and the
-  Linux/macOS/Windows e2e gates assert the command. AeroSpace TCC /
+  Linux/macOS/Windows e2e gates assert the command. Its canonical config forces
+  the built-in Rose Pine theme with automatic switching disabled on every OS.
+  AeroSpace TCC /
   Accessibility and Herdr interactive-session behavior remain
   manual-verification-pending in `tests/MANUAL.md`.
   Hosted macOS additionally proves the real AeroSpace app and CLI binaries have
@@ -609,7 +613,9 @@ reconciliation followed by per-tool proven update ownership**:
   resolving from `/usr/bin` report `unmanaged` with a Homebrew migration hint.
 - Setup persists Homebrew shellenv and Homebrew GNU Make's `libexec/gnubin` path
   when the `make` formula is installed, so Brew-owned GNU Make is not a hidden
-  manual `export PATH=...` step.
+  manual `export PATH=...` step. Install and update also ask Homebrew to
+  idempotently relink its completion surface, preventing stale `_brew` links
+  after tap/repository migration.
 - Windows manager-owned packages now report `current` without running a mutating
   package update when Scoop `status`, winget `list --upgrade-available`, or
   Chocolatey `outdated --limit-output` has no exact package row; failed
@@ -764,8 +770,9 @@ reconciliation followed by per-tool proven update ownership**:
      `nvim`, `cmake`, `rg`, `fd`, `fzf`, `lsd`, `chezmoi`, `lazygit`,
      `starship`, `tmux`, `python3`, `node`, `tree-sitter`, `shellcheck`,
      `hyperfine`, `taplo`, `yamllint`, and similar).
-   - The repo manages Homebrew shellenv and any required PATH adoption. There
-     should be no hidden manual `export PATH=...` step.
+   - The repo manages Homebrew shellenv, completion-link reconciliation, and any
+     required PATH adoption. There should be no hidden manual repair or
+     `export PATH=...` step.
    - GNU Make's Homebrew `gnubin` path is required for this profile because
      Homebrew's formula exposes GNU Make as `gmake` by default. If the catalog
      says Homebrew owns `make`, setup must manage this PATH entry instead of
@@ -869,7 +876,8 @@ The shipped tests prove behavior, not just branches:
     checksum fields for Neovim, lazygit, Starship, tree-sitter CLI, and chezmoi.
 11. Homebrew shellenv/setup tests prove the managed `make` `libexec/gnubin`
     path is added to the current setup process, persisted for future shells, and
-    retrofitted into a legacy managed block without dropping user content.
+    retrofitted into a legacy managed block without dropping user content;
+    install/update completion-link reconciliation is idempotent and fail-closed.
 12. Windows Pester coverage proves source-proven Scoop/winget/Chocolatey update
     ownership, manager-specific `current`/`updated`/availability-failure status,
     manual-source shadows with package rows, and Chocolatey-bin/package-list

@@ -831,7 +831,7 @@ function Assert-KnownFolderStateBoundary {
     foreach ($child in $children) {
         $relative = [IO.Path]::GetRelativePath($StateRoot, $child.FullName).Replace('\', '/')
         if ($child.PSIsContainer -or ($child.Attributes -band [IO.FileAttributes]::ReparsePoint) -or
-            $relative -notin @('localappdata.boltdb', 'documents.boltdb')) {
+            $relative -notin @('localappdata.boltdb', 'appdata.boltdb', 'documents.boltdb')) {
             throw "unexpected current-generation known-folder state blocks recovery: $($child.FullName)"
         }
     }

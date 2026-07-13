@@ -22,6 +22,7 @@ greenfield runbook.
 | Ghostty | `ghostty/config`; `home/.chezmoitemplates/ghostty/config` | macOS: `~/Library/Application Support/com.mitchellh.ghostty/config`; Linux: `~/.config/ghostty/config`; Windows: n/a | Per-path POSIX `symlink_config.tmpl` entries into `.chezmoitemplates`. |
 | WezTerm | `wezterm/wezterm.lua`; `home/.chezmoitemplates/wezterm/wezterm.lua`; `home/dot_config/wezterm/wezterm.lua` | macOS/Linux/WSL GUI opt-in: `~/.config/wezterm/wezterm.lua`; Windows: `%USERPROFILE%\.config\wezterm\wezterm.lua` | POSIX path-specific symlinks; Windows copy. WSL skips Linux GUI terminal config unless setup passes the explicit GUI override. |
 | AeroSpace | `aerospace/aerospace.toml`; `home/dot_config/aerospace/aerospace.toml` | macOS: `~/.config/aerospace/aerospace.toml`; Linux/Windows: ignored | macOS symlink via `mode = "symlink"`. |
+| Herdr | `herdr/config.toml`; `home/.chezmoitemplates/herdr/config.toml`; `home/dot_config/herdr/symlink_config.toml.tmpl`; `windows/chezmoi-appdata/herdr/symlink_config.toml.tmpl` | macOS/Linux/WSL: `~/.config/herdr/config.toml`; Windows: actual roaming ApplicationData `herdr\config.toml` | POSIX path-specific symlink and dedicated Windows ApplicationData destination state; built-in `rose-pine` is forced with automatic switching disabled. |
 | lazygit | `lazygit/config.yml`; `home/.chezmoitemplates/lazygit/config.yml`; `windows/chezmoi-localappdata/lazygit/symlink_config.yml.tmpl` | macOS: `~/Library/Application Support/lazygit/config.yml`; Linux/WSL: `~/.config/lazygit/config.yml`; Windows: actual LocalApplicationData `lazygit\config.yml` | POSIX path-specific symlinks; Windows known-folder symlink to the native config. |
 | gh-dash | `gh-dash/config.yml`; `home/dot_config/gh-dash/config.yml` | macOS/Linux/WSL: `~/.config/gh-dash/config.yml`; Windows: `%USERPROFILE%\.config\gh-dash\config.yml` | POSIX symlink via `mode = "symlink"`; Windows copy via `mode = "file"`. |
 | lsd | `lsd/config.yaml`; `lsd/colors.yaml`; `home/dot_config/lsd/config.yaml`; `home/dot_config/lsd/colors.yaml` | macOS/Linux/WSL: `~/.config/lsd/{config.yaml,colors.yaml}`; Windows: `%USERPROFILE%\.config\lsd\{config.yaml,colors.yaml}` | POSIX symlink via `mode = "symlink"`; Windows copy via `mode = "file"`. The shell profiles own Rose Pine `LS_COLORS` for file/directory names, with `DOTFILES_LS_COLORS` as the explicit override; `colors.yaml` owns long-list metadata. |
@@ -294,12 +295,13 @@ broken repo-symlink still cleaned) is covered by
       `29140112030`; all six downloaded schema-2 markers bound that source head
       to the executed synthetic merge SHA. The PR E2E run used ordinary PR
       caches, so it is not promoted to the pending merged-main cache-free gate.
-- [x] Native Windows no longer derives LocalApplicationData or Documents from
-      UserProfile. Setup/uninstall share one validated known-folder identity,
-      apply separate UserProfile/LocalApplicationData/Documents chezmoi source
-      states, post-check application consumers, and preserve divergent legacy
-      conventional-path data. Redirected-folder runtime proof remains listed
-      below because this checkout is not that environment.
+- [x] Native Windows no longer derives LocalApplicationData, ApplicationData,
+      or Documents from UserProfile. Setup/uninstall share one validated
+      known-folder identity, apply separate UserProfile/LocalApplicationData/
+      ApplicationData/Documents chezmoi source states, post-check application
+      consumers, and preserve divergent legacy conventional-path data.
+      Redirected-folder runtime proof remains listed below because this checkout
+      is not that environment.
 - [x] PowerShell 7, VS Code, Windows PowerShell ConsoleHost, and ISE profile
       targets are managed under the actual Documents known folder. The current
       runtime `$PROFILE` must be one of those post-apply consumers.
@@ -372,7 +374,8 @@ broken repo-symlink still cleaned) is covered by
       (`~/.config/powershell/Microsoft.PowerShell_profile.ps1`) is intentionally
       not migrated. It is install-gated and provisioning-adjacent, like VS Code.
 - [ ] Redirected Windows known-folder runtime confirmation is pending a real
-      Windows host with Documents and LocalApplicationData on alternate paths.
+      Windows host with Documents, LocalApplicationData, and ApplicationData on
+      alternate paths.
       Pester and migration round-trip fixtures are implementation proof, not a
       claim about a host run.
 - [ ] Full WSL runtime parity remains manual. The optional hosted canary was
