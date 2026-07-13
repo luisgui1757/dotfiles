@@ -30,7 +30,7 @@ greenfield runbook.
 | tmux POSIX overlay | `tmux/tmux.posix.conf`; `home/dot_tmux.posix.conf` | POSIX: `~/.tmux.posix.conf`; Windows: ignored | POSIX symlink only. Holds the native-clipboard `if-shell` probes, which hang psmux at config-load time, so it is **never** deployed on Windows; `tmux.conf` sources it with `source-file -q`. |
 | psmux | `tmux/psmux.conf`; `home/dot_psmux.conf` | Windows: `%USERPROFILE%\.psmux.conf`; POSIX: ignored | Windows copy only. It is the first native-Windows multiplexer entrypoint and source-files the tmux Windows overlay. |
 | Generated Rose Pine tmux/psmux bar | `tmux/psmux-rose-pine.ps1`; generated `tmux/psmux-rose-pine.{main,moon,dawn}.conf`; `home/dot_tmux.rose-pine.ps1`; `home/dot_tmux.rose-pine.*.conf` | POSIX/Windows: `~/.tmux.rose-pine.{main,moon,dawn}.conf`; Windows also gets `~/.tmux.rose-pine.ps1` | Source generator plus checked generated configs; POSIX symlinks, Windows copies. |
-| Windows Terminal | `windows-terminal/settings.fragment.jsonc`; `home/.chezmoitemplates/windows-terminal/{settings.fragment.jsonc,merge-settings.ps1}`; `scripts/windows-terminal-targets.ps1` | Windows stable packaged + Preview packaged + portable settings paths | `setup.ps1` is the only publisher. Chezmoi exposes no WT target. One validated enumerator is shared by setup, release migration/recovery, and uninstall. Setup independently merges each selected target's own state, stages beside the destination, validates all plans, creates separate verified backups, atomically publishes with concurrent-change detection, and rolls back the multi-target transaction on failure. |
+| Windows Terminal | `windows-terminal/settings.fragment.jsonc`; `home/.chezmoitemplates/windows-terminal/{settings.fragment.jsonc,merge-settings.ps1}`; `scripts/windows-terminal-targets.ps1` | Windows stable packaged + Preview + Canary + portable settings paths | `setup.ps1` is the only publisher. Chezmoi exposes no WT target. One validated enumerator is shared by setup, release migration/recovery, and uninstall. Setup independently merges each selected target's own state, stages beside the destination, validates all plans, creates separate verified backups, atomically publishes with concurrent-change detection, and rolls back the multi-target transaction on failure. |
 | PowerShell profiles | `shells/powershell_profile.ps1`; `windows/chezmoi-documents/{PowerShell,WindowsPowerShell}/symlink_*_profile.ps1.tmpl` | actual Documents known folder for ConsoleHost, VS Code, and ISE; active runtime `$PROFILE` must resolve to one of them | Dedicated Documents destination state; every supported host profile symlinks to the canonical source and setup post-checks consumption. |
 | zsh plugins | `scripts/ensure-pinned-zsh-plugin.sh`; `home/.chezmoiscripts/run_onchange_after_20-ensure-zsh-plugin-pins.sh.tmpl` | POSIX: `~/.local/share/dotfiles/zsh-plugins/{fzf-tab,zsh-autosuggestions}`; Windows: ignored | Install-deps and pin/helper changes in chezmoi share the serialized sibling-stage publisher. Unproved payloads are quarantined before fetch; only expected-origin, exact-HEAD, clean, tracked-entry-file checkouts publish atomically. Generic git-repo externals are intentionally absent. |
 
@@ -68,10 +68,10 @@ canonical v0.2.0 path is now side-by-side and exact-tag-only:
 - `scripts/upgrade-v0.1.0.ps1` handles native Windows without Nix. It applies
   config files/symlinks with dependencies, Neovim caches, agent policy, and
   chezmoi run scripts skipped; resolves actual known folders; freezes both
-  exact release trees plus stable packaged, Preview packaged, and portable Terminal recovery bytes under a
+  exact release trees plus stable packaged, Preview, Canary, and portable Terminal recovery bytes under a
   protected ACL, publishes and rolls back only from those trees, retains
   conventional v0.1 targets until acceptance, removes only transaction-created
-  overlay state on rollback, and validates all three canonical Terminal paths
+  overlay state on rollback, and validates all four canonical Terminal paths
   before any restore write.
 - `scripts/install-nix-prerequisite.sh` installs only checksum-reviewed upstream
   Nix 2.34.0 release archives and refuses non-release checkouts. Setup owns its
@@ -86,7 +86,7 @@ canonical v0.2.0 path is now side-by-side and exact-tag-only:
   pre-migration command-provider boundary.
 
 The release remains gated on real Apple Silicon owner-host, WSL split-host,
-redirected Windows, and divergent stable packaged/Preview/portable Terminal
+redirected Windows, and divergent stable packaged/Preview/Canary/portable Terminal
 executions. Until the annotated
 v0.2.0 tag and those release rows exist, v0.1.0 users are told to remain on
 v0.1.0. No non-Apple-Silicon macOS migration path is shipped or pending proof.
@@ -146,7 +146,7 @@ then remove only targets they can prove are repo-owned:
   `-ForceExternals` to remove it anyway. This protects in-place edits to the
   vendored plugin clones from being lost.
 - Windows Terminal `settings.json` is never deleted. `uninstall.ps1` validates
-  stable packaged, Preview packaged, and portable candidate sets plus backup
+  stable packaged, Preview, Canary, and portable candidate sets plus backup
   JSON before restoring any target,
   atomically restores the selected pre-setup bytes, and preserves the displaced
   current file as `settings.json.uninstall-current.<timestamp>[.n]`.
@@ -164,7 +164,7 @@ broken repo-symlink still cleaned) is covered by
 
 ### Resolved
 
-- [x] Stable packaged, Preview packaged, and portable Windows Terminal settings are independent
+- [x] Stable packaged, Preview, Canary, and portable Windows Terminal settings are independent
       user-owned merge transactions. The old full-file mirror and best-effort
       warning path are removed. Setup stages/validates all outputs, backs up
       each divergent target, detects concurrent changes through atomic rollback
@@ -318,7 +318,7 @@ broken repo-symlink still cleaned) is covered by
       `86360593122`): all six
       phases, exact Tree-sitter `0.26.10`, Hack Nerd Font file and registry
       consumption, Pi `0.80.3`, and the strict 257-check Neovim language smoke.
-      This does not close the redirected-folder or three-variant Windows Terminal manual
+      This does not close the redirected-folder or four-variant Windows Terminal manual
       rows below.
 
 ### Open

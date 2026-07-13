@@ -1315,6 +1315,11 @@ function Get-WindowsTerminalPreviewSettingsPath {
             -LocalApplicationData (Get-WindowsLocalApplicationData) -Kind Preview).Path
 }
 
+function Get-WindowsTerminalCanarySettingsPath {
+    return (Get-DotfilesWindowsTerminalTargetDefinition `
+            -LocalApplicationData (Get-WindowsLocalApplicationData) -Kind Canary).Path
+}
+
 function Get-WindowsTerminalUnpackagedSettingsPath {
     return (Get-DotfilesWindowsTerminalTargetDefinition `
             -LocalApplicationData (Get-WindowsLocalApplicationData) -Kind Portable).Path

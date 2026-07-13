@@ -159,7 +159,7 @@ that violates one of these, fix it instead of disabling the test.
     merge by default. Opt out with `-SkipWindowsTerminalMerge`;
     `-MergeWindowsTerminal` is a retained no-op alias. Chezmoi exposes no WT
     target: it cannot provide the required backup/concurrency/atomicity contract.
-    One shared validated enumerator defines stable packaged, Preview packaged,
+    One shared validated enumerator defines stable packaged, Preview, Canary,
     and portable settings identities for setup, release migration, recovery,
     and uninstall. Setup treats all selected files independently, never mirrors
     one over another, and seeds the portable path only when portable WT is
@@ -411,7 +411,7 @@ that violates one of these, fix it instead of disabling the test.
     trees, and uses only those frozen sources for Nix/config publication and
     rollback; post-validation checkout changes cannot affect a write.
     Windows recovery likewise archives both exact commits beneath its protected
-    ACL, records all three canonical Terminal identities and their expected
+    ACL, records all four canonical Terminal identities and their expected
     presence/hash state, and binds setup, acceptance, uninstall, and rollback to
     those validated trees rather than either retained checkout.
     The reversible core runs only Nix activation plus config files/links on POSIX
@@ -992,7 +992,7 @@ save only**. The next plain `:w` formats normally. Implemented in
 - The Windows installer does NOT symlink `settings.json` for Windows Terminal:
   WT rewrites that file on launch. `setup.ps1` Phase 2 excludes WT from chezmoi
   publication, then builds one independent plan for each existing stable
-  packaged and Preview packaged target plus each existing/detected portable
+  packaged, Preview, and Canary target plus each existing/detected portable
   target. It stages in the destination directory,
   parses and byte-validates all results, makes a verified collision-safe backup
   for each divergent existing target, detects source changes both before and
@@ -1306,7 +1306,7 @@ save only**. The next plain `:w` formats normally. Implemented in
   backups by validated filename timestamp/collision order (never mtime), and
   leave chezmoi's own config/state alone. Malformed or ambiguous candidates fail
   before target removal. Windows restores stable packaged, Preview packaged,
-  and portable WT backups only after validating all three canonical paths,
+  Canary, and portable WT backups only after validating all four canonical paths,
   atomically preserves the displaced current file
   as `settings.json.uninstall-current.*`, and honors `-NoRestoreBackups`.
   Dry-run mode must also leave empty external parent directories in place; it
@@ -1316,6 +1316,11 @@ save only**. The next plain `:w` formats normally. Implemented in
   installs it through Scoop/winget/choco, and other native Linux/WSL hosts
   without brew use a pinned Starship GitHub release tarball with SHA-256
   verification.
+- **Terminal scrollback units are not interchangeable.** WezTerm retains
+  5,000,000 lines per tab. Ghostty retains a lazily allocated 1 GiB byte budget
+  per terminal surface because `scrollback-limit` is bytes, not lines. Windows
+  Terminal stable/Preview/Canary/portable receive `historySize = 32767`, the
+  upstream hard maximum; do not claim that WT can retain millions of lines.
 - **lazygit binary install paths differ by OS.** Homebrew owns macOS/Linuxbrew,
   Alpine uses the native `lazygit` apk package, Windows setup installs it
   through Scoop/winget/choco, and other native Linux/WSL hosts without brew use

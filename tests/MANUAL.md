@@ -35,12 +35,12 @@ commits, recovery path, provider inventory, and whether any user data changed.
 - [ ] **Windows conventional known folders:** exact v0.1.0 checkout with
       divergent copy-mode files and nvim link. Apply from exact v0.2.0, fail
       after Terminal/config publication, and prove exact old config plus
-      stable packaged/Preview/portable Terminal bytes return before retry. After recovery is
+      stable packaged/Preview/Canary/portable Terminal bytes return before retry. After recovery is
       captured, alter or temporarily move both retained checkouts and prove
       apply/rollback still consume only the frozen release trees.
 - [ ] **Windows redirected/OneDrive/alternate drive:** repeat with Documents,
       LocalApplicationData, and runtime `$PROFILE` on independent real paths.
-      Include divergent packaged, Preview, and portable Terminal installations;
+      Include divergent packaged, Preview, Canary, and portable Terminal installations;
       no conventional path may be guessed or overwritten.
 - [ ] **Release acceptance:** on the final annotated v0.2.0 tag, run the full
       local/hosted gates and public-secret scan, record the tag object and peeled
@@ -72,8 +72,8 @@ commits, recovery path, provider inventory, and whether any user data changed.
 - [ ] **Windows Terminal**: rose-pine scheme applied; tabs use the
       configured theme; acrylic OFF on the body, ON in the tab row; a new tab
       opens `PowerShell 7` unless the user intentionally chose another default.
-- [ ] **Windows Terminal three-variant preservation**: give stable packaged,
-      Preview packaged, and portable settings different custom profiles,
+- [ ] **Windows Terminal four-variant preservation**: give stable packaged,
+      Preview, Canary, and portable settings different custom profiles,
       schemes, actions, and defaults; run
       `setup.ps1 -SkipDeps -SkipNvim`. Confirm each retains only its own custom
       state plus the managed fragment and receives its own verified backup.
@@ -274,7 +274,7 @@ commits, recovery path, provider inventory, and whether any user data changed.
       `86399025519`, Apple Silicon `86399025503`, Intel `86399025491`, native
       Windows `86399025722`, and all four setup logical proofs were green.
       This checks the exact branch behavior; it is not WSL, redirected Windows,
-      divergent stable packaged/Preview/portable Terminal, or desktop/TCC
+      divergent stable packaged/Preview/Canary/portable Terminal, or desktop/TCC
       evidence. Merged-main run
       [`29114125798`](https://github.com/luisgui1757/dotfiles/actions/runs/29114125798)
       on PR #48 merge SHA `f104bf066e4af7d4d707fe22ba36600711f1ae14`
@@ -321,6 +321,13 @@ commits, recovery path, provider inventory, and whether any user data changed.
       npm/starship/zoxide) lands in `~/.nix-profile/bin` with NO root, and that `nvim` +
       `tree-sitter` are still the native install-deps binaries (NOT nix) so
       parser builds keep working.
+      From a clean committed checkout, `./tests/linux_owner_lifecycle.sh` runs
+      install, update, config uninstall, an idempotent uninstall retry,
+      reinstall, final update, and full validation while proving no
+      pre-existing native package disappeared. On macOS, the digest-pinned
+      `./tests/greenfield/docker-linux-owner-lifecycle.sh` wrapper provides the
+      same non-root Linux runtime surface without claiming WSL or physical-host
+      release proof.
 - [ ] **Fresh Home Manager zsh session**, native Linux and WSL: with no caller
       PATH injection, run `env -i HOME="$HOME" USER="$USER" PATH=/usr/bin:/bin
       TERM=xterm zsh -l -i -c 'command -v rg'`. Confirm it resolves through a

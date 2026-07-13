@@ -68,7 +68,8 @@ rendering host, then run `./setup.sh --all` from the exact release checkout
 inside the WSL home for the Linux CLI/editor stack; setup installs Nix there
 when it is missing. Windows Terminal settings handling
 runs by default, and setup independently stages, validates, backs up, and
-atomically merges each existing packaged, Preview, and portable target. If Scoop, winget, and choco
+atomically merges each existing stable packaged, Preview, Canary, and portable
+target. If Scoop, winget, and choco
 cannot register the MSIX app, setup falls back to a pinned
 SHA-256-verified portable WT zip. Portable WT reads the unpackaged settings
 path, so portable WT is merged from its own current settings (or seeded only
@@ -287,7 +288,7 @@ the newest validated `<target>.bak.<timestamp>[.n]` backup by filename order,
 and leave chezmoi's own
 state/config alone. Dry-run mode prints the planned removals without deleting
 files or pruning empty external parent directories. Windows Terminal settings
-are not deleted: validated packaged/Preview/portable backups restore independently, and
+are not deleted: validated stable/Preview/Canary/portable backups restore independently, and
 the displaced current file is preserved as `settings.json.uninstall-current.*`.
 
 For a destructive Apple Silicon owner-host smoke, run
@@ -371,13 +372,13 @@ and Windows Terminal remains a merge.
 | zsh | `~/.zshenv` -> `shells/zshenv`; `~/.zshrc` -> `shells/zshrc` | same | n/a |
 | PowerShell | n/a | n/a | actual runtime `$PROFILE` plus Console/VS Code/ISE host profiles under the real Documents known folder -> `shells\powershell_profile.ps1` |
 | tmux / psmux | `~/.tmux.conf` -> `tmux/tmux.conf`; `~/.tmux.posix.conf` -> `tmux/tmux.posix.conf` (POSIX clipboard + TPM functional plugins + generated Rose Pine bar); `~/.tmux.rose-pine.{main,moon,dawn}.conf` -> generated `tmux/psmux-rose-pine.{main,moon,dawn}.conf` (Omer-shaped Rose Pine bar, **shared** with Windows) | same | `%USERPROFILE%\.psmux.conf` -> `tmux\psmux.conf` (first psmux entrypoint, disables warm sessions, then flag-free source-files the Windows overlay); `%USERPROFILE%\.tmux.conf` -> `tmux\tmux.conf`; `%USERPROFILE%\.tmux.windows.conf` -> `tmux\tmux.windows.conf`; `%USERPROFILE%\.tmux.rose-pine.ps1` -> `tmux\psmux-rose-pine.ps1` (Rose Pine bar generator / manual live-switch helper); `%USERPROFILE%\.tmux.rose-pine.{main,moon,dawn}.conf` -> the same generated `tmux\psmux-rose-pine.{main,moon,dawn}.conf`; the POSIX overlay is **excluded** on Windows (its `if-shell` probes hang psmux); WSL uses the Unix path |
-| Ghostty | `~/Library/Application Support/com.mitchellh.ghostty/config` -> `ghostty/config` | native Linux links `~/.config/ghostty/config`; WSL links it only with `--experimental-wsl-gui` | n/a |
-| WezTerm | `~/.config/wezterm/wezterm.lua` -> `wezterm/wezterm.lua` | same; WSL links it only with `--experimental-wsl-gui` | `%USERPROFILE%\.config\wezterm\wezterm.lua` -> `wezterm\wezterm.lua` (copied) |
+| Ghostty | `~/Library/Application Support/com.mitchellh.ghostty/config` -> `ghostty/config` (lazy 1 GiB per-surface scrollback byte budget) | native Linux links the same `~/.config/ghostty/config`; WSL links it only with `--experimental-wsl-gui` | n/a |
+| WezTerm | `~/.config/wezterm/wezterm.lua` -> `wezterm/wezterm.lua` (5,000,000 scrollback lines per tab) | same; WSL links it only with `--experimental-wsl-gui` | `%USERPROFILE%\.config\wezterm\wezterm.lua` -> `wezterm\wezterm.lua` (copied; same 5,000,000-line budget) |
 | AeroSpace | `~/.config/aerospace/aerospace.toml` -> `aerospace/aerospace.toml` (macOS tiling WM; focus/move on `ctrl-alt(-shift)` to avoid nvim `<A-h/j/k/l>` and fzf `Alt-c`) | n/a (macOS-only) | n/a (macOS-only) |
 | lazygit | `~/Library/Application Support/lazygit/config.yml` -> `lazygit/config.yml` | `~/.config/lazygit/config.yml` -> `lazygit/config.yml` | `%LOCALAPPDATA%\lazygit\config.yml` -> `lazygit\config.windows.yml` |
 | lsd | `~/.config/lsd/{config.yaml,colors.yaml}` -> `lsd/{config.yaml,colors.yaml}` | same | `%USERPROFILE%\.config\lsd\{config.yaml,colors.yaml}` -> `lsd\{config.yaml,colors.yaml}` |
 | gh-dash | `~/.config/gh-dash/config.yml` -> `gh-dash/config.yml` | same | `%USERPROFILE%\.config\gh-dash\config.yml` -> `gh-dash\config.yml` |
-| Windows Terminal | n/a | n/a | app installed by `setup.ps1` through Scoop/winget/choco, with a SHA-256-verified portable zip fallback; one validated enumerator identifies stable packaged, Preview packaged, and portable `settings.json` targets for setup, migration, recovery, and uninstall; setup stages and validates all selected targets before publication, creates separate verified backups, detects concurrent changes through atomic replacement rollback bytes, and rolls the group back on failure; opt out with `-SkipWindowsTerminalMerge`; see [windows-terminal/README.md](windows-terminal/README.md) |
+| Windows Terminal | n/a | n/a | app installed by `setup.ps1` through Scoop/winget/choco, with a SHA-256-verified portable zip fallback; one validated enumerator identifies stable packaged, Preview, Canary, and portable `settings.json` targets for setup, migration, recovery, and uninstall; all profiles receive WT's hard maximum of 32,767 history lines; setup stages and validates all selected targets before publication, creates separate verified backups, detects concurrent changes through atomic replacement rollback bytes, and rolls the group back on failure; opt out with `-SkipWindowsTerminalMerge`; see [windows-terminal/README.md](windows-terminal/README.md) |
 
 Windows setup resolves UserProfile, LocalApplicationData, Documents, and the
 active host's `$PROFILE` independently through supported runtime/known-folder
@@ -666,6 +667,7 @@ make validate-renovate  # schema + official local extraction inventory under Nod
 make lint               # shellcheck everything
 ./tests/wsl/e2e.sh      # manual WSL split-host validation from inside WSL
 ./tests/greenfield/docker-greenfield.sh # local clean Ubuntu container e2e
+./tests/greenfield/docker-linux-owner-lifecycle.sh # Linux install/update/uninstall/reinstall/update
 ```
 
 `make lint` checks production shell scripts strictly. Source-only shell test
@@ -741,6 +743,7 @@ The e2e jobs cover different install paths, not symmetric container platforms:
 | Check | What it proves |
 |---|---|
 | `e2e containers / ubuntu-24.04` | Clean `ubuntu:24.04`, non-root user, native `apt`, no Linuxbrew (`DOTFILES_SKIP_BREW_BOOTSTRAP=1`), then `install-deps.sh --all`, chezmoi config apply, executable/version probes including `zoxide`, `gh`, WezTerm, Herdr, Neovim >= 0.12, lazygit, zsh plugin files, config content assertions, and nvim directory realpath assertion. This is the native installer regression fixture, not the Nix-backed public POSIX package-plane proof; it does not assert Pi CLI because Node 24 comes from the Nix package layer. |
+| Local Linux owner lifecycle | Pinned Ubuntu and Nix container images, non-root user, real Home Manager plus native `apt`, then install, update, config uninstall, idempotent uninstall retry, reinstall, final update, full validation, and proof that no pre-existing native package disappeared. |
 | `setup.sh / ubuntu-24.04` | Full public Unix setup on the hosted Ubuntu runner after installing Nix in CI: Home Manager first, then native/deferred installs, chezmoi, Lazy, Tree-sitter, Mason, and Sentinel. Its clean login/interactive PATH proof resolves the effective account's actual login zsh from the account database; this matters because fresh Ubuntu has no `/usr/bin/zsh` and setup selects Linuxbrew zsh. The shell must resolve `rg` from Nix with no caller PATH injection. |
 | `setup.sh / macos-26` | Full public Apple Silicon setup through the hosted runner: architecture-matched nix-darwin/declarative Homebrew, native/deferred installs, real Ghostty/WezTerm config consumption, installed AeroSpace app/CLI identity agreement, chezmoi, Lazy, Tree-sitter, Mason, and Sentinel. AeroSpace waits for a user-granted Accessibility permission before parsing user config or starting the CLI server, so managed-config consumption remains explicit TCC-enabled desktop proof in `tests/MANUAL.md`; hosted CI does not pretend to prove it. Hosted and real Macs share the same mixed-ownership Homebrew contract: declared packages are applied, tap clones stay target-user-owned, and unrelated user state is preserved. |
 | `setup.ps1 / windows-2025` | Full Windows setup through the real Windows hosted runner, including Scoop/winget/choco behavior, PowerShell, symlinks, Hack Nerd Font file/registry consumption, `zoxide`/`gh`/WezTerm/Herdr/Pi CLI command probes, and Neovim restore/sync phases. Windows containers do not model the desktop/user-profile setup well. |
@@ -1109,7 +1112,7 @@ stale; CI then fails verification until a human reviews the adjacent constant.
   `-MergeWindowsTerminal` remains accepted as a no-op alias for older commands.
 - **Windows Terminal settings.json is NOT symlinked** because WT auto-rewrites
   it. Only the user-owned keys live in `settings.fragment.jsonc`; setup reads
-  each stable packaged, Preview packaged, and portable target independently,
+  each stable packaged, Preview, Canary, and portable target independently,
   stages and validates every
   result, makes a verified per-target backup, then atomically publishes. It
   updates keys by identity, adds a fixed `PowerShell 7` profile (`pwsh.exe`), promotes an empty or
@@ -1291,7 +1294,7 @@ MIT. See `LICENSE`.
 | A `wt --version` window popped up during `setup.ps1 -All` | the dependency version table ran `<tool> --version`, and `wt --version` opens a Windows Terminal window instead of printing | fixed — `Get-CommandVersionString` never runs `wt --version`; it reads the file version (or shows `installed`) |
 | Ghostty doesn't open maximized | `window-save-state = always` restored an old geometry over `maximize` (macOS only) | `ghostty/config` uses `window-save-state = default` (not `always`) with `maximize = true`; `always` lets the saved size win |
 | Ghostty doesn't load the config | wrong path, or WSL default skip | the install path is `~/Library/Application Support/com.mitchellh.ghostty/config` on macOS and `~/.config/ghostty/config` on native Linux. WSL only links Linux Ghostty config after `./setup.sh --experimental-wsl-gui`; otherwise use Windows Terminal |
-| Windows Terminal lost a profile after merge | WT rewrote one installation's file after setup, or an older pre-transactional setup was used | inspect that installation's independent `<settings.json>.bak.<YYYYMMDD-HHMMSS>[.n]` backups; `uninstall.ps1` validates every stable packaged, Preview packaged, and portable candidate before mutation, restores each target independently, and preserves the displaced current file for recovery |
+| Windows Terminal lost a profile after merge | WT rewrote one installation's file after setup, or an older pre-transactional setup was used | inspect that installation's independent `<settings.json>.bak.<YYYYMMDD-HHMMSS>[.n]` backups; `uninstall.ps1` validates every stable packaged, Preview, Canary, and portable candidate before mutation, restores each target independently, and preserves the displaced current file for recovery |
 | `setup.ps1` errors "cannot create symbolic links" | Developer Mode off and not elevated | `setup.ps1` reports your *elevated* + *Developer Mode* state before chezmoi apply. Enable Developer Mode (Settings -> Privacy & security -> For developers, no admin, recommended) **then** `.\setup.ps1 -SkipDeps`; OR run just the config phase elevated with `.\setup.ps1 -SkipDeps -SkipNvim`, then return to a normal shell for `.\setup.ps1 -SkipDeps -SkipConfig`. Don't elevate the dependency-install run because Scoop refuses admin installs |
 | Ghostty won't open maximized on Linux/GNOME | `maximize = true` is a hint the WM may ignore (GNOME Mutter often does) | on **X11**, `install-deps` offers a devilspie2 setup through the native Linux package manager, even when Linuxbrew is the main CLI manager; the rule is keyed on `com.mitchellh.ghostty`. Wayland needs a GNOME Shell extension instead |
 | `install-deps.ps1`: winget `No package found matching input criteria` (exit `-1978335212`) | winget source/catalog flakiness | install-deps now **prefers scoop** and falls back across managers per tool -- accept the scoop bootstrap when offered and re-run; VS Build Tools has no Scoop package, so it falls through to choco and then Microsoft's official bootstrapper |

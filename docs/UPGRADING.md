@@ -219,6 +219,6 @@ Do not publish v0.2.0 or direct v0.1.0 users here until all of these are true:
 - the Windows Pester and native Windows exact-tag runs prove setup-owned
   migration orchestration and recovery;
 - real WSL host/guest, redirected Windows, divergent stable
-  packaged/Preview/portable Terminal, and Apple Silicon owner-host migrations
+  packaged/Preview/Canary/portable Terminal, and Apple Silicon owner-host migrations
   are recorded in `tests/MANUAL.md` and the append-only review ledger;
 - the full release gate and public-secret scan pass on the tagged tree.

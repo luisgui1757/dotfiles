@@ -198,7 +198,11 @@ Commit-by-commit status:
   the E5113 parser/ABI mismatch. They stay native until nvim + its parser
   toolchain can move into one ABI-matched Nix closure (follow-up). Excluded from
   `nix/home/common.nix` and asserted absent by `tests/nix/linux_home_test.sh`.
-  The first real Home Manager activation on Linux/WSL remains
+  The guarded stale-`PATH` recovery is driven explicitly through the Linux Home
+  Manager path, and a checked-in non-root Linux lifecycle runner mirrors the
+  macOS install/update/config-uninstall/reinstall/update proof while rejecting
+  removal of pre-existing native packages. The first real Home Manager
+  activation on Linux/WSL remains
   manual-verification-pending in `tests/MANUAL.md`.
 - **Commit 7 - setup/update ownership integration — DONE.** Unix update
   ownership recognizes Nix-owned tools: `install-deps.sh --update` resolves a
@@ -272,7 +276,7 @@ Commit-by-commit status:
   retired the Intel product contract; WSL real-host proof remains explicitly
   pending.
   UGR-001 and UGR-014 are implemented:
-  stable packaged/Preview/portable WT state is independently transactionally merged and
+  stable packaged/Preview/Canary/portable WT state is independently transactionally merged and
   recovered, while uninstall backup selection is filename-keyed and fails
   closed on malformed candidates. UGR-004 through UGR-009 are implemented:
   recoverable installs share the summary boundary; Pi and zsh executable
@@ -1254,7 +1258,7 @@ Canonical solution:
 5. DONE - Make setup the sole normal install/migration/update orchestrator while
    preserving exact-tag acquisition and the existing recovery transaction.
 6. PENDING LIVE - Record Apple Silicon owner-host, real WSL2, redirected
-   Windows, divergent stable packaged/Preview/portable Terminal, and exact tagged v0.2.0 release runs before
+   Windows, divergent stable packaged/Preview/Canary/portable Terminal, and exact tagged v0.2.0 release runs before
    publication.
 
 ## Disproved Or Non-Blocking Assumptions

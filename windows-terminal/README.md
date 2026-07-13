@@ -21,6 +21,12 @@ Preview Store/MSIX Windows Terminal:
 %LOCALAPPDATA%\Packages\Microsoft.WindowsTerminalPreview_8wekyb3d8bbwe\LocalState\settings.json
 ```
 
+Canary App Installer Windows Terminal:
+
+```
+%LOCALAPPDATA%\Packages\Microsoft.WindowsTerminalCanary_8wekyb3d8bbwe\LocalState\settings.json
+```
+
 Portable unpackaged Windows Terminal:
 
 ```
@@ -31,7 +37,8 @@ Portable unpackaged Windows Terminal:
 
 - `actions` — keybindings.
 - `profiles.defaults` — font (Hack Nerd Font 12), Rose Pine color scheme,
-  acrylic off, padding, antialiasing, `scrollbarState: visible`.
+  acrylic off, padding, antialiasing, `scrollbarState: visible`, and WT's hard
+  maximum `historySize` of 32,767 lines.
 - `profiles.list[PowerShell 7]` — a repo-owned fixed-GUID profile that runs
   `pwsh.exe`.
 - `defaultProfile` — the desired PowerShell 7 profile GUID, consumed by the
@@ -79,7 +86,7 @@ rewrites its own `settings.json`.
 `-MergeWindowsTerminal` switch is still accepted on `setup.ps1` as a no-op
 alias for older commands.
 
-Stable packaged, Preview packaged, and portable settings are never mirrored.
+Stable packaged, Preview, Canary, and portable settings are never mirrored.
 `scripts/windows-terminal-targets.ps1` is the single validated identity source
 used by setup, release migration/recovery, and uninstall. For every existing
 MSIX target and every existing/detected portable target, setup reads that
@@ -107,7 +114,7 @@ Windows PowerShell default is promoted to the fixed `PowerShell 7` profile.
 Bare `chezmoi apply` deliberately has no Windows Terminal target because it
 cannot provide setup's backup/concurrency/atomic-publication contract.
 
-`uninstall.ps1 -All` validates backup filenames and JSON for all three canonical
+`uninstall.ps1 -All` validates backup filenames and JSON for all four canonical
 paths before restoring any target. It orders by the filename timestamp plus collision suffix,
 never filesystem mtime, atomically restores the selected pre-setup backup, and
 preserves the displaced current settings as

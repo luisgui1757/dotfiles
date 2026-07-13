@@ -150,6 +150,16 @@ This is the clean native `apt` proof: non-root user, no Linuxbrew bootstrap,
 real `install-deps.sh --all`, chezmoi apply, and the existing container
 assertions.
 
+For the stronger owner lifecycle using pinned Ubuntu and Nix image digests:
+
+```bash
+tests/greenfield/docker-linux-owner-lifecycle.sh
+```
+
+That runs the real public setup/update/config-uninstall/reinstall/update path as
+a non-root user, checks idempotent uninstall, performs full validation, and
+proves no pre-existing native package was removed.
+
 There is deliberately no hosted WSL workflow. [GitHub documents nested
 virtualization on hosted runners as technically possible but not officially
 supported](https://docs.github.com/en/actions/concepts/runners/github-hosted-runners), and both real canary attempts stalled before setup evidence. Do not

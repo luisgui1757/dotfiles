@@ -1499,6 +1499,7 @@ Describe "setup.ps1 transactional Windows Terminal merge" {
         $written.theme | Should -Be 'rose-pine'
         $written.profiles.defaults.colorScheme | Should -Be 'rose-pine'
         $written.profiles.defaults.font.face | Should -Be 'Hack Nerd Font'
+        $written.profiles.defaults.historySize | Should -Be 32767
         $written.defaultProfile | Should -Be $script:ManagedPwshProfileGuid
         $pwshProfile = @($written.profiles.list | Where-Object { $_.guid -eq $script:ManagedPwshProfileGuid })
         $pwshProfile.Count | Should -Be 1
@@ -1528,33 +1529,62 @@ Describe "setup.ps1 transactional Windows Terminal merge" {
         [System.IO.File]::ReadAllText($backups[0].FullName) | Should -Be $original
     }
 
-    It "preserves divergent packaged, Preview, and portable state without mirroring variants" {
+    It "merges Canary-only settings as an independent target" {
+        $packaged = Get-WindowsTerminalSettingsPath
+        $canary = Get-WindowsTerminalCanarySettingsPath
+        $portable = Get-WindowsTerminalUnpackagedSettingsPath
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $canary) | Out-Null
+        $original = '{"defaultProfile":"{canary}","profiles":{"defaults":{},"list":[{"guid":"{canary}","name":"CanaryOnly"}]},"schemes":[{"name":"CanaryScheme"}],"actions":[{"command":"closeWindow","keys":"alt+f4"}]}'
+        [System.IO.File]::WriteAllText($canary, $original, [System.Text.UTF8Encoding]::new($false))
+
+        Invoke-WindowsTerminalSettingsTransaction -IsPortablePresent $false
+
+        Test-Path -LiteralPath $packaged | Should -BeFalse
+        Test-Path -LiteralPath $portable | Should -BeFalse
+        $written = [System.IO.File]::ReadAllText($canary) | ConvertFrom-Json
+        $written.profiles.defaults.historySize | Should -Be 32767
+        @($written.profiles.list | Where-Object { $_.guid -eq '{canary}' }).Count | Should -Be 1
+        @($written.schemes | Where-Object { $_.name -eq 'CanaryScheme' }).Count | Should -Be 1
+        @($written.actions | Where-Object { $_.keys -eq 'alt+f4' }).Count | Should -Be 1
+        $backups = @(Get-ChildItem -LiteralPath (Split-Path -Parent $canary) -Filter 'settings.json.bak.*')
+        $backups.Count | Should -Be 1
+        [System.IO.File]::ReadAllText($backups[0].FullName) | Should -Be $original
+    }
+
+    It "preserves divergent packaged, Preview, Canary, and portable state without mirroring variants" {
         $packaged = Get-WindowsTerminalSettingsPath
         $preview = Get-WindowsTerminalPreviewSettingsPath
+        $canary = Get-WindowsTerminalCanarySettingsPath
         $portable = Get-WindowsTerminalUnpackagedSettingsPath
         New-Item -ItemType Directory -Force -Path (Split-Path -Parent $packaged), `
-            (Split-Path -Parent $preview), (Split-Path -Parent $portable) | Out-Null
+            (Split-Path -Parent $preview), (Split-Path -Parent $canary), `
+            (Split-Path -Parent $portable) | Out-Null
         $packagedOriginal = '{"defaultProfile":"{pkg}","profiles":{"defaults":{},"list":[{"guid":"{pkg}","name":"PackagedOnly"}]},"schemes":[{"name":"PackagedScheme"}],"actions":[{"command":"closeWindow","keys":"alt+f4"}]}'
         $previewOriginal = '{"defaultProfile":"{pre}","profiles":{"defaults":{},"list":[{"guid":"{pre}","name":"PreviewOnly"}]},"schemes":[{"name":"PreviewScheme"}],"actions":[{"command":"newTab","keys":"ctrl+shift+8"}]}'
+        $canaryOriginal = '{"defaultProfile":"{can}","profiles":{"defaults":{},"list":[{"guid":"{can}","name":"CanaryOnly"}]},"schemes":[{"name":"CanaryScheme"}],"actions":[{"command":"newTab","keys":"ctrl+shift+7"}]}'
         $portableOriginal = '{"defaultProfile":"{port}","profiles":{"defaults":{},"list":[{"guid":"{port}","name":"PortableOnly"}]},"schemes":[{"name":"PortableScheme"}],"actions":[{"command":"newTab","keys":"ctrl+shift+9"}]}'
         [System.IO.File]::WriteAllText($packaged, $packagedOriginal, [System.Text.UTF8Encoding]::new($false))
         [System.IO.File]::WriteAllText($preview, $previewOriginal, [System.Text.UTF8Encoding]::new($false))
+        [System.IO.File]::WriteAllText($canary, $canaryOriginal, [System.Text.UTF8Encoding]::new($false))
         [System.IO.File]::WriteAllText($portable, $portableOriginal, [System.Text.UTF8Encoding]::new($false))
 
         Invoke-WindowsTerminalSettingsTransaction -IsPortablePresent $true
 
         $pkg = [System.IO.File]::ReadAllText($packaged) | ConvertFrom-Json
         $pre = [System.IO.File]::ReadAllText($preview) | ConvertFrom-Json
+        $can = [System.IO.File]::ReadAllText($canary) | ConvertFrom-Json
         $port = [System.IO.File]::ReadAllText($portable) | ConvertFrom-Json
         @($pkg.profiles.list | Where-Object { $_.guid -eq '{pkg}' }).Count | Should -Be 1
-        @($pkg.profiles.list | Where-Object { $_.guid -in @('{pre}', '{port}') }).Count | Should -Be 0
+        @($pkg.profiles.list | Where-Object { $_.guid -in @('{pre}', '{can}', '{port}') }).Count | Should -Be 0
         @($pre.profiles.list | Where-Object { $_.guid -eq '{pre}' }).Count | Should -Be 1
-        @($pre.profiles.list | Where-Object { $_.guid -in @('{pkg}', '{port}') }).Count | Should -Be 0
-        @($pkg.profiles.list | Where-Object { $_.guid -eq '{port}' }).Count | Should -Be 0
+        @($pre.profiles.list | Where-Object { $_.guid -in @('{pkg}', '{can}', '{port}') }).Count | Should -Be 0
+        @($can.profiles.list | Where-Object { $_.guid -eq '{can}' }).Count | Should -Be 1
+        @($can.profiles.list | Where-Object { $_.guid -in @('{pkg}', '{pre}', '{port}') }).Count | Should -Be 0
         @($port.profiles.list | Where-Object { $_.guid -eq '{port}' }).Count | Should -Be 1
-        @($port.profiles.list | Where-Object { $_.guid -in @('{pkg}', '{pre}') }).Count | Should -Be 0
+        @($port.profiles.list | Where-Object { $_.guid -in @('{pkg}', '{pre}', '{can}') }).Count | Should -Be 0
         @(Get-ChildItem -LiteralPath (Split-Path -Parent $packaged) -Filter 'settings.json.bak.*').Count | Should -Be 1
         @(Get-ChildItem -LiteralPath (Split-Path -Parent $preview) -Filter 'settings.json.bak.*').Count | Should -Be 1
+        @(Get-ChildItem -LiteralPath (Split-Path -Parent $canary) -Filter 'settings.json.bak.*').Count | Should -Be 1
         @(Get-ChildItem -LiteralPath (Split-Path -Parent $portable) -Filter 'settings.json.bak.*').Count | Should -Be 1
     }
 
@@ -1562,6 +1592,7 @@ Describe "setup.ps1 transactional Windows Terminal merge" {
         Invoke-WindowsTerminalSettingsTransaction -IsPortablePresent $false
         Test-Path -LiteralPath (Get-WindowsTerminalSettingsPath) | Should -BeFalse
         Test-Path -LiteralPath (Get-WindowsTerminalPreviewSettingsPath) | Should -BeFalse
+        Test-Path -LiteralPath (Get-WindowsTerminalCanarySettingsPath) | Should -BeFalse
         Test-Path -LiteralPath (Get-WindowsTerminalUnpackagedSettingsPath) | Should -BeFalse
     }
 

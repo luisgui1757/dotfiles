@@ -14,4 +14,8 @@ if grep -E "^theme\s*=\s*dark:" "$REPO_ROOT/ghostty/config" >/dev/null; then
     echo "FAIL: ghostty/config must NOT use the adaptive dark:/light: theme split"
     exit 1
 fi
+if ! grep -E '^scrollback-limit\s*=\s*1073741824\s*$' "$REPO_ROOT/ghostty/config" >/dev/null; then
+    echo "FAIL: ghostty/config must retain the shared 1 GiB per-surface scrollback budget"
+    exit 1
+fi
 echo "OK"
