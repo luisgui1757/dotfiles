@@ -333,7 +333,10 @@ commits, recovery path, provider inventory, and whether any user data changed.
       pre-existing native package disappeared. On macOS, the digest-pinned
       `./tests/greenfield/docker-linux-owner-lifecycle.sh` wrapper provides the
       same non-root Linux runtime surface without claiming WSL or physical-host
-      release proof.
+      release proof. That wrapper passed on 2026-07-13 at exact commit
+      `51c5211b4b3dee4f0758533beac5e18345d668a1`, including 36/36 final
+      validation checks and pre-existing-package preservation. This row remains
+      open for a physical Linux host and WSL.
 - [ ] **Fresh Home Manager zsh session**, native Linux and WSL: with no caller
       PATH injection, run `env -i HOME="$HOME" USER="$USER" PATH=/usr/bin:/bin
       TERM=xterm zsh -l -i -c 'command -v rg'`. Confirm it resolves through a

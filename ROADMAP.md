@@ -109,6 +109,11 @@ Sequenced PRs (split for independent, revertable blast radius):
 - **PR-7 `feat/nix-linux` - DONE.** Home Manager standalone on Ubuntu/WSL userland;
   public Linux/WSL setup applies it by default; native/deferred install arms
   remain for artifacts and regression evidence (nvim last, for ABI reasons).
+  The digest-pinned local Ubuntu 24.04 arm64 owner lifecycle passed at exact
+  commit `51c5211b4b3dee4f0758533beac5e18345d668a1`: install, update, config
+  uninstall, idempotent uninstall retry, reinstall, final update, 36/36 full
+  validation, and preservation of every pre-existing native package. This is
+  Linux runtime evidence, not physical-host or WSL proof.
 
 ### Mega-PR: `feat/platform-nix-tooling-mega` (2026-07-07)
 

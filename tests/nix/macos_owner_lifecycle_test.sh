@@ -25,6 +25,14 @@ BREW
 chmod +x "$fake_brew"
 export BREW="$fake_brew"
 
+# The production lifecycle is Darwin-only and correctly uses BSD stat. This
+# unit test runs on both CI hosts, so isolate that host-specific command while
+# retaining the real path-selection and ownership assertions.
+stat() {
+    [[ "${1:-}" == "-f" && "${2:-}" == "%Su" && -d "${3:-}" ]] || return 92
+    id -un
+}
+
 mkdir -p \
     "$FAKE_BREW_PREFIX/Library/Taps/nikitabobko/homebrew-tap" \
     "$FAKE_BREW_REPOSITORY/Library/Taps"

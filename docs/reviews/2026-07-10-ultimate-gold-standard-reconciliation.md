@@ -2138,3 +2138,51 @@ The complete install/update/uninstall/reinstall/update row remains pending. No
 pushed-head hosted result, completed lifecycle, review, approval, merge, release
 tag, live safeguard mutation, or merged-main cache-free proof is claimed by this
 entry.
+
+## Cross-platform owner-lifecycle and theme closure — entry 53
+
+- Exact committed head `51c5211b4b3dee4f0758533beac5e18345d668a1`
+  completed the digest-pinned local Ubuntu 24.04 arm64 owner lifecycle: real
+  Home Manager plus native apt install, update, config uninstall, idempotent
+  uninstall retry, reinstall, final update, and 36/36 full validation. Every
+  pre-existing native package remained installed. This proves the Linux runtime
+  surface in the pinned container, not a physical Linux host or WSL.
+- The same run consumed the chezmoi-managed Herdr config at
+  `~/.config/herdr/config.toml`; the canonical file forces Herdr's built-in
+  `rose-pine` theme with onboarding and automatic light/dark switching disabled.
+  POSIX uses the XDG path and native Windows uses an independent roaming
+  ApplicationData chezmoi state so the actual application consumer is managed
+  on every platform.
+- The first pushed CI run on that head exposed two test-host portability
+  defects, not installer failures: the macOS lifecycle unit fixture invoked BSD
+  `stat` while running on Ubuntu, and ShellCheck rejected a fixture function
+  definition that appeared after its first production-function call. The
+  macOS-only command is now stubbed only at the cross-host unit-test boundary;
+  the universal setup test runs the real production profile recovery in an
+  isolated re-source while defining the later bootstrap fixture before use. No
+  lint suppression or product-behavior relaxation was added.
+- Homebrew completion repair is now setup-owned after activation in install and
+  update modes. It runs `brew completions link` through the selected Homebrew,
+  fails closed on repair failure, and removes the prior hidden manual recovery
+  step for stale `_brew` completion links.
+- A config-only owner-host apply then created the real Herdr consumer path at
+  `~/.config/herdr/config.toml` as a chezmoi-managed symlink to the canonical
+  template. `herdr status` parsed the resulting configuration successfully and
+  reported client `0.7.3`, stable channel, with no running server. This is
+  application/config parse evidence, not a visual theme-session observation.
+
+### Closure verification
+
+| Check | Exact result |
+|---|---|
+| `./tests/greenfield/docker-linux-owner-lifecycle.sh` at `51c5211b4b3dee4f0758533beac5e18345d668a1` | PASS: full five-phase lifecycle, 36/36 final validation, all pre-existing packages preserved; host log retained at `tests/.cache/linux-owner-lifecycle-docker-20260713-093950.log` |
+| `bash tests/nix/macos_owner_lifecycle_test.sh` | PASS on macOS after the Ubuntu test-boundary repair |
+| `bash tests/shell/setup_universal_entrypoint_test.sh` | PASS: real guarded-profile recovery plus verified bootstrap and migration cases |
+| `bash tests/shell/lint.sh` | PASS: no SC2218 and no new suppressions |
+| `PATH=/opt/homebrew/bin:$PATH make ci` | PASS: ended `local pre-PR gate passed` on the complete repair, proof, and documentation tree |
+| `./setup.sh --all --skip-deps --skip-config-scripts --skip-nvim --skip-agents` plus `herdr status` | PASS: live Mac consumer path created, bytes match `herdr/config.toml`, and Herdr parses the managed config |
+| Full Apple Silicon owner lifecycle | PENDING: the dedicated owner Terminal is at its one `sudo -v` credential prompt; no credential is captured or automated |
+
+No physical-Linux, WSL, Windows desktop, Herdr visual-session, completed macOS
+lifecycle, final pushed-head hosted, approval, merge, release tag, safeguard
+mutation, or merged-main cache-free proof is claimed by this entry.

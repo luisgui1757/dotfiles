@@ -35,26 +35,31 @@ chmod +x "$home/.nix-profile/bin/nix"
 
 old_home="$HOME"
 old_path="$PATH"
-old_nix_profile_guard="${__ETC_PROFILE_NIX_SOURCED-}"
-old_nix_profile_guard_set="${__ETC_PROFILE_NIX_SOURCED+x}"
-HOME="$home"
-PATH="/usr/bin:/bin"
-__ETC_PROFILE_NIX_SOURCED=1
-export HOME PATH __ETC_PROFILE_NIX_SOURCED
-activate_nix_profile
-case "$(command -v nix)" in
-    /nix/var/nix/profiles/default/bin/nix|"$home/.nix-profile/bin/nix") ;;
-    *) fail "setup did not recover a canonical Nix profile binary after guarded profile sourcing" ;;
-esac
-HOME="$old_home"
-PATH="$old_path"
-export HOME PATH
-if [[ -n "$old_nix_profile_guard_set" ]]; then
-    __ETC_PROFILE_NIX_SOURCED="$old_nix_profile_guard"
-    export __ETC_PROFILE_NIX_SOURCED
-else
-    unset __ETC_PROFILE_NIX_SOURCED
-fi
+
+activate_nix_profile() {
+    local profile="$HOME/.nix-profile/etc/profile.d/nix.sh"
+    [[ -f "$profile" ]] || return 1
+    # Fixture boundary: the real helper/profile contract has separate tests.
+    # shellcheck disable=SC1090
+    source "$profile"
+    [[ "$(command -v nix)" == "$fake_bin/nix" ]]
+}
+
+# Source setup again inside an isolated environment so this probe exercises the
+# production function without replacing the fixture used by the later bootstrap
+# cases in the parent shell.
+(
+    HOME="$home"
+    PATH="/usr/bin:/bin"
+    __ETC_PROFILE_NIX_SOURCED=1
+    export HOME PATH __ETC_PROFILE_NIX_SOURCED
+    DOTFILES_SETUP_SOURCE_ONLY=1 source "$REPO_ROOT/setup.sh"
+    activate_nix_profile
+    case "$(command -v nix)" in
+        /nix/var/nix/profiles/default/bin/nix|"$home/.nix-profile/bin/nix") ;;
+        *) fail "setup did not recover a canonical Nix profile binary after guarded profile sourcing" ;;
+    esac
+)
 
 cat > "$fake_repo/scripts/install-nix-prerequisite.sh" <<'HELPER'
 #!/usr/bin/env bash
@@ -83,14 +88,6 @@ DRY_RUN=1
 ALL=1
 SETUP_UNIVERSAL_TEST_ROOT="$WORK"
 export HOME PATH SETUP_UNIVERSAL_TEST_ROOT
-activate_nix_profile() {
-    local profile="$HOME/.nix-profile/etc/profile.d/nix.sh"
-    [[ -f "$profile" ]] || return 1
-    # Fixture boundary: the real helper/profile contract has separate tests.
-    # shellcheck disable=SC1090
-    source "$profile"
-    [[ "$(command -v nix)" == "$fake_bin/nix" ]]
-}
 ensure_nix_prerequisite >/dev/null
 [[ "$NIX_PREREQUISITE_DRY_RUN_PLANNED" -eq 1 && ! -e "$WORK/nix-helper.args" ]] ||
     fail "fresh dry-run did not preview Nix bootstrap without invoking it"
