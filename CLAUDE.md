@@ -462,8 +462,9 @@ to lazy-loading (`event` / `cmd` / `keys` / `ft`). Only `rose-pine` may set
 
 1. Add the server name to `vim.lsp.config(...)` and the `vim.lsp.enable({...})`
    list in `nvim/lua/plugins/lsp-config.lua`.
-2. Add the Mason package to the `ensure_installed` array in the same file
-   (under the `mason-tool-installer` config block).
+2. Add the Mason package to `expected_tools()` in
+   `nvim/lua/util/mason_tools.lua`; the plugin config and fail-closed headless
+   postcondition share that one manifest.
 3. Add the server name to `tests/nvim/spec/lsp_spec.lua`'s `required_servers`
    so the static-check catches a future accidental removal.
 
@@ -474,11 +475,16 @@ actual file/project ancestors (including `build/`).
 one Neovim process and requires isolated roots, flags, and diagnostics. The
 generic Ubuntu test lane installs the distro `clangd` package explicitly; the
 spec fails when the real binary is absent rather than substituting static proof.
+Production Linux/WSL owns `clangd` through Home Manager's `clang-tools` package
+on both supported architectures. Mason's registry currently has Linux x64 but
+no Linux arm64 clangd artifact, so Linux is deliberately excluded from the
+Mason clangd entry; macOS and Windows retain Mason ownership.
 
 > **Headless-install gotcha:** `mason-tool-installer` is `event = "VeryLazy"`
 > (interactive auto-install via `run_on_start`) **and** registers its commands
 > under `cmd = { … }`. Those `cmd` triggers are load-bearing — the setup phase
-> runs `nvim --headless +MasonToolsInstallSync`, and `VeryLazy` never fires
+> invokes `MasonToolsInstallSync` through `util.mason_tools.run_checked`, and
+> `VeryLazy` never fires
 > without a UI, so without the `cmd` trigger that command is `E492: Not an
 > editor command`. Keep `MasonToolsInstallSync`/`MasonToolsUpdateSync` in the
 > `cmd` list (guarded by `lsp_spec.lua`).
@@ -486,7 +492,8 @@ spec fails when the real binary is absent rather than substituting static proof.
 ### Add a new formatter
 
 1. Add to `formatters_by_ft` in `nvim/lua/plugins/conform.lua`.
-2. Add the Mason package to `mason-tool-installer` `ensure_installed`.
+2. Add the Mason package to `expected_tools()` in
+   `nvim/lua/util/mason_tools.lua`.
 3. If an LSP also attaches for that filetype, add or update a realistic fixture
    under `tests/nvim/fixtures/formatter_lsp/` and the Tier-2 formatter/LSP
    compatibility table in `tests/nvim/lsp_smoke.lua`. The invariant is:
@@ -609,11 +616,12 @@ live cache to recover; fix/restore `nvim/lazy-lock.json` and restart Neovim.
 ### Update Mason-installed tools across machines
 
 ```bash
-nvim --headless "+MasonToolsUpdateSync" +qa
+nvim --headless "+lua require('util.mason_tools').run_checked('MasonToolsUpdateSync')"
 ```
 
 There's no machine-pinned lockfile for Mason itself — `mason-tool-installer`
-ensures the named tools exist on each machine.
+ensures the named tools exist on each machine, and the repo wrapper verifies
+every expected package before allowing a zero exit.
 
 ## Test runner
 
@@ -1089,10 +1097,11 @@ save only**. The next plain `:w` formats normally. Implemented in
   the pinned package layer, missing native/deferred dependencies, config apply,
   Lazy restore, synchronous parser installation, Mason install, and Sentinel.
   They then run `install-deps --update` and
-  `nvim --headless +MasonToolsUpdateSync +qa`. The Mason update command is
-  synchronous on purpose; the async update command can let headless Neovim exit
-  while package installs are still running, which Mason reports as aborted
-  installs. Update mode still never runs git pull, Lazy sync, Lazy update,
+  `util.mason_tools.run_checked('MasonToolsUpdateSync')`. The wrapper runs the
+  synchronous command, validates every platform-expected Mason package, and
+  exits via `:cquit` on any command/postcondition failure. This closes
+  Neovim's normal headless behavior of printing a command error while exiting
+  zero. Update mode still never runs git pull, Lazy sync, Lazy update,
   blanket package-manager upgrades, or lockfile rewrites. `--upgrade` /
   `-Upgrade` is an alias. `install-deps --update` updates only present catalog
   tools after proving ownership from the executable source, then runs a scoped
@@ -1896,6 +1905,12 @@ pipe-to-shell bootstrap.
   Nix/Homebrew package layer remains installed.
   The mixed-ownership cleanup/tap contract is identical on real Macs and hosted
   CI; no environment marker weakens or changes it.
+- **The Docker Linux owner lifecycle retains proof outside the container.**
+  `tests/greenfield/docker-linux-owner-lifecycle.sh` exports exact committed
+  `HEAD` as a Git bundle, runs the real lifecycle in the digest-pinned image,
+  and tees all output to a timestamped host file under `tests/.cache/`. It must
+  preserve the Docker process status through that tee; the ephemeral
+  container's internal log is not durable evidence.
 - **User resolution.** setup.sh resolves one actual non-root account and account
   home before any install phase, requires `HOME` to identify the same directory,
   and passes both variables through `sudo -H env`. The flake ignores ambient
@@ -1948,6 +1963,8 @@ pipe-to-shell bootstrap.
   standalone Linux configuration sets `home.sessionPath` to its evaluated
   `home.profileDirectory/bin`, so that canonical file—not caller PATH
   injection—exports the Nix-owned CLI path.
+  Linux also owns `clangd` through `pkgs.clang-tools` on both x86_64 and arm64;
+  Mason is not a Linux clangd owner because its registry has no arm64 artifact.
   First-run bootstrap likewise uses
   `github:nix-community/home-manager/<locked-rev>?narHash=<encoded-narHash>#home-manager`
   from `flake.lock`, not a mutable registry alias. **Native install-deps arms are

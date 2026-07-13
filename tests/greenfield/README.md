@@ -164,7 +164,10 @@ filesystem, which can return `Resource deadlock avoided` for worktree metadata.
 The lifecycle checks idempotent uninstall, performs full validation, and proves
 no pre-existing native package was removed. It also exercises the production
 noninteractive apt boundary; an unattended run must never open a debconf prompt
-for transitive dependencies such as `tzdata`.
+for transitive dependencies such as `tzdata`. Complete container output is
+retained on the host at
+`tests/.cache/linux-owner-lifecycle-docker-<timestamp>.log`; a pipeline or
+container failure remains the driver's exit status.
 
 There is deliberately no hosted WSL workflow. [GitHub documents nested
 virtualization on hosted runners as technically possible but not officially

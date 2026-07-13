@@ -45,8 +45,8 @@ output="$(run_update_mode 2>&1)"
 
 grep -Fx -- '--update' "$TMP_ROOT/install-deps.args" >/dev/null \
     || fail "setup update did not invoke install-deps.sh --update"
-grep -Fx -- '--headless +MasonToolsUpdateSync +qa' "$TMP_ROOT/nvim.args" >/dev/null \
-    || fail "setup update did not invoke MasonToolsUpdateSync"
+grep -Fx -- "--headless +lua require('util.mason_tools').run_checked('MasonToolsUpdateSync')" "$TMP_ROOT/nvim.args" >/dev/null \
+    || fail "setup update did not invoke the checked MasonToolsUpdateSync wrapper"
 if printf '%s\n' "$output" | grep -Eq 'chezmoi|Lazy(!| sync)|Tree-sitter|MasonToolsInstallSync|Phase 2|Phase 3'; then
     echo "$output"
     fail "setup update touched config, Lazy, Tree-sitter, or Mason install paths"

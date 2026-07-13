@@ -2024,7 +2024,7 @@ function Invoke-NvimSyncPhases {
                 }
             }
         },
-        [scriptblock]$MasonRunner = { & nvim --headless "+MasonToolsInstallSync" "+qa" }
+        [scriptblock]$MasonRunner = { & nvim --headless "+lua require('util.mason_tools').run_checked('MasonToolsInstallSync')" }
     )
 
     if (-not $SkipNvimPhase -and -not $IsDryRun) {
@@ -2082,7 +2082,7 @@ function Invoke-SetupUpdateMode {
     }
     if (-not $NvimRunner) {
         $NvimRunner = {
-            & nvim --headless "+MasonToolsUpdateSync" "+qa"
+            & nvim --headless "+lua require('util.mason_tools').run_checked('MasonToolsUpdateSync')"
         }
     }
 
@@ -2111,7 +2111,7 @@ function Invoke-SetupUpdateMode {
     if (-not $SkipNvimPhase) {
         Phase "Update 2/2: update Mason LSP servers + formatters"
         if ($IsDryRun) {
-            Write-Host "  would: nvim --headless +MasonToolsUpdateSync +qa"
+            Write-Host "  would: nvim --headless +lua require('util.mason_tools').run_checked('MasonToolsUpdateSync')"
         } elseif (& $CommandTester 'nvim') {
             Invoke-NvimCommandOrFail -Label "Mason update" -IsBestEffort $IsBestEffort -Block $NvimRunner
         } else {

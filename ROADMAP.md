@@ -198,6 +198,12 @@ Commit-by-commit status:
   the E5113 parser/ABI mismatch. They stay native until nvim + its parser
   toolchain can move into one ABI-matched Nix closure (follow-up). Excluded from
   `nix/home/common.nix` and asserted absent by `tests/nix/linux_home_test.sh`.
+  Linux `clangd` is instead package-layer owned through `pkgs.clang-tools` on
+  both supported architectures: Mason publishes no Linux arm64 clangd artifact,
+  so its platform manifest excludes clangd on every Linux host rather than
+  creating architecture-dependent ownership. Setup and validation invoke a
+  shared checked Mason wrapper that turns command or missing-package failures
+  into a nonzero Neovim exit.
   The guarded stale-`PATH` recovery is driven explicitly through the Linux Home
   Manager path, and a checked-in non-root Linux lifecycle runner mirrors the
   macOS install/update/config-uninstall/reinstall/update proof while rejecting

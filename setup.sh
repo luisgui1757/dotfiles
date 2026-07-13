@@ -924,9 +924,10 @@ run_update_mode() {
     if [[ "$SKIP_NVIM" -eq 0 ]]; then
         phase "Update 2/2: update Mason LSP servers + formatters"
         if [[ "$DRY_RUN" -eq 1 ]]; then
-            echo "  would: nvim --headless +MasonToolsUpdateSync +qa"
+            echo "  would: nvim --headless +lua require('util.mason_tools').run_checked('MasonToolsUpdateSync')"
         elif command -v nvim >/dev/null 2>&1; then
-            run_or_fail "Mason update" nvim --headless "+MasonToolsUpdateSync" "+qa"
+            run_or_fail "Mason update" nvim --headless \
+                "+lua require('util.mason_tools').run_checked('MasonToolsUpdateSync')"
         else
             echo "  skipped   Mason update: nvim not on PATH"
         fi
@@ -1726,7 +1727,8 @@ if [[ "$SKIP_NVIM" -eq 0 ]] && [[ "$DRY_RUN" -eq 0 ]]; then
 
         phase "Phase 5/6: install LSP servers + formatters (Mason)"
         echo "  this can take 3-8 minutes on a fresh machine."
-        run_or_fail "Mason install" nvim --headless "+MasonToolsInstallSync" "+qa"
+        run_or_fail "Mason install" nvim --headless \
+            "+lua require('util.mason_tools').run_checked('MasonToolsInstallSync')"
     else
         echo
         echo "skipped: Phase 3-5 (nvim plugins/parsers/tools) -- nvim not on PATH yet."

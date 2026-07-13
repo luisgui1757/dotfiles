@@ -33,7 +33,9 @@ clone the next exact annotated release beside the old checkout first.
 Clone the repo first, then run the local setup entry point. `setup.{sh,ps1}`
 installs repo-managed dependencies, links every config, then runs
 `:Lazy! restore`, a synchronous nvim-treesitter parser install, and
-`:MasonToolsInstallSync` before the first interactive Neovim launch.
+the repo's checked `:MasonToolsInstallSync` wrapper before the first interactive
+Neovim launch. The wrapper exits nonzero on a command error or missing package;
+headless Neovim cannot print an install error and still let setup report done.
 Piped or stdin setup is intentionally disabled; if setup cannot prove it is
 running from a local checkout, it fails closed with clone-first instructions.
 
@@ -312,7 +314,7 @@ setup -> install-deps                 phase 1: programs and optional tools
       -> nvim "+Lazy! restore" +qa    phase 3: plugins from lazy-lock.json;
                                             parser-update build tasks must finish
       -> nvim +DOTFILES_TREESITTER_SYNC_INSTALL  phase 4: Tree-sitter parsers
-      -> nvim "+MasonToolsInstallSync" +qa        phase 5: LSP servers and formatters
+      -> nvim +checked-MasonToolsInstallSync      phase 5: LSP servers and formatters
       -> Sentinel global install       phase 6: per-user agent policy
 ```
 
@@ -343,8 +345,8 @@ Add `--dry-run` / `-DryRun` to preview every step without touching disk.
 Pass `--skip-agents` / `-SkipAgents` to leave global AI-agent entrypoints alone.
 Pass `--update` / `-Update` from an exact release checkout to run the same
 install-or-migrate and full-reconciliation path as all mode, followed by scoped
-package-manager/direct-artifact updates for proven present tools and
-`MasonToolsUpdateSync`. `--upgrade` / `-Upgrade` is an alias. Update never runs
+package-manager/direct-artifact updates for proven present tools and the checked
+`MasonToolsUpdateSync` wrapper. `--upgrade` / `-Upgrade` is an alias. Update never runs
 `git pull`, follows a moving branch, performs a blanket package-manager upgrade,
 rewrites `flake.lock`, or runs `:Lazy update`; repository pins change only in a
 reviewed release.
@@ -1241,10 +1243,13 @@ parser compilation does not pollute the startup timing assertion.
 ### Updating Mason tools across machines
 
 ```bash
-nvim --headless "+MasonToolsUpdateSync" +qa
+nvim --headless "+lua require('util.mason_tools').run_checked('MasonToolsUpdateSync')"
 ```
 
-Run on each machine; there's no machine-pinned lockfile for Mason itself.
+Run on each machine; there's no machine-pinned lockfile for Mason itself. Linux
+gets `clangd` from the architecture-independent Home Manager package layer;
+Mason retains `clangd` ownership on macOS and Windows, where its registry has a
+matching artifact.
 
 ### Reproducing the same release on another machine
 

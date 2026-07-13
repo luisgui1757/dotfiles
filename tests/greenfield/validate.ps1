@@ -297,7 +297,7 @@ try {
         $env:DOTFILES_TREESITTER_SYNC_INSTALL = $oldTreeSitterSyncInstall
     }
 }
-Invoke-NvimChecked -Name mason -NvimArgs @('+MasonToolsInstallSync', '+qa')
+Invoke-NvimChecked -Name mason -NvimArgs @("+lua require('util.mason_tools').run_checked('MasonToolsInstallSync')")
 Assert-MasonTool -Name 'lua-language-server' -FileNames @('lua-language-server.cmd', 'lua-language-server.exe', 'lua-language-server')
 Assert-MasonTool -Name 'stylua' -FileNames @('stylua.cmd', 'stylua.exe', 'stylua')
 

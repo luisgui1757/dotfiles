@@ -82,7 +82,7 @@ output="$(HOME="$TMP_ROOT/home" SETUP_TEST_ROOT="$TMP_ROOT" PATH="$TMP_ROOT/brew
 grep -F -- "--headless +Lazy! restore +qa" "$TMP_ROOT/nvim.log" >/dev/null
 grep -F -- "DOTFILES_TREESITTER_SYNC_INSTALL=1" "$TMP_ROOT/nvim.log" >/dev/null
 grep -F -- "--headless +lua require('lazy').load({ plugins = { 'nvim-treesitter' } }) +qa" "$TMP_ROOT/nvim.log" >/dev/null
-grep -F -- "--headless +MasonToolsInstallSync +qa" "$TMP_ROOT/nvim.log" >/dev/null
+grep -F -- "--headless +lua require('util.mason_tools').run_checked('MasonToolsInstallSync')" "$TMP_ROOT/nvim.log" >/dev/null
 grep -F "$TMP_ROOT/home/.linuxbrew/opt/make/libexec/gnubin" "$TMP_ROOT/nvim.log" >/dev/null
 
 echo "OK"

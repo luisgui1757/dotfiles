@@ -76,6 +76,12 @@ for arch in x86_64-linux aarch64-linux; do
         echo "FAIL: $arch HM set does not include nodejs for the Pi CLI npm runtime"
         fail=1
     fi
+    if printf '%s\n' "$names" | grep -qx 'clang-tools'; then
+        echo "ok  : $arch HM set includes clang-tools (canonical Linux clangd owner)"
+    else
+        echo "FAIL: $arch HM set does not include clang-tools for the clangd runtime"
+        fail=1
+    fi
     if printf '%s\n' "$names" | grep -qiE '(^|[^[:alnum:]])(neovim|nvim|tree-sitter)([^[:alnum:]]|$)'; then
         echo "FAIL: $arch HM set includes an ABI-coupled deferred tool (neovim/tree-sitter)"
         fail=1

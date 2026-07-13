@@ -300,6 +300,9 @@ main() {
         for cmd in git nvim rg fd fzf tmux zsh lazygit starship chezmoi tree-sitter cmake lsd; do
             require_cmd "$cmd"
         done
+        if [[ "$(uname -s)" == "Linux" ]]; then
+            require_cmd clangd
+        fi
     fi
 
     assert_nvim_version
@@ -308,7 +311,7 @@ main() {
     assert_chezmoi_verify
     run_nvim_checked lazy "+Lazy! restore" "+qa"
     DOTFILES_TREESITTER_SYNC_INSTALL=1 run_nvim_checked treesitter -u "$REPO_ROOT/nvim/init.lua" -c "lua require('lazy').load({ plugins = { 'nvim-treesitter' } })" +qa
-    run_nvim_checked mason "+MasonToolsInstallSync" "+qa"
+    run_nvim_checked mason "+lua require('util.mason_tools').run_checked('MasonToolsInstallSync')"
     assert_mason_tool "lua-language-server" lua-language-server lua-language-server.cmd lua-language-server.exe
     assert_mason_tool "stylua" stylua stylua.cmd stylua.exe
 

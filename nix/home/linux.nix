@@ -5,6 +5,7 @@
 # apps/fonts/terminal stay a Windows-host responsibility).
 { config
 , homeDirectory
+, pkgs
 , username
 , ...
 }:
@@ -18,6 +19,11 @@
   # does not depend on caller/system PATH injection. This owns session state,
   # not a dotfile; chezmoi remains the sole ~/.zshrc owner.
   home.sessionPath = [ "${config.home.profileDirectory}/bin" ];
+
+  # Mason's clangd package has no Linux arm64 artifact. Keep one canonical
+  # owner across supported Linux architectures and expose clangd from the Nix
+  # package layer instead of allowing architecture-dependent Mason failures.
+  home.packages = [ pkgs.clang-tools ];
 
   # Standalone Home Manager manages its own `home-manager` CLI. This is the ONE
   # allowed programs.* module (it installs the HM tool, it does not render any

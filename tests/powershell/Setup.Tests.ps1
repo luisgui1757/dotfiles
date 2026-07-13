@@ -1249,7 +1249,7 @@ Describe "setup.ps1 update mode" {
         $script:SetupUpdateDepsPath | Should -Be (Join-Path $root 'install-deps.ps1')
         $script:SetupUpdateDepsArgs['Update'] | Should -BeTrue
         $script:SetupUpdateNvimRan | Should -BeTrue
-        ($script:SetupUpdateNvimArgs -join ' ') | Should -Be '--headless +MasonToolsUpdateSync +qa'
+        ($script:SetupUpdateNvimArgs -join ' ') | Should -Be "--headless +lua require('util.mason_tools').run_checked('MasonToolsUpdateSync')"
         $script:SetupUpdateRuntimeRefreshed | Should -BeTrue
         $output | Should -Match 'Update 1/2'
         $output | Should -Match 'Update 2/2'
@@ -1287,7 +1287,7 @@ Describe "setup.ps1 update mode" {
         $script:SetupUpdateDepsArgs['Update'] | Should -BeTrue
         $script:SetupUpdateDepsArgs['DryRun'] | Should -BeTrue
         $script:SetupUpdateRuntimeRefreshed | Should -BeFalse
-        $output | Should -Match '(?m)^\s*would:\s+nvim --headless \+MasonToolsUpdateSync \+qa[ \t]*$'
+        $output | Should -Match "(?m)^\s*would:\s+nvim --headless \+lua require\('util\.mason_tools'\)\.run_checked\('MasonToolsUpdateSync'\)[ \t]*$"
         Should -Invoke -CommandName Invoke-ChezmoiApplyPhase -Times 0 -Exactly
     }
 

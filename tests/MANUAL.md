@@ -318,9 +318,11 @@ commits, recovery path, provider inventory, and whether any user data changed.
       setup derives the locked
       `github:nix-community/home-manager/<rev>?narHash=<encoded-narHash>#home-manager`
       ref from `flake.lock`). Confirm the nix CLI set (ripgrep/fd/fzf/jq/lazygit/node/
-      npm/starship/zoxide) lands in `~/.nix-profile/bin` with NO root, and that `nvim` +
-      `tree-sitter` are still the native install-deps binaries (NOT nix) so
-      parser builds keep working.
+      npm/starship/zoxide/clangd) lands in `~/.nix-profile/bin` with NO root.
+      `clangd` must resolve from Home Manager's `clang-tools` package on both
+      Linux architectures and must not be expected from Mason, whose registry
+      lacks a Linux arm64 artifact. Confirm `nvim` + `tree-sitter` are still the
+      native install-deps binaries (NOT nix) so parser builds keep working.
       From a clean committed checkout, `./tests/linux_owner_lifecycle.sh` runs
       install, update, config uninstall, an idempotent uninstall retry,
       reinstall, final update, and full validation while proving no

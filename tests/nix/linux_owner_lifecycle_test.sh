@@ -25,6 +25,14 @@ if grep -F -- "--volume \"\$REPO_ROOT:/repo:ro\"" "$docker_driver" >/dev/null; t
 fi
 echo "ok  : Linux lifecycle transports and verifies an exact-HEAD Git bundle"
 
+grep -F "linux-owner-lifecycle-docker-\$TIMESTAMP.log" "$docker_driver" >/dev/null ||
+    fail "Linux lifecycle driver must retain a host-side log"
+grep -F "2>&1 | tee \"\$LOG_FILE\"" "$docker_driver" >/dev/null ||
+    fail "Linux lifecycle driver must capture the complete container output"
+grep -F "docker_rc=\"\${PIPESTATUS[0]}\"" "$docker_driver" >/dev/null ||
+    fail "Linux lifecycle driver must preserve the container exit status through tee"
+echo "ok  : Linux lifecycle retains an auditable host log without masking failures"
+
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 fake_bin="$WORK/bin"
