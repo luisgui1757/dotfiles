@@ -138,8 +138,11 @@ commits, recovery path, provider inventory, and whether any user data changed.
       to focus it (`Ctrl+B`, `g` is the same full-navigator alias). Confirm
       `Ctrl+B`, `,` renames the current tab/window; `Ctrl+B`, `$` renames the
       workspace; `Ctrl+B`, Up/Down traverses workspaces; `Ctrl+B`, Shift+1..9
-      selects workspaces while unshifted 1..9 still selects tabs. Then exit
-      cleanly. Confirm the managed config is `~/.config/herdr/config.toml` on
+      selects workspaces while unshifted 1..9 still selects tabs. With at least
+      two detected agents, confirm `Ctrl+B`, `a` / `Ctrl+B`, `Shift+A` moves to
+      the next/previous agent and `Ctrl+B`, Ctrl+1..9 focuses that numbered agent.
+      Then exit cleanly. Confirm the managed config is
+      `~/.config/herdr/config.toml` on
       POSIX and the real `%APPDATA%\herdr\config.toml` on Windows. On Windows,
       create a fresh pane and confirm `(Get-Process -Id $PID).Name` is `pwsh`,
       `$PROFILE` resolves below the managed PowerShell Documents path, and prior

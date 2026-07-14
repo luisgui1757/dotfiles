@@ -96,8 +96,8 @@ It is a sequence, not one four-key chord. This README calls `Ctrl+B` the
 ### Herdr
 
 Herdr is the agent-focused multiplexer. It groups terminal panes into tabs and
-workspaces. The repo makes its common navigation feel like tmux and uses
-Herdr's built-in `rose-pine` theme.
+workspaces, then tracks the agents running inside them. The repo makes its
+common navigation feel like tmux and uses Herdr's built-in `rose-pine` theme.
 
 Start it from a normal shell with `herdr`. On Windows, new Herdr panes run
 `pwsh.exe`, so they load the same PowerShell profile, history list, and
@@ -108,11 +108,14 @@ change; an already-running shell cannot change into PowerShell 7 retroactively.
 |---|---|
 | `Ctrl+B`, then `w` | Open the full workspace/tab/pane navigator. Use Up/Down and Enter. |
 | `Ctrl+B`, then `g` | Open the same full navigator. |
+| `Ctrl+B`, then `p` / `n` | Move to the previous/next tab/window. |
 | `Ctrl+B`, then `1` ... `9` | Switch tabs/windows. |
 | `Ctrl+B`, then `,` | Rename the current tab/window. |
 | `Ctrl+B`, then `$` | Rename the current workspace. |
 | `Ctrl+B`, then Up/Down | Move to the previous/next workspace. |
 | `Ctrl+B`, then `Shift+1` ... `Shift+9` | Jump directly to workspace 1 ... 9. |
+| `Ctrl+B`, then `Shift+A` / `a` | Move to the previous/next agent. |
+| `Ctrl+B`, then `Ctrl+1` ... `Ctrl+9` | Focus agent 1 ... 9 directly. |
 
 Named Herdr sessions are separate server namespaces. A session does not appear
 inside another session's navigator; attach to the other session from a normal

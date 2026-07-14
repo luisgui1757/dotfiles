@@ -8,14 +8,16 @@ onboarding = false
 # as an alias; the narrower workspace-only picker is redundant with this tree.
 workspace_picker = ""
 goto = ["prefix+w", "prefix+g"]
-# Herdr calls tmux windows "tabs". Preserve the tmux rename chords, then use
-# prefix+Up/Down for ordered workspace movement and Shift+number for the direct
-# workspace equivalent of tmux's prefix+number tab selection.
+# Herdr calls tmux windows "tabs". Preserve the tmux rename chords, then give
+# tabs, workspaces, and agents distinct cycle/direct-selection layers.
 rename_tab = "prefix+comma"
 rename_workspace = "prefix+$"
 previous_workspace = "prefix+up"
 next_workspace = "prefix+down"
 switch_workspace = "prefix+shift+1..9"
+previous_agent = "prefix+shift+a"
+next_agent = "prefix+a"
+focus_agent = "prefix+ctrl+1..9"
 
 [theme]
 name = "rose-pine"

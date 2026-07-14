@@ -42,6 +42,9 @@ for path in paths:
         "previous_workspace": "prefix+up",
         "next_workspace": "prefix+down",
         "switch_workspace": "prefix+shift+1..9",
+        "previous_agent": "prefix+shift+a",
+        "next_agent": "prefix+a",
+        "focus_agent": "prefix+ctrl+1..9",
     }
     for action, binding in expected_keys.items():
         if keys.get(action) != binding:
@@ -70,4 +73,4 @@ for script in setup.ps1 uninstall.ps1; do
         fail "$script does not use the Herdr overlay state boundary"
 done
 
-echo "all Herdr tmux-parity navigation, Rose Pine theme, and Windows pwsh invariants OK"
+echo "all Herdr tab/workspace/agent navigation, Rose Pine theme, and Windows pwsh invariants OK"

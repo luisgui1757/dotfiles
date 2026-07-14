@@ -607,7 +607,9 @@ stack), herdr/config.toml + herdr/config.windows.toml (built-in `rose-pine`,
 forced with `auto_switch = false`; both map `prefix+w`/`prefix+g` to the full
 navigator, `prefix+comma`/`prefix+$` to tab/workspace rename,
 `prefix+up`/`prefix+down` to sequential workspace navigation, and
-`prefix+shift+1..9` to indexed workspace selection; Windows alone selects `pwsh.exe`),
+`prefix+shift+1..9` to indexed workspace selection; agent navigation uses
+`prefix+shift+a`/`prefix+a` for previous/next and `prefix+ctrl+1..9` for indexed
+focus; Windows alone selects `pwsh.exe`),
 windows-terminal/settings.fragment.jsonc (`schemes` + `themes`),
 shells/powershell_profile.ps1 (PSReadLine `-Colors` for syntax, `Selection`,
 the version-gated prediction colors, and `$PSStyle.FileInfo.Directory` for `ls`
@@ -1717,6 +1719,16 @@ save only**. The next plain `:w` formats normally. Implemented in
   exclusively for tabs/windows. Use the literal `$` binding: Herdr accepts
   single-character punctuation, while `prefix+shift+4` does not match the
   legacy terminal `$` event on every input path.
+- **Herdr agent navigation is a third, non-destructive modifier layer.** Use
+  `prefix+a` / `prefix+Shift+A` for next/previous agent: `a` is mnemonic and
+  unbound by both stock tmux and Herdr. Direct agent focus uses
+  `prefix+Ctrl+1..9`, matching Herdr's digit-only indexed-binding shape and the
+  existing number ladder: bare number selects a tab, Shift+number selects a
+  workspace, and Ctrl+number selects an agent. Plain Ctrl+number is unbound by
+  stock tmux, AeroSpace, and the managed Ghostty/WezTerm keymaps. Do not use
+  Alt+number here: AeroSpace owns it globally for macOS workspaces. Also do not
+  consume tmux's daily-use copy/paste, pane, window, session, create, detach,
+  rename, navigator, or bare-number bindings for agent actions.
 - **psmux + PSReadLine: Windows-only overlay, two settings.** psmux's default
   shell is **cmd**, not pwsh — which is the *real* reason "history prediction"
   and `MenuComplete` looked broken inside panes: PSReadLine was never loaded.
