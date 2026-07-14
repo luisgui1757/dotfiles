@@ -15,6 +15,13 @@ run the printed rollback, then prove rerunning setup resumes or retries safely.
 Also run setup update/upgrade once. Record the old/new tag objects, peeled
 commits, recovery path, provider inventory, and whether any user data changed.
 
+- [ ] **Bare POSIX prerequisite:** before v0.2.0 publication, use clean
+      Nix-free Apple Silicon macOS and Linux VMs at the exact fully pushed head
+      of an official prerelease branch. Run only `./setup.sh --all`; prove the
+      helper reports that branch identity, installs/verifies Nix 2.34.0, and
+      setup finishes. After publishing the annotated tag, prove that same
+      branch checkout is rejected before download and an exact-tag clone
+      succeeds instead.
 - [ ] **Apple Silicon owner-host:** begin with v0.1.0 Homebrew formulae/casks,
       real taps, no Nix, divergent config, and backup-name collisions. Install
       Nix through setup's checksum-verified helper; prove failed

@@ -61,6 +61,19 @@ for name in ("nix workflow", "e2e workflow"):
     if text.count("DeterminateSystems/nix-installer-action@") != 1:
         raise SystemExit(f"FAIL: {name} must use exactly one pinned Determinate Nix action")
 
+e2e = active["e2e workflow"]
+for required in (
+    "Checkout exact POSIX Nix bootstrap source",
+    "Bootstrap Nix from a bare POSIX runner",
+    "if command -v nix >/dev/null 2>&1 || [[ -e /nix ]]",
+    "./scripts/install-nix-prerequisite.sh --install",
+    "github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository",
+):
+    if required not in e2e:
+        raise SystemExit(f"FAIL: e2e POSIX Nix bootstrap proof is missing {required}")
+if e2e.index("Bootstrap Nix from a bare POSIX runner") > e2e.index("Run setup.sh end-to-end"):
+    raise SystemExit("FAIL: required POSIX setup proof runs before the bare Nix bootstrap")
+
 if Path(".github/workflows/wsl2-canary.yml").exists():
     raise SystemExit("FAIL: unsupported optional WSL2 hosted canary was not retired")
 

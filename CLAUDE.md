@@ -298,11 +298,16 @@ that violates one of these, fix it instead of disabling the test.
     - **(d) no remote-eval installer.** The repo never adds a `curl | sh`,
       `irm | iex`, `Invoke-Expression`, or `nix-installer`/`install.determinate.systems`
       pipe-to-shell path for Nix (or anything else). Public setup invokes only
-      `scripts/install-nix-prerequisite.sh`, which requires the exact official
-      annotated release, downloads the pinned upstream Nix archive, verifies its
+      `scripts/install-nix-prerequisite.sh`. Before v0.2.0 publication it
+      accepts only a clean exact current official branch head; one isolated
+      remote-ref snapshot binds that prerelease decision and the absent release
+      tag. Once the unique annotated tag appears, the branch path closes and
+      only the matching local tag object, peeled commit, and HEAD are accepted.
+      The helper then downloads the pinned upstream Nix archive, verifies its
       platform SHA-256 and archive paths, and executes only those verified local
-      bytes. (Also covered by
-      `tests/static/supply_chain_remote_execution_test.sh`.)
+      bytes. Guarded behaviorally by
+      `tests/shell/nix_prerequisite_identity_test.sh` and statically by
+      `tests/static/supply_chain_remote_execution_test.sh`.
     - **(e) Nix owner reporting in update mode.** When `install-deps.sh --update`
       resolves a tool whose command source (or its real path) lives under a Nix
       profile/store path (`/nix/store`, `*/.nix-profile/*`,
@@ -782,9 +787,15 @@ major; `tests/static/repo_policy_test.sh` enforces this.
   `setup.ps1 / windows-2025` run the real public setup entry points, apply
   configs through chezmoi in Phase 2, then rerun Lazy restore, Tree-sitter
   parser install, Mason headless sync, and the Sentinel Phase 6/6 agent-policy
-  install. The POSIX setup jobs install Nix first, apply the enforced
-  nix-darwin/Home Manager layer before native/deferred installs, and assert the
-  nix-owned CLI set resolves from a Nix profile/store path. The Linux job first
+  install. The required POSIX jobs begin with no `/nix`, check out the exact PR
+  source head separately from GitHub's synthetic merge, and run the real
+  prerequisite helper before setup. Before v0.2.0 publication that source must
+  be a current official branch head; after publication the smoke switches to
+  the fetched exact tag. Fork PRs cannot satisfy the official-head identity, so
+  only they retain the pinned Determinate action as a pre-seeded test path.
+  Both jobs then apply the enforced nix-darwin/Home Manager layer before
+  native/deferred installs and assert the nix-owned CLI set resolves from a Nix
+  profile/store path. The Linux job first
   proves a clean login/interactive zsh resolves Nix-owned `rg` through Home
   Manager session state with no CI PATH injection. That proof resolves the
   effective account's login shell from the account record and executes that
@@ -1906,10 +1917,10 @@ save only**. The next plain `:w` formats normally. Implemented in
 
 The `flake.nix` + committed `flake.lock` are the POSIX **package** layer. They own
 NO dotfiles — chezmoi does, on every OS (invariant 22). Native Windows is
-non-Nix. On macOS/Linux/WSL, public `setup.sh` ensures the release-pinned,
-checksum-verified Nix prerequisite and applies this layer before native or
-deferred dependency provisioning. The repo never installs Nix through a
-pipe-to-shell bootstrap.
+non-Nix. On macOS/Linux/WSL, public `setup.sh` ensures the checksum-verified Nix
+prerequisite through the official-head-before-release / exact-tag-after-release
+identity transition and applies this layer before native or deferred dependency
+provisioning. The repo never installs Nix through a pipe-to-shell bootstrap.
 
 - **`flake.nix` structure.** `nixpkgs` (nixos-unstable, pinned by `flake.lock`),
   plus `nix-darwin`, `home-manager`, and `nix-homebrew`. Tap repositories are

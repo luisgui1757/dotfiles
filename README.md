@@ -351,9 +351,18 @@ running from a local checkout, it fails closed with clone-first instructions.
 Git is required to clone this repo. On macOS/Linux/WSL, setup bootstraps Nix
 when it is missing by calling the release-pinned prerequisite helper itself.
 That helper downloads the official upstream Nix 2.34.0 release and verifies the
-platform SHA-256 before extraction or execution. The helper and the versioned upgrade tools refuse branches, moving
-`main`, lightweight tags, dirty checkouts, and non-official release identities;
-this repo has no pipe-to-shell Nix bootstrap.
+platform SHA-256 before extraction or execution. Before v0.2.0 is published,
+the helper accepts only a clean commit that is currently an exact branch head
+in the official repository. Once the annotated v0.2.0 tag exists, that
+prerelease path closes automatically and only the exact clean official tag is
+accepted. Local-only/stale commits, forks, lightweight tags, dirty checkouts,
+and non-official origins fail before download. The versioned upgrade tools
+remain exact-tag-only; this repo has no pipe-to-shell Nix bootstrap.
+
+Maintainers testing an official prerelease branch can run `./setup.sh --all`
+directly from its clean, fully pushed head on a Nix-free macOS/Linux/WSL host.
+No manual Nix install is needed. This is prerelease validation, not the stable
+public install path below.
 
 ```bash
 # Apple Silicon mac / linux / wsl, after the annotated v0.2.0 release exists

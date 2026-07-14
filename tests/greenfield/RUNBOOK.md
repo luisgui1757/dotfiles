@@ -139,14 +139,17 @@ cd ~/dotfiles
 git fetch --depth 1 origin <full-40-character-sha>
 git checkout --detach FETCH_HEAD
 test "$(git rev-parse HEAD)" = "<full-40-character-sha>"
-# PR/main commits are not published releases, so provision Nix through the
-# trusted VM image or another independently verified method before this step.
+# Before v0.2.0 publication, this SHA must be the current head of an official
+# repository branch. setup verifies that identity and bootstraps Nix itself.
 ./setup.sh --all
 ./tests/greenfield/validate.sh
 ```
 
 For PR validation, use the PR head commit SHA. For main validation, use the
 current full `origin/main` SHA. Do not validate a moving branch name.
+These SHA instructions are prerelease-only. Once v0.2.0 is published, a
+Nix-free bootstrap must use the exact annotated tag; a later branch test must
+pre-seed Nix and is not release-bootstrap proof.
 Do the GUI/visual parts of Part 3 in the `tart run` window (VS Code, terminal
 colours); the CLI parts over SSH are fine too.
 
@@ -170,14 +173,17 @@ cd ~/dotfiles
 git fetch --depth 1 origin <full-40-character-sha>
 git checkout --detach FETCH_HEAD
 test "$(git rev-parse HEAD)" = "<full-40-character-sha>"
-# PR/main commits are not published releases, so provision Nix through the
-# trusted VM image or another independently verified method before this step.
+# Before v0.2.0 publication, this SHA must be the current head of an official
+# repository branch. setup verifies that identity and bootstraps Nix itself.
 ./setup.sh --all
 ./tests/greenfield/validate.sh
 ```
 
 For PR validation, use the PR head commit SHA. For main validation, use the
 current full `origin/main` SHA. Do not validate a moving branch name.
+These SHA instructions are prerelease-only. Once v0.2.0 is published, a
+Nix-free bootstrap must use the exact annotated tag; a later branch test must
+pre-seed Nix and is not release-bootstrap proof.
 A `tart` Linux guest is a real desktop (unlike WSL), so Ghostty + fonts install
 natively here and the visual checks apply. Over a headless SSH session the CLI
 checks (tmux/nvim/lazygit/shell) still apply; skip the GUI rows.

@@ -7,12 +7,13 @@ for desktop checks CI cannot see, especially Windows Terminal, fonts, ConPTY,
 and VS Code rendering.
 
 For macOS, Linux, and WSL greenfield runs, invoke `setup.sh --all` directly
-from the exact release checkout. The public POSIX setup path installs the
-release-pinned, checksum-verified Nix prerequisite when it is missing, then
-applies nix-darwin / Home Manager. It never uses a remote script pipeline.
-Pre-release PR/main validation is different: because the prerequisite helper
-correctly rejects an untagged commit, provision Nix through the trusted VM
-image or another separately verified host method before testing that commit.
+from the exact release checkout. Before v0.2.0 is published, an official
+prerelease branch may be tested from its clean, fully pushed head instead. The
+public POSIX setup path installs the checksum-verified Nix prerequisite when it
+is missing, then applies nix-darwin / Home Manager. It never uses a remote
+script pipeline. Local-only commits, stale branch commits, forks, and dirty
+trees are deliberately rejected; after release publication, the prerelease
+branch allowance closes and the exact annotated tag is mandatory.
 
 Do not add these VM or desktop launchers to the CI matrix. They need an
 interactive desktop or local virtualization and can hang or fail headless. The
