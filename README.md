@@ -348,7 +348,9 @@ headless Neovim cannot print an install error and still let setup report done.
 Piped or stdin setup is intentionally disabled; if setup cannot prove it is
 running from a local checkout, it fails closed with clone-first instructions.
 
-Git is required to clone this repo. On macOS/Linux/WSL, setup bootstraps Nix
+Git is required to clone this repo. On Linux/WSL, a greenfield setup installs
+`curl` plus CA certificates through the detected native package manager before
+the Nix prerequisite helper needs them. On macOS/Linux/WSL, setup bootstraps Nix
 when it is missing by calling the release-pinned prerequisite helper itself.
 That helper downloads the official upstream Nix 2.34.0 release and verifies the
 platform SHA-256 before extraction or execution, then runs the verified local

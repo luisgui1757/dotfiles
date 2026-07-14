@@ -227,6 +227,40 @@ activate_nix_profile() {
     return 1
 }
 
+nix_downloader_available() {
+    command -v curl >/dev/null 2>&1
+}
+
+ensure_nix_downloader() {
+    [[ "$SKIP_DEPS" -eq 0 ]] || return 0
+    nix_downloader_available && return 0
+
+    local installer="$SCRIPT_DIR/install-deps.sh"
+    local setup_dry_run="$DRY_RUN"
+    [[ -f "$installer" && ! -L "$installer" ]] || {
+        echo "  FAIL: dependency installer is missing or unsafe: $installer" >&2
+        return 1
+    }
+
+    # Nix must be available before the full dependency phase, but its verified
+    # prerequisite helper needs curl. Reuse install-deps.sh's package-manager
+    # bootstrap in an isolated source-only shell so setup flags and functions
+    # cannot be overwritten by the dependency installer.
+    (
+        set --
+        INSTALL_DEPS_SOURCE_ONLY=1
+        export INSTALL_DEPS_SOURCE_ONLY
+        # shellcheck disable=SC1090
+        source "$installer"
+        local bootstrap_pm
+        bootstrap_pm="$(detect_pm)"
+        if [[ "$bootstrap_pm" == "brew" && "$setup_dry_run" -eq 0 ]]; then
+            enable_homebrew_for_current_shell
+        fi
+        PM="$bootstrap_pm" DRY_RUN="$setup_dry_run" require_downloader
+    )
+}
+
 ensure_nix_prerequisite() {
     local helper="$SCRIPT_DIR/scripts/install-nix-prerequisite.sh"
     [[ "$SKIP_DEPS" -eq 0 ]] || return 0
@@ -1654,6 +1688,7 @@ run_home_manager_switch() {
 if [[ -z "${DOTFILES_SETUP_SOURCE_ONLY:-}" ]]; then
     resolve_target_identity
     refuse_nvim_self_link_if_needed
+    ensure_nix_downloader
     ensure_nix_prerequisite
     maybe_complete_v0_1_upgrade
 fi

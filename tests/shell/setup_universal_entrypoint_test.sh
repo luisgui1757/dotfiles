@@ -173,12 +173,14 @@ grep -F 'migration recovery path is not a real directory' "$WORK/symlink-recover
 sentinel_line="$(grep -nE '^[[:space:]]*run_sentinel_agent_policy[[:space:]]*$' "$REPO_ROOT/setup.sh" | tail -n1 | cut -d: -f1)"
 update_line="$(grep -nE '^[[:space:]]*run_update_mode[[:space:]]*$' "$REPO_ROOT/setup.sh" | tail -n1 | cut -d: -f1)"
 phase1_line="$(grep -n 'Phase 1/6: install dependencies' "$REPO_ROOT/setup.sh" | tail -n1 | cut -d: -f1)"
+ensure_downloader_line="$(grep -nE '^[[:space:]]*ensure_nix_downloader[[:space:]]*$' "$REPO_ROOT/setup.sh" | tail -n1 | cut -d: -f1)"
 ensure_nix_line="$(grep -nE '^[[:space:]]*ensure_nix_prerequisite[[:space:]]*$' "$REPO_ROOT/setup.sh" | tail -n1 | cut -d: -f1)"
 migration_line="$(grep -nE '^[[:space:]]*maybe_complete_v0_1_upgrade[[:space:]]*$' "$REPO_ROOT/setup.sh" | tail -n1 | cut -d: -f1)"
 [[ -n "$phase1_line" && -n "$sentinel_line" && -n "$update_line" &&
     "$phase1_line" -lt "$update_line" && "$sentinel_line" -lt "$update_line" ]] ||
     fail "--update does not reconcile the full release before the scoped refresh"
-[[ -n "$ensure_nix_line" && -n "$migration_line" &&
+[[ -n "$ensure_downloader_line" && -n "$ensure_nix_line" && -n "$migration_line" &&
+    "$ensure_downloader_line" -lt "$ensure_nix_line" &&
     "$ensure_nix_line" -lt "$phase1_line" && "$migration_line" -lt "$phase1_line" ]] ||
     fail "setup does not bootstrap prerequisites and migrate before package/config publication"
 

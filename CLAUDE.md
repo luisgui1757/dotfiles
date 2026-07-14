@@ -309,7 +309,12 @@ that violates one of these, fix it instead of disabling the test.
       daemon mode. Its reviewed extra config enables `nix-command flakes` in
       daemon installs; single-user Linux merges those additive features into
       the user's Nix config, and a retry self-heals the same disabled-feature
-      state after an otherwise-complete install. Guarded behaviorally by
+      state after an otherwise-complete install. Before invoking that helper,
+      greenfield Linux/WSL setup must reuse `install-deps.sh`'s source-only
+      `require_downloader` path to install `curl` plus CA certificates through
+      the detected package manager; this bootstrap precedes Nix because the full
+      native dependency phase intentionally follows Nix activation. Guarded
+      behaviorally by `tests/shell/setup_nix_downloader_test.sh`,
       `tests/shell/nix_prerequisite_identity_test.sh` and statically by
       `tests/static/supply_chain_remote_execution_test.sh`.
     - **(e) Nix owner reporting in update mode.** When `install-deps.sh --update`
