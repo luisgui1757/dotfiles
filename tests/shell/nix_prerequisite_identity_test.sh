@@ -72,10 +72,11 @@ run_helper() {
     local repo="$1" refs_file="$2" mode="${3:-ok}"
     local run_path="${RUN_PATH_OVERRIDE:-$work/bin:$ORIGINAL_PATH}"
     local run_home="${RUN_HOME_OVERRIDE:-$HOME}"
+    local run_xdg_config_home="${RUN_XDG_CONFIG_HOME_OVERRIDE:-$run_home/.config}"
     remote_call_log="$work/remote-calls.log"
     : > "$remote_call_log"
     set +e
-    output="$(HOME="$run_home" PATH="$run_path" \
+    output="$(HOME="$run_home" XDG_CONFIG_HOME="$run_xdg_config_home" PATH="$run_path" \
         REAL_GIT="$REAL_GIT" \
         FAKE_REMOTE_REFS_FILE="$refs_file" \
         FAKE_REMOTE_CALL_LOG="$remote_call_log" \
