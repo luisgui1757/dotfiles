@@ -1100,8 +1100,12 @@ save only**. The next plain `:w` formats normally. Implemented in
   whole wrong-OS directories to avoid empty parent dirs. Windows setup resolves
   the actual LocalApplicationData, ApplicationData, and Documents known folders
   plus runtime `$PROFILE`, then applies dedicated source states for
-  nvim/lazygit, Herdr, and the Console/VS Code/ISE PowerShell profiles. Never
-  restore hardcoded `home/AppData` or `home/Documents` targets. POSIX pwsh
+  nvim/lazygit, Herdr, and the Console/VS Code/ISE PowerShell profiles. After
+  proving each deployed profile resolves to `shells/powershell_profile.ps1` or
+  is an exact byte copy, setup removes Mark-of-the-Web from only those validated
+  profile files; failure is fatal so a successful install cannot leave every new
+  terminal broken under `RemoteSigned`. Never restore hardcoded `home/AppData`
+  or `home/Documents` targets. POSIX pwsh
   profile management remains
   outside the static chezmoi source tree because it depends on which host shell
   and `$PROFILE` path are available after `pwsh` is installed. WSL is gated

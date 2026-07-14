@@ -1778,6 +1778,17 @@ function Get-WindowsKnownFolderOverlays {
     )
 }
 
+function Get-WindowsPowerShellProfileCandidate {
+    param([Parameter(Mandatory)] $Identity)
+
+    return @(
+        (Join-Path $Identity.Documents 'PowerShell\Microsoft.PowerShell_profile.ps1'),
+        (Join-Path $Identity.Documents 'PowerShell\Microsoft.VSCode_profile.ps1'),
+        (Join-Path $Identity.Documents 'WindowsPowerShell\Microsoft.PowerShell_profile.ps1'),
+        (Join-Path $Identity.Documents 'WindowsPowerShell\Microsoft.PowerShellISE_profile.ps1')
+    )
+}
+
 function Assert-WindowsKnownFolderConsumption {
     param([Parameter(Mandatory)] $Identity)
 
@@ -1799,12 +1810,7 @@ function Assert-WindowsKnownFolderConsumption {
         throw "Herdr does not consume the repo config through actual ApplicationData: $herdrTarget"
     }
 
-    $profileCandidates = @(
-        (Join-Path $Identity.Documents 'PowerShell\Microsoft.PowerShell_profile.ps1'),
-        (Join-Path $Identity.Documents 'PowerShell\Microsoft.VSCode_profile.ps1'),
-        (Join-Path $Identity.Documents 'WindowsPowerShell\Microsoft.PowerShell_profile.ps1'),
-        (Join-Path $Identity.Documents 'WindowsPowerShell\Microsoft.PowerShellISE_profile.ps1')
-    )
+    $profileCandidates = @(Get-WindowsPowerShellProfileCandidate -Identity $Identity)
     if (-not @($profileCandidates | Where-Object { Test-SamePath $_ $Identity.RuntimeProfile }).Count) {
         throw "unsupported PowerShell host profile path: $($Identity.RuntimeProfile). Expected a supported profile under actual Documents."
     }
@@ -1812,6 +1818,45 @@ function Assert-WindowsKnownFolderConsumption {
     if (-not (Test-SamePath (Get-RealExistingPath $Identity.RuntimeProfile) (Get-RealExistingPath $expectedProfile)) -and
         -not (Test-FileBytesEqual $Identity.RuntimeProfile $expectedProfile)) {
         throw "the runtime PowerShell profile does not consume the repo profile: $($Identity.RuntimeProfile)"
+    }
+}
+
+function Unblock-WindowsPowerShellProfile {
+    param(
+        [Parameter(Mandatory)] $Identity,
+        [string]$ExpectedProfile = (Join-Path $ScriptDir 'shells\powershell_profile.ps1'),
+        [scriptblock]$Unblocker = {
+            param([string]$Path)
+            Unblock-File -LiteralPath $Path -ErrorAction Stop
+        }
+    )
+
+    $expectedReal = Get-RealExistingPath $ExpectedProfile
+    if (-not $expectedReal -or -not (Test-Path -LiteralPath $expectedReal -PathType Leaf)) {
+        throw "repo PowerShell profile source is missing: $ExpectedProfile"
+    }
+
+    $seen = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+    foreach ($candidate in @(Get-WindowsPowerShellProfileCandidate -Identity $Identity)) {
+        if (-not (Test-Path -LiteralPath $candidate -PathType Leaf)) { continue }
+        $candidateReal = Get-RealExistingPath $candidate
+        $target = if ($candidateReal -and (Test-SamePath $candidateReal $expectedReal)) {
+            $expectedReal
+        } elseif (Test-FileBytesEqual $candidate $ExpectedProfile) {
+            Get-FullPathSafe $candidate
+        } else {
+            throw "refusing to unblock a PowerShell profile that is not repo-owned: $candidate"
+        }
+        if (-not $seen.Add($target)) { continue }
+
+        $wasBlocked = $false
+        if ($env:OS -eq 'Windows_NT') {
+            $wasBlocked = $null -ne (Get-Item -LiteralPath $target -Stream Zone.Identifier -ErrorAction SilentlyContinue)
+        }
+        & $Unblocker $target
+        if ($wasBlocked) {
+            Write-Step "unblocked managed PowerShell profile: $target"
+        }
     }
 }
 
@@ -1908,6 +1953,7 @@ function Invoke-WindowsKnownFolderOverlays {
     }
     if (-not $IsDryRun) {
         Assert-WindowsKnownFolderConsumption -Identity $Identity
+        Unblock-WindowsPowerShellProfile -Identity $Identity
     }
     Move-LegacyWindowsKnownFolderTargets -Identity $Identity -IsDryRun:$IsDryRun
 }

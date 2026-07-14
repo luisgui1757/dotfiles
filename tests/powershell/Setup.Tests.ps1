@@ -442,6 +442,71 @@ Describe "setup.ps1 Windows known-folder identity" {
         }
     }
 
+    It "unblocks only validated repo-owned PowerShell profile consumers" {
+        $root = Join-Path $TestDrive 'profile trust publication'
+        $documents = Join-Path $root 'Documents'
+        $expected = Join-Path $root 'powershell_profile.ps1'
+        $runtimeProfile = Join-Path $documents 'PowerShell\Microsoft.PowerShell_profile.ps1'
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $runtimeProfile) | Out-Null
+        [System.IO.File]::WriteAllText($expected, 'exit 0', [System.Text.UTF8Encoding]::new($false))
+        New-Item -ItemType SymbolicLink -Path $runtimeProfile -Target $expected | Out-Null
+        $identity = [pscustomobject]@{
+            UserProfile = $root
+            LocalApplicationData = Join-Path $root 'Local'
+            ApplicationData = Join-Path $root 'Roaming'
+            Documents = $documents
+            RuntimeProfile = $runtimeProfile
+        }
+        $script:UnblockedProfilePaths = @()
+
+        Unblock-WindowsPowerShellProfile -Identity $identity -ExpectedProfile $expected -Unblocker {
+            param([string]$Path)
+            $script:UnblockedProfilePaths += $Path
+        }
+
+        $script:UnblockedProfilePaths | Should -HaveCount 1
+        $script:UnblockedProfilePaths[0] | Should -Be ([System.IO.Path]::GetFullPath($expected))
+
+        if ($env:OS -eq 'Windows_NT') {
+            Set-Content -LiteralPath $expected -Stream Zone.Identifier -Value "[ZoneTransfer]`r`nZoneId=3"
+            (Get-Item -LiteralPath $expected -Stream Zone.Identifier -ErrorAction Stop) | Should -Not -BeNullOrEmpty
+
+            Unblock-WindowsPowerShellProfile -Identity $identity -ExpectedProfile $expected
+
+            Get-Item -LiteralPath $expected -Stream Zone.Identifier -ErrorAction SilentlyContinue |
+                Should -BeNullOrEmpty
+            $pwsh = (Get-Command pwsh -ErrorAction Stop).Source
+            & $pwsh -NoProfile -ExecutionPolicy RemoteSigned -File $runtimeProfile
+            $LASTEXITCODE | Should -Be 0
+        }
+    }
+
+    It "refuses to unblock a divergent PowerShell profile" {
+        $root = Join-Path $TestDrive 'divergent profile trust'
+        $documents = Join-Path $root 'Documents'
+        $expected = Join-Path $root 'powershell_profile.ps1'
+        $runtimeProfile = Join-Path $documents 'PowerShell\Microsoft.PowerShell_profile.ps1'
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $runtimeProfile) | Out-Null
+        [System.IO.File]::WriteAllText($expected, 'repo profile', [System.Text.UTF8Encoding]::new($false))
+        [System.IO.File]::WriteAllText($runtimeProfile, 'user profile', [System.Text.UTF8Encoding]::new($false))
+        $identity = [pscustomobject]@{
+            UserProfile = $root
+            LocalApplicationData = Join-Path $root 'Local'
+            ApplicationData = Join-Path $root 'Roaming'
+            Documents = $documents
+            RuntimeProfile = $runtimeProfile
+        }
+        $script:UnblockedProfilePaths = @()
+
+        {
+            Unblock-WindowsPowerShellProfile -Identity $identity -ExpectedProfile $expected -Unblocker {
+                param([string]$Path)
+                $script:UnblockedProfilePaths += $Path
+            }
+        } | Should -Throw '*not repo-owned*'
+        $script:UnblockedProfilePaths | Should -BeNullOrEmpty
+    }
+
     It "backs up recognized legacy-shape targets but preserves divergent legacy user data" {
         $root = Join-Path ([IO.Path]::GetTempPath()) ('legacy shape ' + [Guid]::NewGuid())
         $identity = [pscustomobject]@{

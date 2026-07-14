@@ -715,6 +715,9 @@ Documents, and the active host's `$PROFILE` independently through supported
 runtime/known-folder APIs. It applies the UserProfile source plus dedicated
 LocalApplicationData, ApplicationData, and Documents source states, then
 verifies the paths Neovim, lazygit, Herdr, ConsoleHost, VS Code, and ISE consume.
+For the PowerShell profiles, setup removes Mark-of-the-Web only after proving
+each profile is the repo-owned source or an exact byte copy, so new terminals can
+load normally under `RemoteSigned` without weakening the user's execution policy.
 Redirected folders, alternate drives, and spaces are supported. Directory
 ownership checks resolve both symbolic links and Windows junctions. Recognized
 conventional-path legacy targets are backed up only after the new targets
