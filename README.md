@@ -1,34 +1,340 @@
 # Dotfiles
 
-Cross-platform terminal and editor setup for Apple Silicon macOS, Linux, WSL,
-and Windows.
-The repo owns the daily shell/editor stack: Neovim, tmux/psmux, Starship, zsh,
-PowerShell, Ghostty, WezTerm, lazygit, `lsd`, `zoxide` smart-cd, the `gh` CLI with the
-`gh-dash` dashboard, the `pi` CLI, Windows Terminal theming, locked plugin restore, LSP /
-formatter provisioning, and global Sentinel agent-policy bootstrap. It also provisions the `tree-sitter` CLI needed by
-`nvim-treesitter` main parser builds, plus AeroSpace (macOS tiling WM) and Herdr
-(agent multiplexer: macOS/Linux stable, Windows preview) through vendor-channel installs.
+One setup command gives you the same terminal-first working style, shortcuts,
+and Rose Pine theme on Apple Silicon macOS, Linux, WSL2, and Windows.
 
-The public interface is intentionally small. After cloning an exact release,
-fresh installs and supported historical migrations use the same command:
+If the repo is already installed, jump to the [cheat sheets](#cheat-sheets).
+If this is a new machine, start with [install, update, and remove](#install-update-and-remove).
 
-```text
-setup --all -> bootstrap prerequisites -> migrate if needed -> reconcile the full release
+## What you get
+
+| Area | Tools | What this repo does |
+|---|---|---|
+| Editor | Neovim, VS Code | Installs the editor stack, plugins, language servers, formatters, parsers, theme, and shortcuts. |
+| Multiplexers | Herdr, tmux, psmux | Gives you tabs, panes, workspaces/sessions, restore support, and tmux-shaped keys. `psmux` is the native-Windows tmux equivalent. |
+| Terminals | Ghostty, WezTerm, Windows Terminal | Applies Rose Pine, Hack Nerd Font, large scrollback, sensible clipboard behavior, and maximized startup. |
+| Shell | zsh, PowerShell 7, Starship | Adds vi command-line editing, history suggestions, fuzzy completion, a shared prompt, and useful aliases. |
+| Navigation | fzf, zoxide, lsd, ripgrep, fd | Adds fuzzy history/file/directory pickers, smart `cd`, readable file listings, and fast search. |
+| Git | Git, lazygit, GitHub CLI, gh-dash | Installs the CLI tools and applies their shared terminal configuration. |
+| Languages | Python, Node.js, Tree-sitter, Mason tools | Installs the base runtimes plus the language servers and formatters used by Neovim. |
+| macOS desktop | AeroSpace | Adds keyboard-driven tiling workspaces on macOS. |
+| Agent tooling | Pi CLI, Sentinel policy | Installs the supported CLI and applies the global agent-policy block. Local sessions and credentials stay local. |
+| Config management | Nix, nix-darwin/Home Manager, chezmoi | Reconciles POSIX packages and applies the repo-owned config files. Windows uses native package managers plus chezmoi. You do not need to run these layers by hand. |
+
+The main configuration is intentionally consistent: dark Rose Pine, Hack Nerd
+Font, vi-style navigation, `Ctrl+B` as the multiplexer prefix, and the same
+shell helpers wherever the platform supports them.
+
+## Platform support
+
+| Platform | Supported path | Important note |
+|---|---|---|
+| Apple Silicon macOS | `./setup.sh --all` | Fully supported. AeroSpace is macOS-only and needs one manual Accessibility grant. |
+| Native Linux | `./setup.sh --all` | Supports Homebrew/Linuxbrew or `apt`, `dnf`, `pacman`, `zypper`, and `apk`. GUI app availability still depends on the distro and architecture. |
+| WSL2 | Windows `setup.ps1` plus WSL `setup.sh` | Windows owns Windows Terminal, fonts, and host clipboard tools. WSL owns the Linux shell/editor stack. Linux GUI terminals are opt-in experiments. |
+| Native Windows | `.\setup.ps1 -All` | Use PowerShell 7. Enable Developer Mode first so setup can create the required config links without running the whole install as Administrator. Herdr for Windows is a pinned preview build. |
+
+## Install, update, and remove
+
+Run setup from a local checkout of an exact release. Setup is safe to rerun.
+
+```bash
+# macOS, Linux, or WSL
+cd ~/dotfiles
+./setup.sh --all
 ```
 
-For a fresh machine or a machine still carrying exact v0.1.0 state, run
-`./setup.sh --all` or `.\setup.ps1 -All`. The split behind that entry point is deliberate:
-Nix is the enforced package layer on macOS/Linux/WSL; `install-deps` handles
-native/deferred tools and Windows packages; chezmoi owns the dotfiles/config
-layer in `home/`. The full setup scripts apply configs through chezmoi.
+```powershell
+# native Windows
+Set-Location $HOME\dotfiles
+.\setup.ps1 -All
+```
 
-`--update` / `-Update` first reconciles the complete checked-out release—Nix,
-missing tools, config, locked plugins, parsers, Mason, and Sentinel—then refreshes
-only the proven drift-tolerant package/Mason edge. `--upgrade` / `-Upgrade` is
-an alias. Neither spelling fetches a moving branch or rewrites repository pins;
-clone the next exact annotated release beside the old checkout first.
+Open a new terminal after the first install. The current shell started before
+the new PATH, profile, and default shell existed.
 
-## Quick Start
+To reconcile the checked-out release and update the tools that this repo can
+prove it owns:
+
+```bash
+./setup.sh --update
+```
+
+```powershell
+.\setup.ps1 -Update
+```
+
+`--update` does not pull Git or move you to a new release. For a release change,
+clone the new exact tag beside the old checkout and follow
+[docs/UPGRADING.md](docs/UPGRADING.md). Do not turn a live old checkout into a
+new release with `git pull`.
+
+To preview or remove the managed config layer:
+
+```bash
+./uninstall.sh --dry-run
+./uninstall.sh --all
+```
+
+```powershell
+.\uninstall.ps1 -DryRun
+.\uninstall.ps1 -All
+```
+
+Uninstall removes repo-owned config. It does not blindly remove every package
+that exists on the machine. Detailed install, migration, and recovery behavior
+starts at [Detailed setup and migration reference](#detailed-setup-and-migration-reference).
+
+## Cheat sheets
+
+### How to read multiplexer shortcuts
+
+`Ctrl+B`, then `w` means: hold `Ctrl`, press `B`, release both, then press `w`.
+It is a sequence, not one four-key chord. This README calls `Ctrl+B` the
+**prefix**.
+
+### Herdr
+
+Herdr is the agent-focused multiplexer. It groups terminal panes into tabs and
+workspaces. The repo makes its common navigation feel like tmux and uses
+Herdr's built-in `rose-pine` theme.
+
+Start it from a normal shell with `herdr`. On Windows, new Herdr panes run
+`pwsh.exe`, so they load the same PowerShell profile, history list, and
+completion behavior as Windows Terminal. Recreate an old pane after a config
+change; an already-running shell cannot change into PowerShell 7 retroactively.
+
+| Keys | Result |
+|---|---|
+| `Ctrl+B`, then `w` | Open the full workspace/tab/pane navigator. Use Up/Down and Enter. |
+| `Ctrl+B`, then `g` | Open the same full navigator. |
+| `Ctrl+B`, then `1` ... `9` | Switch tabs/windows. |
+| `Ctrl+B`, then `,` | Rename the current tab/window. |
+| `Ctrl+B`, then `$` | Rename the current workspace. |
+| `Ctrl+B`, then Up/Down | Move to the previous/next workspace. |
+| `Ctrl+B`, then `Shift+1` ... `Shift+9` | Jump directly to workspace 1 ... 9. |
+
+Named Herdr sessions are separate server namespaces. A session does not appear
+inside another session's navigator; attach to the other session from a normal
+shell.
+
+Config locations:
+
+- macOS/Linux/WSL: `~/.config/herdr/config.toml`
+- Windows: `%APPDATA%\herdr\config.toml`
+
+### tmux and psmux
+
+Use `tmux` on macOS, Linux, and WSL. Use `psmux` on native Windows. Both use
+`Ctrl+B` as the prefix and count windows/panes from 1.
+
+```bash
+tmux              # start
+tmux attach       # reattach
+```
+
+```powershell
+psmux             # start
+psmux attach      # reattach
+```
+
+| Keys | Result |
+|---|---|
+| `Ctrl+B`, then `c` | Create a window. |
+| `Ctrl+B`, then `1` ... `9` | Switch windows. |
+| `Ctrl+B`, then `n` / `p` | Next / previous window. |
+| `Ctrl+B`, then `,` | Rename the current window. |
+| `Ctrl+B`, then `$` | Rename the current session. |
+| `Ctrl+B`, then `|` | Split left/right. |
+| `Ctrl+B`, then `-` | Split top/bottom. |
+| `Ctrl+B`, then `h` / `j` / `k` / `l` | Focus the pane left/down/up/right. |
+| `Ctrl+B`, then `H` / `L` | Move the current window left/right. |
+| `Ctrl+B`, then `w` | Open the session/window/pane tree. |
+| `Ctrl+B`, then `d` | Detach and leave the session running. |
+| `Ctrl+B`, then `r` | Reload the managed config. |
+| `Ctrl+B`, then `Ctrl+S` | Save the current session layout. |
+| `Ctrl+B`, then `Ctrl+R` | Restore the saved session layout. |
+
+Copy text with vi-style copy mode:
+
+1. Press `Ctrl+B`, then `[`.
+2. Move with vi keys.
+3. Press `v` to start selecting.
+4. Press `y` to copy to the system clipboard.
+5. Press `Ctrl+B`, then `]` to paste into the terminal.
+
+On Windows, click-and-drag selection belongs to Windows Terminal; use
+`Ctrl+Shift+C` to copy it. The normal tmux mouse features—pane focus, wheel
+scroll, and border resize—stay enabled.
+
+The Rose Pine variant is `main` by default. Switch it live with:
+
+```bash
+tmux set -g @rosepine-variant moon
+tmux source-file ~/.tmux.posix.conf
+```
+
+```powershell
+psmux set -g @rosepine-variant moon
+psmux source-file ~/.tmux.windows.conf
+```
+
+Valid variants are `main`, `moon`, and `dawn`.
+
+Configs: `~/.tmux.conf` plus `~/.tmux.posix.conf` on POSIX;
+`~/.psmux.conf` plus `~/.tmux.windows.conf` on Windows.
+
+### AeroSpace (macOS)
+
+AeroSpace tiles macOS app windows. It starts at login and reloads its config
+when the file changes. On first launch, grant it access in **System Settings ->
+Privacy & Security -> Accessibility**. macOS does not allow setup to grant this
+permission for you.
+
+| Keys | Result |
+|---|---|
+| `Ctrl+Alt+h/j/k/l` | Focus the window left/down/up/right. |
+| `Ctrl+Alt+Shift+h/j/k/l` | Move the focused window left/down/up/right. |
+| `Ctrl+Alt+-` / `Ctrl+Alt+=` | Shrink / grow the focused window. |
+| `Ctrl+Alt+/` | Use tiled layout. |
+| `Ctrl+Alt+,` | Use accordion layout. |
+| `Ctrl+Alt+f` | Toggle fullscreen. |
+| `Alt+1` ... `Alt+9` | Switch workspace. |
+| `Alt+Shift+1` ... `Alt+Shift+9` | Move the focused window to a workspace. |
+| `Alt+Tab` | Jump back to the previous workspace. |
+| `Ctrl+Alt+Shift+;` | Enter service mode. |
+
+In service mode, press `Esc` to reload the config, `r` to flatten the workspace
+tree, `f` to toggle floating/tiling, or Backspace to close every window except
+the current one.
+
+Config: `~/.config/aerospace/aerospace.toml`.
+
+### Neovim
+
+The leader key is Space. For example, `<leader>fg` means press Space, then `f`,
+then `g`.
+
+| Keys / command | Result |
+|---|---|
+| `<leader>?` | Show the keys available in the current buffer. Start here when you forget a shortcut. |
+| `Ctrl+P` | Find a file. |
+| `<leader>fg` | Search text in the project. |
+| `<leader>fb` | List open buffers. |
+| `<leader>fd` | List diagnostics. |
+| `Alt+h/j/k/l` | Focus the Neovim window left/down/up/right. |
+| `gd` / `gr` | Go to definition / find references. |
+| `K` | Show documentation for the item under the cursor. |
+| `<leader>rn` | Rename a symbol. |
+| `<leader>ca` | Show code actions. |
+| `[d` / `]d` | Previous / next diagnostic. |
+| `[h` / `]h` | Previous / next Git hunk. |
+| `<leader>gp` | Preview the current Git hunk. |
+| `<leader>gt` | Toggle blame for the current line. |
+| `<leader>gf` | Format the current buffer or selection. |
+| `:wnf` | Save once without formatting. The next normal `:w` formats again. |
+| `<leader>u` | Open/close the undo tree. |
+| `<leader>mr` | Toggle rendered Markdown. |
+| `<leader>lt` | Toggle relative line numbers. |
+| `gcc` | Comment/uncomment the current line. |
+| `<leader>b` | Toggle a debugger breakpoint. |
+| `F5` / `F10` / `F11` / `F12` | Continue / step over / step into / step out. |
+
+Files format on `:w`. The timeout is 10 seconds. Use `:ConformInfo` to see which
+formatter is active if a save fails or times out; use `:wnf` only when you
+intentionally want one unformatted save.
+
+Config: `~/.config/nvim` on macOS/Linux/WSL and `%LOCALAPPDATA%\nvim` on
+Windows. Both point to this repo's `nvim/` directory.
+
+### Starship
+
+Starship is the prompt. It has no special mode and no shortcuts. It shows:
+
+- your username and full current path;
+- the Git branch and working-tree state;
+- active C, Go, Node.js, Rust, Python, or Conda versions;
+- the current time.
+
+The Git symbols are deliberately compact:
+
+| Symbol | Meaning |
+|---|---|
+| `✓` | clean |
+| `?(n)` | untracked files |
+| `!(n)` | modified files |
+| `++(n)` | staged files |
+| `✘(n)` | deleted files |
+| `⇡(n)` / `⇣(n)` | commits ahead / behind |
+| `$` | stash exists |
+
+Edit the repo file `starship/starship.toml` to change the prompt. Start a new
+shell to see startup-level changes.
+
+### Shell, completion, and navigation
+
+zsh on POSIX and PowerShell 7 on Windows use the same basic habits:
+
+| Keys / command | Result |
+|---|---|
+| Tab | Open the completion menu. Keep typing to narrow it. |
+| Up/Down | Search history using the text already typed as a prefix. |
+| `Ctrl+R` | Fuzzy-search command history. |
+| `Ctrl+T` | Fuzzy-pick a file and insert its path. |
+| `Alt+C` | Fuzzy-pick a directory and change into it. |
+| `Esc` | Enter vi normal mode on the command line. |
+| `i` / `a` | Return to vi insert mode. |
+| `z proj` | Jump to the best previously visited directory matching `proj`. |
+| `zi` | Pick a known directory interactively. |
+
+`ls`, `l`, `la`, `lla`, and `lt` use `lsd` for readable icons and colors.
+zsh-only local changes belong in `~/.zshrc.local`; setup does not overwrite that
+file.
+
+Useful standalone tools:
+
+- `lazygit`: terminal Git UI. In the commits panel, `J`/`K` move a commit. On
+  Windows inside psmux, use `Ctrl+G` when a popup expects Esc.
+- `gh dash`: dashboard for pull requests and issues. Run `gh auth login` first,
+  then rerun setup if the extension was skipped while unauthenticated.
+- `pi`: the pinned Pi CLI. Its personal runtime state is not synced.
+
+### Terminals and scrollback
+
+- **tmux/psmux panes:** 50,000 history lines per pane. This is separate from the
+  outer terminal's scrollback limit.
+- **Ghostty:** macOS/Linux, dark Rose Pine, 1 GiB lazy scrollback budget per
+  surface, copy-on-select, maximized startup. On macOS, Cmd+grave accent toggles
+  the global quick terminal.
+- **WezTerm:** macOS/Linux/Windows, dark Rose Pine, 5,000,000 scrollback lines
+  per tab, maximized startup. It opens a normal shell; start Herdr/tmux/psmux
+  yourself.
+- **Windows Terminal:** Windows/WSL host, dark Rose Pine, 32,767 history lines
+  per profile. That is Windows Terminal's hard maximum.
+
+### Clipboard on Linux, WSL, and Windows
+
+Neovim and tmux copy to the system clipboard. The helper depends on where the
+shell is running:
+
+| Environment | Clipboard path |
+|---|---|
+| macOS | `pbcopy` |
+| Linux Wayland | `wl-copy` from `wl-clipboard` |
+| Linux X11 | `xclip`, then `xsel` as fallback |
+| WSL | `win32yank.exe` on the Windows host |
+| Native Windows psmux | `clip.exe` |
+| Remote shell / no helper | OSC52 through the terminal |
+
+`devilspie2` is **not** a clipboard tool. On Linux/X11 it is an optional rule
+that forces Ghostty to open maximized when the window manager ignores Ghostty's
+maximize request. It does not work on Wayland; GNOME/Wayland needs a Shell
+extension for that window behavior.
+
+## Detailed setup and migration reference
+
+The rest of this README explains the implementation, recovery paths, CI, and
+maintenance rules. Normal daily use does not require it.
 
 Clone the repo first, then run the local setup entry point. `setup.{sh,ps1}`
 installs repo-managed dependencies, links every config, then runs
@@ -1169,67 +1475,10 @@ the canonical operational guide because Claude Code auto-loads it; `AGENTS.md`
 points there so other agents reach the same instructions without duplicating
 content.
 
-## Daily workflows
+## Maintainer workflows
 
-### `:wnf` — write without formatting
-
-In any buffer: `:wnf<CR>` (lowercase) saves the file with formatters skipped
-**for this one save**. The next plain `:w` formats normally. Useful in legacy
-codebases where the formatter would create a noisy diff. Implemented in
-`nvim/lua/vim-options.lua`.
-
-### Neovim keymap discovery & scroll context
-
-which-key pops up a menu of the keys that can follow a prefix once you pause
-past `timeoutlen` (e.g. after `<leader>`); `<leader>?` lists the buffer-local
-keymaps on demand. The cursor also keeps **16 lines** of context above and below
-it (`scrolloff = 16`), so you never edit against the top or bottom edge.
-
-### zoxide — smarter `cd`
-
-`z <partial>` jumps to the best-matching directory you have visited (by
-frecency); `zi` opens an interactive picker. Works in zsh and PowerShell; plain
-`cd` is unchanged. Nothing to configure — `zoxide init` is wired into both shell
-profiles (PowerShell uses a cached init, no `Invoke-Expression`).
-
-### gh-dash — pull-request / issue dashboard
-
-Run `gh dash` for a terminal dashboard of your PRs, review requests, and issues.
-Its config (`~/.config/gh-dash/config.yml`, same relative path on Windows) is
-applied by setup **always**. The dashboard binary is a pinned `gh` CLI
-extension, and it only works once you have authenticated — so setup installs the
-extension only **after** `gh auth login`. If you have not authenticated yet,
-setup skips the extension cleanly (no error, because an unauthenticated install
-hits GitHub's anonymous rate limit); run `gh auth login`, then rerun `setup` /
-`install-deps` to pick it up. Before mutation, setup verifies that tag `v4.25.1`
-still has annotated tag object `e6ebbd7e83e30161b9192ce3339972d2c8269e7f`
-and peels to commit `49f37e4832956c57bf52d4ea8b1b1e5c0f863700`, then installs by that immutable
-commit rather than the tag. The token is machine-local and never stored in this
-repo.
-
-### Pi CLI
-
-Run `pi --version` to confirm setup installed the pinned Pi CLI. The installer
-packs the exact version, verifies the tarball bytes against the pinned SRI, and
-installs only that local tarball. Setup installs the CLI only; `.pi/` runtime
-state remains local to each machine.
-
-### Command-line vi mode
-
-Both shells edit the command line with **vi keybindings**. Press `Esc` to leave
-insert mode and use `h`/`j`/`k`/`l`, `w`/`b`, `dd`, `cw`, `.` etc. on the current
-line; press `i`/`a`/`o` to type again. The cursor changes shape with the mode
-(beam while typing, block in normal mode). Everything you already use still
-works in insert mode: **Tab** opens the fuzzy completion menu, **Up/Down** do
-prefix history search, and **Ctrl-R / Ctrl-T / Alt-C** are the fzf history / file
-/ cd pickers. The arrows also search history from normal mode.
-
-- **zsh:** enabled with `bindkey -v`. `Esc` responsiveness vs. Alt/Meta chords is
-  governed by `KEYTIMEOUT` (250 ms by default). To retune it, export
-  `DOTFILES_KEYTIMEOUT` (hundredths of a second) or set `KEYTIMEOUT` in
-  `~/.zshrc.local`.
-- **PowerShell:** enabled with `Set-PSReadLineOption -EditMode Vi`; the mode
-  indicator changes the cursor shape on supported terminals (Windows Terminal).
+Daily shortcuts live in the [cheat sheets](#cheat-sheets). The workflows below
+are for changing or reproducing the managed configuration itself.
 
 ### Adding a plugin
 

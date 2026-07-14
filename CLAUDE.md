@@ -9,14 +9,22 @@ the install script works, read this too.
 > content there because two real guide files would drift. Claude Code auto-loads
 > this file, and other agents reach it through `AGENTS.md`.
 
+`README.md` is the operator guide. Keep its opening sections simple and
+task-oriented: supported platforms/tools, install/update/remove commands, then
+daily cheat sheets. When a user-visible key, command, config path, or platform
+boundary changes, update the matching cheat sheet in the same change. Detailed
+implementation rationale belongs later in the README or in this file; do not
+make users read Nix, migration, or CI internals before they can operate a tool.
+
 ## What this repo is
 
-Cross-platform dotfiles: Neovim (lazy.nvim), Starship, Ghostty, Windows
-Terminal, tmux, zshenv/zshrc, PowerShell profile, lazygit, `lsd`, Pi CLI, and global
+Cross-platform dotfiles for Neovim, VS Code, Herdr, tmux/psmux, Starship,
+Ghostty, WezTerm, Windows Terminal, AeroSpace, zsh, PowerShell 7, lazygit,
+`lsd`, `zoxide`, fzf, GitHub CLI/gh-dash, Pi CLI, language tooling, and global
 Sentinel agent-policy bootstrap. Public installs go through `setup.sh` (macOS /
 Linux / WSL) or `setup.ps1` (Windows), which install dependencies, apply the
-chezmoi config layer, restore locked Neovim plugins, sync Mason tools, and
-apply global agent policy. The repo can live anywhere — `~/dotfiles/`,
+chezmoi config layer, restore locked Neovim plugins, sync Tree-sitter/Mason
+tools, and apply global agent policy. The repo can live anywhere — `~/dotfiles/`,
 `~/Documents/dotfiles/`, etc. The remote-clone default in `setup.{sh,ps1}` is
 `~/dotfiles/`, but an
 in-place clone elsewhere works too. Do NOT put the repo at `~/.config/nvim/` —
@@ -43,9 +51,12 @@ auth files, and package caches stay per machine.
 ├── shells/                zshenv + zshrc + powershell_profile.ps1
 ├── tmux/                  tmux.conf (Rose Pine, vi-mode, OSC52 clipboard)
 ├── ghostty/               config (Rose Pine, Hack Nerd, tuned for tmux)
+├── wezterm/               wezterm.lua (shared terminal config on every OS)
+├── aerospace/             macOS tiling-window-manager config
 ├── herdr/                 config.toml (forced built-in Rose Pine theme)
 ├── windows-terminal/      settings.fragment.jsonc + merge README
 ├── lazygit/               config.yml + config.windows.yml (J/K + Windows Ctrl-G)
+├── gh-dash/               pull-request/issue dashboard config
 ├── home/                  chezmoi source tree for the config layer
 ├── tests/                 automated tests, grouped by tool
 ├── tests/wsl/             manual WSL split-host e2e check
@@ -58,7 +69,7 @@ auth files, and package caches stay per machine.
 ├── Makefile               Unix `make setup`, `make test`, `make lint`
 ├── .editorconfig          formatting rules every editor + agent respects
 ├── stylua.toml            Lua formatter style (Spaces / width 2); conform reads it
-├── README.md              the human-facing install matrix
+├── README.md              operator guide, cheat sheets, and detailed reference
 ├── AGENTS.md              standard agent entry point, points here
 └── CLAUDE.md              canonical tracked coding-agent guide
 ```
