@@ -647,7 +647,7 @@ maybe_install_brew() {
         if [[ "$DRY_RUN" -eq 1 ]]; then
             echo "  would: curl -fsSL $url -o /tmp/homebrew-install.sh"
             echo "         verify sha256 $HOMEBREW_INSTALL_SHA256"
-            echo "         /bin/bash /tmp/homebrew-install.sh"
+            echo "         NONINTERACTIVE=1 /bin/bash /tmp/homebrew-install.sh"
             return 0
         fi
         require_downloader || return 1
@@ -664,7 +664,7 @@ maybe_install_brew() {
             rm -rf "$tmp"
             return 1
         fi
-        /bin/bash "$script" || {
+        NONINTERACTIVE=1 /bin/bash "$script" || {
             rm -rf "$tmp"
             return 1
         }

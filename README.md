@@ -656,9 +656,10 @@ compiler tasks around the proof phase.
 
 Pass `--all` / `-All` for explicit non-interactive installs (Y to every setup
 prompt). Setup also owns consent after that decision: its POSIX dependency
-child clears Homebrew's inherited ask override and uses Homebrew's supported
-`HOMEBREW_NO_ASK=1` mode, so Homebrew 6+ cannot add a second confirmation for
-each missing package or scoped upgrade. This setting exists only inside setup;
+child launches the verified Homebrew bootstrap with `NONINTERACTIVE=1`, then
+clears Homebrew's inherited ask override and uses its supported
+`HOMEBREW_NO_ASK=1` mode. Neither the bootstrap nor Homebrew 6+ package commands
+can add a second confirmation. These settings exist only inside setup;
 ordinary `brew` commands keep their normal behavior. Password authentication
 and OS permission grants can still require the user because they are not
 package-selection confirmations.

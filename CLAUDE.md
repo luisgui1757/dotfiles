@@ -1668,13 +1668,17 @@ save only**. The next plain `:w` formats normally. Implemented in
   `--dry-run`/`-DryRun`, no tty/user interaction, or `--skip-agents` /
   `-SkipAgents` already made that decision. Once the dependency installer has
   accepted a mutation, it also owns downstream package-manager consent.
+  The verified Homebrew bootstrap runs with its supported `NONINTERACTIVE=1`
+  environment after setup consent, so it must not pause at its separate
+  "Press RETURN/ENTER" directory-creation prompt.
   Homebrew 6 enables ask mode by default for `brew install` and `brew upgrade`,
   so `install-deps.sh` clears inherited `HOMEBREW_ASK` and exports the official
   `HOMEBREW_NO_ASK=1` setting inside its own process. Do not replace this with
   piped `yes`, do not export it into the user's shell, and do not let one
   accepted package produce a second Homebrew confirmation. Password and OS
   permission boundaries remain interactive. Guarded by
-  `tests/shell/homebrew_no_ask_test.sh`.
+  `tests/shell/homebrew_no_ask_test.sh`, which exercises both the bootstrap
+  child environment and a real `brew install` call shape.
 - **Windows symlink pre-flight reports WHY symlinks fail and how to fix it.**
   `setup.ps1` probes symlink capability before chezmoi apply. When the probe
   fails it prints your *elevated* (admin) and *Developer Mode* state, then the
