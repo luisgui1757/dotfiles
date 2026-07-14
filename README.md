@@ -823,7 +823,10 @@ POSIX pwsh profile management remains provisioning-adjacent.
   installs the explicit Tree-sitter parser matrix, including `latex`; it also
   installs `latex2text` through a pinned, SHA-256-checked venv
   (`setuptools` 80.9.0, `pylatexenc` 2.10) so rendered Markdown equations work
-  on fresh machines instead of depending on a random host Python package.
+  on fresh machines instead of depending on a random host Python package. On
+  Linux, setup repairs the active distro Python's native venv/pip support even
+  when Linuxbrew is the selected package manager; manager selection alone does
+  not prove that `python3` on PATH is Homebrew-owned.
 - `install-deps` prints a dependency pre-flight table before package-manager
   bootstrap and before the one-shot install prompt, showing the package manager
   itself, present/missing tools, best-effort versions, and the resulting

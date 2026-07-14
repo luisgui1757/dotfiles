@@ -1309,6 +1309,10 @@ save only**. The next plain `:w` formats normally. Implemented in
   `~/.local/share/dotfiles/python-tools/pylatexenc`, installs pinned
   `setuptools==80.9.0` first, installs `pylatexenc==2.10` with pip `--require-hashes`
   and `--no-build-isolation`, and writes `~/.local/bin/latex2text`;
+  Linux must repair venv/pip through the detected native package manager when
+  the active `python3` lacks them, even if Linuxbrew is the selected manager:
+  `/usr/bin/python3` can still win PATH and is not repaired by a Brew-only
+  short-circuit. Guarded by `tests/shell/python_venv_test.sh`.
   interactive zsh prepends `~/.local/bin`. `install-deps.ps1` creates the same
   venv under
   `%LOCALAPPDATA%\dotfiles\python-tools\pylatexenc` and adds its `Scripts`

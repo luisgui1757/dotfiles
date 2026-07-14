@@ -45,4 +45,11 @@ out="$(PYTHON_VENV_OK=0 NATIVE_PM=apt DRY_RUN=1 ensure_python_pip_venv)"
 [[ -s "$INSTALL_LOG" ]] && fail "dry-run still installed packages"
 [[ "$out" == *"would:"* ]] || fail "dry-run did not print a would line"
 
+# Case 4: Linuxbrew can be the selected manager while Ubuntu's system python3
+# still wins PATH. That interpreter needs the native python3-venv/pip packages.
+: > "$INSTALL_LOG"
+PYTHON_VENV_OK=0 NATIVE_PM=apt PM=brew ensure_python_pip_venv >/dev/null
+grep -q "apt python3-venv python3-pip" "$INSTALL_LOG" \
+    || fail "Linuxbrew selection skipped venv/pip repair for Ubuntu system python3"
+
 echo "OK"

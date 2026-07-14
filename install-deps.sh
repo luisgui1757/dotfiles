@@ -1786,15 +1786,16 @@ install_tree_sitter_cli() {
 # Debian/Ubuntu ship python3 WITHOUT ensurepip/venv -- they live in the separate
 # python3-venv + python3-pip packages. Mason installs clang-format / ruff /
 # gersemi from PyPI, which runs `python3 -m venv` + pip, so on apt those tools
-# fail with "ensurepip is not available" until venv + pip are present. brew, dnf,
-# and pacman python already bundle them, so this only does work on apt systems.
+# fail with "ensurepip is not available" until venv + pip are present. A Linux
+# PM=brew selection does not prove the active python3 is Homebrew-owned: Ubuntu's
+# /usr/bin/python3 may still win PATH, so Linux always checks its native manager.
 ensure_python_pip_venv() {
     command -v python3 >/dev/null 2>&1 || return 0
     if python3 -c 'import ensurepip, venv' >/dev/null 2>&1; then
         printf "  ok        %-26s venv + pip present\n" "python venv/pip"
         return
     fi
-    if [[ "$PM" == "brew" ]]; then
+    if [[ "$(uname -s)" == "Darwin" && "$PM" == "brew" ]]; then
         return 0
     fi
     local native_pm
