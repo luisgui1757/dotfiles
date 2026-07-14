@@ -232,6 +232,16 @@ ensure_nix_prerequisite() {
     [[ "$SKIP_DEPS" -eq 0 ]] || return 0
     if activate_nix_profile; then
         nix --version >/dev/null
+        if nix store info >/dev/null 2>&1; then
+            return 0
+        fi
+        # A prior upstream install may have completed before the helper proved
+        # nix-command. Let the identity-checked helper reconcile that config.
+        [[ -f "$helper" && ! -L "$helper" && -x "$helper" ]] || {
+            echo "  FAIL: verified Nix prerequisite helper is missing or unsafe: $helper" >&2
+            return 1
+        }
+        "$helper" --install
         nix store info >/dev/null
         return 0
     fi

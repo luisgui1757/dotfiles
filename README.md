@@ -352,7 +352,9 @@ Git is required to clone this repo. On macOS/Linux/WSL, setup bootstraps Nix
 when it is missing by calling the release-pinned prerequisite helper itself.
 That helper downloads the official upstream Nix 2.34.0 release and verifies the
 platform SHA-256 before extraction or execution, then runs the verified local
-installer non-interactively. Before v0.2.0 is published,
+installer non-interactively with `nix-command` and flakes enabled. If an earlier
+attempt installed Nix but stopped before enabling those features, rerunning
+setup repairs the user setting and continues. Before v0.2.0 is published,
 the helper accepts only a clean commit that is currently an exact branch head
 in the official repository. Once the annotated v0.2.0 tag exists, that
 prerelease path closes automatically and only the exact clean official tag is

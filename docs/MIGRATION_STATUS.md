@@ -79,7 +79,9 @@ canonical v0.2.0 path is now side-by-side and exact-tag-only:
   exact current official branch head; publication closes that path and requires
   the exact annotated tag object and peeled commit. Setup owns its invocation;
   no downloaded bytes execute before the platform SHA-256 matches, and the
-  verified installer runs non-interactively in the selected daemon mode.
+  verified installer runs non-interactively in the selected daemon mode with
+  `nix-command flakes` persisted. A retry reconciles the disabled-feature state
+  left by an otherwise-complete upstream install.
 - `tests/migration/v0_1_upgrade_test.sh` materializes the exact peeled v0.1.0
   commit, proves in-place/dirty paths fail before mutation, runs the real setup
   config/backup path, injects a failure after Home Manager/config publication,

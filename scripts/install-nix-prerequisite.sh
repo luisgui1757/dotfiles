@@ -89,6 +89,70 @@ trap 'exit 129' HUP
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
+nix_extra_conf="$work/nix-extra.conf"
+printf '%s\n' 'extra-experimental-features = nix-command flakes' > "$nix_extra_conf"
+chmod 600 "$nix_extra_conf"
+
+ensure_user_nix_features() {
+    local config_root config stage rendered
+    config_root="${XDG_CONFIG_HOME:-$HOME/.config}/nix"
+    config="$config_root/nix.conf"
+    [[ ! -L "$config" ]] || fail "refusing to replace symlinked Nix user config: $config"
+    [[ ! -e "$config" || -f "$config" ]] || fail "Nix user config is not a regular file: $config"
+    mkdir -p "$config_root"
+    stage="$(mktemp "$config_root/.nix.conf.dotfiles.XXXXXX")"
+    rendered="$work/nix-user-conf.rendered"
+    if [[ -f "$config" ]]; then
+        cp -p "$config" "$stage"
+        awk '
+            function has_token(value, token, count, parts, index) {
+                count = split(value, parts, /[[:space:]]+/)
+                for (index = 1; index <= count; index++) {
+                    if (parts[index] == token) return 1
+                }
+                return 0
+            }
+            BEGIN { updated = 0 }
+            {
+                line = $0
+                if (!updated && line !~ /^[[:space:]]*#/) {
+                    equals = index(line, "=")
+                    if (equals > 0) {
+                        key = substr(line, 1, equals - 1)
+                        gsub(/[[:space:]]/, "", key)
+                        if (key == "experimental-features" ||
+                            key == "extra-experimental-features") {
+                            value = substr(line, equals + 1)
+                            comment = ""
+                            comment_at = index(value, "#")
+                            if (comment_at > 0) {
+                                comment = substr(value, comment_at)
+                                value = substr(value, 1, comment_at - 1)
+                            }
+                            addition = ""
+                            if (!has_token(value, "nix-command")) addition = addition " nix-command"
+                            if (!has_token(value, "flakes")) addition = addition " flakes"
+                            print substr(line, 1, equals) value addition comment
+                            updated = 1
+                            next
+                        }
+                    }
+                }
+                print line
+            }
+            END {
+                if (!updated) print "extra-experimental-features = nix-command flakes"
+            }
+        ' "$config" > "$rendered"
+        cat "$rendered" > "$stage"
+    else
+        printf '%s\n' 'extra-experimental-features = nix-command flakes' > "$stage"
+        chmod 600 "$stage"
+    fi
+    mv -f "$stage" "$config"
+    echo "Configured Nix user features: nix-command flakes"
+}
+
 remote_git() (
     unset GIT_DIR GIT_WORK_TREE GIT_COMMON_DIR GIT_OBJECT_DIRECTORY
     unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_CONFIG GIT_PROXY_COMMAND
@@ -157,8 +221,16 @@ fi
 
 if command -v nix >/dev/null 2>&1; then
     nix --version
-    nix store info >/dev/null
-    echo "Nix is already usable; no installation was attempted."
+    if nix store info >/dev/null 2>&1; then
+        echo "Nix is already usable; no installation was attempted."
+        exit 0
+    fi
+    nix_error="$(nix store info 2>&1 || true)"
+    [[ "$nix_error" == *"experimental Nix feature 'nix-command' is disabled"* ]] ||
+        fail "Nix is installed but its store is unusable: $nix_error"
+    ensure_user_nix_features
+    nix store info >/dev/null || fail "Nix feature reconciliation did not make its store usable."
+    echo "Nix is installed; required user features were reconciled."
     exit 0
 fi
 
@@ -226,7 +298,13 @@ installer="$work/nix-$nix_version-$system/install"
 }
 
 echo "Verified upstream Nix $nix_version for $system: $expected_sha256"
-"$installer" "$install_mode" --yes
+"$installer" "$install_mode" --yes --nix-extra-conf-file "$nix_extra_conf"
+
+if [[ "$install_mode" == "--no-daemon" ]]; then
+    # The upstream flag persists /etc/nix/nix.conf only for daemon installs.
+    # Single-user Linux therefore needs the same additive setting in its user config.
+    ensure_user_nix_features
+fi
 
 for profile in \
     /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh \

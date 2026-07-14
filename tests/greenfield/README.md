@@ -15,6 +15,8 @@ script pipeline or waits for an upstream confirmation prompt. Local-only
 commits, stale branch commits, forks, and dirty
 trees are deliberately rejected; after release publication, the prerelease
 branch allowance closes and the exact annotated tag is mandatory.
+The helper persists `nix-command flakes`; rerunning setup also repairs an
+otherwise-complete upstream install that stopped with those features disabled.
 
 Do not add these VM or desktop launchers to the CI matrix. They need an
 interactive desktop or local virtualization and can hang or fail headless. The

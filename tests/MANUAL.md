@@ -20,7 +20,10 @@ commits, recovery path, provider inventory, and whether any user data changed.
       of an official prerelease branch. Run only `./setup.sh --all`; prove the
       helper reports that branch identity, installs/verifies Nix 2.34.0, and
       reaches any required sudo interaction without an upstream installer
-      confirmation prompt. After publishing the annotated tag, prove that same
+      confirmation prompt. Confirm `nix store info` and flake evaluation work
+      without extra flags; interrupt after upstream installation but before
+      helper success, then prove a setup retry reconciles and continues. After
+      publishing the annotated tag, prove that same
       branch checkout is rejected before download and an exact-tag clone
       succeeds instead.
 - [ ] **Apple Silicon owner-host:** begin with v0.1.0 Homebrew formulae/casks,

@@ -40,7 +40,14 @@ cat > "$work/bin/nix" <<'EOF'
 set -euo pipefail
 case "${1:-}" in
     --version) echo "nix (Nix) 2.34.0" ;;
-    store) [[ "${2:-}" == "info" ]] ;;
+    store)
+        [[ "${2:-}" == "info" ]]
+        if [[ "${FAKE_NIX_FEATURES_DISABLED:-0}" == "1" ]] &&
+            ! grep -Fq 'nix-command flakes' "${XDG_CONFIG_HOME:-$HOME/.config}/nix/nix.conf" 2>/dev/null; then
+            echo "error: experimental Nix feature 'nix-command' is disabled" >&2
+            exit 49
+        fi
+        ;;
     *) exit 44 ;;
 esac
 EOF
@@ -64,10 +71,11 @@ new_fixture() {
 run_helper() {
     local repo="$1" refs_file="$2" mode="${3:-ok}"
     local run_path="${RUN_PATH_OVERRIDE:-$work/bin:$ORIGINAL_PATH}"
+    local run_home="${RUN_HOME_OVERRIDE:-$HOME}"
     remote_call_log="$work/remote-calls.log"
     : > "$remote_call_log"
     set +e
-    output="$(PATH="$run_path" \
+    output="$(HOME="$run_home" PATH="$run_path" \
         REAL_GIT="$REAL_GIT" \
         FAKE_REMOTE_REFS_FILE="$refs_file" \
         FAKE_REMOTE_CALL_LOG="$remote_call_log" \
@@ -191,6 +199,23 @@ run_helper "$fixture" "$refs"
 assert_clean_diagnostic
 pass "dirty checkout fails before remote or installer execution"
 
+new_fixture existing-nix-disabled-features
+head_commit="$($REAL_GIT -C "$fixture" rev-parse HEAD)"
+refs="$work/existing-nix-disabled-features.refs"
+printf '%s\trefs/heads/fix/bootstrap\n' "$head_commit" > "$refs"
+export FAKE_NIX_FEATURES_DISABLED=1
+export RUN_HOME_OVERRIDE="$work/repair-home"
+run_helper "$fixture" "$refs"
+[[ "$rc" -eq 0 ]] || fail "disabled existing Nix features were not reconciled:\n$output"
+grep -Fx 'extra-experimental-features = nix-command flakes' \
+    "$RUN_HOME_OVERRIDE/.config/nix/nix.conf" >/dev/null ||
+    fail "existing Nix reconciliation did not publish the required user features"
+[[ "$output" == *"required user features were reconciled"* ]] ||
+    fail "existing Nix reconciliation was not reported"
+assert_clean_diagnostic
+pass "a completed upstream install with disabled nix-command self-heals on retry"
+unset FAKE_NIX_FEATURES_DISABLED RUN_HOME_OVERRIDE
+
 rm "$work/bin/nix"
 cat > "$work/bin/uname" <<'EOF'
 #!/usr/bin/env bash
@@ -229,6 +254,8 @@ cat > "$installer_dir/install" <<'INSTALLER'
 #!/usr/bin/env bash
 set -euo pipefail
 printf '%s\n' "$@" > "${FAKE_INSTALL_ARGS:?}"
+[[ "${3:-}" == "--nix-extra-conf-file" && -f "${4:-}" ]] || exit 50
+cat "$4" > "${FAKE_INSTALL_CONF:?}"
 cat > "${FAKE_RUNTIME_BIN:?}/nix" <<'NIX'
 #!/usr/bin/env bash
 case "${1:-}" in
@@ -248,15 +275,24 @@ head_commit="$($REAL_GIT -C "$fixture" rev-parse HEAD)"
 refs="$work/noninteractive-install.refs"
 printf '%s\trefs/heads/fix/bootstrap\n' "$head_commit" > "$refs"
 export FAKE_INSTALL_ARGS="$work/install-args.log"
+export FAKE_INSTALL_CONF="$work/install-conf.log"
 export FAKE_RUNTIME_BIN="$work/bin"
 export RUN_PATH_OVERRIDE="$work/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+export RUN_HOME_OVERRIDE="$work/install-home"
 run_helper "$fixture" "$refs"
 [[ "$rc" -eq 0 ]] || fail "verified installer fixture failed:\n$output"
-[[ "$(tr '\n' ' ' < "$FAKE_INSTALL_ARGS")" == "--no-daemon --yes " ]] ||
-    fail "upstream installer was not invoked non-interactively in the selected mode"
+[[ "$(sed -n '1p' "$FAKE_INSTALL_ARGS")" == "--no-daemon" &&
+    "$(sed -n '2p' "$FAKE_INSTALL_ARGS")" == "--yes" &&
+    "$(sed -n '3p' "$FAKE_INSTALL_ARGS")" == "--nix-extra-conf-file" ]] ||
+    fail "upstream installer did not receive its mode, --yes, and extra config flag"
+grep -Fx 'extra-experimental-features = nix-command flakes' "$FAKE_INSTALL_CONF" >/dev/null ||
+    fail "upstream installer did not receive the reviewed Nix feature config"
+grep -Fx 'extra-experimental-features = nix-command flakes' \
+    "$RUN_HOME_OVERRIDE/.config/nix/nix.conf" >/dev/null ||
+    fail "single-user Linux install did not persist required Nix user features"
 [[ "$output" == *"Nix prerequisite installed and verified"* ]] ||
     fail "installer success was not verified in the same shell"
 assert_clean_diagnostic
-pass "verified upstream installer receives its platform mode plus --yes"
+pass "verified upstream installer receives mode, --yes, and persistent flake features"
 
 echo "all Nix prerequisite checkout identity behaviors OK"
