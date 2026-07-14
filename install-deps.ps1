@@ -2661,8 +2661,36 @@ function Test-TreeSitterCliCompatible {
     return ((Get-TreeSitterCliVersion -Path $Path) -eq $TreeSitterCliVersion.TrimStart('v'))
 }
 
+function Get-WindowsOsArchitecture {
+    param(
+        [AllowEmptyString()]
+        [string]$RuntimeArchitecture = [string][System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture
+    )
+
+    $architecture = $RuntimeArchitecture
+    if ([string]::IsNullOrWhiteSpace($architecture)) {
+        $architecture = if (-not [string]::IsNullOrWhiteSpace($env:PROCESSOR_ARCHITEW6432)) {
+            $env:PROCESSOR_ARCHITEW6432
+        } else {
+            $env:PROCESSOR_ARCHITECTURE
+        }
+    }
+    if ([string]::IsNullOrWhiteSpace($architecture)) {
+        throw 'unsupported Windows architecture for tree-sitter CLI: <unknown>'
+    }
+
+    switch ($architecture.ToLowerInvariant()) {
+        { $_ -in @('x64', 'amd64') } { return 'x64' }
+        'arm64' { return 'arm64' }
+        { $_ -in @('x86', 'i386', 'i686') } { return 'x86' }
+        default {
+            throw "unsupported Windows architecture for tree-sitter CLI: $architecture"
+        }
+    }
+}
+
 function Get-TreeSitterWindowsArtifact {
-    param([string]$Architecture = [string][System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture)
+    param([string]$Architecture = (Get-WindowsOsArchitecture))
     switch ($Architecture.ToLowerInvariant()) {
         'x64'   { $assetArch = 'x64';   $sha = $TreeSitterCliWindowsX64Sha256 }
         'arm64' { $assetArch = 'arm64'; $sha = $TreeSitterCliWindowsArm64Sha256 }
@@ -2796,9 +2824,10 @@ function Test-PiCliCurrent {
 function Test-PiCliNodeReady {
     if (-not (Get-Command node -ErrorAction SilentlyContinue)) { return $false }
     try {
-        $versionText = @(& node -p "process.versions.node" 2>$null | Select-Object -First 1)
-        if ($LASTEXITCODE -ne 0 -or $versionText.Count -eq 0) { return $false }
-        return ([version](([string]$versionText[0]).Trim()) -ge [version]'22.19.0')
+        $versionOutput = @(& node -p "process.versions.node" 2>$null)
+        $exitCode = $LASTEXITCODE
+        if ($exitCode -ne 0 -or $versionOutput.Count -eq 0) { return $false }
+        return ([version](([string]$versionOutput[0]).Trim()) -ge [version]'22.19.0')
     } catch {
         return $false
     }
@@ -2901,9 +2930,10 @@ function Invoke-PiCliVerifiedTarballInstall {
 
 function Add-NpmGlobalPrefixToPath {
     try {
-        $prefix = @(& npm prefix -g 2>$null | Select-Object -First 1)
-        if ($LASTEXITCODE -ne 0 -or $prefix.Count -eq 0) { return }
-        $dir = ([string]$prefix[0]).Trim()
+        $prefixOutput = @(& npm prefix -g 2>$null)
+        $exitCode = $LASTEXITCODE
+        if ($exitCode -ne 0 -or $prefixOutput.Count -eq 0) { return }
+        $dir = ([string]$prefixOutput[0]).Trim()
         if (-not [string]::IsNullOrWhiteSpace($dir) -and (Test-Path -LiteralPath $dir -PathType Container)) {
             Add-DirectoryToUserPath -Directory $dir
         }

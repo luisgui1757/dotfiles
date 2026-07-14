@@ -1290,7 +1290,10 @@ save only**. The next plain `:w` formats normally. Implemented in
   wire zig into nvim-treesitter main: the old `master` branch could use it,
   while main emits MSVC-style `cc` crate flags that require MSVC. Ad-hoc
   `:TSUpdate` parser rebuilds on Windows should run from a "Developer
-  PowerShell for VS" shell or after rerunning setup.
+  PowerShell for VS" shell or after rerunning setup. Windows release-asset
+  selection prefers `RuntimeInformation.OSArchitecture` and falls back to the
+  native `PROCESSOR_ARCHITEW6432` / `PROCESSOR_ARCHITECTURE` identity when the
+  runtime reports an empty value during greenfield bootstrap.
 - **Markdown equations use a pinned `pylatexenc` converter.** render-markdown's
   LaTeX support needs the non-bundled `latex` parser (already in
   `treesitter_parsers`) and a converter executable. `install-deps.sh` creates
@@ -1887,7 +1890,10 @@ save only**. The next plain `:w` formats normally. Implemented in
   gets Node through the native catalog. The CLI binary is provisioned on every
   OS, but `.pi/` sessions, auth, and preferences remain machine-local. Renovate
   may bump `PI_CLI_VERSION`, but the integrity constant is context-only and must
-  be recomputed/reviewed by a human.
+  be recomputed/reviewed by a human. PowerShell probes Node and npm by capturing
+  native output before selecting its first line; piping the native process into
+  `Select-Object` loses `LASTEXITCODE` in a fresh shell and falsely rejects a
+  compatible Node or skips npm global-prefix PATH publication.
 - **which-key.nvim is the only keymap-hint plugin.** `nvim/lua/plugins/which-key.lua`
   loads it on `event = "VeryLazy"` (never eager — only `rose-pine.lua` may load
   eagerly, invariant 7) with `opts = {}` and a `<leader>?` popup of buffer-local

@@ -766,6 +766,36 @@ Describe "install-deps.ps1" {
         $PiCliIntegrity | Should -Match '^sha512-'
     }
 
+    It "accepts a real Node 24 native probe when LASTEXITCODE starts unset" {
+        $nodeBin = Join-Path $TestDrive 'node-bin'
+        New-Item -ItemType Directory -Force -Path $nodeBin | Out-Null
+        [System.IO.File]::WriteAllText(
+            (Join-Path $nodeBin 'node.cmd'),
+            "@echo off`r`necho 24.18.0`r`n",
+            [System.Text.Encoding]::ASCII
+        )
+        $oldPath = $env:PATH
+        $runner = (Get-Process -Id $PID).Path
+        $escapedInstaller = $script:InstallDeps.Replace("'", "''")
+        $probe = @"
+`$env:INSTALL_DEPS_PS1_SOURCE_ONLY = '1'
+. '$escapedInstaller' -All
+Remove-Item Env:INSTALL_DEPS_PS1_SOURCE_ONLY
+Remove-Variable LASTEXITCODE -Scope Global -ErrorAction SilentlyContinue
+if (Test-PiCliNodeReady) { exit 0 }
+exit 97
+"@
+        try {
+            $env:PATH = "$nodeBin;$oldPath"
+            & $runner -NoProfile -Command $probe
+            $exitCode = $LASTEXITCODE
+        } finally {
+            $env:PATH = $oldPath
+        }
+
+        $exitCode | Should -Be 0
+    }
+
     It "dry-runs the Pi CLI as a packed, byte-verified local tarball" {
         . $script:ImportInstallDepsForTest -DryRun
         Mock -CommandName Test-PiCliCurrent -MockWith { return $false }
@@ -935,6 +965,24 @@ Describe "install-deps.ps1" {
         (Get-TreeSitterWindowsArtifact -Architecture arm64).Sha256 | Should -Be $TreeSitterCliWindowsArm64Sha256
         (Get-TreeSitterWindowsArtifact -Architecture x86).Sha256 | Should -Be $TreeSitterCliWindowsX86Sha256
         { Get-TreeSitterWindowsArtifact -Architecture riscv64 } | Should -Throw '*unsupported Windows architecture*'
+    }
+
+    It "falls back to native Windows processor architecture when RuntimeInformation is empty" {
+        . $script:ImportInstallDepsForTest
+        $oldArchitecture = $env:PROCESSOR_ARCHITECTURE
+        $oldWowArchitecture = $env:PROCESSOR_ARCHITEW6432
+        try {
+            $env:PROCESSOR_ARCHITECTURE = 'AMD64'
+            $env:PROCESSOR_ARCHITEW6432 = ''
+            Get-WindowsOsArchitecture -RuntimeArchitecture '' | Should -Be 'x64'
+
+            $env:PROCESSOR_ARCHITECTURE = 'x86'
+            $env:PROCESSOR_ARCHITEW6432 = 'ARM64'
+            Get-WindowsOsArchitecture -RuntimeArchitecture '' | Should -Be 'arm64'
+        } finally {
+            $env:PROCESSOR_ARCHITECTURE = $oldArchitecture
+            $env:PROCESSOR_ARCHITEW6432 = $oldWowArchitecture
+        }
     }
 
     It "promotes an owned Windows PATH directory once without removing other entries" {
