@@ -1431,7 +1431,10 @@ save only**. The next plain `:w` formats normally. Implemented in
   (`48f6ea398b3a3fa26fae0093d37bd85b13e7eaa5d1d4a3e208408768408e35ae`), runs the local temp
   installer with `-RunAsAdmin` only when elevated, then adds the Scoop `shims`
   dir to the current process PATH so the rest of `install-deps.ps1` can
-  immediately use `scoop`.
+  immediately use `scoop`. The bootstrap must preserve the caller's process
+  execution policy. In particular, changing a greenfield setup launched with
+  `Bypass` to `RemoteSigned` strands Mark-of-the-Web repository helpers such as
+  the Windows Terminal merger later in the same process.
   `Install-Scoop` also ensures the `extras` and `nerd-fonts` buckets whenever
   Scoop exists, including pre-existing user installs. Every bucket add routes
   through `Add-ScoopBucketSafe`: idempotent; non-interactive via

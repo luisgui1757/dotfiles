@@ -1484,8 +1484,9 @@ stale; CI then fails verification until a human reviews the adjacent constant.
   Windows runners are elevated, and Scoop blocks elevated bootstrap by default.
   `install-deps.ps1` downloads `ScoopInstaller/Install` at a pinned commit,
   verifies the installer SHA-256, runs it with `-RunAsAdmin` only when elevated,
-  then refreshes the current-process Scoop shims path so later installs can use
-  `scoop` immediately. Existing Scoop installs also get the `extras` and
+  preserves the caller's process execution policy, then refreshes the
+  current-process Scoop shims path so later installs can use `scoop` immediately.
+  Existing Scoop installs also get the `extras` and
   `nerd-fonts` buckets normalized before catalog installs.
   Chezmoi's Windows nvim directory symlink still uses the elevated/native
   CreateSymbolicLink path. For local machines, Developer Mode plus a normal

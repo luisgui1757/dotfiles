@@ -231,6 +231,34 @@ Describe "install-deps.ps1" {
         $output | Should -Match '-RunAsAdmin'
     }
 
+    It "preserves the caller execution policy while bootstrapping Scoop" {
+        . $script:ImportInstallDepsForTest
+        $script:ScoopProbeCount = 0
+        Mock -CommandName Get-Command -MockWith {
+            $script:ScoopProbeCount++
+            if ($script:ScoopProbeCount -gt 1) {
+                return [pscustomobject]@{ Name = 'scoop'; Source = 'scoop' }
+            }
+            return $null
+        } -ParameterFilter { $Name -eq 'scoop' }
+        Mock -CommandName Test-IsElevated -MockWith { return $false }
+        Mock -CommandName Invoke-WebRequest -MockWith {
+            param([string]$Uri, [string]$OutFile)
+            $Uri | Should -Be $ScoopInstallerUrl
+            [System.IO.File]::WriteAllText($OutFile, '# verified test installer')
+        }
+        Mock -CommandName Test-FileSha256 -MockWith { return $true }
+        Mock -CommandName Add-ScoopToPathForCurrentProcess -MockWith { }
+        Mock -CommandName Ensure-ScoopBuckets -MockWith { }
+        Mock -CommandName Set-ExecutionPolicy -MockWith {
+            throw 'bootstrap must not mutate the caller execution policy'
+        }
+
+        Install-Scoop | Should -BeTrue
+
+        Should -Invoke -CommandName Set-ExecutionPolicy -Times 0 -Exactly
+    }
+
     It "adds required buckets when Scoop already exists" {
         . $script:ImportInstallDepsForTest
         $script:ScoopArgs = @()
