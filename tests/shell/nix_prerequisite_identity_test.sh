@@ -280,17 +280,26 @@ export FAKE_INSTALL_CONF="$work/install-conf.log"
 export FAKE_RUNTIME_BIN="$work/bin"
 export RUN_PATH_OVERRIDE="$work/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 export RUN_HOME_OVERRIDE="$work/install-home"
+expected_install_mode="--no-daemon"
+if [[ -d /run/systemd/system ]] && command -v systemctl >/dev/null 2>&1; then
+    expected_install_mode="--daemon"
+fi
 run_helper "$fixture" "$refs"
 [[ "$rc" -eq 0 ]] || fail "verified installer fixture failed:\n$output"
-[[ "$(sed -n '1p' "$FAKE_INSTALL_ARGS")" == "--no-daemon" &&
+[[ "$(sed -n '1p' "$FAKE_INSTALL_ARGS")" == "$expected_install_mode" &&
     "$(sed -n '2p' "$FAKE_INSTALL_ARGS")" == "--yes" &&
     "$(sed -n '3p' "$FAKE_INSTALL_ARGS")" == "--nix-extra-conf-file" ]] ||
     fail "upstream installer did not receive its mode, --yes, and extra config flag"
 grep -Fx 'extra-experimental-features = nix-command flakes' "$FAKE_INSTALL_CONF" >/dev/null ||
     fail "upstream installer did not receive the reviewed Nix feature config"
-grep -Fx 'extra-experimental-features = nix-command flakes' \
-    "$RUN_HOME_OVERRIDE/.config/nix/nix.conf" >/dev/null ||
-    fail "single-user Linux install did not persist required Nix user features"
+if [[ "$expected_install_mode" == "--no-daemon" ]]; then
+    grep -Fx 'extra-experimental-features = nix-command flakes' \
+        "$RUN_HOME_OVERRIDE/.config/nix/nix.conf" >/dev/null ||
+        fail "single-user Linux install did not persist required Nix user features"
+else
+    [[ ! -e "$RUN_HOME_OVERRIDE/.config/nix/nix.conf" ]] ||
+        fail "daemon install unexpectedly published a per-user Nix config"
+fi
 [[ "$output" == *"Nix prerequisite installed and verified"* ]] ||
     fail "installer success was not verified in the same shell"
 assert_clean_diagnostic
