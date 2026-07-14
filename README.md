@@ -653,7 +653,13 @@ That prevents Lazy restore, Mason, and smoke validators from creating separate
 compiler tasks around the proof phase.
 
 Pass `--all` / `-All` for explicit non-interactive installs (Y to every setup
-prompt).
+prompt). Setup also owns consent after that decision: its POSIX dependency
+child clears Homebrew's inherited ask override and uses Homebrew's supported
+`HOMEBREW_NO_ASK=1` mode, so Homebrew 6+ cannot add a second confirmation for
+each missing package or scoped upgrade. This setting exists only inside setup;
+ordinary `brew` commands keep their normal behavior. Password authentication
+and OS permission grants can still require the user because they are not
+package-selection confirmations.
 When setup detects redirected stdin/stdout and neither all nor dry-run was
 requested, it defaults to all and prints `note: no TTY detected; running with
 --all` (or `-All`). An interactive run (no all flag) can still ask the

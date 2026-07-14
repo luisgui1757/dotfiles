@@ -108,6 +108,16 @@ for arg in "$@"; do
     esac
 done
 [[ "$EXPERIMENTAL_WSL_GUI" == "1" ]] || EXPERIMENTAL_WSL_GUI=0
+
+# This installer owns consent for every package mutation. Homebrew 6 enables
+# ask mode by default for install/upgrade, so letting an accepted setup action
+# reach brew unchanged creates a second confirmation and can hang --all runs.
+# Scope the official no-ask setting to this child process; ordinary user brew
+# commands outside setup keep their normal behavior. An inherited explicit ask
+# must be cleared because it takes precedence over HOMEBREW_NO_ASK.
+unset HOMEBREW_ASK
+export HOMEBREW_NO_ASK=1
+
 INSTALL_FAILURES_COUNT=0
 INSTALL_FAILURES_DETAIL=""
 
