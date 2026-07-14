@@ -19,7 +19,8 @@ commits, recovery path, provider inventory, and whether any user data changed.
       Nix-free Apple Silicon macOS and Linux VMs at the exact fully pushed head
       of an official prerelease branch. Run only `./setup.sh --all`; prove the
       helper reports that branch identity, installs/verifies Nix 2.34.0, and
-      setup finishes. After publishing the annotated tag, prove that same
+      reaches any required sudo interaction without an upstream installer
+      confirmation prompt. After publishing the annotated tag, prove that same
       branch checkout is rejected before download and an exact-tag clone
       succeeds instead.
 - [ ] **Apple Silicon owner-host:** begin with v0.1.0 Homebrew formulae/casks,

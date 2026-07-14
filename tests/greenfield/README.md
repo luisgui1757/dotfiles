@@ -11,7 +11,8 @@ from the exact release checkout. Before v0.2.0 is published, an official
 prerelease branch may be tested from its clean, fully pushed head instead. The
 public POSIX setup path installs the checksum-verified Nix prerequisite when it
 is missing, then applies nix-darwin / Home Manager. It never uses a remote
-script pipeline. Local-only commits, stale branch commits, forks, and dirty
+script pipeline or waits for an upstream confirmation prompt. Local-only
+commits, stale branch commits, forks, and dirty
 trees are deliberately rejected; after release publication, the prerelease
 branch allowance closes and the exact annotated tag is mandatory.
 

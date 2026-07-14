@@ -351,7 +351,8 @@ running from a local checkout, it fails closed with clone-first instructions.
 Git is required to clone this repo. On macOS/Linux/WSL, setup bootstraps Nix
 when it is missing by calling the release-pinned prerequisite helper itself.
 That helper downloads the official upstream Nix 2.34.0 release and verifies the
-platform SHA-256 before extraction or execution. Before v0.2.0 is published,
+platform SHA-256 before extraction or execution, then runs the verified local
+installer non-interactively. Before v0.2.0 is published,
 the helper accepts only a clean commit that is currently an exact branch head
 in the official repository. Once the annotated v0.2.0 tag exists, that
 prerelease path closes automatically and only the exact clean official tag is

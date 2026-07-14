@@ -226,7 +226,7 @@ installer="$work/nix-$nix_version-$system/install"
 }
 
 echo "Verified upstream Nix $nix_version for $system: $expected_sha256"
-"$installer" "$install_mode"
+"$installer" "$install_mode" --yes
 
 for profile in \
     /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh \

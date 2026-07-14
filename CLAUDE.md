@@ -305,7 +305,8 @@ that violates one of these, fix it instead of disabling the test.
       only the matching local tag object, peeled commit, and HEAD are accepted.
       The helper then downloads the pinned upstream Nix archive, verifies its
       platform SHA-256 and archive paths, and executes only those verified local
-      bytes. Guarded behaviorally by
+      bytes with the upstream `--yes` non-interactive flag and the selected
+      daemon mode. Guarded behaviorally by
       `tests/shell/nix_prerequisite_identity_test.sh` and statically by
       `tests/static/supply_chain_remote_execution_test.sh`.
     - **(e) Nix owner reporting in update mode.** When `install-deps.sh --update`

@@ -63,10 +63,11 @@ new_fixture() {
 
 run_helper() {
     local repo="$1" refs_file="$2" mode="${3:-ok}"
+    local run_path="${RUN_PATH_OVERRIDE:-$work/bin:$ORIGINAL_PATH}"
     remote_call_log="$work/remote-calls.log"
     : > "$remote_call_log"
     set +e
-    output="$(PATH="$work/bin:$ORIGINAL_PATH" \
+    output="$(PATH="$run_path" \
         REAL_GIT="$REAL_GIT" \
         FAKE_REMOTE_REFS_FILE="$refs_file" \
         FAKE_REMOTE_CALL_LOG="$remote_call_log" \
@@ -189,5 +190,73 @@ run_helper "$fixture" "$refs"
 [[ "$remote_call_count" == "0" ]] || fail "dirty checkout reached the remote identity query"
 assert_clean_diagnostic
 pass "dirty checkout fails before remote or installer execution"
+
+rm "$work/bin/nix"
+cat > "$work/bin/uname" <<'EOF'
+#!/usr/bin/env bash
+case "${1:-}" in
+    -s) echo Linux ;;
+    -m) echo x86_64 ;;
+    *) exit 45 ;;
+esac
+EOF
+cat > "$work/bin/curl" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+while [[ "$#" -gt 0 ]]; do
+    if [[ "$1" == "--output" ]]; then
+        : > "$2"
+        exit 0
+    fi
+    shift
+done
+exit 46
+EOF
+cat > "$work/bin/sha256sum" <<'EOF'
+#!/usr/bin/env bash
+echo "5676b0887f1274e62edd175b6611af49aa8170c69c16877aa9bc6cebceb19855  $1"
+EOF
+cat > "$work/bin/tar" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+if [[ "${1:-}" == "-tJf" ]]; then
+    exit 1
+fi
+[[ "${1:-}" == "-xJf" && "${3:-}" == "-C" ]] || exit 47
+installer_dir="$4/nix-2.34.0-x86_64-linux"
+mkdir -p "$installer_dir"
+cat > "$installer_dir/install" <<'INSTALLER'
+#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\n' "$@" > "${FAKE_INSTALL_ARGS:?}"
+cat > "${FAKE_RUNTIME_BIN:?}/nix" <<'NIX'
+#!/usr/bin/env bash
+case "${1:-}" in
+    --version) echo "nix (Nix) 2.34.0" ;;
+    store) [[ "${2:-}" == "info" ]] ;;
+    *) exit 48 ;;
+esac
+NIX
+chmod +x "${FAKE_RUNTIME_BIN:?}/nix"
+INSTALLER
+chmod +x "$installer_dir/install"
+EOF
+chmod +x "$work/bin/uname" "$work/bin/curl" "$work/bin/sha256sum" "$work/bin/tar"
+
+new_fixture noninteractive-install
+head_commit="$($REAL_GIT -C "$fixture" rev-parse HEAD)"
+refs="$work/noninteractive-install.refs"
+printf '%s\trefs/heads/fix/bootstrap\n' "$head_commit" > "$refs"
+export FAKE_INSTALL_ARGS="$work/install-args.log"
+export FAKE_RUNTIME_BIN="$work/bin"
+export RUN_PATH_OVERRIDE="$work/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+run_helper "$fixture" "$refs"
+[[ "$rc" -eq 0 ]] || fail "verified installer fixture failed:\n$output"
+[[ "$(tr '\n' ' ' < "$FAKE_INSTALL_ARGS")" == "--no-daemon --yes " ]] ||
+    fail "upstream installer was not invoked non-interactively in the selected mode"
+[[ "$output" == *"Nix prerequisite installed and verified"* ]] ||
+    fail "installer success was not verified in the same shell"
+assert_clean_diagnostic
+pass "verified upstream installer receives its platform mode plus --yes"
 
 echo "all Nix prerequisite checkout identity behaviors OK"
