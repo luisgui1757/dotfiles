@@ -593,8 +593,10 @@ Surfaces that consume these: nvim (rose-pine plugin defaults), lualine
 literals in status/borders), ghostty/config (`theme = Rose Pine` -- forced dark
 on every platform, NOT the adaptive `dark:,light:` split, to match the dark
 stack), herdr/config.toml + herdr/config.windows.toml (built-in `rose-pine`,
-forced with `auto_switch = false`; both map `prefix+w` and `prefix+g` to the
-full workspace/tab/pane navigator; Windows alone selects `pwsh.exe`),
+forced with `auto_switch = false`; both map `prefix+w`/`prefix+g` to the full
+navigator, `prefix+comma`/`prefix+$` to tab/workspace rename,
+`prefix+up`/`prefix+down` to sequential workspace navigation, and
+`prefix+shift+1..9` to indexed workspace selection; Windows alone selects `pwsh.exe`),
 windows-terminal/settings.fragment.jsonc (`schemes` + `themes`),
 shells/powershell_profile.ps1 (PSReadLine `-Colors` for syntax, `Selection`,
 the version-gated prediction colors, and `$PSStyle.FileInfo.Directory` for `ls`
@@ -1152,9 +1154,13 @@ save only**. The next plain `:w` formats normally. Implemented in
   macOS is `system`. Normal macOS developer tools that still resolve from
   `/usr/bin` are `unmanaged` with a Homebrew migration hint. Setup owns the
   Homebrew shellenv block, Homebrew GNU Make `libexec/gnubin` PATH adoption when
-  the `make` formula is installed, and `brew completions link` reconciliation
-  after Homebrew activation in both install and update mode; do not document a
-  hidden manual repair step instead. Scoop ownership must use shim metadata as
+  the `make` formula is installed, and completion reconciliation after Homebrew
+  activation in both install and update mode. `brew completions link` owns tap
+  completions but Homebrew 6 does not repair its own `_brew`; setup must also
+  locate the active core completion across official Homebrew, nix-homebrew, and
+  Linuxbrew layouts, atomically publish only a missing/symlink destination, and
+  verify resolved source identity. A non-symlink conflict fails closed; do not
+  document a hidden manual repair step instead. Scoop ownership must use shim metadata as
   the first proof layer:
   a command source under `...\scoop\shims` must parse the sibling `.shim` target
   and match `...\scoop\apps\<catalog-package>\...` before any package-list
@@ -1692,6 +1698,14 @@ save only**. The next plain `:w` formats normally. Implemented in
   `prefix+g` alias to `goto`, Herdr's searchable workspace/tab/pane navigator;
   Up/Down selects and Enter focuses. Named Herdr sessions remain separate server
   namespaces and cannot be listed inside another session's navigator.
+- **Herdr preserves the common tmux rename and workspace-selection muscle
+  memory.** Herdr calls tmux windows `tabs`, so `rename_tab = "prefix+comma"`
+  implements `prefix+,`; `rename_workspace = "prefix+$"` implements
+  `prefix+$`. Ordered workspace movement is `prefix+Up` / `prefix+Down`, and
+  direct selection is `prefix+Shift+1..9`, leaving unshifted `prefix+1..9`
+  exclusively for tabs/windows. Use the literal `$` binding: Herdr accepts
+  single-character punctuation, while `prefix+shift+4` does not match the
+  legacy terminal `$` event on every input path.
 - **psmux + PSReadLine: Windows-only overlay, two settings.** psmux's default
   shell is **cmd**, not pwsh — which is the *real* reason "history prediction"
   and `MenuComplete` looked broken inside panes: PSReadLine was never loaded.

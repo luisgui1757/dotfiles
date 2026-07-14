@@ -135,7 +135,10 @@ commits, recovery path, provider inventory, and whether any user data changed.
       version; start a session (`herdr`), confirm it opens panes and its
       agent-state awareness works, confirm the UI uses dark Rose Pine, then
       press `Ctrl+B`, `w`, use Up/Down to select a workspace/tab/pane, and Enter
-      to focus it (`Ctrl+B`, `g` is the same full-navigator alias), then exit
+      to focus it (`Ctrl+B`, `g` is the same full-navigator alias). Confirm
+      `Ctrl+B`, `,` renames the current tab/window; `Ctrl+B`, `$` renames the
+      workspace; `Ctrl+B`, Up/Down traverses workspaces; `Ctrl+B`, Shift+1..9
+      selects workspaces while unshifted 1..9 still selects tabs. Then exit
       cleanly. Confirm the managed config is `~/.config/herdr/config.toml` on
       POSIX and the real `%APPDATA%\herdr\config.toml` on Windows. On Windows,
       create a fresh pane and confirm `(Get-Process -Id $PID).Name` is `pwsh`,

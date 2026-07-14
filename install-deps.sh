@@ -328,19 +328,96 @@ enable_homebrew_for_current_shell() {
 # Homebrew owns the completion symlinks consumed by zsh/bash. Package/tap
 # migrations can leave those links pointing at a removed repository checkout,
 # which makes every new shell print compinit errors even though brew itself
-# works. Let Homebrew reconcile its own completion surface after activation;
-# the command is idempotent on both macOS and Linuxbrew.
+# works. `brew completions link` reconciles tap completions, but Homebrew 6 does
+# not repair its own core `_brew` link. Reconcile both surfaces and prove that
+# the core link resolves to the active Homebrew implementation on macOS,
+# nix-homebrew, and Linuxbrew.
 link_homebrew_completions() {
+    local brew_prefix brew_repository core_source candidate
+    local site_dir core_link tmp source_real link_real
+
     [[ "$PM" == "brew" ]] || return 0
     if [[ "$DRY_RUN" -eq 1 ]]; then
-        echo "  would: brew completions link"
+        echo "  would: brew completions link + verify core _brew"
         return 0
     fi
     if ! brew completions link >/dev/null; then
         echo "  FAIL: Homebrew could not link its shell completions; repair Homebrew and retry." >&2
         return 1
     fi
-    printf "  ok        %-26s linked\n" "Homebrew completions"
+
+    brew_prefix="$(brew --prefix 2>/dev/null || true)"
+    brew_repository="$(brew --repository 2>/dev/null || true)"
+    case "$brew_prefix" in
+        /*) ;;
+        *)
+            echo "  FAIL: Homebrew did not report an absolute prefix while reconciling completions." >&2
+            return 1
+            ;;
+    esac
+    case "$brew_repository" in
+        /*) ;;
+        *)
+            echo "  FAIL: Homebrew did not report an absolute repository while reconciling completions." >&2
+            return 1
+            ;;
+    esac
+
+    # Official Homebrew keeps the core completion below `brew --repository`.
+    # nix-homebrew exposes a marker repository instead, while
+    # $prefix/Library/Homebrew points into the active Nix generation; resolving
+    # `../..` after that symlink reaches the matching package's completions.
+    core_source=""
+    for candidate in \
+        "$brew_repository/completions/zsh/_brew" \
+        "$brew_prefix/Library/Homebrew/../../completions/zsh/_brew" \
+        "$brew_prefix/completions/zsh/_brew"; do
+        if [[ -f "$candidate" && -r "$candidate" ]]; then
+            core_source="$candidate"
+            break
+        fi
+    done
+    if [[ -z "$core_source" ]]; then
+        echo "  FAIL: active Homebrew has no readable core zsh completion (_brew); reinstall or repair Homebrew and retry." >&2
+        return 1
+    fi
+
+    site_dir="$brew_prefix/share/zsh/site-functions"
+    core_link="$site_dir/_brew"
+    if ! mkdir -p "$site_dir"; then
+        echo "  FAIL: could not create Homebrew's zsh completion directory: $site_dir" >&2
+        return 1
+    fi
+
+    source_real="$(real_source_path "$core_source")"
+    if [[ -r "$core_link" ]]; then
+        link_real="$(real_source_path "$core_link")"
+    else
+        link_real=""
+    fi
+    if [[ "$link_real" != "$source_real" ]]; then
+        if [[ -e "$core_link" && ! -L "$core_link" ]]; then
+            echo "  FAIL: refusing to replace non-symlink Homebrew completion: $core_link" >&2
+            return 1
+        fi
+        if ! tmp="$(mktemp -d "$site_dir/.dotfiles-brew-completion.XXXXXX")"; then
+            echo "  FAIL: could not stage Homebrew's core zsh completion beside $core_link" >&2
+            return 1
+        fi
+        trap 'rm -rf "$tmp"; trap - RETURN' RETURN
+        if ! ln -s "$core_source" "$tmp/_brew" || ! mv -f "$tmp/_brew" "$core_link"; then
+            echo "  FAIL: could not publish Homebrew's core zsh completion: $core_link" >&2
+            return 1
+        fi
+        rmdir "$tmp" 2>/dev/null || true
+    fi
+
+    if [[ ! -r "$core_link" ]] ||
+        [[ "$(real_source_path "$core_link")" != "$source_real" ]]; then
+        echo "  FAIL: Homebrew's core zsh completion did not resolve to the active implementation: $core_link" >&2
+        return 1
+    fi
+    printf "  ok        %-26s linked + core _brew verified\n" "Homebrew completions"
 }
 
 enable_homebrew_make_gnubin_for_current_shell() {
@@ -4587,7 +4664,7 @@ if ! bootstrap_package_manager; then
 fi
 
 if ! link_homebrew_completions; then
-    record_install_failure "Homebrew completions" brew "completions link" 1
+    record_install_failure "Homebrew completions" brew "completions link + core _brew" 1
     echo "  FAIL: Homebrew completion linking is an unrecoverable shell-startup precondition; no package installs were attempted." >&2
     exit_if_install_failures
 fi

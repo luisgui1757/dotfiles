@@ -36,6 +36,16 @@ for path in paths:
         raise SystemExit(f"Herdr workspace-only picker must be disabled in {path}")
     if keys.get("goto") != ["prefix+w", "prefix+g"]:
         raise SystemExit(f"Herdr full navigator must own prefix+w and prefix+g in {path}")
+    expected_keys = {
+        "rename_tab": "prefix+comma",
+        "rename_workspace": "prefix+$",
+        "previous_workspace": "prefix+up",
+        "next_workspace": "prefix+down",
+        "switch_workspace": "prefix+shift+1..9",
+    }
+    for action, binding in expected_keys.items():
+        if keys.get(action) != binding:
+            raise SystemExit(f"Herdr {action} must be {binding} in {path}")
 
 if configs[0].get("terminal", {}).get("default_shell") is not None:
     raise SystemExit("POSIX Herdr config must preserve the platform shell default")
@@ -60,4 +70,4 @@ for script in setup.ps1 uninstall.ps1; do
         fail "$script does not use the Herdr overlay state boundary"
 done
 
-echo "all Herdr navigation, Rose Pine theme, and Windows pwsh invariants OK"
+echo "all Herdr tmux-parity navigation, Rose Pine theme, and Windows pwsh invariants OK"
