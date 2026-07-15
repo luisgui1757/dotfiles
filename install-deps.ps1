@@ -186,7 +186,7 @@ function Install-Scoop {
         return $false
     }
     try {
-        # Run the pinned, hash-verified bootstrap under the caller's existing
+        # Run the pinned, hash-verified bootstrap under the calling process
         # process policy. setup.ps1 may have been launched with Bypass so a
         # Mark-of-the-Web checkout remains usable; never tighten that policy
         # mid-run and strand later local helpers.
