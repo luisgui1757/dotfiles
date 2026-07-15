@@ -48,8 +48,16 @@ out="$(PYTHON_VENV_OK=0 NATIVE_PM=apt DRY_RUN=1 ensure_python_pip_venv)"
 # Case 4: Linuxbrew can be the selected manager while Ubuntu's system python3
 # still wins PATH. That interpreter needs the native python3-venv/pip packages.
 : > "$INSTALL_LOG"
+uname() { printf 'Linux\n'; }
 PYTHON_VENV_OK=0 NATIVE_PM=apt PM=brew ensure_python_pip_venv >/dev/null
 grep -q "apt python3-venv python3-pip" "$INSTALL_LOG" \
     || fail "Linuxbrew selection skipped venv/pip repair for Ubuntu system python3"
+
+# Case 5: macOS Homebrew Python owns its venv/pip support; never invoke a
+# Linux-native package manager merely because the import probe failed.
+: > "$INSTALL_LOG"
+uname() { printf 'Darwin\n'; }
+PYTHON_VENV_OK=0 NATIVE_PM=apt PM=brew ensure_python_pip_venv >/dev/null
+[[ -s "$INSTALL_LOG" ]] && fail "macOS Homebrew path attempted a Linux venv/pip repair"
 
 echo "OK"
