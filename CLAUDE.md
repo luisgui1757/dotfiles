@@ -414,12 +414,15 @@ that violates one of these, fix it instead of disabling the test.
     logical jobs that verify exact per-OS proof artifacts bound to the same run,
     PR source head, and actually executed SHA. On `pull_request`, the executed
     SHA is GitHub's synthetic merge commit; it must never be mislabeled as the
-    source head. Workflows retain legacy producer names until live cutover.
+    source head. The 2026-07-15 live cutover is complete; workflows retain
+    legacy producer names only as explicit compatibility output pending a
+    separately reviewed cleanup.
     Never make a no-op check to manufacture green status, and never switch live
     contexts from the cutover PR. Follow `docs/security/branch-protection.md`:
-    merge while live legacy checks still gate, pass cache-free plus all logical
-    checks on the exact merged `main` SHA, then have the owner run
-    `--preflight-only`, apply, and verify the checked-in safeguards. Before its
+    for any future rename, merge while live legacy checks still gate, pass
+    cache-free plus all logical checks on the exact merged `main` SHA, then have
+    the owner run `--preflight-only`, apply, and verify the checked-in
+    safeguards. Before its
     first mutation the apply command twice verifies exact branch/repository/main
     identity, clean sources, unique and exact legacy live policy, GitHub Actions
     app/workflow/event/run provenance, and cache-free E2E evidence. It snapshots

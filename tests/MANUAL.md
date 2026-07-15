@@ -6,6 +6,11 @@ significant change to the relevant area.
 
 ## v0.1.0 to v0.2.0 release upgrade
 
+> Release status (2026-07-15): v0.2.0 is published under explicit owner
+> authorization. Automated exact-release gates passed; every unchecked row
+> below remains an unclaimed post-release evidence gap. Publication is not
+> evidence that a row ran.
+
 Use throwaway users/VMs seeded from the exact annotated v0.1.0 release. Follow
 `docs/UPGRADING.md`; never use `main` or update the old checkout in place.
 For every row, the normal success path must be only `setup --all` / `setup -All`
@@ -15,17 +20,18 @@ run the printed rollback, then prove rerunning setup resumes or retries safely.
 Also run setup update/upgrade once. Record the old/new tag objects, peeled
 commits, recovery path, provider inventory, and whether any user data changed.
 
-- [ ] **Bare POSIX prerequisite:** before v0.2.0 publication, use clean
-      Nix-free Apple Silicon macOS and Linux VMs at the exact fully pushed head
-      of an official prerelease branch. Run only `./setup.sh --all`; prove the
-      helper reports that branch identity, installs/verifies Nix 2.34.0, and
+- [ ] **Bare POSIX prerequisite:** use clean Nix-free Apple Silicon macOS and
+      Linux VMs at the exact annotated v0.2.0 release. Run only
+      `./setup.sh --all`; prove the helper reports that tag identity,
+      installs/verifies Nix 2.34.0, and
       reaches any required sudo interaction without an upstream installer
       confirmation prompt. Confirm `nix store info` and flake evaluation work
       without extra flags; interrupt after upstream installation but before
       helper success, then prove a setup retry reconciles and continues. After
-      publishing the annotated tag, prove that same
-      branch checkout is rejected before download and an exact-tag clone
-      succeeds instead.
+      publication, also prove a branch checkout is rejected before download and
+      an exact-tag clone succeeds instead. Hosted Ubuntu/macOS lanes and a fresh
+      Nix-present consumer clone verified the immutable tag path, but they do not
+      replace these Nix-free real-VM rows.
 - [ ] **Apple Silicon owner-host:** begin with v0.1.0 Homebrew formulae/casks,
       real taps, no Nix, divergent config, and backup-name collisions. Install
       Nix through setup's checksum-verified helper; prove failed
@@ -58,8 +64,10 @@ commits, recovery path, provider inventory, and whether any user data changed.
       local/hosted gates and public-secret scan, record the tag object and peeled
       commit, prove fresh and v0.1.0 machines both need only setup all, then
       confirm the release document contains no branch command or placeholder
-      identity. Until every required row is accepted, keep v0.1.0 as the only
-      user-facing release.
+      identity. The automated gate, secret scan, and identities are recorded;
+      fresh and v0.1.0 real-machine acceptance remains open. v0.2.0 is
+      user-facing by explicit owner authorization, not because this row is
+      complete.
 
 ## Visual / GUI
 

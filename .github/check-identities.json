@@ -1,6 +1,6 @@
 {
   "schema": 2,
-  "stage": "stable-required-live-apply-pending",
+  "stage": "stable-required-live-applied",
   "legacyEmitted": [
     "ubuntu",
     "macos",
