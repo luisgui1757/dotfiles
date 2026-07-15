@@ -235,6 +235,8 @@ proves.
 | `C-b %` / `C-b "` then `C-b h/j/k/l` | split and move between panes | pane bindings |
 | `C-b H` / `C-b L` | current window swaps left / right | uppercase window-swap binding |
 | enter copy-mode (`C-b [`), `v` to select, `y` | text copies to the system clipboard (paste elsewhere) | clipboard (pbcopy/xclip/win32yank on POSIX, `clip.exe`/OSC52 on Windows) |
+| (POSIX) `C-b C-s`, then restart tmux | the layout restores automatically; the first-run missing-file message does not recur after the save | resurrect + Continuum |
+| (Windows) save a named psmux session with `C-b C-s`; close the `run-shell` popup with `q`/Esc; after `psmux kill-server`, start `psmux new-session -s recovery`, press `C-b C-r`, then `C-b w` | the save needs no confirmation, restore is manual, and the named session returns with its windows/panes | psmux-resurrect popup + restore contract |
 | (Windows) open several psmux panes, check Task Manager | no runaway `conhost.exe` pile-up, CPU idle | freeze cascade gone |
 
 ### Neovim

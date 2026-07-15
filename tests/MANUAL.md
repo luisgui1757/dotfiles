@@ -114,6 +114,10 @@ commits, recovery path, provider inventory, and whether any user data changed.
       config-load freeze, no sustained CPU spike, and no clipped final cell at
       the right edge. Switch flavor:
       `psmux set -g @rosepine-variant moon; psmux source-file ~/.tmux.windows.conf`.
+- [ ] **psmux manual restore**: save a named session with `prefix C-s`; confirm
+      the `run-shell` `Saved to ...` popup is only output and closes with `q` or
+      Esc. Kill the server, start `psmux new-session -s recovery`, restore with
+      `prefix C-r`, then use `prefix w` to select the restored named session.
 - [ ] **Starship prompt**: shows dir, git branch, git status icons
       (untracked/modified/staged), trailing time, and no opaque background
       blocks behind prompt text. The final Rose glyph on the right-aligned time

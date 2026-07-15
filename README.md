@@ -165,6 +165,13 @@ psmux attach      # reattach
 | `Ctrl+B`, then `Ctrl+S` | Save the current session layout. |
 | `Ctrl+B`, then `Ctrl+R` | Restore the saved session layout. |
 
+POSIX tmux auto-saves every 15 minutes and auto-restores on startup. Its first
+launch may say `Tmux resurrect file not found!` until the first save exists.
+Windows psmux is manual: the `run-shell` `Saved to ...` popup means the save is
+done; close it with `q` or `Esc` (`Enter` does nothing). After restarting psmux,
+restore with `Ctrl+B`, then `Ctrl+R`, then use `Ctrl+B`, then `w` to select the
+restored session.
+
 Copy text with vi-style copy mode:
 
 1. Press `Ctrl+B`, then `[`.
@@ -1611,6 +1618,9 @@ MIT. See `LICENSE`.
 | Move commits in lazygit, including inside psmux | Ctrl+J collides with Enter on the wire, and psmux v3.3.4 does not relay Windows Terminal's Win32-input-mode modifier data into panes | use uppercase `J` / `K`. `%LOCALAPPDATA%\lazygit\config.yml` binds commits-panel moveDownCommit / moveUpCommit to printable J/K, so no psmux root bind is needed. In the commits panel, use PgUp/PgDn or Ctrl-U/Ctrl-D to scroll the diff |
 | Windows Terminal opens Windows PowerShell 5.1 instead of PowerShell 7 | settings predate the managed WT default-profile merge, or the merge was skipped | re-run `.\setup.ps1 -SkipDeps -SkipNvim`; it adds the fixed `PowerShell 7` profile and promotes only an unset or legacy Windows PowerShell default, preserving a custom default |
 | tmux / psmux does not show the Rose Pine status bar | The generated variant config was not deployed or sourced, or it loaded in an already-running server | re-run setup / re-apply chezmoi, then restart all tmux/psmux sessions. The bar is the generated `~/.tmux.rose-pine.{main,moon,dawn}.conf`, sourced by `tmux/tmux.posix.conf` (POSIX) and `tmux/tmux.windows.conf` (Windows). Windows psmux starts from `~/.psmux.conf`, then flag-free source-files `~/.tmux.windows.conf`. Change the `@rosepine-variant` (`main` / `moon` / `dawn`) option for a different flavor |
+| tmux says `Tmux resurrect file not found!` on first launch | Continuum tried to restore before the first snapshot existed | save once with `Ctrl+B`, then `Ctrl+S`, or wait 15 minutes for the first auto-save |
+| psmux shows a `run-shell` `Saved to ...` popup but does not restore after restart | the popup is a completed save receipt; Windows restore is manual | press `q` or `Esc`, restart psmux, then press `Ctrl+B`, then `Ctrl+R`; use `Ctrl+B`, then `w` to select the restored session |
+| psmux restore says a session `already exists, skipping` | psmux-resurrect will not overwrite a running same-named session | start a temporary session with `psmux new-session -s recovery`, restore there, then use `Ctrl+B`, then `w` to select the restored session |
 | psmux warns `unknown option` while sourcing config | A psmux-parsed config still contains a tmux-only option | update this repo and re-run `.\setup.ps1 -SkipDeps -SkipNvim`, then restart psmux. The managed shared and Windows configs intentionally avoid `set ... terminal-features`, and the generated Rose Pine artifacts omit tmux-only `display-panes-*` color options; tmux extended-key flags live only in the POSIX overlay |
 | tmux / psmux status bar looks fully opaque | The generated status canvas is not using the terminal default background, or an older generated artifact is still loaded | update this repo, re-run setup / chezmoi apply, then restart tmux/psmux. The managed bar sets `status-style` and pill outside caps to `bg=default`; only the pill interiors have explicit Rose Pine backgrounds |
 | PowerShell Tab completion — the selected option is **gold** | PSReadLine `Selection` colors the highlighted MenuComplete option | it is a gold foreground. Note: PSReadLine uses that same `Selection` color for the completion suffix it inserts into the command line while you navigate, so that suffix also shows gold until you accept — it is one setting, not separable |
