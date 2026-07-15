@@ -46,9 +46,16 @@ cd ~/dotfiles
 
 ```powershell
 # native Windows
+Set-ExecutionPolicy -Scope Process Bypass -Force
 Set-Location $HOME\dotfiles
 .\setup.ps1 -All
 ```
+
+The process-scoped execution-policy command is required when Windows rejects
+the checkout as unsigned. It affects only the current PowerShell process and
+does not weaken the user or machine policy permanently. Run setup from that
+same window; `setup.ps1` cannot apply this itself because PowerShell evaluates
+the policy before loading the script.
 
 Open a new terminal after the first install. The current shell started before
 the new PATH, profile, and default shell existed.
@@ -383,6 +390,7 @@ cd ~/dotfiles
 # Settings -> Privacy & security -> For developers -> Developer Mode = On
 git clone --branch v0.2.0 --single-branch `
   https://github.com/luisgui1757/dotfiles.git $HOME\dotfiles
+Set-ExecutionPolicy -Scope Process Bypass -Force
 Set-Location $HOME\dotfiles
 .\setup.ps1 -All
 ```
@@ -1607,6 +1615,7 @@ MIT. See `LICENSE`.
 | tmux / psmux status bar looks fully opaque | The generated status canvas is not using the terminal default background, or an older generated artifact is still loaded | update this repo, re-run setup / chezmoi apply, then restart tmux/psmux. The managed bar sets `status-style` and pill outside caps to `bg=default`; only the pill interiors have explicit Rose Pine backgrounds |
 | PowerShell Tab completion — the selected option is **gold** | PSReadLine `Selection` colors the highlighted MenuComplete option | it is a gold foreground. Note: PSReadLine uses that same `Selection` color for the completion suffix it inserts into the command line while you navigate, so that suffix also shows gold until you accept — it is one setting, not separable |
 | A `wt --version` window popped up during `setup.ps1 -All` | the dependency version table ran `<tool> --version`, and `wt --version` opens a Windows Terminal window instead of printing | fixed — `Get-CommandVersionString` never runs `wt --version`; it reads the file version (or shows `installed`) |
+| `setup.ps1` or a managed helper says it cannot be loaded because it is not digitally signed | the current PowerShell execution policy rejects the checkout before setup can run or remove Mark-of-the-Web from managed files | in that same PowerShell window run `Set-ExecutionPolicy -Scope Process Bypass -Force`, then run `.\setup.ps1 -All`; the bypass ends when that PowerShell process closes and does not change the persistent user or machine policy |
 | Ghostty doesn't open maximized | `window-save-state = always` restored an old geometry over `maximize` (macOS only) | `ghostty/config` uses `window-save-state = default` (not `always`) with `maximize = true`; `always` lets the saved size win |
 | Ghostty doesn't load the config | wrong path, or WSL default skip | the install path is `~/Library/Application Support/com.mitchellh.ghostty/config` on macOS and `~/.config/ghostty/config` on native Linux. WSL only links Linux Ghostty config after `./setup.sh --experimental-wsl-gui`; otherwise use Windows Terminal |
 | Windows Terminal lost a profile after merge | WT rewrote one installation's file after setup, or an older pre-transactional setup was used | inspect that installation's independent `<settings.json>.bak.<YYYYMMDD-HHMMSS>[.n]` backups; `uninstall.ps1` validates every stable packaged, Preview, Canary, and portable candidate before mutation, restores each target independently, and preserves the displaced current file for recovery |
