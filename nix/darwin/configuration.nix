@@ -2,15 +2,11 @@
 # chezmoi owns every dotfile target (CLAUDE.md invariant 22). This module wires
 # declarative Homebrew for the GUI/vendor apps (WezTerm, AeroSpace casks) and the
 # Herdr brew; the nix-owned CLI package set lives in Home Manager (nix/home/darwin.nix).
-{ config
-, pkgs
+{ pkgs
 , username
 , userHome
 , ...
 }:
-let
-  hostedCiHomebrewCleanup = builtins.getEnv "DOTFILES_NIX_DARWIN_HOSTED_CI" == "1";
-in
 {
   # Determinate Systems owns the Nix daemon on the proving host, so nix-darwin
   # must NOT try to manage Nix itself (that would fight the Determinate daemon).
@@ -32,7 +28,7 @@ in
   users.users.${username}.home = userHome;
 
   # Declarative Homebrew. GUI / TCC-sensitive apps come from vendor channels
-  # (casks / a pinned tap), never nixpkgs -- see the migration ruling.
+  # (casks / the trusted AeroSpace tap), never nixpkgs -- see the migration ruling.
   homebrew = {
     enable = true;
 
@@ -40,16 +36,16 @@ in
       # Never mutate the world implicitly: no `brew update`, no `brew upgrade`.
       autoUpdate = false;
       upgrade = false;
-      # Report drift (uninstall-what-is-not-declared) WITHOUT destroying it.
-      # GitHub's hosted macOS images ship a large preinstalled Brew surface, so
-      # setup.sh passes DOTFILES_NIX_DARWIN_HOSTED_CI=1 only for that disposable
-      # activation path. Real hosts keep the strict drift check.
-      cleanup = if hostedCiHomebrewCleanup then "none" else "check";
+      # Homebrew is a mixed-ownership package plane: nix-darwin installs the
+      # repo-declared subset, while install-deps and the user may own additional
+      # formulae/casks. Never reject or remove those unrelated packages.
+      cleanup = "none";
     };
 
-    # With nix-homebrew mutableTaps=false, the declared taps are the pinned flake
-    # inputs; mirror them here so the homebrew module does not try to re-tap.
-    taps = builtins.attrNames config.nix-homebrew.taps;
+    # Homebrew owns mutable tap clones as the target user. nix-homebrew pins the
+    # Homebrew implementation but does not copy tap trees during root activation;
+    # copied trees are root-owned and make ordinary brew update/install noisy.
+    taps = [ "nikitabobko/tap" ];
 
     casks = [
       "wezterm"

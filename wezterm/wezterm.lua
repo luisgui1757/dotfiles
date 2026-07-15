@@ -83,7 +83,7 @@ config.adjust_window_size_when_changing_font_size = false
 config.default_cursor_style = "SteadyBlock" -- block, no blink (matches ghostty)
 
 -- ---- Scrollback ------------------------------------------------------------
-config.scrollback_lines = 50000
+config.scrollback_lines = 5000000
 
 -- ---- Shell -----------------------------------------------------------------
 -- pwsh.exe on Windows; POSIX uses the login shell (zsh after set_default_shell_zsh).

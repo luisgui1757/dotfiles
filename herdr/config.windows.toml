@@ -1,0 +1,28 @@
+# Managed by dotfiles. Native Windows must use PowerShell 7 so Herdr panes load
+# the same profile, PSReadLine ListView predictions, and history as the normal
+# Windows Terminal pwsh profile.
+onboarding = false
+
+[terminal]
+default_shell = "pwsh.exe"
+
+[keys]
+# Match tmux's prefix+w mental model: open Herdr's full workspace/tab/pane
+# navigator, where Up/Down selects an entry and Enter focuses it. Keep prefix+g
+# as an alias; the narrower workspace-only picker is redundant with this tree.
+workspace_picker = ""
+goto = ["prefix+w", "prefix+g"]
+# Herdr calls tmux windows "tabs". Preserve the tmux rename chords, then give
+# tabs, workspaces, and agents distinct cycle/direct-selection layers.
+rename_tab = "prefix+comma"
+rename_workspace = "prefix+$"
+previous_workspace = "prefix+up"
+next_workspace = "prefix+down"
+switch_workspace = "prefix+shift+1..9"
+previous_agent = "prefix+shift+a"
+next_agent = "prefix+a"
+focus_agent = "prefix+ctrl+1..9"
+
+[theme]
+name = "rose-pine"
+auto_switch = false

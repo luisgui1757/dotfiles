@@ -22,6 +22,10 @@ function Get-DotfilesWindowsTerminalTargetDefinitions {
             Path = Join-Path $LocalApplicationData 'Packages\Microsoft.WindowsTerminalPreview_8wekyb3d8bbwe\LocalState\settings.json'
         },
         [pscustomobject]@{
+            Kind = 'Canary'
+            Path = Join-Path $LocalApplicationData 'Packages\Microsoft.WindowsTerminalCanary_8wekyb3d8bbwe\LocalState\settings.json'
+        },
+        [pscustomobject]@{
             Kind = 'Portable'
             Path = Join-Path $LocalApplicationData 'Microsoft\Windows Terminal\settings.json'
         }
@@ -35,7 +39,7 @@ function Get-DotfilesWindowsTerminalTargetDefinitions {
                 [IO.Path]::GetFullPath($_).TrimEnd('\', '/')
             }
         } | Sort-Object -Unique)
-    if ($definitions.Count -ne 3 -or $kinds.Count -ne 3 -or $paths.Count -ne 3) {
+    if ($definitions.Count -ne 4 -or $kinds.Count -ne 4 -or $paths.Count -ne 4) {
         throw 'Windows Terminal target definitions are incomplete or ambiguous'
     }
     return $definitions
@@ -64,7 +68,7 @@ function Get-DotfilesWindowsTerminalTargetDefinition {
     param(
         [Parameter(Mandatory)] [string]$LocalApplicationData,
         [Parameter(Mandatory)]
-        [ValidateSet('Packaged', 'Preview', 'Portable')]
+        [ValidateSet('Packaged', 'Preview', 'Canary', 'Portable')]
         [string]$Kind
     )
 

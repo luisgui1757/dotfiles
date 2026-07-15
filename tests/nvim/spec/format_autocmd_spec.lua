@@ -39,6 +39,16 @@ describe("format-on-save autocmds", function()
     )
   end)
 
+  it("gives synchronous save formatting the strict formatter smoke timeout", function()
+    package.loaded["plugins.conform"] = nil
+    local spec = require("plugins.conform")
+    local buf = vim.api.nvim_create_buf(false, true)
+
+    assert.are.same({ timeout_ms = 10000, lsp_format = "fallback" }, spec.opts.format_on_save(buf))
+
+    vim.api.nvim_buf_delete(buf, { force = true })
+  end)
+
   it("runs Ruff fixes before Ruff formatting for Python", function()
     package.loaded["plugins.conform"] = nil
     local spec = require("plugins.conform")

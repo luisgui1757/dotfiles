@@ -186,9 +186,10 @@ function Install-Scoop {
         return $false
     }
     try {
-        # Pinned Scoop bootstrap. RemoteSigned policy is needed for the script;
-        # it is set for the current process only.
-        Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process -Force
+        # Run the pinned, hash-verified bootstrap under the calling process
+        # process policy. setup.ps1 may have been launched with Bypass so a
+        # Mark-of-the-Web checkout remains usable; never tighten that policy
+        # mid-run and strand later local helpers.
         $installer = Join-Path ([IO.Path]::GetTempPath()) "scoop-install-$([guid]::NewGuid()).ps1"
         Invoke-WebRequest -Uri $ScoopInstallerUrl -OutFile $installer -UseBasicParsing -ErrorAction Stop
         if (-not (Test-FileSha256 $installer $ScoopInstallerSha256)) {
@@ -261,6 +262,22 @@ function Test-PathListContains {
     return $false
 }
 
+function Get-PathListWithDirectoryFirst {
+    param([string]$PathValue, [Parameter(Mandatory)][string]$Directory)
+    $needle = Normalize-PathListEntry $Directory
+    if (-not $needle) { throw 'PATH directory must not be empty' }
+
+    $parts = [Collections.Generic.List[string]]::new()
+    $parts.Add($Directory)
+    foreach ($part in ($PathValue -split ';')) {
+        $trimmed = $part.Trim()
+        if ([string]::IsNullOrWhiteSpace($trimmed)) { continue }
+        if ((Normalize-PathListEntry $trimmed).Equals($needle, [StringComparison]::OrdinalIgnoreCase)) { continue }
+        $parts.Add($trimmed)
+    }
+    return ($parts -join ';')
+}
+
 function Add-DirectoryToUserPath {
     param([Parameter(Mandatory)][string]$Directory)
     $full = [IO.Path]::GetFullPath($Directory)
@@ -268,13 +285,11 @@ function Add-DirectoryToUserPath {
         throw "PATH directory does not exist: $full"
     }
 
-    if (-not (Test-PathListContains -PathValue $env:PATH -Directory $full)) {
-        $env:PATH = "$full;$env:PATH"
-    }
+    $env:PATH = Get-PathListWithDirectoryFirst -PathValue $env:PATH -Directory $full
 
     $userPath = [Environment]::GetEnvironmentVariable('PATH', 'User')
-    if (-not (Test-PathListContains -PathValue $userPath -Directory $full)) {
-        $newUserPath = if ([string]::IsNullOrWhiteSpace($userPath)) { $full } else { "$userPath;$full" }
+    $newUserPath = Get-PathListWithDirectoryFirst -PathValue $userPath -Directory $full
+    if (-not $newUserPath.Equals([string]$userPath, [StringComparison]::OrdinalIgnoreCase)) {
         [Environment]::SetEnvironmentVariable('PATH', $newUserPath, 'User')
     }
 }
@@ -2647,8 +2662,36 @@ function Test-TreeSitterCliCompatible {
     return ((Get-TreeSitterCliVersion -Path $Path) -eq $TreeSitterCliVersion.TrimStart('v'))
 }
 
+function Get-WindowsOsArchitecture {
+    param(
+        [AllowEmptyString()]
+        [string]$RuntimeArchitecture = [string][System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture
+    )
+
+    $architecture = $RuntimeArchitecture
+    if ([string]::IsNullOrWhiteSpace($architecture)) {
+        $architecture = if (-not [string]::IsNullOrWhiteSpace($env:PROCESSOR_ARCHITEW6432)) {
+            $env:PROCESSOR_ARCHITEW6432
+        } else {
+            $env:PROCESSOR_ARCHITECTURE
+        }
+    }
+    if ([string]::IsNullOrWhiteSpace($architecture)) {
+        throw 'unsupported Windows architecture for tree-sitter CLI: <unknown>'
+    }
+
+    switch ($architecture.ToLowerInvariant()) {
+        { $_ -in @('x64', 'amd64') } { return 'x64' }
+        'arm64' { return 'arm64' }
+        { $_ -in @('x86', 'i386', 'i686') } { return 'x86' }
+        default {
+            throw "unsupported Windows architecture for tree-sitter CLI: $architecture"
+        }
+    }
+}
+
 function Get-TreeSitterWindowsArtifact {
-    param([string]$Architecture = [string][System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture)
+    param([string]$Architecture = (Get-WindowsOsArchitecture))
     switch ($Architecture.ToLowerInvariant()) {
         'x64'   { $assetArch = 'x64';   $sha = $TreeSitterCliWindowsX64Sha256 }
         'arm64' { $assetArch = 'arm64'; $sha = $TreeSitterCliWindowsArm64Sha256 }
@@ -2782,9 +2825,10 @@ function Test-PiCliCurrent {
 function Test-PiCliNodeReady {
     if (-not (Get-Command node -ErrorAction SilentlyContinue)) { return $false }
     try {
-        $versionText = @(& node -p "process.versions.node" 2>$null | Select-Object -First 1)
-        if ($LASTEXITCODE -ne 0 -or $versionText.Count -eq 0) { return $false }
-        return ([version](([string]$versionText[0]).Trim()) -ge [version]'22.19.0')
+        $versionOutput = @(& node -p "process.versions.node" 2>$null)
+        $exitCode = $LASTEXITCODE
+        if ($exitCode -ne 0 -or $versionOutput.Count -eq 0) { return $false }
+        return ([version](([string]$versionOutput[0]).Trim()) -ge [version]'22.19.0')
     } catch {
         return $false
     }
@@ -2887,9 +2931,10 @@ function Invoke-PiCliVerifiedTarballInstall {
 
 function Add-NpmGlobalPrefixToPath {
     try {
-        $prefix = @(& npm prefix -g 2>$null | Select-Object -First 1)
-        if ($LASTEXITCODE -ne 0 -or $prefix.Count -eq 0) { return }
-        $dir = ([string]$prefix[0]).Trim()
+        $prefixOutput = @(& npm prefix -g 2>$null)
+        $exitCode = $LASTEXITCODE
+        if ($exitCode -ne 0 -or $prefixOutput.Count -eq 0) { return }
+        $dir = ([string]$prefixOutput[0]).Trim()
         if (-not [string]::IsNullOrWhiteSpace($dir) -and (Test-Path -LiteralPath $dir -PathType Container)) {
             Add-DirectoryToUserPath -Directory $dir
         }
@@ -3266,15 +3311,18 @@ function Install-GhDashExtension {
         return
     }
 
-    # Verify the *installed* pin, not merely presence -- a mismatched pin must be
-    # re-pinned (remove+install), because a plain install of an already-present
-    # extension errors.
+    # gh-dash is a binary extension, so the gh --pin contract accepts a release
+    # tag (commit refs are for script extensions). Verify the reviewed annotated
+    # tag -> commit mapping before installation, then pass the tag to gh.
+    # Verify the *installed* tag, not merely presence -- a mismatched release
+    # must be re-pinned (remove+install), because a plain install of an
+    # already-present extension errors.
     $list = (Invoke-GhProbe -GhArgs @('extension', 'list')).Output
     $line = @($list | Where-Object { $_ -match 'dlvhdr/gh-dash' }) | Select-Object -First 1
     $reinstall = $false
     if ($line) {
-        $expectedCommit = [regex]::Escape($GhDashCommit)
-        if ($line -match "\b$expectedCommit\b") {
+        $expectedVersion = [regex]::Escape($GhDashVersion)
+        if ($line -match "\b$expectedVersion\b") {
             Write-Host ("  ok        {0,-26} already installed ({1} -> {2})" -f "gh-dash", $GhDashVersion, $GhDashCommit)
             return
         }
@@ -3289,9 +3337,9 @@ function Install-GhDashExtension {
     if ($DryRun) {
         Write-Host "  would: verify $GhDashVersion tag object $GhDashTagObject peels to $GhDashCommit"
         if ($reinstall) {
-            Write-Host "  would: gh extension remove dash; gh extension install dlvhdr/gh-dash --pin $GhDashCommit"
+            Write-Host "  would: gh extension remove dash; gh extension install dlvhdr/gh-dash --pin $GhDashVersion"
         } else {
-            Write-Host "  would: gh extension install dlvhdr/gh-dash --pin $GhDashCommit"
+            Write-Host "  would: gh extension install dlvhdr/gh-dash --pin $GhDashVersion"
         }
         return
     }
@@ -3318,12 +3366,12 @@ function Install-GhDashExtension {
             return
         }
     }
-    $installProbe = Invoke-GhProbe -GhArgs @('extension', 'install', 'dlvhdr/gh-dash', '--pin', $GhDashCommit)
+    $installProbe = Invoke-GhProbe -GhArgs @('extension', 'install', 'dlvhdr/gh-dash', '--pin', $GhDashVersion)
     if ($installProbe.Ok) {
         $suffix = if ($reinstall) { " (re-pinned)" } else { "" }
         Write-Host ("  installed {0,-26} {1} -> {2}{3}" -f "gh-dash", $GhDashVersion, $GhDashCommit, $suffix)
     } else {
-        $script:InstallFailures += [pscustomobject]@{ Tool = 'gh-dash'; Pm = 'gh-extension'; Pkg = "dlvhdr/gh-dash@$GhDashCommit"; ExitCode = $installProbe.ExitCode }
+        $script:InstallFailures += [pscustomobject]@{ Tool = 'gh-dash'; Pm = 'gh-extension'; Pkg = "dlvhdr/gh-dash@$GhDashVersion"; ExitCode = $installProbe.ExitCode }
     }
 }
 

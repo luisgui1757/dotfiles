@@ -6,6 +6,7 @@ if (Get-Variable -Name PSNativeCommandUseErrorActionPreference -ErrorAction Sile
 $script:RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $script:SourceDir = Join-Path $script:RepoRoot 'home'
 $script:LocalAppDataSource = Join-Path $script:RepoRoot 'windows\chezmoi-localappdata'
+$script:AppDataSource = Join-Path $script:RepoRoot 'windows\chezmoi-appdata'
 $script:DocumentsSource = Join-Path $script:RepoRoot 'windows\chezmoi-documents'
 $script:OverlayConfig = Join-Path $script:RepoRoot 'windows\chezmoi-overlay.toml'
 $script:UninstallPath = Join-Path $script:RepoRoot 'uninstall.ps1'
@@ -179,6 +180,7 @@ try {
             Invoke-Chezmoi -Arguments @('init')
             Invoke-Chezmoi -Arguments @('apply')
             Invoke-ChezmoiOverlay -Source $script:LocalAppDataSource -Destination $env:LOCALAPPDATA -StateName 'localappdata' -Arguments @('apply')
+            Invoke-ChezmoiOverlay -Source $script:AppDataSource -Destination $env:APPDATA -StateName 'appdata' -Arguments @('apply')
             Invoke-ChezmoiOverlay -Source $script:DocumentsSource -Destination (Split-Path -Parent (Split-Path -Parent ([string]$PROFILE))) -StateName 'documents' -Arguments @('apply')
             Pass 'chezmoi apply completed'
 
@@ -196,6 +198,8 @@ try {
             Assert-CopyModeFilePresent -Path (Join-Path $sandbox '.config\lsd\colors.yaml')
             Assert-Condition ((Get-Item -LiteralPath ([string]$PROFILE) -Force).LinkType -eq 'SymbolicLink') 'runtime PowerShell profile is not a symlink'
             Assert-Condition ((Get-Item -LiteralPath (Join-Path $env:LOCALAPPDATA 'lazygit\config.yml') -Force).LinkType -eq 'SymbolicLink') 'lazygit actual config is not a symlink'
+            Assert-Condition ((Get-Item -LiteralPath (Join-Path $env:APPDATA 'herdr\config.toml') -Force).LinkType -eq 'SymbolicLink') 'Herdr actual config is not a symlink'
+            Assert-Condition (-not (Test-Path -LiteralPath (Join-Path $sandbox '.config\herdr\config.toml'))) 'POSIX Herdr path was created on Windows'
             Assert-NvimSymlinkPresent -Sandbox $sandbox
             Assert-Condition (-not (Test-Path -LiteralPath (Join-Path $sandbox 'Documents\PowerShell\Microsoft.PowerShell_profile.ps1'))) 'conventional Documents profile was created'
             Assert-Condition (-not (Test-Path -LiteralPath (Join-Path $sandbox 'AppData\Local\nvim'))) 'conventional LocalAppData nvim was created'
@@ -225,6 +229,7 @@ try {
             $identity = [pscustomobject]@{
                 UserProfile = $sandbox
                 LocalApplicationData = $env:LOCALAPPDATA
+                ApplicationData = $env:APPDATA
                 Documents = Split-Path -Parent (Split-Path -Parent ([string]$PROFILE))
                 RuntimeProfile = [string]$PROFILE
             }
@@ -244,6 +249,7 @@ try {
             Assert-Condition (-not (Test-Path -LiteralPath ([string]$PROFILE))) 'PowerShell profile symlink was not removed'
             Assert-Condition (-not (Test-Path -LiteralPath (Join-Path $env:LOCALAPPDATA 'nvim'))) 'nvim symlink was not removed'
             Assert-Condition (-not (Test-Path -LiteralPath (Join-Path $env:LOCALAPPDATA 'lazygit\config.yml'))) 'lazygit symlink was not removed'
+            Assert-Condition (-not (Test-Path -LiteralPath (Join-Path $env:APPDATA 'herdr\config.toml'))) 'Herdr symlink was not removed'
             Assert-Condition (Test-Path -LiteralPath $wtSettings) 'WT settings.json should not be deleted'
             Assert-Condition (-not (Test-Path -LiteralPath "$wtSettings.bak.20000101-000000")) 'selected WT backup should be consumed by restoration'
             Assert-Condition ((Get-Content -Raw -LiteralPath $wtSettings).TrimEnd("`r", "`n") -eq $wtOriginal) 'WT pre-setup backup was not restored'

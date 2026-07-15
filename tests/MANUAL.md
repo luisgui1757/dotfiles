@@ -15,6 +15,17 @@ run the printed rollback, then prove rerunning setup resumes or retries safely.
 Also run setup update/upgrade once. Record the old/new tag objects, peeled
 commits, recovery path, provider inventory, and whether any user data changed.
 
+- [ ] **Bare POSIX prerequisite:** before v0.2.0 publication, use clean
+      Nix-free Apple Silicon macOS and Linux VMs at the exact fully pushed head
+      of an official prerelease branch. Run only `./setup.sh --all`; prove the
+      helper reports that branch identity, installs/verifies Nix 2.34.0, and
+      reaches any required sudo interaction without an upstream installer
+      confirmation prompt. Confirm `nix store info` and flake evaluation work
+      without extra flags; interrupt after upstream installation but before
+      helper success, then prove a setup retry reconciles and continues. After
+      publishing the annotated tag, prove that same
+      branch checkout is rejected before download and an exact-tag clone
+      succeeds instead.
 - [ ] **Apple Silicon owner-host:** begin with v0.1.0 Homebrew formulae/casks,
       real taps, no Nix, divergent config, and backup-name collisions. Install
       Nix through setup's checksum-verified helper; prove failed
@@ -35,12 +46,13 @@ commits, recovery path, provider inventory, and whether any user data changed.
 - [ ] **Windows conventional known folders:** exact v0.1.0 checkout with
       divergent copy-mode files and nvim link. Apply from exact v0.2.0, fail
       after Terminal/config publication, and prove exact old config plus
-      stable packaged/Preview/portable Terminal bytes return before retry. After recovery is
+      stable packaged/Preview/Canary/portable Terminal bytes return before retry. After recovery is
       captured, alter or temporarily move both retained checkouts and prove
       apply/rollback still consume only the frozen release trees.
 - [ ] **Windows redirected/OneDrive/alternate drive:** repeat with Documents,
-      LocalApplicationData, and runtime `$PROFILE` on independent real paths.
-      Include divergent packaged, Preview, and portable Terminal installations;
+      LocalApplicationData, ApplicationData, and runtime `$PROFILE` on
+      independent real paths.
+      Include divergent packaged, Preview, Canary, and portable Terminal installations;
       no conventional path may be guessed or overwritten.
 - [ ] **Release acceptance:** on the final annotated v0.2.0 tag, run the full
       local/hosted gates and public-secret scan, record the tag object and peeled
@@ -72,20 +84,21 @@ commits, recovery path, provider inventory, and whether any user data changed.
 - [ ] **Windows Terminal**: rose-pine scheme applied; tabs use the
       configured theme; acrylic OFF on the body, ON in the tab row; a new tab
       opens `PowerShell 7` unless the user intentionally chose another default.
-- [ ] **Windows Terminal three-variant preservation**: give stable packaged,
-      Preview packaged, and portable settings different custom profiles,
+- [ ] **Windows Terminal four-variant preservation**: give stable packaged,
+      Preview, Canary, and portable settings different custom profiles,
       schemes, actions, and defaults; run
       `setup.ps1 -SkipDeps -SkipNvim`. Confirm each retains only its own custom
       state plus the managed fragment and receives its own verified backup.
       Run `uninstall.ps1 -All`; confirm all pre-setup backups restore and each
       displaced current file remains as `settings.json.uninstall-current.*`.
-- [ ] **Redirected Windows known folders**: redirect Documents and
-      LocalApplicationData to different real paths (include an alternate drive
-      and spaces), run `setup.ps1 -All`, then open Neovim, lazygit, ConsoleHost,
-      VS Code, and ISE. Confirm each consumes the managed target in the actual
-      known folder and no conventional `%USERPROFILE%\AppData\Local`/`Documents`
-      target was silently overwritten. Run `uninstall.ps1 -All` and verify the
-      same source states are removed or restored without guessing paths.
+- [ ] **Redirected Windows known folders**: redirect Documents,
+      LocalApplicationData, and roaming ApplicationData to different real paths
+      (include an alternate drive and spaces), run `setup.ps1 -All`, then open
+      Neovim, lazygit, Herdr, ConsoleHost, VS Code, and ISE. Confirm each consumes
+      the managed target in the actual known folder and no conventional
+      `%USERPROFILE%\AppData`/`Documents` target was silently overwritten. Run
+      `uninstall.ps1 -All` and verify the same source states are removed or
+      restored without guessing paths.
 - [ ] **Tmux status bar**: generated Rose Pine bar is at the top, includes the
       signal-bar segments (session, window list/current program, directory
       basename; no user/host/date/time duplication), segments are readable,
@@ -101,6 +114,10 @@ commits, recovery path, provider inventory, and whether any user data changed.
       config-load freeze, no sustained CPU spike, and no clipped final cell at
       the right edge. Switch flavor:
       `psmux set -g @rosepine-variant moon; psmux source-file ~/.tmux.windows.conf`.
+- [ ] **psmux manual restore**: save a named session with `prefix C-s`; confirm
+      the `run-shell` `Saved to ...` popup is only output and closes with `q` or
+      Esc. Kill the server, start `psmux new-session -s recovery`, restore with
+      `prefix C-r`, then use `prefix w` to select the restored named session.
 - [ ] **Starship prompt**: shows dir, git branch, git status icons
       (untracked/modified/staged), trailing time, and no opaque background
       blocks behind prompt text. The final Rose glyph on the right-aligned time
@@ -131,7 +148,22 @@ commits, recovery path, provider inventory, and whether any user data changed.
       fullscreen; `ctrl-alt-shift-;` enters service mode (esc reloads config).
 - [ ] **Herdr session smoke**, all OSes: `herdr --version` prints the installed
       version; start a session (`herdr`), confirm it opens panes and its
-      agent-state awareness works, then exit cleanly. On native Linux without
+      agent-state awareness works, confirm the UI uses dark Rose Pine, then
+      press `Ctrl+B`, `w`, use Up/Down to select a workspace/tab/pane, and Enter
+      to focus it (`Ctrl+B`, `g` is the same full-navigator alias). Confirm
+      `Ctrl+B`, `,` renames the current tab/window; `Ctrl+B`, `$` renames the
+      workspace; `Ctrl+B`, Up/Down traverses workspaces; `Ctrl+B`, Shift+1..9
+      selects workspaces while unshifted 1..9 still selects tabs. With at least
+      two detected agents, confirm `Ctrl+B`, `a` / `Ctrl+B`, `Shift+A` moves to
+      the next/previous agent and `Ctrl+B`, Ctrl+1..9 focuses that numbered agent.
+      Then exit cleanly. Confirm the managed config is
+      `~/.config/herdr/config.toml` on
+      POSIX and the real `%APPDATA%\herdr\config.toml` on Windows. On Windows,
+      create a fresh pane and confirm `(Get-Process -Id $PID).Name` is `pwsh`,
+      `$PROFILE` resolves below the managed PowerShell Documents path, and prior
+      PowerShell 7 commands appear in the PSReadLine ListView prediction menu.
+      Existing panes retain their old shell and are not valid evidence after a
+      config change. On native Linux without
       brew, confirm the binary is the pinned SHA-256-verified release
       (`~/.local/bin/herdr`), not a remote-eval install. On native Windows,
       confirm `herdr.exe` resolves from `%LOCALAPPDATA%\Programs\Herdr\bin`, not
@@ -160,6 +192,9 @@ commits, recovery path, provider inventory, and whether any user data changed.
 - [ ] **Windows Tree-sitter CLI**: `tree-sitter --version` prints exactly
       `0.26.10`. A compatible unmanaged executable remains untouched; after a
       stale unmanaged fixture, the verified dotfiles executable wins PATH.
+      Repeat with `%LOCALAPPDATA%\dotfiles\bin` already present behind the stale
+      command; setup must promote it once, preserve every other PATH entry, and
+      finish without the publication warning.
 - [ ] **Zsh plugin pin recovery**: bare `chezmoi apply` self-heals a clean old
       pin. With a dirty/wrong fixture and network disabled, it fails with the
       fixed source path absent and prints a preserved quarantine path.
@@ -196,15 +231,15 @@ commits, recovery path, provider inventory, and whether any user data changed.
 - [ ] **nix-darwin bootstrap/switch**, Apple Silicon macOS: with Nix installed, run
       `./setup.sh --all` (or the compatibility alias `./setup.sh --nix-darwin`;
       equivalent activation:
-      `sudo env DOTFILES_TARGET_USER="$USER" DOTFILES_TARGET_HOME="$HOME"
+      `sudo -H env DOTFILES_TARGET_USER="$USER" DOTFILES_TARGET_HOME="$HOME"
       darwin-rebuild switch --flake .#dotfiles-aarch64 --impure`; first-run setup
       derives the locked
       `github:nix-darwin/nix-darwin/<rev>?narHash=<encoded-narHash>#darwin-rebuild`
       ref from `flake.lock`). Confirm activation uses sudo but targets the
       setup-validated real invoking user/home via `DOTFILES_TARGET_*` (not
       `root` or a fabricated home), installs the WezTerm + AeroSpace casks and the Herdr brew via
-      declarative Homebrew (no `brew update`/`upgrade`; `cleanup = check` only
-      reports drift), and puts the nix-owned CLI set on PATH from
+      declarative Homebrew (no `brew update`/`upgrade`; `cleanup = none`
+      preserves mixed-ownership packages), and puts the nix-owned CLI set on PATH from
       `~/.nix-profile` / the system profile.
       On a first bootstrap with existing `/etc/bashrc` or `/etc/zshrc`, confirm
       setup retains their exact bytes at `.before-nix-darwin`; an injected
@@ -212,16 +247,33 @@ commits, recovery path, provider inventory, and whether any user data changed.
       generated replacements at collision-safe `.dotfiles-failed-*` paths. A
       pre-existing `.before-nix-darwin` collision must move neither file and
       must print explicit compare/resolve/retry guidance.
+      Without opening a new terminal after first activation, rerun
+      `./setup.sh --all`. Confirm setup uses the installed
+      `/run/current-system/sw/bin/darwin-rebuild`, does not print the bootstrap
+      message, and leaves the `/etc/static/{bashrc,zshrc}` links and both
+      `.before-nix-darwin` recovery files unchanged.
       If Homebrew already existed, confirm nix-homebrew auto-migrated the
       Homebrew repositories while keeping installed packages. If the old
-      architecture-correct `Library/Taps` directory existed, confirm setup moved
-      it to a `Taps.dotfiles-pre-nix-*` backup and nix-homebrew replaced it with
-      the declarative pinned tap symlink. Inject/fix an activation failure and
-      confirm the original taps return before retrying. Confirm
+      `Library/Taps` contains an unrelated user tap, confirm setup leaves that
+      tap installed across two runs. If the retired root-owned pinned-tap shape
+      exists, confirm setup migrates only those three snapshots and the resulting
+      `nikitabobko/tap` checkout is owned by the target user. Confirm
       `brew tap-info nikitabobko/tap`
       reports a trusted tap so Homebrew 5 can load the AeroSpace cask.
-      The `DOTFILES_NIX_DARWIN_HOSTED_CI=1` cleanup override is only for
-      GitHub's disposable macOS runner; do not use it for this real-host check.
+      Run `./tests/macos_owner_lifecycle.sh` from a clean committed checkout for
+      the canonical owner-host cycle: install, update, config uninstall,
+      reinstall, final update, and full greenfield validation. The runner must
+      report no setup-created transaction/recovery directory below
+      `Library/Taps`, an idempotent second uninstall, and no removed pre-existing
+      Homebrew formula, cask, or unrelated tap. The sudo prompt belongs to the
+      invoking terminal; do not pipe credentials into the runner or its log.
+      Tap filesystem assertions must resolve `Library/Taps` below
+      `brew --prefix`; nix-homebrew's `brew --repository` points at the managed
+      implementation and is not the tap-install root.
+      Run once from a shell where the Nix daemon profile guard is already set
+      but `/nix/var/nix/profiles/default/bin` is absent from `PATH`; setup must
+      re-adopt the installed Nix binary and must not invoke the prerequisite
+      installer.
 - [x] **Historical Intel macOS hosted runtime proof (platform retired)**: exact head
       `f4b63953f2f982702a685358b09e89bae2d78fdd` passed the real
       `macos-26-intel` Nix job (`29092384007` / `86360593091`) and full setup job
@@ -257,7 +309,7 @@ commits, recovery path, provider inventory, and whether any user data changed.
       `86399025519`, Apple Silicon `86399025503`, Intel `86399025491`, native
       Windows `86399025722`, and all four setup logical proofs were green.
       This checks the exact branch behavior; it is not WSL, redirected Windows,
-      divergent stable packaged/Preview/portable Terminal, or desktop/TCC
+      divergent stable packaged/Preview/Canary/portable Terminal, or desktop/TCC
       evidence. Merged-main run
       [`29114125798`](https://github.com/luisgui1757/dotfiles/actions/runs/29114125798)
       on PR #48 merge SHA `f104bf066e4af7d4d707fe22ba36600711f1ae14`
@@ -301,9 +353,21 @@ commits, recovery path, provider inventory, and whether any user data changed.
       setup derives the locked
       `github:nix-community/home-manager/<rev>?narHash=<encoded-narHash>#home-manager`
       ref from `flake.lock`). Confirm the nix CLI set (ripgrep/fd/fzf/jq/lazygit/node/
-      npm/starship/zoxide) lands in `~/.nix-profile/bin` with NO root, and that `nvim` +
-      `tree-sitter` are still the native install-deps binaries (NOT nix) so
-      parser builds keep working.
+      npm/starship/zoxide/clangd) lands in `~/.nix-profile/bin` with NO root.
+      `clangd` must resolve from Home Manager's `clang-tools` package on both
+      Linux architectures and must not be expected from Mason, whose registry
+      lacks a Linux arm64 artifact. Confirm `nvim` + `tree-sitter` are still the
+      native install-deps binaries (NOT nix) so parser builds keep working.
+      From a clean committed checkout, `./tests/linux_owner_lifecycle.sh` runs
+      install, update, config uninstall, an idempotent uninstall retry,
+      reinstall, final update, and full validation while proving no
+      pre-existing native package disappeared. On macOS, the digest-pinned
+      `./tests/greenfield/docker-linux-owner-lifecycle.sh` wrapper provides the
+      same non-root Linux runtime surface without claiming WSL or physical-host
+      release proof. That wrapper passed on 2026-07-13 at exact commit
+      `51c5211b4b3dee4f0758533beac5e18345d668a1`, including 36/36 final
+      validation checks and pre-existing-package preservation. This row remains
+      open for a physical Linux host and WSL.
 - [ ] **Fresh Home Manager zsh session**, native Linux and WSL: with no caller
       PATH injection, run `env -i HOME="$HOME" USER="$USER" PATH=/usr/bin:/bin
       TERM=xterm zsh -l -i -c 'command -v rg'`. Confirm it resolves through a

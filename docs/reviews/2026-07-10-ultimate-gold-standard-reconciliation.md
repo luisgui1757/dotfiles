@@ -1999,3 +1999,293 @@ until the new head runs.
 
 No review, approval, merge, release tag, live safeguard mutation, or
 merged-main cache-free proof is claimed by this entry.
+
+## nix-darwin stale-PATH retry repair — entry 50
+
+- A real Apple Silicon owner-host retry after the first successful nix-darwin
+  activation failed before a second activation. The still-open terminal could
+  not resolve `darwin-rebuild` on `PATH`, so setup incorrectly re-entered first
+  bootstrap and rejected the legitimate retained
+  `/etc/{bashrc,zshrc}.before-nix-darwin` recovery files. The Homebrew tap
+  transaction rolled back all three staged legacy snapshots, so the failure was
+  explicit and left no partial tap migration.
+- Current host state proved the alternative explanation false: nix-darwin was
+  installed at `/run/current-system/sw/bin/darwin-rebuild`, `/etc/bashrc` and
+  `/etc/zshrc` were exact links to `/etc/static/{bashrc,zshrc}`, and both
+  original recovery files remained intact. This was an idempotency defect in
+  setup discovery, not a user-created backup collision.
+- Setup now resolves the installed current-system or system-profile rebuild
+  command after ordinary `PATH` lookup. First-bootstrap shell migration skips
+  only exact nix-darwin `/etc/static` links; unmanaged sources with occupied
+  backup names still fail before either file moves. Rollback continues to own
+  only shell files moved by the current invocation.
+- Automated coverage reproduces the owner-host shape with a stale `PATH`, an
+  installed absolute rebuild command, managed shell links, and retained
+  backups. It also directly proves managed-link retry idempotency while keeping
+  the prior collision, partial-move, failure, signal, and rollback cases.
+
+### Repair verification
+
+| Check | Exact result |
+|---|---|
+| Restricted-`PATH` real-host `./setup.sh --all --dry-run` | PASS: selected `/run/current-system/sw/bin/darwin-rebuild`; no bootstrap migration was selected |
+| `bash tests/nix/setup_nix_darwin_test.sh` | PASS: stale-PATH installed-generation and managed-link retry regressions plus all prior nix-darwin cases |
+| `bash tests/nix/run_all.sh` | PASS |
+| `/opt/homebrew/bin/shellcheck setup.sh tests/nix/setup_nix_darwin_test.sh` | PASS |
+| `git diff --check` and Bash parse checks | PASS |
+| `make ci` | PASS: ended `local pre-PR gate passed` |
+| Privileged owner-host retry | PENDING: sudo credential expired; no password was requested or captured by automation |
+
+No pushed-head hosted result, privileged retry, review, approval, merge,
+release tag, live safeguard mutation, or merged-main cache-free proof is claimed
+by this entry.
+
+## Homebrew tap scan-boundary repair — entry 51
+
+- The next real Apple Silicon owner-host retry reached nix-darwin activation and
+  disproved entry 50's remaining assumption about tap rollback storage.
+  Setup staged the retired root-owned `nikitabobko/homebrew-tap` snapshot as
+  `nikitabobko/homebrew-tap.dotfiles-pre-user-taps-*` below
+  `Library/Taps`. Homebrew enumerated that diagnostic directory as another live
+  tap, then failed because `aerospace` existed in both it and the replacement
+  `nikitabobko/tap` checkout.
+- Rollback restored all three original root-owned snapshots but retained the
+  failed replacement as `homebrew-tap.dotfiles-failed-*` under the same scan
+  root, so a plain retry would reproduce duplicate-tap discovery. This was a
+  setup-owned transaction-boundary defect, not a pre-existing Tart/Cirrus
+  package conflict and not a reason to uninstall user packages.
+- Setup now stores original snapshots, failed replacements, and diagnostic
+  recovery trees beside `Library/Taps`, never below it. Before a new migration,
+  it recognizes only the exact three tap paths plus exact recovery suffixes
+  emitted by the broken predecessor and relocates those artifacts outside the
+  scan tree. Unrelated tap names and the whole `Library/Taps` directory remain
+  outside the selector.
+- The failure regression proves restored originals plus failed replacement
+  retention outside the scan tree. The retry regression seeds an old in-tree
+  artifact, proves automatic external relocation, proves every activation-time
+  backup is external, proves success removes the transaction root, and proves a
+  second activation is idempotent.
+- `tests/macos_owner_lifecycle.sh` is now the canonical destructive host smoke:
+  install, update, config uninstall, reinstall, final update, final full
+  greenfield validation, and before/after Homebrew inventory preservation. It
+  keeps the password prompt on the owner's terminal and logs no credential.
+
+### Repair verification
+
+| Check | Exact result |
+|---|---|
+| `bash -n setup.sh tests/nix/setup_nix_darwin_test.sh tests/macos_owner_lifecycle.sh` | PASS |
+| `/opt/homebrew/bin/shellcheck setup.sh tests/nix/setup_nix_darwin_test.sh tests/macos_owner_lifecycle.sh` | PASS |
+| `bash tests/nix/setup_nix_darwin_test.sh` | PASS, including external transaction, prior-artifact recovery, failed-output quarantine, and second-run idempotency cases |
+| Real-host `./setup.sh --all --dry-run` | PASS: selected `/run/current-system/sw/bin/darwin-rebuild`, scheduled the exact stale failed-tap artifact for external relocation, and selected only the three retired root-owned snapshots |
+| `make ci` | PASS: ended `local pre-PR gate passed` on the complete repaired behavior/documentation tree |
+| Full owner-host lifecycle runner | PENDING until this repaired committed head is invoked from the owner's terminal |
+
+UGR-013 remains ACCEPTED/FIXED at the code/regression level, but the real
+owner-host lifecycle row remains pending. No pushed-head hosted result,
+privileged lifecycle result, review, approval, merge, release tag, live
+safeguard mutation, or merged-main cache-free proof is claimed by this entry.
+
+## Guarded Nix-profile PATH recovery — entry 52
+
+- The first committed owner-host lifecycle invocation at
+  `a3fc2f5040fa40434c10580502a115e261062403` stopped before nix-darwin with
+  Git's `fatal: Needed a single revision`. A second ordinary run repeated it,
+  so retry was stopped and the lifecycle was instrumented.
+- The exact trace proved setup saw no `nix` on `PATH`, then sourced
+  `/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh`. The login shell
+  had already set that profile's sourced guard, so the source correctly no-op'd.
+  Setup then misclassified installed Nix as absent, invoked the prerequisite
+  installer, and that release-only helper rejected the untagged development
+  branch at its tag revision check. This was not a corrupt repository or a
+  failed nix-darwin/Homebrew activation.
+- The environment shape is valid: Homebrew's `path_helper` refresh can replace
+  `PATH` after the Nix profile guard is set. Setup now checks the canonical
+  daemon and user profile binaries directly before sourcing guarded profile
+  scripts. The lifecycle runner also carries the daemon profile bin explicitly.
+- A focused regression sets the profile guard, removes Nix from `PATH`, and
+  requires canonical profile recovery without invoking the prerequisite helper.
+  A real stale-PATH dry-run reaches installed nix-darwin normally.
+- The first post-repair lifecycle install at `3e937f2` then completed all six
+  setup phases in 17 seconds. Its post-install assertion—not setup—failed by
+  deriving `Library/Taps` from `brew --repository`. Under nix-homebrew that
+  repository is `.homebrew-is-managed-by-nix`; live tap clones remain below
+  `brew --prefix`. The runner now uses the prefix, and a fake managed-repository
+  regression proves both correct discovery and rejection of an in-prefix
+  `.dotfiles-failed-*` artifact.
+- Separately, the owner ran ordinary `./setup.sh --all` successfully at
+  `a3fc2f5`: all six phases completed. Live readback found the active
+  current-system rebuild command, target-user-owned `nikitabobko/tap`, and no
+  setup recovery artifact under Homebrew's scanned `Library/Taps`. This proves
+  the repaired tap boundary's install path, but not yet the complete lifecycle.
+
+### Repair verification
+
+| Check | Exact result |
+|---|---|
+| Instrumented owner-host lifecycle at `a3fc2f5` | FAIL before mutation: installed Nix was absent from stale PATH and guarded profile sourcing no-op'd |
+| Owner-terminal `./setup.sh --all` at `a3fc2f5` | PASS: nix-darwin plus all six setup phases completed |
+| Live tap/system readback after install | PASS: current-system rebuild executable, `nikitabobko/tap` target-user owned, no `.dotfiles-*` tap enumerated or stored below `Library/Taps` |
+| `bash tests/shell/setup_universal_entrypoint_test.sh` | PASS: guarded canonical-profile recovery plus existing bootstrap/migration cases |
+| Stale-PATH `./setup.sh --all --dry-run` | PASS: Nix store and installed current-system rebuild resolved without prerequisite reinstall |
+| `make ci` | PASS: ended `local pre-PR gate passed` on the guarded-profile recovery tree |
+| Owner lifecycle phase 1 at `3e937f2` | PASS: all six setup phases completed in 17 seconds; runner then failed its incorrect repository-derived tap assertion |
+| `bash tests/nix/macos_owner_lifecycle_test.sh` | PASS: prefix/repository split and in-prefix recovery-artifact rejection |
+| `make ci` after the lifecycle tap-root correction | PASS: ended `local pre-PR gate passed` |
+| Full lifecycle on the new recovery head | PENDING |
+
+The complete install/update/uninstall/reinstall/update row remains pending. No
+pushed-head hosted result, completed lifecycle, review, approval, merge, release
+tag, live safeguard mutation, or merged-main cache-free proof is claimed by this
+entry.
+
+## Cross-platform owner-lifecycle and theme closure — entry 53
+
+- Exact committed head `51c5211b4b3dee4f0758533beac5e18345d668a1`
+  completed the digest-pinned local Ubuntu 24.04 arm64 owner lifecycle: real
+  Home Manager plus native apt install, update, config uninstall, idempotent
+  uninstall retry, reinstall, final update, and 36/36 full validation. Every
+  pre-existing native package remained installed. This proves the Linux runtime
+  surface in the pinned container, not a physical Linux host or WSL.
+- The same run consumed the chezmoi-managed Herdr config at
+  `~/.config/herdr/config.toml`; the canonical file forces Herdr's built-in
+  `rose-pine` theme with onboarding and automatic light/dark switching disabled.
+  POSIX uses the XDG path and native Windows uses an independent roaming
+  ApplicationData chezmoi state so the actual application consumer is managed
+  on every platform.
+- The first pushed CI run on that head exposed two test-host portability
+  defects, not installer failures: the macOS lifecycle unit fixture invoked BSD
+  `stat` while running on Ubuntu, and ShellCheck rejected a fixture function
+  definition that appeared after its first production-function call. The
+  macOS-only command is now stubbed only at the cross-host unit-test boundary;
+  the universal setup test runs the real production profile recovery in an
+  isolated re-source while defining the later bootstrap fixture before use. No
+  lint suppression or product-behavior relaxation was added.
+- Homebrew completion repair is now setup-owned after activation in install and
+  update modes. It runs `brew completions link` through the selected Homebrew,
+  fails closed on repair failure, and removes the prior hidden manual recovery
+  step for stale `_brew` completion links.
+- A config-only owner-host apply then created the real Herdr consumer path at
+  `~/.config/herdr/config.toml` as a chezmoi-managed symlink to the canonical
+  template. `herdr status` parsed the resulting configuration successfully and
+  reported client `0.7.3`, stable channel, with no running server. This is
+  application/config parse evidence, not a visual theme-session observation.
+
+### Closure verification
+
+| Check | Exact result |
+|---|---|
+| `./tests/greenfield/docker-linux-owner-lifecycle.sh` at `51c5211b4b3dee4f0758533beac5e18345d668a1` | PASS: full five-phase lifecycle, 36/36 final validation, all pre-existing packages preserved; host log retained at `tests/.cache/linux-owner-lifecycle-docker-20260713-093950.log` |
+| `bash tests/nix/macos_owner_lifecycle_test.sh` | PASS on macOS after the Ubuntu test-boundary repair |
+| `bash tests/shell/setup_universal_entrypoint_test.sh` | PASS: real guarded-profile recovery plus verified bootstrap and migration cases |
+| `bash tests/shell/lint.sh` | PASS: no SC2218 and no new suppressions |
+| `PATH=/opt/homebrew/bin:$PATH make ci` | PASS: ended `local pre-PR gate passed` on the complete repair, proof, and documentation tree |
+| `./setup.sh --all --skip-deps --skip-config-scripts --skip-nvim --skip-agents` plus `herdr status` | PASS: live Mac consumer path created, bytes match `herdr/config.toml`, and Herdr parses the managed config |
+| Full Apple Silicon owner lifecycle | PENDING: the dedicated owner Terminal is at its one `sudo -v` credential prompt; no credential is captured or automated |
+
+No physical-Linux, WSL, Windows desktop, Herdr visual-session, completed macOS
+lifecycle, final pushed-head hosted, approval, merge, release tag, safeguard
+mutation, or merged-main cache-free proof is claimed by this entry.
+
+## PowerShell analyzer identity closure — entry 54
+
+- Pushed head `0e5f48bdc32e9cb5b32a1cac26f16ce281b8f816` reached the
+  Windows `test.ps1` entry point in hosted Test run
+  [`29233944017`](https://github.com/luisgui1757/dotfiles/actions/runs/29233944017).
+  PSScriptAnalyzer 1.25.0 retained every reviewed rule/path/count group but
+  rejected the stale exact identity fingerprint: expected `5630775a...f090`,
+  actual `284a5c26...718a`. The runner then passed all 266 Pester tests and
+  invoked every Neovim spec; the job's final exit 1 was the correctly retained
+  analyzer failure, not a Neovim failure.
+- The stale fingerprint predated this branch's later reviewed changes to
+  warning extents in `setup.ps1` and related PowerShell surfaces, including the
+  fail-closed Mason command text. Recomputing with the same analyzer version on
+  macOS produced the same `284a5c26ff6986b5bb4805367417a09958e5bea39de25edfefc14487c175718a`
+  identity as Windows. The baseline is refreshed to that exact reviewed
+  identity without changing a rule, scanned path, group count, diagnostic, or
+  suppression.
+
+### Repair verification
+
+| Check | Exact result |
+|---|---|
+| Hosted Windows `test.ps1` at `0e5f48b` before repair | FAIL: exact analyzer identity mismatch; Pester 266 passed, 0 failed/skipped; all 18 Neovim specs were invoked |
+| Local PSScriptAnalyzer 1.25.0 recomputation | PASS: exact rule/path/count groups retained; independently produced fingerprint `284a5c26ff6986b5bb4805367417a09958e5bea39de25edfefc14487c175718a` |
+| `pwsh -NoLogo -NoProfile -File ./test.ps1` after repair | PASS: analyzer exact fingerprint, 265 Pester passed with zero failed/skipped, and all 18 Neovim specs exited 0 |
+
+The repaired pushed-head hosted result remains pending. No completed macOS
+lifecycle, approval, merge, release tag, live safeguard mutation, or
+merged-main cache-free proof is claimed by this entry.
+
+## Windows Herdr PowerShell-profile closure — entry 55
+
+- The owner observed that native-Windows Herdr panes had no prior-command
+  ListView predictions and treated previously used commands as new. This was
+  not a Windows Terminal history-size defect: the pinned Herdr preview source
+  at `f5354780e4ef` hardcodes `powershell.exe` when
+  `terminal.default_shell` is empty. Windows PowerShell and PowerShell 7 use
+  different profile/history roots, and Windows PowerShell cannot provide the
+  managed PSReadLine ListView experience.
+- Windows now consumes `herdr/config.windows.toml` through the independently
+  resolved roaming ApplicationData overlay. It retains forced built-in Rose
+  Pine and explicitly selects `pwsh.exe`. POSIX continues consuming
+  `herdr/config.toml` without a shell override, so macOS/Linux preserve the
+  user's normal shell. The pinned Herdr source recognizes `pwsh.exe` as an
+  interactive PowerShell pane and injects its normal `-NoExit` prompt
+  integration without `-NoProfile`, allowing the managed PowerShell 7 profile
+  to load.
+- Setup consumption checks, Windows migration assertions, the greenfield
+  validator, and the static Herdr invariant now bind the Windows destination to
+  the Windows config and require `pwsh.exe`. Documentation calls out Herdr's
+  startup boundary: existing panes retain their original shell and must be
+  recreated before manual validation.
+
+### Closure verification
+
+| Check | Exact result |
+|---|---|
+| Pinned upstream source inspection (`ogulcancelik/herdr@f5354780e4ef`) | PASS: empty Windows shell resolves to `powershell.exe`; configured `pwsh.exe` is recognized as an interactive PowerShell shell |
+| `bash tests/static/herdr_theme_test.sh` | PASS: both configs force Rose Pine; POSIX has no shell override; Windows requires `pwsh.exe` and the ApplicationData overlay targets it |
+| `bash tests/migration/template_test.sh` and `bash tests/migration/windows_render_test.sh` | PASS: all OS ignore renders and Windows Terminal ownership/render contracts remain clean |
+| Focused `tests/powershell/Setup.Tests.ps1` | PASS: 63 passed, 0 failed/skipped, including the exact Windows Herdr consumer check |
+| `pwsh -NoLogo -NoProfile -File ./test.ps1` | PASS: exact analyzer identity, 265 Pester passed with zero failed/skipped, and all 18 Neovim specs exited 0 |
+| `PATH=/opt/homebrew/bin:$PATH make ci` | PASS: ended `local pre-PR gate passed` on the complete behavior, tests, and documentation tree |
+
+Native-Windows fresh-pane visual/history confirmation and the full Apple
+Silicon owner lifecycle remain pending. No final pushed-head hosted result,
+approval, merge, release tag, live safeguard mutation, or merged-main
+cache-free proof is claimed by this entry.
+
+## Windows Tree-sitter PATH-publication closure — entry 56
+
+- The owner observed accepted native-Windows Tree-sitter installation ending
+  with `published tree-sitter executable is not the command resolved on PATH`
+  and setup exit 1. The pinned archive, staged executable, and final managed
+  executable had already passed exact-version and checksum validation; command
+  discovery still selected an incompatible executable earlier in `PATH`.
+- Root cause: `Add-DirectoryToUserPath` prepended a newly absent directory to
+  the process path, but treated an existing later entry as complete and
+  appended new entries to persistent User `PATH`. A prior failed/retried setup
+  or older managed directory could therefore remain permanently shadowed.
+- Windows direct-artifact publication now de-duplicates the owned directory and
+  promotes it to the front of both current-process and User `PATH`. Other PATH
+  entries and the shadowing preinstalled tool remain intact; the verified
+  dotfiles artifact wins resolution without package-manager cleanup.
+- The existing transactional Tree-sitter test now reproduces the real state:
+  an incompatible command first, the managed bin already second, and a stale
+  managed target. It failed with the owner's exact warning before the repair
+  and passes only when publication reorders PATH and resolves version 0.26.10.
+
+### Repair verification
+
+| Check | Exact result |
+|---|---|
+| Focused Tree-sitter shadow-PATH regression before repair | EXPECTED FAIL: exact publication warning reproduced; 0 passed, 1 failed |
+| Same focused regression after repair | PASS: 1 passed, 0 failed; exact verified artifact installed and resolved |
+| Full `tests/powershell/InstallDeps.Tests.ps1` | PASS: 123 passed, 0 failed/skipped, including PATH order/de-duplication and transactional rollback cases |
+| `pwsh -NoLogo -NoProfile -File ./test.ps1` | PASS: PSScriptAnalyzer, 266 Pester tests, and all 18 Neovim specs |
+| `PATH=/opt/homebrew/bin:$PATH make ci` | PASS: ended `local pre-PR gate passed` |
+
+Pushed-head hosted and native-Windows rerun proof remain pending. No completed
+Apple Silicon owner lifecycle, approval, merge, release tag, live safeguard
+mutation, or merged-main cache-free proof is claimed by this entry.

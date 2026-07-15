@@ -27,6 +27,7 @@ Describe 'uninstall.ps1 backup ordering and Windows Terminal recovery' {
         $script:WindowsIdentity = [pscustomobject]@{
             UserProfile = $script:Root
             LocalApplicationData = $env:LOCALAPPDATA
+            ApplicationData = Join-Path $script:Root 'Redirected Roaming AppData'
             Documents = Join-Path $script:Root 'Redirected Documents'
             RuntimeProfile = Join-Path $script:Root 'Redirected Documents\PowerShell\Microsoft.PowerShell_profile.ps1'
         }
@@ -41,18 +42,27 @@ Describe 'uninstall.ps1 backup ordering and Windows Terminal recovery' {
         Remove-Item -LiteralPath $script:Root -Recurse -Force -ErrorAction SilentlyContinue
     }
 
-    It 'enumerates stable packaged, Preview packaged, and portable targets' {
+    It 'enumerates stable, Preview, Canary, and portable targets' {
         $targets = @(Get-WindowsTerminalRecoveryTargets)
 
-        $targets.Count | Should -Be 3
+        $targets.Count | Should -Be 4
         $targets[0] | Should -Match 'Microsoft\.WindowsTerminal_8wekyb3d8bbwe'
         $targets[1] | Should -Match 'Microsoft\.WindowsTerminalPreview_8wekyb3d8bbwe'
-        $targets[2] | Should -Match 'Microsoft[\\/]Windows Terminal'
+        $targets[2] | Should -Match 'Microsoft\.WindowsTerminalCanary_8wekyb3d8bbwe'
+        $targets[3] | Should -Match 'Microsoft[\\/]Windows Terminal'
     }
 
     It 'rejects a relative LocalApplicationData boundary before enumerating targets' {
         { Get-DotfilesWindowsTerminalTargetDefinitions -LocalApplicationData 'relative\profile' } |
             Should -Throw '*missing or not absolute*'
+    }
+
+    It 'tracks empty Herdr parents inside the independently resolved ApplicationData boundary' {
+        $herdrDir = Join-Path $script:WindowsIdentity.ApplicationData 'herdr'
+
+        Add-ParentDirs -Path (Join-Path $herdrDir 'config.toml')
+
+        $script:DirCandidates | Should -Contain $herdrDir
     }
 
     It 'selects filename timestamp and collision suffix instead of mtime' {
@@ -87,21 +97,26 @@ Describe 'uninstall.ps1 backup ordering and Windows Terminal recovery' {
         { Get-NewestBackup -Target $target } | Should -Throw '*malformed backup candidate*'
     }
 
-    It 'restores packaged, Preview, and portable settings independently while preserving current bytes' {
+    It 'restores packaged, Preview, Canary, and portable settings independently while preserving current bytes' {
         $targets = @(Get-WindowsTerminalRecoveryTargets)
         $packaged = $targets[0]
         $preview = $targets[1]
-        $portable = $targets[2]
+        $canary = $targets[2]
+        $portable = $targets[3]
         New-Item -ItemType Directory -Force -Path (Split-Path -Parent $packaged), `
-            (Split-Path -Parent $preview), (Split-Path -Parent $portable) | Out-Null
+            (Split-Path -Parent $preview), (Split-Path -Parent $canary), `
+            (Split-Path -Parent $portable) | Out-Null
         [IO.File]::WriteAllText($packaged, '{"current":"packaged"}')
         [IO.File]::WriteAllText($preview, '{"current":"preview"}')
+        [IO.File]::WriteAllText($canary, '{"current":"canary"}')
         [IO.File]::WriteAllText($portable, '{"current":"portable"}')
         $packagedBackup = "$packaged.bak.20260202-020202.1"
         $previewBackup = "$preview.bak.20260203-020202"
+        $canaryBackup = "$canary.bak.20260204-020202"
         $portableBackup = "$portable.bak.20260303-030303"
         [IO.File]::WriteAllText($packagedBackup, '{"before":"packaged"}')
         [IO.File]::WriteAllText($previewBackup, '{"before":"preview"}')
+        [IO.File]::WriteAllText($canaryBackup, '{"before":"canary"}')
         [IO.File]::WriteAllText($portableBackup, '{"before":"portable"}')
         (Get-Item $packagedBackup).LastWriteTimeUtc = [DateTime]::UtcNow.AddYears(-2)
 
@@ -109,28 +124,32 @@ Describe 'uninstall.ps1 backup ordering and Windows Terminal recovery' {
 
         [IO.File]::ReadAllText($packaged) | Should -Be '{"before":"packaged"}'
         [IO.File]::ReadAllText($preview) | Should -Be '{"before":"preview"}'
+        [IO.File]::ReadAllText($canary) | Should -Be '{"before":"canary"}'
         [IO.File]::ReadAllText($portable) | Should -Be '{"before":"portable"}'
         @(Get-ChildItem -LiteralPath (Split-Path -Parent $packaged) -Filter 'settings.json.uninstall-current.*').Count | Should -Be 1
         @(Get-ChildItem -LiteralPath (Split-Path -Parent $preview) -Filter 'settings.json.uninstall-current.*').Count | Should -Be 1
+        @(Get-ChildItem -LiteralPath (Split-Path -Parent $canary) -Filter 'settings.json.uninstall-current.*').Count | Should -Be 1
         @(Get-ChildItem -LiteralPath (Split-Path -Parent $portable) -Filter 'settings.json.uninstall-current.*').Count | Should -Be 1
         [IO.File]::ReadAllText(@(Get-ChildItem -LiteralPath (Split-Path -Parent $packaged) -Filter 'settings.json.uninstall-current.*')[0].FullName) | Should -Be '{"current":"packaged"}'
         [IO.File]::ReadAllText(@(Get-ChildItem -LiteralPath (Split-Path -Parent $preview) -Filter 'settings.json.uninstall-current.*')[0].FullName) | Should -Be '{"current":"preview"}'
+        [IO.File]::ReadAllText(@(Get-ChildItem -LiteralPath (Split-Path -Parent $canary) -Filter 'settings.json.uninstall-current.*')[0].FullName) | Should -Be '{"current":"canary"}'
         [IO.File]::ReadAllText(@(Get-ChildItem -LiteralPath (Split-Path -Parent $portable) -Filter 'settings.json.uninstall-current.*')[0].FullName) | Should -Be '{"current":"portable"}'
     }
 
-    It 'validates all three paths before restoring any one' {
+    It 'validates all four paths before restoring any one' {
         $targets = @(Get-WindowsTerminalRecoveryTargets)
         foreach ($target in $targets) {
             New-Item -ItemType Directory -Force -Path (Split-Path -Parent $target) | Out-Null
             [IO.File]::WriteAllText($target, '{"current":true}')
             [IO.File]::WriteAllText("$target.bak.20260101-010101", '{"before":true}')
         }
-        [IO.File]::WriteAllText("$($targets[2]).bak.latest", '{"bad":true}')
+        [IO.File]::WriteAllText("$($targets[3]).bak.latest", '{"bad":true}')
 
         { Restore-WindowsTerminalSettingsBackups } | Should -Throw '*malformed backup candidate*'
         [IO.File]::ReadAllText($targets[0]) | Should -Be '{"current":true}'
         [IO.File]::ReadAllText($targets[1]) | Should -Be '{"current":true}'
         [IO.File]::ReadAllText($targets[2]) | Should -Be '{"current":true}'
+        [IO.File]::ReadAllText($targets[3]) | Should -Be '{"current":true}'
     }
 
     It 'is write-free in dry-run and honors NoRestoreBackups' {

@@ -22,6 +22,7 @@ greenfield runbook.
 | Ghostty | `ghostty/config`; `home/.chezmoitemplates/ghostty/config` | macOS: `~/Library/Application Support/com.mitchellh.ghostty/config`; Linux: `~/.config/ghostty/config`; Windows: n/a | Per-path POSIX `symlink_config.tmpl` entries into `.chezmoitemplates`. |
 | WezTerm | `wezterm/wezterm.lua`; `home/.chezmoitemplates/wezterm/wezterm.lua`; `home/dot_config/wezterm/wezterm.lua` | macOS/Linux/WSL GUI opt-in: `~/.config/wezterm/wezterm.lua`; Windows: `%USERPROFILE%\.config\wezterm\wezterm.lua` | POSIX path-specific symlinks; Windows copy. WSL skips Linux GUI terminal config unless setup passes the explicit GUI override. |
 | AeroSpace | `aerospace/aerospace.toml`; `home/dot_config/aerospace/aerospace.toml` | macOS: `~/.config/aerospace/aerospace.toml`; Linux/Windows: ignored | macOS symlink via `mode = "symlink"`. |
+| Herdr | `herdr/config.toml`; `herdr/config.windows.toml`; `home/.chezmoitemplates/herdr/config.toml`; `home/dot_config/herdr/symlink_config.toml.tmpl`; `windows/chezmoi-appdata/herdr/symlink_config.toml.tmpl` | macOS/Linux/WSL: `~/.config/herdr/config.toml`; Windows: actual roaming ApplicationData `herdr\config.toml` | POSIX path-specific symlink and dedicated Windows ApplicationData destination state; both force built-in `rose-pine`, while Windows additionally selects `pwsh.exe` so panes load the managed PowerShell 7 profile and PSReadLine history UI. |
 | lazygit | `lazygit/config.yml`; `home/.chezmoitemplates/lazygit/config.yml`; `windows/chezmoi-localappdata/lazygit/symlink_config.yml.tmpl` | macOS: `~/Library/Application Support/lazygit/config.yml`; Linux/WSL: `~/.config/lazygit/config.yml`; Windows: actual LocalApplicationData `lazygit\config.yml` | POSIX path-specific symlinks; Windows known-folder symlink to the native config. |
 | gh-dash | `gh-dash/config.yml`; `home/dot_config/gh-dash/config.yml` | macOS/Linux/WSL: `~/.config/gh-dash/config.yml`; Windows: `%USERPROFILE%\.config\gh-dash\config.yml` | POSIX symlink via `mode = "symlink"`; Windows copy via `mode = "file"`. |
 | lsd | `lsd/config.yaml`; `lsd/colors.yaml`; `home/dot_config/lsd/config.yaml`; `home/dot_config/lsd/colors.yaml` | macOS/Linux/WSL: `~/.config/lsd/{config.yaml,colors.yaml}`; Windows: `%USERPROFILE%\.config\lsd\{config.yaml,colors.yaml}` | POSIX symlink via `mode = "symlink"`; Windows copy via `mode = "file"`. The shell profiles own Rose Pine `LS_COLORS` for file/directory names, with `DOTFILES_LS_COLORS` as the explicit override; `colors.yaml` owns long-list metadata. |
@@ -30,7 +31,7 @@ greenfield runbook.
 | tmux POSIX overlay | `tmux/tmux.posix.conf`; `home/dot_tmux.posix.conf` | POSIX: `~/.tmux.posix.conf`; Windows: ignored | POSIX symlink only. Holds the native-clipboard `if-shell` probes, which hang psmux at config-load time, so it is **never** deployed on Windows; `tmux.conf` sources it with `source-file -q`. |
 | psmux | `tmux/psmux.conf`; `home/dot_psmux.conf` | Windows: `%USERPROFILE%\.psmux.conf`; POSIX: ignored | Windows copy only. It is the first native-Windows multiplexer entrypoint and source-files the tmux Windows overlay. |
 | Generated Rose Pine tmux/psmux bar | `tmux/psmux-rose-pine.ps1`; generated `tmux/psmux-rose-pine.{main,moon,dawn}.conf`; `home/dot_tmux.rose-pine.ps1`; `home/dot_tmux.rose-pine.*.conf` | POSIX/Windows: `~/.tmux.rose-pine.{main,moon,dawn}.conf`; Windows also gets `~/.tmux.rose-pine.ps1` | Source generator plus checked generated configs; POSIX symlinks, Windows copies. |
-| Windows Terminal | `windows-terminal/settings.fragment.jsonc`; `home/.chezmoitemplates/windows-terminal/{settings.fragment.jsonc,merge-settings.ps1}`; `scripts/windows-terminal-targets.ps1` | Windows stable packaged + Preview packaged + portable settings paths | `setup.ps1` is the only publisher. Chezmoi exposes no WT target. One validated enumerator is shared by setup, release migration/recovery, and uninstall. Setup independently merges each selected target's own state, stages beside the destination, validates all plans, creates separate verified backups, atomically publishes with concurrent-change detection, and rolls back the multi-target transaction on failure. |
+| Windows Terminal | `windows-terminal/settings.fragment.jsonc`; `home/.chezmoitemplates/windows-terminal/{settings.fragment.jsonc,merge-settings.ps1}`; `scripts/windows-terminal-targets.ps1` | Windows stable packaged + Preview + Canary + portable settings paths | `setup.ps1` is the only publisher. Chezmoi exposes no WT target. One validated enumerator is shared by setup, release migration/recovery, and uninstall. Setup independently merges each selected target's own state, stages beside the destination, validates all plans, creates separate verified backups, atomically publishes with concurrent-change detection, and rolls back the multi-target transaction on failure. |
 | PowerShell profiles | `shells/powershell_profile.ps1`; `windows/chezmoi-documents/{PowerShell,WindowsPowerShell}/symlink_*_profile.ps1.tmpl` | actual Documents known folder for ConsoleHost, VS Code, and ISE; active runtime `$PROFILE` must resolve to one of them | Dedicated Documents destination state; every supported host profile symlinks to the canonical source and setup post-checks consumption. |
 | zsh plugins | `scripts/ensure-pinned-zsh-plugin.sh`; `home/.chezmoiscripts/run_onchange_after_20-ensure-zsh-plugin-pins.sh.tmpl` | POSIX: `~/.local/share/dotfiles/zsh-plugins/{fzf-tab,zsh-autosuggestions}`; Windows: ignored | Install-deps and pin/helper changes in chezmoi share the serialized sibling-stage publisher. Unproved payloads are quarantined before fetch; only expected-origin, exact-HEAD, clean, tracked-entry-file checkouts publish atomically. Generic git-repo externals are intentionally absent. |
 
@@ -68,14 +69,19 @@ canonical v0.2.0 path is now side-by-side and exact-tag-only:
 - `scripts/upgrade-v0.1.0.ps1` handles native Windows without Nix. It applies
   config files/symlinks with dependencies, Neovim caches, agent policy, and
   chezmoi run scripts skipped; resolves actual known folders; freezes both
-  exact release trees plus stable packaged, Preview packaged, and portable Terminal recovery bytes under a
+  exact release trees plus stable packaged, Preview, Canary, and portable Terminal recovery bytes under a
   protected ACL, publishes and rolls back only from those trees, retains
   conventional v0.1 targets until acceptance, removes only transaction-created
-  overlay state on rollback, and validates all three canonical Terminal paths
+  overlay state on rollback, and validates all four canonical Terminal paths
   before any restore write.
 - `scripts/install-nix-prerequisite.sh` installs only checksum-reviewed upstream
-  Nix 2.34.0 release archives and refuses non-release checkouts. Setup owns its
-  invocation; no downloaded bytes execute before the platform SHA-256 matches.
+  Nix 2.34.0 release archives. Before v0.2.0 publication it accepts only a clean
+  exact current official branch head; publication closes that path and requires
+  the exact annotated tag object and peeled commit. Setup owns its invocation;
+  no downloaded bytes execute before the platform SHA-256 matches, and the
+  verified installer runs non-interactively in the selected daemon mode with
+  `nix-command flakes` persisted. A retry reconciles the disabled-feature state
+  left by an otherwise-complete upstream install.
 - `tests/migration/v0_1_upgrade_test.sh` materializes the exact peeled v0.1.0
   commit, proves in-place/dirty paths fail before mutation, runs the real setup
   config/backup path, injects a failure after Home Manager/config publication,
@@ -86,7 +92,7 @@ canonical v0.2.0 path is now side-by-side and exact-tag-only:
   pre-migration command-provider boundary.
 
 The release remains gated on real Apple Silicon owner-host, WSL split-host,
-redirected Windows, and divergent stable packaged/Preview/portable Terminal
+redirected Windows, and divergent stable packaged/Preview/Canary/portable Terminal
 executions. Until the annotated
 v0.2.0 tag and those release rows exist, v0.1.0 users are told to remain on
 v0.1.0. No non-Apple-Silicon macOS migration path is shipped or pending proof.
@@ -98,6 +104,9 @@ Provisioning stays in `install-deps`, not chezmoi run-scripts:
 - package installs from Unix `PKG_TABLE` and Windows `$Catalog`
 - psmux installation on Windows, including the hardened `Add-ScoopBucketSafe`
   bucket-add path in `install-deps.ps1`
+- Windows direct-artifact bin directories are de-duplicated and promoted to the
+  front of process and User `PATH`, so an already-listed but shadowed managed
+  Tree-sitter installation self-repairs without uninstalling the older tool
 - pinned binary/font/script installers and direct artifacts: Homebrew installer,
   Neovim Linux, native-Linux chezmoi, lazygit Linux, Starship Linux,
   tree-sitter CLI Linux/Windows, WezTerm Ubuntu `.deb`, Herdr Linux, Herdr Windows
@@ -146,7 +155,7 @@ then remove only targets they can prove are repo-owned:
   `-ForceExternals` to remove it anyway. This protects in-place edits to the
   vendored plugin clones from being lost.
 - Windows Terminal `settings.json` is never deleted. `uninstall.ps1` validates
-  stable packaged, Preview packaged, and portable candidate sets plus backup
+  stable packaged, Preview, Canary, and portable candidate sets plus backup
   JSON before restoring any target,
   atomically restores the selected pre-setup bytes, and preserves the displaced
   current file as `settings.json.uninstall-current.<timestamp>[.n]`.
@@ -164,7 +173,7 @@ broken repo-symlink still cleaned) is covered by
 
 ### Resolved
 
-- [x] Stable packaged, Preview packaged, and portable Windows Terminal settings are independent
+- [x] Stable packaged, Preview, Canary, and portable Windows Terminal settings are independent
       user-owned merge transactions. The old full-file mirror and best-effort
       warning path are removed. Setup stages/validates all outputs, backs up
       each divergent target, detects concurrent changes through atomic rollback
@@ -184,12 +193,24 @@ broken repo-symlink still cleaned) is covered by
       Homebrew paths follow the actual Apple Silicon repository.
       First nix-darwin bootstrap collision-checks and preserves existing
       `/etc/bashrc` and `/etc/zshrc` as `.before-nix-darwin`, rolling both back
-      on failure/interruption while retaining failed generated output.
-- [x] nix-homebrew tap migration is transactional. Existing taps move to a
-      collision-safe backup, and installed/bootstrap activation failure or an
-      interruption quarantines the failed replacement and restores the old
-      state. A rollback failure leaves the backup intact and prints exact manual
-      recovery rather than guessing.
+      on failure/interruption while retaining failed generated output. A retry
+      from the terminal that performed first activation resolves the installed
+      current-system rebuild command outside stale `PATH`; exact `/etc/static`
+      shell links and retained backups are accepted as already-managed state.
+- [x] nix-homebrew uses mixed tap/package ownership. `mutableTaps = true` with
+      no Nix-managed tap contents leaves every tap clone owned by target-user
+      Homebrew, while `cleanup = "none"` preserves formulae/casks outside the
+      generated Brewfile. setup never moves the whole `Library/Taps` directory;
+      it transactionally migrates only the three exact root-owned, non-Git tap
+      snapshots created by the retired pinned-tap shape and never selects an
+      unrelated user tap. Transaction, failure, and recovery snapshots live
+      beside `Library/Taps`, never below Homebrew's live-tap scan root. Setup
+      automatically relocates the exact in-tree artifact names produced by the
+      broken predecessor before retry. `tests/macos_owner_lifecycle.sh` is the
+      destructive real-host install/update/uninstall/reinstall validation path.
+      Setup prerequisite discovery also recovers a canonical daemon/user Nix
+      profile binary when it is present but an already-guarded login profile no
+      longer exports it after Homebrew path refresh.
 - [x] Fresh Linux/WSL zsh startup consumes Home Manager's canonical session-vars
       file once from the XDG profile, `~/.nix-profile`, or the
       system-integrated `/etc/profiles/per-user/<effective-user>` profile, with
@@ -282,12 +303,13 @@ broken repo-symlink still cleaned) is covered by
       `29140112030`; all six downloaded schema-2 markers bound that source head
       to the executed synthetic merge SHA. The PR E2E run used ordinary PR
       caches, so it is not promoted to the pending merged-main cache-free gate.
-- [x] Native Windows no longer derives LocalApplicationData or Documents from
-      UserProfile. Setup/uninstall share one validated known-folder identity,
-      apply separate UserProfile/LocalApplicationData/Documents chezmoi source
-      states, post-check application consumers, and preserve divergent legacy
-      conventional-path data. Redirected-folder runtime proof remains listed
-      below because this checkout is not that environment.
+- [x] Native Windows no longer derives LocalApplicationData, ApplicationData,
+      or Documents from UserProfile. Setup/uninstall share one validated
+      known-folder identity, apply separate UserProfile/LocalApplicationData/
+      ApplicationData/Documents chezmoi source states, post-check application
+      consumers, and preserve divergent legacy conventional-path data.
+      Redirected-folder runtime proof remains listed below because this checkout
+      is not that environment.
 - [x] PowerShell 7, VS Code, Windows PowerShell ConsoleHost, and ISE profile
       targets are managed under the actual Documents known folder. The current
       runtime `$PROFILE` must be one of those post-apply consumers.
@@ -306,7 +328,7 @@ broken repo-symlink still cleaned) is covered by
       `86360593122`): all six
       phases, exact Tree-sitter `0.26.10`, Hack Nerd Font file and registry
       consumption, Pi `0.80.3`, and the strict 257-check Neovim language smoke.
-      This does not close the redirected-folder or three-variant Windows Terminal manual
+      This does not close the redirected-folder or four-variant Windows Terminal manual
       rows below.
 
 ### Open
@@ -360,7 +382,8 @@ broken repo-symlink still cleaned) is covered by
       (`~/.config/powershell/Microsoft.PowerShell_profile.ps1`) is intentionally
       not migrated. It is install-gated and provisioning-adjacent, like VS Code.
 - [ ] Redirected Windows known-folder runtime confirmation is pending a real
-      Windows host with Documents and LocalApplicationData on alternate paths.
+      Windows host with Documents, LocalApplicationData, and ApplicationData on
+      alternate paths.
       Pester and migration round-trip fixtures are implementation proof, not a
       claim about a host run.
 - [ ] Full WSL runtime parity remains manual. The optional hosted canary was

@@ -282,6 +282,7 @@ Assert-ContentEqual -Path (Join-Path $env:USERPROFILE '.tmux.rose-pine.moon.conf
 Assert-ContentEqual -Path (Join-Path $env:USERPROFILE '.tmux.rose-pine.dawn.conf') -Expected (Join-Path $Repo 'tmux\psmux-rose-pine.dawn.conf')
 Assert-ContentEqual -Path (Join-Path $env:USERPROFILE 'Documents\PowerShell\Microsoft.PowerShell_profile.ps1') -Expected (Join-Path $Repo 'shells\powershell_profile.ps1')
 Assert-ContentEqual -Path (Join-Path $env:LOCALAPPDATA 'lazygit\config.yml') -Expected (Join-Path $Repo 'lazygit\config.windows.yml')
+Assert-ContentEqual -Path (Join-Path $env:APPDATA 'herdr\config.toml') -Expected (Join-Path $Repo 'herdr\config.windows.toml')
 Assert-WindowsTerminalPortableSettings
 
 Assert-ChezmoiVerify
@@ -297,7 +298,7 @@ try {
         $env:DOTFILES_TREESITTER_SYNC_INSTALL = $oldTreeSitterSyncInstall
     }
 }
-Invoke-NvimChecked -Name mason -NvimArgs @('+MasonToolsInstallSync', '+qa')
+Invoke-NvimChecked -Name mason -NvimArgs @("+lua require('util.mason_tools').run_checked('MasonToolsInstallSync')")
 Assert-MasonTool -Name 'lua-language-server' -FileNames @('lua-language-server.cmd', 'lua-language-server.exe', 'lua-language-server')
 Assert-MasonTool -Name 'stylua' -FileNames @('stylua.cmd', 'stylua.exe', 'stylua')
 

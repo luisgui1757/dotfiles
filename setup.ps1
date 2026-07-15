@@ -77,7 +77,7 @@ function Resolve-WindowsTargetIdentity {
     )
 
     $resolved = @{}
-    foreach ($name in 'UserProfile', 'LocalApplicationData', 'MyDocuments') {
+    foreach ($name in 'UserProfile', 'LocalApplicationData', 'ApplicationData', 'MyDocuments') {
         $path = [string](& $FolderResolver $name)
         $isWindowsAbsolute = $path -match '^(?:[A-Za-z]:[\\/]|\\\\)'
         if ([string]::IsNullOrWhiteSpace($path) -or (-not [IO.Path]::IsPathRooted($path) -and -not $isWindowsAbsolute) -or
@@ -97,6 +97,7 @@ function Resolve-WindowsTargetIdentity {
     return [pscustomobject]@{
         UserProfile = $resolved.UserProfile
         LocalApplicationData = $resolved.LocalApplicationData
+        ApplicationData = $resolved.ApplicationData
         Documents = $resolved.MyDocuments
         RuntimeProfile = if ($runtimeIsWindowsAbsolute -and $env:OS -ne 'Windows_NT') {
             $RuntimeProfile -replace '/', '\'
@@ -1315,6 +1316,11 @@ function Get-WindowsTerminalPreviewSettingsPath {
             -LocalApplicationData (Get-WindowsLocalApplicationData) -Kind Preview).Path
 }
 
+function Get-WindowsTerminalCanarySettingsPath {
+    return (Get-DotfilesWindowsTerminalTargetDefinition `
+            -LocalApplicationData (Get-WindowsLocalApplicationData) -Kind Canary).Path
+}
+
 function Get-WindowsTerminalUnpackagedSettingsPath {
     return (Get-DotfilesWindowsTerminalTargetDefinition `
             -LocalApplicationData (Get-WindowsLocalApplicationData) -Kind Portable).Path
@@ -1758,6 +1764,12 @@ function Get-WindowsKnownFolderOverlays {
             State = Join-Path $stateRoot 'localappdata.boltdb'
         },
         [pscustomobject]@{
+            Label = 'ApplicationData'
+            Source = Join-Path $ScriptDir 'windows\chezmoi-appdata'
+            Destination = $Identity.ApplicationData
+            State = Join-Path $stateRoot 'appdata.boltdb'
+        },
+        [pscustomobject]@{
             Label = 'Documents profiles'
             Source = Join-Path $ScriptDir 'windows\chezmoi-documents'
             Destination = $Identity.Documents
@@ -1766,13 +1778,26 @@ function Get-WindowsKnownFolderOverlays {
     )
 }
 
+function Get-WindowsPowerShellProfileCandidate {
+    param([Parameter(Mandatory)] $Identity)
+
+    return @(
+        (Join-Path $Identity.Documents 'PowerShell\Microsoft.PowerShell_profile.ps1'),
+        (Join-Path $Identity.Documents 'PowerShell\Microsoft.VSCode_profile.ps1'),
+        (Join-Path $Identity.Documents 'WindowsPowerShell\Microsoft.PowerShell_profile.ps1'),
+        (Join-Path $Identity.Documents 'WindowsPowerShell\Microsoft.PowerShellISE_profile.ps1')
+    )
+}
+
 function Assert-WindowsKnownFolderConsumption {
     param([Parameter(Mandatory)] $Identity)
 
     $nvimTarget = Join-Path $Identity.LocalApplicationData 'nvim'
     $lazygitTarget = Join-Path $Identity.LocalApplicationData 'lazygit\config.yml'
+    $herdrTarget = Join-Path $Identity.ApplicationData 'herdr\config.toml'
     $expectedNvim = Join-Path $ScriptDir 'nvim'
     $expectedLazygit = Join-Path $ScriptDir 'lazygit\config.windows.yml'
+    $expectedHerdr = Join-Path $ScriptDir 'herdr\config.windows.toml'
     if (-not (Test-SamePath (Get-RealExistingPath $nvimTarget) (Get-RealExistingPath $expectedNvim))) {
         throw "Neovim does not consume the repo config through actual LocalApplicationData: $nvimTarget"
     }
@@ -1780,13 +1805,12 @@ function Assert-WindowsKnownFolderConsumption {
         -not (Test-FileBytesEqual $lazygitTarget $expectedLazygit)) {
         throw "lazygit does not consume the repo config through actual LocalApplicationData: $lazygitTarget"
     }
+    if (-not (Test-SamePath (Get-RealExistingPath $herdrTarget) (Get-RealExistingPath $expectedHerdr)) -and
+        -not (Test-FileBytesEqual $herdrTarget $expectedHerdr)) {
+        throw "Herdr does not consume the repo config through actual ApplicationData: $herdrTarget"
+    }
 
-    $profileCandidates = @(
-        (Join-Path $Identity.Documents 'PowerShell\Microsoft.PowerShell_profile.ps1'),
-        (Join-Path $Identity.Documents 'PowerShell\Microsoft.VSCode_profile.ps1'),
-        (Join-Path $Identity.Documents 'WindowsPowerShell\Microsoft.PowerShell_profile.ps1'),
-        (Join-Path $Identity.Documents 'WindowsPowerShell\Microsoft.PowerShellISE_profile.ps1')
-    )
+    $profileCandidates = @(Get-WindowsPowerShellProfileCandidate -Identity $Identity)
     if (-not @($profileCandidates | Where-Object { Test-SamePath $_ $Identity.RuntimeProfile }).Count) {
         throw "unsupported PowerShell host profile path: $($Identity.RuntimeProfile). Expected a supported profile under actual Documents."
     }
@@ -1794,6 +1818,45 @@ function Assert-WindowsKnownFolderConsumption {
     if (-not (Test-SamePath (Get-RealExistingPath $Identity.RuntimeProfile) (Get-RealExistingPath $expectedProfile)) -and
         -not (Test-FileBytesEqual $Identity.RuntimeProfile $expectedProfile)) {
         throw "the runtime PowerShell profile does not consume the repo profile: $($Identity.RuntimeProfile)"
+    }
+}
+
+function Unblock-WindowsPowerShellProfile {
+    param(
+        [Parameter(Mandatory)] $Identity,
+        [string]$ExpectedProfile = (Join-Path $ScriptDir 'shells\powershell_profile.ps1'),
+        [scriptblock]$Unblocker = {
+            param([string]$Path)
+            Unblock-File -LiteralPath $Path -ErrorAction Stop
+        }
+    )
+
+    $expectedReal = Get-RealExistingPath $ExpectedProfile
+    if (-not $expectedReal -or -not (Test-Path -LiteralPath $expectedReal -PathType Leaf)) {
+        throw "repo PowerShell profile source is missing: $ExpectedProfile"
+    }
+
+    $seen = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+    foreach ($candidate in @(Get-WindowsPowerShellProfileCandidate -Identity $Identity)) {
+        if (-not (Test-Path -LiteralPath $candidate -PathType Leaf)) { continue }
+        $candidateReal = Get-RealExistingPath $candidate
+        $target = if ($candidateReal -and (Test-SamePath $candidateReal $expectedReal)) {
+            $expectedReal
+        } elseif (Test-FileBytesEqual $candidate $ExpectedProfile) {
+            Get-FullPathSafe $candidate
+        } else {
+            throw "refusing to unblock a PowerShell profile that is not repo-owned: $candidate"
+        }
+        if (-not $seen.Add($target)) { continue }
+
+        $wasBlocked = $false
+        if ($env:OS -eq 'Windows_NT') {
+            $wasBlocked = $null -ne (Get-Item -LiteralPath $target -Stream Zone.Identifier -ErrorAction SilentlyContinue)
+        }
+        & $Unblocker $target
+        if ($wasBlocked) {
+            Write-Step "unblocked managed PowerShell profile: $target"
+        }
     }
 }
 
@@ -1890,6 +1953,7 @@ function Invoke-WindowsKnownFolderOverlays {
     }
     if (-not $IsDryRun) {
         Assert-WindowsKnownFolderConsumption -Identity $Identity
+        Unblock-WindowsPowerShellProfile -Identity $Identity
     }
     Move-LegacyWindowsKnownFolderTargets -Identity $Identity -IsDryRun:$IsDryRun
 }
@@ -2019,7 +2083,7 @@ function Invoke-NvimSyncPhases {
                 }
             }
         },
-        [scriptblock]$MasonRunner = { & nvim --headless "+MasonToolsInstallSync" "+qa" }
+        [scriptblock]$MasonRunner = { & nvim --headless "+lua require('util.mason_tools').run_checked('MasonToolsInstallSync')" }
     )
 
     if (-not $SkipNvimPhase -and -not $IsDryRun) {
@@ -2077,7 +2141,7 @@ function Invoke-SetupUpdateMode {
     }
     if (-not $NvimRunner) {
         $NvimRunner = {
-            & nvim --headless "+MasonToolsUpdateSync" "+qa"
+            & nvim --headless "+lua require('util.mason_tools').run_checked('MasonToolsUpdateSync')"
         }
     }
 
@@ -2106,7 +2170,7 @@ function Invoke-SetupUpdateMode {
     if (-not $SkipNvimPhase) {
         Phase "Update 2/2: update Mason LSP servers + formatters"
         if ($IsDryRun) {
-            Write-Host "  would: nvim --headless +MasonToolsUpdateSync +qa"
+            Write-Host "  would: nvim --headless +lua require('util.mason_tools').run_checked('MasonToolsUpdateSync')"
         } elseif (& $CommandTester 'nvim') {
             Invoke-NvimCommandOrFail -Label "Mason update" -IsBestEffort $IsBestEffort -Block $NvimRunner
         } else {

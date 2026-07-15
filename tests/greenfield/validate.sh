@@ -271,6 +271,7 @@ assert_posix_managed_configs() {
     assert_file_content "$HOME/.config/gh-dash/config.yml" "$REPO_ROOT/gh-dash/config.yml"
     assert_file_content "$HOME/.config/lsd/config.yaml" "$REPO_ROOT/lsd/config.yaml"
     assert_file_content "$HOME/.config/lsd/colors.yaml" "$REPO_ROOT/lsd/colors.yaml"
+    assert_file_content "$HOME/.config/herdr/config.toml" "$REPO_ROOT/herdr/config.toml"
     assert_file_content "$HOME/.tmux.conf" "$REPO_ROOT/tmux/tmux.conf"
     assert_file_content "$HOME/.tmux.posix.conf" "$REPO_ROOT/tmux/tmux.posix.conf"
     assert_file_content "$HOME/.zshenv" "$REPO_ROOT/shells/zshenv"
@@ -297,9 +298,12 @@ main() {
     if [[ "$CONFIG_ONLY" -eq 1 ]]; then
         skip_check "full setup tool checks skipped by --config-only"
     else
-        for cmd in git nvim rg fd fzf tmux zsh lazygit starship chezmoi tree-sitter cmake lsd; do
+        for cmd in git nvim rg fd fzf tmux zsh lazygit starship chezmoi tree-sitter cmake lsd herdr; do
             require_cmd "$cmd"
         done
+        if [[ "$(uname -s)" == "Linux" ]]; then
+            require_cmd clangd
+        fi
     fi
 
     assert_nvim_version
@@ -308,7 +312,7 @@ main() {
     assert_chezmoi_verify
     run_nvim_checked lazy "+Lazy! restore" "+qa"
     DOTFILES_TREESITTER_SYNC_INSTALL=1 run_nvim_checked treesitter -u "$REPO_ROOT/nvim/init.lua" -c "lua require('lazy').load({ plugins = { 'nvim-treesitter' } })" +qa
-    run_nvim_checked mason "+MasonToolsInstallSync" "+qa"
+    run_nvim_checked mason "+lua require('util.mason_tools').run_checked('MasonToolsInstallSync')"
     assert_mason_tool "lua-language-server" lua-language-server lua-language-server.cmd lua-language-server.exe
     assert_mason_tool "stylua" stylua stylua.cmd stylua.exe
 

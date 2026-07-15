@@ -100,7 +100,7 @@ prints its exact rollback command instead of starting another transaction.
 After success, open a new login shell and verify:
 
 ```bash
-nix store ping
+nix store info
 command -v rg fd fzf jq lazygit node starship zoxide nvim
 chezmoi --source ~/dotfiles-v0.2.0/home --destination "$HOME" \
   verify --include files,symlinks
@@ -130,8 +130,8 @@ protected recovery folder, and completes packages, config repointing, Neovim,
 and Sentinel.
 
 The same command covers conventional, redirected, OneDrive, and alternate-drive
-known folders because UserProfile, LocalApplicationData, Documents, and the
-runtime PowerShell profile are resolved independently.
+known folders because UserProfile, LocalApplicationData, ApplicationData,
+Documents, and the runtime PowerShell profile are resolved independently.
 
 After success, open Neovim, lazygit, PowerShell, and every installed Windows
 Terminal variant. Keep the old checkout and protected recovery folder until
@@ -170,7 +170,19 @@ Update first runs the same install/migration/idempotent reconciliation as all
 mode. It then performs only scoped updates for present tools whose package or
 direct-artifact ownership is proven, plus synchronous Mason updates. It never
 runs a blanket package-manager upgrade, `git pull`, `nix flake update`, or
-`:Lazy update`, and it never rewrites repository lockfiles.
+`:Lazy update`, and it never rewrites repository lockfiles. On macOS the retry
+is safe in the terminal that performed first activation: setup resolves the
+installed current-system `darwin-rebuild` outside stale `PATH` and recognizes
+nix-darwin's `/etc/static` shell links plus retained backups as managed state.
+Legacy Homebrew tap migration state is also retry-safe: setup keeps transaction
+and failed-output roots beside `Library/Taps`, where Homebrew cannot enumerate
+them as additional taps, and automatically relocates the exact in-tree recovery
+names created by the broken predecessor. Do not manually untap or delete those
+artifacts before retrying setup.
+If the same login shell already sourced the Nix daemon profile and a later
+Homebrew `path_helper` refresh removed Nix from `PATH`, setup re-adopts the
+canonical daemon/user profile binary directly. Do not reinstall Nix or unset
+the upstream profile guard manually.
 
 To move to a newer dotfiles release, clone that exact annotated tag beside the
 current checkout and run its setup update command. The new checkout, not Git
@@ -207,6 +219,6 @@ Do not publish v0.2.0 or direct v0.1.0 users here until all of these are true:
 - the Windows Pester and native Windows exact-tag runs prove setup-owned
   migration orchestration and recovery;
 - real WSL host/guest, redirected Windows, divergent stable
-  packaged/Preview/portable Terminal, and Apple Silicon owner-host migrations
+  packaged/Preview/Canary/portable Terminal, and Apple Silicon owner-host migrations
   are recorded in `tests/MANUAL.md` and the append-only review ledger;
 - the full release gate and public-secret scan pass on the tagged tree.

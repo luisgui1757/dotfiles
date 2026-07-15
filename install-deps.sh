@@ -108,6 +108,16 @@ for arg in "$@"; do
     esac
 done
 [[ "$EXPERIMENTAL_WSL_GUI" == "1" ]] || EXPERIMENTAL_WSL_GUI=0
+
+# This installer owns consent for every package mutation. Homebrew 6 enables
+# ask mode by default for install/upgrade, so letting an accepted setup action
+# reach brew unchanged creates a second confirmation and can hang --all runs.
+# Scope the official no-ask setting to this child process; ordinary user brew
+# commands outside setup keep their normal behavior. An inherited explicit ask
+# must be cleared because it takes precedence over HOMEBREW_NO_ASK.
+unset HOMEBREW_ASK
+export HOMEBREW_NO_ASK=1
+
 INSTALL_FAILURES_COUNT=0
 INSTALL_FAILURES_DETAIL=""
 
@@ -325,6 +335,101 @@ enable_homebrew_for_current_shell() {
     hash -r 2>/dev/null || true
 }
 
+# Homebrew owns the completion symlinks consumed by zsh/bash. Package/tap
+# migrations can leave those links pointing at a removed repository checkout,
+# which makes every new shell print compinit errors even though brew itself
+# works. `brew completions link` reconciles tap completions, but Homebrew 6 does
+# not repair its own core `_brew` link. Reconcile both surfaces and prove that
+# the core link resolves to the active Homebrew implementation on macOS,
+# nix-homebrew, and Linuxbrew.
+link_homebrew_completions() {
+    local brew_prefix brew_repository core_source candidate
+    local site_dir core_link tmp source_real link_real
+
+    [[ "$PM" == "brew" ]] || return 0
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        echo "  would: brew completions link + verify core _brew"
+        return 0
+    fi
+    if ! brew completions link >/dev/null; then
+        echo "  FAIL: Homebrew could not link its shell completions; repair Homebrew and retry." >&2
+        return 1
+    fi
+
+    brew_prefix="$(brew --prefix 2>/dev/null || true)"
+    brew_repository="$(brew --repository 2>/dev/null || true)"
+    case "$brew_prefix" in
+        /*) ;;
+        *)
+            echo "  FAIL: Homebrew did not report an absolute prefix while reconciling completions." >&2
+            return 1
+            ;;
+    esac
+    case "$brew_repository" in
+        /*) ;;
+        *)
+            echo "  FAIL: Homebrew did not report an absolute repository while reconciling completions." >&2
+            return 1
+            ;;
+    esac
+
+    # Official Homebrew keeps the core completion below `brew --repository`.
+    # nix-homebrew exposes a marker repository instead, while
+    # $prefix/Library/Homebrew points into the active Nix generation; resolving
+    # `../..` after that symlink reaches the matching package's completions.
+    core_source=""
+    for candidate in \
+        "$brew_repository/completions/zsh/_brew" \
+        "$brew_prefix/Library/Homebrew/../../completions/zsh/_brew" \
+        "$brew_prefix/completions/zsh/_brew"; do
+        if [[ -f "$candidate" && -r "$candidate" ]]; then
+            core_source="$candidate"
+            break
+        fi
+    done
+    if [[ -z "$core_source" ]]; then
+        echo "  FAIL: active Homebrew has no readable core zsh completion (_brew); reinstall or repair Homebrew and retry." >&2
+        return 1
+    fi
+
+    site_dir="$brew_prefix/share/zsh/site-functions"
+    core_link="$site_dir/_brew"
+    if ! mkdir -p "$site_dir"; then
+        echo "  FAIL: could not create Homebrew's zsh completion directory: $site_dir" >&2
+        return 1
+    fi
+
+    source_real="$(real_source_path "$core_source")"
+    if [[ -r "$core_link" ]]; then
+        link_real="$(real_source_path "$core_link")"
+    else
+        link_real=""
+    fi
+    if [[ "$link_real" != "$source_real" ]]; then
+        if [[ -e "$core_link" && ! -L "$core_link" ]]; then
+            echo "  FAIL: refusing to replace non-symlink Homebrew completion: $core_link" >&2
+            return 1
+        fi
+        if ! tmp="$(mktemp -d "$site_dir/.dotfiles-brew-completion.XXXXXX")"; then
+            echo "  FAIL: could not stage Homebrew's core zsh completion beside $core_link" >&2
+            return 1
+        fi
+        trap 'rm -rf "$tmp"; trap - RETURN' RETURN
+        if ! ln -s "$core_source" "$tmp/_brew" || ! mv -f "$tmp/_brew" "$core_link"; then
+            echo "  FAIL: could not publish Homebrew's core zsh completion: $core_link" >&2
+            return 1
+        fi
+        rmdir "$tmp" 2>/dev/null || true
+    fi
+
+    if [[ ! -r "$core_link" ]] ||
+        [[ "$(real_source_path "$core_link")" != "$source_real" ]]; then
+        echo "  FAIL: Homebrew's core zsh completion did not resolve to the active implementation: $core_link" >&2
+        return 1
+    fi
+    printf "  ok        %-26s linked + core _brew verified\n" "Homebrew completions"
+}
+
 enable_homebrew_make_gnubin_for_current_shell() {
     local brew_bin="$1" make_prefix gnubin
     make_prefix="$("$brew_bin" --prefix make 2>/dev/null || true)"
@@ -498,6 +603,13 @@ maybe_sudo() {
     return 1
 }
 
+# Debian-family package installs must stay unattended even when a dependency
+# (notably tzdata) has debconf questions. Put the environment assignment after
+# sudo so it survives sudo's environment filtering for ordinary users.
+apt_get_noninteractive() {
+    maybe_sudo env DEBIAN_FRONTEND=noninteractive apt-get "$@"
+}
+
 # ---- OS / package-manager detection ------------------------------------------
 detect_pm() {
     if homebrew_bin >/dev/null 2>&1; then echo brew; return; fi
@@ -535,7 +647,7 @@ maybe_install_brew() {
         if [[ "$DRY_RUN" -eq 1 ]]; then
             echo "  would: curl -fsSL $url -o /tmp/homebrew-install.sh"
             echo "         verify sha256 $HOMEBREW_INSTALL_SHA256"
-            echo "         /bin/bash /tmp/homebrew-install.sh"
+            echo "         NONINTERACTIVE=1 /bin/bash /tmp/homebrew-install.sh"
             return 0
         fi
         require_downloader || return 1
@@ -552,7 +664,7 @@ maybe_install_brew() {
             rm -rf "$tmp"
             return 1
         fi
-        /bin/bash "$script" || {
+        NONINTERACTIVE=1 /bin/bash "$script" || {
             rm -rf "$tmp"
             return 1
         }
@@ -1674,15 +1786,16 @@ install_tree_sitter_cli() {
 # Debian/Ubuntu ship python3 WITHOUT ensurepip/venv -- they live in the separate
 # python3-venv + python3-pip packages. Mason installs clang-format / ruff /
 # gersemi from PyPI, which runs `python3 -m venv` + pip, so on apt those tools
-# fail with "ensurepip is not available" until venv + pip are present. brew, dnf,
-# and pacman python already bundle them, so this only does work on apt systems.
+# fail with "ensurepip is not available" until venv + pip are present. A Linux
+# PM=brew selection does not prove the active python3 is Homebrew-owned: Ubuntu's
+# /usr/bin/python3 may still win PATH, so Linux always checks its native manager.
 ensure_python_pip_venv() {
     command -v python3 >/dev/null 2>&1 || return 0
     if python3 -c 'import ensurepip, venv' >/dev/null 2>&1; then
         printf "  ok        %-26s venv + pip present\n" "python venv/pip"
         return
     fi
-    if [[ "$PM" == "brew" ]]; then
+    if [[ "$(uname -s)" == "Darwin" && "$PM" == "brew" ]]; then
         return 0
     fi
     local native_pm
@@ -2218,15 +2331,18 @@ install_gh_dash_extension() {
         return 0
     fi
 
-    # Verify the *installed* pin, not merely presence -- an extension pinned to a
-    # different tag must be re-pinned, and a plain `gh extension install` of an
-    # already-present extension errors, so a mismatch takes the remove+install path.
+    # gh-dash is a binary extension, so gh's --pin contract accepts a release
+    # tag (commit refs are for script extensions). Verify the reviewed annotated
+    # tag -> commit mapping before installation, then pass the tag to gh.
+    # Verify the *installed* tag, not merely presence -- a different release
+    # must be re-pinned, and a plain install of an already-present extension
+    # errors, so a mismatch takes the remove+install path.
     local list installed_ver reinstall=0
     list="$(gh extension list 2>/dev/null || true)"
     if printf '%s\n' "$list" | grep -q 'dlvhdr/gh-dash'; then
         installed_ver="$(printf '%s\n' "$list" \
             | awk '{ for (i = 1; i <= NF; i++) if ($i == "dlvhdr/gh-dash") { print $(i + 1); exit } }')"
-        if [[ "$installed_ver" == "$GH_DASH_COMMIT" ]]; then
+        if [[ "$installed_ver" == "$GH_DASH_VERSION" ]]; then
             printf "  ok        %-26s already installed (%s -> %s)\n" "gh-dash" "$GH_DASH_VERSION" "$GH_DASH_COMMIT"
             return 0
         fi
@@ -2246,9 +2362,9 @@ install_gh_dash_extension() {
     if [[ "$DRY_RUN" -eq 1 ]]; then
         echo "  would: verify $GH_DASH_VERSION tag object $GH_DASH_TAG_OBJECT peels to $GH_DASH_COMMIT"
         if [[ "$reinstall" -eq 1 ]]; then
-            echo "  would: gh extension remove dash && gh extension install dlvhdr/gh-dash --pin $GH_DASH_COMMIT"
+            echo "  would: gh extension remove dash && gh extension install dlvhdr/gh-dash --pin $GH_DASH_VERSION"
         else
-            echo "  would: gh extension install dlvhdr/gh-dash --pin $GH_DASH_COMMIT"
+            echo "  would: gh extension install dlvhdr/gh-dash --pin $GH_DASH_VERSION"
         fi
         return 0
     fi
@@ -2276,7 +2392,7 @@ install_gh_dash_extension() {
             return 0
         fi
     fi
-    if gh extension install dlvhdr/gh-dash --pin "$GH_DASH_COMMIT"; then
+    if gh extension install dlvhdr/gh-dash --pin "$GH_DASH_VERSION"; then
         if [[ "$reinstall" -eq 1 ]]; then
             printf "  installed %-26s %s -> %s (re-pinned)\n" "gh-dash" "$GH_DASH_VERSION" "$GH_DASH_COMMIT"
         else
@@ -2284,8 +2400,8 @@ install_gh_dash_extension() {
         fi
     else
         local rc=$?
-        record_install_failure "gh-dash" gh "dlvhdr/gh-dash@$GH_DASH_COMMIT" "$rc"
-        printf "  FAIL: %-26s gh extension install dlvhdr/gh-dash --pin %s failed\n" "gh-dash" "$GH_DASH_COMMIT" >&2
+        record_install_failure "gh-dash" gh "dlvhdr/gh-dash@$GH_DASH_VERSION" "$rc"
+        printf "  FAIL: %-26s gh extension install dlvhdr/gh-dash --pin %s failed\n" "gh-dash" "$GH_DASH_VERSION" >&2
     fi
     return 0
 }
@@ -2425,8 +2541,13 @@ install_tmux_plugins() {
     return "$rc"
 }
 
+homebrew_cask_installed() {
+    local cask="$1"
+    brew list --cask --versions "$cask" >/dev/null 2>&1
+}
+
 install_ghostty_macos() {
-    if have ghostty; then
+    if have ghostty || homebrew_cask_installed ghostty; then
         printf "  ok        %-26s already installed\n" "ghostty"
         return
     fi
@@ -2448,7 +2569,7 @@ install_ghostty_macos() {
 }
 
 install_wezterm_macos() {
-    if have wezterm; then
+    if have wezterm || homebrew_cask_installed wezterm; then
         printf "  ok        %-26s already installed\n" "wezterm"
         return
     fi
@@ -2472,7 +2593,7 @@ install_wezterm_macos() {
 # AeroSpace: i3-like tiling WM, macOS only. Official tap cask (nikitabobko/tap).
 # NOT nixpkgs. Needs an Accessibility (TCC) grant on first launch -- unscriptable.
 install_aerospace_macos() {
-    if have aerospace; then
+    if have aerospace || homebrew_cask_installed aerospace; then
         printf "  ok        %-26s already installed\n" "aerospace"
         return
     fi
@@ -2573,8 +2694,8 @@ pm_install() {
     fi
     case "$PM" in
         brew)   brew install "${pkgs[@]}" ;;
-        apt)    maybe_sudo apt-get update -qq || echo "  WARN: apt-get update failed; installing from the existing apt cache" >&2
-                maybe_sudo apt-get install -y "${pkgs[@]}" ;;
+        apt)    apt_get_noninteractive update -qq || echo "  WARN: apt-get update failed; installing from the existing apt cache" >&2
+                apt_get_noninteractive install -y "${pkgs[@]}" ;;
         dnf)    maybe_sudo dnf install -y "${pkgs[@]}" ;;
         pacman) maybe_sudo pacman -S --noconfirm "${pkgs[@]}" ;;
         zypper) maybe_sudo zypper install -y "${pkgs[@]}" ;;
@@ -2594,8 +2715,8 @@ native_linux_pm_install() {
         echo "  would: $native_pm install ${pkgs[*]}"; return 0
     fi
     case "$native_pm" in
-        apt)    maybe_sudo apt-get update -qq || echo "  WARN: apt-get update failed; installing from the existing apt cache" >&2
-                maybe_sudo apt-get install -y "${pkgs[@]}" ;;
+        apt)    apt_get_noninteractive update -qq || echo "  WARN: apt-get update failed; installing from the existing apt cache" >&2
+                apt_get_noninteractive install -y "${pkgs[@]}" ;;
         dnf)    maybe_sudo dnf install -y "${pkgs[@]}" ;;
         pacman) maybe_sudo pacman -S --noconfirm --needed "${pkgs[@]}" ;;
         zypper) maybe_sudo zypper install -y "${pkgs[@]}" ;;
@@ -2757,6 +2878,28 @@ brew_claims_tool_source() {
         return 2
     fi
     return 1
+}
+
+brew_formula_owning_tool_source() {
+    local source="$1" prefix cellar real_source source_physical relative formula
+    prefix="$(brew_prefix)"
+    cellar="$(brew --cellar 2>/dev/null || true)"
+    [[ -n "$source" && -n "$prefix" && -n "$cellar" ]] || return 1
+    [[ "$cellar" == /* ]] || return 1
+    cellar="$(real_source_path "$cellar")"
+    source_physical="$(physical_path "$source")"
+    if ! path_under "$source" "$prefix" && ! path_under "$source_physical" "$(real_source_path "$prefix")"; then
+        return 1
+    fi
+    real_source="$(real_source_path "$source")"
+    path_under "$real_source" "$cellar" || return 1
+    relative="${real_source#"${cellar%/}/"}"
+    [[ "$relative" == */* ]] || return 1
+    formula="${relative%%/*}"
+    [[ -n "$formula" ]] || return 1
+    pm_pkg_installed brew "$formula" || return 1
+    brew_formula_owns_tool_source "$formula" "$source" || return 1
+    printf '%s\n' "$formula"
 }
 
 dpkg_claims_tool_source() {
@@ -3153,7 +3296,7 @@ apt_refresh_metadata_once() {
         return "$APT_UPDATE_REFRESH_OK"
     fi
     APT_UPDATE_REFRESHED=1
-    if maybe_sudo apt-get update -qq; then
+    if apt_get_noninteractive update -qq; then
         APT_UPDATE_REFRESH_OK=0
     else
         APT_UPDATE_REFRESH_OK=1
@@ -3240,7 +3383,7 @@ scoped_update_status() {
                 printf "  current   %-26s owner=apt package=%s source=%s\n" "$tool" "$pkg" "$source"
                 return 0
             fi
-            if maybe_sudo apt-get install -y --only-upgrade "$pkg"; then
+            if apt_get_noninteractive install -y --only-upgrade "$pkg"; then
                 after="$(apt_installed_version "$pkg")"
                 if [[ -n "$before" && -n "$after" && "$before" != "$after" ]]; then
                     printf "  updated   %-26s owner=apt package=%s source=%s\n" "$tool" "$pkg" "$source"
@@ -3356,7 +3499,7 @@ nix_owns_tool_source() {
 }
 
 update_catalog_tool() {
-    local tool="$1" pkg source brew_rc native_pm native_pkg direct_rc hint
+    local tool="$1" pkg source brew_rc brew_owner_pkg native_pm native_pkg direct_rc hint
     [[ -n "$tool" ]] || return 0
 
     if ! update_tool_present "$tool"; then
@@ -3389,6 +3532,15 @@ update_catalog_tool() {
         fi
         if [[ "$brew_rc" -eq 0 ]]; then
             scoped_update_status brew "$tool" "$pkg" "$source"
+            return $?
+        fi
+        # The catalog package is the install default, not proof that it owns an
+        # already-present executable. Versioned formulae such as python@3.14
+        # can legitimately own the active command while python@3.12 remains
+        # installed. Resolve that ownership from the executable's real Cellar
+        # path and verify it against Homebrew's receipt before updating.
+        if brew_owner_pkg="$(brew_formula_owning_tool_source "$source")"; then
+            scoped_update_status brew "$tool" "$brew_owner_pkg" "$source"
             return $?
         fi
         if [[ "$brew_rc" -eq 2 ]]; then
@@ -3483,6 +3635,8 @@ run_update_mode() {
 
     local rc=0
     if [[ "$PM" == "brew" ]] && ! enable_homebrew_for_current_shell; then
+        rc=1
+    elif [[ "$PM" == "brew" ]] && ! link_homebrew_completions; then
         rc=1
     fi
 
@@ -3659,8 +3813,23 @@ install() {
     fi
 }
 
-install_nerd_font() {
+hack_nerd_font_installed() {
     if fc-list 2>/dev/null | grep -qi "hack.*nerd"; then
+        return 0
+    fi
+    # Homebrew's cask receipt is authoritative on macOS even before fontconfig
+    # has indexed Apple's font directories. This keeps repeated setup runs from
+    # trying to reinstall an already-present cask (and from triggering an
+    # unnecessary Brew update).
+    if [[ "$(uname -s)" == "Darwin" ]] && [[ "$PM" == "brew" ]]; then
+        brew list --cask --versions font-hack-nerd-font >/dev/null 2>&1
+        return $?
+    fi
+    return 1
+}
+
+install_nerd_font() {
+    if hack_nerd_font_installed; then
         printf "  ok        %-26s already installed\n" "Hack Nerd Font"
         return
     fi
@@ -3860,7 +4029,7 @@ install_verified_ghostty_deb() {
             echo "        received Package=${package:-<missing>} Architecture=${architecture:-<missing>} Version=${version:-<missing>}"
             return 1
         fi
-        if ! maybe_sudo apt-get install -y "$deb"; then
+        if ! apt_get_noninteractive install -y "$deb"; then
             echo "  FAIL: could not install verified Ghostty package $asset"
             echo "        repair apt with 'sudo apt-get -f install', then rerun setup"
             return 1
@@ -3967,7 +4136,7 @@ run_wezterm_deb_install() {
         echo "        upstream changed; review it, then bump WEZTERM_VERSION + SHA together"
         rm -rf "$tmp"; return 1
     fi
-    maybe_sudo apt-get install -y "$deb" || rc=$?
+    apt_get_noninteractive install -y "$deb" || rc=$?
     rm -rf "$tmp"
     return "$rc"
 }
@@ -4303,7 +4472,7 @@ install_dependency_scan_items() {
         "editorconfig-checker|command|editorconfig-checker"
 
     if [[ "$(uname -s)" == "Darwin" && ( "$PM" == "brew" || "$PM" == "brew_missing" ) ]]; then
-        printf '%s\n' "ghostty|command|ghostty"
+        printf '%s\n' "ghostty|macos-cask|ghostty"
     elif [[ "$(uname -s)" == "Linux" ]]; then
         if ! is_wsl || wsl_gui_opt_in; then
             printf '%s\n' "ghostty|command|ghostty"
@@ -4322,7 +4491,7 @@ install_dependency_scan_items() {
 }
 
 install_scan_present() {
-    local tool="$1" kind="$2" bins
+    local tool="$1" kind="$2" version_bin="${3:-}" bins
     case "$kind" in
         command)
             bins="$(binaries_for "$tool")"
@@ -4333,7 +4502,10 @@ install_scan_present() {
             have_c_compiler
             ;;
         font)
-            fc-list 2>/dev/null | grep -qi "hack.*nerd"
+            hack_nerd_font_installed
+            ;;
+        macos-cask)
+            have "$tool" || homebrew_cask_installed "$version_bin"
             ;;
         zsh-plugins)
             local root fzf_tab_dir autosuggestions_dir
@@ -4362,6 +4534,10 @@ install_scan_present() {
 install_scan_version() {
     local tool="$1" kind="$2" version_bin="${3:-}" bins candidate first_line
     case "$kind" in
+        macos-cask)
+            brew list --cask --versions "$version_bin" 2>/dev/null | sed -n '1p'
+            return
+            ;;
         font)
             printf '%s\n' "-"
             return
@@ -4421,7 +4597,7 @@ scan_install_dependencies() {
         status="missing"
         version="-"
         action="install"
-        if install_scan_present "$tool" "$kind"; then
+        if install_scan_present "$tool" "$kind" "$version_bin"; then
             status="present"
             version="$(install_scan_version "$tool" "$kind" "$version_bin")"
             action="skip"
@@ -4495,6 +4671,12 @@ fi
 if ! bootstrap_package_manager; then
     record_install_failure "Homebrew bootstrap/activation" brew shellenv 1
     echo "  FAIL: Homebrew bootstrap/activation is an unrecoverable package-manager precondition; no package installs were attempted." >&2
+    exit_if_install_failures
+fi
+
+if ! link_homebrew_completions; then
+    record_install_failure "Homebrew completions" brew "completions link + core _brew" 1
+    echo "  FAIL: Homebrew completion linking is an unrecoverable shell-startup precondition; no package installs were attempted." >&2
     exit_if_install_failures
 fi
 

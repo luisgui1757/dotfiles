@@ -159,7 +159,8 @@ install_verified_ghostty_deb \
 
 grep -Fx "$GHOSTTY_DEB_URL" "$TMP_ROOT/url.log" >/dev/null || fail "download did not use the immutable URL"
 grep -F "$GHOSTTY_DEB_SHA256" "$TMP_ROOT/sha.log" >/dev/null || fail "downloaded bytes were not checked against the selected digest"
-grep -F "apt-get install -y" "$TMP_ROOT/install.log" >/dev/null || fail "verified local package was not passed to apt"
+grep -F "env DEBIAN_FRONTEND=noninteractive apt-get install -y" "$TMP_ROOT/install.log" >/dev/null \
+    || fail "verified local package was not passed to apt through the noninteractive boundary"
 if find "$TMP_ROOT/tmp" -mindepth 1 -print -quit | grep -q .; then
     echo "FAIL: successful Ghostty install leaked temporary content" >&2
     exit 1

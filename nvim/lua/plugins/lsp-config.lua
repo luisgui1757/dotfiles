@@ -20,9 +20,9 @@ return {
     "WhoIsSethDaniel/mason-tool-installer.nvim",
     -- event = VeryLazy drives the interactive auto-install (run_on_start).
     -- cmd ALSO registers these as lazy load-triggers so the headless setup
-    -- phase `nvim --headless +MasonToolsInstallSync` actually loads this
-    -- plugin -- VeryLazy never fires without a UI, which is why a clean
-    -- headless install previously failed with "E492: Not an editor command".
+    -- phase's checked MasonToolsInstallSync wrapper actually loads this plugin.
+    -- VeryLazy never fires without a UI, which is why a clean headless install
+    -- previously failed with "E492: Not an editor command".
     event = "VeryLazy",
     cmd = {
       "MasonToolsInstall",
@@ -34,27 +34,7 @@ return {
     dependencies = { "williamboman/mason.nvim" },
     config = function()
       require("mason-tool-installer").setup({
-        ensure_installed = {
-          -- LSP servers (installed via Mason, enabled via vim.lsp.enable below)
-          "lua-language-server",
-          "clangd",
-          "pyright",
-          "rust-analyzer",
-          "bash-language-server",
-          "yaml-language-server",
-          "json-lsp",
-          "neocmakelsp",
-          "powershell-editor-services",
-          -- Formatters (used by conform.nvim)
-          "stylua",
-          "shfmt",
-          "prettier",
-          "clang-format",
-          "gersemi",
-          "ruff",
-          -- DAP adapters
-          "js-debug-adapter",
-        },
+        ensure_installed = require("util.mason_tools").ensure_installed(),
         auto_update = false,
         run_on_start = true,
       })

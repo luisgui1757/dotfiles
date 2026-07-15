@@ -22,7 +22,45 @@ state="$({
 home="$WORK/home"
 fake_repo="$WORK/repo"
 fake_bin="$WORK/bin"
-mkdir -p "$home/.nix-profile/etc/profile.d" "$fake_repo/scripts" "$fake_bin"
+mkdir -p "$home/.nix-profile/bin" "$home/.nix-profile/etc/profile.d" "$fake_repo/scripts" "$fake_bin"
+cat > "$home/.nix-profile/bin/nix" <<'PROFILE_NIX'
+#!/usr/bin/env bash
+case "${1:-}" in
+    --version) echo 'nix (profile fixture) 2.34.0' ;;
+    store) [[ "${2:-}" == info ]] ;;
+    *) exit 90 ;;
+esac
+PROFILE_NIX
+chmod +x "$home/.nix-profile/bin/nix"
+
+old_home="$HOME"
+old_path="$PATH"
+
+activate_nix_profile() {
+    local profile="$HOME/.nix-profile/etc/profile.d/nix.sh"
+    [[ -f "$profile" ]] || return 1
+    # Fixture boundary: the real helper/profile contract has separate tests.
+    # shellcheck disable=SC1090
+    source "$profile"
+    [[ "$(command -v nix)" == "$fake_bin/nix" ]]
+}
+
+# Source setup again inside an isolated environment so this probe exercises the
+# production function without replacing the fixture used by the later bootstrap
+# cases in the parent shell.
+(
+    HOME="$home"
+    PATH="/usr/bin:/bin"
+    __ETC_PROFILE_NIX_SOURCED=1
+    export HOME PATH __ETC_PROFILE_NIX_SOURCED
+    DOTFILES_SETUP_SOURCE_ONLY=1 source "$REPO_ROOT/setup.sh"
+    activate_nix_profile
+    case "$(command -v nix)" in
+        /nix/var/nix/profiles/default/bin/nix|"$home/.nix-profile/bin/nix") ;;
+        *) fail "setup did not recover a canonical Nix profile binary after guarded profile sourcing" ;;
+    esac
+)
+
 cat > "$fake_repo/scripts/install-nix-prerequisite.sh" <<'HELPER'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -36,14 +74,12 @@ cat > "$fake_bin/nix" <<'NIX'
 #!/usr/bin/env bash
 case "${1:-}" in
     --version) echo 'nix (fixture) 2.34.0' ;;
-    store) [[ "${2:-}" == ping ]] ;;
+    store) [[ "${2:-}" == info ]] ;;
     *) exit 91 ;;
 esac
 NIX
 chmod +x "$fake_repo/scripts/install-nix-prerequisite.sh" "$fake_bin/nix"
 
-old_home="$HOME"
-old_path="$PATH"
 HOME="$home"
 PATH="/usr/bin:/bin"
 SCRIPT_DIR="$fake_repo"
@@ -52,14 +88,6 @@ DRY_RUN=1
 ALL=1
 SETUP_UNIVERSAL_TEST_ROOT="$WORK"
 export HOME PATH SETUP_UNIVERSAL_TEST_ROOT
-activate_nix_profile() {
-    local profile="$HOME/.nix-profile/etc/profile.d/nix.sh"
-    [[ -f "$profile" ]] || return 1
-    # Fixture boundary: the real helper/profile contract has separate tests.
-    # shellcheck disable=SC1090
-    source "$profile"
-    [[ "$(command -v nix)" == "$fake_bin/nix" ]]
-}
 ensure_nix_prerequisite >/dev/null
 [[ "$NIX_PREREQUISITE_DRY_RUN_PLANNED" -eq 1 && ! -e "$WORK/nix-helper.args" ]] ||
     fail "fresh dry-run did not preview Nix bootstrap without invoking it"
@@ -145,12 +173,14 @@ grep -F 'migration recovery path is not a real directory' "$WORK/symlink-recover
 sentinel_line="$(grep -nE '^[[:space:]]*run_sentinel_agent_policy[[:space:]]*$' "$REPO_ROOT/setup.sh" | tail -n1 | cut -d: -f1)"
 update_line="$(grep -nE '^[[:space:]]*run_update_mode[[:space:]]*$' "$REPO_ROOT/setup.sh" | tail -n1 | cut -d: -f1)"
 phase1_line="$(grep -n 'Phase 1/6: install dependencies' "$REPO_ROOT/setup.sh" | tail -n1 | cut -d: -f1)"
+ensure_downloader_line="$(grep -nE '^[[:space:]]*ensure_nix_downloader[[:space:]]*$' "$REPO_ROOT/setup.sh" | tail -n1 | cut -d: -f1)"
 ensure_nix_line="$(grep -nE '^[[:space:]]*ensure_nix_prerequisite[[:space:]]*$' "$REPO_ROOT/setup.sh" | tail -n1 | cut -d: -f1)"
 migration_line="$(grep -nE '^[[:space:]]*maybe_complete_v0_1_upgrade[[:space:]]*$' "$REPO_ROOT/setup.sh" | tail -n1 | cut -d: -f1)"
 [[ -n "$phase1_line" && -n "$sentinel_line" && -n "$update_line" &&
     "$phase1_line" -lt "$update_line" && "$sentinel_line" -lt "$update_line" ]] ||
     fail "--update does not reconcile the full release before the scoped refresh"
-[[ -n "$ensure_nix_line" && -n "$migration_line" &&
+[[ -n "$ensure_downloader_line" && -n "$ensure_nix_line" && -n "$migration_line" &&
+    "$ensure_downloader_line" -lt "$ensure_nix_line" &&
     "$ensure_nix_line" -lt "$phase1_line" && "$migration_line" -lt "$phase1_line" ]] ||
     fail "setup does not bootstrap prerequisites and migrate before package/config publication"
 

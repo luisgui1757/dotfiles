@@ -150,6 +150,42 @@ assert_eq "default bootstrap uses locked Home Manager rev+narHash" \
     "nix run $LOCKED_HOME_MANAGER_REF -- switch --flake $REPO_ROOT#x86_64-linux --impure" \
     "$(probe '--all' Linux bootstrap)"
 
+guarded_home="$WORK/guarded-linux-home"
+mkdir -p "$guarded_home/.nix-profile/bin"
+cat > "$guarded_home/.nix-profile/bin/nix" <<EOF
+#!/usr/bin/env bash
+case "\${1:-}" in
+    --version) echo 'nix (guarded Linux profile fixture) 2.34.0' ;;
+    store) [[ "\${2:-}" == info ]] ;;
+    eval) printf '%s\n%s\n' '$LOCKED_HOME_MANAGER_REV' '$LOCKED_HOME_MANAGER_NAR_HASH' ;;
+    *) exit 93 ;;
+esac
+EOF
+chmod +x "$guarded_home/.nix-profile/bin/nix"
+guarded_output="$({
+    HOME="$guarded_home"
+    # shellcheck disable=SC2030  # command substitution intentionally isolates this fixture PATH
+    PATH="/usr/bin:/bin"
+    __ETC_PROFILE_NIX_SOURCED=1
+    export HOME PATH __ETC_PROFILE_NIX_SOURCED
+    DOTFILES_SETUP_SOURCE_ONLY=1 source "$REPO_ROOT/setup.sh" --all --dry-run >/dev/null
+    uname() { case "${1:-}" in -m) echo x86_64 ;; *) echo Linux ;; esac; }
+    activate_nix_profile
+    ensure_nix_prerequisite
+    printf 'nix=%s planned=%s\n' "$(command -v nix)" "$NIX_PREREQUISITE_DRY_RUN_PLANNED"
+    run_home_manager_switch
+})"
+if [[ "$guarded_output" == *" planned=0"* ]] &&
+    { [[ "$guarded_output" == *"nix=/nix/var/nix/profiles/default/bin/nix"* ]] ||
+      [[ "$guarded_output" == *"nix=$guarded_home/.nix-profile/bin/nix"* ]]; } &&
+    [[ "$guarded_output" == *"home-manager switch --flake $REPO_ROOT#x86_64-linux --impure"* ]]; then
+    echo "ok  : guarded stale PATH recovers the Linux profile without prerequisite reinstall"
+else
+    echo "FAIL: Linux guarded-profile recovery did not reach Home Manager"
+    printf '%s\n' "$guarded_output"
+    fail=1
+fi
+
 missing_nix_output="$(probe_missing_nix)" && missing_nix_rc=0 || missing_nix_rc=$?
 if [[ "$missing_nix_rc" -ne 0 ]] && [[ "$missing_nix_output" == *"FAIL: Nix is required for Linux/WSL setup"* ]]; then
     echo "ok  : Linux/WSL setup fails closed when Nix is missing"
@@ -188,6 +224,7 @@ fi
 exit 0
 EOF
 chmod +x "$dry_bin/nix"
+# shellcheck disable=SC2031  # the guarded-profile fixture intentionally left the outer PATH unchanged
 old_path="$PATH"
 PATH="$dry_bin:/usr/bin:/bin"
 export PATH

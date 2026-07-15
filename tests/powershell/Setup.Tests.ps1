@@ -124,6 +124,7 @@ Describe "setup.ps1 main chezmoi apply boundary" {
         $script:WindowsIdentity = [pscustomobject]@{
             UserProfile = 'C:\User'
             LocalApplicationData = 'D:\Local Data'
+            ApplicationData = 'D:\Roaming Data'
             Documents = 'E:\Documents'
             RuntimeProfile = 'E:\Documents\PowerShell\Microsoft.PowerShell_profile.ps1'
         }
@@ -351,6 +352,7 @@ Describe "setup.ps1 Windows known-folder identity" {
             switch ($Name) {
                 'UserProfile' { 'D:\Actual User With Spaces' }
                 'LocalApplicationData' { 'E:\Redirected Local Data' }
+                'ApplicationData' { 'G:\Redirected Roaming Data' }
                 'MyDocuments' { 'F:\OneDrive - Example\Documents' }
             }
         }
@@ -359,6 +361,7 @@ Describe "setup.ps1 Windows known-folder identity" {
 
         $identity.UserProfile | Should -Be 'D:\Actual User With Spaces'
         $identity.LocalApplicationData | Should -Be 'E:\Redirected Local Data'
+        $identity.ApplicationData | Should -Be 'G:\Redirected Roaming Data'
         $identity.Documents | Should -Be 'F:\OneDrive - Example\Documents'
         $identity.RuntimeProfile | Should -Be 'F:\OneDrive - Example\Documents\PowerShell\Microsoft.VSCode_profile.ps1'
         $identity.UserProfile | Should -Not -Be $env:USERPROFILE
@@ -371,6 +374,8 @@ Describe "setup.ps1 Windows known-folder identity" {
             Should -Throw '*MyDocuments known folder*'
         { Resolve-WindowsTargetIdentity -FolderResolver { param($Name) if ($Name -eq 'LocalApplicationData') { 'relative' } else { "C:\$Name" } } -RuntimeProfile 'C:\profile.ps1' } |
             Should -Throw '*LocalApplicationData known folder*'
+        { Resolve-WindowsTargetIdentity -FolderResolver { param($Name) if ($Name -eq 'ApplicationData') { 'relative' } else { "C:\$Name" } } -RuntimeProfile 'C:\profile.ps1' } |
+            Should -Throw '*ApplicationData known folder*'
         { Resolve-WindowsTargetIdentity -FolderResolver $goodResolver -RuntimeProfile 'relative-profile.ps1' } |
             Should -Throw '*runtime profile path*'
     }
@@ -380,31 +385,37 @@ Describe "setup.ps1 Windows known-folder identity" {
         $identity = [pscustomobject]@{
             UserProfile = Join-Path $root 'Actual User'
             LocalApplicationData = Join-Path $root 'Redirected Local Data'
+            ApplicationData = Join-Path $root 'Redirected Roaming Data'
             Documents = Join-Path $root 'OneDrive Documents'
             RuntimeProfile = Join-Path $root 'OneDrive Documents\PowerShell\Microsoft.PowerShell_profile.ps1'
         }
         $overlays = @(Get-WindowsKnownFolderOverlays -Identity $identity)
 
-        $overlays.Count | Should -Be 2
+        $overlays.Count | Should -Be 3
         $overlays[0].Destination | Should -Be $identity.LocalApplicationData
-        $overlays[1].Destination | Should -Be $identity.Documents
+        $overlays[1].Destination | Should -Be $identity.ApplicationData
+        $overlays[2].Destination | Should -Be $identity.Documents
         $overlays[0].State | Should -Match 'localappdata\.boltdb$'
-        $overlays[1].State | Should -Match 'documents\.boltdb$'
+        $overlays[1].State | Should -Match 'appdata\.boltdb$'
+        $overlays[2].State | Should -Match 'documents\.boltdb$'
     }
 
-    It "post-checks actual Neovim, lazygit, Console, VS Code, and ISE consumers" {
+    It "post-checks actual Neovim, lazygit, Herdr, Console, VS Code, and ISE consumers" {
         $root = Join-Path ([IO.Path]::GetTempPath()) ('known folders ' + [Guid]::NewGuid())
         $localAppData = Join-Path $root 'Redirected Local Data'
+        $appData = Join-Path $root 'Redirected Roaming Data'
         $documents = Join-Path $root 'OneDrive Documents'
         $nvimTarget = Join-Path $localAppData 'nvim'
         $lazygitTarget = Join-Path $localAppData 'lazygit\config.yml'
-        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $lazygitTarget) | Out-Null
+        $herdrTarget = Join-Path $appData 'herdr\config.toml'
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $lazygitTarget), (Split-Path -Parent $herdrTarget) | Out-Null
         if ($env:OS -eq 'Windows_NT') {
             New-Item -ItemType Junction -Path $nvimTarget -Target (Join-Path $script:RepoRoot 'nvim') | Out-Null
         } else {
             New-Item -ItemType SymbolicLink -Path $nvimTarget -Target (Join-Path $script:RepoRoot 'nvim') | Out-Null
         }
         Copy-Item -LiteralPath (Join-Path $script:RepoRoot 'lazygit\config.windows.yml') -Destination $lazygitTarget
+        Copy-Item -LiteralPath (Join-Path $script:RepoRoot 'herdr\config.windows.toml') -Destination $herdrTarget
         $profiles = @(
             (Join-Path $documents 'PowerShell\Microsoft.PowerShell_profile.ps1'),
             (Join-Path $documents 'PowerShell\Microsoft.VSCode_profile.ps1'),
@@ -420,6 +431,7 @@ Describe "setup.ps1 Windows known-folder identity" {
                 $identity = [pscustomobject]@{
                     UserProfile = $root
                     LocalApplicationData = $localAppData
+                    ApplicationData = $appData
                     Documents = $documents
                     RuntimeProfile = $profilePath
                 }
@@ -430,11 +442,77 @@ Describe "setup.ps1 Windows known-folder identity" {
         }
     }
 
+    It "unblocks only validated repo-owned PowerShell profile consumers" {
+        $root = Join-Path $TestDrive 'profile trust publication'
+        $documents = Join-Path $root 'Documents'
+        $expected = Join-Path $root 'powershell_profile.ps1'
+        $runtimeProfile = Join-Path $documents 'PowerShell\Microsoft.PowerShell_profile.ps1'
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $runtimeProfile) | Out-Null
+        [System.IO.File]::WriteAllText($expected, 'exit 0', [System.Text.UTF8Encoding]::new($false))
+        New-Item -ItemType SymbolicLink -Path $runtimeProfile -Target $expected | Out-Null
+        $identity = [pscustomobject]@{
+            UserProfile = $root
+            LocalApplicationData = Join-Path $root 'Local'
+            ApplicationData = Join-Path $root 'Roaming'
+            Documents = $documents
+            RuntimeProfile = $runtimeProfile
+        }
+        $script:UnblockedProfilePaths = @()
+
+        Unblock-WindowsPowerShellProfile -Identity $identity -ExpectedProfile $expected -Unblocker {
+            param([string]$Path)
+            $script:UnblockedProfilePaths += $Path
+        }
+
+        $script:UnblockedProfilePaths | Should -HaveCount 1
+        $script:UnblockedProfilePaths[0] | Should -Be ([System.IO.Path]::GetFullPath($expected))
+
+        if ($env:OS -eq 'Windows_NT') {
+            Set-Content -LiteralPath $expected -Stream Zone.Identifier -Value "[ZoneTransfer]`r`nZoneId=3"
+            (Get-Item -LiteralPath $expected -Stream Zone.Identifier -ErrorAction Stop) | Should -Not -BeNullOrEmpty
+
+            Unblock-WindowsPowerShellProfile -Identity $identity -ExpectedProfile $expected
+
+            Get-Item -LiteralPath $expected -Stream Zone.Identifier -ErrorAction SilentlyContinue |
+                Should -BeNullOrEmpty
+            $pwsh = (Get-Command pwsh -ErrorAction Stop).Source
+            & $pwsh -NoProfile -ExecutionPolicy RemoteSigned -File $runtimeProfile
+            $LASTEXITCODE | Should -Be 0
+        }
+    }
+
+    It "refuses to unblock a divergent PowerShell profile" {
+        $root = Join-Path $TestDrive 'divergent profile trust'
+        $documents = Join-Path $root 'Documents'
+        $expected = Join-Path $root 'powershell_profile.ps1'
+        $runtimeProfile = Join-Path $documents 'PowerShell\Microsoft.PowerShell_profile.ps1'
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $runtimeProfile) | Out-Null
+        [System.IO.File]::WriteAllText($expected, 'repo profile', [System.Text.UTF8Encoding]::new($false))
+        [System.IO.File]::WriteAllText($runtimeProfile, 'user profile', [System.Text.UTF8Encoding]::new($false))
+        $identity = [pscustomobject]@{
+            UserProfile = $root
+            LocalApplicationData = Join-Path $root 'Local'
+            ApplicationData = Join-Path $root 'Roaming'
+            Documents = $documents
+            RuntimeProfile = $runtimeProfile
+        }
+        $script:UnblockedProfilePaths = @()
+
+        {
+            Unblock-WindowsPowerShellProfile -Identity $identity -ExpectedProfile $expected -Unblocker {
+                param([string]$Path)
+                $script:UnblockedProfilePaths += $Path
+            }
+        } | Should -Throw '*not repo-owned*'
+        $script:UnblockedProfilePaths | Should -BeNullOrEmpty
+    }
+
     It "backs up recognized legacy-shape targets but preserves divergent legacy user data" {
         $root = Join-Path ([IO.Path]::GetTempPath()) ('legacy shape ' + [Guid]::NewGuid())
         $identity = [pscustomobject]@{
             UserProfile = Join-Path $root 'User'
             LocalApplicationData = Join-Path $root 'Redirected Local'
+            ApplicationData = Join-Path $root 'Redirected Roaming'
             Documents = Join-Path $root 'Redirected Documents'
             RuntimeProfile = Join-Path $root 'Redirected Documents\PowerShell\Microsoft.PowerShell_profile.ps1'
         }
@@ -467,6 +545,7 @@ Describe "setup.ps1 Windows known-folder identity" {
         $identity = [pscustomobject]@{
             UserProfile = Join-Path $root 'User'
             LocalApplicationData = Join-Path $root 'Redirected Local'
+            ApplicationData = Join-Path $root 'Redirected Roaming'
             Documents = Join-Path $root 'Redirected Documents'
             RuntimeProfile = Join-Path $root 'Redirected Documents\PowerShell\Microsoft.PowerShell_profile.ps1'
         }
@@ -1091,6 +1170,7 @@ Describe "setup.ps1 universal install and migration entrypoint" {
         $script:UniversalIdentity = [pscustomobject]@{
             UserProfile = (Join-Path $script:UniversalRoot 'User')
             LocalApplicationData = $script:UniversalLocal
+            ApplicationData = (Join-Path $script:UniversalRoot 'Roaming')
             Documents = (Join-Path $script:UniversalRoot 'Documents')
             RuntimeProfile = (Join-Path $script:UniversalRoot 'Documents\PowerShell\Microsoft.PowerShell_profile.ps1')
         }
@@ -1249,7 +1329,7 @@ Describe "setup.ps1 update mode" {
         $script:SetupUpdateDepsPath | Should -Be (Join-Path $root 'install-deps.ps1')
         $script:SetupUpdateDepsArgs['Update'] | Should -BeTrue
         $script:SetupUpdateNvimRan | Should -BeTrue
-        ($script:SetupUpdateNvimArgs -join ' ') | Should -Be '--headless +MasonToolsUpdateSync +qa'
+        ($script:SetupUpdateNvimArgs -join ' ') | Should -Be "--headless +lua require('util.mason_tools').run_checked('MasonToolsUpdateSync')"
         $script:SetupUpdateRuntimeRefreshed | Should -BeTrue
         $output | Should -Match 'Update 1/2'
         $output | Should -Match 'Update 2/2'
@@ -1287,7 +1367,7 @@ Describe "setup.ps1 update mode" {
         $script:SetupUpdateDepsArgs['Update'] | Should -BeTrue
         $script:SetupUpdateDepsArgs['DryRun'] | Should -BeTrue
         $script:SetupUpdateRuntimeRefreshed | Should -BeFalse
-        $output | Should -Match '(?m)^\s*would:\s+nvim --headless \+MasonToolsUpdateSync \+qa[ \t]*$'
+        $output | Should -Match "(?m)^\s*would:\s+nvim --headless \+lua require\('util\.mason_tools'\)\.run_checked\('MasonToolsUpdateSync'\)[ \t]*$"
         Should -Invoke -CommandName Invoke-ChezmoiApplyPhase -Times 0 -Exactly
     }
 
@@ -1448,6 +1528,7 @@ Describe "setup.ps1 transactional Windows Terminal merge" {
         $script:WindowsIdentity = [pscustomobject]@{
             UserProfile = $script:FakeHome
             LocalApplicationData = $script:FakeLocalAppData
+            ApplicationData = Join-Path $script:FakeHome 'AppData\Roaming'
             Documents = Join-Path $script:FakeHome 'Documents'
             RuntimeProfile = Join-Path $script:FakeHome 'Documents\PowerShell\Microsoft.PowerShell_profile.ps1'
         }
@@ -1499,6 +1580,7 @@ Describe "setup.ps1 transactional Windows Terminal merge" {
         $written.theme | Should -Be 'rose-pine'
         $written.profiles.defaults.colorScheme | Should -Be 'rose-pine'
         $written.profiles.defaults.font.face | Should -Be 'Hack Nerd Font'
+        $written.profiles.defaults.historySize | Should -Be 32767
         $written.defaultProfile | Should -Be $script:ManagedPwshProfileGuid
         $pwshProfile = @($written.profiles.list | Where-Object { $_.guid -eq $script:ManagedPwshProfileGuid })
         $pwshProfile.Count | Should -Be 1
@@ -1528,33 +1610,62 @@ Describe "setup.ps1 transactional Windows Terminal merge" {
         [System.IO.File]::ReadAllText($backups[0].FullName) | Should -Be $original
     }
 
-    It "preserves divergent packaged, Preview, and portable state without mirroring variants" {
+    It "merges Canary-only settings as an independent target" {
+        $packaged = Get-WindowsTerminalSettingsPath
+        $canary = Get-WindowsTerminalCanarySettingsPath
+        $portable = Get-WindowsTerminalUnpackagedSettingsPath
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $canary) | Out-Null
+        $original = '{"defaultProfile":"{canary}","profiles":{"defaults":{},"list":[{"guid":"{canary}","name":"CanaryOnly"}]},"schemes":[{"name":"CanaryScheme"}],"actions":[{"command":"closeWindow","keys":"alt+f4"}]}'
+        [System.IO.File]::WriteAllText($canary, $original, [System.Text.UTF8Encoding]::new($false))
+
+        Invoke-WindowsTerminalSettingsTransaction -IsPortablePresent $false
+
+        Test-Path -LiteralPath $packaged | Should -BeFalse
+        Test-Path -LiteralPath $portable | Should -BeFalse
+        $written = [System.IO.File]::ReadAllText($canary) | ConvertFrom-Json
+        $written.profiles.defaults.historySize | Should -Be 32767
+        @($written.profiles.list | Where-Object { $_.guid -eq '{canary}' }).Count | Should -Be 1
+        @($written.schemes | Where-Object { $_.name -eq 'CanaryScheme' }).Count | Should -Be 1
+        @($written.actions | Where-Object { $_.keys -eq 'alt+f4' }).Count | Should -Be 1
+        $backups = @(Get-ChildItem -LiteralPath (Split-Path -Parent $canary) -Filter 'settings.json.bak.*')
+        $backups.Count | Should -Be 1
+        [System.IO.File]::ReadAllText($backups[0].FullName) | Should -Be $original
+    }
+
+    It "preserves divergent packaged, Preview, Canary, and portable state without mirroring variants" {
         $packaged = Get-WindowsTerminalSettingsPath
         $preview = Get-WindowsTerminalPreviewSettingsPath
+        $canary = Get-WindowsTerminalCanarySettingsPath
         $portable = Get-WindowsTerminalUnpackagedSettingsPath
         New-Item -ItemType Directory -Force -Path (Split-Path -Parent $packaged), `
-            (Split-Path -Parent $preview), (Split-Path -Parent $portable) | Out-Null
+            (Split-Path -Parent $preview), (Split-Path -Parent $canary), `
+            (Split-Path -Parent $portable) | Out-Null
         $packagedOriginal = '{"defaultProfile":"{pkg}","profiles":{"defaults":{},"list":[{"guid":"{pkg}","name":"PackagedOnly"}]},"schemes":[{"name":"PackagedScheme"}],"actions":[{"command":"closeWindow","keys":"alt+f4"}]}'
         $previewOriginal = '{"defaultProfile":"{pre}","profiles":{"defaults":{},"list":[{"guid":"{pre}","name":"PreviewOnly"}]},"schemes":[{"name":"PreviewScheme"}],"actions":[{"command":"newTab","keys":"ctrl+shift+8"}]}'
+        $canaryOriginal = '{"defaultProfile":"{can}","profiles":{"defaults":{},"list":[{"guid":"{can}","name":"CanaryOnly"}]},"schemes":[{"name":"CanaryScheme"}],"actions":[{"command":"newTab","keys":"ctrl+shift+7"}]}'
         $portableOriginal = '{"defaultProfile":"{port}","profiles":{"defaults":{},"list":[{"guid":"{port}","name":"PortableOnly"}]},"schemes":[{"name":"PortableScheme"}],"actions":[{"command":"newTab","keys":"ctrl+shift+9"}]}'
         [System.IO.File]::WriteAllText($packaged, $packagedOriginal, [System.Text.UTF8Encoding]::new($false))
         [System.IO.File]::WriteAllText($preview, $previewOriginal, [System.Text.UTF8Encoding]::new($false))
+        [System.IO.File]::WriteAllText($canary, $canaryOriginal, [System.Text.UTF8Encoding]::new($false))
         [System.IO.File]::WriteAllText($portable, $portableOriginal, [System.Text.UTF8Encoding]::new($false))
 
         Invoke-WindowsTerminalSettingsTransaction -IsPortablePresent $true
 
         $pkg = [System.IO.File]::ReadAllText($packaged) | ConvertFrom-Json
         $pre = [System.IO.File]::ReadAllText($preview) | ConvertFrom-Json
+        $can = [System.IO.File]::ReadAllText($canary) | ConvertFrom-Json
         $port = [System.IO.File]::ReadAllText($portable) | ConvertFrom-Json
         @($pkg.profiles.list | Where-Object { $_.guid -eq '{pkg}' }).Count | Should -Be 1
-        @($pkg.profiles.list | Where-Object { $_.guid -in @('{pre}', '{port}') }).Count | Should -Be 0
+        @($pkg.profiles.list | Where-Object { $_.guid -in @('{pre}', '{can}', '{port}') }).Count | Should -Be 0
         @($pre.profiles.list | Where-Object { $_.guid -eq '{pre}' }).Count | Should -Be 1
-        @($pre.profiles.list | Where-Object { $_.guid -in @('{pkg}', '{port}') }).Count | Should -Be 0
-        @($pkg.profiles.list | Where-Object { $_.guid -eq '{port}' }).Count | Should -Be 0
+        @($pre.profiles.list | Where-Object { $_.guid -in @('{pkg}', '{can}', '{port}') }).Count | Should -Be 0
+        @($can.profiles.list | Where-Object { $_.guid -eq '{can}' }).Count | Should -Be 1
+        @($can.profiles.list | Where-Object { $_.guid -in @('{pkg}', '{pre}', '{port}') }).Count | Should -Be 0
         @($port.profiles.list | Where-Object { $_.guid -eq '{port}' }).Count | Should -Be 1
-        @($port.profiles.list | Where-Object { $_.guid -in @('{pkg}', '{pre}') }).Count | Should -Be 0
+        @($port.profiles.list | Where-Object { $_.guid -in @('{pkg}', '{pre}', '{can}') }).Count | Should -Be 0
         @(Get-ChildItem -LiteralPath (Split-Path -Parent $packaged) -Filter 'settings.json.bak.*').Count | Should -Be 1
         @(Get-ChildItem -LiteralPath (Split-Path -Parent $preview) -Filter 'settings.json.bak.*').Count | Should -Be 1
+        @(Get-ChildItem -LiteralPath (Split-Path -Parent $canary) -Filter 'settings.json.bak.*').Count | Should -Be 1
         @(Get-ChildItem -LiteralPath (Split-Path -Parent $portable) -Filter 'settings.json.bak.*').Count | Should -Be 1
     }
 
@@ -1562,6 +1673,7 @@ Describe "setup.ps1 transactional Windows Terminal merge" {
         Invoke-WindowsTerminalSettingsTransaction -IsPortablePresent $false
         Test-Path -LiteralPath (Get-WindowsTerminalSettingsPath) | Should -BeFalse
         Test-Path -LiteralPath (Get-WindowsTerminalPreviewSettingsPath) | Should -BeFalse
+        Test-Path -LiteralPath (Get-WindowsTerminalCanarySettingsPath) | Should -BeFalse
         Test-Path -LiteralPath (Get-WindowsTerminalUnpackagedSettingsPath) | Should -BeFalse
     }
 

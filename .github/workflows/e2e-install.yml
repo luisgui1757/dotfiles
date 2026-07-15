@@ -93,7 +93,42 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
+      # The required POSIX setup proofs must exercise the repository bootstrap,
+      # not inherit Nix from an action. pull_request runs the synthetic merge in
+      # the main workspace, so use a second exact source checkout for the helper.
+      # Fork PRs cannot be official branch heads and retain the pre-seeded path.
+      - name: Checkout exact POSIX Nix bootstrap source
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+          path: nix-prerequisite-source
+
+      - name: Bootstrap Nix from a bare POSIX runner
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        working-directory: nix-prerequisite-source
+        run: |
+          set -euo pipefail
+          if command -v nix >/dev/null 2>&1 || [[ -e /nix ]]; then
+            echo "POSIX bootstrap fixture is not bare: Nix already exists" >&2
+            exit 1
+          fi
+          # Before publication this is the exact official source branch head.
+          # After publication, fetch-depth 0 carries the release tag and this
+          # smoke follows the public exact-tag path instead.
+          if git show-ref --verify --quiet refs/tags/v0.2.0; then
+            git checkout --detach refs/tags/v0.2.0
+          fi
+          bootstrap_log="$RUNNER_TEMP/nix-prerequisite-bootstrap.log"
+          ./scripts/install-nix-prerequisite.sh --install 2>&1 | tee "$bootstrap_log"
+          grep -F "Nix prerequisite installed and verified" "$bootstrap_log" >/dev/null
+          grep -E "Verified (prerelease|immutable release) checkout:" "$bootstrap_log" >/dev/null
+          echo "/nix/var/nix/profiles/default/bin" >> "$GITHUB_PATH"
+
       - name: Install Determinate Nix (flakes enabled)
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository
         uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22
 
       - name: "PR-only cache: POSIX setup"

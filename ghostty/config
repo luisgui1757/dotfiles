@@ -47,7 +47,10 @@ shell-integration = detect
 shell-integration-features = cursor,sudo,title
 
 # ---- Scrollback / clipboard --------------------------------------------------
-scrollback-limit = 50000
+# Ghostty measures scrollback in bytes, not lines. Keep a lazy 1 GiB budget per
+# terminal surface so long-running sessions can retain roughly millions of
+# ordinary log lines without claiming the memory up front.
+scrollback-limit = 1073741824
 clipboard-read = ask
 clipboard-write = allow
 clipboard-paste-protection = true

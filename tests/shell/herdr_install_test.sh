@@ -13,6 +13,8 @@ trap 'rm -rf "$TMP_ROOT"' EXIT
 
 export TMPDIR="$TMP_ROOT/tmp"
 export HOME="$TMP_ROOT/home"
+PATH="/usr/bin:/bin"
+export PATH
 FAKE_HERDR="$TMP_ROOT/herdr.fixture"
 cat > "$FAKE_HERDR" <<EOF
 #!/usr/bin/env bash
@@ -66,7 +68,7 @@ grep -F "version=$HERDR_VERSION" "$marker" >/dev/null
 grep -F "source_url=https://github.com/ogulcancelik/herdr/releases/download/${HERDR_VERSION}/herdr-linux-x86_64" "$marker" >/dev/null
 grep -F "command_path=$dest" "$marker" >/dev/null
 
-PATH="$HOME/.local/bin:/usr/bin:/bin"
+PATH="$HOME/.local/bin:$PATH"
 export PATH
 INSTALL_DEPS_UPDATE_TOOLS="herdr"
 update_catalog_tools > "$TMP_ROOT/update.out"

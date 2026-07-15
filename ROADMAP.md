@@ -92,18 +92,28 @@ Sequenced PRs (split for independent, revertable blast radius):
   config; not a Nix/nixpkgs GUI package.
 - **PR-4 `feat/aerospace-herdr` - DONE.** AeroSpace (macOS tap cask,
   reserved-chord-safe keymap) + Herdr (macOS/Linux stable channels plus native
-  Windows pinned preview binary).
+  Windows pinned preview binary). Herdr now consumes one chezmoi-managed,
+  forced-dark built-in Rose Pine config on POSIX and from Windows' real roaming
+  ApplicationData known folder.
 - **PR-5 `feat/nix-skeleton` - DONE.** flake + committed `flake.lock` with ZERO
   ownership; `nix flake check` CI; disjointness test (Home Manager declares no
   file targets); Renovate `nix` manager.
-- **PR-6 `feat/nix-darwin` - DONE.** macOS host config: `darwinConfigurations` +
-  `system.primaryUser`; nix-homebrew (pinned taps, `mutableTaps = false`) +
-  homebrew module (`cleanup = "check"`, no auto-update/upgrade); Home Manager
-  **packages only**; public macOS setup applies it by default; `--update` gains
-  an `owner=nix` status.
+- **PR-6 `feat/nix-darwin` - DONE (mixed-ownership correction 2026-07-13).**
+  macOS host config: `darwinConfigurations` + `system.primaryUser`;
+  nix-homebrew (`mutableTaps = true`, target-user-owned tap clones) + homebrew module
+  (`cleanup = "none"`, no auto-update/upgrade); Home Manager **packages only**;
+  public macOS setup applies it by default; `--update` gains an `owner=nix`
+  status. Repeated setup also resolves the installed current-system rebuild
+  command outside a pre-activation shell's stale `PATH` and treats exact
+  `/etc/static` shell links plus retained backups as managed state.
 - **PR-7 `feat/nix-linux` - DONE.** Home Manager standalone on Ubuntu/WSL userland;
   public Linux/WSL setup applies it by default; native/deferred install arms
   remain for artifacts and regression evidence (nvim last, for ABI reasons).
+  The digest-pinned local Ubuntu 24.04 arm64 owner lifecycle passed at exact
+  commit `51c5211b4b3dee4f0758533beac5e18345d668a1`: install, update, config
+  uninstall, idempotent uninstall retry, reinstall, final update, 36/36 full
+  validation, and preservation of every pre-existing native package. This is
+  Linux runtime evidence, not physical-host or WSL proof.
 
 ### Mega-PR: `feat/platform-nix-tooling-mega` (2026-07-07)
 
@@ -146,7 +156,9 @@ Commit-by-commit status:
   Linuxbrew formula, pinned native-Linux binary with provenance-backed update
   ownership, and pinned SHA-256-verified native-Windows preview `.exe` without
   `herdr.dev` remote eval). Herdr install failures now emit `FAIL:` and the
-  Linux/macOS/Windows e2e gates assert the command. AeroSpace TCC /
+  Linux/macOS/Windows e2e gates assert the command. Its canonical config forces
+  the built-in Rose Pine theme with automatic switching disabled on every OS.
+  AeroSpace TCC /
   Accessibility and Herdr interactive-session behavior remain
   manual-verification-pending in `tests/MANUAL.md`.
   Hosted macOS additionally proves the real AeroSpace app and CLI binaries have
@@ -159,20 +171,28 @@ Commit-by-commit status:
 - **Commit 5 - nix-darwin + declarative Homebrew — DONE.**
   Architecture-specific `darwinConfigurations` with `system.primaryUser` and
   home resolved once by setup from the authoritative target account;
-  nix-homebrew (pinned taps,
-  `autoMigrate = true`, `mutableTaps = false`, `trust.taps = [ "nikitabobko/tap" ]` for the
+  nix-homebrew (target-user-owned tap clones,
+  `autoMigrate = true`, `mutableTaps = true`, `trust.taps = [ "nikitabobko/tap" ]` for the
   AeroSpace cask); homebrew module (`autoUpdate = false`, `upgrade = false`,
-  `cleanup = "check"`); casks WezTerm + AeroSpace; brews Herdr + selected CLI; Home
+  `cleanup = "none"`); casks WezTerm + AeroSpace; brews Herdr + selected CLI; Home
   Manager packages-only; default `setup.sh` applies `sudo darwin-rebuild switch`
   on macOS (prompted unless `--all`) with first-run bootstrap pinned to the
   locked nix-darwin rev plus `narHash`.
-  Existing Homebrew installs are adopted with `autoMigrate = true`, and setup
-  transactionally moves architecture-correct `Library/Taps` to a timestamped
-  backup before activation so `mutableTaps = false` can install the pinned taps;
-  activation/bootstrap/interruption failure restores the original.
-  GitHub's hosted macOS e2e passes `DOTFILES_NIX_DARWIN_HOSTED_CI=1` to use
-  `cleanup = "none"` for that disposable activation only, because the runner
-  image ships many undeclared Brew packages; real hosts remain `cleanup = "check"`.
+  Existing Homebrew installs are adopted with `autoMigrate = true`. The
+  2026-07-13 correction made Homebrew explicitly mixed ownership: activation
+  applies declared packages while Homebrew owns mutable tap clones as the target
+  user. A scoped one-time transaction migrates only the three root-owned,
+  non-Git snapshots created by the retired pinned-tap shape; unrelated user
+  taps/packages are preserved, no whole-`Library/Taps` migration occurs, and CI
+  uses the same contract. Transaction/recovery roots are siblings of
+  `Library/Taps`, because descendants are live Homebrew tap candidates; setup
+  auto-relocates the exact descendant artifacts emitted by the short-lived
+  broken migration before retry. A checked-in owner-host lifecycle runner now
+  covers install, update, config uninstall, reinstall, final update, package/tap
+  preservation, and full validation. Its first real invocation also exposed a
+  stale login-shell PATH: setup now directly re-adopts an existing canonical
+  Nix profile binary when Homebrew path refresh occurs after the upstream
+  already-sourced guard, rather than attempting a second Nix installation.
   The first real system activation remains manual-verification-pending in
   `tests/MANUAL.md`.
 - **Commit 6 - Linux/WSL Home Manager packages-only — DONE.** HM standalone for
@@ -187,7 +207,17 @@ Commit-by-commit status:
   the E5113 parser/ABI mismatch. They stay native until nvim + its parser
   toolchain can move into one ABI-matched Nix closure (follow-up). Excluded from
   `nix/home/common.nix` and asserted absent by `tests/nix/linux_home_test.sh`.
-  The first real Home Manager activation on Linux/WSL remains
+  Linux `clangd` is instead package-layer owned through `pkgs.clang-tools` on
+  both supported architectures: Mason publishes no Linux arm64 clangd artifact,
+  so its platform manifest excludes clangd on every Linux host rather than
+  creating architecture-dependent ownership. Setup and validation invoke a
+  shared checked Mason wrapper that turns command or missing-package failures
+  into a nonzero Neovim exit.
+  The guarded stale-`PATH` recovery is driven explicitly through the Linux Home
+  Manager path, and a checked-in non-root Linux lifecycle runner mirrors the
+  macOS install/update/config-uninstall/reinstall/update proof while rejecting
+  removal of pre-existing native packages. The first real Home Manager
+  activation on Linux/WSL remains
   manual-verification-pending in `tests/MANUAL.md`.
 - **Commit 7 - setup/update ownership integration — DONE.** Unix update
   ownership recognizes Nix-owned tools: `install-deps.sh --update` resolves a
@@ -229,9 +259,10 @@ Commit-by-commit status:
   through every Brew-backed preview phase; the manual WSL greenfield harness
   installs Ubuntu's `nix-bin` package and enables flakes before invoking setup.
   The ultimate closure added authoritative account/home resolution,
-  transactionally rolled-back tap migration, and Home Manager session-vars
-  startup. Apple Silicon is the only current Darwin contract; Intel evidence is
-  retained in the append-only ledger as historical proof, not current support.
+  mixed-ownership tap preservation (superseding the earlier tap migration), and
+  Home Manager session-vars startup. Apple Silicon is the only current Darwin
+  contract; Intel evidence is retained in the append-only ledger as historical
+  proof, not current support.
 - **Pi CLI provisioning — DONE.** Setup installs the Pi CLI on every OS as the
   pinned npm package `@earendil-works/pi-coding-agent@0.80.3` after checking npm
   `dist.integrity`. POSIX public setup gets Node 24 from the enforced Nix package
@@ -260,7 +291,7 @@ Commit-by-commit status:
   retired the Intel product contract; WSL real-host proof remains explicitly
   pending.
   UGR-001 and UGR-014 are implemented:
-  stable packaged/Preview/portable WT state is independently transactionally merged and
+  stable packaged/Preview/Canary/portable WT state is independently transactionally merged and
   recovered, while uninstall backup selection is filename-keyed and fails
   closed on malformed candidates. UGR-004 through UGR-009 are implemented:
   recoverable installs share the summary boundary; Pi and zsh executable
@@ -556,7 +587,9 @@ reconciliation followed by per-tool proven update ownership**:
 - Homebrew/Linuxbrew ownership requires the PATH-visible command path and its
   resolved executable target to stay under `brew --prefix`, an installed
   formula, and `brew list --formula <formula>` file ownership of the resolved
-  executable. Formula-list presence alone cannot claim `/usr/bin`, another
+  executable. The catalog formula remains the install default; an active
+  versioned formula is instead resolved from its Cellar target and verified
+  receipt before update. Formula-list presence alone cannot claim `/usr/bin`, another
   shadowing path, a Brew-prefix symlink that resolves outside the Brew prefix,
   or an unrelated file under the Brew prefix.
 - Native Linux ownership is source-proven through `dpkg-query -S`, `rpm -qf`,
@@ -585,7 +618,9 @@ reconciliation followed by per-tool proven update ownership**:
   resolving from `/usr/bin` report `unmanaged` with a Homebrew migration hint.
 - Setup persists Homebrew shellenv and Homebrew GNU Make's `libexec/gnubin` path
   when the `make` formula is installed, so Brew-owned GNU Make is not a hidden
-  manual `export PATH=...` step.
+  manual `export PATH=...` step. Install and update also ask Homebrew to
+  idempotently relink its completion surface, preventing stale `_brew` links
+  after tap/repository migration.
 - Windows manager-owned packages now report `current` without running a mutating
   package update when Scoop `status`, winget `list --upgrade-available`, or
   Chocolatey `outdated --limit-output` has no exact package row; failed
@@ -594,7 +629,7 @@ reconciliation followed by per-tool proven update ownership**:
   `Latest Version`, and empty `Info`/`Missing Dependencies`.
 - Regression coverage lives in `tests/shell/install_deps_update_test.sh` for
   mixed Linuxbrew/apt dispatch, Homebrew `current`, shadowed Homebrew tools,
-  Brew-prefix contradictions, Brew-prefix symlink escapes, external shadow
+  versioned-formula ownership, Brew-prefix contradictions, Brew-prefix symlink escapes, external shadow
   symlinks to Brew, apt `current`, pacman skip semantics, macOS system zsh,
   direct-artifact current/unmarked/blocked/refresh behavior, command-path
   shadowing, install-root mismatches, and unsupported direct-artifact install
@@ -740,8 +775,9 @@ reconciliation followed by per-tool proven update ownership**:
      `nvim`, `cmake`, `rg`, `fd`, `fzf`, `lsd`, `chezmoi`, `lazygit`,
      `starship`, `tmux`, `python3`, `node`, `tree-sitter`, `shellcheck`,
      `hyperfine`, `taplo`, `yamllint`, and similar).
-   - The repo manages Homebrew shellenv and any required PATH adoption. There
-     should be no hidden manual `export PATH=...` step.
+   - The repo manages Homebrew shellenv, completion-link reconciliation, and any
+     required PATH adoption. There should be no hidden manual repair or
+     `export PATH=...` step.
    - GNU Make's Homebrew `gnubin` path is required for this profile because
      Homebrew's formula exposes GNU Make as `gmake` by default. If the catalog
      says Homebrew owns `make`, setup must manage this PATH entry instead of
@@ -845,7 +881,8 @@ The shipped tests prove behavior, not just branches:
     checksum fields for Neovim, lazygit, Starship, tree-sitter CLI, and chezmoi.
 11. Homebrew shellenv/setup tests prove the managed `make` `libexec/gnubin`
     path is added to the current setup process, persisted for future shells, and
-    retrofitted into a legacy managed block without dropping user content.
+    retrofitted into a legacy managed block without dropping user content;
+    install/update completion-link reconciliation is idempotent and fail-closed.
 12. Windows Pester coverage proves source-proven Scoop/winget/Chocolatey update
     ownership, manager-specific `current`/`updated`/availability-failure status,
     manual-source shadows with package rows, and Chocolatey-bin/package-list
@@ -1240,7 +1277,7 @@ Canonical solution:
 5. DONE - Make setup the sole normal install/migration/update orchestrator while
    preserving exact-tag acquisition and the existing recovery transaction.
 6. PENDING LIVE - Record Apple Silicon owner-host, real WSL2, redirected
-   Windows, divergent stable packaged/Preview/portable Terminal, and exact tagged v0.2.0 release runs before
+   Windows, divergent stable packaged/Preview/Canary/portable Terminal, and exact tagged v0.2.0 release runs before
    publication.
 
 ## Disproved Or Non-Blocking Assumptions

@@ -110,8 +110,10 @@ run_probe() {
     local home="$1" path_value="$2"
     # shellcheck disable=SC2016 # the single-quoted body is zsh code; $ must NOT
     # expand in bash. Only "$zshrc" (double-quoted) is interpolated by bash.
-    HOME="$home" HOMEBREW_PREFIX="$home/no-brew" DOTFILES_TEST_PATH="$path_value" "$zsh_bin" -i -c '
+    HOME="$home" HOMEBREW_PREFIX="$home/no-brew" __HM_SESS_VARS_SOURCED=1 \
+        DOTFILES_TEST_PATH="$path_value" "$zsh_bin" -i -c '
         export PATH="$DOTFILES_TEST_PATH"
+        export HOMEBREW_PREFIX="$HOME/no-brew"
         path=(${(s.:.)PATH})
         rehash
         source '"$zshrc"' >/dev/null 2>&1 || exit 1

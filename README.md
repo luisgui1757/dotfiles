@@ -1,48 +1,387 @@
 # Dotfiles
 
-Cross-platform terminal and editor setup for Apple Silicon macOS, Linux, WSL,
-and Windows.
-The repo owns the daily shell/editor stack: Neovim, tmux/psmux, Starship, zsh,
-PowerShell, Ghostty, WezTerm, lazygit, `lsd`, `zoxide` smart-cd, the `gh` CLI with the
-`gh-dash` dashboard, the `pi` CLI, Windows Terminal theming, locked plugin restore, LSP /
-formatter provisioning, and global Sentinel agent-policy bootstrap. It also provisions the `tree-sitter` CLI needed by
-`nvim-treesitter` main parser builds, plus AeroSpace (macOS tiling WM) and Herdr
-(agent multiplexer: macOS/Linux stable, Windows preview) through vendor-channel installs.
+One setup command gives you the same terminal-first working style, shortcuts,
+and Rose Pine theme on Apple Silicon macOS, Linux, WSL2, and Windows.
 
-The public interface is intentionally small. After cloning an exact release,
-fresh installs and supported historical migrations use the same command:
+If the repo is already installed, jump to the [cheat sheets](#cheat-sheets).
+If this is a new machine, start with [install, update, and remove](#install-update-and-remove).
 
-```text
-setup --all -> bootstrap prerequisites -> migrate if needed -> reconcile the full release
+## What you get
+
+| Area | Tools | What this repo does |
+|---|---|---|
+| Editor | Neovim, VS Code | Installs the editor stack, plugins, language servers, formatters, parsers, theme, and shortcuts. |
+| Multiplexers | Herdr, tmux, psmux | Gives you tabs, panes, workspaces/sessions, restore support, and tmux-shaped keys. `psmux` is the native-Windows tmux equivalent. |
+| Terminals | Ghostty, WezTerm, Windows Terminal | Applies Rose Pine, Hack Nerd Font, large scrollback, sensible clipboard behavior, and maximized startup. |
+| Shell | zsh, PowerShell 7, Starship | Adds vi command-line editing, history suggestions, fuzzy completion, a shared prompt, and useful aliases. |
+| Navigation | fzf, zoxide, lsd, ripgrep, fd | Adds fuzzy history/file/directory pickers, smart `cd`, readable file listings, and fast search. |
+| Git | Git, lazygit, GitHub CLI, gh-dash | Installs the CLI tools and applies their shared terminal configuration. |
+| Languages | Python, Node.js, Tree-sitter, Mason tools | Installs the base runtimes plus the language servers and formatters used by Neovim. |
+| macOS desktop | AeroSpace | Adds keyboard-driven tiling workspaces on macOS. |
+| Agent tooling | Pi CLI, Sentinel policy | Installs the supported CLI and applies the global agent-policy block. Local sessions and credentials stay local. |
+| Config management | Nix, nix-darwin/Home Manager, chezmoi | Reconciles POSIX packages and applies the repo-owned config files. Windows uses native package managers plus chezmoi. You do not need to run these layers by hand. |
+
+The main configuration is intentionally consistent: dark Rose Pine, Hack Nerd
+Font, vi-style navigation, `Ctrl+B` as the multiplexer prefix, and the same
+shell helpers wherever the platform supports them.
+
+## Platform support
+
+| Platform | Supported path | Important note |
+|---|---|---|
+| Apple Silicon macOS | `./setup.sh --all` | Fully supported. AeroSpace is macOS-only and needs one manual Accessibility grant. |
+| Native Linux | `./setup.sh --all` | Supports Homebrew/Linuxbrew or `apt`, `dnf`, `pacman`, `zypper`, and `apk`. GUI app availability still depends on the distro and architecture. |
+| WSL2 | Windows `setup.ps1` plus WSL `setup.sh` | Windows owns Windows Terminal, fonts, and host clipboard tools. WSL owns the Linux shell/editor stack. Linux GUI terminals are opt-in experiments. |
+| Native Windows | `.\setup.ps1 -All` | Use PowerShell 7. Enable Developer Mode first so setup can create the required config links without running the whole install as Administrator. Herdr for Windows is a pinned preview build. |
+
+## Install, update, and remove
+
+Run setup from a local checkout of an exact release. Setup is safe to rerun.
+
+```bash
+# macOS, Linux, or WSL
+cd ~/dotfiles
+./setup.sh --all
 ```
 
-For a fresh machine or a machine still carrying exact v0.1.0 state, run
-`./setup.sh --all` or `.\setup.ps1 -All`. The split behind that entry point is deliberate:
-Nix is the enforced package layer on macOS/Linux/WSL; `install-deps` handles
-native/deferred tools and Windows packages; chezmoi owns the dotfiles/config
-layer in `home/`. The full setup scripts apply configs through chezmoi.
+```powershell
+# native Windows
+Set-ExecutionPolicy -Scope Process Bypass -Force
+Set-Location $HOME\dotfiles
+.\setup.ps1 -All
+```
 
-`--update` / `-Update` first reconciles the complete checked-out release—Nix,
-missing tools, config, locked plugins, parsers, Mason, and Sentinel—then refreshes
-only the proven drift-tolerant package/Mason edge. `--upgrade` / `-Upgrade` is
-an alias. Neither spelling fetches a moving branch or rewrites repository pins;
-clone the next exact annotated release beside the old checkout first.
+The process-scoped execution-policy command is required when Windows rejects
+the checkout as unsigned. It affects only the current PowerShell process and
+does not weaken the user or machine policy permanently. Run setup from that
+same window; `setup.ps1` cannot apply this itself because PowerShell evaluates
+the policy before loading the script.
 
-## Quick Start
+Open a new terminal after the first install. The current shell started before
+the new PATH, profile, and default shell existed.
+
+To reconcile the checked-out release and update the tools that this repo can
+prove it owns:
+
+```bash
+./setup.sh --update
+```
+
+```powershell
+.\setup.ps1 -Update
+```
+
+`--update` does not pull Git or move you to a new release. For a release change,
+clone the new exact tag beside the old checkout and follow
+[docs/UPGRADING.md](docs/UPGRADING.md). Do not turn a live old checkout into a
+new release with `git pull`.
+
+To preview or remove the managed config layer:
+
+```bash
+./uninstall.sh --dry-run
+./uninstall.sh --all
+```
+
+```powershell
+.\uninstall.ps1 -DryRun
+.\uninstall.ps1 -All
+```
+
+Uninstall removes repo-owned config. It does not blindly remove every package
+that exists on the machine. Detailed install, migration, and recovery behavior
+starts at [Detailed setup and migration reference](#detailed-setup-and-migration-reference).
+
+## Cheat sheets
+
+### How to read multiplexer shortcuts
+
+`Ctrl+B`, then `w` means: hold `Ctrl`, press `B`, release both, then press `w`.
+It is a sequence, not one four-key chord. This README calls `Ctrl+B` the
+**prefix**.
+
+### Herdr
+
+Herdr is the agent-focused multiplexer. It groups terminal panes into tabs and
+workspaces, then tracks the agents running inside them. The repo makes its
+common navigation feel like tmux and uses Herdr's built-in `rose-pine` theme.
+
+Start it from a normal shell with `herdr`. On Windows, new Herdr panes run
+`pwsh.exe`, so they load the same PowerShell profile, history list, and
+completion behavior as Windows Terminal. Recreate an old pane after a config
+change; an already-running shell cannot change into PowerShell 7 retroactively.
+
+| Keys | Result |
+|---|---|
+| `Ctrl+B`, then `w` | Open the full workspace/tab/pane navigator. Use Up/Down and Enter. |
+| `Ctrl+B`, then `g` | Open the same full navigator. |
+| `Ctrl+B`, then `p` / `n` | Move to the previous/next tab/window. |
+| `Ctrl+B`, then `1` ... `9` | Switch tabs/windows. |
+| `Ctrl+B`, then `,` | Rename the current tab/window. |
+| `Ctrl+B`, then `$` | Rename the current workspace. |
+| `Ctrl+B`, then Up/Down | Move to the previous/next workspace. |
+| `Ctrl+B`, then `Shift+1` ... `Shift+9` | Jump directly to workspace 1 ... 9. |
+| `Ctrl+B`, then `Shift+A` / `a` | Move to the previous/next agent. |
+| `Ctrl+B`, then `Ctrl+1` ... `Ctrl+9` | Focus agent 1 ... 9 directly. |
+
+Named Herdr sessions are separate server namespaces. A session does not appear
+inside another session's navigator; attach to the other session from a normal
+shell.
+
+Config locations:
+
+- macOS/Linux/WSL: `~/.config/herdr/config.toml`
+- Windows: `%APPDATA%\herdr\config.toml`
+
+### tmux and psmux
+
+Use `tmux` on macOS, Linux, and WSL. Use `psmux` on native Windows. Both use
+`Ctrl+B` as the prefix and count windows/panes from 1.
+
+```bash
+tmux              # start
+tmux attach       # reattach
+```
+
+```powershell
+psmux             # start
+psmux attach      # reattach
+```
+
+| Keys | Result |
+|---|---|
+| `Ctrl+B`, then `c` | Create a window. |
+| `Ctrl+B`, then `1` ... `9` | Switch windows. |
+| `Ctrl+B`, then `n` / `p` | Next / previous window. |
+| `Ctrl+B`, then `,` | Rename the current window. |
+| `Ctrl+B`, then `$` | Rename the current session. |
+| `Ctrl+B`, then `|` | Split left/right. |
+| `Ctrl+B`, then `-` | Split top/bottom. |
+| `Ctrl+B`, then `h` / `j` / `k` / `l` | Focus the pane left/down/up/right. |
+| `Ctrl+B`, then `H` / `L` | Move the current window left/right. |
+| `Ctrl+B`, then `w` | Open the session/window/pane tree. |
+| `Ctrl+B`, then `d` | Detach and leave the session running. |
+| `Ctrl+B`, then `r` | Reload the managed config. |
+| `Ctrl+B`, then `Ctrl+S` | Save the current session layout. |
+| `Ctrl+B`, then `Ctrl+R` | Restore the saved session layout. |
+
+POSIX tmux auto-saves every 15 minutes and auto-restores on startup. Its first
+launch may say `Tmux resurrect file not found!` until the first save exists.
+Windows psmux is manual: the `run-shell` `Saved to ...` popup means the save is
+done; close it with `q` or `Esc` (`Enter` does nothing). After restarting psmux,
+restore with `Ctrl+B`, then `Ctrl+R`, then use `Ctrl+B`, then `w` to select the
+restored session.
+
+Copy text with vi-style copy mode:
+
+1. Press `Ctrl+B`, then `[`.
+2. Move with vi keys.
+3. Press `v` to start selecting.
+4. Press `y` to copy to the system clipboard.
+5. Press `Ctrl+B`, then `]` to paste into the terminal.
+
+On Windows, click-and-drag selection belongs to Windows Terminal; use
+`Ctrl+Shift+C` to copy it. The normal tmux mouse features—pane focus, wheel
+scroll, and border resize—stay enabled.
+
+The Rose Pine variant is `main` by default. Switch it live with:
+
+```bash
+tmux set -g @rosepine-variant moon
+tmux source-file ~/.tmux.posix.conf
+```
+
+```powershell
+psmux set -g @rosepine-variant moon
+psmux source-file ~/.tmux.windows.conf
+```
+
+Valid variants are `main`, `moon`, and `dawn`.
+
+Configs: `~/.tmux.conf` plus `~/.tmux.posix.conf` on POSIX;
+`~/.psmux.conf` plus `~/.tmux.windows.conf` on Windows.
+
+### AeroSpace (macOS)
+
+AeroSpace tiles macOS app windows. It starts at login and reloads its config
+when the file changes. On first launch, grant it access in **System Settings ->
+Privacy & Security -> Accessibility**. macOS does not allow setup to grant this
+permission for you.
+
+| Keys | Result |
+|---|---|
+| `Ctrl+Alt+h/j/k/l` | Focus the window left/down/up/right. |
+| `Ctrl+Alt+Shift+h/j/k/l` | Move the focused window left/down/up/right. |
+| `Ctrl+Alt+-` / `Ctrl+Alt+=` | Shrink / grow the focused window. |
+| `Ctrl+Alt+/` | Use tiled layout. |
+| `Ctrl+Alt+,` | Use accordion layout. |
+| `Ctrl+Alt+f` | Toggle fullscreen. |
+| `Alt+1` ... `Alt+9` | Switch workspace. |
+| `Alt+Shift+1` ... `Alt+Shift+9` | Move the focused window to a workspace. |
+| `Alt+Tab` | Jump back to the previous workspace. |
+| `Ctrl+Alt+Shift+;` | Enter service mode. |
+
+In service mode, press `Esc` to reload the config, `r` to flatten the workspace
+tree, `f` to toggle floating/tiling, or Backspace to close every window except
+the current one.
+
+Config: `~/.config/aerospace/aerospace.toml`.
+
+### Neovim
+
+The leader key is Space. For example, `<leader>fg` means press Space, then `f`,
+then `g`.
+
+| Keys / command | Result |
+|---|---|
+| `<leader>?` | Show the keys available in the current buffer. Start here when you forget a shortcut. |
+| `Ctrl+P` | Find a file. |
+| `<leader>fg` | Search text in the project. |
+| `<leader>fb` | List open buffers. |
+| `<leader>fd` | List diagnostics. |
+| `Alt+h/j/k/l` | Focus the Neovim window left/down/up/right. |
+| `gd` / `gr` | Go to definition / find references. |
+| `K` | Show documentation for the item under the cursor. |
+| `<leader>rn` | Rename a symbol. |
+| `<leader>ca` | Show code actions. |
+| `[d` / `]d` | Previous / next diagnostic. |
+| `[h` / `]h` | Previous / next Git hunk. |
+| `<leader>gp` | Preview the current Git hunk. |
+| `<leader>gt` | Toggle blame for the current line. |
+| `<leader>gf` | Format the current buffer or selection. |
+| `:wnf` | Save once without formatting. The next normal `:w` formats again. |
+| `<leader>u` | Open/close the undo tree. |
+| `<leader>mr` | Toggle rendered Markdown. |
+| `<leader>lt` | Toggle relative line numbers. |
+| `gcc` | Comment/uncomment the current line. |
+| `<leader>b` | Toggle a debugger breakpoint. |
+| `F5` / `F10` / `F11` / `F12` | Continue / step over / step into / step out. |
+
+Files format on `:w`. The timeout is 10 seconds. Use `:ConformInfo` to see which
+formatter is active if a save fails or times out; use `:wnf` only when you
+intentionally want one unformatted save.
+
+Config: `~/.config/nvim` on macOS/Linux/WSL and `%LOCALAPPDATA%\nvim` on
+Windows. Both point to this repo's `nvim/` directory.
+
+### Starship
+
+Starship is the prompt. It has no special mode and no shortcuts. It shows:
+
+- your username and full current path;
+- the Git branch and working-tree state;
+- active C, Go, Node.js, Rust, Python, or Conda versions;
+- the current time.
+
+The Git symbols are deliberately compact:
+
+| Symbol | Meaning |
+|---|---|
+| `✓` | clean |
+| `?(n)` | untracked files |
+| `!(n)` | modified files |
+| `++(n)` | staged files |
+| `✘(n)` | deleted files |
+| `⇡(n)` / `⇣(n)` | commits ahead / behind |
+| `$` | stash exists |
+
+Edit the repo file `starship/starship.toml` to change the prompt. Start a new
+shell to see startup-level changes.
+
+### Shell, completion, and navigation
+
+zsh on POSIX and PowerShell 7 on Windows use the same basic habits:
+
+| Keys / command | Result |
+|---|---|
+| Tab | Open the completion menu. Keep typing to narrow it. |
+| Up/Down | Search history using the text already typed as a prefix. |
+| `Ctrl+R` | Fuzzy-search command history. |
+| `Ctrl+T` | Fuzzy-pick a file and insert its path. |
+| `Alt+C` | Fuzzy-pick a directory and change into it. |
+| `Esc` | Enter vi normal mode on the command line. |
+| `i` / `a` | Return to vi insert mode. |
+| `z proj` | Jump to the best previously visited directory matching `proj`. |
+| `zi` | Pick a known directory interactively. |
+
+`ls`, `l`, `la`, `lla`, and `lt` use `lsd` for readable icons and colors.
+zsh-only local changes belong in `~/.zshrc.local`; setup does not overwrite that
+file.
+
+Useful standalone tools:
+
+- `lazygit`: terminal Git UI. In the commits panel, `J`/`K` move a commit. On
+  Windows inside psmux, use `Ctrl+G` when a popup expects Esc.
+- `gh dash`: dashboard for pull requests and issues. Run `gh auth login` first,
+  then rerun setup if the extension was skipped while unauthenticated.
+- `pi`: the pinned Pi CLI. Its personal runtime state is not synced.
+
+### Terminals and scrollback
+
+- **tmux/psmux panes:** 50,000 history lines per pane. This is separate from the
+  outer terminal's scrollback limit.
+- **Ghostty:** macOS/Linux, dark Rose Pine, 1 GiB lazy scrollback budget per
+  surface, copy-on-select, maximized startup. On macOS, Cmd+grave accent toggles
+  the global quick terminal.
+- **WezTerm:** macOS/Linux/Windows, dark Rose Pine, 5,000,000 scrollback lines
+  per tab, maximized startup. It opens a normal shell; start Herdr/tmux/psmux
+  yourself.
+- **Windows Terminal:** Windows/WSL host, dark Rose Pine, 32,767 history lines
+  per profile. That is Windows Terminal's hard maximum.
+
+### Clipboard on Linux, WSL, and Windows
+
+Neovim and tmux copy to the system clipboard. The helper depends on where the
+shell is running:
+
+| Environment | Clipboard path |
+|---|---|
+| macOS | `pbcopy` |
+| Linux Wayland | `wl-copy` from `wl-clipboard` |
+| Linux X11 | `xclip`, then `xsel` as fallback |
+| WSL | `win32yank.exe` on the Windows host |
+| Native Windows psmux | `clip.exe` |
+| Remote shell / no helper | OSC52 through the terminal |
+
+`devilspie2` is **not** a clipboard tool. On Linux/X11 it is an optional rule
+that forces Ghostty to open maximized when the window manager ignores Ghostty's
+maximize request. It does not work on Wayland; GNOME/Wayland needs a Shell
+extension for that window behavior.
+
+## Detailed setup and migration reference
+
+The rest of this README explains the implementation, recovery paths, CI, and
+maintenance rules. Normal daily use does not require it.
 
 Clone the repo first, then run the local setup entry point. `setup.{sh,ps1}`
 installs repo-managed dependencies, links every config, then runs
 `:Lazy! restore`, a synchronous nvim-treesitter parser install, and
-`:MasonToolsInstallSync` before the first interactive Neovim launch.
+the repo's checked `:MasonToolsInstallSync` wrapper before the first interactive
+Neovim launch. The wrapper exits nonzero on a command error or missing package;
+headless Neovim cannot print an install error and still let setup report done.
 Piped or stdin setup is intentionally disabled; if setup cannot prove it is
 running from a local checkout, it fails closed with clone-first instructions.
 
-Git is required to clone this repo. On macOS/Linux/WSL, setup bootstraps Nix
+Git is required to clone this repo. On Linux/WSL, a greenfield setup installs
+`curl` plus CA certificates through the detected native package manager before
+the Nix prerequisite helper needs them. On macOS/Linux/WSL, setup bootstraps Nix
 when it is missing by calling the release-pinned prerequisite helper itself.
 That helper downloads the official upstream Nix 2.34.0 release and verifies the
-platform SHA-256 before extraction or execution. The helper and the versioned upgrade tools refuse branches, moving
-`main`, lightweight tags, dirty checkouts, and non-official release identities;
-this repo has no pipe-to-shell Nix bootstrap.
+platform SHA-256 before extraction or execution, then runs the verified local
+installer non-interactively with `nix-command` and flakes enabled. If an earlier
+attempt installed Nix but stopped before enabling those features, rerunning
+setup repairs the user setting and continues. Before v0.2.0 is published,
+the helper accepts only a clean commit that is currently an exact branch head
+in the official repository. Once the annotated v0.2.0 tag exists, that
+prerelease path closes automatically and only the exact clean official tag is
+accepted. Local-only/stale commits, forks, lightweight tags, dirty checkouts,
+and non-official origins fail before download. The versioned upgrade tools
+remain exact-tag-only; this repo has no pipe-to-shell Nix bootstrap.
+
+Maintainers testing an official prerelease branch can run `./setup.sh --all`
+directly from its clean, fully pushed head on a Nix-free macOS/Linux/WSL host.
+No manual Nix install is needed. This is prerelease validation, not the stable
+public install path below.
 
 ```bash
 # Apple Silicon mac / linux / wsl, after the annotated v0.2.0 release exists
@@ -58,6 +397,7 @@ cd ~/dotfiles
 # Settings -> Privacy & security -> For developers -> Developer Mode = On
 git clone --branch v0.2.0 --single-branch `
   https://github.com/luisgui1757/dotfiles.git $HOME\dotfiles
+Set-ExecutionPolicy -Scope Process Bypass -Force
 Set-Location $HOME\dotfiles
 .\setup.ps1 -All
 ```
@@ -68,7 +408,8 @@ rendering host, then run `./setup.sh --all` from the exact release checkout
 inside the WSL home for the Linux CLI/editor stack; setup installs Nix there
 when it is missing. Windows Terminal settings handling
 runs by default, and setup independently stages, validates, backs up, and
-atomically merges each existing packaged, Preview, and portable target. If Scoop, winget, and choco
+atomically merges each existing stable packaged, Preview, Canary, and portable
+target. If Scoop, winget, and choco
 cannot register the MSIX app, setup falls back to a pinned
 SHA-256-verified portable WT zip. Portable WT reads the unpackaged settings
 path, so portable WT is merged from its own current settings (or seeded only
@@ -134,7 +475,7 @@ declarative Homebrew + Home Manager; Linux/WSL uses standalone Home Manager.
 chezmoi still owns **every** dotfile; Nix owns no config. A normal `./setup.sh`
 or `./setup.sh --all` applies the matching package layer before native/deferred
 dependency provisioning. On macOS setup normalizes `uname -m` and runs only the
-Apple Silicon `sudo env DOTFILES_TARGET_USER=... DOTFILES_TARGET_HOME=...
+Apple Silicon `sudo -H env DOTFILES_TARGET_USER=... DOTFILES_TARGET_HOME=...
 darwin-rebuild switch --flake .#dotfiles-aarch64 --impure` activation, which activates the
 declarative Homebrew casks (WezTerm, AeroSpace) + Herdr brew and the nix-owned
 CLI package set. Any other macOS architecture fails closed before Nix/Homebrew
@@ -145,14 +486,17 @@ requires ambient `HOME` to resolve to that same directory and passes
 Nix, Home Manager, chezmoi, and native setup cannot split across users or
 fabricated homes. First-run bootstrap is also pinned: setup derives the locked
 nix-darwin rev and `narHash` from `flake.lock` before running
-`sudo env DOTFILES_TARGET_USER=... DOTFILES_TARGET_HOME=... nix run
+`sudo -H env DOTFILES_TARGET_USER=... DOTFILES_TARGET_HOME=... nix run
 github:nix-darwin/nix-darwin/<locked-rev>?narHash=<encoded-narHash>#darwin-rebuild -- ...`;
 it never uses the mutable `nix-darwin` registry alias. On first bootstrap,
 pre-existing `/etc/bashrc` and `/etc/zshrc` are moved only to nix-darwin's
 documented `.before-nix-darwin` names after both backup paths pass a collision
 preflight. Activation failure or interruption quarantines any generated
 replacement and restores both originals; success retains the backups for
-nix-darwin recovery/uninstall. On Linux/WSL, setup runs
+nix-darwin recovery/uninstall. A retry from the same pre-activation terminal
+resolves the installed `/run/current-system` rebuild command even before that
+terminal's `PATH` is refreshed; nix-darwin-managed `/etc/static` links and their
+retained backups are recognized as the normal idempotent state. On Linux/WSL, setup runs
 `home-manager switch --flake .#<arch>-linux --impure`; first-run bootstrap uses
 the locked
 `github:nix-community/home-manager/<locked-rev>?narHash=<encoded-narHash>#home-manager`
@@ -179,23 +523,31 @@ Brew-backed preview phase without claiming the bootstrap already happened.
 The Nix-owned CLI set includes Node 24 so the pinned npm-backed Pi CLI can run
 reproducibly on macOS/Linux/WSL while the `pi` package itself stays pinned by
 npm integrity until nixpkgs catches up.
-On real Macs, nix-darwin keeps `homebrew.onActivation.cleanup = "check"` so
-undeclared Brew drift aborts activation without uninstalling anything. The
-GitHub-hosted macOS setup job is the only exception: setup passes a
-repo-scoped `DOTFILES_NIX_DARWIN_HOSTED_CI=1` marker because runner images ship
-a large preinstalled Brew surface outside this dotfiles Brewfile. The marker is
-only automatic when Actions reports `RUNNER_ENVIRONMENT=github-hosted` and
-`RUNNER_OS=macOS`; self-hosted Macs keep the strict drift check.
+Homebrew is intentionally mixed ownership on macOS. nix-darwin installs the
+repo-declared subset with `homebrew.onActivation.cleanup = "none"`; it never
+rejects or removes extra formulae/casks installed by `install-deps.sh` or the
+user. The same non-destructive contract applies on real Macs and hosted CI, so
+there is no environment-only cleanup bypass.
 nix-homebrew uses `autoMigrate = true` so Macs that already have official-script
 Homebrew can be adopted by the declarative Nix layer; upstream's migration keeps
-installed packages while replacing the Homebrew repositories. Because this repo
-keeps `mutableTaps = false`, setup moves an existing architecture-correct tap
-directory (`/opt/homebrew/Library/Taps`) to a unique timestamped backup.
-Activation, bootstrap, or interruption failure quarantines any replacement and
-restores the original taps; rollback failure prints exact manual recovery. On
-success the backup remains available. The `nikitabobko/tap` tap is also
-explicitly trusted through nix-homebrew because Homebrew 5 refuses to load
-personal-tap casks, including AeroSpace, without a trust entry.
+installed packages while replacing the Homebrew repository. `mutableTaps = true`
+keeps every tap clone owned and updated by Homebrew as the target user; nix-homebrew
+pins the Homebrew implementation but deliberately copies no tap trees during root
+activation. A one-time scoped migration removes only the three recognizable
+root-owned, non-Git tap snapshots produced by the earlier configuration, then
+Homebrew recreates the required AeroSpace tap normally. Unrelated taps such as
+Cirrus are never selected. The `nikitabobko/tap` tap is explicitly trusted
+through nix-homebrew because Homebrew 5 refuses to load personal-tap casks,
+including AeroSpace, without a trust entry.
+Tap transaction and diagnostic snapshots always live beside
+`Library/Taps`, never below it: Homebrew enumerates directories below `Taps` as
+live taps. Setup also recognizes the exact in-tree recovery names emitted by
+the short-lived broken migration and moves them to an external recovery root
+before activation, so retry needs no manual `brew untap` or filesystem cleanup.
+Setup also re-adopts the canonical daemon or user Nix profile binary directly
+when Homebrew's `path_helper` refresh has removed Nix from `PATH` after the
+upstream profile's already-sourced guard was set; it does not misclassify that
+stale-shell state as a missing Nix installation.
 **nvim and the
 tree-sitter CLI stay native** (ABI-coupled to nvim-treesitter parser builds;
 migrating them into a same-closure toolchain is a follow-up). Native Windows is
@@ -276,8 +628,17 @@ the newest validated `<target>.bak.<timestamp>[.n]` backup by filename order,
 and leave chezmoi's own
 state/config alone. Dry-run mode prints the planned removals without deleting
 files or pruning empty external parent directories. Windows Terminal settings
-are not deleted: validated packaged/Preview/portable backups restore independently, and
+are not deleted: validated stable/Preview/Canary/portable backups restore independently, and
 the displaced current file is preserved as `settings.json.uninstall-current.*`.
+
+For a destructive Apple Silicon owner-host smoke, run
+`./tests/macos_owner_lifecycle.sh` from a clean committed checkout. It prompts
+for sudo in the terminal once, then exercises install, update, config uninstall,
+reinstall, and final update; verifies the second uninstall is a no-op; and
+proves pre-existing Homebrew formulae, casks, and unrelated taps were not
+removed. POSIX uninstall intentionally removes the config layer, not Nix or
+Homebrew packages. Its tap checks use `brew --prefix` because nix-homebrew's
+managed implementation repository is intentionally not the installed-tap root.
 Backup selection uses the filename timestamp/collision suffix, never mtime;
 malformed candidates fail before removal/restoration.
 
@@ -291,7 +652,7 @@ setup -> install-deps                 phase 1: programs and optional tools
       -> nvim "+Lazy! restore" +qa    phase 3: plugins from lazy-lock.json;
                                             parser-update build tasks must finish
       -> nvim +DOTFILES_TREESITTER_SYNC_INSTALL  phase 4: Tree-sitter parsers
-      -> nvim "+MasonToolsInstallSync" +qa        phase 5: LSP servers and formatters
+      -> nvim +checked-MasonToolsInstallSync      phase 5: LSP servers and formatters
       -> Sentinel global install       phase 6: per-user agent policy
 ```
 
@@ -309,7 +670,14 @@ That prevents Lazy restore, Mason, and smoke validators from creating separate
 compiler tasks around the proof phase.
 
 Pass `--all` / `-All` for explicit non-interactive installs (Y to every setup
-prompt).
+prompt). Setup also owns consent after that decision: its POSIX dependency
+child launches the verified Homebrew bootstrap with `NONINTERACTIVE=1`, then
+clears Homebrew's inherited ask override and uses its supported
+`HOMEBREW_NO_ASK=1` mode. Neither the bootstrap nor Homebrew 6+ package commands
+can add a second confirmation. These settings exist only inside setup;
+ordinary `brew` commands keep their normal behavior. Password authentication
+and OS permission grants can still require the user because they are not
+package-selection confirmations.
 When setup detects redirected stdin/stdout and neither all nor dry-run was
 requested, it defaults to all and prints `note: no TTY detected; running with
 --all` (or `-All`). An interactive run (no all flag) can still ask the
@@ -322,8 +690,8 @@ Add `--dry-run` / `-DryRun` to preview every step without touching disk.
 Pass `--skip-agents` / `-SkipAgents` to leave global AI-agent entrypoints alone.
 Pass `--update` / `-Update` from an exact release checkout to run the same
 install-or-migrate and full-reconciliation path as all mode, followed by scoped
-package-manager/direct-artifact updates for proven present tools and
-`MasonToolsUpdateSync`. `--upgrade` / `-Upgrade` is an alias. Update never runs
+package-manager/direct-artifact updates for proven present tools and the checked
+`MasonToolsUpdateSync` wrapper. `--upgrade` / `-Upgrade` is an alias. Update never runs
 `git pull`, follows a moving branch, performs a blanket package-manager upgrade,
 rewrites `flake.lock`, or runs `:Lazy update`; repository pins change only in a
 reviewed release.
@@ -341,8 +709,8 @@ remains a symlink even though single-file configs are copies.
 The table below is the config layer. Full setup and config-only applies use the
 chezmoi source under `home/`, plus dedicated Windows known-folder source states.
 Mechanisms differ: POSIX uses symlinks; ordinary UserProfile Windows files are
-copies; redirected LocalApplicationData/Documents targets are symlink overlays;
-and Windows Terminal remains a merge.
+copies; redirected LocalApplicationData/ApplicationData/Documents targets are
+symlink overlays; and Windows Terminal remains a merge.
 
 | Tool | macOS | Linux / WSL | Windows |
 |---|---|---|---|
@@ -351,23 +719,28 @@ and Windows Terminal remains a merge.
 | zsh | `~/.zshenv` -> `shells/zshenv`; `~/.zshrc` -> `shells/zshrc` | same | n/a |
 | PowerShell | n/a | n/a | actual runtime `$PROFILE` plus Console/VS Code/ISE host profiles under the real Documents known folder -> `shells\powershell_profile.ps1` |
 | tmux / psmux | `~/.tmux.conf` -> `tmux/tmux.conf`; `~/.tmux.posix.conf` -> `tmux/tmux.posix.conf` (POSIX clipboard + TPM functional plugins + generated Rose Pine bar); `~/.tmux.rose-pine.{main,moon,dawn}.conf` -> generated `tmux/psmux-rose-pine.{main,moon,dawn}.conf` (Omer-shaped Rose Pine bar, **shared** with Windows) | same | `%USERPROFILE%\.psmux.conf` -> `tmux\psmux.conf` (first psmux entrypoint, disables warm sessions, then flag-free source-files the Windows overlay); `%USERPROFILE%\.tmux.conf` -> `tmux\tmux.conf`; `%USERPROFILE%\.tmux.windows.conf` -> `tmux\tmux.windows.conf`; `%USERPROFILE%\.tmux.rose-pine.ps1` -> `tmux\psmux-rose-pine.ps1` (Rose Pine bar generator / manual live-switch helper); `%USERPROFILE%\.tmux.rose-pine.{main,moon,dawn}.conf` -> the same generated `tmux\psmux-rose-pine.{main,moon,dawn}.conf`; the POSIX overlay is **excluded** on Windows (its `if-shell` probes hang psmux); WSL uses the Unix path |
-| Ghostty | `~/Library/Application Support/com.mitchellh.ghostty/config` -> `ghostty/config` | native Linux links `~/.config/ghostty/config`; WSL links it only with `--experimental-wsl-gui` | n/a |
-| WezTerm | `~/.config/wezterm/wezterm.lua` -> `wezterm/wezterm.lua` | same; WSL links it only with `--experimental-wsl-gui` | `%USERPROFILE%\.config\wezterm\wezterm.lua` -> `wezterm\wezterm.lua` (copied) |
+| Ghostty | `~/Library/Application Support/com.mitchellh.ghostty/config` -> `ghostty/config` (lazy 1 GiB per-surface scrollback byte budget) | native Linux links the same `~/.config/ghostty/config`; WSL links it only with `--experimental-wsl-gui` | n/a |
+| WezTerm | `~/.config/wezterm/wezterm.lua` -> `wezterm/wezterm.lua` (5,000,000 scrollback lines per tab) | same; WSL links it only with `--experimental-wsl-gui` | `%USERPROFILE%\.config\wezterm\wezterm.lua` -> `wezterm\wezterm.lua` (copied; same 5,000,000-line budget) |
 | AeroSpace | `~/.config/aerospace/aerospace.toml` -> `aerospace/aerospace.toml` (macOS tiling WM; focus/move on `ctrl-alt(-shift)` to avoid nvim `<A-h/j/k/l>` and fzf `Alt-c`) | n/a (macOS-only) | n/a (macOS-only) |
+| Herdr | `~/.config/herdr/config.toml` -> `herdr/config.toml` (built-in `rose-pine`, forced dark; tmux-shaped navigator, rename, and workspace bindings) | same | actual roaming `%APPDATA%\herdr\config.toml` -> `herdr\config.windows.toml` (same theme/navigation plus `pwsh.exe` as the pane shell) |
 | lazygit | `~/Library/Application Support/lazygit/config.yml` -> `lazygit/config.yml` | `~/.config/lazygit/config.yml` -> `lazygit/config.yml` | `%LOCALAPPDATA%\lazygit\config.yml` -> `lazygit\config.windows.yml` |
 | lsd | `~/.config/lsd/{config.yaml,colors.yaml}` -> `lsd/{config.yaml,colors.yaml}` | same | `%USERPROFILE%\.config\lsd\{config.yaml,colors.yaml}` -> `lsd\{config.yaml,colors.yaml}` |
 | gh-dash | `~/.config/gh-dash/config.yml` -> `gh-dash/config.yml` | same | `%USERPROFILE%\.config\gh-dash\config.yml` -> `gh-dash\config.yml` |
-| Windows Terminal | n/a | n/a | app installed by `setup.ps1` through Scoop/winget/choco, with a SHA-256-verified portable zip fallback; one validated enumerator identifies stable packaged, Preview packaged, and portable `settings.json` targets for setup, migration, recovery, and uninstall; setup stages and validates all selected targets before publication, creates separate verified backups, detects concurrent changes through atomic replacement rollback bytes, and rolls the group back on failure; opt out with `-SkipWindowsTerminalMerge`; see [windows-terminal/README.md](windows-terminal/README.md) |
+| Windows Terminal | n/a | n/a | app installed by `setup.ps1` through Scoop/winget/choco, with a SHA-256-verified portable zip fallback; one validated enumerator identifies stable packaged, Preview, Canary, and portable `settings.json` targets for setup, migration, recovery, and uninstall; all profiles receive WT's hard maximum of 32,767 history lines; setup stages and validates all selected targets before publication, creates separate verified backups, detects concurrent changes through atomic replacement rollback bytes, and rolls the group back on failure; opt out with `-SkipWindowsTerminalMerge`; see [windows-terminal/README.md](windows-terminal/README.md) |
 
-Windows setup resolves UserProfile, LocalApplicationData, Documents, and the
-active host's `$PROFILE` independently through supported runtime/known-folder
-APIs. It applies the UserProfile source plus dedicated LocalApplicationData and
-Documents source states, then verifies the paths Neovim, lazygit, ConsoleHost,
-VS Code, and ISE consume. Redirected folders, alternate drives, and spaces are
-supported. Directory ownership checks resolve both symbolic links and Windows
-junctions. Recognized conventional-path legacy targets are backed up only after
-the new targets publish; divergent legacy user data stays in place with a
-migration warning. POSIX pwsh profile management remains provisioning-adjacent.
+Windows setup resolves UserProfile, LocalApplicationData, ApplicationData,
+Documents, and the active host's `$PROFILE` independently through supported
+runtime/known-folder APIs. It applies the UserProfile source plus dedicated
+LocalApplicationData, ApplicationData, and Documents source states, then
+verifies the paths Neovim, lazygit, Herdr, ConsoleHost, VS Code, and ISE consume.
+For the PowerShell profiles, setup removes Mark-of-the-Web only after proving
+each profile is the repo-owned source or an exact byte copy, so new terminals can
+load normally under `RemoteSigned` without weakening the user's execution policy.
+Redirected folders, alternate drives, and spaces are supported. Directory
+ownership checks resolve both symbolic links and Windows junctions. Recognized
+conventional-path legacy targets are backed up only after the new targets
+publish; divergent legacy user data stays in place with a migration warning.
+POSIX pwsh profile management remains provisioning-adjacent.
 
 ### Platform Notes
 
@@ -380,6 +753,10 @@ migration warning. POSIX pwsh profile management remains provisioning-adjacent.
 - `install-deps` provisions chezmoi itself: Homebrew on macOS/Linuxbrew,
   a pinned SHA-256-verified GitHub release archive on native Linux without
   brew, and the Scoop-first catalog on Windows.
+- Native Debian-family installs run every apt update/install/upgrade with an
+  explicit noninteractive debconf frontend after the sudo boundary. Therefore
+  `./setup.sh --all` does not stop for transitive package questions such as
+  `tzdata` timezone selection.
 - `install-deps` provisions Starship through Homebrew on macOS/Linuxbrew,
   Alpine's native package on Alpine, and a pinned SHA-256-verified Starship
   GitHub release archive on other native Linux/WSL hosts.
@@ -448,7 +825,11 @@ migration warning. POSIX pwsh profile management remains provisioning-adjacent.
   project toolchain it drives.
 - `install-deps` provisions the `tree-sitter` CLI for `nvim-treesitter` main:
   Homebrew on macOS/Linuxbrew, a pinned SHA-256-verified GitHub release into
-  `~/.local/bin` on native Linux/WSL, and Scoop with npm fallback on Windows.
+  `~/.local/bin` on native Linux/WSL, and the exact SHA-256-verified Windows
+  release into `%LOCALAPPDATA%\dotfiles\bin`. Windows places that owned
+  directory first in both the running process and User `PATH`, even when the
+  directory was already present later in the list; an incompatible shadowing
+  install remains installed but no longer wins command resolution.
   Windows `-All` also installs VS Build Tools so parser builds can find MSVC;
   after winget/choco failures it falls back to Microsoft's official
   `vs_BuildTools.exe` bootstrapper with the same VCTools workload, but only
@@ -457,7 +838,10 @@ migration warning. POSIX pwsh profile management remains provisioning-adjacent.
   installs the explicit Tree-sitter parser matrix, including `latex`; it also
   installs `latex2text` through a pinned, SHA-256-checked venv
   (`setuptools` 80.9.0, `pylatexenc` 2.10) so rendered Markdown equations work
-  on fresh machines instead of depending on a random host Python package.
+  on fresh machines instead of depending on a random host Python package. On
+  Linux, setup repairs the active distro Python's native venv/pip support even
+  when Linuxbrew is the selected package manager; manager selection alone does
+  not prove that `python3` on PATH is Homebrew-owned.
 - `install-deps` prints a dependency pre-flight table before package-manager
   bootstrap and before the one-shot install prompt, showing the package manager
   itself, present/missing tools, best-effort versions, and the resulting
@@ -481,7 +865,9 @@ migration warning. POSIX pwsh profile management remains provisioning-adjacent.
   from the executable source: Homebrew/Linuxbrew requires the PATH-visible
   command path and its resolved executable target to stay under `brew --prefix`,
   plus an installed formula and `brew list --formula <formula>` file ownership
-  of the resolved executable; native Linux managers require file ownership proof
+  of the resolved executable. The catalog formula is the install default, not an
+  ownership guess: an active versioned formula such as `python@3.14` is resolved
+  from its Cellar target and receipt before a scoped update. Native Linux managers require file ownership proof
   (`dpkg-query -S`, `rpm -qf`, `pacman -Qo`, or `apk info --who-owns`);
   dotfiles-owned Linux artifacts require a durable provenance marker with the
   expected version, URL, SHA-256, command path, binary path, install root,
@@ -561,8 +947,8 @@ migration warning. POSIX pwsh profile management remains provisioning-adjacent.
   Nix/nixpkgs GUI package.
 - AeroSpace (macOS-only i3-like tiling WM) installs from the official tap cask
   (`brew install --cask nikitabobko/tap/aerospace`), `start-at-login = true`,
-  chezmoi-owned config. The tap is a pinned nix-homebrew input and is explicitly
-  trusted so Homebrew 5 will load the cask. Its keymap deliberately avoids the
+  chezmoi-owned config. The Homebrew-owned tap is explicitly trusted so Homebrew
+  5 will load the cask. Its keymap deliberately avoids the
   reserved chords:
   window focus/move live on `ctrl-alt(-shift)-h/j/k/l` so they never shadow
   Neovim's `<A-h/j/k/l>` window navigation, and nothing uses `Alt-c` (fzf-tab /
@@ -579,8 +965,24 @@ migration warning. POSIX pwsh profile management remains provisioning-adjacent.
   remote-eval installers remain banned. Native-Linux Herdr writes the same
   provenance marker as the other dotfiles-owned direct artifacts, so
   `./setup.sh --update` can prove ownership and refresh only the repo-pinned
-  version. Windows Herdr is beta/ConPTY-backed, so runtime behavior remains a
-  manual checklist item before treating it as a daily driver.
+  version. Chezmoi also installs the same deterministic config on every host:
+  Herdr's built-in `rose-pine` theme with onboarding and automatic light/dark
+  switching disabled. Windows consumes its platform config from the
+  independently resolved roaming `%APPDATA%` folder and explicitly launches
+  `pwsh.exe`; this keeps new panes on the managed PowerShell 7 profile and the
+  same PSReadLine ListView/history experience as Windows Terminal instead of
+  falling back to Windows PowerShell 5.1. Existing panes retain their original
+  shell and must be recreated after this setting changes. On every host,
+  `Ctrl+B`, then `w` (or `g`) opens Herdr's full workspace/tab/pane navigator;
+  use Up/Down and Enter to select. The tmux-shaped bindings use `Ctrl+B`, then
+  `,` to rename the current tab/window and `Ctrl+B`, then `$` to rename the
+  current workspace. `Ctrl+B`, then Up/Down moves between workspaces, while
+  `Ctrl+B`, then Shift+1..9 jumps directly to workspace 1..9; unshifted
+  `Ctrl+B`, then 1..9 remains tab/window selection. Named Herdr sessions are separate server
+  namespaces, so they are attached from the shell rather than listed inside
+  another session's navigator. Windows Herdr is
+  beta/ConPTY-backed, so runtime behavior remains a manual checklist item before
+  treating it as a daily driver.
 - WSL fonts are host-rendered in the supported path. Install and merge Windows
   Terminal from Windows (`.\setup.ps1 -All`; the merge is default-on); the WSL
   Linux fontconfig install is only for `--experimental-wsl-gui`.
@@ -644,6 +1046,7 @@ make validate-renovate  # schema + official local extraction inventory under Nod
 make lint               # shellcheck everything
 ./tests/wsl/e2e.sh      # manual WSL split-host validation from inside WSL
 ./tests/greenfield/docker-greenfield.sh # local clean Ubuntu container e2e
+./tests/greenfield/docker-linux-owner-lifecycle.sh # Linux install/update/uninstall/reinstall/update
 ```
 
 `make lint` checks production shell scripts strictly. Source-only shell test
@@ -719,8 +1122,9 @@ The e2e jobs cover different install paths, not symmetric container platforms:
 | Check | What it proves |
 |---|---|
 | `e2e containers / ubuntu-24.04` | Clean `ubuntu:24.04`, non-root user, native `apt`, no Linuxbrew (`DOTFILES_SKIP_BREW_BOOTSTRAP=1`), then `install-deps.sh --all`, chezmoi config apply, executable/version probes including `zoxide`, `gh`, WezTerm, Herdr, Neovim >= 0.12, lazygit, zsh plugin files, config content assertions, and nvim directory realpath assertion. This is the native installer regression fixture, not the Nix-backed public POSIX package-plane proof; it does not assert Pi CLI because Node 24 comes from the Nix package layer. |
+| Local Linux owner lifecycle | Pinned Ubuntu and Nix container images, non-root user, real Home Manager plus native `apt`, then install, update, config uninstall, idempotent uninstall retry, reinstall, final update, full validation, and proof that no pre-existing native package disappeared. |
 | `setup.sh / ubuntu-24.04` | Full public Unix setup on the hosted Ubuntu runner after installing Nix in CI: Home Manager first, then native/deferred installs, chezmoi, Lazy, Tree-sitter, Mason, and Sentinel. Its clean login/interactive PATH proof resolves the effective account's actual login zsh from the account database; this matters because fresh Ubuntu has no `/usr/bin/zsh` and setup selects Linuxbrew zsh. The shell must resolve `rg` from Nix with no caller PATH injection. |
-| `setup.sh / macos-26` | Full public Apple Silicon setup through the hosted runner: architecture-matched nix-darwin/declarative Homebrew, native/deferred installs, real Ghostty/WezTerm config consumption, installed AeroSpace app/CLI identity agreement, chezmoi, Lazy, Tree-sitter, Mason, and Sentinel. AeroSpace waits for a user-granted Accessibility permission before parsing user config or starting its CLI server, so managed-config consumption remains explicit TCC-enabled desktop proof in `tests/MANUAL.md`; hosted CI does not pretend to prove it. The hosted runner alone gets the cleanup override; real hosts keep `cleanup = "check"`. |
+| `setup.sh / macos-26` | Full public Apple Silicon setup through the hosted runner: architecture-matched nix-darwin/declarative Homebrew, native/deferred installs, real Ghostty/WezTerm config consumption, installed AeroSpace app/CLI identity agreement, chezmoi, Lazy, Tree-sitter, Mason, and Sentinel. AeroSpace waits for a user-granted Accessibility permission before parsing user config or starting the CLI server, so managed-config consumption remains explicit TCC-enabled desktop proof in `tests/MANUAL.md`; hosted CI does not pretend to prove it. Hosted and real Macs share the same mixed-ownership Homebrew contract: declared packages are applied, tap clones stay target-user-owned, and unrelated user state is preserved. |
 | `setup.ps1 / windows-2025` | Full Windows setup through the real Windows hosted runner, including Scoop/winget/choco behavior, PowerShell, symlinks, Hack Nerd Font file/registry consumption, `zoxide`/`gh`/WezTerm/Herdr/Pi CLI command probes, and Neovim restore/sync phases. Windows containers do not model the desktop/user-profile setup well. |
 
 After the Lazy restore, deterministic Tree-sitter parser install, and Mason sync, each
@@ -916,7 +1320,7 @@ Manual-review pin surfaces that Renovate may touch only partially:
 | `setuptools`/`pylatexenc` | Renovate can bump versions; adjacent hashes remain human-reviewed. Current pins: `setuptools` 80.9.0, `pylatexenc` 2.10. |
 | Hack Nerd Font | Unix and Windows mirrors must stay identical; version/hash drift is caught by `pin_consistency_test.sh`. |
 | Pi CLI | Unix/Windows install pins and e2e assertions mirror version `0.80.3`; the npm-pack metadata and downloaded tarball bytes must both match the human-reviewed SRI. |
-| gh-dash | Tag `v4.25.1`, annotated tag object `e6ebbd7e83e30161b9192ce3339972d2c8269e7f`, and peeled commit `49f37e4832956c57bf52d4ea8b1b1e5c0f863700` are mirrored; installers verify the tag mapping and pin the extension to the commit. |
+| gh-dash | Tag `v4.25.1`, annotated tag object `e6ebbd7e83e30161b9192ce3339972d2c8269e7f`, and peeled commit `49f37e4832956c57bf52d4ea8b1b1e5c0f863700` are mirrored; installers verify the tag mapping and pass the release tag required by `gh extension install --pin` for binary extensions. |
 
 Direct network executables must be pinned and verified before execution, or be a
 reviewed exception whose verification is proved by the static scanner. Scoop
@@ -955,6 +1359,7 @@ stale; CI then fails verification until a human reviews the adjacent constant.
 ├── shells/                # zshenv + zshrc + powershell_profile.ps1
 ├── tmux/                  # tmux.conf (Rose Pine, vi-mode, true-color)
 ├── ghostty/               # config (Rose Pine, Hack Nerd, Ghostty-tuned)
+├── herdr/                 # POSIX/Windows configs (Rose Pine; Windows uses pwsh)
 ├── windows-terminal/      # settings.fragment.jsonc + merge README
 ├── home/                  # chezmoi source tree for the config layer
 ├── tests/                 # automated test tree
@@ -986,7 +1391,7 @@ stale; CI then fails verification until a human reviews the adjacent constant.
   managed global entrypoint blocks. This repo does not vendor Sentinel core or
   sync agent runtime state.
 - **Rose Pine everywhere it can render.** Nvim, lualine, foreground-only
-  Starship, tmux/psmux, `lsd`, ghostty, Windows Terminal, PSReadLine — same
+  Starship, tmux/psmux, `lsd`, ghostty, Herdr, Windows Terminal, PSReadLine — same
   palette across the stack. tmux and psmux share ONE repo-owned generated Rose
   Pine bar (`tmux/psmux-rose-pine.ps1` -> `psmux-rose-pine.{main,moon,dawn}.conf`,
   sourced on both), so the bar is byte-identical; TPM (POSIX) and the vendored
@@ -1002,8 +1407,10 @@ stale; CI then fails verification until a human reviews the adjacent constant.
   prior LSP-attach autocmd + null-ls duo eliminates a real race condition
   with different timeouts. Formatter output must still stay inside the LSP's
   parser/schema rules; Tier 2 proves this by formatting realistic samples and
-  failing on post-format LSP warnings/errors. `:WNF` (or `:wnf`) skips
-  formatting for one save.
+  failing on post-format LSP warnings/errors. Save formatting is synchronous
+  and bounded at 10 seconds, matching that strict formatter smoke window so a
+  cold Windows Node/Prettier process is not killed by the old 3-second ceiling.
+  `:WNF` (or `:wnf`) skips formatting for one save.
 - **Mason installs LSP servers + formatters via mason-tool-installer.** No
   `mason-lspconfig` — redundant on nvim 0.11 with `vim.lsp.enable`.
 - **DAP launches stay generic.** The shared browser launch defaults to
@@ -1087,7 +1494,7 @@ stale; CI then fails verification until a human reviews the adjacent constant.
   `-MergeWindowsTerminal` remains accepted as a no-op alias for older commands.
 - **Windows Terminal settings.json is NOT symlinked** because WT auto-rewrites
   it. Only the user-owned keys live in `settings.fragment.jsonc`; setup reads
-  each stable packaged, Preview packaged, and portable target independently,
+  each stable packaged, Preview, Canary, and portable target independently,
   stages and validates every
   result, makes a verified per-target backup, then atomically publishes. It
   updates keys by identity, adds a fixed `PowerShell 7` profile (`pwsh.exe`), promotes an empty or
@@ -1101,8 +1508,9 @@ stale; CI then fails verification until a human reviews the adjacent constant.
   Windows runners are elevated, and Scoop blocks elevated bootstrap by default.
   `install-deps.ps1` downloads `ScoopInstaller/Install` at a pinned commit,
   verifies the installer SHA-256, runs it with `-RunAsAdmin` only when elevated,
-  then refreshes the current-process Scoop shims path so later installs can use
-  `scoop` immediately. Existing Scoop installs also get the `extras` and
+  preserves the caller's process execution policy, then refreshes the
+  current-process Scoop shims path so later installs can use `scoop` immediately.
+  Existing Scoop installs also get the `extras` and
   `nerd-fonts` buckets normalized before catalog installs.
   Chezmoi's Windows nvim directory symlink still uses the elevated/native
   CreateSymbolicLink path. For local machines, Developer Mode plus a normal
@@ -1113,67 +1521,10 @@ the canonical operational guide because Claude Code auto-loads it; `AGENTS.md`
 points there so other agents reach the same instructions without duplicating
 content.
 
-## Daily workflows
+## Maintainer workflows
 
-### `:wnf` — write without formatting
-
-In any buffer: `:wnf<CR>` (lowercase) saves the file with formatters skipped
-**for this one save**. The next plain `:w` formats normally. Useful in legacy
-codebases where the formatter would create a noisy diff. Implemented in
-`nvim/lua/vim-options.lua`.
-
-### Neovim keymap discovery & scroll context
-
-which-key pops up a menu of the keys that can follow a prefix once you pause
-past `timeoutlen` (e.g. after `<leader>`); `<leader>?` lists the buffer-local
-keymaps on demand. The cursor also keeps **16 lines** of context above and below
-it (`scrolloff = 16`), so you never edit against the top or bottom edge.
-
-### zoxide — smarter `cd`
-
-`z <partial>` jumps to the best-matching directory you have visited (by
-frecency); `zi` opens an interactive picker. Works in zsh and PowerShell; plain
-`cd` is unchanged. Nothing to configure — `zoxide init` is wired into both shell
-profiles (PowerShell uses a cached init, no `Invoke-Expression`).
-
-### gh-dash — pull-request / issue dashboard
-
-Run `gh dash` for a terminal dashboard of your PRs, review requests, and issues.
-Its config (`~/.config/gh-dash/config.yml`, same relative path on Windows) is
-applied by setup **always**. The dashboard binary is a pinned `gh` CLI
-extension, and it only works once you have authenticated — so setup installs the
-extension only **after** `gh auth login`. If you have not authenticated yet,
-setup skips the extension cleanly (no error, because an unauthenticated install
-hits GitHub's anonymous rate limit); run `gh auth login`, then rerun `setup` /
-`install-deps` to pick it up. Before mutation, setup verifies that tag `v4.25.1`
-still has annotated tag object `e6ebbd7e83e30161b9192ce3339972d2c8269e7f`
-and peels to commit `49f37e4832956c57bf52d4ea8b1b1e5c0f863700`, then installs by that immutable
-commit rather than the tag. The token is machine-local and never stored in this
-repo.
-
-### Pi CLI
-
-Run `pi --version` to confirm setup installed the pinned Pi CLI. The installer
-packs the exact version, verifies the tarball bytes against the pinned SRI, and
-installs only that local tarball. Setup installs the CLI only; `.pi/` runtime
-state remains local to each machine.
-
-### Command-line vi mode
-
-Both shells edit the command line with **vi keybindings**. Press `Esc` to leave
-insert mode and use `h`/`j`/`k`/`l`, `w`/`b`, `dd`, `cw`, `.` etc. on the current
-line; press `i`/`a`/`o` to type again. The cursor changes shape with the mode
-(beam while typing, block in normal mode). Everything you already use still
-works in insert mode: **Tab** opens the fuzzy completion menu, **Up/Down** do
-prefix history search, and **Ctrl-R / Ctrl-T / Alt-C** are the fzf history / file
-/ cd pickers. The arrows also search history from normal mode.
-
-- **zsh:** enabled with `bindkey -v`. `Esc` responsiveness vs. Alt/Meta chords is
-  governed by `KEYTIMEOUT` (250 ms by default). To retune it, export
-  `DOTFILES_KEYTIMEOUT` (hundredths of a second) or set `KEYTIMEOUT` in
-  `~/.zshrc.local`.
-- **PowerShell:** enabled with `Set-PSReadLineOption -EditMode Vi`; the mode
-  indicator changes the cursor shape on supported terminals (Windows Terminal).
+Daily shortcuts live in the [cheat sheets](#cheat-sheets). The workflows below
+are for changing or reproducing the managed configuration itself.
 
 ### Adding a plugin
 
@@ -1212,10 +1563,13 @@ parser compilation does not pollute the startup timing assertion.
 ### Updating Mason tools across machines
 
 ```bash
-nvim --headless "+MasonToolsUpdateSync" +qa
+nvim --headless "+lua require('util.mason_tools').run_checked('MasonToolsUpdateSync')"
 ```
 
-Run on each machine; there's no machine-pinned lockfile for Mason itself.
+Run on each machine; there's no machine-pinned lockfile for Mason itself. Linux
+gets `clangd` from the architecture-independent Home Manager package layer;
+Mason retains `clangd` ownership on macOS and Windows, where its registry has a
+matching artifact.
 
 ### Reproducing the same release on another machine
 
@@ -1240,7 +1594,9 @@ MIT. See `LICENSE`.
 |---|---|---|
 | Neovim stops before loading Lazy with a lockfile/cache identity error | `lazy-lock.json` is missing, malformed, incomplete, has a non-40-hex commit or invalid branch; or the cached `lazy.nvim` checkout is dirty, at the wrong commit, from the wrong origin, missing locked default-branch metadata, non-Git, or partial | restore the tracked `nvim/lazy-lock.json` and restart Neovim. Startup repairs the cache through a verified staging checkout and never executes an unproved path. If publication fails, fix the destination permissions named in the error and retry |
 | setup reports a Homebrew `shellenv` failure even though `brew` already resolves | the selected command and PATH-resolved command report different Homebrew prefixes/repositories, or `shellenv` exited nonzero; empty stdout alone is a normal Homebrew idempotence signal | compare `brew --prefix` and `brew --repository` through both entrypoints named in the error. Repair the shadowing PATH or Homebrew installation, then rerun setup; a nix-darwin wrapper and native brew path are accepted only when those identities match |
+| a new zsh prints `compinit: no such file or directory: .../_brew` | Homebrew's core completion symlink survived a repository/Nix-generation migration but its target did not; `brew completions link` alone only reconciles tap completions | update this repo and rerun setup or `./setup.sh --update`; both paths reconcile tap completions, atomically repair a missing/dangling core `_brew` symlink to the active Homebrew implementation, and verify the resolved target. A conflicting non-symlink is preserved and reported instead of overwritten |
 | first nix-darwin setup reports an existing `.before-nix-darwin` backup | setup found both an unmanaged `/etc/bashrc` or `/etc/zshrc` and an older backup, so choosing either would risk user/system data | compare the two files and resolve the collision deliberately, then rerun. Setup moves neither shell file until both backup destinations are clear and restores both if activation fails |
+| setup says it is bootstrapping nix-darwin again immediately after a successful activation | the checkout predates the retry fix, so the still-open terminal cannot see the new system profile on `PATH` and setup mistakes the retry for first bootstrap | update the checkout and rerun setup. Current setup resolves `/run/current-system/sw/bin/darwin-rebuild` directly and accepts the managed `/etc/static` shell links without touching their recovery backups |
 | `<leader>X` keymaps fire `\X` instead of `<Space>X` | mapleader set after lazy.setup somehow | restore the order in `nvim/init.lua` — leader **before** `require("lazy").setup` |
 | Formatter runs twice or shows two BufWritePre autocmds | someone added a second handler outside conform.nvim | `:lua print(#vim.api.nvim_get_autocmds({event="BufWritePre"}))` should be 1; if not, find the second autocmd and delete it |
 | Lazy/Tree-sitter/Mason says `No C compiler found` | WSL/Linux has `make` but no `cc`/`gcc`/`clang`; Tree-sitter parsers and some plugin builds compile native code | re-run `./setup.sh --skip-config` to install the Linux compiler toolchain, or on Ubuntu run `sudo apt-get update && sudo apt-get install -y build-essential`, then `./setup.sh --skip-deps --skip-config` |
@@ -1262,13 +1618,17 @@ MIT. See `LICENSE`.
 | Move commits in lazygit, including inside psmux | Ctrl+J collides with Enter on the wire, and psmux v3.3.4 does not relay Windows Terminal's Win32-input-mode modifier data into panes | use uppercase `J` / `K`. `%LOCALAPPDATA%\lazygit\config.yml` binds commits-panel moveDownCommit / moveUpCommit to printable J/K, so no psmux root bind is needed. In the commits panel, use PgUp/PgDn or Ctrl-U/Ctrl-D to scroll the diff |
 | Windows Terminal opens Windows PowerShell 5.1 instead of PowerShell 7 | settings predate the managed WT default-profile merge, or the merge was skipped | re-run `.\setup.ps1 -SkipDeps -SkipNvim`; it adds the fixed `PowerShell 7` profile and promotes only an unset or legacy Windows PowerShell default, preserving a custom default |
 | tmux / psmux does not show the Rose Pine status bar | The generated variant config was not deployed or sourced, or it loaded in an already-running server | re-run setup / re-apply chezmoi, then restart all tmux/psmux sessions. The bar is the generated `~/.tmux.rose-pine.{main,moon,dawn}.conf`, sourced by `tmux/tmux.posix.conf` (POSIX) and `tmux/tmux.windows.conf` (Windows). Windows psmux starts from `~/.psmux.conf`, then flag-free source-files `~/.tmux.windows.conf`. Change the `@rosepine-variant` (`main` / `moon` / `dawn`) option for a different flavor |
+| tmux says `Tmux resurrect file not found!` on first launch | Continuum tried to restore before the first snapshot existed | save once with `Ctrl+B`, then `Ctrl+S`, or wait 15 minutes for the first auto-save |
+| psmux shows a `run-shell` `Saved to ...` popup but does not restore after restart | the popup is a completed save receipt; Windows restore is manual | press `q` or `Esc`, restart psmux, then press `Ctrl+B`, then `Ctrl+R`; use `Ctrl+B`, then `w` to select the restored session |
+| psmux restore says a session `already exists, skipping` | psmux-resurrect will not overwrite a running same-named session | start a temporary session with `psmux new-session -s recovery`, restore there, then use `Ctrl+B`, then `w` to select the restored session |
 | psmux warns `unknown option` while sourcing config | A psmux-parsed config still contains a tmux-only option | update this repo and re-run `.\setup.ps1 -SkipDeps -SkipNvim`, then restart psmux. The managed shared and Windows configs intentionally avoid `set ... terminal-features`, and the generated Rose Pine artifacts omit tmux-only `display-panes-*` color options; tmux extended-key flags live only in the POSIX overlay |
 | tmux / psmux status bar looks fully opaque | The generated status canvas is not using the terminal default background, or an older generated artifact is still loaded | update this repo, re-run setup / chezmoi apply, then restart tmux/psmux. The managed bar sets `status-style` and pill outside caps to `bg=default`; only the pill interiors have explicit Rose Pine backgrounds |
 | PowerShell Tab completion — the selected option is **gold** | PSReadLine `Selection` colors the highlighted MenuComplete option | it is a gold foreground. Note: PSReadLine uses that same `Selection` color for the completion suffix it inserts into the command line while you navigate, so that suffix also shows gold until you accept — it is one setting, not separable |
 | A `wt --version` window popped up during `setup.ps1 -All` | the dependency version table ran `<tool> --version`, and `wt --version` opens a Windows Terminal window instead of printing | fixed — `Get-CommandVersionString` never runs `wt --version`; it reads the file version (or shows `installed`) |
+| `setup.ps1` or a managed helper says it cannot be loaded because it is not digitally signed | the current PowerShell execution policy rejects the checkout before setup can run or remove Mark-of-the-Web from managed files | in that same PowerShell window run `Set-ExecutionPolicy -Scope Process Bypass -Force`, then run `.\setup.ps1 -All`; the bypass ends when that PowerShell process closes and does not change the persistent user or machine policy |
 | Ghostty doesn't open maximized | `window-save-state = always` restored an old geometry over `maximize` (macOS only) | `ghostty/config` uses `window-save-state = default` (not `always`) with `maximize = true`; `always` lets the saved size win |
 | Ghostty doesn't load the config | wrong path, or WSL default skip | the install path is `~/Library/Application Support/com.mitchellh.ghostty/config` on macOS and `~/.config/ghostty/config` on native Linux. WSL only links Linux Ghostty config after `./setup.sh --experimental-wsl-gui`; otherwise use Windows Terminal |
-| Windows Terminal lost a profile after merge | WT rewrote one installation's file after setup, or an older pre-transactional setup was used | inspect that installation's independent `<settings.json>.bak.<YYYYMMDD-HHMMSS>[.n]` backups; `uninstall.ps1` validates every stable packaged, Preview packaged, and portable candidate before mutation, restores each target independently, and preserves the displaced current file for recovery |
+| Windows Terminal lost a profile after merge | WT rewrote one installation's file after setup, or an older pre-transactional setup was used | inspect that installation's independent `<settings.json>.bak.<YYYYMMDD-HHMMSS>[.n]` backups; `uninstall.ps1` validates every stable packaged, Preview, Canary, and portable candidate before mutation, restores each target independently, and preserves the displaced current file for recovery |
 | `setup.ps1` errors "cannot create symbolic links" | Developer Mode off and not elevated | `setup.ps1` reports your *elevated* + *Developer Mode* state before chezmoi apply. Enable Developer Mode (Settings -> Privacy & security -> For developers, no admin, recommended) **then** `.\setup.ps1 -SkipDeps`; OR run just the config phase elevated with `.\setup.ps1 -SkipDeps -SkipNvim`, then return to a normal shell for `.\setup.ps1 -SkipDeps -SkipConfig`. Don't elevate the dependency-install run because Scoop refuses admin installs |
 | Ghostty won't open maximized on Linux/GNOME | `maximize = true` is a hint the WM may ignore (GNOME Mutter often does) | on **X11**, `install-deps` offers a devilspie2 setup through the native Linux package manager, even when Linuxbrew is the main CLI manager; the rule is keyed on `com.mitchellh.ghostty`. Wayland needs a GNOME Shell extension instead |
 | `install-deps.ps1`: winget `No package found matching input criteria` (exit `-1978335212`) | winget source/catalog flakiness | install-deps now **prefers scoop** and falls back across managers per tool -- accept the scoop bootstrap when offered and re-run; VS Build Tools has no Scoop package, so it falls through to choco and then Microsoft's official bootstrapper |

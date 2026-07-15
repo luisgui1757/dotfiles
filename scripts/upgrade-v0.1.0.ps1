@@ -714,11 +714,11 @@ function Get-ValidatedWindowsTerminalRecovery {
     $manifestPath = Join-Path $Recovery 'windows-terminal.json'
     Assert-RegularFile -Path $manifestPath
     $entries = @([IO.File]::ReadAllText($manifestPath) | ConvertFrom-Json -ErrorAction Stop)
-    if ($entries.Count -ne 3 -or $ExpectedTargets.Count -ne 3) {
-        throw 'Windows Terminal recovery must contain exactly three targets'
+    if ($entries.Count -ne 4 -or $ExpectedTargets.Count -ne 4) {
+        throw 'Windows Terminal recovery must contain exactly four targets'
     }
     $validated = @()
-    for ($index = 0; $index -lt 3; $index++) {
+    for ($index = 0; $index -lt 4; $index++) {
         $entry = $entries[$index]
         $propertyNames = @($entry.PSObject.Properties.Name | Sort-Object)
         if (($propertyNames -join ',') -ne 'Backup,BeforeSha,Existed,ExpectedPresent,ExpectedSha,Kind,Path') {
@@ -831,7 +831,7 @@ function Assert-KnownFolderStateBoundary {
     foreach ($child in $children) {
         $relative = [IO.Path]::GetRelativePath($StateRoot, $child.FullName).Replace('\', '/')
         if ($child.PSIsContainer -or ($child.Attributes -band [IO.FileAttributes]::ReparsePoint) -or
-            $relative -notin @('localappdata.boltdb', 'documents.boltdb')) {
+            $relative -notin @('localappdata.boltdb', 'appdata.boltdb', 'documents.boltdb')) {
             throw "unexpected current-generation known-folder state blocks recovery: $($child.FullName)"
         }
     }

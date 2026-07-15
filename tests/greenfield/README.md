@@ -7,12 +7,16 @@ for desktop checks CI cannot see, especially Windows Terminal, fonts, ConPTY,
 and VS Code rendering.
 
 For macOS, Linux, and WSL greenfield runs, invoke `setup.sh --all` directly
-from the exact release checkout. The public POSIX setup path installs the
-release-pinned, checksum-verified Nix prerequisite when it is missing, then
-applies nix-darwin / Home Manager. It never uses a remote script pipeline.
-Pre-release PR/main validation is different: because the prerequisite helper
-correctly rejects an untagged commit, provision Nix through the trusted VM
-image or another separately verified host method before testing that commit.
+from the exact release checkout. Before v0.2.0 is published, an official
+prerelease branch may be tested from its clean, fully pushed head instead. The
+public POSIX setup path installs the checksum-verified Nix prerequisite when it
+is missing, then applies nix-darwin / Home Manager. It never uses a remote
+script pipeline or waits for an upstream confirmation prompt. Local-only
+commits, stale branch commits, forks, and dirty
+trees are deliberately rejected; after release publication, the prerelease
+branch allowance closes and the exact annotated tag is mandatory.
+The helper persists `nix-command flakes`; rerunning setup also repairs an
+otherwise-complete upstream install that stopped with those features disabled.
 
 Do not add these VM or desktop launchers to the CI matrix. They need an
 interactive desktop or local virtualization and can hang or fail headless. The
@@ -149,6 +153,25 @@ tests/greenfield/docker-greenfield.sh
 This is the clean native `apt` proof: non-root user, no Linuxbrew bootstrap,
 real `install-deps.sh --all`, chezmoi apply, and the existing container
 assertions.
+
+For the stronger owner lifecycle using pinned Ubuntu and Nix image digests:
+
+```bash
+tests/greenfield/docker-linux-owner-lifecycle.sh
+```
+
+That exports the committed `HEAD` as a Git bundle, clones and verifies that
+exact commit inside the container, then runs the real public
+setup/update/config-uninstall/reinstall/update path as a non-root user. The
+bundle avoids copying `.git` through Docker Desktop's bind-mounted macOS
+filesystem, which can return `Resource deadlock avoided` for worktree metadata.
+The lifecycle checks idempotent uninstall, performs full validation, and proves
+no pre-existing native package was removed. It also exercises the production
+noninteractive apt boundary; an unattended run must never open a debconf prompt
+for transitive dependencies such as `tzdata`. Complete container output is
+retained on the host at
+`tests/.cache/linux-owner-lifecycle-docker-<timestamp>.log`; a pipeline or
+container failure remains the driver's exit status.
 
 There is deliberately no hosted WSL workflow. [GitHub documents nested
 virtualization on hosted runners as technically possible but not officially

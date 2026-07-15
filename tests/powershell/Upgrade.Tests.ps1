@@ -10,12 +10,12 @@ BeforeAll {
             [Parameter(Mandatory)] [byte[][]]$BeforeBytes,
             [Parameter(Mandatory)] [byte[][]]$ExpectedBytes
         )
-        if ($Paths.Count -ne 3 -or $Kinds.Count -ne 3 -or
-            $BeforeBytes.Count -ne 2 -or $ExpectedBytes.Count -ne 3) {
-            throw 'fixture requires three Terminal targets and two original payloads'
+        if ($Paths.Count -ne 4 -or $Kinds.Count -ne 4 -or
+            $BeforeBytes.Count -ne 2 -or $ExpectedBytes.Count -ne 4) {
+            throw 'fixture requires four Terminal targets and two original payloads'
         }
         $entries = @()
-        for ($index = 0; $index -lt 3; $index++) {
+        for ($index = 0; $index -lt 4; $index++) {
             $existed = $index -lt 2
             if ($existed) {
                 [IO.File]::WriteAllBytes((Join-Path $Recovery "wt-$index.before"), $BeforeBytes[$index])
@@ -71,12 +71,14 @@ Describe 'v0.1.0 to v0.2.0 Windows release migration recovery' {
         $script:Recovery = Join-Path $script:Root 'recovery'
         $script:Target0 = Join-Path $script:Root 'packaged/settings.json'
         $script:Target1 = Join-Path $script:Root 'preview/settings.json'
-        $script:Target2 = Join-Path $script:Root 'portable/settings.json'
-        $script:Kinds = @('Packaged', 'Preview', 'Portable')
+        $script:Target2 = Join-Path $script:Root 'canary/settings.json'
+        $script:Target3 = Join-Path $script:Root 'portable/settings.json'
+        $script:Kinds = @('Packaged', 'Preview', 'Canary', 'Portable')
         $script:ExpectedTargets = @(
             [pscustomobject]@{ Kind = $script:Kinds[0]; Path = $script:Target0 },
             [pscustomobject]@{ Kind = $script:Kinds[1]; Path = $script:Target1 },
-            [pscustomobject]@{ Kind = $script:Kinds[2]; Path = $script:Target2 }
+            [pscustomobject]@{ Kind = $script:Kinds[2]; Path = $script:Target2 },
+            [pscustomobject]@{ Kind = $script:Kinds[3]; Path = $script:Target3 }
         )
         New-Item -ItemType Directory -Force -Path $script:Recovery, `
             (Split-Path -Parent $script:Target0), (Split-Path -Parent $script:Target1) | Out-Null
@@ -84,35 +86,39 @@ Describe 'v0.1.0 to v0.2.0 Windows release migration recovery' {
         $script:Before1 = [Text.UTF8Encoding]::new($false).GetBytes('{"before":"preview"}')
         $script:Expected0 = [Text.UTF8Encoding]::new($false).GetBytes('{"expected":"packaged"}')
         $script:Expected1 = [Text.UTF8Encoding]::new($false).GetBytes('{"expected":"preview"}')
-        $script:Expected2 = [Text.UTF8Encoding]::new($false).GetBytes('{"expected":"portable"}')
+        $script:Expected2 = [Text.UTF8Encoding]::new($false).GetBytes('{"expected":"canary"}')
+        $script:Expected3 = [Text.UTF8Encoding]::new($false).GetBytes('{"expected":"portable"}')
         [IO.File]::WriteAllBytes($script:Target0, $script:Before0)
         [IO.File]::WriteAllBytes($script:Target1, $script:Before1)
         Write-TerminalRecoveryFixture -Recovery $script:Recovery `
-            -Paths @($script:Target0, $script:Target1, $script:Target2) -Kinds $script:Kinds `
+            -Paths @($script:Target0, $script:Target1, $script:Target2, $script:Target3) -Kinds $script:Kinds `
             -BeforeBytes @($script:Before0, $script:Before1) `
-            -ExpectedBytes @($script:Expected0, $script:Expected1, $script:Expected2)
+            -ExpectedBytes @($script:Expected0, $script:Expected1, $script:Expected2, $script:Expected3)
     }
 
     AfterEach {
         Remove-Item -LiteralPath $script:Root -Recurse -Force -ErrorAction SilentlyContinue
     }
 
-    It 'restores exact retained bytes and removes only a transaction-created target' {
+    It 'restores exact retained bytes and removes only transaction-created targets' {
         $entries = @(Get-ValidatedWindowsTerminalRecovery -Recovery $script:Recovery `
                 -ExpectedTargets $script:ExpectedTargets)
         [IO.File]::WriteAllBytes($script:Target0, $script:Expected0)
         [IO.File]::WriteAllBytes($script:Target1, $script:Expected1)
         New-Item -ItemType Directory -Force -Path (Split-Path -Parent $script:Target2) | Out-Null
         [IO.File]::WriteAllBytes($script:Target2, $script:Expected2)
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $script:Target3) | Out-Null
+        [IO.File]::WriteAllBytes($script:Target3, $script:Expected3)
 
         Restore-WindowsTerminalState -Entries $entries
 
         [IO.File]::ReadAllBytes($script:Target0) | Should -Be $script:Before0
         [IO.File]::ReadAllBytes($script:Target1) | Should -Be $script:Before1
         Test-Path -LiteralPath $script:Target2 | Should -BeFalse
+        Test-Path -LiteralPath $script:Target3 | Should -BeFalse
     }
 
-    It 'captures stable packaged, Preview, and detected portable identities independently' {
+    It 'captures stable, Preview, Canary, and detected portable identities independently' {
         Initialize-SetupLibrary -NewCheckout $script:RepoRoot
         $captureRecovery = Join-Path $script:Root 'capture recovery'
         New-Item -ItemType Directory -Force -Path $captureRecovery | Out-Null
@@ -120,6 +126,7 @@ Describe 'v0.1.0 to v0.2.0 Windows release migration recovery' {
         $script:WindowsIdentity = [pscustomobject]@{
             UserProfile = $script:Root
             LocalApplicationData = $localAppData
+            ApplicationData = Join-Path $script:Root 'Roaming App Data'
             Documents = Join-Path $script:Root 'Documents'
             RuntimeProfile = Join-Path $script:Root 'Documents/PowerShell/Microsoft.PowerShell_profile.ps1'
         }
@@ -128,23 +135,25 @@ Describe 'v0.1.0 to v0.2.0 Windows release migration recovery' {
                 Get-DotfilesWindowsTerminalTargets -LocalApplicationData $LocalApplicationData -IncludeAbsent
             } $localAppData)
         New-Item -ItemType Directory -Force -Path (Split-Path -Parent $definitions[1].Path), `
-            (Split-Path -Parent $definitions[2].Path) | Out-Null
+            (Split-Path -Parent $definitions[3].Path) | Out-Null
         [IO.File]::WriteAllText($definitions[1].Path, '{"preview":"before"}')
 
         Save-WindowsTerminalRecovery -Recovery $captureRecovery
 
         $manifest = @(Get-Content -Raw -LiteralPath (Join-Path $captureRecovery 'windows-terminal.json') |
             ConvertFrom-Json)
-        $manifest.Count | Should -Be 3
-        @($manifest.Kind) | Should -Be @('Packaged', 'Preview', 'Portable')
-        @($manifest.Existed) | Should -Be @($false, $true, $false)
-        @($manifest.ExpectedPresent) | Should -Be @($false, $true, $true)
+        $manifest.Count | Should -Be 4
+        @($manifest.Kind) | Should -Be @('Packaged', 'Preview', 'Canary', 'Portable')
+        @($manifest.Existed) | Should -Be @($false, $true, $false, $false)
+        @($manifest.ExpectedPresent) | Should -Be @($false, $true, $false, $true)
         $manifest[0].ExpectedSha | Should -Be ''
         $manifest[1].ExpectedSha | Should -Match '^[0-9a-f]{64}$'
-        $manifest[2].ExpectedSha | Should -Match '^[0-9a-f]{64}$'
+        $manifest[2].ExpectedSha | Should -Be ''
+        $manifest[3].ExpectedSha | Should -Match '^[0-9a-f]{64}$'
         Test-Path -LiteralPath (Join-Path $captureRecovery 'wt-0.before') | Should -BeFalse
         Test-Path -LiteralPath (Join-Path $captureRecovery 'wt-1.before') | Should -BeTrue
         Test-Path -LiteralPath (Join-Path $captureRecovery 'wt-2.before') | Should -BeFalse
+        Test-Path -LiteralPath (Join-Path $captureRecovery 'wt-3.before') | Should -BeFalse
     }
 
     It 'rejects a corrupted retained backup before changing any live target' {
@@ -153,6 +162,8 @@ Describe 'v0.1.0 to v0.2.0 Windows release migration recovery' {
         [IO.File]::WriteAllBytes($script:Target1, $script:Expected1)
         New-Item -ItemType Directory -Force -Path (Split-Path -Parent $script:Target2) | Out-Null
         [IO.File]::WriteAllBytes($script:Target2, $script:Expected2)
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $script:Target3) | Out-Null
+        [IO.File]::WriteAllBytes($script:Target3, $script:Expected3)
 
         {
             Get-ValidatedWindowsTerminalRecovery -Recovery $script:Recovery `
@@ -161,6 +172,7 @@ Describe 'v0.1.0 to v0.2.0 Windows release migration recovery' {
         [IO.File]::ReadAllBytes($script:Target0) | Should -Be $script:Expected0
         [IO.File]::ReadAllBytes($script:Target1) | Should -Be $script:Expected1
         [IO.File]::ReadAllBytes($script:Target2) | Should -Be $script:Expected2
+        [IO.File]::ReadAllBytes($script:Target3) | Should -Be $script:Expected3
     }
 
     It 'rechecks every target for concurrent drift before restoring the first one' {
@@ -169,12 +181,15 @@ Describe 'v0.1.0 to v0.2.0 Windows release migration recovery' {
         [IO.File]::WriteAllBytes($script:Target0, $script:Expected0)
         [IO.File]::WriteAllBytes($script:Target1, $script:Expected1)
         New-Item -ItemType Directory -Force -Path (Split-Path -Parent $script:Target2) | Out-Null
-        [IO.File]::WriteAllText($script:Target2, '{"concurrent":true}')
+        [IO.File]::WriteAllBytes($script:Target2, $script:Expected2)
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $script:Target3) | Out-Null
+        [IO.File]::WriteAllText($script:Target3, '{"concurrent":true}')
 
         { Restore-WindowsTerminalState -Entries $entries } | Should -Throw '*changed concurrently*'
         [IO.File]::ReadAllBytes($script:Target0) | Should -Be $script:Expected0
         [IO.File]::ReadAllBytes($script:Target1) | Should -Be $script:Expected1
-        [IO.File]::ReadAllText($script:Target2) | Should -Be '{"concurrent":true}'
+        [IO.File]::ReadAllBytes($script:Target2) | Should -Be $script:Expected2
+        [IO.File]::ReadAllText($script:Target3) | Should -Be '{"concurrent":true}'
     }
 
     It 'rejects incomplete recovery schema before changing live targets' {
@@ -192,6 +207,7 @@ Describe 'v0.1.0 to v0.2.0 Windows release migration recovery' {
         (Get-FileSha256OrEmpty -Path $script:Target0) | Should -Be $beforeHash
         [IO.File]::ReadAllBytes($script:Target1) | Should -Be $script:Before1
         Test-Path -LiteralPath $script:Target2 | Should -BeFalse
+        Test-Path -LiteralPath $script:Target3 | Should -BeFalse
     }
 
     It 'refuses acceptance while any Terminal target still has pre-migration bytes' {
@@ -207,22 +223,24 @@ Describe 'v0.1.0 to v0.2.0 Windows release migration recovery' {
 
     It 'refuses acceptance when an expected Terminal target is absent' {
         $entry = [pscustomobject]@{
-            Path = $script:Target2
+            Path = $script:Target3
             ExpectedPresent = $true
-            ExpectedSha = Get-BytesSha256 -Bytes $script:Expected2
+            ExpectedSha = Get-BytesSha256 -Bytes $script:Expected3
         }
 
         { Confirm-WindowsTerminalExpectedState -Entries @($entry) } |
             Should -Throw '*expected post-migration state*'
     }
 
-    It 'refuses acceptance when one of three Terminal targets has external bytes' {
+    It 'refuses acceptance when one of four Terminal targets has external bytes' {
         [IO.File]::WriteAllBytes($script:Target0, $script:Expected0)
         [IO.File]::WriteAllBytes($script:Target1, $script:Expected1)
         $entries = @(Get-ValidatedWindowsTerminalRecovery -Recovery $script:Recovery `
                 -ExpectedTargets $script:ExpectedTargets)
         New-Item -ItemType Directory -Force -Path (Split-Path -Parent $script:Target2) | Out-Null
-        [IO.File]::WriteAllText($script:Target2, '{"external":true}')
+        [IO.File]::WriteAllBytes($script:Target2, $script:Expected2)
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $script:Target3) | Out-Null
+        [IO.File]::WriteAllText($script:Target3, '{"external":true}')
 
         { Confirm-WindowsTerminalExpectedState -Entries $entries } |
             Should -Throw '*expected post-migration state*'
@@ -247,10 +265,11 @@ Describe 'v0.1.0 to v0.2.0 Windows release migration recovery' {
         { Confirm-WindowsTerminalExpectedState -Entries $entries } | Should -Not -Throw
     }
 
-    It 'removes only the two transaction-created known-folder state files' {
+    It 'removes only the three transaction-created known-folder state files' {
         $stateRoot = Join-Path $script:Root 'known folder state'
         New-Item -ItemType Directory -Force -Path $stateRoot | Out-Null
         [IO.File]::WriteAllText((Join-Path $stateRoot 'localappdata.boltdb'), 'local')
+        [IO.File]::WriteAllText((Join-Path $stateRoot 'appdata.boltdb'), 'roaming')
         [IO.File]::WriteAllText((Join-Path $stateRoot 'documents.boltdb'), 'documents')
 
         Restore-KnownFolderStateBoundary -StateRoot $stateRoot

@@ -6,8 +6,9 @@
        ghostty is also ignored unless .experimentalWslGui is true -- the terminal
        is a Windows-host responsibility by default; lazygit stays managed on
        WSL. */ -}}
-{{- /* Windows LocalAppData and Documents can be redirected to unrelated drives.
-       setup.ps1 manages them through dedicated chezmoi destination roots. */ -}}
+{{- /* Windows LocalAppData, roaming AppData, and Documents can be redirected to
+       unrelated drives. setup.ps1 manages them through dedicated chezmoi
+       destination roots. */ -}}
 AppData
 Documents
 {{- if ne .targetOS "windows" }}
@@ -20,6 +21,7 @@ Documents
 .zshrc
 .tmux.posix.conf
 .config/nvim
+.config/herdr
 {{- end }}
 {{- if ne .targetOS "darwin" }}
 Library

@@ -70,7 +70,7 @@ assert(contains(cfg.colors.ansi, "#31748f"), "pine (#31748f) missing from ansi")
 -- font / transparency / scrollback / cursor parity with ghostty
 assert(cfg.font, "font missing")
 assert(cfg.window_background_opacity == 0.95, "opacity must be 0.95")
-assert(cfg.scrollback_lines == 50000, "scrollback must be 50000")
+assert(cfg.scrollback_lines == 5000000, "scrollback must be 5000000 lines")
 assert(cfg.default_cursor_style == "SteadyBlock", "cursor must be SteadyBlock")
 assert(cfg.window_padding and cfg.window_padding.left == 6, "padding must be 6")
 

@@ -38,7 +38,7 @@ curl() {
 # maybe_sudo records any apt-get invocation so we can prove the package database
 # is never touched after a failed download/checksum. It must not actually run.
 maybe_sudo() {
-    if [[ "${1:-}" == "apt-get" ]]; then
+    if [[ "$*" == *"apt-get "* ]]; then
         printf '%s\n' "$*" >> "$WEZTERM_FAIL_TEST_ROOT/apt.log"
     fi
     return 0

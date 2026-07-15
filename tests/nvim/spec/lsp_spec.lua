@@ -5,6 +5,10 @@ local fh = assert(io.open(repo_root .. "/nvim/lua/plugins/lsp-config.lua", "r"))
 local src = fh:read("*a")
 fh:close()
 
+local mason_fh = assert(io.open(repo_root .. "/nvim/lua/util/mason_tools.lua", "r"))
+local mason_src = mason_fh:read("*a")
+mason_fh:close()
+
 -- Strip Lua comments so test patterns don't false-positive on comment text
 -- like "-- don't add a BufWritePre formatter here".
 local function strip_comments(s)
@@ -61,9 +65,11 @@ describe("LSP server coverage", function()
     assert.is_nil(code_only:match("BufWritePre"), "format-on-save belongs in conform.nvim, not here")
   end)
 
-  -- setup.{sh,ps1} run `nvim --headless +MasonToolsInstallSync` (phase 5) and
-  -- update mode runs `+MasonToolsUpdateSync`. mason-tool-installer is event=VeryLazy,
-  -- which never fires without a UI, so each command MUST also be a lazy `cmd`
+  -- setup.{sh,ps1} invoke these through util.mason_tools.run_checked. The
+  -- upstream command still has to lazy-load mason-tool-installer, and the
+  -- wrapper must turn command errors or missing postconditions into a nonzero
+  -- Neovim exit instead of letting headless setup fake-green.
+  -- VeryLazy never fires without a UI, so each command MUST also be a lazy `cmd`
   -- load-trigger or the headless invocation dies with "E492: Not an editor
   -- command". Regression guard for exactly that.
   for _, mcmd in ipairs({ "MasonToolsInstallSync", "MasonToolsUpdateSync" }) do
@@ -74,6 +80,33 @@ describe("LSP server coverage", function()
       )
     end)
   end
+
+  it("uses the checked Mason manifest and fail-closed sync wrapper", function()
+    assert.is_truthy(
+      code_only:find('require("util.mason_tools").ensure_installed()', 1, true),
+      "mason-tool-installer must consume the shared checked manifest"
+    )
+    assert.is_truthy(
+      mason_src:find('if vim.fn.has("linux") ~= 1 then', 1, true),
+      "Linux must leave clangd to the Nix package layer"
+    )
+    assert.is_truthy(
+      mason_src:find('table.insert(tools, 2, "clangd")', 1, true),
+      "non-Linux hosts must retain Mason-owned clangd"
+    )
+    assert.is_truthy(
+      mason_src:find("local ok, err = pcall(vim.cmd, command)", 1, true),
+      "checked Mason sync must catch command failures"
+    )
+    assert.is_truthy(
+      mason_src:find("package:is_installed()", 1, true),
+      "checked Mason sync must validate every package postcondition"
+    )
+    assert.is_truthy(
+      mason_src:find('vim.cmd("cquit 1")', 1, true),
+      "checked Mason sync must produce a nonzero headless exit on failure"
+    )
+  end)
 
   it("starts neocmake from the real Mason package binary before PATH shims", function()
     assert.is_truthy(code_only:find("get_neocmake_cmd", 1, true), "neocmake command resolver missing")

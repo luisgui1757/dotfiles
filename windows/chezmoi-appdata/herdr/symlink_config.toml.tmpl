@@ -1,0 +1,3 @@
+{{- /* Herdr consumes roaming ApplicationData on Windows, which may be
+       redirected independently from UserProfile and LocalApplicationData. */ -}}
+{{ .chezmoi.sourceDir | replace "\\" "/" | dir | dir | replace "/" "\\" }}\herdr\config.windows.toml

@@ -139,14 +139,17 @@ cd ~/dotfiles
 git fetch --depth 1 origin <full-40-character-sha>
 git checkout --detach FETCH_HEAD
 test "$(git rev-parse HEAD)" = "<full-40-character-sha>"
-# PR/main commits are not published releases, so provision Nix through the
-# trusted VM image or another independently verified method before this step.
+# Before v0.2.0 publication, this SHA must be the current head of an official
+# repository branch. setup verifies that identity and bootstraps Nix itself.
 ./setup.sh --all
 ./tests/greenfield/validate.sh
 ```
 
 For PR validation, use the PR head commit SHA. For main validation, use the
 current full `origin/main` SHA. Do not validate a moving branch name.
+These SHA instructions are prerelease-only. Once v0.2.0 is published, a
+Nix-free bootstrap must use the exact annotated tag; a later branch test must
+pre-seed Nix and is not release-bootstrap proof.
 Do the GUI/visual parts of Part 3 in the `tart run` window (VS Code, terminal
 colours); the CLI parts over SSH are fine too.
 
@@ -170,14 +173,17 @@ cd ~/dotfiles
 git fetch --depth 1 origin <full-40-character-sha>
 git checkout --detach FETCH_HEAD
 test "$(git rev-parse HEAD)" = "<full-40-character-sha>"
-# PR/main commits are not published releases, so provision Nix through the
-# trusted VM image or another independently verified method before this step.
+# Before v0.2.0 publication, this SHA must be the current head of an official
+# repository branch. setup verifies that identity and bootstraps Nix itself.
 ./setup.sh --all
 ./tests/greenfield/validate.sh
 ```
 
 For PR validation, use the PR head commit SHA. For main validation, use the
 current full `origin/main` SHA. Do not validate a moving branch name.
+These SHA instructions are prerelease-only. Once v0.2.0 is published, a
+Nix-free bootstrap must use the exact annotated tag; a later branch test must
+pre-seed Nix and is not release-bootstrap proof.
 A `tart` Linux guest is a real desktop (unlike WSL), so Ghostty + fonts install
 natively here and the visual checks apply. Over a headless SSH session the CLI
 checks (tmux/nvim/lazygit/shell) still apply; skip the GUI rows.
@@ -229,6 +235,8 @@ proves.
 | `C-b %` / `C-b "` then `C-b h/j/k/l` | split and move between panes | pane bindings |
 | `C-b H` / `C-b L` | current window swaps left / right | uppercase window-swap binding |
 | enter copy-mode (`C-b [`), `v` to select, `y` | text copies to the system clipboard (paste elsewhere) | clipboard (pbcopy/xclip/win32yank on POSIX, `clip.exe`/OSC52 on Windows) |
+| (POSIX) `C-b C-s`, then restart tmux | the layout restores automatically; the first-run missing-file message does not recur after the save | resurrect + Continuum |
+| (Windows) save a named psmux session with `C-b C-s`; close the `run-shell` popup with `q`/Esc; after `psmux kill-server`, start `psmux new-session -s recovery`, press `C-b C-r`, then `C-b w` | the save needs no confirmation, restore is manual, and the named session returns with its windows/panes | psmux-resurrect popup + restore contract |
 | (Windows) open several psmux panes, check Task Manager | no runaway `conhost.exe` pile-up, CPU idle | freeze cascade gone |
 
 ### Neovim

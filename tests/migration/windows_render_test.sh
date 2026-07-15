@@ -67,6 +67,7 @@ $managedPwshProfileGuid = '{8a0e8c9b-2b4c-5842-ac1b-29cd17efc89b}'
 $m = [Console]::In.ReadToEnd() | ConvertFrom-Json
 if ($m.theme -ne 'rose-pine') { throw 'managed theme not applied' }
 if ($m.profiles.defaults.colorScheme -ne 'rose-pine') { throw 'managed colorScheme not applied' }
+if ($m.profiles.defaults.historySize -ne 32767) { throw 'managed maximum historySize not applied' }
 if (-not ($m.schemes | Where-Object { $_.name -eq 'rose-pine' })) { throw 'rose-pine scheme missing' }
 if (-not ($m.themes  | Where-Object { $_.name -eq 'rose-pine' })) { throw 'rose-pine theme missing' }
 if (@($m.actions).Count -lt 15) { throw 'managed keybindings missing' }

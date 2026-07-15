@@ -61,6 +61,7 @@ lazygit config|config-file|Library/Application Support/lazygit/config.yml|.confi
 lsd config|config-file|.config/lsd/config.yaml|.config/lsd/config.yaml|lsd/config.yaml|home/dot_config/lsd/config.yaml
 lsd colors|config-file|.config/lsd/colors.yaml|.config/lsd/colors.yaml|lsd/colors.yaml|home/dot_config/lsd/colors.yaml
 gh-dash config|config-file|.config/gh-dash/config.yml|.config/gh-dash/config.yml|gh-dash/config.yml|home/dot_config/gh-dash/config.yml
+herdr config|config-file|.config/herdr/config.toml|.config/herdr/config.toml|herdr/config.toml|home/.chezmoitemplates/herdr/config.toml
 nvim|nvim|.config/nvim|.config/nvim|nvim|
 starship|config-file|.config/starship.toml|.config/starship.toml|starship/starship.toml|home/dot_config/starship.toml
 zshenv|config-file|.zshenv|.zshenv|shells/zshenv|home/dot_zshenv
