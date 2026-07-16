@@ -2325,3 +2325,49 @@ Real Apple Silicon owner lifecycle, physical Linux, WSL2 split-host,
 redirected Windows, divergent stable packaged/Preview/Canary/portable Terminal,
 and desktop/visual/TCC rows remain open. No completion of those manual surfaces
 is claimed by publication.
+
+## Linux Nix system-profile ownership repair — entry 58
+
+- The owner observed an exact-v0.2.0 Linux install abort with
+  `cat: /etc/bashrc: Permission denied`; the pinned upstream multi-user
+  installer's EXIT trap then printed its `Oh no` failure.
+- Inspection of the checksum-verified Nix 2.34.0 archive confirmed the causal
+  path. Its daemon installer includes `/etc/bashrc` among system profile
+  targets, prepares missing targets through its privileged helper, then feeds
+  an unprivileged `cat` of the target into a privileged `tee`. A target that
+  exists but is not readable by the invoking user therefore aborts after system
+  mutation has begun.
+- The prerequisite wrapper now passes upstream's supported
+  `--no-modify-profile` flag. This is an ownership correction, not a skipped
+  prerequisite: setup sources the verified installed profile in the same
+  transaction, Home Manager writes the canonical future-session state, and the
+  managed zsh config consumes it. The upstream installer no longer owns or
+  inspects system shell profiles.
+- The installer-boundary fixture fails with the owner's exact
+  `cat: /etc/bashrc: Permission denied` output when the flag is absent and
+  requires the exact mode, `--yes`, `--no-modify-profile`, and reviewed
+  extra-config arguments before publishing its fake Nix command.
+- The immutable v0.2.0 bytes cannot contain this later repair. README records
+  the bounded recovery for that exact release: make the system-wide
+  `/etc/bashrc` readable, then rerun setup. A patched release is still required
+  before the workaround can be retired.
+- Normal setup remains attached to the immutable annotated release. The new
+  explicit `--allow-unreleased` field-test lane accepts a post-release checkout
+  only when its clean HEAD exactly equals a current branch head advertised by
+  the official repository in the helper's single identity snapshot. It rejects
+  forks, dirty trees, stale/local-only commits, malformed official release
+  metadata, and does not relax the exact-tag v0.1.0 migration boundary.
+
+### Repair verification
+
+| Check | Exact result |
+|---|---|
+| Installer-boundary regression before repair | EXPECTED FAIL: `cat: /etc/bashrc: Permission denied`; verified installer fixture exited nonzero |
+| `bash tests/shell/nix_prerequisite_identity_test.sh` after repair | PASS: default exact-release identity, explicit official branch-head opt-in, stale/local commit rejection, retry, feature-reconciliation, and installer-argument cases passed |
+| `bash tests/shell/setup_universal_entrypoint_test.sh` | PASS: public option parsing and exact helper argument forwarding passed |
+| `bash tests/shell/setup_help_test.sh` | PASS: public help advertises the explicit field-test lane |
+| Focused ShellCheck | PASS: changed setup, helper, and shell tests report no diagnostics |
+| `PATH=/opt/homebrew/bin:$PATH make ci` | PASS: ended `local pre-PR gate passed` on the complete Linux repair, opt-in identity lane, regression tests, and documentation tree |
+
+Hosted Linux proof, merge, and patched-release publication remain pending. No
+result is promoted to exact-v0.2.0 evidence.

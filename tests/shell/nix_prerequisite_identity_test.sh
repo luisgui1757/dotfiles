@@ -69,10 +69,12 @@ new_fixture() {
 }
 
 run_helper() {
-    local repo="$1" refs_file="$2" mode="${3:-ok}"
+    local repo="$1" refs_file="$2" mode="${3:-ok}" allow_unreleased="${4:-0}"
+    local -a helper_args=(--install)
     local run_path="${RUN_PATH_OVERRIDE:-$work/bin:$ORIGINAL_PATH}"
     local run_home="${RUN_HOME_OVERRIDE:-$HOME}"
     local run_xdg_config_home="${RUN_XDG_CONFIG_HOME_OVERRIDE:-$run_home/.config}"
+    [[ "$allow_unreleased" -eq 1 ]] && helper_args+=(--allow-unreleased)
     remote_call_log="$work/remote-calls.log"
     : > "$remote_call_log"
     set +e
@@ -81,7 +83,7 @@ run_helper() {
         FAKE_REMOTE_REFS_FILE="$refs_file" \
         FAKE_REMOTE_CALL_LOG="$remote_call_log" \
         FAKE_REMOTE_MODE="$mode" \
-        "$repo/scripts/install-nix-prerequisite.sh" --install 2>&1)"
+        "$repo/scripts/install-nix-prerequisite.sh" "${helper_args[@]}" 2>&1)"
     rc=$?
     set -e
     remote_call_count="$(wc -l < "$remote_call_log" | tr -d '[:space:]')"
@@ -157,6 +159,13 @@ run_helper "$fixture" "$refs"
 assert_clean_diagnostic
 pass "published annotated release accepts only its exact tag object and peeled commit"
 
+run_helper "$fixture" "$refs" ok 1
+[[ "$rc" -eq 0 ]] || fail "exact annotated release was rejected with the test override:\n$output"
+[[ "$output" == *"Verified immutable release checkout: v0.2.0 at $head_commit"* ]] ||
+    fail "test override displaced the immutable release identity"
+assert_clean_diagnostic
+pass "the explicit test override still prefers an exact immutable release"
+
 new_fixture published-without-local-tag
 head_commit="$($REAL_GIT -C "$fixture" rev-parse HEAD)"
 "$REAL_GIT" -C "$fixture" -c user.name=fixture -c user.email=fixture@example.invalid \
@@ -175,6 +184,45 @@ run_helper "$fixture" "$refs"
     fail "published-release transition did not give the exact checkout recovery:\n$output"
 assert_clean_diagnostic
 pass "release publication closes the prerelease branch-head path"
+
+new_fixture explicitly-authorized-unreleased
+release_commit="$($REAL_GIT -C "$fixture" rev-parse HEAD)"
+"$REAL_GIT" -C "$fixture" -c user.name=fixture -c user.email=fixture@example.invalid \
+    tag -a v0.2.0 -m release
+tag_object="$($REAL_GIT -C "$fixture" rev-parse refs/tags/v0.2.0)"
+printf 'branch head\n' >> "$fixture/tracked.txt"
+"$REAL_GIT" -C "$fixture" add tracked.txt
+"$REAL_GIT" -C "$fixture" -c user.name=fixture -c user.email=fixture@example.invalid \
+    commit -qm branch-head
+head_commit="$($REAL_GIT -C "$fixture" rev-parse HEAD)"
+refs="$work/explicitly-authorized-unreleased.refs"
+{
+    printf '%s\trefs/tags/v0.2.0\n' "$tag_object"
+    printf '%s\trefs/tags/v0.2.0^{}\n' "$release_commit"
+    printf '%s\trefs/heads/fix/linux-nix-profile-read\n' "$head_commit"
+} > "$refs"
+run_helper "$fixture" "$refs"
+[[ "$rc" -ne 0 ]] || fail "published branch head was accepted without explicit authorization"
+[[ "$output" == *"local v0.2.0 does not match the official immutable annotated release"* ]] ||
+    fail "default release boundary did not remain closed:\n$output"
+run_helper "$fixture" "$refs" ok 1
+[[ "$rc" -eq 0 ]] || fail "explicit official branch-head test was rejected:\n$output"
+[[ "$output" == *"Verified explicitly authorized unreleased checkout: refs/heads/fix/linux-nix-profile-read at $head_commit"* ]] ||
+    fail "unreleased success did not report its exact official branch identity"
+[[ "$remote_call_count" == "1" ]] || fail "unreleased decision used $remote_call_count remote snapshots"
+assert_clean_diagnostic
+pass "published branch head requires and honors the explicit test override"
+
+printf 'local only\n' >> "$fixture/tracked.txt"
+"$REAL_GIT" -C "$fixture" add tracked.txt
+"$REAL_GIT" -C "$fixture" -c user.name=fixture -c user.email=fixture@example.invalid \
+    commit -qm local-only
+run_helper "$fixture" "$refs" ok 1
+[[ "$rc" -ne 0 ]] || fail "stale or local-only HEAD was accepted by the test override"
+[[ "$output" == *"--allow-unreleased requires checkout HEAD to be a current official branch head"* ]] ||
+    fail "stale test checkout failure was not actionable:\n$output"
+assert_clean_diagnostic
+pass "the explicit test override rejects stale and local-only commits"
 
 new_fixture malformed-release
 head_commit="$($REAL_GIT -C "$fixture" rev-parse HEAD)"
@@ -255,8 +303,12 @@ cat > "$installer_dir/install" <<'INSTALLER'
 #!/usr/bin/env bash
 set -euo pipefail
 printf '%s\n' "$@" > "${FAKE_INSTALL_ARGS:?}"
-[[ "${3:-}" == "--nix-extra-conf-file" && -f "${4:-}" ]] || exit 50
-cat "$4" > "${FAKE_INSTALL_CONF:?}"
+if [[ "${3:-}" != "--no-modify-profile" ]]; then
+    echo "cat: /etc/bashrc: Permission denied" >&2
+    exit 50
+fi
+[[ "${4:-}" == "--nix-extra-conf-file" && -f "${5:-}" ]] || exit 51
+cat "$5" > "${FAKE_INSTALL_CONF:?}"
 cat > "${FAKE_RUNTIME_BIN:?}/nix" <<'NIX'
 #!/usr/bin/env bash
 case "${1:-}" in
@@ -288,8 +340,9 @@ run_helper "$fixture" "$refs"
 [[ "$rc" -eq 0 ]] || fail "verified installer fixture failed:\n$output"
 [[ "$(sed -n '1p' "$FAKE_INSTALL_ARGS")" == "$expected_install_mode" &&
     "$(sed -n '2p' "$FAKE_INSTALL_ARGS")" == "--yes" &&
-    "$(sed -n '3p' "$FAKE_INSTALL_ARGS")" == "--nix-extra-conf-file" ]] ||
-    fail "upstream installer did not receive its mode, --yes, and extra config flag"
+    "$(sed -n '3p' "$FAKE_INSTALL_ARGS")" == "--no-modify-profile" &&
+    "$(sed -n '4p' "$FAKE_INSTALL_ARGS")" == "--nix-extra-conf-file" ]] ||
+    fail "upstream installer did not receive its mode, --yes, no-profile-mutation, and extra config flags"
 grep -Fx 'extra-experimental-features = nix-command flakes' "$FAKE_INSTALL_CONF" >/dev/null ||
     fail "upstream installer did not receive the reviewed Nix feature config"
 if [[ "$expected_install_mode" == "--no-daemon" ]]; then
@@ -303,6 +356,6 @@ fi
 [[ "$output" == *"Nix prerequisite installed and verified"* ]] ||
     fail "installer success was not verified in the same shell"
 assert_clean_diagnostic
-pass "verified upstream installer receives mode, --yes, and persistent flake features"
+pass "verified upstream installer leaves shell profiles to dotfiles and persists flake features"
 
 echo "all Nix prerequisite checkout identity behaviors OK"

@@ -11,11 +11,26 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 checkout="$(cd "$script_dir/.." && pwd -P)"
 
 usage() {
-    echo "usage: $0 --install" >&2
+    echo "usage: $0 --install [--allow-unreleased]" >&2
     exit 2
 }
 
-[[ "$#" -eq 1 && "$1" == "--install" ]] || usage
+install_requested=0
+allow_unreleased=0
+for arg in "$@"; do
+    case "$arg" in
+        --install)
+            [[ "$install_requested" -eq 0 ]] || usage
+            install_requested=1
+            ;;
+        --allow-unreleased)
+            [[ "$allow_unreleased" -eq 0 ]] || usage
+            allow_unreleased=1
+            ;;
+        *) usage ;;
+    esac
+done
+[[ "$install_requested" -eq 1 ]] || usage
 [[ "$(id -u)" -ne 0 ]] || {
     echo "FAIL: run as the target non-root user; the reviewed installer invokes sudo when needed." >&2
     exit 1
@@ -76,8 +91,9 @@ fi
 
 # Query release and branch identities in one advertisement. Before v0.2.0 is
 # published, an exact current official branch head is the prerelease authority.
-# The moment the tag appears in this snapshot, that branch path closes and only
-# the immutable annotated release is accepted.
+# After publication the immutable annotated release remains the default; the
+# explicit test-only override may instead authorize an exact current official
+# branch head from this same snapshot.
 work="$(mktemp -d "${TMPDIR:-/tmp}/dotfiles-nix-install.XXXXXX")"
 chmod 700 "$work"
 mkdir "$work/remote-query"
@@ -194,10 +210,10 @@ remote_tag_object_count="$(printf '%s\n' "$remote_refs" | awk -v ref="$tag_ref" 
     '$2 == ref { count++ } END { print count + 0 }')"
 remote_commit_count="$(printf '%s\n' "$remote_refs" | awk -v ref="$peeled_tag_ref" \
     '$2 == ref { count++ } END { print count + 0 }')"
+matched_branch="$(printf '%s\n' "$remote_refs" | awk -v head="$head_commit" \
+    '$1 == head && $2 ~ /^refs\/heads\// { print $2; exit }')"
 
 if [[ "$remote_tag_object_count" == "0" && "$remote_commit_count" == "0" ]]; then
-    matched_branch="$(printf '%s\n' "$remote_refs" | awk -v head="$head_commit" \
-        '$1 == head && $2 ~ /^refs\/heads\// { print $2; exit }')"
     [[ -n "$matched_branch" ]] || fail \
         "before $release_tag is published, checkout HEAD must be a current official branch head."
     echo "Verified prerelease checkout: $matched_branch at $head_commit"
@@ -208,15 +224,28 @@ else
         '$2 == ref { print $1 }')"
     remote_commit="$(printf '%s\n' "$remote_refs" | awk -v ref="$peeled_tag_ref" \
         '$2 == ref { print $1 }')"
-    if ! tag_object="$(repo_git rev-parse --verify --quiet "$tag_ref" 2>/dev/null)" ||
-        ! tag_commit="$(repo_git rev-parse --verify --quiet "$tag_ref^{commit}" 2>/dev/null)" ||
-        ! tag_type="$(repo_git cat-file -t "$tag_object" 2>/dev/null)"; then
-        fail "$release_tag is published; use a fresh exact-tag checkout of the official release."
+    local_release_readable=0
+    release_identity_matches=0
+    if tag_object="$(repo_git rev-parse --verify --quiet "$tag_ref" 2>/dev/null)" &&
+        tag_commit="$(repo_git rev-parse --verify --quiet "$tag_ref^{commit}" 2>/dev/null)" &&
+        tag_type="$(repo_git cat-file -t "$tag_object" 2>/dev/null)"; then
+        local_release_readable=1
+        if [[ "$tag_type" == "tag" && "$tag_object" == "$remote_tag_object" &&
+            "$tag_commit" == "$remote_commit" && "$head_commit" == "$remote_commit" ]]; then
+            release_identity_matches=1
+        fi
     fi
-    [[ "$tag_type" == "tag" && "$tag_object" == "$remote_tag_object" &&
-        "$tag_commit" == "$remote_commit" && "$head_commit" == "$remote_commit" ]] || fail \
-        "local $release_tag does not match the official immutable annotated release."
-    echo "Verified immutable release checkout: $release_tag at $head_commit"
+    if [[ "$release_identity_matches" -eq 1 ]]; then
+        echo "Verified immutable release checkout: $release_tag at $head_commit"
+    elif [[ "$allow_unreleased" -eq 1 && -n "$matched_branch" ]]; then
+        echo "Verified explicitly authorized unreleased checkout: $matched_branch at $head_commit"
+    elif [[ "$allow_unreleased" -eq 1 ]]; then
+        fail "--allow-unreleased requires checkout HEAD to be a current official branch head."
+    elif [[ "$local_release_readable" -eq 0 ]]; then
+        fail "$release_tag is published; use a fresh exact-tag checkout of the official release."
+    else
+        fail "local $release_tag does not match the official immutable annotated release."
+    fi
 fi
 
 if command -v nix >/dev/null 2>&1; then
@@ -298,7 +327,13 @@ installer="$work/nix-$nix_version-$system/install"
 }
 
 echo "Verified upstream Nix $nix_version for $system: $expected_sha256"
-"$installer" "$install_mode" --yes --nix-extra-conf-file "$nix_extra_conf"
+# Shell activation belongs to this setup transaction: it sources the verified
+# installer output below, then Home Manager publishes the future-session path
+# consumed by the managed zsh config. The upstream daemon installer otherwise
+# creates and reads system shell files such as /etc/bashrc before its privileged
+# write, which aborts on valid hosts where that file is not user-readable.
+"$installer" "$install_mode" --yes --no-modify-profile \
+    --nix-extra-conf-file "$nix_extra_conf"
 
 if [[ "$install_mode" == "--no-daemon" ]]; then
     # The upstream flag persists /etc/nix/nix.conf only for daemon installs.

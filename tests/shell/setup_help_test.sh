@@ -22,5 +22,8 @@ fi
 if ! grep -F './setup.sh --upgrade' <<<"$out" >/dev/null; then
     echo "FAIL: setup.sh help does not advertise the update alias"; echo "$out"; exit 1
 fi
+if ! grep -F './setup.sh --allow-unreleased' <<<"$out" >/dev/null; then
+    echo "FAIL: setup.sh help does not advertise the explicit branch-head test lane"; echo "$out"; exit 1
+fi
 
 echo "OK"
