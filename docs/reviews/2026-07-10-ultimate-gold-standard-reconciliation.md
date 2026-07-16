@@ -2379,6 +2379,20 @@ is claimed by publication.
   the official repository in the helper's single identity snapshot. It rejects
   forks, dirty trees, stale/local-only commits, malformed official release
   metadata, and does not relax the exact-tag v0.1.0 migration boundary.
+- The owner's next corporate-Linux field run progressed to Nix's default-profile
+  installation and then failed while a build user inspected the archive's
+  `busybox-1.36.1` store path. The upstream Linux daemon copy preserves
+  ownership and timestamps but not modes; under a restrictive umask such as
+  `077`, its new directories become `0700`, and the following recursive
+  write-bit removal makes them root-only `0500`. A local reproduction of that exact copy/mode
+  sequence produced `0500` for the BusyBox directory, child directory, and
+  executable, rejecting partial-state cleanup as the only explanation.
+- The checksum-bound daemon transform now also changes that one exact upstream
+  mode command to add read and conditional traverse bits while removing all
+  write bits. This yields Nix's canonical `0444`/`0555` store modes for a new
+  install and repairs the inaccessible copied paths on retry. All three complete
+  rendered-script hashes were recalculated from the pinned archives and passed
+  `bash -n`; any second source-anchor or rendered-byte drift remains fatal.
 
 ### Repair verification
 
@@ -2395,6 +2409,12 @@ is claimed by publication.
 | Environment-only `PATH=/opt/homebrew/bin:$PATH make ci` | PASS but not closure: final inner-script trace showed the daemon never consults the propagated setting |
 | First local-script `make ci` attempt | FAIL outside the changed path: the safeguard fixture's temporary fake `gh` disappeared during an injected rollback; the exact safeguard test passed immediately in isolation |
 | Final `PATH=/opt/homebrew/bin:$PATH make ci` | PASS: uninterrupted run ended `local pre-PR gate passed` with the exact daemon-script input/output hashes, guarded profile call, branch-head opt-in, tests, and documentation |
+| First pushed-head Ubuntu setup job | INSUFFICIENT despite PASS: workflow run `29485581784` detached its prerequisite checkout to immutable `v0.2.0`; the log contained upstream `Setting up shell profiles:` and therefore did not exercise the PR's local daemon-script repair |
+| Corporate-Linux rerun at `a52513c` | FAIL with new evidence: default-profile installation could not stat the archive's BusyBox store path; this supersedes closure on that head without reviving the already-repaired shell-profile cause |
+| Restrictive-umask copy reproduction | EXPECTED FAIL: upstream-equivalent no-mode-preservation copy under `umask 077`, followed by `chmod -R ugo-w`, produced root-only-style `0500` directories and executable |
+| Expanded exact Nix 2.34.0 archive transform audit | PASS: aarch64-darwin, x86_64-linux, and aarch64-linux input hashes remained exact; complete outputs matched `de0074c...`, `02ed7d0...`, and `54c0a6e...`; all rendered scripts passed `bash -n` |
+| Focused restrictive-store regression and release identity/static checks | PASS: the fake daemon starts with unreadable/untraversable BusyBox modes and completes only after the exact local transform restores read/traverse access while retaining the no-profile and identity boundaries |
+| `PATH=/opt/homebrew/bin:$PATH make ci` after store-mode and hosted-proof repair | PASS: uninterrupted run ended `local pre-PR gate passed`; workflow YAML, restrictive-store behavior, exact hashes, release identity, architecture, documentation, migration, and full repository suites passed |
 
 Hosted Linux proof, merge, and patched-release publication remain pending. No
 result is promoted to exact-v0.2.0 evidence.

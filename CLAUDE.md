@@ -313,19 +313,30 @@ that violates one of these, fix it instead of disabling the test.
       bytes with the upstream `--yes` non-interactive flag and the selected
       daemon mode. Nix's multi-user installer has a long-standing open upstream
       bug: `--no-modify-profile` applies only to the single-user path and the
-      daemon script unconditionally invokes `configure_shell_profile`. For a
-      daemon install, the wrapper verifies the exact extracted script hash,
-      deterministically guards that one call with the public option's backing
-      setting, verifies the complete patched-script hash, and only then executes
-      the local installer with both `--no-modify-profile` and
+      daemon script unconditionally invokes `configure_shell_profile`. On Linux,
+      its store copy also omits mode preservation, so a restrictive invoking
+      umask can create `0700` store directories that the following write-bit
+      removal turns into root-only `0500`; daemon build users then cannot read
+      bootstrap paths such as BusyBox. For a daemon install, the wrapper verifies
+      the exact extracted script hash, deterministically guards the profile call
+      and normalizes store paths to Nix's canonical read-only/traversable modes,
+      verifies the complete patched-script hash, and only then executes the
+      local installer with both `--no-modify-profile` and
       `NIX_INSTALLER_NO_MODIFY_PROFILE=1`. Any source or rendered-byte drift
-      fails before execution. Setup activates the verified profile in its
+      fails before execution. The mode normalization also repairs paths left by
+      an interrupted attempt. Setup activates the verified profile in its
       current shell, Home Manager publishes the future-session path consumed by
       the managed zsh config, and the daemon installer never creates or reads
       system shell files such as `/etc/bashrc`. That boundary is load-bearing
       because upstream otherwise performs an unprivileged read after its
       privileged file preparation and aborts on a valid non-user-readable
-      system file. Its
+      system file. Same-repository hosted POSIX bootstrap proofs must run this
+      exact source head through `--allow-unreleased`, require both the reviewed
+      local-patch and profile-skip messages, and reject any upstream `Setting up
+      shell profiles:` task. They set `umask 077` before bootstrap so store-mode
+      coverage represents restrictive managed hosts; detaching to the older
+      release or using the runner's permissive default would make that job green
+      without testing the change under review. Its
       reviewed extra config enables `nix-command flakes` in daemon installs;
       single-user Linux merges those additive features into the user's Nix
       config, and a retry self-heals the same disabled-feature state after an

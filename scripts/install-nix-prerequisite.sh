@@ -270,7 +270,7 @@ case "$os:$arch" in
         system="aarch64-darwin"
         expected_sha256="47cb78c9fdc7b630dbbb9a89869c8e8bcd8c9eb17be036fba18585120693a4c1"
         expected_multi_user_sha256="832c033bac08eac43e2749427cb3e85d12f11d34685f44153bf044c6d32fafd0"
-        expected_patched_multi_user_sha256="cfa68093aa33400ea20db27d1469387c576e658855ea3c23060961c36ac31adf"
+        expected_patched_multi_user_sha256="de0074c29f938cac623e0734e359021a5a6b595b8969908ca7c4ef3598b88332"
         install_mode="--daemon"
         ;;
     Darwin:*)
@@ -281,7 +281,7 @@ case "$os:$arch" in
         system="x86_64-linux"
         expected_sha256="5676b0887f1274e62edd175b6611af49aa8170c69c16877aa9bc6cebceb19855"
         expected_multi_user_sha256="328dc650e29350b3d87f48b4b46e564458a5f2e413abb598c271fca3191f35d1"
-        expected_patched_multi_user_sha256="8860fb941aa9c8bea0a4b5868078da0b052dc65f53913003d8eeef73f48d01c6"
+        expected_patched_multi_user_sha256="02ed7d08aea2c191cfefda3f7e21aa17a10cc9384debe494f7a4c1357b65bff1"
         install_mode="--no-daemon"
         if [[ -d /run/systemd/system ]] && command -v systemctl >/dev/null 2>&1; then
             install_mode="--daemon"
@@ -291,7 +291,7 @@ case "$os:$arch" in
         system="aarch64-linux"
         expected_sha256="cfddd4008b57a71464a16d5232cba79b1c76ae9dc81bbf71b4972b0118bc29c5"
         expected_multi_user_sha256="d287e7cc727ccfa49e1a4756636c8292bda00c0d0743e79035ceddc7a42a45ae"
-        expected_patched_multi_user_sha256="7ef37eb58501ec8cca55068a019bdb2d5354544fba093e2f22d833afb9b324a0"
+        expected_patched_multi_user_sha256="54c0a6e1678c4c26a28d5bf638b8654ee12b2173ba0be521be24346d4de14eff"
         install_mode="--no-daemon"
         if [[ -d /run/systemd/system ]] && command -v systemctl >/dev/null 2>&1; then
             install_mode="--daemon"
@@ -347,18 +347,25 @@ if [[ "$install_mode" == "--daemon" ]]; then
     [[ "$actual_multi_user_sha256" == "$expected_multi_user_sha256" ]] || fail \
         "verified Nix archive contains an unexpected multi-user installer."
     if ! awk '
-        BEGIN { replacements = 0 }
+        BEGIN { profile_replacements = 0; mode_replacements = 0 }
+        $0 == "              chmod -R ugo-w \"$NIX_ROOT/store/\"" {
+            print "              chmod -R a+rX,ugo-w \"$NIX_ROOT/store/\""
+            mode_replacements++
+            next
+        }
         $0 == "    configure_shell_profile" {
             print "    if [ -z \"${NIX_INSTALLER_NO_MODIFY_PROFILE:-}\" ]; then"
             print "        configure_shell_profile"
             print "    else"
             print "        task \"Leaving shell profiles unchanged (--no-modify-profile)\""
             print "    fi"
-            replacements++
+            profile_replacements++
             next
         }
         { print }
-        END { if (replacements != 1) exit 42 }
+        END {
+            if (profile_replacements != 1 || mode_replacements != 1) exit 42
+        }
     ' "$multi_user_installer" > "$patched_multi_user_installer"; then
         fail "could not apply the reviewed Nix multi-user profile-ownership patch."
     fi
@@ -376,9 +383,13 @@ echo "Verified upstream Nix $nix_version for $system: $expected_sha256"
 # consumed by the managed zsh config. The upstream daemon installer otherwise
 # creates and reads system shell files such as /etc/bashrc before its privileged
 # write, which aborts on valid hosts where that file is not user-readable. Nix
-# 2.34.0's multi-user installer ignores --no-modify-profile, so the exact
-# checksum-bound local copy above is deterministically patched to honor the
-# option without changing or executing unverified network bytes.
+# 2.34.0's multi-user installer ignores --no-modify-profile. Its Linux store
+# copy also applies the invoking umask before removing write bits, so a
+# restrictive umask can leave directories inaccessible to daemon build users.
+# The exact checksum-bound local copy above is deterministically patched to
+# honor the option and normalize the store to Nix's read-only/traversable modes,
+# including state left by an interrupted attempt, without changing or executing
+# unverified network bytes.
 NIX_INSTALLER_NO_MODIFY_PROFILE=1 \
     "$installer" "$install_mode" --yes --no-modify-profile \
         --nix-extra-conf-file "$nix_extra_conf"

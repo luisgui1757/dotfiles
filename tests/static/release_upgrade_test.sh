@@ -79,11 +79,11 @@ for hash in \
 done
 for hash in \
     832c033bac08eac43e2749427cb3e85d12f11d34685f44153bf044c6d32fafd0 \
-    cfa68093aa33400ea20db27d1469387c576e658855ea3c23060961c36ac31adf \
+    de0074c29f938cac623e0734e359021a5a6b595b8969908ca7c4ef3598b88332 \
     328dc650e29350b3d87f48b4b46e564458a5f2e413abb598c271fca3191f35d1 \
-    8860fb941aa9c8bea0a4b5868078da0b052dc65f53913003d8eeef73f48d01c6 \
+    02ed7d08aea2c191cfefda3f7e21aa17a10cc9384debe494f7a4c1357b65bff1 \
     d287e7cc727ccfa49e1a4756636c8292bda00c0d0743e79035ceddc7a42a45ae \
-    7ef37eb58501ec8cca55068a019bdb2d5354544fba093e2f22d833afb9b324a0; do
+    54c0a6e1678c4c26a28d5bf638b8654ee12b2173ba0be521be24346d4de14eff; do
     grep -F "$hash" scripts/install-nix-prerequisite.sh >/dev/null ||
         fail "reviewed Nix daemon script hash is missing from the helper: $hash"
     grep -F "$hash" docs/security/supply-chain.md >/dev/null ||
@@ -91,6 +91,22 @@ for hash in \
 done
 grep -F 'nix_version="2.34.0"' scripts/install-nix-prerequisite.sh >/dev/null ||
     fail "Nix prerequisite version drifted"
+
+e2e_workflow=".github/workflows/e2e-install.yml"
+grep -F './scripts/install-nix-prerequisite.sh --install --allow-unreleased' "$e2e_workflow" >/dev/null ||
+    fail "hosted POSIX bootstrap does not exercise the exact unreleased source head"
+grep -F 'umask 077' "$e2e_workflow" >/dev/null ||
+    fail "hosted POSIX bootstrap does not model a restrictive managed-host umask"
+if grep -F 'git checkout --detach refs/tags/v0.2.0' "$e2e_workflow" >/dev/null; then
+    fail "hosted POSIX bootstrap still replaces the reviewed source head with v0.2.0"
+fi
+for proof in \
+    'Verified local Nix daemon profile-ownership patch:' \
+    'Leaving shell profiles unchanged (--no-modify-profile)' \
+    'Setting up shell profiles:'; do
+    grep -F "$proof" "$e2e_workflow" >/dev/null ||
+        fail "hosted POSIX bootstrap does not assert installer ownership proof: $proof"
+done
 
 grep -Eq '^[[:space:]]*ensure_nix_prerequisite[[:space:]]*$' setup.sh ||
     fail "POSIX setup does not own verified Nix prerequisite installation"

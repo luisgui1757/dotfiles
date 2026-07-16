@@ -87,8 +87,11 @@ canonical v0.2.0 path is now side-by-side and exact-tag-only:
   `nix-command flakes` persisted and profile mutation disabled. Because the
   upstream multi-user path ignores `--no-modify-profile`, daemon bootstrap
   verifies the exact extracted script hash, deterministically guards its single
-  profile-configuration call, verifies the complete patched-script hash, and
-  executes only that reviewed output with the public option and backing setting.
+  profile-configuration call, normalizes Nix store paths to canonical
+  read-only/traversable modes even under a restrictive invoking umask, verifies
+  the complete patched-script hash, and executes only that reviewed output with
+  the public option and backing setting. The same mode normalization repairs a
+  partial daemon install left by an earlier failed attempt.
   Setup and Home Manager own current- and future-shell activation. A retry
   reconciles the disabled-feature state left by an otherwise-complete upstream
   install.

@@ -5,7 +5,11 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 REAL_GIT="$(command -v git)"
 ORIGINAL_PATH="$PATH"
 work="$(mktemp -d)"
-trap 'rm -rf "$work"' EXIT
+cleanup() {
+    chmod -R u+rwX "$work" 2>/dev/null || true
+    rm -rf "$work"
+}
+trap cleanup EXIT
 mkdir -p "$work/bin"
 
 fail() {
@@ -296,7 +300,7 @@ case "$1" in
         digest="832c033bac08eac43e2749427cb3e85d12f11d34685f44153bf044c6d32fafd0"
         ;;
     */.install-multi-user.dotfiles)
-        digest="cfa68093aa33400ea20db27d1469387c576e658855ea3c23060961c36ac31adf"
+        digest="de0074c29f938cac623e0734e359021a5a6b595b8969908ca7c4ef3598b88332"
         ;;
     *) exit 53 ;;
 esac
@@ -327,6 +331,7 @@ INSTALLER
 cat > "$installer_dir/install-multi-user" <<'MULTI_USER_INSTALLER'
 #!/usr/bin/env bash
 set -euo pipefail
+NIX_ROOT="${FAKE_NIX_ROOT:?}"
 
 task() {
     echo "$*"
@@ -338,7 +343,17 @@ configure_shell_profile() {
     exit 52
 }
 
+normalize_store_permissions() {
+    local busybox="$NIX_ROOT/store/l34zf9300cgydgsimmnxvjl9ivjn2yjc-busybox-1.36.1"
+    mkdir -p "$busybox/bin"
+    : > "$busybox/bin/busybox"
+    chmod 700 "$busybox" "$busybox/bin" "$busybox/bin/busybox"
+    # Exact upstream indentation is part of the checksum-bound transform anchor.
+              chmod -R ugo-w "$NIX_ROOT/store/"
+}
+
 main() {
+    normalize_store_permissions
     configure_shell_profile
 cat > "${FAKE_RUNTIME_BIN:?}/nix" <<'NIX'
 #!/usr/bin/env bash
@@ -364,6 +379,7 @@ printf '%s\trefs/heads/fix/bootstrap\n' "$head_commit" > "$refs"
 export FAKE_INSTALL_ARGS="$work/install-args.log"
 export FAKE_INSTALL_CONF="$work/install-conf.log"
 export FAKE_RUNTIME_BIN="$work/bin"
+export FAKE_NIX_ROOT="$work/fake-nix-root"
 export RUN_PATH_OVERRIDE="$work/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 export RUN_HOME_OVERRIDE="$work/install-home"
 export FAKE_UNAME_SYSTEM=Darwin
@@ -393,7 +409,11 @@ fi
     fail "daemon installer patch did not pass its exact output hash check"
 [[ "$output" == *"Leaving shell profiles unchanged (--no-modify-profile)"* ]] ||
     fail "patched daemon installer did not report the no-profile ownership boundary"
+busybox_store="$FAKE_NIX_ROOT/store/l34zf9300cgydgsimmnxvjl9ivjn2yjc-busybox-1.36.1"
+[[ -r "$busybox_store" && -x "$busybox_store" &&
+    -r "$busybox_store/bin/busybox" && -x "$busybox_store/bin/busybox" ]] ||
+    fail "patched daemon installer did not repair restrictive Nix store modes"
 assert_clean_diagnostic
-pass "verified upstream installer leaves shell profiles to dotfiles and persists flake features"
+pass "verified upstream installer preserves readable store paths, leaves shell profiles to dotfiles, and persists flake features"
 
 echo "all Nix prerequisite checkout identity behaviors OK"

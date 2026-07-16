@@ -115,16 +115,22 @@ jobs:
             echo "POSIX bootstrap fixture is not bare: Nix already exists" >&2
             exit 1
           fi
-          # Before publication this is the exact official source branch head.
-          # After publication, fetch-depth 0 carries the release tag and this
-          # smoke follows the public exact-tag path instead.
-          if git show-ref --verify --quiet refs/tags/v0.2.0; then
-            git checkout --detach refs/tags/v0.2.0
-          fi
+          # Exercise the exact current source head. The explicit test lane
+          # still requires this clean checkout to equal an official branch
+          # head (or the immutable release when dispatched on its exact tag).
+          # Model managed Linux baselines: upstream must not turn this strict
+          # umask into store paths that daemon build users cannot traverse.
+          umask 077
           bootstrap_log="$RUNNER_TEMP/nix-prerequisite-bootstrap.log"
-          ./scripts/install-nix-prerequisite.sh --install 2>&1 | tee "$bootstrap_log"
+          ./scripts/install-nix-prerequisite.sh --install --allow-unreleased 2>&1 | tee "$bootstrap_log"
           grep -F "Nix prerequisite installed and verified" "$bootstrap_log" >/dev/null
-          grep -E "Verified (prerelease|immutable release) checkout:" "$bootstrap_log" >/dev/null
+          grep -E "Verified (prerelease|immutable release|explicitly authorized unreleased) checkout:" "$bootstrap_log" >/dev/null
+          grep -F "Verified local Nix daemon profile-ownership patch:" "$bootstrap_log" >/dev/null
+          grep -F "Leaving shell profiles unchanged (--no-modify-profile)" "$bootstrap_log" >/dev/null
+          if grep -Fq "Setting up shell profiles:" "$bootstrap_log"; then
+            echo "Nix daemon installer attempted to modify shell profiles" >&2
+            exit 1
+          fi
           echo "/nix/var/nix/profiles/default/bin" >> "$GITHUB_PATH"
 
       - name: Install Determinate Nix (flakes enabled)
