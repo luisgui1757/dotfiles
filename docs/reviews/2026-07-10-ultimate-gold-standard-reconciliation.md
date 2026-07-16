@@ -2393,6 +2393,22 @@ is claimed by publication.
   install and repairs the inaccessible copied paths on retry. All three complete
   rendered-script hashes were recalculated from the pinned archives and passed
   `bash -n`; any second source-anchor or rendered-byte drift remains fatal.
+- Exact branch-head hosted run `29487371753` then passed all 21 checks. Its
+  Ubuntu bootstrap ran head `32e37f4a6040a380fc0eeb373bb7b6d8f531a57c`
+  under `umask 077`, logged patched output `02ed7d08...` and `Leaving shell
+  profiles unchanged`, completed setup plus post-install assertions, and emitted
+  neither a runtime shell-profile task nor the BusyBox permission failure.
+- The owner's next corporate-Linux run surfaced an upstream warning while
+  fetching `https://channels.nixos.org/nixpkgs-unstable`: the installer default
+  channel step explicitly uses its bundled Mozilla CA, which does not contain
+  the managed network's inspection root. This repository uses locked flakes and
+  has no channel consumer, so weakening certificate verification or importing
+  ad hoc trust would be the wrong repair.
+- The verified upstream invocation now passes its public `--no-channel-add`
+  option. The regression models the exact corporate TLS error unless that flag
+  reaches the daemon child; hosted bootstrap also rejects the channel URL. Once
+  installation returns, Nix's own Linux profile selects the first available
+  system CA bundle, retaining managed-host trust for the locked flake downloads.
 
 ### Repair verification
 
@@ -2415,6 +2431,10 @@ is claimed by publication.
 | Expanded exact Nix 2.34.0 archive transform audit | PASS: aarch64-darwin, x86_64-linux, and aarch64-linux input hashes remained exact; complete outputs matched `de0074c...`, `02ed7d0...`, and `54c0a6e...`; all rendered scripts passed `bash -n` |
 | Focused restrictive-store regression and release identity/static checks | PASS: the fake daemon starts with unreadable/untraversable BusyBox modes and completes only after the exact local transform restores read/traverse access while retaining the no-profile and identity boundaries |
 | `PATH=/opt/homebrew/bin:$PATH make ci` after store-mode and hosted-proof repair | PASS: uninterrupted run ended `local pre-PR gate passed`; workflow YAML, restrictive-store behavior, exact hashes, release identity, architecture, documentation, migration, and full repository suites passed |
+| Exact-head hosted run `29487371753` at `32e37f4` | PASS: 21/21 checks; Ubuntu exact-source bootstrap under `umask 077`, local-patch hash, profile skip, full setup, and post-install assertions all passed; runtime profile task and permission errors were absent |
+| Corporate-Linux rerun after store-mode repair | NEW GAP: upstream attempted the unused mutable `nixpkgs-unstable` channel with its bundled CA and reported the managed network's certificate as untrusted |
+| Focused no-channel regression | PASS: the daemon fixture emits the owner's exact channel TLS failure without `--no-channel-add`; the repaired invocation suppresses that path while retaining mode, profile, identity, and flake-feature assertions |
+| `PATH=/opt/homebrew/bin:$PATH make ci` after no-channel repair | PASS: uninterrupted run ended `local pre-PR gate passed`; exact TLS-error regression, installer arguments, hosted channel guard, Nix architecture, lint, migration, and full repository suites passed |
 
 Hosted Linux proof, merge, and patched-release publication remain pending. No
 result is promoted to exact-v0.2.0 evidence.

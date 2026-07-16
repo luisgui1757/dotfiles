@@ -92,6 +92,10 @@ canonical v0.2.0 path is now side-by-side and exact-tag-only:
   the complete patched-script hash, and executes only that reviewed output with
   the public option and backing setting. The same mode normalization repairs a
   partial daemon install left by an earlier failed attempt.
+  The verified invocation also passes upstream's public `--no-channel-add`:
+  package activation uses locked flakes, so the mutable `nixpkgs-unstable`
+  bootstrap is unnecessary and must not replace a managed host's system CA
+  trust with the installer's temporary bundled CA.
   Setup and Home Manager own current- and future-shell activation. A retry
   reconciles the disabled-feature state left by an otherwise-complete upstream
   install.

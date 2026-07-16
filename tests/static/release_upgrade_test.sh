@@ -91,6 +91,8 @@ for hash in \
 done
 grep -F 'nix_version="2.34.0"' scripts/install-nix-prerequisite.sh >/dev/null ||
     fail "Nix prerequisite version drifted"
+grep -F -- '--yes --no-channel-add --no-modify-profile' scripts/install-nix-prerequisite.sh >/dev/null ||
+    fail "Nix prerequisite installer still allows the unused mutable channel bootstrap"
 
 e2e_workflow=".github/workflows/e2e-install.yml"
 grep -F './scripts/install-nix-prerequisite.sh --install --allow-unreleased' "$e2e_workflow" >/dev/null ||
@@ -103,7 +105,8 @@ fi
 for proof in \
     'Verified local Nix daemon profile-ownership patch:' \
     'Leaving shell profiles unchanged (--no-modify-profile)' \
-    'Setting up shell profiles:'; do
+    'Setting up shell profiles:' \
+    'channels.nixos.org/nixpkgs-unstable'; do
     grep -F "$proof" "$e2e_workflow" >/dev/null ||
         fail "hosted POSIX bootstrap does not assert installer ownership proof: $proof"
 done

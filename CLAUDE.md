@@ -336,7 +336,11 @@ that violates one of these, fix it instead of disabling the test.
       shell profiles:` task. They set `umask 077` before bootstrap so store-mode
       coverage represents restrictive managed hosts; detaching to the older
       release or using the runner's permissive default would make that job green
-      without testing the change under review. Its
+      without testing the change under review. The installer must also receive
+      upstream's public `--no-channel-add`: this repository consumes locked
+      flakes, never the mutable `nixpkgs-unstable` channel, and the legacy
+      channel update forces an upstream CA bundle that omits managed corporate
+      trust roots. Hosted bootstrap rejects any attempted channel URL. Its
       reviewed extra config enables `nix-command flakes` in daemon installs;
       single-user Linux merges those additive features into the user's Nix
       config, and a retry self-heals the same disabled-feature state after an

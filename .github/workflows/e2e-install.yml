@@ -131,6 +131,10 @@ jobs:
             echo "Nix daemon installer attempted to modify shell profiles" >&2
             exit 1
           fi
+          if grep -Fq "channels.nixos.org/nixpkgs-unstable" "$bootstrap_log"; then
+            echo "Nix daemon installer attempted the unused mutable channel bootstrap" >&2
+            exit 1
+          fi
           echo "/nix/var/nix/profiles/default/bin" >> "$GITHUB_PATH"
 
       - name: Install Determinate Nix (flakes enabled)

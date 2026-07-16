@@ -319,13 +319,18 @@ cat > "$installer_dir/install" <<'INSTALLER'
 #!/usr/bin/env bash
 set -euo pipefail
 printf '%s\n' "$@" > "${FAKE_INSTALL_ARGS:?}"
-if [[ "${3:-}" != "--no-modify-profile" ]]; then
+if [[ "${3:-}" != "--no-channel-add" ]]; then
+    echo "warning: error: unable to download 'https://channels.nixos.org/nixpkgs-unstable': SSL peer certificate or SSH remote key was not OK" >&2
+    exit 54
+fi
+export NIX_INSTALLER_NO_CHANNEL_ADD=1
+if [[ "${4:-}" != "--no-modify-profile" ]]; then
     echo "cat: /etc/bashrc: Permission denied" >&2
     exit 50
 fi
 NIX_INSTALLER_NO_MODIFY_PROFILE=1
-[[ "${4:-}" == "--nix-extra-conf-file" && -f "${5:-}" ]] || exit 51
-cat "$5" > "${FAKE_INSTALL_CONF:?}"
+[[ "${5:-}" == "--nix-extra-conf-file" && -f "${6:-}" ]] || exit 51
+cat "$6" > "${FAKE_INSTALL_CONF:?}"
 exec "$(dirname "$0")/install-multi-user"
 INSTALLER
 cat > "$installer_dir/install-multi-user" <<'MULTI_USER_INSTALLER'
@@ -353,6 +358,10 @@ normalize_store_permissions() {
 }
 
 main() {
+    [[ "${NIX_INSTALLER_NO_CHANNEL_ADD:-}" == "1" ]] || {
+        echo "warning: error: unable to download 'https://channels.nixos.org/nixpkgs-unstable': SSL peer certificate or SSH remote key was not OK" >&2
+        exit 54
+    }
     normalize_store_permissions
     configure_shell_profile
 cat > "${FAKE_RUNTIME_BIN:?}/nix" <<'NIX'
@@ -390,9 +399,10 @@ run_helper "$fixture" "$refs"
 [[ "$rc" -eq 0 ]] || fail "verified installer fixture failed:\n$output"
 [[ "$(sed -n '1p' "$FAKE_INSTALL_ARGS")" == "$expected_install_mode" &&
     "$(sed -n '2p' "$FAKE_INSTALL_ARGS")" == "--yes" &&
-    "$(sed -n '3p' "$FAKE_INSTALL_ARGS")" == "--no-modify-profile" &&
-    "$(sed -n '4p' "$FAKE_INSTALL_ARGS")" == "--nix-extra-conf-file" ]] ||
-    fail "upstream installer did not receive its mode, --yes, no-profile-mutation, and extra config flags"
+    "$(sed -n '3p' "$FAKE_INSTALL_ARGS")" == "--no-channel-add" &&
+    "$(sed -n '4p' "$FAKE_INSTALL_ARGS")" == "--no-modify-profile" &&
+    "$(sed -n '5p' "$FAKE_INSTALL_ARGS")" == "--nix-extra-conf-file" ]] ||
+    fail "upstream installer did not receive its mode, --yes, no-channel, no-profile-mutation, and extra config flags"
 grep -Fx 'extra-experimental-features = nix-command flakes' "$FAKE_INSTALL_CONF" >/dev/null ||
     fail "upstream installer did not receive the reviewed Nix feature config"
 if [[ "$expected_install_mode" == "--no-daemon" ]]; then
@@ -409,11 +419,13 @@ fi
     fail "daemon installer patch did not pass its exact output hash check"
 [[ "$output" == *"Leaving shell profiles unchanged (--no-modify-profile)"* ]] ||
     fail "patched daemon installer did not report the no-profile ownership boundary"
+[[ "$output" != *"channels.nixos.org/nixpkgs-unstable"* ]] ||
+    fail "verified daemon bootstrap attempted the unused mutable Nix channel"
 busybox_store="$FAKE_NIX_ROOT/store/l34zf9300cgydgsimmnxvjl9ivjn2yjc-busybox-1.36.1"
 [[ -r "$busybox_store" && -x "$busybox_store" &&
     -r "$busybox_store/bin/busybox" && -x "$busybox_store/bin/busybox" ]] ||
     fail "patched daemon installer did not repair restrictive Nix store modes"
 assert_clean_diagnostic
-pass "verified upstream installer preserves readable store paths, leaves shell profiles to dotfiles, and persists flake features"
+pass "verified upstream installer skips mutable channels, preserves readable store paths, leaves shell profiles to dotfiles, and persists flake features"
 
 echo "all Nix prerequisite checkout identity behaviors OK"

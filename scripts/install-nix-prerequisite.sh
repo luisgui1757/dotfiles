@@ -391,7 +391,7 @@ echo "Verified upstream Nix $nix_version for $system: $expected_sha256"
 # including state left by an interrupted attempt, without changing or executing
 # unverified network bytes.
 NIX_INSTALLER_NO_MODIFY_PROFILE=1 \
-    "$installer" "$install_mode" --yes --no-modify-profile \
+    "$installer" "$install_mode" --yes --no-channel-add --no-modify-profile \
         --nix-extra-conf-file "$nix_extra_conf"
 
 if [[ "$install_mode" == "--no-daemon" ]]; then
