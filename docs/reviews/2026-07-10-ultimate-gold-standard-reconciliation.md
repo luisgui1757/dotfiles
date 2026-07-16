@@ -2506,6 +2506,12 @@ or completion of those manual surfaces is claimed by this entry.
   After reviewing that one-for-one change, the fingerprint is
   `670c470c779ff3900f07852e6be17f977a28eff73f873e7ae175e5923fbb5251`;
   no rule, suppression, or warning count changed.
+- Hosted repair head `3c72ec1` proved the actual Ubuntu setup and Pi runtime
+  now complete, then correctly failed a stale post-install expectation that
+  still named historical Pi `0.80.3`. Both POSIX and Windows physical assertions
+  now expect `0.80.9`, and the static pin-consistency test extracts each
+  assertion independently so a future Pi bump cannot strand either hidden
+  workflow mirror again.
 
 ### Repair verification
 
@@ -2517,6 +2523,7 @@ or completion of those manual surfaces is claimed by this entry.
 | `Invoke-Pester tests/powershell/InstallDeps.Tests.ps1 -CI` | PASS: 128 passed, 0 failed/skipped, including exact same-release Pi install arguments |
 | `pwsh -NoLogo -NoProfile -File ./test.ps1` | PASS after the reviewed fingerprint refresh: exact analyzer identities, 275 Pester tests, and all 18 Neovim specs |
 | `PATH=/opt/homebrew/bin:$PATH make ci` | PASS: ended `local pre-PR gate passed` on the complete implementation, tests, and documentation tree before this result-only ledger update |
+| Hosted Ubuntu setup at `3c72ec1` | EXPECTED FAIL after setup: install and `pi --version` succeeded at `0.80.9`; the later workflow assertion still expected `0.80.3`, identifying the last stale mirror |
 
 The repaired pushed-head hosted jobs, physical Herdr keypress confirmation, and
 visual Pi theme check remain downstream runtime evidence. No merge, release,
