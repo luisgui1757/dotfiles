@@ -1958,6 +1958,51 @@ function Invoke-WindowsKnownFolderOverlays {
     Move-LegacyWindowsKnownFolderTargets -Identity $Identity -IsDryRun:$IsDryRun
 }
 
+function Invoke-PiThemeSelectionMerge {
+    param(
+        [Parameter(Mandatory)] $Identity,
+        [bool]$IsDryRun = $DryRun,
+        [bool]$ExcludeScripts = $SkipConfigScripts
+    )
+    if ($ExcludeScripts) {
+        Write-Step 'deferred  Pi theme selection (-SkipConfigScripts)'
+        return
+    }
+    if ($IsDryRun) {
+        Write-Step "would    set Pi's global theme to rose-pine while preserving other settings"
+        return
+    }
+
+    $theme = Join-Path $Identity.UserProfile '.pi\agent\themes\rose-pine.json'
+    $expectedTheme = Join-Path $ScriptDir 'pi\rose-pine.json'
+    if (-not (Test-FileBytesEqual $theme $expectedTheme)) {
+        throw "deployed Pi Rose Pine theme differs from the reviewed source: $theme"
+    }
+    $node = Get-Command node -ErrorAction SilentlyContinue
+    if (-not $node) {
+        throw "node is required to merge Pi's global theme setting"
+    }
+
+    $settings = Join-Path $Identity.UserProfile '.pi\agent\settings.json'
+    $oldNativePreference = $null
+    $hasNativePreference = Test-Path Variable:PSNativeCommandUseErrorActionPreference
+    try {
+        if ($hasNativePreference) {
+            $oldNativePreference = $PSNativeCommandUseErrorActionPreference
+            $PSNativeCommandUseErrorActionPreference = $false
+        }
+        & $node.Source (Join-Path $ScriptDir 'scripts\configure-pi-theme.mjs') set $settings rose-pine
+        $rc = if ($null -eq $LASTEXITCODE) { 0 } else { [int]$LASTEXITCODE }
+    } finally {
+        if ($hasNativePreference) {
+            $PSNativeCommandUseErrorActionPreference = $oldNativePreference
+        }
+    }
+    if ($rc -ne 0) {
+        throw "Pi theme settings merge exited $rc"
+    }
+}
+
 function Invoke-ChezmoiApplyPhase {
     param(
         [bool]$ExcludeScripts = $SkipConfigScripts,
@@ -1990,6 +2035,8 @@ function Invoke-ChezmoiApplyPhase {
             Invoke-WindowsKnownFolderOverlays -Identity $script:WindowsIdentity `
                 -IsDryRun $true -ExcludeScripts:$ExcludeScripts
             Invoke-WindowsTerminalSettingsTransaction -IsDryRun $true
+            Invoke-PiThemeSelectionMerge -Identity $script:WindowsIdentity `
+                -IsDryRun $true -ExcludeScripts:$ExcludeScripts
         } finally {
             Remove-Item -LiteralPath $dryRunConfig -Force -ErrorAction SilentlyContinue
             $script:ChezmoiConfigArgs = @()
@@ -2027,6 +2074,7 @@ function Invoke-ChezmoiApplyPhase {
     Invoke-WindowsKnownFolderOverlays -Identity $script:WindowsIdentity `
         -ExcludeScripts:$ExcludeScripts
     Invoke-WindowsTerminalSettingsTransaction
+    Invoke-PiThemeSelectionMerge -Identity $script:WindowsIdentity -ExcludeScripts:$ExcludeScripts
 }
 
 function Invoke-NvimCommandOrFail {

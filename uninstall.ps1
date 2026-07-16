@@ -584,6 +584,36 @@ function Remove-Externals {
     }
 }
 
+function Invoke-PiThemeSelectionCleanup {
+    param([Parameter(Mandatory)] $Identity)
+    if ($DryRun) {
+        Write-Output '  would: remove Pi theme=rose-pine only if it is still the managed selection'
+        return
+    }
+    $node = Get-Command node -ErrorAction SilentlyContinue
+    if (-not $node) {
+        throw 'node is required to safely remove the managed Pi theme selection'
+    }
+    $settings = Join-Path $Identity.UserProfile '.pi\agent\settings.json'
+    $oldNativePreference = $null
+    $hasNativePreference = Test-Path Variable:PSNativeCommandUseErrorActionPreference
+    try {
+        if ($hasNativePreference) {
+            $oldNativePreference = $PSNativeCommandUseErrorActionPreference
+            $PSNativeCommandUseErrorActionPreference = $false
+        }
+        & $node.Source (Join-Path $RepoRoot 'scripts\configure-pi-theme.mjs') unset $settings rose-pine
+        $rc = if ($null -eq $LASTEXITCODE) { 0 } else { [int]$LASTEXITCODE }
+    } finally {
+        if ($hasNativePreference) {
+            $PSNativeCommandUseErrorActionPreference = $oldNativePreference
+        }
+    }
+    if ($rc -ne 0) {
+        throw "Pi theme settings cleanup exited $rc"
+    }
+}
+
 function Invoke-DotfilesUninstall {
     param([Parameter(Mandatory)] $Identity)
     $script:WindowsIdentity = $Identity
@@ -592,6 +622,7 @@ function Invoke-DotfilesUninstall {
 
     $targets = @(Get-ManagedTargets)
     if ($targets.Count -gt 0 -and (Confirm-Category -Prompt 'Remove chezmoi-managed config targets?')) {
+        Invoke-PiThemeSelectionCleanup -Identity $Identity
         foreach ($target in $targets) {
             Remove-ManagedTarget -Target $target
         }

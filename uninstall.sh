@@ -64,6 +64,20 @@ have() {
     command -v "$1" >/dev/null 2>&1
 }
 
+unset_pi_theme_selection() {
+    local settings="$HOME/.pi/agent/settings.json"
+
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        echo "  would: remove Pi theme=rose-pine only if it is still the managed selection"
+        return 0
+    fi
+    have node || {
+        echo "uninstall: node is required to safely remove the managed Pi theme selection" >&2
+        return 1
+    }
+    node "$REPO_ROOT/scripts/configure-pi-theme.mjs" unset "$settings" rose-pine
+}
+
 realpath_or_self() {
     local path="$1"
     if have realpath; then
@@ -387,6 +401,7 @@ echo
 
 managed_targets="$(require_managed_targets)"
 if [[ -n "$managed_targets" ]] && prompt_category "Remove chezmoi-managed config targets?"; then
+    unset_pi_theme_selection
     while IFS= read -r target; do
         [[ -n "$target" ]] || continue
         remove_managed_target "$target"

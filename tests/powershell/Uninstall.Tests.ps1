@@ -172,6 +172,31 @@ Describe 'uninstall.ps1 backup ordering and Windows Terminal recovery' {
     }
 }
 
+Describe 'uninstall.ps1 Pi theme cleanup' -Skip:(-not (Get-Command node -ErrorAction SilentlyContinue)) {
+    BeforeEach {
+        . $script:ImportUninstallForTest
+        $script:PiThemeRoot = Join-Path ([IO.Path]::GetTempPath()) ('uninstall-pi-theme-' + [guid]::NewGuid())
+        $script:PiThemeIdentity = [pscustomobject]@{ UserProfile = $script:PiThemeRoot }
+        $settings = Join-Path $script:PiThemeRoot '.pi\agent\settings.json'
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $settings) | Out-Null
+        [IO.File]::WriteAllText($settings, '{"theme":"rose-pine","keep":true}')
+    }
+
+    AfterEach {
+        Remove-Item -LiteralPath $script:PiThemeRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
+    It 'removes only the still-managed theme selection' {
+        $settings = Join-Path $script:PiThemeRoot '.pi\agent\settings.json'
+
+        Invoke-PiThemeSelectionCleanup -Identity $script:PiThemeIdentity
+
+        $result = Get-Content -Raw -LiteralPath $settings | ConvertFrom-Json
+        $result.PSObject.Properties.Name | Should -Not -Contain 'theme'
+        $result.keep | Should -BeTrue
+    }
+}
+
 Describe 'uninstall.ps1 chezmoi native verify semantics' {
     BeforeEach {
         . $script:ImportUninstallForTest

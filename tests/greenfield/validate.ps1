@@ -274,6 +274,7 @@ Assert-ContentEqual -Path (Join-Path $env:USERPROFILE '.config\starship.toml') -
 Assert-ContentEqual -Path (Join-Path $env:USERPROFILE '.config\gh-dash\config.yml') -Expected (Join-Path $Repo 'gh-dash\config.yml')
 Assert-ContentEqual -Path (Join-Path $env:USERPROFILE '.config\lsd\config.yaml') -Expected (Join-Path $Repo 'lsd\config.yaml')
 Assert-ContentEqual -Path (Join-Path $env:USERPROFILE '.config\lsd\colors.yaml') -Expected (Join-Path $Repo 'lsd\colors.yaml')
+Assert-ContentEqual -Path (Join-Path $env:USERPROFILE '.pi\agent\themes\rose-pine.json') -Expected (Join-Path $Repo 'pi\rose-pine.json')
 Assert-ContentEqual -Path (Join-Path $env:USERPROFILE '.psmux.conf') -Expected (Join-Path $Repo 'tmux\psmux.conf')
 Assert-ContentEqual -Path (Join-Path $env:USERPROFILE '.tmux.conf') -Expected (Join-Path $Repo 'tmux\tmux.conf')
 Assert-ContentEqual -Path (Join-Path $env:USERPROFILE '.tmux.windows.conf') -Expected (Join-Path $Repo 'tmux\tmux.windows.conf')
@@ -283,6 +284,20 @@ Assert-ContentEqual -Path (Join-Path $env:USERPROFILE '.tmux.rose-pine.dawn.conf
 Assert-ContentEqual -Path (Join-Path $env:USERPROFILE 'Documents\PowerShell\Microsoft.PowerShell_profile.ps1') -Expected (Join-Path $Repo 'shells\powershell_profile.ps1')
 Assert-ContentEqual -Path (Join-Path $env:LOCALAPPDATA 'lazygit\config.yml') -Expected (Join-Path $Repo 'lazygit\config.windows.yml')
 Assert-ContentEqual -Path (Join-Path $env:APPDATA 'herdr\config.toml') -Expected (Join-Path $Repo 'herdr\config.windows.toml')
+if ($ConfigOnly) {
+    Add-Skip 'Pi global theme selection skipped by -ConfigOnly'
+} else {
+    try {
+        $piSettings = Get-Content -Raw -LiteralPath (Join-Path $env:USERPROFILE '.pi\agent\settings.json') | ConvertFrom-Json
+        if ($piSettings.theme -eq 'rose-pine') {
+            Add-Pass 'Pi global theme selects rose-pine'
+        } else {
+            Add-Fail 'Pi global theme does not select rose-pine'
+        }
+    } catch {
+        Add-Fail ("Pi global settings could not be parsed: " + $_.Exception.Message)
+    }
+}
 Assert-WindowsTerminalPortableSettings
 
 Assert-ChezmoiVerify

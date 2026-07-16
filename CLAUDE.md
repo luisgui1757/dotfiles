@@ -37,9 +37,10 @@ must stay byte-identical where the parity manifest says so; update both in the
 same change.
 
 Agent runtime state and preferences are intentionally **NOT** synced through
-this repo. The supported agent surface is setup's global Sentinel policy phase;
-local agent preference folders such as `.claude/`, `.codex/`, `.pi/`, sessions,
-auth files, and package caches stay per machine.
+this repo. The supported agent surfaces are setup's global Sentinel policy and
+Pi's audited Rose Pine theme plus one merged `theme` setting. Local agent
+folders such as `.claude/` and `.codex/`, Pi sessions/auth/providers/other
+preferences, and package caches stay per machine.
 
 ## Layout at a glance
 
@@ -54,6 +55,7 @@ auth files, and package caches stay per machine.
 ├── wezterm/               wezterm.lua (shared terminal config on every OS)
 ├── aerospace/             macOS tiling-window-manager config
 ├── herdr/                 config.toml (forced built-in Rose Pine theme)
+├── pi/                    audited Pi Rose Pine theme
 ├── windows-terminal/      settings.fragment.jsonc + merge README
 ├── lazygit/               config.yml + config.windows.yml (J/K + Windows Ctrl-G)
 ├── gh-dash/               pull-request/issue dashboard config
@@ -662,6 +664,8 @@ navigator, `prefix+comma`/`prefix+$` to tab/workspace rename,
 `prefix+shift+1..9` to indexed workspace selection; agent navigation uses
 `prefix+shift+a`/`prefix+a` for previous/next and `prefix+ctrl+1..9` for indexed
 focus; Windows alone selects `pwsh.exe`),
+pi/rose-pine.json (the audited 51-token Pi theme; setup merges only
+`theme = rose-pine` into global settings),
 windows-terminal/settings.fragment.jsonc (`schemes` + `themes`),
 shells/powershell_profile.ps1 (PSReadLine `-Colors` for syntax, `Selection`,
 the version-gated prediction colors, and `$PSStyle.FileInfo.Directory` for `ls`
@@ -1418,6 +1422,9 @@ save only**. The next plain `:w` formats normally. Implemented in
   Canary, and portable WT backups only after validating all four canonical paths,
   atomically preserves the displaced current file
   as `settings.json.uninstall-current.*`, and honors `-NoRestoreBackups`.
+  Before removing the Pi theme file, uninstall deletes the global `theme` key
+  only when it still equals `rose-pine`; a later user selection and every other
+  Pi setting remain untouched.
   Dry-run mode must also leave empty external parent directories in place; it
   prints `would:` lines only and does not prune `~/.local/share/dotfiles`.
 - **Starship binary install paths differ by OS.** Homebrew owns
@@ -1788,6 +1795,11 @@ save only**. The next plain `:w` formats normally. Implemented in
   POSIX config because it would replace the user's normal Unix shell. Herdr
   keeps the shell of existing panes, so recreate panes (or stop/restart the
   session) after changing this startup setting.
+- **Herdr Windows preview updates are hash-owned, not presence-owned.** A
+  resolved command is refreshable only when its normalized source is the exact
+  `%LOCALAPPDATA%\Programs\Herdr\bin\herdr.exe` destination. If that owned
+  binary's hash differs from the current reviewed preview, normal setup
+  reconciles it; an unrelated command is reported as unmanaged and preserved.
 - **Herdr `prefix+w` is the full navigator on every host.** Upstream's default
   `prefix+w` opens only workspace navigate mode, which appears inert with one
   workspace and does not match tmux's session/window/pane tree. The managed
@@ -1803,6 +1815,9 @@ save only**. The next plain `:w` formats normally. Implemented in
   exclusively for tabs/windows. Use the literal `$` binding: Herdr accepts
   single-character punctuation, while `prefix+shift+4` does not match the
   legacy terminal `$` event on every input path.
+  Herdr `v0.7.3` also rejected the punctuation events emitted by
+  `Shift+1..9`; stable installs must be at least `v0.7.4`, and the pinned
+  Windows preview must descend from upstream fix `b708f85`.
 - **Herdr agent navigation is a third, non-destructive modifier layer.** Use
   `prefix+a` / `prefix+Shift+A` for next/previous agent: `a` is mnemonic and
   unbound by both stock tmux and Herdr. Direct agent focus uses
@@ -1937,7 +1952,7 @@ save only**. The next plain `:w` formats normally. Implemented in
   row in `parity_gate.sh`); the config is applied regardless of auth — only the
   extension binary is auth-gated. Running the dashboard needs `gh auth login` —
   a manual, secret-bearing step this repo never automates or stores.
-- **Pi CLI is a pinned npm package, not synced `.pi/` state.** `install-deps.sh`
+- **Pi CLI is pinned; only its audited theme selection is repo-owned.** `install-deps.sh`
   and `install-deps.ps1` run `npm pack --ignore-scripts --json` for
   `@earendil-works/pi-coding-agent@0.80.3`, require both reported metadata and
   independently hashed tarball bytes to match
@@ -1945,8 +1960,14 @@ save only**. The next plain `:w` formats normally. Implemented in
   and install only the verified local tarball. Pack state is scoped to a unique
   temp directory and cleaned through return/signal/finally paths. POSIX public
   setup gets Node 24 from the enforced Nix package layer; Windows
-  gets Node through the native catalog. The CLI binary is provisioned on every
-  OS, but `.pi/` sessions, auth, and preferences remain machine-local. Renovate
+  gets Node through the native catalog. Chezmoi deploys the byte-identical
+  `pi/rose-pine.json` / `home/dot_pi/agent/themes/rose-pine.json` pair on every
+  OS. After apply, `scripts/configure-pi-theme.mjs` acquires Pi's compatible
+  `settings.json.lock`, validates an object-shaped JSON file, atomically merges
+  only `theme: rose-pine`, and preserves every unrelated key. `--skip-config-scripts`
+  defers this merge. Uninstall removes the key only if it is still the managed
+  value. Sessions, auth, providers, and all other preferences remain
+  machine-local. Renovate
   may bump `PI_CLI_VERSION`, but the integrity constant is context-only and must
   be recomputed/reviewed by a human. PowerShell probes Node and npm by capturing
   native output before selecting its first line; piping the native process into
@@ -1954,8 +1975,11 @@ save only**. The next plain `:w` formats normally. Implemented in
   compatible Node or skips npm global-prefix PATH publication.
 - **which-key.nvim is the only keymap-hint plugin.** `nvim/lua/plugins/which-key.lua`
   loads it on `event = "VeryLazy"` (never eager — only `rose-pine.lua` may load
-  eagerly, invariant 7) with `opts = {}` and a `<leader>?` popup of buffer-local
-  keymaps. It only *displays* existing keymaps, so it never contends with
+  eagerly, invariant 7) or the built-in `:WhichKey` command, with `opts = {}`
+  and a `<leader>?` popup of buffer-local keymaps. `:WhichKey` is the explicit
+  all-keymaps entry point and Esc closes the popup; do not invent a private
+  enable/disable API because upstream exposes `show`, not a toggle. It only
+  *displays* existing keymaps, so it never contends with
   conform/telescope/gitsigns for a chord; `:checkhealth which-key` must stay free
   of overlap/duplicate errors. Refresh `nvim/lazy-lock.json` only via the
   documented Lazy path (`Lazy! restore` then `Lazy! install`, or `Lazy! sync`);

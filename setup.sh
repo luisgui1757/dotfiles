@@ -184,6 +184,33 @@ phase() {
     echo "================================================================"
 }
 
+configure_pi_theme_selection() {
+    local settings="$HOME/.pi/agent/settings.json"
+    local theme="$HOME/.pi/agent/themes/rose-pine.json"
+
+    if [[ "$SKIP_CONFIG_SCRIPTS" -eq 1 ]]; then
+        echo "  deferred  Pi theme selection (--skip-config-scripts)"
+        return 0
+    fi
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        echo "  would: set Pi's global theme to rose-pine while preserving other settings"
+        return 0
+    fi
+    command -v node >/dev/null 2>&1 || {
+        echo "  FAIL: node is required to merge Pi's global theme setting" >&2
+        return 1
+    }
+    [[ -f "$theme" ]] || {
+        echo "  FAIL: chezmoi did not deploy the Pi Rose Pine theme: $theme" >&2
+        return 1
+    }
+    cmp -s "$theme" "$SCRIPT_DIR/pi/rose-pine.json" || {
+        echo "  FAIL: deployed Pi Rose Pine theme differs from the reviewed source" >&2
+        return 1
+    }
+    node "$SCRIPT_DIR/scripts/configure-pi-theme.mjs" set "$settings" rose-pine
+}
+
 release_git() {
     local checkout="$1"
     shift
@@ -1759,6 +1786,7 @@ if [[ "$SKIP_BOOTSTRAP" -eq 0 ]]; then
         run_chezmoi --no-tty --force apply \
             ${CHEZMOI_APPLY_ARGS[@]+"${CHEZMOI_APPLY_ARGS[@]}"}
     fi
+    configure_pi_theme_selection
 else
     echo
     echo "skipped: Phase 2 (config) via --skip-bootstrap/--skip-config"

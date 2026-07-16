@@ -2438,3 +2438,46 @@ is claimed by publication.
 
 Hosted Linux proof, merge, and patched-release publication remain pending. No
 result is promoted to exact-v0.2.0 evidence.
+## Herdr shifted workspaces, Pi theme, and which-key entry point — entry 59
+
+- Herdr `prefix+Shift+1..9` was a confirmed upstream `v0.7.3` defect, not a
+  terminal or dotfiles collision: shifted digits arrive as punctuation on the
+  legacy input path, while indexed bindings accepted only literal `1..9`.
+  Upstream fix `b708f85` ships in stable `v0.7.4`. Native Linux now pins both
+  reviewed `v0.7.4` assets; current Homebrew carries `v0.7.4`; Windows advances
+  to preview `preview-2026-07-16-e907e6a36646`, which descends from the same fix.
+  Windows also closes the pre-existing update gap: only the exact repo-owned
+  executable is refreshed when its hash is stale, while unrelated Herdr
+  installations remain untouched.
+- Pi now defaults to Rose Pine through the exact palette previously audited in
+  the Helix repository. The source `pi-themes-rose-pine@0.1.0` tarball contains
+  six data/documentation files, no JavaScript entrypoint, scripts, dependencies,
+  or runtime code; this repo vendors only `rose-pine.json` and its MIT license.
+  Chezmoi publishes the theme on every OS. Setup then acquires Pi's compatible
+  `settings.json.lock` and atomically changes only the global `theme` key;
+  invalid/busy settings fail without mutation. Uninstall removes that key only
+  while it remains `rose-pine`, preserving later user choices and every other
+  setting.
+- Folke which-key already owns the correct command surface. The lazy spec now
+  exposes upstream's built-in `:WhichKey` command as a load trigger while
+  retaining `<leader>?` for buffer-local mappings. No private toggle API or new
+  chord was invented; Esc closes the popup.
+- PSScriptAnalyzer retained every reviewed warning group and changed only the
+  exact diagnostic fingerprint for the reviewed Herdr progress-message extent.
+  The baseline is now
+  `7afbc05765c54b68225c941857c9247c58a95b98f36618870b3a6e0e1a0e3139`.
+
+### Closure verification
+
+| Check | Exact result |
+|---|---|
+| Upstream Herdr source/release and asset metadata | PASS: the shifted-index fix is in both selected builds; all three downloaded assets matched GitHub's published SHA-256 digests |
+| `bash tests/static/herdr_theme_test.sh`, `herdr_windows_preview_test.sh`, and Herdr installer tests | PASS: stable/preview identities, hashes, remote-eval exclusion, config binding, owned refresh, and mismatch failure paths |
+| `bash tests/shell/pi_theme_test.sh` | PASS: exact 51-token palette, source parity, merge/idempotence, invalid JSON, lock contention, managed uninstall, user override, and absent-settings behavior |
+| `bash tests/migration/parity_gate.sh` | PASS: Pi theme deployed from the canonical source and second apply remained a no-op |
+| `pwsh -NoLogo -NoProfile -File ./test.ps1` | PASS: exact analyzer identity, 275 Pester tests, and all 18 Neovim specs |
+| `PATH=/opt/homebrew/bin:$PATH make ci` | PASS: ended `local pre-PR gate passed` on the complete behavior, tests, and documentation tree |
+
+Hosted macOS/Linux/Windows setup, physical Herdr keypress confirmation, and a
+visual Pi theme check remain downstream runtime evidence. No merge, release,
+or completion of those manual surfaces is claimed by this entry.

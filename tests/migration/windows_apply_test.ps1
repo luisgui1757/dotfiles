@@ -335,6 +335,10 @@ function Assert-Part1Files {
         -ExpectedPath (Join-Path $script:RepoRoot 'gh-dash\config.yml') `
         -Label 'gh-dash config'
     Assert-CopyModeFileMatches `
+        -ActualPath (Join-Path $Sandbox '.pi\agent\themes\rose-pine.json') `
+        -ExpectedPath (Join-Path $script:RepoRoot 'pi\rose-pine.json') `
+        -Label 'Pi Rose Pine theme'
+    Assert-CopyModeFileMatches `
         -ActualPath (Join-Path $Sandbox '.config\lsd\config.yaml') `
         -ExpectedPath (Join-Path $script:RepoRoot 'lsd\config.yaml') `
         -Label 'lsd config'

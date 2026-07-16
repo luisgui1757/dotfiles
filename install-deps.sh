@@ -83,13 +83,13 @@ WEZTERM_DEB_AMD64_SHA256="86358dab5794a4fb63f7c91dd68d4fdc3da58faad648a58fc77d2b
 # Herdr (agent multiplexer). macOS + Linuxbrew use the canonical homebrew-core
 # formula (`brew install herdr`). Native Linux without brew installs the pinned
 # release binary, SHA-256 verified. Upstream publishes no checksum sidecar, so
-# these SHAs were computed from the pinned v0.7.3 assets on 2026-07-09 (bump the
+# these SHAs were computed from the pinned v0.7.4 assets on 2026-07-16 (bump the
 # version + both SHAs together). NOT the herdr.dev install.sh remote-eval path.
 # Native Windows uses install-deps.ps1's separate pinned, SHA-256-verified
 # preview .exe path, never the herdr.dev install.ps1 remote-eval path.
-HERDR_VERSION="v0.7.3"
-HERDR_LINUX_X86_64_SHA256="043ef43ecbabda28465dcff1eec3184518150d567b8b8f20cda9c6c88770641d"
-HERDR_LINUX_ARM64_SHA256="ea490094f2c7c39099870857d00c64c628ef7b5eba1967df4258033455ee2cb1"
+HERDR_VERSION="v0.7.4"
+HERDR_LINUX_X86_64_SHA256="bc0fc02d4ba500f9cac2353a43e67fe036785ecca6eb55378e050fac3c103059"
+HERDR_LINUX_ARM64_SHA256="544e0002de42806d1ab64ccdef3a7e7414f24717b0b6b022bc9e57d2eefd26a2"
 PYLATEXENC_BUILD_BACKEND_VERSION="80.9.0"
 PYLATEXENC_BUILD_BACKEND_SHA256="062d34222ad13e0cc312a4c02d73f059e86a4acbfbdea8f8f76b28c99f306922"
 PYLATEXENC_VERSION="2.10"

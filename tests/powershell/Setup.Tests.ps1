@@ -135,6 +135,7 @@ Describe "setup.ps1 main chezmoi apply boundary" {
         Mock -CommandName Backup-PreexistingManagedTargets
         Mock -CommandName Invoke-WindowsKnownFolderOverlays
         Mock -CommandName Invoke-WindowsTerminalSettingsTransaction
+        Mock -CommandName Invoke-PiThemeSelectionMerge
         Mock -CommandName Invoke-ChezmoiOrExit
     }
 
@@ -150,6 +151,7 @@ Describe "setup.ps1 main chezmoi apply boundary" {
             $Label -eq 'chezmoi apply' -and
             ($Arguments -join '|') -eq '--no-tty|--force|apply'
         }
+        Should -Invoke Invoke-PiThemeSelectionMerge -Times 1 -ParameterFilter { -not $ExcludeScripts }
     }
 
     It "limits release migration apply to files and symlinks without init" {
@@ -162,6 +164,7 @@ Describe "setup.ps1 main chezmoi apply boundary" {
             $Label -eq 'chezmoi apply' -and
             ($Arguments -join '|') -eq '--no-tty|--force|apply|--include|files,symlinks'
         }
+        Should -Invoke Invoke-PiThemeSelectionMerge -Times 1 -ParameterFilter { $ExcludeScripts }
     }
 
     It "keeps the files and symlinks boundary in release migration previews" {
@@ -176,6 +179,33 @@ Describe "setup.ps1 main chezmoi apply boundary" {
         Should -Invoke Invoke-WindowsKnownFolderOverlays -Times 1 -ParameterFilter {
             $IsDryRun -and $ExcludeScripts
         }
+    }
+}
+
+Describe "setup.ps1 Pi theme selection" -Skip:(-not (Get-Command node -ErrorAction SilentlyContinue)) {
+    BeforeEach {
+        . $script:ImportSetupForTest
+        $script:PiThemeRoot = Join-Path ([IO.Path]::GetTempPath()) ("setup-pi-theme-" + [guid]::NewGuid())
+        $script:PiThemeIdentity = [pscustomobject]@{ UserProfile = $script:PiThemeRoot }
+        $theme = Join-Path $script:PiThemeRoot '.pi\agent\themes\rose-pine.json'
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $theme) | Out-Null
+        Copy-Item -LiteralPath (Join-Path $script:RepoRoot 'pi\rose-pine.json') -Destination $theme
+    }
+
+    AfterEach {
+        Remove-Item -LiteralPath $script:PiThemeRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
+    It "merges only theme into existing global Pi settings" {
+        $settings = Join-Path $script:PiThemeRoot '.pi\agent\settings.json'
+        [IO.File]::WriteAllText($settings, '{"theme":"dark","provider":"keep","nested":{"keep":true}}')
+
+        Invoke-PiThemeSelectionMerge -Identity $script:PiThemeIdentity
+
+        $result = Get-Content -Raw -LiteralPath $settings | ConvertFrom-Json
+        $result.theme | Should -Be 'rose-pine'
+        $result.provider | Should -Be 'keep'
+        $result.nested.keep | Should -BeTrue
     }
 }
 

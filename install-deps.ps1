@@ -28,8 +28,8 @@ $ScoopInstallerSha256 = '48f6ea398b3a3fa26fae0093d37bd85b13e7eaa5d1d4a3e20840876
 $ScoopInstallerUrl = "https://raw.githubusercontent.com/ScoopInstaller/Install/$ScoopInstallerCommit/install.ps1"
 $WindowsTerminalVersion = 'v1.24.11321.0'
 $WindowsTerminalX64Sha256 = '7caef554147e5498ed1becdca73cdedb79fbc81f89032e46ae9b095c53433812'
-$HerdrWindowsPreviewVersion = 'preview-2026-07-07-f5354780e4ef'
-$HerdrWindowsX64Sha256 = '9b28eb0a3a55ca2ca9d47e96397544d2cbcca965d88a40b8bd8ccacfb61333ba'
+$HerdrWindowsPreviewVersion = 'preview-2026-07-16-e907e6a36646'
+$HerdrWindowsX64Sha256 = 'a5827b33cbd0352e4c0f1469ca6e0f71083e1333cf0250ca9dbecc41770a6d30'
 $VsBuildToolsBootstrapperUrl = 'https://aka.ms/vs/17/release/vs_BuildTools.exe'
 $PylatexencBuildBackendVersion = '80.9.0'
 $PylatexencBuildBackendSha256 = '062d34222ad13e0cc312a4c02d73f059e86a4acbfbdea8f8f76b28c99f306922'
@@ -2426,18 +2426,37 @@ function Get-HerdrWindowsInstallRoot {
 }
 
 function Install-HerdrWindowsPreview {
+    $installRoot = Get-HerdrWindowsInstallRoot
+    $destination = Join-Path $installRoot 'herdr.exe'
+    $reconcile = $false
+    $presentStatus = ''
     if (Test-Tool 'herdr') {
-        Write-Host ("  ok        {0,-26} already installed" -f "herdr")
+        $source = Get-CatalogToolCommandSource -tool 'herdr'
+        $managed = (Test-Path -LiteralPath $destination -PathType Leaf) -and
+            (ConvertTo-WindowsComparablePath -Path $source).Equals(
+                (ConvertTo-WindowsComparablePath -Path $destination),
+                [StringComparison]::OrdinalIgnoreCase
+            )
+        if (-not $managed) {
+            $presentStatus = 'already installed (unmanaged)'
+        } elseif (Test-FileSha256 -Path $destination -Expected $HerdrWindowsX64Sha256) {
+            $presentStatus = "pinned $HerdrWindowsPreviewVersion"
+        } else {
+            $reconcile = $true
+        }
+    }
+    if ($presentStatus) {
+        Write-Host ("  ok        {0,-26} {1}" -f "herdr", $presentStatus)
         return
     }
-    if (-not (Ask "Install Herdr native Windows preview (pinned SHA-256 verified beta)?")) {
+    $verb = if ($reconcile) { 'Update repo-owned' } else { 'Install' }
+    if (-not (Ask "$verb Herdr native Windows preview (pinned SHA-256 verified beta)?")) {
         Write-Host ("  skipped   {0,-26}" -f "herdr")
         return
     }
 
     $assetName = 'herdr-windows-x86_64.exe'
     $assetUrl = "https://github.com/ogulcancelik/herdr/releases/download/$HerdrWindowsPreviewVersion/$assetName"
-    $installRoot = Get-HerdrWindowsInstallRoot
     if ($DryRun) {
         Write-Host ("  would:    download {0} ({1})" -f $assetName, $HerdrWindowsPreviewVersion)
         Write-Host ("  would:    verify SHA-256 {0}, install as {1}, add to User PATH" -f $HerdrWindowsX64Sha256, (Join-Path $installRoot 'herdr.exe'))
@@ -2456,11 +2475,12 @@ function Install-HerdrWindowsPreview {
         }
 
         New-Item -ItemType Directory -Force -Path $installRoot | Out-Null
-        Copy-Item -LiteralPath $download -Destination (Join-Path $installRoot 'herdr.exe') -Force
+        Copy-Item -LiteralPath $download -Destination $destination -Force
         Add-DirectoryToUserPath -Directory $installRoot
 
         if (Test-Tool 'herdr') {
-            Write-Host ("  installed {0,-26} {1}" -f "herdr", $HerdrWindowsPreviewVersion)
+            $status = if ($reconcile) { 'updated' } else { 'installed' }
+            Write-Host ("  {0,-9} {1,-26} {2}" -f $status, "herdr", $HerdrWindowsPreviewVersion)
             return
         }
         throw "herdr.exe installed but herdr is not on PATH"

@@ -306,6 +306,10 @@ jobs:
           command -v gh >/dev/null 2>&1 || fail "gh is not on PATH"
           command -v pi >/dev/null 2>&1 || fail "pi is not on PATH"
           [[ "$(pi --version)" == "0.80.3" ]] || fail "pi version is not pinned 0.80.3"
+          cmp -s "$HOME/.pi/agent/themes/rose-pine.json" "$repo/pi/rose-pine.json" \
+            || fail "Pi Rose Pine theme differs from the reviewed source"
+          jq -e '.theme == "rose-pine"' "$HOME/.pi/agent/settings.json" >/dev/null \
+            || fail "Pi global theme is not rose-pine"
           for cmd in rg fd fzf jq lazygit node npm starship zoxide; do
             assert_nix_owned_command "$cmd"
           done
@@ -548,6 +552,11 @@ jobs:
               throw "nvim version is below 0.12: $nvimLine"
           }
           $repo = (Resolve-Path -LiteralPath '.').Path
+          Assert-ContentEqual -Path (Join-Path $env:USERPROFILE '.pi\agent\themes\rose-pine.json') -Expected (Join-Path $repo 'pi\rose-pine.json')
+          $piSettings = Get-Content -Raw -LiteralPath (Join-Path $env:USERPROFILE '.pi\agent\settings.json') | ConvertFrom-Json
+          if ($piSettings.theme -ne 'rose-pine') {
+              throw 'Pi global theme is not rose-pine'
+          }
           $nvimTarget = Join-Path $env:LOCALAPPDATA 'nvim'
           Assert-NvimSymlink -Path $nvimTarget -Expected (Join-Path $repo 'nvim')
           Assert-ContentEqual -Path (Join-Path $nvimTarget 'init.lua') -Expected (Join-Path $repo 'nvim\init.lua')

@@ -18,7 +18,7 @@ If this is a new machine, start with [install, update, and remove](#install-upda
 | Git | Git, lazygit, GitHub CLI, gh-dash | Installs the CLI tools and applies their shared terminal configuration. |
 | Languages | Python, Node.js, Tree-sitter, Mason tools | Installs the base runtimes plus the language servers and formatters used by Neovim. |
 | macOS desktop | AeroSpace | Adds keyboard-driven tiling workspaces on macOS. |
-| Agent tooling | Pi CLI, Sentinel policy | Installs the supported CLI and applies the global agent-policy block. Local sessions and credentials stay local. |
+| Agent tooling | Pi CLI, Sentinel policy | Installs the supported CLI, selects the audited Rose Pine Pi theme, and applies the global agent-policy block. Local sessions, credentials, and all other Pi preferences stay local. |
 | Config management | Nix, nix-darwin/Home Manager, chezmoi | Reconciles POSIX packages and applies the repo-owned config files. Windows uses native package managers plus chezmoi. You do not need to run these layers by hand. |
 
 The main configuration is intentionally consistent: dark Rose Pine, Hack Nerd
@@ -105,6 +105,9 @@ It is a sequence, not one four-key chord. This README calls `Ctrl+B` the
 Herdr is the agent-focused multiplexer. It groups terminal panes into tabs and
 workspaces, then tracks the agents running inside them. The repo makes its
 common navigation feel like tmux and uses Herdr's built-in `rose-pine` theme.
+The managed binaries include Herdr's shifted indexed-key fix (`v0.7.4` on
+stable platforms and the July 16 preview on Windows), so `Shift+1..9` reaches
+the punctuation keycodes terminals actually send.
 
 Start it from a normal shell with `herdr`. On Windows, new Herdr panes run
 `pwsh.exe`, so they load the same PowerShell profile, history list, and
@@ -235,6 +238,7 @@ then `g`.
 | Keys / command | Result |
 |---|---|
 | `<leader>?` | Show the keys available in the current buffer. Start here when you forget a shortcut. |
+| `:WhichKey` | Open Folke's full keymap popup explicitly; press Esc to close it. |
 | `Ctrl+P` | Find a file. |
 | `<leader>fg` | Search text in the project. |
 | `<leader>fb` | List open buffers. |
@@ -314,7 +318,8 @@ Useful standalone tools:
   Windows inside psmux, use `Ctrl+G` when a popup expects Esc.
 - `gh dash`: dashboard for pull requests and issues. Run `gh auth login` first,
   then rerun setup if the extension was skipped while unauthenticated.
-- `pi`: the pinned Pi CLI. Its personal runtime state is not synced.
+- `pi`: the pinned Pi CLI, with the repo's audited Rose Pine theme selected by
+  default. Sessions, credentials, providers, and other preferences are not synced.
 
 ### Terminals and scrollback
 
@@ -659,6 +664,8 @@ state/config alone. Dry-run mode prints the planned removals without deleting
 files or pruning empty external parent directories. Windows Terminal settings
 are not deleted: validated stable/Preview/Canary/portable backups restore independently, and
 the displaced current file is preserved as `settings.json.uninstall-current.*`.
+Pi settings are also preserved: uninstall removes `theme` only when it still
+equals the repo-managed `rose-pine` value, and never changes a later user choice.
 
 For a destructive Apple Silicon owner-host smoke, run
 `./tests/macos_owner_lifecycle.sh` from a clean committed checkout. It prompts
@@ -755,6 +762,7 @@ symlink overlays; and Windows Terminal remains a merge.
 | lazygit | `~/Library/Application Support/lazygit/config.yml` -> `lazygit/config.yml` | `~/.config/lazygit/config.yml` -> `lazygit/config.yml` | `%LOCALAPPDATA%\lazygit\config.yml` -> `lazygit\config.windows.yml` |
 | lsd | `~/.config/lsd/{config.yaml,colors.yaml}` -> `lsd/{config.yaml,colors.yaml}` | same | `%USERPROFILE%\.config\lsd\{config.yaml,colors.yaml}` -> `lsd\{config.yaml,colors.yaml}` |
 | gh-dash | `~/.config/gh-dash/config.yml` -> `gh-dash/config.yml` | same | `%USERPROFILE%\.config\gh-dash\config.yml` -> `gh-dash\config.yml` |
+| Pi theme | `~/.pi/agent/themes/rose-pine.json` -> `pi/rose-pine.json`; setup merges `theme: rose-pine` into global settings | same | `%USERPROFILE%\.pi\agent\themes\rose-pine.json` is copied; setup performs the same one-key merge |
 | Windows Terminal | n/a | n/a | app installed by `setup.ps1` through Scoop/winget/choco, with a SHA-256-verified portable zip fallback; one validated enumerator identifies stable packaged, Preview, Canary, and portable `settings.json` targets for setup, migration, recovery, and uninstall; all profiles receive WT's hard maximum of 32,767 history lines; setup stages and validates all selected targets before publication, creates separate verified backups, detects concurrent changes through atomic replacement rollback bytes, and rolls the group back on failure; opt out with `-SkipWindowsTerminalMerge`; see [windows-terminal/README.md](windows-terminal/README.md) |
 
 Windows setup resolves UserProfile, LocalApplicationData, ApplicationData,
@@ -991,7 +999,9 @@ POSIX pwsh profile management remains provisioning-adjacent.
   SHA-256-verified GitHub release binary on native Linux without brew, and a
   pinned, SHA-256-verified **Windows preview** `.exe` under
   `%LOCALAPPDATA%\Programs\Herdr\bin` on native Windows. The `herdr.dev`
-  remote-eval installers remain banned. Native-Linux Herdr writes the same
+  remote-eval installers remain banned. Windows setup refreshes a stale binary
+  only when command resolution points at that exact repo-owned path; an
+  unrelated installation remains untouched. Native-Linux Herdr writes the same
   provenance marker as the other dotfiles-owned direct artifacts, so
   `./setup.sh --update` can prove ownership and refresh only the repo-pinned
   version. Chezmoi also installs the same deterministic config on every host:
@@ -1007,7 +1017,9 @@ POSIX pwsh profile management remains provisioning-adjacent.
   `,` to rename the current tab/window and `Ctrl+B`, then `$` to rename the
   current workspace. `Ctrl+B`, then Up/Down moves between workspaces, while
   `Ctrl+B`, then Shift+1..9 jumps directly to workspace 1..9; unshifted
-  `Ctrl+B`, then 1..9 remains tab/window selection. Named Herdr sessions are separate server
+  `Ctrl+B`, then 1..9 remains tab/window selection. Herdr `v0.7.3` incorrectly
+  rejected the punctuation keycodes produced by shifted digits; the repo pins
+  stable `v0.7.4` and a post-fix Windows preview. Named Herdr sessions are separate server
   namespaces, so they are attached from the shell rather than listed inside
   another session's navigator. Windows Herdr is
   beta/ConPTY-backed, so runtime behavior remains a manual checklist item before
@@ -1039,7 +1051,8 @@ POSIX pwsh profile management remains provisioning-adjacent.
   run the cached Sentinel Bash installer with `--global --remove` on POSIX or
   from Git Bash on Windows. Project/team adoption is separate: run Sentinel
   repo-local install or vendoring in that project and commit those files there.
-- Pi CLI is a provisioned binary, not synced runtime state. Setup installs
+- Pi CLI is a provisioned binary with one repo-owned presentation default, not
+  synced runtime state. Setup installs
   `@earendil-works/pi-coding-agent@0.80.3` by running `npm pack`, requiring the
   pack metadata and the actual tarball SHA-512 bytes to match the reviewed SRI,
   then passing only that verified local tarball to `npm install`. Temporary
@@ -1047,7 +1060,12 @@ POSIX pwsh profile management remains provisioning-adjacent.
   The reviewed SRI is
   `sha512-TIggw9gCXpA+Ph7OjdTA7ka2NPwTVuPmy39KDSyUzaKq8VvHfMGR7vtRz4JB7Um/RMRblmzhu4p9tUCk6MTgGA==`.
   POSIX public setup gets Node 24 from Nix first; Windows uses the native Node
-  LTS catalog entry. Local `.pi/` sessions and preferences stay machine-local.
+  LTS catalog entry. Chezmoi deploys the audited `pi/rose-pine.json` theme and
+  setup atomically merges only `theme: rose-pine` into
+  `~/.pi/agent/settings.json` under Pi's `settings.json.lock` convention.
+  Invalid or busy settings fail without mutation; all unrelated keys remain.
+  Local `.pi/` sessions, credentials, providers, and other preferences stay
+  machine-local.
 - Native Windows accepts an existing Tree-sitter CLI only when `tree-sitter
   --version` is exactly `0.26.10`. Missing, stale, partial, or incompatible
   commands are repaired from the architecture-specific `v0.26.10` GitHub
@@ -1349,6 +1367,8 @@ Manual-review pin surfaces that Renovate may touch only partially:
 | `setuptools`/`pylatexenc` | Renovate can bump versions; adjacent hashes remain human-reviewed. Current pins: `setuptools` 80.9.0, `pylatexenc` 2.10. |
 | Hack Nerd Font | Unix and Windows mirrors must stay identical; version/hash drift is caught by `pin_consistency_test.sh`. |
 | Pi CLI | Unix/Windows install pins and e2e assertions mirror version `0.80.3`; the npm-pack metadata and downloaded tarball bytes must both match the human-reviewed SRI. |
+| Herdr | Native Linux pins stable `v0.7.4` with both architecture hashes; Windows pins post-fix preview `preview-2026-07-16-e907e6a36646` with its x64 hash. Homebrew platforms consume the reviewed `v0.7.4` formula. |
+| Pi Rose Pine theme | The repo vendors only `rose-pine.json` from audited data-only package `pi-themes-rose-pine@0.1.0`, preserves its MIT license, and tests the exact palette plus all 51 Pi tokens. |
 | gh-dash | Tag `v4.25.1`, annotated tag object `e6ebbd7e83e30161b9192ce3339972d2c8269e7f`, and peeled commit `49f37e4832956c57bf52d4ea8b1b1e5c0f863700` are mirrored; installers verify the tag mapping and pass the release tag required by `gh extension install --pin` for binary extensions. |
 
 Direct network executables must be pinned and verified before execution, or be a
@@ -1389,6 +1409,7 @@ stale; CI then fails verification until a human reviews the adjacent constant.
 ├── tmux/                  # tmux.conf (Rose Pine, vi-mode, true-color)
 ├── ghostty/               # config (Rose Pine, Hack Nerd, Ghostty-tuned)
 ├── herdr/                 # POSIX/Windows configs (Rose Pine; Windows uses pwsh)
+├── pi/                    # audited Pi Rose Pine theme
 ├── windows-terminal/      # settings.fragment.jsonc + merge README
 ├── home/                  # chezmoi source tree for the config layer
 ├── tests/                 # automated test tree
@@ -1420,7 +1441,7 @@ stale; CI then fails verification until a human reviews the adjacent constant.
   managed global entrypoint blocks. This repo does not vendor Sentinel core or
   sync agent runtime state.
 - **Rose Pine everywhere it can render.** Nvim, lualine, foreground-only
-  Starship, tmux/psmux, `lsd`, ghostty, Herdr, Windows Terminal, PSReadLine — same
+  Starship, tmux/psmux, `lsd`, ghostty, Herdr, Pi, Windows Terminal, PSReadLine — same
   palette across the stack. tmux and psmux share ONE repo-owned generated Rose
   Pine bar (`tmux/psmux-rose-pine.ps1` -> `psmux-rose-pine.{main,moon,dawn}.conf`,
   sourced on both), so the bar is byte-identical; TPM (POSIX) and the vendored
@@ -1630,6 +1651,7 @@ MIT. See `LICENSE`.
 | first nix-darwin setup reports an existing `.before-nix-darwin` backup | setup found both an unmanaged `/etc/bashrc` or `/etc/zshrc` and an older backup, so choosing either would risk user/system data | compare the two files and resolve the collision deliberately, then rerun. Setup moves neither shell file until both backup destinations are clear and restores both if activation fails |
 | setup says it is bootstrapping nix-darwin again immediately after a successful activation | the checkout predates the retry fix, so the still-open terminal cannot see the new system profile on `PATH` and setup mistakes the retry for first bootstrap | update the checkout and rerun setup. Current setup resolves `/run/current-system/sw/bin/darwin-rebuild` directly and accepts the managed `/etc/static` shell links without touching their recovery backups |
 | `<leader>X` keymaps fire `\X` instead of `<Space>X` | mapleader set after lazy.setup somehow | restore the order in `nvim/init.lua` — leader **before** `require("lazy").setup` |
+| Herdr `Ctrl+B`, then `Shift+1..9` does nothing | Herdr `v0.7.3` did not map shifted digits to the punctuation keycodes terminals report | update this repo and rerun setup/update. Native Linux pins `v0.7.4`, current Homebrew carries `v0.7.4`, and Windows uses the pinned post-fix preview |
 | Formatter runs twice or shows two BufWritePre autocmds | someone added a second handler outside conform.nvim | `:lua print(#vim.api.nvim_get_autocmds({event="BufWritePre"}))` should be 1; if not, find the second autocmd and delete it |
 | Lazy/Tree-sitter/Mason says `No C compiler found` | WSL/Linux has `make` but no `cc`/`gcc`/`clang`; Tree-sitter parsers and some plugin builds compile native code | re-run `./setup.sh --skip-config` to install the Linux compiler toolchain, or on Ubuntu run `sudo apt-get update && sudo apt-get install -y build-essential`, then `./setup.sh --skip-deps --skip-config` |
 | Tree-sitter parser install reports temp-dir rename errors such as `ENOTEMPTY`, or a cold setup reports a parser with no captures | a previous/parallel parser build left partial grammar/query output, or an older command-form Lazy `:TSUpdate` returned before its compiler tasks finished | update this repo and rerun setup; both the Lazy update hook and explicit bootstrap now serialize and wait for their upstream tasks, incomplete managed output is purged, and Tier 2 fails causally if any declared parser or explicit highlight query is missing |

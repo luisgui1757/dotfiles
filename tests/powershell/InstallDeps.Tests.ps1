@@ -1423,6 +1423,58 @@ exit 97
         }
     }
 
+    It "updates only a stale repo-owned Herdr Windows preview" {
+        . $script:ImportInstallDepsForTest -All
+        $oldLocalAppData = $env:LOCALAPPDATA
+        $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("herdr-windows-update-test-" + [System.Guid]::NewGuid())
+        try {
+            $env:LOCALAPPDATA = $tempRoot
+            $installRoot = Join-Path $tempRoot 'Programs\Herdr\bin'
+            $destination = Join-Path $installRoot 'herdr.exe'
+            New-Item -ItemType Directory -Force -Path $installRoot | Out-Null
+            [System.IO.File]::WriteAllText($destination, 'old-managed-exe')
+
+            Mock -CommandName Test-Tool -MockWith { return $true } -ParameterFilter { $name -eq 'herdr' }
+            Mock -CommandName Get-CatalogToolCommandSource -MockWith { return $destination } -ParameterFilter { $tool -eq 'herdr' }
+            Mock -CommandName Test-FileSha256 -MockWith {
+                param($Path, $Expected)
+                $Expected | Should -Be $HerdrWindowsX64Sha256
+                return ([IO.Path]::GetFullPath($Path) -ne [IO.Path]::GetFullPath($destination))
+            }
+            Mock -CommandName Invoke-WebRequest -MockWith {
+                param($Uri, $OutFile)
+                $Uri | Should -Match ([regex]::Escape($HerdrWindowsPreviewVersion))
+                [System.IO.File]::WriteAllText($OutFile, 'new-reviewed-exe')
+            }
+            Mock -CommandName Add-DirectoryToUserPath
+
+            $output = & { Install-HerdrWindowsPreview } 6>&1 | Out-String
+
+            [System.IO.File]::ReadAllText($destination) | Should -Be 'new-reviewed-exe'
+            $output | Should -Match 'updated\s+herdr'
+            Should -Invoke -CommandName Invoke-WebRequest -Times 1 -Exactly
+        } finally {
+            if ($null -eq $oldLocalAppData) {
+                Remove-Item Env:LOCALAPPDATA -ErrorAction SilentlyContinue
+            } else {
+                $env:LOCALAPPDATA = $oldLocalAppData
+            }
+            Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    It "leaves an unmanaged Herdr executable untouched" {
+        . $script:ImportInstallDepsForTest -All
+        Mock -CommandName Test-Tool -MockWith { return $true } -ParameterFilter { $name -eq 'herdr' }
+        Mock -CommandName Get-CatalogToolCommandSource -MockWith { return 'C:\Tools\herdr.exe' } -ParameterFilter { $tool -eq 'herdr' }
+        Mock -CommandName Invoke-WebRequest -MockWith { throw 'must not download' }
+
+        $output = & { Install-HerdrWindowsPreview } 6>&1 | Out-String
+
+        $output | Should -Match 'already installed \(unmanaged\)'
+        Should -Invoke -CommandName Invoke-WebRequest -Times 0 -Exactly
+    }
+
     It "registers PowerShell 7 (pwsh) in the Windows package catalog" {
         . $script:ImportInstallDepsForTest
 
