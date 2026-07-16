@@ -307,6 +307,15 @@ if [[ "${3:-}" != "--no-modify-profile" ]]; then
     echo "cat: /etc/bashrc: Permission denied" >&2
     exit 50
 fi
+# Nix 2.34.0 sets this shell variable when parsing the public flag but does not
+# export it before exec-ing install-multi-user. Model that process boundary:
+# the daemon child must receive the setting in its environment.
+NIX_INSTALLER_NO_MODIFY_PROFILE=1
+if ! bash -c '[[ "${NIX_INSTALLER_NO_MODIFY_PROFILE:-}" == "1" ]]'; then
+    echo "Setting up shell profiles: /etc/bashrc /etc/profile.d/nix.sh /etc/zshrc /etc/bash.bashrc /etc/zsh/zshrc" >&2
+    echo "cat: /etc/bashrc: Permission denied" >&2
+    exit 52
+fi
 [[ "${4:-}" == "--nix-extra-conf-file" && -f "${5:-}" ]] || exit 51
 cat "$5" > "${FAKE_INSTALL_CONF:?}"
 cat > "${FAKE_RUNTIME_BIN:?}/nix" <<'NIX'

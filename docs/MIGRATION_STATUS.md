@@ -84,9 +84,12 @@ canonical v0.2.0 path is now side-by-side and exact-tag-only:
   outside that authority. Setup owns its invocation;
   no downloaded bytes execute before the platform SHA-256 matches, and the
   verified installer runs non-interactively in the selected daemon mode with
-  `nix-command flakes` persisted and profile mutation disabled. Setup and Home
-  Manager own current- and future-shell activation. A retry reconciles the
-  disabled-feature state left by an otherwise-complete upstream install.
+  `nix-command flakes` persisted and profile mutation disabled. The wrapper
+  passes both Nix 2.34.0's public `--no-modify-profile` option and its backing
+  environment variable because the upstream parser does not export that setting
+  before the daemon-installer exec. Setup and Home Manager own current- and
+  future-shell activation. A retry reconciles the disabled-feature state left
+  by an otherwise-complete upstream install.
 - `tests/migration/v0_1_upgrade_test.sh` materializes the exact peeled v0.1.0
   commit, proves in-place/dirty paths fail before mutation, runs the real setup
   config/backup path, injects a failure after Home Manager/config publication,

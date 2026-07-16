@@ -331,9 +331,13 @@ echo "Verified upstream Nix $nix_version for $system: $expected_sha256"
 # installer output below, then Home Manager publishes the future-session path
 # consumed by the managed zsh config. The upstream daemon installer otherwise
 # creates and reads system shell files such as /etc/bashrc before its privileged
-# write, which aborts on valid hosts where that file is not user-readable.
-"$installer" "$install_mode" --yes --no-modify-profile \
-    --nix-extra-conf-file "$nix_extra_conf"
+# write, which aborts on valid hosts where that file is not user-readable. Nix
+# 2.34.0 parses --no-modify-profile but does not export its backing variable
+# before exec-ing install-multi-user. Seed that same variable in the environment
+# so the supported option survives the daemon subprocess boundary.
+NIX_INSTALLER_NO_MODIFY_PROFILE=1 \
+    "$installer" "$install_mode" --yes --no-modify-profile \
+        --nix-extra-conf-file "$nix_extra_conf"
 
 if [[ "$install_mode" == "--no-daemon" ]]; then
     # The upstream flag persists /etc/nix/nix.conf only for daemon installs.
