@@ -311,17 +311,21 @@ that violates one of these, fix it instead of disabling the test.
       The helper then downloads the pinned upstream Nix archive, verifies its
       platform SHA-256 and archive paths, and executes only those verified local
       bytes with the upstream `--yes` non-interactive flag and the selected
-      daemon mode. It passes upstream's `--no-modify-profile` and seeds its
-      `NIX_INSTALLER_NO_MODIFY_PROFILE=1` backing environment variable. Both are
-      required for Nix 2.34.0: its public option parser assigns but does not
-      export that variable before exec-ing `install-multi-user`, so the flag
-      alone is silently lost in daemon mode. Setup activates the verified
-      profile in its current shell, Home Manager publishes the future-session
-      path consumed by the managed zsh config, and the upstream daemon installer
-      never creates or reads system shell files such as `/etc/bashrc`. That
-      boundary is load-bearing because upstream otherwise performs an
-      unprivileged read after its privileged file preparation and aborts on a
-      valid non-user-readable system file. Its
+      daemon mode. Nix's multi-user installer has a long-standing open upstream
+      bug: `--no-modify-profile` applies only to the single-user path and the
+      daemon script unconditionally invokes `configure_shell_profile`. For a
+      daemon install, the wrapper verifies the exact extracted script hash,
+      deterministically guards that one call with the public option's backing
+      setting, verifies the complete patched-script hash, and only then executes
+      the local installer with both `--no-modify-profile` and
+      `NIX_INSTALLER_NO_MODIFY_PROFILE=1`. Any source or rendered-byte drift
+      fails before execution. Setup activates the verified profile in its
+      current shell, Home Manager publishes the future-session path consumed by
+      the managed zsh config, and the daemon installer never creates or reads
+      system shell files such as `/etc/bashrc`. That boundary is load-bearing
+      because upstream otherwise performs an unprivileged read after its
+      privileged file preparation and aborts on a valid non-user-readable
+      system file. Its
       reviewed extra config enables `nix-command flakes` in daemon installs;
       single-user Linux merges those additive features into the user's Nix
       config, and a retry self-heals the same disabled-feature state after an

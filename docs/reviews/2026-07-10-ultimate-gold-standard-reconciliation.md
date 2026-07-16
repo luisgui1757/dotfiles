@@ -2342,26 +2342,37 @@ is claimed by publication.
   on the affected Linux host and reproduced the same system-profile task and
   permission error. That field result rejected the initial closure despite the
   local and hosted-green tree.
-- Reinspection of the checksum-verified Nix 2.34.0 archive found the missing
-  subprocess edge: `install` assigns `NIX_INSTALLER_NO_MODIFY_PROFILE=1` for the
-  public flag but does not export it before exec-ing `install-multi-user`. The
-  daemon process therefore never sees the setting. The wrapper now seeds the
-  same variable in the installer's environment as well as passing the public
-  option, preserving it across the exec without modifying verified upstream
-  bytes.
+- Reinspection of the checksum-verified Nix 2.34.0 archive first found that
+  `install` does not export the public flag's backing variable before exec-ing
+  `install-multi-user`. Head `54f9d0fe401a24bacba909144ec1ea2e33b6779d`
+  seeded that variable and passed the full local gate, but a final inner-script
+  trace rejected that second closure before field rerun: `install-multi-user`
+  never reads the setting and unconditionally invokes `configure_shell_profile`.
+  The same defect remains open upstream in
+  [NixOS/nix#4369](https://github.com/NixOS/nix/issues/4369), and the upstream
+  implementation PR [#9179](https://github.com/NixOS/nix/pull/9179) is unmerged.
+- The wrapper now preserves the recommended daemon installation while repairing
+  only the broken local decision point. After the full archive digest and path
+  checks, it requires the exact platform-specific `install-multi-user` hash,
+  deterministically guards its single `configure_shell_profile` call with the
+  public option's backing setting, and requires the complete platform-specific
+  patched hash. Any source, anchor-count, or rendered-byte drift fails before
+  execution; no downloaded or system file is edited in place.
 - This remains an ownership correction, not a skipped prerequisite: setup
   sources the verified installed profile in the same transaction, Home Manager
   writes the canonical future-session state, and the managed zsh config consumes
   it. The upstream installer no longer owns or inspects system shell profiles.
-- The installer-boundary fixture models the real Nix parser plus daemon-child
-  process boundary. It failed with the owner's complete shell-profile task and
-  `cat: /etc/bashrc: Permission denied` output before the environment repair and
-  now requires the exact mode, `--yes`, `--no-modify-profile`, exported backing
+- The installer-boundary fixture models the real top-level parser, daemon-child
+  process boundary, and unconditional inner profile call. It fails with the
+  owner's complete shell-profile task and `cat: /etc/bashrc: Permission denied`
+  until the exact local inner-script transform is applied, then requires the
+  input/output hash checks, exact mode, `--yes`, `--no-modify-profile`, backing
   setting, and reviewed extra-config arguments before publishing fake Nix.
 - The immutable v0.2.0 bytes cannot contain this later repair. README records
-  the bounded recovery for that exact release: make the system-wide
-  `/etc/bashrc` readable, then rerun setup. A patched release is still required
-  before the workaround can be retired.
+  the bounded recovery for that exact release: first restore the upstream
+  `.backup-before-nix` file when the failed pipeline created one; otherwise make
+  the system-wide `/etc/bashrc` readable before rerunning setup. A patched
+  release is still required before the workaround can be retired.
 - Normal setup remains attached to the immutable annotated release. The new
   explicit `--allow-unreleased` field-test lane accepts a post-release checkout
   only when its clean HEAD exactly equals a current branch head advertised by
@@ -2375,12 +2386,15 @@ is claimed by publication.
 |---|---|
 | Initial argument-only installer regression | INSUFFICIENT: proved the public option was present but did not model Nix 2.34.0's daemon exec; field test reproduced the bug |
 | Daemon subprocess regression before environment repair | EXPECTED FAIL: complete `Setting up shell profiles: ...` line and `cat: /etc/bashrc: Permission denied`; verified installer fixture exited nonzero |
-| `bash tests/shell/nix_prerequisite_identity_test.sh` after repair | PASS: default exact-release identity, explicit official branch-head opt-in, stale/local commit rejection, retry, feature-reconciliation, and installer-argument cases passed |
+| Exact Nix 2.34.0 archive transform audit | PASS: all three pinned platform archives matched their published digest; extracted daemon-script input and deterministic output hashes matched the six committed values; all three rendered scripts passed `bash -n` |
+| `bash tests/shell/nix_prerequisite_identity_test.sh` after local-script repair | PASS: daemon-child fixture skipped its unconditional profile failure only after exact input/output patch checks; release identity, explicit branch-head opt-in, stale/local commit rejection, retry, feature reconciliation, and installer arguments also passed |
 | `bash tests/shell/setup_universal_entrypoint_test.sh` | PASS: public option parsing and exact helper argument forwarding passed |
 | `bash tests/shell/setup_help_test.sh` | PASS: public help advertises the explicit field-test lane |
 | Focused ShellCheck | PASS: changed setup, helper, and shell tests report no diagnostics |
 | Initial `PATH=/opt/homebrew/bin:$PATH make ci` | PASS but not closure: the argument-only fixture missed the daemon subprocess propagation bug later reproduced in the field |
-| Corrected `PATH=/opt/homebrew/bin:$PATH make ci` | PASS: ended `local pre-PR gate passed` with the daemon subprocess regression, environment repair, opt-in identity lane, and corrected documentation |
+| Environment-only `PATH=/opt/homebrew/bin:$PATH make ci` | PASS but not closure: final inner-script trace showed the daemon never consults the propagated setting |
+| First local-script `make ci` attempt | FAIL outside the changed path: the safeguard fixture's temporary fake `gh` disappeared during an injected rollback; the exact safeguard test passed immediately in isolation |
+| Final `PATH=/opt/homebrew/bin:$PATH make ci` | PASS: uninterrupted run ended `local pre-PR gate passed` with the exact daemon-script input/output hashes, guarded profile call, branch-head opt-in, tests, and documentation |
 
 Hosted Linux proof, merge, and patched-release publication remain pending. No
 result is promoted to exact-v0.2.0 evidence.

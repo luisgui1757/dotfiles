@@ -269,8 +269,8 @@ rm "$work/bin/nix"
 cat > "$work/bin/uname" <<'EOF'
 #!/usr/bin/env bash
 case "${1:-}" in
-    -s) echo Linux ;;
-    -m) echo x86_64 ;;
+    -s) echo "${FAKE_UNAME_SYSTEM:-Linux}" ;;
+    -m) echo "${FAKE_UNAME_ARCH:-x86_64}" ;;
     *) exit 45 ;;
 esac
 EOF
@@ -288,7 +288,19 @@ exit 46
 EOF
 cat > "$work/bin/sha256sum" <<'EOF'
 #!/usr/bin/env bash
-echo "5676b0887f1274e62edd175b6611af49aa8170c69c16877aa9bc6cebceb19855  $1"
+case "$1" in
+    */nix-2.34.0-aarch64-darwin.tar.xz)
+        digest="47cb78c9fdc7b630dbbb9a89869c8e8bcd8c9eb17be036fba18585120693a4c1"
+        ;;
+    */install-multi-user)
+        digest="832c033bac08eac43e2749427cb3e85d12f11d34685f44153bf044c6d32fafd0"
+        ;;
+    */.install-multi-user.dotfiles)
+        digest="cfa68093aa33400ea20db27d1469387c576e658855ea3c23060961c36ac31adf"
+        ;;
+    *) exit 53 ;;
+esac
+echo "$digest  $1"
 EOF
 cat > "$work/bin/tar" <<'EOF'
 #!/usr/bin/env bash
@@ -297,7 +309,7 @@ if [[ "${1:-}" == "-tJf" ]]; then
     exit 1
 fi
 [[ "${1:-}" == "-xJf" && "${3:-}" == "-C" ]] || exit 47
-installer_dir="$4/nix-2.34.0-x86_64-linux"
+installer_dir="$4/nix-2.34.0-${FAKE_NIX_SYSTEM:-x86_64-linux}"
 mkdir -p "$installer_dir"
 cat > "$installer_dir/install" <<'INSTALLER'
 #!/usr/bin/env bash
@@ -307,17 +319,27 @@ if [[ "${3:-}" != "--no-modify-profile" ]]; then
     echo "cat: /etc/bashrc: Permission denied" >&2
     exit 50
 fi
-# Nix 2.34.0 sets this shell variable when parsing the public flag but does not
-# export it before exec-ing install-multi-user. Model that process boundary:
-# the daemon child must receive the setting in its environment.
 NIX_INSTALLER_NO_MODIFY_PROFILE=1
-if ! bash -c '[[ "${NIX_INSTALLER_NO_MODIFY_PROFILE:-}" == "1" ]]'; then
+[[ "${4:-}" == "--nix-extra-conf-file" && -f "${5:-}" ]] || exit 51
+cat "$5" > "${FAKE_INSTALL_CONF:?}"
+exec "$(dirname "$0")/install-multi-user"
+INSTALLER
+cat > "$installer_dir/install-multi-user" <<'MULTI_USER_INSTALLER'
+#!/usr/bin/env bash
+set -euo pipefail
+
+task() {
+    echo "$*"
+}
+
+configure_shell_profile() {
     echo "Setting up shell profiles: /etc/bashrc /etc/profile.d/nix.sh /etc/zshrc /etc/bash.bashrc /etc/zsh/zshrc" >&2
     echo "cat: /etc/bashrc: Permission denied" >&2
     exit 52
-fi
-[[ "${4:-}" == "--nix-extra-conf-file" && -f "${5:-}" ]] || exit 51
-cat "$5" > "${FAKE_INSTALL_CONF:?}"
+}
+
+main() {
+    configure_shell_profile
 cat > "${FAKE_RUNTIME_BIN:?}/nix" <<'NIX'
 #!/usr/bin/env bash
 case "${1:-}" in
@@ -327,8 +349,11 @@ case "${1:-}" in
 esac
 NIX
 chmod +x "${FAKE_RUNTIME_BIN:?}/nix"
-INSTALLER
-chmod +x "$installer_dir/install"
+}
+
+main
+MULTI_USER_INSTALLER
+chmod +x "$installer_dir/install" "$installer_dir/install-multi-user"
 EOF
 chmod +x "$work/bin/uname" "$work/bin/curl" "$work/bin/sha256sum" "$work/bin/tar"
 
@@ -341,10 +366,10 @@ export FAKE_INSTALL_CONF="$work/install-conf.log"
 export FAKE_RUNTIME_BIN="$work/bin"
 export RUN_PATH_OVERRIDE="$work/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 export RUN_HOME_OVERRIDE="$work/install-home"
-expected_install_mode="--no-daemon"
-if [[ -d /run/systemd/system ]] && command -v systemctl >/dev/null 2>&1; then
-    expected_install_mode="--daemon"
-fi
+export FAKE_UNAME_SYSTEM=Darwin
+export FAKE_UNAME_ARCH=arm64
+export FAKE_NIX_SYSTEM=aarch64-darwin
+expected_install_mode="--daemon"
 run_helper "$fixture" "$refs"
 [[ "$rc" -eq 0 ]] || fail "verified installer fixture failed:\n$output"
 [[ "$(sed -n '1p' "$FAKE_INSTALL_ARGS")" == "$expected_install_mode" &&
@@ -364,6 +389,10 @@ else
 fi
 [[ "$output" == *"Nix prerequisite installed and verified"* ]] ||
     fail "installer success was not verified in the same shell"
+[[ "$output" == *"Verified local Nix daemon profile-ownership patch:"* ]] ||
+    fail "daemon installer patch did not pass its exact output hash check"
+[[ "$output" == *"Leaving shell profiles unchanged (--no-modify-profile)"* ]] ||
+    fail "patched daemon installer did not report the no-profile ownership boundary"
 assert_clean_diagnostic
 pass "verified upstream installer leaves shell profiles to dotfiles and persists flake features"
 

@@ -369,14 +369,15 @@ when it is missing by calling the release-pinned prerequisite helper itself.
 That helper downloads the official upstream Nix 2.34.0 release and verifies the
 platform SHA-256 before extraction or execution, then runs the verified local
 installer non-interactively with `nix-command` and flakes enabled. It disables
-the upstream installer's shell-profile edits: the wrapper passes the public
-`--no-modify-profile` option and explicitly preserves its backing setting across
-Nix 2.34.0's daemon subprocess boundary. Setup activates Nix in the current
-transaction, then Home Manager publishes the future-session path used by the
-managed zsh config. This avoids upstream reads or writes of system shell files
-such as `/etc/bashrc`. If an earlier attempt installed Nix but stopped before
-enabling those features, rerunning setup repairs the user setting and
-continues. The annotated v0.2.0 release is published, so normal setup accepts
+the upstream installer's shell-profile edits. Nix's multi-user path does not
+honor its own `--no-modify-profile` option, so daemon bootstrap verifies the
+exact extracted script, locally guards its one profile-configuration call, and
+verifies the complete patched-script hash before execution. Setup then activates
+Nix in the current transaction, and Home Manager publishes the future-session
+path used by the managed zsh config. This avoids upstream reads or writes of
+system shell files such as `/etc/bashrc`. If an earlier attempt installed Nix
+but stopped before enabling those features, rerunning setup repairs the user
+setting and continues. The annotated v0.2.0 release is published, so normal setup accepts
 only the exact clean official tag. For field testing before another release,
 the explicit `--allow-unreleased` option accepts a clean checkout only when its
 HEAD is a current branch head in the official repository. Local-only or stale
@@ -1613,7 +1614,7 @@ MIT. See `LICENSE`.
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| v0.2.0 Linux Nix bootstrap ends with `cat: /etc/bashrc: Permission denied` and upstream's `Oh no` failure | the pinned upstream daemon installer prepared `/etc/bashrc` through its privileged path, then tried to read it as the invoking user; Nix 2.34.0 also loses its public `--no-modify-profile` setting when it execs the daemon installer unless the backing variable was already exported | for the immutable v0.2.0 release, run `sudo chmod a+r /etc/bashrc` and rerun `./setup.sh --all`. On an official test branch, pull the latest head and rerun with `./setup.sh --all --allow-unreleased`; the patched wrapper preserves the no-profile setting across the daemon subprocess boundary and leaves shell activation to setup/Home Manager |
+| v0.2.0 Linux Nix bootstrap ends with `cat: /etc/bashrc: Permission denied` and upstream's `Oh no` failure | the pinned upstream daemon installer prepared `/etc/bashrc` through its privileged path, then tried to read it as the invoking user; its multi-user path does not honor the public `--no-modify-profile` option | if `/etc/bashrc.backup-before-nix` exists after the failure, restore it with `sudo mv /etc/bashrc.backup-before-nix /etc/bashrc`. For immutable v0.2.0 without that backup, the bounded workaround is `sudo chmod a+r /etc/bashrc` before rerunning. On the current official test branch, pull the latest head and rerun `./setup.sh --all --allow-unreleased`; the wrapper applies an exact-hash-verified local patch that skips the daemon profile step and leaves shell activation to setup/Home Manager |
 | Neovim stops before loading Lazy with a lockfile/cache identity error | `lazy-lock.json` is missing, malformed, incomplete, has a non-40-hex commit or invalid branch; or the cached `lazy.nvim` checkout is dirty, at the wrong commit, from the wrong origin, missing locked default-branch metadata, non-Git, or partial | restore the tracked `nvim/lazy-lock.json` and restart Neovim. Startup repairs the cache through a verified staging checkout and never executes an unproved path. If publication fails, fix the destination permissions named in the error and retry |
 | setup reports a Homebrew `shellenv` failure even though `brew` already resolves | the selected command and PATH-resolved command report different Homebrew prefixes/repositories, or `shellenv` exited nonzero; empty stdout alone is a normal Homebrew idempotence signal | compare `brew --prefix` and `brew --repository` through both entrypoints named in the error. Repair the shadowing PATH or Homebrew installation, then rerun setup; a nix-darwin wrapper and native brew path are accepted only when those identities match |
 | a new zsh prints `compinit: no such file or directory: .../_brew` | Homebrew's core completion symlink survived a repository/Nix-generation migration but its target did not; `brew completions link` alone only reconciles tap completions | update this repo and rerun setup or `./setup.sh --update`; both paths reconcile tap completions, atomically repair a missing/dangling core `_brew` symlink to the active Homebrew implementation, and verify the resolved target. A conflicting non-symlink is preserved and reported instead of overwritten |

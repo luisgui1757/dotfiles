@@ -269,6 +269,8 @@ case "$os:$arch" in
     Darwin:arm64|Darwin:aarch64)
         system="aarch64-darwin"
         expected_sha256="47cb78c9fdc7b630dbbb9a89869c8e8bcd8c9eb17be036fba18585120693a4c1"
+        expected_multi_user_sha256="832c033bac08eac43e2749427cb3e85d12f11d34685f44153bf044c6d32fafd0"
+        expected_patched_multi_user_sha256="cfa68093aa33400ea20db27d1469387c576e658855ea3c23060961c36ac31adf"
         install_mode="--daemon"
         ;;
     Darwin:*)
@@ -278,6 +280,8 @@ case "$os:$arch" in
     Linux:x86_64|Linux:amd64)
         system="x86_64-linux"
         expected_sha256="5676b0887f1274e62edd175b6611af49aa8170c69c16877aa9bc6cebceb19855"
+        expected_multi_user_sha256="328dc650e29350b3d87f48b4b46e564458a5f2e413abb598c271fca3191f35d1"
+        expected_patched_multi_user_sha256="8860fb941aa9c8bea0a4b5868078da0b052dc65f53913003d8eeef73f48d01c6"
         install_mode="--no-daemon"
         if [[ -d /run/systemd/system ]] && command -v systemctl >/dev/null 2>&1; then
             install_mode="--daemon"
@@ -286,6 +290,8 @@ case "$os:$arch" in
     Linux:aarch64|Linux:arm64)
         system="aarch64-linux"
         expected_sha256="cfddd4008b57a71464a16d5232cba79b1c76ae9dc81bbf71b4972b0118bc29c5"
+        expected_multi_user_sha256="d287e7cc727ccfa49e1a4756636c8292bda00c0d0743e79035ceddc7a42a45ae"
+        expected_patched_multi_user_sha256="7ef37eb58501ec8cca55068a019bdb2d5354544fba093e2f22d833afb9b324a0"
         install_mode="--no-daemon"
         if [[ -d /run/systemd/system ]] && command -v systemctl >/dev/null 2>&1; then
             install_mode="--daemon"
@@ -302,11 +308,15 @@ url="https://releases.nixos.org/nix/nix-$nix_version/$archive"
 curl --proto '=https' --tlsv1.2 --fail --silent --show-error --location \
     --output "$work/$archive" "$url"
 
-if command -v sha256sum >/dev/null 2>&1; then
-    actual_sha256="$(sha256sum "$work/$archive" | awk '{print $1}')"
-else
-    actual_sha256="$(shasum -a 256 "$work/$archive" | awk '{print $1}')"
-fi
+sha256_file() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$1" | awk '{print $1}'
+    else
+        shasum -a 256 "$1" | awk '{print $1}'
+    fi
+}
+
+actual_sha256="$(sha256_file "$work/$archive")"
 [[ "$actual_sha256" == "$expected_sha256" ]] || {
     echo "FAIL: Nix release digest mismatch; downloaded bytes were not executed." >&2
     exit 1
@@ -320,11 +330,45 @@ if tar -tJf "$work/$archive" | awk '
     exit 1
 fi
 tar -xJf "$work/$archive" -C "$work"
-installer="$work/nix-$nix_version-$system/install"
+installer_dir="$work/nix-$nix_version-$system"
+installer="$installer_dir/install"
 [[ -f "$installer" && ! -L "$installer" && -x "$installer" ]] || {
     echo "FAIL: verified Nix archive does not contain the expected installer." >&2
     exit 1
 }
+
+if [[ "$install_mode" == "--daemon" ]]; then
+    multi_user_installer="$installer_dir/install-multi-user"
+    patched_multi_user_installer="$installer_dir/.install-multi-user.dotfiles"
+    [[ -f "$multi_user_installer" && ! -L "$multi_user_installer" &&
+        -x "$multi_user_installer" ]] || fail \
+        "verified Nix archive does not contain the expected multi-user installer."
+    actual_multi_user_sha256="$(sha256_file "$multi_user_installer")"
+    [[ "$actual_multi_user_sha256" == "$expected_multi_user_sha256" ]] || fail \
+        "verified Nix archive contains an unexpected multi-user installer."
+    if ! awk '
+        BEGIN { replacements = 0 }
+        $0 == "    configure_shell_profile" {
+            print "    if [ -z \"${NIX_INSTALLER_NO_MODIFY_PROFILE:-}\" ]; then"
+            print "        configure_shell_profile"
+            print "    else"
+            print "        task \"Leaving shell profiles unchanged (--no-modify-profile)\""
+            print "    fi"
+            replacements++
+            next
+        }
+        { print }
+        END { if (replacements != 1) exit 42 }
+    ' "$multi_user_installer" > "$patched_multi_user_installer"; then
+        fail "could not apply the reviewed Nix multi-user profile-ownership patch."
+    fi
+    chmod 755 "$patched_multi_user_installer"
+    actual_patched_multi_user_sha256="$(sha256_file "$patched_multi_user_installer")"
+    [[ "$actual_patched_multi_user_sha256" == "$expected_patched_multi_user_sha256" ]] || fail \
+        "reviewed Nix multi-user profile-ownership patch produced unexpected bytes."
+    mv -f "$patched_multi_user_installer" "$multi_user_installer"
+    echo "Verified local Nix daemon profile-ownership patch: $actual_patched_multi_user_sha256"
+fi
 
 echo "Verified upstream Nix $nix_version for $system: $expected_sha256"
 # Shell activation belongs to this setup transaction: it sources the verified
@@ -332,9 +376,9 @@ echo "Verified upstream Nix $nix_version for $system: $expected_sha256"
 # consumed by the managed zsh config. The upstream daemon installer otherwise
 # creates and reads system shell files such as /etc/bashrc before its privileged
 # write, which aborts on valid hosts where that file is not user-readable. Nix
-# 2.34.0 parses --no-modify-profile but does not export its backing variable
-# before exec-ing install-multi-user. Seed that same variable in the environment
-# so the supported option survives the daemon subprocess boundary.
+# 2.34.0's multi-user installer ignores --no-modify-profile, so the exact
+# checksum-bound local copy above is deterministically patched to honor the
+# option without changing or executing unverified network bytes.
 NIX_INSTALLER_NO_MODIFY_PROFILE=1 \
     "$installer" "$install_mode" --yes --no-modify-profile \
         --nix-extra-conf-file "$nix_extra_conf"

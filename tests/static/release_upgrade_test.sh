@@ -77,6 +77,18 @@ for hash in \
     grep -F "$hash" scripts/install-nix-prerequisite.sh >/dev/null ||
         fail "reviewed Nix release hash is missing: $hash"
 done
+for hash in \
+    832c033bac08eac43e2749427cb3e85d12f11d34685f44153bf044c6d32fafd0 \
+    cfa68093aa33400ea20db27d1469387c576e658855ea3c23060961c36ac31adf \
+    328dc650e29350b3d87f48b4b46e564458a5f2e413abb598c271fca3191f35d1 \
+    8860fb941aa9c8bea0a4b5868078da0b052dc65f53913003d8eeef73f48d01c6 \
+    d287e7cc727ccfa49e1a4756636c8292bda00c0d0743e79035ceddc7a42a45ae \
+    7ef37eb58501ec8cca55068a019bdb2d5354544fba093e2f22d833afb9b324a0; do
+    grep -F "$hash" scripts/install-nix-prerequisite.sh >/dev/null ||
+        fail "reviewed Nix daemon script hash is missing from the helper: $hash"
+    grep -F "$hash" docs/security/supply-chain.md >/dev/null ||
+        fail "reviewed Nix daemon script hash is missing from the supply-chain ledger: $hash"
+done
 grep -F 'nix_version="2.34.0"' scripts/install-nix-prerequisite.sh >/dev/null ||
     fail "Nix prerequisite version drifted"
 
