@@ -370,21 +370,15 @@ That helper downloads the official upstream Nix 2.34.0 release and verifies the
 platform SHA-256 before extraction or execution, then runs the verified local
 installer non-interactively with `nix-command` and flakes enabled. If an earlier
 attempt installed Nix but stopped before enabling those features, rerunning
-setup repairs the user setting and continues. Before v0.2.0 is published,
-the helper accepts only a clean commit that is currently an exact branch head
-in the official repository. Once the annotated v0.2.0 tag exists, that
-prerelease path closes automatically and only the exact clean official tag is
-accepted. Local-only/stale commits, forks, lightweight tags, dirty checkouts,
-and non-official origins fail before download. The versioned upgrade tools
-remain exact-tag-only; this repo has no pipe-to-shell Nix bootstrap.
-
-Maintainers testing an official prerelease branch can run `./setup.sh --all`
-directly from its clean, fully pushed head on a Nix-free macOS/Linux/WSL host.
-No manual Nix install is needed. This is prerelease validation, not the stable
-public install path below.
+setup repairs the user setting and continues. The annotated v0.2.0 release is
+published, so the former official-branch prerelease path is closed and only the
+exact clean official tag is accepted. Local-only/stale commits, branches,
+forks, lightweight tags, dirty checkouts, and non-official origins fail before
+download. The versioned upgrade tools remain exact-tag-only; this repo has no
+pipe-to-shell Nix bootstrap.
 
 ```bash
-# Apple Silicon mac / linux / wsl, after the annotated v0.2.0 release exists
+# Apple Silicon mac / linux / wsl
 git clone --branch v0.2.0 --single-branch \
   https://github.com/luisgui1757/dotfiles.git ~/dotfiles
 cd ~/dotfiles
@@ -392,7 +386,7 @@ cd ~/dotfiles
 ```
 
 ```powershell
-# windows, after the annotated v0.2.0 release exists
+# windows
 # enable Developer Mode, then run from a normal PowerShell
 # Settings -> Privacy & security -> For developers -> Developer Mode = On
 git clone --branch v0.2.0 --single-branch `
@@ -433,8 +427,8 @@ dependency-install run; Scoop refuses admin installs.
 checkout. **Do not run `git pull` in that checkout.** Changing it in place can
 change live config before recovery exists.
 
-Remain on v0.1.0 until the annotated v0.2.0 release is published. Then retain
-the exact old checkout, clone v0.2.0 beside it, and run only `./setup.sh --all`
+The annotated v0.2.0 release is published. Retain the exact old checkout, clone
+v0.2.0 beside it, and run only `./setup.sh --all`
 or `.\setup.ps1 -All` from the new checkout. Setup detects the live exact-v0.1.0
 owner, installs Nix on POSIX when needed, runs the existing digest-bound
 transaction, verifies and accepts its reversible core, retains private recovery,

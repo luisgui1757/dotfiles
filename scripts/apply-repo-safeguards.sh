@@ -745,7 +745,7 @@ prepare_transaction_payloads() {
       type == "object"
       and (keys | sort) == (["legacyEmitted", "replacements", "required", "schema", "stage"] | sort)
       and .schema == 2
-      and .stage == "stable-required-live-apply-pending"
+      and .stage == "stable-required-live-applied"
       and (.legacyEmitted | type == "array" and length > 0 and length == (unique | length))
       and all(.legacyEmitted[]; type == "string" and length > 0)
       and (.required | type == "array" and length > 0 and length == (unique | length))
@@ -948,7 +948,7 @@ restore_snapshot() (
         "legacyEmitted", "replacements", "required", "schema", "stage"
       ] | sort)
       and .schema == 2
-      and .stage == "stable-required-live-apply-pending"
+      and .stage == "stable-required-live-applied"
       and (.legacyEmitted | type == "array" and length > 0 and length == (unique | length))
       and all(.legacyEmitted[]; type == "string" and length > 0)
       and (.required | type == "array" and length > 0 and length == (unique | length))

@@ -2289,3 +2289,39 @@ cache-free proof is claimed by this entry.
 Pushed-head hosted and native-Windows rerun proof remain pending. No completed
 Apple Silicon owner lifecycle, approval, merge, release tag, live safeguard
 mutation, or merged-main cache-free proof is claimed by this entry.
+
+## v0.2.0 immutable publication and safeguard closure — entry 57
+
+- Pull request #55 merged to exact `main` commit
+  `22cfad80e904e003f52932ae6d6403520df00d3c`. A clean isolated clone of that
+  commit passed the full local gate before any tag mutation.
+- Annotated tag object `cd9a60436b3064c5e2f6ed5bfd8ae0f5297f1b49`
+  peels to that exact commit. GitHub release `354480554` is immutable, latest,
+  non-draft, and non-prerelease at
+  [`v0.2.0`](https://github.com/luisgui1757/dotfiles/releases/tag/v0.2.0).
+- The cache-free release workflow passed every physical producer and stable
+  logical proof. Ubuntu and Apple Silicon macOS logs independently reported
+  `Verified immutable release checkout: v0.2.0` at the exact peeled commit.
+- Live readback reports `sha_pinning_required: true` and strict classic
+  protection requiring exactly the twelve checked-in stable contexts. The
+  required-check metadata now records the completed live cutover; legacy
+  producer output remains only for a separately reviewed compatibility cleanup.
+- The owner explicitly authorized publication with the real-environment rows in
+  `tests/MANUAL.md` still open. This entry preserves that waiver without
+  converting any unchecked row into evidence.
+
+### Publication verification
+
+| Check | Exact result |
+|---|---|
+| `PATH=/opt/homebrew/bin:$PATH make ci` in a clean isolated clone | PASS: exact `22cfad80e904e003f52932ae6d6403520df00d3c`; ended `local pre-PR gate passed` |
+| Gitleaks 8.30.1 across `v0.1.0..v0.2.0` and downloaded hosted proofs | PASS: 13 commits (approximately 1.76 MB) plus all four stable logical proof artifacts (912 bytes), no leaks found with redaction enabled |
+| Cache-free hosted release run [`29419942595`](https://github.com/luisgui1757/dotfiles/actions/runs/29419942595) | PASS: Ubuntu container `87367536392`, Ubuntu setup `87367536368`, Apple Silicon macOS setup `87367536440`, Windows setup `87367536398`, and all four stable logical jobs |
+| Fresh detached public `v0.2.0` clone | PASS: annotated tag object and peeled commit matched the official remote; release-upgrade static check passed; Nix prerequisite helper accepted the immutable tag and attempted no install because Nix was already usable |
+| GitHub release readback | PASS: release `354480554`, immutable/latest, draft=false, prerelease=false, prepared user-facing body exact after trailing-newline normalization |
+| Live Actions and classic protection readback | PASS: SHA pinning enabled; strict contexts exactly match `.github/check-identities.json.required` |
+
+Real Apple Silicon owner lifecycle, physical Linux, WSL2 split-host,
+redirected Windows, divergent stable packaged/Preview/Canary/portable Terminal,
+and desktop/visual/TCC rows remain open. No completion of those manual surfaces
+is claimed by publication.

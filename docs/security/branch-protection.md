@@ -174,10 +174,11 @@ actors, so removing an old context before the live setting changes deadlocks the
 PR; requiring a new context before GitHub has observed it creates the inverse
 deadlock. `.github/check-identities.json` records the transition.
 
-This PR is the checked-in cutover stage. The ruleset, required-check metadata,
-and transactional apply path name the stable per-OS logical checks, while
-workflows continue to emit both the legacy runner-versioned producers and
-stable checks. Each stable check downloads the
+The 2026-07-15 live cutover is complete. The ruleset, required-check metadata,
+classic protection, and transactional apply path name the stable per-OS logical
+checks. Workflows continue to emit both the legacy runner-versioned producers
+and stable checks only for compatibility pending a separately reviewed cleanup.
+Each stable check downloads the
 exact producer artifact and verifies the source head SHA, actually executed
 SHA, run id/attempt, logical identity, and legacy producer through
 `scripts/ci-logical-proof.sh`; it is not a fake/no-op check. GitHub executes a
@@ -260,8 +261,8 @@ out immediately below):
 - rebase merges disabled;
 - squash merges enabled;
 - auto-merge disabled;
-- Actions enabled with `sha_pinning_required: true` after the owner applies the
-  post-merge safeguard update;
+- Actions enabled with `sha_pinning_required: true`, verified after the
+  2026-07-15 owner apply;
 - required checks are strict and include exactly:
   `ubuntu`, `macos`, `windows`, `chezmoi-parity`, `chezmoi-parity-macos`,
   `chezmoi-parity-windows`, `nix flake check / linux`,
@@ -269,7 +270,8 @@ out immediately below):
   `setup.sh / macos`, and `setup.ps1 / windows` in both the integrity ruleset
   and classic fallback;
 - the workflows continue emitting the six replaced legacy producer contexts in
-  `.github/check-identities.json` until the live owner apply is verified;
+  `.github/check-identities.json` as compatibility output after the verified
+  live owner apply;
 - only `Protect main: review` and `Protect main: owner updates` have bypass actors;
 - each bypass actor is `luisgui1757` with `bypass_mode: pull_request`;
 - `Protect main: integrity` has no bypass actors.
@@ -277,13 +279,13 @@ out immediately below):
 - CodeQL default setup scans exactly Actions and Python with default queries;
 - the integrity ruleset blocks CodeQL errors and high-or-higher security alerts.
 
-Checked-in versus live truth matters: at the start of the 2026-07-10 closure
+Checked-in versus live truth matters. At the start of the 2026-07-10 closure
 branch, the live Actions permissions endpoint reported
 `sha_pinning_required: false`, and live required contexts were the twelve legacy
-names. The branch updates the desired safeguard sources but does not apply them.
-The owner must run the apply command only after the merged-main proof above;
-until then both the SHA policy and stable-context cutover are pending live
-confirmation, not already-active safeguards.
+names. After merged-main cache-free proof, the owner completed the transactional
+apply. Readback on 2026-07-15 reports `sha_pinning_required: true` and exactly
+the twelve stable contexts listed above in strict classic protection; the
+checked-in metadata stage is `stable-required-live-applied`.
 
 GitHub does not let pull request authors approve their own pull requests. Owner
 authored PRs can use the owner review bypass, but only after the non-bypass

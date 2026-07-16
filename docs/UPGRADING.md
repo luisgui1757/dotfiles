@@ -207,18 +207,23 @@ pwsh -NoProfile -File 'C:\exact\recovery\upgrade-v0.1.0.ps1' -Rollback 'C:\exact
 pwsh -NoProfile -File 'C:\exact\recovery\upgrade-v0.1.0.ps1' -Accept 'C:\exact\recovery'
 ```
 
-## Release evidence gate
+## Release evidence status
 
-Do not publish v0.2.0 or direct v0.1.0 users here until all of these are true:
+v0.2.0 was published on 2026-07-15 under explicit owner authorization. The
+automated publication gates passed; the real-environment rows below remain open
+and are not implied by publication:
 
-- the annotated `v0.2.0` tag and peeled commit are immutable and match the
-  release notes;
-- the exact-tag POSIX fixture proves setup-owned Nix bootstrap, automatic
-  migration orchestration, rollback, retry/resume, acceptance, and final
-  reconciliation on Apple Silicon and Linux;
-- the Windows Pester and native Windows exact-tag runs prove setup-owned
-  migration orchestration and recovery;
-- real WSL host/guest, redirected Windows, divergent stable
-  packaged/Preview/Canary/portable Terminal, and Apple Silicon owner-host migrations
-  are recorded in `tests/MANUAL.md` and the append-only review ledger;
-- the full release gate and public-secret scan pass on the tagged tree.
+- [x] annotated tag object `cd9a60436b3064c5e2f6ed5bfd8ae0f5297f1b49`
+  peels to immutable commit `22cfad80e904e003f52932ae6d6403520df00d3c`
+  and matches GitHub release `354480554`;
+- [x] full local `make ci`, the deterministic exact-v0.1.0 POSIX fixture,
+  Windows Pester coverage, and the redacted public-secret scan passed on the
+  release commit;
+- [x] cache-free hosted run
+  [`29419942595`](https://github.com/luisgui1757/dotfiles/actions/runs/29419942595)
+  passed Ubuntu, Apple Silicon macOS, Windows, the Linux container, and all four
+  stable logical proofs; both POSIX lanes verified the exact v0.2.0 tag path;
+- [ ] real WSL host/guest, redirected Windows, divergent stable
+  packaged/Preview/Canary/portable Terminal, physical Linux, and Apple Silicon
+  owner-host migrations remain unchecked in `tests/MANUAL.md` and unclaimed in
+  the append-only review ledger.

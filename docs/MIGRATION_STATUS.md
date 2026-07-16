@@ -91,11 +91,14 @@ canonical v0.2.0 path is now side-by-side and exact-tag-only:
   all-target concurrency rejection, known-folder state validation, and the
   pre-migration command-provider boundary.
 
-The release remains gated on real Apple Silicon owner-host, WSL split-host,
-redirected Windows, and divergent stable packaged/Preview/Canary/portable Terminal
-executions. Until the annotated
-v0.2.0 tag and those release rows exist, v0.1.0 users are told to remain on
-v0.1.0. No non-Apple-Silicon macOS migration path is shipped or pending proof.
+The annotated v0.2.0 release was published on 2026-07-15 after the exact local,
+hosted cache-free, public-secret, and live-safeguard gates passed. The owner
+explicitly authorized publication with real Apple Silicon owner-host, physical
+Linux, WSL split-host, redirected Windows, and divergent stable
+packaged/Preview/Canary/portable Terminal executions still open. Those
+unchecked rows remain unclaimed post-release evidence gaps in
+`tests/MANUAL.md`; publication does not mark them complete. No
+non-Apple-Silicon macOS migration path is shipped or pending proof.
 
 ## install-deps owns (provisioning -- deliberately NOT in chezmoi)
 
@@ -278,10 +281,12 @@ broken repo-symlink still cleaned) is covered by
       emitted and bound to exact per-OS proof artifacts. Marker schema 2 binds
       the PR source head separately from GitHub's actually executed synthetic
       merge SHA; push/dispatch proofs truthfully record equal identities.
-      Legacy producer names remain emitted so the currently live legacy
-      safeguards can gate this cutover PR. `.github/check-identities.json` and
-      `docs/security/branch-protection.md` define the post-merge cache-free gate
-      and owner-applied live switch. The apply script now completes and repeats
+      Live safeguards now require the stable identities after the verified
+      2026-07-15 owner apply. Legacy producer names remain emitted only as
+      compatibility output for a separately reviewed cleanup.
+      `.github/check-identities.json` records the completed cutover, while
+      `docs/security/branch-protection.md` retains the transaction and recovery
+      procedure. The apply script completes and repeats
       a full read-only preflight before mutation: exact branch/repo/main and
       public visibility, clean sources, exact legacy live policy, unique
       rulesets, exact GitHub-Actions app/workflow/event/run provenance, and

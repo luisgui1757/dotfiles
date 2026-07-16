@@ -20,7 +20,7 @@ import re
 import sys
 
 metadata = json.loads(pathlib.Path(".github/check-identities.json").read_text(encoding="utf-8"))
-if metadata.get("schema") != 2 or metadata.get("stage") != "stable-required-live-apply-pending":
+if metadata.get("schema") != 2 or metadata.get("stage") != "stable-required-live-applied":
     raise SystemExit("FAIL: required-check migration metadata has an unsupported stage")
 
 test_workflow = pathlib.Path(".github/workflows/test.yml").read_text(encoding="utf-8")
@@ -79,7 +79,7 @@ for required_call in (
     if required_call not in safeguards:
         raise SystemExit(f"FAIL: safeguard apply lost a frozen policy/readback boundary: {required_call}")
 
-print("OK: stable required identities are emitted while legacy producers remain available for the live transition")
+print("OK: live safeguards require stable identities while legacy producers remain available for compatibility")
 PY
 
 command -v ruby >/dev/null 2>&1 || {
