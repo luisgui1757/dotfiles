@@ -44,8 +44,8 @@ GH_DASH_VERSION="v4.25.1"   # dlvhdr/gh-dash pinned gh-extension tag; mirror in 
 GH_DASH_TAG_OBJECT="e6ebbd7e83e30161b9192ce3339972d2c8269e7f"
 GH_DASH_COMMIT="49f37e4832956c57bf52d4ea8b1b1e5c0f863700"
 PI_CLI_PACKAGE="@earendil-works/pi-coding-agent"
-PI_CLI_VERSION="0.80.3"
-PI_CLI_INTEGRITY="sha512-TIggw9gCXpA+Ph7OjdTA7ka2NPwTVuPmy39KDSyUzaKq8VvHfMGR7vtRz4JB7Um/RMRblmzhu4p9tUCk6MTgGA=="
+PI_CLI_VERSION="0.80.9"
+PI_CLI_INTEGRITY="sha512-Clgx2Bg5NbMcCpGxusSDQwE+GC0g/d6sCBluE9aypPgSgtJ6n8VmZIIT6auXObMskpRgkr+XZ77wG5hf+cSDtg=="
 TPM_COMMIT="e261deb1b47614eed3400089ce7197dc68acc4eb"
 # Functional tmux plugins (Omer-style set). The Rose Pine status bar is NOT a
 # plugin here -- it is a repo-owned generated config (tmux/psmux-rose-pine.ps1),
@@ -2065,7 +2065,10 @@ NODE
             printf "  FAIL: %-26s packed tarball bytes do not match pinned SRI for %s\n" "pi" "$spec" >&2
             return 1
         fi
-        if ! npm install -g --prefix "$HOME/.local" "$tarball"; then
+        if ! npm install -g --prefix "$HOME/.local" "$tarball" \
+            "@earendil-works/pi-agent-core@$PI_CLI_VERSION" \
+            "@earendil-works/pi-ai@$PI_CLI_VERSION" \
+            "@earendil-works/pi-tui@$PI_CLI_VERSION"; then
             printf "  FAIL: %-26s npm install failed for verified local tarball %s\n" "pi" "$filename" >&2
             return 1
         fi
@@ -2096,7 +2099,7 @@ install_pi_cli() {
     if [[ "$DRY_RUN" -eq 1 ]]; then
         echo "  would: npm pack --ignore-scripts --json --pack-destination <temp> ${PI_CLI_PACKAGE}@${PI_CLI_VERSION}"
         echo "         require pack metadata integrity and tarball bytes to match $PI_CLI_INTEGRITY"
-        echo "  would: npm install -g --prefix \"$HOME/.local\" <verified-local-tarball>"
+        echo "  would: npm install -g --prefix \"$HOME/.local\" <verified-local-tarball> <exact same-release Pi companions>"
         return 0
     fi
     mkdir -p "$HOME/.local"

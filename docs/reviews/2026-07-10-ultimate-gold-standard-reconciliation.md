@@ -2481,3 +2481,43 @@ result is promoted to exact-v0.2.0 evidence.
 Hosted macOS/Linux/Windows setup, physical Herdr keypress confirmation, and a
 visual Pi theme check remain downstream runtime evidence. No merge, release,
 or completion of those manual surfaces is claimed by this entry.
+
+## Pi same-release npm dependency closure — entry 59
+
+- The first hosted setup run for pull request #58 exposed a registry-timing bug
+  before the new Pi theme phase: the verified coding-agent `0.80.3` tarball
+  installed successfully, but npm satisfied its caret-ranged `pi-agent-core`,
+  `pi-ai`, and `pi-tui` dependencies with the newly published `0.80.9`
+  packages. Starting `pi` then failed on an API import that exists in the old
+  coding-agent but not the newer companion, so all six physical setup jobs
+  correctly rejected the result instead of accepting an unusable command.
+- Pi now advances coherently to coding-agent `0.80.9`, SRI
+  `sha512-Clgx2Bg5NbMcCpGxusSDQwE+GC0g/d6sCBluE9aypPgSgtJ6n8VmZIIT6auXObMskpRgkr+XZ77wG5hf+cSDtg==`.
+  POSIX and Windows continue to install the byte-verified local coding-agent
+  tarball, but also request `pi-agent-core`, `pi-ai`, and `pi-tui` at that exact
+  same release. A later companion publish can no longer silently mix Pi
+  monorepo API versions into an older pinned CLI.
+- The shell fixture and PowerShell tests now bind all four direct install
+  inputs. Historical `0.80.3` evidence remains unchanged where it records an
+  earlier successful run rather than the current contract.
+- The analyzer rule groups and counts did not change. Exact before/after
+  comparison found one diagnostic-identity replacement only: the existing Pi
+  dry-run `Write-Host` extent now includes the exact same-release companions.
+  After reviewing that one-for-one change, the fingerprint is
+  `670c470c779ff3900f07852e6be17f977a28eff73f873e7ae175e5923fbb5251`;
+  no rule, suppression, or warning count changed.
+
+### Repair verification
+
+| Check | Exact result |
+|---|---|
+| Exact `0.80.3` coding-agent tarball installed after `0.80.9` companions were published | EXPECTED FAIL reproduced on macOS: npm selected all three companions at `0.80.9`; `pi --version` raised the same missing-export startup error hidden behind the hosted `<missing>` version diagnostic |
+| Exact `0.80.9` coding-agent tarball and same-release companions in an isolated prefix | PASS: tarball metadata SRI matched the independently hashed bytes; all four Pi packages reported `0.80.9`; `pi --version` printed `0.80.9` |
+| `bash tests/shell/pi_cli_test.sh` | PASS: pack metadata/byte rejection, cleanup, idempotence, and exact four-input install contract |
+| `Invoke-Pester tests/powershell/InstallDeps.Tests.ps1 -CI` | PASS: 128 passed, 0 failed/skipped, including exact same-release Pi install arguments |
+| `pwsh -NoLogo -NoProfile -File ./test.ps1` | PASS after the reviewed fingerprint refresh: exact analyzer identities, 275 Pester tests, and all 18 Neovim specs |
+| `PATH=/opt/homebrew/bin:$PATH make ci` | PASS: ended `local pre-PR gate passed` on the complete implementation, tests, and documentation tree before this result-only ledger update |
+
+The repaired pushed-head hosted jobs, physical Herdr keypress confirmation, and
+visual Pi theme check remain downstream runtime evidence. No merge, release,
+or completion of those manual surfaces is claimed by this entry.

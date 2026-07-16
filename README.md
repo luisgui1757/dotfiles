@@ -1053,12 +1053,15 @@ POSIX pwsh profile management remains provisioning-adjacent.
   repo-local install or vendoring in that project and commit those files there.
 - Pi CLI is a provisioned binary with one repo-owned presentation default, not
   synced runtime state. Setup installs
-  `@earendil-works/pi-coding-agent@0.80.3` by running `npm pack`, requiring the
+  `@earendil-works/pi-coding-agent@0.80.9` by running `npm pack`, requiring the
   pack metadata and the actual tarball SHA-512 bytes to match the reviewed SRI,
-  then passing only that verified local tarball to `npm install`. Temporary
-  pack state is removed on success, mismatch, failure, interruption, and retry.
+  then passing that verified local tarball plus the exact `0.80.9` Pi
+  `agent-core`, `ai`, and `tui` companions to `npm install`. Keeping the Pi
+  monorepo packages on one release prevents compatible-looking npm ranges from
+  mixing runtime APIs. Temporary pack state is removed on success, mismatch,
+  failure, interruption, and retry.
   The reviewed SRI is
-  `sha512-TIggw9gCXpA+Ph7OjdTA7ka2NPwTVuPmy39KDSyUzaKq8VvHfMGR7vtRz4JB7Um/RMRblmzhu4p9tUCk6MTgGA==`.
+  `sha512-Clgx2Bg5NbMcCpGxusSDQwE+GC0g/d6sCBluE9aypPgSgtJ6n8VmZIIT6auXObMskpRgkr+XZ77wG5hf+cSDtg==`.
   POSIX public setup gets Node 24 from Nix first; Windows uses the native Node
   LTS catalog entry. Chezmoi deploys the audited `pi/rose-pine.json` theme and
   setup atomically merges only `theme: rose-pine` into
@@ -1366,7 +1369,7 @@ Manual-review pin surfaces that Renovate may touch only partially:
 | TPM/tmux plugin refs and psmux plugin ref | Commit pins are manual-reviewed and mirrored in docs/tests; Renovate does not recompute or prove tag commits. |
 | `setuptools`/`pylatexenc` | Renovate can bump versions; adjacent hashes remain human-reviewed. Current pins: `setuptools` 80.9.0, `pylatexenc` 2.10. |
 | Hack Nerd Font | Unix and Windows mirrors must stay identical; version/hash drift is caught by `pin_consistency_test.sh`. |
-| Pi CLI | Unix/Windows install pins and e2e assertions mirror version `0.80.3`; the npm-pack metadata and downloaded tarball bytes must both match the human-reviewed SRI. |
+| Pi CLI | Unix/Windows install pins and e2e assertions mirror version `0.80.9`; the npm-pack metadata and downloaded coding-agent tarball bytes must both match the human-reviewed SRI, and all three Pi companion modules are requested at the exact same release. |
 | Herdr | Native Linux pins stable `v0.7.4` with both architecture hashes; Windows pins post-fix preview `preview-2026-07-16-e907e6a36646` with its x64 hash. Homebrew platforms consume the reviewed `v0.7.4` formula. |
 | Pi Rose Pine theme | The repo vendors only `rose-pine.json` from audited data-only package `pi-themes-rose-pine@0.1.0`, preserves its MIT license, and tests the exact palette plus all 51 Pi tokens. |
 | gh-dash | Tag `v4.25.1`, annotated tag object `e6ebbd7e83e30161b9192ce3339972d2c8269e7f`, and peeled commit `49f37e4832956c57bf52d4ea8b1b1e5c0f863700` are mirrored; installers verify the tag mapping and pass the release tag required by `gh extension install --pin` for binary extensions. |

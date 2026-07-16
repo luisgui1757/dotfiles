@@ -39,8 +39,8 @@ $GhDashVersion = 'v4.25.1'   # dlvhdr/gh-dash pinned gh-extension tag; mirror in
 $GhDashTagObject = 'e6ebbd7e83e30161b9192ce3339972d2c8269e7f'
 $GhDashCommit = '49f37e4832956c57bf52d4ea8b1b1e5c0f863700'
 $PiCliPackage = '@earendil-works/pi-coding-agent'
-$PiCliVersion = '0.80.3'
-$PiCliIntegrity = 'sha512-TIggw9gCXpA+Ph7OjdTA7ka2NPwTVuPmy39KDSyUzaKq8VvHfMGR7vtRz4JB7Um/RMRblmzhu4p9tUCk6MTgGA=='
+$PiCliVersion = '0.80.9'
+$PiCliIntegrity = 'sha512-Clgx2Bg5NbMcCpGxusSDQwE+GC0g/d6sCBluE9aypPgSgtJ6n8VmZIIT6auXObMskpRgkr+XZ77wG5hf+cSDtg=='
 $TreeSitterCliVersion = 'v0.26.10'
 $TreeSitterCliWindowsX64Sha256 = 'e378c57f5de3e698058997489e69a027551dc05a09c6ff51e42ffab6ea5d5b6b'
 $TreeSitterCliWindowsArm64Sha256 = 'd30a6a6986a0fdbdb3a6c0f0e23dc6e6719e133f73dee7c65cf73839a458bced'
@@ -2940,7 +2940,7 @@ function Invoke-PiCliVerifiedTarballInstall {
             throw "packed tarball bytes do not match pinned SRI for $spec"
         }
 
-        $install = Invoke-PiCliNpm -Arguments @('install', '-g', $tarball) -StderrPath $stderrPath
+        $install = Invoke-PiCliNpm -Arguments @('install', '-g', $tarball, "@earendil-works/pi-agent-core@$PiCliVersion", "@earendil-works/pi-ai@$PiCliVersion", "@earendil-works/pi-tui@$PiCliVersion") -StderrPath $stderrPath
         if ($install.ExitCode -ne 0) {
             throw "npm install failed for verified local tarball $filename (exit $($install.ExitCode))"
         }
@@ -2986,7 +2986,7 @@ function Install-PiCli {
     if ($DryRun) {
         Write-Host "  would:    npm pack --ignore-scripts --json --pack-destination <temp> $PiCliPackage@$PiCliVersion"
         Write-Host "             require metadata integrity and tarball bytes to match $PiCliIntegrity"
-        Write-Host "  would:    npm install -g <verified-local-tarball>"
+        Write-Host "  would:    npm install -g <verified-local-tarball> <exact same-release Pi companions>"
         return
     }
     $rc = 1

@@ -266,8 +266,9 @@ Commit-by-commit status:
   contract; Intel evidence is retained in the append-only ledger as historical
   proof, not current support.
 - **Pi CLI provisioning and theme — DONE.** Setup installs the Pi CLI on every OS as the
-  pinned npm package `@earendil-works/pi-coding-agent@0.80.3` after checking npm
-  `dist.integrity`. POSIX public setup gets Node 24 from the enforced Nix package
+  pinned npm package `@earendil-works/pi-coding-agent@0.80.9` after checking npm
+  `dist.integrity`; its three Pi companion modules are held to the same exact
+  release. POSIX public setup gets Node 24 from the enforced Nix package
   layer; Windows uses the native Node LTS catalog path. Chezmoi deploys the
   audited Rose Pine theme and setup merges only its global `theme` selection;
   sessions, auth, providers, and every other `.pi/` preference remain local.
@@ -522,8 +523,9 @@ Reconciled by the 2026-07-10 ultimate closure branch; each item is marked DONE
 only with its implementation, tests, and documentation:
 
 1. **Pi CLI verified tarball install — DONE.** POSIX and Windows use `npm pack`,
-   require pack metadata and actual tarball bytes to match the mirrored SRI,
-   install only the local verified tarball, and clean temp state on every exit.
+   require pack metadata and actual coding-agent tarball bytes to match the
+   mirrored SRI, install it with exact same-release Pi companions, and clean
+   temp state on every exit.
 2. **zsh plugin quarantine-on-mismatch — DONE.** The shared serialized
    publisher neutralizes unproved executable payloads, verifies a sibling exact
    checkout, publishes atomically, preserves unsafe quarantines, and lets bare

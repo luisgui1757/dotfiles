@@ -105,7 +105,7 @@ Invoke-Step 'PSScriptAnalyzer' {
     # per rule group; the fingerprint below additionally binds the exact stable
     # script/rule/message/extent identities, so one warning cannot silently
     # replace another while preserving a filename/rule/count total.
-    $analyzerWarningFingerprint = '7afbc05765c54b68225c941857c9247c58a95b98f36618870b3a6e0e1a0e3139'
+    $analyzerWarningFingerprint = '670c470c779ff3900f07852e6be17f977a28eff73f873e7ae175e5923fbb5251'
     $analyzerWarningBaseline = @{
         'dot_tmux.rose-pine.ps1, PSAvoidUsingWriteHost'                               = @{ Count = 1; Reason = 'generated tmux theme status output' }
         'install-deps.ps1, PSAvoidUsingWriteHost'                                     = @{ Count = 165; Reason = 'interactive installer progress output' }

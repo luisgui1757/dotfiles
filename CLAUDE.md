@@ -1954,11 +1954,14 @@ save only**. The next plain `:w` formats normally. Implemented in
   a manual, secret-bearing step this repo never automates or stores.
 - **Pi CLI is pinned; only its audited theme selection is repo-owned.** `install-deps.sh`
   and `install-deps.ps1` run `npm pack --ignore-scripts --json` for
-  `@earendil-works/pi-coding-agent@0.80.3`, require both reported metadata and
+  `@earendil-works/pi-coding-agent@0.80.9`, require both reported metadata and
   independently hashed tarball bytes to match
-  `sha512-TIggw9gCXpA+Ph7OjdTA7ka2NPwTVuPmy39KDSyUzaKq8VvHfMGR7vtRz4JB7Um/RMRblmzhu4p9tUCk6MTgGA==`
-  and install only the verified local tarball. Pack state is scoped to a unique
-  temp directory and cleaned through return/signal/finally paths. POSIX public
+  `sha512-Clgx2Bg5NbMcCpGxusSDQwE+GC0g/d6sCBluE9aypPgSgtJ6n8VmZIIT6auXObMskpRgkr+XZ77wG5hf+cSDtg==`
+  and install the verified local tarball alongside exact same-release
+  `pi-agent-core`, `pi-ai`, and `pi-tui` specs. Do not rely on the coding-agent's
+  caret ranges: a later companion publish can otherwise combine incompatible
+  monorepo APIs with an older CLI. Pack state is scoped to a unique temp
+  directory and cleaned through return/signal/finally paths. POSIX public
   setup gets Node 24 from the enforced Nix package layer; Windows
   gets Node through the native catalog. Chezmoi deploys the byte-identical
   `pi/rose-pine.json` / `home/dot_pi/agent/themes/rose-pine.json` pair on every

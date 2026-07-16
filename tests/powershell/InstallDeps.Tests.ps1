@@ -790,7 +790,7 @@ Describe "install-deps.ps1" {
         $BinaryName['pi'] | Should -Be 'pi'
         @((Get-InstallDependencySpec) | Where-Object { $_.Tool -eq 'pi' }).Count | Should -Be 1
         $PiCliPackage | Should -Be '@earendil-works/pi-coding-agent'
-        $PiCliVersion | Should -Be '0.80.3'
+        $PiCliVersion | Should -Be '0.80.9'
         $PiCliIntegrity | Should -Match '^sha512-'
     }
 
@@ -836,9 +836,9 @@ exit 97
 
         $output = & { Install-PiCli } 6>&1 | Out-String
 
-        $output | Should -Match 'npm pack --ignore-scripts --json --pack-destination <temp> @earendil-works/pi-coding-agent@0\.80\.3'
+        $output | Should -Match 'npm pack --ignore-scripts --json --pack-destination <temp> @earendil-works/pi-coding-agent@0\.80\.9'
         $output | Should -Match ([regex]::Escape($PiCliIntegrity))
-        $output | Should -Match 'npm install -g <verified-local-tarball>'
+        $output | Should -Match 'npm install -g <verified-local-tarball> <exact same-release Pi companions>'
     }
 
     It "validates Pi tarball bytes independently against SHA-512 SRI" {
@@ -902,11 +902,11 @@ exit 97
         }
     }
 
-    It "installs only the verified local Pi tarball and cleans on success" {
+    It "installs the verified Pi tarball with exact same-release companions and cleans on success" {
         . $script:ImportInstallDepsForTest
         $tempRoot = Join-Path $TestDrive 'pi success temp'
         $oldTempRoot = $env:DOTFILES_PI_CLI_TEMP_ROOT
-        $script:InstalledPiTarball = ''
+        $script:InstalledPiArguments = @()
         try {
             $env:DOTFILES_PI_CLI_TEMP_ROOT = $tempRoot
             Mock -CommandName Test-PiCliTarballIntegrity -MockWith { return $true }
@@ -918,13 +918,18 @@ exit 97
                     $json = @([pscustomobject]@{ filename = 'pi.tgz'; integrity = $PiCliIntegrity }) | ConvertTo-Json -Compress
                     return [pscustomobject]@{ Output = @($json); ExitCode = 0 }
                 }
-                $script:InstalledPiTarball = $Arguments[2]
+                $script:InstalledPiArguments = @($Arguments)
                 return [pscustomobject]@{ Output = @(); ExitCode = 0 }
             }
 
             Invoke-PiCliVerifiedTarballInstall
 
-            $script:InstalledPiTarball | Should -Match 'dotfiles-pi-[0-9a-f]+[\\/]pi\.tgz$'
+            $script:InstalledPiArguments[2] | Should -Match 'dotfiles-pi-[0-9a-f]+[\\/]pi\.tgz$'
+            $script:InstalledPiArguments[3..5] | Should -Be @(
+                '@earendil-works/pi-agent-core@0.80.9',
+                '@earendil-works/pi-ai@0.80.9',
+                '@earendil-works/pi-tui@0.80.9'
+            )
             @(Get-ChildItem -LiteralPath $tempRoot -Force -ErrorAction SilentlyContinue).Count | Should -Be 0
         } finally {
             $env:DOTFILES_PI_CLI_TEMP_ROOT = $oldTempRoot
@@ -981,7 +986,7 @@ exit 97
 
         $output = & { Install-PiCli } 6>&1 | Out-String
 
-        $output | Should -Match 'already installed \(0\.80\.3\)'
+        $output | Should -Match 'already installed \(0\.80\.9\)'
         Should -Invoke -CommandName Invoke-PiCliVerifiedTarballInstall -Times 0 -Exactly
     }
 

@@ -40,7 +40,7 @@ case "${1:-}" in
             shift
         done
         [[ -n "$dest" ]] || exit 52
-        filename='earendil-works-pi-coding-agent-0.80.3.tgz'
+        filename='earendil-works-pi-coding-agent-0.80.9.tgz'
         if [[ "${PI_TEST_MODE:-success}" == "partial" ]]; then
             printf '%s' 'partial tarball' > "$dest/$filename"
         else
@@ -51,12 +51,15 @@ case "${1:-}" in
         ;;
     install)
         [[ "${PI_TEST_MODE:-success}" != "install-fail" ]] || exit 61
-        tarball="${@: -1}"
+        tarball=''
+        for arg in "$@"; do
+            [[ "$arg" == *.tgz ]] && tarball="$arg"
+        done
         [[ -s "$tarball" ]] || exit 62
         mkdir -p "$HOME/.local/bin"
         cat > "$HOME/.local/bin/pi" <<EOS
 #!/usr/bin/env bash
-printf '%s\n' "${PI_TEST_INSTALLED_VERSION:-0.80.3}"
+printf '%s\n' "${PI_TEST_INSTALLED_VERSION:-0.80.9}"
 EOS
         chmod +x "$HOME/.local/bin/pi"
         ;;
@@ -77,7 +80,7 @@ assert_no_pi_temp_dirs() {
 }
 
 run_case() {
-    local name="$1" mode="$2" reported="$3" installed_version="${4:-0.80.3}"
+    local name="$1" mode="$2" reported="$3" installed_version="${4:-0.80.9}"
     local home="$TMP_ROOT/$name-home" bin="$TMP_ROOT/$name-bin" tmp="$TMP_ROOT/$name-tmp"
     mkdir -p "$home" "$bin" "$tmp"
     write_npm_stub "$bin"
@@ -109,7 +112,7 @@ run_case() {
     PATH="$bin:$PATH"; export PATH
     cat > "$bin/pi" <<'EOF'
 #!/usr/bin/env bash
-printf '%s\n' '0.80.3'
+printf '%s\n' '0.80.9'
 EOF
     chmod +x "$bin/pi"
     cat > "$bin/npm" <<'EOF'
@@ -119,7 +122,7 @@ EOF
     chmod +x "$bin/npm"
     YES_ALL=1; DRY_RUN=0
     out="$(install_pi_cli 2>&1)"
-    [[ "$out" == *"already installed (0.80.3)"* ]] || fail "current Pi must be idempotent; got: $out"
+    [[ "$out" == *"already installed (0.80.9)"* ]] || fail "current Pi must be idempotent; got: $out"
 )
 
 # Dry-run describes pack, byte verification, and local-tarball install.
@@ -135,7 +138,7 @@ EOF
     out="$(install_pi_cli 2>&1)"
     [[ "$out" == *"npm pack --ignore-scripts --json"* ]] || fail "dry-run missing npm pack; got: $out"
     [[ "$out" == *"tarball bytes"*"$PI_CLI_INTEGRITY"* ]] || fail "dry-run missing byte-bound SRI; got: $out"
-    [[ "$out" == *"npm install -g --prefix"*"<verified-local-tarball>"* ]] || fail "dry-run missing local tarball install; got: $out"
+    [[ "$out" == *"npm install -g --prefix"*"<verified-local-tarball>"*"<exact same-release Pi companions>"* ]] || fail "dry-run missing exact Pi install inputs; got: $out"
     [[ ! -e "$PI_TEST_LOG" ]] || fail "dry-run invoked npm"
 )
 
@@ -178,7 +181,8 @@ set -e
 ! grep -q '^install ' "$TMP_ROOT/partial.log" || fail "install ran after partial tarball"
 assert_no_pi_temp_dirs "$TMP_ROOT/partial-tmp"
 
-# A verified local tarball is the only install input; failures still clean temp.
+# A verified local coding-agent tarball plus exact same-release Pi companions are
+# the only install inputs; failures still clean temporary state.
 set +e
 install_fail_out="$(run_case install-fail install-fail "$TEST_SRI" 2>&1)"
 install_fail_rc=$?
@@ -190,8 +194,8 @@ assert_no_pi_temp_dirs "$TMP_ROOT/install-fail-tmp"
 # Success installs from the verified temporary tarball and repeated setup reuses
 # the validated installed version without another pack/download.
 run_case success success "$TEST_SRI" >/dev/null
-grep -E '^install -g --prefix .*/dotfiles-pi\.[^/]*/earendil-works-pi-coding-agent-0\.80\.3\.tgz$' "$TMP_ROOT/success.log" >/dev/null \
-    || fail "npm install did not receive the verified local tarball: $(cat "$TMP_ROOT/success.log")"
+grep -E '^install -g --prefix .*/dotfiles-pi\.[^/]*/earendil-works-pi-coding-agent-0\.80\.9\.tgz @earendil-works/pi-agent-core@0\.80\.9 @earendil-works/pi-ai@0\.80\.9 @earendil-works/pi-tui@0\.80\.9$' "$TMP_ROOT/success.log" >/dev/null \
+    || fail "npm install did not receive the verified tarball and exact same-release companions: $(cat "$TMP_ROOT/success.log")"
 assert_no_pi_temp_dirs "$TMP_ROOT/success-tmp"
 (
     HOME="$TMP_ROOT/success-home"; export HOME
