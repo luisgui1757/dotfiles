@@ -44,6 +44,19 @@ cd ~/dotfiles
 ./setup.sh --all
 ```
 
+Testing a clean, pushed branch from this official repository before it has a
+release? Run the same setup with the explicit branch-test option:
+
+```bash
+./setup.sh --all --allow-unreleased
+```
+
+The checkout must be clean and its HEAD must exactly match a current official
+branch head. Forks, local-only or stale commits, and dirty checkouts are refused.
+Run setup as your normal user, not with `sudo`. See
+[Testing an unreleased official branch](#testing-an-unreleased-official-branch)
+for the complete clone example and scope.
+
 ```powershell
 # native Windows
 Set-ExecutionPolicy -Scope Process Bypass -Force
@@ -411,7 +424,7 @@ Use this only for a greenfield or already-v0.2.0 test machine. Replace the
 example branch value with the official branch you want to test:
 
 ```bash
-TEST_BRANCH=fix/linux-nix-profile-read
+TEST_BRANCH=BRANCH_NAME
 git clone --branch "$TEST_BRANCH" --single-branch \
   https://github.com/luisgui1757/dotfiles.git ~/dotfiles-test
 cd ~/dotfiles-test
@@ -1120,6 +1133,9 @@ Plenary's default timeout. The startup-budget spec preclones the locked plugin
 checkouts into isolated XDG dirs before measuring warm production init; it must
 not invoke Lazy install/restore or leave nvim-treesitter parser outputs in that
 cache, because parser builds are setup/bootstrap work rather than startup work.
+Before timing, the prewarm also proves `lazy.nvim` through the same reviewed
+origin, locked branch, commit, cleanliness, and entry-file boundary as production,
+so stale upstream default-branch metadata is repaired outside the benchmark.
 It emits `[startup_spec]` progress lines before plugin prewarm and each child
 init so a parent timeout leaves the run root and last long operation in logs.
 

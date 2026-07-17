@@ -272,6 +272,22 @@ describe("startup time", function()
     for _, name in ipairs(names) do
       checkout_plugin(plugin_root, name, sources[name], lock[name].commit)
     end
+
+    -- The production bootstrap proves more than HEAD: it also requires the
+    -- reviewed origin, locked default-branch metadata, cleanliness, and entry
+    -- file. A persistent prewarm cloned while upstream advertised another
+    -- default branch can therefore have the right commit but still require a
+    -- transactional production repair. Complete that exact proof before the
+    -- timed init so the benchmark tests warm startup rather than cache repair.
+    local lazy_lock = assert(lock["lazy.nvim"], "lazy.nvim lock entry is missing")
+    diag("proving the prewarmed lazy.nvim cache through the production identity boundary")
+    require("util.pinned_git_checkout").ensure({
+      target = plugin_root .. "/lazy.nvim",
+      url = "https://github.com/" .. sources["lazy.nvim"] .. ".git",
+      commit = lazy_lock.commit,
+      branch = lazy_lock.branch,
+      required_file = "lua/lazy/init.lua",
+    })
   end
 
   local function clear_startup_parser_outputs(data_path)

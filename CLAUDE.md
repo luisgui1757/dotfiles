@@ -738,7 +738,11 @@ consistently slow production init. `startup_spec.lua` must keep its
 `[startup_spec]` stderr progress lines before plugin prewarm and each child init
 so a parent timeout leaves the run root and last long operation in logs. Cached
 plugin HEAD verification reads `.git/HEAD`/packed refs directly; do not replace
-that warm-cache path with one `git rev-parse` subprocess per plugin.
+that warm-cache path with one `git rev-parse` subprocess per plugin. Before the
+timed init, the prewarm must additionally pass `lazy.nvim` through production's
+origin, locked-branch, HEAD, cleanliness, and required-entry proof. Otherwise a
+cache cloned under older upstream default-branch metadata is repaired inside the
+benchmark and creates a false startup regression.
 
 Sub-targets **skip gracefully** when their tool isn't installed
 (`yamllint`/`editorconfig-checker`/`hyperfine`/`ghostty`). The

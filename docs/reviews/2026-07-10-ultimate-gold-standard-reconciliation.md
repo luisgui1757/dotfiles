@@ -2482,7 +2482,7 @@ Hosted macOS/Linux/Windows setup, physical Herdr keypress confirmation, and a
 visual Pi theme check remain downstream runtime evidence. No merge, release,
 or completion of those manual surfaces is claimed by this entry.
 
-## Pi same-release npm dependency closure — entry 59
+## Pi same-release npm dependency closure — entry 60
 
 - The first hosted setup run for pull request #58 exposed a registry-timing bug
   before the new Pi theme phase: the verified coding-agent `0.80.3` tarball
@@ -2528,3 +2528,42 @@ or completion of those manual surfaces is claimed by this entry.
 The repaired pushed-head hosted jobs, physical Herdr keypress confirmation, and
 visual Pi theme check remain downstream runtime evidence. No merge, release,
 or completion of those manual surfaces is claimed by this entry.
+
+## PR #57 integration and branch-test discoverability — entry 61
+
+- Pull request #58 was rebased onto merged pull request #57 at
+  `67fdf86720bb0f2d1747b54d9f0655d8984b01d2`. The one expected conflict was
+  append-only evidence numbering: the merged Linux Nix repair retains entry 58,
+  while the Herdr/Pi work retains its complete history as entries 59 and 60.
+- The explicit unreleased-branch lane was complete but too easy to miss: it
+  appeared in setup help and a later dedicated README section, not beside the
+  primary POSIX install command. The top install section now shows
+  `./setup.sh --all --allow-unreleased`, its clean/current official branch-head
+  boundary, and the normal-user requirement, then links to the complete clone
+  flow. A regression requires that exact command in the top install section.
+- The detailed example no longer names the already-merged Linux repair branch;
+  `BRANCH_NAME` makes the copy/paste flow durable for future official branches.
+- The first post-rebase full gate exposed a stale startup-fixture assumption,
+  not a product startup regression. Its persistent `lazy.nvim` cache had the
+  correct locked HEAD but obsolete upstream default-branch metadata, so the
+  production identity proof transactionally repaired it inside the timed init
+  and correctly tripped the strict cache-mutation assertion. Prewarm now runs
+  that one cache through production's origin, locked-branch, HEAD, cleanliness,
+  and entry-file proof before timing; the startup budget and no-mutation
+  assertion remain unchanged.
+
+### Rebase verification
+
+| Check | Exact result |
+|---|---|
+| `bash tests/shell/setup_help_test.sh` and `bash tests/static/release_upgrade_test.sh` | PASS: the top installation section advertises the exact branch-test command and release/upgrade documentation remains consistent |
+| Combined #57/#58 focused shell, static, and parity suite | PASS: Nix identity and corporate repairs, setup forwarding, Pi theme/CLI, Herdr identities, pins, and chezmoi parity |
+| Initial post-rebase startup benchmark | EXPECTED FAIL after diagnosis: production repaired stale `lazy.nvim` default-branch metadata inside the timed init and changed the cache mtime |
+| Startup benchmark after injecting a stale `refs/remotes/origin/HEAD` into the prewarm cache | PASS: prewarm repaired the metadata through the production proof before timing; the real init preserved cache mtime |
+| First complete gate after the startup-fixture repair | INFRASTRUCTURE FAIL after all repository tests passed: npm returned `ENOENT` from its pre-existing shared download cache before Renovate validation began |
+| `make validate-renovate` with a fresh temporary npm cache | PASS: strict official schema validation and local extraction found all 81 reviewed dependency records |
+| `PATH=/opt/homebrew/bin:$PATH NPM_CONFIG_CACHE=<fresh-temporary-cache> make ci` | PASS: uninterrupted run ended `local pre-PR gate passed` across lint, full Neovim and shell suites, startup benchmark, official Renovate extraction, migration, and parity |
+
+Rewritten-branch hosted checks and the existing physical Herdr/Pi confirmation
+remain downstream evidence. No merge or completion of those manual surfaces is
+claimed by this entry.
