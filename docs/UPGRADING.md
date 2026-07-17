@@ -22,6 +22,12 @@ Setup never fetches a moving branch or mutates an old release checkout. Git
 acquisition remains explicit: clone the exact next annotated release beside the
 old checkout, then run setup from the new checkout.
 
+`./setup.sh --allow-unreleased` is a separate greenfield/already-v0.2.0 field-test
+lane. It authorizes only a clean exact current branch head of the official
+repository for POSIX prerequisite bootstrap. It is not an upgrade authority and
+must not be used to migrate a live v0.1.0 checkout; the versioned migration
+tools remain exact-tag-only.
+
 ## v0.1.0 to v0.2.0
 
 `v0.1.0` is already a chezmoi release. On POSIX, its managed files are live

@@ -5,7 +5,11 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 REAL_GIT="$(command -v git)"
 ORIGINAL_PATH="$PATH"
 work="$(mktemp -d)"
-trap 'rm -rf "$work"' EXIT
+cleanup() {
+    chmod -R u+rwX "$work" 2>/dev/null || true
+    rm -rf "$work"
+}
+trap cleanup EXIT
 mkdir -p "$work/bin"
 
 fail() {
@@ -69,10 +73,12 @@ new_fixture() {
 }
 
 run_helper() {
-    local repo="$1" refs_file="$2" mode="${3:-ok}"
+    local repo="$1" refs_file="$2" mode="${3:-ok}" allow_unreleased="${4:-0}"
+    local -a helper_args=(--install)
     local run_path="${RUN_PATH_OVERRIDE:-$work/bin:$ORIGINAL_PATH}"
     local run_home="${RUN_HOME_OVERRIDE:-$HOME}"
     local run_xdg_config_home="${RUN_XDG_CONFIG_HOME_OVERRIDE:-$run_home/.config}"
+    [[ "$allow_unreleased" -eq 1 ]] && helper_args+=(--allow-unreleased)
     remote_call_log="$work/remote-calls.log"
     : > "$remote_call_log"
     set +e
@@ -81,7 +87,7 @@ run_helper() {
         FAKE_REMOTE_REFS_FILE="$refs_file" \
         FAKE_REMOTE_CALL_LOG="$remote_call_log" \
         FAKE_REMOTE_MODE="$mode" \
-        "$repo/scripts/install-nix-prerequisite.sh" --install 2>&1)"
+        "$repo/scripts/install-nix-prerequisite.sh" "${helper_args[@]}" 2>&1)"
     rc=$?
     set -e
     remote_call_count="$(wc -l < "$remote_call_log" | tr -d '[:space:]')"
@@ -157,6 +163,13 @@ run_helper "$fixture" "$refs"
 assert_clean_diagnostic
 pass "published annotated release accepts only its exact tag object and peeled commit"
 
+run_helper "$fixture" "$refs" ok 1
+[[ "$rc" -eq 0 ]] || fail "exact annotated release was rejected with the test override:\n$output"
+[[ "$output" == *"Verified immutable release checkout: v0.2.0 at $head_commit"* ]] ||
+    fail "test override displaced the immutable release identity"
+assert_clean_diagnostic
+pass "the explicit test override still prefers an exact immutable release"
+
 new_fixture published-without-local-tag
 head_commit="$($REAL_GIT -C "$fixture" rev-parse HEAD)"
 "$REAL_GIT" -C "$fixture" -c user.name=fixture -c user.email=fixture@example.invalid \
@@ -175,6 +188,45 @@ run_helper "$fixture" "$refs"
     fail "published-release transition did not give the exact checkout recovery:\n$output"
 assert_clean_diagnostic
 pass "release publication closes the prerelease branch-head path"
+
+new_fixture explicitly-authorized-unreleased
+release_commit="$($REAL_GIT -C "$fixture" rev-parse HEAD)"
+"$REAL_GIT" -C "$fixture" -c user.name=fixture -c user.email=fixture@example.invalid \
+    tag -a v0.2.0 -m release
+tag_object="$($REAL_GIT -C "$fixture" rev-parse refs/tags/v0.2.0)"
+printf 'branch head\n' >> "$fixture/tracked.txt"
+"$REAL_GIT" -C "$fixture" add tracked.txt
+"$REAL_GIT" -C "$fixture" -c user.name=fixture -c user.email=fixture@example.invalid \
+    commit -qm branch-head
+head_commit="$($REAL_GIT -C "$fixture" rev-parse HEAD)"
+refs="$work/explicitly-authorized-unreleased.refs"
+{
+    printf '%s\trefs/tags/v0.2.0\n' "$tag_object"
+    printf '%s\trefs/tags/v0.2.0^{}\n' "$release_commit"
+    printf '%s\trefs/heads/fix/linux-nix-profile-read\n' "$head_commit"
+} > "$refs"
+run_helper "$fixture" "$refs"
+[[ "$rc" -ne 0 ]] || fail "published branch head was accepted without explicit authorization"
+[[ "$output" == *"local v0.2.0 does not match the official immutable annotated release"* ]] ||
+    fail "default release boundary did not remain closed:\n$output"
+run_helper "$fixture" "$refs" ok 1
+[[ "$rc" -eq 0 ]] || fail "explicit official branch-head test was rejected:\n$output"
+[[ "$output" == *"Verified explicitly authorized unreleased checkout: refs/heads/fix/linux-nix-profile-read at $head_commit"* ]] ||
+    fail "unreleased success did not report its exact official branch identity"
+[[ "$remote_call_count" == "1" ]] || fail "unreleased decision used $remote_call_count remote snapshots"
+assert_clean_diagnostic
+pass "published branch head requires and honors the explicit test override"
+
+printf 'local only\n' >> "$fixture/tracked.txt"
+"$REAL_GIT" -C "$fixture" add tracked.txt
+"$REAL_GIT" -C "$fixture" -c user.name=fixture -c user.email=fixture@example.invalid \
+    commit -qm local-only
+run_helper "$fixture" "$refs" ok 1
+[[ "$rc" -ne 0 ]] || fail "stale or local-only HEAD was accepted by the test override"
+[[ "$output" == *"--allow-unreleased requires checkout HEAD to be a current official branch head"* ]] ||
+    fail "stale test checkout failure was not actionable:\n$output"
+assert_clean_diagnostic
+pass "the explicit test override rejects stale and local-only commits"
 
 new_fixture malformed-release
 head_commit="$($REAL_GIT -C "$fixture" rev-parse HEAD)"
@@ -221,8 +273,8 @@ rm "$work/bin/nix"
 cat > "$work/bin/uname" <<'EOF'
 #!/usr/bin/env bash
 case "${1:-}" in
-    -s) echo Linux ;;
-    -m) echo x86_64 ;;
+    -s) echo "${FAKE_UNAME_SYSTEM:-Linux}" ;;
+    -m) echo "${FAKE_UNAME_ARCH:-x86_64}" ;;
     *) exit 45 ;;
 esac
 EOF
@@ -240,7 +292,19 @@ exit 46
 EOF
 cat > "$work/bin/sha256sum" <<'EOF'
 #!/usr/bin/env bash
-echo "5676b0887f1274e62edd175b6611af49aa8170c69c16877aa9bc6cebceb19855  $1"
+case "$1" in
+    */nix-2.34.0-aarch64-darwin.tar.xz)
+        digest="47cb78c9fdc7b630dbbb9a89869c8e8bcd8c9eb17be036fba18585120693a4c1"
+        ;;
+    */install-multi-user)
+        digest="832c033bac08eac43e2749427cb3e85d12f11d34685f44153bf044c6d32fafd0"
+        ;;
+    */.install-multi-user.dotfiles)
+        digest="de0074c29f938cac623e0734e359021a5a6b595b8969908ca7c4ef3598b88332"
+        ;;
+    *) exit 53 ;;
+esac
+echo "$digest  $1"
 EOF
 cat > "$work/bin/tar" <<'EOF'
 #!/usr/bin/env bash
@@ -249,14 +313,57 @@ if [[ "${1:-}" == "-tJf" ]]; then
     exit 1
 fi
 [[ "${1:-}" == "-xJf" && "${3:-}" == "-C" ]] || exit 47
-installer_dir="$4/nix-2.34.0-x86_64-linux"
+installer_dir="$4/nix-2.34.0-${FAKE_NIX_SYSTEM:-x86_64-linux}"
 mkdir -p "$installer_dir"
 cat > "$installer_dir/install" <<'INSTALLER'
 #!/usr/bin/env bash
 set -euo pipefail
 printf '%s\n' "$@" > "${FAKE_INSTALL_ARGS:?}"
-[[ "${3:-}" == "--nix-extra-conf-file" && -f "${4:-}" ]] || exit 50
-cat "$4" > "${FAKE_INSTALL_CONF:?}"
+if [[ "${3:-}" != "--no-channel-add" ]]; then
+    echo "warning: error: unable to download 'https://channels.nixos.org/nixpkgs-unstable': SSL peer certificate or SSH remote key was not OK" >&2
+    exit 54
+fi
+export NIX_INSTALLER_NO_CHANNEL_ADD=1
+if [[ "${4:-}" != "--no-modify-profile" ]]; then
+    echo "cat: /etc/bashrc: Permission denied" >&2
+    exit 50
+fi
+NIX_INSTALLER_NO_MODIFY_PROFILE=1
+[[ "${5:-}" == "--nix-extra-conf-file" && -f "${6:-}" ]] || exit 51
+cat "$6" > "${FAKE_INSTALL_CONF:?}"
+exec "$(dirname "$0")/install-multi-user"
+INSTALLER
+cat > "$installer_dir/install-multi-user" <<'MULTI_USER_INSTALLER'
+#!/usr/bin/env bash
+set -euo pipefail
+NIX_ROOT="${FAKE_NIX_ROOT:?}"
+
+task() {
+    echo "$*"
+}
+
+configure_shell_profile() {
+    echo "Setting up shell profiles: /etc/bashrc /etc/profile.d/nix.sh /etc/zshrc /etc/bash.bashrc /etc/zsh/zshrc" >&2
+    echo "cat: /etc/bashrc: Permission denied" >&2
+    exit 52
+}
+
+normalize_store_permissions() {
+    local busybox="$NIX_ROOT/store/l34zf9300cgydgsimmnxvjl9ivjn2yjc-busybox-1.36.1"
+    mkdir -p "$busybox/bin"
+    : > "$busybox/bin/busybox"
+    chmod 700 "$busybox" "$busybox/bin" "$busybox/bin/busybox"
+    # Exact upstream indentation is part of the checksum-bound transform anchor.
+              chmod -R ugo-w "$NIX_ROOT/store/"
+}
+
+main() {
+    [[ "${NIX_INSTALLER_NO_CHANNEL_ADD:-}" == "1" ]] || {
+        echo "warning: error: unable to download 'https://channels.nixos.org/nixpkgs-unstable': SSL peer certificate or SSH remote key was not OK" >&2
+        exit 54
+    }
+    normalize_store_permissions
+    configure_shell_profile
 cat > "${FAKE_RUNTIME_BIN:?}/nix" <<'NIX'
 #!/usr/bin/env bash
 case "${1:-}" in
@@ -266,8 +373,11 @@ case "${1:-}" in
 esac
 NIX
 chmod +x "${FAKE_RUNTIME_BIN:?}/nix"
-INSTALLER
-chmod +x "$installer_dir/install"
+}
+
+main
+MULTI_USER_INSTALLER
+chmod +x "$installer_dir/install" "$installer_dir/install-multi-user"
 EOF
 chmod +x "$work/bin/uname" "$work/bin/curl" "$work/bin/sha256sum" "$work/bin/tar"
 
@@ -278,18 +388,21 @@ printf '%s\trefs/heads/fix/bootstrap\n' "$head_commit" > "$refs"
 export FAKE_INSTALL_ARGS="$work/install-args.log"
 export FAKE_INSTALL_CONF="$work/install-conf.log"
 export FAKE_RUNTIME_BIN="$work/bin"
+export FAKE_NIX_ROOT="$work/fake-nix-root"
 export RUN_PATH_OVERRIDE="$work/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 export RUN_HOME_OVERRIDE="$work/install-home"
-expected_install_mode="--no-daemon"
-if [[ -d /run/systemd/system ]] && command -v systemctl >/dev/null 2>&1; then
-    expected_install_mode="--daemon"
-fi
+export FAKE_UNAME_SYSTEM=Darwin
+export FAKE_UNAME_ARCH=arm64
+export FAKE_NIX_SYSTEM=aarch64-darwin
+expected_install_mode="--daemon"
 run_helper "$fixture" "$refs"
 [[ "$rc" -eq 0 ]] || fail "verified installer fixture failed:\n$output"
 [[ "$(sed -n '1p' "$FAKE_INSTALL_ARGS")" == "$expected_install_mode" &&
     "$(sed -n '2p' "$FAKE_INSTALL_ARGS")" == "--yes" &&
-    "$(sed -n '3p' "$FAKE_INSTALL_ARGS")" == "--nix-extra-conf-file" ]] ||
-    fail "upstream installer did not receive its mode, --yes, and extra config flag"
+    "$(sed -n '3p' "$FAKE_INSTALL_ARGS")" == "--no-channel-add" &&
+    "$(sed -n '4p' "$FAKE_INSTALL_ARGS")" == "--no-modify-profile" &&
+    "$(sed -n '5p' "$FAKE_INSTALL_ARGS")" == "--nix-extra-conf-file" ]] ||
+    fail "upstream installer did not receive its mode, --yes, no-channel, no-profile-mutation, and extra config flags"
 grep -Fx 'extra-experimental-features = nix-command flakes' "$FAKE_INSTALL_CONF" >/dev/null ||
     fail "upstream installer did not receive the reviewed Nix feature config"
 if [[ "$expected_install_mode" == "--no-daemon" ]]; then
@@ -302,7 +415,17 @@ else
 fi
 [[ "$output" == *"Nix prerequisite installed and verified"* ]] ||
     fail "installer success was not verified in the same shell"
+[[ "$output" == *"Verified local Nix daemon profile-ownership patch:"* ]] ||
+    fail "daemon installer patch did not pass its exact output hash check"
+[[ "$output" == *"Leaving shell profiles unchanged (--no-modify-profile)"* ]] ||
+    fail "patched daemon installer did not report the no-profile ownership boundary"
+[[ "$output" != *"channels.nixos.org/nixpkgs-unstable"* ]] ||
+    fail "verified daemon bootstrap attempted the unused mutable Nix channel"
+busybox_store="$FAKE_NIX_ROOT/store/l34zf9300cgydgsimmnxvjl9ivjn2yjc-busybox-1.36.1"
+[[ -r "$busybox_store" && -x "$busybox_store" &&
+    -r "$busybox_store/bin/busybox" && -x "$busybox_store/bin/busybox" ]] ||
+    fail "patched daemon installer did not repair restrictive Nix store modes"
 assert_clean_diagnostic
-pass "verified upstream installer receives mode, --yes, and persistent flake features"
+pass "verified upstream installer skips mutable channels, preserves readable store paths, leaves shell profiles to dotfiles, and persists flake features"
 
 echo "all Nix prerequisite checkout identity behaviors OK"

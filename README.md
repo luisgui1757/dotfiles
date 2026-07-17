@@ -368,14 +368,29 @@ the Nix prerequisite helper needs them. On macOS/Linux/WSL, setup bootstraps Nix
 when it is missing by calling the release-pinned prerequisite helper itself.
 That helper downloads the official upstream Nix 2.34.0 release and verifies the
 platform SHA-256 before extraction or execution, then runs the verified local
-installer non-interactively with `nix-command` and flakes enabled. If an earlier
-attempt installed Nix but stopped before enabling those features, rerunning
-setup repairs the user setting and continues. The annotated v0.2.0 release is
-published, so the former official-branch prerelease path is closed and only the
-exact clean official tag is accepted. Local-only/stale commits, branches,
-forks, lightweight tags, dirty checkouts, and non-official origins fail before
-download. The versioned upgrade tools remain exact-tag-only; this repo has no
-pipe-to-shell Nix bootstrap.
+installer non-interactively with `nix-command` and flakes enabled. Nix's
+multi-user path does not honor its own `--no-modify-profile` option, and its
+Linux copy step can turn a restrictive invoking umask into root-only store
+directories. Daemon bootstrap therefore verifies the exact extracted script,
+locally guards its one profile-configuration call, normalizes store paths to
+Nix's canonical read-only/traversable modes, and verifies the complete patched
+script hash before execution. Setup then activates Nix in the current
+transaction, and Home Manager publishes the future-session path used by the
+managed zsh config. This avoids upstream reads or writes of system shell files
+such as `/etc/bashrc`, works under restrictive corporate umasks, and repairs the
+same inaccessible store modes left by an interrupted attempt. The wrapper also
+passes upstream's public `--no-channel-add` option: this repository uses locked
+flakes, so fetching the mutable `nixpkgs-unstable` channel is unnecessary and
+would wrongly force the installer's bundled CA instead of the managed host's
+system trust store. If an earlier attempt installed Nix but stopped before
+enabling those features, rerunning setup repairs the user setting and continues.
+The annotated v0.2.0 release is published, so normal setup accepts
+only the exact clean official tag. For field testing before another release,
+the explicit `--allow-unreleased` option accepts a clean checkout only when its
+HEAD is a current branch head in the official repository. Local-only or stale
+commits, forks, dirty checkouts, lightweight tags, and non-official origins
+still fail before download. The versioned upgrade tools remain exact-tag-only;
+this repo has no pipe-to-shell Nix bootstrap.
 
 ```bash
 # Apple Silicon mac / linux / wsl
@@ -384,6 +399,25 @@ git clone --branch v0.2.0 --single-branch \
 cd ~/dotfiles
 ./setup.sh --all
 ```
+
+### Testing an unreleased official branch
+
+Use this only for a greenfield or already-v0.2.0 test machine. Replace the
+example branch value with the official branch you want to test:
+
+```bash
+TEST_BRANCH=fix/linux-nix-profile-read
+git clone --branch "$TEST_BRANCH" --single-branch \
+  https://github.com/luisgui1757/dotfiles.git ~/dotfiles-test
+cd ~/dotfiles-test
+./setup.sh --all --allow-unreleased
+```
+
+The opt-in verifies one official remote-ref snapshot and proceeds only if the
+clean local HEAD exactly matches a current official branch head. It does not
+authorize a fork, a local commit, a stale checkout, or an in-place v0.1.0
+migration. Setup links managed config to this checkout, so keep it in place
+while the machine uses the tested configuration.
 
 ```powershell
 # windows
@@ -450,6 +484,7 @@ recovery, but they are no longer the normal user path.
 ./setup.sh --update              # full reconciliation + proven tool/Mason refresh
 ./setup.sh --upgrade             # alias for --update
 ./setup.sh --dry-run             # preview
+./setup.sh --allow-unreleased    # test a clean current official branch head
 ./setup.sh --experimental-wsl-gui # WSL-only opt-in for Linux GUI terminal bits
 ./setup.sh --nix-darwin          # compatibility alias; macOS setup already applies nix-darwin
 ./setup.sh --home-manager        # compatibility alias; Linux/WSL setup already applies Home Manager
@@ -1586,6 +1621,9 @@ MIT. See `LICENSE`.
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
+| v0.2.0 Linux Nix bootstrap ends with `cat: /etc/bashrc: Permission denied` and upstream's `Oh no` failure | the pinned upstream daemon installer prepared `/etc/bashrc` through its privileged path, then tried to read it as the invoking user; its multi-user path does not honor the public `--no-modify-profile` option | if `/etc/bashrc.backup-before-nix` exists after the failure, restore it with `sudo mv /etc/bashrc.backup-before-nix /etc/bashrc`. For immutable v0.2.0 without that backup, the bounded workaround is `sudo chmod a+r /etc/bashrc` before rerunning. On the current official test branch, pull the latest head and rerun `./setup.sh --all --allow-unreleased`; the wrapper applies an exact-hash-verified local patch that skips the daemon profile step and leaves shell activation to setup/Home Manager |
+| Linux Nix bootstrap reports `getting status of '/nix/store/...-busybox...': Permission denied` while installing Nix | a restrictive invoking umask—common on managed corporate hosts—combined with Nix 2.34.0's Linux daemon copy and write-bit removal left store directories as root-only `0500`; a previous interrupted attempt can retain those modes | pull the latest current official test-branch head and rerun `./setup.sh --all --allow-unreleased` as the normal target user. Its checksum-bound daemon installer normalizes the copied and pre-existing store paths to read-only/traversable modes before Nix creates the default profile; do not run all of setup with `sudo` |
+| Corporate Linux bootstrap warns that `https://channels.nixos.org/nixpkgs-unstable` failed TLS verification | upstream's legacy default-channel step uses its bundled CA file, which does not contain the corporate TLS-inspection root; the dotfiles package layer uses locked flakes and does not need this mutable channel | pull the latest current official test-branch head and rerun `./setup.sh --all --allow-unreleased`. The wrapper disables channel creation with upstream's public `--no-channel-add`; subsequent Nix activation selects the host system CA bundle, preserving corporate trust without weakening TLS verification |
 | Neovim stops before loading Lazy with a lockfile/cache identity error | `lazy-lock.json` is missing, malformed, incomplete, has a non-40-hex commit or invalid branch; or the cached `lazy.nvim` checkout is dirty, at the wrong commit, from the wrong origin, missing locked default-branch metadata, non-Git, or partial | restore the tracked `nvim/lazy-lock.json` and restart Neovim. Startup repairs the cache through a verified staging checkout and never executes an unproved path. If publication fails, fix the destination permissions named in the error and retry |
 | setup reports a Homebrew `shellenv` failure even though `brew` already resolves | the selected command and PATH-resolved command report different Homebrew prefixes/repositories, or `shellenv` exited nonzero; empty stdout alone is a normal Homebrew idempotence signal | compare `brew --prefix` and `brew --repository` through both entrypoints named in the error. Repair the shadowing PATH or Homebrew installation, then rerun setup; a nix-darwin wrapper and native brew path are accepted only when those identities match |
 | a new zsh prints `compinit: no such file or directory: .../_brew` | Homebrew's core completion symlink survived a repository/Nix-generation migration but its target did not; `brew completions link` alone only reconciles tap completions | update this repo and rerun setup or `./setup.sh --update`; both paths reconcile tap completions, atomically repair a missing/dangling core `_brew` symlink to the active Homebrew implementation, and verify the resolved target. A conflicting non-symlink is preserved and reported instead of overwritten |

@@ -7,6 +7,7 @@
 #   ./setup.sh --update            reconcile the release, then refresh proven tools + Mason
 #   ./setup.sh --upgrade           alias for --update
 #   ./setup.sh --dry-run           preview every step
+#   ./setup.sh --allow-unreleased  test a clean current official branch head
 #   ./setup.sh --skip-deps         already provisioned; skip Nix + native deps
 #   ./setup.sh --skip-native-deps  keep Nix activation; skip native/deferred deps
 #   ./setup.sh --skip-bootstrap    back-compat alias: skip config apply
@@ -34,6 +35,7 @@ DEFAULT_DEST="$HOME/dotfiles"
 
 ALL=0
 DRY_RUN=0
+ALLOW_UNRELEASED=0
 UPDATE_MODE=0
 SKIP_DEPS=0
 SKIP_NATIVE_DEPS=0
@@ -71,6 +73,7 @@ Local usage:
   ./setup.sh --update            reconcile the release, then refresh proven tools + Mason
   ./setup.sh --upgrade           alias for --update
   ./setup.sh --dry-run           preview every step
+  ./setup.sh --allow-unreleased  test a clean current official branch head
   ./setup.sh --skip-deps         already provisioned; skip Nix + native deps
   ./setup.sh --skip-native-deps  apply Nix/config but skip native/deferred deps
   ./setup.sh --skip-bootstrap    back-compat alias: skip config apply
@@ -96,6 +99,8 @@ for arg in "$@"; do
     case "$arg" in
         --all|-y)         ALL=1 ;;
         --dry-run)        DRY_RUN=1 ;;
+        --allow-unreleased)
+                          ALLOW_UNRELEASED=1 ;;
         --update|--upgrade)
                           UPDATE_MODE=1; ALL=1 ;;
         --skip-deps)      SKIP_DEPS=1 ;;
@@ -263,6 +268,8 @@ ensure_nix_downloader() {
 
 ensure_nix_prerequisite() {
     local helper="$SCRIPT_DIR/scripts/install-nix-prerequisite.sh"
+    local -a helper_args=(--install)
+    [[ "$ALLOW_UNRELEASED" -eq 1 ]] && helper_args+=(--allow-unreleased)
     [[ "$SKIP_DEPS" -eq 0 ]] || return 0
     if activate_nix_profile; then
         nix --version >/dev/null
@@ -275,13 +282,17 @@ ensure_nix_prerequisite() {
             echo "  FAIL: verified Nix prerequisite helper is missing or unsafe: $helper" >&2
             return 1
         }
-        "$helper" --install
+        "$helper" "${helper_args[@]}"
         nix store info >/dev/null
         return 0
     fi
     if [[ "$DRY_RUN" -eq 1 ]]; then
         NIX_PREREQUISITE_DRY_RUN_PLANNED=1
-        echo "  would: install and verify the release-pinned Nix prerequisite"
+        if [[ "$ALLOW_UNRELEASED" -eq 1 ]]; then
+            echo "  would: install and verify Nix from an exact release or current official branch head"
+        else
+            echo "  would: install and verify the release-pinned Nix prerequisite"
+        fi
         return 0
     fi
     [[ -f "$helper" && ! -L "$helper" && -x "$helper" ]] || {
@@ -293,7 +304,7 @@ ensure_nix_prerequisite() {
         echo "  FAIL: setup requires Nix on macOS/Linux/WSL." >&2
         return 1
     fi
-    "$helper" --install
+    "$helper" "${helper_args[@]}"
     activate_nix_profile || {
         echo "  FAIL: Nix installation returned success but setup cannot activate it." >&2
         return 1

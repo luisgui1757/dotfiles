@@ -76,12 +76,29 @@ canonical v0.2.0 path is now side-by-side and exact-tag-only:
   before any restore write.
 - `scripts/install-nix-prerequisite.sh` installs only checksum-reviewed upstream
   Nix 2.34.0 release archives. Before v0.2.0 publication it accepts only a clean
-  exact current official branch head; publication closes that path and requires
-  the exact annotated tag object and peeled commit. Setup owns its invocation;
+  exact current official branch head; after publication the default requires
+  the exact annotated tag object and peeled commit. The explicit POSIX
+  `--allow-unreleased` field-test lane may instead accept a clean checkout whose
+  HEAD equals a current branch head in the official repository; forks, dirty
+  trees, stale/local-only commits, and the exact-tag migration tools remain
+  outside that authority. Setup owns its invocation;
   no downloaded bytes execute before the platform SHA-256 matches, and the
   verified installer runs non-interactively in the selected daemon mode with
-  `nix-command flakes` persisted. A retry reconciles the disabled-feature state
-  left by an otherwise-complete upstream install.
+  `nix-command flakes` persisted and profile mutation disabled. Because the
+  upstream multi-user path ignores `--no-modify-profile`, daemon bootstrap
+  verifies the exact extracted script hash, deterministically guards its single
+  profile-configuration call, normalizes Nix store paths to canonical
+  read-only/traversable modes even under a restrictive invoking umask, verifies
+  the complete patched-script hash, and executes only that reviewed output with
+  the public option and backing setting. The same mode normalization repairs a
+  partial daemon install left by an earlier failed attempt.
+  The verified invocation also passes upstream's public `--no-channel-add`:
+  package activation uses locked flakes, so the mutable `nixpkgs-unstable`
+  bootstrap is unnecessary and must not replace a managed host's system CA
+  trust with the installer's temporary bundled CA.
+  Setup and Home Manager own current- and future-shell activation. A retry
+  reconciles the disabled-feature state left by an otherwise-complete upstream
+  install.
 - `tests/migration/v0_1_upgrade_test.sh` materializes the exact peeled v0.1.0
   commit, proves in-place/dirty paths fail before mutation, runs the real setup
   config/backup path, injects a failure after Home Manager/config publication,
@@ -225,6 +242,13 @@ broken repo-symlink still cleaned) is covered by
       Native-Linux CI resolves and executes the effective account's actual
       login zsh from the account database; it does not assume `/usr/bin/zsh`
       exists after setup selected a platform-specific shell.
+- [x] The verified Nix prerequisite invokes upstream with
+      `--no-modify-profile`. Setup sources the fixed verified installer output
+      for the active transaction, and Home Manager supplies future-session
+      state, so Linux daemon bootstrap no longer creates and then reads
+      `/etc/bashrc` across different privilege boundaries. The regression
+      fixture reproduces upstream's exact permission-denied abort when the flag
+      is missing.
 
 - [x] Windows `nvim` directory-symlink round-trip is fixed in commit `eed6690`.
       The Windows template renders a clean, backslash, no-`..` absolute path

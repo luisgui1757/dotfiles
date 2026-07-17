@@ -19,6 +19,12 @@ state="$({
 })"
 [[ "$state" == "1:1" ]] || fail "--upgrade did not alias non-interactive --update"
 
+state="$({
+    DOTFILES_SETUP_SOURCE_ONLY=1 source "$REPO_ROOT/setup.sh" --all --allow-unreleased
+    printf '%s\n' "$ALLOW_UNRELEASED"
+})"
+[[ "$state" == "1" ]] || fail "--allow-unreleased did not select the explicit test lane"
+
 home="$WORK/home"
 fake_repo="$WORK/repo"
 fake_bin="$WORK/bin"
@@ -64,7 +70,10 @@ activate_nix_profile() {
 cat > "$fake_repo/scripts/install-nix-prerequisite.sh" <<'HELPER'
 #!/usr/bin/env bash
 set -euo pipefail
-[[ "$*" == "--install" ]]
+case "$*" in
+    --install|"--install --allow-unreleased") ;;
+    *) exit 93 ;;
+esac
 printf '%s\n' "$*" > "$SETUP_UNIVERSAL_TEST_ROOT/nix-helper.args"
 cat > "$HOME/.nix-profile/etc/profile.d/nix.sh" <<EOF
 export PATH="$SETUP_UNIVERSAL_TEST_ROOT/bin:\$PATH"
@@ -97,6 +106,15 @@ ensure_nix_prerequisite >/dev/null
 [[ "$(< "$WORK/nix-helper.args")" == "--install" ]] ||
     fail "setup did not invoke the verified Nix prerequisite helper"
 command -v nix >/dev/null 2>&1 || fail "setup did not activate the installed Nix profile"
+
+PATH="/usr/bin:/bin"
+rm -f "$home/.nix-profile/etc/profile.d/nix.sh" "$WORK/nix-helper.args"
+ALLOW_UNRELEASED=1
+ensure_nix_prerequisite >/dev/null
+[[ "$(< "$WORK/nix-helper.args")" == "--install --allow-unreleased" ]] ||
+    fail "setup did not pass the explicit unreleased authorization to the identity helper"
+command -v nix >/dev/null 2>&1 || fail "unreleased setup did not activate the installed Nix profile"
+ALLOW_UNRELEASED=0
 
 PATH="$old_path"
 HOME="$old_home"

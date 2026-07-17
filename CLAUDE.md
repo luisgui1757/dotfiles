@@ -301,15 +301,50 @@ that violates one of these, fix it instead of disabling the test.
       `scripts/install-nix-prerequisite.sh`. Before v0.2.0 publication it
       accepts only a clean exact current official branch head; one isolated
       remote-ref snapshot binds that prerelease decision and the absent release
-      tag. Once the unique annotated tag appears, the branch path closes and
-      only the matching local tag object, peeled commit, and HEAD are accepted.
+      tag. Once the unique annotated tag appears, the default path accepts only
+      the matching local tag object, peeled commit, and HEAD. The explicit
+      `setup.sh --allow-unreleased` test lane may instead accept a clean checkout
+      whose HEAD exactly equals a current branch head in the official repository
+      from that same remote-ref snapshot. It never accepts a fork, dirty tree,
+      stale branch checkout, or local-only commit, and it never relaxes the
+      exact-tag v0.1.0 migration tools.
       The helper then downloads the pinned upstream Nix archive, verifies its
       platform SHA-256 and archive paths, and executes only those verified local
       bytes with the upstream `--yes` non-interactive flag and the selected
-      daemon mode. Its reviewed extra config enables `nix-command flakes` in
-      daemon installs; single-user Linux merges those additive features into
-      the user's Nix config, and a retry self-heals the same disabled-feature
-      state after an otherwise-complete install. Before invoking that helper,
+      daemon mode. Nix's multi-user installer has a long-standing open upstream
+      bug: `--no-modify-profile` applies only to the single-user path and the
+      daemon script unconditionally invokes `configure_shell_profile`. On Linux,
+      its store copy also omits mode preservation, so a restrictive invoking
+      umask can create `0700` store directories that the following write-bit
+      removal turns into root-only `0500`; daemon build users then cannot read
+      bootstrap paths such as BusyBox. For a daemon install, the wrapper verifies
+      the exact extracted script hash, deterministically guards the profile call
+      and normalizes store paths to Nix's canonical read-only/traversable modes,
+      verifies the complete patched-script hash, and only then executes the
+      local installer with both `--no-modify-profile` and
+      `NIX_INSTALLER_NO_MODIFY_PROFILE=1`. Any source or rendered-byte drift
+      fails before execution. The mode normalization also repairs paths left by
+      an interrupted attempt. Setup activates the verified profile in its
+      current shell, Home Manager publishes the future-session path consumed by
+      the managed zsh config, and the daemon installer never creates or reads
+      system shell files such as `/etc/bashrc`. That boundary is load-bearing
+      because upstream otherwise performs an unprivileged read after its
+      privileged file preparation and aborts on a valid non-user-readable
+      system file. Same-repository hosted POSIX bootstrap proofs must run this
+      exact source head through `--allow-unreleased`, require both the reviewed
+      local-patch and profile-skip messages, and reject any upstream `Setting up
+      shell profiles:` task. They set `umask 077` before bootstrap so store-mode
+      coverage represents restrictive managed hosts; detaching to the older
+      release or using the runner's permissive default would make that job green
+      without testing the change under review. The installer must also receive
+      upstream's public `--no-channel-add`: this repository consumes locked
+      flakes, never the mutable `nixpkgs-unstable` channel, and the legacy
+      channel update forces an upstream CA bundle that omits managed corporate
+      trust roots. Hosted bootstrap rejects any attempted channel URL. Its
+      reviewed extra config enables `nix-command flakes` in daemon installs;
+      single-user Linux merges those additive features into the user's Nix
+      config, and a retry self-heals the same disabled-feature state after an
+      otherwise-complete install. Before invoking that helper,
       greenfield Linux/WSL setup must reuse `install-deps.sh`'s source-only
       `require_downloader` path to install `curl` plus CA certificates through
       the detected package manager; this bootstrap precedes Nix because the full

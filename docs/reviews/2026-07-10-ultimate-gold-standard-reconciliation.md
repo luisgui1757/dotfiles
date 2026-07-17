@@ -2325,3 +2325,116 @@ Real Apple Silicon owner lifecycle, physical Linux, WSL2 split-host,
 redirected Windows, divergent stable packaged/Preview/Canary/portable Terminal,
 and desktop/visual/TCC rows remain open. No completion of those manual surfaces
 is claimed by publication.
+
+## Linux Nix system-profile ownership repair — entry 58
+
+- The owner observed an exact-v0.2.0 Linux install abort with
+  `cat: /etc/bashrc: Permission denied`; the pinned upstream multi-user
+  installer's EXIT trap then printed its `Oh no` failure.
+- Inspection of the checksum-verified Nix 2.34.0 archive confirmed the causal
+  path. Its daemon installer includes `/etc/bashrc` among system profile
+  targets, prepares missing targets through its privileged helper, then feeds
+  an unprivileged `cat` of the target into a privileged `tee`. A target that
+  exists but is not readable by the invoking user therefore aborts after system
+  mutation has begun.
+- The first repair passed upstream's public `--no-modify-profile` flag. The owner
+  then tested exact pushed branch head `31daead98fe8ffd59ed778e11c4c0e173f3c3dc4`
+  on the affected Linux host and reproduced the same system-profile task and
+  permission error. That field result rejected the initial closure despite the
+  local and hosted-green tree.
+- Reinspection of the checksum-verified Nix 2.34.0 archive first found that
+  `install` does not export the public flag's backing variable before exec-ing
+  `install-multi-user`. Head `54f9d0fe401a24bacba909144ec1ea2e33b6779d`
+  seeded that variable and passed the full local gate, but a final inner-script
+  trace rejected that second closure before field rerun: `install-multi-user`
+  never reads the setting and unconditionally invokes `configure_shell_profile`.
+  The same defect remains open upstream in
+  [NixOS/nix#4369](https://github.com/NixOS/nix/issues/4369), and the upstream
+  implementation PR [#9179](https://github.com/NixOS/nix/pull/9179) is unmerged.
+- The wrapper now preserves the recommended daemon installation while repairing
+  only the broken local decision point. After the full archive digest and path
+  checks, it requires the exact platform-specific `install-multi-user` hash,
+  deterministically guards its single `configure_shell_profile` call with the
+  public option's backing setting, and requires the complete platform-specific
+  patched hash. Any source, anchor-count, or rendered-byte drift fails before
+  execution; no downloaded or system file is edited in place.
+- This remains an ownership correction, not a skipped prerequisite: setup
+  sources the verified installed profile in the same transaction, Home Manager
+  writes the canonical future-session state, and the managed zsh config consumes
+  it. The upstream installer no longer owns or inspects system shell profiles.
+- The installer-boundary fixture models the real top-level parser, daemon-child
+  process boundary, and unconditional inner profile call. It fails with the
+  owner's complete shell-profile task and `cat: /etc/bashrc: Permission denied`
+  until the exact local inner-script transform is applied, then requires the
+  input/output hash checks, exact mode, `--yes`, `--no-modify-profile`, backing
+  setting, and reviewed extra-config arguments before publishing fake Nix.
+- The immutable v0.2.0 bytes cannot contain this later repair. README records
+  the bounded recovery for that exact release: first restore the upstream
+  `.backup-before-nix` file when the failed pipeline created one; otherwise make
+  the system-wide `/etc/bashrc` readable before rerunning setup. A patched
+  release is still required before the workaround can be retired.
+- Normal setup remains attached to the immutable annotated release. The new
+  explicit `--allow-unreleased` field-test lane accepts a post-release checkout
+  only when its clean HEAD exactly equals a current branch head advertised by
+  the official repository in the helper's single identity snapshot. It rejects
+  forks, dirty trees, stale/local-only commits, malformed official release
+  metadata, and does not relax the exact-tag v0.1.0 migration boundary.
+- The owner's next corporate-Linux field run progressed to Nix's default-profile
+  installation and then failed while a build user inspected the archive's
+  `busybox-1.36.1` store path. The upstream Linux daemon copy preserves
+  ownership and timestamps but not modes; under a restrictive umask such as
+  `077`, its new directories become `0700`, and the following recursive
+  write-bit removal makes them root-only `0500`. A local reproduction of that exact copy/mode
+  sequence produced `0500` for the BusyBox directory, child directory, and
+  executable, rejecting partial-state cleanup as the only explanation.
+- The checksum-bound daemon transform now also changes that one exact upstream
+  mode command to add read and conditional traverse bits while removing all
+  write bits. This yields Nix's canonical `0444`/`0555` store modes for a new
+  install and repairs the inaccessible copied paths on retry. All three complete
+  rendered-script hashes were recalculated from the pinned archives and passed
+  `bash -n`; any second source-anchor or rendered-byte drift remains fatal.
+- Exact branch-head hosted run `29487371753` then passed all 21 checks. Its
+  Ubuntu bootstrap ran head `32e37f4a6040a380fc0eeb373bb7b6d8f531a57c`
+  under `umask 077`, logged patched output `02ed7d08...` and `Leaving shell
+  profiles unchanged`, completed setup plus post-install assertions, and emitted
+  neither a runtime shell-profile task nor the BusyBox permission failure.
+- The owner's next corporate-Linux run surfaced an upstream warning while
+  fetching `https://channels.nixos.org/nixpkgs-unstable`: the installer default
+  channel step explicitly uses its bundled Mozilla CA, which does not contain
+  the managed network's inspection root. This repository uses locked flakes and
+  has no channel consumer, so weakening certificate verification or importing
+  ad hoc trust would be the wrong repair.
+- The verified upstream invocation now passes its public `--no-channel-add`
+  option. The regression models the exact corporate TLS error unless that flag
+  reaches the daemon child; hosted bootstrap also rejects the channel URL. Once
+  installation returns, Nix's own Linux profile selects the first available
+  system CA bundle, retaining managed-host trust for the locked flake downloads.
+
+### Repair verification
+
+| Check | Exact result |
+|---|---|
+| Initial argument-only installer regression | INSUFFICIENT: proved the public option was present but did not model Nix 2.34.0's daemon exec; field test reproduced the bug |
+| Daemon subprocess regression before environment repair | EXPECTED FAIL: complete `Setting up shell profiles: ...` line and `cat: /etc/bashrc: Permission denied`; verified installer fixture exited nonzero |
+| Exact Nix 2.34.0 archive transform audit | PASS: all three pinned platform archives matched their published digest; extracted daemon-script input and deterministic output hashes matched the six committed values; all three rendered scripts passed `bash -n` |
+| `bash tests/shell/nix_prerequisite_identity_test.sh` after local-script repair | PASS: daemon-child fixture skipped its unconditional profile failure only after exact input/output patch checks; release identity, explicit branch-head opt-in, stale/local commit rejection, retry, feature reconciliation, and installer arguments also passed |
+| `bash tests/shell/setup_universal_entrypoint_test.sh` | PASS: public option parsing and exact helper argument forwarding passed |
+| `bash tests/shell/setup_help_test.sh` | PASS: public help advertises the explicit field-test lane |
+| Focused ShellCheck | PASS: changed setup, helper, and shell tests report no diagnostics |
+| Initial `PATH=/opt/homebrew/bin:$PATH make ci` | PASS but not closure: the argument-only fixture missed the daemon subprocess propagation bug later reproduced in the field |
+| Environment-only `PATH=/opt/homebrew/bin:$PATH make ci` | PASS but not closure: final inner-script trace showed the daemon never consults the propagated setting |
+| First local-script `make ci` attempt | FAIL outside the changed path: the safeguard fixture's temporary fake `gh` disappeared during an injected rollback; the exact safeguard test passed immediately in isolation |
+| Final `PATH=/opt/homebrew/bin:$PATH make ci` | PASS: uninterrupted run ended `local pre-PR gate passed` with the exact daemon-script input/output hashes, guarded profile call, branch-head opt-in, tests, and documentation |
+| First pushed-head Ubuntu setup job | INSUFFICIENT despite PASS: workflow run `29485581784` detached its prerequisite checkout to immutable `v0.2.0`; the log contained upstream `Setting up shell profiles:` and therefore did not exercise the PR's local daemon-script repair |
+| Corporate-Linux rerun at `a52513c` | FAIL with new evidence: default-profile installation could not stat the archive's BusyBox store path; this supersedes closure on that head without reviving the already-repaired shell-profile cause |
+| Restrictive-umask copy reproduction | EXPECTED FAIL: upstream-equivalent no-mode-preservation copy under `umask 077`, followed by `chmod -R ugo-w`, produced root-only-style `0500` directories and executable |
+| Expanded exact Nix 2.34.0 archive transform audit | PASS: aarch64-darwin, x86_64-linux, and aarch64-linux input hashes remained exact; complete outputs matched `de0074c...`, `02ed7d0...`, and `54c0a6e...`; all rendered scripts passed `bash -n` |
+| Focused restrictive-store regression and release identity/static checks | PASS: the fake daemon starts with unreadable/untraversable BusyBox modes and completes only after the exact local transform restores read/traverse access while retaining the no-profile and identity boundaries |
+| `PATH=/opt/homebrew/bin:$PATH make ci` after store-mode and hosted-proof repair | PASS: uninterrupted run ended `local pre-PR gate passed`; workflow YAML, restrictive-store behavior, exact hashes, release identity, architecture, documentation, migration, and full repository suites passed |
+| Exact-head hosted run `29487371753` at `32e37f4` | PASS: 21/21 checks; Ubuntu exact-source bootstrap under `umask 077`, local-patch hash, profile skip, full setup, and post-install assertions all passed; runtime profile task and permission errors were absent |
+| Corporate-Linux rerun after store-mode repair | NEW GAP: upstream attempted the unused mutable `nixpkgs-unstable` channel with its bundled CA and reported the managed network's certificate as untrusted |
+| Focused no-channel regression | PASS: the daemon fixture emits the owner's exact channel TLS failure without `--no-channel-add`; the repaired invocation suppresses that path while retaining mode, profile, identity, and flake-feature assertions |
+| `PATH=/opt/homebrew/bin:$PATH make ci` after no-channel repair | PASS: uninterrupted run ended `local pre-PR gate passed`; exact TLS-error regression, installer arguments, hosted channel guard, Nix architecture, lint, migration, and full repository suites passed |
+
+Hosted Linux proof, merge, and patched-release publication remain pending. No
+result is promoted to exact-v0.2.0 evidence.
