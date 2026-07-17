@@ -281,7 +281,7 @@ EOF
     [[ "$(pi --version)" == "0.80.9" ]] || fail "wrong Pi wins after install"
     local_count="$(printf '%s\n' "$PATH" | tr ':' '\n' | grep -Fxc "$HOME/.local/bin")"
     [[ "$local_count" == "1" ]] || fail "$HOME/.local/bin appears $local_count times after install"
-    [[ "$shadow_out" == *"WARN: another Pi installation remains"* ]] \
+    [[ "$shadow_out" == *"WARN: multiple managed pi commands are on PATH"* ]] \
         || fail "duplicate Pi warning missing: $shadow_out"
     [[ "$shadow_out" == *"$bin/pi"* ]] || fail "duplicate Pi path missing from warning: $shadow_out"
     [[ "$shadow_out" == *"$bin/npm uninstall --global --prefix $prefix @earendil-works/pi-coding-agent"* ]] \

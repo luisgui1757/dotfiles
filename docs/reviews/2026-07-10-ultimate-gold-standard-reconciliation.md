@@ -2643,3 +2643,44 @@ this local closure does not claim either result or merge completion.
 
 Hosted reruns and the user's physical duplicate cleanup remain downstream
 evidence; setup deliberately reports but does not remove external state.
+
+## Cross-platform managed-command duplicate audit — entry 64
+
+- Entry 63 correctly closed the observed Pi split, but its warning and
+  ownership proof were Pi-only. The same silent command switch can occur for
+  any CLI that setup installs when a second manager publishes the same command
+  later on `PATH`. Per the owner's follow-up, this entry generalizes detection
+  across the complete POSIX and Windows managed-command inventories rather than
+  cloning package-specific checks.
+- The selected first command is the runtime authority. Setup enumerates every
+  later command path without executing it, resolves physical identities, and
+  reports only distinct installations. POSIX symlinks and Windows
+  case/junction/symlink aliases collapse to one identity. Base-OS fallbacks
+  (`/usr/bin`, `/bin`, Windows `System32`, and WindowsApps execution aliases)
+  remain intentionally quiet because they are not removable user-managed
+  conflicts.
+- Cleanup remains fail-closed. POSIX emits an exact same-user/no-`sudo` command
+  only after Homebrew receipt ownership or an npm global-prefix plus package
+  receipt prove the duplicate; Nix is identified without inventing a profile
+  mutation. Windows emits exact no-admin cleanup only for a user-scoped Scoop
+  shim whose target and installed package agree. Proven winget/Chocolatey
+  copies are identified but require scope/elevation review. Unknown copies get
+  original-manager guidance. No installation is removed automatically.
+- Pi now uses this shared POSIX audit while retaining its stronger canonical
+  `~/.local/bin/pi` identity. The Windows installer invokes the same class of
+  audit after normal installs and update mode, superseding entry 63's narrower
+  statement that Windows remained outside duplicate reporting.
+
+### Duplicate-audit verification
+
+| Check | Exact result |
+|---|---|
+| New POSIX regression before implementation | EXPECTED FAIL: `audit_managed_cli_installations` was absent (exit 127) |
+| Three new Windows regressions before implementation | EXPECTED FAIL: the shared audit and system-fallback functions were absent |
+| Two strengthened Windows coverage cases added during implementation | PASS: the full managed inventory is included and an unproven Scoop receipt never produces cleanup |
+| `bash tests/shell/managed_cli_duplicates_test.sh` and `pi_cli_test.sh` | PASS: inventory-wide reporting, physical alias collapse, OS-fallback filtering, exact npm proof/cleanup, canonical Pi behavior, and zero duplicate execution |
+| Focused Pester `managed command duplicate audit` describe | PASS: 5/5 inventory coverage, distinct-path identity, Windows-fallback, proven user-Scoop cleanup, and unproven-owner fail-closed cases |
+
+Hosted checks and real-machine cleanup remain downstream evidence. This entry
+records detection and guidance only; it does not claim removal of any external
+installation.

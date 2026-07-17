@@ -947,8 +947,12 @@ function Get-ScoopPackageNameFromKnownAppsPath {
 }
 
 function Get-ScoopShimPackageState {
-    param([string]$tool)
-    $source = Get-CatalogToolCommandSource -tool $tool
+    param([string]$tool, [string]$Source = '')
+    $source = if ([string]::IsNullOrWhiteSpace($Source)) {
+        Get-CatalogToolCommandSource -tool $tool
+    } else {
+        $Source
+    }
     if ([string]::IsNullOrWhiteSpace($source)) {
         return [pscustomobject]@{ Status = 'none'; Source = ''; Shim = ''; Package = ''; Reason = '' }
     }
@@ -1425,6 +1429,147 @@ function Get-ChocoPackageOwnershipState {
         }
     }
     return [pscustomobject]@{ Status = 'not-managed'; Reason = ''; Source = $source; Package = ''; Expected = $Package }
+}
+
+function Get-ManagedCommandSourceText {
+    param([object]$Command)
+    if ($null -eq $Command) { return '' }
+    foreach ($propertyName in @('Source', 'Path', 'Definition')) {
+        $property = $Command.PSObject.Properties[$propertyName]
+        if ($null -ne $property -and -not [string]::IsNullOrWhiteSpace([string]$property.Value)) {
+            return [string]$property.Value
+        }
+    }
+    return ''
+}
+
+function Resolve-WindowsCommandIdentity {
+    param([string]$Path)
+    $normalized = ConvertTo-WindowsComparablePath -Path $Path
+    if ([string]::IsNullOrWhiteSpace($normalized)) { return '' }
+    try {
+        if (Test-Path -LiteralPath $normalized -PathType Leaf) {
+            $resolved = Resolve-Path -LiteralPath $normalized -ErrorAction Stop
+            return (ConvertTo-WindowsComparablePath -Path $resolved.Path)
+        }
+    } catch {
+        Write-Verbose ("Could not resolve managed command path {0}: {1}" -f $normalized, $_.Exception.Message)
+    }
+    return $normalized
+}
+
+function Test-WindowsSystemCommandFallback {
+    param([string]$Path)
+    $normalized = ConvertTo-WindowsComparablePath -Path $Path
+    if ([string]::IsNullOrWhiteSpace($normalized)) { return $false }
+    if ($normalized -match '(?i)\\AppData\\Local\\Microsoft\\WindowsApps\\') { return $true }
+    $windowsRoots = @('C:\Windows')
+    if (-not [string]::IsNullOrWhiteSpace($env:WINDIR)) { $windowsRoots += $env:WINDIR }
+    foreach ($root in @($windowsRoots | Select-Object -Unique)) {
+        if (Test-WindowsPathUnderDirectoryText -Path $normalized -Directory (Join-WindowsPathText -Left $root -Right 'System32')) {
+            return $true
+        }
+    }
+    return $false
+}
+
+function Write-ManagedCommandDuplicateOwner {
+    param([string]$Tool, [string]$Duplicate)
+
+    if (Get-Command scoop -ErrorAction SilentlyContinue) {
+        $scoopState = Get-ScoopShimPackageState -tool $Tool -Source $Duplicate
+        if (($scoopState.Status -eq 'found') -and (Test-ScoopPackageManagedByList -Package $scoopState.Package)) {
+            Write-Warning ("        owner=scoop package={0}" -f $scoopState.Package)
+            $sourceRoot = Get-ScoopRootFromShimSource -Source $Duplicate
+            $userRoot = Get-ScoopRoot
+            if (-not [string]::IsNullOrWhiteSpace($sourceRoot) -and
+                (ConvertTo-WindowsComparablePath -Path $sourceRoot).Equals(
+                    (ConvertTo-WindowsComparablePath -Path $userRoot),
+                    [StringComparison]::OrdinalIgnoreCase
+                )) {
+                Write-Warning ("        cleanup (same user, no admin): scoop uninstall {0}" -f $scoopState.Package)
+            } else {
+                Write-Warning "        review the Scoop install scope before removing this package"
+            }
+            return
+        }
+    }
+
+    if ($Catalog.ContainsKey($Tool)) {
+        $wingetPackage = Get-CatalogPackageId -tool $Tool -Manager 'winget'
+        if (-not [string]::IsNullOrWhiteSpace($wingetPackage) -and
+            (Get-Command winget -ErrorAction SilentlyContinue) -and
+            (Test-WingetPackageManaged -Package $wingetPackage) -and
+            (Test-WingetToolSourceMatchesPackage -tool $Tool -Package $wingetPackage -Source $Duplicate)) {
+            Write-Warning ("        owner=winget package={0}; review package scope before removing it with winget" -f $wingetPackage)
+            return
+        }
+
+        $chocoPackage = Get-CatalogPackageId -tool $Tool -Manager 'choco'
+        if (-not [string]::IsNullOrWhiteSpace($chocoPackage) -and
+            (Get-Command choco -ErrorAction SilentlyContinue) -and
+            (Test-ChocoPackageManaged -Package $chocoPackage) -and
+            (Test-ChocolateyToolSourceUnderKnownRoot -Source $Duplicate)) {
+            Write-Warning ("        owner=choco package={0}; review package scope and elevation before removing it" -f $chocoPackage)
+            return
+        }
+    }
+
+    Write-Warning "        owner=unknown; remove it only through the manager that installed it"
+}
+
+function Get-ManagedCommandDuplicateAuditSpec {
+    $seen = @{}
+    foreach ($spec in @(Get-InstallDependencySpec)) {
+        if ($spec.Kind -ne 'tool' -or $spec.Tool -eq 'scoop' -or
+            [string]::IsNullOrWhiteSpace([string]$spec.Binary) -or $seen.ContainsKey([string]$spec.Tool)) {
+            continue
+        }
+        $seen[[string]$spec.Tool] = $true
+        $spec
+    }
+    foreach ($extra in @(
+        [pscustomobject]@{ Tool = 'npm'; Kind = 'tool'; Binary = 'npm'; Module = '' },
+        [pscustomobject]@{ Tool = 'latex2text'; Kind = 'tool'; Binary = 'latex2text'; Module = '' }
+    )) {
+        if (-not $seen.ContainsKey([string]$extra.Tool)) { $extra }
+    }
+}
+
+function Invoke-ManagedCommandDuplicateAudit {
+    param([object[]]$SpecList = @(Get-ManagedCommandDuplicateAuditSpec))
+
+    foreach ($spec in @($SpecList)) {
+        if ($spec.Kind -ne 'tool' -or [string]::IsNullOrWhiteSpace([string]$spec.Binary)) { continue }
+        $commands = @(Get-Command -Name ([string]$spec.Binary) -All -CommandType Application -ErrorAction SilentlyContinue)
+        if ($commands.Count -lt 2) { continue }
+
+        $selected = Get-ManagedCommandSourceText -Command $commands[0]
+        $selectedIdentity = Resolve-WindowsCommandIdentity -Path $selected
+        if ([string]::IsNullOrWhiteSpace($selectedIdentity)) { continue }
+        $seen = @{}
+        $seen[$selectedIdentity.ToLowerInvariant()] = $true
+        $duplicates = @()
+        foreach ($command in @($commands | Select-Object -Skip 1)) {
+            $candidate = Get-ManagedCommandSourceText -Command $command
+            $identity = Resolve-WindowsCommandIdentity -Path $candidate
+            if ([string]::IsNullOrWhiteSpace($identity)) { continue }
+            $key = $identity.ToLowerInvariant()
+            if ($seen.ContainsKey($key)) { continue }
+            $seen[$key] = $true
+            if (Test-WindowsSystemCommandFallback -Path $candidate) { continue }
+            $duplicates += $candidate
+        }
+        if ($duplicates.Count -eq 0) { continue }
+
+        Write-Warning ("multiple managed {0} commands are on PATH" -f $spec.Tool)
+        Write-Warning ("        selected: {0}" -f $selected)
+        foreach ($duplicate in $duplicates) {
+            Write-Warning ("        duplicate: {0}" -f $duplicate)
+            Write-ManagedCommandDuplicateOwner -Tool ([string]$spec.Tool) -Duplicate $duplicate
+        }
+        Write-Warning "        setup leaves foreign installations untouched; rerun after cleanup to prove one command remains"
+    }
 }
 
 function Get-ManagedCatalogToolUpdateTarget {
@@ -3459,6 +3604,7 @@ $Pm = Get-AvailablePM
 
 if ($Update) {
     Invoke-InstallDepsUpdateMode -IsDryRun $DryRun
+    Invoke-ManagedCommandDuplicateAudit
     Exit-InstallDepsIfFailures
     exit 0
 }
@@ -3577,6 +3723,7 @@ Write-Host "            Use Windows Terminal (setup applies the rose-pine"
 Write-Host "            fragment by default) or WezTerm for now."
 
 Write-Host ""
+Invoke-ManagedCommandDuplicateAudit
 Exit-InstallDepsIfFailures
 Write-Host "install-deps: done"
 if ($DryRun) { Write-Host "(dry run -- nothing was installed)" }

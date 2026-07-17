@@ -3083,6 +3083,126 @@ Describe "Python install rejects the Microsoft Store stub" {
     }
 }
 
+Describe "managed command duplicate audit" {
+    BeforeEach {
+        . $script:ImportInstallDepsForTest
+    }
+
+    It "reports distinct commands, collapses identical paths, and never invokes them" {
+        Mock -CommandName Get-Command -MockWith {
+            param([string]$Name)
+            if ($Name -eq 'rg') {
+                return @(
+                    [pscustomobject]@{ Source = 'C:\Tools\selected\rg.exe' },
+                    [pscustomobject]@{ Source = 'c:\tools\selected\RG.EXE' },
+                    [pscustomobject]@{ Source = 'C:\Manual\rg.exe' }
+                )
+            }
+            return $null
+        }
+
+        $output = & {
+            Invoke-ManagedCommandDuplicateAudit -SpecList @(
+                [pscustomobject]@{ Tool = 'rg'; Kind = 'tool'; Binary = 'rg'; Module = '' }
+            )
+        } 3>&1 6>&1 | Out-String
+
+        $output | Should -Match 'multiple managed rg commands are on PATH'
+        $output | Should -Match 'selected: C:\\Tools\\selected\\rg\.exe'
+        $output | Should -Match 'duplicate: C:\\Manual\\rg\.exe'
+        ([regex]::Matches($output, '(?i)selected\\rg\.exe')).Count | Should -Be 1
+    }
+
+    It "covers every managed command in the install inventory" {
+        $expected = @((Get-InstallDependencySpec) | Where-Object {
+                $_.Kind -eq 'tool' -and $_.Tool -ne 'scoop' -and
+                -not [string]::IsNullOrWhiteSpace([string]$_.Binary)
+            } | ForEach-Object { [string]$_.Tool } | Select-Object -Unique)
+        $actual = @((Get-ManagedCommandDuplicateAuditSpec) | ForEach-Object { [string]$_.Tool })
+
+        foreach ($tool in $expected) { $actual | Should -Contain $tool }
+        $actual | Should -Contain 'npm'
+        $actual | Should -Contain 'latex2text'
+    }
+
+    It "ignores Windows system and app-execution-alias fallbacks" {
+        Test-WindowsSystemCommandFallback -Path 'C:\Windows\System32\where.exe' | Should -BeTrue
+        Test-WindowsSystemCommandFallback -Path 'C:\Users\U\AppData\Local\Microsoft\WindowsApps\python.exe' | Should -BeTrue
+        Test-WindowsSystemCommandFallback -Path 'C:\Users\U\scoop\shims\python.exe' | Should -BeFalse
+    }
+
+    It "prints Scoop cleanup only after shim and package-list ownership proof" {
+        Mock -CommandName Get-Command -MockWith {
+            param([string]$Name)
+            if ($Name -eq 'rg') {
+                return @(
+                    [pscustomobject]@{ Source = 'C:\Tools\selected\rg.exe' },
+                    [pscustomobject]@{ Source = 'C:\Users\U\scoop\shims\rg.exe' }
+                )
+            }
+            if ($Name -eq 'scoop') {
+                return [pscustomobject]@{ Source = 'C:\Users\U\scoop\shims\scoop.ps1' }
+            }
+            return $null
+        }
+        Mock -CommandName Get-ScoopShimPackageState -MockWith {
+            [pscustomobject]@{
+                Status = 'found'
+                Source = 'C:\Users\U\scoop\shims\rg.exe'
+                Shim = 'C:\Users\U\scoop\shims\rg.shim'
+                Package = 'ripgrep'
+                Reason = ''
+            }
+        }
+        Mock -CommandName Test-ScoopPackageManagedByList -MockWith { return $true }
+        Mock -CommandName Get-ScoopRoot -MockWith { return 'C:\Users\U\scoop' }
+
+        $output = & {
+            Invoke-ManagedCommandDuplicateAudit -SpecList @(
+                [pscustomobject]@{ Tool = 'rg'; Kind = 'tool'; Binary = 'rg'; Module = '' }
+            )
+        } 3>&1 6>&1 | Out-String
+
+        $output | Should -Match 'owner=scoop package=ripgrep'
+        $output | Should -Match 'cleanup \(same user, no admin\): scoop uninstall ripgrep'
+    }
+
+    It "does not invent Scoop cleanup when package-list ownership is absent" {
+        Mock -CommandName Get-Command -MockWith {
+            param([string]$Name)
+            if ($Name -eq 'rg') {
+                return @(
+                    [pscustomobject]@{ Source = 'C:\Tools\selected\rg.exe' },
+                    [pscustomobject]@{ Source = 'C:\Users\U\scoop\shims\rg.exe' }
+                )
+            }
+            if ($Name -eq 'scoop') {
+                return [pscustomobject]@{ Source = 'C:\Users\U\scoop\shims\scoop.ps1' }
+            }
+            return $null
+        }
+        Mock -CommandName Get-ScoopShimPackageState -MockWith {
+            [pscustomobject]@{
+                Status = 'found'
+                Source = 'C:\Users\U\scoop\shims\rg.exe'
+                Shim = 'C:\Users\U\scoop\shims\rg.shim'
+                Package = 'ripgrep'
+                Reason = ''
+            }
+        }
+        Mock -CommandName Test-ScoopPackageManagedByList -MockWith { return $false }
+
+        $output = & {
+            Invoke-ManagedCommandDuplicateAudit -SpecList @(
+                [pscustomobject]@{ Tool = 'rg'; Kind = 'tool'; Binary = 'rg'; Module = '' }
+            )
+        } 3>&1 6>&1 | Out-String
+
+        $output | Should -Match 'owner=unknown'
+        $output | Should -Not -Match 'scoop uninstall'
+    }
+}
+
 Describe "Markdown equation converter provisioning" {
     BeforeEach {
         $script:OldLocalAppData = $env:LOCALAPPDATA

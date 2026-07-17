@@ -1088,6 +1088,17 @@ POSIX pwsh profile management remains provisioning-adjacent.
   Invalid or busy settings fail without mutation; all unrelated keys remain.
   Local `.pi/` sessions, credentials, providers, and other preferences stay
   machine-local.
+- Dependency setup finishes with a cross-platform duplicate-command audit for
+  every managed CLI in its install inventory. The first physically distinct
+  command on `PATH` is the selected runtime authority; later commands with the
+  same name are reported without being executed or removed. Symlinked aliases
+  of the same executable and immutable OS fallbacks (`/usr/bin`, `/bin`,
+  Windows `System32`, and Windows app-execution aliases) are not treated as
+  competing installations. POSIX ownership probes recognize exact Homebrew,
+  npm-global, and Nix sources; Windows recognizes Scoop, winget, and Chocolatey
+  sources. Exact uninstall commands are printed only for proven user-scoped
+  Homebrew, npm, or Scoop packages. System/global managers are identified but
+  still require a deliberate scope review before removal.
 - Native Windows accepts an existing Tree-sitter CLI only when `tree-sitter
   --version` is exactly `0.26.10`. Missing, stale, partial, or incompatible
   commands are repaired from the architecture-specific `v0.26.10` GitHub
@@ -1667,7 +1678,8 @@ MIT. See `LICENSE`.
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| Pi setup says `expected 0.80.9 after install, got 0.80.3`, or warns that another Pi installation remains | an older global npm/Homebrew `pi` duplicates the repo-owned `~/.local/bin/pi`; older checkouts also let the global command win `PATH` resolution | update this repo and rerun setup. Current setup proves only `~/.local/bin/pi`, makes it win in current and future shells, and prints every duplicate path. For a proven npm-global copy, run the exact `cleanup (same user, no sudo)` command shown, then rerun setup to confirm the warning is gone. Never prepend `sudo`; unknown owners must be removed with their original package manager |
+| Setup warns `multiple managed <tool> commands are on PATH` | two physically distinct installations publish the same managed command; changing `PATH` order could silently switch which one runs | keep the printed `selected` command, then remove each `duplicate` through its proven owner. Setup prints exact no-elevation cleanup only for a proven user-scoped Homebrew, npm, or Scoop package; review scope yourself for winget/Chocolatey/system managers, and use the original manager for `owner=unknown`. Setup never removes either copy automatically. Rerun setup until the warning disappears |
+| Pi setup says `expected 0.80.9 after install, got 0.80.3`, or reports multiple managed `pi` commands | an older global npm/Homebrew `pi` duplicates the repo-owned `~/.local/bin/pi`; older checkouts also let the global command win `PATH` resolution | update this repo and rerun setup. Current setup proves only `~/.local/bin/pi`, makes it win in current and future shells, and reports every physical duplicate. For a proven npm-global copy, run the exact `cleanup (same user, no sudo)` command shown, then rerun setup to confirm one command remains. Never prepend `sudo`; unknown owners must be removed with their original package manager |
 | v0.2.0 Linux Nix bootstrap ends with `cat: /etc/bashrc: Permission denied` and upstream's `Oh no` failure | the pinned upstream daemon installer prepared `/etc/bashrc` through its privileged path, then tried to read it as the invoking user; its multi-user path does not honor the public `--no-modify-profile` option | if `/etc/bashrc.backup-before-nix` exists after the failure, restore it with `sudo mv /etc/bashrc.backup-before-nix /etc/bashrc`. For immutable v0.2.0 without that backup, the bounded workaround is `sudo chmod a+r /etc/bashrc` before rerunning. On the current official test branch, pull the latest head and rerun `./setup.sh --all --allow-unreleased`; the wrapper applies an exact-hash-verified local patch that skips the daemon profile step and leaves shell activation to setup/Home Manager |
 | Linux Nix bootstrap reports `getting status of '/nix/store/...-busybox...': Permission denied` while installing Nix | a restrictive invoking umask—common on managed corporate hosts—combined with Nix 2.34.0's Linux daemon copy and write-bit removal left store directories as root-only `0500`; a previous interrupted attempt can retain those modes | pull the latest current official test-branch head and rerun `./setup.sh --all --allow-unreleased` as the normal target user. Its checksum-bound daemon installer normalizes the copied and pre-existing store paths to read-only/traversable modes before Nix creates the default profile; do not run all of setup with `sudo` |
 | Corporate Linux bootstrap warns that `https://channels.nixos.org/nixpkgs-unstable` failed TLS verification | upstream's legacy default-channel step uses its bundled CA file, which does not contain the corporate TLS-inspection root; the dotfiles package layer uses locked flakes and does not need this mutable channel | pull the latest current official test-branch head and rerun `./setup.sh --all --allow-unreleased`. The wrapper disables channel creation with upstream's public `--no-channel-add`; subsequent Nix activation selects the host system CA bundle, preserving corporate trust without weakening TLS verification |

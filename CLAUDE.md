@@ -1535,11 +1535,20 @@ save only**. The next plain `:w` formats normally. Implemented in
   user-local artifact wins over any stale global/Homebrew command with the same
   name. Pi's idempotence and post-install version checks read the canonical
   `~/.local/bin/pi` directly; a same-version foreign command never satisfies
-  ownership. After proof, enumerate other executable `pi` paths without running
-  them and warn on each. When a sibling npm executable proves the matching
-  global prefix and package ownership, print its exact same-user, no-`sudo`
-  uninstall command; otherwise require cleanup through the unknown original
-  manager. Never silently delete a foreign installation.
+  ownership.
+- **Audit duplicate managed commands after dependency setup on every OS.** Use
+  the install inventory, not a Pi-only list. The first physical command on
+  `PATH` is the selected runtime authority; enumerate later physical commands
+  without executing them, collapse symlinks/junctions and case variants, and
+  ignore immutable base-OS fallbacks (`/usr/bin`, `/bin`, Windows `System32`,
+  and WindowsApps aliases). POSIX may attribute a duplicate only after exact
+  Homebrew receipt, npm global-prefix/package, or Nix-path proof. Windows may
+  attribute only after Scoop shim/package-list, winget package/path, or
+  Chocolatey package/path proof. Print exact cleanup only for a proven
+  user-scoped Homebrew, npm, or Scoop owner; global/system scope still requires
+  explicit human review. Unknown provenance gets original-manager guidance.
+  Never silently delete a foreign installation. Pi retains the stronger
+  canonical `~/.local/bin/pi` selection before this shared audit.
 - **Apt `update` is best-effort, decoupled from `install`.** The apt arms of
   `pm_install`, `native_linux_pm_install`, and `pm_update` run `apt-get update`
   on its own line (`|| warn`), then ALWAYS run `apt-get install`. Do NOT restore

@@ -120,6 +120,7 @@ export HOMEBREW_NO_ASK=1
 
 INSTALL_FAILURES_COUNT=0
 INSTALL_FAILURES_DETAIL=""
+MANAGED_CLI_AUDITED="|"
 
 # ---- Bash 3.2-safe helpers ---------------------------------------------------
 have() { command -v "$1" >/dev/null 2>&1; }
@@ -2015,46 +2016,8 @@ pi_cli_version() {
     "$canonical" --version 2>/dev/null | awk 'NF { print $1; exit }'
 }
 
-pi_cli_competing_paths() {
-    local canonical="$HOME/.local/bin/pi" candidate
-
-    [[ -x "$canonical" ]] || return 0
-    while IFS= read -r candidate; do
-        [[ "$candidate" -ef "$canonical" ]] || printf '%s\n' "$candidate"
-    done < <(type -a -p pi 2>/dev/null | awk '!seen[$0]++')
-}
-
 pi_cli_warn_duplicate_installations() {
-    local duplicate duplicate_dir npm_candidate npm_prefix unproven_duplicate=0
-    local -a duplicates=()
-
-    while IFS= read -r duplicate; do
-        [[ -n "$duplicate" ]] && duplicates+=("$duplicate")
-    done < <(pi_cli_competing_paths)
-    [[ "${#duplicates[@]}" -gt 0 ]] || return 0
-
-    echo "  WARN: another Pi installation remains and is shadowed by the verified user-local Pi:" >&2
-    for duplicate in "${duplicates[@]}"; do
-        printf '        %s\n' "$duplicate" >&2
-        duplicate_dir="${duplicate%/*}"
-        npm_candidate="$duplicate_dir/npm"
-        npm_prefix=""
-        if [[ -x "$npm_candidate" ]]; then
-            npm_prefix="$("$npm_candidate" prefix -g 2>/dev/null | awk 'NF { print; exit }' || true)"
-        fi
-        if [[ -n "$npm_prefix" && "$duplicate" == "$npm_prefix/bin/pi" ]] &&
-            "$npm_candidate" list --global --prefix "$npm_prefix" --depth=0 "$PI_CLI_PACKAGE" >/dev/null 2>&1; then
-            printf '        cleanup (same user, no sudo): %q uninstall --global --prefix %q %q\n' \
-                "$npm_candidate" "$npm_prefix" "$PI_CLI_PACKAGE" >&2
-        else
-            unproven_duplicate=1
-        fi
-    done
-    printf '        canonical: %s\n' "$HOME/.local/bin/pi" >&2
-    if [[ "$unproven_duplicate" -eq 1 ]]; then
-        echo "        remove each unproven duplicate with its original package manager (no sudo for Homebrew)." >&2
-    fi
-    echo "        setup does not silently remove installations it does not own." >&2
+    audit_managed_cli_command pi pi "$HOME/.local/bin/pi"
 }
 
 verify_pi_cli_tarball_sri() {
@@ -3042,6 +3005,145 @@ accepted_system_tool_source() {
         Darwin:zsh:/bin/zsh) return 0 ;;
         *) return 1 ;;
     esac
+}
+
+# Report physically distinct managed commands that can make the same command
+# name change meaning when PATH order changes. Base-OS directories are retained
+# as fallbacks and are not actionable duplicates. Classification is read-only:
+# competing commands are never executed, and cleanup is emitted only when the
+# owning manager proves the exact package/command relationship.
+managed_cli_system_fallback_path() {
+    local source="$1" physical
+    physical="$(physical_path "$source")"
+    case "$physical" in
+        /bin/* | /sbin/* | /usr/bin/* | /usr/sbin/*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+npm_package_owning_command_source() {
+    local source="$1" expected_package="${2:-}" source_dir npm_candidate prefix root real relative package
+    NPM_COMMAND_OWNER=""
+    NPM_COMMAND_OWNER_NPM=""
+    NPM_COMMAND_OWNER_PREFIX=""
+    source_dir="${source%/*}"
+    npm_candidate="$source_dir/npm"
+    [[ "${source##*/}" != "npm" && -x "$npm_candidate" ]] || return 1
+    prefix="$("$npm_candidate" prefix -g 2>/dev/null | awk 'NF { print; exit }' || true)"
+    [[ -n "$prefix" ]] || return 1
+    prefix="${prefix%/}"
+    path_under "$source" "$prefix/bin" || return 1
+    if [[ -n "$expected_package" && "${source##*/}" == "pi" ]]; then
+        package="$expected_package"
+    else
+        root="$prefix/lib/node_modules"
+        real="$(real_source_path "$source")"
+        path_under "$real" "$root" || return 1
+        relative="${real#"${root%/}/"}"
+        if [[ "$relative" == @*/*/* ]]; then
+            package="${relative%%/*}/${relative#*/}"
+            package="${package%/*}"
+        else
+            package="${relative%%/*}"
+        fi
+    fi
+    [[ -n "$package" ]] || return 1
+    "$npm_candidate" list --global --prefix "$prefix" --depth=0 "$package" >/dev/null 2>&1 || return 1
+    NPM_COMMAND_OWNER="$package"
+    NPM_COMMAND_OWNER_NPM="$npm_candidate"
+    NPM_COMMAND_OWNER_PREFIX="$prefix"
+    return 0
+}
+
+managed_cli_report_duplicate_owner() {
+    local duplicate="$1" tool="$2" expected_npm_package="" formula brew_bin
+    if formula="$(brew_formula_owning_tool_source "$duplicate" 2>/dev/null)"; then
+        brew_bin="$(homebrew_bin 2>/dev/null || printf 'brew')"
+        printf '        owner=brew package=%s\n' "$formula" >&2
+        printf '        cleanup (same user, no sudo): %q uninstall %q\n' "$brew_bin" "$formula" >&2
+        return 0
+    fi
+    [[ "$tool" == "pi" ]] && expected_npm_package="$PI_CLI_PACKAGE"
+    if npm_package_owning_command_source "$duplicate" "$expected_npm_package"; then
+        printf '        owner=npm package=%s\n' "$NPM_COMMAND_OWNER" >&2
+        printf '        cleanup (same user, no sudo): %q uninstall --global --prefix %q %q\n' \
+            "$NPM_COMMAND_OWNER_NPM" "$NPM_COMMAND_OWNER_PREFIX" "$NPM_COMMAND_OWNER" >&2
+        return 0
+    fi
+    if nix_owns_tool_source "$duplicate"; then
+        echo "        owner=nix; reconcile it through setup.sh or the declaring Nix profile." >&2
+        return 0
+    fi
+    echo "        owner=unknown; remove it only through its original package manager." >&2
+}
+
+audit_managed_cli_command() {
+    local tool="$1" binary="$2" selected="${3:-}" key candidate candidate_real selected_real
+    local -a duplicates=()
+    key="|${tool}:${binary}|"
+    [[ "$MANAGED_CLI_AUDITED" != *"$key"* ]] || return 0
+    MANAGED_CLI_AUDITED="${MANAGED_CLI_AUDITED}${tool}:${binary}|"
+
+    if [[ -z "$selected" ]]; then
+        selected="$(command -v "$binary" 2>/dev/null || true)"
+    fi
+    [[ -n "$selected" && -x "$selected" ]] || return 0
+    selected_real="$(real_source_path "$selected")"
+    while IFS= read -r candidate; do
+        [[ -n "$candidate" && -x "$candidate" ]] || continue
+        candidate_real="$(real_source_path "$candidate")"
+        [[ "$candidate_real" != "$selected_real" ]] || continue
+        managed_cli_system_fallback_path "$candidate" && continue
+        duplicates+=("$candidate")
+    done < <(type -a -p "$binary" 2>/dev/null | awk '!seen[$0]++')
+    [[ "${#duplicates[@]}" -gt 0 ]] || return 0
+
+    printf '  WARN: multiple managed %s commands are on PATH\n' "$tool" >&2
+    printf '        selected: %s\n' "$selected" >&2
+    for candidate in "${duplicates[@]}"; do
+        printf '        duplicate: %s\n' "$candidate" >&2
+        managed_cli_report_duplicate_owner "$candidate" "$tool"
+    done
+    echo "        setup leaves foreign installations untouched; rerun after cleanup to prove one command remains." >&2
+}
+
+managed_cli_audit_items() {
+    if [[ -n "${INSTALL_DEPS_AUDIT_ITEMS:-}" ]]; then
+        printf '%s\n' "$INSTALL_DEPS_AUDIT_ITEMS"
+        return
+    fi
+    install_dependency_scan_items | awk -F'|' '$2 == "command" { print $1 "|" $3 }'
+    printf '%s\n' \
+        "zoxide|zoxide" \
+        "npm|npm" \
+        "latex2text|latex2text" \
+        "wezterm|wezterm" \
+        "aerospace|aerospace" \
+        "herdr|herdr" \
+        "devilspie2|devilspie2"
+}
+
+audit_managed_cli_installations() {
+    local tool binary selected bins candidate
+    while IFS='|' read -r tool binary selected; do
+        [[ -n "$tool" ]] || continue
+        if [[ -z "$binary" ]]; then
+            bins="$(binaries_for "$tool")"
+            for candidate in $bins; do
+                if have "$candidate"; then
+                    binary="$candidate"
+                    break
+                fi
+            done
+        fi
+        [[ -n "$binary" ]] || continue
+        if [[ "$tool" == "pi" && -x "$HOME/.local/bin/pi" ]]; then
+            selected="$HOME/.local/bin/pi"
+        fi
+        audit_managed_cli_command "$tool" "$binary" "$selected"
+    done <<EOF
+$(managed_cli_audit_items)
+EOF
 }
 
 direct_artifact_provenance_dir() {
@@ -4699,8 +4801,10 @@ if [[ -n "${INSTALL_DEPS_SOURCE_ONLY:-}" ]]; then
 fi
 
 if [[ "$UPDATE_ONLY" -eq 1 ]]; then
-    run_update_mode
-    exit $?
+    UPDATE_RC=0
+    run_update_mode || UPDATE_RC=$?
+    audit_managed_cli_installations
+    exit "$UPDATE_RC"
 fi
 
 PM="$(detect_pm)"
@@ -4845,6 +4949,7 @@ run_catalog_install editorconfig-checker
 section "notes / Obsidian vault (optional)"
 configure_notes_vault
 
+audit_managed_cli_installations
 exit_if_install_failures
 echo
 echo "install-deps: done"
