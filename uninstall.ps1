@@ -590,11 +590,12 @@ function Invoke-PiThemeSelectionCleanup {
         Write-Output '  would: remove Pi theme=rose-pine only if it is still the managed selection'
         return
     }
+    $settings = Join-Path $Identity.UserProfile '.pi\agent\settings.json'
+    if (-not (Test-Path -LiteralPath $settings -PathType Leaf)) { return }
     $node = Get-Command node -ErrorAction SilentlyContinue
     if (-not $node) {
         throw 'node is required to safely remove the managed Pi theme selection'
     }
-    $settings = Join-Path $Identity.UserProfile '.pi\agent\settings.json'
     $oldNativePreference = $null
     $hasNativePreference = Test-Path Variable:PSNativeCommandUseErrorActionPreference
     try {

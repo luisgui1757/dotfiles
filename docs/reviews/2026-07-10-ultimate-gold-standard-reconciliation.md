@@ -2724,3 +2724,63 @@ installation.
 
 Hosted exact-head checks and a physical `Shift+Enter` keystroke inside Pi under
 Herdr remain downstream evidence; this local entry does not claim either yet.
+
+## PR #58 independent-review reconciliation — entry 66
+
+- Fable independently reviewed pull request #58 at exact head `600bc71` and
+  found no merge blocker, but identified three concrete P3 robustness and
+  provenance gaps. The branch subsequently added only the Pi multiline-input
+  change through `d3e4783` before this reconciliation, so every finding was
+  revalidated against the current combined tree rather than assumed from the
+  older review head.
+- Managed-command duplicate detection now compares the filesystem object, not
+  merely its canonical path. POSIX uses device and inode from `stat`; Windows
+  opens the file and compares the Win32 volume serial plus file index. Case
+  aliases, symlinks, ancestor directory junctions, and hardlinks to one file
+  therefore collapse to one installation. If native identity metadata cannot
+  be read, both implementations retain their non-fatal canonical-path fallback.
+  The POSIX fixture exercises a real hardlink; the Windows-only Pester case
+  creates both a real directory junction and a hardlink.
+- Pi-theme uninstall now returns successfully before probing Node when the
+  settings file does not exist. An existing settings file still requires the
+  structured Node helper and fails closed if Node is unavailable; neither
+  wrapper guesses at a JSON edit. Focused shell and PowerShell regressions own
+  both sides of that boundary.
+- The Pi Rose Pine provenance row now records the exact intentional divergence
+  from `pi-themes-rose-pine@0.1.0`: the obsolete `badlogic/pi-mono` schema URL
+  was updated to `earendil-works/pi`, six blank-only lines were removed, and all
+  palette/token values remain identical. README and the agent invariant mirror
+  that normalization.
+- The unreleased-branch guide now states the native-Windows contract explicitly:
+  Windows has no Nix release-identity gate or `-AllowUnreleased` option, so a
+  branch test is the normal `.\setup.ps1 -All` from the cloned official branch.
+  The static pin-consistency test now binds Herdr stable/preview versions and
+  all three artifact hashes to README and the supply-chain ledger.
+- Fable's concern that Renovate could not order the non-semver Windows preview
+  tag was rejected after checking the real manager: `renovate.json` already
+  assigns `regex:^preview-(?<major>\d{4})-(?<minor>\d{2})-(?<patch>\d{2})-(?<build>[0-9a-f]+)$`,
+  and official local extraction still finds the record. No manager change was
+  needed. A full lazy.nvim stub invocation for `:WhichKey`, stale-lock
+  reclamation for the Pi theme helper, and behavior with an unset empty `PATH`
+  remain non-material optional coverage or new-policy ideas, not observed
+  defects; no speculative feature was added.
+
+### Reconciliation verification
+
+| Check | Exact result |
+|---|---|
+| New POSIX hardlink and absent-settings regressions before implementation | EXPECTED FAIL: a hardlink to the selected command was reported as a duplicate, and uninstall probed Node with no Pi settings file |
+| `make test-shell` | PASS: complete shell suite, including the new physical-identity and uninstall-no-op regressions, ended `lint OK` |
+| `pwsh -NoLogo -NoProfile -File ./test.ps1` | PASS before this result-only ledger append: exact PSScriptAnalyzer fingerprint, 281 passed, 0 failed, 1 Windows-only skipped Pester test, plus the direct Neovim spec runner |
+| `make test-starship test-tmux test-ghostty test-wezterm test-aerospace test-nix` | PASS: complete terminal and Nix configuration/ownership groups |
+| `make test-migration` | PASS: release-upgrade, parity, uninstall lifecycle, Windows Terminal policy, and oracle gates |
+| `make validate-renovate` | PASS: official schema validation and local extraction found all 81 reviewed dependency records, including the regex-versioned Herdr preview |
+| `bash tests/static/pin_consistency_test.sh`, changed-script `bash -n`, and changed-script ShellCheck | PASS: Herdr doc mirrors, syntax, and shell diagnostics are clean |
+| Full `make ci` attempt on this host | ENVIRONMENTAL FAIL after the complete static gate: one Neovim startup-cache mtime assertion changed while the macOS file provider stretched repository reads from milliseconds to minutes; all subsequent reported Neovim specs were green |
+| Isolated startup-spec retry | ENVIRONMENTAL TIMEOUT before measured init while prewarm was still verifying the 30 locked plugin checkouts; per the two-attempt rule no third local result is claimed |
+
+The opened-handle Windows identity path and its real junction/hardlink fixture
+remain exact-head hosted-Windows evidence until the pushed PR checks complete.
+The local startup result is intentionally not promoted to green; entry 65
+records the same host-I/O failure class and its prior isolated pass. No merge,
+release, physical Herdr keypress, or visual Pi-theme result is claimed here.

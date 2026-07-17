@@ -442,6 +442,18 @@ authorize a fork, a local commit, a stale checkout, or an in-place v0.1.0
 migration. Setup links managed config to this checkout, so keep it in place
 while the machine uses the tested configuration.
 
+Native Windows has no Nix release-identity gate and therefore no
+`-AllowUnreleased` switch. Test the same official branch by cloning it and
+running the normal Windows entry point:
+
+```powershell
+$TestBranch = 'BRANCH_NAME'
+git clone --branch $TestBranch --single-branch `
+  https://github.com/luisgui1757/dotfiles.git $HOME\dotfiles-test
+Set-Location $HOME\dotfiles-test
+.\setup.ps1 -All
+```
+
 ```powershell
 # windows
 # enable Developer Mode, then run from a normal PowerShell
@@ -684,6 +696,9 @@ are not deleted: validated stable/Preview/Canary/portable backups restore indepe
 the displaced current file is preserved as `settings.json.uninstall-current.*`.
 Pi settings are also preserved: uninstall removes `theme` only when it still
 equals the repo-managed `rose-pine` value, and never changes a later user choice.
+When Pi has no `settings.json`, that cleanup is a successful no-op and does not
+require Node; an existing settings file still requires Node for the structured,
+fail-closed edit.
 
 For a destructive Apple Silicon owner-host smoke, run
 `./tests/macos_owner_lifecycle.sh` from a clean committed checkout. It prompts
@@ -1089,7 +1104,10 @@ POSIX pwsh profile management remains provisioning-adjacent.
   proves ownership, the warning includes the exact same-user, no-`sudo`
   uninstall command. Chezmoi deploys the audited `pi/rose-pine.json` theme and
   the exact `pi/keybindings.json` multiline pair (`Shift+Enter`, with `Ctrl+J`
-  retained as Pi's transport fallback). Setup atomically merges only
+  retained as Pi's transport fallback). The theme is a documented normalization
+  of `pi-themes-rose-pine@0.1.0`: its obsolete `badlogic/pi-mono` schema URL is
+  updated to `earendil-works/pi` and six blank-only lines are removed; every
+  palette and token value is unchanged. Setup atomically merges only
   `theme: rose-pine` into
   `~/.pi/agent/settings.json` under Pi's `settings.json.lock` convention.
   Invalid or busy settings fail without mutation; all unrelated keys remain.
@@ -1102,14 +1120,17 @@ POSIX pwsh profile management remains provisioning-adjacent.
 - Dependency setup finishes with a cross-platform duplicate-command audit for
   every managed CLI in its install inventory. The first physically distinct
   command on `PATH` is the selected runtime authority; later commands with the
-  same name are reported without being executed or removed. Symlinked aliases
-  of the same executable and immutable OS fallbacks (`/usr/bin`, `/bin`,
-  Windows `System32`, and Windows app-execution aliases) are not treated as
-  competing installations. POSIX ownership probes recognize exact Homebrew,
-  npm-global, and Nix sources; Windows recognizes Scoop, winget, and Chocolatey
-  sources. Exact uninstall commands are printed only for proven user-scoped
-  Homebrew, npm, or Scoop packages. System/global managers are identified but
-  still require a deliberate scope review before removal.
+  same name are reported without being executed or removed. Filesystem identity
+  (device+inode on POSIX; volume+file index on Windows) collapses case aliases,
+  symlinks, ancestor junctions, and hardlinks to the same executable; canonical
+  path resolution is the non-fatal fallback when identity metadata is
+  unavailable. Immutable OS fallbacks (`/usr/bin`, `/bin`, Windows `System32`,
+  and Windows app-execution aliases) are not treated as competing installations.
+  POSIX ownership probes recognize exact Homebrew, npm-global, and Nix sources;
+  Windows recognizes Scoop, winget, and Chocolatey sources. Exact uninstall
+  commands are printed only for proven user-scoped Homebrew, npm, or Scoop
+  packages. System/global managers are identified but still require a deliberate
+  scope review before removal.
 - Native Windows accepts an existing Tree-sitter CLI only when `tree-sitter
   --version` is exactly `0.26.10`. Missing, stale, partial, or incompatible
   commands are repaired from the architecture-specific `v0.26.10` GitHub
@@ -1415,7 +1436,7 @@ Manual-review pin surfaces that Renovate may touch only partially:
 | Hack Nerd Font | Unix and Windows mirrors must stay identical; version/hash drift is caught by `pin_consistency_test.sh`. |
 | Pi CLI | Unix/Windows install pins and e2e assertions mirror version `0.80.9`; the npm-pack metadata and downloaded coding-agent tarball bytes must both match the human-reviewed SRI, and all three Pi companion modules are requested at the exact same release. |
 | Herdr | Native Linux pins stable `v0.7.4` with both architecture hashes; Windows pins post-fix preview `preview-2026-07-16-e907e6a36646` with its x64 hash. Homebrew platforms consume the reviewed `v0.7.4` formula. |
-| Pi Rose Pine theme | The repo vendors only `rose-pine.json` from audited data-only package `pi-themes-rose-pine@0.1.0`, preserves its MIT license, and tests the exact palette plus all 51 Pi tokens. Pi's separate keybindings file explicitly retains the upstream `Shift+Enter` / `Ctrl+J` newline pair. |
+| Pi Rose Pine theme | The repo vendors a documented normalization of `rose-pine.json` from audited data-only package `pi-themes-rose-pine@0.1.0`: the obsolete schema URL is updated from `badlogic/pi-mono` to `earendil-works/pi`, six blank-only lines are removed, every palette/token value is unchanged, and the MIT license is preserved. Tests bind the exact palette plus all 51 Pi tokens. Pi's separate keybindings file explicitly retains the upstream `Shift+Enter` / `Ctrl+J` newline pair. |
 | gh-dash | Tag `v4.25.1`, annotated tag object `e6ebbd7e83e30161b9192ce3339972d2c8269e7f`, and peeled commit `49f37e4832956c57bf52d4ea8b1b1e5c0f863700` are mirrored; installers verify the tag mapping and pass the release tag required by `gh extension install --pin` for binary extensions. |
 
 Direct network executables must be pinned and verified before execution, or be a

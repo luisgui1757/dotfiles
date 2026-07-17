@@ -1443,19 +1443,123 @@ function Get-ManagedCommandSourceText {
     return ''
 }
 
+function Initialize-WindowsFileIdentityType {
+    $type = [System.Management.Automation.PSTypeName]'Dotfiles.WindowsFileIdentity'
+    if ($null -ne $type.Type) { return $true }
+    if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) { return $false }
+    try {
+        Add-Type -TypeDefinition @"
+using System;
+using System.ComponentModel;
+using System.Globalization;
+using System.IO;
+using System.Runtime.InteropServices;
+using Microsoft.Win32.SafeHandles;
+
+namespace Dotfiles
+{
+    public static class WindowsFileIdentity
+    {
+        [StructLayout(LayoutKind.Sequential)]
+        private struct ByHandleFileInformation
+        {
+            public uint FileAttributes;
+            public System.Runtime.InteropServices.ComTypes.FILETIME CreationTime;
+            public System.Runtime.InteropServices.ComTypes.FILETIME LastAccessTime;
+            public System.Runtime.InteropServices.ComTypes.FILETIME LastWriteTime;
+            public uint VolumeSerialNumber;
+            public uint FileSizeHigh;
+            public uint FileSizeLow;
+            public uint NumberOfLinks;
+            public uint FileIndexHigh;
+            public uint FileIndexLow;
+        }
+
+        [DllImport("kernel32.dll", EntryPoint = "CreateFileW", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern SafeFileHandle CreateFile(
+            string path,
+            uint desiredAccess,
+            FileShare shareMode,
+            IntPtr securityAttributes,
+            FileMode creationDisposition,
+            uint flagsAndAttributes,
+            IntPtr templateFile
+        );
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool GetFileInformationByHandle(
+            SafeFileHandle handle,
+            out ByHandleFileInformation information
+        );
+
+        public static string GetIdentity(string path)
+        {
+            using (SafeFileHandle handle = CreateFile(
+                path,
+                0,
+                FileShare.ReadWrite | FileShare.Delete,
+                IntPtr.Zero,
+                FileMode.Open,
+                0,
+                IntPtr.Zero
+            ))
+            {
+                if (handle.IsInvalid)
+                {
+                    throw new Win32Exception(Marshal.GetLastWin32Error());
+                }
+
+                ByHandleFileInformation information;
+                if (!GetFileInformationByHandle(handle, out information))
+                {
+                    throw new Win32Exception(Marshal.GetLastWin32Error());
+                }
+
+                ulong fileIndex = ((ulong)information.FileIndexHigh << 32) | information.FileIndexLow;
+                return information.VolumeSerialNumber.ToString("X8", CultureInfo.InvariantCulture) + ":" +
+                    fileIndex.ToString("X16", CultureInfo.InvariantCulture);
+            }
+        }
+    }
+}
+"@ -ErrorAction Stop
+        return $true
+    } catch {
+        Write-Verbose ("Could not initialize Windows file identity support: {0}" -f $_.Exception.Message)
+        return $false
+    }
+}
+
+function Get-WindowsPhysicalFileIdentity {
+    param([string]$Path)
+    if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) { return '' }
+    if (-not (Initialize-WindowsFileIdentityType)) { return '' }
+    try {
+        return [Dotfiles.WindowsFileIdentity]::GetIdentity($Path)
+    } catch {
+        Write-Verbose ("Could not read Windows file identity for {0}: {1}" -f $Path, $_.Exception.Message)
+        return ''
+    }
+}
+
 function Resolve-WindowsCommandIdentity {
     param([string]$Path)
     $normalized = ConvertTo-WindowsComparablePath -Path $Path
     if ([string]::IsNullOrWhiteSpace($normalized)) { return '' }
     try {
         if (Test-Path -LiteralPath $normalized -PathType Leaf) {
+            $physicalIdentity = Get-WindowsPhysicalFileIdentity -Path $normalized
+            if (-not [string]::IsNullOrWhiteSpace($physicalIdentity)) {
+                return "file-id:$physicalIdentity"
+            }
             $resolved = Resolve-Path -LiteralPath $normalized -ErrorAction Stop
-            return (ConvertTo-WindowsComparablePath -Path $resolved.Path)
+            return ("path:{0}" -f (ConvertTo-WindowsComparablePath -Path $resolved.Path))
         }
     } catch {
         Write-Verbose ("Could not resolve managed command path {0}: {1}" -f $normalized, $_.Exception.Message)
     }
-    return $normalized
+    return "path:$normalized"
 }
 
 function Test-WindowsSystemCommandFallback {

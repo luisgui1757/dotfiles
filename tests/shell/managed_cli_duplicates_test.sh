@@ -16,7 +16,8 @@ trap 'rm -rf "$TMP_ROOT"' EXIT
 selected_bin="$TMP_ROOT/selected/bin"
 duplicate_bin="$TMP_ROOT/duplicate/bin"
 alias_bin="$TMP_ROOT/alias/bin"
-mkdir -p "$selected_bin" "$duplicate_bin" "$alias_bin"
+hardlink_bin="$TMP_ROOT/hardlink/bin"
+mkdir -p "$selected_bin" "$duplicate_bin" "$alias_bin" "$hardlink_bin"
 
 cat > "$selected_bin/rg" <<'EOF'
 #!/usr/bin/env bash
@@ -28,12 +29,13 @@ printf '%s\n' duplicate-executed >> "${MANAGED_CLI_EXEC_LOG:?}"
 EOF
 chmod +x "$selected_bin/rg" "$duplicate_bin/rg"
 ln -s "$selected_bin/rg" "$alias_bin/rg"
+ln "$selected_bin/rg" "$hardlink_bin/rg"
 
 # The selected command is the runtime authority. A physically distinct command
 # later on PATH is reported without executing either command; a second symlink
 # to the selected executable is not a second installation.
 (
-    PATH="$selected_bin:$alias_bin:$duplicate_bin:/usr/bin:/bin"; export PATH
+    PATH="$selected_bin:$alias_bin:$hardlink_bin:$duplicate_bin:/usr/bin:/bin"; export PATH
     MANAGED_CLI_EXEC_LOG="$TMP_ROOT/executed.log"; export MANAGED_CLI_EXEC_LOG
     INSTALL_DEPS_AUDIT_ITEMS='rg|rg'; export INSTALL_DEPS_AUDIT_ITEMS
 
@@ -46,6 +48,8 @@ ln -s "$selected_bin/rg" "$alias_bin/rg"
         || fail "distinct duplicate missing: $out"
     [[ "$out" != *"$alias_bin/rg"* ]] \
         || fail "same physical executable was reported twice: $out"
+    [[ "$out" != *"$hardlink_bin/rg"* ]] \
+        || fail "hardlink to the same physical executable was reported twice: $out"
     [[ ! -e "$MANAGED_CLI_EXEC_LOG" ]] \
         || fail "the audit executed a managed command"
 )

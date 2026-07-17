@@ -3113,6 +3113,28 @@ Describe "managed command duplicate audit" {
         ([regex]::Matches($output, '(?i)selected\\rg\.exe')).Count | Should -Be 1
     }
 
+    It "collapses ancestor junctions and hardlinks by physical file identity" `
+        -Skip:([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
+        $root = Join-Path ([IO.Path]::GetTempPath()) ('managed-command-identity-' + [guid]::NewGuid())
+        $targetDir = Join-Path $root 'target'
+        $junctionDir = Join-Path $root 'junction'
+        $hardlinkDir = Join-Path $root 'hardlink'
+        $target = Join-Path $targetDir 'rg.exe'
+        $junction = Join-Path $junctionDir 'rg.exe'
+        $hardlink = Join-Path $hardlinkDir 'rg.exe'
+        try {
+            New-Item -ItemType Directory -Force -Path $targetDir, $hardlinkDir | Out-Null
+            [IO.File]::WriteAllBytes($target, [byte[]](0x4d, 0x5a))
+            New-Item -ItemType Junction -Path $junctionDir -Target $targetDir | Out-Null
+            New-Item -ItemType HardLink -Path $hardlink -Target $target | Out-Null
+
+            Resolve-WindowsCommandIdentity -Path $junction | Should -Be (Resolve-WindowsCommandIdentity -Path $target)
+            Resolve-WindowsCommandIdentity -Path $hardlink | Should -Be (Resolve-WindowsCommandIdentity -Path $target)
+        } finally {
+            Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
     It "covers every managed command in the install inventory" {
         $expected = @((Get-InstallDependencySpec) | Where-Object {
                 $_.Kind -eq 'tool' -and $_.Tool -ne 'scoop' -and

@@ -43,6 +43,7 @@ assert_contains() {
 }
 
 sh_const() { grep -E "^$1=" install-deps.sh | head -1 | cut -d'"' -f2; }
+ps_const() { grep -E "^[[:space:]]*\\\$$1[[:space:]]*=" install-deps.ps1 | head -1 | cut -d"'" -f2; }
 yml_const() { awk -v key="$1" '$1 == key ":" { print $2; exit }' .github/workflows/test.yml; }
 setup_sh_const() { grep -E "^$1=" setup.sh | head -1 | cut -d'"' -f2; }
 setup_ps_const() { grep -E "^[[:space:]]*\\\$$1[[:space:]]*=" setup.ps1 | head -1 | cut -d"'" -f2; }
@@ -84,6 +85,20 @@ assert_eq "tree-sitter version (install-deps.sh == test.yml)" \
     "$(sh_const TREE_SITTER_CLI_LINUX_VERSION)" "$(yml_const TREE_SITTER_CLI_LINUX_VERSION)"
 assert_eq "tree-sitter x86_64 SHA (install-deps.sh == test.yml)" \
     "$(sh_const TREE_SITTER_CLI_LINUX_X86_64_SHA256)" "$(yml_const TREE_SITTER_CLI_LINUX_X86_64_SHA256)"
+
+# --- Herdr stable/preview pins: installers <-> operator/provenance docs -------
+herdr_version="$(sh_const HERDR_VERSION)"
+herdr_windows_preview="$(ps_const HerdrWindowsPreviewVersion)"
+assert_contains "Herdr stable version (README.md)" "README.md" "$herdr_version"
+assert_contains "Herdr stable version (security ledger)" "docs/security/supply-chain.md" "$herdr_version"
+assert_contains "Herdr Linux x86_64 SHA (security ledger)" \
+    "docs/security/supply-chain.md" "$(sh_const HERDR_LINUX_X86_64_SHA256)"
+assert_contains "Herdr Linux arm64 SHA (security ledger)" \
+    "docs/security/supply-chain.md" "$(sh_const HERDR_LINUX_ARM64_SHA256)"
+assert_contains "Herdr Windows preview (README.md)" "README.md" "$herdr_windows_preview"
+assert_contains "Herdr Windows preview (security ledger)" "docs/security/supply-chain.md" "$herdr_windows_preview"
+assert_contains "Herdr Windows x64 SHA (security ledger)" \
+    "docs/security/supply-chain.md" "$(ps_const HerdrWindowsX64Sha256)"
 
 # --- Ghostty exact Debian package pins: source <-> tests <-> security ledger --
 ghostty_version="$(sh_const GHOSTTY_UBUNTU_VERSION)"
@@ -129,7 +144,6 @@ assert_eq "zsh-autosuggestions commit (install-deps.sh == chezmoi publisher)" \
 # install-deps.sh. Windows: the psmux/psmux-plugins monorepo commit in
 # install-deps.ps1 (vendored resurrect/continuum). The Rose Pine bar is a
 # repo-owned generated config, NOT a plugin, so rose-pine/tmux is retired.
-ps_const() { grep -E "^[[:space:]]*\\\$$1[[:space:]]*=" install-deps.ps1 | head -1 | cut -d"'" -f2; }
 tpm_commit="$(sh_const TPM_COMMIT)"
 psmux_plugins_commit="$(ps_const PsmuxPluginsCommit)"
 assert_eq "tree-sitter version (POSIX == Windows)" \

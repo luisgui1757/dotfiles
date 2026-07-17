@@ -2825,6 +2825,22 @@ PY
     printf '%s\n' "$source"
 }
 
+managed_cli_file_identity() {
+    local source="$1" identity real
+    if [[ -e "$source" ]]; then
+        case "$(uname -s)" in
+            Darwin) identity="$(stat -Lf '%d:%i' "$source" 2>/dev/null || true)" ;;
+            *) identity="$(stat -Lc '%d:%i' "$source" 2>/dev/null || true)" ;;
+        esac
+        if [[ -n "$identity" ]]; then
+            printf 'file-id:%s\n' "$identity"
+            return 0
+        fi
+    fi
+    real="$(real_source_path "$source")"
+    printf 'path:%s\n' "$real"
+}
+
 physical_path() {
     local source="$1" dir base physical_dir
     dir="$(dirname "$source")"
@@ -3078,7 +3094,7 @@ managed_cli_report_duplicate_owner() {
 }
 
 audit_managed_cli_command() {
-    local tool="$1" binary="$2" selected="${3:-}" key candidate candidate_real selected_real
+    local tool="$1" binary="$2" selected="${3:-}" key candidate candidate_identity selected_identity
     local -a duplicates=()
     key="|${tool}:${binary}|"
     [[ "$MANAGED_CLI_AUDITED" != *"$key"* ]] || return 0
@@ -3088,11 +3104,11 @@ audit_managed_cli_command() {
         selected="$(command -v "$binary" 2>/dev/null || true)"
     fi
     [[ -n "$selected" && -x "$selected" ]] || return 0
-    selected_real="$(real_source_path "$selected")"
+    selected_identity="$(managed_cli_file_identity "$selected")"
     while IFS= read -r candidate; do
         [[ -n "$candidate" && -x "$candidate" ]] || continue
-        candidate_real="$(real_source_path "$candidate")"
-        [[ "$candidate_real" != "$selected_real" ]] || continue
+        candidate_identity="$(managed_cli_file_identity "$candidate")"
+        [[ "$candidate_identity" != "$selected_identity" ]] || continue
         managed_cli_system_fallback_path "$candidate" && continue
         duplicates+=("$candidate")
     done < <(type -a -p "$binary" 2>/dev/null | awk '!seen[$0]++')

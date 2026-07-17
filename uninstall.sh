@@ -71,6 +71,7 @@ unset_pi_theme_selection() {
         echo "  would: remove Pi theme=rose-pine only if it is still the managed selection"
         return 0
     fi
+    [[ -e "$settings" ]] || return 0
     have node || {
         echo "uninstall: node is required to safely remove the managed Pi theme selection" >&2
         return 1

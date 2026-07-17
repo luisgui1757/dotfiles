@@ -197,6 +197,23 @@ Describe 'uninstall.ps1 Pi theme cleanup' -Skip:(-not (Get-Command node -ErrorAc
     }
 }
 
+Describe 'uninstall.ps1 absent Pi settings cleanup' {
+    It 'does not require node when there is no settings file to edit' {
+        . $script:ImportUninstallForTest
+        $root = Join-Path ([IO.Path]::GetTempPath()) ('uninstall-pi-theme-absent-' + [guid]::NewGuid())
+        $identity = [pscustomobject]@{ UserProfile = $root }
+        try {
+            Mock -CommandName Get-Command -MockWith { throw 'node lookup must not run' } `
+                -ParameterFilter { $Name -eq 'node' }
+
+            { Invoke-PiThemeSelectionCleanup -Identity $identity } | Should -Not -Throw
+            Should -Invoke -CommandName Get-Command -Times 0 -Exactly -ParameterFilter { $Name -eq 'node' }
+        } finally {
+            Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
 Describe 'uninstall.ps1 chezmoi native verify semantics' {
     BeforeEach {
         . $script:ImportUninstallForTest

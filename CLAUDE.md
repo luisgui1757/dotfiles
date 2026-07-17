@@ -1027,10 +1027,11 @@ captures; their adjacent SHA-256 constants remain manual verification context.
 Several pins are also **mirrored across files** (nvim version/SHA in
 `install-deps.sh`, `test.yml`, and `tests/shell/install_nvim_linux{,_fail}_test.sh`;
 zsh plugin tag/commit in `install-deps.sh`, `home/.chezmoiexternal.toml.tmpl`, and
-the verify-pins run-script). A Renovate bump touches one surface and strands the
-mirrors. `tests/static/pin_consistency_test.sh` is the canonical drift guard — it
-fails CI when any mirror disagrees. When you bump a pin, update every mirror and
-keep that test green.
+the verify-pins run-script; Herdr stable/preview versions and checksums in the
+installers, README, and supply-chain ledger). A Renovate bump touches one surface
+and strands the mirrors. `tests/static/pin_consistency_test.sh` is the canonical
+drift guard — it fails CI when any mirror disagrees. When you bump a pin, update
+every mirror and keep that test green.
 
 Validate `renovate.json` locally with Renovate's own schema validator and local
 extract dry run, not just `jq`: run `scripts/validate-renovate.sh`, `make validate-renovate`, or `make ci`
@@ -1429,7 +1430,9 @@ save only**. The next plain `:w` formats normally. Implemented in
   as `settings.json.uninstall-current.*`, and honors `-NoRestoreBackups`.
   Before removing the Pi theme file, uninstall deletes the global `theme` key
   only when it still equals `rose-pine`; a later user selection and every other
-  Pi setting remain untouched.
+  Pi setting remain untouched. If the Pi settings file is absent, cleanup returns
+  successfully before probing Node; if it exists, Node remains mandatory for the
+  structured fail-closed edit.
   Dry-run mode must also leave empty external parent directories in place; it
   prints `would:` lines only and does not prune `~/.local/share/dotfiles`.
 - **Starship binary install paths differ by OS.** Homebrew owns
@@ -1540,16 +1543,20 @@ save only**. The next plain `:w` formats normally. Implemented in
 - **Audit duplicate managed commands after dependency setup on every OS.** Use
   the install inventory, not a Pi-only list. The first physical command on
   `PATH` is the selected runtime authority; enumerate later physical commands
-  without executing them, collapse symlinks/junctions and case variants, and
-  ignore immutable base-OS fallbacks (`/usr/bin`, `/bin`, Windows `System32`,
-  and WindowsApps aliases). POSIX may attribute a duplicate only after exact
-  Homebrew receipt, npm global-prefix/package, or Nix-path proof. Windows may
-  attribute only after Scoop shim/package-list, winget package/path, or
-  Chocolatey package/path proof. Print exact cleanup only for a proven
-  user-scoped Homebrew, npm, or Scoop owner; global/system scope still requires
-  explicit human review. Unknown provenance gets original-manager guidance.
-  Never silently delete a foreign installation. Pi retains the stronger
-  canonical `~/.local/bin/pi` selection before this shared audit.
+  without executing them. Compare the filesystem object itself—device+inode on
+  POSIX and volume serial+file index from an opened handle on Windows—so case
+  aliases, symlinks, ancestor junctions, and hardlinks collapse to one identity.
+  Canonical path resolution is the non-fatal fallback when native identity
+  metadata cannot be read. Ignore immutable base-OS fallbacks (`/usr/bin`,
+  `/bin`, Windows `System32`, and WindowsApps aliases). POSIX may attribute a
+  duplicate only after exact Homebrew receipt, npm global-prefix/package, or
+  Nix-path proof. Windows may attribute only after Scoop shim/package-list,
+  winget package/path, or Chocolatey package/path proof. Print exact cleanup
+  only for a proven user-scoped Homebrew, npm, or Scoop owner; global/system
+  scope still requires explicit human review. Unknown provenance gets
+  original-manager guidance. Never silently delete a foreign installation. Pi
+  retains the stronger canonical `~/.local/bin/pi` selection before this shared
+  audit.
 - **Apt `update` is best-effort, decoupled from `install`.** The apt arms of
   `pm_install`, `native_linux_pm_install`, and `pm_update` run `apt-get update`
   on its own line (`|| warn`), then ALWAYS run `apt-get install`. Do NOT restore
@@ -1990,7 +1997,11 @@ save only**. The next plain `:w` formats normally. Implemented in
   gets Node through the native catalog. Chezmoi deploys the byte-identical
   `pi/rose-pine.json` / `home/dot_pi/agent/themes/rose-pine.json` and
   `pi/keybindings.json` / `home/dot_pi/agent/keybindings.json` pairs on every
-  OS. The keybindings file owns exactly Pi's upstream-default newline action:
+  OS. The canonical theme is a documented normalization of the audited package
+  file: its obsolete `badlogic/pi-mono` schema URL is updated to
+  `earendil-works/pi` and six blank-only lines are removed, with every palette
+  and token value unchanged. The keybindings file owns exactly Pi's
+  upstream-default newline action:
   `Shift+Enter`, with `Ctrl+J` retained as the transport fallback. Herdr v0.7.4
   preserves the modified key directly; POSIX tmux uses its version-compatible
   extended-key transport. Do not add Ghostty's legacy
