@@ -2819,3 +2819,32 @@ release, physical Herdr keypress, or visual Pi-theme result is claimed here.
 Hosted exact-head checks and a real Windows Pi failure remain downstream
 evidence after push. This entry does not promote either to locally verified and
 does not claim merge, release, physical Herdr keypress, or visual theme proof.
+
+## PR #58 Windows analyzer-baseline correction — entry 68
+
+- Exact-head Windows CI at `79e67b0` passed all 283 Pester tests but failed the
+  PSScriptAnalyzer baseline. The stderr regression in entry 67 now consumes the
+  mock's `StderrPath`, intentionally removing one `PSReviewUnusedParameter`
+  warning from `InstallDeps.Tests.ps1`; the reviewed baseline still expected 17
+  and the real analyzer reported 16.
+- Entry 67's local analyzer PASS claim is withdrawn. Its analyzer-only extraction
+  replaced `$PSScriptRoot` correctly but checked `$script:Failures` from the
+  wrong dynamic-script scope, so the wrapper returned success after the inner
+  gate failed. Re-running the raw analyzer locally reproduces the same 16-warning
+  total as Windows.
+- The baseline now expects 16 and binds the recomputed exact warning-identity
+  fingerprint `8d474f5850fe92a168f5d9528897866d3a14a68d57913b7072a3cfb63722adc6`.
+  No warning was suppressed or manufactured; the only removed identity is the
+  newly used mock parameter.
+
+### Analyzer correction verification
+
+| Check | Exact result |
+|---|---|
+| Exact-head Windows `test` job at `79e67b0` | EXPECTED PRODUCT PASS / BASELINE FAIL: Pester 283 passed, 0 failed; analyzer expected 17 unused-parameter warnings and observed 16 |
+| Raw local `PSReviewUnusedParameter` enumeration | PASS: the same 16 warning locations reported by Windows are present locally |
+| Corrected analyzer-only runner with failure exit inside the extracted script scope | EXPECTED FAIL before fingerprint update: expected `670c470c...`, actual `8d474f58...` |
+| Corrected count and exact fingerprint | PASS: the repository analyzer gate accepts all reviewed warnings with no new or missing identity |
+
+The next pushed exact-head Windows check remains the authority for closing this
+CI-only correction. No merge or release is claimed here.
