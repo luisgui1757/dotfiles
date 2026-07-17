@@ -4,6 +4,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 INSTALL_DEPS_SOURCE_ONLY=1 source "$REPO_ROOT/install-deps.sh"
+REAL_NODE="$(command -v node)"
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
 
@@ -63,6 +64,14 @@ printf '%s\n' "${PI_TEST_INSTALLED_VERSION:-0.80.9}"
 EOS
         chmod +x "$HOME/.local/bin/pi"
         ;;
+    prefix)
+        [[ "$#" -eq 2 && "${2:-}" == "-g" ]] || exit 71
+        printf '%s\n' "${PI_TEST_NPM_PREFIX:?}"
+        ;;
+    list)
+        [[ "$*" == "list --global --prefix ${PI_TEST_NPM_PREFIX:?} --depth=0 @earendil-works/pi-coding-agent" ]] || exit 72
+        [[ "${PI_TEST_NPM_OWNS_DUPLICATE:-0}" == "1" ]] || exit 1
+        ;;
     *)
         printf 'unexpected npm args: %s\n' "$*" >&2
         exit 2
@@ -70,6 +79,7 @@ EOS
 esac
 EOF
     chmod +x "$dir/npm"
+    ln -s "$REAL_NODE" "$dir/node"
 }
 
 assert_no_pi_temp_dirs() {
@@ -87,7 +97,7 @@ run_case() {
     (
         HOME="$home"; export HOME
         TMPDIR="$tmp"; export TMPDIR
-        PATH="$bin:$PATH"; export PATH
+        PATH="$bin:/usr/bin:/bin"; export PATH
         PI_TEST_LOG="$TMP_ROOT/$name.log"; export PI_TEST_LOG
         PI_TEST_MODE="$mode"; export PI_TEST_MODE
         PI_TEST_PAYLOAD="$VERIFIED_PAYLOAD"; export PI_TEST_PAYLOAD
@@ -105,16 +115,16 @@ run_case() {
     )
 }
 
-# Already-current execution is idempotent and never calls npm.
+# An already-current canonical installation is idempotent and never calls npm.
 (
     HOME="$TMP_ROOT/current-home"; export HOME
-    bin="$TMP_ROOT/current-bin"; mkdir -p "$bin" "$HOME"
-    PATH="$bin:$PATH"; export PATH
-    cat > "$bin/pi" <<'EOF'
+    bin="$TMP_ROOT/current-bin"; mkdir -p "$bin" "$HOME/.local/bin"
+    PATH="$bin:$HOME/.local/bin:/usr/bin:/bin"; export PATH
+    cat > "$HOME/.local/bin/pi" <<'EOF'
 #!/usr/bin/env bash
 printf '%s\n' '0.80.9'
 EOF
-    chmod +x "$bin/pi"
+    chmod +x "$HOME/.local/bin/pi"
     cat > "$bin/npm" <<'EOF'
 #!/usr/bin/env bash
 exit 99
@@ -125,11 +135,46 @@ EOF
     [[ "$out" == *"already installed (0.80.9)"* ]] || fail "current Pi must be idempotent; got: $out"
 )
 
+# A same-version foreign/global Pi is not the repo-owned installation. Setup
+# must publish and prove its canonical ~/.local copy rather than accepting a
+# coincidentally matching command elsewhere on PATH.
+(
+    HOME="$TMP_ROOT/foreign-current-home"; export HOME
+    prefix="$TMP_ROOT/foreign-current-prefix"; bin="$prefix/bin"; tmp="$TMP_ROOT/foreign-current-tmp"
+    mkdir -p "$bin" "$tmp"
+    write_npm_stub "$bin"
+    cat > "$bin/pi" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' '0.80.9'
+EOF
+    chmod +x "$bin/pi"
+    TMPDIR="$tmp"; export TMPDIR
+    PATH="$bin:/usr/bin:/bin"; export PATH
+    PI_TEST_LOG="$TMP_ROOT/foreign-current.log"; export PI_TEST_LOG
+    PI_TEST_MODE=success; export PI_TEST_MODE
+    PI_TEST_PAYLOAD="$VERIFIED_PAYLOAD"; export PI_TEST_PAYLOAD
+    PI_TEST_REPORTED_INTEGRITY="$TEST_SRI"; export PI_TEST_REPORTED_INTEGRITY
+    PI_TEST_INSTALLED_VERSION=0.80.9; export PI_TEST_INSTALLED_VERSION
+    PI_TEST_NPM_PREFIX="$prefix"; export PI_TEST_NPM_PREFIX
+    PI_TEST_NPM_OWNS_DUPLICATE=1; export PI_TEST_NPM_OWNS_DUPLICATE
+    PI_CLI_INTEGRITY="$TEST_SRI"
+    YES_ALL=1
+    DRY_RUN=0
+    pi_cli_node_ready() { return 0; }
+
+    install_pi_cli > "$tmp/install.out" 2>&1
+    foreign_out="$(cat "$tmp/install.out")"
+    [[ "$foreign_out" == *"installed"*"0.80.9"* ]] \
+        || fail "same-version foreign Pi was accepted as canonical: $foreign_out"
+    [[ -x "$HOME/.local/bin/pi" ]] || fail "canonical Pi was not published"
+    grep -q '^install ' "$PI_TEST_LOG" || fail "canonical Pi install did not run"
+)
+
 # Dry-run describes pack, byte verification, and local-tarball install.
 (
     HOME="$TMP_ROOT/dry-home"; export HOME
     bin="$TMP_ROOT/dry-bin"; mkdir -p "$bin" "$HOME"
-    PATH="$bin:$PATH"; export PATH
+    PATH="$bin:/usr/bin:/bin"; export PATH
     write_npm_stub "$bin"
     PI_TEST_LOG="$TMP_ROOT/dry.log"; export PI_TEST_LOG
     YES_ALL=1; DRY_RUN=1
@@ -203,21 +248,25 @@ assert_no_pi_temp_dirs "$TMP_ROOT/success-tmp"
 # later on PATH, so setup installed 0.80.9 but verified Homebrew's stale 0.80.3.
 (
     HOME="$TMP_ROOT/shadow-home"; export HOME
-    bin="$TMP_ROOT/shadow-bin"; tmp="$TMP_ROOT/shadow-tmp"
+    prefix="$TMP_ROOT/shadow-prefix"; bin="$prefix/bin"; tmp="$TMP_ROOT/shadow-tmp"
     mkdir -p "$HOME/.local/bin" "$bin" "$tmp"
     write_npm_stub "$bin"
     cat > "$bin/pi" <<'EOF'
 #!/usr/bin/env bash
+printf '%s\n' executed >> "${PI_TEST_DUPLICATE_EXEC_LOG:?}"
 printf '%s\n' '0.80.3'
 EOF
     chmod +x "$bin/pi"
     TMPDIR="$tmp"; export TMPDIR
-    PATH="$bin:$HOME/.local/bin:$PATH"; export PATH
+    PATH="$bin:$HOME/.local/bin:/usr/bin:/bin"; export PATH
     PI_TEST_LOG="$TMP_ROOT/shadow.log"; export PI_TEST_LOG
     PI_TEST_MODE=success; export PI_TEST_MODE
     PI_TEST_PAYLOAD="$VERIFIED_PAYLOAD"; export PI_TEST_PAYLOAD
     PI_TEST_REPORTED_INTEGRITY="$TEST_SRI"; export PI_TEST_REPORTED_INTEGRITY
     PI_TEST_INSTALLED_VERSION=0.80.9; export PI_TEST_INSTALLED_VERSION
+    PI_TEST_NPM_PREFIX="$prefix"; export PI_TEST_NPM_PREFIX
+    PI_TEST_NPM_OWNS_DUPLICATE=1; export PI_TEST_NPM_OWNS_DUPLICATE
+    PI_TEST_DUPLICATE_EXEC_LOG="$TMP_ROOT/shadow-executed.log"; export PI_TEST_DUPLICATE_EXEC_LOG
     PI_CLI_INTEGRITY="$TEST_SRI"
     YES_ALL=1
     DRY_RUN=0
@@ -232,11 +281,43 @@ EOF
     [[ "$(pi --version)" == "0.80.9" ]] || fail "wrong Pi wins after install"
     local_count="$(printf '%s\n' "$PATH" | tr ':' '\n' | grep -Fxc "$HOME/.local/bin")"
     [[ "$local_count" == "1" ]] || fail "$HOME/.local/bin appears $local_count times after install"
+    [[ "$shadow_out" == *"WARN: another Pi installation remains"* ]] \
+        || fail "duplicate Pi warning missing: $shadow_out"
+    [[ "$shadow_out" == *"$bin/pi"* ]] || fail "duplicate Pi path missing from warning: $shadow_out"
+    [[ "$shadow_out" == *"$bin/npm uninstall --global --prefix $prefix @earendil-works/pi-coding-agent"* ]] \
+        || fail "proven npm cleanup command missing: $shadow_out"
+    [[ "$shadow_out" != *"sudo npm uninstall"* ]] || fail "duplicate cleanup incorrectly recommends sudo"
+    [[ ! -e "$PI_TEST_DUPLICATE_EXEC_LOG" ]] || fail "duplicate Pi was executed during detection"
+)
+
+# Unknown duplicate owners still get a path-specific warning, but setup does
+# not invent an uninstall command or execute the foreign command to classify it.
+(
+    HOME="$TMP_ROOT/unknown-owner-home"; export HOME
+    bin="$TMP_ROOT/unknown-owner-bin"
+    mkdir -p "$HOME/.local/bin" "$bin"
+    cat > "$HOME/.local/bin/pi" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' '0.80.9'
+EOF
+    cat > "$bin/pi" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' executed >> "${PI_TEST_DUPLICATE_EXEC_LOG:?}"
+EOF
+    chmod +x "$HOME/.local/bin/pi" "$bin/pi"
+    PATH="$HOME/.local/bin:$bin:/usr/bin:/bin"; export PATH
+    PI_TEST_DUPLICATE_EXEC_LOG="$TMP_ROOT/unknown-owner-executed.log"; export PI_TEST_DUPLICATE_EXEC_LOG
+
+    unknown_out="$(pi_cli_warn_duplicate_installations 2>&1)"
+    [[ "$unknown_out" == *"$bin/pi"* ]] || fail "unknown duplicate path missing: $unknown_out"
+    [[ "$unknown_out" == *"original package manager"* ]] || fail "unknown-owner guidance missing: $unknown_out"
+    [[ "$unknown_out" != *"cleanup (same user"* ]] || fail "unproved cleanup command was emitted"
+    [[ ! -e "$PI_TEST_DUPLICATE_EXEC_LOG" ]] || fail "unknown duplicate Pi was executed"
 )
 
 (
     HOME="$TMP_ROOT/success-home"; export HOME
-    bin="$TMP_ROOT/success-bin"; PATH="$bin:$HOME/.local/bin:$PATH"; export PATH
+    bin="$TMP_ROOT/success-bin"; PATH="$bin:$HOME/.local/bin:/usr/bin:/bin"; export PATH
     PI_TEST_LOG="$TMP_ROOT/success.log"; export PI_TEST_LOG
     before="$(wc -l < "$PI_TEST_LOG" | tr -d ' ')"
     YES_ALL=1; DRY_RUN=0

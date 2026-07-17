@@ -2010,8 +2010,51 @@ pi_cli_node_ready() {
 }
 
 pi_cli_version() {
-    command -v pi >/dev/null 2>&1 || return 1
-    pi --version 2>/dev/null | awk 'NF { print $1; exit }'
+    local canonical="$HOME/.local/bin/pi"
+    [[ -x "$canonical" ]] || return 1
+    "$canonical" --version 2>/dev/null | awk 'NF { print $1; exit }'
+}
+
+pi_cli_competing_paths() {
+    local canonical="$HOME/.local/bin/pi" candidate
+
+    [[ -x "$canonical" ]] || return 0
+    while IFS= read -r candidate; do
+        [[ "$candidate" -ef "$canonical" ]] || printf '%s\n' "$candidate"
+    done < <(type -a -p pi 2>/dev/null | awk '!seen[$0]++')
+}
+
+pi_cli_warn_duplicate_installations() {
+    local duplicate duplicate_dir npm_candidate npm_prefix unproven_duplicate=0
+    local -a duplicates=()
+
+    while IFS= read -r duplicate; do
+        [[ -n "$duplicate" ]] && duplicates+=("$duplicate")
+    done < <(pi_cli_competing_paths)
+    [[ "${#duplicates[@]}" -gt 0 ]] || return 0
+
+    echo "  WARN: another Pi installation remains and is shadowed by the verified user-local Pi:" >&2
+    for duplicate in "${duplicates[@]}"; do
+        printf '        %s\n' "$duplicate" >&2
+        duplicate_dir="${duplicate%/*}"
+        npm_candidate="$duplicate_dir/npm"
+        npm_prefix=""
+        if [[ -x "$npm_candidate" ]]; then
+            npm_prefix="$("$npm_candidate" prefix -g 2>/dev/null | awk 'NF { print; exit }' || true)"
+        fi
+        if [[ -n "$npm_prefix" && "$duplicate" == "$npm_prefix/bin/pi" ]] &&
+            "$npm_candidate" list --global --prefix "$npm_prefix" --depth=0 "$PI_CLI_PACKAGE" >/dev/null 2>&1; then
+            printf '        cleanup (same user, no sudo): %q uninstall --global --prefix %q %q\n' \
+                "$npm_candidate" "$npm_prefix" "$PI_CLI_PACKAGE" >&2
+        else
+            unproven_duplicate=1
+        fi
+    done
+    printf '        canonical: %s\n' "$HOME/.local/bin/pi" >&2
+    if [[ "$unproven_duplicate" -eq 1 ]]; then
+        echo "        remove each unproven duplicate with its original package manager (no sudo for Homebrew)." >&2
+    fi
+    echo "        setup does not silently remove installations it does not own." >&2
 }
 
 verify_pi_cli_tarball_sri() {
@@ -2088,9 +2131,13 @@ NODE
 
 install_pi_cli() {
     local current node_version
+    if [[ -x "$HOME/.local/bin/pi" ]]; then
+        ensure_local_bin_on_path
+    fi
     current="$(pi_cli_version || true)"
     if [[ "$current" == "$PI_CLI_VERSION" ]]; then
         printf "  ok        %-26s already installed (%s)\n" "pi" "$PI_CLI_VERSION"
+        pi_cli_warn_duplicate_installations
         return 0
     fi
     if ! command -v npm >/dev/null 2>&1; then
@@ -2122,6 +2169,7 @@ install_pi_cli() {
         return 1
     fi
     printf "  installed %-26s %s\n" "pi" "$PI_CLI_VERSION"
+    pi_cli_warn_duplicate_installations
 }
 
 install_chezmoi() {

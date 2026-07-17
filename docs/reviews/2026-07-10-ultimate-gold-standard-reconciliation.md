@@ -2605,3 +2605,41 @@ claimed by this entry.
 
 Hosted reruns and the user's physical confirmation remain downstream evidence;
 this local closure does not claim either result or merge completion.
+
+## POSIX Pi installation ownership and duplicate reporting — entry 63
+
+- The PATH-precedence repair in entry 62 restored the verified user-local Pi at
+  runtime, but it left two ownership gaps: an unrelated same-version `pi` could
+  satisfy the generic installed-version probe, and a shadowed physical duplicate
+  remained opaque after setup succeeded. That was inconsistent with the
+  repository's single-source-of-truth contract even though command resolution
+  was deterministic.
+- On POSIX, `~/.local/bin/pi` is now the sole artifact that can satisfy Pi's
+  installed-version proof. A matching foreign command never suppresses the
+  canonical install. After an already-current or newly installed canonical Pi
+  is verified, setup enumerates every other active `pi` path without executing
+  it and reports each duplicate beside the canonical path.
+- Setup never silently deletes a foreign installation. When the duplicate's
+  sibling `npm` proves both the exact global prefix and ownership by the pinned
+  scoped package, setup prints the exact same-user `npm uninstall --global
+  --prefix ...` command. Unknown provenance receives package-manager-neutral
+  removal guidance. Neither path recommends `sudo`: npm's global ownership is
+  prefix-specific, and Homebrew explicitly rejects sudo for a normal
+  current-user-owned installation.
+- Windows retains its distinct current-npm-prefix publication model. No
+  equivalent Windows failure was observed, so this repair stays scoped to the
+  reported POSIX/Homebrew boundary instead of speculatively changing that
+  contract.
+
+### Ownership verification
+
+| Check | Exact result |
+|---|---|
+| Same-version foreign Pi with no canonical `~/.local/bin/pi`, before implementation | EXPECTED FAIL: setup accepted the foreign version and never published the canonical Pi (`canonical Pi was not published`) |
+| `bash tests/shell/pi_cli_test.sh` | PASS: canonical-only identity, exact install, proven npm duplicate cleanup guidance, unknown-owner warning, no duplicate execution, and no sudo recommendation |
+| `bash tests/shell/setup_local_bin_path_test.sh`, `setup_homebrew_path_test.sh`, and `path_dedupe_test.sh` | PASS: the canonical directory remains first and duplicate-free across setup and shell publication |
+| `make lint` and `bash tests/static/pin_consistency_test.sh` | PASS: strict ShellCheck and exact Pi pin consistency remain clean |
+| `NPM_CONFIG_CACHE=<fresh-temporary-cache> PATH=/opt/homebrew/bin:$PATH make ci` | PASS before this result-only ledger update: uninterrupted run ended `local pre-PR gate passed` across the complete repository gate |
+
+Hosted reruns and the user's physical duplicate cleanup remain downstream
+evidence; setup deliberately reports but does not remove external state.

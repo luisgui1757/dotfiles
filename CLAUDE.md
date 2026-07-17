@@ -1533,7 +1533,13 @@ save only**. The next plain `:w` formats normally. Implemented in
   membership: `install-deps.sh`, setup's runtime refresh, and managed zsh put
   `~/.local/bin` first and remove duplicate entries. This ensures a verified
   user-local artifact wins over any stale global/Homebrew command with the same
-  name; Pi's post-install version proof is the regression surface.
+  name. Pi's idempotence and post-install version checks read the canonical
+  `~/.local/bin/pi` directly; a same-version foreign command never satisfies
+  ownership. After proof, enumerate other executable `pi` paths without running
+  them and warn on each. When a sibling npm executable proves the matching
+  global prefix and package ownership, print its exact same-user, no-`sudo`
+  uninstall command; otherwise require cleanup through the unknown original
+  manager. Never silently delete a foreign installation.
 - **Apt `update` is best-effort, decoupled from `install`.** The apt arms of
   `pm_install`, `native_linux_pm_install`, and `pm_update` run `apt-get update`
   on its own line (`|| warn`), then ALWAYS run `apt-get install`. Do NOT restore
