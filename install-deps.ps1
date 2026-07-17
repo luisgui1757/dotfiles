@@ -3154,6 +3154,22 @@ function Invoke-PiCliNpm {
     }
 }
 
+function Get-PiCliNpmFailureDetail {
+    param([Parameter(Mandatory)][string]$Path)
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return '' }
+    try {
+        $detail = (@(Get-Content -LiteralPath $Path -Tail 20 -ErrorAction Stop) -join [Environment]::NewLine).Trim()
+    } catch {
+        return ''
+    }
+    if ([string]::IsNullOrWhiteSpace($detail)) { return '' }
+    $maxCharacters = 4096
+    if ($detail.Length -gt $maxCharacters) {
+        $detail = '...' + $detail.Substring($detail.Length - ($maxCharacters - 3))
+    }
+    return ([Environment]::NewLine + 'npm stderr (tail):' + [Environment]::NewLine + $detail)
+}
+
 function Invoke-PiCliVerifiedTarballInstall {
     $tempParent = if (-not [string]::IsNullOrWhiteSpace($env:DOTFILES_PI_CLI_TEMP_ROOT)) {
         $env:DOTFILES_PI_CLI_TEMP_ROOT
@@ -3168,7 +3184,8 @@ function Invoke-PiCliVerifiedTarballInstall {
         $spec = "$PiCliPackage@$PiCliVersion"
         $pack = Invoke-PiCliNpm -Arguments @('pack', '--ignore-scripts', '--json', '--pack-destination', $tempDir, $spec) -StderrPath $stderrPath
         if ($pack.ExitCode -ne 0) {
-            throw "npm pack failed for $spec (exit $($pack.ExitCode))"
+            $detail = Get-PiCliNpmFailureDetail -Path $stderrPath
+            throw "npm pack failed for $spec (exit $($pack.ExitCode))$detail"
         }
         try {
             $metadata = @(($pack.Output -join [Environment]::NewLine) | ConvertFrom-Json -ErrorAction Stop)
@@ -3191,7 +3208,8 @@ function Invoke-PiCliVerifiedTarballInstall {
 
         $install = Invoke-PiCliNpm -Arguments @('install', '-g', $tarball, "@earendil-works/pi-agent-core@$PiCliVersion", "@earendil-works/pi-ai@$PiCliVersion", "@earendil-works/pi-tui@$PiCliVersion") -StderrPath $stderrPath
         if ($install.ExitCode -ne 0) {
-            throw "npm install failed for verified local tarball $filename (exit $($install.ExitCode))"
+            $detail = Get-PiCliNpmFailureDetail -Path $stderrPath
+            throw "npm install failed for verified local tarball $filename (exit $($install.ExitCode))$detail"
         }
     } finally {
         Remove-Item -LiteralPath $tempDir -Recurse -Force -ErrorAction SilentlyContinue

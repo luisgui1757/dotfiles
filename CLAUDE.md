@@ -1027,11 +1027,12 @@ captures; their adjacent SHA-256 constants remain manual verification context.
 Several pins are also **mirrored across files** (nvim version/SHA in
 `install-deps.sh`, `test.yml`, and `tests/shell/install_nvim_linux{,_fail}_test.sh`;
 zsh plugin tag/commit in `install-deps.sh`, `home/.chezmoiexternal.toml.tmpl`, and
-the verify-pins run-script; Herdr stable/preview versions and checksums in the
-installers, README, and supply-chain ledger). A Renovate bump touches one surface
-and strands the mirrors. `tests/static/pin_consistency_test.sh` is the canonical
-drift guard — it fails CI when any mirror disagrees. When you bump a pin, update
-every mirror and keep that test green.
+the verify-pins run-script; Herdr stable/preview versions in the installers,
+README, and supply-chain ledger; and Herdr checksums in the installers and
+supply-chain ledger). A Renovate bump touches one surface and strands the mirrors.
+`tests/static/pin_consistency_test.sh` is the canonical drift guard — it fails CI
+when any mirror disagrees. When you bump a pin, update every mirror and keep that
+test green.
 
 Validate `renovate.json` locally with Renovate's own schema validator and local
 extract dry run, not just `jq`: run `scripts/validate-renovate.sh`, `make validate-renovate`, or `make ci`
@@ -1992,7 +1993,9 @@ save only**. The next plain `:w` formats normally. Implemented in
   `pi-agent-core`, `pi-ai`, and `pi-tui` specs. Do not rely on the coding-agent's
   caret ranges: a later companion publish can otherwise combine incompatible
   monorepo APIs with an older CLI. Pack state is scoped to a unique temp
-  directory and cleaned through return/signal/finally paths. POSIX public
+  directory and cleaned through return/signal/finally paths. Windows captures
+  native npm stderr to preserve PowerShell 5.1 behavior; on failure it includes
+  only the last 20 lines and at most 4096 characters before cleanup. POSIX public
   setup gets Node 24 from the enforced Nix package layer; Windows
   gets Node through the native catalog. Chezmoi deploys the byte-identical
   `pi/rose-pine.json` / `home/dot_pi/agent/themes/rose-pine.json` and

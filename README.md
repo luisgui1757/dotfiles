@@ -1092,7 +1092,9 @@ POSIX pwsh profile management remains provisioning-adjacent.
   `agent-core`, `ai`, and `tui` companions to `npm install`. Keeping the Pi
   monorepo packages on one release prevents compatible-looking npm ranges from
   mixing runtime APIs. Temporary pack state is removed on success, mismatch,
-  failure, interruption, and retry.
+  failure, interruption, and retry. Before Windows removes failed temporary
+  state, its error includes a bounded tail of npm stderr so the rejected pack or
+  install remains diagnosable.
   The reviewed SRI is
   `sha512-Clgx2Bg5NbMcCpGxusSDQwE+GC0g/d6sCBluE9aypPgSgtJ6n8VmZIIT6auXObMskpRgkr+XZ77wG5hf+cSDtg==`.
   POSIX public setup gets Node 24 from Nix first; Windows uses the native Node

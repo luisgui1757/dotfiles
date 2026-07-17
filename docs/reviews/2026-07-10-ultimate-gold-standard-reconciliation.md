@@ -2784,3 +2784,38 @@ remain exact-head hosted-Windows evidence until the pushed PR checks complete.
 The local startup result is intentionally not promoted to green; entry 65
 records the same host-I/O failure class and its prior isolated pass. No merge,
 release, physical Herdr keypress, or visual Pi-theme result is claimed here.
+
+## PR #58 final P3 reconciliation — entry 67
+
+- Fable's second independent review covered pull request #58 at exact head
+  `84e22da` and found no P0, P1, or P2 issue. Its three surviving P3 findings
+  were revalidated and closed without expanding the feature scope.
+- The POSIX managed-command inventory now includes the unconditional `gh`
+  install path. The human pre-flight table and the derived duplicate audit
+  therefore cover the same command; the regression binds that exact contract
+  without incorrectly requiring Linux-only conditional packages on macOS.
+- Windows Pi installation still keeps successful npm output quiet and always
+  removes temporary pack state. On a rejected pack or install it now appends
+  only the last 20 stderr lines, capped at 4096 characters, before cleanup so
+  the failure remains actionable without dumping an unbounded npm log.
+- Entry 66's Herdr mirror wording is narrowed to the real contract: installers,
+  README, and this ledger mirror the versions; installers and this ledger mirror
+  the artifact hashes. README has never been a checksum authority, and the
+  static pin-consistency test already enforced the correct split.
+- The review's P4 expansion ideas were not accepted as defects: no observed
+  failure justifies manager-wide install-log capture, another ownership
+  abstraction, or broader duplicate-audit policy in this pull request.
+
+### Final P3 verification
+
+| Check | Exact result |
+|---|---|
+| First generalized POSIX inventory assertion | TEST-DESIGN FAIL: it incorrectly required Linux-only `xclip` in the macOS audit; the assertion was narrowed to the reported unconditional `gh` gap |
+| `bash tests/shell/managed_cli_duplicates_test.sh`, changed-script `bash -n`, and changed-script ShellCheck | PASS: `gh` is present in the pre-flight/duplicate inventory and the changed shell remains clean |
+| `Invoke-Pester -Path tests/powershell/InstallDeps.Tests.ps1 -CI` | PASS: 133 passed, 0 failed, 1 Windows-native-identity test skipped on macOS; rejected Pi installs preserve the bounded stderr tail and clean temporary state |
+| Repository PSScriptAnalyzer warning baseline and exact fingerprint | PASS: no new error, warning group, or warning identity |
+| `bash tests/static/pin_consistency_test.sh` | PASS: the Herdr version/hash documentation split remains bound to its intended authorities |
+
+Hosted exact-head checks and a real Windows Pi failure remain downstream
+evidence after push. This entry does not promote either to locally verified and
+does not claim merge, release, physical Herdr keypress, or visual theme proof.

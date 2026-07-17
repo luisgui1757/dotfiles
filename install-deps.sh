@@ -4646,6 +4646,7 @@ install_dependency_scan_items() {
         "tree-sitter|command|tree-sitter" \
         "shellcheck|command|shellcheck" \
         "jq|command|jq" \
+        "gh|command|gh" \
         "hyperfine|command|hyperfine" \
         "taplo|command|taplo" \
         "yamllint|command|yamllint" \

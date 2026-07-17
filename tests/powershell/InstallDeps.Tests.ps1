@@ -951,10 +951,21 @@ exit 97
                     $json = @([pscustomobject]@{ filename = 'pi.tgz'; integrity = $PiCliIntegrity }) | ConvertTo-Json -Compress
                     return [pscustomobject]@{ Output = @($json); ExitCode = 0 }
                 }
+                1..25 | ForEach-Object { "npm diagnostic line $_" } | Set-Content -LiteralPath $StderrPath
                 return [pscustomobject]@{ Output = @(); ExitCode = 61 }
             }
 
-            { Invoke-PiCliVerifiedTarballInstall } | Should -Throw '*verified local tarball*pi.tgz*exit 61*'
+            $failureMessage = ''
+            try {
+                Invoke-PiCliVerifiedTarballInstall
+                throw 'expected verified-local-tarball install failure'
+            } catch {
+                $failureMessage = $_.Exception.Message
+            }
+            $failureMessage | Should -Match 'verified local tarball.*pi\.tgz.*exit 61'
+            $failureMessage | Should -Match 'npm stderr \(tail\):'
+            $failureMessage | Should -Match 'npm diagnostic line 25'
+            $failureMessage | Should -Not -Match 'npm diagnostic line 5(?:\r?\n|$)'
             @(Get-ChildItem -LiteralPath $tempRoot -Force -ErrorAction SilentlyContinue).Count | Should -Be 0
         } finally {
             $env:DOTFILES_PI_CLI_TEMP_ROOT = $oldTempRoot

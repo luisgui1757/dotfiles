@@ -74,6 +74,12 @@ while IFS='|' read -r tool kind _version_bin; do
     printf '%s\n' "$audit_items" | awk -F'|' -v expected="$tool" '$1 == expected { found = 1 } END { exit !found }' \
         || fail "$tool is present in the install inventory but absent from the duplicate audit"
 done < <(install_dependency_scan_items)
+
+# gh is installed unconditionally and must remain in both the human-facing
+# pre-flight inventory and the derived duplicate audit.
+printf '%s\n' "$audit_items" | awk -F'|' '$1 == "gh" && $2 == "gh" { found = 1 } END { exit !found }' \
+    || fail "gh is installed unconditionally but absent from the duplicate audit"
+
 for tool in zoxide npm latex2text wezterm aerospace herdr devilspie2; do
     printf '%s\n' "$audit_items" | awk -F'|' -v expected="$tool" '$1 == expected { found = 1 } END { exit !found }' \
         || fail "$tool is absent from the explicit duplicate-audit inventory"
