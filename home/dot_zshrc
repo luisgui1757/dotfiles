@@ -53,15 +53,15 @@ if [[ -z "${HOMEBREW_PREFIX:-}" ]]; then
   done
 fi
 
-# ---- PATH (de-duplicating helper, order: user-local → brew → python → system)
+# ---- PATH (order: user-local → cargo → brew → python → system) ---------------
 # zsh's `typeset -U path` keeps the array unique automatically.
 typeset -U path PATH
-[[ -d "$HOME/.local/bin" ]] && path=("$HOME/.local/bin" $path)
-[[ -d "$HOME/.cargo/bin" ]] && path=("$HOME/.cargo/bin" $path)
 if [[ -n "${HOMEBREW_PREFIX:-}" ]]; then
   [[ -d "$HOMEBREW_PREFIX/opt/python@3.12/bin" ]] && path=("$HOMEBREW_PREFIX/opt/python@3.12/bin" $path)
   [[ -d "$HOMEBREW_PREFIX/bin" ]] && path=("$HOMEBREW_PREFIX/bin" $path)
 fi
+[[ -d "$HOME/.cargo/bin" ]] && path=("$HOME/.cargo/bin" $path)
+[[ -d "$HOME/.local/bin" ]] && path=("$HOME/.local/bin" $path)
 export PATH
 
 # ---- Rose Pine file listing colors ------------------------------------------

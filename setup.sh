@@ -616,6 +616,18 @@ resolve_target_identity() {
     SENTINEL_CACHE_ROOT="$HOME/.local/share/dotfiles/sentinel"
 }
 
+prepend_unique_path_dir() {
+    local dir="$1" entry remaining new_path="$1"
+    remaining="${PATH-}:"
+    while [[ "$remaining" == *:* ]]; do
+        entry="${remaining%%:*}"
+        remaining="${remaining#*:}"
+        [[ "$entry" == "$dir" ]] && continue
+        new_path="$new_path:$entry"
+    done
+    PATH="$new_path"
+}
+
 refresh_runtime_path() {
     local brew_bin brew_env dir make_prefix gnubin nix_user
 
@@ -653,11 +665,12 @@ refresh_runtime_path() {
         fi
     done
 
-    for dir in /usr/local/bin "$HOME/.local/bin"; do
-        if [[ -d "$dir" && ":$PATH:" != *":$dir:"* ]]; then
-            PATH="$PATH:$dir"
-        fi
-    done
+    if [[ -d /usr/local/bin && ":$PATH:" != *":/usr/local/bin:"* ]]; then
+        PATH="$PATH:/usr/local/bin"
+    fi
+    if [[ -d "$HOME/.local/bin" ]]; then
+        prepend_unique_path_dir "$HOME/.local/bin"
+    fi
     export PATH
     hash -r 2>/dev/null || true
 }

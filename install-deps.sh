@@ -167,14 +167,25 @@ exit_if_install_failures() {
     exit 1
 }
 
-# Idempotently prepend ~/.local/bin to PATH for THIS process (pinned binaries,
-# pip --user, and chezmoi all land there). Safe to call repeatedly.
+prepend_unique_path_dir() {
+    local dir="$1" entry remaining new_path="$1"
+    remaining="${PATH-}:"
+    while [[ "$remaining" == *:* ]]; do
+        entry="${remaining%%:*}"
+        remaining="${remaining#*:}"
+        [[ "$entry" == "$dir" ]] && continue
+        new_path="$new_path:$entry"
+    done
+    PATH="$new_path"
+}
+
+# Idempotently put ~/.local/bin first on PATH for THIS process (pinned
+# binaries, pip --user, and chezmoi all land there). Moving an existing later
+# entry prevents an older global command from shadowing the verified install.
 ensure_local_bin_on_path() {
-    if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
-        PATH="$HOME/.local/bin:$PATH"
-        export PATH
-        hash -r 2>/dev/null || true
-    fi
+    prepend_unique_path_dir "$HOME/.local/bin"
+    export PATH
+    hash -r 2>/dev/null || true
 }
 verify_sha256() {
     local f="$1" expected="$2" got

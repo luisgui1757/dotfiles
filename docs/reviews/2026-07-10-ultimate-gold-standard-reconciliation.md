@@ -2567,3 +2567,41 @@ or completion of those manual surfaces is claimed by this entry.
 Rewritten-branch hosted checks and the existing physical Herdr/Pi confirmation
 remain downstream evidence. No merge or completion of those manual surfaces is
 claimed by this entry.
+
+## POSIX user-local command precedence repair — entry 62
+
+- A physical macOS rerun installed all four pinned Pi `0.80.9` packages under
+  `~/.local`, then setup reported `expected 0.80.9 after install, got 0.80.3`.
+  Direct inspection proved both facts simultaneously: the new user-local Pi
+  reported `0.80.9`, while an older Homebrew-global Pi reported `0.80.3` and
+  appeared first on `PATH`. npm's two `allow-scripts` messages were warnings,
+  not the failed step; no global lifecycle-script permission was granted.
+- The failure was a shared ordering defect, not a Pi install defect.
+  `ensure_local_bin_on_path` prepended `~/.local/bin` only when it was absent,
+  setup's runtime refresh appended it when absent, and managed zsh prepended
+  Homebrew after user-local paths. An existing later user-local entry therefore
+  satisfied every membership check while a stale global command still won.
+- POSIX publication now moves `~/.local/bin` to the front and removes all prior
+  occurrences before clearing Bash's command cache. Setup repeats the same
+  normalization after Homebrew and Nix discovery, and managed zsh applies its
+  prepend operations in reverse construction order so the documented final
+  order is real. The older global package is preserved but cannot shadow the
+  verified user-local artifact.
+- The Pi fixture now reproduces the exact stale-global `0.80.3` / installed
+  user-local `0.80.9` split through the real post-install version probe. Setup's
+  focused and Homebrew-path fixtures require first-position, duplicate-free
+  user-local publication, while the interactive-zsh test requires the same
+  durable order in a newly opened shell.
+
+### Repair verification
+
+| Check | Exact result |
+|---|---|
+| Four new/strengthened PATH regressions before the implementation change | EXPECTED FAIL: Pi installed `0.80.9` but resolved stale `0.80.3`; setup and interactive zsh left `~/.local/bin` behind Homebrew/global paths |
+| `bash tests/shell/pi_cli_test.sh`, `setup_local_bin_path_test.sh`, `path_dedupe_test.sh`, and `setup_homebrew_path_test.sh` | PASS: the verified user-local Pi wins immediately, setup normalizes existing/duplicate entries, and managed zsh preserves the same order |
+| `make lint` | PASS: strict ShellCheck on the complete script tree |
+| `bash tests/migration/parity_gate.sh` | PASS: canonical zsh source and chezmoi-deployed output remain byte-identical; second apply was a no-op and verify was clean |
+| `NPM_CONFIG_CACHE=<fresh-temporary-cache> PATH=/opt/homebrew/bin:$PATH make ci` | PASS before this result-only ledger update: uninterrupted run ended `local pre-PR gate passed`, including all shell/static/Nix/Neovim suites, official Renovate extraction of 81 reviewed pins, and the complete migration/parity bundle |
+
+Hosted reruns and the user's physical confirmation remain downstream evidence;
+this local closure does not claim either result or merge completion.

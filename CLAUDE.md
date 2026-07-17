@@ -1529,7 +1529,11 @@ save only**. The next plain `:w` formats normally. Implemented in
 - **Apt `fd-find` is shimmed to `fd`.** Debian/Ubuntu package the command as
   `fdfind`, but Telescope expects `fd`. After installing `fd-find`,
   `install-deps.sh` idempotently links `~/.local/bin/fd` to `fdfind` and adds
-  that directory to the current PATH.
+  that directory to the current PATH. POSIX publication requires more than
+  membership: `install-deps.sh`, setup's runtime refresh, and managed zsh put
+  `~/.local/bin` first and remove duplicate entries. This ensures a verified
+  user-local artifact wins over any stale global/Homebrew command with the same
+  name; Pi's post-install version proof is the regression surface.
 - **Apt `update` is best-effort, decoupled from `install`.** The apt arms of
   `pm_install`, `native_linux_pm_install`, and `pm_update` run `apt-get update`
   on its own line (`|| warn`), then ALWAYS run `apt-get install`. Do NOT restore

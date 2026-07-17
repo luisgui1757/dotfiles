@@ -197,6 +197,43 @@ run_case success success "$TEST_SRI" >/dev/null
 grep -E '^install -g --prefix .*/dotfiles-pi\.[^/]*/earendil-works-pi-coding-agent-0\.80\.9\.tgz @earendil-works/pi-agent-core@0\.80\.9 @earendil-works/pi-ai@0\.80\.9 @earendil-works/pi-tui@0\.80\.9$' "$TMP_ROOT/success.log" >/dev/null \
     || fail "npm install did not receive the verified tarball and exact same-release companions: $(cat "$TMP_ROOT/success.log")"
 assert_no_pi_temp_dirs "$TMP_ROOT/success-tmp"
+
+# An older globally installed Pi must not shadow the verified user-local copy.
+# This reproduces a macOS field failure where ~/.local/bin was already present
+# later on PATH, so setup installed 0.80.9 but verified Homebrew's stale 0.80.3.
+(
+    HOME="$TMP_ROOT/shadow-home"; export HOME
+    bin="$TMP_ROOT/shadow-bin"; tmp="$TMP_ROOT/shadow-tmp"
+    mkdir -p "$HOME/.local/bin" "$bin" "$tmp"
+    write_npm_stub "$bin"
+    cat > "$bin/pi" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' '0.80.3'
+EOF
+    chmod +x "$bin/pi"
+    TMPDIR="$tmp"; export TMPDIR
+    PATH="$bin:$HOME/.local/bin:$PATH"; export PATH
+    PI_TEST_LOG="$TMP_ROOT/shadow.log"; export PI_TEST_LOG
+    PI_TEST_MODE=success; export PI_TEST_MODE
+    PI_TEST_PAYLOAD="$VERIFIED_PAYLOAD"; export PI_TEST_PAYLOAD
+    PI_TEST_REPORTED_INTEGRITY="$TEST_SRI"; export PI_TEST_REPORTED_INTEGRITY
+    PI_TEST_INSTALLED_VERSION=0.80.9; export PI_TEST_INSTALLED_VERSION
+    PI_CLI_INTEGRITY="$TEST_SRI"
+    YES_ALL=1
+    DRY_RUN=0
+    pi_cli_node_ready() { return 0; }
+
+    shadow_rc=0
+    install_pi_cli > "$tmp/install.out" 2>&1 || shadow_rc=$?
+    shadow_out="$(cat "$tmp/install.out")"
+    [[ "$shadow_rc" -eq 0 ]] || fail "stale global Pi shadowed the verified install: $shadow_out"
+    [[ "$(command -v pi)" == "$HOME/.local/bin/pi" ]] \
+        || fail "user-local Pi is not first after install: $(command -v pi)"
+    [[ "$(pi --version)" == "0.80.9" ]] || fail "wrong Pi wins after install"
+    local_count="$(printf '%s\n' "$PATH" | tr ':' '\n' | grep -Fxc "$HOME/.local/bin")"
+    [[ "$local_count" == "1" ]] || fail "$HOME/.local/bin appears $local_count times after install"
+)
+
 (
     HOME="$TMP_ROOT/success-home"; export HOME
     bin="$TMP_ROOT/success-bin"; PATH="$bin:$HOME/.local/bin:$PATH"; export PATH

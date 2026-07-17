@@ -1076,8 +1076,10 @@ POSIX pwsh profile management remains provisioning-adjacent.
   The reviewed SRI is
   `sha512-Clgx2Bg5NbMcCpGxusSDQwE+GC0g/d6sCBluE9aypPgSgtJ6n8VmZIIT6auXObMskpRgkr+XZ77wG5hf+cSDtg==`.
   POSIX public setup gets Node 24 from Nix first; Windows uses the native Node
-  LTS catalog entry. Chezmoi deploys the audited `pi/rose-pine.json` theme and
-  setup atomically merges only `theme: rose-pine` into
+  LTS catalog entry. On POSIX, Pi is published under `~/.local/bin`; setup and
+  managed zsh keep that directory first and duplicate-free so an older global
+  npm/Homebrew copy cannot shadow the verified CLI. Chezmoi deploys the audited
+  `pi/rose-pine.json` theme and setup atomically merges only `theme: rose-pine` into
   `~/.pi/agent/settings.json` under Pi's `settings.json.lock` convention.
   Invalid or busy settings fail without mutation; all unrelated keys remain.
   Local `.pi/` sessions, credentials, providers, and other preferences stay
@@ -1661,6 +1663,7 @@ MIT. See `LICENSE`.
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
+| Pi setup says `expected 0.80.9 after install, got 0.80.3` (or another older version) | the verified Pi was installed under `~/.local/bin`, but an older global npm/Homebrew `pi` appeared earlier on the current `PATH` | update this repo and rerun setup. Current setup moves `~/.local/bin` to the front, removes duplicate entries, and verifies the installed copy; managed zsh preserves that order in new shells. The older global copy may remain installed without winning command resolution |
 | v0.2.0 Linux Nix bootstrap ends with `cat: /etc/bashrc: Permission denied` and upstream's `Oh no` failure | the pinned upstream daemon installer prepared `/etc/bashrc` through its privileged path, then tried to read it as the invoking user; its multi-user path does not honor the public `--no-modify-profile` option | if `/etc/bashrc.backup-before-nix` exists after the failure, restore it with `sudo mv /etc/bashrc.backup-before-nix /etc/bashrc`. For immutable v0.2.0 without that backup, the bounded workaround is `sudo chmod a+r /etc/bashrc` before rerunning. On the current official test branch, pull the latest head and rerun `./setup.sh --all --allow-unreleased`; the wrapper applies an exact-hash-verified local patch that skips the daemon profile step and leaves shell activation to setup/Home Manager |
 | Linux Nix bootstrap reports `getting status of '/nix/store/...-busybox...': Permission denied` while installing Nix | a restrictive invoking umask—common on managed corporate hosts—combined with Nix 2.34.0's Linux daemon copy and write-bit removal left store directories as root-only `0500`; a previous interrupted attempt can retain those modes | pull the latest current official test-branch head and rerun `./setup.sh --all --allow-unreleased` as the normal target user. Its checksum-bound daemon installer normalizes the copied and pre-existing store paths to read-only/traversable modes before Nix creates the default profile; do not run all of setup with `sudo` |
 | Corporate Linux bootstrap warns that `https://channels.nixos.org/nixpkgs-unstable` failed TLS verification | upstream's legacy default-channel step uses its bundled CA file, which does not contain the corporate TLS-inspection root; the dotfiles package layer uses locked flakes and does not need this mutable channel | pull the latest current official test-branch head and rerun `./setup.sh --all --allow-unreleased`. The wrapper disables channel creation with upstream's public `--no-channel-add`; subsequent Nix activation selects the host system CA bundle, preserving corporate trust without weakening TLS verification |
