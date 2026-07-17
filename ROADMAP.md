@@ -265,12 +265,13 @@ Commit-by-commit status:
   Home Manager session-vars startup. Apple Silicon is the only current Darwin
   contract; Intel evidence is retained in the append-only ledger as historical
   proof, not current support.
-- **Pi CLI provisioning and theme — DONE.** Setup installs the Pi CLI on every OS as the
+- **Pi CLI provisioning, theme, and multiline input — DONE.** Setup installs the Pi CLI on every OS as the
   pinned npm package `@earendil-works/pi-coding-agent@0.80.9` after checking npm
   `dist.integrity`; its three Pi companion modules are held to the same exact
   release. POSIX public setup gets Node 24 from the enforced Nix package
   layer; Windows uses the native Node LTS catalog path. Chezmoi deploys the
-  audited Rose Pine theme and setup merges only its global `theme` selection;
+  audited Rose Pine theme plus the exact upstream `Shift+Enter` / `Ctrl+J`
+  newline keybinding pair, and setup merges only the global `theme` selection;
   sessions, auth, providers, and every other `.pi/` preference remain local.
 - **Gold-standard gap close — DONE (2026-07-09, PR #46).** Accepted
   install failures record and force nonzero setup/update exits; stdin/no-script-path

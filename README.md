@@ -18,7 +18,7 @@ If this is a new machine, start with [install, update, and remove](#install-upda
 | Git | Git, lazygit, GitHub CLI, gh-dash | Installs the CLI tools and applies their shared terminal configuration. |
 | Languages | Python, Node.js, Tree-sitter, Mason tools | Installs the base runtimes plus the language servers and formatters used by Neovim. |
 | macOS desktop | AeroSpace | Adds keyboard-driven tiling workspaces on macOS. |
-| Agent tooling | Pi CLI, Sentinel policy | Installs the supported CLI, selects the audited Rose Pine Pi theme, and applies the global agent-policy block. Local sessions, credentials, and all other Pi preferences stay local. |
+| Agent tooling | Pi CLI, Sentinel policy | Installs the supported CLI, selects the audited Rose Pine Pi theme, pins `Shift+Enter` for multiline input, and applies the global agent-policy block. Local sessions, credentials, providers, and other Pi preferences stay local. |
 | Config management | Nix, nix-darwin/Home Manager, chezmoi | Reconciles POSIX packages and applies the repo-owned config files. Windows uses native package managers plus chezmoi. You do not need to run these layers by hand. |
 
 The main configuration is intentionally consistent: dark Rose Pine, Hack Nerd
@@ -139,6 +139,11 @@ change; an already-running shell cannot change into PowerShell 7 retroactively.
 | `Ctrl+B`, then `Shift+1` ... `Shift+9` | Jump directly to workspace 1 ... 9. |
 | `Ctrl+B`, then `Shift+A` / `a` | Move to the previous/next agent. |
 | `Ctrl+B`, then `Ctrl+1` ... `Ctrl+9` | Focus agent 1 ... 9 directly. |
+
+Inside Pi, `Enter` submits and `Shift+Enter` inserts a line break; `Ctrl+J`
+remains the transport-compatible fallback. Herdr preserves modified Enter, so
+the repo does not install Ghostty's legacy raw-LF remap, which would erase the
+difference between `Shift+Enter` and `Ctrl+J` before Pi receives the key.
 
 Named Herdr sessions are separate server namespaces. A session does not appear
 inside another session's navigator; attach to the other session from a normal
@@ -775,7 +780,7 @@ symlink overlays; and Windows Terminal remains a merge.
 | lazygit | `~/Library/Application Support/lazygit/config.yml` -> `lazygit/config.yml` | `~/.config/lazygit/config.yml` -> `lazygit/config.yml` | `%LOCALAPPDATA%\lazygit\config.yml` -> `lazygit\config.windows.yml` |
 | lsd | `~/.config/lsd/{config.yaml,colors.yaml}` -> `lsd/{config.yaml,colors.yaml}` | same | `%USERPROFILE%\.config\lsd\{config.yaml,colors.yaml}` -> `lsd\{config.yaml,colors.yaml}` |
 | gh-dash | `~/.config/gh-dash/config.yml` -> `gh-dash/config.yml` | same | `%USERPROFILE%\.config\gh-dash\config.yml` -> `gh-dash\config.yml` |
-| Pi theme | `~/.pi/agent/themes/rose-pine.json` -> `pi/rose-pine.json`; setup merges `theme: rose-pine` into global settings | same | `%USERPROFILE%\.pi\agent\themes\rose-pine.json` is copied; setup performs the same one-key merge |
+| Pi theme and keys | `~/.pi/agent/themes/rose-pine.json` -> `pi/rose-pine.json`; `~/.pi/agent/keybindings.json` -> `pi/keybindings.json`; setup merges `theme: rose-pine` into global settings | same | Both files are copied under `%USERPROFILE%\.pi\agent`; setup performs the same one-key theme merge |
 | Windows Terminal | n/a | n/a | app installed by `setup.ps1` through Scoop/winget/choco, with a SHA-256-verified portable zip fallback; one validated enumerator identifies stable packaged, Preview, Canary, and portable `settings.json` targets for setup, migration, recovery, and uninstall; all profiles receive WT's hard maximum of 32,767 history lines; setup stages and validates all selected targets before publication, creates separate verified backups, detects concurrent changes through atomic replacement rollback bytes, and rolls the group back on failure; opt out with `-SkipWindowsTerminalMerge`; see [windows-terminal/README.md](windows-terminal/README.md) |
 
 Windows setup resolves UserProfile, LocalApplicationData, ApplicationData,
@@ -1064,8 +1069,8 @@ POSIX pwsh profile management remains provisioning-adjacent.
   run the cached Sentinel Bash installer with `--global --remove` on POSIX or
   from Git Bash on Windows. Project/team adoption is separate: run Sentinel
   repo-local install or vendoring in that project and commit those files there.
-- Pi CLI is a provisioned binary with one repo-owned presentation default, not
-  synced runtime state. Setup installs
+- Pi CLI is a provisioned binary with two repo-owned defaults, not synced
+  runtime state. Setup installs
   `@earendil-works/pi-coding-agent@0.80.9` by running `npm pack`, requiring the
   pack metadata and the actual tarball SHA-512 bytes to match the reviewed SRI,
   then passing that verified local tarball plus the exact `0.80.9` Pi
@@ -1083,11 +1088,17 @@ POSIX pwsh profile management remains provisioning-adjacent.
   active `pi` path without executing or deleting it; when a sibling npm command
   proves ownership, the warning includes the exact same-user, no-`sudo`
   uninstall command. Chezmoi deploys the audited `pi/rose-pine.json` theme and
-  setup atomically merges only `theme: rose-pine` into
+  the exact `pi/keybindings.json` multiline pair (`Shift+Enter`, with `Ctrl+J`
+  retained as Pi's transport fallback). Setup atomically merges only
+  `theme: rose-pine` into
   `~/.pi/agent/settings.json` under Pi's `settings.json.lock` convention.
   Invalid or busy settings fail without mutation; all unrelated keys remain.
   Local `.pi/` sessions, credentials, providers, and other preferences stay
-  machine-local.
+  machine-local. The terminal stack preserves modified Enter semantically:
+  Herdr v0.7.4 carries it directly, while POSIX tmux enables its
+  version-compatible extended-key transport. Do not add Ghostty's legacy
+  `shift+enter=text:\\n` translation; it converts the chord to the same raw LF
+  as `Ctrl+J` before Pi can distinguish it.
 - Dependency setup finishes with a cross-platform duplicate-command audit for
   every managed CLI in its install inventory. The first physically distinct
   command on `PATH` is the selected runtime authority; later commands with the
@@ -1404,7 +1415,7 @@ Manual-review pin surfaces that Renovate may touch only partially:
 | Hack Nerd Font | Unix and Windows mirrors must stay identical; version/hash drift is caught by `pin_consistency_test.sh`. |
 | Pi CLI | Unix/Windows install pins and e2e assertions mirror version `0.80.9`; the npm-pack metadata and downloaded coding-agent tarball bytes must both match the human-reviewed SRI, and all three Pi companion modules are requested at the exact same release. |
 | Herdr | Native Linux pins stable `v0.7.4` with both architecture hashes; Windows pins post-fix preview `preview-2026-07-16-e907e6a36646` with its x64 hash. Homebrew platforms consume the reviewed `v0.7.4` formula. |
-| Pi Rose Pine theme | The repo vendors only `rose-pine.json` from audited data-only package `pi-themes-rose-pine@0.1.0`, preserves its MIT license, and tests the exact palette plus all 51 Pi tokens. |
+| Pi Rose Pine theme | The repo vendors only `rose-pine.json` from audited data-only package `pi-themes-rose-pine@0.1.0`, preserves its MIT license, and tests the exact palette plus all 51 Pi tokens. Pi's separate keybindings file explicitly retains the upstream `Shift+Enter` / `Ctrl+J` newline pair. |
 | gh-dash | Tag `v4.25.1`, annotated tag object `e6ebbd7e83e30161b9192ce3339972d2c8269e7f`, and peeled commit `49f37e4832956c57bf52d4ea8b1b1e5c0f863700` are mirrored; installers verify the tag mapping and pass the release tag required by `gh extension install --pin` for binary extensions. |
 
 Direct network executables must be pinned and verified before execution, or be a
@@ -1445,7 +1456,7 @@ stale; CI then fails verification until a human reviews the adjacent constant.
 ├── tmux/                  # tmux.conf (Rose Pine, vi-mode, true-color)
 ├── ghostty/               # config (Rose Pine, Hack Nerd, Ghostty-tuned)
 ├── herdr/                 # POSIX/Windows configs (Rose Pine; Windows uses pwsh)
-├── pi/                    # audited Pi Rose Pine theme
+├── pi/                    # audited Pi Rose Pine theme + newline keybindings
 ├── windows-terminal/      # settings.fragment.jsonc + merge README
 ├── home/                  # chezmoi source tree for the config layer
 ├── tests/                 # automated test tree

@@ -62,6 +62,7 @@ lsd config|config-file|.config/lsd/config.yaml|.config/lsd/config.yaml|lsd/confi
 lsd colors|config-file|.config/lsd/colors.yaml|.config/lsd/colors.yaml|lsd/colors.yaml|home/dot_config/lsd/colors.yaml
 gh-dash config|config-file|.config/gh-dash/config.yml|.config/gh-dash/config.yml|gh-dash/config.yml|home/dot_config/gh-dash/config.yml
 Pi rose-pine theme|config-file|.pi/agent/themes/rose-pine.json|.pi/agent/themes/rose-pine.json|pi/rose-pine.json|home/dot_pi/agent/themes/rose-pine.json
+Pi keybindings|config-file|.pi/agent/keybindings.json|.pi/agent/keybindings.json|pi/keybindings.json|home/dot_pi/agent/keybindings.json
 herdr config|config-file|.config/herdr/config.toml|.config/herdr/config.toml|herdr/config.toml|home/.chezmoitemplates/herdr/config.toml
 nvim|nvim|.config/nvim|.config/nvim|nvim|
 starship|config-file|.config/starship.toml|.config/starship.toml|starship/starship.toml|home/dot_config/starship.toml

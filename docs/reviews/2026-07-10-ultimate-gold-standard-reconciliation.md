@@ -2684,3 +2684,43 @@ evidence; setup deliberately reports but does not remove external state.
 Hosted checks and real-machine cleanup remain downstream evidence. This entry
 records detection and guidance only; it does not claim removal of any external
 installation.
+
+## Pi semantic multiline input through Herdr/tmux — entry 65
+
+- Per the owner's report, Pi now owns an explicit cross-platform
+  `tui.input.newLine` mapping in `~/.pi/agent/keybindings.json`. It retains the
+  complete upstream-default pair: semantic `Shift+Enter` first and `Ctrl+J` as
+  the transport-compatible fallback. The canonical file and chezmoi source are
+  byte-identical; POSIX deploys a repo link and Windows deploys a copy through
+  the existing full-source apply.
+- Pi's terminal guide calls Ghostty's historical
+  `shift+enter=text:\n` rule a legacy workaround. That rule is deliberately
+  absent: it translates the modified key to raw LF, making it
+  indistinguishable from `Ctrl+J` before Pi receives it. Herdr v0.7.4 preserves
+  modified Enter directly, which is the primary path requested here.
+- tmux needs separate transport configuration because it strips modified-key
+  identity by default. The existing POSIX overlay already enables
+  `extended-keys` plus the `extkeys` terminal feature. It intentionally omits
+  `extended-keys-format csi-u`: Pi supports tmux 3.2--3.4's default xterm
+  encoding, while that option is available only in tmux 3.5+ and is rejected
+  by the Ubuntu 24.04 tmux 3.4 contract.
+- The regression owns all three boundaries: exact Pi JSON semantics,
+  cross-platform chezmoi parity, and terminal/multiplexer transport. It also
+  rejects reintroduction of the lossy Ghostty remap. Sessions, credentials,
+  providers, and every other Pi preference remain machine-local.
+
+### Multiline-input verification
+
+| Check | Exact result |
+|---|---|
+| New focused regression before implementation | EXPECTED FAIL: `canonical Pi keybindings file is missing` |
+| `tests/shell/pi_keybindings_test.sh` and `tests/shell/pi_theme_test.sh` | PASS: exact newline pair, canonical/mirror identity, lossy-remap absence, modified-key transport, and existing Rose Pine ownership |
+| `tests/migration/parity_gate.sh` and `tests/migration/oracle_test.sh` | PASS: Pi keybindings apply at the native path, match canonical bytes, survive idempotent reapply/verify, and participate in uninstall cleanup |
+| `make lint` | PASS: JSON, shell, and repository static checks remain clean |
+| `NPM_CONFIG_CACHE=<fresh-temporary-cache> PATH=/opt/homebrew/bin:$PATH make ci` | PASS before this result-only ledger update: uninterrupted run ended `local pre-PR gate passed`, including the new Pi regression and full migration/parity coverage |
+| `pwsh -NoLogo -NoProfile -File ./test.ps1` | PASS: PSScriptAnalyzer clean and Pester 280/280, with Windows full-source apply semantics intact |
+| Result-only full-gate rerun | ENVIRONMENTAL FAIL after the complete static gate: Neovim's startup prewarm timed out while normally millisecond Lua loads were stretched to roughly one second each; every other reported Neovim spec remained green |
+| `PlenaryBustedDirectory tests/nvim/spec/startup_spec.lua` with the production minimal init and 180-second timeout | PASS immediately after the timeout: the exact startup spec completed 1/1 under its unchanged macOS budget, rejecting a product or test regression |
+
+Hosted exact-head checks and a physical `Shift+Enter` keystroke inside Pi under
+Herdr remain downstream evidence; this local entry does not claim either yet.

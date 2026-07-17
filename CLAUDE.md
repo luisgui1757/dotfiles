@@ -38,9 +38,9 @@ same change.
 
 Agent runtime state and preferences are intentionally **NOT** synced through
 this repo. The supported agent surfaces are setup's global Sentinel policy and
-Pi's audited Rose Pine theme plus one merged `theme` setting. Local agent
-folders such as `.claude/` and `.codex/`, Pi sessions/auth/providers/other
-preferences, and package caches stay per machine.
+Pi's audited Rose Pine theme, exact multiline-input keybinding, and one merged
+`theme` setting. Local agent folders such as `.claude/` and `.codex/`, Pi
+sessions/auth/providers/other preferences, and package caches stay per machine.
 
 ## Layout at a glance
 
@@ -55,7 +55,7 @@ preferences, and package caches stay per machine.
 ├── wezterm/               wezterm.lua (shared terminal config on every OS)
 ├── aerospace/             macOS tiling-window-manager config
 ├── herdr/                 config.toml (forced built-in Rose Pine theme)
-├── pi/                    audited Pi Rose Pine theme
+├── pi/                    audited Pi Rose Pine theme + newline keybindings
 ├── windows-terminal/      settings.fragment.jsonc + merge README
 ├── lazygit/               config.yml + config.windows.yml (J/K + Windows Ctrl-G)
 ├── gh-dash/               pull-request/issue dashboard config
@@ -665,7 +665,8 @@ navigator, `prefix+comma`/`prefix+$` to tab/workspace rename,
 `prefix+shift+a`/`prefix+a` for previous/next and `prefix+ctrl+1..9` for indexed
 focus; Windows alone selects `pwsh.exe`),
 pi/rose-pine.json (the audited 51-token Pi theme; setup merges only
-`theme = rose-pine` into global settings),
+`theme = rose-pine` into global settings), pi/keybindings.json (Pi's canonical
+`Shift+Enter` / `Ctrl+J` multiline-input pair),
 windows-terminal/settings.fragment.jsonc (`schemes` + `themes`),
 shells/powershell_profile.ps1 (PSReadLine `-Colors` for syntax, `Selection`,
 the version-gated prediction colors, and `$PSStyle.FileInfo.Directory` for `ls`
@@ -1975,7 +1976,7 @@ save only**. The next plain `:w` formats normally. Implemented in
   row in `parity_gate.sh`); the config is applied regardless of auth — only the
   extension binary is auth-gated. Running the dashboard needs `gh auth login` —
   a manual, secret-bearing step this repo never automates or stores.
-- **Pi CLI is pinned; only its audited theme selection is repo-owned.** `install-deps.sh`
+- **Pi CLI is pinned; only its audited theme selection and canonical newline keybinding are repo-owned.** `install-deps.sh`
   and `install-deps.ps1` run `npm pack --ignore-scripts --json` for
   `@earendil-works/pi-coding-agent@0.80.9`, require both reported metadata and
   independently hashed tarball bytes to match
@@ -1987,8 +1988,15 @@ save only**. The next plain `:w` formats normally. Implemented in
   directory and cleaned through return/signal/finally paths. POSIX public
   setup gets Node 24 from the enforced Nix package layer; Windows
   gets Node through the native catalog. Chezmoi deploys the byte-identical
-  `pi/rose-pine.json` / `home/dot_pi/agent/themes/rose-pine.json` pair on every
-  OS. After apply, `scripts/configure-pi-theme.mjs` acquires Pi's compatible
+  `pi/rose-pine.json` / `home/dot_pi/agent/themes/rose-pine.json` and
+  `pi/keybindings.json` / `home/dot_pi/agent/keybindings.json` pairs on every
+  OS. The keybindings file owns exactly Pi's upstream-default newline action:
+  `Shift+Enter`, with `Ctrl+J` retained as the transport fallback. Herdr v0.7.4
+  preserves the modified key directly; POSIX tmux uses its version-compatible
+  extended-key transport. Do not add Ghostty's legacy
+  `shift+enter=text:\\n` remap: it reduces the chord to the same raw LF as
+  `Ctrl+J` before Pi receives it. After apply,
+  `scripts/configure-pi-theme.mjs` acquires Pi's compatible
   `settings.json.lock`, validates an object-shaped JSON file, atomically merges
   only `theme: rose-pine`, and preserves every unrelated key. `--skip-config-scripts`
   defers this merge. Uninstall removes the key only if it is still the managed
