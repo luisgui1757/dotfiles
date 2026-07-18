@@ -587,7 +587,7 @@ function Remove-Externals {
 function Invoke-PiThemeSelectionCleanup {
     param([Parameter(Mandatory)] $Identity)
     if ($DryRun) {
-        Write-Output '  would: remove Pi theme=rose-pine only if it is still the managed selection'
+        Write-Output '  would: remove Pi theme only if it is still rose-pine, rose-pine-moon, or rose-pine-dawn'
         return
     }
     $settings = Join-Path $Identity.UserProfile '.pi\agent\settings.json'
@@ -603,7 +603,8 @@ function Invoke-PiThemeSelectionCleanup {
             $oldNativePreference = $PSNativeCommandUseErrorActionPreference
             $PSNativeCommandUseErrorActionPreference = $false
         }
-        & $node.Source (Join-Path $RepoRoot 'scripts\configure-pi-theme.mjs') unset $settings rose-pine
+        & $node.Source (Join-Path $RepoRoot 'scripts\configure-pi-theme.mjs') unset $settings `
+            rose-pine rose-pine-moon rose-pine-dawn
         $rc = if ($null -eq $LASTEXITCODE) { 0 } else { [int]$LASTEXITCODE }
     } finally {
         if ($hasNativePreference) {

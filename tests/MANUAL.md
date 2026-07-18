@@ -196,9 +196,11 @@ commits, recovery path, provider inventory, and whether any user data changed.
       icons, and `gh extension list` identifies commit
       `49f37e4832956c57bf52d4ea8b1b1e5c0f863700`.
 - [ ] **Pi CLI**: `pi --version` prints `0.80.9` on macOS, Linux/WSL, and
-      Windows. Confirm Pi opens with `rose-pine`, while an unrelated custom key
-      in `~/.pi/agent/settings.json` survives setup. Session/auth/provider state
-      must remain local and untouched.
+      Windows. Confirm Pi opens with `rose-pine`; `/settings` also lists
+      `rose-pine-moon` and `rose-pine-dawn`, and each variant renders readable
+      messages, tools, Markdown, diffs, syntax, and thinking borders. Confirm an
+      unrelated custom key in `~/.pi/agent/settings.json` survives setup.
+      Session/auth/provider state must remain local and untouched.
 - [ ] **Windows Tree-sitter CLI**: `tree-sitter --version` prints exactly
       `0.26.10`. A compatible unmanaged executable remains untouched; after a
       stale unmanaged fixture, the verified dotfiles executable wins PATH.

@@ -110,7 +110,11 @@ if [[ "${1:-}" == "--as-user" ]]; then
     assert_file_content "$HOME/.zshenv" "$repo/shells/zshenv"
     assert_file_content "$HOME/.zshrc" "$repo/shells/zshrc"
     assert_file_content "$HOME/.config/lazygit/config.yml" "$repo/lazygit/config.yml"
-    assert_file_content "$HOME/.pi/agent/themes/rose-pine.json" "$repo/pi/rose-pine.json"
+    for theme_name in rose-pine rose-pine-moon rose-pine-dawn; do
+        assert_file_content \
+            "$HOME/.pi/agent/themes/$theme_name.json" \
+            "$repo/pi/$theme_name.json"
+    done
 
     plugin_root="$HOME/.local/share/dotfiles/zsh-plugins"
     [[ -r "$plugin_root/fzf-tab/fzf-tab.plugin.zsh" ]] \

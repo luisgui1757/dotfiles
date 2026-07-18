@@ -187,9 +187,12 @@ Describe "setup.ps1 Pi theme selection" -Skip:(-not (Get-Command node -ErrorActi
         . $script:ImportSetupForTest
         $script:PiThemeRoot = Join-Path ([IO.Path]::GetTempPath()) ("setup-pi-theme-" + [guid]::NewGuid())
         $script:PiThemeIdentity = [pscustomobject]@{ UserProfile = $script:PiThemeRoot }
-        $theme = Join-Path $script:PiThemeRoot '.pi\agent\themes\rose-pine.json'
-        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $theme) | Out-Null
-        Copy-Item -LiteralPath (Join-Path $script:RepoRoot 'pi\rose-pine.json') -Destination $theme
+        $themeRoot = Join-Path $script:PiThemeRoot '.pi\agent\themes'
+        New-Item -ItemType Directory -Force -Path $themeRoot | Out-Null
+        foreach ($themeName in @('rose-pine', 'rose-pine-moon', 'rose-pine-dawn')) {
+            Copy-Item -LiteralPath (Join-Path $script:RepoRoot "pi\$themeName.json") `
+                -Destination (Join-Path $themeRoot "$themeName.json")
+        }
     }
 
     AfterEach {

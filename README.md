@@ -18,7 +18,7 @@ If this is a new machine, start with [install, update, and remove](#install-upda
 | Git | Git, lazygit, GitHub CLI, gh-dash | Installs the CLI tools and applies their shared terminal configuration. |
 | Languages | Python, Node.js, Tree-sitter, Mason tools | Installs the base runtimes plus the language servers and formatters used by Neovim. |
 | macOS desktop | AeroSpace | Adds keyboard-driven tiling workspaces on macOS. |
-| Agent tooling | Pi CLI, Sentinel policy | Installs the supported CLI, selects the audited Rose Pine Pi theme, pins `Shift+Enter` for multiline input, and applies the global agent-policy block. Local sessions, credentials, providers, and other Pi preferences stay local. |
+| Agent tooling | Pi CLI, Sentinel policy | Installs the supported CLI, deploys audited Rose Pine main/moon/dawn themes, selects main by default, pins `Shift+Enter` for multiline input, and applies the global agent-policy block. Local sessions, credentials, providers, and other Pi preferences stay local. |
 | Config management | Nix, nix-darwin/Home Manager, chezmoi | Reconciles POSIX packages and applies the repo-owned config files. Windows uses native package managers plus chezmoi. You do not need to run these layers by hand. |
 
 The main configuration is intentionally consistent: dark Rose Pine, Hack Nerd
@@ -336,8 +336,10 @@ Useful standalone tools:
   Windows inside psmux, use `Ctrl+G` when a popup expects Esc.
 - `gh dash`: dashboard for pull requests and issues. Run `gh auth login` first,
   then rerun setup if the extension was skipped while unauthenticated.
-- `pi`: the pinned Pi CLI, with the repo's audited Rose Pine theme selected by
-  default. Sessions, credentials, providers, and other preferences are not synced.
+- `pi`: the pinned Pi CLI, with audited `rose-pine`, `rose-pine-moon`, and
+  `rose-pine-dawn` themes. Main is selected by default; switch variants through
+  Pi's `/settings`. Sessions, credentials, providers, and other preferences are
+  not synced.
 
 ### Terminals and scrollback
 
@@ -795,7 +797,7 @@ symlink overlays; and Windows Terminal remains a merge.
 | lazygit | `~/Library/Application Support/lazygit/config.yml` -> `lazygit/config.yml` | `~/.config/lazygit/config.yml` -> `lazygit/config.yml` | `%LOCALAPPDATA%\lazygit\config.yml` -> `lazygit\config.windows.yml` |
 | lsd | `~/.config/lsd/{config.yaml,colors.yaml}` -> `lsd/{config.yaml,colors.yaml}` | same | `%USERPROFILE%\.config\lsd\{config.yaml,colors.yaml}` -> `lsd\{config.yaml,colors.yaml}` |
 | gh-dash | `~/.config/gh-dash/config.yml` -> `gh-dash/config.yml` | same | `%USERPROFILE%\.config\gh-dash\config.yml` -> `gh-dash\config.yml` |
-| Pi theme and keys | `~/.pi/agent/themes/rose-pine.json` -> `pi/rose-pine.json`; `~/.pi/agent/keybindings.json` -> `pi/keybindings.json`; setup merges `theme: rose-pine` into global settings | same | Both files are copied under `%USERPROFILE%\.pi\agent`; setup performs the same one-key theme merge |
+| Pi themes and keys | `~/.pi/agent/themes/{rose-pine,rose-pine-moon,rose-pine-dawn}.json` -> the matching files under `pi/`; `~/.pi/agent/keybindings.json` -> `pi/keybindings.json`; setup merges `theme: rose-pine` into global settings | same | All four files are copied under `%USERPROFILE%\.pi\agent`; setup performs the same one-key main-theme merge |
 | Windows Terminal | n/a | n/a | app installed by `setup.ps1` through Scoop/winget/choco, with a SHA-256-verified portable zip fallback; one validated enumerator identifies stable packaged, Preview, Canary, and portable `settings.json` targets for setup, migration, recovery, and uninstall; all profiles receive WT's hard maximum of 32,767 history lines; setup stages and validates all selected targets before publication, creates separate verified backups, detects concurrent changes through atomic replacement rollback bytes, and rolls the group back on failure; opt out with `-SkipWindowsTerminalMerge`; see [windows-terminal/README.md](windows-terminal/README.md) |
 
 Windows setup resolves UserProfile, LocalApplicationData, ApplicationData,
@@ -1084,8 +1086,8 @@ POSIX pwsh profile management remains provisioning-adjacent.
   run the cached Sentinel Bash installer with `--global --remove` on POSIX or
   from Git Bash on Windows. Project/team adoption is separate: run Sentinel
   repo-local install or vendoring in that project and commit those files there.
-- Pi CLI is a provisioned binary with two repo-owned defaults, not synced
-  runtime state. Setup installs
+- Pi CLI is a provisioned binary with two repo-owned preference surfaces
+  (themes/selection and multiline keys), not synced runtime state. Setup installs
   `@earendil-works/pi-coding-agent@0.80.9` by running `npm pack`, requiring the
   pack metadata and the actual tarball SHA-512 bytes to match the reviewed SRI,
   then passing that verified local tarball plus the exact `0.80.9` Pi
@@ -1104,13 +1106,20 @@ POSIX pwsh profile management remains provisioning-adjacent.
   satisfies setup's installed-version proof. Setup warns about every other
   active `pi` path without executing or deleting it; when a sibling npm command
   proves ownership, the warning includes the exact same-user, no-`sudo`
-  uninstall command. Chezmoi deploys the audited `pi/rose-pine.json` theme and
-  the exact `pi/keybindings.json` multiline pair (`Shift+Enter`, with `Ctrl+J`
-  retained as Pi's transport fallback). The theme is a documented normalization
-  of `pi-themes-rose-pine@0.1.0`: its obsolete `badlogic/pi-mono` schema URL is
-  updated to `earendil-works/pi` and six blank-only lines are removed; every
-  palette and token value is unchanged. Setup atomically merges only
-  `theme: rose-pine` into
+  uninstall command. Chezmoi deploys audited `pi/rose-pine.json`,
+  `pi/rose-pine-moon.json`, and `pi/rose-pine-dawn.json` themes plus the exact
+  `pi/keybindings.json` multiline pair (`Shift+Enter`, with `Ctrl+J` retained as
+  Pi's transport fallback). The theme files preserve the mappings from archived
+  [`zenobi-us/pi-rose-pine`](https://github.com/zenobi-us/pi-rose-pine) commit
+  `9b342f6e16d6b28c00c2f888ba2f050273981bdb`, with only Pi's current
+  `earendil-works/pi` schema URL added. Its 15 base colors per variant are the
+  official Rose Pine palettes; its 24 additional light/dark derivatives and 43
+  of 51 changed resolved main-theme token colors are the deliberately different
+  look. The compared
+  `pi-themes-rose-pine@0.1.0` pack uses the repo's retired simple main mapping
+  (plus matching simple moon/dawn variants), so installing it would not fix the
+  disliked appearance and would add package state without value. Setup
+  atomically merges only `theme: rose-pine` into
   `~/.pi/agent/settings.json` under Pi's `settings.json.lock` convention.
   Invalid or busy settings fail without mutation; all unrelated keys remain.
   Local `.pi/` sessions, credentials, providers, and other preferences stay
@@ -1438,7 +1447,7 @@ Manual-review pin surfaces that Renovate may touch only partially:
 | Hack Nerd Font | Unix and Windows mirrors must stay identical; version/hash drift is caught by `pin_consistency_test.sh`. |
 | Pi CLI | Unix/Windows install pins and e2e assertions mirror version `0.80.9`; the npm-pack metadata and downloaded coding-agent tarball bytes must both match the human-reviewed SRI, and all three Pi companion modules are requested at the exact same release. |
 | Herdr | Native Linux pins stable `v0.7.4` with both architecture hashes; Windows pins post-fix preview `preview-2026-07-16-e907e6a36646` with its x64 hash. Homebrew platforms consume the reviewed `v0.7.4` formula. |
-| Pi Rose Pine theme | The repo vendors a documented normalization of `rose-pine.json` from audited data-only package `pi-themes-rose-pine@0.1.0`: the obsolete schema URL is updated from `badlogic/pi-mono` to `earendil-works/pi`, six blank-only lines are removed, every palette/token value is unchanged, and the MIT license is preserved. Tests bind the exact palette plus all 51 Pi tokens. Pi's separate keybindings file explicitly retains the upstream `Shift+Enter` / `Ctrl+J` newline pair. |
+| Pi Rose Pine themes | The repo vendors main/moon/dawn from archived MIT-licensed `zenobi-us/pi-rose-pine` commit `9b342f6e16d6b28c00c2f888ba2f050273981bdb`, adding only Pi's current `earendil-works/pi` schema URL. Tests bind each normalized file byte-for-byte, its official palette, 39 variables, and all 51 Pi tokens. The compared `pi-themes-rose-pine@0.1.0` pack is the retired simple mapping and is intentionally not installed. Pi's separate keybindings file explicitly retains the upstream `Shift+Enter` / `Ctrl+J` newline pair. |
 | gh-dash | Tag `v4.25.1`, annotated tag object `e6ebbd7e83e30161b9192ce3339972d2c8269e7f`, and peeled commit `49f37e4832956c57bf52d4ea8b1b1e5c0f863700` are mirrored; installers verify the tag mapping and pass the release tag required by `gh extension install --pin` for binary extensions. |
 
 Direct network executables must be pinned and verified before execution, or be a
@@ -1479,7 +1488,7 @@ stale; CI then fails verification until a human reviews the adjacent constant.
 ├── tmux/                  # tmux.conf (Rose Pine, vi-mode, true-color)
 ├── ghostty/               # config (Rose Pine, Hack Nerd, Ghostty-tuned)
 ├── herdr/                 # POSIX/Windows configs (Rose Pine; Windows uses pwsh)
-├── pi/                    # audited Pi Rose Pine theme + newline keybindings
+├── pi/                    # audited Pi Rose Pine main/moon/dawn + newline keys
 ├── windows-terminal/      # settings.fragment.jsonc + merge README
 ├── home/                  # chezmoi source tree for the config layer
 ├── tests/                 # automated test tree

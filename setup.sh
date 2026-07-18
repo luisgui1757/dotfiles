@@ -186,7 +186,7 @@ phase() {
 
 configure_pi_theme_selection() {
     local settings="$HOME/.pi/agent/settings.json"
-    local theme="$HOME/.pi/agent/themes/rose-pine.json"
+    local theme_name theme expected_theme
 
     if [[ "$SKIP_CONFIG_SCRIPTS" -eq 1 ]]; then
         echo "  deferred  Pi theme selection (--skip-config-scripts)"
@@ -200,14 +200,18 @@ configure_pi_theme_selection() {
         echo "  FAIL: node is required to merge Pi's global theme setting" >&2
         return 1
     }
-    [[ -f "$theme" ]] || {
-        echo "  FAIL: chezmoi did not deploy the Pi Rose Pine theme: $theme" >&2
-        return 1
-    }
-    cmp -s "$theme" "$SCRIPT_DIR/pi/rose-pine.json" || {
-        echo "  FAIL: deployed Pi Rose Pine theme differs from the reviewed source" >&2
-        return 1
-    }
+    for theme_name in rose-pine rose-pine-moon rose-pine-dawn; do
+        theme="$HOME/.pi/agent/themes/$theme_name.json"
+        expected_theme="$SCRIPT_DIR/pi/$theme_name.json"
+        [[ -f "$theme" ]] || {
+            echo "  FAIL: chezmoi did not deploy the Pi Rose Pine theme: $theme" >&2
+            return 1
+        }
+        cmp -s "$theme" "$expected_theme" || {
+            echo "  FAIL: deployed Pi Rose Pine theme differs from the reviewed source: $theme" >&2
+            return 1
+        }
+    done
     node "$SCRIPT_DIR/scripts/configure-pi-theme.mjs" set "$settings" rose-pine
 }
 

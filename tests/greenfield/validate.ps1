@@ -274,7 +274,11 @@ Assert-ContentEqual -Path (Join-Path $env:USERPROFILE '.config\starship.toml') -
 Assert-ContentEqual -Path (Join-Path $env:USERPROFILE '.config\gh-dash\config.yml') -Expected (Join-Path $Repo 'gh-dash\config.yml')
 Assert-ContentEqual -Path (Join-Path $env:USERPROFILE '.config\lsd\config.yaml') -Expected (Join-Path $Repo 'lsd\config.yaml')
 Assert-ContentEqual -Path (Join-Path $env:USERPROFILE '.config\lsd\colors.yaml') -Expected (Join-Path $Repo 'lsd\colors.yaml')
-Assert-ContentEqual -Path (Join-Path $env:USERPROFILE '.pi\agent\themes\rose-pine.json') -Expected (Join-Path $Repo 'pi\rose-pine.json')
+foreach ($themeName in @('rose-pine', 'rose-pine-moon', 'rose-pine-dawn')) {
+    Assert-ContentEqual `
+        -Path (Join-Path $env:USERPROFILE ".pi\agent\themes\$themeName.json") `
+        -Expected (Join-Path $Repo "pi\$themeName.json")
+}
 Assert-ContentEqual -Path (Join-Path $env:USERPROFILE '.psmux.conf') -Expected (Join-Path $Repo 'tmux\psmux.conf')
 Assert-ContentEqual -Path (Join-Path $env:USERPROFILE '.tmux.conf') -Expected (Join-Path $Repo 'tmux\tmux.conf')
 Assert-ContentEqual -Path (Join-Path $env:USERPROFILE '.tmux.windows.conf') -Expected (Join-Path $Repo 'tmux\tmux.windows.conf')

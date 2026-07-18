@@ -68,7 +68,7 @@ unset_pi_theme_selection() {
     local settings="$HOME/.pi/agent/settings.json"
 
     if [[ "$DRY_RUN" -eq 1 ]]; then
-        echo "  would: remove Pi theme=rose-pine only if it is still the managed selection"
+        echo "  would: remove Pi's theme only if it is still rose-pine, rose-pine-moon, or rose-pine-dawn"
         return 0
     fi
     [[ -e "$settings" ]] || return 0
@@ -76,7 +76,8 @@ unset_pi_theme_selection() {
         echo "uninstall: node is required to safely remove the managed Pi theme selection" >&2
         return 1
     }
-    node "$REPO_ROOT/scripts/configure-pi-theme.mjs" unset "$settings" rose-pine
+    node "$REPO_ROOT/scripts/configure-pi-theme.mjs" unset "$settings" \
+        rose-pine rose-pine-moon rose-pine-dawn
 }
 
 realpath_or_self() {
