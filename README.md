@@ -909,7 +909,7 @@ POSIX pwsh profile management remains provisioning-adjacent.
 - Neovim Markdown rendering is owned by `render-markdown.nvim`. Setup already
   installs the explicit Tree-sitter parser matrix, including `latex`; it also
   installs `latex2text` through a pinned, SHA-256-checked venv
-  (`setuptools` 80.10.2, `pylatexenc` 2.10) so rendered Markdown equations work
+  (`setuptools` 83.0.0, `pylatexenc` 2.10) so rendered Markdown equations work
   on fresh machines instead of depending on a random host Python package. On
   Linux, setup repairs the active distro Python's native venv/pip support even
   when Linuxbrew is the selected package manager; manager selection alone does
@@ -1443,7 +1443,7 @@ Manual-review pin surfaces that Renovate may touch only partially:
 | Sentinel version/commit | Manual-reviewed mirror between `setup.sh`, `setup.ps1`, README, CLAUDE, and `tests/static/pin_consistency_test.sh`. The current renamed tree is exact-commit pinned because the published `v0.1.2` tag predates it. |
 | Scoop installer | Renovate can bump `ScoopInstaller/Install` commit `b0ee913725139b816f9178163af0aecdba07a7ed`; SHA `48f6ea398b3a3fa26fae0093d37bd85b13e7eaa5d1d4a3e208408768408e35ae` is human-reviewed. |
 | TPM/tmux plugin refs and psmux plugin ref | Commit pins are manual-reviewed and mirrored in docs/tests; Renovate does not recompute or prove tag commits. |
-| `setuptools`/`pylatexenc` | Renovate can bump versions; adjacent hashes remain human-reviewed. Current pins: `setuptools` 80.10.2, `pylatexenc` 2.10. |
+| `setuptools`/`pylatexenc` | Renovate can bump versions; adjacent hashes remain human-reviewed. Current pins: `setuptools` 83.0.0, `pylatexenc` 2.10. |
 | Hack Nerd Font | Unix and Windows mirrors must stay identical; version/hash drift is caught by `pin_consistency_test.sh`. |
 | Pi CLI | Unix/Windows install pins and e2e assertions mirror version `0.80.10`; the npm-pack metadata and downloaded coding-agent tarball bytes must both match the human-reviewed SRI, and all three Pi companion modules are requested at the exact same release. |
 | Herdr | Native Linux pins stable `v0.7.4` with both architecture hashes; Windows pins post-fix preview `preview-2026-07-16-e907e6a36646` with its x64 hash. Homebrew platforms consume the reviewed `v0.7.4` formula. |

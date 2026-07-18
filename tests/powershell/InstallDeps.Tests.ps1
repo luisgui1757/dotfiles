@@ -3256,7 +3256,7 @@ Describe "Markdown equation converter provisioning" {
         $output = Install-PylatexencConverter 6>&1 | Out-String
 
         $output | Should -Match 'python -m venv'
-        $output | Should -Match 'setuptools==80\.10\.2'
+        $output | Should -Match 'setuptools==83\.0\.0'
         $output | Should -Match $PylatexencBuildBackendSha256
         $output | Should -Match 'pylatexenc==2\.10'
         $output | Should -Match $PylatexencSha256
@@ -3299,7 +3299,7 @@ Describe "Markdown equation converter provisioning" {
 
         $expectedScripts = Join-Path (Get-PylatexencVenvRoot) 'Scripts'
         $script:AddedPath | Should -Be $expectedScripts
-            $script:SetuptoolsRequirementsText | Should -Match 'setuptools==80\.10\.2'
+            $script:SetuptoolsRequirementsText | Should -Match 'setuptools==83\.0\.0'
         $script:SetuptoolsRequirementsText | Should -Match $PylatexencBuildBackendSha256
         $script:RequirementsText | Should -Match 'pylatexenc==2\.10'
         $script:RequirementsText | Should -Match $PylatexencSha256

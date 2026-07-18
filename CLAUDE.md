@@ -1356,7 +1356,7 @@ save only**. The next plain `:w` formats normally. Implemented in
   LaTeX support needs the non-bundled `latex` parser (already in
   `treesitter_parsers`) and a converter executable. `install-deps.sh` creates
   `~/.local/share/dotfiles/python-tools/pylatexenc`, installs pinned
-  `setuptools==80.10.2` first, installs `pylatexenc==2.10` with pip `--require-hashes`
+  `setuptools==83.0.0` first, installs `pylatexenc==2.10` with pip `--require-hashes`
   and `--no-build-isolation`, and writes `~/.local/bin/latex2text`;
   Linux must repair venv/pip through the detected native package manager when
   the active `python3` lacks them, even if Linuxbrew is the selected manager:
