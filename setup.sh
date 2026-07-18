@@ -184,6 +184,33 @@ phase() {
     echo "================================================================"
 }
 
+configure_pi_theme_selection() {
+    local settings="$HOME/.pi/agent/settings.json"
+    local theme="$HOME/.pi/agent/themes/rose-pine.json"
+
+    if [[ "$SKIP_CONFIG_SCRIPTS" -eq 1 ]]; then
+        echo "  deferred  Pi theme selection (--skip-config-scripts)"
+        return 0
+    fi
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        echo "  would: set Pi's global theme to rose-pine while preserving other settings"
+        return 0
+    fi
+    command -v node >/dev/null 2>&1 || {
+        echo "  FAIL: node is required to merge Pi's global theme setting" >&2
+        return 1
+    }
+    [[ -f "$theme" ]] || {
+        echo "  FAIL: chezmoi did not deploy the Pi Rose Pine theme: $theme" >&2
+        return 1
+    }
+    cmp -s "$theme" "$SCRIPT_DIR/pi/rose-pine.json" || {
+        echo "  FAIL: deployed Pi Rose Pine theme differs from the reviewed source" >&2
+        return 1
+    }
+    node "$SCRIPT_DIR/scripts/configure-pi-theme.mjs" set "$settings" rose-pine
+}
+
 release_git() {
     local checkout="$1"
     shift
@@ -589,6 +616,18 @@ resolve_target_identity() {
     SENTINEL_CACHE_ROOT="$HOME/.local/share/dotfiles/sentinel"
 }
 
+prepend_unique_path_dir() {
+    local dir="$1" entry remaining new_path="$1"
+    remaining="${PATH-}:"
+    while [[ "$remaining" == *:* ]]; do
+        entry="${remaining%%:*}"
+        remaining="${remaining#*:}"
+        [[ "$entry" == "$dir" ]] && continue
+        new_path="$new_path:$entry"
+    done
+    PATH="$new_path"
+}
+
 refresh_runtime_path() {
     local brew_bin brew_env dir make_prefix gnubin nix_user
 
@@ -626,11 +665,12 @@ refresh_runtime_path() {
         fi
     done
 
-    for dir in /usr/local/bin "$HOME/.local/bin"; do
-        if [[ -d "$dir" && ":$PATH:" != *":$dir:"* ]]; then
-            PATH="$PATH:$dir"
-        fi
-    done
+    if [[ -d /usr/local/bin && ":$PATH:" != *":/usr/local/bin:"* ]]; then
+        PATH="$PATH:/usr/local/bin"
+    fi
+    if [[ -d "$HOME/.local/bin" ]]; then
+        prepend_unique_path_dir "$HOME/.local/bin"
+    fi
     export PATH
     hash -r 2>/dev/null || true
 }
@@ -1759,6 +1799,7 @@ if [[ "$SKIP_BOOTSTRAP" -eq 0 ]]; then
         run_chezmoi --no-tty --force apply \
             ${CHEZMOI_APPLY_ARGS[@]+"${CHEZMOI_APPLY_ARGS[@]}"}
     fi
+    configure_pi_theme_selection
 else
     echo
     echo "skipped: Phase 2 (config) via --skip-bootstrap/--skip-config"

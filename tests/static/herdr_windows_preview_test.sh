@@ -54,7 +54,9 @@ for snippet in \
     'herdr-windows-x86_64.exe' \
     "Invoke-WebRequest -Uri \$assetUrl -OutFile \$download -UseBasicParsing -ErrorAction Stop" \
     "Test-FileSha256 -Path \$download -Expected \$HerdrWindowsX64Sha256" \
-    "Copy-Item -LiteralPath \$download -Destination (Join-Path \$installRoot 'herdr.exe') -Force" \
+    "Test-FileSha256 -Path \$destination -Expected \$HerdrWindowsX64Sha256" \
+    'already installed (unmanaged)' \
+    "Copy-Item -LiteralPath \$download -Destination \$destination -Force" \
     'Install-HerdrWindowsPreview'
 do
     if ! grep -Fq "$snippet" "$INSTALL_PS1"; then

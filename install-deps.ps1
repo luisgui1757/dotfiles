@@ -28,8 +28,8 @@ $ScoopInstallerSha256 = '48f6ea398b3a3fa26fae0093d37bd85b13e7eaa5d1d4a3e20840876
 $ScoopInstallerUrl = "https://raw.githubusercontent.com/ScoopInstaller/Install/$ScoopInstallerCommit/install.ps1"
 $WindowsTerminalVersion = 'v1.24.11321.0'
 $WindowsTerminalX64Sha256 = '7caef554147e5498ed1becdca73cdedb79fbc81f89032e46ae9b095c53433812'
-$HerdrWindowsPreviewVersion = 'preview-2026-07-07-f5354780e4ef'
-$HerdrWindowsX64Sha256 = '9b28eb0a3a55ca2ca9d47e96397544d2cbcca965d88a40b8bd8ccacfb61333ba'
+$HerdrWindowsPreviewVersion = 'preview-2026-07-16-e907e6a36646'
+$HerdrWindowsX64Sha256 = 'a5827b33cbd0352e4c0f1469ca6e0f71083e1333cf0250ca9dbecc41770a6d30'
 $VsBuildToolsBootstrapperUrl = 'https://aka.ms/vs/17/release/vs_BuildTools.exe'
 $PylatexencBuildBackendVersion = '80.9.0'
 $PylatexencBuildBackendSha256 = '062d34222ad13e0cc312a4c02d73f059e86a4acbfbdea8f8f76b28c99f306922'
@@ -39,8 +39,8 @@ $GhDashVersion = 'v4.25.1'   # dlvhdr/gh-dash pinned gh-extension tag; mirror in
 $GhDashTagObject = 'e6ebbd7e83e30161b9192ce3339972d2c8269e7f'
 $GhDashCommit = '49f37e4832956c57bf52d4ea8b1b1e5c0f863700'
 $PiCliPackage = '@earendil-works/pi-coding-agent'
-$PiCliVersion = '0.80.3'
-$PiCliIntegrity = 'sha512-TIggw9gCXpA+Ph7OjdTA7ka2NPwTVuPmy39KDSyUzaKq8VvHfMGR7vtRz4JB7Um/RMRblmzhu4p9tUCk6MTgGA=='
+$PiCliVersion = '0.80.9'
+$PiCliIntegrity = 'sha512-Clgx2Bg5NbMcCpGxusSDQwE+GC0g/d6sCBluE9aypPgSgtJ6n8VmZIIT6auXObMskpRgkr+XZ77wG5hf+cSDtg=='
 $TreeSitterCliVersion = 'v0.26.10'
 $TreeSitterCliWindowsX64Sha256 = 'e378c57f5de3e698058997489e69a027551dc05a09c6ff51e42ffab6ea5d5b6b'
 $TreeSitterCliWindowsArm64Sha256 = 'd30a6a6986a0fdbdb3a6c0f0e23dc6e6719e133f73dee7c65cf73839a458bced'
@@ -947,8 +947,12 @@ function Get-ScoopPackageNameFromKnownAppsPath {
 }
 
 function Get-ScoopShimPackageState {
-    param([string]$tool)
-    $source = Get-CatalogToolCommandSource -tool $tool
+    param([string]$tool, [string]$Source = '')
+    $source = if ([string]::IsNullOrWhiteSpace($Source)) {
+        Get-CatalogToolCommandSource -tool $tool
+    } else {
+        $Source
+    }
     if ([string]::IsNullOrWhiteSpace($source)) {
         return [pscustomobject]@{ Status = 'none'; Source = ''; Shim = ''; Package = ''; Reason = '' }
     }
@@ -1425,6 +1429,251 @@ function Get-ChocoPackageOwnershipState {
         }
     }
     return [pscustomobject]@{ Status = 'not-managed'; Reason = ''; Source = $source; Package = ''; Expected = $Package }
+}
+
+function Get-ManagedCommandSourceText {
+    param([object]$Command)
+    if ($null -eq $Command) { return '' }
+    foreach ($propertyName in @('Source', 'Path', 'Definition')) {
+        $property = $Command.PSObject.Properties[$propertyName]
+        if ($null -ne $property -and -not [string]::IsNullOrWhiteSpace([string]$property.Value)) {
+            return [string]$property.Value
+        }
+    }
+    return ''
+}
+
+function Initialize-WindowsFileIdentityType {
+    $type = [System.Management.Automation.PSTypeName]'Dotfiles.WindowsFileIdentity'
+    if ($null -ne $type.Type) { return $true }
+    if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) { return $false }
+    try {
+        Add-Type -TypeDefinition @"
+using System;
+using System.ComponentModel;
+using System.Globalization;
+using System.IO;
+using System.Runtime.InteropServices;
+using Microsoft.Win32.SafeHandles;
+
+namespace Dotfiles
+{
+    public static class WindowsFileIdentity
+    {
+        [StructLayout(LayoutKind.Sequential)]
+        private struct ByHandleFileInformation
+        {
+            public uint FileAttributes;
+            public System.Runtime.InteropServices.ComTypes.FILETIME CreationTime;
+            public System.Runtime.InteropServices.ComTypes.FILETIME LastAccessTime;
+            public System.Runtime.InteropServices.ComTypes.FILETIME LastWriteTime;
+            public uint VolumeSerialNumber;
+            public uint FileSizeHigh;
+            public uint FileSizeLow;
+            public uint NumberOfLinks;
+            public uint FileIndexHigh;
+            public uint FileIndexLow;
+        }
+
+        [DllImport("kernel32.dll", EntryPoint = "CreateFileW", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern SafeFileHandle CreateFile(
+            string path,
+            uint desiredAccess,
+            FileShare shareMode,
+            IntPtr securityAttributes,
+            FileMode creationDisposition,
+            uint flagsAndAttributes,
+            IntPtr templateFile
+        );
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool GetFileInformationByHandle(
+            SafeFileHandle handle,
+            out ByHandleFileInformation information
+        );
+
+        public static string GetIdentity(string path)
+        {
+            using (SafeFileHandle handle = CreateFile(
+                path,
+                0,
+                FileShare.ReadWrite | FileShare.Delete,
+                IntPtr.Zero,
+                FileMode.Open,
+                0,
+                IntPtr.Zero
+            ))
+            {
+                if (handle.IsInvalid)
+                {
+                    throw new Win32Exception(Marshal.GetLastWin32Error());
+                }
+
+                ByHandleFileInformation information;
+                if (!GetFileInformationByHandle(handle, out information))
+                {
+                    throw new Win32Exception(Marshal.GetLastWin32Error());
+                }
+
+                ulong fileIndex = ((ulong)information.FileIndexHigh << 32) | information.FileIndexLow;
+                return information.VolumeSerialNumber.ToString("X8", CultureInfo.InvariantCulture) + ":" +
+                    fileIndex.ToString("X16", CultureInfo.InvariantCulture);
+            }
+        }
+    }
+}
+"@ -ErrorAction Stop
+        return $true
+    } catch {
+        Write-Verbose ("Could not initialize Windows file identity support: {0}" -f $_.Exception.Message)
+        return $false
+    }
+}
+
+function Get-WindowsPhysicalFileIdentity {
+    param([string]$Path)
+    if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) { return '' }
+    if (-not (Initialize-WindowsFileIdentityType)) { return '' }
+    try {
+        return [Dotfiles.WindowsFileIdentity]::GetIdentity($Path)
+    } catch {
+        Write-Verbose ("Could not read Windows file identity for {0}: {1}" -f $Path, $_.Exception.Message)
+        return ''
+    }
+}
+
+function Resolve-WindowsCommandIdentity {
+    param([string]$Path)
+    $normalized = ConvertTo-WindowsComparablePath -Path $Path
+    if ([string]::IsNullOrWhiteSpace($normalized)) { return '' }
+    try {
+        if (Test-Path -LiteralPath $normalized -PathType Leaf) {
+            $physicalIdentity = Get-WindowsPhysicalFileIdentity -Path $normalized
+            if (-not [string]::IsNullOrWhiteSpace($physicalIdentity)) {
+                return "file-id:$physicalIdentity"
+            }
+            $resolved = Resolve-Path -LiteralPath $normalized -ErrorAction Stop
+            return ("path:{0}" -f (ConvertTo-WindowsComparablePath -Path $resolved.Path))
+        }
+    } catch {
+        Write-Verbose ("Could not resolve managed command path {0}: {1}" -f $normalized, $_.Exception.Message)
+    }
+    return "path:$normalized"
+}
+
+function Test-WindowsSystemCommandFallback {
+    param([string]$Path)
+    $normalized = ConvertTo-WindowsComparablePath -Path $Path
+    if ([string]::IsNullOrWhiteSpace($normalized)) { return $false }
+    if ($normalized -match '(?i)\\AppData\\Local\\Microsoft\\WindowsApps\\') { return $true }
+    $windowsRoots = @('C:\Windows')
+    if (-not [string]::IsNullOrWhiteSpace($env:WINDIR)) { $windowsRoots += $env:WINDIR }
+    foreach ($root in @($windowsRoots | Select-Object -Unique)) {
+        if (Test-WindowsPathUnderDirectoryText -Path $normalized -Directory (Join-WindowsPathText -Left $root -Right 'System32')) {
+            return $true
+        }
+    }
+    return $false
+}
+
+function Write-ManagedCommandDuplicateOwner {
+    param([string]$Tool, [string]$Duplicate)
+
+    if (Get-Command scoop -ErrorAction SilentlyContinue) {
+        $scoopState = Get-ScoopShimPackageState -tool $Tool -Source $Duplicate
+        if (($scoopState.Status -eq 'found') -and (Test-ScoopPackageManagedByList -Package $scoopState.Package)) {
+            Write-Warning ("        owner=scoop package={0}" -f $scoopState.Package)
+            $sourceRoot = Get-ScoopRootFromShimSource -Source $Duplicate
+            $userRoot = Get-ScoopRoot
+            if (-not [string]::IsNullOrWhiteSpace($sourceRoot) -and
+                (ConvertTo-WindowsComparablePath -Path $sourceRoot).Equals(
+                    (ConvertTo-WindowsComparablePath -Path $userRoot),
+                    [StringComparison]::OrdinalIgnoreCase
+                )) {
+                Write-Warning ("        cleanup (same user, no admin): scoop uninstall {0}" -f $scoopState.Package)
+            } else {
+                Write-Warning "        review the Scoop install scope before removing this package"
+            }
+            return
+        }
+    }
+
+    if ($Catalog.ContainsKey($Tool)) {
+        $wingetPackage = Get-CatalogPackageId -tool $Tool -Manager 'winget'
+        if (-not [string]::IsNullOrWhiteSpace($wingetPackage) -and
+            (Get-Command winget -ErrorAction SilentlyContinue) -and
+            (Test-WingetPackageManaged -Package $wingetPackage) -and
+            (Test-WingetToolSourceMatchesPackage -tool $Tool -Package $wingetPackage -Source $Duplicate)) {
+            Write-Warning ("        owner=winget package={0}; review package scope before removing it with winget" -f $wingetPackage)
+            return
+        }
+
+        $chocoPackage = Get-CatalogPackageId -tool $Tool -Manager 'choco'
+        if (-not [string]::IsNullOrWhiteSpace($chocoPackage) -and
+            (Get-Command choco -ErrorAction SilentlyContinue) -and
+            (Test-ChocoPackageManaged -Package $chocoPackage) -and
+            (Test-ChocolateyToolSourceUnderKnownRoot -Source $Duplicate)) {
+            Write-Warning ("        owner=choco package={0}; review package scope and elevation before removing it" -f $chocoPackage)
+            return
+        }
+    }
+
+    Write-Warning "        owner=unknown; remove it only through the manager that installed it"
+}
+
+function Get-ManagedCommandDuplicateAuditSpec {
+    $seen = @{}
+    foreach ($spec in @(Get-InstallDependencySpec)) {
+        if ($spec.Kind -ne 'tool' -or $spec.Tool -eq 'scoop' -or
+            [string]::IsNullOrWhiteSpace([string]$spec.Binary) -or $seen.ContainsKey([string]$spec.Tool)) {
+            continue
+        }
+        $seen[[string]$spec.Tool] = $true
+        $spec
+    }
+    foreach ($extra in @(
+        [pscustomobject]@{ Tool = 'npm'; Kind = 'tool'; Binary = 'npm'; Module = '' },
+        [pscustomobject]@{ Tool = 'latex2text'; Kind = 'tool'; Binary = 'latex2text'; Module = '' }
+    )) {
+        if (-not $seen.ContainsKey([string]$extra.Tool)) { $extra }
+    }
+}
+
+function Invoke-ManagedCommandDuplicateAudit {
+    param([object[]]$SpecList = @(Get-ManagedCommandDuplicateAuditSpec))
+
+    foreach ($spec in @($SpecList)) {
+        if ($spec.Kind -ne 'tool' -or [string]::IsNullOrWhiteSpace([string]$spec.Binary)) { continue }
+        $commands = @(Get-Command -Name ([string]$spec.Binary) -All -CommandType Application -ErrorAction SilentlyContinue)
+        if ($commands.Count -lt 2) { continue }
+
+        $selected = Get-ManagedCommandSourceText -Command $commands[0]
+        $selectedIdentity = Resolve-WindowsCommandIdentity -Path $selected
+        if ([string]::IsNullOrWhiteSpace($selectedIdentity)) { continue }
+        $seen = @{}
+        $seen[$selectedIdentity.ToLowerInvariant()] = $true
+        $duplicates = @()
+        foreach ($command in @($commands | Select-Object -Skip 1)) {
+            $candidate = Get-ManagedCommandSourceText -Command $command
+            $identity = Resolve-WindowsCommandIdentity -Path $candidate
+            if ([string]::IsNullOrWhiteSpace($identity)) { continue }
+            $key = $identity.ToLowerInvariant()
+            if ($seen.ContainsKey($key)) { continue }
+            $seen[$key] = $true
+            if (Test-WindowsSystemCommandFallback -Path $candidate) { continue }
+            $duplicates += $candidate
+        }
+        if ($duplicates.Count -eq 0) { continue }
+
+        Write-Warning ("multiple managed {0} commands are on PATH" -f $spec.Tool)
+        Write-Warning ("        selected: {0}" -f $selected)
+        foreach ($duplicate in $duplicates) {
+            Write-Warning ("        duplicate: {0}" -f $duplicate)
+            Write-ManagedCommandDuplicateOwner -Tool ([string]$spec.Tool) -Duplicate $duplicate
+        }
+        Write-Warning "        setup leaves foreign installations untouched; rerun after cleanup to prove one command remains"
+    }
 }
 
 function Get-ManagedCatalogToolUpdateTarget {
@@ -2426,18 +2675,37 @@ function Get-HerdrWindowsInstallRoot {
 }
 
 function Install-HerdrWindowsPreview {
+    $installRoot = Get-HerdrWindowsInstallRoot
+    $destination = Join-Path $installRoot 'herdr.exe'
+    $reconcile = $false
+    $presentStatus = ''
     if (Test-Tool 'herdr') {
-        Write-Host ("  ok        {0,-26} already installed" -f "herdr")
+        $source = Get-CatalogToolCommandSource -tool 'herdr'
+        $managed = (Test-Path -LiteralPath $destination -PathType Leaf) -and
+            (ConvertTo-WindowsComparablePath -Path $source).Equals(
+                (ConvertTo-WindowsComparablePath -Path $destination),
+                [StringComparison]::OrdinalIgnoreCase
+            )
+        if (-not $managed) {
+            $presentStatus = 'already installed (unmanaged)'
+        } elseif (Test-FileSha256 -Path $destination -Expected $HerdrWindowsX64Sha256) {
+            $presentStatus = "pinned $HerdrWindowsPreviewVersion"
+        } else {
+            $reconcile = $true
+        }
+    }
+    if ($presentStatus) {
+        Write-Host ("  ok        {0,-26} {1}" -f "herdr", $presentStatus)
         return
     }
-    if (-not (Ask "Install Herdr native Windows preview (pinned SHA-256 verified beta)?")) {
+    $verb = if ($reconcile) { 'Update repo-owned' } else { 'Install' }
+    if (-not (Ask "$verb Herdr native Windows preview (pinned SHA-256 verified beta)?")) {
         Write-Host ("  skipped   {0,-26}" -f "herdr")
         return
     }
 
     $assetName = 'herdr-windows-x86_64.exe'
     $assetUrl = "https://github.com/ogulcancelik/herdr/releases/download/$HerdrWindowsPreviewVersion/$assetName"
-    $installRoot = Get-HerdrWindowsInstallRoot
     if ($DryRun) {
         Write-Host ("  would:    download {0} ({1})" -f $assetName, $HerdrWindowsPreviewVersion)
         Write-Host ("  would:    verify SHA-256 {0}, install as {1}, add to User PATH" -f $HerdrWindowsX64Sha256, (Join-Path $installRoot 'herdr.exe'))
@@ -2456,11 +2724,12 @@ function Install-HerdrWindowsPreview {
         }
 
         New-Item -ItemType Directory -Force -Path $installRoot | Out-Null
-        Copy-Item -LiteralPath $download -Destination (Join-Path $installRoot 'herdr.exe') -Force
+        Copy-Item -LiteralPath $download -Destination $destination -Force
         Add-DirectoryToUserPath -Directory $installRoot
 
         if (Test-Tool 'herdr') {
-            Write-Host ("  installed {0,-26} {1}" -f "herdr", $HerdrWindowsPreviewVersion)
+            $status = if ($reconcile) { 'updated' } else { 'installed' }
+            Write-Host ("  {0,-9} {1,-26} {2}" -f $status, "herdr", $HerdrWindowsPreviewVersion)
             return
         }
         throw "herdr.exe installed but herdr is not on PATH"
@@ -2885,6 +3154,22 @@ function Invoke-PiCliNpm {
     }
 }
 
+function Get-PiCliNpmFailureDetail {
+    param([Parameter(Mandatory)][string]$Path)
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return '' }
+    try {
+        $detail = (@(Get-Content -LiteralPath $Path -Tail 20 -ErrorAction Stop) -join [Environment]::NewLine).Trim()
+    } catch {
+        return ''
+    }
+    if ([string]::IsNullOrWhiteSpace($detail)) { return '' }
+    $maxCharacters = 4096
+    if ($detail.Length -gt $maxCharacters) {
+        $detail = '...' + $detail.Substring($detail.Length - ($maxCharacters - 3))
+    }
+    return ([Environment]::NewLine + 'npm stderr (tail):' + [Environment]::NewLine + $detail)
+}
+
 function Invoke-PiCliVerifiedTarballInstall {
     $tempParent = if (-not [string]::IsNullOrWhiteSpace($env:DOTFILES_PI_CLI_TEMP_ROOT)) {
         $env:DOTFILES_PI_CLI_TEMP_ROOT
@@ -2899,7 +3184,8 @@ function Invoke-PiCliVerifiedTarballInstall {
         $spec = "$PiCliPackage@$PiCliVersion"
         $pack = Invoke-PiCliNpm -Arguments @('pack', '--ignore-scripts', '--json', '--pack-destination', $tempDir, $spec) -StderrPath $stderrPath
         if ($pack.ExitCode -ne 0) {
-            throw "npm pack failed for $spec (exit $($pack.ExitCode))"
+            $detail = Get-PiCliNpmFailureDetail -Path $stderrPath
+            throw "npm pack failed for $spec (exit $($pack.ExitCode))$detail"
         }
         try {
             $metadata = @(($pack.Output -join [Environment]::NewLine) | ConvertFrom-Json -ErrorAction Stop)
@@ -2920,9 +3206,10 @@ function Invoke-PiCliVerifiedTarballInstall {
             throw "packed tarball bytes do not match pinned SRI for $spec"
         }
 
-        $install = Invoke-PiCliNpm -Arguments @('install', '-g', $tarball) -StderrPath $stderrPath
+        $install = Invoke-PiCliNpm -Arguments @('install', '-g', $tarball, "@earendil-works/pi-agent-core@$PiCliVersion", "@earendil-works/pi-ai@$PiCliVersion", "@earendil-works/pi-tui@$PiCliVersion") -StderrPath $stderrPath
         if ($install.ExitCode -ne 0) {
-            throw "npm install failed for verified local tarball $filename (exit $($install.ExitCode))"
+            $detail = Get-PiCliNpmFailureDetail -Path $stderrPath
+            throw "npm install failed for verified local tarball $filename (exit $($install.ExitCode))$detail"
         }
     } finally {
         Remove-Item -LiteralPath $tempDir -Recurse -Force -ErrorAction SilentlyContinue
@@ -2966,7 +3253,7 @@ function Install-PiCli {
     if ($DryRun) {
         Write-Host "  would:    npm pack --ignore-scripts --json --pack-destination <temp> $PiCliPackage@$PiCliVersion"
         Write-Host "             require metadata integrity and tarball bytes to match $PiCliIntegrity"
-        Write-Host "  would:    npm install -g <verified-local-tarball>"
+        Write-Host "  would:    npm install -g <verified-local-tarball> <exact same-release Pi companions>"
         return
     }
     $rc = 1
@@ -3439,6 +3726,7 @@ $Pm = Get-AvailablePM
 
 if ($Update) {
     Invoke-InstallDepsUpdateMode -IsDryRun $DryRun
+    Invoke-ManagedCommandDuplicateAudit
     Exit-InstallDepsIfFailures
     exit 0
 }
@@ -3557,6 +3845,7 @@ Write-Host "            Use Windows Terminal (setup applies the rose-pine"
 Write-Host "            fragment by default) or WezTerm for now."
 
 Write-Host ""
+Invoke-ManagedCommandDuplicateAudit
 Exit-InstallDepsIfFailures
 Write-Host "install-deps: done"
 if ($DryRun) { Write-Host "(dry run -- nothing was installed)" }

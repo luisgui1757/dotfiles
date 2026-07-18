@@ -44,8 +44,8 @@ GH_DASH_VERSION="v4.25.1"   # dlvhdr/gh-dash pinned gh-extension tag; mirror in 
 GH_DASH_TAG_OBJECT="e6ebbd7e83e30161b9192ce3339972d2c8269e7f"
 GH_DASH_COMMIT="49f37e4832956c57bf52d4ea8b1b1e5c0f863700"
 PI_CLI_PACKAGE="@earendil-works/pi-coding-agent"
-PI_CLI_VERSION="0.80.3"
-PI_CLI_INTEGRITY="sha512-TIggw9gCXpA+Ph7OjdTA7ka2NPwTVuPmy39KDSyUzaKq8VvHfMGR7vtRz4JB7Um/RMRblmzhu4p9tUCk6MTgGA=="
+PI_CLI_VERSION="0.80.9"
+PI_CLI_INTEGRITY="sha512-Clgx2Bg5NbMcCpGxusSDQwE+GC0g/d6sCBluE9aypPgSgtJ6n8VmZIIT6auXObMskpRgkr+XZ77wG5hf+cSDtg=="
 TPM_COMMIT="e261deb1b47614eed3400089ce7197dc68acc4eb"
 # Functional tmux plugins (Omer-style set). The Rose Pine status bar is NOT a
 # plugin here -- it is a repo-owned generated config (tmux/psmux-rose-pine.ps1),
@@ -83,13 +83,13 @@ WEZTERM_DEB_AMD64_SHA256="86358dab5794a4fb63f7c91dd68d4fdc3da58faad648a58fc77d2b
 # Herdr (agent multiplexer). macOS + Linuxbrew use the canonical homebrew-core
 # formula (`brew install herdr`). Native Linux without brew installs the pinned
 # release binary, SHA-256 verified. Upstream publishes no checksum sidecar, so
-# these SHAs were computed from the pinned v0.7.3 assets on 2026-07-09 (bump the
+# these SHAs were computed from the pinned v0.7.4 assets on 2026-07-16 (bump the
 # version + both SHAs together). NOT the herdr.dev install.sh remote-eval path.
 # Native Windows uses install-deps.ps1's separate pinned, SHA-256-verified
 # preview .exe path, never the herdr.dev install.ps1 remote-eval path.
-HERDR_VERSION="v0.7.3"
-HERDR_LINUX_X86_64_SHA256="043ef43ecbabda28465dcff1eec3184518150d567b8b8f20cda9c6c88770641d"
-HERDR_LINUX_ARM64_SHA256="ea490094f2c7c39099870857d00c64c628ef7b5eba1967df4258033455ee2cb1"
+HERDR_VERSION="v0.7.4"
+HERDR_LINUX_X86_64_SHA256="bc0fc02d4ba500f9cac2353a43e67fe036785ecca6eb55378e050fac3c103059"
+HERDR_LINUX_ARM64_SHA256="544e0002de42806d1ab64ccdef3a7e7414f24717b0b6b022bc9e57d2eefd26a2"
 PYLATEXENC_BUILD_BACKEND_VERSION="80.9.0"
 PYLATEXENC_BUILD_BACKEND_SHA256="062d34222ad13e0cc312a4c02d73f059e86a4acbfbdea8f8f76b28c99f306922"
 PYLATEXENC_VERSION="2.10"
@@ -120,6 +120,7 @@ export HOMEBREW_NO_ASK=1
 
 INSTALL_FAILURES_COUNT=0
 INSTALL_FAILURES_DETAIL=""
+MANAGED_CLI_AUDITED="|"
 
 # ---- Bash 3.2-safe helpers ---------------------------------------------------
 have() { command -v "$1" >/dev/null 2>&1; }
@@ -167,14 +168,25 @@ exit_if_install_failures() {
     exit 1
 }
 
-# Idempotently prepend ~/.local/bin to PATH for THIS process (pinned binaries,
-# pip --user, and chezmoi all land there). Safe to call repeatedly.
+prepend_unique_path_dir() {
+    local dir="$1" entry remaining new_path="$1"
+    remaining="${PATH-}:"
+    while [[ "$remaining" == *:* ]]; do
+        entry="${remaining%%:*}"
+        remaining="${remaining#*:}"
+        [[ "$entry" == "$dir" ]] && continue
+        new_path="$new_path:$entry"
+    done
+    PATH="$new_path"
+}
+
+# Idempotently put ~/.local/bin first on PATH for THIS process (pinned
+# binaries, pip --user, and chezmoi all land there). Moving an existing later
+# entry prevents an older global command from shadowing the verified install.
 ensure_local_bin_on_path() {
-    if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
-        PATH="$HOME/.local/bin:$PATH"
-        export PATH
-        hash -r 2>/dev/null || true
-    fi
+    prepend_unique_path_dir "$HOME/.local/bin"
+    export PATH
+    hash -r 2>/dev/null || true
 }
 verify_sha256() {
     local f="$1" expected="$2" got
@@ -1999,8 +2011,13 @@ pi_cli_node_ready() {
 }
 
 pi_cli_version() {
-    command -v pi >/dev/null 2>&1 || return 1
-    pi --version 2>/dev/null | awk 'NF { print $1; exit }'
+    local canonical="$HOME/.local/bin/pi"
+    [[ -x "$canonical" ]] || return 1
+    "$canonical" --version 2>/dev/null | awk 'NF { print $1; exit }'
+}
+
+pi_cli_warn_duplicate_installations() {
+    audit_managed_cli_command pi pi "$HOME/.local/bin/pi"
 }
 
 verify_pi_cli_tarball_sri() {
@@ -2065,7 +2082,10 @@ NODE
             printf "  FAIL: %-26s packed tarball bytes do not match pinned SRI for %s\n" "pi" "$spec" >&2
             return 1
         fi
-        if ! npm install -g --prefix "$HOME/.local" "$tarball"; then
+        if ! npm install -g --prefix "$HOME/.local" "$tarball" \
+            "@earendil-works/pi-agent-core@$PI_CLI_VERSION" \
+            "@earendil-works/pi-ai@$PI_CLI_VERSION" \
+            "@earendil-works/pi-tui@$PI_CLI_VERSION"; then
             printf "  FAIL: %-26s npm install failed for verified local tarball %s\n" "pi" "$filename" >&2
             return 1
         fi
@@ -2074,9 +2094,13 @@ NODE
 
 install_pi_cli() {
     local current node_version
+    if [[ -x "$HOME/.local/bin/pi" ]]; then
+        ensure_local_bin_on_path
+    fi
     current="$(pi_cli_version || true)"
     if [[ "$current" == "$PI_CLI_VERSION" ]]; then
         printf "  ok        %-26s already installed (%s)\n" "pi" "$PI_CLI_VERSION"
+        pi_cli_warn_duplicate_installations
         return 0
     fi
     if ! command -v npm >/dev/null 2>&1; then
@@ -2096,7 +2120,7 @@ install_pi_cli() {
     if [[ "$DRY_RUN" -eq 1 ]]; then
         echo "  would: npm pack --ignore-scripts --json --pack-destination <temp> ${PI_CLI_PACKAGE}@${PI_CLI_VERSION}"
         echo "         require pack metadata integrity and tarball bytes to match $PI_CLI_INTEGRITY"
-        echo "  would: npm install -g --prefix \"$HOME/.local\" <verified-local-tarball>"
+        echo "  would: npm install -g --prefix \"$HOME/.local\" <verified-local-tarball> <exact same-release Pi companions>"
         return 0
     fi
     mkdir -p "$HOME/.local"
@@ -2108,6 +2132,7 @@ install_pi_cli() {
         return 1
     fi
     printf "  installed %-26s %s\n" "pi" "$PI_CLI_VERSION"
+    pi_cli_warn_duplicate_installations
 }
 
 install_chezmoi() {
@@ -2800,6 +2825,22 @@ PY
     printf '%s\n' "$source"
 }
 
+managed_cli_file_identity() {
+    local source="$1" identity real
+    if [[ -e "$source" ]]; then
+        case "$(uname -s)" in
+            Darwin) identity="$(stat -Lf '%d:%i' "$source" 2>/dev/null || true)" ;;
+            *) identity="$(stat -Lc '%d:%i' "$source" 2>/dev/null || true)" ;;
+        esac
+        if [[ -n "$identity" ]]; then
+            printf 'file-id:%s\n' "$identity"
+            return 0
+        fi
+    fi
+    real="$(real_source_path "$source")"
+    printf 'path:%s\n' "$real"
+}
+
 physical_path() {
     local source="$1" dir base physical_dir
     dir="$(dirname "$source")"
@@ -2980,6 +3021,145 @@ accepted_system_tool_source() {
         Darwin:zsh:/bin/zsh) return 0 ;;
         *) return 1 ;;
     esac
+}
+
+# Report physically distinct managed commands that can make the same command
+# name change meaning when PATH order changes. Base-OS directories are retained
+# as fallbacks and are not actionable duplicates. Classification is read-only:
+# competing commands are never executed, and cleanup is emitted only when the
+# owning manager proves the exact package/command relationship.
+managed_cli_system_fallback_path() {
+    local source="$1" physical
+    physical="$(physical_path "$source")"
+    case "$physical" in
+        /bin/* | /sbin/* | /usr/bin/* | /usr/sbin/*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+npm_package_owning_command_source() {
+    local source="$1" expected_package="${2:-}" source_dir npm_candidate prefix root real relative package
+    NPM_COMMAND_OWNER=""
+    NPM_COMMAND_OWNER_NPM=""
+    NPM_COMMAND_OWNER_PREFIX=""
+    source_dir="${source%/*}"
+    npm_candidate="$source_dir/npm"
+    [[ "${source##*/}" != "npm" && -x "$npm_candidate" ]] || return 1
+    prefix="$("$npm_candidate" prefix -g 2>/dev/null | awk 'NF { print; exit }' || true)"
+    [[ -n "$prefix" ]] || return 1
+    prefix="${prefix%/}"
+    path_under "$source" "$prefix/bin" || return 1
+    if [[ -n "$expected_package" && "${source##*/}" == "pi" ]]; then
+        package="$expected_package"
+    else
+        root="$prefix/lib/node_modules"
+        real="$(real_source_path "$source")"
+        path_under "$real" "$root" || return 1
+        relative="${real#"${root%/}/"}"
+        if [[ "$relative" == @*/*/* ]]; then
+            package="${relative%%/*}/${relative#*/}"
+            package="${package%/*}"
+        else
+            package="${relative%%/*}"
+        fi
+    fi
+    [[ -n "$package" ]] || return 1
+    "$npm_candidate" list --global --prefix "$prefix" --depth=0 "$package" >/dev/null 2>&1 || return 1
+    NPM_COMMAND_OWNER="$package"
+    NPM_COMMAND_OWNER_NPM="$npm_candidate"
+    NPM_COMMAND_OWNER_PREFIX="$prefix"
+    return 0
+}
+
+managed_cli_report_duplicate_owner() {
+    local duplicate="$1" tool="$2" expected_npm_package="" formula brew_bin
+    if formula="$(brew_formula_owning_tool_source "$duplicate" 2>/dev/null)"; then
+        brew_bin="$(homebrew_bin 2>/dev/null || printf 'brew')"
+        printf '        owner=brew package=%s\n' "$formula" >&2
+        printf '        cleanup (same user, no sudo): %q uninstall %q\n' "$brew_bin" "$formula" >&2
+        return 0
+    fi
+    [[ "$tool" == "pi" ]] && expected_npm_package="$PI_CLI_PACKAGE"
+    if npm_package_owning_command_source "$duplicate" "$expected_npm_package"; then
+        printf '        owner=npm package=%s\n' "$NPM_COMMAND_OWNER" >&2
+        printf '        cleanup (same user, no sudo): %q uninstall --global --prefix %q %q\n' \
+            "$NPM_COMMAND_OWNER_NPM" "$NPM_COMMAND_OWNER_PREFIX" "$NPM_COMMAND_OWNER" >&2
+        return 0
+    fi
+    if nix_owns_tool_source "$duplicate"; then
+        echo "        owner=nix; reconcile it through setup.sh or the declaring Nix profile." >&2
+        return 0
+    fi
+    echo "        owner=unknown; remove it only through its original package manager." >&2
+}
+
+audit_managed_cli_command() {
+    local tool="$1" binary="$2" selected="${3:-}" key candidate candidate_identity selected_identity
+    local -a duplicates=()
+    key="|${tool}:${binary}|"
+    [[ "$MANAGED_CLI_AUDITED" != *"$key"* ]] || return 0
+    MANAGED_CLI_AUDITED="${MANAGED_CLI_AUDITED}${tool}:${binary}|"
+
+    if [[ -z "$selected" ]]; then
+        selected="$(command -v "$binary" 2>/dev/null || true)"
+    fi
+    [[ -n "$selected" && -x "$selected" ]] || return 0
+    selected_identity="$(managed_cli_file_identity "$selected")"
+    while IFS= read -r candidate; do
+        [[ -n "$candidate" && -x "$candidate" ]] || continue
+        candidate_identity="$(managed_cli_file_identity "$candidate")"
+        [[ "$candidate_identity" != "$selected_identity" ]] || continue
+        managed_cli_system_fallback_path "$candidate" && continue
+        duplicates+=("$candidate")
+    done < <(type -a -p "$binary" 2>/dev/null | awk '!seen[$0]++')
+    [[ "${#duplicates[@]}" -gt 0 ]] || return 0
+
+    printf '  WARN: multiple managed %s commands are on PATH\n' "$tool" >&2
+    printf '        selected: %s\n' "$selected" >&2
+    for candidate in "${duplicates[@]}"; do
+        printf '        duplicate: %s\n' "$candidate" >&2
+        managed_cli_report_duplicate_owner "$candidate" "$tool"
+    done
+    echo "        setup leaves foreign installations untouched; rerun after cleanup to prove one command remains." >&2
+}
+
+managed_cli_audit_items() {
+    if [[ -n "${INSTALL_DEPS_AUDIT_ITEMS:-}" ]]; then
+        printf '%s\n' "$INSTALL_DEPS_AUDIT_ITEMS"
+        return
+    fi
+    install_dependency_scan_items | awk -F'|' '$2 == "command" { print $1 "|" $3 }'
+    printf '%s\n' \
+        "zoxide|zoxide" \
+        "npm|npm" \
+        "latex2text|latex2text" \
+        "wezterm|wezterm" \
+        "aerospace|aerospace" \
+        "herdr|herdr" \
+        "devilspie2|devilspie2"
+}
+
+audit_managed_cli_installations() {
+    local tool binary selected bins candidate
+    while IFS='|' read -r tool binary selected; do
+        [[ -n "$tool" ]] || continue
+        if [[ -z "$binary" ]]; then
+            bins="$(binaries_for "$tool")"
+            for candidate in $bins; do
+                if have "$candidate"; then
+                    binary="$candidate"
+                    break
+                fi
+            done
+        fi
+        [[ -n "$binary" ]] || continue
+        if [[ "$tool" == "pi" && -x "$HOME/.local/bin/pi" ]]; then
+            selected="$HOME/.local/bin/pi"
+        fi
+        audit_managed_cli_command "$tool" "$binary" "$selected"
+    done <<EOF
+$(managed_cli_audit_items)
+EOF
 }
 
 direct_artifact_provenance_dir() {
@@ -4466,6 +4646,7 @@ install_dependency_scan_items() {
         "tree-sitter|command|tree-sitter" \
         "shellcheck|command|shellcheck" \
         "jq|command|jq" \
+        "gh|command|gh" \
         "hyperfine|command|hyperfine" \
         "taplo|command|taplo" \
         "yamllint|command|yamllint" \
@@ -4637,8 +4818,10 @@ if [[ -n "${INSTALL_DEPS_SOURCE_ONLY:-}" ]]; then
 fi
 
 if [[ "$UPDATE_ONLY" -eq 1 ]]; then
-    run_update_mode
-    exit $?
+    UPDATE_RC=0
+    run_update_mode || UPDATE_RC=$?
+    audit_managed_cli_installations
+    exit "$UPDATE_RC"
 fi
 
 PM="$(detect_pm)"
@@ -4783,6 +4966,7 @@ run_catalog_install editorconfig-checker
 section "notes / Obsidian vault (optional)"
 configure_notes_vault
 
+audit_managed_cli_installations
 exit_if_install_failures
 echo
 echo "install-deps: done"

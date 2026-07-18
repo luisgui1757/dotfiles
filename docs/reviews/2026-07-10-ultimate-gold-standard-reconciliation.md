@@ -2438,3 +2438,413 @@ is claimed by publication.
 
 Hosted Linux proof, merge, and patched-release publication remain pending. No
 result is promoted to exact-v0.2.0 evidence.
+## Herdr shifted workspaces, Pi theme, and which-key entry point — entry 59
+
+- Herdr `prefix+Shift+1..9` was a confirmed upstream `v0.7.3` defect, not a
+  terminal or dotfiles collision: shifted digits arrive as punctuation on the
+  legacy input path, while indexed bindings accepted only literal `1..9`.
+  Upstream fix `b708f85` ships in stable `v0.7.4`. Native Linux now pins both
+  reviewed `v0.7.4` assets; current Homebrew carries `v0.7.4`; Windows advances
+  to preview `preview-2026-07-16-e907e6a36646`, which descends from the same fix.
+  Windows also closes the pre-existing update gap: only the exact repo-owned
+  executable is refreshed when its hash is stale, while unrelated Herdr
+  installations remain untouched.
+- Pi now defaults to Rose Pine through the exact palette previously audited in
+  the Helix repository. The source `pi-themes-rose-pine@0.1.0` tarball contains
+  six data/documentation files, no JavaScript entrypoint, scripts, dependencies,
+  or runtime code; this repo vendors only `rose-pine.json` and its MIT license.
+  Chezmoi publishes the theme on every OS. Setup then acquires Pi's compatible
+  `settings.json.lock` and atomically changes only the global `theme` key;
+  invalid/busy settings fail without mutation. Uninstall removes that key only
+  while it remains `rose-pine`, preserving later user choices and every other
+  setting.
+- Folke which-key already owns the correct command surface. The lazy spec now
+  exposes upstream's built-in `:WhichKey` command as a load trigger while
+  retaining `<leader>?` for buffer-local mappings. No private toggle API or new
+  chord was invented; Esc closes the popup.
+- PSScriptAnalyzer retained every reviewed warning group and changed only the
+  exact diagnostic fingerprint for the reviewed Herdr progress-message extent.
+  The baseline is now
+  `7afbc05765c54b68225c941857c9247c58a95b98f36618870b3a6e0e1a0e3139`.
+
+### Closure verification
+
+| Check | Exact result |
+|---|---|
+| Upstream Herdr source/release and asset metadata | PASS: the shifted-index fix is in both selected builds; all three downloaded assets matched GitHub's published SHA-256 digests |
+| `bash tests/static/herdr_theme_test.sh`, `herdr_windows_preview_test.sh`, and Herdr installer tests | PASS: stable/preview identities, hashes, remote-eval exclusion, config binding, owned refresh, and mismatch failure paths |
+| `bash tests/shell/pi_theme_test.sh` | PASS: exact 51-token palette, source parity, merge/idempotence, invalid JSON, lock contention, managed uninstall, user override, and absent-settings behavior |
+| `bash tests/migration/parity_gate.sh` | PASS: Pi theme deployed from the canonical source and second apply remained a no-op |
+| `pwsh -NoLogo -NoProfile -File ./test.ps1` | PASS: exact analyzer identity, 275 Pester tests, and all 18 Neovim specs |
+| `PATH=/opt/homebrew/bin:$PATH make ci` | PASS: ended `local pre-PR gate passed` on the complete behavior, tests, and documentation tree |
+
+Hosted macOS/Linux/Windows setup, physical Herdr keypress confirmation, and a
+visual Pi theme check remain downstream runtime evidence. No merge, release,
+or completion of those manual surfaces is claimed by this entry.
+
+## Pi same-release npm dependency closure — entry 60
+
+- The first hosted setup run for pull request #58 exposed a registry-timing bug
+  before the new Pi theme phase: the verified coding-agent `0.80.3` tarball
+  installed successfully, but npm satisfied its caret-ranged `pi-agent-core`,
+  `pi-ai`, and `pi-tui` dependencies with the newly published `0.80.9`
+  packages. Starting `pi` then failed on an API import that exists in the old
+  coding-agent but not the newer companion, so all six physical setup jobs
+  correctly rejected the result instead of accepting an unusable command.
+- Pi now advances coherently to coding-agent `0.80.9`, SRI
+  `sha512-Clgx2Bg5NbMcCpGxusSDQwE+GC0g/d6sCBluE9aypPgSgtJ6n8VmZIIT6auXObMskpRgkr+XZ77wG5hf+cSDtg==`.
+  POSIX and Windows continue to install the byte-verified local coding-agent
+  tarball, but also request `pi-agent-core`, `pi-ai`, and `pi-tui` at that exact
+  same release. A later companion publish can no longer silently mix Pi
+  monorepo API versions into an older pinned CLI.
+- The shell fixture and PowerShell tests now bind all four direct install
+  inputs. Historical `0.80.3` evidence remains unchanged where it records an
+  earlier successful run rather than the current contract.
+- The analyzer rule groups and counts did not change. Exact before/after
+  comparison found one diagnostic-identity replacement only: the existing Pi
+  dry-run `Write-Host` extent now includes the exact same-release companions.
+  After reviewing that one-for-one change, the fingerprint is
+  `670c470c779ff3900f07852e6be17f977a28eff73f873e7ae175e5923fbb5251`;
+  no rule, suppression, or warning count changed.
+- Hosted repair head `3c72ec1` proved the actual Ubuntu setup and Pi runtime
+  now complete, then correctly failed a stale post-install expectation that
+  still named historical Pi `0.80.3`. Both POSIX and Windows physical assertions
+  now expect `0.80.9`, and the static pin-consistency test extracts each
+  assertion independently so a future Pi bump cannot strand either hidden
+  workflow mirror again.
+
+### Repair verification
+
+| Check | Exact result |
+|---|---|
+| Exact `0.80.3` coding-agent tarball installed after `0.80.9` companions were published | EXPECTED FAIL reproduced on macOS: npm selected all three companions at `0.80.9`; `pi --version` raised the same missing-export startup error hidden behind the hosted `<missing>` version diagnostic |
+| Exact `0.80.9` coding-agent tarball and same-release companions in an isolated prefix | PASS: tarball metadata SRI matched the independently hashed bytes; all four Pi packages reported `0.80.9`; `pi --version` printed `0.80.9` |
+| `bash tests/shell/pi_cli_test.sh` | PASS: pack metadata/byte rejection, cleanup, idempotence, and exact four-input install contract |
+| `Invoke-Pester tests/powershell/InstallDeps.Tests.ps1 -CI` | PASS: 128 passed, 0 failed/skipped, including exact same-release Pi install arguments |
+| `pwsh -NoLogo -NoProfile -File ./test.ps1` | PASS after the reviewed fingerprint refresh: exact analyzer identities, 275 Pester tests, and all 18 Neovim specs |
+| `PATH=/opt/homebrew/bin:$PATH make ci` | PASS: ended `local pre-PR gate passed` on the complete implementation, tests, and documentation tree before this result-only ledger update |
+| Hosted Ubuntu setup at `3c72ec1` | EXPECTED FAIL after setup: install and `pi --version` succeeded at `0.80.9`; the later workflow assertion still expected `0.80.3`, identifying the last stale mirror |
+
+The repaired pushed-head hosted jobs, physical Herdr keypress confirmation, and
+visual Pi theme check remain downstream runtime evidence. No merge, release,
+or completion of those manual surfaces is claimed by this entry.
+
+## PR #57 integration and branch-test discoverability — entry 61
+
+- Pull request #58 was rebased onto merged pull request #57 at
+  `67fdf86720bb0f2d1747b54d9f0655d8984b01d2`. The one expected conflict was
+  append-only evidence numbering: the merged Linux Nix repair retains entry 58,
+  while the Herdr/Pi work retains its complete history as entries 59 and 60.
+- The explicit unreleased-branch lane was complete but too easy to miss: it
+  appeared in setup help and a later dedicated README section, not beside the
+  primary POSIX install command. The top install section now shows
+  `./setup.sh --all --allow-unreleased`, its clean/current official branch-head
+  boundary, and the normal-user requirement, then links to the complete clone
+  flow. A regression requires that exact command in the top install section.
+- The detailed example no longer names the already-merged Linux repair branch;
+  `BRANCH_NAME` makes the copy/paste flow durable for future official branches.
+- The first post-rebase full gate exposed a stale startup-fixture assumption,
+  not a product startup regression. Its persistent `lazy.nvim` cache had the
+  correct locked HEAD but obsolete upstream default-branch metadata, so the
+  production identity proof transactionally repaired it inside the timed init
+  and correctly tripped the strict cache-mutation assertion. Prewarm now runs
+  that one cache through production's origin, locked-branch, HEAD, cleanliness,
+  and entry-file proof before timing; the startup budget and no-mutation
+  assertion remain unchanged.
+
+### Rebase verification
+
+| Check | Exact result |
+|---|---|
+| `bash tests/shell/setup_help_test.sh` and `bash tests/static/release_upgrade_test.sh` | PASS: the top installation section advertises the exact branch-test command and release/upgrade documentation remains consistent |
+| Combined #57/#58 focused shell, static, and parity suite | PASS: Nix identity and corporate repairs, setup forwarding, Pi theme/CLI, Herdr identities, pins, and chezmoi parity |
+| Initial post-rebase startup benchmark | EXPECTED FAIL after diagnosis: production repaired stale `lazy.nvim` default-branch metadata inside the timed init and changed the cache mtime |
+| Startup benchmark after injecting a stale `refs/remotes/origin/HEAD` into the prewarm cache | PASS: prewarm repaired the metadata through the production proof before timing; the real init preserved cache mtime |
+| First complete gate after the startup-fixture repair | INFRASTRUCTURE FAIL after all repository tests passed: npm returned `ENOENT` from its pre-existing shared download cache before Renovate validation began |
+| `make validate-renovate` with a fresh temporary npm cache | PASS: strict official schema validation and local extraction found all 81 reviewed dependency records |
+| `PATH=/opt/homebrew/bin:$PATH NPM_CONFIG_CACHE=<fresh-temporary-cache> make ci` | PASS: uninterrupted run ended `local pre-PR gate passed` across lint, full Neovim and shell suites, startup benchmark, official Renovate extraction, migration, and parity |
+
+Rewritten-branch hosted checks and the existing physical Herdr/Pi confirmation
+remain downstream evidence. No merge or completion of those manual surfaces is
+claimed by this entry.
+
+## POSIX user-local command precedence repair — entry 62
+
+- A physical macOS rerun installed all four pinned Pi `0.80.9` packages under
+  `~/.local`, then setup reported `expected 0.80.9 after install, got 0.80.3`.
+  Direct inspection proved both facts simultaneously: the new user-local Pi
+  reported `0.80.9`, while an older Homebrew-global Pi reported `0.80.3` and
+  appeared first on `PATH`. npm's two `allow-scripts` messages were warnings,
+  not the failed step; no global lifecycle-script permission was granted.
+- The failure was a shared ordering defect, not a Pi install defect.
+  `ensure_local_bin_on_path` prepended `~/.local/bin` only when it was absent,
+  setup's runtime refresh appended it when absent, and managed zsh prepended
+  Homebrew after user-local paths. An existing later user-local entry therefore
+  satisfied every membership check while a stale global command still won.
+- POSIX publication now moves `~/.local/bin` to the front and removes all prior
+  occurrences before clearing Bash's command cache. Setup repeats the same
+  normalization after Homebrew and Nix discovery, and managed zsh applies its
+  prepend operations in reverse construction order so the documented final
+  order is real. The older global package is preserved but cannot shadow the
+  verified user-local artifact.
+- The Pi fixture now reproduces the exact stale-global `0.80.3` / installed
+  user-local `0.80.9` split through the real post-install version probe. Setup's
+  focused and Homebrew-path fixtures require first-position, duplicate-free
+  user-local publication, while the interactive-zsh test requires the same
+  durable order in a newly opened shell.
+
+### Repair verification
+
+| Check | Exact result |
+|---|---|
+| Four new/strengthened PATH regressions before the implementation change | EXPECTED FAIL: Pi installed `0.80.9` but resolved stale `0.80.3`; setup and interactive zsh left `~/.local/bin` behind Homebrew/global paths |
+| `bash tests/shell/pi_cli_test.sh`, `setup_local_bin_path_test.sh`, `path_dedupe_test.sh`, and `setup_homebrew_path_test.sh` | PASS: the verified user-local Pi wins immediately, setup normalizes existing/duplicate entries, and managed zsh preserves the same order |
+| `make lint` | PASS: strict ShellCheck on the complete script tree |
+| `bash tests/migration/parity_gate.sh` | PASS: canonical zsh source and chezmoi-deployed output remain byte-identical; second apply was a no-op and verify was clean |
+| `NPM_CONFIG_CACHE=<fresh-temporary-cache> PATH=/opt/homebrew/bin:$PATH make ci` | PASS before this result-only ledger update: uninterrupted run ended `local pre-PR gate passed`, including all shell/static/Nix/Neovim suites, official Renovate extraction of 81 reviewed pins, and the complete migration/parity bundle |
+
+Hosted reruns and the user's physical confirmation remain downstream evidence;
+this local closure does not claim either result or merge completion.
+
+## POSIX Pi installation ownership and duplicate reporting — entry 63
+
+- The PATH-precedence repair in entry 62 restored the verified user-local Pi at
+  runtime, but it left two ownership gaps: an unrelated same-version `pi` could
+  satisfy the generic installed-version probe, and a shadowed physical duplicate
+  remained opaque after setup succeeded. That was inconsistent with the
+  repository's single-source-of-truth contract even though command resolution
+  was deterministic.
+- On POSIX, `~/.local/bin/pi` is now the sole artifact that can satisfy Pi's
+  installed-version proof. A matching foreign command never suppresses the
+  canonical install. After an already-current or newly installed canonical Pi
+  is verified, setup enumerates every other active `pi` path without executing
+  it and reports each duplicate beside the canonical path.
+- Setup never silently deletes a foreign installation. When the duplicate's
+  sibling `npm` proves both the exact global prefix and ownership by the pinned
+  scoped package, setup prints the exact same-user `npm uninstall --global
+  --prefix ...` command. Unknown provenance receives package-manager-neutral
+  removal guidance. Neither path recommends `sudo`: npm's global ownership is
+  prefix-specific, and Homebrew explicitly rejects sudo for a normal
+  current-user-owned installation.
+- Windows retains its distinct current-npm-prefix publication model. No
+  equivalent Windows failure was observed, so this repair stays scoped to the
+  reported POSIX/Homebrew boundary instead of speculatively changing that
+  contract.
+
+### Ownership verification
+
+| Check | Exact result |
+|---|---|
+| Same-version foreign Pi with no canonical `~/.local/bin/pi`, before implementation | EXPECTED FAIL: setup accepted the foreign version and never published the canonical Pi (`canonical Pi was not published`) |
+| `bash tests/shell/pi_cli_test.sh` | PASS: canonical-only identity, exact install, proven npm duplicate cleanup guidance, unknown-owner warning, no duplicate execution, and no sudo recommendation |
+| `bash tests/shell/setup_local_bin_path_test.sh`, `setup_homebrew_path_test.sh`, and `path_dedupe_test.sh` | PASS: the canonical directory remains first and duplicate-free across setup and shell publication |
+| `make lint` and `bash tests/static/pin_consistency_test.sh` | PASS: strict ShellCheck and exact Pi pin consistency remain clean |
+| `NPM_CONFIG_CACHE=<fresh-temporary-cache> PATH=/opt/homebrew/bin:$PATH make ci` | PASS before this result-only ledger update: uninterrupted run ended `local pre-PR gate passed` across the complete repository gate |
+
+Hosted reruns and the user's physical duplicate cleanup remain downstream
+evidence; setup deliberately reports but does not remove external state.
+
+## Cross-platform managed-command duplicate audit — entry 64
+
+- Entry 63 correctly closed the observed Pi split, but its warning and
+  ownership proof were Pi-only. The same silent command switch can occur for
+  any CLI that setup installs when a second manager publishes the same command
+  later on `PATH`. Per the owner's follow-up, this entry generalizes detection
+  across the complete POSIX and Windows managed-command inventories rather than
+  cloning package-specific checks.
+- The selected first command is the runtime authority. Setup enumerates every
+  later command path without executing it, resolves physical identities, and
+  reports only distinct installations. POSIX symlinks and Windows
+  case/junction/symlink aliases collapse to one identity. Base-OS fallbacks
+  (`/usr/bin`, `/bin`, Windows `System32`, and WindowsApps execution aliases)
+  remain intentionally quiet because they are not removable user-managed
+  conflicts.
+- Cleanup remains fail-closed. POSIX emits an exact same-user/no-`sudo` command
+  only after Homebrew receipt ownership or an npm global-prefix plus package
+  receipt prove the duplicate; Nix is identified without inventing a profile
+  mutation. Windows emits exact no-admin cleanup only for a user-scoped Scoop
+  shim whose target and installed package agree. Proven winget/Chocolatey
+  copies are identified but require scope/elevation review. Unknown copies get
+  original-manager guidance. No installation is removed automatically.
+- Pi now uses this shared POSIX audit while retaining its stronger canonical
+  `~/.local/bin/pi` identity. The Windows installer invokes the same class of
+  audit after normal installs and update mode, superseding entry 63's narrower
+  statement that Windows remained outside duplicate reporting.
+
+### Duplicate-audit verification
+
+| Check | Exact result |
+|---|---|
+| New POSIX regression before implementation | EXPECTED FAIL: `audit_managed_cli_installations` was absent (exit 127) |
+| Three new Windows regressions before implementation | EXPECTED FAIL: the shared audit and system-fallback functions were absent |
+| Two strengthened Windows coverage cases added during implementation | PASS: the full managed inventory is included and an unproven Scoop receipt never produces cleanup |
+| `bash tests/shell/managed_cli_duplicates_test.sh` and `pi_cli_test.sh` | PASS: inventory-wide reporting, physical alias collapse, OS-fallback filtering, exact npm proof/cleanup, canonical Pi behavior, and zero duplicate execution |
+| Focused Pester `managed command duplicate audit` describe | PASS: 5/5 inventory coverage, distinct-path identity, Windows-fallback, proven user-Scoop cleanup, and unproven-owner fail-closed cases |
+
+Hosted checks and real-machine cleanup remain downstream evidence. This entry
+records detection and guidance only; it does not claim removal of any external
+installation.
+
+## Pi semantic multiline input through Herdr/tmux — entry 65
+
+- Per the owner's report, Pi now owns an explicit cross-platform
+  `tui.input.newLine` mapping in `~/.pi/agent/keybindings.json`. It retains the
+  complete upstream-default pair: semantic `Shift+Enter` first and `Ctrl+J` as
+  the transport-compatible fallback. The canonical file and chezmoi source are
+  byte-identical; POSIX deploys a repo link and Windows deploys a copy through
+  the existing full-source apply.
+- Pi's terminal guide calls Ghostty's historical
+  `shift+enter=text:\n` rule a legacy workaround. That rule is deliberately
+  absent: it translates the modified key to raw LF, making it
+  indistinguishable from `Ctrl+J` before Pi receives it. Herdr v0.7.4 preserves
+  modified Enter directly, which is the primary path requested here.
+- tmux needs separate transport configuration because it strips modified-key
+  identity by default. The existing POSIX overlay already enables
+  `extended-keys` plus the `extkeys` terminal feature. It intentionally omits
+  `extended-keys-format csi-u`: Pi supports tmux 3.2--3.4's default xterm
+  encoding, while that option is available only in tmux 3.5+ and is rejected
+  by the Ubuntu 24.04 tmux 3.4 contract.
+- The regression owns all three boundaries: exact Pi JSON semantics,
+  cross-platform chezmoi parity, and terminal/multiplexer transport. It also
+  rejects reintroduction of the lossy Ghostty remap. Sessions, credentials,
+  providers, and every other Pi preference remain machine-local.
+
+### Multiline-input verification
+
+| Check | Exact result |
+|---|---|
+| New focused regression before implementation | EXPECTED FAIL: `canonical Pi keybindings file is missing` |
+| `tests/shell/pi_keybindings_test.sh` and `tests/shell/pi_theme_test.sh` | PASS: exact newline pair, canonical/mirror identity, lossy-remap absence, modified-key transport, and existing Rose Pine ownership |
+| `tests/migration/parity_gate.sh` and `tests/migration/oracle_test.sh` | PASS: Pi keybindings apply at the native path, match canonical bytes, survive idempotent reapply/verify, and participate in uninstall cleanup |
+| `make lint` | PASS: JSON, shell, and repository static checks remain clean |
+| `NPM_CONFIG_CACHE=<fresh-temporary-cache> PATH=/opt/homebrew/bin:$PATH make ci` | PASS before this result-only ledger update: uninterrupted run ended `local pre-PR gate passed`, including the new Pi regression and full migration/parity coverage |
+| `pwsh -NoLogo -NoProfile -File ./test.ps1` | PASS: PSScriptAnalyzer clean and Pester 280/280, with Windows full-source apply semantics intact |
+| Result-only full-gate rerun | ENVIRONMENTAL FAIL after the complete static gate: Neovim's startup prewarm timed out while normally millisecond Lua loads were stretched to roughly one second each; every other reported Neovim spec remained green |
+| `PlenaryBustedDirectory tests/nvim/spec/startup_spec.lua` with the production minimal init and 180-second timeout | PASS immediately after the timeout: the exact startup spec completed 1/1 under its unchanged macOS budget, rejecting a product or test regression |
+
+Hosted exact-head checks and a physical `Shift+Enter` keystroke inside Pi under
+Herdr remain downstream evidence; this local entry does not claim either yet.
+
+## PR #58 independent-review reconciliation — entry 66
+
+- Fable independently reviewed pull request #58 at exact head `600bc71` and
+  found no merge blocker, but identified three concrete P3 robustness and
+  provenance gaps. The branch subsequently added only the Pi multiline-input
+  change through `d3e4783` before this reconciliation, so every finding was
+  revalidated against the current combined tree rather than assumed from the
+  older review head.
+- Managed-command duplicate detection now compares the filesystem object, not
+  merely its canonical path. POSIX uses device and inode from `stat`; Windows
+  opens the file and compares the Win32 volume serial plus file index. Case
+  aliases, symlinks, ancestor directory junctions, and hardlinks to one file
+  therefore collapse to one installation. If native identity metadata cannot
+  be read, both implementations retain their non-fatal canonical-path fallback.
+  The POSIX fixture exercises a real hardlink; the Windows-only Pester case
+  creates both a real directory junction and a hardlink.
+- Pi-theme uninstall now returns successfully before probing Node when the
+  settings file does not exist. An existing settings file still requires the
+  structured Node helper and fails closed if Node is unavailable; neither
+  wrapper guesses at a JSON edit. Focused shell and PowerShell regressions own
+  both sides of that boundary.
+- The Pi Rose Pine provenance row now records the exact intentional divergence
+  from `pi-themes-rose-pine@0.1.0`: the obsolete `badlogic/pi-mono` schema URL
+  was updated to `earendil-works/pi`, six blank-only lines were removed, and all
+  palette/token values remain identical. README and the agent invariant mirror
+  that normalization.
+- The unreleased-branch guide now states the native-Windows contract explicitly:
+  Windows has no Nix release-identity gate or `-AllowUnreleased` option, so a
+  branch test is the normal `.\setup.ps1 -All` from the cloned official branch.
+  The static pin-consistency test now binds Herdr stable/preview versions and
+  all three artifact hashes to README and the supply-chain ledger.
+- Fable's concern that Renovate could not order the non-semver Windows preview
+  tag was rejected after checking the real manager: `renovate.json` already
+  assigns `regex:^preview-(?<major>\d{4})-(?<minor>\d{2})-(?<patch>\d{2})-(?<build>[0-9a-f]+)$`,
+  and official local extraction still finds the record. No manager change was
+  needed. A full lazy.nvim stub invocation for `:WhichKey`, stale-lock
+  reclamation for the Pi theme helper, and behavior with an unset empty `PATH`
+  remain non-material optional coverage or new-policy ideas, not observed
+  defects; no speculative feature was added.
+
+### Reconciliation verification
+
+| Check | Exact result |
+|---|---|
+| New POSIX hardlink and absent-settings regressions before implementation | EXPECTED FAIL: a hardlink to the selected command was reported as a duplicate, and uninstall probed Node with no Pi settings file |
+| `make test-shell` | PASS: complete shell suite, including the new physical-identity and uninstall-no-op regressions, ended `lint OK` |
+| `pwsh -NoLogo -NoProfile -File ./test.ps1` | PASS before this result-only ledger append: exact PSScriptAnalyzer fingerprint, 281 passed, 0 failed, 1 Windows-only skipped Pester test, plus the direct Neovim spec runner |
+| `make test-starship test-tmux test-ghostty test-wezterm test-aerospace test-nix` | PASS: complete terminal and Nix configuration/ownership groups |
+| `make test-migration` | PASS: release-upgrade, parity, uninstall lifecycle, Windows Terminal policy, and oracle gates |
+| `make validate-renovate` | PASS: official schema validation and local extraction found all 81 reviewed dependency records, including the regex-versioned Herdr preview |
+| `bash tests/static/pin_consistency_test.sh`, changed-script `bash -n`, and changed-script ShellCheck | PASS: Herdr doc mirrors, syntax, and shell diagnostics are clean |
+| Full `make ci` attempt on this host | ENVIRONMENTAL FAIL after the complete static gate: one Neovim startup-cache mtime assertion changed while the macOS file provider stretched repository reads from milliseconds to minutes; all subsequent reported Neovim specs were green |
+| Isolated startup-spec retry | ENVIRONMENTAL TIMEOUT before measured init while prewarm was still verifying the 30 locked plugin checkouts; per the two-attempt rule no third local result is claimed |
+
+The opened-handle Windows identity path and its real junction/hardlink fixture
+remain exact-head hosted-Windows evidence until the pushed PR checks complete.
+The local startup result is intentionally not promoted to green; entry 65
+records the same host-I/O failure class and its prior isolated pass. No merge,
+release, physical Herdr keypress, or visual Pi-theme result is claimed here.
+
+## PR #58 final P3 reconciliation — entry 67
+
+- Fable's second independent review covered pull request #58 at exact head
+  `84e22da` and found no P0, P1, or P2 issue. Its three surviving P3 findings
+  were revalidated and closed without expanding the feature scope.
+- The POSIX managed-command inventory now includes the unconditional `gh`
+  install path. The human pre-flight table and the derived duplicate audit
+  therefore cover the same command; the regression binds that exact contract
+  without incorrectly requiring Linux-only conditional packages on macOS.
+- Windows Pi installation still keeps successful npm output quiet and always
+  removes temporary pack state. On a rejected pack or install it now appends
+  only the last 20 stderr lines, capped at 4096 characters, before cleanup so
+  the failure remains actionable without dumping an unbounded npm log.
+- Entry 66's Herdr mirror wording is narrowed to the real contract: installers,
+  README, and this ledger mirror the versions; installers and this ledger mirror
+  the artifact hashes. README has never been a checksum authority, and the
+  static pin-consistency test already enforced the correct split.
+- The review's P4 expansion ideas were not accepted as defects: no observed
+  failure justifies manager-wide install-log capture, another ownership
+  abstraction, or broader duplicate-audit policy in this pull request.
+
+### Final P3 verification
+
+| Check | Exact result |
+|---|---|
+| First generalized POSIX inventory assertion | TEST-DESIGN FAIL: it incorrectly required Linux-only `xclip` in the macOS audit; the assertion was narrowed to the reported unconditional `gh` gap |
+| `bash tests/shell/managed_cli_duplicates_test.sh`, changed-script `bash -n`, and changed-script ShellCheck | PASS: `gh` is present in the pre-flight/duplicate inventory and the changed shell remains clean |
+| `Invoke-Pester -Path tests/powershell/InstallDeps.Tests.ps1 -CI` | PASS: 133 passed, 0 failed, 1 Windows-native-identity test skipped on macOS; rejected Pi installs preserve the bounded stderr tail and clean temporary state |
+| Repository PSScriptAnalyzer warning baseline and exact fingerprint | PASS: no new error, warning group, or warning identity |
+| `bash tests/static/pin_consistency_test.sh` | PASS: the Herdr version/hash documentation split remains bound to its intended authorities |
+
+Hosted exact-head checks and a real Windows Pi failure remain downstream
+evidence after push. This entry does not promote either to locally verified and
+does not claim merge, release, physical Herdr keypress, or visual theme proof.
+
+## PR #58 Windows analyzer-baseline correction — entry 68
+
+- Exact-head Windows CI at `79e67b0` passed all 283 Pester tests but failed the
+  PSScriptAnalyzer baseline. The stderr regression in entry 67 now consumes the
+  mock's `StderrPath`, intentionally removing one `PSReviewUnusedParameter`
+  warning from `InstallDeps.Tests.ps1`; the reviewed baseline still expected 17
+  and the real analyzer reported 16.
+- Entry 67's local analyzer PASS claim is withdrawn. Its analyzer-only extraction
+  replaced `$PSScriptRoot` correctly but checked `$script:Failures` from the
+  wrong dynamic-script scope, so the wrapper returned success after the inner
+  gate failed. Re-running the raw analyzer locally reproduces the same 16-warning
+  total as Windows.
+- The baseline now expects 16 and binds the recomputed exact warning-identity
+  fingerprint `8d474f5850fe92a168f5d9528897866d3a14a68d57913b7072a3cfb63722adc6`.
+  No warning was suppressed or manufactured; the only removed identity is the
+  newly used mock parameter.
+
+### Analyzer correction verification
+
+| Check | Exact result |
+|---|---|
+| Exact-head Windows `test` job at `79e67b0` | EXPECTED PRODUCT PASS / BASELINE FAIL: Pester 283 passed, 0 failed; analyzer expected 17 unused-parameter warnings and observed 16 |
+| Raw local `PSReviewUnusedParameter` enumeration | PASS: the same 16 warning locations reported by Windows are present locally |
+| Corrected analyzer-only runner with failure exit inside the extracted script scope | EXPECTED FAIL before fingerprint update: expected `670c470c...`, actual `8d474f58...` |
+| Corrected count and exact fingerprint | PASS: the repository analyzer gate accepts all reviewed warnings with no new or missing identity |
+
+The next pushed exact-head Windows check remains the authority for closing this
+CI-only correction. No merge or release is claimed here.

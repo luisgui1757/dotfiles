@@ -8,7 +8,10 @@ mkdir -p "$TMP_ROOT"
 trap 'rm -rf "$TMP_ROOT"' EXIT
 
 cp "$REPO_ROOT/setup.sh" "$TMP_ROOT/setup.sh"
-mkdir -p "$TMP_ROOT/home/.local/state/nix/profile/bin" "$TMP_ROOT/fakebin"
+mkdir -p "$TMP_ROOT/home/.local/state/nix/profile/bin" "$TMP_ROOT/fakebin" \
+    "$TMP_ROOT/pi" "$TMP_ROOT/scripts"
+cp "$REPO_ROOT/pi/rose-pine.json" "$TMP_ROOT/pi/rose-pine.json"
+cp "$REPO_ROOT/scripts/configure-pi-theme.mjs" "$TMP_ROOT/scripts/configure-pi-theme.mjs"
 cat > "$TMP_ROOT/install-deps.sh" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -21,6 +24,11 @@ set -euo pipefail
 printf '%s\n' "$*" >> "$SETUP_TEST_ROOT/chezmoi.args"
 case " $* " in
     *" managed "*) exit 0 ;;
+    *" apply "*)
+        mkdir -p "$HOME/.pi/agent/themes"
+        cp "$SETUP_TEST_ROOT/pi/rose-pine.json" "$HOME/.pi/agent/themes/rose-pine.json"
+        exit 0
+        ;;
     *) exit 0 ;;
 esac
 EOF
@@ -63,6 +71,7 @@ chmod +x "$TMP_ROOT/install-deps.sh" "$TMP_ROOT/fakebin/chezmoi" "$TMP_ROOT/fake
     "$TMP_ROOT/fakebin/id" "$TMP_ROOT/fakebin/getent"
 ln -s "$TMP_ROOT/fakebin/chezmoi" "$TMP_ROOT/home/.local/state/nix/profile/bin/chezmoi"
 ln -s "$TMP_ROOT/fakebin/brew" "$TMP_ROOT/home/.local/state/nix/profile/bin/brew"
+ln -s "$(command -v node)" "$TMP_ROOT/fakebin/node"
 
 output="$(HOME="$TMP_ROOT/home" SETUP_TEST_ROOT="$TMP_ROOT" PATH="$TMP_ROOT/fakebin:/usr/bin:/bin" bash "$TMP_ROOT/setup.sh" --all --skip-nvim --skip-agents --experimental-wsl-gui 2>&1)"
 [[ "$output" == *"setup.sh: done"* ]]
@@ -70,5 +79,12 @@ grep -Fx -- "--experimental-wsl-gui" "$TMP_ROOT/deps.args" >/dev/null
 grep -Fx -- "1" "$TMP_ROOT/deps.env" >/dev/null
 grep -F -- "--override-data {\"experimentalWslGui\":true} managed" "$TMP_ROOT/chezmoi.args" >/dev/null
 grep -F -- "--override-data {\"experimentalWslGui\":true} --no-tty --force apply" "$TMP_ROOT/chezmoi.args" >/dev/null
+python3 - "$TMP_ROOT/home/.pi/agent/settings.json" <<'PY'
+import json
+import pathlib
+import sys
+
+assert json.loads(pathlib.Path(sys.argv[1]).read_text())["theme"] == "rose-pine"
+PY
 
 echo "OK"

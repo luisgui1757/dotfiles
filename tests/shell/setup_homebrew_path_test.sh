@@ -5,7 +5,8 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 TMP_ROOT="$REPO_ROOT/tests/.cache/setup-homebrew-path-test"
 rm -rf "$TMP_ROOT"
 mkdir -p "$TMP_ROOT/home/.linuxbrew/bin" "$TMP_ROOT/home/.linuxbrew/opt/make/libexec/gnubin" \
-    "$TMP_ROOT/home/.local/state/nix/profile/bin" "$TMP_ROOT/brewbin" "$TMP_ROOT/home"
+    "$TMP_ROOT/home/.local/bin" "$TMP_ROOT/home/.local/state/nix/profile/bin" \
+    "$TMP_ROOT/brewbin" "$TMP_ROOT/home"
 trap 'rm -rf "$TMP_ROOT"' EXIT
 
 cp "$REPO_ROOT/setup.sh" "$TMP_ROOT/setup.sh"
@@ -84,5 +85,7 @@ grep -F -- "DOTFILES_TREESITTER_SYNC_INSTALL=1" "$TMP_ROOT/nvim.log" >/dev/null
 grep -F -- "--headless +lua require('lazy').load({ plugins = { 'nvim-treesitter' } }) +qa" "$TMP_ROOT/nvim.log" >/dev/null
 grep -F -- "--headless +lua require('util.mason_tools').run_checked('MasonToolsInstallSync')" "$TMP_ROOT/nvim.log" >/dev/null
 grep -F "$TMP_ROOT/home/.linuxbrew/opt/make/libexec/gnubin" "$TMP_ROOT/nvim.log" >/dev/null
+grep -F "PATH=$TMP_ROOT/home/.local/bin:" "$TMP_ROOT/nvim.log" >/dev/null \
+    || { echo "FAIL: setup did not keep ~/.local/bin first after Homebrew refresh" >&2; exit 1; }
 
 echo "OK"

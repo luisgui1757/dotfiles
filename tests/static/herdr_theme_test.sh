@@ -7,6 +7,8 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 CONFIG="$REPO_ROOT/herdr/config.toml"
 WINDOWS_CONFIG="$REPO_ROOT/herdr/config.windows.toml"
 MIRROR="$REPO_ROOT/home/.chezmoitemplates/herdr/config.toml"
+INSTALL_SH="$REPO_ROOT/install-deps.sh"
+INSTALL_PS1="$REPO_ROOT/install-deps.ps1"
 
 fail() {
     echo "FAIL: $*" >&2
@@ -57,6 +59,16 @@ if configs[1].get("terminal", {}).get("default_shell") != "pwsh.exe":
 PY
 
 cmp -s "$CONFIG" "$MIRROR" || fail "canonical Herdr config and chezmoi mirror differ"
+grep -F 'HERDR_VERSION="v0.7.4"' "$INSTALL_SH" >/dev/null ||
+    fail "POSIX Herdr must include the shifted indexed-key fix from v0.7.4"
+grep -F 'HERDR_LINUX_X86_64_SHA256="bc0fc02d4ba500f9cac2353a43e67fe036785ecca6eb55378e050fac3c103059"' "$INSTALL_SH" >/dev/null ||
+    fail "Herdr v0.7.4 x86_64 digest drifted"
+grep -F 'HERDR_LINUX_ARM64_SHA256="544e0002de42806d1ab64ccdef3a7e7414f24717b0b6b022bc9e57d2eefd26a2"' "$INSTALL_SH" >/dev/null ||
+    fail "Herdr v0.7.4 arm64 digest drifted"
+grep -F "\$HerdrWindowsPreviewVersion = 'preview-2026-07-16-e907e6a36646'" "$INSTALL_PS1" >/dev/null ||
+    fail "Windows Herdr preview must include the shifted indexed-key fix"
+grep -F "\$HerdrWindowsX64Sha256 = 'a5827b33cbd0352e4c0f1469ca6e0f71083e1333cf0250ca9dbecc41770a6d30'" "$INSTALL_PS1" >/dev/null ||
+    fail "post-fix Windows Herdr digest drifted"
 grep -F '.chezmoitemplates/herdr/config.toml' \
     "$REPO_ROOT/home/dot_config/herdr/symlink_config.toml.tmpl" >/dev/null ||
     fail "POSIX Herdr target does not reference the managed mirror"

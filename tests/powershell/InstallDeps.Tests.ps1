@@ -790,7 +790,7 @@ Describe "install-deps.ps1" {
         $BinaryName['pi'] | Should -Be 'pi'
         @((Get-InstallDependencySpec) | Where-Object { $_.Tool -eq 'pi' }).Count | Should -Be 1
         $PiCliPackage | Should -Be '@earendil-works/pi-coding-agent'
-        $PiCliVersion | Should -Be '0.80.3'
+        $PiCliVersion | Should -Be '0.80.9'
         $PiCliIntegrity | Should -Match '^sha512-'
     }
 
@@ -836,9 +836,9 @@ exit 97
 
         $output = & { Install-PiCli } 6>&1 | Out-String
 
-        $output | Should -Match 'npm pack --ignore-scripts --json --pack-destination <temp> @earendil-works/pi-coding-agent@0\.80\.3'
+        $output | Should -Match 'npm pack --ignore-scripts --json --pack-destination <temp> @earendil-works/pi-coding-agent@0\.80\.9'
         $output | Should -Match ([regex]::Escape($PiCliIntegrity))
-        $output | Should -Match 'npm install -g <verified-local-tarball>'
+        $output | Should -Match 'npm install -g <verified-local-tarball> <exact same-release Pi companions>'
     }
 
     It "validates Pi tarball bytes independently against SHA-512 SRI" {
@@ -902,11 +902,11 @@ exit 97
         }
     }
 
-    It "installs only the verified local Pi tarball and cleans on success" {
+    It "installs the verified Pi tarball with exact same-release companions and cleans on success" {
         . $script:ImportInstallDepsForTest
         $tempRoot = Join-Path $TestDrive 'pi success temp'
         $oldTempRoot = $env:DOTFILES_PI_CLI_TEMP_ROOT
-        $script:InstalledPiTarball = ''
+        $script:InstalledPiArguments = @()
         try {
             $env:DOTFILES_PI_CLI_TEMP_ROOT = $tempRoot
             Mock -CommandName Test-PiCliTarballIntegrity -MockWith { return $true }
@@ -918,13 +918,18 @@ exit 97
                     $json = @([pscustomobject]@{ filename = 'pi.tgz'; integrity = $PiCliIntegrity }) | ConvertTo-Json -Compress
                     return [pscustomobject]@{ Output = @($json); ExitCode = 0 }
                 }
-                $script:InstalledPiTarball = $Arguments[2]
+                $script:InstalledPiArguments = @($Arguments)
                 return [pscustomobject]@{ Output = @(); ExitCode = 0 }
             }
 
             Invoke-PiCliVerifiedTarballInstall
 
-            $script:InstalledPiTarball | Should -Match 'dotfiles-pi-[0-9a-f]+[\\/]pi\.tgz$'
+            $script:InstalledPiArguments[2] | Should -Match 'dotfiles-pi-[0-9a-f]+[\\/]pi\.tgz$'
+            $script:InstalledPiArguments[3..5] | Should -Be @(
+                '@earendil-works/pi-agent-core@0.80.9',
+                '@earendil-works/pi-ai@0.80.9',
+                '@earendil-works/pi-tui@0.80.9'
+            )
             @(Get-ChildItem -LiteralPath $tempRoot -Force -ErrorAction SilentlyContinue).Count | Should -Be 0
         } finally {
             $env:DOTFILES_PI_CLI_TEMP_ROOT = $oldTempRoot
@@ -946,10 +951,21 @@ exit 97
                     $json = @([pscustomobject]@{ filename = 'pi.tgz'; integrity = $PiCliIntegrity }) | ConvertTo-Json -Compress
                     return [pscustomobject]@{ Output = @($json); ExitCode = 0 }
                 }
+                1..25 | ForEach-Object { "npm diagnostic line $_" } | Set-Content -LiteralPath $StderrPath
                 return [pscustomobject]@{ Output = @(); ExitCode = 61 }
             }
 
-            { Invoke-PiCliVerifiedTarballInstall } | Should -Throw '*verified local tarball*pi.tgz*exit 61*'
+            $failureMessage = ''
+            try {
+                Invoke-PiCliVerifiedTarballInstall
+                throw 'expected verified-local-tarball install failure'
+            } catch {
+                $failureMessage = $_.Exception.Message
+            }
+            $failureMessage | Should -Match 'verified local tarball.*pi\.tgz.*exit 61'
+            $failureMessage | Should -Match 'npm stderr \(tail\):'
+            $failureMessage | Should -Match 'npm diagnostic line 25'
+            $failureMessage | Should -Not -Match 'npm diagnostic line 5(?:\r?\n|$)'
             @(Get-ChildItem -LiteralPath $tempRoot -Force -ErrorAction SilentlyContinue).Count | Should -Be 0
         } finally {
             $env:DOTFILES_PI_CLI_TEMP_ROOT = $oldTempRoot
@@ -981,7 +997,7 @@ exit 97
 
         $output = & { Install-PiCli } 6>&1 | Out-String
 
-        $output | Should -Match 'already installed \(0\.80\.3\)'
+        $output | Should -Match 'already installed \(0\.80\.9\)'
         Should -Invoke -CommandName Invoke-PiCliVerifiedTarballInstall -Times 0 -Exactly
     }
 
@@ -1421,6 +1437,58 @@ exit 97
             }
             Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
         }
+    }
+
+    It "updates only a stale repo-owned Herdr Windows preview" {
+        . $script:ImportInstallDepsForTest -All
+        $oldLocalAppData = $env:LOCALAPPDATA
+        $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("herdr-windows-update-test-" + [System.Guid]::NewGuid())
+        try {
+            $env:LOCALAPPDATA = $tempRoot
+            $installRoot = Join-Path $tempRoot 'Programs\Herdr\bin'
+            $destination = Join-Path $installRoot 'herdr.exe'
+            New-Item -ItemType Directory -Force -Path $installRoot | Out-Null
+            [System.IO.File]::WriteAllText($destination, 'old-managed-exe')
+
+            Mock -CommandName Test-Tool -MockWith { return $true } -ParameterFilter { $name -eq 'herdr' }
+            Mock -CommandName Get-CatalogToolCommandSource -MockWith { return $destination } -ParameterFilter { $tool -eq 'herdr' }
+            Mock -CommandName Test-FileSha256 -MockWith {
+                param($Path, $Expected)
+                $Expected | Should -Be $HerdrWindowsX64Sha256
+                return ([IO.Path]::GetFullPath($Path) -ne [IO.Path]::GetFullPath($destination))
+            }
+            Mock -CommandName Invoke-WebRequest -MockWith {
+                param($Uri, $OutFile)
+                $Uri | Should -Match ([regex]::Escape($HerdrWindowsPreviewVersion))
+                [System.IO.File]::WriteAllText($OutFile, 'new-reviewed-exe')
+            }
+            Mock -CommandName Add-DirectoryToUserPath
+
+            $output = & { Install-HerdrWindowsPreview } 6>&1 | Out-String
+
+            [System.IO.File]::ReadAllText($destination) | Should -Be 'new-reviewed-exe'
+            $output | Should -Match 'updated\s+herdr'
+            Should -Invoke -CommandName Invoke-WebRequest -Times 1 -Exactly
+        } finally {
+            if ($null -eq $oldLocalAppData) {
+                Remove-Item Env:LOCALAPPDATA -ErrorAction SilentlyContinue
+            } else {
+                $env:LOCALAPPDATA = $oldLocalAppData
+            }
+            Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    It "leaves an unmanaged Herdr executable untouched" {
+        . $script:ImportInstallDepsForTest -All
+        Mock -CommandName Test-Tool -MockWith { return $true } -ParameterFilter { $name -eq 'herdr' }
+        Mock -CommandName Get-CatalogToolCommandSource -MockWith { return 'C:\Tools\herdr.exe' } -ParameterFilter { $tool -eq 'herdr' }
+        Mock -CommandName Invoke-WebRequest -MockWith { throw 'must not download' }
+
+        $output = & { Install-HerdrWindowsPreview } 6>&1 | Out-String
+
+        $output | Should -Match 'already installed \(unmanaged\)'
+        Should -Invoke -CommandName Invoke-WebRequest -Times 0 -Exactly
     }
 
     It "registers PowerShell 7 (pwsh) in the Windows package catalog" {
@@ -3023,6 +3091,148 @@ Describe "Python install rejects the Microsoft Store stub" {
         $script:probeCount = 0
         Install-One 'python' -InstalledCheck { $script:probeCount++; $true } -SkipPrompt -NoRecordFailure
         $script:probeCount | Should -BeGreaterThan 0
+    }
+}
+
+Describe "managed command duplicate audit" {
+    BeforeEach {
+        . $script:ImportInstallDepsForTest
+    }
+
+    It "reports distinct commands, collapses identical paths, and never invokes them" {
+        Mock -CommandName Get-Command -MockWith {
+            param([string]$Name)
+            if ($Name -eq 'rg') {
+                return @(
+                    [pscustomobject]@{ Source = 'C:\Tools\selected\rg.exe' },
+                    [pscustomobject]@{ Source = 'c:\tools\selected\RG.EXE' },
+                    [pscustomobject]@{ Source = 'C:\Manual\rg.exe' }
+                )
+            }
+            return $null
+        }
+
+        $output = & {
+            Invoke-ManagedCommandDuplicateAudit -SpecList @(
+                [pscustomobject]@{ Tool = 'rg'; Kind = 'tool'; Binary = 'rg'; Module = '' }
+            )
+        } 3>&1 6>&1 | Out-String
+
+        $output | Should -Match 'multiple managed rg commands are on PATH'
+        $output | Should -Match 'selected: C:\\Tools\\selected\\rg\.exe'
+        $output | Should -Match 'duplicate: C:\\Manual\\rg\.exe'
+        ([regex]::Matches($output, '(?i)selected\\rg\.exe')).Count | Should -Be 1
+    }
+
+    It "collapses ancestor junctions and hardlinks by physical file identity" `
+        -Skip:([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
+        $root = Join-Path ([IO.Path]::GetTempPath()) ('managed-command-identity-' + [guid]::NewGuid())
+        $targetDir = Join-Path $root 'target'
+        $junctionDir = Join-Path $root 'junction'
+        $hardlinkDir = Join-Path $root 'hardlink'
+        $target = Join-Path $targetDir 'rg.exe'
+        $junction = Join-Path $junctionDir 'rg.exe'
+        $hardlink = Join-Path $hardlinkDir 'rg.exe'
+        try {
+            New-Item -ItemType Directory -Force -Path $targetDir, $hardlinkDir | Out-Null
+            [IO.File]::WriteAllBytes($target, [byte[]](0x4d, 0x5a))
+            New-Item -ItemType Junction -Path $junctionDir -Target $targetDir | Out-Null
+            New-Item -ItemType HardLink -Path $hardlink -Target $target | Out-Null
+
+            Resolve-WindowsCommandIdentity -Path $junction | Should -Be (Resolve-WindowsCommandIdentity -Path $target)
+            Resolve-WindowsCommandIdentity -Path $hardlink | Should -Be (Resolve-WindowsCommandIdentity -Path $target)
+        } finally {
+            Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    It "covers every managed command in the install inventory" {
+        $expected = @((Get-InstallDependencySpec) | Where-Object {
+                $_.Kind -eq 'tool' -and $_.Tool -ne 'scoop' -and
+                -not [string]::IsNullOrWhiteSpace([string]$_.Binary)
+            } | ForEach-Object { [string]$_.Tool } | Select-Object -Unique)
+        $actual = @((Get-ManagedCommandDuplicateAuditSpec) | ForEach-Object { [string]$_.Tool })
+
+        foreach ($tool in $expected) { $actual | Should -Contain $tool }
+        $actual | Should -Contain 'npm'
+        $actual | Should -Contain 'latex2text'
+    }
+
+    It "ignores Windows system and app-execution-alias fallbacks" {
+        Test-WindowsSystemCommandFallback -Path 'C:\Windows\System32\where.exe' | Should -BeTrue
+        Test-WindowsSystemCommandFallback -Path 'C:\Users\U\AppData\Local\Microsoft\WindowsApps\python.exe' | Should -BeTrue
+        Test-WindowsSystemCommandFallback -Path 'C:\Users\U\scoop\shims\python.exe' | Should -BeFalse
+    }
+
+    It "prints Scoop cleanup only after shim and package-list ownership proof" {
+        Mock -CommandName Get-Command -MockWith {
+            param([string]$Name)
+            if ($Name -eq 'rg') {
+                return @(
+                    [pscustomobject]@{ Source = 'C:\Tools\selected\rg.exe' },
+                    [pscustomobject]@{ Source = 'C:\Users\U\scoop\shims\rg.exe' }
+                )
+            }
+            if ($Name -eq 'scoop') {
+                return [pscustomobject]@{ Source = 'C:\Users\U\scoop\shims\scoop.ps1' }
+            }
+            return $null
+        }
+        Mock -CommandName Get-ScoopShimPackageState -MockWith {
+            [pscustomobject]@{
+                Status = 'found'
+                Source = 'C:\Users\U\scoop\shims\rg.exe'
+                Shim = 'C:\Users\U\scoop\shims\rg.shim'
+                Package = 'ripgrep'
+                Reason = ''
+            }
+        }
+        Mock -CommandName Test-ScoopPackageManagedByList -MockWith { return $true }
+        Mock -CommandName Get-ScoopRoot -MockWith { return 'C:\Users\U\scoop' }
+
+        $output = & {
+            Invoke-ManagedCommandDuplicateAudit -SpecList @(
+                [pscustomobject]@{ Tool = 'rg'; Kind = 'tool'; Binary = 'rg'; Module = '' }
+            )
+        } 3>&1 6>&1 | Out-String
+
+        $output | Should -Match 'owner=scoop package=ripgrep'
+        $output | Should -Match 'cleanup \(same user, no admin\): scoop uninstall ripgrep'
+    }
+
+    It "does not invent Scoop cleanup when package-list ownership is absent" {
+        Mock -CommandName Get-Command -MockWith {
+            param([string]$Name)
+            if ($Name -eq 'rg') {
+                return @(
+                    [pscustomobject]@{ Source = 'C:\Tools\selected\rg.exe' },
+                    [pscustomobject]@{ Source = 'C:\Users\U\scoop\shims\rg.exe' }
+                )
+            }
+            if ($Name -eq 'scoop') {
+                return [pscustomobject]@{ Source = 'C:\Users\U\scoop\shims\scoop.ps1' }
+            }
+            return $null
+        }
+        Mock -CommandName Get-ScoopShimPackageState -MockWith {
+            [pscustomobject]@{
+                Status = 'found'
+                Source = 'C:\Users\U\scoop\shims\rg.exe'
+                Shim = 'C:\Users\U\scoop\shims\rg.shim'
+                Package = 'ripgrep'
+                Reason = ''
+            }
+        }
+        Mock -CommandName Test-ScoopPackageManagedByList -MockWith { return $false }
+
+        $output = & {
+            Invoke-ManagedCommandDuplicateAudit -SpecList @(
+                [pscustomobject]@{ Tool = 'rg'; Kind = 'tool'; Binary = 'rg'; Module = '' }
+            )
+        } 3>&1 6>&1 | Out-String
+
+        $output | Should -Match 'owner=unknown'
+        $output | Should -Not -Match 'scoop uninstall'
     }
 }
 

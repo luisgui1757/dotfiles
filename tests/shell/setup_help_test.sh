@@ -26,4 +26,14 @@ if ! grep -F './setup.sh --allow-unreleased' <<<"$out" >/dev/null; then
     echo "FAIL: setup.sh help does not advertise the explicit branch-head test lane"; echo "$out"; exit 1
 fi
 
+install_section="$(awk '
+    /^## Install, update, and remove$/ { in_section = 1 }
+    /^## Cheat sheets$/ { in_section = 0 }
+    in_section { print }
+' "$REPO_ROOT/README.md")"
+if ! grep -F './setup.sh --all --allow-unreleased' <<<"$install_section" >/dev/null; then
+    echo "FAIL: README top-level install section hides the unreleased branch test command"
+    exit 1
+fi
+
 echo "OK"

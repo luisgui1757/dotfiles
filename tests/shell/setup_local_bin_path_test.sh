@@ -10,20 +10,20 @@ export HOME="$WORK/home"
 mkdir -p "$HOME/.local/bin"
 
 # Load setup.sh's helper functions without running the install/config/sync
-# phases. Unit-testing refresh_runtime_path directly avoids the nvim-precedence
-# fragility of a full setup.sh run (a real nvim in /usr/local/bin on a CI runner
-# would shadow a stub in ~/.local/bin, since the refresh APPENDS ~/.local/bin).
+# phases. Unit-testing refresh_runtime_path directly keeps this fixture isolated
+# from whichever Homebrew/Nix tools happen to exist on the host.
 DOTFILES_SETUP_SOURCE_ONLY=1 source "$REPO_ROOT/setup.sh"
 
-# F7: a normal refresh must put ~/.local/bin on PATH, so install-deps' fd-find
-# symlink (~/.local/bin/fd on apt) resolves for Phase 3-5 and fresh shells.
+# F7: a normal refresh must move ~/.local/bin to the front and deduplicate it,
+# so freshly installed user-local tools win over stale global copies.
 DRY_RUN=0
-PATH="/usr/bin:/bin"
+PATH="/usr/bin:$HOME/.local/bin:/bin:$HOME/.local/bin"
 refresh_runtime_path
-case ":$PATH:" in
-    *":$HOME/.local/bin:"*) ;;
-    *) fail "refresh_runtime_path did not add ~/.local/bin to PATH" ;;
-esac
+[[ "${PATH%%:*}" == "$HOME/.local/bin" ]] \
+    || fail "refresh_runtime_path did not put ~/.local/bin first: $PATH"
+local_count="$(printf '%s\n' "$PATH" | tr ':' '\n' | grep -Fxc "$HOME/.local/bin")"
+[[ "$local_count" == "1" ]] \
+    || fail "refresh_runtime_path left $local_count ~/.local/bin entries"
 
 # F9: under --dry-run the refresh must be a no-op (the dry-run contract promises
 # nothing is changed -- no PATH mutation, no brew shellenv eval, no hash -r).
@@ -55,6 +55,8 @@ case ":$PATH:" in
     *":$HOME/.local/bin:"*) ;;
     *) fail "refresh_runtime_path did not continue after failed brew shellenv" ;;
 esac
+[[ "${PATH%%:*}" == "$HOME/.local/bin" ]] \
+    || fail "refresh_runtime_path did not keep ~/.local/bin first after failed brew shellenv: $PATH"
 grep -F "shellenv failed" "$WORK/brew.err" >/dev/null \
     || fail "refresh_runtime_path did not warn about failed brew shellenv"
 

@@ -185,7 +185,8 @@ commits, recovery path, provider inventory, and whether any user data changed.
       best-matching one and `zi` opens the interactive picker — in BOTH a fresh
       zsh and a fresh PowerShell (incl. inside psmux). Plain `cd` is unchanged.
 - [ ] **which-key**: in nvim press `<leader>` and pause past `timeoutlen`; a
-      popup lists the follow-up keys. `<leader>?` shows the buffer-local keymaps.
+      popup lists the follow-up keys. `<leader>?` shows the buffer-local keymaps;
+      `:WhichKey` opens the explicit all-keymaps popup and Esc closes it.
 - [ ] **gh-dash**: the config (`~/.config/gh-dash/config.yml`;
       `%USERPROFILE%\.config\gh-dash\config.yml` on Windows) is applied by setup
       regardless of auth; the extension binary installs only **after**
@@ -194,9 +195,10 @@ commits, recovery path, provider inventory, and whether any user data changed.
       dashboard (My Pull Requests / Needs My Review / My Issues) with Nerd Font
       icons, and `gh extension list` identifies commit
       `49f37e4832956c57bf52d4ea8b1b1e5c0f863700`.
-- [ ] **Pi CLI**: `pi --version` prints `0.80.3` on macOS, Linux/WSL, and
-      Windows. Confirm `.pi/` session/auth state stays local and is not created
-      or modified by chezmoi.
+- [ ] **Pi CLI**: `pi --version` prints `0.80.9` on macOS, Linux/WSL, and
+      Windows. Confirm Pi opens with `rose-pine`, while an unrelated custom key
+      in `~/.pi/agent/settings.json` survives setup. Session/auth/provider state
+      must remain local and untouched.
 - [ ] **Windows Tree-sitter CLI**: `tree-sitter --version` prints exactly
       `0.26.10`. A compatible unmanaged executable remains untouched; after a
       stale unmanaged fixture, the verified dotfiles executable wins PATH.

@@ -272,6 +272,7 @@ assert_posix_managed_configs() {
     assert_file_content "$HOME/.config/lsd/config.yaml" "$REPO_ROOT/lsd/config.yaml"
     assert_file_content "$HOME/.config/lsd/colors.yaml" "$REPO_ROOT/lsd/colors.yaml"
     assert_file_content "$HOME/.config/herdr/config.toml" "$REPO_ROOT/herdr/config.toml"
+    assert_file_content "$HOME/.pi/agent/themes/rose-pine.json" "$REPO_ROOT/pi/rose-pine.json"
     assert_file_content "$HOME/.tmux.conf" "$REPO_ROOT/tmux/tmux.conf"
     assert_file_content "$HOME/.tmux.posix.conf" "$REPO_ROOT/tmux/tmux.posix.conf"
     assert_file_content "$HOME/.zshenv" "$REPO_ROOT/shells/zshenv"
@@ -308,6 +309,21 @@ main() {
 
     assert_nvim_version
     assert_posix_managed_configs
+    if [[ "$CONFIG_ONLY" -eq 1 ]]; then
+        skip_check "Pi global theme selection skipped by --config-only"
+    elif python3 - "$HOME/.pi/agent/settings.json" <<'PY'
+import json
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+raise SystemExit(0 if json.loads(path.read_text()).get("theme") == "rose-pine" else 1)
+PY
+    then
+        pass_check "Pi global theme selects rose-pine"
+    else
+        fail_check "Pi global theme does not select rose-pine"
+    fi
     assert_zsh_plugins
     assert_chezmoi_verify
     run_nvim_checked lazy "+Lazy! restore" "+qa"

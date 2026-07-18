@@ -7,6 +7,7 @@ return {
     -- only rose-pine.lua is allowed to load eagerly (invariant 7).
     "folke/which-key.nvim",
     event = "VeryLazy",
+    cmd = "WhichKey",
     opts = {},
     keys = {
       {

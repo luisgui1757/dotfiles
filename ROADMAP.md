@@ -74,7 +74,7 @@ remote-eval installers.
 Sequenced PRs (split for independent, revertable blast radius):
 
 - **PR-1 `feat/ergonomics-core` - DONE (merged as #42).** No Nix, no vi-mode.
-  Neovim `scrolloff = 16`; which-key.nvim (`<leader>?`, VeryLazy); zoxide across
+  Neovim `scrolloff = 16`; which-key.nvim (`<leader>?`, `:WhichKey`, VeryLazy); zoxide across
   zsh + PowerShell + both installers (cached, no-`Invoke-Expression` PowerShell
   init); `gh` + pinned `gh-dash` extension (`v4.25.1`) with a chezmoi-managed
   same-path config and Renovate / pin-consistency coverage.
@@ -94,7 +94,9 @@ Sequenced PRs (split for independent, revertable blast radius):
   reserved-chord-safe keymap) + Herdr (macOS/Linux stable channels plus native
   Windows pinned preview binary). Herdr now consumes one chezmoi-managed,
   forced-dark built-in Rose Pine config on POSIX and from Windows' real roaming
-  ApplicationData known folder.
+  ApplicationData known folder. Stable `v0.7.4` and the July 16 Windows preview
+  close the shifted indexed-workspace key bug; stale repo-owned Windows previews
+  reconcile by exact path plus hash while unrelated binaries stay untouched.
 - **PR-5 `feat/nix-skeleton` - DONE.** flake + committed `flake.lock` with ZERO
   ownership; `nix flake check` CI; disjointness test (Home Manager declares no
   file targets); Renovate `nix` manager.
@@ -263,11 +265,14 @@ Commit-by-commit status:
   Home Manager session-vars startup. Apple Silicon is the only current Darwin
   contract; Intel evidence is retained in the append-only ledger as historical
   proof, not current support.
-- **Pi CLI provisioning — DONE.** Setup installs the Pi CLI on every OS as the
-  pinned npm package `@earendil-works/pi-coding-agent@0.80.3` after checking npm
-  `dist.integrity`. POSIX public setup gets Node 24 from the enforced Nix package
-  layer; Windows uses the native Node LTS catalog path. `.pi/` runtime state
-  remains local and unsynced.
+- **Pi CLI provisioning, theme, and multiline input — DONE.** Setup installs the Pi CLI on every OS as the
+  pinned npm package `@earendil-works/pi-coding-agent@0.80.9` after checking npm
+  `dist.integrity`; its three Pi companion modules are held to the same exact
+  release. POSIX public setup gets Node 24 from the enforced Nix package
+  layer; Windows uses the native Node LTS catalog path. Chezmoi deploys the
+  audited Rose Pine theme plus the exact upstream `Shift+Enter` / `Ctrl+J`
+  newline keybinding pair, and setup merges only the global `theme` selection;
+  sessions, auth, providers, and every other `.pi/` preference remain local.
 - **Gold-standard gap close — DONE (2026-07-09, PR #46).** Accepted
   install failures record and force nonzero setup/update exits; stdin/no-script-path
   setup fails closed with clone-first instructions instead of clone-and-reinvoke;
@@ -519,8 +524,9 @@ Reconciled by the 2026-07-10 ultimate closure branch; each item is marked DONE
 only with its implementation, tests, and documentation:
 
 1. **Pi CLI verified tarball install — DONE.** POSIX and Windows use `npm pack`,
-   require pack metadata and actual tarball bytes to match the mirrored SRI,
-   install only the local verified tarball, and clean temp state on every exit.
+   require pack metadata and actual coding-agent tarball bytes to match the
+   mirrored SRI, install it with exact same-release Pi companions, and clean
+   temp state on every exit.
 2. **zsh plugin quarantine-on-mismatch — DONE.** The shared serialized
    publisher neutralizes unproved executable payloads, verifies a sibling exact
    checkout, publishes atomically, preserves unsafe quarantines, and lets bare

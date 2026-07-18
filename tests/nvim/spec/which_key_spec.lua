@@ -1,6 +1,7 @@
 -- which-key.nvim must stay lazy-loaded so it never adds to the startup budget,
 -- must NOT force eager load (invariant 7: only rose-pine may be lazy = false),
--- and must keep the <leader>? buffer-local keymap popup. We inspect the spec by
+-- and must expose Folke's built-in :WhichKey command while keeping the
+-- <leader>? buffer-local keymap popup. We inspect the spec by
 -- dofile (same approach as debugging_spec) so the assertion holds without the
 -- plugin being cloned.
 describe("which-key spec", function()
@@ -26,6 +27,12 @@ describe("which-key spec", function()
     local spec = which_key_spec()
     assert.is_not_nil(spec)
     assert.is_true(spec.lazy ~= false)
+  end)
+
+  it("lazy-loads for Folke's built-in :WhichKey command", function()
+    local spec = which_key_spec()
+    assert.is_not_nil(spec)
+    assert.are.equal("WhichKey", spec.cmd)
   end)
 
   it("registers the <leader>? buffer-local keymap popup", function()

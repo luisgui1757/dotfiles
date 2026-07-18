@@ -105,7 +105,7 @@ Invoke-Step 'PSScriptAnalyzer' {
     # per rule group; the fingerprint below additionally binds the exact stable
     # script/rule/message/extent identities, so one warning cannot silently
     # replace another while preserving a filename/rule/count total.
-    $analyzerWarningFingerprint = '284a5c26ff6986b5bb4805367417a09958e5bea39de25edfefc14487c175718a'
+    $analyzerWarningFingerprint = '8d474f5850fe92a168f5d9528897866d3a14a68d57913b7072a3cfb63722adc6'
     $analyzerWarningBaseline = @{
         'dot_tmux.rose-pine.ps1, PSAvoidUsingWriteHost'                               = @{ Count = 1; Reason = 'generated tmux theme status output' }
         'install-deps.ps1, PSAvoidUsingWriteHost'                                     = @{ Count = 165; Reason = 'interactive installer progress output' }
@@ -115,7 +115,7 @@ Invoke-Step 'PSScriptAnalyzer' {
         'install-wt-portable.ps1, PSAvoidUsingWriteHost'                              = @{ Count = 3; Reason = 'greenfield harness progress output' }
         'InstallDeps.Tests.ps1, PSAvoidAssignmentToAutomaticVariable'                 = @{ Count = 2; Reason = 'Pester mock scope fixtures' }
         'InstallDeps.Tests.ps1, PSAvoidOverwritingBuiltInCmdlets'                     = @{ Count = 1; Reason = 'Pester mock command fixture' }
-        'InstallDeps.Tests.ps1, PSReviewUnusedParameter'                              = @{ Count = 17; Reason = 'Pester mock signatures mirror production calls' }
+        'InstallDeps.Tests.ps1, PSReviewUnusedParameter'                              = @{ Count = 16; Reason = 'Pester mock signatures mirror production calls' }
         'InstallDeps.Tests.ps1, PSUseApprovedVerbs'                                   = @{ Count = 1; Reason = 'Pester helper name' }
         'InstallDeps.Tests.ps1, PSUseDeclaredVarsMoreThanAssignments'                 = @{ Count = 7; Reason = 'Pester assertion captures' }
         'InstallDeps.Tests.ps1, PSUseShouldProcessForStateChangingFunctions'          = @{ Count = 3; Reason = 'Pester helper fixtures' }
