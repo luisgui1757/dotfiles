@@ -1973,10 +1973,12 @@ function Invoke-PiThemeSelectionMerge {
         return
     }
 
-    $theme = Join-Path $Identity.UserProfile '.pi\agent\themes\rose-pine.json'
-    $expectedTheme = Join-Path $ScriptDir 'pi\rose-pine.json'
-    if (-not (Test-FileBytesEqual $theme $expectedTheme)) {
-        throw "deployed Pi Rose Pine theme differs from the reviewed source: $theme"
+    foreach ($themeName in @('rose-pine', 'rose-pine-moon', 'rose-pine-dawn')) {
+        $theme = Join-Path $Identity.UserProfile ".pi\agent\themes\$themeName.json"
+        $expectedTheme = Join-Path $ScriptDir "pi\$themeName.json"
+        if (-not (Test-FileBytesEqual $theme $expectedTheme)) {
+            throw "deployed Pi Rose Pine theme differs from the reviewed source: $theme"
+        }
     }
     $node = Get-Command node -ErrorAction SilentlyContinue
     if (-not $node) {

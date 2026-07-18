@@ -10,7 +10,9 @@ trap 'rm -rf "$TMP_ROOT"' EXIT
 cp "$REPO_ROOT/setup.sh" "$TMP_ROOT/setup.sh"
 mkdir -p "$TMP_ROOT/home/.local/state/nix/profile/bin" "$TMP_ROOT/fakebin" \
     "$TMP_ROOT/pi" "$TMP_ROOT/scripts"
-cp "$REPO_ROOT/pi/rose-pine.json" "$TMP_ROOT/pi/rose-pine.json"
+for theme_name in rose-pine rose-pine-moon rose-pine-dawn; do
+    cp "$REPO_ROOT/pi/$theme_name.json" "$TMP_ROOT/pi/$theme_name.json"
+done
 cp "$REPO_ROOT/scripts/configure-pi-theme.mjs" "$TMP_ROOT/scripts/configure-pi-theme.mjs"
 cat > "$TMP_ROOT/install-deps.sh" <<'EOF'
 #!/usr/bin/env bash
@@ -26,7 +28,9 @@ case " $* " in
     *" managed "*) exit 0 ;;
     *" apply "*)
         mkdir -p "$HOME/.pi/agent/themes"
-        cp "$SETUP_TEST_ROOT/pi/rose-pine.json" "$HOME/.pi/agent/themes/rose-pine.json"
+        for theme_name in rose-pine rose-pine-moon rose-pine-dawn; do
+            cp "$SETUP_TEST_ROOT/pi/$theme_name.json" "$HOME/.pi/agent/themes/$theme_name.json"
+        done
         exit 0
         ;;
     *) exit 0 ;;

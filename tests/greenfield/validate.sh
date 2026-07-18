@@ -272,7 +272,11 @@ assert_posix_managed_configs() {
     assert_file_content "$HOME/.config/lsd/config.yaml" "$REPO_ROOT/lsd/config.yaml"
     assert_file_content "$HOME/.config/lsd/colors.yaml" "$REPO_ROOT/lsd/colors.yaml"
     assert_file_content "$HOME/.config/herdr/config.toml" "$REPO_ROOT/herdr/config.toml"
-    assert_file_content "$HOME/.pi/agent/themes/rose-pine.json" "$REPO_ROOT/pi/rose-pine.json"
+    for theme_name in rose-pine rose-pine-moon rose-pine-dawn; do
+        assert_file_content \
+            "$HOME/.pi/agent/themes/$theme_name.json" \
+            "$REPO_ROOT/pi/$theme_name.json"
+    done
     assert_file_content "$HOME/.tmux.conf" "$REPO_ROOT/tmux/tmux.conf"
     assert_file_content "$HOME/.tmux.posix.conf" "$REPO_ROOT/tmux/tmux.posix.conf"
     assert_file_content "$HOME/.zshenv" "$REPO_ROOT/shells/zshenv"

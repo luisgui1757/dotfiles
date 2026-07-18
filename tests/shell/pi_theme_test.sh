@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
-# Pi gets the audited Rose Pine data file while setup changes only the global
-# `theme` setting. The merge helper must preserve every unrelated preference,
-# serialize with Pi's lock convention, and fail without damaging bad input.
+# Pi gets the audited Rose Pine main/moon/dawn data files while setup changes
+# only the global `theme` setting. The merge helper must preserve every
+# unrelated preference, serialize with Pi's lock convention, and fail without
+# damaging bad input.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
-THEME="$REPO_ROOT/pi/rose-pine.json"
-MIRROR="$REPO_ROOT/home/dot_pi/agent/themes/rose-pine.json"
 HELPER="$REPO_ROOT/scripts/configure-pi-theme.mjs"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
@@ -17,7 +16,12 @@ fail() {
 }
 
 command -v node >/dev/null 2>&1 || fail "node is required"
-cmp -s "$THEME" "$MIRROR" || fail "canonical Pi theme and chezmoi mirror differ"
+for theme_name in rose-pine rose-pine-moon rose-pine-dawn; do
+    cmp -s \
+        "$REPO_ROOT/pi/$theme_name.json" \
+        "$REPO_ROOT/home/dot_pi/agent/themes/$theme_name.json" ||
+        fail "canonical Pi $theme_name theme and chezmoi mirror differ"
+done
 for integration in \
     'setup.sh:configure_pi_theme_selection' \
     'setup.ps1:Invoke-PiThemeSelectionMerge' \
@@ -30,19 +34,46 @@ do
         fail "$file does not integrate the Pi theme settings helper"
 done
 
-python3 - "$THEME" <<'PY'
+python3 - \
+    "$REPO_ROOT/pi/rose-pine.json" \
+    "$REPO_ROOT/pi/rose-pine-moon.json" \
+    "$REPO_ROOT/pi/rose-pine-dawn.json" <<'PY'
+import hashlib
 import json
 import pathlib
 import sys
 
-theme = json.loads(pathlib.Path(sys.argv[1]).read_text())
-expected_vars = {
-    "base": "#191724", "surface": "#1f1d2e", "overlay": "#26233a",
-    "muted": "#6e6a86", "subtle": "#908caa", "text": "#e0def4",
-    "love": "#eb6f92", "gold": "#f6c177", "rose": "#ebbcba",
-    "pine": "#31748f", "foam": "#9ccfd8", "iris": "#c4a7e7",
-    "highlightLow": "#21202e", "highlightMed": "#403d52",
-    "highlightHigh": "#524f67",
+schema = "https://raw.githubusercontent.com/earendil-works/pi/main/packages/coding-agent/src/modes/interactive/theme/theme-schema.json"
+expected_hashes = {
+    "rose-pine": "5e162b1e79e282adf5fd4f2b216e5c84683ff997c214d38890376d3b5bb90592",
+    "rose-pine-moon": "97720d05503193f385b6fd17e93d4a3ad16689f6e2b81284540d4c55565f04fb",
+    "rose-pine-dawn": "53a82f1e219a2cf4de55ded76522d2ac75f9a200d74ac49e9165cb7191a65e6d",
+}
+expected_palettes = {
+    "rose-pine": {
+        "base": "#191724", "surface": "#1f1d2e", "overlay": "#26233a",
+        "muted": "#6e6a86", "subtle": "#908caa", "text": "#e0def4",
+        "love": "#eb6f92", "gold": "#f6c177", "rose": "#ebbcba",
+        "pine": "#31748f", "foam": "#9ccfd8", "iris": "#c4a7e7",
+        "highlightLow": "#21202e", "highlightMed": "#403d52",
+        "highlightHigh": "#524f67",
+    },
+    "rose-pine-moon": {
+        "base": "#232136", "surface": "#2a273f", "overlay": "#393552",
+        "muted": "#6e6a86", "subtle": "#908caa", "text": "#e0def4",
+        "love": "#eb6f92", "gold": "#f6c177", "rose": "#ea9a97",
+        "pine": "#3e8fb0", "foam": "#9ccfd8", "iris": "#c4a7e7",
+        "highlightLow": "#2a283e", "highlightMed": "#44415a",
+        "highlightHigh": "#56526e",
+    },
+    "rose-pine-dawn": {
+        "base": "#faf4ed", "surface": "#fffaf3", "overlay": "#f2e9e1",
+        "muted": "#9893a5", "subtle": "#797593", "text": "#575279",
+        "love": "#b4637a", "gold": "#ea9d34", "rose": "#d7827e",
+        "pine": "#286983", "foam": "#56949f", "iris": "#907aa9",
+        "highlightLow": "#f4ede8", "highlightMed": "#dfdad9",
+        "highlightHigh": "#cecacd",
+    },
 }
 expected_colors = {
     "accent", "bashMode", "border", "borderAccent", "borderMuted",
@@ -58,16 +89,33 @@ expected_colors = {
     "toolOutput", "toolPendingBg", "toolSuccessBg", "toolTitle",
     "userMessageBg", "userMessageText", "warning",
 }
-if theme.get("name") != "rose-pine":
-    raise SystemExit("Pi theme name must be rose-pine")
-if theme.get("vars") != expected_vars:
-    raise SystemExit("Pi Rose Pine palette drifted")
-if set(theme.get("colors", {})) != expected_colors:
-    raise SystemExit("Pi theme must define the exact 51-token schema")
-if theme.get("export") != {
-    "pageBg": "#191724", "cardBg": "#1f1d2e", "infoBg": "#26233a"
-}:
-    raise SystemExit("Pi export palette drifted")
+for raw_path in sys.argv[1:]:
+    path = pathlib.Path(raw_path)
+    raw = path.read_bytes()
+    theme = json.loads(raw)
+    name = theme.get("name")
+    if name != path.stem or name not in expected_hashes:
+        raise SystemExit(f"Pi theme filename/name mismatch: {path.name}: {name!r}")
+    if theme.get("$schema") != schema:
+        raise SystemExit(f"Pi {name} schema URL drifted")
+    if hashlib.sha256(raw).hexdigest() != expected_hashes[name]:
+        raise SystemExit(f"Pi {name} audited Zenobi mapping drifted")
+    variables = theme.get("vars", {})
+    if len(variables) != 39:
+        raise SystemExit(f"Pi {name} must keep the 15 official and 24 derived colors")
+    for key, value in expected_palettes[name].items():
+        if variables.get(key) != value:
+            raise SystemExit(f"Pi {name} official palette drifted at {key}")
+    colors = theme.get("colors", {})
+    if set(colors) != expected_colors:
+        raise SystemExit(f"Pi {name} must define the exact 51-token schema")
+    undefined = {value for value in colors.values() if value not in variables and value != ""}
+    if undefined:
+        raise SystemExit(f"Pi {name} references undefined colors: {sorted(undefined)!r}")
+    if theme.get("export") != {
+        "pageBg": "base", "cardBg": "surface", "infoBg": "highlightLow"
+    }:
+        raise SystemExit(f"Pi {name} export palette drifted")
 PY
 
 # Absent settings become a minimal selection file.
@@ -122,27 +170,29 @@ fi
 after="$(shasum -a 256 "$settings" | awk '{print $1}')"
 [[ "$before" == "$after" ]] || fail "locked Pi settings changed"
 
-# Uninstall removes only the managed selection. A later user choice wins.
-settings="$WORK/unset-managed/settings.json"
-mkdir -p "$(dirname "$settings")"
-printf '%s\n' '{"theme":"rose-pine","keep":1}' > "$settings"
-node "$HELPER" unset "$settings" rose-pine >/dev/null
-python3 - "$settings" <<'PY'
+# Uninstall removes any managed selection atomically. A later user choice wins.
+for managed_theme in rose-pine rose-pine-moon rose-pine-dawn; do
+    settings="$WORK/unset-managed-$managed_theme/settings.json"
+    mkdir -p "$(dirname "$settings")"
+    printf '{"theme":"%s","keep":1}\n' "$managed_theme" > "$settings"
+    node "$HELPER" unset "$settings" rose-pine rose-pine-moon rose-pine-dawn >/dev/null
+    python3 - "$settings" <<'PY'
 import json, pathlib, sys
 assert json.loads(pathlib.Path(sys.argv[1]).read_text()) == {"keep": 1}
 PY
+done
 
 settings="$WORK/unset-user/settings.json"
 mkdir -p "$(dirname "$settings")"
 printf '%s\n' '{"theme":"light","keep":1}' > "$settings"
 before="$(shasum -a 256 "$settings" | awk '{print $1}')"
-node "$HELPER" unset "$settings" rose-pine >/dev/null
+node "$HELPER" unset "$settings" rose-pine rose-pine-moon rose-pine-dawn >/dev/null
 after="$(shasum -a 256 "$settings" | awk '{print $1}')"
 [[ "$before" == "$after" ]] || fail "uninstall overwrote a user-selected Pi theme"
 
 # Unsetting absent settings is a no-op and must not create .pi directories.
 settings="$WORK/unset-absent/settings.json"
-node "$HELPER" unset "$settings" rose-pine >/dev/null
+node "$HELPER" unset "$settings" rose-pine rose-pine-moon rose-pine-dawn >/dev/null
 [[ ! -e "$(dirname "$settings")" ]] || fail "absent Pi settings cleanup created directories"
 
 echo "all Pi Rose Pine theme and settings-merge invariants OK"

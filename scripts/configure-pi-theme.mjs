@@ -9,7 +9,9 @@ const LOCK_RETRIES = 10;
 const LOCK_RETRY_MS = 20;
 
 function usage() {
-  console.error("usage: configure-pi-theme.mjs <set|unset> <settings.json> <theme-name>");
+  console.error(
+    "usage: configure-pi-theme.mjs set <settings.json> <theme-name> | unset <settings.json> <managed-theme> [managed-theme...]",
+  );
 }
 
 function sleep(milliseconds) {
@@ -84,12 +86,16 @@ async function atomicWrite(settingsPath, settings) {
 }
 
 async function main() {
-  const [command, settingsPath, themeName, ...extra] = process.argv.slice(2);
-  if (!(["set", "unset"].includes(command)) || !settingsPath || !themeName || extra.length > 0) {
+  const [command, settingsPath, ...themeNames] = process.argv.slice(2);
+  const hasValidThemeCount =
+    (command === "set" && themeNames.length === 1) ||
+    (command === "unset" && themeNames.length > 0);
+  if (!(["set", "unset"].includes(command)) || !settingsPath || !hasValidThemeCount) {
     usage();
     process.exitCode = 2;
     return;
   }
+  const themeName = themeNames[0];
 
   if (command === "unset") {
     try {
@@ -119,13 +125,14 @@ async function main() {
       return;
     }
 
-    if (settings.theme !== themeName) {
+    if (!themeNames.includes(settings.theme)) {
       console.log(`kept user-selected Pi theme: ${settings.theme ?? "<unset>"}`);
       return;
     }
+    const selectedTheme = settings.theme;
     delete settings.theme;
     await atomicWrite(settingsPath, settings);
-    console.log(`removed managed Pi theme: ${themeName}`);
+    console.log(`removed managed Pi theme: ${selectedTheme}`);
   } catch (error) {
     operationError = error;
     throw error;

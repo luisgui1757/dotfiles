@@ -337,7 +337,15 @@ function Assert-Part1Files {
     Assert-CopyModeFileMatches `
         -ActualPath (Join-Path $Sandbox '.pi\agent\themes\rose-pine.json') `
         -ExpectedPath (Join-Path $script:RepoRoot 'pi\rose-pine.json') `
-        -Label 'Pi Rose Pine theme'
+        -Label 'Pi Rose Pine main theme'
+    Assert-CopyModeFileMatches `
+        -ActualPath (Join-Path $Sandbox '.pi\agent\themes\rose-pine-moon.json') `
+        -ExpectedPath (Join-Path $script:RepoRoot 'pi\rose-pine-moon.json') `
+        -Label 'Pi Rose Pine moon theme'
+    Assert-CopyModeFileMatches `
+        -ActualPath (Join-Path $Sandbox '.pi\agent\themes\rose-pine-dawn.json') `
+        -ExpectedPath (Join-Path $script:RepoRoot 'pi\rose-pine-dawn.json') `
+        -Label 'Pi Rose Pine dawn theme'
     Assert-CopyModeFileMatches `
         -ActualPath (Join-Path $Sandbox '.config\lsd\config.yaml') `
         -ExpectedPath (Join-Path $script:RepoRoot 'lsd\config.yaml') `
