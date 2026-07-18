@@ -573,7 +573,7 @@ Describe "install-deps.ps1" {
 
         $Catalog.ContainsKey('tree-sitter') | Should -BeFalse
         $BinaryName['tree-sitter'] | Should -Be 'tree-sitter'
-        $TreeSitterCliVersion | Should -Be 'v0.26.10'
+        $TreeSitterCliVersion | Should -Be 'v0.26.11'
         $TreeSitterCliWindowsX64Sha256 | Should -Match '^[0-9a-f]{64}$'
         $TreeSitterCliWindowsArm64Sha256 | Should -Match '^[0-9a-f]{64}$'
         $TreeSitterCliWindowsX86Sha256 | Should -Match '^[0-9a-f]{64}$'
@@ -790,7 +790,7 @@ Describe "install-deps.ps1" {
         $BinaryName['pi'] | Should -Be 'pi'
         @((Get-InstallDependencySpec) | Where-Object { $_.Tool -eq 'pi' }).Count | Should -Be 1
         $PiCliPackage | Should -Be '@earendil-works/pi-coding-agent'
-        $PiCliVersion | Should -Be '0.80.9'
+        $PiCliVersion | Should -Be '0.80.10'
         $PiCliIntegrity | Should -Match '^sha512-'
     }
 
@@ -836,7 +836,7 @@ exit 97
 
         $output = & { Install-PiCli } 6>&1 | Out-String
 
-        $output | Should -Match 'npm pack --ignore-scripts --json --pack-destination <temp> @earendil-works/pi-coding-agent@0\.80\.9'
+        $output | Should -Match 'npm pack --ignore-scripts --json --pack-destination <temp> @earendil-works/pi-coding-agent@0\.80\.10'
         $output | Should -Match ([regex]::Escape($PiCliIntegrity))
         $output | Should -Match 'npm install -g <verified-local-tarball> <exact same-release Pi companions>'
     }
@@ -926,9 +926,9 @@ exit 97
 
             $script:InstalledPiArguments[2] | Should -Match 'dotfiles-pi-[0-9a-f]+[\\/]pi\.tgz$'
             $script:InstalledPiArguments[3..5] | Should -Be @(
-                '@earendil-works/pi-agent-core@0.80.9',
-                '@earendil-works/pi-ai@0.80.9',
-                '@earendil-works/pi-tui@0.80.9'
+                '@earendil-works/pi-agent-core@0.80.10',
+                '@earendil-works/pi-ai@0.80.10',
+                '@earendil-works/pi-tui@0.80.10'
             )
             @(Get-ChildItem -LiteralPath $tempRoot -Force -ErrorAction SilentlyContinue).Count | Should -Be 0
         } finally {
@@ -997,7 +997,7 @@ exit 97
 
         $output = & { Install-PiCli } 6>&1 | Out-String
 
-        $output | Should -Match 'already installed \(0\.80\.9\)'
+        $output | Should -Match 'already installed \(0\.80\.10\)'
         Should -Invoke -CommandName Invoke-PiCliVerifiedTarballInstall -Times 0 -Exactly
     }
 
@@ -1046,12 +1046,12 @@ exit 97
 
     It "accepts a compatible unmanaged tree-sitter without replacing it" {
         . $script:ImportInstallDepsForTest
-        Mock -CommandName Get-TreeSitterCliVersion -MockWith { return '0.26.10' }
+        Mock -CommandName Get-TreeSitterCliVersion -MockWith { return '0.26.11' }
         Mock -CommandName Invoke-WebRequest -MockWith { throw 'compatible install must not download' }
 
         $output = & { Install-TreeSitterCli } 6>&1 | Out-String
 
-        $output | Should -Match 'compatible 0\.26\.10'
+        $output | Should -Match 'compatible 0\.26\.11'
         Should -Invoke -CommandName Invoke-WebRequest -Times 0 -Exactly
         $script:InstallFailures.Count | Should -Be 0
     }
@@ -1076,11 +1076,11 @@ exit 97
                 if (-not [string]::IsNullOrWhiteSpace($Path)) {
                     $script:TreeSitterValidatedPaths += $Path
                     if ([IO.Path]::GetExtension($Path) -ne '.exe') { return '' }
-                    return '0.26.10'
+                    return '0.26.11'
                 }
                 $firstPath = Normalize-PathListEntry (($env:PATH -split ';')[0])
                 if ($firstPath.Equals((Normalize-PathListEntry $installRoot), [StringComparison]::OrdinalIgnoreCase)) {
-                    return '0.26.10'
+                    return '0.26.11'
                 }
                 return '0.25.0'
             }
@@ -1097,7 +1097,7 @@ exit 97
 
             $output = & { Install-TreeSitterCli } 6>&1 | Out-String
 
-            $output | Should -Match 'installed\s+tree-sitter\s+v0\.26\.10'
+            $output | Should -Match 'installed\s+tree-sitter\s+v0\.26\.11'
             [System.IO.File]::ReadAllText($target) | Should -Be 'exact executable'
             @(Get-ChildItem -LiteralPath $installRoot -Filter '.tree-sitter.exe.*' -Force).Count | Should -Be 0
             @($script:TreeSitterValidatedPaths | Where-Object { [IO.Path]::GetExtension($_) -ne '.exe' }).Count | Should -Be 0
@@ -1121,7 +1121,7 @@ exit 97
             $env:DOTFILES_LOCAL_APP_DATA_OVERRIDE = $localAppData
             Mock -CommandName Get-TreeSitterCliVersion -MockWith {
                 param([string]$Path)
-                if (-not [string]::IsNullOrWhiteSpace($Path)) { return '0.26.10' }
+                if (-not [string]::IsNullOrWhiteSpace($Path)) { return '0.26.11' }
                 return '0.25.0'
             }
             Mock -CommandName Invoke-WebRequest -MockWith {
@@ -1196,8 +1196,8 @@ exit 97
         $Catalog['wt'].scoop | Should -Be 'extras/windows-terminal'
         $Catalog['wt'].winget | Should -Be 'Microsoft.WindowsTerminal'
         $Catalog['wt'].choco | Should -Be 'microsoft-windows-terminal'
-        $WindowsTerminalVersion | Should -Be 'v1.24.11321.0'
-        $WindowsTerminalX64Sha256 | Should -Be '7caef554147e5498ed1becdca73cdedb79fbc81f89032e46ae9b095c53433812'
+        $WindowsTerminalVersion | Should -Be 'v1.24.11911.0'
+        $WindowsTerminalX64Sha256 | Should -Be '7691efeb71c8dd0b95536c84e366fa4cf809a42c534912f9cefa1056534383bd'
     }
 
     It "dry-runs Windows Terminal managers plus the pinned portable fallback" {
@@ -1208,8 +1208,8 @@ exit 97
         $output = & { Install-WindowsTerminal } 6>&1 | Out-String
 
         $output | Should -Match 'extras/windows-terminal'
-        $output | Should -Match 'pinned portable zip v1\.24\.11321\.0'
-        $output | Should -Match 'Microsoft\.WindowsTerminal_1\.24\.11321\.0_x64\.zip'
+        $output | Should -Match 'pinned portable zip v1\.24\.11911\.0'
+        $output | Should -Match 'Microsoft\.WindowsTerminal_1\.24\.11911\.0_x64\.zip'
         Should -Invoke -CommandName Read-Host -Times 0 -Exactly
     }
 
@@ -1226,7 +1226,7 @@ exit 97
 
         $output = & { Install-WindowsTerminal } 6>&1 | Out-String
 
-        $output | Should -Match 'FAIL: checksum mismatch for Microsoft\.WindowsTerminal_1\.24\.11321\.0_x64\.zip'
+        $output | Should -Match 'FAIL: checksum mismatch for Microsoft\.WindowsTerminal_1\.24\.11911\.0_x64\.zip'
         $script:InstallFailures.Count | Should -Be 1
         $script:InstallFailures[0].Tool | Should -Be 'wt'
         $script:InstallFailures[0].Pm | Should -Be 'portable'
@@ -1324,7 +1324,7 @@ exit 97
             Mock -CommandName Test-FileSha256 -MockWith { return $true }
             Mock -CommandName Expand-Archive -MockWith {
                 param($Path, $DestinationPath)
-                $portableDir = Join-Path $DestinationPath 'terminal-1.24.11321.0'
+                $portableDir = Join-Path $DestinationPath 'terminal-1.24.11911.0'
                 New-Item -ItemType Directory -Force -Path $portableDir | Out-Null
                 [System.IO.File]::WriteAllText((Join-Path $portableDir 'wt.exe'), 'exe')
                 [System.IO.File]::WriteAllText((Join-Path $portableDir 'WindowsTerminal.exe'), 'exe')
@@ -1341,7 +1341,7 @@ exit 97
             Test-Path -LiteralPath (Join-Path $installRoot 'wt.exe') -PathType Leaf | Should -BeTrue
             $script:AddedWtPath | Should -Be $installRoot
             $script:InstallFailures.Count | Should -Be 0
-            $output | Should -Match 'installed\s+wt\s+portable v1\.24\.11321\.0'
+            $output | Should -Match 'installed\s+wt\s+portable v1\.24\.11911\.0'
             Should -Invoke -CommandName Install-One -Times 1 -Exactly -ParameterFilter {
                 $tool -eq 'wt' -and $SkipPrompt -and $NoRecordFailure
             }
@@ -3256,7 +3256,7 @@ Describe "Markdown equation converter provisioning" {
         $output = Install-PylatexencConverter 6>&1 | Out-String
 
         $output | Should -Match 'python -m venv'
-        $output | Should -Match 'setuptools==80\.9\.0'
+        $output | Should -Match 'setuptools==80\.10\.2'
         $output | Should -Match $PylatexencBuildBackendSha256
         $output | Should -Match 'pylatexenc==2\.10'
         $output | Should -Match $PylatexencSha256
@@ -3299,7 +3299,7 @@ Describe "Markdown equation converter provisioning" {
 
         $expectedScripts = Join-Path (Get-PylatexencVenvRoot) 'Scripts'
         $script:AddedPath | Should -Be $expectedScripts
-        $script:SetuptoolsRequirementsText | Should -Match 'setuptools==80\.9\.0'
+            $script:SetuptoolsRequirementsText | Should -Match 'setuptools==80\.10\.2'
         $script:SetuptoolsRequirementsText | Should -Match $PylatexencBuildBackendSha256
         $script:RequirementsText | Should -Match 'pylatexenc==2\.10'
         $script:RequirementsText | Should -Match $PylatexencSha256
@@ -3437,8 +3437,8 @@ Describe "Install-GhDashExtension" {
         $script:GhInstallRc = 0
         $script:GhRemoveRc = 0
         $script:GhApiRc = 0
-        $script:GhTagObjectResult = 'e6ebbd7e83e30161b9192ce3339972d2c8269e7f'
-        $script:GhPeeledCommitResult = '49f37e4832956c57bf52d4ea8b1b1e5c0f863700'
+        $script:GhTagObjectResult = '61e619ba8a9682ba8a822282d1da8c5eb7b0bbff'
+        $script:GhPeeledCommitResult = 'a613ef744c99ef8d8ead33467813c6ee6086af52'
         $script:GhCalls = @()
     }
 

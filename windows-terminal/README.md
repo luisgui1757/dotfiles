@@ -68,7 +68,7 @@ scoop install extras/windows-terminal
 
 Those package-manager installs are MSIX-backed. If they fail to register WT or
 do not put `wt` on PATH, `install-deps.ps1` falls back to the pinned portable
-GitHub release zip (`v1.24.11321.0`, x64), verifies its SHA-256 before
+GitHub release zip (`v1.24.11911.0`, x64), verifies its SHA-256 before
 extracting, installs it under `%LOCALAPPDATA%\Programs\WindowsTerminal`, and
 adds that folder to the current process PATH plus the persistent User PATH.
 

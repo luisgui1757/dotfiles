@@ -305,7 +305,7 @@ jobs:
           command -v zoxide >/dev/null 2>&1 || fail "zoxide is not on PATH"
           command -v gh >/dev/null 2>&1 || fail "gh is not on PATH"
           command -v pi >/dev/null 2>&1 || fail "pi is not on PATH"
-          [[ "$(pi --version)" == "0.80.9" ]] || fail "pi version is not pinned 0.80.9"
+          [[ "$(pi --version)" == "0.80.10" ]] || fail "pi version is not pinned 0.80.10"
           cmp -s "$HOME/.pi/agent/themes/rose-pine.json" "$repo/pi/rose-pine.json" \
             || fail "Pi Rose Pine theme differs from the reviewed source"
           jq -e '.theme == "rose-pine"' "$HOME/.pi/agent/settings.json" >/dev/null \
@@ -544,8 +544,8 @@ jobs:
               throw 'Hack Nerd Font files exist but are not registered for application consumption'
           }
           $piVersion = (& pi --version | Select-Object -First 1)
-          if ($piVersion -ne '0.80.9') {
-              throw "pi version is not pinned 0.80.9: $piVersion"
+          if ($piVersion -ne '0.80.10') {
+              throw "pi version is not pinned 0.80.10: $piVersion"
           }
           $nvimLine = & nvim --version | Select-Object -First 1
           if ($nvimLine -notmatch '^NVIM v(0\.1[2-9]|0\.[2-9][0-9]|[1-9]\.)') {
