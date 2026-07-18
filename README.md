@@ -909,7 +909,7 @@ POSIX pwsh profile management remains provisioning-adjacent.
 - Neovim Markdown rendering is owned by `render-markdown.nvim`. Setup already
   installs the explicit Tree-sitter parser matrix, including `latex`; it also
   installs `latex2text` through a pinned, SHA-256-checked venv
-  (`setuptools` 80.9.0, `pylatexenc` 2.10) so rendered Markdown equations work
+  (`setuptools` 80.10.2, `pylatexenc` 2.10) so rendered Markdown equations work
   on fresh machines instead of depending on a random host Python package. On
   Linux, setup repairs the active distro Python's native venv/pip support even
   when Linuxbrew is the selected package manager; manager selection alone does
@@ -1088,9 +1088,9 @@ POSIX pwsh profile management remains provisioning-adjacent.
   repo-local install or vendoring in that project and commit those files there.
 - Pi CLI is a provisioned binary with two repo-owned preference surfaces
   (themes/selection and multiline keys), not synced runtime state. Setup installs
-  `@earendil-works/pi-coding-agent@0.80.9` by running `npm pack`, requiring the
+  `@earendil-works/pi-coding-agent@0.80.10` by running `npm pack`, requiring the
   pack metadata and the actual tarball SHA-512 bytes to match the reviewed SRI,
-  then passing that verified local tarball plus the exact `0.80.9` Pi
+  then passing that verified local tarball plus the exact `0.80.10` Pi
   `agent-core`, `ai`, and `tui` companions to `npm install`. Keeping the Pi
   monorepo packages on one release prevents compatible-looking npm ranges from
   mixing runtime APIs. Temporary pack state is removed on success, mismatch,
@@ -1098,7 +1098,7 @@ POSIX pwsh profile management remains provisioning-adjacent.
   state, its error includes a bounded tail of npm stderr so the rejected pack or
   install remains diagnosable.
   The reviewed SRI is
-  `sha512-Clgx2Bg5NbMcCpGxusSDQwE+GC0g/d6sCBluE9aypPgSgtJ6n8VmZIIT6auXObMskpRgkr+XZ77wG5hf+cSDtg==`.
+  `sha512-aL4apbupCHiVLSXASXvRzH4Q2vmtfrDa+0s909CJuVu/GgGylbDzr7oyF1mPmip5E+VxYYxKWmph4hV04wUcQg==`.
   POSIX public setup gets Node 24 from Nix first; Windows uses the native Node
   LTS catalog entry. On POSIX, Pi is published under `~/.local/bin`; setup and
   managed zsh keep that directory first and duplicate-free so an older global
@@ -1143,8 +1143,8 @@ POSIX pwsh profile management remains provisioning-adjacent.
   packages. System/global managers are identified but still require a deliberate
   scope review before removal.
 - Native Windows accepts an existing Tree-sitter CLI only when `tree-sitter
-  --version` is exactly `0.26.10`. Missing, stale, partial, or incompatible
-  commands are repaired from the architecture-specific `v0.26.10` GitHub
+  --version` is exactly `0.26.11`. Missing, stale, partial, or incompatible
+  commands are repaired from the architecture-specific `v0.26.11` GitHub
   release zip after SHA-256 verification; the executable is validated before
   and after atomic publication under the real LocalApplicationData known folder.
   Scoop/npm are not allowed to silently supply a different parser-build ABI.
@@ -1443,12 +1443,12 @@ Manual-review pin surfaces that Renovate may touch only partially:
 | Sentinel version/commit | Manual-reviewed mirror between `setup.sh`, `setup.ps1`, README, CLAUDE, and `tests/static/pin_consistency_test.sh`. The current renamed tree is exact-commit pinned because the published `v0.1.2` tag predates it. |
 | Scoop installer | Renovate can bump `ScoopInstaller/Install` commit `b0ee913725139b816f9178163af0aecdba07a7ed`; SHA `48f6ea398b3a3fa26fae0093d37bd85b13e7eaa5d1d4a3e208408768408e35ae` is human-reviewed. |
 | TPM/tmux plugin refs and psmux plugin ref | Commit pins are manual-reviewed and mirrored in docs/tests; Renovate does not recompute or prove tag commits. |
-| `setuptools`/`pylatexenc` | Renovate can bump versions; adjacent hashes remain human-reviewed. Current pins: `setuptools` 80.9.0, `pylatexenc` 2.10. |
+| `setuptools`/`pylatexenc` | Renovate can bump versions; adjacent hashes remain human-reviewed. Current pins: `setuptools` 80.10.2, `pylatexenc` 2.10. |
 | Hack Nerd Font | Unix and Windows mirrors must stay identical; version/hash drift is caught by `pin_consistency_test.sh`. |
-| Pi CLI | Unix/Windows install pins and e2e assertions mirror version `0.80.9`; the npm-pack metadata and downloaded coding-agent tarball bytes must both match the human-reviewed SRI, and all three Pi companion modules are requested at the exact same release. |
+| Pi CLI | Unix/Windows install pins and e2e assertions mirror version `0.80.10`; the npm-pack metadata and downloaded coding-agent tarball bytes must both match the human-reviewed SRI, and all three Pi companion modules are requested at the exact same release. |
 | Herdr | Native Linux pins stable `v0.7.4` with both architecture hashes; Windows pins post-fix preview `preview-2026-07-16-e907e6a36646` with its x64 hash. Homebrew platforms consume the reviewed `v0.7.4` formula. |
 | Pi Rose Pine themes | The repo vendors main/moon/dawn from archived MIT-licensed `zenobi-us/pi-rose-pine` commit `9b342f6e16d6b28c00c2f888ba2f050273981bdb`, adding only Pi's current `earendil-works/pi` schema URL. Tests bind each normalized file byte-for-byte, its official palette, 39 variables, and all 51 Pi tokens. The compared `pi-themes-rose-pine@0.1.0` pack is the retired simple mapping and is intentionally not installed. Pi's separate keybindings file explicitly retains the upstream `Shift+Enter` / `Ctrl+J` newline pair. |
-| gh-dash | Tag `v4.25.1`, annotated tag object `e6ebbd7e83e30161b9192ce3339972d2c8269e7f`, and peeled commit `49f37e4832956c57bf52d4ea8b1b1e5c0f863700` are mirrored; installers verify the tag mapping and pass the release tag required by `gh extension install --pin` for binary extensions. |
+| gh-dash | Tag `v4.25.2`, annotated tag object `61e619ba8a9682ba8a822282d1da8c5eb7b0bbff`, and peeled commit `a613ef744c99ef8d8ead33467813c6ee6086af52` are mirrored; installers verify the tag mapping and pass the release tag required by `gh extension install --pin` for binary extensions. |
 
 Direct network executables must be pinned and verified before execution, or be a
 reviewed exception whose verification is proved by the static scanner. Scoop
@@ -1722,7 +1722,7 @@ MIT. See `LICENSE`.
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | Setup warns `multiple managed <tool> commands are on PATH` | two physically distinct installations publish the same managed command; changing `PATH` order could silently switch which one runs | keep the printed `selected` command, then remove each `duplicate` through its proven owner. Setup prints exact no-elevation cleanup only for a proven user-scoped Homebrew, npm, or Scoop package; review scope yourself for winget/Chocolatey/system managers, and use the original manager for `owner=unknown`. Setup never removes either copy automatically. Rerun setup until the warning disappears |
-| Pi setup says `expected 0.80.9 after install, got 0.80.3`, or reports multiple managed `pi` commands | an older global npm/Homebrew `pi` duplicates the repo-owned `~/.local/bin/pi`; older checkouts also let the global command win `PATH` resolution | update this repo and rerun setup. Current setup proves only `~/.local/bin/pi`, makes it win in current and future shells, and reports every physical duplicate. For a proven npm-global copy, run the exact `cleanup (same user, no sudo)` command shown, then rerun setup to confirm one command remains. Never prepend `sudo`; unknown owners must be removed with their original package manager |
+| Pi setup says `expected 0.80.10 after install, got 0.80.3`, or reports multiple managed `pi` commands | an older global npm/Homebrew `pi` duplicates the repo-owned `~/.local/bin/pi`; older checkouts also let the global command win `PATH` resolution | update this repo and rerun setup. Current setup proves only `~/.local/bin/pi`, makes it win in current and future shells, and reports every physical duplicate. For a proven npm-global copy, run the exact `cleanup (same user, no sudo)` command shown, then rerun setup to confirm one command remains. Never prepend `sudo`; unknown owners must be removed with their original package manager |
 | v0.2.0 Linux Nix bootstrap ends with `cat: /etc/bashrc: Permission denied` and upstream's `Oh no` failure | the pinned upstream daemon installer prepared `/etc/bashrc` through its privileged path, then tried to read it as the invoking user; its multi-user path does not honor the public `--no-modify-profile` option | if `/etc/bashrc.backup-before-nix` exists after the failure, restore it with `sudo mv /etc/bashrc.backup-before-nix /etc/bashrc`. For immutable v0.2.0 without that backup, the bounded workaround is `sudo chmod a+r /etc/bashrc` before rerunning. On the current official test branch, pull the latest head and rerun `./setup.sh --all --allow-unreleased`; the wrapper applies an exact-hash-verified local patch that skips the daemon profile step and leaves shell activation to setup/Home Manager |
 | Linux Nix bootstrap reports `getting status of '/nix/store/...-busybox...': Permission denied` while installing Nix | a restrictive invoking umask—common on managed corporate hosts—combined with Nix 2.34.0's Linux daemon copy and write-bit removal left store directories as root-only `0500`; a previous interrupted attempt can retain those modes | pull the latest current official test-branch head and rerun `./setup.sh --all --allow-unreleased` as the normal target user. Its checksum-bound daemon installer normalizes the copied and pre-existing store paths to read-only/traversable modes before Nix creates the default profile; do not run all of setup with `sudo` |
 | Corporate Linux bootstrap warns that `https://channels.nixos.org/nixpkgs-unstable` failed TLS verification | upstream's legacy default-channel step uses its bundled CA file, which does not contain the corporate TLS-inspection root; the dotfiles package layer uses locked flakes and does not need this mutable channel | pull the latest current official test-branch head and rerun `./setup.sh --all --allow-unreleased`. The wrapper disables channel creation with upstream's public `--no-channel-add`; subsequent Nix activation selects the host system CA bundle, preserving corporate trust without weakening TLS verification |

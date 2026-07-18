@@ -41,7 +41,7 @@ case "${1:-}" in
             shift
         done
         [[ -n "$dest" ]] || exit 52
-        filename='earendil-works-pi-coding-agent-0.80.9.tgz'
+        filename='earendil-works-pi-coding-agent-0.80.10.tgz'
         if [[ "${PI_TEST_MODE:-success}" == "partial" ]]; then
             printf '%s' 'partial tarball' > "$dest/$filename"
         else
@@ -60,7 +60,7 @@ case "${1:-}" in
         mkdir -p "$HOME/.local/bin"
         cat > "$HOME/.local/bin/pi" <<EOS
 #!/usr/bin/env bash
-printf '%s\n' "${PI_TEST_INSTALLED_VERSION:-0.80.9}"
+printf '%s\n' "${PI_TEST_INSTALLED_VERSION:-0.80.10}"
 EOS
         chmod +x "$HOME/.local/bin/pi"
         ;;
@@ -90,7 +90,7 @@ assert_no_pi_temp_dirs() {
 }
 
 run_case() {
-    local name="$1" mode="$2" reported="$3" installed_version="${4:-0.80.9}"
+    local name="$1" mode="$2" reported="$3" installed_version="${4:-0.80.10}"
     local home="$TMP_ROOT/$name-home" bin="$TMP_ROOT/$name-bin" tmp="$TMP_ROOT/$name-tmp"
     mkdir -p "$home" "$bin" "$tmp"
     write_npm_stub "$bin"
@@ -122,7 +122,7 @@ run_case() {
     PATH="$bin:$HOME/.local/bin:/usr/bin:/bin"; export PATH
     cat > "$HOME/.local/bin/pi" <<'EOF'
 #!/usr/bin/env bash
-printf '%s\n' '0.80.9'
+printf '%s\n' '0.80.10'
 EOF
     chmod +x "$HOME/.local/bin/pi"
     cat > "$bin/npm" <<'EOF'
@@ -132,7 +132,7 @@ EOF
     chmod +x "$bin/npm"
     YES_ALL=1; DRY_RUN=0
     out="$(install_pi_cli 2>&1)"
-    [[ "$out" == *"already installed (0.80.9)"* ]] || fail "current Pi must be idempotent; got: $out"
+    [[ "$out" == *"already installed (0.80.10)"* ]] || fail "current Pi must be idempotent; got: $out"
 )
 
 # A same-version foreign/global Pi is not the repo-owned installation. Setup
@@ -145,7 +145,7 @@ EOF
     write_npm_stub "$bin"
     cat > "$bin/pi" <<'EOF'
 #!/usr/bin/env bash
-printf '%s\n' '0.80.9'
+printf '%s\n' '0.80.10'
 EOF
     chmod +x "$bin/pi"
     TMPDIR="$tmp"; export TMPDIR
@@ -154,7 +154,7 @@ EOF
     PI_TEST_MODE=success; export PI_TEST_MODE
     PI_TEST_PAYLOAD="$VERIFIED_PAYLOAD"; export PI_TEST_PAYLOAD
     PI_TEST_REPORTED_INTEGRITY="$TEST_SRI"; export PI_TEST_REPORTED_INTEGRITY
-    PI_TEST_INSTALLED_VERSION=0.80.9; export PI_TEST_INSTALLED_VERSION
+    PI_TEST_INSTALLED_VERSION=0.80.10; export PI_TEST_INSTALLED_VERSION
     PI_TEST_NPM_PREFIX="$prefix"; export PI_TEST_NPM_PREFIX
     PI_TEST_NPM_OWNS_DUPLICATE=1; export PI_TEST_NPM_OWNS_DUPLICATE
     PI_CLI_INTEGRITY="$TEST_SRI"
@@ -164,7 +164,7 @@ EOF
 
     install_pi_cli > "$tmp/install.out" 2>&1
     foreign_out="$(cat "$tmp/install.out")"
-    [[ "$foreign_out" == *"installed"*"0.80.9"* ]] \
+    [[ "$foreign_out" == *"installed"*"0.80.10"* ]] \
         || fail "same-version foreign Pi was accepted as canonical: $foreign_out"
     [[ -x "$HOME/.local/bin/pi" ]] || fail "canonical Pi was not published"
     grep -q '^install ' "$PI_TEST_LOG" || fail "canonical Pi install did not run"
@@ -239,13 +239,13 @@ assert_no_pi_temp_dirs "$TMP_ROOT/install-fail-tmp"
 # Success installs from the verified temporary tarball and repeated setup reuses
 # the validated installed version without another pack/download.
 run_case success success "$TEST_SRI" >/dev/null
-grep -E '^install -g --prefix .*/dotfiles-pi\.[^/]*/earendil-works-pi-coding-agent-0\.80\.9\.tgz @earendil-works/pi-agent-core@0\.80\.9 @earendil-works/pi-ai@0\.80\.9 @earendil-works/pi-tui@0\.80\.9$' "$TMP_ROOT/success.log" >/dev/null \
+grep -E '^install -g --prefix .*/dotfiles-pi\.[^/]*/earendil-works-pi-coding-agent-0\.80\.10\.tgz @earendil-works/pi-agent-core@0\.80\.10 @earendil-works/pi-ai@0\.80\.10 @earendil-works/pi-tui@0\.80\.10$' "$TMP_ROOT/success.log" >/dev/null \
     || fail "npm install did not receive the verified tarball and exact same-release companions: $(cat "$TMP_ROOT/success.log")"
 assert_no_pi_temp_dirs "$TMP_ROOT/success-tmp"
 
 # An older globally installed Pi must not shadow the verified user-local copy.
 # This reproduces a macOS field failure where ~/.local/bin was already present
-# later on PATH, so setup installed 0.80.9 but verified Homebrew's stale 0.80.3.
+# later on PATH, so setup installed 0.80.10 but verified Homebrew's stale 0.80.3.
 (
     HOME="$TMP_ROOT/shadow-home"; export HOME
     prefix="$TMP_ROOT/shadow-prefix"; bin="$prefix/bin"; tmp="$TMP_ROOT/shadow-tmp"
@@ -263,7 +263,7 @@ EOF
     PI_TEST_MODE=success; export PI_TEST_MODE
     PI_TEST_PAYLOAD="$VERIFIED_PAYLOAD"; export PI_TEST_PAYLOAD
     PI_TEST_REPORTED_INTEGRITY="$TEST_SRI"; export PI_TEST_REPORTED_INTEGRITY
-    PI_TEST_INSTALLED_VERSION=0.80.9; export PI_TEST_INSTALLED_VERSION
+    PI_TEST_INSTALLED_VERSION=0.80.10; export PI_TEST_INSTALLED_VERSION
     PI_TEST_NPM_PREFIX="$prefix"; export PI_TEST_NPM_PREFIX
     PI_TEST_NPM_OWNS_DUPLICATE=1; export PI_TEST_NPM_OWNS_DUPLICATE
     PI_TEST_DUPLICATE_EXEC_LOG="$TMP_ROOT/shadow-executed.log"; export PI_TEST_DUPLICATE_EXEC_LOG
@@ -278,7 +278,7 @@ EOF
     [[ "$shadow_rc" -eq 0 ]] || fail "stale global Pi shadowed the verified install: $shadow_out"
     [[ "$(command -v pi)" == "$HOME/.local/bin/pi" ]] \
         || fail "user-local Pi is not first after install: $(command -v pi)"
-    [[ "$(pi --version)" == "0.80.9" ]] || fail "wrong Pi wins after install"
+    [[ "$(pi --version)" == "0.80.10" ]] || fail "wrong Pi wins after install"
     local_count="$(printf '%s\n' "$PATH" | tr ':' '\n' | grep -Fxc "$HOME/.local/bin")"
     [[ "$local_count" == "1" ]] || fail "$HOME/.local/bin appears $local_count times after install"
     [[ "$shadow_out" == *"WARN: multiple managed pi commands are on PATH"* ]] \
@@ -298,7 +298,7 @@ EOF
     mkdir -p "$HOME/.local/bin" "$bin"
     cat > "$HOME/.local/bin/pi" <<'EOF'
 #!/usr/bin/env bash
-printf '%s\n' '0.80.9'
+printf '%s\n' '0.80.10'
 EOF
     cat > "$bin/pi" <<'EOF'
 #!/usr/bin/env bash

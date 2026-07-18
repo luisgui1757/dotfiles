@@ -76,7 +76,7 @@ Sequenced PRs (split for independent, revertable blast radius):
 - **PR-1 `feat/ergonomics-core` - DONE (merged as #42).** No Nix, no vi-mode.
   Neovim `scrolloff = 16`; which-key.nvim (`<leader>?`, `:WhichKey`, VeryLazy); zoxide across
   zsh + PowerShell + both installers (cached, no-`Invoke-Expression` PowerShell
-  init); `gh` + pinned `gh-dash` extension (`v4.25.1`) with a chezmoi-managed
+  init); `gh` + pinned `gh-dash` extension (`v4.25.2`) with a chezmoi-managed
   same-path config and Renovate / pin-consistency coverage.
 - **PR-2 `feat/vi-mode` - DONE (merged as #43).** zsh (`bindkey -v`) +
   PSReadLine (`-EditMode Vi`) command-line vi-mode with a full re-bind matrix
@@ -204,7 +204,7 @@ Commit-by-commit status:
   `/mnt/c`); native install arms RETAINED for deferred/artifact provisioning and
   regression proof. **nvim + the tree-sitter CLI are intentionally deferred with proof:**
   they are ABI-coupled (nvim-treesitter `main` compiles parsers whose ABI must
-  match nvim's built-in libtree-sitter; the CLI is pinned to v0.26.10 — invariant
+  match nvim's built-in libtree-sitter; the CLI is pinned to v0.26.11 — invariant
   19), so a nix nvim/tree-sitter shadowing the pinned native binaries would risk
   the E5113 parser/ABI mismatch. They stay native until nvim + its parser
   toolchain can move into one ABI-matched Nix closure (follow-up). Excluded from
@@ -266,7 +266,7 @@ Commit-by-commit status:
   contract; Intel evidence is retained in the append-only ledger as historical
   proof, not current support.
 - **Pi CLI provisioning, theme, and multiline input — DONE.** Setup installs the Pi CLI on every OS as the
-  pinned npm package `@earendil-works/pi-coding-agent@0.80.9` after checking npm
+  pinned npm package `@earendil-works/pi-coding-agent@0.80.10` after checking npm
   `dist.integrity`; its three Pi companion modules are held to the same exact
   release. POSIX public setup gets Node 24 from the enforced Nix package
   layer; Windows uses the native Node LTS catalog path. Chezmoi deploys the
@@ -532,11 +532,11 @@ only with its implementation, tests, and documentation:
    checkout, publishes atomically, preserves unsafe quarantines, and lets bare
    chezmoi self-heal legitimate pin changes.
 3. **Windows Tree-sitter compatibility pin — DONE.** Mutable Scoop/npm fallback
-   ownership is removed; exact `0.26.10` compatibility and the reviewed
+   ownership is removed; exact `0.26.11` compatibility and the reviewed
    x64/arm64/x86 release zip hashes gate transactional publication.
-4. **gh-dash tag provenance — DONE.** Tag `v4.25.1` is verified through its
+4. **gh-dash tag provenance — DONE.** Tag `v4.25.2` is verified through its
    annotated object to peeled commit
-   `49f37e4832956c57bf52d4ea8b1b1e5c0f863700`, and installation pins that commit.
+   `a613ef744c99ef8d8ead33467813c6ee6086af52`, and installation pins that commit.
 5. **Ubuntu CI Microsoft repo package — DONE.** Ubuntu 24.04 downloads the exact
    configuration `.deb`, checks reviewed SHA-256
    `c13f01ac7c3001b51a9281d40dde666db5e037e05512840c319832f7852bfec4`,

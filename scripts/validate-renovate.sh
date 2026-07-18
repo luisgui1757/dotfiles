@@ -5,7 +5,7 @@
 set -euo pipefail
 
 RENOVATE_NODE_VERSION="24.18.0"
-RENOVATE_VERSION="43.257.4"
+RENOVATE_VERSION="43.270.0"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 cd "$REPO_ROOT"

@@ -1327,7 +1327,7 @@ save only**. The next plain `:w` formats normally. Implemented in
   binary). The `PKG_TABLE` brew column for `tree-sitter` is therefore
   `tree-sitter-cli`, while `binaries_for` still probes for the `tree-sitter`
   binary. Native Linux/WSL installs a pinned `tree-sitter/tree-sitter` release
-  asset (v0.26.10) into `~/.local/bin` with SHA-256 verification. `install-deps.ps1` installs the CLI through the Scoop
+  asset (v0.26.11) into `~/.local/bin` with SHA-256 verification. `install-deps.ps1` installs the CLI through the Scoop
   `tree-sitter` manifest first and falls back to `npm install -g
   tree-sitter-cli` after Node is present. Windows compiler support is separate:
   `install-deps.ps1 -All` auto-installs Visual Studio 2022 Build Tools with the
@@ -1356,7 +1356,7 @@ save only**. The next plain `:w` formats normally. Implemented in
   LaTeX support needs the non-bundled `latex` parser (already in
   `treesitter_parsers`) and a converter executable. `install-deps.sh` creates
   `~/.local/share/dotfiles/python-tools/pylatexenc`, installs pinned
-  `setuptools==80.9.0` first, installs `pylatexenc==2.10` with pip `--require-hashes`
+  `setuptools==80.10.2` first, installs `pylatexenc==2.10` with pip `--require-hashes`
   and `--no-build-isolation`, and writes `~/.local/bin/latex2text`;
   Linux must repair venv/pip through the detected native package manager when
   the active `python3` lacks them, even if Linuxbrew is the selected manager:
@@ -1958,11 +1958,11 @@ save only**. The next plain `:w` formats normally. Implemented in
 - **gh-dash is a pinned gh CLI extension, not a package.** `gh` is in both
   catalogs (`PKG_TABLE`: `gh` on brew/apt/dnf/zypper, `github-cli` on
   pacman/apk; `$Catalog`: winget `GitHub.cli` / choco `gh` / scoop `gh`).
-  gh-dash itself has no brew/apt/scoop package. Tag `v4.25.1` is paired with
-  annotated tag object `e6ebbd7e83e30161b9192ce3339972d2c8269e7f` and peeled
-  commit `49f37e4832956c57bf52d4ea8b1b1e5c0f863700`; both installers verify that
+  gh-dash itself has no brew/apt/scoop package. Tag `v4.25.2` is paired with
+  annotated tag object `61e619ba8a9682ba8a822282d1da8c5eb7b0bbff` and peeled
+  commit `a613ef744c99ef8d8ead33467813c6ee6086af52`; both installers verify that
   remote mapping before mutation and run
-  `gh extension install dlvhdr/gh-dash --pin v4.25.1`. gh requires a release
+  `gh extension install dlvhdr/gh-dash --pin v4.25.2`. gh requires a release
   tag for binary extensions; commit refs are accepted only for script extensions.
   (`GH_DASH_VERSION` in `install-deps.sh`, mirrored as `$GhDashVersion` in
   `install-deps.ps1`; a Renovate `github-releases` manager can bump the tag and
@@ -1987,9 +1987,9 @@ save only**. The next plain `:w` formats normally. Implemented in
   a manual, secret-bearing step this repo never automates or stores.
 - **Pi CLI is pinned; only its audited theme selection and canonical newline keybinding are repo-owned.** `install-deps.sh`
   and `install-deps.ps1` run `npm pack --ignore-scripts --json` for
-  `@earendil-works/pi-coding-agent@0.80.9`, require both reported metadata and
+  `@earendil-works/pi-coding-agent@0.80.10`, require both reported metadata and
   independently hashed tarball bytes to match
-  `sha512-Clgx2Bg5NbMcCpGxusSDQwE+GC0g/d6sCBluE9aypPgSgtJ6n8VmZIIT6auXObMskpRgkr+XZ77wG5hf+cSDtg==`
+  `sha512-aL4apbupCHiVLSXASXvRzH4Q2vmtfrDa+0s909CJuVu/GgGylbDzr7oyF1mPmip5E+VxYYxKWmph4hV04wUcQg==`
   and install the verified local tarball alongside exact same-release
   `pi-agent-core`, `pi-ai`, and `pi-tui` specs. Do not rely on the coding-agent's
   caret ranges: a later companion publish can otherwise combine incompatible
@@ -2210,7 +2210,7 @@ provisioning. The repo never installs Nix through a pipe-to-shell bootstrap.
 - **nvim + the tree-sitter CLI are DELIBERATELY NOT in the Nix package set
   (deferred, with proof).** nvim-treesitter `main` compiles parsers whose ABI
   must match nvim's built-in libtree-sitter, and the repo pins the tree-sitter
-  CLI to `v0.26.10` precisely to keep that build reproducible (invariant 19). A
+  CLI to `v0.26.11` precisely to keep that build reproducible (invariant 19). A
   nix neovim / tree-sitter shadowing the pinned native binaries would risk the
   `E5113` parser/ABI-mismatch class of bug. So `nix/home/common.nix` omits both;
   they stay on the native install-deps path. Moving nvim into the SAME Nix
