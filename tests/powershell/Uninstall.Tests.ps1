@@ -179,7 +179,7 @@ Describe 'uninstall.ps1 Pi theme cleanup' -Skip:(-not (Get-Command node -ErrorAc
         $script:PiThemeIdentity = [pscustomobject]@{ UserProfile = $script:PiThemeRoot }
         $settings = Join-Path $script:PiThemeRoot '.pi\agent\settings.json'
         New-Item -ItemType Directory -Force -Path (Split-Path -Parent $settings) | Out-Null
-        [IO.File]::WriteAllText($settings, '{"theme":"rose-pine-dawn","keep":true}')
+        [IO.File]::WriteAllText($settings, '{"theme":"rose-pine-dawn-fable","keep":true}')
     }
 
     AfterEach {

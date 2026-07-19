@@ -10,7 +10,9 @@ trap 'rm -rf "$TMP_ROOT"' EXIT
 cp "$REPO_ROOT/setup.sh" "$TMP_ROOT/setup.sh"
 mkdir -p "$TMP_ROOT/home/.local/state/nix/profile/bin" "$TMP_ROOT/fakebin" \
     "$TMP_ROOT/pi" "$TMP_ROOT/scripts"
-for theme_name in rose-pine rose-pine-moon rose-pine-dawn; do
+for theme_name in \
+    rose-pine rose-pine-moon rose-pine-dawn
+do
     cp "$REPO_ROOT/pi/$theme_name.json" "$TMP_ROOT/pi/$theme_name.json"
 done
 cp "$REPO_ROOT/scripts/configure-pi-theme.mjs" "$TMP_ROOT/scripts/configure-pi-theme.mjs"
@@ -28,7 +30,9 @@ case " $* " in
     *" managed "*) exit 0 ;;
     *" apply "*)
         mkdir -p "$HOME/.pi/agent/themes"
-        for theme_name in rose-pine rose-pine-moon rose-pine-dawn; do
+        for theme_name in \
+            rose-pine rose-pine-moon rose-pine-dawn
+        do
             cp "$SETUP_TEST_ROOT/pi/$theme_name.json" "$HOME/.pi/agent/themes/$theme_name.json"
         done
         exit 0
@@ -90,5 +94,53 @@ import sys
 
 assert json.loads(pathlib.Path(sys.argv[1]).read_text())["theme"] == "rose-pine"
 PY
+
+python3 - "$TMP_ROOT/home/.pi/agent/settings.json" <<'PY'
+import json
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+settings = json.loads(path.read_text())
+settings["theme"] = "rose-pine-moon"
+path.write_text(json.dumps(settings) + "\n")
+PY
+
+for retired_theme in \
+    rose-pine-fable rose-pine-moon-fable rose-pine-dawn-fable
+do
+    ln -s \
+        "$TMP_ROOT/home/dot_pi/agent/themes/$retired_theme.json" \
+        "$TMP_ROOT/home/.pi/agent/themes/$retired_theme.json"
+done
+output="$(HOME="$TMP_ROOT/home" SETUP_TEST_ROOT="$TMP_ROOT" PATH="$TMP_ROOT/fakebin:/usr/bin:/bin" bash "$TMP_ROOT/setup.sh" --all --skip-nvim --skip-agents --experimental-wsl-gui 2>&1)"
+[[ "$output" == *"setup.sh: done"* ]]
+python3 - "$TMP_ROOT/home/.pi/agent/settings.json" <<'PY'
+import json
+import pathlib
+import sys
+
+assert json.loads(pathlib.Path(sys.argv[1]).read_text())["theme"] == "rose-pine-moon"
+PY
+for retired_theme in \
+    rose-pine-fable rose-pine-moon-fable rose-pine-dawn-fable
+do
+    [[ ! -e "$TMP_ROOT/home/.pi/agent/themes/$retired_theme.json" ]]
+    [[ ! -L "$TMP_ROOT/home/.pi/agent/themes/$retired_theme.json" ]]
+done
+
+printf '%s\n' '{"name":"rose-pine-fable","userOwned":true}' \
+    > "$TMP_ROOT/home/.pi/agent/themes/rose-pine-fable.json"
+sed 's/"name": "rose-pine-moon"/"name": "rose-pine-moon-fable"/' \
+    "$TMP_ROOT/pi/rose-pine-moon.json" \
+    > "$TMP_ROOT/home/.pi/agent/themes/rose-pine-moon-fable.json"
+sed 's/"name": "rose-pine-dawn"/"name": "rose-pine-dawn-fable"/' \
+    "$TMP_ROOT/pi/rose-pine-dawn.json" | sed 's/$/\r/' \
+    > "$TMP_ROOT/home/.pi/agent/themes/rose-pine-dawn-fable.json"
+output="$(HOME="$TMP_ROOT/home" SETUP_TEST_ROOT="$TMP_ROOT" PATH="$TMP_ROOT/fakebin:/usr/bin:/bin" bash "$TMP_ROOT/setup.sh" --all --skip-nvim --skip-agents --experimental-wsl-gui 2>&1)"
+[[ "$output" == *"setup.sh: done"* ]]
+grep -F '"userOwned":true' "$TMP_ROOT/home/.pi/agent/themes/rose-pine-fable.json" >/dev/null
+[[ ! -e "$TMP_ROOT/home/.pi/agent/themes/rose-pine-moon-fable.json" ]]
+[[ ! -e "$TMP_ROOT/home/.pi/agent/themes/rose-pine-dawn-fable.json" ]]
 
 echo "OK"

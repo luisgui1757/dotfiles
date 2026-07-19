@@ -1958,6 +1958,36 @@ function Invoke-WindowsKnownFolderOverlays {
     Move-LegacyWindowsKnownFolderTargets -Identity $Identity -IsDryRun:$IsDryRun
 }
 
+function Invoke-RetiredPiThemeAliasRetirement {
+    param([Parameter(Mandatory)] $Identity)
+
+    $retiredThemes = [ordered]@{
+        'rose-pine-fable' = @(
+            '36d25cc144bc38ab849ec5f47f839c8aa8a8946416557c5e14939183fff56805',
+            '45813d7827fbe091f2029f8e0bfccb0927d1923576ebfb94cebb192b5235953c'
+        )
+        'rose-pine-moon-fable' = @(
+            '9f33de93c8749e2fc79831e07b175bda5018e08261372fb4e1b4b507408b4ad9',
+            '2f18ee6657d6748d13b13287760494e05d4fefad3d10c824becafaf6210c3bf0'
+        )
+        'rose-pine-dawn-fable' = @(
+            'f0a8f234c826b37998c3035178b47265c167aa9f1ae8f896f2bf81eeb48f256a',
+            '57adc5fe3252ed4511d79c31beb9ed46cee6b4d3946fbdc47c71e4bdc094bad8'
+        )
+    }
+    foreach ($themeName in $retiredThemes.Keys) {
+        $path = Join-Path $Identity.UserProfile ".pi\agent\themes\$themeName.json"
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { continue }
+        $actualHash = (Get-FileHash -LiteralPath $path -Algorithm SHA256 -ErrorAction Stop).Hash
+        if ($retiredThemes[$themeName] -contains $actualHash) {
+            Remove-Item -LiteralPath $path -Force -ErrorAction Stop
+            Write-Step "removed  retired Pi theme alias $path"
+        } else {
+            Write-Step "kept     modified retired-name Pi theme file $path"
+        }
+    }
+}
+
 function Invoke-PiThemeSelectionMerge {
     param(
         [Parameter(Mandatory)] $Identity,
@@ -1969,17 +1999,19 @@ function Invoke-PiThemeSelectionMerge {
         return
     }
     if ($IsDryRun) {
-        Write-Step "would    set Pi's global theme to rose-pine while preserving other settings"
+        Write-Step 'would    default Pi to rose-pine, preserve a managed variant, and retire recognized trial aliases'
         return
     }
 
-    foreach ($themeName in @('rose-pine', 'rose-pine-moon', 'rose-pine-dawn')) {
+    $managedThemes = @('rose-pine', 'rose-pine-moon', 'rose-pine-dawn')
+    foreach ($themeName in $managedThemes) {
         $theme = Join-Path $Identity.UserProfile ".pi\agent\themes\$themeName.json"
         $expectedTheme = Join-Path $ScriptDir "pi\$themeName.json"
         if (-not (Test-FileBytesEqual $theme $expectedTheme)) {
             throw "deployed Pi Rose Pine theme differs from the reviewed source: $theme"
         }
     }
+    Invoke-RetiredPiThemeAliasRetirement -Identity $Identity
     $node = Get-Command node -ErrorAction SilentlyContinue
     if (-not $node) {
         throw "node is required to merge Pi's global theme setting"
@@ -1993,7 +2025,7 @@ function Invoke-PiThemeSelectionMerge {
             $oldNativePreference = $PSNativeCommandUseErrorActionPreference
             $PSNativeCommandUseErrorActionPreference = $false
         }
-        & $node.Source (Join-Path $ScriptDir 'scripts\configure-pi-theme.mjs') set $settings rose-pine
+        & $node.Source (Join-Path $ScriptDir 'scripts\configure-pi-theme.mjs') set $settings @managedThemes
         $rc = if ($null -eq $LASTEXITCODE) { 0 } else { [int]$LASTEXITCODE }
     } finally {
         if ($hasNativePreference) {

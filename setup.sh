@@ -184,23 +184,96 @@ phase() {
     echo "================================================================"
 }
 
+retired_pi_theme_sha256() {
+    case "$1" in
+        rose-pine-fable)
+            printf '%s\n' \
+                '36d25cc144bc38ab849ec5f47f839c8aa8a8946416557c5e14939183fff56805' \
+                '45813d7827fbe091f2029f8e0bfccb0927d1923576ebfb94cebb192b5235953c'
+            ;;
+        rose-pine-moon-fable)
+            printf '%s\n' \
+                '9f33de93c8749e2fc79831e07b175bda5018e08261372fb4e1b4b507408b4ad9' \
+                '2f18ee6657d6748d13b13287760494e05d4fefad3d10c824becafaf6210c3bf0'
+            ;;
+        rose-pine-dawn-fable)
+            printf '%s\n' \
+                'f0a8f234c826b37998c3035178b47265c167aa9f1ae8f896f2bf81eeb48f256a' \
+                '57adc5fe3252ed4511d79c31beb9ed46cee6b4d3946fbdc47c71e4bdc094bad8'
+            ;;
+        *) return 1 ;;
+    esac
+}
+
+remove_retired_pi_theme_aliases() {
+    local theme_name path link_target expected_hashes actual_hash
+    for theme_name in rose-pine-fable rose-pine-moon-fable rose-pine-dawn-fable; do
+        path="$HOME/.pi/agent/themes/$theme_name.json"
+        [[ -e "$path" || -L "$path" ]] || continue
+
+        if [[ -L "$path" ]]; then
+            link_target="$(readlink "$path")" || {
+                echo "  FAIL: could not inspect retired Pi theme symlink: $path" >&2
+                return 1
+            }
+            case "$link_target" in
+                */home/dot_pi/agent/themes/"$theme_name".json)
+                    rm -f "$path" || {
+                        echo "  FAIL: could not remove retired Pi theme symlink: $path" >&2
+                        return 1
+                    }
+                    echo "  removed   retired Pi theme alias $path"
+                    ;;
+                *) echo "  kept      non-repo retired-name Pi theme symlink $path" ;;
+            esac
+            continue
+        fi
+
+        [[ -f "$path" ]] || {
+            echo "  kept      non-file retired-name Pi theme path $path"
+            continue
+        }
+        expected_hashes="$(retired_pi_theme_sha256 "$theme_name")"
+        if command -v shasum >/dev/null 2>&1; then
+            actual_hash="$(shasum -a 256 "$path" | awk '{print $1}')"
+        elif command -v sha256sum >/dev/null 2>&1; then
+            actual_hash="$(sha256sum "$path" | awk '{print $1}')"
+        else
+            echo "  FAIL: shasum or sha256sum is required to inspect retired Pi theme files" >&2
+            return 1
+        fi
+        if grep -Fxq "$actual_hash" <<< "$expected_hashes"; then
+            rm -f "$path" || {
+                echo "  FAIL: could not remove retired Pi theme file: $path" >&2
+                return 1
+            }
+            echo "  removed   retired Pi theme alias $path"
+        else
+            echo "  kept      modified retired-name Pi theme file $path"
+        fi
+    done
+}
+
 configure_pi_theme_selection() {
     local settings="$HOME/.pi/agent/settings.json"
     local theme_name theme expected_theme
+    local -a managed_themes=(
+        rose-pine rose-pine-moon rose-pine-dawn
+    )
 
     if [[ "$SKIP_CONFIG_SCRIPTS" -eq 1 ]]; then
         echo "  deferred  Pi theme selection (--skip-config-scripts)"
         return 0
     fi
     if [[ "$DRY_RUN" -eq 1 ]]; then
-        echo "  would: set Pi's global theme to rose-pine while preserving other settings"
+        echo "  would: default Pi to rose-pine, preserve a managed variant, and retire recognized trial aliases"
         return 0
     fi
     command -v node >/dev/null 2>&1 || {
         echo "  FAIL: node is required to merge Pi's global theme setting" >&2
         return 1
     }
-    for theme_name in rose-pine rose-pine-moon rose-pine-dawn; do
+    for theme_name in "${managed_themes[@]}"; do
         theme="$HOME/.pi/agent/themes/$theme_name.json"
         expected_theme="$SCRIPT_DIR/pi/$theme_name.json"
         [[ -f "$theme" ]] || {
@@ -212,7 +285,8 @@ configure_pi_theme_selection() {
             return 1
         }
     done
-    node "$SCRIPT_DIR/scripts/configure-pi-theme.mjs" set "$settings" rose-pine
+    remove_retired_pi_theme_aliases || return 1
+    node "$SCRIPT_DIR/scripts/configure-pi-theme.mjs" set "$settings" "${managed_themes[@]}"
 }
 
 release_git() {

@@ -189,7 +189,9 @@ Describe "setup.ps1 Pi theme selection" -Skip:(-not (Get-Command node -ErrorActi
         $script:PiThemeIdentity = [pscustomobject]@{ UserProfile = $script:PiThemeRoot }
         $themeRoot = Join-Path $script:PiThemeRoot '.pi\agent\themes'
         New-Item -ItemType Directory -Force -Path $themeRoot | Out-Null
-        foreach ($themeName in @('rose-pine', 'rose-pine-moon', 'rose-pine-dawn')) {
+        foreach ($themeName in @(
+                'rose-pine', 'rose-pine-moon', 'rose-pine-dawn'
+            )) {
             Copy-Item -LiteralPath (Join-Path $script:RepoRoot "pi\$themeName.json") `
                 -Destination (Join-Path $themeRoot "$themeName.json")
         }
@@ -209,6 +211,47 @@ Describe "setup.ps1 Pi theme selection" -Skip:(-not (Get-Command node -ErrorActi
         $result.theme | Should -Be 'rose-pine'
         $result.provider | Should -Be 'keep'
         $result.nested.keep | Should -BeTrue
+    }
+
+    It "preserves every managed variant across setup reruns" {
+        $settings = Join-Path $script:PiThemeRoot '.pi\agent\settings.json'
+        foreach ($themeName in @(
+                'rose-pine', 'rose-pine-moon', 'rose-pine-dawn'
+            )) {
+            [IO.File]::WriteAllText($settings, "{`"theme`":`"$themeName`",`"keep`":true}")
+
+            Invoke-PiThemeSelectionMerge -Identity $script:PiThemeIdentity
+
+            $result = Get-Content -Raw -LiteralPath $settings | ConvertFrom-Json
+            $result.theme | Should -Be $themeName
+            $result.keep | Should -BeTrue
+        }
+    }
+
+    It "retires only content-identical trial aliases across checkout line endings" {
+        $themeRoot = Join-Path $script:PiThemeRoot '.pi\agent\themes'
+        $aliases = [ordered]@{
+            'rose-pine-fable' = 'rose-pine'
+            'rose-pine-moon-fable' = 'rose-pine-moon'
+            'rose-pine-dawn-fable' = 'rose-pine-dawn'
+        }
+        foreach ($aliasName in $aliases.Keys) {
+            $canonicalName = $aliases[$aliasName]
+            $canonical = [IO.File]::ReadAllText((Join-Path $script:RepoRoot "pi\$canonicalName.json"))
+            $retired = $canonical.Replace(
+                "`"name`": `"$canonicalName`"",
+                "`"name`": `"$aliasName`""
+            )
+            [IO.File]::WriteAllText((Join-Path $themeRoot "$aliasName.json"), $retired)
+        }
+        $modified = Join-Path $themeRoot 'rose-pine-fable.json'
+        [IO.File]::AppendAllText($modified, "`n")
+
+        Invoke-PiThemeSelectionMerge -Identity $script:PiThemeIdentity
+
+        Test-Path -LiteralPath $modified | Should -BeTrue
+        Test-Path -LiteralPath (Join-Path $themeRoot 'rose-pine-moon-fable.json') | Should -BeFalse
+        Test-Path -LiteralPath (Join-Path $themeRoot 'rose-pine-dawn-fable.json') | Should -BeFalse
     }
 }
 
