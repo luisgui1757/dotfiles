@@ -20,7 +20,7 @@
 #                                  WSL opt-in: install/link Linux GUI terminal bits
 #
 # First run (no checkout yet):
-#   git clone --branch v0.2.0 --single-branch https://github.com/luisgui1757/dotfiles.git "${DOTFILES_DEST:-$HOME/dotfiles}"
+#   git clone --branch v0.3.0 --single-branch https://github.com/luisgui1757/dotfiles.git "${DOTFILES_DEST:-$HOME/dotfiles}"
 #   cd "${DOTFILES_DEST:-$HOME/dotfiles}"
 #   ./setup.sh --all
 #
@@ -30,7 +30,7 @@
 set -euo pipefail
 
 REPO_URL="https://github.com/luisgui1757/dotfiles.git"
-RELEASE_TAG="v0.2.0"
+RELEASE_TAG="v0.3.0"
 DEFAULT_DEST="$HOME/dotfiles"
 
 ALL=0
@@ -89,7 +89,7 @@ Local usage:
   ./setup.sh --home-manager      compatibility alias; Linux/WSL setup applies Home Manager by default
 
 First run:
-  git clone --branch v0.2.0 --single-branch https://github.com/luisgui1757/dotfiles.git "${DOTFILES_DEST:-$HOME/dotfiles}"
+  git clone --branch v0.3.0 --single-branch https://github.com/luisgui1757/dotfiles.git "${DOTFILES_DEST:-$HOME/dotfiles}"
   cd "${DOTFILES_DEST:-$HOME/dotfiles}"
   ./setup.sh --all
 EOF
@@ -492,6 +492,34 @@ load_pending_v0_1_recovery() {
     [[ -d "$root" && ! -L "$root" ]] || return 0
     while IFS= read -r -d '' directory; do
         [[ -d "$directory" && ! -L "$directory" ]] || {
+            echo "  FAIL: legacy migration recovery path is not a real directory: $directory" >&2
+            return 1
+        }
+        if ! stage="$(read_setup_recovery_scalar "$directory/stage")" ||
+            ! new_checkout="$(read_setup_recovery_scalar "$directory/new-checkout")" ||
+            ! old_checkout="$(read_setup_recovery_scalar "$directory/old-checkout")"; then
+            echo "  FAIL: legacy migration recovery identity is incomplete or unsafe: $directory" >&2
+            return 1
+        fi
+        case "$stage" in
+            accepted|rolled-back)
+                ;;
+            prepared|applying|applied|rolling-back|recovery-required)
+                echo "  FAIL: unfinished v0.2.0 migration must be resolved before v0.3.0 setup." >&2
+                echo "        recovery=$directory" >&2
+                echo "        new-checkout=$new_checkout" >&2
+                echo "        old-checkout=$old_checkout" >&2
+                return 1
+                ;;
+            *)
+                echo "  FAIL: legacy migration recovery stage is invalid: $directory ($stage)" >&2
+                return 1
+                ;;
+        esac
+    done < <(find "$root" -mindepth 1 -maxdepth 1 \
+        -name 'v0.1.0-to-v0.2.0.*' -print0)
+    while IFS= read -r -d '' directory; do
+        [[ -d "$directory" && ! -L "$directory" ]] || {
             echo "  FAIL: migration recovery path is not a real directory: $directory" >&2
             return 1
         }
@@ -517,7 +545,7 @@ load_pending_v0_1_recovery() {
                 ;;
         esac
     done < <(find "$root" -mindepth 1 -maxdepth 1 \
-        -name 'v0.1.0-to-v0.2.0.*' -print0)
+        -name 'v0.1.0-to-v0.3.0.*' -print0)
     if [[ "${#active[@]}" -gt 1 ]]; then
         echo "  FAIL: multiple unfinished v0.1.0 migrations target this checkout." >&2
         printf '        %s\n' "${active[@]}" >&2

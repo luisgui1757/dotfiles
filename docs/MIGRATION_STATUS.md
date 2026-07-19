@@ -48,7 +48,7 @@ top-level sources instead.
 `v0.1.0` is a chezmoi release, not a pre-chezmoi install. Its POSIX targets are
 live symlinks into the source checkout, so the former README `git pull` path was
 unsafe: it could publish new bytes before current setup reached backup. The
-canonical v0.2.0 path is now side-by-side and exact-tag-only:
+canonical v0.3.0 path is side-by-side and exact-tag-only:
 
 - `setup.sh --all` and `setup.ps1 -All` are the sole normal user entrypoints.
   They discover exact live v0.1.0 ownership, invoke the platform transaction,
@@ -76,7 +76,7 @@ canonical v0.2.0 path is now side-by-side and exact-tag-only:
   overlay state on rollback, and validates all four canonical Terminal paths
   before any restore write.
 - `scripts/install-nix-prerequisite.sh` installs only checksum-reviewed upstream
-  Nix 2.34.0 release archives. Before v0.2.0 publication it accepts only a clean
+  Nix 2.34.0 release archives. Before v0.3.0 publication it accepts only a clean
   exact current official branch head; after publication the default requires
   the exact annotated tag object and peeled commit. The explicit POSIX
   `--allow-unreleased` field-test lane may instead accept a clean checkout whose
@@ -109,14 +109,16 @@ canonical v0.2.0 path is now side-by-side and exact-tag-only:
   all-target concurrency rejection, known-folder state validation, and the
   pre-migration command-provider boundary.
 
-The annotated v0.2.0 release was published on 2026-07-15 after the exact local,
-hosted cache-free, public-secret, and live-safeguard gates passed. The owner
-explicitly authorized publication with real Apple Silicon owner-host, physical
-Linux, WSL split-host, redirected Windows, and divergent stable
-packaged/Preview/Canary/portable Terminal executions still open. Those
-unchecked rows remain unclaimed post-release evidence gaps in
-`tests/MANUAL.md`; publication does not mark them complete. No
-non-Apple-Silicon macOS migration path is shipped or pending proof.
+The annotated v0.2.0 release was published on 2026-07-15 after its exact local,
+hosted cache-free, public-secret, and live-safeguard gates passed. v0.3.0 is the
+current release candidate: its setup, prerequisite helper, and both v0.1.0
+migrators bind the exact new tag while retaining the same frozen-source and
+rollback boundaries. The owner requested publication with real Apple Silicon
+owner-host, physical Linux, WSL split-host, redirected Windows, and divergent
+stable packaged/Preview/Canary/portable Terminal executions still open. Those
+unchecked rows remain unclaimed evidence gaps in `tests/MANUAL.md`; publication
+does not mark them complete. No non-Apple-Silicon macOS migration path is
+shipped or pending proof.
 
 ## install-deps owns (provisioning -- deliberately NOT in chezmoi)
 

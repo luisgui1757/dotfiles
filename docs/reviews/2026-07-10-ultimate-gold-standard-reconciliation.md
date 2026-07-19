@@ -2848,3 +2848,46 @@ does not claim merge, release, physical Herdr keypress, or visual theme proof.
 
 The next pushed exact-head Windows check remains the authority for closing this
 CI-only correction. No merge or release is claimed here.
+
+## v0.3.0 release-candidate identity preparation — entry 69
+
+- Pull request #60 merged to exact `main` commit
+  `bde9bc34724c52960f64d503c68b692d64240760`. Its merged-main Test, Nix, and
+  CodeQL workflows passed, and a clean isolated worktree of that exact commit
+  passed the complete local gate before release-version edits.
+- The complete delta after v0.2.0 contains backward-compatible user-visible
+  additions: Herdr workspace/navigation behavior plus Pi multiline keys and
+  Main/Moon/Dawn Rose Pine themes. SemVer therefore selects v0.3.0; v0.2.1
+  would incorrectly classify the release as fixes only.
+- A direct tag of the merged feature commit would not be a usable release.
+  Both setup entrypoints and the POSIX prerequisite helper still advertised
+  v0.2.0, while the v0.1.0 migrators and recovery namespace required the same
+  old target. The release-preparation change moves those current identities to
+  v0.3.0 and updates the deterministic fixtures, while preserving the frozen
+  published v0.2.0 evidence as history.
+- Setup also scans the frozen `v0.1.0-to-v0.2.0.*` recovery namespace before
+  considering a v0.3.0 migration. Accepted or rolled-back records are history;
+  malformed or still-active records fail closed until the published v0.2.0
+  transaction is explicitly resolved.
+- The owner requested publication with the existing real-host/manual rows still
+  open. Those rows remain unclaimed; exact release-preparation checks, annotated
+  tag identity, redacted range/proof scan, cache-free exact-tag hosted run, and
+  immutable GitHub release readback remain mandatory publication gates.
+
+### Candidate verification
+
+| Check | Exact result |
+|---|---|
+| `PATH=/opt/homebrew/bin:$PATH make ci` in a clean exact-main worktree before edits | PASS: exact `bde9bc34724c52960f64d503c68b692d64240760`; ended `local pre-PR gate passed` |
+| Focused release identity, universal setup, Nix prerequisite, and Linux v0.1.0 migration checks | PASS |
+| Focused `Setup.Tests.ps1` plus `Upgrade.Tests.ps1` | PASS: 86 passed, 0 failed/skipped |
+| Complete `pwsh -NoLogo -NoProfile -File ./test.ps1` | PASS: PSScriptAnalyzer clean; 284 Pester passed, 0 failed, 1 platform-only skip; Neovim suite completed without failure |
+| Explicit Darwin v0.1.0 migration fixture on this owner host | UNAVAILABLE: the fixture correctly refused the host because live nix-darwin state already exists; the required clean pre-v0.2.0 host boundary is not available locally |
+| Final `PATH=/opt/homebrew/bin:$PATH make ci` on the release-preparation tree | PASS: ended `local pre-PR gate passed` |
+| Merged-main Test run `29673992310` | PASS: macOS, Ubuntu, Windows, three parity jobs, and stable logical jobs |
+| Merged-main Nix run `29673992299` | PASS: Ubuntu/macOS physical jobs plus both logical jobs |
+| Merged-main CodeQL run `29673992015` | PASS |
+| Release tag / GitHub release | NOT CREATED: publication cannot precede the release-preparation merge and exact-tag evidence |
+
+No v0.3.0 tag, GitHub release, cache-free exact-tag run, or post-publication
+identity readback is claimed by this entry.

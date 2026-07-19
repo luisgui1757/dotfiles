@@ -1,5 +1,5 @@
-# Transactional v0.1.0 to v0.2.0 migration for native Windows.
-# Run only from a separate, exact v0.2.0 release checkout.
+# Transactional v0.1.0 to v0.3.0 migration for native Windows.
+# Run only from a separate, exact v0.3.0 release checkout.
 [CmdletBinding(DefaultParameterSetName = 'Source')]
 param(
     [Parameter(ParameterSetName = 'Source', Mandatory)] [switch]$SourceOnly,
@@ -16,7 +16,7 @@ $ErrorActionPreference = 'Stop'
 $script:OldTag = 'v0.1.0'
 $script:OldTagObject = 'a3b4d6d7b6d289959cac68d76faec96219b3e310'
 $script:OldCommit = '015617362830280bf85c7142e69d0681d376d453'
-$script:NewTag = 'v0.2.0'
+$script:NewTag = 'v0.3.0'
 $script:OfficialRepo = 'https://github.com/luisgui1757/dotfiles.git'
 $script:UpgradeScript = [IO.Path]::GetFullPath($MyInvocation.MyCommand.Path)
 $script:DefaultNewCheckout = [IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $script:UpgradeScript) '..'))
@@ -238,7 +238,7 @@ function Invoke-UpgradePreflight {
     $old = Get-CanonicalDirectory -Path $OldPath
     $new = Get-CanonicalDirectory -Path $NewPath
     if ($old -ieq $new) {
-        throw 'in-place migration is forbidden; retain v0.1.0 and use a separate v0.2.0 checkout'
+        throw 'in-place migration is forbidden; retain v0.1.0 and use a separate v0.3.0 checkout'
     }
     Assert-ReleaseCheckout -Checkout $old -Tag $script:OldTag `
         -ExpectedCommit $script:OldCommit -ExpectedTagObject $script:OldTagObject -Label old
@@ -370,7 +370,7 @@ function Initialize-PrivateRecoveryDirectory {
         throw "recovery parent is a reparse point: $Parent"
     }
     do {
-        $recovery = Join-Path $Parent ("v0.1.0-to-v0.2.0." + [guid]::NewGuid().ToString('N'))
+        $recovery = Join-Path $Parent ("v0.1.0-to-v0.3.0." + [guid]::NewGuid().ToString('N'))
     } while (Test-Path -LiteralPath $recovery)
     New-Item -ItemType Directory -Path $recovery | Out-Null
 
@@ -650,7 +650,7 @@ function Initialize-UpgradeRecovery {
         Initialize-SetupLibrary -NewCheckout $frozen.NewSource
         if ([IO.Path]::GetFullPath($script:WindowsIdentity.UserProfile) -ine
             [IO.Path]::GetFullPath($Preflight.Identity.UserProfile)) {
-            throw 'frozen v0.2.0 release resolves a different Windows target identity'
+            throw 'frozen v0.3.0 release resolves a different Windows target identity'
         }
         Copy-Item -LiteralPath (Join-Path $frozen.NewSource 'scripts/upgrade-v0.1.0.ps1') `
             -Destination (Join-Path $recovery 'upgrade-v0.1.0.ps1')
@@ -659,7 +659,7 @@ function Initialize-UpgradeRecovery {
         $providers | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $recovery 'providers.before.json') -Encoding utf8
         Save-RecoveryStage -Recovery $recovery -Stage prepared
         @(
-            'Private recovery material for v0.1.0 to v0.2.0.',
+            'Private recovery material for v0.1.0 to v0.3.0.',
             "Old checkout: $($Preflight.OldCheckout)",
             "New checkout: $($Preflight.NewCheckout)",
             "Frozen rollback source: $($frozen.OldSource)",
@@ -895,7 +895,7 @@ function Get-RecoveryState {
         }
         if ($newHeadResult.Stdout.Count -ne 1 -or $newHeadResult.Stdout[0] -ne $newCommit -or
             $newTagResult.Stdout.Count -ne 1 -or $newTagResult.Stdout[0] -ne $newTagObject) {
-            throw 'retained v0.2.0 checkout or tag moved; refusing acceptance'
+            throw 'retained v0.3.0 checkout or tag moved; refusing acceptance'
         }
         foreach ($checkout in $oldCheckout, $newCheckout) {
             $status = Invoke-GitCapture -Checkout $checkout -Arguments @('status', '--porcelain=v1', '--untracked-files=all')
@@ -906,7 +906,7 @@ function Get-RecoveryState {
     }
     if ((Get-FileSha256OrEmpty -Path (Join-Path $recovery 'upgrade-v0.1.0.ps1')) -ne
         (Get-FileSha256OrEmpty -Path (Join-Path $frozen.NewSource 'scripts/upgrade-v0.1.0.ps1'))) {
-        throw 'recovery script differs from the exact v0.2.0 release'
+        throw 'recovery script differs from the exact v0.3.0 release'
     }
     $providersBefore = @(Get-ValidatedProviderInventory -Path (Join-Path $recovery 'providers.before.json'))
     Initialize-SetupLibrary -NewCheckout $frozen.NewSource
@@ -1003,14 +1003,14 @@ function Invoke-UpgradeAccept {
     }
     $new = Get-CanonicalDirectory -Path $state.NewCheckout
     $head = [string](Invoke-GitCapture -Checkout $new -Arguments @('rev-parse', 'HEAD^{commit}')).Stdout[0]
-    if ($head -ne $state.NewCommit) { throw 'v0.2.0 checkout moved after migration' }
+    if ($head -ne $state.NewCommit) { throw 'v0.3.0 checkout moved after migration' }
     if (-not (Test-NewConfig -NewCheckout $state.NewSource)) {
-        throw 'v0.2.0 config verification failed; retain both checkouts and recovery material'
+        throw 'v0.3.0 config verification failed; retain both checkouts and recovery material'
     }
     Confirm-WindowsTerminalExpectedState -Entries $state.TerminalRecovery
     Save-RecoveryStage -Recovery $state.Recovery -Stage accepted
-    Write-Information 'Migration core accepted. Keep v0.1.0 until full v0.2.0 setup finalizes retained conventional targets.' -InformationAction Continue
-    Write-Information 'Run full v0.2.0 setup now; archive v0.1.0 only after it succeeds.' -InformationAction Continue
+    Write-Information 'Migration core accepted. Keep v0.1.0 until full v0.3.0 setup finalizes retained conventional targets.' -InformationAction Continue
+    Write-Information 'Run full v0.3.0 setup now; archive v0.1.0 only after it succeeds.' -InformationAction Continue
 }
 
 function Invoke-UpgradeApply {
@@ -1043,10 +1043,10 @@ function Invoke-UpgradeApply {
         }
         $setupExitCode = $setup.ExitCode
         if ($setupExitCode -ne 0) {
-            throw "v0.2.0 setup exited $setupExitCode"
+            throw "v0.3.0 setup exited $setupExitCode"
         }
         if (-not (Test-NewConfig -NewCheckout $frozen.NewSource)) {
-            throw 'v0.2.0 config verification failed'
+            throw 'v0.3.0 config verification failed'
         }
         $state = Get-RecoveryState -RecoveryPath $recovery
         Confirm-WindowsTerminalExpectedState -Entries $state.TerminalRecovery
@@ -1070,11 +1070,11 @@ function Invoke-UpgradeApply {
             Remove-Item -LiteralPath $recovery -Recurse -Force -ErrorAction SilentlyContinue
         }
         if ($setupExitCode -ne 0) {
-            throw "v0.2.0 setup exited $setupExitCode; v0.1.0 was restored"
+            throw "v0.3.0 setup exited $setupExitCode; v0.1.0 was restored"
         }
         throw "$($applyFailure.Exception.Message); v0.1.0 was restored"
     }
-    Write-Information 'v0.2.0 config migration applied and verified without package mutation.' -InformationAction Continue
+    Write-Information 'v0.3.0 config migration applied and verified without package mutation.' -InformationAction Continue
     Write-Information 'Retain both checkouts, then accept with:' -InformationAction Continue
     Write-Information "  pwsh -NoProfile -File `"$(Join-Path $recovery 'upgrade-v0.1.0.ps1')`" -Accept `"$recovery`"" -InformationAction Continue
 }
@@ -1084,7 +1084,7 @@ if ($SourceOnly) { return }
 switch ($PSCmdlet.ParameterSetName) {
     'Preflight' {
         $result = Invoke-UpgradePreflight -OldPath $OldCheckout -NewPath $script:DefaultNewCheckout
-        Write-Information 'v0.1.0 to v0.2.0 preflight passed; no live state changed.' -InformationAction Continue
+        Write-Information 'v0.1.0 to v0.3.0 preflight passed; no live state changed.' -InformationAction Continue
         Write-Information "old=$($result.OldCheckout)" -InformationAction Continue
         Write-Information "new=$($result.NewCheckout)" -InformationAction Continue
     }

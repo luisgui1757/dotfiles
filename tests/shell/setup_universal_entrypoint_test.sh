@@ -151,7 +151,7 @@ expected_calls="$(printf '%s\t%s\n%s\t%s' \
     fail "setup did not retain the completed recovery identity"
 
 rm -f "$WORK/migration.calls"
-pending="$XDG_STATE_HOME/dotfiles/migrations/v0.1.0-to-v0.2.0.pending"
+pending="$XDG_STATE_HOME/dotfiles/migrations/v0.1.0-to-v0.3.0.pending"
 mkdir -p "$pending"
 printf '%s\n' applied > "$pending/stage"
 printf '%s\n' "$SCRIPT_DIR" > "$pending/new-checkout"
@@ -176,12 +176,25 @@ grep -F 'migration recovery identity is incomplete or unsafe' "$WORK/malformed-r
     fail "malformed recovery failure did not identify the recovery boundary"
 
 rm -rf "$pending"
+legacy_pending="$XDG_STATE_HOME/dotfiles/migrations/v0.1.0-to-v0.2.0.pending"
+mkdir -p "$legacy_pending"
+printf '%s\n' applied > "$legacy_pending/stage"
+printf '%s\n' "$WORK/legacy-v0.2.0" > "$legacy_pending/new-checkout"
+printf '%s\n' "$WORK/old-release" > "$legacy_pending/old-checkout"
+if maybe_complete_v0_1_upgrade > "$WORK/legacy-recovery.out" 2>&1; then
+    fail "setup bypassed an unfinished v0.2.0 recovery"
+fi
+grep -F 'unfinished v0.2.0 migration must be resolved before v0.3.0 setup' \
+    "$WORK/legacy-recovery.out" >/dev/null ||
+    fail "legacy recovery failure did not identify the release boundary"
+rm -rf "$legacy_pending"
+
 real_recovery="$WORK/real-recovery"
 mkdir -p "$real_recovery"
 printf '%s\n' applied > "$real_recovery/stage"
 printf '%s\n' "$SCRIPT_DIR" > "$real_recovery/new-checkout"
 printf '%s\n' "$WORK/old-release" > "$real_recovery/old-checkout"
-ln -s "$real_recovery" "$XDG_STATE_HOME/dotfiles/migrations/v0.1.0-to-v0.2.0.symlink"
+ln -s "$real_recovery" "$XDG_STATE_HOME/dotfiles/migrations/v0.1.0-to-v0.3.0.symlink"
 if maybe_complete_v0_1_upgrade > "$WORK/symlink-recovery.out" 2>&1; then
     fail "setup accepted a symlinked migration recovery directory"
 fi
