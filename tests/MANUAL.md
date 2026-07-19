@@ -6,10 +6,10 @@ significant change to the relevant area.
 
 ## v0.1.0 to v0.3.0 release upgrade
 
-> Release-candidate status (2026-07-19): the owner requested v0.3.0 publication
-> with these real-environment rows still open. The deterministic exact-release
-> gates remain mandatory; every unchecked row below remains an unclaimed
-> evidence gap. Publication is not evidence that a row ran.
+> Published-release status (2026-07-19): v0.3.0 passed its deterministic
+> exact-release gates and was published under owner authorization with these
+> real-environment rows still open. Every unchecked row below remains an
+> unclaimed evidence gap; publication is not evidence that a row ran.
 
 Use throwaway users/VMs seeded from the exact annotated v0.1.0 release. Follow
 `docs/UPGRADING.md`; never use `main` or update the old checkout in place.
@@ -65,9 +65,8 @@ commits, recovery path, provider inventory, and whether any user data changed.
       commit, prove fresh and v0.1.0 machines both need only setup all, then
       confirm the release document contains no branch command or placeholder
       identity. The automated gate, secret scan, and identities are recorded;
-      fresh and v0.1.0 real-machine acceptance remains open. v0.3.0 is
-      authorized for publication once deterministic gates pass, not because
-      this row is complete.
+      fresh and v0.1.0 real-machine acceptance remains open. v0.3.0 publication
+      did not mark this row complete.
 
 ## Visual / GUI
 

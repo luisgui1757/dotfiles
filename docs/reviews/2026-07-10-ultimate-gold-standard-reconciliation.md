@@ -2891,3 +2891,52 @@ CI-only correction. No merge or release is claimed here.
 
 No v0.3.0 tag, GitHub release, cache-free exact-tag run, or post-publication
 identity readback is claimed by this entry.
+
+## v0.3.0 immutable publication closure — entry 70
+
+- Pull request #61 merged reviewed head
+  `8adf6d4a88cb37d5dec4fddda522d1c9c2bc5a5d` to exact `main` commit
+  `c8507312153620b9b30fe2c84980c62bccb3b25a`. Both commits have tree
+  `9b47f4b264be836babb71c7654b45ebbb489ef76`; their diff is empty. Exact-head
+  Test run `29674911477`, Nix run `29674911485`, E2E run `29674911496`, and
+  CodeQL run `29674910882` all passed before merge.
+- Annotated tag object `473f675e863640484d4d11349bf69d01def12c43`
+  peels to the exact merged commit locally and in the official remote. A fresh
+  detached public-tag clone passed the release-upgrade identity check, and the
+  prerequisite helper reported the immutable v0.3.0 identity without attempting
+  an install because Nix was already usable.
+- Initial cache-free run
+  [`29675684683`](https://github.com/luisgui1757/dotfiles/actions/runs/29675684683)
+  is retained as failed diagnostic evidence. Ubuntu and the container passed;
+  macOS setup completed, then its neocmake LSP probe missed the 45-second attach
+  boundary. The identical exact-head PR job had passed that probe. One fresh
+  full retry was permitted; no failed or cancelled artifact was reused.
+- Fresh cache-free run
+  [`29676087505`](https://github.com/luisgui1757/dotfiles/actions/runs/29676087505)
+  passed all four producers and all four stable logical proof jobs. Ubuntu and
+  Apple Silicon macOS independently logged `Verified immutable release
+  checkout: v0.3.0` at the exact peeled commit; the macOS post-install step also
+  passed neocmake attachment and all 257 LSP-smoke checks.
+- GitHub release `356273955` was published on 2026-07-19 at
+  [`v0.3.0`](https://github.com/luisgui1757/dotfiles/releases/tag/v0.3.0).
+  Readback is immutable, latest, non-draft, and non-prerelease; the release body
+  matches the prepared user-facing notes after trailing-newline normalization.
+- The owner explicitly authorized publication with the real-environment rows in
+  `tests/MANUAL.md` still open. This entry preserves that boundary without
+  converting any unchecked row into evidence.
+
+### Publication verification
+
+| Check | Exact result |
+|---|---|
+| Final `PATH=/opt/homebrew/bin:$PATH make ci` on the reviewed release-preparation tree | PASS: ended `local pre-PR gate passed`; merged `main` is tree-identical |
+| Gitleaks 8.30.1 across `v0.2.0..v0.3.0` and downloaded hosted proofs | PASS: 8 commits (281,979 bytes) plus all 4 stable logical proof artifacts (912 bytes), no leaks found with redaction enabled |
+| Cache-free hosted release run [`29676087505`](https://github.com/luisgui1757/dotfiles/actions/runs/29676087505) | PASS: Ubuntu container `88163730907`, Ubuntu setup `88163730903`, Apple Silicon macOS setup `88163730915`, Windows setup `88163730909`, and logical jobs `88164800628`, `88164800657`, `88164800615`, and `88164800636` |
+| Fresh detached public `v0.3.0` clone | PASS: tag object and peeled commit matched the official remote; release-upgrade static check and immutable prerequisite-helper path passed |
+| Downloaded schema-2 logical proofs | PASS: all four bound source SHA, executed SHA, run ID, attempt, logical context, and legacy context to the successful release run |
+| GitHub release readback | PASS: release `356273955`, immutable/latest, draft=false, prerelease=false, prepared user-facing body exact after trailing-newline normalization |
+
+Real Apple Silicon owner lifecycle, physical Linux, WSL2 split-host,
+redirected Windows, divergent stable packaged/Preview/Canary/portable Terminal,
+and desktop/visual/TCC rows remain open. No completion of those manual surfaces
+is claimed by publication.

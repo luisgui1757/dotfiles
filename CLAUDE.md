@@ -300,11 +300,9 @@ that violates one of these, fix it instead of disabling the test.
     - **(d) no remote-eval installer.** The repo never adds a `curl | sh`,
       `irm | iex`, `Invoke-Expression`, or `nix-installer`/`install.determinate.systems`
       pipe-to-shell path for Nix (or anything else). Public setup invokes only
-      `scripts/install-nix-prerequisite.sh`. Before v0.3.0 publication it
-      accepts only a clean exact current official branch head; one isolated
-      remote-ref snapshot binds that prerelease decision and the absent release
-      tag. Once the unique annotated tag appears, the default path accepts only
-      the matching local tag object, peeled commit, and HEAD. The explicit
+      `scripts/install-nix-prerequisite.sh`. The published v0.3.0 default path
+      accepts only the matching local annotated tag object, peeled commit, and
+      HEAD from one isolated official remote-ref snapshot. The explicit
       `setup.sh --allow-unreleased` test lane may instead accept a clean checkout
       whose HEAD exactly equals a current branch head in the official repository
       from that same remote-ref snapshot. It never accepts a fork, dirty tree,
@@ -848,10 +846,10 @@ major; `tests/static/repo_policy_test.sh` enforces this.
   parser install, Mason headless sync, and the Sentinel Phase 6/6 agent-policy
   install. The required POSIX jobs begin with no `/nix`, check out the exact PR
   source head separately from GitHub's synthetic merge, and run the real
-  prerequisite helper before setup. Before v0.3.0 publication that source must
-  be a current official branch head; after publication the smoke switches to
-  the fetched exact tag. Fork PRs cannot satisfy the official-head identity, so
-  only they retain the pinned Determinate action as a pre-seeded test path.
+  prerequisite helper before setup. The published default requires the fetched
+  exact v0.3.0 tag; an official branch source requires the explicit
+  `--allow-unreleased` lane. Fork PRs cannot satisfy the official-head identity,
+  so only they retain the pinned Determinate action as a pre-seeded test path.
   Both jobs then apply the enforced nix-darwin/Home Manager layer before
   native/deferred installs and assert the nix-owned CLI set resolves from a Nix
   profile/store path. The Linux job first

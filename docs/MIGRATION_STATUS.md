@@ -76,9 +76,8 @@ canonical v0.3.0 path is side-by-side and exact-tag-only:
   overlay state on rollback, and validates all four canonical Terminal paths
   before any restore write.
 - `scripts/install-nix-prerequisite.sh` installs only checksum-reviewed upstream
-  Nix 2.34.0 release archives. Before v0.3.0 publication it accepts only a clean
-  exact current official branch head; after publication the default requires
-  the exact annotated tag object and peeled commit. The explicit POSIX
+  Nix 2.34.0 release archives. The published default requires the exact v0.3.0
+  annotated tag object and peeled commit. The explicit POSIX
   `--allow-unreleased` field-test lane may instead accept a clean checkout whose
   HEAD equals a current branch head in the official repository; forks, dirty
   trees, stale/local-only commits, and the exact-tag migration tools remain
@@ -109,16 +108,18 @@ canonical v0.3.0 path is side-by-side and exact-tag-only:
   all-target concurrency rejection, known-folder state validation, and the
   pre-migration command-provider boundary.
 
-The annotated v0.2.0 release was published on 2026-07-15 after its exact local,
-hosted cache-free, public-secret, and live-safeguard gates passed. v0.3.0 is the
-current release candidate: its setup, prerequisite helper, and both v0.1.0
-migrators bind the exact new tag while retaining the same frozen-source and
-rollback boundaries. The owner requested publication with real Apple Silicon
-owner-host, physical Linux, WSL split-host, redirected Windows, and divergent
-stable packaged/Preview/Canary/portable Terminal executions still open. Those
-unchecked rows remain unclaimed evidence gaps in `tests/MANUAL.md`; publication
-does not mark them complete. No non-Apple-Silicon macOS migration path is
-shipped or pending proof.
+The annotated v0.2.0 release was published on 2026-07-15. The annotated v0.3.0
+release was published on 2026-07-19 after its exact local, hosted cache-free,
+release-range/proof scan, and immutable-release gates passed. Its setup,
+prerequisite helper, and both v0.1.0 migrators bind tag object
+`473f675e863640484d4d11349bf69d01def12c43` to peeled commit
+`c8507312153620b9b30fe2c84980c62bccb3b25a` while retaining the same
+frozen-source and rollback boundaries. The owner authorized publication with
+real Apple Silicon owner-host, physical Linux, WSL split-host, redirected
+Windows, and divergent stable packaged/Preview/Canary/portable Terminal
+executions still open. Those unchecked rows remain unclaimed evidence gaps in
+`tests/MANUAL.md`; publication does not mark them complete. No
+non-Apple-Silicon macOS migration path is shipped or pending proof.
 
 ## install-deps owns (provisioning -- deliberately NOT in chezmoi)
 
