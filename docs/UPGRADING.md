@@ -22,36 +22,36 @@ Setup never fetches a moving branch or mutates an old release checkout. Git
 acquisition remains explicit: clone the exact next annotated release beside the
 old checkout, then run setup from the new checkout.
 
-`./setup.sh --allow-unreleased` is a separate greenfield/already-v0.2.0 field-test
+`./setup.sh --allow-unreleased` is a separate greenfield/already-current-release field-test
 lane. It authorizes only a clean exact current branch head of the official
 repository for POSIX prerequisite bootstrap. It is not an upgrade authority and
 must not be used to migrate a live v0.1.0 checkout; the versioned migration
 tools remain exact-tag-only.
 
-## v0.1.0 to v0.2.0
+## v0.1.0 to v0.3.0
 
 `v0.1.0` is already a chezmoi release. On POSIX, its managed files are live
 symlinks into the checkout. Do **not** run `git pull`, switch that checkout to a
 new revision, or run an upgrade from `main`: doing so can change live config
 before recovery exists.
 
-These commands become user-facing only after the annotated `v0.2.0` release
+These commands become user-facing only after the annotated `v0.3.0` release
 exists. Before then, remain on `v0.1.0`.
 
 ### Common preparation
 
-Keep the checkout that currently owns v0.1.0 and clone v0.2.0 beside it:
+Keep the checkout that currently owns v0.1.0 and clone v0.3.0 beside it:
 
 ```bash
-git clone --branch v0.2.0 --single-branch \
-  https://github.com/luisgui1757/dotfiles.git ~/dotfiles-v0.2.0
-cd ~/dotfiles-v0.2.0
+git clone --branch v0.3.0 --single-branch \
+  https://github.com/luisgui1757/dotfiles.git ~/dotfiles-v0.3.0
+cd ~/dotfiles-v0.3.0
 ```
 
 ```powershell
-git clone --branch v0.2.0 --single-branch `
-  https://github.com/luisgui1757/dotfiles.git "$HOME\dotfiles-v0.2.0"
-Set-Location "$HOME\dotfiles-v0.2.0"
+git clone --branch v0.3.0 --single-branch `
+  https://github.com/luisgui1757/dotfiles.git "$HOME\dotfiles-v0.3.0"
+Set-Location "$HOME\dotfiles-v0.3.0"
 ```
 
 Do not stash, delete, or overwrite local changes to make migration pass. Setup
@@ -102,13 +102,16 @@ If an earlier migration reached `applied` but setup stopped before acceptance,
 rerunning the same command resumes at validated acceptance. A recovery in
 `prepared`, `applying`, `rolling-back`, or `recovery-required` fails closed and
 prints its exact rollback command instead of starting another transaction.
+An unfinished v0.2.0 recovery must first be accepted or rolled back from its
+retained exact v0.2.0 checkout. v0.3.0 setup detects that older active namespace
+and refuses to start or resume a second release transaction around it.
 
 After success, open a new login shell and verify:
 
 ```bash
 nix store info
 command -v rg fd fzf jq lazygit node starship zoxide nvim
-chezmoi --source ~/dotfiles-v0.2.0/home --destination "$HOME" \
+chezmoi --source ~/dotfiles-v0.3.0/home --destination "$HOME" \
   verify --include files,symlinks
 ```
 
@@ -147,9 +150,9 @@ those checks pass.
 
 WSL still has two independent owners and therefore two setup invocations:
 
-1. Clone v0.2.0 on Windows and run `.\setup.ps1 -All` for host Terminal, font,
+1. Clone v0.3.0 on Windows and run `.\setup.ps1 -All` for host Terminal, font,
    clipboard, and Windows tools.
-2. Clone v0.2.0 separately inside the Linux home—never under `/mnt/c`—and run
+2. Clone v0.3.0 separately inside the Linux home—never under `/mnt/c`—and run
    `./setup.sh --all` for the guest Nix/config/tool stack.
 3. Run `tests/wsl/e2e.sh` in the guest and verify host Windows Terminal,
    `win32yank`, font, and PowerShell behavior.
@@ -213,7 +216,24 @@ pwsh -NoProfile -File 'C:\exact\recovery\upgrade-v0.1.0.ps1' -Rollback 'C:\exact
 pwsh -NoProfile -File 'C:\exact\recovery\upgrade-v0.1.0.ps1' -Accept 'C:\exact\recovery'
 ```
 
-## Release evidence status
+## v0.3.0 release-candidate evidence status
+
+The owner requested publication of v0.3.0 with the existing real-environment
+gaps still open. Publication remains blocked on the deterministic release gates:
+
+- [ ] exact release-preparation commit merged to `main` with required checks;
+- [ ] annotated `v0.3.0` tag object and peeled commit recorded after creation;
+- [ ] full local gate, deterministic exact-v0.1.0 migration fixtures, Windows
+  Pester coverage, and redacted scan across `v0.2.0..v0.3.0`;
+- [ ] cache-free hosted release run whose POSIX lanes report the exact immutable
+  `v0.3.0` tag identity;
+- [ ] immutable/latest GitHub release readback matches the prepared notes.
+
+The unchecked real WSL, redirected-Windows, divergent Windows Terminal,
+physical-Linux, Apple-Silicon owner-host, and visual rows in `tests/MANUAL.md`
+remain explicit residual gaps rather than implied passes.
+
+## Historical v0.2.0 release evidence
 
 v0.2.0 was published on 2026-07-15 under explicit owner authorization. The
 automated publication gates passed; the real-environment rows below remain open

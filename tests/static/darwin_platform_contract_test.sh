@@ -22,7 +22,7 @@ active = {
     "e2e workflow": Path(".github/workflows/e2e-install.yml").read_text(encoding="utf-8"),
     "README": Path("README.md").read_text(encoding="utf-8"),
     "upgrade guide": Path("docs/UPGRADING.md").read_text(encoding="utf-8"),
-    "release notes": Path("docs/releases/v0.2.0.md").read_text(encoding="utf-8"),
+    "release notes": Path("docs/releases/v0.3.0.md").read_text(encoding="utf-8"),
     "supply-chain guide": Path("docs/security/supply-chain.md").read_text(encoding="utf-8"),
     "safeguard guide": Path("docs/security/branch-protection.md").read_text(encoding="utf-8"),
 }

@@ -410,17 +410,18 @@ flakes, so fetching the mutable `nixpkgs-unstable` channel is unnecessary and
 would wrongly force the installer's bundled CA instead of the managed host's
 system trust store. If an earlier attempt installed Nix but stopped before
 enabling those features, rerunning setup repairs the user setting and continues.
-The annotated v0.2.0 release is published, so normal setup accepts
-only the exact clean official tag. For field testing before another release,
-the explicit `--allow-unreleased` option accepts a clean checkout only when its
-HEAD is a current branch head in the official repository. Local-only or stale
-commits, forks, dirty checkouts, lightweight tags, and non-official origins
-still fail before download. The versioned upgrade tools remain exact-tag-only;
-this repo has no pipe-to-shell Nix bootstrap.
+The `v0.3.0` release candidate is bound to one exact annotated tag. Before that
+tag is published, the explicit `--allow-unreleased` option accepts a clean
+checkout only when its HEAD is a current branch head in the official repository.
+After publication, normal setup accepts only the exact clean official tag;
+branch testing remains an explicit opt-in. Local-only or stale commits, forks,
+dirty checkouts, lightweight tags, and non-official origins still fail before
+download. The versioned upgrade tools remain exact-tag-only; this repo has no
+pipe-to-shell Nix bootstrap.
 
 ```bash
 # Apple Silicon mac / linux / wsl
-git clone --branch v0.2.0 --single-branch \
+git clone --branch v0.3.0 --single-branch \
   https://github.com/luisgui1757/dotfiles.git ~/dotfiles
 cd ~/dotfiles
 ./setup.sh --all
@@ -428,7 +429,7 @@ cd ~/dotfiles
 
 ### Testing an unreleased official branch
 
-Use this only for a greenfield or already-v0.2.0 test machine. Replace the
+Use this only for a greenfield or already-current-release test machine. Replace the
 example branch value with the official branch you want to test:
 
 ```bash
@@ -461,7 +462,7 @@ Set-Location $HOME\dotfiles-test
 # windows
 # enable Developer Mode, then run from a normal PowerShell
 # Settings -> Privacy & security -> For developers -> Developer Mode = On
-git clone --branch v0.2.0 --single-branch `
+git clone --branch v0.3.0 --single-branch `
   https://github.com/luisgui1757/dotfiles.git $HOME\dotfiles
 Set-ExecutionPolicy -Scope Process Bypass -Force
 Set-Location $HOME\dotfiles
@@ -499,16 +500,18 @@ dependency-install run; Scoop refuses admin installs.
 checkout. **Do not run `git pull` in that checkout.** Changing it in place can
 change live config before recovery exists.
 
-The annotated v0.2.0 release is published. Retain the exact old checkout, clone
-v0.2.0 beside it, and run only `./setup.sh --all`
+After the annotated v0.3.0 release is published, retain the exact old checkout,
+clone v0.3.0 beside it, and run only `./setup.sh --all`
 or `.\setup.ps1 -All` from the new checkout. Setup detects the live exact-v0.1.0
 owner, installs Nix on POSIX when needed, runs the existing digest-bound
 transaction, verifies and accepts its reversible core, retains private recovery,
-then completes additive provisioning and repoints config to v0.2.0. A pending
+then completes additive provisioning and repoints config to v0.3.0. A pending
 `applied` recovery resumes at acceptance; an unsafe/incomplete recovery fails
 closed with its exact rollback command. If the old checkout is not discoverable
 from the live config, set `DOTFILES_V0_1_CHECKOUT` to its real path for that same
-setup invocation. macOS migration is available only on Apple Silicon.
+setup invocation. Finish or roll back any unfinished v0.2.0 recovery from its
+retained exact v0.2.0 checkout before starting v0.3.0; the new setup refuses to
+bypass that transaction. macOS migration is available only on Apple Silicon.
 
 The manual preflight/apply/rollback/accept commands remain available in
 [docs/UPGRADING.md](docs/UPGRADING.md) for diagnosis and operator-controlled
@@ -1434,7 +1437,7 @@ update PRs are intentionally not configured.
 |---|---|---|
 | GitHub Actions | Managed, digest-pinned, labeled `github-actions` | Actions are repo-owned CI inputs with stable Renovate support. |
 | GitHub runner images | Managed, labeled `github-runners`, reviewed separately | `ubuntu-*`, `macos-*`, and `windows-*` bumps can change the supported CI platform, so they should not be mixed with ordinary Action bumps. |
-| Repo-pinned installer versions/refs | Managed, labeled `pinned-downloads`, never automerged | The v0.2.0 Nix prerequisite tarballs, Neovim Linux tarballs, chezmoi CI release archives, lazygit Linux tarballs, Starship Linux tarballs, Tree-sitter CLI Linux/Windows archives, WezTerm Ubuntu `.deb`, Herdr Linux binaries, Herdr Windows preview `.exe`, Hack Nerd Font, Windows Terminal portable zip, Ghostty distro/architecture `.deb` assets, Pi CLI npm package, zsh plugin refs, `setuptools`/`pylatexenc` converter pins, the Homebrew installer commit, the Scoop installer commit, the Renovate validator package/runtime, the Ubuntu Microsoft-repository `.deb`, and the CI `cargo-binstall` commit are explicit repo pins. |
+| Repo-pinned installer versions/refs | Managed, labeled `pinned-downloads`, never automerged | The v0.3.0 Nix prerequisite tarballs, Neovim Linux tarballs, chezmoi CI release archives, lazygit Linux tarballs, Starship Linux tarballs, Tree-sitter CLI Linux/Windows archives, WezTerm Ubuntu `.deb`, Herdr Linux binaries, Herdr Windows preview `.exe`, Hack Nerd Font, Windows Terminal portable zip, Ghostty distro/architecture `.deb` assets, Pi CLI npm package, zsh plugin refs, `setuptools`/`pylatexenc` converter pins, the Homebrew installer commit, the Scoop installer commit, the Renovate validator package/runtime, the Ubuntu Microsoft-repository `.deb`, and the CI `cargo-binstall` commit are explicit repo pins. |
 | Adjacent SHA-256 / commit constants | Not managed; matched only as regex context | Renovate can bump the version/ref but cannot recompute archive/script hashes or verify tag commit IDs. CI must fail until a human recomputes and reviews them. |
 | Package-manager catalogs | Not managed | Brew, apt, dnf, pacman, zypper, apk, Scoop, winget, and choco entries are package names/IDs, not repo version pins. Let the package manager resolve current versions. |
 | Neovim plugin and Mason tools | Not managed | `lazy-lock.json` is refreshed with Lazy and tested as editor behavior; Mason intentionally has no machine-pinned lockfile. |
@@ -1715,7 +1718,7 @@ matching artifact.
 ### Reproducing the same release on another machine
 
 ```bash
-git clone --branch v0.2.0 --single-branch \
+git clone --branch v0.3.0 --single-branch \
   https://github.com/luisgui1757/dotfiles.git ~/dotfiles
 cd ~/dotfiles
 ./setup.sh --all                 # prerequisites + packages + config + locked plugins
@@ -1735,9 +1738,9 @@ MIT. See `LICENSE`.
 |---|---|---|
 | Setup warns `multiple managed <tool> commands are on PATH` | two physically distinct installations publish the same managed command; changing `PATH` order could silently switch which one runs | keep the printed `selected` command, then remove each `duplicate` through its proven owner. Setup prints exact no-elevation cleanup only for a proven user-scoped Homebrew, npm, or Scoop package; review scope yourself for winget/Chocolatey/system managers, and use the original manager for `owner=unknown`. Setup never removes either copy automatically. Rerun setup until the warning disappears |
 | Pi setup says `expected 0.80.10 after install, got 0.80.3`, or reports multiple managed `pi` commands | an older global npm/Homebrew `pi` duplicates the repo-owned `~/.local/bin/pi`; older checkouts also let the global command win `PATH` resolution | update this repo and rerun setup. Current setup proves only `~/.local/bin/pi`, makes it win in current and future shells, and reports every physical duplicate. For a proven npm-global copy, run the exact `cleanup (same user, no sudo)` command shown, then rerun setup to confirm one command remains. Never prepend `sudo`; unknown owners must be removed with their original package manager |
-| v0.2.0 Linux Nix bootstrap ends with `cat: /etc/bashrc: Permission denied` and upstream's `Oh no` failure | the pinned upstream daemon installer prepared `/etc/bashrc` through its privileged path, then tried to read it as the invoking user; its multi-user path does not honor the public `--no-modify-profile` option | if `/etc/bashrc.backup-before-nix` exists after the failure, restore it with `sudo mv /etc/bashrc.backup-before-nix /etc/bashrc`. For immutable v0.2.0 without that backup, the bounded workaround is `sudo chmod a+r /etc/bashrc` before rerunning. On the current official test branch, pull the latest head and rerun `./setup.sh --all --allow-unreleased`; the wrapper applies an exact-hash-verified local patch that skips the daemon profile step and leaves shell activation to setup/Home Manager |
-| Linux Nix bootstrap reports `getting status of '/nix/store/...-busybox...': Permission denied` while installing Nix | a restrictive invoking umask—common on managed corporate hosts—combined with Nix 2.34.0's Linux daemon copy and write-bit removal left store directories as root-only `0500`; a previous interrupted attempt can retain those modes | pull the latest current official test-branch head and rerun `./setup.sh --all --allow-unreleased` as the normal target user. Its checksum-bound daemon installer normalizes the copied and pre-existing store paths to read-only/traversable modes before Nix creates the default profile; do not run all of setup with `sudo` |
-| Corporate Linux bootstrap warns that `https://channels.nixos.org/nixpkgs-unstable` failed TLS verification | upstream's legacy default-channel step uses its bundled CA file, which does not contain the corporate TLS-inspection root; the dotfiles package layer uses locked flakes and does not need this mutable channel | pull the latest current official test-branch head and rerun `./setup.sh --all --allow-unreleased`. The wrapper disables channel creation with upstream's public `--no-channel-add`; subsequent Nix activation selects the host system CA bundle, preserving corporate trust without weakening TLS verification |
+| v0.2.0 Linux Nix bootstrap ends with `cat: /etc/bashrc: Permission denied` and upstream's `Oh no` failure | the pinned upstream daemon installer prepared `/etc/bashrc` through its privileged path, then tried to read it as the invoking user; its multi-user path does not honor the public `--no-modify-profile` option | if `/etc/bashrc.backup-before-nix` exists after the failure, restore it with `sudo mv /etc/bashrc.backup-before-nix /etc/bashrc`. For immutable v0.2.0 without that backup, the bounded workaround is `sudo chmod a+r /etc/bashrc` before rerunning. Move to the exact v0.3.0 release checkout and rerun `./setup.sh --all`; its hash-verified local patch skips the daemon profile step and leaves shell activation to setup/Home Manager |
+| Linux Nix bootstrap reports `getting status of '/nix/store/...-busybox...': Permission denied` while installing Nix | a restrictive invoking umask—common on managed corporate hosts—combined with Nix 2.34.0's Linux daemon copy and write-bit removal left store directories as root-only `0500`; a previous interrupted attempt can retain those modes | move to the exact v0.3.0 release checkout and rerun `./setup.sh --all` as the normal target user. Its checksum-bound daemon installer normalizes the copied and pre-existing store paths to read-only/traversable modes before Nix creates the default profile; do not run all of setup with `sudo` |
+| Corporate Linux bootstrap warns that `https://channels.nixos.org/nixpkgs-unstable` failed TLS verification | upstream's legacy default-channel step uses its bundled CA file, which does not contain the corporate TLS-inspection root; the dotfiles package layer uses locked flakes and does not need this mutable channel | move to the exact v0.3.0 release checkout and rerun `./setup.sh --all`. The wrapper disables channel creation with upstream's public `--no-channel-add`; subsequent Nix activation selects the host system CA bundle, preserving corporate trust without weakening TLS verification |
 | Neovim stops before loading Lazy with a lockfile/cache identity error | `lazy-lock.json` is missing, malformed, incomplete, has a non-40-hex commit or invalid branch; or the cached `lazy.nvim` checkout is dirty, at the wrong commit, from the wrong origin, missing locked default-branch metadata, non-Git, or partial | restore the tracked `nvim/lazy-lock.json` and restart Neovim. Startup repairs the cache through a verified staging checkout and never executes an unproved path. If publication fails, fix the destination permissions named in the error and retry |
 | setup reports a Homebrew `shellenv` failure even though `brew` already resolves | the selected command and PATH-resolved command report different Homebrew prefixes/repositories, or `shellenv` exited nonzero; empty stdout alone is a normal Homebrew idempotence signal | compare `brew --prefix` and `brew --repository` through both entrypoints named in the error. Repair the shadowing PATH or Homebrew installation, then rerun setup; a nix-darwin wrapper and native brew path are accepted only when those identities match |
 | a new zsh prints `compinit: no such file or directory: .../_brew` | Homebrew's core completion symlink survived a repository/Nix-generation migration but its target did not; `brew completions link` alone only reconciles tap completions | update this repo and rerun setup or `./setup.sh --update`; both paths reconcile tap completions, atomically repair a missing/dangling core `_brew` symlink to the active Homebrew implementation, and verify the resolved target. A conflicting non-symlink is preserved and reported instead of overwritten |

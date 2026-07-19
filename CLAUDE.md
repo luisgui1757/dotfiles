@@ -300,7 +300,7 @@ that violates one of these, fix it instead of disabling the test.
     - **(d) no remote-eval installer.** The repo never adds a `curl | sh`,
       `irm | iex`, `Invoke-Expression`, or `nix-installer`/`install.determinate.systems`
       pipe-to-shell path for Nix (or anything else). Public setup invokes only
-      `scripts/install-nix-prerequisite.sh`. Before v0.2.0 publication it
+      `scripts/install-nix-prerequisite.sh`. Before v0.3.0 publication it
       accepts only a clean exact current official branch head; one isolated
       remote-ref snapshot binds that prerelease decision and the absent release
       tag. Once the unique annotated tag appears, the default path accepts only
@@ -476,12 +476,15 @@ that violates one of these, fix it instead of disabling the test.
 29. **Published release upgrades are exact-tag, side-by-side transactions.**
     v0.1.0 is already chezmoi-based; its POSIX targets are live checkout
     symlinks, so `git pull` or switching that checkout before setup crosses the
-    backup boundary. Never publish an in-place v0.1.0 migration. The v0.2.0
+    backup boundary. Never publish an in-place v0.1.0 migration. The v0.3.0
     tools require separate clean official annotated-tag checkouts, exact
     historical config, authoritative target identity, and private recovery.
     POSIX recovery archives both exact commits, validates digest-bound read-only
     trees, and uses only those frozen sources for Nix/config publication and
-    rollback; post-validation checkout changes cannot affect a write.
+    rollback; post-validation checkout changes cannot affect a write. Setup
+    must fail closed when an unfinished `v0.1.0-to-v0.2.0.*` recovery remains;
+    that published transaction must be accepted or rolled back before v0.3.0
+    setup can begin. Windows enforces the same cross-release recovery boundary.
     Windows recovery likewise archives both exact commits beneath its protected
     ACL, records all four canonical Terminal identities and their expected
     presence/hash state, and binds setup, acceptance, uninstall, and rollback to
@@ -845,7 +848,7 @@ major; `tests/static/repo_policy_test.sh` enforces this.
   parser install, Mason headless sync, and the Sentinel Phase 6/6 agent-policy
   install. The required POSIX jobs begin with no `/nix`, check out the exact PR
   source head separately from GitHub's synthetic merge, and run the real
-  prerequisite helper before setup. Before v0.2.0 publication that source must
+  prerequisite helper before setup. Before v0.3.0 publication that source must
   be a current official branch head; after publication the smoke switches to
   the fetched exact tag. Fork PRs cannot satisfy the official-head identity, so
   only they retain the pinned Determinate action as a pre-seeded test path.

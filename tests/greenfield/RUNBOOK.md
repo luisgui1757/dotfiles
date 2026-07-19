@@ -139,17 +139,16 @@ cd ~/dotfiles
 git fetch --depth 1 origin <full-40-character-sha>
 git checkout --detach FETCH_HEAD
 test "$(git rev-parse HEAD)" = "<full-40-character-sha>"
-# Before v0.2.0 publication, this SHA must be the current head of an official
-# repository branch. setup verifies that identity and bootstraps Nix itself.
-./setup.sh --all
+# This SHA must be the current head of an official repository branch.
+# setup verifies that identity and bootstraps Nix itself.
+./setup.sh --all --allow-unreleased
 ./tests/greenfield/validate.sh
 ```
 
 For PR validation, use the PR head commit SHA. For main validation, use the
 current full `origin/main` SHA. Do not validate a moving branch name.
-These SHA instructions are prerelease-only. Once v0.2.0 is published, a
-Nix-free bootstrap must use the exact annotated tag; a later branch test must
-pre-seed Nix and is not release-bootstrap proof.
+These SHA instructions are branch-test-only. Exact-release proof must instead
+clone the annotated `v0.3.0` tag and run setup without `--allow-unreleased`.
 Do the GUI/visual parts of Part 3 in the `tart run` window (VS Code, terminal
 colours); the CLI parts over SSH are fine too.
 
@@ -173,17 +172,16 @@ cd ~/dotfiles
 git fetch --depth 1 origin <full-40-character-sha>
 git checkout --detach FETCH_HEAD
 test "$(git rev-parse HEAD)" = "<full-40-character-sha>"
-# Before v0.2.0 publication, this SHA must be the current head of an official
-# repository branch. setup verifies that identity and bootstraps Nix itself.
-./setup.sh --all
+# This SHA must be the current head of an official repository branch.
+# setup verifies that identity and bootstraps Nix itself.
+./setup.sh --all --allow-unreleased
 ./tests/greenfield/validate.sh
 ```
 
 For PR validation, use the PR head commit SHA. For main validation, use the
 current full `origin/main` SHA. Do not validate a moving branch name.
-These SHA instructions are prerelease-only. Once v0.2.0 is published, a
-Nix-free bootstrap must use the exact annotated tag; a later branch test must
-pre-seed Nix and is not release-bootstrap proof.
+These SHA instructions are branch-test-only. Exact-release proof must instead
+clone the annotated `v0.3.0` tag and run setup without `--allow-unreleased`.
 A `tart` Linux guest is a real desktop (unlike WSL), so Ghostty + fonts install
 natively here and the visual checks apply. Over a headless SSH session the CLI
 checks (tmux/nvim/lazygit/shell) still apply; skip the GUI rows.

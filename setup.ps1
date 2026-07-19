@@ -18,7 +18,7 @@
 #   .\setup.ps1 -MergeWindowsTerminal        (no-op alias; the WT rose-pine merge is now default-on)
 #
 # First run (no checkout yet):
-#   git clone --branch v0.2.0 --single-branch https://github.com/luisgui1757/dotfiles.git "$env:USERPROFILE\dotfiles"
+#   git clone --branch v0.3.0 --single-branch https://github.com/luisgui1757/dotfiles.git "$env:USERPROFILE\dotfiles"
 #   Set-Location "$env:USERPROFILE\dotfiles"
 #   .\setup.ps1 -All
 #
@@ -45,7 +45,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $RepoUrl        = 'https://github.com/luisgui1757/dotfiles.git'
-$ReleaseTag     = 'v0.2.0'
+$ReleaseTag     = 'v0.3.0'
 $SentinelRepoUrl = 'https://github.com/luisgui1757/sentinel.git'
 $SentinelVersion = '0.1.2'
 $SentinelRef     = 'ecafffa858666343c1639f996d177f460163e93e'
@@ -267,6 +267,24 @@ function Get-PendingV01Recovery {
     $active = @()
     $rolledBack = @()
     foreach ($directory in @(Get-ChildItem -LiteralPath $root -Force -Filter 'v0.1.0-to-v0.2.0.*' -ErrorAction SilentlyContinue)) {
+        if (-not $directory.PSIsContainer -or ($directory.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+            throw "legacy migration recovery path is not a real directory: $($directory.FullName)"
+        }
+        try {
+            $stage = Read-SetupRecoveryScalar -Path (Join-Path $directory.FullName 'stage')
+            $newCheckout = Read-SetupRecoveryScalar -Path (Join-Path $directory.FullName 'new-checkout')
+            $oldCheckout = Read-SetupRecoveryScalar -Path (Join-Path $directory.FullName 'old-checkout')
+        } catch {
+            throw "legacy migration recovery identity is incomplete or unsafe: $($directory.FullName): $($_.Exception.Message)"
+        }
+        if ($stage -in @('prepared', 'applying', 'applied', 'rolling-back', 'recovery-required')) {
+            throw "unfinished v0.2.0 migration must be resolved before v0.3.0 setup: recovery=$($directory.FullName); new-checkout=$newCheckout; old-checkout=$oldCheckout"
+        }
+        if ($stage -notin @('accepted', 'rolled-back')) {
+            throw "legacy migration recovery stage is invalid: $($directory.FullName) ($stage)"
+        }
+    }
+    foreach ($directory in @(Get-ChildItem -LiteralPath $root -Force -Filter 'v0.1.0-to-v0.3.0.*' -ErrorAction SilentlyContinue)) {
         if (-not $directory.PSIsContainer -or ($directory.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
             throw "migration recovery path is not a real directory: $($directory.FullName)"
         }
