@@ -410,14 +410,14 @@ flakes, so fetching the mutable `nixpkgs-unstable` channel is unnecessary and
 would wrongly force the installer's bundled CA instead of the managed host's
 system trust store. If an earlier attempt installed Nix but stopped before
 enabling those features, rerunning setup repairs the user setting and continues.
-The `v0.3.0` release candidate is bound to one exact annotated tag. Before that
-tag is published, the explicit `--allow-unreleased` option accepts a clean
-checkout only when its HEAD is a current branch head in the official repository.
-After publication, normal setup accepts only the exact clean official tag;
-branch testing remains an explicit opt-in. Local-only or stale commits, forks,
-dirty checkouts, lightweight tags, and non-official origins still fail before
-download. The versioned upgrade tools remain exact-tag-only; this repo has no
-pipe-to-shell Nix bootstrap.
+The published `v0.3.0` release is bound to annotated tag object
+`473f675e863640484d4d11349bf69d01def12c43`, which peels to commit
+`c8507312153620b9b30fe2c84980c62bccb3b25a`. Normal setup accepts only that
+exact clean official tag; branch testing remains an explicit opt-in through
+`--allow-unreleased` and still requires a current branch head in the official
+repository. Local-only or stale commits, forks, dirty checkouts, lightweight
+tags, and non-official origins fail before download. The versioned upgrade
+tools remain exact-tag-only; this repo has no pipe-to-shell Nix bootstrap.
 
 ```bash
 # Apple Silicon mac / linux / wsl
@@ -500,8 +500,8 @@ dependency-install run; Scoop refuses admin installs.
 checkout. **Do not run `git pull` in that checkout.** Changing it in place can
 change live config before recovery exists.
 
-After the annotated v0.3.0 release is published, retain the exact old checkout,
-clone v0.3.0 beside it, and run only `./setup.sh --all`
+Retain the exact old checkout, clone the annotated v0.3.0 release beside it,
+and run only `./setup.sh --all`
 or `.\setup.ps1 -All` from the new checkout. Setup detects the live exact-v0.1.0
 owner, installs Nix on POSIX when needed, runs the existing digest-bound
 transaction, verifies and accepts its reversible core, retains private recovery,

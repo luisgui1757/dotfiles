@@ -216,18 +216,35 @@ pwsh -NoProfile -File 'C:\exact\recovery\upgrade-v0.1.0.ps1' -Rollback 'C:\exact
 pwsh -NoProfile -File 'C:\exact\recovery\upgrade-v0.1.0.ps1' -Accept 'C:\exact\recovery'
 ```
 
-## v0.3.0 release-candidate evidence status
+## v0.3.0 release evidence status
 
-The owner requested publication of v0.3.0 with the existing real-environment
-gaps still open. Publication remains blocked on the deterministic release gates:
+v0.3.0 was published on 2026-07-19 under explicit owner authorization. The
+deterministic publication gates passed; the real-environment rows below remain
+open and are not implied by publication:
 
-- [ ] exact release-preparation commit merged to `main` with required checks;
-- [ ] annotated `v0.3.0` tag object and peeled commit recorded after creation;
-- [ ] full local gate, deterministic exact-v0.1.0 migration fixtures, Windows
-  Pester coverage, and redacted scan across `v0.2.0..v0.3.0`;
-- [ ] cache-free hosted release run whose POSIX lanes report the exact immutable
-  `v0.3.0` tag identity;
-- [ ] immutable/latest GitHub release readback matches the prepared notes.
+- [x] pull request #61 merged the reviewed release-preparation tree to exact
+  `main` commit `c8507312153620b9b30fe2c84980c62bccb3b25a` with all required
+  checks passing;
+- [x] annotated tag object `473f675e863640484d4d11349bf69d01def12c43`
+  peels to that exact commit and matches immutable/latest GitHub release
+  `356273955`;
+- [x] full local `make ci`, the deterministic exact-v0.1.0 POSIX fixture,
+  Windows Pester coverage, and Gitleaks 8.30.1 scans across all 8 commits in
+  `v0.2.0..v0.3.0` plus the 4 downloaded logical proofs passed;
+- [x] cache-free hosted run
+  [`29676087505`](https://github.com/luisgui1757/dotfiles/actions/runs/29676087505)
+  passed Ubuntu, Apple Silicon macOS, Windows, the Linux container, and all four
+  stable logical proofs; both POSIX lanes verified the exact immutable v0.3.0
+  tag path;
+- [x] GitHub release `356273955` is immutable, latest, non-draft, and
+  non-prerelease, and its body matches the prepared user-facing notes.
+
+Initial cache-free run
+[`29675684683`](https://github.com/luisgui1757/dotfiles/actions/runs/29675684683)
+is retained as failed evidence: macOS setup completed, but its neocmake LSP
+probe missed the 45-second attach boundary. The identical exact-head PR job had
+passed that probe, and the one permitted fresh full retry above passed it in
+39 seconds; no failed or cancelled artifact was promoted into release proof.
 
 The unchecked real WSL, redirected-Windows, divergent Windows Terminal,
 physical-Linux, Apple-Silicon owner-host, and visual rows in `tests/MANUAL.md`
