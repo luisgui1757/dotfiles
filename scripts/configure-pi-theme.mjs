@@ -10,7 +10,7 @@ const LOCK_RETRY_MS = 20;
 
 function usage() {
   console.error(
-    "usage: configure-pi-theme.mjs set <settings.json> <theme-name> | unset <settings.json> <managed-theme> [managed-theme...]",
+    "usage: configure-pi-theme.mjs set <settings.json> <default-theme> [managed-theme...] | unset <settings.json> <managed-theme> [managed-theme...]",
   );
 }
 
@@ -88,7 +88,7 @@ async function atomicWrite(settingsPath, settings) {
 async function main() {
   const [command, settingsPath, ...themeNames] = process.argv.slice(2);
   const hasValidThemeCount =
-    (command === "set" && themeNames.length === 1) ||
+    (command === "set" && themeNames.length > 0) ||
     (command === "unset" && themeNames.length > 0);
   if (!(["set", "unset"].includes(command)) || !settingsPath || !hasValidThemeCount) {
     usage();
@@ -115,8 +115,8 @@ async function main() {
   try {
     const settings = await readSettings(settingsPath);
     if (command === "set") {
-      if (settings.theme === themeName) {
-        console.log(`unchanged Pi theme: ${themeName}`);
+      if (themeNames.includes(settings.theme)) {
+        console.log(`unchanged managed Pi theme: ${settings.theme}`);
         return;
       }
       settings.theme = themeName;

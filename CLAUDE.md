@@ -55,7 +55,7 @@ sessions/auth/providers/other preferences, and package caches stay per machine.
 ├── wezterm/               wezterm.lua (shared terminal config on every OS)
 ├── aerospace/             macOS tiling-window-manager config
 ├── herdr/                 config.toml (forced built-in Rose Pine theme)
-├── pi/                    audited Pi Rose Pine main/moon/dawn + newline keys
+├── pi/                    Pi canonical Fable-tuned Rose Pine themes and newline keys
 ├── windows-terminal/      settings.fragment.jsonc + merge README
 ├── lazygit/               config.yml + config.windows.yml (J/K + Windows Ctrl-G)
 ├── gh-dash/               pull-request/issue dashboard config
@@ -664,8 +664,8 @@ navigator, `prefix+comma`/`prefix+$` to tab/workspace rename,
 `prefix+shift+1..9` to indexed workspace selection; agent navigation uses
 `prefix+shift+a`/`prefix+a` for previous/next and `prefix+ctrl+1..9` for indexed
 focus; Windows alone selects `pwsh.exe`),
-pi/{rose-pine,rose-pine-moon,rose-pine-dawn}.json (the audited 51-token Pi
-themes; main is the setup default), pi/keybindings.json (Pi's canonical
+pi/{rose-pine,rose-pine-moon,rose-pine-dawn}.json (three audited, Fable-tuned
+51-token Pi themes; main is the first-setup default), pi/keybindings.json (Pi's canonical
 `Shift+Enter` / `Ctrl+J` multiline-input pair),
 windows-terminal/settings.fragment.jsonc (`schemes` + `themes`),
 shells/powershell_profile.ps1 (PSReadLine `-Colors` for syntax, `Selection`,
@@ -1430,8 +1430,9 @@ save only**. The next plain `:w` formats normally. Implemented in
   atomically preserves the displaced current file
   as `settings.json.uninstall-current.*`, and honors `-NoRestoreBackups`.
   Before removing the Pi theme files, uninstall deletes the global `theme` key
-  only when it still equals `rose-pine`, `rose-pine-moon`, or
-  `rose-pine-dawn`; every other user selection and Pi setting remain untouched.
+  only when it still equals one of the three canonical Rose Pine variants or a
+  retired repo-managed `*-fable` trial alias; every other user selection and Pi
+  setting remains untouched.
   If the Pi settings file is absent, cleanup returns
   successfully before probing Node; if it exists, Node remains mandatory for the
   structured fail-closed edit.
@@ -1999,17 +2000,24 @@ save only**. The next plain `:w` formats normally. Implemented in
   only the last 20 lines and at most 4096 characters before cleanup. POSIX public
   setup gets Node 24 from the enforced Nix package layer; Windows
   gets Node through the native catalog. Chezmoi deploys byte-identical canonical
-  and `home/dot_pi/agent/themes/` mirrors for `pi/rose-pine.json`,
-  `pi/rose-pine-moon.json`, and `pi/rose-pine-dawn.json`, plus the
+  and `home/dot_pi/agent/themes/` mirrors for the Fable-tuned
+  `pi/{rose-pine,rose-pine-moon,rose-pine-dawn}.json` files, plus the
   `pi/keybindings.json` / `home/dot_pi/agent/keybindings.json` pair on every OS.
-  The themes preserve the data mappings from archived MIT-licensed
+  The themes preserve the variables and export roles from archived MIT-licensed
   `zenobi-us/pi-rose-pine` commit
   `9b342f6e16d6b28c00c2f888ba2f050273981bdb`, with only the current
   `earendil-works/pi` schema URL added. Each keeps the official 15-color variant
   palette and adds 24 contrast derivatives used by its 51 token mappings. The
+  canonical Main/Moon intentionally differ from the archived mapping only at
+  `border`, `borderMuted`, `dim`, `thinkingText`, `selectedBg`,
+  `userMessageText`, `syntaxComment`, `syntaxFunction`, `syntaxVariable`,
+  and `syntaxNumber`; canonical Dawn differs only at `mdLinkUrl`, which uses
+  `pine`. The theme test binds all three complete hashes, official palettes,
+  schema shape, and customized roles. The
   compared `pi-themes-rose-pine@0.1.0` pack is the old simple mapping already
-  retired here; do not install it as a second source of theme state. Main remains
-  setup's default, while Pi `/settings` exposes moon and dawn. The keybindings
+  retired here; do not install it as a second source of theme state. Main
+  remains the first-setup default, while Pi `/settings` exposes all three. The
+  keybindings
   file owns exactly Pi's
   upstream-default newline action:
   `Shift+Enter`, with `Ctrl+J` retained as the transport fallback. Herdr v0.7.4
@@ -2019,9 +2027,15 @@ save only**. The next plain `:w` formats normally. Implemented in
   `Ctrl+J` before Pi receives it. After apply,
   `scripts/configure-pi-theme.mjs` acquires Pi's compatible
   `settings.json.lock`, validates an object-shaped JSON file, atomically merges
-  only `theme: rose-pine`, and preserves every unrelated key. `--skip-config-scripts`
-  defers this merge. Uninstall removes the key only if it is still one of the
-  three managed variant names. Sessions, auth, providers, and all other
+  only `theme: rose-pine` when no managed variant is selected, and preserves
+  every unrelated key. Setup/update reruns preserve any of the three managed
+  selections. An update from the six-theme trial removes retired `*-fable`
+  aliases only when they are repo-shaped symlinks on POSIX or their copy
+  content matches the reviewed trial files with Git-normalized LF or CRLF
+  framing; substantively modified or unrelated paths are preserved.
+  `--skip-config-scripts` defers this merge and retirement. Uninstall removes the
+  key only if it is still canonical or names a retired managed trial alias.
+  Sessions, auth, providers, and all other
   preferences remain machine-local. Renovate
   may bump `PI_CLI_VERSION`, but the integrity constant is context-only and must
   be recomputed/reviewed by a human. PowerShell probes Node and npm by capturing

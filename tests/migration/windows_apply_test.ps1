@@ -334,18 +334,14 @@ function Assert-Part1Files {
         -ActualPath (Join-Path $Sandbox '.config\gh-dash\config.yml') `
         -ExpectedPath (Join-Path $script:RepoRoot 'gh-dash\config.yml') `
         -Label 'gh-dash config'
-    Assert-CopyModeFileMatches `
-        -ActualPath (Join-Path $Sandbox '.pi\agent\themes\rose-pine.json') `
-        -ExpectedPath (Join-Path $script:RepoRoot 'pi\rose-pine.json') `
-        -Label 'Pi Rose Pine main theme'
-    Assert-CopyModeFileMatches `
-        -ActualPath (Join-Path $Sandbox '.pi\agent\themes\rose-pine-moon.json') `
-        -ExpectedPath (Join-Path $script:RepoRoot 'pi\rose-pine-moon.json') `
-        -Label 'Pi Rose Pine moon theme'
-    Assert-CopyModeFileMatches `
-        -ActualPath (Join-Path $Sandbox '.pi\agent\themes\rose-pine-dawn.json') `
-        -ExpectedPath (Join-Path $script:RepoRoot 'pi\rose-pine-dawn.json') `
-        -Label 'Pi Rose Pine dawn theme'
+    foreach ($themeName in @(
+            'rose-pine', 'rose-pine-moon', 'rose-pine-dawn'
+        )) {
+        Assert-CopyModeFileMatches `
+            -ActualPath (Join-Path $Sandbox ".pi\agent\themes\$themeName.json") `
+            -ExpectedPath (Join-Path $script:RepoRoot "pi\$themeName.json") `
+            -Label "Pi $themeName theme"
+    }
     Assert-CopyModeFileMatches `
         -ActualPath (Join-Path $Sandbox '.config\lsd\config.yaml') `
         -ExpectedPath (Join-Path $script:RepoRoot 'lsd\config.yaml') `

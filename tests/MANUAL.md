@@ -197,9 +197,11 @@ commits, recovery path, provider inventory, and whether any user data changed.
       `a613ef744c99ef8d8ead33467813c6ee6086af52`.
 - [ ] **Pi CLI**: `pi --version` prints `0.80.10` on macOS, Linux/WSL, and
       Windows. Confirm Pi opens with `rose-pine`; `/settings` also lists
-      `rose-pine-moon` and `rose-pine-dawn`, and each variant renders readable
-      messages, tools, Markdown, diffs, syntax, and thinking borders. Confirm an
-      unrelated custom key in `~/.pi/agent/settings.json` survives setup.
+      `rose-pine-moon` and `rose-pine-dawn`, with no retired `*-fable` duplicate
+      names. Compare Main, Moon, and Dawn for messages, selection, borders,
+      tools, Markdown, diffs, syntax, dim text, and thinking borders. After
+      choosing Moon or Dawn, rerun setup/update and confirm the selection survives.
+      Confirm an unrelated custom key in `~/.pi/agent/settings.json` survives setup.
       Session/auth/provider state must remain local and untouched.
 - [ ] **Windows Tree-sitter CLI**: `tree-sitter --version` prints exactly
       `0.26.11`. A compatible unmanaged executable remains untouched; after a

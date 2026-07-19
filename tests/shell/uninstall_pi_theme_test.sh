@@ -29,4 +29,16 @@ if unset_pi_theme_selection >/dev/null 2>&1; then
     fail "existing Pi settings were accepted without Node"
 fi
 
+# Direct uninstall after the trial also clears a retired managed alias.
+printf '%s\n' '{"theme":"rose-pine-moon-fable","keep":true}' > "$HOME/.pi/agent/settings.json"
+have() { command -v "$1" >/dev/null 2>&1; }
+unset_pi_theme_selection >/dev/null
+python3 - "$HOME/.pi/agent/settings.json" <<'PY'
+import json
+import pathlib
+import sys
+
+assert json.loads(pathlib.Path(sys.argv[1]).read_text()) == {"keep": True}
+PY
+
 echo "OK"

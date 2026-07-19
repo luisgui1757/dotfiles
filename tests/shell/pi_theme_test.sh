@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Pi gets the audited Rose Pine main/moon/dawn data files while setup changes
-# only the global `theme` setting. The merge helper must preserve every
-# unrelated preference, serialize with Pi's lock convention, and fail without
-# damaging bad input.
+# Pi gets the three canonical Fable-tuned Rose Pine data files while setup
+# changes only the global `theme` setting. The merge helper must
+# preserve managed variant choices and every unrelated preference, serialize
+# with Pi's lock convention, and fail without damaging bad input.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
@@ -16,7 +16,31 @@ fail() {
 }
 
 command -v node >/dev/null 2>&1 || fail "node is required"
-for theme_name in rose-pine rose-pine-moon rose-pine-dawn; do
+THEME_NAMES=(
+    rose-pine rose-pine-moon rose-pine-dawn
+)
+UNINSTALL_THEME_NAMES=(
+    "${THEME_NAMES[@]}"
+    rose-pine-fable rose-pine-moon-fable rose-pine-dawn-fable
+)
+if find "$REPO_ROOT/pi" "$REPO_ROOT/home/dot_pi/agent/themes" \
+    -maxdepth 1 -type f -name '*-fable.json' -print | grep -q .; then
+    fail "retired Pi *-fable source files remain"
+fi
+for retired_hash in \
+    36d25cc144bc38ab849ec5f47f839c8aa8a8946416557c5e14939183fff56805 \
+    45813d7827fbe091f2029f8e0bfccb0927d1923576ebfb94cebb192b5235953c \
+    9f33de93c8749e2fc79831e07b175bda5018e08261372fb4e1b4b507408b4ad9 \
+    2f18ee6657d6748d13b13287760494e05d4fefad3d10c824becafaf6210c3bf0 \
+    f0a8f234c826b37998c3035178b47265c167aa9f1ae8f896f2bf81eeb48f256a \
+    57adc5fe3252ed4511d79c31beb9ed46cee6b4d3946fbdc47c71e4bdc094bad8
+do
+    grep -F "$retired_hash" "$REPO_ROOT/setup.sh" >/dev/null ||
+        fail "setup.sh is missing a reviewed retired-theme hash"
+    grep -F "$retired_hash" "$REPO_ROOT/setup.ps1" >/dev/null ||
+        fail "setup.ps1 is missing a reviewed retired-theme hash"
+done
+for theme_name in "${THEME_NAMES[@]}"; do
     cmp -s \
         "$REPO_ROOT/pi/$theme_name.json" \
         "$REPO_ROOT/home/dot_pi/agent/themes/$theme_name.json" ||
@@ -45,9 +69,9 @@ import sys
 
 schema = "https://raw.githubusercontent.com/earendil-works/pi/main/packages/coding-agent/src/modes/interactive/theme/theme-schema.json"
 expected_hashes = {
-    "rose-pine": "5e162b1e79e282adf5fd4f2b216e5c84683ff997c214d38890376d3b5bb90592",
-    "rose-pine-moon": "97720d05503193f385b6fd17e93d4a3ad16689f6e2b81284540d4c55565f04fb",
-    "rose-pine-dawn": "53a82f1e219a2cf4de55ded76522d2ac75f9a200d74ac49e9165cb7191a65e6d",
+    "rose-pine": "47393b1ae8c7e31cb6e484d270604bbb0a98d9c99c04a87cf85bc65f4c7b47f5",
+    "rose-pine-moon": "9dcfb2f727ecef62075aab8a7e28a3b84198f605b8a2c6cf615e8868ab0bc556",
+    "rose-pine-dawn": "7c32014116c6e4e974a2e5e3126d3b42cd83bd20e19731d93e6854d845b735e4",
 }
 expected_palettes = {
     "rose-pine": {
@@ -89,6 +113,7 @@ expected_colors = {
     "toolOutput", "toolPendingBg", "toolSuccessBg", "toolTitle",
     "userMessageBg", "userMessageText", "warning",
 }
+themes = {}
 for raw_path in sys.argv[1:]:
     path = pathlib.Path(raw_path)
     raw = path.read_bytes()
@@ -99,7 +124,7 @@ for raw_path in sys.argv[1:]:
     if theme.get("$schema") != schema:
         raise SystemExit(f"Pi {name} schema URL drifted")
     if hashlib.sha256(raw).hexdigest() != expected_hashes[name]:
-        raise SystemExit(f"Pi {name} audited Zenobi mapping drifted")
+        raise SystemExit(f"Pi {name} reviewed mapping drifted")
     variables = theme.get("vars", {})
     if len(variables) != 39:
         raise SystemExit(f"Pi {name} must keep the 15 official and 24 derived colors")
@@ -116,11 +141,50 @@ for raw_path in sys.argv[1:]:
         "pageBg": "base", "cardBg": "surface", "infoBg": "highlightLow"
     }:
         raise SystemExit(f"Pi {name} export palette drifted")
+    themes[name] = theme
+
+expected_canonical_roles = {
+    "rose-pine": {
+        "border": "highlightMed",
+        "borderMuted": "highlightLow",
+        "dim": "mutedDark1",
+        "thinkingText": "iris",
+        "selectedBg": "highlightMed",
+        "userMessageText": "text",
+        "syntaxComment": "muted",
+        "syntaxFunction": "rose",
+        "syntaxVariable": "text",
+        "syntaxNumber": "gold",
+    },
+    "rose-pine-moon": {
+        "border": "highlightMed",
+        "borderMuted": "highlightLow",
+        "dim": "mutedDark1",
+        "thinkingText": "iris",
+        "selectedBg": "highlightMed",
+        "userMessageText": "text",
+        "syntaxComment": "muted",
+        "syntaxFunction": "rose",
+        "syntaxVariable": "text",
+        "syntaxNumber": "gold",
+    },
+    "rose-pine-dawn": {
+        "mdLinkUrl": "pine",
+    },
+}
+for name, expected_roles in expected_canonical_roles.items():
+    colors = themes[name]["colors"]
+    for token, expected_value in expected_roles.items():
+        if colors.get(token) != expected_value:
+            raise SystemExit(
+                f"Pi {name} canonical Fable role drifted at {token}: "
+                f"{colors.get(token)!r} != {expected_value!r}"
+            )
 PY
 
 # Absent settings become a minimal selection file.
 settings="$WORK/absent/settings.json"
-node "$HELPER" set "$settings" rose-pine >/dev/null
+node "$HELPER" set "$settings" "${THEME_NAMES[@]}" >/dev/null
 python3 - "$settings" <<'PY'
 import json, pathlib, sys
 assert json.loads(pathlib.Path(sys.argv[1]).read_text()) == {"theme": "rose-pine"}
@@ -130,7 +194,7 @@ PY
 settings="$WORK/merge/settings.json"
 mkdir -p "$(dirname "$settings")"
 printf '%s\n' '{"theme":"dark","defaultProvider":"example","nested":{"keep":true}}' > "$settings"
-node "$HELPER" set "$settings" rose-pine >/dev/null
+node "$HELPER" set "$settings" "${THEME_NAMES[@]}" >/dev/null
 python3 - "$settings" <<'PY'
 import json, pathlib, sys
 assert json.loads(pathlib.Path(sys.argv[1]).read_text()) == {
@@ -138,9 +202,35 @@ assert json.loads(pathlib.Path(sys.argv[1]).read_text()) == {
 }
 PY
 before="$(shasum -a 256 "$settings" | awk '{print $1}')"
-node "$HELPER" set "$settings" rose-pine >/dev/null
+node "$HELPER" set "$settings" "${THEME_NAMES[@]}" >/dev/null
 after="$(shasum -a 256 "$settings" | awk '{print $1}')"
 [[ "$before" == "$after" ]] || fail "idempotent Pi theme set rewrote settings"
+
+# Setup reruns preserve every canonical choice instead of reselecting Main.
+for managed_theme in "${THEME_NAMES[@]}"; do
+    settings="$WORK/set-managed-$managed_theme/settings.json"
+    mkdir -p "$(dirname "$settings")"
+    printf '{"theme":"%s","keep":1}\n' "$managed_theme" > "$settings"
+    before="$(shasum -a 256 "$settings" | awk '{print $1}')"
+    node "$HELPER" set "$settings" "${THEME_NAMES[@]}" >/dev/null
+    after="$(shasum -a 256 "$settings" | awk '{print $1}')"
+    [[ "$before" == "$after" ]] ||
+        fail "setup overwrote managed Pi theme: $managed_theme"
+done
+
+# A retired trial selection migrates to canonical Main because its alias file is gone.
+for retired_theme in rose-pine-fable rose-pine-moon-fable rose-pine-dawn-fable; do
+    settings="$WORK/set-retired-$retired_theme/settings.json"
+    mkdir -p "$(dirname "$settings")"
+    printf '{"theme":"%s","keep":1}\n' "$retired_theme" > "$settings"
+    node "$HELPER" set "$settings" "${THEME_NAMES[@]}" >/dev/null
+    python3 - "$settings" <<'PY'
+import json, pathlib, sys
+assert json.loads(pathlib.Path(sys.argv[1]).read_text()) == {
+    "theme": "rose-pine", "keep": 1
+}
+PY
+done
 
 # Invalid JSON and a non-object root fail closed without changing the bytes.
 for invalid in broken array; do
@@ -152,7 +242,7 @@ for invalid in broken array; do
         printf '%s\n' '[]' > "$settings"
     fi
     before="$(shasum -a 256 "$settings" | awk '{print $1}')"
-    if node "$HELPER" set "$settings" rose-pine >/dev/null 2>&1; then
+    if node "$HELPER" set "$settings" "${THEME_NAMES[@]}" >/dev/null 2>&1; then
         fail "invalid $invalid Pi settings were accepted"
     fi
     after="$(shasum -a 256 "$settings" | awk '{print $1}')"
@@ -164,18 +254,18 @@ settings="$WORK/locked/settings.json"
 mkdir -p "$(dirname "$settings")" "$settings.lock"
 printf '%s\n' '{"theme":"dark","keep":1}' > "$settings"
 before="$(shasum -a 256 "$settings" | awk '{print $1}')"
-if node "$HELPER" set "$settings" rose-pine >/dev/null 2>&1; then
+if node "$HELPER" set "$settings" "${THEME_NAMES[@]}" >/dev/null 2>&1; then
     fail "Pi theme helper ignored the active settings lock"
 fi
 after="$(shasum -a 256 "$settings" | awk '{print $1}')"
 [[ "$before" == "$after" ]] || fail "locked Pi settings changed"
 
 # Uninstall removes any managed selection atomically. A later user choice wins.
-for managed_theme in rose-pine rose-pine-moon rose-pine-dawn; do
+for managed_theme in "${UNINSTALL_THEME_NAMES[@]}"; do
     settings="$WORK/unset-managed-$managed_theme/settings.json"
     mkdir -p "$(dirname "$settings")"
     printf '{"theme":"%s","keep":1}\n' "$managed_theme" > "$settings"
-    node "$HELPER" unset "$settings" rose-pine rose-pine-moon rose-pine-dawn >/dev/null
+    node "$HELPER" unset "$settings" "${UNINSTALL_THEME_NAMES[@]}" >/dev/null
     python3 - "$settings" <<'PY'
 import json, pathlib, sys
 assert json.loads(pathlib.Path(sys.argv[1]).read_text()) == {"keep": 1}
@@ -186,13 +276,13 @@ settings="$WORK/unset-user/settings.json"
 mkdir -p "$(dirname "$settings")"
 printf '%s\n' '{"theme":"light","keep":1}' > "$settings"
 before="$(shasum -a 256 "$settings" | awk '{print $1}')"
-node "$HELPER" unset "$settings" rose-pine rose-pine-moon rose-pine-dawn >/dev/null
+node "$HELPER" unset "$settings" "${UNINSTALL_THEME_NAMES[@]}" >/dev/null
 after="$(shasum -a 256 "$settings" | awk '{print $1}')"
 [[ "$before" == "$after" ]] || fail "uninstall overwrote a user-selected Pi theme"
 
 # Unsetting absent settings is a no-op and must not create .pi directories.
 settings="$WORK/unset-absent/settings.json"
-node "$HELPER" unset "$settings" rose-pine rose-pine-moon rose-pine-dawn >/dev/null
+node "$HELPER" unset "$settings" "${UNINSTALL_THEME_NAMES[@]}" >/dev/null
 [[ ! -e "$(dirname "$settings")" ]] || fail "absent Pi settings cleanup created directories"
 
 echo "all Pi Rose Pine theme and settings-merge invariants OK"
