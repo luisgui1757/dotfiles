@@ -301,7 +301,7 @@ that violates one of these, fix it instead of disabling the test.
     - **(d) no remote-eval installer.** The repo never adds a `curl | sh`,
       `irm | iex`, `Invoke-Expression`, or `nix-installer`/`install.determinate.systems`
       pipe-to-shell path for Nix (or anything else). Public setup invokes only
-      `scripts/install-nix-prerequisite.sh`. The published v0.3.0 default path
+      `scripts/install-nix-prerequisite.sh`. Once published, the v0.4.0 default path
       accepts only the matching local annotated tag object, peeled commit, and
       HEAD from one isolated official remote-ref snapshot. The explicit
       `setup.sh --allow-unreleased` test lane may instead accept a clean checkout
@@ -475,15 +475,16 @@ that violates one of these, fix it instead of disabling the test.
 29. **Published release upgrades are exact-tag, side-by-side transactions.**
     v0.1.0 is already chezmoi-based; its POSIX targets are live checkout
     symlinks, so `git pull` or switching that checkout before setup crosses the
-    backup boundary. Never publish an in-place v0.1.0 migration. The v0.3.0
+    backup boundary. Never publish an in-place v0.1.0 migration. The v0.4.0
     tools require separate clean official annotated-tag checkouts, exact
     historical config, authoritative target identity, and private recovery.
     POSIX recovery archives both exact commits, validates digest-bound read-only
     trees, and uses only those frozen sources for Nix/config publication and
     rollback; post-validation checkout changes cannot affect a write. Setup
-    must fail closed when an unfinished `v0.1.0-to-v0.2.0.*` recovery remains;
-    that published transaction must be accepted or rolled back before v0.3.0
-    setup can begin. Windows enforces the same cross-release recovery boundary.
+    must fail closed when an unfinished `v0.1.0-to-v0.2.0.*` or
+    `v0.1.0-to-v0.3.0.*` recovery remains; that published transaction must be
+    accepted or rolled back before v0.4.0 setup can begin. Windows enforces the
+    same cross-release recovery boundary.
     Windows recovery likewise archives both exact commits beneath its protected
     ACL, records all four canonical Terminal identities and their expected
     presence/hash state, and binds setup, acceptance, uninstall, and rollback to
@@ -848,8 +849,8 @@ major; `tests/static/repo_policy_test.sh` enforces this.
   parser install, Mason headless sync, and the Sentinel Phase 6/6 agent-policy
   install. The required POSIX jobs begin with no `/nix`, check out the exact PR
   source head separately from GitHub's synthetic merge, and run the real
-  prerequisite helper before setup. The published default requires the fetched
-  exact v0.3.0 tag; an official branch source requires the explicit
+  prerequisite helper before setup. Once published, the default requires the
+  fetched exact v0.4.0 tag; an official branch source requires the explicit
   `--allow-unreleased` lane. Fork PRs cannot satisfy the official-head identity,
   so only they retain the pinned Determinate action as a pre-seeded test path.
   Both jobs then apply the enforced nix-darwin/Home Manager layer before

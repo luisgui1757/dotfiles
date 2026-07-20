@@ -1,7 +1,7 @@
 # Dotfiles Roadmap
 
-Last audited: 2026-07-19 on branch `release/v0.3.0`.
-Baseline: `main` at `bde9bc34724c52960f64d503c68b692d64240760`.
+Last audited: 2026-07-20 on branch `release/v0.4.0`.
+Baseline: `main` at `2e40241f3f29e09d8f12ea309efeef4db800ecde`.
 
 This is the adversarial post-merge roadmap for the chezmoi migration and the
 current setup/CI surface. The goal is not "good enough"; the repo should have a
@@ -1236,14 +1236,14 @@ every other zsh plugin surface.
 
 ### 9. The published in-place upgrade crossed the config backup boundary
 
-Status: implementation done; v0.2.0 published; v0.3.0 release evidence in progress.
+Status: implementation done; v0.2.0 and v0.3.0 published; v0.4.0 release evidence in progress.
 
 Evidence:
 
 - Exact v0.1.0 POSIX config uses checkout-backed chezmoi symlinks. Updating that
   checkout changed live bytes before current setup could back them up.
 - `scripts/upgrade-v0.1.0.sh` and `.ps1` now require clean, separate official
-  annotated v0.1.0/v0.3.0 checkouts and retain v0.1.0 until acceptance.
+  annotated v0.1.0/v0.4.0 checkouts and retain v0.1.0 until acceptance.
 - The public `setup.sh --all` / `setup.ps1 -All` entrypoints now discover exact
   live v0.1.0 ownership, invoke and verify those transactions, resume a pending
   applied recovery, accept under the explicit non-interactive all-mode
@@ -1269,7 +1269,7 @@ Evidence:
   acceptance. Windows Pester proves frozen release-tree validation, complete Terminal recovery,
   all-target concurrency rejection, known-folder boundary validation, private
   ACL policy, and provider-boundary verification.
-- `docs/UPGRADING.md` and `docs/releases/v0.3.0.md` define the supported
+- `docs/UPGRADING.md` and `docs/releases/v0.4.0.md` define the supported
   per-platform commands, Apple-Silicon-only macOS boundary, WSL ordering, Nix
   provenance, and release evidence gate.
 
@@ -1282,8 +1282,9 @@ Canonical solution:
 5. DONE - Make setup the sole normal install/migration/update orchestrator while
    preserving exact-tag acquisition and the existing recovery transaction.
 6. PENDING LIVE - Record Apple Silicon owner-host, real WSL2, redirected
-   Windows, divergent stable packaged/Preview/Canary/portable Terminal, and exact tagged v0.3.0 release runs before
-   publication.
+   Windows, divergent stable packaged/Preview/Canary/portable Terminal, and
+   exact tagged v0.4.0 release runs. These remain explicit residual gaps if the
+   owner publishes before completing them.
 
 ## Disproved Or Non-Blocking Assumptions
 

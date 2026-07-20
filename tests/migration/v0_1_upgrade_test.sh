@@ -52,7 +52,7 @@ git -C "$REPO_ROOT" cat-file -e "$OLD_COMMIT^{commit}" 2>/dev/null || {
     fail "v0.1.0 tag object drifted"
 
 old_checkout="$WORK/dotfiles-v0.1.0"
-new_checkout="$WORK/dotfiles-v0.3.0"
+new_checkout="$WORK/dotfiles-v0.4.0"
 home="$WORK/home"
 bin="$WORK/bin"
 mkdir -p "$home" "$bin"
@@ -93,11 +93,11 @@ chmod +x "$new_checkout/setup.sh" "$new_checkout/setup-real.sh" \
     git config user.email test@example.invalid
     git add .
     git commit -qm fixture
-    git tag -am fixture v0.3.0
+    git tag -am fixture v0.4.0
     git remote add origin https://github.com/luisgui1757/dotfiles.git
 )
 new_commit="$(git -C "$new_checkout" rev-parse HEAD)"
-new_tag_object="$(git -C "$new_checkout" rev-parse v0.3.0)"
+new_tag_object="$(git -C "$new_checkout" rev-parse v0.4.0)"
 
 cat > "$bin/git" <<'GIT'
 #!/usr/bin/env bash
@@ -109,10 +109,10 @@ if [[ "$*" == *"ls-remote --tags https://github.com/luisgui1757/dotfiles.git"* ]
                 "$TEST_OLD_TAG_OBJECT" refs/tags/v0.1.0 \
                 "$TEST_OLD_COMMIT" 'refs/tags/v0.1.0^{}'
             ;;
-        *refs/tags/v0.3.0*)
+        *refs/tags/v0.4.0*)
             printf '%s\t%s\n' \
-                "$TEST_NEW_TAG_OBJECT" refs/tags/v0.3.0 \
-                "$TEST_NEW_COMMIT" 'refs/tags/v0.3.0^{}'
+                "$TEST_NEW_TAG_OBJECT" refs/tags/v0.4.0 \
+                "$TEST_NEW_COMMIT" 'refs/tags/v0.4.0^{}'
             ;;
         *) exit 91 ;;
     esac
@@ -451,7 +451,7 @@ success_recovery="$(awk -F': ' '/^Recovery directory:/ { print $2 }' <<<"$succes
     fail "successful migration did not retain applied recovery state"
 [[ "$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$HOME/.zshrc")" == \
     "$success_recovery/new-release/home/dot_zshrc" ]] || \
-    fail "successful migration did not publish frozen v0.3.0 config"
+    fail "successful migration did not publish frozen v0.4.0 config"
 [[ ! -e "$XDG_STATE_HOME/dotfiles/zsh-plugin-publisher.initialized" ]] ||
     fail "successful release migration executed a deferred chezmoi run script"
 [[ -d "$old_checkout" ]] || fail "successful migration removed the old checkout"

@@ -5,7 +5,7 @@
 set -euo pipefail
 
 nix_version="2.34.0"
-release_tag="v0.3.0"
+release_tag="v0.4.0"
 official_repo="https://github.com/luisgui1757/dotfiles.git"
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 checkout="$(cd "$script_dir/.." && pwd -P)"
@@ -89,7 +89,7 @@ if ! checkout_status="$(repo_git status --porcelain=v1 --untracked-files=all 2>/
 fi
 [[ -z "$checkout_status" ]] || fail "checkout has tracked or untracked changes."
 
-# Query release and branch identities in one advertisement. Before v0.3.0 is
+# Query release and branch identities in one advertisement. Before v0.4.0 is
 # published, an exact current official branch head is the prerelease authority.
 # After publication the immutable annotated release remains the default; the
 # explicit test-only override may instead authorize an exact current official

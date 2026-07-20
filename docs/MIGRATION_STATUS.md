@@ -49,7 +49,7 @@ top-level sources instead.
 `v0.1.0` is a chezmoi release, not a pre-chezmoi install. Its POSIX targets are
 live symlinks into the source checkout, so the former README `git pull` path was
 unsafe: it could publish new bytes before current setup reached backup. The
-canonical v0.3.0 path is side-by-side and exact-tag-only:
+canonical v0.4.0 path is side-by-side and exact-tag-only:
 
 - `setup.sh --all` and `setup.ps1 -All` are the sole normal user entrypoints.
   They discover exact live v0.1.0 ownership, invoke the platform transaction,
@@ -77,8 +77,8 @@ canonical v0.3.0 path is side-by-side and exact-tag-only:
   overlay state on rollback, and validates all four canonical Terminal paths
   before any restore write.
 - `scripts/install-nix-prerequisite.sh` installs only checksum-reviewed upstream
-  Nix 2.34.0 release archives. The published default requires the exact v0.3.0
-  annotated tag object and peeled commit. The explicit POSIX
+  Nix 2.34.0 release archives. Once published, the default requires the exact
+  v0.4.0 annotated tag object and peeled commit. The explicit POSIX
   `--allow-unreleased` field-test lane may instead accept a clean checkout whose
   HEAD equals a current branch head in the official repository; forks, dirty
   trees, stale/local-only commits, and the exact-tag migration tools remain
@@ -108,6 +108,11 @@ canonical v0.3.0 path is side-by-side and exact-tag-only:
   acceptance. Windows Pester pins digest-bound release trees, complete/frozen Terminal recovery,
   all-target concurrency rejection, known-folder state validation, and the
   pre-migration command-provider boundary.
+
+The v0.4.0 release authority is prepared on top of exact `main` commit
+`2e40241f3f29e09d8f12ea309efeef4db800ecde`; its annotated tag object, peeled
+commit, cache-free hosted run, range/proof scan, and immutable release readback
+remain pending until the release-preparation pull request is merged.
 
 The annotated v0.2.0 release was published on 2026-07-15. The annotated v0.3.0
 release was published on 2026-07-19 after its exact local, hosted cache-free,
