@@ -59,6 +59,7 @@ sessions/auth/providers/other preferences, and package caches stay per machine.
 ├── windows-terminal/      settings.fragment.jsonc + merge README
 ├── lazygit/               config.yml + config.windows.yml (J/K + Windows Ctrl-G)
 ├── gh-dash/               pull-request/issue dashboard config
+├── git/                   Git defaults that do not take over ~/.gitconfig
 ├── home/                  chezmoi source tree for the config layer
 ├── tests/                 automated tests, grouped by tool
 ├── tests/wsl/             manual WSL split-host e2e check
@@ -664,7 +665,8 @@ navigator, `prefix+comma`/`prefix+$` to tab/workspace rename,
 `prefix+up`/`prefix+down` to sequential workspace navigation, and
 `prefix+shift+1..9` to indexed workspace selection; agent navigation uses
 `prefix+shift+a`/`prefix+a` for previous/next and `prefix+ctrl+1..9` for indexed
-focus; Windows alone selects `pwsh.exe`),
+focus; expanded agent cards preserve the Herdr 0.7.3 two-line layout and
+spacing; Windows alone selects `pwsh.exe`),
 pi/{rose-pine,rose-pine-moon,rose-pine-dawn}.json (three audited, Fable-tuned
 51-token Pi themes; main is the first-setup default), pi/keybindings.json (Pi's canonical
 `Shift+Enter` / `Ctrl+J` multiline-input pair),
@@ -1116,6 +1118,13 @@ save only**. The next plain `:w` formats normally. Implemented in
   Windows renders `lazygit/config.windows.yml` so psmux users get a Ctrl-G
   return/cancel binding without changing macOS/Linux Esc behavior. Keep the
   chezmoi templates, README, and tests aligned with those real read paths.
+- **Git fetch pruning is an XDG default, not ownership of `~/.gitconfig`.**
+  Chezmoi manages `~/.config/git/config` on POSIX and
+  `%USERPROFILE%\.config\git\config` on Windows with only
+  `fetch.prune = true`. Git reads that XDG file before `~/.gitconfig`, so user
+  identity, credentials, and explicit overrides remain in the later user-owned
+  file. Keep `git/config`, `home/dot_config/git/config`, the parity manifest,
+  Windows apply/round-trip checks, and the managed-config docs aligned.
 - **The chezmoi tree in `home/` owns the config layer, not provisioning.** The
   rule is `chezmoi=dotfiles, install-deps=provisioning`: do not port package
   installs, pinned binary/font installers, login-shell mutation, devilspie2, VS
@@ -1863,6 +1872,12 @@ save only**. The next plain `:w` formats normally. Implemented in
   Alt+number here: AeroSpace owns it globally for macOS workspaces. Also do not
   consume tmux's daily-use copy/paste, pane, window, session, create, detach,
   rename, navigator, or bare-number bindings for agent actions.
+- **Herdr expanded agent cards preserve the v0.7.3 layout.** The upstream
+  v0.7.4 default omits `state_text` and packs adjacent cards. Both managed
+  configs set rows to `[["state_icon", "workspace", "tab"], ["state_text",
+  "agent"]]` with `row_gap = 1`, preserving workspace/tab on the first line,
+  explicit `idle` / `working` plus the agent on the second, and the previous
+  blank-line spacing. Collapsed and mobile layouts remain compact.
 - **psmux + PSReadLine: Windows-only overlay, two settings.** psmux's default
   shell is **cmd**, not pwsh — which is the *real* reason "history prediction"
   and `MenuComplete` looked broken inside panes: PSReadLine was never loaded.

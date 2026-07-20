@@ -15,7 +15,7 @@ If this is a new machine, start with [install, update, and remove](#install-upda
 | Terminals | Ghostty, WezTerm, Windows Terminal | Applies Rose Pine, Hack Nerd Font, large scrollback, sensible clipboard behavior, and maximized startup. |
 | Shell | zsh, PowerShell 7, Starship | Adds vi command-line editing, history suggestions, fuzzy completion, a shared prompt, and useful aliases. |
 | Navigation | fzf, zoxide, lsd, ripgrep, fd | Adds fuzzy history/file/directory pickers, smart `cd`, readable file listings, and fast search. |
-| Git | Git, lazygit, GitHub CLI, gh-dash | Installs the CLI tools and applies their shared terminal configuration. |
+| Git | Git, lazygit, GitHub CLI, gh-dash | Installs the CLI tools, prunes stale remote-tracking refs on fetch, and applies their shared terminal configuration. |
 | Languages | Python, Node.js, Tree-sitter, Mason tools | Installs the base runtimes plus the language servers and formatters used by Neovim. |
 | macOS desktop | AeroSpace | Adds keyboard-driven tiling workspaces on macOS. |
 | Agent tooling | Pi CLI, Sentinel policy | Installs the supported CLI, deploys the three canonical Fable-tuned Rose Pine themes, selects Main on first setup while preserving later managed choices, pins `Shift+Enter` for multiline input, and applies the global agent-policy block. Local sessions, credentials, providers, and other Pi preferences stay local. |
@@ -118,6 +118,9 @@ It is a sequence, not one four-key chord. This README calls `Ctrl+B` the
 Herdr is the agent-focused multiplexer. It groups terminal panes into tabs and
 workspaces, then tracks the agents running inside them. The repo makes its
 common navigation feel like tmux and uses Herdr's built-in `rose-pine` theme.
+Expanded agent cards preserve the previous two-line layout: state icon plus
+workspace/tab first, explicit `idle` / `working` plus agent second, with a blank
+line between cards.
 The managed binaries include Herdr's shifted indexed-key fix (`v0.7.4` on
 stable platforms and the July 16 preview on Windows), so `Shift+1..9` reaches
 the punctuation keycodes terminals actually send.
@@ -800,6 +803,7 @@ symlink overlays; and Windows Terminal remains a merge.
 | AeroSpace | `~/.config/aerospace/aerospace.toml` -> `aerospace/aerospace.toml` (macOS tiling WM; focus/move on `ctrl-alt(-shift)` to avoid nvim `<A-h/j/k/l>` and fzf `Alt-c`) | n/a (macOS-only) | n/a (macOS-only) |
 | Herdr | `~/.config/herdr/config.toml` -> `herdr/config.toml` (built-in `rose-pine`, forced dark; tmux-shaped navigator, rename, and workspace bindings) | same | actual roaming `%APPDATA%\herdr\config.toml` -> `herdr\config.windows.toml` (same theme/navigation plus `pwsh.exe` as the pane shell) |
 | lazygit | `~/Library/Application Support/lazygit/config.yml` -> `lazygit/config.yml` | `~/.config/lazygit/config.yml` -> `lazygit/config.yml` | `%LOCALAPPDATA%\lazygit\config.yml` -> `lazygit\config.windows.yml` |
+| Git | `~/.config/git/config` -> `git/config` (`fetch.prune = true`; later `~/.gitconfig` values still override it) | same | `%USERPROFILE%\.config\git\config` -> `git\config` (copied; same override order) |
 | lsd | `~/.config/lsd/{config.yaml,colors.yaml}` -> `lsd/{config.yaml,colors.yaml}` | same | `%USERPROFILE%\.config\lsd\{config.yaml,colors.yaml}` -> `lsd\{config.yaml,colors.yaml}` |
 | gh-dash | `~/.config/gh-dash/config.yml` -> `gh-dash/config.yml` | same | `%USERPROFILE%\.config\gh-dash\config.yml` -> `gh-dash\config.yml` |
 | Pi themes and keys | `~/.pi/agent/themes/{rose-pine,rose-pine-moon,rose-pine-dawn}.json` -> the matching files under `pi/`; `~/.pi/agent/keybindings.json` -> `pi/keybindings.json`; first setup selects `rose-pine`, while reruns preserve any managed variant | same | All four files are copied under `%USERPROFILE%\.pi\agent`; setup applies the same default-and-preserve rule |
@@ -1499,6 +1503,7 @@ stale; CI then fails verification until a human reviews the adjacent constant.
 ├── starship/              # starship.toml (Rose Pine)
 ├── lsd/                   # config.yaml + colors.yaml (Rose Pine)
 ├── gh-dash/               # config.yml (gh-dash PR/issue dashboard)
+├── git/                   # config (fetch pruning default)
 ├── shells/                # zshenv + zshrc + powershell_profile.ps1
 ├── tmux/                  # tmux.conf (Rose Pine, vi-mode, true-color)
 ├── ghostty/               # config (Rose Pine, Hack Nerd, Ghostty-tuned)

@@ -1,0 +1,3 @@
+# Managed by dotfiles. Prune stale remote-tracking refs during every fetch.
+[fetch]
+  prune = true
