@@ -51,6 +51,23 @@ for path in paths:
     for action, binding in expected_keys.items():
         if keys.get(action) != binding:
             raise SystemExit(f"Herdr {action} must be {binding} in {path}")
+    ui = config.get("ui", {})
+    if ui.get("agent_panel_sort") != "spaces":
+        raise SystemExit(f"Herdr agent panel must stay grouped by spaces in {path}")
+    if ui.get("show_agent_labels_on_pane_borders") is not False:
+        raise SystemExit(f"Herdr pane-border agent labels must stay disabled in {path}")
+    agent_sidebar = ui.get("sidebar", {}).get("agents", {})
+    agent_rows = agent_sidebar.get("rows")
+    expected_agent_rows = [
+        ["state_icon", "workspace", "tab"],
+        ["state_text", "agent"],
+    ]
+    if agent_rows != expected_agent_rows:
+        raise SystemExit(
+            f"Herdr expanded agent rows must preserve the 0.7.3 layout in {path}"
+        )
+    if agent_sidebar.get("row_gap") != 1:
+        raise SystemExit(f"Herdr expanded agent rows must preserve the 0.7.3 spacing in {path}")
 
 if configs[0].get("terminal", {}).get("default_shell") is not None:
     raise SystemExit("POSIX Herdr config must preserve the platform shell default")
@@ -85,4 +102,4 @@ for script in setup.ps1 uninstall.ps1; do
         fail "$script does not use the Herdr overlay state boundary"
 done
 
-echo "all Herdr tab/workspace/agent navigation, Rose Pine theme, and Windows pwsh invariants OK"
+echo "all Herdr state layout, tab/workspace/agent navigation, Rose Pine theme, and Windows pwsh invariants OK"

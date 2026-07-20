@@ -61,6 +61,7 @@ lazygit config|config-file|Library/Application Support/lazygit/config.yml|.confi
 lsd config|config-file|.config/lsd/config.yaml|.config/lsd/config.yaml|lsd/config.yaml|home/dot_config/lsd/config.yaml
 lsd colors|config-file|.config/lsd/colors.yaml|.config/lsd/colors.yaml|lsd/colors.yaml|home/dot_config/lsd/colors.yaml
 gh-dash config|config-file|.config/gh-dash/config.yml|.config/gh-dash/config.yml|gh-dash/config.yml|home/dot_config/gh-dash/config.yml
+git config|config-file|.config/git/config|.config/git/config|git/config|home/dot_config/git/config
 Pi rose-pine theme|config-file|.pi/agent/themes/rose-pine.json|.pi/agent/themes/rose-pine.json|pi/rose-pine.json|home/dot_pi/agent/themes/rose-pine.json
 Pi rose-pine moon theme|config-file|.pi/agent/themes/rose-pine-moon.json|.pi/agent/themes/rose-pine-moon.json|pi/rose-pine-moon.json|home/dot_pi/agent/themes/rose-pine-moon.json
 Pi rose-pine dawn theme|config-file|.pi/agent/themes/rose-pine-dawn.json|.pi/agent/themes/rose-pine-dawn.json|pi/rose-pine-dawn.json|home/dot_pi/agent/themes/rose-pine-dawn.json

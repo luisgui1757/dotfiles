@@ -334,6 +334,10 @@ function Assert-Part1Files {
         -ActualPath (Join-Path $Sandbox '.config\gh-dash\config.yml') `
         -ExpectedPath (Join-Path $script:RepoRoot 'gh-dash\config.yml') `
         -Label 'gh-dash config'
+    Assert-CopyModeFileMatches `
+        -ActualPath (Join-Path $Sandbox '.config\git\config') `
+        -ExpectedPath (Join-Path $script:RepoRoot 'git\config') `
+        -Label 'Git config'
     foreach ($themeName in @(
             'rose-pine', 'rose-pine-moon', 'rose-pine-dawn'
         )) {

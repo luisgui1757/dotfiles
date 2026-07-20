@@ -194,6 +194,7 @@ try {
             Assert-Condition (-not (Test-Path -LiteralPath (Join-Path $sandbox '.tmux.posix.conf'))) `
                 '~/.tmux.posix.conf must NOT be deployed on Windows (psmux config-load freeze boundary)'
             Assert-CopyModeFilePresent -Path (Join-Path $sandbox '.config\starship.toml')
+            Assert-CopyModeFilePresent -Path (Join-Path $sandbox '.config\git\config')
             Assert-CopyModeFilePresent -Path (Join-Path $sandbox '.config\lsd\config.yaml')
             Assert-CopyModeFilePresent -Path (Join-Path $sandbox '.config\lsd\colors.yaml')
             Assert-Condition ((Get-Item -LiteralPath ([string]$PROFILE) -Force).LinkType -eq 'SymbolicLink') 'runtime PowerShell profile is not a symlink'
@@ -244,6 +245,7 @@ try {
             Assert-Condition (-not (Test-Path -LiteralPath (Join-Path $sandbox '.tmux.rose-pine.moon.conf'))) 'psmux rose-pine moon config was not removed'
             Assert-Condition (-not (Test-Path -LiteralPath (Join-Path $sandbox '.tmux.rose-pine.dawn.conf'))) 'psmux rose-pine dawn config was not removed'
             Assert-Condition (-not (Test-Path -LiteralPath (Join-Path $sandbox '.config\starship.toml'))) 'starship copy was not removed'
+            Assert-Condition (-not (Test-Path -LiteralPath (Join-Path $sandbox '.config\git\config'))) 'Git config copy was not removed'
             Assert-Condition (-not (Test-Path -LiteralPath (Join-Path $sandbox '.config\lsd\config.yaml'))) 'lsd config copy was not removed'
             Assert-Condition (-not (Test-Path -LiteralPath (Join-Path $sandbox '.config\lsd\colors.yaml'))) 'lsd colors copy was not removed'
             Assert-Condition (-not (Test-Path -LiteralPath ([string]$PROFILE))) 'PowerShell profile symlink was not removed'
