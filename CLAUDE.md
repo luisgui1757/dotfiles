@@ -301,7 +301,7 @@ that violates one of these, fix it instead of disabling the test.
     - **(d) no remote-eval installer.** The repo never adds a `curl | sh`,
       `irm | iex`, `Invoke-Expression`, or `nix-installer`/`install.determinate.systems`
       pipe-to-shell path for Nix (or anything else). Public setup invokes only
-      `scripts/install-nix-prerequisite.sh`. Once published, the v0.4.0 default path
+      `scripts/install-nix-prerequisite.sh`. The published v0.4.0 default path
       accepts only the matching local annotated tag object, peeled commit, and
       HEAD from one isolated official remote-ref snapshot. The explicit
       `setup.sh --allow-unreleased` test lane may instead accept a clean checkout
@@ -849,7 +849,7 @@ major; `tests/static/repo_policy_test.sh` enforces this.
   parser install, Mason headless sync, and the Sentinel Phase 6/6 agent-policy
   install. The required POSIX jobs begin with no `/nix`, check out the exact PR
   source head separately from GitHub's synthetic merge, and run the real
-  prerequisite helper before setup. Once published, the default requires the
+  prerequisite helper before setup. The published default requires the
   fetched exact v0.4.0 tag; an official branch source requires the explicit
   `--allow-unreleased` lane. Fork PRs cannot satisfy the official-head identity,
   so only they retain the pinned Determinate action as a pre-seeded test path.

@@ -2975,3 +2975,46 @@ Real Apple Silicon owner lifecycle, physical Linux, WSL2 split-host,
 redirected Windows, divergent stable packaged/Preview/Canary/portable Terminal,
 and desktop/visual/TCC rows remain open. No completion of those manual surfaces
 is claimed by publication.
+
+## v0.4.0 immutable publication closure — entry 72
+
+- Pull request #65 merged reviewed head
+  `dcff7461dca02eb9f2c134edd135dfb8c3472f88` to exact `main` commit
+  `6317b375a0724804d7a8d895753364cc036e5658`. Both commits have tree
+  `60b910100a4e966d8425b76426f449ea495ebe71`; their diff is empty. Exact-head
+  Test run `29769117260`, Nix run `29769117447`, E2E run `29769117454`, and
+  CodeQL default-setup run `29769114846` all passed before merge.
+- Annotated tag object `1539e550ac45d0a9732f329cb1ae3fb13bb078a8`
+  peels to the exact merged commit locally and in the official remote. A fresh
+  detached public-tag clone passed the release-upgrade identity check, and the
+  prerequisite helper reported the immutable v0.4.0 identity without attempting
+  an install because Nix was already usable.
+- Fresh cache-free run
+  [`29797123753`](https://github.com/luisgui1757/dotfiles/actions/runs/29797123753)
+  passed all four producers and all four stable logical proof jobs. Ubuntu and
+  Apple Silicon macOS independently logged `Verified immutable release
+  checkout: v0.4.0` at the exact peeled commit; the macOS post-install step also
+  passed neocmake attachment and all 257 LSP-smoke checks.
+- GitHub release `357094679` was published on 2026-07-21 at
+  [`v0.4.0`](https://github.com/luisgui1757/dotfiles/releases/tag/v0.4.0).
+  Readback is immutable, latest, non-draft, and non-prerelease; the release body
+  matches the prepared user-facing notes after trailing-newline normalization.
+- The owner explicitly authorized publication with the real-environment rows in
+  `tests/MANUAL.md` still open. This entry preserves that boundary without
+  converting any unchecked row into evidence.
+
+### Publication verification
+
+| Check | Exact result |
+|---|---|
+| Final `PATH=/opt/homebrew/bin:$PATH make ci` on the reviewed release-preparation tree | PASS: ended `local pre-PR gate passed`; merged `main` is tree-identical |
+| Gitleaks 8.30.1 across `v0.3.0..v0.4.0` and downloaded hosted proofs | PASS: 4 commits (47,503 bytes) plus all 4 stable logical proof artifacts (912 bytes), no leaks found with redaction enabled |
+| Cache-free hosted release run [`29797123753`](https://github.com/luisgui1757/dotfiles/actions/runs/29797123753) | PASS: Ubuntu container `88530603810`, Ubuntu setup `88530603867`, Apple Silicon macOS setup `88530603794`, Windows setup `88530603840`, and logical jobs `88533038216`, `88533038236`, `88533038237`, and `88533038244` |
+| Fresh detached public `v0.4.0` clone | PASS: tag object and peeled commit matched the official remote; release-upgrade static check and immutable prerequisite-helper path passed |
+| Downloaded schema-2 logical proofs | PASS: all four bound source SHA, executed SHA, run ID, attempt, logical context, and legacy context to the successful release run |
+| GitHub release readback | PASS: release `357094679`, immutable/latest, draft=false, prerelease=false, prepared user-facing body exact after trailing-newline normalization |
+
+Real Apple Silicon owner lifecycle, physical Linux, WSL2 split-host,
+redirected Windows, divergent stable packaged/Preview/Canary/portable Terminal,
+and desktop/visual/TCC rows remain open. No completion of those manual surfaces
+is claimed by publication.

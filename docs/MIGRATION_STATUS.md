@@ -77,7 +77,7 @@ canonical v0.4.0 path is side-by-side and exact-tag-only:
   overlay state on rollback, and validates all four canonical Terminal paths
   before any restore write.
 - `scripts/install-nix-prerequisite.sh` installs only checksum-reviewed upstream
-  Nix 2.34.0 release archives. Once published, the default requires the exact
+  Nix 2.34.0 release archives. The published default requires the exact
   v0.4.0 annotated tag object and peeled commit. The explicit POSIX
   `--allow-unreleased` field-test lane may instead accept a clean checkout whose
   HEAD equals a current branch head in the official repository; forks, dirty
@@ -109,10 +109,12 @@ canonical v0.4.0 path is side-by-side and exact-tag-only:
   all-target concurrency rejection, known-folder state validation, and the
   pre-migration command-provider boundary.
 
-The v0.4.0 release authority is prepared on top of exact `main` commit
-`2e40241f3f29e09d8f12ea309efeef4db800ecde`; its annotated tag object, peeled
-commit, cache-free hosted run, range/proof scan, and immutable release readback
-remain pending until the release-preparation pull request is merged.
+The annotated v0.4.0 release was published on 2026-07-21 after its exact local,
+hosted cache-free, release-range/proof scan, and immutable-release gates passed.
+Its setup, prerequisite helper, and both v0.1.0 migrators bind tag object
+`1539e550ac45d0a9732f329cb1ae3fb13bb078a8` to peeled commit
+`6317b375a0724804d7a8d895753364cc036e5658` while retaining the same
+frozen-source and rollback boundaries.
 
 The annotated v0.2.0 release was published on 2026-07-15. The annotated v0.3.0
 release was published on 2026-07-19 after its exact local, hosted cache-free,
@@ -120,8 +122,8 @@ release-range/proof scan, and immutable-release gates passed. Its setup,
 prerequisite helper, and both v0.1.0 migrators bind tag object
 `473f675e863640484d4d11349bf69d01def12c43` to peeled commit
 `c8507312153620b9b30fe2c84980c62bccb3b25a` while retaining the same
-frozen-source and rollback boundaries. The owner authorized publication with
-real Apple Silicon owner-host, physical Linux, WSL split-host, redirected
+frozen-source and rollback boundaries. The owner authorized v0.4.0 publication
+with real Apple Silicon owner-host, physical Linux, WSL split-host, redirected
 Windows, and divergent stable packaged/Preview/Canary/portable Terminal
 executions still open. Those unchecked rows remain unclaimed evidence gaps in
 `tests/MANUAL.md`; publication does not mark them complete. No

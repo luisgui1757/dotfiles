@@ -413,13 +413,14 @@ flakes, so fetching the mutable `nixpkgs-unstable` channel is unnecessary and
 would wrongly force the installer's bundled CA instead of the managed host's
 system trust store. If an earlier attempt installed Nix but stopped before
 enabling those features, rerunning setup repairs the user setting and continues.
-The `v0.4.0` release path accepts only the exact clean official annotated tag;
-the tag object and peeled commit will be recorded after publication. Branch
-testing remains an explicit opt-in through `--allow-unreleased` and still
-requires a current branch head in the official repository. Local-only or stale
-commits, forks, dirty checkouts, lightweight tags, and non-official origins fail
-before download. The versioned upgrade tools remain exact-tag-only; this repo
-has no pipe-to-shell Nix bootstrap.
+The published `v0.4.0` release is bound to annotated tag object
+`1539e550ac45d0a9732f329cb1ae3fb13bb078a8`, which peels to commit
+`6317b375a0724804d7a8d895753364cc036e5658`. Normal setup accepts only that
+exact clean official tag. Branch testing remains an explicit opt-in through
+`--allow-unreleased` and still requires a current branch head in the official
+repository. Local-only or stale commits, forks, dirty checkouts, lightweight
+tags, and non-official origins fail before download. The versioned upgrade
+tools remain exact-tag-only; this repo has no pipe-to-shell Nix bootstrap.
 
 ```bash
 # Apple Silicon mac / linux / wsl
