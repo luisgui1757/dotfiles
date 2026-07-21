@@ -4,12 +4,11 @@ The automated suite covers the deterministic surface. Some things only
 make sense to verify by eye — keep this checklist alongside any
 significant change to the relevant area.
 
-## v0.1.0 to v0.3.0 release upgrade
+## v0.1.0 to v0.4.0 release upgrade
 
-> Published-release status (2026-07-19): v0.3.0 passed its deterministic
-> exact-release gates and was published under owner authorization with these
-> real-environment rows still open. Every unchecked row below remains an
-> unclaimed evidence gap; publication is not evidence that a row ran.
+> Release-candidate status (2026-07-20): v0.4.0 publication is not complete.
+> Every unchecked row below remains an unclaimed evidence gap; publication will
+> not be evidence that a row ran.
 
 Use throwaway users/VMs seeded from the exact annotated v0.1.0 release. Follow
 `docs/UPGRADING.md`; never use `main` or update the old checkout in place.
@@ -21,7 +20,7 @@ Also run setup update/upgrade once. Record the old/new tag objects, peeled
 commits, recovery path, provider inventory, and whether any user data changed.
 
 - [ ] **Bare POSIX prerequisite:** use clean Nix-free Apple Silicon macOS and
-      Linux VMs at the exact annotated v0.3.0 release. Run only
+      Linux VMs at the exact annotated v0.4.0 release. Run only
       `./setup.sh --all`; prove the helper reports that tag identity,
       installs/verifies Nix 2.34.0, and
       reaches any required sudo interaction without an upstream installer
@@ -50,7 +49,7 @@ commits, recovery path, provider inventory, and whether any user data changed.
       rollback/retry, then run `tests/wsl/e2e.sh` after both setup invocations
       succeed.
 - [ ] **Windows conventional known folders:** exact v0.1.0 checkout with
-      divergent copy-mode files and nvim link. Apply from exact v0.3.0, fail
+      divergent copy-mode files and nvim link. Apply from exact v0.4.0, fail
       after Terminal/config publication, and prove exact old config plus
       stable packaged/Preview/Canary/portable Terminal bytes return before retry. After recovery is
       captured, alter or temporarily move both retained checkouts and prove
@@ -60,13 +59,13 @@ commits, recovery path, provider inventory, and whether any user data changed.
       independent real paths.
       Include divergent packaged, Preview, Canary, and portable Terminal installations;
       no conventional path may be guessed or overwritten.
-- [ ] **Release acceptance:** on the final annotated v0.3.0 tag, run the full
+- [ ] **Release acceptance:** on the final annotated v0.4.0 tag, run the full
       local/hosted gates and public-secret scan, record the tag object and peeled
       commit, prove fresh and v0.1.0 machines both need only setup all, then
       confirm the release document contains no branch command or placeholder
-      identity. The automated gate, secret scan, and identities are recorded;
-      fresh and v0.1.0 real-machine acceptance remains open. v0.3.0 publication
-      did not mark this row complete.
+      identity. Until those automated results and identities are recorded, this
+      row remains wholly open. Fresh and v0.1.0 real-machine acceptance remains
+      open after publication unless it is separately performed and recorded.
 
 ## Visual / GUI
 

@@ -2326,6 +2326,41 @@ redirected Windows, divergent stable packaged/Preview/Canary/portable Terminal,
 and desktop/visual/TCC rows remain open. No completion of those manual surfaces
 is claimed by publication.
 
+## v0.4.0 release-candidate identity preparation — entry 71
+
+- Pull requests #63 and #64 merged to exact `main` commit
+  `2e40241f3f29e09d8f12ea309efeef4db800ecde`. A clean isolated worktree of
+  that exact commit passed the complete local gate before release-version edits.
+- The delta after v0.3.0 adds backward-compatible user-visible behavior: Herdr
+  restores its explicit state-text two-line agent cards and separating blank
+  line, while the managed XDG Git config now enables fetch pruning by default.
+  SemVer therefore selects v0.4.0; a patch bump would misclassify the release as
+  fixes only.
+- Setup, the POSIX prerequisite helper, both v0.1.0 migrators, their recovery
+  namespace, deterministic fixtures, and current user documentation now share
+  v0.4.0 as the release authority. Published v0.2.0 and v0.3.0 identities and
+  evidence remain frozen history.
+- Both setup entrypoints scan the older `v0.1.0-to-v0.2.0.*` and
+  `v0.1.0-to-v0.3.0.*` namespaces before considering the current v0.4.0
+  transaction. Accepted or rolled-back records remain history; malformed or
+  active records fail closed until resolved from their retained exact release.
+- Candidate documentation contains no invented tag object, peeled commit,
+  workflow run, or GitHub release identity. Those are mandatory downstream
+  gates after the release-preparation pull request merges.
+
+### Candidate verification
+
+| Check | Exact result |
+|---|---|
+| `PATH=/opt/homebrew/bin:$PATH make ci` in a clean exact-main worktree before edits | PASS: exact `2e40241f3f29e09d8f12ea309efeef4db800ecde`; ended `local pre-PR gate passed` |
+| Focused release identity, Nix prerequisite, universal setup, Linux v0.1.0 migration, and Darwin contract checks | PASS |
+| PSScriptAnalyzer and Pester stages of `pwsh -NoLogo -NoProfile -File ./test.ps1` | PASS: analyzer advanced cleanly; 285 Pester passed, 0 failed, 1 platform-only skip |
+| `PATH=/opt/homebrew/bin:$PATH make ci` on the release-preparation tree | PASS: ended `local pre-PR gate passed` |
+| Release tag / GitHub release | NOT CREATED: publication cannot precede the release-preparation merge and exact-tag evidence |
+
+No v0.4.0 tag, GitHub release, cache-free exact-tag run, redacted release-range
+proof scan, or post-publication identity readback is claimed by this entry.
+
 ## Linux Nix system-profile ownership repair — entry 58
 
 - The owner observed an exact-v0.2.0 Linux install abort with

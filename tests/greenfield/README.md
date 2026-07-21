@@ -9,8 +9,8 @@ and VS Code rendering.
 For macOS, Linux, and WSL greenfield runs, invoke `setup.sh --all` directly
 from the exact release checkout. A clean, fully pushed official branch head may
 instead be tested only with the explicit `--allow-unreleased` option. The
-published v0.3.0 default is the exact annotated tag; branch testing remains an
-explicit opt-in. The public POSIX setup path installs the checksum-verified
+v0.4.0 default is the exact annotated tag once published; branch testing remains
+an explicit opt-in. The public POSIX setup path installs the checksum-verified
 Nix prerequisite when it is missing, then applies nix-darwin / Home Manager. It
 never uses a remote script pipeline or waits for an upstream confirmation
 prompt. Local-only commits, stale branch commits, forks, and dirty trees are
