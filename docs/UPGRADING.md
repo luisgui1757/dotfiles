@@ -35,8 +35,7 @@ symlinks into the checkout. Do **not** run `git pull`, switch that checkout to a
 new revision, or run an upgrade from `main`: doing so can change live config
 before recovery exists.
 
-These commands become user-facing only after the annotated `v0.4.0` release
-exists. Before then, remain on `v0.1.0`.
+The annotated `v0.4.0` release is the current exact-tag upgrade source.
 
 ### Common preparation
 
@@ -217,22 +216,28 @@ pwsh -NoProfile -File 'C:\exact\recovery\upgrade-v0.1.0.ps1' -Rollback 'C:\exact
 pwsh -NoProfile -File 'C:\exact\recovery\upgrade-v0.1.0.ps1' -Accept 'C:\exact\recovery'
 ```
 
-## v0.4.0 release-candidate evidence status
+## v0.4.0 release evidence status
 
-The v0.4.0 release is not yet published. Its release authority is prepared on
-top of exact `main` commit `2e40241f3f29e09d8f12ea309efeef4db800ecde`;
-publication remains gated on:
+v0.4.0 was published on 2026-07-21 under explicit owner authorization. The
+deterministic publication gates passed; the real-environment rows below remain
+open and are not implied by publication:
 
-- [ ] the reviewed release-preparation pull request merged to `main` with all
-  required checks passing;
-- [ ] an annotated `v0.4.0` tag whose tag object and peeled commit match the
-  exact merged release-preparation commit and the official remote;
-- [ ] full local and hosted gates, deterministic exact-v0.1.0 migration
-  fixtures, Windows Pester coverage, and a redacted scan across
-  `v0.3.0..v0.4.0` plus all downloaded logical proofs;
-- [ ] a cache-free hosted release run whose POSIX lanes report the exact
-  immutable `v0.4.0` tag identity;
-- [ ] immutable/latest GitHub release readback matching the prepared notes.
+- [x] pull request #65 merged the reviewed release-preparation tree to exact
+  `main` commit `6317b375a0724804d7a8d895753364cc036e5658` with all required
+  checks passing;
+- [x] annotated tag object `1539e550ac45d0a9732f329cb1ae3fb13bb078a8`
+  peels to that exact commit and matches immutable/latest GitHub release
+  `357094679`;
+- [x] the full local gate, deterministic exact-v0.1.0 migration fixtures,
+  Windows Pester coverage, and Gitleaks scans across four commits in
+  `v0.3.0..v0.4.0` plus all four downloaded logical proofs passed;
+- [x] cache-free hosted run
+  [`29797123753`](https://github.com/luisgui1757/dotfiles/actions/runs/29797123753)
+  passed the Ubuntu, macOS, Windows, and container producers plus all four
+  logical proof jobs; both POSIX lanes reported the exact immutable tag;
+- [x] GitHub release `357094679` read back immutable/latest, non-draft,
+  non-prerelease, and with the prepared user-facing body exact after
+  trailing-newline normalization.
 
 The unchecked real WSL, redirected-Windows, divergent Windows Terminal,
 physical-Linux, Apple-Silicon owner-host, and visual rows in `tests/MANUAL.md`
