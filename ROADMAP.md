@@ -1,7 +1,7 @@
 # Dotfiles Roadmap
 
-Last audited: 2026-07-22 on branch `release/v0.4.1`.
-Baseline: `main` at `1dfe20ffb9e6146f52e6010c216bb684ab536874`.
+Last audited: 2026-07-22 after immutable v0.4.1 publication.
+Baseline: `main` at `bac8cc97177b3bb58119fde5720b31e6b57febcc`.
 
 This is the adversarial post-merge roadmap for the chezmoi migration and the
 current setup/CI surface. The goal is not "good enough"; the repo should have a
@@ -1237,8 +1237,7 @@ every other zsh plugin surface.
 
 ### 9. The published in-place upgrade crossed the config backup boundary
 
-Status: implementation done; v0.2.0, v0.3.0, and v0.4.0 published; v0.4.1
-release evidence in progress.
+Status: implementation done; v0.2.0, v0.3.0, v0.4.0, and v0.4.1 published.
 
 Evidence:
 
@@ -1283,10 +1282,11 @@ Canonical solution:
 4. DONE - Pin the exact peeled v0.1.0 fixture and failure boundaries in CI.
 5. DONE - Make setup the sole normal install/migration/update orchestrator while
    preserving exact-tag acquisition and the existing recovery transaction.
-6. PENDING LIVE - Record the exact tagged v0.4.1 hosted release run. Apple
-   Silicon owner-host, real WSL2, redirected Windows, divergent stable
-   packaged/Preview/Canary/portable Terminal, physical Linux, and visual rows
-   remain explicit residual gaps if the owner publishes before completing them.
+6. DONE - Exact-tag cache-free run `29891574548` passed all four producers and
+   all four stable logical proof jobs before immutable release `357785004` was
+   published. Apple Silicon owner-host, real WSL2, redirected Windows,
+   divergent stable packaged/Preview/Canary/portable Terminal, physical Linux,
+   and visual rows remain explicit residual gaps.
 
 ## Disproved Or Non-Blocking Assumptions
 
