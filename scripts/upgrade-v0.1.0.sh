@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Transactional v0.1.0 -> v0.4.0 migration for macOS, Linux, and WSL userland.
-# Run this script only from a separate, exact v0.4.0 release checkout.
+# Transactional v0.1.0 -> v0.4.1 migration for macOS, Linux, and WSL userland.
+# Run this script only from a separate, exact v0.4.1 release checkout.
 set -euo pipefail
 
 old_tag="v0.1.0"
 old_tag_object="a3b4d6d7b6d289959cac68d76faec96219b3e310"
 old_commit="015617362830280bf85c7142e69d0681d376d453"
-new_tag="v0.4.0"
+new_tag="v0.4.1"
 official_repo="https://github.com/luisgui1757/dotfiles.git"
 script_path="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/$(basename "${BASH_SOURCE[0]}")"
 default_new_checkout="$(cd "$(dirname "$script_path")/.." && pwd -P)"
@@ -40,7 +40,7 @@ upgrade-v0.1.0.sh --rollback       <recovery-directory>
 upgrade-v0.1.0.sh --accept         <recovery-directory>
 
 The preflight and apply commands must run from a separate checkout at the exact
-annotated v0.4.0 release. The old v0.1.0 checkout remains untouched and is the
+annotated v0.4.1 release. The old v0.1.0 checkout remains untouched and is the
 acceptance identity; apply archives both exact commits into private recovery and
 uses only those frozen trees for publication and rollback. It rolls back
 automatically on failure or interruption and requires explicit acceptance before
@@ -301,7 +301,7 @@ platform_preflight() {
     case "$os" in
         Darwin)
             [[ "$arch" == "arm64" || "$arch" == "aarch64" ]] || {
-                fail "the v0.4.0 macOS upgrade requires Apple Silicon (arm64); detected $arch."
+                fail "the v0.4.1 macOS upgrade requires Apple Silicon (arm64); detected $arch."
                 return 1
             }
             require_command brew || return 1
@@ -337,11 +337,11 @@ run_preflight() {
         return 1
     }
     new_checkout="$(canonical_directory "$new_input")" || {
-        fail "v0.4.0 checkout is not an existing real directory: $new_input"
+        fail "v0.4.1 checkout is not an existing real directory: $new_input"
         return 1
     }
     [[ "$old_checkout" != "$new_checkout" ]] || {
-        fail "in-place migration is forbidden; retain v0.1.0 and use a separate v0.4.0 checkout."
+        fail "in-place migration is forbidden; retain v0.1.0 and use a separate v0.4.1 checkout."
         return 1
     }
     assert_release_checkout "$old_checkout" "$old_tag" "$old_commit" \
@@ -513,7 +513,7 @@ prepare_recovery() {
     state_root="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/migrations"
     mkdir -p "$state_root"
     chmod 700 "$state_root"
-    recovery="$(mktemp -d "$state_root/v0.1.0-to-v0.4.0.XXXXXX")"
+    recovery="$(mktemp -d "$state_root/v0.1.0-to-v0.4.1.XXXXXX")"
     chmod 700 "$recovery"
     preparing_recovery="$recovery"
     head="$(repo_git "$new_checkout" rev-parse 'HEAD^{commit}')"
@@ -557,7 +557,7 @@ prepare_recovery() {
     fi
     set_stage "$recovery" prepared
     printf '%s\n' \
-        "Private recovery material for v0.1.0 -> v0.4.0." \
+        "Private recovery material for v0.1.0 -> v0.4.1." \
         "Old checkout: $old_checkout" \
         "New checkout: $new_checkout" \
         "Rollback: $recovery/upgrade-v0.1.0.sh --rollback '$recovery'" \
@@ -891,7 +891,7 @@ load_recovery() {
             return 1
         }
         new_checkout="$(canonical_directory "$new_checkout")" || {
-            fail "retained v0.4.0 checkout is missing or unsafe."
+            fail "retained v0.4.1 checkout is missing or unsafe."
             return 1
         }
         assert_local_release_checkout "$old_checkout" "$old_tag" "$old_commit" \
@@ -902,11 +902,11 @@ load_recovery() {
     old_source="$recovery/old-release"
     new_source="$recovery/new-release"
     cmp -s "$recovery/flake.lock" "$new_source/flake.lock" || {
-        fail "captured flake.lock differs from the exact v0.4.0 release."
+        fail "captured flake.lock differs from the exact v0.4.1 release."
         return 1
     }
     cmp -s "$recovery/upgrade-v0.1.0.sh" "$new_source/scripts/upgrade-v0.1.0.sh" || {
-        fail "recovery script differs from the exact v0.4.0 release."
+        fail "recovery script differs from the exact v0.4.1 release."
         return 1
     }
     expected_old_targets="$(chezmoi --source "$old_source/home" --destination "$HOME" \
@@ -1005,11 +1005,11 @@ perform_accept() {
     }
     os="$loaded_platform"
     verify_new_state "$recovery" "$loaded_new_source" "$os" || {
-        fail "v0.4.0 verification failed; keep both checkouts and recovery material."
+        fail "v0.4.1 verification failed; keep both checkouts and recovery material."
         return 1
     }
     set_stage "$recovery" accepted
-    echo "Migration core accepted. Keep v0.1.0 until full v0.4.0 setup succeeds."
+    echo "Migration core accepted. Keep v0.1.0 until full v0.4.1 setup succeeds."
     echo "Keep $recovery until independent application and data checks are complete."
 }
 
@@ -1058,7 +1058,7 @@ perform_apply() {
     set_stage "$active_recovery" applied
     transaction_active=0
     trap - EXIT HUP INT TERM
-    echo "v0.4.0 migration applied and verified."
+    echo "v0.4.1 migration applied and verified."
     echo "Retain both checkouts and recovery material until explicit acceptance:"
     echo "  $active_recovery/upgrade-v0.1.0.sh --accept '$active_recovery'"
 }
@@ -1073,7 +1073,7 @@ argument="$2"
 case "$mode" in
     --preflight-only)
         run_preflight "$argument" "$default_new_checkout"
-        echo "v0.1.0 -> v0.4.0 preflight passed; no live state changed."
+        echo "v0.1.0 -> v0.4.1 preflight passed; no live state changed."
         printf 'old=%s\nnew=%s\nplatform=%s\n' \
             "$preflight_old_checkout" \
             "$preflight_new_checkout" \

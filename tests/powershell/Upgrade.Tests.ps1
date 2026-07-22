@@ -65,7 +65,7 @@ BeforeAll {
     }
 }
 
-Describe 'v0.1.0 to v0.4.0 Windows release migration recovery' {
+Describe 'v0.1.0 to v0.4.1 Windows release migration recovery' {
     BeforeEach {
         $script:Root = Join-Path ([IO.Path]::GetTempPath()) ('upgrade recovery ' + [guid]::NewGuid())
         $script:Recovery = Join-Path $script:Root 'recovery'

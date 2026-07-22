@@ -162,20 +162,26 @@ case "\${1:-}" in
 esac
 EOF
 chmod +x "$guarded_home/.nix-profile/bin/nix"
-guarded_output="$({
-    HOME="$guarded_home"
-    # shellcheck disable=SC2030  # command substitution intentionally isolates this fixture PATH
-    PATH="/usr/bin:/bin"
-    __ETC_PROFILE_NIX_SOURCED=1
-    export HOME PATH __ETC_PROFILE_NIX_SOURCED
-    DOTFILES_SETUP_SOURCE_ONLY=1 source "$REPO_ROOT/setup.sh" --all --dry-run >/dev/null
-    uname() { case "${1:-}" in -m) echo x86_64 ;; *) echo Linux ;; esac; }
-    activate_nix_profile
-    ensure_nix_prerequisite
-    printf 'nix=%s planned=%s\n' "$(command -v nix)" "$NIX_PREREQUISITE_DRY_RUN_PLANNED"
-    run_home_manager_switch
-})"
-if [[ "$guarded_output" == *" planned=0"* ]] &&
+if guarded_output="$({
+        HOME="$guarded_home"
+        # shellcheck disable=SC2030  # command substitution intentionally isolates this fixture PATH
+        PATH="/usr/bin:/bin"
+        __ETC_PROFILE_NIX_SOURCED=1
+        export HOME PATH __ETC_PROFILE_NIX_SOURCED
+        DOTFILES_SETUP_SOURCE_ONLY=1 source "$REPO_ROOT/setup.sh" --all --dry-run >/dev/null
+        # Bash 3.2 misparses a compact case statement here while parsing the
+        # surrounding command substitution. Keep this form portable to macOS.
+        uname() { if [[ "${1:-}" == "-m" ]]; then echo x86_64; else echo Linux; fi; }
+        activate_nix_profile
+        ensure_nix_prerequisite
+        printf 'nix=%s planned=%s\n' "$(command -v nix)" "$NIX_PREREQUISITE_DRY_RUN_PLANNED"
+        run_home_manager_switch
+    })"; then
+    guarded_rc=0
+else
+    guarded_rc=$?
+fi
+if [[ "$guarded_rc" -eq 0 ]] && [[ "$guarded_output" == *" planned=0"* ]] &&
     { [[ "$guarded_output" == *"nix=/nix/var/nix/profiles/default/bin/nix"* ]] ||
       [[ "$guarded_output" == *"nix=$guarded_home/.nix-profile/bin/nix"* ]]; } &&
     [[ "$guarded_output" == *"home-manager switch --flake $REPO_ROOT#x86_64-linux --impure"* ]]; then

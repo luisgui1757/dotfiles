@@ -148,7 +148,7 @@ test "$(git rev-parse HEAD)" = "<full-40-character-sha>"
 For PR validation, use the PR head commit SHA. For main validation, use the
 current full `origin/main` SHA. Do not validate a moving branch name.
 These SHA instructions are branch-test-only. Exact-release proof must instead
-clone the annotated `v0.4.0` tag and run setup without `--allow-unreleased`.
+clone the annotated `v0.4.1` tag and run setup without `--allow-unreleased`.
 Do the GUI/visual parts of Part 3 in the `tart run` window (VS Code, terminal
 colours); the CLI parts over SSH are fine too.
 
@@ -181,7 +181,7 @@ test "$(git rev-parse HEAD)" = "<full-40-character-sha>"
 For PR validation, use the PR head commit SHA. For main validation, use the
 current full `origin/main` SHA. Do not validate a moving branch name.
 These SHA instructions are branch-test-only. Exact-release proof must instead
-clone the annotated `v0.4.0` tag and run setup without `--allow-unreleased`.
+clone the annotated `v0.4.1` tag and run setup without `--allow-unreleased`.
 A `tart` Linux guest is a real desktop (unlike WSL), so Ghostty + fonts install
 natively here and the visual checks apply. Over a headless SSH session the CLI
 checks (tmux/nvim/lazygit/shell) still apply; skip the GUI rows.

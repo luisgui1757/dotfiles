@@ -3018,3 +3018,101 @@ Real Apple Silicon owner lifecycle, physical Linux, WSL2 split-host,
 redirected Windows, divergent stable packaged/Preview/Canary/portable Terminal,
 and desktop/visual/TCC rows remain open. No completion of those manual surfaces
 is claimed by publication.
+
+## v0.4.1 workspace-key collision and release preparation — entry 73
+
+- The candidate starts from clean exact `main` commit
+  `1dfe20ffb9e6146f52e6010c216bb684ab536874`. Terminals encode Shift+4 as the
+  literal `$`, so Herdr's former `prefix+Shift+1..9` indexed-workspace family
+  collided structurally with the intended `prefix+$` workspace rename action.
+  This was not an upstream shifted-key decoding defect: both actions received
+  the same key identity after terminal decoding.
+- POSIX, Windows, and the canonical chezmoi mirror now use
+  `prefix+Ctrl+Alt+1..9` for direct workspace selection. This keeps bare
+  `prefix+1..9` for tabs, `prefix+Ctrl+1..9` for agents, plain Alt+number for
+  AeroSpace, literal `prefix+$` for workspace rename, and `prefix+g` / `w` as
+  the searchable navigator. On macOS, Alt is Option.
+- The clean baseline aggregate command returned zero but emitted a Bash 3.2
+  parse error from the guarded Home Manager fixture and stopped that focused
+  test before its completion sentinel. That run was rejected as evidence. The
+  fixture now uses the already-established `if` form accepted by macOS system
+  Bash and captures the substitution exit status so a parse failure cannot
+  false-green.
+- This changes no setup command, managed data shape, or ownership boundary.
+  SemVer therefore selects patch release v0.4.1. Setup, the Nix prerequisite
+  helper, both v0.1.0 migrators, their recovery namespace, deterministic
+  fixtures, and current user documentation share that release authority.
+  Setup scans unfinished v0.2.0, v0.3.0, and v0.4.0 recovery namespaces before
+  considering a v0.4.1 transaction.
+- Candidate documentation contains no invented tag object, peeled commit,
+  workflow run, or GitHub release identity. Those remain mandatory downstream
+  gates after the release-preparation pull request merges.
+
+### Candidate verification
+
+| Check | Exact result |
+|---|---|
+| Clean exact-main baseline aggregate | INVALID AS EVIDENCE: command returned zero, but `tests/nix/setup_home_manager_test.sh` emitted the Bash 3.2 parse error and did not print its completion sentinel |
+| Herdr 0.7.4 real parser against POSIX and Windows managed configs | PASS: `HERDR_CONFIG_PATH=... herdr config check` returned `config: ok` for both files |
+| Focused Herdr, Home Manager, release identity, universal setup, Nix identity, and exact-v0.1.0 migration regressions | PASS |
+| `PATH=/opt/homebrew/bin:$PATH make ci` on the release-preparation tree | PASS: ended `local pre-PR gate passed`; the Home Manager fixture reached `all setup --home-manager behaviors OK` without diagnostics |
+| Local PowerShell parser/Pester execution | UNAVAILABLE: `pwsh` is not installed on this host; required hosted Windows checks remain mandatory before merge |
+| Release tag / GitHub release | NOT CREATED: publication cannot precede the release-preparation merge and exact-tag evidence |
+
+No v0.4.1 tag, GitHub release, cache-free exact-tag run, redacted
+`v0.4.0..v0.4.1` release-range/proof scan, or post-publication identity readback
+is claimed by this entry.
+
+## v0.4.1 macOS Herdr identity gate — entry 74
+
+- Exact-head pull-request E2E run
+  [`29889332879`](https://github.com/luisgui1757/dotfiles/actions/runs/29889332879)
+  rejected the candidate at macOS job `88826438357`. Setup completed, but the
+  new real-consumer assertion received only the `config reset-keys` command
+  surface from the installed Herdr and therefore failed `herdr config check`.
+  Ubuntu job `88826438382` passed the same managed config with the pinned 0.7.4
+  binary; no binding-parser failure was observed.
+- The repository-wide workflow environment intentionally disables implicit
+  Homebrew auto-update. GitHub's macOS image supplies a pre-seeded Homebrew
+  checkout, so the fixture could install an older formula definition instead
+  of the repository's reviewed stable Herdr 0.7.4 identity. Upstream v0.7.3
+  source exposes only `config reset-keys`; upstream v0.7.4 adds the fail-closed
+  `config check` command used by the release gate. Current Homebrew metadata
+  reports stable 0.7.4.
+- The macOS setup fixture now explicitly refreshes formula metadata with the
+  global auto-update guard unset for that command only. Post-install assertions
+  then require exact `herdr 0.7.4` before invoking the installed binary against
+  the managed config. The static Herdr regression locks both requirements.
+- This is a hosted-fixture correction, not a downgrade, bypass, skipped check,
+  or application fallback. The failed run remains diagnostic evidence and
+  cannot satisfy merge or publication; a new exact-head run must pass every
+  required producer before v0.4.1 can merge.
+
+## v0.4.1 mutable Homebrew Herdr bound — entry 75
+
+- Exact-head pull-request E2E run
+  [`29890305520`](https://github.com/luisgui1757/dotfiles/actions/runs/29890305520)
+  rejected Ubuntu job `88829260350` before config parsing because Linuxbrew
+  installed newly published Herdr 0.7.5 while the first correction required
+  exact `herdr 0.7.4`. The refreshed macOS formula plane selected the same
+  0.7.5 identity and job `88829260348` failed at the same assertion. All
+  non-install lanes passed, and both failures were the explicit identity gate
+  rather than a config or shortcut rejection.
+- Entry 74's exact-version assertion was too narrow for the repository's
+  established mixed channel: native Linux without brew uses the reviewed,
+  hash-pinned v0.7.4 artifact, while Homebrew platforms intentionally consume
+  the mutable current formula. The security ledger now states that distinction
+  instead of claiming Homebrew is exact-pinned.
+- Hosted POSIX setup now accepts only strict stable `0.7.x` identities with a
+  patch component at least 4, then still requires the installed binary's
+  fail-closed `config check` against the managed path. Pre-0.7.4, prerelease,
+  malformed, or future 0.8 identities fail before parser trust; compatible
+  Homebrew patch releases must also accept the real config.
+- The official v0.7.5 Apple Silicon release asset reported `herdr 0.7.5` and
+  returned `config: ok` for both the POSIX and Windows managed config files.
+  This focused proof confirms the newly observed patch release accepts the
+  shortcut change before another full hosted run is requested.
+- This is not an automatic compatibility assumption. The version bound limits
+  the candidate family, and real parser execution supplies the behavioral
+  proof for the exact binary Homebrew selected. Run `29890305520` remains
+  failed diagnostic evidence; a new exact-head run is mandatory.

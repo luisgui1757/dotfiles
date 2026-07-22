@@ -1,7 +1,7 @@
 # Dotfiles Roadmap
 
-Last audited: 2026-07-21 on branch `chore/v0.4.0-release-closure`.
-Baseline: `main` at `6317b375a0724804d7a8d895753364cc036e5658`.
+Last audited: 2026-07-22 on branch `release/v0.4.1`.
+Baseline: `main` at `1dfe20ffb9e6146f52e6010c216bb684ab536874`.
 
 This is the adversarial post-merge roadmap for the chezmoi migration and the
 current setup/CI surface. The goal is not "good enough"; the repo should have a
@@ -93,9 +93,10 @@ Sequenced PRs (split for independent, revertable blast radius):
   reserved-chord-safe keymap) + Herdr (macOS/Linux stable channels plus native
   Windows pinned preview binary). Herdr now consumes one chezmoi-managed,
   forced-dark built-in Rose Pine config on POSIX and from Windows' real roaming
-  ApplicationData known folder. Stable `v0.7.4` and the July 16 Windows preview
-  close the shifted indexed-workspace key bug; stale repo-owned Windows previews
-  reconcile by exact path plus hash while unrelated binaries stay untouched.
+  ApplicationData known folder. Direct workspace jumps use
+  `prefix+Ctrl+Alt+1..9`, avoiding the terminal-level `Shift+4` / `$` collision
+  with workspace rename; stale repo-owned Windows previews reconcile by exact
+  path plus hash while unrelated binaries stay untouched.
 - **PR-5 `feat/nix-skeleton` - DONE.** flake + committed `flake.lock` with ZERO
   ownership; `nix flake check` CI; disjointness test (Home Manager declares no
   file targets); Renovate `nix` manager.
@@ -1236,14 +1237,15 @@ every other zsh plugin surface.
 
 ### 9. The published in-place upgrade crossed the config backup boundary
 
-Status: implementation done; v0.2.0, v0.3.0, and v0.4.0 published.
+Status: implementation done; v0.2.0, v0.3.0, and v0.4.0 published; v0.4.1
+release evidence in progress.
 
 Evidence:
 
 - Exact v0.1.0 POSIX config uses checkout-backed chezmoi symlinks. Updating that
   checkout changed live bytes before current setup could back them up.
 - `scripts/upgrade-v0.1.0.sh` and `.ps1` now require clean, separate official
-  annotated v0.1.0/v0.4.0 checkouts and retain v0.1.0 until acceptance.
+  annotated v0.1.0/v0.4.1 checkouts and retain v0.1.0 until acceptance.
 - The public `setup.sh --all` / `setup.ps1 -All` entrypoints now discover exact
   live v0.1.0 ownership, invoke and verify those transactions, resume a pending
   applied recovery, accept under the explicit non-interactive all-mode
@@ -1269,7 +1271,7 @@ Evidence:
   acceptance. Windows Pester proves frozen release-tree validation, complete Terminal recovery,
   all-target concurrency rejection, known-folder boundary validation, private
   ACL policy, and provider-boundary verification.
-- `docs/UPGRADING.md` and `docs/releases/v0.4.0.md` define the supported
+- `docs/UPGRADING.md` and `docs/releases/v0.4.1.md` define the supported
   per-platform commands, Apple-Silicon-only macOS boundary, WSL ordering, Nix
   provenance, and release evidence gate.
 
@@ -1281,10 +1283,10 @@ Canonical solution:
 4. DONE - Pin the exact peeled v0.1.0 fixture and failure boundaries in CI.
 5. DONE - Make setup the sole normal install/migration/update orchestrator while
    preserving exact-tag acquisition and the existing recovery transaction.
-6. PENDING LIVE - The exact tagged v0.4.0 hosted release run is recorded.
-   Apple Silicon owner-host, real WSL2, redirected Windows, divergent stable
+6. PENDING LIVE - Record the exact tagged v0.4.1 hosted release run. Apple
+   Silicon owner-host, real WSL2, redirected Windows, divergent stable
    packaged/Preview/Canary/portable Terminal, physical Linux, and visual rows
-   remain explicit residual gaps after publication.
+   remain explicit residual gaps if the owner publishes before completing them.
 
 ## Disproved Or Non-Blocking Assumptions
 

@@ -301,9 +301,9 @@ that violates one of these, fix it instead of disabling the test.
     - **(d) no remote-eval installer.** The repo never adds a `curl | sh`,
       `irm | iex`, `Invoke-Expression`, or `nix-installer`/`install.determinate.systems`
       pipe-to-shell path for Nix (or anything else). Public setup invokes only
-      `scripts/install-nix-prerequisite.sh`. The published v0.4.0 default path
-      accepts only the matching local annotated tag object, peeled commit, and
-      HEAD from one isolated official remote-ref snapshot. The explicit
+      `scripts/install-nix-prerequisite.sh`. Once published, the v0.4.1 default
+      path accepts only the matching local annotated tag object, peeled commit,
+      and HEAD from one isolated official remote-ref snapshot. The explicit
       `setup.sh --allow-unreleased` test lane may instead accept a clean checkout
       whose HEAD exactly equals a current branch head in the official repository
       from that same remote-ref snapshot. It never accepts a fork, dirty tree,
@@ -475,16 +475,16 @@ that violates one of these, fix it instead of disabling the test.
 29. **Published release upgrades are exact-tag, side-by-side transactions.**
     v0.1.0 is already chezmoi-based; its POSIX targets are live checkout
     symlinks, so `git pull` or switching that checkout before setup crosses the
-    backup boundary. Never publish an in-place v0.1.0 migration. The v0.4.0
+    backup boundary. Never publish an in-place v0.1.0 migration. The v0.4.1
     tools require separate clean official annotated-tag checkouts, exact
     historical config, authoritative target identity, and private recovery.
     POSIX recovery archives both exact commits, validates digest-bound read-only
     trees, and uses only those frozen sources for Nix/config publication and
     rollback; post-validation checkout changes cannot affect a write. Setup
-    must fail closed when an unfinished `v0.1.0-to-v0.2.0.*` or
-    `v0.1.0-to-v0.3.0.*` recovery remains; that published transaction must be
-    accepted or rolled back before v0.4.0 setup can begin. Windows enforces the
-    same cross-release recovery boundary.
+    must fail closed when an unfinished `v0.1.0-to-v0.2.0.*`,
+    `v0.1.0-to-v0.3.0.*`, or `v0.1.0-to-v0.4.0.*` recovery remains; that
+    published transaction must be accepted or rolled back before v0.4.1 setup
+    can begin. Windows enforces the same cross-release recovery boundary.
     Windows recovery likewise archives both exact commits beneath its protected
     ACL, records all four canonical Terminal identities and their expected
     presence/hash state, and binds setup, acceptance, uninstall, and rollback to
@@ -664,7 +664,7 @@ stack), herdr/config.toml + herdr/config.windows.toml (built-in `rose-pine`,
 forced with `auto_switch = false`; both map `prefix+w`/`prefix+g` to the full
 navigator, `prefix+comma`/`prefix+$` to tab/workspace rename,
 `prefix+up`/`prefix+down` to sequential workspace navigation, and
-`prefix+shift+1..9` to indexed workspace selection; agent navigation uses
+`prefix+ctrl+alt+1..9` to indexed workspace selection; agent navigation uses
 `prefix+shift+a`/`prefix+a` for previous/next and `prefix+ctrl+1..9` for indexed
 focus; expanded agent cards preserve the Herdr 0.7.3 two-line layout and
 spacing; Windows alone selects `pwsh.exe`),
@@ -849,8 +849,8 @@ major; `tests/static/repo_policy_test.sh` enforces this.
   parser install, Mason headless sync, and the Sentinel Phase 6/6 agent-policy
   install. The required POSIX jobs begin with no `/nix`, check out the exact PR
   source head separately from GitHub's synthetic merge, and run the real
-  prerequisite helper before setup. The published default requires the
-  fetched exact v0.4.0 tag; an official branch source requires the explicit
+  prerequisite helper before setup. Once published, the default requires the
+  fetched exact v0.4.1 tag; an official branch source requires the explicit
   `--allow-unreleased` lane. Fork PRs cannot satisfy the official-head identity,
   so only they retain the pinned Determinate action as a pre-seeded test path.
   Both jobs then apply the enforced nix-darwin/Home Manager layer before
@@ -1856,23 +1856,27 @@ save only**. The next plain `:w` formats normally. Implemented in
   memory.** Herdr calls tmux windows `tabs`, so `rename_tab = "prefix+comma"`
   implements `prefix+,`; `rename_workspace = "prefix+$"` implements
   `prefix+$`. Ordered workspace movement is `prefix+Up` / `prefix+Down`, and
-  direct selection is `prefix+Shift+1..9`, leaving unshifted `prefix+1..9`
-  exclusively for tabs/windows. Use the literal `$` binding: Herdr accepts
-  single-character punctuation, while `prefix+shift+4` does not match the
-  legacy terminal `$` event on every input path.
-  Herdr `v0.7.3` also rejected the punctuation events emitted by
-  `Shift+1..9`; stable installs must be at least `v0.7.4`, and the pinned
-  Windows preview must descend from upstream fix `b708f85`.
+  direct selection is `prefix+Ctrl+Alt+1..9`, leaving unshifted
+  `prefix+1..9` exclusively for tabs/windows. On macOS, Alt is Option. Do not
+  use Shift+number for direct selection: terminals report shifted digits as
+  punctuation, so Shift+4 is indistinguishable from the literal `$` workspace
+  rename binding. Do not use plain Alt+number either; AeroSpace owns it
+  globally on macOS.
 - **Herdr agent navigation is a third, non-destructive modifier layer.** Use
   `prefix+a` / `prefix+Shift+A` for next/previous agent: `a` is mnemonic and
   unbound by both stock tmux and Herdr. Direct agent focus uses
   `prefix+Ctrl+1..9`, matching Herdr's digit-only indexed-binding shape and the
-  existing number ladder: bare number selects a tab, Shift+number selects a
+  existing number ladder: bare number selects a tab, Ctrl+Alt+number selects a
   workspace, and Ctrl+number selects an agent. Plain Ctrl+number is unbound by
   stock tmux, AeroSpace, and the managed Ghostty/WezTerm keymaps. Do not use
   Alt+number here: AeroSpace owns it globally for macOS workspaces. Also do not
   consume tmux's daily-use copy/paste, pane, window, session, create, detach,
   rename, navigator, or bare-number bindings for agent actions.
+- **macOS system Bash is still 3.2.** Do not place a compact `case`-based
+  function definition inside a command substitution in shell tests; Bash 3.2
+  can misparse the case-arm `)` as the command-substitution terminator. Use the
+  portable `if` form and assert the substitution's exit status so fixture parse
+  failures cannot false-green.
 - **Herdr expanded agent cards preserve the v0.7.3 layout.** The upstream
   v0.7.4 default omits `state_text` and packs adjacent cards. Both managed
   configs set rows to `[["state_icon", "workspace", "tab"], ["state_text",
