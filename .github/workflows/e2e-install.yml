@@ -356,8 +356,16 @@ jobs:
             command -v herdr >/dev/null 2>&1 || fail "herdr is not on PATH after setup.sh --all requested it"
           fi
           herdr_identity="$(herdr --version)" || fail "Herdr identity probe failed"
-          [[ "$herdr_identity" == "herdr 0.7.4" ]] \
-            || fail "Herdr stable identity differs: $herdr_identity"
+          case "$herdr_identity" in
+            "herdr 0.7."*) herdr_patch="${herdr_identity#herdr 0.7.}" ;;
+            *) fail "Herdr stable identity is outside the reviewed 0.7.x line: $herdr_identity" ;;
+          esac
+          case "$herdr_patch" in
+            ""|*[!0-9]*) fail "Herdr stable identity is not strict semver: $herdr_identity" ;;
+          esac
+          if (( 10#$herdr_patch < 4 )); then
+            fail "Herdr stable identity predates config check: $herdr_identity"
+          fi
           HERDR_CONFIG_PATH="$HOME/.config/herdr/config.toml" herdr config check \
             || fail "Herdr rejected the managed config"
           wezterm_bin="$(resolve_wezterm_binary)" || fail "WezTerm binary is missing"

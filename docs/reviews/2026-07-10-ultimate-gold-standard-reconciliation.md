@@ -3087,3 +3087,32 @@ is claimed by this entry.
   or application fallback. The failed run remains diagnostic evidence and
   cannot satisfy merge or publication; a new exact-head run must pass every
   required producer before v0.4.1 can merge.
+
+## v0.4.1 mutable Homebrew Herdr bound — entry 75
+
+- Exact-head pull-request E2E run
+  [`29890305520`](https://github.com/luisgui1757/dotfiles/actions/runs/29890305520)
+  rejected Ubuntu job `88829260350` before config parsing because Linuxbrew
+  installed newly published Herdr 0.7.5 while the first correction required
+  exact `herdr 0.7.4`. The refreshed macOS formula plane selected the same
+  0.7.5 identity and job `88829260348` failed at the same assertion. All
+  non-install lanes passed, and both failures were the explicit identity gate
+  rather than a config or shortcut rejection.
+- Entry 74's exact-version assertion was too narrow for the repository's
+  established mixed channel: native Linux without brew uses the reviewed,
+  hash-pinned v0.7.4 artifact, while Homebrew platforms intentionally consume
+  the mutable current formula. The security ledger now states that distinction
+  instead of claiming Homebrew is exact-pinned.
+- Hosted POSIX setup now accepts only strict stable `0.7.x` identities with a
+  patch component at least 4, then still requires the installed binary's
+  fail-closed `config check` against the managed path. Pre-0.7.4, prerelease,
+  malformed, or future 0.8 identities fail before parser trust; compatible
+  Homebrew patch releases must also accept the real config.
+- The official v0.7.5 Apple Silicon release asset reported `herdr 0.7.5` and
+  returned `config: ok` for both the POSIX and Windows managed config files.
+  This focused proof confirms the newly observed patch release accepts the
+  shortcut change before another full hosted run is requested.
+- This is not an automatic compatibility assumption. The version bound limits
+  the candidate family, and real parser execution supplies the behavioral
+  proof for the exact binary Homebrew selected. Run `29890305520` remains
+  failed diagnostic evidence; a new exact-head run is mandatory.
