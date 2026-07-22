@@ -141,6 +141,15 @@ jobs:
         if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository
         uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22
 
+      - name: Refresh Homebrew formula metadata for stable Herdr
+        if: matrix.logical == 'macos'
+        run: |
+          set -euo pipefail
+          # Hosted macOS carries a pre-seeded Homebrew checkout. Refresh that
+          # formula plane explicitly so the fresh-install fixture cannot select
+          # a stale Herdr while the workflow-wide auto-update guard is active.
+          env -u HOMEBREW_NO_AUTO_UPDATE brew update
+
       - name: "PR-only cache: POSIX setup"
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         if: github.event_name == 'pull_request'
@@ -346,6 +355,9 @@ jobs:
             command -v wezterm >/dev/null 2>&1 || fail "wezterm is not on PATH after setup.sh --all requested it"
             command -v herdr >/dev/null 2>&1 || fail "herdr is not on PATH after setup.sh --all requested it"
           fi
+          herdr_identity="$(herdr --version)" || fail "Herdr identity probe failed"
+          [[ "$herdr_identity" == "herdr 0.7.4" ]] \
+            || fail "Herdr stable identity differs: $herdr_identity"
           HERDR_CONFIG_PATH="$HOME/.config/herdr/config.toml" herdr config check \
             || fail "Herdr rejected the managed config"
           wezterm_bin="$(resolve_wezterm_binary)" || fail "WezTerm binary is missing"

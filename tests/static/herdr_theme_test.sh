@@ -97,6 +97,13 @@ grep -F '\herdr\config.windows.toml' \
 grep -F 'HERDR_CONFIG_PATH="$HOME/.config/herdr/config.toml" herdr config check' \
     "$REPO_ROOT/.github/workflows/e2e-install.yml" >/dev/null ||
     fail "hosted POSIX setup does not parse the installed Herdr config"
+grep -F 'env -u HOMEBREW_NO_AUTO_UPDATE brew update' \
+    "$REPO_ROOT/.github/workflows/e2e-install.yml" >/dev/null ||
+    fail "hosted macOS setup does not refresh stale Homebrew formula metadata"
+# shellcheck disable=SC2016
+grep -F '[[ "$herdr_identity" == "herdr 0.7.4" ]]' \
+    "$REPO_ROOT/.github/workflows/e2e-install.yml" >/dev/null ||
+    fail "hosted POSIX setup does not require the reviewed Herdr stable identity"
 grep -F "\$env:HERDR_CONFIG_PATH = Join-Path \$env:APPDATA 'herdr\config.toml'" \
     "$REPO_ROOT/.github/workflows/e2e-install.yml" >/dev/null ||
     fail "hosted Windows setup does not parse the installed Herdr config"

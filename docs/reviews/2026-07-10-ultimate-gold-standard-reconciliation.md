@@ -3062,3 +3062,28 @@ is claimed by publication.
 No v0.4.1 tag, GitHub release, cache-free exact-tag run, redacted
 `v0.4.0..v0.4.1` release-range/proof scan, or post-publication identity readback
 is claimed by this entry.
+
+## v0.4.1 macOS Herdr identity gate — entry 74
+
+- Exact-head pull-request E2E run
+  [`29889332879`](https://github.com/luisgui1757/dotfiles/actions/runs/29889332879)
+  rejected the candidate at macOS job `88826438357`. Setup completed, but the
+  new real-consumer assertion received only the `config reset-keys` command
+  surface from the installed Herdr and therefore failed `herdr config check`.
+  Ubuntu job `88826438382` passed the same managed config with the pinned 0.7.4
+  binary; no binding-parser failure was observed.
+- The repository-wide workflow environment intentionally disables implicit
+  Homebrew auto-update. GitHub's macOS image supplies a pre-seeded Homebrew
+  checkout, so the fixture could install an older formula definition instead
+  of the repository's reviewed stable Herdr 0.7.4 identity. Upstream v0.7.3
+  source exposes only `config reset-keys`; upstream v0.7.4 adds the fail-closed
+  `config check` command used by the release gate. Current Homebrew metadata
+  reports stable 0.7.4.
+- The macOS setup fixture now explicitly refreshes formula metadata with the
+  global auto-update guard unset for that command only. Post-install assertions
+  then require exact `herdr 0.7.4` before invoking the installed binary against
+  the managed config. The static Herdr regression locks both requirements.
+- This is a hosted-fixture correction, not a downgrade, bypass, skipped check,
+  or application fallback. The failed run remains diagnostic evidence and
+  cannot satisfy merge or publication; a new exact-head run must pass every
+  required producer before v0.4.1 can merge.
