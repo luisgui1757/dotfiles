@@ -35,8 +35,7 @@ symlinks into the checkout. Do **not** run `git pull`, switch that checkout to a
 new revision, or run an upgrade from `main`: doing so can change live config
 before recovery exists.
 
-These commands become user-facing only after the annotated `v0.4.1` release
-exists. Before then, remain on the current published release.
+These commands target the published annotated `v0.4.1` release.
 
 ### Common preparation
 
@@ -217,22 +216,26 @@ pwsh -NoProfile -File 'C:\exact\recovery\upgrade-v0.1.0.ps1' -Rollback 'C:\exact
 pwsh -NoProfile -File 'C:\exact\recovery\upgrade-v0.1.0.ps1' -Accept 'C:\exact\recovery'
 ```
 
-## v0.4.1 release-candidate evidence status
+## v0.4.1 immutable release evidence
 
-The v0.4.1 release is not yet published. Its release authority is prepared on
-top of exact `main` commit `1dfe20ffb9e6146f52e6010c216bb684ab536874`;
-publication remains gated on:
+v0.4.1 was published on 2026-07-22 under explicit owner authorization. The
+deterministic publication gates passed:
 
-- [ ] the reviewed release-preparation pull request merged to `main` with all
+- [x] pull request #67 merged reviewed head
+  `ee02e551b6e9357da52e29754dac6692f5802ae1` to exact `main` commit
+  `bac8cc97177b3bb58119fde5720b31e6b57febcc` with identical trees and all
   required checks passing;
-- [ ] an annotated `v0.4.1` tag whose tag object and peeled commit match the
-  exact merged release-preparation commit and the official remote;
-- [ ] full local and hosted gates, deterministic exact-v0.1.0 migration
-  fixtures, Windows Pester coverage, and a redacted scan across
-  `v0.4.0..v0.4.1` plus all downloaded logical proofs;
-- [ ] a cache-free hosted release run whose POSIX lanes report the exact
-  immutable `v0.4.1` tag identity;
-- [ ] immutable/latest GitHub release readback matching the prepared notes.
+- [x] annotated tag object `558d19a8c62453f68e5463e8999b216e0b692551`
+  peels to that exact commit locally and in the official remote;
+- [x] the full local gate, deterministic exact-v0.1.0 migration fixtures,
+  hosted Windows coverage, and Gitleaks scans across the two commits in
+  `v0.4.0..v0.4.1` plus all four downloaded logical proofs passed;
+- [x] cache-free hosted run
+  [`29891574548`](https://github.com/luisgui1757/dotfiles/actions/runs/29891574548)
+  passed the Ubuntu, macOS, Windows, and container producers plus all four
+  logical proof jobs; both POSIX lanes reported the exact immutable tag;
+- [x] GitHub release `357785004` read back immutable/latest, non-draft,
+  non-prerelease, and with the prepared user-facing body exact.
 
 The unchecked real WSL, redirected-Windows, divergent Windows Terminal,
 physical-Linux, Apple-Silicon owner-host, and visual rows in `tests/MANUAL.md`

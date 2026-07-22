@@ -6,9 +6,9 @@ significant change to the relevant area.
 
 ## v0.1.0 to v0.4.1 release upgrade
 
-> Release-candidate status (2026-07-22): v0.4.1 publication is not complete.
-> Every unchecked row below remains an unclaimed evidence gap; publication will
-> not be evidence that a row ran.
+> Published-release status (2026-07-22): immutable v0.4.1 release `357785004`
+> is current. Every unchecked row below remains an unclaimed evidence gap;
+> publication is not evidence that a row ran.
 
 Use throwaway users/VMs seeded from the exact annotated v0.1.0 release. Follow
 `docs/UPGRADING.md`; never use `main` or update the old checkout in place.

@@ -3116,3 +3116,51 @@ is claimed by this entry.
   the candidate family, and real parser execution supplies the behavioral
   proof for the exact binary Homebrew selected. Run `29890305520` remains
   failed diagnostic evidence; a new exact-head run is mandatory.
+
+## v0.4.1 immutable publication closure — entry 76
+
+- Pull request #67 merged reviewed head
+  `ee02e551b6e9357da52e29754dac6692f5802ae1` to exact `main` commit
+  `bac8cc97177b3bb58119fde5720b31e6b57febcc`. Both commits have tree
+  `bfdcf53a12da8d302b5da63b47ac6ba9e480c01c`; their diff is empty. Exact-head
+  E2E run
+  [`29890948764`](https://github.com/luisgui1757/dotfiles/actions/runs/29890948764)
+  passed all four producers and all four logical proof jobs after the two
+  earlier Herdr identity failures documented in entries 74 and 75. Test, Nix,
+  CodeQL, parity, and every other required check also passed; 21 checks were
+  successful with none pending or failing before merge.
+- Annotated tag object `558d19a8c62453f68e5463e8999b216e0b692551`
+  peels to the exact merged commit locally and in the official remote. A fresh
+  full public clone checked out the detached tag, passed the release-upgrade
+  identity test, and reported the immutable v0.4.1 prerequisite identity
+  without attempting an install because Nix was already usable.
+- Cache-free run
+  [`29891574548`](https://github.com/luisgui1757/dotfiles/actions/runs/29891574548)
+  passed all four producers and all four stable logical proof jobs. Ubuntu and
+  Apple Silicon macOS independently logged `Verified immutable release
+  checkout: v0.4.1` at the exact peeled commit. Ubuntu, macOS, and Windows each
+  executed the installed Herdr binary against the managed config and returned
+  `config: ok`.
+- GitHub release `357785004` was published on 2026-07-22 at
+  [`v0.4.1`](https://github.com/luisgui1757/dotfiles/releases/tag/v0.4.1).
+  Readback is immutable, latest, non-draft, and non-prerelease; the release body
+  matches the prepared user-facing notes after trailing-newline normalization.
+- The owner explicitly authorized publication with the real-environment rows in
+  `tests/MANUAL.md` still open. This entry preserves that boundary without
+  converting any unchecked row into evidence.
+
+### Publication verification
+
+| Check | Exact result |
+|---|---|
+| Final `PATH=/opt/homebrew/bin:$PATH make ci` on the reviewed release-preparation tree | PASS: ended `local pre-PR gate passed`; merged `main` is tree-identical |
+| Gitleaks 8.30.1 across `v0.4.0..v0.4.1` and downloaded hosted proofs | PASS: 2 commits (50,021 bytes) plus all 4 stable logical proof artifacts (912 bytes), no leaks found with redaction enabled |
+| Cache-free hosted release run [`29891574548`](https://github.com/luisgui1757/dotfiles/actions/runs/29891574548) | PASS: Ubuntu container `88832902103`, Ubuntu setup `88832902106`, Apple Silicon macOS setup `88832902086`, Windows setup `88832902093`, and logical jobs `88835415834`, `88835415839`, `88835415824`, and `88835415821` |
+| Fresh detached public `v0.4.1` clone | PASS: tag object and peeled commit matched the official remote; release-upgrade static check and immutable prerequisite-helper path passed |
+| Downloaded schema-2 logical proofs | PASS: all four bound source SHA, executed SHA, run ID, attempt, logical context, and legacy context to the successful release run |
+| GitHub release readback | PASS: release `357785004`, immutable/latest, draft=false, prerelease=false, prepared user-facing body exact after trailing-newline normalization |
+
+Real Apple Silicon owner lifecycle, physical Linux, WSL2 split-host,
+redirected Windows, divergent stable packaged/Preview/Canary/portable Terminal,
+and desktop/visual/TCC rows remain open. No completion of those manual surfaces
+is claimed by publication.

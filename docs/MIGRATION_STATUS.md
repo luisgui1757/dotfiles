@@ -109,10 +109,12 @@ canonical v0.4.1 path is side-by-side and exact-tag-only:
   all-target concurrency rejection, known-folder state validation, and the
   pre-migration command-provider boundary.
 
-The v0.4.1 release authority is prepared on top of exact `main` commit
-`1dfe20ffb9e6146f52e6010c216bb684ab536874`; its annotated tag object, peeled
-commit, cache-free hosted run, range/proof scan, and immutable release readback
-remain pending until the release-preparation pull request is merged.
+The annotated v0.4.1 release was published on 2026-07-22 after its exact local,
+hosted cache-free, release-range/proof scan, and immutable-release gates passed.
+Its setup, prerequisite helper, and both v0.1.0 migrators bind tag object
+`558d19a8c62453f68e5463e8999b216e0b692551` to peeled commit
+`bac8cc97177b3bb58119fde5720b31e6b57febcc` while retaining the same
+frozen-source and rollback boundaries.
 
 The annotated v0.4.0 release was published on 2026-07-21 after its exact local,
 hosted cache-free, release-range/proof scan, and immutable-release gates passed.
@@ -127,11 +129,11 @@ release-range/proof scan, and immutable-release gates passed. Its setup,
 prerequisite helper, and both v0.1.0 migrators bind tag object
 `473f675e863640484d4d11349bf69d01def12c43` to peeled commit
 `c8507312153620b9b30fe2c84980c62bccb3b25a` while retaining the same
-frozen-source and rollback boundaries. The owner authorized v0.4.0 publication
-with real Apple Silicon owner-host, physical Linux, WSL split-host, redirected
-Windows, and divergent stable packaged/Preview/Canary/portable Terminal
-executions still open. Those unchecked rows remain unclaimed evidence gaps in
-`tests/MANUAL.md`; publication does not mark them complete. No
+frozen-source and rollback boundaries. The owner authorized v0.4.0 and v0.4.1
+publication with real Apple Silicon owner-host, physical Linux, WSL split-host,
+redirected Windows, and divergent stable packaged/Preview/Canary/portable
+Terminal executions still open. Those unchecked rows remain unclaimed evidence
+gaps in `tests/MANUAL.md`; publication does not mark them complete. No
 non-Apple-Silicon macOS migration path is shipped or pending proof.
 
 ## install-deps owns (provisioning -- deliberately NOT in chezmoi)
