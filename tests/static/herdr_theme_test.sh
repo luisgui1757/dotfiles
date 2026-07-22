@@ -43,7 +43,7 @@ for path in paths:
         "rename_workspace": "prefix+$",
         "previous_workspace": "prefix+up",
         "next_workspace": "prefix+down",
-        "switch_workspace": "prefix+shift+1..9",
+        "switch_workspace": "prefix+ctrl+alt+1..9",
         "previous_agent": "prefix+shift+a",
         "next_agent": "prefix+a",
         "focus_agent": "prefix+ctrl+1..9",
@@ -77,13 +77,13 @@ PY
 
 cmp -s "$CONFIG" "$MIRROR" || fail "canonical Herdr config and chezmoi mirror differ"
 grep -F 'HERDR_VERSION="v0.7.4"' "$INSTALL_SH" >/dev/null ||
-    fail "POSIX Herdr must include the shifted indexed-key fix from v0.7.4"
+    fail "POSIX Herdr must stay pinned to the reviewed v0.7.4 release"
 grep -F 'HERDR_LINUX_X86_64_SHA256="bc0fc02d4ba500f9cac2353a43e67fe036785ecca6eb55378e050fac3c103059"' "$INSTALL_SH" >/dev/null ||
     fail "Herdr v0.7.4 x86_64 digest drifted"
 grep -F 'HERDR_LINUX_ARM64_SHA256="544e0002de42806d1ab64ccdef3a7e7414f24717b0b6b022bc9e57d2eefd26a2"' "$INSTALL_SH" >/dev/null ||
     fail "Herdr v0.7.4 arm64 digest drifted"
 grep -F "\$HerdrWindowsPreviewVersion = 'preview-2026-07-16-e907e6a36646'" "$INSTALL_PS1" >/dev/null ||
-    fail "Windows Herdr preview must include the shifted indexed-key fix"
+    fail "Windows Herdr must stay pinned to the reviewed preview"
 grep -F "\$HerdrWindowsX64Sha256 = 'a5827b33cbd0352e4c0f1469ca6e0f71083e1333cf0250ca9dbecc41770a6d30'" "$INSTALL_PS1" >/dev/null ||
     fail "post-fix Windows Herdr digest drifted"
 grep -F '.chezmoitemplates/herdr/config.toml' \
@@ -92,6 +92,14 @@ grep -F '.chezmoitemplates/herdr/config.toml' \
 grep -F '\herdr\config.windows.toml' \
     "$REPO_ROOT/windows/chezmoi-appdata/herdr/symlink_config.toml.tmpl" >/dev/null ||
     fail "Windows ApplicationData overlay does not reference the Windows Herdr config"
+# The workflow must retain the literal runtime HOME expression.
+# shellcheck disable=SC2016
+grep -F 'HERDR_CONFIG_PATH="$HOME/.config/herdr/config.toml" herdr config check' \
+    "$REPO_ROOT/.github/workflows/e2e-install.yml" >/dev/null ||
+    fail "hosted POSIX setup does not parse the installed Herdr config"
+grep -F "\$env:HERDR_CONFIG_PATH = Join-Path \$env:APPDATA 'herdr\config.toml'" \
+    "$REPO_ROOT/.github/workflows/e2e-install.yml" >/dev/null ||
+    fail "hosted Windows setup does not parse the installed Herdr config"
 
 for script in setup.ps1 uninstall.ps1; do
     grep -F "'ApplicationData'" "$REPO_ROOT/$script" >/dev/null ||

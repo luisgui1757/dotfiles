@@ -346,6 +346,8 @@ jobs:
             command -v wezterm >/dev/null 2>&1 || fail "wezterm is not on PATH after setup.sh --all requested it"
             command -v herdr >/dev/null 2>&1 || fail "herdr is not on PATH after setup.sh --all requested it"
           fi
+          HERDR_CONFIG_PATH="$HOME/.config/herdr/config.toml" herdr config check \
+            || fail "Herdr rejected the managed config"
           wezterm_bin="$(resolve_wezterm_binary)" || fail "WezTerm binary is missing"
           "$wezterm_bin" --config-file "$repo/wezterm/wezterm.lua" show-keys >/dev/null \
             || fail "WezTerm real binary rejected the managed config"
@@ -524,6 +526,11 @@ jobs:
           }
           if (-not (Get-Command herdr -ErrorAction SilentlyContinue)) {
               throw 'herdr is not on PATH'
+          }
+          $env:HERDR_CONFIG_PATH = Join-Path $env:APPDATA 'herdr\config.toml'
+          & herdr config check
+          if ($LASTEXITCODE -ne 0) {
+              throw 'Herdr rejected the managed Windows config'
           }
           if (-not (Get-Command pi -ErrorAction SilentlyContinue)) {
               throw 'pi is not on PATH'

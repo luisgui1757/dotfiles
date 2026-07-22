@@ -3018,3 +3018,47 @@ Real Apple Silicon owner lifecycle, physical Linux, WSL2 split-host,
 redirected Windows, divergent stable packaged/Preview/Canary/portable Terminal,
 and desktop/visual/TCC rows remain open. No completion of those manual surfaces
 is claimed by publication.
+
+## v0.4.1 workspace-key collision and release preparation — entry 73
+
+- The candidate starts from clean exact `main` commit
+  `1dfe20ffb9e6146f52e6010c216bb684ab536874`. Terminals encode Shift+4 as the
+  literal `$`, so Herdr's former `prefix+Shift+1..9` indexed-workspace family
+  collided structurally with the intended `prefix+$` workspace rename action.
+  This was not an upstream shifted-key decoding defect: both actions received
+  the same key identity after terminal decoding.
+- POSIX, Windows, and the canonical chezmoi mirror now use
+  `prefix+Ctrl+Alt+1..9` for direct workspace selection. This keeps bare
+  `prefix+1..9` for tabs, `prefix+Ctrl+1..9` for agents, plain Alt+number for
+  AeroSpace, literal `prefix+$` for workspace rename, and `prefix+g` / `w` as
+  the searchable navigator. On macOS, Alt is Option.
+- The clean baseline aggregate command returned zero but emitted a Bash 3.2
+  parse error from the guarded Home Manager fixture and stopped that focused
+  test before its completion sentinel. That run was rejected as evidence. The
+  fixture now uses the already-established `if` form accepted by macOS system
+  Bash and captures the substitution exit status so a parse failure cannot
+  false-green.
+- This changes no setup command, managed data shape, or ownership boundary.
+  SemVer therefore selects patch release v0.4.1. Setup, the Nix prerequisite
+  helper, both v0.1.0 migrators, their recovery namespace, deterministic
+  fixtures, and current user documentation share that release authority.
+  Setup scans unfinished v0.2.0, v0.3.0, and v0.4.0 recovery namespaces before
+  considering a v0.4.1 transaction.
+- Candidate documentation contains no invented tag object, peeled commit,
+  workflow run, or GitHub release identity. Those remain mandatory downstream
+  gates after the release-preparation pull request merges.
+
+### Candidate verification
+
+| Check | Exact result |
+|---|---|
+| Clean exact-main baseline aggregate | INVALID AS EVIDENCE: command returned zero, but `tests/nix/setup_home_manager_test.sh` emitted the Bash 3.2 parse error and did not print its completion sentinel |
+| Herdr 0.7.4 real parser against POSIX and Windows managed configs | PASS: `HERDR_CONFIG_PATH=... herdr config check` returned `config: ok` for both files |
+| Focused Herdr, Home Manager, release identity, universal setup, Nix identity, and exact-v0.1.0 migration regressions | PASS |
+| `PATH=/opt/homebrew/bin:$PATH make ci` on the release-preparation tree | PASS: ended `local pre-PR gate passed`; the Home Manager fixture reached `all setup --home-manager behaviors OK` without diagnostics |
+| Local PowerShell parser/Pester execution | UNAVAILABLE: `pwsh` is not installed on this host; required hosted Windows checks remain mandatory before merge |
+| Release tag / GitHub release | NOT CREATED: publication cannot precede the release-preparation merge and exact-tag evidence |
+
+No v0.4.1 tag, GitHub release, cache-free exact-tag run, redacted
+`v0.4.0..v0.4.1` release-range/proof scan, or post-publication identity readback
+is claimed by this entry.

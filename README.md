@@ -120,10 +120,8 @@ workspaces, then tracks the agents running inside them. The repo makes its
 common navigation feel like tmux and uses Herdr's built-in `rose-pine` theme.
 Expanded agent cards preserve the previous two-line layout: state icon plus
 workspace/tab first, explicit `idle` / `working` plus agent second, with a blank
-line between cards.
-The managed binaries include Herdr's shifted indexed-key fix (`v0.7.4` on
-stable platforms and the July 16 preview on Windows), so `Shift+1..9` reaches
-the punctuation keycodes terminals actually send.
+line between cards. Direct workspace jumps use a modifier chord that remains
+distinct from the literal punctuation bindings terminals send.
 
 Start it from a normal shell with `herdr`. On Windows, new Herdr panes run
 `pwsh.exe`, so they load the same PowerShell profile, history list, and
@@ -139,7 +137,7 @@ change; an already-running shell cannot change into PowerShell 7 retroactively.
 | `Ctrl+B`, then `,` | Rename the current tab/window. |
 | `Ctrl+B`, then `$` | Rename the current workspace. |
 | `Ctrl+B`, then Up/Down | Move to the previous/next workspace. |
-| `Ctrl+B`, then `Shift+1` ... `Shift+9` | Jump directly to workspace 1 ... 9. |
+| `Ctrl+B`, then `Ctrl+Alt+1` ... `Ctrl+Alt+9` | Jump directly to workspace 1 ... 9. On macOS, Alt is Option. |
 | `Ctrl+B`, then `Shift+A` / `a` | Move to the previous/next agent. |
 | `Ctrl+B`, then `Ctrl+1` ... `Ctrl+9` | Focus agent 1 ... 9 directly. |
 
@@ -413,10 +411,9 @@ flakes, so fetching the mutable `nixpkgs-unstable` channel is unnecessary and
 would wrongly force the installer's bundled CA instead of the managed host's
 system trust store. If an earlier attempt installed Nix but stopped before
 enabling those features, rerunning setup repairs the user setting and continues.
-The published `v0.4.0` release is bound to annotated tag object
-`1539e550ac45d0a9732f329cb1ae3fb13bb078a8`, which peels to commit
-`6317b375a0724804d7a8d895753364cc036e5658`. Normal setup accepts only that
-exact clean official tag. Branch testing remains an explicit opt-in through
+The `v0.4.1` release path accepts only the exact clean official annotated tag;
+the tag object and peeled commit will be recorded after publication. Branch
+testing remains an explicit opt-in through
 `--allow-unreleased` and still requires a current branch head in the official
 repository. Local-only or stale commits, forks, dirty checkouts, lightweight
 tags, and non-official origins fail before download. The versioned upgrade
@@ -424,7 +421,7 @@ tools remain exact-tag-only; this repo has no pipe-to-shell Nix bootstrap.
 
 ```bash
 # Apple Silicon mac / linux / wsl
-git clone --branch v0.4.0 --single-branch \
+git clone --branch v0.4.1 --single-branch \
   https://github.com/luisgui1757/dotfiles.git ~/dotfiles
 cd ~/dotfiles
 ./setup.sh --all
@@ -465,7 +462,7 @@ Set-Location $HOME\dotfiles-test
 # windows
 # enable Developer Mode, then run from a normal PowerShell
 # Settings -> Privacy & security -> For developers -> Developer Mode = On
-git clone --branch v0.4.0 --single-branch `
+git clone --branch v0.4.1 --single-branch `
   https://github.com/luisgui1757/dotfiles.git $HOME\dotfiles
 Set-ExecutionPolicy -Scope Process Bypass -Force
 Set-Location $HOME\dotfiles
@@ -503,19 +500,19 @@ dependency-install run; Scoop refuses admin installs.
 checkout. **Do not run `git pull` in that checkout.** Changing it in place can
 change live config before recovery exists.
 
-Retain the exact old checkout, clone the annotated v0.4.0 release beside it,
+Retain the exact old checkout, clone the annotated v0.4.1 release beside it,
 and run only `./setup.sh --all`
 or `.\setup.ps1 -All` from the new checkout. Setup detects the live exact-v0.1.0
 owner, installs Nix on POSIX when needed, runs the existing digest-bound
 transaction, verifies and accepts its reversible core, retains private recovery,
-then completes additive provisioning and repoints config to v0.4.0. A pending
+then completes additive provisioning and repoints config to v0.4.1. A pending
 `applied` recovery resumes at acceptance; an unsafe/incomplete recovery fails
 closed with its exact rollback command. If the old checkout is not discoverable
 from the live config, set `DOTFILES_V0_1_CHECKOUT` to its real path for that same
-setup invocation. Finish or roll back any unfinished v0.2.0 or v0.3.0 recovery
-from its retained exact release checkout before starting v0.4.0; the new setup
-refuses to bypass either transaction. macOS migration is available only on
-Apple Silicon.
+setup invocation. Finish or roll back any unfinished v0.2.0, v0.3.0, or v0.4.0
+recovery from its retained exact release checkout before starting v0.4.1; the
+new setup refuses to bypass any earlier transaction. macOS migration is
+available only on Apple Silicon.
 
 The manual preflight/apply/rollback/accept commands remain available in
 [docs/UPGRADING.md](docs/UPGRADING.md) for diagnosis and operator-controlled
@@ -1061,10 +1058,10 @@ POSIX pwsh profile management remains provisioning-adjacent.
   use Up/Down and Enter to select. The tmux-shaped bindings use `Ctrl+B`, then
   `,` to rename the current tab/window and `Ctrl+B`, then `$` to rename the
   current workspace. `Ctrl+B`, then Up/Down moves between workspaces, while
-  `Ctrl+B`, then Shift+1..9 jumps directly to workspace 1..9; unshifted
-  `Ctrl+B`, then 1..9 remains tab/window selection. Herdr `v0.7.3` incorrectly
-  rejected the punctuation keycodes produced by shifted digits; the repo pins
-  stable `v0.7.4` and a post-fix Windows preview. Named Herdr sessions are separate server
+  `Ctrl+B`, then Ctrl+Alt+1..9 jumps directly to workspace 1..9 (on macOS,
+  Alt is Option); unshifted `Ctrl+B`, then 1..9 remains tab/window selection.
+  Shift+4 is intentionally not used for indexed navigation because terminals
+  report it as the literal `$`, which belongs to workspace rename. Named Herdr sessions are separate server
   namespaces, so they are attached from the shell rather than listed inside
   another session's navigator. Windows Herdr is
   beta/ConPTY-backed, so runtime behavior remains a manual checklist item before
@@ -1442,7 +1439,7 @@ update PRs are intentionally not configured.
 |---|---|---|
 | GitHub Actions | Managed, digest-pinned, labeled `github-actions` | Actions are repo-owned CI inputs with stable Renovate support. |
 | GitHub runner images | Managed, labeled `github-runners`, reviewed separately | `ubuntu-*`, `macos-*`, and `windows-*` bumps can change the supported CI platform, so they should not be mixed with ordinary Action bumps. |
-| Repo-pinned installer versions/refs | Managed, labeled `pinned-downloads`, never automerged | The v0.4.0 Nix prerequisite tarballs, Neovim Linux tarballs, chezmoi CI release archives, lazygit Linux tarballs, Starship Linux tarballs, Tree-sitter CLI Linux/Windows archives, WezTerm Ubuntu `.deb`, Herdr Linux binaries, Herdr Windows preview `.exe`, Hack Nerd Font, Windows Terminal portable zip, Ghostty distro/architecture `.deb` assets, Pi CLI npm package, zsh plugin refs, `setuptools`/`pylatexenc` converter pins, the Homebrew installer commit, the Scoop installer commit, the Renovate validator package/runtime, the Ubuntu Microsoft-repository `.deb`, and the CI `cargo-binstall` commit are explicit repo pins. |
+| Repo-pinned installer versions/refs | Managed, labeled `pinned-downloads`, never automerged | The v0.4.1 Nix prerequisite tarballs, Neovim Linux tarballs, chezmoi CI release archives, lazygit Linux tarballs, Starship Linux tarballs, Tree-sitter CLI Linux/Windows archives, WezTerm Ubuntu `.deb`, Herdr Linux binaries, Herdr Windows preview `.exe`, Hack Nerd Font, Windows Terminal portable zip, Ghostty distro/architecture `.deb` assets, Pi CLI npm package, zsh plugin refs, `setuptools`/`pylatexenc` converter pins, the Homebrew installer commit, the Scoop installer commit, the Renovate validator package/runtime, the Ubuntu Microsoft-repository `.deb`, and the CI `cargo-binstall` commit are explicit repo pins. |
 | Adjacent SHA-256 / commit constants | Not managed; matched only as regex context | Renovate can bump the version/ref but cannot recompute archive/script hashes or verify tag commit IDs. CI must fail until a human recomputes and reviews them. |
 | Package-manager catalogs | Not managed | Brew, apt, dnf, pacman, zypper, apk, Scoop, winget, and choco entries are package names/IDs, not repo version pins. Let the package manager resolve current versions. |
 | Neovim plugin and Mason tools | Not managed | `lazy-lock.json` is refreshed with Lazy and tested as editor behavior; Mason intentionally has no machine-pinned lockfile. |
@@ -1724,7 +1721,7 @@ matching artifact.
 ### Reproducing the same release on another machine
 
 ```bash
-git clone --branch v0.4.0 --single-branch \
+git clone --branch v0.4.1 --single-branch \
   https://github.com/luisgui1757/dotfiles.git ~/dotfiles
 cd ~/dotfiles
 ./setup.sh --all                 # prerequisites + packages + config + locked plugins
@@ -1744,16 +1741,16 @@ MIT. See `LICENSE`.
 |---|---|---|
 | Setup warns `multiple managed <tool> commands are on PATH` | two physically distinct installations publish the same managed command; changing `PATH` order could silently switch which one runs | keep the printed `selected` command, then remove each `duplicate` through its proven owner. Setup prints exact no-elevation cleanup only for a proven user-scoped Homebrew, npm, or Scoop package; review scope yourself for winget/Chocolatey/system managers, and use the original manager for `owner=unknown`. Setup never removes either copy automatically. Rerun setup until the warning disappears |
 | Pi setup says `expected 0.80.10 after install, got 0.80.3`, or reports multiple managed `pi` commands | an older global npm/Homebrew `pi` duplicates the repo-owned `~/.local/bin/pi`; older checkouts also let the global command win `PATH` resolution | update this repo and rerun setup. Current setup proves only `~/.local/bin/pi`, makes it win in current and future shells, and reports every physical duplicate. For a proven npm-global copy, run the exact `cleanup (same user, no sudo)` command shown, then rerun setup to confirm one command remains. Never prepend `sudo`; unknown owners must be removed with their original package manager |
-| v0.2.0 Linux Nix bootstrap ends with `cat: /etc/bashrc: Permission denied` and upstream's `Oh no` failure | the pinned upstream daemon installer prepared `/etc/bashrc` through its privileged path, then tried to read it as the invoking user; its multi-user path does not honor the public `--no-modify-profile` option | if `/etc/bashrc.backup-before-nix` exists after the failure, restore it with `sudo mv /etc/bashrc.backup-before-nix /etc/bashrc`. For immutable v0.2.0 without that backup, the bounded workaround is `sudo chmod a+r /etc/bashrc` before rerunning. Move to the exact v0.4.0 release checkout and rerun `./setup.sh --all`; its hash-verified local patch skips the daemon profile step and leaves shell activation to setup/Home Manager |
-| Linux Nix bootstrap reports `getting status of '/nix/store/...-busybox...': Permission denied` while installing Nix | a restrictive invoking umask—common on managed corporate hosts—combined with Nix 2.34.0's Linux daemon copy and write-bit removal left store directories as root-only `0500`; a previous interrupted attempt can retain those modes | move to the exact v0.4.0 release checkout and rerun `./setup.sh --all` as the normal target user. Its checksum-bound daemon installer normalizes the copied and pre-existing store paths to read-only/traversable modes before Nix creates the default profile; do not run all of setup with `sudo` |
-| Corporate Linux bootstrap warns that `https://channels.nixos.org/nixpkgs-unstable` failed TLS verification | upstream's legacy default-channel step uses its bundled CA file, which does not contain the corporate TLS-inspection root; the dotfiles package layer uses locked flakes and does not need this mutable channel | move to the exact v0.4.0 release checkout and rerun `./setup.sh --all`. The wrapper disables channel creation with upstream's public `--no-channel-add`; subsequent Nix activation selects the host system CA bundle, preserving corporate trust without weakening TLS verification |
+| v0.2.0 Linux Nix bootstrap ends with `cat: /etc/bashrc: Permission denied` and upstream's `Oh no` failure | the pinned upstream daemon installer prepared `/etc/bashrc` through its privileged path, then tried to read it as the invoking user; its multi-user path does not honor the public `--no-modify-profile` option | if `/etc/bashrc.backup-before-nix` exists after the failure, restore it with `sudo mv /etc/bashrc.backup-before-nix /etc/bashrc`. For immutable v0.2.0 without that backup, the bounded workaround is `sudo chmod a+r /etc/bashrc` before rerunning. Move to the exact v0.4.1 release checkout and rerun `./setup.sh --all`; its hash-verified local patch skips the daemon profile step and leaves shell activation to setup/Home Manager |
+| Linux Nix bootstrap reports `getting status of '/nix/store/...-busybox...': Permission denied` while installing Nix | a restrictive invoking umask—common on managed corporate hosts—combined with Nix 2.34.0's Linux daemon copy and write-bit removal left store directories as root-only `0500`; a previous interrupted attempt can retain those modes | move to the exact v0.4.1 release checkout and rerun `./setup.sh --all` as the normal target user. Its checksum-bound daemon installer normalizes the copied and pre-existing store paths to read-only/traversable modes before Nix creates the default profile; do not run all of setup with `sudo` |
+| Corporate Linux bootstrap warns that `https://channels.nixos.org/nixpkgs-unstable` failed TLS verification | upstream's legacy default-channel step uses its bundled CA file, which does not contain the corporate TLS-inspection root; the dotfiles package layer uses locked flakes and does not need this mutable channel | move to the exact v0.4.1 release checkout and rerun `./setup.sh --all`. The wrapper disables channel creation with upstream's public `--no-channel-add`; subsequent Nix activation selects the host system CA bundle, preserving corporate trust without weakening TLS verification |
 | Neovim stops before loading Lazy with a lockfile/cache identity error | `lazy-lock.json` is missing, malformed, incomplete, has a non-40-hex commit or invalid branch; or the cached `lazy.nvim` checkout is dirty, at the wrong commit, from the wrong origin, missing locked default-branch metadata, non-Git, or partial | restore the tracked `nvim/lazy-lock.json` and restart Neovim. Startup repairs the cache through a verified staging checkout and never executes an unproved path. If publication fails, fix the destination permissions named in the error and retry |
 | setup reports a Homebrew `shellenv` failure even though `brew` already resolves | the selected command and PATH-resolved command report different Homebrew prefixes/repositories, or `shellenv` exited nonzero; empty stdout alone is a normal Homebrew idempotence signal | compare `brew --prefix` and `brew --repository` through both entrypoints named in the error. Repair the shadowing PATH or Homebrew installation, then rerun setup; a nix-darwin wrapper and native brew path are accepted only when those identities match |
 | a new zsh prints `compinit: no such file or directory: .../_brew` | Homebrew's core completion symlink survived a repository/Nix-generation migration but its target did not; `brew completions link` alone only reconciles tap completions | update this repo and rerun setup or `./setup.sh --update`; both paths reconcile tap completions, atomically repair a missing/dangling core `_brew` symlink to the active Homebrew implementation, and verify the resolved target. A conflicting non-symlink is preserved and reported instead of overwritten |
 | first nix-darwin setup reports an existing `.before-nix-darwin` backup | setup found both an unmanaged `/etc/bashrc` or `/etc/zshrc` and an older backup, so choosing either would risk user/system data | compare the two files and resolve the collision deliberately, then rerun. Setup moves neither shell file until both backup destinations are clear and restores both if activation fails |
 | setup says it is bootstrapping nix-darwin again immediately after a successful activation | the checkout predates the retry fix, so the still-open terminal cannot see the new system profile on `PATH` and setup mistakes the retry for first bootstrap | update the checkout and rerun setup. Current setup resolves `/run/current-system/sw/bin/darwin-rebuild` directly and accepts the managed `/etc/static` shell links without touching their recovery backups |
 | `<leader>X` keymaps fire `\X` instead of `<Space>X` | mapleader set after lazy.setup somehow | restore the order in `nvim/init.lua` — leader **before** `require("lazy").setup` |
-| Herdr `Ctrl+B`, then `Shift+1..9` does nothing | Herdr `v0.7.3` did not map shifted digits to the punctuation keycodes terminals report | update this repo and rerun setup/update. Native Linux pins `v0.7.4`, current Homebrew carries `v0.7.4`, and Windows uses the pinned post-fix preview |
+| Herdr `Ctrl+B`, then `Shift+4` renames the workspace instead of jumping to workspace 4 | terminals report `Shift+4` as the literal `$`, which is the workspace-rename binding | update this repo and rerun setup/update, then use `Ctrl+B`, release, and `Ctrl+Alt+1..9` for direct workspace jumps (`Ctrl+Option+1..9` on macOS) |
 | Formatter runs twice or shows two BufWritePre autocmds | someone added a second handler outside conform.nvim | `:lua print(#vim.api.nvim_get_autocmds({event="BufWritePre"}))` should be 1; if not, find the second autocmd and delete it |
 | Lazy/Tree-sitter/Mason says `No C compiler found` | WSL/Linux has `make` but no `cc`/`gcc`/`clang`; Tree-sitter parsers and some plugin builds compile native code | re-run `./setup.sh --skip-config` to install the Linux compiler toolchain, or on Ubuntu run `sudo apt-get update && sudo apt-get install -y build-essential`, then `./setup.sh --skip-deps --skip-config` |
 | Tree-sitter parser install reports temp-dir rename errors such as `ENOTEMPTY`, or a cold setup reports a parser with no captures | a previous/parallel parser build left partial grammar/query output, or an older command-form Lazy `:TSUpdate` returned before its compiler tasks finished | update this repo and rerun setup; both the Lazy update hook and explicit bootstrap now serialize and wait for their upstream tasks, incomplete managed output is purged, and Tier 2 fails causally if any declared parser or explicit highlight query is missing |
