@@ -49,7 +49,7 @@ top-level sources instead.
 `v0.1.0` is a chezmoi release, not a pre-chezmoi install. Its POSIX targets are
 live symlinks into the source checkout, so the former README `git pull` path was
 unsafe: it could publish new bytes before current setup reached backup. The
-canonical v0.4.2 path is side-by-side and exact-tag-only:
+canonical v0.4.3 path is side-by-side and exact-tag-only:
 
 - `setup.sh --all` and `setup.ps1 -All` are the sole normal user entrypoints.
   They discover exact live v0.1.0 ownership, invoke the platform transaction,
@@ -77,8 +77,8 @@ canonical v0.4.2 path is side-by-side and exact-tag-only:
   overlay state on rollback, and validates all four canonical Terminal paths
   before any restore write.
 - `scripts/install-nix-prerequisite.sh` installs only checksum-reviewed upstream
-  Nix 2.34.0 release archives. The published default requires the exact v0.4.2
-  annotated tag object and peeled commit. The explicit POSIX
+  Nix 2.34.0 release archives. Once published, the default requires the exact
+  v0.4.3 annotated tag object and peeled commit. The explicit POSIX
   `--allow-unreleased` field-test lane may instead accept a clean checkout whose
   HEAD equals a current branch head in the official repository; forks, dirty
   trees, stale/local-only commits, and the exact-tag migration tools remain
@@ -108,6 +108,13 @@ canonical v0.4.2 path is side-by-side and exact-tag-only:
   acceptance. Windows Pester pins digest-bound release trees, complete/frozen Terminal recovery,
   all-target concurrency rejection, known-folder state validation, and the
   pre-migration command-provider boundary.
+
+The v0.4.3 candidate keeps the same frozen-source and rollback boundaries while
+moving the current exact-tag authority, setup recovery namespace, and
+prerequisite identity to `v0.4.3`. Setup also treats any unfinished v0.4.2
+transaction as an older recovery that must be accepted or rolled back before
+v0.4.3 can begin. Publication identities will be recorded only after the
+reviewed preparation tree merges and the exact-tag gates pass.
 
 The annotated v0.4.2 release was published on 2026-07-25 after its exact local,
 hosted cache-free, release-range/proof scan, fresh detached public-clone, and

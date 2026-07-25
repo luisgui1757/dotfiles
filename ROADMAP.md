@@ -1,7 +1,7 @@
 # Dotfiles Roadmap
 
-Last audited: 2026-07-25 after immutable v0.4.2 publication and adversarial audit.
-Baseline: `main` at `fdd628b34a58a3ecf3a1bef3de72f7cd4ac7dfc0`.
+Last audited: 2026-07-25 during v0.4.3 release preparation.
+Baseline: `main` at `6e9ccf8086fdb36cbfe06280718decd93e53e89d`.
 
 This is the adversarial post-merge roadmap for the chezmoi migration and the
 current setup/CI surface. The goal is not "good enough"; the repo should have a
@@ -1247,14 +1247,14 @@ every other zsh plugin surface.
 ### 9. The published in-place upgrade crossed the config backup boundary
 
 Status: implementation done; v0.2.0, v0.3.0, v0.4.0, v0.4.1, and v0.4.2
-published.
+published; v0.4.3 release preparation in progress.
 
 Evidence:
 
 - Exact v0.1.0 POSIX config uses checkout-backed chezmoi symlinks. Updating that
   checkout changed live bytes before current setup could back them up.
 - `scripts/upgrade-v0.1.0.sh` and `.ps1` now require clean, separate official
-  annotated v0.1.0/v0.4.2 checkouts and retain v0.1.0 until acceptance.
+  annotated v0.1.0/v0.4.3 checkouts and retain v0.1.0 until acceptance.
 - The public `setup.sh --all` / `setup.ps1 -All` entrypoints now discover exact
   live v0.1.0 ownership, invoke and verify those transactions, resume a pending
   applied recovery, accept under the explicit non-interactive all-mode
@@ -1280,7 +1280,7 @@ Evidence:
   acceptance. Windows Pester proves frozen release-tree validation, complete Terminal recovery,
   all-target concurrency rejection, known-folder boundary validation, private
   ACL policy, and provider-boundary verification.
-- `docs/UPGRADING.md` and `docs/releases/v0.4.2.md` define the supported
+- `docs/UPGRADING.md` and `docs/releases/v0.4.3.md` define the supported
   per-platform commands, Apple-Silicon-only macOS boundary, WSL ordering, Nix
   provenance, and release evidence gate.
 
@@ -1313,6 +1313,9 @@ Canonical solution:
    created the zsh-plugin parent tree. Check-only probes now return before
    parent creation or lock acquisition; direct and real chezmoi preview oracles
    bind the write-free contract.
+10. IN PROGRESS - Prepare, merge, tag, certify, and publish v0.4.3 from the
+    exact post-audit repair tree; record only observed tag, workflow, scan, and
+    immutable-release identities after each gate passes.
 
 ## Disproved Or Non-Blocking Assumptions
 
