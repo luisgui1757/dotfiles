@@ -1,7 +1,7 @@
 # Dotfiles Roadmap
 
-Last audited: 2026-07-25 during v0.4.2 release preparation.
-Baseline: `main` at `e085ea62ba19819b81b3d7bcfc0ead5ec57904c4`.
+Last audited: 2026-07-25 during v0.4.2 publication closure.
+Baseline: `main` at `fdd628b34a58a3ecf3a1bef3de72f7cd4ac7dfc0`.
 
 This is the adversarial post-merge roadmap for the chezmoi migration and the
 current setup/CI surface. The goal is not "good enough"; the repo should have a
@@ -1246,8 +1246,8 @@ every other zsh plugin surface.
 
 ### 9. The published in-place upgrade crossed the config backup boundary
 
-Status: implementation done; v0.2.0, v0.3.0, v0.4.0, and v0.4.1 published;
-v0.4.2 release preparation in progress.
+Status: implementation done; v0.2.0, v0.3.0, v0.4.0, v0.4.1, and v0.4.2
+published.
 
 Evidence:
 
@@ -1297,9 +1297,13 @@ Canonical solution:
    published. Apple Silicon owner-host, real WSL2, redirected Windows,
    divergent stable packaged/Preview/Canary/portable Terminal, physical Linux,
    and visual rows remain explicit residual gaps.
-7. IN PROGRESS - Prepare, merge, tag, certify, and publish v0.4.2 from the
-   exact npm-prefix fix tree; record only observed tag, workflow, scan, and
-   immutable-release identities after each gate passes.
+7. DONE - Pull request #70 merged the reviewed release-preparation tree to
+   `fdd628b34a58a3ecf3a1bef3de72f7cd4ac7dfc0`; annotated tag object
+   `807b2f8bb47ae9c7e132f1f8a218cf19c9ae2c61`, cache-free run
+   `30152048314`, the release-range/proof scans, a fresh detached public clone,
+   and immutable/latest GitHub release `359736736` all passed their exact
+   identity gates. Diagnostic run `30151746003` remains failed evidence, not
+   promoted proof.
 
 ## Disproved Or Non-Blocking Assumptions
 

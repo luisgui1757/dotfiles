@@ -77,8 +77,8 @@ canonical v0.4.2 path is side-by-side and exact-tag-only:
   overlay state on rollback, and validates all four canonical Terminal paths
   before any restore write.
 - `scripts/install-nix-prerequisite.sh` installs only checksum-reviewed upstream
-  Nix 2.34.0 release archives. Once published, the default requires the exact
-  v0.4.2 annotated tag object and peeled commit. The explicit POSIX
+  Nix 2.34.0 release archives. The published default requires the exact v0.4.2
+  annotated tag object and peeled commit. The explicit POSIX
   `--allow-unreleased` field-test lane may instead accept a clean checkout whose
   HEAD equals a current branch head in the official repository; forks, dirty
   trees, stale/local-only commits, and the exact-tag migration tools remain
@@ -109,10 +109,14 @@ canonical v0.4.2 path is side-by-side and exact-tag-only:
   all-target concurrency rejection, known-folder state validation, and the
   pre-migration command-provider boundary.
 
-The v0.4.2 candidate keeps the same frozen-source and rollback boundaries while
-moving the current exact-tag authority, setup recovery namespace, and
-prerequisite identity to `v0.4.2`. Publication identities will be recorded only
-after the reviewed preparation tree merges and the exact-tag gates pass.
+The annotated v0.4.2 release was published on 2026-07-25 after its exact local,
+hosted cache-free, release-range/proof scan, fresh detached public-clone, and
+immutable-release gates passed. Its setup, prerequisite helper, and both
+v0.1.0 migrators bind tag object
+`807b2f8bb47ae9c7e132f1f8a218cf19c9ae2c61` to peeled commit
+`fdd628b34a58a3ecf3a1bef3de72f7cd4ac7dfc0` while retaining the same
+frozen-source and rollback boundaries. GitHub release `359736736` is immutable
+and latest.
 
 The annotated v0.4.1 release was published on 2026-07-22 after its exact local,
 hosted cache-free, release-range/proof scan, and immutable-release gates passed.
