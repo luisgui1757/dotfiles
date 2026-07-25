@@ -784,6 +784,9 @@ tool. Phase 6 then asks **"Apply Sentinel global agent rules? [Y/n]"** unless
 `--all` / `-All`, `--dry-run` / `-DryRun`, or `--skip-agents` / `-SkipAgents`
 already made that decision.
 Add `--dry-run` / `-DryRun` to preview every step without touching disk.
+On POSIX, the zsh-plugin fingerprints rendered by chezmoi are check-only:
+`diff`, `status`, and dry-run apply neither create the plugin parent directory
+nor acquire a publication lock.
 Pass `--skip-agents` / `-SkipAgents` to leave global AI-agent entrypoints alone.
 Pass `--update` / `-Update` from an exact release checkout to run the same
 install-or-migrate and full-reconciliation path as all mode, followed by scoped
@@ -1011,7 +1014,9 @@ POSIX pwsh profile management remains provisioning-adjacent.
   serializes concurrent starts, quarantines an unproved payload before any
   fetch, stages the exact commit beside the target, proves origin, HEAD,
   cleanliness, worktree identity, and the tracked plugin entry file, then
-  publishes atomically. A clean old pin self-heals; dirty/wrong-origin/partial
+  publishes atomically. Template-time check-only probes never create an absent
+  plugin parent or publication lock, so chezmoi diff/status/dry-run previews
+  stay write-free. A clean old pin self-heals; dirty/wrong-origin/partial
   payloads remain quarantined for recovery and are never left sourceable.
   Completion is `fzf-tab` (an fzf-driven fuzzy Tab menu over native `compinit`)
   — it loads *after* `compinit` and *before*

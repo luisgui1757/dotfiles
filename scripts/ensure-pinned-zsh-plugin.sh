@@ -40,9 +40,16 @@ case "$repo" in
 esac
 
 parent="$(dirname "$target")"
-mkdir -p "$parent"
-parent="$(cd "$parent" && pwd -P)"
-target="$parent/$(basename "$target")"
+if [[ "${DOTFILES_PINNED_GIT_CHECK_ONLY:-0}" == "1" ]]; then
+    if [[ -d "$parent" ]]; then
+        parent="$(cd "$parent" && pwd -P)"
+        target="$parent/$(basename "$target")"
+    fi
+else
+    mkdir -p "$parent"
+    parent="$(cd "$parent" && pwd -P)"
+    target="$parent/$(basename "$target")"
+fi
 lock="${target}.lock"
 stage=""
 quarantine=""
@@ -124,6 +131,21 @@ unique_quarantine() {
     printf '%s\n' "$candidate"
 }
 
+if [[ "${DOTFILES_PINNED_GIT_CHECK_ONLY:-0}" == "1" ]]; then
+    if checkout_ok "$target" "$repo" "$commit" "$required_file"; then
+        printf '%s\n' "ready:$commit"
+    elif [[ -n "${DOTFILES_PINNED_GIT_BOOTSTRAP_MARKER:-}" &&
+        ! -e "$DOTFILES_PINNED_GIT_BOOTSTRAP_MARKER" ]]; then
+        # First apply has no chezmoi script state yet and will execute this
+        # run_onchange script. Match the post-install fingerprint so a fresh
+        # successful apply verifies cleanly without a redundant second run.
+        printf '%s\n' "ready:$commit"
+    else
+        printf '%s\n' "invalid"
+    fi
+    exit 0
+fi
+
 attempt=0
 while ! mkdir "$lock" 2>/dev/null; do
     lock_pid="$(cat "$lock/pid" 2>/dev/null || true)"
@@ -146,21 +168,6 @@ while ! mkdir "$lock" 2>/dev/null; do
 done
 have_lock=1
 printf '%s\n' "$$" > "$lock/pid"
-
-if [[ "${DOTFILES_PINNED_GIT_CHECK_ONLY:-0}" == "1" ]]; then
-    if checkout_ok "$target" "$repo" "$commit" "$required_file"; then
-        printf '%s\n' "ready:$commit"
-    elif [[ -n "${DOTFILES_PINNED_GIT_BOOTSTRAP_MARKER:-}" &&
-        ! -e "$DOTFILES_PINNED_GIT_BOOTSTRAP_MARKER" ]]; then
-        # First apply has no chezmoi script state yet and will execute this
-        # run_onchange script. Match the post-install fingerprint so a fresh
-        # successful apply verifies cleanly without a redundant second run.
-        printf '%s\n' "ready:$commit"
-    else
-        printf '%s\n' "invalid"
-    fi
-    exit 0
-fi
 
 if checkout_ok "$target" "$repo" "$commit" "$required_file"; then
     printf "  ok        %-26s %s (%s)\n" "$name" "$ref" "$commit"

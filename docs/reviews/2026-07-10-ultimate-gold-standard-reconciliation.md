@@ -3284,3 +3284,29 @@ Real Apple Silicon owner lifecycle, physical Linux, WSL2 split-host,
 redirected Windows, divergent stable packaged/Preview/Canary/portable Terminal,
 and desktop/visual/TCC rows remain open. No completion of those manual surfaces
 is claimed by this audit remediation.
+
+## v0.4.2 follow-up stale-baseline audit reconciliation — entry 80
+
+- The follow-up whole-repository audit inspected release commit
+  `fdd628b34a58a3ecf3a1bef3de72f7cd4ac7dfc0`, not the remediation branch based
+  on publication-closure commit `8d500185955feed3e3ad914b04d5a01d0ba5706f`.
+  Its truncated Nix ledger hash and missing POSIX uninstall-order CI findings
+  are therefore duplicates already fixed and regression-bound by entry 79.
+- The remaining Medium finding is accepted. Chezmoi renders the zsh-plugin
+  fingerprints during `diff`, `status`, and dry-run apply. The publisher
+  previously created the target parent and acquired a transient lock before its
+  check-only branch, contradicting the advertised write-free preview contract.
+  An isolated direct execution and real chezmoi previews reproduced the
+  persistent `.local/share/dotfiles/zsh-plugins` parent creation.
+- Check-only execution now returns before parent creation or publication-lock
+  acquisition while retaining the same bootstrap-marker and verified-checkout
+  fingerprints. Publication mode retains its existing same-parent staging,
+  serialized lock, quarantine, identity proof, and atomic publish behavior.
+
+### Follow-up verification
+
+| Check | Exact result |
+|---|---|
+| Direct check-only publisher before the fix | EXPECTED FAIL: returned the bootstrap `ready:` fingerprint but created the absent plugin parent chain |
+| `tests/shell/pinned_zsh_plugin_publisher_test.sh` | PASS: fresh and initialized missing-target probes leave the parent absent; a verified-target probe creates no lock; all publication/repair/concurrency cases still pass |
+| `tests/migration/oracle_test.sh` | PASS: real chezmoi `diff`, `status`, and `--dry-run apply` leave an absent `.local` tree absent; apply/self-heal/verify oracles still pass |

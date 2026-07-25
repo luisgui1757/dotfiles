@@ -1308,6 +1308,11 @@ Canonical solution:
    existing-`nix.conf` merge, abandoned Neovim cache-lock recovery, the
    malformed Nix archive ledger hash, and required POSIX uninstall-order CI
    coverage. Focused behavioral/static tests and the full gate bind each fix.
+9. DONE - A follow-up stale-baseline audit re-reported the ledger and CI defects
+   already fixed by item 8, and newly proved that chezmoi preview rendering
+   created the zsh-plugin parent tree. Check-only probes now return before
+   parent creation or lock acquisition; direct and real chezmoi preview oracles
+   bind the write-free contract.
 
 ## Disproved Or Non-Blocking Assumptions
 

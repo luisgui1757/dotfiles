@@ -157,8 +157,11 @@ that violates one of these, fix it instead of disabling the test.
     pin/helper-sensitive chezmoi `run_onchange` script. It neutralizes any unproved sourceable target,
     stages the exact commit in the same parent, proves expected origin, HEAD,
     clean/usable worktree, and tracked regular entry file, then atomically
-    publishes under a serialized lock. Never restore generic chezmoi
-    `git-repo` externals for executable zsh payloads.
+    publishes under a serialized lock. Its template-time check-only path is
+    strictly read-only: an absent plugin parent stays absent and no publication
+    lock is acquired, including during chezmoi `diff`, `status`, and dry-run
+    apply. Never restore generic chezmoi `git-repo` externals for executable zsh
+    payloads.
     PowerShell uses `HistorySearch` parity. Do NOT swap in an always-on
     as-you-type completion-list plugin — that paradigm rebinds Ctrl-R, fights
     `zsh-autosuggestions`, and is slow; fzf-tab + autosuggestions is the

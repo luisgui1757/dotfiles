@@ -31,12 +31,45 @@ EOF
 repo="file://$WORK/plugin.git"
 export DOTFILES_PINNED_GIT_ALLOW_FILE=1
 
+# Template-time state probes must be strictly read-only. A fresh bootstrap
+# marker reports the post-install fingerprint without creating the target
+# parent; an existing marker reports the missing checkout without doing so.
+check_only_target="$WORK/check-only/home/.local/share/dotfiles/zsh-plugins/plugin"
+check_only_marker="$WORK/check-only-marker"
+check_only_output="$(
+    DOTFILES_PINNED_GIT_CHECK_ONLY=1 \
+    DOTFILES_PINNED_GIT_BOOTSTRAP_MARKER="$check_only_marker" \
+    /bin/bash "$PUBLISHER" check-only-plugin "$repo" v1 "$commit1" plugin.zsh "$check_only_target"
+)"
+[[ "$check_only_output" == "ready:$commit1" ]] ||
+    fail "fresh check-only probe did not report the bootstrap fingerprint"
+[[ ! -e "$WORK/check-only" ]] ||
+    fail "fresh check-only probe created the absent target parent"
+printf '%s\n' initialized > "$check_only_marker"
+check_only_output="$(
+    DOTFILES_PINNED_GIT_CHECK_ONLY=1 \
+    DOTFILES_PINNED_GIT_BOOTSTRAP_MARKER="$check_only_marker" \
+    /bin/bash "$PUBLISHER" check-only-plugin "$repo" v1 "$commit1" plugin.zsh "$check_only_target"
+)"
+[[ "$check_only_output" == "invalid" ]] ||
+    fail "check-only probe with initialized state accepted a missing checkout"
+[[ ! -e "$WORK/check-only" ]] ||
+    fail "initialized check-only probe created the absent target parent"
+
 target="$WORK/managed/plugin"
 /bin/bash "$PUBLISHER" test-plugin "$repo" v1 "$commit1" plugin.zsh "$target" >/dev/null
 [[ "$(git -C "$target" rev-parse HEAD)" == "$commit1" ]] || fail "initial exact commit was not published"
 [[ "$(cat "$target/plugin.zsh")" == plugin-v1 ]] || fail "initial required plugin file is wrong"
 [[ "$(git -C "$target" remote get-url origin)" == "$repo" ]] || fail "published origin is wrong"
 [[ -z "$(git -C "$target" status --porcelain --untracked-files=all --ignored)" ]] || fail "published checkout is not clean"
+check_only_output="$(
+    DOTFILES_PINNED_GIT_CHECK_ONLY=1 \
+    /bin/bash "$PUBLISHER" test-plugin "$repo" v1 "$commit1" plugin.zsh "$target"
+)"
+[[ "$check_only_output" == "ready:$commit1" ]] ||
+    fail "check-only probe did not recognize a verified checkout"
+[[ ! -e "${target}.lock" ]] ||
+    fail "verified check-only probe created a publication lock"
 
 # Verified-cache reuse performs no network repair and creates no staging state.
 mv "$WORK/plugin.git" "$WORK/plugin.git.offline"
