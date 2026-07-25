@@ -319,6 +319,10 @@ jobs:
         run: |
           set -euo pipefail
           PATH="$HOME/.local/bin:$PATH" bash tests/migration/uninstall_safety_test.sh
+      - name: Uninstall backup selection (adversarial)
+        run: |
+          set -euo pipefail
+          PATH="$HOME/.local/bin:$PATH" bash tests/migration/uninstall_backup_order_test.sh
       - name: Windows template render/parse/merge (pwsh)
         run: |
           set -euo pipefail
@@ -368,6 +372,10 @@ jobs:
         run: |
           set -euo pipefail
           PATH="$HOME/.local/bin:$PATH" bash tests/migration/uninstall_safety_test.sh
+      - name: Uninstall backup selection (adversarial)
+        run: |
+          set -euo pipefail
+          PATH="$HOME/.local/bin:$PATH" bash tests/migration/uninstall_backup_order_test.sh
       - name: Oracle (negative) tests
         run: |
           set -euo pipefail

@@ -3246,3 +3246,41 @@ Real Apple Silicon owner lifecycle, physical Linux, WSL2 split-host,
 redirected Windows, divergent stable packaged/Preview/Canary/portable Terminal,
 and desktop/visual/TCC rows remain open. No completion of those manual surfaces
 is claimed by publication.
+
+## v0.4.2 post-publication adversarial-audit remediation — entry 79
+
+- A post-publication whole-repository adversarial audit accepted no Critical
+  findings and reported one High plus three Medium defects. Independent
+  reconciliation confirmed all four:
+  - the existing-`nix.conf` path used the reserved `awk` function-parameter
+    name `index`, so reconciliation and single-user Linux setup aborted;
+  - abandoned Neovim plugin-cache locks had no owner proof or recovery;
+  - the x86_64-linux Nix archive ledger hash was truncated and its
+    implementation/ledger mirror lacked a drift guard;
+  - the sole adversarial POSIX uninstall backup-order oracle was absent from
+    required Ubuntu and macOS parity jobs.
+- The fixes are canonical and fail-closed: Nix merging is portable, preserves
+  unrelated config, and cleans its atomic stage; Neovim records lock owners,
+  reclaims only an OS-proven dead PID, and gives an exact recovery path when
+  ownership cannot be proved; release hashes are shape- and mirror-checked; and
+  Makefile migration tests are policy-bound into both POSIX parity jobs, with
+  only the Windows renderer explicitly platform-exempt.
+- Publication-document drift observed during reconciliation was resolved
+  independently by the preceding canonical closure entry 78 and pull request
+  #71; this remediation does not duplicate or supersede that evidence.
+
+### Audit-remediation verification
+
+| Check | Exact result |
+|---|---|
+| `tests/shell/nix_prerequisite_identity_test.sh` before the fix | EXPECTED FAIL: platform `awk` rejected `index` in `has_token`; the existing-config reconciliation path exited nonzero |
+| `tests/nvim/spec/pinned_git_checkout_spec.lua` before the fix | EXPECTED FAIL: a dead-owner lock timed out instead of being reclaimed |
+| Focused Nix prerequisite test after the fix | PASS: 15 identity/install behaviors, including existing-config reconciliation, injected-render rollback/cleanup, and single-user Linux merge with no staged residue |
+| Focused pinned-checkout spec after the fix | PASS: 11 behavioral cases, including dead-owner reclaim and live-owner preservation |
+| Supply-chain, repository-policy, and uninstall-order focused checks | PASS: archive identities/shape, Makefile-to-CI migration coverage, and the adversarial backup-selection oracle |
+| Final `make ci` on the complete remediation tree | PASS: ended `local pre-PR gate passed`; local `pwsh` remained unavailable and the existing PowerShell parser/render checks self-skipped as designed |
+
+Real Apple Silicon owner lifecycle, physical Linux, WSL2 split-host,
+redirected Windows, divergent stable packaged/Preview/Canary/portable Terminal,
+and desktop/visual/TCC rows remain open. No completion of those manual surfaces
+is claimed by this audit remediation.

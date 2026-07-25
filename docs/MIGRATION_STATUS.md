@@ -230,7 +230,17 @@ broken repo-symlink still cleaned) is covered by
 - [x] POSIX and Windows uninstall choose backups from validated filename
       timestamps/collision suffixes instead of mtime. Opposing mtime order,
       files/directories, collisions, malformed names, and pre-mutation failure
-      are covered by shell and Pester tests.
+      are covered by shell and Pester tests. The POSIX adversarial oracle runs
+      in both required Ubuntu and macOS parity jobs, and a policy test binds
+      Makefile migration coverage to those jobs.
+- [x] Existing POSIX Nix user configs merge `nix-command flakes` with portable
+      `awk`, preserve unrelated settings/comments, publish through a
+      same-directory atomic stage, and remove that stage on every trapped exit.
+      Reconciliation and single-user Linux installation both exercise the
+      existing-config path.
+- [x] Neovim plugin-cache locks record their owner PID. A waiter reclaims only
+      an OS-proven dead owner; a live, malformed, legacy ownerless, or
+      unprovable lock stays fail-closed and reports the exact recovery path.
 
 - [x] POSIX setup now resolves one authoritative non-root target account and
       account-record home before Nix, Home Manager, chezmoi, or native setup.

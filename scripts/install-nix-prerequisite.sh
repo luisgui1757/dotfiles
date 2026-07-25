@@ -97,7 +97,11 @@ fi
 work="$(mktemp -d "${TMPDIR:-/tmp}/dotfiles-nix-install.XXXXXX")"
 chmod 700 "$work"
 mkdir "$work/remote-query"
+nix_user_config_stage=""
 cleanup() {
+    if [[ -n "$nix_user_config_stage" ]]; then
+        rm -f -- "$nix_user_config_stage"
+    fi
     rm -rf "$work"
 }
 trap cleanup EXIT
@@ -110,21 +114,21 @@ printf '%s\n' 'extra-experimental-features = nix-command flakes' > "$nix_extra_c
 chmod 600 "$nix_extra_conf"
 
 ensure_user_nix_features() {
-    local config_root config stage rendered
+    local config_root config rendered
     config_root="${XDG_CONFIG_HOME:-$HOME/.config}/nix"
     config="$config_root/nix.conf"
     [[ ! -L "$config" ]] || fail "refusing to replace symlinked Nix user config: $config"
     [[ ! -e "$config" || -f "$config" ]] || fail "Nix user config is not a regular file: $config"
     mkdir -p "$config_root"
-    stage="$(mktemp "$config_root/.nix.conf.dotfiles.XXXXXX")"
+    nix_user_config_stage="$(mktemp "$config_root/.nix.conf.dotfiles.XXXXXX")"
     rendered="$work/nix-user-conf.rendered"
     if [[ -f "$config" ]]; then
-        cp -p "$config" "$stage"
+        cp -p "$config" "$nix_user_config_stage"
         awk '
-            function has_token(value, token, count, parts, index) {
+            function has_token(value, token, count, parts, idx) {
                 count = split(value, parts, /[[:space:]]+/)
-                for (index = 1; index <= count; index++) {
-                    if (parts[index] == token) return 1
+                for (idx = 1; idx <= count; idx++) {
+                    if (parts[idx] == token) return 1
                 }
                 return 0
             }
@@ -160,12 +164,13 @@ ensure_user_nix_features() {
                 if (!updated) print "extra-experimental-features = nix-command flakes"
             }
         ' "$config" > "$rendered"
-        cat "$rendered" > "$stage"
+        cat "$rendered" > "$nix_user_config_stage"
     else
-        printf '%s\n' 'extra-experimental-features = nix-command flakes' > "$stage"
-        chmod 600 "$stage"
+        printf '%s\n' 'extra-experimental-features = nix-command flakes' > "$nix_user_config_stage"
+        chmod 600 "$nix_user_config_stage"
     fi
-    mv -f "$stage" "$config"
+    mv -f "$nix_user_config_stage" "$config"
+    nix_user_config_stage=""
     echo "Configured Nix user features: nix-command flakes"
 }
 

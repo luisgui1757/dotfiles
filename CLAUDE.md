@@ -350,8 +350,11 @@ that violates one of these, fix it instead of disabling the test.
       trust roots. Hosted bootstrap rejects any attempted channel URL. Its
       reviewed extra config enables `nix-command flakes` in daemon installs;
       single-user Linux merges those additive features into the user's Nix
-      config, and a retry self-heals the same disabled-feature state after an
-      otherwise-complete install. Before invoking that helper,
+      config, preserving unrelated settings and comments. The existing-config
+      merge must parse under the platform `awk`, add each feature exactly once,
+      and register its same-directory atomic stage with EXIT cleanup. A retry
+      self-heals the same disabled-feature state after an otherwise-complete
+      install. Before invoking that helper,
       greenfield Linux/WSL setup must reuse `install-deps.sh`'s source-only
       `require_downloader` path to install `curl` plus CA certificates through
       the detected package manager; this bootstrap precedes Nix because the full
@@ -386,8 +389,11 @@ that violates one of these, fix it instead of disabling the test.
     a clean tracked/untracked state, and the required Lua entrypoint. Repairs
     fetch the locked commit into a same-parent staging checkout under an atomic
     lock, verify it, preserve the previous checkout until publication succeeds,
-    and clean lock/staging state on failure. Runtimepath mutation and
-    `require("lazy")` occur only after that proof. Guarded behaviorally by
+    and clean lock/staging state on failure. Each lock records its owner PID;
+    waiters reclaim it only when the OS proves that owner is gone, while live,
+    malformed, legacy ownerless, or otherwise unprovable locks fail closed with
+    the exact recovery path. Runtimepath mutation and `require("lazy")` occur
+    only after that proof. Guarded behaviorally by
     `tests/nvim/spec/pinned_git_checkout_spec.lua`; do not replace this with
     grep-only evidence or a mutable `git clone` directly into the live cache.
     For lazy.nvim, validate the locked branch name and prove `origin/HEAD` plus

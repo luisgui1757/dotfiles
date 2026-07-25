@@ -1,6 +1,6 @@
 # Dotfiles Roadmap
 
-Last audited: 2026-07-25 during v0.4.2 publication closure.
+Last audited: 2026-07-25 after immutable v0.4.2 publication and adversarial audit.
 Baseline: `main` at `fdd628b34a58a3ecf3a1bef3de72f7cd4ac7dfc0`.
 
 This is the adversarial post-merge roadmap for the chezmoi migration and the
@@ -1304,6 +1304,10 @@ Canonical solution:
    and immutable/latest GitHub release `359736736` all passed their exact
    identity gates. Diagnostic run `30151746003` remains failed evidence, not
    promoted proof.
+8. DONE - The post-publication adversarial audit repaired the portable
+   existing-`nix.conf` merge, abandoned Neovim cache-lock recovery, the
+   malformed Nix archive ledger hash, and required POSIX uninstall-order CI
+   coverage. Focused behavioral/static tests and the full gate bind each fix.
 
 ## Disproved Or Non-Blocking Assumptions
 

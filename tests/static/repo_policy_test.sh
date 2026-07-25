@@ -160,6 +160,33 @@ for workflow in pathlib.Path(".github/workflows").glob("*.yml"):
         if parsed and not re.fullmatch(r"[0-9a-f]{40}", parsed[1]):
             fail(f"{workflow}:{line_number} external action {parsed[0]} must use a full lowercase 40-hex commit SHA")
 
+makefile = pathlib.Path("Makefile").read_text(encoding="utf-8")
+migration_target = re.search(r"(?ms)^test-migration:\n(?P<body>(?:\t.*\n)+)", makefile)
+if not migration_target:
+    fail("Makefile must define a populated test-migration target")
+    migration_scripts = set()
+else:
+    migration_scripts = set(re.findall(r"tests/migration/[A-Za-z0-9_.-]+", migration_target.group("body")))
+
+test_workflow = pathlib.Path(".github/workflows/test.yml").read_text(encoding="utf-8")
+for job_name, allowed_local_only in (
+    ("chezmoi-parity", set()),
+    ("chezmoi-parity-macos", {"tests/migration/windows_render_test.sh"}),
+):
+    job_match = re.search(
+        rf"(?ms)^  {re.escape(job_name)}:\n(?P<body>.*?)(?=^  [A-Za-z0-9_-]+:\n|\Z)",
+        test_workflow,
+    )
+    if not job_match:
+        fail(f"test.yml is missing the {job_name} job")
+        continue
+    missing = sorted(migration_scripts - allowed_local_only - set(re.findall(
+        r"tests/migration/[A-Za-z0-9_.-]+",
+        job_match.group("body"),
+    )))
+    for script_path in missing:
+        fail(f"test.yml {job_name} job does not execute Makefile migration test {script_path}")
+
 e2e_install = pathlib.Path(".github/workflows/e2e-install.yml").read_text(encoding="utf-8")
 cache_versions = re.findall(r"actions/cache@[0-9a-f]{40}\s+# v(\d+)(?:\.\d+)*", e2e_install)
 if len(cache_versions) != 2:

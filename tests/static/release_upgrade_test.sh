@@ -98,7 +98,27 @@ for hash in \
     cfddd4008b57a71464a16d5232cba79b1c76ae9dc81bbf71b4972b0118bc29c5; do
     grep -F "$hash" scripts/install-nix-prerequisite.sh >/dev/null ||
         fail "reviewed Nix release hash is missing: $hash"
+    grep -F "$hash" docs/security/supply-chain.md >/dev/null ||
+        fail "reviewed Nix release hash is missing from the supply-chain ledger: $hash"
 done
+python3 - <<'PY'
+import pathlib
+import re
+import sys
+
+row = next(
+    (
+        line
+        for line in pathlib.Path("docs/security/supply-chain.md").read_text(encoding="utf-8").splitlines()
+        if line.startswith("| v0.4.2 Nix prerequisite |")
+    ),
+    "",
+)
+hashes = re.findall(r"`([0-9a-f]+)`", row)
+if len(hashes) != 9 or any(len(value) != 64 for value in hashes):
+    print("FAIL: v0.4.2 Nix supply-chain ledger must contain exactly nine 64-hex SHA-256 values", file=sys.stderr)
+    sys.exit(1)
+PY
 for hash in \
     832c033bac08eac43e2749427cb3e85d12f11d34685f44153bf044c6d32fafd0 \
     de0074c29f938cac623e0734e359021a5a6b595b8969908ca7c4ef3598b88332 \
