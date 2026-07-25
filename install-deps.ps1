@@ -3734,11 +3734,11 @@ $Pm = Get-AvailablePM
 
 if ($Update -and (Test-PwshIsActiveProcessHost)) {
     if ($DryRun) {
-        Write-Host "note: real Windows update mode must run under Windows PowerShell so pwsh can be replaced safely."
+        Write-Output "note: real Windows update mode must run under Windows PowerShell so pwsh can be replaced safely."
     } else {
-        Write-Host "FAIL: update mode cannot replace the active pwsh runtime." -ForegroundColor Red
-        Write-Host "Re-run from Windows PowerShell 5.1:"
-        Write-Host "  powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\setup.ps1 -Update"
+        Write-Output "FAIL: update mode cannot replace the active pwsh runtime."
+        Write-Output "Re-run from Windows PowerShell 5.1:"
+        Write-Output "  powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\setup.ps1 -Update"
         exit 1
     }
 }
