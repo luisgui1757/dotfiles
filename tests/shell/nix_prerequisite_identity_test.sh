@@ -161,17 +161,17 @@ pass "remote identity failure is explicit and does not leak a raw Git fatal"
 new_fixture exact-release
 head_commit="$($REAL_GIT -C "$fixture" rev-parse HEAD)"
 "$REAL_GIT" -C "$fixture" -c user.name=fixture -c user.email=fixture@example.invalid \
-    tag -a v0.4.2 -m release
-tag_object="$($REAL_GIT -C "$fixture" rev-parse refs/tags/v0.4.2)"
+    tag -a v0.4.3 -m release
+tag_object="$($REAL_GIT -C "$fixture" rev-parse refs/tags/v0.4.3)"
 refs="$work/exact-release.refs"
 {
-    printf '%s\trefs/tags/v0.4.2\n' "$tag_object"
-    printf '%s\trefs/tags/v0.4.2^{}\n' "$head_commit"
+    printf '%s\trefs/tags/v0.4.3\n' "$tag_object"
+    printf '%s\trefs/tags/v0.4.3^{}\n' "$head_commit"
     printf '%s\trefs/heads/main\n' "$head_commit"
 } > "$refs"
 run_helper "$fixture" "$refs"
 [[ "$rc" -eq 0 ]] || fail "exact annotated release was rejected:\n$output"
-[[ "$output" == *"Verified immutable release checkout: v0.4.2 at $head_commit"* ]] ||
+[[ "$output" == *"Verified immutable release checkout: v0.4.3 at $head_commit"* ]] ||
     fail "release success did not report the immutable identity"
 [[ "$remote_call_count" == "1" ]] || fail "release decision used $remote_call_count remote snapshots"
 assert_clean_diagnostic
@@ -179,7 +179,7 @@ pass "published annotated release accepts only its exact tag object and peeled c
 
 run_helper "$fixture" "$refs" ok 1
 [[ "$rc" -eq 0 ]] || fail "exact annotated release was rejected with the test override:\n$output"
-[[ "$output" == *"Verified immutable release checkout: v0.4.2 at $head_commit"* ]] ||
+[[ "$output" == *"Verified immutable release checkout: v0.4.3 at $head_commit"* ]] ||
     fail "test override displaced the immutable release identity"
 assert_clean_diagnostic
 pass "the explicit test override still prefers an exact immutable release"
@@ -187,18 +187,18 @@ pass "the explicit test override still prefers an exact immutable release"
 new_fixture published-without-local-tag
 head_commit="$($REAL_GIT -C "$fixture" rev-parse HEAD)"
 "$REAL_GIT" -C "$fixture" -c user.name=fixture -c user.email=fixture@example.invalid \
-    tag -a v0.4.2 -m release
-tag_object="$($REAL_GIT -C "$fixture" rev-parse refs/tags/v0.4.2)"
+    tag -a v0.4.3 -m release
+tag_object="$($REAL_GIT -C "$fixture" rev-parse refs/tags/v0.4.3)"
 refs="$work/published-without-local-tag.refs"
 {
-    printf '%s\trefs/tags/v0.4.2\n' "$tag_object"
-    printf '%s\trefs/tags/v0.4.2^{}\n' "$head_commit"
+    printf '%s\trefs/tags/v0.4.3\n' "$tag_object"
+    printf '%s\trefs/tags/v0.4.3^{}\n' "$head_commit"
     printf '%s\trefs/heads/main\n' "$head_commit"
 } > "$refs"
-"$REAL_GIT" -C "$fixture" tag -d v0.4.2 >/dev/null
+"$REAL_GIT" -C "$fixture" tag -d v0.4.3 >/dev/null
 run_helper "$fixture" "$refs"
 [[ "$rc" -ne 0 ]] || fail "official branch fallback remained open after release publication"
-[[ "$output" == *"v0.4.2 is published; use a fresh exact-tag checkout"* ]] ||
+[[ "$output" == *"v0.4.3 is published; use a fresh exact-tag checkout"* ]] ||
     fail "published-release transition did not give the exact checkout recovery:\n$output"
 assert_clean_diagnostic
 pass "release publication closes the prerelease branch-head path"
@@ -206,8 +206,8 @@ pass "release publication closes the prerelease branch-head path"
 new_fixture explicitly-authorized-unreleased
 release_commit="$($REAL_GIT -C "$fixture" rev-parse HEAD)"
 "$REAL_GIT" -C "$fixture" -c user.name=fixture -c user.email=fixture@example.invalid \
-    tag -a v0.4.2 -m release
-tag_object="$($REAL_GIT -C "$fixture" rev-parse refs/tags/v0.4.2)"
+    tag -a v0.4.3 -m release
+tag_object="$($REAL_GIT -C "$fixture" rev-parse refs/tags/v0.4.3)"
 printf 'branch head\n' >> "$fixture/tracked.txt"
 "$REAL_GIT" -C "$fixture" add tracked.txt
 "$REAL_GIT" -C "$fixture" -c user.name=fixture -c user.email=fixture@example.invalid \
@@ -215,13 +215,13 @@ printf 'branch head\n' >> "$fixture/tracked.txt"
 head_commit="$($REAL_GIT -C "$fixture" rev-parse HEAD)"
 refs="$work/explicitly-authorized-unreleased.refs"
 {
-    printf '%s\trefs/tags/v0.4.2\n' "$tag_object"
-    printf '%s\trefs/tags/v0.4.2^{}\n' "$release_commit"
+    printf '%s\trefs/tags/v0.4.3\n' "$tag_object"
+    printf '%s\trefs/tags/v0.4.3^{}\n' "$release_commit"
     printf '%s\trefs/heads/fix/linux-nix-profile-read\n' "$head_commit"
 } > "$refs"
 run_helper "$fixture" "$refs"
 [[ "$rc" -ne 0 ]] || fail "published branch head was accepted without explicit authorization"
-[[ "$output" == *"local v0.4.2 does not match the official immutable annotated release"* ]] ||
+[[ "$output" == *"local v0.4.3 does not match the official immutable annotated release"* ]] ||
     fail "default release boundary did not remain closed:\n$output"
 run_helper "$fixture" "$refs" ok 1
 [[ "$rc" -eq 0 ]] || fail "explicit official branch-head test was rejected:\n$output"
@@ -245,10 +245,10 @@ pass "the explicit test override rejects stale and local-only commits"
 new_fixture malformed-release
 head_commit="$($REAL_GIT -C "$fixture" rev-parse HEAD)"
 refs="$work/malformed-release.refs"
-printf '%s\trefs/tags/v0.4.2\n' "$head_commit" > "$refs"
+printf '%s\trefs/tags/v0.4.3\n' "$head_commit" > "$refs"
 run_helper "$fixture" "$refs"
 [[ "$rc" -ne 0 ]] || fail "lightweight or incomplete official release tag was accepted"
-[[ "$output" == *"official v0.4.2 must be one unique annotated tag"* ]] ||
+[[ "$output" == *"official v0.4.3 must be one unique annotated tag"* ]] ||
     fail "malformed official tag failure was not explicit:\n$output"
 assert_clean_diagnostic
 pass "lightweight or incomplete release identity fails closed"

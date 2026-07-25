@@ -26,33 +26,35 @@ for script in \
 done
 [[ -f scripts/upgrade-v0.1.0.ps1 ]] || fail "Windows release migrator is missing"
 
-grep -F 'new_tag="v0.4.2"' scripts/upgrade-v0.1.0.sh >/dev/null ||
-    fail "POSIX migration does not require v0.4.2"
-grep -F "\$script:NewTag = 'v0.4.2'" scripts/upgrade-v0.1.0.ps1 >/dev/null ||
-    fail "Windows migration does not require v0.4.2"
-grep -F 'release_tag="v0.4.2"' scripts/install-nix-prerequisite.sh >/dev/null ||
-    fail "Nix prerequisite installer does not require v0.4.2"
-grep -F 'RELEASE_TAG="v0.4.2"' setup.sh >/dev/null ||
-    fail "POSIX setup does not advertise v0.4.2"
-grep -F "\$ReleaseTag     = 'v0.4.2'" setup.ps1 >/dev/null ||
-    fail "Windows setup does not advertise v0.4.2"
+grep -F 'new_tag="v0.4.3"' scripts/upgrade-v0.1.0.sh >/dev/null ||
+    fail "POSIX migration does not require v0.4.3"
+grep -F "\$script:NewTag = 'v0.4.3'" scripts/upgrade-v0.1.0.ps1 >/dev/null ||
+    fail "Windows migration does not require v0.4.3"
+grep -F 'release_tag="v0.4.3"' scripts/install-nix-prerequisite.sh >/dev/null ||
+    fail "Nix prerequisite installer does not require v0.4.3"
+grep -F 'RELEASE_TAG="v0.4.3"' setup.sh >/dev/null ||
+    fail "POSIX setup does not advertise v0.4.3"
+grep -F "\$ReleaseTag     = 'v0.4.3'" setup.ps1 >/dev/null ||
+    fail "Windows setup does not advertise v0.4.3"
 for script in setup.sh scripts/upgrade-v0.1.0.sh; do
-    grep -F 'v0.1.0-to-v0.4.2.' "$script" >/dev/null ||
-        fail "$script does not use the v0.4.2 migration recovery namespace"
+    grep -F 'v0.1.0-to-v0.4.3.' "$script" >/dev/null ||
+        fail "$script does not use the v0.4.3 migration recovery namespace"
 done
 for script in setup.ps1 scripts/upgrade-v0.1.0.ps1; do
-    grep -F 'v0.1.0-to-v0.4.2.' "$script" >/dev/null ||
-        fail "$script does not use the v0.4.2 migration recovery namespace"
+    grep -F 'v0.1.0-to-v0.4.3.' "$script" >/dev/null ||
+        fail "$script does not use the v0.4.3 migration recovery namespace"
 done
 for script in setup.sh setup.ps1; do
-    grep -F 'unfinished v0.2.0 migration must be resolved before v0.4.2 setup' "$script" >/dev/null ||
+    grep -F 'unfinished v0.2.0 migration must be resolved before v0.4.3 setup' "$script" >/dev/null ||
         fail "$script can bypass an unfinished v0.2.0 recovery"
-    grep -F 'unfinished v0.3.0 migration must be resolved before v0.4.2 setup' "$script" >/dev/null ||
+    grep -F 'unfinished v0.3.0 migration must be resolved before v0.4.3 setup' "$script" >/dev/null ||
         fail "$script can bypass an unfinished v0.3.0 recovery"
-    grep -F 'unfinished v0.4.0 migration must be resolved before v0.4.2 setup' "$script" >/dev/null ||
+    grep -F 'unfinished v0.4.0 migration must be resolved before v0.4.3 setup' "$script" >/dev/null ||
         fail "$script can bypass an unfinished v0.4.0 recovery"
-    grep -F 'unfinished v0.4.1 migration must be resolved before v0.4.2 setup' "$script" >/dev/null ||
+    grep -F 'unfinished v0.4.1 migration must be resolved before v0.4.3 setup' "$script" >/dev/null ||
         fail "$script can bypass an unfinished v0.4.1 recovery"
+    grep -F 'unfinished v0.4.2 migration must be resolved before v0.4.3 setup' "$script" >/dev/null ||
+        fail "$script can bypass an unfinished v0.4.2 recovery"
 done
 
 for identity in "$OLD_COMMIT" "$OLD_TAG_OBJECT"; do
@@ -110,13 +112,13 @@ row = next(
     (
         line
         for line in pathlib.Path("docs/security/supply-chain.md").read_text(encoding="utf-8").splitlines()
-        if line.startswith("| v0.4.2 Nix prerequisite |")
+        if line.startswith("| v0.4.3 Nix prerequisite |")
     ),
     "",
 )
 hashes = re.findall(r"`([0-9a-f]+)`", row)
 if len(hashes) != 9 or any(len(value) != 64 for value in hashes):
-    print("FAIL: v0.4.2 Nix supply-chain ledger must contain exactly nine 64-hex SHA-256 values", file=sys.stderr)
+    print("FAIL: v0.4.3 Nix supply-chain ledger must contain exactly nine 64-hex SHA-256 values", file=sys.stderr)
     sys.exit(1)
 PY
 for hash in \
@@ -141,8 +143,8 @@ grep -F './scripts/install-nix-prerequisite.sh --install --allow-unreleased' "$e
     fail "hosted POSIX bootstrap does not exercise the exact unreleased source head"
 grep -F 'umask 077' "$e2e_workflow" >/dev/null ||
     fail "hosted POSIX bootstrap does not model a restrictive managed-host umask"
-if grep -F 'git checkout --detach refs/tags/v0.4.2' "$e2e_workflow" >/dev/null; then
-    fail "hosted POSIX bootstrap still replaces the reviewed source head with v0.4.2"
+if grep -F 'git checkout --detach refs/tags/v0.4.3' "$e2e_workflow" >/dev/null; then
+    fail "hosted POSIX bootstrap still replaces the reviewed source head with v0.4.3"
 fi
 for proof in \
     'Verified local Nix daemon profile-ownership patch:' \
@@ -179,14 +181,14 @@ grep -F "'scripts/upgrade-v0.1.0.ps1'" test.ps1 >/dev/null ||
 [[ "$(grep -c 'Exact v0.1.0 release migration' .github/workflows/test.yml)" -eq 2 ]] ||
     fail "exact historical migration must run on hosted Linux and Apple Silicon"
 
-for document in README.md docs/UPGRADING.md docs/releases/v0.2.0.md docs/releases/v0.3.0.md docs/releases/v0.4.0.md docs/releases/v0.4.1.md docs/releases/v0.4.2.md; do
+for document in README.md docs/UPGRADING.md docs/releases/v0.2.0.md docs/releases/v0.3.0.md docs/releases/v0.4.0.md docs/releases/v0.4.1.md docs/releases/v0.4.2.md docs/releases/v0.4.3.md; do
     [[ -f "$document" ]] || fail "release documentation is missing: $document"
 done
 if grep -F 'git -C ~/dotfiles pull' README.md >/dev/null; then
     fail "README still publishes the unsafe in-place v0.1.0 command"
 fi
 if grep -R -E '<post-Nix-release-tag>|<next-release>|git (pull|checkout).*main' \
-    README.md docs/UPGRADING.md docs/releases/v0.2.0.md docs/releases/v0.3.0.md docs/releases/v0.4.0.md docs/releases/v0.4.1.md docs/releases/v0.4.2.md >/dev/null; then
+    README.md docs/UPGRADING.md docs/releases/v0.2.0.md docs/releases/v0.3.0.md docs/releases/v0.4.0.md docs/releases/v0.4.1.md docs/releases/v0.4.2.md docs/releases/v0.4.3.md >/dev/null; then
     fail "release documentation contains a moving branch or release placeholder"
 fi
 # Literal Markdown assertion.

@@ -3310,3 +3310,32 @@ is claimed by this audit remediation.
 | Direct check-only publisher before the fix | EXPECTED FAIL: returned the bootstrap `ready:` fingerprint but created the absent plugin parent chain |
 | `tests/shell/pinned_zsh_plugin_publisher_test.sh` | PASS: fresh and initialized missing-target probes leave the parent absent; a verified-target probe creates no lock; all publication/repair/concurrency cases still pass |
 | `tests/migration/oracle_test.sh` | PASS: real chezmoi `diff`, `status`, and `--dry-run apply` leave an absent `.local` tree absent; apply/self-heal/verify oracles still pass |
+
+## v0.4.3 release preparation — entry 81
+
+- The merged audit-remediation tree is a backward-compatible patch: it repairs
+  Nix reconciliation, Neovim abandoned-lock recovery, write-free chezmoi
+  previews, supply-chain mirror enforcement, and required POSIX uninstall
+  coverage without moving managed targets or changing persisted application
+  data shapes. SemVer therefore selects v0.4.3.
+- Setup, the Nix prerequisite helper, both v0.1.0 migrators, their recovery
+  namespace, deterministic fixtures, and current user documentation now share
+  the v0.4.3 release authority. Setup additionally scans unfinished v0.4.2
+  recovery namespaces before considering a v0.4.3 transaction.
+- Candidate documentation contains no invented tag object, peeled commit,
+  workflow run, or GitHub release identity. Those remain mandatory downstream
+  gates after the release-preparation pull request merges.
+
+### Candidate verification
+
+| Check | Exact result |
+|---|---|
+| Exact-main baseline | PASS: merged commit `6e9ccf8086fdb36cbfe06280718decd93e53e89d` is tree-identical to reviewed PR #72 head `42e550067aeabd3655a37fc497aab57ba89649de`; its full local gate and all hosted checks passed |
+| Release identity, migration namespace, and prior-recovery regressions | PASS: Nix identity/reconciliation, setup orchestration through the v0.4.2 prior namespace, and the exact-v0.1.0 POSIX transaction passed |
+| Full `make ci` on the release-preparation tree | PASS: ended `local pre-PR gate passed`; local PowerShell execution was unavailable because `pwsh` is not installed |
+| Hosted required checks | PENDING |
+| Release tag / GitHub release | NOT CREATED: publication cannot precede the release-preparation merge and exact-tag evidence |
+
+No v0.4.3 tag, GitHub release, cache-free exact-tag run, redacted
+`v0.4.2..v0.4.3` release-range/proof scan, or post-publication identity readback
+is claimed by this entry.
