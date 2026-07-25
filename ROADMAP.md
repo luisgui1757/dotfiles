@@ -1,7 +1,7 @@
 # Dotfiles Roadmap
 
-Last audited: 2026-07-22 after immutable v0.4.1 publication.
-Baseline: `main` at `bac8cc97177b3bb58119fde5720b31e6b57febcc`.
+Last audited: 2026-07-25 during v0.4.2 release preparation.
+Baseline: `main` at `e085ea62ba19819b81b3d7bcfc0ead5ec57904c4`.
 
 This is the adversarial post-merge roadmap for the chezmoi migration and the
 current setup/CI surface. The goal is not "good enough"; the repo should have a
@@ -265,6 +265,15 @@ Commit-by-commit status:
   Home Manager session-vars startup. Apple Silicon is the only current Darwin
   contract; Intel evidence is retained in the append-only ledger as historical
   proof, not current support.
+- **User-owned npm globals under Nix — DONE (2026-07-25, PR #69).** Nix remains
+  the sole POSIX owner of the immutable Node/npm runtime; normal setup uses
+  npm's own user-config writer to persist the mutable global package prefix at
+  `~/.local`, preserves unrelated registry/auth settings, and fails closed
+  unless effective readback matches. Tests cover generic global installs,
+  dry-run, idempotence, environment overrides, and hosted/container setup.
+  Native Windows keeps its normal per-user npm prefix. Windows reconciliation
+  also leaves an active PowerShell 7 runtime untouched; explicit update must
+  run under Windows PowerShell 5.1 and rejects active `pwsh` before mutation.
 - **Pi CLI provisioning, theme, and multiline input — DONE.** Setup installs the Pi CLI on every OS as the
   pinned npm package `@earendil-works/pi-coding-agent@0.80.10` after checking npm
   `dist.integrity`; its three Pi companion modules are held to the same exact
@@ -1237,14 +1246,15 @@ every other zsh plugin surface.
 
 ### 9. The published in-place upgrade crossed the config backup boundary
 
-Status: implementation done; v0.2.0, v0.3.0, v0.4.0, and v0.4.1 published.
+Status: implementation done; v0.2.0, v0.3.0, v0.4.0, and v0.4.1 published;
+v0.4.2 release preparation in progress.
 
 Evidence:
 
 - Exact v0.1.0 POSIX config uses checkout-backed chezmoi symlinks. Updating that
   checkout changed live bytes before current setup could back them up.
 - `scripts/upgrade-v0.1.0.sh` and `.ps1` now require clean, separate official
-  annotated v0.1.0/v0.4.1 checkouts and retain v0.1.0 until acceptance.
+  annotated v0.1.0/v0.4.2 checkouts and retain v0.1.0 until acceptance.
 - The public `setup.sh --all` / `setup.ps1 -All` entrypoints now discover exact
   live v0.1.0 ownership, invoke and verify those transactions, resume a pending
   applied recovery, accept under the explicit non-interactive all-mode
@@ -1270,7 +1280,7 @@ Evidence:
   acceptance. Windows Pester proves frozen release-tree validation, complete Terminal recovery,
   all-target concurrency rejection, known-folder boundary validation, private
   ACL policy, and provider-boundary verification.
-- `docs/UPGRADING.md` and `docs/releases/v0.4.1.md` define the supported
+- `docs/UPGRADING.md` and `docs/releases/v0.4.2.md` define the supported
   per-platform commands, Apple-Silicon-only macOS boundary, WSL ordering, Nix
   provenance, and release evidence gate.
 
@@ -1287,6 +1297,9 @@ Canonical solution:
    published. Apple Silicon owner-host, real WSL2, redirected Windows,
    divergent stable packaged/Preview/Canary/portable Terminal, physical Linux,
    and visual rows remain explicit residual gaps.
+7. IN PROGRESS - Prepare, merge, tag, certify, and publish v0.4.2 from the
+   exact npm-prefix fix tree; record only observed tag, workflow, scan, and
+   immutable-release identities after each gate passes.
 
 ## Disproved Or Non-Blocking Assumptions
 

@@ -3164,3 +3164,37 @@ Real Apple Silicon owner lifecycle, physical Linux, WSL2 split-host,
 redirected Windows, divergent stable packaged/Preview/Canary/portable Terminal,
 and desktop/visual/TCC rows remain open. No completion of those manual surfaces
 is claimed by publication.
+
+## v0.4.2 npm ownership release preparation — entry 77
+
+- The candidate starts from clean exact `main` commit
+  `e085ea62ba19819b81b3d7bcfc0ead5ec57904c4`, the squash merge of pull request
+  #69. That change keeps the POSIX Node/npm runtime Nix-owned while persisting
+  npm's mutable user-global prefix at `~/.local`, preserving unrelated user
+  config and verifying effective readback. It also prevents normal Windows
+  reconciliation from replacing the active PowerShell 7 host and requires
+  explicit update to run under Windows PowerShell 5.1.
+- These are backward-compatible provisioning and update-safety corrections;
+  no public setup command, managed dotfile target, or persisted application data
+  shape breaks. SemVer therefore selects patch release v0.4.2.
+- Setup, the Nix prerequisite helper, both v0.1.0 migrators, their recovery
+  namespace, deterministic fixtures, and current user documentation now share
+  the v0.4.2 release authority. Setup additionally scans unfinished v0.4.1
+  recovery namespaces before considering a v0.4.2 transaction.
+- Candidate documentation contains no invented tag object, peeled commit,
+  workflow run, or GitHub release identity. Those remain mandatory downstream
+  gates after the release-preparation pull request merges.
+
+### Candidate verification
+
+| Check | Exact result |
+|---|---|
+| Clean exact-main baseline `make ci` | PASS: ended `local pre-PR gate passed`, including the npm-prefix regression |
+| Release identity, migration namespace, npm prefix, and Windows update-host regressions | PASS: POSIX focused suites passed locally; PowerShell cases are present and remain hosted-Windows proof |
+| Full `make ci` on the release-preparation tree | PASS: ended `local pre-PR gate passed`; local PowerShell execution was unavailable because `pwsh` is not installed |
+| Hosted required checks | PENDING |
+| Release tag / GitHub release | NOT CREATED: publication cannot precede the release-preparation merge and exact-tag evidence |
+
+No v0.4.2 tag, GitHub release, cache-free exact-tag run, redacted
+`v0.4.1..v0.4.2` release-range/proof scan, or post-publication identity readback
+is claimed by this entry.
