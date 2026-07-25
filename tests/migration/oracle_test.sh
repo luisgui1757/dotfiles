@@ -98,8 +98,28 @@ pass "detected oracle host OS: $target_os"
 COMMIT_HOME="$(mktemp -d)"
 VERIFY_HOME="$(mktemp -d)"
 WORK="$(mktemp -d)"
-trap 'rm -rf "$COMMIT_HOME" "$VERIFY_HOME" "$WORK"' EXIT
+PREVIEW_HOME="$(mktemp -d)"
+trap 'rm -rf "$COMMIT_HOME" "$VERIFY_HOME" "$PREVIEW_HOME" "$WORK"' EXIT
 export XDG_DATA_HOME="$WORK/xdg-data"
+
+assert_preview_write_free() {
+    local label="$1" preview_log
+    shift
+    env HOME="$PREVIEW_HOME" chezmoi --source "$SRC" init
+    rm -rf "$PREVIEW_HOME/.local"
+    preview_log="$WORK/preview-${label}.log"
+    if ! env HOME="$PREVIEW_HOME" chezmoi --source "$SRC" "$@" > "$preview_log" 2>&1; then
+        print_log "$preview_log"
+        fail "chezmoi $label preview failed"
+    fi
+    [[ ! -e "$PREVIEW_HOME/.local" ]] ||
+        fail "chezmoi $label preview created $PREVIEW_HOME/.local"
+}
+
+assert_preview_write_free diff diff
+assert_preview_write_free status status
+assert_preview_write_free dry-apply --dry-run apply
+pass "chezmoi diff, status, and dry-run apply leave an absent plugin parent absent"
 
 apply_clean_home "$COMMIT_HOME"
 pass "checked-publisher oracle fixture applied cleanly"

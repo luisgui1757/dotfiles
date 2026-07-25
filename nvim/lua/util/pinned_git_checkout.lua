@@ -109,6 +109,70 @@ local function unique_sibling(path, suffix)
   return candidate
 end
 
+local function lock_owner_pid(lock)
+  local lock_stat = vim.uv.fs_lstat(lock)
+  if not lock_stat or lock_stat.type ~= "directory" then
+    return nil, "lock is not a directory"
+  end
+
+  local owner_file = vim.fs.joinpath(lock, "owner.pid")
+  local owner_stat = vim.uv.fs_lstat(owner_file)
+  if not owner_stat or owner_stat.type ~= "file" then
+    return nil, "lock has no regular owner record"
+  end
+
+  local ok, lines = pcall(vim.fn.readfile, owner_file)
+  if not ok or type(lines) ~= "table" or #lines ~= 1 or not lines[1]:match("^%d+$") then
+    return nil, "lock owner record is malformed"
+  end
+  local pid = tonumber(lines[1])
+  if not pid or pid < 1 or pid % 1 ~= 0 then
+    return nil, "lock owner PID is invalid"
+  end
+  return pid
+end
+
+local function write_lock_owner(lock)
+  local owner_file = vim.fs.joinpath(lock, "owner.pid")
+  local ok, err = pcall(vim.fn.writefile, { tostring(vim.fn.getpid()) }, owner_file)
+  if not ok then
+    return false, tostring(err)
+  end
+  local owner_pid, owner_err = lock_owner_pid(lock)
+  if owner_pid ~= vim.fn.getpid() then
+    return false, owner_err or "lock owner record did not round-trip"
+  end
+  return true
+end
+
+local function reclaim_abandoned_lock(lock)
+  local pid, owner_state = lock_owner_pid(lock)
+  if not pid then
+    return false, owner_state
+  end
+
+  local alive, err, code = vim.uv.kill(pid, 0)
+  if alive then
+    return false, "owner PID " .. pid .. " is alive"
+  end
+  if code ~= "ESRCH" then
+    return false, "owner PID " .. pid .. " liveness is unknown: " .. tostring(err)
+  end
+
+  local abandoned = unique_sibling(lock, ".abandoned." .. pid)
+  local moved, move_err, move_code = vim.uv.fs_rename(lock, abandoned)
+  if not moved then
+    if move_code == "ENOENT" then
+      return true, "another process reclaimed the abandoned lock"
+    end
+    error("could not quarantine abandoned checkout lock " .. lock .. ": " .. tostring(move_err), 0)
+  end
+  if not checked_delete(abandoned) then
+    error("could not remove abandoned checkout lock quarantine: " .. abandoned, 0)
+  end
+  return true, "reclaimed lock from dead owner PID " .. pid
+end
+
 local function valid_branch_name(branch)
   return type(branch) == "string"
     and branch ~= ""
@@ -223,9 +287,15 @@ local function acquire_lock(opts)
   local lock = opts.target .. ".lock"
   local timeout_ms = opts.lock_timeout_ms or 30000
   local started = vim.uv.hrtime()
+  local owner_state = "lock owner has not been inspected"
   while true do
     local made, err, code = vim.uv.fs_mkdir(lock, 448)
     if made then
+      local owner_written, owner_err = write_lock_owner(lock)
+      if not owner_written then
+        checked_delete(lock)
+        error("could not record checkout lock owner " .. lock .. ": " .. tostring(owner_err), 0)
+      end
       return lock
     end
     if code ~= "EEXIST" then
@@ -236,11 +306,23 @@ local function acquire_lock(opts)
     if valid then
       return nil
     end
-    local elapsed_ms = (vim.uv.hrtime() - started) / 1000000
-    if elapsed_ms >= timeout_ms then
-      error("timed out waiting for checkout lock: " .. lock, 0)
+    local reclaimed
+    reclaimed, owner_state = reclaim_abandoned_lock(lock)
+    if not reclaimed then
+      local elapsed_ms = (vim.uv.hrtime() - started) / 1000000
+      if elapsed_ms >= timeout_ms then
+        error(
+          "timed out waiting for checkout lock: "
+            .. lock
+            .. " ("
+            .. owner_state
+            .. "). Remove it only after confirming no Neovim process owns it: "
+            .. lock,
+          0
+        )
+      end
+      vim.wait(50)
     end
-    vim.wait(50)
   end
 end
 
@@ -343,8 +425,13 @@ function M.ensure(opts)
   if path_exists(stage) and not checked_delete(stage) then
     table.insert(cleanup_errors, "staging cleanup failed: " .. stage)
   end
-  if path_exists(lock) and not checked_delete(lock) then
-    table.insert(cleanup_errors, "lock cleanup failed: " .. lock)
+  if path_exists(lock) then
+    local owner_pid, owner_error = lock_owner_pid(lock)
+    if owner_pid ~= vim.fn.getpid() then
+      table.insert(cleanup_errors, "lock ownership changed before cleanup: " .. (owner_error or tostring(owner_pid)))
+    elseif not checked_delete(lock) then
+      table.insert(cleanup_errors, "lock cleanup failed: " .. lock)
+    end
   end
 
   if not ok then

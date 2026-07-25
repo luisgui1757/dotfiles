@@ -3246,3 +3246,67 @@ Real Apple Silicon owner lifecycle, physical Linux, WSL2 split-host,
 redirected Windows, divergent stable packaged/Preview/Canary/portable Terminal,
 and desktop/visual/TCC rows remain open. No completion of those manual surfaces
 is claimed by publication.
+
+## v0.4.2 post-publication adversarial-audit remediation — entry 79
+
+- A post-publication whole-repository adversarial audit accepted no Critical
+  findings and reported one High plus three Medium defects. Independent
+  reconciliation confirmed all four:
+  - the existing-`nix.conf` path used the reserved `awk` function-parameter
+    name `index`, so reconciliation and single-user Linux setup aborted;
+  - abandoned Neovim plugin-cache locks had no owner proof or recovery;
+  - the x86_64-linux Nix archive ledger hash was truncated and its
+    implementation/ledger mirror lacked a drift guard;
+  - the sole adversarial POSIX uninstall backup-order oracle was absent from
+    required Ubuntu and macOS parity jobs.
+- The fixes are canonical and fail-closed: Nix merging is portable, preserves
+  unrelated config, and cleans its atomic stage; Neovim records lock owners,
+  reclaims only an OS-proven dead PID, and gives an exact recovery path when
+  ownership cannot be proved; release hashes are shape- and mirror-checked; and
+  Makefile migration tests are policy-bound into both POSIX parity jobs, with
+  only the Windows renderer explicitly platform-exempt.
+- Publication-document drift observed during reconciliation was resolved
+  independently by the preceding canonical closure entry 78 and pull request
+  #71; this remediation does not duplicate or supersede that evidence.
+
+### Audit-remediation verification
+
+| Check | Exact result |
+|---|---|
+| `tests/shell/nix_prerequisite_identity_test.sh` before the fix | EXPECTED FAIL: platform `awk` rejected `index` in `has_token`; the existing-config reconciliation path exited nonzero |
+| `tests/nvim/spec/pinned_git_checkout_spec.lua` before the fix | EXPECTED FAIL: a dead-owner lock timed out instead of being reclaimed |
+| Focused Nix prerequisite test after the fix | PASS: 15 identity/install behaviors, including existing-config reconciliation, injected-render rollback/cleanup, and single-user Linux merge with no staged residue |
+| Focused pinned-checkout spec after the fix | PASS: 11 behavioral cases, including dead-owner reclaim and live-owner preservation |
+| Supply-chain, repository-policy, and uninstall-order focused checks | PASS: archive identities/shape, Makefile-to-CI migration coverage, and the adversarial backup-selection oracle |
+| Final `make ci` on the complete remediation tree | PASS: ended `local pre-PR gate passed`; local `pwsh` remained unavailable and the existing PowerShell parser/render checks self-skipped as designed |
+
+Real Apple Silicon owner lifecycle, physical Linux, WSL2 split-host,
+redirected Windows, divergent stable packaged/Preview/Canary/portable Terminal,
+and desktop/visual/TCC rows remain open. No completion of those manual surfaces
+is claimed by this audit remediation.
+
+## v0.4.2 follow-up stale-baseline audit reconciliation — entry 80
+
+- The follow-up whole-repository audit inspected release commit
+  `fdd628b34a58a3ecf3a1bef3de72f7cd4ac7dfc0`, not the remediation branch based
+  on publication-closure commit `8d500185955feed3e3ad914b04d5a01d0ba5706f`.
+  Its truncated Nix ledger hash and missing POSIX uninstall-order CI findings
+  are therefore duplicates already fixed and regression-bound by entry 79.
+- The remaining Medium finding is accepted. Chezmoi renders the zsh-plugin
+  fingerprints during `diff`, `status`, and dry-run apply. The publisher
+  previously created the target parent and acquired a transient lock before its
+  check-only branch, contradicting the advertised write-free preview contract.
+  An isolated direct execution and real chezmoi previews reproduced the
+  persistent `.local/share/dotfiles/zsh-plugins` parent creation.
+- Check-only execution now returns before parent creation or publication-lock
+  acquisition while retaining the same bootstrap-marker and verified-checkout
+  fingerprints. Publication mode retains its existing same-parent staging,
+  serialized lock, quarantine, identity proof, and atomic publish behavior.
+
+### Follow-up verification
+
+| Check | Exact result |
+|---|---|
+| Direct check-only publisher before the fix | EXPECTED FAIL: returned the bootstrap `ready:` fingerprint but created the absent plugin parent chain |
+| `tests/shell/pinned_zsh_plugin_publisher_test.sh` | PASS: fresh and initialized missing-target probes leave the parent absent; a verified-target probe creates no lock; all publication/repair/concurrency cases still pass |
+| `tests/migration/oracle_test.sh` | PASS: real chezmoi `diff`, `status`, and `--dry-run apply` leave an absent `.local` tree absent; apply/self-heal/verify oracles still pass |

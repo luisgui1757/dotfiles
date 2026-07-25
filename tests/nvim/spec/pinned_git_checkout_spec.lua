@@ -222,6 +222,32 @@ describe("pinned Git checkout", function()
     assert.is_true(valid, reason)
   end)
 
+  it("reclaims a lock whose recorded owner is gone and publishes the checkout", function()
+    local lock = opts.target .. ".lock"
+    vim.fn.mkdir(lock, "p")
+    write(lock .. "/owner.pid", { "2147483647" })
+
+    checkout.ensure(opts)
+
+    local valid, reason = checkout.verify(opts)
+    assert.is_true(valid, reason)
+    assert.is_false(vim.uv.fs_stat(lock) ~= nil)
+  end)
+
+  it("does not reclaim a lock whose recorded owner is alive", function()
+    local lock = opts.target .. ".lock"
+    vim.fn.mkdir(lock, "p")
+    write(lock .. "/owner.pid", { tostring(vim.fn.getpid()) })
+    local waiting = vim.tbl_extend("force", opts, { lock_timeout_ms = 80 })
+
+    local ok, err = pcall(checkout.ensure, waiting)
+
+    assert.is_false(ok)
+    assert.matches("timed out waiting for checkout lock", tostring(err), 1, true)
+    assert.matches("Remove it only after confirming no Neovim process owns it", tostring(err), 1, true)
+    assert.is_true(vim.uv.fs_stat(lock) ~= nil)
+  end)
+
   it("keeps runtimepath and require after the production identity proof", function()
     local source = table.concat(vim.fn.readfile(_G.TEST_REPO_ROOT .. "/nvim/init.lua"), "\n")
     local lock_index = assert(source:find("pinned_checkout.locked_identity", 1, true))

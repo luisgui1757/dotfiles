@@ -3,6 +3,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 REAL_GIT="$(command -v git)"
+REAL_AWK="$(command -v awk)"
 ORIGINAL_PATH="$PATH"
 work="$(mktemp -d)"
 cleanup() {
@@ -55,7 +56,19 @@ case "${1:-}" in
     *) exit 44 ;;
 esac
 EOF
-chmod +x "$work/bin/git" "$work/bin/nix"
+cat > "$work/bin/awk" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+if [[ "${FAKE_AWK_NIX_CONFIG_FAILURE:-0}" == "1" ]]; then
+    for arg in "$@"; do
+        if [[ "$arg" == */nix/nix.conf ]]; then
+            exit 42
+        fi
+    done
+fi
+exec "${REAL_AWK:?}" "$@"
+EOF
+chmod +x "$work/bin/git" "$work/bin/nix" "$work/bin/awk"
 
 new_fixture() {
     local name="$1"
@@ -84,6 +97,7 @@ run_helper() {
     set +e
     output="$(HOME="$run_home" XDG_CONFIG_HOME="$run_xdg_config_home" PATH="$run_path" \
         REAL_GIT="$REAL_GIT" \
+        REAL_AWK="$REAL_AWK" \
         FAKE_REMOTE_REFS_FILE="$refs_file" \
         FAKE_REMOTE_CALL_LOG="$remote_call_log" \
         FAKE_REMOTE_MODE="$mode" \
@@ -258,16 +272,59 @@ refs="$work/existing-nix-disabled-features.refs"
 printf '%s\trefs/heads/fix/bootstrap\n' "$head_commit" > "$refs"
 export FAKE_NIX_FEATURES_DISABLED=1
 export RUN_HOME_OVERRIDE="$work/repair-home"
+mkdir -p "$RUN_HOME_OVERRIDE/.config/nix"
+cat > "$RUN_HOME_OVERRIDE/.config/nix/nix.conf" <<'EOF'
+# preserve this user comment
+experimental-features = ca-derivations
+warn-dirty = false
+EOF
 run_helper "$fixture" "$refs"
 [[ "$rc" -eq 0 ]] || fail "disabled existing Nix features were not reconciled:\n$output"
-grep -Fx 'extra-experimental-features = nix-command flakes' \
-    "$RUN_HOME_OVERRIDE/.config/nix/nix.conf" >/dev/null ||
-    fail "existing Nix reconciliation did not publish the required user features"
+repair_config="$RUN_HOME_OVERRIDE/.config/nix/nix.conf"
+grep -Fx '# preserve this user comment' "$repair_config" >/dev/null ||
+    fail "existing Nix reconciliation did not preserve the user comment"
+grep -Fx 'warn-dirty = false' "$repair_config" >/dev/null ||
+    fail "existing Nix reconciliation did not preserve an unrelated setting"
+[[ "$(awk '
+    /^experimental-features[[:space:]]*=/ {
+        for (field = 2; field <= NF; field++) {
+            if ($field == "nix-command") nix_command++
+            if ($field == "flakes") flakes++
+        }
+    }
+    END { print nix_command + 0, flakes + 0 }
+' "$repair_config")" == "1 1" ]] ||
+    fail "existing Nix reconciliation did not add nix-command and flakes exactly once"
+[[ -z "$(find "$RUN_HOME_OVERRIDE/.config/nix" -maxdepth 1 \
+    -name '.nix.conf.dotfiles.*' -print -quit)" ]] ||
+    fail "existing Nix reconciliation leaked a staged config"
 [[ "$output" == *"required user features were reconciled"* ]] ||
     fail "existing Nix reconciliation was not reported"
 assert_clean_diagnostic
-pass "a completed upstream install with disabled nix-command self-heals on retry"
+pass "a completed upstream install merges disabled features into an existing config"
 unset FAKE_NIX_FEATURES_DISABLED RUN_HOME_OVERRIDE
+
+new_fixture existing-nix-merge-failure
+head_commit="$($REAL_GIT -C "$fixture" rev-parse HEAD)"
+refs="$work/existing-nix-merge-failure.refs"
+printf '%s\trefs/heads/fix/bootstrap\n' "$head_commit" > "$refs"
+export FAKE_NIX_FEATURES_DISABLED=1
+export FAKE_AWK_NIX_CONFIG_FAILURE=1
+export RUN_HOME_OVERRIDE="$work/repair-failure-home"
+mkdir -p "$RUN_HOME_OVERRIDE/.config/nix"
+printf '%s\n' 'experimental-features = ca-derivations' \
+    > "$RUN_HOME_OVERRIDE/.config/nix/nix.conf"
+run_helper "$fixture" "$refs"
+[[ "$rc" -ne 0 ]] || fail "injected Nix user-config render failure was accepted"
+[[ -z "$(find "$RUN_HOME_OVERRIDE/.config/nix" -maxdepth 1 \
+    -name '.nix.conf.dotfiles.*' -print -quit)" ]] ||
+    fail "failed Nix user-config render leaked a staged config"
+grep -Fx 'experimental-features = ca-derivations' \
+    "$RUN_HOME_OVERRIDE/.config/nix/nix.conf" >/dev/null ||
+    fail "failed Nix user-config render changed the original config"
+assert_clean_diagnostic
+pass "failed existing-config render preserves the original and cleans its stage"
+unset FAKE_NIX_FEATURES_DISABLED FAKE_AWK_NIX_CONFIG_FAILURE RUN_HOME_OVERRIDE
 
 rm "$work/bin/nix"
 cat > "$work/bin/uname" <<'EOF'
@@ -295,6 +352,9 @@ cat > "$work/bin/sha256sum" <<'EOF'
 case "$1" in
     */nix-2.34.0-aarch64-darwin.tar.xz)
         digest="47cb78c9fdc7b630dbbb9a89869c8e8bcd8c9eb17be036fba18585120693a4c1"
+        ;;
+    */nix-2.34.0-x86_64-linux.tar.xz)
+        digest="5676b0887f1274e62edd175b6611af49aa8170c69c16877aa9bc6cebceb19855"
         ;;
     */install-multi-user)
         digest="832c033bac08eac43e2749427cb3e85d12f11d34685f44153bf044c6d32fafd0"
@@ -331,6 +391,18 @@ fi
 NIX_INSTALLER_NO_MODIFY_PROFILE=1
 [[ "${5:-}" == "--nix-extra-conf-file" && -f "${6:-}" ]] || exit 51
 cat "$6" > "${FAKE_INSTALL_CONF:?}"
+if [[ "${1:-}" == "--no-daemon" ]]; then
+cat > "${FAKE_RUNTIME_BIN:?}/nix" <<'NIX'
+#!/usr/bin/env bash
+case "${1:-}" in
+    --version) echo "nix (Nix) 2.34.0" ;;
+    store) [[ "${2:-}" == "info" ]] ;;
+    *) exit 48 ;;
+esac
+NIX
+    chmod +x "${FAKE_RUNTIME_BIN:?}/nix"
+    exit 0
+fi
 exec "$(dirname "$0")/install-multi-user"
 INSTALLER
 cat > "$installer_dir/install-multi-user" <<'MULTI_USER_INSTALLER'
@@ -427,5 +499,62 @@ busybox_store="$FAKE_NIX_ROOT/store/l34zf9300cgydgsimmnxvjl9ivjn2yjc-busybox-1.3
     fail "patched daemon installer did not repair restrictive Nix store modes"
 assert_clean_diagnostic
 pass "verified upstream installer skips mutable channels, preserves readable store paths, leaves shell profiles to dotfiles, and persists flake features"
+
+rm "$work/bin/nix"
+no_systemd_bin="$work/no-systemd-bin"
+mkdir -p "$no_systemd_bin"
+for command_name in bash cat chmod cp dirname id mkdir mktemp mv rm; do
+    command_path="$(command -v "$command_name")"
+    [[ -x "$command_path" ]] ||
+        fail "required non-systemd fixture command is unavailable: $command_name"
+    ln -s "$command_path" "$no_systemd_bin/$command_name"
+done
+if PATH="$work/bin:$no_systemd_bin" command -v systemctl >/dev/null 2>&1; then
+    fail "single-user fixture PATH unexpectedly exposes systemctl"
+fi
+new_fixture noninteractive-single-user-install
+head_commit="$($REAL_GIT -C "$fixture" rev-parse HEAD)"
+refs="$work/noninteractive-single-user-install.refs"
+printf '%s\trefs/heads/fix/bootstrap\n' "$head_commit" > "$refs"
+export FAKE_INSTALL_ARGS="$work/single-user-install-args.log"
+export FAKE_INSTALL_CONF="$work/single-user-install-conf.log"
+export FAKE_RUNTIME_BIN="$work/bin"
+export RUN_PATH_OVERRIDE="$work/bin:$no_systemd_bin"
+export RUN_HOME_OVERRIDE="$work/single-user-install-home"
+export FAKE_UNAME_SYSTEM=Linux
+export FAKE_UNAME_ARCH=x86_64
+export FAKE_NIX_SYSTEM=x86_64-linux
+mkdir -p "$RUN_HOME_OVERRIDE/.config/nix"
+cat > "$RUN_HOME_OVERRIDE/.config/nix/nix.conf" <<'EOF'
+# preserve this single-user comment
+experimental-features = ca-derivations
+warn-dirty = false
+EOF
+run_helper "$fixture" "$refs"
+[[ "$rc" -eq 0 ]] || fail "verified single-user installer fixture failed:\n$output"
+[[ "$(sed -n '1p' "$FAKE_INSTALL_ARGS")" == "--no-daemon" ]] ||
+    fail "single-user Linux installer did not receive --no-daemon"
+single_user_config="$RUN_HOME_OVERRIDE/.config/nix/nix.conf"
+grep -Fx '# preserve this single-user comment' "$single_user_config" >/dev/null ||
+    fail "single-user Linux feature merge did not preserve the user comment"
+grep -Fx 'warn-dirty = false' "$single_user_config" >/dev/null ||
+    fail "single-user Linux feature merge did not preserve an unrelated setting"
+[[ "$(awk '
+    /^experimental-features[[:space:]]*=/ {
+        for (field = 2; field <= NF; field++) {
+            if ($field == "nix-command") nix_command++
+            if ($field == "flakes") flakes++
+        }
+    }
+    END { print nix_command + 0, flakes + 0 }
+' "$single_user_config")" == "1 1" ]] ||
+    fail "single-user Linux feature merge did not add nix-command and flakes exactly once"
+[[ -z "$(find "$RUN_HOME_OVERRIDE/.config/nix" -maxdepth 1 \
+    -name '.nix.conf.dotfiles.*' -print -quit)" ]] ||
+    fail "single-user Linux feature merge leaked a staged config"
+[[ "$output" == *"Nix prerequisite installed and verified"* ]] ||
+    fail "single-user Linux install was not verified in the same shell"
+assert_clean_diagnostic
+pass "single-user Linux install merges features into an existing config without staged residue"
 
 echo "all Nix prerequisite checkout identity behaviors OK"
