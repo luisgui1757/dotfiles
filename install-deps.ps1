@@ -3673,6 +3673,14 @@ function Get-CatalogUpdateSpec {
     }
 }
 
+function Test-PwshIsActiveProcessHost {
+    param(
+        [string]$Edition = [string]$PSVersionTable.PSEdition,
+        [string]$ProcessName = [System.Diagnostics.Process]::GetCurrentProcess().ProcessName
+    )
+    return ($Edition -eq 'Core' -and $ProcessName -eq 'pwsh')
+}
+
 function Invoke-InstallDepsUpdateMode {
     param(
         [object[]]$SpecList = @(Get-InstallDependencySpec),
@@ -3723,6 +3731,17 @@ function Exit-InstallDepsIfFailures {
 if ($env:INSTALL_DEPS_PS1_SOURCE_ONLY) { return }
 
 $Pm = Get-AvailablePM
+
+if ($Update -and (Test-PwshIsActiveProcessHost)) {
+    if ($DryRun) {
+        Write-Host "note: real Windows update mode must run under Windows PowerShell so pwsh can be replaced safely."
+    } else {
+        Write-Host "FAIL: update mode cannot replace the active pwsh runtime." -ForegroundColor Red
+        Write-Host "Re-run from Windows PowerShell 5.1:"
+        Write-Host "  powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\setup.ps1 -Update"
+        exit 1
+    }
+}
 
 if ($Update) {
     Invoke-InstallDepsUpdateMode -IsDryRun $DryRun
@@ -3809,7 +3828,9 @@ Install-PsmuxPlugins
 
 Section "modern shell (optional, you can stay on Windows PowerShell 5.1)"
 Install-One pwsh
-Update-ManagedCatalogTool pwsh -ReportSkip
+# Normal reconciliation installs a missing pwsh but never upgrades the process
+# host in place. Explicit -Update is guarded above and must run from Windows
+# PowerShell so package managers can safely replace the pwsh executable.
 Install-PSFzf
 
 Section "language tooling (for LSP / formatter back-ends)"

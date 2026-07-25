@@ -1510,7 +1510,13 @@ save only**. The next plain `:w` formats normally. Implemented in
   availability checks, or package updates append to `InstallFailures`, so update
   mode exits nonzero when a scoped refresh did not actually succeed. Present
   tools outside Scoop/winget/Chocolatey are reported as unmanaged and do not
-  count as successful dotfiles-owned updates.
+  count as successful dotfiles-owned updates. Normal reconciliation may install
+  a missing `pwsh` but must never upgrade the active process host in place.
+  Real Windows `-Update` therefore fails before any package mutation when
+  hosted by `pwsh`; launch it through Windows PowerShell 5.1 with
+  `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\setup.ps1 -Update`
+  so the scoped PowerShell package update can safely replace `pwsh`. Dry-run
+  remains non-mutating and reports that host precondition.
 - **Windows CI uses a pinned, verified elevated Scoop bootstrap.** GitHub-hosted
   `windows-2025` runners are elevated, and Scoop blocks elevated install by
   default. `Install-Scoop` downloads `ScoopInstaller/Install` at the pinned
