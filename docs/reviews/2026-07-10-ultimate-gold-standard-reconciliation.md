@@ -3198,3 +3198,51 @@ is claimed by publication.
 No v0.4.2 tag, GitHub release, cache-free exact-tag run, redacted
 `v0.4.1..v0.4.2` release-range/proof scan, or post-publication identity readback
 is claimed by this entry.
+
+## v0.4.2 immutable publication closure — entry 78
+
+- Pull request #70 merged reviewed head
+  `d3107898da59c8317db7c5b4d6e9ad8fdfba5d5e` to exact `main` commit
+  `fdd628b34a58a3ecf3a1bef3de72f7cd4ac7dfc0`. Both commits have tree
+  `aee8b07da50e4c4d1a99f7dabef7b8ffcc56f1ef`; their diff is empty. All 21
+  required checks were successful with none pending or failing before merge,
+  and full `make ci` passed again on merged `main`.
+- Annotated tag object `807b2f8bb47ae9c7e132f1f8a218cf19c9ae2c61`
+  peels to the exact merged commit locally and in the official remote. A fresh
+  full public clone checked out the detached tag, passed the release-upgrade
+  identity test, and reported the immutable v0.4.2 prerequisite identity
+  without attempting an install because Nix was already usable.
+- Exact-tag run
+  [`30151746003`](https://github.com/luisgui1757/dotfiles/actions/runs/30151746003)
+  passed Ubuntu setup and container producers, then failed the post-setup
+  macOS neocmake attachment probe and cancelled Windows. It remains diagnostic
+  evidence and was never promoted as release proof.
+- One permitted fresh cache-free run
+  [`30152048314`](https://github.com/luisgui1757/dotfiles/actions/runs/30152048314)
+  passed all four producers and all four stable logical proof jobs. Ubuntu and
+  Apple Silicon macOS independently logged `Verified immutable release
+  checkout: v0.4.2` at the exact peeled commit and verified npm's effective
+  global prefix is `~/.local`.
+- GitHub release `359736736` was published on 2026-07-25 at
+  [`v0.4.2`](https://github.com/luisgui1757/dotfiles/releases/tag/v0.4.2).
+  Readback is immutable, latest, non-draft, and non-prerelease; the release body
+  matches the prepared user-facing notes after trailing-newline normalization.
+- The owner explicitly authorized publication with the real-environment rows in
+  `tests/MANUAL.md` still open. This entry preserves that boundary without
+  converting any unchecked row into evidence.
+
+### Publication verification
+
+| Check | Exact result |
+|---|---|
+| Final `make ci` on the reviewed release-preparation tree and merged `main` | PASS: both ended `local pre-PR gate passed`; reviewed head and merged `main` are tree-identical |
+| Gitleaks 8.30.1 across `v0.4.1..v0.4.2` and downloaded hosted proofs | PASS: 3 commits (54,643 bytes) plus all 4 stable logical proof artifacts (912 bytes), no leaks found with redaction enabled |
+| Cache-free hosted release run [`30152048314`](https://github.com/luisgui1757/dotfiles/actions/runs/30152048314) | PASS: Ubuntu container `89663966130`, Ubuntu setup `89663966090`, Apple Silicon macOS setup `89663966129`, Windows setup `89663966127`, and logical jobs `89665176065`, `89665176060`, `89665176043`, and `89665176037` |
+| Fresh detached public `v0.4.2` clone | PASS: tag object and peeled commit matched the official remote; release-upgrade static check and immutable prerequisite-helper path passed |
+| Downloaded schema-2 logical proofs | PASS: all four bound source SHA, executed SHA, run ID, attempt, logical context, and legacy context to the successful release run |
+| GitHub release readback | PASS: release `359736736`, immutable/latest, draft=false, prerelease=false, prepared user-facing body exact after trailing-newline normalization |
+
+Real Apple Silicon owner lifecycle, physical Linux, WSL2 split-host,
+redirected Windows, divergent stable packaged/Preview/Canary/portable Terminal,
+and desktop/visual/TCC rows remain open. No completion of those manual surfaces
+is claimed by publication.

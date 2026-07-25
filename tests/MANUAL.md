@@ -6,9 +6,9 @@ significant change to the relevant area.
 
 ## v0.1.0 to v0.4.2 release upgrade
 
-> Release-candidate status (2026-07-25): v0.4.2 publication is not complete.
-> Every unchecked row below remains an unclaimed evidence gap; publication will
-> not be evidence that a row ran.
+> Publication status (2026-07-25): immutable/latest v0.4.2 release `359736736`
+> is published. Every unchecked row below remains an unclaimed evidence gap;
+> publication is not evidence that a row ran.
 
 Use throwaway users/VMs seeded from the exact annotated v0.1.0 release. Follow
 `docs/UPGRADING.md`; never use `main` or update the old checkout in place.
@@ -63,9 +63,10 @@ commits, recovery path, provider inventory, and whether any user data changed.
       local/hosted gates and public-secret scan, record the tag object and peeled
       commit, prove fresh and v0.1.0 machines both need only setup all, then
       confirm the release document contains no branch command or placeholder
-      identity. Until those automated results and identities are recorded, this
-      row remains wholly open. Fresh and v0.1.0 real-machine acceptance remains
-      open after publication unless it is separately performed and recorded.
+      identity. The deterministic publication gates, public detached-clone
+      check, and exact identities are recorded in `docs/UPGRADING.md`; this row
+      remains open because fresh Nix-free and v0.1.0 real-machine acceptance
+      has not been separately performed and recorded.
 
 ## Visual / GUI
 

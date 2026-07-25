@@ -35,7 +35,7 @@ symlinks into the checkout. Do **not** run `git pull`, switch that checkout to a
 new revision, or run an upgrade from `main`: doing so can change live config
 before recovery exists.
 
-These commands target the annotated `v0.4.2` release once it is published.
+These commands target the published annotated `v0.4.2` release.
 
 ### Common preparation
 
@@ -216,21 +216,37 @@ pwsh -NoProfile -File 'C:\exact\recovery\upgrade-v0.1.0.ps1' -Rollback 'C:\exact
 pwsh -NoProfile -File 'C:\exact\recovery\upgrade-v0.1.0.ps1' -Accept 'C:\exact\recovery'
 ```
 
-## v0.4.2 release evidence gate
+## v0.4.2 release evidence
 
-The candidate starts from exact clean `main` commit
-`e085ea62ba19819b81b3d7bcfc0ead5ec57904c4`; publication remains gated on:
+v0.4.2 was published on 2026-07-25 under explicit owner authorization. The
+deterministic publication gates passed:
 
-- [ ] the reviewed release-preparation pull request merged to `main` with all
-  required checks passing;
-- [ ] an annotated `v0.4.2` tag whose tag object and peeled commit match the
-  exact merged release-preparation commit and the official remote;
-- [ ] full local and hosted gates, deterministic exact-v0.1.0 migration
-  fixtures, Windows Pester coverage, and a redacted scan across
-  `v0.4.1..v0.4.2` plus all downloaded logical proofs;
-- [ ] a cache-free hosted release run whose POSIX lanes report the exact
-  immutable `v0.4.2` tag identity;
-- [ ] immutable/latest GitHub release readback matching the prepared notes.
+- [x] pull request #70 merged reviewed head
+  `d3107898da59c8317db7c5b4d6e9ad8fdfba5d5e` to exact `main` commit
+  `fdd628b34a58a3ecf3a1bef3de72f7cd4ac7dfc0` with identical tree
+  `aee8b07da50e4c4d1a99f7dabef7b8ffcc56f1ef` and all required checks
+  passing;
+- [x] annotated tag object `807b2f8bb47ae9c7e132f1f8a218cf19c9ae2c61`
+  peels to that exact commit locally and in the official remote;
+- [x] the full local gate, deterministic exact-v0.1.0 migration fixtures,
+  hosted Windows coverage, and Gitleaks 8.30.1 scans across the three commits
+  and 54,643 bytes in `v0.4.1..v0.4.2` plus all four downloaded schema-2
+  logical proofs (912 bytes) passed;
+- [x] cache-free hosted run
+  [`30152048314`](https://github.com/luisgui1757/dotfiles/actions/runs/30152048314)
+  passed the Ubuntu, macOS, Windows, and container producers plus all four
+  logical proof jobs; both POSIX lanes reported the exact immutable tag and
+  proved npm's global prefix is `~/.local`;
+- [x] a fresh detached public clone resolved the same tag object and peeled
+  commit, passed the release-upgrade identity test, and verified the immutable
+  prerequisite path;
+- [x] GitHub release `359736736` read back immutable/latest, non-draft,
+  non-prerelease, and with the prepared user-facing body exact.
+
+Earlier exact-tag run
+[`30151746003`](https://github.com/luisgui1757/dotfiles/actions/runs/30151746003)
+failed the macOS neocmake attachment probe after setup and cancelled Windows.
+It remains diagnostic evidence and was not promoted as release proof.
 
 The unchecked real WSL, redirected-Windows, divergent Windows Terminal,
 physical-Linux, Apple-Silicon owner-host, and visual rows in `tests/MANUAL.md`
