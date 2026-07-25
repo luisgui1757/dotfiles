@@ -1409,6 +1409,17 @@ Describe "setup.ps1 update mode" {
         Mock -CommandName Invoke-ChezmoiApplyPhase -MockWith { throw "chezmoi apply must not run in update mode" }
     }
 
+    It "guards active pwsh before the real setup update path can mutate" {
+        $content = [System.IO.File]::ReadAllText($script:Setup)
+        $guardIndex = $content.IndexOf('if ($Update -and (Test-PwshIsActiveProcessHost))')
+        $mutationIndex = $content.IndexOf('$script:WindowsIdentity = Resolve-WindowsTargetIdentity')
+
+        $content | Should -Match '\$Update -and \(Test-PwshIsActiveProcessHost\)'
+        $content | Should -Match 'powershell\.exe -NoProfile -ExecutionPolicy Bypass -File \.\\setup\.ps1 -Update'
+        $guardIndex | Should -BeGreaterThan -1
+        $guardIndex | Should -BeLessThan $mutationIndex
+    }
+
     It "runs install-deps Update and MasonToolsUpdateSync only" {
         $root = Join-Path ([System.IO.Path]::GetTempPath()) 'setup-update-root'
         $depsRunner = {

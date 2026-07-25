@@ -1501,6 +1501,27 @@ exit 97
         $Catalog['pwsh'].choco | Should -Be 'powershell-core'
     }
 
+    It "detects only pwsh as the active replaceable PowerShell runtime" {
+        . $script:ImportInstallDepsForTest
+
+        (Test-PwshIsActiveProcessHost -Edition 'Core' -ProcessName 'pwsh') | Should -BeTrue
+        (Test-PwshIsActiveProcessHost -Edition 'Desktop' -ProcessName 'powershell') | Should -BeFalse
+        (Test-PwshIsActiveProcessHost -Edition 'Core' -ProcessName 'powershell') | Should -BeFalse
+    }
+
+    It "never upgrades pwsh during normal reconciliation and guards explicit update mode" {
+        $content = [System.IO.File]::ReadAllText($script:InstallDeps)
+        $normalSection = [regex]::Match(
+            $content,
+            '(?s)Section "modern shell .*?Section "language tooling'
+        ).Value
+
+        $normalSection | Should -Match 'Install-One pwsh'
+        $normalSection | Should -Not -Match 'Update-ManagedCatalogTool pwsh'
+        $content | Should -Match '\$Update -and \(Test-PwshIsActiveProcessHost\)'
+        $content | Should -Match 'powershell\.exe -NoProfile -ExecutionPolicy Bypass -File \.\\setup\.ps1 -Update'
+    }
+
     It "dry-runs a scoped PowerShell scoop update without blanket updates" {
         . $script:ImportInstallDepsForTest -DryRun
         $script:ScoopArgs = @()

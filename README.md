@@ -81,13 +81,16 @@ prove it owns:
 ```
 
 ```powershell
-.\setup.ps1 -Update
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\setup.ps1 -Update
 ```
 
 `--update` does not pull Git or move you to a new release. For a release change,
 clone the new exact tag beside the old checkout and follow
 [docs/UPGRADING.md](docs/UPGRADING.md). Do not turn a live old checkout into a
-new release with `git pull`.
+new release with `git pull`. Windows update mode intentionally runs under
+Windows PowerShell 5.1 so a scoped package-manager update can replace `pwsh`
+without terminating its own process. Normal `-All` setup installs a missing
+PowerShell 7 but never upgrades an already-running `pwsh`.
 
 To preview or remove the managed config layer:
 
@@ -594,6 +597,23 @@ Brew-backed preview phase without claiming the bootstrap already happened.
 The Nix-owned CLI set includes Node 24 so the pinned npm-backed Pi CLI can run
 reproducibly on macOS/Linux/WSL while the `pi` package itself stays pinned by
 npm integrity until nixpkgs catches up.
+
+**npm ownership on POSIX.** Nix owns the immutable Node/npm runtime; npm does
+not write packages back into that runtime. During normal setup,
+`install-deps.sh` uses npm's own user-config command to persist the global
+prefix as `~/.local`, preserves existing registry/auth settings, and verifies
+the effective prefix before continuing. Managed zsh already puts
+`~/.local/bin` first on `PATH`. The canonical usage split is:
+
+```bash
+npm exec --package <package> -- <command>  # try/run a package without a global install
+npm install                               # project dependency, local to the project
+npm install --global <package>            # persistent personal CLI under ~/.local
+```
+
+Do not use `sudo npm install --global`, and do not overlay a second mutable Node
+installation. Native Windows keeps npm's normal per-user Windows prefix.
+
 Homebrew is intentionally mixed ownership on macOS. nix-darwin installs the
 repo-declared subset with `homebrew.onActivation.cleanup = "none"`; it never
 rejects or removes extra formulae/casks installed by `install-deps.sh` or the
@@ -631,8 +651,8 @@ append-only evidence ledger and are not a current support claim.
 ```powershell
 .\setup.ps1
 .\setup.ps1 -All
-.\setup.ps1 -Update
-.\setup.ps1 -Upgrade  # alias for -Update
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\setup.ps1 -Update
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\setup.ps1 -Upgrade
 .\setup.ps1 -DryRun
 .\setup.ps1 -SkipConfig
 .\setup.ps1 -SkipAgents
@@ -1264,7 +1284,7 @@ The e2e jobs cover different install paths, not symmetric container platforms:
 
 | Check | What it proves |
 |---|---|
-| `e2e containers / ubuntu-24.04` | Clean `ubuntu:24.04`, non-root user, native `apt`, no Linuxbrew (`DOTFILES_SKIP_BREW_BOOTSTRAP=1`), then `install-deps.sh --all`, chezmoi config apply, executable/version probes including `zoxide`, `gh`, WezTerm, Herdr, Neovim >= 0.12, lazygit, zsh plugin files, config content assertions, and nvim directory realpath assertion. This is the native installer regression fixture, not the Nix-backed public POSIX package-plane proof; it does not assert Pi CLI because Node 24 comes from the Nix package layer. |
+| `e2e containers / ubuntu-24.04` | Clean `ubuntu:24.04`, non-root user, native `apt`, no Linuxbrew (`DOTFILES_SKIP_BREW_BOOTSTRAP=1`), then `install-deps.sh --all`, chezmoi config apply, npm's `~/.local` global-prefix postcondition, executable/version probes including `zoxide`, `gh`, WezTerm, Herdr, Neovim >= 0.12, lazygit, zsh plugin files, config content assertions, and nvim directory realpath assertion. This is the native installer regression fixture, not the Nix-backed public POSIX package-plane proof; it does not assert Pi CLI because Node 24 comes from the Nix package layer. |
 | Local Linux owner lifecycle | Pinned Ubuntu and Nix container images, non-root user, real Home Manager plus native `apt`, then install, update, config uninstall, idempotent uninstall retry, reinstall, final update, full validation, and proof that no pre-existing native package disappeared. |
 | `setup.sh / ubuntu-24.04` | Full public Unix setup on the hosted Ubuntu runner after installing Nix in CI: Home Manager first, then native/deferred installs, chezmoi, Lazy, Tree-sitter, Mason, and Sentinel. Its clean login/interactive PATH proof resolves the effective account's actual login zsh from the account database; this matters because fresh Ubuntu has no `/usr/bin/zsh` and setup selects Linuxbrew zsh. The shell must resolve `rg` from Nix with no caller PATH injection. |
 | `setup.sh / macos-26` | Full public Apple Silicon setup through the hosted runner: architecture-matched nix-darwin/declarative Homebrew, native/deferred installs, real Ghostty/WezTerm config consumption, installed AeroSpace app/CLI identity agreement, chezmoi, Lazy, Tree-sitter, Mason, and Sentinel. AeroSpace waits for a user-granted Accessibility permission before parsing user config or starting the CLI server, so managed-config consumption remains explicit TCC-enabled desktop proof in `tests/MANUAL.md`; hosted CI does not pretend to prove it. Hosted and real Macs share the same mixed-ownership Homebrew contract: declared packages are applied, tap clones stay target-user-owned, and unrelated user state is preserved. |
@@ -1739,6 +1759,8 @@ MIT. See `LICENSE`.
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
+| `npm install --global …` fails with `EACCES` under `/nix/store/...-nodejs...` | npm inherited its compiled-in global prefix from the immutable Nix-owned Node runtime; the checkout predates user-prefix reconciliation or setup was skipped | update this repo and rerun normal `./setup.sh --all` (or `./install-deps.sh --all` if the Nix package layer is already active). Setup preserves unrelated `~/.npmrc` registry/auth settings, persists `prefix=$HOME/.local`, and verifies it. Then rerun the npm command without `sudo`; use `npm exec --package <package> -- <command>` for a one-off |
+| Windows update mode says it cannot replace the active `pwsh` runtime | PowerShell 7 is hosting setup, so winget/Scoop/Chocolatey cannot safely replace that executable and still return a verified result | run `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\setup.ps1 -Update` from the repo. The Windows PowerShell 5.1 host remains separate while the scoped manager updates `pwsh`; normal `-All` setup never upgrades an already-present PowerShell 7 |
 | Setup warns `multiple managed <tool> commands are on PATH` | two physically distinct installations publish the same managed command; changing `PATH` order could silently switch which one runs | keep the printed `selected` command, then remove each `duplicate` through its proven owner. Setup prints exact no-elevation cleanup only for a proven user-scoped Homebrew, npm, or Scoop package; review scope yourself for winget/Chocolatey/system managers, and use the original manager for `owner=unknown`. Setup never removes either copy automatically. Rerun setup until the warning disappears |
 | Pi setup says `expected 0.80.10 after install, got 0.80.3`, or reports multiple managed `pi` commands | an older global npm/Homebrew `pi` duplicates the repo-owned `~/.local/bin/pi`; older checkouts also let the global command win `PATH` resolution | update this repo and rerun setup. Current setup proves only `~/.local/bin/pi`, makes it win in current and future shells, and reports every physical duplicate. For a proven npm-global copy, run the exact `cleanup (same user, no sudo)` command shown, then rerun setup to confirm one command remains. Never prepend `sudo`; unknown owners must be removed with their original package manager |
 | v0.2.0 Linux Nix bootstrap ends with `cat: /etc/bashrc: Permission denied` and upstream's `Oh no` failure | the pinned upstream daemon installer prepared `/etc/bashrc` through its privileged path, then tried to read it as the invoking user; its multi-user path does not honor the public `--no-modify-profile` option | if `/etc/bashrc.backup-before-nix` exists after the failure, restore it with `sudo mv /etc/bashrc.backup-before-nix /etc/bashrc`. For immutable v0.2.0 without that backup, the bounded workaround is `sudo chmod a+r /etc/bashrc` before rerunning. Move to the exact v0.4.1 release checkout and rerun `./setup.sh --all`; its hash-verified local patch skips the daemon profile step and leaves shell activation to setup/Home Manager |

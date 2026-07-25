@@ -3,8 +3,10 @@
 # Local usage (from a checked-out copy):
 #   .\setup.ps1                  interactive: dependency prompts, then config + sync
 #   .\setup.ps1 -All             non-interactive: install or migrate, then reconcile everything
-#   .\setup.ps1 -Update          reconcile the release, then refresh proven tools + Mason
-#   .\setup.ps1 -Upgrade         alias for -Update
+#   powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\setup.ps1 -Update
+#                                reconcile the release, then refresh proven tools + Mason
+#   powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\setup.ps1 -Upgrade
+#                                alias for -Update
 #   .\setup.ps1 -DryRun          preview every step
 #   .\setup.ps1 -SkipDeps        already have nvim/starship; just config+sync
 #   .\setup.ps1 -SkipBootstrap   back-compat alias: skip config apply
@@ -147,6 +149,14 @@ function Update-RuntimePath {
 function Stop-SetupWithExitCode {
     param([int]$ExitCode)
     exit $ExitCode
+}
+
+function Test-PwshIsActiveProcessHost {
+    param(
+        [string]$Edition = [string]$PSVersionTable.PSEdition,
+        [string]$ProcessName = [System.Diagnostics.Process]::GetCurrentProcess().ProcessName
+    )
+    return ($Edition -eq 'Core' -and $ProcessName -eq 'pwsh')
 }
 
 function Invoke-DependencyInstallerOrFail {
@@ -2329,6 +2339,17 @@ function Invoke-SetupUpdateMode {
 # Test seam: set DOTFILES_SETUP_PS1_SOURCE_ONLY and dot-source this file to load
 # helper functions without running install, config, or Neovim sync phases.
 if ($env:DOTFILES_SETUP_PS1_SOURCE_ONLY) { return }
+
+if ($Update -and (Test-PwshIsActiveProcessHost)) {
+    if ($DryRun) {
+        Write-Output "note: real Windows update mode must run under Windows PowerShell so pwsh can be replaced safely."
+    } else {
+        Write-Output "FAIL: update mode cannot replace the active pwsh runtime."
+        Write-Output "Re-run from Windows PowerShell 5.1:"
+        Write-Output "  powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\setup.ps1 -Update"
+        exit 1
+    }
+}
 
 $script:WindowsIdentity = Resolve-WindowsTargetIdentity
 $script:ChezmoiBaseArgs = @('--source', $HomeSource, '--destination', $script:WindowsIdentity.UserProfile)

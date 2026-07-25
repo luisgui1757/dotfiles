@@ -315,6 +315,8 @@ jobs:
           command -v gh >/dev/null 2>&1 || fail "gh is not on PATH"
           command -v pi >/dev/null 2>&1 || fail "pi is not on PATH"
           [[ "$(pi --version)" == "0.80.10" ]] || fail "pi version is not pinned 0.80.10"
+          [[ "$(npm prefix --global)" == "$HOME/.local" ]] \
+            || fail "npm global prefix is not the canonical user-local root"
           for theme_name in \
             rose-pine rose-pine-moon rose-pine-dawn
           do

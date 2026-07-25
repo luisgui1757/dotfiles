@@ -94,6 +94,9 @@ if [[ "${1:-}" == "--as-user" ]]; then
     assert_tool_runs gh --version
     assert_tool_runs wezterm --version
     assert_tool_runs herdr --version
+    assert_tool_runs npm --version
+    [[ "$(npm prefix --global)" == "$HOME/.local" ]] \
+        || fail "npm global prefix is not the canonical user-local root"
 
     nvim_line="$(nvim --version | head -n 1)"
     case "$nvim_line" in
