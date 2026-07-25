@@ -6,9 +6,11 @@ significant change to the relevant area.
 
 ## v0.1.0 to v0.4.3 release upgrade
 
-> Release-candidate status (2026-07-25): v0.4.3 publication is not complete.
-> Every unchecked row below remains an unclaimed evidence gap; publication will
-> not be evidence that a row ran.
+> Release status (2026-07-25): immutable/latest GitHub release `359840729`
+> binds annotated tag object `72232aee30201506320889a0c82be515041b9674`
+> to peeled commit `e3e459a20c23ae546b26d5206d13b648b29e8788`.
+> Every unchecked row below remains an unclaimed evidence gap; publication is
+> not evidence that a row ran.
 
 Use throwaway users/VMs seeded from the exact annotated v0.1.0 release. Follow
 `docs/UPGRADING.md`; never use `main` or update the old checkout in place.

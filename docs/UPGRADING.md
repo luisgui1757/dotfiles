@@ -35,7 +35,7 @@ symlinks into the checkout. Do **not** run `git pull`, switch that checkout to a
 new revision, or run an upgrade from `main`: doing so can change live config
 before recovery exists.
 
-These commands target the annotated `v0.4.3` release once it is published.
+These commands target the published annotated `v0.4.3` release.
 
 ### Common preparation
 
@@ -216,25 +216,37 @@ pwsh -NoProfile -File 'C:\exact\recovery\upgrade-v0.1.0.ps1' -Rollback 'C:\exact
 pwsh -NoProfile -File 'C:\exact\recovery\upgrade-v0.1.0.ps1' -Accept 'C:\exact\recovery'
 ```
 
-## v0.4.3 release evidence gate
+## v0.4.3 release evidence
 
-The candidate starts from exact clean `main` commit
-`6e9ccf8086fdb36cbfe06280718decd93e53e89d`; publication remains gated on:
+v0.4.3 was published on 2026-07-25 under explicit owner authorization. The
+deterministic publication gates passed:
 
-- [ ] the reviewed release-preparation pull request merged to `main` with all
-  required checks passing;
-- [ ] an annotated `v0.4.3` tag whose tag object and peeled commit match the
-  exact merged release-preparation commit and the official remote;
-- [ ] full local and hosted gates, deterministic exact-v0.1.0 migration
-  fixtures, Windows Pester coverage, and a redacted scan across
-  `v0.4.2..v0.4.3` plus all downloaded logical proofs;
-- [ ] a cache-free hosted release run whose POSIX lanes report the exact
-  immutable `v0.4.3` tag identity;
-- [ ] immutable/latest GitHub release readback matching the prepared notes.
+- [x] pull request #73 merged reviewed head
+  `8d5c27768fc8fe528818c3a1fe879b213a594c23` to exact `main` commit
+  `e3e459a20c23ae546b26d5206d13b648b29e8788` with identical tree
+  `e022993c8dd3adbeb9c3ecaab1d01a97856d2b14` and all 21 hosted checks
+  passing;
+- [x] annotated tag object `72232aee30201506320889a0c82be515041b9674`
+  peels to that exact commit locally and in the official remote;
+- [x] the full local gate, deterministic exact-v0.1.0 migration fixtures,
+  hosted Windows coverage, and Gitleaks 8.30.1 scans across the three commits
+  and 69,707 bytes in `v0.4.2..v0.4.3` plus all four downloaded schema-2
+  logical proofs (912 bytes) passed;
+- [x] cache-free hosted run
+  [`30171230547`](https://github.com/luisgui1757/dotfiles/actions/runs/30171230547)
+  passed the Ubuntu, macOS, Windows, and container producers plus all four
+  logical proof jobs; both POSIX lanes reported the exact immutable tag;
+- [x] a fresh detached public clone resolved the same tag object and peeled
+  commit, passed the release-upgrade identity test, and exercised the immutable
+  prerequisite-helper no-op path;
+- [x] GitHub release
+  [`359840729`](https://github.com/luisgui1757/dotfiles/releases/tag/v0.4.3)
+  is immutable, latest, non-draft, and non-prerelease, and its body matches the
+  prepared user-facing notes.
 
 The unchecked real WSL, redirected-Windows, divergent Windows Terminal,
 physical-Linux, Apple-Silicon owner-host, and visual rows in `tests/MANUAL.md`
-remain explicit residual gaps; publication will not mark them complete.
+remain explicit residual gaps; publication does not mark them complete.
 
 ## v0.4.2 release evidence
 

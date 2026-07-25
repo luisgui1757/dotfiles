@@ -1,7 +1,7 @@
 # Dotfiles Roadmap
 
-Last audited: 2026-07-25 during v0.4.3 release preparation.
-Baseline: `main` at `6e9ccf8086fdb36cbfe06280718decd93e53e89d`.
+Last audited: 2026-07-25 during immutable v0.4.3 publication closure.
+Baseline: `main` at `e3e459a20c23ae546b26d5206d13b648b29e8788`.
 
 This is the adversarial post-merge roadmap for the chezmoi migration and the
 current setup/CI surface. The goal is not "good enough"; the repo should have a
@@ -1246,8 +1246,8 @@ every other zsh plugin surface.
 
 ### 9. The published in-place upgrade crossed the config backup boundary
 
-Status: implementation done; v0.2.0, v0.3.0, v0.4.0, v0.4.1, and v0.4.2
-published; v0.4.3 release preparation in progress.
+Status: implementation done; v0.2.0, v0.3.0, v0.4.0, v0.4.1, v0.4.2, and
+v0.4.3 published.
 
 Evidence:
 
@@ -1282,7 +1282,7 @@ Evidence:
   ACL policy, and provider-boundary verification.
 - `docs/UPGRADING.md` and `docs/releases/v0.4.3.md` define the supported
   per-platform commands, Apple-Silicon-only macOS boundary, WSL ordering, Nix
-  provenance, and release evidence gate.
+  provenance, and release evidence record.
 
 Canonical solution:
 
@@ -1313,9 +1313,12 @@ Canonical solution:
    created the zsh-plugin parent tree. Check-only probes now return before
    parent creation or lock acquisition; direct and real chezmoi preview oracles
    bind the write-free contract.
-10. IN PROGRESS - Prepare, merge, tag, certify, and publish v0.4.3 from the
-    exact post-audit repair tree; record only observed tag, workflow, scan, and
-    immutable-release identities after each gate passes.
+10. DONE - Pull request #73 merged the reviewed v0.4.3 preparation tree to
+    `e3e459a20c23ae546b26d5206d13b648b29e8788`; annotated tag object
+    `72232aee30201506320889a0c82be515041b9674`, cache-free run
+    `30171230547`, release-range/proof scans, a fresh detached public clone,
+    and immutable/latest GitHub release `359840729` passed their exact
+    identity gates.
 
 ## Disproved Or Non-Blocking Assumptions
 

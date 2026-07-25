@@ -414,9 +414,10 @@ flakes, so fetching the mutable `nixpkgs-unstable` channel is unnecessary and
 would wrongly force the installer's bundled CA instead of the managed host's
 system trust store. If an earlier attempt installed Nix but stopped before
 enabling those features, rerunning setup repairs the user setting and continues.
-Once published, the `v0.4.3` release path accepts only the exact clean official
-annotated tag whose observed tag object and peeled commit will be recorded in
-the supply-chain ledger. Branch testing remains an explicit opt-in through
+The published `v0.4.3` release path accepts only the exact clean official
+annotated tag object `72232aee30201506320889a0c82be515041b9674`, which
+peels to commit `e3e459a20c23ae546b26d5206d13b648b29e8788` as recorded
+in the supply-chain ledger. Branch testing remains an explicit opt-in through
 `--allow-unreleased` and still requires a current branch head in the official
 repository. Local-only or stale commits, forks, dirty checkouts, lightweight
 tags, and non-official origins fail before download. The versioned upgrade tools
