@@ -501,6 +501,17 @@ assert_clean_diagnostic
 pass "verified upstream installer skips mutable channels, preserves readable store paths, leaves shell profiles to dotfiles, and persists flake features"
 
 rm "$work/bin/nix"
+no_systemd_bin="$work/no-systemd-bin"
+mkdir -p "$no_systemd_bin"
+for command_name in bash cat chmod cp dirname id mkdir mktemp mv rm; do
+    command_path="$(command -v "$command_name")"
+    [[ -x "$command_path" ]] ||
+        fail "required non-systemd fixture command is unavailable: $command_name"
+    ln -s "$command_path" "$no_systemd_bin/$command_name"
+done
+if PATH="$work/bin:$no_systemd_bin" command -v systemctl >/dev/null 2>&1; then
+    fail "single-user fixture PATH unexpectedly exposes systemctl"
+fi
 new_fixture noninteractive-single-user-install
 head_commit="$($REAL_GIT -C "$fixture" rev-parse HEAD)"
 refs="$work/noninteractive-single-user-install.refs"
@@ -508,6 +519,7 @@ printf '%s\trefs/heads/fix/bootstrap\n' "$head_commit" > "$refs"
 export FAKE_INSTALL_ARGS="$work/single-user-install-args.log"
 export FAKE_INSTALL_CONF="$work/single-user-install-conf.log"
 export FAKE_RUNTIME_BIN="$work/bin"
+export RUN_PATH_OVERRIDE="$work/bin:$no_systemd_bin"
 export RUN_HOME_OVERRIDE="$work/single-user-install-home"
 export FAKE_UNAME_SYSTEM=Linux
 export FAKE_UNAME_ARCH=x86_64

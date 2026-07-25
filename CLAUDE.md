@@ -357,7 +357,10 @@ that violates one of these, fix it instead of disabling the test.
       merge must parse under the platform `awk`, add each feature exactly once,
       and register its same-directory atomic stage with EXIT cleanup. A retry
       self-heals the same disabled-feature state after an otherwise-complete
-      install. Before invoking that helper,
+      install. The single-user regression fixture must expose the required
+      commands through a PATH that omits `systemctl`, so a systemd-capable CI
+      host cannot silently switch the intended `--no-daemon` path to daemon
+      mode. Before invoking that helper,
       greenfield Linux/WSL setup must reuse `install-deps.sh`'s source-only
       `require_downloader` path to install `curl` plus CA certificates through
       the detected package manager; this bootstrap precedes Nix because the full
