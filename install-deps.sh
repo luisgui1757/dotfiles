@@ -2005,6 +2005,44 @@ ensure_npm() {
     esac
 }
 
+# Nix/Home Manager owns the Node/npm runtime, whose compiled-in global prefix
+# points into the immutable Nix store. Keep mutable user-installed npm globals
+# in the repo's existing per-user executable root instead. Use npm's config
+# writer so unrelated registry/auth settings in ~/.npmrc survive, then verify
+# the effective value so environment overrides cannot silently defeat it.
+configure_npm_user_prefix() {
+    local expected="$HOME/.local" current
+
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        printf "  would:    npm config set prefix %q --location=user\n" "$expected"
+        printf "  would:    verify npm global prefix is %s\n" "$expected"
+        return 0
+    fi
+
+    if ! command -v npm >/dev/null 2>&1; then
+        printf "  skipped   %-26s npm is not installed\n" "npm global prefix"
+        return 0
+    fi
+
+    if ! npm config set prefix "$expected" --location=user; then
+        echo "  FAIL: npm could not persist the user-global prefix at $expected" >&2
+        return 1
+    fi
+    if ! current="$(npm prefix --global 2>/dev/null)"; then
+        echo "  FAIL: npm could not report its effective global prefix" >&2
+        return 1
+    fi
+    current="$(printf '%s\n' "$current" | awk 'NF { print; exit }')"
+    if [[ "$current" != "$expected" ]]; then
+        echo "  FAIL: npm global prefix is $current; expected $expected" >&2
+        echo "        Remove or correct any NPM_CONFIG_PREFIX/npm_config_prefix override." >&2
+        return 1
+    fi
+
+    ensure_local_bin_on_path
+    printf "  configured %-26s %s\n" "npm global prefix" "$expected"
+}
+
 pi_cli_node_ready() {
     command -v node >/dev/null 2>&1 || return 1
     node -e 'const [maj,min]=process.versions.node.split(".").map(Number); process.exit(maj > 22 || (maj === 22 && min >= 19) ? 0 : 1)' >/dev/null 2>&1
@@ -4941,6 +4979,7 @@ run_install_step "python venv/pip" "$(native_linux_pm)" python3-venv ensure_pyth
 run_install_step latex2text direct "pylatexenc@$PYLATEXENC_VERSION" install_pylatexenc_converter
 run_catalog_install node "needed by prettier and JS tooling"
 run_install_step npm "$(native_linux_pm)" npm ensure_npm
+run_install_step "npm global prefix" npm-config "$HOME/.local" configure_npm_user_prefix
 run_install_step pi npm "$PI_CLI_PACKAGE@$PI_CLI_VERSION" install_pi_cli
 run_install_step tree-sitter direct "$TREE_SITTER_CLI_LINUX_VERSION" install_tree_sitter_cli
 

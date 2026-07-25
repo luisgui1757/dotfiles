@@ -291,7 +291,13 @@ that violates one of these, fix it instead of disabling the test.
       artifacts, including the Windows Herdr preview `.exe`), never nixpkgs.
       Node 24 is in this package-only set because the pinned Pi CLI npm package
       needs a modern Node runtime; the Pi package itself remains npm-pinned until
-      nixpkgs catches up.
+      nixpkgs catches up. On POSIX, Nix owns that immutable Node/npm runtime,
+      while npm owns mutable user-global packages under `~/.local`:
+      `install-deps.sh` persists the prefix through `npm config set
+      --location=user`, preserving unrelated registry/auth settings, and fails
+      closed unless `npm prefix --global` reads back exactly `~/.local`.
+      npm's user config remains user-owned and untracked; never add a second
+      mutable Node installation or make Home Manager own `~/.npmrc`.
     - **(c) native Windows is non-Nix.** Windows-host files are `setup.ps1` +
       native package managers (Scoop/winget/choco) + chezmoi. Nix has no supported
       native-Windows story; it applies to WSL2 *userland* only and must never
@@ -855,7 +861,9 @@ major; `tests/static/repo_policy_test.sh` enforces this.
   so only they retain the pinned Determinate action as a pre-seeded test path.
   Both jobs then apply the enforced nix-darwin/Home Manager layer before
   native/deferred installs and assert the nix-owned CLI set resolves from a Nix
-  profile/store path. The Linux job first
+  profile/store path. They also require npm's independently managed mutable
+  global prefix to resolve to `~/.local`, proving the Nix-store runtime is never
+  used as a write target. The Linux job first
   proves a clean login/interactive zsh resolves Nix-owned `rg` through Home
   Manager session state with no CI PATH injection. That proof resolves the
   effective account's login shell from the account record and executes that
@@ -2202,7 +2210,11 @@ provisioning. The repo never installs Nix through a pipe-to-shell bootstrap.
   level by `tests/static/nix_architecture_test.sh`, which allowlists only
   `programs.home-manager` and bans `home.activation` outright. The shared
   package list includes `nodejs_24` specifically so npm-backed Pi CLI
-  provisioning does not depend on a stale distro Node.
+  provisioning does not depend on a stale distro Node. The runtime remains
+  immutable and Nix-owned; after activation, `install-deps.sh` uses npm's own
+  user-config writer to persist `prefix=$HOME/.local`, preserves all unrelated
+  npm settings, and verifies the effective global prefix. This is provisioning,
+  not a Home Manager activation or chezmoi-owned dotfile.
 - **setup.sh integration is enforced + consent-gated.** On macOS, `setup.sh`
   applies nix-darwin by default before Phase 1 dependency provisioning.
   `--nix-darwin` remains a compatibility alias, not the switch that makes Nix
