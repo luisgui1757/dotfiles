@@ -3339,3 +3339,44 @@ is claimed by this audit remediation.
 No v0.4.3 tag, GitHub release, cache-free exact-tag run, redacted
 `v0.4.2..v0.4.3` release-range/proof scan, or post-publication identity readback
 is claimed by this entry.
+
+## v0.4.3 immutable publication closure — entry 82
+
+- Pull request #73 merged reviewed head
+  `8d5c27768fc8fe528818c3a1fe879b213a594c23` to exact `main` commit
+  `e3e459a20c23ae546b26d5206d13b648b29e8788`. Both commits have tree
+  `e022993c8dd3adbeb9c3ecaab1d01a97856d2b14`; their diff is empty. All 21
+  hosted checks were successful with none pending or failing before merge.
+- Annotated tag object `72232aee30201506320889a0c82be515041b9674`
+  peels to that exact merged commit locally and in the official remote. A fresh
+  credential-free public clone checked out the detached tag, passed the
+  release-upgrade identity test, and reported the immutable v0.4.3 prerequisite
+  identity without attempting an install because Nix was already usable.
+- Cache-free exact-tag run
+  [`30171230547`](https://github.com/luisgui1757/dotfiles/actions/runs/30171230547)
+  passed all four producers and all four stable logical proof jobs. Ubuntu and
+  Apple Silicon macOS independently logged `Verified immutable release
+  checkout: v0.4.3` at the exact peeled commit.
+- GitHub release `359840729` was published on 2026-07-25 at
+  [`v0.4.3`](https://github.com/luisgui1757/dotfiles/releases/tag/v0.4.3).
+  Readback is immutable, latest, non-draft, and non-prerelease; the release body
+  matches the prepared user-facing notes after trailing-newline normalization.
+- The owner explicitly authorized publication with the real-environment rows in
+  `tests/MANUAL.md` still open. This entry preserves that boundary without
+  converting any unchecked row into evidence.
+
+### Publication verification
+
+| Check | Exact result |
+|---|---|
+| Final `make ci` on the reviewed release-preparation tree | PASS: ended `local pre-PR gate passed`; reviewed head and merged `main` are tree-identical |
+| Gitleaks 8.30.1 across `v0.4.2..v0.4.3` and downloaded hosted proofs | PASS: 3 commits (69,707 bytes) plus all 4 stable logical proof artifacts (912 bytes), no leaks found with redaction enabled |
+| Cache-free hosted release run [`30171230547`](https://github.com/luisgui1757/dotfiles/actions/runs/30171230547) | PASS: macOS setup `89712619125`, Ubuntu container `89712619142`, Windows setup `89712619150`, Ubuntu setup `89712619164`, and logical jobs `89713834863`, `89713834864`, `89713834872`, and `89713834882` |
+| Fresh detached public `v0.4.3` clone | PASS: tag object and peeled commit matched the official remote; release-upgrade static check and immutable prerequisite-helper path passed |
+| Downloaded schema-2 logical proofs | PASS: all four bound source SHA, executed SHA, run ID, attempt, logical context, and legacy context to the successful release run |
+| GitHub release readback | PASS: release `359840729`, immutable/latest, draft=false, prerelease=false, prepared user-facing body exact after trailing-newline normalization |
+
+Real Apple Silicon owner lifecycle, physical Linux, WSL2 split-host,
+redirected Windows, divergent stable packaged/Preview/Canary/portable Terminal,
+and desktop/visual/TCC rows remain open. No completion of those manual surfaces
+is claimed by publication.

@@ -77,8 +77,8 @@ canonical v0.4.3 path is side-by-side and exact-tag-only:
   overlay state on rollback, and validates all four canonical Terminal paths
   before any restore write.
 - `scripts/install-nix-prerequisite.sh` installs only checksum-reviewed upstream
-  Nix 2.34.0 release archives. Once published, the default requires the exact
-  v0.4.3 annotated tag object and peeled commit. The explicit POSIX
+  Nix 2.34.0 release archives. The published default requires the exact v0.4.3
+  annotated tag object and peeled commit. The explicit POSIX
   `--allow-unreleased` field-test lane may instead accept a clean checkout whose
   HEAD equals a current branch head in the official repository; forks, dirty
   trees, stale/local-only commits, and the exact-tag migration tools remain
@@ -109,12 +109,17 @@ canonical v0.4.3 path is side-by-side and exact-tag-only:
   all-target concurrency rejection, known-folder state validation, and the
   pre-migration command-provider boundary.
 
-The v0.4.3 candidate keeps the same frozen-source and rollback boundaries while
-moving the current exact-tag authority, setup recovery namespace, and
-prerequisite identity to `v0.4.3`. Setup also treats any unfinished v0.4.2
+The annotated v0.4.3 release was published on 2026-07-25 after its exact local,
+hosted cache-free, release-range/proof scan, fresh detached public-clone, and
+immutable-release gates passed. Its setup, prerequisite helper, and both
+v0.1.0 migrators bind tag object
+`72232aee30201506320889a0c82be515041b9674` to peeled commit
+`e3e459a20c23ae546b26d5206d13b648b29e8788` while retaining the same
+frozen-source and rollback boundaries. Setup also treats any unfinished v0.4.2
 transaction as an older recovery that must be accepted or rolled back before
-v0.4.3 can begin. Publication identities will be recorded only after the
-reviewed preparation tree merges and the exact-tag gates pass.
+v0.4.3 can begin. Cache-free run `30171230547` passed all four producers and
+all four stable logical proofs; GitHub release `359840729` is immutable and
+latest.
 
 The annotated v0.4.2 release was published on 2026-07-25 after its exact local,
 hosted cache-free, release-range/proof scan, fresh detached public-clone, and
