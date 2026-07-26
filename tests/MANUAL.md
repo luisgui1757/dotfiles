@@ -6,8 +6,9 @@ significant change to the relevant area.
 
 ## v0.1.0 to v0.4.4 release upgrade
 
-> Release candidate status: `v0.4.4` identities are recorded only after every
-> deterministic publication gate passes.
+> Release status (2026-07-26): immutable/latest GitHub release `359951205`
+> binds annotated tag object `5c19cfaa19087b286d867c2bf422d33f76c64887`
+> to peeled commit `05874e536372f6a73f8971c84e675e95666662d4`.
 > Every unchecked row below remains an unclaimed evidence gap; publication is
 > not evidence that a row ran.
 

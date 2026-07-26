@@ -1,0 +1,111 @@
+{
+  "schema": 1,
+  "kind": "publication-closure",
+  "repository": "luisgui1757/dotfiles",
+  "tag": "v0.4.4",
+  "previous_tag": "v0.4.3",
+  "tag_object": "5c19cfaa19087b286d867c2bf422d33f76c64887",
+  "commit": "05874e536372f6a73f8971c84e675e95666662d4",
+  "tree": "df353441f2592262c7583e8ee728f74e53930d8e",
+  "preparation": {
+    "pull_request": 79,
+    "head": "f0c747127689d0548c5f4a62507584c2e971c882",
+    "tree": "df353441f2592262c7583e8ee728f74e53930d8e",
+    "hosted_checks": [
+      "Analyze (actions)",
+      "Analyze (python)",
+      "CodeQL",
+      "chezmoi-parity",
+      "chezmoi-parity-macos",
+      "chezmoi-parity-windows",
+      "e2e containers / linux",
+      "e2e containers / ubuntu-24.04",
+      "macos",
+      "nix flake check (macos-26)",
+      "nix flake check (ubuntu-24.04)",
+      "nix flake check / linux",
+      "nix flake check / macos",
+      "setup.ps1 / windows",
+      "setup.ps1 / windows-2025",
+      "setup.sh / linux",
+      "setup.sh / macos",
+      "setup.sh / macos-26",
+      "setup.sh / ubuntu-24.04",
+      "ubuntu",
+      "windows"
+    ],
+    "required_checks": [
+      "chezmoi-parity",
+      "chezmoi-parity-macos",
+      "chezmoi-parity-windows",
+      "e2e containers / linux",
+      "macos",
+      "nix flake check / linux",
+      "nix flake check / macos",
+      "setup.ps1 / windows",
+      "setup.sh / linux",
+      "setup.sh / macos",
+      "ubuntu",
+      "windows"
+    ]
+  },
+  "workflow": {
+    "name": "e2e-install.yml",
+    "run_id": 30192132079,
+    "run_attempt": 1,
+    "url": "https://github.com/luisgui1757/dotfiles/actions/runs/30192132079",
+    "conclusion": "success"
+  },
+  "logical_proofs": [
+    {
+      "artifact": "e2e-container-linux-logical-proof",
+      "marker": "e2e-container-linux.env",
+      "size": 237,
+      "sha256": "ed44dc3c5c8de297e53d5eac988a5eb6a6bad2e84b3da4c00ad19a9e5fb53943"
+    },
+    {
+      "artifact": "setup-sh-linux-logical-proof",
+      "marker": "setup-sh-linux.env",
+      "size": 225,
+      "sha256": "8542a0740522e3bbfa2ba61cac30a347d1ce5c6474e775a524bcf152aeba8b18"
+    },
+    {
+      "artifact": "setup-sh-macos-logical-proof",
+      "marker": "setup-sh-macos.env",
+      "size": 221,
+      "sha256": "da0edb4a5c21855438f4f49caac7c0145b47beebd3a861bf65619e6648fcae6d"
+    },
+    {
+      "artifact": "setup-ps1-windows-logical-proof",
+      "marker": "setup-ps1-windows.env",
+      "size": 229,
+      "sha256": "468985d84db3eff2da38160dc3b3e6b1798fbd622f731cf15369543e5fd47ba5"
+    }
+  ],
+  "scans": {
+    "gitleaks_version": "8.30.1",
+    "release_range": "v0.4.3..v0.4.4",
+    "proof_bytes": 912
+  },
+  "fresh_public_clone": "passed",
+  "release": {
+    "id": 359951205,
+    "published_at": "2026-07-26T07:21:35Z",
+    "immutable": true,
+    "latest": true,
+    "draft": false,
+    "prerelease": false
+  },
+  "residual_evidence": [
+    "real WSL",
+    "redirected Windows",
+    "divergent Windows Terminal targets",
+    "physical Linux",
+    "Apple Silicon owner host",
+    "manual visual checks"
+  ],
+  "certification_asset": {
+    "name": "release-proof.json",
+    "sha256": "03dc6734b243153c7d59f103c4f92abbdcdbcae469a4de06d36fde711d34b71d"
+  }
+}

@@ -4,15 +4,12 @@
   "official_remote": "https://github.com/luisgui1757/dotfiles.git",
   "workflow": "e2e-install.yml",
   "current": {
-    "state": "candidate",
+    "state": "published",
     "tag": "v0.4.4",
     "previous_tag": "v0.4.3",
     "title": "v0.4.4 — Automated releases and current agent tooling",
     "notes": "docs/releases/v0.4.4.md",
-    "preparation": {
-      "base_commit": "402c84b8ac8707dbaf1e4f7e44a1ce31fec34a72",
-      "branch": "release/v0.4.4"
-    }
+    "proof": "release/proofs/v0.4.4.json"
   },
   "logical_proofs": [
     {
