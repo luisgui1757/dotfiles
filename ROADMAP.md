@@ -29,6 +29,10 @@ repeatable instead of tribal.
   into shared ordered registries; setup behavior and both regression suites now
   consume those registries so each release adds one reviewed value instead of
   another control-flow copy.
+- DONE - Closed the first live preparation-gate defects: atomic rendering now
+  preserves executable modes, and the release lifecycle self-test accepts both
+  published and active-candidate manifests while still exercising the next
+  candidate transition.
 
 ## Audit Evidence
 

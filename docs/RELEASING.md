@@ -61,7 +61,8 @@ validate. It then:
    registries;
 4. creates the candidate source row, evidence gate, roadmap entry, manual-test
    status, release notes, and candidate manifest;
-5. runs `make ci` and `git diff --check`;
+5. preserves the tracked mode of every rewritten file, then runs `make ci`
+   against the active-candidate state and `git diff --check`;
 6. commits, pushes, and opens the preparation pull request.
 
 The preparation worktree is intentionally retained for review. The command

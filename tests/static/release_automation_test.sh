@@ -11,6 +11,7 @@ python3 - <<'PY'
 import importlib.util
 import pathlib
 import shutil
+import stat
 import tempfile
 
 root = pathlib.Path.cwd()
@@ -37,10 +38,16 @@ for required in (
 for forbidden in ('"--clobber"', '"--yes"', 'git push --force', 'tag -d'):
     assert forbidden not in source, f"release publisher contains unsafe bypass: {forbidden}"
 
-notes = """# v0.4.4 — Automated release fixture
+def next_patch(tag):
+    major, minor, patch = module.semver(tag)
+    return f"v{major}.{minor}.{patch + 1}"
+
+
+def candidate_notes(tag, title="Automated release fixture"):
+    return f"""# {tag} — {title}
 
 > Release candidate notes. Publish these only with the official annotated
-> `v0.4.4` tag after the deterministic evidence gate below passes.
+> `{tag}` tag after the deterministic evidence gate below passes.
 
 ## Highlights
 
@@ -48,7 +55,7 @@ notes = """# v0.4.4 — Automated release fixture
 
 ## Compatibility and upgrade
 
-Clone the exact annotated `v0.4.4` tag beside the prior checkout.
+Clone the exact annotated `{tag}` tag beside the prior checkout.
 
 ## Release identity
 
@@ -69,19 +76,53 @@ with tempfile.TemporaryDirectory(prefix="dotfiles-release-render-test.") as temp
         symlinks=True,
         ignore=shutil.ignore_patterns(".git", ".cache", "__pycache__", "*.pyc"),
     )
-    base = "1" * 40
-    module.render_candidate(fixture, version="v0.4.4", notes_text=notes, base_commit=base)
-    candidate = module.validate_manifest(fixture)
+    initial = module.validate_manifest(fixture)
+    if initial["current"]["state"] == "published":
+        previous_tag = initial["current"]["tag"]
+        candidate_tag = next_patch(previous_tag)
+        original_modes = {
+            relative: stat.S_IMODE((fixture / relative).stat().st_mode)
+            for relative in module.GLOBAL_VERSION_FILES
+        }
+        module.render_candidate(
+            fixture,
+            version=candidate_tag,
+            notes_text=candidate_notes(candidate_tag),
+            base_commit="1" * 40,
+        )
+        for relative, original_mode in original_modes.items():
+            assert stat.S_IMODE((fixture / relative).stat().st_mode) == original_mode, (
+                f"release renderer changed file mode for {relative}"
+            )
+        candidate = module.validate_manifest(fixture)
+    else:
+        candidate = initial
+        candidate_tag = candidate["current"]["tag"]
+        previous_tag = candidate["current"]["previous_tag"]
+
     assert candidate["current"]["state"] == "candidate"
-    assert candidate["current"]["previous_tag"] == "v0.4.3"
-    assert (fixture / "docs/releases/v0.4.3.md").is_file()
-    assert (fixture / "release/proofs/v0.4.3.json").is_file()
+    assert candidate["current"]["previous_tag"] == previous_tag
+    assert (fixture / f"docs/releases/{previous_tag}.md").is_file()
+    assert (fixture / f"release/proofs/{previous_tag}.json").is_file()
+    for relative in (
+        "scripts/install-nix-prerequisite.sh",
+        "scripts/upgrade-v0.1.0.sh",
+        "setup.sh",
+        "tests/migration/v0_1_upgrade_test.sh",
+        "tests/shell/nix_prerequisite_identity_test.sh",
+        "tests/shell/setup_universal_entrypoint_test.sh",
+        "tests/static/darwin_platform_contract_test.sh",
+        "tests/static/release_upgrade_test.sh",
+    ):
+        assert stat.S_IMODE((fixture / relative).stat().st_mode) & stat.S_IXUSR, (
+            f"release-controlled executable lost its owner execute bit: {relative}"
+        )
     setup = (fixture / "setup.sh").read_text(encoding="utf-8")
     setup_ps1 = (fixture / "setup.ps1").read_text(encoding="utf-8")
-    assert 'RELEASE_TAG="v0.4.4"' in setup
-    assert '"v0.4.3"' in setup.split("LEGACY_RELEASE_TAGS=", 1)[1].splitlines()[0]
-    assert "$ReleaseTag     = 'v0.4.4'" in setup_ps1
-    assert "'v0.4.3'" in setup_ps1.split("$LegacyReleaseTags =", 1)[1].splitlines()[0]
+    assert f'RELEASE_TAG="{candidate_tag}"' in setup
+    assert f'"{previous_tag}"' in setup.split("LEGACY_RELEASE_TAGS=", 1)[1].splitlines()[0]
+    assert f"$ReleaseTag     = '{candidate_tag}'" in setup_ps1
+    assert f"'{previous_tag}'" in setup_ps1.split("$LegacyReleaseTags =", 1)[1].splitlines()[0]
     assert "release-candidate sources" in (fixture / "docs/security/supply-chain.md").read_text(encoding="utf-8")
 
     logical = []
@@ -98,8 +139,8 @@ with tempfile.TemporaryDirectory(prefix="dotfiles-release-render-test.") as temp
         "schema": 1,
         "kind": "publication-closure",
         "repository": candidate["repository"],
-        "tag": "v0.4.4",
-        "previous_tag": "v0.4.3",
+        "tag": candidate_tag,
+        "previous_tag": previous_tag,
         "tag_object": "2" * 40,
         "commit": "3" * 40,
         "tree": "4" * 40,
@@ -119,7 +160,7 @@ with tempfile.TemporaryDirectory(prefix="dotfiles-release-render-test.") as temp
         "logical_proofs": logical,
         "scans": {
             "gitleaks_version": "8.30.1",
-            "release_range": "v0.4.3..v0.4.4",
+            "release_range": f"{previous_tag}..{candidate_tag}",
             "proof_bytes": sum(item["size"] for item in logical),
         },
         "fresh_public_clone": "passed",
@@ -137,29 +178,27 @@ with tempfile.TemporaryDirectory(prefix="dotfiles-release-render-test.") as temp
     module.render_closure(fixture, proof, "6" * 64)
     published = module.validate_manifest(fixture)
     assert published["current"]["state"] == "published"
-    assert published["current"]["proof"] == "release/proofs/v0.4.4.json"
-    checked_proof = module.load_json(fixture / "release/proofs/v0.4.4.json")
+    assert published["current"]["proof"] == f"release/proofs/{candidate_tag}.json"
+    checked_proof = module.load_json(fixture / f"release/proofs/{candidate_tag}.json")
     assert checked_proof["certification_asset"]["sha256"] == "6" * 64
-    final_notes = (fixture / "docs/releases/v0.4.4.md").read_text(encoding="utf-8")
+    final_notes = (fixture / f"docs/releases/{candidate_tag}.md").read_text(encoding="utf-8")
     assert "## Publication evidence" in final_notes
     assert "## Evidence required before publication" not in final_notes
     assert "immutable/latest GitHub release" in final_notes
 
-    next_notes = notes.replace("v0.4.4", "v0.4.5").replace(
-        "Automated release fixture", "Second automated release fixture"
-    )
+    next_tag = next_patch(candidate_tag)
     module.render_candidate(
         fixture,
-        version="v0.4.5",
-        notes_text=next_notes,
+        version=next_tag,
+        notes_text=candidate_notes(next_tag, "Second automated release fixture"),
         base_commit="7" * 40,
     )
     second_candidate = module.validate_manifest(fixture)
     assert second_candidate["current"]["state"] == "candidate"
-    assert second_candidate["current"]["previous_tag"] == "v0.4.4"
+    assert second_candidate["current"]["previous_tag"] == candidate_tag
     second_setup = (fixture / "setup.sh").read_text(encoding="utf-8")
-    assert 'RELEASE_TAG="v0.4.5"' in second_setup
-    assert '"v0.4.4"' in second_setup.split("LEGACY_RELEASE_TAGS=", 1)[1].splitlines()[0]
+    assert f'RELEASE_TAG="{next_tag}"' in second_setup
+    assert f'"{candidate_tag}"' in second_setup.split("LEGACY_RELEASE_TAGS=", 1)[1].splitlines()[0]
 
 print("release manifest, candidate renderer, and publication closure OK")
 PY

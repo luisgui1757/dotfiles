@@ -558,6 +558,9 @@ that violates one of these, fix it instead of disabling the test.
     `release-proof.json` truthfully certifies only pre-publication evidence;
     final immutable/latest readback and that asset's SHA-256 belong in the
     closure proof. Publication requires the exact typed tag+SHA confirmation.
+    Atomic release rendering preserves every existing file mode, and the
+    release self-test must pass in both published and active-candidate states;
+    otherwise the preparation command could invalidate its own full gate.
     A rerun may reuse only an explicitly named first-attempt run after fully
     revalidating it, and may reconstruct a failed closure only from the live
     immutable release plus its exact certification asset. Never move/delete an
