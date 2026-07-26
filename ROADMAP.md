@@ -1272,14 +1272,14 @@ every other zsh plugin surface.
 ### 9. The published in-place upgrade crossed the config backup boundary
 
 Status: implementation done; v0.2.0, v0.3.0, v0.4.0, v0.4.1, v0.4.2, and
-v0.4.3 published.
+v0.4.3 published; v0.4.4 release preparation in progress.
 
 Evidence:
 
 - Exact v0.1.0 POSIX config uses checkout-backed chezmoi symlinks. Updating that
   checkout changed live bytes before current setup could back them up.
 - `scripts/upgrade-v0.1.0.sh` and `.ps1` now require clean, separate official
-  annotated v0.1.0/v0.4.3 checkouts and retain v0.1.0 until acceptance.
+  annotated v0.1.0/v0.4.4 checkouts and retain v0.1.0 until acceptance.
 - The public `setup.sh --all` / `setup.ps1 -All` entrypoints now discover exact
   live v0.1.0 ownership, invoke and verify those transactions, resume a pending
   applied recovery, accept under the explicit non-interactive all-mode
@@ -1305,7 +1305,7 @@ Evidence:
   acceptance. Windows Pester proves frozen release-tree validation, complete Terminal recovery,
   all-target concurrency rejection, known-folder boundary validation, private
   ACL policy, and provider-boundary verification.
-- `docs/UPGRADING.md` and `docs/releases/v0.4.3.md` define the supported
+- `docs/UPGRADING.md` and `docs/releases/v0.4.4.md` define the supported
   per-platform commands, Apple-Silicon-only macOS boundary, WSL ordering, Nix
   provenance, and release evidence record.
 
@@ -1344,6 +1344,10 @@ Canonical solution:
     `30171230547`, release-range/proof scans, a fresh detached public clone,
     and immutable/latest GitHub release `359840729` passed their exact
     identity gates.
+11. IN PROGRESS - Prepare, merge, tag, certify, and publish v0.4.4 from the
+    exact reviewed release tree using the manifest-bound automation; record only
+    observed tag, workflow, proof, scan, clone, and immutable-release identities.
+
 
 ## Disproved Or Non-Blocking Assumptions
 

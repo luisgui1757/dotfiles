@@ -26,23 +26,23 @@ for script in \
 done
 [[ -f scripts/upgrade-v0.1.0.ps1 ]] || fail "Windows release migrator is missing"
 
-grep -F 'new_tag="v0.4.3"' scripts/upgrade-v0.1.0.sh >/dev/null ||
-    fail "POSIX migration does not require v0.4.3"
-grep -F "\$script:NewTag = 'v0.4.3'" scripts/upgrade-v0.1.0.ps1 >/dev/null ||
-    fail "Windows migration does not require v0.4.3"
-grep -F 'release_tag="v0.4.3"' scripts/install-nix-prerequisite.sh >/dev/null ||
-    fail "Nix prerequisite installer does not require v0.4.3"
-grep -F 'RELEASE_TAG="v0.4.3"' setup.sh >/dev/null ||
-    fail "POSIX setup does not advertise v0.4.3"
-grep -F "\$ReleaseTag     = 'v0.4.3'" setup.ps1 >/dev/null ||
-    fail "Windows setup does not advertise v0.4.3"
+grep -F 'new_tag="v0.4.4"' scripts/upgrade-v0.1.0.sh >/dev/null ||
+    fail "POSIX migration does not require v0.4.4"
+grep -F "\$script:NewTag = 'v0.4.4'" scripts/upgrade-v0.1.0.ps1 >/dev/null ||
+    fail "Windows migration does not require v0.4.4"
+grep -F 'release_tag="v0.4.4"' scripts/install-nix-prerequisite.sh >/dev/null ||
+    fail "Nix prerequisite installer does not require v0.4.4"
+grep -F 'RELEASE_TAG="v0.4.4"' setup.sh >/dev/null ||
+    fail "POSIX setup does not advertise v0.4.4"
+grep -F "\$ReleaseTag     = 'v0.4.4'" setup.ps1 >/dev/null ||
+    fail "Windows setup does not advertise v0.4.4"
 for script in setup.sh scripts/upgrade-v0.1.0.sh; do
-    grep -F 'v0.1.0-to-v0.4.3.' "$script" >/dev/null ||
-        fail "$script does not use the v0.4.3 migration recovery namespace"
+    grep -F 'v0.1.0-to-v0.4.4.' "$script" >/dev/null ||
+        fail "$script does not use the v0.4.4 migration recovery namespace"
 done
 for script in setup.ps1 scripts/upgrade-v0.1.0.ps1; do
-    grep -F 'v0.1.0-to-v0.4.3.' "$script" >/dev/null ||
-        fail "$script does not use the v0.4.3 migration recovery namespace"
+    grep -F 'v0.1.0-to-v0.4.4.' "$script" >/dev/null ||
+        fail "$script does not use the v0.4.4 migration recovery namespace"
 done
 python3 - <<'PY'
 import ast
@@ -129,13 +129,13 @@ row = next(
     (
         line
         for line in pathlib.Path("docs/security/supply-chain.md").read_text(encoding="utf-8").splitlines()
-        if line.startswith("| v0.4.3 Nix prerequisite |")
+        if line.startswith("| v0.4.4 Nix prerequisite |")
     ),
     "",
 )
 hashes = re.findall(r"`([0-9a-f]+)`", row)
 if len(hashes) != 9 or any(len(value) != 64 for value in hashes):
-    print("FAIL: v0.4.3 Nix supply-chain ledger must contain exactly nine 64-hex SHA-256 values", file=sys.stderr)
+    print("FAIL: v0.4.4 Nix supply-chain ledger must contain exactly nine 64-hex SHA-256 values", file=sys.stderr)
     sys.exit(1)
 PY
 for hash in \
@@ -160,8 +160,8 @@ grep -F './scripts/install-nix-prerequisite.sh --install --allow-unreleased' "$e
     fail "hosted POSIX bootstrap does not exercise the exact unreleased source head"
 grep -F 'umask 077' "$e2e_workflow" >/dev/null ||
     fail "hosted POSIX bootstrap does not model a restrictive managed-host umask"
-if grep -F 'git checkout --detach refs/tags/v0.4.3' "$e2e_workflow" >/dev/null; then
-    fail "hosted POSIX bootstrap still replaces the reviewed source head with v0.4.3"
+if grep -F 'git checkout --detach refs/tags/v0.4.4' "$e2e_workflow" >/dev/null; then
+    fail "hosted POSIX bootstrap still replaces the reviewed source head with v0.4.4"
 fi
 for proof in \
     'Verified local Nix daemon profile-ownership patch:' \

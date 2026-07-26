@@ -4,12 +4,15 @@
   "official_remote": "https://github.com/luisgui1757/dotfiles.git",
   "workflow": "e2e-install.yml",
   "current": {
-    "state": "published",
-    "tag": "v0.4.3",
-    "previous_tag": "v0.4.2",
-    "title": "v0.4.3 — Reliable recovery and write-free previews",
-    "notes": "docs/releases/v0.4.3.md",
-    "proof": "release/proofs/v0.4.3.json"
+    "state": "candidate",
+    "tag": "v0.4.4",
+    "previous_tag": "v0.4.3",
+    "title": "v0.4.4 — Automated releases and current agent tooling",
+    "notes": "docs/releases/v0.4.4.md",
+    "preparation": {
+      "base_commit": "402c84b8ac8707dbaf1e4f7e44a1ce31fec34a72",
+      "branch": "release/v0.4.4"
+    }
   },
   "logical_proofs": [
     {

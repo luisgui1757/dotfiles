@@ -151,7 +151,7 @@ expected_calls="$(printf '%s\t%s\n%s\t%s' \
     fail "setup did not retain the completed recovery identity"
 
 rm -f "$WORK/migration.calls"
-pending="$XDG_STATE_HOME/dotfiles/migrations/v0.1.0-to-v0.4.3.pending"
+pending="$XDG_STATE_HOME/dotfiles/migrations/v0.1.0-to-v0.4.4.pending"
 mkdir -p "$pending"
 printf '%s\n' applied > "$pending/stage"
 printf '%s\n' "$SCRIPT_DIR" > "$pending/new-checkout"
@@ -196,7 +196,7 @@ mkdir -p "$real_recovery"
 printf '%s\n' applied > "$real_recovery/stage"
 printf '%s\n' "$SCRIPT_DIR" > "$real_recovery/new-checkout"
 printf '%s\n' "$WORK/old-release" > "$real_recovery/old-checkout"
-ln -s "$real_recovery" "$XDG_STATE_HOME/dotfiles/migrations/v0.1.0-to-v0.4.3.symlink"
+ln -s "$real_recovery" "$XDG_STATE_HOME/dotfiles/migrations/v0.1.0-to-v0.4.4.symlink"
 if maybe_complete_v0_1_upgrade > "$WORK/symlink-recovery.out" 2>&1; then
     fail "setup accepted a symlinked migration recovery directory"
 fi
