@@ -20,7 +20,7 @@
 #   .\setup.ps1 -MergeWindowsTerminal        (no-op alias; the WT rose-pine merge is now default-on)
 #
 # First run (no checkout yet):
-#   git clone --branch v0.4.3 --single-branch https://github.com/luisgui1757/dotfiles.git "$env:USERPROFILE\dotfiles"
+#   git clone --branch v0.4.4 --single-branch https://github.com/luisgui1757/dotfiles.git "$env:USERPROFILE\dotfiles"
 #   Set-Location "$env:USERPROFILE\dotfiles"
 #   .\setup.ps1 -All
 #
@@ -47,8 +47,8 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $RepoUrl        = 'https://github.com/luisgui1757/dotfiles.git'
-$ReleaseTag     = 'v0.4.3'
-$LegacyReleaseTags = @('v0.2.0', 'v0.3.0', 'v0.4.0', 'v0.4.1', 'v0.4.2')
+$ReleaseTag     = 'v0.4.4'
+$LegacyReleaseTags = @('v0.2.0', 'v0.3.0', 'v0.4.0', 'v0.4.1', 'v0.4.2', 'v0.4.3')
 $SentinelRepoUrl = 'https://github.com/luisgui1757/sentinel.git'
 $SentinelVersion = '0.1.2'
 $SentinelRef     = 'ecafffa858666343c1639f996d177f460163e93e'
@@ -297,7 +297,7 @@ function Get-PendingV01Recovery {
             }
         }
     }
-    foreach ($directory in @(Get-ChildItem -LiteralPath $root -Force -Filter 'v0.1.0-to-v0.4.3.*' -ErrorAction SilentlyContinue)) {
+    foreach ($directory in @(Get-ChildItem -LiteralPath $root -Force -Filter 'v0.1.0-to-v0.4.4.*' -ErrorAction SilentlyContinue)) {
         if (-not $directory.PSIsContainer -or ($directory.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
             throw "migration recovery path is not a real directory: $($directory.FullName)"
         }

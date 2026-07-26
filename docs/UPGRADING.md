@@ -28,29 +28,29 @@ repository for POSIX prerequisite bootstrap. It is not an upgrade authority and
 must not be used to migrate a live v0.1.0 checkout; the versioned migration
 tools remain exact-tag-only.
 
-## v0.1.0 to v0.4.3
+## v0.1.0 to v0.4.4
 
 `v0.1.0` is already a chezmoi release. On POSIX, its managed files are live
 symlinks into the checkout. Do **not** run `git pull`, switch that checkout to a
 new revision, or run an upgrade from `main`: doing so can change live config
 before recovery exists.
 
-These commands target the published annotated `v0.4.3` release.
+These commands target the published annotated `v0.4.4` release.
 
 ### Common preparation
 
-Keep the checkout that currently owns v0.1.0 and clone v0.4.3 beside it:
+Keep the checkout that currently owns v0.1.0 and clone v0.4.4 beside it:
 
 ```bash
-git clone --branch v0.4.3 --single-branch \
-  https://github.com/luisgui1757/dotfiles.git ~/dotfiles-v0.4.3
-cd ~/dotfiles-v0.4.3
+git clone --branch v0.4.4 --single-branch \
+  https://github.com/luisgui1757/dotfiles.git ~/dotfiles-v0.4.4
+cd ~/dotfiles-v0.4.4
 ```
 
 ```powershell
-git clone --branch v0.4.3 --single-branch `
-  https://github.com/luisgui1757/dotfiles.git "$HOME\dotfiles-v0.4.3"
-Set-Location "$HOME\dotfiles-v0.4.3"
+git clone --branch v0.4.4 --single-branch `
+  https://github.com/luisgui1757/dotfiles.git "$HOME\dotfiles-v0.4.4"
+Set-Location "$HOME\dotfiles-v0.4.4"
 ```
 
 Do not stash, delete, or overwrite local changes to make migration pass. Setup
@@ -102,7 +102,7 @@ rerunning the same command resumes at validated acceptance. A recovery in
 `prepared`, `applying`, `rolling-back`, or `recovery-required` fails closed and
 prints its exact rollback command instead of starting another transaction.
 Any unfinished earlier supported recovery must first be accepted or rolled back
-from its retained exact release checkout. v0.4.3 setup detects every namespace
+from its retained exact release checkout. v0.4.4 setup detects every namespace
 in its ordered legacy-release registry and refuses to start or resume a second
 release transaction around any one.
 
@@ -111,7 +111,7 @@ After success, open a new login shell and verify:
 ```bash
 nix store info
 command -v rg fd fzf jq lazygit node starship zoxide nvim
-chezmoi --source ~/dotfiles-v0.4.3/home --destination "$HOME" \
+chezmoi --source ~/dotfiles-v0.4.4/home --destination "$HOME" \
   verify --include files,symlinks
 ```
 
@@ -150,9 +150,9 @@ those checks pass.
 
 WSL still has two independent owners and therefore two setup invocations:
 
-1. Clone v0.4.3 on Windows and run `.\setup.ps1 -All` for host Terminal, font,
+1. Clone v0.4.4 on Windows and run `.\setup.ps1 -All` for host Terminal, font,
    clipboard, and Windows tools.
-2. Clone v0.4.3 separately inside the Linux home—never under `/mnt/c`—and run
+2. Clone v0.4.4 separately inside the Linux home—never under `/mnt/c`—and run
    `./setup.sh --all` for the guest Nix/config/tool stack.
 3. Run `tests/wsl/e2e.sh` in the guest and verify host Windows Terminal,
    `win32yank`, font, and PowerShell behavior.
@@ -215,6 +215,29 @@ manual acceptance, and recovery. They are not required for the normal path:
 pwsh -NoProfile -File 'C:\exact\recovery\upgrade-v0.1.0.ps1' -Rollback 'C:\exact\recovery'
 pwsh -NoProfile -File 'C:\exact\recovery\upgrade-v0.1.0.ps1' -Accept 'C:\exact\recovery'
 ```
+
+## v0.4.4 release evidence gate
+
+The candidate starts from exact clean `main` commit
+`402c84b8ac8707dbaf1e4f7e44a1ce31fec34a72`; publication remains gated on:
+
+- [ ] the reviewed release-preparation pull request merged to `main` with all
+  required checks passing;
+- [ ] an annotated `v0.4.4` tag whose tag object and peeled commit match the
+  exact merged release-preparation commit and the official remote;
+- [ ] full local and hosted gates, deterministic exact-v0.1.0 migration
+  fixtures, Windows Pester coverage, and a redacted scan across
+  `v0.4.3..v0.4.4` plus all downloaded logical proofs;
+- [ ] a cache-free hosted release run whose POSIX lanes report the exact
+  immutable `v0.4.4` tag identity;
+- [ ] a fresh credential-free public clone reproducing the tag and release
+  identity gates;
+- [ ] an immutable/latest GitHub release with the reviewed proof asset and
+  prepared body exact.
+
+The unchecked real WSL, redirected-Windows, divergent Windows Terminal,
+physical-Linux, Apple-Silicon owner-host, and visual rows in `tests/MANUAL.md`
+remain explicit residual gaps; publication will not mark them complete.
 
 ## v0.4.3 release evidence
 

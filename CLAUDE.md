@@ -310,7 +310,7 @@ that violates one of these, fix it instead of disabling the test.
     - **(d) no remote-eval installer.** The repo never adds a `curl | sh`,
       `irm | iex`, `Invoke-Expression`, or `nix-installer`/`install.determinate.systems`
       pipe-to-shell path for Nix (or anything else). Public setup invokes only
-      `scripts/install-nix-prerequisite.sh`. The published v0.4.3 default
+      `scripts/install-nix-prerequisite.sh`. The published v0.4.4 default
       path accepts only the matching local annotated tag object, peeled commit,
       and HEAD from one isolated official remote-ref snapshot. The explicit
       `setup.sh --allow-unreleased` test lane may instead accept a clean checkout
@@ -493,7 +493,7 @@ that violates one of these, fix it instead of disabling the test.
 29. **Published release upgrades are exact-tag, side-by-side transactions.**
     v0.1.0 is already chezmoi-based; its POSIX targets are live checkout
     symlinks, so `git pull` or switching that checkout before setup crosses the
-    backup boundary. Never publish an in-place v0.1.0 migration. The v0.4.3
+    backup boundary. Never publish an in-place v0.1.0 migration. The v0.4.4
     tools require separate clean official annotated-tag checkouts, exact
     historical config, authoritative target identity, and private recovery.
     POSIX recovery archives both exact commits, validates digest-bound read-only
@@ -501,7 +501,7 @@ that violates one of these, fix it instead of disabling the test.
     rollback; post-validation checkout changes cannot affect a write. Setup
     must fail closed when any namespace in the ordered `LEGACY_RELEASE_TAGS` /
     `$LegacyReleaseTags` registries remains unfinished; that published
-    transaction must be accepted or rolled back before v0.4.3 setup can begin.
+    transaction must be accepted or rolled back before v0.4.4 setup can begin.
     The current-release namespace stays separate so setup may resume it. Both
     registries must stay identical, and release preparation adds exactly the
     previous current tag before advancing the new namespace. Windows enforces
@@ -894,7 +894,7 @@ major; `tests/static/repo_policy_test.sh` enforces this.
   install. The required POSIX jobs begin with no `/nix`, check out the exact PR
   source head separately from GitHub's synthetic merge, and run the real
   prerequisite helper before setup. The published default requires the
-  fetched exact v0.4.3 tag; an official branch source requires the explicit
+  fetched exact v0.4.4 tag; an official branch source requires the explicit
   `--allow-unreleased` lane. Fork PRs cannot satisfy the official-head identity,
   so only they retain the pinned Determinate action as a pre-seeded test path.
   Both jobs then apply the enforced nix-darwin/Home Manager layer before

@@ -20,7 +20,7 @@
 #                                  WSL opt-in: install/link Linux GUI terminal bits
 #
 # First run (no checkout yet):
-#   git clone --branch v0.4.3 --single-branch https://github.com/luisgui1757/dotfiles.git "${DOTFILES_DEST:-$HOME/dotfiles}"
+#   git clone --branch v0.4.4 --single-branch https://github.com/luisgui1757/dotfiles.git "${DOTFILES_DEST:-$HOME/dotfiles}"
 #   cd "${DOTFILES_DEST:-$HOME/dotfiles}"
 #   ./setup.sh --all
 #
@@ -30,8 +30,8 @@
 set -euo pipefail
 
 REPO_URL="https://github.com/luisgui1757/dotfiles.git"
-RELEASE_TAG="v0.4.3"
-LEGACY_RELEASE_TAGS=("v0.2.0" "v0.3.0" "v0.4.0" "v0.4.1" "v0.4.2")
+RELEASE_TAG="v0.4.4"
+LEGACY_RELEASE_TAGS=("v0.2.0" "v0.3.0" "v0.4.0" "v0.4.1" "v0.4.2" "v0.4.3")
 DEFAULT_DEST="$HOME/dotfiles"
 
 ALL=0
@@ -90,7 +90,7 @@ Local usage:
   ./setup.sh --home-manager      compatibility alias; Linux/WSL setup applies Home Manager by default
 
 First run:
-  git clone --branch v0.4.3 --single-branch https://github.com/luisgui1757/dotfiles.git "${DOTFILES_DEST:-$HOME/dotfiles}"
+  git clone --branch v0.4.4 --single-branch https://github.com/luisgui1757/dotfiles.git "${DOTFILES_DEST:-$HOME/dotfiles}"
   cd "${DOTFILES_DEST:-$HOME/dotfiles}"
   ./setup.sh --all
 EOF
@@ -548,7 +548,7 @@ load_pending_v0_1_recovery() {
                 ;;
         esac
     done < <(find "$root" -mindepth 1 -maxdepth 1 \
-        -name 'v0.1.0-to-v0.4.3.*' -print0)
+        -name 'v0.1.0-to-v0.4.4.*' -print0)
     if [[ "${#active[@]}" -gt 1 ]]; then
         echo "  FAIL: multiple unfinished v0.1.0 migrations target this checkout." >&2
         printf '        %s\n' "${active[@]}" >&2

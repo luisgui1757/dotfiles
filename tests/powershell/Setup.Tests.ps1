@@ -1305,7 +1305,7 @@ Describe "setup.ps1 universal install and migration entrypoint" {
 
     It "resumes an already-applied migration at acceptance" {
         Remove-Item Env:DOTFILES_V0_1_CHECKOUT -ErrorAction SilentlyContinue
-        $pending = Join-Path (Join-Path (Join-Path $script:UniversalLocal 'dotfiles') 'migrations') 'v0.1.0-to-v0.4.3.pending'
+        $pending = Join-Path (Join-Path (Join-Path $script:UniversalLocal 'dotfiles') 'migrations') 'v0.1.0-to-v0.4.4.pending'
         New-Item -ItemType Directory -Force -Path $pending | Out-Null
         [IO.File]::WriteAllText((Join-Path $pending 'stage'), "applied`n")
         [IO.File]::WriteAllText((Join-Path $pending 'new-checkout'), "$ScriptDir`n")
@@ -1345,7 +1345,7 @@ Describe "setup.ps1 universal install and migration entrypoint" {
 
     It "refuses to cross an unfinished recovery-required boundary" {
         Remove-Item Env:DOTFILES_V0_1_CHECKOUT -ErrorAction SilentlyContinue
-        $pending = Join-Path (Join-Path (Join-Path $script:UniversalLocal 'dotfiles') 'migrations') 'v0.1.0-to-v0.4.3.pending'
+        $pending = Join-Path (Join-Path (Join-Path $script:UniversalLocal 'dotfiles') 'migrations') 'v0.1.0-to-v0.4.4.pending'
         New-Item -ItemType Directory -Force -Path $pending | Out-Null
         [IO.File]::WriteAllText((Join-Path $pending 'stage'), "recovery-required`n")
         [IO.File]::WriteAllText((Join-Path $pending 'new-checkout'), "$ScriptDir`n")
@@ -1357,7 +1357,7 @@ Describe "setup.ps1 universal install and migration entrypoint" {
 
     It "rejects malformed pending recovery instead of starting another migration" {
         Remove-Item Env:DOTFILES_V0_1_CHECKOUT -ErrorAction SilentlyContinue
-        $pending = Join-Path (Join-Path (Join-Path $script:UniversalLocal 'dotfiles') 'migrations') 'v0.1.0-to-v0.4.3.invalid'
+        $pending = Join-Path (Join-Path (Join-Path $script:UniversalLocal 'dotfiles') 'migrations') 'v0.1.0-to-v0.4.4.invalid'
         New-Item -ItemType Directory -Force -Path $pending | Out-Null
         [IO.File]::WriteAllText((Join-Path $pending 'stage'), "applied`n")
         [IO.File]::WriteAllText((Join-Path $pending 'new-checkout'), "$ScriptDir`n")
@@ -1368,7 +1368,7 @@ Describe "setup.ps1 universal install and migration entrypoint" {
 
     It "rejects a pending recovery scalar without exact newline framing" {
         Remove-Item Env:DOTFILES_V0_1_CHECKOUT -ErrorAction SilentlyContinue
-        $pending = Join-Path (Join-Path (Join-Path $script:UniversalLocal 'dotfiles') 'migrations') 'v0.1.0-to-v0.4.3.invalid'
+        $pending = Join-Path (Join-Path (Join-Path $script:UniversalLocal 'dotfiles') 'migrations') 'v0.1.0-to-v0.4.4.invalid'
         New-Item -ItemType Directory -Force -Path $pending | Out-Null
         [IO.File]::WriteAllText((Join-Path $pending 'stage'), 'applied')
         [IO.File]::WriteAllText((Join-Path $pending 'new-checkout'), "$ScriptDir`n")

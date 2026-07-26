@@ -49,7 +49,7 @@ top-level sources instead.
 `v0.1.0` is a chezmoi release, not a pre-chezmoi install. Its POSIX targets are
 live symlinks into the source checkout, so the former README `git pull` path was
 unsafe: it could publish new bytes before current setup reached backup. The
-canonical v0.4.3 path is side-by-side and exact-tag-only:
+canonical v0.4.4 path is side-by-side and exact-tag-only:
 
 - `setup.sh --all` and `setup.ps1 -All` are the sole normal user entrypoints.
   They discover exact live v0.1.0 ownership, invoke the platform transaction,
@@ -77,7 +77,7 @@ canonical v0.4.3 path is side-by-side and exact-tag-only:
   overlay state on rollback, and validates all four canonical Terminal paths
   before any restore write.
 - `scripts/install-nix-prerequisite.sh` installs only checksum-reviewed upstream
-  Nix 2.34.0 release archives. The published default requires the exact v0.4.3
+  Nix 2.34.0 release archives. The published default requires the exact v0.4.4
   annotated tag object and peeled commit. The explicit POSIX
   `--allow-unreleased` field-test lane may instead accept a clean checkout whose
   HEAD equals a current branch head in the official repository; forks, dirty
@@ -117,6 +117,12 @@ older namespace. `release/manifest.json` plus `scripts/release.py` generate and
 test that transition before opening a preparation PR; publication and closure
 remain exact-SHA, observed-evidence operations documented in
 `docs/RELEASING.md`.
+
+The v0.4.4 candidate keeps the same frozen-source and rollback boundaries while
+moving current exact-tag authority, recovery namespace, and prerequisite identity to
+`v0.4.4`. Setup treats unfinished `v0.4.3` transactions as older recoveries.
+Observed tag, workflow, proof, scan, clone, and immutable-release identities are
+recorded only after their gates pass.
 
 The annotated v0.4.3 release was published on 2026-07-25 after its exact local,
 hosted cache-free, release-range/proof scan, fresh detached public-clone, and
