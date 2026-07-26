@@ -10,6 +10,7 @@ import os
 import pathlib
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -110,12 +111,15 @@ def write_json(path: pathlib.Path, value: Any) -> None:
 
 def write_text(path: pathlib.Path, value: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
+    existing_mode = stat.S_IMODE(path.stat().st_mode) if path.exists() else None
     fd, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
     try:
         with os.fdopen(fd, "w", encoding="utf-8", newline="") as handle:
             handle.write(value)
             handle.flush()
             os.fsync(handle.fileno())
+        if existing_mode is not None:
+            os.chmod(temporary, existing_mode)
         os.replace(temporary, path)
     finally:
         if os.path.exists(temporary):
