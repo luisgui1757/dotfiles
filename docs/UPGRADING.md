@@ -101,10 +101,10 @@ If an earlier migration reached `applied` but setup stopped before acceptance,
 rerunning the same command resumes at validated acceptance. A recovery in
 `prepared`, `applying`, `rolling-back`, or `recovery-required` fails closed and
 prints its exact rollback command instead of starting another transaction.
-An unfinished v0.2.0, v0.3.0, v0.4.0, v0.4.1, or v0.4.2 recovery must first
-be accepted or rolled back from its retained exact release checkout. v0.4.3
-setup detects all older active namespaces and refuses to start or resume a
-second release transaction around any one.
+Any unfinished earlier supported recovery must first be accepted or rolled back
+from its retained exact release checkout. v0.4.3 setup detects every namespace
+in its ordered legacy-release registry and refuses to start or resume a second
+release transaction around any one.
 
 After success, open a new login shell and verify:
 

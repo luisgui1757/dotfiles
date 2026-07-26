@@ -32,6 +32,18 @@ privileged-flow model includes the repository's `maybe_sudo` and
 `tests/static/repo_policy_test.sh` requires every external GitHub Actions
 `uses:` reference to be a full lowercase 40-hex commit SHA.
 
+Release publication itself is also identity-bound. `release/manifest.json`
+selects the exact repository, workflow, current/previous tag, reviewed notes,
+and four logical proof contracts. A published manifest points to a checked-in
+closure proof under `release/proofs/`; the draft release carries a separate
+pre-publication `release-proof.json` asset whose GitHub-computed SHA-256 is
+recorded by that closure. `scripts/release.py` refuses tag creation until the
+unique merged preparation PR, identical tree, required checks, full local gate,
+and release-range scan pass, and refuses immutable publication until the
+cache-free exact-tag matrix, downloaded proofs, proof scan, credential-free
+public clone, draft body, and asset digest all read back exact. The operator's
+typed tag-plus-full-SHA phrase is the only irreversible transition.
+
 The checked-in safeguard script also requests repository-level Actions SHA
 pinning. At the start of the 2026-07-10 closure branch the live API reported
 `sha_pinning_required: false`; this branch does not mutate live settings. After

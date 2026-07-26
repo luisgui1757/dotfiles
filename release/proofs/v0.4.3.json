@@ -1,0 +1,67 @@
+{
+  "schema": 1,
+  "repository": "luisgui1757/dotfiles",
+  "tag": "v0.4.3",
+  "previous_tag": "v0.4.2",
+  "tag_object": "72232aee30201506320889a0c82be515041b9674",
+  "commit": "e3e459a20c23ae546b26d5206d13b648b29e8788",
+  "tree": "e022993c8dd3adbeb9c3ecaab1d01a97856d2b14",
+  "preparation": {
+    "pull_request": 73,
+    "head": "8d5c27768fc8fe528818c3a1fe879b213a594c23",
+    "required_checks": 21
+  },
+  "workflow": {
+    "name": "e2e-install.yml",
+    "run_id": 30171230547,
+    "run_attempt": 1,
+    "conclusion": "success"
+  },
+  "logical_proofs": [
+    {
+      "artifact": "e2e-container-linux-logical-proof",
+      "marker": "e2e-container-linux.env",
+      "size": 237,
+      "sha256": "1dace69997b9b01bed471f3f538085334ed9ffc5221cb4253a142e73fb7c156a"
+    },
+    {
+      "artifact": "setup-sh-linux-logical-proof",
+      "marker": "setup-sh-linux.env",
+      "size": 225,
+      "sha256": "6fcb5b86efdea7b346d4cf8316912020fd7616f7e72bd958f6157427af7d5bf4"
+    },
+    {
+      "artifact": "setup-sh-macos-logical-proof",
+      "marker": "setup-sh-macos.env",
+      "size": 221,
+      "sha256": "33d3d0c067ae13b2313b1abb447d0ed6e692b31e16417fda15b1e9d7bfbff835"
+    },
+    {
+      "artifact": "setup-ps1-windows-logical-proof",
+      "marker": "setup-ps1-windows.env",
+      "size": 229,
+      "sha256": "87f8a299e529e1dd51bdf32b9e004e652baf7850bd25efb15e0edc3b57000abd"
+    }
+  ],
+  "scans": {
+    "gitleaks_version": "8.30.1",
+    "release_range": "v0.4.2..v0.4.3",
+    "proof_bytes": 912
+  },
+  "release": {
+    "id": 359840729,
+    "published_at": "2026-07-25T19:31:51Z",
+    "immutable": true,
+    "latest": true,
+    "draft": false,
+    "prerelease": false
+  },
+  "residual_evidence": [
+    "real WSL",
+    "redirected Windows",
+    "divergent Windows Terminal targets",
+    "physical Linux",
+    "Apple Silicon owner host",
+    "manual visual checks"
+  ]
+}

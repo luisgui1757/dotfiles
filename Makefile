@@ -2,7 +2,7 @@
 # current OS; sub-targets skip themselves with a clear message when the
 # tool they depend on isn't installed.
 
-.PHONY: ci test-required test test-migration test-nvim test-shell test-starship test-tmux test-ghostty test-wezterm test-aerospace test-nix test-static validate-renovate lint setup setup-dryrun install dryrun deps deps-dryrun chezmoi chezmoi-diff help
+.PHONY: ci test-required test test-migration test-nvim test-shell test-starship test-tmux test-ghostty test-wezterm test-aerospace test-nix test-static validate-renovate lint release-check release-prepare release-publish setup setup-dryrun install dryrun deps deps-dryrun chezmoi chezmoi-diff help
 
 REPO := $(shell pwd)
 
@@ -25,6 +25,9 @@ help:
 	@echo "  test-static     — json/toml/yaml lint, editorconfig, invariants"
 	@echo "  validate-renovate — schema-check renovate.json under Node 24"
 	@echo "  lint            — shellcheck everything"
+	@echo "  release-check   — validate the release manifest and checked-in proof"
+	@echo "  release-prepare — create/test/push a release prep PR (VERSION=... NOTES=...)"
+	@echo "  release-publish — certify/publish exact main (VERSION=... EXPECTED_SHA=...)"
 	@echo
 	@echo "Maintainer phase targets:"
 	@echo "  deps            — phase 1 only: dependency install"
@@ -114,3 +117,16 @@ validate-renovate:
 
 lint:
 	@bash tests/shell/lint.sh
+
+release-check:
+	@python3 scripts/release.py check
+
+release-prepare:
+	@test -n "$(VERSION)" || { echo "FAIL: VERSION=vMAJOR.MINOR.PATCH is required" >&2; exit 2; }
+	@test -n "$(NOTES)" || { echo "FAIL: NOTES=/path/to/reviewed-release-notes.md is required" >&2; exit 2; }
+	@python3 scripts/release.py prepare --version "$(VERSION)" --notes "$(NOTES)"
+
+release-publish:
+	@test -n "$(VERSION)" || { echo "FAIL: VERSION=vMAJOR.MINOR.PATCH is required" >&2; exit 2; }
+	@test -n "$(EXPECTED_SHA)" || { echo "FAIL: EXPECTED_SHA=<40-hex-merged-main> is required" >&2; exit 2; }
+	@python3 scripts/release.py publish --version "$(VERSION)" --expected-sha "$(EXPECTED_SHA)" $(if $(RUN_ID),--run-id "$(RUN_ID)",)

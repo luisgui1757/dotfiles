@@ -513,9 +513,9 @@ then completes additive provisioning and repoints config to v0.4.3. A pending
 `applied` recovery resumes at acceptance; an unsafe/incomplete recovery fails
 closed with its exact rollback command. If the old checkout is not discoverable
 from the live config, set `DOTFILES_V0_1_CHECKOUT` to its real path for that same
-setup invocation. Finish or roll back any unfinished v0.2.0, v0.3.0, v0.4.0,
-v0.4.1, or v0.4.2 recovery from its retained exact release checkout before
-starting v0.4.3; the new setup refuses to bypass any earlier transaction. macOS
+setup invocation. Finish or roll back any unfinished earlier supported recovery
+from its retained exact release checkout before starting v0.4.3; the new setup
+refuses to bypass any earlier transaction. macOS
 migration is available only on Apple Silicon.
 
 The manual preflight/apply/rollback/accept commands remain available in
@@ -1541,6 +1541,7 @@ stale; CI then fails verification until a human reviews the adjacent constant.
 ├── .github/workflows/     # CI matrix + chezmoi parity
 ├── .github/rulesets/      # checked-in GitHub ruleset payloads for main
 ├── docs/security/         # branch-protection runbook
+├── release/               # current release manifest + immutable closure proofs
 ├── setup.sh               # public macOS/Linux/WSL entry point
 ├── setup.ps1              # public Windows entry point
 ├── test.ps1               # Windows test entry point
@@ -1756,6 +1757,20 @@ make test                       # verify the new state
 
 Use `docs/UPGRADING.md` when the release version changes. A moving-branch pull
 is not a release migration.
+
+### Preparing and publishing a release
+
+The release process is manifest-bound and fail-closed. A maintainer supplies
+reviewed candidate notes, then `make release-prepare VERSION=... NOTES=...`
+creates a release worktree, advances controlled version/recovery surfaces, runs
+the full gate, and opens the preparation PR. After that PR merges,
+`make release-publish VERSION=... EXPECTED_SHA=...` certifies the exact merged
+commit, annotated tag, cache-free hosted matrix, logical proofs, Gitleaks scans,
+and fresh public clone before asking for the one explicit immutable-publication
+confirmation. It uploads `release-proof.json` to the draft and opens a
+post-publication closure PR with final readback evidence. See
+[`docs/RELEASING.md`](docs/RELEASING.md) for the complete state machine and
+recovery rules.
 
 ## License
 

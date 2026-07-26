@@ -109,6 +109,15 @@ canonical v0.4.3 path is side-by-side and exact-tag-only:
   all-target concurrency rejection, known-folder state validation, and the
   pre-migration command-provider boundary.
 
+Release preparation now extends one ordered legacy-release registry in each
+setup entrypoint instead of copying another recovery scan. POSIX and PowerShell
+iterate the same version sequence, keep current-release recovery handling
+separate, and preserve the exact fail-closed error and stage rules for every
+older namespace. `release/manifest.json` plus `scripts/release.py` generate and
+test that transition before opening a preparation PR; publication and closure
+remain exact-SHA, observed-evidence operations documented in
+`docs/RELEASING.md`.
+
 The annotated v0.4.3 release was published on 2026-07-25 after its exact local,
 hosted cache-free, release-range/proof scan, fresh detached public-clone, and
 immutable-release gates passed. Its setup, prerequisite helper, and both
