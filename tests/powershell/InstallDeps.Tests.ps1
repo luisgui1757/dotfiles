@@ -836,7 +836,7 @@ exit 97
 
         $output = & { Install-PiCli } 6>&1 | Out-String
 
-        $output | Should -Match 'npm pack --ignore-scripts --json --pack-destination <temp> @earendil-works/pi-coding-agent@0\.80\.10'
+        $output | Should -Match 'npm pack --ignore-scripts --json --pack-destination <temp> @earendil-works/pi-coding-agent@0\.82\.1'
         $output | Should -Match ([regex]::Escape($PiCliIntegrity))
         $output | Should -Match 'npm install -g <verified-local-tarball> <exact same-release Pi companions>'
     }
@@ -997,7 +997,7 @@ exit 97
 
         $output = & { Install-PiCli } 6>&1 | Out-String
 
-        $output | Should -Match 'already installed \(0\.80\.10\)'
+        $output | Should -Match 'already installed \(0\.82\.1\)'
         Should -Invoke -CommandName Invoke-PiCliVerifiedTarballInstall -Times 0 -Exactly
     }
 
