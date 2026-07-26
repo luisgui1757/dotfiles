@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "repository": "luisgui1757/dotfiles",
+  "official_remote": "https://github.com/luisgui1757/dotfiles.git",
+  "workflow": "e2e-install.yml",
+  "current": {
+    "state": "published",
+    "tag": "v0.4.3",
+    "previous_tag": "v0.4.2",
+    "title": "v0.4.3 — Reliable recovery and write-free previews",
+    "notes": "docs/releases/v0.4.3.md",
+    "proof": "release/proofs/v0.4.3.json"
+  },
+  "logical_proofs": [
+    {
+      "artifact": "e2e-container-linux-logical-proof",
+      "marker": "e2e-container-linux.env",
+      "logical_context": "e2e containers / linux",
+      "legacy_context": "e2e containers / ubuntu-24.04"
+    },
+    {
+      "artifact": "setup-sh-linux-logical-proof",
+      "marker": "setup-sh-linux.env",
+      "logical_context": "setup.sh / linux",
+      "legacy_context": "setup.sh / ubuntu-24.04"
+    },
+    {
+      "artifact": "setup-sh-macos-logical-proof",
+      "marker": "setup-sh-macos.env",
+      "logical_context": "setup.sh / macos",
+      "legacy_context": "setup.sh / macos-26"
+    },
+    {
+      "artifact": "setup-ps1-windows-logical-proof",
+      "marker": "setup-ps1-windows.env",
+      "logical_context": "setup.ps1 / windows",
+      "legacy_context": "setup.ps1 / windows-2025"
+    }
+  ]
+}

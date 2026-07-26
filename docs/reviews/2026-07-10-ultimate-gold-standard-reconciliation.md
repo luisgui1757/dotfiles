@@ -2326,6 +2326,47 @@ redirected Windows, divergent stable packaged/Preview/Canary/portable Terminal,
 and desktop/visual/TCC rows remain open. No completion of those manual surfaces
 is claimed by publication.
 
+## Release state-machine automation — entry 83
+
+- The v0.4.3 publication proved the release contract, but its identity checks,
+  proof downloads, credential-free consumer verification, typed publication
+  authorization, and post-publication closure were still an operator-composed
+  sequence. That made the strongest guarantees dependent on repeating a long
+  manual transcript exactly for every release.
+- `release/manifest.json` is now the machine-readable source of truth for the
+  current published release and the four stable logical proof contracts.
+  Versioned proof records preserve the immutable tag, commit, tree, workflow,
+  release, and artifact identities that were previously spread across prose.
+- `scripts/release.py` implements two fail-closed transitions: `prepare`
+  creates a version-only release pull request from exact clean official main,
+  while `publish` proves the merged preparation tree, local and hosted gates,
+  exact first-attempt tag run, downloaded logical proofs, credential-free
+  consumer path, draft release body, and certification asset before accepting
+  the explicit immutable-publication phrase. Publication closure is a separate
+  generated pull request, so observed identities are never invented before
+  they exist.
+- The ordered POSIX and PowerShell legacy-release registries replace five
+  duplicated recovery scans. Preparing a release appends the prior current tag
+  to those registries, keeping every unfinished historical transaction
+  discoverable without another hand-edited block.
+- The automation is regression-bound through two consecutive synthetic release
+  cycles. This proves that a closed release can seed the next preparation rather
+  than only proving the initial v0.4.3-to-v0.4.4 transition.
+
+### Release-automation verification
+
+| Check | Exact result |
+|---|---|
+| `tests/static/release_automation_test.sh` | PASS: publisher authority boundaries, current manifest/surfaces, synthetic v0.4.4 preparation and closure, then synthetic v0.4.5 preparation |
+| `tests/static/release_upgrade_test.sh` | PASS: both legacy registries derive from the published manifest and supply-chain ledger and remain consumed in order |
+| `tests/shell/setup_universal_entrypoint_test.sh` | PASS: every registered POSIX recovery namespace is exercised before the current release path |
+| `scripts/release.py check --live` | PASS: the checked-in v0.4.3 proof validates; its annotated tag, exact first-attempt workflow, and immutable/latest release agree with live GitHub state |
+| Full `make ci` | PASS: ended `local pre-PR gate passed`; local PowerShell execution remained unavailable because `pwsh` is not installed |
+
+Hosted checks for the release-automation pull request remain a downstream merge
+gate. This entry does not claim that any new tag or GitHub release was created;
+the next release begins only through the documented `release-prepare` target.
+
 ## v0.4.0 release-candidate identity preparation — entry 71
 
 - Pull requests #63 and #64 merged to exact `main` commit

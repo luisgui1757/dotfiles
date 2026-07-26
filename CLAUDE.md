@@ -499,11 +499,13 @@ that violates one of these, fix it instead of disabling the test.
     POSIX recovery archives both exact commits, validates digest-bound read-only
     trees, and uses only those frozen sources for Nix/config publication and
     rollback; post-validation checkout changes cannot affect a write. Setup
-    must fail closed when an unfinished `v0.1.0-to-v0.2.0.*`,
-    `v0.1.0-to-v0.3.0.*`, `v0.1.0-to-v0.4.0.*`,
-    `v0.1.0-to-v0.4.1.*`, or `v0.1.0-to-v0.4.2.*` recovery remains; that
-    published transaction must be accepted or rolled back before v0.4.3 setup
-    can begin. Windows enforces the same cross-release recovery boundary.
+    must fail closed when any namespace in the ordered `LEGACY_RELEASE_TAGS` /
+    `$LegacyReleaseTags` registries remains unfinished; that published
+    transaction must be accepted or rolled back before v0.4.3 setup can begin.
+    The current-release namespace stays separate so setup may resume it. Both
+    registries must stay identical, and release preparation adds exactly the
+    previous current tag before advancing the new namespace. Windows enforces
+    the same cross-release recovery boundary.
     Windows recovery likewise archives both exact commits beneath its protected
     ACL, records all four canonical Terminal identities and their expected
     presence/hash state, and binds setup, acceptance, uninstall, and rollback to
@@ -542,6 +544,26 @@ that violates one of these, fix it instead of disabling the test.
     closed across a mixed stage. Shell, PowerShell, Lua, and Nix remain outside
     CodeQL coverage and keep their focused CI authority. Guarded by
     `tests/static/github_security_policy_test.sh` and `repo_policy_test.sh`.
+32. **Release publication is manifest-bound with one explicit irreversible
+    boundary.** `release/manifest.json` is the current release authority and a
+    published state must point to one checked-in `release/proofs/<tag>.json`.
+    `make release-prepare VERSION=... NOTES=...` starts only from clean exact
+    official `main`, requires human-reviewed candidate Markdown, advances the
+    controlled version surfaces and shared legacy-recovery registries, runs the
+    full gate, and opens—but never merges—the preparation PR. After merge,
+    `make release-publish VERSION=... EXPECTED_SHA=...` binds the unique PR,
+    identical reviewed/merged tree, required checks, local gate, annotated tag,
+    cache-free exact-tag job set, schema-2 logical proofs, Gitleaks scans, and a
+    credential-free detached public clone before creating a draft. The draft's
+    `release-proof.json` truthfully certifies only pre-publication evidence;
+    final immutable/latest readback and that asset's SHA-256 belong in the
+    closure proof. Publication requires the exact typed tag+SHA confirmation.
+    A rerun may reuse only an explicitly named first-attempt run after fully
+    revalidating it, and may reconstruct a failed closure only from the live
+    immutable release plus its exact certification asset. Never move/delete an
+    official tag or invent a missing identity to recover. The workflow and
+    recovery contract are in `docs/RELEASING.md`, guarded by
+    `tests/static/release_automation_test.sh`.
 
 ## Common workflows
 

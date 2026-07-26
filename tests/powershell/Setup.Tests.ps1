@@ -1325,64 +1325,22 @@ Describe "setup.ps1 universal install and migration entrypoint" {
         $script:CompletedV01Recovery | Should -Be $pending
     }
 
-    It "refuses to bypass an unfinished v0.2.0 migration recovery" {
+    It "refuses to bypass every registered legacy migration recovery" {
         Remove-Item Env:DOTFILES_V0_1_CHECKOUT -ErrorAction SilentlyContinue
-        $pending = Join-Path (Join-Path (Join-Path $script:UniversalLocal 'dotfiles') 'migrations') 'v0.1.0-to-v0.2.0.pending'
-        New-Item -ItemType Directory -Force -Path $pending | Out-Null
-        [IO.File]::WriteAllText((Join-Path $pending 'stage'), "applied`n")
-        [IO.File]::WriteAllText((Join-Path $pending 'new-checkout'), "C:\retained-v0.2.0`n")
-        [IO.File]::WriteAllText((Join-Path $pending 'old-checkout'), "$($script:UniversalOld)`n")
+        foreach ($legacyTag in $LegacyReleaseTags) {
+            $pending = Join-Path (Join-Path (Join-Path $script:UniversalLocal 'dotfiles') 'migrations') "v0.1.0-to-$legacyTag.pending"
+            try {
+                New-Item -ItemType Directory -Force -Path $pending | Out-Null
+                [IO.File]::WriteAllText((Join-Path $pending 'stage'), "applied`n")
+                [IO.File]::WriteAllText((Join-Path $pending 'new-checkout'), "C:\retained-$legacyTag`n")
+                [IO.File]::WriteAllText((Join-Path $pending 'old-checkout'), "$($script:UniversalOld)`n")
 
-        { Invoke-SetupV01Migration -Identity $script:UniversalIdentity -AllMode $true } |
-            Should -Throw '*unfinished v0.2.0 migration must be resolved before v0.4.3 setup*'
-    }
-
-    It "refuses to bypass an unfinished v0.3.0 migration recovery" {
-        Remove-Item Env:DOTFILES_V0_1_CHECKOUT -ErrorAction SilentlyContinue
-        $pending = Join-Path (Join-Path (Join-Path $script:UniversalLocal 'dotfiles') 'migrations') 'v0.1.0-to-v0.3.0.pending'
-        New-Item -ItemType Directory -Force -Path $pending | Out-Null
-        [IO.File]::WriteAllText((Join-Path $pending 'stage'), "applied`n")
-        [IO.File]::WriteAllText((Join-Path $pending 'new-checkout'), "C:\retained-v0.3.0`n")
-        [IO.File]::WriteAllText((Join-Path $pending 'old-checkout'), "$($script:UniversalOld)`n")
-
-        { Invoke-SetupV01Migration -Identity $script:UniversalIdentity -AllMode $true } |
-            Should -Throw '*unfinished v0.3.0 migration must be resolved before v0.4.3 setup*'
-    }
-
-    It "refuses to bypass an unfinished v0.4.0 migration recovery" {
-        Remove-Item Env:DOTFILES_V0_1_CHECKOUT -ErrorAction SilentlyContinue
-        $pending = Join-Path (Join-Path (Join-Path $script:UniversalLocal 'dotfiles') 'migrations') 'v0.1.0-to-v0.4.0.pending'
-        New-Item -ItemType Directory -Force -Path $pending | Out-Null
-        [IO.File]::WriteAllText((Join-Path $pending 'stage'), "applied`n")
-        [IO.File]::WriteAllText((Join-Path $pending 'new-checkout'), "C:\retained-v0.4.0`n")
-        [IO.File]::WriteAllText((Join-Path $pending 'old-checkout'), "$($script:UniversalOld)`n")
-
-        { Invoke-SetupV01Migration -Identity $script:UniversalIdentity -AllMode $true } |
-            Should -Throw '*unfinished v0.4.0 migration must be resolved before v0.4.3 setup*'
-    }
-
-    It "refuses to bypass an unfinished v0.4.1 migration recovery" {
-        Remove-Item Env:DOTFILES_V0_1_CHECKOUT -ErrorAction SilentlyContinue
-        $pending = Join-Path (Join-Path (Join-Path $script:UniversalLocal 'dotfiles') 'migrations') 'v0.1.0-to-v0.4.1.pending'
-        New-Item -ItemType Directory -Force -Path $pending | Out-Null
-        [IO.File]::WriteAllText((Join-Path $pending 'stage'), "applied`n")
-        [IO.File]::WriteAllText((Join-Path $pending 'new-checkout'), "C:\retained-v0.4.1`n")
-        [IO.File]::WriteAllText((Join-Path $pending 'old-checkout'), "$($script:UniversalOld)`n")
-
-        { Invoke-SetupV01Migration -Identity $script:UniversalIdentity -AllMode $true } |
-            Should -Throw '*unfinished v0.4.1 migration must be resolved before v0.4.3 setup*'
-    }
-
-    It "refuses to bypass an unfinished v0.4.2 migration recovery" {
-        Remove-Item Env:DOTFILES_V0_1_CHECKOUT -ErrorAction SilentlyContinue
-        $pending = Join-Path (Join-Path (Join-Path $script:UniversalLocal 'dotfiles') 'migrations') 'v0.1.0-to-v0.4.2.pending'
-        New-Item -ItemType Directory -Force -Path $pending | Out-Null
-        [IO.File]::WriteAllText((Join-Path $pending 'stage'), "applied`n")
-        [IO.File]::WriteAllText((Join-Path $pending 'new-checkout'), "C:\retained-v0.4.2`n")
-        [IO.File]::WriteAllText((Join-Path $pending 'old-checkout'), "$($script:UniversalOld)`n")
-
-        { Invoke-SetupV01Migration -Identity $script:UniversalIdentity -AllMode $true } |
-            Should -Throw '*unfinished v0.4.2 migration must be resolved before v0.4.3 setup*'
+                { Invoke-SetupV01Migration -Identity $script:UniversalIdentity -AllMode $true } |
+                    Should -Throw "*unfinished $legacyTag migration must be resolved before $ReleaseTag setup*"
+            } finally {
+                Remove-Item -LiteralPath $pending -Recurse -Force -ErrorAction SilentlyContinue
+            }
+        }
     }
 
     It "refuses to cross an unfinished recovery-required boundary" {

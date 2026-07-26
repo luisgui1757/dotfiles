@@ -48,6 +48,7 @@ $ErrorActionPreference = 'Stop'
 
 $RepoUrl        = 'https://github.com/luisgui1757/dotfiles.git'
 $ReleaseTag     = 'v0.4.3'
+$LegacyReleaseTags = @('v0.2.0', 'v0.3.0', 'v0.4.0', 'v0.4.1', 'v0.4.2')
 $SentinelRepoUrl = 'https://github.com/luisgui1757/sentinel.git'
 $SentinelVersion = '0.1.2'
 $SentinelRef     = 'ecafffa858666343c1639f996d177f460163e93e'
@@ -276,94 +277,24 @@ function Get-PendingV01Recovery {
     if (-not (Test-Path -LiteralPath $root -PathType Container)) { return $null }
     $active = @()
     $rolledBack = @()
-    foreach ($directory in @(Get-ChildItem -LiteralPath $root -Force -Filter 'v0.1.0-to-v0.2.0.*' -ErrorAction SilentlyContinue)) {
-        if (-not $directory.PSIsContainer -or ($directory.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
-            throw "legacy migration recovery path is not a real directory: $($directory.FullName)"
-        }
-        try {
-            $stage = Read-SetupRecoveryScalar -Path (Join-Path $directory.FullName 'stage')
-            $newCheckout = Read-SetupRecoveryScalar -Path (Join-Path $directory.FullName 'new-checkout')
-            $oldCheckout = Read-SetupRecoveryScalar -Path (Join-Path $directory.FullName 'old-checkout')
-        } catch {
-            throw "legacy migration recovery identity is incomplete or unsafe: $($directory.FullName): $($_.Exception.Message)"
-        }
-        if ($stage -in @('prepared', 'applying', 'applied', 'rolling-back', 'recovery-required')) {
-            throw "unfinished v0.2.0 migration must be resolved before v0.4.3 setup: recovery=$($directory.FullName); new-checkout=$newCheckout; old-checkout=$oldCheckout"
-        }
-        if ($stage -notin @('accepted', 'rolled-back')) {
-            throw "legacy migration recovery stage is invalid: $($directory.FullName) ($stage)"
-        }
-    }
-    foreach ($directory in @(Get-ChildItem -LiteralPath $root -Force -Filter 'v0.1.0-to-v0.3.0.*' -ErrorAction SilentlyContinue)) {
-        if (-not $directory.PSIsContainer -or ($directory.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
-            throw "legacy migration recovery path is not a real directory: $($directory.FullName)"
-        }
-        try {
-            $stage = Read-SetupRecoveryScalar -Path (Join-Path $directory.FullName 'stage')
-            $newCheckout = Read-SetupRecoveryScalar -Path (Join-Path $directory.FullName 'new-checkout')
-            $oldCheckout = Read-SetupRecoveryScalar -Path (Join-Path $directory.FullName 'old-checkout')
-        } catch {
-            throw "legacy migration recovery identity is incomplete or unsafe: $($directory.FullName): $($_.Exception.Message)"
-        }
-        if ($stage -in @('prepared', 'applying', 'applied', 'rolling-back', 'recovery-required')) {
-            throw "unfinished v0.3.0 migration must be resolved before v0.4.3 setup: recovery=$($directory.FullName); new-checkout=$newCheckout; old-checkout=$oldCheckout"
-        }
-        if ($stage -notin @('accepted', 'rolled-back')) {
-            throw "legacy migration recovery stage is invalid: $($directory.FullName) ($stage)"
-        }
-    }
-    foreach ($directory in @(Get-ChildItem -LiteralPath $root -Force -Filter 'v0.1.0-to-v0.4.0.*' -ErrorAction SilentlyContinue)) {
-        if (-not $directory.PSIsContainer -or ($directory.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
-            throw "legacy migration recovery path is not a real directory: $($directory.FullName)"
-        }
-        try {
-            $stage = Read-SetupRecoveryScalar -Path (Join-Path $directory.FullName 'stage')
-            $newCheckout = Read-SetupRecoveryScalar -Path (Join-Path $directory.FullName 'new-checkout')
-            $oldCheckout = Read-SetupRecoveryScalar -Path (Join-Path $directory.FullName 'old-checkout')
-        } catch {
-            throw "legacy migration recovery identity is incomplete or unsafe: $($directory.FullName): $($_.Exception.Message)"
-        }
-        if ($stage -in @('prepared', 'applying', 'applied', 'rolling-back', 'recovery-required')) {
-            throw "unfinished v0.4.0 migration must be resolved before v0.4.3 setup: recovery=$($directory.FullName); new-checkout=$newCheckout; old-checkout=$oldCheckout"
-        }
-        if ($stage -notin @('accepted', 'rolled-back')) {
-            throw "legacy migration recovery stage is invalid: $($directory.FullName) ($stage)"
-        }
-    }
-    foreach ($directory in @(Get-ChildItem -LiteralPath $root -Force -Filter 'v0.1.0-to-v0.4.1.*' -ErrorAction SilentlyContinue)) {
-        if (-not $directory.PSIsContainer -or ($directory.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
-            throw "legacy migration recovery path is not a real directory: $($directory.FullName)"
-        }
-        try {
-            $stage = Read-SetupRecoveryScalar -Path (Join-Path $directory.FullName 'stage')
-            $newCheckout = Read-SetupRecoveryScalar -Path (Join-Path $directory.FullName 'new-checkout')
-            $oldCheckout = Read-SetupRecoveryScalar -Path (Join-Path $directory.FullName 'old-checkout')
-        } catch {
-            throw "legacy migration recovery identity is incomplete or unsafe: $($directory.FullName): $($_.Exception.Message)"
-        }
-        if ($stage -in @('prepared', 'applying', 'applied', 'rolling-back', 'recovery-required')) {
-            throw "unfinished v0.4.1 migration must be resolved before v0.4.3 setup: recovery=$($directory.FullName); new-checkout=$newCheckout; old-checkout=$oldCheckout"
-        }
-        if ($stage -notin @('accepted', 'rolled-back')) {
-            throw "legacy migration recovery stage is invalid: $($directory.FullName) ($stage)"
-        }
-    }
-    foreach ($directory in @(Get-ChildItem -LiteralPath $root -Force -Filter 'v0.1.0-to-v0.4.2.*' -ErrorAction SilentlyContinue)) {
-        if (-not $directory.PSIsContainer -or ($directory.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
-            throw "legacy migration recovery path is not a real directory: $($directory.FullName)"
-        }
-        try {
-            $stage = Read-SetupRecoveryScalar -Path (Join-Path $directory.FullName 'stage')
-            $newCheckout = Read-SetupRecoveryScalar -Path (Join-Path $directory.FullName 'new-checkout')
-            $oldCheckout = Read-SetupRecoveryScalar -Path (Join-Path $directory.FullName 'old-checkout')
-        } catch {
-            throw "legacy migration recovery identity is incomplete or unsafe: $($directory.FullName): $($_.Exception.Message)"
-        }
-        if ($stage -in @('prepared', 'applying', 'applied', 'rolling-back', 'recovery-required')) {
-            throw "unfinished v0.4.2 migration must be resolved before v0.4.3 setup: recovery=$($directory.FullName); new-checkout=$newCheckout; old-checkout=$oldCheckout"
-        }
-        if ($stage -notin @('accepted', 'rolled-back')) {
-            throw "legacy migration recovery stage is invalid: $($directory.FullName) ($stage)"
+    foreach ($legacyTag in $LegacyReleaseTags) {
+        foreach ($directory in @(Get-ChildItem -LiteralPath $root -Force -Filter "v0.1.0-to-$legacyTag.*" -ErrorAction SilentlyContinue)) {
+            if (-not $directory.PSIsContainer -or ($directory.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+                throw "legacy migration recovery path is not a real directory: $($directory.FullName)"
+            }
+            try {
+                $stage = Read-SetupRecoveryScalar -Path (Join-Path $directory.FullName 'stage')
+                $newCheckout = Read-SetupRecoveryScalar -Path (Join-Path $directory.FullName 'new-checkout')
+                $oldCheckout = Read-SetupRecoveryScalar -Path (Join-Path $directory.FullName 'old-checkout')
+            } catch {
+                throw "legacy migration recovery identity is incomplete or unsafe: $($directory.FullName): $($_.Exception.Message)"
+            }
+            if ($stage -in @('prepared', 'applying', 'applied', 'rolling-back', 'recovery-required')) {
+                throw "unfinished $legacyTag migration must be resolved before $ReleaseTag setup: recovery=$($directory.FullName); new-checkout=$newCheckout; old-checkout=$oldCheckout"
+            }
+            if ($stage -notin @('accepted', 'rolled-back')) {
+                throw "legacy migration recovery stage is invalid: $($directory.FullName) ($stage)"
+            }
         }
     }
     foreach ($directory in @(Get-ChildItem -LiteralPath $root -Force -Filter 'v0.1.0-to-v0.4.3.*' -ErrorAction SilentlyContinue)) {

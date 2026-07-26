@@ -44,18 +44,35 @@ for script in setup.ps1 scripts/upgrade-v0.1.0.ps1; do
     grep -F 'v0.1.0-to-v0.4.3.' "$script" >/dev/null ||
         fail "$script does not use the v0.4.3 migration recovery namespace"
 done
-for script in setup.sh setup.ps1; do
-    grep -F 'unfinished v0.2.0 migration must be resolved before v0.4.3 setup' "$script" >/dev/null ||
-        fail "$script can bypass an unfinished v0.2.0 recovery"
-    grep -F 'unfinished v0.3.0 migration must be resolved before v0.4.3 setup' "$script" >/dev/null ||
-        fail "$script can bypass an unfinished v0.3.0 recovery"
-    grep -F 'unfinished v0.4.0 migration must be resolved before v0.4.3 setup' "$script" >/dev/null ||
-        fail "$script can bypass an unfinished v0.4.0 recovery"
-    grep -F 'unfinished v0.4.1 migration must be resolved before v0.4.3 setup' "$script" >/dev/null ||
-        fail "$script can bypass an unfinished v0.4.1 recovery"
-    grep -F 'unfinished v0.4.2 migration must be resolved before v0.4.3 setup' "$script" >/dev/null ||
-        fail "$script can bypass an unfinished v0.4.2 recovery"
-done
+python3 - <<'PY'
+import ast
+import json
+import pathlib
+import re
+import sys
+
+shell = pathlib.Path("setup.sh").read_text(encoding="utf-8")
+powershell = pathlib.Path("setup.ps1").read_text(encoding="utf-8")
+manifest = json.loads(pathlib.Path("release/manifest.json").read_text(encoding="utf-8"))
+ledger = pathlib.Path("docs/security/supply-chain.md").read_text(encoding="utf-8")
+published = re.findall(r'^\| v0\.1\.0 to (v[0-9]+\.[0-9]+\.[0-9]+) release sources \|', ledger, re.MULTILINE)
+expected = [tag for tag in published if tag != manifest["current"]["tag"]]
+shell_match = re.search(r'^LEGACY_RELEASE_TAGS=\(([^\n]*)\)$', shell, re.MULTILINE)
+ps_match = re.search(r'^\$LegacyReleaseTags = @\(([^\n]*)\)$', powershell, re.MULTILINE)
+if not shell_match or not ps_match:
+    print("FAIL: setup legacy release registries are missing", file=sys.stderr)
+    sys.exit(1)
+shell_tags = re.findall(r'"(v[0-9]+\.[0-9]+\.[0-9]+)"', shell_match.group(1))
+ps_tags = [ast.literal_eval(part.strip()) for part in ps_match.group(1).split(",")]
+if shell_tags != expected or ps_tags != expected:
+    print(f"FAIL: setup legacy release registries drifted: shell={shell_tags}, powershell={ps_tags}", file=sys.stderr)
+    sys.exit(1)
+for text, label in ((shell, "setup.sh"), (powershell, "setup.ps1")):
+    for snippet in ("for legacy_tag in", "unfinished $legacy_tag migration") if label.endswith(".sh") else ("foreach ($legacyTag in $LegacyReleaseTags)", "unfinished $legacyTag migration"):
+        if snippet not in text:
+            print(f"FAIL: {label} does not consume the complete legacy release registry", file=sys.stderr)
+            sys.exit(1)
+PY
 
 for identity in "$OLD_COMMIT" "$OLD_TAG_OBJECT"; do
     grep -F "$identity" scripts/upgrade-v0.1.0.sh >/dev/null ||
@@ -181,14 +198,14 @@ grep -F "'scripts/upgrade-v0.1.0.ps1'" test.ps1 >/dev/null ||
 [[ "$(grep -c 'Exact v0.1.0 release migration' .github/workflows/test.yml)" -eq 2 ]] ||
     fail "exact historical migration must run on hosted Linux and Apple Silicon"
 
-for document in README.md docs/UPGRADING.md docs/releases/v0.2.0.md docs/releases/v0.3.0.md docs/releases/v0.4.0.md docs/releases/v0.4.1.md docs/releases/v0.4.2.md docs/releases/v0.4.3.md; do
+for document in README.md docs/UPGRADING.md docs/releases/v*.md; do
     [[ -f "$document" ]] || fail "release documentation is missing: $document"
 done
 if grep -F 'git -C ~/dotfiles pull' README.md >/dev/null; then
     fail "README still publishes the unsafe in-place v0.1.0 command"
 fi
 if grep -R -E '<post-Nix-release-tag>|<next-release>|git (pull|checkout).*main' \
-    README.md docs/UPGRADING.md docs/releases/v0.2.0.md docs/releases/v0.3.0.md docs/releases/v0.4.0.md docs/releases/v0.4.1.md docs/releases/v0.4.2.md docs/releases/v0.4.3.md >/dev/null; then
+    README.md docs/UPGRADING.md docs/releases/v*.md >/dev/null; then
     fail "release documentation contains a moving branch or release placeholder"
 fi
 # Literal Markdown assertion.

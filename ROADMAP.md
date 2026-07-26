@@ -9,6 +9,27 @@ single obvious setup path, enforce the tests it claims are required, avoid
 mutable supply-chain execution where practical, and make greenfield evidence
 repeatable instead of tribal.
 
+## Release automation (2026-07, DONE)
+
+- DONE - Added a strict machine-readable current-release manifest and seeded
+  the complete observed v0.4.3 closure proof, including tag, commit, tree, PR,
+  workflow, logical-proof digests, scan, immutable release, and residual gaps.
+- DONE - Added a preparation command that starts from clean exact official
+  `main`, requires reviewed release prose, mechanically advances controlled
+  version/legacy-recovery/doc surfaces in an isolated worktree, runs the full
+  gate, and opens the release PR without merging it.
+- DONE - Added resumable exact-SHA publication: unique preparation PR and tree,
+  required checks, local gate, Gitleaks, annotated tag, cache-free exact-tag
+  matrix, logical proof validation, public-clone proof, draft asset digest, and
+  an exact typed confirmation before immutable publication.
+- DONE - Added deterministic closure generation and a recovery path that can
+  reconstruct a post-publication closure only from the live immutable release
+  and its exact uploaded certification asset.
+- DONE - Collapsed five duplicated POSIX and PowerShell legacy-recovery scans
+  into shared ordered registries; setup behavior and both regression suites now
+  consume those registries so each release adds one reviewed value instead of
+  another control-flow copy.
+
 ## Audit Evidence
 
 - Local `make ci`: passed on 2026-06-18 after the final fix round. This covered

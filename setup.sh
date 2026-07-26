@@ -31,6 +31,7 @@ set -euo pipefail
 
 REPO_URL="https://github.com/luisgui1757/dotfiles.git"
 RELEASE_TAG="v0.4.3"
+LEGACY_RELEASE_TAGS=("v0.2.0" "v0.3.0" "v0.4.0" "v0.4.1" "v0.4.2")
 DEFAULT_DEST="$HOME/dotfiles"
 
 ALL=0
@@ -483,153 +484,43 @@ sys.stdout.buffer.write(raw[:-1])
 }
 
 load_pending_v0_1_recovery() {
-    local root directory stage new_checkout old_checkout
+    local root directory stage new_checkout old_checkout legacy_tag
     local -a active=() rolled_back=()
     V0_1_RECOVERY_PATH=""
     V0_1_RECOVERY_STAGE=""
     V0_1_RECOVERY_OLD_CHECKOUT=""
     root="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/migrations"
     [[ -d "$root" && ! -L "$root" ]] || return 0
-    while IFS= read -r -d '' directory; do
-        [[ -d "$directory" && ! -L "$directory" ]] || {
-            echo "  FAIL: legacy migration recovery path is not a real directory: $directory" >&2
-            return 1
-        }
-        if ! stage="$(read_setup_recovery_scalar "$directory/stage")" ||
-            ! new_checkout="$(read_setup_recovery_scalar "$directory/new-checkout")" ||
-            ! old_checkout="$(read_setup_recovery_scalar "$directory/old-checkout")"; then
-            echo "  FAIL: legacy migration recovery identity is incomplete or unsafe: $directory" >&2
-            return 1
-        fi
-        case "$stage" in
-            accepted|rolled-back)
-                ;;
-            prepared|applying|applied|rolling-back|recovery-required)
-                echo "  FAIL: unfinished v0.2.0 migration must be resolved before v0.4.3 setup." >&2
-                echo "        recovery=$directory" >&2
-                echo "        new-checkout=$new_checkout" >&2
-                echo "        old-checkout=$old_checkout" >&2
+    for legacy_tag in "${LEGACY_RELEASE_TAGS[@]}"; do
+        while IFS= read -r -d '' directory; do
+            [[ -d "$directory" && ! -L "$directory" ]] || {
+                echo "  FAIL: legacy migration recovery path is not a real directory: $directory" >&2
                 return 1
-                ;;
-            *)
-                echo "  FAIL: legacy migration recovery stage is invalid: $directory ($stage)" >&2
+            }
+            if ! stage="$(read_setup_recovery_scalar "$directory/stage")" ||
+                ! new_checkout="$(read_setup_recovery_scalar "$directory/new-checkout")" ||
+                ! old_checkout="$(read_setup_recovery_scalar "$directory/old-checkout")"; then
+                echo "  FAIL: legacy migration recovery identity is incomplete or unsafe: $directory" >&2
                 return 1
-                ;;
-        esac
-    done < <(find "$root" -mindepth 1 -maxdepth 1 \
-        -name 'v0.1.0-to-v0.2.0.*' -print0)
-    while IFS= read -r -d '' directory; do
-        [[ -d "$directory" && ! -L "$directory" ]] || {
-            echo "  FAIL: legacy migration recovery path is not a real directory: $directory" >&2
-            return 1
-        }
-        if ! stage="$(read_setup_recovery_scalar "$directory/stage")" ||
-            ! new_checkout="$(read_setup_recovery_scalar "$directory/new-checkout")" ||
-            ! old_checkout="$(read_setup_recovery_scalar "$directory/old-checkout")"; then
-            echo "  FAIL: legacy migration recovery identity is incomplete or unsafe: $directory" >&2
-            return 1
-        fi
-        case "$stage" in
-            accepted|rolled-back)
-                ;;
-            prepared|applying|applied|rolling-back|recovery-required)
-                echo "  FAIL: unfinished v0.3.0 migration must be resolved before v0.4.3 setup." >&2
-                echo "        recovery=$directory" >&2
-                echo "        new-checkout=$new_checkout" >&2
-                echo "        old-checkout=$old_checkout" >&2
-                return 1
-                ;;
-            *)
-                echo "  FAIL: legacy migration recovery stage is invalid: $directory ($stage)" >&2
-                return 1
-                ;;
-        esac
-    done < <(find "$root" -mindepth 1 -maxdepth 1 \
-        -name 'v0.1.0-to-v0.3.0.*' -print0)
-    while IFS= read -r -d '' directory; do
-        [[ -d "$directory" && ! -L "$directory" ]] || {
-            echo "  FAIL: legacy migration recovery path is not a real directory: $directory" >&2
-            return 1
-        }
-        if ! stage="$(read_setup_recovery_scalar "$directory/stage")" ||
-            ! new_checkout="$(read_setup_recovery_scalar "$directory/new-checkout")" ||
-            ! old_checkout="$(read_setup_recovery_scalar "$directory/old-checkout")"; then
-            echo "  FAIL: legacy migration recovery identity is incomplete or unsafe: $directory" >&2
-            return 1
-        fi
-        case "$stage" in
-            accepted|rolled-back)
-                ;;
-            prepared|applying|applied|rolling-back|recovery-required)
-                echo "  FAIL: unfinished v0.4.0 migration must be resolved before v0.4.3 setup." >&2
-                echo "        recovery=$directory" >&2
-                echo "        new-checkout=$new_checkout" >&2
-                echo "        old-checkout=$old_checkout" >&2
-                return 1
-                ;;
-            *)
-                echo "  FAIL: legacy migration recovery stage is invalid: $directory ($stage)" >&2
-                return 1
-                ;;
-        esac
-    done < <(find "$root" -mindepth 1 -maxdepth 1 \
-        -name 'v0.1.0-to-v0.4.0.*' -print0)
-    while IFS= read -r -d '' directory; do
-        [[ -d "$directory" && ! -L "$directory" ]] || {
-            echo "  FAIL: legacy migration recovery path is not a real directory: $directory" >&2
-            return 1
-        }
-        if ! stage="$(read_setup_recovery_scalar "$directory/stage")" ||
-            ! new_checkout="$(read_setup_recovery_scalar "$directory/new-checkout")" ||
-            ! old_checkout="$(read_setup_recovery_scalar "$directory/old-checkout")"; then
-            echo "  FAIL: legacy migration recovery identity is incomplete or unsafe: $directory" >&2
-            return 1
-        fi
-        case "$stage" in
-            accepted|rolled-back)
-                ;;
-            prepared|applying|applied|rolling-back|recovery-required)
-                echo "  FAIL: unfinished v0.4.1 migration must be resolved before v0.4.3 setup." >&2
-                echo "        recovery=$directory" >&2
-                echo "        new-checkout=$new_checkout" >&2
-                echo "        old-checkout=$old_checkout" >&2
-                return 1
-                ;;
-            *)
-                echo "  FAIL: legacy migration recovery stage is invalid: $directory ($stage)" >&2
-                return 1
-                ;;
-        esac
-    done < <(find "$root" -mindepth 1 -maxdepth 1 \
-        -name 'v0.1.0-to-v0.4.1.*' -print0)
-    while IFS= read -r -d '' directory; do
-        [[ -d "$directory" && ! -L "$directory" ]] || {
-            echo "  FAIL: legacy migration recovery path is not a real directory: $directory" >&2
-            return 1
-        }
-        if ! stage="$(read_setup_recovery_scalar "$directory/stage")" ||
-            ! new_checkout="$(read_setup_recovery_scalar "$directory/new-checkout")" ||
-            ! old_checkout="$(read_setup_recovery_scalar "$directory/old-checkout")"; then
-            echo "  FAIL: legacy migration recovery identity is incomplete or unsafe: $directory" >&2
-            return 1
-        fi
-        case "$stage" in
-            accepted|rolled-back)
-                ;;
-            prepared|applying|applied|rolling-back|recovery-required)
-                echo "  FAIL: unfinished v0.4.2 migration must be resolved before v0.4.3 setup." >&2
-                echo "        recovery=$directory" >&2
-                echo "        new-checkout=$new_checkout" >&2
-                echo "        old-checkout=$old_checkout" >&2
-                return 1
-                ;;
-            *)
-                echo "  FAIL: legacy migration recovery stage is invalid: $directory ($stage)" >&2
-                return 1
-                ;;
-        esac
-    done < <(find "$root" -mindepth 1 -maxdepth 1 \
-        -name 'v0.1.0-to-v0.4.2.*' -print0)
+            fi
+            case "$stage" in
+                accepted|rolled-back)
+                    ;;
+                prepared|applying|applied|rolling-back|recovery-required)
+                    echo "  FAIL: unfinished $legacy_tag migration must be resolved before $RELEASE_TAG setup." >&2
+                    echo "        recovery=$directory" >&2
+                    echo "        new-checkout=$new_checkout" >&2
+                    echo "        old-checkout=$old_checkout" >&2
+                    return 1
+                    ;;
+                *)
+                    echo "  FAIL: legacy migration recovery stage is invalid: $directory ($stage)" >&2
+                    return 1
+                    ;;
+            esac
+        done < <(find "$root" -mindepth 1 -maxdepth 1 \
+            -name "v0.1.0-to-$legacy_tag.*" -print0)
+    done
     while IFS= read -r -d '' directory; do
         [[ -d "$directory" && ! -L "$directory" ]] || {
             echo "  FAIL: migration recovery path is not a real directory: $directory" >&2
