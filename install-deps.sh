@@ -19,14 +19,14 @@ YES_ALL=0
 DRY_RUN=0
 UPDATE_ONLY=0
 EXPERIMENTAL_WSL_GUI="${DOTFILES_EXPERIMENTAL_WSL_GUI:-0}"
-HOMEBREW_INSTALL_COMMIT="99e13e96cbbdc1ac1ac09c0a40b450bf219ef3aa"
-HOMEBREW_INSTALL_SHA256="99287f194a8b3c9e6b0203a11a5fa54518be57209343e6bb954dec4635796d9d"
+HOMEBREW_INSTALL_COMMIT="ca0130bd52235f2fcb2bf23cfdda004bc5d250c1"
+HOMEBREW_INSTALL_SHA256="8ff338091a5e10bb5fc040b38316648110f42feff057ecf9feaab51fd0a13ef9"
 NVIM_LINUX_VERSION="v0.12.4"
 NVIM_LINUX_X86_64_SHA256="012bf3fcac5ade43914df3f174668bf64d05e049a4f032a388c027b1ebd78628"
 NVIM_LINUX_ARM64_SHA256="ceb7e88c6b681f0515d135dcdfad54f5eb4373b25ce6172197cd9a69c758063f"
-CHEZMOI_VERSION="v2.71.0"
-CHEZMOI_LINUX_X86_64_SHA256="6ea2040ecc0e82d3dac604289e100b0157afefcd94ebb818e5f6e31655156d34"
-CHEZMOI_LINUX_ARM64_SHA256="d8fb35f9d43237b4f6d022cad40e1094957b990cfaee5f3b131ded65422b0983"
+CHEZMOI_VERSION="v2.71.1"
+CHEZMOI_LINUX_X86_64_SHA256="e1fb16c962644d57f4d451c324aa86163d00faf5d035500f41fb48943a66dfed"
+CHEZMOI_LINUX_ARM64_SHA256="6e88c8150d3d54533ba2f335a52c2ac7b67259c525ba0f19091fc078b6852154"
 LAZYGIT_LINUX_VERSION="v0.63.1"
 LAZYGIT_LINUX_X86_64_SHA256="8e033bc78c8e192dee9510e951f6c9e154289b7198d22c924ed1d0a951b0dac1"
 LAZYGIT_LINUX_ARM64_SHA256="555dbc9a8efcf2e33bc24e7fbd9463e9fa375e3c5e23cc270763733c38eeae36"
@@ -44,8 +44,8 @@ GH_DASH_VERSION="v4.25.2"   # dlvhdr/gh-dash pinned gh-extension tag; mirror in 
 GH_DASH_TAG_OBJECT="61e619ba8a9682ba8a822282d1da8c5eb7b0bbff"
 GH_DASH_COMMIT="a613ef744c99ef8d8ead33467813c6ee6086af52"
 PI_CLI_PACKAGE="@earendil-works/pi-coding-agent"
-PI_CLI_VERSION="0.80.10"
-PI_CLI_INTEGRITY="sha512-aL4apbupCHiVLSXASXvRzH4Q2vmtfrDa+0s909CJuVu/GgGylbDzr7oyF1mPmip5E+VxYYxKWmph4hV04wUcQg=="
+PI_CLI_VERSION="0.82.1"
+PI_CLI_INTEGRITY="sha512-zbkAhoIuDPMF3pKuja0ajZabrMWU29FUMV9A/XMXT/XC1yXs5xt6t6t13GogQFsDrDqbFP4DkZQO1w8rWRAzYA=="
 TPM_COMMIT="e261deb1b47614eed3400089ce7197dc68acc4eb"
 # Functional tmux plugins (Omer-style set). The Rose Pine status bar is NOT a
 # plugin here -- it is a repo-owned generated config (tmux/psmux-rose-pine.ps1),
@@ -83,17 +83,17 @@ WEZTERM_DEB_AMD64_SHA256="86358dab5794a4fb63f7c91dd68d4fdc3da58faad648a58fc77d2b
 # Herdr (agent multiplexer). macOS + Linuxbrew use the canonical homebrew-core
 # formula (`brew install herdr`). Native Linux without brew installs the pinned
 # release binary, SHA-256 verified. Upstream publishes no checksum sidecar, so
-# these SHAs were computed from the pinned v0.7.4 assets on 2026-07-16 (bump the
+# these SHAs were computed from the pinned v0.7.5 assets on 2026-07-21 (bump the
 # version + both SHAs together). NOT the herdr.dev install.sh remote-eval path.
 # Native Windows uses install-deps.ps1's separate pinned, SHA-256-verified
 # preview .exe path, never the herdr.dev install.ps1 remote-eval path.
-HERDR_VERSION="v0.7.4"
-HERDR_LINUX_X86_64_SHA256="bc0fc02d4ba500f9cac2353a43e67fe036785ecca6eb55378e050fac3c103059"
-HERDR_LINUX_ARM64_SHA256="544e0002de42806d1ab64ccdef3a7e7414f24717b0b6b022bc9e57d2eefd26a2"
+HERDR_VERSION="v0.7.5"
+HERDR_LINUX_X86_64_SHA256="3dc83288073e4c2d3c679a30e7be97bcca9141c6fd17dbbb9219142e95c59253"
+HERDR_LINUX_ARM64_SHA256="32e763a1499a6b694b1d708e4f062b743be1da9f34fcfa4d212d6db6fe09a8b9"
 PYLATEXENC_BUILD_BACKEND_VERSION="83.0.0"
 PYLATEXENC_BUILD_BACKEND_SHA256="29b23c360f22f414dc7336bb39178cc7bcbf6021ed2733cde173f09dba19abb3"
-PYLATEXENC_VERSION="2.10"
-PYLATEXENC_SHA256="3dd8fd84eb46dc30bee1e23eaab8d8fb5a7f507347b23e5f38ad9675c84f40d3"
+PYLATEXENC_VERSION="2.11"
+PYLATEXENC_SHA256="305a072a99ce736246049c9da05841b9d718c0f7ea8888f5f596cf15cb621053"
 for arg in "$@"; do
     case "$arg" in
         --all|-y)   YES_ALL=1 ;;
@@ -1912,7 +1912,7 @@ install_pylatexenc_converter() {
         echo "  would:    python3 -m venv $venv_dir"
         echo "  would:    pip install --require-hashes setuptools==$PYLATEXENC_BUILD_BACKEND_VERSION"
         echo "             sha256=$PYLATEXENC_BUILD_BACKEND_SHA256"
-        echo "  would:    pip install --require-hashes --no-build-isolation pylatexenc==$PYLATEXENC_VERSION"
+        echo "  would:    pip install --require-hashes --no-binary=pylatexenc --no-build-isolation pylatexenc==$PYLATEXENC_VERSION"
         echo "             sha256=$PYLATEXENC_SHA256"
         echo "  would:    write ~/.local/bin/latex2text shim"
         return 0
@@ -1932,7 +1932,7 @@ install_pylatexenc_converter() {
         return 1
     fi
     printf 'pylatexenc==%s --hash=sha256:%s\n' "$PYLATEXENC_VERSION" "$PYLATEXENC_SHA256" > "$req"
-    if ! "$venv_python" -m pip install --disable-pip-version-check --no-cache-dir --require-hashes --no-deps --no-build-isolation -r "$req"; then
+    if ! "$venv_python" -m pip install --disable-pip-version-check --no-cache-dir --require-hashes --no-deps --no-binary=pylatexenc --no-build-isolation -r "$req"; then
         rm -f "$req"
         echo "  FAIL: pylatexenc install failed"
         return 1

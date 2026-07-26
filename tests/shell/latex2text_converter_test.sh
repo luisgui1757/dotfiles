@@ -41,6 +41,8 @@ out="$(install_pylatexenc_converter)"
     || fail "dry-run did not preview the dotfiles-owned pylatexenc venv"
 [[ "$out" == *"pylatexenc==$PYLATEXENC_VERSION"* ]] \
     || fail "dry-run did not pin pylatexenc version"
+[[ "$out" == *"--no-binary=pylatexenc"* ]] \
+    || fail "dry-run did not force the reviewed pylatexenc source distribution"
 [[ "$out" == *"setuptools==$PYLATEXENC_BUILD_BACKEND_VERSION"* ]] \
     || fail "dry-run did not pin the pylatexenc build backend"
 [[ "$out" == *"sha256=$PYLATEXENC_BUILD_BACKEND_SHA256"* ]] \
@@ -62,6 +64,8 @@ grep -F -- "--require-hashes" "$PYTHON_LOG" >/dev/null \
     || fail "pylatexenc install did not use pip hash-checking mode"
 grep -F -- "--no-build-isolation" "$PYTHON_LOG" >/dev/null \
     || fail "pylatexenc install did not disable build isolation after pinning setuptools"
+grep -F -- "--no-binary=pylatexenc" "$PYTHON_LOG" >/dev/null \
+    || fail "pylatexenc install did not force the reviewed source distribution"
 case ":$PATH:" in
     *":$HOME/.local/bin:"*) ;;
     *) fail "install did not add ~/.local/bin to PATH" ;;

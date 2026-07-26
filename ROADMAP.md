@@ -296,7 +296,7 @@ Commit-by-commit status:
   also leaves an active PowerShell 7 runtime untouched; explicit update must
   run under Windows PowerShell 5.1 and rejects active `pwsh` before mutation.
 - **Pi CLI provisioning, theme, and multiline input — DONE.** Setup installs the Pi CLI on every OS as the
-  pinned npm package `@earendil-works/pi-coding-agent@0.80.10` after checking npm
+  pinned npm package `@earendil-works/pi-coding-agent@0.82.1` after checking npm
   `dist.integrity`; its three Pi companion modules are held to the same exact
   release. POSIX public setup gets Node 24 from the enforced Nix package
   layer; Windows uses the native Node LTS catalog path. Chezmoi deploys the

@@ -790,7 +790,7 @@ Describe "install-deps.ps1" {
         $BinaryName['pi'] | Should -Be 'pi'
         @((Get-InstallDependencySpec) | Where-Object { $_.Tool -eq 'pi' }).Count | Should -Be 1
         $PiCliPackage | Should -Be '@earendil-works/pi-coding-agent'
-        $PiCliVersion | Should -Be '0.80.10'
+        $PiCliVersion | Should -Be '0.82.1'
         $PiCliIntegrity | Should -Match '^sha512-'
     }
 
@@ -836,7 +836,7 @@ exit 97
 
         $output = & { Install-PiCli } 6>&1 | Out-String
 
-        $output | Should -Match 'npm pack --ignore-scripts --json --pack-destination <temp> @earendil-works/pi-coding-agent@0\.80\.10'
+        $output | Should -Match 'npm pack --ignore-scripts --json --pack-destination <temp> @earendil-works/pi-coding-agent@0\.82\.1'
         $output | Should -Match ([regex]::Escape($PiCliIntegrity))
         $output | Should -Match 'npm install -g <verified-local-tarball> <exact same-release Pi companions>'
     }
@@ -926,9 +926,9 @@ exit 97
 
             $script:InstalledPiArguments[2] | Should -Match 'dotfiles-pi-[0-9a-f]+[\\/]pi\.tgz$'
             $script:InstalledPiArguments[3..5] | Should -Be @(
-                '@earendil-works/pi-agent-core@0.80.10',
-                '@earendil-works/pi-ai@0.80.10',
-                '@earendil-works/pi-tui@0.80.10'
+                '@earendil-works/pi-agent-core@0.82.1',
+                '@earendil-works/pi-ai@0.82.1',
+                '@earendil-works/pi-tui@0.82.1'
             )
             @(Get-ChildItem -LiteralPath $tempRoot -Force -ErrorAction SilentlyContinue).Count | Should -Be 0
         } finally {
@@ -997,7 +997,7 @@ exit 97
 
         $output = & { Install-PiCli } 6>&1 | Out-String
 
-        $output | Should -Match 'already installed \(0\.80\.10\)'
+        $output | Should -Match 'already installed \(0\.82\.1\)'
         Should -Invoke -CommandName Invoke-PiCliVerifiedTarballInstall -Times 0 -Exactly
     }
 
@@ -3279,7 +3279,8 @@ Describe "Markdown equation converter provisioning" {
         $output | Should -Match 'python -m venv'
         $output | Should -Match 'setuptools==83\.0\.0'
         $output | Should -Match $PylatexencBuildBackendSha256
-        $output | Should -Match 'pylatexenc==2\.10'
+        $output | Should -Match 'pylatexenc==2\.11'
+        $output | Should -Match '--no-binary=pylatexenc'
         $output | Should -Match $PylatexencSha256
     }
 
@@ -3322,10 +3323,11 @@ Describe "Markdown equation converter provisioning" {
         $script:AddedPath | Should -Be $expectedScripts
             $script:SetuptoolsRequirementsText | Should -Match 'setuptools==83\.0\.0'
         $script:SetuptoolsRequirementsText | Should -Match $PylatexencBuildBackendSha256
-        $script:RequirementsText | Should -Match 'pylatexenc==2\.10'
+        $script:RequirementsText | Should -Match 'pylatexenc==2\.11'
         $script:RequirementsText | Should -Match $PylatexencSha256
         @($script:PythonCalls | Where-Object { $_.Arguments -contains '--require-hashes' }).Count | Should -Be 2
         @($script:PythonCalls | Where-Object { $_.Arguments -contains '--no-build-isolation' }).Count | Should -Be 1
+        @($script:PythonCalls | Where-Object { $_.Arguments -contains '--no-binary=pylatexenc' }).Count | Should -Be 1
     }
 }
 
