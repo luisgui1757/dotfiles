@@ -1410,8 +1410,11 @@ save only**. The next plain `:w` formats normally. Implemented in
   LaTeX support needs the non-bundled `latex` parser (already in
   `treesitter_parsers`) and a converter executable. `install-deps.sh` creates
   `~/.local/share/dotfiles/python-tools/pylatexenc`, installs pinned
-  `setuptools==83.0.0` first, installs `pylatexenc==2.10` with pip `--require-hashes`
-  and `--no-build-isolation`, and writes `~/.local/bin/latex2text`;
+  `setuptools==83.0.0` first, installs `pylatexenc==2.11` with pip `--require-hashes`,
+  `--no-binary=pylatexenc`, and `--no-build-isolation`, and writes
+  `~/.local/bin/latex2text`; 2.11 publishes both a wheel and a source
+  distribution, so the explicit source-only selector binds pip to the reviewed
+  source-distribution digest rather than whichever artifact it prefers;
   Linux must repair venv/pip through the detected native package manager when
   the active `python3` lacks them, even if Linuxbrew is the selected manager:
   `/usr/bin/python3` can still win PATH and is not repaired by a Brew-only
@@ -1927,7 +1930,7 @@ save only**. The next plain `:w` formats normally. Implemented in
   portable `if` form and assert the substitution's exit status so fixture parse
   failures cannot false-green.
 - **Herdr expanded agent cards preserve the v0.7.3 layout.** The upstream
-  v0.7.4 default omits `state_text` and packs adjacent cards. Both managed
+  v0.7.4+ defaults omit `state_text` and pack adjacent cards. Both managed
   configs set rows to `[["state_icon", "workspace", "tab"], ["state_text",
   "agent"]]` with `row_gap = 1`, preserving workspace/tab on the first line,
   explicit `idle` / `working` plus the agent on the second, and the previous
@@ -2058,9 +2061,9 @@ save only**. The next plain `:w` formats normally. Implemented in
   a manual, secret-bearing step this repo never automates or stores.
 - **Pi CLI is pinned; only its audited theme selection and canonical newline keybinding are repo-owned.** `install-deps.sh`
   and `install-deps.ps1` run `npm pack --ignore-scripts --json` for
-  `@earendil-works/pi-coding-agent@0.80.10`, require both reported metadata and
+  `@earendil-works/pi-coding-agent@0.82.1`, require both reported metadata and
   independently hashed tarball bytes to match
-  `sha512-aL4apbupCHiVLSXASXvRzH4Q2vmtfrDa+0s909CJuVu/GgGylbDzr7oyF1mPmip5E+VxYYxKWmph4hV04wUcQg==`
+  `sha512-zbkAhoIuDPMF3pKuja0ajZabrMWU29FUMV9A/XMXT/XC1yXs5xt6t6t13GogQFsDrDqbFP4DkZQO1w8rWRAzYA==`
   and install the verified local tarball alongside exact same-release
   `pi-agent-core`, `pi-ai`, and `pi-tui` specs. Do not rely on the coding-agent's
   caret ranges: a later companion publish can otherwise combine incompatible
@@ -2090,7 +2093,7 @@ save only**. The next plain `:w` formats normally. Implemented in
   keybindings
   file owns exactly Pi's
   upstream-default newline action:
-  `Shift+Enter`, with `Ctrl+J` retained as the transport fallback. Herdr v0.7.4
+  `Shift+Enter`, with `Ctrl+J` retained as the transport fallback. Herdr v0.7.5
   preserves the modified key directly; POSIX tmux uses its version-compatible
   extended-key transport. Do not add Ghostty's legacy
   `shift+enter=text:\\n` remap: it reduces the chord to the same raw LF as

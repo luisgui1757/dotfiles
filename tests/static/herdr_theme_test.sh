@@ -76,15 +76,15 @@ if configs[1].get("terminal", {}).get("default_shell") != "pwsh.exe":
 PY
 
 cmp -s "$CONFIG" "$MIRROR" || fail "canonical Herdr config and chezmoi mirror differ"
-grep -F 'HERDR_VERSION="v0.7.4"' "$INSTALL_SH" >/dev/null ||
-    fail "POSIX Herdr must stay pinned to the reviewed v0.7.4 release"
-grep -F 'HERDR_LINUX_X86_64_SHA256="bc0fc02d4ba500f9cac2353a43e67fe036785ecca6eb55378e050fac3c103059"' "$INSTALL_SH" >/dev/null ||
-    fail "Herdr v0.7.4 x86_64 digest drifted"
-grep -F 'HERDR_LINUX_ARM64_SHA256="544e0002de42806d1ab64ccdef3a7e7414f24717b0b6b022bc9e57d2eefd26a2"' "$INSTALL_SH" >/dev/null ||
-    fail "Herdr v0.7.4 arm64 digest drifted"
-grep -F "\$HerdrWindowsPreviewVersion = 'preview-2026-07-16-e907e6a36646'" "$INSTALL_PS1" >/dev/null ||
+grep -F 'HERDR_VERSION="v0.7.5"' "$INSTALL_SH" >/dev/null ||
+    fail "POSIX Herdr must stay pinned to the reviewed v0.7.5 release"
+grep -F 'HERDR_LINUX_X86_64_SHA256="3dc83288073e4c2d3c679a30e7be97bcca9141c6fd17dbbb9219142e95c59253"' "$INSTALL_SH" >/dev/null ||
+    fail "Herdr v0.7.5 x86_64 digest drifted"
+grep -F 'HERDR_LINUX_ARM64_SHA256="32e763a1499a6b694b1d708e4f062b743be1da9f34fcfa4d212d6db6fe09a8b9"' "$INSTALL_SH" >/dev/null ||
+    fail "Herdr v0.7.5 arm64 digest drifted"
+grep -F "\$HerdrWindowsPreviewVersion = 'preview-2026-07-21-0f10e1453a7f'" "$INSTALL_PS1" >/dev/null ||
     fail "Windows Herdr must stay pinned to the reviewed preview"
-grep -F "\$HerdrWindowsX64Sha256 = 'a5827b33cbd0352e4c0f1469ca6e0f71083e1333cf0250ca9dbecc41770a6d30'" "$INSTALL_PS1" >/dev/null ||
+grep -F "\$HerdrWindowsX64Sha256 = '75c85763db0ca5fd13b485d0728cc3e9ea1152964a4e976e1d49f2e86b01a92b'" "$INSTALL_PS1" >/dev/null ||
     fail "post-fix Windows Herdr digest drifted"
 grep -F '.chezmoitemplates/herdr/config.toml' \
     "$REPO_ROOT/home/dot_config/herdr/symlink_config.toml.tmpl" >/dev/null ||

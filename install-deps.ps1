@@ -28,19 +28,19 @@ $ScoopInstallerSha256 = '48f6ea398b3a3fa26fae0093d37bd85b13e7eaa5d1d4a3e20840876
 $ScoopInstallerUrl = "https://raw.githubusercontent.com/ScoopInstaller/Install/$ScoopInstallerCommit/install.ps1"
 $WindowsTerminalVersion = 'v1.24.11911.0'
 $WindowsTerminalX64Sha256 = '7691efeb71c8dd0b95536c84e366fa4cf809a42c534912f9cefa1056534383bd'
-$HerdrWindowsPreviewVersion = 'preview-2026-07-16-e907e6a36646'
-$HerdrWindowsX64Sha256 = 'a5827b33cbd0352e4c0f1469ca6e0f71083e1333cf0250ca9dbecc41770a6d30'
+$HerdrWindowsPreviewVersion = 'preview-2026-07-21-0f10e1453a7f'
+$HerdrWindowsX64Sha256 = '75c85763db0ca5fd13b485d0728cc3e9ea1152964a4e976e1d49f2e86b01a92b'
 $VsBuildToolsBootstrapperUrl = 'https://aka.ms/vs/17/release/vs_BuildTools.exe'
 $PylatexencBuildBackendVersion = '83.0.0'
 $PylatexencBuildBackendSha256 = '29b23c360f22f414dc7336bb39178cc7bcbf6021ed2733cde173f09dba19abb3'
 $PylatexencVersion = '2.11'
-$PylatexencSha256 = '3dd8fd84eb46dc30bee1e23eaab8d8fb5a7f507347b23e5f38ad9675c84f40d3'
+$PylatexencSha256 = '305a072a99ce736246049c9da05841b9d718c0f7ea8888f5f596cf15cb621053'
 $GhDashVersion = 'v4.25.2'   # dlvhdr/gh-dash pinned gh-extension tag; mirror in install-deps.sh (GH_DASH_VERSION)
 $GhDashTagObject = '61e619ba8a9682ba8a822282d1da8c5eb7b0bbff'
 $GhDashCommit = 'a613ef744c99ef8d8ead33467813c6ee6086af52'
 $PiCliPackage = '@earendil-works/pi-coding-agent'
 $PiCliVersion = '0.82.1'
-$PiCliIntegrity = 'sha512-aL4apbupCHiVLSXASXvRzH4Q2vmtfrDa+0s909CJuVu/GgGylbDzr7oyF1mPmip5E+VxYYxKWmph4hV04wUcQg=='
+$PiCliIntegrity = 'sha512-zbkAhoIuDPMF3pKuja0ajZabrMWU29FUMV9A/XMXT/XC1yXs5xt6t6t13GogQFsDrDqbFP4DkZQO1w8rWRAzYA=='
 $TreeSitterCliVersion = 'v0.26.11'
 $TreeSitterCliWindowsX64Sha256 = 'd40e158839062803a5182ecefca76f809b89464146625d303ef779ed8ceb0f73'
 $TreeSitterCliWindowsArm64Sha256 = '405b108531872a12d9a607b84ff8be21f96ad09bb40bd76043f31ce6565069f9'
@@ -460,7 +460,7 @@ function Install-PylatexencConverter {
         Write-Host ("  would:    python -m venv {0}" -f $venvRoot)
         Write-Host ("  would:    pip install --require-hashes setuptools=={0}" -f $PylatexencBuildBackendVersion)
         Write-Host ("             sha256={0}" -f $PylatexencBuildBackendSha256)
-        Write-Host ("  would:    pip install --require-hashes --no-build-isolation pylatexenc=={0}" -f $PylatexencVersion)
+        Write-Host ("  would:    pip install --require-hashes --no-binary=pylatexenc --no-build-isolation pylatexenc=={0}" -f $PylatexencVersion)
         Write-Host ("             sha256={0}" -f $PylatexencSha256)
         Write-Host ("  would:    add {0} to User PATH" -f $scriptsDir)
         return
@@ -503,7 +503,7 @@ function Install-PylatexencConverter {
         }
 
         Set-Content -LiteralPath $requirements -Value ("pylatexenc=={0} --hash=sha256:{1}" -f $PylatexencVersion, $PylatexencSha256) -Encoding ascii
-        Invoke-PythonCommand -Python $venvPython -Arguments @('-m', 'pip', 'install', '--disable-pip-version-check', '--no-cache-dir', '--require-hashes', '--no-deps', '--no-build-isolation', '-r', $requirements)
+        Invoke-PythonCommand -Python $venvPython -Arguments @('-m', 'pip', 'install', '--disable-pip-version-check', '--no-cache-dir', '--require-hashes', '--no-deps', '--no-binary=pylatexenc', '--no-build-isolation', '-r', $requirements)
         if ($LASTEXITCODE -ne 0) {
             Write-Warning ("pylatexenc install failed (exit {0})" -f $LASTEXITCODE)
             $script:InstallFailures += [pscustomobject]@{ Tool='latex2text'; Pm='pip'; Pkg='pylatexenc'; ExitCode=$LASTEXITCODE }

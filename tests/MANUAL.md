@@ -198,7 +198,7 @@ commits, recovery path, provider inventory, and whether any user data changed.
       dashboard (My Pull Requests / Needs My Review / My Issues) with Nerd Font
       icons, and `gh extension list` identifies commit
       `a613ef744c99ef8d8ead33467813c6ee6086af52`.
-- [ ] **Pi CLI**: `pi --version` prints `0.80.10` on macOS, Linux/WSL, and
+- [ ] **Pi CLI**: `pi --version` prints `0.82.1` on macOS, Linux/WSL, and
       Windows. Confirm Pi opens with `rose-pine`; `/settings` also lists
       `rose-pine-moon` and `rose-pine-dawn`, with no retired `*-fable` duplicate
       names. Compare Main, Moon, and Dawn for messages, selection, borders,
