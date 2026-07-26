@@ -1272,7 +1272,7 @@ every other zsh plugin surface.
 ### 9. The published in-place upgrade crossed the config backup boundary
 
 Status: implementation done; v0.2.0, v0.3.0, v0.4.0, v0.4.1, v0.4.2, and
-v0.4.3 published; v0.4.4 release preparation in progress.
+v0.4.3 and v0.4.4 published.
 
 Evidence:
 
@@ -1344,9 +1344,11 @@ Canonical solution:
     `30171230547`, release-range/proof scans, a fresh detached public clone,
     and immutable/latest GitHub release `359840729` passed their exact
     identity gates.
-11. IN PROGRESS - Prepare, merge, tag, certify, and publish v0.4.4 from the
-    exact reviewed release tree using the manifest-bound automation; record only
-    observed tag, workflow, proof, scan, clone, and immutable-release identities.
+11. DONE - Pull request #79 merged the reviewed v0.4.4 preparation tree to
+    `05874e536372f6a73f8971c84e675e95666662d4`; annotated tag object `5c19cfaa19087b286d867c2bf422d33f76c64887`, cache-free run
+    `30192132079`, release-range/proof scans, a fresh detached public clone,
+    and immutable/latest GitHub release `359951205` passed their exact
+    manifest-bound identity gates.
 
 
 ## Disproved Or Non-Blocking Assumptions

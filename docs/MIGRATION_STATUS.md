@@ -118,11 +118,10 @@ test that transition before opening a preparation PR; publication and closure
 remain exact-SHA, observed-evidence operations documented in
 `docs/RELEASING.md`.
 
-The v0.4.4 candidate keeps the same frozen-source and rollback boundaries while
-moving current exact-tag authority, recovery namespace, and prerequisite identity to
-`v0.4.4`. Setup treats unfinished `v0.4.3` transactions as older recoveries.
-Observed tag, workflow, proof, scan, clone, and immutable-release identities are
-recorded only after their gates pass.
+The annotated v0.4.4 release was published on 2026-07-26 after its exact local,
+hosted cache-free, release-range/proof scan, fresh detached public-clone, and
+immutable-release gates passed. Cache-free run `30192132079` passed all four
+producers and logical proofs; GitHub release `359951205` is immutable/latest.
 
 The annotated v0.4.3 release was published on 2026-07-25 after its exact local,
 hosted cache-free, release-range/proof scan, fresh detached public-clone, and

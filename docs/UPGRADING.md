@@ -216,28 +216,30 @@ pwsh -NoProfile -File 'C:\exact\recovery\upgrade-v0.1.0.ps1' -Rollback 'C:\exact
 pwsh -NoProfile -File 'C:\exact\recovery\upgrade-v0.1.0.ps1' -Accept 'C:\exact\recovery'
 ```
 
-## v0.4.4 release evidence gate
+## v0.4.4 release evidence
 
-The candidate starts from exact clean `main` commit
-`402c84b8ac8707dbaf1e4f7e44a1ce31fec34a72`; publication remains gated on:
+v0.4.4 was published on 2026-07-26.
 
-- [ ] the reviewed release-preparation pull request merged to `main` with all
-  required checks passing;
-- [ ] an annotated `v0.4.4` tag whose tag object and peeled commit match the
-  exact merged release-preparation commit and the official remote;
-- [ ] full local and hosted gates, deterministic exact-v0.1.0 migration
-  fixtures, Windows Pester coverage, and a redacted scan across
-  `v0.4.3..v0.4.4` plus all downloaded logical proofs;
-- [ ] a cache-free hosted release run whose POSIX lanes report the exact
-  immutable `v0.4.4` tag identity;
-- [ ] a fresh credential-free public clone reproducing the tag and release
-  identity gates;
-- [ ] an immutable/latest GitHub release with the reviewed proof asset and
-  prepared body exact.
+- Pull request #79 merged reviewed head
+  `f0c747127689d0548c5f4a62507584c2e971c882` to exact `main` commit `05874e536372f6a73f8971c84e675e95666662d4`;
+  both have tree `df353441f2592262c7583e8ee728f74e53930d8e`, and all required checks passed.
+- The full local gate and redacted Gitleaks scan across
+  `v0.4.3..v0.4.4` passed before the tag was created.
+- Cache-free exact-tag run
+  [`30192132079`](https://github.com/luisgui1757/dotfiles/actions/runs/30192132079)
+  passed all four producers and all four stable logical proof jobs at the exact
+  release commit; both POSIX lanes reported the immutable tag identity.
+- All four schema-2 logical proofs independently bound source SHA, executed
+  SHA, run ID, run attempt, logical context, and legacy context; their total
+  size was 912 bytes and their SHA-256 values are in the checked-in proof.
+- A fresh credential-free detached public clone reproduced the tag identities,
+  release-upgrade static gate, and immutable prerequisite-helper no-op path.
+- GitHub release `359951205` read back immutable/latest,
+  non-draft, and non-prerelease with the prepared body and certification asset exact.
 
-The unchecked real WSL, redirected-Windows, divergent Windows Terminal,
-physical-Linux, Apple-Silicon owner-host, and visual rows in `tests/MANUAL.md`
-remain explicit residual gaps; publication will not mark them complete.
+The real WSL, redirected-Windows, divergent Windows Terminal, physical-Linux,
+Apple-Silicon owner-host, and visual rows remain explicit residual evidence gaps
+in `tests/MANUAL.md`; publication did not mark them complete.
 
 ## v0.4.3 release evidence
 
