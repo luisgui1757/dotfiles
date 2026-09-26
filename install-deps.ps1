@@ -21,9 +21,9 @@ param(
 )
 
 $ErrorActionPreference = 'Continue'
-$HackNerdFontVersion = 'v3.4.0'
+$HackNerdFontVersion = 'v3.5.1'
 $HackNerdFontSha256 = '8ca33a60c791392d872b80d26c42f2bfa914a480f9eb2d7516d9f84373c36897'
-$ScoopInstallerCommit = 'b0ee913725139b816f9178163af0aecdba07a7ed'
+$ScoopInstallerCommit = '1e2f334083d609986d8c8bc9e31ae8e87c39fab4'
 $ScoopInstallerSha256 = '48f6ea398b3a3fa26fae0093d37bd85b13e7eaa5d1d4a3e208408768408e35ae'
 $ScoopInstallerUrl = "https://raw.githubusercontent.com/ScoopInstaller/Install/$ScoopInstallerCommit/install.ps1"
 $WindowsTerminalVersion = 'v1.24.11911.0'
@@ -35,11 +35,11 @@ $PylatexencBuildBackendVersion = '83.0.0'
 $PylatexencBuildBackendSha256 = '29b23c360f22f414dc7336bb39178cc7bcbf6021ed2733cde173f09dba19abb3'
 $PylatexencVersion = '2.11'
 $PylatexencSha256 = '305a072a99ce736246049c9da05841b9d718c0f7ea8888f5f596cf15cb621053'
-$GhDashVersion = 'v4.25.2'   # dlvhdr/gh-dash pinned gh-extension tag; mirror in install-deps.sh (GH_DASH_VERSION)
+$GhDashVersion = 'v4.26.0'   # dlvhdr/gh-dash pinned gh-extension tag; mirror in install-deps.sh (GH_DASH_VERSION)
 $GhDashTagObject = '61e619ba8a9682ba8a822282d1da8c5eb7b0bbff'
 $GhDashCommit = 'a613ef744c99ef8d8ead33467813c6ee6086af52'
 $PiCliPackage = '@earendil-works/pi-coding-agent'
-$PiCliVersion = '0.82.1'
+$PiCliVersion = '0.87.1'
 $PiCliIntegrity = 'sha512-zbkAhoIuDPMF3pKuja0ajZabrMWU29FUMV9A/XMXT/XC1yXs5xt6t6t13GogQFsDrDqbFP4DkZQO1w8rWRAzYA=='
 $TreeSitterCliVersion = 'v0.26.11'
 $TreeSitterCliWindowsX64Sha256 = 'd40e158839062803a5182ecefca76f809b89464146625d303ef779ed8ceb0f73'
