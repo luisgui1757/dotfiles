@@ -201,7 +201,7 @@ choosing the release to validate. Known failures remain failures in the evidence
       dashboard (My Pull Requests / Needs My Review / My Issues) with Nerd Font
       icons, and `gh extension list` identifies commit
       `c6dfbc17edfdbf1060fc06efe6aabb34f6a725f0`.
-- [ ] **Pi CLI**: `pi --version` prints `0.99.2` on macOS, Linux/WSL, and
+- [ ] **Pi CLI**: `pi --version` prints `1.0.4` on macOS, Linux/WSL, and
       Windows. Confirm Pi opens with `rose-pine`; `/settings` also lists
       `rose-pine-moon` and `rose-pine-dawn`, with no retired `*-fable` duplicate
       names. Compare Main, Moon, and Dawn for messages, selection, borders,

@@ -1427,7 +1427,7 @@ save only**. The next plain `:w` formats normally. Implemented in
   LaTeX support needs the non-bundled `latex` parser (already in
   `treesitter_parsers`) and a converter executable. `install-deps.sh` creates
   `~/.local/share/dotfiles/python-tools/pylatexenc`, installs pinned
-  `setuptools==83.0.0` first, installs `pylatexenc==2.11` with pip `--require-hashes`,
+  `setuptools==84.0.0` first, installs `pylatexenc==2.11` with pip `--require-hashes`,
   `--no-binary=pylatexenc`, and `--no-build-isolation`, and writes
   `~/.local/bin/latex2text`; 2.11 publishes both a wheel and a source
   distribution, so the explicit source-only selector binds pip to the reviewed
@@ -2086,14 +2086,18 @@ save only**. The next plain `:w` formats normally. Implemented in
   a manual, secret-bearing step this repo never automates or stores.
 - **Pi CLI is pinned; only its audited theme selection and canonical newline keybinding are repo-owned.** `install-deps.sh`
   and `install-deps.ps1` run `npm pack --ignore-scripts --json` for
-  `@earendil-works/pi-coding-agent@0.99.2`, require both reported metadata and
+  `@earendil-works/pi-coding-agent@1.0.4`, require both reported metadata and
   independently hashed tarball bytes to match
-  `sha512-6R1BZ2N77CrVcGf3eC2KovTz1Q4RYiAeydvVWQT546N2fi1nBc81aURlbOZCgruWoW9VY/UrLzDynF4YTolpoA==`
+  `sha512-+956nfMFHr5lDUVY/2Q4k+YzojzBuCaBXFgj0eSlXVGr7QVliVddKdc1Pz6yVg1dOlJQmb67doOVrlMsIcIdaw==`
   and install the verified local tarball alongside exact same-release
   `pi-agent-core`, `pi-ai`, `pi-tui`, `pi-mcp`, `pi-codemode`, `chord`, and
   `pi-telemetry` specs. Do not rely on the coding-agent's
   caret ranges: a later companion publish can otherwise combine incompatible
-  monorepo APIs with an older CLI. Pack state is scoped to a unique temp
+  monorepo APIs with an older CLI. Pi 1.0 removed its published npm shrinkwrap,
+  so this pins the eight Pi modules, not the full transitive dependency closure.
+  Its fullscreen default and Azure provider rename are documented in README;
+  display preferences, providers, and authentication remain user-owned.
+  Pack state is scoped to a unique temp
   directory and cleaned through return/signal/finally paths. Windows captures
   native npm stderr to preserve PowerShell 5.1 behavior; on failure it includes
   only the last 20 lines and at most 4096 characters before cleanup. POSIX public
