@@ -94,20 +94,12 @@ grep -F '\herdr\config.windows.toml' \
     fail "Windows ApplicationData overlay does not reference the Windows Herdr config"
 # The workflow must retain the literal runtime HOME expression.
 # shellcheck disable=SC2016
-grep -F 'HERDR_CONFIG_PATH="$HOME/.config/herdr/config.toml" herdr config check' \
+grep -F 'bash "$repo/scripts/check-herdr-runtime.sh" "$HOME/.config/herdr/config.toml"' \
     "$REPO_ROOT/.github/workflows/e2e-install.yml" >/dev/null ||
     fail "hosted POSIX setup does not parse the installed Herdr config"
 grep -F 'env -u HOMEBREW_NO_AUTO_UPDATE brew update' \
     "$REPO_ROOT/.github/workflows/e2e-install.yml" >/dev/null ||
     fail "hosted macOS setup does not refresh stale Homebrew formula metadata"
-# shellcheck disable=SC2016
-grep -F '"herdr 0.7."*) herdr_patch="${herdr_identity#herdr 0.7.}"' \
-    "$REPO_ROOT/.github/workflows/e2e-install.yml" >/dev/null ||
-    fail "hosted POSIX setup does not bound Herdr to the reviewed 0.7.x line"
-# shellcheck disable=SC2016
-grep -F 'if (( 10#$herdr_patch < 4 )); then' \
-    "$REPO_ROOT/.github/workflows/e2e-install.yml" >/dev/null ||
-    fail "hosted POSIX setup accepts Herdr releases without config check"
 grep -F "\$env:HERDR_CONFIG_PATH = Join-Path \$env:APPDATA 'herdr\config.toml'" \
     "$REPO_ROOT/.github/workflows/e2e-install.yml" >/dev/null ||
     fail "hosted Windows setup does not parse the installed Herdr config"

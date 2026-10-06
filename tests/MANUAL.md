@@ -21,6 +21,9 @@ run the printed rollback, then prove rerunning setup resumes or retries safely.
 Also run setup update/upgrade once. Record the old/new tag objects, peeled
 commits, recovery path, provider inventory, and whether any user data changed.
 
+For macOS rows, check [known release issues](../docs/KNOWN-ISSUES.md) before
+choosing the release to validate. Known failures remain failures in the evidence.
+
 - [ ] **Bare POSIX prerequisite:** use clean Nix-free Apple Silicon macOS and
       Linux VMs at the exact annotated v0.4.4 release. Run only
       `./setup.sh --all`; prove the helper reports that tag identity,

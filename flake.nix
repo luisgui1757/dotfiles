@@ -66,11 +66,17 @@
             ./nix/darwin/configuration.nix
             nix-homebrew.darwinModules.nix-homebrew
             home-manager.darwinModules.home-manager
-            {
+            ({ config, ... }: {
               nix-homebrew = {
                 enable = true;
                 user = username;
                 autoMigrate = true;
+                # Homebrew 7 moved version detection into utils/git.sh, so
+                # nix-homebrew's old brew.sh substitutions no longer match.
+                # Its Nix source has no Git metadata. Advertise the selected
+                # package's version through the supported launcher setting.
+                # Remove once upstream embeds the version correctly again.
+                extraEnv.HOMEBREW_VERSION = config.nix-homebrew.package.version;
                 # Homebrew is intentionally mixed ownership. nix-homebrew pins
                 # the Homebrew implementation, while Homebrew itself owns every
                 # mutable tap clone as the target user. Copying pinned tap trees
@@ -94,7 +100,7 @@
                 };
                 users.${username} = import ./nix/home/darwin.nix;
               };
-            }
+            })
           ];
         };
 

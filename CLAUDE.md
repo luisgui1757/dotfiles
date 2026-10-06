@@ -561,6 +561,10 @@ that violates one of these, fix it instead of disabling the test.
     Atomic release rendering preserves every existing file mode, and the
     release self-test must pass in both published and active-candidate states;
     otherwise the preparation command could invalidate its own full gate.
+    Release-specific advisories live in `docs/KNOWN-ISSUES.md`, outside the
+    globally rewritten current-version surfaces. Operator guides link there
+    without embedding affected tags, so preparation cannot rename an old
+    defect to the new candidate.
     A rerun may reuse only an explicitly named first-attempt run after fully
     revalidating it, and may reconstruct a failed closure only from the live
     immutable release plus its exact certification asset. Never move/delete an
@@ -1895,6 +1899,14 @@ save only**. The next plain `:w` formats normally. Implemented in
   POSIX config because it would replace the user's normal Unix shell. Herdr
   keeps the shell of existing panes, so recreate panes (or stop/restart the
   session) after changing this startup setting.
+- **Herdr Homebrew compatibility is a bounded runtime gate.**
+  `scripts/check-herdr-runtime.sh` accepts strict stable identities in `0.7.x`
+  starting at `0.7.5` or `0.9.x` starting at `0.9.3`, then requires the installed
+  managed config to parse. Other minor lines, prereleases and malformed versions
+  fail closed. Test behavior in `tests/shell/herdr_runtime_test.sh`; keep the
+  hosted POSIX workflow wired to this helper. This does not pin Homebrew's
+  mutable formula or change the direct Linux/Windows artifact pins. Review a
+  new minor line before widening the gate.
 - **Herdr Windows preview updates are hash-owned, not presence-owned.** A
   resolved command is refreshable only when its normalized source is the exact
   `%LOCALAPPDATA%\Programs\Herdr\bin\herdr.exe` destination. If that owned
@@ -2196,6 +2208,24 @@ provisioning. The repo never installs Nix through a pipe-to-shell bootstrap.
   `nix-homebrew.taps` set so Homebrew owns every tap clone as the target user,
   `trust.taps = [ "nikitabobko/tap" ]` so Homebrew 5 can load the AeroSpace
   personal-tap cask, and `homebrew.taps = [ "nikitabobko/tap" ]`.
+  The current nix-homebrew lock selects Homebrew 7.0.4. The previous 6.0.1
+  runtime could not interpolate versions in AeroSpace's postflight steps,
+  could install Ghostty completions before their source app, and could count
+  a failed parallel cask install as successful. Update nix-homebrew and its
+  upstream-selected brew-src together through `nix flake update nix-homebrew`;
+  do not patch installed Homebrew or override brew-src with mismatched version
+  metadata. Hosted macOS setup runs real cask compatibility probes and verifies
+  that native setup finds all three declarative packages already installed.
+  Homebrew 7 moved version detection out of the file patched by nix-homebrew.
+  Set its supported `extraEnv.HOMEBREW_VERSION` from `package.version` until
+  upstream embeds that metadata again. Tests bind the brew input revision/hash
+  to nix-homebrew's own versioned lock and the effective package store path to
+  that verified input before accepting its label. A package override must not
+  bypass this check by preserving a version string.
+  Never supply an independently hardcoded version. Hosted setup also verifies
+  the actual `brew --version` output against the selected package.
+  Native Windows does not consume this runtime; Linux/WSL keep their unchanged
+  Home Manager package inputs. See the 2026-10-05 macOS Homebrew review record.
   `system.primaryUser` + `users.users.<user>.home` come from setup's validated
   `DOTFILES_TARGET_USER` / `DOTFILES_TARGET_HOME`; pure evaluation alone uses an
   inert `runner` placeholder. On hosts that ran the retired pinned-tap shape,

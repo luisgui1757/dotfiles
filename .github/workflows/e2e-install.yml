@@ -186,6 +186,14 @@ jobs:
           grep -F "Phase 4/6" "$setup_log" >/dev/null
           grep -F "Phase 5/6" "$setup_log" >/dev/null
           grep -F "Phase 6/6" "$setup_log" >/dev/null
+          if [[ "${RUNNER_OS:-}" == "macOS" ]]; then
+            # nix-darwin must install its own declared packages. A later native
+            # retry must not hide a false-success result from brew bundle.
+            for package in wezterm aerospace herdr; do
+              grep -Eq "^[[:space:]]*ok[[:space:]]+$package[[:space:]]+already installed$" "$setup_log" \
+                || { echo "nix-darwin did not install $package before native dependency setup" >&2; exit 1; }
+            done
+          fi
 
       - name: Post-install assertions
         run: |
@@ -329,6 +337,14 @@ jobs:
             assert_nix_owned_command "$cmd"
           done
           if [[ "${RUNNER_OS:-}" == "macOS" ]]; then
+            expected_brew_version="$(nix eval --raw '.#darwinConfigurations.dotfiles.config.nix-homebrew.package.version')"
+            brew_identity="$(brew --version)" || fail "Homebrew identity probe failed"
+            [[ "${brew_identity%%$'\n'*}" == "Homebrew $expected_brew_version" ]] \
+              || fail "Homebrew runtime identity differs from the selected Nix package"
+            printf '%s\n' "$brew_identity"
+            # Exercise the runtime selected by nix-homebrew, without persisting
+            # Homebrew's developer-mode setting on the runner.
+            HOMEBREW_DEVELOPER=1 brew ruby "$repo/tests/nix/homebrew_cask_compatibility.rb"
             ghostty_bin="$(resolve_ghostty_binary)" \
               || fail "Ghostty binary is missing after setup.sh --all requested it"
             "$ghostty_bin" +validate-config --config-file="$repo/ghostty/config" \
@@ -357,19 +373,8 @@ jobs:
             command -v wezterm >/dev/null 2>&1 || fail "wezterm is not on PATH after setup.sh --all requested it"
             command -v herdr >/dev/null 2>&1 || fail "herdr is not on PATH after setup.sh --all requested it"
           fi
-          herdr_identity="$(herdr --version)" || fail "Herdr identity probe failed"
-          case "$herdr_identity" in
-            "herdr 0.7."*) herdr_patch="${herdr_identity#herdr 0.7.}" ;;
-            *) fail "Herdr stable identity is outside the reviewed 0.7.x line: $herdr_identity" ;;
-          esac
-          case "$herdr_patch" in
-            ""|*[!0-9]*) fail "Herdr stable identity is not strict semver: $herdr_identity" ;;
-          esac
-          if (( 10#$herdr_patch < 4 )); then
-            fail "Herdr stable identity predates config check: $herdr_identity"
-          fi
-          HERDR_CONFIG_PATH="$HOME/.config/herdr/config.toml" herdr config check \
-            || fail "Herdr rejected the managed config"
+          bash "$repo/scripts/check-herdr-runtime.sh" "$HOME/.config/herdr/config.toml" \
+            || fail "Herdr runtime/config compatibility check failed"
           wezterm_bin="$(resolve_wezterm_binary)" || fail "WezTerm binary is missing"
           "$wezterm_bin" --config-file "$repo/wezterm/wezterm.lua" show-keys >/dev/null \
             || fail "WezTerm real binary rejected the managed config"

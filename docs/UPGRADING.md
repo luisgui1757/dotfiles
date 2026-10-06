@@ -37,6 +37,9 @@ before recovery exists.
 
 These commands target the published annotated `v0.4.4` release.
 
+Before choosing a release for macOS, check [known release issues](KNOWN-ISSUES.md).
+The branch-testing procedure is not authority to migrate a live v0.1.0 install.
+
 ### Common preparation
 
 Keep the checkout that currently owns v0.1.0 and clone v0.4.4 beside it:

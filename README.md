@@ -29,7 +29,7 @@ shell helpers wherever the platform supports them.
 
 | Platform | Supported path | Important note |
 |---|---|---|
-| Apple Silicon macOS | `./setup.sh --all` | Fully supported. AeroSpace is macOS-only and needs one manual Accessibility grant. |
+| Apple Silicon macOS | `./setup.sh --all` | Check [known macOS release issues](docs/KNOWN-ISSUES.md) before installing. AeroSpace is macOS-only and needs one manual Accessibility grant. |
 | Native Linux | `./setup.sh --all` | Supports Homebrew/Linuxbrew or `apt`, `dnf`, `pacman`, `zypper`, and `apk`. GUI app availability still depends on the distro and architecture. |
 | WSL2 | Windows `setup.ps1` plus WSL `setup.sh` | Windows owns Windows Terminal, fonts, and host clipboard tools. WSL owns the Linux shell/editor stack. Linux GUI terminals are opt-in experiments. |
 | Native Windows | `.\setup.ps1 -All` | Use PowerShell 7. Enable Developer Mode first so setup can create the required config links without running the whole install as Administrator. Herdr for Windows is a pinned preview build. |
@@ -37,6 +37,7 @@ shell helpers wherever the platform supports them.
 ## Install, update, and remove
 
 Run setup from a local checkout of an exact release. Setup is safe to rerun.
+Mac users should check [known release issues](docs/KNOWN-ISSUES.md) first.
 
 ```bash
 # macOS, Linux, or WSL
@@ -423,8 +424,13 @@ repository. Local-only or stale commits, forks, dirty checkouts, lightweight
 tags, and non-official origins fail before download. The versioned upgrade tools
 remain exact-tag-only; this repo has no pipe-to-shell Nix bootstrap.
 
+### Installing an exact release
+
+Before choosing a release for macOS, check the affected versions and installation
+guidance in [known release issues](docs/KNOWN-ISSUES.md).
+
 ```bash
-# Apple Silicon mac / linux / wsl
+# macOS / Linux / WSL; check the release compatibility guidance above.
 git clone --branch v0.4.4 --single-branch \
   https://github.com/luisgui1757/dotfiles.git ~/dotfiles
 cd ~/dotfiles
@@ -499,6 +505,9 @@ normal shell for `.\setup.ps1 -SkipDeps -SkipConfig`. Do not elevate the whole
 dependency-install run; Scoop refuses admin installs.
 
 ### Upgrading from v0.1.0
+
+Before choosing a release for macOS, check [known release issues](docs/KNOWN-ISSUES.md).
+The unreleased branch-testing option does not support an in-place v0.1.0 migration.
 
 `v0.1.0` is already chezmoi-based and its POSIX config is linked into the
 checkout. **Do not run `git pull` in that checkout.** Changing it in place can
@@ -631,6 +640,9 @@ Homebrew recreates the required AeroSpace tap normally. Unrelated taps such as
 Cirrus are never selected. The `nikitabobko/tap` tap is explicitly trusted
 through nix-homebrew because Homebrew 5 refuses to load personal-tap casks,
 including AeroSpace, without a trust entry.
+The current lock selects Homebrew 7.0.4 through nix-homebrew. Refresh that
+dependency through a reviewed lock update when current casks need newer
+Homebrew behavior. Updating tap metadata alone cannot update this pinned runtime.
 Tap transaction and diagnostic snapshots always live beside
 `Library/Taps`, never below it: Homebrew enumerates directories below `Taps` as
 live taps. Setup also recognizes the exact in-tree recovery names emitted by
@@ -1491,7 +1503,7 @@ Manual-review pin surfaces that Renovate may touch only partially:
 | `setuptools`/`pylatexenc` | Renovate can bump versions; adjacent hashes remain human-reviewed. Current pins: `setuptools` 83.0.0, `pylatexenc` 2.11. The install explicitly selects the reviewed source distribution so pip cannot choose the separately hashed wheel. |
 | Hack Nerd Font | Unix and Windows mirrors must stay identical; version/hash drift is caught by `pin_consistency_test.sh`. |
 | Pi CLI | Unix/Windows install pins and e2e assertions mirror version `0.82.1`; the npm-pack metadata and downloaded coding-agent tarball bytes must both match the human-reviewed SRI, and all three Pi companion modules are requested at the exact same release. |
-| Herdr | Native Linux pins stable `v0.7.5` with both architecture hashes; Windows pins post-fix preview `preview-2026-07-21-0f10e1453a7f` with its x64 hash. Homebrew platforms consume a formula bounded by hosted proof to stable `0.7.x >= 0.7.5`. |
+| Herdr | Native Linux pins stable `v0.7.5` with both architecture hashes; Windows pins post-fix preview `preview-2026-07-21-0f10e1453a7f` with its x64 hash. Homebrew platforms consume a formula bounded by hosted proof to stable `0.7.x >= 0.7.5` or `0.9.x >= 0.9.3`. |
 | Pi Rose Pine themes | The repo's canonical main/moon/dawn retain the palettes, derivatives, and export roles from archived MIT-licensed `zenobi-us/pi-rose-pine` commit `9b342f6e16d6b28c00c2f888ba2f050273981bdb`, add Pi's current `earendil-works/pi` schema URL, and intentionally apply the documented Fable token choices. Tests hash-bind all three complete files and assert the customized roles. The compared `pi-themes-rose-pine@0.1.0` pack is the retired simple mapping and is intentionally not installed. Pi's separate keybindings file explicitly retains the upstream `Shift+Enter` / `Ctrl+J` newline pair. |
 | gh-dash | Tag `v4.25.2`, annotated tag object `61e619ba8a9682ba8a822282d1da8c5eb7b0bbff`, and peeled commit `a613ef744c99ef8d8ead33467813c6ee6086af52` are mirrored; installers verify the tag mapping and pass the release tag required by `gh extension install --pin` for binary extensions. |
 
@@ -1748,6 +1760,9 @@ Mason retains `clangd` ownership on macOS and Windows, where its registry has a
 matching artifact.
 
 ### Reproducing the same release on another machine
+
+On macOS, check [known release issues](docs/KNOWN-ISSUES.md) before using
+this example.
 
 ```bash
 git clone --branch v0.4.4 --single-branch \
