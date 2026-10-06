@@ -73,3 +73,8 @@ Independent review rehashed all downloaded artifacts and found one Low issue:
 the active Windows manual checklist still expected Tree-sitter 0.26.11. It now
 expects 0.27.0. The full local `make ci` gate and final static suite passed;
 required hosted checks remain the merge gate.
+
+Hosted Windows job `112121935277` exposed three Pester failures caused by four
+remaining regex-escaped Windows Terminal 1.24.11911.0 literals. They now expect
+1.25.2733.0, matching the verified artifact and plain-string fixture versions.
+Checksum rejection and manager-fallback behavior remain unchanged.

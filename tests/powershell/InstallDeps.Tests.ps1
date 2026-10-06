@@ -1213,8 +1213,8 @@ exit 97
         $output = & { Install-WindowsTerminal } 6>&1 | Out-String
 
         $output | Should -Match 'extras/windows-terminal'
-        $output | Should -Match 'pinned portable zip v1\.24\.11911\.0'
-        $output | Should -Match 'Microsoft\.WindowsTerminal_1\.24\.11911\.0_x64\.zip'
+        $output | Should -Match 'pinned portable zip v1\.25\.2733\.0'
+        $output | Should -Match 'Microsoft\.WindowsTerminal_1\.25\.2733\.0_x64\.zip'
         Should -Invoke -CommandName Read-Host -Times 0 -Exactly
     }
 
@@ -1231,7 +1231,7 @@ exit 97
 
         $output = & { Install-WindowsTerminal } 6>&1 | Out-String
 
-        $output | Should -Match 'FAIL: checksum mismatch for Microsoft\.WindowsTerminal_1\.24\.11911\.0_x64\.zip'
+        $output | Should -Match 'FAIL: checksum mismatch for Microsoft\.WindowsTerminal_1\.25\.2733\.0_x64\.zip'
         $script:InstallFailures.Count | Should -Be 1
         $script:InstallFailures[0].Tool | Should -Be 'wt'
         $script:InstallFailures[0].Pm | Should -Be 'portable'
@@ -1346,7 +1346,7 @@ exit 97
             Test-Path -LiteralPath (Join-Path $installRoot 'wt.exe') -PathType Leaf | Should -BeTrue
             $script:AddedWtPath | Should -Be $installRoot
             $script:InstallFailures.Count | Should -Be 0
-            $output | Should -Match 'installed\s+wt\s+portable v1\.24\.11911\.0'
+            $output | Should -Match 'installed\s+wt\s+portable v1\.25\.2733\.0'
             Should -Invoke -CommandName Install-One -Times 1 -Exactly -ParameterFilter {
                 $tool -eq 'wt' -and $SkipPrompt -and $NoRecordFailure
             }
