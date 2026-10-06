@@ -69,6 +69,12 @@ The preparation worktree is intentionally retained for review. The command
 never merges the PR. Review the semantic notes and generated diff, wait for all
 required checks, then merge through the protected squash-only path.
 
+Release-specific advisories belong in `docs/KNOWN-ISSUES.md`, outside the
+renderer-controlled current-version surfaces. README and upgrade instructions
+link to that history without embedding its affected tag: preparation must not
+rename an old defect to the candidate release. The release-rendering regression
+test verifies that the advisory is preserved and the operator links remain.
+
 ## 3. Certify and publish exact merged main
 
 Update local `main` to the exact merged commit and copy its full SHA from the

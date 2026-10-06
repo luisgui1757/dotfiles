@@ -41,6 +41,40 @@ assert_eq() {
     fi
 }
 
+# Bind the advertised version to both the resolved input and effective package.
+# Either an input override or a package override can otherwise change the code.
+brew_identity="$(nix eval --json --impure --expr '
+  let
+    f = builtins.getFlake (toString ./.);
+    source = f.inputs.nix-homebrew.inputs.brew-src;
+    upstream = builtins.fromJSON (builtins.readFile
+      (f.inputs.nix-homebrew.outPath + "/flake.lock"));
+    expected = upstream.nodes.brew-src;
+    cfg = f.darwinConfigurations.dotfiles.config.nix-homebrew;
+  in {
+    actualRev = source.rev;
+    actualHash = source.narHash;
+    inputPath = toString source;
+    packagePath = toString cfg.package;
+    expectedRev = expected.locked.rev;
+    expectedHash = expected.locked.narHash;
+    expectedVersion = expected.original.ref;
+    packageVersion = cfg.package.version;
+    advertisedVersion = cfg.extraEnv.HOMEBREW_VERSION or "";
+  }
+')"
+identity_field() { printf '%s\n' "$brew_identity" | jq -r ".$1"; }
+assert_eq "Homebrew source revision matches nix-homebrew's versioned input" \
+    "$(identity_field expectedRev)" "$(identity_field actualRev)"
+assert_eq "Homebrew source hash matches nix-homebrew's versioned input" \
+    "$(identity_field expectedHash)" "$(identity_field actualHash)"
+assert_eq "Homebrew effective package uses the verified input source" \
+    "$(identity_field inputPath)" "$(identity_field packagePath)"
+assert_eq "Homebrew package version matches the selected upstream tag" \
+    "$(identity_field expectedVersion)" "$(identity_field packageVersion)"
+assert_eq "Homebrew launcher advertises the selected upstream tag" \
+    "$(identity_field expectedVersion)" "$(identity_field advertisedVersion)"
+
 casks="$(eval_json homebrew.casks | jq -r '[.[].name] | sort | join(",")')"
 assert_eq "declarative casks are aerospace + wezterm (vendor channel, not nixpkgs)" \
     "aerospace,wezterm" "$casks"

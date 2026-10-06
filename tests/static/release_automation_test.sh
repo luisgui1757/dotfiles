@@ -102,6 +102,22 @@ with tempfile.TemporaryDirectory(prefix="dotfiles-release-render-test.") as temp
 
     assert candidate["current"]["state"] == "candidate"
     assert candidate["current"]["previous_tag"] == previous_tag
+    readme = (fixture / "README.md").read_text(encoding="utf-8")
+    upgrading = (fixture / "docs/UPGRADING.md").read_text(encoding="utf-8")
+    assert f"`{candidate_tag}` pins Homebrew 6.0.1" not in readme, (
+        "release renderer attributed the old Homebrew defect to the candidate"
+    )
+    assert f"{candidate_tag} retains the affected Homebrew runtime" not in " ".join(upgrading.split()), (
+        "upgrade guide attributed the old Homebrew defect to the candidate"
+    )
+    issue_path = pathlib.Path("docs/KNOWN-ISSUES.md")
+    issues = (fixture / issue_path).read_text(encoding="utf-8")
+    assert issues == (root / issue_path).read_text(encoding="utf-8"), (
+        "release renderer changed historical release advisories"
+    )
+    assert "`v0.4.4` pins Homebrew 6.0.1" in issues
+    assert "(docs/KNOWN-ISSUES.md)" in readme
+    assert "(KNOWN-ISSUES.md)" in upgrading
     assert (fixture / f"docs/releases/{previous_tag}.md").is_file()
     assert (fixture / f"release/proofs/{previous_tag}.json").is_file()
     for relative in (

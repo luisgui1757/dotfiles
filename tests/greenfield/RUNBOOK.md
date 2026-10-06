@@ -123,6 +123,9 @@ too. The host network is shared as-is, so this is not a dotfiles issue.
 
 ### tart macOS VM
 
+Check [known macOS release issues](../../docs/KNOWN-ISSUES.md) before choosing
+an exact release to validate.
+
 ```bash
 brew install cirruslabs/cli/tart
 tart clone ghcr.io/cirruslabs/macos-sequoia-base:latest dotfiles-macos
