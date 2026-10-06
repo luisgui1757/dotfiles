@@ -139,7 +139,7 @@ jobs:
 
       - name: Install Determinate Nix (flakes enabled)
         if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository
-        uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22
+        uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
 
       - name: Refresh Homebrew formula metadata for stable Herdr
         if: matrix.logical == 'macos'
