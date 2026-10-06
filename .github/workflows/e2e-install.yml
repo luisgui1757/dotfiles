@@ -27,13 +27,13 @@ env:
 jobs:
   linux-container-install:
     name: e2e containers / ${{ matrix.id }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 75
     strategy:
       matrix:
         include:
           # Why a container AND a hosted setup.sh/ubuntu job? They prove
-          # different install paths. The hosted ubuntu-24.04 runner has
+          # different install paths. The hosted Ubuntu runner has
           # Linuxbrew available, so setup.sh can take the brew branch. This
           # clean-image job is the only required proof of the native apt path:
           # non-root user, no Linuxbrew bootstrap, pinned Neovim tarball,
@@ -75,7 +75,7 @@ jobs:
           retention-days: 1
 
   setup-sh:
-    name: setup.sh / ${{ matrix.runner }}
+    name: ${{ matrix.legacy_context }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
     strategy:
@@ -83,7 +83,7 @@ jobs:
       matrix:
         include:
           - logical: linux
-            runner: ubuntu-24.04
+            runner: ubuntu-26.04
             legacy_context: setup.sh / ubuntu-24.04
             publish_logical_proof: true
           - logical: macos
@@ -655,7 +655,7 @@ jobs:
     name: ${{ matrix.logical_context }}
     if: always()
     needs: [linux-container-install, setup-sh, setup-ps1]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     strategy:
       fail-fast: false
       matrix:

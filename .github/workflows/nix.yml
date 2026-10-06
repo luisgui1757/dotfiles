@@ -28,14 +28,14 @@ jobs:
       matrix:
         include:
           - logical: linux
-            runner: ubuntu-24.04
+            runner: ubuntu-26.04
             legacy_context: nix flake check (ubuntu-24.04)
             publish_logical_proof: true
           - logical: macos
             runner: macos-26
             legacy_context: nix flake check (macos-26)
             publish_logical_proof: true
-    name: nix flake check (${{ matrix.runner }})
+    name: ${{ matrix.legacy_context }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 25
     steps:
@@ -68,7 +68,7 @@ jobs:
     name: nix flake check / ${{ matrix.logical }}
     if: always()
     needs: flake-check
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     strategy:
       fail-fast: false
       matrix:
