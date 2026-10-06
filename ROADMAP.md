@@ -100,7 +100,7 @@ Sequenced PRs (split for independent, revertable blast radius):
 - **PR-1 `feat/ergonomics-core` - DONE (merged as #42).** No Nix, no vi-mode.
   Neovim `scrolloff = 16`; which-key.nvim (`<leader>?`, `:WhichKey`, VeryLazy); zoxide across
   zsh + PowerShell + both installers (cached, no-`Invoke-Expression` PowerShell
-  init); `gh` + pinned `gh-dash` extension (`v4.25.2`) with a chezmoi-managed
+  init); `gh` + pinned `gh-dash` extension (`v4.26.0`) with a chezmoi-managed
   same-path config and Renovate / pin-consistency coverage.
 - **PR-2 `feat/vi-mode` - DONE (merged as #43).** zsh (`bindkey -v`) +
   PSReadLine (`-EditMode Vi`) command-line vi-mode with a full re-bind matrix
@@ -229,7 +229,7 @@ Commit-by-commit status:
   `/mnt/c`); native install arms RETAINED for deferred/artifact provisioning and
   regression proof. **nvim + the tree-sitter CLI are intentionally deferred with proof:**
   they are ABI-coupled (nvim-treesitter `main` compiles parsers whose ABI must
-  match nvim's built-in libtree-sitter; the CLI is pinned to v0.26.11 — invariant
+  match nvim's built-in libtree-sitter; the CLI is pinned to v0.27.0 — invariant
   19), so a nix nvim/tree-sitter shadowing the pinned native binaries would risk
   the E5113 parser/ABI mismatch. They stay native until nvim + its parser
   toolchain can move into one ABI-matched Nix closure (follow-up). Excluded from
@@ -300,8 +300,8 @@ Commit-by-commit status:
   also leaves an active PowerShell 7 runtime untouched; explicit update must
   run under Windows PowerShell 5.1 and rejects active `pwsh` before mutation.
 - **Pi CLI provisioning, theme, and multiline input — DONE.** Setup installs the Pi CLI on every OS as the
-  pinned npm package `@earendil-works/pi-coding-agent@0.82.1` after checking npm
-  `dist.integrity`; its three Pi companion modules are held to the same exact
+  pinned npm package `@earendil-works/pi-coding-agent@0.99.2` after checking npm
+  `dist.integrity`; its seven Pi companion modules are held to the same exact
   release. POSIX public setup gets Node 24 from the enforced Nix package
   layer; Windows uses the native Node LTS catalog path. Chezmoi deploys the
   audited Rose Pine theme plus the exact upstream `Shift+Enter` / `Ctrl+J`
@@ -566,11 +566,11 @@ only with its implementation, tests, and documentation:
    checkout, publishes atomically, preserves unsafe quarantines, and lets bare
    chezmoi self-heal legitimate pin changes.
 3. **Windows Tree-sitter compatibility pin — DONE.** Mutable Scoop/npm fallback
-   ownership is removed; exact `0.26.11` compatibility and the reviewed
+   ownership is removed; exact `0.27.0` compatibility and the reviewed
    x64/arm64/x86 release zip hashes gate transactional publication.
-4. **gh-dash tag provenance — DONE.** Tag `v4.25.2` is verified through its
+4. **gh-dash tag provenance — DONE.** Tag `v4.26.0` is verified through its
    annotated object to peeled commit
-   `a613ef744c99ef8d8ead33467813c6ee6086af52`, and installation pins that commit.
+   `c6dfbc17edfdbf1060fc06efe6aabb34f6a725f0`, and installation pins that commit.
 5. **Ubuntu CI PowerShell runtime — DONE.** Ubuntu 26.04 requires and executes
    the image-provided PowerShell 7 before static parsing. The matching Microsoft
    apt repository does not publish PowerShell; CI no longer installs its redundant

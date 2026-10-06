@@ -22,12 +22,12 @@ param(
 
 $ErrorActionPreference = 'Continue'
 $HackNerdFontVersion = 'v3.5.1'
-$HackNerdFontSha256 = '8ca33a60c791392d872b80d26c42f2bfa914a480f9eb2d7516d9f84373c36897'
+$HackNerdFontSha256 = 'fa24da7de7cefe7766614d27762570b20453c852fc1d5b657111666df9a5e449'
 $ScoopInstallerCommit = '1e2f334083d609986d8c8bc9e31ae8e87c39fab4'
-$ScoopInstallerSha256 = '48f6ea398b3a3fa26fae0093d37bd85b13e7eaa5d1d4a3e208408768408e35ae'
+$ScoopInstallerSha256 = '94f983b190438311e006b957db7c8422709e0ba62a6c2ac04e278164108f2512'
 $ScoopInstallerUrl = "https://raw.githubusercontent.com/ScoopInstaller/Install/$ScoopInstallerCommit/install.ps1"
 $WindowsTerminalVersion = 'v1.25.2733.0'
-$WindowsTerminalX64Sha256 = '7691efeb71c8dd0b95536c84e366fa4cf809a42c534912f9cefa1056534383bd'
+$WindowsTerminalX64Sha256 = 'bf3ef2012f6c44d8340a4c58125acc9498d19b580f9890dc043cdf831852e796'
 $HerdrWindowsPreviewVersion = 'preview-2026-07-21-0f10e1453a7f'
 $HerdrWindowsX64Sha256 = '75c85763db0ca5fd13b485d0728cc3e9ea1152964a4e976e1d49f2e86b01a92b'
 $VsBuildToolsBootstrapperUrl = 'https://aka.ms/vs/17/release/vs_BuildTools.exe'
@@ -36,15 +36,15 @@ $PylatexencBuildBackendSha256 = '29b23c360f22f414dc7336bb39178cc7bcbf6021ed2733c
 $PylatexencVersion = '2.11'
 $PylatexencSha256 = '305a072a99ce736246049c9da05841b9d718c0f7ea8888f5f596cf15cb621053'
 $GhDashVersion = 'v4.26.0'   # dlvhdr/gh-dash pinned gh-extension tag; mirror in install-deps.sh (GH_DASH_VERSION)
-$GhDashTagObject = '61e619ba8a9682ba8a822282d1da8c5eb7b0bbff'
-$GhDashCommit = 'a613ef744c99ef8d8ead33467813c6ee6086af52'
+$GhDashTagObject = '17b8f7d6a21d79172f0f2309b607643a215c780f'
+$GhDashCommit = 'c6dfbc17edfdbf1060fc06efe6aabb34f6a725f0'
 $PiCliPackage = '@earendil-works/pi-coding-agent'
 $PiCliVersion = '0.99.2'
-$PiCliIntegrity = 'sha512-zbkAhoIuDPMF3pKuja0ajZabrMWU29FUMV9A/XMXT/XC1yXs5xt6t6t13GogQFsDrDqbFP4DkZQO1w8rWRAzYA=='
-$TreeSitterCliVersion = 'v0.26.11'
-$TreeSitterCliWindowsX64Sha256 = 'd40e158839062803a5182ecefca76f809b89464146625d303ef779ed8ceb0f73'
-$TreeSitterCliWindowsArm64Sha256 = '405b108531872a12d9a607b84ff8be21f96ad09bb40bd76043f31ce6565069f9'
-$TreeSitterCliWindowsX86Sha256 = '4c35ec6046fa2b16b6508d2d2026b2f8567ac4473721fc815c51a68e33780193'
+$PiCliIntegrity = 'sha512-6R1BZ2N77CrVcGf3eC2KovTz1Q4RYiAeydvVWQT546N2fi1nBc81aURlbOZCgruWoW9VY/UrLzDynF4YTolpoA=='
+$TreeSitterCliVersion = 'v0.27.0'
+$TreeSitterCliWindowsX64Sha256 = '46188d31c1f3847307b03e92f3a3f60606eb04147609e26cdd50a07f7d0b35da'
+$TreeSitterCliWindowsArm64Sha256 = 'e44462444fa7fc873b07e6d0735c6772980c7be6024184b40529a17904da58bf'
+$TreeSitterCliWindowsX86Sha256 = '88510ef8cd1d4fdf3b97dc19298d3e31736226a9f53ab9ec3749d056ce3536c4'
 # psmux session plugin (resurrect only) is vendored from the psmux/psmux-plugins
 # monorepo at this immutable commit. We do NOT use PPM: it clones the monorepo
 # HEAD (unpinned) and rewrites managed config files. (psmux-continuum is blocked
@@ -3206,7 +3206,16 @@ function Invoke-PiCliVerifiedTarballInstall {
             throw "packed tarball bytes do not match pinned SRI for $spec"
         }
 
-        $install = Invoke-PiCliNpm -Arguments @('install', '-g', $tarball, "@earendil-works/pi-agent-core@$PiCliVersion", "@earendil-works/pi-ai@$PiCliVersion", "@earendil-works/pi-tui@$PiCliVersion") -StderrPath $stderrPath
+        $install = Invoke-PiCliNpm -Arguments @(
+            'install', '-g', $tarball,
+            "@earendil-works/pi-agent-core@$PiCliVersion",
+            "@earendil-works/pi-ai@$PiCliVersion",
+            "@earendil-works/pi-tui@$PiCliVersion",
+            "@earendil-works/pi-mcp@$PiCliVersion",
+            "@earendil-works/pi-codemode@$PiCliVersion",
+            "@earendil-works/chord@$PiCliVersion",
+            "@earendil-works/pi-telemetry@$PiCliVersion"
+        ) -StderrPath $stderrPath
         if ($install.ExitCode -ne 0) {
             $detail = Get-PiCliNpmFailureDetail -Path $stderrPath
             throw "npm install failed for verified local tarball $filename (exit $($install.ExitCode))$detail"

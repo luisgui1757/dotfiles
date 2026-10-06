@@ -200,8 +200,8 @@ choosing the release to validate. Known failures remain failures in the evidence
       setup/install-deps after authenticating). Then `gh dash` renders the
       dashboard (My Pull Requests / Needs My Review / My Issues) with Nerd Font
       icons, and `gh extension list` identifies commit
-      `a613ef744c99ef8d8ead33467813c6ee6086af52`.
-- [ ] **Pi CLI**: `pi --version` prints `0.82.1` on macOS, Linux/WSL, and
+      `c6dfbc17edfdbf1060fc06efe6aabb34f6a725f0`.
+- [ ] **Pi CLI**: `pi --version` prints `0.99.2` on macOS, Linux/WSL, and
       Windows. Confirm Pi opens with `rose-pine`; `/settings` also lists
       `rose-pine-moon` and `rose-pine-dawn`, with no retired `*-fable` duplicate
       names. Compare Main, Moon, and Dawn for messages, selection, borders,
