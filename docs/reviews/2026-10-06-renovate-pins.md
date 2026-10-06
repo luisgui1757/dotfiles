@@ -68,3 +68,8 @@ review and all required hosted checks must pass before merging. The local
 macOS gate skips PowerShell when unavailable; native Windows execution is
 proved by the required hosted Windows jobs. Historical release notes and prior
 review records retain their original identities.
+
+Independent review rehashed all downloaded artifacts and found one Low issue:
+the active Windows manual checklist still expected Tree-sitter 0.26.11. It now
+expects 0.27.0. The full local `make ci` gate and final static suite passed;
+required hosted checks remain the merge gate.

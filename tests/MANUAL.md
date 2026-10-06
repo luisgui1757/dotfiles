@@ -210,7 +210,7 @@ choosing the release to validate. Known failures remain failures in the evidence
       Confirm an unrelated custom key in `~/.pi/agent/settings.json` survives setup.
       Session/auth/provider state must remain local and untouched.
 - [ ] **Windows Tree-sitter CLI**: `tree-sitter --version` prints exactly
-      `0.26.11`. A compatible unmanaged executable remains untouched; after a
+      `0.27.0`. A compatible unmanaged executable remains untouched; after a
       stale unmanaged fixture, the verified dotfiles executable wins PATH.
       Repeat with `%LOCALAPPDATA%\dotfiles\bin` already present behind the stale
       command; setup must promote it once, preserve every other PATH entry, and
