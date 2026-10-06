@@ -267,8 +267,6 @@ required_workflow_snippets = [
     "tree-sitter-cli-linux-x64.zip",
     "sudo install -m 0755 /tmp/tree-sitter-cli/tree-sitter /usr/local/bin/tree-sitter",
     "Get-FileHash -Algorithm SHA256 -LiteralPath $zip",
-    "POWERSHELL_REPO_DEB_SHA256:",
-    'printf \'%s  %s\\n\' "$POWERSHELL_REPO_DEB_SHA256" /tmp/packages-microsoft-prod.deb | sha256sum -c -',
 ]
 for snippet in required_workflow_snippets:
     if snippet not in workflow:

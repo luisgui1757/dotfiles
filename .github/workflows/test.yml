@@ -32,7 +32,6 @@ env:
   STARSHIP_LINUX_X86_64_SHA256: 321f0dd7af8340a5f2e6a8fec6538a04f617486f9ec70d878f91c09cd8deef22
   TREE_SITTER_CLI_LINUX_VERSION: v0.26.11
   TREE_SITTER_CLI_LINUX_X86_64_SHA256: ff1b7f9863f2faafd78dc0e66d902ee85b37f709b314b22c009f51caf233eebd
-  POWERSHELL_REPO_DEB_SHA256: b2e7c6b9328e0c6a68bfe5d0045be90ceb192b32e0ca906c6c529b9012726f39
 
 jobs:
   ubuntu:
@@ -81,14 +80,10 @@ jobs:
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           export PATH="$HOME/.local/bin:$PATH"
 
-          # PowerShell so tests/static/ps1_parse.sh catches .ps1 syntax regressions.
-          curl -fsSL "https://packages.microsoft.com/config/ubuntu/26.04/packages-microsoft-prod.deb" -o /tmp/packages-microsoft-prod.deb
-          printf '%s  %s\n' "$POWERSHELL_REPO_DEB_SHA256" /tmp/packages-microsoft-prod.deb | sha256sum -c -
-          sudo dpkg --force-confmiss -i /tmp/packages-microsoft-prod.deb
-          rm /tmp/packages-microsoft-prod.deb
-          sudo apt-get update
-          sudo apt-get install -y powershell
-          pwsh -NoProfile -Command '$PSVersionTable.PSVersion'
+          # Ubuntu 26.04 images ship PowerShell; Microsoft's matching apt repo
+          # does not publish it. Require the image runtime so parse tests run.
+          command -v pwsh
+          pwsh -NoLogo -NoProfile -Command 'if ($PSVersionTable.PSVersion.Major -lt 7) { throw "PowerShell 7 is required" }; $PSVersionTable.PSVersion'
 
           # Neovim pinned release tarball avoids AppImage/FUSE and old asset-name drift.
           curl -fsSL "https://github.com/neovim/neovim/releases/download/${NVIM_LINUX_VERSION}/nvim-linux-x86_64.tar.gz" -o /tmp/nvim-linux-x86_64.tar.gz

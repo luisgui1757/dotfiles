@@ -8,12 +8,13 @@ require 'yaml'
 load_workflow = ->(name) { YAML.load_file(".github/workflows/#{name}.yml") }
 test = load_workflow.call('test')
 ubuntu = test.fetch('jobs').fetch('ubuntu')
-version = ubuntu.fetch('runs-on').delete_prefix('ubuntu-')
 install = ubuntu.fetch('steps').find { |step| step['name'] == 'Install deps' }.fetch('run')
-expected_url = "https://packages.microsoft.com/config/ubuntu/#{version}/packages-microsoft-prod.deb"
-abort 'FAIL: Microsoft repository package does not match the Ubuntu runner' unless install.include?(expected_url)
-abort 'FAIL: deleted Microsoft keyring must be restored without a conffile prompt' unless
-  install.include?('sudo dpkg --force-confmiss -i /tmp/packages-microsoft-prod.deb')
+abort 'FAIL: hosted PowerShell must not use the unavailable Microsoft apt package' if
+  install.include?('packages.microsoft.com') || install.include?('apt-get install -y powershell')
+abort 'FAIL: hosted PowerShell must be required, not silently skipped' unless
+  install.lines.any? { |line| line.strip == 'command -v pwsh' }
+abort 'FAIL: hosted PowerShell must execute and require major version 7 or newer' unless
+  install.lines.any? { |line| line.strip == %q(pwsh -NoLogo -NoProfile -Command 'if ($PSVersionTable.PSVersion.Major -lt 7) { throw "PowerShell 7 is required" }; $PSVersionTable.PSVersion') }
 
 # Runner updates must not rename compatibility checks consumed by release
 # certification or mislabel the producer in the exact-run proof artifact.
@@ -25,5 +26,5 @@ abort 'FAIL: deleted Microsoft keyring must be restored without a conffile promp
       rendered == row.fetch('legacy_context')
   end
 end
-puts 'OK: Ubuntu repository and rendered producer identities match their contracts'
+puts 'OK: Hosted PowerShell and rendered producer identities match their contracts'
 RUBY

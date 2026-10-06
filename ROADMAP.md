@@ -571,10 +571,10 @@ only with its implementation, tests, and documentation:
 4. **gh-dash tag provenance — DONE.** Tag `v4.25.2` is verified through its
    annotated object to peeled commit
    `a613ef744c99ef8d8ead33467813c6ee6086af52`, and installation pins that commit.
-5. **Ubuntu CI Microsoft repo package — DONE.** Ubuntu 26.04 downloads the exact
-   configuration `.deb`, checks reviewed SHA-256
-   `b2e7c6b9328e0c6a68bfe5d0045be90ceb192b32e0ca906c6c529b9012726f39`,
-   then invokes `sudo dpkg`; the general scanner self-tests this ordering.
+5. **Ubuntu CI PowerShell runtime — DONE.** Ubuntu 26.04 requires and executes
+   the image-provided PowerShell 7 before static parsing. The matching Microsoft
+   apt repository does not publish PowerShell; CI no longer installs its redundant
+   repository package. The runtime contract has a regression guard.
 
 Startup SIGTERM harness changes were not made in this branch because the failure
 was not reproduced; do not rewrite that test without a deterministic

@@ -1070,9 +1070,10 @@ ordinary Action bumps.
 Hosted Linux jobs run on Ubuntu 26.04; the native installer container remains
 Ubuntu 24.04. Matrix producer names render `legacy_context`, independently of
 the runner label, to preserve release certification and proof identities.
-The Microsoft repository `.deb` must match the Ubuntu runner and retain its
-reviewed SHA-256. CI uses `dpkg --force-confmiss` to restore a removed vendor
-keyring without an interactive conffile prompt. Guarded by
+The hosted image supplies PowerShell 7; CI unconditionally locates and executes
+it, rejecting older versions so `.ps1` parse coverage cannot silently skip.
+Do not install PowerShell from the Ubuntu 26.04 Microsoft apt repository: that
+repository does not publish the package. Guarded by
 `tests/static/ubuntu_runner_contract_test.sh`.
 
 Renovate custom managers can bump pinned version/ref constants, but they cannot
