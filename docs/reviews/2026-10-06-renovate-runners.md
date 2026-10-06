@@ -55,3 +55,7 @@ matching-repository approach above remains recorded as an insufficient fix,
 not the final implementation.
 
 After the hosted follow-up correction, the full local `make ci` gate passed.
+
+Rereview found one Low stale README download-list entry for the now-removed
+Microsoft repository package. The entry was removed; the hosted PowerShell
+requirement remains documented in the agent guide and supply-chain ledger.

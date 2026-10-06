@@ -1522,8 +1522,7 @@ branch.
 Direct-download SHA-256 values for the upstream Nix prerequisite, Neovim tarballs, chezmoi CI release archives,
 lazygit tarballs, Starship tarballs, tree-sitter CLI archives, the WezTerm
 Ubuntu `.deb`, Herdr Linux binaries, Herdr Windows preview `.exe`, Hack Nerd Font, the Windows Terminal
-portable zip, the Ghostty Debian-family `.deb` assets, the Ubuntu 26.04 Microsoft
-repository `.deb`, Homebrew installer script, Scoop
+portable zip, the Ghostty Debian-family `.deb` assets, Homebrew installer script, Scoop
 installer script, and the CI `cargo-binstall` installer script are
 intentionally human-reviewed. zsh plugin tag commits and tmux/psmux plugin
 commits are also human-reviewed because the installers verify the checked-out
