@@ -35,7 +35,7 @@ jobs:
             runner: macos-26
             legacy_context: nix flake check (macos-26)
             publish_logical_proof: true
-    name: nix flake check (${{ matrix.runner }})
+    name: ${{ matrix.legacy_context }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 25
     steps:

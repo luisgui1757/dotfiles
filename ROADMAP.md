@@ -571,9 +571,9 @@ only with its implementation, tests, and documentation:
 4. **gh-dash tag provenance — DONE.** Tag `v4.25.2` is verified through its
    annotated object to peeled commit
    `a613ef744c99ef8d8ead33467813c6ee6086af52`, and installation pins that commit.
-5. **Ubuntu CI Microsoft repo package — DONE.** Ubuntu 24.04 downloads the exact
+5. **Ubuntu CI Microsoft repo package — DONE.** Ubuntu 26.04 downloads the exact
    configuration `.deb`, checks reviewed SHA-256
-   `c13f01ac7c3001b51a9281d40dde666db5e037e05512840c319832f7852bfec4`,
+   `b2e7c6b9328e0c6a68bfe5d0045be90ceb192b32e0ca906c6c529b9012726f39`,
    then invokes `sudo dpkg`; the general scanner self-tests this ordering.
 
 Startup SIGTERM harness changes were not made in this branch because the failure

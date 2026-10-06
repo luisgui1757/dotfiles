@@ -33,7 +33,7 @@ jobs:
       matrix:
         include:
           # Why a container AND a hosted setup.sh/ubuntu job? They prove
-          # different install paths. The hosted ubuntu-24.04 runner has
+          # different install paths. The hosted Ubuntu runner has
           # Linuxbrew available, so setup.sh can take the brew branch. This
           # clean-image job is the only required proof of the native apt path:
           # non-root user, no Linuxbrew bootstrap, pinned Neovim tarball,
@@ -75,7 +75,7 @@ jobs:
           retention-days: 1
 
   setup-sh:
-    name: setup.sh / ${{ matrix.runner }}
+    name: ${{ matrix.legacy_context }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
     strategy:
