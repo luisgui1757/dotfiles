@@ -1393,13 +1393,14 @@ save only**. The next plain `:w` formats normally. Implemented in
   the CLI per OS: macOS/Linuxbrew use the Homebrew **`tree-sitter-cli`** formula
   (NOT `tree-sitter` — Homebrew split the formula, and `tree-sitter` now installs
   only `libtree-sitter` with no CLI binary, so a fresh machine would be left
-  without the `tree-sitter` executable; `tree-sitter-cli` ships the 0.26.x
+  without the `tree-sitter` executable; `tree-sitter-cli` ships the 0.27.x
   binary). The `PKG_TABLE` brew column for `tree-sitter` is therefore
   `tree-sitter-cli`, while `binaries_for` still probes for the `tree-sitter`
   binary. Native Linux/WSL installs a pinned `tree-sitter/tree-sitter` release
-  asset (v0.26.11) into `~/.local/bin` with SHA-256 verification. `install-deps.ps1` installs the CLI through the Scoop
-  `tree-sitter` manifest first and falls back to `npm install -g
-  tree-sitter-cli` after Node is present. Windows compiler support is separate:
+  asset (v0.27.0) into `~/.local/bin` with SHA-256 verification. Windows installs
+  the same exact CLI release from architecture-specific, SHA-256-verified zips
+  and validates the staged executable before atomic publication; mutable
+  Scoop/npm CLI fallback ownership is retired. Windows compiler support is separate:
   `install-deps.ps1 -All` auto-installs Visual Studio 2022 Build Tools with the
   `Microsoft.VisualStudio.Workload.VCTools` workload through winget or choco,
   then falls back to Microsoft's official `vs_BuildTools.exe` bootstrapper with
@@ -1574,9 +1575,9 @@ save only**. The next plain `:w` formats normally. Implemented in
 - **Windows CI uses a pinned, verified elevated Scoop bootstrap.** GitHub-hosted
   `windows-2025` runners are elevated, and Scoop blocks elevated install by
   default. `Install-Scoop` downloads `ScoopInstaller/Install` at the pinned
-  `$ScoopInstallerCommit` (`b0ee913725139b816f9178163af0aecdba07a7ed`),
+  `$ScoopInstallerCommit` (`1e2f334083d609986d8c8bc9e31ae8e87c39fab4`),
   verifies `$ScoopInstallerSha256`
-  (`48f6ea398b3a3fa26fae0093d37bd85b13e7eaa5d1d4a3e208408768408e35ae`), runs the local temp
+  (`94f983b190438311e006b957db7c8422709e0ba62a6c2ac04e278164108f2512`), runs the local temp
   installer with `-RunAsAdmin` only when elevated, then adds the Scoop `shims`
   dir to the current process PATH so the rest of `install-deps.ps1` can
   immediately use `scoop`. The bootstrap must preserve the caller's process
@@ -2056,11 +2057,11 @@ save only**. The next plain `:w` formats normally. Implemented in
 - **gh-dash is a pinned gh CLI extension, not a package.** `gh` is in both
   catalogs (`PKG_TABLE`: `gh` on brew/apt/dnf/zypper, `github-cli` on
   pacman/apk; `$Catalog`: winget `GitHub.cli` / choco `gh` / scoop `gh`).
-  gh-dash itself has no brew/apt/scoop package. Tag `v4.25.2` is paired with
-  annotated tag object `61e619ba8a9682ba8a822282d1da8c5eb7b0bbff` and peeled
-  commit `a613ef744c99ef8d8ead33467813c6ee6086af52`; both installers verify that
+  gh-dash itself has no brew/apt/scoop package. Tag `v4.26.0` is paired with
+  annotated tag object `17b8f7d6a21d79172f0f2309b607643a215c780f` and peeled
+  commit `c6dfbc17edfdbf1060fc06efe6aabb34f6a725f0`; both installers verify that
   remote mapping before mutation and run
-  `gh extension install dlvhdr/gh-dash --pin v4.25.2`. gh requires a release
+  `gh extension install dlvhdr/gh-dash --pin v4.26.0`. gh requires a release
   tag for binary extensions; commit refs are accepted only for script extensions.
   (`GH_DASH_VERSION` in `install-deps.sh`, mirrored as `$GhDashVersion` in
   `install-deps.ps1`; a Renovate `github-releases` manager can bump the tag and
@@ -2085,11 +2086,12 @@ save only**. The next plain `:w` formats normally. Implemented in
   a manual, secret-bearing step this repo never automates or stores.
 - **Pi CLI is pinned; only its audited theme selection and canonical newline keybinding are repo-owned.** `install-deps.sh`
   and `install-deps.ps1` run `npm pack --ignore-scripts --json` for
-  `@earendil-works/pi-coding-agent@0.82.1`, require both reported metadata and
+  `@earendil-works/pi-coding-agent@0.99.2`, require both reported metadata and
   independently hashed tarball bytes to match
-  `sha512-zbkAhoIuDPMF3pKuja0ajZabrMWU29FUMV9A/XMXT/XC1yXs5xt6t6t13GogQFsDrDqbFP4DkZQO1w8rWRAzYA==`
+  `sha512-6R1BZ2N77CrVcGf3eC2KovTz1Q4RYiAeydvVWQT546N2fi1nBc81aURlbOZCgruWoW9VY/UrLzDynF4YTolpoA==`
   and install the verified local tarball alongside exact same-release
-  `pi-agent-core`, `pi-ai`, and `pi-tui` specs. Do not rely on the coding-agent's
+  `pi-agent-core`, `pi-ai`, `pi-tui`, `pi-mcp`, `pi-codemode`, `chord`, and
+  `pi-telemetry` specs. Do not rely on the coding-agent's
   caret ranges: a later companion publish can otherwise combine incompatible
   monorepo APIs with an older CLI. Pack state is scoped to a unique temp
   directory and cleaned through return/signal/finally paths. Windows captures
@@ -2343,7 +2345,7 @@ provisioning. The repo never installs Nix through a pipe-to-shell bootstrap.
 - **nvim + the tree-sitter CLI are DELIBERATELY NOT in the Nix package set
   (deferred, with proof).** nvim-treesitter `main` compiles parsers whose ABI
   must match nvim's built-in libtree-sitter, and the repo pins the tree-sitter
-  CLI to `v0.26.11` precisely to keep that build reproducible (invariant 19). A
+  CLI to `v0.27.0` precisely to keep that build reproducible (invariant 19). A
   nix neovim / tree-sitter shadowing the pinned native binaries would risk the
   `E5113` parser/ABI-mismatch class of bug. So `nix/home/common.nix` omits both;
   they stay on the native install-deps path. Moving nvim into the SAME Nix

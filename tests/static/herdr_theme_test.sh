@@ -76,12 +76,12 @@ if configs[1].get("terminal", {}).get("default_shell") != "pwsh.exe":
 PY
 
 cmp -s "$CONFIG" "$MIRROR" || fail "canonical Herdr config and chezmoi mirror differ"
-grep -F 'HERDR_VERSION="v0.7.5"' "$INSTALL_SH" >/dev/null ||
-    fail "POSIX Herdr must stay pinned to the reviewed v0.7.5 release"
-grep -F 'HERDR_LINUX_X86_64_SHA256="3dc83288073e4c2d3c679a30e7be97bcca9141c6fd17dbbb9219142e95c59253"' "$INSTALL_SH" >/dev/null ||
-    fail "Herdr v0.7.5 x86_64 digest drifted"
-grep -F 'HERDR_LINUX_ARM64_SHA256="32e763a1499a6b694b1d708e4f062b743be1da9f34fcfa4d212d6db6fe09a8b9"' "$INSTALL_SH" >/dev/null ||
-    fail "Herdr v0.7.5 arm64 digest drifted"
+grep -F 'HERDR_VERSION="v0.9.3"' "$INSTALL_SH" >/dev/null ||
+    fail "POSIX Herdr must stay pinned to the reviewed v0.9.3 release"
+grep -F 'HERDR_LINUX_X86_64_SHA256="18a8dc65f1c2fa485884344356dea1cfd911c6f06cf46fa78e193f4087f4dba7"' "$INSTALL_SH" >/dev/null ||
+    fail "Herdr v0.9.3 x86_64 digest drifted"
+grep -F 'HERDR_LINUX_ARM64_SHA256="4de7aa3e25678812e92960de64f7c2aaa1bca1f0f80a3c5e559837e231e1f5c0"' "$INSTALL_SH" >/dev/null ||
+    fail "Herdr v0.9.3 arm64 digest drifted"
 grep -F "\$HerdrWindowsPreviewVersion = 'preview-2026-07-21-0f10e1453a7f'" "$INSTALL_PS1" >/dev/null ||
     fail "Windows Herdr must stay pinned to the reviewed preview"
 grep -F "\$HerdrWindowsX64Sha256 = '75c85763db0ca5fd13b485d0728cc3e9ea1152964a4e976e1d49f2e86b01a92b'" "$INSTALL_PS1" >/dev/null ||

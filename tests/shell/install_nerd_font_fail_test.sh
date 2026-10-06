@@ -69,7 +69,7 @@ output="$(cat "$output_file")"
 
 [[ "$output" == *"FAIL: checksum mismatch for Hack.zip"* ]]
 [[ "$INSTALL_FAILURES_COUNT" -eq 1 ]]
-grep -F "8ca33a60c791392d872b80d26c42f2bfa914a480f9eb2d7516d9f84373c36897" "$TMP_ROOT/sha.log" >/dev/null
+grep -F "fa24da7de7cefe7766614d27762570b20453c852fc1d5b657111666df9a5e449" "$TMP_ROOT/sha.log" >/dev/null
 if [[ -e "$TMP_ROOT/unzip.log" ]]; then
     echo "FAIL: font extraction ran after checksum failure" >&2
     exit 1

@@ -19,33 +19,33 @@ YES_ALL=0
 DRY_RUN=0
 UPDATE_ONLY=0
 EXPERIMENTAL_WSL_GUI="${DOTFILES_EXPERIMENTAL_WSL_GUI:-0}"
-HOMEBREW_INSTALL_COMMIT="ca0130bd52235f2fcb2bf23cfdda004bc5d250c1"
-HOMEBREW_INSTALL_SHA256="8ff338091a5e10bb5fc040b38316648110f42feff057ecf9feaab51fd0a13ef9"
-NVIM_LINUX_VERSION="v0.12.4"
-NVIM_LINUX_X86_64_SHA256="012bf3fcac5ade43914df3f174668bf64d05e049a4f032a388c027b1ebd78628"
-NVIM_LINUX_ARM64_SHA256="ceb7e88c6b681f0515d135dcdfad54f5eb4373b25ce6172197cd9a69c758063f"
-CHEZMOI_VERSION="v2.71.1"
-CHEZMOI_LINUX_X86_64_SHA256="e1fb16c962644d57f4d451c324aa86163d00faf5d035500f41fb48943a66dfed"
-CHEZMOI_LINUX_ARM64_SHA256="6e88c8150d3d54533ba2f335a52c2ac7b67259c525ba0f19091fc078b6852154"
-LAZYGIT_LINUX_VERSION="v0.63.1"
-LAZYGIT_LINUX_X86_64_SHA256="8e033bc78c8e192dee9510e951f6c9e154289b7198d22c924ed1d0a951b0dac1"
-LAZYGIT_LINUX_ARM64_SHA256="555dbc9a8efcf2e33bc24e7fbd9463e9fa375e3c5e23cc270763733c38eeae36"
+HOMEBREW_INSTALL_COMMIT="35da6871c4be7d7fdab2fd505fb7fa667926a2a5"
+HOMEBREW_INSTALL_SHA256="5f333bbe53bc490e51e7ccb1df8779b3dd6ee73a1a7379efda216edb08ccb148"
+NVIM_LINUX_VERSION="v0.12.5"
+NVIM_LINUX_X86_64_SHA256="bce0f56eda1f1b1db6eee8f4133d7a38813ea07933837dd1777411ca384c6875"
+NVIM_LINUX_ARM64_SHA256="1aa5ca085249580ae0f91eb14f27ec0919773ff2d99a163d03f3d6c21ac29725"
+CHEZMOI_VERSION="v2.73.0"
+CHEZMOI_LINUX_X86_64_SHA256="b597729b687af4488a848240134cb633de8ca0f04e0d26d48f400ee2ac338ffa"
+CHEZMOI_LINUX_ARM64_SHA256="abcb840401d3c1f2356e0f53f5d52aa10d10f572654d9626db9ad0ca4dc03355"
+LAZYGIT_LINUX_VERSION="v0.66.0"
+LAZYGIT_LINUX_X86_64_SHA256="5b45541155d20bd32bf2cc5ab5b7e3d91c2eebf0fb1242281350edc27d59d2b7"
+LAZYGIT_LINUX_ARM64_SHA256="9a4fc4656897ac9f7877b835473ce1a75620cc267f554c57fc4ff266407f3257"
 STARSHIP_VERSION="v1.26.0"
 STARSHIP_LINUX_X86_64_SHA256="321f0dd7af8340a5f2e6a8fec6538a04f617486f9ec70d878f91c09cd8deef22"
 STARSHIP_LINUX_ARM64_SHA256="dc30189378d2f2e287384e8a692d3f95ad1df64cf0e8c36aa9201516028aed6b"
-TREE_SITTER_CLI_LINUX_VERSION="v0.26.11"
-TREE_SITTER_CLI_LINUX_X86_64_SHA256="ff1b7f9863f2faafd78dc0e66d902ee85b37f709b314b22c009f51caf233eebd"
-TREE_SITTER_CLI_LINUX_ARM64_SHA256="db28509fe6db8902f9d14c43c486858c7486b42c3a96b30e811e73f105762336"
+TREE_SITTER_CLI_LINUX_VERSION="v0.27.0"
+TREE_SITTER_CLI_LINUX_X86_64_SHA256="e4a3826bcd0fe099ee3a5617767374939cbc23c4a35b5b53f5fc04142525a2c1"
+TREE_SITTER_CLI_LINUX_ARM64_SHA256="6260b621bf5ab87027dfb463bf955504ef32cdcda62b81f28447753e48c83a62"
 FZF_TAB_VERSION="v1.3.0"
 FZF_TAB_COMMIT="d7e0234614dbe5369fdd760907d12c0e05a4dccc"
 ZSH_AUTOSUGGESTIONS_VERSION="v0.7.1"
 ZSH_AUTOSUGGESTIONS_COMMIT="e52ee8ca55bcc56a17c828767a3f98f22a68d4eb"
-GH_DASH_VERSION="v4.25.2"   # dlvhdr/gh-dash pinned gh-extension tag; mirror in install-deps.ps1 ($GhDashVersion)
-GH_DASH_TAG_OBJECT="61e619ba8a9682ba8a822282d1da8c5eb7b0bbff"
-GH_DASH_COMMIT="a613ef744c99ef8d8ead33467813c6ee6086af52"
+GH_DASH_VERSION="v4.26.0"   # dlvhdr/gh-dash pinned gh-extension tag; mirror in install-deps.ps1 ($GhDashVersion)
+GH_DASH_TAG_OBJECT="17b8f7d6a21d79172f0f2309b607643a215c780f"
+GH_DASH_COMMIT="c6dfbc17edfdbf1060fc06efe6aabb34f6a725f0"
 PI_CLI_PACKAGE="@earendil-works/pi-coding-agent"
-PI_CLI_VERSION="0.82.1"
-PI_CLI_INTEGRITY="sha512-zbkAhoIuDPMF3pKuja0ajZabrMWU29FUMV9A/XMXT/XC1yXs5xt6t6t13GogQFsDrDqbFP4DkZQO1w8rWRAzYA=="
+PI_CLI_VERSION="0.99.2"
+PI_CLI_INTEGRITY="sha512-6R1BZ2N77CrVcGf3eC2KovTz1Q4RYiAeydvVWQT546N2fi1nBc81aURlbOZCgruWoW9VY/UrLzDynF4YTolpoA=="
 TPM_COMMIT="e261deb1b47614eed3400089ce7197dc68acc4eb"
 # Functional tmux plugins (Omer-style set). The Rose Pine status bar is NOT a
 # plugin here -- it is a repo-owned generated config (tmux/psmux-rose-pine.ps1),
@@ -54,8 +54,8 @@ TMUX_SENSIBLE_COMMIT="25cb91f42d020f675bb0a2ce3fbd3a5d96119efa"
 TMUX_YANK_COMMIT="acfd36e4fcba99f8310a7dfb432111c242fe7392"
 TMUX_RESURRECT_COMMIT="cff343cf9e81983d3da0c8562b01616f12e8d548"
 TMUX_CONTINUUM_COMMIT="0698e8f4b17d6454c71bf5212895ec055c578da0"
-HACK_NERD_FONT_VERSION="v3.4.0"
-HACK_NERD_FONT_SHA256="8ca33a60c791392d872b80d26c42f2bfa914a480f9eb2d7516d9f84373c36897"
+HACK_NERD_FONT_VERSION="v3.5.1"
+HACK_NERD_FONT_SHA256="fa24da7de7cefe7766614d27762570b20453c852fc1d5b657111666df9a5e449"
 # Ghostty on Debian-family hosts: install only exact mkasberg/ghostty-ubuntu
 # release assets whose bytes and package metadata are reviewed here. The
 # upstream install.sh queries mutable releases/latest and downloads an
@@ -83,13 +83,13 @@ WEZTERM_DEB_AMD64_SHA256="86358dab5794a4fb63f7c91dd68d4fdc3da58faad648a58fc77d2b
 # Herdr (agent multiplexer). macOS + Linuxbrew use the canonical homebrew-core
 # formula (`brew install herdr`). Native Linux without brew installs the pinned
 # release binary, SHA-256 verified. Upstream publishes no checksum sidecar, so
-# these SHAs were computed from the pinned v0.7.5 assets on 2026-07-21 (bump the
+# these SHAs were computed from the pinned v0.9.3 assets on 2026-10-06 (bump the
 # version + both SHAs together). NOT the herdr.dev install.sh remote-eval path.
 # Native Windows uses install-deps.ps1's separate pinned, SHA-256-verified
 # preview .exe path, never the herdr.dev install.ps1 remote-eval path.
-HERDR_VERSION="v0.7.5"
-HERDR_LINUX_X86_64_SHA256="3dc83288073e4c2d3c679a30e7be97bcca9141c6fd17dbbb9219142e95c59253"
-HERDR_LINUX_ARM64_SHA256="32e763a1499a6b694b1d708e4f062b743be1da9f34fcfa4d212d6db6fe09a8b9"
+HERDR_VERSION="v0.9.3"
+HERDR_LINUX_X86_64_SHA256="18a8dc65f1c2fa485884344356dea1cfd911c6f06cf46fa78e193f4087f4dba7"
+HERDR_LINUX_ARM64_SHA256="4de7aa3e25678812e92960de64f7c2aaa1bca1f0f80a3c5e559837e231e1f5c0"
 PYLATEXENC_BUILD_BACKEND_VERSION="83.0.0"
 PYLATEXENC_BUILD_BACKEND_SHA256="29b23c360f22f414dc7336bb39178cc7bcbf6021ed2733cde173f09dba19abb3"
 PYLATEXENC_VERSION="2.11"
@@ -1789,7 +1789,7 @@ install_tree_sitter_cli() {
         # only libtree-sitter (no CLI binary), so a fresh machine would be left
         # without the `tree-sitter` executable nvim-treesitter `main` needs to
         # generate/build parsers. `tree-sitter-cli` provides the `tree-sitter`
-        # binary (0.26.x, matching the pinned Linux release). The PKG_TABLE brew
+        # binary (0.27.x, matching the pinned Linux release). The PKG_TABLE brew
         # column carries that name; `binaries_for` still checks for `tree-sitter`.
         install tree-sitter "nvim-treesitter main parser CLI"
     fi
@@ -2123,7 +2123,11 @@ NODE
         if ! npm install -g --prefix "$HOME/.local" "$tarball" \
             "@earendil-works/pi-agent-core@$PI_CLI_VERSION" \
             "@earendil-works/pi-ai@$PI_CLI_VERSION" \
-            "@earendil-works/pi-tui@$PI_CLI_VERSION"; then
+            "@earendil-works/pi-tui@$PI_CLI_VERSION" \
+            "@earendil-works/pi-mcp@$PI_CLI_VERSION" \
+            "@earendil-works/pi-codemode@$PI_CLI_VERSION" \
+            "@earendil-works/chord@$PI_CLI_VERSION" \
+            "@earendil-works/pi-telemetry@$PI_CLI_VERSION"; then
             printf "  FAIL: %-26s npm install failed for verified local tarball %s\n" "pi" "$filename" >&2
             return 1
         fi
