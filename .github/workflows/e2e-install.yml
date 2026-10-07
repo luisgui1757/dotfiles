@@ -322,7 +322,7 @@ jobs:
           command -v zoxide >/dev/null 2>&1 || fail "zoxide is not on PATH"
           command -v gh >/dev/null 2>&1 || fail "gh is not on PATH"
           command -v pi >/dev/null 2>&1 || fail "pi is not on PATH"
-          [[ "$(pi --version)" == "0.99.2" ]] || fail "pi version is not pinned 0.99.2"
+          [[ "$(pi --version)" == "1.0.4" ]] || fail "pi version is not pinned 1.0.4"
           [[ "$(npm prefix --global)" == "$HOME/.local" ]] \
             || fail "npm global prefix is not the canonical user-local root"
           for theme_name in \
@@ -582,8 +582,8 @@ jobs:
               throw 'Hack Nerd Font files exist but are not registered for application consumption'
           }
           $piVersion = (& pi --version | Select-Object -First 1)
-          if ($piVersion -ne '0.99.2') {
-              throw "pi version is not pinned 0.99.2: $piVersion"
+          if ($piVersion -ne '1.0.4') {
+              throw "pi version is not pinned 1.0.4: $piVersion"
           }
           $nvimLine = & nvim --version | Select-Object -First 1
           if ($nvimLine -notmatch '^NVIM v(0\.1[2-9]|0\.[2-9][0-9]|[1-9]\.)') {
