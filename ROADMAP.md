@@ -9,6 +9,43 @@ single obvious setup path, enforce the tests it claims are required, avoid
 mutable supply-chain execution where practical, and make greenfield evidence
 repeatable instead of tribal.
 
+## Interactive installer and removal (2026-10, DESIGN RECONCILED)
+
+The [canonical overhaul plan](docs/plans/interactive-installer-overhaul.md)
+defines feature selection, automatic dependency resolution, shared-resource-safe
+removal, legacy adoption and the required native three-OS verification matrix.
+The [review ledger](docs/reviews/2026-10-08-interactive-installer-overhaul.md)
+reconciles the primary assessment with the Opus 5.5 CLI review, including rejected
+claims and candidates still needing runtime proof.
+
+- DONE (stage 0) - Reconcile both assessments into one canonical design,
+  including accepted objections, rejected shortcuts and verification limits.
+- PARTIAL (stage 1, draft `44308da`) - An initial manifest exists. Complete
+  capability/dependency/side-effect and platform inventories, assigned evidence
+  infrastructure, and the open runtime reproductions remain unfinished.
+- PLANNED (stage 2a) - Prove distribution, terminal and authenticated binary-trust
+  feasibility on all three OSes. This gate must pass before stage 2b.
+- EXPERIMENTAL (stage 2b, not accepted) - Initial planner/state work exists in a
+  separate draft. Stage 2a, config selection and safe initial/subsequent Nix
+  reconciliation remain unproved; this is not completion of stage 2b.
+- PLANNED (stage 3) - Extract platform adapters while preserving existing
+  full-install and migration behavior.
+- PLANNED (stage 4) - Prove the Neovim/Pi shared-dependency lifecycle, including
+  Windows compiler provisioning and removal/recovery.
+- PLANNED (stage 5) - Complete remaining features, adoption, menus and
+  unattended parity.
+- PLANNED (stage 6) - Pass the complete claimed-platform lifecycle matrix and
+  canonical release gates before replacing the documented setup/removal workflow.
+
+The production rollout is **not implemented**. The separate
+[experimental draft](https://github.com/luisgui1757/dotfiles/pull/87), observed at
+[`44308da`](https://github.com/luisgui1757/dotfiles/commit/44308da9a9d62afca101a0366fb7b229ce97da75), is not a
+usable installer. Existing install commands and config-only uninstall behavior
+remain current; documentation review is not runtime proof of the proposed
+overhaul. This design delivery is one commit in one PR; stages describe evidence
+gates, not mandatory separate PRs. The older audit baseline above describes the
+historical sections below, not a fresh audit of every roadmap item.
+
 ## Release automation (2026-07, DONE)
 
 - DONE - Added a strict machine-readable current-release manifest and seeded

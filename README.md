@@ -1575,6 +1575,13 @@ stale; CI then fails verification until a human reviews the adjacent constant.
 
 ## Key design decisions (and why)
 
+Future installer work is specified in the
+[interactive install/removal plan](docs/plans/interactive-installer-overhaul.md).
+It proposes tool checkboxes, automatic prerequisites and safe selective removal;
+the production rollout is not implemented. A separate experimental planner is
+not a usable installer. The install and removal commands in this README describe
+the current behavior; the plan records the reconciled decisions and test gates.
+
 - **One source of truth through chezmoi-managed configs.** POSIX uses symlinks
   for live-edit behavior, Windows copies simple files, and nvim remains a
   directory symlink into repo `nvim/`.

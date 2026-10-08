@@ -36,13 +36,38 @@ JSON_OUT="$TMP_REPO/hyperfine.json"
         "starship prompt --jobs 0 --status 0 --cmd-duration 0" >/dev/null
 )
 
-# Mean is in seconds in hyperfine JSON.
-mean_ms=$(python3 -c "
+# Hyperfine 1.x exports mean directly; schema 2 exports named metric summaries.
+# Keep the existing wall-clock seconds and integer-millisecond budget semantics.
+mean_ms=$(python3 - "$JSON_OUT" <<'PY'
 import json
-with open('$JSON_OUT') as f:
-    d = json.load(f)
-print(int(d['results'][0]['mean'] * 1000))
-")
+import math
+import sys
+
+try:
+    with open(sys.argv[1]) as source:
+        data = json.load(source)
+    results = data["results"]
+    if not isinstance(results, list) or len(results) != 1:
+        raise ValueError("expected exactly one benchmark result")
+    version = data.get("schema_version", 1)
+    if type(version) is not int:
+        raise ValueError("schema version must be an integer")
+    if version == 1:
+        mean = results[0]["mean"]
+    elif version == 2:
+        wall_clock = results[0]["summary"]["time_wall_clock"]
+        if wall_clock["unit"] != "second":
+            raise ValueError("wall-clock unit must be second")
+        mean = wall_clock["mean"]
+    else:
+        raise ValueError(f"unsupported schema version {version}")
+    if type(mean) not in (int, float) or not math.isfinite(mean) or mean < 0:
+        raise ValueError("mean must be a finite nonnegative number")
+    print(int(mean * 1000))
+except (OSError, KeyError, TypeError, ValueError, OverflowError) as error:
+    raise SystemExit(f"FAIL: invalid Hyperfine wall-clock result: {error}")
+PY
+)
 
 echo "starship prompt mean = ${mean_ms}ms (budget ${budget_ms}ms)"
 if [[ "$mean_ms" -gt "$budget_ms" ]]; then

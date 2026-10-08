@@ -124,6 +124,75 @@ partial_quarantine="$(find "$WORK/partial" -maxdepth 1 -name 'plugin.quarantine.
 [[ -n "$partial_quarantine" && "$(cat "$partial_quarantine/plugin.zsh")" == partial ]] \
     || fail "partial prior payload was not preserved"
 
+# A competing publisher must preserve a live lock even when the default mkdir
+# falsely succeeds on EEXIST (uutils 0.10.0's concurrent-creation behavior).
+# Model that process boundary; the available GNU command has normal semantics.
+lock_bin="$WORK/lock-bin"
+mkdir -p "$lock_bin" "$WORK/held"
+export TEST_REAL_MKDIR
+TEST_REAL_MKDIR="$(command -v gnumkdir || command -v mkdir)"
+export TEST_HELD_LOCK
+TEST_HELD_LOCK="$(cd "$WORK/held" && pwd -P)/plugin.lock"
+export TEST_LOCK_ATTEMPTS="$WORK/lock-attempts"
+mkdir "$TEST_HELD_LOCK"
+printf '%s\n' "$$" > "$TEST_HELD_LOCK/pid"
+: > "$TEST_LOCK_ATTEMPTS"
+cat > "$lock_bin/mkdir" <<'SH'
+#!/bin/bash
+if [[ "$#" -eq 1 && "$1" == "$TEST_HELD_LOCK" ]]; then
+    printf '%s\n' attempt >> "$TEST_LOCK_ATTEMPTS"
+    "$TEST_REAL_MKDIR" "$@"
+    rc=$?
+    [[ "${0##*/}" != mkdir ]] || exit 0
+    exit "$rc"
+fi
+exec "$TEST_REAL_MKDIR" "$@"
+SH
+cp "$lock_bin/mkdir" "$lock_bin/gnumkdir"
+chmod +x "$lock_bin/mkdir" "$lock_bin/gnumkdir"
+PATH="$lock_bin:$PATH" /bin/bash "$PUBLISHER" held-plugin "$repo" v2 "$commit2" plugin.zsh "$WORK/held/plugin" >"$WORK/held.log" 2>&1 &
+held_pid=$!
+attempt=0
+while kill -0 "$held_pid" 2>/dev/null && [[ "$(wc -l < "$TEST_LOCK_ATTEMPTS")" -lt 2 && "$attempt" -lt 100 ]]; do
+    sleep 0.05
+    attempt=$((attempt + 1))
+done
+held_owner="$(cat "$TEST_HELD_LOCK/pid" 2>/dev/null || true)"
+held_target_absent=0
+[[ -e "$WORK/held/plugin" ]] || held_target_absent=1
+held_attempts="$(wc -l < "$TEST_LOCK_ATTEMPTS")"
+rm -rf "$TEST_HELD_LOCK"
+held_rc=0
+wait "$held_pid" || held_rc=$?
+[[ "$held_owner" == "$$" && "$held_target_absent" -eq 1 && "$held_attempts" -ge 2 ]] ||
+    fail "competing publisher took over a live lock"
+[[ "$held_rc" -eq 0 ]] || fail "publisher failed after the live lock was released"
+[[ "$(git -C "$WORK/held/plugin" rev-parse HEAD)" == "$commit2" && ! -e "$TEST_HELD_LOCK" ]] ||
+    fail "publisher did not converge cleanly after the live lock was released"
+
+# Without a GNU companion, reject uutils rather than trusting its exit status.
+# This minimal PATH exercises the actual missing-command boundary on every OS.
+no_gnu_bin="$WORK/no-gnu-bin"
+mkdir -p "$no_gnu_bin"
+for tool in dirname basename rm; do
+    ln -s "$(command -v "$tool")" "$no_gnu_bin/$tool"
+done
+cat > "$no_gnu_bin/mkdir" <<'SH'
+#!/bin/bash
+if [[ "$#" -eq 1 && "$1" == --version ]]; then
+    printf '%s\n' 'mkdir (uutils coreutils) 0.10.0'
+    exit 0
+fi
+exec "$TEST_REAL_MKDIR" "$@"
+SH
+chmod +x "$no_gnu_bin/mkdir"
+no_gnu_rc=0
+no_gnu_output="$(PATH="$no_gnu_bin" /bin/bash "$PUBLISHER" no-gnu-plugin "$repo" v2 "$commit2" plugin.zsh "$WORK/no-gnu/plugin" 2>&1)" || no_gnu_rc=$?
+[[ "$no_gnu_rc" -ne 0 && "$no_gnu_output" == *"GNU gnumkdir is required"* ]] ||
+    fail "uutils without GNU companion did not fail explicitly"
+[[ ! -e "$WORK/no-gnu/plugin" && ! -e "$WORK/no-gnu/plugin.lock" ]] ||
+    fail "rejected lock provider created publication state"
+
 # Concurrent first starts serialize and converge on one proved checkout.
 concurrent="$WORK/concurrent/plugin"
 /bin/bash "$PUBLISHER" concurrent-plugin "$repo" v2 "$commit2" plugin.zsh "$concurrent" >"$WORK/concurrent.1.log" 2>&1 &

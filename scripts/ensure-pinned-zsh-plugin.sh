@@ -146,8 +146,21 @@ if [[ "${DOTFILES_PINNED_GIT_CHECK_ONLY:-0}" == "1" ]]; then
     exit 0
 fi
 
+# Ubuntu's uutils mkdir 0.10.0 can return success after a racing mkdirat gets
+# EEXIST. Prefer the GNU companion's exclusive creation when available.
+lock_mkdir="mkdir"
+if command -v gnumkdir >/dev/null 2>&1; then
+    lock_mkdir="gnumkdir"
+else
+    # BSD mkdir has no --version option; that expected probe failure is fine.
+    mkdir_version="$(mkdir --version 2>/dev/null)" || mkdir_version=""
+    if [[ "$mkdir_version" == *"uutils coreutils"* ]]; then
+        echo "FAIL: GNU gnumkdir is required for exclusive zsh plugin locks with uutils mkdir; install GNU coreutils." >&2
+        exit 1
+    fi
+fi
 attempt=0
-while ! mkdir "$lock" 2>/dev/null; do
+while ! "$lock_mkdir" "$lock" 2>/dev/null; do
     lock_pid="$(cat "$lock/pid" 2>/dev/null || true)"
     case "$lock_pid" in
         ''|*[!0-9]*) ;;

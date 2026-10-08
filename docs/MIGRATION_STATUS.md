@@ -1,5 +1,17 @@
 # Chezmoi Migration Status
 
+## Future selective-installer migration
+
+The [interactive installer plan](plans/interactive-installer-overhaul.md) is
+**design reconciled; production rollout not implemented**. Initial planner/state
+experiments in a separate draft have not passed its acceptance gates. Adoption
+must preserve prior Nix profiles, existing owner evidence, exact-release recovery,
+all Windows known-folder destinations and chezmoi parity. Selection-aware
+config application and surgical package removal are future work, separate from
+the shipped chezmoi migration documented below. See its
+[review ledger](reviews/2026-10-08-interactive-installer-overhaul.md) for the
+ownership gaps and unresolved reproduction work.
+
 ## chezmoi owns (config layer)
 
 `home/` is the active chezmoi source tree for the dotfiles config layer. It now

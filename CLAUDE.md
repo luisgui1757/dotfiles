@@ -157,7 +157,17 @@ that violates one of these, fix it instead of disabling the test.
     pin/helper-sensitive chezmoi `run_onchange` script. It neutralizes any unproved sourceable target,
     stages the exact commit in the same parent, proves expected origin, HEAD,
     clean/usable worktree, and tracked regular entry file, then atomically
-    publishes under a serialized lock. Its template-time check-only path is
+    publishes under a serialized lock. Lock acquisition prefers the available
+    GNU `gnumkdir` companion: Ubuntu 26.04's uutils 0.10.0 `mkdir` can report
+    success after a concurrent `mkdirat` returns `EEXIST`, defeating exclusion.
+    If `mkdir` identifies itself as uutils and no companion exists, fail before
+    acquiring a lock or publishing; never fall back to the unsafe provider.
+    Other directory operations retain the default command; no system utility is
+    replaced. Update the `publisher-sha256` trigger in
+    `home/.chezmoiscripts/run_onchange_after_20-ensure-zsh-plugin-pins.sh.tmpl`
+    whenever this helper changes; the pin-consistency gate enforces it.
+    `tests/shell/pinned_zsh_plugin_publisher_test.sh` verifies both
+    live-owner exclusion and concurrent publication. Its template-time check-only path is
     strictly read-only: an absent plugin parent stays absent and no publication
     lock is acquired, including during chezmoi `diff`, `status`, and dry-run
     apply. Never restore generic chezmoi `git-repo` externals for executable zsh
@@ -817,6 +827,12 @@ surface.
 it is healthy, but if local macOS `taplo` panics with the known
 system-configuration null-object crash they fall back to Python `tomllib`;
 ordinary `taplo` lint errors still fail.
+`tests/starship/perf_test.sh` accepts Hyperfine's legacy `results[0].mean`
+and schema-2 `results[0].summary.time_wall_clock.mean` in seconds. Never use
+the selected primary metric or CPU time for this wall-clock budget. Unknown
+schemas, wrong units and malformed/nonfinite results fail closed. Preserve the
+80ms local / 150ms CI integer-millisecond thresholds; `perf_json_test.sh`
+exercises both export shapes and failure boundaries through the real gate.
 `tests/static/supply_chain_remote_execution_test.sh` must stay pure Python for
 the repository-wide scan; fast CI runs static tests before optional developer
 tools like ripgrep are installed.
@@ -2675,6 +2691,16 @@ deliberately worded as failure modes ("regression guard for …") — read them
 carefully before "fixing" the test.
 
 ## Plan / history
+
+The [interactive installer overhaul](docs/plans/interactive-installer-overhaul.md)
+is the consolidated future implementation plan. Its
+[review ledger](docs/reviews/2026-10-08-interactive-installer-overhaul.md)
+records confirmed coupling, unresolved runtime candidates and rejected claims.
+The production rollout is not implemented; a separate experimental draft does
+not establish it. Do not treat proposed selections, ownership state or removal
+semantics as current behavior. Preserve existing provider,
+config-parity, migration and release invariants while delivering the sequenced
+plan; update the plan and `ROADMAP.md` as each verified stage lands.
 
 The durable rationale belongs in this file, `README.md`, or the tests that
 guard an invariant. Do not rely on private local plan files for public repo
