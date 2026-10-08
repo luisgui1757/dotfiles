@@ -1,121 +1,39 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
-cd "$REPO_ROOT"
-
-tmp="$(mktemp -d)"
-trap 'rm -rf "$tmp"' EXIT
-
-expected="$tmp/expected.txt"
-safeguards_function="$tmp/safeguards-function.txt"
-ruleset="$tmp/ruleset.txt"
-
-jq -r '.required[]' .github/check-identities.json > "$expected"
-
-python3 - <<'PY'
-import json
-import pathlib
-import re
-import sys
-
-metadata = json.loads(pathlib.Path(".github/check-identities.json").read_text(encoding="utf-8"))
-if metadata.get("schema") != 2 or metadata.get("stage") != "stable-required-live-applied":
-    raise SystemExit("FAIL: required-check migration metadata has an unsupported stage")
-
-test_workflow = pathlib.Path(".github/workflows/test.yml").read_text(encoding="utf-8")
-test_jobs = test_workflow.split("\njobs:\n", 1)[1]
-stable_jobs = set(re.findall(r"(?m)^  ([A-Za-z0-9_-]+):\s*$", test_jobs))
-e2e = pathlib.Path(".github/workflows/e2e-install.yml").read_text(encoding="utf-8")
-nix = pathlib.Path(".github/workflows/nix.yml").read_text(encoding="utf-8")
-
-legacy = stable_jobs | set(re.findall(r"(?m)^\s+legacy_context:\s*(.+?)\s*$", e2e + "\n" + nix))
-expected_legacy = set(metadata["legacyEmitted"])
-if legacy != expected_legacy:
-    print("FAIL: emitted legacy check identities differ from legacyEmitted", file=sys.stderr)
-    print("missing:", sorted(expected_legacy - legacy), file=sys.stderr)
-    print("extra:", sorted(legacy - expected_legacy), file=sys.stderr)
-    raise SystemExit(1)
-
-e2e_logical = set(re.findall(r"(?m)^\s+- logical_context:\s*(.+?)\s*$", e2e))
-nix_logical_block = nix.split("\n  logical-proof:\n", 1)[1]
-nix_logical = {
-    f"nix flake check / {value}"
-    for value in re.findall(r"(?m)^\s+- logical:\s*(.+?)\s*$", nix_logical_block)
-}
-required = stable_jobs | e2e_logical | nix_logical
-expected_required = set(metadata["required"])
-if required != expected_required:
-    print("FAIL: emitted logical identities differ from required", file=sys.stderr)
-    print("missing:", sorted(expected_required - required), file=sys.stderr)
-    print("extra:", sorted(required - expected_required), file=sys.stderr)
-    raise SystemExit(1)
-
-replacements = {(item["legacy"], item["logical"]) for item in metadata["replacements"]}
-if {old for old, _ in replacements} != expected_legacy - required:
-    raise SystemExit("FAIL: replacement metadata does not cover every legacy-only identity")
-if {new for _, new in replacements} != required - expected_legacy:
-    raise SystemExit("FAIL: replacement metadata does not cover every logical-only identity")
-if len(replacements) != len(metadata["replacements"]):
-    raise SystemExit("FAIL: duplicate required-check replacement mapping")
-
-for workflow in (e2e, nix):
-    if "ci-logical-proof.sh emit" not in workflow or "ci-logical-proof.sh verify" not in workflow:
-        raise SystemExit("FAIL: logical checks are not bound to exact proof artifacts")
-    if "DOTFILES_SOURCE_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}" not in workflow:
-        raise SystemExit("FAIL: logical proof workflow does not distinguish PR source head from executed SHA")
-
-safeguards = pathlib.Path("scripts/apply-repo-safeguards.sh").read_text(encoding="utf-8")
-for required_call in (
-    "build_classic_payload_from_file",
-    "build_classic_state_from_file",
-    "git -C \"$repo_root\" show HEAD:.github/check-identities.json",
-    "git -C \"$repo_root\" show HEAD:.github/rulesets/main-integrity.json",
-    "git -C \"$repo_root\" show HEAD:.github/rulesets/main-review.json",
-    "git -C \"$repo_root\" show HEAD:.github/rulesets/main-owner-updates.json",
-    'capture_and_validate_live_state "$postflight_dir" "$transaction_dir"',
-    'verify_local_boundary "$postflight_dir"',
-):
-    if required_call not in safeguards:
-        raise SystemExit(f"FAIL: safeguard apply lost a frozen policy/readback boundary: {required_call}")
-
-print("OK: live safeguards require stable identities while legacy producers remain available for compatibility")
-PY
-
-command -v ruby >/dev/null 2>&1 || {
-    echo "FAIL: ruby is required for semantic .github/settings.yml policy checks" >&2
-    exit 1
-}
+cd "$(dirname "${BASH_SOURCE[0]}")/../.."
+ruby - <<'RUBY'
+require 'yaml'
+require 'json'
+metadata = JSON.parse(File.read('.github/check-identities.json'))
+abort 'unsupported required-check cutover schema' unless metadata['schema'] == 3 && metadata['stage'] == 'installer-required-pending-apply'
+rendered = []
+%w[test installer-engine].each do |name|
+  YAML.load_file(".github/workflows/#{name}.yml").fetch('jobs').each do |id, job|
+    matrix = job.dig('strategy', 'matrix')
+    rows = [{}]
+    if matrix
+      dimensions = matrix.reject { |key, _| %w[include exclude].include?(key) }
+      dimensions.each { |key, values| rows = rows.flat_map { |row| values.map { |value| row.merge(key => value) } } }
+      rows = [] if dimensions.empty?
+      rows += matrix.fetch('include', [])
+      rows -= matrix.fetch('exclude', [])
+    end
+    rows.each do |row|
+      rendered << job.fetch('name', id).gsub(/\$\{\{ matrix\.(\w+) \}\}/) { row.fetch(Regexp.last_match(1)).to_s }
+    end
+  end
+end
+abort "required contexts differ from emitted jobs: #{(rendered - metadata['required']) + (metadata['required'] - rendered)}" unless rendered.sort == metadata['required'].sort
+abort 'duplicate emitted context' unless rendered.uniq == rendered
+rules = JSON.parse(File.read('.github/rulesets/main-integrity.json')).fetch('rules')
+checks = rules.find { |rule| rule['type'] == 'required_status_checks' }.fetch('parameters').fetch('required_status_checks')
+abort 'ruleset contexts drifted' unless checks == metadata['required'].map { |name| {'context' => name, 'integration_id' => 15368} }
+script = File.read('scripts/apply-repo-safeguards.sh')
+contexts = script.match(/required_check_contexts\(\) \{\n    cat <<'EOF'\n(.*?)\nEOF/m)[1].lines.map(&:strip)
+abort 'safeguard contexts drifted' unless contexts == metadata['required']
+%w[build_classic_payload_from_file build_classic_state_from_file verify_local_boundary verify_snapshot_unchanged].each do |boundary|
+  abort "missing #{boundary}" unless script.include?(boundary)
+end
+puts 'OK: emitted jobs, desired ruleset and frozen safeguard apply agree; live policy application remains explicit'
+RUBY
 ruby tests/static/assert_no_probot_branches.rb .github/settings.yml
-
-awk '
-  /^required_check_contexts\(\) \{/ { in_fn = 1; next }
-  in_fn && /^}/ { in_fn = 0; next }
-  in_fn && /^[[:space:]]*cat <<'\''EOF'\''/ { in_heredoc = 1; next }
-  in_fn && in_heredoc && /^EOF$/ { in_heredoc = 0; next }
-  in_fn && in_heredoc { print }
-' scripts/apply-repo-safeguards.sh > "$safeguards_function"
-
-python3 - <<'PY' > "$ruleset"
-import json
-
-with open(".github/rulesets/main-integrity.json", encoding="utf-8") as fh:
-    data = json.load(fh)
-
-for rule in data["rules"]:
-    if rule["type"] == "required_status_checks":
-        for check in rule["parameters"]["required_status_checks"]:
-            print(check["context"])
-        break
-PY
-
-if ! diff -u "$expected" "$safeguards_function"; then
-    echo "FAIL: safeguards required_check_contexts is out of sync with the stable target" >&2
-    exit 1
-fi
-if ! diff -u "$expected" "$ruleset"; then
-    echo "FAIL: main-integrity ruleset required checks are out of sync with the stable target" >&2
-    exit 1
-fi
-
-echo "OK"

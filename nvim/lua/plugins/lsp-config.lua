@@ -5,6 +5,7 @@ return {
     build = ":MasonUpdate",
     config = function()
       require("mason").setup({
+        install_root_dir = require("util.managed_runtime").path("mason"),
         ui = {
           border = "rounded",
           icons = {
@@ -67,7 +68,7 @@ return {
         -- Prefer the real Mason package binary over Mason's PATH shim. On
         -- Windows the shim is a .cmd wrapper, and killing the wrapper can leave
         -- the actual neocmakelsp.exe child alive after headless nvim exits.
-        local mason_exe = vim.fn.stdpath("data") .. "/mason/packages/neocmakelsp/" .. exe
+        local mason_exe = require("util.managed_runtime").path("mason/packages/neocmakelsp/" .. exe)
         if vim.fn.executable(mason_exe) == 1 then
           return { mason_exe, "stdio" }
         end
@@ -142,7 +143,7 @@ return {
       vim.lsp.config("powershell_es", {
         capabilities = capabilities,
         root_markers = { ".git" },
-        bundle_path = vim.fn.stdpath("data") .. "/mason/packages/powershell-editor-services",
+        bundle_path = require("util.managed_runtime").path("mason/packages/powershell-editor-services"),
       })
 
       -- powershell_es starts via `pwsh` and runs the PowerShellEditorServices
@@ -160,7 +161,7 @@ return {
         "jsonls",
         "neocmake",
       }
-      local pses_bundle = vim.fn.stdpath("data") .. "/mason/packages/powershell-editor-services"
+      local pses_bundle = require("util.managed_runtime").path("mason/packages/powershell-editor-services")
       if vim.fn.executable("pwsh") == 1 and vim.fn.isdirectory(pses_bundle) == 1 then
         table.insert(enabled_servers, "powershell_es")
       end

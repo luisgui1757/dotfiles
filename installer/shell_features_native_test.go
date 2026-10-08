@@ -1,0 +1,197 @@
+package installer
+
+import (
+	"context"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"testing"
+	"time"
+)
+
+func TestNativeArchiveSelectedShellFeaturesLifecycle(t *testing.T) {
+	if os.Getenv("DOTFILES_TEST_ARCHIVES") != "1" {
+		t.Skip("enable real upstream native lifecycle")
+	}
+	t.Run("native-default-shell", selectedShellLifecycle)
+}
+
+// Cross-OS PowerShell syntax and process behavior use the generated active
+// shell fixtures in Profile.Tests.ps1. Native package lifecycles keep native OS
+// identity and providers; a Linux process cannot observe Windows VC++ runtime.
+func selectedShellLifecycle(t *testing.T) {
+	powershell := runtime.GOOS == "windows"
+
+	repository, err := filepath.Abs("..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	home, err := resolveConfigPath(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	folders := ConfigFolders{Home: home, Config: filepath.Join(home, ".config"), Documents: filepath.Join(home, "documents"), LocalAppData: filepath.Join(home, "local"), AppData: filepath.Join(home, "roaming")}
+	target := nativePlatform(t)
+	if powershell {
+		target.WindowsPowerShell, err = DiscoverWindowsPowerShell()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	c, err := NewNativeController(repository, "feature-lifecycle", filepath.Join(home, "state"), target, folders)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := c.Driver.(*NativeDriver)
+	var runtimeResource Resource
+	var runtimeBefore Observation
+	if powershell {
+		var ok bool
+		runtimeResource, ok = c.Catalog.Resource("tool.vcredist")
+		if !ok {
+			t.Fatal("missing native VC++ runtime resource")
+		}
+		runtimeBefore, err = d.Observe(t.Context(), runtimeResource, Receipt{})
+		if err != nil || !runtimeBefore.Present || !runtimeBefore.Healthy {
+			t.Fatal("archive fixture requires a healthy pre-existing VC++ runtime; owned vendor installation belongs to the fresh Windows lane", runtimeBefore, err)
+		}
+	}
+	selected := []string{"starship", "fzf", "zoxide", "lsd"}
+	if runtime.GOOS == "windows" {
+		selected = append(selected, "powershell")
+	}
+	dispatchApproved(t, c, Request{Schema: 1, Mode: "apply", Selected: selected})
+	verify := func(zoxide bool) {
+		t.Helper()
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		var cmd *exec.Cmd
+		if powershell {
+			// This subprocess tests real loaded functions with an explicit
+			// invocation fixture. Native terminal interaction is a separate gate.
+			profile := filepath.Join(folders.Documents, "PowerShell", "profile.ps1")
+			command, err := d.Archives.CommandPath("tool.starship", "starship")
+			if err != nil {
+				t.Fatal(err)
+			}
+			script := "$global:DotfilesProfileInvocationContext = @{UserInteractive=$true;HostName='ConsoleHost';CommandLineArgs=@('pwsh','-NoExit');InputRedirected=$false;OutputRedirected=$false;ErrorRedirected=$false;CIValue=''}; . " + powershellLiteral(profile) + "; if ((Get-Command starship).Source -ne " + powershellLiteral(command) + ") { throw 'wrong Starship executable' }; starship --version; fzf --version; Get-Command Invoke-Fzf | Select-Object -ExpandProperty Name; "
+			if zoxide {
+				script += "Get-Command z | Select-Object -ExpandProperty Name; zoxide --version"
+			} else {
+				script += "if (Get-Command z -ErrorAction SilentlyContinue) { throw 'removed zoxide hook remains' }"
+			}
+			program, err := d.Archives.CommandPath("tool.powershell", "pwsh")
+			if err != nil {
+				t.Fatal(err)
+			}
+			script += "; if ((Get-PSReadLineOption).EditMode -ne 'Vi') { throw 'Active profile lost PSReadLine vi mode' }; $keys=Get-PSReadLineKeyHandler -Bound; foreach ($binding in @(@('Tab','MenuComplete'),@('UpArrow','HistorySearchBackward'),@('DownArrow','HistorySearchForward'))) { if (-not ($keys | Where-Object { $_.Key -eq $binding[0] -and $_.Function -eq $binding[1] })) { throw ('Active PSReadLine binding missing: '+$binding[0]) } }; if ((Get-Command ls).CommandType -ne 'Function' -or $env:LS_COLORS -notmatch 'di=38;2;246;193;119') { throw 'Active lsd profile missing' }"
+			cmd = exec.CommandContext(ctx, program, "-NoLogo", "-NoProfile", "-NonInteractive", "-Command", script)
+		} else {
+			script := "starship --version; fzf --version; alias ls; "
+			if zoxide {
+				script += "type z; zoxide --version"
+			} else {
+				script += "if declare -F __zoxide_z >/dev/null; then exit 31; fi"
+			}
+			cmd = exec.CommandContext(ctx, "/bin/bash", "--noprofile", "--rcfile", filepath.Join(home, ".bashrc"), "-ic", script)
+		}
+		cmd.Dir = home
+		cmd.Env = append(os.Environ(), "HOME="+home, "XDG_CONFIG_HOME="+folders.Config, "ZDOTDIR="+home, "TERM=xterm-256color")
+		output, err := cmd.CombinedOutput()
+		if err != nil || !strings.Contains(string(output), "starship "+d.Archives.Pins["tool.starship"].Version) || !strings.Contains(string(output), d.Archives.Pins["tool.fzf"].Version) || zoxide && !strings.Contains(string(output), "zoxide "+d.Archives.Pins["tool.zoxide"].Version) {
+			t.Fatalf("selected hooks zoxide=%v: %s %v", zoxide, output, err)
+		}
+		t.Logf("selected hooks zoxide=%v: %s", zoxide, output)
+	}
+	verify(true)
+	initName, personal := "init.sh", "export DOTFILES_PERSONAL_VALUE=preserved\n"
+	if powershell {
+		initName, personal = "init.ps1", "$env:DOTFILES_PERSONAL_VALUE = 'preserved'\n"
+	}
+	edited := filepath.Join(home, "state", "shells", initName)
+	data, err := os.ReadFile(edited)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(edited, append(data, []byte(personal)...), 0600); err != nil {
+		t.Fatal(err)
+	}
+	dispatchApproved(t, c, Request{Schema: 1, Mode: "update"})
+	dispatchApproved(t, c, Request{Schema: 1, Mode: "repair"})
+	selected = []string{"starship", "fzf", "lsd"}
+	if runtime.GOOS == "windows" {
+		selected = append(selected, "powershell")
+	}
+	dispatchApproved(t, c, Request{Schema: 1, Mode: "apply", Selected: selected})
+	verify(false)
+	if _, err := os.Lstat(d.Archives.currentLink("tool.zoxide")); !os.IsNotExist(err) {
+		t.Fatal("unused private dependency survived removal", err)
+	}
+	var retainedShell []byte
+	if powershell {
+		retainedShell, err = os.ReadFile(edited)
+		if err != nil || !strings.Contains(string(retainedShell), "# >>> dotfiles:integration.shells >>>") || !strings.HasSuffix(string(retainedShell), personal) {
+			t.Fatal("expected owned shell block and personal suffix before deselection", err)
+		}
+	}
+	removed := dispatchApproved(t, c, Request{Schema: 1, Mode: "apply", Selected: []string{}})
+	if powershell {
+		// A shared runtime and its shell prerequisite remain until the user
+		// explicitly authorizes removal of that exact owned runtime.
+		for _, id := range []string{"tool.powershell", "integration.shells"} {
+			op := operation(t, removed.Plan, id)
+			if op.Action != "retain" || op.Ownership != "created" || !op.Observed.Present {
+				t.Fatal("shared PowerShell deselection did not retain its owned prerequisite", op)
+			}
+		}
+		if _, err := os.Lstat(d.Archives.currentLink("tool.powershell")); err != nil {
+			t.Fatal("shared PowerShell archive was not retained", err)
+		}
+		data, err := os.ReadFile(edited)
+		if err != nil || string(data) != string(retainedShell) {
+			t.Fatal("default retention changed the owned shell block or personal suffix", err)
+		}
+		t.Log("default deselection retained owned PowerShell and exact shell/personal bytes")
+		removed = dispatchApproved(t, c, Request{Schema: 1, Mode: "apply", Selected: []string{}, RemoveShared: []string{"tool.powershell"}})
+		if op := operation(t, removed.Plan, "tool.powershell"); op.Action != "remove" || op.Ownership != "created" {
+			t.Fatal("explicit owned PowerShell removal was not performed", op)
+		}
+		if _, err := os.Lstat(d.Archives.currentLink("tool.powershell")); !os.IsNotExist(err) {
+			t.Fatal("owned PowerShell archive survived explicit removal", err)
+		}
+		t.Log("explicit per-item removal released only the owned PowerShell runtime")
+	}
+	for _, id := range []string{"tool.starship", "tool.fzf", "tool.zoxide"} {
+		if _, err := os.Lstat(d.Archives.currentLink(id)); !os.IsNotExist(err) {
+			t.Fatal("private dependency survived full removal", id, err)
+		}
+	}
+	for _, entry := range d.Profiles.Targets["integration.shells"] {
+		if entry.Path == edited {
+			data, err := os.ReadFile(edited)
+			expected := personal
+			if powershell {
+				expected = "\ufeff" + expected
+			}
+			if err != nil || string(data) != expected {
+				t.Fatalf("outside shell edits lost: %q %v", data, err)
+			}
+			continue
+		}
+		if _, err := os.Lstat(entry.Path); !os.IsNotExist(err) {
+			t.Fatal("newly created profile survived full removal", entry.Path, err)
+		}
+	}
+	if powershell {
+		state, err := LoadState(c.StatePath, c.Home)
+		if err != nil || state.Receipts["tool.vcredist"].Ownership != "reused" {
+			t.Fatal("pre-existing VC++ runtime ownership changed", err)
+		}
+		after, err := d.Observe(t.Context(), runtimeResource, state.Receipts["tool.vcredist"])
+		if err != nil || !after.Present || !after.Healthy || after.Fingerprint != runtimeBefore.Fingerprint {
+			t.Fatal("pre-existing VC++ runtime changed", runtimeBefore, after, err)
+		}
+	}
+}

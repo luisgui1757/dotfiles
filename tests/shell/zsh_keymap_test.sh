@@ -9,8 +9,10 @@ if ! command -v zsh >/dev/null 2>&1; then
 fi
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
+# shellcheck source=tests/shell/active_fixture.sh
+source "$REPO_ROOT/tests/shell/active_fixture.sh"
 
-if grep -E "^[^#]*bindkey\s+'\\\e'\s+kill-whole-line" "$REPO_ROOT/shells/zshrc" >/dev/null; then
+if grep -E "^[^#]*bindkey\s+'\\\e'\s+kill-whole-line" "$ACTIVE_ZSH" >/dev/null; then
     echo "FAIL: zshrc still binds bare Esc to kill-whole-line"
     echo "      That shadows the Meta prefix and breaks Alt-X keybindings."
     exit 1

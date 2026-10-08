@@ -190,6 +190,10 @@ end
 
 local function update_installed_parsers_for_build()
   local nvim_treesitter = require("nvim-treesitter")
+  local managed_runtime = require("util.managed_runtime")
+  if managed_runtime.root() then
+    nvim_treesitter.setup({ install_dir = managed_runtime.path("site") })
+  end
   if type(nvim_treesitter.update) ~= "function" then
     error("nvim-treesitter update API is unavailable; restore the locked plugin and retry", 0)
   end
@@ -215,10 +219,15 @@ return {
     "nvim-treesitter/nvim-treesitter",
     branch = "main",
     build = update_installed_parsers_for_build,
+    opts = { dotfiles_parsers = treesitter_parsers },
     cmd = { "TSInstall", "TSInstallFromGrammar", "TSUpdate", "TSUninstall", "TSLog" },
     event = { "BufReadPre", "BufNewFile" },
     config = function()
       local nvim_treesitter = require("nvim-treesitter")
+      local managed_runtime = require("util.managed_runtime")
+      if managed_runtime.root() then
+        nvim_treesitter.setup({ install_dir = managed_runtime.path("site") })
+      end
       local sync_install = vim.env.DOTFILES_TREESITTER_SYNC_INSTALL == "1"
       local headless = #vim.api.nvim_list_uis() == 0
       local install_requested = sync_install or not headless
@@ -232,11 +241,11 @@ return {
         end)
       end
 
-      -- Every nvim-treesitter cleanup is constrained to stdpath("data"). A
-      -- successful vim.fn.delete() return is not sufficient proof: verify the
+      -- Cleanup stays inside the active managed runtime, or stdpath("data")
+      -- for released setup. A successful delete is not proof: verify the
       -- path is absent as well, because permission and partial directory
       -- failures can leave executable parser/query payloads behind.
-      local managed_data_root = vim.fs.normalize(vim.fn.stdpath("data")):gsub("/$", "")
+      local managed_data_root = vim.fs.normalize(managed_runtime.root() or vim.fn.stdpath("data")):gsub("/$", "")
       local managed_data_prefix = managed_data_root .. "/"
       local function checked_delete_managed(path, mode)
         local deleted, delete_error = require("util.checked_delete").managed(path, mode, managed_data_root)
@@ -357,7 +366,7 @@ return {
             return dir
           end
         end
-        return vim.fs.joinpath(vim.fn.stdpath("data"), "site", "queries")
+        return managed_runtime.path("site/queries")
       end
 
       local function purge_managed_bundled_query_dirs()
@@ -453,7 +462,7 @@ return {
         report_install_problem(
           "nvim-treesitter: 'tree-sitter' CLI not found on PATH; parsers were not compiled. "
             .. "Install it (macOS: brew install tree-sitter-cli; Linux/WSL: run the dotfiles setup; "
-            .. "Windows: install-deps.ps1 -All), then run :TSUpdate."
+            .. "Windows: open setup.ps1 and choose Neovim), then run :TSUpdate."
         )
       end
 

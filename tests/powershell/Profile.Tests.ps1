@@ -1,6 +1,18 @@
 BeforeAll {
     $script:RepoRoot = (Resolve-Path "$PSScriptRoot/../..").Path
-    $script:Profile  = Join-Path $script:RepoRoot "shells/powershell_profile.ps1"
+    $script:Fixture = Join-Path ([IO.Path]::GetTempPath()) ('active shell ' + [char]0xfc + ' ' + [Guid]::NewGuid())
+    [void][IO.Directory]::CreateDirectory($script:Fixture)
+    $previousExport = $env:DOTFILES_WRITE_SHELL_FIXTURES
+    try {
+        $env:DOTFILES_WRITE_SHELL_FIXTURES = $script:Fixture
+        & go -C (Join-Path $script:RepoRoot 'installer') test -count=1 -run '^TestWriteActiveShellFixtures$' .
+        if ($LASTEXITCODE -ne 0) { throw 'Active shell generation failed' }
+    } finally {
+        $env:DOTFILES_WRITE_SHELL_FIXTURES = $previousExport
+    }
+    $script:Profile = Join-Path $script:Fixture 'windows/state/shells/init.ps1'
+    $script:CacheDirectory = Join-Path $script:Fixture 'windows/state/shell-cache'
+
     $script:InteractiveProfileContext = @'
 $DotfilesProfileInvocationContext = @{
     UserInteractive = $true
@@ -14,12 +26,22 @@ $DotfilesProfileInvocationContext = @{
 '@
 }
 
+AfterAll {
+    if ($script:Fixture) { Remove-Item -LiteralPath $script:Fixture -Recurse -Force }
+}
+
 Describe "PowerShell profile" {
 
-    It "passes PSScriptAnalyzer with no Warning+ findings" {
+    It "matches the exact reviewed generated-profile analyzer findings" {
         $diags = Invoke-ScriptAnalyzer -Path $script:Profile -Severity Warning,Error
         if ($diags) { $diags | Format-Table | Out-String | Write-Host }
-        $diags.Count | Should -Be 0
+        # This process-wide sentinel prevents duplicate initialization across
+        # dot-sourced host profiles. It is the only permitted warning identity.
+        $diags.Count | Should -Be 2
+        foreach ($finding in $diags) {
+            $finding.RuleName | Should -BeExactly 'PSAvoidGlobalVars'
+            $finding.Extent.Text | Should -BeExactly '$global:DotfilesShellReady'
+        }
     }
 
     It "dot-sources cleanly even when starship is not on PATH" {
@@ -47,16 +69,16 @@ Describe "PowerShell profile" {
         }
     }
 
-    It "uses an approved verb (Confirm- not Ensure-)" {
+    It "uses an approved verb for the shared initialization cache" {
         $src = Get-Content -Raw -LiteralPath $script:Profile
-        $src | Should -Match 'function Confirm-StarshipInitScript'
-        $src | Should -Not -Match 'function Ensure-StarshipInitScript'
+        $src | Should -Match 'function Get-DotfilesInitScript'
+        $src | Should -Not -Match 'function Ensure-DotfilesInitScript'
     }
 
     It "uses invocation, redirection, CI, and host checks before profile work" {
         $src = Get-Content -Raw -LiteralPath $script:Profile
         $guardIndex = $src.IndexOf('function Test-DotfilesInteractiveInvocation')
-        $cacheIndex = $src.IndexOf('$script:CacheDir')
+        $cacheIndex = $src.IndexOf('function Get-DotfilesInitScript')
         $guardIndex | Should -BeGreaterOrEqual 0
         $cacheIndex | Should -BeGreaterThan $guardIndex
         $src | Should -Match '\[Environment\]::GetCommandLineArgs\(\)'
@@ -139,118 +161,52 @@ Describe "PowerShell profile" {
             $process.ExitCode | Should -Be 0
             $stdout | Should -BeNullOrEmpty
             $stderr | Should -BeNullOrEmpty
-            Test-Path -LiteralPath (Join-Path $cache 'starship.ps1') | Should -BeFalse
-            Test-Path -LiteralPath (Join-Path $cache 'zoxide.ps1') | Should -BeFalse
-            Test-Path -LiteralPath (Join-Path $cache 'zoxide.ps1.version') | Should -BeFalse
+            Test-Path -LiteralPath $script:CacheDirectory | Should -BeFalse
         } finally {
             Remove-Item -LiteralPath $sandbox -Recurse -Force -ErrorAction SilentlyContinue
         }
     }
 
-    It "writes the starship init cache with UTF8 no-BOM encoding" {
+    It "uses parsed local UTF8 caches with exclusive atomic publication" {
         $src = Get-Content -Raw -LiteralPath $script:Profile
-        $src | Should -Match 'function Publish-StarshipInitScript'
-        $src | Should -Match '\[System\.Text\.UTF8Encoding\]::new\(\$false\)'
+        $src | Should -Not -Match 'Invoke-Expression|(^|[^A-Za-z0-9_])iex([^A-Za-z0-9_]|$)'
+        $src | Should -Match '\[Text\.UTF8Encoding\]::new\(\$false\)'
+        $src | Should -Match '\[IO\.File\]::Move\(\$temporary, \$CachePath\)'
+        $src.IndexOf('tool.starship/current/bin/starship.ps1'.Replace('/', [IO.Path]::DirectorySeparatorChar)) | Should -BeLessThan $src.LastIndexOf('tool.zoxide/current/bin/zoxide.ps1'.Replace('/', [IO.Path]::DirectorySeparatorChar))
     }
 
-    It "publishes the starship init cache atomically from a temp file" {
-        $src = Get-Content -Raw -LiteralPath $script:Profile
-        $src | Should -Match '"\{0\}\.\{1\}\.\{2\}\.tmp"\s+-f\s+\$initLeaf,\s+\$PID'
-        $src | Should -Match '\[IO\.File\]::Replace\(\$tempPath,\s*\$InitPath,\s*\$rollbackPath,\s*\$true\)'
-        $src | Should -Match 'Test-StarshipInitScriptValid\s+-Path\s+\$InitPath'
-        $src | Should -Match 'function Import-StarshipInitScriptWithRetry'
-        $src | Should -Match 'Start-Sleep\s+-Milliseconds\s+\$DelayMilliseconds'
-    }
-
-    It "repairs an invalid Starship cache and preserves old bytes on generation failure" {
-        $pwshExe = (Get-Command pwsh -ErrorAction Stop).Source
-        $profilePath = $script:Profile.Replace('"', '`"')
-        $sandbox = Join-Path ([IO.Path]::GetTempPath()) ('starship cache ' + [Guid]::NewGuid())
-        $scriptBlock = @"
+    It "reuses valid caches and preserves invalid or failed-generation evidence" {
+        $sandbox = Join-Path $TestDrive ('cache contract ' + [char]0xfc)
+        [void][IO.Directory]::CreateDirectory($sandbox)
+        $child = @"
 $($script:InteractiveProfileContext)
-`$env:PATH = ''
-. "$profilePath"
-`$root = '$($sandbox.Replace("'", "''"))'
-`$cache = Join-Path `$root 'starship.ps1'
-`$config = Join-Path `$root 'starship.toml'
-New-Item -ItemType Directory -Force -Path `$root | Out-Null
-[IO.File]::WriteAllText(`$cache, 'function broken {', [Text.UTF8Encoding]::new(`$false))
-Confirm-StarshipInitScript -InitPath `$cache -ConfigPath `$config -Generator {
-    `$global:LASTEXITCODE = 0
-    'function global:prompt { return "repaired" }'
+. '$($script:Profile.Replace("'", "''"))'
+`$cache = '$((Join-Path $sandbox 'init.ps1').Replace("'", "''"))'
+`$generator = '$((Join-Path $sandbox 'generator.ps1').Replace("'", "''"))'
+[IO.File]::WriteAllText(`$generator, '`$global:LASTEXITCODE=0; ''function global:FixtureInit { }''')
+`$path = Get-DotfilesInitScript -Command `$generator -Arguments @() -CachePath `$cache
+if (`$path -ne `$cache) { throw 'Wrong initialization cache' }
+`$bytes = [IO.File]::ReadAllBytes(`$cache)
+if (`$bytes.Length -ge 3 -and `$bytes[0] -eq 239 -and `$bytes[1] -eq 187 -and `$bytes[2] -eq 191) { throw 'Cache has a BOM' }
+[IO.File]::WriteAllText(`$generator, 'throw "Must not regenerate a valid cache"')
+`$null = Get-DotfilesInitScript -Command `$generator -Arguments @() -CachePath `$cache
+[IO.File]::WriteAllText(`$cache, 'function broken {')
+try { `$null = Get-DotfilesInitScript -Command `$generator -Arguments @() -CachePath `$cache; throw 'Accepted invalid cache' } catch {
+    if (`$_.Exception.Message -notmatch 'Invalid initialization cache') { throw }
 }
-if (-not (Test-StarshipInitScriptValid -Path `$cache)) { exit 10 }
-if ([IO.File]::ReadAllText(`$cache) -notmatch 'repaired') { exit 11 }
-
-`$preserved = [IO.File]::ReadAllBytes(`$cache)
-[IO.File]::WriteAllText(`$config, 'newer', [Text.UTF8Encoding]::new(`$false))
-(Get-Item -LiteralPath `$config).LastWriteTimeUtc = [DateTime]::UtcNow.AddMinutes(1)
-try {
-    Confirm-StarshipInitScript -InitPath `$cache -ConfigPath `$config -Generator {
-        `$global:LASTEXITCODE = 9
-        'function global:prompt { return "must-not-publish" }'
+if ([IO.File]::ReadAllText(`$cache) -cne 'function broken {') { throw 'Changed invalid cache evidence' }
+[IO.File]::Delete(`$cache)
+foreach (`$body in @('`$global:LASTEXITCODE=9; ''function global:bad { }''', '`$global:LASTEXITCODE=0; ''function broken {''', '`$global:LASTEXITCODE=0; ''   ''')) {
+    [IO.File]::WriteAllText(`$generator, `$body)
+    try { `$null = Get-DotfilesInitScript -Command `$generator -Arguments @() -CachePath `$cache; throw 'Accepted bad generator' } catch {
+        if (`$_.Exception.Message -notmatch 'Initialization generation failed') { throw }
     }
-    exit 12
-} catch {
-    if (`$_.Exception.Message -notmatch 'exited 9') { exit 13 }
+    if (Test-Path -LiteralPath `$cache) { throw 'Published failed generator' }
 }
-`$after = [IO.File]::ReadAllBytes(`$cache)
-if (`$after.Length -ne `$preserved.Length) { exit 14 }
-for (`$i = 0; `$i -lt `$after.Length; `$i++) {
-    if (`$after[`$i] -ne `$preserved[`$i]) { exit 15 }
-}
-
-[IO.File]::WriteAllText(`$cache, 'function broken {', [Text.UTF8Encoding]::new(`$false))
-try {
-    Confirm-StarshipInitScript -InitPath `$cache -ConfigPath `$config -Generator {
-        `$global:LASTEXITCODE = 0
-        '   '
-    }
-    exit 16
-} catch {
-    if (`$_.Exception.Message -notmatch 'empty or invalid') { exit 17 }
-}
-if ([IO.File]::ReadAllText(`$cache) -ne 'function broken {') { exit 18 }
-exit 0
+if (@(Get-ChildItem -LiteralPath (Split-Path -Parent `$cache) -Filter '*.tmp').Count) { throw 'Temporary cache leaked' }
 "@
-        try {
-            & $pwshExe -NoLogo -NoProfile -Command $scriptBlock
-            $LASTEXITCODE | Should -Be 0
-        } finally {
-            Remove-Item -LiteralPath $sandbox -Recurse -Force -ErrorAction SilentlyContinue
-        }
-    }
-
-    It "caches the zoxide init without remote eval (no Invoke-Expression / iex)" {
-        $src = Get-Content -Raw -LiteralPath $script:Profile
-        $src | Should -Not -Match 'Invoke-Expression'
-        $src | Should -Not -Match '(^|[^A-Za-z0-9_])iex([^A-Za-z0-9_]|$)'
-        $src | Should -Match 'function Confirm-ZoxideInitScript'
-        $src | Should -Match 'function Import-ZoxideInitScriptWithRetry'
-    }
-
-    It "publishes the zoxide init cache atomically (UTF8 no-BOM temp + Move-Item)" {
-        $src = Get-Content -Raw -LiteralPath $script:Profile
-        $src | Should -Match 'function Publish-ZoxideInitScript'
-        $src | Should -Match '"\{0\}\.\{1\}\.\{2\}\.tmp"\s+-f\s+\$initLeaf,\s+\$PID'
-        $src | Should -Match '\[System\.Text\.UTF8Encoding\]::new\(\$false\)'
-        $src | Should -Match 'Move-Item\s+-LiteralPath\s+\$tempPath\s+-Destination\s+\$InitPath\s+-Force'
-    }
-
-    It "regenerates the zoxide cache only when missing or the version changed" {
-        $src = Get-Content -Raw -LiteralPath $script:Profile
-        $src | Should -Match 'function Test-ZoxideInitRegenerationNeeded'
-        $src | Should -Match 'zoxide --version'
-        $src | Should -Match '\$script:ZoxideVersionPath'
-    }
-
-    It "wires zoxide only when the binary exists, after starship" {
-        $src = Get-Content -Raw -LiteralPath $script:Profile
-        $src | Should -Match 'Get-Command\s+zoxide\s+-ErrorAction\s+SilentlyContinue'
-        $starshipIdx = $src.IndexOf('Get-Command starship')
-        $zoxideIdx = $src.IndexOf('Get-Command zoxide')
-        $starshipIdx | Should -BeGreaterOrEqual 0
-        $zoxideIdx | Should -BeGreaterThan $starshipIdx
+        & (Get-Command pwsh -ErrorAction Stop).Source -NoLogo -NoProfile -Command $child
+        $LASTEXITCODE | Should -Be 0
     }
 
     It "configures PSReadLine with Rose Pine colors" {
@@ -316,6 +272,7 @@ if (`$env:LS_COLORS -notmatch 'ow=38;2;246;193;119' -or `$env:LS_COLORS -notmatc
 }
 `$env:LS_COLORS = 'di=01;34:ex=01;32:fi=00'
 `$env:DOTFILES_LS_COLORS = 'di=38;2;1;2;3:ex=38;2;4;5;6'
+`$global:DotfilesShellReady = `$false
 $($script:InteractiveProfileContext)
 . "$profilePath"
 if (`$env:LS_COLORS -ne `$env:DOTFILES_LS_COLORS) {
@@ -395,23 +352,9 @@ exit 0
         $src | Should -Match 'Set-PSReadLineKeyHandler -Key Tab\s+-Function MenuComplete\s+-ErrorAction'
     }
 
-    It "reapplies the vi-mode key handlers from the psmux OnIdle block" {
-        $src = Get-Content -Raw -LiteralPath $script:Profile
-        $onIdleIdx = $src.IndexOf('PowerShell.OnIdle')
-        $onIdleIdx | Should -BeGreaterThan 0
-        $tail = $src.Substring($onIdleIdx)
-        $tail | Should -Match 'Set-PSReadLineKeyHandler\s+-Key Tab\s+-Function MenuComplete\s+-ViMode Insert'
-        $tail | Should -Match 'Set-PSReadLineKeyHandler\s+-Key UpArrow\s+-Function HistorySearchBackward\s+-ViMode Insert'
-    }
+    It "does not register a delayed multiplexer rewrite in the active profile" {
+        Get-Content -Raw -LiteralPath $script:Profile | Should -Not -Match 'Register-EngineEvent|PowerShell.OnIdle'
 
-    It "does not reset EditMode from the psmux OnIdle block" {
-        $src = Get-Content -Raw -LiteralPath $script:Profile
-        $onIdleIdx = $src.IndexOf('PowerShell.OnIdle')
-        $psfzfIdx = $src.IndexOf('Set-PsFzfOption')
-        $onIdleIdx | Should -BeGreaterThan 0
-        $psfzfIdx | Should -BeGreaterThan $onIdleIdx
-        $onIdleBlock = $src.Substring($onIdleIdx, $psfzfIdx - $onIdleIdx)
-        $onIdleBlock | Should -Not -Match 'Set-PSReadLineOption\s+-EditMode'
     }
 
     It "keeps the PSFzf chords and wires them after EditMode" {
@@ -444,6 +387,7 @@ exit 0
 $($script:InteractiveProfileContext)
 . "$profilePath"
 `$o = Get-PSReadLineOption
+if ((`$global:DotfilesFixtureFzf -join '|') -cne 'Vi|Ctrl+t|Ctrl+r|Alt+c') { throw 'PSFzf did not initialize after actual PSReadLine vi mode' }
 if (`$o.EditMode -ne 'Vi') { Write-Error "EditMode=`$(`$o.EditMode)"; exit 1 }
 `$tab = Get-PSReadLineKeyHandler -Bound | Where-Object { `$_.Key -eq 'Tab' }
 if (-not (`$tab | Where-Object { `$_.Function -eq 'MenuComplete' })) { Write-Error 'Tab not MenuComplete'; exit 2 }
