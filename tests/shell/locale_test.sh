@@ -7,10 +7,12 @@ if ! command -v zsh >/dev/null 2>&1; then
 fi
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
+# shellcheck source=tests/shell/active_fixture.sh
+source "$REPO_ROOT/tests/shell/active_fixture.sh"
 TMP_ROOT="$REPO_ROOT/tests/.cache/locale-test"
 rm -rf "$TMP_ROOT"
 mkdir -p "$TMP_ROOT/bin"
-trap 'rm -rf "$TMP_ROOT"' EXIT
+trap 'active_shell_cleanup; rm -rf "$TMP_ROOT"' EXIT
 
 cat > "$TMP_ROOT/bin/locale" <<'EOF'
 #!/usr/bin/env bash
@@ -36,7 +38,7 @@ run_case() {
         PATH="$TMP_ROOT/bin:$PATH" \
         LOCALE_FIXTURE="$fixture" \
         LANG=C LC_ALL=C LANGUAGE=C LC_MESSAGES=C \
-        zsh -i -c "source $REPO_ROOT/shells/zshrc; print -r -- '@@LOCALE@@'\$LANG'|'\$LC_ALL'|'\$LANGUAGE'|'\$LC_MESSAGES'@@END@@'" 2>&1
+        zsh -d -f -i -c "source \"$ACTIVE_ZSH_CORE\" || exit 1; print -r -- '@@LOCALE@@'\$LANG'|'\$LC_ALL'|'\$LANGUAGE'|'\$LC_MESSAGES'@@END@@'" 2>&1
     )
     value=$(printf '%s\n' "$raw" | grep -oE '@@LOCALE@@.*@@END@@' | sed -e 's/^@@LOCALE@@//' -e 's/@@END@@$//')
     if [[ "$value" != "$expected" ]]; then

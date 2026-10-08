@@ -25,7 +25,7 @@ vim.opt.confirm = true
 
 -- Mouse intentionally disabled. The `mouse = ""` line alone is enough on
 -- a clean nvim install (default is "nvi" in 0.11 -- left-click places the
--- cursor when enabled), but on Windows under psmux + Windows Terminal the
+-- cursor when enabled), but the terminal/editor
 -- input pipeline has multiple layers that can flip mouse handling on (a
 -- Lazy-loaded plugin, the :terminal mouse pass-through, etc.). Belt-and-
 -- braces: even if `mouse` ever gets flipped back to nvi, the other three
@@ -45,33 +45,44 @@ vim.opt.list = true
 vim.opt.listchars = { tab = "▸ ", lead = "·", trail = "·", nbsp = "␣" }
 
 -- Cross-platform system clipboard.
--- mac: works via pbcopy; wsl: needs win32yank.exe; linux: needs xclip/wl-copy.
+-- Providers follow the active display, terminal or an existing clipboard bridge.
 vim.opt.clipboard = "unnamedplus"
 
--- Runtime sanity check: if nothing in the clipboard-provider chain is on
--- PATH, yanks will silently fail to reach the system clipboard. Warn once
+-- An installed display helper is not usable without its display session. Warn once
 -- on a delayed timer so the message lands AFTER the colorscheme + lualine
 -- load (otherwise it gets buried in startup output).
 function M._warn_if_missing_clipboard_provider()
   -- Escape hatch: a user-defined vim.g.clipboard provider overrides
   -- nvim's discovery chain. Don't warn in that case.
-  if vim.g.clipboard ~= nil then
+  if vim.g.clipboard ~= nil and vim.g.clipboard ~= false then
     return
   end
-  local providers = { "pbcopy", "wl-copy", "xclip", "xsel", "win32yank.exe" }
-  for _, p in ipairs(providers) do
-    if vim.fn.executable(p) == 1 then
-      return
+  local function available(...)
+    for _, command in ipairs({ ... }) do
+      if vim.fn.executable(command) ~= 1 then
+        return false
+      end
     end
+    return true
+  end
+  local function session(name)
+    return vim.env[name] ~= nil and vim.env[name] ~= ""
+  end
+  if
+    available("pbcopy", "pbpaste")
+    or available("win32yank.exe")
+    or available("clip", "powershell")
+    or (session("WAYLAND_DISPLAY") and available("wl-copy", "wl-paste"))
+    or (session("DISPLAY") and (available("xclip") or available("xsel")))
+    or (session("TMUX") and available("tmux"))
+  then
+    return
   end
   vim.notify(
-    "clipboard: no provider on PATH (pbcopy / wl-copy / xclip / xsel / win32yank.exe).\n"
-      .. "Yanks will not reach the system clipboard. Install one for your OS:\n"
-      .. "  macOS:        pre-installed (pbcopy)\n"
-      .. "  Linux X11:    sudo apt install xclip\n"
-      .. "  Linux Wayland: sudo apt install wl-clipboard\n"
-      .. "  WSL:          install win32yank on the Windows side (scoop install win32yank)\n"
-      .. "(Set vim.g.clipboard = {...} to define a custom provider and silence this warning.)",
+    "clipboard: no provider on PATH for this session.\n"
+      .. "Run dotfiles and select Neovim to install its clipboard helpers.\n"
+      .. "A headless session needs a terminal clipboard transport or an existing bridge.\n"
+      .. "See :help clipboard-osc52, or set vim.g.clipboard for a custom provider.",
     vim.log.levels.WARN
   )
 end
