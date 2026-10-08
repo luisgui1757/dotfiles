@@ -1,5 +1,24 @@
 # Chezmoi Migration Status
 
+> Historical release record. Current setup uses the Go installer; see
+> [installer status](installer-status.md). WezTerm was retired from the active
+> product on 2026-10-10. Its passive `home/dot_config/wezterm/wezterm.lua` and
+> released inventory remain for old live links/discovery; the canonical active
+> configuration and installer route described below no longer exist.
+
+## Future selective-installer migration
+
+The [interactive installer plan](plans/interactive-installer-overhaul.md) is
+**implementation in progress; public workflow unchanged**. The
+[status inventory](installer-status.md) records the experimental Go core and
+missing adapters, projections, interface, distribution and native evidence. Its adoption phase must
+preserve prior Nix profiles, existing owner evidence, exact-release recovery,
+all Windows known-folder destinations and chezmoi parity. Selection-aware
+config application and surgical package removal are future work, separate from
+the shipped chezmoi migration documented below. See its
+[review ledger](reviews/2026-10-08-interactive-installer-overhaul.md) for the
+ownership gaps and unresolved reproduction work.
+
 ## chezmoi owns (config layer)
 
 `home/` is the active chezmoi source tree for the dotfiles config layer. It now
@@ -28,14 +47,11 @@ greenfield runbook.
 | gh-dash | `gh-dash/config.yml`; `home/dot_config/gh-dash/config.yml` | macOS/Linux/WSL: `~/.config/gh-dash/config.yml`; Windows: `%USERPROFILE%\.config\gh-dash\config.yml` | POSIX symlink via `mode = "symlink"`; Windows copy via `mode = "file"`. |
 | Pi themes and keys | Three canonical Fable-tuned `pi/{rose-pine,rose-pine-moon,rose-pine-dawn}.json` files and matching `home/dot_pi/agent/themes/` mirrors; `pi/keybindings.json`; `home/dot_pi/agent/keybindings.json`; `scripts/configure-pi-theme.mjs` | all OSes: three `~/.pi/agent/themes/rose-pine*.json` files, `~/.pi/agent/keybindings.json`, plus the `theme` key in `~/.pi/agent/settings.json` | Config files are POSIX symlinks / Windows copies. Keybindings own exactly the upstream `Shift+Enter` / `Ctrl+J` newline pair. First setup selects Main; reruns preserve any managed variant; updates retire recognized `*-fable` aliases across Git-normalized LF/CRLF framing while preserving substantive edits; uninstall also clears a still-selected retired managed alias. |
 | lsd | `lsd/config.yaml`; `lsd/colors.yaml`; `home/dot_config/lsd/config.yaml`; `home/dot_config/lsd/colors.yaml` | macOS/Linux/WSL: `~/.config/lsd/{config.yaml,colors.yaml}`; Windows: `%USERPROFILE%\.config\lsd\{config.yaml,colors.yaml}` | POSIX symlink via `mode = "symlink"`; Windows copy via `mode = "file"`. The shell profiles own Rose Pine `LS_COLORS` for file/directory names, with `DOTFILES_LS_COLORS` as the explicit override; `colors.yaml` owns long-list metadata. |
-| tmux | `tmux/tmux.conf`; `home/dot_tmux.conf` | POSIX: `~/.tmux.conf`; Windows: `%USERPROFILE%\.tmux.conf` | POSIX symlink via `mode = "symlink"`; Windows copy via `mode = "file"`. |
-| tmux Windows overlay | `tmux/tmux.windows.conf`; `home/dot_tmux.windows.conf` | Windows: `%USERPROFILE%\.tmux.windows.conf`; POSIX: ignored | Windows copy only; `tmux.conf` sources it with `source-file -q`. |
-| tmux POSIX overlay | `tmux/tmux.posix.conf`; `home/dot_tmux.posix.conf` | POSIX: `~/.tmux.posix.conf`; Windows: ignored | POSIX symlink only. Holds the native-clipboard `if-shell` probes, which hang psmux at config-load time, so it is **never** deployed on Windows; `tmux.conf` sources it with `source-file -q`. |
-| psmux | `tmux/psmux.conf`; `home/dot_psmux.conf` | Windows: `%USERPROFILE%\.psmux.conf`; POSIX: ignored | Windows copy only. It is the first native-Windows multiplexer entrypoint and source-files the tmux Windows overlay. |
-| Generated Rose Pine tmux/psmux bar | `tmux/psmux-rose-pine.ps1`; generated `tmux/psmux-rose-pine.{main,moon,dawn}.conf`; `home/dot_tmux.rose-pine.ps1`; `home/dot_tmux.rose-pine.*.conf` | POSIX/Windows: `~/.tmux.rose-pine.{main,moon,dawn}.conf`; Windows also gets `~/.tmux.rose-pine.ps1` | Source generator plus checked generated configs; POSIX symlinks, Windows copies. |
+| tmux | `tmux/tmux.conf`; `home/dot_tmux.conf` | macOS/Linux: `~/.tmux.conf`; Windows: not deployed | One POSIX config plus generated Rose Pine variants. |
+| Generated Rose Pine tmux bar | `tmux/rose-pine.ps1`; generated `tmux/rose-pine.{main,moon,dawn}.conf`; `home/dot_tmux.rose-pine.*.conf` | macOS/Linux: `~/.tmux.rose-pine.{main,moon,dawn}.conf`; Windows: not deployed | Maintainer generator plus checked artifacts; only artifacts are installed. |
 | Windows Terminal | `windows-terminal/settings.fragment.jsonc`; `home/.chezmoitemplates/windows-terminal/{settings.fragment.jsonc,merge-settings.ps1}`; `scripts/windows-terminal-targets.ps1` | Windows stable packaged + Preview + Canary + portable settings paths | `setup.ps1` is the only publisher. Chezmoi exposes no WT target. One validated enumerator is shared by setup, release migration/recovery, and uninstall. Setup independently merges each selected target's own state, stages beside the destination, validates all plans, creates separate verified backups, atomically publishes with concurrent-change detection, and rolls back the multi-target transaction on failure. |
 | PowerShell profiles | `shells/powershell_profile.ps1`; `windows/chezmoi-documents/{PowerShell,WindowsPowerShell}/symlink_*_profile.ps1.tmpl` | actual Documents known folder for ConsoleHost, VS Code, and ISE; active runtime `$PROFILE` must resolve to one of them | Dedicated Documents destination state; every supported host profile symlinks to the canonical source and setup post-checks consumption. |
-| zsh plugins | `scripts/ensure-pinned-zsh-plugin.sh`; `home/.chezmoiscripts/run_onchange_after_20-ensure-zsh-plugin-pins.sh.tmpl` | POSIX: `~/.local/share/dotfiles/zsh-plugins/{fzf-tab,zsh-autosuggestions}`; Windows: ignored | Install-deps and pin/helper changes in chezmoi share the serialized sibling-stage publisher. Unproved payloads are quarantined before fetch; only expected-origin, exact-HEAD, clean, tracked-entry-file checkouts publish atomically. Template-time check-only probes create neither an absent plugin parent nor a publication lock. Generic git-repo externals are intentionally absent. |
+| zsh plugins | `scripts/ensure-pinned-zsh-plugin.sh`; `home/.chezmoiscripts/run_onchange_after_20-ensure-zsh-plugin-pins.sh.tmpl` | POSIX: `~/.local/share/dotfiles/zsh-plugins/{fzf-tab,zsh-autosuggestions}`; Windows: ignored | Install-deps and pin/helper changes in chezmoi share the serialized sibling-stage publisher. A Bash noclobber claim inside the lock directory prevents duplicate holders despite uutils 0.10's racing-EEXIST success bug, without requiring a later-installed runtime. Unproved payloads are quarantined before fetch; only expected-origin, exact-HEAD, clean, tracked-entry-file checkouts publish atomically. Template-time check-only probes create neither an absent plugin parent nor a publication lock. Generic git-repo externals are intentionally absent. |
 
 The migration oracle is manifest-driven:
 `tests/migration/parity_gate.sh`, `tests/migration/oracle_test.sh`, and
@@ -176,8 +192,6 @@ non-Apple-Silicon macOS migration path is shipped or pending proof.
 Provisioning stays in `install-deps`, not chezmoi run-scripts:
 
 - package installs from Unix `PKG_TABLE` and Windows `$Catalog`
-- psmux installation on Windows, including the hardened `Add-ScoopBucketSafe`
-  bucket-add path in `install-deps.ps1`
 - Windows direct-artifact bin directories are de-duplicated and promoted to the
   front of process and User `PATH`, so an already-listed but shadowed managed
   Tree-sitter installation self-repairs without uninstalling the older tool

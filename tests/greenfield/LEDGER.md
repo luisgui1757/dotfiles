@@ -1,5 +1,9 @@
 # Greenfield Evidence Ledger
 
+> Historical Nix/chezmoi release material. Commands below apply only at their
+> recorded revisions; retired launchers are not part of the new installer. Use
+> [the current guide](../../README.md) and its linked installer status for this major release.
+
 Append-only record for clean-machine and visual validation. Keep automated
 script results separate from manual observations; a desktop surface counts only
 when someone inspected it on that machine.

@@ -1,12 +1,8 @@
 #!/usr/bin/env bash
-# Herdr native-Windows guard. Stable Herdr releases still ship macOS/Linux
-# assets only; the Windows build is preview beta. Windows may therefore install
-# only the repo-pinned preview .exe with adjacent SHA-256 verification, never the
-# upstream herdr.dev remote-eval installer or an unpinned package-manager guess.
+# Herdr Windows ships the reviewed official archive and adjacent ConPTY runtime.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
-INSTALL_PS1="$REPO_ROOT/install-deps.ps1"
 
 fail=0
 
@@ -36,48 +32,14 @@ else
     echo "ok  : no herdr.dev remote-eval installer in repo code"
 fi
 
-if ! grep -Eq "\\\$HerdrWindowsPreviewVersion = 'preview-[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9a-f]{12}'" "$INSTALL_PS1"; then
-    echo "FAIL: install-deps.ps1 must pin a concrete Herdr Windows preview tag"
-    fail=1
-else
-    echo "ok  : Herdr Windows preview tag is pinned"
-fi
-
-if ! grep -Eq "\\\$HerdrWindowsX64Sha256 = '[0-9a-f]{64}'" "$INSTALL_PS1"; then
-    echo "FAIL: install-deps.ps1 must carry the Herdr Windows preview SHA-256"
-    fail=1
-else
-    echo "ok  : Herdr Windows preview SHA-256 is pinned"
-fi
-
-for snippet in \
-    'herdr-windows-x86_64.exe' \
-    "Invoke-WebRequest -Uri \$assetUrl -OutFile \$download -UseBasicParsing -ErrorAction Stop" \
-    "Test-FileSha256 -Path \$download -Expected \$HerdrWindowsX64Sha256" \
-    "Test-FileSha256 -Path \$destination -Expected \$HerdrWindowsX64Sha256" \
-    'already installed (unmanaged)' \
-    "Copy-Item -LiteralPath \$download -Destination \$destination -Force" \
-    'Install-HerdrWindowsPreview'
-do
-    if ! grep -Fq "$snippet" "$INSTALL_PS1"; then
-        echo "FAIL: install-deps.ps1 missing Herdr Windows direct-artifact snippet: $snippet"
-        fail=1
-    fi
-done
-
-if grep -Eq "^[[:space:]]*herdr[[:space:]]*=[[:space:]]*@\\{" "$INSTALL_PS1"; then
-    echo "FAIL: Herdr Windows must not be a Scoop/winget/choco catalog row"
-    fail=1
-else
-    echo "ok  : Herdr Windows is not package-manager catalog-owned"
-fi
-
-if grep -Eq 'Install-One[[:space:]]+herdr\b' "$INSTALL_PS1"; then
-    echo "FAIL: Herdr Windows must not install via Install-One/package managers"
-    fail=1
-else
-    echo "ok  : Herdr Windows installs through the pinned direct-artifact function"
-fi
-
+python3 - "$REPO_ROOT/installer/archive-pins.json" <<'PY'
+import json,pathlib,re,sys
+pin=json.loads(pathlib.Path(sys.argv[1]).read_text())["resources"]["tool.herdr"]["windows/amd64"]
+assert re.fullmatch(r"\d+\.\d+\.\d+",pin["version"])
+assert re.fullmatch(r"[0-9a-f]{64}",pin["sha256"])
+assert pin["url"].endswith("/herdr-windows-x86_64.zip")
+assert pin["format"] == "zip"
+assert {"conpty/conpty.dll", "conpty/herdr-conpty.json", "conpty/x64/OpenConsole.exe"} <= set(pin["required_files"])
+PY
 [[ "$fail" -eq 0 ]] || exit 1
-echo "all Herdr Windows preview invariants OK"
+echo "Herdr Windows uses the reviewed private archive"

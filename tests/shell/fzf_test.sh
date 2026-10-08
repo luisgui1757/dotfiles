@@ -8,12 +8,6 @@ set -uo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 fail() { echo "FAIL: $1"; exit 1; }
 
-# 1) install-deps installs fzf, and the PKG_TABLE knows it on every PM.
-grep -q 'install fzf ' "$REPO_ROOT/install-deps.sh" \
-    || fail "install-deps.sh no longer installs fzf"
-grep -qF 'fzf|fzf|fzf' "$REPO_ROOT/install-deps.sh" \
-    || fail "install-deps.sh PKG_TABLE is missing the fzf row"
-
 # 2) zshrc wires fzf, guarded by 'command -v' so a missing fzf can't break
 #    startup, and prefers the modern `fzf --zsh` integration.
 grep -q 'command -v fzf' "$REPO_ROOT/shells/zshrc" \

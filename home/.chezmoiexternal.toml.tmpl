@@ -1,6 +1,0 @@
-{{- if ne .targetOS "windows" }}
-# Zsh plugins are deliberately not generic chezmoi git-repo externals. The
-# always-run checked publisher neutralizes an unproved target before fetching,
-# then atomically publishes only the reviewed commit. A git-repo external could
-# leave mutable or mismatched executable shell content at the sourceable path.
-{{- end }}

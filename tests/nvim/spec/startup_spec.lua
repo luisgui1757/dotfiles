@@ -334,6 +334,54 @@ describe("startup time", function()
     )
   end
 
+  it("normal init loads long module paths and still activates lazy plugins on demand", function()
+    local repo_root = _G.TEST_REPO_ROOT
+    local root = vim.fn.tempname()
+    local env = {
+      HOME = root,
+      USERPROFILE = root,
+      XDG_CONFIG_HOME = repo_root,
+      XDG_DATA_HOME = repo_root .. "/tests/.cache/startup-real/data",
+      XDG_STATE_HOME = root .. "/state",
+      XDG_CACHE_HOME = root .. "/cache",
+      XDG_RUNTIME_DIR = root .. "/run",
+      LOCALAPPDATA = root .. "/localappdata",
+      APPDATA = root .. "/appdata",
+      DOTFILES_NVIM_RUNTIME = "",
+      DOTFILES_NVIM_LOCKFILE = "",
+    }
+    for _, name in ipairs({ "config", "state", "cache", "run", "localappdata", "appdata" }) do
+      mkdir(root .. "/" .. name)
+    end
+    local data_path = child_stdpath_data(env)
+    prewarm_locked_plugin_checkouts(data_path, repo_root)
+    assert_plugin_cache(data_path, repo_root)
+
+    -- Every directory component is valid. Only the optional loader's encoding
+    -- of the entire absolute source path into one filename exceeds NAME_MAX.
+    local runtime_path = root .. "/runtime"
+    while #vim.uri_encode(runtime_path .. "/lua/long_runtime_probe.lua", "rfc2396") <= 300 do
+      runtime_path = runtime_path .. "/nested"
+    end
+    mkdir(runtime_path .. "/lua")
+    vim.fn.writefile({ "return { ready = true }" }, runtime_path .. "/lua/long_runtime_probe.lua")
+    local probe = root .. "/probe.lua"
+    vim.fn.writefile({
+      "local ok, err = pcall(function()",
+      "  assert(vim.v.errmsg == '', vim.v.errmsg)",
+      "  vim.opt.rtp:prepend(" .. string.format("%q", runtime_path) .. ")",
+      "  assert(require('long_runtime_probe').ready)",
+      "  local plugin = assert(require('lazy.core.config').plugins['nvim-dap-ui'])",
+      "  assert(not plugin._.loaded, 'DAP UI loaded before being requested')",
+      "  require('dapui')",
+      "  assert(plugin._.loaded, 'Lazy did not activate the requested plugin')",
+      "end)",
+      "if not ok then vim.api.nvim_err_writeln(tostring(err)); vim.cmd('cquit 1') end",
+    }, probe)
+    run_real_init(env, root .. "/startup.log", { "+luafile " .. vim.fn.fnameescape(probe), "+qa" })
+    assert.are.equal(0, vim.fn.delete(root, "rf"))
+  end)
+
   it("real init.lua completes under the OS-appropriate budget", function()
     local sysname = (vim.uv.os_uname() or {}).sysname or ""
     local budget_ms = 1200
@@ -360,7 +408,9 @@ describe("startup time", function()
     mkdir(run_root .. "/userprofile")
 
     local env = {
-      XDG_CONFIG_HOME = run_root .. "/config",
+      -- Lazy resets runtimepath to stdpath('config'); the real configuration
+      -- must occupy that path rather than only being passed with -u.
+      XDG_CONFIG_HOME = repo_root,
       XDG_DATA_HOME = shared_data,
       XDG_STATE_HOME = run_root .. "/state",
       XDG_CACHE_HOME = run_root .. "/cache",

@@ -101,7 +101,7 @@ describe("pinned Git checkout", function()
   end)
 
   it("creates and proves an absent cache before returning it", function()
-    assert.are.equal(opts.target, checkout.ensure(opts))
+    assert.are.equal(vim.fs.normalize(opts.target), checkout.ensure(opts))
     local valid, reason = checkout.verify(opts)
     assert.is_true(valid, reason)
     assert.are.equal(

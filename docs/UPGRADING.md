@@ -1,420 +1,82 @@
-# Upgrading dotfiles releases
+# Moving to the native installer
 
-## One public entry point
+This major release replaces Nix and chezmoi with the interactive installer.
+There is no old-runtime compatibility mode. Its supported platforms are Apple
+Silicon macOS, Ubuntu/Debian amd64/arm64 and native Windows amd64.
 
-After cloning an exact annotated release, setup is the only normal user-facing
-command:
+## Existing installation
+
+Preserve local checkout changes first. Update to the reviewed new revision, either
+in the existing checkout or a separate checkout you intend to keep. Released
+live-link source paths remain passive data so updating the checkout does not
+break those links before migration. This retention does not run an old installer.
+
+From the new checkout run:
 
 ```bash
-./setup.sh --all
+./migrate.sh
 ```
 
 ```powershell
-.\setup.ps1 -All
+.\migrate.ps1
 ```
 
-The same command handles a clean machine, an idempotent rerun, and the supported
-v0.1.0 migration. `--update` / `-Update` runs that complete reconciliation and
-then refreshes the proven drift-tolerant dependency/Mason edge. `--upgrade` /
-`-Upgrade` is an alias.
-
-Setup never fetches a moving branch or mutates an old release checkout. Git
-acquisition remains explicit: clone the exact next annotated release beside the
-old checkout, then run setup from the new checkout.
-
-`./setup.sh --allow-unreleased` is a separate greenfield/already-current-release field-test
-lane. It authorizes only a clean exact current branch head of the official
-repository for POSIX prerequisite bootstrap. It is not an upgrade authority and
-must not be used to migrate a live v0.1.0 checkout; the versioned migration
-tools remain exact-tag-only.
-
-## v0.1.0 to v0.4.4
-
-`v0.1.0` is already a chezmoi release. On POSIX, its managed files are live
-symlinks into the checkout. Do **not** run `git pull`, switch that checkout to a
-new revision, or run an upgrade from `main`: doing so can change live config
-before recovery exists.
-
-These commands target the published annotated `v0.4.4` release.
-
-Before choosing a release for macOS, check [known release issues](KNOWN-ISSUES.md).
-The branch-testing procedure is not authority to migrate a live v0.1.0 install.
-
-### Common preparation
-
-Keep the checkout that currently owns v0.1.0 and clone v0.4.4 beside it:
-
-```bash
-git clone --branch v0.4.4 --single-branch \
-  https://github.com/luisgui1757/dotfiles.git ~/dotfiles-v0.4.4
-cd ~/dotfiles-v0.4.4
-```
-
-```powershell
-git clone --branch v0.4.4 --single-branch `
-  https://github.com/luisgui1757/dotfiles.git "$HOME\dotfiles-v0.4.4"
-Set-Location "$HOME\dotfiles-v0.4.4"
-```
-
-Do not stash, delete, or overwrite local changes to make migration pass. Setup
-requires the exact old and new official release identities and refuses to guess
-which user bytes are authoritative.
-
-Setup normally discovers v0.1.0 from its live Neovim/shell config ownership. If
-the old checkout uses an unusual path and cannot be discovered, identify it for
-the same setup invocation:
-
-```bash
-DOTFILES_V0_1_CHECKOUT=/actual/path/to/v0.1.0 ./setup.sh --all
-```
-
-```powershell
-$env:DOTFILES_V0_1_CHECKOUT = 'D:\actual\path\to\v0.1.0'
-.\setup.ps1 -All
-Remove-Item Env:DOTFILES_V0_1_CHECKOUT
-```
-
-The override is not trusted blindly; setup still requires the exact annotated
-v0.1.0 tag object and peeled commit, and the migration performs its complete
-official-remote, clean-tree, target-identity, and historical-config preflight.
-
-### Apple Silicon macOS, Linux x86_64, and Linux aarch64
-
-Run:
-
-```bash
-./setup.sh --all
-```
-
-That one invocation:
-
-1. resolves and validates the real target account and home;
-2. installs the release-pinned, SHA-256-verified Nix prerequisite when missing
-   and activates it in the current process;
-3. detects exact live v0.1.0 ownership or a resumable applied recovery;
-4. runs the side-by-side digest-bound Nix/config transaction;
-5. automatically rolls back v0.1.0 on migration failure or interruption;
-6. verifies and accepts the reversible core under the explicit non-interactive
-   `--all` contract;
-7. retains the private recovery directory for evidence;
-8. completes native/deferred dependencies, config repointing, locked Neovim
-   restore, parsers, Mason, and Sentinel.
-
-If an earlier migration reached `applied` but setup stopped before acceptance,
-rerunning the same command resumes at validated acceptance. A recovery in
-`prepared`, `applying`, `rolling-back`, or `recovery-required` fails closed and
-prints its exact rollback command instead of starting another transaction.
-Any unfinished earlier supported recovery must first be accepted or rolled back
-from its retained exact release checkout. v0.4.4 setup detects every namespace
-in its ordered legacy-release registry and refuses to start or resume a second
-release transaction around any one.
-
-After success, open a new login shell and verify:
-
-```bash
-nix store info
-command -v rg fd fzf jq lazygit node starship zoxide nvim
-chezmoi --source ~/dotfiles-v0.4.4/home --destination "$HOME" \
-  verify --include files,symlinks
-```
-
-Keep the old checkout and printed recovery directory until personal application
-data has been checked. Automatic rollback authority ends only after the
-transaction's config/package verification passes and setup accepts it; the
-recovery directory remains private evidence.
-
-No macOS path exists outside Apple Silicon.
-
-### Native Windows
-
-Windows remains non-Nix. Enable Developer Mode, open a normal PowerShell, and
-run:
-
-```powershell
-.\setup.ps1 -All
-```
-
-Setup discovers exact v0.1.0 through the live Neovim link (or the validated
-override), then runs the digest-bound config/known-folder/Terminal transaction,
-requires the expected post-migration state for stable packaged, Preview
-packaged, and portable Windows Terminal, accepts the verified core, retains the
-protected recovery folder, and completes packages, config repointing, Neovim,
-and Sentinel.
-
-The same command covers conventional, redirected, OneDrive, and alternate-drive
-known folders because UserProfile, LocalApplicationData, ApplicationData,
-Documents, and the runtime PowerShell profile are resolved independently.
-
-After success, open Neovim, lazygit, PowerShell, and every installed Windows
-Terminal variant. Keep the old checkout and protected recovery folder until
-those checks pass.
-
-### WSL2 split-host upgrade
-
-WSL still has two independent owners and therefore two setup invocations:
-
-1. Clone v0.4.4 on Windows and run `.\setup.ps1 -All` for host Terminal, font,
-   clipboard, and Windows tools.
-2. Clone v0.4.4 separately inside the Linux home—never under `/mnt/c`—and run
-   `./setup.sh --all` for the guest Nix/config/tool stack.
-3. Run `tests/wsl/e2e.sh` in the guest and verify host Windows Terminal,
-   `win32yank`, font, and PowerShell behavior.
-
-Each setup invocation verifies and accepts its own platform transaction. A
-failed guest migration rolls its guest state back automatically without
-invalidating an already-verified Windows host installation.
-
-## Updating an installed release
-
-From the exact release checkout:
-
-```bash
-./setup.sh --update
-# alias: ./setup.sh --upgrade
-```
-
-```powershell
-.\setup.ps1 -Update
-# alias: .\setup.ps1 -Upgrade
-```
-
-Update first runs the same install/migration/idempotent reconciliation as all
-mode. It then performs only scoped updates for present tools whose package or
-direct-artifact ownership is proven, plus synchronous Mason updates. It never
-runs a blanket package-manager upgrade, `git pull`, `nix flake update`, or
-`:Lazy update`, and it never rewrites repository lockfiles. On macOS the retry
-is safe in the terminal that performed first activation: setup resolves the
-installed current-system `darwin-rebuild` outside stale `PATH` and recognizes
-nix-darwin's `/etc/static` shell links plus retained backups as managed state.
-Legacy Homebrew tap migration state is also retry-safe: setup keeps transaction
-and failed-output roots beside `Library/Taps`, where Homebrew cannot enumerate
-them as additional taps, and automatically relocates the exact in-tree recovery
-names created by the broken predecessor. Do not manually untap or delete those
-artifacts before retrying setup.
-If the same login shell already sourced the Nix daemon profile and a later
-Homebrew `path_helper` refresh removed Nix from `PATH`, setup re-adopts the
-canonical daemon/user profile binary directly. Do not reinstall Nix or unset
-the upstream profile guard manually.
-
-To move to a newer dotfiles release, clone that exact annotated tag beside the
-current checkout and run its setup update command. The new checkout, not Git
-mutation of the old one, is the release boundary.
-
-## Operator recovery commands
-
-The standalone migration commands remain supported for diagnosis, deliberate
-manual acceptance, and recovery. They are not required for the normal path:
-
-```bash
-./scripts/upgrade-v0.1.0.sh --preflight-only /path/to/v0.1.0
-./scripts/upgrade-v0.1.0.sh --apply /path/to/v0.1.0
-/exact/recovery/upgrade-v0.1.0.sh --rollback /exact/recovery
-/exact/recovery/upgrade-v0.1.0.sh --accept /exact/recovery
-```
-
-```powershell
-.\scripts\upgrade-v0.1.0.ps1 -PreflightOnly -OldCheckout 'C:\path\to\v0.1.0'
-.\scripts\upgrade-v0.1.0.ps1 -Apply -OldCheckout 'C:\path\to\v0.1.0'
-pwsh -NoProfile -File 'C:\exact\recovery\upgrade-v0.1.0.ps1' -Rollback 'C:\exact\recovery'
-pwsh -NoProfile -File 'C:\exact\recovery\upgrade-v0.1.0.ps1' -Accept 'C:\exact\recovery'
-```
-
-## v0.4.4 release evidence
-
-v0.4.4 was published on 2026-07-26.
-
-- Pull request #79 merged reviewed head
-  `f0c747127689d0548c5f4a62507584c2e971c882` to exact `main` commit `05874e536372f6a73f8971c84e675e95666662d4`;
-  both have tree `df353441f2592262c7583e8ee728f74e53930d8e`, and all required checks passed.
-- The full local gate and redacted Gitleaks scan across
-  `v0.4.3..v0.4.4` passed before the tag was created.
-- Cache-free exact-tag run
-  [`30192132079`](https://github.com/luisgui1757/dotfiles/actions/runs/30192132079)
-  passed all four producers and all four stable logical proof jobs at the exact
-  release commit; both POSIX lanes reported the immutable tag identity.
-- All four schema-2 logical proofs independently bound source SHA, executed
-  SHA, run ID, run attempt, logical context, and legacy context; their total
-  size was 912 bytes and their SHA-256 values are in the checked-in proof.
-- A fresh credential-free detached public clone reproduced the tag identities,
-  release-upgrade static gate, and immutable prerequisite-helper no-op path.
-- GitHub release `359951205` read back immutable/latest,
-  non-draft, and non-prerelease with the prepared body and certification asset exact.
-
-The real WSL, redirected-Windows, divergent Windows Terminal, physical-Linux,
-Apple-Silicon owner-host, and visual rows remain explicit residual evidence gaps
-in `tests/MANUAL.md`; publication did not mark them complete.
-
-## v0.4.3 release evidence
-
-v0.4.3 was published on 2026-07-25 under explicit owner authorization. The
-deterministic publication gates passed:
-
-- [x] pull request #73 merged reviewed head
-  `8d5c27768fc8fe528818c3a1fe879b213a594c23` to exact `main` commit
-  `e3e459a20c23ae546b26d5206d13b648b29e8788` with identical tree
-  `e022993c8dd3adbeb9c3ecaab1d01a97856d2b14` and all 21 hosted checks
-  passing;
-- [x] annotated tag object `72232aee30201506320889a0c82be515041b9674`
-  peels to that exact commit locally and in the official remote;
-- [x] the full local gate, deterministic exact-v0.1.0 migration fixtures,
-  hosted Windows coverage, and Gitleaks 8.30.1 scans across the three commits
-  and 69,707 bytes in `v0.4.2..v0.4.3` plus all four downloaded schema-2
-  logical proofs (912 bytes) passed;
-- [x] cache-free hosted run
-  [`30171230547`](https://github.com/luisgui1757/dotfiles/actions/runs/30171230547)
-  passed the Ubuntu, macOS, Windows, and container producers plus all four
-  logical proof jobs; both POSIX lanes reported the exact immutable tag;
-- [x] a fresh detached public clone resolved the same tag object and peeled
-  commit, passed the release-upgrade identity test, and exercised the immutable
-  prerequisite-helper no-op path;
-- [x] GitHub release
-  [`359840729`](https://github.com/luisgui1757/dotfiles/releases/tag/v0.4.3)
-  is immutable, latest, non-draft, and non-prerelease, and its body matches the
-  prepared user-facing notes.
-
-The unchecked real WSL, redirected-Windows, divergent Windows Terminal,
-physical-Linux, Apple-Silicon owner-host, and visual rows in `tests/MANUAL.md`
-remain explicit residual gaps; publication does not mark them complete.
-
-## v0.4.2 release evidence
-
-v0.4.2 was published on 2026-07-25 under explicit owner authorization. The
-deterministic publication gates passed:
-
-- [x] pull request #70 merged reviewed head
-  `d3107898da59c8317db7c5b4d6e9ad8fdfba5d5e` to exact `main` commit
-  `fdd628b34a58a3ecf3a1bef3de72f7cd4ac7dfc0` with identical tree
-  `aee8b07da50e4c4d1a99f7dabef7b8ffcc56f1ef` and all required checks
-  passing;
-- [x] annotated tag object `807b2f8bb47ae9c7e132f1f8a218cf19c9ae2c61`
-  peels to that exact commit locally and in the official remote;
-- [x] the full local gate, deterministic exact-v0.1.0 migration fixtures,
-  hosted Windows coverage, and Gitleaks 8.30.1 scans across the three commits
-  and 54,643 bytes in `v0.4.1..v0.4.2` plus all four downloaded schema-2
-  logical proofs (912 bytes) passed;
-- [x] cache-free hosted run
-  [`30152048314`](https://github.com/luisgui1757/dotfiles/actions/runs/30152048314)
-  passed the Ubuntu, macOS, Windows, and container producers plus all four
-  logical proof jobs; both POSIX lanes reported the exact immutable tag and
-  proved npm's global prefix is `~/.local`;
-- [x] a fresh detached public clone resolved the same tag object and peeled
-  commit, passed the release-upgrade identity test, and verified the immutable
-  prerequisite path;
-- [x] GitHub release `359736736` read back immutable/latest, non-draft,
-  non-prerelease, and with the prepared user-facing body exact.
-
-Earlier exact-tag run
-[`30151746003`](https://github.com/luisgui1757/dotfiles/actions/runs/30151746003)
-failed the macOS neocmake attachment probe after setup and cancelled Windows.
-It remains diagnostic evidence and was not promoted as release proof.
-
-The unchecked real WSL, redirected-Windows, divergent Windows Terminal,
-physical-Linux, Apple-Silicon owner-host, and visual rows in `tests/MANUAL.md`
-remain explicit residual gaps rather than implied passes.
-
-## Historical v0.4.1 release evidence
-
-v0.4.1 was published on 2026-07-22 under explicit owner authorization. The
-deterministic publication gates passed:
-
-- [x] pull request #67 merged reviewed head
-  `ee02e551b6e9357da52e29754dac6692f5802ae1` to exact `main` commit
-  `bac8cc97177b3bb58119fde5720b31e6b57febcc` with identical trees and all
-  required checks passing;
-- [x] annotated tag object `558d19a8c62453f68e5463e8999b216e0b692551`
-  peels to that exact commit locally and in the official remote;
-- [x] the full local gate, deterministic exact-v0.1.0 migration fixtures,
-  hosted Windows coverage, and Gitleaks scans across the two commits in
-  `v0.4.0..v0.4.1` plus all four downloaded logical proofs passed;
-- [x] cache-free hosted run
-  [`29891574548`](https://github.com/luisgui1757/dotfiles/actions/runs/29891574548)
-  passed the Ubuntu, macOS, Windows, and container producers plus all four
-  logical proof jobs; both POSIX lanes reported the exact immutable tag;
-- [x] GitHub release `357785004` read back immutable/latest, non-draft,
-  non-prerelease, and with the prepared user-facing body exact.
-
-The unchecked real WSL, redirected-Windows, divergent Windows Terminal,
-physical-Linux, Apple-Silicon owner-host, and visual rows in `tests/MANUAL.md`
-remain explicit residual gaps rather than implied passes.
-
-## Historical v0.4.0 release evidence
-
-v0.4.0 was published on 2026-07-21 under explicit owner authorization. The
-deterministic publication gates passed; the real-environment rows below remain
-open and are not implied by publication:
-
-- [x] pull request #65 merged the reviewed release-preparation tree to exact
-  `main` commit `6317b375a0724804d7a8d895753364cc036e5658` with all required
-  checks passing;
-- [x] annotated tag object `1539e550ac45d0a9732f329cb1ae3fb13bb078a8`
-  peels to that exact commit and matches immutable/latest GitHub release
-  `357094679`;
-- [x] the full local gate, deterministic exact-v0.1.0 migration fixtures,
-  Windows Pester coverage, and Gitleaks scans across four commits in
-  `v0.3.0..v0.4.0` plus all four downloaded logical proofs passed;
-- [x] cache-free hosted run
-  [`29797123753`](https://github.com/luisgui1757/dotfiles/actions/runs/29797123753)
-  passed the Ubuntu, macOS, Windows, and container producers plus all four
-  logical proof jobs; both POSIX lanes reported the exact immutable tag;
-- [x] GitHub release `357094679` read back immutable/latest, non-draft,
-  non-prerelease, and with the prepared user-facing body exact after
-  trailing-newline normalization.
-
-The unchecked real WSL, redirected-Windows, divergent Windows Terminal,
-physical-Linux, Apple-Silicon owner-host, and visual rows in `tests/MANUAL.md`
-remain explicit residual gaps rather than implied passes.
-
-## Historical v0.3.0 release evidence
-
-v0.3.0 was published on 2026-07-19 under explicit owner authorization. The
-deterministic publication gates passed; the real-environment rows below remain
-open and are not implied by publication:
-
-- [x] pull request #61 merged the reviewed release-preparation tree to exact
-  `main` commit `c8507312153620b9b30fe2c84980c62bccb3b25a` with all required
-  checks passing;
-- [x] annotated tag object `473f675e863640484d4d11349bf69d01def12c43`
-  peels to that exact commit and matches immutable/latest GitHub release
-  `356273955`;
-- [x] full local `make ci`, the deterministic exact-v0.1.0 POSIX fixture,
-  Windows Pester coverage, and Gitleaks 8.30.1 scans across all 8 commits in
-  `v0.2.0..v0.3.0` plus the 4 downloaded logical proofs passed;
-- [x] cache-free hosted run
-  [`29676087505`](https://github.com/luisgui1757/dotfiles/actions/runs/29676087505)
-  passed Ubuntu, Apple Silicon macOS, Windows, the Linux container, and all four
-  stable logical proofs; both POSIX lanes verified the exact immutable v0.3.0
-  tag path;
-- [x] GitHub release `356273955` is immutable, latest, non-draft, and
-  non-prerelease, and its body matches the prepared user-facing notes.
-
-Initial cache-free run
-[`29675684683`](https://github.com/luisgui1757/dotfiles/actions/runs/29675684683)
-is retained as failed evidence: macOS setup completed, but its neocmake LSP
-probe missed the 45-second attach boundary. The identical exact-head PR job had
-passed that probe, and the one permitted fresh full retry above passed it in
-39 seconds; no failed or cancelled artifact was promoted into release proof.
-
-The unchecked real WSL, redirected-Windows, divergent Windows Terminal,
-physical-Linux, Apple-Silicon owner-host, and visual rows in `tests/MANUAL.md`
-remain explicit residual gaps rather than implied passes.
-
-## Historical v0.2.0 release evidence
-
-v0.2.0 was published on 2026-07-15 under explicit owner authorization. The
-automated publication gates passed; the real-environment rows below remain open
-and are not implied by publication:
-
-- [x] annotated tag object `cd9a60436b3064c5e2f6ed5bfd8ae0f5297f1b49`
-  peels to immutable commit `22cfad80e904e003f52932ae6d6403520df00d3c`
-  and matches GitHub release `354480554`;
-- [x] full local `make ci`, the deterministic exact-v0.1.0 POSIX fixture,
-  Windows Pester coverage, and the redacted public-secret scan passed on the
-  release commit;
-- [x] cache-free hosted run
-  [`29419942595`](https://github.com/luisgui1757/dotfiles/actions/runs/29419942595)
-  passed Ubuntu, Apple Silicon macOS, Windows, the Linux container, and all four
-  stable logical proofs; both POSIX lanes verified the exact v0.2.0 tag path;
-- [ ] real WSL host/guest, redirected Windows, divergent stable
-  packaged/Preview/Canary/portable Terminal, physical Linux, and Apple Silicon
-  owner-host migrations remain unchecked in `tests/MANUAL.md` and unclaimed in
-  the append-only review ledger.
+Migration previews the detected shell profiles. Check each profile you want to
+detach, then approve its exact preview. The original artifact and a readable copy
+are retained at the reported recovery paths. Exact released bytes are recognized
+from pinned evidence; unknown/personal commands are never copied automatically
+into the new shell. Review those saved files and reapply personal settings you
+still need. For the released bash-to-zsh hook, only the exact marked block is
+removed; surrounding bytes stay intact.
+
+Unselected profiles stay unchanged and migration reports the remaining work.
+After successful preparation, the normal menu opens. Choose tools and explicitly
+adopt existing tool configurations where offered. The installer preserves their
+first baseline and uses that same baseline for later removal. A completed
+migration receipt is historical evidence: rerunning migration cannot replay the
+old detachment over newly installed profile blocks.
+
+The new Windows installer discovers actual known folders independently, including
+redirected Documents and Start Menu Programs. Neovim uses a directory junction;
+other configuration uses copies/scoped settings. Developer Mode is not required.
+Windows Terminal manages only its pinned stable unpackaged instance. Existing
+Store, Preview and Canary installations remain personal. If that instance still
+contains ambiguous legacy combined actions, launch it once to let Terminal migrate
+its own settings, then retry the reviewed setup.
+
+## Retained infrastructure
+
+Migration does not claim or uninstall existing Nix, Home Manager, nix-darwin,
+chezmoi state, native packages or login-shell settings. Those may serve unrelated
+software, and old installer inventory is not removal authority. Their retention
+is disclosed. The new installation runs without them; removing such shared
+infrastructure is a separate owner-managed task after checking its other users.
+Keep the old checkout/recovery files until you have checked your personal data and
+all adopted applications. Do not delete an old Nix-provided login shell while it
+is still your account's login shell; change it through the OS account settings
+before retiring that infrastructure.
+
+## Interruptions and conflicts
+
+An unfinished transaction from a released old installer must first be recovered
+with that exact retained release and recovery directory. Migration reports the
+blocking evidence and does not start a second operation over it.
+
+For a new installer interruption, reopen the same checkout entrypoint and use the
+recovery menu. Resume binds to the saved source and operation; restoration uses
+saved physical artifacts without overwriting newly created personal files.
+Do not delete state, profile locks or journals to manufacture a clean install.
+A changed file, unreadable baseline or live consumer remains a visible action
+item until its real cause is resolved.
+
+## Later updates and removal
+
+Open `setup.sh`/`setup.ps1` and choose **Update selected tools** after updating the
+checkout to a reviewed revision. Updates preserve your selections and reconcile
+only the declared pins/native packages. Use **Remove tools** for removal and
+review its shared-dependency choices. Personal data and pre-existing packages are
+preserved; unchanged owned resources are removed/restored surgically.
+
+For historical v0.1.0-to-v0.4.4 procedures, read
+[the immutable former guide](https://github.com/luisgui1757/dotfiles/blob/ae9a6446eb0a837a144d77d2a6345db967c61e4e/docs/UPGRADING.md).
+Those commands belong to their corresponding release, not this installer.

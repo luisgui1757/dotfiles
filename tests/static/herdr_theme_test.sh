@@ -6,9 +6,6 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 CONFIG="$REPO_ROOT/herdr/config.toml"
 WINDOWS_CONFIG="$REPO_ROOT/herdr/config.windows.toml"
-MIRROR="$REPO_ROOT/home/.chezmoitemplates/herdr/config.toml"
-INSTALL_SH="$REPO_ROOT/install-deps.sh"
-INSTALL_PS1="$REPO_ROOT/install-deps.ps1"
 
 fail() {
     echo "FAIL: $*" >&2
@@ -75,42 +72,4 @@ if configs[1].get("terminal", {}).get("default_shell") != "pwsh.exe":
     raise SystemExit("Windows Herdr must launch PowerShell 7 through pwsh.exe")
 PY
 
-cmp -s "$CONFIG" "$MIRROR" || fail "canonical Herdr config and chezmoi mirror differ"
-grep -F 'HERDR_VERSION="v0.9.3"' "$INSTALL_SH" >/dev/null ||
-    fail "POSIX Herdr must stay pinned to the reviewed v0.9.3 release"
-grep -F 'HERDR_LINUX_X86_64_SHA256="18a8dc65f1c2fa485884344356dea1cfd911c6f06cf46fa78e193f4087f4dba7"' "$INSTALL_SH" >/dev/null ||
-    fail "Herdr v0.9.3 x86_64 digest drifted"
-grep -F 'HERDR_LINUX_ARM64_SHA256="4de7aa3e25678812e92960de64f7c2aaa1bca1f0f80a3c5e559837e231e1f5c0"' "$INSTALL_SH" >/dev/null ||
-    fail "Herdr v0.9.3 arm64 digest drifted"
-grep -F "\$HerdrWindowsPreviewVersion = 'preview-2026-07-21-0f10e1453a7f'" "$INSTALL_PS1" >/dev/null ||
-    fail "Windows Herdr must stay pinned to the reviewed preview"
-grep -F "\$HerdrWindowsX64Sha256 = '75c85763db0ca5fd13b485d0728cc3e9ea1152964a4e976e1d49f2e86b01a92b'" "$INSTALL_PS1" >/dev/null ||
-    fail "post-fix Windows Herdr digest drifted"
-grep -F '.chezmoitemplates/herdr/config.toml' \
-    "$REPO_ROOT/home/dot_config/herdr/symlink_config.toml.tmpl" >/dev/null ||
-    fail "POSIX Herdr target does not reference the managed mirror"
-grep -F '\herdr\config.windows.toml' \
-    "$REPO_ROOT/windows/chezmoi-appdata/herdr/symlink_config.toml.tmpl" >/dev/null ||
-    fail "Windows ApplicationData overlay does not reference the Windows Herdr config"
-# The workflow must retain the literal runtime HOME expression.
-# shellcheck disable=SC2016
-grep -F 'bash "$repo/scripts/check-herdr-runtime.sh" "$HOME/.config/herdr/config.toml"' \
-    "$REPO_ROOT/.github/workflows/e2e-install.yml" >/dev/null ||
-    fail "hosted POSIX setup does not parse the installed Herdr config"
-grep -F 'env -u HOMEBREW_NO_AUTO_UPDATE brew update' \
-    "$REPO_ROOT/.github/workflows/e2e-install.yml" >/dev/null ||
-    fail "hosted macOS setup does not refresh stale Homebrew formula metadata"
-grep -F "\$env:HERDR_CONFIG_PATH = Join-Path \$env:APPDATA 'herdr\config.toml'" \
-    "$REPO_ROOT/.github/workflows/e2e-install.yml" >/dev/null ||
-    fail "hosted Windows setup does not parse the installed Herdr config"
-
-for script in setup.ps1 uninstall.ps1; do
-    grep -F "'ApplicationData'" "$REPO_ROOT/$script" >/dev/null ||
-        fail "$script does not resolve roaming ApplicationData"
-    grep -F 'windows\chezmoi-appdata' "$REPO_ROOT/$script" >/dev/null ||
-        fail "$script does not own the Herdr ApplicationData overlay"
-    grep -F 'appdata.boltdb' "$REPO_ROOT/$script" >/dev/null ||
-        fail "$script does not use the Herdr overlay state boundary"
-done
-
-echo "all Herdr state layout, tab/workspace/agent navigation, Rose Pine theme, and Windows pwsh invariants OK"
+echo "Herdr config, navigation, theme and Windows shell invariants OK"

@@ -1,0 +1,194 @@
+{
+  "schema": 1,
+  "targets": [
+    {
+      "resource": "config.tmux",
+      "source": "tmux/tmux.conf",
+      "folder": "home",
+      "path": ".tmux.conf",
+      "platforms": [
+        "darwin",
+        "linux"
+      ]
+    },
+    {
+      "resource": "config.tmux",
+      "source": "tmux/rose-pine.main.conf",
+      "folder": "home",
+      "path": ".tmux.rose-pine.main.conf",
+      "platforms": [
+        "darwin",
+        "linux"
+      ]
+    },
+    {
+      "resource": "config.tmux",
+      "source": "tmux/rose-pine.moon.conf",
+      "folder": "home",
+      "path": ".tmux.rose-pine.moon.conf",
+      "platforms": [
+        "darwin",
+        "linux"
+      ]
+    },
+    {
+      "resource": "config.tmux",
+      "source": "tmux/rose-pine.dawn.conf",
+      "folder": "home",
+      "path": ".tmux.rose-pine.dawn.conf",
+      "platforms": [
+        "darwin",
+        "linux"
+      ]
+    },
+    {
+      "resource": "config.lsd",
+      "source": "lsd/config.yaml",
+      "folder": "config",
+      "path": "lsd/config.yaml"
+    },
+    {
+      "resource": "config.lsd",
+      "source": "lsd/colors.yaml",
+      "folder": "config",
+      "path": "lsd/colors.yaml"
+    },
+    {
+      "resource": "config.gh-dash",
+      "source": "gh-dash/config.yml",
+      "folder": "config",
+      "path": "gh-dash/config.yml"
+    },
+    {
+      "resource": "config.git",
+      "source": "git/config",
+      "folder": "config",
+      "path": "git/config"
+    },
+    {
+      "resource": "config.starship",
+      "source": "starship/starship.toml",
+      "folder": "config",
+      "path": "starship.toml"
+    },
+    {
+      "resource": "config.pi",
+      "source": "pi/rose-pine.json",
+      "folder": "home",
+      "path": ".pi/agent/themes/rose-pine.json"
+    },
+    {
+      "resource": "config.pi",
+      "source": "pi/rose-pine-moon.json",
+      "folder": "home",
+      "path": ".pi/agent/themes/rose-pine-moon.json"
+    },
+    {
+      "resource": "config.pi",
+      "source": "pi/rose-pine-dawn.json",
+      "folder": "home",
+      "path": ".pi/agent/themes/rose-pine-dawn.json"
+    },
+    {
+      "resource": "config.pi",
+      "source": "pi/keybindings.json",
+      "folder": "home",
+      "path": ".pi/agent/keybindings.json"
+    },
+    {
+      "resource": "config.nvim",
+      "source": "nvim",
+      "folder": "config",
+      "path": "nvim",
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "directory": true
+    },
+    {
+      "resource": "config.nvim",
+      "source": "nvim",
+      "folder": "local_app_data",
+      "path": "nvim",
+      "platforms": [
+        "windows"
+      ],
+      "directory": true,
+      "mode": "junction"
+    },
+    {
+      "resource": "config.herdr",
+      "source": "herdr/config.toml",
+      "folder": "config",
+      "path": "herdr/config.toml",
+      "platforms": [
+        "darwin",
+        "linux"
+      ]
+    },
+    {
+      "resource": "config.herdr",
+      "source": "herdr/config.windows.toml",
+      "folder": "app_data",
+      "path": "herdr/config.toml",
+      "platforms": [
+        "windows"
+      ]
+    },
+    {
+      "resource": "config.lazygit",
+      "source": "lazygit/config.yml",
+      "folder": "home",
+      "path": "Library/Application Support/lazygit/config.yml",
+      "platforms": [
+        "darwin"
+      ]
+    },
+    {
+      "resource": "config.lazygit",
+      "source": "lazygit/config.yml",
+      "folder": "config",
+      "path": "lazygit/config.yml",
+      "platforms": [
+        "linux"
+      ]
+    },
+    {
+      "resource": "config.lazygit",
+      "source": "lazygit/config.yml",
+      "folder": "local_app_data",
+      "path": "lazygit/config.yml",
+      "platforms": [
+        "windows"
+      ]
+    },
+    {
+      "resource": "config.ghostty",
+      "source": "ghostty/config",
+      "folder": "home",
+      "path": "Library/Application Support/com.mitchellh.ghostty/config",
+      "platforms": [
+        "darwin"
+      ]
+    },
+    {
+      "resource": "config.ghostty",
+      "source": "ghostty/config",
+      "folder": "config",
+      "path": "ghostty/config",
+      "platforms": [
+        "linux"
+      ]
+    },
+    {
+      "resource": "config.aerospace",
+      "source": "aerospace/aerospace.toml",
+      "folder": "config",
+      "path": "aerospace/aerospace.toml",
+      "platforms": [
+        "darwin"
+      ]
+    }
+  ]
+}

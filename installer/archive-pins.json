@@ -1,0 +1,2686 @@
+{
+  "schema": 1,
+  "resources": {
+    "tool.starship": {
+      "darwin/arm64": {
+        "version": "1.26.0",
+        "url": "https://github.com/starship/starship/releases/download/v1.26.0/starship-aarch64-apple-darwin.tar.gz",
+        "sha256": "c40b27b11f580411e068f2fa6c1be7830a387c0bc47a94d1d37f32b054c5361d",
+        "format": "tar.gz",
+        "commands": {
+          "starship": "starship"
+        },
+        "bin_dirs": [
+          "."
+        ]
+      },
+      "linux/amd64": {
+        "version": "1.26.0",
+        "url": "https://github.com/starship/starship/releases/download/v1.26.0/starship-x86_64-unknown-linux-musl.tar.gz",
+        "sha256": "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3",
+        "format": "tar.gz",
+        "commands": {
+          "starship": "starship"
+        },
+        "bin_dirs": [
+          "."
+        ]
+      },
+      "linux/arm64": {
+        "version": "1.26.0",
+        "url": "https://github.com/starship/starship/releases/download/v1.26.0/starship-aarch64-unknown-linux-musl.tar.gz",
+        "sha256": "dc30189378d2f2e287384e8a692d3f95ad1df64cf0e8c36aa9201516028aed6b",
+        "format": "tar.gz",
+        "commands": {
+          "starship": "starship"
+        },
+        "bin_dirs": [
+          "."
+        ]
+      },
+      "windows/amd64": {
+        "version": "1.26.0",
+        "url": "https://github.com/starship/starship/releases/download/v1.26.0/starship-x86_64-pc-windows-msvc.zip",
+        "sha256": "690021e22f2bf2c57d5867dc0fababe5e55e714c26942bd909ffddb6c5df42f2",
+        "format": "zip",
+        "commands": {
+          "starship": "starship.exe"
+        },
+        "bin_dirs": [
+          "."
+        ]
+      }
+    },
+    "tool.fzf": {
+      "darwin/arm64": {
+        "version": "0.73.1",
+        "url": "https://github.com/junegunn/fzf/releases/download/v0.73.1/fzf-0.73.1-darwin_arm64.tar.gz",
+        "sha256": "d27fd68c04fb9b42f7c73a3f7d38069a74d308e40174f64a072c747213e97286",
+        "format": "tar.gz",
+        "commands": {
+          "fzf": "fzf"
+        },
+        "bin_dirs": [
+          "."
+        ]
+      },
+      "windows/amd64": {
+        "version": "0.73.1",
+        "url": "https://github.com/junegunn/fzf/releases/download/v0.73.1/fzf-0.73.1-windows_amd64.zip",
+        "sha256": "521a974dc32e93404265e55bffaf71a59e05e80abdf8ca4afb21a6030dc76f5f",
+        "format": "zip",
+        "commands": {
+          "fzf": "fzf.exe"
+        },
+        "bin_dirs": [
+          "."
+        ]
+      },
+      "linux/arm64": {
+        "version": "0.73.1",
+        "url": "https://github.com/junegunn/fzf/releases/download/v0.73.1/fzf-0.73.1-linux_arm64.tar.gz",
+        "sha256": "a408b0b6c08d486307b8f1554f967b8b50ee1b3ea8b4035e3161bab31fdfc28d",
+        "format": "tar.gz",
+        "commands": {
+          "fzf": "fzf"
+        },
+        "bin_dirs": [
+          "."
+        ]
+      },
+      "linux/amd64": {
+        "version": "0.73.1",
+        "url": "https://github.com/junegunn/fzf/releases/download/v0.73.1/fzf-0.73.1-linux_amd64.tar.gz",
+        "sha256": "f3252c2c366bc1700d3c85781ec8c9695998927ac127870eb049ceea2d540f8a",
+        "format": "tar.gz",
+        "commands": {
+          "fzf": "fzf"
+        },
+        "bin_dirs": [
+          "."
+        ]
+      }
+    },
+    "tool.fd": {
+      "darwin/arm64": {
+        "version": "10.4.2",
+        "url": "https://github.com/sharkdp/fd/releases/download/v10.4.2/fd-v10.4.2-aarch64-apple-darwin.tar.gz",
+        "sha256": "623dc0afc81b92e4d4606b380d7bc91916ba7b97814263e554d50923a39e480a",
+        "format": "tar.gz",
+        "commands": {
+          "fd": "fd"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "strip_components": 1
+      },
+      "linux/arm64": {
+        "version": "10.4.2",
+        "url": "https://github.com/sharkdp/fd/releases/download/v10.4.2/fd-v10.4.2-aarch64-unknown-linux-musl.tar.gz",
+        "sha256": "f32d3657473fba74e2600babc8db0b93420d51169223b7e8143b2ed55d8fd9e8",
+        "format": "tar.gz",
+        "commands": {
+          "fd": "fd"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "strip_components": 1
+      },
+      "windows/amd64": {
+        "version": "10.4.2",
+        "url": "https://github.com/sharkdp/fd/releases/download/v10.4.2/fd-v10.4.2-x86_64-pc-windows-msvc.zip",
+        "sha256": "b2816e506390a89941c63c9187d58a3cc10e9a55f2ef0685f9ea0eccaf7c98c8",
+        "format": "zip",
+        "commands": {
+          "fd": "fd.exe"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "strip_components": 1
+      },
+      "linux/amd64": {
+        "version": "10.4.2",
+        "url": "https://github.com/sharkdp/fd/releases/download/v10.4.2/fd-v10.4.2-x86_64-unknown-linux-musl.tar.gz",
+        "sha256": "e3257d48e29a6be965187dbd24ce9af564e0fe67b3e73c9bdcd180f4ec11bdde",
+        "format": "tar.gz",
+        "commands": {
+          "fd": "fd"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "strip_components": 1
+      }
+    },
+    "tool.lsd": {
+      "darwin/arm64": {
+        "version": "1.2.0",
+        "url": "https://github.com/lsd-rs/lsd/releases/download/v1.2.0/lsd-v1.2.0-aarch64-apple-darwin.tar.gz",
+        "sha256": "9e34a5d392ff913302098aad0543dafa1883c531eaf229b82f086c3fca675e3e",
+        "format": "tar.gz",
+        "commands": {
+          "lsd": "lsd"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "strip_components": 1
+      },
+      "linux/arm64": {
+        "version": "1.2.0",
+        "url": "https://github.com/lsd-rs/lsd/releases/download/v1.2.0/lsd-v1.2.0-aarch64-unknown-linux-musl.tar.gz",
+        "sha256": "642ecb1a763b9f790a99c83a1445c117a6813ed4edb5d498d4420423c6353eb8",
+        "format": "tar.gz",
+        "commands": {
+          "lsd": "lsd"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "strip_components": 1
+      },
+      "windows/amd64": {
+        "version": "1.2.0",
+        "url": "https://github.com/lsd-rs/lsd/releases/download/v1.2.0/lsd-v1.2.0-x86_64-pc-windows-msvc.zip",
+        "sha256": "a65b9f457153934a7ce1f7e0fe1c4922a95bb2822222126e4fbaa6ee9c0d78e5",
+        "format": "zip",
+        "commands": {
+          "lsd": "lsd.exe"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "strip_components": 1
+      },
+      "linux/amd64": {
+        "version": "1.2.0",
+        "url": "https://github.com/lsd-rs/lsd/releases/download/v1.2.0/lsd-v1.2.0-x86_64-unknown-linux-musl.tar.gz",
+        "sha256": "77849da1210336534258551a581401ba19ae6b8d7b66a2a1feff148ad41e3814",
+        "format": "tar.gz",
+        "commands": {
+          "lsd": "lsd"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "strip_components": 1
+      }
+    },
+    "tool.zoxide": {
+      "darwin/arm64": {
+        "version": "0.10.0",
+        "url": "https://github.com/ajeetdsouza/zoxide/releases/download/v0.10.0/zoxide-0.10.0-aarch64-apple-darwin.tar.gz",
+        "sha256": "b55ae6f2f5f23d0a6ccb3bd4eeb2af9c7e0a6556e5255c82100e40305129bbb0",
+        "format": "tar.gz",
+        "commands": {
+          "zoxide": "zoxide"
+        },
+        "bin_dirs": [
+          "."
+        ]
+      },
+      "linux/arm64": {
+        "version": "0.10.0",
+        "url": "https://github.com/ajeetdsouza/zoxide/releases/download/v0.10.0/zoxide-0.10.0-aarch64-unknown-linux-musl.tar.gz",
+        "sha256": "f1f16c5d6298d63dee467eedea1cdcd8490e43e493bea43acd416dc9033ef641",
+        "format": "tar.gz",
+        "commands": {
+          "zoxide": "zoxide"
+        },
+        "bin_dirs": [
+          "."
+        ]
+      },
+      "windows/amd64": {
+        "version": "0.10.0",
+        "url": "https://github.com/ajeetdsouza/zoxide/releases/download/v0.10.0/zoxide-0.10.0-x86_64-pc-windows-msvc.zip",
+        "sha256": "f465ae548f8754c8e7edbc60b45fbf58c92bfe123db83d790252d6810fa5daf1",
+        "format": "zip",
+        "commands": {
+          "zoxide": "zoxide.exe"
+        },
+        "bin_dirs": [
+          "."
+        ]
+      },
+      "linux/amd64": {
+        "version": "0.10.0",
+        "url": "https://github.com/ajeetdsouza/zoxide/releases/download/v0.10.0/zoxide-0.10.0-x86_64-unknown-linux-musl.tar.gz",
+        "sha256": "2d93385b99f3e82cf2701609a1bffcad863fbeb75aa3fe7eb6be4d29be68b1ae",
+        "format": "tar.gz",
+        "commands": {
+          "zoxide": "zoxide"
+        },
+        "bin_dirs": [
+          "."
+        ]
+      }
+    },
+    "plugin.fzf-tab": {
+      "darwin/arm64": {
+        "version": "v1.3.0",
+        "url": "https://codeload.github.com/Aloxaf/fzf-tab/tar.gz/d7e0234614dbe5369fdd760907d12c0e05a4dccc",
+        "sha256": "3f0f56c168ab59ad87363a15931f27847eac5dfc34e10a033a04ae84372c56ac",
+        "format": "tar.gz",
+        "commands": {},
+        "bin_dirs": [],
+        "required_files": [
+          "fzf-tab.plugin.zsh"
+        ],
+        "strip_components": 1
+      },
+      "linux/amd64": {
+        "version": "v1.3.0",
+        "url": "https://codeload.github.com/Aloxaf/fzf-tab/tar.gz/d7e0234614dbe5369fdd760907d12c0e05a4dccc",
+        "sha256": "3f0f56c168ab59ad87363a15931f27847eac5dfc34e10a033a04ae84372c56ac",
+        "format": "tar.gz",
+        "commands": {},
+        "bin_dirs": [],
+        "required_files": [
+          "fzf-tab.plugin.zsh"
+        ],
+        "strip_components": 1
+      },
+      "linux/arm64": {
+        "version": "v1.3.0",
+        "url": "https://codeload.github.com/Aloxaf/fzf-tab/tar.gz/d7e0234614dbe5369fdd760907d12c0e05a4dccc",
+        "sha256": "3f0f56c168ab59ad87363a15931f27847eac5dfc34e10a033a04ae84372c56ac",
+        "format": "tar.gz",
+        "commands": {},
+        "bin_dirs": [],
+        "required_files": [
+          "fzf-tab.plugin.zsh"
+        ],
+        "strip_components": 1
+      }
+    },
+    "plugin.zsh-autosuggestions": {
+      "darwin/arm64": {
+        "version": "v0.7.1",
+        "url": "https://codeload.github.com/zsh-users/zsh-autosuggestions/tar.gz/e52ee8ca55bcc56a17c828767a3f98f22a68d4eb",
+        "sha256": "166fad9326c99904fd3b16b5d770efb4f5df39a674599e72bba8fc41636ab065",
+        "format": "tar.gz",
+        "commands": {},
+        "bin_dirs": [],
+        "required_files": [
+          "zsh-autosuggestions.zsh"
+        ],
+        "strip_components": 1
+      },
+      "linux/amd64": {
+        "version": "v0.7.1",
+        "url": "https://codeload.github.com/zsh-users/zsh-autosuggestions/tar.gz/e52ee8ca55bcc56a17c828767a3f98f22a68d4eb",
+        "sha256": "166fad9326c99904fd3b16b5d770efb4f5df39a674599e72bba8fc41636ab065",
+        "format": "tar.gz",
+        "commands": {},
+        "bin_dirs": [],
+        "required_files": [
+          "zsh-autosuggestions.zsh"
+        ],
+        "strip_components": 1
+      },
+      "linux/arm64": {
+        "version": "v0.7.1",
+        "url": "https://codeload.github.com/zsh-users/zsh-autosuggestions/tar.gz/e52ee8ca55bcc56a17c828767a3f98f22a68d4eb",
+        "sha256": "166fad9326c99904fd3b16b5d770efb4f5df39a674599e72bba8fc41636ab065",
+        "format": "tar.gz",
+        "commands": {},
+        "bin_dirs": [],
+        "required_files": [
+          "zsh-autosuggestions.zsh"
+        ],
+        "strip_components": 1
+      }
+    },
+    "powershell.psfzf": {
+      "windows/amd64": {
+        "version": "2.7.12",
+        "url": "https://www.powershellgallery.com/api/v2/package/PSFzf/2.7.12",
+        "sha256": "5d5c55df79d24b5efbb6c6715c12ec12cb34f32dca57f5c90868de7f47a9b1ad",
+        "format": "zip",
+        "commands": {},
+        "bin_dirs": [],
+        "required_files": [
+          "PSFzf.psd1"
+        ]
+      }
+    },
+    "tool.nvim": {
+      "linux/amd64": {
+        "version": "0.12.5",
+        "url": "https://github.com/neovim/neovim/releases/download/v0.12.5/nvim-linux-x86_64.tar.gz",
+        "sha256": "bce0f56eda1f1b1db6eee8f4133d7a38813ea07933837dd1777411ca384c6875",
+        "format": "tar.gz",
+        "commands": {
+          "nvim": "bin/nvim"
+        },
+        "bin_dirs": [
+          "bin"
+        ],
+        "strip_components": 1,
+        "required_files": [
+          "share/nvim/runtime/filetype.lua"
+        ],
+        "libc": "glibc"
+      },
+      "windows/amd64": {
+        "version": "0.12.5",
+        "url": "https://github.com/neovim/neovim/releases/download/v0.12.5/nvim-win64.zip",
+        "sha256": "de8625ba8cf65ebf40eb80a388ba1ec8e9c15b30218821e2c639119b05920de1",
+        "format": "zip",
+        "commands": {
+          "nvim": "bin/nvim.exe"
+        },
+        "bin_dirs": [
+          "bin"
+        ],
+        "strip_components": 1,
+        "required_files": [
+          "share/nvim/runtime/filetype.lua"
+        ]
+      },
+      "linux/arm64": {
+        "version": "0.12.5",
+        "url": "https://github.com/neovim/neovim/releases/download/v0.12.5/nvim-linux-arm64.tar.gz",
+        "sha256": "1aa5ca085249580ae0f91eb14f27ec0919773ff2d99a163d03f3d6c21ac29725",
+        "format": "tar.gz",
+        "commands": {
+          "nvim": "bin/nvim"
+        },
+        "bin_dirs": [
+          "bin"
+        ],
+        "strip_components": 1,
+        "required_files": [
+          "share/nvim/runtime/filetype.lua"
+        ],
+        "libc": "glibc"
+      },
+      "darwin/arm64": {
+        "version": "0.12.5",
+        "url": "https://github.com/neovim/neovim/releases/download/v0.12.5/nvim-macos-arm64.tar.gz",
+        "sha256": "65fb000099e47ca1b762584c484cc833f40e30851a0ec450d4174e16317c1f9b",
+        "format": "tar.gz",
+        "commands": {
+          "nvim": "bin/nvim"
+        },
+        "bin_dirs": [
+          "bin"
+        ],
+        "strip_components": 1,
+        "required_files": [
+          "share/nvim/runtime/filetype.lua"
+        ]
+      }
+    },
+    "tool.rg": {
+      "darwin/arm64": {
+        "version": "15.1.0",
+        "url": "https://github.com/BurntSushi/ripgrep/releases/download/15.1.0/ripgrep-15.1.0-aarch64-apple-darwin.tar.gz",
+        "sha256": "378e973289176ca0c6054054ee7f631a065874a352bf43f0fa60ef079b6ba715",
+        "format": "tar.gz",
+        "commands": {
+          "rg": "rg"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "strip_components": 1
+      },
+      "windows/amd64": {
+        "version": "15.1.0",
+        "url": "https://github.com/BurntSushi/ripgrep/releases/download/15.1.0/ripgrep-15.1.0-x86_64-pc-windows-msvc.zip",
+        "sha256": "124510b94b6baa3380d051fdf4650eaa80a302c876d611e9dba0b2e18d87493a",
+        "format": "zip",
+        "commands": {
+          "rg": "rg.exe"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "strip_components": 1
+      },
+      "linux/amd64": {
+        "version": "15.1.0",
+        "url": "https://github.com/BurntSushi/ripgrep/releases/download/15.1.0/ripgrep-15.1.0-x86_64-unknown-linux-musl.tar.gz",
+        "sha256": "1c9297be4a084eea7ecaedf93eb03d058d6faae29bbc57ecdaf5063921491599",
+        "format": "tar.gz",
+        "commands": {
+          "rg": "rg"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "strip_components": 1
+      },
+      "linux/arm64": {
+        "version": "15.1.0",
+        "url": "https://github.com/BurntSushi/ripgrep/releases/download/15.1.0/ripgrep-15.1.0-aarch64-unknown-linux-gnu.tar.gz",
+        "sha256": "2b661c6ef508e902f388e9098d9c4c5aca72c87b55922d94abdba830b4dc885e",
+        "format": "tar.gz",
+        "commands": {
+          "rg": "rg"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "strip_components": 1,
+        "libc": "glibc"
+      }
+    },
+    "tool.gh": {
+      "darwin/arm64": {
+        "version": "2.96.0",
+        "url": "https://github.com/cli/cli/releases/download/v2.96.0/gh_2.96.0_macOS_arm64.zip",
+        "sha256": "f23a0c37d963aacc3bed703ccbd59b41c5ca22101fab7f00eb2b7cad23aba463",
+        "format": "zip",
+        "commands": {
+          "gh": "bin/gh"
+        },
+        "bin_dirs": [
+          "bin"
+        ],
+        "strip_components": 1
+      },
+      "linux/arm64": {
+        "version": "2.96.0",
+        "url": "https://github.com/cli/cli/releases/download/v2.96.0/gh_2.96.0_linux_arm64.tar.gz",
+        "sha256": "06f86ec7103d41993b76cd78072f43595c34aaa56506d971d9860e67140bf909",
+        "format": "tar.gz",
+        "commands": {
+          "gh": "bin/gh"
+        },
+        "bin_dirs": [
+          "bin"
+        ],
+        "strip_components": 1
+      },
+      "windows/amd64": {
+        "version": "2.96.0",
+        "url": "https://github.com/cli/cli/releases/download/v2.96.0/gh_2.96.0_windows_amd64.zip",
+        "sha256": "c2d6acc935cd2f00e2144d7e036d5cd82e6b6bd5594e8c75aa75ef2a4ed6aac3",
+        "format": "zip",
+        "commands": {
+          "gh": "bin/gh.exe"
+        },
+        "bin_dirs": [
+          "bin"
+        ]
+      },
+      "linux/amd64": {
+        "version": "2.96.0",
+        "url": "https://github.com/cli/cli/releases/download/v2.96.0/gh_2.96.0_linux_amd64.tar.gz",
+        "sha256": "83d5c2ccad5498f58bf6368acb1ab32588cf43ab3a4b1c301bf36328b1c8bd60",
+        "format": "tar.gz",
+        "commands": {
+          "gh": "bin/gh"
+        },
+        "bin_dirs": [
+          "bin"
+        ],
+        "strip_components": 1
+      }
+    },
+    "tool.lazygit": {
+      "darwin/arm64": {
+        "version": "0.66.0",
+        "url": "https://github.com/jesseduffield/lazygit/releases/download/v0.66.0/lazygit_0.66.0_darwin_arm64.tar.gz",
+        "sha256": "e9fe2fe1f1bbc1b4c3214b33e8e0d57a4d6e3c2276aa9aa713f9bcbdc223e65c",
+        "format": "tar.gz",
+        "commands": {
+          "lazygit": "lazygit"
+        },
+        "bin_dirs": [
+          "."
+        ]
+      },
+      "linux/arm64": {
+        "version": "0.66.0",
+        "url": "https://github.com/jesseduffield/lazygit/releases/download/v0.66.0/lazygit_0.66.0_linux_arm64.tar.gz",
+        "sha256": "9a4fc4656897ac9f7877b835473ce1a75620cc267f554c57fc4ff266407f3257",
+        "format": "tar.gz",
+        "commands": {
+          "lazygit": "lazygit"
+        },
+        "bin_dirs": [
+          "."
+        ]
+      },
+      "linux/amd64": {
+        "version": "0.66.0",
+        "url": "https://github.com/jesseduffield/lazygit/releases/download/v0.66.0/lazygit_0.66.0_linux_x86_64.tar.gz",
+        "sha256": "5b45541155d20bd32bf2cc5ab5b7e3d91c2eebf0fb1242281350edc27d59d2b7",
+        "format": "tar.gz",
+        "commands": {
+          "lazygit": "lazygit"
+        },
+        "bin_dirs": [
+          "."
+        ]
+      },
+      "windows/amd64": {
+        "version": "0.66.0",
+        "url": "https://github.com/jesseduffield/lazygit/releases/download/v0.66.0/lazygit_0.66.0_windows_x86_64.zip",
+        "sha256": "ed8fab4af7b8bac474084e976214a96569dea841c9f9b293502b83d8c3163e4b",
+        "format": "zip",
+        "commands": {
+          "lazygit": "lazygit.exe"
+        },
+        "bin_dirs": [
+          "."
+        ]
+      }
+    },
+    "tool.jq": {
+      "darwin/arm64": {
+        "version": "1.8.1",
+        "url": "https://github.com/jqlang/jq/releases/download/jq-1.8.1/jq-macos-arm64",
+        "sha256": "a9fe3ea2f86dfc72f6728417521ec9067b343277152b114f4e98d8cb0e263603",
+        "format": "file",
+        "commands": {
+          "jq": "jq"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "file": "jq"
+      },
+      "linux/amd64": {
+        "version": "1.8.1",
+        "url": "https://github.com/jqlang/jq/releases/download/jq-1.8.1/jq-linux-amd64",
+        "sha256": "020468de7539ce70ef1bceaf7cde2e8c4f2ca6c3afb84642aabc5c97d9fc2a0d",
+        "format": "file",
+        "commands": {
+          "jq": "jq"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "file": "jq"
+      },
+      "linux/arm64": {
+        "version": "1.8.1",
+        "url": "https://github.com/jqlang/jq/releases/download/jq-1.8.1/jq-linux-arm64",
+        "sha256": "6bc62f25981328edd3cfcfe6fe51b073f2d7e7710d7ef7fcdac28d4e384fc3d4",
+        "format": "file",
+        "commands": {
+          "jq": "jq"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "file": "jq"
+      },
+      "windows/amd64": {
+        "version": "1.8.1",
+        "url": "https://github.com/jqlang/jq/releases/download/jq-1.8.1/jq-windows-amd64.exe",
+        "sha256": "23cb60a1354eed6bcc8d9b9735e8c7b388cd1fdcb75726b93bc299ef22dd9334",
+        "format": "file",
+        "commands": {
+          "jq": "jq.exe"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "file": "jq.exe"
+      }
+    },
+    "tool.tree-sitter": {
+      "darwin/arm64": {
+        "version": "0.27.0",
+        "url": "https://github.com/tree-sitter/tree-sitter/releases/download/v0.27.0/tree-sitter-macos-arm64.gz",
+        "sha256": "70f7573b2b2e5371a5b58cc5227d2ad981fd5374596b9874e770af486060774e",
+        "format": "gzip",
+        "commands": {
+          "tree-sitter": "tree-sitter"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "file": "tree-sitter"
+      },
+      "linux/amd64": {
+        "version": "0.27.0",
+        "url": "https://github.com/tree-sitter/tree-sitter/releases/download/v0.27.0/tree-sitter-linux-x64.gz",
+        "sha256": "20a1f39ec1c45f2211492dcb8881c802b643b554bb196869a29ac3778277fa77",
+        "format": "gzip",
+        "commands": {
+          "tree-sitter": "tree-sitter"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "file": "tree-sitter",
+        "libc": "glibc"
+      },
+      "linux/arm64": {
+        "version": "0.27.0",
+        "url": "https://github.com/tree-sitter/tree-sitter/releases/download/v0.27.0/tree-sitter-linux-arm64.gz",
+        "sha256": "3a35a2dd961ad842384e982c75daf792c01d1a67e442fc3914d4de37bd8a59cb",
+        "format": "gzip",
+        "commands": {
+          "tree-sitter": "tree-sitter"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "file": "tree-sitter",
+        "libc": "glibc"
+      },
+      "windows/amd64": {
+        "version": "0.27.0",
+        "url": "https://github.com/tree-sitter/tree-sitter/releases/download/v0.27.0/tree-sitter-windows-x64.gz",
+        "sha256": "2d6c014b4e91d3d302ba7b30b3b625914027c3861ae7817e068a273e3f034550",
+        "format": "gzip",
+        "commands": {
+          "tree-sitter": "tree-sitter.exe"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "file": "tree-sitter.exe"
+      }
+    },
+    "tool.hyperfine": {
+      "darwin/arm64": {
+        "version": "1.20.0",
+        "url": "https://github.com/sharkdp/hyperfine/releases/download/v1.20.0/hyperfine-v1.20.0-aarch64-apple-darwin.tar.gz",
+        "sha256": "8ee7067016620447c9d2d6234ec9a4680f958b7ad983549b56334668f63075b5",
+        "format": "tar.gz",
+        "commands": {
+          "hyperfine": "hyperfine"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "strip_components": 1
+      },
+      "linux/amd64": {
+        "version": "1.20.0",
+        "url": "https://github.com/sharkdp/hyperfine/releases/download/v1.20.0/hyperfine-v1.20.0-x86_64-unknown-linux-musl.tar.gz",
+        "sha256": "3285ec7959285288137043dd81dce0dde056227018a8277532d9a364b4f03c2b",
+        "format": "tar.gz",
+        "commands": {
+          "hyperfine": "hyperfine"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "strip_components": 1
+      },
+      "linux/arm64": {
+        "version": "1.20.0",
+        "url": "https://github.com/sharkdp/hyperfine/releases/download/v1.20.0/hyperfine-v1.20.0-aarch64-unknown-linux-gnu.tar.gz",
+        "sha256": "90875cb1db7a1d797c311174d061728361e58fc70e3b62262a00635ac3b1997c",
+        "format": "tar.gz",
+        "commands": {
+          "hyperfine": "hyperfine"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "strip_components": 1,
+        "libc": "glibc"
+      },
+      "windows/amd64": {
+        "version": "1.20.0",
+        "url": "https://github.com/sharkdp/hyperfine/releases/download/v1.20.0/hyperfine-v1.20.0-x86_64-pc-windows-msvc.zip",
+        "sha256": "2508c549b049b1d4342d08edc1cb42bfac169082b6e3069431b5bab9822dbb32",
+        "format": "zip",
+        "commands": {
+          "hyperfine": "hyperfine.exe"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "strip_components": 1
+      }
+    },
+    "tool.node": {
+      "darwin/arm64": {
+        "version": "24.21.0",
+        "url": "https://nodejs.org/dist/v24.21.0/node-v24.21.0-darwin-arm64.tar.gz",
+        "sha256": "bed7eea5325e1108f32ce5228ddd6a5f0f08a499ee42aa7442aea583702f6057",
+        "format": "tar.gz",
+        "strip_components": 1,
+        "commands": {
+          "node": "bin/node",
+          "npm": "bin/npm",
+          "npx": "bin/npx"
+        },
+        "bin_dirs": [
+          "bin"
+        ],
+        "required_files": [
+          "lib/node_modules/npm/bin/npm-cli.js"
+        ]
+      },
+      "linux/amd64": {
+        "version": "24.21.0",
+        "url": "https://nodejs.org/dist/v24.21.0/node-v24.21.0-linux-x64.tar.gz",
+        "sha256": "6e1db87ef58b8819e5d5402eff1536491b18edd8eb7bee5ef7897876e88dc5ff",
+        "format": "tar.gz",
+        "strip_components": 1,
+        "commands": {
+          "node": "bin/node",
+          "npm": "bin/npm",
+          "npx": "bin/npx"
+        },
+        "bin_dirs": [
+          "bin"
+        ],
+        "required_files": [
+          "lib/node_modules/npm/bin/npm-cli.js"
+        ],
+        "libc": "glibc"
+      },
+      "linux/arm64": {
+        "version": "24.21.0",
+        "url": "https://nodejs.org/dist/v24.21.0/node-v24.21.0-linux-arm64.tar.gz",
+        "sha256": "724282c3b43aec998aa9527380465b45d229e021b58035f5f4f63095eabfe5d5",
+        "format": "tar.gz",
+        "strip_components": 1,
+        "commands": {
+          "node": "bin/node",
+          "npm": "bin/npm",
+          "npx": "bin/npx"
+        },
+        "bin_dirs": [
+          "bin"
+        ],
+        "required_files": [
+          "lib/node_modules/npm/bin/npm-cli.js"
+        ],
+        "libc": "glibc"
+      },
+      "windows/amd64": {
+        "version": "24.21.0",
+        "url": "https://nodejs.org/dist/v24.21.0/node-v24.21.0-win-x64.zip",
+        "sha256": "158f7685b44de51f6c0df1d153526cbcd3e1bc739a8dfc607721cef75de9e541",
+        "format": "zip",
+        "strip_components": 1,
+        "commands": {
+          "node": "node.exe",
+          "npm": "npm.cmd",
+          "npx": "npx.cmd"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "required_files": [
+          "node_modules/npm/bin/npm-cli.js"
+        ]
+      }
+    },
+    "tool.powershell": {
+      "windows/amd64": {
+        "version": "7.6.3",
+        "url": "https://github.com/PowerShell/PowerShell/releases/download/v7.6.3/PowerShell-7.6.3-win-x64.zip",
+        "sha256": "07ddb0d00b660459560ef82a9841da7705b27cd5dcca5a0d7b025a98eca29eca",
+        "format": "zip",
+        "commands": {
+          "pwsh": "pwsh.exe"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "required_files": [
+          "pwsh.dll",
+          "System.Management.Automation.dll"
+        ]
+      }
+    },
+    "tool.gh-dash": {
+      "darwin/arm64": {
+        "version": "4.26.0",
+        "url": "https://github.com/dlvhdr/gh-dash/releases/download/v4.26.0/gh-dash_v4.26.0_darwin-arm64",
+        "sha256": "3bcb088df5668a1b53f213a7a889b19a0eda59be48d44a3586ec54fc778494d1",
+        "format": "file",
+        "commands": {
+          "gh-dash": "gh-dash"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "file": "gh-dash"
+      },
+      "linux/amd64": {
+        "version": "4.26.0",
+        "url": "https://github.com/dlvhdr/gh-dash/releases/download/v4.26.0/gh-dash_v4.26.0_linux-amd64",
+        "sha256": "469012a8c607a503a4e873bc3862adedbc2c1c31878c62a396cd9874555f25ac",
+        "format": "file",
+        "commands": {
+          "gh-dash": "gh-dash"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "file": "gh-dash"
+      },
+      "linux/arm64": {
+        "version": "4.26.0",
+        "url": "https://github.com/dlvhdr/gh-dash/releases/download/v4.26.0/gh-dash_v4.26.0_linux-arm64",
+        "sha256": "eb73585f0d873e1039729bd9bc5b2c2dcdfc22ab30b47f96aece51270a5332d4",
+        "format": "file",
+        "commands": {
+          "gh-dash": "gh-dash"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "file": "gh-dash"
+      },
+      "windows/amd64": {
+        "version": "4.26.0",
+        "url": "https://github.com/dlvhdr/gh-dash/releases/download/v4.26.0/gh-dash_v4.26.0_windows-amd64.exe",
+        "sha256": "2c9ce2589048ddaf8efb2e4676fa1d39b8b72a9c5785a0eec71c3b485d7c69a6",
+        "format": "file",
+        "commands": {
+          "gh-dash": "gh-dash.exe"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "file": "gh-dash.exe"
+      }
+    },
+    "tool.shellcheck": {
+      "darwin/arm64": {
+        "version": "0.11.0",
+        "url": "https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.darwin.aarch64.tar.gz",
+        "sha256": "339b930feb1ea764467013cc1f72d09cd6b869ebf1013296ba9055ab2ffbd26f",
+        "format": "tar.gz",
+        "commands": {
+          "shellcheck": "shellcheck"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "strip_components": 1
+      },
+      "linux/amd64": {
+        "version": "0.11.0",
+        "url": "https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.linux.x86_64.tar.gz",
+        "sha256": "b7af85e41cc99489dcc21d66c6d5f3685138f06d34651e6d34b42ec6d54fe6f6",
+        "format": "tar.gz",
+        "commands": {
+          "shellcheck": "shellcheck"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "strip_components": 1
+      },
+      "linux/arm64": {
+        "version": "0.11.0",
+        "url": "https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.linux.aarch64.tar.gz",
+        "sha256": "68a8133197a50beb8803f8d42f9908d1af1c5540d4bb05fdfca8c1fa47decefc",
+        "format": "tar.gz",
+        "commands": {
+          "shellcheck": "shellcheck"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "strip_components": 1
+      },
+      "windows/amd64": {
+        "version": "0.11.0",
+        "url": "https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.zip",
+        "sha256": "8a4e35ab0b331c85d73567b12f2a444df187f483e5079ceffa6bda1faa2e740e",
+        "format": "zip",
+        "commands": {
+          "shellcheck": "shellcheck.exe"
+        },
+        "bin_dirs": [
+          "."
+        ]
+      }
+    },
+    "tool.taplo": {
+      "darwin/arm64": {
+        "version": "0.10.0",
+        "url": "https://github.com/tamasfe/taplo/releases/download/0.10.0/taplo-darwin-aarch64.gz",
+        "sha256": "713734314c3e71894b9e77513c5349835eefbd52908445a0d73b0c7dc469347d",
+        "format": "gzip",
+        "commands": {
+          "taplo": "taplo"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "file": "taplo"
+      },
+      "linux/amd64": {
+        "version": "0.10.0",
+        "url": "https://github.com/tamasfe/taplo/releases/download/0.10.0/taplo-linux-x86_64.gz",
+        "sha256": "8fe196b894ccf9072f98d4e1013a180306e17d244830b03986ee5e8eabeb6156",
+        "format": "gzip",
+        "commands": {
+          "taplo": "taplo"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "file": "taplo"
+      },
+      "linux/arm64": {
+        "version": "0.10.0",
+        "url": "https://github.com/tamasfe/taplo/releases/download/0.10.0/taplo-linux-aarch64.gz",
+        "sha256": "033681d01eec8376c3fd38fa3703c79316f5e14bb013d859943b60a07bccdcc3",
+        "format": "gzip",
+        "commands": {
+          "taplo": "taplo"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "file": "taplo"
+      },
+      "windows/amd64": {
+        "version": "0.10.0",
+        "url": "https://github.com/tamasfe/taplo/releases/download/0.10.0/taplo-windows-x86_64.gz",
+        "sha256": "550fdc955343f8a196447a05346ecf8827e391726e4ded577bb00a0a36cf220c",
+        "format": "gzip",
+        "commands": {
+          "taplo": "taplo.exe"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "file": "taplo.exe"
+      }
+    },
+    "tool.cmake": {
+      "darwin/arm64": {
+        "version": "4.4.4",
+        "url": "https://github.com/Kitware/CMake/releases/download/v4.4.4/cmake-4.4.4-macos-universal.tar.gz",
+        "sha256": "4b7b73704b1db9b374e5c9ab8e17ac6148b817b6396ee75cd94a852cbac9d305",
+        "format": "tar.gz",
+        "commands": {
+          "cmake": "CMake.app/Contents/bin/cmake",
+          "ctest": "CMake.app/Contents/bin/ctest",
+          "cpack": "CMake.app/Contents/bin/cpack"
+        },
+        "bin_dirs": [
+          "CMake.app/Contents/bin"
+        ],
+        "strip_components": 1,
+        "required_files": [
+          "CMake.app/Contents/share/cmake-4.4/Modules/CMakeDetermineSystem.cmake"
+        ]
+      },
+      "linux/amd64": {
+        "version": "4.4.4",
+        "url": "https://github.com/Kitware/CMake/releases/download/v4.4.4/cmake-4.4.4-linux-x86_64.tar.gz",
+        "sha256": "e5bb807f7728cb60cd8b27ebc97a2edb469b68655f21e844a600c3575b76f5bb",
+        "format": "tar.gz",
+        "commands": {
+          "cmake": "bin/cmake",
+          "ctest": "bin/ctest",
+          "cpack": "bin/cpack"
+        },
+        "bin_dirs": [
+          "bin"
+        ],
+        "strip_components": 1,
+        "required_files": [
+          "share/cmake-4.4/Modules/CMakeDetermineSystem.cmake"
+        ],
+        "libc": "glibc"
+      },
+      "linux/arm64": {
+        "version": "4.4.4",
+        "url": "https://github.com/Kitware/CMake/releases/download/v4.4.4/cmake-4.4.4-linux-aarch64.tar.gz",
+        "sha256": "a1b6cc63636a0e55c63257cf3315a8a5f129e42fade25db1afea4ff8ab06f25e",
+        "format": "tar.gz",
+        "commands": {
+          "cmake": "bin/cmake",
+          "ctest": "bin/ctest",
+          "cpack": "bin/cpack"
+        },
+        "bin_dirs": [
+          "bin"
+        ],
+        "strip_components": 1,
+        "required_files": [
+          "share/cmake-4.4/Modules/CMakeDetermineSystem.cmake"
+        ],
+        "libc": "glibc"
+      },
+      "windows/amd64": {
+        "version": "4.4.4",
+        "url": "https://github.com/Kitware/CMake/releases/download/v4.4.4/cmake-4.4.4-windows-x86_64.zip",
+        "sha256": "bace36e94b31c68ab6fa295f26dfa11219e0701cf7c94b0284a7d1cb13dac536",
+        "format": "zip",
+        "commands": {
+          "cmake": "bin/cmake.exe",
+          "ctest": "bin/ctest.exe",
+          "cpack": "bin/cpack.exe"
+        },
+        "bin_dirs": [
+          "bin"
+        ],
+        "strip_components": 1,
+        "required_files": [
+          "share/cmake-4.4/Modules/CMakeDetermineSystem.cmake"
+        ]
+      }
+    },
+    "tool.python": {
+      "darwin/arm64": {
+        "version": "3.13.16",
+        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261009/cpython-3.13.16%2B20261009-aarch64-apple-darwin-install_only_stripped.tar.gz",
+        "sha256": "11785155d0f70e634178219c20925d8f20be00a3da4684fc4f5019dd15602ef7",
+        "format": "tar.gz",
+        "commands": {
+          "python3": "bin/python3"
+        },
+        "bin_dirs": [
+          "bin"
+        ],
+        "strip_components": 1,
+        "required_files": [
+          "lib/python3.13/os.py"
+        ],
+        "python_stdlib": "lib/python3.13"
+      },
+      "linux/amd64": {
+        "version": "3.13.16",
+        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261009/cpython-3.13.16%2B20261009-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz",
+        "sha256": "24801ea31c7d406d559a17e2226325c723d50c56900b9c0da7b62adaae2affc9",
+        "format": "tar.gz",
+        "commands": {
+          "python3": "bin/python3"
+        },
+        "bin_dirs": [
+          "bin"
+        ],
+        "strip_components": 1,
+        "required_files": [
+          "lib/python3.13/os.py"
+        ],
+        "libc": "glibc",
+        "python_stdlib": "lib/python3.13"
+      },
+      "linux/arm64": {
+        "version": "3.13.16",
+        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261009/cpython-3.13.16%2B20261009-aarch64-unknown-linux-gnu-install_only_stripped.tar.gz",
+        "sha256": "52c6993abd6ac687cceb787ecee83b166271bc06ad80ac9cac82c5d28d3c00bc",
+        "format": "tar.gz",
+        "commands": {
+          "python3": "bin/python3"
+        },
+        "bin_dirs": [
+          "bin"
+        ],
+        "strip_components": 1,
+        "required_files": [
+          "lib/python3.13/os.py"
+        ],
+        "libc": "glibc",
+        "python_stdlib": "lib/python3.13"
+      },
+      "windows/amd64": {
+        "version": "3.13.16",
+        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261009/cpython-3.13.16%2B20261009-x86_64-pc-windows-msvc-install_only_stripped.tar.gz",
+        "sha256": "3a7adfb69e3ff02a41ed38ac637808532b438ab3c8619af46ca5dbec5c1f5190",
+        "format": "tar.gz",
+        "commands": {
+          "python": "python.exe"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "strip_components": 1,
+        "required_files": [
+          "Lib/os.py",
+          "python313.dll",
+          "vcruntime140.dll",
+          "vcruntime140_1.dll"
+        ],
+        "python_stdlib": "Lib"
+      }
+    },
+    "tool.herdr": {
+      "darwin/arm64": {
+        "version": "0.9.3",
+        "url": "https://github.com/herdrdev/herdr/releases/download/v0.9.3/herdr-macos-aarch64",
+        "sha256": "5173a3e0ae42d5d1ab7ebfa5d5e6329f7c3d23f8e1a3677c7ce3231da2884157",
+        "format": "file",
+        "commands": {
+          "herdr": "herdr"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "file": "herdr"
+      },
+      "linux/amd64": {
+        "version": "0.9.3",
+        "url": "https://github.com/herdrdev/herdr/releases/download/v0.9.3/herdr-linux-x86_64",
+        "sha256": "18a8dc65f1c2fa485884344356dea1cfd911c6f06cf46fa78e193f4087f4dba7",
+        "format": "file",
+        "commands": {
+          "herdr": "herdr"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "file": "herdr"
+      },
+      "linux/arm64": {
+        "version": "0.9.3",
+        "url": "https://github.com/herdrdev/herdr/releases/download/v0.9.3/herdr-linux-aarch64",
+        "sha256": "4de7aa3e25678812e92960de64f7c2aaa1bca1f0f80a3c5e559837e231e1f5c0",
+        "format": "file",
+        "commands": {
+          "herdr": "herdr"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "file": "herdr"
+      },
+      "windows/amd64": {
+        "version": "0.9.3",
+        "url": "https://github.com/herdrdev/herdr/releases/download/v0.9.3/herdr-windows-x86_64.zip",
+        "sha256": "c75b1fa49f7a3ba4b8b11789912a6147e4214a3b6fd3556d0f80076c8887d795",
+        "format": "zip",
+        "commands": {
+          "herdr": "herdr.exe"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "required_files": [
+          "conpty/conpty.dll",
+          "conpty/herdr-conpty.json",
+          "conpty/x64/OpenConsole.exe"
+        ]
+      }
+    },
+    "tool.editorconfig": {
+      "darwin/arm64": {
+        "version": "4.0.2",
+        "url": "https://github.com/editorconfig-checker/editorconfig-checker/releases/download/v4.0.2/editorconfig-checker-darwin-all.tar.gz",
+        "sha256": "ff59f57717d95fc62b8e372c8051dbbb766f7d660942409a85d027b0feb2422c",
+        "format": "tar.gz",
+        "commands": {
+          "editorconfig-checker": "editorconfig-checker",
+          "ec": "editorconfig-checker"
+        },
+        "bin_dirs": [
+          "."
+        ]
+      },
+      "linux/amd64": {
+        "version": "4.0.2",
+        "url": "https://github.com/editorconfig-checker/editorconfig-checker/releases/download/v4.0.2/editorconfig-checker-linux-amd64.tar.gz",
+        "sha256": "44efaef3ed14c6ab52eb87481d78e5e5c204796dccf26e2f4598a61ba17f8003",
+        "format": "tar.gz",
+        "commands": {
+          "editorconfig-checker": "editorconfig-checker",
+          "ec": "editorconfig-checker"
+        },
+        "bin_dirs": [
+          "."
+        ]
+      },
+      "linux/arm64": {
+        "version": "4.0.2",
+        "url": "https://github.com/editorconfig-checker/editorconfig-checker/releases/download/v4.0.2/editorconfig-checker-linux-arm64.tar.gz",
+        "sha256": "abad76da8c9950fdc2a314bcd66969172aa823e9c595fa7e3a389a91e34d025e",
+        "format": "tar.gz",
+        "commands": {
+          "editorconfig-checker": "editorconfig-checker",
+          "ec": "editorconfig-checker"
+        },
+        "bin_dirs": [
+          "."
+        ]
+      },
+      "windows/amd64": {
+        "version": "4.0.2",
+        "url": "https://github.com/editorconfig-checker/editorconfig-checker/releases/download/v4.0.2/editorconfig-checker-windows-amd64.zip",
+        "sha256": "857f8f74dfc259d73dac93573e37cf3ce01150787d7b139bf839549cc6b5beb9",
+        "format": "zip",
+        "commands": {
+          "editorconfig-checker": "editorconfig-checker.exe",
+          "ec": "editorconfig-checker.exe"
+        },
+        "bin_dirs": [
+          "."
+        ]
+      }
+    },
+    "tool.clipboard": {
+      "windows/amd64": {
+        "version": "0.1.1",
+        "url": "https://github.com/equalsraf/win32yank/releases/download/v0.1.1/win32yank-x64.zip",
+        "sha256": "247c9a05b94387a884b49d3db13f806b1677dfc38020f955f719be6902260cd6",
+        "format": "zip",
+        "commands": {
+          "win32yank": "win32yank.exe"
+        },
+        "bin_dirs": [
+          "."
+        ]
+      }
+    },
+    "font.hack": {
+      "darwin/arm64": {
+        "version": "3.5.1",
+        "url": "https://github.com/ryanoasis/nerd-fonts/releases/download/v3.5.1/Hack.zip",
+        "sha256": "fa24da7de7cefe7766614d27762570b20453c852fc1d5b657111666df9a5e449",
+        "format": "zip",
+        "commands": {},
+        "bin_dirs": [],
+        "required_files": [
+          "HackNerdFont-Italic.ttf",
+          "HackNerdFontPropo-Regular.ttf",
+          "HackNerdFontMono-Bold.ttf",
+          "HackNerdFontPropo-Bold.ttf",
+          "HackNerdFontMono-BoldItalic.ttf",
+          "HackNerdFont-Regular.ttf",
+          "HackNerdFontMono-Regular.ttf",
+          "HackNerdFont-BoldItalic.ttf",
+          "HackNerdFont-Bold.ttf",
+          "HackNerdFontPropo-Italic.ttf",
+          "HackNerdFontMono-Italic.ttf",
+          "HackNerdFontPropo-BoldItalic.ttf"
+        ]
+      },
+      "linux/amd64": {
+        "version": "3.5.1",
+        "url": "https://github.com/ryanoasis/nerd-fonts/releases/download/v3.5.1/Hack.zip",
+        "sha256": "fa24da7de7cefe7766614d27762570b20453c852fc1d5b657111666df9a5e449",
+        "format": "zip",
+        "commands": {},
+        "bin_dirs": [],
+        "required_files": [
+          "HackNerdFont-Italic.ttf",
+          "HackNerdFontPropo-Regular.ttf",
+          "HackNerdFontMono-Bold.ttf",
+          "HackNerdFontPropo-Bold.ttf",
+          "HackNerdFontMono-BoldItalic.ttf",
+          "HackNerdFont-Regular.ttf",
+          "HackNerdFontMono-Regular.ttf",
+          "HackNerdFont-BoldItalic.ttf",
+          "HackNerdFont-Bold.ttf",
+          "HackNerdFontPropo-Italic.ttf",
+          "HackNerdFontMono-Italic.ttf",
+          "HackNerdFontPropo-BoldItalic.ttf"
+        ]
+      },
+      "linux/arm64": {
+        "version": "3.5.1",
+        "url": "https://github.com/ryanoasis/nerd-fonts/releases/download/v3.5.1/Hack.zip",
+        "sha256": "fa24da7de7cefe7766614d27762570b20453c852fc1d5b657111666df9a5e449",
+        "format": "zip",
+        "commands": {},
+        "bin_dirs": [],
+        "required_files": [
+          "HackNerdFont-Italic.ttf",
+          "HackNerdFontPropo-Regular.ttf",
+          "HackNerdFontMono-Bold.ttf",
+          "HackNerdFontPropo-Bold.ttf",
+          "HackNerdFontMono-BoldItalic.ttf",
+          "HackNerdFont-Regular.ttf",
+          "HackNerdFontMono-Regular.ttf",
+          "HackNerdFont-BoldItalic.ttf",
+          "HackNerdFont-Bold.ttf",
+          "HackNerdFontPropo-Italic.ttf",
+          "HackNerdFontMono-Italic.ttf",
+          "HackNerdFontPropo-BoldItalic.ttf"
+        ]
+      },
+      "windows/amd64": {
+        "version": "3.5.1",
+        "url": "https://github.com/ryanoasis/nerd-fonts/releases/download/v3.5.1/Hack.zip",
+        "sha256": "fa24da7de7cefe7766614d27762570b20453c852fc1d5b657111666df9a5e449",
+        "format": "zip",
+        "commands": {},
+        "bin_dirs": [],
+        "required_files": [
+          "HackNerdFont-Italic.ttf",
+          "HackNerdFontPropo-Regular.ttf",
+          "HackNerdFontMono-Bold.ttf",
+          "HackNerdFontPropo-Bold.ttf",
+          "HackNerdFontMono-BoldItalic.ttf",
+          "HackNerdFont-Regular.ttf",
+          "HackNerdFontMono-Regular.ttf",
+          "HackNerdFont-BoldItalic.ttf",
+          "HackNerdFont-Bold.ttf",
+          "HackNerdFontPropo-Italic.ttf",
+          "HackNerdFontMono-Italic.ttf",
+          "HackNerdFontPropo-BoldItalic.ttf"
+        ]
+      }
+    },
+    "tmux.sensible": {
+      "darwin/arm64": {
+        "version": "25cb91f42d020f675bb0a2ce3fbd3a5d96119efa",
+        "url": "https://codeload.github.com/tmux-plugins/tmux-sensible/tar.gz/25cb91f42d020f675bb0a2ce3fbd3a5d96119efa",
+        "sha256": "0af1e1eb7139ded74fe03c1ebba7fb4533f5c7d345e42b73f718a9d822d88903",
+        "format": "tar.gz",
+        "strip_components": 1,
+        "commands": {},
+        "bin_dirs": [],
+        "required_files": [
+          "sensible.tmux"
+        ]
+      },
+      "linux/amd64": {
+        "version": "25cb91f42d020f675bb0a2ce3fbd3a5d96119efa",
+        "url": "https://codeload.github.com/tmux-plugins/tmux-sensible/tar.gz/25cb91f42d020f675bb0a2ce3fbd3a5d96119efa",
+        "sha256": "0af1e1eb7139ded74fe03c1ebba7fb4533f5c7d345e42b73f718a9d822d88903",
+        "format": "tar.gz",
+        "strip_components": 1,
+        "commands": {},
+        "bin_dirs": [],
+        "required_files": [
+          "sensible.tmux"
+        ]
+      },
+      "linux/arm64": {
+        "version": "25cb91f42d020f675bb0a2ce3fbd3a5d96119efa",
+        "url": "https://codeload.github.com/tmux-plugins/tmux-sensible/tar.gz/25cb91f42d020f675bb0a2ce3fbd3a5d96119efa",
+        "sha256": "0af1e1eb7139ded74fe03c1ebba7fb4533f5c7d345e42b73f718a9d822d88903",
+        "format": "tar.gz",
+        "strip_components": 1,
+        "commands": {},
+        "bin_dirs": [],
+        "required_files": [
+          "sensible.tmux"
+        ]
+      }
+    },
+    "tmux.yank": {
+      "darwin/arm64": {
+        "version": "acfd36e4fcba99f8310a7dfb432111c242fe7392",
+        "url": "https://codeload.github.com/tmux-plugins/tmux-yank/tar.gz/acfd36e4fcba99f8310a7dfb432111c242fe7392",
+        "sha256": "702c4f164fee51c70798264917e9c53854c2e357ddf6f1982ed89dba563d4e84",
+        "format": "tar.gz",
+        "strip_components": 1,
+        "commands": {},
+        "bin_dirs": [],
+        "required_files": [
+          "yank.tmux"
+        ]
+      },
+      "linux/amd64": {
+        "version": "acfd36e4fcba99f8310a7dfb432111c242fe7392",
+        "url": "https://codeload.github.com/tmux-plugins/tmux-yank/tar.gz/acfd36e4fcba99f8310a7dfb432111c242fe7392",
+        "sha256": "702c4f164fee51c70798264917e9c53854c2e357ddf6f1982ed89dba563d4e84",
+        "format": "tar.gz",
+        "strip_components": 1,
+        "commands": {},
+        "bin_dirs": [],
+        "required_files": [
+          "yank.tmux"
+        ]
+      },
+      "linux/arm64": {
+        "version": "acfd36e4fcba99f8310a7dfb432111c242fe7392",
+        "url": "https://codeload.github.com/tmux-plugins/tmux-yank/tar.gz/acfd36e4fcba99f8310a7dfb432111c242fe7392",
+        "sha256": "702c4f164fee51c70798264917e9c53854c2e357ddf6f1982ed89dba563d4e84",
+        "format": "tar.gz",
+        "strip_components": 1,
+        "commands": {},
+        "bin_dirs": [],
+        "required_files": [
+          "yank.tmux"
+        ]
+      }
+    },
+    "tmux.resurrect": {
+      "darwin/arm64": {
+        "version": "cff343cf9e81983d3da0c8562b01616f12e8d548",
+        "url": "https://codeload.github.com/tmux-plugins/tmux-resurrect/tar.gz/cff343cf9e81983d3da0c8562b01616f12e8d548",
+        "sha256": "9f1dda18554291ee7f8a0f499e2af90bbadc2ebceb7a995bb13b76529fe0c5c9",
+        "format": "tar.gz",
+        "strip_components": 1,
+        "commands": {},
+        "bin_dirs": [],
+        "required_files": [
+          "resurrect.tmux"
+        ],
+        "excluded_files": [
+          "run_tests",
+          "tests/helpers/helpers.sh",
+          "tests/run_tests_in_isolation"
+        ],
+        "replacements": [
+          {
+            "file": "scripts/helpers.sh",
+            "before": "\t$CURRENT_DIR/check_tmux_version.sh \"$SUPPORTED_VERSION\"",
+            "after": "\t\"$CURRENT_DIR/check_tmux_version.sh\" \"$SUPPORTED_VERSION\""
+          },
+          {
+            "file": "scripts/save.sh",
+            "before": "remove_old_backups() {\n\t# remove resurrect files older than 30 days (default), but keep at least 5 copies of backup.\n\tlocal delete_after=\"$(get_tmux_option \"$delete_backup_after_option\" \"$default_delete_backup_after\")\"\n\tlocal -a files\n\tfiles=($(ls -t $(resurrect_dir)/${RESURRECT_FILE_PREFIX}_*.${RESURRECT_FILE_EXTENSION} | tail -n +6))\n\t[[ ${#files[@]} -eq 0 ]] ||\n\t\tfind \"${files[@]}\" -type f -mtime \"+${delete_after}\" -exec rm -v \"{}\" \\; > /dev/null\n}",
+            "after": "remove_old_backups() {\n\t# remove resurrect files older than 30 days (default), but keep at least 5 copies of backup.\n\tlocal delete_after=\"$(get_tmux_option \"$delete_backup_after_option\" \"$default_delete_backup_after\")\"\n\tlocal -a files=()\n\tlocal file\n\twhile IFS= read -r file; do\n\t\tfiles+=(\"$file\")\n\tdone < <(QUOTING_STYLE=literal ls -1t -- \"$(resurrect_dir)\"/${RESURRECT_FILE_PREFIX}_*.${RESURRECT_FILE_EXTENSION} | tail -n +6)\n\t[[ ${#files[@]} -eq 0 ]] ||\n\t\tfind \"${files[@]}\" -type f -mtime \"+${delete_after}\" -exec rm -v \"{}\" \\; > /dev/null\n}"
+          },
+          {
+            "file": "scripts/restore.sh",
+            "before": " $(last_resurrect_file)",
+            "after": " \"$(last_resurrect_file)\"",
+            "count": 8
+          },
+          {
+            "file": "scripts/restore.sh",
+            "before": "[ ! -f $resurrect_file ]",
+            "after": "[ ! -f \"$resurrect_file\" ]"
+          },
+          {
+            "file": "scripts/restore.sh",
+            "before": "pane_creation_command() {\n\techo \"cat '$(pane_contents_file \"restore\" \"${1}:${2}.${3}\")'; exec $(tmux_default_command)\"\n}",
+            "after": "pane_creation_command() {\n\tlocal file=\"$(pane_contents_file \"restore\" \"${1}:${2}.${3}\")\"\n\tfile=${file//\\'/\\'\\\"\\'\\\"\\'}\n\tprintf \"cat '%s'; exec %s\\n\" \"$file\" \"$(tmux_default_command)\"\n}"
+          },
+          {
+            "file": "scripts/spinner_helpers.sh",
+            "before": "\t$CURRENT_DIR/tmux_spinner.sh \"$1\" \"$2\" &",
+            "after": "\t\"$CURRENT_DIR/tmux_spinner.sh\" \"$1\" \"$2\" &"
+          }
+        ]
+      },
+      "linux/amd64": {
+        "version": "cff343cf9e81983d3da0c8562b01616f12e8d548",
+        "url": "https://codeload.github.com/tmux-plugins/tmux-resurrect/tar.gz/cff343cf9e81983d3da0c8562b01616f12e8d548",
+        "sha256": "9f1dda18554291ee7f8a0f499e2af90bbadc2ebceb7a995bb13b76529fe0c5c9",
+        "format": "tar.gz",
+        "strip_components": 1,
+        "commands": {},
+        "bin_dirs": [],
+        "required_files": [
+          "resurrect.tmux"
+        ],
+        "excluded_files": [
+          "run_tests",
+          "tests/helpers/helpers.sh",
+          "tests/run_tests_in_isolation"
+        ],
+        "replacements": [
+          {
+            "file": "scripts/helpers.sh",
+            "before": "\t$CURRENT_DIR/check_tmux_version.sh \"$SUPPORTED_VERSION\"",
+            "after": "\t\"$CURRENT_DIR/check_tmux_version.sh\" \"$SUPPORTED_VERSION\""
+          },
+          {
+            "file": "scripts/save.sh",
+            "before": "remove_old_backups() {\n\t# remove resurrect files older than 30 days (default), but keep at least 5 copies of backup.\n\tlocal delete_after=\"$(get_tmux_option \"$delete_backup_after_option\" \"$default_delete_backup_after\")\"\n\tlocal -a files\n\tfiles=($(ls -t $(resurrect_dir)/${RESURRECT_FILE_PREFIX}_*.${RESURRECT_FILE_EXTENSION} | tail -n +6))\n\t[[ ${#files[@]} -eq 0 ]] ||\n\t\tfind \"${files[@]}\" -type f -mtime \"+${delete_after}\" -exec rm -v \"{}\" \\; > /dev/null\n}",
+            "after": "remove_old_backups() {\n\t# remove resurrect files older than 30 days (default), but keep at least 5 copies of backup.\n\tlocal delete_after=\"$(get_tmux_option \"$delete_backup_after_option\" \"$default_delete_backup_after\")\"\n\tlocal -a files=()\n\tlocal file\n\twhile IFS= read -r file; do\n\t\tfiles+=(\"$file\")\n\tdone < <(QUOTING_STYLE=literal ls -1t -- \"$(resurrect_dir)\"/${RESURRECT_FILE_PREFIX}_*.${RESURRECT_FILE_EXTENSION} | tail -n +6)\n\t[[ ${#files[@]} -eq 0 ]] ||\n\t\tfind \"${files[@]}\" -type f -mtime \"+${delete_after}\" -exec rm -v \"{}\" \\; > /dev/null\n}"
+          },
+          {
+            "file": "scripts/restore.sh",
+            "before": " $(last_resurrect_file)",
+            "after": " \"$(last_resurrect_file)\"",
+            "count": 8
+          },
+          {
+            "file": "scripts/restore.sh",
+            "before": "[ ! -f $resurrect_file ]",
+            "after": "[ ! -f \"$resurrect_file\" ]"
+          },
+          {
+            "file": "scripts/restore.sh",
+            "before": "pane_creation_command() {\n\techo \"cat '$(pane_contents_file \"restore\" \"${1}:${2}.${3}\")'; exec $(tmux_default_command)\"\n}",
+            "after": "pane_creation_command() {\n\tlocal file=\"$(pane_contents_file \"restore\" \"${1}:${2}.${3}\")\"\n\tfile=${file//\\'/\\'\\\"\\'\\\"\\'}\n\tprintf \"cat '%s'; exec %s\\n\" \"$file\" \"$(tmux_default_command)\"\n}"
+          },
+          {
+            "file": "scripts/spinner_helpers.sh",
+            "before": "\t$CURRENT_DIR/tmux_spinner.sh \"$1\" \"$2\" &",
+            "after": "\t\"$CURRENT_DIR/tmux_spinner.sh\" \"$1\" \"$2\" &"
+          }
+        ]
+      },
+      "linux/arm64": {
+        "version": "cff343cf9e81983d3da0c8562b01616f12e8d548",
+        "url": "https://codeload.github.com/tmux-plugins/tmux-resurrect/tar.gz/cff343cf9e81983d3da0c8562b01616f12e8d548",
+        "sha256": "9f1dda18554291ee7f8a0f499e2af90bbadc2ebceb7a995bb13b76529fe0c5c9",
+        "format": "tar.gz",
+        "strip_components": 1,
+        "commands": {},
+        "bin_dirs": [],
+        "required_files": [
+          "resurrect.tmux"
+        ],
+        "excluded_files": [
+          "run_tests",
+          "tests/helpers/helpers.sh",
+          "tests/run_tests_in_isolation"
+        ],
+        "replacements": [
+          {
+            "file": "scripts/helpers.sh",
+            "before": "\t$CURRENT_DIR/check_tmux_version.sh \"$SUPPORTED_VERSION\"",
+            "after": "\t\"$CURRENT_DIR/check_tmux_version.sh\" \"$SUPPORTED_VERSION\""
+          },
+          {
+            "file": "scripts/save.sh",
+            "before": "remove_old_backups() {\n\t# remove resurrect files older than 30 days (default), but keep at least 5 copies of backup.\n\tlocal delete_after=\"$(get_tmux_option \"$delete_backup_after_option\" \"$default_delete_backup_after\")\"\n\tlocal -a files\n\tfiles=($(ls -t $(resurrect_dir)/${RESURRECT_FILE_PREFIX}_*.${RESURRECT_FILE_EXTENSION} | tail -n +6))\n\t[[ ${#files[@]} -eq 0 ]] ||\n\t\tfind \"${files[@]}\" -type f -mtime \"+${delete_after}\" -exec rm -v \"{}\" \\; > /dev/null\n}",
+            "after": "remove_old_backups() {\n\t# remove resurrect files older than 30 days (default), but keep at least 5 copies of backup.\n\tlocal delete_after=\"$(get_tmux_option \"$delete_backup_after_option\" \"$default_delete_backup_after\")\"\n\tlocal -a files=()\n\tlocal file\n\twhile IFS= read -r file; do\n\t\tfiles+=(\"$file\")\n\tdone < <(QUOTING_STYLE=literal ls -1t -- \"$(resurrect_dir)\"/${RESURRECT_FILE_PREFIX}_*.${RESURRECT_FILE_EXTENSION} | tail -n +6)\n\t[[ ${#files[@]} -eq 0 ]] ||\n\t\tfind \"${files[@]}\" -type f -mtime \"+${delete_after}\" -exec rm -v \"{}\" \\; > /dev/null\n}"
+          },
+          {
+            "file": "scripts/restore.sh",
+            "before": " $(last_resurrect_file)",
+            "after": " \"$(last_resurrect_file)\"",
+            "count": 8
+          },
+          {
+            "file": "scripts/restore.sh",
+            "before": "[ ! -f $resurrect_file ]",
+            "after": "[ ! -f \"$resurrect_file\" ]"
+          },
+          {
+            "file": "scripts/restore.sh",
+            "before": "pane_creation_command() {\n\techo \"cat '$(pane_contents_file \"restore\" \"${1}:${2}.${3}\")'; exec $(tmux_default_command)\"\n}",
+            "after": "pane_creation_command() {\n\tlocal file=\"$(pane_contents_file \"restore\" \"${1}:${2}.${3}\")\"\n\tfile=${file//\\'/\\'\\\"\\'\\\"\\'}\n\tprintf \"cat '%s'; exec %s\\n\" \"$file\" \"$(tmux_default_command)\"\n}"
+          },
+          {
+            "file": "scripts/spinner_helpers.sh",
+            "before": "\t$CURRENT_DIR/tmux_spinner.sh \"$1\" \"$2\" &",
+            "after": "\t\"$CURRENT_DIR/tmux_spinner.sh\" \"$1\" \"$2\" &"
+          }
+        ]
+      }
+    },
+    "tmux.continuum": {
+      "darwin/arm64": {
+        "version": "0698e8f4b17d6454c71bf5212895ec055c578da0",
+        "url": "https://codeload.github.com/tmux-plugins/tmux-continuum/tar.gz/0698e8f4b17d6454c71bf5212895ec055c578da0",
+        "sha256": "a1b9a2f0715163472ca713679204a1ca55d3f845cf1c659ae04222db3553424f",
+        "format": "tar.gz",
+        "strip_components": 1,
+        "commands": {},
+        "bin_dirs": [],
+        "required_files": [
+          "continuum.tmux"
+        ]
+      },
+      "linux/amd64": {
+        "version": "0698e8f4b17d6454c71bf5212895ec055c578da0",
+        "url": "https://codeload.github.com/tmux-plugins/tmux-continuum/tar.gz/0698e8f4b17d6454c71bf5212895ec055c578da0",
+        "sha256": "a1b9a2f0715163472ca713679204a1ca55d3f845cf1c659ae04222db3553424f",
+        "format": "tar.gz",
+        "strip_components": 1,
+        "commands": {},
+        "bin_dirs": [],
+        "required_files": [
+          "continuum.tmux"
+        ]
+      },
+      "linux/arm64": {
+        "version": "0698e8f4b17d6454c71bf5212895ec055c578da0",
+        "url": "https://codeload.github.com/tmux-plugins/tmux-continuum/tar.gz/0698e8f4b17d6454c71bf5212895ec055c578da0",
+        "sha256": "a1b9a2f0715163472ca713679204a1ca55d3f845cf1c659ae04222db3553424f",
+        "format": "tar.gz",
+        "strip_components": 1,
+        "commands": {},
+        "bin_dirs": [],
+        "required_files": [
+          "continuum.tmux"
+        ]
+      }
+    },
+    "tool.pi": {
+      "darwin/arm64": {
+        "version": "1.0.4",
+        "url": "https://github.com/earendil-works/pi/releases/download/v1.0.4/pi-darwin-arm64.tar.gz",
+        "sha256": "717dcd38a03849e919f9dec9daa96f5ca102e15ea33d804e5db57b1d47e513bc",
+        "format": "tar.gz",
+        "strip_components": 1,
+        "commands": {
+          "pi": "pi"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "required_files": [
+          "package.json",
+          "photon_rs_bg.wasm",
+          "theme/dark.json",
+          "theme/light.json"
+        ]
+      },
+      "linux/amd64": {
+        "version": "1.0.4",
+        "url": "https://github.com/earendil-works/pi/releases/download/v1.0.4/pi-linux-x64.tar.gz",
+        "sha256": "284c45dd28cf975a13cff6af34741dd0a0cdca6634e8bdfc0083ae7d452e86d6",
+        "format": "tar.gz",
+        "strip_components": 1,
+        "commands": {
+          "pi": "pi"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "required_files": [
+          "package.json",
+          "photon_rs_bg.wasm",
+          "theme/dark.json",
+          "theme/light.json"
+        ],
+        "libc": "glibc"
+      },
+      "linux/arm64": {
+        "version": "1.0.4",
+        "url": "https://github.com/earendil-works/pi/releases/download/v1.0.4/pi-linux-arm64.tar.gz",
+        "sha256": "6a6bc66a6ac2750bd7ccd7f2109090463f564d447feefb10a5965f6b6aed2211",
+        "format": "tar.gz",
+        "strip_components": 1,
+        "commands": {
+          "pi": "pi"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "required_files": [
+          "package.json",
+          "photon_rs_bg.wasm",
+          "theme/dark.json",
+          "theme/light.json"
+        ],
+        "libc": "glibc"
+      },
+      "windows/amd64": {
+        "version": "1.0.4",
+        "url": "https://github.com/earendil-works/pi/releases/download/v1.0.4/pi-windows-x64.zip",
+        "sha256": "6bdbfb7bac252eea36a0095e4b741c9d5784d5ba99146e2d76e9246dee409b58",
+        "format": "zip",
+        "commands": {
+          "pi": "pi.exe"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "required_files": [
+          "package.json",
+          "photon_rs_bg.wasm",
+          "theme/dark.json",
+          "theme/light.json"
+        ]
+      }
+    },
+    "tool.rust": {
+      "windows/amd64": {
+        "version": "1.99.0",
+        "url": "https://static.rust-lang.org/dist/2026-10-01/rustc-1.99.0-x86_64-pc-windows-msvc.tar.gz",
+        "sha256": "4d05087fd7786cceb9460f573df54d1c0511ff3aa121e8e8da346c325b9fc3f6",
+        "format": "tar.gz",
+        "strip_components": 1,
+        "commands": {
+          "rustc": "bin/rustc.exe",
+          "cargo": "bin/cargo.exe",
+          "rustfmt": "bin/rustfmt.exe",
+          "cargo-fmt": "bin/cargo-fmt.exe",
+          "cargo-clippy": "bin/cargo-clippy.exe",
+          "clippy-driver": "bin/clippy-driver.exe"
+        },
+        "bin_dirs": [
+          "bin"
+        ],
+        "required_files": [
+          "lib/rustlib/src/rust/library/core/src/lib.rs"
+        ],
+        "rust_target": "x86_64-pc-windows-msvc",
+        "windows_rust_launcher": {
+          "revision": 1
+        },
+        "rust_components": [
+          {
+            "version": "1.99.0",
+            "url": "https://static.rust-lang.org/dist/2026-10-01/cargo-1.99.0-x86_64-pc-windows-msvc.tar.gz",
+            "sha256": "5e7c399c9bcc944791dcd6cb666eec826bfa8cd04e4b81b7790c030165927965",
+            "format": "tar.gz",
+            "strip_components": 1,
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "cargo/manifest.in"
+            ]
+          },
+          {
+            "version": "1.99.0",
+            "url": "https://static.rust-lang.org/dist/2026-10-01/rust-std-1.99.0-x86_64-pc-windows-msvc.tar.gz",
+            "sha256": "0f755f2339d6fcb97da532cde33566350e9690398a0fdd06fba8fc281e0bd6dc",
+            "format": "tar.gz",
+            "strip_components": 1,
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "rust-std-x86_64-pc-windows-msvc/manifest.in"
+            ]
+          },
+          {
+            "version": "1.99.0",
+            "url": "https://static.rust-lang.org/dist/2026-10-01/rustfmt-1.99.0-x86_64-pc-windows-msvc.tar.gz",
+            "sha256": "0a152a82f36aaefcf9380a7294126c0b70ab44c0342f792ba27006f47888e587",
+            "format": "tar.gz",
+            "strip_components": 1,
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "rustfmt-preview/manifest.in"
+            ]
+          },
+          {
+            "version": "1.99.0",
+            "url": "https://static.rust-lang.org/dist/2026-10-01/clippy-1.99.0-x86_64-pc-windows-msvc.tar.gz",
+            "sha256": "57a07620787891328e0a02592eb256e16770e9375df32a31312d9a764d13c490",
+            "format": "tar.gz",
+            "strip_components": 1,
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "clippy-preview/manifest.in"
+            ]
+          },
+          {
+            "version": "1.99.0",
+            "url": "https://static.rust-lang.org/dist/2026-10-01/rust-src-1.99.0.tar.gz",
+            "sha256": "82b978093b33c71bcbe69005b92181bfb76d3d0e434ef303e637812e21badcd7",
+            "format": "tar.gz",
+            "strip_components": 1,
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "rust-src/manifest.in"
+            ]
+          }
+        ]
+      },
+      "darwin/arm64": {
+        "version": "1.99.0",
+        "url": "https://static.rust-lang.org/dist/2026-10-01/rustc-1.99.0-aarch64-apple-darwin.tar.gz",
+        "sha256": "2f6b9c9cdc9c2e87ab2e27335e8bb0c4dbe4daea486e39030b66980058f74353",
+        "format": "tar.gz",
+        "strip_components": 1,
+        "commands": {
+          "rustc": "bin/rustc",
+          "cargo": "bin/cargo",
+          "rustfmt": "bin/rustfmt",
+          "cargo-fmt": "bin/cargo-fmt",
+          "cargo-clippy": "bin/cargo-clippy",
+          "clippy-driver": "bin/clippy-driver"
+        },
+        "bin_dirs": [
+          "bin"
+        ],
+        "required_files": [
+          "lib/rustlib/src/rust/library/core/src/lib.rs"
+        ],
+        "rust_target": "aarch64-apple-darwin",
+        "rust_components": [
+          {
+            "version": "1.99.0",
+            "url": "https://static.rust-lang.org/dist/2026-10-01/cargo-1.99.0-aarch64-apple-darwin.tar.gz",
+            "sha256": "318b85c276b43134102fb49bbb54bfd0757e5cce47a772461149aeab5adea2ab",
+            "format": "tar.gz",
+            "strip_components": 1,
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "cargo/manifest.in"
+            ]
+          },
+          {
+            "version": "1.99.0",
+            "url": "https://static.rust-lang.org/dist/2026-10-01/rust-std-1.99.0-aarch64-apple-darwin.tar.gz",
+            "sha256": "3589b3a6c6470d590aa5aa7fa1a4af0101103847761a5372a7300b0aa85699c6",
+            "format": "tar.gz",
+            "strip_components": 1,
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "rust-std-aarch64-apple-darwin/manifest.in"
+            ]
+          },
+          {
+            "version": "1.99.0",
+            "url": "https://static.rust-lang.org/dist/2026-10-01/rustfmt-1.99.0-aarch64-apple-darwin.tar.gz",
+            "sha256": "c8d86490e38920ab7783483dc828695a9a678eff541c5fa793f165b374e87312",
+            "format": "tar.gz",
+            "strip_components": 1,
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "rustfmt-preview/manifest.in"
+            ]
+          },
+          {
+            "version": "1.99.0",
+            "url": "https://static.rust-lang.org/dist/2026-10-01/clippy-1.99.0-aarch64-apple-darwin.tar.gz",
+            "sha256": "d13d16085280bd652d4a77041073264719c9ee92f33702f9dce2ee86777c92b1",
+            "format": "tar.gz",
+            "strip_components": 1,
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "clippy-preview/manifest.in"
+            ]
+          },
+          {
+            "version": "1.99.0",
+            "url": "https://static.rust-lang.org/dist/2026-10-01/rust-src-1.99.0.tar.gz",
+            "sha256": "82b978093b33c71bcbe69005b92181bfb76d3d0e434ef303e637812e21badcd7",
+            "format": "tar.gz",
+            "strip_components": 1,
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "rust-src/manifest.in"
+            ]
+          }
+        ]
+      },
+      "linux/amd64": {
+        "version": "1.99.0",
+        "url": "https://static.rust-lang.org/dist/2026-10-01/rustc-1.99.0-x86_64-unknown-linux-gnu.tar.gz",
+        "sha256": "238e72b8617f79bc96f27a5bfeb1a208b5755fe1a48f8bc190fe403ef6d54ab8",
+        "format": "tar.gz",
+        "strip_components": 1,
+        "commands": {
+          "rustc": "bin/rustc",
+          "cargo": "bin/cargo",
+          "rustfmt": "bin/rustfmt",
+          "cargo-fmt": "bin/cargo-fmt",
+          "cargo-clippy": "bin/cargo-clippy",
+          "clippy-driver": "bin/clippy-driver"
+        },
+        "bin_dirs": [
+          "bin"
+        ],
+        "required_files": [
+          "lib/rustlib/src/rust/library/core/src/lib.rs"
+        ],
+        "rust_target": "x86_64-unknown-linux-gnu",
+        "rust_components": [
+          {
+            "version": "1.99.0",
+            "url": "https://static.rust-lang.org/dist/2026-10-01/cargo-1.99.0-x86_64-unknown-linux-gnu.tar.gz",
+            "sha256": "c2b8ba1f59e7a230aa5522684f3f7aa620b98e5ad37683a5e5cf9b41f534fa1e",
+            "format": "tar.gz",
+            "strip_components": 1,
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "cargo/manifest.in"
+            ]
+          },
+          {
+            "version": "1.99.0",
+            "url": "https://static.rust-lang.org/dist/2026-10-01/rust-std-1.99.0-x86_64-unknown-linux-gnu.tar.gz",
+            "sha256": "1dcaa01beb6bc78fdb13815b4f15214719167c58e3d79fbdf214591f8c195ee1",
+            "format": "tar.gz",
+            "strip_components": 1,
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "rust-std-x86_64-unknown-linux-gnu/manifest.in"
+            ]
+          },
+          {
+            "version": "1.99.0",
+            "url": "https://static.rust-lang.org/dist/2026-10-01/rustfmt-1.99.0-x86_64-unknown-linux-gnu.tar.gz",
+            "sha256": "9fc3a87d3d4f6e5e2bd87e6fb8779b7a95831f533cb8cc8ae1304a797c648733",
+            "format": "tar.gz",
+            "strip_components": 1,
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "rustfmt-preview/manifest.in"
+            ]
+          },
+          {
+            "version": "1.99.0",
+            "url": "https://static.rust-lang.org/dist/2026-10-01/clippy-1.99.0-x86_64-unknown-linux-gnu.tar.gz",
+            "sha256": "4b3b972738f6b8e0e55065e273a972cc25fccf53629b4308eec67d6a66a8cf4a",
+            "format": "tar.gz",
+            "strip_components": 1,
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "clippy-preview/manifest.in"
+            ]
+          },
+          {
+            "version": "1.99.0",
+            "url": "https://static.rust-lang.org/dist/2026-10-01/rust-src-1.99.0.tar.gz",
+            "sha256": "82b978093b33c71bcbe69005b92181bfb76d3d0e434ef303e637812e21badcd7",
+            "format": "tar.gz",
+            "strip_components": 1,
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "rust-src/manifest.in"
+            ]
+          }
+        ],
+        "libc": "glibc"
+      },
+      "linux/arm64": {
+        "version": "1.99.0",
+        "url": "https://static.rust-lang.org/dist/2026-10-01/rustc-1.99.0-aarch64-unknown-linux-gnu.tar.gz",
+        "sha256": "6780ebb1b8ae66cc5d37ebfdc70b18fe775b1083c997f4e2c963d45a7eec59bc",
+        "format": "tar.gz",
+        "strip_components": 1,
+        "commands": {
+          "rustc": "bin/rustc",
+          "cargo": "bin/cargo",
+          "rustfmt": "bin/rustfmt",
+          "cargo-fmt": "bin/cargo-fmt",
+          "cargo-clippy": "bin/cargo-clippy",
+          "clippy-driver": "bin/clippy-driver"
+        },
+        "bin_dirs": [
+          "bin"
+        ],
+        "required_files": [
+          "lib/rustlib/src/rust/library/core/src/lib.rs"
+        ],
+        "rust_target": "aarch64-unknown-linux-gnu",
+        "rust_components": [
+          {
+            "version": "1.99.0",
+            "url": "https://static.rust-lang.org/dist/2026-10-01/cargo-1.99.0-aarch64-unknown-linux-gnu.tar.gz",
+            "sha256": "f8b85e84b0514b69e17e3bad1c2dec7526f4a40cec565d233bbdcb66484dd9e0",
+            "format": "tar.gz",
+            "strip_components": 1,
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "cargo/manifest.in"
+            ]
+          },
+          {
+            "version": "1.99.0",
+            "url": "https://static.rust-lang.org/dist/2026-10-01/rust-std-1.99.0-aarch64-unknown-linux-gnu.tar.gz",
+            "sha256": "cdffa7100206633ccfd2514ea7781b4211813bf04c831a509240e1cda5308512",
+            "format": "tar.gz",
+            "strip_components": 1,
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "rust-std-aarch64-unknown-linux-gnu/manifest.in"
+            ]
+          },
+          {
+            "version": "1.99.0",
+            "url": "https://static.rust-lang.org/dist/2026-10-01/rustfmt-1.99.0-aarch64-unknown-linux-gnu.tar.gz",
+            "sha256": "6dd2fc9666ca97f366a8d581e46ca115ebcc962e9717d72ff4b9422c0c99551d",
+            "format": "tar.gz",
+            "strip_components": 1,
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "rustfmt-preview/manifest.in"
+            ]
+          },
+          {
+            "version": "1.99.0",
+            "url": "https://static.rust-lang.org/dist/2026-10-01/clippy-1.99.0-aarch64-unknown-linux-gnu.tar.gz",
+            "sha256": "18b0a743b8b6952ec6271edd385c8af8517de2d3eba5939f8bebd0f9ba99ffbd",
+            "format": "tar.gz",
+            "strip_components": 1,
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "clippy-preview/manifest.in"
+            ]
+          },
+          {
+            "version": "1.99.0",
+            "url": "https://static.rust-lang.org/dist/2026-10-01/rust-src-1.99.0.tar.gz",
+            "sha256": "82b978093b33c71bcbe69005b92181bfb76d3d0e434ef303e637812e21badcd7",
+            "format": "tar.gz",
+            "strip_components": 1,
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "rust-src/manifest.in"
+            ]
+          }
+        ],
+        "libc": "glibc"
+      }
+    },
+    "tool.latex2text": {
+      "darwin/arm64": {
+        "version": "2.11",
+        "url": "https://files.pythonhosted.org/packages/52/45/ddb0fb04acf95fe9cf9c369814dbdd08651bd2c9ee455f142651e06f4488/pylatexenc-2.11.tar.gz",
+        "sha256": "305a072a99ce736246049c9da05841b9d718c0f7ea8888f5f596cf15cb621053",
+        "format": "file",
+        "file": "pylatexenc-2.11.tar.gz",
+        "commands": {
+          "latex2text": "bin/latex2text"
+        },
+        "bin_dirs": [
+          "bin"
+        ],
+        "required_files": [],
+        "latex2text": {
+          "backend": {
+            "version": "84.0.0",
+            "url": "https://files.pythonhosted.org/packages/95/9c/c510029fc6ef33a6275cd2c5d3cecd6613dfd6aa401d57c54f1c18852ccf/setuptools-84.0.0-py3-none-any.whl",
+            "sha256": "51a52592b3b99e102b609654876bd65f19f999935166d1352678931132b0c670",
+            "format": "file",
+            "file": "setuptools-84.0.0-py3-none-any.whl",
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "setuptools-84.0.0-py3-none-any.whl"
+            ]
+          },
+          "python_pin_id": ""
+        }
+      },
+      "linux/amd64": {
+        "version": "2.11",
+        "url": "https://files.pythonhosted.org/packages/52/45/ddb0fb04acf95fe9cf9c369814dbdd08651bd2c9ee455f142651e06f4488/pylatexenc-2.11.tar.gz",
+        "sha256": "305a072a99ce736246049c9da05841b9d718c0f7ea8888f5f596cf15cb621053",
+        "format": "file",
+        "file": "pylatexenc-2.11.tar.gz",
+        "commands": {
+          "latex2text": "bin/latex2text"
+        },
+        "bin_dirs": [
+          "bin"
+        ],
+        "required_files": [],
+        "latex2text": {
+          "backend": {
+            "version": "84.0.0",
+            "url": "https://files.pythonhosted.org/packages/95/9c/c510029fc6ef33a6275cd2c5d3cecd6613dfd6aa401d57c54f1c18852ccf/setuptools-84.0.0-py3-none-any.whl",
+            "sha256": "51a52592b3b99e102b609654876bd65f19f999935166d1352678931132b0c670",
+            "format": "file",
+            "file": "setuptools-84.0.0-py3-none-any.whl",
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "setuptools-84.0.0-py3-none-any.whl"
+            ]
+          },
+          "python_pin_id": ""
+        }
+      },
+      "linux/arm64": {
+        "version": "2.11",
+        "url": "https://files.pythonhosted.org/packages/52/45/ddb0fb04acf95fe9cf9c369814dbdd08651bd2c9ee455f142651e06f4488/pylatexenc-2.11.tar.gz",
+        "sha256": "305a072a99ce736246049c9da05841b9d718c0f7ea8888f5f596cf15cb621053",
+        "format": "file",
+        "file": "pylatexenc-2.11.tar.gz",
+        "commands": {
+          "latex2text": "bin/latex2text"
+        },
+        "bin_dirs": [
+          "bin"
+        ],
+        "required_files": [],
+        "latex2text": {
+          "backend": {
+            "version": "84.0.0",
+            "url": "https://files.pythonhosted.org/packages/95/9c/c510029fc6ef33a6275cd2c5d3cecd6613dfd6aa401d57c54f1c18852ccf/setuptools-84.0.0-py3-none-any.whl",
+            "sha256": "51a52592b3b99e102b609654876bd65f19f999935166d1352678931132b0c670",
+            "format": "file",
+            "file": "setuptools-84.0.0-py3-none-any.whl",
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "setuptools-84.0.0-py3-none-any.whl"
+            ]
+          },
+          "python_pin_id": ""
+        }
+      },
+      "windows/amd64": {
+        "version": "2.11",
+        "url": "https://files.pythonhosted.org/packages/52/45/ddb0fb04acf95fe9cf9c369814dbdd08651bd2c9ee455f142651e06f4488/pylatexenc-2.11.tar.gz",
+        "sha256": "305a072a99ce736246049c9da05841b9d718c0f7ea8888f5f596cf15cb621053",
+        "format": "file",
+        "file": "pylatexenc-2.11.tar.gz",
+        "commands": {
+          "latex2text": "Scripts/latex2text.exe"
+        },
+        "bin_dirs": [
+          "Scripts"
+        ],
+        "required_files": [],
+        "latex2text": {
+          "backend": {
+            "version": "84.0.0",
+            "url": "https://files.pythonhosted.org/packages/95/9c/c510029fc6ef33a6275cd2c5d3cecd6613dfd6aa401d57c54f1c18852ccf/setuptools-84.0.0-py3-none-any.whl",
+            "sha256": "51a52592b3b99e102b609654876bd65f19f999935166d1352678931132b0c670",
+            "format": "file",
+            "file": "setuptools-84.0.0-py3-none-any.whl",
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "setuptools-84.0.0-py3-none-any.whl"
+            ]
+          },
+          "python_pin_id": ""
+        }
+      }
+    },
+    "tool.git": {
+      "windows/amd64": {
+        "version": "2.56.0.windows.2",
+        "url": "https://github.com/git-for-windows/git/releases/download/v2.56.0.windows.2/PortableGit-2.56.0.2-64-bit.7z.exe",
+        "sha256": "075e158ef8e1f0ab80b347e245405d3eca735c2dc88fd8e032e137d0ca61f61b",
+        "format": "file",
+        "file": "portable-git.exe",
+        "portable_git": true,
+        "commands": {
+          "git": "cmd/git.exe",
+          "bash": "bin/bash.exe",
+          "sh": "bin/sh.exe",
+          "ssh": "usr/bin/ssh.exe",
+          "ssh-keygen": "usr/bin/ssh-keygen.exe",
+          "git-lfs": "ucrt64/bin/git-lfs.exe",
+          "git-credential-manager": "ucrt64/bin/git-credential-manager.exe",
+          "git-gui": "cmd/git-gui.exe",
+          "gitk": "cmd/gitk.exe"
+        },
+        "bin_dirs": [
+          "cmd",
+          "bin"
+        ],
+        "required_files": [
+          "cmd/git.exe",
+          "cmd/git-gui.exe",
+          "cmd/gitk.exe",
+          "bin/bash.exe",
+          "bin/sh.exe",
+          "git-bash.exe",
+          "git-cmd.exe",
+          "usr/bin/bash.exe",
+          "usr/bin/ssh.exe",
+          "usr/bin/ssh-keygen.exe",
+          "usr/bin/msys-2.0.dll",
+          "usr/bin/msys-crypto-3.dll",
+          "usr/bin/msys-z.dll",
+          "usr/bin/msys-iconv-2.dll",
+          "usr/bin/msys-intl-8.dll",
+          "usr/bin/msys-readline8.dll",
+          "usr/bin/msys-ncursesw6.dll",
+          "ucrt64/bin/git.exe",
+          "ucrt64/bin/git-lfs.exe",
+          "ucrt64/bin/git-credential-manager.exe",
+          "ucrt64/bin/libcurl-4.dll",
+          "ucrt64/bin/libpcre2-8-0.dll",
+          "ucrt64/bin/libiconv-2.dll",
+          "ucrt64/bin/libintl-8.dll",
+          "ucrt64/bin/libcrypto-3-x64.dll",
+          "ucrt64/bin/libssl-3-x64.dll",
+          "ucrt64/bin/zlib1.dll",
+          "ucrt64/bin/tcl86.dll",
+          "ucrt64/bin/tk86.dll",
+          "ucrt64/libexec/git-core/git-gui",
+          "etc/gitconfig",
+          "etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem",
+          "README.portable"
+        ]
+      }
+    },
+    "tool.make": {
+      "windows/amd64": {
+        "version": "4.4.1",
+        "url": "https://downloads.sourceforge.net/project/ezwinports/make-4.4.1-without-guile-w32-bin.zip",
+        "sha256": "fb66a02b530f7466f6222ce53c0b602c5288e601547a034e4156a512dd895ee7",
+        "format": "zip",
+        "commands": {
+          "make": "bin/make.exe"
+        },
+        "bin_dirs": [
+          "bin"
+        ],
+        "required_files": [
+          "bin/make.exe"
+        ]
+      }
+    },
+    "tool.yamllint": {
+      "darwin/arm64": {
+        "version": "1.38.0",
+        "url": "https://files.pythonhosted.org/packages/05/92/aed08e68de6e6a3d7c2328ce7388072cd6affc26e2917197430b646aed02/yamllint-1.38.0-py3-none-any.whl",
+        "sha256": "fc394a5b3be980a4062607b8fdddc0843f4fa394152b6da21722f5d59013c220",
+        "format": "file",
+        "file": "yamllint-1.38.0-py3-none-any.whl",
+        "commands": {
+          "yamllint": "bin/yamllint"
+        },
+        "bin_dirs": [
+          "bin"
+        ],
+        "required_files": [],
+        "yamllint": {
+          "pathspec": {
+            "version": "1.1.1",
+            "url": "https://files.pythonhosted.org/packages/f1/d9/7fb5aa316bc299258e68c73ba3bddbc499654a07f151cba08f6153988714/pathspec-1.1.1-py3-none-any.whl",
+            "sha256": "a00ce642f577bf7f473932318056212bc4f8bfdf53128c78bbd5af0b9b20b189",
+            "format": "file",
+            "file": "pathspec-1.1.1-py3-none-any.whl",
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "pathspec-1.1.1-py3-none-any.whl"
+            ]
+          },
+          "pyyaml": {
+            "version": "6.0.3",
+            "url": "https://files.pythonhosted.org/packages/b1/16/95309993f1d3748cd644e02e38b75d50cbc0d9561d21f390a76242ce073f/pyyaml-6.0.3-cp313-cp313-macosx_11_0_arm64.whl",
+            "sha256": "2283a07e2c21a2aa78d9c4442724ec1eb15f5e42a723b99cb3d822d48f5f7ad1",
+            "format": "file",
+            "file": "pyyaml-6.0.3-cp313-cp313-macosx_11_0_arm64.whl",
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "pyyaml-6.0.3-cp313-cp313-macosx_11_0_arm64.whl"
+            ]
+          },
+          "python_pin_id": ""
+        }
+      },
+      "linux/amd64": {
+        "version": "1.38.0",
+        "url": "https://files.pythonhosted.org/packages/05/92/aed08e68de6e6a3d7c2328ce7388072cd6affc26e2917197430b646aed02/yamllint-1.38.0-py3-none-any.whl",
+        "sha256": "fc394a5b3be980a4062607b8fdddc0843f4fa394152b6da21722f5d59013c220",
+        "format": "file",
+        "file": "yamllint-1.38.0-py3-none-any.whl",
+        "commands": {
+          "yamllint": "bin/yamllint"
+        },
+        "bin_dirs": [
+          "bin"
+        ],
+        "required_files": [],
+        "yamllint": {
+          "pathspec": {
+            "version": "1.1.1",
+            "url": "https://files.pythonhosted.org/packages/f1/d9/7fb5aa316bc299258e68c73ba3bddbc499654a07f151cba08f6153988714/pathspec-1.1.1-py3-none-any.whl",
+            "sha256": "a00ce642f577bf7f473932318056212bc4f8bfdf53128c78bbd5af0b9b20b189",
+            "format": "file",
+            "file": "pathspec-1.1.1-py3-none-any.whl",
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "pathspec-1.1.1-py3-none-any.whl"
+            ]
+          },
+          "pyyaml": {
+            "version": "6.0.3",
+            "url": "https://files.pythonhosted.org/packages/74/27/e5b8f34d02d9995b80abcef563ea1f8b56d20134d8f4e5e81733b1feceb2/pyyaml-6.0.3-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
+            "sha256": "0f29edc409a6392443abf94b9cf89ce99889a1dd5376d94316ae5145dfedd5d6",
+            "format": "file",
+            "file": "pyyaml-6.0.3-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "pyyaml-6.0.3-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl"
+            ]
+          },
+          "python_pin_id": ""
+        },
+        "libc": "glibc"
+      },
+      "linux/arm64": {
+        "version": "1.38.0",
+        "url": "https://files.pythonhosted.org/packages/05/92/aed08e68de6e6a3d7c2328ce7388072cd6affc26e2917197430b646aed02/yamllint-1.38.0-py3-none-any.whl",
+        "sha256": "fc394a5b3be980a4062607b8fdddc0843f4fa394152b6da21722f5d59013c220",
+        "format": "file",
+        "file": "yamllint-1.38.0-py3-none-any.whl",
+        "commands": {
+          "yamllint": "bin/yamllint"
+        },
+        "bin_dirs": [
+          "bin"
+        ],
+        "required_files": [],
+        "yamllint": {
+          "pathspec": {
+            "version": "1.1.1",
+            "url": "https://files.pythonhosted.org/packages/f1/d9/7fb5aa316bc299258e68c73ba3bddbc499654a07f151cba08f6153988714/pathspec-1.1.1-py3-none-any.whl",
+            "sha256": "a00ce642f577bf7f473932318056212bc4f8bfdf53128c78bbd5af0b9b20b189",
+            "format": "file",
+            "file": "pathspec-1.1.1-py3-none-any.whl",
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "pathspec-1.1.1-py3-none-any.whl"
+            ]
+          },
+          "pyyaml": {
+            "version": "6.0.3",
+            "url": "https://files.pythonhosted.org/packages/50/31/b20f376d3f810b9b2371e72ef5adb33879b25edb7a6d072cb7ca0c486398/pyyaml-6.0.3-cp313-cp313-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl",
+            "sha256": "ee2922902c45ae8ccada2c5b501ab86c36525b883eff4255313a253a3160861c",
+            "format": "file",
+            "file": "pyyaml-6.0.3-cp313-cp313-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl",
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "pyyaml-6.0.3-cp313-cp313-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl"
+            ]
+          },
+          "python_pin_id": ""
+        },
+        "libc": "glibc"
+      },
+      "windows/amd64": {
+        "version": "1.38.0",
+        "url": "https://files.pythonhosted.org/packages/05/92/aed08e68de6e6a3d7c2328ce7388072cd6affc26e2917197430b646aed02/yamllint-1.38.0-py3-none-any.whl",
+        "sha256": "fc394a5b3be980a4062607b8fdddc0843f4fa394152b6da21722f5d59013c220",
+        "format": "file",
+        "file": "yamllint-1.38.0-py3-none-any.whl",
+        "commands": {
+          "yamllint": "Scripts/yamllint.exe"
+        },
+        "bin_dirs": [
+          "Scripts"
+        ],
+        "required_files": [],
+        "yamllint": {
+          "pathspec": {
+            "version": "1.1.1",
+            "url": "https://files.pythonhosted.org/packages/f1/d9/7fb5aa316bc299258e68c73ba3bddbc499654a07f151cba08f6153988714/pathspec-1.1.1-py3-none-any.whl",
+            "sha256": "a00ce642f577bf7f473932318056212bc4f8bfdf53128c78bbd5af0b9b20b189",
+            "format": "file",
+            "file": "pathspec-1.1.1-py3-none-any.whl",
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "pathspec-1.1.1-py3-none-any.whl"
+            ]
+          },
+          "pyyaml": {
+            "version": "6.0.3",
+            "url": "https://files.pythonhosted.org/packages/97/c9/39d5b874e8b28845e4ec2202b5da735d0199dbe5b8fb85f91398814a9a46/pyyaml-6.0.3-cp313-cp313-win_amd64.whl",
+            "sha256": "79005a0d97d5ddabfeeea4cf676af11e647e41d81c9a7722a193022accdb6b7c",
+            "format": "file",
+            "file": "pyyaml-6.0.3-cp313-cp313-win_amd64.whl",
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "pyyaml-6.0.3-cp313-cp313-win_amd64.whl"
+            ]
+          },
+          "python_pin_id": ""
+        }
+      }
+    },
+    "tool.ghostty": {
+      "darwin/arm64": {
+        "version": "1.3.1",
+        "url": "https://release.files.ghostty.org/1.3.1/ghostty-macos-universal.zip",
+        "sha256": "105f63ec2df9b53cd5dd1f685434d1924163fd4bcf23ecb1b07df343e79d2077",
+        "format": "zip",
+        "commands": {
+          "ghostty": "Ghostty.app/Contents/MacOS/ghostty"
+        },
+        "bin_dirs": [
+          "Ghostty.app/Contents/MacOS"
+        ],
+        "required_files": [
+          "Ghostty.app/Contents/Info.plist",
+          "Ghostty.app/Contents/Resources/terminfo/78/xterm-ghostty"
+        ]
+      },
+      "linux/amd64": {
+        "version": "1.3.1",
+        "url": "https://github.com/mkasberg/ghostty-ubuntu/releases/download/1.3.1-0-ppa2/ghostty_1.3.1-0.ppa2_amd64_trixie.deb",
+        "sha256": "9fda8e418d7a7f58149ba3ba823a255d6b80f8bb5431b3bd7e912ff597715b2e",
+        "format": "deb",
+        "commands": {
+          "ghostty": "usr/bin/ghostty"
+        },
+        "bin_dirs": [
+          "usr/bin"
+        ],
+        "required_files": [
+          "usr/share/terminfo/x/xterm-ghostty",
+          "usr/share/ghostty/themes/Rose Pine",
+          "usr/share/applications/com.mitchellh.ghostty.desktop",
+          "usr/lib/libghostty-vt.so.0.1.0",
+          "usr/lib/libgtk4-layer-shell.so",
+          "usr/share/icons/hicolor/256x256/apps/com.mitchellh.ghostty.png",
+          "usr/bin/ghostty-bin"
+        ],
+        "ghostty_libraries": true
+      },
+      "linux/arm64": {
+        "version": "1.3.1",
+        "url": "https://github.com/mkasberg/ghostty-ubuntu/releases/download/1.3.1-0-ppa2/ghostty_1.3.1-0.ppa2_arm64_trixie.deb",
+        "sha256": "73f384e62c419d7a7809d686bf579fea5e23f52742b34f70c74d6adf0e72f8ab",
+        "format": "deb",
+        "commands": {
+          "ghostty": "usr/bin/ghostty"
+        },
+        "bin_dirs": [
+          "usr/bin"
+        ],
+        "required_files": [
+          "usr/share/terminfo/x/xterm-ghostty",
+          "usr/share/ghostty/themes/Rose Pine",
+          "usr/share/applications/com.mitchellh.ghostty.desktop",
+          "usr/lib/libghostty-vt.so.0.1.0",
+          "usr/lib/libgtk4-layer-shell.so",
+          "usr/share/icons/hicolor/256x256/apps/com.mitchellh.ghostty.png",
+          "usr/bin/ghostty-bin"
+        ],
+        "ghostty_libraries": true
+      }
+    },
+    "tool.aerospace": {
+      "darwin/arm64": {
+        "version": "0.21.1-Beta",
+        "url": "https://github.com/nikitabobko/AeroSpace/releases/download/v0.21.1-Beta/AeroSpace-v0.21.1-Beta.zip",
+        "sha256": "4f44d0710f71f1bc3b3c6b20af17bc1857773fb5432696ecc04f300934fad131",
+        "format": "zip",
+        "commands": {
+          "aerospace": "bin/aerospace"
+        },
+        "bin_dirs": [
+          "bin"
+        ],
+        "required_files": [
+          "AeroSpace.app/Contents/MacOS/AeroSpace",
+          "AeroSpace.app/Contents/Info.plist"
+        ],
+        "strip_components": 1
+      }
+    },
+    "tool.vscode": {
+      "darwin/arm64": {
+        "version": "1.141.0",
+        "url": "https://vscode.download.prss.microsoft.com/dbazure/download/stable/2a59476c9bfcb90b3ddc372c36762471b7dfad1c/VSCode-darwin-arm64.zip",
+        "sha256": "9b4ae386e3cf738d7ba990237ddf0a18092c924a1bcae465ed4697964745f42d",
+        "format": "zip",
+        "commands": {
+          "code": "Visual Studio Code.app/Contents/Resources/app/bin/code"
+        },
+        "bin_dirs": [
+          "Visual Studio Code.app/Contents/Resources/app/bin"
+        ],
+        "required_files": [
+          "Visual Studio Code.app/Contents/MacOS/Code",
+          "Visual Studio Code.app/Contents/Info.plist",
+          "Visual Studio Code.app/Contents/Resources/app/product.json"
+        ]
+      },
+      "linux/amd64": {
+        "version": "1.141.0",
+        "url": "https://vscode.download.prss.microsoft.com/dbazure/download/stable/2a59476c9bfcb90b3ddc372c36762471b7dfad1c/code-stable-x64-1791276637.tar.gz",
+        "sha256": "d77d588f0454cbaaa71e723497de4160d15b95fba4988abe177b1432e6bd570a",
+        "format": "tar.gz",
+        "commands": {
+          "code": "bin/code"
+        },
+        "bin_dirs": [
+          "bin"
+        ],
+        "required_files": [
+          "code",
+          "resources/app/product.json",
+          "resources/app/out/cli.js",
+          "libffmpeg.so",
+          "libEGL.so",
+          "icudtl.dat",
+          "chrome-sandbox",
+          "resources/app/resources/linux/code.png"
+        ],
+        "strip_components": 1,
+        "libc": "glibc"
+      },
+      "linux/arm64": {
+        "version": "1.141.0",
+        "url": "https://vscode.download.prss.microsoft.com/dbazure/download/stable/2a59476c9bfcb90b3ddc372c36762471b7dfad1c/code-stable-arm64-1791276594.tar.gz",
+        "sha256": "3b6ea238a2aa9000bab0137c19f06d4e8edcb5587438a3afc9dc9739e793e934",
+        "format": "tar.gz",
+        "commands": {
+          "code": "bin/code"
+        },
+        "bin_dirs": [
+          "bin"
+        ],
+        "required_files": [
+          "code",
+          "resources/app/product.json",
+          "resources/app/out/cli.js",
+          "libffmpeg.so",
+          "libEGL.so",
+          "icudtl.dat",
+          "chrome-sandbox",
+          "resources/app/resources/linux/code.png"
+        ],
+        "strip_components": 1,
+        "libc": "glibc"
+      },
+      "windows/amd64": {
+        "version": "1.141.0",
+        "url": "https://vscode.download.prss.microsoft.com/dbazure/download/stable/2a59476c9bfcb90b3ddc372c36762471b7dfad1c/VSCode-win32-x64-1.141.0.zip",
+        "sha256": "30ef5f55c377452af33009d0a8ac29a15cf8f770782bff42fe987c30da272223",
+        "format": "zip",
+        "commands": {
+          "code": "bin/code.cmd"
+        },
+        "bin_dirs": [
+          "bin"
+        ],
+        "required_files": [
+          "Code.exe",
+          "2a59476c9b/resources/app/product.json",
+          "2a59476c9b/resources/app/out/cli.js",
+          "2a59476c9b/ffmpeg.dll",
+          "2a59476c9b/libEGL.dll",
+          "2a59476c9b/icudtl.dat"
+        ]
+      }
+    },
+    "vscode.rose-pine": {
+      "darwin/arm64": {
+        "version": "2.15.2",
+        "url": "https://marketplace.visualstudio.com/_apis/public/gallery/publishers/mvllow/vsextensions/rose-pine/2.15.2/vspackage",
+        "sha256": "e635e508593ff3a04bd72a234d1ba14734b75ea730702a65fe0980a5c4dd941c",
+        "format": "zip",
+        "commands": {},
+        "bin_dirs": [],
+        "required_files": [
+          "extension/package.json",
+          "extension/LICENSE.txt",
+          "extension/themes/rose-pine-color-theme.json",
+          "extension/themes/rose-pine-no-italics-color-theme.json",
+          "extension/themes/rose-pine-moon-color-theme.json",
+          "extension/themes/rose-pine-moon-no-italics-color-theme.json",
+          "extension/themes/rose-pine-dawn-color-theme.json",
+          "extension/themes/rose-pine-dawn-no-italics-color-theme.json",
+          "extension/icons/rose-pine-icon-theme.json"
+        ]
+      },
+      "linux/amd64": {
+        "version": "2.15.2",
+        "url": "https://marketplace.visualstudio.com/_apis/public/gallery/publishers/mvllow/vsextensions/rose-pine/2.15.2/vspackage",
+        "sha256": "e635e508593ff3a04bd72a234d1ba14734b75ea730702a65fe0980a5c4dd941c",
+        "format": "zip",
+        "commands": {},
+        "bin_dirs": [],
+        "required_files": [
+          "extension/package.json",
+          "extension/LICENSE.txt",
+          "extension/themes/rose-pine-color-theme.json",
+          "extension/themes/rose-pine-no-italics-color-theme.json",
+          "extension/themes/rose-pine-moon-color-theme.json",
+          "extension/themes/rose-pine-moon-no-italics-color-theme.json",
+          "extension/themes/rose-pine-dawn-color-theme.json",
+          "extension/themes/rose-pine-dawn-no-italics-color-theme.json",
+          "extension/icons/rose-pine-icon-theme.json"
+        ]
+      },
+      "linux/arm64": {
+        "version": "2.15.2",
+        "url": "https://marketplace.visualstudio.com/_apis/public/gallery/publishers/mvllow/vsextensions/rose-pine/2.15.2/vspackage",
+        "sha256": "e635e508593ff3a04bd72a234d1ba14734b75ea730702a65fe0980a5c4dd941c",
+        "format": "zip",
+        "commands": {},
+        "bin_dirs": [],
+        "required_files": [
+          "extension/package.json",
+          "extension/LICENSE.txt",
+          "extension/themes/rose-pine-color-theme.json",
+          "extension/themes/rose-pine-no-italics-color-theme.json",
+          "extension/themes/rose-pine-moon-color-theme.json",
+          "extension/themes/rose-pine-moon-no-italics-color-theme.json",
+          "extension/themes/rose-pine-dawn-color-theme.json",
+          "extension/themes/rose-pine-dawn-no-italics-color-theme.json",
+          "extension/icons/rose-pine-icon-theme.json"
+        ]
+      },
+      "windows/amd64": {
+        "version": "2.15.2",
+        "url": "https://marketplace.visualstudio.com/_apis/public/gallery/publishers/mvllow/vsextensions/rose-pine/2.15.2/vspackage",
+        "sha256": "e635e508593ff3a04bd72a234d1ba14734b75ea730702a65fe0980a5c4dd941c",
+        "format": "zip",
+        "commands": {},
+        "bin_dirs": [],
+        "required_files": [
+          "extension/package.json",
+          "extension/LICENSE.txt",
+          "extension/themes/rose-pine-color-theme.json",
+          "extension/themes/rose-pine-no-italics-color-theme.json",
+          "extension/themes/rose-pine-moon-color-theme.json",
+          "extension/themes/rose-pine-moon-no-italics-color-theme.json",
+          "extension/themes/rose-pine-dawn-color-theme.json",
+          "extension/themes/rose-pine-dawn-no-italics-color-theme.json",
+          "extension/icons/rose-pine-icon-theme.json"
+        ]
+      }
+    },
+    "tool.windows-terminal": {
+      "windows/amd64": {
+        "version": "1.25.2733.0",
+        "url": "https://github.com/microsoft/terminal/releases/download/v1.25.2733.0/Microsoft.WindowsTerminal_1.25.2733.0_x64.zip",
+        "sha256": "bf3ef2012f6c44d8340a4c58125acc9498d19b580f9890dc043cdf831852e796",
+        "format": "zip",
+        "strip_components": 1,
+        "commands": {
+          "wt": "wt.exe"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "required_files": [
+          "WindowsTerminal.exe",
+          "OpenConsole.exe",
+          "TerminalApp.dll",
+          "Microsoft.Terminal.Settings.Model.dll",
+          "Microsoft.UI.Xaml.dll",
+          "defaults.json",
+          "resources.pri"
+        ]
+      }
+    }
+  }
+}

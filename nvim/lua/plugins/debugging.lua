@@ -52,7 +52,7 @@ return {
         executable = {
           command = "node",
           args = {
-            vim.fn.stdpath("data") .. "/mason/packages/js-debug-adapter/js-debug/src/dapDebugServer.js",
+            require("util.managed_runtime").path("mason/packages/js-debug-adapter/js-debug/src/dapDebugServer.js"),
             "${port}",
           },
         },

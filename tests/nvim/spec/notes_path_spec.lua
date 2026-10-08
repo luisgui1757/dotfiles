@@ -26,12 +26,11 @@ describe("notes_path.resolve", function()
     assert.is_truthy(p:match("Library/Mobile Documents/iCloud~md~obsidian/Documents$"))
   end)
 
-  it("WSL kernel marker → generic /mnt/c/Users/<winuser>/Notes", function()
+  it("Linux uses the same local default under a WSL kernel", function()
     local p = resolve(function()
       return { sysname = "Linux", release = "5.15.90.1-microsoft-standard-WSL2" }
     end, stub_env({ WINUSER = "alice" }))
-    assert.are.equal("/mnt/c/Users/alice/Notes", p)
-    assert.is_nil(p:match("ZF"))
+    assert.are.equal(vim.fn.expand("~") .. "/notes", p)
   end)
 
   it("native Linux → ~/notes", function()
@@ -69,6 +68,8 @@ describe("notes plugin spec", function()
   local original_system
   local original_getenv
   local original_uname
+  local original_vault
+  local temporary_vault
 
   before_each(function()
     package.loaded["plugins.notes"] = nil
@@ -76,12 +77,16 @@ describe("notes plugin spec", function()
     original_system = vim.fn.system
     original_getenv = vim.fn.getenv
     original_uname = vim.uv.os_uname
+    original_vault = vim.env.NOTES_VAULT
+    temporary_vault = vim.fn.tempname()
   end)
 
   after_each(function()
     vim.fn.system = original_system
     vim.fn.getenv = original_getenv
     vim.uv.os_uname = original_uname
+    vim.env.NOTES_VAULT = original_vault
+    vim.fn.delete(temporary_vault, "rf")
     package.loaded["plugins.notes"] = nil
     package.loaded["util.notes_path"] = nil
   end)
@@ -103,5 +108,20 @@ describe("notes plugin spec", function()
       require("plugins.notes")
     end)
     assert.are.equal(0, system_calls)
+  end)
+
+  it("provisions the locked plugin without activating or creating an absent vault", function()
+    vim.env.NOTES_VAULT = temporary_vault
+    local spec = require("plugins.notes")[1]
+    assert.is_nil(spec.cond)
+    assert.has_no.errors(spec.config)
+    assert.are.equal(0, vim.fn.isdirectory(temporary_vault))
+  end)
+
+  it("keeps notes available for an existing explicitly selected vault", function()
+    vim.fn.mkdir(temporary_vault, "p")
+    vim.env.NOTES_VAULT = temporary_vault
+    assert.is_nil(require("plugins.notes")[1].cond)
+    assert.are.equal(temporary_vault, require("util.notes_path").resolve())
   end)
 end)

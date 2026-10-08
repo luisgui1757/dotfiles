@@ -81,79 +81,25 @@ Invoke-Step 'PSScriptAnalyzer' {
     }
     Import-Module PSScriptAnalyzer -Force
     $analyzerPaths = @(
-        'install-deps.ps1',
         'setup.ps1',
-        'scripts/upgrade-v0.1.0.ps1',
-        'uninstall.ps1',
+        'migrate.ps1',
+        'scripts/installer-bootstrap.ps1',
         'test.ps1',
         'shells/powershell_profile.ps1',
-        'tmux/psmux-rose-pine.ps1',
-        'home/.chezmoitemplates/windows-terminal/merge-settings.ps1',
-        'home/Documents/PowerShell/Microsoft.PowerShell_profile.ps1',
-        'home/dot_tmux.rose-pine.ps1',
-        'tests/greenfield/install-wt-portable.ps1',
-        'tests/greenfield/sandbox-bootstrap.ps1',
-        'tests/greenfield/sandbox-run.ps1',
-        'tests/greenfield/validate.ps1',
-        'tests/greenfield/wsl-greenfield.ps1',
-        'tests/migration/windows_apply_test.ps1',
-        'tests/migration/windows_roundtrip_test.ps1',
+        'tmux/rose-pine.ps1',
         'tests/nvim/run.ps1',
         'tests/powershell'
-    ) | Where-Object { Test-Path -LiteralPath $_ }
+    )
     # Reviewed baseline for broad analyzer coverage. Counts retain the rationale
     # per rule group; the fingerprint below additionally binds the exact stable
     # script/rule/message/extent identities, so one warning cannot silently
     # replace another while preserving a filename/rule/count total.
-    $analyzerWarningFingerprint = '8c580c25cd103f71b8d2f9fe9078cff1b0b2883b69fb1492d37d336fd5497048'
+    $analyzerWarningFingerprint = '55d9d54d663a97d7cff2a741cfc4aa67f9973868ff075a06a34c322985853b0a'
     $analyzerWarningBaseline = @{
-        'dot_tmux.rose-pine.ps1, PSAvoidUsingWriteHost'                               = @{ Count = 1; Reason = 'generated tmux theme status output' }
-        'install-deps.ps1, PSAvoidUsingWriteHost'                                     = @{ Count = 165; Reason = 'interactive installer progress output' }
-        'install-deps.ps1, PSUseApprovedVerbs'                                        = @{ Count = 5; Reason = 'established installer helper names' }
-        'install-deps.ps1, PSUseShouldProcessForStateChangingFunctions'               = @{ Count = 6; Reason = 'installer entry points are explicitly invoked' }
-        'install-deps.ps1, PSUseSingularNouns'                                        = @{ Count = 11; Reason = 'established installer helper names' }
-        'install-wt-portable.ps1, PSAvoidUsingWriteHost'                              = @{ Count = 3; Reason = 'greenfield harness progress output' }
-        'InstallDeps.Tests.ps1, PSAvoidAssignmentToAutomaticVariable'                 = @{ Count = 2; Reason = 'Pester mock scope fixtures' }
-        'InstallDeps.Tests.ps1, PSAvoidOverwritingBuiltInCmdlets'                     = @{ Count = 1; Reason = 'Pester mock command fixture' }
-        'InstallDeps.Tests.ps1, PSReviewUnusedParameter'                              = @{ Count = 16; Reason = 'Pester mock signatures mirror production calls' }
-        'InstallDeps.Tests.ps1, PSUseApprovedVerbs'                                   = @{ Count = 1; Reason = 'Pester helper name' }
-        'InstallDeps.Tests.ps1, PSUseDeclaredVarsMoreThanAssignments'                 = @{ Count = 7; Reason = 'Pester assertion captures' }
-        'InstallDeps.Tests.ps1, PSUseShouldProcessForStateChangingFunctions'          = @{ Count = 3; Reason = 'Pester helper fixtures' }
-        'InstallDeps.Tests.ps1, PSUseSingularNouns'                                   = @{ Count = 4; Reason = 'Pester helper names' }
-        'merge-settings.ps1, PSAvoidAssignmentToAutomaticVariable'                    = @{ Count = 2; Reason = 'Windows Terminal merge script fixture variables' }
-        'merge-settings.ps1, PSUseShouldProcessForStateChangingFunctions'             = @{ Count = 2; Reason = 'local profile-generation script' }
-        'merge-settings.ps1, PSUseSingularNouns'                                      = @{ Count = 2; Reason = 'established template helper names' }
-        'Profile.Tests.ps1, PSAvoidUsingWriteHost'                                    = @{ Count = 1; Reason = 'test fixture command output assertion' }
-        'psmux-rose-pine.ps1, PSAvoidUsingWriteHost'                                  = @{ Count = 1; Reason = 'generated psmux theme status output' }
-        'run.ps1, PSAvoidUsingWriteHost'                                              = @{ Count = 3; Reason = 'nvim test harness progress output' }
-        'sandbox-bootstrap.ps1, PSAvoidUsingWriteHost'                                = @{ Count = 2; Reason = 'greenfield harness progress output' }
-        'sandbox-run.ps1, PSAvoidUsingWriteHost'                                      = @{ Count = 15; Reason = 'greenfield harness progress output' }
-        'sandbox-run.ps1, PSUseShouldProcessForStateChangingFunctions'                = @{ Count = 1; Reason = 'sandbox harness setup helper' }
-        'sandbox-run.ps1, PSUseSingularNouns'                                         = @{ Count = 1; Reason = 'sandbox harness helper name' }
-        'setup.ps1, PSAvoidUsingWriteHost'                                            = @{ Count = 101; Reason = 'interactive setup progress output' }
-        'setup.ps1, PSUseApprovedVerbs'                                               = @{ Count = 1; Reason = 'established setup helper name' }
-        'setup.ps1, PSUseShouldProcessForStateChangingFunctions'                      = @{ Count = 7; Reason = 'setup entry points are explicitly invoked' }
-        'setup.ps1, PSUseSingularNouns'                                               = @{ Count = 9; Reason = 'established setup helper names' }
-        'Setup.Tests.ps1, PSReviewUnusedParameter'                                    = @{ Count = 4; Reason = 'Pester mock signatures mirror production calls' }
-        'test.ps1, PSAvoidUsingWriteHost'                                             = @{ Count = 4; Reason = 'test runner progress output' }
-        'test.ps1, PSUseApprovedVerbs'                                                = @{ Count = 1; Reason = 'test runner step helper name' }
-        'uninstall.ps1, PSAvoidUsingWriteHost'                                        = @{ Count = 21; Reason = 'interactive uninstall progress output' }
-        'uninstall.ps1, PSReviewUnusedParameter'                                      = @{ Count = 5; Reason = 'interactive uninstall helper signatures' }
-        'uninstall.ps1, PSUseShouldProcessForStateChangingFunctions'                  = @{ Count = 3; Reason = 'uninstall entry points are explicitly invoked' }
-        'uninstall.ps1, PSUseSingularNouns'                                           = @{ Count = 7; Reason = 'established uninstall helper names' }
-        'Uninstall.Tests.ps1, PSUseDeclaredVarsMoreThanAssignments'                   = @{ Count = 2; Reason = 'Pester assertion captures' }
-        'validate.ps1, PSAvoidUsingWriteHost'                                         = @{ Count = 6; Reason = 'greenfield validator progress output' }
-        'validate.ps1, PSUseShouldProcessForStateChangingFunctions'                   = @{ Count = 1; Reason = 'greenfield validator helper' }
-        'validate.ps1, PSUseSingularNouns'                                            = @{ Count = 1; Reason = 'greenfield validator helper name' }
-        'windows_apply_test.ps1, PSAvoidUsingWriteHost'                               = @{ Count = 3; Reason = 'migration test progress output' }
-        'windows_apply_test.ps1, PSUseShouldProcessForStateChangingFunctions'         = @{ Count = 3; Reason = 'migration test helpers' }
-        'windows_apply_test.ps1, PSUseSingularNouns'                                  = @{ Count = 5; Reason = 'migration test helper names' }
-        'windows_roundtrip_test.ps1, PSAvoidUsingWriteHost'                           = @{ Count = 3; Reason = 'migration test progress output' }
-        'windows_roundtrip_test.ps1, PSUseShouldProcessForStateChangingFunctions'     = @{ Count = 2; Reason = 'migration test helpers' }
-        'wsl-greenfield.ps1, PSAvoidUsingWriteHost'                                   = @{ Count = 7; Reason = 'WSL greenfield harness progress output' }
-        'wsl-greenfield.ps1, PSReviewUnusedParameter'                                 = @{ Count = 1; Reason = 'WSL harness entrypoint compatibility' }
-        'wsl-greenfield.ps1, PSUseShouldProcessForStateChangingFunctions'             = @{ Count = 2; Reason = 'WSL harness setup helpers' }
-        'wsl-greenfield.ps1, PSUseSingularNouns'                                      = @{ Count = 2; Reason = 'WSL harness helper names' }
+        'Profile.Tests.ps1, PSAvoidUsingWriteHost' = @{ Count = 1; Reason = 'test fixture command output assertion' }
+        'run.ps1, PSAvoidUsingWriteHost' = @{ Count = 3; Reason = 'nvim test harness progress output' }
+        'test.ps1, PSAvoidUsingWriteHost' = @{ Count = 4; Reason = 'test harness progress output' }
+        'test.ps1, PSUseApprovedVerbs' = @{ Count = 1; Reason = 'established Require-OrSkip harness helper' }
     }
     $diag = @(
         foreach ($path in $analyzerPaths) {
@@ -204,6 +150,26 @@ Invoke-Step 'PSScriptAnalyzer' {
     if ($actualWarningFingerprint -ne $analyzerWarningFingerprint) {
         throw "PSScriptAnalyzer warning identities drifted (expected $analyzerWarningFingerprint, actual $actualWarningFingerprint). Review the exact diagnostics before updating the baseline."
     }
+}
+
+Invoke-Step 'Installer format, vet and race tests' {
+    if (-not (Get-Command go -ErrorAction SilentlyContinue)) { throw 'Go is required for the contributor gate.' }
+    Push-Location (Join-Path $RepoRoot 'installer')
+    try {
+        $formatting = & gofmt -l .
+        if ($LASTEXITCODE -ne 0 -or $formatting) { throw "Go formatting check failed: $formatting" }
+        & go vet ./...
+        if ($LASTEXITCODE -ne 0) { throw 'go vet failed' }
+        & go test -race -timeout 20m ./...
+        if ($LASTEXITCODE -ne 0) { throw 'Go race tests failed' }
+    } finally {
+        Pop-Location
+    }
+}
+
+Invoke-Step 'Public launchers and migration evidence' {
+    & python -m unittest discover -s tests/bootstrap -p '*_test.py'
+    if ($LASTEXITCODE -ne 0) { throw 'Bootstrap regression tests failed' }
 }
 
 Invoke-Step 'Pester' {

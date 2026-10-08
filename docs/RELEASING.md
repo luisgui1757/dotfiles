@@ -1,139 +1,120 @@
 # Releasing dotfiles
 
-Releases use one manifest-bound state machine instead of a hand-copied command
-log. `release/manifest.json` identifies the current candidate or published
-release, the exact public repository and workflow, and the four logical proof
-contracts. A published release points to its checked-in closure proof under
-`release/proofs/`.
+`release/manifest.json` is the release identity source. Published schema-1
+manifests and proofs describe historical releases, including
+[v0.4.4](releases/v0.4.4.md); their bytes remain unchanged. New preparation writes
+schema 2, selecting `installer-engine.yml` and the native jobs required by
+`.github/check-identities.json`. The manifest, versioned notes and closure proof
+are the only renderer-managed release artifacts. Historical migration ledgers,
+source files and prior release advisories are not rewritten.
 
-The automation does not write release prose. A maintainer must supply reviewed
-Markdown because commit subjects are not evidence and cannot safely determine
-compatibility, user impact, or residual gaps.
+Release commands perform external writes and require an explicit maintainer
+instruction. Preparing a release opens a PR; publishing creates a tag and release.
+Neither command grants permission to merge a PR.
 
-## 1. Write candidate notes
+## Prepare reviewed notes and a PR
 
-Create a Markdown file outside the repository with this exact shape:
+Start from clean `main` exactly matching official `origin/main`. Supply reviewed
+notes outside the checkout, using the next release version:
 
 ```markdown
-# v0.4.4 — Reviewed release title
+# v1.0.0 — Reviewed release title
 
 > Release candidate notes. Publish these only with the official annotated
-> `v0.4.4` tag after the deterministic evidence gate below passes.
+> `v1.0.0` tag after the deterministic evidence gate below passes.
 
 ## Highlights
 
-- User-facing, reviewed changes.
+- Reviewed user-facing changes.
 
 ## Compatibility and upgrade
 
-State the compatibility boundary and exact-tag upgrade path.
+State the supported platforms, migration boundary and local-checkout entrypoint.
 
 ## Release identity
 
-State the exact-tag and official-remote boundary.
+The exact annotated tag and official remote must agree.
 
 ## Evidence required before publication
 
-- full local and hosted gates;
-- exact tag, proof, scan, clone, and immutable release readback.
+- Full local and required hosted gates.
+- Exact tag, archived native jobs, scans, fresh clone and immutable release readback.
 ```
 
-Do not include placeholders or claim that an unexecuted owner-host/manual row
-passed. The six residual evidence categories remain explicit unless they were
-actually executed and separately recorded.
-
-## 2. Prepare the reviewed tree
-
-Start on clean `main`, exactly equal to official `origin/main`:
+Replace the example version and title with the reviewed release. Do not claim
+unexecuted native, owner-host or visual checks passed.
 
 ```bash
 make release-check
-make release-prepare VERSION=v0.4.4 NOTES=/absolute/path/v0.4.4.md
+make release-prepare VERSION=v1.0.0 NOTES=/absolute/path/reviewed-notes.md
 ```
 
-Preparation fails before editing unless the published manifest, proof, official
-remote, clean branch, exact main head, semantic version, and note shape all
-validate. It then:
+Preparation validates the current published proof against the official tag,
+release and workflow; checks clean exact main, version ordering and note shape;
+creates a sibling `release/<version>` worktree; writes schema-2 candidate metadata
+and notes; runs `make ci` and `git diff --check`; then commits, pushes and opens a
+preparation PR. The worktree remains for review. No source-version constants or
+old installer registries are generated. Review and merge separately through the
+protected squash-only path.
 
-1. creates a sibling worktree on `release/v0.4.4`;
-2. advances every controlled current-version surface;
-3. adds the previous release to the shared POSIX/PowerShell legacy-recovery
-   registries;
-4. creates the candidate source row, evidence gate, roadmap entry, manual-test
-   status, release notes, and candidate manifest;
-5. preserves the tracked mode of every rewritten file, then runs `make ci`
-   against the active-candidate state and `git diff --check`;
-6. commits, pushes, and opens the preparation pull request.
+The contributor gate requires the Go version declared in `installer/go.mod`.
+Archive/component/wheel checksums and the bootstrap toolchain are manually
+reviewed pins, updated with upstream provenance and actual runtime evidence.
+Renovate covers the remaining declared workflow, Go and validator dependencies;
+it does not calculate heterogeneous archive checksums.
 
-The preparation worktree is intentionally retained for review. The command
-never merges the PR. Review the semantic notes and generated diff, wait for all
-required checks, then merge through the protected squash-only path.
+## Certify the exact merged commit
 
-Release-specific advisories belong in `docs/KNOWN-ISSUES.md`, outside the
-renderer-controlled current-version surfaces. README and upgrade instructions
-link to that history without embedding its affected tag: preparation must not
-rename an old defect to the candidate release. The release-rendering regression
-test verifies that the advisory is preserved and the operator links remain.
-
-## 3. Certify and publish exact merged main
-
-Update local `main` to the exact merged commit and copy its full SHA from the
-live repository. Publication refuses abbreviations or a different local/remote
-head:
+After authorized merge, update local `main` to the exact official head:
 
 ```bash
-make release-publish \
-  VERSION=v0.4.4 \
-  EXPECTED_SHA=0123456789abcdef0123456789abcdef01234567
+make release-publish VERSION=v1.0.0 EXPECTED_SHA=<full-40-character-merged-commit>
 ```
 
-The command verifies the unique merged preparation PR, identical reviewed and
-squash-merged trees, every required check, immutable-release policy, the full
-local gate, and Gitleaks across the prior-release range before creating an
-annotated tag. It then dispatches a new exact-tag run and requires:
+The publisher verifies the unique merged preparation PR, equality of reviewed
+and merged trees, all hosted checks, the exact canonical required-check policy,
+and successful GitHub Actions checks at the reviewed PR head. A stale live
+required-check policy blocks publication. It also requires immutable releases,
+the complete local gate and a redacted Gitleaks scan of the release range before
+creating the annotated tag.
 
-- the exact four producer and four stable logical jobs, all successful at the
-  expected SHA;
-- all three PR-only cache steps skipped;
-- both POSIX logs reporting the exact immutable tag identity;
-- exactly four downloaded schema-2 proof markers, each independently verified
-  against source SHA, executed SHA, run ID, attempt, logical context, and legacy
-  context;
-- a redacted scan of the downloaded proof tree;
-- a credential-free detached public clone reproducing the tag object, peeled
-  commit, release-upgrade gate, and Nix-prerequisite no-op identity path.
+A new `workflow_dispatch` run on that exact tag must pass on its first attempt.
+Every manifest-bound native job must complete successfully with the exact commit,
+run ID and attempt. Certification archives canonical API run/job records and the
+exact-commit workflow source inside `release-proof.json`, with bounded byte size
+and SHA-256. URLs alone are not evidence. Every setup-go step must disable tag
+caching and the workflow must contain no broad Actions cache step. Branch Go
+module caches do not establish cache-free release proof.
 
-Only after those checks does it create a private draft release with the exact
-reviewed public body. It generates and uploads `release-proof.json`, then reads
-back the asset size and GitHub-computed SHA-256. That asset is intentionally a
-pre-publication certification: it truthfully records the draft release ID and
-that immutable publication is still pending. It cannot claim its own later
-immutability.
+The archived evidence is scanned. A fresh credential-free detached public clone
+must reproduce the annotated tag object, peeled commit and release-manifest
+checks. Native package/archive fixtures verify actual selected bytes and runtime
+outcomes in the hosted jobs; cross-compilation does not substitute for them.
 
-The sole irreversible boundary requires typing the complete phrase printed by
-the command, including tag and full commit SHA. A mismatch leaves the verified
-draft unpublished. After confirmation, the command publishes it as latest,
-requires immutable/latest/non-draft/non-prerelease readback, and opens a closure
-PR. The closure proof records final publication time/state plus the exact digest
-of the already-uploaded certification asset.
+Only then does the command create a draft with the exact reviewed public body,
+upload the certification and verify GitHub's asset size and digest. The
+certification truthfully records that immutable publication is pending. Type the
+complete printed `PUBLISH IMMUTABLE ...` phrase to cross that irreversible
+boundary. A mismatch leaves the draft unpublished. Final readback must be
+immutable/latest/non-draft/non-prerelease. The closure PR records observed release
+state, archived evidence and the uploaded asset's digest. It is not auto-merged.
 
-## Recovery and resumption
+## Recovery
 
-- Before the tag is pushed, failures have no release-side state. Inspect and
-  correct the preparation tree rather than bypassing a gate.
-- After the annotated tag exists, rerunning publication accepts it only when its
-  local and official tag objects peel to `EXPECTED_SHA`.
-- To reuse an already-observed exact-tag first-attempt run after a local failure,
-  add `RUN_ID=<id>`. The run is still fully revalidated; this is not an evidence
-  override.
-- If confirmation is declined, the exact draft and proof asset remain private.
-  Rerun with the same version, SHA, and run ID to revalidate them.
-- If publication succeeded but closure work failed, rerun the same command. It
-  downloads and validates the immutable certification asset, reconstructs the
-  final proof from live readback, and opens the closure PR without republishing.
-- Branch or worktree collisions fail closed. Remove them only after proving the
-  associated PR/release state and preserving anything not merged.
+- Before tag creation, correct the preparation tree and rerun its gates.
+- An existing official annotated tag is accepted only if its local and remote
+  objects peel to the exact expected commit. Never move or delete a release tag.
+- `RUN_ID=<id>` reuses an observed first-attempt exact-tag run after a local
+  failure; every identity and job is revalidated.
+- A declined confirmation leaves the verified draft and exact proof asset.
+  Reuse the same version, commit and run ID; existing bytes cannot be clobbered.
+- If publication succeeded but closure failed, the publisher revalidates the
+  immutable certification asset and reconstructs closure from live readback
+  without republishing.
+- Branch/worktree collisions fail closed. Preserve unmerged work and establish
+  PR/release state before removing a collision.
 
-Never delete or move an official release tag to recover from a failure. Never
-edit an immutable release or hand-author a closure identity. Diagnose the failed
-gate and resume from the observed state.
+Unexecuted redirected-Windows, divergent Windows Terminal, physical Linux,
+Apple-Silicon owner-host and visual checks remain explicit residual evidence.
+See [the test retirement map](installer-test-retirement.md) for current versus
+historical gates, and [known issues](KNOWN-ISSUES.md) for version-specific history.

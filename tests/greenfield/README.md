@@ -1,5 +1,9 @@
 # Greenfield / clean-machine testing
 
+> Historical Nix/chezmoi release material. Commands below apply only at their
+> recorded revisions; retired launchers are not part of the new installer. Use
+> [the current guide](../../README.md) and its linked installer status for this major release.
+
 This directory is for local clean-machine validation. CI already runs the real
 `setup.sh` / `setup.ps1` paths on hosted clean runners and the native `apt`
 container path. These harnesses are for reproducing those installs locally and
@@ -138,7 +142,7 @@ Fallbacks:
 ```
 
 Windows containers are not a substitute. They do not model Developer Mode
-symlink behavior, Windows Terminal settings, fonts, psmux under real ConPTY, or
+symlink behavior, Windows Terminal settings, fonts, Herdr under real ConPTY, or
 the visual desktop surface.
 
 ## Linux / WSL
@@ -173,11 +177,11 @@ retained on the host at
 `tests/.cache/linux-owner-lifecycle-docker-<timestamp>.log`; a pipeline or
 container failure remains the driver's exit status.
 
-There is deliberately no hosted WSL workflow. [GitHub documents nested
-virtualization on hosted runners as technically possible but not officially
-supported](https://docs.github.com/en/actions/concepts/runners/github-hosted-runners), and both real canary attempts stalled before setup evidence. Do not
-substitute Linux plus WSL-shaped environment variables; that would not exercise
-the Windows host/WSL guest boundary. Use the throwaway distro path below.
+The new installer uses the same Linux lifecycle inside WSL. The separate hosted
+WSL2 boot-only probe is retired: it did not exercise the installer. The manual
+harness below verifies the released split-host setup until cutover. Ordinary
+Linux tests do not prove Windows-host clipboard or desktop interoperability;
+test those actual capabilities wherever the product promises them.
 
 Throwaway WSL distro path: run from Windows PowerShell:
 
@@ -247,6 +251,6 @@ Run these after the automated greenfield checks on a real desktop:
 - `ls` / `Get-ChildItem` directories are gold.
 - PSReadLine ListView predictions are visible in rose/gold.
 - fzf `Ctrl+R`, `Ctrl+T`, and `Alt+C` work.
-- psmux loads a pane without freezing and stays at normal CPU.
+- Herdr loads a PowerShell pane with working input and predictions.
 - VS Code uses Rose Pine and Hack Nerd Font.
 - VS Code editor glyphs and integrated terminal glyphs render correctly.
