@@ -24,42 +24,12 @@ HEX40 = re.compile(r"[0-9a-f]{40}\Z")
 SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 SEMVER = re.compile(r"v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\Z")
 RESIDUAL_EVIDENCE = [
-    "real WSL",
     "redirected Windows",
     "divergent Windows Terminal targets",
     "physical Linux",
     "Apple Silicon owner host",
     "manual visual checks",
 ]
-GLOBAL_VERSION_FILES = (
-    "CLAUDE.md",
-    "README.md",
-    "scripts/install-nix-prerequisite.sh",
-    "scripts/upgrade-v0.1.0.ps1",
-    "scripts/upgrade-v0.1.0.sh",
-    "setup.ps1",
-    "setup.sh",
-    "tests/MANUAL.md",
-    "tests/greenfield/README.md",
-    "tests/greenfield/RUNBOOK.md",
-    "tests/migration/v0_1_upgrade_test.sh",
-    "tests/powershell/Setup.Tests.ps1",
-    "tests/powershell/Upgrade.Tests.ps1",
-    "tests/shell/nix_prerequisite_identity_test.sh",
-    "tests/shell/setup_universal_entrypoint_test.sh",
-    "tests/static/darwin_platform_contract_test.sh",
-    "tests/static/release_upgrade_test.sh",
-)
-EXPECTED_JOBS = {
-    "e2e containers / ubuntu-24.04",
-    "e2e containers / linux",
-    "setup.sh / ubuntu-24.04",
-    "setup.sh / linux",
-    "setup.sh / macos-26",
-    "setup.sh / macos",
-    "setup.ps1 / windows-2025",
-    "setup.ps1 / windows",
-}
 
 
 class ReleaseError(RuntimeError):
@@ -196,7 +166,7 @@ def validate_logical_proofs(value: Any) -> list[dict[str, str]]:
 
 def validate_proof(path: pathlib.Path, manifest: dict[str, Any]) -> dict[str, Any]:
     proof = load_json(path)
-    if not isinstance(proof, dict) or proof.get("schema") != 1:
+    if not isinstance(proof, dict) or proof.get("schema") != manifest["schema"]:
         fail(f"unsupported release proof schema: {path}")
     for key in ("tag", "previous_tag"):
         semver(str(proof.get(key, "")))
@@ -211,21 +181,30 @@ def validate_proof(path: pathlib.Path, manifest: dict[str, Any]) -> dict[str, An
         for key, expected in (("immutable", True), ("latest", True), ("draft", False), ("prerelease", False))
     ):
         fail(f"release proof does not describe an immutable latest release: {path}")
-    entries = proof.get("logical_proofs")
-    if not isinstance(entries, list) or len(entries) != 4:
-        fail(f"release proof must contain four logical proof digests: {path}")
-    for entry in entries:
-        if not isinstance(entry, dict) or not SHA256.fullmatch(str(entry.get("sha256", ""))):
-            fail(f"release proof contains an invalid SHA-256: {path}")
-        if not isinstance(entry.get("size"), int) or entry["size"] <= 0:
-            fail(f"release proof contains an invalid marker size: {path}")
-    expected_proofs = [
-        (item["artifact"], item["marker"])
-        for item in validate_logical_proofs(manifest["logical_proofs"])
-    ]
-    observed_proofs = [(item.get("artifact"), item.get("marker")) for item in entries]
-    if observed_proofs != expected_proofs:
-        fail(f"release proof artifact/marker identities drifted from the manifest: {path}")
+    if manifest["schema"] == 1:
+        entries = proof.get("logical_proofs")
+        if not isinstance(entries, list) or len(entries) != 4:
+            fail(f"release proof must contain four logical proof digests: {path}")
+        for entry in entries:
+            if not isinstance(entry, dict) or not SHA256.fullmatch(str(entry.get("sha256", ""))):
+                fail(f"release proof contains an invalid SHA-256: {path}")
+            if not isinstance(entry.get("size"), int) or entry["size"] <= 0:
+                fail(f"release proof contains an invalid marker size: {path}")
+        expected_proofs = [
+            (item["artifact"], item["marker"])
+            for item in validate_logical_proofs(manifest["logical_proofs"])
+        ]
+        observed_proofs = [(item.get("artifact"), item.get("marker")) for item in entries]
+        if observed_proofs != expected_proofs:
+            fail(f"release proof artifact/marker identities drifted from the manifest: {path}")
+    else:
+        validate_job_evidence(proof.get("job_evidence"), manifest, proof["commit"], proof["tag"])
+        record = proof["job_evidence"]["document"]["run"]
+        workflow = proof.get("workflow", {})
+        if (workflow.get("name") != manifest["workflow"] or workflow.get("run_id") != record["databaseId"]
+                or workflow.get("run_attempt") != record["attempt"] or workflow.get("conclusion") != "success"):
+            fail("release proof workflow disagrees with archived native evidence")
+
     certification_asset = proof.get("certification_asset")
     if certification_asset is not None and (
         not isinstance(certification_asset, dict)
@@ -239,24 +218,30 @@ def validate_proof(path: pathlib.Path, manifest: dict[str, Any]) -> dict[str, An
 def validate_manifest(root: pathlib.Path = ROOT) -> dict[str, Any]:
     path = root / MANIFEST_PATH
     manifest = load_json(path)
-    if not isinstance(manifest, dict) or manifest.get("schema") != 1:
-        fail("release manifest schema must be 1")
+    if not isinstance(manifest, dict) or manifest.get("schema") not in {1, 2}:
+        fail("release manifest schema must be 1 or 2")
     if set(manifest) != {
         "schema",
         "repository",
         "official_remote",
         "workflow",
         "current",
-        "logical_proofs",
+        "logical_proofs" if manifest["schema"] == 1 else "workflow_jobs",
     }:
         fail("release manifest contains missing or unknown top-level fields")
     if manifest.get("repository") != "luisgui1757/dotfiles":
         fail("release manifest repository is not the reviewed public repository")
     if manifest.get("official_remote") != "https://github.com/luisgui1757/dotfiles.git":
         fail("release manifest official remote drifted")
-    if manifest.get("workflow") != "e2e-install.yml":
+    expected_workflow = "e2e-install.yml" if manifest["schema"] == 1 else "installer-engine.yml"
+    if manifest.get("workflow") != expected_workflow:
         fail("release manifest workflow drifted")
-    validate_logical_proofs(manifest.get("logical_proofs"))
+    if manifest["schema"] == 1:
+        if manifest.get("current", {}).get("state") != "published":
+            fail("schema 1 is historical published evidence only")
+        validate_logical_proofs(manifest.get("logical_proofs"))
+    else:
+        validate_workflow_jobs(manifest.get("workflow_jobs"))
     current = manifest.get("current")
     if not isinstance(current, dict) or current.get("state") not in {"published", "candidate"}:
         fail("release manifest current state must be published or candidate")
@@ -308,42 +293,60 @@ def validate_manifest(root: pathlib.Path = ROOT) -> dict[str, Any]:
 
 
 def validate_current_surfaces(root: pathlib.Path, manifest: dict[str, Any]) -> None:
-    tag = manifest["current"]["tag"]
-    exact_strings = {
-        "setup.sh": [f'RELEASE_TAG="{tag}"', f"v0.1.0-to-{tag}."],
-        "setup.ps1": [f"$ReleaseTag     = '{tag}'", f"v0.1.0-to-{tag}."],
-        "scripts/install-nix-prerequisite.sh": [f'release_tag="{tag}"'],
-        "scripts/upgrade-v0.1.0.sh": [f'new_tag="{tag}"', f"v0.1.0-to-{tag}."],
-        "scripts/upgrade-v0.1.0.ps1": [f"$script:NewTag = '{tag}'", f"v0.1.0-to-{tag}."],
-        "docs/UPGRADING.md": [f"## v0.1.0 to {tag}"],
-        "docs/security/supply-chain.md": [f"| {tag} Nix prerequisite |"],
-    }
-    for relative, snippets in exact_strings.items():
-        text = (root / relative).read_text(encoding="utf-8")
-        for snippet in snippets:
-            if text.count(snippet) != 1:
-                fail(f"current release surface {relative} does not contain exactly one {snippet!r}")
+    # Published schema-1 evidence describes the released tree, not today's runtime.
+    # New candidates bind the reviewed native workflow matrix in their manifest.
+    if manifest["schema"] == 2 and manifest["current"]["state"] == "candidate":
+        if manifest["workflow_jobs"] != native_job_names(root):
+            fail("candidate native job identities differ from canonical required checks")
 
-    shell = (root / "setup.sh").read_text(encoding="utf-8")
-    powershell = (root / "setup.ps1").read_text(encoding="utf-8")
-    shell_match = re.search(r'^LEGACY_RELEASE_TAGS=\(([^\n]*)\)$', shell, re.MULTILINE)
-    ps_match = re.search(r'^\$LegacyReleaseTags = @\(([^\n]*)\)$', powershell, re.MULTILINE)
-    if not shell_match or not ps_match:
-        fail("setup legacy release registries are missing")
-    shell_tags = re.findall(r'"(v[0-9]+\.[0-9]+\.[0-9]+)"', shell_match.group(1))
-    ps_tags = re.findall(r"'(v[0-9]+\.[0-9]+\.[0-9]+)'", ps_match.group(1))
-    ledger = (root / "docs/security/supply-chain.md").read_text(encoding="utf-8")
-    published = re.findall(
-        r"^\| v0\.1\.0 to (v[0-9]+\.[0-9]+\.[0-9]+) release sources \|",
-        ledger,
-        re.MULTILINE,
-    )
-    expected = [value for value in published if value != tag]
-    if shell_tags != expected or ps_tags != expected:
-        fail(
-            "setup legacy release registries do not match the ordered published source ledger: "
-            f"expected={expected}, shell={shell_tags}, powershell={ps_tags}"
-        )
+
+def native_job_names(root: pathlib.Path) -> list[str]:
+    policy = load_json(root / ".github/check-identities.json")
+    return validate_workflow_jobs([name for name in policy["required"] if name not in {"ubuntu", "macos", "windows"}])
+
+
+def validate_workflow_jobs(value: Any) -> list[str]:
+    if (not isinstance(value, list) or not 1 <= len(value) <= 64
+            or any(not isinstance(name, str) or not name or len(name) > 150 for name in value)
+            or len(value) != len(set(value))):
+        fail("native workflow job identities are invalid")
+    return value
+
+
+def canonical_bytes(value: Any) -> bytes:
+    return (json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True) + "\n").encode("utf-8")
+
+
+def validate_job_evidence(value: Any, manifest: dict[str, Any], commit: str, tag: str) -> None:
+    if not isinstance(value, dict) or set(value) != {"sha256", "size", "document"}:
+        fail("native job evidence must contain the canonical archived document and digest")
+    encoded = canonical_bytes(value["document"])
+    if len(encoded) > 4 * 1024 * 1024 or value["size"] != len(encoded) or value["sha256"] != hashlib.sha256(encoded).hexdigest():
+        fail("native job evidence bytes do not match their bounded digest")
+    document = value["document"]
+    if not isinstance(document, dict) or set(document) != {"schema", "run", "jobs", "workflow_source"} or document["schema"] != 1:
+        fail("native job evidence document schema drifted")
+    run_record = document["run"]
+    expected = {"headSha": commit, "headBranch": tag, "attempt": 1, "event": "workflow_dispatch", "status": "completed", "conclusion": "success", "workflowName": "installer engine"}
+    if not isinstance(run_record, dict) or any(run_record.get(key) != val for key, val in expected.items()) or not isinstance(run_record.get("databaseId"), int) or run_record["databaseId"] < 1:
+        fail("native job evidence run is not the first successful exact-tag run")
+    jobs = document["jobs"]
+    if not isinstance(jobs, list) or len(jobs) != len(manifest["workflow_jobs"]) or any(not isinstance(job, dict) for job in jobs) or {job.get("name") for job in jobs} != set(manifest["workflow_jobs"]):
+        fail("native job evidence job set differs from the reviewed matrix")
+    if any(job.get("head_sha") != commit or job.get("run_id") != run_record["databaseId"] or job.get("run_attempt") != 1 or job.get("status") != "completed" or job.get("conclusion") != "success" for job in jobs):
+        fail("not every native job completed successfully at the exact release identity")
+    source = document["workflow_source"]
+    if not isinstance(source, dict) or set(source) != {"commit", "path", "text", "sha256"} or source["commit"] != commit or source["path"] != ".github/workflows/installer-engine.yml":
+        fail("native workflow source identity drifted")
+    text = source["text"]
+    if not isinstance(text, str) or hashlib.sha256(text.encode("utf-8")).hexdigest() != source["sha256"]:
+        fail("native workflow source digest drifted")
+    blocks = re.findall(r"(?ms)^ *- uses: actions/setup-go@[^\n]+\n(.*?)(?=^ *- (?:uses|name):|\Z)", text)
+    cache_setting = "cache: ${{ !startsWith(github.ref, 'refs/tags/') }}"
+    if (not blocks or len(blocks) != text.count("uses: actions/setup-go@")
+            or any(not re.search(r"(?m)^ +" + re.escape(cache_setting) + r" *$", block) for block in blocks)
+            or "actions/cache@" in text):
+        fail("exact-tag workflow source does not disable every Go cache and broad Actions cache")
 
 
 def git_clean(root: pathlib.Path) -> None:
@@ -366,165 +369,6 @@ def require_exact_main(root: pathlib.Path, manifest: dict[str, Any]) -> str:
     return head
 
 
-def append_legacy_tag(root: pathlib.Path, current_tag: str) -> None:
-    shell_path = root / "setup.sh"
-    shell = shell_path.read_text(encoding="utf-8")
-    match = re.search(r'^LEGACY_RELEASE_TAGS=\((?P<body>[^\n]*)\)$', shell, re.MULTILINE)
-    if not match or f'"{current_tag}"' in match.group("body"):
-        fail("POSIX legacy release registry cannot be extended exactly once")
-    shell = shell[: match.start("body")] + match.group("body") + f' "{current_tag}"' + shell[match.end("body") :]
-    write_text(shell_path, shell)
-
-    ps_path = root / "setup.ps1"
-    powershell = ps_path.read_text(encoding="utf-8")
-    match = re.search(r"^\$LegacyReleaseTags = @\((?P<body>[^\n]*)\)$", powershell, re.MULTILINE)
-    if not match or f"'{current_tag}'" in match.group("body"):
-        fail("Windows legacy release registry cannot be extended exactly once")
-    powershell = powershell[: match.start("body")] + match.group("body") + f", '{current_tag}'" + powershell[match.end("body") :]
-    write_text(ps_path, powershell)
-
-
-def rewrite_readme_candidate(root: pathlib.Path, manifest: dict[str, Any], new_tag: str) -> None:
-    path = root / "README.md"
-    text = path.read_text(encoding="utf-8")
-    proof = validate_proof(root / manifest["current"]["proof"], manifest)
-    pattern = re.compile(
-        rf"The published `{re.escape(new_tag)}` release path accepts only the exact clean official\n"
-        rf"annotated tag object `{proof['tag_object']}`, which\n"
-        rf"peels to commit `{proof['commit']}` as recorded\n"
-        r"in the supply-chain ledger\."
-    )
-    replacement = (
-        f"Once published, the `{new_tag}` release path accepts only the exact clean official\n"
-        "annotated tag whose observed tag object and peeled commit will be recorded in\n"
-        "the supply-chain ledger. The local tag object, peeled commit, HEAD, and one\n"
-        "isolated official-remote advertisement must all agree."
-    )
-    text, count = pattern.subn(replacement, text)
-    if count != 1:
-        fail("README published release identity paragraph did not match exactly once")
-    write_text(path, text)
-
-
-def rewrite_manual_candidate(root: pathlib.Path, manifest: dict[str, Any], new_tag: str) -> None:
-    path = root / "tests/MANUAL.md"
-    text = path.read_text(encoding="utf-8")
-    proof = validate_proof(root / manifest["current"]["proof"], manifest)
-    pattern = re.compile(
-        rf"> Release status \([^\n]+\): immutable/latest GitHub release `{proof['release']['id']}`\n"
-        rf"> binds annotated tag object `{proof['tag_object']}`\n"
-        rf"> to peeled commit `{proof['commit']}`\."
-    )
-    replacement = (
-        f"> Release candidate status: `{new_tag}` identities are recorded only after every\n"
-        "> deterministic publication gate passes."
-    )
-    text, count = pattern.subn(replacement, text)
-    if count != 1:
-        fail("manual checklist published release identity did not match exactly once")
-    write_text(path, text)
-
-
-def rewrite_upgrading_candidate(root: pathlib.Path, current_tag: str, new_tag: str, base: str) -> None:
-    path = root / "docs/UPGRADING.md"
-    text = path.read_text(encoding="utf-8")
-    marker = f"## {current_tag} release evidence"
-    if text.count(marker) != 1:
-        fail("upgrade guide current release evidence marker is ambiguous")
-    prefix, history = text.split(marker, 1)
-    prefix = replace_exact(prefix, current_tag, new_tag)
-    gate = f"""## {new_tag} release evidence gate
-
-The candidate starts from exact clean `main` commit
-`{base}`; publication remains gated on:
-
-- [ ] the reviewed release-preparation pull request merged to `main` with all
-  required checks passing;
-- [ ] an annotated `{new_tag}` tag whose tag object and peeled commit match the
-  exact merged release-preparation commit and the official remote;
-- [ ] full local and hosted gates, deterministic exact-v0.1.0 migration
-  fixtures, Windows Pester coverage, and a redacted scan across
-  `{current_tag}..{new_tag}` plus all downloaded logical proofs;
-- [ ] a cache-free hosted release run whose POSIX lanes report the exact
-  immutable `{new_tag}` tag identity;
-- [ ] a fresh credential-free public clone reproducing the tag and release
-  identity gates;
-- [ ] an immutable/latest GitHub release with the reviewed proof asset and
-  prepared body exact.
-
-The unchecked real WSL, redirected-Windows, divergent Windows Terminal,
-physical-Linux, Apple-Silicon owner-host, and visual rows in `tests/MANUAL.md`
-remain explicit residual gaps; publication will not mark them complete.
-
-"""
-    write_text(path, prefix + gate + marker + history)
-
-
-def rewrite_migration_candidate(root: pathlib.Path, current_tag: str, new_tag: str) -> None:
-    path = root / "docs/MIGRATION_STATUS.md"
-    text = path.read_text(encoding="utf-8")
-    marker = f"The annotated {current_tag} release was published"
-    if text.count(marker) != 1:
-        fail("migration ledger current published-release marker is ambiguous")
-    prefix, history = text.split(marker, 1)
-    prefix = replace_exact(prefix, current_tag, new_tag)
-    candidate = (
-        f"The {new_tag} candidate keeps the same frozen-source and rollback boundaries while\n"
-        f"moving current exact-tag authority, recovery namespace, and prerequisite identity to\n"
-        f"`{new_tag}`. Setup treats unfinished `{current_tag}` transactions as older recoveries.\n"
-        "Observed tag, workflow, proof, scan, clone, and immutable-release identities are\n"
-        "recorded only after their gates pass.\n\n"
-    )
-    write_text(path, prefix + candidate + marker + history)
-
-
-def rewrite_supply_chain_candidate(root: pathlib.Path, current_tag: str, new_tag: str) -> None:
-    path = root / "docs/security/supply-chain.md"
-    text = path.read_text(encoding="utf-8")
-    text = replace_exact(text, f"| {current_tag} Nix prerequisite |", f"| {new_tag} Nix prerequisite |", count=1)
-    prior_prefix = f"| v0.1.0 to {current_tag} release sources |"
-    prior_lines = [line for line in text.splitlines() if line.startswith(prior_prefix)]
-    if len(prior_lines) != 1:
-        fail("supply-chain ledger current release-source row is ambiguous")
-    candidate = (
-        f"| v0.1.0 to {new_tag} release-candidate sources | "
-        "v0.1.0 tag object `a3b4d6d7b6d289959cac68d76faec96219b3e310`, peeled commit "
-        "`015617362830280bf85c7142e69d0681d376d453`; exact annotated tag name "
-        f"`{new_tag}`, with its observed tag object and peeled commit recorded only after publication | "
-        "Both migrators require the exact local/official annotated-tag mapping before mutation, "
-        "then archive the exact commits into private recovery, fingerprint the extracted trees, "
-        "and bind apply/readback/rollback to those frozen sources. A branch, missing/lightweight/moved "
-        "tag, or retained-checkout drift cannot authorize or change a transaction write. |"
-    )
-    text = text.replace(prior_lines[0], prior_lines[0] + "\n" + candidate, 1)
-    write_text(path, text)
-
-
-def rewrite_roadmap_candidate(root: pathlib.Path, current_tag: str, new_tag: str) -> None:
-    path = root / "ROADMAP.md"
-    text = path.read_text(encoding="utf-8")
-    heading = "## P1 - v0.1.0 Release Upgrade"
-    end_marker = "## Disproved Or Non-Blocking Assumptions"
-    if text.count(heading) != 1 or text.count(end_marker) != 1:
-        fail("release roadmap section is ambiguous")
-    before, remainder = text.split(heading, 1)
-    section, after = remainder.split(end_marker, 1)
-    section = replace_exact(section, f"{current_tag} published.", f"{current_tag} published; {new_tag} release preparation in progress.", count=1)
-    evidence, solution = section.split("Canonical solution:", 1)
-    status, evidence_body = evidence.split("Evidence:\n", 1)
-    evidence = status + "Evidence:\n" + replace_exact(evidence_body, current_tag, new_tag)
-    numbers = [int(value) for value in re.findall(r"(?m)^(\d+)\. (?:DONE|IN PROGRESS) -", solution)]
-    if not numbers:
-        fail("release roadmap has no numbered publication ledger")
-    entry = (
-        f"\n{max(numbers) + 1}. IN PROGRESS - Prepare, merge, tag, certify, and publish {new_tag} from the\n"
-        "    exact reviewed release tree using the manifest-bound automation; record only\n"
-        "    observed tag, workflow, proof, scan, clone, and immutable-release identities.\n"
-    )
-    section = evidence + "Canonical solution:" + solution.rstrip() + entry + "\n\n"
-    write_text(path, before + heading + section + end_marker + after)
-
-
 def render_candidate(
     root: pathlib.Path,
     *,
@@ -540,17 +384,13 @@ def render_candidate(
         fail("candidate version must be newer than the published release")
     title = validate_notes(notes_text, version, candidate=True)
     current_tag = current["tag"]
-    for relative in GLOBAL_VERSION_FILES:
-        path = root / relative
-        text = path.read_text(encoding="utf-8")
-        write_text(path, replace_exact(text, current_tag, version))
-    append_legacy_tag(root, current_tag)
-    rewrite_readme_candidate(root, manifest, version)
-    rewrite_manual_candidate(root, manifest, version)
-    rewrite_upgrading_candidate(root, current_tag, version, base_commit)
-    rewrite_migration_candidate(root, current_tag, version)
-    rewrite_supply_chain_candidate(root, current_tag, version)
-    rewrite_roadmap_candidate(root, current_tag, version)
+    manifest = {
+        "schema": 2,
+        "repository": manifest["repository"],
+        "official_remote": manifest["official_remote"],
+        "workflow": "installer-engine.yml",
+        "workflow_jobs": native_job_names(root),
+    }
     note_path = root / f"docs/releases/{version}.md"
     if note_path.exists():
         fail(f"candidate release notes already exist: {note_path}")
@@ -609,9 +449,9 @@ def prepare(args: argparse.Namespace) -> None:
             "--body",
             (
                 "## Summary\n\n"
-                f"- prepare the exact `{args.version}` release identity and migration surfaces\n"
+                f"- prepare the exact `{args.version}` release identity and native certification matrix\n"
                 "- add reviewed candidate notes and deterministic publication gates\n"
-                "- extend legacy recovery coverage without weakening earlier transactions\n\n"
+                "- preserve historical publication evidence unchanged\n\n"
                 "## Verification\n\n- `make ci`\n"
             ),
         ],
@@ -677,7 +517,7 @@ def check_live(manifest: dict[str, Any]) -> None:
         "headBranch": current["tag"],
         "headSha": proof["commit"],
         "status": "completed",
-        "workflowName": "e2e-install",
+        "workflowName": "e2e-install" if manifest["schema"] == 1 else "installer engine",
     }
     if workflow != workflow_expected:
         fail("published manifest workflow identity no longer matches GitHub")
@@ -759,6 +599,16 @@ def verify_preparation_pr(manifest: dict[str, Any], expected_sha: str) -> dict[s
     head_sha = pull.get("head", {}).get("sha")
     if not HEX40.fullmatch(str(head_sha or "")):
         fail("preparation PR head identity is invalid")
+    canonical_required = load_json(ROOT / ".github/check-identities.json")["required"]
+    if set(item["name"] for item in required) != set(canonical_required):
+        fail("live required-check policy differs from the reviewed canonical check set")
+    head_checks = load_json_from_gh([f"repos/{manifest['repository']}/commits/{head_sha}/check-runs?per_page=100", "--paginate"])
+    for name in canonical_required:
+        matches = [item for item in head_checks.get("check_runs", []) if item.get("name") == name
+                   and item.get("head_sha") == head_sha and item.get("status") == "completed"
+                   and item.get("conclusion") == "success" and item.get("app", {}).get("id") == 15368]
+        if len(matches) != 1:
+            fail(f"required check is not uniquely successful at the reviewed PR head: {name}")
     head_commit = load_json_from_gh([f"repos/{manifest['repository']}/git/commits/{head_sha}"])
     merged_commit = load_json_from_gh([f"repos/{manifest['repository']}/git/commits/{expected_sha}"])
     head_tree = str(head_commit.get("tree", {}).get("sha", ""))
@@ -905,7 +755,7 @@ def select_release_run(
         "headSha": expected_sha,
         "status": "completed",
         "conclusion": "success",
-        "workflowName": "e2e-install",
+        "workflowName": "e2e-install" if manifest["schema"] == 1 else "installer engine",
     }
     for key, value in expected.items():
         if selected_run.get(key) != value:
@@ -915,72 +765,24 @@ def select_release_run(
     return selected_run
 
 
-def verify_release_jobs(manifest: dict[str, Any], run_id: int, expected_sha: str, tag: str) -> None:
-    response = load_json_from_gh(
-        [f"repos/{manifest['repository']}/actions/runs/{run_id}/jobs", "--paginate"]
-    )
-    jobs = response.get("jobs", [])
-    if {job.get("name") for job in jobs} != EXPECTED_JOBS:
-        fail("exact-tag workflow job set differs from the reviewed producer/logical matrix")
-    if any(job.get("conclusion") != "success" or job.get("head_sha") != expected_sha for job in jobs):
-        fail("not every exact-tag workflow job passed at the expected SHA")
-    cache_steps = [
-        step
-        for job in jobs
-        for step in job.get("steps", [])
-        if str(step.get("name", "")).startswith("PR-only cache:")
-    ]
-    if len(cache_steps) != 3 or any(step.get("conclusion") != "skipped" for step in cache_steps):
-        fail("release workflow did not remain cache-free")
-    logs = output(["gh", "run", "view", str(run_id), "--log"])
-    identity = f"Verified immutable release checkout: {tag} at {expected_sha}"
-    if logs.count(identity) < 2:
-        fail("both POSIX setup producers did not report the exact immutable release identity")
-
-
-def verify_downloaded_proofs(
-    manifest: dict[str, Any], run_id: int, run_attempt: int, expected_sha: str, proof_root: pathlib.Path
-) -> list[dict[str, Any]]:
-    run(["gh", "run", "download", str(run_id), "--dir", str(proof_root)], capture=False)
-    records = []
-    allowed_files: set[pathlib.Path] = set()
-    for item in validate_logical_proofs(manifest["logical_proofs"]):
-        marker = proof_root / item["artifact"] / item["marker"]
-        if not marker.is_file() or marker.is_symlink():
-            fail(f"logical proof marker is missing or unsafe: {marker}")
-        allowed_files.add(marker.resolve())
-        environment = os.environ.copy()
-        environment.update(
-            {
-                "DOTFILES_SOURCE_HEAD_SHA": expected_sha,
-                "GITHUB_SHA": expected_sha,
-                "GITHUB_RUN_ID": str(run_id),
-                "GITHUB_RUN_ATTEMPT": str(run_attempt),
-            }
-        )
-        run(
-            [
-                str(ROOT / "scripts/ci-logical-proof.sh"),
-                "verify",
-                str(marker),
-                item["logical_context"],
-                item["legacy_context"],
-            ],
-            env=environment,
-        )
-        records.append(
-            {
-                "artifact": item["artifact"],
-                "marker": item["marker"],
-                "size": marker.stat().st_size,
-                "sha256": sha256_file(marker),
-            }
-        )
-    observed = {path.resolve() for path in proof_root.rglob("*") if path.is_file()}
-    if observed != allowed_files:
-        fail("downloaded workflow artifacts contain an unexpected or missing file")
+def archive_release_jobs(
+    manifest: dict[str, Any], run_record: dict[str, Any], expected_sha: str, tag: str, proof_root: pathlib.Path
+) -> dict[str, Any]:
+    response = load_json_from_gh([f"repos/{manifest['repository']}/actions/runs/{run_record['databaseId']}/jobs?per_page=100", "--paginate"])
+    source = run(["git", "show", f"{expected_sha}:.github/workflows/installer-engine.yml"]).stdout
+    document = {
+        "schema": 1,
+        "run": run_record,
+        "jobs": response.get("jobs", []),
+        "workflow_source": {"commit": expected_sha, "path": ".github/workflows/installer-engine.yml", "text": source, "sha256": hashlib.sha256(source.encode("utf-8")).hexdigest()},
+    }
+    encoded = canonical_bytes(document)
+    evidence = {"sha256": hashlib.sha256(encoded).hexdigest(), "size": len(encoded), "document": document}
+    validate_job_evidence(evidence, manifest, expected_sha, tag)
+    proof_root.mkdir(mode=0o700)
+    (proof_root / "native-jobs.json").write_bytes(encoded)
     run(["gitleaks", "dir", "--no-banner", "--redact", str(proof_root)], capture=False)
-    return records
+    return evidence
 
 
 def verify_public_clone(manifest: dict[str, Any], tag: str, tag_object: str, commit: str) -> None:
@@ -1018,16 +820,7 @@ def verify_public_clone(manifest: dict[str, Any], tag: str, tag_object: str, com
             fail("fresh exact-tag clone is not detached")
         git_clean(clone)
         run(["bash", "tests/static/release_upgrade_test.sh"], cwd=clone, capture=False)
-        nix_probe = run(["nix", "store", "info"], cwd=clone, check=False)
-        if nix_probe.returncode != 0:
-            fail("fresh-clone prerequisite no-op proof requires a usable local Nix")
-        helper = run(
-            ["bash", "scripts/install-nix-prerequisite.sh", "--install"],
-            cwd=clone,
-            env=environment,
-        )
-        if f"Verified immutable release checkout: {tag} at {commit}" not in helper.stdout:
-            fail("fresh public clone did not exercise the immutable prerequisite identity path")
+        run(["python3", "scripts/release.py", "check"], cwd=clone, capture=False)
 
 
 def create_certification(
@@ -1036,11 +829,11 @@ def create_certification(
     tag_object: str,
     commit: str,
     run_record: dict[str, Any],
-    logical_proofs: list[dict[str, Any]],
+    job_evidence: dict[str, Any],
     release_id: int,
 ) -> dict[str, Any]:
     return {
-        "schema": 1,
+        "schema": 2,
         "kind": "pre-publication-certification",
         "repository": manifest["repository"],
         "tag": manifest["current"]["tag"],
@@ -1056,11 +849,11 @@ def create_certification(
             "url": run_record["url"],
             "conclusion": "success",
         },
-        "logical_proofs": logical_proofs,
+        "job_evidence": job_evidence,
         "scans": {
             "gitleaks_version": output(["gitleaks", "version"]),
             "release_range": f"{manifest['current']['previous_tag']}..{manifest['current']['tag']}",
-            "proof_bytes": sum(item["size"] for item in logical_proofs),
+            "proof_bytes": job_evidence["size"],
         },
         "fresh_public_clone": "passed",
         "release": {
@@ -1168,26 +961,21 @@ def publish_draft(manifest: dict[str, Any], expected_sha: str, draft: dict[str, 
 def closure_evidence(proof: dict[str, Any]) -> str:
     return f"""## Publication evidence
 
-- Pull request #{proof['preparation']['pull_request']} merged reviewed head
-  `{proof['preparation']['head']}` to exact `main` commit `{proof['commit']}`;
-  both have tree `{proof['tree']}`, and all required checks passed.
-- The full local gate and redacted Gitleaks scan across
-  `{proof['scans']['release_range']}` passed before the tag was created.
-- Cache-free exact-tag run
-  [`{proof['workflow']['run_id']}`](https://github.com/{proof['repository']}/actions/runs/{proof['workflow']['run_id']})
-  passed all four producers and all four stable logical proof jobs at the exact
-  release commit; both POSIX lanes reported the immutable tag identity.
-- All four schema-2 logical proofs independently bound source SHA, executed
-  SHA, run ID, run attempt, logical context, and legacy context; their total
-  size was {proof['scans']['proof_bytes']} bytes and their SHA-256 values are in the checked-in proof.
-- A fresh credential-free detached public clone reproduced the tag identities,
-  release-upgrade static gate, and immutable prerequisite-helper no-op path.
-- GitHub release `{proof['release']['id']}` read back immutable/latest,
-  non-draft, and non-prerelease with the prepared body and certification asset exact.
+- Reviewed PR #{proof['preparation']['pull_request']} head `{proof['preparation']['head']}`
+  and merged commit `{proof['commit']}` have exact tree `{proof['tree']}`.
+- Full local and required hosted checks passed; redacted scans covered
+  `{proof['scans']['release_range']}` and the archived native-job evidence.
+- First-attempt exact-tag run `{proof['workflow']['run_id']}` passed every reviewed
+  native job at the release commit. The archived workflow source disables tag caches.
+- Canonical job/source evidence is embedded in the proof: {proof['scans']['proof_bytes']}
+  bytes, SHA-256 `{proof['job_evidence']['sha256']}`.
+- A fresh credential-free detached public clone reproduced the annotated tag,
+  peeled commit, and release manifest checks.
+- GitHub release `{proof['release']['id']}` read back immutable/latest, non-draft,
+  non-prerelease, with exact reviewed body and certification asset.
 
-The real WSL, redirected-Windows, divergent Windows Terminal, physical-Linux,
-Apple-Silicon owner-host, and visual rows remain explicit residual evidence gaps
-in `tests/MANUAL.md`; publication did not mark them complete.
+Unexecuted owner-host and manual visual checks remain residual evidence; publication
+never marks them complete. See the proof's `residual_evidence` list.
 """
 
 
@@ -1217,106 +1005,6 @@ def render_closure(root: pathlib.Path, proof: dict[str, Any], asset_sha256: str)
         fail("candidate release notes lost the publication evidence gate")
     notes = notes[:evidence_start] + closure_evidence(proof)
     write_text(notes_path, notes.rstrip() + "\n")
-
-    readme_path = root / "README.md"
-    readme = readme_path.read_text(encoding="utf-8")
-    candidate = re.compile(
-        rf"Once published, the `{re.escape(tag)}` release path accepts only the exact clean official\n"
-        r"annotated tag whose observed tag object and peeled commit will be recorded in\n"
-        r"the supply-chain ledger\. The local tag object, peeled commit, HEAD, and one\n"
-        r"isolated official-remote advertisement must all agree\."
-    )
-    replacement = (
-        f"The published `{tag}` release path accepts only the exact clean official\n"
-        f"annotated tag object `{proof['tag_object']}`, which\n"
-        f"peels to commit `{proof['commit']}` as recorded\n"
-        "in the supply-chain ledger."
-    )
-    readme, count = candidate.subn(replacement, readme)
-    if count != 1:
-        fail("README candidate identity paragraph did not match exactly once")
-    write_text(readme_path, readme)
-
-    manual_path = root / "tests/MANUAL.md"
-    manual = manual_path.read_text(encoding="utf-8")
-    candidate_manual = (
-        f"> Release candidate status: `{tag}` identities are recorded only after every\n"
-        "> deterministic publication gate passes."
-    )
-    published_manual = (
-        f"> Release status ({proof['release']['published_at'][:10]}): immutable/latest GitHub release `{proof['release']['id']}`\n"
-        f"> binds annotated tag object `{proof['tag_object']}`\n"
-        f"> to peeled commit `{proof['commit']}`."
-    )
-    manual = replace_exact(manual, candidate_manual, published_manual, count=1)
-    write_text(manual_path, manual)
-
-    upgrading_path = root / "docs/UPGRADING.md"
-    upgrading = upgrading_path.read_text(encoding="utf-8")
-    start = upgrading.find(f"## {tag} release evidence gate")
-    end = upgrading.find(f"## {previous} release evidence", start)
-    if start < 0 or end <= start:
-        fail("upgrade guide candidate evidence gate is not bounded by the previous release")
-    completed = f"## {tag} release evidence\n\n{tag} was published on {proof['release']['published_at'][:10]}.\n\n" + closure_evidence(proof).removeprefix("## Publication evidence\n\n") + "\n"
-    write_text(upgrading_path, upgrading[:start] + completed + upgrading[end:])
-
-    supply_path = root / "docs/security/supply-chain.md"
-    supply = supply_path.read_text(encoding="utf-8")
-    candidate_lines = [line for line in supply.splitlines() if line.startswith(f"| v0.1.0 to {tag} release-candidate sources |")]
-    if len(candidate_lines) != 1:
-        fail("supply-chain candidate release-source row is ambiguous")
-    published_row = (
-        f"| v0.1.0 to {tag} release sources | v0.1.0 tag object "
-        "`a3b4d6d7b6d289959cac68d76faec96219b3e310`, peeled commit "
-        "`015617362830280bf85c7142e69d0681d376d453`; "
-        f"{tag} tag object `{proof['tag_object']}`, peeled commit `{proof['commit']}` | "
-        "Both migrators require the exact local/official annotated-tag mapping before mutation, "
-        "then archive the exact commits into private recovery, fingerprint the extracted trees, "
-        "and bind apply/readback/rollback to those frozen sources. A branch, missing/lightweight/moved "
-        "tag, or retained-checkout drift cannot authorize or change a transaction write. |"
-    )
-    write_text(supply_path, supply.replace(candidate_lines[0], published_row, 1))
-
-    migration_path = root / "docs/MIGRATION_STATUS.md"
-    migration = migration_path.read_text(encoding="utf-8")
-    candidate_start = migration.find(f"The {tag} candidate keeps")
-    old_published = migration.find(f"The annotated {previous} release was published", candidate_start)
-    if candidate_start < 0 or old_published <= candidate_start:
-        fail("migration candidate ledger paragraph is not bounded by the previous release")
-    published = (
-        f"The annotated {tag} release was published on {proof['release']['published_at'][:10]} after its exact local,\n"
-        "hosted cache-free, release-range/proof scan, fresh detached public-clone, and\n"
-        f"immutable-release gates passed. Cache-free run `{proof['workflow']['run_id']}` passed all four\n"
-        f"producers and logical proofs; GitHub release `{proof['release']['id']}` is immutable/latest.\n\n"
-    )
-    write_text(migration_path, migration[:candidate_start] + published + migration[old_published:])
-
-    roadmap_path = root / "ROADMAP.md"
-    roadmap = roadmap_path.read_text(encoding="utf-8")
-    roadmap = replace_exact(
-        roadmap,
-        f"{previous} published; {tag} release preparation in progress.",
-        f"{previous} and {tag} published.",
-        count=1,
-    )
-    pattern = re.compile(
-        rf"(?m)^(\d+)\. IN PROGRESS - Prepare, merge, tag, certify, and publish {re.escape(tag)} from the\n"
-        r"    exact reviewed release tree using the manifest-bound automation; record only\n"
-        r"    observed tag, workflow, proof, scan, clone, and immutable-release identities\."
-    )
-    roadmap, count = pattern.subn(
-        lambda match: (
-            f"{match.group(1)}. DONE - Pull request #{proof['preparation']['pull_request']} merged the reviewed "
-            f"{tag} preparation tree to\n    `{proof['commit']}`; annotated tag object `{proof['tag_object']}`, "
-            f"cache-free run\n    `{proof['workflow']['run_id']}`, release-range/proof scans, a fresh detached public clone,\n"
-            f"    and immutable/latest GitHub release `{proof['release']['id']}` passed their exact\n"
-            "    manifest-bound identity gates."
-        ),
-        roadmap,
-    )
-    if count != 1:
-        fail("release roadmap in-progress entry did not match exactly once")
-    write_text(roadmap_path, roadmap)
 
     proof["certification_asset"] = {
         "name": "release-proof.json",
@@ -1413,7 +1101,7 @@ def resume_publication_closure(
         certification = load_json(asset_path)
         if (
             not isinstance(certification, dict)
-            or certification.get("schema") != 1
+            or certification.get("schema") != manifest["schema"]
             or certification.get("kind") != "pre-publication-certification"
             or certification.get("repository") != manifest["repository"]
             or certification.get("tag") != current["tag"]
@@ -1441,7 +1129,7 @@ def resume_publication_closure(
 
 
 def publish(args: argparse.Namespace) -> None:
-    for tool in ("gh", "git", "gitleaks", "make", "nix"):
+    for tool in ("gh", "git", "gitleaks", "make", "python3"):
         require_tool(tool)
     manifest = validate_manifest(ROOT)
     current = manifest["current"]
@@ -1488,16 +1176,9 @@ def publish(args: argparse.Namespace) -> None:
     )
     tag_object = verify_or_publish_tag(manifest, current["tag"], expected_sha)
     run_record = select_release_run(manifest, current["tag"], expected_sha, args.run_id)
-    verify_release_jobs(manifest, run_record["databaseId"], expected_sha, current["tag"])
     with tempfile.TemporaryDirectory(prefix="dotfiles-release-publication.") as temporary_name:
         temporary = pathlib.Path(temporary_name)
-        logical = verify_downloaded_proofs(
-            manifest,
-            run_record["databaseId"],
-            run_record["attempt"],
-            expected_sha,
-            temporary / "proofs",
-        )
+        evidence = archive_release_jobs(manifest, run_record, expected_sha, current["tag"], temporary / "proofs")
         verify_public_clone(manifest, current["tag"], tag_object, expected_sha)
         notes = (ROOT / current["notes"]).read_text(encoding="utf-8")
         body = release_body(notes)
@@ -1507,7 +1188,7 @@ def publish(args: argparse.Namespace) -> None:
             tag_object,
             expected_sha,
             run_record,
-            logical,
+            evidence,
             0,
         )
         draft, _proof_path, asset_sha256 = ensure_draft_release(

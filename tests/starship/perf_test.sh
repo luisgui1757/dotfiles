@@ -36,17 +36,5 @@ JSON_OUT="$TMP_REPO/hyperfine.json"
         "starship prompt --jobs 0 --status 0 --cmd-duration 0" >/dev/null
 )
 
-# Mean is in seconds in hyperfine JSON.
-mean_ms=$(python3 -c "
-import json
-with open('$JSON_OUT') as f:
-    d = json.load(f)
-print(int(d['results'][0]['mean'] * 1000))
-")
-
-echo "starship prompt mean = ${mean_ms}ms (budget ${budget_ms}ms)"
-if [[ "$mean_ms" -gt "$budget_ms" ]]; then
-    echo "FAIL: prompt mean ${mean_ms}ms exceeds budget ${budget_ms}ms"
-    exit 1
-fi
-echo "OK"
+# Compare the unrounded wall-clock measurement from either supported schema.
+python3 "$REPO_ROOT/tests/starship/check_perf.py" "$JSON_OUT" "$budget_ms"

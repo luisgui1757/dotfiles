@@ -1,109 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
-cd "$REPO_ROOT"
-
+cd "$(dirname "${BASH_SOURCE[0]}")/../.."
 python3 - <<'PY'
-from pathlib import Path
-
-active = {
-    "flake.nix": Path("flake.nix").read_text(encoding="utf-8"),
-    "setup.sh": Path("setup.sh").read_text(encoding="utf-8"),
-    "setup.ps1": Path("setup.ps1").read_text(encoding="utf-8"),
-    "POSIX dependencies": Path("install-deps.sh").read_text(encoding="utf-8"),
-    "Windows dependencies": Path("install-deps.ps1").read_text(encoding="utf-8"),
-    "Nix prerequisite installer": Path("scripts/install-nix-prerequisite.sh").read_text(encoding="utf-8"),
-    "release migrator": Path("scripts/upgrade-v0.1.0.sh").read_text(encoding="utf-8"),
-    "Windows release migrator": Path("scripts/upgrade-v0.1.0.ps1").read_text(encoding="utf-8"),
-    "pinned chezmoi installer": Path("scripts/install-pinned-chezmoi.sh").read_text(encoding="utf-8"),
-    "test workflow": Path(".github/workflows/test.yml").read_text(encoding="utf-8"),
-    "nix workflow": Path(".github/workflows/nix.yml").read_text(encoding="utf-8"),
-    "e2e workflow": Path(".github/workflows/e2e-install.yml").read_text(encoding="utf-8"),
-    "README": Path("README.md").read_text(encoding="utf-8"),
-    "upgrade guide": Path("docs/UPGRADING.md").read_text(encoding="utf-8"),
-    "release notes": Path("docs/releases/v0.4.4.md").read_text(encoding="utf-8"),
-    "supply-chain guide": Path("docs/security/supply-chain.md").read_text(encoding="utf-8"),
-    "safeguard guide": Path("docs/security/branch-protection.md").read_text(encoding="utf-8"),
-}
-for path in sorted(Path("nix").rglob("*.nix")):
-    active[f"Nix module {path}"] = path.read_text(encoding="utf-8")
-
-for name, text in active.items():
-    for retired in (
-        "dotfiles-x86_64",
-        "x86_64-darwin",
-        "macos-26-intel",
-        "macos-intel",
-        "Darwin:x86_64",
-        "CHEZMOI_DARWIN_X86_64_SHA256",
-        "Intel macOS",
-    ):
-        if retired in text:
-            raise SystemExit(f"FAIL: {name} still contains removed macOS architecture contract {retired}")
-
-flake = active["flake.nix"]
-for supported in ("aarch64-darwin", "aarch64-linux", "x86_64-linux"):
-    if supported not in flake:
-        raise SystemExit(f"FAIL: flake.nix lost supported system {supported}")
-
-setup = active["setup.sh"]
-if "macOS setup requires Apple Silicon (arm64)" not in setup:
-    raise SystemExit("FAIL: setup.sh does not enforce the Apple-Silicon-only contract")
-
-if "Darwin:arm64|Darwin:aarch64" not in active["pinned chezmoi installer"]:
-    raise SystemExit("FAIL: pinned chezmoi installer lost Apple Silicon support")
-
-for name in ("nix workflow", "e2e workflow"):
-    text = active[name]
-    if "cachix/install-nix-action" in text:
-        raise SystemExit(f"FAIL: {name} retains the removed alternate-architecture Nix bootstrap action")
-    if text.count("DeterminateSystems/nix-installer-action@") != 1:
-        raise SystemExit(f"FAIL: {name} must use exactly one pinned Determinate Nix action")
-
-e2e = active["e2e workflow"]
-for required in (
-    "Checkout exact POSIX Nix bootstrap source",
-    "Bootstrap Nix from a bare POSIX runner",
-    "if command -v nix >/dev/null 2>&1 || [[ -e /nix ]]",
-    "./scripts/install-nix-prerequisite.sh --install",
-    "github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository",
-):
-    if required not in e2e:
-        raise SystemExit(f"FAIL: e2e POSIX Nix bootstrap proof is missing {required}")
-if e2e.index("Bootstrap Nix from a bare POSIX runner") > e2e.index("Run setup.sh end-to-end"):
-    raise SystemExit("FAIL: required POSIX setup proof runs before the bare Nix bootstrap")
-
-if Path(".github/workflows/wsl2-canary.yml").exists():
-    raise SystemExit("FAIL: unsupported optional WSL2 hosted canary was not retired")
-
-print("OK: macOS is Apple-Silicon-only with no active x86_64 product path; the unsupported WSL hosted canary is retired")
+import json,pathlib
+pins=json.loads(pathlib.Path("installer/archive-pins.json").read_text())["resources"]
+assert all(key != "darwin/amd64" for targets in pins.values() for key in targets)
+bootstrap=pathlib.Path("scripts/installer-bootstrap.sh").read_text()
+assert "darwin-arm64" in bootstrap
+assert "darwin-amd64" not in bootstrap
+for workflow in pathlib.Path(".github/workflows").glob("*.yml"):
+    text=workflow.read_text()
+    assert "macos-26-intel" not in text, workflow
+print("OK: active macOS provisioning supports Apple Silicon only")
 PY
-
-work="$(mktemp -d)"
-trap 'rm -rf "$work"' EXIT
-cat > "$work/uname" <<'EOF'
-#!/usr/bin/env bash
-case "${1:-}" in
-    -s) echo Darwin ;;
-    -m) echo x86_64 ;;
-    *) echo Darwin ;;
-esac
-EOF
-chmod +x "$work/uname"
-
-if output="$(PATH="$work:/usr/bin:/bin" CHEZMOI_VERSION=v2.71.0 \
-    scripts/install-pinned-chezmoi.sh "$work/bin" 2>&1)"; then
-    echo "FAIL: pinned chezmoi installer accepted a removed macOS architecture" >&2
-    exit 1
-fi
-[[ "$output" == *"FAIL: unsupported chezmoi release platform: Darwin/x86_64"* ]] || {
-    echo "FAIL: pinned chezmoi installer did not fail at the platform boundary" >&2
-    printf '%s\n' "$output" >&2
-    exit 1
-}
-[[ ! -e "$work/bin/chezmoi" ]] || {
-    echo "FAIL: pinned chezmoi installer published bytes for a removed macOS architecture" >&2
-    exit 1
-}
-echo "OK: pinned chezmoi installer rejects removed macOS architectures before download"

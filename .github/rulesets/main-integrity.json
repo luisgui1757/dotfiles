@@ -5,7 +5,9 @@
   "bypass_actors": [],
   "conditions": {
     "ref_name": {
-      "include": ["refs/heads/main"],
+      "include": [
+        "refs/heads/main"
+      ],
       "exclude": []
     }
   },
@@ -18,7 +20,9 @@
         "require_code_owner_review": false,
         "require_last_push_approval": false,
         "required_review_thread_resolution": false,
-        "allowed_merge_methods": ["squash"]
+        "allowed_merge_methods": [
+          "squash"
+        ]
       }
     },
     {
@@ -40,39 +44,83 @@
             "integration_id": 15368
           },
           {
-            "context": "chezmoi-parity",
+            "context": "core (ubuntu-26.04)",
             "integration_id": 15368
           },
           {
-            "context": "chezmoi-parity-macos",
+            "context": "core (ubuntu-26.04-arm)",
             "integration_id": 15368
           },
           {
-            "context": "chezmoi-parity-windows",
+            "context": "core (macos-26)",
             "integration_id": 15368
           },
           {
-            "context": "nix flake check / linux",
+            "context": "core (windows-2025)",
             "integration_id": 15368
           },
           {
-            "context": "nix flake check / macos",
+            "context": "Fresh Homebrew (macOS arm64)",
             "integration_id": 15368
           },
           {
-            "context": "e2e containers / linux",
+            "context": "Fresh Debian APT (amd64)",
             "integration_id": 15368
           },
           {
-            "context": "setup.sh / linux",
+            "context": "Fresh Debian APT (arm64)",
             "integration_id": 15368
           },
           {
-            "context": "setup.sh / macos",
+            "context": "Fresh Ubuntu APT (amd64)",
             "integration_id": 15368
           },
           {
-            "context": "setup.ps1 / windows",
+            "context": "Fresh Ubuntu APT (arm64)",
+            "integration_id": 15368
+          },
+          {
+            "context": "Missing Apple developer tools (macOS arm64)",
+            "integration_id": 15368
+          },
+          {
+            "context": "Fresh Windows vendor (VC-runtime)",
+            "integration_id": 15368
+          },
+          {
+            "context": "Fresh Windows vendor (Build-Tools)",
+            "integration_id": 15368
+          },
+          {
+            "context": "Neovim lifecycle (ubuntu-26.04)",
+            "integration_id": 15368
+          },
+          {
+            "context": "Neovim lifecycle (ubuntu-26.04-arm)",
+            "integration_id": 15368
+          },
+          {
+            "context": "Neovim lifecycle (macos-26)",
+            "integration_id": 15368
+          },
+          {
+            "context": "Neovim lifecycle (windows-2025)",
+            "integration_id": 15368
+          },
+          {
+            "context": "Desktop lifecycle (ubuntu-26.04)",
+            "integration_id": 15368
+          },
+          {
+            "context": "Desktop lifecycle (ubuntu-26.04-arm)",
+            "integration_id": 15368
+          },
+          {
+            "context": "Desktop lifecycle (macos-26)",
+            "integration_id": 15368
+          },
+          {
+            "context": "Desktop lifecycle (windows-2025)",
             "integration_id": 15368
           }
         ]

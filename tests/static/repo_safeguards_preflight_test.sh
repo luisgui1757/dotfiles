@@ -10,12 +10,10 @@ trap 'rm -rf "$WORK"' EXIT
 fixture="$WORK/repo"
 mkdir -p "$fixture/scripts" "$fixture/.github/rulesets" "$fixture/.github/workflows"
 cp "$REPO_ROOT/scripts/apply-repo-safeguards.sh" "$fixture/scripts/"
-cp "$REPO_ROOT/scripts/ci-logical-proof.sh" "$fixture/scripts/"
 cp "$REPO_ROOT/.github/check-identities.json" "$fixture/.github/"
 cp "$REPO_ROOT/.github/settings.yml" "$fixture/.github/"
 cp "$REPO_ROOT/.github/rulesets/"*.json "$fixture/.github/rulesets/"
-cp "$REPO_ROOT/.github/workflows/e2e-install.yml" "$fixture/.github/workflows/"
-cp "$REPO_ROOT/.github/workflows/nix.yml" "$fixture/.github/workflows/"
+cp "$REPO_ROOT/.github/workflows/installer-engine.yml" "$fixture/.github/workflows/"
 cp "$REPO_ROOT/.github/workflows/test.yml" "$fixture/.github/workflows/"
 (
     cd "$fixture"
@@ -83,7 +81,7 @@ make_state() {
         secret_scanning_push_protection: {status: "enabled"}
       }
     }' > "$state/repository.json"
-    jq -n '{enabled: true, allowed_actions: "all", sha_pinning_required: false}' > "$state/actions.json"
+    jq -n '{enabled: true, allowed_actions: "all", sha_pinning_required: true}' > "$state/actions.json"
     jq --slurpfile identities "$fixture/.github/check-identities.json" '
       (.rules[] | select(.type == "required_status_checks").parameters.required_status_checks) =
         ($identities[0].legacyEmitted | map({context: ., integration_id: 15368}))
@@ -105,46 +103,17 @@ make_state() {
       repository: {full_name: "owner/repo"}
     }]}' > "$state/test-runs.json"
     jq -n --arg sha "$fixture_head" '{workflow_runs: [{
-      id: 202, run_number: 1, event: "push", status: "completed", conclusion: "success",
-      head_branch: "main", head_sha: $sha, path: ".github/workflows/nix.yml",
-      repository: {full_name: "owner/repo"}
-    }]}' > "$state/nix-runs.json"
-    jq -n --arg sha "$fixture_head" '{workflow_runs: [{
       id: 203, run_number: 1, event: "workflow_dispatch", status: "completed", conclusion: "success",
-      head_branch: "main", head_sha: $sha, path: ".github/workflows/e2e-install.yml",
+      head_branch: "main", head_sha: $sha, path: ".github/workflows/installer-engine.yml",
       repository: {full_name: "owner/repo"}
-    }]}' > "$state/e2e-install-runs.json"
-
-    write_jobs "$state/test-jobs.json" \
-        ubuntu macos windows chezmoi-parity chezmoi-parity-macos chezmoi-parity-windows
-    write_jobs "$state/nix-jobs.json" \
-        "nix flake check (ubuntu-24.04)" "nix flake check (macos-26)" \
-        "nix flake check / linux" "nix flake check / macos"
-    write_jobs "$state/e2e-jobs.json" \
-        "e2e containers / ubuntu-24.04" "setup.sh / ubuntu-24.04" \
-        "setup.sh / macos-26" "setup.ps1 / windows-2025" \
-        "e2e containers / linux" "setup.sh / linux" \
-        "setup.sh / macos" "setup.ps1 / windows"
-    jq '
-      .jobs |= map(
-        if (.name == "setup.sh / ubuntu-24.04" or
-            .name == "setup.sh / macos-26" or
-            .name == "setup.ps1 / windows-2025")
-        then .steps = [{name: "PR-only cache: fixture", conclusion: "skipped"}]
-        else . end)
-    ' "$state/e2e-jobs.json" > "$state/e2e-jobs.tmp"
-    mv "$state/e2e-jobs.tmp" "$state/e2e-jobs.json"
+    }]}' > "$state/installer-engine-runs.json"
+    write_jobs "$state/test-jobs.json" ubuntu macos windows
+    jq '{jobs: [.required[] | select(. != "ubuntu" and . != "macos" and . != "windows") | {name: ., status: "completed", conclusion: "success", steps: []}]}' \
+        "$fixture/.github/check-identities.json" > "$state/engine-jobs.json"
 
     {
-        printf '%s\n' ubuntu macos windows chezmoi-parity chezmoi-parity-macos chezmoi-parity-windows \
-            | jq -Rn '[inputs | {name: ., run_id: 201}]'
-        printf '%s\n' "nix flake check (ubuntu-24.04)" "nix flake check (macos-26)" \
-            "nix flake check / linux" "nix flake check / macos" \
-            | jq -Rn '[inputs | {name: ., run_id: 202}]'
-        printf '%s\n' "e2e containers / ubuntu-24.04" "setup.sh / ubuntu-24.04" \
-            "setup.sh / macos-26" "setup.ps1 / windows-2025" \
-            "e2e containers / linux" "setup.sh / linux" "setup.sh / macos" "setup.ps1 / windows" \
-            | jq -Rn '[inputs | {name: ., run_id: 203}]'
+        printf '%s\n' ubuntu macos windows | jq -Rn '[inputs | {name: ., run_id: 201}]'
+        jq '[.jobs[] | {name, run_id: 203}]' "$state/engine-jobs.json"
     } | jq -s --arg repo owner/repo '
       add | {check_runs: map({
         name,
@@ -315,11 +284,9 @@ case "$path" in
     repos/owner/repo/vulnerability-alerts|repos/owner/repo/automated-security-fixes) exit 0 ;;
     repos/owner/repo/commits/*/check-runs*) file="$state/check-runs.json" ;;
     repos/owner/repo/actions/workflows/test.yml/runs*) file="$state/test-runs.json" ;;
-    repos/owner/repo/actions/workflows/nix.yml/runs*) file="$state/nix-runs.json" ;;
-    repos/owner/repo/actions/workflows/e2e-install.yml/runs*) file="$state/e2e-install-runs.json" ;;
+    repos/owner/repo/actions/workflows/installer-engine.yml/runs*) file="$state/installer-engine-runs.json" ;;
     repos/owner/repo/actions/runs/201/jobs*) file="$state/test-jobs.json" ;;
-    repos/owner/repo/actions/runs/202/jobs*) file="$state/nix-jobs.json" ;;
-    repos/owner/repo/actions/runs/203/jobs*) file="$state/e2e-jobs.json" ;;
+    repos/owner/repo/actions/runs/203/jobs*) file="$state/engine-jobs.json" ;;
     *) echo "unexpected read: $path" >&2; exit 94 ;;
 esac
 
@@ -420,26 +387,25 @@ expect_failure "exact three unique active repository rulesets" \
 echo "ok  : duplicate rulesets fail before mutation"
 
 state="$(new_case_state wrong-app)"
-jq '(.check_runs[] | select(.name == "setup.sh / linux").app.id) = 999' \
+jq '(.check_runs[] | select(.name == "core (ubuntu-26.04)").app.id) = 999' \
     "$state/check-runs.json" > "$state/check-runs.tmp"
 mv "$state/check-runs.tmp" "$state/check-runs.json"
 expect_failure "not uniquely bound to GitHub Actions app 15368" \
     run_safeguards "$state" "$mutation_log" --preflight-only
 
 state="$(new_case_state wrong-event)"
-jq '.workflow_runs[0].event = "pull_request"' "$state/e2e-install-runs.json" > "$state/e2e.tmp"
-mv "$state/e2e.tmp" "$state/e2e-install-runs.json"
-expect_failure "no successful .github/workflows/e2e-install.yml run with allowed event provenance" \
+jq '.workflow_runs[0].event = "pull_request"' "$state/installer-engine-runs.json" > "$state/e2e.tmp"
+mv "$state/e2e.tmp" "$state/installer-engine-runs.json"
+expect_failure "no successful .github/workflows/installer-engine.yml run with allowed event provenance" \
     run_safeguards "$state" "$mutation_log" --preflight-only
 
-state="$(new_case_state cached-e2e)"
-jq '(.jobs[] | select(.name == "setup.sh / linux") | .steps) = [{name: "PR-only cache: fixture", conclusion: "success"}]' \
-    "$state/e2e-jobs.json" > "$state/e2e.tmp"
-mv "$state/e2e.tmp" "$state/e2e-jobs.json"
-expect_failure "did not skip every broad actions/cache step" \
+state="$(new_case_state disabled-sha-pinning)"
+jq '.sha_pinning_required = false' "$state/actions.json" > "$state/actions.tmp"
+mv "$state/actions.tmp" "$state/actions.json"
+expect_failure "required contexts must coincide with sha_pinning_required=true" \
     run_safeguards "$state" "$mutation_log" --preflight-only
-[[ ! -s "$mutation_log" ]] || { echo "FAIL: provenance failure mutated live state" >&2; exit 1; }
-echo "ok  : wrong app, event, and cache provenance fail before mutation"
+
+echo "ok  : wrong app, event, and disabled action SHA pinning fail before mutation"
 
 state="$(new_case_state unexpected-contexts)"
 jq 'del(.required_status_checks.contexts[-1], .required_status_checks.checks[-1])' \
@@ -506,7 +472,7 @@ jq -e '
   [.rules[] | select(.type == "required_status_checks") |
     .parameters.required_status_checks[].context] == $stable
 ' --argjson stable "$stable_contexts_json" "$WORK/published-integrity.json" >/dev/null
-jq -e '.sha_pinning_required == false' "$state/actions.json" >/dev/null
+jq -e '.sha_pinning_required == true' "$state/actions.json" >/dev/null
 jq -e '
   [.rules[] | select(.type == "required_status_checks") |
     .parameters.required_status_checks[].context] == $legacy
@@ -521,7 +487,7 @@ TEST_MUTATE_APPLY_SOURCE_AFTER_POSTFLIGHT_BOUNDARY="$fixture/.github/rulesets/ma
     expect_failure "reviewed safeguard/proof sources differ from exact live main" \
     run_safeguards "$state" "$mutation_log"
 cp "$WORK/postflight-integrity.backup" "$fixture/.github/rulesets/main-integrity.json"
-jq -e '.sha_pinning_required == false' "$state/actions.json" >/dev/null
+jq -e '.sha_pinning_required == true' "$state/actions.json" >/dev/null
 jq -e '
   [.rules[] | select(.type == "required_status_checks") |
     .parameters.required_status_checks[].context] == $legacy
@@ -548,9 +514,9 @@ grep -Fx "PATCH repos/owner/repo/branches/main/protection/required_status_checks
     exit 1
 }
 jq -e '.sha_pinning_required == true' "$state/actions.json" >/dev/null
-jq -e '[.rules[] | select(.type == "required_status_checks") | .parameters.required_status_checks[].context] | index("setup.sh / linux") != null' \
+jq -e '[.rules[] | select(.type == "required_status_checks") | .parameters.required_status_checks[].context] | index("core (ubuntu-26.04)") != null' \
     "$state/integrity.json" >/dev/null
-jq -e '.required_status_checks.contexts | index("setup.sh / linux") != null' "$state/classic.json" >/dev/null
+jq -e '.required_status_checks.contexts | index("core (ubuntu-26.04)") != null' "$state/classic.json" >/dev/null
 jq -e '
   .required_signatures.enabled == false
   and .block_creations.enabled == false
@@ -748,7 +714,7 @@ expect_restore_rejected_without_mutation \
 
 altered_actions_snapshot="$WORK/altered-actions-snapshot"
 cp -R "$snapshot" "$altered_actions_snapshot"
-jq '.sha_pinning_required = true' "$altered_actions_snapshot/actions-restore.json" \
+jq '.sha_pinning_required = false' "$altered_actions_snapshot/actions-restore.json" \
     > "$altered_actions_snapshot/actions-restore.tmp"
 mv "$altered_actions_snapshot/actions-restore.tmp" \
     "$altered_actions_snapshot/actions-restore.json"
@@ -839,7 +805,7 @@ echo "ok  : restore writes only private frozen bytes after validation"
 
 : > "$mutation_log"
 run_safeguards "$state" "$mutation_log" --restore "$snapshot" >/dev/null
-jq -e '.sha_pinning_required == false' "$state/actions.json" >/dev/null
+jq -e '.sha_pinning_required == true' "$state/actions.json" >/dev/null
 jq -e '.required_status_checks.contexts == $legacy' --argjson legacy "$legacy_contexts_json" "$state/classic.json" >/dev/null
 echo "ok  : explicit recovery restores and verifies the complete prior cutover state"
 
@@ -875,7 +841,7 @@ rc=$?
 set -e
 [[ "$rc" -ne 0 ]] || { echo "FAIL: injected apply failure succeeded" >&2; exit 1; }
 grep -F "previous three-resource cutover state was restored" <<<"$output" >/dev/null
-jq -e '.sha_pinning_required == false' "$state/actions.json" >/dev/null
+jq -e '.sha_pinning_required == true' "$state/actions.json" >/dev/null
 jq -e '.required_status_checks.contexts == $legacy' --argjson legacy "$legacy_contexts_json" "$state/classic.json" >/dev/null
 echo "ok  : partial apply failure automatically restores the prior valid state"
 
@@ -896,7 +862,40 @@ recovery_snapshot="$(find "$fixture/.git/dotfiles-safeguards" -mindepth 1 -maxde
 }
 : > "$mutation_log"
 run_safeguards "$state" "$mutation_log" --restore "$recovery_snapshot" >/dev/null
-jq -e '.sha_pinning_required == false' "$state/actions.json" >/dev/null
+jq -e '.sha_pinning_required == true' "$state/actions.json" >/dev/null
 echo "ok  : rollback failure is explicit and the retained snapshot recovers on retry"
+
+# A stored schema-1 transaction against the historical schema-2 check policy
+# remains restorable after the new runtime policy ships.
+historical_snapshot="$WORK/historical-snapshot"
+cp -R "$snapshot" "$historical_snapshot"
+cp "$REPO_ROOT/tests/static/fixtures/check-identities-v2.json" "$fixture/.github/check-identities.json"
+jq --slurpfile identities "$fixture/.github/check-identities.json" '
+  (.rules[] | select(.type == "required_status_checks").parameters.required_status_checks) =
+    ($identities[0].required | map({context: ., integration_id: 15368}))
+' "$fixture/.github/rulesets/main-integrity.json" > "$WORK/historical-integrity.json"
+cp "$WORK/historical-integrity.json" "$fixture/.github/rulesets/main-integrity.json"
+git -C "$fixture" add .github/check-identities.json .github/rulesets/main-integrity.json
+git -C "$fixture" commit -qm historical-policy-fixture
+historical_sha="$(git -C "$fixture" rev-parse HEAD)"
+jq -n --arg sha "$historical_sha" '{sha: $sha}' > "$state/live-main.json"
+jq --arg sha "$historical_sha" '.schema = 1 | .live_main_sha = $sha | .stage = "legacy" | .proof_runs = {test: 201, nix: 202, e2e_cache_free: 203}' \
+    "$historical_snapshot/manifest.json" > "$WORK/historical-manifest.json"
+cp "$WORK/historical-manifest.json" "$historical_snapshot/manifest.json"
+jq '.sha_pinning_required = false' "$historical_snapshot/actions-restore.json" > "$WORK/historical-actions.json"
+cp "$WORK/historical-actions.json" "$historical_snapshot/actions-restore.json"
+jq --slurpfile identities "$fixture/.github/check-identities.json" '
+  (.rules[] | select(.type == "required_status_checks").parameters.required_status_checks) =
+    ($identities[0].legacyEmitted | map({context: ., integration_id: 15368}))
+' "$WORK/historical-integrity.json" > "$historical_snapshot/integrity-restore.json"
+historical_contexts="$(jq -c .legacyEmitted "$fixture/.github/check-identities.json")"
+write_classic_state "$historical_contexts" "$historical_snapshot/classic-live.json"
+jq '.required_status_checks | {strict, contexts, checks}' "$historical_snapshot/classic-live.json" \
+    > "$historical_snapshot/classic-restore.json"
+: > "$mutation_log"
+run_safeguards "$state" "$mutation_log" --restore "$historical_snapshot" >/dev/null
+jq -e '.sha_pinning_required == false' "$state/actions.json" >/dev/null
+jq -e --argjson expected "$historical_contexts" '.required_status_checks.contexts == $expected' "$state/classic.json" >/dev/null
+echo "ok  : historical schema-2 policy snapshots retain their exact original restore contract"
 
 echo "all repository safeguard preflight and transaction behaviors OK"
