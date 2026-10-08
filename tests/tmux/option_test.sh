@@ -11,11 +11,7 @@ fi
 session_name="dotfiles-opt-$$"
 sock_name="dotfiles-opt-$$"
 
-# Hermetic HOME so the baseline check below is real: tmux.conf does
-# `source-file -q ~/.tmux.posix.conf`, and if the runner already has that
-# overlay deployed in its real HOME, the POSIX probes would rebind copy-mode `y`
-# and mask the OSC52 baseline we are asserting. An empty temp HOME guarantees the
-# overlay is absent; we source it explicitly later for the pbcopy assertion.
+# Isolate user plugins and deploy exactly the managed theme files.
 isolated_home="$(mktemp -d)"
 export HOME="$isolated_home"
 
@@ -24,6 +20,19 @@ cleanup() {
     rm -rf "$isolated_home"
 }
 trap cleanup EXIT
+
+for variant in main moon dawn; do
+    cp "$REPO_ROOT/tmux/rose-pine.$variant.conf" "$HOME/.tmux.rose-pine.$variant.conf"
+done
+
+# A migrated machine may retain TPM while the managed plugin attachment is
+# absent. Loading the new configuration must never execute that old manager.
+mkdir -p "$HOME/.local/share/dotfiles/tmux-plugins/tpm"
+cat > "$HOME/.local/share/dotfiles/tmux-plugins/tpm/tpm" <<'SH'
+#!/bin/sh
+: > "$HOME/legacy-tpm-ran"
+SH
+chmod +x "$HOME/.local/share/dotfiles/tmux-plugins/tpm/tpm"
 
 # Capture the config-load output. tmux WARNS-but-continues on an unknown option
 # (the option checks below still pass), which is exactly how a tmux 3.5+-only
@@ -56,23 +65,6 @@ check mouse on
 check escape-time 10
 check history-limit 50000
 check status-position top
-
-if grep -Eq 'source-file -q "~/' "$REPO_ROOT/tmux/tmux.conf"; then
-    echo "FAIL: tmux.conf must not quote ~/.tmux.* overlay paths; psmux does not reliably expand quoted tilde paths"
-    exit 1
-fi
-
-for required in \
-    "set -go @rosepine-variant 'main'" \
-    "source-file ~/.tmux.rose-pine.main.conf" \
-    "source-file ~/.tmux.rose-pine.moon.conf" \
-    "source-file ~/.tmux.rose-pine.dawn.conf" \
-    "set -g status-position top"; do
-    if ! grep -F "$required" "$REPO_ROOT/tmux/tmux.windows.conf" >/dev/null; then
-        echo "FAIL: tmux.windows.conf missing required Rose Pine source line: $required"
-        exit 1
-    fi
-done
 
 # Prefix isn't shown by show-options; verify via list-keys instead.
 if ! tmux -L "$sock_name" list-keys -T prefix >/dev/null 2>&1; then
@@ -113,50 +105,22 @@ if [[ "$order" != *"1:two 2:one"* ]]; then
     exit 1
 fi
 
-# Copy-mode `y` baseline. The session above booted with `-f tmux/tmux.conf`;
-# its bottom-of-file `source-file -q ~/.tmux.posix.conf` is a no-op under the
-# isolated HOME (the overlay is absent). So only the psmux-safe OSC52 baseline applies: `y`
-# must be bound to a BARE `copy-pipe-and-cancel` with NO pipe command after it.
-# The `$` anchor is load-bearing -- a probe rebind appends a pipe argument
-# (e.g. `... copy-pipe-and-cancel pbcopy`), and without the anchor this assertion
-# would pass even when the overlay had leaked in and masked the baseline.
-copy_keys="$(tmux -L "$sock_name" list-keys -T copy-mode-vi)"
-if ! printf '%s\n' "$copy_keys" | grep -Eq 'copy-mode-vi[[:space:]]+y[[:space:]]+send(-keys)?[[:space:]]+-X[[:space:]]+copy-pipe-and-cancel[[:space:]]*$'; then
-    echo "FAIL: copy-mode-vi y must be a BARE OSC52 copy-pipe-and-cancel (no pipe command)"
-    printf '%s\n' "$copy_keys" | grep -E 'copy-mode-vi[[:space:]]+y[[:space:]]' || true
-    exit 1
-fi
-echo "  copy-mode-vi y baseline bound (bare OSC52, no shell probe)"
-
-# Deploy the generated Rose Pine configs into the isolated HOME so the overlay's
-# `source-file ~/.tmux.rose-pine.main.conf` resolves (mirrors a real chezmoi
-# apply). This also lets us assert the Omer bar actually applies below.
-cp "$REPO_ROOT/tmux/psmux-rose-pine.main.conf" "$HOME/.tmux.rose-pine.main.conf"
-cp "$REPO_ROOT/tmux/psmux-rose-pine.moon.conf" "$HOME/.tmux.rose-pine.moon.conf"
-cp "$REPO_ROOT/tmux/psmux-rose-pine.dawn.conf" "$HOME/.tmux.rose-pine.dawn.conf"
-
-# Sourcing the POSIX overlay declares the functional plugins + session options,
+# Sourcing the POSIX config declares the functional plugins + session options,
 # sources the generated Rose Pine bar, and re-binds `y` to the platform's native
 # clipboard CLI. On macOS that is pbcopy; assert it there (Linux CI has no single
 # guaranteed CLI installed).
-tmux -L "$sock_name" source-file "$REPO_ROOT/tmux/tmux.posix.conf"
-posix_conf="$REPO_ROOT/tmux/tmux.posix.conf"
-for required in \
-    "set-environment -g TMUX_PLUGIN_MANAGER_PATH \"~/.local/share/dotfiles/tmux-plugins\"" \
-    "set -g @plugin 'tmux-plugins/tpm'" \
-    "set -g @plugin 'tmux-plugins/tmux-sensible'" \
-    "set -g @plugin 'tmux-plugins/tmux-yank'" \
-    "set -g @plugin 'tmux-plugins/tmux-resurrect'" \
-    "set -g @plugin 'tmux-plugins/tmux-continuum'" \
-    "run-shell \"\$HOME/.local/share/dotfiles/tmux-plugins/tpm/tpm\""; do
-    if ! grep -F "$required" "$posix_conf" >/dev/null; then
-        echo "FAIL: tmux.posix.conf missing required plugin line: $required"
-        exit 1
-    fi
-done
+posix_conf="$REPO_ROOT/tmux/tmux.conf"
+if [[ -e "$HOME/legacy-tpm-ran" ]] || grep -Eq 'TMUX_PLUGIN_MANAGER_PATH|@plugin|tmux-plugins/tpm' "$posix_conf"; then
+    echo "FAIL: current tmux configuration executes or references retired TPM"
+    exit 1
+fi
+if ! grep -Fx 'source-file -q ~/.tmux.plugins.conf' "$posix_conf" >/dev/null; then
+    echo "FAIL: tmux.conf must load its managed plugin attachment"
+    exit 1
+fi
 # rose-pine/tmux must be fully retired: the bar is a repo-owned generated config.
 if grep -F "rose-pine/tmux" "$posix_conf" >/dev/null; then
-    echo "FAIL: tmux.posix.conf must not reference rose-pine/tmux anymore"
+    echo "FAIL: tmux.conf must not reference rose-pine/tmux anymore"
     exit 1
 fi
 check @rosepine-variant main
@@ -165,21 +129,21 @@ check @resurrect-strategy-nvim session
 check @continuum-save-interval 15
 echo "  functional plugins + session save/restore configured"
 if [[ "$(uname -s)" == "Darwin" ]]; then
-    overlay_keys="$(tmux -L "$sock_name" list-keys -T copy-mode-vi)"
-    if ! printf '%s\n' "$overlay_keys" | grep -Eq 'copy-mode-vi[[:space:]]+y[[:space:]]+send.*copy-pipe-and-cancel.*pbcopy'; then
-        echo "FAIL: tmux.posix.conf overlay must rebind copy-mode-vi y to pbcopy on macOS"
+    config_keys="$(tmux -L "$sock_name" list-keys -T copy-mode-vi)"
+    if ! printf '%s\n' "$config_keys" | grep -Eq 'copy-mode-vi[[:space:]]+y[[:space:]]+send.*copy-pipe-and-cancel.*pbcopy'; then
+        echo "FAIL: tmux.conf config must rebind copy-mode-vi y to pbcopy on macOS"
         exit 1
     fi
-    echo "  tmux.posix.conf overlay rebinds y -> pbcopy on macOS"
+    echo "  tmux.conf config rebinds y -> pbcopy on macOS"
 fi
 
-# End-to-end: sourcing the overlay above pulled in the generated Rose Pine bar
+# End-to-end: sourcing the config above pulled in the generated Rose Pine bar
 # (variant main). Assert it actually applied the Omer-shaped bar (session pill
 # left, zoom-aware current window, directory pill right). This is the POSIX proof
 # that the generated artifact is not just byte-stable but valid tmux that applies.
 check status-style "fg=#908caa,bg=default"
 if ! show status-left | grep -q '#26233a'; then
-    echo "FAIL: Rose Pine main status-left must render the main overlay pill"; exit 1
+    echo "FAIL: Rose Pine main status-left must render the main config pill"; exit 1
 fi
 if ! show status-left | grep -q '#S'; then
     echo "FAIL: Rose Pine status-left must render the session pill (#S)"; exit 1
@@ -201,10 +165,10 @@ if [[ "$(show status-right)" != *' ' ]]; then
 fi
 echo "  generated Rose Pine bar applies (Omer-shaped pill bar)"
 
-# Live variant switch must PERSIST across repeated sourcing. The overlay uses
+# Live variant switch must PERSIST across repeated sourcing. The config uses
 # `set -go @rosepine-variant` (only-if-unset), so a user's `tmux set -g
-# @rosepine-variant moon` is NOT clobbered back to main every time the overlay is
-# re-sourced. Distinguish variants by the generated pill overlay color (main
+# @rosepine-variant moon` is NOT clobbered back to main every time the config is
+# re-sourced. Distinguish variants by the generated pill config color (main
 # #26233a vs moon #393552) because the status canvas uses bg=default so terminal
 # transparency can show through. Re-sourcing an already-set `-go` option makes
 # tmux `source-file` exit nonzero ("already set"), which is expected -- the
@@ -213,13 +177,13 @@ echo "  generated Rose Pine bar applies (Omer-shaped pill bar)"
 check @rosepine-variant main
 check status-style "fg=#908caa,bg=default"
 tmux -L "$sock_name" set -g @rosepine-variant moon
-tmux -L "$sock_name" source-file "$REPO_ROOT/tmux/tmux.posix.conf" || true
+tmux -L "$sock_name" source-file "$REPO_ROOT/tmux/tmux.conf" || true
 check @rosepine-variant moon
 check status-style "fg=#908caa,bg=default"
 if ! show status-left | grep -q '#393552'; then
-    echo "FAIL: moon variant must repaint the generated pill overlay"; exit 1
+    echo "FAIL: moon variant must repaint the generated pill config"; exit 1
 fi
-tmux -L "$sock_name" source-file "$REPO_ROOT/tmux/tmux.posix.conf" || true
+tmux -L "$sock_name" source-file "$REPO_ROOT/tmux/tmux.conf" || true
 if [[ "$(show @rosepine-variant)" != "moon" ]]; then
     echo "FAIL: @rosepine-variant snapped back to main on re-source (set -go regressed to set -g)"; exit 1
 fi
@@ -230,16 +194,12 @@ fi
 tmux -L "$sock_name" set -g @rosepine-variant main
 echo "  @rosepine-variant persists across repeated source (set -go, not clobbered)"
 
-# Prove the shared config's tilde overlay source lines actually load an overlay
-# from HOME. This catches quoted-tilde regressions that real tmux tolerates less
-# strictly than psmux, and prevents the Windows overlay from silently disappearing.
-printf '%s\n' 'set -g @dotfiles-test-windows-overlay loaded' > "$HOME/.tmux.windows.conf"
-tmux -L "$sock_name" source-file "$REPO_ROOT/tmux/tmux.conf"
-if [[ "$(tmux -L "$sock_name" show-options -gv @dotfiles-test-windows-overlay 2>/dev/null)" != "loaded" ]]; then
-    echo "FAIL: tmux.conf did not source ~/.tmux.windows.conf from HOME"
+# Obsolete Windows configuration must never be sourced, even if still present.
+printf '%s\n' 'set -g @dotfiles-test-windows-config loaded' > "$HOME/.tmux.windows.conf"
+tmux -L "$sock_name" source-file "$REPO_ROOT/tmux/tmux.conf" || true
+if tmux -L "$sock_name" show-options -gv @dotfiles-test-windows-config >/dev/null 2>&1; then
+    echo "FAIL: obsolete Windows config was sourced"
     exit 1
 fi
-rm -f "$HOME/.tmux.windows.conf"
-echo "  tmux.conf sources ~/.tmux.windows.conf from HOME"
 
 echo "OK"

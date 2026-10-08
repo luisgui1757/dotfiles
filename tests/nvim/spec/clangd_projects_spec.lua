@@ -14,10 +14,10 @@ local function write_compile_database(directory, source, define)
 end
 
 local function wait_for_clean_diagnostics(buffer)
-  local response = vim.lsp.buf_request_sync(buffer, "textDocument/documentSymbol", {
+  local response, request_error = vim.lsp.buf_request_sync(buffer, "textDocument/documentSymbol", {
     textDocument = { uri = vim.uri_from_bufnr(buffer) },
   }, 15000)
-  assert.is_not_nil(response, "clangd did not answer a document request")
+  assert.is_not_nil(response, "clangd did not answer a document request: " .. tostring(request_error))
   vim.wait(5000, function()
     return not vim.tbl_isempty(vim.lsp.get_clients({ bufnr = buffer }))
   end, 25)
@@ -55,9 +55,11 @@ describe("clangd project isolation", function()
     local old_config = vim.lsp.config
     local old_enable = vim.lsp.enable
     local captured
-    package.loaded["cmp_nvim_lsp"] = { default_capabilities = function()
-      return {}
-    end }
+    package.loaded["cmp_nvim_lsp"] = {
+      default_capabilities = function()
+        return {}
+      end,
+    }
     vim.lsp.config = function(name, config)
       if name == "clangd" then
         captured = vim.deepcopy(config)
@@ -77,6 +79,18 @@ describe("clangd project isolation", function()
 
     local buffers = {}
     local clients = {}
+    local exits = {}
+    local stderr = ""
+    local original_log_error = vim.lsp.log.error
+    -- Neovim forwards each owned server's stderr here. Retain a bounded tail
+    -- in this process while delegating logging unchanged; never read a shared log.
+    vim.lsp.log.error = function(...)
+      local source, command, stream, chunk = ...
+      if source == "rpc" and command == captured.cmd[1] and stream == "stderr" and type(chunk) == "string" then
+        stderr = (stderr .. chunk:sub(-8192)):sub(-8192)
+      end
+      return original_log_error(...)
+    end
     local ok, err = pcall(function()
       for _, item in ipairs({
         { source = source_one, root = project_one },
@@ -89,6 +103,9 @@ describe("clangd project isolation", function()
         local config = vim.tbl_deep_extend("force", captured, {
           name = "dotfiles-clangd-isolation",
           root_dir = item.root,
+          on_exit = function(code, signal, client_id)
+            exits[#exits + 1] = { id = client_id, code = code, signal = signal }
+          end,
         })
         local client_id = vim.lsp.start(config, { bufnr = buffer })
         assert.is_not_nil(client_id, "clangd client did not start for " .. item.source)
@@ -97,8 +114,7 @@ describe("clangd project isolation", function()
 
       assert.are_not.equal(clients[1], clients[2])
       assert.is_true(vim.wait(15000, function()
-        return #vim.lsp.get_clients({ bufnr = buffers[1] }) == 1
-          and #vim.lsp.get_clients({ bufnr = buffers[2] }) == 1
+        return #vim.lsp.get_clients({ bufnr = buffers[1] }) == 1 and #vim.lsp.get_clients({ bufnr = buffers[2] }) == 1
       end, 25))
       assert.are.equal(project_one, vim.lsp.get_client_by_id(clients[1]).root_dir)
       assert.are.equal(project_two, vim.lsp.get_client_by_id(clients[2]).root_dir)
@@ -106,6 +122,32 @@ describe("clangd project isolation", function()
       wait_for_clean_diagnostics(buffers[2])
     end)
 
+    vim.lsp.log.error = original_log_error
+    local failure_detail = ""
+    if not ok then
+      local states = {}
+      for _, client_id in ipairs(clients) do
+        local client = vim.lsp.get_client_by_id(client_id)
+        states[#states + 1] = client
+            and {
+              id = client_id,
+              initialized = client.initialized,
+              stopped = client:is_stopped(),
+              root = client.root_dir,
+            }
+          or { id = client_id, absent = true }
+      end
+      failure_detail = "\nclangd fixture: "
+        .. vim.inspect({
+          executable = vim.fn.exepath("clangd"),
+          command = captured.cmd,
+          clients = states,
+          exits = exits,
+          compiler = vim.fn.exepath("clang++"),
+        })
+        .. "\nclangd stderr tail (8192 bytes maximum):\n"
+        .. stderr
+    end
     for _, client_id in ipairs(clients) do
       local client = vim.lsp.get_client_by_id(client_id)
       if client then
@@ -116,6 +158,6 @@ describe("clangd project isolation", function()
       pcall(vim.api.nvim_buf_delete, buffer, { force = true })
     end
     vim.fn.delete(root, "rf")
-    assert.is_true(ok, tostring(err))
+    assert.is_true(ok, tostring(err) .. failure_detail)
   end)
 end)

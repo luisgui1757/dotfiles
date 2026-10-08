@@ -11,8 +11,8 @@ end
 local function git_environment()
   return vim.tbl_extend("force", vim.fn.environ(), {
     GIT_CONFIG_NOSYSTEM = "1",
-    GIT_CONFIG_SYSTEM = vim.fn.has("win32") == 1 and "NUL" or "/dev/null",
-    GIT_CONFIG_GLOBAL = vim.fn.has("win32") == 1 and "NUL" or "/dev/null",
+    GIT_CONFIG_SYSTEM = "/dev/null",
+    GIT_CONFIG_GLOBAL = "/dev/null",
     GIT_CONFIG_COUNT = "0",
     GIT_CONFIG_PARAMETERS = "",
     GIT_TEMPLATE_DIR = "",
@@ -57,6 +57,10 @@ local function git_args(...)
     "core.untrackedCache=false",
     "-c",
     "core.hooksPath=/dev/null",
+    "-c",
+    -- This checkout intentionally bypasses Git's system/global configuration.
+    -- Git for Windows otherwise rejects long managed generation paths.
+    "core.longpaths=true",
     "-c",
     "init.templateDir=",
   }

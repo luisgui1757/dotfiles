@@ -168,15 +168,26 @@ required_check_contexts() {
 ubuntu
 macos
 windows
-chezmoi-parity
-chezmoi-parity-macos
-chezmoi-parity-windows
-nix flake check / linux
-nix flake check / macos
-e2e containers / linux
-setup.sh / linux
-setup.sh / macos
-setup.ps1 / windows
+core (ubuntu-26.04)
+core (ubuntu-26.04-arm)
+core (macos-26)
+core (windows-2025)
+Fresh Homebrew (macOS arm64)
+Fresh Debian APT (amd64)
+Fresh Debian APT (arm64)
+Fresh Ubuntu APT (amd64)
+Fresh Ubuntu APT (arm64)
+Missing Apple developer tools (macOS arm64)
+Fresh Windows vendor (VC-runtime)
+Fresh Windows vendor (Build-Tools)
+Neovim lifecycle (ubuntu-26.04)
+Neovim lifecycle (ubuntu-26.04-arm)
+Neovim lifecycle (macos-26)
+Neovim lifecycle (windows-2025)
+Desktop lifecycle (ubuntu-26.04)
+Desktop lifecycle (ubuntu-26.04-arm)
+Desktop lifecycle (macos-26)
+Desktop lifecycle (windows-2025)
 EOF
 }
 
@@ -185,35 +196,31 @@ legacy_check_contexts() {
 }
 
 test_workflow_contexts() {
-    cat <<'EOF'
-ubuntu
-macos
-windows
-chezmoi-parity
-chezmoi-parity-macos
-chezmoi-parity-windows
-EOF
+    printf '%s\n' ubuntu macos windows
 }
 
-nix_workflow_contexts() {
+engine_workflow_contexts() {
     cat <<'EOF'
-nix flake check (ubuntu-24.04)
-nix flake check (macos-26)
-nix flake check / linux
-nix flake check / macos
-EOF
-}
-
-e2e_workflow_contexts() {
-    cat <<'EOF'
-e2e containers / ubuntu-24.04
-setup.sh / ubuntu-24.04
-setup.sh / macos-26
-setup.ps1 / windows-2025
-e2e containers / linux
-setup.sh / linux
-setup.sh / macos
-setup.ps1 / windows
+core (ubuntu-26.04)
+core (ubuntu-26.04-arm)
+core (macos-26)
+core (windows-2025)
+Fresh Homebrew (macOS arm64)
+Fresh Debian APT (amd64)
+Fresh Debian APT (arm64)
+Fresh Ubuntu APT (amd64)
+Fresh Ubuntu APT (arm64)
+Missing Apple developer tools (macOS arm64)
+Fresh Windows vendor (VC-runtime)
+Fresh Windows vendor (Build-Tools)
+Neovim lifecycle (ubuntu-26.04)
+Neovim lifecycle (ubuntu-26.04-arm)
+Neovim lifecycle (macos-26)
+Neovim lifecycle (windows-2025)
+Desktop lifecycle (ubuntu-26.04)
+Desktop lifecycle (ubuntu-26.04-arm)
+Desktop lifecycle (macos-26)
+Desktop lifecycle (windows-2025)
 EOF
 }
 
@@ -431,11 +438,9 @@ verify_local_boundary() {
         .github/check-identities.json \
         .github/settings.yml \
         .github/rulesets \
-        .github/workflows/e2e-install.yml \
-        .github/workflows/nix.yml \
+        .github/workflows/installer-engine.yml \
         .github/workflows/test.yml \
-        scripts/apply-repo-safeguards.sh \
-        scripts/ci-logical-proof.sh)"
+        scripts/apply-repo-safeguards.sh)"
     if [[ -n "$dirty" ]]; then
         echo "FAIL: reviewed safeguard/proof sources differ from exact live main." >&2
         printf '%s\n' "$dirty" >&2
@@ -641,17 +646,11 @@ capture_and_validate_live_state() {
         echo "FAIL: live Actions enabled/allowed posture is unexpected." >&2
         return 1
     fi
-    if [[ "$stage" == "legacy" ]]; then
-        jq -e '.sha_pinning_required == false' "$capture_dir/actions-live.json" >/dev/null || {
-            echo "FAIL: legacy required contexts must coincide with sha_pinning_required=false before this cutover." >&2
-            return 1
-        }
-    else
-        jq -e '.sha_pinning_required == true' "$capture_dir/actions-live.json" >/dev/null || {
-            echo "FAIL: stable required contexts must coincide with sha_pinning_required=true." >&2
-            return 1
-        }
-    fi
+    # Both sides of this runtime cutover already require action SHA pinning.
+    jq -e '.sha_pinning_required == true' "$capture_dir/actions-live.json" >/dev/null || {
+        echo "FAIL: required contexts must coincide with sha_pinning_required=true." >&2
+        return 1
+    }
 
     gh api --silent "repos/$repo/vulnerability-alerts" >/dev/null || {
         echo "FAIL: vulnerability alerts are not enabled or could not be verified." >&2
@@ -664,11 +663,9 @@ capture_and_validate_live_state() {
 
     gh api "repos/$repo/commits/$(jq -r .sha "$capture_dir/live-main.json")/check-runs?per_page=100" > "$capture_dir/check-runs.json"
     select_workflow_run "$capture_dir" test.yml .github/workflows/test.yml '["push", "workflow_dispatch"]' "$capture_dir/test-run.json"
-    select_workflow_run "$capture_dir" nix.yml .github/workflows/nix.yml '["push", "workflow_dispatch"]' "$capture_dir/nix-run.json"
-    select_workflow_run "$capture_dir" e2e-install.yml .github/workflows/e2e-install.yml '["workflow_dispatch"]' "$capture_dir/e2e-run.json"
+    select_workflow_run "$capture_dir" installer-engine.yml .github/workflows/installer-engine.yml '["push", "workflow_dispatch"]' "$capture_dir/engine-run.json"
     verify_workflow_jobs "$capture_dir" test "$capture_dir/test-run.json" test_workflow_contexts 0
-    verify_workflow_jobs "$capture_dir" nix "$capture_dir/nix-run.json" nix_workflow_contexts 0
-    verify_workflow_jobs "$capture_dir" e2e "$capture_dir/e2e-run.json" e2e_workflow_contexts 1
+    verify_workflow_jobs "$capture_dir" engine "$capture_dir/engine-run.json" engine_workflow_contexts 0
 
     ruleset_restore_payload "$capture_dir/integrity-live.json" > "$capture_dir/integrity-restore.json"
     classic_restore_payload "$capture_dir/classic-live.json" > "$capture_dir/classic-restore.json"
@@ -679,11 +676,10 @@ capture_and_validate_live_state() {
         --arg stage "$stage" \
         --argjson integrity_ruleset_id "$integrity_id" \
         --argjson test_run_id "$(jq -r .id "$capture_dir/test-run.json")" \
-        --argjson nix_run_id "$(jq -r .id "$capture_dir/nix-run.json")" \
-        --argjson e2e_run_id "$(jq -r .id "$capture_dir/e2e-run.json")" \
-        '{schema: 1, repository: $repo, live_main_sha: $live_main_sha, stage: $stage,
+        --argjson engine_run_id "$(jq -r .id "$capture_dir/engine-run.json")" \
+        '{schema: 2, repository: $repo, live_main_sha: $live_main_sha, stage: $stage,
           integrity_ruleset_id: $integrity_ruleset_id,
-          proof_runs: {test: $test_run_id, nix: $nix_run_id, e2e_cache_free: $e2e_run_id}}' \
+          proof_runs: {test: $test_run_id, engine: $engine_run_id}}' \
         > "$capture_dir/manifest.json"
 }
 
@@ -743,19 +739,13 @@ prepare_transaction_payloads() {
     fi
     if ! jq -e '
       type == "object"
-      and (keys | sort) == (["legacyEmitted", "replacements", "required", "schema", "stage"] | sort)
-      and .schema == 2
-      and .stage == "stable-required-live-applied"
+      and (keys | sort) == (["legacyEmitted", "required", "schema", "stage"] | sort)
+      and .schema == 3
+      and .stage == "installer-required-pending-apply"
       and (.legacyEmitted | type == "array" and length > 0 and length == (unique | length))
       and all(.legacyEmitted[]; type == "string" and length > 0)
       and (.required | type == "array" and length > 0 and length == (unique | length))
       and all(.required[]; type == "string" and length > 0)
-      and (.replacements | type == "array" and length > 0 and length == (unique | length))
-      and all(.replacements[];
-        type == "object"
-        and (keys | sort) == (["legacy", "logical"] | sort)
-        and (.legacy | type == "string" and length > 0)
-        and (.logical | type == "string" and length > 0))
     ' "$transaction_dir/check-identities.json" >/dev/null; then
         echo "FAIL: frozen required-check metadata is malformed." >&2
         return 1
@@ -818,7 +808,7 @@ prepare_transaction_payloads() {
     if ! jq -e --arg repo "$repo" \
         --arg sha "$(git -C "$repo_root" rev-parse HEAD)" '
       type == "object"
-      and .schema == 1
+      and (.schema == 1 or .schema == 2)
       and .repository == $repo
       and .live_main_sha == $sha
       and .stage == "legacy"
@@ -882,7 +872,7 @@ restore_snapshot() (
         "integrity_ruleset_id", "live_main_sha", "proof_runs",
         "repository", "schema", "stage"
       ] | sort)
-      and .schema == 1
+      and (.schema == 1 or .schema == 2)
       and (.repository | type == "string")
       and (.live_main_sha | test("^[0-9a-f]{40}$"))
       and (.stage == "legacy" or .stage == "stable")
@@ -890,7 +880,7 @@ restore_snapshot() (
       and (.integrity_ruleset_id > 0)
       and ((.integrity_ruleset_id | floor) == .integrity_ruleset_id)
       and (.proof_runs | type == "object")
-      and (.proof_runs | keys | sort) == (["e2e_cache_free", "nix", "test"] | sort)
+      and (.proof_runs | keys | sort) == (if .schema == 1 then ["e2e_cache_free", "nix", "test"] else ["engine", "test"] end | sort)
       and all(.proof_runs[]; type == "number" and . > 0 and floor == .)
     ' "$frozen/manifest.json" >/dev/null || \
         ! jq -e '
@@ -942,6 +932,15 @@ restore_snapshot() (
         return 1
     fi
     if ! jq -e '
+      if .schema == 3 then
+        type == "object"
+        and (keys | sort) == (["legacyEmitted", "required", "schema", "stage"] | sort)
+        and .stage == "installer-required-pending-apply"
+        and (.legacyEmitted | type == "array" and length > 0 and length == (unique | length))
+        and all(.legacyEmitted[]; type == "string" and length > 0)
+        and (.required | type == "array" and length > 0 and length == (unique | length))
+        and all(.required[]; type == "string" and length > 0)
+      else
       . as $root
       | type == "object"
       and (keys | sort) == ([
@@ -966,6 +965,7 @@ restore_snapshot() (
         and (.logical as $logical | $logical | IN($root.required[]))))
       and ((.legacyEmitted - (.replacements | map(.legacy)) | sort) ==
         (.required - (.replacements | map(.logical)) | sort))
+      end
     ' "$frozen/check-identities-reviewed.json" >/dev/null; then
         echo "FAIL: recovery snapshot's committed check identity source is malformed: $policy_sha" >&2
         return 1
@@ -1011,7 +1011,7 @@ restore_snapshot() (
     fi
 
     if [[ "$stage" == "legacy" ]]; then
-        expected_pin=false
+        expected_pin="$(jq ' .schema == 3' "$frozen/check-identities-reviewed.json")"
         jq -r '.legacyEmitted[]' "$frozen/check-identities-reviewed.json" \
             > "$frozen/stage-contexts.txt"
         jq --slurpfile identities "$frozen/check-identities-reviewed.json" \

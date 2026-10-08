@@ -16,8 +16,6 @@ function M.resolve(uname_fn, env_fn)
   local home = vim.fn.expand("~")
   local uname = uname_fn() or {}
   local sysname = uname.sysname or ""
-  local release = (uname.release or ""):lower()
-  local is_wsl = release:find("microsoft") ~= nil or release:find("wsl") ~= nil
 
   -- Explicit override always wins.
   local override = env_fn("NOTES_VAULT")
@@ -30,23 +28,6 @@ function M.resolve(uname_fn, env_fn)
     return home .. "/Library/Mobile Documents/iCloud~md~obsidian/Documents"
   end
 
-  if is_wsl then
-    -- Resolve the Windows user dir generically; WSL and Windows usernames
-    -- can differ, so prefer an explicit WINUSER, then cmd.exe, then the
-    -- WSL home basename. Set NOTES_VAULT for a specific vault.
-    local winuser = env_fn("WINUSER")
-    if not is_set(winuser) then
-      local ok, raw = pcall(vim.fn.system, { "cmd.exe", "/c", "echo %USERNAME%" })
-      if ok and type(raw) == "string" then
-        winuser = raw:gsub("[\r\n%s]+$", "")
-      end
-    end
-    if not is_set(winuser) then
-      winuser = vim.fn.fnamemodify(home, ":t")
-    end
-    return "/mnt/c/Users/" .. winuser .. "/Notes"
-  end
-
   if sysname:match("Windows") or sysname:match("MINGW") then
     local userprofile = env_fn("USERPROFILE")
     if not is_set(userprofile) then
@@ -55,7 +36,7 @@ function M.resolve(uname_fn, env_fn)
     return userprofile .. "/Notes"
   end
 
-  -- Native Linux (no WSL): generic vault fallback under ~/notes
+  -- All Linux environments share the same local default.
   return home .. "/notes"
 end
 
