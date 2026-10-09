@@ -125,15 +125,41 @@ partial_quarantine="$(find "$WORK/partial" -maxdepth 1 -name 'plugin.quarantine.
     || fail "partial prior payload was not preserved"
 
 # Concurrent first starts serialize and converge on one proved checkout.
-concurrent="$WORK/concurrent/plugin"
-/bin/bash "$PUBLISHER" concurrent-plugin "$repo" v2 "$commit2" plugin.zsh "$concurrent" >"$WORK/concurrent.1.log" 2>&1 &
-pid1=$!
-/bin/bash "$PUBLISHER" concurrent-plugin "$repo" v2 "$commit2" plugin.zsh "$concurrent" >"$WORK/concurrent.2.log" 2>&1 &
-pid2=$!
-wait "$pid1" || fail "first concurrent publisher failed"
-wait "$pid2" || fail "second concurrent publisher failed"
-[[ "$(git -C "$concurrent" rev-parse HEAD)" == "$commit2" ]] || fail "concurrent publication produced the wrong pin"
-find "$WORK/concurrent" -maxdepth 1 \( -name '*.stage.*' -o -name '*.lock' \) -print | grep -q . \
-    && fail "concurrent publication leaked staging/lock state"
+# uutils 0.10 can return success when mkdir(2) returned EEXIST in a race.
+# Model that external-command behavior deterministically, without replacing
+# the kernel/filesystem or any publisher function.
+real_mkdir="$(command -v mkdir)"
+mkdir -p "$WORK/racy-bin"
+cat > "$WORK/racy-bin/mkdir" <<'SH'
+#!/bin/bash
+if [[ "$#" -eq 1 && "$1" == *.lock ]]; then
+    "$PUBLISHER_TEST_MKDIR" -p "$1"
+    sleep 0.15
+else
+    exec "$PUBLISHER_TEST_MKDIR" "$@"
+fi
+SH
+chmod +x "$WORK/racy-bin/mkdir"
+export PUBLISHER_TEST_MKDIR="$real_mkdir"
+run_concurrent() {
+    local concurrent="$WORK/$1/plugin" launch_path="$2"
+    PATH="$launch_path" /bin/bash "$PUBLISHER" concurrent-plugin "$repo" v2 "$commit2" plugin.zsh "$concurrent" >"$WORK/concurrent.1.log" 2>&1 &
+    pid1=$!
+    PATH="$launch_path" /bin/bash "$PUBLISHER" concurrent-plugin "$repo" v2 "$commit2" plugin.zsh "$concurrent" >"$WORK/concurrent.2.log" 2>&1 &
+    pid2=$!
+    concurrent_failed=0
+    wait "$pid1" || concurrent_failed=1
+    wait "$pid2" || concurrent_failed=1
+    if [[ "$concurrent_failed" -ne 0 ]]; then
+        cat "$WORK/concurrent.1.log" "$WORK/concurrent.2.log" >&2
+        fail "concurrent publisher failed"
+    fi
+    [[ "$(git -C "$concurrent" rev-parse HEAD)" == "$commit2" ]] || fail "concurrent publication produced the wrong pin"
+    if find "$(dirname "$concurrent")" -maxdepth 1 \( -name '*.stage.*' -o -name '*.lock' \) -print | grep -q .; then
+        fail "concurrent publication leaked staging/lock state"
+    fi
+}
+run_concurrent concurrent "$PATH"
+run_concurrent racy-mkdir "$WORK/racy-bin:$PATH"
 
 echo "OK"

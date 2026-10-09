@@ -2695,3 +2695,11 @@ carefully before "fixing" the test.
 The durable rationale belongs in this file, `README.md`, or the tests that
 guard an invariant. Do not rely on private local plan files for public repo
 maintenance.
+
+## Plugin publication lock invariant
+
+Publication locking uses Python 3 `os.mkdir` to preserve the kernel's exclusive
+create result. Do not replace it with a shell `mkdir` command: uutils 0.10.0 can
+return success after racing EEXIST, allowing two publishers into the same target.
+Keep the existing lock/PID protocol and cleanup semantics; the regression models
+the faulty external utility and also retains real concurrent-start coverage.

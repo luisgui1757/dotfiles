@@ -42,3 +42,20 @@ Linux, WSL and Windows do not use the affected macOS Homebrew runtime.
   or fix is claimed from that evidence. The hosted retry then exposed the
   Hyperfine schema failure above. Both original logs are retained in the task
   archive. The final CI run must pass without excluding either test.
+
+### Concurrent publisher cause confirmed and fixed in source
+
+A four-worker Linux run reproduced the publisher failure. Syscall tracing showed
+one `mkdir` succeed and another return `EEXIST`, while both utilities reported
+success. uutils coreutils 0.10.0's precheck/error handling permits this race.
+[Upstream implementation](https://github.com/uutils/coreutils/blob/0.10.0/src/uu/mkdir/src/mkdir.rs).
+The publisher now uses Python's direct `os.mkdir` result for exclusive lock
+creation, retaining the existing on-disk lock/PID protocol. Python 3 is already
+part of setup; a missing interpreter produces an explicit error.
+
+The ordinary concurrent test remains. An added external-command fixture models
+the faulty mkdir success deterministically; it fails before and passes after.
+Both children are awaited and their failure logs are retained in CI output.
+The corrected publisher passed 100 Linux runs with four parallel workers.
+The earlier "unreproduced" note records the initial investigation, not the
+current finding status. Full gates and final review follow.

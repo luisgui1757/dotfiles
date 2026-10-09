@@ -147,7 +147,14 @@ if [[ "${DOTFILES_PINNED_GIT_CHECK_ONLY:-0}" == "1" ]]; then
 fi
 
 attempt=0
-while ! mkdir "$lock" 2>/dev/null; do
+# Lock acquisition must reflect mkdir(2), not a utility's existence recheck.
+# uutils 0.10 can report success after a racing EEXIST. Python is already a
+# bootstrap prerequisite and preserves the kernel's exclusive-create result.
+command -v python3 >/dev/null 2>&1 || {
+    echo "FAIL: python3 is required for $name publication locking" >&2
+    exit 1
+}
+while ! python3 -c 'import os, sys; os.mkdir(sys.argv[1])' "$lock" 2>/dev/null; do
     lock_pid="$(cat "$lock/pid" 2>/dev/null || true)"
     case "$lock_pid" in
         ''|*[!0-9]*) ;;

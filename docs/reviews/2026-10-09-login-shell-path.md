@@ -61,3 +61,21 @@ VM login shell still fails before deployment with `codex: command not found`
 and exit 127, while both native binaries run directly. Those captured results
 will accompany the next independent review. Hosted checks are rerun on this
 correction commit.
+
+## Hosted concurrency failure resolved
+
+The next Ubuntu run failed the publisher again. Real Linux stress reproduced it;
+strace proved mkdir(2) returned EEXIST to one contender while the uutils command
+reported success. Source inspection confirmed its directory-existence fallback.
+The correction uses Python's exclusive `os.mkdir`, with a direct missing-runtime
+error, preserving the prior lock protocol. The new deterministic boundary
+regression fails before and passes after; the original real concurrency case
+remains. All 100 corrected Linux repetitions passed with four parallel workers.
+The original traces contain only disposable test repositories and are retained
+in the task archive. Full CI and another Opus review are required for this newly
+changed publisher before deployment.
+
+The corrected publisher's full local `make ci` passed. The chezmoi onchange
+helper fingerprint was updated to the real new script SHA; the first gate
+correctly rejected the stale fingerprint. No pin, budget or check was weakened.
+Fresh hosted CI and Opus review now cover the complete correction.
