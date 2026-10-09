@@ -18,6 +18,7 @@ Documents
 {{- end }}
 {{- if eq .targetOS "windows" }}
 .zshenv
+.zprofile
 .zshrc
 .tmux.posix.conf
 .config/nvim

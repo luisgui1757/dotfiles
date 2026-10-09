@@ -1,5 +1,13 @@
 # Known release issues
 
+## Fixed in source: user-local commands missing from zsh login shells
+
+Native tools installed in `~/.local/bin` worked in interactive terminals but
+were missing from non-interactive login shells used by remote desktop apps.
+The managed `.zprofile` now adds that directory without loading interactive
+configuration. This applies to macOS/Linux/WSL; Windows ignores the new target.
+See [verification and review](reviews/2026-10-09-login-shell-path.md).
+
 ## macOS: v0.4.4
 
 `v0.4.4` pins Homebrew 6.0.1, which is incompatible with current AeroSpace and

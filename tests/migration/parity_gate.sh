@@ -70,6 +70,7 @@ herdr config|config-file|.config/herdr/config.toml|.config/herdr/config.toml|her
 nvim|nvim|.config/nvim|.config/nvim|nvim|
 starship|config-file|.config/starship.toml|.config/starship.toml|starship/starship.toml|home/dot_config/starship.toml
 zshenv|config-file|.zshenv|.zshenv|shells/zshenv|home/dot_zshenv
+zprofile|config-file|.zprofile|.zprofile|shells/zprofile|home/dot_zprofile
 zshrc|config-file|.zshrc|.zshrc|shells/zshrc|home/dot_zshrc
 ghostty config|config-file|Library/Application Support/com.mitchellh.ghostty/config|.config/ghostty/config|ghostty/config|home/.chezmoitemplates/ghostty/config
 wezterm config|config-file|.config/wezterm/wezterm.lua|.config/wezterm/wezterm.lua|wezterm/wezterm.lua|home/dot_config/wezterm/wezterm.lua

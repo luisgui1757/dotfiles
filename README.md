@@ -74,6 +74,11 @@ the policy before loading the script.
 Open a new terminal after the first install. The current shell started before
 the new PATH, profile, and default shell existed.
 
+On macOS, Linux and WSL, login shells also find programs in `~/.local/bin`
+without opening an interactive terminal. This lets remote apps start native
+tools such as Codex and Claude. Chezmoi manages this through `~/.zprofile`.
+Windows continues to use its PowerShell profile.
+
 To reconcile the checked-out release and update the tools that this repo can
 prove it owns:
 

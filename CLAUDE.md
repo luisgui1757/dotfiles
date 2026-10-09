@@ -49,7 +49,7 @@ sessions/auth/providers/other preferences, and package caches stay per machine.
 ├── nvim/                  Neovim — init.lua, lua/{vim-options,util,plugins}
 ├── starship/              starship.toml (Rose Pine palette)
 ├── lsd/                   config.yaml + colors.yaml (Rose Pine)
-├── shells/                zshenv + zshrc + powershell_profile.ps1
+├── shells/                zshenv + zprofile + zshrc + powershell_profile.ps1
 ├── tmux/                  tmux.conf (Rose Pine, vi-mode, OSC52 clipboard)
 ├── ghostty/               config (Rose Pine, Hack Nerd, tuned for tmux)
 ├── wezterm/               wezterm.lua (shared terminal config on every OS)
@@ -2361,6 +2361,15 @@ provisioning. The repo never installs Nix through a pipe-to-shell bootstrap.
 - **`--update` owner=nix** is Phase 7 (`tests/shell/install_deps_update_test.sh`).
 
 ## Login shell: zsh adoption (install-deps.sh)
+
+Chezmoi also owns `~/.zprofile` on macOS/Linux/WSL. Its matching canonical file
+is `shells/zprofile`. It silently adds an existing `~/.local/bin` once, so
+non-interactive login shells can find native tools such as Codex and Claude.
+Do not source `.zshrc` to make remote app startup work: that loads interactive
+widgets, prompts and package-manager setup into the app's protocol stream.
+Keep `.zshenv` minimal. Native Windows ignores `.zprofile`; its PowerShell
+profile and persistent user PATH are unchanged. The login regression exercises
+a real zsh with a temporary home, including spaces and repeated loading.
 
 Installing the zsh *package* does NOT make zsh your login shell — that takes a
 `chsh`. `install-deps.sh` does it in the "terminal multiplexer + shell" section

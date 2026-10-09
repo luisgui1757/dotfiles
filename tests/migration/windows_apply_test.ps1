@@ -318,6 +318,8 @@ function Assert-Part1Files {
     # a regression in the ignore rule can never silently reintroduce the freeze.
     Assert-Condition (-not (Test-Path -LiteralPath (Join-Path $Sandbox '.tmux.posix.conf'))) `
         '~/.tmux.posix.conf must NOT be deployed on Windows (psmux config-load freeze boundary)'
+    Assert-Condition (-not (Test-Path -LiteralPath (Join-Path $Sandbox '.zprofile'))) `
+        '~/.zprofile must NOT be deployed on native Windows'
     Assert-SymlinkMatchesRepo `
         -ActualPath (Join-Path $env:LOCALAPPDATA 'lazygit\config.yml') `
         -ExpectedPath (Join-Path $script:RepoRoot 'lazygit\config.windows.yml') `

@@ -1,0 +1,5 @@
+# Non-interactive login shells need native user-local tools too. Keep this
+# silent and independent of prompts, completion, package managers and .zshrc.
+typeset -U path PATH
+[[ -d "$HOME/.local/bin" ]] && path=("$HOME/.local/bin" $path)
+export PATH
