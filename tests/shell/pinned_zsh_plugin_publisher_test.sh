@@ -162,4 +162,15 @@ run_concurrent() {
 run_concurrent concurrent "$PATH"
 run_concurrent racy-mkdir "$WORK/racy-bin:$PATH"
 
+# Fresh install-deps publishes plugins before installing Python. Only the
+# publisher's existing shell/Git tools are available at that point.
+mkdir -p "$WORK/bootstrap-bin"
+for tool in basename cat date dirname env git mkdir mktemp mv rm sleep; do
+    ln -s "$(command -v "$tool")" "$WORK/bootstrap-bin/$tool"
+done
+bootstrap_target="$WORK/bootstrap/plugin"
+PATH="$WORK/bootstrap-bin" /bin/bash "$PUBLISHER" bootstrap-plugin "$repo" v2 "$commit2" plugin.zsh "$bootstrap_target" >/dev/null
+[[ "$(git -C "$bootstrap_target" rev-parse HEAD)" == "$commit2" ]] || fail "bootstrap without Python did not publish the exact pin"
+[[ ! -e "${bootstrap_target}.lock" ]] || fail "bootstrap publication leaked its lock"
+
 echo "OK"

@@ -157,7 +157,11 @@ that violates one of these, fix it instead of disabling the test.
     pin/helper-sensitive chezmoi `run_onchange` script. It neutralizes any unproved sourceable target,
     stages the exact commit in the same parent, proves expected origin, HEAD,
     clean/usable worktree, and tracked regular entry file, then atomically
-    publishes under a serialized lock. Its template-time check-only path is
+    publishes under a serialized lock. A Bash noclobber claim inside the lock
+    directory guards against uutils 0.10 reporting mkdir success after racing
+    EEXIST. No additional runtime is available at this bootstrap stage. Keep
+    both the real-concurrency and faulty-mkdir regression cases.
+    Its template-time check-only path is
     strictly read-only: an absent plugin parent stays absent and no publication
     lock is acquired, including during chezmoi `diff`, `status`, and dry-run
     apply. Never restore generic chezmoi `git-repo` externals for executable zsh
@@ -2695,11 +2699,3 @@ carefully before "fixing" the test.
 The durable rationale belongs in this file, `README.md`, or the tests that
 guard an invariant. Do not rely on private local plan files for public repo
 maintenance.
-
-## Plugin publication lock invariant
-
-Publication locking uses Python 3 `os.mkdir` to preserve the kernel's exclusive
-create result. Do not replace it with a shell `mkdir` command: uutils 0.10.0 can
-return success after racing EEXIST, allowing two publishers into the same target.
-Keep the existing lock/PID protocol and cleanup semantics; the regression models
-the faulty external utility and also retains real concurrent-start coverage.

@@ -49,9 +49,9 @@ A four-worker Linux run reproduced the publisher failure. Syscall tracing showed
 one `mkdir` succeed and another return `EEXIST`, while both utilities reported
 success. uutils coreutils 0.10.0's precheck/error handling permits this race.
 [Upstream implementation](https://github.com/uutils/coreutils/blob/0.10.0/src/uu/mkdir/src/mkdir.rs).
-The publisher now uses Python's direct `os.mkdir` result for exclusive lock
-creation, retaining the existing on-disk lock/PID protocol. Python 3 is already
-part of setup; a missing interpreter produces an explicit error.
+The publisher now creates a Bash noclobber claim inside the lock directory.
+Only one contender can create that file, even if mkdir reports success twice.
+The lock/PID protocol and cleanup remain; there is no new runtime dependency.
 
 The ordinary concurrent test remains. An added external-command fixture models
 the faulty mkdir success deterministically; it fails before and passes after.
@@ -59,3 +59,12 @@ Both children are awaited and their failure logs are retained in CI output.
 The corrected publisher passed 100 Linux runs with four parallel workers.
 The earlier "unreproduced" note records the initial investigation, not the
 current finding status. Full gates and final review follow.
+
+### Bootstrap ordering regression in the first lock correction
+
+The first correction used Python `os.mkdir` and passed local/concurrency checks,
+but the clean Ubuntu container showed that install-deps publishes plugins before
+installing Python. That correction was not deployed. The final Bash claim fixes
+the same race without changing installer order. A minimal-tool PATH regression
+reproduces the missing-Python failure before the correction and passes afterward.
+Fresh hosted checks must still prove the full container install.

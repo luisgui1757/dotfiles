@@ -78,4 +78,21 @@ changed publisher before deployment.
 The corrected publisher's full local `make ci` passed. The chezmoi onchange
 helper fingerprint was updated to the real new script SHA; the first gate
 correctly rejected the stale fingerprint. No pin, budget or check was weakened.
-Fresh hosted CI and Opus review now cover the complete correction.
+Fresh hosted CI and Opus review are required for the complete correction.
+
+## Clean-install correction, after review 3
+
+Opus 5.5/xhigh approved the previous source but required clean-image proof.
+That check failed: plugin publication precedes Python installation. The Python
+lock was never deployed. It is replaced by an atomic Bash noclobber claim inside
+the directory lock, retaining the PID/cleanup protocol and adding no prerequisite.
+An isolated PATH with only the existing shell/Git tools fails before and passes
+after this correction. The real and faulty-mkdir concurrent tests remain.
+The invariant now lives alongside the existing publisher rule in CLAUDE.md.
+The older stale-lock recovery race noted by Opus is unchanged: it needs a crashed
+holder and two simultaneous reclaimers; failed publication remains visible.
+Full checks, Linux stress, hosted CI and a fresh review follow.
+
+The final dependency-free publisher passed 100 real Linux test runs with four
+parallel workers. Both its faulty-mkdir fixture and its no-Python bootstrap
+fixture pass. The original ordinary concurrency case also remains green.
