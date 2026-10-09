@@ -76,6 +76,7 @@ managed_rels_for_host() {
 .config/nvim
 .config/starship.toml
 .zshenv
+.zprofile
 .zshrc
 Library/Application Support/com.mitchellh.ghostty/config
 Library/Application Support/lazygit/config.yml
@@ -95,6 +96,7 @@ EOF
 .config/nvim
 .config/starship.toml
 .zshenv
+.zprofile
 .zshrc
 EOF
             ;;
@@ -117,6 +119,10 @@ mkdir -p "$HOME"
 printf '%s\n' "$preseed" > "$HOME/.tmux.conf"
 cp "$HOME/.tmux.conf" "$HOME/.tmux.conf.bak.20000101-000000"
 pass "pre-seeded tmux config and bootstrap-style backup"
+profile_preseed='export USER_LOGIN_SETTING=preserved'
+printf '%s\n' "$profile_preseed" > "$HOME/.zprofile"
+cp "$HOME/.zprofile" "$HOME/.zprofile.bak.20000101-000000"
+pass "pre-seeded login profile and bootstrap-style backup"
 
 chezmoi --source "$SRC" init
 chezmoi --source "$SRC" --no-tty --force apply
@@ -143,6 +149,9 @@ done < <(managed_rels_for_host)
 [[ -f "$HOME/.tmux.conf" ]] || fail "pre-seeded ~/.tmux.conf was not restored"
 [[ "$(cat "$HOME/.tmux.conf")" == "$preseed" ]] || fail "restored ~/.tmux.conf content mismatch"
 pass "pre-seeded config restored from backup"
+[[ -f "$HOME/.zprofile" ]] || fail "pre-seeded ~/.zprofile was not restored"
+[[ "$(cat "$HOME/.zprofile")" == "$profile_preseed" ]] || fail "restored ~/.zprofile content mismatch"
+pass "pre-seeded login profile restored from backup"
 
 for plugin in fzf-tab zsh-autosuggestions; do
     [[ ! -e "$HOME/.local/share/dotfiles/zsh-plugins/$plugin" ]] || fail "external plugin still exists after uninstall: $plugin"
@@ -155,4 +164,5 @@ second_output="$("$REPO_ROOT/uninstall.sh" --all 2>&1)"
 printf '%s\n' "$second_output" | grep -q 'nothing to remove' || fail "second uninstall did not report no-op"
 [[ -f "$HOME/.tmux.conf" ]] || fail "second uninstall removed restored user config"
 [[ "$(cat "$HOME/.tmux.conf")" == "$preseed" ]] || fail "second uninstall changed restored user config"
+[[ "$(cat "$HOME/.zprofile")" == "$profile_preseed" ]] || fail "second uninstall changed restored login profile"
 pass "second uninstall is idempotent"

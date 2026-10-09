@@ -74,7 +74,7 @@ the policy before loading the script.
 Open a new terminal after the first install. The current shell started before
 the new PATH, profile, and default shell existed.
 
-On macOS, Linux and WSL, login shells also find programs in `~/.local/bin`
+On macOS, Linux and WSL, zsh login shells also find programs in `~/.local/bin`
 without opening an interactive terminal. This lets remote apps start native
 tools such as Codex and Claude. Chezmoi manages this through `~/.zprofile`.
 Windows continues to use its PowerShell profile.
@@ -338,7 +338,13 @@ zsh on POSIX and PowerShell 7 on Windows use the same basic habits:
 
 `ls`, `l`, `la`, `lla`, and `lt` use `lsd` for readable icons and colors.
 zsh-only local changes belong in `~/.zshrc.local`; setup does not overwrite that
-file.
+file. The managed `~/.zprofile` also reads `~/.zprofile.local` last for login
+environment settings. Keep that file silent and free of interactive prompts.
+Before adopting this update, move any still-needed settings from an existing
+`~/.zprofile` into `.zprofile.local`, including Homebrew environment setup if you
+use it there. Setup backs up and replaces the managed target; it does not merge
+those settings. A selective `chezmoi apply` must first inspect the diff and back
+up an existing target as `.zprofile.bak.<timestamp>` instead of overwriting it.
 
 Useful standalone tools:
 

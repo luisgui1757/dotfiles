@@ -26,3 +26,19 @@ v0.1.0 installation. Existing-Mac in-place upgrades have not been verified by
 the fresh-install checks.
 
 Linux, WSL and Windows do not use the affected macOS Homebrew runtime.
+
+## Login-profile adoption and CI result formats, 2026-10-09
+
+- The new managed `.zprofile` replaces an existing target. Preserve still-needed
+  local login settings in `.zprofile.local` first. Normal setup makes a timestamped
+  backup; direct selective chezmoi apply needs an explicit preflight/backup.
+  Native Windows ignores this POSIX profile.
+- Fixed in source: Hyperfine 2.0 moved the mean to
+  `results[].summary.time_wall_clock.mean`. The prompt budget check accepts both
+  the previous and new formats, validates units/numbers, and keeps the 80/150 ms
+  limits. [Upstream schema](https://github.com/sharkdp/hyperfine/blob/v2.0.0/src/export/json.rs).
+- One Ubuntu run failed the existing concurrent plugin-publisher test. Thirty
+  isolated Linux repetitions and the next hosted run passed that test; no defect
+  or fix is claimed from that evidence. The hosted retry then exposed the
+  Hyperfine schema failure above. Both original logs are retained in the task
+  archive. The final CI run must pass without excluding either test.

@@ -42,5 +42,10 @@ with tempfile.TemporaryDirectory(prefix="zsh login ") as directory:
     result = subprocess.run([zsh, "-d", "-lc", "print -r -- $PATH"],
                             env=environment, text=True, capture_output=True, check=True)
     assert str(local_bin) not in result.stdout and not result.stderr, result
+    # Owner-specific login environment survives in an unmanaged, silent hook.
+    (target / ".zprofile.local").write_text('export DOTFILES_LOGIN_LOCAL=preserved\n')
+    result = subprocess.run([zsh, "-d", "-lc", 'print -r -- $DOTFILES_LOGIN_LOCAL'],
+                            env=environment, text=True, capture_output=True, check=True)
+    assert result.stdout == "preserved\n" and not result.stderr, result
 print("PASS: login shell finds user-local commands without interactive startup; repeated and missing-directory cases pass")
 PY

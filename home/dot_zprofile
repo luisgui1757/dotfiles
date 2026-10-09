@@ -3,3 +3,8 @@
 typeset -U path PATH
 [[ -d "$HOME/.local/bin" ]] && path=("$HOME/.local/bin" $path)
 export PATH
+
+# Keep machine-specific login environment here, never interactive prompts.
+if [[ -r "$HOME/.zprofile.local" ]]; then
+    source "$HOME/.zprofile.local"
+fi
