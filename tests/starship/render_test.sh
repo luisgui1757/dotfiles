@@ -17,7 +17,7 @@ if grep -nF 'bg:' "$REPO_ROOT/starship/starship.toml"; then
     exit 1
 fi
 if ! grep -F "\$username\\" "$REPO_ROOT/starship/starship.toml" >/dev/null; then
-    echo "FAIL: starship format must show username; tmux/psmux intentionally does not duplicate it"
+    echo "FAIL: starship format must show username; tmux intentionally does not duplicate it"
     exit 1
 fi
 if ! awk '

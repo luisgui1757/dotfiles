@@ -10,13 +10,13 @@ import sys
 
 failures = []
 
-setup_sh = pathlib.Path("setup.sh").read_text(encoding="utf-8")
-setup_ps1 = pathlib.Path("setup.ps1").read_text(encoding="utf-8")
+setup_sh = pathlib.Path("setup.sh").read_text(encoding="utf-8") + pathlib.Path("scripts/installer-bootstrap.sh").read_text(encoding="utf-8")
+setup_ps1 = pathlib.Path("setup.ps1").read_text(encoding="utf-8") + pathlib.Path("scripts/installer-bootstrap.ps1").read_text(encoding="utf-8")
 readme = pathlib.Path("README.md").read_text(encoding="utf-8")
 claude = pathlib.Path("CLAUDE.md").read_text(encoding="utf-8")
 
 for path, text in (("setup.sh", setup_sh), ("setup.ps1", setup_ps1)):
-    if "Remote/piped clone-and-reinvoke setup is disabled" not in text:
+    if "installer-bootstrap" not in text or "bootstrap-toolchain.tsv" not in text:
         failures.append(f"{path} must explicitly fail closed for remote/piped setup")
 
 for banned in (

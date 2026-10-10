@@ -1,0 +1,464 @@
+name: installer engine
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  core:
+    name: core (${{ matrix.runner }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-26.04
+            target: linux/amd64
+          - runner: ubuntu-26.04-arm
+            target: linux/arm64
+          - runner: macos-26
+            target: darwin/arm64
+          - runner: windows-2025
+            target: windows/amd64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: installer
+        shell: bash
+    env:
+      GOTOOLCHAIN: local
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: 1.27.1
+          cache: ${{ !startsWith(github.ref, 'refs/tags/') }}
+          cache-dependency-path: installer/go.sum
+      - name: Verify actual native runner target
+        run: test "$(go env GOHOSTOS)/$(go env GOHOSTARCH)" = '${{ matrix.target }}'
+      - name: Install shell test prerequisites
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends zsh tmux
+      - name: Install tmux integration test prerequisite
+        if: runner.os == 'macOS'
+        run: |
+          # This supplies the fixture executable; native tmux provisioning is
+          # tested separately when its production package provider is connected.
+          if ! command -v tmux >/dev/null; then
+            HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1 brew install tmux
+          fi
+      - name: Check formatting and dependencies
+        run: |
+          set -euo pipefail
+          formatting=$(gofmt -l .)
+          if [[ -n "$formatting" ]]; then
+            printf 'Files requiring gofmt:\n%s\n' "$formatting"
+            exit 1
+          fi
+          go mod tidy
+          git diff --exit-code -- go.mod go.sum
+      - name: Vet and exercise the engine against the native filesystem
+        run: |
+          set -euo pipefail
+          go vet ./...
+          go test -race -count=1 -timeout 20m -v ./...
+      - name: Install, execute, check and remove the real pinned archive
+        env:
+          DOTFILES_TEST_ARCHIVES: '1'
+          DOTFILES_TEST_PUBLIC_WINDOWS: '1'
+        run: go test -v -count=1 -timeout 20m -run '^TestNativeArchive' ./...
+      - name: Verify native APT transaction and removal contracts
+        if: ${{ !cancelled() && runner.os == 'Linux' }}
+        env:
+          DOTFILES_TEST_NATIVE_PACKAGES: '1'
+        run: go test -v -count=1 -timeout 12m -run '^TestNative(APT|LinuxAPT)' .
+      - name: Verify native Homebrew transaction and removal contracts
+        if: ${{ !cancelled() && runner.os == 'macOS' }}
+        env:
+          DOTFILES_TEST_NATIVE_PACKAGES: '1'
+        run: go test -v -count=1 -timeout 20m -run '^TestNativeBrew' .
+      - name: Verify Windows runtime registration and Microsoft signature
+        if: ${{ !cancelled() && runner.os == 'Windows' }}
+        env:
+          DOTFILES_NATIVE_WINDOWS_VENDOR: '1'
+        run: go test -v -count=1 -timeout 8m -run '^TestWindows(VendorNativeRegistrationAndSignature|BuildToolsNativeReuseAndEnvironment)$' .
+      - name: Install, use and remove the private language prerequisites
+        if: ${{ !cancelled() }}
+        env:
+          DOTFILES_TEST_LANGUAGE_PREPARATION: '1'
+        run: go test -v -count=1 -timeout 15m -run '^TestNative(Latex|Rust|Yamllint)Preparation' .
+      - name: Install, upgrade, use and remove full Windows Git and GNU Make
+        if: ${{ !cancelled() && runner.os == 'Windows' }}
+        env:
+          DOTFILES_NATIVE_WINDOWS_GIT_MAKE: '1'
+        run: go test -v -count=1 -timeout 12m -run '^TestNativeWindowsGitAndMakeLifecycle$' .
+      - name: Install and remove the locked Neovim runtime
+        if: ${{ !cancelled() && runner.os == 'macOS' }}
+        env:
+          DOTFILES_TEST_NVIM_SYNC_BOOTSTRAP: '1'
+        run: go test -v -count=1 -timeout 12m -run '^TestNativeNvimSyncCompleteBootstrap$' .
+
+      - name: Verify public PowerShell bootstrap and legacy migration lifecycle
+        if: ${{ !cancelled() && runner.os == 'Windows' }}
+        env:
+          DOTFILES_TEST_PUBLIC_WINDOWS_MIGRATION: '1'
+        run: go test -v -count=1 -timeout 12m -run '^TestNativeWindowsPublicMigrationSetupLifecycle$' .
+
+  neovim-lifecycle:
+    name: Neovim lifecycle (${{ matrix.runner }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-26.04
+            target: linux/amd64
+          - runner: ubuntu-26.04-arm
+            target: linux/arm64
+          - runner: macos-26
+            target: darwin/arm64
+          - runner: windows-2025
+            target: windows/amd64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: installer
+        shell: bash
+    env:
+      GOTOOLCHAIN: local
+      DOTFILES_TEST_NVIM_APPLICATION: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: 1.27.1
+          cache: ${{ !startsWith(github.ref, 'refs/tags/') }}
+          cache-dependency-path: installer/go.sum
+      - name: Verify actual native runner target
+        run: test "$(go env GOHOSTOS)/$(go env GOHOSTARCH)" = '${{ matrix.target }}'
+      - name: Install, consume, update and remove the complete Neovim selection
+        run: go test -v -count=1 -timeout 80m -run '^TestNativeNeovimInstalledApplicationLifecycle$' .
+
+  desktop-lifecycle:
+    name: Desktop lifecycle (${{ matrix.runner }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-26.04
+            target: linux/amd64
+          - runner: ubuntu-26.04-arm
+            target: linux/arm64
+          - runner: macos-26
+            target: darwin/arm64
+          - runner: windows-2025
+            target: windows/amd64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 100
+    defaults:
+      run:
+        working-directory: installer
+        shell: bash
+    env:
+      GOTOOLCHAIN: local
+      DOTFILES_NATIVE_DESKTOP_FONTS: 1
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: 1.27.1
+          cache: ${{ !startsWith(github.ref, 'refs/tags/') }}
+          cache-dependency-path: installer/go.sum
+      - name: Verify actual native runner target
+        run: test "$(go env GOHOSTOS)/$(go env GOHOSTARCH)" = '${{ matrix.target }}'
+      - name: Prepare disposable Linux display and native font inspection
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends xvfb xauth dbus-x11 x11-utils libglib2.0-bin fontconfig pango1.0-tools
+      - name: Install, render, check and remove native fonts
+        run: go test -v -count=1 -timeout 12m -run '^TestNativeFontInstallConsumeRemove$' .
+      - name: Consume scoped Windows Terminal settings and verify removal
+        if: runner.os == 'Windows'
+        env:
+          DOTFILES_TEST_WINDOWS_TERMINAL: '1'
+        run: go test -v -count=1 -timeout 15m -run '^TestNativeWindowsTerminalConsumesScopedSettingsAndExits$' .
+
+      - name: Launch configured desktop applications and verify update/removal
+        env:
+          DOTFILES_NATIVE_DESKTOP: '1'
+        run: |
+          if [[ "${{ runner.os }}" == Linux ]]; then
+            dbus-run-session -- xvfb-run -a go test -v -count=1 -timeout 70m -run '^TestNativeDesktopInstalledApplicationLifecycle$' .
+          else
+            go test -v -count=1 -timeout 70m -run '^TestNativeDesktopInstalledApplicationLifecycle$' .
+          fi
+
+  fresh-homebrew:
+    name: Fresh Homebrew (macOS arm64)
+    runs-on: macos-26
+    timeout-minutes: 35
+    env:
+      GOTOOLCHAIN: local
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: 1.27.1
+          cache: ${{ !startsWith(github.ref, 'refs/tags/') }}
+          cache-dependency-path: installer/go.sum
+      - name: Prepare an actually absent Homebrew prefix on this disposable runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTIONS" = true
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          test "$(go env GOHOSTOS)/$(go env GOHOSTARCH)" = darwin/arm64
+          CGO_ENABLED=0 go -C installer test -c -o "$RUNNER_TEMP/installer.test" .
+          if [[ -e /opt/homebrew ]]; then
+            test ! -e "$RUNNER_TEMP/preinstalled-homebrew"
+            sudo mv /opt/homebrew "$RUNNER_TEMP/preinstalled-homebrew"
+          fi
+          test ! -e /opt/homebrew
+          # This job proves fresh Homebrew with the runner's Apple toolchain.
+          # Fresh Command Line Tools provisioning has a separate fixture.
+      - name: Bootstrap and verify retained infrastructure through the production worker
+        working-directory: installer
+        shell: bash
+        env:
+          DOTFILES_TEST_NATIVE_PACKAGES: '1'
+          DOTFILES_TEST_HOMEBREW_BOOTSTRAP: '1'
+        run: '"$RUNNER_TEMP/installer.test" -test.v -test.timeout=30m -test.run="^TestNativeHomebrewBootstrapFreshLifecycle$"'
+
+  fresh-debian-apt:
+    name: Fresh Debian APT (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-26.04
+            arch: amd64
+          - runner: ubuntu-26.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    container: debian:13-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f
+    timeout-minutes: 110
+    env:
+      GOTOOLCHAIN: local
+      DOTFILES_TEST_NATIVE_PACKAGES: '1'
+      DOTFILES_TEST_LINUX_FRESH: '1'
+    steps:
+      - name: Prepare the disposable Linux test host
+        shell: bash
+        run: |
+          set -euo pipefail
+          apt-get -o APT::Update::Error-Mode=any update
+          apt-get install --yes --no-install-recommends ca-certificates gcc libc6-dev
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: 1.27.1
+          cache: ${{ !startsWith(github.ref, 'refs/tags/') }}
+          cache-dependency-path: installer/go.sum
+      - name: Exercise the native provider and installed application as root without sudo
+        working-directory: installer
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(go env GOHOSTOS)/$(go env GOHOSTARCH)" = 'linux/${{ matrix.arch }}'
+          test "$(id -u)" = 0
+          if command -v sudo >/dev/null; then exit 1; fi
+          go test -race -v -count=1 -timeout 20m -run '^TestNativeLinuxAPT' .
+      - name: Install, consume, update and remove Neovim from absent Mason prerequisites
+        working-directory: installer
+        shell: bash
+        env:
+          DOTFILES_TEST_NVIM_APPLICATION: '1'
+        run: go test -v -count=1 -timeout 80m -run '^TestNativeNeovimInstalledApplicationLifecycle$' .
+
+  fresh-ubuntu-apt:
+    name: Fresh Ubuntu APT (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-26.04
+            arch: amd64
+          - runner: ubuntu-26.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    container: ubuntu:26.04@sha256:f144425ff09be612d6d9ad965196e9cdc23dae1f42110a8a11a3e9a8198759f7
+    timeout-minutes: 110
+    env:
+      GOTOOLCHAIN: local
+      DOTFILES_TEST_NATIVE_PACKAGES: '1'
+      DOTFILES_TEST_LINUX_FRESH: '1'
+    steps:
+      - name: Prepare the disposable Linux test host
+        shell: bash
+        run: |
+          set -euo pipefail
+          apt-get -o APT::Update::Error-Mode=any update
+          apt-get install --yes --no-install-recommends ca-certificates gcc libc6-dev
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: 1.27.1
+          cache: ${{ !startsWith(github.ref, 'refs/tags/') }}
+          cache-dependency-path: installer/go.sum
+      - name: Exercise the native provider and installed application as root without sudo
+        working-directory: installer
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(go env GOHOSTOS)/$(go env GOHOSTARCH)" = 'linux/${{ matrix.arch }}'
+          test "$(id -u)" = 0
+          if command -v sudo >/dev/null; then exit 1; fi
+          go test -race -v -count=1 -timeout 20m -run '^TestNativeLinuxAPT' .
+      - name: Install, consume, update and remove Neovim from absent Mason prerequisites
+        working-directory: installer
+        shell: bash
+        env:
+          DOTFILES_TEST_NVIM_APPLICATION: '1'
+        run: go test -v -count=1 -timeout 80m -run '^TestNativeNeovimInstalledApplicationLifecycle$' .
+
+  missing-apple-clt:
+    name: Missing Apple developer tools (macOS arm64)
+    runs-on: macos-26
+    timeout-minutes: 40
+    env:
+      GOTOOLCHAIN: local
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: 1.27.1
+          cache: ${{ !startsWith(github.ref, 'refs/tags/') }}
+          cache-dependency-path: installer/go.sum
+      - name: Prepare missing Apple tools while retaining Homebrew on this disposable runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTIONS" = true
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          test "$(go env GOHOSTOS)/$(go env GOHOSTARCH)" = darwin/arm64
+          test -x /opt/homebrew/bin/brew
+          CGO_ENABLED=0 go -C installer test -c -o "$RUNNER_TEMP/installer.test" .
+          baseline="$RUNNER_TEMP/preinstalled-apple-tools"
+          DOTFILES_TEST_NATIVE_PACKAGES=1 DOTFILES_TEST_APPLE_CLT=1 "$RUNNER_TEMP/installer.test" -test.v -test.timeout=5m -test.run='^TestNativeAppleCLTPreinstalledReuse$'
+          # Inspect payload files, not receipt directory records, before moves.
+          receipts="$(pkgutil --pkgs)"
+          while IFS= read -r receipt; do
+            case "$receipt" in
+              com.apple.pkg.CLTools*)
+                info="$(pkgutil --pkg-info "$receipt")"
+                printf '%s\n' "$info"
+                printf '%s\n' "$info" | /usr/bin/awk -F': ' -v package="$receipt" '
+                  $1 == "package-id" {if ($2 != package) exit 1; ids++}
+                  $1 == "volume" {if ($2 != "/") exit 1; volumes++}
+                  $1 == "location" {if ($2 != "/") exit 1; locations++}
+                  END {if (ids != 1 || volumes != 1 || locations != 1) exit 1}'
+                members="$(pkgutil --only-files --files "$receipt")"
+                printf '%s' "$members" | /usr/bin/awk '
+                  /^Library\/Developer\/CommandLineTools\// {
+                    n=split($0, parts, "/")
+                    valid=1
+                    for (i=1;i<=n;i++) if (parts[i]=="." || parts[i]==".." || parts[i]=="") valid=0
+                    if (valid) next
+                  }
+                  {
+                    invalid++
+                    if (invalid <= 20) printf "CLT receipt has an outside or noncanonical payload file: %.256s\n", $0 > "/dev/stderr"
+                  }
+                  END {
+                    if (invalid > 20) printf "CLT receipt has %d additional invalid payload files\n", invalid-20 > "/dev/stderr"
+                    if (invalid) exit 1
+                  }
+                '
+                ;;
+            esac
+          done <<< "$receipts"
+          # Historical receipts remain unchanged; only payloads move aside.
+          shopt -s nullglob
+          for application in /Applications/Xcode*.app; do
+            sudo mv "$application" "$baseline/"
+          done
+          if [[ -e /Library/Developer/CommandLineTools ]]; then
+            sudo mv /Library/Developer/CommandLineTools "$baseline/"
+          fi
+          sudo xcode-select --reset
+          unset DEVELOPER_DIR SDKROOT TOOLCHAINS
+          if selected="$(LC_ALL=C xcode-select --print-path 2>&1)"; then exit 1; else status=$?; fi
+          test "$status" = 2
+          test "$selected" = $'xcode-select: error: Unable to get active developer directory. Use `sudo xcode-select --switch path/to/Xcode.app` to set one (or see `man xcode-select`)'
+      - name: Install the advertised Apple tools and compile an SDK program
+        working-directory: installer
+        shell: bash
+        env:
+          DOTFILES_TEST_NATIVE_PACKAGES: '1'
+          DOTFILES_TEST_APPLE_CLT: '1'
+        run: '"$RUNNER_TEMP/installer.test" -test.v -test.timeout=35m -test.run="^TestNativeAppleCLTMissingPayloadWithExistingHomebrew$"'
+
+  fresh-windows-vendor:
+    name: Fresh Windows vendor (${{ matrix.recipe }})
+    runs-on: windows-2022
+    timeout-minutes: 85
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - recipe: VC-runtime
+            test: TestWindowsVendorNativeOwnedLifecycle
+            flag: DOTFILES_NATIVE_WINDOWS_VENDOR_INSTALL
+          - recipe: Build-Tools
+            test: TestWindowsBuildToolsNativeOwnedLifecycle
+            flag: DOTFILES_NATIVE_WINDOWS_BUILDTOOLS_INSTALL
+    env:
+      GOTOOLCHAIN: local
+      # Distinct fresh containers prevent Build Tools from preinstalling the
+      # runtime before its separate fresh/changed-version lifecycle assertion.
+      WINDOWS_TEST_IMAGE: mcr.microsoft.com/dotnet/framework/runtime:4.8-windowsservercore-ltsc2022@sha256:3983348680840ca6e53ad641e314c3c9184ca2fd19f88bc467600f7d9f6e9d73
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: 1.27.1
+          cache: ${{ !startsWith(github.ref, 'refs/tags/') }}
+          cache-dependency-path: installer/go.sum
+      - name: Compile fixture and verify the disposable Windows container engine
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_ENVIRONMENT -ne 'github-hosted') { throw 'Disposable runner required' }
+          if ((go env GOHOSTOS) -ne 'windows' -or (go env GOHOSTARCH) -ne 'amd64') { throw 'Native Windows amd64 required' }
+          if ((docker info --format '{{.OSType}}') -ne 'windows') { throw 'Native Windows container engine required' }
+          $fixture = Join-Path $env:RUNNER_TEMP 'vendor-native'
+          New-Item -ItemType Directory -Path $fixture | Out-Null
+          $env:CGO_ENABLED = '0'
+          go -C installer test -c -o (Join-Path $fixture 'installer.test.exe') .
+          if ($LASTEXITCODE -ne 0) { throw 'Native fixture compilation failed' }
+          docker pull $env:WINDOWS_TEST_IMAGE
+          if ($LASTEXITCODE -ne 0) { throw 'Pinned Windows test image unavailable' }
+      - name: Verify fresh install, update, repair and exact removal
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $fixture = Join-Path $env:RUNNER_TEMP 'vendor-native'
+          docker run --rm --isolation=process --memory 4g --storage-opt size=60G `
+            --mount "type=bind,source=$fixture,target=C:\fixtures,readonly" `
+            --env GITHUB_ACTIONS=true --env RUNNER_ENVIRONMENT=github-hosted `
+            --env DOTFILES_NATIVE_WINDOWS_VENDOR=1 --env '${{ matrix.flag }}=1' `
+            --workdir C:\fixtures --entrypoint C:\fixtures\installer.test.exe `
+            $env:WINDOWS_TEST_IMAGE '-test.v' '-test.timeout=70m' '-test.run=^${{ matrix.test }}$'
+          if ($LASTEXITCODE -ne 0) { throw 'Native vendor lifecycle failed' }

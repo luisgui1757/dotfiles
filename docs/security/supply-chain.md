@@ -1,67 +1,43 @@
 # Supply-chain identities
 
-Executable content is installed or executed only after it is bound to a
-reviewed immutable identity. Package-manager catalog names are not treated as
-proof for the direct-artifact paths below.
+The current installer has two explicit package boundaries: reviewed private
+archives and native package managers. The catalog is
+[`installer/resources.json`](../../installer/resources.json); reviewed archive
+identities are [`installer/archive-pins.json`](../../installer/archive-pins.json).
+Neither a package name nor a version print proves downloaded bytes.
 
-| Surface | Reviewed identity | Enforcement |
-|---|---|---|
-| v0.4.4 Nix prerequisite | Upstream Nix `2.34.0`; archive SHA-256: aarch64-darwin `47cb78c9fdc7b630dbbb9a89869c8e8bcd8c9eb17be036fba18585120693a4c1`, x86_64-linux `5676b0887f1274e62edd175b6611af49aa8170c69c16877aa9bc6cebceb19855`, aarch64-linux `cfddd4008b57a71464a16d5232cba79b1c76ae9dc81bbf71b4972b0118bc29c5`; daemon script input to reviewed-output SHA-256: aarch64-darwin `832c033bac08eac43e2749427cb3e85d12f11d34685f44153bf044c6d32fafd0` to `de0074c29f938cac623e0734e359021a5a6b595b8969908ca7c4ef3598b88332`, x86_64-linux `328dc650e29350b3d87f48b4b46e564458a5f2e413abb598c271fca3191f35d1` to `02ed7d08aea2c191cfefda3f7e21aa17a10cc9384debe494f7a4c1357b65bff1`, aarch64-linux `d287e7cc727ccfa49e1a4756636c8292bda00c0d0743e79035ceddc7a42a45ae` to `54c0a6e1678c4c26a28d5bf638b8654ee12b2173ba0be521be24346d4de14eff` | One isolated official-remote advertisement selects the source identity. The unique annotated release is the default and the local tag object, peeled commit, and HEAD must match it. The explicit `--allow-unreleased` field-test lane may instead accept only a clean checkout whose HEAD equals a current branch head in that same official advertisement; forks, dirty trees, and stale/local-only commits remain rejected. The installer downloads one versioned `releases.nixos.org` tarball with HTTPS/TLS constraints, compares the review-pinned SHA-256, and rejects unsafe archive paths. For daemon mode, the wrapper then requires the exact platform-specific `install-multi-user` hash, deterministically guards its single `configure_shell_profile` call, normalizes copied and pre-existing store paths to read-only/traversable modes despite restrictive invoking umasks, and requires the complete platform-specific patched hash before execution. Only that local reviewed output runs with upstream `--yes`, `--no-channel-add`, `--no-modify-profile`, `NIX_INSTALLER_NO_MODIFY_PROFILE=1`, and the reviewed `nix-command flakes` config. The unused mutable `nixpkgs-unstable` channel is never added or fetched; setup uses locked flakes and the activated Linux profile prefers the managed host's system CA bundle. Setup/Home Manager own shell activation. Daemon installs persist the Nix features through the upstream config flag; single-user Linux merges the same additive user setting. Other platforms are rejected before download. |
-| v0.1.0 to v0.2.0 release sources | v0.1.0 tag object `a3b4d6d7b6d289959cac68d76faec96219b3e310`, peeled commit `015617362830280bf85c7142e69d0681d376d453`; v0.2.0 tag object `cd9a60436b3064c5e2f6ed5bfd8ae0f5297f1b49`, peeled commit `22cfad80e904e003f52932ae6d6403520df00d3c` | Preflight binds local tags to the official remote and requires clean side-by-side checkouts. Before mutation, both migrators archive the exact commits into private recovery, fingerprint the extracted trees, and bind apply/readback/rollback to those frozen sources. Retained-checkout drift cannot change a transaction write. |
-| v0.1.0 to v0.3.0 release sources | v0.1.0 tag object `a3b4d6d7b6d289959cac68d76faec96219b3e310`, peeled commit `015617362830280bf85c7142e69d0681d376d453`; v0.3.0 tag object `473f675e863640484d4d11349bf69d01def12c43`, peeled commit `c8507312153620b9b30fe2c84980c62bccb3b25a` | Both migrators require the exact local/official annotated-tag mapping before mutation, then archive the exact commits into private recovery, fingerprint the extracted trees, and bind apply/readback/rollback to those frozen sources. A branch, missing/lightweight/moved tag, or retained-checkout drift cannot authorize or change a transaction write. |
-| v0.1.0 to v0.4.0 release sources | v0.1.0 tag object `a3b4d6d7b6d289959cac68d76faec96219b3e310`, peeled commit `015617362830280bf85c7142e69d0681d376d453`; v0.4.0 tag object `1539e550ac45d0a9732f329cb1ae3fb13bb078a8`, peeled commit `6317b375a0724804d7a8d895753364cc036e5658` | Both migrators require the exact local/official annotated-tag mapping before mutation, then archive the exact commits into private recovery, fingerprint the extracted trees, and bind apply/readback/rollback to those frozen sources. A branch, missing/lightweight/moved tag, or retained-checkout drift cannot authorize or change a transaction write. |
-| v0.1.0 to v0.4.1 release sources | v0.1.0 tag object `a3b4d6d7b6d289959cac68d76faec96219b3e310`, peeled commit `015617362830280bf85c7142e69d0681d376d453`; v0.4.1 tag object `558d19a8c62453f68e5463e8999b216e0b692551`, peeled commit `bac8cc97177b3bb58119fde5720b31e6b57febcc` | Both migrators require the exact local/official annotated-tag mapping before mutation, then archive the exact commits into private recovery, fingerprint the extracted trees, and bind apply/readback/rollback to those frozen sources. A branch, missing/lightweight/moved tag, or retained-checkout drift cannot authorize or change a transaction write. |
-| v0.1.0 to v0.4.2 release sources | v0.1.0 tag object `a3b4d6d7b6d289959cac68d76faec96219b3e310`, peeled commit `015617362830280bf85c7142e69d0681d376d453`; v0.4.2 tag object `807b2f8bb47ae9c7e132f1f8a218cf19c9ae2c61`, peeled commit `fdd628b34a58a3ecf3a1bef3de72f7cd4ac7dfc0` | Both migrators require the exact local/official annotated-tag mapping before mutation, then archive the exact commits into private recovery, fingerprint the extracted trees, and bind apply/readback/rollback to those frozen sources. A branch, missing/lightweight/moved tag, or retained-checkout drift cannot authorize or change a transaction write. |
-| v0.1.0 to v0.4.3 release sources | v0.1.0 tag object `a3b4d6d7b6d289959cac68d76faec96219b3e310`, peeled commit `015617362830280bf85c7142e69d0681d376d453`; v0.4.3 tag object `72232aee30201506320889a0c82be515041b9674`, peeled commit `e3e459a20c23ae546b26d5206d13b648b29e8788` | Both migrators require the exact local/official annotated-tag mapping before mutation, then archive the exact commits into private recovery, fingerprint the extracted trees, and bind apply/readback/rollback to those frozen sources. A branch, missing/lightweight/moved tag, or retained-checkout drift cannot authorize or change a transaction write. |
-| v0.1.0 to v0.4.4 release sources | v0.1.0 tag object `a3b4d6d7b6d289959cac68d76faec96219b3e310`, peeled commit `015617362830280bf85c7142e69d0681d376d453`; v0.4.4 tag object `5c19cfaa19087b286d867c2bf422d33f76c64887`, peeled commit `05874e536372f6a73f8971c84e675e95666662d4` | Both migrators require the exact local/official annotated-tag mapping before mutation, then archive the exact commits into private recovery, fingerprint the extracted trees, and bind apply/readback/rollback to those frozen sources. A branch, missing/lightweight/moved tag, or retained-checkout drift cannot authorize or change a transaction write. |
-| Pi CLI | `@earendil-works/pi-coding-agent@1.0.4`, SRI `sha512-+956nfMFHr5lDUVY/2Q4k+YzojzBuCaBXFgj0eSlXVGr7QVliVddKdc1Pz6yVg1dOlJQmb67doOVrlMsIcIdaw==` | Both `npm pack` metadata and the downloaded coding-agent tarball bytes must match. npm receives that local verified tarball plus exact `1.0.4` specs for `pi-agent-core`, `pi-ai`, `pi-tui`, `pi-mcp`, `pi-codemode`, `chord`, and `pi-telemetry`, preventing later companion publishes from creating a mixed Pi runtime. Pi 1.0 removed its published npm shrinkwrap; other transitive dependencies still resolve through npm. |
-| Pi Rose Pine themes | Archived `zenobi-us/pi-rose-pine` commit `9b342f6e16d6b28c00c2f888ba2f050273981bdb`; MIT license preserved in `LICENSES/zenobi-us-pi-rose-pine-MIT.txt` | The three canonical data-only `main`, `moon`, and `dawn` themes retain the source variables/export, add the current Pi `$schema` URL, and intentionally apply the documented Fable token choices. Tests bind all three hashes, official palettes, 39 variables, 51-token schemas, and customized roles. |
-| Herdr | Direct Linux stable `v0.9.3`: x86_64 `18a8dc65f1c2fa485884344356dea1cfd911c6f06cf46fa78e193f4087f4dba7`, arm64 `4de7aa3e25678812e92960de64f7c2aaa1bca1f0f80a3c5e559837e231e1f5c0`; Windows `preview-2026-07-21-0f10e1453a7f`, x64 `75c85763db0ca5fd13b485d0728cc3e9ea1152964a4e976e1d49f2e86b01a92b` | Direct-artifact installers verify the architecture-specific SHA-256 before publication. Homebrew platforms consume the mutable current formula, bounded by hosted proof to stable `0.7.x >= 0.7.5` or `0.9.x >= 0.9.3` and acceptance of the managed config. Managed direct workspace jumps use `prefix+Ctrl+Alt+1..9`; shifted digits remain punctuation so `prefix+$` is unambiguously workspace rename. |
-| Windows Tree-sitter CLI | `v0.27.0`; x64 `46188d31c1f3847307b03e92f3a3f60606eb04147609e26cdd50a07f7d0b35da`; arm64 `e44462444fa7fc873b07e6d0735c6772980c7be6024184b40529a17904da58bf`; x86 `88510ef8cd1d4fdf3b97dc19298d3e31736226a9f53ab9ec3749d056ce3536c4` | Architecture-specific release zip hash plus executable version validation before and after atomic publication. |
-| gh-dash | tag `v4.26.0`; tag object `17b8f7d6a21d79172f0f2309b607643a215c780f`; peeled commit `c6dfbc17edfdbf1060fc06efe6aabb34f6a725f0` | Remote tag mapping is checked, then `gh extension install --pin` receives the release tag required for a binary extension. |
-| Hosted Ubuntu PowerShell | PowerShell 7 supplied by the `ubuntu-26.04` runner image | CI requires `pwsh` on PATH and executes a version check before static parsing; missing or older runtimes fail the job. No additional repository package or remote script is installed. |
-| Ghostty Debian-family packages | `mkasberg/ghostty-ubuntu` `1.3.1-0-ppa2`; Ubuntu 24.04 amd64 `478d440153ef544426418efc7d6d8901715359f452c46be29071901a94b8cd47`, arm64 `91063815b6ce3d834d59714b4ad0310f744448b6716836d035b3d331d1923363`; Ubuntu 25.10 amd64 `793bde1c31163d8e1d12ea939c8b941f7908170e57bbf19b121434a0f6621c59`, arm64 `c6a4fd4fd786b4bdea42036650ef1724f535c4b636329f488f7ece36820d3d6b`; Debian trixie amd64 `9fda8e418d7a7f58149ba3ba823a255d6b80f8bb5431b3bd7e912ff597715b2e`, arm64 `73f384e62c419d7a7809d686bf579fea5e23f52742b34f70c74d6adf0e72f8ab` | Setup maps reviewed distro/architecture pairs to one release URL, verifies SHA-256 and exact dpkg package/architecture/version metadata before privileged apt, then validates installed version plus command. The upstream script and its mutable `releases/latest` lookup are never executed. |
-| Windows Terminal Sandbox helper | Production `v1.25.2733.0` x64 portable zip, SHA-256 `bf3ef2012f6c44d8340a4c58125acc9498d19b580f9890dc043cdf831852e796` | The helper imports the production pin, verifies it, transactionally publishes the portable tree, and delegates settings to setup. It never queries `releases/latest` or mirrors packaged settings. |
-| Local Linux owner lifecycle container | `ubuntu:24.04@sha256:4fbb8e6a8395de5a7550b33509421a2bafbc0aab6c06ba2cef9ebffbc7092d90`; `nixos/nix:2.34.0@sha256:b9c9611c8530fa8049a1215b20638536e1e71dcaf85212e47845112caf3adeea` | The checked Dockerfile uses digest-bound base images, copies the reviewed Nix store into the Ubuntu fixture, and runs the real lifecycle as a non-root user. No mutable image tag selects executed bytes. |
-| Zsh plugins | fzf-tab `d7e0234614dbe5369fdd760907d12c0e05a4dccc`; zsh-autosuggestions `e52ee8ca55bcc56a17c828767a3f98f22a68d4eb` | One publisher quarantines unproved sourceable paths, fetches the exact commit into a sibling stage, verifies origin/HEAD/cleanliness/tracked entry file, and atomically publishes. |
+| Surface | Identity and enforcement |
+|---|---|
+| Checkout bootstrap | Pinned Go archive and SHA-256, verified before extraction; build identity includes the runtime and embedded source inputs. Personal Go settings, workspaces and external cache programs cannot alter the build. |
+| Private tools and desktop apps | Exact upstream URL/version/SHA-256, bounded safe archive extraction, declared required files, private generation publication and recorded content identity. Update reconciles reviewed pins in the checkout. |
+| Rust and Python tools | Rust's six upstream components are independently verified and combined without upstream install scripts. LaTeX conversion and Yamllint use private venvs with pinned offline sources/wheels; complete Python identity is part of the desired state. |
+| Pi | Pinned standalone upstream archive with runtime assets and native helpers. Node/npm and Git support Pi package features without changing a global npm prefix. User-added packages follow Pi's own package workflow. |
+| Neovim | Locked plugin sources, reviewed parser/tool recipes and a private generated runtime. Check loads the existing runtime without triggering package repair. |
+| Shell/tmux plugins and Sentinel | Pinned source archives or exact generated policy, source corrections restricted to reviewed fresh payloads, and retained upstream license/provenance. No runtime remote-script pipeline. |
+| Ubuntu/Debian native packages | Actual APT/dpkg transactions and metadata; ownership is attributed to the operation, never an inventory difference. Native repositories resolve system packages under their own trust model. |
+| macOS native packages | Actual Homebrew formula transactions and native dependency/linkage checks. Existing infrastructure remains unowned; verified fresh bootstrap is retained infrastructure. Apple CLT uses Apple's advertised signed packages. |
+| Windows vendor tools | Pinned bootstrapper bytes plus valid Microsoft Authenticode and native registration/operation evidence. Build Tools resolves Microsoft's signed servicing packages; its bootstrap hash is not a claim that those changing components are individually pinned. |
+| Windows Terminal | Pinned official unpackaged stable ZIP; scoped settings at the observed LocalAppData path. Store/Preview/Canary are independent. |
+| Ghostty on Linux | One reviewed Debian-family archive per architecture, extracted privately; native APT supplies declared system libraries. No upstream repository-add script or DEB maintainer script executes. |
+| Hosted actions and containers | Full action commit SHAs and immutable container digests; native jobs verify their actual OS/architecture. |
 
-`tests/static/supply_chain_remote_execution_test.sh` rejects remote-eval
-patterns, unchecked downloaded PowerShell executables, and downloads that flow
-to privileged package installation without an intervening SHA-256 check. Its
-privileged-flow model includes the repository's `maybe_sudo` and
-`verify_sha256` helpers, with positive and negative self-tests.
-`tests/static/repo_policy_test.sh` requires every external GitHub Actions
-`uses:` reference to be a full lowercase 40-hex commit SHA.
+Existing packages, foreign files and personal data never acquire deletion
+authority merely by matching a package name. Removal verifies saved ownership and
+current native consumers; it does not run global autoremove. Failed or unknown
+native operations require reconciliation before another mutation.
 
-Release publication itself is also identity-bound. `release/manifest.json`
-selects the exact repository, workflow, current/previous tag, reviewed notes,
-and four logical proof contracts. A published manifest points to a checked-in
-closure proof under `release/proofs/`; the draft release carries a separate
-pre-publication `release-proof.json` asset whose GitHub-computed SHA-256 is
-recorded by that closure. `scripts/release.py` refuses tag creation until the
-unique merged preparation PR, identical tree, required checks, full local gate,
-and release-range scan pass, and refuses immutable publication until the
-cache-free exact-tag matrix, downloaded proofs, proof scan, credential-free
-public clone, draft body, and asset digest all read back exact. The operator's
-typed tag-plus-full-SHA phrase is the only irreversible transition.
+Archive/bootstrap pin updates remain reviewed maintenance in this major release.
+Update hashes together with extraction/layout and native-consumption evidence.
+Renovate covers only sources in its generated extraction inventory; do not claim
+that it maintains archive hashes that it does not extract.
 
-The checked-in safeguard script also requests repository-level Actions SHA
-pinning. At the start of the 2026-07-10 closure branch the live API reported
-`sha_pinning_required: false`; this branch does not mutate live settings. After
-merge and exact cache-free proof, the owner must run the script's no-write
-preflight and apply. It accepts only the expected legacy-to-stable transition,
-requires public repository visibility, captures the old
-Actions/integrity/classic state before writing, and restores all three on
-failure. Restore freezes and exact-policy-validates every consumed snapshot file
-against the manifest's captured Git commit—which must still be live `main`—
-before publishing only those bytes; incomplete, altered, or cross-stage recovery
-material cannot reach a live write.
-Apply likewise derives every desired payload
-from exact committed objects after the second live capture, freezes the complete
-set in a private read-only directory, and never publishes mutable checkout
-bytes. The apply verifies the live value becomes `true`.
+Release publication follows [RELEASING.md](../RELEASING.md) and
+`release/manifest.json`. Future release certification uses exact-head native
+installer jobs and captured evidence; historical published proofs remain
+immutable. Checked-in branch-protection policy is separate from live GitHub
+configuration; its cutover is documented in
+[branch protection](branch-protection.md).
 
-The LaTeX converter build backend is `setuptools==84.0.0`; both installers
-require wheel SHA-256
-`51a52592b3b99e102b609654876bd65f19f999935166d1352678931132b0c670`
-before building the independently hash-pinned `pylatexenc==2.11` source.
+The [previous supply-chain guide](https://github.com/luisgui1757/dotfiles/blob/ae9a6446eb0a837a144d77d2a6345db967c61e4e/docs/security/supply-chain.md)
+preserves Nix/chezmoi-era identities and enforcement for historical releases.
+Those installers and their fallback package-manager chains are retired.

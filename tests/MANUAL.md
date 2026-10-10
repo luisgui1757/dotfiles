@@ -1,5 +1,9 @@
 # Manual test checklist
 
+> Historical Nix/chezmoi release material. Commands below apply only at their
+> recorded revisions; retired launchers are not part of the new installer. Use
+> [the current guide](../README.md) and its linked installer status for this major release.
+
 The automated suite covers the deterministic surface. Some things only
 make sense to verify by eye — keep this checklist alongside any
 significant change to the relevant area.
@@ -88,10 +92,7 @@ choosing the release to validate. Known failures remain failures in the evidence
       It must NOT auto-launch a multiplexer -- you get a bare shell.
 - [ ] **WezTerm** in light mode (e.g. fresh GNOME Ubuntu / macOS light): STAYS
       Rose Pine dark, same forced-dark rule as Ghostty.
-- [ ] **psmux inside WezTerm** (Windows): open WezTerm, run `psmux`, confirm the
-      pane renders without a config-load freeze, no runaway `psmux.exe`/`conhost`
-      CPU, the generated Rose Pine bar draws, and `pwsh` prediction/MenuComplete
-      still work inside the pane (same smoke as psmux inside Windows Terminal).
+
 - [ ] **Windows Terminal**: rose-pine scheme applied; tabs use the
       configured theme; acrylic OFF on the body, ON in the tab row; a new tab
       opens `PowerShell 7` unless the user intentionally chose another default.
@@ -116,19 +117,7 @@ choosing the release to validate. Known failures remain failures in the evidence
       empty bar space follows terminal transparency,
       prefix is `C-b`,
       `prefix r` reloads the conf and shows the "reloaded" message.
-- [ ] **psmux status bar**: on a fresh `psmux` launch, with no manual command,
-      the generated Rose Pine config (`~/.tmux.rose-pine.main.conf` by default)
-      draws the same rounded pill bar as POSIX tmux at the top: session/window
-      list on the left, directory basename on the right, foam session accent,
-      gold active-window number, muted inactive-window number, icons render, no
-      config warnings, empty bar space follows terminal transparency, no
-      config-load freeze, no sustained CPU spike, and no clipped final cell at
-      the right edge. Switch flavor:
-      `psmux set -g @rosepine-variant moon; psmux source-file ~/.tmux.windows.conf`.
-- [ ] **psmux manual restore**: save a named session with `prefix C-s`; confirm
-      the `run-shell` `Saved to ...` popup is only output and closes with `q` or
-      Esc. Kill the server, start `psmux new-session -s recovery`, restore with
-      `prefix C-r`, then use `prefix w` to select the restored named session.
+
 - [ ] **Starship prompt**: shows dir, git branch, git status icons
       (untracked/modified/staged), trailing time, and no opaque background
       blocks behind prompt text. The final Rose glyph on the right-aligned time
@@ -182,14 +171,14 @@ choosing the release to validate. Known failures remain failures in the evidence
       (`~/.local/bin/herdr`), not a remote-eval install. On native Windows,
       confirm `herdr.exe` resolves from `%LOCALAPPDATA%\Programs\Herdr\bin`, not
       `herdr.dev/install.ps1`; the Windows build is preview beta / ConPTY-backed,
-      so verify it does not freeze in Windows Terminal, WezTerm, or psmux before
+      so verify it does not freeze in Windows Terminal or WezTerm before
       treating it as a daily driver.
 
 ## Shell tooling
 
 - [ ] **zoxide**: after visiting a few directories, `z <partial>` jumps to the
       best-matching one and `zi` opens the interactive picker — in BOTH a fresh
-      zsh and a fresh PowerShell (incl. inside psmux). Plain `cd` is unchanged.
+      zsh and a fresh PowerShell (incl. inside Herdr). Plain `cd` is unchanged.
 - [ ] **which-key**: in nvim press `<leader>` and pause past `timeoutlen`; a
       popup lists the follow-up keys. `<leader>?` shows the buffer-local keymaps;
       `:WhichKey` opens the explicit all-keymaps popup and Esc closes it.
@@ -232,11 +221,9 @@ choosing the release to validate. Known failures remain failures in the evidence
       `EditMode = Vi`. `Esc` enters command mode (cursor becomes a block on
       Windows Terminal); `Tab` still opens MenuComplete while typing, `Up`/`Down`
       history-search, and PSFzf `Ctrl+R`/`Ctrl+T`/`Alt+C` still work.
-- [ ] **PowerShell vi mode inside psmux**: open a fresh psmux pane, wait for the
-      prompt to settle (the `OnIdle` re-apply runs ~300 ms in), then confirm
-      `Get-PSReadLineOption` still shows `EditMode = Vi`, `Tab` = MenuComplete,
-      the ListView history prediction is back, and the PSFzf `Ctrl+R` picker
-      still works (the re-apply must NOT have wiped the fzf chords).
+- [ ] **PowerShell vi mode inside Herdr**: open a fresh pane and confirm
+      `EditMode = Vi`, Tab completion, ListView prediction, and the PSFzf
+      Ctrl+R picker. No delayed profile reapplication should be needed.
 - [ ] **PowerShell invocation guard on Windows**: run the profile through
       `pwsh -NonInteractive -Command`, a credential-helper-shaped `-Command`,
       redirected stdin/stdout, and a CI subprocess. Confirm zero prompt output

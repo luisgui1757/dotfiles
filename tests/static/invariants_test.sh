@@ -71,31 +71,12 @@ for profile_template in \
 done
 [[ "$fail" -ne 0 ]] || echo "ok  : Windows known-folder overlays target the canonical PowerShell profile"
 
-# psmux freeze guard. The native-clipboard probes use `if-shell`, which spawns a
-# shell at config-LOAD time; under psmux/ConPTY on Windows that shell never
-# returns and hangs the whole config load. Those probes live ONLY in the
-# POSIX-only tmux.posix.conf overlay (sourced via `source-file -q`, absent on
-# Windows). The cross-platform tmux.conf -- and its byte-identical chezmoi mirror
-# -- must contain NO command-position `if-shell`. tmux.posix.conf legitimately
-# does, so it is deliberately NOT in this check's file set.
-check_absent "no load-time if-shell in cross-platform tmux.conf (psmux freeze guard)" \
-    "^[[:space:]]*if-shell" \
-    tmux/tmux.conf home/dot_tmux.conf
-
-check_absent "tmux overlay source paths keep unquoted tilde for psmux" \
-    'source-file -q "~/' \
-    tmux/tmux.conf home/dot_tmux.conf
-
-check_absent "psmux-parsed tmux configs avoid unsupported terminal-features warnings" \
-    "^[[:space:]]*set[[:space:]][^#]*terminal-features" \
-    tmux/tmux.conf home/dot_tmux.conf tmux/tmux.windows.conf home/dot_tmux.windows.conf
-
-for posix_conf in tmux/tmux.posix.conf home/dot_tmux.posix.conf; do
-    if ! grep -Fx "set -as terminal-features ',*:extkeys'" "$posix_conf" >/dev/null; then
-        echo "FAIL: $posix_conf must keep tmux extended-key terminal-features in the POSIX-only overlay"
-        fail=1
-    fi
-done
+# Only the active configuration carries current terminal behavior. Released
+# home/dot_tmux.conf remains exact migration evidence, checked by the inventory test.
+if ! grep -Fx "set -as terminal-features ',*:extkeys'" tmux/tmux.conf >/dev/null; then
+    echo "FAIL: tmux/tmux.conf must keep extended-key terminal-features on macOS/Linux"
+    fail=1
+fi
 
 if find tmux/themes -type f -name '*.conf' 2>/dev/null | grep -q .; then
     echo "FAIL: local tmux theme snippets must stay deleted; use upstream Rose Pine variants"
@@ -105,24 +86,23 @@ else
     echo "ok  : no local tmux theme snippets"
 fi
 
-# The Rose Pine bar is a single repo-owned generated config sourced by BOTH tmux
-# and psmux. It must own only multiplexer context (session/windows/directory);
+# The Rose Pine bar is a single repo-owned generated config sourced by tmux. It must own only multiplexer context (session/windows/directory);
 # date/time, user, host stay with Starship. The old rose-pine/tmux plugin is
 # retired -- POSIX must not reference it.
-if grep -F '%a %d %b %H:%M' tmux/psmux-rose-pine.main.conf >/dev/null; then
+if grep -F '%a %d %b %H:%M' tmux/rose-pine.main.conf >/dev/null; then
     echo "FAIL: generated Rose Pine main config must leave date/time to Starship"
     fail=1
-elif grep -Eq '#\{(user|host_short)\}' tmux/psmux-rose-pine.main.conf; then
+elif grep -Eq '#\{(user|host_short)\}' tmux/rose-pine.main.conf; then
     echo "FAIL: generated Rose Pine main config must not duplicate Starship user/host context"
     fail=1
-elif ! grep -F '#{b:pane_current_path} ' tmux/psmux-rose-pine.main.conf >/dev/null; then
+elif ! grep -F '#{b:pane_current_path} ' tmux/rose-pine.main.conf >/dev/null; then
     echo "FAIL: generated Rose Pine main config must keep directory context with a trailing safety cell"
     fail=1
-elif grep -F 'rose-pine/tmux' tmux/tmux.posix.conf >/dev/null; then
+elif grep -F 'rose-pine/tmux' tmux/tmux.conf >/dev/null; then
     echo "FAIL: POSIX tmux must not use the rose-pine/tmux plugin (bar is a repo-owned generated config)"
     fail=1
 else
-    echo "ok  : tmux/psmux own session/windows/directory only; Starship owns user/host/time"
+    echo "ok  : tmux own session/windows/directory only; Starship owns user/host/time"
 fi
 
 # Lazy-load discipline: only rose-pine should be lazy=false
@@ -166,8 +146,7 @@ else
 fi
 
 if lazy_sync_hits=$(grep -rnF '+Lazy! sync' \
-    setup.sh setup.ps1 .github/workflows/e2e-install.yml \
-    tests/greenfield/validate.sh tests/greenfield/validate.ps1 \
+    installer/nvim_sync.go .github/workflows/installer-engine.yml \
     tests/nvim/spec/startup_spec.lua); then
     echo "FAIL: setup and validation paths must use Lazy! restore, not Lazy! sync"
     echo "$lazy_sync_hits"
@@ -229,13 +208,6 @@ if ! grep -Fq '.\test.ps1' .github/workflows/test.yml; then
     fail=1
 else
     echo "ok  : Windows CI uses test.ps1"
-fi
-
-if ! grep -Fq "Join-Path \$repo 'lazygit\config.windows.yml'" .github/workflows/e2e-install.yml; then
-    echo "FAIL: Windows e2e must assert native lazygit config.windows.yml, not the POSIX/default config"
-    fail=1
-else
-    echo "ok  : Windows e2e asserts the native lazygit config variant"
 fi
 
 if [[ ! -f AGENTS.md ]] || ! grep -q 'CLAUDE.md' AGENTS.md; then
@@ -359,7 +331,7 @@ fi
 # manually. Scope: every .lua under nvim/, tests/nvim/, linux/. Portable
 # `grep -E "^<TAB>"` via printf so this passes on BSD grep (macOS) too.
 tab_pat="$(printf '^\t')"
-tab_indented_lua=$(find nvim tests/nvim linux wezterm -name '*.lua' -type f \
+tab_indented_lua=$(find nvim tests/nvim linux -name '*.lua' -type f \
     -exec grep -lE "$tab_pat" {} + 2>/dev/null || true)
 if [[ -n "$tab_indented_lua" ]]; then
     echo "FAIL: .lua files have tab indentation (should be spaces):"

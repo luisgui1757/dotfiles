@@ -1,0 +1,75 @@
+{
+  "tool.git": {
+    "version": "2.56.0.windows.2",
+    "url": "https://github.com/git-for-windows/git/releases/download/v2.56.0.windows.2/PortableGit-2.56.0.2-64-bit.7z.exe",
+    "sha256": "075e158ef8e1f0ab80b347e245405d3eca735c2dc88fd8e032e137d0ca61f61b",
+    "format": "file",
+    "file": "portable-git.exe",
+    "portable_git": true,
+    "commands": {
+      "git": "cmd/git.exe",
+      "bash": "bin/bash.exe",
+      "sh": "bin/sh.exe",
+      "ssh": "usr/bin/ssh.exe",
+      "ssh-keygen": "usr/bin/ssh-keygen.exe",
+      "git-lfs": "ucrt64/bin/git-lfs.exe",
+      "git-credential-manager": "ucrt64/bin/git-credential-manager.exe",
+      "git-gui": "cmd/git-gui.exe",
+      "gitk": "cmd/gitk.exe"
+    },
+    "bin_dirs": [
+      "cmd",
+      "bin"
+    ],
+    "required_files": [
+      "cmd/git.exe",
+      "cmd/git-gui.exe",
+      "cmd/gitk.exe",
+      "bin/bash.exe",
+      "bin/sh.exe",
+      "git-bash.exe",
+      "git-cmd.exe",
+      "usr/bin/bash.exe",
+      "usr/bin/ssh.exe",
+      "usr/bin/ssh-keygen.exe",
+      "usr/bin/msys-2.0.dll",
+      "usr/bin/msys-crypto-3.dll",
+      "usr/bin/msys-z.dll",
+      "usr/bin/msys-iconv-2.dll",
+      "usr/bin/msys-intl-8.dll",
+      "usr/bin/msys-readline8.dll",
+      "usr/bin/msys-ncursesw6.dll",
+      "ucrt64/bin/git.exe",
+      "ucrt64/bin/git-lfs.exe",
+      "ucrt64/bin/git-credential-manager.exe",
+      "ucrt64/bin/libcurl-4.dll",
+      "ucrt64/bin/libpcre2-8-0.dll",
+      "ucrt64/bin/libiconv-2.dll",
+      "ucrt64/bin/libintl-8.dll",
+      "ucrt64/bin/libcrypto-3-x64.dll",
+      "ucrt64/bin/libssl-3-x64.dll",
+      "ucrt64/bin/zlib1.dll",
+      "ucrt64/bin/tcl86.dll",
+      "ucrt64/bin/tk86.dll",
+      "ucrt64/libexec/git-core/git-gui",
+      "etc/gitconfig",
+      "etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem",
+      "README.portable"
+    ]
+  },
+  "tool.make": {
+    "version": "4.4.1",
+    "url": "https://downloads.sourceforge.net/project/ezwinports/make-4.4.1-without-guile-w32-bin.zip",
+    "sha256": "fb66a02b530f7466f6222ce53c0b602c5288e601547a034e4156a512dd895ee7",
+    "format": "zip",
+    "commands": {
+      "make": "bin/make.exe"
+    },
+    "bin_dirs": [
+      "bin"
+    ],
+    "required_files": [
+      "bin/make.exe"
+    ]
+  }
+}

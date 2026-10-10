@@ -17,3 +17,11 @@ zshrc   text eol=lf
 *.ps1   text eol=lf
 *.bat   text eol=lf
 *.cmd   text eol=lf
+
+# gofmt and embedded manifest bytes must be identical on Windows checkouts.
+installer/** text=auto eol=lf
+.github/workflows/*.yml text eol=lf
+
+# Retained release-source hashes describe physical live-link bytes on every OS.
+home/** text=auto eol=lf
+windows/chezmoi-*/** text=auto eol=lf

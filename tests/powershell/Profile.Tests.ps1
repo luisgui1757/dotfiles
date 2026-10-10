@@ -395,23 +395,11 @@ exit 0
         $src | Should -Match 'Set-PSReadLineKeyHandler -Key Tab\s+-Function MenuComplete\s+-ErrorAction'
     }
 
-    It "reapplies the vi-mode key handlers from the psmux OnIdle block" {
-        $src = Get-Content -Raw -LiteralPath $script:Profile
-        $onIdleIdx = $src.IndexOf('PowerShell.OnIdle')
-        $onIdleIdx | Should -BeGreaterThan 0
-        $tail = $src.Substring($onIdleIdx)
-        $tail | Should -Match 'Set-PSReadLineKeyHandler\s+-Key Tab\s+-Function MenuComplete\s+-ViMode Insert'
-        $tail | Should -Match 'Set-PSReadLineKeyHandler\s+-Key UpArrow\s+-Function HistorySearchBackward\s+-ViMode Insert'
-    }
-
-    It "does not reset EditMode from the psmux OnIdle block" {
-        $src = Get-Content -Raw -LiteralPath $script:Profile
-        $onIdleIdx = $src.IndexOf('PowerShell.OnIdle')
-        $psfzfIdx = $src.IndexOf('Set-PsFzfOption')
-        $onIdleIdx | Should -BeGreaterThan 0
-        $psfzfIdx | Should -BeGreaterThan $onIdleIdx
-        $onIdleBlock = $src.Substring($onIdleIdx, $psfzfIdx - $onIdleIdx)
-        $onIdleBlock | Should -Not -Match 'Set-PSReadLineOption\s+-EditMode'
+    It "does not register a delayed multiplexer rewrite in the active profile" {
+        $path = Join-Path $script:RepoRoot 'installer/shells/powershell-core.ps1'
+        Get-Content -Raw -LiteralPath $path | Should -Not -Match 'Register-EngineEvent|PowerShell.OnIdle'
+        # shells/ retains the released profile for live links and migration;
+        # legacy_inventory_test.py binds those passive bytes to release evidence.
     }
 
     It "keeps the PSFzf chords and wires them after EditMode" {

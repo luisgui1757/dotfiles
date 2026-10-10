@@ -23,7 +23,7 @@ local function expected_tools()
   }
 
   -- The Mason registry publishes clangd for macOS, Windows, and Linux x64,
-  -- but not Linux arm64. Linux owns clangd through Home Manager on every
+  -- but not Linux arm64. Linux installs clangd through APT on every
   -- supported architecture instead, avoiding platform-dependent ownership.
   if vim.fn.has("linux") ~= 1 then
     table.insert(tools, 2, "clangd")

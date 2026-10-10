@@ -1,21 +1,7 @@
 {
-  "schema": 2,
-  "stage": "stable-required-live-applied",
+  "schema": 3,
+  "stage": "installer-required-pending-apply",
   "legacyEmitted": [
-    "ubuntu",
-    "macos",
-    "windows",
-    "chezmoi-parity",
-    "chezmoi-parity-macos",
-    "chezmoi-parity-windows",
-    "nix flake check (ubuntu-24.04)",
-    "nix flake check (macos-26)",
-    "e2e containers / ubuntu-24.04",
-    "setup.sh / ubuntu-24.04",
-    "setup.sh / macos-26",
-    "setup.ps1 / windows-2025"
-  ],
-  "required": [
     "ubuntu",
     "macos",
     "windows",
@@ -29,12 +15,29 @@
     "setup.sh / macos",
     "setup.ps1 / windows"
   ],
-  "replacements": [
-    { "legacy": "nix flake check (ubuntu-24.04)", "logical": "nix flake check / linux" },
-    { "legacy": "nix flake check (macos-26)", "logical": "nix flake check / macos" },
-    { "legacy": "e2e containers / ubuntu-24.04", "logical": "e2e containers / linux" },
-    { "legacy": "setup.sh / ubuntu-24.04", "logical": "setup.sh / linux" },
-    { "legacy": "setup.sh / macos-26", "logical": "setup.sh / macos" },
-    { "legacy": "setup.ps1 / windows-2025", "logical": "setup.ps1 / windows" }
+  "required": [
+    "ubuntu",
+    "macos",
+    "windows",
+    "core (ubuntu-26.04)",
+    "core (ubuntu-26.04-arm)",
+    "core (macos-26)",
+    "core (windows-2025)",
+    "Fresh Homebrew (macOS arm64)",
+    "Fresh Debian APT (amd64)",
+    "Fresh Debian APT (arm64)",
+    "Fresh Ubuntu APT (amd64)",
+    "Fresh Ubuntu APT (arm64)",
+    "Missing Apple developer tools (macOS arm64)",
+    "Fresh Windows vendor (VC-runtime)",
+    "Fresh Windows vendor (Build-Tools)",
+    "Neovim lifecycle (ubuntu-26.04)",
+    "Neovim lifecycle (ubuntu-26.04-arm)",
+    "Neovim lifecycle (macos-26)",
+    "Neovim lifecycle (windows-2025)",
+    "Desktop lifecycle (ubuntu-26.04)",
+    "Desktop lifecycle (ubuntu-26.04-arm)",
+    "Desktop lifecycle (macos-26)",
+    "Desktop lifecycle (windows-2025)"
   ]
 }

@@ -1,6 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "description": "Renovate owns GitHub Actions, runner labels, Nix inputs, and repo-pinned version/ref constants. Direct-download SHA-256 values must still be recomputed and reviewed by a human after version/ref bumps.",
+  "description": "Renovate owns GitHub Actions, runner labels, Go toolchain/modules and CI validator/tool constants. Installer archive/component/wheel pins and bootstrap-toolchain.tsv are manually reviewed with checksums and runtime proof; adjacent CI download hashes also require review after version bumps.",
   "extends": [
     "config:recommended",
     "helpers:pinGitHubActionDigests",
@@ -8,13 +8,21 @@
     ":semanticCommits",
     ":timezone(Etc/UTC)"
   ],
-  "enabledManagers": ["github-actions", "custom.regex", "nix"],
+  "enabledManagers": [
+    "github-actions",
+    "custom.regex",
+    "gomod"
+  ],
   "dependencyDashboard": true,
   "dependencyDashboardTitle": "Renovate dashboard",
-  "schedule": ["before 06:00 on monday"],
+  "schedule": [
+    "before 06:00 on monday"
+  ],
   "prConcurrentLimit": 4,
   "prHourlyLimit": 2,
-  "labels": ["dependencies"],
+  "labels": [
+    "dependencies"
+  ],
   "automerge": false,
   "rebaseWhen": "behind-base-branch",
   "vulnerabilityAlerts": {
@@ -23,54 +31,21 @@
   "lockFileMaintenance": {
     "enabled": false
   },
-  "nix": {
-    "enabled": true
-  },
   "ignorePaths": [
     "**/node_modules/**",
     "**/dist/**",
     "**/.venv/**",
     "tests/.cache/**",
+    "tests/nvim/fixtures/go.mod",
     "vendor/**"
   ],
   "customManagers": [
     {
       "customType": "regex",
-      "description": "Upstream Nix prerequisite release. Every adjacent platform SHA-256 must be recomputed manually after Renovate bumps this.",
-      "managerFilePatterns": ["/^scripts/install-nix-prerequisite\\.sh$/"],
-      "matchStrings": [
-        "nix_version=\"(?<currentValue>[^\"]+)\"(?:.|\\n)*?expected_sha256=\"[a-f0-9]{64}\""
-      ],
-      "depNameTemplate": "NixOS/nix",
-      "datasourceTemplate": "github-releases",
-      "versioningTemplate": "semver"
-    },
-    {
-      "customType": "regex",
-      "description": "Neovim Linux x86_64 tarball version. The adjacent SHA-256 must be recomputed manually after Renovate bumps this.",
-      "managerFilePatterns": ["/^install-deps\\.sh$/"],
-      "matchStrings": [
-        "NVIM_LINUX_VERSION=\"(?<currentValue>v[^\"]+)\"\\s+NVIM_LINUX_X86_64_SHA256=\"[a-f0-9]{64}\""
-      ],
-      "depNameTemplate": "neovim/neovim",
-      "datasourceTemplate": "github-releases",
-      "versioningTemplate": "semver"
-    },
-    {
-      "customType": "regex",
-      "description": "Neovim Linux arm64 tarball version. The adjacent SHA-256 must be recomputed manually after Renovate bumps this.",
-      "managerFilePatterns": ["/^install-deps\\.sh$/"],
-      "matchStrings": [
-        "NVIM_LINUX_VERSION=\"(?<currentValue>v[^\"]+)\"(?:.|\\n)*?NVIM_LINUX_ARM64_SHA256=\"[a-f0-9]{64}\""
-      ],
-      "depNameTemplate": "neovim/neovim",
-      "datasourceTemplate": "github-releases",
-      "versioningTemplate": "semver"
-    },
-    {
-      "customType": "regex",
       "description": "Neovim Linux x86_64 tarball version in CI. The adjacent SHA-256 must be recomputed manually after Renovate bumps this.",
-      "managerFilePatterns": ["/^\\.github/workflows/test\\.yml$/"],
+      "managerFilePatterns": [
+        "/^\\.github/workflows/test\\.yml$/"
+      ],
       "matchStrings": [
         "NVIM_LINUX_VERSION:\\s*(?<currentValue>v[^\\s]+)\\s+NVIM_LINUX_X86_64_SHA256:\\s*[a-f0-9]{64}"
       ],
@@ -80,197 +55,10 @@
     },
     {
       "customType": "regex",
-      "description": "Hack Nerd Font archive version for Unix. The SHA-256 must be recomputed manually after Renovate bumps this.",
-      "managerFilePatterns": ["/^install-deps\\.sh$/"],
-      "matchStrings": [
-        "HACK_NERD_FONT_VERSION=\"(?<currentValue>v[^\"]+)\"\\s+HACK_NERD_FONT_SHA256=\"[a-f0-9]{64}\""
-      ],
-      "depNameTemplate": "ryanoasis/nerd-fonts",
-      "datasourceTemplate": "github-releases",
-      "versioningTemplate": "semver"
-    },
-    {
-      "customType": "regex",
-      "description": "Hack Nerd Font archive version for Windows. The SHA-256 must be recomputed manually after Renovate bumps this.",
-      "managerFilePatterns": ["/^install-deps\\.ps1$/"],
-      "matchStrings": [
-        "\\$HackNerdFontVersion\\s*=\\s*'(?<currentValue>v[^']+)'\\s+\\$HackNerdFontSha256\\s*=\\s*'[a-f0-9]{64}'"
-      ],
-      "depNameTemplate": "ryanoasis/nerd-fonts",
-      "datasourceTemplate": "github-releases",
-      "versioningTemplate": "semver"
-    },
-    {
-      "customType": "regex",
-      "description": "Windows Terminal portable archive version for Windows. The SHA-256 must be recomputed manually after Renovate bumps this.",
-      "managerFilePatterns": ["/^install-deps\\.ps1$/"],
-      "matchStrings": [
-        "\\$WindowsTerminalVersion\\s*=\\s*'(?<currentValue>v[^']+)'\\s+\\$WindowsTerminalX64Sha256\\s*=\\s*'[a-f0-9]{64}'"
-      ],
-      "depNameTemplate": "microsoft/terminal",
-      "datasourceTemplate": "github-releases",
-      "versioningTemplate": "loose"
-    },
-    {
-      "customType": "regex",
-      "description": "Ubuntu Ghostty release version. Every adjacent distro/architecture .deb SHA-256 must be recomputed manually after Renovate bumps this.",
-      "managerFilePatterns": ["/^install-deps\\.sh$/"],
-      "matchStrings": [
-        "GHOSTTY_UBUNTU_VERSION=\"(?<currentValue>[^\"]+)\"\\s+GHOSTTY_UBUNTU_AMD64_2404_SHA256=\"[a-f0-9]{64}\""
-      ],
-      "depNameTemplate": "mkasberg/ghostty-ubuntu",
-      "datasourceTemplate": "github-releases",
-      "versioningTemplate": "loose"
-    },
-    {
-      "customType": "regex",
-      "description": "WezTerm Ubuntu .deb version. The adjacent .deb SHA-256 must be recomputed manually after Renovate bumps this.",
-      "managerFilePatterns": ["/^install-deps\\.sh$/"],
-      "matchStrings": [
-        "WEZTERM_VERSION=\"(?<currentValue>[^\"]+)\"\\s+WEZTERM_DEB_AMD64_SHA256=\"[a-f0-9]{64}\""
-      ],
-      "depNameTemplate": "wezterm/wezterm",
-      "datasourceTemplate": "github-releases",
-      "versioningTemplate": "loose"
-    },
-    {
-      "customType": "regex",
-      "description": "Herdr Linux x86_64 binary version. Adjacent Linux asset SHA-256 values must be recomputed manually after Renovate bumps this.",
-      "managerFilePatterns": ["/^install-deps\\.sh$/"],
-      "matchStrings": [
-        "HERDR_VERSION=\"(?<currentValue>v[^\"]+)\"\\s+HERDR_LINUX_X86_64_SHA256=\"[a-f0-9]{64}\""
-      ],
-      "depNameTemplate": "ogulcancelik/herdr",
-      "datasourceTemplate": "github-releases",
-      "versioningTemplate": "semver"
-    },
-    {
-      "customType": "regex",
-      "description": "Herdr Linux arm64 binary version. Adjacent Linux asset SHA-256 values must be recomputed manually after Renovate bumps this.",
-      "managerFilePatterns": ["/^install-deps\\.sh$/"],
-      "matchStrings": [
-        "HERDR_VERSION=\"(?<currentValue>v[^\"]+)\"(?:.|\\n)*?HERDR_LINUX_ARM64_SHA256=\"[a-f0-9]{64}\""
-      ],
-      "depNameTemplate": "ogulcancelik/herdr",
-      "datasourceTemplate": "github-releases",
-      "versioningTemplate": "semver"
-    },
-    {
-      "customType": "regex",
-      "description": "Herdr Windows preview binary tag. Adjacent Windows asset SHA-256 must be recomputed manually after Renovate bumps this.",
-      "managerFilePatterns": ["/^install-deps\\.ps1$/"],
-      "matchStrings": [
-        "\\$HerdrWindowsPreviewVersion\\s*=\\s*'(?<currentValue>preview-[^']+)'\\s+\\$HerdrWindowsX64Sha256\\s*=\\s*'[a-f0-9]{64}'"
-      ],
-      "depNameTemplate": "ogulcancelik/herdr",
-      "datasourceTemplate": "github-releases",
-      "versioningTemplate": "regex:^preview-(?<major>\\d{4})-(?<minor>\\d{2})-(?<patch>\\d{2})-(?<build>[0-9a-f]+)$"
-    },
-    {
-      "customType": "regex",
-      "description": "Homebrew installer script commit pinned to the current main branch digest. The adjacent installer script SHA-256 must be recomputed manually after Renovate bumps this.",
-      "managerFilePatterns": ["/^install-deps\\.sh$/"],
-      "matchStrings": [
-        "HOMEBREW_INSTALL_COMMIT=\"(?<currentDigest>[a-f0-9]{40})\"\\s+HOMEBREW_INSTALL_SHA256=\"[a-f0-9]{64}\""
-      ],
-      "currentValueTemplate": "main",
-      "depNameTemplate": "Homebrew/install",
-      "packageNameTemplate": "https://github.com/Homebrew/install",
-      "datasourceTemplate": "git-refs"
-    },
-    {
-      "customType": "regex",
-      "description": "Scoop installer script commit pinned to the upstream master branch digest. The adjacent installer script SHA-256 must be recomputed manually after Renovate bumps this.",
-      "managerFilePatterns": ["/^install-deps\\.ps1$/"],
-      "matchStrings": [
-        "\\$ScoopInstallerCommit\\s*=\\s*'(?<currentDigest>[a-f0-9]{40})'\\s+\\$ScoopInstallerSha256\\s*=\\s*'[a-f0-9]{64}'"
-      ],
-      "currentValueTemplate": "master",
-      "depNameTemplate": "ScoopInstaller/Install",
-      "packageNameTemplate": "https://github.com/ScoopInstaller/Install",
-      "datasourceTemplate": "git-refs"
-    },
-    {
-      "customType": "regex",
-      "description": "chezmoi Linux x86_64 release version. Adjacent Linux asset SHA-256 values must be recomputed manually after Renovate bumps this.",
-      "managerFilePatterns": ["/^install-deps\\.sh$/"],
-      "matchStrings": [
-        "CHEZMOI_VERSION=\"(?<currentValue>v[^\"]+)\"\\s+CHEZMOI_LINUX_X86_64_SHA256=\"[a-f0-9]{64}\""
-      ],
-      "depNameTemplate": "twpayne/chezmoi",
-      "datasourceTemplate": "github-releases",
-      "versioningTemplate": "semver"
-    },
-    {
-      "customType": "regex",
-      "description": "chezmoi Linux arm64 release version. Adjacent Linux asset SHA-256 values must be recomputed manually after Renovate bumps this.",
-      "managerFilePatterns": ["/^install-deps\\.sh$/"],
-      "matchStrings": [
-        "CHEZMOI_VERSION=\"(?<currentValue>v[^\"]+)\"(?:.|\\n)*?CHEZMOI_LINUX_ARM64_SHA256=\"[a-f0-9]{64}\""
-      ],
-      "depNameTemplate": "twpayne/chezmoi",
-      "datasourceTemplate": "github-releases",
-      "versioningTemplate": "semver"
-    },
-    {
-      "customType": "regex",
-      "description": "chezmoi release version in CI. Adjacent Linux/macOS/Windows asset SHA-256 values must be recomputed manually after Renovate bumps this.",
-      "managerFilePatterns": ["/^\\.github/workflows/test\\.yml$/"],
-      "matchStrings": [
-        "CHEZMOI_VERSION:\\s*(?<currentValue>v[^\\s]+)\\s+CHEZMOI_LINUX_X86_64_SHA256:\\s*[a-f0-9]{64}"
-      ],
-      "depNameTemplate": "twpayne/chezmoi",
-      "datasourceTemplate": "github-releases",
-      "versioningTemplate": "semver"
-    },
-    {
-      "customType": "regex",
-      "description": "lazygit Linux release version. Adjacent Linux asset SHA-256 values must be recomputed manually after Renovate bumps this.",
-      "managerFilePatterns": ["/^install-deps\\.sh$/"],
-      "matchStrings": [
-        "LAZYGIT_LINUX_VERSION=\"(?<currentValue>v[^\"]+)\"\\s+LAZYGIT_LINUX_X86_64_SHA256=\"[a-f0-9]{64}\""
-      ],
-      "depNameTemplate": "jesseduffield/lazygit",
-      "datasourceTemplate": "github-releases",
-      "versioningTemplate": "semver"
-    },
-    {
-      "customType": "regex",
-      "description": "lazygit Linux arm64 release version. Adjacent Linux asset SHA-256 values must be recomputed manually after Renovate bumps this.",
-      "managerFilePatterns": ["/^install-deps\\.sh$/"],
-      "matchStrings": [
-        "LAZYGIT_LINUX_VERSION=\"(?<currentValue>v[^\"]+)\"(?:.|\\n)*?LAZYGIT_LINUX_ARM64_SHA256=\"[a-f0-9]{64}\""
-      ],
-      "depNameTemplate": "jesseduffield/lazygit",
-      "datasourceTemplate": "github-releases",
-      "versioningTemplate": "semver"
-    },
-    {
-      "customType": "regex",
-      "description": "Starship Linux x86_64 release version. Adjacent Linux asset SHA-256 values must be recomputed manually after Renovate bumps this.",
-      "managerFilePatterns": ["/^install-deps\\.sh$/"],
-      "matchStrings": [
-        "STARSHIP_VERSION=\"(?<currentValue>v[^\"]+)\"\\s+STARSHIP_LINUX_X86_64_SHA256=\"[a-f0-9]{64}\""
-      ],
-      "depNameTemplate": "starship/starship",
-      "datasourceTemplate": "github-releases",
-      "versioningTemplate": "semver"
-    },
-    {
-      "customType": "regex",
-      "description": "Starship Linux arm64 release version. Adjacent Linux asset SHA-256 values must be recomputed manually after Renovate bumps this.",
-      "managerFilePatterns": ["/^install-deps\\.sh$/"],
-      "matchStrings": [
-        "STARSHIP_VERSION=\"(?<currentValue>v[^\"]+)\"(?:.|\\n)*?STARSHIP_LINUX_ARM64_SHA256=\"[a-f0-9]{64}\""
-      ],
-      "depNameTemplate": "starship/starship",
-      "datasourceTemplate": "github-releases",
-      "versioningTemplate": "semver"
-    },
-    {
-      "customType": "regex",
       "description": "Starship Linux x86_64 release version in CI. The adjacent SHA-256 must be recomputed manually after Renovate bumps this.",
-      "managerFilePatterns": ["/^\\.github/workflows/test\\.yml$/"],
+      "managerFilePatterns": [
+        "/^\\.github/workflows/test\\.yml$/"
+      ],
       "matchStrings": [
         "STARSHIP_VERSION:\\s*(?<currentValue>v[^\\s]+)\\s+STARSHIP_LINUX_X86_64_SHA256:\\s*[a-f0-9]{64}"
       ],
@@ -280,63 +68,10 @@
     },
     {
       "customType": "regex",
-      "description": "setuptools version for the pinned pylatexenc build backend on Unix. The adjacent wheel SHA-256 must be recomputed manually after Renovate bumps this.",
-      "managerFilePatterns": ["/^install-deps\\.sh$/"],
-      "matchStrings": [
-        "PYLATEXENC_BUILD_BACKEND_VERSION=\"(?<currentValue>[^\"]+)\"\\s+PYLATEXENC_BUILD_BACKEND_SHA256=\"[a-f0-9]{64}\""
-      ],
-      "depNameTemplate": "setuptools",
-      "datasourceTemplate": "pypi",
-      "versioningTemplate": "pep440"
-    },
-    {
-      "customType": "regex",
-      "description": "setuptools version for the pinned pylatexenc build backend on Windows. The adjacent wheel SHA-256 must be recomputed manually after Renovate bumps this.",
-      "managerFilePatterns": ["/^install-deps\\.ps1$/"],
-      "matchStrings": [
-        "\\$PylatexencBuildBackendVersion\\s*=\\s*'(?<currentValue>[^']+)'\\s+\\$PylatexencBuildBackendSha256\\s*=\\s*'[a-f0-9]{64}'"
-      ],
-      "depNameTemplate": "setuptools",
-      "datasourceTemplate": "pypi",
-      "versioningTemplate": "pep440"
-    },
-    {
-      "customType": "regex",
-      "description": "pylatexenc version for the latex2text converter on Unix. The adjacent source SHA-256 must be recomputed manually after Renovate bumps this.",
-      "managerFilePatterns": ["/^install-deps\\.sh$/"],
-      "matchStrings": [
-        "PYLATEXENC_VERSION=\"(?<currentValue>[^\"]+)\"\\s+PYLATEXENC_SHA256=\"[a-f0-9]{64}\""
-      ],
-      "depNameTemplate": "pylatexenc",
-      "datasourceTemplate": "pypi",
-      "versioningTemplate": "pep440"
-    },
-    {
-      "customType": "regex",
-      "description": "pylatexenc version for the latex2text converter on Windows. The adjacent source SHA-256 must be recomputed manually after Renovate bumps this.",
-      "managerFilePatterns": ["/^install-deps\\.ps1$/"],
-      "matchStrings": [
-        "\\$PylatexencVersion\\s*=\\s*'(?<currentValue>[^']+)'\\s+\\$PylatexencSha256\\s*=\\s*'[a-f0-9]{64}'"
-      ],
-      "depNameTemplate": "pylatexenc",
-      "datasourceTemplate": "pypi",
-      "versioningTemplate": "pep440"
-    },
-    {
-      "customType": "regex",
-      "description": "tree-sitter CLI Linux x86_64 release version. Adjacent Linux asset SHA-256 values must be recomputed manually after Renovate bumps this.",
-      "managerFilePatterns": ["/^install-deps\\.sh$/"],
-      "matchStrings": [
-        "TREE_SITTER_CLI_LINUX_VERSION=\"(?<currentValue>v[^\"]+)\"\\s+TREE_SITTER_CLI_LINUX_X86_64_SHA256=\"[a-f0-9]{64}\""
-      ],
-      "depNameTemplate": "tree-sitter/tree-sitter",
-      "datasourceTemplate": "github-releases",
-      "versioningTemplate": "semver"
-    },
-    {
-      "customType": "regex",
       "description": "tree-sitter CLI Linux x86_64 release version in CI. The adjacent SHA-256 must be recomputed manually after Renovate bumps this.",
-      "managerFilePatterns": ["/^\\.github/workflows/test\\.yml$/"],
+      "managerFilePatterns": [
+        "/^\\.github/workflows/test\\.yml$/"
+      ],
       "matchStrings": [
         "TREE_SITTER_CLI_LINUX_VERSION:\\s*(?<currentValue>v[^\\s]+)\\s+TREE_SITTER_CLI_LINUX_X86_64_SHA256:\\s*[a-f0-9]{64}"
       ],
@@ -346,85 +81,10 @@
     },
     {
       "customType": "regex",
-      "description": "tree-sitter CLI Linux arm64 release version. Adjacent Linux asset SHA-256 values must be recomputed manually after Renovate bumps this.",
-      "managerFilePatterns": ["/^install-deps\\.sh$/"],
-      "matchStrings": [
-        "TREE_SITTER_CLI_LINUX_VERSION=\"(?<currentValue>v[^\"]+)\"(?:.|\\n)*?TREE_SITTER_CLI_LINUX_ARM64_SHA256=\"[a-f0-9]{64}\""
-      ],
-      "depNameTemplate": "tree-sitter/tree-sitter",
-      "datasourceTemplate": "github-releases",
-      "versioningTemplate": "semver"
-    },
-    {
-      "customType": "regex",
-      "description": "fzf-tab pinned tag. The adjacent commit SHA must be reviewed manually after Renovate bumps this.",
-      "managerFilePatterns": ["/^install-deps\\.sh$/"],
-      "matchStrings": [
-        "FZF_TAB_VERSION=\"(?<currentValue>v[^\"]+)\"\\s+FZF_TAB_COMMIT=\"[a-f0-9]{40}\""
-      ],
-      "depNameTemplate": "Aloxaf/fzf-tab",
-      "datasourceTemplate": "github-tags",
-      "versioningTemplate": "semver"
-    },
-    {
-      "customType": "regex",
-      "description": "zsh-autosuggestions pinned tag. The adjacent commit SHA must be reviewed manually after Renovate bumps this.",
-      "managerFilePatterns": ["/^install-deps\\.sh$/"],
-      "matchStrings": [
-        "ZSH_AUTOSUGGESTIONS_VERSION=\"(?<currentValue>v[^\"]+)\"\\s+ZSH_AUTOSUGGESTIONS_COMMIT=\"[a-f0-9]{40}\""
-      ],
-      "depNameTemplate": "zsh-users/zsh-autosuggestions",
-      "datasourceTemplate": "github-tags",
-      "versioningTemplate": "semver"
-    },
-    {
-      "customType": "regex",
-      "description": "gh-dash pinned gh-extension tag (install-deps.sh). Mirrored in install-deps.ps1; no adjacent SHA to recompute.",
-      "managerFilePatterns": ["/^install-deps\\.sh$/"],
-      "matchStrings": [
-        "GH_DASH_VERSION=\"(?<currentValue>v[^\"]+)\""
-      ],
-      "depNameTemplate": "dlvhdr/gh-dash",
-      "datasourceTemplate": "github-releases",
-      "versioningTemplate": "semver"
-    },
-    {
-      "customType": "regex",
-      "description": "gh-dash pinned gh-extension tag (install-deps.ps1). Mirrored in install-deps.sh; no adjacent SHA to recompute.",
-      "managerFilePatterns": ["/^install-deps\\.ps1$/"],
-      "matchStrings": [
-        "\\$GhDashVersion\\s*=\\s*'(?<currentValue>v[^']+)'"
-      ],
-      "depNameTemplate": "dlvhdr/gh-dash",
-      "datasourceTemplate": "github-releases",
-      "versioningTemplate": "semver"
-    },
-    {
-      "customType": "regex",
-      "description": "Pi CLI npm package version (install-deps.sh). The adjacent npm integrity must be recomputed manually after Renovate bumps this.",
-      "managerFilePatterns": ["/^install-deps\\.sh$/"],
-      "matchStrings": [
-        "PI_CLI_VERSION=\"(?<currentValue>[^\"]+)\"\\s+PI_CLI_INTEGRITY=\"sha512-[^\"]+\""
-      ],
-      "depNameTemplate": "@earendil-works/pi-coding-agent",
-      "datasourceTemplate": "npm",
-      "versioningTemplate": "semver"
-    },
-    {
-      "customType": "regex",
-      "description": "Pi CLI npm package version (install-deps.ps1). The adjacent npm integrity must be recomputed manually after Renovate bumps this.",
-      "managerFilePatterns": ["/^install-deps\\.ps1$/"],
-      "matchStrings": [
-        "\\$PiCliVersion\\s*=\\s*'(?<currentValue>[^']+)'\\s+\\$PiCliIntegrity\\s*=\\s*'sha512-[^']+'"
-      ],
-      "depNameTemplate": "@earendil-works/pi-coding-agent",
-      "datasourceTemplate": "npm",
-      "versioningTemplate": "semver"
-    },
-    {
-      "customType": "regex",
       "description": "cargo-binstall installer script commit pinned to the current main branch digest. The adjacent installer script SHA-256 must be recomputed manually after Renovate bumps this.",
-      "managerFilePatterns": ["/^\\.github/workflows/test\\.yml$/"],
+      "managerFilePatterns": [
+        "/^\\.github/workflows/test\\.yml$/"
+      ],
       "matchStrings": [
         "CARGO_BINSTALL_COMMIT:\\s*(?<currentDigest>[a-f0-9]{40})\\s+CARGO_BINSTALL_INSTALLER_SHA256:\\s*[a-f0-9]{64}"
       ],
@@ -436,7 +96,9 @@
     {
       "customType": "regex",
       "description": "Node runtime version used to run Renovate's schema validator.",
-      "managerFilePatterns": ["/^scripts/validate-renovate\\.sh$/"],
+      "managerFilePatterns": [
+        "/^scripts/validate-renovate\\.sh$/"
+      ],
       "matchStrings": [
         "RENOVATE_NODE_VERSION=\"(?<currentValue>[^\"]+)\""
       ],
@@ -447,7 +109,9 @@
     {
       "customType": "regex",
       "description": "Renovate package version used by the required schema validator.",
-      "managerFilePatterns": ["/^scripts/validate-renovate\\.sh$/"],
+      "managerFilePatterns": [
+        "/^scripts/validate-renovate\\.sh$/"
+      ],
       "matchStrings": [
         "RENOVATE_VERSION=\"(?<currentValue>[^\"]+)\""
       ],
@@ -458,46 +122,74 @@
     {
       "customType": "regex",
       "description": "GitHub runner labels stored in matrix include entries, which the built-in manager cannot extract through matrix variables.",
-      "managerFilePatterns": ["/^\\.github/workflows/(?:nix|e2e-install)\\.yml$/"],
+      "managerFilePatterns": [
+        "/^\\.github/workflows/installer-engine\\.yml$/"
+      ],
       "matchStrings": [
         "runner:\\s*(?<depName>ubuntu|macos|windows)-(?<currentValue>[^\\s#]+)"
       ],
       "datasourceTemplate": "github-runners",
       "versioningTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "description": "Pinned Windows container image used for fresh native installer acceptance.",
+      "managerFilePatterns": [
+        "/^\\.github/workflows/installer-engine\\.yml$/"
+      ],
+      "matchStrings": [
+        "WINDOWS_TEST_IMAGE:\\s*(?<depName>mcr\\.microsoft\\.com/dotnet/framework/runtime):(?<currentValue>[^@\\s]+)@(?<currentDigest>sha256:[a-f0-9]{64})"
+      ],
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "docker"
     }
   ],
   "packageRules": [
     {
-      "matchManagers": ["custom.regex"],
-      "groupName": "pinned installer constants",
-      "addLabels": ["pinned-downloads"],
+      "matchManagers": [
+        "custom.regex"
+      ],
+      "groupName": "pinned CI tool constants",
+      "addLabels": [
+        "pinned-downloads"
+      ],
       "automerge": false
     },
     {
-      "matchManagers": ["github-actions"],
+      "matchManagers": [
+        "github-actions"
+      ],
       "groupName": "github actions",
-      "addLabels": ["github-actions"],
+      "addLabels": [
+        "github-actions"
+      ],
       "pinDigests": true,
       "automerge": false
     },
     {
-      "matchManagers": ["github-actions"],
-      "matchDatasources": ["github-runners"],
+      "matchManagers": [
+        "github-actions"
+      ],
+      "matchDatasources": [
+        "github-runners"
+      ],
       "groupName": "github runner images",
-      "addLabels": ["github-runners"],
+      "addLabels": [
+        "github-runners"
+      ],
       "automerge": false
     },
     {
-      "matchManagers": ["custom.regex"],
-      "matchDatasources": ["github-runners"],
+      "matchManagers": [
+        "custom.regex"
+      ],
+      "matchDatasources": [
+        "github-runners"
+      ],
       "groupName": "github runner images",
-      "addLabels": ["github-runners"],
-      "automerge": false
-    },
-    {
-      "matchManagers": ["nix"],
-      "groupName": "nix flake inputs",
-      "addLabels": ["nix"],
+      "addLabels": [
+        "github-runners"
+      ],
       "automerge": false
     }
   ]

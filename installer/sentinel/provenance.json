@@ -1,0 +1,25 @@
+{
+  "version": "0.1.2",
+  "commit": "ecafffa858666343c1639f996d177f460163e93e",
+  "archive_url": "https://codeload.github.com/luisgui1757/sentinel/tar.gz/ecafffa858666343c1639f996d177f460163e93e",
+  "archive_sha256": "6523513b9cf81f9484834b509f2e5a88c36218a2a5a2437e726cfdac40c7fc12",
+  "policy_sha256": "efeb284196e99ee049718c1a4cd8a2090cdd41a7ce8be304cb158fc8a4d16801",
+  "bundle_sha256": "0b79f9d33727d0d53edc0d3f88f4f46fc18802b7845f7ba4f9a6cb764d83437e",
+  "render": "source \"$source/tools/sentinel-lib.sh\"; sentinel_render_managed_block \"$source/core\" \"$source/MANIFEST.json\" \"$source/VERSION\"",
+  "files": {
+    "VERSION": "297b50f08386d3521f8fdaf2f78eb8d9d0acdf452d2e61596905fba37208c792",
+    "LICENSE": "f98a131df903d1f1576be2984f1a00086ba4b39dde77570ba8f63348963fa461",
+    "MANIFEST.json": "cea59e3c59419fccdbaba21da50f98d8df847e30c0189f255a007b68606b57af",
+    "tools/install": "8bf60f503e2b8d0e3dd04aa19ba045abc2bff0f793bce0d5e44a41f862d31c60",
+    "tools/sentinel-lib.sh": "581a6788fc0ec4629699a41e245349b902d08e66429bd6ea4cd9f17d842ca76c",
+    "core/MODES.md": "6a1e22869a9df406d9a73e6c3e463d7bceca834a499393e86b8c29691161f54e",
+    "core/REVIEW_PROTOCOL.md": "983679e4fefa915c574e21ff06fe1d92b60d5947dd0394e3713b3f6158a3481d",
+    "core/INVARIANTS.md": "8b40972b3253f555cf8734dbf7ec3fac6e0b7797780b13191d824d1ceb5d1579",
+    "core/EXECUTION.md": "07d7c9386d7478e8348a3eeae520bba177ef687c9cee15b6c1d6d417f8eb5438",
+    "core/WORKFLOW.md": "ee65bf2b8efc54497822b14684ec99e173996c7e9f9d9c340f7668e7208b1b36",
+    "core/TESTING.md": "1d0ccea08fd414e29363d39ab0ca99f1ddc555c269827c05d1afe747260f4694",
+    "core/MEMORY.md": "76c0b40b19411b3dd23451fe5af046a010a2171ed0626c458826f0d9a92b5016",
+    "core/BOOTSTRAP.md": "757b62f143f58a264236cafe76277ec6abc1aedc67b2acb572aaeb29e5a148b3",
+    "core/ADAPTERS.md": "efca09b41039ffe03f8d927c1786441ccbe364167c4105af566c966af5aea0ec"
+  }
+}

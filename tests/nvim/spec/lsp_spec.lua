@@ -111,11 +111,11 @@ describe("LSP server coverage", function()
   it("starts neocmake from the real Mason package binary before PATH shims", function()
     assert.is_truthy(code_only:find("get_neocmake_cmd", 1, true), "neocmake command resolver missing")
     assert.is_truthy(
-      code_only:find('cmd = get_neocmake_cmd()', 1, true),
+      code_only:find("cmd = get_neocmake_cmd()", 1, true),
       "neocmake must use the package-binary command resolver"
     )
     assert.is_truthy(
-      code_only:find('/mason/packages/neocmakelsp/', 1, true),
+      code_only:find('managed_runtime").path("mason/packages/neocmakelsp/', 1, true),
       "neocmake resolver must prefer Mason's package directory over mason/bin shims"
     )
     assert.is_truthy(

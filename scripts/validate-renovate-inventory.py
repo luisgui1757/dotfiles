@@ -89,7 +89,7 @@ def main() -> int:
         return 1
 
     managers = {key[0] for key in actual}
-    if managers != {"github-actions", "nix", "regex"}:
+    if managers != {"github-actions", "regex", "gomod"}:
         print(f"FAIL: incomplete Renovate manager inventory: {sorted(managers)}", file=sys.stderr)
         return 1
     print(f"OK: Renovate officially extracted {sum(actual.values())} reviewed dependency records")

@@ -12,8 +12,8 @@ apply-github-security.sh --restore <snapshot-directory> [owner/repo]
 Ensures:
   - private vulnerability reporting
   - immutable releases
-  - CodeQL default setup for GitHub Actions and Python with default queries
-  - successful Actions and Python analyses for the exact live main SHA
+  - CodeQL default setup for GitHub Actions, Go and Python with default queries
+  - successful Actions, Go and Python analyses for the exact live main SHA
   - non-bypassable CodeQL merge protection in Protect main: integrity
 
 The merge-protection mutation is snapshotted and rolled back automatically if
@@ -163,7 +163,7 @@ codeql_config_is_desired() {
     jq -e '
       .state == "configured"
       and .query_suite == "default"
-      and (.languages | sort) == ["actions", "python"]
+      and (.languages | sort) == ["actions", "go", "python"]
     ' "$1" >/dev/null
 }
 
@@ -174,8 +174,8 @@ verify_codeql_analyses() {
         .commit_sha == $sha
         and .ref == "refs/heads/main"
         and .error == ""
-        and (.category == "/language:actions" or .category == "/language:python")
-      ) | .category] | unique | sort == ["/language:actions", "/language:python"]
+        and (.category == "/language:actions" or .category == "/language:go" or .category == "/language:python")
+      ) | .category] | unique | sort == ["/language:actions", "/language:go", "/language:python"]
     ' "$analyses" >/dev/null
 }
 
@@ -319,7 +319,7 @@ if [[ "$preflight_only" -eq 1 ]]; then
         exit 4
     }
     codeql_config_is_desired "$work_dir/codeql-config.json" || {
-        echo "FAIL: CodeQL default setup is not actions+python with default queries" >&2
+        echo "FAIL: CodeQL default setup is not actions+go+python with default queries" >&2
         exit 4
     }
 else
@@ -333,11 +333,11 @@ else
         gh api -X PATCH "repos/$repo/code-scanning/default-setup" --input - <<'JSON' >/dev/null
 {
   "state": "configured",
-  "languages": ["actions", "python"],
+  "languages": ["actions", "go", "python"],
   "query_suite": "default"
 }
 JSON
-        echo "CodeQL configuration requested. Wait for its Actions and Python jobs to pass, then rerun." >&2
+        echo "CodeQL configuration requested. Wait for its Actions, Go and Python jobs to pass, then rerun." >&2
         exit 4
     fi
 fi
@@ -356,7 +356,7 @@ jq -e '.enabled == true' "$work_dir/immutable-releases.json" >/dev/null || {
 gh api "repos/$repo/code-scanning/analyses?ref=refs/heads/main&tool_name=CodeQL&per_page=100" \
     > "$work_dir/codeql-analyses.json"
 verify_codeql_analyses "$work_dir/codeql-analyses.json" "$live_main_sha" || {
-    echo "FAIL: successful Actions and Python CodeQL analyses are missing for live main $live_main_sha" >&2
+    echo "FAIL: successful Actions, Go and Python CodeQL analyses are missing for live main $live_main_sha" >&2
     exit 4
 }
 

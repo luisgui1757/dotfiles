@@ -1,0 +1,98 @@
+# Remote login command path, 2026-10-09
+
+## Scope and decision
+
+Native user-local tools are available from `.zshrc`, but remote desktop clients
+start a non-interactive login shell that does not read it. A real VM probe found
+neither coding CLI through `zsh -lc`; `zsh -lic` found both.
+
+Add a small chezmoi-owned `.zprofile`, with a canonical `shells/zprofile` twin.
+It adds an existing user-local bin directory once and emits no output. Loading
+`.zshrc` would invoke interactive widgets; putting PATH changes in `.zshenv`
+would affect every zsh and break the existing ownership convention. Neither is
+needed. This intentionally does not initialize package managers in login shells.
+
+Native Windows ignores the target. WSL uses the Linux login-shell behavior.
+The parity manifest checks both source copies and the installed target; the
+template matrix checks the Windows exclusion.
+
+## Verification
+
+- Baseline `make ci` passed before edits.
+- New real-shell regression failed before the fix: the synthetic native command
+  could not be found by a non-interactive login shell.
+- Final gate, Linux runtime verification and Opus 5.5/xhigh review are pending.
+
+This is a source fix, not a new release. No Windows profile or installer package
+selection changed. Review and deployment receipts will be appended below.
+
+## Local gate
+
+The final real-shell regression passes for command resolution, silent startup,
+paths containing spaces, duplicate prevention and a missing user-local directory.
+`make ci` passed, including source/apply parity and the Windows ignore-template
+matrix. The native Windows apply test now also asserts `.zprofile` stays absent.
+Actual Linux VM verification, hosted cross-platform checks and independent
+Opus review follow; they are not implied by the Mac gate.
+
+## Opus review and corrections
+
+Opus 5.5/xhigh requested safe adoption of an existing profile and confirmation of
+Codex's executable type. Added `.zprofile.local`, documented migration before
+replacement, and extended the backup/uninstall round-trip with a pre-seeded
+profile. The hook regression failed before and passes after the change.
+
+The real VM has no `.zprofile`. Its Codex is a static ELF standalone binary,
+0.161.0; Claude is native 2.1.285. Both execute by absolute path. The conditional
+Node-backed concern is therefore not applicable to this deployment. A managed
+login-shell apply and actual `zsh -lc` version checks remain pending review.
+
+All initial Windows and macOS hosted jobs passed. Ubuntu first exposed an
+unreproduced concurrent publisher failure, then a confirmed Hyperfine 2 schema
+incompatibility. The existing publisher passed 30 isolated Linux repeats and the
+retry. The performance parser now handles both upstream formats without changing
+the budget, with legacy, schema-2, unit, invalid-number and boundary tests.
+Evidence and final hosted/review/deployment results follow; prior pending entries
+above describe the state when they were written.
+
+Correction-round local `make ci` passed in full, including the profile hook,
+pre-seeded profile backup/restore and both Hyperfine JSON shapes. The actual
+VM login shell still fails before deployment with `codex: command not found`
+and exit 127, while both native binaries run directly. Those captured results
+will accompany the next independent review. Hosted checks are rerun on this
+correction commit.
+
+## Hosted concurrency failure resolved
+
+The next Ubuntu run failed the publisher again. Real Linux stress reproduced it;
+strace proved mkdir(2) returned EEXIST to one contender while the uutils command
+reported success. Source inspection confirmed its directory-existence fallback.
+The correction uses Python's exclusive `os.mkdir`, with a direct missing-runtime
+error, preserving the prior lock protocol. The new deterministic boundary
+regression fails before and passes after; the original real concurrency case
+remains. All 100 corrected Linux repetitions passed with four parallel workers.
+The original traces contain only disposable test repositories and are retained
+in the task archive. Full CI and another Opus review are required for this newly
+changed publisher before deployment.
+
+The corrected publisher's full local `make ci` passed. The chezmoi onchange
+helper fingerprint was updated to the real new script SHA; the first gate
+correctly rejected the stale fingerprint. No pin, budget or check was weakened.
+Fresh hosted CI and Opus review are required for the complete correction.
+
+## Clean-install correction, after review 3
+
+Opus 5.5/xhigh approved the previous source but required clean-image proof.
+That check failed: plugin publication precedes Python installation. The Python
+lock was never deployed. It is replaced by an atomic Bash noclobber claim inside
+the directory lock, retaining the PID/cleanup protocol and adding no prerequisite.
+An isolated PATH with only the existing shell/Git tools fails before and passes
+after this correction. The real and faulty-mkdir concurrent tests remain.
+The invariant now lives alongside the existing publisher rule in CLAUDE.md.
+The older stale-lock recovery race noted by Opus is unchanged: it needs a crashed
+holder and two simultaneous reclaimers; failed publication remains visible.
+Full checks, Linux stress, hosted CI and a fresh review follow.
+
+The final dependency-free publisher passed 100 real Linux test runs with four
+parallel workers. Both its faulty-mkdir fixture and its no-Python bootstrap
+fixture pass. The original ordinary concurrency case also remains green.

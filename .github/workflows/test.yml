@@ -20,11 +20,6 @@ defaults:
 env:
   CARGO_BINSTALL_COMMIT: 7bebc2e59eb8820162b7ac8f62a92bfdb2732447
   CARGO_BINSTALL_INSTALLER_SHA256: d3a93702160e0ec03e2a4e996855db1f01adee801fb84a43add24e0877ef8eae
-  CHEZMOI_VERSION: v2.73.0
-  CHEZMOI_LINUX_X86_64_SHA256: b597729b687af4488a848240134cb633de8ca0f04e0d26d48f400ee2ac338ffa
-  CHEZMOI_LINUX_ARM64_SHA256: abcb840401d3c1f2356e0f53f5d52aa10d10f572654d9626db9ad0ca4dc03355
-  CHEZMOI_DARWIN_ARM64_SHA256: 246679a0b200e7e8be4a951be3b95d37c33ecb87eaab5af6f4949f7d0317bcc1
-  CHEZMOI_WINDOWS_X86_64_SHA256: 266938399108028a5b6dc7a137026e3ead747304122e5fe381d5396e496620f6
   NVIM_LINUX_VERSION: v0.12.5
   NVIM_LINUX_X86_64_SHA256: bce0f56eda1f1b1db6eee8f4133d7a38813ea07933837dd1777411ca384c6875
   PIP_DISABLE_PIP_VERSION_CHECK: "1"
@@ -41,16 +36,6 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
-      - name: Install Nix (flakes enabled)
-        uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
-      - name: Dogfood install-deps dry run
-        run: |
-          set -euxo pipefail
-          ./install-deps.sh --dry-run --all
-      - name: Dogfood setup dry run
-        run: |
-          set -euxo pipefail
-          ./setup.sh --dry-run --all
       - name: Install deps
         run: |
           set -euxo pipefail
@@ -96,6 +81,7 @@ jobs:
         run: |
           set -euo pipefail
           make test-static
+          make test-bootstrap
       - name: Renovate schema
         run: |
           set -euo pipefail
@@ -120,18 +106,10 @@ jobs:
         run: |
           set -euo pipefail
           make test-nvim
-      - name: WezTerm smoke
-        run: |
-          set -euo pipefail
-          make test-wezterm
       - name: AeroSpace static checks
         run: |
           set -euo pipefail
           make test-aerospace
-      - name: Nix integration smoke
-        run: |
-          set -euo pipefail
-          make test-nix
 
   macos:
     runs-on: macos-26
@@ -140,16 +118,6 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
-      - name: Install Nix (flakes enabled)
-        uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
-      - name: Dogfood install-deps dry run
-        run: |
-          set -euxo pipefail
-          ./install-deps.sh --dry-run --all
-      - name: Dogfood setup dry run
-        run: |
-          set -euxo pipefail
-          ./setup.sh --dry-run --all
       - name: Install deps
         run: |
           set -euxo pipefail
@@ -159,24 +127,19 @@ jobs:
         run: |
           set -euo pipefail
           make test
+          make test-bootstrap
 
   windows:
     runs-on: windows-2025
-    timeout-minutes: 25
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - name: Dogfood install-deps dry run
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $PSNativeCommandUseErrorActionPreference = $true
-          .\install-deps.ps1 -DryRun -All
-      - name: Dogfood setup dry run
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $PSNativeCommandUseErrorActionPreference = $true
-          .\setup.ps1 -DryRun -All
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: 1.27.1
+          cache-dependency-path: installer/go.sum
       - name: Install deps
         shell: pwsh
         run: |
@@ -239,36 +202,6 @@ jobs:
           }
           nvim --version | Select-Object -First 1
 
-          # The Pester suite exercises real chezmoi drift/exit semantics. Install
-          # the same immutable Windows asset used by the parity lane so those
-          # behavioral tests never become platform-dependent skips.
-          $chezmoiBin = Join-Path $env:RUNNER_TEMP 'pinned-chezmoi'
-          $chezmoiTemp = Join-Path $env:RUNNER_TEMP "chezmoi-test-$([guid]::NewGuid())"
-          New-Item -ItemType Directory -Force -Path $chezmoiBin, $chezmoiTemp | Out-Null
-          try {
-            $version = $env:CHEZMOI_VERSION.TrimStart('v')
-            $asset = "chezmoi_${version}_windows_amd64.zip"
-            $zip = Join-Path $chezmoiTemp $asset
-            $extract = Join-Path $chezmoiTemp 'extract'
-            Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/twpayne/chezmoi/releases/download/$env:CHEZMOI_VERSION/$asset" -OutFile $zip
-            $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $zip).Hash.ToLowerInvariant()
-            if ($actual -ne $env:CHEZMOI_WINDOWS_X86_64_SHA256) {
-              throw "checksum mismatch for ${asset}: got $actual expected $env:CHEZMOI_WINDOWS_X86_64_SHA256"
-            }
-            Expand-Archive -Path $zip -DestinationPath $extract -Force
-            $chezmoi = Get-ChildItem -Path $extract -Filter 'chezmoi.exe' -File -Recurse | Select-Object -First 1
-            if (-not $chezmoi) { throw "chezmoi.exe missing from $asset" }
-            Copy-Item -LiteralPath $chezmoi.FullName -Destination (Join-Path $chezmoiBin 'chezmoi.exe') -Force
-          } finally {
-            Remove-Item -LiteralPath $chezmoiTemp -Recurse -Force -ErrorAction SilentlyContinue
-          }
-          $chezmoiVersion = (& (Join-Path $chezmoiBin 'chezmoi.exe') --version) -join "`n"
-          if ($chezmoiVersion -notmatch [regex]::Escape($env:CHEZMOI_VERSION)) {
-            throw "chezmoi version output does not include $env:CHEZMOI_VERSION"
-          }
-          Add-Content -Path $env:GITHUB_PATH -Value $chezmoiBin
-          $env:PATH = "$chezmoiBin;$env:PATH"
-
           Import-Module Pester -MinimumVersion 5.0.0 -Force
           Import-Module PSScriptAnalyzer -Force
           Get-Module Pester, PSScriptAnalyzer | Format-Table Name,Version,Path -AutoSize
@@ -278,158 +211,3 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $PSNativeCommandUseErrorActionPreference = $true
           .\test.ps1
-
-  chezmoi-parity:
-    runs-on: ubuntu-26.04
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          fetch-depth: 0
-      - name: Install deps
-        run: |
-          set -euxo pipefail
-          sudo apt-get update
-          sudo apt-get install -y ca-certificates curl git python3
-          scripts/install-pinned-chezmoi.sh "$HOME/.local/bin"
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-          "$HOME/.local/bin/chezmoi" --version
-      - name: Template tests
-        run: |
-          set -euo pipefail
-          PATH="$HOME/.local/bin:$PATH" bash tests/migration/template_test.sh
-      - name: Parity gate
-        run: |
-          set -euo pipefail
-          PATH="$HOME/.local/bin:$PATH" bash tests/migration/parity_gate.sh
-      - name: Greenfield round-trip uninstall
-        run: |
-          set -euo pipefail
-          PATH="$HOME/.local/bin:$PATH" bash tests/migration/greenfield_roundtrip.sh
-      - name: Exact v0.1.0 release migration
-        run: |
-          set -euo pipefail
-          PATH="$HOME/.local/bin:$PATH" bash tests/migration/v0_1_upgrade_test.sh
-      - name: Uninstall safety (adversarial)
-        run: |
-          set -euo pipefail
-          PATH="$HOME/.local/bin:$PATH" bash tests/migration/uninstall_safety_test.sh
-      - name: Uninstall backup selection (adversarial)
-        run: |
-          set -euo pipefail
-          PATH="$HOME/.local/bin:$PATH" bash tests/migration/uninstall_backup_order_test.sh
-      - name: Windows template render/parse/merge (pwsh)
-        run: |
-          set -euo pipefail
-          # the ubuntu runner ships pwsh, so this exercises the Windows-only
-          # .ps1.tmpl scripts (render + parse + WT merge) that ps1_parse.sh
-          # cannot see; the test self-skips if pwsh is ever absent.
-          PATH="$HOME/.local/bin:$PATH" bash tests/migration/windows_render_test.sh
-      - name: Oracle (negative) tests
-        run: |
-          set -euo pipefail
-          PATH="$HOME/.local/bin:$PATH" bash tests/migration/oracle_test.sh
-
-  chezmoi-parity-macos:
-    runs-on: macos-26
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          fetch-depth: 0
-      - name: Install chezmoi
-        run: |
-          set -euxo pipefail
-          command -v python3
-          command -v git
-          scripts/install-pinned-chezmoi.sh "$HOME/.local/bin"
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-          "$HOME/.local/bin/chezmoi" --version
-      - name: Template tests
-        run: |
-          set -euo pipefail
-          PATH="$HOME/.local/bin:$PATH" bash tests/migration/template_test.sh
-      - name: Parity gate
-        run: |
-          set -euo pipefail
-          PATH="$HOME/.local/bin:$PATH" bash tests/migration/parity_gate.sh
-      - name: Greenfield round-trip uninstall
-        run: |
-          set -euo pipefail
-          PATH="$HOME/.local/bin:$PATH" bash tests/migration/greenfield_roundtrip.sh
-      - name: Exact v0.1.0 release migration
-        env:
-          TEST_UPGRADE_PLATFORM: Darwin
-        run: |
-          set -euo pipefail
-          PATH="$HOME/.local/bin:$PATH" bash tests/migration/v0_1_upgrade_test.sh
-      - name: Uninstall safety (adversarial)
-        run: |
-          set -euo pipefail
-          PATH="$HOME/.local/bin:$PATH" bash tests/migration/uninstall_safety_test.sh
-      - name: Uninstall backup selection (adversarial)
-        run: |
-          set -euo pipefail
-          PATH="$HOME/.local/bin:$PATH" bash tests/migration/uninstall_backup_order_test.sh
-      - name: Oracle (negative) tests
-        run: |
-          set -euo pipefail
-          PATH="$HOME/.local/bin:$PATH" bash tests/migration/oracle_test.sh
-
-  chezmoi-parity-windows:
-    runs-on: windows-2025
-    # Heaviest job: a full Windows chezmoi apply plus the WT managed-subset
-    # deep-compare. Borderline at 25 on a slow runner (one cancellation), so
-    # give headroom.
-    timeout-minutes: 40
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - name: Install chezmoi
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          if (Get-Variable -Name PSNativeCommandUseErrorActionPreference -ErrorAction SilentlyContinue) {
-            $PSNativeCommandUseErrorActionPreference = $true
-          }
-
-          $bin = Join-Path $env:USERPROFILE 'bin'
-          New-Item -ItemType Directory -Force -Path $bin | Out-Null
-          $version = $env:CHEZMOI_VERSION.TrimStart('v')
-          $asset = "chezmoi_${version}_windows_amd64.zip"
-          $zip = Join-Path $env:TEMP $asset
-          $extract = Join-Path $env:TEMP "chezmoi-$([guid]::NewGuid())"
-          Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/twpayne/chezmoi/releases/download/$env:CHEZMOI_VERSION/$asset" -OutFile $zip
-          $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $zip).Hash.ToLowerInvariant()
-          if ($actual -ne $env:CHEZMOI_WINDOWS_X86_64_SHA256) {
-            throw "checksum mismatch for ${asset}: got $actual expected $env:CHEZMOI_WINDOWS_X86_64_SHA256"
-          }
-          Expand-Archive -Path $zip -DestinationPath $extract -Force
-          $chezmoi = Get-ChildItem -Path $extract -Filter 'chezmoi.exe' -File -Recurse | Select-Object -First 1
-          if (-not $chezmoi) {
-            throw "chezmoi.exe missing from $asset"
-          }
-          Copy-Item -LiteralPath $chezmoi.FullName -Destination (Join-Path $bin 'chezmoi.exe') -Force
-
-          Add-Content -Path $env:GITHUB_PATH -Value $bin
-          $env:PATH = "$bin;$env:PATH"
-          $version = (& (Join-Path $bin 'chezmoi.exe') --version) -join "`n"
-          Write-Host $version
-          if ($version -notmatch [regex]::Escape($env:CHEZMOI_VERSION)) {
-            throw "chezmoi version output does not include $env:CHEZMOI_VERSION"
-          }
-      - name: Windows chezmoi apply parity
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          if (Get-Variable -Name PSNativeCommandUseErrorActionPreference -ErrorAction SilentlyContinue) {
-            $PSNativeCommandUseErrorActionPreference = $true
-          }
-          .\tests\migration\windows_apply_test.ps1
-      - name: Windows greenfield round-trip uninstall
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          if (Get-Variable -Name PSNativeCommandUseErrorActionPreference -ErrorAction SilentlyContinue) {
-            $PSNativeCommandUseErrorActionPreference = $true
-          }
-          .\tests\migration\windows_roundtrip_test.ps1

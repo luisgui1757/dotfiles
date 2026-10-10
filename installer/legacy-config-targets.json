@@ -1,0 +1,833 @@
+{
+  "schema": 1,
+  "purpose": "Bounded released configuration discovery input; never deletion or adoption authority.",
+  "coverage": "v0.1.0 and v0.4.4 source metadata only. Intermediate releases, script-created changes, package ownership, and complete migration remain separate proofs.",
+  "semantics": {
+    "source-file": "Released POSIX mode links to the recorded home source path; Windows copies source bytes.",
+    "explicit-link": "The recorded template describes a link; it is evidence to interpret, never code to execute.",
+    "rendered-file": "Rendered bytes require separately reviewed template inputs; source SHA256 is not the installed file hash.",
+    "scoped-modification": "A scoped settings transformation, never ownership of the complete target file.",
+    "roots": "Resolve Windows known folders independently; v0.1.0 home/AppData and home/Documents targets deliberately remain conventional home-relative paths.",
+    "retention": "Keep legacy checkout source files and existing shared infrastructure until an approved, recoverable migration replaces their consumers."
+  },
+  "releases": [
+    {
+      "tag": "v0.1.0",
+      "commit": "015617362830280bf85c7142e69d0681d376d453",
+      "metadata": [
+        {
+          "source": "home/.chezmoi.toml.tmpl",
+          "blob": "21ef05d6c8cd53d068c865ce99856e082ad2196f",
+          "sha256": "f6be5547fe13df3e7cc424b0fd18bbac864dd237561cce2c2f68646ebd6dc413"
+        },
+        {
+          "source": "home/.chezmoiexternal.toml.tmpl",
+          "blob": "47778c348b131e7468355c4156e4af2dd69c673c",
+          "sha256": "c5035c9cb09801c6eb42788a3d0997ea4a3fa63355806e72497badc7cb8e0224"
+        },
+        {
+          "source": "home/.chezmoiignore",
+          "blob": "53de0125ccc9b541eb5ee983f52dc64cdbea54a7",
+          "sha256": "42601796bb3383eb407f13ae4cf0c10d1fc5caf4ee9f69aa3e640e0466cdc6b8"
+        },
+        {
+          "source": "home/.chezmoiscripts/run_onchange_after_20-verify-zsh-plugin-pins.sh.tmpl",
+          "blob": "65e543bbba9018e7f3acdf454e5819713b97cc83",
+          "sha256": "9c506f117619a0bad059ae9eecdd558c955fec6abd7ccf0c71af0f860de210cd"
+        },
+        {
+          "source": "home/.chezmoitemplates/ghostty/config",
+          "blob": "8c4624a43ec20989a4fbb126ce4b26755a078a10",
+          "sha256": "86619d24d97e96e5f4525dd85cb9807042d8ee836f2c533317bf7b54683ca7c6"
+        },
+        {
+          "source": "home/.chezmoitemplates/lazygit/config.windows.yml",
+          "blob": "b4707614535da9aa4e630592240fadf6ce5fdfd9",
+          "sha256": "f67dae5d7dfbe1352c4da6710444204921482325e2e14eac98721c6a5853c7fe"
+        },
+        {
+          "source": "home/.chezmoitemplates/lazygit/config.yml",
+          "blob": "09d2a7c4f076086d2028a8d9f2ae7f7f6c3ed513",
+          "sha256": "6fb9d275198ba00dc41b4c7b6319809828362e0a53f2b3bc5dcac407c71a9d5a"
+        },
+        {
+          "source": "home/.chezmoitemplates/windows-terminal/merge-settings.ps1",
+          "blob": "c33a41c946482a4c9d54ae4cbea2b9e4ab51424c",
+          "sha256": "f0488d95aac58cb2bb070e33ee4b5e56fc60c4c595c542a3122017051c87e02b"
+        },
+        {
+          "source": "home/.chezmoitemplates/windows-terminal/settings.fragment.jsonc",
+          "blob": "cac989633a1f5baa2d9baf4e967f10007cf2548d",
+          "sha256": "e384025ff2e23795c2dd89c8ed30ad9b26974036513c7a6af093fa5930e0b23e"
+        }
+      ],
+      "targets": [
+        {
+          "root": "home",
+          "path": "AppData/Local/Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/LocalState/settings.json",
+          "platforms": [
+            "windows"
+          ],
+          "source": "home/AppData/Local/Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/LocalState/modify_settings.json.ps1.tmpl",
+          "blob": "bbe34131d2f8b1e16ac24d1e16c47a85023a3c52",
+          "source_sha256": "22aa9aad471cc23f3339a743ffc3307f43624d1d3327cdaa9abffeeb794e5858",
+          "form": "scoped-modification"
+        },
+        {
+          "root": "home",
+          "path": "AppData/Local/lazygit/config.yml",
+          "platforms": [
+            "windows"
+          ],
+          "source": "home/AppData/Local/lazygit/config.yml.tmpl",
+          "blob": "4271031f5b5985af406b4d9e8518f3390ec08e26",
+          "source_sha256": "a811ee3c8d6b52566680911968c4a70819eb23c0c0bd8256d339a304b0c4019c",
+          "form": "rendered-file"
+        },
+        {
+          "root": "home",
+          "path": "AppData/Local/nvim",
+          "platforms": [
+            "windows"
+          ],
+          "source": "home/AppData/Local/symlink_nvim.tmpl",
+          "blob": "dfe0c90e301bd26011c1412fa2ebbaaf1ee3d49e",
+          "source_sha256": "b6056c9da1a976de96088150dabaec6f558fc34f4a6e40d217fbb8b0204f5516",
+          "form": "explicit-link",
+          "link_expression": "{{- /* Windows: clean, backslash, no-`..` absolute path. Windows readlink returns\n       backslashes and may resolve `..`, so the POSIX `{{ .chezmoi.sourceDir }}/../nvim`\n       form never round-trips and chezmoi reports drift-on-every-apply (it then\n       prompts and hangs a non-interactive apply). See docs/MIGRATION_STATUS.md and\n       tests/migration/windows_apply_test.ps1. */ -}}\n{{ .chezmoi.sourceDir | replace \"\\\\\" \"/\" | dir | replace \"/\" \"\\\\\" }}\\nvim"
+        },
+        {
+          "root": "home",
+          "path": "Documents/PowerShell/Microsoft.PowerShell_profile.ps1",
+          "platforms": [
+            "windows"
+          ],
+          "source": "home/Documents/PowerShell/Microsoft.PowerShell_profile.ps1",
+          "blob": "21aa77aa1ad21e495d40ecb58389b7020d93268d",
+          "source_sha256": "37e684500fb2ac0906eab25f336237915cd5aa1a65315cb610f71f1d27b625da",
+          "form": "source-file"
+        },
+        {
+          "root": "home",
+          "path": "Library/Application Support/com.mitchellh.ghostty/config",
+          "platforms": [
+            "darwin"
+          ],
+          "source": "home/Library/Application Support/com.mitchellh.ghostty/symlink_config.tmpl",
+          "blob": "2ae64f365728e5104545e66d22cf324873b1869e",
+          "source_sha256": "2951fcb55dcdce8a5d3ef4510739503ceb8c48fa1a6afaabb02d8bf467b1a2dd",
+          "form": "explicit-link",
+          "link_expression": "{{ .chezmoi.sourceDir }}/.chezmoitemplates/ghostty/config"
+        },
+        {
+          "root": "home",
+          "path": "Library/Application Support/lazygit/config.yml",
+          "platforms": [
+            "darwin"
+          ],
+          "source": "home/Library/Application Support/lazygit/symlink_config.yml.tmpl",
+          "blob": "39fd6304bce9609276a665ec778d21a8a197d465",
+          "source_sha256": "c646a20e9a0d295bedf7e0cebabdec0a24fe24ef9e13e174940d884c610baa3c",
+          "form": "explicit-link",
+          "link_expression": "{{ .chezmoi.sourceDir }}/.chezmoitemplates/lazygit/config.yml"
+        },
+        {
+          "root": "home",
+          "path": ".config/gh-dash/config.yml",
+          "platforms": [
+            "darwin",
+            "linux",
+            "windows"
+          ],
+          "source": "home/dot_config/gh-dash/config.yml",
+          "blob": "a1da5b5b96580d5596f64ea50e49c09ef7e49cbc",
+          "source_sha256": "efeb5603cf96fe50ac72c3abf473e614645d6d5a90c0811f39b276725de16f79",
+          "form": "source-file"
+        },
+        {
+          "root": "home",
+          "path": ".config/ghostty/config",
+          "platforms": [
+            "linux"
+          ],
+          "source": "home/dot_config/ghostty/symlink_config.tmpl",
+          "blob": "2ae64f365728e5104545e66d22cf324873b1869e",
+          "source_sha256": "2951fcb55dcdce8a5d3ef4510739503ceb8c48fa1a6afaabb02d8bf467b1a2dd",
+          "form": "explicit-link",
+          "link_expression": "{{ .chezmoi.sourceDir }}/.chezmoitemplates/ghostty/config",
+          "conditional": "Released WSL installs may omit this target unless experimentalWslGui was enabled. Presence still needs independent ownership evidence."
+        },
+        {
+          "root": "home",
+          "path": ".config/lazygit/config.yml",
+          "platforms": [
+            "linux"
+          ],
+          "source": "home/dot_config/lazygit/symlink_config.yml.tmpl",
+          "blob": "39fd6304bce9609276a665ec778d21a8a197d465",
+          "source_sha256": "c646a20e9a0d295bedf7e0cebabdec0a24fe24ef9e13e174940d884c610baa3c",
+          "form": "explicit-link",
+          "link_expression": "{{ .chezmoi.sourceDir }}/.chezmoitemplates/lazygit/config.yml"
+        },
+        {
+          "root": "home",
+          "path": ".config/lsd/colors.yaml",
+          "platforms": [
+            "darwin",
+            "linux",
+            "windows"
+          ],
+          "source": "home/dot_config/lsd/colors.yaml",
+          "blob": "bfe6751c4b99705fd6c07fa493dd8bd31066bcc9",
+          "source_sha256": "4ffd1adb6e5d70099d669b1488b91ca80f2ea417574f12359f8e376e88275c52",
+          "form": "source-file"
+        },
+        {
+          "root": "home",
+          "path": ".config/lsd/config.yaml",
+          "platforms": [
+            "darwin",
+            "linux",
+            "windows"
+          ],
+          "source": "home/dot_config/lsd/config.yaml",
+          "blob": "213d08f3ddfda95bd38a1bf0689aa135f50697b7",
+          "source_sha256": "3a7d6317030c578877cae39fe74f6ffaf245e5be240e1cdf3f769ff504291c4f",
+          "form": "source-file"
+        },
+        {
+          "root": "home",
+          "path": ".config/starship.toml",
+          "platforms": [
+            "darwin",
+            "linux",
+            "windows"
+          ],
+          "source": "home/dot_config/starship.toml",
+          "blob": "d3b25c94eebbe303d81424579e7abb4e77f4612b",
+          "source_sha256": "0bd71c8dcacdfd38179a290f451e6a5eaae12160fa284cf6dd6491ba73e5fd28",
+          "form": "source-file"
+        },
+        {
+          "root": "home",
+          "path": ".config/nvim",
+          "platforms": [
+            "darwin",
+            "linux"
+          ],
+          "source": "home/dot_config/symlink_nvim.tmpl",
+          "blob": "ddfc3c3876b8759a075eb41b9164ce6a951af56d",
+          "source_sha256": "e7eaa937de8a978da7109977ccabbb8bddff65841ecefb59c17bf9d6c4283cd7",
+          "form": "explicit-link",
+          "link_expression": "{{ .chezmoi.sourceDir }}/../nvim"
+        },
+        {
+          "root": "home",
+          "path": ".psmux.conf",
+          "platforms": [
+            "windows"
+          ],
+          "source": "home/dot_psmux.conf",
+          "blob": "67ef2e01609abdee1c30a7c1bb75f2b4efd38bbb",
+          "source_sha256": "9e616b68a80ed0940a429aa9a69b130ab6a7283543fcb0ef1b8872cee6f14880",
+          "form": "source-file"
+        },
+        {
+          "root": "home",
+          "path": ".tmux.conf",
+          "platforms": [
+            "darwin",
+            "linux",
+            "windows"
+          ],
+          "source": "home/dot_tmux.conf",
+          "blob": "ae0057d936abc9dcd48afac16175d52d9e5831dc",
+          "source_sha256": "b1e1f0f0fb912443988dfd82bcc9dab4ecda55ee181480992521b1eb88d1f703",
+          "form": "source-file"
+        },
+        {
+          "root": "home",
+          "path": ".tmux.posix.conf",
+          "platforms": [
+            "darwin",
+            "linux"
+          ],
+          "source": "home/dot_tmux.posix.conf",
+          "blob": "bf2edd4eecb7c68e9923308228a378900e69ce31",
+          "source_sha256": "a4f4bbc8c03e4f6e57de04a4bc5273cd0ffef4983b610ec60edf9e664a1b72d5",
+          "form": "source-file"
+        },
+        {
+          "root": "home",
+          "path": ".tmux.rose-pine.dawn.conf",
+          "platforms": [
+            "darwin",
+            "linux",
+            "windows"
+          ],
+          "source": "home/dot_tmux.rose-pine.dawn.conf",
+          "blob": "405f39616815c202495b950ac984563550c3f2cc",
+          "source_sha256": "27340407b499e36a2a7798cbae31004c68ac847b2042eb7ea329ecd76edd688a",
+          "form": "source-file"
+        },
+        {
+          "root": "home",
+          "path": ".tmux.rose-pine.main.conf",
+          "platforms": [
+            "darwin",
+            "linux",
+            "windows"
+          ],
+          "source": "home/dot_tmux.rose-pine.main.conf",
+          "blob": "13a9f9b4737872de312549d32a6c4391c10e8e7c",
+          "source_sha256": "228deef5b16e16c965053e412a392e6a8c11bd823763f45ee50ab4f225e8259d",
+          "form": "source-file"
+        },
+        {
+          "root": "home",
+          "path": ".tmux.rose-pine.moon.conf",
+          "platforms": [
+            "darwin",
+            "linux",
+            "windows"
+          ],
+          "source": "home/dot_tmux.rose-pine.moon.conf",
+          "blob": "2d908e2d1cf3078446f7d7d17344e0862ccc8361",
+          "source_sha256": "bc571c5dbd17ffe7f0b2a1fb8337f67e49814a98172a9bc0e9e8d23612cc04c2",
+          "form": "source-file"
+        },
+        {
+          "root": "home",
+          "path": ".tmux.rose-pine.ps1",
+          "platforms": [
+            "windows"
+          ],
+          "source": "home/dot_tmux.rose-pine.ps1",
+          "blob": "981e62129fa8fa28abb9bd0a648855a9af9a7a55",
+          "source_sha256": "b42bc4cfaaaf4ee41ff0d99c3204e86aca906e462253828a23ab612274930695",
+          "form": "source-file"
+        },
+        {
+          "root": "home",
+          "path": ".tmux.windows.conf",
+          "platforms": [
+            "windows"
+          ],
+          "source": "home/dot_tmux.windows.conf",
+          "blob": "ee32ff4ef691c7f482e9c7acbf2a4f77d533ce32",
+          "source_sha256": "6931c3aecf0560293bd25116651b2a68dd31a8c752ce829b11ac9d99622c4d47",
+          "form": "source-file"
+        },
+        {
+          "root": "home",
+          "path": ".zshenv",
+          "platforms": [
+            "darwin",
+            "linux"
+          ],
+          "source": "home/dot_zshenv",
+          "blob": "e6cb7f5fbd15e8a85deff5682e11940095dc7499",
+          "source_sha256": "59a2d3a9a57f8035b48cfcfc75e1b37795719c6dcc8dc5c131a78ed416e6cdc2",
+          "form": "source-file"
+        },
+        {
+          "root": "home",
+          "path": ".zshrc",
+          "platforms": [
+            "darwin",
+            "linux"
+          ],
+          "source": "home/dot_zshrc",
+          "blob": "46bb76a5e6553d0340d75328dfbbeb8f0ae9233a",
+          "source_sha256": "089d528e6bb90f3ae7fbbd6156acfb97e644ea5046a16d7beb6fc0b2e37466a2",
+          "form": "source-file"
+        }
+      ]
+    },
+    {
+      "tag": "v0.4.4",
+      "commit": "05874e536372f6a73f8971c84e675e95666662d4",
+      "metadata": [
+        {
+          "source": "home/.chezmoi.toml.tmpl",
+          "blob": "21ef05d6c8cd53d068c865ce99856e082ad2196f",
+          "sha256": "f6be5547fe13df3e7cc424b0fd18bbac864dd237561cce2c2f68646ebd6dc413"
+        },
+        {
+          "source": "home/.chezmoiexternal.toml.tmpl",
+          "blob": "69f917064ba77d98185355fa744a2d27096a3a6d",
+          "sha256": "11b20ca7312fea900f67bdc42d1d44a2de2ce65a3cdeccdda21e51795d49583b"
+        },
+        {
+          "source": "home/.chezmoiignore",
+          "blob": "d8655a5a1b9abbd3df8d7edf835598f5ded12848",
+          "sha256": "fa1340a49ed184d6bf0c5657fab12280001e5b8711da951dd52ad3e1dc9b4163"
+        },
+        {
+          "source": "home/.chezmoiscripts/run_onchange_after_20-ensure-zsh-plugin-pins.sh.tmpl",
+          "blob": "4a2051374ea39e7c38950f3e6695bedf53926690",
+          "sha256": "ac60d1de4b373d447a10170a22c7474d7b11a1fa2634ac25d147b7963375cb12"
+        },
+        {
+          "source": "home/.chezmoitemplates/ghostty/config",
+          "blob": "fea937d84a389a3f999b585c7e1e297f3ce62a33",
+          "sha256": "7fb9a58f998451dde657a04abf1ea852fad89500382bae06686a36b725cd2da3"
+        },
+        {
+          "source": "home/.chezmoitemplates/herdr/config.toml",
+          "blob": "44b7be76b310ac38296b12297168310f35cb5fb9",
+          "sha256": "dbf12d0b8f9d352e49eba913cdcdfe029fd43ce91aafd19e899126375aa4d4ee"
+        },
+        {
+          "source": "home/.chezmoitemplates/lazygit/config.windows.yml",
+          "blob": "b4707614535da9aa4e630592240fadf6ce5fdfd9",
+          "sha256": "f67dae5d7dfbe1352c4da6710444204921482325e2e14eac98721c6a5853c7fe"
+        },
+        {
+          "source": "home/.chezmoitemplates/lazygit/config.yml",
+          "blob": "09d2a7c4f076086d2028a8d9f2ae7f7f6c3ed513",
+          "sha256": "6fb9d275198ba00dc41b4c7b6319809828362e0a53f2b3bc5dcac407c71a9d5a"
+        },
+        {
+          "source": "home/.chezmoitemplates/windows-terminal/merge-settings.ps1",
+          "blob": "c33a41c946482a4c9d54ae4cbea2b9e4ab51424c",
+          "sha256": "f0488d95aac58cb2bb070e33ee4b5e56fc60c4c595c542a3122017051c87e02b"
+        },
+        {
+          "source": "home/.chezmoitemplates/windows-terminal/settings.fragment.jsonc",
+          "blob": "2d8bb874f77b29276ceb06ed1ec14c4372a39339",
+          "sha256": "13469d7bd36e4e2a4370704a42cb15b3f24072d20bb03fcf9db71b9aea91c78c"
+        },
+        {
+          "source": "windows/chezmoi-overlay.toml",
+          "blob": "9dc7d4d9b4204223bd71ee99742a41306f242521",
+          "sha256": "ddb41c7abee37cc7faca48a185777af803fad2426e637dcea3c466d60a470ced"
+        }
+      ],
+      "targets": [
+        {
+          "root": "home",
+          "path": "Library/Application Support/com.mitchellh.ghostty/config",
+          "platforms": [
+            "darwin"
+          ],
+          "source": "home/Library/Application Support/com.mitchellh.ghostty/symlink_config.tmpl",
+          "blob": "2ae64f365728e5104545e66d22cf324873b1869e",
+          "source_sha256": "2951fcb55dcdce8a5d3ef4510739503ceb8c48fa1a6afaabb02d8bf467b1a2dd",
+          "form": "explicit-link",
+          "link_expression": "{{ .chezmoi.sourceDir }}/.chezmoitemplates/ghostty/config"
+        },
+        {
+          "root": "home",
+          "path": "Library/Application Support/lazygit/config.yml",
+          "platforms": [
+            "darwin"
+          ],
+          "source": "home/Library/Application Support/lazygit/symlink_config.yml.tmpl",
+          "blob": "39fd6304bce9609276a665ec778d21a8a197d465",
+          "source_sha256": "c646a20e9a0d295bedf7e0cebabdec0a24fe24ef9e13e174940d884c610baa3c",
+          "form": "explicit-link",
+          "link_expression": "{{ .chezmoi.sourceDir }}/.chezmoitemplates/lazygit/config.yml"
+        },
+        {
+          "root": "home",
+          "path": ".config/aerospace/aerospace.toml",
+          "platforms": [
+            "darwin"
+          ],
+          "source": "home/dot_config/aerospace/aerospace.toml",
+          "blob": "b18299841c521a5f66c7f44c114ac035ba2da104",
+          "source_sha256": "495d4eaa3703241c3423b02f9628e442e8895c17f04386ad443004b73b59aa53",
+          "form": "source-file"
+        },
+        {
+          "root": "home",
+          "path": ".config/gh-dash/config.yml",
+          "platforms": [
+            "darwin",
+            "linux",
+            "windows"
+          ],
+          "source": "home/dot_config/gh-dash/config.yml",
+          "blob": "a1da5b5b96580d5596f64ea50e49c09ef7e49cbc",
+          "source_sha256": "efeb5603cf96fe50ac72c3abf473e614645d6d5a90c0811f39b276725de16f79",
+          "form": "source-file"
+        },
+        {
+          "root": "home",
+          "path": ".config/ghostty/config",
+          "platforms": [
+            "linux"
+          ],
+          "source": "home/dot_config/ghostty/symlink_config.tmpl",
+          "blob": "2ae64f365728e5104545e66d22cf324873b1869e",
+          "source_sha256": "2951fcb55dcdce8a5d3ef4510739503ceb8c48fa1a6afaabb02d8bf467b1a2dd",
+          "form": "explicit-link",
+          "link_expression": "{{ .chezmoi.sourceDir }}/.chezmoitemplates/ghostty/config",
+          "conditional": "Released WSL installs may omit this target unless experimentalWslGui was enabled. Presence still needs independent ownership evidence."
+        },
+        {
+          "root": "home",
+          "path": ".config/git/config",
+          "platforms": [
+            "darwin",
+            "linux",
+            "windows"
+          ],
+          "source": "home/dot_config/git/config",
+          "blob": "af16541a14388e879ec6b093a859ba13331e9151",
+          "source_sha256": "2a7e9475b0637746681bd5fd237ed6ef94a729c3c50e08808e6e9301078cc832",
+          "form": "source-file"
+        },
+        {
+          "root": "home",
+          "path": ".config/herdr/config.toml",
+          "platforms": [
+            "darwin",
+            "linux"
+          ],
+          "source": "home/dot_config/herdr/symlink_config.toml.tmpl",
+          "blob": "4f01087248455d215e59c1c92d09eefc737817d9",
+          "source_sha256": "1148563678349ef188024d634f2bf8dd4bde415d8ddbf3c9b22422a524ec3b5b",
+          "form": "explicit-link",
+          "link_expression": "{{ .chezmoi.sourceDir }}/.chezmoitemplates/herdr/config.toml"
+        },
+        {
+          "root": "home",
+          "path": ".config/lazygit/config.yml",
+          "platforms": [
+            "linux"
+          ],
+          "source": "home/dot_config/lazygit/symlink_config.yml.tmpl",
+          "blob": "39fd6304bce9609276a665ec778d21a8a197d465",
+          "source_sha256": "c646a20e9a0d295bedf7e0cebabdec0a24fe24ef9e13e174940d884c610baa3c",
+          "form": "explicit-link",
+          "link_expression": "{{ .chezmoi.sourceDir }}/.chezmoitemplates/lazygit/config.yml"
+        },
+        {
+          "root": "home",
+          "path": ".config/lsd/colors.yaml",
+          "platforms": [
+            "darwin",
+            "linux",
+            "windows"
+          ],
+          "source": "home/dot_config/lsd/colors.yaml",
+          "blob": "bfe6751c4b99705fd6c07fa493dd8bd31066bcc9",
+          "source_sha256": "4ffd1adb6e5d70099d669b1488b91ca80f2ea417574f12359f8e376e88275c52",
+          "form": "source-file"
+        },
+        {
+          "root": "home",
+          "path": ".config/lsd/config.yaml",
+          "platforms": [
+            "darwin",
+            "linux",
+            "windows"
+          ],
+          "source": "home/dot_config/lsd/config.yaml",
+          "blob": "213d08f3ddfda95bd38a1bf0689aa135f50697b7",
+          "source_sha256": "3a7d6317030c578877cae39fe74f6ffaf245e5be240e1cdf3f769ff504291c4f",
+          "form": "source-file"
+        },
+        {
+          "root": "home",
+          "path": ".config/starship.toml",
+          "platforms": [
+            "darwin",
+            "linux",
+            "windows"
+          ],
+          "source": "home/dot_config/starship.toml",
+          "blob": "d3b25c94eebbe303d81424579e7abb4e77f4612b",
+          "source_sha256": "0bd71c8dcacdfd38179a290f451e6a5eaae12160fa284cf6dd6491ba73e5fd28",
+          "form": "source-file"
+        },
+        {
+          "root": "home",
+          "path": ".config/nvim",
+          "platforms": [
+            "darwin",
+            "linux"
+          ],
+          "source": "home/dot_config/symlink_nvim.tmpl",
+          "blob": "ddfc3c3876b8759a075eb41b9164ce6a951af56d",
+          "source_sha256": "e7eaa937de8a978da7109977ccabbb8bddff65841ecefb59c17bf9d6c4283cd7",
+          "form": "explicit-link",
+          "link_expression": "{{ .chezmoi.sourceDir }}/../nvim"
+        },
+        {
+          "root": "home",
+          "path": ".config/wezterm/wezterm.lua",
+          "platforms": [
+            "darwin",
+            "linux",
+            "windows"
+          ],
+          "source": "home/dot_config/wezterm/wezterm.lua",
+          "blob": "9374c5ffdf3d990fbc9ca4986dab8257fd355932",
+          "source_sha256": "b514e4303f64258e143720524ea2e8eda225d4bf9b194b14bc9d51469ad256a2",
+          "form": "source-file",
+          "conditional": "Released WSL installs may omit this target unless experimentalWslGui was enabled. Presence still needs independent ownership evidence."
+        },
+        {
+          "root": "home",
+          "path": ".pi/agent/keybindings.json",
+          "platforms": [
+            "darwin",
+            "linux",
+            "windows"
+          ],
+          "source": "home/dot_pi/agent/keybindings.json",
+          "blob": "ac6e2b7f94264b68b3c0d82391e23d1df73ee208",
+          "source_sha256": "44fdac65547cdede61cad8670ae8a65007d4cc8cf751c1b29d613bd26066f2d9",
+          "form": "source-file"
+        },
+        {
+          "root": "home",
+          "path": ".pi/agent/themes/rose-pine-dawn.json",
+          "platforms": [
+            "darwin",
+            "linux",
+            "windows"
+          ],
+          "source": "home/dot_pi/agent/themes/rose-pine-dawn.json",
+          "blob": "b3e6ab4f6d5603c27c8a0485de69caa8ca4586b7",
+          "source_sha256": "7c32014116c6e4e974a2e5e3126d3b42cd83bd20e19731d93e6854d845b735e4",
+          "form": "source-file"
+        },
+        {
+          "root": "home",
+          "path": ".pi/agent/themes/rose-pine-moon.json",
+          "platforms": [
+            "darwin",
+            "linux",
+            "windows"
+          ],
+          "source": "home/dot_pi/agent/themes/rose-pine-moon.json",
+          "blob": "bd8af9f4a39296e56362efbf6250e4f6b53eef2f",
+          "source_sha256": "9dcfb2f727ecef62075aab8a7e28a3b84198f605b8a2c6cf615e8868ab0bc556",
+          "form": "source-file"
+        },
+        {
+          "root": "home",
+          "path": ".pi/agent/themes/rose-pine.json",
+          "platforms": [
+            "darwin",
+            "linux",
+            "windows"
+          ],
+          "source": "home/dot_pi/agent/themes/rose-pine.json",
+          "blob": "90fe0b2fb8d98659ca4c74d30fcb98462dd6d234",
+          "source_sha256": "47393b1ae8c7e31cb6e484d270604bbb0a98d9c99c04a87cf85bc65f4c7b47f5",
+          "form": "source-file"
+        },
+        {
+          "root": "home",
+          "path": ".psmux.conf",
+          "platforms": [
+            "windows"
+          ],
+          "source": "home/dot_psmux.conf",
+          "blob": "67ef2e01609abdee1c30a7c1bb75f2b4efd38bbb",
+          "source_sha256": "9e616b68a80ed0940a429aa9a69b130ab6a7283543fcb0ef1b8872cee6f14880",
+          "form": "source-file"
+        },
+        {
+          "root": "home",
+          "path": ".tmux.conf",
+          "platforms": [
+            "darwin",
+            "linux",
+            "windows"
+          ],
+          "source": "home/dot_tmux.conf",
+          "blob": "ae0057d936abc9dcd48afac16175d52d9e5831dc",
+          "source_sha256": "b1e1f0f0fb912443988dfd82bcc9dab4ecda55ee181480992521b1eb88d1f703",
+          "form": "source-file"
+        },
+        {
+          "root": "home",
+          "path": ".tmux.posix.conf",
+          "platforms": [
+            "darwin",
+            "linux"
+          ],
+          "source": "home/dot_tmux.posix.conf",
+          "blob": "bf2edd4eecb7c68e9923308228a378900e69ce31",
+          "source_sha256": "a4f4bbc8c03e4f6e57de04a4bc5273cd0ffef4983b610ec60edf9e664a1b72d5",
+          "form": "source-file"
+        },
+        {
+          "root": "home",
+          "path": ".tmux.rose-pine.dawn.conf",
+          "platforms": [
+            "darwin",
+            "linux",
+            "windows"
+          ],
+          "source": "home/dot_tmux.rose-pine.dawn.conf",
+          "blob": "405f39616815c202495b950ac984563550c3f2cc",
+          "source_sha256": "27340407b499e36a2a7798cbae31004c68ac847b2042eb7ea329ecd76edd688a",
+          "form": "source-file"
+        },
+        {
+          "root": "home",
+          "path": ".tmux.rose-pine.main.conf",
+          "platforms": [
+            "darwin",
+            "linux",
+            "windows"
+          ],
+          "source": "home/dot_tmux.rose-pine.main.conf",
+          "blob": "13a9f9b4737872de312549d32a6c4391c10e8e7c",
+          "source_sha256": "228deef5b16e16c965053e412a392e6a8c11bd823763f45ee50ab4f225e8259d",
+          "form": "source-file"
+        },
+        {
+          "root": "home",
+          "path": ".tmux.rose-pine.moon.conf",
+          "platforms": [
+            "darwin",
+            "linux",
+            "windows"
+          ],
+          "source": "home/dot_tmux.rose-pine.moon.conf",
+          "blob": "2d908e2d1cf3078446f7d7d17344e0862ccc8361",
+          "source_sha256": "bc571c5dbd17ffe7f0b2a1fb8337f67e49814a98172a9bc0e9e8d23612cc04c2",
+          "form": "source-file"
+        },
+        {
+          "root": "home",
+          "path": ".tmux.rose-pine.ps1",
+          "platforms": [
+            "windows"
+          ],
+          "source": "home/dot_tmux.rose-pine.ps1",
+          "blob": "981e62129fa8fa28abb9bd0a648855a9af9a7a55",
+          "source_sha256": "b42bc4cfaaaf4ee41ff0d99c3204e86aca906e462253828a23ab612274930695",
+          "form": "source-file"
+        },
+        {
+          "root": "home",
+          "path": ".tmux.windows.conf",
+          "platforms": [
+            "windows"
+          ],
+          "source": "home/dot_tmux.windows.conf",
+          "blob": "ee32ff4ef691c7f482e9c7acbf2a4f77d533ce32",
+          "source_sha256": "6931c3aecf0560293bd25116651b2a68dd31a8c752ce829b11ac9d99622c4d47",
+          "form": "source-file"
+        },
+        {
+          "root": "home",
+          "path": ".zshenv",
+          "platforms": [
+            "darwin",
+            "linux"
+          ],
+          "source": "home/dot_zshenv",
+          "blob": "e6cb7f5fbd15e8a85deff5682e11940095dc7499",
+          "source_sha256": "59a2d3a9a57f8035b48cfcfc75e1b37795719c6dcc8dc5c131a78ed416e6cdc2",
+          "form": "source-file"
+        },
+        {
+          "root": "home",
+          "path": ".zshrc",
+          "platforms": [
+            "darwin",
+            "linux"
+          ],
+          "source": "home/dot_zshrc",
+          "blob": "f22470e919418261a74d7e05018841699bfa4ad2",
+          "source_sha256": "dfff7fa88e78d1c1c018149489bb3cec1cd40f9feb69642cad3ce8d2da7ad68a",
+          "form": "source-file"
+        },
+        {
+          "root": "roaming_app_data",
+          "path": "herdr/config.toml",
+          "platforms": [
+            "windows"
+          ],
+          "source": "windows/chezmoi-appdata/herdr/symlink_config.toml.tmpl",
+          "blob": "84200ea5ec37391855522da523404f992f7d9aec",
+          "source_sha256": "988dda3cdc603031ab9288cb449cb4630cd1dec1277595a832e78af2277ae08e",
+          "form": "explicit-link",
+          "link_expression": "{{- /* Herdr consumes roaming ApplicationData on Windows, which may be\n       redirected independently from UserProfile and LocalApplicationData. */ -}}\n{{ .chezmoi.sourceDir | replace \"\\\\\" \"/\" | dir | dir | replace \"/\" \"\\\\\" }}\\herdr\\config.windows.toml"
+        },
+        {
+          "root": "documents",
+          "path": "PowerShell/Microsoft.PowerShell_profile.ps1",
+          "platforms": [
+            "windows"
+          ],
+          "source": "windows/chezmoi-documents/PowerShell/symlink_Microsoft.PowerShell_profile.ps1.tmpl",
+          "blob": "792d951c421303000618f19b22f769c4d5a7974e",
+          "source_sha256": "d05cacd6d67a9fadd0003cb6b65f62e94fe5bdec85ec4e6567c5b368ef693781",
+          "form": "explicit-link",
+          "link_expression": "{{ .chezmoi.sourceDir | replace \"\\\\\" \"/\" | dir | dir | replace \"/\" \"\\\\\" }}\\shells\\powershell_profile.ps1"
+        },
+        {
+          "root": "documents",
+          "path": "PowerShell/Microsoft.VSCode_profile.ps1",
+          "platforms": [
+            "windows"
+          ],
+          "source": "windows/chezmoi-documents/PowerShell/symlink_Microsoft.VSCode_profile.ps1.tmpl",
+          "blob": "792d951c421303000618f19b22f769c4d5a7974e",
+          "source_sha256": "d05cacd6d67a9fadd0003cb6b65f62e94fe5bdec85ec4e6567c5b368ef693781",
+          "form": "explicit-link",
+          "link_expression": "{{ .chezmoi.sourceDir | replace \"\\\\\" \"/\" | dir | dir | replace \"/\" \"\\\\\" }}\\shells\\powershell_profile.ps1"
+        },
+        {
+          "root": "documents",
+          "path": "WindowsPowerShell/Microsoft.PowerShellISE_profile.ps1",
+          "platforms": [
+            "windows"
+          ],
+          "source": "windows/chezmoi-documents/WindowsPowerShell/symlink_Microsoft.PowerShellISE_profile.ps1.tmpl",
+          "blob": "792d951c421303000618f19b22f769c4d5a7974e",
+          "source_sha256": "d05cacd6d67a9fadd0003cb6b65f62e94fe5bdec85ec4e6567c5b368ef693781",
+          "form": "explicit-link",
+          "link_expression": "{{ .chezmoi.sourceDir | replace \"\\\\\" \"/\" | dir | dir | replace \"/\" \"\\\\\" }}\\shells\\powershell_profile.ps1"
+        },
+        {
+          "root": "documents",
+          "path": "WindowsPowerShell/Microsoft.PowerShell_profile.ps1",
+          "platforms": [
+            "windows"
+          ],
+          "source": "windows/chezmoi-documents/WindowsPowerShell/symlink_Microsoft.PowerShell_profile.ps1.tmpl",
+          "blob": "792d951c421303000618f19b22f769c4d5a7974e",
+          "source_sha256": "d05cacd6d67a9fadd0003cb6b65f62e94fe5bdec85ec4e6567c5b368ef693781",
+          "form": "explicit-link",
+          "link_expression": "{{ .chezmoi.sourceDir | replace \"\\\\\" \"/\" | dir | dir | replace \"/\" \"\\\\\" }}\\shells\\powershell_profile.ps1"
+        },
+        {
+          "root": "local_app_data",
+          "path": "lazygit/config.yml",
+          "platforms": [
+            "windows"
+          ],
+          "source": "windows/chezmoi-localappdata/lazygit/symlink_config.yml.tmpl",
+          "blob": "f430512fea309e2f5ad378e8644eda65540bc0f7",
+          "source_sha256": "5b714b41ab034d8661fb9f2ed355b12fa0e0496f18654ccd1538505a9b07000d",
+          "form": "explicit-link",
+          "link_expression": "{{ .chezmoi.sourceDir | replace \"\\\\\" \"/\" | dir | dir | replace \"/\" \"\\\\\" }}\\lazygit\\config.windows.yml"
+        },
+        {
+          "root": "local_app_data",
+          "path": "nvim",
+          "platforms": [
+            "windows"
+          ],
+          "source": "windows/chezmoi-localappdata/symlink_nvim.tmpl",
+          "blob": "011c37207c78a331caa11ad86ea6f68cc9ae349c",
+          "source_sha256": "514c6dfa60d62d527181911a83deb22c871e3a158431716052a906c5034ad74b",
+          "form": "explicit-link",
+          "link_expression": "{{- /* This source state is applied with actual LocalApplicationData as its\n       destination, so the target is exactly the directory Neovim consumes. */ -}}\n{{ .chezmoi.sourceDir | replace \"\\\\\" \"/\" | dir | dir | replace \"/\" \"\\\\\" }}\\nvim"
+        }
+      ]
+    }
+  ]
+}
