@@ -43,3 +43,18 @@ EditorConfig/gofmt checks, workflow YAML lint and Bash syntax, explicit branch/
 permission/working-directory/failure-preservation checks, and `git diff --check`.
 No full gate was repeated and no commit, branch publication or native mutation
 was performed while assembling this diagnostic checkout.
+
+## Second diagnostic candidate
+
+The first run failed honestly: exact child HANDLE signals lagged query completion
+by 2.21–3.45 ms, and Git failed within two adjacent version/config assertions.
+This follow-up waits for verified private-job HANDLE completion under the same
+five-second total bound, adds a real late-member refusal test, and separates those
+two Git assertions in the diagnostic output. The workflow includes the new native
+case. PowerShell 5.1 extraction, COM publication and progress checks passed in the
+first run; the next native result is still required for these new changes.
+
+If the original private config assertion fails, bounded diagnostics compare its
+native `cygpath` spelling and collect the independent original-path GCM version
+trace before returning the original failed status. Neither comparison can turn
+that failed lifecycle into a pass; no second installation or authentication runs.

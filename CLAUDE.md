@@ -218,7 +218,11 @@ Job Object. Create the query suspended with atomic job-list assignment, then
 resume it and verify all
 owned descendants have exited before returning; compiler telemetry must not turn
 the next observation into a new external consumer. Keep the 30-second inspection
-and output bounds, with a separate five-second termination bound. Preserve
+and output bounds, with a separate five-second termination bound shared by every
+captured member. Capture exact process HANDLEs from that private job and verify
+membership before termination; wait for HANDLE signals, not merely exit codes or
+zero ActiveProcesses. Refuse an incomplete/changed member snapshot instead of
+claiming completion, and never terminate a PID outside the job. Preserve
 pre-existing consumers, machine telemetry settings and vendor files. Do not apply
 this cancellation policy to the durable native mutation worker. Neither filtering
 `vctip.exe` by name nor retrying a changed plan is an ownership proof.

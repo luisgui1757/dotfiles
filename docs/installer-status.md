@@ -238,3 +238,14 @@ explicitly. Recipe revision 1 makes this an ordinary update for completed older
 payloads and rejects replaying unfinished older preparation. Local real-Git
 configuration, archive lifecycle and long-path Lua regressions cover the change;
 actual Windows long-path Git and full Neovim lifecycle proof remain required.
+
+Temporary diagnostic `48fbcc8` / job `114309772969` passes all four actual
+PowerShell 5.1 extraction cases, real private COM shortcut lifecycle and both
+progress regressions. All five Build Tools process cases demonstrate exit code 1
+before HANDLE signal, followed by signal 2.21–3.45 ms after the query returned.
+The provider now captures verified private-job HANDLEs and waits within the same
+five-second total bound, refusing changing membership. Native zero-time assertions
+and a new late-member refusal case remain required in the next diagnostic run.
+PortableGit now stops before LFS/GCM at the adjacent version/private-config
+assertions; separate value/exit diagnostics are prepared. Its original .NET-style
+failure is still unresolved, not disproved by this earlier failure.

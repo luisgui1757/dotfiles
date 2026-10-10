@@ -30,7 +30,7 @@ jobs:
       - name: Exercise ordinary PowerShell and private process boundaries
         run: >-
           go test -race -v -count=1 -timeout 10m
-          -run '^Test(BootstrapToolchainExtraction|WindowsBuildToolsQueryContainsOnlyItsOwnProcessTree|WindowsBuildToolsQueryRejectsUnsafeOrUnavailableProgram|DesktopShortcutNativePowerShell51COMPublication|DesktopShortcutPowerShellProgressPreservesHashProtocol|DesktopQueryPowerShellProgress)$' .
+          -run '^Test(BootstrapToolchainExtraction|WindowsBuildToolsQueryContainsOnlyItsOwnProcessTree|WindowsBuildToolsQueryRejectsUnsafeOrUnavailableProgram|WindowsBuildToolsQueryRejectsChangedMembership|DesktopShortcutNativePowerShell51COMPublication|DesktopShortcutPowerShellProgressPreservesHashProtocol|DesktopQueryPowerShellProgress)$' .
       - name: Install, upgrade, use and remove private Git and GNU Make
         if: always()
         env:

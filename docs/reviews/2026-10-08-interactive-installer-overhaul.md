@@ -5669,3 +5669,57 @@ Focused verification: all PortableGit regression tests pass with Go race in
 3.267 seconds; all 12 pinned-checkout Lua tests pass using private Neovim 0.12.5
 and HOME/XDG directories. Windows amd64 test compilation, StyLua, changed-file
 EditorConfig and `git diff --check` pass. No native Windows result is implied.
+
+
+### 2026-10-10 — Native HANDLE rundown confirmed and exact completion awaited
+
+Temporary diagnostic head `48fbcc8b5e258298630680f8d6e6edc279e57035`, run
+`38085071529`, job `114309772969` is failed evidence. Its raw log SHA-256 is
+`d8aa147fa2d5a59c98408438da3966adb3209d76ab8b562865ab2b0fcc55cd7c`. All five
+process-tree modes report an initial unsignaled exact child HANDLE despite exit
+code 1, then a signaled HANDLE after 2.21–3.45 ms. This confirms final process
+object rundown rather than an uncontained, still-executing child in these cases.
+The original immediate completion assertions remain failed; no grace period
+changes their outcome.
+
+[TerminateProcess is asynchronous and requires a process HANDLE wait](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-terminateprocess).
+Termination now captures the [private job's member PIDs](https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-jobobject_basic_process_id_list),
+opens exact synchronization handles and verifies each with [IsProcessInJob](https://learn.microsoft.com/en-us/windows/win32/api/jobapi/nf-jobapi-isprocessinjob)
+before terminating the job. It awaits every captured HANDLE within the existing
+single five-second deadline, then requires empty accounting and unchanged job
+lifetime membership. The bounded member buffer, failed opens, changed identity
+or new membership all fail the read-only inspection; none can authorize a
+success from a partial snapshot. Only the private job is terminated. This avoids
+unconditional delays, per-handle timeout multiplication, unrelated-process
+filtering, and treating an exit code as completion. The existing five native
+cases still require immediately signaled children and surviving outside work.
+A new real-kernel fixture creates a late job member between capture and
+termination and requires explicit refusal of that incomplete proof.
+
+The same native diagnostic passes PowerShell 5.1 extraction (4.73 s, all four
+cases), private COM shortcut install/check/remove (1.39 s), shortcut progress hash
+protocol (0.75 s), and read-only desktop query progress/error handling (1.28 s).
+These are actual Windows passes, not cross-compilation claims.
+
+Git/Make remains failed. The `Git version` diagnostic label covered both version
+equality and the newly added private core.longpaths query, so the log proves only
+that one of this pair failed before LFS/GCM/SSH. The probe now labels them
+separately and reports only version text, bool value or exact failed query exit.
+The original strict comparisons, physical paths, byte pins and GCM trace remain;
+there is no guessed .NET fix or weakened acceptance. The next temporary native
+run must verify exact process completion and resolve the earlier Git assertion.
+
+Focused local preflight: all PortableGit tests pass with Go race (1.986 s);
+Windows amd64 test-binary compilation and Windows-target `go vet ./...` pass.
+Gofmt, EditorConfig, embedded Bash syntax, diagnostic workflow YAML lint and
+`git diff --check` pass. The new exact-HANDLE and late-member cases cannot run
+on this Mac; their red-to-green native proof remains the next hosted run.
+
+The private-config failure branch additionally makes a read-only comparison with
+`cygpath -w /etc/gitconfig`, reports whether Bash sees `MSYS_NO_PATHCONV`, then
+runs the unchanged-path GCM version command with the fixture's existing bounded,
+secret-disabled trace. It always returns the original strict config failure.
+[MSYS source checks variable presence, not its value](https://github.com/git-for-windows/msys2-runtime/blob/main/winsup/cygwin/msys2_path_conv.cc)
+while preparation currently exports an empty value. This is a concrete competing
+path-conversion explanation, not yet native proof or an accepted fallback. No
+configuration/authentication is changed by these additional diagnostics.

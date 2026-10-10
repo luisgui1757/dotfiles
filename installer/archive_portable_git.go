@@ -218,8 +218,36 @@ test -d /dev/shm && test -d /dev/mqueue
 test "$(readlink /etc/mtab)" = /proc/mounts
 test -f /ucrt64/libexec/git-core/dlls-copied
 printf '%s\n' 'PortableGit runtime: Git version' >&2
-test "$(git --version)" = "git version $1"
-test "$(git -c core.longpaths=true config --file /etc/gitconfig --type=bool --get core.longpaths)" = true
+actual_version=$(git --version)
+printf 'PortableGit runtime: actual=%s expected=git version %s\n' "$actual_version" "$1" >&2
+test "$actual_version" = "git version $1"
+printf '%s\n' 'PortableGit runtime: private core.longpaths' >&2
+if actual_longpaths=$(git -c core.longpaths=true config --file /etc/gitconfig --type=bool --get core.longpaths); then
+	printf 'PortableGit runtime: core.longpaths=%s\n' "$actual_longpaths" >&2
+	if test "$actual_longpaths" = true; then config_result=0; else config_result=$?; fi
+else
+	config_result=$?
+	printf 'PortableGit runtime: private config query exited %s\n' "$config_result" >&2
+fi
+if test "$config_result" -ne 0; then
+	printf 'PortableGit diagnostic: MSYS_NO_PATHCONV present=%s\n' "${MSYS_NO_PATHCONV+x}" >&2
+	if native_config=$(cygpath -w /etc/gitconfig); then
+		if native_longpaths=$(git -c core.longpaths=true config --file "$native_config" --type=bool --get core.longpaths); then
+			printf 'PortableGit diagnostic: native path core.longpaths=%s\n' "$native_longpaths" >&2
+		else
+			printf 'PortableGit diagnostic: native path config query exited %s\n' "$?" >&2
+		fi
+	else
+		printf 'PortableGit diagnostic: cygpath exited %s\n' "$?" >&2
+	fi
+	printf '%s\n' 'PortableGit diagnostic: original-path Git Credential Manager' >&2
+	if git credential-manager --version; then
+		printf '%s\n' 'PortableGit diagnostic: GCM exited 0' >&2
+	else
+		printf 'PortableGit diagnostic: GCM exited %s\n' "$?" >&2
+	fi
+	exit "$config_result"
+fi
 printf '%s\n' 'PortableGit runtime: Git LFS' >&2
 git lfs version >/dev/null
 printf '%s\n' 'PortableGit runtime: Git Credential Manager' >&2

@@ -15,6 +15,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unsafe"
 
 	"golang.org/x/sys/windows"
 )
@@ -255,4 +256,84 @@ func TestWindowsBuildToolsQueryHelper(t *testing.T) {
 		t.Fatal("unsupported fixture mode", mode)
 	}
 	os.Exit(0)
+}
+
+// A child created after the captured membership cannot be silently covered by
+// the earlier HANDLE proof. Exercise the real job boundary, without test hooks.
+func TestWindowsBuildToolsQueryRejectsChangedMembership(t *testing.T) {
+	job, err := windows.CreateJobObject(nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := errors.Join(windows.TerminateJobObject(job, 1), windows.CloseHandle(job)); err != nil {
+			t.Error(err)
+		}
+	})
+	program, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	application, err := windows.UTF16PtrFromString(program)
+	if err != nil {
+		t.Fatal(err)
+	}
+	commandLine := windows.ComposeCommandLine(append([]string{program}, buildToolsQueryFixtureArgs("hold", t.TempDir())...))
+	start := func() windows.Handle {
+		t.Helper()
+		// CreateProcess may modify its command-line buffer.
+		arguments, err := windows.UTF16PtrFromString(commandLine)
+		if err != nil {
+			t.Fatal(err)
+		}
+		startup := windows.StartupInfo{Cb: uint32(unsafe.Sizeof(windows.StartupInfo{}))}
+		var process windows.ProcessInformation
+		if err := windows.CreateProcess(application, arguments, nil, nil, false, windows.CREATE_SUSPENDED|windows.CREATE_NO_WINDOW, nil, nil, &startup, &process); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() {
+			if status, err := windows.WaitForSingleObject(process.Process, 0); err != nil {
+				t.Error(err)
+			} else if status == uint32(windows.WAIT_TIMEOUT) {
+				if err := windows.TerminateProcess(process.Process, 1); err != nil {
+					t.Error(err)
+				}
+				if status, err := windows.WaitForSingleObject(process.Process, 5000); err != nil || status != windows.WAIT_OBJECT_0 {
+					t.Error("fixture child cleanup failed", status, err)
+				}
+			}
+			if err := errors.Join(windows.CloseHandle(process.Thread), windows.CloseHandle(process.Process)); err != nil {
+				t.Error(err)
+			}
+		})
+		if err := windows.AssignProcessToJobObject(job, process.Process); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := windows.ResumeThread(process.Thread); err != nil {
+			t.Fatal(err)
+		}
+		return process.Process
+	}
+	first := start()
+	handles, total, err := captureBuildToolsQueryProcesses(job)
+	defer func() {
+		for _, handle := range handles {
+			if err := windows.CloseHandle(handle); err != nil {
+				t.Error(err)
+			}
+		}
+	}()
+	if err != nil || len(handles) != 1 || total != 1 {
+		t.Fatal("initial exact membership capture failed", len(handles), total, err)
+	}
+	second := start()
+	err = terminateBuildToolsQueryProcesses(job, handles, total, time.Now().Add(5*time.Second))
+	if err == nil || !strings.Contains(err.Error(), "membership changed during termination") {
+		t.Fatal("late child was accepted under an earlier HANDLE proof", err)
+	}
+	for _, handle := range []windows.Handle{first, second} {
+		if status, err := windows.WaitForSingleObject(handle, 5000); err != nil || status != windows.WAIT_OBJECT_0 {
+			t.Fatal("private job did not terminate its exact member", status, err)
+		}
+	}
 }

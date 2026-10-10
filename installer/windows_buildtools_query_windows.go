@@ -161,32 +161,101 @@ func queryWindowsBuildTools(ctx context.Context, privileged bool, program string
 	return output.data.Bytes(), nil
 }
 
-// TerminateJobObject initiates termination. Confirm every owned process has
-// exited before a fresh inventory can observe it; cancellation gets a separate
-// five-second reap bound. Never wait for or terminate an unrelated process.
-func stopBuildToolsQueryJob(job windows.Handle) error {
+// TerminateJobObject initiates termination, but job accounting and exit codes
+// can settle before process HANDLEs signal. Capture exact job members first and
+// await those handles within one shared reap bound. A changing membership cannot
+// authorize a success claim from an incomplete snapshot.
+func stopBuildToolsQueryJob(job windows.Handle) (result error) {
+	deadline := time.Now().Add(5 * time.Second)
+	handles, total, captureErr := captureBuildToolsQueryProcesses(job)
+	defer func() {
+		for _, handle := range handles {
+			result = errors.Join(result, windows.CloseHandle(handle))
+		}
+	}()
+	return errors.Join(captureErr, terminateBuildToolsQueryProcesses(job, handles, total, deadline))
+}
+
+type buildToolsJobAccounting struct {
+	Times      [4]int64
+	PageFaults uint32
+	Total      uint32
+	Active     uint32
+	Terminated uint32
+}
+
+func readBuildToolsJobAccounting(job windows.Handle) (buildToolsJobAccounting, error) {
+	var info buildToolsJobAccounting
+	err := windows.QueryInformationJobObject(job, windows.JobObjectBasicAccountingInformation, uintptr(unsafe.Pointer(&info)), uint32(unsafe.Sizeof(info)), nil)
+	return info, err
+}
+
+// Query only the private job, never a machine-wide PID/name inventory. The fixed
+// buffer bounds this compiler inspection; overflow is an error, not truncation.
+func captureBuildToolsQueryProcesses(job windows.Handle) ([]windows.Handle, uint32, error) {
+	before, err := readBuildToolsJobAccounting(job)
+	if err != nil {
+		return nil, 0, err
+	}
+	var members struct {
+		Assigned uint32
+		Listed   uint32
+		PIDs     [256]uintptr
+	}
+	if err := windows.QueryInformationJobObject(job, windows.JobObjectBasicProcessIdList, uintptr(unsafe.Pointer(&members)), uint32(unsafe.Sizeof(members)), nil); err != nil {
+		return nil, before.Total, fmt.Errorf("capture Build Tools inspection members: %w", err)
+	}
+	if members.Listed > uint32(len(members.PIDs)) || members.Listed != members.Assigned || members.Assigned != before.Active {
+		return nil, before.Total, errors.New("Build Tools inspection membership changed during capture")
+	}
+	handles := make([]windows.Handle, 0, members.Listed)
+	isProcessInJob := windows.NewLazySystemDLL("kernel32.dll").NewProc("IsProcessInJob")
+	for _, pid := range members.PIDs[:members.Listed] {
+		if pid == 0 || pid > 1<<32-1 {
+			return handles, before.Total, errors.New("invalid Build Tools inspection member PID")
+		}
+		handle, err := windows.OpenProcess(windows.SYNCHRONIZE|windows.PROCESS_QUERY_LIMITED_INFORMATION, false, uint32(pid))
+		if err != nil {
+			return handles, before.Total, fmt.Errorf("open Build Tools inspection member: %w", err)
+		}
+		var belongs int32
+		ok, _, callErr := isProcessInJob.Call(uintptr(handle), uintptr(job), uintptr(unsafe.Pointer(&belongs)))
+		if ok == 0 || belongs == 0 {
+			closeErr := windows.CloseHandle(handle)
+			if ok == 0 {
+				return handles, before.Total, errors.Join(fmt.Errorf("verify Build Tools inspection membership: %w", callErr), closeErr)
+			}
+			return handles, before.Total, errors.Join(errors.New("Build Tools inspection member changed before capture"), closeErr)
+		}
+		handles = append(handles, handle)
+	}
+	return handles, before.Total, nil
+}
+
+func terminateBuildToolsQueryProcesses(job windows.Handle, handles []windows.Handle, total uint32, deadline time.Time) error {
 	if err := windows.TerminateJobObject(job, 1); err != nil {
 		return err
 	}
-	deadline := time.Now().Add(5 * time.Second)
-	for {
-		// JOBOBJECT_BASIC_ACCOUNTING_INFORMATION, including its four LARGE_INTEGERs.
-		var accounting struct {
-			Times      [4]int64
-			PageFaults uint32
-			Total      uint32
-			Active     uint32
-			Terminated uint32
-		}
-		if err := windows.QueryInformationJobObject(job, windows.JobObjectBasicAccountingInformation, uintptr(unsafe.Pointer(&accounting)), uint32(unsafe.Sizeof(accounting)), nil); err != nil {
-			return err
-		}
-		if accounting.Active == 0 {
-			return nil
-		}
-		if time.Now().After(deadline) {
+	for _, handle := range handles {
+		remaining := time.Until(deadline)
+		if remaining <= 0 {
 			return errors.New("Build Tools inspection process tree did not terminate within five seconds")
 		}
-		time.Sleep(10 * time.Millisecond)
+		milliseconds := uint32((remaining + time.Millisecond - 1) / time.Millisecond)
+		status, err := windows.WaitForSingleObject(handle, milliseconds)
+		if err != nil {
+			return err
+		}
+		if status != windows.WAIT_OBJECT_0 {
+			return fmt.Errorf("Build Tools inspection process completion was not signaled within five seconds (wait %d)", status)
+		}
 	}
+	after, err := readBuildToolsJobAccounting(job)
+	if err != nil {
+		return err
+	}
+	if after.Total != total || after.Active != 0 {
+		return errors.New("Build Tools inspection membership changed during termination; completion is unproved")
+	}
+	return nil
 }
