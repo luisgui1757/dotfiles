@@ -984,3 +984,15 @@ Keep `-G` inspection offline and retain the same physical key path.
 Use OpenSSH's documented `-F none` to disable both personal and system config
 reads. The bundled MSYS OpenSSH does not accept Windows `NUL` as that file path;
 its explicit no-config option avoids null-device path translation entirely.
+
+
+## Native desktop fixture launcher output
+
+A successful GUI launcher may exit while its application retains inherited
+stdout/stderr. Native desktop acceptance must pass private regular OS file
+handles to that launcher, then read at most 1 MiB for diagnostics. Do not attach
+Go writer pipes and wait for GUI descendants to close them, ignore ErrWaitDelay,
+leave a detached Wait goroutine, or extend the existing launch deadline.
+Nonzero launcher exit, cancellation and file errors remain fatal. Success still
+requires the exact owned executable, a native window and actual settings witness;
+cleanup stops only owned application processes before the final log check.

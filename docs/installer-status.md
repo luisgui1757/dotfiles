@@ -411,3 +411,29 @@ user and system config for this value. An offline process regression reproduces
 the missing-file failure and succeeds with `none`, preserving the identity path.
 No runtime code or later assertion changes. Complete native Git/Make, final
 payload/personal-config integrity and owned removal remain pending.
+
+## 2026-10-11 — Desktop launcher inherited-output wait
+
+Temporary source `a5493783d8acfe1b6cb0c17dc7bfd19bb38061e8`, run `38092318318`,
+passes the corrected real Code lifecycle (including reviewed downgrade) and
+native font rendering/removal on Ubuntu amd64 and arm64. Both full desktop jobs
+then remain inside `vscode-singleton` for more than nine minutes, beyond the
+fixture's 90-second launch context. ARM records the installed Code process
+activating accessibility services. The temporary run was explicitly cancelled
+to collect that phase trace; it is not a successful GUI lifecycle.
+
+A bounded private process reproduction proves that an exited launcher can still
+leave `Cmd.Run` waiting on writer pipes held by its living child, past context
+expiry. Native desktop fixtures now use exclusive private regular-file output,
+retaining the same 1 MiB diagnostic read bound, exit/context/error checks,
+90-second context and actual executable/window/settings assertions. Owned GUI
+cleanup precedes the final log read. The regression releases its exact private
+child and joins the original waiter even on the failed-before path. No package,
+provider, sandbox or application behavior changes. Full corrected hosted GUI
+acceptance remains pending the subsequent checkpoint.
+
+Validation: failed-before process regression reproduces the inherited-pipe wait;
+corrected focused cases pass (0.553s), including explicit nonzero exit,
+cancellation and output-limit boundaries. Race tests pass (2.610s); Go vet,
+Linux amd64/arm64 and Windows amd64 test compilation, EditorConfig and diff
+checks pass. No everyday-workstation GUI or native package mutation was used.

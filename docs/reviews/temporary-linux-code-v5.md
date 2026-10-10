@@ -80,3 +80,15 @@ environment tests (5.681s), Linux amd64 and arm64 test compilation, YAML parsing
 and exact canonical step comparison, EditorConfig, gofmt and diff checks. Native
 execution remains pending the two actual hosted jobs; compilation is not proof
 of configured application consumption.
+
+## 2026-10-11 — Bounded launcher output correction
+
+The `a549378` attempt passed both real Code and font steps, then remained in the
+VS Code singleton fixture for over nine minutes. It was cancelled after a private
+process reproduction established the inherited-pipe wait; cancellation is not
+GUI success. The next checkpoint changes only native fixture launcher capture
+to private OS file handles with bounded reads, preserving exit/context failures,
+the same 90-second context and every owned/window/settings assertion. The exact
+same two jobs rerun all three Code/font/GUI lifecycle steps; no preceding test is
+removed or replaced. The application/process diagnosis is recorded in the
+canonical status/review append for eventual parent integration.

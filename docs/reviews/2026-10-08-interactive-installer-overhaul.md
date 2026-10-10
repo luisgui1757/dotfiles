@@ -6210,3 +6210,40 @@ owner/mode, with existing output bounds; every health requirement remains intact
 Focused process-boundary tests prove failures stay failures and healthy checks
 stay silent. The actual hosted metadata/cause remains pending; no permission,
 sandbox or application path change is justified by the incomplete trace.
+
+### 2026-10-11 — GUI launcher output outlives its root process
+
+Accepted native-fixture defect. Diagnostic head `a5493783d8acfe1b6cb0c17dc7bfd19bb38061e8`
+run `38092318318` passes actual Code install/recovery/repair/approved downgrade/
+removal on Ubuntu arm64 (86.51s) and amd64 (91.26s), and native font lifecycle
+(6.64s/7.39s). Both public desktop tests reach `vscode-singleton` and remain there
+for over nine minutes despite a 90-second context. ARM records the actual
+`/usr/share/code/code` process activating the accessibility bus. The scoped
+run was then cancelled, not passed. Raw arm64/amd64 job log SHA-256s:
+`f95e66a00b3f1d273d31bdbf8fef97321f25d79568a8aee80cffadb2db966f4d` and
+`a77ebdea4a76ba3eff469f8da30e06ae4a5b9645c4c7621c8ecb9fe138922ce2`.
+
+The fixture captures launcher output through a Go writer. A launched GUI can
+inherit those pipes after its successful launcher exits, leaving `Cmd.Wait`
+blocked on copy goroutines that context cancellation cannot complete. A private
+root/child process reproduces root exit 0 but a 3.028s wait with a 300ms context;
+regular OS file handles return in 14ms while the child remains alive. No GUI
+was launched locally. The focused regression fails on the original writer-pipe
+operation and passes with exclusive private file handles; it releases the exact
+private child and joins the waiter on both paths. Separate cases retain nonzero
+root exit, context cancellation and the 1 MiB diagnostic bound.
+
+Change only native test launch capture. Preserve the original 90-second context,
+all owned-process/window/settings witnesses and exact owned-process cleanup.
+Read bounded output on launch completion and again after owned GUI cleanup;
+late output/read errors still fail the subtest. Do not ignore ErrWaitDelay,
+extend deadlines, treat root exit as GUI proof or use a detached Wait goroutine.
+No production provider or sandbox behavior changes. Native corrected GUI
+acceptance remains required; the cancelled jobs only prove their completed Code
+and font steps plus the recorded stalled phase.
+
+Validation: failed-before process regression reproduces the inherited-pipe wait;
+corrected focused cases pass (0.553s), including explicit nonzero exit,
+cancellation and output-limit boundaries. Race tests pass (2.610s); Go vet,
+Linux amd64/arm64 and Windows amd64 test compilation, EditorConfig and diff
+checks pass. No everyday-workstation GUI or native package mutation was used.

@@ -345,13 +345,25 @@ func desktopConsumePublished(t *testing.T, d *DesktopDriver, a *ArchiveDriver, i
 	if runtime.GOOS == "darwin" {
 		command.Stdin = desktopMacLaunchEnvironment(t, environment)
 	}
-	var output nativeOutput
-	command.Stdout, command.Stderr = &output, &output
-	if err := command.Run(); err != nil || output.exceeded {
-		t.Fatalf("published %s launcher failed: %v (output exceeded=%v)%s", id, err, output.exceeded, nativeDiagnostic(output.data.Bytes()))
+	logPath := filepath.Join(t.TempDir(), "launcher.log")
+	launchErr := runDesktopLauncher(ctx, command, logPath)
+	// The owned-process deferred cleanup above runs before testing cleanups,
+	// so this final read also captures output from the actual GUI child.
+	t.Cleanup(func() {
+		output, err := readDesktopLauncherOutput(logPath)
+		if err != nil {
+			t.Errorf("published %s launcher output: %v", id, err)
+		}
+		if t.Failed() {
+			t.Logf("published %s final launcher output:%s", id, nativeDiagnostic(output))
+		}
+	})
+	output, outputErr := readDesktopLauncherOutput(logPath)
+	if err := errors.Join(launchErr, outputErr); err != nil {
+		t.Fatalf("published %s launcher failed: %v%s", id, err, nativeDiagnostic(output))
 	}
-	if output.data.Len() != 0 {
-		t.Logf("published %s launcher output:%s", id, nativeDiagnostic(output.data.Bytes()))
+	if len(output) != 0 {
+		t.Logf("published %s launcher output:%s", id, nativeDiagnostic(output))
 	}
 	var owned []int
 	window := false
