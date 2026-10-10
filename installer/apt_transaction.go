@@ -21,7 +21,8 @@ type aptInstalledPackage struct {
 var aptPackageName = regexp.MustCompile(`^[a-z0-9][a-z0-9+.-]*:[a-z0-9][a-z0-9-]*$`)
 var aptInstallItem = regexp.MustCompile(`^([a-z0-9][a-z0-9+.-]*:[a-z0-9][a-z0-9-]*) \(([^ ,()\t\r\n]+)(, automatic)?\)(, |$)`)
 
-func aptInstallEvidence(history, dpkgLog []byte, operation string) ([]aptInstalledPackage, error) {
+// approvedDowngrade, when supplied, is the exact saved fixed-Code history tuple.
+func aptInstallEvidence(history, dpkgLog []byte, operation string, approvedDowngrade ...string) ([]aptInstalledPackage, error) {
 	if !operationID.MatchString(operation) || len(history) == 0 || len(history) > 8<<20 || len(dpkgLog) > 8<<20 ||
 		strings.ContainsRune(string(history), '\x00') || strings.ContainsRune(string(dpkgLog), '\x00') {
 		return nil, errors.New("invalid or oversized APT operation evidence")
@@ -62,7 +63,7 @@ func aptInstallEvidence(history, dpkgLog []byte, operation string) ([]aptInstall
 		return nil, errors.New("APT transaction does not match the saved operation")
 	}
 	for _, destructive := range []string{"Remove", "Purge", "Downgrade", "Disappeared"} {
-		if fields[destructive] != "" {
+		if fields[destructive] != "" && !(destructive == "Downgrade" && len(approvedDowngrade) == 1 && fields[destructive] == approvedDowngrade[0]) {
 			return nil, fmt.Errorf("APT unexpectedly recorded %s; preserve the operation for inspection", destructive)
 		}
 	}

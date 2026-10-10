@@ -20,10 +20,17 @@
       "capability": true,
       "requires": [
         "tool.vscode",
-        "integration.vscode",
-        "desktop.vscode"
+        "integration.vscode"
       ],
-      "scope": "user"
+      "scope": "user",
+      "platform_requires": {
+        "darwin": [
+          "desktop.vscode"
+        ],
+        "windows": [
+          "desktop.vscode"
+        ]
+      }
     },
     {
       "id": "zsh",
@@ -693,12 +700,10 @@
           "package": "xclip"
         }
       },
-      "requires": [
-        "integration.shells"
-      ],
       "platform_requires": {
         "windows": [
-          "tool.vcredist"
+          "tool.vcredist",
+          "integration.shells"
         ],
         "linux": [
           "tool.clipboard-wayland"
@@ -905,9 +910,14 @@
           "package": "tool.vscode"
         }
       },
-      "requires": [
-        "integration.shells"
-      ]
+      "platform_requires": {
+        "darwin": [
+          "integration.shells"
+        ],
+        "windows": [
+          "integration.shells"
+        ]
+      }
     },
     {
       "id": "tool.gh",
@@ -1869,7 +1879,11 @@
         "tool.vscode"
       ],
       "action": "desktop",
-      "scope": "user"
+      "scope": "user",
+      "platforms": [
+        "darwin",
+        "windows"
+      ]
     },
     {
       "id": "desktop.aerospace",

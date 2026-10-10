@@ -41,3 +41,42 @@ after. This is a nonrecursive fixture precondition, not a production health-guar
 relaxation or payload repair; no developer-machine permission is changed.
 The Linux implementation lane supplied the reviewed workflow patch with SHA-256
 `17d7dc86b315a104ff70dfb004b4c4d3fece4c72908165be4d97aa112ffd9908`.
+
+## 2026-10-11 — Current configured Linux Desktop acceptance
+
+This next branch-only checkpoint starts at diagnostic `b1f4a191` and copies the
+current parent-integrated Linux Code/APT/planner/catalog corrections, combined
+desktop native fixture/helpers, clipboard graph regression and current archive
+pin/Node preparation tests from the delivery writer based on `de769314`. The
+external source manifest records exact bytes. Unrelated shell, Git/Lua and
+Windows query corrections are outside this diagnostic subset.
+
+The same two Ubuntu architectures now run all three canonical Linux Desktop
+steps in order: actual pinned Code install/lost-outcome recovery/repair/approved
+downgrade/removal with repository/key/debconf preservation; native font
+installation/rendering/check/removal; and the compiled public desktop lifecycle.
+The latter exercises VS Code alone before the complete VS Code/Ghostty selection,
+actual configured windows/settings, update, owned-process-only cleanup and
+selective/full removal with personal launcher/configuration preservation. It
+uses the package-owned canonical Code launcher and all unchanged strict process,
+window, witness and ownership assertions. No shortened paths, sandbox flags,
+global policy relaxation or fixture skips are introduced.
+
+Each existing per-step deadline remains 15, 12 and 70 minutes respectively; the
+job's aggregate 100-minute deadline matches canonical Desktop acceptance. The
+nonrecursive `/usr/share` root-owned 0755 disposable-host preparation remains
+identical. Fonts and packages mutate only explicitly opted-in GitHub-hosted
+jobs. No native GUI, package, font or user policy mutation runs locally.
+
+This workflow and temporary note never enter the delivery commit, do not open a
+pull request and do not replace required acceptance contexts. The delegated
+implementation agent is authorized to update only the existing diagnostic branch
+with an exact old-head lease. Local focused/compile/static checks precede that
+push; actual native results must still be retrieved and attributed to its exact
+published head.
+
+Preflight passes on the composed source: focused Code/clipboard/desktop child
+environment tests (5.681s), Linux amd64 and arm64 test compilation, YAML parsing
+and exact canonical step comparison, EditorConfig, gofmt and diff checks. Native
+execution remains pending the two actual hosted jobs; compilation is not proof
+of configured application consumption.

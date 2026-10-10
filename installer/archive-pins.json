@@ -756,6 +756,13 @@
         ],
         "required_files": [
           "lib/node_modules/npm/bin/npm-cli.js"
+        ],
+        "replacements": [
+          {
+            "file": "lib/node_modules/npm/node_modules/node-gyp/gyp/gyp_main.py",
+            "before": "import gyp  # noqa: E402",
+            "after": "sys.dont_write_bytecode = True\nimport gyp  # noqa: E402"
+          }
         ]
       },
       "linux/amd64": {
@@ -775,7 +782,14 @@
         "required_files": [
           "lib/node_modules/npm/bin/npm-cli.js"
         ],
-        "libc": "glibc"
+        "libc": "glibc",
+        "replacements": [
+          {
+            "file": "lib/node_modules/npm/node_modules/node-gyp/gyp/gyp_main.py",
+            "before": "import gyp  # noqa: E402",
+            "after": "sys.dont_write_bytecode = True\nimport gyp  # noqa: E402"
+          }
+        ]
       },
       "linux/arm64": {
         "version": "24.21.0",
@@ -794,7 +808,14 @@
         "required_files": [
           "lib/node_modules/npm/bin/npm-cli.js"
         ],
-        "libc": "glibc"
+        "libc": "glibc",
+        "replacements": [
+          {
+            "file": "lib/node_modules/npm/node_modules/node-gyp/gyp/gyp_main.py",
+            "before": "import gyp  # noqa: E402",
+            "after": "sys.dont_write_bytecode = True\nimport gyp  # noqa: E402"
+          }
+        ]
       },
       "windows/amd64": {
         "version": "24.21.0",
@@ -812,6 +833,13 @@
         ],
         "required_files": [
           "node_modules/npm/bin/npm-cli.js"
+        ],
+        "replacements": [
+          {
+            "file": "node_modules/npm/node_modules/node-gyp/gyp/gyp_main.py",
+            "before": "import gyp  # noqa: E402",
+            "after": "sys.dont_write_bytecode = True\nimport gyp  # noqa: E402"
+          }
         ]
       }
     },

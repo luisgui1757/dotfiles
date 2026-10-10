@@ -15,7 +15,8 @@ import (
 // They authorize only a reviewed retry of the same saved operation.
 // Ownership additionally requires a successful final command, completed dpkg
 // configuration across those attempts and current installed-state verification.
-func linuxAPTAttemptEvidence(history, log []byte, operation string) (map[string]aptInstalledPackage, map[string]string, map[string]string, error) {
+// approvedDowngrade, when supplied, is the exact saved fixed-Code history tuple.
+func linuxAPTAttemptEvidence(history, log []byte, operation string, approvedDowngrade ...string) (map[string]aptInstalledPackage, map[string]string, map[string]string, error) {
 	introduced := map[string]aptInstalledPackage{}
 	configured, changed := map[string]string{}, map[string]string{}
 	if len(history) == 0 && len(log) == 0 {
@@ -53,7 +54,7 @@ func linuxAPTAttemptEvidence(history, log []byte, operation string) (map[string]
 		return nil, nil, nil, errors.New("APT recovery transaction belongs to another operation")
 	}
 	for _, field := range []string{"Remove", "Purge", "Downgrade", "Disappeared"} {
-		if fields[field] != "" {
+		if fields[field] != "" && !(field == "Downgrade" && len(approvedDowngrade) == 1 && fields[field] == approvedDowngrade[0]) {
 			return nil, nil, nil, errors.New("APT recovery transaction contains unexpected removal or downgrade")
 		}
 	}
@@ -150,11 +151,11 @@ func (d *LinuxAPTDriver) attemptEvidence(intent linuxAPTIntent) (map[string]aptI
 			return nil, nil, nil, err
 		}
 		if len(history) > 0 && reply.Error == "" && reply.ExitCode != nil && *reply.ExitCode == 0 {
-			if _, err := aptInstallEvidence(history, log, saved.Command.Operation); err != nil {
+			if _, err := aptInstallEvidence(history, log, saved.Command.Operation, linuxCodeApprovedDowngrade(intent)); err != nil {
 				return nil, nil, nil, err
 			}
 		}
-		added, statuses, changed, err := linuxAPTAttemptEvidence(history, log, saved.Command.Operation)
+		added, statuses, changed, err := linuxAPTAttemptEvidence(history, log, saved.Command.Operation, linuxCodeApprovedDowngrade(intent))
 		if err != nil {
 			return nil, nil, nil, err
 		}

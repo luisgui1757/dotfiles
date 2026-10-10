@@ -192,6 +192,9 @@ func (d *LinuxAPTDriver) intent(operation string) (linuxAPTIntent, error) {
 		if intent.Code.Operation != intent.Operation || intent.Claim != "" || intent.Resource != "tool.vscode" && (intent.Action != "remove" || !slices.Contains(intent.Remove, "code:"+intent.Code.Pin.Architecture)) {
 			return intent, errors.New("Code input exceeds the saved APT operation")
 		}
+		if intent.Code.AllowDowngrade && intent.Action != "update" && intent.Action != "repair" {
+			return intent, errors.New("Code downgrade permission exceeds saved update or repair")
+		}
 		if err := intent.Code.validate(); err != nil {
 			return intent, err
 		}
@@ -273,12 +276,6 @@ func (d *LinuxAPTDriver) Observe(ctx context.Context, r Resource, receipt Receip
 		if err != nil {
 			return o, err
 		}
-		if r.ID == "tool.vscode" {
-			o.Fingerprint, err = digest(struct{ Native, Version string }{o.Fingerprint, pkg.Version})
-			if err != nil {
-				return o, err
-			}
-		}
 		for consumer, p := range installed {
 			if consumer != identity && slices.Contains(p.Dependencies, identity) && !d.ownedConsumer(state, p) {
 				o.Consumers = append(o.Consumers, consumer)
@@ -305,6 +302,12 @@ func (d *LinuxAPTDriver) Observe(ctx context.Context, r Resource, receipt Receip
 			o.ApplyBlocked = err.Error()
 		}
 	}
+	if r.ID == "tool.vscode" && (!present || state.Roots[r.ID].Name == identity) {
+		o.ApplyDetail, err = d.codeApplyDetail(ctx, pkg.Version)
+		if err != nil {
+			return o, err
+		}
+	}
 	if receipt.OperationID == "" {
 		return o, nil
 	}
@@ -327,6 +330,19 @@ func (d *LinuxAPTDriver) Observe(ctx context.Context, r Resource, receipt Receip
 				return o, err
 			}
 			o.CompletedOperation = intent.Operation
+			// The initial Code recipe included version in its fingerprint. Honor
+			// that exact legacy receipt only through this completed operation and
+			// unchanged native classification; a new operation publishes the normal
+			// version-independent native identity.
+			if intent.Code != nil && intent.Action != "remove" && receipt.Ownership == "created" && receipt.After.CompletedOperation == intent.Operation {
+				legacy, err := digest(struct{ Native, Version string }{o.Fingerprint, intent.Code.Pin.Version})
+				if err != nil {
+					return o, err
+				}
+				if receipt.After.Fingerprint == legacy {
+					o.Fingerprint = legacy
+				}
+			}
 		}
 		for _, kept := range intent.Preserved {
 			if _, present := installed[kept]; present {
@@ -486,6 +502,7 @@ func (d *LinuxAPTDriver) change(ctx context.Context, r Resource, action string, 
 				if err != nil {
 					return Observation{}, err
 				}
+				intent.Code.AllowDowngrade = intent.Action == "update" || intent.Action == "repair"
 				if err := saveDocument(d.intentPath(intent.Operation), intent); err != nil {
 					return Observation{}, err
 				}
@@ -565,7 +582,7 @@ func (d *LinuxAPTDriver) finish(ctx context.Context, r Resource, receipt Receipt
 		if intent.Action == "remove" && slices.Contains(intent.Remove, name) && !present {
 			continue
 		}
-		if !present || pkg.Source != old.Source || pkg.Held != old.Held || pkg.Protected != old.Protected || pkg.Automatic != old.Automatic || old.Healthy && !pkg.Healthy {
+		if !present || pkg.Source != old.Source || pkg.Held != old.Held || pkg.Automatic != old.Automatic || old.Healthy && !pkg.Healthy {
 			return Observation{}, fmt.Errorf("APT changed protected package %s; preserve the operation for inspection", name)
 		}
 		if pkg.Version != old.Version && changes[name] != pkg.Version {
@@ -649,6 +666,9 @@ func (d *LinuxAPTDriver) finish(ctx context.Context, r Resource, receipt Receipt
 		return Observation{}, err
 	}
 	if intent.Code != nil {
+		if err := d.cleanupCodePayload(intent.Code.Pin); err != nil {
+			return Observation{}, err
+		}
 		if err := intent.Code.cleanup(); err != nil {
 			return Observation{}, err
 		}

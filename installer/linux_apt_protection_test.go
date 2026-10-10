@@ -75,3 +75,27 @@ func TestLinuxAPTLegacySavedRemovalCannotBypassCurrentNativeProtection(t *testin
 		t.Fatal("legacy removal did not recheck current native protection", err)
 	}
 }
+
+func TestLinuxAPTLegacyPendingInstallCompletesWithCurrentProtection(t *testing.T) {
+	f := newLinuxAPTFixture(t)
+	f.installed["essential:amd64"] = nativePackage{Name: "essential:amd64", Version: "1", Source: "essential", Healthy: true}
+	f.lostReply = true
+	f.approve()
+	r, receipt := aptFixtureResource("first"), aptFixtureReceipt("legacy-protection")
+	if _, err := f.driver.Apply(context.Background(), r, Operation{Action: "install"}, receipt); err == nil {
+		t.Fatal("fixture did not lose completed reply")
+	}
+	intent, err := f.driver.intent(receipt.OperationID)
+	if err != nil || intent.Before["essential:amd64"].Protected {
+		t.Fatal("fixture must start with the missing legacy protection flag", err)
+	}
+	pkg := f.installed["essential:amd64"]
+	pkg.Protected = true
+	f.installed[pkg.Name] = pkg
+	calls := f.runs
+	f.approve()
+	got, err := f.driver.ResumeResource(context.Background(), r, Operation{Action: "install"}, receipt)
+	if err != nil || !got.Healthy || got.CompletedOperation != receipt.OperationID || f.runs != calls {
+		t.Fatal("legacy completed worker could not publish ownership", got, err)
+	}
+}
