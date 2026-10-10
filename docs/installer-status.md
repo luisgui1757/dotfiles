@@ -249,3 +249,16 @@ and a new late-member refusal case remain required in the next diagnostic run.
 PortableGit now stops before LFS/GCM at the adjacent version/private-config
 assertions; separate value/exit diagnostics are prepared. Its original .NET-style
 failure is still unresolved, not disproved by this earlier failure.
+
+### Windows diagnostic follow-up: native HANDLE proof and Git path boundaries
+
+Exact temporary head `9ff8dd0` passes all five immediate child-HANDLE/outside-work
+cases plus real late-member refusal, PowerShell 5.1 extraction, desktop query and
+COM publication. Git/Make still fails: its version is correct, but `/etc/gitconfig`
+misses the private file while an explicit native path reads `core.longpaths=true`.
+The independent GCM trace identifies .NET suggestion-directory creation beneath
+private TMP, beyond the native 248-character directory boundary. The correction
+uses `cygpath` for native Git and a separate fixed GCM phase with extended TMP/TEMP
+spelling for the same directory. No settings, executable bytes or physical paths
+are changed. Focused checks pass; complete native Git/Make and Neovim acceptance
+remain pending the corrected candidate, not inferred from the HANDLE passes.

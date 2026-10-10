@@ -5723,3 +5723,65 @@ secret-disabled trace. It always returns the original strict config failure.
 while preparation currently exports an empty value. This is a concrete competing
 path-conversion explanation, not yet native proof or an accepted fallback. No
 configuration/authentication is changed by these additional diagnostics.
+
+
+### 2026-10-10 — Native HANDLE green; exact Git and GCM path boundaries
+
+Temporary head `9ff8dd0f6ec71f29912b6bd2d075e7cc786e4b9e`, run `38085987819`,
+job `114312463601` is failed Git evidence and passing process-boundary evidence.
+Raw log SHA-256: `ffdfd483339d9137db16f13a2436cf837c81fd6a3797affd409f568ea70df14a`.
+All five original immediate HANDLE assertions and outside-process survival pass
+(1.69 s), as does the new real late-member refusal (0.01 s). PowerShell 5.1
+extraction (4.08 s), desktop query (0.85 s), actual COM publication (1.20 s) and
+shortcut hash progress handling (0.63 s) pass. No assertion was weakened.
+
+Git/Make remains failed (38.52 s). The expected and actual Git version match.
+The original `/etc/gitconfig` query exits 1, Bash sees `MSYS_NO_PATHCONV` present,
+and the same read-only query using `cygpath -w` returns true. This proves a path
+representation defect, not missing private settings. The fixed probe now always
+converts the path at the native Git boundary, following the [MSYS path contract](https://www.msys2.org/docs/filesystem-paths/).
+The private `core.longpaths` preparation and normal published Git consumers stay
+unchanged; physical ownership paths are never shortened.
+
+The independent GCM trace reports .NET Framework 4.8.9345 and
+`Directory.InternalCreateDirectory -> FeatureRegistration.EnsureRegistered ->
+RegisterWithDotnetSuggest` before its version handler. The pinned [System.CommandLine
+2.0.0-beta4.22272.1 source](https://github.com/dotnet/command-line-api/blob/2.0.0-beta4.22272.1/src/System.CommandLine/Invocation/FeatureRegistration.cs)
+creates `system-commandline-sentinel-files` beneath `Path.GetTempPath()`. This
+run's exact directory is 252 characters. The shipped GCM config already targets
+.NET Framework 4.7.2 (extracted SHA-256
+`a64e209b9476be9acb9e4a3b7813e0ba48321ae2da1b675cd584f5319dc0c66f`), so adding
+already-default managed AppContext switches is not supported by this evidence.
+The OS-level path failure instead calls for the [documented extended native
+spelling](https://learn.microsoft.com/dotnet/standard/io/file-path-formats#skip-normalization)
+of the same directory; [CreateDirectoryW supports that spelling](https://learn.microsoft.com/windows/win32/api/fileapi/nf-fileapi-createdirectoryw).
+
+The fixed GCM `--version` check now uses the existing native session directly,
+with a copied environment overriding only TMP/TEMP to `windowsExtendedPath` of
+the original private directory. This is a distinct fixed phase with the existing
+operation/attempt identity and bounded strict failure handling. It avoids MSYS's
+special TMP/TEMP conversion, which occurs before generic environment exclusions
+in [environ.cc](https://github.com/git-for-windows/msys2-runtime/blob/main/winsup/cygwin/environ.cc).
+Other preparation programs retain their existing environment. GCM suggestions,
+signed executable/config bytes, personal settings and default installed command
+behavior are unchanged; there is no authentication, disabled registration,
+shorter temp path, global policy change or accepted failure. Completed revision1
+generations remain valid: only verification path spelling/transport changes, not
+prepared settings or desired payload, so no recipe revision is bumped.
+
+The process-boundary regression fails before the fix because no native GCM phase
+receives its private extended temporary path. Focused tests require one fixed
+version-only call, unchanged environments for other phases, drive/UNC/already-
+extended spelling, and refusal when GCM fails. The hosted lifecycle additionally
+requires the actual suggestion-registration file at the original >248-character
+temporary directory for both installed generations. Its existing normal published
+`git credential-manager --version`, offline Git/LFS/SSH/Make usage, update, check,
+personal-config preservation and removal remain required. No local Mac execution
+can claim that final native green; the next exact-head hosted run is decisive.
+
+Focused local checks: the native-environment boundary regression is red before
+this correction, then all PortableGit tests pass with Go race in 1.983 s. Windows
+amd64 compilation, Windows-target vet, gofmt/EditorConfig, embedded Bash syntax,
+temporary workflow YAML lint and diff checks pass. The temporary ordinary Windows
+step also includes the fixed native-environment assertions and existing real-CMD
+self-deleting-input regression before the complete Git/Make lifecycle.

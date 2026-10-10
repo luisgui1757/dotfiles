@@ -90,12 +90,12 @@ func (d *ArchiveDriver) preparePortableGit(ctx context.Context, intent archiveIn
 	// A resumed archive publication preserves an incomplete stage and starts a
 	// fresh one. Give each attempt distinct worker IDs so no old reply is reused.
 	attempt := rand.Text()
-	run := func(phase, program string, args ...string) error {
+	run := func(phase, program string, commandEnvironment []string, args ...string) error {
 		operation, err := digest([]string{intent.Operation, attempt, phase})
 		if err != nil {
 			return err
 		}
-		output, err := d.Run(ctx, nativeCommand{Operation: operation, Program: program, Arguments: args, Environment: environment})
+		output, err := d.Run(ctx, nativeCommand{Operation: operation, Program: program, Arguments: args, Environment: commandEnvironment})
 		if err != nil {
 			return fmt.Errorf("PortableGit %s: %s", phase, nativeErrorDetail(err, output))
 		}
@@ -109,7 +109,7 @@ func (d *ArchiveDriver) preparePortableGit(ctx context.Context, intent archiveIn
 	if runtime.GOOS == "windows" {
 		outputPath = windowsExtendedPath(payload)
 	}
-	if err := run("extract", program, "-y", "-o"+outputPath); err != nil {
+	if err := run("extract", program, environment, "-y", "-o"+outputPath); err != nil {
 		return err
 	}
 	var stagedScript string
@@ -148,7 +148,7 @@ func (d *ArchiveDriver) preparePortableGit(ctx context.Context, intent archiveIn
 			return err
 		}
 		stagedHash = sha256.Sum256(data)
-		if err := run("post-install", filepath.Join(payload, "git-bash.exe"), "--no-needs-console", "--hide", "--cd="+payload, "--command=.prepare-post-install.bat"); err != nil {
+		if err := run("post-install", filepath.Join(payload, "git-bash.exe"), environment, "--no-needs-console", "--hide", "--cd="+payload, "--command=.prepare-post-install.bat"); err != nil {
 			return err
 		}
 	} else if !errors.Is(err, os.ErrNotExist) {
@@ -168,10 +168,25 @@ func (d *ArchiveDriver) preparePortableGit(ctx context.Context, intent archiveIn
 	}
 	// Set only this distribution's configuration before its immutable snapshot.
 	// The command-line flag also permits opening the long staging config path.
-	if err := run("long-paths", filepath.Join(payload, "cmd", "git.exe"), "-c", "core.longpaths=true", "config", "--file", filepath.Join(payload, "etc", "gitconfig"), "core.longpaths", "true"); err != nil {
+	if err := run("long-paths", filepath.Join(payload, "cmd", "git.exe"), environment, "-c", "core.longpaths=true", "config", "--file", filepath.Join(payload, "etc", "gitconfig"), "core.longpaths", "true"); err != nil {
 		return err
 	}
-	if err := run("runtime", filepath.Join(payload, "bin", "bash.exe"), "--noprofile", "--norc", "-p", "-c", portableGitRuntimeProbe, "dotfiles-portable-git", pin.Version); err != nil {
+	if err := run("runtime", filepath.Join(payload, "bin", "bash.exe"), environment, "--noprofile", "--norc", "-p", "-c", portableGitRuntimeProbe, "dotfiles-portable-git", pin.Version); err != nil {
+		return err
+	}
+	// .NET's suggestion registration creates a subdirectory beneath TMP. Give
+	// only GCM the extended native spelling of the same private directory; the
+	// MSYS environment converter treats TMP/TEMP specially and may remove it.
+	// https://learn.microsoft.com/dotnet/standard/io/file-path-formats#skip-normalization
+	credentialEnvironment := slices.Clone(environment)
+	for index, value := range credentialEnvironment {
+		if strings.HasPrefix(value, "TMP=") {
+			credentialEnvironment[index] = "TMP=" + windowsExtendedPath(temporary)
+		} else if strings.HasPrefix(value, "TEMP=") {
+			credentialEnvironment[index] = "TEMP=" + windowsExtendedPath(temporary)
+		}
+	}
+	if err := run("credential-runtime", filepath.Join(payload, "ucrt64", "bin", "git-credential-manager.exe"), credentialEnvironment, "--version"); err != nil {
 		return err
 	}
 	// Retain the execution copy on every failed preparation. Successful cleanup
@@ -222,36 +237,12 @@ actual_version=$(git --version)
 printf 'PortableGit runtime: actual=%s expected=git version %s\n' "$actual_version" "$1" >&2
 test "$actual_version" = "git version $1"
 printf '%s\n' 'PortableGit runtime: private core.longpaths' >&2
-if actual_longpaths=$(git -c core.longpaths=true config --file /etc/gitconfig --type=bool --get core.longpaths); then
-	printf 'PortableGit runtime: core.longpaths=%s\n' "$actual_longpaths" >&2
-	if test "$actual_longpaths" = true; then config_result=0; else config_result=$?; fi
-else
-	config_result=$?
-	printf 'PortableGit runtime: private config query exited %s\n' "$config_result" >&2
-fi
-if test "$config_result" -ne 0; then
-	printf 'PortableGit diagnostic: MSYS_NO_PATHCONV present=%s\n' "${MSYS_NO_PATHCONV+x}" >&2
-	if native_config=$(cygpath -w /etc/gitconfig); then
-		if native_longpaths=$(git -c core.longpaths=true config --file "$native_config" --type=bool --get core.longpaths); then
-			printf 'PortableGit diagnostic: native path core.longpaths=%s\n' "$native_longpaths" >&2
-		else
-			printf 'PortableGit diagnostic: native path config query exited %s\n' "$?" >&2
-		fi
-	else
-		printf 'PortableGit diagnostic: cygpath exited %s\n' "$?" >&2
-	fi
-	printf '%s\n' 'PortableGit diagnostic: original-path Git Credential Manager' >&2
-	if git credential-manager --version; then
-		printf '%s\n' 'PortableGit diagnostic: GCM exited 0' >&2
-	else
-		printf 'PortableGit diagnostic: GCM exited %s\n' "$?" >&2
-	fi
-	exit "$config_result"
-fi
+native_config=$(cygpath -w /etc/gitconfig)
+actual_longpaths=$(git -c core.longpaths=true config --file "$native_config" --type=bool --get core.longpaths)
+printf 'PortableGit runtime: core.longpaths=%s\n' "$actual_longpaths" >&2
+test "$actual_longpaths" = true
 printf '%s\n' 'PortableGit runtime: Git LFS' >&2
 git lfs version >/dev/null
-printf '%s\n' 'PortableGit runtime: Git Credential Manager' >&2
-git credential-manager --version >/dev/null
 printf '%s\n' 'PortableGit runtime: SSH' >&2
 ssh -V
 printf '%s\n' portable-git-ready

@@ -903,6 +903,16 @@ disposable Windows fixture enables GCM tracing only for the existing private
 `--version` runtime probe, with secret tracing disabled; preserve the original
 exit and journal. Git core.longpaths does not prove .NET GCM path support.
 
+The private Git runtime probe converts `/etc/gitconfig` explicitly with `cygpath`
+before passing it to native Git; an empty `MSYS_NO_PATHCONV` still disables
+implicit conversion. GCM's fixed version check runs directly through the native
+session with only its copied TMP/TEMP using the extended Windows spelling of the
+same private directory. MSYS specially converts TMP/TEMP before generic conversion
+exclusions, so it must not mediate this native path boundary. Keep suggestions,
+executable/config bytes, physical paths and strict failures unchanged. Verify the
+actual suggestion-registration file in that original private directory and normal
+published `git credential-manager --version`; no authentication is required.
+
 The Build Tools process-tree fixture holds an exact child HANDLE before releasing
 its parent. A failed immediate wait remains a failure even if later diagnostic
 waiting observes termination; do not replace that assertion with a grace period,

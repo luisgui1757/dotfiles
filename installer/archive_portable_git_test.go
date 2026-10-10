@@ -121,6 +121,44 @@ func portableGitFixtureDriver(t *testing.T) (Controller, *ArchiveDriver, *[]nati
 	return c, d, &commands
 }
 
+func TestPortableGitRuntimeUsesNativePrivateTemporaryPath(t *testing.T) {
+	_, d, commands := portableGitFixtureDriver(t)
+	payload := filepath.Join(t.TempDir(), "private Git ü")
+	if err := d.preparePayload(t.Context(), archiveIntent{Operation: strings.Repeat("a", 64), Pin: d.Pins["tool.shared"]}, payload); err != nil {
+		t.Fatal(err)
+	}
+	temporary := filepath.Join(payload, ".prepare-temp")
+	credentialCalls := 0
+	for _, command := range *commands {
+		want := temporary
+		if filepath.Base(command.Program) == "git-credential-manager.exe" {
+			credentialCalls++
+			want = windowsExtendedPath(temporary)
+			if !slices.Equal(command.Arguments, []string{"--version"}) {
+				t.Fatal("GCM probe must not authenticate or configure", command.Arguments)
+			}
+		}
+		if !slices.Contains(command.Environment, "TMP="+want) || !slices.Contains(command.Environment, "TEMP="+want) {
+			t.Fatal("native temporary spelling was missing or escaped into another preparation boundary", command.Program)
+		}
+	}
+	if credentialCalls != 1 {
+		t.Fatal("GCM must consume its original private temporary directory through its native process boundary", credentialCalls)
+	}
+}
+
+func TestPortableGitNativeTemporaryPathSpellings(t *testing.T) {
+	for path, want := range map[string]string{
+		`C:\private Git ü\temporary`:             `\\?\C:\private Git ü\temporary`,
+		`\\server\share\private Git ü\temporary`: `\\?\UNC\server\share\private Git ü\temporary`,
+		`\\?\C:\private Git ü\temporary`:         `\\?\C:\private Git ü\temporary`,
+	} {
+		if actual := windowsExtendedPath(path); actual != want {
+			t.Fatalf("native spelling changed physical location: %q -> %q, want %q", path, actual, want)
+		}
+	}
+}
+
 func TestPortableGitPreparesLongPathsInItsPrivateSystemConfig(t *testing.T) {
 	_, d, _ := portableGitFixtureDriver(t)
 	git, err := exec.LookPath("git")
@@ -157,7 +195,7 @@ func TestPortableGitUsesArchivePublicationAndRemoval(t *testing.T) {
 	d.Directory = filepath.Join(c.Home, "private Git ü path")
 	dispatchApproved(t, c, Request{Schema: 1, Mode: "apply", Selected: []string{"first"}})
 	payload, err := d.PayloadPath("tool.shared")
-	if err != nil || len(*commands) != 3 {
+	if err != nil || len(*commands) != 4 {
 		t.Fatal("verified extraction and runtime probe were not completed", err, len(*commands))
 	}
 	for _, command := range *commands {
@@ -172,7 +210,7 @@ func TestPortableGitUsesArchivePublicationAndRemoval(t *testing.T) {
 		t.Fatal("self-extractor remained in published payload", err)
 	}
 	check, err := c.Dispatch(context.Background(), Request{Schema: 1, Mode: "check"})
-	if err != nil || check.Status != "ready" || len(*commands) != 3 {
+	if err != nil || check.Status != "ready" || len(*commands) != 4 {
 		t.Fatal("check changed payload or lost ownership", check.Status, err)
 	}
 	dispatchApproved(t, c, Request{Schema: 1, Mode: "apply", Selected: []string{}})
@@ -182,7 +220,7 @@ func TestPortableGitUsesArchivePublicationAndRemoval(t *testing.T) {
 }
 
 func TestPortableGitFailureCannotPublishReadyPayload(t *testing.T) {
-	for _, problem := range []string{"checksum", "extract", "post-install", "long-paths", "runtime", "missing-dll"} {
+	for _, problem := range []string{"checksum", "extract", "post-install", "long-paths", "runtime", "credentials", "missing-dll"} {
 		t.Run(problem, func(t *testing.T) {
 			_, d, commands := portableGitFixtureDriver(t)
 			pin := d.Pins["tool.shared"]
@@ -201,7 +239,7 @@ func TestPortableGitFailureCannotPublishReadyPayload(t *testing.T) {
 					case "missing-dll":
 						err = os.Remove(filepath.Join(filepath.Dir(command.Program), "usr", "bin", "msys-2.0.dll"))
 					}
-				} else if problem == "long-paths" && filepath.Base(command.Program) == "git.exe" || problem == "runtime" && filepath.Base(command.Program) == "bash.exe" {
+				} else if problem == "long-paths" && filepath.Base(command.Program) == "git.exe" || problem == "runtime" && filepath.Base(command.Program) == "bash.exe" || problem == "credentials" && filepath.Base(command.Program) == "git-credential-manager.exe" {
 					return nil, errors.New("fixture runtime failed")
 				}
 				return output, err
@@ -302,7 +340,7 @@ func TestPortableGitCompletesUpstreamPostInstallAfterExtraction(t *testing.T) {
 			}
 			wantCommands := 2
 			if outcome == "complete" || outcome == "changed-copy" {
-				wantCommands = 4
+				wantCommands = 5
 			}
 			if outcome == "occupied-copy" {
 				wantCommands = 1
@@ -395,7 +433,7 @@ func TestPortableGitRevisionUpgradesReadableLegacyGeneration(t *testing.T) {
 	if err != nil || !observed.Present || observed.Healthy || observed.Adoptable || observed.Pending != "" {
 		t.Fatal("old complete generation is not available for an ordinary update", observed, err)
 	}
-	if len(*commands) != 3 {
+	if len(*commands) != 4 {
 		t.Fatal("read-only check executed preparation")
 	}
 	receipt.After, receipt.Ownership, receipt.OperationID = observed, "created", strings.Repeat("b", 64)

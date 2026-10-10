@@ -65,7 +65,7 @@ func TestNativeWindowsGitAndMakeLifecycle(t *testing.T) {
 		}
 	})
 	d.Run = func(ctx context.Context, command nativeCommand) ([]byte, error) {
-		if filepath.Base(command.Program) == "bash.exe" && len(command.Arguments) == 7 && command.Arguments[4] == portableGitRuntimeProbe {
+		if filepath.Base(command.Program) == "git-credential-manager.exe" && len(command.Arguments) == 1 && command.Arguments[0] == "--version" {
 			// The fixed --version probe never authenticates. Upstream GCM prints
 			// its exception stack only with tracing enabled; keep secret tracing off.
 			command.Environment = append(command.Environment, "GCM_TRACE=1", "GCM_TRACE_SECRETS=0")
@@ -92,12 +92,27 @@ func TestNativeWindowsGitAndMakeLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	assertPrivateCredentialTemp := func(payload string) {
+		t.Helper()
+		// Keep the original physical ownership path. This is the exact directory
+		// that failed in .NET's FeatureRegistration before the version handler.
+		directory := filepath.Join(payload, ".prepare-temp", "system-commandline-sentinel-files")
+		if len([]rune(directory)) <= 248 {
+			t.Fatal("native GCM fixture no longer crosses the directory path boundary", len([]rune(directory)))
+		}
+		entries, err := os.ReadDir(directory)
+		if err != nil || len(entries) != 1 || entries[0].IsDir() || !strings.HasPrefix(entries[0].Name(), "dotnet-suggest-registration-git-credential-manager,") {
+			t.Fatal("GCM did not use its original private temporary directory for suggestion registration", err, entries)
+		}
+	}
+	assertPrivateCredentialTemp(previous)
 	d.Pins["tool.git"] = latest
 	dispatchApproved(t, c, Request{Schema: 1, Mode: "update"})
 	gitRoot, err := d.PayloadPath("tool.git")
 	if err != nil || gitRoot == previous {
 		t.Fatal("changed-version Git update did not publish a new generation", err)
 	}
+	assertPrivateCredentialTemp(gitRoot)
 	if _, err := os.Lstat(previous); !errors.Is(err, os.ErrNotExist) {
 		t.Fatal("unchanged obsolete Git payload was not removed", err)
 	}
