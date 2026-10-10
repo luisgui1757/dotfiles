@@ -913,6 +913,15 @@ executable/config bytes, physical paths and strict failures unchanged. Verify th
 actual suggestion-registration file in that original private directory and normal
 published `git credential-manager --version`; no authentication is required.
 
+Windows Git's `core.longpaths` supports long file paths inside an ordinary
+worktree; it does not remove the native working-directory limit. Keep native
+coverage beyond 320 characters for nested directories/files, plain add/commit,
+clone, checkout, diff and exact bytes, using the private system setting without
+an override. Do not require an arbitrarily long repository root: upstream
+[PR 3877](https://github.com/git-for-windows/git/pull/3877) documents the separate
+`_wchdir`/current-directory limitation. Preserve the original managed payload,
+home and Neovim paths when correcting a fixture's unsupported assertion.
+
 The Build Tools process-tree fixture holds an exact child HANDLE before releasing
 its parent. A failed immediate wait remains a failure even if later diagnostic
 waiting observes termination; do not replace that assertion with a grace period,

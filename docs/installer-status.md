@@ -262,3 +262,18 @@ uses `cygpath` for native Git and a separate fixed GCM phase with extended TMP/T
 spelling for the same directory. No settings, executable bytes or physical paths
 are changed. Focused checks pass; complete native Git/Make and Neovim acceptance
 remain pending the corrected candidate, not inferred from the HANDLE passes.
+
+### Windows Git diagnostic: supported long-file coverage
+
+Temporary head `db366b6`, job `114315143713`, passes both verified Git archive
+install/update preparations, their native GCM checks and actual suggestion files
+in the original >248-character private temporary directories. Published Git
+reads its private system `core.longpaths=true`; ordinary initialization and Unicode
+add/commit pass. The job then fails on our newly added roughly 450-character
+repository root, a separate unsupported upstream working-directory boundary
+([PR 3877](https://github.com/git-for-windows/git/pull/3877)). This assertion is
+replaced by >320-character nested directory/file paths inside the existing normal
+worktree, with plain add/commit, ordinary-root clone, checkout, diff and exact-byte
+verification. Product code and all original managed paths remain unchanged.
+Full Git/Make, normal published GCM, LFS/SSH, preservation/removal and Windows
+Neovim acceptance remain pending; the failed diagnostic is not a lifecycle pass.

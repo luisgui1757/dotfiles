@@ -155,20 +155,34 @@ func TestNativeWindowsGitAndMakeLifecycle(t *testing.T) {
 	}
 	run(git, "", "add", "--", "file ü.txt")
 	run(git, "", "commit", "-m", "offline fixture")
-	// Keep the physical ownership path and test builtin Git consumers beyond
-	// MAX_PATH without a command-line or environment long-path override.
-	longRoot := filepath.Join(c.Home, strings.Repeat("managed-generation"+string(filepath.Separator), 18))
-	if err := os.MkdirAll(longRoot, 0700); err != nil {
+	// Git supports long file paths inside an ordinary worktree, not an
+	// arbitrarily long working directory (git-for-windows/git#3877). Keep the
+	// original ownership paths and use only the private system configuration.
+	longRelative := filepath.Join(strings.Repeat("nested-directory"+string(filepath.Separator), 18), "file ü.dat")
+	longFile := filepath.Join(work, longRelative)
+	if len([]rune(filepath.Dir(longFile))) <= 320 {
+		t.Fatal("long-file fixture did not cross the required directory boundary", longFile)
+	}
+	if err := os.MkdirAll(filepath.Dir(longFile), 0700); err != nil {
 		t.Fatal(err)
 	}
-	run(git, "", "init", "--initial-branch=main", filepath.Join(longRoot, "new ü"))
-	longCheckout := filepath.Join(longRoot, "checkout ü")
+	// Binary bytes avoid a checkout's unrelated line-ending conversion.
+	longContents := "offline long-path bytes\x00\xff"
+	if err := os.WriteFile(longFile, []byte(longContents), 0600); err != nil {
+		t.Fatal(err)
+	}
+	run(git, "", "add", "--", filepath.ToSlash(longRelative))
+	run(git, "", "commit", "-m", "long file fixture")
+	longCheckout := filepath.Join(c.Home, "offline clone ü")
 	run(git, "", "clone", "--no-local", work, longCheckout)
 	commit := strings.TrimSpace(run(git, "", "rev-parse", "HEAD"))
 	run(git, "", "-C", longCheckout, "checkout", "--detach", commit)
 	run(git, "", "-C", longCheckout, "diff", "--quiet", "HEAD", "--")
 	if output := run(git, "", "-C", longCheckout, "rev-parse", "HEAD"); strings.TrimSpace(output) != commit {
 		t.Fatal("long-path Git checkout differs from its pinned commit", output)
+	}
+	if contents, err := os.ReadFile(filepath.Join(longCheckout, longRelative)); err != nil || string(contents) != longContents {
+		t.Fatalf("cloned long file differs: %v, %q", err, contents)
 	}
 
 	if err := os.WriteFile(file, []byte("first\nsecond\n"), 0600); err != nil {

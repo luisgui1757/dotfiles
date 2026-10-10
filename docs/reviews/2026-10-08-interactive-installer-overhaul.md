@@ -5785,3 +5785,38 @@ amd64 compilation, Windows-target vet, gofmt/EditorConfig, embedded Bash syntax,
 temporary workflow YAML lint and diff checks pass. The temporary ordinary Windows
 step also includes the fixed native-environment assertions and existing real-CMD
 self-deleting-input regression before the complete Git/Make lifecycle.
+
+### 2026-10-10 — Reject unsupported Git working-directory assertion
+
+Temporary exact head `db366b69e611d582827f9066f1115d3f5bf93705`, run `38086884459`,
+job `114315143713` remains failed evidence. Raw log SHA-256:
+`10d7cc361449ed0f560401c08f90d11f12f0c184c187804ecffc6b90273a0806`.
+Both original archive install/update preparations and fixed native GCM version
+checks succeed; the fixture observes actual suggestion files beneath each
+original >248-character private temporary directory. Published Git consumes its
+private system long-path setting and ordinary Unicode add/commit succeeds.
+All five exact-HANDLE/outside-process cases, late-member refusal, PowerShell 5.1
+extraction, read-only progress and actual shortcut COM regressions also pass.
+
+The later failure is our added `git init` at an approximately 450-character
+repository root, not extraction, missing system configuration or GCM. Pinned
+Git's `mingw_chdir` still reaches `_wchdir` after normalizing the native path;
+upstream [PR 3877](https://github.com/git-for-windows/git/pull/3877) reproduces this
+separate working-directory limit. Its pinned [long-path regression](https://github.com/git-for-windows/git/blob/v2.56.0.windows.2/t/t2031-checkout-long-paths.sh)
+covers long file paths within an ordinary worktree. Requiring an arbitrarily long
+repository root was unsupported test overreach, explicitly rejected by the owner;
+it was not the observed Neovim case (root 257 characters, `.git` 262).
+
+Replace only that added root assertion with a >320-character directory/file path
+inside the original ordinary worktree. Plain managed Git add/commit and
+`clone --no-local` into another ordinary root must preserve exact binary bytes
+through checkout, diff and commit verification, with no long-path command or
+environment override. Binary fixture contents isolate this check from unrelated
+line-ending conversion. Original payload/home/Neovim paths and all normal init,
+interactive staging, GCM/LFS/SSH/Make, ownership and removal assertions remain.
+No production code changes. Native completion of those later assertions remains
+required; local compile/static checks cannot turn the earlier failed job green.
+
+Focused preflight passes: Windows amd64 test compilation, Windows-target Go vet,
+gofmt, EditorConfig and `git diff --check`. The native fixture is compiled, not
+executed locally. Its complete hosted rerun remains required.
