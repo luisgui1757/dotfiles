@@ -5,6 +5,36 @@ import (
 	"testing"
 )
 
+func TestEveryPinnedArchiveHasAConnectedNativeProvider(t *testing.T) {
+	catalog, err := DefaultCatalog()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, target := range []Context{{OS: "darwin", Arch: "arm64"}, linux, {OS: "linux", Arch: "arm64"}, {OS: "windows", Arch: "amd64"}} {
+		pins, err := DefaultArchivePins(NativePlatform{Context: target, Libc: "glibc"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		archives := &ArchiveDriver{Pins: pins}
+		fonts := &FontDriver{Archives: archives}
+		driver := &NativeDriver{Catalog: catalog, Context: target, Archives: archives, Fonts: fonts}
+		for id := range pins {
+			resource, ok := catalog.Resource(id)
+			if !ok || !resource.Available(target) {
+				t.Fatalf("pinned archive %s is not available on %s/%s", id, target.OS, target.Arch)
+			}
+			provider, err := driver.provider(resource)
+			var expected Driver = archives
+			if id == "tool.font" {
+				expected = fonts
+			}
+			if err != nil || provider != expected {
+				t.Errorf("pinned archive %s has no matching native route on %s/%s: %v", id, target.OS, target.Arch, err)
+			}
+		}
+	}
+}
+
 func TestNeovimPrerequisitesHaveConnectedProviders(t *testing.T) {
 	catalog, err := DefaultCatalog()
 	if err != nil {

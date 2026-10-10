@@ -52,6 +52,8 @@ do {
 		if let error = error { report(error as NSError); exit(1) }
 		guard let application = application else { exit(3) }
 		print("LaunchServices started PID \(application.processIdentifier)")
+		print("LaunchServices executable: \((application.executableURL?.path ?? "missing").prefix(4096))")
+		print("LaunchServices terminated at completion: \(application.isTerminated)")
 		exit(0)
 	}
 	RunLoop.main.run(until: Date(timeIntervalSinceNow: 30))
@@ -80,7 +82,7 @@ func desktopMacLauncher(t *testing.T, ctx context.Context) string {
 func desktopMacLaunchEnvironment(t *testing.T, environment []string) io.Reader {
 	t.Helper()
 	values := map[string]string{}
-	for _, value := range environment {
+	for _, value := range desktopFixtureEnvironment(environment) {
 		key, data, ok := strings.Cut(value, "=")
 		if !ok {
 			t.Fatal("invalid desktop fixture environment")

@@ -6199,3 +6199,39 @@ receives a dedicated full-path SHELL value, preserved by its Windows shell looku
 no further demonstrable path defect was found, so those assertions stay intact.
 Windows compilation, gofmt/EditorConfig and diff checks pass. Complete native
 Git/Make acceptance remains required; this failed context remains failed.
+
+### 2026-10-11 — Native desktop folders and absent mode variables
+
+Exact `de769314978411d63e509d260ae1e7ce51437f58` jobs `114321418370` (macOS) and
+`114321418462` (Windows) fail the published Code singleton window assertion.
+LaunchServices reports a PID, but neither case observes an owned window or a
+private settings witness/main.log. These failed jobs remain failed; a successful
+launch API return is not runtime readiness.
+
+A real read-only Foundation executable, given private fake HOME/XDG directories,
+still returns the real user home and native Library/Application Support. The
+macOS fixture's redirected shell folders therefore cannot establish the actual
+GUI settings contract. Use discovered native folders on both macOS and Windows;
+the existing adopted configuration snapshots, private witness, public singleton
+launch, update and surgical restoration remain required. No everyday-Mac GUI or
+package mutation ran.
+
+VS Code 1.141.0's [.npmrc](https://github.com/microsoft/vscode/blob/1.141.0/.npmrc)
+binds Electron 43.7.7. Its [Windows entrypoint](https://github.com/electron/electron/blob/v43.7.7/shell/app/electron_main_win.cc)
+uses getenv_s's required-size test for ELECTRON_RUN_AS_NODE; an empty value can
+still denote presence. The [macOS entrypoint](https://github.com/electron/electron/blob/v43.7.7/shell/app/electron_main_mac.cc)
+checks nonempty contents instead, so this is not claimed as the macOS failure
+cause. The controlled fixture clears its seven existing mode/resource overrides
+by removing names from child environment vectors. It does not change the caller
+or product launcher behavior. A real private child process reproduces presence
+with the old empty/nonempty environment and absence after cleanup, while its
+private HOME remains exact. The first red-harness attempt retained now-unused
+imports and failed compilation; that setup failure is retained separately from
+the subsequent behavioral red.
+
+Swift launch completion now reports bounded executable-path/termination metadata;
+Windows ShellExecute reports its returned PID. Neither report grants ownership,
+changes a deadline, bypasses sandboxing or substitutes for a native window and
+settings witness. Private process-inventory/outside-survival and the Swift helper
+compile/reject-missing-input regressions pass without opening an application.
+Corrected configured GUI lifecycles remain pending hosted proof.

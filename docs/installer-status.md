@@ -411,3 +411,16 @@ user and system config for this value. An offline process regression reproduces
 the missing-file failure and succeeds with `none`, preserving the identity path.
 No runtime code or later assertion changes. Complete native Git/Make, final
 payload/personal-config integrity and owned removal remain pending.
+
+### Desktop native folder and launch-mode boundaries
+
+At `de76931`, macOS and Windows Code launch APIs return without a verified owned
+window or settings witness. A read-only Foundation probe proves that fake HOME
+and XDG overrides leave the native macOS home/application-support directories
+unchanged. macOS acceptance now uses those real folders, as Windows already does,
+with the existing reviewed adoption and exact restoration assertions. Controlled
+mode variables are actually removed from child environments: empty values are
+not equivalent to absence in Electron's Windows entrypoint. Real child-process
+regressions and the no-GUI Swift helper check pass; corrected configured GUI
+launches remain pending disposable hosted verification. Product launchers and
+window/settings/ownership checks are unchanged.

@@ -984,3 +984,13 @@ Keep `-G` inspection offline and retain the same physical key path.
 Use OpenSSH's documented `-F none` to disable both personal and system config
 reads. The bundled MSYS OpenSSH does not accept Windows `NUL` as that file path;
 its explicit no-config option avoids null-device path translation entirely.
+
+Native GUI acceptance uses observed macOS and Windows user folders, preserving
+existing configuration through the ordinary adoption/removal journal. A fake HOME
+does not redirect macOS Foundation's home or application-support directories.
+Clear controlled Electron/Node/resource mode variables by removing them from the
+fixture child environment, not assigning empty strings: Electron's Windows
+entrypoint tests getenv_s's required size. The launch API's returned PID/path is
+bounded diagnostic evidence only; executable-vnode ownership and native window
+checks remain the cleanup and acceptance authority. Never launch native GUI or
+mutate system packages on a contributor's daily Mac to validate these fixtures.

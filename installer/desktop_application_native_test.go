@@ -39,7 +39,7 @@ func TestNativeDesktopInstalledApplicationLifecycle(t *testing.T) {
 	target := nativePlatform(t)
 	folders := ConfigFolders{Home: home, Config: filepath.Join(home, ".config"), Data: filepath.Join(home, ".local", "share"), Zsh: home}
 	stateDir := filepath.Join(home, ".local", "state", "dotfiles")
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == "windows" || runtime.GOOS == "darwin" {
 		folders, err = DiscoverConfigFolders()
 		if err != nil {
 			t.Fatal(err)
@@ -52,8 +52,8 @@ func TestNativeDesktopInstalledApplicationLifecycle(t *testing.T) {
 	if _, err := os.Lstat(stateDir); !errors.Is(err, os.ErrNotExist) {
 		t.Fatal("public desktop acceptance requires fresh installer state", stateDir, err)
 	}
-	// Keep the native folder identity on Windows. GUI apps do not read the
-	// installer shell's PowerShell profile, nor invented APPDATA overrides.
+	// Use native application-folder identities on macOS and Windows. Foundation
+	// ignores HOME redirects, and GUI apps do not read installer shell profiles.
 	environment := []string{"HOME=" + folders.Home, "USERPROFILE=" + folders.Home, "XDG_CONFIG_HOME=" + folders.Config, "XDG_DATA_HOME=" + folders.Data, "XDG_STATE_HOME=" + filepath.Dir(stateDir), "XDG_CACHE_HOME=" + filepath.Join(home, "cache"), "ZDOTDIR=" + folders.Home, "BASH_ENV=", "ENV=", "NODE_OPTIONS=", "ELECTRON_RUN_AS_NODE=", "VSCODE_PORTABLE=", "GHOSTTY_RESOURCES_DIR=", "LD_LIBRARY_PATH="}
 	if runtime.GOOS == "windows" {
 		environment = append(environment, "APPDATA="+folders.AppData, "LOCALAPPDATA="+folders.LocalAppData)
@@ -249,7 +249,7 @@ func desktopMachineFixture(t *testing.T, repository, home string, environment []
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Minute)
 		defer cancel()
 		command := exec.CommandContext(ctx, binary, "machine")
-		command.Env = append(append(os.Environ(), environment...), "DOTFILES_CHECKOUT="+repository, "DOTFILES_ENTRYPOINT=setup", "TERM=xterm-256color")
+		command.Env = desktopFixtureEnvironment(append(append(os.Environ(), environment...), "DOTFILES_CHECKOUT="+repository, "DOTFILES_ENTRYPOINT=setup", "TERM=xterm-256color"))
 		command.Stdin = bytes.NewReader(input)
 		var stderr bytes.Buffer
 		command.Stderr = &stderr
@@ -309,7 +309,7 @@ func desktopConsumePublished(t *testing.T, d *DesktopDriver, a *ArchiveDriver, i
 			t.Logf("%s published bundle signature: %v %s", id, err, output)
 		})
 	case "windows":
-		script := `$ErrorActionPreference='Stop';$shortcut=(New-Object -ComObject WScript.Shell).CreateShortcut(` + desktopPSQuote(launcher) + `);if($shortcut.TargetPath -cne ` + desktopPSQuote(p.Command) + `){throw 'Published shortcut target differs from managed application'};Start-Process -FilePath ` + desktopPSQuote(launcher) + ` | Out-Null`
+		script := `$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$shortcut=(New-Object -ComObject WScript.Shell).CreateShortcut(` + desktopPSQuote(launcher) + `);if($shortcut.TargetPath -cne ` + desktopPSQuote(p.Command) + `){throw 'Published shortcut target differs from managed application'};$app=Start-Process -FilePath ` + desktopPSQuote(launcher) + ` -PassThru;if($app){'ShellExecute started PID '+$app.Id}`
 		args = append([]string{d.PowerShell}, windowsVendorArguments(script)...)
 	}
 	before, err := desktopOwnedProcesses(ctx, d.PowerShell, packageRoot)
@@ -318,7 +318,7 @@ func desktopConsumePublished(t *testing.T, d *DesktopDriver, a *ArchiveDriver, i
 	}
 	defer desktopStopOwned(t, d.PowerShell, packageRoot)
 	command := exec.CommandContext(ctx, args[0], args[1:]...)
-	command.Env = append(os.Environ(), environment...)
+	command.Env = desktopFixtureEnvironment(append(os.Environ(), environment...))
 	command.Dir = home
 	if runtime.GOOS == "darwin" {
 		command.Stdin = desktopMacLaunchEnvironment(t, environment)
@@ -356,7 +356,7 @@ func desktopConsumePublished(t *testing.T, d *DesktopDriver, a *ArchiveDriver, i
 	run := func(program string, args ...string) string {
 		t.Helper()
 		call := exec.CommandContext(ctx, program, args...)
-		call.Env = append(os.Environ(), environment...)
+		call.Env = desktopFixtureEnvironment(append(os.Environ(), environment...))
 		output, err := call.CombinedOutput()
 		if err != nil {
 			t.Fatalf("native %s configuration consumer: %v\n%s", id, err, output)
@@ -398,7 +398,7 @@ func desktopConsumePublished(t *testing.T, d *DesktopDriver, a *ArchiveDriver, i
 			t.Fatal(err)
 		}
 		call := exec.CommandContext(ctx, cli, "config", "--config-path")
-		call.Env = append(os.Environ(), environment...)
+		call.Env = desktopFixtureEnvironment(append(os.Environ(), environment...))
 		output, err := call.CombinedOutput()
 		if err != nil {
 			// Pinned v0.21.1-Beta initAppBundle.swift waits for Accessibility
