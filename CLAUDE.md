@@ -996,3 +996,12 @@ leave a detached Wait goroutine, or extend the existing launch deadline.
 Nonzero launcher exit, cancellation and file errors remain fatal. Success still
 requires the exact owned executable, a native window and actual settings witness;
 cleanup stops only owned application processes before the final log check.
+
+APT consumer observation retains declared but absent dependency alternatives.
+A pre-existing browser's GTK3-or-GTK4 declaration must appear in GTK4 preview
+before an approved install makes GTK4 present. Resolve installed names, exact
+architectures and Provides as before; unresolved names are declarations, not
+installed packages or removal authority. Keep the executor's consumer equality
+and native inventory approval checks strict. Conservative outside-consumer
+protection may retain either installed alternative; do not delete a personal
+consumer or invent an alternative-version solver to collect it.

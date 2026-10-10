@@ -437,3 +437,20 @@ corrected focused cases pass (0.553s), including explicit nonzero exit,
 cancellation and output-limit boundaries. Race tests pass (2.610s); Go vet,
 Linux amd64/arm64 and Windows amd64 test compilation, EditorConfig and diff
 checks pass. No everyday-workstation GUI or native package mutation was used.
+
+## 2026-10-11 — Existing APT alternative consumers during desktop install
+
+The corrected launcher at diagnostic `8a1af68` passed the complete ARM Code/font/
+configured desktop lifecycle, including actual Code and Ghostty windows/settings,
+update/check and removal. The amd64 Code lifecycle, fonts and Code singleton GUI
+passed, then the full-group apply rejected GTK4. Failure-only observation at
+`7bf54fe` proved preinstalled Chrome/Edge GTK3-or-GTK4 declarations were hidden
+while GTK4 was absent and appeared after the earlier approved libadwaita install.
+
+APT now preserves unresolved declaration names and discloses those consumers for
+an absent package. Exact same-plan introduction proof and the executor's strict
+consumer equality remain unchanged. Removal retains libraries needed by personal
+consumers; it never acquires the browser or removes its existing GTK3 alternative.
+Focused controller/parser, architecture/Provides, foreign-change rejection and
+legacy pending-intent recovery tests pass. Corrected full hosted amd64 desktop
+acceptance remains pending; ARM's earlier pass is not final-head certification.

@@ -104,7 +104,14 @@ func parseLinuxAPTInventory(output, automatic []byte) (map[string]nativePackage,
 	}
 	for name, pkg := range installed {
 		for _, dependency := range requirements[name] {
-			pkg.Dependencies = append(pkg.Dependencies, aliases[dependency]...)
+			if resolved := aliases[dependency]; len(resolved) != 0 {
+				pkg.Dependencies = append(pkg.Dependencies, resolved...)
+			} else {
+				// An absent alternative is still an existing declaration. Keep
+				// its name so preview can disclose its outside consumers before
+				// an approved operation installs that alternative.
+				pkg.Dependencies = append(pkg.Dependencies, dependency)
+			}
 		}
 		pkg.Dependencies = sortedUnique(pkg.Dependencies)
 		installed[name] = pkg

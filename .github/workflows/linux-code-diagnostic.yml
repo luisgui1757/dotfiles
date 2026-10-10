@@ -16,8 +16,6 @@ jobs:
         include:
           - runner: ubuntu-26.04
             target: linux/amd64
-          - runner: ubuntu-26.04-arm
-            target: linux/arm64
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 100
     defaults:

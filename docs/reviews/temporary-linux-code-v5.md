@@ -104,3 +104,14 @@ records the saved next operation, fresh observation, native package/consumer
 metadata, provider ledger and receipts, bounded to 64 KiB and 90 seconds. It
 never retries, authorizes or changes a package. The strict original lifecycle
 runs again on both architectures; the earlier amd64 result remains failed.
+
+## 2026-10-11 — Canonical absent-consumer correction
+
+The failure-only diagnostic proved GTK4's originally empty consumer list gained
+the preinstalled Chrome and Edge packages after the owned libadwaita install.
+Keep their declared absent GTK4 alternative visible in preview; no executor
+comparison is relaxed. The controller regression reproduces the same error on
+the old source and passes the complete focused lifecycle with outside browser
+preservation on the correction. Run only the affected amd64 diagnostic lane at
+this checkpoint; ARM passed the complete lifecycle twice already. Final delivery
+acceptance still requires both architectures at the integrated final head.

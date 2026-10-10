@@ -6247,3 +6247,37 @@ corrected focused cases pass (0.553s), including explicit nonzero exit,
 cancellation and output-limit boundaries. Race tests pass (2.610s); Go vet,
 Linux amd64/arm64 and Windows amd64 test compilation, EditorConfig and diff
 checks pass. No everyday-workstation GUI or native package mutation was used.
+
+## 2026-10-11 — APT absent alternatives concealed existing browser consumers
+
+Accepted production observation defect, isolated from the prior GUI-pipe fixture
+correction. At `8a1af683120cfb5f15287d8c13d009d09565f87b`, ARM job
+`114334224074` passed the complete configured Code/Ghostty lifecycle; amd64 job
+`114334224279` passed Code/font lifecycles and the real Code singleton GUI, then
+failed GTK4 approval. Diagnostic `7bf54fe5c2a0c526a521f3c5b08b883d165acaba`
+job `114335724004` showed the exact difference: approved GTK4 absent with no
+consumers; fresh GTK4 healthy with valid same-plan libadwaita introduction proof
+and outside consumers `google-chrome-stable:amd64` and
+`microsoft-edge-stable:amd64`. The raw log SHA-256 is
+`56e47c9656fcad7b682d9cec4a76dd2a65feb12744b69037dfa430354073a2b7`.
+Their existing alternative declarations became visible because the parser
+previously discarded uninstalled names and Observe inspected consumers only for
+present packages. No evidence supported changing the executor approval guard.
+
+Keep unresolved declared dependency names in the existing inventory field and
+observe outside consumers for absent selected packages. Installed aliases,
+architecture identities and virtual Provides keep their existing resolution.
+Unresolved references never fabricate installed packages. No persisted schema,
+manager command, native ownership proof, graph order or approval comparison
+changes. Old pending inventory without absent references still recovers through
+its saved command and operation-specific evidence. Native removal remains
+conservative about all installed alternatives; unchanged personal browsers and
+GTK3 remain, and GTK4 is retained while declared outside use exists.
+
+The controller reproduction fails before the fix at the same approval guard and
+passes install/update/removal afterward, preserving the outside browser and both
+alternatives until the outside consumer disappears. Parser :all/multiarchitecture/
+Provides and legacy interrupted-operation coverage pass, as do existing manual,
+source and newly introduced consumer rejection tests. Corrected full amd64
+configured desktop proof is pending the next hosted run. The temporary diagnostic
+helper/workflow/note remain outside the delivery patch.

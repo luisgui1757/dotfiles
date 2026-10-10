@@ -276,12 +276,6 @@ func (d *LinuxAPTDriver) Observe(ctx context.Context, r Resource, receipt Receip
 		if err != nil {
 			return o, err
 		}
-		for consumer, p := range installed {
-			if consumer != identity && slices.Contains(p.Dependencies, identity) && !d.ownedConsumer(state, p) {
-				o.Consumers = append(o.Consumers, consumer)
-			}
-		}
-		o.Consumers = sortedUnique(o.Consumers)
 		if o.Healthy {
 			if err := d.check(ctx, r); err != nil {
 				if ctx.Err() != nil {
@@ -291,6 +285,16 @@ func (d *LinuxAPTDriver) Observe(ctx context.Context, r Resource, receipt Receip
 			}
 		}
 	}
+	consumerIdentity := identity
+	if !present {
+		consumerIdentity = name
+	}
+	for consumer, p := range installed {
+		if consumer != identity && slices.Contains(p.Dependencies, consumerIdentity) && !d.ownedConsumer(state, p) {
+			o.Consumers = append(o.Consumers, consumer)
+		}
+	}
+	o.Consumers = sortedUnique(o.Consumers)
 	if owned, ok := state.Pool[identity]; ok && o.Healthy && !pkg.Held && d.matchesOwnership(owned, pkg) {
 		o.CompletedOperation = owned.CreatedBy
 	}
