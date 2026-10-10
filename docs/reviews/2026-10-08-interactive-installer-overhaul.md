@@ -6234,3 +6234,46 @@ the developer workstation.
 Focused preflight: Windows amd64 test compilation and target vet pass; gofmt,
 EditorConfig and diff checks pass. Real Windows capture/containment and vendor
 lifecycle proof remain pending, not inferred from cross-compilation.
+
+### 2026-10-11 — natural-exit regression startup boundary
+
+Native diagnostic 810f50e job 114325970355 passed all five process-tree cases and
+late-member refusal, but the new fixture took its baseline before initialization:
+Total increased from 1 to 2 before the exact process HANDLE signaled. The final
+unchanged-Total check correctly failed. Wait for a helper readiness handshake and
+record the actual nonzero lifetime baseline while exactly one member is active,
+then release that member and require unchanged Total. The source of the extra
+startup member is unproved; this does not name/filter it or excuse later members.
+No production guard, timeout or immediate completion assertion changes. Native
+rerun must prove this fixture actually isolates its intended natural exit.
+
+### 2026-10-11 — native PowerShell module inheritance
+
+Quality job 114321418460 at de76931 failed Get-FileHash in extraction and both
+shortcut boundaries. Its parent was PowerShell 7 invoking Go; core job
+114321418397 launched Go from Bash and passed those same three boundaries.
+[Microsoft's module-path contract](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_psmodulepath#starting-windows-powershell-from-powershell-7)
+explicitly identifies indirect PS7 launches: the intermediary keeps PS7 module
+paths, which can resolve Utility to an incompatible edition and raise
+CommandNotFoundException. This supports a module boundary correction, not a
+timeout, warm-up, retry, or engine fallback.
+
+Existing encoded fixed scripts need only engine-shipped modules, so the common
+argument builder sets their child process's module search to `$PSHOME/Modules`.
+The public bootstrap imports its own Management/Utility manifests by exact path,
+retaining the caller's PSModulePath. The extraction fixture invokes that actual
+binding before its existing archive hash and strict extraction assertions.
+The native regression launches PS7 → Go → PS5.1, requires the unmodified hash
+command to reproduce the original error, then validates actual SHA-256 through
+vendor, Job Object, integration, durable worker and bootstrap boundaries. All
+files are private; no profiles, registry or global environment change. Changed
+encoded commands remain subject to existing saved-command identity validation;
+old in-progress commands are not silently reinterpreted. Native proof is pending.
+
+The core Build Tools reuse deadline is separate: it occurred under Bash without
+a module error. The existing 30-second query limit remains unchanged; bounded
+native phase diagnostics are required before attributing or changing it.
+
+Regression coverage explicitly preserves/refuses both legacy unprefixed VC++ and
+Build Tools pending commands without journal writes or another native call;
+existing completed-command replay and unfinished-intent refusal tests pass.

@@ -8,6 +8,14 @@ if ($env:OS -ne 'Windows_NT' -or $env:PROCESSOR_ARCHITECTURE -ne 'AMD64' -or
     ($env:PROCESSOR_ARCHITEW6432 -and $env:PROCESSOR_ARCHITEW6432 -ne 'AMD64')) {
     throw 'This launcher requires native Windows amd64; macOS/Linux use installer-bootstrap.sh'
 }
+# Bind the built-in modules to the current engine, even through a PS7 -> native
+# process -> Windows PowerShell 5.1 launch. Do not change the caller's module path.
+function Import-BootstrapModules {
+    foreach ($Name in @('Microsoft.PowerShell.Management', 'Microsoft.PowerShell.Utility')) {
+        Import-Module ([IO.Path]::Combine($PSHOME, 'Modules', $Name, "$Name.psd1")) -ErrorAction Stop
+    }
+}
+Import-BootstrapModules
 $Checkout = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).ProviderPath
 $Pins = @(Get-Content -LiteralPath (Join-Path $Checkout 'installer/bootstrap-toolchain.tsv') |
     Where-Object { -not $_.StartsWith('#') } | ConvertFrom-Csv -Delimiter "`t")

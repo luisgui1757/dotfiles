@@ -83,6 +83,15 @@ func TestBootstrapToolchainExtraction(t *testing.T) {
 			}
 			script := `param([string]$Archive, [string]$Toolchain, [string]$Launcher, [string]$ExpectedSHA256)
 $ErrorActionPreference = 'Stop'
+$tokens = $null
+$errors = $null
+$ast = [Management.Automation.Language.Parser]::ParseFile($Launcher, [ref]$tokens, [ref]$errors)
+if (@($errors).Count -ne 0) { throw 'Bootstrap parse error' }
+$imports = @($ast.FindAll({ param($node)
+	$node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Import-BootstrapModules'
+}, $true))
+if ($imports.Count -ne 1) { throw 'Expected one bootstrap built-in module binding' }
+& $imports[0].Body.GetScriptBlock()
 # Production verifies the archive before extraction. Its Get-FileHash imports
 # the same Utility module as Add-Type; legitimate first-load progress is allowed.
 $ProgressPreference = 'Continue'
@@ -91,10 +100,6 @@ if ((Get-FileHash -LiteralPath $Archive -Algorithm SHA256).Hash.ToLowerInvariant
 $ProgressPreference = 'Stop'
 if ($env:OS -eq 'Windows_NT' -and ($PSVersionTable.PSVersion.Major -ne 5 -or $PSVersionTable.PSVersion.Minor -ne 1)) { throw 'Requires system Windows PowerShell 5.1' }
 [Console]::Error.WriteLine("Extraction engine: PowerShell $($PSVersionTable.PSVersion), CLR $([Environment]::Version)")
-$tokens = $null
-$errors = $null
-$ast = [Management.Automation.Language.Parser]::ParseFile($Launcher, [ref]$tokens, [ref]$errors)
-if (@($errors).Count -ne 0) { throw 'Bootstrap parse error' }
 $actions = @($ast.FindAll({ param($node)
 	$node -is [Management.Automation.Language.CommandAst] -and
 	$node.GetCommandName() -eq 'Invoke-BootstrapPhase' -and

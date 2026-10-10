@@ -423,3 +423,18 @@ five-second bound, final zero Active/unchanged lifetime Total and late-child ref
 remain. A real-kernel regression deliberately exits a private child between the
 snapshots. Windows native proof and the fresh Build Tools lifecycle rerun remain
 pending; compilation alone does not establish them.
+
+The natural-exit Job Object fixture waits for its helper readiness before taking
+the lifetime accounting baseline. The failed native 810f50e run captured startup
+instead (Total 1→2); its unchanged late-member guard correctly rejected that case.
+The regression still requires exactly one active member, an exact signaled HANDLE,
+and unchanged lifetime Total after release; readiness is not a production retry
+or a relaxation of the five-second completion bound. Native rerun is pending.
+
+Windows PS7 → Go → PS5.1 module inheritance: **correction implemented; native
+verification pending**. The quality job's Get-FileHash failures are distinct from
+the Bash-launched core job, where the same extraction/COM/progress tests passed.
+Fixed script children now use their current engine's built-in modules; bootstrap
+binds Management/Utility manifests explicitly. The new native regression proves
+the original autoload failure and checks real query/job/worker/bootstrap hashes.
+The separate Build Tools reuse 30-second timeout has no identified stage yet.

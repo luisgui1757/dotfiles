@@ -36,3 +36,23 @@ The old native capture error combines three predicates without raw counters, so
 its exact interleaving is not identifiable from the log alone. The regression
 forces the independently invalid cross-query Active equality; incomplete same-call
 lists and newly added lifetime membership continue to fail.
+
+## Follow-up after 810f50e
+
+The original five process cases and late-member refusal passed. The new natural
+exit fixture failed because startup increased lifetime Total from 1 to 2; its
+strict production guard remained correct. This follow-up waits for explicit
+helper readiness before the lifetime snapshot, preserving the same later-member
+refusal, exact HANDLE checks and five-second bound. The source of that startup
+member is unproved. All three prior Git257 variants failed init; the complete
+ordinary Git/Make lifecycle nevertheless passed. The replacement probe tests the
+actual Neovim254 case and retains257 as a diagnostic control.
+
+A separate PowerShell step runs the actual PS7 → Go → PS5.1 boundary and requires
+its raw autoload failure before checking corrected hashes. Existing extraction
+and COM lifecycle tests run under that same PS7 parent. The Build Tools reuse
+inspection retains its original30-second bound; fixed stderr phase labels report
+the last reached signature/inventory/CIM/compiler stage on failure. No inventory,
+credentials or personal environment is logged. These diagnostics neither widen
+timeouts nor make the original failed contexts green. The workflow and timing
+helper are temporary and excluded from the delivery patch.

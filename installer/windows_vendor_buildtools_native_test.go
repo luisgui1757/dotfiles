@@ -21,6 +21,9 @@ func windowsBuildToolsNativeFixture(t *testing.T) (*WindowsBuildToolsDriver, Res
 
 func TestWindowsBuildToolsNativeReuseAndEnvironment(t *testing.T) {
 	driver, resource := windowsBuildToolsNativeFixture(t)
+	if os.Getenv("DOTFILES_TEST_BUILDTOOLS_TIMING") == "1" {
+		driver.Query = traceBuildToolsNativeQuery(t, driver.Query)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	observed, err := driver.Observe(ctx, resource, Receipt{})

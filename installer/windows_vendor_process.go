@@ -7,6 +7,10 @@ import (
 )
 
 func windowsVendorArguments(script string) []string {
+	// These fixed scripts use only modules shipped with this engine. A Go
+	// intermediary otherwise carries PS7 module paths into Windows PowerShell
+	// 5.1, where incompatible Utility modules break command autoloading.
+	script = "$env:PSModulePath = [IO.Path]::Combine($PSHOME, 'Modules')\n" + script
 	units := utf16.Encode([]rune(script))
 	bytes := make([]byte, len(units)*2)
 	for i, unit := range units {

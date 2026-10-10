@@ -992,3 +992,21 @@ Keep `-G` inspection offline and retain the same physical key path.
 Use OpenSSH's documented `-F none` to disable both personal and system config
 reads. The bundled MSYS OpenSSH does not accept Windows `NUL` as that file path;
 its explicit no-config option avoids null-device path translation entirely.
+
+The natural-exit Job Object fixture waits for its helper readiness before taking
+the lifetime accounting baseline. The failed native 810f50e run captured startup
+instead (Total 1→2); its unchanged late-member guard correctly rejected that case.
+The regression still requires exactly one active member, an exact signaled HANDLE,
+and unchanged lifetime Total after release; readiness is not a production retry
+or a relaxation of the five-second completion bound. Native rerun is pending.
+
+Fixed encoded PowerShell commands must bind module discovery to their own
+`$PSHOME/Modules`. PS7 adjusts module paths only for directly launched PS5.1; a
+Go intermediary otherwise inherits incompatible PS7 Utility modules and loses
+Get-FileHash. The bootstrap imports its two built-in Management/Utility manifests
+by exact current-engine paths without changing the caller's PSModulePath. Keep
+this child-scoped; no machine/user environment edits or engine fallback.
+
+Regression coverage explicitly preserves/refuses both legacy unprefixed VC++ and
+Build Tools pending commands without journal writes or another native call;
+existing completed-command replay and unfinished-intent refusal tests pass.
