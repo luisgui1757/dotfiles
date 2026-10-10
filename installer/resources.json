@@ -1145,6 +1145,9 @@
           "tool.clangd",
           "tool.curl",
           "tool.unzip"
+        ],
+        "windows": [
+          "tool.powershell"
         ]
       }
     },
