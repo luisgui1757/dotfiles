@@ -922,6 +922,11 @@ an override. Do not require an arbitrarily long repository root: upstream
 `_wchdir`/current-directory limitation. Preserve the original managed payload,
 home and Neovim paths when correcting a fixture's unsupported assertion.
 
+OpenSSH `-o` parses configuration-file syntax even when its value is one argv
+entry. Use the dedicated `-i` filename argument for fixture identity paths with
+spaces; preserving argv boundaries alone does not quote an `IdentityFile=` value.
+Keep `-G` inspection offline and retain the same physical key path.
+
 The Build Tools process-tree fixture holds an exact child HANDLE before releasing
 its parent. A failed immediate wait remains a failure even if later diagnostic
 waiting observes termination; do not replace that assertion with a grace period,

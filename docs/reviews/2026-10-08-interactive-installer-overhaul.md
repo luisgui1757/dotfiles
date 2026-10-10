@@ -5820,3 +5820,32 @@ required; local compile/static checks cannot turn the earlier failed job green.
 Focused preflight passes: Windows amd64 test compilation, Windows-target Go vet,
 gofmt, EditorConfig and `git diff --check`. The native fixture is compiled, not
 executed locally. Its complete hosted rerun remains required.
+
+### 2026-10-10 — SSH fixture identity path uses its filename option
+
+Exact diagnostic head `4eea1ff115e7048609693e09f7d5c4ad6f8968d2`, run `38087734757`,
+job `114317661301` reaches SSH configuration inspection after passing both archive
+preparations, original long-temp GCM registration, changed-version update,
+428-character file operations, interactive staging, LFS and published GCM. Its
+raw log SHA-256 is
+`ea76bcf088c1b3d3e2f8c623d37257dcde99e9c13f305b44d5268e6a2c986b0a`.
+All ordinary PowerShell/COM/private-process boundary tests also pass. The full
+Git/Make lifecycle remains failed at SSH, before Make, final integrity/personal
+configuration verification and removal; these later assertions are not waived.
+
+The fixture supplies `-o IdentityFile=<path with spaces>` as one argv value.
+OpenSSH reports `keyword identityfile extra arguments at end of line`: `-o`
+applies configuration-file parsing after argv handling. The primary [ssh(1)
+contract](https://man.openbsd.org/ssh.1) provides `-i identity_file` for this exact
+filename boundary. Change only those two arguments, retaining the same physical
+path, `-F NUL`, offline `-G` mode, hostname assertion and every later check. A
+multi-location search finds no other `IdentityFile=` construction. This is a
+fixture syntax defect, not a bundled SSH or managed-path failure.
+
+A real local `/usr/bin/ssh -F none -G` process with a private spaces/Unicode path
+reproduces the identical error and exit 255 using the old arguments; `-i` exits 0
+and emits the exact identity path and expected hostname. No connection,
+authentication, personal SSH config or native package mutation occurs. The
+portable parser proof complements the native failed-before evidence; it does not
+claim the pending corrected Windows lifecycle is green. Windows amd64 test
+compilation, target vet, gofmt, EditorConfig and diff checks pass.

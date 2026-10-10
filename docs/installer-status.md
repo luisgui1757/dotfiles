@@ -277,3 +277,15 @@ worktree, with plain add/commit, ordinary-root clone, checkout, diff and exact-b
 verification. Product code and all original managed paths remain unchanged.
 Full Git/Make, normal published GCM, LFS/SSH, preservation/removal and Windows
 Neovim acceptance remain pending; the failed diagnostic is not a lifecycle pass.
+
+### Windows Git diagnostic: SSH identity-file argument
+
+Temporary head `4eea1ff`, job `114317661301`, passes the corrected 428-character
+long-file add/commit/clone/checkout/diff/byte checks, interactive staging, LFS,
+normal published GCM and SSH key generation. It then fails because the fixture
+passes an unquoted path with spaces through OpenSSH's configuration-syntax `-o`
+option. The fixture now uses the documented dedicated `-i` filename argument,
+with the identical key path. Real offline OpenSSH inspection reproduces exit 255
+before and exit 0 after; Windows compilation/static checks pass. No product code
+changes. The complete Windows SSH/Make, final payload/personal-config checks and
+owned removal remain pending the next native run; this failed context stays failed.
