@@ -40,6 +40,14 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --yes --no-install-recommends xvfb xauth dbus-x11 x11-utils libglib2.0-bin fontconfig pango1.0-tools apt-utils
+      - name: Establish trusted disposable system parent
+        run: |
+          test ! -L /usr/share
+          test "$(stat -c %u /usr/share)" = 0
+          stat -c 'Code test host before: %n owner=%u mode=%a' /usr/share
+          sudo chmod 0755 /usr/share
+          test "$(stat -c %u:%a /usr/share)" = 0:755
+          stat -c 'Code test host after: %n owner=%u mode=%a' /usr/share
       - name: Verify pinned Code native ownership and repository preservation
         env:
           DOTFILES_TEST_NATIVE_PACKAGES: '1'

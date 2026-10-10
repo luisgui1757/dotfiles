@@ -32,3 +32,12 @@ SHA-256 `826ef1311223aad0c3a94451e0bc8606666d48d58bbbd015a67e94cd1c4cdb5f`,
 from the Linux package implementation lane at the same exact base. It preserves
 the existing UID/mode/link predicates and empty successful output. Its focused
 process regression covers owner, mode and link mismatches plus healthy silence.
+
+Both first diagnostic jobs report the hosted image's physical `/usr/share` as
+root-owned mode 0777. The next disposable-runner attempt explicitly establishes
+that single parent directory as root-owned 0755 before the existing lifecycle.
+It verifies non-symlink/root ownership first and logs the exact mode before and
+after. This is a nonrecursive fixture precondition, not a production health-guard
+relaxation or payload repair; no developer-machine permission is changed.
+The Linux implementation lane supplied the reviewed workflow patch with SHA-256
+`17d7dc86b315a104ff70dfb004b4c4d3fece4c72908165be4d97aa112ffd9908`.
