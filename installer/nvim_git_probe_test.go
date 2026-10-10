@@ -16,15 +16,10 @@ import (
 
 // Temporary native proof: use the real default Windows data layout, a complete
 // random operation identity, and unchanged private Git. Every expectation is fatal.
-func probeNvimGitConfigBoundary(t *testing.T, git string) {
+func probeNvimGitConfigBoundary(t *testing.T, git string, folders ConfigFolders) {
 	t.Helper()
 	if runtime.GOOS != "windows" {
 		t.Fatal("Windows-only boundary proof")
-	}
-	t.Setenv("XDG_DATA_HOME", "")
-	folders, err := DiscoverConfigFolders()
-	if err != nil {
-		t.Fatal(err)
 	}
 	runtimeDirectory, err := nvimRuntimeDirectory(Context{OS: "windows", Arch: "amd64"}, folders)
 	if err != nil {

@@ -27,52 +27,7 @@ jobs:
           cache-dependency-path: installer/go.sum
       - name: Verify actual native runner target
         run: test "$(go env GOHOSTOS)/$(go env GOHOSTARCH)" = windows/amd64
-      - name: Verify natural exit and exact private process completion
-        run: >-
-          go test -race -v -count=1 -timeout 10m
-          -run '^TestWindowsBuildToolsQuery(ContainsOnlyItsOwnProcessTree|RejectsUnsafeOrUnavailableProgram|RejectsChangedMembership|AcceptsExitedMemberDuringCapture)$' .
-      - name: Verify PowerShell 7 indirect native module boundaries
-        if: always()
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $PSNativeCommandUseErrorActionPreference = $true
-          go test -v -count=1 -timeout 5m -run '^Test(WindowsPowerShell|BootstrapToolchainExtraction|DesktopShortcutNativePowerShell51COMPublication|DesktopShortcutPowerShellProgressPreservesHashProtocol)' .
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Inspect existing Build Tools with original query deadline
-        if: always()
-        env:
-          DOTFILES_NATIVE_WINDOWS_VENDOR: '1'
-          DOTFILES_TEST_BUILDTOOLS_TIMING: '1'
-        run: go test -v -count=1 -timeout 5m -run '^TestWindowsBuildToolsNativeReuseAndEnvironment$' .
-      - name: Probe isolated Git config boundary and preserve complete Git Make lifecycle
-        if: always()
+      - name: Prove native default Git roots and all 13 pinned Lua checkout cases
         env:
           DOTFILES_NATIVE_WINDOWS_GIT_MAKE: '1'
         run: go test -v -count=1 -timeout 15m -run '^TestNativeWindowsGitAndMakeLifecycle$' .
-
-  windows-neovim:
-    name: Complete Windows Neovim lifecycle
-    runs-on: windows-2025
-    timeout-minutes: 90
-    defaults:
-      run:
-        working-directory: installer
-        shell: bash
-    env:
-      GOTOOLCHAIN: local
-      DOTFILES_TEST_NVIM_APPLICATION: '1'
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          persist-credentials: false
-      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
-        with:
-          go-version: 1.27.1
-          cache-dependency-path: installer/go.sum
-      - name: Verify actual native runner target
-        run: test "$(go env GOHOSTOS)/$(go env GOHOSTARCH)" = windows/amd64
-      - name: Install consume update and remove complete Neovim selection
-        run: >-
-          go test -v -count=1 -timeout 80m
-          -run '^TestNativeNeovimInstalledApplicationLifecycle$' .

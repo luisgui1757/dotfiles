@@ -18,6 +18,12 @@ func TestNativeWindowsGitAndMakeLifecycle(t *testing.T) {
 	if runtime.GOOS != "windows" || runtime.GOARCH != "amd64" || os.Getenv("GITHUB_ACTIONS") != "true" || os.Getenv("RUNNER_ENVIRONMENT") != "github-hosted" || os.Getenv("DOTFILES_NATIVE_WINDOWS_GIT_MAKE") != "1" {
 		t.Skip("requires explicit opt-in on a disposable GitHub-hosted Windows amd64 runner")
 	}
+	// Sample genuine native folders before the fixture redirects USERPROFILE.
+	t.Setenv("XDG_DATA_HOME", "")
+	nativeFolders, err := DiscoverConfigFolders()
+	if err != nil {
+		t.Fatal(err)
+	}
 	c, d, _ := archiveController(t)
 	d.Directory = filepath.Join(c.Home, "private Git and Make ü")
 	d.Client = nil
@@ -140,7 +146,8 @@ func TestNativeWindowsGitAndMakeLifecycle(t *testing.T) {
 		return string(output)
 	}
 	git := filepath.Join(gitRoot, "cmd", "git.exe")
-	probeNvimGitConfigBoundary(t, git)
+	probeNvimGitConfigBoundary(t, git, nativeFolders)
+	probeNvimPinnedCheckoutSpecs(t, git)
 	if output := run(git, "", "--version"); !strings.Contains(output, latest.Version) {
 		t.Fatal("published Git version differs", output)
 	}
