@@ -113,8 +113,63 @@ func TestNativeLinuxCodeDEBLifecycle(t *testing.T) {
 			return &http.Response{StatusCode: 200, Body: input, Header: http.Header{}, Request: request}, nil
 		})}
 	}
+	pristine := filepath.Join(root, "reviewed-code.deb")
 	r := Resource{ID: "tool.vscode", Name: "Code", Action: "vscode"}
 	for _, action := range []string{"install", "repair", "update", "remove"} {
+		if action == "update" {
+			// Install the exact payload with deliberately newer package metadata,
+			// through dpkg itself. This is a synthetic external-version fixture,
+			// not a claim that an unpublished upstream release was downloaded.
+			stage := filepath.Join(root, "external-version")
+			privateRun := func(program string, args ...string) {
+				t.Helper()
+				if output, err := exec.CommandContext(ctx, program, args...).CombinedOutput(); err != nil {
+					t.Fatalf("private package fixture: %v%s", err, nativeDiagnostic(output))
+				}
+			}
+			privateRun("/usr/bin/dpkg-deb", "--raw-extract", pristine, stage)
+			control := filepath.Join(stage, "DEBIAN", "control")
+			data, err := os.ReadFile(control)
+			if err != nil || strings.Count(string(data), "Version: "+pin.Version+"\n") != 1 {
+				t.Fatal("unexpected pinned control", err)
+			}
+			const externalVersion = "1:1.141.0-1"
+			data = []byte(strings.Replace(string(data), "Version: "+pin.Version+"\n", "Version: "+externalVersion+"\n", 1))
+			if err := os.WriteFile(control, data, 0644); err != nil {
+				t.Fatal(err)
+			}
+			external := filepath.Join(root, "external-code.deb")
+			privateRun("/usr/bin/dpkg-deb", "--root-owner-group", "-Zgzip", "-z1", "--build", stage, external)
+			op, err := digest("native external Code fixture")
+			if err != nil {
+				t.Fatal(err)
+			}
+			input, err := newLinuxCodeInput(pin, op)
+			if err != nil {
+				t.Fatal(err)
+			}
+			run("", "/usr/bin/env", "DEBCONF_DB_OVERRIDE=File{filename:"+filepath.Join(input.Directory, "answer.dat")+" accept_name:^code/add-microsoft-repo$ mode:0644 backup:no}", location.Dpkg, "--install", external)
+			if err := input.cleanup(); err != nil {
+				t.Fatal(err)
+			}
+			inventory, err := linuxAPTInventory(ctx, d.Query)
+			if err != nil || inventory["code:"+runtime.GOARCH].Version != externalVersion {
+				t.Fatal("external native upgrade missing", err)
+			}
+			detail, err := d.codeApplyDetail(ctx, externalVersion)
+			if err != nil || !strings.Contains(detail, "downgrade") {
+				t.Fatal("epoch-aware downgrade disclosure missing", detail, err)
+			}
+			t.Log("native external upgrade observed:", detail)
+			assertPersonal()
+			if err := os.RemoveAll(stage); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Remove(external); err != nil {
+				t.Fatal(err)
+			}
+		}
+
 		state, err := d.ledger()
 		if err != nil {
 			t.Fatal(err)
@@ -145,6 +200,12 @@ func TestNativeLinuxCodeDEBLifecycle(t *testing.T) {
 			if _, err := d.Apply(ctx, r, Operation{Action: action}, receipt); err == nil || !strings.Contains(err.Error(), "fixture lost completed") {
 				t.Fatal("native install did not reach its deliberate lost reply", err)
 			}
+			if err := d.verifyCodePayload(pin); err != nil {
+				t.Fatal("unknown outcome lost verified package", err)
+			}
+			if output, err := exec.CommandContext(ctx, "/bin/cp", d.codePayload(pin), pristine).CombinedOutput(); err != nil {
+				t.Fatalf("save exact fixture input: %v%s", err, nativeDiagnostic(output))
+			}
 			d.Run = session.run
 			current, err := linuxAPTInventory(ctx, d.Query)
 			if err != nil {
@@ -162,6 +223,18 @@ func TestNativeLinuxCodeDEBLifecycle(t *testing.T) {
 		got, err := d.Apply(ctx, r, Operation{Action: action}, receipt)
 		if err != nil || got.Present != (action != "remove") || got.CompletedOperation != receipt.OperationID || action != "remove" && !got.Healthy {
 			t.Fatal(action, got, err)
+		}
+		if _, err := os.Lstat(d.codePayload(pin)); !errors.Is(err, os.ErrNotExist) {
+			t.Fatal("completed operation retained DEB cache", action, err)
+		}
+		if _, err := os.Stat("/usr/share/applications/com.microsoft.VSCode.desktop"); (action == "remove" && !errors.Is(err, os.ErrNotExist)) || (action != "remove" && err != nil) {
+			t.Fatal("native package launcher lifecycle", action, err)
+		}
+		if action == "update" {
+			inventory, err := linuxAPTInventory(ctx, d.Query)
+			if err != nil || inventory["code:"+runtime.GOARCH].Version != pin.Version {
+				t.Fatal("approved update did not reconcile reviewed pin", err)
+			}
 		}
 		assertPersonal()
 		t.Log("native pinned Code", action, "passed with repository/key/answer preserved")

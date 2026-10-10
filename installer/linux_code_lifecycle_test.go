@@ -12,6 +12,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -35,6 +36,15 @@ func linuxCodeFixture(t *testing.T) (*linuxAPTFixture, Resource) {
 		return &http.Response{StatusCode: 200, ContentLength: int64(len(payload)), Body: io.NopCloser(bytes.NewReader(payload)), Header: http.Header{}, Request: r}, nil
 	})}
 	f.driver.Query = func(ctx context.Context, privileged bool, program string, input []byte, args ...string) ([]byte, error) {
+		if len(args) == 4 && args[0] == "--compare-versions" {
+			if args[2] != "gt" {
+				t.Fatal("unexpected version comparison", args)
+			}
+			if args[1] > args[3] {
+				return nil, nil
+			}
+			return exec.CommandContext(ctx, "/bin/sh", "-c", "exit 1").CombinedOutput()
+		}
 		if program == "/bin/sh" || slices.Equal(args, []string{"--verify", "code"}) {
 			return nil, nil
 		}
@@ -317,5 +327,226 @@ func TestLinuxCodeChangedPublicCommandIsPreservedOnRemoval(t *testing.T) {
 	}
 	if _, present := f.installed["code:amd64"]; !present {
 		t.Fatal("native package was removed after its command changed")
+	}
+}
+
+func TestLinuxCodeSuccessfulCompletionCleansOnlyVerifiedPackageInput(t *testing.T) {
+	f, r := linuxCodeFixture(t)
+	f.approve()
+	if _, err := f.driver.Apply(context.Background(), r, Operation{Action: "install"}, aptFixtureReceipt("code-clean-input")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Lstat(f.driver.codePayload(*f.driver.Code)); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("completed Code operation retained its large DEB input", err)
+	}
+}
+
+func TestLinuxCodeInputCleanupRecoveryPreservesUnexpectedFiles(t *testing.T) {
+	for _, change := range []string{"extra", "payload", "empty"} {
+		t.Run(change, func(t *testing.T) {
+			f, r := linuxCodeFixture(t)
+			f.lostReply = true
+			f.approve()
+			receipt := aptFixtureReceipt("cleanup-" + change)
+			if _, err := f.driver.Apply(context.Background(), r, Operation{Action: "install"}, receipt); err == nil {
+				t.Fatal("missing interrupted fixture")
+			}
+			file := f.driver.codePayload(*f.driver.Code)
+			if err := f.driver.verifyCodePayload(*f.driver.Code); err != nil {
+				t.Fatal("unknown outcome discarded input", err)
+			}
+			original, err := os.ReadFile(file)
+			if err != nil {
+				t.Fatal(err)
+			}
+			calls := f.runs
+			switch change {
+			case "extra":
+				writeConfigFixture(t, filepath.Join(filepath.Dir(file), "personal"), "preserve me")
+			case "payload":
+				writeConfigFixture(t, file, "changed input")
+			case "empty":
+				if err := os.Remove(file); err != nil {
+					t.Fatal(err)
+				}
+			}
+			f.approve()
+			got, err := f.driver.ResumeResource(context.Background(), r, Operation{Action: "install"}, receipt)
+			if change != "empty" {
+				if err == nil || f.runs != calls {
+					t.Fatal("changed input was deleted or worker repeated", got, err)
+				}
+				if change == "extra" {
+					extra := filepath.Join(filepath.Dir(file), "personal")
+					if b, err := os.ReadFile(extra); err != nil || string(b) != "preserve me" {
+						t.Fatal(b, err)
+					}
+					if err := os.Remove(extra); err != nil {
+						t.Fatal(err)
+					}
+				} else {
+					if b, err := os.ReadFile(file); err != nil || string(b) != "changed input" {
+						t.Fatal(b, err)
+					}
+					if err := os.WriteFile(file, original, 0600); err != nil {
+						t.Fatal(err)
+					}
+				}
+				f.approve()
+				got, err = f.driver.ResumeResource(context.Background(), r, Operation{Action: "install"}, receipt)
+			}
+			if err != nil || got.CompletedOperation != receipt.OperationID || f.runs != calls {
+				t.Fatal("completed worker could not recover cleanup", got, err)
+			}
+			if _, err := os.Lstat(filepath.Dir(file)); !errors.Is(err, os.ErrNotExist) {
+				t.Fatal("verified cache was retained", err)
+			}
+		})
+	}
+}
+
+func TestLinuxCodeOldSavedCommandsRetainDowngradePolicy(t *testing.T) {
+	f, r := linuxCodeFixture(t)
+	f.approve()
+	if _, err := f.driver.Apply(context.Background(), r, Operation{Action: "install"}, aptFixtureReceipt("before-old-update")); err != nil {
+		t.Fatal(err)
+	}
+	f.lostReply = true
+	f.approve()
+	receipt := aptFixtureReceipt("old-update")
+	if _, err := f.driver.Apply(context.Background(), r, Operation{Action: "update"}, receipt); err == nil {
+		t.Fatal("missing lost reply")
+	}
+	intent, err := f.driver.intent(receipt.OperationID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Reproduce the old saved shape and its actual recorded command identity.
+	intent.Code.AllowDowngrade = false
+	last := &intent.Commands[len(intent.Commands)-1]
+	last.Command.Arguments = slices.DeleteFunc(last.Command.Arguments, func(s string) bool { return s == "--allow-downgrades" })
+	hash, err := digest(last.Command)
+	if err != nil {
+		t.Fatal(err)
+	}
+	code := 0
+	if err := saveDocument(filepath.Join(f.driver.WorkerDirectory, "commands", last.Command.Operation+".json"), nativeCommandRecord{Schema: 1, Command: hash, Reply: &nativeReply{ExitCode: &code}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := saveDocument(f.driver.intentPath(intent.Operation), intent); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(f.driver.intentPath(intent.Operation))
+	if err != nil || bytes.Contains(data, []byte("allow_downgrade")) {
+		t.Fatal("not an old serialized input", err)
+	}
+	calls := f.runs
+	f.approve()
+	got, err := f.driver.ResumeResource(context.Background(), r, Operation{Action: "update"}, receipt)
+	if err != nil || got.CompletedOperation != receipt.OperationID || f.runs != calls {
+		t.Fatal("old saved command changed or repeated", got, err)
+	}
+}
+
+func TestLinuxCodeVersionDisclosurePropagatesNativeComparisonFailure(t *testing.T) {
+	f, _ := linuxCodeFixture(t)
+	f.driver.Query = func(context.Context, bool, string, []byte, ...string) ([]byte, error) {
+		return nil, context.DeadlineExceeded
+	}
+	if _, err := f.driver.codeApplyDetail(context.Background(), "1:1.0-2"); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatal("comparison timeout was treated as upgrade permission", err)
+	}
+}
+
+func TestLinuxCodeDowngradeEvidenceIsExactAndOperationBound(t *testing.T) {
+	f, r := linuxCodeFixture(t)
+	f.approve()
+	if _, err := f.driver.Apply(context.Background(), r, Operation{Action: "install"}, aptFixtureReceipt("downgrade-base")); err != nil {
+		t.Fatal(err)
+	}
+	pkg := f.installed["code:amd64"]
+	pkg.Version = "1:1.141.0-1"
+	f.installed[pkg.Name] = pkg
+	f.approve()
+	f.lostReply = true
+	receipt := aptFixtureReceipt("downgrade-native-history")
+	if _, err := f.driver.Apply(context.Background(), r, Operation{Action: "update"}, receipt); err == nil {
+		t.Fatal("missing lost reply")
+	}
+	intent, err := f.driver.intent(receipt.OperationID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	last := intent.Commands[len(intent.Commands)-1]
+	path := filepath.Join(f.driver.Directory, "logs", last.Command.Operation+".history")
+	history, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	approved := linuxCodeApprovedDowngrade(intent)
+	for _, field := range []string{approved, "other:amd64 (2, 1)", approved + ", other:amd64 (2, 1)", "code:amd64 (wrong, " + f.driver.Code.Version + ")"} {
+		data := strings.Replace(string(history), "End-Date:", "Downgrade: "+field+"\nEnd-Date:", 1)
+		if err := os.WriteFile(path, []byte(data), 0600); err != nil {
+			t.Fatal(err)
+		}
+		_, _, err := f.driver.evidence(intent)
+		if (err == nil) != (field == approved) {
+			t.Fatal("downgrade evidence exceeded saved exact permission", field, err)
+		}
+	}
+	data := strings.Replace(string(history), "End-Date:", "Downgrade: "+approved+"\nEnd-Date:", 1)
+	if err := os.WriteFile(path, []byte(data), 0600); err != nil {
+		t.Fatal(err)
+	}
+	intent.Code.AllowDowngrade = false
+	if _, _, err := f.driver.evidence(intent); err == nil {
+		t.Fatal("old command acquired new downgrade authority")
+	}
+	calls := f.runs
+	f.approve()
+	if got, err := f.driver.ResumeResource(context.Background(), r, Operation{Action: "update"}, receipt); err != nil || got.CompletedOperation != receipt.OperationID || f.runs != calls {
+		t.Fatal("approved completed downgrade could not resume", got, err)
+	}
+}
+
+func TestLinuxCodeInterruptedDowngradeResumesExactPinnedInput(t *testing.T) {
+	f, r := linuxCodeFixture(t)
+	f.approve()
+	if _, err := f.driver.Apply(context.Background(), r, Operation{Action: "install"}, aptFixtureReceipt("partial-downgrade-base")); err != nil {
+		t.Fatal(err)
+	}
+	pkg := f.installed["code:amd64"]
+	pkg.Version = "1:1.141.0-1"
+	f.installed[pkg.Name] = pkg
+	f.partial = true
+	f.approve()
+	receipt := aptFixtureReceipt("partial-downgrade")
+	if _, err := f.driver.Apply(context.Background(), r, Operation{Action: "update"}, receipt); err == nil {
+		t.Fatal("configuration failure was hidden")
+	}
+	intent, err := f.driver.intent(receipt.OperationID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	last := intent.Commands[len(intent.Commands)-1]
+	path := filepath.Join(f.driver.Directory, "logs", last.Command.Operation+".history")
+	history, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data := strings.Replace(string(history), "End-Date:", "Downgrade: "+linuxCodeApprovedDowngrade(intent)+"\nEnd-Date:", 1)
+	if err := os.WriteFile(path, []byte(data), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.driver.verifyCodePayload(intent.Code.Pin); err != nil {
+		t.Fatal("failed worker lost required input", err)
+	}
+	f.approve()
+	got, err := f.driver.ResumeResource(context.Background(), r, Operation{Action: "update"}, receipt)
+	if err != nil || !got.Healthy || got.CompletedOperation != receipt.OperationID || f.installed[pkg.Name].Version != intent.Code.Pin.Version {
+		t.Fatal("partial downgrade could not finish its exact operation", got, err)
+	}
+	if _, err := os.Lstat(f.driver.codePayload(intent.Code.Pin)); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("successful recovery retained payload", err)
 	}
 }

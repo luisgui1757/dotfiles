@@ -111,15 +111,50 @@ describe("pinned Git checkout", function()
     assert.are.equal(expected_commit, git("-C", opts.target, "rev-parse", "refs/remotes/origin/" .. opts.branch))
   end)
 
-  it("creates and verifies a checkout beyond the Windows MAX_PATH boundary", function()
-    opts.target = root .. "/" .. string.rep("managed-generation/", 18) .. "example.nvim"
-    assert.is_true(#opts.target > 320)
+  it("checks out files beyond MAX_PATH inside a supported repository root", function()
+    -- core.longpaths extends files, not repository discovery or the Windows CWD.
+    local nested = string.rep("nested-managed-files/", 16) .. "proof.txt"
+    write(remote .. "/" .. nested, { "locked long-file proof" })
+    git("-c", "core.longpaths=true", "-C", remote, "add", nested)
+    git("-c", "core.longpaths=true", "-C", remote, "commit", "--quiet", "-m", "long file fixture")
+    opts.commit = git("-C", remote, "rev-parse", "HEAD")
+    assert.is_true(#(opts.target .. "/" .. nested) > 320)
+
+    -- The production helper bypasses all system/global config. Its explicit
+    -- command setting must support these files without a fixture override.
     assert.are.equal(vim.fs.normalize(opts.target), checkout.ensure(opts))
     local valid, reason = checkout.verify(opts)
     assert.is_true(valid, reason)
     assert.are.equal("return true", vim.fn.readfile(opts.target .. "/lua/example/init.lua")[1])
+    assert.are.equal("locked long-file proof", vim.fn.readfile(opts.target .. "/" .. nested)[1])
     assert.are.same({}, stages_for(opts.target))
   end)
+
+  if vim.fn.has("win32") == 1 then
+    it("refuses an unsupported native Git root without replacing the original target", function()
+      -- Exact native failure: 254-char stage, 266-char .git/config. Discovery
+      -- precedes config, so even a system longpaths setting cannot fix it.
+      -- https://github.com/git-for-windows/git/blob/v2.56.0.windows.2/compat/mingw.c
+      local stage_suffix = ".stage." .. tostring(vim.fn.getpid())
+      local target_suffix = "/cache/example.nvim"
+      local padding = 254 - #stage_suffix - #root - 1 - #target_suffix
+      assert.is_true(padding > 0 and padding < 255)
+      opts.target = root .. "/" .. string.rep("g", padding) .. target_suffix
+      assert.are.equal(254, #(opts.target .. stage_suffix))
+      assert.are.equal(266, #(opts.target .. stage_suffix .. "/.git/config"))
+      write(opts.target .. "/personal.txt", { "preserve original checkout data" })
+
+      local ok, err = pcall(checkout.ensure, opts)
+
+      assert.is_false(ok)
+      assert.matches("git init failed", tostring(err), 1, true)
+      assert.matches("Filename too long", tostring(err), 1, true)
+      assert.are.same({ "personal.txt" }, vim.fn.readdir(opts.target))
+      assert.are.equal("preserve original checkout data", vim.fn.readfile(opts.target .. "/personal.txt")[1])
+      assert.are.same({}, stages_for(opts.target))
+      assert.is_nil(vim.uv.fs_stat(opts.target .. ".lock"))
+    end)
+  end
 
   it("reuses a verified cache without init, fetch, or checkout", function()
     checkout.ensure(opts)

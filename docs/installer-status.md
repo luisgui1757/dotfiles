@@ -438,3 +438,16 @@ Fixed script children now use their current engine's built-in modules; bootstrap
 binds Management/Utility manifests explicitly. The new native regression proves
 the original autoload failure and checks real query/job/worker/bootstrap hashes.
 The separate Build Tools reuse 30-second timeout has no identified stage yet.
+
+The 3cedd3e native readiness attempt proved two live private members, disproving
+the fixture's single-member premise. The corrected regression holds all ready
+private HANDLEs, proves the exact root's natural zero exit, requires unchanged
+lifetime Total and a decreased Active count, then captures and terminates any
+remaining members under the existing bound. Every initially held HANDLE must be
+signaled immediately afterward. This supports both natural2→1 and2→0; it neither
+requires startup children to exit naturally nor permits new members. Basename/PID
+logging describes already-proved private HANDLEs and grants no authority. The
+ABI was checked against Microsoft's four LARGE_INTEGER/four DWORD definition.
+The initial timeout diagnostic had an ambiguous two-site chain.Build marker and
+never invoked inspection; its marker now selects the multiline first-chain site
+exactly. The original30-second timeout remains unexplained pending native data.

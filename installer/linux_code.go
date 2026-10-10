@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -77,6 +78,8 @@ type linuxCodeInput struct {
 	Operation string       `json:"operation"`
 	Directory string       `json:"directory"`
 	Identity  string       `json:"identity"`
+	// Older pending inputs omit this permission and retain their exact commands.
+	AllowDowngrade bool `json:"allow_downgrade,omitempty"`
 }
 
 func newLinuxCodeInput(pin LinuxCodePin, operation string) (*linuxCodeInput, error) {
@@ -225,6 +228,36 @@ func (d *LinuxAPTDriver) verifyCodePayload(pin LinuxCodePin) error {
 	return nil
 }
 
+// Delete only the exact verified transaction input after successful native
+// completion. Interrupted cleanup may leave an empty directory; unexpected
+// children or changed payloads remain available for inspection and recovery.
+func (d *LinuxAPTDriver) cleanupCodePayload(pin LinuxCodePin) error {
+	file := d.codePayload(pin)
+	bound, err := bindConfigDestination(file)
+	if err != nil || bound != file {
+		return errors.Join(errors.New("Code package input was redirected"), err)
+	}
+	entries, err := os.ReadDir(filepath.Dir(file))
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if len(entries) > 1 || len(entries) == 1 && entries[0].Name() != "code.deb" {
+		return errors.New("unexpected Code package input is preserved for inspection")
+	}
+	if len(entries) == 1 {
+		if err := d.verifyCodePayload(pin); err != nil {
+			return err
+		}
+		if err := os.Remove(file); err != nil {
+			return err
+		}
+	}
+	return os.Remove(filepath.Dir(file))
+}
+
 // These are the reviewed DEB's nonshared publications plus the legacy command
 // that its postinst removes. Do not let dpkg overwrite a personal installation.
 var linuxCodePublications = []string{
@@ -256,11 +289,14 @@ func (d *LinuxAPTDriver) checkCodeCollisions(ctx context.Context, absent bool) e
 // Package checksum verification does not check this postinst-created symlink.
 // Verify the actual canonical executable and trusted parent ownership as well.
 const linuxCodeHealth = "set -eu\n" +
-	"[ \"$(readlink /usr/bin/code)\" = /usr/share/code/bin/code ]\n" +
+	"fail() { printf 'Code native health: %s\\n' \"$*\" >&2; exit 1; }\n" +
+	"link=$(readlink /usr/bin/code) || fail '/usr/bin/code target unreadable'\n" +
+	"[ \"$link\" = /usr/share/code/bin/code ] || fail \"/usr/bin/code target=$link\"\n" +
 	"for p in /usr /usr/share /usr/share/code /usr/share/code/code /usr/share/code/chrome-sandbox; do\n" +
-	"  [ ! -L \"$p\" ]\n" +
-	"  [ \"$(stat -c %u \"$p\")\" = 0 ]\n" +
-	"  [ \"$(stat -c %a \"$p\")\" = 755 ]\n" +
+	"  [ ! -L \"$p\" ] || fail \"$p is a symbolic link\"\n" +
+	"  owner=$(stat -c %u \"$p\") || fail \"$p owner unreadable\"\n" +
+	"  mode=$(stat -c %a \"$p\") || fail \"$p mode unreadable\"\n" +
+	"  [ \"$owner\" = 0 ] && [ \"$mode\" = 755 ] || fail \"$p owner=$owner mode=$mode (expected owner=0 mode=755)\"\n" +
 	"done\n"
 
 const linuxCodeRemoveLink = "set -eu\n" +
@@ -268,3 +304,48 @@ const linuxCodeRemoveLink = "set -eu\n" +
 	"  [ -L /usr/bin/code ]\n" +
 	"  [ \"$(readlink /usr/bin/code)\" = /usr/share/code/bin/code ]\n" +
 	"fi\n"
+
+// Version is display/approval metadata, not native ownership. dpkg owns Debian
+// ordering (epochs, revisions and prereleases); only its false exit is benign.
+func (d *LinuxAPTDriver) codeApplyDetail(ctx context.Context, current string) (string, error) {
+	if len(current) > 256 || strings.ContainsAny(current, "\x00\r\n\t") {
+		return "", errors.New("invalid Code version observation")
+	}
+	if current == "" {
+		return "install reviewed Code pin " + d.Code.Version, nil
+	}
+	detail := fmt.Sprintf("Code %q -> reviewed pin %s", current, d.Code.Version)
+	if current == d.Code.Version {
+		return detail, nil
+	}
+	output, err := d.Query(ctx, false, d.Location.Dpkg, nil, "--compare-versions", current, "gt", d.Code.Version)
+	if ctx.Err() != nil {
+		return "", ctx.Err()
+	}
+	if len(output) != 0 {
+		return "", errors.New("unexpected dpkg version comparison output")
+	}
+	if err == nil {
+		return "downgrade " + detail, nil
+	}
+	var status *exec.ExitError
+	if errors.As(err, &status) && status.ExitCode() == 1 {
+		return detail, nil
+	}
+	return "", errors.Join(errors.New("cannot compare installed Code with reviewed pin"), err)
+}
+
+// Only the saved fixed-DEB update may account for this one exact APT history
+// downgrade. Success still requires operation-linked dpkg completion and the
+// current requested version; unrelated package downgrades remain fatal.
+func linuxCodeApprovedDowngrade(intent linuxAPTIntent) string {
+	if intent.Code == nil || !intent.Code.AllowDowngrade {
+		return ""
+	}
+	name := "code:" + intent.Code.Pin.Architecture
+	before, present := intent.Before[name]
+	if !present || before.Version == intent.Code.Pin.Version {
+		return ""
+	}
+	return name + " (" + before.Version + ", " + intent.Code.Pin.Version + ")"
+}

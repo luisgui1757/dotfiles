@@ -90,8 +90,6 @@ func (d *DesktopDriver) recipe(id string) (desktopRecipe, error) {
 		p.Source, p.Folder, p.Destination, p.Directory = filepath.Dir(filepath.Dir(entry)), d.Folders.Home, "Applications/"+p.Name+".app", true
 	case "linux":
 		switch p.Package {
-		case "tool.vscode":
-			p.Command, p.Icon = "/usr/share/code/code", "/usr/share/pixmaps/vscode.png"
 		case "tool.ghostty":
 			p.Command, err = command("ghostty")
 			if err == nil {
@@ -144,18 +142,13 @@ func (d *DesktopDriver) configuration(r Resource, receipt Receipt) (*ConfigDrive
 	if err != nil {
 		return nil, r, p, "", err
 	}
-	var pin any
-	if d.Target.OS == "linux" && p.Package == "tool.vscode" {
-		pin = Binding{Provider: "apt", Package: "code"}
-	} else {
-		pin, err = d.Archives.validate(p.Package)
-	}
+	pin, err := d.Archives.validate(p.Package)
 	if err != nil {
 		return nil, r, p, "", err
 	}
 	desired, err := digest(struct {
 		Recipe desktopRecipe
-		Pin    any
+		Pin    ArchivePin
 	}{p, pin})
 	if err != nil {
 		return nil, r, p, "", err

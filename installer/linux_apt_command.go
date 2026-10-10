@@ -56,6 +56,9 @@ func (d *LinuxAPTDriver) command(intent linuxAPTIntent, index int, kind string, 
 		packageInput := intent.Package
 		if intent.Code != nil {
 			packageInput = d.codePayload(intent.Code.Pin)
+			if intent.Code.AllowDowngrade {
+				args = append(args, "--allow-downgrades")
+			}
 		}
 		args = append(args, "install", packageInput)
 	case "remove":

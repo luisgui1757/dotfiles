@@ -15,7 +15,7 @@ import (
 
 // Both archive and native-package acceptance use the installed executable and
 // real machine protocol. No controller or process boundary is substituted.
-func installedMachineFixture(t *testing.T, repository, home string, timeout time.Duration) func(Request) Result {
+func installedMachineFixture(t *testing.T, repository, home string, timeout time.Duration, environment ...string) func(Request) Result {
 	t.Helper()
 	binary := filepath.Join(home, "dotfiles")
 	if runtime.GOOS == "windows" {
@@ -29,7 +29,7 @@ func installedMachineFixture(t *testing.T, repository, home string, timeout time
 		t.Helper()
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
-		result, err := installedMachineRequest(ctx, binary, repository, home, request)
+		result, err := installedMachineRequest(ctx, binary, repository, home, request, environment...)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -37,7 +37,7 @@ func installedMachineFixture(t *testing.T, repository, home string, timeout time
 	}
 }
 
-func installedMachineRequest(ctx context.Context, binary, repository, home string, request Request) (Result, error) {
+func installedMachineRequest(ctx context.Context, binary, repository, home string, request Request, environment ...string) (Result, error) {
 	var result Result
 	data, err := json.Marshal(request)
 	if err != nil {
@@ -45,6 +45,7 @@ func installedMachineRequest(ctx context.Context, binary, repository, home strin
 	}
 	cmd := exec.CommandContext(ctx, binary, "machine")
 	cmd.Env = append(os.Environ(), "HOME="+home, "XDG_CONFIG_HOME="+filepath.Join(home, ".config"), "XDG_DATA_HOME="+filepath.Join(home, ".local", "share"), "XDG_STATE_HOME="+filepath.Join(home, ".local", "state"), "CODEX_HOME="+filepath.Join(home, ".codex"), "PI_CODING_AGENT_DIR="+filepath.Join(home, ".pi", "agent"), "DOTFILES_CHECKOUT="+repository, "ZDOTDIR="+home, "TERM=xterm-256color")
+	cmd.Env = append(cmd.Env, environment...)
 	cmd.Stdin = bytes.NewReader(data)
 	cmd.WaitDelay = 2 * time.Second
 	output, diagnostic := boundedCommandOutput{limit: 8 << 20}, boundedCommandOutput{limit: 64 << 10}

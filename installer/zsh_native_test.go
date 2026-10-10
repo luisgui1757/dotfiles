@@ -27,11 +27,29 @@ func TestNativeArchiveZshCompositionAndSharedFzfRemoval(t *testing.T) {
 		t.Fatal(err)
 	}
 	folders := ConfigFolders{Home: home, Config: filepath.Join(home, ".config"), Zsh: filepath.Join(home, "custom zsh")}
-	c, err := NewNativeController(repository, "zsh-composition", filepath.Join(home, "state"), nativePlatform(t), folders)
+	platform := nativePlatform(t)
+	if platform.OS == "linux" {
+		platform.APT, err = DiscoverLinuxAPT(t.Context())
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	c, err := NewNativeController(repository, "zsh-composition", filepath.Join(home, "state"), platform, folders)
 	if err != nil {
 		t.Fatal(err)
 	}
 	d := c.Driver.(*NativeDriver)
+	resource, ok := c.Catalog.Resource("tool.zsh")
+	if !ok {
+		t.Fatal("missing native zsh resource")
+	}
+	before, err := d.Observe(t.Context(), resource, Receipt{})
+	if err != nil || !before.Present || !before.Healthy {
+		t.Fatal("archive fixture requires a healthy pre-existing native zsh; native installation belongs to the fresh APT lane", before, err)
+	}
+	if platform.OS == "linux" && before.Provider != "apt" {
+		t.Fatal("Linux zsh did not use the connected APT provider", before)
+	}
 	run := func(fzf bool) {
 		t.Helper()
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -79,4 +97,9 @@ func TestNativeArchiveZshCompositionAndSharedFzfRemoval(t *testing.T) {
 	if err != nil || state.Receipts["tool.zsh"].Ownership != "reused" {
 		t.Fatal("system shell ownership changed", err)
 	}
+	after, err := d.Observe(t.Context(), resource, state.Receipts["tool.zsh"])
+	if err != nil || !after.Present || !after.Healthy || after.Fingerprint != before.Fingerprint || after.Inventory != before.Inventory {
+		t.Fatal("pre-existing system shell or native package inventory changed", before, after, err)
+	}
+	t.Logf("pre-existing %s zsh stayed healthy, reused and unchanged after selective/full removal", before.Provider)
 }

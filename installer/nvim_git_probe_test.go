@@ -2,34 +2,62 @@ package installer
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 )
 
-// Temporary Windows diagnostic: call after the existing private Git install,
-// before that fixture removes it. No production invocation changes.
+// Temporary native proof: use the real default Windows data layout, a complete
+// random operation identity, and unchanged private Git. Every expectation is fatal.
 func probeNvimGitConfigBoundary(t *testing.T, git string) {
 	t.Helper()
 	if runtime.GOOS != "windows" {
-		t.Fatal("Windows-only boundary probe")
+		t.Fatal("Windows-only boundary proof")
 	}
+	t.Setenv("XDG_DATA_HOME", "")
+	folders, err := DiscoverConfigFolders()
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtimeDirectory, err := nvimRuntimeDirectory(Context{OS: "windows", Arch: "amd64"}, folders)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var nonce [32]byte
+	if _, err := rand.Read(nonce[:]); err != nil {
+		t.Fatal(err)
+	}
+	version := filepath.Join(runtimeDirectory, "nvim.sync", "versions", hex.EncodeToString(nonce[:]))
+	if err := os.MkdirAll(filepath.Dir(version), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(version, 0700); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := os.RemoveAll(version); err != nil {
+			t.Error(err)
+		}
+	})
 	base, err := resolveConfigPath(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
-	fixed := filepath.Join(base, "isolated.config")
-	writeConfigFixture(t, fixed, "[core]\nlongpaths = true\n")
 	source := filepath.Join(base, "source")
-	writeConfigFixture(t, filepath.Join(source, "proof.txt"), "locked proof\n")
+	nested := strings.Repeat("nested-managed-files/", 16) + "proof.txt"
+	writeConfigFixture(t, filepath.Join(source, filepath.FromSlash(nested)), "locked long-file proof\n")
 	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
 	defer cancel()
-	run := func(system bool, args ...string) ([]byte, error) {
-		cmd := exec.CommandContext(ctx, git, args...)
+	run := func(args ...string) ([]byte, error) {
+		prefix := []string{"-c", "core.fsmonitor=false", "-c", "core.untrackedCache=false", "-c", "core.hooksPath=/dev/null", "-c", "core.longpaths=true", "-c", "core.autocrlf=false", "-c", "init.templateDir="}
+		cmd := exec.CommandContext(ctx, git, append(prefix, args...)...)
 		for _, entry := range os.Environ() {
 			key, _, _ := strings.Cut(entry, "=")
 			if !strings.HasPrefix(strings.ToUpper(key), "GIT_") {
@@ -37,68 +65,67 @@ func probeNvimGitConfigBoundary(t *testing.T, git string) {
 			}
 		}
 		cmd.Env = append(cmd.Env, "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_SYSTEM=/dev/null", "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_COUNT=0", "GIT_CONFIG_PARAMETERS=", "GIT_TEMPLATE_DIR=", "GIT_TERMINAL_PROMPT=0")
-		if system {
-			cmd.Env = append(cmd.Env, "GIT_CONFIG_NOSYSTEM=0", "GIT_CONFIG_SYSTEM="+fixed)
-		}
 		cmd.Dir = base
-		return cmd.CombinedOutput()
+		var output boundedCommandOutput
+		output.limit = 8 << 10
+		cmd.Stdout, cmd.Stderr = &output, &output
+		err := cmd.Run()
+		return output.data.Bytes(), err
 	}
-	for _, args := range [][]string{{"-C", source, "init", "--quiet"}, {"-C", source, "add", "proof.txt"}, {"-C", source, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "--quiet", "-m", "fixture"}} {
-		if out, err := run(false, args...); err != nil {
-			t.Fatalf("probe remote: %s %v", out, err)
+	checked := func(args ...string) string {
+		t.Helper()
+		out, err := run(args...)
+		if err != nil {
+			t.Fatalf("native default Git %v: %v %s", args, err, out)
 		}
+		return strings.TrimSpace(string(out))
 	}
-	commitOut, err := run(false, "-C", source, "rev-parse", "HEAD")
-	if err != nil {
-		t.Fatal(err)
-	}
-	commit := strings.TrimSpace(string(commitOut))
-	for _, stageLength := range []int{254, 257} {
-		stage := filepath.Join(base, strings.Repeat("g", stageLength-len(base)-1))
-		if len(stage) != stageLength {
-			t.Fatal("probe physical root boundary", len(stage))
-		}
-		if err := os.Mkdir(stage, 0700); err != nil {
+	checked("-C", source, "init", "--quiet")
+	checked("-C", source, "add", nested)
+	checked("-C", source, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "--quiet", "-m", "fixture")
+	commit := checked("-C", source, "rev-parse", "HEAD")
+	branch := checked("-C", source, "symbolic-ref", "--short", "HEAD")
+	for _, name := range []string{"lazy.nvim", "mason-tool-installer.nvim"} {
+		target := filepath.Join(version, "payload", "lazy", name)
+		stage := target + ".stage." + strconv.Itoa(os.Getpid())
+		if err := os.MkdirAll(stage, 0700); err != nil {
 			t.Fatal(err)
 		}
-		for _, v := range []struct {
-			name   string
-			gitDir string
-			system bool
-		}{{"isolated-command-config", "", false}, {"extended-git-dir", "extended", false}, {"isolated-system-config", "", true}, {"isolated-system-explicit-git-dir", "relative", true}} {
-			if err := os.RemoveAll(filepath.Join(stage, ".git")); err != nil {
-				t.Fatal(err)
-			}
-			if err := os.Remove(filepath.Join(stage, "proof.txt")); err != nil && !os.IsNotExist(err) {
-				t.Fatal(err)
-			}
-			prefix := []string{"-c", "core.fsmonitor=false", "-c", "core.untrackedCache=false", "-c", "core.hooksPath=/dev/null", "-c", "core.longpaths=true", "-c", "init.templateDir=", "-C", stage}
-			if v.gitDir == "extended" {
-				prefix = append(prefix, "--git-dir="+strings.ReplaceAll(windowsExtendedPath(filepath.Join(stage, ".git")), "\\", "/"))
-			} else if v.gitDir == "relative" {
-				prefix = append(prefix, "--git-dir=.git")
-			}
-			steps := [][]string{{"init", "--quiet"}, {"remote", "add", "origin", source}, {"fetch", "--depth", "1", "origin", commit}, {"checkout", "--detach", commit}, {"rev-parse", "HEAD"}, {"status", "--porcelain"}}
-			success := true
-			for _, step := range steps {
-				args := append(append([]string{}, prefix...), step...)
-				out, err := run(v.system, args...)
-				if len(out) > 8192 {
-					out = append(out[:8192], []byte(" [bounded]")...)
-				}
-				t.Logf("NvimGitConfigBoundary variant=%s stage=%d config=%d step=%s exit=%v output=%q", v.name, len(stage), len(filepath.Join(stage, ".git", "config")), step[0], err, out)
-				if err != nil {
-					success = false
-					break
-				}
-			}
-			t.Logf("NvimGitConfigBoundary COMPLETE variant=%s stage=%d success=%t", v.name, len(stage), success)
-			if success {
-				data, err := os.ReadFile(filepath.Join(stage, "proof.txt"))
-				if err != nil || string(data) != "locked proof\n" && string(data) != "locked proof\r\n" {
-					t.Fatal("probe checkout content", string(data), err)
-				}
-			}
+		checked("-C", stage, "init", "--quiet")
+		checked("-C", stage, "remote", "add", "origin", source)
+		checked("-C", stage, "fetch", "--depth", "1", "--filter=blob:none", "origin", commit)
+		checked("-C", stage, "checkout", "--detach", commit)
+		ref := "refs/remotes/origin/" + branch
+		checked("-C", stage, "update-ref", ref, commit)
+		checked("-C", stage, "symbolic-ref", "refs/remotes/origin/HEAD", ref)
+		if head := checked("-C", stage, "rev-parse", "HEAD"); head != commit {
+			t.Fatal("staged identity differs", head, commit)
 		}
+		if err := os.Rename(stage, target); err != nil {
+			t.Fatal(err)
+		}
+		if checked("-C", target, "rev-parse", "HEAD") != commit || checked("-C", target, "status", "--porcelain=v1", "--untracked-files=all") != "" || checked("-C", target, "symbolic-ref", "refs/remotes/origin/HEAD") != ref {
+			t.Fatal("published identity/cleanliness differs")
+		}
+		checked("-C", target, "diff", "--quiet", "HEAD", "--")
+		file := filepath.Join(target, filepath.FromSlash(nested))
+		if data, err := os.ReadFile(file); err != nil || string(data) != "locked long-file proof\n" || len(file) <= 320 {
+			t.Fatal("long published file bytes/boundary", len(file), string(data), err)
+		}
+		t.Logf("NvimGitNativeDefault complete name=%s stage=%d target=%d config=%d nested=%d", name, len(stage), len(target), len(filepath.Join(target, ".git", "config")), len(file))
 	}
+
+	// Retain the exact failing physical-root boundary as a strict refusal proof.
+	stage := filepath.Join(base, strings.Repeat("g", 254-len(base)-1))
+	if len(stage) != 254 {
+		t.Fatal("unsupported-root proof lost exact length", len(stage))
+	}
+	if err := os.Mkdir(stage, 0700); err != nil {
+		t.Fatal(err)
+	}
+	out, err := run("-C", stage, "init", "--quiet")
+	if err == nil || !strings.Contains(string(out), "Filename too long") {
+		t.Fatal("expected explicit native root refusal", err, string(out))
+	}
+	t.Logf("NvimGitNativeDefault unsupported stage=254 config=266 explicitly refused: %s", out)
 }

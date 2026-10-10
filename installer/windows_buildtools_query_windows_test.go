@@ -400,17 +400,46 @@ func TestWindowsBuildToolsQueryAcceptsExitedMemberDuringCapture(t *testing.T) {
 	if _, err := windows.ResumeThread(process.Thread); err != nil {
 		t.Fatal(err)
 	}
-	// Capture only after the helper has initialized. Startup may create and
-	// finish another process; that belongs in the lifetime baseline, not in
-	// this test's deliberately forced natural-exit interval.
+	// Startup may include other private members. Hold every ready member's
+	// exact HANDLE, then force only this root to exit between the snapshots.
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := waitBuildToolsQueryFixtureFile(ctx, filepath.Join(directory, "ready")); err != nil {
 		t.Fatal("private fixture did not become ready", err)
 	}
 	before, err := readBuildToolsJobAccounting(job)
-	if err != nil || before.Active != 1 || before.Total == 0 {
-		t.Fatal("expected one ready private member before capture", before, err)
+	if err != nil || before.Active == 0 || before.Total == 0 {
+		t.Fatal("expected ready private members before capture", before, err)
+	}
+	ready, total, err := captureBuildToolsQueryProcessesAfterAccounting(job, before)
+	defer func() {
+		for _, handle := range ready {
+			if err := windows.CloseHandle(handle); err != nil {
+				t.Error(err)
+			}
+		}
+	}()
+	if err != nil || total != before.Total {
+		t.Fatal("ready private member capture failed", err)
+	}
+	foundRoot := false
+	for _, handle := range ready {
+		pid, err := windows.GetProcessId(handle)
+		if err != nil {
+			t.Fatal(err)
+		}
+		foundRoot = foundRoot || pid == process.ProcessId
+		image := make([]uint16, 32768)
+		size := uint32(len(image))
+		if err := windows.QueryFullProcessImageName(handle, 0, &image[0], &size); err != nil {
+			t.Fatal(err)
+		}
+		// These handles already have proved job membership. The image is a
+		// diagnostic, never process selection or termination authority.
+		t.Logf("ready private member pid=%d image=%s root=%t", pid, filepath.Base(windows.UTF16ToString(image[:size])), pid == process.ProcessId)
+	}
+	if !foundRoot {
+		t.Fatal("ready capture omitted the exact private root")
 	}
 	if err := os.WriteFile(filepath.Join(directory, "release"), nil, 0600); err != nil {
 		t.Fatal(err)
@@ -427,6 +456,9 @@ func TestWindowsBuildToolsQueryAcceptsExitedMemberDuringCapture(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Logf("natural exit accounting: before active=%d total=%d; after active=%d total=%d; exact HANDLE signaled", before.Active, before.Total, after.Active, after.Total)
+	if after.Total != before.Total || after.Active >= before.Active {
+		t.Fatal("natural exit did not preserve lifetime membership and reduce active members")
+	}
 	handles, total, err := captureBuildToolsQueryProcessesAfterAccounting(job, before)
 	defer func() {
 		for _, handle := range handles {
@@ -435,10 +467,15 @@ func TestWindowsBuildToolsQueryAcceptsExitedMemberDuringCapture(t *testing.T) {
 			}
 		}
 	}()
-	if err != nil || len(handles) != 0 || total != before.Total {
+	if err != nil || total != before.Total {
 		t.Fatal("natural exit invalidated a complete private member list", len(handles), total, err)
 	}
 	if err := terminateBuildToolsQueryProcesses(job, handles, total, time.Now().Add(5*time.Second)); err != nil {
 		t.Fatal("completed private query rejected after natural exit", err)
+	}
+	for _, handle := range ready {
+		if status, err := windows.WaitForSingleObject(handle, 0); err != nil || status != windows.WAIT_OBJECT_0 {
+			t.Fatal("ready private member survived exact completion", status, err)
+		}
 	}
 }

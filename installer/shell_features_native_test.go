@@ -15,17 +15,14 @@ func TestNativeArchiveSelectedShellFeaturesLifecycle(t *testing.T) {
 	if os.Getenv("DOTFILES_TEST_ARCHIVES") != "1" {
 		t.Skip("enable real upstream native lifecycle")
 	}
-	t.Run("native-default-shell", func(t *testing.T) { selectedShellLifecycle(t, runtime.GOOS == "windows") })
-	if runtime.GOOS != "windows" {
-		if _, err := exec.LookPath("pwsh"); err == nil {
-			t.Run("powershell-script-composition", func(t *testing.T) { selectedShellLifecycle(t, true) })
-		} else {
-			t.Log("PowerShell script composition requires pwsh; native Windows lane covers it")
-		}
-	}
+	t.Run("native-default-shell", selectedShellLifecycle)
 }
 
-func selectedShellLifecycle(t *testing.T, powershell bool) {
+// Cross-OS PowerShell syntax and process behavior use the generated active
+// shell fixtures in Profile.Tests.ps1. Native package lifecycles keep native OS
+// identity and providers; a Linux process cannot observe Windows VC++ runtime.
+func selectedShellLifecycle(t *testing.T) {
+	powershell := runtime.GOOS == "windows"
 
 	repository, err := filepath.Abs("..")
 	if err != nil {
@@ -38,23 +35,28 @@ func selectedShellLifecycle(t *testing.T, powershell bool) {
 	folders := ConfigFolders{Home: home, Config: filepath.Join(home, ".config"), Documents: filepath.Join(home, "documents"), LocalAppData: filepath.Join(home, "local"), AppData: filepath.Join(home, "roaming")}
 	target := nativePlatform(t)
 	if powershell {
-		target.OS = "windows"
-		target.Arch = "amd64"
+		target.WindowsPowerShell, err = DiscoverWindowsPowerShell()
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 	c, err := NewNativeController(repository, "feature-lifecycle", filepath.Join(home, "state"), target, folders)
 	if err != nil {
 		t.Fatal(err)
 	}
 	d := c.Driver.(*NativeDriver)
-	if powershell && runtime.GOOS != "windows" {
-		// Cross-platform PowerShell script proof on actual host executables.
-		// This does not claim Windows filesystem/ACL or terminal verification.
-		pins, err := DefaultArchivePins(nativePlatform(t))
-		if err != nil {
-			t.Fatal(err)
+	var runtimeResource Resource
+	var runtimeBefore Observation
+	if powershell {
+		var ok bool
+		runtimeResource, ok = c.Catalog.Resource("tool.vcredist")
+		if !ok {
+			t.Fatal("missing native VC++ runtime resource")
 		}
-		pins["powershell.psfzf"] = d.Archives.Pins["powershell.psfzf"]
-		d.Archives.Pins = pins
+		runtimeBefore, err = d.Observe(t.Context(), runtimeResource, Receipt{})
+		if err != nil || !runtimeBefore.Present || !runtimeBefore.Healthy {
+			t.Fatal("archive fixture requires a healthy pre-existing VC++ runtime; owned vendor installation belongs to the fresh Windows lane", runtimeBefore, err)
+		}
 	}
 	selected := []string{"starship", "fzf", "zoxide", "lsd"}
 	if runtime.GOOS == "windows" {
@@ -80,14 +82,11 @@ func selectedShellLifecycle(t *testing.T, powershell bool) {
 			} else {
 				script += "if (Get-Command z -ErrorAction SilentlyContinue) { throw 'removed zoxide hook remains' }"
 			}
-			program := "pwsh"
-			if runtime.GOOS == "windows" {
-				program, err = d.Archives.CommandPath("tool.powershell", "pwsh")
-				if err != nil {
-					t.Fatal(err)
-				}
-				script += "; if ((Get-PSReadLineOption).EditMode -ne 'Vi') { throw 'Active profile lost PSReadLine vi mode' }; $keys=Get-PSReadLineKeyHandler -Bound; foreach ($binding in @(@('Tab','MenuComplete'),@('UpArrow','HistorySearchBackward'),@('DownArrow','HistorySearchForward'))) { if (-not ($keys | Where-Object { $_.Key -eq $binding[0] -and $_.Function -eq $binding[1] })) { throw ('Active PSReadLine binding missing: '+$binding[0]) } }; if ((Get-Command ls).CommandType -ne 'Function' -or $env:LS_COLORS -notmatch 'di=38;2;246;193;119') { throw 'Active lsd profile missing' }"
+			program, err := d.Archives.CommandPath("tool.powershell", "pwsh")
+			if err != nil {
+				t.Fatal(err)
 			}
+			script += "; if ((Get-PSReadLineOption).EditMode -ne 'Vi') { throw 'Active profile lost PSReadLine vi mode' }; $keys=Get-PSReadLineKeyHandler -Bound; foreach ($binding in @(@('Tab','MenuComplete'),@('UpArrow','HistorySearchBackward'),@('DownArrow','HistorySearchForward'))) { if (-not ($keys | Where-Object { $_.Key -eq $binding[0] -and $_.Function -eq $binding[1] })) { throw ('Active PSReadLine binding missing: '+$binding[0]) } }; if ((Get-Command ls).CommandType -ne 'Function' -or $env:LS_COLORS -notmatch 'di=38;2;246;193;119') { throw 'Active lsd profile missing' }"
 			cmd = exec.CommandContext(ctx, program, "-NoLogo", "-NoProfile", "-NonInteractive", "-Command", script)
 		} else {
 			script := "starship --version; fzf --version; alias ls; "
@@ -150,6 +149,16 @@ func selectedShellLifecycle(t *testing.T, powershell bool) {
 		}
 		if _, err := os.Lstat(entry.Path); !os.IsNotExist(err) {
 			t.Fatal("newly created profile survived full removal", entry.Path, err)
+		}
+	}
+	if powershell {
+		state, err := LoadState(c.StatePath, c.Home)
+		if err != nil || state.Receipts["tool.vcredist"].Ownership != "reused" {
+			t.Fatal("pre-existing VC++ runtime ownership changed", err)
+		}
+		after, err := d.Observe(t.Context(), runtimeResource, state.Receipts["tool.vcredist"])
+		if err != nil || !after.Present || !after.Healthy || after.Fingerprint != runtimeBefore.Fingerprint {
+			t.Fatal("pre-existing VC++ runtime changed", runtimeBefore, after, err)
 		}
 	}
 }

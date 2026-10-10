@@ -30,5 +30,9 @@ for script in installer/shells/*.zsh; do zsh -n "$script"; done
 source "$REPO_ROOT/tests/shell/active_fixture.sh"
 zsh -n "$ACTIVE_ZSH"
 zsh -n "$ACTIVE_ZSH_CORE"
+# Bash also sources this shared file when zsh is selected. An inactive branch
+# still has to parse, before its shell-specific condition can be evaluated.
+bash -n "$ACTIVE_ZSH"
+bash -n "$ACTIVE_ZSH_CORE"
 shellcheck --shell=sh "$DOTFILES_SHELL_FIXTURES/posix/state/shells/env.sh"
 echo "lint OK"

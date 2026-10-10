@@ -92,7 +92,9 @@ _dotfiles_source_first_readable() {
 autoload -Uz compinit
 mkdir -p "${HOME}/.cache"
 _zcompdump="${HOME}/.cache/zcompdump-${ZSH_VERSION}"
-if [[ -n "$_zcompdump"(#qN.mh+24) ]]; then
+# The shared init is also parsed by Bash. Delay only this fixed zsh grammar;
+# parameter expansion happens inside zsh, never as executable input to eval.
+if eval '[[ -n "$_zcompdump"(#qN.mh+24) ]]'; then
   compinit -d "$_zcompdump"
 else
   compinit -C -d "$_zcompdump"

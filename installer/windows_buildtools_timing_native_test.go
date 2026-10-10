@@ -15,7 +15,7 @@ func traceBuildToolsNativeQuery(t *testing.T, query func(context.Context, bool, 
 		script := shortcutPowerShellScript(t, arguments)
 		for _, point := range []struct{ source, label string }{
 			{"$signature = Get-AuthenticodeSignature", "authenticode"},
-			{"if (-not $chain.Build($signature.SignerCertificate))", "certificate-chain"},
+			{"if (-not $chain.Build($signature.SignerCertificate)) {\n", "certificate-chain"},
 			{"$json = & $locator", "locator-inventory"},
 			{"foreach ($item in $registered)", "package-inventory"},
 			{"foreach ($name in $files.Keys)", "tool-file-hashes"},
@@ -42,5 +42,25 @@ func traceBuildToolsNativeQuery(t *testing.T, query func(context.Context, bool, 
 		output, err := query(ctx, privileged, program, input, windowsVendorArguments(script)...)
 		t.Logf("bounded native Build Tools query completed after %s: %v", time.Since(started), err)
 		return output, err
+	}
+}
+
+func TestBuildToolsTimingMarkersCoverExactScripts(t *testing.T) {
+	for _, script := range []string{windowsBuildToolsObserveScript, windowsBuildToolsEnvironmentScript} {
+		calls := 0
+		traced := traceBuildToolsNativeQuery(t, func(_ context.Context, _ bool, program string, _ []byte, args ...string) ([]byte, error) {
+			calls++
+			if len(program)+len(strings.Join(args, " "))+4 >= 32767 {
+				t.Fatal("timing script exceeds native command-line bound")
+			}
+			source := shortcutPowerShellScript(t, args)
+			if strings.Count(source, "Build Tools stage certificate-chain elapsed-ms=") != 1 {
+				t.Fatal("certificate-chain marker is not unique")
+			}
+			return nil, nil
+		})
+		if _, err := traced(t.Context(), false, `C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe`, nil, windowsVendorArguments(script)...); err != nil || calls != 1 {
+			t.Fatal("timing instrumentation did not dispatch the original inspection", err, calls)
+		}
 	}
 }

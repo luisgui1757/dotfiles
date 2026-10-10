@@ -1,6 +1,9 @@
 package installer
 
-import "testing"
+import (
+	"slices"
+	"testing"
+)
 
 func TestLinuxCodeUsesCanonicalNativePackage(t *testing.T) {
 	catalog, err := DefaultCatalog()
@@ -25,12 +28,24 @@ func TestLinuxCodeUsesCanonicalNativePackage(t *testing.T) {
 	}
 }
 
-func TestLinuxCodeDesktopUsesNativePackageWithoutArchivePin(t *testing.T) {
-	for _, arch := range []string{"amd64", "arm64"} {
-		d := &DesktopDriver{Target: Context{OS: "linux", Arch: arch}, Archives: &ArchiveDriver{Pins: map[string]ArchivePin{}}}
-		p, err := d.recipe("desktop.vscode")
-		if err != nil || p.Command != "/usr/share/code/code" || p.Icon != "/usr/share/pixmaps/vscode.png" {
-			t.Fatal("launcher escaped the canonical native package", p, err)
+func TestLinuxCodeUsesPackageLauncherWithoutPrivateShellAttachment(t *testing.T) {
+	catalog, err := DefaultCatalog()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, target := range []Context{{OS: "linux", Arch: "amd64"}, {OS: "linux", Arch: "arm64"}, {OS: "darwin", Arch: "arm64"}, {OS: "windows", Arch: "amd64"}} {
+		closure, err := catalog.Closure([]string{"vscode"}, target)
+		if err != nil {
+			t.Fatal(err)
 		}
+		for _, id := range []string{"desktop.vscode", "integration.shells"} {
+			if slices.Contains(closure, id) != (target.OS != "linux") {
+				t.Fatal(target, id, closure)
+			}
+		}
+	}
+	d := &DesktopDriver{Target: linux, Archives: &ArchiveDriver{}}
+	if _, err := d.recipe("desktop.vscode"); err == nil {
+		t.Fatal("Linux Code has a redundant private launcher")
 	}
 }

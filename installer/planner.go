@@ -23,6 +23,8 @@ type Observation struct {
 	// ApplyBlocked explains unavailable inputs without blocking restoration of
 	// an already owned target from its independent recovery baseline.
 	ApplyBlocked string `json:"apply_blocked,omitempty"`
+	// ApplyDetail is bounded provider disclosure, never artifact or mutation authority.
+	ApplyDetail string `json:"apply_detail,omitempty"`
 	// Preserved reports user edits retained independently of the uninstall
 	// baseline. These paths are informational and never authorize deletion.
 	Preserved []string `json:"preserved,omitempty"`
@@ -275,6 +277,12 @@ func PlanChanges(c *Catalog, ctx Context, state State, request Request, observed
 			} else if owned {
 				op.Action, op.Reason = "update", "explicit update of an owned resource"
 			}
+		}
+		if len(o.ApplyDetail) > 1024 {
+			return plan, fmt.Errorf("oversized apply detail for %s", id)
+		}
+		if o.ApplyDetail != "" && slices.Contains([]string{"install", "update", "repair"}, op.Action) {
+			op.Reason += "; " + o.ApplyDetail
 		}
 		if r.ReplanAfter && (op.Action == "install" || op.Action == "repair" || op.Action == "update") {
 			op.Reason += "; bootstrap then review newly available provider inventory"

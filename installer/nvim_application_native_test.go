@@ -3,6 +3,7 @@ package installer
 import (
 	"context"
 	"crypto/sha256"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -31,12 +32,16 @@ func TestNativeNeovimInstalledApplicationLifecycle(t *testing.T) {
 	requireFreshLinuxMasonPrerequisitesAbsent(t)
 	folders := ConfigFolders{Home: home, Config: filepath.Join(home, ".config"), Data: filepath.Join(home, ".local", "share"), Zsh: home}
 	stateDirectory := filepath.Join(home, ".local", "state", "dotfiles")
+	var environment []string
 	if runtime.GOOS == "windows" {
+		// Exercise Neovim's native LocalAppData default, as the public command
+		// does without XDG overrides. The disposable HOME stays private.
+		t.Setenv("XDG_DATA_HOME", "")
+		environment = []string{"XDG_DATA_HOME="}
 		folders, err = DiscoverConfigFolders()
 		if err != nil {
 			t.Fatal(err)
 		}
-		folders.Data = filepath.Join(home, ".local", "share")
 		stateDirectory, err = DiscoverStateDirectory(target.Context, folders)
 		if err != nil {
 			t.Fatal(err)
@@ -84,15 +89,53 @@ func TestNativeNeovimInstalledApplicationLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	personal := filepath.Join(filepath.Dir(runtimeDirectory), "personal-session.txt")
-	writeConfigFixture(t, personal, "preserve editor data outside the managed runtime\n")
-	invoke := installedMachineFixture(t, repository, home, 35*time.Minute)
+	if _, err := os.Lstat(runtimeDirectory); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("native Neovim acceptance requires an absent managed runtime", err)
+	}
+	dataDirectory := filepath.Dir(runtimeDirectory)
+	entries, err := readPlainDirectory(dataDirectory)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		path := filepath.Join(dataDirectory, entry.Name())
+		before[path], err = snapshotConfig(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.MkdirAll(dataDirectory, 0700); err != nil {
+		t.Fatal(err)
+	}
+	personalFile, err := os.CreateTemp(dataDirectory, ".dotfiles-native-session-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	personal := personalFile.Name()
+	if _, err := personalFile.WriteString("preserve editor data outside the managed runtime\n"); err != nil {
+		t.Fatal(errors.Join(err, personalFile.Close()))
+	}
+	if err := personalFile.Close(); err != nil {
+		t.Fatal(err)
+	}
+	personalSnapshot, err := snapshotConfig(personal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := verifyConfigSnapshot(personal, personalSnapshot); err != nil {
+			t.Error("preserve changed personal-data witness", err)
+		} else if err := os.Remove(personal); err != nil {
+			t.Error(err)
+		}
+	})
+	invoke := installedMachineFixture(t, repository, home, 35*time.Minute, environment...)
 	t.Setenv("DOTFILES_ENTRYPOINT", "setup")
 	var reviewed Plan
 	var applying *Request
 	t.Cleanup(func() {
 		if runtime.GOOS == "windows" && t.Failed() && applying != nil {
-			nativeNeovimPlanDiagnostic(t, repository, home, *applying, reviewed)
+			nativeNeovimPlanDiagnostic(t, repository, home, *applying, reviewed, environment...)
 		}
 	})
 	apply := func(request Request) {
@@ -173,8 +216,12 @@ func TestNativeNeovimInstalledApplicationLifecycle(t *testing.T) {
 			config = "" // Native Neovim uses its actual LocalAppData config target.
 		}
 		command.Env = append(os.Environ(), d.NvimSync.Environment...)
+		data := folders.Data
+		if runtime.GOOS == "windows" {
+			data = "" // Exercise the native stdpath default in the real consumer too.
+		}
 		command.Env = append(command.Env, "HOME="+home, "USERPROFILE="+home, "LOCALAPPDATA="+folders.LocalAppData, "APPDATA="+folders.AppData,
-			"XDG_CONFIG_HOME="+config, "XDG_DATA_HOME="+folders.Data, "XDG_STATE_HOME="+filepath.Join(home, ".local", "state"),
+			"XDG_CONFIG_HOME="+config, "XDG_DATA_HOME="+data, "XDG_STATE_HOME="+filepath.Join(home, ".local", "state"),
 			"XDG_CACHE_HOME="+filepath.Join(home, ".cache"), "NVIM_APPNAME=nvim", "DOTFILES_NVIM_RUNTIME=", "DOTFILES_NVIM_LOCKFILE=",
 			"VIMINIT=", "EXINIT=", "DOTFILES_LSP_SMOKE=strict", "DOTFILES_TREESITTER_SYNC_INSTALL=", "TERM=xterm-256color")
 		var output boundedCommandOutput
