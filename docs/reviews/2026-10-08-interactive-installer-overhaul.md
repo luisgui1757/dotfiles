@@ -5849,3 +5849,35 @@ authentication, personal SSH config or native package mutation occurs. The
 portable parser proof complements the native failed-before evidence; it does not
 claim the pending corrected Windows lifecycle is green. Windows amd64 test
 compilation, target vet, gofmt, EditorConfig and diff checks pass.
+
+### 2026-10-10 — MSYS OpenSSH uses explicit no-config mode
+
+Exact head `07e5ed15e79d1f4c60eb735d2e228586187209d1`, run `38088366432`, job
+`114319529231`, passes ordinary boundaries and the unchanged long-file/LFS/GCM
+checks, then reports `Can't open user config file NUL: No such file or directory`.
+Raw supplied log SHA-256:
+`eb7cd6895bd6767da63ce528daf4dd0cbf140b3f6a386c01f2744f3557122c22`.
+This later parser boundary was obscured by the preceding IdentityFile syntax
+error; the successful `-i` correction did not establish config-file isolation.
+
+The exact PortableGit archive rehashes to its pin
+`075e158ef8e1f0ab80b347e245405d3eca735c2dc88fd8e032e137d0ca61f61b`.
+Its `etc/package-versions.txt` identifies OpenSSH 10.5p1-1. The matching
+[ssh.c process_config_files](https://github.com/openssh/openssh-portable/blob/V_10_5_P1/ssh.c#L541-L560)
+and [ssh(1)](https://github.com/openssh/openssh-portable/blob/V_10_5_P1/ssh.1)
+explicitly support `-F none`, bypassing both personal and system config reads.
+Change only `NUL` to `none`; keep the exact key path, dedicated `-i`, offline `-G`,
+hostname check and all later Bash/Make/integrity/preservation/removal assertions.
+No private empty-file fallback, path reduction, skipped assertion or product code
+change is needed.
+
+A real local OpenSSH query reproduces the same missing-NUL error and exit 255;
+`-F none` exits 0 and reports the same identity path and expected hostname, even
+with an invalid file named `none` in the private working directory. No connection
+or authentication occurs. A nearby multi-location audit finds no other executable
+NUL boundary; remaining occurrences are archive rejection fixtures or explanatory
+comments. Later Bash assertions use actual MSYS `/etc` and `/dev` paths. GNU Make
+receives a dedicated full-path SHELL value, preserved by its Windows shell lookup;
+no further demonstrable path defect was found, so those assertions stay intact.
+Windows compilation, gofmt/EditorConfig and diff checks pass. Complete native
+Git/Make acceptance remains required; this failed context remains failed.

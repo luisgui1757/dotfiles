@@ -289,3 +289,14 @@ with the identical key path. Real offline OpenSSH inspection reproduces exit 255
 before and exit 0 after; Windows compilation/static checks pass. No product code
 changes. The complete Windows SSH/Make, final payload/personal-config checks and
 owned removal remain pending the next native run; this failed context stays failed.
+
+### Windows Git diagnostic: explicit OpenSSH no-config mode
+
+Temporary head `07e5ed1`, job `114319529231`, confirms the corrected identity
+argument, then fails when bundled MSYS OpenSSH tries to open `NUL` as a config
+file. The fixture now uses its documented `-F none` mode. The checksum-verified
+Git archive records OpenSSH 10.5p1-1, whose exact upstream source bypasses both
+user and system config for this value. An offline process regression reproduces
+the missing-file failure and succeeds with `none`, preserving the identity path.
+No runtime code or later assertion changes. Complete native Git/Make, final
+payload/personal-config integrity and owned removal remain pending.

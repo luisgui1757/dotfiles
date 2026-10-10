@@ -205,7 +205,7 @@ func TestNativeWindowsGitAndMakeLifecycle(t *testing.T) {
 	run(git, "", "lfs", "fsck")
 	run(git, "", "credential-manager", "--version")
 	run(filepath.Join(gitRoot, "usr", "bin", "ssh-keygen.exe"), "", "-q", "-t", "ed25519", "-N", "", "-f", filepath.Join(work, "fixture-key"))
-	if output := run(filepath.Join(gitRoot, "usr", "bin", "ssh.exe"), "", "-F", "NUL", "-G", "-i", filepath.Join(work, "fixture-key"), "fixture.invalid"); !strings.Contains(output, "hostname fixture.invalid") {
+	if output := run(filepath.Join(gitRoot, "usr", "bin", "ssh.exe"), "", "-F", "none", "-G", "-i", filepath.Join(work, "fixture-key"), "fixture.invalid"); !strings.Contains(output, "hostname fixture.invalid") {
 		t.Fatal("bundled SSH could not evaluate its offline connection configuration")
 	}
 	if output := run(filepath.Join(gitRoot, "bin", "bash.exe"), "", "--noprofile", "--norc", "-c", "printf '%s\\n' bash-ready; test -r /etc/mtab; test -d /dev/shm"); !strings.Contains(output, "bash-ready") {

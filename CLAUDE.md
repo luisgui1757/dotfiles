@@ -926,6 +926,9 @@ OpenSSH `-o` parses configuration-file syntax even when its value is one argv
 entry. Use the dedicated `-i` filename argument for fixture identity paths with
 spaces; preserving argv boundaries alone does not quote an `IdentityFile=` value.
 Keep `-G` inspection offline and retain the same physical key path.
+Use OpenSSH's documented `-F none` to disable both personal and system config
+reads. The bundled MSYS OpenSSH does not accept Windows `NUL` as that file path;
+its explicit no-config option avoids null-device path translation entirely.
 
 The Build Tools process-tree fixture holds an exact child HANDLE before releasing
 its parent. A failed immediate wait remains a failure even if later diagnostic
