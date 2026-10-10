@@ -6199,3 +6199,14 @@ receives a dedicated full-path SHELL value, preserved by its Windows shell looku
 no further demonstrable path defect was found, so those assertions stay intact.
 Windows compilation, gofmt/EditorConfig and diff checks pass. Complete native
 Git/Make acceptance remains required; this failed context remains failed.
+
+### 2026-10-10 — Hosted Linux Code health diagnosis
+
+ARM desktop job `114321418527` failed the native Code ownership fixture before
+GUI setup: canonical package health returned exit1 without identifying its
+failed predicate. The same pinned package passed root and sudo container runs.
+The fixed-path read-only probe now reports the failing symlink target or native
+owner/mode, with existing output bounds; every health requirement remains intact.
+Focused process-boundary tests prove failures stay failures and healthy checks
+stay silent. The actual hosted metadata/cause remains pending; no permission,
+sandbox or application path change is justified by the incomplete trace.

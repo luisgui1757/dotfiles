@@ -256,11 +256,14 @@ func (d *LinuxAPTDriver) checkCodeCollisions(ctx context.Context, absent bool) e
 // Package checksum verification does not check this postinst-created symlink.
 // Verify the actual canonical executable and trusted parent ownership as well.
 const linuxCodeHealth = "set -eu\n" +
-	"[ \"$(readlink /usr/bin/code)\" = /usr/share/code/bin/code ]\n" +
+	"fail() { printf 'Code native health: %s\\n' \"$*\" >&2; exit 1; }\n" +
+	"link=$(readlink /usr/bin/code) || fail '/usr/bin/code target unreadable'\n" +
+	"[ \"$link\" = /usr/share/code/bin/code ] || fail \"/usr/bin/code target=$link\"\n" +
 	"for p in /usr /usr/share /usr/share/code /usr/share/code/code /usr/share/code/chrome-sandbox; do\n" +
-	"  [ ! -L \"$p\" ]\n" +
-	"  [ \"$(stat -c %u \"$p\")\" = 0 ]\n" +
-	"  [ \"$(stat -c %a \"$p\")\" = 755 ]\n" +
+	"  [ ! -L \"$p\" ] || fail \"$p is a symbolic link\"\n" +
+	"  owner=$(stat -c %u \"$p\") || fail \"$p owner unreadable\"\n" +
+	"  mode=$(stat -c %a \"$p\") || fail \"$p mode unreadable\"\n" +
+	"  [ \"$owner\" = 0 ] && [ \"$mode\" = 755 ] || fail \"$p owner=$owner mode=$mode (expected owner=0 mode=755)\"\n" +
 	"done\n"
 
 const linuxCodeRemoveLink = "set -eu\n" +
