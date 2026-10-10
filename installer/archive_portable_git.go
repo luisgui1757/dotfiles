@@ -39,7 +39,7 @@ func validatePortableGitPin(pin ArchivePin) error {
 		version = strings.TrimSuffix(pin.Version, ".windows.1")
 	}
 	u, err := url.Parse(pin.URL)
-	if !pin.PortableGit || !portableGitVersion.MatchString(pin.Version) || pin.Format != "file" || pin.File != "portable-git.exe" || pin.StripComponents != 0 || len(pin.ExcludedFiles) != 0 || len(pin.Replacements) != 0 ||
+	if !pin.PortableGit || pin.PortableGitRevision < 0 || pin.PortableGitRevision > 1 || !portableGitVersion.MatchString(pin.Version) || pin.Format != "file" || pin.File != "portable-git.exe" || pin.StripComponents != 0 || len(pin.ExcludedFiles) != 0 || len(pin.Replacements) != 0 ||
 		err != nil || u.Scheme != "https" || u.Host != "github.com" || u.RawQuery != "" || u.User != nil || u.Fragment != "" || u.Path != "/git-for-windows/git/releases/download/v"+pin.Version+"/PortableGit-"+version+"-64-bit.7z.exe" ||
 		pin.Commands["git"] != "cmd/git.exe" || pin.Commands["bash"] != "bin/bash.exe" || pin.Commands["sh"] != "bin/sh.exe" {
 		return errors.New("PortableGit requires the pinned complete official amd64 self-extractor and fixed command layout")
@@ -60,6 +60,9 @@ func (d *ArchiveDriver) preparePortableGit(ctx context.Context, intent archiveIn
 	pin := intent.Pin
 	if err := validatePortableGitPin(pin); err != nil {
 		return err
+	}
+	if pin.PortableGitRevision != 1 {
+		return errors.New("saved PortableGit preparation predates long-path support; preserve the original operation and payload for explicit recovery")
 	}
 	if d.Run == nil {
 		return errors.New("PortableGit preparation requires the native session")
@@ -163,6 +166,11 @@ func (d *ArchiveDriver) preparePortableGit(ctx context.Context, intent archiveIn
 	if err := errors.Join(checkArchivePayload(root, pin), root.Close()); err != nil {
 		return err
 	}
+	// Set only this distribution's configuration before its immutable snapshot.
+	// The command-line flag also permits opening the long staging config path.
+	if err := run("long-paths", filepath.Join(payload, "cmd", "git.exe"), "-c", "core.longpaths=true", "config", "--file", filepath.Join(payload, "etc", "gitconfig"), "core.longpaths", "true"); err != nil {
+		return err
+	}
 	if err := run("runtime", filepath.Join(payload, "bin", "bash.exe"), "--noprofile", "--norc", "-p", "-c", portableGitRuntimeProbe, "dotfiles-portable-git", pin.Version); err != nil {
 		return err
 	}
@@ -205,12 +213,18 @@ func portableGitPreparationEnvironment(payload, home, temporary string) []string
 
 const portableGitRuntimeProbe = `set -eu
 export PATH=/ucrt64/bin:/usr/bin:/bin
+printf '%s\n' 'PortableGit runtime: prepared filesystem' >&2
 test -d /dev/shm && test -d /dev/mqueue
 test "$(readlink /etc/mtab)" = /proc/mounts
 test -f /ucrt64/libexec/git-core/dlls-copied
+printf '%s\n' 'PortableGit runtime: Git version' >&2
 test "$(git --version)" = "git version $1"
+test "$(git -c core.longpaths=true config --file /etc/gitconfig --type=bool --get core.longpaths)" = true
+printf '%s\n' 'PortableGit runtime: Git LFS' >&2
 git lfs version >/dev/null
+printf '%s\n' 'PortableGit runtime: Git Credential Manager' >&2
 git credential-manager --version >/dev/null
+printf '%s\n' 'PortableGit runtime: SSH' >&2
 ssh -V
 printf '%s\n' portable-git-ready
 `

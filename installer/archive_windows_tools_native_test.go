@@ -65,6 +65,11 @@ func TestNativeWindowsGitAndMakeLifecycle(t *testing.T) {
 		}
 	})
 	d.Run = func(ctx context.Context, command nativeCommand) ([]byte, error) {
+		if filepath.Base(command.Program) == "bash.exe" && len(command.Arguments) == 7 && command.Arguments[4] == portableGitRuntimeProbe {
+			// The fixed --version probe never authenticates. Upstream GCM prints
+			// its exception stack only with tracing enabled; keep secret tracing off.
+			command.Environment = append(command.Environment, "GCM_TRACE=1", "GCM_TRACE_SECRETS=0")
+		}
 		output, err := session.run(ctx, command)
 		if err != nil && filepath.Base(command.Program) == "portable-git.exe" {
 			diagnosePortableGitFailure(t, command, d.Pins["tool.git"])
@@ -105,7 +110,7 @@ func TestNativeWindowsGitAndMakeLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 	environment := []string{"SystemRoot=" + os.Getenv("SystemRoot"), "WINDIR=" + os.Getenv("SystemRoot"), "COMSPEC=" + filepath.Join(os.Getenv("SystemRoot"), "System32", "cmd.exe"),
-		"HOME=" + personal, "USERPROFILE=" + personal, "TEMP=" + work, "TMP=" + work, "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_COUNT=0",
+		"HOME=" + personal, "USERPROFILE=" + personal, "TEMP=" + work, "TMP=" + work, "GIT_CONFIG_GLOBAL=" + personalConfig, "GIT_CONFIG_COUNT=0",
 		"PATH=" + strings.Join([]string{filepath.Join(gitRoot, "cmd"), filepath.Join(gitRoot, "bin"), filepath.Join(gitRoot, "usr", "bin"), filepath.Join(gitRoot, "ucrt64", "bin"), filepath.Join(makeRoot, "bin"), filepath.Join(os.Getenv("SystemRoot"), "System32")}, ";")}
 	run := func(program, input string, args ...string) string {
 		t.Helper()
@@ -123,6 +128,9 @@ func TestNativeWindowsGitAndMakeLifecycle(t *testing.T) {
 	if output := run(git, "", "--version"); !strings.Contains(output, latest.Version) {
 		t.Fatal("published Git version differs", output)
 	}
+	if output := run(git, "", "config", "--type=bool", "--get", "core.longpaths"); strings.TrimSpace(output) != "true" {
+		t.Fatal("published Git did not consume its private long-path setting", output)
+	}
 	run(git, "", "init", "--initial-branch=main", ".")
 	run(git, "", "config", "--local", "user.name", "Offline fixture")
 	run(git, "", "config", "--local", "user.email", "fixture@example.invalid")
@@ -132,6 +140,22 @@ func TestNativeWindowsGitAndMakeLifecycle(t *testing.T) {
 	}
 	run(git, "", "add", "--", "file ü.txt")
 	run(git, "", "commit", "-m", "offline fixture")
+	// Keep the physical ownership path and test builtin Git consumers beyond
+	// MAX_PATH without a command-line or environment long-path override.
+	longRoot := filepath.Join(c.Home, strings.Repeat("managed-generation"+string(filepath.Separator), 18))
+	if err := os.MkdirAll(longRoot, 0700); err != nil {
+		t.Fatal(err)
+	}
+	run(git, "", "init", "--initial-branch=main", filepath.Join(longRoot, "new ü"))
+	longCheckout := filepath.Join(longRoot, "checkout ü")
+	run(git, "", "clone", "--no-local", work, longCheckout)
+	commit := strings.TrimSpace(run(git, "", "rev-parse", "HEAD"))
+	run(git, "", "-C", longCheckout, "checkout", "--detach", commit)
+	run(git, "", "-C", longCheckout, "diff", "--quiet", "HEAD", "--")
+	if output := run(git, "", "-C", longCheckout, "rev-parse", "HEAD"); strings.TrimSpace(output) != commit {
+		t.Fatal("long-path Git checkout differs from its pinned commit", output)
+	}
+
 	if err := os.WriteFile(file, []byte("first\nsecond\n"), 0600); err != nil {
 		t.Fatal(err)
 	}

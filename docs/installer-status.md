@@ -114,11 +114,12 @@ That is historical engine evidence, not final product certification.
 | Windows public bootstrap | Download and verification now complete quickly, but script-module ZIP extraction consumes the fixture deadline | Replace per-entry PowerShell module work with the built-in .NET extractor. Exact-byte, literal-path, error and preservation regressions pass; system PowerShell 5.1 and full public migration/setup remain required on the existing deadline. |
 | Windows quality | Git Bash wrapper shadowed PATH doubles; equivalent MSYS/native directories compared unequal | Corrected fixture boundaries. The Windows quality job passed at `077683f`; final-head quality remains required. |
 | Apple developer tools | Preservation now passes; receipt directory `private` is wrongly treated as an outside payload file | Inspect documented `--only-files` output; outside/noncanonical files and query failures remain fatal before moves, with bounded diagnostics. Focused red/green passes; native provisioning rerun required. |
-| Windows Terminal | Actual UIA Settings Save succeeds, then equivalent `closeTab` action serialization loses ownership | Normalize only the exact argument-free string/object forms, preserving original fingerprints and raw restoration. Focused lifecycle/red-green passes; failure-only owned-field diff retains actual UIA proof for the required native rerun. |
+| Windows Terminal | Earlier actual UIA Save serialized an equivalent `closeTab` object and lost ownership | At `28c92f5`, actual Settings Save changed bytes and mtime, followed by check/removal PASS (26.66 seconds). Windows font lifecycle also passed (22.91 seconds); the separate desktop-application step failed later. |
 | Linux Neovim | Normal startup bytecode cache exceeded filename limits; fresh APT jobs then rejected residual-state Git installation | Both Ubuntu Neovim lifecycle jobs passed at `077683f`. APT remove/reinstall correction has real Debian/Ubuntu conffile-preservation proof; all four fresh prerequisite lanes need the next hosted run. |
 | macOS Neovim | Final verification rejects the Node payload; reference diagnostic failed on a logical temporary-path alias | Resolve only the private reference parent, with actual red/green alias and preservation regressions. Node integrity remains enforced; payload drift cause still needs the native entry diff. |
 | Windows Neovim | v3 reviewed/fresh plans differ only in compiler consumers: absent → `vctip.exe` | Compiler inspection captures consumers before its probe spawns the surviving child. Isolate that query's process tree without relaxing consumer or approval checks. Windows native regression and full Neovim rerun remain required; no automatic apply retry. |
 | WezTerm desktop | Earlier native startup failures | Removed from all OSes by explicit owner scope decision. Historical failures are not fixes or passes; remaining desktop apps still need native acceptance. |
+| Windows desktop shortcut | At `28c92f5`, public VS Code installation stopped at native shortcut hash verification before app launch | Real PowerShell progress reproduces the mismatch through the durable worker. Script-local progress suppression and strict bounded failure diagnostics are implemented; focused race tests and Windows compilation pass. The Windows GUI fixture also separates PID/window protocol stdout from PowerShell progress through the existing bounded query helper. Actual PowerShell 5.1 COM and complete public GUI reruns remain required. |
 | Review F1 | Shortcut preparation retry can strand operations | Operation/attempt-scoped preparation and existing journal-bound source recovery integrated. Durable failure/unfinished-result, hash and resume regressions pass; real Windows COM rerun required. |
 | Review F5 | A newly created higher-priority Bash profile strands the recorded target | Reuse the receipt-validated baseline path. Fresh-controller install/update/removal, forged-evidence and interrupted-operation regressions pass; personal profile bytes survive. |
 | Review F2/F3/F4 | Old TPM fallback, missing Linux Mason prerequisites and misleading Windows Make privilege | Corrections integrated with focused regressions. Fresh Ubuntu/Debian jobs now exercise the complete Neovim lifecycle from absent curl/unzip. |
@@ -203,3 +204,37 @@ removing the archive module's measured per-entry script overhead. Exact-byte
 extraction and boundary regressions pass locally; this is not a Windows timing
 result. Native PowerShell 5.1 extraction and the complete public migration/setup
 lifecycle remain required on the original paths and deadline.
+
+The `28c92f5` Windows core job passed the public setup/migrate lifecycle in
+71.76 seconds, including cold download (1.352 s), verified extraction (15.858 s)
+and build (16.767 s). The ordinary extraction fixture failed earlier because it
+omitted mandatory archive verification and treated Utility module first-load
+progress as extraction progress. The fixture now reproduces that preceding
+Get-FileHash phase; its Stop guard and malformed/escaping/existing-file checks
+remain. Actual Windows execution of this fixture correction is pending.
+
+Windows Git/Make at `28c92f5` reaches the strict PortableGit runtime phase after
+extraction and upstream post-install completion, then exits 255 with a .NET-style
+path-length error. The exact subcommand was not logged. Fixed runtime labels and
+upstream GCM stack tracing in the same disposable private version probe are now
+prepared; no runtime check is removed, no payload path is shortened, and no GCM
+long-path correction is claimed before the native diagnostic rerun.
+
+At `28c92f5`, fresh Windows Build Tools install/compile/remove and ordinary native
+reuse/environment both pass. The five private process-tree boundary scenarios
+still fail because their exact child HANDLE is not signaled when inspection
+returns. A failure-only five-second HANDLE wait now records exit state and elapsed
+time without changing the immediate assertion. Final object rundown versus a
+containment defect remains unresolved pending native output.
+
+
+## 2026-10-10 — Windows Neovim Git long paths
+
+At `28c92f5`, both Linux Neovim lifecycles pass. Windows reaches synchronization
+but Git rejects the managed Lazy staging path as too long. PortableGit now enables
+its documented long-path support in its private system configuration before the
+archive fingerprint; the isolated pinned-checkout helper supplies the same setting
+explicitly. Recipe revision 1 makes this an ordinary update for completed older
+payloads and rejects replaying unfinished older preparation. Local real-Git
+configuration, archive lifecycle and long-path Lua regressions cover the change;
+actual Windows long-path Git and full Neovim lifecycle proof remain required.

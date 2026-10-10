@@ -438,7 +438,7 @@ func desktopOwnedProcesses(ctx context.Context, powerShell, root string) ([]int,
 	switch runtime.GOOS {
 	case "windows":
 		script := `$ErrorActionPreference='Stop';$root=` + desktopPSQuote(root+string(filepath.Separator)) + `;@((Get-CimInstance Win32_Process | Where-Object {$_.ExecutablePath -and $_.ExecutablePath.StartsWith($root,[StringComparison]::OrdinalIgnoreCase)} | ForEach-Object {[int]$_.ProcessId})) | ConvertTo-Json -Compress`
-		output, err := exec.CommandContext(ctx, powerShell, windowsVendorArguments(script)...).CombinedOutput()
+		output, err := runIntegrationQuery(ctx, nativeCommand{Program: powerShell, Arguments: windowsVendorArguments(script)})
 		if err != nil {
 			return nil, fmt.Errorf("inspect owned GUI processes: %w: %s", err, output)
 		}
@@ -504,7 +504,7 @@ func desktopOwnedWindow(ctx context.Context, powerShell string, ids []int) (bool
 			names = append(names, strconv.Itoa(id))
 		}
 		script := `$ErrorActionPreference='Stop';$found=$false;foreach($id in @(` + strings.Join(names, ",") + `)){$p=Get-Process -Id $id -ErrorAction SilentlyContinue;if($p -and $p.MainWindowHandle -ne 0){$found=$true}};if($found){'visible'}else{'absent'}`
-		output, err := exec.CommandContext(ctx, powerShell, windowsVendorArguments(script)...).CombinedOutput()
+		output, err := runIntegrationQuery(ctx, nativeCommand{Program: powerShell, Arguments: windowsVendorArguments(script)})
 		return strings.TrimSpace(string(output)) == "visible", err
 	case "darwin":
 		data, _ := json.Marshal(ids)

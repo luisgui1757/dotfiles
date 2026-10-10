@@ -17,6 +17,9 @@ func validateArchivePreparation(pin ArchivePin) error {
 	if err := validateWindowsRustLauncherPin(pin); err != nil {
 		return err
 	}
+	if !pin.PortableGit && pin.PortableGitRevision != 0 {
+		return errors.New("PortableGit recipe revision requires its fixed preparation")
+	}
 	preparations := 0
 	for _, enabled := range []bool{len(pin.RustComponents) > 0, pin.Latex2text != nil, pin.Yamllint != nil, pin.PythonStdlib != "", pin.PortableGit, pin.GhosttyLibraries} {
 		if enabled {
@@ -88,6 +91,7 @@ func (d *ArchiveDriver) preparePayload(ctx context.Context, intent archiveIntent
 	source.RustTarget = ""
 	source.WindowsRustLauncher = nil
 	source.PortableGit = false
+	source.PortableGitRevision = 0
 	source.GhosttyLibraries = false
 	if pin.GhosttyLibraries {
 		source.RequiredFiles = slices.DeleteFunc(slices.Clone(source.RequiredFiles), func(name string) bool { return name == "usr/bin/ghostty-bin" })

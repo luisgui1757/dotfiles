@@ -347,6 +347,7 @@ func (d *DesktopDriver) prepareShortcut(ctx context.Context, p desktopRecipe, id
 	}
 	stage, source := filepath.Join(directory, "staged.lnk"), filepath.Join(directory, "shortcut.lnk")
 	script := `$ErrorActionPreference='Stop'
+$ProgressPreference='SilentlyContinue'
 $destination=` + desktopPSQuote(stage) + `
 $target=` + desktopPSQuote(p.Command) + `
 $icon=` + desktopPSQuote(p.Icon) + `
@@ -363,7 +364,7 @@ $link.TargetPath=$target; $link.Arguments=''; $link.WorkingDirectory=[IO.Path]::
 		return "", err
 	}
 	if fmt.Sprintf("%x", sha256.Sum256(data)) != strings.TrimSpace(string(output)) {
-		return "", errors.New("shortcut bytes differ from native preparation result")
+		return "", fmt.Errorf("shortcut bytes differ from native preparation result (native output: %d bytes, PowerShell CLIXML: %t)", len(output), strings.Contains(string(output), "#< CLIXML"))
 	}
 	// Copy the verified bytes into a flushed exclusive file before atomic
 	// publication; never publish a COM-owned partial or follow its replacement.

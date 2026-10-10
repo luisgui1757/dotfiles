@@ -6,6 +6,7 @@
     "format": "file",
     "file": "portable-git.exe",
     "portable_git": true,
+    "portable_git_revision": 1,
     "commands": {
       "git": "cmd/git.exe",
       "bash": "bin/bash.exe",

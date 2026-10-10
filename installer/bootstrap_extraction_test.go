@@ -4,6 +4,8 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -79,9 +81,13 @@ func TestBootstrapToolchainExtraction(t *testing.T) {
 			if err := os.WriteFile(preserved, []byte("preserved"), 0600); err != nil {
 				t.Fatal(err)
 			}
-			script := `param([string]$Archive, [string]$Toolchain, [string]$Launcher)
+			script := `param([string]$Archive, [string]$Toolchain, [string]$Launcher, [string]$ExpectedSHA256)
 $ErrorActionPreference = 'Stop'
-# Extraction must not execute per-entry PowerShell progress machinery.
+# Production verifies the archive before extraction. Its Get-FileHash imports
+# the same Utility module as Add-Type; legitimate first-load progress is allowed.
+$ProgressPreference = 'Continue'
+if ((Get-FileHash -LiteralPath $Archive -Algorithm SHA256).Hash.ToLowerInvariant() -cne $ExpectedSHA256) { throw 'Fixture archive verification failed' }
+# Extraction itself must not execute per-entry PowerShell progress machinery.
 $ProgressPreference = 'Stop'
 if ($env:OS -eq 'Windows_NT' -and ($PSVersionTable.PSVersion.Major -ne 5 -or $PSVersionTable.PSVersion.Minor -ne 1)) { throw 'Requires system Windows PowerShell 5.1' }
 [Console]::Error.WriteLine("Extraction engine: PowerShell $($PSVersionTable.PSVersion), CLR $([Environment]::Version)")
@@ -103,7 +109,7 @@ if ($actions.Count -ne 1) { throw 'Expected one bootstrap extraction action' }
 			}
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
-			command := exec.CommandContext(ctx, powershell, "-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", scriptPath, archive, destination, launcher)
+			command := exec.CommandContext(ctx, powershell, "-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", scriptPath, archive, destination, launcher, fmt.Sprintf("%x", sha256.Sum256(archiveBytes)))
 			command.Env = append(os.Environ(), "HOME="+root, "XDG_CONFIG_HOME="+filepath.Join(root, "config"), "XDG_CACHE_HOME="+filepath.Join(root, "cache"), "XDG_DATA_HOME="+filepath.Join(root, "data"))
 			var stderr bytes.Buffer
 			command.Stderr = &stderr

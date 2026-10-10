@@ -8,7 +8,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"unicode/utf16"
@@ -58,15 +60,7 @@ func shortcutFixture(t *testing.T) (Controller, *DesktopDriver, string, string, 
 	var calls []nativeCommand
 	d.Run = func(_ context.Context, command nativeCommand) ([]byte, error) {
 		calls = append(calls, command)
-		encoded, err := base64.StdEncoding.DecodeString(command.Arguments[4])
-		if err != nil || len(encoded)%2 != 0 {
-			t.Fatal("invalid encoded PowerShell", err)
-		}
-		units := make([]uint16, len(encoded)/2)
-		for i := range units {
-			units[i] = binary.LittleEndian.Uint16(encoded[i*2:])
-		}
-		script := string(utf16.Decode(units))
+		script := shortcutPowerShellScript(t, command.Arguments)
 		line := strings.Split(strings.SplitN(script, "$destination=", 2)[1], "\n")[0]
 		stage := strings.ReplaceAll(strings.TrimSuffix(strings.TrimPrefix(line, "'"), "'"), "''", "'")
 		command.Arguments = []string{"-test.run=^TestDesktopShortcutProcessFixture$", "--", stage, control}
@@ -264,5 +258,58 @@ func TestDesktopShortcutRejectsNativeHashMismatchBeforePublication(t *testing.T)
 	ready, err := filepath.Glob(filepath.Join(d.Directory, "desktop", "inputs", "*", "shortcut.lnk"))
 	if err != nil || len(ready) != 0 {
 		t.Fatal("unverified private input was published", ready, err)
+	}
+}
+
+func shortcutPowerShellScript(t *testing.T, arguments []string) string {
+	t.Helper()
+	encoded, err := base64.StdEncoding.DecodeString(arguments[4])
+	if err != nil || len(encoded)%2 != 0 {
+		t.Fatal("invalid encoded PowerShell", err)
+	}
+	units := make([]uint16, len(encoded)/2)
+	for i := range units {
+		units[i] = binary.LittleEndian.Uint16(encoded[i*2:])
+	}
+	return string(utf16.Decode(units))
+}
+
+func TestDesktopShortcutPowerShellProgressPreservesHashProtocol(t *testing.T) {
+	name := "pwsh"
+	if runtime.GOOS == "windows" {
+		name = "powershell.exe"
+	}
+	program, err := exec.LookPath(name)
+	if err != nil {
+		if runtime.GOOS == "windows" {
+			t.Fatal(err)
+		}
+		t.Skip("optional PowerShell process boundary; Windows PowerShell 5.1 is required on Windows")
+	}
+	c, d, _, _, _ := shortcutFixture(t)
+	d.PowerShell = program
+	d.Run = func(_ context.Context, command nativeCommand) ([]byte, error) {
+		script := shortcutPowerShellScript(t, command.Arguments)
+		// Substitute only COM creation; file hashing,
+		// progress serialization and the durable native worker are real.
+		begin := strings.Index(script, "$link=(New-Object -ComObject WScript.Shell)")
+		end := strings.Index(script, "(Get-FileHash")
+		if begin < 0 || end <= begin {
+			t.Fatal("missing COM boundary")
+		}
+		script = script[:begin] + "[IO.File]::WriteAllText($destination, 'private shortcut fixture')\nWrite-Progress -Activity 'Preparing modules for first use.' -Status 'Loading' -PercentComplete 10\n" + script[end:]
+		command.Arguments = windowsVendorArguments(script)
+		reply, err := executeNativeCommand(filepath.Join(d.Directory, "worker"), command)
+		if strings.Contains(string(reply.Output), "#< CLIXML") {
+			t.Logf("fixture hash plus real PowerShell progress: %q", reply.Output)
+		}
+		if err == nil && reply.Error != "" {
+			err = errors.New(reply.Error)
+		}
+		return reply.Output, err
+	}
+	dispatchApproved(t, c, Request{Schema: 1, Mode: "apply", Selected: []string{"app"}})
+	if check, err := c.Dispatch(context.Background(), Request{Schema: 1, Mode: "check"}); err != nil || check.Status != "ready" {
+		t.Fatal(check, err)
 	}
 }

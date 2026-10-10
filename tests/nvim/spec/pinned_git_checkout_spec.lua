@@ -111,6 +111,16 @@ describe("pinned Git checkout", function()
     assert.are.equal(expected_commit, git("-C", opts.target, "rev-parse", "refs/remotes/origin/" .. opts.branch))
   end)
 
+  it("creates and verifies a checkout beyond the Windows MAX_PATH boundary", function()
+    opts.target = root .. "/" .. string.rep("managed-generation/", 18) .. "example.nvim"
+    assert.is_true(#opts.target > 320)
+    assert.are.equal(vim.fs.normalize(opts.target), checkout.ensure(opts))
+    local valid, reason = checkout.verify(opts)
+    assert.is_true(valid, reason)
+    assert.are.equal("return true", vim.fn.readfile(opts.target .. "/lua/example/init.lua")[1])
+    assert.are.same({}, stages_for(opts.target))
+  end)
+
   it("reuses a verified cache without init, fetch, or checkout", function()
     checkout.ensure(opts)
     local mutating = {}

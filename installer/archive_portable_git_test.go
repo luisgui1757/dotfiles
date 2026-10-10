@@ -121,12 +121,43 @@ func portableGitFixtureDriver(t *testing.T) (Controller, *ArchiveDriver, *[]nati
 	return c, d, &commands
 }
 
+func TestPortableGitPreparesLongPathsInItsPrivateSystemConfig(t *testing.T) {
+	_, d, _ := portableGitFixtureDriver(t)
+	git, err := exec.LookPath("git")
+	if err != nil {
+		t.Fatal(err)
+	}
+	original := d.Run
+	d.Run = func(ctx context.Context, command nativeCommand) ([]byte, error) {
+		if filepath.Base(command.Program) == "git.exe" {
+			probe := exec.CommandContext(ctx, git, command.Arguments...)
+			probe.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_COUNT=0", "GIT_CONFIG_PARAMETERS=")
+			return probe.CombinedOutput()
+		}
+		output, err := original(ctx, command)
+		if filepath.Base(command.Program) == "portable-git.exe" && err == nil {
+			err = os.WriteFile(filepath.Join(filepath.Dir(command.Program), "etc", "gitconfig"), []byte("[core]\n\tlongpaths = false\n[fixture]\n\tretained = true\n"), 0600)
+		}
+		return output, err
+	}
+	payload := filepath.Join(t.TempDir(), "private Git ü")
+	if err := d.preparePayload(t.Context(), archiveIntent{Operation: strings.Repeat("a", 64), Pin: d.Pins["tool.shared"]}, payload); err != nil {
+		t.Fatal(err)
+	}
+	for key, expected := range map[string]string{"core.longpaths": "true", "fixture.retained": "true"} {
+		command := exec.CommandContext(t.Context(), git, "config", "--file", filepath.Join(payload, "etc", "gitconfig"), "--get", key)
+		if output, err := command.CombinedOutput(); err != nil || strings.TrimSpace(string(output)) != expected {
+			t.Fatal("private system configuration was not prepared without losing upstream settings", key, err, string(output))
+		}
+	}
+}
+
 func TestPortableGitUsesArchivePublicationAndRemoval(t *testing.T) {
 	c, d, commands := portableGitFixtureDriver(t)
 	d.Directory = filepath.Join(c.Home, "private Git ü path")
 	dispatchApproved(t, c, Request{Schema: 1, Mode: "apply", Selected: []string{"first"}})
 	payload, err := d.PayloadPath("tool.shared")
-	if err != nil || len(*commands) != 2 {
+	if err != nil || len(*commands) != 3 {
 		t.Fatal("verified extraction and runtime probe were not completed", err, len(*commands))
 	}
 	for _, command := range *commands {
@@ -141,7 +172,7 @@ func TestPortableGitUsesArchivePublicationAndRemoval(t *testing.T) {
 		t.Fatal("self-extractor remained in published payload", err)
 	}
 	check, err := c.Dispatch(context.Background(), Request{Schema: 1, Mode: "check"})
-	if err != nil || check.Status != "ready" || len(*commands) != 2 {
+	if err != nil || check.Status != "ready" || len(*commands) != 3 {
 		t.Fatal("check changed payload or lost ownership", check.Status, err)
 	}
 	dispatchApproved(t, c, Request{Schema: 1, Mode: "apply", Selected: []string{}})
@@ -151,7 +182,7 @@ func TestPortableGitUsesArchivePublicationAndRemoval(t *testing.T) {
 }
 
 func TestPortableGitFailureCannotPublishReadyPayload(t *testing.T) {
-	for _, problem := range []string{"checksum", "extract", "post-install", "runtime", "missing-dll"} {
+	for _, problem := range []string{"checksum", "extract", "post-install", "long-paths", "runtime", "missing-dll"} {
 		t.Run(problem, func(t *testing.T) {
 			_, d, commands := portableGitFixtureDriver(t)
 			pin := d.Pins["tool.shared"]
@@ -170,7 +201,7 @@ func TestPortableGitFailureCannotPublishReadyPayload(t *testing.T) {
 					case "missing-dll":
 						err = os.Remove(filepath.Join(filepath.Dir(command.Program), "usr", "bin", "msys-2.0.dll"))
 					}
-				} else if problem == "runtime" {
+				} else if problem == "long-paths" && filepath.Base(command.Program) == "git.exe" || problem == "runtime" && filepath.Base(command.Program) == "bash.exe" {
 					return nil, errors.New("fixture runtime failed")
 				}
 				return output, err
@@ -271,7 +302,7 @@ func TestPortableGitCompletesUpstreamPostInstallAfterExtraction(t *testing.T) {
 			}
 			wantCommands := 2
 			if outcome == "complete" || outcome == "changed-copy" {
-				wantCommands = 3
+				wantCommands = 4
 			}
 			if outcome == "occupied-copy" {
 				wantCommands = 1
@@ -315,5 +346,104 @@ func TestPortableGitNullConfigIgnoresPersonalSettings(t *testing.T) {
 	command.Env = append(command.Env, portableGitPreparationEnvironment(home, home, home)...)
 	if output, err := command.CombinedOutput(); err != nil || len(output) != 0 {
 		t.Fatal("Git's private null configuration must ignore personal settings", err, string(output))
+	}
+}
+
+func TestPortableGitRevisionUpgradesReadableLegacyGeneration(t *testing.T) {
+	_, d, commands := portableGitFixtureDriver(t)
+	r := Resource{ID: "tool.shared"}
+	receipt := Receipt{OperationID: strings.Repeat("a", 64), Status: "in-progress"}
+	before, err := d.Observe(context.Background(), r, receipt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := d.Apply(context.Background(), r, Operation{Action: "install", Observed: before}, receipt); err != nil {
+		t.Fatal(err)
+	}
+	// Model the actual old persisted shape: no portable_git_revision in either the
+	// published version or its matching intent. Payload ownership is unchanged.
+	version, err := d.version(r.ID, receipt.OperationID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	intent, err := d.readIntent(r.ID, receipt.OperationID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	version.Pin.PortableGitRevision = 0
+	intent.Pin.PortableGitRevision = 0
+	oldPin, err := json.Marshal(version.Pin)
+	if err != nil || strings.Contains(string(oldPin), "portable_git_revision") {
+		t.Fatal("legacy shape changed", err)
+	}
+	var restored ArchivePin
+	if err := Decode(oldPin, &restored); err != nil || restored.Validate() != nil || archivePinID(restored) != archivePinID(version.Pin) {
+		t.Fatal("legacy identity changed during reading", err)
+	}
+	versionPath := filepath.Join(d.versionDirectory(r.ID, receipt.OperationID), "version.json")
+	if err := saveDocument(versionPath, version); err != nil {
+		t.Fatal(err)
+	}
+	if err := saveDocument(d.intentPath(r.ID, receipt.OperationID), intent); err != nil {
+		t.Fatal(err)
+	}
+	oldDocument, err := os.ReadFile(versionPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	observed, err := d.Observe(context.Background(), r, receipt)
+	if err != nil || !observed.Present || observed.Healthy || observed.Adoptable || observed.Pending != "" {
+		t.Fatal("old complete generation is not available for an ordinary update", observed, err)
+	}
+	if len(*commands) != 3 {
+		t.Fatal("read-only check executed preparation")
+	}
+	receipt.After, receipt.Ownership, receipt.OperationID = observed, "created", strings.Repeat("b", 64)
+	after, err := d.Apply(context.Background(), r, Operation{Action: "update", Observed: observed}, receipt)
+	if err != nil || !after.Healthy || after.CompletedOperation != receipt.OperationID {
+		t.Fatal("PortableGit recipe change did not produce a healthy replacement", after, err)
+	}
+	if data, err := os.ReadFile(versionPath); err != nil || string(data) != string(oldDocument) {
+		t.Fatal("update rewrote old provenance", err)
+	}
+}
+
+func TestPortableGitPreparationRefusesOldOrUnknownRecipes(t *testing.T) {
+	for _, revision := range []int{-1, 0, 2} {
+		_, d, commands := portableGitFixtureDriver(t)
+		pin := d.Pins["tool.shared"]
+		pin.PortableGitRevision = revision
+		payload := t.TempDir()
+		if err := d.preparePortableGit(context.Background(), archiveIntent{Pin: pin}, payload); err == nil || revision == 0 && !strings.Contains(err.Error(), "preserve the original operation and payload") {
+			t.Fatal("unreviewed saved preparation was executed", revision, err)
+		}
+		if len(*commands) != 0 {
+			t.Fatal("invalid recipe reached native Git")
+		}
+		entries, err := os.ReadDir(payload)
+		if err != nil || len(entries) != 0 {
+			t.Fatal("old saved preparation changed its payload", entries, err)
+		}
+	}
+}
+
+func TestPortableGitRevisionIsBoundInDefaultPin(t *testing.T) {
+	pins, err := DefaultArchivePins(NativePlatform{Context: Context{OS: "windows", Arch: "amd64"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	pin := pins["tool.git"]
+	if pin.PortableGitRevision != 1 {
+		t.Fatal("default pin did not request long-path support")
+	}
+	current := archivePinID(pin)
+	pin.PortableGitRevision = 0
+	if archivePinID(pin) == current {
+		t.Fatal("PortableGit recipe is absent from desired identity")
+	}
+	pin.PortableGit = false
+	pin.PortableGitRevision = 1
+	if err := pin.Validate(); err == nil {
+		t.Fatal("recipe revision accepted without PortableGit")
 	}
 }

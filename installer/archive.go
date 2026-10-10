@@ -47,6 +47,7 @@ type ArchivePin struct {
 	Latex2text          *Latex2textPin          `json:"latex2text,omitempty"`
 	Yamllint            *YamllintPin            `json:"yamllint,omitempty"`
 	PortableGit         bool                    `json:"portable_git,omitempty"`
+	PortableGitRevision int                     `json:"portable_git_revision,omitempty"`
 	GhosttyLibraries    bool                    `json:"ghostty_libraries,omitempty"`
 }
 

@@ -5494,3 +5494,178 @@ source hashes also change because this correction was made while its remaining
 checks completed. A fresh complete gate and foreign compilation must cover the
 corrected source before publication. The all-file EditorConfig preflight passed
 all 684 eligible files before this wording correction.
+
+
+### 2026-10-10 — Windows shortcut PowerShell progress boundary
+
+At candidate `28c92f5`, completed Windows Desktop job `114302868951` passed
+native font install/render/check/removal (22.91 seconds) and the Terminal fixture's
+real Settings UI Save/check/removal (26.66 seconds). The Save changed both the
+settings hash and write time. Public VS Code singleton application then failed
+before launch with `shortcut bytes differ from native preparation result`.
+The complete failed job remains failed; the narrower passes are separate proof.
+
+Shortcut preparation compared its staged file digest with the complete native
+worker output. Its encoded PowerShell script called `Get-FileHash` without the
+progress preference already used by vendor scripts. A real PowerShell regression
+substitutes only COM file creation, keeps the production script's remaining work,
+and runs the actual durable native worker. It records a correct SHA-256 mixed
+with `#< CLIXML` progress and reproduces the same rejection. The hosted error did
+not record the mismatched output, so attributing that particular instance to
+CLIXML remains an inference supported by source and this process reproduction;
+the alternate actual-byte-change explanation is not silently accepted.
+
+The correction sets the script-local progress preference to `SilentlyContinue`,
+consistent with [Microsoft's preference-variable contract](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_preference_variables?view=powershell-5.1#progresspreference).
+It does not change the worker protocol or trim CLIXML, errors or arbitrary text.
+Terminating errors, failed exits and exact file-digest verification still fail.
+A future mismatch reports only bounded output length and CLIXML presence, not
+personal output contents. The native Windows ordinary fixture uses real system
+PowerShell 5.1/COM to create, inspect, check and remove private shortcuts; it does
+not launch an app or write to the user's Start menu.
+
+The real progress regression failed before the correction and passed afterward.
+The focused shortcut race suite passed in 11.148 seconds, including failed and
+unfinished attempts, exact saved-input recovery and native hash rejection.
+Windows amd64 compilation includes the new actual-COM fixture. Actual Windows
+execution and the full public GUI lifecycle remain pending; no native machine
+mutation, publication or global PowerShell preference change was performed.
+
+
+### 2026-10-10 — Windows desktop inspection progress boundary
+
+A concrete multi-location check after the shortcut finding found the same mixed
+stream assumption in the desktop fixture's two Windows read-only process/window
+queries. Both now call the existing `runIntegrationQuery`, which separates success
+stdout from bounded stderr diagnostics and preserves failed native exits. The
+macOS/Linux queries and app launch behavior are unchanged. This is a source-found
+follow-up: the hosted public desktop failure happened before app launch and did
+not execute either query.
+
+A real encoded PowerShell process regression emits first-use-style progress with
+each of the PID array, single PID and visible-window token protocols. With the
+former `CombinedOutput` boundary all three fail with recorded CLIXML mixed into
+valid output; using the existing query helper all three pass. A valid token with
+exit 23 still fails with its bounded diagnostic. The test uses Windows PowerShell
+5.1 on Windows and the private PowerShell executable for the local process proof;
+it does not open windows or inspect unrelated applications. Actual Windows GUI
+consumption remains a required hosted rerun, not a claim from this boundary test.
+
+Focused query/font boundary race tests passed in 7.767 seconds with the real
+PowerShell probe enabled; Windows amd64 compilation and changed-file formatting
+checks passed. No native Windows query execution is claimed by the local run.
+
+
+### 2026-10-10 — Windows extraction fixture matches mandatory verification order
+
+Completed Windows core `114302869285` and quality `114302869152` both reject the
+ordinary extraction fixture's literal-path case: PowerShell 5.1 first-use Utility
+module progress from Add-Type encounters the fixture-only Stop preference. This
+is not the production extraction failure seen on the prior candidate. The same
+core job passes public setup/migrate (71.76 s): cold download 1.352 s, archive
+verification 0.093 s, extraction 15.858 s and source build 16.767 s; the cached
+archive's second extraction also passes (15.934 s).
+
+Production always verifies the archive with Get-FileHash before Add-Type; both
+cmdlets belong to Microsoft.PowerShell.Utility. The isolated fixture now performs
+that same preceding file-hash phase against a Go-computed expected digest under
+ordinary progress handling, then retains Stop around the unchanged real extraction
+action. This preserves detection of extraction progress machinery and exact
+archive contents, including literal Unicode paths and the longest pinned entry.
+Malformed ZIP, path escape and preexisting-file refusal remain required; those
+negative cases must reach the extractor rather than pass on a module-load error.
+The native failed logs are the red evidence. No bootstrap production algorithm,
+download path, filesystem limit or PowerShell error handling was relaxed.
+
+Focused extraction race tests pass locally (3.200 s) with private PowerShell
+7.6.3: each negative case reports the actual ZipFile extraction exception and
+retains the sentinel bytes. Windows amd64 compilation passes; Windows PowerShell
+5.1 execution of the corrected fixture remains pending.
+
+
+### 2026-10-10 — PortableGit runtime phase diagnosed separately from extraction
+
+Windows core `114302869285` reaches `PortableGit runtime` then exits 255. The
+upstream `post-install.bat` and `etc/post-install` are both absent, and the actual
+ordinary CMD self-deleting-input regression passes. This is not another SFX or
+batch-input failure. The unlabelled set-e probe checks Git, LFS, GCM and SSH; its
+.NET-style path-length exception makes GCM the leading hypothesis, not yet a
+captured command attribution. The exact pinned binary identifies GCM
+`2.9.1+6760f0ef069c994aa2bb1d703fb374986ee82a3e`, targeting .NET Framework 4.7.2.
+
+Each fixed runtime step now announces its label on stderr without changing
+commands, expected results or strict failed-exit behavior. The opted-in native
+fixture enables `GCM_TRACE=1` and explicitly disables secret tracing on that
+same private version-check child. Upstream [Application.WriteException](https://github.com/git-ecosystem/git-credential-manager/blob/6760f0ef069c994aa2bb1d703fb374986ee82a3e/src/shared/Core/Application.cs#L148)
+prints the exception stack only when tracing is enabled. There is no credential
+operation, second native attempt, shorter path, ignored exit or global setting.
+The private Git core.longpaths recipe remains a separate correction for Git's
+own repository paths; it is not evidence that .NET path handling works. These
+changes preserve the failure and supply the minimum next native evidence.
+
+
+### 2026-10-10 — Build Tools query completion remains a failing native boundary
+
+At `28c92f5`, core and quality fail all five private process-tree cases with
+`WAIT_TIMEOUT` (258) on the exact held child HANDLE immediately after inspection
+returns. Success bytes, explicit failure, cancellation and both output limits
+reach their expected preceding assertions. Fresh vendor lifecycle (626.17 s) and
+existing compiler/environment reuse (29.86 s) pass separately; neither proves
+the ordinary process-tree completion contract.
+
+The child is created directly by Go's CreateProcess path, not ShellExecute, and
+the fixture holds its HANDLE before releasing the root. Broker escape and PID
+recycling therefore do not explain this observation. Production currently checks
+job ActiveProcesses after TerminateJobObject. [Microsoft's termination contract](https://learn.microsoft.com/en-us/windows/win32/api/jobapi2/nf-jobapi2-terminatejobobject)
+is per-process TerminateProcess behavior; [the process HANDLE signal](https://learn.microsoft.com/en-us/windows/win32/procthread/terminating-a-process)
+is the completion event. The log does not yet establish whether job accounting
+reaches zero before final object rundown or whether containment is incomplete.
+A failure-only five-second wait on that same exact HANDLE now records initial
+and final exit state and elapsed time. The original immediate assertion still
+fails, even if the later wait succeeds; cleanup remains limited to fixture-owned
+handles. No production delay, timeout increase, name filter, or fake-green
+termination exception is introduced. The native diagnostic rerun is required
+before claiming this boundary fixed.
+
+
+### 2026-10-10 — Windows Neovim Git long-path boundary
+
+Candidate `28c92f5` Windows Neovim job `114302869144` reaches synchronization but
+Git rejects the long `lazy.nvim.stage.3740/.git` path during `git init`. This is
+not the previous compiler-consumer drift: execution passed that approval boundary.
+The failure-only Node diagnostic reports an intact Node payload on this target.
+Both Linux Neovim jobs (`114302869031`, `114302869093`) complete successfully.
+
+The pinned [Git for Windows long-path contract](https://github.com/git-for-windows/git/blob/v2.56.0.windows.2/Documentation/config/core.adoc#corelongpaths)
+explicitly enables builtin support beyond 260 characters; it defaults off.
+PortableGit's existing preparation now sets this in its own `etc/gitconfig`,
+preserving other upstream settings, before publication/fingerprinting. Its new
+recipe revision participates in desired identity. Omitted revision remains valid
+historical provenance; complete old generations update normally without rewriting
+old records, while unfinished old preparation fails with recovery guidance.
+Failed setting commands cannot publish. No personal/global Git file is changed.
+
+The pinned-checkout helper intentionally sets `GIT_CONFIG_NOSYSTEM=1` and null
+system/global files, so it passes `-c core.longpaths=true` explicitly and uses
+Git's `/dev/null` spelling on Windows as well. Exact locked Lazy `306a055` inherits
+`uv.os_environ()` in `manage/process.lua`; Mason `16ba83b` clones through its
+inheriting spawn boundary; `sync_check.lua` inherits as well. Synchronization
+staging sets no system-config suppression. Caller Git overrides keep their normal
+precedence; there is no process-wide environment count parser or added wrapper.
+
+The real-Git regression failed before preparation with `core.longpaths=false`;
+the correction sets it to true and preserves an unrelated existing key. Archive
+checks cover old shapes/updates, rejected unknown revisions, failed preparation,
+publication and exact cleanup. The Lua fixture creates and verifies a checkout
+beyond 320 characters without changing the ownership path. The disposable Windows
+Git lifecycle now uses its private system configuration and tests long init,
+clone, checkout, diff and commit verification without extra long-path flags.
+Local POSIX execution does not prove Windows path behavior; actual private Git
+system-config lookup and the full Windows Neovim lifecycle still require hosted
+execution. Integrity checks, fixture deadlines and ownership identities remain
+unchanged. The parent owns the integrated full gate.
+
+Focused verification: all PortableGit regression tests pass with Go race in
+3.267 seconds; all 12 pinned-checkout Lua tests pass using private Neovim 0.12.5
+and HOME/XDG directories. Windows amd64 test compilation, StyLua, changed-file
+EditorConfig and `git diff --check` pass. No native Windows result is implied.

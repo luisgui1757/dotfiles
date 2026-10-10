@@ -121,7 +121,15 @@ Consume Python through its stable managed path.
 Windows uses full PortableGit (Bash, SSH, LFS, credential manager and GUI payloads)
 and GNU Make. Make's approval scope comes from its actual provider: the Windows
 archive is private/user; APT and Apple observations remain machine-scoped. PortableGit's fixed preparation runs only inside the private payload;
-its upstream SHA-256 is not a Microsoft Authenticode claim. Do not expose Git's
+its upstream SHA-256 is not a Microsoft Authenticode claim.
+Enable `core.longpaths` only in that private distribution's `etc/gitconfig` before
+fingerprinting. Its recipe revision changes desired identity; completed older
+pins remain readable for update, while unfinished older preparation requires
+explicit recovery. Lazy, Mason and sync verification inherit this system setting;
+the pinned-checkout helper deliberately isolates Git configuration and therefore
+passes its own `-c core.longpaths=true`. Preserve caller Git override precedence
+and personal configuration. Native acceptance must exercise long physical paths
+without global settings or shortened fixtures. Do not expose Git's
 `usr/bin` ahead of Windows system utilities. Reuse the archive lifecycle for all
 these packages, including preservation of modified generations.
 
@@ -177,6 +185,10 @@ checksum-before-extraction, error propagation and the original physical paths;
 do not install another extractor or change global .NET/registry path settings.
 Ordinary Windows regression tests use system PowerShell 5.1 for this extraction
 action; only the disposable public lifecycle proves the complete bootstrap.
+The isolated extraction fixture must perform the preceding archive Get-FileHash
+verification before setting progress to Stop. On Windows PowerShell 5.1 that
+mandatory phase imports Utility with legitimate first-use progress; Stop applies
+to extraction work, not to a fixture-only cold Add-Type module import.
 
 Neovim synchronizes locked plugins, parsers and Mason tools into private runtime
 generations under its independently observed XDG data directory (nvim-data on
@@ -756,6 +768,12 @@ records and partial inputs remain evidence; a later attempt uses new paths.
 Once ConfigDriver records the source, recovery must reuse those exact bytes,
 including legacy recipe-only inputs. COM shortcut bytes are not assumed stable
 across runs. Never regenerate an input belonging to a saved configuration journal.
+Shortcut preparation suppresses PowerShell progress only in its child script:
+first-use module loading can otherwise add CLIXML to the native worker's combined
+hash result. Keep terminating errors, failed exits and exact digest verification;
+never strip unexpected output to manufacture a hash. The ordinary Windows COM
+fixture uses system PowerShell 5.1 and private files, while the public desktop
+fixture still proves actual launch/configuration/update/removal.
 
 Windows Terminal owns fixed JSONC leaves and identified profiles/schemes/themes/
 keybindings in the pinned unpackaged stable instance. Preserve every existing
@@ -799,7 +817,8 @@ AllHosts profile.ps1 are separate paths. Historical detachment cannot authorize
 replacing either later personal content or active scoped setup blocks.
 
 
-Read-only font inspection parses stdout only. Encoded PowerShell commands can emit
+Read-only font inspection and Windows desktop process/window fixture queries parse
+stdout only through `runIntegrationQuery`. Encoded PowerShell commands can emit
 CLIXML module-loading progress on stderr even when they succeed. Keep diagnostic
 stderr separate, preserve failed exit codes with bounded sanitized diagnostics,
 and enforce the combined 1 MiB inspection limit. Never repair malformed protocol
@@ -874,3 +893,13 @@ work before publication. Never accept a nonzero exit or shorten ownership paths.
 Git configuration isolation uses `/dev/null`, which Git for Windows recognizes;
 Go's uppercase `os.DevNull` spelling `NUL` is not a valid Git config-file boundary.
 SFX and wrapper child waits rule out the proposed post-install child race.
+
+PortableGit runtime failures must identify the failing fixed probe step. The
+disposable Windows fixture enables GCM tracing only for the existing private
+`--version` runtime probe, with secret tracing disabled; preserve the original
+exit and journal. Git core.longpaths does not prove .NET GCM path support.
+
+The Build Tools process-tree fixture holds an exact child HANDLE before releasing
+its parent. A failed immediate wait remains a failure even if later diagnostic
+waiting observes termination; do not replace that assertion with a grace period,
+PID/name filtering or an assumed empty-job synchronization guarantee.

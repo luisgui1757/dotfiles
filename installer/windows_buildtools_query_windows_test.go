@@ -100,7 +100,7 @@ func TestWindowsBuildToolsQueryContainsOnlyItsOwnProcessTree(t *testing.T) {
 			}
 			// Hold the exact child handle before allowing its parent to exit. The
 			// regression cannot confuse a recycled PID with this owned process.
-			child, err := windows.OpenProcess(windows.SYNCHRONIZE|windows.PROCESS_TERMINATE, false, uint32(pid))
+			child, err := windows.OpenProcess(windows.SYNCHRONIZE|windows.PROCESS_TERMINATE|windows.PROCESS_QUERY_LIMITED_INFORMATION, false, uint32(pid))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -144,7 +144,15 @@ func TestWindowsBuildToolsQueryContainsOnlyItsOwnProcessTree(t *testing.T) {
 				}
 			}
 			if status, err := windows.WaitForSingleObject(child, 0); err != nil || status != windows.WAIT_OBJECT_0 {
-				t.Fatal("inspection returned with its child still running", status, err)
+				// Preserve the immediate quiescence failure. The bounded diagnostic
+				// distinguishes final process-object rundown from an uncontained
+				// child without changing the assertion or terminating another PID.
+				var before, after uint32
+				beforeErr := windows.GetExitCodeProcess(child, &before)
+				started := time.Now()
+				later, waitErr := windows.WaitForSingleObject(child, 5000)
+				afterErr := windows.GetExitCodeProcess(child, &after)
+				t.Fatalf("inspection returned with its child still running: initial wait=%d error=%v exit=%d error=%v; diagnostic wait=%d error=%v elapsed=%s exit=%d error=%v", status, err, before, beforeErr, later, waitErr, time.Since(started), after, afterErr)
 			}
 			if status, err := windows.WaitForSingleObject(outsideHandle, 0); err != nil || status != uint32(windows.WAIT_TIMEOUT) {
 				t.Fatal("inspection affected an unrelated process", status, err)
