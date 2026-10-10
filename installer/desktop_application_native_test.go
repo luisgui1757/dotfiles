@@ -63,6 +63,7 @@ func TestNativeDesktopInstalledApplicationLifecycle(t *testing.T) {
 			t.Fatal("native desktop fixture requires absent system Code", err)
 		}
 	}
+	t.Cleanup(func() { temporaryDesktopAPTDiagnostic(t, stateDir, folders.Home, target.Arch) })
 	invoke := desktopMachineFixture(t, repository, home, environment)
 	catalog, err := DefaultCatalog()
 	if err != nil {

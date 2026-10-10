@@ -92,3 +92,15 @@ the same 90-second context and every owned/window/settings assertion. The exact
 same two jobs rerun all three Code/font/GUI lifecycle steps; no preceding test is
 removed or replaced. The application/process diagnosis is recorded in the
 canonical status/review append for eventual parent integration.
+
+## 2026-10-11 — Architecture-specific APT approval evidence
+
+At `8a1af68`, ARM passed all three complete native steps, including actual
+Code/Ghostty windows, configuration witnesses, update/check and final removal.
+The amd64 job passed Code, fonts and the Code singleton GUI, then rejected the
+next selected group at the `libgtk-4-1` approval guard. The generic error does not
+identify the changed field. A temporary failure-only read-only fixture diagnostic
+records the saved next operation, fresh observation, native package/consumer
+metadata, provider ledger and receipts, bounded to 64 KiB and 90 seconds. It
+never retries, authorizes or changes a package. The strict original lifecycle
+runs again on both architectures; the earlier amd64 result remains failed.
