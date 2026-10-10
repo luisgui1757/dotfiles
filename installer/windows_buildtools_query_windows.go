@@ -163,8 +163,8 @@ func queryWindowsBuildTools(ctx context.Context, privileged bool, program string
 
 // TerminateJobObject initiates termination, but job accounting and exit codes
 // can settle before process HANDLEs signal. Capture exact job members first and
-// await those handles within one shared reap bound. A changing membership cannot
-// authorize a success claim from an incomplete snapshot.
+// await those handles within one shared reap bound. Newly added membership cannot
+// authorize a success claim from an incomplete snapshot; natural exits can.
 func stopBuildToolsQueryJob(job windows.Handle) (result error) {
 	deadline := time.Now().Add(5 * time.Second)
 	handles, total, captureErr := captureBuildToolsQueryProcesses(job)
@@ -197,6 +197,13 @@ func captureBuildToolsQueryProcesses(job windows.Handle) ([]windows.Handle, uint
 	if err != nil {
 		return nil, 0, err
 	}
+	return captureBuildToolsQueryProcessesAfterAccounting(job, before)
+}
+
+// Accounting and the PID list are separate snapshots. An earlier Active count
+// may include a member that has since exited; only the list's own counts prove
+// completeness. The lifetime Total is checked again after exact HANDLE waits.
+func captureBuildToolsQueryProcessesAfterAccounting(job windows.Handle, before buildToolsJobAccounting) ([]windows.Handle, uint32, error) {
 	var members struct {
 		Assigned uint32
 		Listed   uint32
@@ -205,7 +212,7 @@ func captureBuildToolsQueryProcesses(job windows.Handle) ([]windows.Handle, uint
 	if err := windows.QueryInformationJobObject(job, windows.JobObjectBasicProcessIdList, uintptr(unsafe.Pointer(&members)), uint32(unsafe.Sizeof(members)), nil); err != nil {
 		return nil, before.Total, fmt.Errorf("capture Build Tools inspection members: %w", err)
 	}
-	if members.Listed > uint32(len(members.PIDs)) || members.Listed != members.Assigned || members.Assigned != before.Active {
+	if members.Listed > uint32(len(members.PIDs)) || members.Listed != members.Assigned {
 		return nil, before.Total, errors.New("Build Tools inspection membership changed during capture")
 	}
 	handles := make([]windows.Handle, 0, members.Listed)

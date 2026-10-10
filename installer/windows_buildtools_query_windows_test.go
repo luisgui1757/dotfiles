@@ -215,6 +215,14 @@ func TestWindowsBuildToolsQueryHelper(t *testing.T) {
 		time.Sleep(time.Minute)
 		os.Exit(0)
 	}
+	if mode == "exit-on-release" {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := waitBuildToolsQueryFixtureFile(ctx, filepath.Join(directory, "release")); err != nil {
+			t.Fatal(err)
+		}
+		os.Exit(0)
+	}
 	program, err := os.Executable()
 	if err != nil {
 		t.Fatal(err)
@@ -335,5 +343,91 @@ func TestWindowsBuildToolsQueryRejectsChangedMembership(t *testing.T) {
 		if status, err := windows.WaitForSingleObject(handle, 5000); err != nil || status != windows.WAIT_OBJECT_0 {
 			t.Fatal("private job did not terminate its exact member", status, err)
 		}
+	}
+}
+
+// Force a real private member to exit between the two independent kernel
+// snapshots. Its earlier Active count cannot invalidate the later complete list.
+func TestWindowsBuildToolsQueryAcceptsExitedMemberDuringCapture(t *testing.T) {
+	job, err := windows.CreateJobObject(nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := errors.Join(windows.TerminateJobObject(job, 1), windows.CloseHandle(job)); err != nil {
+			t.Error(err)
+		}
+	})
+	program, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	directory := t.TempDir()
+	application, err := windows.UTF16PtrFromString(program)
+	if err != nil {
+		t.Fatal(err)
+	}
+	arguments, err := windows.UTF16PtrFromString(windows.ComposeCommandLine(append([]string{program}, buildToolsQueryFixtureArgs("exit-on-release", directory)...)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	startup := windows.StartupInfo{Cb: uint32(unsafe.Sizeof(windows.StartupInfo{}))}
+	var process windows.ProcessInformation
+	if err := windows.CreateProcess(application, arguments, nil, nil, false, windows.CREATE_SUSPENDED|windows.CREATE_NO_WINDOW, nil, nil, &startup, &process); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if status, err := windows.WaitForSingleObject(process.Process, 0); err != nil {
+			t.Error(err)
+		} else if status == uint32(windows.WAIT_TIMEOUT) {
+			if err := windows.TerminateProcess(process.Process, 1); err != nil {
+				t.Error(err)
+			}
+			if status, err := windows.WaitForSingleObject(process.Process, 5000); err != nil || status != windows.WAIT_OBJECT_0 {
+				t.Error("fixture child cleanup failed", status, err)
+			}
+		}
+		if err := errors.Join(windows.CloseHandle(process.Thread), windows.CloseHandle(process.Process)); err != nil {
+			t.Error(err)
+		}
+	})
+	if err := windows.AssignProcessToJobObject(job, process.Process); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := windows.ResumeThread(process.Thread); err != nil {
+		t.Fatal(err)
+	}
+	before, err := readBuildToolsJobAccounting(job)
+	if err != nil || before.Active != 1 || before.Total != 1 {
+		t.Fatal("expected a live private member before capture", before, err)
+	}
+	if err := os.WriteFile(filepath.Join(directory, "release"), nil, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if status, err := windows.WaitForSingleObject(process.Process, 5000); err != nil || status != windows.WAIT_OBJECT_0 {
+		t.Fatal("private fixture did not exit naturally", status, err)
+	}
+	var exitCode uint32
+	if err := windows.GetExitCodeProcess(process.Process, &exitCode); err != nil || exitCode != 0 {
+		t.Fatal("private fixture did not complete its ordinary exit", exitCode, err)
+	}
+	after, err := readBuildToolsJobAccounting(job)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("natural exit accounting: before active=%d total=%d; after active=%d total=%d; exact HANDLE signaled", before.Active, before.Total, after.Active, after.Total)
+	handles, total, err := captureBuildToolsQueryProcessesAfterAccounting(job, before)
+	defer func() {
+		for _, handle := range handles {
+			if err := windows.CloseHandle(handle); err != nil {
+				t.Error(err)
+			}
+		}
+	}()
+	if err != nil || len(handles) != 0 || total != before.Total {
+		t.Fatal("natural exit invalidated a complete private member list", len(handles), total, err)
+	}
+	if err := terminateBuildToolsQueryProcesses(job, handles, total, time.Now().Add(5*time.Second)); err != nil {
+		t.Fatal("completed private query rejected after natural exit", err)
 	}
 }

@@ -140,6 +140,7 @@ func TestNativeWindowsGitAndMakeLifecycle(t *testing.T) {
 		return string(output)
 	}
 	git := filepath.Join(gitRoot, "cmd", "git.exe")
+	probeNvimGitConfigBoundary(t, git)
 	if output := run(git, "", "--version"); !strings.Contains(output, latest.Version) {
 		t.Fatal("published Git version differs", output)
 	}

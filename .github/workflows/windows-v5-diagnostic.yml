@@ -1,0 +1,38 @@
+name: Windows v5 native diagnostics
+
+on:
+  push:
+    branches: [diagnostics/installer-windows-v5]
+
+permissions:
+  contents: read
+
+jobs:
+  windows-diagnostic:
+    runs-on: windows-2025
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: installer
+        shell: bash
+    env:
+      GOTOOLCHAIN: local
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: 1.27.1
+          cache-dependency-path: installer/go.sum
+      - name: Verify actual native runner target
+        run: test "$(go env GOHOSTOS)/$(go env GOHOSTARCH)" = windows/amd64
+      - name: Verify natural exit and exact private process completion
+        run: >-
+          go test -race -v -count=1 -timeout 10m
+          -run '^TestWindowsBuildToolsQuery(ContainsOnlyItsOwnProcessTree|RejectsUnsafeOrUnavailableProgram|RejectsChangedMembership|AcceptsExitedMemberDuringCapture)$' .
+      - name: Probe isolated Git config boundary and preserve complete Git Make lifecycle
+        if: always()
+        env:
+          DOTFILES_NATIVE_WINDOWS_GIT_MAKE: '1'
+        run: go test -v -count=1 -timeout 15m -run '^TestNativeWindowsGitAndMakeLifecycle$' .

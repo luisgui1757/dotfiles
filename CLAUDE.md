@@ -955,6 +955,14 @@ disposable Windows fixture enables GCM tracing only for the existing private
 `--version` runtime probe, with secret tracing disabled; preserve the original
 exit and journal. Git core.longpaths does not prove .NET GCM path support.
 
+Build Tools job accounting and its PID list are independent snapshots. A natural
+exit may reduce the list after the accounting read; never compare that list's
+Assigned count to the earlier Active count. Require a complete same-call PID list,
+verified exact HANDLEs, one shared five-second completion deadline, empty final
+accounting and unchanged lifetime Total. New members, truncated lists and unproved
+handle opens or membership still fail inspection; do not infer exit from arbitrary
+OpenProcess errors or wait on machine-wide process names.
+
 The Build Tools process-tree fixture holds an exact child HANDLE before releasing
 its parent. A failed immediate wait remains a failure even if later diagnostic
 waiting observes termination; do not replace that assertion with a grace period,

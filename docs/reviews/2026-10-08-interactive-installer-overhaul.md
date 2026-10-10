@@ -6199,3 +6199,38 @@ receives a dedicated full-path SHELL value, preserved by its Windows shell looku
 no further demonstrable path defect was found, so those assertions stay intact.
 Windows compilation, gofmt/EditorConfig and diff checks pass. Complete native
 Git/Make acceptance remains required; this failed context remains failed.
+
+### 2026-10-11 — Independent Windows job snapshots permit natural exits
+
+Fresh Build Tools job `114321418383` on exact delivery
+`de769314978411d63e509d260ae1e7ce51437f58` fails after 345.50 seconds with
+`Build Tools inspection membership changed during capture`. Raw log SHA-256:
+`ca988e6210d15afaec569cf8c5a508bd105b887105f67aebfa22cf1f0de88d8e`.
+The earlier lower-confidence review finding is now material native evidence:
+capture requires `members.Assigned == before.Active`, although those values come
+from separate `QueryInformationJobObject` calls. Microsoft defines [Active as a
+current count and Total as lifetime membership including exited processes](https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-jobobject_basic_accounting_information);
+only the PID-list call's own [Assigned/List counts establish completeness](https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-jobobject_basic_process_id_list).
+There is no atomic cross-call snapshot contract. A natural exit is a valid
+alternative to newly spawned membership, which remains detectable by Total.
+
+Remove that comparison while preserving the bounded same-call list, validated
+PID range, exact opened HANDLE/membership checks, unchanged five-second total
+deadline, final empty accounting and unchanged lifetime Total. No post-return
+grace period, outside-process termination or new-member acceptance is introduced.
+A narrow helper accepts the already-read accounting snapshot so a real-kernel
+regression can deliberately release and await a private child's ordinary exit
+before capturing the list. The original five immediate HANDLE/outside-survival
+cases and real late-member refusal remain unchanged.
+
+OpenProcess or IsProcessInJob errors still fail closed: the documented API does
+not license treating an arbitrary failed open as successful completion. This
+correction addresses the proved cross-query comparison; it does not claim native
+proof for every process-disappearance interleaving. The next temporary Windows
+run must execute the natural-exit regression and existing containment cases;
+fresh vendor acceptance remains separate. No native package mutation occurs on
+the developer workstation.
+
+Focused preflight: Windows amd64 test compilation and target vet pass; gofmt,
+EditorConfig and diff checks pass. Real Windows capture/containment and vendor
+lifecycle proof remain pending, not inferred from cross-compilation.

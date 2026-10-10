@@ -411,3 +411,15 @@ user and system config for this value. An offline process regression reproduces
 the missing-file failure and succeeds with `none`, preserving the identity path.
 No runtime code or later assertion changes. Complete native Git/Make, final
 payload/personal-config integrity and owned removal remain pending.
+
+### 2026-10-11 — Windows compiler inspection snapshot race
+
+Delivery `de769314` fresh Build Tools native job `114321418383` fails after install
+at `membership changed during capture`. The capture compared the PID list with an
+Active count from an earlier independent kernel query; an ordinary child exit can
+change that count without introducing new membership. Remove only that invalid
+comparison. Complete same-call PID-list validation, exact-HANDLE waits, the one
+five-second bound, final zero Active/unchanged lifetime Total and late-child refusal
+remain. A real-kernel regression deliberately exits a private child between the
+snapshots. Windows native proof and the fresh Build Tools lifecycle rerun remain
+pending; compilation alone does not establish them.
