@@ -7252,3 +7252,41 @@ exercise those cases and the unchanged outside-process, exit/cancel/output-bound
 and natural-exit cases, plus six fixed repetitions of the existing real compiler
 reuse/environment test. This is evidence collection, not a runtime fix or a retry
 of the failed full Neovim lifecycle. Native results remain pending.
+
+### Native diagnostic values and typed Windows syscall boundary
+
+At temporary `383880fb692a1367d501c48fcf291e56230ce460`, job `114354654925`
+reproduced the real compiler reuse failure: baseline Total/Active/Terminated
+`0/0/0`, after-capture `45/1/0`, final `45/0/0`, one captured HANDLE, empty final
+private member list. An ordinary process case independently reported baseline
+`0/0/0`, after-capture `3/2/0`, final `3/0/0`. Five preceding real reuse tests
+passed. Raw log SHA-256:
+`182b37903096e9b08a1fca8a09bae60f338740a9114f3507d8fa25bdc43d2f63`.
+This establishes the failed Total comparison, not nonzero final Active. It does
+not establish that 45 children genuinely joined between two adjacent snapshots.
+
+The pinned x/sys v0.48.0 generated QueryInformationJobObject wrapper takes a
+plain uintptr without uintptrescapes; Go 1.27.1 escape analysis leaves the caller's
+accounting structure on its movable stack. The address has already become an
+integer before the Go wrapper's calls can grow that stack. [Go's unsafe contract](https://pkg.go.dev/unsafe#Pointer)
+requires pointer conversion at the actual syscall boundary; x/sys LazyProc.Call
+has the corresponding uintptrescapes annotation. [Windows documents TotalProcesses](https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-jobobject_basic_accounting_information)
+as lifetime membership, so zero after the query root executed is not a normal
+count baseline. This is a concrete pointer-lifetime defect candidate, not grounds
+to accept changed membership or to wait until an arbitrary count looks stable.
+
+Keep a typed pointer until direct LazyProc.Call for all three bounded job-info
+reads. Apply the same rule to the matching SetInformationJobObject input buffer.
+The counted membership guard, exact HANDLE waits, existing time/output bounds,
+atomic job assignment and outside-process protection remain unchanged. A real
+empty-kernel-job regression writes sentinel-filled buffers from fresh goroutines
+at varied stack depths; the old wrapper must fail to overwrite a buffer and the
+corrected boundary must pass. Native red/green remains pending.
+
+Two diagnostic-only fixture issues are separate: the expected-red workflow left
+LASTEXITCODE=1 after correctly recognizing its failure; explicitly exit zero
+only after that exact expected failure and byte-for-byte source restoration.
+The new error assertion incorrectly assumed the second Go child added exactly
+one lifetime process; native startup produced Total3. Require the actual final
+Total to exceed the captured baseline while preserving deliberate late-member
+refusal and exact child completion. Neither changes the production guard.

@@ -75,9 +75,7 @@ func queryWindowsBuildTools(ctx context.Context, privileged bool, program string
 		return nil, err
 	}
 	defer windows.CloseHandle(job)
-	limits := windows.JOBOBJECT_EXTENDED_LIMIT_INFORMATION{}
-	limits.BasicLimitInformation.LimitFlags = windows.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
-	if _, err := windows.SetInformationJobObject(job, windows.JobObjectExtendedLimitInformation, uintptr(unsafe.Pointer(&limits)), uint32(unsafe.Sizeof(limits))); err != nil {
+	if err := setBuildToolsQueryJobLimits(job); err != nil {
 		return nil, err
 	}
 	// WinBase.h: ProcThreadAttributeValue(13, FALSE, TRUE, FALSE). Job-list
@@ -184,9 +182,36 @@ type buildToolsJobAccounting struct {
 	Terminated uint32
 }
 
+var (
+	buildToolsGetJobInformation = windows.NewLazySystemDLL("kernel32.dll").NewProc("QueryInformationJobObject")
+	buildToolsSetJobInformation = windows.NewLazySystemDLL("kernel32.dll").NewProc("SetInformationJobObject")
+)
+
+// x/sys's generated QueryInformationJobObject wrapper takes uintptr without
+// uintptrescapes. Keep a typed pointer until LazyProc.Call's annotated boundary,
+// so Go retains and does not move the output buffer while the kernel writes it.
+func queryBuildToolsJobInformation(job windows.Handle, class int32, data unsafe.Pointer, size uint32) error {
+	ok, _, err := buildToolsGetJobInformation.Call(uintptr(job), uintptr(class), uintptr(data), uintptr(size), 0)
+	if ok == 0 {
+		return err
+	}
+	return nil
+}
+
+// Keep the fixed query-job limit buffer at the same annotated syscall boundary.
+func setBuildToolsQueryJobLimits(job windows.Handle) error {
+	limits := windows.JOBOBJECT_EXTENDED_LIMIT_INFORMATION{}
+	limits.BasicLimitInformation.LimitFlags = windows.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+	ok, _, err := buildToolsSetJobInformation.Call(uintptr(job), uintptr(windows.JobObjectExtendedLimitInformation), uintptr(unsafe.Pointer(&limits)), unsafe.Sizeof(limits))
+	if ok == 0 {
+		return err
+	}
+	return nil
+}
+
 func readBuildToolsJobAccounting(job windows.Handle) (buildToolsJobAccounting, error) {
 	var info buildToolsJobAccounting
-	err := windows.QueryInformationJobObject(job, windows.JobObjectBasicAccountingInformation, uintptr(unsafe.Pointer(&info)), uint32(unsafe.Sizeof(info)), nil)
+	err := queryBuildToolsJobInformation(job, windows.JobObjectBasicAccountingInformation, unsafe.Pointer(&info), uint32(unsafe.Sizeof(info)))
 	return info, err
 }
 
@@ -219,7 +244,7 @@ func captureBuildToolsQueryProcesses(job windows.Handle) ([]windows.Handle, buil
 func captureBuildToolsQueryProcessesAfterAccounting(job windows.Handle, before buildToolsJobAccounting) ([]windows.Handle, buildToolsQueryCapture, error) {
 	capture := buildToolsQueryCapture{Before: before}
 	var members buildToolsJobMembers
-	if err := windows.QueryInformationJobObject(job, windows.JobObjectBasicProcessIdList, uintptr(unsafe.Pointer(&members)), uint32(unsafe.Sizeof(members)), nil); err != nil {
+	if err := queryBuildToolsJobInformation(job, windows.JobObjectBasicProcessIdList, unsafe.Pointer(&members), uint32(unsafe.Sizeof(members))); err != nil {
 		return nil, capture, fmt.Errorf("capture Build Tools inspection members: %w", err)
 	}
 	if members.Listed > uint32(len(members.PIDs)) || members.Listed != members.Assigned {
@@ -290,7 +315,7 @@ func buildToolsQueryMembershipDiagnostic(job windows.Handle, capture buildToolsQ
 		detail += fmt.Sprintf("; after_capture(total=%d active=%d terminated=%d)", capture.After.Total, capture.After.Active, capture.After.Terminated)
 	}
 	var members buildToolsJobMembers
-	if err := windows.QueryInformationJobObject(job, windows.JobObjectBasicProcessIdList, uintptr(unsafe.Pointer(&members)), uint32(unsafe.Sizeof(members)), nil); err != nil {
+	if err := queryBuildToolsJobInformation(job, windows.JobObjectBasicProcessIdList, unsafe.Pointer(&members), uint32(unsafe.Sizeof(members))); err != nil {
 		return fmt.Sprintf("%s; current_members unavailable: %v", detail, err)
 	}
 	if members.Listed > uint32(len(members.PIDs)) || members.Listed != members.Assigned {

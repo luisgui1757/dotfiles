@@ -51,6 +51,53 @@ jobs:
           } finally {
             [IO.File]::WriteAllBytes($path, $saved)
           }
+          exit 0
+      - name: Prove unsafe wrapper loses actual kernel output
+        working-directory: installer
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $path = Join-Path (Get-Location) 'windows_buildtools_query_windows.go'
+          $saved = [IO.File]::ReadAllBytes($path)
+          $source = [Text.Encoding]::UTF8.GetString($saved)
+          $signature = 'func queryBuildToolsJobInformation(job windows.Handle, class int32, data unsafe.Pointer, size uint32) error {'
+          $start = $source.IndexOf($signature, [StringComparison]::Ordinal)
+          if ($start -lt 0 -or $source.LastIndexOf($signature, [StringComparison]::Ordinal) -ne $start) { throw 'Expected exact typed query helper' }
+          $end = $source.IndexOf("`n}", $start, [StringComparison]::Ordinal) + 2
+          if ($end -le $start) { throw 'Typed query helper end not found' }
+          $current = $source.Substring($start, $end - $start)
+          $original = $signature + "`n`treturn windows.QueryInformationJobObject(job, class, uintptr(data), size, nil)`n}"
+          try {
+            [IO.File]::WriteAllText($path, $source.Replace($current, $original), [Text.UTF8Encoding]::new($false))
+            $output = & go test -v -count=1 -timeout 2m -run '^TestWindowsBuildToolsQueryWritesOutputAcrossStackGrowth$' . 2>&1
+            $code = $LASTEXITCODE
+            $output | ForEach-Object { Write-Output $_ }
+            if ($code -eq 0 -or ($output -join "`n") -notmatch 'kernel output was lost') { throw 'Unsafe wrapper did not reproduce lost kernel output' }
+          } finally {
+            [IO.File]::WriteAllBytes($path, $saved)
+          }
+          exit 0
+      - name: Prove unsafe limit wrapper loses actual kernel input
+        working-directory: installer
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $path = Join-Path (Get-Location) 'windows_buildtools_query_windows.go'
+          $saved = [IO.File]::ReadAllBytes($path)
+          $source = [Text.Encoding]::UTF8.GetString($saved)
+          $current = "`tok, _, err := buildToolsSetJobInformation.Call(uintptr(job), uintptr(windows.JobObjectExtendedLimitInformation), uintptr(unsafe.Pointer(&limits)), unsafe.Sizeof(limits))`n`tif ok == 0 {"
+          $original = "`t_, err := windows.SetInformationJobObject(job, windows.JobObjectExtendedLimitInformation, uintptr(unsafe.Pointer(&limits)), uint32(unsafe.Sizeof(limits)))`n`tif err != nil {"
+          if (($source.Split(@($current), [StringSplitOptions]::None).Count - 1) -ne 1) { throw 'Expected exact fixed limit boundary' }
+          try {
+            [IO.File]::WriteAllText($path, $source.Replace($current, $original), [Text.UTF8Encoding]::new($false))
+            $output = & go test -v -count=1 -timeout 2m -run '^TestWindowsBuildToolsQueryWritesOutputAcrossStackGrowth$/limits$' . 2>&1
+            $code = $LASTEXITCODE
+            $output | ForEach-Object { Write-Output $_ }
+            if ($code -eq 0 -or ($output -join "`n") -notmatch 'kernel output was lost') { throw 'Unsafe limit wrapper did not reproduce lost kernel input' }
+          } finally {
+            [IO.File]::WriteAllBytes($path, $saved)
+          }
+          exit 0
       - name: Verify exact owned process completion and outside survival
         if: always()
         working-directory: installer

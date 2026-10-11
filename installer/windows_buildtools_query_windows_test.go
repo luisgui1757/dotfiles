@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -342,10 +343,16 @@ func TestWindowsBuildToolsQueryRejectsChangedMembership(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "membership changed during termination") {
 		t.Fatal("late child was accepted under an earlier HANDLE proof", err)
 	}
-	for _, detail := range []string{"baseline(total=1 active=1 terminated=0)", "final(total=2 active=", "captured_handles=1", "after_capture(total=1 active=1 terminated=0)", "current_members assigned="} {
+	for _, detail := range []string{"baseline(total=1 active=1 terminated=0)", "final(total=", "captured_handles=1", "after_capture(total=1 active=1 terminated=0)", "current_members assigned="} {
 		if !strings.Contains(err.Error(), detail) {
 			t.Fatalf("late-member refusal lost bounded accounting evidence %q: %v", detail, err)
 		}
+	}
+	_, tail, _ := strings.Cut(err.Error(), "final(total=")
+	finalText, _, _ := strings.Cut(tail, " ")
+	finalTotal, parseErr := strconv.ParseUint(finalText, 10, 32)
+	if parseErr != nil || finalTotal <= uint64(capture.Before.Total) {
+		t.Fatalf("deliberate late member did not increase lifetime membership: %v", err)
 	}
 	t.Log(err)
 	for _, handle := range []windows.Handle{first, second} {
@@ -495,4 +502,70 @@ func TestWindowsBuildToolsQueryMembershipDiagnosticKeepsAccountingOnQueryError(t
 			t.Fatalf("failed private-job diagnostic lost evidence %q: %s", expected, detail)
 		}
 	}
+}
+
+// Fresh goroutines at varied stack depths exercise stack growth in the actual
+// Windows syscall path. The empty kernel job must overwrite every sentinel; no
+// mocked query or caller-owned process is involved.
+func TestWindowsBuildToolsQueryWritesOutputAcrossStackGrowth(t *testing.T) {
+	job, err := windows.CreateJobObject(nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer windows.CloseHandle(job)
+	for _, kind := range []string{"accounting", "members", "limits"} {
+		t.Run(kind, func(t *testing.T) {
+			for depth := range 128 {
+				done := make(chan error, 1)
+				go func() { done <- queryBuildToolsJobAtStackDepth(job, depth, kind) }()
+				if err := <-done; err != nil {
+					t.Fatalf("kernel output was lost at depth %d: %v", depth, err)
+				}
+			}
+		})
+	}
+}
+
+//go:noinline
+func queryBuildToolsJobAtStackDepth(job windows.Handle, depth int, kind string) error {
+	var padding [128]byte
+	padding[depth%len(padding)] = byte(depth)
+	var err error
+	if depth > 0 {
+		err = queryBuildToolsJobAtStackDepth(job, depth-1, kind)
+	} else {
+		switch kind {
+		case "accounting":
+			info := buildToolsJobAccounting{Times: [4]int64{-1, -1, -1, -1}, PageFaults: ^uint32(0), Total: ^uint32(0), Active: ^uint32(0), Terminated: ^uint32(0)}
+			err = queryBuildToolsJobInformation(job, windows.JobObjectBasicAccountingInformation, unsafe.Pointer(&info), uint32(unsafe.Sizeof(info)))
+			if err == nil && info != (buildToolsJobAccounting{}) {
+				err = fmt.Errorf("empty private job did not overwrite accounting: total=%d active=%d terminated=%d", info.Total, info.Active, info.Terminated)
+			}
+		case "members":
+			members := buildToolsJobMembers{Assigned: ^uint32(0), Listed: ^uint32(0)}
+			err = queryBuildToolsJobInformation(job, windows.JobObjectBasicProcessIdList, unsafe.Pointer(&members), uint32(unsafe.Sizeof(members)))
+			if err == nil && (members.Assigned != 0 || members.Listed != 0) {
+				err = fmt.Errorf("empty private job did not overwrite member counts: assigned=%d listed=%d", members.Assigned, members.Listed)
+			}
+		case "limits":
+			var limitJob windows.Handle
+			limitJob, err = windows.CreateJobObject(nil, nil)
+			if err != nil {
+				return err
+			}
+			defer windows.CloseHandle(limitJob)
+			err = setBuildToolsQueryJobLimits(limitJob)
+			if err == nil {
+				var limits windows.JOBOBJECT_EXTENDED_LIMIT_INFORMATION
+				err = queryBuildToolsJobInformation(limitJob, windows.JobObjectExtendedLimitInformation, unsafe.Pointer(&limits), uint32(unsafe.Sizeof(limits)))
+				if err == nil && limits.BasicLimitInformation.LimitFlags != windows.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE {
+					err = fmt.Errorf("private query job limits were lost: flags=%d", limits.BasicLimitInformation.LimitFlags)
+				}
+			}
+		default:
+			err = errors.New("invalid native pointer-boundary fixture")
+		}
+	}
+	runtime.KeepAlive(padding)
+	return err
 }
