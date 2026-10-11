@@ -542,28 +542,7 @@ func desktopOwnedWindow(ctx context.Context, powerShell string, ids []int) (bool
 		output, err := exec.CommandContext(ctx, "/usr/bin/osascript", "-l", "JavaScript", "-e", script).CombinedOutput()
 		return strings.TrimSpace(string(output)) == "true", err
 	case "linux":
-		output, err := exec.CommandContext(ctx, "/usr/bin/xwininfo", "-root", "-tree").CombinedOutput()
-		if err != nil {
-			return false, fmt.Errorf("inspect disposable X display: %w: %s", err, output)
-		}
-		for _, line := range strings.Split(string(output), "\n") {
-			fields := strings.Fields(line)
-			if len(fields) == 0 || !strings.HasPrefix(fields[0], "0x") {
-				continue
-			}
-			property, err := exec.CommandContext(ctx, "/usr/bin/xprop", "-id", fields[0], "_NET_WM_PID").CombinedOutput()
-			if err != nil {
-				continue
-			}
-			_, value, ok := strings.Cut(string(property), "=")
-			if !ok {
-				continue
-			}
-			id, err := strconv.Atoi(strings.TrimSpace(value))
-			if err == nil && slices.Contains(ids, id) {
-				return true, nil
-			}
-		}
+		return desktopLinuxOwnedWindow(ctx, ids, desktopXCommand)
 	}
 	return false, nil
 }

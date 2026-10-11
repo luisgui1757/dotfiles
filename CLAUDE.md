@@ -1214,3 +1214,12 @@ Archive inspection failures become Unknown/Pending observations, rather than
 direct driver errors. Their diagnostic text is therefore bound into a blocked
 preview's plan ID. Report already-observed file metadata only; do not add read-
 time clocks or later probes. Unknown/Pending still cannot authorize mutation.
+
+Linux desktop acceptance treats X tree enumeration as a changing observation,
+not a snapshot. Discard failed enumeration stdout. Only exact native
+BadWindow/QueryTree child errors, a fresh live-root check and Window-specific
+BadWindow/GetProperty on that same non-root ID allow the existing poll to observe
+absence. Unknown errors, display/root faults and cancellation stay fatal, including
+`xprop` failures. Require the window's `_NET_WM_PID` to match an owned executable
+process and its native map state to be `IsViewable`. The original 45-second poll
+and fresh application-settings witness remain unchanged.

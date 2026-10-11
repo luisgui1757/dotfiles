@@ -7672,3 +7672,26 @@ kernel tests prove those paths separately. Actual recovery after the original
 Git failure was not exercised because it did not recur; existing transaction
 and inspection recovery gates remain required. Runtime/test bytes are frozen;
 only this proof Markdown follows, with a focused static gate before publication.
+
+### 2026-10-11 — Accepted Linux X tree disappearance boundary
+
+- Evidence: exact final `406218a` ARM Desktop job `114371815911`, raw SHA-256
+  `d6aa5553182f5dadf5bb7ffe9c10331338c0b5b7c0a1f381dd8b44f12dd40e4d`,
+  lines 423–439. Code singleton settings passed before the second launch's X
+  tree query failed on a disappearing child. Code package ownership/preservation
+  and font lifecycle had passed; full ARM GUI acceptance did not.
+- Source truth: upstream [xwininfo tree traversal](https://gitlab.freedesktop.org/xorg/app/xwininfo/-/blob/master/xwininfo.c)
+  queues geometry/tree requests after enumerating children;
+  [its error printer](https://gitlab.freedesktop.org/xorg/app/xwininfo/-/blob/master/dsimple.c)
+  emits native error/request/resource numbers. A disposable Ubuntu 26 ARM Xvfb
+  reproduction captured the same geometry/tree errors. Xlib GetProperty returns
+  BadWindow for a nonexistent window; BadDrawable alone is not the fresh proof.
+- Resolution: failed tree output never proves a window. Exact typed errors plus
+  a fresh root and matching Window-specific absent-child query may return
+  absence to the existing poll. Unrecognized/root/display/permission/context
+  errors remain fatal, including the previously unchecked `xprop` failures.
+  Native PID ownership and `IsViewable` are both required for positive proof.
+- Verification: focused red/green process-boundary cases and actual Xvfb owned,
+  outside, unmapped, destroyed and unavailable-display cases. No new runtime
+  dependency, time budget, provider behavior or sandbox policy. Corrected full
+  hosted amd64/arm64 desktop lifecycle proof remains pending.

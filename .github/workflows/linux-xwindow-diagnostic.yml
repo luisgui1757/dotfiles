@@ -1,0 +1,74 @@
+name: Linux X window native diagnostics
+on:
+  push:
+    branches: [diagnostics/linux-xwindow-406]
+permissions:
+  contents: read
+jobs:
+  desktop-lifecycle:
+    name: Desktop lifecycle (${{ matrix.runner }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-26.04
+            target: linux/amd64
+          - runner: ubuntu-26.04-arm
+            target: linux/arm64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 100
+    defaults:
+      run:
+        working-directory: installer
+        shell: bash
+    env:
+      GOTOOLCHAIN: local
+      DOTFILES_NATIVE_DESKTOP_FONTS: 1
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: 1.27.1
+          cache: ${{ !startsWith(github.ref, 'refs/tags/') }}
+          cache-dependency-path: installer/go.sum
+      - name: Verify actual native runner target
+        run: test "$(go env GOHOSTOS)/$(go env GOHOSTARCH)" = '${{ matrix.target }}'
+      - name: Prepare disposable Linux display and native font inspection
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends xvfb xauth dbus-x11 x11-utils libglib2.0-bin fontconfig pango1.0-tools apt-utils
+      # The hosted image deliberately chmods /usr/share 0777. A writable
+      # system parent is not an acceptable production installation boundary.
+      - name: Establish trusted disposable system parent
+        if: runner.os == 'Linux'
+        run: bash ../scripts/prepare-disposable-linux-host.sh desktop
+      - name: Verify native X window disappearance and query failures
+        if: runner.os == 'Linux'
+        env:
+          DOTFILES_NATIVE_XWINDOW: '1'
+        run: xvfb-run -a go test -v -count=1 -timeout 1m -run '^TestNativeDesktopXWindowBoundary$' .
+      - name: Verify pinned Code native ownership and repository preservation
+        if: runner.os == 'Linux'
+        env:
+          DOTFILES_TEST_NATIVE_PACKAGES: '1'
+          DOTFILES_TEST_NATIVE_CODE: '1'
+        run: go test -v -count=1 -timeout 15m -run '^TestNativeLinuxCodeDEBLifecycle$' .
+      - name: Install, render, check and remove native fonts
+        run: go test -v -count=1 -timeout 12m -run '^TestNativeFontInstallConsumeRemove$' .
+      - name: Consume scoped Windows Terminal settings and verify removal
+        if: runner.os == 'Windows'
+        env:
+          DOTFILES_TEST_WINDOWS_TERMINAL: '1'
+        run: go test -v -count=1 -timeout 15m -run '^TestNativeWindowsTerminalConsumesScopedSettingsAndExits$' .
+
+      - name: Launch configured desktop applications and verify update/removal
+        env:
+          DOTFILES_NATIVE_DESKTOP: '1'
+        run: |
+          if [[ "${{ runner.os }}" == Linux ]]; then
+            dbus-run-session -- xvfb-run -a go test -v -count=1 -timeout 70m -run '^TestNativeDesktopInstalledApplicationLifecycle$' .
+          else
+            go test -v -count=1 -timeout 70m -run '^TestNativeDesktopInstalledApplicationLifecycle$' .
+          fi
+

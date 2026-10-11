@@ -195,6 +195,11 @@ jobs:
       - name: Establish trusted disposable system parent
         if: runner.os == 'Linux'
         run: bash ../scripts/prepare-disposable-linux-host.sh desktop
+      - name: Verify native X window disappearance and query failures
+        if: runner.os == 'Linux'
+        env:
+          DOTFILES_NATIVE_XWINDOW: '1'
+        run: xvfb-run -a go test -v -count=1 -timeout 1m -run '^TestNativeDesktopXWindowBoundary$' .
       - name: Verify pinned Code native ownership and repository preservation
         if: runner.os == 'Linux'
         env:

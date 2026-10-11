@@ -1330,3 +1330,21 @@ and all configured Desktop/Neovim acceptance remain final-head requirements.
 Only proof Markdown follows this review/gate, with focused static verification
 before amending the existing single commit. Live policy, merge and release are
 unchanged; every 23 canonical check plus CodeQL must pass on the published head.
+
+### 2026-10-11 — Linux X window inspection boundary
+
+Final `406218a` ARM Desktop job `114371815911` passed Code's native package
+lifecycle, fonts and the singleton's fresh settings witness, then failed on
+`xwininfo` BadDrawable/GetGeometry and BadWindow/QueryTree while an enumerated
+child disappeared. AMD64 Desktop passed. The fixture treated this first failed
+query as fatal after 0.47 seconds; this is not evidence of Code startup failure.
+
+The correction discards failed tree output and permits only that exact typed
+non-root disappearance, with fresh root and Window-specific absent-child proof,
+to return absence to the unchanged 45-second poll. Other `xwininfo`/`xprop`
+errors remain fatal. Owned PID matching additionally requires `IsViewable`.
+Process-boundary regressions and a real disposable Ubuntu 26 ARM Xvfb fixture
+cover disappearance, outside/unmapped windows and unavailable-display failure.
+A real concurrent Xvfb tree deletion reproduced the recorded error; fresh native
+root/GetProperty checks accepted only its now-absent child. Both architecture
+full public desktop lifecycle proofs remain pending on the corrected source.
