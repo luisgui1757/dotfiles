@@ -30,3 +30,10 @@ directory identities after native zsh installation, verifies the frozen helper
 and refusal fixture SHA-256 values, and runs those unchanged sources followed by
 the complete unchanged `make test-shell`. No missing-directory accommodation or
 production source change is made.
+
+ARM run 38100200478/job 114354384785 proved all three directories exist with
+root:root ownership and mode 0777, and the exact helper, strict compaudit and
+all zsh/Starship tests passed. The complete shell suite also checks released
+Git-tag inventory; the temporary shallow checkout lacked v0.1.0 and that
+independent test failed. The follow-up matches canonical quality's fetch-depth 0
+and repeats the unchanged suite. Frozen helper sources remain unchanged.
