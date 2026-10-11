@@ -45,7 +45,25 @@ jobs:
             namei -l "$path"
             stat -c '%n type=%F owner=%u group=%g mode=%a' "$path"
           done < "$RUNNER_TEMP/compaudit.out"
-      - name: Run unchanged failing startup tests and preserve both results
+      - name: Establish the exact trusted disposable completion directories
+        shell: bash
+        run: |
+          set -euo pipefail
+          for path in /usr/share /usr/share/zsh /usr/share/zsh/vendor-completions; do
+            test -d "$path"
+            test "$(readlink -e "$path")" = "$path"
+            test "$(stat -c %u "$path")" = 0
+            stat -c 'Completion host before: %n owner=%u mode=%a' "$path"
+          done
+          for path in /usr/share /usr/share/zsh /usr/share/zsh/vendor-completions; do
+            sudo chmod 0755 "$path"
+            test "$(stat -c %u:%a "$path")" = 0:755
+            stat -c 'Completion host after: %n owner=%u mode=%a' "$path"
+          done
+          audit=$(zsh -d -f -c 'autoload -Uz compaudit; compaudit')
+          test -z "$audit"
+          echo 'Strict compaudit passed without insecure paths'
+      - name: Run unchanged startup tests and preserve both results
         shell: bash
         run: |
           set -euo pipefail

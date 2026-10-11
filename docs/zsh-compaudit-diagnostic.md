@@ -8,5 +8,13 @@ terminal. The job did not log the offending completion paths.
 The temporary workflow installs the same Ubuntu 26 zsh package, records native
 fpath/compaudit paths with physical ancestry, ownership and modes, then runs both
 unchanged failing tests against the generated profiles. It changes no system
-permissions, production behavior or assertions. Its failed status is expected if
-the original failure reproduces. This file and workflow do not enter delivery.
+permissions, production behavior or assertions in its first run. This file and
+workflow do not enter delivery.
+
+Run 38098923912/job 114350585028 reproduced both failures and identified
+`/usr/share/zsh/vendor-completions` and `/usr/share/zsh` as insecure physical,
+root-owned mode 0777 directories; `/usr/share` was also mode 0777. The follow-up
+checks those three exact directories are physical and root-owned before setting
+only their own modes to 0755. No recursive chmod or completion bypass is used.
+Strict compaudit must then produce no insecure paths, and both original tests
+must pass. This changes only the explicitly disposable test host.
