@@ -43,7 +43,13 @@ func desktopStopProcess(ctx context.Context, root string, id int) (result error)
 	var image [32768]uint16
 	size := uint32(len(image))
 	if err := windows.QueryFullProcessImageName(handle, 0, &image[0], &size); err != nil {
-		return fmt.Errorf("inspect desktop process %d image: %w", id, err)
+		cause := fmt.Errorf("inspect desktop process %d image: %w", id, err)
+		if errors.Is(err, windows.ERROR_ACCESS_DENIED) {
+			// An exiting process can stop exposing its image before its object
+			// signals. Wait only; never signal a process with unproved ownership.
+			return desktopWaitWindowsProcess(ctx, handle, cause)
+		}
+		return cause
 	}
 	path, err := resolveConfigPath(windows.UTF16ToString(image[:size]))
 	if err != nil {
@@ -62,32 +68,34 @@ func desktopTerminateWindowsProcess(ctx context.Context, handle windows.Handle) 
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	deadline, ok := ctx.Deadline()
-	if !ok {
+	if _, ok := ctx.Deadline(); !ok {
 		return errors.New("desktop process cleanup requires a deadline")
-	}
-	remaining := time.Until(deadline)
-	if remaining <= 0 {
-		return context.DeadlineExceeded
 	}
 	terminateErr := windows.TerminateProcess(handle, 1)
 	if terminateErr != nil && !errors.Is(terminateErr, windows.ERROR_ACCESS_DENIED) {
 		return terminateErr
 	}
-	remaining = max(0, time.Until(deadline))
-	milliseconds := uint32(remaining / time.Millisecond)
-	if terminateErr != nil {
-		// Windows returns ACCESS_DENIED for an already terminated process.
-		// Accept that error only when this exact held object is already signaled;
-		// a live handle without termination rights remains a failure.
-		milliseconds = 0
+	return desktopWaitWindowsProcess(ctx, handle, terminateErr)
+}
+
+// Termination and image inspection can report ACCESS_DENIED while the exact
+// object is still finishing rundown. Use only the existing shared deadline;
+// a still-live/inaccessible object retains its original error and cannot pass.
+func desktopWaitWindowsProcess(ctx context.Context, handle windows.Handle, cause error) error {
+	if err := ctx.Err(); err != nil {
+		return errors.Join(cause, err)
 	}
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		return errors.Join(cause, errors.New("desktop process cleanup requires a deadline"))
+	}
+	milliseconds := uint32(max(0, time.Until(deadline)) / time.Millisecond)
 	status, waitErr := windows.WaitForSingleObject(handle, milliseconds)
 	if waitErr != nil {
-		return errors.Join(terminateErr, waitErr)
+		return errors.Join(cause, waitErr)
 	}
 	if status != windows.WAIT_OBJECT_0 {
-		return errors.Join(terminateErr, fmt.Errorf("desktop process completion unproved: wait=%d", status))
+		return errors.Join(cause, fmt.Errorf("desktop process completion unproved: wait=%d", status))
 	}
 	return nil
 }
@@ -175,7 +183,7 @@ func TestDesktopWindowsStopRequiresExactCompletionAndPrivateImage(t *testing.T) 
 		return command.Process.Pid, handle
 	}
 	outsidePID, outsideHandle := start(t, outside)
-	for _, name := range []string{"owned", "exited", "live-denied", "outside", "canceled"} {
+	for _, name := range []string{"owned", "exited", "terminating", "live-denied", "image-denied", "outside", "canceled"} {
 		t.Run(name, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
@@ -211,7 +219,22 @@ func TestDesktopWindowsStopRequiresExactCompletionAndPrivateImage(t *testing.T) 
 				if err := desktopTerminateWindowsProcess(ctx, handle); err != nil {
 					t.Fatal("signaled held process was not accepted", err)
 				}
-			case "live-denied":
+			case "terminating":
+				if err := windows.TerminateProcess(handle, 1); err != nil {
+					t.Fatal(err)
+				}
+				status, err := windows.WaitForSingleObject(handle, 0)
+				if err != nil {
+					t.Fatal(err)
+				}
+				t.Log("asynchronous termination initial exact wait:", status)
+				if err := desktopTerminateWindowsProcess(ctx, handle); err != nil {
+					t.Fatal("asynchronously terminating object was not reaped", err)
+				}
+				if status, err := windows.WaitForSingleObject(handle, 0); err != nil || status != windows.WAIT_OBJECT_0 {
+					t.Fatal("asynchronous cleanup returned before exact completion", status, err)
+				}
+			case "live-denied", "image-denied":
 				limited, err := windows.OpenProcess(windows.SYNCHRONIZE, false, uint32(pid))
 				if err != nil {
 					t.Fatal(err)
@@ -221,7 +244,18 @@ func TestDesktopWindowsStopRequiresExactCompletionAndPrivateImage(t *testing.T) 
 						t.Error(err)
 					}
 				}()
-				if err := desktopTerminateWindowsProcess(ctx, limited); !errors.Is(err, windows.ERROR_ACCESS_DENIED) {
+				if name == "live-denied" {
+					err = desktopTerminateWindowsProcess(ctx, limited)
+				} else {
+					var image [32768]uint16
+					size := uint32(len(image))
+					imageErr := windows.QueryFullProcessImageName(limited, 0, &image[0], &size)
+					if !errors.Is(imageErr, windows.ERROR_ACCESS_DENIED) {
+						t.Fatal("restricted image query did not establish native denial", imageErr)
+					}
+					err = desktopWaitWindowsProcess(ctx, limited, imageErr)
+				}
+				if !errors.Is(err, windows.ERROR_ACCESS_DENIED) || !strings.Contains(err.Error(), "completion unproved") {
 					t.Fatal("live termination denial was accepted", err)
 				}
 			case "outside":
@@ -234,7 +268,7 @@ func TestDesktopWindowsStopRequiresExactCompletionAndPrivateImage(t *testing.T) 
 					t.Fatal("canceled cleanup lost its cause", err)
 				}
 			}
-			if name == "live-denied" || name == "canceled" {
+			if name == "live-denied" || name == "image-denied" || name == "canceled" {
 				if status, err := windows.WaitForSingleObject(handle, 0); err != nil || status != uint32(windows.WAIT_TIMEOUT) {
 					t.Fatal("unapproved live process did not survive", status, err)
 				}

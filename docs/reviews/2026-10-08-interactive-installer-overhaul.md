@@ -7462,3 +7462,32 @@ and local race coverage pass; native results are pending. Initial local test
 setup failed because the shared private Go source tree was incomplete; it is not
 counted as the regression red. A separate toolchain was extracted from the
 previously verified Go 1.27.1 archive without changing the workstation.
+
+
+#### Native Desktop teardown refinement within the same deadline
+
+Temporary head `c68557f42c1722a35bcaafae4c00c393198d1d2f`, run
+38103229644/job 114363304745, passes the real old-Kill denial control and all
+five guarded kernel cases, plus the fresh-witness regression. The full GUI
+then publishes a fresh singleton settings witness but fails cleanup: PID4560
+reports ACCESS_DENIED with an immediate WAIT_TIMEOUT258; two other captured
+processes report image-query ACCESS_DENIED during the same rundown. Raw SHA-256:
+`92a5d7b751d796bdeb514830e7a48f56c5445191e6dac4dde4ae49c7444a7ad9`.
+This rejects the narrower assumption that completed termination must already
+signal at a zero-time wait. It does not justify ignoring any access error.
+
+Wait passively on the exact acquired object within the existing shared 15-second
+cleanup deadline after termination denial. If image inspection is denied, only
+wait: never signal an unvalidated executable. Success still requires
+WAIT_OBJECT_0; an object that stays live retains the original access error and
+unproved-completion result. Kernel coverage adds asynchronous termination and a
+live handle lacking image-query rights, retaining outside survival. No new
+retry, timeout or authority was added. The original failed diagnostic remains
+preserved, and complete native GUI proof is still required.
+
+Independent review also identified the POSIX adapter's os.Process ownership:
+release the acquired Process after Kill, join release errors and preserve
+os.ErrProcessDone normalization. This closes its Linux pidfd lifetime without
+changing signal policy. Real macOS private-process/alias/outside-survival and
+fresh-witness race checks pass in 2.524s; Windows source is unaffected by that
+platform-specific refinement.
