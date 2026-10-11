@@ -7419,3 +7419,46 @@ one-commit amendment in PR #87; all 23 canonical native/quality contexts and
 CodeQL must pass on that exact published head before the PR is ready. Required
 context cutover remains a separate explicitly authorized owner action before
 merge. No live policy, daily-Mac native packages, fonts or GUI were changed.
+
+
+### 2026-10-11 — Windows Desktop fixture exit race and stale witness
+
+Final `127e35d` job 114360377438 passed native fonts (22.29s), Terminal settings
+(31.43s) and the Code singleton (9.20s); its second Code invocation failed in
+`desktopStopOwned` after 4.57s with `TerminateProcess: Access is denied.` This
+is deferred fixture cleanup, not a launch/window assertion. Raw log SHA-256:
+`19ff2311be0276b5a10586f87013d88e7e13ad6de1e446c0a76e95ef80841c41`.
+The log alone cannot identify whether the exact process had already exited.
+[Microsoft documents post-exit ERROR_ACCESS_DENIED](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-terminateprocess),
+while [Go 1.27.1 Kill returns the native error](https://github.com/golang/go/blob/go1.27.1/src/os/exec_windows.go)
+without converting it to os.ErrProcessDone. Sequentially stopping an application's
+parent and children must handle that documented boundary without ignoring a live
+permission failure.
+
+The Windows-only test adapter opens an exact HANDLE, validates its executable
+against the physical private package root, and then terminates/waits within the
+existing cleanup deadline. This closes the CIM PID-to-handle reuse gap: a candidate
+PID cannot authorize terminating an outside executable. ACCESS_DENIED is accepted
+only if a zero-time wait proves that exact held object has already terminated;
+live denial and unproved completion remain fatal. The existing final empty-root
+inventory and all public lifecycle assertions remain required. There is no new
+process framework, retry budget, global process exclusion or product change.
+POSIX cleanup keeps its existing behavior.
+
+The same fixture also reused `Code settings witness.json` under the same home
+for singleton and complete-group launches, while per-launch cleanup removed only
+the extension. A real filesystem regression retains the first witness, recreates
+the extension and proves the second invocation must use a distinct absent file
+without changing the earlier bytes. It fails on the old same-path recipe and
+passes with one t.TempDir per invocation. Both native launches now log successful
+fresh settings evidence only after the extension host writes that invocation's
+file and all existing theme/font assertions pass. The earlier short second
+invocation is not proof that stale evidence caused the observed process race.
+
+The real Windows kernel regression will exercise the original os.Process.Kill
+post-exit denial, corrected exact-HANDLE acceptance, a live handle lacking
+termination rights, cancellation and outside-image survival. Compilation/vet
+and local race coverage pass; native results are pending. Initial local test
+setup failed because the shared private Go source tree was incomplete; it is not
+counted as the regression red. A separate toolchain was extracted from the
+previously verified Go 1.27.1 archive without changing the workstation.

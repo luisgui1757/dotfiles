@@ -312,7 +312,7 @@ func desktopConsumePublished(t *testing.T, d *DesktopDriver, a *ArchiveDriver, i
 	}
 	witness := ""
 	if id == "vscode" {
-		witness = desktopVSCodeWitness(t, d.Folders, home)
+		witness = desktopVSCodeWitness(t, d.Folders)
 	}
 	t.Cleanup(func() { desktopFailureLogs(t, d.Folders, id) })
 	args := []string{}
@@ -419,6 +419,7 @@ func desktopConsumePublished(t *testing.T, d *DesktopDriver, a *ArchiveDriver, i
 				if result.Theme != "Rosé Pine" || !strings.Contains(result.Font, "Hack Nerd Font") || !strings.Contains(result.TerminalFont, "Hack Nerd Font") {
 					t.Fatal("Code extension host did not consume managed settings", result)
 				}
+				t.Log("fresh Code extension host settings witness verified")
 				break
 			}
 			if !errors.Is(err, os.ErrNotExist) || time.Now().After(deadline) {
@@ -457,13 +458,15 @@ func desktopConsumePublished(t *testing.T, d *DesktopDriver, a *ArchiveDriver, i
 	}
 }
 
-func desktopVSCodeWitness(t *testing.T, folders ConfigFolders, home string) string {
+func desktopVSCodeWitness(t *testing.T, folders ConfigFolders) string {
 	t.Helper()
 	dir := filepath.Join(folders.Home, ".vscode", "extensions", "dotfiles-fixture.native-settings-1.0.0")
 	if _, err := os.Lstat(dir); !errors.Is(err, os.ErrNotExist) {
 		t.Fatal("fixture extension collision", err)
 	}
-	witness := filepath.Join(home, "Code settings witness.json")
+	// Singleton and complete-group launches share the same home. Evidence must be
+	// fresh for this invocation, even when a prior launch left its file behind.
+	witness := filepath.Join(t.TempDir(), "Code settings witness.json")
 	writeConfigFixture(t, filepath.Join(dir, "package.json"), `{"name":"native-settings","publisher":"dotfiles-fixture","version":"1.0.0","engines":{"vscode":"^1.90.0"},"activationEvents":["onStartupFinished"],"main":"./extension.js"}`)
 	location, _ := json.Marshal(witness)
 	writeConfigFixture(t, filepath.Join(dir, "extension.js"), `exports.activate=()=>{const vscode=require('vscode');const fs=require('fs');const c=vscode.workspace.getConfiguration();fs.writeFileSync(`+string(location)+`,JSON.stringify({Theme:c.get('workbench.colorTheme'),Font:c.get('editor.fontFamily'),TerminalFont:c.get('terminal.integrated.fontFamily')}));};`)
@@ -578,15 +581,7 @@ func desktopStopOwned(t *testing.T, powerShell, root string) {
 			return
 		}
 		for _, id := range ids {
-			process, err := os.FindProcess(id)
-			if err != nil {
-				if errors.Is(err, os.ErrProcessDone) {
-					continue
-				}
-				t.Error(err)
-				continue
-			}
-			if err := process.Kill(); err != nil && !errors.Is(err, os.ErrProcessDone) {
+			if err := desktopStopProcess(ctx, root, id); err != nil {
 				t.Error(err)
 			}
 		}

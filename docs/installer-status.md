@@ -1184,3 +1184,26 @@ one-commit amendment in PR #87; all 23 canonical native/quality contexts and
 CodeQL must pass on that exact published head before the PR is ready. Required
 context cutover remains a separate explicitly authorized owner action before
 merge. No live policy, daily-Mac native packages, fonts or GUI were changed.
+
+
+### 2026-10-11 — Windows desktop cleanup and fresh launch evidence
+
+At final head `127e35d676c69a65068b55e15c0c3508c6a7f3dc`, Windows Desktop
+job 114360377438 passed fonts, Terminal settings and the VS Code singleton,
+then failed the second Code invocation in deferred cleanup with
+`TerminateProcess: Access is denied.` Raw log SHA-256:
+`19ff2311be0276b5a10586f87013d88e7e13ad6de1e446c0a76e95ef80841c41`.
+Windows documents that an already terminated process produces this error;
+the old fixture distinguished only os.ErrProcessDone. The fixture now validates
+the acquired process HANDLE's image under its private root before signaling it,
+and accepts a termination denial only if that exact object is already signaled.
+Live denial remains an error. The existing cleanup deadline and outer inventory
+are retained, and POSIX signal behavior is unchanged.
+
+The two Code invocations also reused one settings witness in their shared home.
+Each invocation now has a unique absent witness, preserving the preceding file.
+The local filesystem regression fails before this change and passes afterward;
+the native lifecycle must obtain fresh extension-host evidence on both launches.
+Windows compilation/vet and the focused local race test pass. Actual Windows
+kernel and full public Desktop lifecycle proof remain pending in the separate
+scoped diagnostic; the original final-head job remains failed.
