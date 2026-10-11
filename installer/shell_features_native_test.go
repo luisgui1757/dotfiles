@@ -129,7 +129,40 @@ func selectedShellLifecycle(t *testing.T) {
 	if _, err := os.Lstat(d.Archives.currentLink("tool.zoxide")); !os.IsNotExist(err) {
 		t.Fatal("unused private dependency survived removal", err)
 	}
-	dispatchApproved(t, c, Request{Schema: 1, Mode: "apply", Selected: []string{}})
+	var retainedShell []byte
+	if powershell {
+		retainedShell, err = os.ReadFile(edited)
+		if err != nil || !strings.Contains(string(retainedShell), "# >>> dotfiles:integration.shells >>>") || !strings.HasSuffix(string(retainedShell), personal) {
+			t.Fatal("expected owned shell block and personal suffix before deselection", err)
+		}
+	}
+	removed := dispatchApproved(t, c, Request{Schema: 1, Mode: "apply", Selected: []string{}})
+	if powershell {
+		// A shared runtime and its shell prerequisite remain until the user
+		// explicitly authorizes removal of that exact owned runtime.
+		for _, id := range []string{"tool.powershell", "integration.shells"} {
+			op := operation(t, removed.Plan, id)
+			if op.Action != "retain" || op.Ownership != "created" || !op.Observed.Present {
+				t.Fatal("shared PowerShell deselection did not retain its owned prerequisite", op)
+			}
+		}
+		if _, err := os.Lstat(d.Archives.currentLink("tool.powershell")); err != nil {
+			t.Fatal("shared PowerShell archive was not retained", err)
+		}
+		data, err := os.ReadFile(edited)
+		if err != nil || string(data) != string(retainedShell) {
+			t.Fatal("default retention changed the owned shell block or personal suffix", err)
+		}
+		t.Log("default deselection retained owned PowerShell and exact shell/personal bytes")
+		removed = dispatchApproved(t, c, Request{Schema: 1, Mode: "apply", Selected: []string{}, RemoveShared: []string{"tool.powershell"}})
+		if op := operation(t, removed.Plan, "tool.powershell"); op.Action != "remove" || op.Ownership != "created" {
+			t.Fatal("explicit owned PowerShell removal was not performed", op)
+		}
+		if _, err := os.Lstat(d.Archives.currentLink("tool.powershell")); !os.IsNotExist(err) {
+			t.Fatal("owned PowerShell archive survived explicit removal", err)
+		}
+		t.Log("explicit per-item removal released only the owned PowerShell runtime")
+	}
 	for _, id := range []string{"tool.starship", "tool.fzf", "tool.zoxide"} {
 		if _, err := os.Lstat(d.Archives.currentLink(id)); !os.IsNotExist(err) {
 			t.Fatal("private dependency survived full removal", id, err)

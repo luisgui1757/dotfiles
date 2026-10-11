@@ -1,0 +1,41 @@
+name: Windows shared PowerShell shell lifecycle proof
+
+on:
+  push:
+    branches: [diagnostics/installer-shell-shared-removal-v9]
+
+permissions:
+  contents: read
+
+env:
+  GOTOOLCHAIN: local
+
+jobs:
+  shell:
+    runs-on: windows-2025
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: installer
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: 1.27.1
+          cache-dependency-path: installer/go.sum
+      - name: Assert native Windows amd64
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          $target = (go env GOOS GOARCH) -join '/'
+          if (-not $IsWindows -or $target -cne 'windows/amd64') {
+            throw "Expected native Windows amd64, found $target"
+          }
+      - name: Exercise complete selected-shell lifecycle with explicit owned runtime removal
+        env:
+          DOTFILES_TEST_ARCHIVES: '1'
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          go test -v -count=1 -timeout 20m -run '^TestNativeArchiveSelectedShellFeaturesLifecycle$' .
