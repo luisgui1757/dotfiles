@@ -18,3 +18,8 @@ checks those three exact directories are physical and root-owned before setting
 only their own modes to 0755. No recursive chmod or completion bypass is used.
 Strict compaudit must then produce no insecure paths, and both original tests
 must pass. This changes only the explicitly disposable test host.
+
+The final diagnostic uses the exact proposed fixed helper, with namespace-isolated
+foreign-owner, symlink, invalid-host and invalid-recipe refusal tests. The private
+mount changes only the namespace's fixture directories, then exits before the
+normal hosted completion directories are prepared and original tests run.
