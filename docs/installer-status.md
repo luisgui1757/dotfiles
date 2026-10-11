@@ -1184,3 +1184,15 @@ one-commit amendment in PR #87; all 23 canonical native/quality contexts and
 CodeQL must pass on that exact published head before the PR is ready. Required
 context cutover remains a separate explicitly authorized owner action before
 merge. No live policy, daily-Mac native packages, fonts or GUI were changed.
+
+### 2026-10-11 — Windows Git inspection diagnostic pending
+
+Final127 Windows Neovim failed final resource inspection with `tool.git:
+configuration changed during inspection`, before the fixture smoke. The generic
+message did not identify a changed entry or metadata field; no Git cache or
+outside mutation cause is proved. An isolated failure-only diagnostic retains the
+original fingerprint/approval/refusal rules and original complete native lifecycle,
+adds bounded entry metadata and saved/current Git provenance, and probes a hidden
+Windows identity-query error only after the existing identity comparison fails.
+The original127 run remains failed. Temporary diagnostic proof is pending, not a
+runtime correction or final-head acceptance.

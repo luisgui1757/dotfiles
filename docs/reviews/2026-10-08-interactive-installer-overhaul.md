@@ -7419,3 +7419,24 @@ one-commit amendment in PR #87; all 23 canonical native/quality contexts and
 CodeQL must pass on that exact published head before the PR is ready. Required
 context cutover remains a separate explicitly authorized owner action before
 merge. No live policy, daily-Mac native packages, fonts or GUI were changed.
+
+### 2026-10-11 — final127 Windows Git inspection evidence gap
+
+Job114360377352 at127e35d failed after626.52s with only the generic tree-scan
+refusal for private `tool.git`; Node's failure diagnostic proved its own archive
+unchanged. The error originates in the per-entry Lstat identity/mode/size/mtime
+comparison, not the planner approval comparison. Its resource-ID-only message
+matches final Unknown/Pending verification. The log does not prove a Git mutation,
+and the fixture's separate smoke never ran. Pinned Go1.27.1 also returns false
+from SameFile on a hidden native identity-query error:
+https://github.com/golang/go/blob/go1.27.1/src/os/types_windows.go .
+
+The isolated diagnostic adds only bounded root-relative failure metadata and one
+subsequent Windows identity probe with Go's flags, preserving the original error.
+Failure-only fixture logging reads the exact Git current/version/saved snapshot
+and transaction receipts; it does not execute Git, download/reconstruct payloads,
+retry approval, or dump file contents/environment/global process inventory. The
+original whole Windows Neovim lifecycle is the native reproduction target. Any
+new failure remains a failure; a non-reproduction is not proof of a root cause.
+No product correction is justified until the concrete native evidence identifies
+the changed predicate. Existing stable-copy/user-edit/link/bounds assertions remain.

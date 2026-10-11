@@ -142,8 +142,9 @@ func inspectTree(path string, byteLimit int64, entryLimit int) ([]configEntry, e
 			}
 		}
 		after, err := os.Lstat(name)
-		if err != nil || !os.SameFile(before, after) || before.Mode() != after.Mode() || before.Size() != after.Size() || !before.ModTime().Equal(after.ModTime()) {
-			return errors.Join(errors.New("configuration changed during inspection; review a fresh plan"), err)
+		same := err == nil && os.SameFile(before, after)
+		if err != nil || !same || before.Mode() != after.Mode() || before.Size() != after.Size() || !before.ModTime().Equal(after.ModTime()) {
+			return configInspectionFailure(name, relative, entry.Kind, before, after, same, err)
 		}
 		return nil
 	}

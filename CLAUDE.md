@@ -1190,3 +1190,12 @@ Failure-only accounting diagnostics cannot authorize success. Native kernel
 sentinel output and limit readback, original-wrapper red proof where reproduced,
 and actual compiler reuse complement compilation/escape-analysis evidence. Do
 not claim an old Set runtime failure when its diagnostic did not reproduce one.
+
+
+A tree-inspection refusal is distinct from a changed approved fingerprint. Its
+failure diagnostic must identify only a bounded root-relative entry and the
+before/after kind, mode, size, modification time and identity comparison. Keep the
+original refusal and any Lstat error. On Windows, Go1.27.1 `os.SameFile` can also
+return false when its native identity query fails; a subsequent read-only probe
+may expose that error, but cannot certify or retry the earlier scan. Never infer
+cache/antivirus mutation, log file contents, or bypass the guard without evidence.

@@ -59,6 +59,9 @@ func TestNativeNeovimInstalledApplicationLifecycle(t *testing.T) {
 	d := c.Driver.(*NativeDriver)
 	t.Cleanup(func() {
 		if t.Failed() {
+			if runtime.GOOS == "windows" {
+				nativeGitInspectionDiagnostic(t, d.Archives, c.StatePath, c.Home)
+			}
 			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 			defer cancel()
 			detail, err := nativeNodeArchiveDiagnostic(ctx, d.Archives, filepath.Join(t.TempDir(), "node-reference"))
