@@ -88,7 +88,7 @@ $errors = $null
 $ast = [Management.Automation.Language.Parser]::ParseFile($Launcher, [ref]$tokens, [ref]$errors)
 if (@($errors).Count -ne 0) { throw 'Bootstrap parse error' }
 $imports = @($ast.FindAll({ param($node)
-	$node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Import-BootstrapModules'
+	$node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Import-BootstrapModule'
 }, $true))
 if ($imports.Count -ne 1) { throw 'Expected one bootstrap built-in module binding' }
 & $imports[0].Body.GetScriptBlock()

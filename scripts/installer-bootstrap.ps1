@@ -10,12 +10,12 @@ if ($env:OS -ne 'Windows_NT' -or $env:PROCESSOR_ARCHITECTURE -ne 'AMD64' -or
 }
 # Bind the built-in modules to the current engine, even through a PS7 -> native
 # process -> Windows PowerShell 5.1 launch. Preserve the launching module path.
-function Import-BootstrapModules {
+function Import-BootstrapModule {
     foreach ($Name in @('Microsoft.PowerShell.Management', 'Microsoft.PowerShell.Utility')) {
         Import-Module ([IO.Path]::Combine($PSHOME, 'Modules', $Name, "$Name.psd1")) -ErrorAction Stop
     }
 }
-Import-BootstrapModules
+Import-BootstrapModule
 $Checkout = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).ProviderPath
 $Pins = @(Get-Content -LiteralPath (Join-Path $Checkout 'installer/bootstrap-toolchain.tsv') |
     Where-Object { -not $_.StartsWith('#') } | ConvertFrom-Csv -Delimiter "`t")

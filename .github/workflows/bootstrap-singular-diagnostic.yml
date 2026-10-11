@@ -1,0 +1,63 @@
+name: Windows bootstrap singular-noun proof
+
+on:
+  push:
+    branches: [diagnostics/installer-bootstrap-singular-v8]
+
+permissions:
+  contents: read
+
+env:
+  GOTOOLCHAIN: local
+
+jobs:
+  bootstrap:
+    runs-on: windows-2025
+    timeout-minutes: 12
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: 1.27.1
+          cache-dependency-path: installer/go.sum
+      - name: Assert native target and required analyzer
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          if (-not $IsWindows -or (go env GOOS GOARCH) -join '/' -cne 'windows/amd64') {
+            throw 'Expected native Windows amd64'
+          }
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module PSScriptAnalyzer -RequiredVersion 1.25.0 -Force -Scope CurrentUser -SkipPublisherCheck -ErrorAction Stop
+          Import-Module PSScriptAnalyzer -RequiredVersion 1.25.0 -Force
+          Get-Module PSScriptAnalyzer | Format-Table Name,Version,Path -AutoSize
+      - name: Prove actual analyzer failure before and success after rename
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          Import-Module PSScriptAnalyzer -RequiredVersion 1.25.0 -Force
+          $before = Join-Path $env:RUNNER_TEMP 'bootstrap-before-044f978.ps1'
+          $original = (& git show 044f9780705faa996914ed95de2aed2126802ba9:scripts/installer-bootstrap.ps1) -join "`n"
+          [IO.File]::WriteAllText($before, $original + "`n", [Text.UTF8Encoding]::new($false))
+          $old = @(Invoke-ScriptAnalyzer -Path $before -Severity Warning,Error)
+          $old | Format-Table RuleName,Severity,Line,Message -AutoSize
+          if ($old.Count -ne 1 -or $old[0].RuleName -cne 'PSUseSingularNouns' -or $old[0].Message -notmatch 'Import-BootstrapModules') {
+            throw 'Original exact naming failure was not reproduced'
+          }
+          $current = @(Invoke-ScriptAnalyzer -Path scripts/installer-bootstrap.ps1 -Severity Warning,Error)
+          if ($current.Count) {
+            $current | Format-Table RuleName,Severity,Line,Message -AutoSize
+            throw 'Corrected bootstrap still has analyzer findings'
+          }
+          Write-Host 'Actual PSScriptAnalyzer1.25: original singular-noun failure reproduced; renamed bootstrap has zero findings.'
+      - name: Exercise actual bootstrap extraction and inherited native module binding
+        working-directory: installer
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          go test -count=1 -v -timeout 3m -run '^(TestBootstrapToolchainExtraction|TestWindowsPowerShellInheritedModulePath|TestWindowsPowerShellBaselineDiagnostic)$' ./...

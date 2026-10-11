@@ -88,7 +88,7 @@ func TestWindowsPowerShellInheritedModulePath(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	bootstrap := `$ErrorActionPreference='Stop'; $tokens=$null; $problems=$null; $ast=[Management.Automation.Language.Parser]::ParseFile(` + desktopPSQuote(launcher) + `,[ref]$tokens,[ref]$problems); if ($problems.Count) { throw 'Bootstrap parse error' }; $functions=@($ast.FindAll({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Import-BootstrapModules'},$true)); if ($functions.Count -ne 1) { throw 'Missing bootstrap module binding' }; & $functions[0].Body.GetScriptBlock(); ` + script
+	bootstrap := `$ErrorActionPreference='Stop'; $tokens=$null; $problems=$null; $ast=[Management.Automation.Language.Parser]::ParseFile(` + desktopPSQuote(launcher) + `,[ref]$tokens,[ref]$problems); if ($problems.Count) { throw 'Bootstrap parse error' }; $functions=@($ast.FindAll({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Import-BootstrapModule'},$true)); if ($functions.Count -ne 1) { throw 'Missing bootstrap module binding' }; & $functions[0].Body.GetScriptBlock(); ` + script
 	command := exec.CommandContext(ctx, powershell, "-NoLogo", "-NoProfile", "-NonInteractive", "-Command", bootstrap)
 	output, err = command.CombinedOutput()
 	if err != nil || strings.TrimSpace(string(output)) != want {
