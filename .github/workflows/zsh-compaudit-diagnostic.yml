@@ -1,0 +1,64 @@
+name: Temporary Ubuntu zsh compaudit diagnostic
+
+on:
+  push:
+    branches: [diagnostics/zsh-compaudit-044]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  observe:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: 1.27.1
+          cache-dependency-path: installer/go.sum
+      - name: Install the same native zsh package
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y zsh
+          zsh --version
+      - name: Observe native completion audit without changing permissions
+        shell: bash
+        run: |
+          set -euo pipefail
+          zsh -d -f -c 'print -rl -- $fpath' | while IFS= read -r path; do
+            if [[ -e "$path" ]]; then
+              namei -l "$path"
+              stat -c '%n type=%F owner=%u group=%g mode=%a' "$path"
+            fi
+          done
+          set +e
+          zsh -d -f -c 'autoload -Uz compaudit; compaudit' > "$RUNNER_TEMP/compaudit.out" 2> "$RUNNER_TEMP/compaudit.err"
+          audit_status=$?
+          set -e
+          printf 'compaudit exit=%s\n' "$audit_status"
+          cat "$RUNNER_TEMP/compaudit.out" "$RUNNER_TEMP/compaudit.err"
+          while IFS= read -r path; do
+            [[ "$path" == /* ]] || exit 1
+            namei -l "$path"
+            stat -c '%n type=%F owner=%u group=%g mode=%a' "$path"
+          done < "$RUNNER_TEMP/compaudit.out"
+      - name: Run unchanged failing startup tests and preserve both results
+        shell: bash
+        run: |
+          set -euo pipefail
+          export DOTFILES_SHELL_FIXTURES="$RUNNER_TEMP/shell-fixtures"
+          mkdir "$DOTFILES_SHELL_FIXTURES"
+          DOTFILES_WRITE_SHELL_FIXTURES="$DOTFILES_SHELL_FIXTURES" go -C installer test -count=1 -run '^TestWriteActiveShellFixtures$' .
+          failed=0
+          for script in tests/shell/starship_init_test.sh tests/shell/zsh_startup_test.sh; do
+            set +e
+            bash "$script"
+            result=$?
+            set -e
+            printf '%s exit=%s\n' "$script" "$result"
+            if [[ "$result" -ne 0 ]]; then failed=1; fi
+          done
+          exit "$failed"
