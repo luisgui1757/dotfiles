@@ -1,0 +1,109 @@
+name: Windows Gallery dependency diagnostic
+
+on:
+  push:
+    branches: [diagnostics/installer-windows-gallery-v8]
+
+permissions:
+  contents: read
+
+jobs:
+  gallery:
+    runs-on: windows-2025
+    timeout-minutes: 12
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Observe native repository and official feed
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (-not $IsWindows -or [Runtime.InteropServices.RuntimeInformation]::OSArchitecture -ne 'X64') {
+            throw 'Expected native Windows amd64'
+          }
+          $PSVersionTable | Format-Table -AutoSize
+          Get-Module -ListAvailable PowerShellGet,PackageManagement,PSScriptAnalyzer,Pester |
+            Select-Object Name,Version,Path | Format-Table -AutoSize
+          $repositories = @(Get-PSRepository -ErrorAction SilentlyContinue)
+          Write-Host "Repository count: $($repositories.Count)"
+          $repositories | Select-Object Name,SourceLocation,InstallationPolicy,PackageManagementProvider |
+            ConvertTo-Json -Depth 3
+          Get-PackageProvider -ListAvailable | Select-Object Name,Version | Format-Table -AutoSize
+          $url = "https://www.powershellgallery.com/api/v2/FindPackagesById()?id='PSScriptAnalyzer'"
+          try {
+            $response = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 60
+            $feed = [xml]$response.Content
+            Write-Host "Official Gallery: HTTP $($response.StatusCode), bytes $($response.RawContentLength), entries $(@($feed.feed.entry).Count)"
+            $feed.feed.entry | Select-Object -Last 3 | ForEach-Object {
+              Write-Host "Entry: $($_.title.'#text') $($_.properties.Version)"
+            }
+          } catch {
+            Write-Host "Official Gallery diagnostic failed: $($_.Exception.GetType().FullName): $($_.Exception.Message)"
+          }
+      - name: Reproduce unchanged required module installation
+        run: |
+          $VerbosePreference = 'Continue'
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          $WarningPreference = 'Stop'
+          if (Get-PSRepository -Name PSGallery -ErrorAction SilentlyContinue) {
+            Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          }
+          function Install-ModuleWithRetry {
+            param(
+              [Parameter(Mandatory)][string]$Name,
+              [string]$MinimumVersion = ''
+            )
+            $installArgs = @{
+              Name = $Name
+              Force = $true
+              Scope = 'CurrentUser'
+              SkipPublisherCheck = $true
+              ErrorAction = 'Stop'
+            }
+            if (-not [string]::IsNullOrWhiteSpace($MinimumVersion)) {
+              $installArgs.MinimumVersion = $MinimumVersion
+            }
+            for ($attempt = 1; $attempt -le 3; $attempt++) {
+              try {
+                Install-Module @installArgs
+                return
+              } catch {
+                if ($attempt -eq 3) { throw }
+                Write-Host ("WARN: Install-Module {0} failed on attempt {1}/3: {2}" -f $Name, $attempt, $_.Exception.Message)
+                Start-Sleep -Seconds (5 * $attempt)
+              }
+            }
+          }
+          $pester = Get-Module -ListAvailable Pester |
+            Where-Object { $_.Version -ge [version]'5.0.0' } |
+            Sort-Object Version -Descending |
+            Select-Object -First 1
+          if (-not $pester) {
+            Install-ModuleWithRetry -Name Pester -MinimumVersion 5.5.0
+          }
+          Install-ModuleWithRetry -Name PSScriptAnalyzer
+          Import-Module PSScriptAnalyzer -Force
+          Get-Command Invoke-ScriptAnalyzer | Select-Object Name,Source,Version | Format-Table -AutoSize
+      - name: Diagnose explicit repository boundary after original result
+        if: always()
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $VerbosePreference = 'Continue'
+          $repository = Get-PSRepository -Name PSGallery -ErrorAction SilentlyContinue
+          if (-not $repository) {
+            Write-Host 'PSGallery absent: testing only official default registration on this disposable runner.'
+            Register-PSRepository -Default -InstallationPolicy Trusted
+          } else {
+            Write-Host 'PSGallery already registered; no registration change made.'
+          }
+          Get-PSRepository -Name PSGallery | Select-Object Name,SourceLocation,InstallationPolicy,PackageManagementProvider |
+            ConvertTo-Json -Depth 3
+          Find-Module -Name PSScriptAnalyzer -Repository PSGallery -ErrorAction Stop |
+            Select-Object Name,Version,Repository,PublishedDate | Format-Table -AutoSize
+          if (-not $repository) {
+            Install-Module -Name PSScriptAnalyzer -Repository PSGallery -Force -Scope CurrentUser -SkipPublisherCheck -ErrorAction Stop
+            Import-Module PSScriptAnalyzer -Force
+            Get-Command Invoke-ScriptAnalyzer | Select-Object Name,Source,Version | Format-Table -AutoSize
+          }
