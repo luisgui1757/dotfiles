@@ -23,3 +23,10 @@ The final diagnostic uses the exact proposed fixed helper, with namespace-isolat
 foreign-owner, symlink, invalid-host and invalid-recipe refusal tests. The private
 mount changes only the namespace's fixture directories, then exits before the
 normal hosted completion directories are prepared and original tests run.
+
+The ARM verification follows review v8's remaining evidence gap: the Ubuntu
+26 ARM runner might lack `vendor-completions`. It records all three actual
+directory identities after native zsh installation, verifies the frozen helper
+and refusal fixture SHA-256 values, and runs those unchanged sources followed by
+the complete unchanged `make test-shell`. No missing-directory accommodation or
+production source change is made.

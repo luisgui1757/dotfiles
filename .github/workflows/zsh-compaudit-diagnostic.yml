@@ -1,4 +1,4 @@
-name: Temporary Ubuntu zsh compaudit diagnostic
+name: Temporary Ubuntu ARM zsh compaudit diagnostic
 
 on:
   push:
@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   observe:
-    runs-on: ubuntu-26.04
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -18,16 +18,30 @@ jobs:
         with:
           go-version: 1.27.1
           cache-dependency-path: installer/go.sum
+      - name: Verify native target and exact frozen helper sources
+        run: |
+          set -euo pipefail
+          test "$(go env GOHOSTOS)/$(go env GOHOSTARCH)" = linux/arm64
+          uname -m
+          printf '%s  %s\n' 60948ab7540979c7d40e9e16a22752c54f951adcb1485f3f02b2b5569c9fa8ea scripts/prepare-disposable-linux-host.sh db618ff1cd7d73c27b9ae48326ceaa8764a2043980f6b8411dc0b510b7ec005f tests/native/linux_host_preparation_test.sh | sha256sum -c -
       - name: Install the same native zsh package
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y zsh
+          sudo apt-get install -y zsh shellcheck
           zsh --version
       - name: Observe native completion audit without changing permissions
         shell: bash
         run: |
           set -euo pipefail
+          for path in /usr/share /usr/share/zsh /usr/share/zsh/vendor-completions; do
+            if [[ -e "$path" ]]; then
+              namei -l "$path"
+              stat -c 'Reviewed boundary: %n type=%F owner=%u group=%g mode=%a' "$path"
+            else
+              printf 'Reviewed boundary MISSING: %s\n' "$path"
+            fi
+          done
           zsh -d -f -c 'print -rl -- $fpath' | while IFS= read -r path; do
             if [[ -e "$path" ]]; then
               namei -l "$path"
@@ -51,20 +65,8 @@ jobs:
           set -euo pipefail
           bash tests/native/linux_host_preparation_test.sh
           bash scripts/prepare-disposable-linux-host.sh shell
-      - name: Run unchanged startup tests and preserve both results
+      - name: Run the unchanged complete shell suite
         shell: bash
         run: |
           set -euo pipefail
-          export DOTFILES_SHELL_FIXTURES="$RUNNER_TEMP/shell-fixtures"
-          mkdir "$DOTFILES_SHELL_FIXTURES"
-          DOTFILES_WRITE_SHELL_FIXTURES="$DOTFILES_SHELL_FIXTURES" go -C installer test -count=1 -run '^TestWriteActiveShellFixtures$' .
-          failed=0
-          for script in tests/shell/starship_init_test.sh tests/shell/zsh_startup_test.sh; do
-            set +e
-            bash "$script"
-            result=$?
-            set -e
-            printf '%s exit=%s\n' "$script" "$result"
-            if [[ "$result" -ne 0 ]]; then failed=1; fi
-          done
-          exit "$failed"
+          make test-shell
