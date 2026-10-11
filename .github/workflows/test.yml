@@ -95,6 +95,10 @@ jobs:
         run: |
           set -euo pipefail
           make lint
+      - name: Establish trusted disposable completion directories
+        run: |
+          bash tests/native/linux_host_preparation_test.sh
+          bash scripts/prepare-disposable-linux-host.sh shell
       - name: Shell smoke
         run: |
           set -euo pipefail

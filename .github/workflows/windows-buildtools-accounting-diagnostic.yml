@@ -1,0 +1,67 @@
+name: Windows Build Tools accounting diagnostic
+
+on:
+  push:
+    branches: [diagnostics/windows-buildtools-accounting-v9]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-buildtools-accounting-v9
+  cancel-in-progress: false
+
+jobs:
+  query:
+    name: Private query lifetime and compiler reuse
+    runs-on: windows-2025
+    timeout-minutes: 15
+    env:
+      GOTOOLCHAIN: local
+      DOTFILES_NATIVE_WINDOWS_VENDOR: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: 1.27.1
+          cache: false
+      - name: Verify disposable native target
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_ENVIRONMENT -ne 'github-hosted') { throw 'Disposable hosted runner required' }
+          if ((go env GOHOSTOS) -ne 'windows' -or (go env GOHOSTARCH) -ne 'amd64') { throw 'Native Windows amd64 required' }
+      - name: Prove the missing-accounting regression fails
+        working-directory: installer
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $path = Join-Path (Get-Location) 'windows_buildtools_query_windows.go'
+          $saved = [IO.File]::ReadAllBytes($path)
+          $source = [Text.Encoding]::UTF8.GetString($saved)
+          $current = 'return fmt.Errorf("Build Tools inspection membership changed during termination; completion is unproved; %s", buildToolsQueryMembershipDiagnostic(job, capture, after, len(handles)))'
+          $original = 'return errors.New("Build Tools inspection membership changed during termination; completion is unproved")'
+          if (($source.Split(@($current), [StringSplitOptions]::None).Count - 1) -ne 1) { throw 'Expected exact diagnostic-only guard source' }
+          try {
+            [IO.File]::WriteAllText($path, $source.Replace($current, $original), [Text.UTF8Encoding]::new($false))
+            $output = & go test -v -count=1 -timeout 2m -run '^TestWindowsBuildToolsQueryRejectsChangedMembership$' . 2>&1
+            $code = $LASTEXITCODE
+            $output | ForEach-Object { Write-Output $_ }
+            if ($code -eq 0 -or ($output -join "`n") -notmatch 'late-member refusal lost bounded accounting evidence') { throw 'Original error did not fail the intended diagnostic regression' }
+          } finally {
+            [IO.File]::WriteAllBytes($path, $saved)
+          }
+      - name: Verify exact owned process completion and outside survival
+        if: always()
+        working-directory: installer
+        shell: pwsh
+        run: |
+          go test -v -count=1 -timeout 3m -run '^TestWindowsBuildToolsQuery' .
+          if ($LASTEXITCODE -ne 0) { throw 'Private query lifetime regression failed' }
+      - name: Observe a fixed series of real compiler reuse queries
+        if: always()
+        working-directory: installer
+        shell: pwsh
+        run: |
+          go test -v -count=6 -timeout 8m -run '^TestWindowsBuildToolsNativeReuseAndEnvironment$' .
+          if ($LASTEXITCODE -ne 0) { throw 'Real compiler reuse failed; preserve original bounded diagnostic' }

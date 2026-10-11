@@ -7176,3 +7176,79 @@ authorized policy write/readback remain real acceptance boundaries. The reviewer
 also confirms the Windows Neovim raw log's actual PSES attachment, 257 smoke checks
 and full 1162.47s lifecycle pass. All 23 canonical native/quality jobs and CodeQL
 must pass at the exact published head; earlier/scoped passes do not replace them.
+
+
+## 2026-10-11 — Hosted Ubuntu zsh completion precondition
+
+Quality run 38098526788/job 114349412458 at head
+`044f9780705faa996914ed95de2aed2126802ba9` failed only the two active zsh
+startup smoke assertions reached in Shell smoke: compinit could not open a
+terminal for its insecure-completion prompt. Native Desktop passed on both Linux
+architectures at that same head (114349412476 and 114349412553).
+
+Diagnostic run 38098923912/job 114350585028 reproduced both failures and recorded
+compaudit's exact paths: `/usr/share/zsh/vendor-completions` and `/usr/share/zsh`,
+physical root:root directories at mode 0777. Their `/usr/share` parent was also
+0777; newly installed zsh functions were 0755. This matches the image's
+[reviewed configure-system script](https://github.com/actions/runner-images/blob/ubuntu26/20260927.149/images/ubuntu/scripts/build/configure-system.sh),
+which recursively changes `/usr/share` permissions during image construction.
+The source SHA-256 is `604976982f8515d86df578993b6c852bc636d53555fefeaa61fa984ecc7fef11`.
+A permission change only to `/usr/share`, as used by Desktop, would leave the
+completion audit failure unresolved.
+
+Run 38099014868/job 114350857283 at
+`a08cb858c2d48e94f8de13581dd14b426d70f719` then proved strict empty compaudit
+and both unchanged tests after validating and setting exactly those three
+physical root-owned directories to 0755. The original failing raw log SHA-256
+is `82a0adb888f650c018aa580795b8862813f79cd32b8e8205309564e963c6f067`;
+the passing raw log SHA-256 is
+`ecbb149653ff5fb1b97ce8f01b83e3b7fd6f0fed952e8fbe525fc1c914f1a5a4`.
+
+The correction factors the existing Desktop host preparation into one small
+fixed helper, gated to GitHub-hosted Linux. Desktop retains its single
+`/usr/share` scope; quality/core use the three-directory shell recipe and strict
+compaudit. Core includes the real archive zsh PTY consumer. All paths must pass
+physical-directory/root:root checks before any chmod, with no recursive changes
+or production-runtime changes. The focused refusal fixture bind-mounts private
+directories over `/usr/share` inside a private root mount namespace and proves
+foreign ownership, final/ancestor symlinks, unsupported hosts and unknown recipes
+are rejected without changing earlier directories. A positive desktop control
+proves completion directories are outside that recipe's mutation scope.
+
+The exact factored helper and refusal fixture passed on disposable Ubuntu in
+run 38099271054/job 114351621069 at
+`b73c38d5c35c8fd55ddc7f344e4f563e3d5d32f8`, followed by both unchanged startup
+tests passing. Raw log SHA-256:
+`37ccfaebfb15a19c8b05d294157c8f41ebc0ff471f62b49d3275f09ca2ce3e9c`.
+No permissions or packages were changed on the developer workstation.
+
+## 2026-10-11 — Bounded evidence for compiler-query final membership refusal
+
+Final head `044f9780705faa996914ed95de2aed2126802ba9` passed all three
+POSIX Neovim lifecycles and all four fresh Debian/Ubuntu APT lifecycles. Windows
+job `114349412580` passed 257 strict smoke checks, update and selective removal,
+then refused final removal because Build Tools inspection could not prove process
+completion. Raw log SHA-256:
+`088439cbcd7f17d341cca89738031cee5ee6de17d7095bc064b0058456b04f00`.
+The existing combined guard does not reveal whether lifetime membership increased
+or final Active accounting remained nonzero after all captured HANDLEs signaled.
+Neither cause is established by that log. Node was already removed when its
+failure-only diagnostic ran; that absence is not evidence of payload drift.
+
+Retain the accounting baseline and one snapshot immediately after exact HANDLE
+capture solely as diagnostic evidence. Only the existing final refusal prints
+baseline/after-capture/final Total, Active and Terminated counts, captured HANDLE
+count, and a bounded current private-job member list. An unavailable/incomplete
+snapshot remains labeled as such and never changes the refusal or grants success.
+No executable paths, environment, global process inventory or secrets are read.
+The original membership equality, Active-zero requirement, exact HANDLE waits,
+private-job authority, stdout/stderr bounds and shared five-second reap budget
+remain unchanged. The mutation worker remains unchanged.
+
+The real late-member regression now requires the accounting evidence while still
+rejecting incomplete completion proof; diagnostic-query failure coverage requires
+the original accounting evidence to survive. A narrow disposable Windows run will
+exercise those cases and the unchanged outside-process, exit/cancel/output-bound
+and natural-exit cases, plus six fixed repetitions of the existing real compiler
+reuse/environment test. This is evidence collection, not a runtime fix or a retry
+of the failed full Neovim lifecycle. Native results remain pending.

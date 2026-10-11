@@ -326,7 +326,7 @@ func TestWindowsBuildToolsQueryRejectsChangedMembership(t *testing.T) {
 		return process.Process
 	}
 	first := start()
-	handles, total, err := captureBuildToolsQueryProcesses(job)
+	handles, capture, err := captureBuildToolsQueryProcesses(job)
 	defer func() {
 		for _, handle := range handles {
 			if err := windows.CloseHandle(handle); err != nil {
@@ -334,14 +334,20 @@ func TestWindowsBuildToolsQueryRejectsChangedMembership(t *testing.T) {
 			}
 		}
 	}()
-	if err != nil || len(handles) != 1 || total != 1 {
-		t.Fatal("initial exact membership capture failed", len(handles), total, err)
+	if err != nil || len(handles) != 1 || capture.Before.Total != 1 {
+		t.Fatal("initial exact membership capture failed", len(handles), capture, err)
 	}
 	second := start()
-	err = terminateBuildToolsQueryProcesses(job, handles, total, time.Now().Add(5*time.Second))
+	err = terminateBuildToolsQueryProcesses(job, handles, capture, time.Now().Add(5*time.Second))
 	if err == nil || !strings.Contains(err.Error(), "membership changed during termination") {
 		t.Fatal("late child was accepted under an earlier HANDLE proof", err)
 	}
+	for _, detail := range []string{"baseline(total=1 active=1 terminated=0)", "final(total=2 active=", "captured_handles=1", "after_capture(total=1 active=1 terminated=0)", "current_members assigned="} {
+		if !strings.Contains(err.Error(), detail) {
+			t.Fatalf("late-member refusal lost bounded accounting evidence %q: %v", detail, err)
+		}
+	}
+	t.Log(err)
 	for _, handle := range []windows.Handle{first, second} {
 		if status, err := windows.WaitForSingleObject(handle, 5000); err != nil || status != windows.WAIT_OBJECT_0 {
 			t.Fatal("private job did not terminate its exact member", status, err)
@@ -411,7 +417,7 @@ func TestWindowsBuildToolsQueryAcceptsExitedMemberDuringCapture(t *testing.T) {
 	if err != nil || before.Active == 0 || before.Total == 0 {
 		t.Fatal("expected ready private members before capture", before, err)
 	}
-	ready, total, err := captureBuildToolsQueryProcessesAfterAccounting(job, before)
+	ready, readyCapture, err := captureBuildToolsQueryProcessesAfterAccounting(job, before)
 	defer func() {
 		for _, handle := range ready {
 			if err := windows.CloseHandle(handle); err != nil {
@@ -419,7 +425,7 @@ func TestWindowsBuildToolsQueryAcceptsExitedMemberDuringCapture(t *testing.T) {
 			}
 		}
 	}()
-	if err != nil || total != before.Total {
+	if err != nil || readyCapture.Before != before {
 		t.Fatal("ready private member capture failed", err)
 	}
 	foundRoot := false
@@ -459,7 +465,7 @@ func TestWindowsBuildToolsQueryAcceptsExitedMemberDuringCapture(t *testing.T) {
 	if after.Total != before.Total || after.Active >= before.Active {
 		t.Fatal("natural exit did not preserve lifetime membership and reduce active members")
 	}
-	handles, total, err := captureBuildToolsQueryProcessesAfterAccounting(job, before)
+	handles, capture, err := captureBuildToolsQueryProcessesAfterAccounting(job, before)
 	defer func() {
 		for _, handle := range handles {
 			if err := windows.CloseHandle(handle); err != nil {
@@ -467,15 +473,26 @@ func TestWindowsBuildToolsQueryAcceptsExitedMemberDuringCapture(t *testing.T) {
 			}
 		}
 	}()
-	if err != nil || total != before.Total {
-		t.Fatal("natural exit invalidated a complete private member list", len(handles), total, err)
+	if err != nil || capture.Before != before {
+		t.Fatal("natural exit invalidated a complete private member list", len(handles), capture, err)
 	}
-	if err := terminateBuildToolsQueryProcesses(job, handles, total, time.Now().Add(5*time.Second)); err != nil {
+	if err := terminateBuildToolsQueryProcesses(job, handles, capture, time.Now().Add(5*time.Second)); err != nil {
 		t.Fatal("completed private query rejected after natural exit", err)
 	}
 	for _, handle := range ready {
 		if status, err := windows.WaitForSingleObject(handle, 0); err != nil || status != windows.WAIT_OBJECT_0 {
 			t.Fatal("ready private member survived exact completion", status, err)
+		}
+	}
+}
+
+func TestWindowsBuildToolsQueryMembershipDiagnosticKeepsAccountingOnQueryError(t *testing.T) {
+	before := buildToolsJobAccounting{Total: 3, Active: 2, Terminated: 1}
+	after := buildToolsJobAccounting{Total: 4, Active: 1, Terminated: 3}
+	detail := buildToolsQueryMembershipDiagnostic(windows.InvalidHandle, buildToolsQueryCapture{Before: before, AfterError: errors.New("fixture accounting unavailable")}, after, 2)
+	for _, expected := range []string{"baseline(total=3 active=2 terminated=1)", "final(total=4 active=1 terminated=3)", "captured_handles=2", "after_capture unavailable: fixture accounting unavailable", "current_members unavailable:"} {
+		if !strings.Contains(detail, expected) {
+			t.Fatalf("failed private-job diagnostic lost evidence %q: %s", expected, detail)
 		}
 	}
 }

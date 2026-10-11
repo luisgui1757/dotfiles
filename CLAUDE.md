@@ -1149,3 +1149,14 @@ assertions remain mandatory with PowerShell 7 required. The Windows Git refusal
 fixture measures the 254-stage/config 266 boundary in UTF-16 units using pinned
 Neovim's `vim.str_utfindex(..., "utf-16")`; UTF-8 byte length mismeasures Unicode
 and astral temporary roots. This changes test fidelity, not supported path layout.
+
+
+Hosted Ubuntu completion tests require trusted native completion directories. The
+runner image recursively makes `/usr/share` writable; installing zsh does not
+replace the pre-existing `/usr/share/zsh` and `vendor-completions` directories.
+Use the fixed GitHub-hosted Linux preparation helper: the desktop recipe secures
+only `/usr/share`, while the shell recipe also secures those two completion
+directories and requires strict empty `compaudit` output. Verify the entire set
+is physical and root:root before any nonrecursive mode change. Never turn this
+fixture precondition into production chmod, a completion security bypass, or
+ignored startup stderr. Core's archive zsh PTY is an interactive consumer too.

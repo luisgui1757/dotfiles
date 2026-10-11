@@ -1007,3 +1007,59 @@ authorized policy write/readback remain real acceptance boundaries. The reviewer
 also confirms the Windows Neovim raw log's actual PSES attachment, 257 smoke checks
 and full 1162.47s lifecycle pass. All 23 canonical native/quality jobs and CodeQL
 must pass at the exact published head; earlier/scoped passes do not replace them.
+
+
+### 2026-10-11 — Ubuntu completion test-host correction
+
+Final-head quality job 114349412458 correctly failed Starship/zsh startup on
+insecure hosted completion directories. Diagnostic run 38098923912 reproduced
+both unchanged assertions and identified root-owned mode 0777
+`/usr/share/zsh/vendor-completions` and `/usr/share/zsh`; their `/usr/share`
+ancestor was also writable. Run 38099014868 proved that physical/root-owned
+validation followed by nonrecursive 0755 on exactly those three directories
+restores strict compaudit and both tests.
+
+The shared disposable-host helper now covers Ubuntu quality and core interactive
+zsh, and replaces Desktop's existing single-parent preparation without expanding
+that recipe. Production completion and all startup/GUI assertions remain intact.
+Unsafe ownership, redirected directories/ancestors and unsupported host/recipe
+invocations have process/filesystem refusal coverage in a private mount namespace.
+The full final-head quality/native matrix still requires a new published-head run.
+
+The exact factored helper and refusal fixture passed on disposable Ubuntu in
+run 38099271054/job 114351621069 at
+`b73c38d5c35c8fd55ddc7f344e4f563e3d5d32f8`, followed by both unchanged startup
+tests passing. Raw log SHA-256:
+`37ccfaebfb15a19c8b05d294157c8f41ebc0ff471f62b49d3275f09ca2ce3e9c`.
+No permissions or packages were changed on the developer workstation.
+
+## 2026-10-11 — Windows compiler-query failure diagnostics
+
+Final head `044f9780705faa996914ed95de2aed2126802ba9` passed all three
+POSIX Neovim lifecycles and all four fresh Debian/Ubuntu APT lifecycles. Windows
+job `114349412580` passed 257 strict smoke checks, update and selective removal,
+then refused final removal because Build Tools inspection could not prove process
+completion. Raw log SHA-256:
+`088439cbcd7f17d341cca89738031cee5ee6de17d7095bc064b0058456b04f00`.
+The existing combined guard does not reveal whether lifetime membership increased
+or final Active accounting remained nonzero after all captured HANDLEs signaled.
+Neither cause is established by that log. Node was already removed when its
+failure-only diagnostic ran; that absence is not evidence of payload drift.
+
+Retain the accounting baseline and one snapshot immediately after exact HANDLE
+capture solely as diagnostic evidence. Only the existing final refusal prints
+baseline/after-capture/final Total, Active and Terminated counts, captured HANDLE
+count, and a bounded current private-job member list. An unavailable/incomplete
+snapshot remains labeled as such and never changes the refusal or grants success.
+No executable paths, environment, global process inventory or secrets are read.
+The original membership equality, Active-zero requirement, exact HANDLE waits,
+private-job authority, stdout/stderr bounds and shared five-second reap budget
+remain unchanged. The mutation worker remains unchanged.
+
+The real late-member regression now requires the accounting evidence while still
+rejecting incomplete completion proof; diagnostic-query failure coverage requires
+the original accounting evidence to survive. A narrow disposable Windows run will
+exercise those cases and the unchanged outside-process, exit/cancel/output-bound
+and natural-exit cases, plus six fixed repetitions of the existing real compiler
+reuse/environment test. This is evidence collection, not a runtime fix or a retry
+of the failed full Neovim lifecycle. Native results remain pending.

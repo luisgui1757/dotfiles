@@ -167,13 +167,13 @@ func queryWindowsBuildTools(ctx context.Context, privileged bool, program string
 // authorize a success claim from an incomplete snapshot; natural exits can.
 func stopBuildToolsQueryJob(job windows.Handle) (result error) {
 	deadline := time.Now().Add(5 * time.Second)
-	handles, total, captureErr := captureBuildToolsQueryProcesses(job)
+	handles, capture, captureErr := captureBuildToolsQueryProcesses(job)
 	defer func() {
 		for _, handle := range handles {
 			result = errors.Join(result, windows.CloseHandle(handle))
 		}
 	}()
-	return errors.Join(captureErr, terminateBuildToolsQueryProcesses(job, handles, total, deadline))
+	return errors.Join(captureErr, terminateBuildToolsQueryProcesses(job, handles, capture, deadline))
 }
 
 type buildToolsJobAccounting struct {
@@ -190,12 +190,25 @@ func readBuildToolsJobAccounting(job windows.Handle) (buildToolsJobAccounting, e
 	return info, err
 }
 
+type buildToolsJobMembers struct {
+	Assigned uint32
+	Listed   uint32
+	PIDs     [256]uintptr
+}
+
+// Keep both accounting snapshots for failure evidence only. The original
+// baseline still controls the lifetime-membership guard.
+type buildToolsQueryCapture struct {
+	Before, After buildToolsJobAccounting
+	AfterError    error
+}
+
 // Query only the private job, never a machine-wide PID/name inventory. The fixed
 // buffer bounds this compiler inspection; overflow is an error, not truncation.
-func captureBuildToolsQueryProcesses(job windows.Handle) ([]windows.Handle, uint32, error) {
+func captureBuildToolsQueryProcesses(job windows.Handle) ([]windows.Handle, buildToolsQueryCapture, error) {
 	before, err := readBuildToolsJobAccounting(job)
 	if err != nil {
-		return nil, 0, err
+		return nil, buildToolsQueryCapture{Before: before}, err
 	}
 	return captureBuildToolsQueryProcessesAfterAccounting(job, before)
 }
@@ -203,43 +216,41 @@ func captureBuildToolsQueryProcesses(job windows.Handle) ([]windows.Handle, uint
 // Accounting and the PID list are separate snapshots. An earlier Active count
 // may include a member that has since exited; only the list's own counts prove
 // completeness. The lifetime Total is checked again after exact HANDLE waits.
-func captureBuildToolsQueryProcessesAfterAccounting(job windows.Handle, before buildToolsJobAccounting) ([]windows.Handle, uint32, error) {
-	var members struct {
-		Assigned uint32
-		Listed   uint32
-		PIDs     [256]uintptr
-	}
+func captureBuildToolsQueryProcessesAfterAccounting(job windows.Handle, before buildToolsJobAccounting) ([]windows.Handle, buildToolsQueryCapture, error) {
+	capture := buildToolsQueryCapture{Before: before}
+	var members buildToolsJobMembers
 	if err := windows.QueryInformationJobObject(job, windows.JobObjectBasicProcessIdList, uintptr(unsafe.Pointer(&members)), uint32(unsafe.Sizeof(members)), nil); err != nil {
-		return nil, before.Total, fmt.Errorf("capture Build Tools inspection members: %w", err)
+		return nil, capture, fmt.Errorf("capture Build Tools inspection members: %w", err)
 	}
 	if members.Listed > uint32(len(members.PIDs)) || members.Listed != members.Assigned {
-		return nil, before.Total, errors.New("Build Tools inspection membership changed during capture")
+		return nil, capture, errors.New("Build Tools inspection membership changed during capture")
 	}
 	handles := make([]windows.Handle, 0, members.Listed)
 	isProcessInJob := windows.NewLazySystemDLL("kernel32.dll").NewProc("IsProcessInJob")
 	for _, pid := range members.PIDs[:members.Listed] {
 		if pid == 0 || pid > 1<<32-1 {
-			return handles, before.Total, errors.New("invalid Build Tools inspection member PID")
+			return handles, capture, errors.New("invalid Build Tools inspection member PID")
 		}
 		handle, err := windows.OpenProcess(windows.SYNCHRONIZE|windows.PROCESS_QUERY_LIMITED_INFORMATION, false, uint32(pid))
 		if err != nil {
-			return handles, before.Total, fmt.Errorf("open Build Tools inspection member: %w", err)
+			return handles, capture, fmt.Errorf("open Build Tools inspection member: %w", err)
 		}
 		var belongs int32
 		ok, _, callErr := isProcessInJob.Call(uintptr(handle), uintptr(job), uintptr(unsafe.Pointer(&belongs)))
 		if ok == 0 || belongs == 0 {
 			closeErr := windows.CloseHandle(handle)
 			if ok == 0 {
-				return handles, before.Total, errors.Join(fmt.Errorf("verify Build Tools inspection membership: %w", callErr), closeErr)
+				return handles, capture, errors.Join(fmt.Errorf("verify Build Tools inspection membership: %w", callErr), closeErr)
 			}
-			return handles, before.Total, errors.Join(errors.New("Build Tools inspection member changed before capture"), closeErr)
+			return handles, capture, errors.Join(errors.New("Build Tools inspection member changed before capture"), closeErr)
 		}
 		handles = append(handles, handle)
 	}
-	return handles, before.Total, nil
+	capture.After, capture.AfterError = readBuildToolsJobAccounting(job)
+	return handles, capture, nil
 }
 
-func terminateBuildToolsQueryProcesses(job windows.Handle, handles []windows.Handle, total uint32, deadline time.Time) error {
+func terminateBuildToolsQueryProcesses(job windows.Handle, handles []windows.Handle, capture buildToolsQueryCapture, deadline time.Time) error {
 	if err := windows.TerminateJobObject(job, 1); err != nil {
 		return err
 	}
@@ -261,8 +272,29 @@ func terminateBuildToolsQueryProcesses(job windows.Handle, handles []windows.Han
 	if err != nil {
 		return err
 	}
-	if after.Total != total || after.Active != 0 {
-		return errors.New("Build Tools inspection membership changed during termination; completion is unproved")
+	if after.Total != capture.Before.Total || after.Active != 0 {
+		return fmt.Errorf("Build Tools inspection membership changed during termination; completion is unproved; %s", buildToolsQueryMembershipDiagnostic(job, capture, after, len(handles)))
 	}
 	return nil
+}
+
+// Failure-only evidence from the private job. Keep the refusal authoritative even
+// if this later snapshot is unavailable or incomplete. No paths or environment
+// values are queried, and at most the existing 256-member bound can be printed.
+func buildToolsQueryMembershipDiagnostic(job windows.Handle, capture buildToolsQueryCapture, after buildToolsJobAccounting, captured int) string {
+	before := capture.Before
+	detail := fmt.Sprintf("baseline(total=%d active=%d terminated=%d) final(total=%d active=%d terminated=%d) captured_handles=%d", before.Total, before.Active, before.Terminated, after.Total, after.Active, after.Terminated, captured)
+	if capture.AfterError != nil {
+		detail += fmt.Sprintf("; after_capture unavailable: %v", capture.AfterError)
+	} else {
+		detail += fmt.Sprintf("; after_capture(total=%d active=%d terminated=%d)", capture.After.Total, capture.After.Active, capture.After.Terminated)
+	}
+	var members buildToolsJobMembers
+	if err := windows.QueryInformationJobObject(job, windows.JobObjectBasicProcessIdList, uintptr(unsafe.Pointer(&members)), uint32(unsafe.Sizeof(members)), nil); err != nil {
+		return fmt.Sprintf("%s; current_members unavailable: %v", detail, err)
+	}
+	if members.Listed > uint32(len(members.PIDs)) || members.Listed != members.Assigned {
+		return fmt.Sprintf("%s; current_members assigned=%d listed=%d incomplete", detail, members.Assigned, members.Listed)
+	}
+	return fmt.Sprintf("%s; current_members assigned=%d listed=%d pids=%v", detail, members.Assigned, members.Listed, members.PIDs[:members.Listed])
 }

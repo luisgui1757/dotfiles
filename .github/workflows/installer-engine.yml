@@ -50,6 +50,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --yes --no-install-recommends zsh tmux
+      - name: Establish trusted disposable completion directories
+        if: runner.os == 'Linux'
+        run: bash ../scripts/prepare-disposable-linux-host.sh shell
       - name: Install tmux integration test prerequisite
         if: runner.os == 'macOS'
         run: |
@@ -191,13 +194,7 @@ jobs:
       # system parent is not an acceptable production installation boundary.
       - name: Establish trusted disposable system parent
         if: runner.os == 'Linux'
-        run: |
-          test ! -L /usr/share
-          test "$(stat -c %u /usr/share)" = 0
-          stat -c 'Code test host before: %n owner=%u mode=%a' /usr/share
-          sudo chmod 0755 /usr/share
-          test "$(stat -c %u:%a /usr/share)" = 0:755
-          stat -c 'Code test host after: %n owner=%u mode=%a' /usr/share
+        run: bash ../scripts/prepare-disposable-linux-host.sh desktop
       - name: Verify pinned Code native ownership and repository preservation
         if: runner.os == 'Linux'
         env:
