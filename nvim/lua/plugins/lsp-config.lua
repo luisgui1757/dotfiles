@@ -2,9 +2,11 @@ return {
   {
     "williamboman/mason.nvim",
     cmd = "Mason",
-    build = ":MasonUpdate",
     config = function()
+      local registry = require("util.mason_registry").prepare()
       require("mason").setup({
+        install_root_dir = require("util.managed_runtime").path("mason"),
+        registries = { registry },
         ui = {
           border = "rounded",
           icons = {
@@ -43,7 +45,8 @@ return {
   {
     "neovim/nvim-lspconfig",
     event = { "BufReadPre", "BufNewFile" },
-    dependencies = { "hrsh7th/cmp-nvim-lsp" },
+    -- Mason must publish its bin PATH before a file on argv enables its LSP.
+    dependencies = { "williamboman/mason.nvim", "hrsh7th/cmp-nvim-lsp" },
     config = function()
       local capabilities = require("cmp_nvim_lsp").default_capabilities()
 
@@ -67,7 +70,7 @@ return {
         -- Prefer the real Mason package binary over Mason's PATH shim. On
         -- Windows the shim is a .cmd wrapper, and killing the wrapper can leave
         -- the actual neocmakelsp.exe child alive after headless nvim exits.
-        local mason_exe = vim.fn.stdpath("data") .. "/mason/packages/neocmakelsp/" .. exe
+        local mason_exe = require("util.managed_runtime").path("mason/packages/neocmakelsp/" .. exe)
         if vim.fn.executable(mason_exe) == 1 then
           return { mason_exe, "stdio" }
         end
@@ -81,6 +84,13 @@ return {
       })
 
       vim.lsp.config("lua_ls", {
+        -- LuaLS otherwise writes logs and generated definitions beside its
+        -- executable, changing the installer's immutable Mason generation.
+        cmd = {
+          "lua-language-server",
+          "--logpath=" .. vim.fs.joinpath(vim.fn.stdpath("state"), "lua-language-server", "log"),
+          "--metapath=" .. vim.fs.joinpath(vim.fn.stdpath("state"), "lua-language-server", "meta"),
+        },
         capabilities = capabilities,
         root_markers = { ".luarc.json", ".luarc.jsonc", ".git" },
         settings = {
@@ -142,7 +152,7 @@ return {
       vim.lsp.config("powershell_es", {
         capabilities = capabilities,
         root_markers = { ".git" },
-        bundle_path = vim.fn.stdpath("data") .. "/mason/packages/powershell-editor-services",
+        bundle_path = require("util.managed_runtime").path("mason/packages/powershell-editor-services"),
       })
 
       -- powershell_es starts via `pwsh` and runs the PowerShellEditorServices
@@ -160,7 +170,7 @@ return {
         "jsonls",
         "neocmake",
       }
-      local pses_bundle = vim.fn.stdpath("data") .. "/mason/packages/powershell-editor-services"
+      local pses_bundle = require("util.managed_runtime").path("mason/packages/powershell-editor-services")
       if vim.fn.executable("pwsh") == 1 and vim.fn.isdirectory(pses_bundle) == 1 then
         table.insert(enabled_servers, "powershell_es")
       end

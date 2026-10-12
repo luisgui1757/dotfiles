@@ -8,5 +8,10 @@ if ! command -v ghostty >/dev/null 2>&1; then
     exit 0
 fi
 
-ghostty +validate-config "--config-file=$REPO_ROOT/ghostty/config"
+# Ghostty reopens stdout on macOS, truncating an inherited regular-file log.
+# A pipe isolates that upstream behavior while preserving diagnostics and status.
+status=0
+output="$(ghostty +validate-config "--config-file=$REPO_ROOT/ghostty/config" 2>&1)" || status=$?
+[[ -z "$output" ]] || printf '%s\n' "$output"
+[[ "$status" -eq 0 ]] || exit "$status"
 echo "OK"

@@ -10,7 +10,9 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
-zshrc="$REPO_ROOT/shells/zshrc"
+# shellcheck source=tests/shell/active_fixture.sh
+source "$REPO_ROOT/tests/shell/active_fixture.sh"
+zshrc="$ACTIVE_ZSH"
 
 fail() { echo "FAIL: $1"; exit 1; }
 
@@ -72,7 +74,7 @@ grep -Eq 'add-zle-hook-widget[[:space:]]+line-init[[:space:]]+_dotfiles_vi_curso
 
 awk '
     /add-zle-hook-widget[[:space:]]+keymap-select[[:space:]]+_dotfiles_vi_cursor_shape/ { hook = NR }
-    /starship init zsh --print-full-init/ { starship = NR }
+    /starship.* init zsh/ { starship = NR }
     END {
         if (!hook)     { print "missing cursor hook registration"; exit 1 }
         if (!starship) { print "missing starship init"; exit 1 }
@@ -83,11 +85,6 @@ awk '
     }
 ' "$zshrc" \
     || fail "zshrc must register cursor hooks before starship init"
-
-# 8. chezmoi twin parity — the fast suite must catch a twin drift on its own.
-if ! diff -q "$zshrc" "$REPO_ROOT/home/dot_zshrc" >/dev/null; then
-    fail "home/dot_zshrc is not byte-identical to shells/zshrc (chezmoi twin drift)"
-fi
 
 echo "static: OK"
 
@@ -104,19 +101,19 @@ fi
 
 zsh_bin="$(command -v zsh)"
 TMP_ROOT="$(mktemp -d)"
-trap 'rm -rf "$TMP_ROOT"' EXIT
+trap 'active_shell_cleanup; rm -rf "$TMP_ROOT"' EXIT
 
 run_probe() {
-    local home="$1" path_value="$2"
+    local home="$1" path_value="$2" profile="$3"
     # shellcheck disable=SC2016 # the single-quoted body is zsh code; $ must NOT
     # expand in bash. Only "$zshrc" (double-quoted) is interpolated by bash.
     HOME="$home" HOMEBREW_PREFIX="$home/no-brew" __HM_SESS_VARS_SOURCED=1 \
-        DOTFILES_TEST_PATH="$path_value" "$zsh_bin" -i -c '
+        DOTFILES_TEST_PATH="$path_value" DOTFILES_ACTIVE_PROFILE="$profile" "$zsh_bin" -d -f -i -c '
         export PATH="$DOTFILES_TEST_PATH"
         export HOMEBREW_PREFIX="$HOME/no-brew"
         path=(${(s.:.)PATH})
         rehash
-        source '"$zshrc"' >/dev/null 2>&1 || exit 1
+        source "$DOTFILES_ACTIVE_PROFILE" >/dev/null 2>&1 || exit 1
         print -r -- "MAIN=$(bindkey -lL main)"
         print -r -- "KEYTIMEOUT=$KEYTIMEOUT"
         print -r -- "VIINS_UP=${${(z)$(bindkey -M viins "^[[A")}[2]}"
@@ -159,7 +156,7 @@ NO_FZF_HOME="$TMP_ROOT/no-fzf-home"
 NO_FZF_BIN="$TMP_ROOT/no-fzf-bin"
 mkdir -p "$NO_FZF_HOME" "$NO_FZF_BIN"
 ln -s "$(command -v mkdir)" "$NO_FZF_BIN/mkdir"
-no_fzf_probe="$(run_probe "$NO_FZF_HOME" "$NO_FZF_BIN")" \
+no_fzf_probe="$(run_probe "$NO_FZF_HOME" "$NO_FZF_BIN" "$ACTIVE_ZSH_CORE")" \
     || fail "functional/no-fzf: zshrc failed to source"
 common_checks "no-fzf" "$no_fzf_probe"
 check_equals "no-fzf" "$no_fzf_probe" "VIINS_TAB" "menu-select"
@@ -168,13 +165,9 @@ check_equals "no-fzf" "$no_fzf_probe" "VIINS_CR" "history-incremental-search-bac
 
 FZF_HOME="$TMP_ROOT/with-fzf-home"
 FZF_BIN="$TMP_ROOT/fake-bin"
-mkdir -p "$FZF_HOME/.local/share/dotfiles/zsh-plugins/fzf-tab" "$FZF_BIN"
+mkdir -p "$FZF_HOME" "$FZF_BIN"
 ln -s "$(command -v mkdir)" "$FZF_BIN/mkdir"
 ln -s "$(command -v cat)" "$FZF_BIN/cat"
-cat > "$FZF_HOME/.local/share/dotfiles/zsh-plugins/fzf-tab/fzf-tab.plugin.zsh" <<'ZSH'
-fzf-tab-complete() { zle menu-select }
-zle -N fzf-tab-complete
-ZSH
 cat > "$FZF_BIN/fzf" <<'SH'
 #!/bin/sh
 if [ "${1:-}" = "--zsh" ]; then
@@ -192,7 +185,7 @@ fi
 exit 0
 SH
 chmod +x "$FZF_BIN/fzf"
-with_fzf_probe="$(run_probe "$FZF_HOME" "$FZF_BIN")" \
+with_fzf_probe="$(run_probe "$FZF_HOME" "$FZF_BIN" "$ACTIVE_ZSH")" \
     || fail "functional/with-fzf-tab: zshrc failed to source"
 common_checks "with-fzf-tab" "$with_fzf_probe"
 check_equals "with-fzf-tab" "$with_fzf_probe" "VIINS_TAB" "fzf-tab-complete"

@@ -1,0 +1,106 @@
+name: agent-cli-pins
+
+# Weekly proposal of new Claude Code, Codex, Copilot CLI and Kiro CLI pins.
+# scripts/update-agent-cli-pins.py verifies every pinned byte; the pull
+# request's ordinary required native checks remain the acceptance gate, and
+# only the owner merges. GITHUB_TOKEN cannot open pull requests in this
+# repository and its pushes would not start those checks, so proposing needs a
+# GitHub App installed on this repository with contents and pull-request write
+# access: variable AGENT_PINS_APP_CLIENT_ID and secret AGENT_PINS_APP_PRIVATE_KEY.
+# Without them a run still verifies, reports and uploads the proposed change.
+
+on:
+  schedule:
+    - cron: '23 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agent-cli-pins
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  propose:
+    name: Propose agent CLI pins
+    runs-on: ubuntu-26.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Verify and pin each CLI's latest stable release
+        id: bump
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 scripts/update-agent-cli-pins.py --summary "$RUNNER_TEMP/summary.md" --failures "$RUNNER_TEMP/failures.md"
+          cat "$RUNNER_TEMP/summary.md" >> "$GITHUB_STEP_SUMMARY"
+          if git diff --quiet -- installer/archive-pins.json; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            git diff -- installer/archive-pins.json > "$RUNNER_TEMP/agent-cli-pins.patch"
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Authenticate the pin proposal App
+        id: app
+        if: steps.bump.outputs.changed == 'true' && vars.AGENT_PINS_APP_CLIENT_ID != ''
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.AGENT_PINS_APP_CLIENT_ID }}
+          private-key: ${{ secrets.AGENT_PINS_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+      - name: Open or update the pull request
+        if: steps.app.outputs.token != ''
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          APP_SLUG: ${{ steps.app.outputs.app-slug }}
+          BASE: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          branch=automation/agent-cli-pins
+          user_id="$(gh api "/users/${APP_SLUG}%5Bbot%5D" --jq .id)"
+          git config user.name "${APP_SLUG}[bot]"
+          git config user.email "${user_id}+${APP_SLUG}[bot]@users.noreply.github.com"
+          gh auth setup-git
+          {
+            printf 'Bump agent CLI pins\n\n'
+            cat "$RUNNER_TEMP/summary.md"
+          } > "$RUNNER_TEMP/message.txt"
+          {
+            cat "$RUNNER_TEMP/summary.md"
+            printf '\nMerge only after the required native checks pass on this head. Then run `git pull` and **Update tools** on each machine; Update without new pins changes nothing.\n'
+          } > "$RUNNER_TEMP/body.md"
+          git switch -c "$branch"
+          git commit -q -F "$RUNNER_TEMP/message.txt" -- installer/archive-pins.json
+          git push --force origin "HEAD:refs/heads/$branch"
+          number="$(gh pr list --head "$branch" --base "$BASE" --state open --json number --jq '.[0].number // empty')"
+          if [ -n "$number" ]; then
+            gh pr edit "$number" --body-file "$RUNNER_TEMP/body.md"
+          else
+            gh pr create --base "$BASE" --head "$branch" --title "Bump agent CLI pins" --body-file "$RUNNER_TEMP/body.md"
+          fi
+      - name: Report a proposal without the App
+        if: steps.bump.outputs.changed == 'true' && steps.app.outputs.token == ''
+        run: echo "::notice title=Agent CLI pins::New verified pins are in the agent-cli-pins artifact. Configure AGENT_PINS_APP_CLIENT_ID and AGENT_PINS_APP_PRIVATE_KEY to open pull requests."
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: steps.bump.outputs.changed == 'true'
+        with:
+          name: agent-cli-pins
+          path: |
+            ${{ runner.temp }}/agent-cli-pins.patch
+            ${{ runner.temp }}/summary.md
+      - name: Fail when a release needs manual review
+        run: |
+          set -euo pipefail
+          if [ -s "$RUNNER_TEMP/failures.md" ]; then
+            cat "$RUNNER_TEMP/failures.md"
+            exit 1
+          fi

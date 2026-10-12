@@ -1,420 +1,661 @@
-# Upgrading dotfiles releases
+# Moving to the native installer
 
-## One public entry point
+This major release replaces Nix and chezmoi with the interactive installer.
+There is no old-runtime compatibility mode. Its supported platforms are Apple
+Silicon macOS, Ubuntu/Debian amd64/arm64 and native Windows amd64.
 
-After cloning an exact annotated release, setup is the only normal user-facing
-command:
+## Existing installation
+
+Preserve local checkout changes first. Update to the reviewed new revision, either
+in the existing checkout or a separate checkout you intend to keep. Retained
+live-link source paths remain passive data so updating the checkout does not
+break those links before migration. Pi's removed sources are the explicit
+exception described below. This retention does not run an old installer.
+
+From the new checkout run:
 
 ```bash
-./setup.sh --all
+./migrate.sh
 ```
 
 ```powershell
-.\setup.ps1 -All
+.\migrate.ps1
 ```
 
-The same command handles a clean machine, an idempotent rerun, and the supported
-v0.1.0 migration. `--update` / `-Update` runs that complete reconciliation and
-then refreshes the proven drift-tolerant dependency/Mason edge. `--upgrade` /
-`-Upgrade` is an alias.
+Migration previews the detected shell profiles. Check each profile you want to
+detach, then approve its exact preview. The original artifact and a readable copy
+are retained at the reported recovery paths. Exact released bytes are recognized
+from pinned evidence; unknown/personal commands are never copied automatically
+into the new shell. Review those saved files and reapply personal settings you
+still need. For the released bash-to-zsh hook, only the exact marked block is
+removed; surrounding bytes stay intact.
 
-Setup never fetches a moving branch or mutates an old release checkout. Git
-acquisition remains explicit: clone the exact next annotated release beside the
-old checkout, then run setup from the new checkout.
+Unselected profiles stay unchanged and migration reports the remaining work.
+The released install's Homebrew block in `.zshrc.local` stays as personal
+configuration. It runs after managed shell setup and can put Homebrew ahead of
+managed tools; review it if you keep duplicate tools or want different PATH
+precedence.
+After successful preparation (and Homebrew conversion on macOS), the normal menu
+opens. Choose tools and explicitly
+adopt existing tool configurations where offered. The installer preserves their
+first baseline and uses that same baseline for later removal. A completed
+migration receipt is historical evidence: rerunning migration cannot replay the
+old detachment over newly installed profile blocks.
 
-`./setup.sh --allow-unreleased` is a separate greenfield/already-current-release field-test
-lane. It authorizes only a clean exact current branch head of the official
-repository for POSIX prerequisite bootstrap. It is not an upgrade authority and
-must not be used to migrate a live v0.1.0 checkout; the versioned migration
-tools remain exact-tag-only.
+The new Windows installer discovers actual known folders independently, including
+redirected Documents and Start Menu Programs. Neovim uses a directory junction;
+other configuration uses copies/scoped settings. Developer Mode is not required.
+Windows Terminal manages only its pinned stable unpackaged instance. Existing
+Store, Preview and Canary installations remain personal. If that instance still
+contains ambiguous legacy combined actions, launch it once to let Terminal migrate
+its own settings, then retry the reviewed setup.
 
-## v0.1.0 to v0.4.4
+## Git configuration handover
 
-`v0.1.0` is already a chezmoi release. On POSIX, its managed files are live
-symlinks into the checkout. Do **not** run `git pull`, switch that checkout to a
-new revision, or run an upgrade from `main`: doing so can change live config
-before recovery exists.
+Git defaults now use a marked include in a regular personal XDG Git file.
+`pull.rebase = true` and `fetch.prune = true` are defaults; personal values later
+in that file or in `~/.gitconfig` override them. The include follows the current
+checkout, so edits to its defaults take effect without an installer update.
 
-These commands target the published annotated `v0.4.4` release.
+For a released chezmoi Git symlink, migration preserves the original link and
+copies every readable setting into a regular file. This includes personal name,
+email and other settings that the former `git config --global` write-through
+behavior might have added to the source. It does not rewrite that old checkout.
+Personal sync links outside the recognized dotfiles layouts stay unchanged.
+Copied personal values still override the new defaults; the released default file
+has no pull policy, so its migration allows the new rebase default to take effect.
+Unreadable links and non-UTF-8 Git files require explicit repair or conversion.
 
-Before choosing a release for macOS, check [known release issues](KNOWN-ISSUES.md).
-The branch-testing procedure is not authority to migrate a live v0.1.0 install.
+An earlier build of this unreleased PR may already own the whole `config.git`
+file. First untick **Git** in setup's **Choose tools**. An unchanged owned file restores
+its first personal baseline. For changed files or uncertain ownership with intact
+recovery evidence, select the optional **legacy settings restoration**: it saves
+the current file separately and restores that first baseline. Settings added to
+that copy (including Git identity and credential helpers) become inactive until
+you copy them back from the reported recovery path. Declining keeps the file
+intact and offers restoration again on the next run; it never makes the obsolete
+mapping installable. Saved proof that a first publication was cancelled before
+any move, or explicitly restored, releases its bookkeeping without modifying the
+personal file. Missing recovery evidence blocks only this configuration. Migrate any restored
+legacy link, then select Git again. Migration refuses to detach setup's owned
+link. The old unowned receipt is released when the new integration takes over;
+its saved backup remains intact. Do not delete installer state to bypass this
+handover. On Windows this same flow covers the former whole-file copy.
+Retired mappings do not retain Git or managed shell blocks. Any old Keep entry
+for such a mapping is dropped from the next plan while its file stays protected.
+When Git remains selected during handover, resume setup after the old receipt is
+released so the new include can acquire its own baseline.
 
-### Common preparation
+Git follows `HOME`/`XDG_CONFIG_HOME` on Windows as well as POSIX. An explicit
+`GIT_CONFIG_GLOBAL` bypasses both personal global files; unset it before applying
+these defaults. If the discovered path changes between shells, setup keeps
+removal attached to the originally approved file and reports the changed path.
+Remove that integration before selecting Git at the new location.
+Git targets that resolve inside the checkout are blocked, including redirected
+parent directories. Historical targets that move or go offline cannot block
+independent selections; any uninspectable old lock evidence remains disclosed.
 
-Keep the checkout that currently owns v0.1.0 and clone v0.4.4 beside it:
+## Retiring the earlier installation
+
+Migration includes a separate retirement phase after the replacement setup
+passes its check. On macOS, Nix-managed Homebrew is converted before setup;
+its installed formulae, casks and taps must remain unchanged during conversion.
+Conversion preserves the old Homebrew source beside its original paths and
+restores the reviewed Homebrew 7.0.9 repository. It reads installation records
+directly, so the old Homebrew need not understand newer cask definitions. It does
+not run a global Homebrew update or migrate packages or taps. Redirected taps,
+submodules, partial clones and executable Git filters require inspection before conversion;
+preview never runs personal tap filter commands, including worktree-specific
+settings. The same protection applies to legacy plugin checkouts. Empty test
+submodules from the released plugin setup are recognized; populated or cached
+submodule data stays. History inspection refuses partial clones instead of
+downloading missing objects.
+The later retirement preview lists the exact old tools, files, services and
+accounts it can remove, including administrator actions and permanent Nix store
+deletion. Check each item you want to retire and review that preview.
+Scroll through the complete scope before confirming: it names native identities,
+remaining steps, preservation paths and anything retained. The summary counts
+these as removals; Homebrew conversion is a change. Administrator counts describe
+the actual remaining steps, including when resuming an interrupted retirement.
+
+The released setup also wrote Sentinel 0.1.2 policy for OpenCode
+(`${XDG_CONFIG_HOME:-~/.config}/opencode/AGENTS.md`) and Pi
+(`~/.pi/agent/AGENTS.md`). Neither agent is supported now. The "Remove released
+agent policy for OpenCode and Pi" item deletes such a file only when it holds
+exactly the released policy bytes; other OpenCode and Pi files stay. A file with
+any other text, or a link, keeps everything, including its policy block; the
+preview names it, and migration still completes.
+
+If migration stops at a phase, it names that phase and points to the report it
+already printed instead of repeating it. A check report closes with its screen,
+so its stop message repeats it in full.
+
+Nix removal first handles the earlier login shell, Home Manager links and
+nix-darwin system integration. It checks other accounts, garbage-collection roots,
+mounted filesystems and running processes before deleting the store. Close old
+Nix-based terminal sessions and open a fresh login session if processes still use
+it. Packages in the Nix store disappear; the preview calls out replacements you
+did not select. Personal Nix configuration remains, and earlier state/configuration
+is preserved at the listed recovery locations. The store itself is not backed up.
+
+Migration identifies upstream Nix and compatible Determinate installations from
+their on-disk evidence; you do not need to choose the installer type. Determinate
+removal validates the vendor receipt and native account/service/volume identities.
+The uninstaller must be protected and root-owned, or match the reviewed official
+release hash for its exact Mac version. The ordinary Mac installer preserves the
+installing user's ownership; migration authenticates those bytes without running
+them during preview. Root then copies and verifies both the binary and receipt
+in a private directory before execution. The preview identifies that trust source,
+the retained temporary copies, and the system Nix configuration backup.
+Unknown receipt actions or unrelated consumers block removal locally.
+Unreadable Neovim runtime journals also block that resource locally. Deselecting
+it preserves the runtime; other tools remain available. If an active operation's
+prior publication cannot be proved, Abandon refuses and identifies the journal
+that must be recovered or inspected.
+Stale links inside root's private temporary directory are checked read-only with
+existing administrator credentials. If they cannot be inspected, migration stops
+without treating them as absent.
+The same bounded inspection handles vendor configuration and remaining boot-time
+files readable only by root, without changing their permissions. If the preview reports missing administrator
+credentials, run `sudo -v` and retry `migrate`; machine mode never prompts.
+The receipt's Nix services are stopped before the final process check. If an
+outside process still uses Nix, removal stops with the store intact; close that
+process and resume migration. The services remain stopped during this pause.
+On Linux, an incomplete process inspection also stops removal. This includes
+processes changing address space during the check and a main thread exiting
+while workers remain alive. The diagnostic identifies the process and reference;
+finish or close that process before resuming. An unreadable process is never
+assumed to have stopped using the store.
+On Linux, inactive, failed or unloaded units do not block recovery after a
+restart or partial uninstall. Socket and service activation links are recorded
+in the preview and
+removed only when unchanged. This includes systemd links resolved into the Nix
+store; upstream retirement removes those links before their source disappears. Older saved evidence cannot authorize a newly
+observed link; a changed approval requires a fresh preview. If an older unfinished
+stop recipe keeps failing on a missing or failed unit, abandon that operation and review
+migration again; saved commands are not silently rewritten.
+
+If a Nix upgrade changed the profile, or the store was deleted outside migration,
+an old store-resolved activation link may no longer be provable. Migration keeps
+it and names its exact path. After confirming that it belongs to the old Nix
+installation, remove only that link with the displayed `sudo rm -- <path>`
+command, then rerun `migrate`. Do not substitute a store or unit-file path.
+This advice applies only to links in `sockets.target.wants` or
+`multi-user.target.wants`. Primary unit/tmpfiles links and files or directories
+at activation paths stay for manual inspection.
+
+On Linux, retirement switches the earlier Linuxbrew zsh login to setup's selected
+native zsh, or system Bash when zsh is unselected, before removing the formula.
+It can also repair this account's login if that formula was already removed.
+Another account using the formula keeps it installed; migration never changes
+other accounts' login shells.
+
+chezmoi retirement removes the verified executable through its original provider;
+it never runs `purge` or `destroy`. An independent chezmoi source blocks its
+removal. Pi session data, personal configuration, and unrelated packages stay.
+Exact direct-artifact and plugin evidence covers the published `v0.4.4` and the
+pre-overhaul `main` commit `ae9a6446`; a filename alone is not removal authority.
+
+Unchecked or unrecognized items remain visible and keep migration incomplete.
+Changes to the installation after preview require another review. Keep the old
+checkout and recovery files until you have checked your personal data and adopted
+applications. Running setup repeatedly reconciles its saved selection and verified
+resources; it does not run the old installer again.
+
+An earlier completed retirement does not select a later reinstallation for
+removal. Each migration respects the current checkboxes and keeps the previous
+operation history and recovery paths. Linux migration also detects tools that
+the released installer installed through Linuxbrew; new Linux setup uses APT
+and private archives. Shared package-manager infrastructure and unproved or
+externally required dependencies stay installed. Migration never runs Homebrew
+autoremove or removes another application's dependencies. The final report also lists
+intentionally kept components, including shared Windows packages and a native
+font family reused by the selected setup.
+
+Some leftovers can never be proved safe to remove, for example when a managed
+Windows laptop has no winget source or a package was updated outside the released
+installer. Once everything else is retired, interactive migrate asks whether to
+keep the remaining items and finish. Checked items stay exactly as they are; the
+report lists each one with its folder, file or package name under "Kept", so you
+can remove it yourself, and migration completes. Unchecked items, or any later
+change to a kept item, leave migration unfinished and appear in the next run.
+Interrupted, blocked or uninspectable retirements are never offered as kept.
+
+An interrupted upstream Linux store deletion records its approved membership and
+holds a separate deletion lock. If its worker is lost, recovery requires a fresh
+approval of the remaining files after the earlier deletion has stopped. Newly
+added root/store members block recovery. A removed default-profile manifest can
+be recovered only with saved proof that it contained installer runtime packages;
+an older journal without that proof cannot authorize another account's files.
+
+## Interruptions and conflicts
+
+An unfinished transaction from a released old installer must first be recovered
+with that exact retained release and recovery directory. Migration reports the
+blocking evidence and does not start a second operation over it.
+
+For a new installer interruption, finish recovery **before updating the checkout**.
+Resume requires the original installer executable and its matching checkout,
+including the original configuration sources. If neither has changed, reopen the
+same `setup` or `migrate` entrypoint and use its recovery menu. Restoration uses
+saved physical artifacts without overwriting newly created personal files;
+abandonment is offered only when the provider can prove it safe. Neither action
+is a general substitute for resuming with the original executable.
+
+The recovery diagnostic's **executable SHA-256** identifies the executable's
+bytes, not a Git revision. The cache filename uses a different build-input key;
+do not put the reported digest into a guessed filename or pass it to `git checkout`.
+If you already updated, preserve your edits and recover the original matching
+checkout contents at the original location from your retained revision/history.
+Keep the original account and state-location settings. Locate the retained
+executable by hashing the cache entries, replacing the placeholder with the full
+64-character digest from the diagnostic:
 
 ```bash
-git clone --branch v0.4.4 --single-branch \
-  https://github.com/luisgui1757/dotfiles.git ~/dotfiles-v0.4.4
-cd ~/dotfiles-v0.4.4
+wanted='EXECUTABLE_SHA256_FROM_DIAGNOSTIC'
+cache="${XDG_CACHE_HOME:-$HOME/.cache}/dotfiles/bootstrap"
+for candidate in "$cache"/dotfiles-*; do
+  [ -f "$candidate" ] && [ -x "$candidate" ] && [ ! -L "$candidate" ] || continue
+  if command -v sha256sum >/dev/null 2>&1; then
+    actual=$(sha256sum < "$candidate" | awk '{print $1}')
+  else
+    actual=$(shasum -a 256 < "$candidate" | awk '{print $1}')
+  fi
+  [ "$actual" != "$wanted" ] || printf '%s\n' "$candidate"
+done
 ```
 
 ```powershell
-git clone --branch v0.4.4 --single-branch `
-  https://github.com/luisgui1757/dotfiles.git "$HOME\dotfiles-v0.4.4"
-Set-Location "$HOME\dotfiles-v0.4.4"
+$wanted = 'EXECUTABLE_SHA256_FROM_DIAGNOSTIC'
+$cache = Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'dotfiles/bootstrap'
+Get-ChildItem -LiteralPath $cache -Filter 'dotfiles-*.exe' -File |
+    Where-Object { -not ($_.Attributes -band [IO.FileAttributes]::ReparsePoint) } |
+    ForEach-Object {
+        if ((Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash -ieq $wanted) {
+            $_.FullName
+        }
+    }
 ```
 
-Do not stash, delete, or overwrite local changes to make migration pass. Setup
-requires the exact old and new official release identities and refuses to guess
-which user bytes are authoritative.
-
-Setup normally discovers v0.1.0 from its live Neovim/shell config ownership. If
-the old checkout uses an unusual path and cannot be discovered, identify it for
-the same setup invocation:
+Run only the matching executable from your retained trusted cache, explicitly
+binding its original checkout. Use `migrate` instead of `setup` when recovering
+a migration transaction:
 
 ```bash
-DOTFILES_V0_1_CHECKOUT=/actual/path/to/v0.1.0 ./setup.sh --all
+DOTFILES_CHECKOUT='/absolute/path/to/original-checkout' DOTFILES_ENTRYPOINT=setup \
+  '/exact/matching/cache/executable'
 ```
 
 ```powershell
-$env:DOTFILES_V0_1_CHECKOUT = 'D:\actual\path\to\v0.1.0'
-.\setup.ps1 -All
-Remove-Item Env:DOTFILES_V0_1_CHECKOUT
+$oldCheckout, $oldEntrypoint = $env:DOTFILES_CHECKOUT, $env:DOTFILES_ENTRYPOINT
+try {
+    $env:DOTFILES_CHECKOUT = 'C:\absolute\path\to\original-checkout'
+    $env:DOTFILES_ENTRYPOINT = 'setup'
+    & 'C:\exact\matching\cache\executable.exe'
+} finally {
+    $env:DOTFILES_CHECKOUT, $env:DOTFILES_ENTRYPOINT = $oldCheckout, $oldEntrypoint
+}
 ```
 
-The override is not trusted blindly; setup still requires the exact annotated
-v0.1.0 tag object and peeled commit, and the migration performs its complete
-official-remote, clean-tree, target-identity, and historical-config preflight.
+If no cached executable matches, retain the transaction and recover the original
+binary or reproduce its exact original build; verify the required executable
+SHA-256 before resuming. A matching checkout name or Git revision alone does not
+prove the executable identity. Do not delete state, profile locks or journals to
+manufacture a clean install. A changed file, unreadable baseline or live consumer
+remains a visible action item until its real cause is resolved.
 
-### Apple Silicon macOS, Linux x86_64, and Linux aarch64
+## Later updates and removal
 
-Run:
+OpenWhispr, Obsidian, Tailscale and Zen are new optional selections; updating
+the checkout does not select them automatically. Consult the README platform
+table for current availability. Existing applications and personal notes,
+browser profiles, dictation settings and Tailscale credentials are not adopted
+implicitly. Tailscale is removed without package purge. Finish pending native
+operations with their original executable before advancing the checkout.
 
-```bash
-./setup.sh --all
-```
+First complete any pending operation with its original executable and checkout.
+Then update the checkout to a reviewed revision, open `setup.sh`/`setup.ps1` and
+choose **Update tools**. Updates preserve your selections and reconcile
+only the declared pins/native packages. Complete Update before opening
+managed Neovim after changing checkout pins: Lazy pin drift stops configured
+startup, and Mason registry drift disables its language-server/formatter setup.
+A failed update leaves those mismatches visible until repair succeeds; ordinary
+editor startup never rewrites the published generation.
 
-That one invocation:
+Untick tools in **Choose tools** to remove them and review the shared-dependency
+choices on the confirmation. Personal data and pre-existing packages are
+preserved; unchanged owned resources are removed/restored surgically.
 
-1. resolves and validates the real target account and home;
-2. installs the release-pinned, SHA-256-verified Nix prerequisite when missing
-   and activates it in the current process;
-3. detects exact live v0.1.0 ownership or a resumable applied recovery;
-4. runs the side-by-side digest-bound Nix/config transaction;
-5. automatically rolls back v0.1.0 on migration failure or interruption;
-6. verifies and accepts the reversible core under the explicit non-interactive
-   `--all` contract;
-7. retains the private recovery directory for evidence;
-8. completes native/deferred dependencies, config repointing, locked Neovim
-   restore, parsers, Mason, and Sentinel.
+Claude Code and Codex CLI are separate selections. Select either or both after
+migration; their standalone binaries do not require Node/npm. Authentication,
+sessions and personal CLI settings stay local. Claude's managed shell disables
+its own updater; use the setup menu's Update action for reviewed CLI pins.
 
-If an earlier migration reached `applied` but setup stopped before acceptance,
-rerunning the same command resumes at validated acceptance. A recovery in
-`prepared`, `applying`, `rolling-back`, or `recovery-required` fails closed and
-prints its exact rollback command instead of starting another transaction.
-Any unfinished earlier supported recovery must first be accepted or rolled back
-from its retained exact release checkout. v0.4.4 setup detects every namespace
-in its ordered legacy-release registry and refuses to start or resume a second
-release transaction around any one.
+GitHub Copilot CLI is a separate selection on every platform. A Copilot you
+installed with npm, `gh`, winget, Homebrew or its install script stays untouched;
+the dotfiles copy takes precedence in configured shells. Remove the other copy with
+its own tool if you no longer want it. Its cached updates under `~/.copilot/pkg`
+belong to that copy. The managed shell sets `COPILOT_AUTO_UPDATE=false`; on
+Windows, PowerShell 7 is added as Copilot's prerequisite.
 
-After success, open a new login shell and verify:
+Kiro CLI is a separate selection on macOS and Linux. It is not offered on Windows,
+where Kiro ships it only as an MSI installer; install it yourself there if you want
+it (Sentinel policy and skills still reach it). If
+you installed Kiro CLI yourself, the dotfiles copy takes precedence in configured
+shells and your copy is left alone; remove it with its own uninstaller if you no
+longer want it. Setup sets only `app.disableAutoupdates` in
+`${KIRO_HOME:-~/.kiro}/settings/cli.json` (an existing `false` is shown for explicit
+adoption first) and restores your file on removal.
 
-```bash
-nix store info
-command -v rg fd fzf jq lazygit node starship zoxide nvim
-chezmoi --source ~/dotfiles-v0.4.4/home --destination "$HOME" \
-  verify --include files,symlinks
-```
+Pi has been removed, including its copied themes/keybindings and Sentinel target.
+Existing released Pi packages and personal data remain outside this installer's
+ownership. Keep an old checkout if a personal Pi configuration still links to it.
+If testing an earlier unreleased native-installer revision, first remove Pi and
+its old Sentinel selection using that exact revision, and finish any pending
+operation there before advancing. Reinstall Sentinel after updating to publish
+its current consumer targets. This also applies to the three-target Sentinel
+selection at `d9a3993`: remove it there before advancing to the current four-target
+recipe. Released OpenCode/Pi policy files are retired by migration (see
+[Retiring the earlier installation](#retiring-the-earlier-installation)); normal
+setup no longer reports them. Never discard state or recovery journals.
+Completed removal can retain restored personal policies and edit evidence.
+Reinstallation requests fresh adoption for those blocks; retained history does
+not grant ownership of the new targets or block that new approval.
 
-Keep the old checkout and printed recovery directory until personal application
-data has been checked. Automatic rollback authority ends only after the
-transaction's config/package verification passes and setup accepts it; the
-recovery directory remains private evidence.
+Sentinel policy goes only to agents that are present: Codex, Claude Code, GitHub
+Copilot or Kiro, when the agent's configuration folder exists, its command (or
+a Kiro macOS app) is found, or Codex, Claude Code, Copilot CLI or Kiro CLI is
+selected in the same run. Copilot's folder is `${COPILOT_HOME:-~/.copilot}` and
+Kiro's is `${KIRO_HOME:-~/.kiro}`. Setup never creates an absent agent's folder. A
+policy already installed for Copilot or Kiro keeps its target: if you set
+COPILOT_HOME or KIRO_HOME later, setup refuses to retarget it; run setup with the
+earlier value (unset) to remove it, then select it again. Installed policy keeps the agents
+it was approved for. An agent installed later is noted; deselect Sentinel policy
+and apply, then select it again to add it. If a covered agent's folder disappears,
+setup stops maintaining its policy and never recreates the folder; the other
+agents stay checked. To record the narrower policy, tick the Sentinel policy
+replacement on the next Choose tools confirmation; removal is then ordinary. If
+every covered agent is gone, setup asks you to deselect Sentinel policy, which
+then forgets it without recreating anything.
+Removal also deletes folders that setup created for a file, while they are
+still empty. An unreleased revision that wrote policy for an absent
+agent created that folder; deselect Sentinel policy there or here (removal
+restores the original files), delete the then-empty folder, and select it again.
 
-No macOS path exists outside Apple Silicon.
+Sentinel skills are a new, independent selection. They use dotfiles receipts,
+not the upstream `.sentinel-skills.json` registry. First finish removal/recovery
+with whichever installer owns existing skills, and retain personal edits before
+selecting them here. Upstream Sentinel installs remove with its own
+`node tools/skills.mjs --host codex --global --remove` (and `--host claude`),
+which refuses edited folders. It leaves an empty `.sentinel-skills.json` that
+owns nothing; setup accepts it and leaves it in place. Skills installed by `npx skills` are recorded in
+its lock (`~/.agents/.skill-lock.json`, or `$XDG_STATE_HOME/skills/` when set).
+An entry for a bundled name, such as an earlier standalone `impeccable`, blocks
+a new selection until `npx skills remove --global <names>` releases it. If the
+CLI claims a name after dotfiles installed its copies, setup only notes it. That command
+deletes every agent's folder of those names, so run it before dotfiles installs
+its copies. Symlinked former Helix folders and identical unowned copies
+are also protected. Before changing this unreleased 12-skill bundle's folder
+inventory, remove it using its original revision; target-count changes do not
+grant ownership of earlier destinations. Managed skills are copies, so editing
+them never writes back into this checkout. Repair can preserve owned edited
+copies after explicit approval. Impeccable's shared engine cache is retained.
+Kiro receives its own copy in `${KIRO_HOME:-~/.kiro}/skills` only while Kiro is
+installed (the same presence rule as the policy). An existing Sentinel skills
+selection picks Kiro up on the next Choose tools or Update after Kiro is installed.
+If you uninstall Kiro, setup reports it, never recreates its folder, and forgets
+those copies when you deselect Sentinel skills. Copilot reads `~/.agents/skills`
+unless COPILOT_HOME is set; with it set, Copilot reads only `$COPILOT_HOME/skills`,
+so setup copies the skills there as well while Copilot is installed.
 
-### Native Windows
+The POSIX launchers create private cache/staging files under umask `077`, then
+restore the caller's umask before starting the installer. They do not change your
+shell's file-creation policy.
+Both launchers isolate the compiler's module/build caches; personal Go settings
+remain intact when the installer starts.
 
-Windows remains non-Nix. Enable Developer Mode, open a normal PowerShell, and
-run:
+For historical v0.1.0-to-v0.4.4 procedures, read
+[the immutable former guide](https://github.com/luisgui1757/dotfiles/blob/ae9a6446eb0a837a144d77d2a6345db967c61e4e/docs/UPGRADING.md).
+Those commands belong to their corresponding release, not this installer.
 
-```powershell
-.\setup.ps1 -All
-```
+Desktop app additions (2026-10-13 candidate): select each independently through
+setup. Linux Obsidian used a private Flathub stable installation until
+2026-10-22 and now uses the official portable build, started without Chromium's
+sandbox (disclosed before approval). If Obsidian was already selected, **Update
+tools** installs the portable build and repoints your existing launcher; it
+removes nothing, so the earlier Flatpak stays until you next apply **Choose
+tools**, which removes it with your approval. Its `~/.var/app/md.obsidian.Obsidian`
+data and private runtime are kept, and ordinary user/system Flatpak stores are
+not managed. Obsidian then keeps its settings in `~/.config/obsidian` instead of
+`~/.var/app/md.obsidian.Obsidian/config/obsidian`, so it asks once for your vault:
+choose **Open folder as vault**; vaults themselves are untouched.
+Linux OpenWhispr amd64 uses the official portable archive: its upstream launcher
+may disable the Chromium sandbox on restricted-userns systems, disclosed before
+approval. No Flatpak or Linux arm64 build is currently published. Zen Linux
+updates through setup and uses a stable personal profile across package generations.
+Tailscale uses normal package removal, preserving service configuration and state;
+removing machine-wide owned packages requires the separate removal choice.
 
-Setup discovers exact v0.1.0 through the live Neovim link (or the validated
-override), then runs the digest-bound config/known-folder/Terminal transaction,
-requires the expected post-migration state for stable packaged, Preview
-packaged, and portable Windows Terminal, accepts the verified core, retains the
-protected recovery folder, and completes packages, config repointing, Neovim,
-and Sentinel.
+VS Code's supported `update.mode: none` preference keeps the application on the
+reviewed installer version. Theme, font and update settings have one owner.
+An earlier theme-only installation must first restore its saved settings through
+**Choose tools**, then **Resume**. Restoration preserves the earlier file
+separately, including unchanged copies. Modified old settings need the optional
+restoration approval. If restored settings contain a personal theme, font or
+update preference, Resume cannot add that new approval: choose **Abandon**, then
+**Choose tools** and approve adoption. Removal restores those values and
+permissions. Missing or damaged evidence blocks handover; preserve it and restore
+the matching settings path and evidence before continuing.
+A bundle that already self-updated stays protected and requires explicit
+replacement approval; changing the preference does not claim changed bytes.
+This application-wide preference can also propagate to other machines through
+[Settings Sync](https://code.visualstudio.com/docs/configure/settings-sync).
+Exclude `update.mode` from sync in Code if those machines should update separately.
 
-The same command covers conventional, redirected, OneDrive, and alternate-drive
-known folders because UserProfile, LocalApplicationData, ApplicationData,
-Documents, and the runtime PowerShell profile are resolved independently.
 
-After success, open Neovim, lazygit, PowerShell, and every installed Windows
-Terminal variant. Keep the old checkout and protected recovery folder until
-those checks pass.
+## T3 Code
 
-### WSL2 split-host upgrade
+T3 Code is a new optional selection, never an automatic migration or provider
+replacement. It uses the official standalone package with a browser UI on Apple
+Silicon macOS, Ubuntu/Debian amd64/arm64 and Windows amd64. The fixed stable
+`v0.1.0` pin supplies Orchestrator V2. Finish any pending nightly installation
+with its original checkout first; then stop T3, update the checkout and choose
+**Update tools** to replace the managed nightly with stable. Personal
+T3 state stays outside the package; back it up before running a newer server.
 
-WSL still has two independent owners and therefore two setup invocations:
+Run `t3` in a fresh terminal, then configure a supported provider when ready
+to run agents. Existing Codex/Claude CLI logins are supported; T3's Connect with
+ChatGPT can instead install its own managed Codex runtime. Codex and Claude Code
+remain independent installer choices. Stop T3 before Update, Repair or Remove. No service or authentication is
+configured. Existing binaries and personal `~/.t3`/`T3CODE_HOME`, conversations,
+settings, credentials and project data are not adopted or removed. Use the
+installer's lifecycle for its private package; T3's own install/update/uninstall
+commands manage a different installation layout.
 
-1. Clone v0.4.4 on Windows and run `.\setup.ps1 -All` for host Terminal, font,
-   clipboard, and Windows tools.
-2. Clone v0.4.4 separately inside the Linux home—never under `/mnt/c`—and run
-   `./setup.sh --all` for the guest Nix/config/tool stack.
-3. Run `tests/wsl/e2e.sh` in the guest and verify host Windows Terminal,
-   `win32yank`, font, and PowerShell behavior.
 
-Each setup invocation verifies and accepts its own platform transaction. A
-failed guest migration rolls its guest state back automatically without
-invalidating an already-verified Windows host installation.
+Before launching V2 against an existing T3 home, stop the server and copy its
+`userdata` directory to a safe backup. Upstream copies the V1 database once into
+V2; later conversations diverge while settings, attachments and workspaces are
+shared. Use `t3 --base-dir /path/to/separate-t3-home` (or `T3CODE_HOME`) for an
+isolated trial. This installer does not perform or verify that upstream migration.
+For dotfiles-managed Codex/Claude, use dotfiles Update, not the provider Update
+or Update all buttons in T3; those can invoke the CLI's own updater.
 
-## Updating an installed release
+### Zen macOS native application
 
-From the exact release checkout:
+The macOS selection now uses Homebrew's official `zen` cask and normal browser
+updates. Existing authentic app bundles are reused without acquiring removal
+rights. Finish an interrupted earlier operation using its original checkout
+before changing revisions; keep all journals and failed generations.
 
-```bash
-./setup.sh --update
-# alias: ./setup.sh --upgrade
-```
+For an earlier private `tool.zen` installation, use **Choose tools** and keep Zen
+selected. Review the new native app and the old launcher/package cleanup together.
+The old launcher is removed before an unchanged private bundle. A bundle that
+already self-updated remains protected; its original ownership checks are not
+relaxed. The old archive pins and preparation revisions remain recovery-only.
+A retained `DotfilesZen.app` still has Zen's bundle ID and may appear in macOS
+application routing. Inspect that retained copy before choosing a default browser.
 
-```powershell
-.\setup.ps1 -Update
-# alias: .\setup.ps1 -Upgrade
-```
+The new installation does not edit profiles, `profiles.ini`, `installs.ini`,
+preferences or default-browser registration. Zen handles its own profile setup;
+a browser version older than an existing profile can display a downgrade warning.
+Quit all Zen copies before changing the native installation. Remove preserves
+personal profiles and caches and requires per-item approval. It verifies the
+recorded app's signer and bundle ID, but a manual reinstall from the same developer
+at the same path is indistinguishable from a normal browser update. An unverified
+app, changed uninstall recipe or an existing shared `zen` command blocks removal.
 
-Update first runs the same install/migration/idempotent reconciliation as all
-mode. It then performs only scoped updates for present tools whose package or
-direct-artifact ownership is proven, plus synchronous Mason updates. It never
-runs a blanket package-manager upgrade, `git pull`, `nix flake update`, or
-`:Lazy update`, and it never rewrites repository lockfiles. On macOS the retry
-is safe in the terminal that performed first activation: setup resolves the
-installed current-system `darwin-rebuild` outside stale `PATH` and recognizes
-nix-darwin's `/etc/static` shell links plus retained backups as managed state.
-Legacy Homebrew tap migration state is also retry-safe: setup keeps transaction
-and failed-output roots beside `Library/Taps`, where Homebrew cannot enumerate
-them as additional taps, and automatically relocates the exact in-tree recovery
-names created by the broken predecessor. Do not manually untap or delete those
-artifacts before retrying setup.
-If the same login shell already sourced the Nix daemon profile and a later
-Homebrew `path_helper` refresh removed Nix from `PATH`, setup re-adopts the
-canonical daemon/user profile binary directly. Do not reinstall Nix or unset
-the upstream profile guard manually.
+### Windows Python preparation correction
 
-To move to a newer dotfiles release, clone that exact annotated tag beside the
-current checkout and run its setup update command. The new checkout, not Git
-mutation of the old one, is the release boundary.
+An earlier unreleased installer can stop while preparing Python bytecode under
+Windows' default path policy. Keep its transaction and original checkout. Use
+that original installer to review the recovery choices before changing revisions;
+Restore or Abandon is available only when the saved evidence permits it. Do not
+delete the failed generation or journal to bypass recovery.
 
-## Operator recovery commands
+Once recovery is complete, update the checkout and run setup again. The corrected
+preparation uses extended paths without changing Windows policy or moving package
+directories. Existing completed LaTeX and yamllint environments receive an
+ordinary approved Update for the new preparation revision. Personal Python
+environments and pip settings are outside this change.
 
-The standalone migration commands remain supported for diagnosis, deliberate
-manual acceptance, and recovery. They are not required for the normal path:
+### Windows Neovim formatter correction
 
-```bash
-./scripts/upgrade-v0.1.0.sh --preflight-only /path/to/v0.1.0
-./scripts/upgrade-v0.1.0.sh --apply /path/to/v0.1.0
-/exact/recovery/upgrade-v0.1.0.sh --rollback /exact/recovery
-/exact/recovery/upgrade-v0.1.0.sh --accept /exact/recovery
-```
+Windows now uses standalone Gersemi and clang-format archives at the same pinned
+versions as the POSIX Mason tools. An approved Update builds a fresh Neovim
+runtime and installs those automatic prerequisites; no new checkbox is needed.
 
-```powershell
-.\scripts\upgrade-v0.1.0.ps1 -PreflightOnly -OldCheckout 'C:\path\to\v0.1.0'
-.\scripts\upgrade-v0.1.0.ps1 -Apply -OldCheckout 'C:\path\to\v0.1.0'
-pwsh -NoProfile -File 'C:\exact\recovery\upgrade-v0.1.0.ps1' -Rollback 'C:\exact\recovery'
-pwsh -NoProfile -File 'C:\exact\recovery\upgrade-v0.1.0.ps1' -Accept 'C:\exact\recovery'
-```
+If Neovim synchronization failed before publishing its runtime, Abandon preserves
+the partial generation and journal so setup can start a fresh operation with the
+corrected checkout. A previously abandoned operation no longer traps Neovim in
+Pending. If publication itself was interrupted, recover that exact operation
+with its original checkout before abandoning or changing source. Never delete
+the journal or partial generation to bypass recovery. Abandonment uses the
+existing provider finalization order: it may finish cleanup of independently
+verified obsolete archive generations before refusing an interrupted Neovim
+publication. That refusal preserves the Neovim publication and recovery evidence.
+If saved evidence is damaged, Check names its location and keeps unrelated tools
+available. An active operation with unreadable publication evidence cannot be
+abandoned safely; preserve it for recovery rather than deleting its journal.
 
-## v0.4.4 release evidence
+### Windows VC++ registry reconciliation
 
-v0.4.4 was published on 2026-07-26.
+Build Tools installation can leave differing VC++ version entries across the
+Windows registry views. Setup now accepts the newer entry only when the installed
+bundle, both MSI providers and the runtime DLL versions agree. Older entries are
+preserved and disclosed, and block runtime removal. Other conflicts still fail.
+Completed receipts from the earlier adapter remain readable. Finish an interrupted
+old VC++ operation with its original checkout before updating; its saved command
+cannot be reinterpreted as the new recipe.
 
-- Pull request #79 merged reviewed head
-  `f0c747127689d0548c5f4a62507584c2e971c882` to exact `main` commit `05874e536372f6a73f8971c84e675e95666662d4`;
-  both have tree `df353441f2592262c7583e8ee728f74e53930d8e`, and all required checks passed.
-- The full local gate and redacted Gitleaks scan across
-  `v0.4.3..v0.4.4` passed before the tag was created.
-- Cache-free exact-tag run
-  [`30192132079`](https://github.com/luisgui1757/dotfiles/actions/runs/30192132079)
-  passed all four producers and all four stable logical proof jobs at the exact
-  release commit; both POSIX lanes reported the immutable tag identity.
-- All four schema-2 logical proofs independently bound source SHA, executed
-  SHA, run ID, run attempt, logical context, and legacy context; their total
-  size was 912 bytes and their SHA-256 values are in the checked-in proof.
-- A fresh credential-free detached public clone reproduced the tag identities,
-  release-upgrade static gate, and immutable prerequisite-helper no-op path.
-- GitHub release `359951205` read back immutable/latest,
-  non-draft, and non-prerelease with the prepared body and certification asset exact.
 
-The real WSL, redirected-Windows, divergent Windows Terminal, physical-Linux,
-Apple-Silicon owner-host, and visual rows remain explicit residual evidence gaps
-in `tests/MANUAL.md`; publication did not mark them complete.
+### Windows legacy profile ownership
 
-## v0.4.3 release evidence
+An earlier elevated setup can leave Git configuration or a PowerShell profile
+owned by `BUILTIN\Administrators`. Windows may let your normal account edit its
+contents but refuse to assign that owner to a replacement file. Setup preserves
+the original file and its permissions, removes its refused staged copy, and
+retains the saved operation. Repeating the same non-elevated attempt cannot fix
+that refusal.
 
-v0.4.3 was published on 2026-07-25 under explicit owner authorization. The
-deterministic publication gates passed:
+Open PowerShell as administrator **under the same Windows account**, return to
+the same checkout, and run `./setup.ps1`. Choose Resume (or finish the saved
+restoration if restoration was already started). Review and approve only the
+one-resource recovery plan. After that resource recovers, leave the elevated
+terminal and run setup from a normal PowerShell window to review remaining work.
+Do not approve an entire new installation as administrator for this exception.
 
-- [x] pull request #73 merged reviewed head
-  `8d5c27768fc8fe528818c3a1fe879b213a594c23` to exact `main` commit
-  `e3e459a20c23ae546b26d5206d13b648b29e8788` with identical tree
-  `e022993c8dd3adbeb9c3ecaab1d01a97856d2b14` and all 21 hosted checks
-  passing;
-- [x] annotated tag object `72232aee30201506320889a0c82be515041b9674`
-  peels to that exact commit locally and in the official remote;
-- [x] the full local gate, deterministic exact-v0.1.0 migration fixtures,
-  hosted Windows coverage, and Gitleaks 8.30.1 scans across the three commits
-  and 69,707 bytes in `v0.4.2..v0.4.3` plus all four downloaded schema-2
-  logical proofs (912 bytes) passed;
-- [x] cache-free hosted run
-  [`30171230547`](https://github.com/luisgui1757/dotfiles/actions/runs/30171230547)
-  passed the Ubuntu, macOS, Windows, and container producers plus all four
-  logical proof jobs; both POSIX lanes reported the exact immutable tag;
-- [x] a fresh detached public clone resolved the same tag object and peeled
-  commit, passed the release-upgrade identity test, and exercised the immutable
-  prerequisite-helper no-op path;
-- [x] GitHub release
-  [`359840729`](https://github.com/luisgui1757/dotfiles/releases/tag/v0.4.3)
-  is immutable, latest, non-draft, and non-prerelease, and its body matches the
-  prepared user-facing notes.
+Setup never takes ownership or elevates profile writes automatically. You can
+instead explicitly resolve the file's ownership outside setup if that is your
+intended policy. Preserving an administrator-owned file may require the same
+authority for later changes, removal or restoration of that file; ordinary Check
+and unrelated tool selections do not require elevation.
+This elevated route applies to `BUILTIN\Administrators`. For another owner, resolve
+ownership explicitly outside setup; administrator elevation alone is not a
+general way to preserve an arbitrary owner SID.
 
-The unchecked real WSL, redirected-Windows, divergent Windows Terminal,
-physical-Linux, Apple-Silicon owner-host, and visual rows in `tests/MANUAL.md`
-remain explicit residual gaps; publication does not mark them complete.
+### Private Python tools and existing terminal sessions
 
-## v0.4.2 release evidence
+The managed `latex2text` and `yamllint` commands now use their own command-only
+directories. Their private Python/pip executables no longer enter your shell PATH.
+Update replaces these two tool generations and the shell integration; the selected
+base Python stays unchanged. Existing saved operations retain their approved recipe.
+After Update, open a fresh terminal from the desktop and restart applications that
+launch shells so they inherit the new command paths.
 
-v0.4.2 was published on 2026-07-25 under explicit owner authorization. The
-deterministic publication gates passed:
+Windows private Python preparation also disables pip configuration
+using Python's exact null-device spelling. This prevents machine or environment
+configuration from changing the pinned installation. For interrupted operations,
+finish recovery with the original checkout before updating.
 
-- [x] pull request #70 merged reviewed head
-  `d3107898da59c8317db7c5b4d6e9ad8fdfba5d5e` to exact `main` commit
-  `fdd628b34a58a3ecf3a1bef3de72f7cd4ac7dfc0` with identical tree
-  `aee8b07da50e4c4d1a99f7dabef7b8ffcc56f1ef` and all required checks
-  passing;
-- [x] annotated tag object `807b2f8bb47ae9c7e132f1f8a218cf19c9ae2c61`
-  peels to that exact commit locally and in the official remote;
-- [x] the full local gate, deterministic exact-v0.1.0 migration fixtures,
-  hosted Windows coverage, and Gitleaks 8.30.1 scans across the three commits
-  and 54,643 bytes in `v0.4.1..v0.4.2` plus all four downloaded schema-2
-  logical proofs (912 bytes) passed;
-- [x] cache-free hosted run
-  [`30152048314`](https://github.com/luisgui1757/dotfiles/actions/runs/30152048314)
-  passed the Ubuntu, macOS, Windows, and container producers plus all four
-  logical proof jobs; both POSIX lanes reported the exact immutable tag and
-  proved npm's global prefix is `~/.local`;
-- [x] a fresh detached public clone resolved the same tag object and peeled
-  commit, passed the release-upgrade identity test, and verified the immutable
-  prerequisite path;
-- [x] GitHub release `359736736` read back immutable/latest, non-draft,
-  non-prerelease, and with the prepared user-facing body exact.
+Windows retirement can remove multiple released PATH entries in one approved
+plan while preserving unrelated entries. If an older interrupted retirement
+reports that a later tool changed after approval, abandon that remaining plan
+through migration recovery, then review a fresh retirement plan. Completed
+removals and their preserved evidence remain recorded.
 
-Earlier exact-tag run
-[`30151746003`](https://github.com/luisgui1757/dotfiles/actions/runs/30151746003)
-failed the macOS neocmake attachment probe after setup and cancelled Windows.
-It remains diagnostic evidence and was not promoted as release proof.
+Personal shell and Sentinel edits may use different line endings from the managed
+block without triggering a repair. Existing UTF-16 profiles retain their encoding;
+saved marked blocks remain readable for interrupted recovery even though the
+journal fragment omits the full file's BOM.
 
-The unchecked real WSL, redirected-Windows, divergent Windows Terminal,
-physical-Linux, Apple-Silicon owner-host, and visual rows in `tests/MANUAL.md`
-remain explicit residual gaps rather than implied passes.
+### Continuing removal after restoring personal settings
 
-## Historical v0.4.1 release evidence
+Restoring an adopted settings file completes removal of that integration even
+when the personal file remains present. A subsequent removal preview releases
+its former prerequisites when the saved completion and restored baseline still
+match. Personal files remain in place. A new edit or unavailable recovery evidence
+keeps the affected dependencies protected without erasing the earlier completion
+record; restore the evidence and review a fresh plan before continuing.
+For an intentional settings edit, explicitly select and adopt that configuration,
+then remove it again to establish the edited settings as the new personal baseline.
+Reselecting without adoption preserves the earlier removal record; any unresolved
+adoption or evidence requirement still appears as pending work.
 
-v0.4.1 was published on 2026-07-22 under explicit owner authorization. The
-deterministic publication gates passed:
+Finish an interrupted operation with its original checkout before changing source.
+When no resource remains in flight, public Abandon can archive the finished part
+and preserve its receipts, followed by the corrected checkout and a fresh removal
+review. Never edit state or delete recovery journals to bypass this boundary.
+Older unreleased native builds could replace the completed-removal status with
+retained status. Those records remain conservative: explicitly select and adopt
+the affected configuration, then remove it again to establish a new verified
+lifecycle. The released chezmoi/Nix migration uses its separate handover workflow.
 
-- [x] pull request #67 merged reviewed head
-  `ee02e551b6e9357da52e29754dac6692f5802ae1` to exact `main` commit
-  `bac8cc97177b3bb58119fde5720b31e6b57febcc` with identical trees and all
-  required checks passing;
-- [x] annotated tag object `558d19a8c62453f68e5463e8999b216e0b692551`
-  peels to that exact commit locally and in the official remote;
-- [x] the full local gate, deterministic exact-v0.1.0 migration fixtures,
-  hosted Windows coverage, and Gitleaks scans across the two commits in
-  `v0.4.0..v0.4.1` plus all four downloaded logical proofs passed;
-- [x] cache-free hosted run
-  [`29891574548`](https://github.com/luisgui1757/dotfiles/actions/runs/29891574548)
-  passed the Ubuntu, macOS, Windows, and container producers plus all four
-  logical proof jobs; both POSIX lanes reported the exact immutable tag;
-- [x] GitHub release `357785004` read back immutable/latest, non-draft,
-  non-prerelease, and with the prepared user-facing body exact.
+### Earlier unreleased Mac bootstrap and application images
 
-The unchecked real WSL, redirected-Windows, divergent Windows Terminal,
-physical-Linux, Apple-Silicon owner-host, and visual rows in `tests/MANUAL.md`
-remain explicit residual gaps rather than implied passes.
+An earlier build of this unreleased PR recorded fresh Homebrew ownership using a
+device number that macOS changes at reboot. Its schema-1 evidence cannot safely
+establish the new volume identity. Keep that evidence and the working Homebrew,
+CLT and packages; no public recovery command can rebind it. Verify the corrected
+fresh bootstrap in a clean environment. This does not affect the released Nix
+installer or an existing Homebrew reused without a new ownership record.
 
-## Historical v0.4.0 release evidence
+Update replaces managed DMG application generations using the corrected image
+transport, which avoids adding AppleDouble files that invalidate vendor signatures.
+Finish interrupted operations with their original checkout first. Personal app
+data stays outside the replacement; do not remove quarantine or disable Gatekeeper.
 
-v0.4.0 was published on 2026-07-21 under explicit owner authorization. The
-deterministic publication gates passed; the real-environment rows below remain
-open and are not implied by publication:
+An earlier native-Zen candidate could install the official app but reject its
+Finder metadata, or lose install attribution when `HOMEBREW_NO_EMOJI` was set.
+Preserve the failed app, native receipt and installer journal. If installation
+has finished and the command record proves Zen was absent beforehand, quit Zen,
+remove only that newly installed cask through normal Homebrew uninstall without
+force/zap/autoremove, and verify the original package inventory and personal data.
+Then public Abandon can archive the interrupted plan before a corrected fresh
+preview. Do not use this procedure for a pre-existing or uncertain app. Corrected
+builds preserve Finder metadata and quarantine, verify the vendor signature and
+sealed resources, and bind attribution output settings into the new cask intent.
 
-- [x] pull request #65 merged the reviewed release-preparation tree to exact
-  `main` commit `6317b375a0724804d7a8d895753364cc036e5658` with all required
-  checks passing;
-- [x] annotated tag object `1539e550ac45d0a9732f329cb1ae3fb13bb078a8`
-  peels to that exact commit and matches immutable/latest GitHub release
-  `357094679`;
-- [x] the full local gate, deterministic exact-v0.1.0 migration fixtures,
-  Windows Pester coverage, and Gitleaks scans across four commits in
-  `v0.3.0..v0.4.0` plus all four downloaded logical proofs passed;
-- [x] cache-free hosted run
-  [`29797123753`](https://github.com/luisgui1757/dotfiles/actions/runs/29797123753)
-  passed the Ubuntu, macOS, Windows, and container producers plus all four
-  logical proof jobs; both POSIX lanes reported the exact immutable tag;
-- [x] GitHub release `357094679` read back immutable/latest, non-draft,
-  non-prerelease, and with the prepared user-facing body exact after
-  trailing-newline normalization.
+The same inherited `HOMEBREW_NO_EMOJI` preference also hides formula installation
+markers. New formula and cask operations explicitly retain those markers; earlier
+schema-3 operations keep their original command environment for inspection and
+recovery. Never rewrite an interrupted operation to grant it new attribution.
 
-The unchecked real WSL, redirected-Windows, divergent Windows Terminal,
-physical-Linux, Apple-Silicon owner-host, and visual rows in `tests/MANUAL.md`
-remain explicit residual gaps rather than implied passes.
-
-## Historical v0.3.0 release evidence
-
-v0.3.0 was published on 2026-07-19 under explicit owner authorization. The
-deterministic publication gates passed; the real-environment rows below remain
-open and are not implied by publication:
-
-- [x] pull request #61 merged the reviewed release-preparation tree to exact
-  `main` commit `c8507312153620b9b30fe2c84980c62bccb3b25a` with all required
-  checks passing;
-- [x] annotated tag object `473f675e863640484d4d11349bf69d01def12c43`
-  peels to that exact commit and matches immutable/latest GitHub release
-  `356273955`;
-- [x] full local `make ci`, the deterministic exact-v0.1.0 POSIX fixture,
-  Windows Pester coverage, and Gitleaks 8.30.1 scans across all 8 commits in
-  `v0.2.0..v0.3.0` plus the 4 downloaded logical proofs passed;
-- [x] cache-free hosted run
-  [`29676087505`](https://github.com/luisgui1757/dotfiles/actions/runs/29676087505)
-  passed Ubuntu, Apple Silicon macOS, Windows, the Linux container, and all four
-  stable logical proofs; both POSIX lanes verified the exact immutable v0.3.0
-  tag path;
-- [x] GitHub release `356273955` is immutable, latest, non-draft, and
-  non-prerelease, and its body matches the prepared user-facing notes.
-
-Initial cache-free run
-[`29675684683`](https://github.com/luisgui1757/dotfiles/actions/runs/29675684683)
-is retained as failed evidence: macOS setup completed, but its neocmake LSP
-probe missed the 45-second attach boundary. The identical exact-head PR job had
-passed that probe, and the one permitted fresh full retry above passed it in
-39 seconds; no failed or cancelled artifact was promoted into release proof.
-
-The unchecked real WSL, redirected-Windows, divergent Windows Terminal,
-physical-Linux, Apple-Silicon owner-host, and visual rows in `tests/MANUAL.md`
-remain explicit residual gaps rather than implied passes.
-
-## Historical v0.2.0 release evidence
-
-v0.2.0 was published on 2026-07-15 under explicit owner authorization. The
-automated publication gates passed; the real-environment rows below remain open
-and are not implied by publication:
-
-- [x] annotated tag object `cd9a60436b3064c5e2f6ed5bfd8ae0f5297f1b49`
-  peels to immutable commit `22cfad80e904e003f52932ae6d6403520df00d3c`
-  and matches GitHub release `354480554`;
-- [x] full local `make ci`, the deterministic exact-v0.1.0 POSIX fixture,
-  Windows Pester coverage, and the redacted public-secret scan passed on the
-  release commit;
-- [x] cache-free hosted run
-  [`29419942595`](https://github.com/luisgui1757/dotfiles/actions/runs/29419942595)
-  passed Ubuntu, Apple Silicon macOS, Windows, the Linux container, and all four
-  stable logical proofs; both POSIX lanes verified the exact v0.2.0 tag path;
-- [ ] real WSL host/guest, redirected Windows, divergent stable
-  packaged/Preview/Canary/portable Terminal, physical Linux, and Apple Silicon
-  owner-host migrations remain unchecked in `tests/MANUAL.md` and unclaimed in
-  the append-only review ledger.
+If you installed Zen yourself through Homebrew and then removed only its app,
+restore it with
+`HOMEBREW_NO_AUTOREMOVE=1 HOMEBREW_NO_INSTALL_CLEANUP=1 brew reinstall --cask zen`,
+or remove the stale record with
+`HOMEBREW_NO_AUTOREMOVE=1 brew uninstall --cask zen` before selecting it in setup.
+These environment settings prevent unrelated dependency removal and, for
+reinstall, automatic package/cache cleanup. Setup does not adopt your existing
+native app or its package record.

@@ -1,5 +1,9 @@
 # Greenfield test runbook (copy-paste)
 
+> Historical Nix/chezmoi release material. Commands below apply only at their
+> recorded revisions; retired launchers are not part of the new installer. Use
+> [the current guide](../../README.md) and its linked installer status for this major release.
+
 A literal step-by-step for validating a clean install in a throwaway machine.
 Three environments are covered: **Windows Sandbox**, a **`tart` macOS VM**, and a
 **`tart` Linux VM** (both `tart` guests run on Apple Silicon).
@@ -10,7 +14,7 @@ What is automated vs manual:
   install (tools on PATH, Neovim >= 0.12, managed configs match the repo, Mason,
   `chezmoi verify`). See the launchers in this directory.
 - **Manual** (you must LOOK): the visual/interactive behaviour — colours, glyphs,
-  predictions, "does psmux freeze", VS Code theme/font. That is the checklist in
+  predictions, "Herdr pane startup", VS Code theme/font. That is the checklist in
   Part 3 below. There is no way to script "is this glyph a tofu box".
 
 > Default target: these steps validate the checkout/ref you intentionally select.
@@ -64,7 +68,7 @@ the checked-out local `sandbox-run.ps1`. For more RAM, see "Speeding up the
 Sandbox" below.
 
 Then do Part 3 inside the sandbox (it is a full Windows desktop: open Windows
-Terminal, VS Code, psmux).
+Terminal, VS Code, Herdr).
 
 #### Manual alternative (no `.wsb`)
 
@@ -228,17 +232,17 @@ proves.
 | type `cd Doc` and pause (Windows) | a greyed **prediction** appears in rose/gold and is readable | **PSReadLine prediction colours** |
 | press `Ctrl+R`, type a few chars | a fuzzy history picker opens (fzf / PSFzf) | **fzf + PSFzf unified** |
 
-### tmux / psmux
+### tmux (macOS/Linux)
+
+Start `tmux`; verify the Rose Pine bar, normal pane rendering and no config warnings.
+Windows uses the Herdr checks above.
 
 | Run | Expect | Proves |
 |-----|--------|--------|
-| `tmux` (macOS/Linux) or launch **psmux** (Windows) | a pane appears **immediately**, fully rendered, Rose Pine status bar is at the top with matching rounded pill segments (session/window list/directory; no user/date-time duplication), and empty bar space follows terminal transparency; **no config warnings, no freeze, normal CPU** | **psmux warm-session guard + synchronous generated theme load** |
 | `C-b %` / `C-b "` then `C-b h/j/k/l` | split and move between panes | pane bindings |
 | `C-b H` / `C-b L` | current window swaps left / right | uppercase window-swap binding |
-| enter copy-mode (`C-b [`), `v` to select, `y` | text copies to the system clipboard (paste elsewhere) | clipboard (pbcopy/xclip/win32yank on POSIX, `clip.exe`/OSC52 on Windows) |
+| enter copy-mode (`C-b [`), `v` to select, `y` | text copies to the system clipboard (paste elsewhere) | clipboard (pbcopy/xclip/win32yank, or OSC52) |
 | (POSIX) `C-b C-s`, then restart tmux | the layout restores automatically; the first-run missing-file message does not recur after the save | resurrect + Continuum |
-| (Windows) save a named psmux session with `C-b C-s`; close the `run-shell` popup with `q`/Esc; after `psmux kill-server`, start `psmux new-session -s recovery`, press `C-b C-r`, then `C-b w` | the save needs no confirmation, restore is manual, and the named session returns with its windows/panes | psmux-resurrect popup + restore contract |
-| (Windows) open several psmux panes, check Task Manager | no runaway `conhost.exe` pile-up, CPU idle | freeze cascade gone |
 
 ### Neovim
 

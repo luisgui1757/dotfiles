@@ -16,15 +16,5 @@ abort 'FAIL: hosted PowerShell must be required, not silently skipped' unless
 abort 'FAIL: hosted PowerShell must execute and require major version 7 or newer' unless
   install.lines.any? { |line| line.strip == %q(pwsh -NoLogo -NoProfile -Command 'if ($PSVersionTable.PSVersion.Major -lt 7) { throw "PowerShell 7 is required" }; $PSVersionTable.PSVersion') }
 
-# Runner updates must not rename compatibility checks consumed by release
-# certification or mislabel the producer in the exact-run proof artifact.
-{'nix' => 'flake-check', 'e2e-install' => 'setup-sh'}.each do |workflow, job_name|
-  job = load_workflow.call(workflow).fetch('jobs').fetch(job_name)
-  job.fetch('strategy').fetch('matrix').fetch('include').each do |row|
-    rendered = job.fetch('name').gsub(/\$\{\{ matrix\.(\w+) \}\}/) { row.fetch(Regexp.last_match(1)) }
-    abort "FAIL: #{workflow} producer #{rendered} differs from its proof identity" unless
-      rendered == row.fetch('legacy_context')
-  end
-end
-puts 'OK: Hosted PowerShell and rendered producer identities match their contracts'
+puts 'OK: hosted PowerShell requires the actual runner runtime'
 RUBY
