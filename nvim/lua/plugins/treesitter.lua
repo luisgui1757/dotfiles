@@ -189,7 +189,14 @@ local function runtime_syntax_for_filetype(buf, filetype)
 end
 
 local function update_installed_parsers_for_build()
+  local managed_runtime = require("util.managed_runtime")
+  if managed_runtime.read_only() then
+    error(managed_runtime.repair_message("parser builds require explicit synchronization"), 0)
+  end
   local nvim_treesitter = require("nvim-treesitter")
+  if managed_runtime.root() then
+    nvim_treesitter.setup({ install_dir = managed_runtime.path("site") })
+  end
   if type(nvim_treesitter.update) ~= "function" then
     error("nvim-treesitter update API is unavailable; restore the locked plugin and retry", 0)
   end
@@ -215,13 +222,19 @@ return {
     "nvim-treesitter/nvim-treesitter",
     branch = "main",
     build = update_installed_parsers_for_build,
+    opts = { dotfiles_parsers = treesitter_parsers },
     cmd = { "TSInstall", "TSInstallFromGrammar", "TSUpdate", "TSUninstall", "TSLog" },
     event = { "BufReadPre", "BufNewFile" },
     config = function()
       local nvim_treesitter = require("nvim-treesitter")
+      local managed_runtime = require("util.managed_runtime")
+      if managed_runtime.root() then
+        nvim_treesitter.setup({ install_dir = managed_runtime.path("site") })
+      end
       local sync_install = vim.env.DOTFILES_TREESITTER_SYNC_INSTALL == "1"
+      local read_only = managed_runtime.read_only()
       local headless = #vim.api.nvim_list_uis() == 0
-      local install_requested = sync_install or not headless
+      local install_requested = not read_only and (sync_install or not headless)
 
       local function report_install_problem(message)
         if sync_install then
@@ -232,11 +245,11 @@ return {
         end)
       end
 
-      -- Every nvim-treesitter cleanup is constrained to stdpath("data"). A
-      -- successful vim.fn.delete() return is not sufficient proof: verify the
+      -- Cleanup stays inside the active managed runtime, or stdpath("data")
+      -- for released setup. A successful delete is not proof: verify the
       -- path is absent as well, because permission and partial directory
       -- failures can leave executable parser/query payloads behind.
-      local managed_data_root = vim.fs.normalize(vim.fn.stdpath("data")):gsub("/$", "")
+      local managed_data_root = vim.fs.normalize(managed_runtime.root() or vim.fn.stdpath("data")):gsub("/$", "")
       local managed_data_prefix = managed_data_root .. "/"
       local function checked_delete_managed(path, mode)
         local deleted, delete_error = require("util.checked_delete").managed(path, mode, managed_data_root)
@@ -357,7 +370,7 @@ return {
             return dir
           end
         end
-        return vim.fs.joinpath(vim.fn.stdpath("data"), "site", "queries")
+        return managed_runtime.path("site/queries")
       end
 
       local function purge_managed_bundled_query_dirs()
@@ -378,24 +391,54 @@ return {
         report_cleanup_failures(cleanup_failures)
       end
 
-      purge_managed_bundled_files("parser/*.so")
-      -- Also drop nvim-treesitter's install bookkeeping so it does not believe a
-      -- bundled language is still installed.
-      purge_managed_bundled_files("parser-info/*.revision")
-      -- Upstream dependencies can also install query directories for bundled
-      -- languages (for example `cpp` requires `c`). Those query overrides are
-      -- managed artifacts too; remove them with the parser files.
-      purge_managed_bundled_query_dirs()
+      if read_only then
+        -- Do not use upstream get_install_dir here: it creates missing dirs.
+        -- Ordinary startup consumes published files; installer sync repairs in
+        -- a new generation and keeps the original for approved replacement.
+        local problem
+        for _, lang in ipairs(nvim_bundled_parsers) do
+          if
+            vim.uv.fs_stat(managed_runtime.path("site/parser/" .. lang .. ".so"))
+            or vim.uv.fs_stat(managed_runtime.path("site/queries/" .. lang))
+          then
+            problem = "unexpected bundled parser/query override: " .. lang
+            break
+          end
+        end
+        if not problem then
+          for _, lang in ipairs(treesitter_parsers) do
+            if
+              not vim.uv.fs_stat(managed_runtime.path("site/parser/" .. lang .. ".so"))
+              or #vim.treesitter.query.get_files(lang, "highlights") == 0
+            then
+              problem = "missing parser or highlight queries: " .. lang
+              break
+            end
+          end
+        end
+        if problem then
+          report_install_problem(managed_runtime.repair_message(problem))
+        end
+      else
+        purge_managed_bundled_files("parser/*.so")
+        -- Also drop nvim-treesitter's install bookkeeping so it does not believe a
+        -- bundled language is still installed.
+        purge_managed_bundled_files("parser-info/*.revision")
+        -- Upstream dependencies can also install query directories for bundled
+        -- languages (for example `cpp` requires `c`). Those query overrides are
+        -- managed artifacts too; remove them with the parser files.
+        purge_managed_bundled_query_dirs()
+      end
 
       -- nvim-treesitter `main` shells out to the `tree-sitter` CLI to compile
-      -- each parser. When the CLI is not on PATH (nvim launched from a shell
-      -- that never sourced brew shellenv, or before setup finished installing
-      -- it), main emits a separate ENOENT error for EVERY parser. Guard on the
+      -- each parser. When the CLI is not on PATH (before setup finishes or the
+      -- shell/editor has not loaded the managed PATH), main emits a separate
+      -- ENOENT error for EVERY parser. Guard on the
       -- CLI so a missing toolchain surfaces ONE actionable message instead of a
       -- wall of errors. Never auto-install from an ordinary headless process:
       -- Lazy restore, Mason, and smoke validators otherwise launch asynchronous
       -- compiler work outside Phase 4. setup forces the sync flag only for its
-      -- explicit parser phase; UI sessions retain the interactive async path.
+      -- explicit parser phase; unmanaged UI sessions retain the async path.
       if install_requested and vim.fn.executable("tree-sitter") == 1 then
         if type(nvim_treesitter.install) == "function" then
           local install_opts = nil
@@ -452,8 +495,8 @@ return {
       elseif install_requested then
         report_install_problem(
           "nvim-treesitter: 'tree-sitter' CLI not found on PATH; parsers were not compiled. "
-            .. "Install it (macOS: brew install tree-sitter-cli; Linux/WSL: run the dotfiles setup; "
-            .. "Windows: install-deps.ps1 -All), then run :TSUpdate."
+            .. "Run the dotfiles installer and choose Update/Repair for Neovim, then reopen the shell/editor "
+            .. "to restore its managed PATH. Unmanaged configurations need the tree-sitter CLI on PATH before :TSUpdate."
         )
       end
 

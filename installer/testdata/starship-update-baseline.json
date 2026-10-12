@@ -1,0 +1,50 @@
+{
+  "darwin/arm64": {
+    "version": "1.25.0",
+    "url": "https://github.com/starship/starship/releases/download/v1.25.0/starship-aarch64-apple-darwin.tar.gz",
+    "sha256": "365301b5f4938322a9f378764b4bc640048bca7d6ac28eaabd406cadd6fc703a",
+    "format": "tar.gz",
+    "commands": {
+      "starship": "starship"
+    },
+    "bin_dirs": [
+      "."
+    ]
+  },
+  "linux/amd64": {
+    "version": "1.25.0",
+    "url": "https://github.com/starship/starship/releases/download/v1.25.0/starship-x86_64-unknown-linux-musl.tar.gz",
+    "sha256": "0169f187e927a0ee9abf41bb80e316717fea6e37e404267bca5134c6ea10c0ed",
+    "format": "tar.gz",
+    "commands": {
+      "starship": "starship"
+    },
+    "bin_dirs": [
+      "."
+    ]
+  },
+  "linux/arm64": {
+    "version": "1.25.0",
+    "url": "https://github.com/starship/starship/releases/download/v1.25.0/starship-aarch64-unknown-linux-musl.tar.gz",
+    "sha256": "68ffcb75582e5ed336b43598bb4d8ecc4ec994ea26eac7955d3d378f1375da34",
+    "format": "tar.gz",
+    "commands": {
+      "starship": "starship"
+    },
+    "bin_dirs": [
+      "."
+    ]
+  },
+  "windows/amd64": {
+    "version": "1.25.0",
+    "url": "https://github.com/starship/starship/releases/download/v1.25.0/starship-x86_64-pc-windows-msvc.zip",
+    "sha256": "6c21422d1b786ed49937adcb3f23bebd169d32fef9b72ae8e77dc1bdb4c2acf1",
+    "format": "zip",
+    "commands": {
+      "starship": "starship.exe"
+    },
+    "bin_dirs": [
+      "."
+    ]
+  }
+}

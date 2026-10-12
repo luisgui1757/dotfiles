@@ -23,7 +23,7 @@ local function expected_tools()
   }
 
   -- The Mason registry publishes clangd for macOS, Windows, and Linux x64,
-  -- but not Linux arm64. Linux owns clangd through Home Manager on every
+  -- but not Linux arm64. Linux installs clangd through APT on every
   -- supported architecture instead, avoiding platform-dependent ownership.
   if vim.fn.has("linux") ~= 1 then
     table.insert(tools, 2, "clangd")
@@ -38,6 +38,7 @@ local function quit_failed(message)
 end
 
 function M.ensure_installed()
+  require("util.mason_registry").sources(expected_tools())
   return expected_tools()
 end
 
@@ -64,6 +65,16 @@ function M.run_checked(command)
 
   if #missing > 0 then
     quit_failed("missing packages after " .. command .. ": " .. table.concat(missing, ", "))
+    return
+  end
+
+  local receipts_ok, receipts_error = pcall(
+    require("util.mason_registry").check_receipts,
+    require("util.managed_runtime").path("mason"),
+    expected_tools()
+  )
+  if not receipts_ok then
+    quit_failed(tostring(receipts_error))
     return
   end
 

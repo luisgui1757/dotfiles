@@ -1,0 +1,2422 @@
+{
+  "schema": 1,
+  "resources": [
+    {
+      "id": "neovim",
+      "name": "Neovim",
+      "description": "Editor, locked plugins, parsers and bundled language tools",
+      "capability": true,
+      "category": "Editors",
+      "requires": [
+        "config.nvim",
+        "nvim.sync",
+        "tool.clipboard"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "vscode",
+      "name": "VS Code",
+      "description": "Editor with Rose Pine and font settings",
+      "capability": true,
+      "category": "Editors",
+      "requires": [
+        "tool.vscode",
+        "integration.vscode"
+      ],
+      "scope": "user",
+      "platform_requires": {
+        "darwin": [
+          "desktop.vscode"
+        ],
+        "windows": [
+          "desktop.vscode"
+        ]
+      }
+    },
+    {
+      "id": "zsh",
+      "name": "zsh",
+      "description": "Shell profile and pinned completion plugins",
+      "capability": true,
+      "category": "Shell essentials",
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "requires": [
+        "config.zsh",
+        "zsh.plugins"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "powershell",
+      "name": "PowerShell 7",
+      "description": "Interactive shell profile and fuzzy pickers",
+      "capability": true,
+      "category": "Shell essentials",
+      "platforms": [
+        "windows"
+      ],
+      "requires": [
+        "config.powershell",
+        "integration.fzf"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "starship",
+      "name": "Starship",
+      "description": "Cross-shell prompt",
+      "capability": true,
+      "category": "Shell essentials",
+      "requires": [
+        "config.starship",
+        "integration.starship"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "lsd",
+      "name": "lsd",
+      "description": "File listings with icons and colors",
+      "capability": true,
+      "category": "Shell essentials",
+      "requires": [
+        "config.lsd",
+        "integration.lsd"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "zoxide",
+      "name": "zoxide",
+      "description": "Jump to frequently used directories",
+      "capability": true,
+      "category": "Shell essentials",
+      "requires": [
+        "tool.zoxide",
+        "integration.zoxide"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "fzf",
+      "name": "fzf",
+      "description": "Interactive fuzzy finding",
+      "capability": true,
+      "category": "Shell essentials",
+      "requires": [
+        "tool.fzf",
+        "integration.fzf"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "ripgrep",
+      "name": "ripgrep",
+      "description": "Fast text search",
+      "capability": true,
+      "category": "Shell essentials",
+      "requires": [
+        "tool.rg"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "fd",
+      "name": "fd",
+      "description": "Fast file finding",
+      "capability": true,
+      "category": "Shell essentials",
+      "requires": [
+        "tool.fd"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "git",
+      "name": "Git",
+      "description": "Git with rebasing pulls and automatic fetch pruning; preserves personal settings",
+      "capability": true,
+      "category": "Version control",
+      "requires": [
+        "integration.git"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "lazygit",
+      "name": "lazygit",
+      "description": "Terminal Git interface",
+      "capability": true,
+      "category": "Version control",
+      "requires": [
+        "config.lazygit"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "github",
+      "name": "GitHub CLI",
+      "description": "Repository and pull-request commands",
+      "capability": true,
+      "category": "Version control",
+      "requires": [
+        "tool.gh"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "gh-dash",
+      "name": "gh-dash",
+      "description": "GitHub dashboard; authentication is a separate step",
+      "capability": true,
+      "category": "Version control",
+      "requires": [
+        "config.gh-dash",
+        "tool.gh-dash"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "ghostty",
+      "name": "Ghostty",
+      "description": "Terminal with the shared configuration and desktop launcher",
+      "capability": true,
+      "category": "Terminal apps",
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "requires": [
+        "config.ghostty",
+        "integration.ghostty"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "windows-terminal",
+      "name": "Windows Terminal",
+      "description": "Terminal with scoped profile and theme merge",
+      "capability": true,
+      "category": "Terminal apps",
+      "platforms": [
+        "windows"
+      ],
+      "requires": [
+        "integration.windows-terminal",
+        "desktop.windows-terminal"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "tmux",
+      "name": "tmux",
+      "description": "Terminal multiplexer and session plugins",
+      "capability": true,
+      "category": "Terminal sessions",
+      "requires": [
+        "config.tmux",
+        "tmux.plugins"
+      ],
+      "scope": "user",
+      "platforms": [
+        "darwin",
+        "linux"
+      ]
+    },
+    {
+      "id": "herdr",
+      "name": "Herdr",
+      "description": "Agent multiplexer",
+      "capability": true,
+      "category": "Terminal sessions",
+      "requires": [
+        "config.herdr"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "t3-code",
+      "name": "T3 Code",
+      "description": "Stable standalone server + browser UI; configure/authenticate a provider separately",
+      "capability": true,
+      "category": "AI coding",
+      "requires": [
+        "tool.t3"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "claude-code",
+      "name": "Claude Code CLI",
+      "description": "Standalone terminal coding agent; sign in after installation",
+      "capability": true,
+      "category": "AI coding",
+      "requires": [
+        "tool.claude"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "codex",
+      "name": "Codex CLI",
+      "description": "Standalone terminal coding agent; sign in after installation",
+      "capability": true,
+      "category": "AI coding",
+      "requires": [
+        "tool.codex"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "sentinel",
+      "name": "Sentinel agent policy",
+      "description": "Pinned global policy blocks for coding agents",
+      "capability": true,
+      "category": "AI coding",
+      "requires": [
+        "integration.sentinel"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "openwhispr",
+      "name": "OpenWhispr",
+      "description": "Voice dictation; Linux vendor launcher disables Chromium sandbox when user namespaces are restricted",
+      "capability": true,
+      "category": "Desktop apps",
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "requires": [
+        "tool.openwhispr"
+      ],
+      "scope": "user",
+      "platform_requires": {
+        "darwin": [
+          "desktop.openwhispr"
+        ],
+        "linux": [
+          "desktop.openwhispr"
+        ]
+      },
+      "platform_architectures": {
+        "linux": [
+          "amd64"
+        ]
+      }
+    },
+    {
+      "id": "obsidian",
+      "name": "Obsidian",
+      "description": "Markdown notes; personal vaults remain untouched",
+      "capability": true,
+      "category": "Desktop apps",
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "requires": [
+        "tool.obsidian"
+      ],
+      "scope": "user",
+      "platform_requires": {
+        "darwin": [
+          "desktop.obsidian"
+        ],
+        "linux": [
+          "desktop.obsidian"
+        ]
+      }
+    },
+    {
+      "id": "tailscale",
+      "name": "Tailscale",
+      "description": "Private network client; sign in after installation",
+      "capability": true,
+      "category": "Desktop apps",
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "requires": [
+        "tool.tailscale"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "zen",
+      "name": "Zen Browser",
+      "description": "Web browser; personal profiles remain untouched",
+      "capability": true,
+      "category": "Desktop apps",
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "requires": [
+        "tool.zen",
+        "desktop.zen"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "aerospace",
+      "name": "AeroSpace",
+      "description": "Tiling window manager",
+      "capability": true,
+      "category": "Desktop apps",
+      "platforms": [
+        "darwin"
+      ],
+      "requires": [
+        "config.aerospace",
+        "desktop.aerospace"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "development",
+      "name": "Lint and benchmark tools",
+      "description": "Optional tools for contributing to this dotfiles repository",
+      "capability": true,
+      "category": "Dotfiles development",
+      "requires": [
+        "tool.shellcheck",
+        "tool.jq",
+        "tool.hyperfine",
+        "tool.taplo",
+        "tool.yamllint",
+        "tool.editorconfig"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "tool.git",
+      "name": "Git",
+      "action": "git",
+      "scope": "user",
+      "shared": true,
+      "bindings": {
+        "darwin": {
+          "provider": "homebrew-formula",
+          "package": "git"
+        },
+        "linux": {
+          "provider": "apt",
+          "package": "git"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.git"
+        }
+      },
+      "platform_requires": {
+        "darwin": [
+          "infra.homebrew"
+        ]
+      }
+    },
+    {
+      "id": "tool.nvim",
+      "name": "Neovim",
+      "requires": [
+        "tool.git",
+        "integration.shells"
+      ],
+      "action": "nvim",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.nvim"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.nvim"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.nvim"
+        }
+      },
+      "platform_requires": {
+        "windows": [
+          "tool.vcredist"
+        ]
+      }
+    },
+    {
+      "id": "tool.make",
+      "name": "Make",
+      "action": "make",
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "make"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.make"
+        }
+      },
+      "platform_requires": {
+        "darwin": [
+          "infra.apple-clt"
+        ],
+        "windows": [
+          "integration.shells",
+          "tool.git"
+        ]
+      }
+    },
+    {
+      "id": "tool.cmake",
+      "name": "CMake",
+      "action": "cmake",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "cmake"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "cmake"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "cmake"
+        }
+      },
+      "requires": [
+        "integration.shells"
+      ]
+    },
+    {
+      "id": "tool.compiler",
+      "name": "C/C++ toolchain",
+      "action": "compiler",
+      "scope": "machine",
+      "shared": true,
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "build-essential"
+        }
+      },
+      "platform_requires": {
+        "windows": [
+          "tool.vcredist"
+        ],
+        "darwin": [
+          "infra.apple-clt"
+        ]
+      }
+    },
+    {
+      "id": "tool.rg",
+      "name": "ripgrep",
+      "action": "rg",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.rg"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.rg"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.rg"
+        }
+      },
+      "requires": [
+        "integration.shells"
+      ]
+    },
+    {
+      "id": "tool.fd",
+      "name": "fd",
+      "action": "fd",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.fd"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.fd"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.fd"
+        }
+      },
+      "requires": [
+        "integration.shells"
+      ]
+    },
+    {
+      "id": "tool.fzf",
+      "name": "fzf",
+      "action": "fzf",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.fzf"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.fzf"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.fzf"
+        }
+      },
+      "requires": [
+        "integration.shells"
+      ]
+    },
+    {
+      "id": "tool.lsd",
+      "name": "lsd",
+      "action": "lsd",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.lsd"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.lsd"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.lsd"
+        }
+      },
+      "requires": [
+        "integration.shells"
+      ],
+      "platform_requires": {
+        "windows": [
+          "tool.vcredist"
+        ]
+      }
+    },
+    {
+      "id": "tool.zoxide",
+      "name": "zoxide",
+      "action": "zoxide",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.zoxide"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.zoxide"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.zoxide"
+        }
+      },
+      "requires": [
+        "integration.shells"
+      ]
+    },
+    {
+      "id": "tool.starship",
+      "name": "Starship",
+      "action": "starship",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.starship"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.starship"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.starship"
+        }
+      }
+    },
+    {
+      "id": "tool.lazygit",
+      "name": "lazygit",
+      "requires": [
+        "tool.git",
+        "integration.shells"
+      ],
+      "action": "lazygit",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.lazygit"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.lazygit"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.lazygit"
+        }
+      }
+    },
+    {
+      "id": "tool.node",
+      "name": "Node.js and npm",
+      "action": "node",
+      "scope": "user",
+      "shared": true,
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.node"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.node"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.node"
+        }
+      },
+      "requires": [
+        "integration.shells"
+      ]
+    },
+    {
+      "id": "tool.python",
+      "name": "Python with pip/venv",
+      "action": "python",
+      "scope": "user",
+      "shared": true,
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "python"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "python"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "python"
+        }
+      },
+      "requires": [
+        "integration.shells"
+      ]
+    },
+    {
+      "id": "tool.rust",
+      "name": "Rust toolchain",
+      "action": "rust",
+      "scope": "user",
+      "shared": true,
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.rust"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.rust"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.rust"
+        }
+      },
+      "requires": [
+        "integration.shells",
+        "tool.compiler"
+      ]
+    },
+    {
+      "id": "tool.tree-sitter",
+      "name": "Tree-sitter CLI",
+      "action": "tree-sitter",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.tree-sitter"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.tree-sitter"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.tree-sitter"
+        }
+      },
+      "requires": [
+        "integration.shells"
+      ],
+      "platform_requires": {
+        "windows": [
+          "tool.vcredist"
+        ]
+      }
+    },
+    {
+      "id": "tool.latex2text",
+      "name": "LaTeX text converter",
+      "requires": [
+        "tool.python",
+        "integration.shells"
+      ],
+      "action": "latex2text",
+      "scope": "user",
+      "shared": true,
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.latex2text"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.latex2text"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.latex2text"
+        }
+      }
+    },
+    {
+      "id": "tool.clipboard",
+      "name": "Clipboard provider",
+      "action": "clipboard",
+      "scope": "user",
+      "shared": true,
+      "bindings": {
+        "windows": {
+          "provider": "archive",
+          "package": "clipboard"
+        },
+        "linux": {
+          "provider": "apt",
+          "package": "xclip"
+        }
+      },
+      "platform_requires": {
+        "windows": [
+          "tool.vcredist",
+          "integration.shells"
+        ],
+        "linux": [
+          "tool.clipboard-wayland"
+        ]
+      }
+    },
+    {
+      "id": "tool.font",
+      "name": "Hack Nerd Font",
+      "action": "font",
+      "scope": "user",
+      "shared": true,
+      "requires": [
+        "font.hack"
+      ],
+      "platform_requires": {
+        "linux": [
+          "tool.fontconfig"
+        ]
+      }
+    },
+    {
+      "id": "tool.zsh",
+      "name": "zsh",
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "action": "zsh",
+      "scope": "machine",
+      "shared": true,
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "zsh"
+        }
+      }
+    },
+    {
+      "id": "tool.powershell",
+      "name": "PowerShell 7",
+      "platforms": [
+        "windows"
+      ],
+      "action": "powershell",
+      "scope": "user",
+      "shared": true,
+      "bindings": {
+        "windows": {
+          "provider": "archive",
+          "package": "powershell"
+        }
+      },
+      "requires": [
+        "integration.shells"
+      ]
+    },
+    {
+      "id": "tool.tmux",
+      "name": "tmux",
+      "action": "tmux",
+      "scope": "user",
+      "shared": true,
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "bindings": {
+        "darwin": {
+          "provider": "homebrew-formula",
+          "package": "tmux"
+        },
+        "linux": {
+          "provider": "apt",
+          "package": "tmux"
+        }
+      },
+      "platform_requires": {
+        "darwin": [
+          "infra.homebrew"
+        ]
+      }
+    },
+    {
+      "id": "tool.ghostty",
+      "name": "Ghostty",
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "action": "ghostty",
+      "scope": "user",
+      "shared": true,
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.ghostty"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.ghostty"
+        }
+      },
+      "requires": [
+        "integration.shells"
+      ],
+      "platform_requires": {
+        "linux": [
+          "library.libadwaita-1-0",
+          "library.libc6",
+          "library.libfontconfig1",
+          "library.libfreetype6",
+          "library.libglib2.0-0t64",
+          "library.libgtk-4-1",
+          "library.libharfbuzz0b",
+          "library.libonig5",
+          "library.libx11-6",
+          "library.libwayland-client0"
+        ]
+      }
+    },
+    {
+      "id": "tool.windows-terminal",
+      "name": "Windows Terminal",
+      "platforms": [
+        "windows"
+      ],
+      "bindings": {
+        "windows": {
+          "provider": "archive",
+          "package": "tool.windows-terminal"
+        }
+      },
+      "platform_requires": {
+        "windows": [
+          "tool.powershell"
+        ]
+      },
+      "action": "archive",
+      "scope": "user",
+      "shared": true,
+      "requires": [
+        "integration.shells"
+      ]
+    },
+    {
+      "id": "tool.aerospace",
+      "name": "AeroSpace",
+      "platforms": [
+        "darwin"
+      ],
+      "action": "aerospace",
+      "scope": "user",
+      "shared": true,
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.aerospace"
+        }
+      },
+      "requires": [
+        "integration.shells"
+      ]
+    },
+    {
+      "id": "tool.herdr",
+      "name": "Herdr",
+      "platform_requires": {
+        "windows": [
+          "tool.powershell"
+        ]
+      },
+      "action": "herdr",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "herdr"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "herdr"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "herdr"
+        }
+      },
+      "requires": [
+        "integration.shells"
+      ]
+    },
+    {
+      "id": "tool.vscode",
+      "name": "VS Code",
+      "action": "vscode",
+      "scope": "user",
+      "shared": true,
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.vscode"
+        },
+        "linux": {
+          "provider": "apt",
+          "package": "code"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.vscode"
+        }
+      },
+      "platform_requires": {
+        "darwin": [
+          "integration.shells"
+        ],
+        "windows": [
+          "integration.shells"
+        ]
+      }
+    },
+    {
+      "id": "tool.gh",
+      "name": "GitHub CLI",
+      "requires": [
+        "tool.git",
+        "integration.shells"
+      ],
+      "action": "gh",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.gh"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.gh"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.gh"
+        }
+      }
+    },
+    {
+      "id": "tool.t3",
+      "name": "T3 Code",
+      "description": "Official standalone package; no provider authentication or background service setup",
+      "requires": [
+        "tool.git",
+        "integration.shells"
+      ],
+      "platform_requires": {
+        "linux": [
+          "library.libstdcxx6"
+        ]
+      },
+      "action": "archive",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.t3"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.t3"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.t3"
+        }
+      }
+    },
+    {
+      "id": "tool.claude",
+      "name": "Claude Code CLI",
+      "requires": [
+        "tool.git",
+        "integration.shells"
+      ],
+      "action": "archive",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.claude"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.claude"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.claude"
+        }
+      }
+    },
+    {
+      "id": "tool.codex",
+      "name": "Codex CLI",
+      "requires": [
+        "tool.git",
+        "integration.shells"
+      ],
+      "action": "archive",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.codex"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.codex"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.codex"
+        }
+      }
+    },
+    {
+      "id": "tool.shellcheck",
+      "name": "ShellCheck",
+      "action": "shellcheck",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "shellcheck"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "shellcheck"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "shellcheck"
+        }
+      },
+      "requires": [
+        "integration.shells"
+      ]
+    },
+    {
+      "id": "tool.jq",
+      "name": "jq",
+      "action": "jq",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.jq"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.jq"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.jq"
+        }
+      },
+      "requires": [
+        "integration.shells"
+      ]
+    },
+    {
+      "id": "tool.hyperfine",
+      "name": "hyperfine",
+      "action": "hyperfine",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.hyperfine"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.hyperfine"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.hyperfine"
+        }
+      },
+      "requires": [
+        "integration.shells"
+      ],
+      "platform_requires": {
+        "windows": [
+          "tool.vcredist"
+        ]
+      }
+    },
+    {
+      "id": "tool.taplo",
+      "name": "Taplo",
+      "action": "taplo",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "taplo"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "taplo"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "taplo"
+        }
+      },
+      "requires": [
+        "integration.shells"
+      ]
+    },
+    {
+      "id": "tool.yamllint",
+      "name": "yamllint",
+      "requires": [
+        "tool.python",
+        "integration.shells"
+      ],
+      "action": "yamllint",
+      "scope": "user",
+      "shared": true,
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.yamllint"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.yamllint"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.yamllint"
+        }
+      }
+    },
+    {
+      "id": "tool.editorconfig",
+      "name": "EditorConfig checker",
+      "action": "editorconfig",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "editorconfig"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "editorconfig"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "editorconfig"
+        }
+      },
+      "requires": [
+        "integration.shells"
+      ]
+    },
+    {
+      "id": "nvim.sync",
+      "name": "Neovim plugins, parsers and language tools",
+      "requires": [
+        "config.nvim",
+        "tool.git",
+        "tool.make",
+        "tool.cmake",
+        "tool.compiler",
+        "tool.rg",
+        "tool.fd",
+        "tool.node",
+        "tool.python",
+        "tool.rust",
+        "tool.tree-sitter",
+        "tool.latex2text"
+      ],
+      "action": "nvim-sync",
+      "scope": "user",
+      "platform_requires": {
+        "linux": [
+          "tool.clangd",
+          "tool.curl",
+          "tool.unzip"
+        ],
+        "windows": [
+          "tool.powershell"
+        ]
+      }
+    },
+    {
+      "id": "zsh.plugins",
+      "name": "Pinned zsh plugins",
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "requires": [
+        "plugin.fzf-tab",
+        "plugin.zsh-autosuggestions",
+        "tool.fzf",
+        "tool.zsh"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "powershell.psfzf",
+      "name": "PSFzf module",
+      "platforms": [
+        "windows"
+      ],
+      "requires": [
+        "tool.fzf"
+      ],
+      "action": "psfzf",
+      "scope": "user",
+      "bindings": {
+        "windows": {
+          "provider": "archive",
+          "package": "powershell.psfzf"
+        }
+      }
+    },
+    {
+      "id": "tmux.plugins",
+      "name": "Multiplexer plugins",
+      "requires": [
+        "tool.tmux",
+        "tmux.sensible",
+        "tmux.yank",
+        "tmux.resurrect",
+        "tmux.continuum"
+      ],
+      "action": "tmux-plugins",
+      "scope": "user",
+      "platforms": [
+        "darwin",
+        "linux"
+      ]
+    },
+    {
+      "id": "tool.gh-dash",
+      "name": "gh-dash",
+      "action": "gh-dash-binary",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "gh-dash"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "gh-dash"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "gh-dash"
+        }
+      },
+      "requires": [
+        "integration.shells"
+      ]
+    },
+    {
+      "id": "integration.vscode",
+      "name": "VS Code theme/settings",
+      "requires": [
+        "tool.vscode",
+        "tool.font",
+        "vscode.rose-pine",
+        "desktop.rose-pine"
+      ],
+      "action": "vscode-settings",
+      "scope": "user"
+    },
+    {
+      "id": "integration.windows-terminal",
+      "name": "Windows Terminal merge",
+      "platforms": [
+        "windows"
+      ],
+      "requires": [
+        "tool.windows-terminal",
+        "tool.font"
+      ],
+      "action": "windows-terminal-settings",
+      "scope": "user"
+    },
+    {
+      "id": "integration.ghostty",
+      "name": "Ghostty desktop integration",
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "requires": [
+        "tool.ghostty"
+      ],
+      "action": "ghostty-desktop",
+      "scope": "user"
+    },
+    {
+      "id": "integration.sentinel",
+      "name": "Sentinel global policy",
+      "action": "sentinel",
+      "scope": "user"
+    },
+    {
+      "id": "config.nvim",
+      "name": "nvim configuration",
+      "requires": [
+        "tool.nvim"
+      ],
+      "action": "config",
+      "scope": "user"
+    },
+    {
+      "id": "config.zsh",
+      "name": "zsh configuration",
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "requires": [
+        "tool.zsh",
+        "integration.shells",
+        "zsh.plugins"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "config.powershell",
+      "name": "powershell configuration",
+      "platforms": [
+        "windows"
+      ],
+      "requires": [
+        "tool.powershell",
+        "integration.shells"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "config.starship",
+      "name": "starship configuration",
+      "requires": [
+        "tool.starship"
+      ],
+      "action": "config",
+      "scope": "user"
+    },
+    {
+      "id": "config.lsd",
+      "name": "lsd configuration",
+      "requires": [
+        "tool.lsd"
+      ],
+      "action": "config",
+      "scope": "user"
+    },
+    {
+      "id": "config.tmux",
+      "name": "tmux configuration",
+      "requires": [
+        "tool.tmux",
+        "integration.shells"
+      ],
+      "action": "config",
+      "scope": "user",
+      "platforms": [
+        "darwin",
+        "linux"
+      ]
+    },
+    {
+      "id": "config.ghostty",
+      "name": "ghostty configuration",
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "requires": [
+        "tool.ghostty",
+        "tool.font"
+      ],
+      "action": "config",
+      "scope": "user"
+    },
+    {
+      "id": "config.aerospace",
+      "name": "aerospace configuration",
+      "platforms": [
+        "darwin"
+      ],
+      "requires": [
+        "tool.aerospace"
+      ],
+      "action": "config",
+      "scope": "user"
+    },
+    {
+      "id": "config.herdr",
+      "name": "herdr configuration",
+      "requires": [
+        "tool.herdr"
+      ],
+      "action": "config",
+      "scope": "user"
+    },
+    {
+      "id": "integration.git",
+      "name": "Git defaults",
+      "requires": [
+        "tool.git",
+        "integration.shells"
+      ],
+      "action": "profile",
+      "scope": "user"
+    },
+    {
+      "id": "config.git",
+      "replaced_by": "integration.git",
+      "name": "Legacy whole-file Git configuration (recovery only)",
+      "action": "config",
+      "scope": "user",
+      "description": "Historical whole-file mapping retained for recovery. Remove an owned Git selection through setup before migration; new selections use scoped defaults."
+    },
+    {
+      "id": "config.lazygit",
+      "name": "lazygit configuration",
+      "requires": [
+        "tool.lazygit"
+      ],
+      "action": "config",
+      "scope": "user"
+    },
+    {
+      "id": "config.gh-dash",
+      "name": "gh-dash configuration",
+      "requires": [
+        "tool.gh"
+      ],
+      "action": "config",
+      "scope": "user"
+    },
+    {
+      "id": "tool.clangd",
+      "name": "clangd language server",
+      "platforms": [
+        "linux"
+      ],
+      "action": "clangd",
+      "scope": "user",
+      "shared": true,
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "clangd"
+        }
+      }
+    },
+    {
+      "id": "tool.curl",
+      "name": "curl download client",
+      "platforms": [
+        "linux"
+      ],
+      "action": "curl",
+      "scope": "machine",
+      "shared": true,
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "curl"
+        }
+      }
+    },
+    {
+      "id": "tool.unzip",
+      "name": "ZIP extraction utility",
+      "platforms": [
+        "linux"
+      ],
+      "action": "unzip",
+      "scope": "machine",
+      "shared": true,
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "unzip"
+        }
+      }
+    },
+    {
+      "id": "infra.homebrew",
+      "name": "Homebrew package infrastructure",
+      "platforms": [
+        "darwin"
+      ],
+      "action": "homebrew",
+      "scope": "machine",
+      "retain": true,
+      "replan_after": true
+    },
+    {
+      "id": "integration.starship",
+      "name": "Starship shell integration",
+      "requires": [
+        "config.starship",
+        "integration.shells"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "integration.fzf",
+      "name": "fzf shell integration",
+      "requires": [
+        "tool.fzf",
+        "integration.shells"
+      ],
+      "scope": "user",
+      "platform_requires": {
+        "windows": [
+          "powershell.psfzf"
+        ]
+      }
+    },
+    {
+      "id": "integration.lsd",
+      "name": "lsd shell integration",
+      "requires": [
+        "tool.lsd",
+        "integration.shells"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "integration.zoxide",
+      "name": "zoxide shell integration",
+      "requires": [
+        "tool.zoxide",
+        "integration.shells"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "integration.shells",
+      "name": "Shared shell integration",
+      "action": "profile",
+      "scope": "user"
+    },
+    {
+      "id": "tool.vcredist",
+      "name": "Microsoft Visual C++ runtime",
+      "platforms": [
+        "windows"
+      ],
+      "action": "vcredist",
+      "scope": "machine",
+      "shared": true
+    },
+    {
+      "id": "plugin.fzf-tab",
+      "name": "fzf-tab pinned plugin",
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "action": "archive",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "plugin.fzf-tab"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "plugin.fzf-tab"
+        }
+      }
+    },
+    {
+      "id": "plugin.zsh-autosuggestions",
+      "name": "zsh-autosuggestions pinned plugin",
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "action": "archive",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "plugin.zsh-autosuggestions"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "plugin.zsh-autosuggestions"
+        }
+      }
+    },
+    {
+      "id": "font.hack",
+      "name": "Hack Nerd Font files",
+      "action": "font-archive",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "hack-nerd-font"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "hack-nerd-font"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "hack-nerd-font"
+        }
+      }
+    },
+    {
+      "id": "tmux.sensible",
+      "name": "tmux sensible plugin",
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "action": "tmux-plugin-archive",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tmux-sensible"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tmux-sensible"
+        }
+      }
+    },
+    {
+      "id": "tmux.yank",
+      "name": "tmux yank plugin",
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "action": "tmux-plugin-archive",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tmux-yank"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tmux-yank"
+        }
+      }
+    },
+    {
+      "id": "tmux.resurrect",
+      "name": "tmux resurrect plugin",
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "action": "tmux-plugin-archive",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tmux-resurrect"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tmux-resurrect"
+        }
+      }
+    },
+    {
+      "id": "tmux.continuum",
+      "name": "tmux continuum plugin",
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "action": "tmux-plugin-archive",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tmux-continuum"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tmux-continuum"
+        }
+      }
+    },
+    {
+      "id": "tool.clipboard-wayland",
+      "name": "Wayland clipboard helper",
+      "platforms": [
+        "linux"
+      ],
+      "action": "clipboard",
+      "scope": "machine",
+      "shared": true,
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "wl-clipboard"
+        }
+      }
+    },
+    {
+      "id": "infra.apple-clt",
+      "name": "Apple developer tools",
+      "action": "apple-clt",
+      "scope": "machine",
+      "platforms": [
+        "darwin"
+      ],
+      "retain": true,
+      "replan_after": true
+    },
+    {
+      "id": "vscode.rose-pine",
+      "name": "VS Code Rose Pine theme files",
+      "action": "theme-archive",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "vscode.rose-pine"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "vscode.rose-pine"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "vscode.rose-pine"
+        }
+      }
+    },
+    {
+      "id": "library.libadwaita-1-0",
+      "name": "libadwaita-1-0 desktop runtime",
+      "platforms": [
+        "linux"
+      ],
+      "action": "apt-library",
+      "scope": "machine",
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "libadwaita-1-0"
+        }
+      }
+    },
+    {
+      "id": "library.libc6",
+      "name": "libc6 desktop runtime",
+      "platforms": [
+        "linux"
+      ],
+      "action": "apt-library",
+      "scope": "machine",
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "libc6"
+        }
+      }
+    },
+    {
+      "id": "library.libfontconfig1",
+      "name": "libfontconfig1 desktop runtime",
+      "platforms": [
+        "linux"
+      ],
+      "action": "apt-library",
+      "scope": "machine",
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "libfontconfig1"
+        }
+      }
+    },
+    {
+      "id": "library.libfreetype6",
+      "name": "libfreetype6 desktop runtime",
+      "platforms": [
+        "linux"
+      ],
+      "action": "apt-library",
+      "scope": "machine",
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "libfreetype6"
+        }
+      }
+    },
+    {
+      "id": "library.libglib2.0-0t64",
+      "name": "libglib2.0-0t64 desktop runtime",
+      "platforms": [
+        "linux"
+      ],
+      "action": "apt-library",
+      "scope": "machine",
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "libglib2.0-0t64"
+        }
+      }
+    },
+    {
+      "id": "library.libgtk-4-1",
+      "name": "libgtk-4-1 desktop runtime",
+      "platforms": [
+        "linux"
+      ],
+      "action": "apt-library",
+      "scope": "machine",
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "libgtk-4-1"
+        }
+      }
+    },
+    {
+      "id": "library.libharfbuzz0b",
+      "name": "libharfbuzz0b desktop runtime",
+      "platforms": [
+        "linux"
+      ],
+      "action": "apt-library",
+      "scope": "machine",
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "libharfbuzz0b"
+        }
+      }
+    },
+    {
+      "id": "library.libonig5",
+      "name": "libonig5 desktop runtime",
+      "platforms": [
+        "linux"
+      ],
+      "action": "apt-library",
+      "scope": "machine",
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "libonig5"
+        }
+      }
+    },
+    {
+      "id": "library.libwayland-client0",
+      "name": "libwayland-client0 desktop runtime",
+      "platforms": [
+        "linux"
+      ],
+      "action": "apt-library",
+      "scope": "machine",
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "libwayland-client0"
+        }
+      }
+    },
+    {
+      "id": "library.libx11-6",
+      "name": "libx11-6 desktop runtime",
+      "platforms": [
+        "linux"
+      ],
+      "action": "apt-library",
+      "scope": "machine",
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "libx11-6"
+        }
+      }
+    },
+    {
+      "id": "tool.fontconfig",
+      "name": "Font discovery/cache",
+      "platforms": [
+        "linux"
+      ],
+      "action": "fontconfig",
+      "scope": "machine",
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "fontconfig"
+        }
+      }
+    },
+    {
+      "id": "desktop.vscode",
+      "name": "VS Code application launcher",
+      "requires": [
+        "tool.vscode"
+      ],
+      "action": "desktop",
+      "scope": "user",
+      "platforms": [
+        "darwin",
+        "windows"
+      ]
+    },
+    {
+      "id": "desktop.aerospace",
+      "name": "AeroSpace application launcher",
+      "requires": [
+        "tool.aerospace"
+      ],
+      "action": "desktop",
+      "scope": "user",
+      "platforms": [
+        "darwin"
+      ]
+    },
+    {
+      "id": "desktop.rose-pine",
+      "name": "VS Code Rose Pine registration",
+      "requires": [
+        "vscode.rose-pine"
+      ],
+      "action": "desktop",
+      "scope": "user"
+    },
+    {
+      "id": "desktop.windows-terminal",
+      "name": "Windows Terminal application launcher",
+      "platforms": [
+        "windows"
+      ],
+      "requires": [
+        "tool.windows-terminal"
+      ],
+      "action": "desktop",
+      "scope": "user"
+    },
+    {
+      "id": "tool.openwhispr",
+      "name": "OpenWhispr",
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "action": "openwhispr",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.openwhispr"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.openwhispr"
+        }
+      },
+      "platform_architectures": {
+        "linux": [
+          "amd64"
+        ]
+      },
+      "platform_requires": {
+        "linux": [
+          "integration.shells",
+          "library.libgtk-3-0t64",
+          "library.libasound2t64",
+          "library.libnss3",
+          "library.libgbm1",
+          "library.libstdcxx6"
+        ]
+      }
+    },
+    {
+      "id": "desktop.openwhispr",
+      "name": "OpenWhispr launcher",
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "requires": [
+        "tool.openwhispr"
+      ],
+      "action": "desktop",
+      "scope": "user",
+      "platform_architectures": {
+        "linux": [
+          "amd64"
+        ]
+      }
+    },
+    {
+      "id": "tool.obsidian",
+      "name": "Obsidian",
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "action": "obsidian",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.obsidian"
+        },
+        "linux": {
+          "provider": "flatpak",
+          "package": "md.obsidian.Obsidian"
+        }
+      },
+      "platform_requires": {
+        "linux": [
+          "tool.flatpak"
+        ]
+      }
+    },
+    {
+      "id": "desktop.obsidian",
+      "name": "Obsidian launcher",
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "requires": [
+        "tool.obsidian"
+      ],
+      "action": "desktop",
+      "scope": "user"
+    },
+    {
+      "id": "tool.tailscale",
+      "name": "Tailscale",
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "action": "tailscale",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "homebrew-formula",
+          "package": "tailscale"
+        },
+        "linux": {
+          "provider": "apt",
+          "package": "tailscale"
+        }
+      },
+      "platform_requires": {
+        "darwin": [
+          "infra.homebrew",
+          "integration.shells"
+        ]
+      }
+    },
+    {
+      "id": "tool.zen",
+      "name": "Zen Browser",
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "action": "zen",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.zen"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.zen"
+        }
+      },
+      "platform_requires": {
+        "linux": [
+          "integration.shells",
+          "tool.xz",
+          "library.libgtk-3-0t64",
+          "library.libdbus-glib-1-2",
+          "library.libasound2t64",
+          "library.libx11-xcb1",
+          "library.libxt6t64",
+          "library.libstdcxx6"
+        ]
+      }
+    },
+    {
+      "id": "desktop.zen",
+      "name": "Zen Browser launcher",
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "requires": [
+        "tool.zen"
+      ],
+      "action": "desktop",
+      "scope": "user"
+    },
+    {
+      "id": "tool.xz",
+      "name": "XZ archive decoder",
+      "platforms": [
+        "linux"
+      ],
+      "action": "xz",
+      "scope": "machine",
+      "shared": true,
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "xz-utils"
+        }
+      }
+    },
+    {
+      "id": "library.libgtk-3-0t64",
+      "name": "libgtk-3-0t64",
+      "platforms": [
+        "linux"
+      ],
+      "action": "apt-library",
+      "scope": "machine",
+      "shared": true,
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "libgtk-3-0t64"
+        }
+      }
+    },
+    {
+      "id": "library.libdbus-glib-1-2",
+      "name": "libdbus-glib-1-2",
+      "platforms": [
+        "linux"
+      ],
+      "action": "apt-library",
+      "scope": "machine",
+      "shared": true,
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "libdbus-glib-1-2"
+        }
+      }
+    },
+    {
+      "id": "library.libasound2t64",
+      "name": "libasound2t64",
+      "platforms": [
+        "linux"
+      ],
+      "action": "apt-library",
+      "scope": "machine",
+      "shared": true,
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "libasound2t64"
+        }
+      }
+    },
+    {
+      "id": "library.libx11-xcb1",
+      "name": "libx11-xcb1",
+      "platforms": [
+        "linux"
+      ],
+      "action": "apt-library",
+      "scope": "machine",
+      "shared": true,
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "libx11-xcb1"
+        }
+      }
+    },
+    {
+      "id": "library.libxt6t64",
+      "name": "libxt6t64",
+      "platforms": [
+        "linux"
+      ],
+      "action": "apt-library",
+      "scope": "machine",
+      "shared": true,
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "libxt6t64"
+        }
+      }
+    },
+    {
+      "id": "library.libstdcxx6",
+      "name": "libstdc++6",
+      "platforms": [
+        "linux"
+      ],
+      "action": "apt-library",
+      "scope": "machine",
+      "shared": true,
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "libstdc++6"
+        }
+      }
+    },
+    {
+      "id": "tool.flatpak",
+      "name": "Flatpak infrastructure",
+      "description": "Native Flatpak and its runtimes are retained; existing installations are untouched.",
+      "platforms": [
+        "linux"
+      ],
+      "action": "package",
+      "scope": "machine",
+      "retain": true,
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "flatpak"
+        }
+      }
+    },
+    {
+      "id": "library.libnss3",
+      "name": "libnss3",
+      "platforms": [
+        "linux"
+      ],
+      "action": "apt-library",
+      "scope": "machine",
+      "shared": true,
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "libnss3"
+        }
+      }
+    },
+    {
+      "id": "library.libgbm1",
+      "name": "libgbm1",
+      "platforms": [
+        "linux"
+      ],
+      "action": "apt-library",
+      "scope": "machine",
+      "shared": true,
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "libgbm1"
+        }
+      }
+    }
+  ]
+}

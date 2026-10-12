@@ -271,7 +271,9 @@ local ok, err = pcall(function()
         if #missing_queries > 0 then
           fail("expected nvim-treesitter query install output missing: " .. table.concat(missing_queries, ", "))
         elseif #missing_highlight_queries > 0 then
-          fail("expected nvim-treesitter highlight query output missing: " .. table.concat(missing_highlight_queries, ", "))
+          fail(
+            "expected nvim-treesitter highlight query output missing: " .. table.concat(missing_highlight_queries, ", ")
+          )
         else
           note("all expected nvim-treesitter query install-output directories/highlights are present")
         end
@@ -300,14 +302,6 @@ local ok, err = pcall(function()
       end
     end
   end
-
-  -- mason.nvim prepends its bin dir to PATH inside its config, which for a real
-  -- session runs on VeryLazy. Headless nvim never fires VeryLazy, so force-load
-  -- it before opening matrix fixtures or testing LSP attachment; otherwise LSP
-  -- rows can produce spawn noise for the wrong reason.
-  pcall(function()
-    require("lazy").load({ plugins = { "mason.nvim" } })
-  end)
 
   local function has_treesitter_highlight_query_capture(buf, parser, parser_obj, parsed_trees)
     if not parser or parser == "" then
@@ -343,7 +337,8 @@ local ok, err = pcall(function()
           for _, node in query:iter_captures(root, buf, 0, line_count) do
             local start_row, start_col, end_row, end_col = node:range()
             if start_row < end_row or start_col < end_col then
-              local text = table.concat(vim.api.nvim_buf_get_text(buf, start_row, start_col, end_row, end_col, {}), "\n")
+              local text =
+                table.concat(vim.api.nvim_buf_get_text(buf, start_row, start_col, end_row, end_col, {}), "\n")
               if text:match("%S") then
                 return true
               end
@@ -576,15 +571,8 @@ local ok, err = pcall(function()
   -- absent runtime is never a failure, even under strict. This is what keeps the
   -- Unix e2e jobs from failing on a server designed not to run there.
   --
-  -- Sanity-check that mason's bin reached PATH so a broken load surfaces as one
-  -- clear failure instead of N opaque "did not attach"s.
-  if vim.fn.executable("lua-language-server") ~= 1 then
-    fail(
-      "Mason bin not on PATH after loading mason; LSP servers are unreachable (expected "
-        .. vim.fn.stdpath("data")
-        .. "/mason/bin on PATH)"
-    )
-  end
+  -- Check Mason after the first real file triggers production lazy loading.
+  local mason_checked = false
   local attach_root = repo_root .. "/tests/.cache/lsp-smoke-attach"
   if vim.fn.isdirectory(attach_root) == 1 and vim.fn.delete(attach_root, "rf") ~= 0 then
     fail("could not clean the isolated LSP attach root: " .. attach_root)
@@ -598,16 +586,16 @@ local ok, err = pcall(function()
       local skip, gated_fail
       if row.lsp_gated then
         -- A gated server is skip-not-fail only OFF its target OS. ON the target
-        -- (powershell_es -> Windows), the runtime MUST be present: setup.ps1
-        -- -All installs pwsh and Mason installs the PSES bundle, so a missing
+        -- (powershell_es -> Windows), the runtime MUST be present: the Neovim
+        -- selection installs pwsh and Mason installs the PSES bundle, so a missing
         -- one is a real setup regression, not a legitimate absence. Failing here
         -- is what makes the Windows STRICT path actually strict (otherwise it
         -- could pass for the wrong reason -- a silently-skipped target server).
-        local pses = vim.fn.stdpath("data") .. "/mason/packages/powershell-editor-services"
+        local pses = require("util.managed_runtime").path("mason/packages/powershell-editor-services")
         if vim.fn.has("win32") ~= 1 then
           skip = "ps1 LSP is a Windows target (not enforced on this OS)"
         elseif vim.fn.executable("pwsh") ~= 1 then
-          gated_fail = "pwsh missing on the Windows target (setup.ps1 -All should install it)"
+          gated_fail = "pwsh missing on the Windows target (the Neovim selection should install it)"
         elseif vim.fn.isdirectory(pses) ~= 1 then
           gated_fail = "PSES bundle missing on the Windows target (Mason should install powershell-editor-services)"
         end
@@ -655,6 +643,16 @@ local ok, err = pcall(function()
           )
         end
         local buf = vim.api.nvim_get_current_buf()
+        if open_ok and not mason_checked then
+          mason_checked = true
+          if vim.fn.executable("lua-language-server") ~= 1 then
+            fail(
+              "Mason bin not on PATH after opening a language file (expected "
+                .. require("util.managed_runtime").path("mason/bin")
+                .. " on PATH)"
+            )
+          end
+        end
         local attached = wait_for_lsp_client(buf, row.lsp)
         -- STRICT (see the header): a non-gated server that does not attach is a
         -- hard failure. The treesitter highlight error that aborted FileType is
