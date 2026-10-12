@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Smoke-test zshrc by sourcing it under zsh in an interactive-ish session.
+# Smoke-test the generated interactive zsh profile through its actual loader.
 # Pass criteria: exit 0, no stderr output, completes within 5s.
 set -euo pipefail
 
@@ -9,19 +9,20 @@ if ! command -v zsh >/dev/null 2>&1; then
 fi
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
+# shellcheck source=tests/shell/active_fixture.sh
+source "$REPO_ROOT/tests/shell/active_fixture.sh"
 
-# Run zsh with HOME pointing at a temp dir to avoid polluting real history.
-TMP_HOME="$(mktemp -d)"
-trap 'rm -rf "$TMP_HOME"' EXIT
+# Start through the generated .zshenv/.zshrc, using its private HOME/ZDOTDIR.
+python3 - "$DOTFILES_SHELL_FIXTURES/zsh" <<'PYTHON'
+import os
+import subprocess
+import sys
 
-# Use a copy with HOMEBREW_PREFIX cleared so we exercise the missing-brew path.
-out=$(HOME="$TMP_HOME" HOMEBREW_PREFIX='' zsh -i -c "source $REPO_ROOT/shells/zshrc && echo OK" 2>&1)
-rc=$?
-
-if [[ "$rc" -ne 0 ]]; then
-    echo "FAIL: zsh exited $rc"; echo "$out"; exit 1
-fi
-if [[ "$out" != *"OK"* ]]; then
-    echo "FAIL: zshrc did not reach 'OK' marker"; echo "$out"; exit 1
-fi
+home = sys.argv[1]
+env = {**os.environ, "HOME": home, "ZDOTDIR": home}
+result = subprocess.run(["zsh", "-d", "-i", "-c", "print -r -- OK"],
+                        env=env, capture_output=True, text=True, timeout=5)
+if result.returncode or result.stdout.strip() != "OK" or result.stderr:
+    raise SystemExit(f"Generated zsh startup failed: {result.returncode}: {result.stdout!r} {result.stderr!r}")
+PYTHON
 echo "OK"

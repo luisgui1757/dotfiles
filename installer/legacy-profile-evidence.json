@@ -1,0 +1,263 @@
+{
+  "schema": 1,
+  "profiles": [
+    {
+      "tag": "v0.1.0",
+      "commit": "015617362830280bf85c7142e69d0681d376d453",
+      "kind": "zshrc",
+      "source": "home/dot_zshrc",
+      "blob": "46bb76a5e6553d0340d75328dfbbeb8f0ae9233a",
+      "sha256": "089d528e6bb90f3ae7fbbd6156acfb97e644ea5046a16d7beb6fc0b2e37466a2"
+    },
+    {
+      "tag": "v0.1.0",
+      "commit": "015617362830280bf85c7142e69d0681d376d453",
+      "kind": "zshenv",
+      "source": "home/dot_zshenv",
+      "blob": "e6cb7f5fbd15e8a85deff5682e11940095dc7499",
+      "sha256": "59a2d3a9a57f8035b48cfcfc75e1b37795719c6dcc8dc5c131a78ed416e6cdc2"
+    },
+    {
+      "tag": "v0.1.0",
+      "commit": "015617362830280bf85c7142e69d0681d376d453",
+      "kind": "powershell",
+      "source": "home/Documents/PowerShell/Microsoft.PowerShell_profile.ps1",
+      "blob": "21aa77aa1ad21e495d40ecb58389b7020d93268d",
+      "sha256": "37e684500fb2ac0906eab25f336237915cd5aa1a65315cb610f71f1d27b625da"
+    },
+    {
+      "tag": "v0.1.0",
+      "commit": "015617362830280bf85c7142e69d0681d376d453",
+      "kind": "powershell",
+      "source": "shells/powershell_profile.ps1",
+      "blob": "21aa77aa1ad21e495d40ecb58389b7020d93268d",
+      "sha256": "37e684500fb2ac0906eab25f336237915cd5aa1a65315cb610f71f1d27b625da"
+    },
+    {
+      "tag": "v0.2.0",
+      "commit": "22cfad80e904e003f52932ae6d6403520df00d3c",
+      "kind": "zshrc",
+      "source": "home/dot_zshrc",
+      "blob": "fcb655629e9680d40f64a528c2fbf5e615007ce8",
+      "sha256": "a42ac956beb9bc2979f48fc0df386494924cc4fee64a119ff679d7f47c7d465f"
+    },
+    {
+      "tag": "v0.2.0",
+      "commit": "22cfad80e904e003f52932ae6d6403520df00d3c",
+      "kind": "zshenv",
+      "source": "home/dot_zshenv",
+      "blob": "e6cb7f5fbd15e8a85deff5682e11940095dc7499",
+      "sha256": "59a2d3a9a57f8035b48cfcfc75e1b37795719c6dcc8dc5c131a78ed416e6cdc2"
+    },
+    {
+      "tag": "v0.2.0",
+      "commit": "22cfad80e904e003f52932ae6d6403520df00d3c",
+      "kind": "powershell",
+      "source": "shells/powershell_profile.ps1",
+      "blob": "1b089270b55e9a624f4c667ea37e27ac593f950e",
+      "sha256": "cee0b8ccdd22851368fc0373cab763bfa3b3ec26e2168330298550b4edec4f6e"
+    },
+    {
+      "tag": "v0.3.0",
+      "commit": "c8507312153620b9b30fe2c84980c62bccb3b25a",
+      "kind": "zshrc",
+      "source": "home/dot_zshrc",
+      "blob": "f22470e919418261a74d7e05018841699bfa4ad2",
+      "sha256": "dfff7fa88e78d1c1c018149489bb3cec1cd40f9feb69642cad3ce8d2da7ad68a"
+    },
+    {
+      "tag": "v0.3.0",
+      "commit": "c8507312153620b9b30fe2c84980c62bccb3b25a",
+      "kind": "zshenv",
+      "source": "home/dot_zshenv",
+      "blob": "e6cb7f5fbd15e8a85deff5682e11940095dc7499",
+      "sha256": "59a2d3a9a57f8035b48cfcfc75e1b37795719c6dcc8dc5c131a78ed416e6cdc2"
+    },
+    {
+      "tag": "v0.3.0",
+      "commit": "c8507312153620b9b30fe2c84980c62bccb3b25a",
+      "kind": "powershell",
+      "source": "shells/powershell_profile.ps1",
+      "blob": "1b089270b55e9a624f4c667ea37e27ac593f950e",
+      "sha256": "cee0b8ccdd22851368fc0373cab763bfa3b3ec26e2168330298550b4edec4f6e"
+    },
+    {
+      "tag": "v0.4.0",
+      "commit": "6317b375a0724804d7a8d895753364cc036e5658",
+      "kind": "zshrc",
+      "source": "home/dot_zshrc",
+      "blob": "f22470e919418261a74d7e05018841699bfa4ad2",
+      "sha256": "dfff7fa88e78d1c1c018149489bb3cec1cd40f9feb69642cad3ce8d2da7ad68a"
+    },
+    {
+      "tag": "v0.4.0",
+      "commit": "6317b375a0724804d7a8d895753364cc036e5658",
+      "kind": "zshenv",
+      "source": "home/dot_zshenv",
+      "blob": "e6cb7f5fbd15e8a85deff5682e11940095dc7499",
+      "sha256": "59a2d3a9a57f8035b48cfcfc75e1b37795719c6dcc8dc5c131a78ed416e6cdc2"
+    },
+    {
+      "tag": "v0.4.0",
+      "commit": "6317b375a0724804d7a8d895753364cc036e5658",
+      "kind": "powershell",
+      "source": "shells/powershell_profile.ps1",
+      "blob": "1b089270b55e9a624f4c667ea37e27ac593f950e",
+      "sha256": "cee0b8ccdd22851368fc0373cab763bfa3b3ec26e2168330298550b4edec4f6e"
+    },
+    {
+      "tag": "v0.4.1",
+      "commit": "bac8cc97177b3bb58119fde5720b31e6b57febcc",
+      "kind": "zshrc",
+      "source": "home/dot_zshrc",
+      "blob": "f22470e919418261a74d7e05018841699bfa4ad2",
+      "sha256": "dfff7fa88e78d1c1c018149489bb3cec1cd40f9feb69642cad3ce8d2da7ad68a"
+    },
+    {
+      "tag": "v0.4.1",
+      "commit": "bac8cc97177b3bb58119fde5720b31e6b57febcc",
+      "kind": "zshenv",
+      "source": "home/dot_zshenv",
+      "blob": "e6cb7f5fbd15e8a85deff5682e11940095dc7499",
+      "sha256": "59a2d3a9a57f8035b48cfcfc75e1b37795719c6dcc8dc5c131a78ed416e6cdc2"
+    },
+    {
+      "tag": "v0.4.1",
+      "commit": "bac8cc97177b3bb58119fde5720b31e6b57febcc",
+      "kind": "powershell",
+      "source": "shells/powershell_profile.ps1",
+      "blob": "1b089270b55e9a624f4c667ea37e27ac593f950e",
+      "sha256": "cee0b8ccdd22851368fc0373cab763bfa3b3ec26e2168330298550b4edec4f6e"
+    },
+    {
+      "tag": "v0.4.2",
+      "commit": "fdd628b34a58a3ecf3a1bef3de72f7cd4ac7dfc0",
+      "kind": "zshrc",
+      "source": "home/dot_zshrc",
+      "blob": "f22470e919418261a74d7e05018841699bfa4ad2",
+      "sha256": "dfff7fa88e78d1c1c018149489bb3cec1cd40f9feb69642cad3ce8d2da7ad68a"
+    },
+    {
+      "tag": "v0.4.2",
+      "commit": "fdd628b34a58a3ecf3a1bef3de72f7cd4ac7dfc0",
+      "kind": "zshenv",
+      "source": "home/dot_zshenv",
+      "blob": "e6cb7f5fbd15e8a85deff5682e11940095dc7499",
+      "sha256": "59a2d3a9a57f8035b48cfcfc75e1b37795719c6dcc8dc5c131a78ed416e6cdc2"
+    },
+    {
+      "tag": "v0.4.2",
+      "commit": "fdd628b34a58a3ecf3a1bef3de72f7cd4ac7dfc0",
+      "kind": "powershell",
+      "source": "shells/powershell_profile.ps1",
+      "blob": "1b089270b55e9a624f4c667ea37e27ac593f950e",
+      "sha256": "cee0b8ccdd22851368fc0373cab763bfa3b3ec26e2168330298550b4edec4f6e"
+    },
+    {
+      "tag": "v0.4.3",
+      "commit": "e3e459a20c23ae546b26d5206d13b648b29e8788",
+      "kind": "zshrc",
+      "source": "home/dot_zshrc",
+      "blob": "f22470e919418261a74d7e05018841699bfa4ad2",
+      "sha256": "dfff7fa88e78d1c1c018149489bb3cec1cd40f9feb69642cad3ce8d2da7ad68a"
+    },
+    {
+      "tag": "v0.4.3",
+      "commit": "e3e459a20c23ae546b26d5206d13b648b29e8788",
+      "kind": "zshenv",
+      "source": "home/dot_zshenv",
+      "blob": "e6cb7f5fbd15e8a85deff5682e11940095dc7499",
+      "sha256": "59a2d3a9a57f8035b48cfcfc75e1b37795719c6dcc8dc5c131a78ed416e6cdc2"
+    },
+    {
+      "tag": "v0.4.3",
+      "commit": "e3e459a20c23ae546b26d5206d13b648b29e8788",
+      "kind": "powershell",
+      "source": "shells/powershell_profile.ps1",
+      "blob": "1b089270b55e9a624f4c667ea37e27ac593f950e",
+      "sha256": "cee0b8ccdd22851368fc0373cab763bfa3b3ec26e2168330298550b4edec4f6e"
+    },
+    {
+      "tag": "v0.4.4",
+      "commit": "05874e536372f6a73f8971c84e675e95666662d4",
+      "kind": "zshrc",
+      "source": "home/dot_zshrc",
+      "blob": "f22470e919418261a74d7e05018841699bfa4ad2",
+      "sha256": "dfff7fa88e78d1c1c018149489bb3cec1cd40f9feb69642cad3ce8d2da7ad68a"
+    },
+    {
+      "tag": "v0.4.4",
+      "commit": "05874e536372f6a73f8971c84e675e95666662d4",
+      "kind": "zshenv",
+      "source": "home/dot_zshenv",
+      "blob": "e6cb7f5fbd15e8a85deff5682e11940095dc7499",
+      "sha256": "59a2d3a9a57f8035b48cfcfc75e1b37795719c6dcc8dc5c131a78ed416e6cdc2"
+    },
+    {
+      "tag": "v0.4.4",
+      "commit": "05874e536372f6a73f8971c84e675e95666662d4",
+      "kind": "powershell",
+      "source": "shells/powershell_profile.ps1",
+      "blob": "1b089270b55e9a624f4c667ea37e27ac593f950e",
+      "sha256": "cee0b8ccdd22851368fc0373cab763bfa3b3ec26e2168330298550b4edec4f6e"
+    }
+  ],
+  "bash_hooks": [
+    {
+      "tag": "v0.1.0",
+      "commit": "015617362830280bf85c7142e69d0681d376d453",
+      "source": "install-deps.sh",
+      "sha256": "8764fca95db091c9bbcfdd97cf1c13d8c0f8371e9e7351d1bb5a94eb4b4b9789",
+      "content": "# >>> dotfiles: exec zsh (interactive bash fallback) >>>\n# Interactive bash re-execs into zsh. Guards: not already zsh (no loop), only\n# interactive shells (scp/rsync/scripts stay bash), and zsh must be installed.\nif [ -z \"${ZSH_VERSION:-}\" ] && [ -n \"${BASH_VERSION:-}\" ] && [[ $- == *i* ]] && command -v zsh >/dev/null 2>&1; then\n    SHELL=\"$(command -v zsh)\"; export SHELL\n    exec zsh\nfi\n# <<< dotfiles: exec zsh (interactive bash fallback) <<<\n"
+    },
+    {
+      "tag": "v0.2.0",
+      "commit": "22cfad80e904e003f52932ae6d6403520df00d3c",
+      "source": "install-deps.sh",
+      "sha256": "8764fca95db091c9bbcfdd97cf1c13d8c0f8371e9e7351d1bb5a94eb4b4b9789",
+      "content": "# >>> dotfiles: exec zsh (interactive bash fallback) >>>\n# Interactive bash re-execs into zsh. Guards: not already zsh (no loop), only\n# interactive shells (scp/rsync/scripts stay bash), and zsh must be installed.\nif [ -z \"${ZSH_VERSION:-}\" ] && [ -n \"${BASH_VERSION:-}\" ] && [[ $- == *i* ]] && command -v zsh >/dev/null 2>&1; then\n    SHELL=\"$(command -v zsh)\"; export SHELL\n    exec zsh\nfi\n# <<< dotfiles: exec zsh (interactive bash fallback) <<<\n"
+    },
+    {
+      "tag": "v0.3.0",
+      "commit": "c8507312153620b9b30fe2c84980c62bccb3b25a",
+      "source": "install-deps.sh",
+      "sha256": "8764fca95db091c9bbcfdd97cf1c13d8c0f8371e9e7351d1bb5a94eb4b4b9789",
+      "content": "# >>> dotfiles: exec zsh (interactive bash fallback) >>>\n# Interactive bash re-execs into zsh. Guards: not already zsh (no loop), only\n# interactive shells (scp/rsync/scripts stay bash), and zsh must be installed.\nif [ -z \"${ZSH_VERSION:-}\" ] && [ -n \"${BASH_VERSION:-}\" ] && [[ $- == *i* ]] && command -v zsh >/dev/null 2>&1; then\n    SHELL=\"$(command -v zsh)\"; export SHELL\n    exec zsh\nfi\n# <<< dotfiles: exec zsh (interactive bash fallback) <<<\n"
+    },
+    {
+      "tag": "v0.4.0",
+      "commit": "6317b375a0724804d7a8d895753364cc036e5658",
+      "source": "install-deps.sh",
+      "sha256": "8764fca95db091c9bbcfdd97cf1c13d8c0f8371e9e7351d1bb5a94eb4b4b9789",
+      "content": "# >>> dotfiles: exec zsh (interactive bash fallback) >>>\n# Interactive bash re-execs into zsh. Guards: not already zsh (no loop), only\n# interactive shells (scp/rsync/scripts stay bash), and zsh must be installed.\nif [ -z \"${ZSH_VERSION:-}\" ] && [ -n \"${BASH_VERSION:-}\" ] && [[ $- == *i* ]] && command -v zsh >/dev/null 2>&1; then\n    SHELL=\"$(command -v zsh)\"; export SHELL\n    exec zsh\nfi\n# <<< dotfiles: exec zsh (interactive bash fallback) <<<\n"
+    },
+    {
+      "tag": "v0.4.1",
+      "commit": "bac8cc97177b3bb58119fde5720b31e6b57febcc",
+      "source": "install-deps.sh",
+      "sha256": "8764fca95db091c9bbcfdd97cf1c13d8c0f8371e9e7351d1bb5a94eb4b4b9789",
+      "content": "# >>> dotfiles: exec zsh (interactive bash fallback) >>>\n# Interactive bash re-execs into zsh. Guards: not already zsh (no loop), only\n# interactive shells (scp/rsync/scripts stay bash), and zsh must be installed.\nif [ -z \"${ZSH_VERSION:-}\" ] && [ -n \"${BASH_VERSION:-}\" ] && [[ $- == *i* ]] && command -v zsh >/dev/null 2>&1; then\n    SHELL=\"$(command -v zsh)\"; export SHELL\n    exec zsh\nfi\n# <<< dotfiles: exec zsh (interactive bash fallback) <<<\n"
+    },
+    {
+      "tag": "v0.4.2",
+      "commit": "fdd628b34a58a3ecf3a1bef3de72f7cd4ac7dfc0",
+      "source": "install-deps.sh",
+      "sha256": "8764fca95db091c9bbcfdd97cf1c13d8c0f8371e9e7351d1bb5a94eb4b4b9789",
+      "content": "# >>> dotfiles: exec zsh (interactive bash fallback) >>>\n# Interactive bash re-execs into zsh. Guards: not already zsh (no loop), only\n# interactive shells (scp/rsync/scripts stay bash), and zsh must be installed.\nif [ -z \"${ZSH_VERSION:-}\" ] && [ -n \"${BASH_VERSION:-}\" ] && [[ $- == *i* ]] && command -v zsh >/dev/null 2>&1; then\n    SHELL=\"$(command -v zsh)\"; export SHELL\n    exec zsh\nfi\n# <<< dotfiles: exec zsh (interactive bash fallback) <<<\n"
+    },
+    {
+      "tag": "v0.4.3",
+      "commit": "e3e459a20c23ae546b26d5206d13b648b29e8788",
+      "source": "install-deps.sh",
+      "sha256": "8764fca95db091c9bbcfdd97cf1c13d8c0f8371e9e7351d1bb5a94eb4b4b9789",
+      "content": "# >>> dotfiles: exec zsh (interactive bash fallback) >>>\n# Interactive bash re-execs into zsh. Guards: not already zsh (no loop), only\n# interactive shells (scp/rsync/scripts stay bash), and zsh must be installed.\nif [ -z \"${ZSH_VERSION:-}\" ] && [ -n \"${BASH_VERSION:-}\" ] && [[ $- == *i* ]] && command -v zsh >/dev/null 2>&1; then\n    SHELL=\"$(command -v zsh)\"; export SHELL\n    exec zsh\nfi\n# <<< dotfiles: exec zsh (interactive bash fallback) <<<\n"
+    },
+    {
+      "tag": "v0.4.4",
+      "commit": "05874e536372f6a73f8971c84e675e95666662d4",
+      "source": "install-deps.sh",
+      "sha256": "8764fca95db091c9bbcfdd97cf1c13d8c0f8371e9e7351d1bb5a94eb4b4b9789",
+      "content": "# >>> dotfiles: exec zsh (interactive bash fallback) >>>\n# Interactive bash re-execs into zsh. Guards: not already zsh (no loop), only\n# interactive shells (scp/rsync/scripts stay bash), and zsh must be installed.\nif [ -z \"${ZSH_VERSION:-}\" ] && [ -n \"${BASH_VERSION:-}\" ] && [[ $- == *i* ]] && command -v zsh >/dev/null 2>&1; then\n    SHELL=\"$(command -v zsh)\"; export SHELL\n    exec zsh\nfi\n# <<< dotfiles: exec zsh (interactive bash fallback) <<<\n"
+    }
+  ]
+}
