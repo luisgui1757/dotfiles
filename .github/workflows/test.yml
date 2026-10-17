@@ -1,227 +1,107 @@
-name: test
+name: Build Tools membership capture diagnostic
 
 on:
-  push:
-    branches: [main]
-  pull_request:
   workflow_dispatch:
 
 permissions:
   contents: read
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
-defaults:
-  run:
-    shell: bash
-
-env:
-  CARGO_BINSTALL_COMMIT: 7bebc2e59eb8820162b7ac8f62a92bfdb2732447
-  CARGO_BINSTALL_INSTALLER_SHA256: d3a93702160e0ec03e2a4e996855db1f01adee801fb84a43add24e0877ef8eae
-  NVIM_LINUX_VERSION: v0.12.5
-  NVIM_LINUX_X86_64_SHA256: bce0f56eda1f1b1db6eee8f4133d7a38813ea07933837dd1777411ca384c6875
-  PIP_DISABLE_PIP_VERSION_CHECK: "1"
-  STARSHIP_VERSION: v1.26.0
-  STARSHIP_LINUX_X86_64_SHA256: 321f0dd7af8340a5f2e6a8fec6538a04f617486f9ec70d878f91c09cd8deef22
-  TREE_SITTER_CLI_LINUX_VERSION: v0.27.0
-  TREE_SITTER_CLI_LINUX_X86_64_SHA256: e4a3826bcd0fe099ee3a5617767374939cbc23c4a35b5b53f5fc04142525a2c1
-
 jobs:
-  ubuntu:
-    runs-on: ubuntu-26.04
-    timeout-minutes: 35
+  fresh-windows-vendor:
+    name: Fresh Windows vendor (${{ matrix.recipe }})
+    runs-on: windows-2022
+    timeout-minutes: 85
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - recipe: Build-Tools
+            test: TestWindowsBuildToolsNativeOwnedLifecycle
+            flag: DOTFILES_NATIVE_WINDOWS_BUILDTOOLS_INSTALL
+    env:
+      GOTOOLCHAIN: local
+      # Distinct fresh containers prevent Build Tools from preinstalling the
+      # runtime before its separate fresh/changed-version lifecycle assertion.
+      WINDOWS_TEST_IMAGE: mcr.microsoft.com/dotnet/framework/runtime:4.8-windowsservercore-ltsc2022@sha256:3983348680840ca6e53ad641e314c3c9184ca2fd19f88bc467600f7d9f6e9d73
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          fetch-depth: 0
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version: 1.27.1
           cache: ${{ !startsWith(github.ref, 'refs/tags/') }}
           cache-dependency-path: installer/go.sum
-      - name: Install deps
-        run: |
-          set -euxo pipefail
-          sudo apt-get update
-          # clangd is a test runtime dependency: clangd_projects_spec.lua starts
-          # two real clients and deliberately refuses static/mock proof.
-          sudo apt-get install -y ca-certificates clangd curl ruby shellcheck tmux zsh python3-pip unzip
-          curl -fsSL "https://github.com/starship/starship/releases/download/${STARSHIP_VERSION}/starship-x86_64-unknown-linux-gnu.tar.gz" -o /tmp/starship.tar.gz
-          printf '%s  %s\n' "$STARSHIP_LINUX_X86_64_SHA256" /tmp/starship.tar.gz | sha256sum -c -
-          sudo tar -xzf /tmp/starship.tar.gz -C /usr/local/bin starship
-          starship --version
-          curl -fsSL "https://github.com/tree-sitter/tree-sitter/releases/download/${TREE_SITTER_CLI_LINUX_VERSION}/tree-sitter-cli-linux-x64.zip" -o /tmp/tree-sitter-cli-linux-x64.zip
-          printf '%s  %s\n' "$TREE_SITTER_CLI_LINUX_X86_64_SHA256" /tmp/tree-sitter-cli-linux-x64.zip | sha256sum -c -
-          rm -rf /tmp/tree-sitter-cli
-          mkdir -p /tmp/tree-sitter-cli
-          unzip -oq /tmp/tree-sitter-cli-linux-x64.zip -d /tmp/tree-sitter-cli
-          sudo install -m 0755 /tmp/tree-sitter-cli/tree-sitter /usr/local/bin/tree-sitter
-          tree-sitter --version
-          curl -fsSL "https://raw.githubusercontent.com/cargo-bins/cargo-binstall/${CARGO_BINSTALL_COMMIT}/install-from-binstall-release.sh" -o /tmp/cargo-binstall.sh
-          printf '%s  %s\n' "$CARGO_BINSTALL_INSTALLER_SHA256" /tmp/cargo-binstall.sh | sha256sum -c -
-          bash /tmp/cargo-binstall.sh
-          # taplo-cli 0.10.0 has no cargo-binstall prebuilt (quickinstall 404) and
-          # fails to source-build on the current runner Rust (time-crate E0119), so
-          # pin 0.9.3, which has a quickinstall prebuilt and installs without compiling.
-          "$HOME/.cargo/bin/cargo-binstall" -y taplo-cli@0.9.3 hyperfine
-          python3 -m pip install --user --break-system-packages --disable-pip-version-check yamllint editorconfig-checker
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-          export PATH="$HOME/.local/bin:$PATH"
-
-          # Ubuntu 26.04 images ship PowerShell; Microsoft's matching apt repo
-          # does not publish it. Require the image runtime so parse tests run.
-          command -v pwsh
-          pwsh -NoLogo -NoProfile -Command 'if ($PSVersionTable.PSVersion.Major -lt 7) { throw "PowerShell 7 is required" }; $PSVersionTable.PSVersion'
-
-          # Neovim pinned release tarball avoids AppImage/FUSE and old asset-name drift.
-          curl -fsSL "https://github.com/neovim/neovim/releases/download/${NVIM_LINUX_VERSION}/nvim-linux-x86_64.tar.gz" -o /tmp/nvim-linux-x86_64.tar.gz
-          printf '%s  %s\n' "$NVIM_LINUX_X86_64_SHA256" /tmp/nvim-linux-x86_64.tar.gz | sha256sum -c -
-          sudo rm -rf /opt/nvim-linux-x86_64
-          sudo tar -xzf /tmp/nvim-linux-x86_64.tar.gz -C /opt
-          sudo ln -sf /opt/nvim-linux-x86_64/bin/nvim /usr/local/bin/nvim
-          nvim --version | head -n 1
-      - name: Static lint
-        run: |
-          set -euo pipefail
-          make test-static
-          make test-bootstrap
-      - name: Renovate schema
-        run: |
-          set -euo pipefail
-          make validate-renovate
-      - name: shellcheck
-        run: |
-          set -euo pipefail
-          make lint
-      - name: Establish trusted disposable completion directories
-        run: |
-          bash tests/native/linux_host_preparation_test.sh
-          bash scripts/prepare-disposable-linux-host.sh shell
-      - name: Shell smoke
-        run: |
-          set -euo pipefail
-          make test-shell
-      - name: Starship render + perf
-        run: |
-          set -euo pipefail
-          make test-starship
-      - name: Tmux load
-        run: |
-          set -euo pipefail
-          make test-tmux
-      - name: Nvim plenary busted
-        run: |
-          set -euo pipefail
-          make test-nvim
-      - name: AeroSpace static checks
-        run: |
-          set -euo pipefail
-          make test-aerospace
-
-  macos:
-    runs-on: macos-26
-    timeout-minutes: 35
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
-        with:
-          go-version: 1.27.1
-          cache: ${{ !startsWith(github.ref, 'refs/tags/') }}
-          cache-dependency-path: installer/go.sum
-      - name: Install deps
-        run: |
-          set -euxo pipefail
-          brew install ruby shellcheck neovim tmux starship tree-sitter-cli taplo hyperfine yamllint editorconfig-checker
-          echo "$(brew --prefix ruby)/bin" >> "$GITHUB_PATH"
-      - name: Make test (full matrix)
-        run: |
-          set -euo pipefail
-          make test
-          make test-bootstrap
-
-  windows:
-    runs-on: windows-2025
-    timeout-minutes: 40
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
-        with:
-          go-version: 1.27.1
-          cache-dependency-path: installer/go.sum
-      - name: Install deps
+      - name: Prepare the disposable Windows container engine
+        timeout-minutes: 2
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $PSNativeCommandUseErrorActionPreference = $true
-          $WarningPreference = 'Stop'
-          if (Get-PSRepository -Name PSGallery -ErrorAction SilentlyContinue) {
-            Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
-          }
-          function Install-ModuleWithRetry {
-            param(
-              [Parameter(Mandatory)][string]$Name,
-              [string]$MinimumVersion = ''
-            )
-            $installArgs = @{
-              Name = $Name
-              Force = $true
-              Scope = 'CurrentUser'
-              SkipPublisherCheck = $true
-              ErrorAction = 'Stop'
-            }
-            if (-not [string]::IsNullOrWhiteSpace($MinimumVersion)) {
-              $installArgs.MinimumVersion = $MinimumVersion
-            }
-            for ($attempt = 1; $attempt -le 3; $attempt++) {
+          if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_ENVIRONMENT -ne 'github-hosted') { throw 'Disposable runner required' }
+          if ((go env GOHOSTOS) -ne 'windows' -or (go env GOHOSTARCH) -ne 'amd64') { throw 'Native Windows amd64 required' }
+          Get-CimInstance Win32_Service -Filter "Name='docker'" |
+            Select-Object State, StartMode, ProcessId, ExitCode, ServiceSpecificExitCode | Format-List
+          $service = Get-Service -Name docker -ErrorAction Stop
+          $timer = [Diagnostics.Stopwatch]::StartNew()
+          $probeDirectory = Join-Path $env:RUNNER_TEMP ('docker-readiness-' + [Guid]::NewGuid().ToString('N'))
+          New-Item -ItemType Directory -Path $probeDirectory | Out-Null
+          $stdout = Join-Path $probeDirectory 'stdout'
+          $stderr = Join-Path $probeDirectory 'stderr'
+          $lastOutput = 'No Docker API response'
+          try {
+            if ($service.Status -eq 'Stopped') { Start-Service -Name docker -ErrorAction Stop }
+            while ($true) {
+              $service.Refresh()
+              if ($service.Status -notin @('Running', 'StartPending')) { throw "Docker service stopped or cannot start: $($service.Status)" }
+              $remaining = 60000 - $timer.ElapsedMilliseconds
+              if ($remaining -le 0) { throw "Windows Docker API readiness expired: $lastOutput" }
+              $probe = Start-Process docker -ArgumentList @('--host', 'npipe:////./pipe/docker_engine', 'version', '--format', '{{.Server.Os}}') `
+                -NoNewWindow -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
               try {
-                Install-Module @installArgs
-                return
-              } catch {
-                if ($attempt -eq 3) { throw }
-                Write-Host ("WARN: Install-Module {0} failed on attempt {1}/3: {2}" -f $Name, $attempt, $_.Exception.Message)
-                Start-Sleep -Seconds (5 * $attempt)
-              }
-            }
-          }
-          $pester = Get-Module -ListAvailable Pester |
-            Where-Object { $_.Version -ge [version]'5.0.0' } |
-            Sort-Object Version -Descending |
-            Select-Object -First 1
-          if (-not $pester) {
-            Install-ModuleWithRetry -Name Pester -MinimumVersion 5.5.0
-          }
-          Install-ModuleWithRetry -Name PSScriptAnalyzer
-          choco install neovim -y
-          $nvim = Get-Command nvim -ErrorAction SilentlyContinue
-          if (-not $nvim) {
-            $candidatePaths = @(
-              "$env:ProgramFiles\Neovim\bin",
-              "C:\tools\neovim\nvim-win64\bin"
-            )
-            foreach ($candidate in $candidatePaths) {
-              if (Test-Path (Join-Path $candidate 'nvim.exe')) {
-                Add-Content -Path $env:GITHUB_PATH -Value $candidate
-                $env:PATH = "$candidate;$env:PATH"
+                if (-not $probe.WaitForExit([int]$remaining)) {
+                  $probe.Kill()
+                  $probe.WaitForExit()
+                  throw 'Windows Docker API readiness query timed out'
+                }
+                $exitCode = $probe.ExitCode
+                $output = [IO.File]::ReadAllText($stdout).Trim()
+                $lastOutput = [IO.File]::ReadAllText($stderr).Trim()
+              } finally { $probe.Dispose() }
+              if ($exitCode -eq 0) {
+                if ($output -cne 'windows') { throw "Native Windows container engine required; received '$output'" }
+                if ($timer.ElapsedMilliseconds -ge 60000) { throw 'Windows Docker API readiness expired' }
                 break
               }
+              Start-Sleep -Milliseconds 500
             }
-          } else {
-            Add-Content -Path $env:GITHUB_PATH -Value (Split-Path -Parent $nvim.Source)
+            Write-Output "Windows Docker API ready after $($timer.ElapsedMilliseconds) ms"
+          } catch {
+            Get-CimInstance Win32_Service -Filter "Name='docker'" |
+              Select-Object State, StartMode, ProcessId, ExitCode, ServiceSpecificExitCode | Format-List
+            Write-Output "Last Docker API diagnostic: $lastOutput"
+            throw
           }
-          nvim --version | Select-Object -First 1
-
-          Import-Module Pester -MinimumVersion 5.0.0 -Force
-          Import-Module PSScriptAnalyzer -Force
-          Get-Module Pester, PSScriptAnalyzer | Format-Table Name,Version,Path -AutoSize
-      - name: Windows test suite
+      - name: Compile fixture and verify the disposable Windows container engine
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $PSNativeCommandUseErrorActionPreference = $true
-          .\test.ps1
+          if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_ENVIRONMENT -ne 'github-hosted') { throw 'Disposable runner required' }
+          if ((go env GOHOSTOS) -ne 'windows' -or (go env GOHOSTARCH) -ne 'amd64') { throw 'Native Windows amd64 required' }
+          if ((docker info --format '{{.OSType}}') -ne 'windows') { throw 'Native Windows container engine required' }
+          $fixture = Join-Path $env:RUNNER_TEMP 'vendor-native'
+          New-Item -ItemType Directory -Path $fixture | Out-Null
+          $env:CGO_ENABLED = '0'
+          go -C installer test -c -o (Join-Path $fixture 'installer.test.exe') .
+          if ($LASTEXITCODE -ne 0) { throw 'Native fixture compilation failed' }
+          docker pull $env:WINDOWS_TEST_IMAGE
+          if ($LASTEXITCODE -ne 0) { throw 'Pinned Windows test image unavailable' }
+      - name: Verify fresh install, update, repair and exact removal
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $fixture = Join-Path $env:RUNNER_TEMP 'vendor-native'
+          docker run --rm --isolation=process --memory 4g --storage-opt size=60G `
+            --mount "type=bind,source=$fixture,target=C:\fixtures,readonly" `
+            --env GITHUB_ACTIONS=true --env RUNNER_ENVIRONMENT=github-hosted `
+            --env DOTFILES_NATIVE_WINDOWS_VENDOR=1 --env '${{ matrix.flag }}=1' `
+            --workdir C:\fixtures --entrypoint C:\fixtures\installer.test.exe `
+            $env:WINDOWS_TEST_IMAGE '-test.v' '-test.timeout=70m' '-test.run=^${{ matrix.test }}$'
+          if ($LASTEXITCODE -ne 0) { throw 'Native vendor lifecycle failed' }

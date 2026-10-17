@@ -248,7 +248,8 @@ func captureBuildToolsQueryProcessesAfterAccounting(job windows.Handle, before b
 		return nil, capture, fmt.Errorf("capture Build Tools inspection members: %w", err)
 	}
 	if members.Listed > uint32(len(members.PIDs)) || members.Listed != members.Assigned {
-		return nil, capture, errors.New("Build Tools inspection membership changed during capture")
+		after, afterErr := readBuildToolsJobAccounting(job)
+		return nil, capture, fmt.Errorf("Build Tools inspection membership changed during capture; assigned=%d listed=%d capacity=%d before_capture(total=%d active=%d terminated=%d) after_capture(total=%d active=%d terminated=%d error=%v)", members.Assigned, members.Listed, len(members.PIDs), before.Total, before.Active, before.Terminated, after.Total, after.Active, after.Terminated, afterErr)
 	}
 	handles := make([]windows.Handle, 0, members.Listed)
 	isProcessInJob := windows.NewLazySystemDLL("kernel32.dll").NewProc("IsProcessInJob")

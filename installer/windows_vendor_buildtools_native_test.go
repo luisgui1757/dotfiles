@@ -89,7 +89,8 @@ func TestWindowsBuildToolsNativeOwnedLifecycle(t *testing.T) {
 	if _, err := driver.CompilerEnvironment(ctx); err != nil {
 		t.Fatal(err)
 	}
-	for range 2 {
+	for cycle := range 50 {
+		t.Logf("fresh owned inspection cycle %d", cycle+1)
 		fresh, err := driver.Observe(ctx, resource, receipt)
 		if err != nil || !fresh.Healthy || len(fresh.Consumers) != 0 || fresh.Fingerprint != after.Fingerprint {
 			t.Fatalf("fresh owned compiler inspection left a consumer or changed inventory: %+v: %v", fresh, err)
