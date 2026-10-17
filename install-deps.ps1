@@ -35,11 +35,11 @@ $PylatexencBuildBackendVersion = '84.0.0'
 $PylatexencBuildBackendSha256 = '51a52592b3b99e102b609654876bd65f19f999935166d1352678931132b0c670'
 $PylatexencVersion = '2.11'
 $PylatexencSha256 = '305a072a99ce736246049c9da05841b9d718c0f7ea8888f5f596cf15cb621053'
-$GhDashVersion = 'v4.26.0'   # dlvhdr/gh-dash pinned gh-extension tag; mirror in install-deps.sh (GH_DASH_VERSION)
+$GhDashVersion = 'v4.26.2'   # dlvhdr/gh-dash pinned gh-extension tag; mirror in install-deps.sh (GH_DASH_VERSION)
 $GhDashTagObject = '17b8f7d6a21d79172f0f2309b607643a215c780f'
 $GhDashCommit = 'c6dfbc17edfdbf1060fc06efe6aabb34f6a725f0'
 $PiCliPackage = '@earendil-works/pi-coding-agent'
-$PiCliVersion = '1.0.4'
+$PiCliVersion = '1.3.0'
 $PiCliIntegrity = 'sha512-+956nfMFHr5lDUVY/2Q4k+YzojzBuCaBXFgj0eSlXVGr7QVliVddKdc1Pz6yVg1dOlJQmb67doOVrlMsIcIdaw=='
 $TreeSitterCliVersion = 'v0.27.0'
 $TreeSitterCliWindowsX64Sha256 = '46188d31c1f3847307b03e92f3a3f60606eb04147609e26cdd50a07f7d0b35da'

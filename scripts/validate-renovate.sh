@@ -4,8 +4,8 @@
 # validator with a newer odd/current host Node can emit EBADENGINE.
 set -euo pipefail
 
-RENOVATE_NODE_VERSION="24.21.0"
-RENOVATE_VERSION="44.138.0"
+RENOVATE_NODE_VERSION="24.22.0"
+RENOVATE_VERSION="44.166.0"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 cd "$REPO_ROOT"
