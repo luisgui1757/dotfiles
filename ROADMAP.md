@@ -1,13 +1,167 @@
 # Dotfiles Roadmap
 
-Last audited: 2026-07-25 during immutable v0.4.3 publication closure.
-Baseline: `main` at `e3e459a20c23ae546b26d5206d13b648b29e8788`.
+2026-10-17 owner scope: use stable T3 Code v0.1.0 and group tool selection into
+category checkboxes with independently selectable children. Preserve platform
+filtering and individual saved selections. The subsequent owner instruction adds
+scoped Git defaults with rebase on pull, earlier-installation detection and
+explicit retirement of Nix, chezmoi and verified replaced artifacts. Disposable
+Linux migration and interruption checks pass; final native matrix acceptance and
+independent Opus review remain pending. See [installer status](docs/installer-status.md).
 
-This is the adversarial post-merge roadmap for the chezmoi migration and the
-current setup/CI surface. The goal is not "good enough"; the repo should have a
-single obvious setup path, enforce the tests it claims are required, avoid
-mutable supply-chain execution where practical, and make greenfield evidence
-repeatable instead of tribal.
+2026-10-13 closure: Zen macOS now passes the complete desktop lifecycle on
+`5657dc5` after correcting the physical executable path and declaring ARM64
+for its script launcher. The signed vendor app is unchanged. Final-head checks
+and the remaining launch-route/version-transition gaps are tracked in
+[installer status](docs/installer-status.md).
+
+2026-10-13 follow-up: Zen's macOS wrapper failed XPCOM startup because it passed
+`../` components through Mozilla's Darwin executable-path sanitizer. Resolve the
+vendor path before exec without changing signed bytes or profile selection.
+Focused red/green and legacy-recipe preservation tests cover the correction;
+the existing native GUI/lifecycle check must confirm it before readiness.
+
+Current owner scope, 2026-10-13: add optional T3 Code using the approved official
+standalone archives/browser UI on all four supported targets. Explicitly pin a
+V2 nightly while stable predates V2 (superseded by the 2026-10-17 stable decision). Keep provider CLIs independent, preserve
+personal data, and let upstream T3 own provider interoperability and orchestration.
+Linux desktop smoke and remaining platform/authentication gaps are recorded in
+[installer status](docs/installer-status.md).
+
+Current owner scope, 2026-10-13: add OpenWhispr, Obsidian, Tailscale and Zen.
+Windows may omit apps whose installers do not fit an existing channel. Linux
+Obsidian uses the approved private Flatpak channel; OpenWhispr uses the subsequently
+approved official amd64 portable archive, with upstream sandbox behavior disclosed.
+Tailscale uses APT/Homebrew CLI, and Zen uses reviewed archives. Linux smoke fixes
+cover URL forwarding, stable Zen profiles/updater state and Flatpak lifecycle
+ownership. Current completion and remaining native-platform gaps are in installer status.
+
+Current owner delivery, 2026-10-12: squash the implementation, smoke fixes and
+CLI replacement into one meaningful commit in PR #87. Earlier commit-layout
+entries below are dated history.
+
+Current owner scope, 2026-10-12: replace Pi with independently selectable Claude
+Code and Codex CLIs on every supported target. Reuse the existing pinned archive
+lifecycle, preserve personal agent state, and add native lifecycle coverage.
+Earlier Pi work below is historical; current evidence is recorded in installer status.
+
+Current major-release implementation status: 2026-10-11. Older audits below
+remain historical evidence; their commands and architecture do not describe this
+candidate. The current operator guide is [README.md](README.md).
+
+## Interactive installer and removal (2026-10, DELIVERY VERIFICATION)
+
+The [canonical overhaul plan](docs/plans/interactive-installer-overhaul.md)
+defines feature selection, automatic dependency resolution, shared-resource-safe
+removal, legacy adoption and the required native three-OS verification matrix.
+The [review ledger](docs/reviews/2026-10-08-interactive-installer-overhaul.md)
+reconciles the primary assessment with the Opus 5.5 CLI review, including rejected
+claims and candidates still needing runtime proof.
+
+The 2026-10-10 roadmap reset preserves the working engine and freezes speculative
+infrastructure work. Actual Opus 5.5 consulted read-only; xhigh requested, effective
+effort unexposed. The owner then narrowed Linux to **Ubuntu/Debian only**.
+No Fedora, Arch, openSUSE, Alpine or Linuxbrew provider is required.
+
+Current checkpoint: `45b8b38` passed all 23 native/quality checks and CodeQL.
+The owner-authorized required-check transition and AeroSpace consent/runtime
+smoke are complete. The subsequent end-to-end review corrections are implemented:
+Mason registry/tool pinning, read-only published Neovim startup, nested-login PATH
+priority, POSIX public bootstrap/umask and recovery guidance. Their complete local
+`make ci` gate and six foreign build/test-compilation checks pass. Astra's correction
+review found no material findings. Actual Opus correction and follow-up reviews
+found no further confirmed production defects; minor fixture/documentation findings
+are resolved. The exact amended-head native matrix gates readiness; current results
+are recorded in
+the same single PR/commit delivery. All four `a8260cd` Neovim native lifecycles
+passed. Subsequent bootstrap-cache isolation and native fixture readiness/teardown
+corrections are in final acceptance; original failed jobs remain failed evidence.
+Windows bootstrap fixture encoding/error-mode corrections and bounded Docker host
+preparation have native scoped proof. They preserve production behavior and every
+canonical acceptance requirement; the final published-head matrix still gates
+readiness. All four public bootstrap/migration lifecycles passed at `f02de9f`.
+The `d83ab95` Docker probe included client-plugin work outside the actual
+server-readiness requirement; its focused correction keeps the overall deadline
+and passed first-invocation native proof on separate running/stopped Windows hosts.
+Final canonical vendor acceptance remains required. A real held-process regression
+also reproduces the `d83ab95` Windows Desktop cleanup failure after process exit;
+passive exact-handle completion replaces an incomplete image-error exception list.
+All seven native kernel cases and the full Desktop lifecycle now pass for that
+correction; final-head canonical verification remains required.
+Historical checkpoints below
+preserve earlier failures; they are not the current failure inventory.
+
+- DONE — Nix/chezmoi removal decision, private archives, dependency/ownership
+  engine, one shell owner, WSL as ordinary Linux, macOS arm64 boundary.
+- DONE — WezTerm retired from all OSes by owner decision; the active catalog now
+  has 22 capabilities. Shared dependencies and passive released evidence remain.
+- DONE — #88 incorporation into #87; one commit and one PR remain the delivery.
+- DONE — Published `e1c987d` full local gate and all four native engine jobs,
+  including Homebrew outside-consumer/cask update and Pi application lifecycle.
+- DONE — M1 implementation: CLI providers, independent fd/ripgrep, native runtime
+  dependencies and fresh Homebrew. APT is the sole Linux provider. Native Windows,
+  Apple and Linux acceptance passed at `45b8b38`.
+- DONE — M2 review corrections: pinned Mason registry/tool versions and
+  read-only published startup, with passing local regressions. Earlier full native lifecycles passed at
+  `45b8b38`; repeat them for these corrections.
+- DONE — M3 implementation: all desktop/font, scoped settings, Sentinel and
+  development providers. Notes activate for an existing vault without a checkbox.
+  Corrected GUI/font lifecycles passed at `45b8b38`; AeroSpace's separate
+  owner-consented tiling/configuration/focus smoke also passed.
+- DONE — M4 review corrections: POSIX public-bootstrap coverage, caller
+  umask restoration and original-engine recovery guidance, with local regressions. Windows public
+  bootstrap/migration already passed under native PowerShell 5.1 at `45b8b38`.
+- IN PROGRESS — M5 correction verification: one PR and one commit, full local
+  gate, independent correction review and all final-head native checks. The
+  owner-authorized required-context cutover is complete. Merge and release
+  remain owner actions.
+
+Published checkpoint `044f9780705faa996914ed95de2aed2126802ba9` passed its full
+local gate, all six foreign all-package build/test-compilation checks and actual
+Opus v7 review. Its native/quality matrix passed **19/23** jobs and all CodeQL
+analyses and aggregate passed. The four failed contexts remain preserved, with native
+corrective proof for Ubuntu hosted completion permissions, bootstrap singular
+naming, explicit shared-PowerShell fixture removal and the Windows API buffer
+lifetime boundary. Actual Opus v8 cleared the unchanged Ubuntu helper; its ARM
+path assumption is now closed by native full shell-suite proof. The Windows
+correction preserves all process completion and outside-consumer safeguards.
+The product remains 22 checkboxes and delivery remains one commit in one PR.
+
+The previous Desktop/inspection correction batch passed all seven local gates
+against 753 source files and the actual 62-call Opus review against 803 supplied
+files. Its published `406218a` completed **22/23** native/quality checks and all
+CodeQL; only Linux ARM Desktop failed at the non-atomic X tree boundary.
+
+The final Linux inspection correction now passes full native Desktop lifecycles
+on both architectures and the complete local gate plus all six foreign
+build/test-compilation checks against 756 unchanged source files. Actual Opus
+5.5 reviewed 792 immutable supplied files with 67 read-only calls and found no
+material inspection-logic defects. Its sole material EditorConfig finding is
+fixed: six Python indentation spaces became valid tabs, with identical Python
+AST and exact corrected ARM native proof. The failed initial gate remains
+failed evidence. Only proof Markdown follows, checked separately. All 23 checks
+and CodeQL must still pass on the amended published PR head before readiness.
+
+Published `127e35d` passes 21/23 native/quality jobs and all CodeQL. The remaining
+two Windows failures are tracked separately: Desktop cleanup and reused launch
+evidence are corrected with full scoped native proof; Neovim's Git inspection
+rejection did not recur in a complete unchanged-guard native lifecycle with all
+257 language checks. Its original cause remains unproved; bounded error details
+are added without changing inspection policy. Both Windows lifecycle jobs and
+public bootstrap/migration subsequently passed on `406218a`. Consolidated
+implementation, local verification and independent review are complete; final
+amended-head acceptance remains in progress. No new architecture or additional
+supported platform is needed.
+
+Readiness is determined by the latest exact head of
+[PR #87](https://github.com/luisgui1757/dotfiles/pull/87), its complete native gate
+and independent review. The [status inventory](docs/installer-status.md) records
+dated proof and outstanding acceptance. Earlier consultations and scoped native
+passes certify their stated source and do not substitute for that final gate.
+
+## Historical release and audit record
+
+The sections below record the previous Nix/chezmoi releases and earlier work.
+Use their exact referenced revision when reproducing historical evidence.
 
 ## Release automation (2026-07, DONE)
 
@@ -66,20 +220,11 @@ repeatable instead of tribal.
 - Post-fix audit hardening added regression coverage for POSIX uninstall
   dry-run immutability, mirrored chezmoi/Starship/tree-sitter pins,
   required-check list duplication, and the Windows Sandbox bootstrap boundary.
-- The tmux/psmux Rose Pine bar is now ONE repo-owned generated artifact sourced
-  on BOTH platforms (PRs #39 / #41): `tmux/psmux-rose-pine.ps1` renders
-  `tmux/psmux-rose-pine.{main,moon,dawn}.conf`, and both POSIX tmux
-  (`tmux.posix.conf`) and native-Windows psmux (`tmux.windows.conf`) source the
-  SAME deployed variant (`~/.tmux.rose-pine.{main,moon,dawn}.conf`,
-  chezmoi-managed on both). The upstream `rose-pine/tmux` TPM plugin is retired
-  from the theme surface (it shelled out ~30x at load and hung psmux/ConPTY);
-  `main` is the default variant, with `moon` / `dawn` selectable via
-  `@rosepine-variant`. POSIX still loads the functional TPM set
-  (sensible/yank/resurrect/continuum). Tests cover plugin provisioning, unquoted
-  overlay source paths, the Windows `~/.psmux.conf` warm-session guard plus
-  flag-free psmux source of `~/.tmux.windows.conf`, generated psmux Rose Pine
-  freshness, and the terminal-edge safety space for right-aligned prompt/status
-  glyphs.
+- Multiplexer simplification (2026-10-10, implementation done; full native gates
+  pending): Herdr on every OS; tmux on macOS/Linux/WSL. Removed Windows psmux,
+  its plugins/configuration and delayed profile hook. One shared LazyGit config
+  restores upstream defaults. tmux uses one config and retains generated Rose
+  Pine variants plus the pinned functional plugins.
 
 ## Nix + Tooling Migration (2026-07, DONE)
 
@@ -108,7 +253,7 @@ Sequenced PRs (split for independent, revertable blast radius):
   BEFORE the completion/keybinding region (zsh) and BEFORE the key handlers
   (PSReadLine) so the mode switch doesn't wipe them; Tab/Up/Down/Ctrl-R are bound
   on the right vi keymaps; explicit `KEYTIMEOUT` (chord-safe) + cursor-shape
-  feedback; the psmux `OnIdle` re-apply also re-asserts the vi handlers. Recorded
+  feedback; normal initialization asserts the vi handlers. Recorded
   as CLAUDE.md invariant 21 and guarded by `tests/shell/zsh_vi_mode_test.sh` +
   new `Profile.Tests.ps1` vi-mode cases.
 - **PR-3 `feat/wezterm` - DONE.** WezTerm on all OSes (brew cask / pinned `.deb` /
@@ -175,7 +320,7 @@ Commit-by-commit status:
   Ubuntu). Tests: Lua smoke (stubbed `require`), parity row, no-auto-launch static
   assertion, installer provenance, Windows `$Catalog` -> `$BinaryName`
   completeness, and required e2e PATH assertions on Linux + Windows. Runtime GUI
-  / psmux-in-WezTerm visual verification remains manual-verification-pending in
+  / Herdr-in-WezTerm visual verification remains manual-verification-pending in
   `tests/MANUAL.md`.
 - **Commit 3 - AeroSpace + Herdr — DONE.** AeroSpace (macOS-only tap cask,
   `start-at-login`, reserved-chord-safe keymap avoiding Alt-h/j/k/l and Alt-c),
@@ -276,7 +421,7 @@ Commit-by-commit status:
   SHA-256 verification; Nix first-run refs include both locked rev and locked
   `narHash`; cheap guardrails now cover macOS vendor-tool e2e presence, Windows
   gh-dash config apply, deterministic zsh vi-mode/fzf-tab behavior, cursor-hook
-  ordering before Starship, and the PowerShell psmux OnIdle no-EditMode reset
+  ordering before Starship, and the PowerShell vi/PSFzf initialization order
   invariant.
 - **POSIX Nix enforcement hardening — DONE.** Public `setup.sh` now applies the
   Nix package layer by default on macOS/Linux/WSL before Phase 1 native/deferred
@@ -1379,3 +1524,131 @@ Canonical solution:
 6. DONE - Resolve the zsh plugin root contract.
 7. DONE - Start a greenfield evidence ledger and move the N-green counter out
    of informal memory.
+
+## Historical unreleased checkpoints (superseded)
+
+The Nix experiments below were retired during the whole-product redesign.
+Current work and verification are listed at the top of this roadmap.
+
+Selective Nix package-plane progress: exact output-group preservation now builds
+locally, retaining baseline priorities and adding only requested packages. Native
+activation with a non-default retained priority is under verification. This does
+not complete the controller, legacy adoption or full installer acceptance stages.
+
+Grouped execution progress: grow/shrink scheduling, all-member intent publication,
+per-member completion recovery and collateral-change verification are implemented
+in the core and pass real-file boundary tests. The Nix adapter now supplies real
+provider discovery and activation; the remaining adapters and public workflow
+are unfinished.
+
+The first real Nix package adapter now connects exact-revision builds and
+activation to grouped engine execution. Native engine lifecycle and detached
+activation passed on Linux/macOS at `d2b91d8`. Review corrections, vendor/native
+adapters, adoption, publication concurrency/recovery and
+the public interfaces remain unfinished. Empty selections now bind complete
+provider inventory to approval, with a reproduced regression and core tests.
+
+At `b6f2a74`, all 26 hosted checks passed, including corrected XDG activation,
+real sudo-prompt cancellation on both POSIX hosts and WSL2 startup. Lease-history
+overflow now fails before publication and passes its complete local gate. Profile
+generation history is bound to approval and checked before completion, with native
+private-profile regression evidence and a passing complete local gate. Hosted
+history verification passed on both POSIX hosts at `979c448`. Exact-target
+partial-state recovery, the remaining adapters and connected public workflow are
+still unfinished. A fresh Opus round completed after the earlier account-limit
+interruption. Its four code findings are reproduced and corrected in focused
+tests and the complete local correction gates passed. A subsequent Opus review
+found no new medium/high correction defects and three low issues. Those are
+being corrected alongside the Nix 2.35 generation-width mismatch exposed by
+both hosted POSIX runners at `7c7cf89`; that head has 22 successful checks and
+four failures (two producers and their two proof dependants). New correction
+verification passed locally and all 26 hosted checks passed at `9a98a44`;
+independent approval remains required. Exact-target recovery now has a shared
+publication classifier and a separate approved resume phase preserving original
+batch/ownership IDs. The recovery checkpoint passed its full local gate; macOS conflict recovery
+passed at `5a1f5e9` (24 checks passed; two Linux checks failed due to a fault-fixture
+PATH omission). Opus found abandonment/removal-retry and smaller recovery defects;
+their failing-before regressions now pass with corrections. The lifecycle controller
+and terminal adapter now cover selection, shared removal/Keep, update, repair, check
+and explicit approval/recovery, with local real-file and macOS PTY proof. Revised
+local gates pass; new hosted proof and review remain pending; other adapters and public cutover
+remain unfinished.
+
+
+The connected-controller checkpoint `ad6bfe8` passed all 26 hosted checks,
+including the expanded Linux fault matrix, macOS recovery, Windows ConPTY and
+independent Nix proof readbacks. Opus 5.5's controller review confirmed earlier
+recovery fixes and found a Medium original-installer availability requirement
+plus smaller UX/input issues. Controller corrections pass focused local tests;
+original-revision distribution, bootstrap, native/config providers, adoption and
+public cutover are still in progress. This remains one unfinished PR/commit.
+
+Installer consolidation (2026-10-10): shared shell-profile ownership and combined
+selected assembly are implemented and under verification; fzf/fd/lsd/zoxide archive recipes are
+connected. The recovery/cleanup checkpoint's full local gate is DONE. Hosted
+Windows restricted-token fixture launch needs re-verification; full product
+catalog, native providers, bootstrap/migration and final delivery remain open.
+
+- **2026-10-10 portable catalog:** connected verified Neovim, ripgrep, GitHub CLI,
+  lazygit, jq, Tree-sitter and Hyperfine assets on the four current native targets.
+  Seven real macOS archive lifecycles pass, including Neovim runtime discovery.
+  Complete capabilities still require native prerequisites and integration recipes.
+  The permission-refused profile recovery diagnostic is fixed with failing-before /
+  passing-after evidence. Unified-shell hosted fixture corrections are in progress.
+
+- **2026-10-10 runtime/update progress:** verified Node 24.21.0 archives and bundled
+  npm are connected. Real Starship 1.25.0 to 1.26.0 update, retired-generation
+  cleanup and final removal pass locally. Linux provider facts stay outside the
+  saved OS/architecture identity; the existing session-policy regression remains
+  unchanged and passes after correcting the initial discovery integration.
+
+### Native-provider verification follow-up (2026-10-10)
+
+- DONE locally: native command worker retains its OS lock after actual controller
+  death; command failures and oversized output remain errors. Hosted verification
+  and production native provider connection are in progress.
+- IN PROGRESS: Linux Python extraction follows destination filesystem case
+  sensitivity; native Homebrew fixtures use explicit, isolated tap trust. Repeat
+  the native runner contracts before connecting their production adapters.
+- DONE locally: durable native command results survive controller death and are
+  replayed without repeating commands; exact exit codes remain available.
+- IN PROGRESS: the native Linux archive correction passes both architectures;
+  APT Architecture: all attribution and unique Homebrew fixture paths are corrected
+  for the next native contract run.
+- DONE natively at `256f952`: both APT architectures and the Homebrew package
+  contracts pass. Shared pool removal policy and actual Homebrew inventory are
+  implemented and under verification; production adapter connection remains open.
+- DONE natively at `9e372ab`: Homebrew adapter install/update/repair/recovery and
+  sequential shared-pool removal pass on the macOS runner. Public routing remains.
+- DONE natively at `40a25c7`: native worker terminal-interrupt isolation passes
+  POSIX group and Windows private-console tests. This proves the worker primitive
+  independently of the public controller signal handler.
+- DONE locally: native controller exclusion before preview/state loading, lazy
+  worker handoff and scoped Homebrew pool approval. The original controller
+  regression fails before integration and passes afterward. Hosted controller
+  lifecycle and corrected Windows console helper also pass at `40a25c7`.
+- IN PROGRESS: compiled Homebrew shared-library update/removal proof. The native
+  contract must execute a pre-existing consumer successfully and preserve its
+  ownership classification; warnings about a broken consumer are not success.
+- IN PROGRESS: native maintenance preservation and failure diagnostics. Before/after
+  tests cover pre-existing package loss/classification changes and bounded actionable
+  native errors; hosted confirmation and default provider routing remain.
+- IN PROGRESS: recover failed native dependent maintenance through Homebrew's
+  exact prior-operation package set. Root-only no-op and missing-root recovery
+  regressions fail against `1b04606` and pass locally after correction. The compiled
+  dependent-rebuild failure/recovery acceptance test awaits hosted execution.
+- IN PROGRESS: targeted Homebrew linkage verification and consumer repair.
+  Native run `38039169398` proves automatic dependent checks alone still leave the
+  outside consumer broken. The replacement inspects the affected native graph and
+  repairs only failing formulae. Application/cask verification remains required.
+
+
+## 2026-10-11 — Owner-authorized smoke-test fixes commit
+
+PR #87 now follows the owner's two-commit delivery: preserve the original
+implementation and add one correction commit for desktop smoke findings. The
+Mason/LSP startup order and Pi canonical-theme maintenance/removal regressions
+are corrected with failed-before coverage. LuaLS writable state moves out of the
+managed package, and native CI verifies fresh file startup for every configured
+LSP plus payload preservation after use. The current smoke and verification
+results are recorded in the installer status and append-only review ledger.

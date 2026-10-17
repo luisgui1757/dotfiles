@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "resources": {
+    "tool.tailscale": {
+      "amd64": {
+        "package": "tailscale",
+        "version": "1.104.1",
+        "architecture": "amd64",
+        "url": "https://pkgs.tailscale.com/stable/tailscale_1.104.1_amd64.deb",
+        "sha256": "509753a4ff223efc70234e7f539afc51f743b3af043d9e55313960bd7327700f",
+        "size": 40512672
+      },
+      "arm64": {
+        "package": "tailscale",
+        "version": "1.104.1",
+        "architecture": "arm64",
+        "url": "https://pkgs.tailscale.com/stable/tailscale_1.104.1_arm64.deb",
+        "sha256": "d5e3c74bccb5006db76d4ca3e38876d98724774e7ea2999ff97406ec040aca27",
+        "size": 37279026
+      }
+    }
+  }
+}

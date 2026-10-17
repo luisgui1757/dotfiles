@@ -18,31 +18,21 @@ while IFS= read -r f; do sh_files+=("$f"); done < <(
 
 fail=0
 for f in "${sh_files[@]}"; do
-    case "$f" in
-        ./tests/migration/uninstall_backup_order_test.sh)
-            # This test deliberately imports uninstall's recovery functions;
-            # follow that literal source so globals are checked at their uses.
-            shellcheck --external-sources --shell=bash "$f" || fail=1
-            ;;
-        ./tests/shell/*_test.sh|./tests/nix/setup_home_manager_test.sh|./tests/nix/setup_nix_darwin_test.sh|./tests/nix/macos_owner_lifecycle_test.sh|./tests/nix/linux_owner_lifecycle_test.sh)
-            # Source-only fixtures intentionally source setup/install scripts via
-            # runtime paths, set globals consumed by those sourced functions, and
-            # override commands such as uname indirectly. Keep these test-only
-            # false positives out of the lint signal; production scripts remain
-            # strict. SC2317 is the same source-only fixture class: command
-            # stubs are reached indirectly through sourced installer functions.
-            shellcheck --shell=bash \
-                --exclude=SC1091,SC2034,SC2317,SC2329 "$f" || fail=1
-            ;;
-        *)
-            shellcheck --shell=bash "$f" || fail=1
-            ;;
-    esac
+    shellcheck -x --shell=bash "$f" || fail=1
 done
 [[ "$fail" -eq 0 ]] || exit 1
 
-# zshrc uses the portable shell subset accepted by both zsh and ShellCheck's
-# Bash parser. Any diagnostic is a real gate failure; no best-effort escape.
-shellcheck --shell=bash shells/zshrc
-
+# ShellCheck does not parse zsh glob qualifiers. Check the real language
+# instead of suppressing parser errors; generated output uses the same gate.
+command -v zsh >/dev/null || { echo 'FAIL: zsh is required for active shell syntax checks'; exit 1; }
+for script in installer/shells/*.zsh; do zsh -n "$script"; done
+# shellcheck source=tests/shell/active_fixture.sh
+source "$REPO_ROOT/tests/shell/active_fixture.sh"
+zsh -n "$ACTIVE_ZSH"
+zsh -n "$ACTIVE_ZSH_CORE"
+# Bash also sources this shared file when zsh is selected. An inactive branch
+# still has to parse, before its shell-specific condition can be evaluated.
+bash -n "$ACTIVE_ZSH"
+bash -n "$ACTIVE_ZSH_CORE"
+shellcheck --shell=sh "$DOTFILES_SHELL_FIXTURES/posix/state/shells/env.sh"
 echo "lint OK"

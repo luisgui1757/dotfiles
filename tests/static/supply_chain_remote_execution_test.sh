@@ -13,14 +13,9 @@ import os
 root = pathlib.Path(".")
 
 scan_files = [
-    pathlib.Path("install-deps.sh"),
-    pathlib.Path("install-deps.ps1"),
-    pathlib.Path("setup.sh"),
-    pathlib.Path("setup.ps1"),
-    pathlib.Path("scripts/validate-renovate.sh"),
-    pathlib.Path(".github/workflows/test.yml"),
-    pathlib.Path("tests/greenfield/windows-sandbox.wsb"),
-    pathlib.Path("tests/greenfield/sandbox-bootstrap.ps1"),
+    pathlib.Path("setup.sh"), pathlib.Path("setup.ps1"),
+    pathlib.Path("scripts/installer-bootstrap.sh"), pathlib.Path("scripts/installer-bootstrap.ps1"),
+    pathlib.Path("scripts/validate-renovate.sh"), pathlib.Path(".github/workflows/test.yml"),
 ]
 
 allowlist = {
@@ -210,63 +205,16 @@ for label, probe, should_fail in privileged_package_probes:
     if not should_fail and probe_failures:
         failures.append(f"supply-chain scanner rejected verified privileged package probe: {label}")
 
-install_deps_sh = pathlib.Path("install-deps.sh").read_text(encoding="utf-8")
-required_install_deps_snippets = [
-    'HOMEBREW_INSTALL_COMMIT="',
-    'HOMEBREW_INSTALL_SHA256="',
-    'url="https://raw.githubusercontent.com/Homebrew/install/${HOMEBREW_INSTALL_COMMIT}/install.sh"',
-    'verify_sha256 "$script" "$HOMEBREW_INSTALL_SHA256"',
-    'CHEZMOI_LINUX_X86_64_SHA256="',
-    'CHEZMOI_LINUX_ARM64_SHA256="',
-    'url="https://github.com/twpayne/chezmoi/releases/download/${CHEZMOI_VERSION}/${asset}"',
-    'verify_sha256 "$tarball" "$expected"',
-    'STARSHIP_VERSION="',
-    'STARSHIP_LINUX_X86_64_SHA256="',
-    'STARSHIP_LINUX_ARM64_SHA256="',
-    'url="https://github.com/starship/starship/releases/download/${STARSHIP_VERSION}/${asset}"',
-    'verify_sha256 "$tarball" "$expected"',
-    'GHOSTTY_UBUNTU_AMD64_2404_SHA256="',
-    'GHOSTTY_UBUNTU_ARM64_2404_SHA256="',
-    'GHOSTTY_UBUNTU_AMD64_2510_SHA256="',
-    'GHOSTTY_UBUNTU_ARM64_2510_SHA256="',
-    'GHOSTTY_DEBIAN_AMD64_TRIXIE_SHA256="',
-    'GHOSTTY_DEBIAN_ARM64_TRIXIE_SHA256="',
-    'GHOSTTY_DEB_URL="https://github.com/mkasberg/ghostty-ubuntu/releases/download/${GHOSTTY_UBUNTU_VERSION}/${GHOSTTY_DEB_ASSET}"',
-    'verify_sha256 "$deb" "$expected_sha"',
-    'apt_get_noninteractive() {',
-    'maybe_sudo env DEBIAN_FRONTEND=noninteractive apt-get "$@"',
-    'apt_get_noninteractive install -y "$deb"',
-]
-for snippet in required_install_deps_snippets:
-    if snippet not in install_deps_sh:
-        failures.append(f"install-deps.sh missing supply-chain guard snippet: {snippet}")
-
-for banned in (
-    "Homebrew/install/HEAD/install.sh",
-    "sh -c \"$(curl -fsLS get.chezmoi.io)\"",
-    "curl -fsSL https://starship.rs/install.sh | sh",
-    "curl -fsSL $ubuntu_url | bash",
-    "/releases/latest",
-    "ghostty-ubuntu-install.sh",
-):
-    if banned in install_deps_sh:
-        failures.append(f"install-deps.sh contains banned mutable installer pattern: {banned}")
-
 workflow = pathlib.Path(".github/workflows/test.yml").read_text(encoding="utf-8")
 required_workflow_snippets = [
     "STARSHIP_VERSION: v",
     "STARSHIP_LINUX_X86_64_SHA256:",
     "starship-x86_64-unknown-linux-gnu.tar.gz",
     "printf '%s  %s\\n' \"$STARSHIP_LINUX_X86_64_SHA256\" /tmp/starship.tar.gz | sha256sum -c -",
-    "scripts/install-pinned-chezmoi.sh",
-    "CHEZMOI_LINUX_X86_64_SHA256:",
-    "CHEZMOI_DARWIN_ARM64_SHA256:",
-    "CHEZMOI_WINDOWS_X86_64_SHA256:",
     "TREE_SITTER_CLI_LINUX_VERSION:",
     "TREE_SITTER_CLI_LINUX_X86_64_SHA256:",
     "tree-sitter-cli-linux-x64.zip",
     "sudo install -m 0755 /tmp/tree-sitter-cli/tree-sitter /usr/local/bin/tree-sitter",
-    "Get-FileHash -Algorithm SHA256 -LiteralPath $zip",
 ]
 for snippet in required_workflow_snippets:
     if snippet not in workflow:
@@ -292,27 +240,6 @@ else:
     if between:
         failures.append(".github/workflows/test.yml has commands between cargo-binstall SHA-256 verification and execution")
 
-install_deps_ps1 = pathlib.Path("install-deps.ps1").read_text(encoding="utf-8")
-required_install_deps_ps1_snippets = [
-    "$ScoopInstallerCommit = '",
-    "$ScoopInstallerSha256 = '",
-    '$ScoopInstallerUrl = "https://raw.githubusercontent.com/ScoopInstaller/Install/$ScoopInstallerCommit/install.ps1"',
-    'Invoke-WebRequest -Uri $ScoopInstallerUrl -OutFile $installer -UseBasicParsing -ErrorAction Stop',
-    'Test-FileSha256 $installer $ScoopInstallerSha256',
-    'verified Scoop installer ScoopInstaller/Install@',
-    '& $installer -RunAsAdmin',
-    '& $installer',
-]
-for snippet in required_install_deps_ps1_snippets:
-    if snippet not in install_deps_ps1:
-        failures.append(f"install-deps.ps1 missing pinned Scoop bootstrap guard snippet: {snippet}")
-for banned in (
-    "https://get.scoop.sh",
-    "Install Scoop via the official one-liner",
-):
-    if banned in install_deps_ps1:
-        failures.append(f"install-deps.ps1 contains banned mutable Scoop bootstrap pattern: {banned}")
-
 renovate_validator = pathlib.Path("scripts/validate-renovate.sh").read_text(encoding="utf-8")
 for snippet in (
     'RENOVATE_NODE_VERSION="',
@@ -328,38 +255,6 @@ for banned in (
 ):
     if banned in renovate_validator:
         failures.append(f"scripts/validate-renovate.sh contains mutable validator package: {banned}")
-
-helper = pathlib.Path("scripts/install-pinned-chezmoi.sh")
-if not helper.exists():
-    failures.append("scripts/install-pinned-chezmoi.sh is missing")
-else:
-    helper_text = helper.read_text(encoding="utf-8")
-    for snippet in (
-        "CHEZMOI_LINUX_X86_64_SHA256",
-        "CHEZMOI_DARWIN_ARM64_SHA256",
-        "sha256sum -c -",
-        "shasum -a 256",
-        'install -m 0755 "$source_bin" "$bin_dir/chezmoi"',
-    ):
-        if snippet not in helper_text:
-            failures.append(f"scripts/install-pinned-chezmoi.sh missing guard snippet: {snippet}")
-
-wt_greenfield = pathlib.Path("tests/greenfield/install-wt-portable.ps1").read_text(encoding="utf-8")
-for snippet in (
-    ". $installDeps",
-    "$WindowsTerminalVersion",
-    "$WindowsTerminalX64Sha256",
-    "Test-FileSha256 -Path $zip -Expected $WindowsTerminalX64Sha256",
-    "[IO.Directory]::Move($stage, $destination)",
-):
-    if snippet not in wt_greenfield:
-        failures.append(f"Windows Sandbox Terminal helper missing production-pin/transaction guard: {snippet}")
-for banned in (
-    "/releases/latest",
-    "Copy-Item -LiteralPath $managed",
-):
-    if banned in wt_greenfield:
-        failures.append(f"Windows Sandbox Terminal helper contains mutable/destructive pattern: {banned}")
 
 setup_doc_files = [
     pathlib.Path("README.md"),
