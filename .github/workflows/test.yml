@@ -1,4 +1,4 @@
-name: Build Tools process churn diagnostic
+name: Build Tools complete snapshot regression
 
 on:
   workflow_dispatch:
@@ -16,7 +16,7 @@ jobs:
       matrix:
         include:
           - recipe: Build-Tools
-            test: TestWindowsBuildToolsCaptureChurnDiagnostic
+            test: TestWindowsBuildToolsQuery
             flag: DOTFILES_NATIVE_WINDOWS_BUILDTOOLS_INSTALL
     env:
       GOTOOLCHAIN: local
@@ -93,12 +93,25 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Native fixture compilation failed' }
           docker pull $env:WINDOWS_TEST_IMAGE
           if ($LASTEXITCODE -ne 0) { throw 'Pinned Windows test image unavailable' }
+      - name: Prove the previous single-snapshot guard fails the native regression
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $fixture = Join-Path $env:RUNNER_TEMP 'vendor-native'
+          python tests/native/buildtools_capture_mutation.py
+          if ($LASTEXITCODE -ne 0) { throw 'Previous guard preparation failed' }
+          go -C installer test -c -o (Join-Path $fixture 'before.test.exe') .
+          if ($LASTEXITCODE -ne 0) { throw 'Previous guard fixture compilation failed' }
+          & (Join-Path $fixture 'before.test.exe') '-test.v' '-test.timeout=10m' '-test.run=^TestWindowsBuildToolsQueryCompletesNativeExitSnapshots$'
+          if ($LASTEXITCODE -eq 0) { throw 'Previous guard unexpectedly passed; native reproduction missing' }
+          git checkout -- installer/windows_buildtools_query_windows.go
+          if ($LASTEXITCODE -ne 0) { throw 'Corrected source restoration failed' }
       - name: Observe process exit on the disposable Windows host
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           $fixture = Join-Path $env:RUNNER_TEMP 'vendor-native'
-          & (Join-Path $fixture 'installer.test.exe') '-test.v' '-test.timeout=10m' '-test.run=^TestWindowsBuildToolsCaptureChurnDiagnostic$'
+          & (Join-Path $fixture 'installer.test.exe') '-test.v' '-test.timeout=10m' '-test.run=^TestWindowsBuildToolsQuery'
           if ($LASTEXITCODE -ne 0) { throw 'Native host churn diagnostic failed' }
       - name: Observe process exit in the pinned disposable Windows container
         shell: pwsh
@@ -110,5 +123,5 @@ jobs:
             --env GITHUB_ACTIONS=true --env RUNNER_ENVIRONMENT=github-hosted `
             --env DOTFILES_NATIVE_WINDOWS_VENDOR=1 --env '${{ matrix.flag }}=1' `
             --workdir C:\fixtures --entrypoint C:\fixtures\installer.test.exe `
-            $env:WINDOWS_TEST_IMAGE '-test.v' '-test.timeout=70m' '-test.run=^${{ matrix.test }}$'
+            $env:WINDOWS_TEST_IMAGE '-test.v' '-test.timeout=70m' '-test.run=^${{ matrix.test }}'
           if ($LASTEXITCODE -ne 0) { throw 'Native vendor lifecycle failed' }

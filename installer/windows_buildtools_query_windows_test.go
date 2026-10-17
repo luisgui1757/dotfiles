@@ -327,7 +327,7 @@ func TestWindowsBuildToolsQueryRejectsChangedMembership(t *testing.T) {
 		return process.Process
 	}
 	first := start()
-	handles, capture, err := captureBuildToolsQueryProcesses(job)
+	handles, capture, err := captureBuildToolsQueryProcesses(job, time.Now().Add(5*time.Second))
 	defer func() {
 		for _, handle := range handles {
 			if err := windows.CloseHandle(handle); err != nil {
@@ -424,7 +424,7 @@ func TestWindowsBuildToolsQueryAcceptsExitedMemberDuringCapture(t *testing.T) {
 	if err != nil || before.Active == 0 || before.Total == 0 {
 		t.Fatal("expected ready private members before capture", before, err)
 	}
-	ready, readyCapture, err := captureBuildToolsQueryProcessesAfterAccounting(job, before)
+	ready, readyCapture, err := captureBuildToolsQueryProcessesAfterAccounting(job, before, time.Now().Add(5*time.Second))
 	defer func() {
 		for _, handle := range ready {
 			if err := windows.CloseHandle(handle); err != nil {
@@ -472,7 +472,7 @@ func TestWindowsBuildToolsQueryAcceptsExitedMemberDuringCapture(t *testing.T) {
 	if after.Total != before.Total || after.Active >= before.Active {
 		t.Fatal("natural exit did not preserve lifetime membership and reduce active members")
 	}
-	handles, capture, err := captureBuildToolsQueryProcessesAfterAccounting(job, before)
+	handles, capture, err := captureBuildToolsQueryProcessesAfterAccounting(job, before, time.Now().Add(5*time.Second))
 	defer func() {
 		for _, handle := range handles {
 			if err := windows.CloseHandle(handle); err != nil {
@@ -568,4 +568,87 @@ func queryBuildToolsJobAtStackDepth(job windows.Handle, depth int, kind string) 
 	}
 	runtime.KeepAlive(padding)
 	return err
+}
+
+// Exercise the native query boundary with explicit Windows API results. Other
+// tests retain real private jobs, exact HANDLE waits and late-member refusal.
+func TestWindowsBuildToolsQueryCompletesExitingMemberSnapshot(t *testing.T) {
+	calls := 0
+	members, err := completeBuildToolsQueryMembers(time.Now().Add(time.Second), func(members *buildToolsJobMembers) error {
+		calls++
+		if calls == 1 {
+			members.Assigned, members.Listed, members.PIDs[0] = 2, 1, 17
+		} else {
+			if *members != (buildToolsJobMembers{}) {
+				t.Fatal("previous partial snapshot was retained")
+			}
+			members.Assigned, members.Listed, members.PIDs[0] = 1, 1, 23
+		}
+		return nil
+	})
+	if err != nil || calls != 2 || members.Assigned != 1 || members.Listed != 1 || members.PIDs[0] != 23 {
+		t.Fatal("complete replacement snapshot was not required", calls, members, err)
+	}
+}
+
+func TestWindowsBuildToolsQueryPreservesMemberQueryFailures(t *testing.T) {
+	for _, sample := range []struct {
+		name             string
+		assigned, listed uint32
+		queryErr         error
+	}{
+		{"overflow", 257, 256, nil},
+		{"invalid counts", 1, 2, nil},
+		{"more data", 257, 256, windows.ERROR_MORE_DATA},
+		{"access denied", 0, 0, windows.ERROR_ACCESS_DENIED},
+	} {
+		t.Run(sample.name, func(t *testing.T) {
+			calls := 0
+			_, err := completeBuildToolsQueryMembers(time.Now().Add(time.Second), func(members *buildToolsJobMembers) error {
+				calls++
+				members.Assigned, members.Listed = sample.assigned, sample.listed
+				return sample.queryErr
+			})
+			if err == nil || calls != 1 || sample.queryErr != nil && !errors.Is(err, sample.queryErr) {
+				t.Fatal("native failure was retried or lost", calls, err)
+			}
+		})
+	}
+}
+
+func TestWindowsBuildToolsQuerySharesOriginalReapDeadline(t *testing.T) {
+	for _, complete := range []bool{false, true} {
+		t.Run(fmt.Sprintf("complete=%t", complete), func(t *testing.T) {
+			deadline := time.Now().Add(20 * time.Millisecond)
+			calls := 0
+			_, err := completeBuildToolsQueryMembers(deadline, func(members *buildToolsJobMembers) error {
+				calls++
+				members.Assigned = 1
+				if complete {
+					members.Listed = 1
+				}
+				time.Sleep(max(0, time.Until(deadline)))
+				return nil
+			})
+			if err == nil || calls > 1 || !strings.Contains(err.Error(), "within five seconds") {
+				t.Fatal("capture renewed or exceeded its original reap deadline", calls, err)
+			}
+		})
+	}
+}
+
+func TestWindowsBuildToolsQueryAcceptsCompleteMemberBoundaries(t *testing.T) {
+	for _, count := range []uint32{0, 1, 256} {
+		t.Run(fmt.Sprint(count), func(t *testing.T) {
+			calls := 0
+			members, err := completeBuildToolsQueryMembers(time.Now().Add(time.Second), func(members *buildToolsJobMembers) error {
+				calls++
+				members.Assigned, members.Listed = count, count
+				return nil
+			})
+			if err != nil || calls != 1 || members.Listed != count {
+				t.Fatal("complete bounded snapshot refused", calls, members, err)
+			}
+		})
+	}
 }

@@ -165,7 +165,7 @@ func queryWindowsBuildTools(ctx context.Context, privileged bool, program string
 // authorize a success claim from an incomplete snapshot; natural exits can.
 func stopBuildToolsQueryJob(job windows.Handle) (result error) {
 	deadline := time.Now().Add(5 * time.Second)
-	handles, capture, captureErr := captureBuildToolsQueryProcesses(job)
+	handles, capture, captureErr := captureBuildToolsQueryProcesses(job, deadline)
 	defer func() {
 		for _, handle := range handles {
 			result = errors.Join(result, windows.CloseHandle(handle))
@@ -230,26 +230,24 @@ type buildToolsQueryCapture struct {
 
 // Query only the private job, never a machine-wide PID/name inventory. The fixed
 // buffer bounds this compiler inspection; overflow is an error, not truncation.
-func captureBuildToolsQueryProcesses(job windows.Handle) ([]windows.Handle, buildToolsQueryCapture, error) {
+func captureBuildToolsQueryProcesses(job windows.Handle, deadline time.Time) ([]windows.Handle, buildToolsQueryCapture, error) {
 	before, err := readBuildToolsJobAccounting(job)
 	if err != nil {
 		return nil, buildToolsQueryCapture{Before: before}, err
 	}
-	return captureBuildToolsQueryProcessesAfterAccounting(job, before)
+	return captureBuildToolsQueryProcessesAfterAccounting(job, before, deadline)
 }
 
 // Accounting and the PID list are separate snapshots. An earlier Active count
 // may include a member that has since exited; only the list's own counts prove
 // completeness. The lifetime Total is checked again after exact HANDLE waits.
-func captureBuildToolsQueryProcessesAfterAccounting(job windows.Handle, before buildToolsJobAccounting) ([]windows.Handle, buildToolsQueryCapture, error) {
+func captureBuildToolsQueryProcessesAfterAccounting(job windows.Handle, before buildToolsJobAccounting, deadline time.Time) ([]windows.Handle, buildToolsQueryCapture, error) {
 	capture := buildToolsQueryCapture{Before: before}
-	var members buildToolsJobMembers
-	if err := queryBuildToolsJobInformation(job, windows.JobObjectBasicProcessIdList, unsafe.Pointer(&members), uint32(unsafe.Sizeof(members))); err != nil {
-		return nil, capture, fmt.Errorf("capture Build Tools inspection members: %w", err)
-	}
-	if members.Listed > uint32(len(members.PIDs)) || members.Listed != members.Assigned {
-		after, afterErr := readBuildToolsJobAccounting(job)
-		return nil, capture, fmt.Errorf("Build Tools inspection membership changed during capture; assigned=%d listed=%d capacity=%d before_capture(total=%d active=%d terminated=%d) after_capture(total=%d active=%d terminated=%d error=%v)", members.Assigned, members.Listed, len(members.PIDs), before.Total, before.Active, before.Terminated, after.Total, after.Active, after.Terminated, afterErr)
+	members, err := completeBuildToolsQueryMembers(deadline, func(members *buildToolsJobMembers) error {
+		return queryBuildToolsJobInformation(job, windows.JobObjectBasicProcessIdList, unsafe.Pointer(members), uint32(unsafe.Sizeof(*members)))
+	})
+	if err != nil {
+		return nil, capture, err
 	}
 	handles := make([]windows.Handle, 0, members.Listed)
 	isProcessInJob := windows.NewLazySystemDLL("kernel32.dll").NewProc("IsProcessInJob")
@@ -274,6 +272,30 @@ func captureBuildToolsQueryProcessesAfterAccounting(job windows.Handle, before b
 	}
 	capture.After, capture.AfterError = readBuildToolsJobAccounting(job)
 	return handles, capture, nil
+}
+
+// Windows can return a successful but short PID list while members exit, even
+// with ample buffer capacity. Only accept a complete snapshot. Re-query that
+// narrow state within the original shared reap deadline; never rebase the
+// lifetime accounting or retry API, capacity, PID or HANDLE failures.
+func completeBuildToolsQueryMembers(deadline time.Time, query func(*buildToolsJobMembers) error) (buildToolsJobMembers, error) {
+	var members buildToolsJobMembers
+	for attempts := 0; ; attempts++ {
+		if !time.Now().Before(deadline) {
+			return members, fmt.Errorf("Build Tools inspection membership remained incomplete within five seconds; attempts=%d assigned=%d listed=%d", attempts, members.Assigned, members.Listed)
+		}
+		members = buildToolsJobMembers{}
+		if err := query(&members); err != nil {
+			return members, fmt.Errorf("capture Build Tools inspection members: %w", err)
+		}
+		if members.Assigned > uint32(len(members.PIDs)) || members.Listed > members.Assigned {
+			return members, fmt.Errorf("invalid Build Tools inspection membership counts; assigned=%d listed=%d capacity=%d", members.Assigned, members.Listed, len(members.PIDs))
+		}
+		if members.Listed == members.Assigned && time.Now().Before(deadline) {
+			return members, nil
+		}
+		time.Sleep(min(time.Millisecond, max(0, time.Until(deadline))))
+	}
 }
 
 func terminateBuildToolsQueryProcesses(job windows.Handle, handles []windows.Handle, capture buildToolsQueryCapture, deadline time.Time) error {
