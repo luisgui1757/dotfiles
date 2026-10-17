@@ -1,4 +1,4 @@
-name: Build Tools membership capture diagnostic
+name: Build Tools process churn diagnostic
 
 on:
   workflow_dispatch:
@@ -8,7 +8,7 @@ permissions:
 
 jobs:
   fresh-windows-vendor:
-    name: Fresh Windows vendor (${{ matrix.recipe }})
+    name: Private Windows process churn
     runs-on: windows-2022
     timeout-minutes: 85
     strategy:
@@ -16,7 +16,7 @@ jobs:
       matrix:
         include:
           - recipe: Build-Tools
-            test: TestWindowsBuildToolsNativeOwnedLifecycle
+            test: TestWindowsBuildToolsCaptureChurnDiagnostic
             flag: DOTFILES_NATIVE_WINDOWS_BUILDTOOLS_INSTALL
     env:
       GOTOOLCHAIN: local
@@ -93,7 +93,14 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Native fixture compilation failed' }
           docker pull $env:WINDOWS_TEST_IMAGE
           if ($LASTEXITCODE -ne 0) { throw 'Pinned Windows test image unavailable' }
-      - name: Verify fresh install, update, repair and exact removal
+      - name: Observe process exit on the disposable Windows host
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $fixture = Join-Path $env:RUNNER_TEMP 'vendor-native'
+          & (Join-Path $fixture 'installer.test.exe') '-test.v' '-test.timeout=10m' '-test.run=^TestWindowsBuildToolsCaptureChurnDiagnostic$'
+          if ($LASTEXITCODE -ne 0) { throw 'Native host churn diagnostic failed' }
+      - name: Observe process exit in the pinned disposable Windows container
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
