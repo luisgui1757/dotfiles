@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "groups": {
+    "delivery": [
+      "helix",
+      "full-stop",
+      "full-send",
+      "sol-loop",
+      "second-opinion",
+      "setup-helix"
+    ],
+    "documents": [
+      "doc-view"
+    ],
+    "writing": [
+      "tldr",
+      "unslop"
+    ],
+    "all": [
+      "beast-ui",
+      "doc-view",
+      "frontend-design",
+      "full-send",
+      "full-stop",
+      "helix",
+      "impeccable",
+      "second-opinion",
+      "setup-helix",
+      "sol-loop",
+      "tldr",
+      "unslop"
+    ]
+  },
+  "skills": {
+    "beast-ui": {
+      "visibility": "public",
+      "requires": [
+        "impeccable"
+      ]
+    },
+    "doc-view": {
+      "visibility": "public",
+      "requires": [
+        "beast-ui",
+        "frontend-design",
+        "impeccable",
+        "tldr",
+        "unslop"
+      ]
+    },
+    "frontend-design": {
+      "visibility": "public",
+      "requires": []
+    },
+    "full-send": {
+      "visibility": "public",
+      "requires": [
+        "full-stop",
+        "helix"
+      ]
+    },
+    "full-stop": {
+      "visibility": "public",
+      "requires": [
+        "helix",
+        "sol-loop",
+        "tldr",
+        "unslop"
+      ]
+    },
+    "helix": {
+      "visibility": "public",
+      "requires": [
+        "setup-helix",
+        "sol-loop"
+      ]
+    },
+    "impeccable": {
+      "visibility": "public",
+      "requires": []
+    },
+    "second-opinion": {
+      "visibility": "public",
+      "requires": [
+        "helix"
+      ]
+    },
+    "setup-helix": {
+      "visibility": "public",
+      "requires": [
+        "helix"
+      ]
+    },
+    "sol-loop": {
+      "visibility": "public",
+      "requires": [
+        "helix"
+      ]
+    },
+    "tldr": {
+      "visibility": "public",
+      "requires": []
+    },
+    "unslop": {
+      "visibility": "public",
+      "requires": []
+    }
+  }
+}

@@ -18,6 +18,16 @@ if ($Specs.Count -eq 0) {
     throw "No Neovim spec files found under $SpecRoot."
 }
 
+# Specs must not observe or write personal editor data: a published
+# managed runtime under the real stdpath data changes plugin behavior.
+$Isolated = Join-Path ([System.IO.Path]::GetTempPath()) ('dotfiles-nvim-spec-' + [guid]::NewGuid())
+New-Item -ItemType Directory -Path $Isolated | Out-Null
+$PreviousXdg = @{}
+foreach ($Name in 'XDG_DATA_HOME', 'XDG_STATE_HOME', 'XDG_CACHE_HOME') {
+    $PreviousXdg[$Name] = [Environment]::GetEnvironmentVariable($Name, 'Process')
+    [Environment]::SetEnvironmentVariable($Name, (Join-Path $Isolated $Name), 'Process')
+}
+
 $Failures = 0
 $OriginalNativePreference = $PSNativeCommandUseErrorActionPreference
 try {
@@ -38,6 +48,10 @@ try {
     }
 } finally {
     $PSNativeCommandUseErrorActionPreference = $OriginalNativePreference
+    foreach ($Name in $PreviousXdg.Keys) {
+        [Environment]::SetEnvironmentVariable($Name, $PreviousXdg[$Name], 'Process')
+    }
+    Remove-Item -LiteralPath $Isolated -Recurse -Force -ErrorAction SilentlyContinue
 }
 
 if ($Failures -gt 0) {

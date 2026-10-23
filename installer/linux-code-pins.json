@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "pins": {
+    "amd64": {
+      "version": "1.141.0-1791276758",
+      "url": "https://vscode.download.prss.microsoft.com/dbazure/download/stable/2a59476c9bfcb90b3ddc372c36762471b7dfad1c/code_1.141.0-1791276758_amd64.deb",
+      "sha256": "d0ff4f7702957d897d2e06956f8d42a08250c5df8339de3bec8190e56f726277",
+      "size": 249220234,
+      "architecture": "amd64"
+    },
+    "arm64": {
+      "version": "1.141.0-1791276699",
+      "url": "https://vscode.download.prss.microsoft.com/dbazure/download/stable/2a59476c9bfcb90b3ddc372c36762471b7dfad1c/code_1.141.0-1791276699_arm64.deb",
+      "sha256": "873d5dac55b7cdb4f0af7172187ae3cc1709f6250331524ad41f1136589e62f2",
+      "size": 230777686,
+      "architecture": "arm64"
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "Version": "17.14.37710.0",
+  "Size": 4478032,
+  "SHA256": "985969f472caad75d993a5cb4c35a6a4271460cc12b343e2433b994d173aa990",
+  "URL": "https://download.visualstudio.microsoft.com/download/pr/bc92e2cb-33de-4a0c-995d-efa817f16b16/985969f472caad75d993a5cb4c35a6a4271460cc12b343e2433b994d173aa990/vs_BuildTools.exe",
+  "Components": [
+    "Microsoft.VisualStudio.Workload.VCTools",
+    "Microsoft.VisualStudio.Component.VC.Tools.x86.x64",
+    "Microsoft.VisualStudio.Component.Windows11SDK.26100"
+  ]
+}

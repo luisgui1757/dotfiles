@@ -1,0 +1,243 @@
+# Mac keyboard shortcuts on Linux (dotfiles "Mac keyboard shortcuts", xremap).
+#
+# A Mac-layout keyboard shared with a Mac reaches Linux with Cmd as Alt and
+# Option as Super. These rules make the same physical keys do what they do on
+# macOS:
+#   Cmd    -> Right Ctrl in apps: Cmd+C/V/X/Z/A/S/F/T/W/Q, Cmd+click, Cmd+Shift+T
+#             work natively. In terminals it gives the terminal's own shortcut.
+#   Option -> Alt: word movement in apps; Meta in terminals (fzf Alt-C,
+#             Neovim Alt-h/j/k/l), like Ghostty's macos-option-as-alt.
+#   Ctrl   -> unchanged: Ctrl+C still interrupts, Ctrl+Tab still changes tabs.
+# Navigation mirrors AeroSpace on the Mac (README "Navigation"): Option+1...9
+# and Option+Shift+1...9 send Super+digit and Super+Shift+digit, which switch to
+# and move a window to workspace 1...9 once GNOME is set up as the README shows
+# (setup never changes GNOME settings; without that, Ubuntu Dock uses them for
+# dock apps). Ctrl+Option+L/H moves to the next/previous window, and Option+Tab
+# stays Alt+Tab, where a quick tap returns to the previous app.
+#
+# Safety rules (checked by TestNativeMacKeyboardMappings):
+# - Rules apply only to windows xremap identifies. An unidentified window, for
+#   example on GNOME Wayland without xremap's Shell extension, keeps plain keys.
+# - In terminals every Cmd combination is mapped or swallowed: Cmd never sends a
+#   control character (Cmd+Z must not suspend, Cmd+D must not end the shell).
+# - Physical Right Alt (AltGr) and Right Super are untouched.
+
+# Reload once an update has finished writing the file, never a half-written one.
+config_watch_debounce_ms: 500
+
+modmap:
+  # Holding Cmd keeps GNOME's switcher open; releasing it picks the window.
+  - name: Finish switching when Cmd is released
+    mode: switching
+    remap:
+      Alt_L:
+        release: [{ release: Alt_L }, { set_mode: default }]
+  - name: Cmd and Option keys
+    application:
+      only: '/./'
+    remap:
+      Alt_L: Ctrl_R
+      Super_L: Alt_L
+
+keymap:
+  - name: Inside the app and window switcher
+    mode: switching
+    remap:
+      Ctrl_R-Tab: [{ press: Tab }, { release: Tab }]
+      Ctrl_R-Shift-Tab: [{ press: Shift_L }, { press: Tab }, { release: Tab }, { release: Shift_L }]
+      Ctrl_R-Grave: [{ press: Grave }, { release: Grave }]
+      Ctrl_R-Shift-Grave: [{ press: Shift_L }, { press: Grave }, { release: Grave }, { release: Shift_L }]
+      Ctrl_R-Left: [{ press: Left }, { release: Left }]
+      Ctrl_R-Right: [{ press: Right }, { release: Right }]
+      Ctrl_R-Esc: [{ press: Esc }, { release: Esc }]
+
+  - name: Desktop
+    application:
+      only: '/./'
+    remap:
+      # Cmd+Tab and Cmd+`: GNOME's application and window switchers.
+      Ctrl_R-Tab: [{ release: Ctrl_R }, { press: Alt_L }, { press: Tab }, { release: Tab }, { set_mode: switching }]
+      Ctrl_R-Shift-Tab: [{ release: Ctrl_R }, { press: Alt_L }, { press: Shift_L }, { press: Tab }, { release: Tab }, { release: Shift_L }, { set_mode: switching }]
+      Ctrl_R-Grave: [{ release: Ctrl_R }, { press: Alt_L }, { press: Grave }, { release: Grave }, { set_mode: switching }]
+      # Cmd+Space: search (GNOME Activities). Ctrl+Up: Mission Control.
+      Ctrl_R-Space: Super_L
+      Ctrl_L-Up: Super_L
+      # Ctrl+Left/Right: previous/next workspace (Spaces).
+      Ctrl_L-Left: Super-PageUp
+      Ctrl_L-Right: Super-PageDown
+      # Cmd+H / Cmd+M: hide/minimize the window. Ctrl+Cmd+Q: lock the screen.
+      Ctrl_R-H: Super-H
+      Ctrl_R-M: Super-H
+      Ctrl_L-Ctrl_R-Q: Super-L
+      # Cmd+Shift+3: full screenshot. Cmd+Shift+4 and 5: screenshot tool
+      # (area selection first).
+      Ctrl_R-Shift-KEY_3: Shift-SysRq
+      Ctrl_R-Shift-KEY_4: SysRq
+      Ctrl_R-Shift-KEY_5: SysRq
+
+  # Exact matches only, before the terminal rules: Cmd+digit keeps its meaning
+  # (Ghostty tab in a terminal, Ctrl+digit in apps), and Cmd+Option is not
+  # taken over. Option+Tab has no rule; it stays Alt+Tab.
+  - name: Navigation (AeroSpace on the Mac)
+    application:
+      only: '/./'
+    exact_match: true
+    remap:
+      # Option+1...9: workspace 1...9 (Super+digit, GNOME switch-to-workspace-N
+      # as the README sets it up; Ubuntu Dock app N otherwise).
+      Alt_L-KEY_1: Super-KEY_1
+      Alt_L-KEY_2: Super-KEY_2
+      Alt_L-KEY_3: Super-KEY_3
+      Alt_L-KEY_4: Super-KEY_4
+      Alt_L-KEY_5: Super-KEY_5
+      Alt_L-KEY_6: Super-KEY_6
+      Alt_L-KEY_7: Super-KEY_7
+      Alt_L-KEY_8: Super-KEY_8
+      Alt_L-KEY_9: Super-KEY_9
+      # Option+Shift+1...9: move the window to workspace 1...9 (Super+Shift+digit,
+      # GNOME move-to-workspace-N as the README sets it up).
+      Alt_L-Shift-KEY_1: Super-Shift-KEY_1
+      Alt_L-Shift-KEY_2: Super-Shift-KEY_2
+      Alt_L-Shift-KEY_3: Super-Shift-KEY_3
+      Alt_L-Shift-KEY_4: Super-Shift-KEY_4
+      Alt_L-Shift-KEY_5: Super-Shift-KEY_5
+      Alt_L-Shift-KEY_6: Super-Shift-KEY_6
+      Alt_L-Shift-KEY_7: Super-Shift-KEY_7
+      Alt_L-Shift-KEY_8: Super-Shift-KEY_8
+      Alt_L-Shift-KEY_9: Super-Shift-KEY_9
+      # Ctrl+Option+L / H: next / previous window (GNOME cycle-windows and
+      # cycle-windows-backward, Alt+Esc / Shift+Alt+Esc by default), like
+      # AeroSpace's focus right / left on the Mac.
+      Ctrl_L-Alt_L-L: Alt-Esc
+      Ctrl_L-Alt_L-H: Shift-Alt-Esc
+
+  - name: Terminals
+    application:
+      only: '/(?i)(^|\.)(com\.mitchellh\.ghostty|gnome-terminal(-server)?|org\.gnome\.(terminal|ptyxis|console)|kgx|konsole|org\.kde\.konsole|kitty|alacritty|xterm|uxterm|tilix|com\.gexperts\.tilix|org\.wezfurlong\.wezterm|foot|footclient|terminator|xfce4-terminal|urxvt)$/'
+    remap:
+      # Ghostty's Linux shortcuts for what Cmd does in Ghostty on the Mac.
+      Ctrl_R-C: C-Shift-C
+      Ctrl_R-V: C-Shift-V
+      Ctrl_R-A: C-Shift-A
+      Ctrl_R-T: C-Shift-T
+      Ctrl_R-N: C-Shift-N
+      Ctrl_R-W: C-Shift-W
+      Ctrl_R-Q: C-Shift-Q
+      Ctrl_R-F: C-Shift-F
+      Ctrl_R-D: C-Shift-O
+      Ctrl_R-Shift-D: C-Shift-E
+      Ctrl_R-Enter: C-Enter
+      Ctrl_R-Comma: C-Comma
+      Ctrl_R-Shift-Comma: C-Shift-Comma
+      Ctrl_R-Equal: C-Equal
+      Ctrl_R-Minus: C-Minus
+      Ctrl_R-KEY_0: C-KEY_0
+      Ctrl_R-KEY_1: M-KEY_1
+      Ctrl_R-KEY_2: M-KEY_2
+      Ctrl_R-KEY_3: M-KEY_3
+      Ctrl_R-KEY_4: M-KEY_4
+      Ctrl_R-KEY_5: M-KEY_5
+      Ctrl_R-KEY_6: M-KEY_6
+      Ctrl_R-KEY_7: M-KEY_7
+      Ctrl_R-KEY_8: M-KEY_8
+      Ctrl_R-KEY_9: M-KEY_9
+      Ctrl_R-Shift-LeftBrace: C-PageUp
+      Ctrl_R-Shift-RightBrace: C-PageDown
+      # Line editing, as Ghostty sends for Cmd+Left/Right/Backspace on the Mac.
+      Ctrl_R-Left: C-A
+      Ctrl_R-Right: C-E
+      Ctrl_R-Backspace: C-U
+      Ctrl_R-K: C-L
+      Ctrl_R-Shift-Left: []
+      Ctrl_R-Shift-Right: []
+      Ctrl_R-Shift-Backspace: []
+      # Option stays Alt in a terminal; the app rules below do not apply here.
+      Alt-Left: M-Left
+      Alt-Right: M-Right
+      Alt-Backspace: M-Backspace
+      Alt-Delete: M-Delete
+      # Every other Cmd combination does nothing, so it never reaches the shell
+      # as a control character.
+      Ctrl_R-B: []
+      Ctrl_R-E: []
+      Ctrl_R-G: []
+      Ctrl_R-I: []
+      Ctrl_R-J: []
+      Ctrl_R-L: []
+      Ctrl_R-O: []
+      Ctrl_R-P: []
+      Ctrl_R-R: []
+      Ctrl_R-S: []
+      Ctrl_R-U: []
+      Ctrl_R-X: []
+      Ctrl_R-Y: []
+      Ctrl_R-Z: []
+      Ctrl_R-Up: []
+      Ctrl_R-Down: []
+      Ctrl_R-LeftBrace: []
+      Ctrl_R-RightBrace: []
+      Ctrl_R-Backslash: []
+      Ctrl_R-Slash: []
+      Ctrl_R-Semicolon: []
+      Ctrl_R-Apostrophe: []
+      Ctrl_R-Dot: []
+      Ctrl_R-Esc: []
+      Ctrl_R-Delete: []
+      Ctrl_R-Insert: []
+      Ctrl_R-Home: []
+      Ctrl_R-End: []
+      Ctrl_R-PageUp: []
+      Ctrl_R-PageDown: []
+      Ctrl_R-102nd: []
+      Ctrl_R-F1: []
+      Ctrl_R-F2: []
+      Ctrl_R-F3: []
+      Ctrl_R-F4: []
+      Ctrl_R-F5: []
+      Ctrl_R-F6: []
+      Ctrl_R-F7: []
+      Ctrl_R-F8: []
+      Ctrl_R-F9: []
+      Ctrl_R-F10: []
+      Ctrl_R-F11: []
+      Ctrl_R-F12: []
+
+  - name: File managers
+    application:
+      only: '/(?i)(^|\.)(org\.gnome\.nautilus|nautilus|nemo|thunar|org\.kde\.dolphin|dolphin|pcmanfm)$/'
+    remap:
+      # Cmd+Backspace: move to trash, as in Finder.
+      Ctrl_R-Backspace: Delete
+
+  - name: Browsers
+    application:
+      only: '/(?i)(^|\.)(zen|firefox|firefox-esr|librewolf|google-chrome|chromium|chromium-browser|brave-browser|microsoft-edge|vivaldi-stable)$/'
+    remap:
+      # Cmd+[ and Cmd+]: back and forward.
+      Ctrl_R-LeftBrace: M-Left
+      Ctrl_R-RightBrace: M-Right
+
+  - name: Apps
+    application:
+      only: '/./'
+    remap:
+      # Cmd+Option+arrows and Cmd+Shift+[ ]: previous/next tab.
+      Ctrl_R-Alt-Up: C-PageUp
+      Ctrl_R-Alt-Left: C-PageUp
+      Ctrl_R-Alt-Down: C-PageDown
+      Ctrl_R-Alt-Right: C-PageDown
+      Ctrl_R-Shift-LeftBrace: C-PageUp
+      Ctrl_R-Shift-RightBrace: C-PageDown
+      # Cmd+arrows: line and document start/end (Shift still selects).
+      Ctrl_R-Left: Home
+      Ctrl_R-Right: End
+      Ctrl_R-Up: C-Home
+      Ctrl_R-Down: C-End
+      # Cmd+Backspace / Cmd+Delete: delete to line start / end.
+      Ctrl_R-Backspace: [Shift-Home, Backspace]
+      Ctrl_R-Delete: [Shift-End, Delete]
+      # Option+arrows and Option+Backspace/Delete: by word.
+      Alt-Left: C-Left
+      Alt-Right: C-Right
+      Alt-Backspace: C-Backspace
+      Alt-Delete: C-Delete

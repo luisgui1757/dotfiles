@@ -1,39 +1,22 @@
 #!/usr/bin/env bash
-# Regression guard: fetches prune stale remote-tracking refs by default while
-# ~/.gitconfig remains a later, user-owned override layer.
+# Source-policy guard. The real publisher, Git precedence, global writes,
+# divergent pulls and removal are exercised by installer/git_settings_test.go.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 CONFIG="$REPO_ROOT/git/config"
-MIRROR="$REPO_ROOT/home/dot_config/git/config"
-TEST_HOME="$(mktemp -d)"
-trap 'rm -rf "$TEST_HOME"' EXIT
 
-fail() {
-    echo "FAIL: $*" >&2
+for key in fetch.prune pull.rebase; do
+    if [[ "$(git config --file "$CONFIG" --bool --get "$key")" != "true" ]]; then
+        echo "FAIL: managed Git defaults must enable $key" >&2
+        exit 1
+    fi
+done
+if git config --file "$CONFIG" --get-regexp '^(user\.|pull\.ff$)' >/dev/null; then
+    echo "FAIL: Git defaults must not set personal identity or an ff-only pull policy" >&2
     exit 1
-}
+fi
 
-cmp -s "$CONFIG" "$MIRROR" ||
-    fail "canonical Git config and chezmoi mirror differ"
-[[ "$(git config --file "$CONFIG" --bool --get fetch.prune)" == "true" ]] ||
-    fail "managed Git config must enable fetch.prune"
-
-mkdir -p "$TEST_HOME/.config/git"
-cp "$CONFIG" "$TEST_HOME/.config/git/config"
-managed_value="$(
-    env HOME="$TEST_HOME" XDG_CONFIG_HOME="$TEST_HOME/.config" GIT_CONFIG_NOSYSTEM=1 \
-        git -C "$TEST_HOME" config --bool --get fetch.prune
-)"
-[[ "$managed_value" == "true" ]] ||
-    fail "XDG Git config did not provide the fetch.prune default"
-
-git config --file "$TEST_HOME/.gitconfig" fetch.prune false
-override_value="$(
-    env HOME="$TEST_HOME" XDG_CONFIG_HOME="$TEST_HOME/.config" GIT_CONFIG_NOSYSTEM=1 \
-        git -C "$TEST_HOME" config --bool --get fetch.prune
-)"
-[[ "$override_value" == "false" ]] ||
-    fail "the user .gitconfig must remain the later override layer"
-
-echo "Git fetch pruning default and user override order OK"
+# home/dot_config/git/config remains immutable released migration evidence.
+# tests/bootstrap/legacy_inventory_test.py verifies its recorded release hash.
+echo "Git rebase and fetch-pruning defaults OK"

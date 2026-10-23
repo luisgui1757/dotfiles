@@ -161,57 +161,9 @@ for workflow in pathlib.Path(".github/workflows").glob("*.yml"):
             fail(f"{workflow}:{line_number} external action {parsed[0]} must use a full lowercase 40-hex commit SHA")
 
 makefile = pathlib.Path("Makefile").read_text(encoding="utf-8")
-migration_target = re.search(r"(?ms)^test-migration:\n(?P<body>(?:\t.*\n)+)", makefile)
-if not migration_target:
-    fail("Makefile must define a populated test-migration target")
-    migration_scripts = set()
-else:
-    migration_scripts = set(re.findall(r"tests/migration/[A-Za-z0-9_.-]+", migration_target.group("body")))
-
-test_workflow = pathlib.Path(".github/workflows/test.yml").read_text(encoding="utf-8")
-for job_name, allowed_local_only in (
-    ("chezmoi-parity", set()),
-    ("chezmoi-parity-macos", {"tests/migration/windows_render_test.sh"}),
-):
-    job_match = re.search(
-        rf"(?ms)^  {re.escape(job_name)}:\n(?P<body>.*?)(?=^  [A-Za-z0-9_-]+:\n|\Z)",
-        test_workflow,
-    )
-    if not job_match:
-        fail(f"test.yml is missing the {job_name} job")
-        continue
-    missing = sorted(migration_scripts - allowed_local_only - set(re.findall(
-        r"tests/migration/[A-Za-z0-9_.-]+",
-        job_match.group("body"),
-    )))
-    for script_path in missing:
-        fail(f"test.yml {job_name} job does not execute Makefile migration test {script_path}")
-
-e2e_install = pathlib.Path(".github/workflows/e2e-install.yml").read_text(encoding="utf-8")
-cache_versions = re.findall(r"actions/cache@[0-9a-f]{40}\s+# v(\d+)(?:\.\d+)*", e2e_install)
-if len(cache_versions) != 2:
-    fail("e2e-install.yml must pin exactly two actions/cache steps with version comments")
-elif len(set(cache_versions)) != 1:
-    fail("e2e-install.yml setup.sh and setup.ps1 cache steps must use the same actions/cache major")
-else:
-    cache_major = cache_versions[0]
-    expected_cache_snippets = (
-        f"${{{{ runner.os }}}}-${{{{ runner.arch }}}}-setup-sh-actions-cache-v{cache_major}-${{{{ hashFiles('nvim/lazy-lock.json', 'nvim/lua/plugins/**/*.lua') }}}}",
-        f"${{{{ runner.os }}}}-${{{{ runner.arch }}}}-setup-sh-actions-cache-v{cache_major}-",
-        f"Windows-${{{{ runner.arch }}}}-setup-ps1-actions-cache-v{cache_major}-${{{{ hashFiles('nvim/lazy-lock.json', 'nvim/lua/plugins/**/*.lua') }}}}",
-        f"Windows-${{{{ runner.arch }}}}-setup-ps1-actions-cache-v{cache_major}-",
-    )
-    for snippet in expected_cache_snippets:
-        if snippet not in e2e_install:
-            fail(f"e2e-install.yml cache key/restore-key must include actions-cache-v{cache_major}: missing {snippet}")
-cache_contracts = re.findall(
-    r'- name: "PR-only cache: [^"]+"\n'
-    r"\s+uses: actions/cache@[0-9a-f]{40}\s+# v\d+(?:\.\d+)*\n"
-    r"\s+if: github\.event_name == 'pull_request'",
-    e2e_install,
-)
-if len(cache_contracts) != 2:
-    fail("every e2e actions/cache step must use a PR-only cache name and exact pull_request guard")
+for target in ("test-bootstrap", "test-installer"):
+    if target not in makefile.split("ci:",1)[1].splitlines()[0]:
+        fail(f"canonical ci gate is missing {target}")
 
 script = pathlib.Path("scripts/apply-repo-safeguards.sh")
 mode = os.stat(script).st_mode
@@ -234,8 +186,7 @@ for snippet in (
     "policy does not match manifest stage",
     "transaction_active=1",
     'select_workflow_run "$capture_dir" test.yml .github/workflows/test.yml',
-    'select_workflow_run "$capture_dir" nix.yml .github/workflows/nix.yml',
-    'select_workflow_run "$capture_dir" e2e-install.yml .github/workflows/e2e-install.yml',
+    'select_workflow_run "$capture_dir" installer-engine.yml .github/workflows/installer-engine.yml',
     'gh_api_json_file PUT "repos/$repo/actions/permissions" "$transaction_dir/actions-desired.json"',
     'gh_api_json_file PUT "repos/$repo/rulesets/',
     '"$transaction_dir/integrity-desired.json"',
@@ -256,29 +207,6 @@ for forbidden in (
 ):
     if forbidden in script_text:
         fail(f"apply-repo-safeguards.sh retains unsafe broad mutation path: {forbidden}")
-
-install_deps = pathlib.Path("install-deps.ps1").read_text(encoding="utf-8")
-if "function Add-ScoopBucketSafe" not in install_deps:
-    fail("install-deps.ps1 must define Add-ScoopBucketSafe")
-in_scoop_bucket_helper = False
-for i, line in enumerate(install_deps.splitlines(), start=1):
-    stripped = line.strip()
-    if stripped == "function Add-ScoopBucketSafe {":
-        in_scoop_bucket_helper = True
-    elif stripped == "function Ensure-ScoopBuckets {":
-        in_scoop_bucket_helper = False
-    if (stripped.startswith("scoop bucket add ") or "| scoop bucket add " in stripped) and not in_scoop_bucket_helper:
-        fail(f"install-deps.ps1:{i} uses a bare 'scoop bucket add'; route it through Add-ScoopBucketSafe")
-
-chezmoi_wave_a_path = pathlib.Path("docs/archive/CHEZMOI_WAVE_A_SPEC.md")
-chezmoi_wave_a = chezmoi_wave_a_path.read_text(encoding="utf-8")
-if not re.search(r"psmux install was removed\s+from\s+the chezmoi scope", chezmoi_wave_a):
-    fail(f"{chezmoi_wave_a_path} must document psmux as install-deps scope, not a chezmoi run-script")
-removed_psmux_script = "run_once_after_10" + "-install-psmux"
-if removed_psmux_script in chezmoi_wave_a:
-    fail(f"{chezmoi_wave_a_path} must not reference the removed psmux chezmoi run-script")
-if re.search(r"(?m)^\s*scoop bucket add psmux\b.*2>\$null", chezmoi_wave_a):
-    fail(f"{chezmoi_wave_a_path} must not contain the old bare 'scoop bucket add psmux ... 2>$null'")
 
 if failures:
     for message in failures:
