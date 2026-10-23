@@ -42,7 +42,7 @@ func TestCapabilityCategoriesFollowPlatformAvailability(t *testing.T) {
 				t.Fatal("categorization changed selectable tools")
 			}
 			for id, want := range map[string]bool{
-				"zsh": target.OS != "windows", "powershell": target.OS == "windows",
+				"zsh": target.OS != "windows", "zsh-handoff": target.OS != "windows", "powershell": target.OS == "windows",
 				"aerospace": target.OS == "darwin", "tmux": target.OS != "windows",
 				"windows-terminal": target.OS == "windows",
 				"openwhispr":       target.OS == "darwin" || target.OS == "linux" && target.Arch == "amd64",
@@ -55,7 +55,7 @@ func TestCapabilityCategoriesFollowPlatformAvailability(t *testing.T) {
 			if terminal.Category != "Terminal apps" {
 				t.Fatal("Windows Terminal has the wrong category", terminal.Category)
 			}
-			for _, id := range []string{"zsh", "powershell", "starship", "lsd", "zoxide", "fzf", "ripgrep", "fd"} {
+			for _, id := range []string{"zsh", "zsh-handoff", "powershell", "starship", "lsd", "zoxide", "fzf", "ripgrep", "fd"} {
 				r, _ := c.Catalog.Resource(id)
 				if r.Category != "Shell essentials" {
 					t.Fatal("shell tool is outside its bulk selection", id, r.Category)

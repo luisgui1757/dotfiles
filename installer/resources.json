@@ -51,6 +51,22 @@
       "scope": "user"
     },
     {
+      "id": "zsh-handoff",
+      "name": "zsh from bash terminals",
+      "description": "Switch interactive bash terminals to zsh when the account's login shell is bash and cannot be changed",
+      "capability": true,
+      "category": "Shell essentials",
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "requires": [
+        "config.zsh",
+        "integration.zsh-handoff"
+      ],
+      "scope": "user"
+    },
+    {
       "id": "powershell",
       "name": "PowerShell 7",
       "description": "Interactive shell profile and fuzzy pickers",
@@ -1800,6 +1816,19 @@
       "scope": "machine",
       "retain": true,
       "replan_after": true
+    },
+    {
+      "id": "integration.zsh-handoff",
+      "name": "zsh handoff from interactive bash",
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "requires": [
+        "config.zsh",
+        "integration.shells"
+      ],
+      "scope": "user"
     },
     {
       "id": "integration.starship",

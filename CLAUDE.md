@@ -590,6 +590,20 @@ under `home/` and `shells/` exist only so old live links survive migration.
   personal overrides run afterward via the documented local profile hooks. Prove nested macOS
   login behavior with the actual system profile/path_helper and generated user
   profiles; sourcing an isolated environment fragment alone misses that boundary.
+- The optional `zsh-handoff` capability (owner request 2026-10-23, for directory
+  accounts whose bash login shell `chsh` cannot change) makes the shared init hand
+  an interactive terminal bash to the zsh setup observes (`/bin/zsh` on macOS,
+  APT `/usr/bin/zsh` on Linux) before any other initialization, exporting
+  `SHELL` so Herdr, tmux and Neovim terminals, which start `$SHELL`, follow. It
+  never acts for `bash -c`, a non-terminal stdin/stdout, an account whose
+  `SHELL` is already zsh, or a set `DOTFILES_ZSH_HANDOFF` (so `bash` typed in zsh
+  stays bash). macOS bash 3.2 exits on a failed exec while reading startup
+  files: keep `execfail` set around the exec only, then restore it, `SHELL` and
+  the marker so a broken zsh leaves a working bash. The receiving zsh sources
+  Ghostty's documented zsh integration once (marker 1 becomes 2), as Ghostty does
+  for a zsh it starts. The real login shell stays bash; never call chsh or edit
+  passwd/directory data. `TestZshHandoff*` drive a real interactive bash on a
+  pseudo-terminal with a recording zsh fixture.
 - PowerShell enables PSReadLine vi mode before binding keys. Its PATH setup works
   for noninteractive invocations, but interactive setup must reject batch,
   encoded/stdin, redirected, CI and unsupported-host invocation before creating

@@ -141,6 +141,15 @@ fi
 			environment += "export COPILOT_AUTO_UPDATE=false\n"
 		}
 		init := "case $- in *i*) ;; *) return 0 ;; esac\n[ \"${__DOTFILES_SHELL_READY-}\" != 1 ] || return 0\n"
+		// Hand off before any other initialization, so bash does no work that
+		// zsh repeats. The zsh is the one setup observes on each OS.
+		zsh := "/usr/bin/zsh"
+		if target.OS == "darwin" {
+			zsh = "/bin/zsh"
+		}
+		if selectedFeature("integration.zsh-handoff") {
+			init += zshHandoff(zsh)
+		}
 		if selectedFeature("config.zsh") || selectedFeature("integration.lsd") {
 			palette, err := source("ls-colors.sh")
 			if err != nil {
@@ -159,6 +168,9 @@ fi
 		if selectedFeature("config.zsh") {
 			local := shellLiteral(filepath.Join(folders.Home, ".zshrc.local"))
 			init += "if [ -n \"${ZSH_VERSION-}\" ] && [ -r " + local + " ]; then . " + local + "; fi\n"
+		}
+		if selectedFeature("integration.zsh-handoff") {
+			init += zshHandoffGhostty
 		}
 		init += "__DOTFILES_SHELL_READY=1\n"
 		envPath, initPath := filepath.Join(root, "env.sh"), filepath.Join(root, "init.sh")
@@ -253,6 +265,45 @@ fi
 	}
 	return nil
 }
+
+// A directory account's login shell can be bash with no way to change it
+// (owner report 2026-10-23). Interactive terminal bash hands over to zsh with
+// SHELL set, so Herdr, tmux and Neovim terminals, which start $SHELL, get zsh
+// too. Scripts, bash -c, an explicit bash inside zsh (the exported marker) and an
+// account whose shell is already zsh stay as they are. A failed exec leaves the
+// interactive bash running with its original SHELL: bash 3.2 exits on a failed
+// exec while reading startup files, so execfail is set for the exec only.
+func zshHandoff(zsh string) string {
+	z := shellLiteral(zsh)
+	return `if [ -n "${BASH_VERSION-}" ] && [ -z "${DOTFILES_ZSH_HANDOFF-}" ] && [ -z "${BASH_EXECUTION_STRING-}" ] && [ -t 0 ] && [ -t 1 ] && [ -x ` + z + ` ]; then
+	case ${SHELL-} in
+	*/zsh) ;;
+	*)
+		__dotfiles_had_shell=${SHELL+1}
+		__dotfiles_shell=${SHELL-}
+		if shopt -q execfail; then __dotfiles_execfail=; else __dotfiles_execfail=1; shopt -s execfail; fi
+		export DOTFILES_ZSH_HANDOFF=1 SHELL=` + z + `
+		if shopt -q login_shell; then exec ` + z + ` -l; else exec ` + z + `; fi
+		if [ -n "$__dotfiles_execfail" ]; then shopt -u execfail; fi
+		if [ -n "$__dotfiles_had_shell" ]; then SHELL=$__dotfiles_shell; else unset SHELL; fi
+		unset DOTFILES_ZSH_HANDOFF __dotfiles_had_shell __dotfiles_shell __dotfiles_execfail
+		;;
+	esac
+fi
+`
+}
+
+// Ghostty injects its integration only into the shell it starts, here bash.
+// Its zsh script documents sourcing after `exec zsh` and guards against a second
+// load. Only the zsh that received the handoff loads it, as on a zsh login shell;
+// the marker then stays set so a later bash is not handed over again.
+const zshHandoffGhostty = `if [ -n "${ZSH_VERSION-}" ] && [ "${DOTFILES_ZSH_HANDOFF-}" = 1 ]; then
+	export DOTFILES_ZSH_HANDOFF=2
+	if [ -n "${GHOSTTY_RESOURCES_DIR-}" ] && [ -r "$GHOSTTY_RESOURCES_DIR/shell-integration/zsh/ghostty-integration" ]; then
+		. "$GHOSTTY_RESOURCES_DIR/shell-integration/zsh/ghostty-integration"
+	fi
+fi
+`
 
 func bashLoginPath(home string) (string, error) {
 	for _, name := range []string{".bash_profile", ".bash_login", ".profile"} {

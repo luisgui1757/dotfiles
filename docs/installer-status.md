@@ -2786,3 +2786,12 @@ Linux Nix process scanner no longer treats pidfd readiness alone as exit: a race
 during a worker thread's exec let it omit a live store consumer, reproduced and
 fixed with a regression test (details in the review ledger).
 
+### 2026-10-23 — zsh from bash terminals
+
+PR #87 merged as `a64f804` after 27/27 checks on `33b61b7`. Follow-up capability
+`zsh-handoff` lets an account whose bash login shell cannot be changed (company
+directory accounts) use zsh in Ghostty, Herdr, tmux and SSH: interactive terminal
+bash hands over to zsh with `SHELL` exported. Verified on macOS (bash 3.2) and in a
+disposable Ubuntu 24.04 container (bash 5.2, real zsh); hosted proof runs on the
+pull request head. Details in the review ledger.
+

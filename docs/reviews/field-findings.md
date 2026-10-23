@@ -204,6 +204,17 @@ and **recheck** (what a reviewer or a future change must keep).
     requires an OpenWhispr window with that class. Existing installs need Update,
     then a restart of OpenWhispr. *Recheck:* every new private launcher declares
     its application's real window class.
+14. **Ghostty and Herdr opened bash, not zsh** (2026-10-23). *Cause:* the laptop
+    account is a company directory account (`getent passwd` gives `/bin/bash`;
+    no line in `/etc/passwd`), so `chsh` cannot change it and the released
+    installer never could. Ghostty starts the login shell, and Herdr, tmux and
+    Neovim terminals start `$SHELL`. A `.bashrc` that only runs `exec zsh` would
+    leave `SHELL=/bin/bash`, so every Herdr pane would still be bash.
+    *Resolution (owner choice):* the optional **zsh from bash terminals**
+    capability hands interactive terminal bash to zsh with `SHELL` exported.
+    Testing found that macOS bash 3.2 exits when `exec` fails during startup, so
+    the handoff keeps `execfail` set around it. *Recheck:* a broken zsh must leave
+    a working bash; the real login shell is never changed.
 
 ## macOS
 
@@ -323,4 +334,5 @@ and **recheck** (what a reviewer or a future change must keep).
 | Black screen after first login (Ubuntu 6) | Not reproduced |
 | Weekly agent pin PRs need a GitHub App | App configured 2026-10-22; first run after PR #87 merges |
 | Retire old Ghostty on the Mac (macOS 3) | Done; migration complete and `/nix` gone after the restart (2026-10-23) |
-| OpenWhispr Linux launcher class (Ubuntu 13) | Fixed; hosted Linux desktop proof runs on the pushed head; owner to Update |
+| OpenWhispr Linux launcher class (Ubuntu 13) | Fixed and confirmed on the laptop (2026-10-23) |
+| zsh on a directory account (Ubuntu 14) | Optional capability added; owner to select it on the laptop |
