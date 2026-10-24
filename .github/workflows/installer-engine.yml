@@ -105,6 +105,11 @@ jobs:
           go test -c -race -o "$RUNNER_TEMP/legacy-process.test" .
           sudo -n "$RUNNER_TEMP/legacy-process.test" -test.v -test.count=1 -test.timeout=2m \
             -test.run='^TestLegacyLinux(Process|Closed|Kernel|Reader(Reports|Refuses|Handle|Inspects|Worker))'
+      - name: Edit a root-owned file through sudoedit and the generated editor
+        if: runner.os != 'Windows'
+        env:
+          DOTFILES_TEST_SUDO_EDITOR: '1'
+        run: go test -v -count=1 -timeout 2m -run '^TestNativeSudoEditorUsesGeneratedNeovim$' .
       - name: Install, execute, check and remove the real pinned archive
         env:
           DOTFILES_TEST_ARCHIVES: '1'

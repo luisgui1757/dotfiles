@@ -604,6 +604,20 @@ under `home/` and `shells/` exist only so old live links survive migration.
   for a zsh it starts. The real login shell stays bash; never call chsh or edit
   passwd/directory data. `TestZshHandoff*` drive a real interactive bash on a
   pseudo-terminal with a recording zsh fixture.
+- Selected `config.nvim` makes Neovim the POSIX editor (owner request 2026-10-24):
+  the shared environment exports `EDITOR=nvim VISUAL=nvim` and `SUDO_EDITOR` as
+  the managed command's stable `current` path. sudoedit ignores PATH (Ubuntu's
+  `secure_path`, sudo-rs), so a bare name fails with "command not found". sudo
+  splits the value on whitespace (a backslash escape works) and sudo-rs fails
+  either way, so a path containing whitespace or a backslash omits `SUDO_EDITOR`.
+  Both run the editor as the user with HOME and XDG variables intact. sudo-rs
+  refuses a file below any user-writable path component (sudo checks only the
+  parent), so the native fixture uses a root-owned directory under `/etc`, not
+  `/tmp`. macOS has `sudo -e` but no `sudoedit` command. zsh picks the vi keymap
+  when the editor's name contains "vi"; managed zsh binds vi mode explicitly.
+  Local hooks run later and may override. Windows is unchanged.
+  `TestNeovimIsTheShellEditor` and the opted-in
+  `TestNativeSudoEditorUsesGeneratedNeovim` (hosted sudo-rs and macOS sudo) cover it.
 - PowerShell enables PSReadLine vi mode before binding keys. Its PATH setup works
   for noninteractive invocations, but interactive setup must reject batch,
   encoded/stdin, redirected, CI and unsupported-host invocation before creating

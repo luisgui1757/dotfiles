@@ -2795,3 +2795,12 @@ bash hands over to zsh with `SHELL` exported. Verified on macOS (bash 3.2) and i
 disposable Ubuntu 24.04 container (bash 5.2, real zsh); hosted proof runs on the
 pull request head. Details in the review ledger.
 
+
+### 2026-10-24 — Neovim as the shell and sudoedit editor
+
+PR #91 merged as `a6246ba` after 27/27 checks on `9d1a38a`. Owner request:
+selected Neovim exports `EDITOR`/`VISUAL=nvim` and `SUDO_EDITOR` as the managed
+nvim's full path on macOS and Linux, so `sudo -e /etc/hosts` opens the configured
+Neovim. Verified in disposable Ubuntu 24.04 (sudo 1.9.15) and 26.04 (sudo-rs
+0.2.13) containers with real sudo; hosted Linux and macOS sudo run on the pull
+request head. Details in the review ledger.

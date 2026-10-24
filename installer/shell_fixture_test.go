@@ -67,7 +67,8 @@ func TestWriteActiveShellFixtures(t *testing.T) {
 			if variant == "posix" {
 				// The handoff stays inert in these runners: they start zsh, or bash
 				// only for syntax checks, so both shells parse its generated code.
-				selected = append(selected, "integration.starship", "integration.fzf", "integration.zoxide", "integration.zsh-handoff")
+				selected = append(selected, "integration.starship", "integration.fzf", "integration.zoxide", "integration.zsh-handoff", "config.nvim")
+				add("tool.nvim", "bin/nvim", "nvim", "#!/bin/sh\nexit 0\n")
 				add("tool.starship", "bin/starship", "starship", "#!/bin/sh\nprintf '%s\\n' 'export DOTFILES_FIXTURE_STARSHIP=loaded'\n")
 				add("tool.zoxide", "bin/zoxide", "zoxide", "#!/bin/sh\nprintf '%s\\n' 'z() { :; }'\n")
 				add("tool.fzf", "bin/fzf", "fzf", `#!/bin/sh
