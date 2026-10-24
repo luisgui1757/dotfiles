@@ -68,13 +68,19 @@ Earlier Pi work below is historical; current evidence is recorded in installer s
 
 Owner addition, 2026-10-24: selected Neovim becomes the editor on macOS and
 Linux (`EDITOR`/`VISUAL=nvim`, `SUDO_EDITOR` as the managed nvim's full path), so
-`sudo -e /etc/hosts` opens the configured Neovim. DONE in the follow-up pull
-request after PR #91; hosted proof on its head.
+`sudo -e /etc/hosts` opens the configured Neovim. DONE in PR #92 (`9ec6a9b`);
+the hosted sudo proof passed on macOS and Ubuntu 26.04.
+
+Field fixes, 2026-10-24: the APT package-list refresh is plain `apt-get update`
+(owner decision), so a source that only warns no longer stops setup, and a failed
+refresh reports APT's output once with the fix; a profile block at the top of a
+file survives Neovim's formatter, and the marker error names the file (see field
+findings, Ubuntu 16 and 17).
 
 Owner addition, 2026-10-23: optional "zsh from bash terminals" for accounts
 whose bash login shell cannot be changed (company directory accounts). Interactive
 terminal bash hands over to zsh with `SHELL` set, so Ghostty, Herdr, tmux and SSH
-open zsh. DONE in the follow-up pull request after PR #87; hosted proof on its head.
+open zsh. DONE in PR #91 (`a6246ba`).
 
 Owner additions, 2026-10-22: Kiro CLI on macOS/Linux (Windows not offered: Kiro
 ships it there only as an MSI installer; revisit if Kiro publishes a plain archive),

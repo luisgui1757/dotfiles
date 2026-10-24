@@ -224,6 +224,36 @@ and **recheck** (what a reviewer or a future change must keep).
     breaks sudo-rs even when escaped; and that sudo-rs refuses any file below a
     user-writable directory such as `/tmp`. *Recheck:* `sudo -e /etc/hosts`
     opens your configured nvim; macOS has no `sudoedit` command.
+16. **Setup stopped on an unrelated APT source with an expired key** (2026-10-24).
+    *Symptom:* resuming an interrupted clangd install, the package-list refresh
+    failed with `EXPKEYSIG B8AC39B0876D807E` for the OneDrive client's openSUSE
+    repository, and the failure report printed APT's output twice more after the
+    live copy. *Cause:* the repository's key had been extended upstream (now
+    expiring 2028-12-18), but the laptop still had the expired copy. The installer
+    refreshes with `apt-get -o APT::Update::Error-Mode=any update`. In a disposable
+    Ubuntu 24.04 container, plain `apt-get update` only warned (exit 0) about a
+    signature failure on a source with earlier verified lists, while that mode
+    exited 100. The repeat came from the APT driver appending the output to a
+    worker error that already ended with it. *Resolution:* the owner refreshed the
+    key; the report shows the output once and says to fix or disable the failing
+    source, then resume. By owner decision the refresh is now plain `apt-get
+    update`, so such a warning no longer stops setup; saved strict refresh
+    commands stay valid and re-run unchanged.
+    `TestLinuxAPTFailedRefreshExplainsItsSourceOnceAndResumes` and
+    `TestLinuxAPTRefreshIsPlainAndSavedStrictRefreshStaysValid` fail on the
+    previous code. *Recheck:* a refresh error (not a warning) still stops setup.
+17. **Saving `.zshrc` in Neovim stopped setup** (2026-10-24). *Symptom:* every
+    tool waited on `integration.shells: profile block markers were edited`,
+    without naming a file. *Cause:* `~/.zshrc` was created by setup, so its block
+    opened the file with an empty first line. The owner added a line in Neovim,
+    and saving ran shfmt (Conform formats zsh on save), which drops a file's
+    leading blank lines; the managed shfmt v3.14.1 does so with or without the zsh
+    dialect. The parser needed a newline before the start marker. *Resolution:*
+    the owner restored the empty line; a block whose start marker opens the file
+    (after any BOM) is now recognized as the block that was written, and the error
+    names the file. `TestProfileBlockOpeningTheFileSurvivesFormatterAndLifecycle`
+    fails on the previous parser. *Recheck:* setup-created `.zshenv`, `.zprofile`
+    and `.zshrc` start with the block; text before a marker is still refused.
 
 ## macOS
 
@@ -341,8 +371,10 @@ and **recheck** (what a reviewer or a future change must keep).
 | Obsidian portable build on Linux (Ubuntu 9) | Proven on amd64 and arm64 (cec98fb); owner to update |
 | Slow Windows inspection (Windows 8) | Unmeasured |
 | Black screen after first login (Ubuntu 6) | Not reproduced |
-| Weekly agent pin PRs need a GitHub App | App configured 2026-10-22; workflow on main since PR #87, not yet run (2026-10-24) |
+| Weekly agent pin PRs need a GitHub App | Working: the App opened PR #93 (agent CLI pins), merged as `b723e97` (2026-10-24) |
 | Retire old Ghostty on the Mac (macOS 3) | Done; migration complete and `/nix` gone after the restart (2026-10-23) |
 | OpenWhispr Linux launcher class (Ubuntu 13) | Fixed and confirmed on the laptop (2026-10-23) |
-| zsh on a directory account (Ubuntu 14) | Merged in PR #91 (`a6246ba`); owner to select it on the laptop |
-| Neovim as the sudoedit editor (Ubuntu 15) | Added in the follow-up PR; owner to apply with Ubuntu 14 |
+| zsh on a directory account (Ubuntu 14) | Merged in PR #91 (`a6246ba`); applied on the laptop (2026-10-24) |
+| Neovim as the sudoedit editor (Ubuntu 15) | Merged in PR #92 (`9ec6a9b`); hosted sudo proof passed on macOS and Ubuntu 26.04 (`a9cfa40`); applied on the laptop (2026-10-24) |
+| Expired third-party APT key stopped setup (Ubuntu 16) | Owner refreshed the key (2026-10-24); report fixed and refresh made plain `apt-get update` (owner decision) in the follow-up PR |
+| Block at the top of `.zshrc` after a Neovim save (Ubuntu 17) | Owner restored the line (2026-10-24); parser fixed in the follow-up PR |

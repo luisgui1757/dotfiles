@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -92,6 +93,82 @@ func TestProfileInstallUpdateAndRemovePreserveOutsideEdits(t *testing.T) {
 	got, err := os.ReadFile(path)
 	if err != nil || string(got) != original+"# later user edit\r\n" {
 		t.Fatalf("outside edits were changed: %q %v", got, err)
+	}
+}
+
+func TestProfileEditedMarkersNameTheirFile(t *testing.T) {
+	c, _, path := profileController(t)
+	writeConfigFixture(t, path, "# personal\n")
+	dispatchApproved(t, c, Request{Schema: 1, Mode: "apply", Selected: []string{"test"}})
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	finish := []byte("# <<< dotfiles:profile.test <<<")
+	if err := os.WriteFile(path, bytes.Replace(data, finish, append(finish, " edited"...), 1), 0600); err != nil {
+		t.Fatal(err)
+	}
+	check, err := c.Dispatch(context.Background(), Request{Schema: 1, Mode: "check"})
+	if report := fmt.Sprintf("%+v", check); err != nil || check.Status == "ready" || !strings.Contains(report, path+": profile.test: profile block markers were edited") {
+		t.Fatal("edited markers did not name their file", report, err)
+	}
+}
+
+func TestProfileBlockOpeningTheFileMayLoseOnlyItsLeadingNewline(t *testing.T) {
+	for _, bom := range [][]byte{nil, {0xef, 0xbb, 0xbf}, {0xff, 0xfe}, {0xfe, 0xff}} {
+		for _, nl := range []string{"\n", "\r\n"} {
+			encode, _, err := profileEncoding(bom)
+			if err != nil {
+				t.Fatal(err)
+			}
+			block := encode(nl + "# >>> dotfiles:profile.test >>>" + nl + "# script" + nl + "# <<< dotfiles:profile.test <<<" + nl)
+			opening := block[len(encode(nl)):]
+			personal := encode("# personal" + nl)
+			formatted := append(append(bytes.Clone(bom), opening...), personal...)
+			content, got, err := replaceProfileBlock(formatted, "profile.test", nil)
+			if err != nil || !bytes.Equal(got, block) || !bytes.Equal(content, append(bytes.Clone(bom), personal...)) {
+				t.Fatalf("%x %q: opening block was not recognized as written: %q %q %v", bom, nl, got, content, err)
+			}
+			edited := append(append(append(bytes.Clone(bom), encode("x")...), opening...), personal...)
+			if _, _, err := replaceProfileBlock(edited, "profile.test", nil); err == nil || !strings.Contains(err.Error(), "markers were edited") {
+				t.Fatalf("%x %q: text before the opening marker was accepted: %v", bom, nl, err)
+			}
+		}
+	}
+}
+
+func TestProfileBlockOpeningTheFileSurvivesFormatterAndLifecycle(t *testing.T) {
+	c, d, path := profileController(t)
+	dispatchApproved(t, c, Request{Schema: 1, Mode: "apply", Selected: []string{"test"}})
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	marker := []byte("# >>> dotfiles:profile.test >>>")
+	at := bytes.Index(data, marker)
+	opening := bytes.TrimSuffix(bytes.TrimSuffix(data[:at], []byte("\n")), []byte("\r"))
+	if at < 0 || len(opening) == at || len(bytes.TrimPrefix(opening, []byte{0xef, 0xbb, 0xbf})) != 0 {
+		t.Fatalf("fixture block does not open a new profile: %q", data)
+	}
+	// shfmt, which Neovim runs on save, drops a file's leading blank lines.
+	formatted := append(append(bytes.Clone(opening), data[at:]...), "# personal\n"...)
+	if err := os.WriteFile(path, formatted, 0600); err != nil {
+		t.Fatal(err)
+	}
+	check, err := c.Dispatch(context.Background(), Request{Schema: 1, Mode: "check"})
+	if err != nil || check.Status != "ready" {
+		t.Fatal("a formatter's removed leading line broke block ownership", check, err)
+	}
+	d.Targets["profile.test"][0].Script = "# second version"
+	dispatchApproved(t, c, Request{Schema: 1, Mode: "update"})
+	updated, err := os.ReadFile(path)
+	if err != nil || !bytes.Contains(updated, []byte("# second version")) || !bytes.HasSuffix(updated, []byte("# personal\n")) || bytes.Index(updated, marker) == len(opening) {
+		t.Fatalf("update did not rewrite the opening block in place: %q %v", updated, err)
+	}
+	dispatchApproved(t, c, Request{Schema: 1, Mode: "apply", Selected: []string{}})
+	removed, err := os.ReadFile(path)
+	if err != nil || string(removed) != string(opening)+"# personal\n" {
+		t.Fatalf("removal did not leave only the personal bytes: %q %v", removed, err)
 	}
 }
 

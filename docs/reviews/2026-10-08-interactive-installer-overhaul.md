@@ -14090,3 +14090,76 @@ install, update and removal on every target, and the field findings show
 real-machine problems (IT AppArmor policy, a directory account, window classes)
 that a clean VM would not have shown. Reboots, first-time permission grants and
 visual checks stay manual evidence from the owner's own machines.
+
+## 2026-10-24 — APT refresh report and profile blocks after formatting
+
+PR #92 merged as `9ec6a9b` after 27/27 checks on its final head `a9cfa40`.
+`TestNativeSudoEditorUsesGeneratedNeovim` passed in core ubuntu-26.04,
+ubuntu-26.04-arm and macos-26, the first run against Apple's sudo. The weekly
+agent pin workflow, through the owner's GitHub App, opened PR #93, merged as
+`b723e97`; Renovate PR #89 merged as `d632e80`.
+
+Field report (Ubuntu laptop): setup's menu resumed an interrupted clangd APT
+operation whose saved refresh had no recorded result. The re-dispatched
+`apt-get -o APT::Update::Error-Mode=any update` exited 100: the OneDrive client's
+openSUSE repository returned `EXPKEYSIG B8AC39B0876D807E`. The key served at
+`download.opensuse.org/.../xUbuntu_24.04/Release.key` today is the same key with
+its expiry extended to 2028-12-18, so re-importing it fixes the machine. The
+report showed APT's output three times: once live (by design) and twice in the
+failure report. `LinuxAPTDriver.mutationError` appended `nativeDiagnostic` to a
+worker `nativeCommandError` whose message already ended with that same tail.
+
+Probe in a disposable `ubuntu:24.04` container: with verified lists from an
+earlier successful update present, a signature failure on that source made plain
+`apt-get update` print warnings and exit 0, while `Error-Mode=any` exited 100. On
+a first fetch with no earlier lists, both exited 100 ("is not signed"). APT keeps
+using only the previously verified lists in the warning case.
+
+Change: the worker's failure message is built by `nativeReply.failure()`, which
+the APT test fixture now also uses, so tests see the production error shape.
+`mutationError` skips its own tail for a `nativeCommandError` and, for a refresh,
+says to fix or disable the source named in the E: lines, then resume.
+`TestLinuxAPTFailedRefreshExplainsItsSourceOnceAndResumes` failed on the previous
+driver (tail twice, no guidance) and passes; it also proves that resuming after
+the source is fixed refreshes again and installs.
+
+Owner decision (same day, on recommendation): the refresh drops `Error-Mode=any`
+and runs plain `apt-get update`. A source that fails only with a warning (stale
+but verified lists, transient network errors) no longer stops setup; persistent
+errors still fail, and an unreachable package still fails at install. `validate`
+compares every saved command with the current recipe, so `command` reproduces the
+earlier strict arguments only when a saved refresh carries exactly them; new
+refresh commands, including later ones in an old operation, are plain.
+`TestLinuxAPTRefreshIsPlainAndSavedStrictRefreshStaysValid` rewrites a saved
+refresh to the strict recipe with its reply lost (the laptop's first failure):
+resume re-runs it unchanged, then installs; other saved arguments are refused
+before any command. It failed on the previous recipe ("not plain") and, with
+the compatibility branch removed, on the saved strict command ("differs from its
+trusted recipe"). The opted-in native APT fixture keeps its own strict refresh as
+test setup.
+
+Second field report the same day: after the key fix, every selected tool waited
+on `integration.shells: profile block markers were edited; preserve the file`,
+with no file named. A read-only listing on the laptop showed `~/.zshrc` with the
+start marker on line 1 and a personal `export SUDO_EDITOR=...` after the block;
+`.zshenv`, `.zprofile`, `.bashrc` and `.profile` were intact. Setup creates
+`.zshrc` with its block, whose leading newline makes the file start with an empty
+line. Conform runs shfmt on zsh files when saving, and the managed shfmt v3.14.1
+from the Mason lock drops leading blank lines, with or without
+`--language-dialect zsh` (reproduced on the Mac with that exact binary). The
+parser required a newline before the start marker. The owner restored the line
+and setup completed.
+
+Change: `profileBlockBounds` also accepts a start marker at the beginning of the
+file after any BOM (never in a saved UTF-16 fragment) and reports the missing
+newline, which `replaceProfileBlock` puts back into the returned block bytes.
+Fingerprints, ownership checks and removal therefore see the block as written,
+and an update or replacement writes the empty line again. Any other text before
+a marker is still "edited". The profile driver's observation and apply paths
+prefix block errors with the profile path. `TestProfileBlockOpeningTheFileSurvivesFormatterAndLifecycle`
+(Check, Update, Remove) failed on the previous parser with needs-action and
+passes; `TestProfileBlockOpeningTheFileMayLoseOnlyItsLeadingNewline` covers LF,
+CRLF, no BOM, UTF-8 and both UTF-16 BOMs and the refused prefix;
+`TestProfileEditedMarkersNameTheirFile` failed before the path prefix. One
+accepted edge: a restoration that reinserts a saved original whose own block had
+lost its newline writes the block back with it.

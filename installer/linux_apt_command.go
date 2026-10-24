@@ -10,6 +10,9 @@ import (
 	"strings"
 )
 
+// The refresh recipe saved before 2026-10-24.
+var linuxAPTStrictRefresh = []string{"-o", "APT::Update::Error-Mode=any", "update"}
+
 func (d *LinuxAPTDriver) command(intent linuxAPTIntent, index int, kind string, input []byte, arguments []string) (nativeCommand, error) {
 	id, err := digest(struct {
 		Operation string
@@ -26,7 +29,14 @@ func (d *LinuxAPTDriver) command(intent linuxAPTIntent, index int, kind string, 
 			return nativeCommand{}, errors.New("invalid APT repository refresh")
 		}
 		program = d.Location.APTGet
-		args = []string{"-o", "APT::Update::Error-Mode=any", "update"}
+		// Plain apt-get update (owner decision 2026-10-24): a source that fails
+		// only with a warning keeps its previously verified lists, so an expired
+		// third-party key no longer blocks every install; errors still fail.
+		// Saved strict commands stay valid and are re-run unchanged.
+		args = []string{"update"}
+		if slices.Equal(arguments, linuxAPTStrictRefresh) {
+			args = slices.Clone(linuxAPTStrictRefresh)
+		}
 	case "install":
 		if intent.Action == "remove" || len(input) != 0 {
 			return nativeCommand{}, errors.New("invalid APT installation command")
