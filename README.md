@@ -123,7 +123,7 @@ selects the rest. Children remain independently selectable. `a` selects all,
 | Category | Tools (where supported) |
 |---|---|
 | Editors | Neovim, VS Code |
-| Shell essentials | zsh on macOS/Linux or PowerShell 7 on Windows; Starship, lsd, zoxide, fzf, ripgrep, fd |
+| Shell essentials | zsh on macOS/Linux or PowerShell 7 on Windows; zsh from bash terminals; Starship, lsd, zoxide, fzf, ripgrep, fd |
 | Version control | Git, lazygit, GitHub CLI, gh-dash |
 | Terminal apps | Ghostty, Windows Terminal |
 | Terminal sessions | tmux, Herdr |
@@ -143,6 +143,7 @@ required dependencies are still resolved automatically in the preview.
 | Tailscale | CLI | ✓ | — |
 | Zen Browser | ✓ | ✓ | — |
 | zsh | ✓ | ✓ | — |
+| zsh from bash terminals | ✓ | ✓ | — |
 | PowerShell 7 | — | — | ✓ |
 | Starship | ✓ | ✓ | ✓ |
 | lsd | ✓ | ✓ | ✓ |
@@ -773,6 +774,19 @@ Use `~/.zprofile.local` for login-only zsh shells.
 Setup adds a marked block to existing profiles. Your text outside that block stays
 in place; removal restores the previous managed block. An existing conflicting
 configuration is shown for explicit adoption before replacement.
+
+**zsh from bash terminals** is for accounts whose login shell is bash and cannot
+be changed, such as company directory (LDAP/SSO) accounts where `chsh` has no
+local entry to edit. Ghostty, Herdr, tmux and Neovim's terminal start the login
+shell or `$SHELL`, so they open bash. With this option, an interactive bash on a
+terminal switches to zsh and sets `SHELL` to it, so those tools and SSH logins
+open zsh too. Scripts, `bash -c` and an account whose shell is already zsh are
+unchanged, and typing `bash` inside zsh still gives bash. If zsh cannot start,
+the terminal stays in bash. Your account's real login shell stays bash: `sudo -i`,
+`su -` and cron still use it. Functions and aliases that exist only in bash
+startup files (for example company proxy or tool setup in `/etc/bash.bashrc`)
+do not carry over; add zsh equivalents to `~/.zshrc.local`. Untick it to return
+to bash.
 
 Useful standalone tools:
 

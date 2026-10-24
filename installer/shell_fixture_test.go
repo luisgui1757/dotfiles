@@ -65,7 +65,9 @@ func TestWriteActiveShellFixtures(t *testing.T) {
 			add("plugin.fzf-tab", "fzf-tab.plugin.zsh", "", "fzf-tab-complete() { zle menu-select }\nzle -N fzf-tab-complete\n")
 			add("plugin.zsh-autosuggestions", "zsh-autosuggestions.zsh", "", "_zsh_autosuggest_start() { :; }\n")
 			if variant == "posix" {
-				selected = append(selected, "integration.starship", "integration.fzf", "integration.zoxide")
+				// The handoff stays inert in these runners: they start zsh, or bash
+				// only for syntax checks, so both shells parse its generated code.
+				selected = append(selected, "integration.starship", "integration.fzf", "integration.zoxide", "integration.zsh-handoff")
 				add("tool.starship", "bin/starship", "starship", "#!/bin/sh\nprintf '%s\\n' 'export DOTFILES_FIXTURE_STARSHIP=loaded'\n")
 				add("tool.zoxide", "bin/zoxide", "zoxide", "#!/bin/sh\nprintf '%s\\n' 'z() { :; }'\n")
 				add("tool.fzf", "bin/fzf", "fzf", `#!/bin/sh

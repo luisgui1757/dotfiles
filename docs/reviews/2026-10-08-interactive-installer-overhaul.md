@@ -14008,3 +14008,43 @@ with the script itself under 7 s. Failures:
 - core (macos-26) passed again on image 20261013, so the macOS prerequisite rule
   still awaits a run on the 20261021 image.
 
+Hosted result for `33b61b7` (2026-10-23): 27/27 green. The 120-second Build Tools
+bound held on windows-2025 20261021 (core reuse test 38.08 s; Neovim lifecycle
+passed). The exec stress test passed on Ubuntu amd64 and arm64, safely refusing 4
+to 7% of scans. core (macos-26) again ran on image 20261013, so the macOS
+prerequisite rule still has only its unit proof. The owner merged PR #87 as
+`a64f804` the same day.
+
+## 2026-10-23 — zsh from bash terminals (follow-up to PR #87)
+
+Owner report from the corporate Ubuntu laptop: Ghostty opened bash. `getent
+passwd` gives `/bin/bash` and `/etc/passwd` has no line for the account, so it is
+a directory account that `chsh` cannot change; IT will not change it. Herdr starts
+`$SHELL` (empty `default_shell` means `$SHELL`, then `/bin/sh`, per its v0.9.3
+template), as do tmux and Neovim terminals, so a `.bashrc` `exec zsh` alone would
+leave Herdr panes in bash. Owner choice: an optional capability, `zsh-handoff`
+("zsh from bash terminals", Shell essentials), requiring `config.zsh` and a new
+graph-only `integration.zsh-handoff`. The shared init hands an interactive bash on
+a terminal to the observed zsh (`/bin/zsh` on macOS, `/usr/bin/zsh` on Linux),
+exporting `SHELL` and `DOTFILES_ZSH_HANDOFF=1`, with `-l` when bash was a login
+shell. It does nothing for `bash -c`, non-terminal input or output, an account
+whose `SHELL` already ends in `/zsh`, or a set marker. The receiving zsh sources
+Ghostty's zsh integration when `GHOSTTY_RESOURCES_DIR` provides it (Ghostty 1.3.1
+documents this after `exec zsh`, and the script guards double loading), then sets
+the marker to 2 so nested shells skip it.
+
+The first failure test exposed that macOS bash 3.2 exits (status 1, "cannot
+execute binary file") when `exec` fails while reading startup files, despite the
+manual's interactive-shell rule; that would have closed the terminal. The handoff
+now enables `execfail` around the exec only and restores it, `SHELL` and the
+marker; `TestZshHandoffFailureKeepsBash` failed before that change and passes now.
+Tests: `TestZshHandoffFromInteractiveTerminalBash` drives a real interactive bash
+on a pseudo-terminal with a recording zsh fixture (a path with a space) for the
+handover, login, already-zsh, marker, `bash -c`, piped-input and unselected cases;
+`TestZshHandoffLoadsGhosttyIntegrationOnce` uses real zsh. They pass with bash
+3.2 on macOS and bash 5.2 in a disposable Ubuntu 24.04 container. An end-to-end
+run there with the real `/usr/bin/zsh` showed `bash -i` and `bash -l -i` ending in
+zsh 5.9 with `SHELL=/usr/bin/zsh`, `bash -c` staying bash, and `bash` typed inside
+the zsh staying bash. The shared POSIX shell fixture now selects the handoff, so
+shell lint parses it with both `bash -n` and `zsh -n`.
+

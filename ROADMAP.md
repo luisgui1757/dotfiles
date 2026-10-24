@@ -66,6 +66,11 @@ Code and Codex CLIs on every supported target. Reuse the existing pinned archive
 lifecycle, preserve personal agent state, and add native lifecycle coverage.
 Earlier Pi work below is historical; current evidence is recorded in installer status.
 
+Owner addition, 2026-10-23: optional "zsh from bash terminals" for accounts
+whose bash login shell cannot be changed (company directory accounts). Interactive
+terminal bash hands over to zsh with `SHELL` set, so Ghostty, Herdr, tmux and SSH
+open zsh. DONE in the follow-up pull request after PR #87; hosted proof on its head.
+
 Owner additions, 2026-10-22: Kiro CLI on macOS/Linux (Windows not offered: Kiro
 ships it there only as an MSI installer; revisit if Kiro publishes a plain archive),
 pinned with its self-update switched off, and Sentinel skills for an installed Kiro; and
