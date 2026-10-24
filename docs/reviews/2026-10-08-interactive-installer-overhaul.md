@@ -14048,3 +14048,45 @@ zsh 5.9 with `SHELL=/usr/bin/zsh`, `bash -c` staying bash, and `bash` typed insi
 the zsh staying bash. The shared POSIX shell fixture now selects the handoff, so
 shell lint parses it with both `bash -n` and `zsh -n`.
 
+
+## 2026-10-24 — Neovim as the shell and sudoedit editor
+
+PR #91 merged as `a6246ba` after 27/27 checks on its final head `9d1a38a`.
+
+Owner request: editing `/etc/hosts` on the Ubuntu laptop opened the system
+default editor. Setup never set an editor. Selected `config.nvim` now adds
+`export EDITOR=nvim VISUAL=nvim` to the shared `env.sh` and
+`export SUDO_EDITOR=<managed current/bin/nvim>`; Git sets no `core.editor`, so
+commit messages follow. Probes in disposable containers with a recording editor
+under the user's home:
+
+- Ubuntu 24.04, sudo 1.9.15p5: `EDITOR=<bare name>` on the user's PATH gives
+  "command not found" (sudoers `secure_path`); an absolute `SUDO_EDITOR` runs as
+  the user with HOME and XDG_CONFIG_HOME intact; a path with a space fails
+  unescaped and works backslash-escaped; a file in a root-owned directory under
+  `/tmp` is accepted.
+- Ubuntu 26.04, sudo-rs 0.2.13: absolute `SUDO_EDITOR` works the same way; a path
+  with a space fails escaped or not (falls back to `/usr/bin/vi`); a file below
+  any user-writable component, including `/tmp`, is refused ("cannot open a file
+  in a path writable by the user").
+- macOS 26 ships sudo 1.9.17p2 with `sudo -e` and no `sudoedit` command; not run
+  locally (it needs the owner's password), so the hosted macOS core job proves it.
+
+Hence: `SUDO_EDITOR` is omitted when the path contains whitespace or a backslash,
+and the native fixture creates its root-owned file under `/etc`.
+`TestNeovimIsTheShellEditor` sources the generated `env.sh` in bash and zsh
+(selected, unselected keeps personal values, whitespace path); it failed on the
+previous generator ("nano|nano|nano"). `TestNativeSudoEditorUsesGeneratedNeovim`
+(opt-in `DOTFILES_TEST_SUDO_EDITOR=1`, a new step in the Linux and macOS core
+jobs) runs real `sudo -n -e` through the generated environment and requires the
+edit written back, root ownership kept, and the editor run with the user's uid and
+HOME. It passed in both containers as an ordinary user and failed on the previous
+generator. The shared POSIX shell fixture now selects `config.nvim`, so shell lint
+and the zsh runners consume the new lines. Windows is unchanged.
+
+The owner also asked whether the earlier local VM rounds are still needed.
+Assessment given (no new decision recorded): hosted native jobs already cover
+install, update and removal on every target, and the field findings show
+real-machine problems (IT AppArmor policy, a directory account, window classes)
+that a clean VM would not have shown. Reboots, first-time permission grants and
+visual checks stay manual evidence from the owner's own machines.

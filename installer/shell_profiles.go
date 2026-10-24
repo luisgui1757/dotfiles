@@ -140,6 +140,19 @@ fi
 		if selectedFeature("tool.copilot") {
 			environment += "export COPILOT_AUTO_UPDATE=false\n"
 		}
+		// sudoedit ignores PATH (sudo's secure_path, sudo-rs), so SUDO_EDITOR
+		// names the managed nvim through its stable current link. sudo splits it
+		// on whitespace and sudo-rs accepts no escape: such a path is left out.
+		if selectedFeature("config.nvim") {
+			environment += "export EDITOR=nvim VISUAL=nvim\n"
+			nvim, err := archives.CommandPath("tool.nvim", "nvim")
+			if err != nil {
+				return err
+			}
+			if !strings.ContainsAny(nvim, " \t\\") {
+				environment += "export SUDO_EDITOR=" + shellLiteral(nvim) + "\n"
+			}
+		}
 		init := "case $- in *i*) ;; *) return 0 ;; esac\n[ \"${__DOTFILES_SHELL_READY-}\" != 1 ] || return 0\n"
 		// Hand off before any other initialization, so bash does no work that
 		// zsh repeats. The zsh is the one setup observes on each OS.

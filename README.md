@@ -716,6 +716,20 @@ Files format on `:w`. The timeout is 10 seconds. Use `:ConformInfo` to see which
 formatter is active if a save fails or times out; use `:wnf` only when you
 intentionally want one unformatted save.
 
+On macOS and Linux, selecting Neovim makes it your editor in new terminals: the
+managed shell environment sets `EDITOR` and `VISUAL` to `nvim` (Git commit
+messages, `crontab -e` and similar) and `SUDO_EDITOR` to the managed nvim's full
+path. Edit a root-owned file such as `/etc/hosts` with `sudo -e /etc/hosts`
+(Linux also has `sudoedit`; macOS does not). Your own nvim, configuration and
+plugins open a copy as your user, and sudo writes it back when you quit. Avoid
+`sudo nvim`: it runs Neovim as root without your configuration. sudoedit ignores
+PATH, hence the full path; if that path contains a space, `SUDO_EDITOR` is left
+unset and sudoedit uses its usual editor. Override any of these in
+`~/.zshrc.local` (or below the managed block in `.bashrc`). An editor whose name
+contains "vi" makes plain zsh start with vi key bindings; managed zsh uses vi mode
+anyway, so add `bindkey -e` to `~/.zshrc.local` only if you want emacs keys.
+Windows is unchanged.
+
 Config: `~/.config/nvim` on macOS/Linux and `%LOCALAPPDATA%\nvim` on
 Windows. Both point to this repo's `nvim/` directory. Windows data defaults to
 `%LOCALAPPDATA%\nvim-data`. Git limits repository roots separately from files;
