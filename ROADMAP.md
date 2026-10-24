@@ -66,6 +66,11 @@ Code and Codex CLIs on every supported target. Reuse the existing pinned archive
 lifecycle, preserve personal agent state, and add native lifecycle coverage.
 Earlier Pi work below is historical; current evidence is recorded in installer status.
 
+Owner addition, 2026-10-24: selected Neovim becomes the editor on macOS and
+Linux (`EDITOR`/`VISUAL=nvim`, `SUDO_EDITOR` as the managed nvim's full path), so
+`sudo -e /etc/hosts` opens the configured Neovim. DONE in the follow-up pull
+request after PR #91; hosted proof on its head.
+
 Owner addition, 2026-10-23: optional "zsh from bash terminals" for accounts
 whose bash login shell cannot be changed (company directory accounts). Interactive
 terminal bash hands over to zsh with `SHELL` set, so Ghostty, Herdr, tmux and SSH

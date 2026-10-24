@@ -215,6 +215,15 @@ and **recheck** (what a reviewer or a future change must keep).
     Testing found that macOS bash 3.2 exits when `exec` fails during startup, so
     the handoff keeps `execfail` set around it. *Recheck:* a broken zsh must leave
     a working bash; the real login shell is never changed.
+15. **`/etc/hosts` opened in a non-Neovim editor** (2026-10-24). *Cause:* setup
+    never set `EDITOR`, so sudoedit used the system default. *Resolution (owner
+    request):* selected Neovim exports `EDITOR`/`VISUAL=nvim` and `SUDO_EDITOR`
+    as the managed nvim's full path. Disposable Ubuntu containers showed that
+    sudoedit ignores PATH (sudo 1.9.15 `secure_path`, sudo-rs 0.2.13 on 26.04),
+    so a bare `nvim` there gives "command not found"; that a path with a space
+    breaks sudo-rs even when escaped; and that sudo-rs refuses any file below a
+    user-writable directory such as `/tmp`. *Recheck:* `sudo -e /etc/hosts`
+    opens your configured nvim; macOS has no `sudoedit` command.
 
 ## macOS
 
@@ -332,7 +341,8 @@ and **recheck** (what a reviewer or a future change must keep).
 | Obsidian portable build on Linux (Ubuntu 9) | Proven on amd64 and arm64 (cec98fb); owner to update |
 | Slow Windows inspection (Windows 8) | Unmeasured |
 | Black screen after first login (Ubuntu 6) | Not reproduced |
-| Weekly agent pin PRs need a GitHub App | App configured 2026-10-22; first run after PR #87 merges |
+| Weekly agent pin PRs need a GitHub App | App configured 2026-10-22; workflow on main since PR #87, not yet run (2026-10-24) |
 | Retire old Ghostty on the Mac (macOS 3) | Done; migration complete and `/nix` gone after the restart (2026-10-23) |
 | OpenWhispr Linux launcher class (Ubuntu 13) | Fixed and confirmed on the laptop (2026-10-23) |
-| zsh on a directory account (Ubuntu 14) | Optional capability added; owner to select it on the laptop |
+| zsh on a directory account (Ubuntu 14) | Merged in PR #91 (`a6246ba`); owner to select it on the laptop |
+| Neovim as the sudoedit editor (Ubuntu 15) | Added in the follow-up PR; owner to apply with Ubuntu 14 |
