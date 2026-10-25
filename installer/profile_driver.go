@@ -239,7 +239,7 @@ func (d *ProfileDriver) inspect(id string) (Observation, error) {
 		}
 		_, block, err := replaceProfileBlock(data, id, nil, d.JSONFields[id]...)
 		if err != nil {
-			return Observation{}, err
+			return Observation{}, fmt.Errorf("%s: %w", target.Path, err)
 		}
 		blockPresent, err := profileBlockPresent(id, block)
 		if err != nil {
@@ -460,7 +460,7 @@ func (d *ProfileDriver) Observe(ctx context.Context, r Resource, receipt Receipt
 			}
 			_, block, err := replaceProfileBlock(data, r.ID, nil, d.JSONFields[r.ID]...)
 			if err != nil {
-				return Observation{}, err
+				return Observation{}, fmt.Errorf("%s: %w", e.Path, err)
 			}
 			matches = matches && bytes.Equal(block, e.Block)
 		}
@@ -538,7 +538,7 @@ func (d *ProfileDriver) change(ctx context.Context, r Resource, action string, a
 		if fresh {
 			_, block, err := replaceProfileBlock(data, r.ID, nil, d.JSONFields[r.ID]...)
 			if err != nil {
-				return o, err
+				return o, fmt.Errorf("%s: %w", target.Path, err)
 			}
 			entry := profileBaselineEntry{Path: target.Path, Block: block, Absent: before.Kind == "absent"}
 			if entry.Absent {
@@ -559,12 +559,12 @@ func (d *ProfileDriver) change(ctx context.Context, r Resource, action string, a
 		if action != "remove" {
 			block, err = d.desiredBlock(data, r.ID, target)
 			if err != nil {
-				return o, err
+				return o, fmt.Errorf("%s: %w", target.Path, err)
 			}
 		}
 		content, _, err := replaceProfileBlock(data, r.ID, block, d.JSONFields[r.ID]...)
 		if err != nil {
-			return o, err
+			return o, fmt.Errorf("%s: %w", target.Path, err)
 		}
 		if r.ID == windowsTerminalResource {
 			_, block, err = replaceProfileBlock(content, r.ID, nil, d.JSONFields[r.ID]...)

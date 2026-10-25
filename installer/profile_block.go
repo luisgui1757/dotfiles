@@ -78,31 +78,50 @@ func markedProfileEncoding(data []byte, begin string) (func(string) []byte, bool
 // The leading newline belongs to the block. Removing a block from a file which
 // originally ended without a newline therefore restores the exact original.
 func profileBlock(data []byte, id string) (start, end int, err error) {
+	start, end, _, err = profileBlockBounds(data, id)
+	return start, end, err
+}
+
+// A block that opens its file can lose that leading newline: formatters drop a
+// file's leading blank lines (Neovim runs shfmt when saving a zsh profile).
+// The block is still found; missing is the lost newline, so the block's bytes
+// still equal the ones that were written.
+func profileBlockBounds(data []byte, id string) (start, end int, missing []byte, err error) {
 	if id == gitSettingsResource {
 		if err := validateGitEncoding(data); err != nil {
-			return 0, 0, err
+			return 0, 0, nil, err
 		}
 	}
 	if id == sentinelResource {
-		return sentinelBlock(data)
+		start, end, err = sentinelBlock(data)
+		return start, end, nil, err
 	}
 	if !resourceID.MatchString(id) {
-		return 0, 0, errors.New("invalid profile block identity")
+		return 0, 0, nil, errors.New("invalid profile block identity")
 	}
 	encode, fragment, err := markedProfileEncoding(data, "# >>> dotfiles:"+id+" >>>")
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, nil, err
 	}
 	begin, finish := "# >>> dotfiles:"+id+" >>>", "# <<< dotfiles:"+id+" <<<"
 	if bytes.Count(data, encode(begin)) == 0 && bytes.Count(data, encode(finish)) == 0 {
-		return -1, -1, nil
+		return -1, -1, nil, nil
 	}
 	if bytes.Count(data, encode(begin)) != 1 || bytes.Count(data, encode(finish)) != 1 {
-		return 0, 0, errors.New("profile block markers are duplicated or incomplete")
+		return 0, 0, nil, errors.New("profile block markers are duplicated or incomplete")
+	}
+	opening := 0
+	for _, bom := range [][]byte{{0xef, 0xbb, 0xbf}, {0xff, 0xfe}, {0xfe, 0xff}} {
+		if !fragment && bytes.HasPrefix(data, bom) {
+			opening = len(bom)
+		}
 	}
 	for _, nl := range []string{"\r\n", "\n"} {
 		left, right := encode(nl+begin+nl), encode(finish+nl)
-		start = bytes.Index(data, left)
+		start, missing = bytes.Index(data, left), nil
+		if start < 0 && !fragment && bytes.HasPrefix(data[opening:], encode(begin+nl)) {
+			start, missing, left = opening, encode(nl), encode(begin+nl)
+		}
 		if start < 0 {
 			continue
 		}
@@ -112,11 +131,11 @@ func profileBlock(data []byte, id string) (start, end int, err error) {
 		}
 		end = start + len(left) + closing + len(right)
 		if fragment && (start != 0 || end != len(data)) {
-			return 0, 0, errors.New("saved UTF-16 profile fragment must contain only its managed block")
+			return 0, 0, nil, errors.New("saved UTF-16 profile fragment must contain only its managed block")
 		}
-		return start, end, nil
+		return start, end, missing, nil
 	}
-	return 0, 0, errors.New("profile block markers were edited; preserve the file")
+	return 0, 0, nil, errors.New("profile block markers were edited; preserve the file")
 }
 
 func renderProfileBlock(data []byte, id, script string, fields ...string) ([]byte, error) {
@@ -177,7 +196,7 @@ func replaceProfileBlock(data []byte, id string, replacement []byte, fields ...s
 		}
 		return replaceJSONFields(data, fields, replacement)
 	}
-	start, end, err := profileBlock(data, id)
+	start, end, missing, err := profileBlockBounds(data, id)
 	if err != nil {
 		return nil, nil, fmt.Errorf("%s: %w", id, err)
 	}
@@ -195,5 +214,5 @@ func replaceProfileBlock(data []byte, id string, replacement []byte, fields ...s
 	}
 	result := append(bytes.Clone(data[:start]), replacement...)
 	result = append(result, data[end:]...)
-	return result, bytes.Clone(data[start:end]), nil
+	return result, append(bytes.Clone(missing), data[start:end]...), nil
 }

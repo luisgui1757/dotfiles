@@ -807,8 +807,15 @@ func (d *LinuxAPTDriver) mutationError(command linuxAPTCommand, err error) error
 		return errors.Join(err, readErr)
 	}
 	diagnostic := nativeDiagnostic(reply.Output)
+	var native *nativeCommandError
+	if errors.As(err, &native) {
+		diagnostic = "" // The worker's error already shows this output.
+	}
 	if strings.Contains(string(reply.Output), "sudo:") {
 		return fmt.Errorf("APT needs administrator authorization in the foreground; authorize sudo and retry the saved operation: %w%s", err, diagnostic)
+	}
+	if command.Kind == "refresh" {
+		return fmt.Errorf("APT could not refresh its package lists; fix or disable the source named in the E: lines (`sudo apt-get update` lists it too), then resume the saved operation: %w%s", err, diagnostic)
 	}
 	return fmt.Errorf("APT native command failed: %w%s", err, diagnostic)
 }

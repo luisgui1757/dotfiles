@@ -410,6 +410,13 @@ before replacement. Personal histories, sessions, project files and credentials
 are not uninstall targets. Interrupted operations keep a recovery journal and
 appear in the menu; do not delete state to force a retry.
 
+On Linux, setup refreshes APT's package lists before installing a package, the
+same way `sudo apt update` does. A source that fails with only a warning, such as
+a third-party repository whose signing key expired, keeps its older verified lists
+and setup continues. If the refresh fails with an error, fix or disable that
+source (`sudo apt update` names it), then run setup and choose **Resume
+interrupted operation**.
+
 Bash integration keeps the login profile chosen during setup. If you later create
 a higher-priority `.bash_profile` or `.bash_login`, Bash follows its usual
 precedence; the installer leaves that new personal file alone. Updates and removal

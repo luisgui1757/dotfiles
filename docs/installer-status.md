@@ -2804,3 +2804,17 @@ nvim's full path on macOS and Linux, so `sudo -e /etc/hosts` opens the configure
 Neovim. Verified in disposable Ubuntu 24.04 (sudo 1.9.15) and 26.04 (sudo-rs
 0.2.13) containers with real sudo; hosted Linux and macOS sudo run on the pull
 request head. Details in the review ledger.
+
+### 2026-10-24 — APT refresh report and profile blocks after formatting
+
+PR #92 merged as `9ec6a9b` after 27/27 checks on `a9cfa40`; its real sudoedit test
+passed on macOS 26 (Apple sudo) and Ubuntu 26.04 amd64/arm64 (sudo-rs). On the
+laptop, an unrelated APT source with an expired key stopped the package-list
+refresh, and the report repeated APT's output. The report now shows it once and
+says to fix or disable the failing source, then resume. By owner decision the
+refresh is now plain `apt-get update`, so a source that only warns no longer stops
+setup; saved strict refresh commands stay valid.
+Saving the setup-created `~/.zshrc` in Neovim let shfmt drop the empty line
+above the opening block, and setup then refused every tool. A block whose start
+marker opens the file is now recognized, and the marker error names the file.
+Details in the review ledger and field findings (Ubuntu 16 and 17).

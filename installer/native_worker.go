@@ -52,6 +52,11 @@ type nativeCommandError struct {
 
 func (err *nativeCommandError) Error() string { return err.Message }
 
+// The message already ends with the output's diagnostic tail.
+func (reply nativeReply) failure() error {
+	return &nativeCommandError{Message: fmt.Sprintf("native command failed: %s%s", reply.Error, nativeDiagnostic(reply.Output)), ExitCode: reply.ExitCode}
+}
+
 type nativeCommandRecord struct {
 	Schema  int          `json:"schema"`
 	Command string       `json:"command"`
@@ -324,7 +329,7 @@ func (client *nativeWorkerClient) run(ctx context.Context, request nativeCommand
 		}
 	}
 	if reply.Error != "" {
-		return reply.Output, &nativeCommandError{Message: fmt.Sprintf("native command failed: %s%s", reply.Error, nativeDiagnostic(reply.Output)), ExitCode: reply.ExitCode}
+		return reply.Output, reply.failure()
 	}
 	if reply.ExitCode == nil || *reply.ExitCode != 0 {
 		return reply.Output, errors.New("native worker returned an invalid successful result")

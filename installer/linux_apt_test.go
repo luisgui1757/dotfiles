@@ -22,7 +22,11 @@ type linuxAPTFixture struct {
 	partial        bool
 	refusedRemoval bool
 	lostReply      bool
+	failedRefresh  bool
+	commands       [][]string
 }
+
+const linuxAPTFixtureRefreshFailure = "E: Failed to fetch https://repository.invalid/InRelease  EXPKEYSIG fixture"
 
 func newLinuxAPTFixture(t *testing.T) *linuxAPTFixture {
 	t.Helper()
@@ -92,11 +96,15 @@ func (f *linuxAPTFixture) query(_ context.Context, privileged bool, program stri
 
 func (f *linuxAPTFixture) run(_ context.Context, command nativeCommand) ([]byte, error) {
 	f.runs++
+	f.commands = append(f.commands, slices.Clone(command.Arguments))
 	code, output := 0, []byte{}
 	if f.fail {
 		code, output = 1, []byte("sudo: a password is required")
 	} else if command.Arguments[len(command.Arguments)-1] == "update" {
 		// Repository metadata refresh has no native package mutation.
+		if f.failedRefresh {
+			code, output = 100, []byte(linuxAPTFixtureRefreshFailure)
+		}
 	} else if slices.Contains(command.Arguments, "-W") {
 		// Read-only verification completes an already absent removal root.
 	} else if slices.Contains(command.Arguments, "--remove") {
@@ -172,7 +180,7 @@ func (f *linuxAPTFixture) run(_ context.Context, command nativeCommand) ([]byte,
 	}
 	reply := nativeReply{ExitCode: &code, Output: output}
 	if code != 0 {
-		reply.Error = "exit status 1"
+		reply.Error = fmt.Sprintf("exit status %d", code)
 	}
 	hash, err := digest(command)
 	if err != nil {
@@ -186,7 +194,7 @@ func (f *linuxAPTFixture) run(_ context.Context, command nativeCommand) ([]byte,
 		return nil, errors.New("fixture lost reply")
 	}
 	if reply.Error != "" {
-		return output, errors.New(reply.Error)
+		return output, reply.failure()
 	}
 	return output, nil
 }
@@ -355,6 +363,74 @@ func TestLinuxAPTElevationFailureIsExplicitAndRetryable(t *testing.T) {
 	got, err := f.driver.ResumeResource(context.Background(), r, Operation{Action: "install"}, receipt)
 	if err != nil || got.CompletedOperation != receipt.OperationID || f.runs != 3 {
 		t.Fatal("authorized retry did not complete saved intent", got, err, f.runs)
+	}
+}
+
+func TestLinuxAPTFailedRefreshExplainsItsSourceOnceAndResumes(t *testing.T) {
+	f := newLinuxAPTFixture(t)
+	f.approve()
+	f.failedRefresh = true
+	r, receipt := aptFixtureResource("first"), aptFixtureReceipt("failed-refresh")
+	_, err := f.driver.Apply(context.Background(), r, Operation{Action: "install"}, receipt)
+	if err == nil || strings.Count(err.Error(), linuxAPTFixtureRefreshFailure) != 1 || !strings.Contains(err.Error(), "fix or disable the source") || f.runs != 1 {
+		t.Fatal("failed refresh did not name its source exactly once", err, f.runs)
+	}
+	f.failedRefresh = false
+	f.approve()
+	got, err := f.driver.ResumeResource(context.Background(), r, Operation{Action: "install"}, receipt)
+	if err != nil || got.CompletedOperation != receipt.OperationID || f.runs != 3 {
+		t.Fatal("repaired source did not let the saved operation refresh and install", got, err, f.runs)
+	}
+}
+
+func TestLinuxAPTRefreshIsPlainAndSavedStrictRefreshStaysValid(t *testing.T) {
+	for _, saved := range []struct {
+		name string
+		args []string
+		ok   bool
+	}{
+		{"strict recipe saved before 2026-10-24", linuxAPTStrictRefresh, true},
+		{"any other arguments", []string{"-o", "Acquire::AllowInsecureRepositories=true", "update"}, false},
+	} {
+		t.Run(saved.name, func(t *testing.T) {
+			f := newLinuxAPTFixture(t)
+			f.approve()
+			f.failedRefresh = true
+			r, receipt := aptFixtureResource("first"), aptFixtureReceipt("saved-refresh")
+			if _, err := f.driver.Apply(context.Background(), r, Operation{Action: "install"}, receipt); err == nil {
+				t.Fatal("fixture refresh did not fail")
+			}
+			prefix := f.driver.commandPrefixLength(linuxAPTIntent{}, "refresh")
+			if len(f.commands) != 1 || !slices.Equal(f.commands[0][prefix:], []string{"update"}) {
+				t.Fatal("new refresh is not plain apt-get update", f.commands)
+			}
+			// Rewrite the saved refresh as an earlier version would have saved it,
+			// with its reply lost, as when the laptop's first run stopped.
+			intent, err := f.driver.intent(receipt.OperationID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			command := &intent.Commands[0].Command
+			command.Arguments = append(command.Arguments[:prefix:prefix], saved.args...)
+			if err := saveDocument(f.driver.intentPath(receipt.OperationID), intent); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Remove(filepath.Join(f.driver.WorkerDirectory, "commands", command.Operation+".json")); err != nil {
+				t.Fatal(err)
+			}
+			f.failedRefresh, f.commands = false, nil
+			f.approve()
+			got, err := f.driver.ResumeResource(context.Background(), r, Operation{Action: "install"}, receipt)
+			if !saved.ok {
+				if err == nil || !strings.Contains(err.Error(), "differs from its trusted recipe") || len(f.commands) != 0 {
+					t.Fatal("unreviewed saved refresh arguments were accepted", err, f.commands)
+				}
+				return
+			}
+			if err != nil || got.CompletedOperation != receipt.OperationID || len(f.commands) != 2 || !slices.Equal(f.commands[0][prefix:], saved.args) || !slices.Contains(f.commands[1], "install") {
+				t.Fatal("saved strict refresh was not re-run unchanged before the install", got, err, f.commands)
+			}
+		})
 	}
 }
 

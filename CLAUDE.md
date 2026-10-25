@@ -281,6 +281,11 @@ fixtures: Go reports an intermediate junction as ENOTDIR (Windows path-not-found
 
 Shell integration owns delimited profile blocks rather than full profile files.
 Outside edits do not invalidate block ownership and must survive removal.
+A block's leading newline belongs to it, so a setup-created profile opens with an
+empty line; formatters drop it (shfmt on a Neovim save, 2026-10-24). A start
+marker that opens the file, after any BOM, is the same block with that newline
+missing: its bytes compare as written and replacement restores the line. Text
+before a marker is still an edit. Marker errors name the profile file.
 Choose an existing managed block's line endings from that block, including
 Sentinel policy, so surrounding personal edits cannot change its desired bytes.
 Saved UTF-16 blocks omit the file BOM: accept only validated marked fragments in
@@ -1167,6 +1172,14 @@ select glibc binaries. Constructors retain explicit target fixtures; native entr
 points and archive execution tests use `DiscoverPlatform`. Distro/libc are
 provider observations, never persisted target identity; Context remains OS/arch.
 
+A worker `nativeCommandError` message already ends with its output tail
+(`nativeReply.failure`); wrappers must not append `nativeDiagnostic` again. The
+APT refresh is plain `apt-get update` (owner decision 2026-10-24): a source that
+fails only with a warning, such as an expired third-party key with earlier verified
+lists, keeps those lists and no longer blocks every install; errors still fail and
+the report names the fix. Saved refresh commands with the earlier
+`-o APT::Update::Error-Mode=any` recipe stay valid and re-run unchanged; no other
+saved refresh arguments are accepted.
 Native command output bounds must use composition, not an embedded bytes.Buffer:
 its promoted ReadFrom lets io.Copy bypass a Write limiter. Drain excessive native
 package output before reporting failure so truncation cannot terminate a mutating
