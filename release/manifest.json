@@ -1,40 +1,39 @@
 {
-  "schema": 1,
+  "schema": 2,
   "repository": "luisgui1757/dotfiles",
   "official_remote": "https://github.com/luisgui1757/dotfiles.git",
-  "workflow": "e2e-install.yml",
+  "workflow": "installer-engine.yml",
+  "workflow_jobs": [
+    "core (ubuntu-26.04)",
+    "core (ubuntu-26.04-arm)",
+    "core (macos-26)",
+    "core (windows-2025)",
+    "Fresh Homebrew (macOS arm64)",
+    "Fresh Debian APT (amd64)",
+    "Fresh Debian APT (arm64)",
+    "Fresh Ubuntu APT (amd64)",
+    "Fresh Ubuntu APT (arm64)",
+    "Missing Apple developer tools (macOS arm64)",
+    "Fresh Windows vendor (VC-runtime)",
+    "Fresh Windows vendor (Build-Tools)",
+    "Neovim lifecycle (ubuntu-26.04)",
+    "Neovim lifecycle (ubuntu-26.04-arm)",
+    "Neovim lifecycle (macos-26)",
+    "Neovim lifecycle (windows-2025)",
+    "Desktop lifecycle (ubuntu-26.04)",
+    "Desktop lifecycle (ubuntu-26.04-arm)",
+    "Desktop lifecycle (macos-26)",
+    "Desktop lifecycle (windows-2025)"
+  ],
   "current": {
-    "state": "published",
-    "tag": "v0.4.4",
-    "previous_tag": "v0.4.3",
-    "title": "v0.4.4 — Automated releases and current agent tooling",
-    "notes": "docs/releases/v0.4.4.md",
-    "proof": "release/proofs/v0.4.4.json"
-  },
-  "logical_proofs": [
-    {
-      "artifact": "e2e-container-linux-logical-proof",
-      "marker": "e2e-container-linux.env",
-      "logical_context": "e2e containers / linux",
-      "legacy_context": "e2e containers / ubuntu-24.04"
-    },
-    {
-      "artifact": "setup-sh-linux-logical-proof",
-      "marker": "setup-sh-linux.env",
-      "logical_context": "setup.sh / linux",
-      "legacy_context": "setup.sh / ubuntu-24.04"
-    },
-    {
-      "artifact": "setup-sh-macos-logical-proof",
-      "marker": "setup-sh-macos.env",
-      "logical_context": "setup.sh / macos",
-      "legacy_context": "setup.sh / macos-26"
-    },
-    {
-      "artifact": "setup-ps1-windows-logical-proof",
-      "marker": "setup-ps1-windows.env",
-      "logical_context": "setup.ps1 / windows",
-      "legacy_context": "setup.ps1 / windows-2025"
+    "state": "candidate",
+    "tag": "v1.0.0",
+    "previous_tag": "v0.4.4",
+    "title": "v1.0.0 — Native interactive installer replaces Nix and chezmoi",
+    "notes": "docs/releases/v1.0.0.md",
+    "preparation": {
+      "base_commit": "a8190f6c6a45ebe91ac82c2d1f4d5aab9ccc518d",
+      "branch": "release/v1.0.0"
     }
-  ]
+  }
 }
