@@ -305,8 +305,9 @@ never follow an existing profile symlink into an unapproved source. Saved profil
 intent precedes publication; an identical target with the staged file still
 present does not prove ownership. Native Windows public-command tests run only on
 explicitly enabled disposable GitHub accounts; HOME cannot substitute for known
-folder discovery. The public command is not release-ready until all providers, old-runtime
-retirement and public migration acceptance are complete.
+folder discovery. The owner chose to release the native installer as v1.0.0
+(2026-10-25) after PR #87's full hosted matrix, including the public bootstrap and
+migration lifecycles; publication follows docs/RELEASING.md.
 
 The checkout bootstrap verifies the pinned Go archive before each extraction,
 extracts into private staging and keeps only the compressed toolchain archive as

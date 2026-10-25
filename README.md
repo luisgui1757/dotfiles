@@ -4,9 +4,9 @@ Choose the tools you want. Setup installs their prerequisites, applies the share
 Rose Pine configuration, and records what it owns so update and removal can make
 precise changes.
 
-**Major-release candidate:** [current delivery status](docs/installer-status.md)
-records implementation and verification. Delivery requires independent review
-and all native/quality checks at the exact PR head.
+**v1.0.0** replaces the earlier Nix/chezmoi setup with this installer. Coming
+from v0.4.x? Follow [the migration guide](docs/UPGRADING.md).
+[Installer status](docs/installer-status.md) records verification evidence.
 
 ## Supported platforms
 

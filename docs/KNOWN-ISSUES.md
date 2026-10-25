@@ -1,5 +1,14 @@
 # Known release issues
 
+## v1.0.0 (2026-10-25)
+
+First native-installer release, prepared in PR #95. Open at release time (see
+[field findings](reviews/field-findings.md)): Windows "Inspecting your system"
+can take minutes on a managed laptop, cause unmeasured (Windows 8); a black
+screen after a first Ubuntu login was not reproduced (Ubuntu 6). The owner's
+MacBook Air and Windows laptop had not run the release commit when it was
+prepared; their next Update is the first real-machine run of it.
+
 ## Native major-release candidate (2026-10-10)
 
 Current unresolved work and native failures are tracked in

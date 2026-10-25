@@ -2818,3 +2818,15 @@ Saving the setup-created `~/.zshrc` in Neovim let shfmt drop the empty line
 above the opening block, and setup then refused every tool. A block whose start
 marker opens the file is now recognized, and the marker error names the file.
 Details in the review ledger and field findings (Ubuntu 16 and 17).
+
+### 2026-10-25 — v1.0.0 release preparation
+
+PR #94 merged as `a8190f6` after 27/27 checks on `d9c1fa4`. The owner asked to
+release now: the recommendation to first run Update and Check on the MacBook Air
+and Windows laptop was offered and the owner chose not to wait. `make
+release-check` passed; `make release-prepare` (full local gate) opened PR #95
+from `a8190f6`, writing the schema-2 manifest bound to `installer-engine.yml` and
+the canonical native jobs, and `docs/releases/v1.0.0.md`. This follow-up commit
+on the release branch replaces pre-release wording (README banner, CLAUDE.md,
+known issues). Publication still requires the exact-tag gates in
+docs/RELEASING.md and the owner's typed confirmation.

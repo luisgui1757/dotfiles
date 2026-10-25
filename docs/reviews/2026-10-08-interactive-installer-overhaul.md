@@ -14163,3 +14163,20 @@ CRLF, no BOM, UTF-8 and both UTF-16 BOMs and the refused prefix;
 `TestProfileEditedMarkersNameTheirFile` failed before the path prefix. One
 accepted edge: a restoration that reinserts a saved original whose own block had
 lost its newline writes the block back with it.
+
+## 2026-10-25 — v1.0.0 release preparation
+
+PR #94 merged as `a8190f6` (27/27 checks on its head `d9c1fa4`). The owner asked
+whether to release; the recommendation was to first run Update and Check on the
+MacBook Air and the Windows laptop, because neither had run this week's changes
+and release tags are immutable. The owner chose to release now. The candidate
+notes say so under field evidence and do not claim those runs.
+
+`make release-check` reported the v0.4.4 manifest and proof identities OK.
+`make release-prepare VERSION=v1.0.0` (notes written outside the checkout and
+validated with `validate_notes`/`release_body`) created `release/v1.0.0`, ran
+`make ci`, and opened PR #95. A first attempt stopped before any change because
+the validation import had left `scripts/__pycache__` in the checkout. A second
+commit on the branch replaces pre-release wording: the README "Major-release
+candidate" banner, the CLAUDE.md sentence that the public command was not
+release-ready, and a v1.0.0 entry in known issues listing the open field items.
