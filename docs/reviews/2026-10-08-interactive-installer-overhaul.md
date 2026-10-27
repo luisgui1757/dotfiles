@@ -14180,3 +14180,24 @@ the validation import had left `scripts/__pycache__` in the checkout. A second
 commit on the branch replaces pre-release wording: the README "Major-release
 candidate" banner, the CLAUDE.md sentence that the public command was not
 release-ready, and a v1.0.0 entry in known issues listing the open field items.
+
+## 2026-10-27 — v1.0.0 preparation committed gate bytecode
+
+The owner merged PR #95 as `c9afe16` and ran `make release-publish`. The pasted
+command wrapped, so `EXPECTED_SHA` never reached make and the publisher stopped
+before any check or write ("EXPECTED_SHA=... is required"). The pull output
+showed four `tests/bootstrap/__pycache__/*.pyc` files (Python 3.14 bytecode) in
+the merge. `prepare` runs `make ci` in the worktree and then `git add --all`; the
+Python test suites write bytecode and `.gitignore` did not cover it. The agent
+had described the preparation commit without reading its file list. The closure
+path had the same staging, so publication would have repeated it.
+
+Correction (no tag existed): `commit_rendered` stages only the rendered paths
+(`docs/releases/{version}.md` and the manifest for preparation; notes, proof and
+manifest for closure) and fails on any other status entry, including untracked
+files and unstaged changes; `.gitignore` covers `__pycache__/` and `*.pyc`; the
+four files are deleted. `CommitRenderedTests` drives a real Git repository with
+a bytecode leftover and a modified tracked file; it failed with the previous
+`git add --all` staging ("ReleaseError not raised") and passes. The correction
+uses the branch name `release/v1.0.0` again, because `verify_preparation_pr`
+accepts only the unique merge of that branch as the release commit.

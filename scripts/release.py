@@ -410,6 +410,18 @@ def render_candidate(
     validate_manifest(root)
 
 
+def commit_rendered(worktree: pathlib.Path, paths: list[str], message: str) -> None:
+    # The full gate runs between rendering and committing and writes its own
+    # files (Python bytecode reached v1.0.0's preparation through `add --all`).
+    # Stage only the rendered files; anything else the gate changed is an error.
+    run(["git", "add", "--", *paths], cwd=worktree)
+    status = run(["git", "status", "--porcelain", "--untracked-files=all"], cwd=worktree).stdout
+    for line in status.splitlines():
+        if line[1] != " " or line[3:] not in paths:
+            fail(f"release gate left an unexpected change: {line}")
+    run(["git", "commit", "-m", message], cwd=worktree, capture=False)
+
+
 def prepare(args: argparse.Namespace) -> None:
     manifest = validate_manifest(ROOT)
     check_live(manifest)
@@ -432,8 +444,9 @@ def prepare(args: argparse.Namespace) -> None:
     render_candidate(worktree, version=args.version, notes_text=notes, base_commit=base)
     run(["make", "ci"], cwd=worktree, capture=False)
     run(["git", "diff", "--check"], cwd=worktree)
-    run(["git", "add", "--all"], cwd=worktree)
-    run(["git", "commit", "-m", f"chore(release): prepare {args.version}"], cwd=worktree, capture=False)
+    commit_rendered(
+        worktree, [f"docs/releases/{args.version}.md", MANIFEST_PATH.as_posix()], f"chore(release): prepare {args.version}"
+    )
     run(["git", "push", "-u", "origin", branch], cwd=worktree, capture=False)
     pr_url = output(
         [
@@ -1040,8 +1053,11 @@ def open_closure_pr(manifest: dict[str, Any], proof: dict[str, Any], asset_sha25
     render_closure(worktree, proof, asset_sha256)
     run(["make", "ci"], cwd=worktree, capture=False)
     run(["git", "diff", "--check"], cwd=worktree)
-    run(["git", "add", "--all"], cwd=worktree)
-    run(["git", "commit", "-m", f"docs(release): close {tag} publication"], cwd=worktree, capture=False)
+    commit_rendered(
+        worktree,
+        [manifest["current"]["notes"], f"release/proofs/{tag}.json", MANIFEST_PATH.as_posix()],
+        f"docs(release): close {tag} publication",
+    )
     run(["git", "push", "-u", "origin", branch], cwd=worktree, capture=False)
     return output(
         [

@@ -2,7 +2,8 @@
 
 ## v1.0.0 (2026-10-25)
 
-First native-installer release, prepared in PR #95. Open at release time (see
+First native-installer release, prepared in PR #95 and corrected by a second PR
+from `release/v1.0.0` (stray bytecode removed). Open at release time (see
 [field findings](reviews/field-findings.md)): Windows "Inspecting your system"
 can take minutes on a managed laptop, cause unmeasured (Windows 8); a black
 screen after a first Ubuntu login was not reproduced (Ubuntu 6). The owner's

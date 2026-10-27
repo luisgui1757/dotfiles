@@ -2830,3 +2830,12 @@ the canonical native jobs, and `docs/releases/v1.0.0.md`. This follow-up commit
 on the release branch replaces pre-release wording (README banner, CLAUDE.md,
 known issues). Publication still requires the exact-tag gates in
 docs/RELEASING.md and the owner's typed confirmation.
+
+### 2026-10-27 — v1.0.0 preparation correction
+
+PR #95 merged as `c9afe16`. Its preparation commit included four
+`tests/bootstrap/__pycache__/*.pyc` files: `release.py` staged with
+`git add --all` after `make ci`, which writes them. Nothing was tagged: the first
+publish attempt stopped on a missing argument. A second PR from `release/v1.0.0`
+removes the files, ignores Python bytecode, and makes preparation and closure
+commit only their rendered files; publication binds that PR's merge commit.

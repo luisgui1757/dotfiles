@@ -67,8 +67,9 @@ lifecycle, preserve personal agent state, and add native lifecycle coverage.
 Earlier Pi work below is historical; current evidence is recorded in installer status.
 
 Owner decision, 2026-10-25: release the native installer as v1.0.0. Prepared in
-PR #95; publication follows the exact-tag gates in docs/RELEASING.md and the
-owner's typed confirmation.
+PR #95 and corrected by a second `release/v1.0.0` PR, which removed Python
+bytecode the tool had committed; publication follows the exact-tag gates in
+docs/RELEASING.md and the owner's typed confirmation.
 
 Owner addition, 2026-10-24: selected Neovim becomes the editor on macOS and
 Linux (`EDITOR`/`VISUAL=nvim`, `SUDO_EDITOR` as the managed nvim's full path), so

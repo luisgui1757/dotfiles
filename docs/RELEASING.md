@@ -53,7 +53,9 @@ Preparation validates the current published proof against the official tag,
 release and workflow; checks clean exact main, version ordering and note shape;
 creates a sibling `release/<version>` worktree; writes schema-2 candidate metadata
 and notes; runs `make ci` and `git diff --check`; then commits, pushes and opens a
-preparation PR. The worktree remains for review. No source-version constants or
+preparation PR. It commits only the rendered manifest and notes (the closure
+commit likewise only its notes, proof and manifest); any other file the gate
+changed or left behind stops the command. The worktree remains for review. No source-version constants or
 old installer registries are generated. Review and merge separately through the
 protected squash-only path.
 

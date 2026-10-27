@@ -2,10 +2,12 @@
 import copy
 import hashlib
 import importlib.util
+import os
 import pathlib
 import shutil
 import tempfile
 import unittest
+from unittest import mock
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SPEC = importlib.util.spec_from_file_location("release", ROOT / "scripts/release.py")
@@ -145,6 +147,54 @@ class ReleaseTests(unittest.TestCase):
                 self.assertEqual((self.root / path).read_bytes(), data)
         next_tag = self.tag.rsplit(".", 1)[0] + "." + str(int(self.tag.rsplit(".", 1)[1]) + 1)
         release.render_candidate(self.root, version=next_tag, notes_text=notes(next_tag), base_commit="8" * 40)
+
+
+class CommitRenderedTests(unittest.TestCase):
+    """The full gate runs between rendering and committing a release change."""
+
+    def setUp(self):
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        self.root = pathlib.Path(temp.name)
+        environment = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+        environment.update(
+            GIT_CONFIG_GLOBAL=os.devnull,
+            GIT_CONFIG_NOSYSTEM="1",
+            GIT_AUTHOR_NAME="Fixture",
+            GIT_AUTHOR_EMAIL="fixture@example.invalid",
+            GIT_COMMITTER_NAME="Fixture",
+            GIT_COMMITTER_EMAIL="fixture@example.invalid",
+        )
+        patcher = mock.patch.dict(os.environ, environment, clear=True)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        release.run(["git", "init", "-q", "-b", "main"], cwd=self.root)
+        (self.root / "tracked.txt").write_text("before\n")
+        release.run(["git", "add", "tracked.txt"], cwd=self.root)
+        release.run(["git", "commit", "-q", "-m", "initial"], cwd=self.root)
+        (self.root / "release").mkdir()
+        (self.root / "release/manifest.json").write_text("{}\n")
+
+    def committed(self):
+        return release.output(["git", "show", "--name-only", "--format=", "HEAD"], cwd=self.root).splitlines()
+
+    def test_gate_leftovers_are_refused_and_only_rendered_files_are_committed(self):
+        # v1.0.0's preparation committed the gate's Python bytecode.
+        for leftover in ("tests/bootstrap/__pycache__/fixture.cpython-314.pyc", "tracked.txt"):
+            with self.subTest(leftover=leftover):
+                path = self.root / leftover
+                path.parent.mkdir(parents=True, exist_ok=True)
+                original = path.read_bytes() if path.exists() else None
+                path.write_text("gate output\n")
+                with self.assertRaisesRegex(release.ReleaseError, "unexpected change"):
+                    release.commit_rendered(self.root, ["release/manifest.json"], "fixture")
+                self.assertEqual(self.committed(), ["tracked.txt"])
+                if original is None:
+                    path.unlink()
+                else:
+                    path.write_bytes(original)
+        release.commit_rendered(self.root, ["release/manifest.json"], "fixture")
+        self.assertEqual(self.committed(), ["release/manifest.json"])
 
 
 if __name__ == "__main__":
