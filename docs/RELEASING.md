@@ -79,7 +79,10 @@ and merged trees, all hosted checks, the exact canonical required-check policy,
 and successful GitHub Actions checks at the reviewed PR head. A stale live
 required-check policy blocks publication. It also requires immutable releases,
 the complete local gate and a redacted Gitleaks scan of the release range before
-creating the annotated tag.
+creating the annotated tag. That scan runs only here, not in pull-request CI. A
+finding reviewed as a false positive goes into `.gitleaksignore` as its exact
+fingerprint (`commit:file:rule:line`) with the reason, through a corrected
+preparation PR; never add a pattern or path-wide rule.
 
 A new `workflow_dispatch` run on that exact tag must pass on its first attempt.
 Every manifest-bound native job must complete successfully with the exact commit,
