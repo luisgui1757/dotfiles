@@ -349,6 +349,12 @@ and **recheck** (what a reviewer or a future change must keep).
 
 ## Support and process lessons
 
+- Read a generated commit's file list before describing it. v1.0.0's
+  preparation commit included four Python bytecode files: the release tool ran
+  the full gate, which writes them, then staged with `git add --all`. The agent
+  reported the commit's contents without checking; the owner's merge exposed it
+  (2026-10-27). The tool now commits only its rendered files and refuses others.
+
 - Interpret owner wording before building: "vanilla AeroSpace" meant "today's
   config", not AeroSpace's stock defaults, and app pinning was taught, not
   configured. Two drafts were reverted before delivery.

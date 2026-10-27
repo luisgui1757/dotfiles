@@ -777,7 +777,10 @@ check may replace a removed lifecycle. Preserve the main-integrity no-bypass rul
 owner-only PR review/update rules, native security gates and exact run/head
 provenance. A checked-in policy is not proof that GitHub has applied it.
 Release publication follows `docs/RELEASING.md` and the manifest; historical tag
-proof is immutable. This overhaul uses one PR. On 2026-10-12 the owner authorized
+proof is immutable. Release preparation and closure commit only their rendered
+files (`commit_rendered`): `make ci` writes Python bytecode, which `git add --all`
+put into v1.0.0's preparation. A corrected preparation is a new PR from the same
+`release/<version>` branch, because publication binds the merge of that branch. This overhaul uses one PR. On 2026-10-12 the owner authorized
 squashing the implementation, smoke fixes and CLI replacement into one commit.
 Merge and release publication remain owner actions unless explicitly delegated.
 

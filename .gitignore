@@ -1,6 +1,10 @@
 .DS_Store
 **/.DS_Store
 
+# Python bytecode written by the test suites
+__pycache__/
+*.pyc
+
 # Test scratch space
 tests/.cache/
 tests/tmp/
