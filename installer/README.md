@@ -93,7 +93,14 @@ Sentinel rules and skills (`sentinel`) needs the hidden
 `integration.sentinel-installer` resource, which needs `tool.git`. That resource
 fetches the commit that `sentinel.go` pins into `<state>/sentinel/checkout`.
 Git runs without system or global configuration. `HEAD` must equal the pin, and
-the tree must be clean.
+each file must equal the tree of the pin, independently of Git index flags.
+Check, update and removal run Sentinel only from such a checkout. Removal
+fetches the pin again when necessary.
+
+`<state>/sentinel/record.json` saves the
+intent of each operation before it changes anything, and its completion after.
+An interrupted operation resumes: the Sentinel installer runs again. The record
+also keeps the hosts and the folder variables of the install.
 
 Then the resource runs the Sentinel installer of that checkout. On macOS and
 Linux it runs `bash tools/install --global --hosts <hosts> --skills core,ui`.

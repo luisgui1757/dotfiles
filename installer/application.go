@@ -84,7 +84,8 @@ func NewNativeController(repository, source, stateDirectory string, platform Nat
 	if target.OS == "windows" {
 		shell = platform.WindowsPowerShell
 	}
-	driver.Sentinel = &SentinelDriver{Target: target, Home: folders.Home, Locations: platform.Sentinel, State: stateDirectory, Git: git, Shell: shell, Run: driver.session.run, Query: querySentinel}
+	driver.Sentinel = &SentinelDriver{Target: target, Home: folders.Home, Locations: platform.Sentinel, State: stateDirectory, Repository: sentinelRepository, Commit: sentinelCommit,
+		Git: git, Shell: shell, Run: driver.session.run, Query: querySentinel}
 	archives.Run = driver.session.run
 	driver.Desktop = &DesktopDriver{Target: target, Folders: folders, Directory: stateDirectory, Archives: archives, PowerShell: platform.WindowsPowerShell, Run: driver.session.run}
 	driver.Fonts = &FontDriver{Target: target, Folders: folders, Directory: stateDirectory, Archives: archives, PowerShell: platform.WindowsPowerShell, Run: driver.session.run, FontMatch: "/usr/bin/fc-match", FontCache: "/usr/bin/fc-cache"}

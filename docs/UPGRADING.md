@@ -427,9 +427,13 @@ The first apply after the update does the handoff:
 3. Sentinel replaces the old rules block in place. Text outside the block stays.
 4. Setup releases the old receipts.
 
-Setup does not delete a skill folder that changed. It reports the folder, and
-Sentinel stops at that folder. Move the folder to a different location, then
-apply again.
+Setup does not delete a skill folder that changed or that a link now leads to.
+It reports the folder, and Sentinel stops at that folder. Move the folder to a
+different location, then apply again.
+
+If v1.0.0 adopted an earlier rules block, the handoff drops that saved block.
+Removal through dotfiles does not bring it back, and the text outside the block
+stays.
 
 If you untick Sentinel in the first run after the update, the old copies stay.
 To remove them, select Sentinel one time so that the handoff runs. Then untick

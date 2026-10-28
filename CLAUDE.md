@@ -151,10 +151,14 @@ and skills for coding agents.
 - `installer/sentinel.go` holds the only pin, a full commit hash. Renovate
   tracks the Sentinel `main` branch and opens a pull request when it moves.
 - Apply fetches that commit into `<state>/sentinel/checkout`. Git runs without
-  system or global configuration. `HEAD` must equal the pin, and the tree must
-  be clean.
+  system or global configuration. `HEAD` must equal the pin, and each file must
+  equal the tree of the pin. Git index flags do not count.
 - Then dotfiles runs the Sentinel installer of that checkout. Dotfiles does not
-  copy or edit Sentinel files.
+  copy or edit Sentinel files. Check, update and removal run Sentinel only from
+  a verified checkout of the pin. Removal fetches the pin again when necessary.
+- `<state>/sentinel/record.json` saves the intent before a change and the
+  completion after it. Resume runs the installer again. The record also keeps
+  the hosts and the five folder variables of the install for check and removal.
 - The hosts are Codex, Claude Code, Copilot, Kiro and OpenCode. A host counts
   when its command or folder exists, or when the same selection installs it.
 - Check runs `--check`. Exit 1 means drift. Any other failure is an error.

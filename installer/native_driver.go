@@ -270,11 +270,11 @@ func (d *NativeDriver) ForSelection(wanted []string, state State) (Driver, error
 	}
 	if d.Sentinel != nil {
 		// A CLI that this selection installs makes its agent a host. The saved
-		// dotfiles 1.0 receipts decide which skill copies Sentinel takes over.
+		// dotfiles 1.0 receipts decide which files Sentinel takes over.
 		sentinel := *d.Sentinel
 		sentinel.Selected = slices.Clone(wanted)
 		sentinel.Earlier = map[string]Receipt{}
-		for _, id := range sentinelEarlierSkills {
+		for _, id := range append([]string{sentinelEarlierRules}, sentinelEarlierSkills...) {
 			if receipt, ok := state.Receipts[id]; ok {
 				sentinel.Earlier[id] = receipt
 			}

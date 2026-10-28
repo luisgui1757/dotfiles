@@ -20,8 +20,9 @@ const sentinelEarlierRules = "integration.sentinel"
 var sentinelEarlierSkills = []string{"skills.sentinel-agents", "skills.sentinel-claude", "skills.sentinel-kiro", "skills.sentinel-copilot"}
 
 // sentinelCopies sorts the folders of one earlier skills receipt. Unchanged
-// folders hold the bytes that dotfiles copied. Changed folders hold other
-// bytes. Absent folders and folders that Sentinel now owns are in neither list.
+// folders hold the bytes that dotfiles copied, at the recorded physical path.
+// Changed folders hold other bytes, or a link leads to them. Absent folders and
+// folders that Sentinel now owns are in neither list.
 type sentinelCopies struct{ Unchanged, Changed []string }
 
 func (d *SentinelDriver) earlierCopies(id string, receipt Receipt) (sentinelCopies, error) {
@@ -40,7 +41,13 @@ func (d *SentinelDriver) earlierCopies(id string, receipt Receipt) (sentinelCopi
 		return copies, errors.New("the saved journal does not prove a finished copy")
 	}
 	for _, entry := range j.Entries {
+		// The journal holds the physical path that dotfiles wrote. A link in
+		// a parent can lead the same path to a copy that dotfiles never wrote.
 		path := entry.State.Target.Destination
+		bound, err := bindConfigDestination(path)
+		if err != nil {
+			return copies, err
+		}
 		current, err := snapshotConfig(path)
 		if err != nil {
 			return copies, err
@@ -50,7 +57,10 @@ func (d *SentinelDriver) earlierCopies(id string, receipt Receipt) (sentinelCopi
 			return copies, err
 		}
 		switch {
-		case current.Kind == "absent" || err == nil && marker.Mode().IsRegular():
+		case current.Kind == "absent":
+		case bound != path:
+			copies.Changed = append(copies.Changed, path)
+		case err == nil && marker.Mode().IsRegular():
 		case current == configPublicationResult(j, entry):
 			copies.Unchanged = append(copies.Unchanged, path)
 		default:
@@ -70,7 +80,7 @@ func (d *SentinelDriver) handoff() ([]string, error) {
 			return nil, fmt.Errorf("cannot verify the earlier dotfiles copies of %s: %w", id, err)
 		}
 		if len(copies.Changed) != 0 {
-			return nil, fmt.Errorf("%s changed after dotfiles copied it. Dotfiles leaves it in place, and Sentinel does not replace it. Move it to a different folder, then apply again", strings.Join(copies.Changed, ", "))
+			return nil, fmt.Errorf("%s changed after dotfiles copied it, or a link now leads to it. Dotfiles leaves it in place, and Sentinel does not replace it. Move it to a different folder, then apply again", strings.Join(copies.Changed, ", "))
 		}
 		unchanged = append(unchanged, copies.Unchanged...)
 	}
@@ -78,7 +88,10 @@ func (d *SentinelDriver) handoff() ([]string, error) {
 }
 
 // handOver deletes the unchanged earlier copies, so that the Sentinel installer
-// can write its own copies.
+// can write its own copies. It also drops the saved baseline of the earlier
+// rules block. That baseline holds a block between the AGENT-RULES markers
+// from an earlier Sentinel install. The Sentinel installer now owns the block,
+// and its removal keeps the text outside the block, so nothing restores it.
 func (d *SentinelDriver) handOver() error {
 	unchanged, err := d.handoff()
 	if err != nil {
@@ -88,6 +101,12 @@ func (d *SentinelDriver) handOver() error {
 		if err := os.RemoveAll(path); err != nil {
 			return err
 		}
+	}
+	if recovery := d.Earlier[sentinelEarlierRules].Recovery; recovery != "" {
+		if !validProfileRecovery(recovery) {
+			return fmt.Errorf("invalid saved baseline reference %q of the earlier Sentinel rules", recovery)
+		}
+		return os.RemoveAll(filepath.Join(d.State, recovery))
 	}
 	return nil
 }
@@ -105,15 +124,15 @@ func (d *SentinelDriver) observeEarlier(r Resource, receipt Receipt) Observation
 	selected := slices.Contains(d.Selected, sentinelResource)
 	handOver := "Select Sentinel rules and skills once to hand these earlier files to the Sentinel installer. Untick it after that to remove them."
 	if r.ID == sentinelEarlierRules {
-		// The host record exists after the Sentinel installer first ran.
-		_, err := os.Lstat(d.record())
+		// A complete record exists after the Sentinel installer ran.
+		record, err := d.readRecord()
 		switch {
 		case !selected:
 			o.Pending = handOver
-		case errors.Is(err, os.ErrNotExist):
-			o.Pending = "The Sentinel installer replaces this rules block when it applies."
 		case err != nil:
-			o.Pending = "Cannot check the Sentinel host record: " + err.Error()
+			o.Pending = err.Error()
+		case record == nil || !record.Complete:
+			o.Pending = "The Sentinel installer replaces this rules block when it applies."
 		}
 		return o
 	}
@@ -122,7 +141,7 @@ func (d *SentinelDriver) observeEarlier(r Resource, receipt Receipt) Observation
 	case err != nil:
 		o.Pending = "Cannot verify the earlier dotfiles Sentinel skills: " + err.Error()
 	case len(copies.Changed) != 0:
-		o.Pending = strings.Join(copies.Changed, ", ") + " changed after dotfiles copied it. Dotfiles leaves it in place. Move it to a different folder, then apply again."
+		o.Pending = strings.Join(copies.Changed, ", ") + " changed after dotfiles copied it, or a link now leads to it. Dotfiles leaves it in place. Move it to a different folder, then apply again."
 	case len(copies.Unchanged) == 0:
 	case selected:
 		o.Pending = "The Sentinel installer replaces these unchanged dotfiles copies when it applies."

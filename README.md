@@ -392,7 +392,9 @@ Sentinel skills.
 Check runs the Sentinel check. When a file changed, Check reports it and
 Repair installs Sentinel again. When you untick Sentinel, setup removes the
 rules and skills from each agent that it installed them for. Then it deletes
-its Sentinel checkout.
+its Sentinel checkout. Setup records `CODEX_HOME`, `CLAUDE_CONFIG_DIR`,
+`COPILOT_HOME`, `XDG_CONFIG_HOME` and `KIRO_HOME` at the install. Check, update
+and removal use these recorded values, and setup shows a note when they changed.
 
 A Renovate pull request proposes a new Sentinel pin. After you merge and pull
 it, **Update tools** applies it. Coming from dotfiles v1.0.0? Read
