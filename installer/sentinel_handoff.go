@@ -22,7 +22,8 @@ var sentinelEarlierSkills = []string{"skills.sentinel-agents", "skills.sentinel-
 // sentinelCopies sorts the folders of one earlier skills receipt. Unchanged
 // folders hold the bytes that dotfiles copied, at the recorded physical path.
 // Changed folders hold other bytes, or a link leads to them. Absent folders and
-// folders that Sentinel now owns are in neither list.
+// folders that Sentinel now owns are in neither list. Both lists, and so each
+// handoff report, use the physical path that the journal recorded.
 type sentinelCopies struct{ Unchanged, Changed []string }
 
 func (d *SentinelDriver) earlierCopies(id string, receipt Receipt) (sentinelCopies, error) {

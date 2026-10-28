@@ -507,16 +507,29 @@ func TestSentinelHandoffDeletesOnlyUnchangedDotfilesCopies(t *testing.T) {
 
 func TestSentinelHandoffLeavesAChangedCopyAndReportsIt(t *testing.T) {
 	d, processes := sentinelFixture(t, Context{OS: "linux", Arch: "amd64"})
+	// Reach the fixture through a link where the system allows one. Windows
+	// reaches a temporary folder through a short 8.3 name in the same way, so
+	// the recorded physical path differs in form from the path of the test.
+	if link := filepath.Join(t.TempDir(), "short"); os.Symlink(filepath.Dir(d.Home), link) == nil {
+		d.Home, d.State = filepath.Join(link, "home"), filepath.Join(link, "state")
+	}
 	writeConfigFixture(t, filepath.Join(d.Home, ".codex", "config.toml"), "")
 	root := sentinelEarlierCopies(t, d)
 	changed := filepath.Join(root, "council")
 	writeConfigFixture(t, filepath.Join(changed, "SKILL.md"), "# my council\n")
+	// The reports name the physical path that dotfiles recorded. It can differ
+	// in form from the temporary path, for example a long Windows name for a
+	// short 8.3 name, or /private/var for /var on macOS.
+	recorded, err := bindConfigDestination(changed)
+	if err != nil {
+		t.Fatal(err)
+	}
 	d.Selected = []string{sentinelResource}
 	o, err := d.Observe(context.Background(), Resource{ID: sentinelResource}, Receipt{})
-	if err != nil || !strings.Contains(o.ApplyBlocked, changed) {
+	if err != nil || !strings.Contains(o.ApplyBlocked, recorded) {
 		t.Fatal("the changed copy does not block the Sentinel install", o, err)
 	}
-	if _, err := sentinelApply(t, d); err == nil || !strings.Contains(err.Error(), changed) {
+	if _, err := sentinelApply(t, d); err == nil || !strings.Contains(err.Error(), recorded) {
 		t.Fatal("apply did not report the changed copy", err)
 	}
 	for path, contents := range map[string]string{filepath.Join(changed, "SKILL.md"): "# my council\n", filepath.Join(root, "doc-view", "SKILL.md"): "# doc-view\n"} {
@@ -527,7 +540,7 @@ func TestSentinelHandoffLeavesAChangedCopyAndReportsIt(t *testing.T) {
 	if len(processes.commands) != 0 {
 		t.Fatal("git or the installer ran before the changed copy was moved away", processes.commands)
 	}
-	if o := d.observeEarlier(Resource{ID: "skills.sentinel-agents"}, d.Earlier["skills.sentinel-agents"]); !strings.Contains(o.Pending, changed) {
+	if o := d.observeEarlier(Resource{ID: "skills.sentinel-agents"}, d.Earlier["skills.sentinel-agents"]); !strings.Contains(o.Pending, recorded) {
 		t.Fatal("the earlier receipt does not report the changed copy", o)
 	}
 }
