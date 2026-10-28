@@ -45,5 +45,4 @@ serializer or generated action identifiers.
 The upstream release requires Windows 10 build 19041 or newer. The supported
 native acceptance runner is Windows Server 2025 x64; actual GUI launch, managed
 profile consumption, check/update/removal and personal-setting preservation are
-covered by the hosted desktop lifecycle fixture. Current verification status is
-tracked in [installer status](../docs/installer-status.md).
+covered by the hosted desktop lifecycle fixture.

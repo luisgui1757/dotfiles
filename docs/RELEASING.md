@@ -122,5 +122,5 @@ state, archived evidence and the uploaded asset's digest. It is not auto-merged.
 
 Unexecuted redirected-Windows, divergent Windows Terminal, physical Linux,
 Apple-Silicon owner-host and visual checks remain explicit residual evidence.
-See [the test retirement map](installer-test-retirement.md) for current versus
-historical gates, and [known issues](KNOWN-ISSUES.md) for version-specific history.
+The release notes in [releases](releases/) record the history of each version.
+[Known issues](KNOWN-ISSUES.md) lists the problems of each release.

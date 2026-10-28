@@ -6,7 +6,6 @@ precise changes.
 
 **v1.0.0** replaces the earlier Nix/chezmoi setup with this installer. Coming
 from v0.4.x? Follow [the migration guide](docs/UPGRADING.md).
-[Installer status](docs/installer-status.md) records verification evidence.
 
 ## Supported platforms
 
@@ -104,7 +103,7 @@ Coming from the Nix/chezmoi release? Run `./migrate.sh` or `.\migrate.ps1` after
 updating the checkout. It detects the earlier installation, preserves its
 configuration, opens the replacement tool menu, and checks the new setup before
 previewing removal of the verified old runtimes and tools, including the Pi CLI
-and the released Sentinel policy files for OpenCode and Pi. On macOS it first
+and the released Sentinel policy file for Pi. On macOS it first
 converts Nix-managed Homebrew while keeping its packages. Read
 [the migration guide](docs/UPGRADING.md) for conflicts and interrupted work.
 
@@ -127,7 +126,7 @@ selects the rest. Children remain independently selectable. `a` selects all,
 | Version control | Git, lazygit, GitHub CLI, gh-dash |
 | Terminal apps | Ghostty, Windows Terminal |
 | Terminal sessions | tmux, Herdr |
-| AI coding | T3 Code, Claude Code CLI, Codex CLI, GitHub Copilot CLI, Kiro CLI, Sentinel agent policy, Sentinel skills |
+| AI coding | T3 Code, Claude Code CLI, Codex CLI, GitHub Copilot CLI, Kiro CLI, Sentinel rules and skills |
 | Desktop apps | OpenWhispr, Obsidian, Tailscale, Zen Browser, AeroSpace, Mac keyboard shortcuts |
 | Dotfiles development | Lint and benchmark tools |
 
@@ -166,12 +165,10 @@ required dependencies are still resolved automatically in the preview.
 | Codex CLI | ✓ | ✓ | ✓ |
 | GitHub Copilot CLI | ✓ | glibc | ✓ |
 | Kiro CLI | ✓ | glibc | — |
-| Sentinel policy | ✓ | ✓ | ✓ |
-| Sentinel skills | ✓ | ✓ | ✓ |
+| Sentinel rules and skills | ✓ | ✓ | ✓ |
 | Lint and benchmark tools | ✓ | ✓ | ✓ |
 
-The table defines the product scope. Completion evidence for each integration is
-tracked separately in [installer status](docs/installer-status.md).
+The table defines the product scope.
 
 **Git** installs or reuses Git and supplies `pull.rebase = true` and
 `fetch.prune = true`: pulls rebase local commits, and fetch removes stale
@@ -230,8 +227,8 @@ Zen-only installation also requires Homebrew and Apple's command-line tools.
 
 On Linux, Zen uses Mozilla's legacy profile selection to retain the same personal
 profile across managed generations. Its application policy disables self-updates;
-use setup's Update action. See [current acceptance evidence](docs/installer-status.md)
-and the [handover instructions for earlier Mac installations](docs/UPGRADING.md#zen-macos-native-application).
+use setup's Update action. See the
+[handover instructions for earlier Mac installations](docs/UPGRADING.md#zen-macos-native-application).
 
 Tailscale uses its pinned official DEB on Linux, including the vendor's daemon
 service. Run `sudo tailscale up` to sign in. On macOS the existing Homebrew formula
@@ -357,33 +354,50 @@ it: its Windows build comes solely as an MSI installer, whose normal install is
 machine-wide, needs an admin prompt and leaves Kiro's own updater in charge, and
 setup does not extract programs from vendor installers. If Kiro publishes a plain
 Windows download (for example a ZIP) someday, it can be added like the other
-platforms. Install Kiro yourself on Windows if you want it; Sentinel policy and
-skills still reach it.
-Sentinel policy and Sentinel skills are independent selections. Policy goes to
-each installed agent among Codex, Claude Code, GitHub Copilot and Kiro: its
-configuration folder exists, its command (or a Kiro macOS app) is found, or you
-select Codex, Claude Code, Copilot CLI or Kiro CLI in the same run. Copilot's
-folder is `${COPILOT_HOME:-~/.copilot}` and Kiro's is `${KIRO_HOME:-~/.kiro}`,
-following Kiro's own rules for `KIRO_HOME`. Setup never creates an absent agent's
-folder. Installed policy keeps its agents; for an agent installed later, deselect
-Sentinel policy and apply, then select it again. An uninstalled agent's policy is
-no longer maintained and its folder is not recreated. The 12 skills are copied from pinned Sentinel 0.2.0
-source into `~/.agents/skills` (Codex/Copilot),
-`${CLAUDE_CONFIG_DIR:-~/.claude}/skills` and, while Kiro is installed (the same
-presence rule as the policy), `${KIRO_HOME:-~/.kiro}/skills`, which the Kiro IDE
-and CLI read. Without Kiro nothing is written there; if Kiro is later
-uninstalled, setup reports it and never recreates its folder. Copilot reads
-`~/.agents/skills`, except that with `COPILOT_HOME` set it reads only
-`$COPILOT_HOME/skills`; setup then copies the skills there too, under the same
-presence rule. Existing skill folders, redirects,
-upstream Sentinel ownership markers and `npx skills` lock entries for a bundled
-name are preserved and block setup; there is no adoption of an outside skill
-installation. Sentinel now contains the
-former Helix workflows; `helix` and `setup-helix` are skill names, not a separate
-dependency. Skills require the managed Node runtime. Impeccable additionally needs
-its explicit `sentinel-engine.mjs --setup` command, once per computer, shown as one
-preview/Check note: every agent's copy shares that engine cache, which remains
-personal and survives removal.
+platforms. Install Kiro yourself on Windows if you want it. Sentinel rules and
+skills also go to it.
+
+**Sentinel rules and skills** installs
+[Sentinel](https://github.com/luisgui1757/sentinel), the shared rules and
+skills for coding agents. Setup gets one pinned Sentinel commit with Git and
+runs the Sentinel installer of that commit. That installer writes the rules
+into a managed block in the instruction file of each agent. Text outside the
+block stays. It also copies the `core` and `ui` skills and writes a
+`.sentinel-owned` file into each skill folder. It does not replace a folder
+that it did not write.
+
+Sentinel goes to each agent that setup finds: Codex, Claude Code, GitHub
+Copilot, Kiro and OpenCode. An agent counts when setup finds its command (or
+the Kiro app on macOS) or its configuration folder. An agent also counts when
+the same selection installs its CLI.
+
+| Agent | Rules | Skills |
+|---|---|---|
+| Codex | `${CODEX_HOME:-~/.codex}/AGENTS.md` | `~/.agents/skills` |
+| Claude Code | `${CLAUDE_CONFIG_DIR:-~/.claude}/CLAUDE.md` | `${CLAUDE_CONFIG_DIR:-~/.claude}/skills` |
+| GitHub Copilot | `${COPILOT_HOME:-~/.copilot}/copilot-instructions.md` | `~/.agents/skills` |
+| Kiro | `~/.kiro/steering/AGENTS.md` | `~/.kiro/skills` |
+| OpenCode | `${XDG_CONFIG_HOME:-~/.config}/opencode/AGENTS.md` | `~/.agents/skills` |
+
+The `core` skills are `babysit-pr`, `council`, `file-pr`, `full-stop`,
+`leaving-pr-comments`, `modernize`, `sol-loop`, `takeover` and `untangle`. The
+`ui` skills are `beast-ui`, `doc-view`, `frontend-design` and `impeccable`.
+The skills are copies, so an edit to a skill never changes this checkout.
+
+Sentinel writes Kiro files only to `~/.kiro` and ignores `KIRO_HOME`. When
+`KIRO_HOME` names another folder, setup shows a note. With `COPILOT_HOME` set,
+Copilot reads skills only from `$COPILOT_HOME/skills`, so it does not see the
+Sentinel skills.
+
+Check runs the Sentinel check. When a file changed, Check reports it and
+Repair installs Sentinel again. When you untick Sentinel, setup removes the
+rules and skills from each agent that it installed them for. Then it deletes
+its Sentinel checkout.
+
+A Renovate pull request proposes a new Sentinel pin. After you merge and pull
+it, **Update tools** applies it. Coming from dotfiles v1.0.0? Read
+[Sentinel rules and skills](docs/UPGRADING.md#sentinel-rules-and-skills).
+
 Authenticated agent execution remains a separate verification step. Notes remain personal: Neovim
 enables the notes integration only when its vault exists; `NOTES_VAULT` can select another existing vault.
 
@@ -889,9 +903,7 @@ install/update/removal, fresh providers, configured applications and interruptio
 recovery. A local unit pass is not proof of a fresh machine installation.
 Do not enable destructive native package fixtures on an everyday workstation.
 
-[CLAUDE.md](CLAUDE.md) is the coding guide. The
-[retirement map](docs/installer-test-retirement.md) records how old installer tests
-map to the new lifecycle proofs. [Release maintenance](docs/RELEASING.md) defines
+[CLAUDE.md](CLAUDE.md) is the coding guide. [Release maintenance](docs/RELEASING.md) defines
 publication evidence and review gates. The machine JSON entrypoint exists for
 these tests and automation; normal installation uses the menu.
 
@@ -918,12 +930,12 @@ successful local checks do not establish current live GitHub settings.
 | `lazygit/config.windows.yml`, `herdr/config.windows.toml` | Passive released Windows live-link sources for migration |
 | `home/`, `shells/`, `windows/chezmoi-*` | Passive released sources needed during migration |
 | `tests/`, `.github/workflows/` | Local and native verification |
-| `docs/` | Operator guidance, delivery status and review evidence |
+| `docs/` | Upgrade, release and security guides, and release notes |
 
 ## License
 
-See [LICENSE](LICENSE). Vendored policy and tool artifacts retain their own
-licenses and provenance.
+See [LICENSE](LICENSE). Pinned tool artifacts and the Mason registry snapshot
+keep their own licenses.
 
 
 ## Acceptance coverage
@@ -931,8 +943,7 @@ licenses and provenance.
 GitHub runs real native installation, migration, application and preservation
 checks on the supported targets. The core jobs begin with keyboard-driven public
 setup, followed through Check, Update, Repair and Remove/Reinstall. Agent checks
-exercise installed Sentinel discovery and helpers without model calls; desktop
-checks use VS Code's editor to edit, save, close and reopen a document.
-[Installer status](docs/installer-status.md) distinguishes implementation from
-passed evidence. Actual reboots, first-time permission grants and visual usability
-remain separately recorded manual checks; no dedicated CI Mac is required.
+run the installed CLIs without model calls. Desktop checks use the VS Code editor
+to edit, save, close and open a document again. Actual reboots, first-time
+permission grants and visual usability remain manual checks. No dedicated CI
+Mac is necessary.
