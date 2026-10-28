@@ -169,18 +169,6 @@ func TestNativePublicInteractiveLifecycle(t *testing.T) {
 	// compiler cache is excluded explicitly; it is not installer ownership state.
 	journalRoot := stateDirectory
 	defer func() { archivePublicJourney(t, journalRoot, filepath.Join(evidence, "installer-state.tar.gz")) }()
-	policy := filepath.Join(private, ".codex", "AGENTS.md")
-	original := "Personal rules before installation.\n<!-- AGENT-RULES:BEGIN -->\nEarlier personal policy.\n<!-- AGENT-RULES:END -->\n"
-	if err := os.MkdirAll(filepath.Dir(policy), 0700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(policy, []byte(original), 0640); err != nil {
-		t.Fatal(err)
-	}
-	policyInfo, err := os.Stat(policy)
-	if err != nil {
-		t.Fatal(err)
-	}
 	personal := filepath.Join(private, "personal document ü.txt")
 	if err := os.WriteFile(personal, []byte("one\nacceptance needle\nthree\n"), 0600); err != nil {
 		t.Fatal(err)
@@ -205,8 +193,8 @@ func TestNativePublicInteractiveLifecycle(t *testing.T) {
 		}
 		return result
 	}
-	selected := []string{"ripgrep", "sentinel"}
-	initial := engine.Request{Schema: 1, Mode: "apply", Selected: selected, Adopt: []string{"integration.sentinel"}}
+	selected := []string{"ripgrep"}
+	initial := engine.Request{Schema: 1, Mode: "apply", Selected: selected}
 	preview := invoke(t, initial)
 	if preview.Status != "preview" {
 		t.Fatal("initial public preview", preview)
@@ -388,15 +376,6 @@ func TestNativePublicInteractiveLifecycle(t *testing.T) {
 		}
 	}
 	consume()
-	file, err := os.OpenFile(policy, os.O_APPEND|os.O_WRONLY, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
-	later := "Later personal rules.\n"
-	_, writeErr := io.WriteString(file, later)
-	if err := errors.Join(writeErr, file.Close()); err != nil {
-		t.Fatal(err)
-	}
 	check := func(name string) {
 		t.Helper()
 		before := publicTree(t, stateDirectory)
@@ -429,13 +408,8 @@ func TestNativePublicInteractiveLifecycle(t *testing.T) {
 		if _, err := os.Lstat(command); !errors.Is(err, os.ErrNotExist) {
 			t.Fatal("removed command remains", err)
 		}
-		contents, err := os.ReadFile(policy)
-		if err != nil || string(contents) != original+later {
-			t.Fatal("removal lost the original policy or later personal edit", err)
-		}
-		info, err := os.Stat(policy)
-		if err != nil || info.Mode() != policyInfo.Mode() || !reflect.DeepEqual(personalBefore, publicTree(t, personal)) {
-			t.Fatal("personal contents or native permissions changed", err)
+		if !reflect.DeepEqual(personalBefore, publicTree(t, personal)) {
+			t.Fatal("personal contents or native permissions changed")
 		}
 		if cycle == 0 {
 			journey("07-reinstall", "choose", initial, true)

@@ -6,11 +6,6 @@ private pinned archives, configuration publication and scoped settings to the
 same planner and recoverable executor. The [operator guide](../README.md)
 lists the current capabilities and supported platform combinations.
 
-This is a major-release candidate. Legacy runtime retirement is implemented;
-delivery requires the final independent review and all native/quality checks at
-the exact PR head. See [installer status](../docs/installer-status.md) for dated
-evidence and outstanding verification.
-
 Migration has two explicit machine phases: `DOTFILES_MIGRATION_PHASE=profiles`
 keeps the released preparation protocol, while `runtime` uses a separate retirement
 catalog, state and saved native outcomes. Interactive migration runs configuration
@@ -46,8 +41,7 @@ worker, attributes ownership to operation-specific native logs and removes exact
 owned packages while protecting other consumers. Interactive authentication stays
 in the foreground; machine requests require existing noninteractive privilege.
 Incomplete worker records or truncated native history require inspection and do
-not grant ownership or automatic replay. Local and hosted native evidence is
-tracked by revision in the status inventory.
+not grant ownership or automatic replay.
 The installed-application native test requires both `GITHUB_ACTIONS=true` and
 `DOTFILES_TEST_NATIVE_PACKAGES=1`: it deliberately removes the runner's tmux test
 prerequisite to establish a real from-absent baseline. Never enable this on a
@@ -83,8 +77,8 @@ downloads: the macOS commands run from a private, unmodified copy of
 `~/.local/bin` aliases. `integration.kiro` owns only `app.disableAutoupdates` in
 `${KIRO_HOME:-~/.kiro}/settings/cli.json`, so Kiro cannot replace the pinned
 payload; Update applies new reviewed pins. The native agent test runs Copilot on
-all four targets and Kiro on macOS/Linux without credentials, and copies Sentinel
-skills into the now-present Kiro. Kiro CLI is not offered on Windows: Kiro ships it
+all four targets and Kiro on macOS/Linux without credentials. Kiro CLI is not
+offered on Windows: Kiro ships it
 there only as an MSI installer, and setup neither runs that installer nor extracts
 programs from it (owner decision 2026-10-22). A plain Windows archive from Kiro
 would make it addable like the other targets.
@@ -95,10 +89,38 @@ which verifies vendor signatures, integrity hashes and layouts before changing
 only version, URL and SHA-256; the pull request's native checks and the owner's
 merge remain the acceptance boundary.
 
-The [plan](../docs/plans/interactive-installer-overhaul.md),
-[status inventory](../docs/installer-status.md) and append-only
-[review ledger](../docs/reviews/2026-10-08-interactive-installer-overhaul.md) separate
-architecture decisions, implemented behavior and exact verification evidence.
+Sentinel rules and skills (`sentinel`) needs the hidden
+`integration.sentinel-installer` resource, which needs `tool.git`. That resource
+fetches the commit that `sentinel.go` pins into `<state>/sentinel/checkout`.
+Git runs without system or global configuration. `HEAD` must equal the pin, and
+each file must equal the tree of the pin as raw bytes. Git index flags, local
+filters and replacement objects do not count.
+
+Check, update and removal run Sentinel only from such a checkout. Removal
+fetches the pin again when necessary.
+
+`<state>/sentinel/record.json` saves the
+intent of each operation before it changes anything, and its completion after.
+An interrupted operation resumes: the Sentinel installer runs again. The record
+also keeps the hosts and the folder variables of the install.
+
+Then the resource runs the Sentinel installer of that checkout. On macOS and
+Linux it runs `bash tools/install --global --hosts <hosts> --skills core,ui`.
+On Windows it runs `powershell.exe -NoProfile -ExecutionPolicy Bypass -File
+tools\install.ps1 -Global -Hosts <hosts> -Skills core,ui`. The hosts are the
+present agents among Codex, Claude Code, Copilot, Kiro and OpenCode. Check runs
+the same installer with `--check`. Exit 0 is healthy, exit 1 is drift for
+Repair, and any other exit is an error.
+
+Removal runs `--remove` for each host that dotfiles installed for, then deletes
+`<state>/sentinel`. The resources `integration.sentinel`,
+`skills.sentinel-agents`, `skills.sentinel-claude`, `skills.sentinel-kiro` and
+`skills.sentinel-copilot` stay in the catalog only for the v1.0.0 handoff. The
+first apply deletes the skill folders that their receipts list, when a hash
+check against the saved journal proves the copied bytes. Then it releases those
+receipts. The [migration guide](../docs/UPGRADING.md#sentinel-rules-and-skills)
+describes the handoff.
+
 The never-released Go Nix prototype and its dedicated experiments have been
 removed. Previous released installers and their pinned source evidence remain
 available for recovery of their own unfinished transactions.
@@ -176,8 +198,6 @@ Missing/null selection never means remove everything. Maintenance and retry reta
 recorded selection. `DOTFILES_CHECKOUT` supplies the trusted checkout. Public
 entrypoints call `scripts/installer-bootstrap.{sh,ps1}` to verify a private pinned
 Go toolchain, build from the checkout and cache the binary by source identity.
-Native public-command lifecycle evidence and remaining migration work are recorded
-in the status inventory.
 
 Resources become owned only after a provider proves completion of the operation
 recorded before mutation. Existing files, matching bytes or an inventory change
@@ -251,9 +271,7 @@ restoration. They do not prove package installation or privilege handling.
 The published checkpoint `e1c987d` passes the native matrix on all four
 OS/architecture targets, including actual changed-version update and restricted-
 token Windows permission tests. WSL uses the Linux lifecycle; its former separate
-boot-only CI probe is retired. Historical
-failures, fixes and independent reviews are retained in the append-only review
-ledger; current outstanding work belongs in the status inventory.
+boot-only CI probe is retired.
 
 `DOTFILES_TEST_NATIVE_PACKAGES=1` additionally opts a disposable Linux host into
 an APT contract test. It builds uniquely named local fixture packages without
@@ -358,10 +376,7 @@ and ripgrep consumption are followed through the whole maintenance lifecycle.
 The retained tar excludes the compiler bootstrap cache, and includes original
 installer journals/payloads even on failure. Never run this on a personal host.
 
-The existing agent native lane also exercises both installed skill-discovery
-protocols, real Node helpers and Sentinel Remove/Reinstall with personal data and
-repair evidence. Impeccable setup is an explicit fixture action; its cache stays
-personal. The Code desktop witness uses editor APIs, saves actual bytes, waits
+The Code desktop witness uses editor APIs, saves actual bytes, waits
 for document disposal and reopens from disk; it also checks native file modes.
 These hosted checks do not certify actual OS reboot or first-time permission
 grants. The owner declined dedicated VM CI on 2026-10-20.

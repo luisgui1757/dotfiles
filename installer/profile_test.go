@@ -173,75 +173,64 @@ func TestProfileBlockOpeningTheFileSurvivesFormatterAndLifecycle(t *testing.T) {
 }
 
 func TestProfileMixedNewlineOutsideEditsPreserveBlockLifecycle(t *testing.T) {
-	for _, kind := range []string{"shell", "sentinel"} {
-		for _, encoding := range []struct {
-			name string
-			bom  []byte
-		}{{"utf8", nil}, {"utf8-bom", []byte{0xef, 0xbb, 0xbf}}, {"utf16-le", []byte{0xff, 0xfe}}, {"utf16-be", []byte{0xfe, 0xff}}} {
-			for _, ending := range []struct{ name, owned, outside string }{{"lf", "\n", "\r\n"}, {"crlf", "\r\n", "\n"}} {
-				t.Run(kind+"/"+encoding.name+"/"+ending.name, func(t *testing.T) {
-					c, d, path := profileController(t)
-					selected, id := "test", "profile.test"
-					oldScript, newScript := "# first version", "# second version"
-					if kind == "sentinel" {
-						c, d = sentinelController(t)
-						selected, id = "sentinel", sentinelResource
-						path = d.Targets[id][0].Path
-						oldScript, newScript = "version: 0.1.2", "version: 0.1.3"
-					}
-					encode, _, err := profileEncoding(encoding.bom)
-					if err != nil {
-						t.Fatal(err)
-					}
-					original := append(bytes.Clone(encoding.bom), encode("# personal café"+ending.owned)...)
-					writeConfigFixture(t, path, string(original))
-					dispatchApproved(t, c, Request{Schema: 1, Mode: "apply", Selected: []string{selected}})
-					installed, err := os.ReadFile(path)
-					if err != nil {
-						t.Fatal(err)
-					}
-					outside := encode("# later personal edit 🌍" + ending.outside)
-					edited := append(bytes.Clone(installed), outside...)
-					if err := os.WriteFile(path, edited, 0600); err != nil {
-						t.Fatal(err)
-					}
-					check, err := c.Dispatch(context.Background(), Request{Schema: 1, Mode: "check"})
-					if err != nil || check.Status != "ready" {
-						t.Fatal("outside line endings invalidated the managed block", check.Status, err)
-					}
-					preview, err := c.Preview(context.Background(), Request{Schema: 1, Mode: "update"})
-					if err != nil || len(preview.Operations) != 1 || preview.Operations[0].Action != "keep" {
-						t.Fatal("outside edit proposed a spurious repair", preview, err)
-					}
-					d.Targets[id][0].Script = strings.Replace(d.Targets[id][0].Script, oldScript, newScript, 1)
-					dispatchApproved(t, c, Request{Schema: 1, Mode: "update"})
-					updated, err := os.ReadFile(path)
-					want := bytes.Replace(edited, encode(oldScript), encode(newScript), 1)
-					if err != nil || !bytes.Equal(updated, want) {
-						t.Fatal("update changed bytes outside its script", err)
-					}
-					dispatchApproved(t, c, Request{Schema: 1, Mode: "apply", Selected: []string{}})
-					restored, err := os.ReadFile(path)
-					if err != nil || !bytes.Equal(restored, append(bytes.Clone(original), outside...)) {
-						t.Fatal("removal changed personal bytes", err)
-					}
-				})
-			}
+	for _, encoding := range []struct {
+		name string
+		bom  []byte
+	}{{"utf8", nil}, {"utf8-bom", []byte{0xef, 0xbb, 0xbf}}, {"utf16-le", []byte{0xff, 0xfe}}, {"utf16-be", []byte{0xfe, 0xff}}} {
+		for _, ending := range []struct{ name, owned, outside string }{{"lf", "\n", "\r\n"}, {"crlf", "\r\n", "\n"}} {
+			t.Run("shell/"+encoding.name+"/"+ending.name, func(t *testing.T) {
+				c, d, path := profileController(t)
+				selected, id := "test", "profile.test"
+				oldScript, newScript := "# first version", "# second version"
+				encode, _, err := profileEncoding(encoding.bom)
+				if err != nil {
+					t.Fatal(err)
+				}
+				original := append(bytes.Clone(encoding.bom), encode("# personal café"+ending.owned)...)
+				writeConfigFixture(t, path, string(original))
+				dispatchApproved(t, c, Request{Schema: 1, Mode: "apply", Selected: []string{selected}})
+				installed, err := os.ReadFile(path)
+				if err != nil {
+					t.Fatal(err)
+				}
+				outside := encode("# later personal edit 🌍" + ending.outside)
+				edited := append(bytes.Clone(installed), outside...)
+				if err := os.WriteFile(path, edited, 0600); err != nil {
+					t.Fatal(err)
+				}
+				check, err := c.Dispatch(context.Background(), Request{Schema: 1, Mode: "check"})
+				if err != nil || check.Status != "ready" {
+					t.Fatal("outside line endings invalidated the managed block", check.Status, err)
+				}
+				preview, err := c.Preview(context.Background(), Request{Schema: 1, Mode: "update"})
+				if err != nil || len(preview.Operations) != 1 || preview.Operations[0].Action != "keep" {
+					t.Fatal("outside edit proposed a spurious repair", preview, err)
+				}
+				d.Targets[id][0].Script = strings.Replace(d.Targets[id][0].Script, oldScript, newScript, 1)
+				dispatchApproved(t, c, Request{Schema: 1, Mode: "update"})
+				updated, err := os.ReadFile(path)
+				want := bytes.Replace(edited, encode(oldScript), encode(newScript), 1)
+				if err != nil || !bytes.Equal(updated, want) {
+					t.Fatal("update changed bytes outside its script", err)
+				}
+				dispatchApproved(t, c, Request{Schema: 1, Mode: "apply", Selected: []string{}})
+				restored, err := os.ReadFile(path)
+				if err != nil || !bytes.Equal(restored, append(bytes.Clone(original), outside...)) {
+					t.Fatal("removal changed personal bytes", err)
+				}
+			})
 		}
 	}
 }
 
 func TestProfileUTF16FragmentsDoNotRelaxFullFileValidation(t *testing.T) {
-	for _, id := range []string{"profile.test", sentinelResource} {
+	for _, id := range []string{"profile.test"} {
 		for _, bom := range [][]byte{{0xff, 0xfe}, {0xfe, 0xff}} {
 			encode, _, err := profileEncoding(bom)
 			if err != nil {
 				t.Fatal(err)
 			}
 			block := encode("\n# >>> dotfiles:profile.test >>>\n# saved script\n# <<< dotfiles:profile.test <<<\n")
-			if id == sentinelResource {
-				block = encode(sentinelBegin + "\n# saved policy\n" + sentinelEnd + "\n")
-			}
 			_, saved, err := replaceProfileBlock(block, id, nil)
 			if err != nil || !bytes.Equal(saved, block) {
 				t.Fatal("schema-1 encoded fragment was not readable", err)

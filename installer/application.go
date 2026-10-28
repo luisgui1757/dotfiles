@@ -72,19 +72,20 @@ func NewNativeController(repository, source, stateDirectory string, platform Nat
 	if err := configureWindowsTerminal(profiles, target, folders, repository, windowsPowerShell); err != nil {
 		return controller, err
 	}
-	if err := configureSentinel(profiles, folders, platform.Sentinel, nil); err != nil {
-		return controller, err
-	}
 	statePath := filepath.Join(stateDirectory, "state.json")
 	driver := &NativeDriver{Catalog: catalog, Context: target, Archives: archives, Configurations: configurations, Profiles: profiles, HomebrewIssue: platform.HomebrewIssue, APTIssue: platform.APTIssue,
 		StatePath: statePath, session: newNativeSession(filepath.Join(stateDirectory, "native", "worker"))}
 	driver.LinuxClipboard = platform.LinuxClipboard
-	node, err := archives.CommandPath("tool.node", "node")
+	git, err := sentinelGit(platform, archives)
 	if err != nil {
 		return controller, err
 	}
-	driver.SentinelSkills = &SentinelSkillsDriver{Target: target, Home: folders.Home, ClaudeConfigDir: platform.Sentinel.ClaudeConfigDir, KiroHome: platform.Sentinel.KiroHome, CopilotHome: platform.Sentinel.CopilotHome, Agents: platform.Sentinel.Installed, Repository: repository, Directory: stateDirectory, Node: node,
-		SkillsLocks: skillsCLILocks(folders.Home, platform.Sentinel.StateHome)}
+	shell := "/bin/bash"
+	if target.OS == "windows" {
+		shell = platform.WindowsPowerShell
+	}
+	driver.Sentinel = &SentinelDriver{Target: target, Home: folders.Home, Locations: platform.Sentinel, State: stateDirectory, Repository: sentinelRepository, Commit: sentinelCommit,
+		Git: git, Shell: shell, Run: driver.session.run, Query: querySentinel}
 	archives.Run = driver.session.run
 	driver.Desktop = &DesktopDriver{Target: target, Folders: folders, Directory: stateDirectory, Archives: archives, PowerShell: platform.WindowsPowerShell, Run: driver.session.run}
 	driver.Fonts = &FontDriver{Target: target, Folders: folders, Directory: stateDirectory, Archives: archives, PowerShell: platform.WindowsPowerShell, Run: driver.session.run, FontMatch: "/usr/bin/fc-match", FontCache: "/usr/bin/fc-cache"}
@@ -158,9 +159,6 @@ func NewNativeController(repository, source, stateDirectory string, platform Nat
 		}
 		if err == nil {
 			err = configureWindowsTerminal(bound, target, folders, repository, windowsPowerShell)
-		}
-		if err == nil {
-			err = configureSentinel(bound, folders, platform.Sentinel, selected)
 		}
 		return bound, err
 	}

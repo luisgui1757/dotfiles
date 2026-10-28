@@ -226,7 +226,6 @@ func TestNativeAgentCLIInstalledApplicationLifecycle(t *testing.T) {
 		}
 		exerciseAgentCLI(t, commands[id], product, home)
 	}
-	exerciseInstalledSentinelLifecycle(t, c, home, commands, invoke, apply)
 	agents := []string{"tool.t3", "tool.claude", "tool.codex", "tool.copilot"}
 	selected := []string{"t3-code", "claude-code", "codex", "copilot-cli"}
 	apply(Request{Schema: 1, Mode: "apply", Selected: selected})

@@ -82,9 +82,7 @@ func TestNativeWindowsPublicMigrationSetupLifecycle(t *testing.T) {
 	for _, profile := range migration.driver.profiles {
 		assertAbsent(migration.driver.destination(profile))
 	}
-	platform := NativePlatform{Context: target, Sentinel: SentinelLocations{
-		CodexHome: os.Getenv("CODEX_HOME"), ConfigHome: os.Getenv("XDG_CONFIG_HOME"), ClaudeConfigDir: os.Getenv("CLAUDE_CONFIG_DIR"),
-	}}
+	platform := NativePlatform{Context: target}
 	c, err := NewNativeController(repository, "inspection", stateDirectory, platform, folders)
 	if err != nil {
 		t.Fatal(err)
@@ -93,15 +91,6 @@ func TestNativeWindowsPublicMigrationSetupLifecycle(t *testing.T) {
 	shellTargets := driver.Profiles.Targets["integration.shells"]
 	for _, target := range shellTargets {
 		assertAbsent(target.Path)
-	}
-	// Sentinel writes only for present agents; every consumer location must be
-	// fresh. The prior Codex policy written below makes Codex present.
-	for _, consumer := range driver.Profiles.SentinelConsumers {
-		assertAbsent(consumer.Target)
-	}
-	codexPolicy := driver.Profiles.SentinelConsumers[0]
-	if codexPolicy.Agent != "codex" {
-		t.Fatal("Sentinel consumer order changed", codexPolicy)
 	}
 	starshipTargets, err := driver.Configurations.Manifest.Resolve(c.Catalog, target, folders, repository, "config.starship")
 	if err != nil || len(starshipTargets) != 1 {
@@ -219,37 +208,17 @@ func TestNativeWindowsPublicMigrationSetupLifecycle(t *testing.T) {
 	}
 	personalShell := "# personal AllHosts preferences\r\n"
 	writeConfigFixture(t, allHosts, personalShell)
-	policy := codexPolicy.Target
-	priorPolicy := "# personal instructions\n<!-- AGENT-RULES:BEGIN -->\nOld policy\n<!-- AGENT-RULES:END -->\n"
-	writeConfigFixture(t, policy, priorPolicy)
 
 	t.Setenv("DOTFILES_ENTRYPOINT", "setup")
-	approve(Request{Schema: 1, Mode: "apply", Selected: []string{"starship", "sentinel"}, Adopt: []string{sentinelResource}})
+	approve(Request{Schema: 1, Mode: "apply", Selected: []string{"starship"}})
 	installed, err := LoadState(c.StatePath, folders.Home)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, id := range []string{"tool.starship", "config.starship", "integration.shells", sentinelResource} {
+	for _, id := range []string{"tool.starship", "config.starship", "integration.shells"} {
 		if receipt := installed.Receipts[id]; receipt.Status != "ready" || receipt.Ownership != "created" {
 			t.Fatal("setup did not complete an owned selection", id, receipt)
 		}
-	}
-	if !installed.Receipts[sentinelResource].Adopted {
-		t.Fatal("setup did not record the explicit prior-policy adoption")
-	}
-	// Present agents decide the published targets; the saved first baseline
-	// records exactly which ones, and must include the adopted Codex policy.
-	var baseline profileBaseline
-	baselineData, err := os.ReadFile(driver.Profiles.baselinePath(installed.Receipts[sentinelResource].Recovery))
-	if err == nil {
-		err = Decode(baselineData, &baseline)
-	}
-	if err != nil || len(baseline.Entries) == 0 || baseline.Entries[0].Path != policy {
-		t.Fatal("setup did not record the present agents' policy targets", baseline.Entries, err)
-	}
-	policyTargets := []string{}
-	for _, entry := range baseline.Entries {
-		policyTargets = append(policyTargets, entry.Path)
 	}
 	assertInstalled := func() {
 		t.Helper()
@@ -257,12 +226,6 @@ func TestNativeWindowsPublicMigrationSetupLifecycle(t *testing.T) {
 			data, err := os.ReadFile(target.Path)
 			if err != nil || !bytes.Contains(data, []byte("# >>> dotfiles:integration.shells >>>")) {
 				t.Fatal("scoped shell attachment was not published", target.Path, err)
-			}
-		}
-		for _, target := range policyTargets {
-			data, err := os.ReadFile(target)
-			if err != nil || !bytes.Contains(data, []byte("Operating Contract")) {
-				t.Fatal("actual Sentinel policy was not published", target, err)
 			}
 		}
 		assertBytes(profile, laterProfile)
@@ -298,14 +261,10 @@ func TestNativeWindowsPublicMigrationSetupLifecycle(t *testing.T) {
 	approve(Request{Schema: 1, Mode: "apply", Selected: []string{}})
 	assertBytes(allHosts, personalShell+laterShell)
 	assertBytes(profile, laterProfile)
-	assertBytes(policy, priorPolicy)
 	for _, target := range shellTargets {
 		if target.Path != allHosts {
 			assertAbsent(target.Path)
 		}
-	}
-	for _, target := range policyTargets[1:] {
-		assertAbsent(target)
 	}
 	assertAbsent(starshipTargets[0].Destination)
 	starship, err := driver.Archives.CommandPath("tool.starship", "starship")
@@ -323,6 +282,5 @@ func TestNativeWindowsPublicMigrationSetupLifecycle(t *testing.T) {
 	}
 	assertBytes(profile, laterProfile)
 	assertBytes(allHosts, personalShell+laterShell)
-	assertBytes(policy, priorPolicy)
 	assertBackups()
 }

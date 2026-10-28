@@ -3,7 +3,6 @@ package installer
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -14,9 +13,9 @@ import (
 )
 
 // exerciseInstalledKiroCLI runs the pinned Kiro CLI commands without
-// credentials, proves that its one owned setting turns self-update off beside
-// personal settings, and that Sentinel skills reach the now-present Kiro. The
-// caller's later Check, Update and removal cover the payload and witnesses.
+// credentials and proves that its one owned setting turns self-update off
+// beside personal settings. The caller's later Check, Update and removal cover
+// the payload and witnesses.
 func exerciseInstalledKiroCLI(t *testing.T, d *NativeDriver, home string, witnesses map[string]string, apply func(Request) Result, base []string) string {
 	t.Helper()
 	kiro := filepath.Join(home, ".kiro")
@@ -30,7 +29,7 @@ func exerciseInstalledKiroCLI(t *testing.T, d *NativeDriver, home string, witnes
 		witnesses[path] = contents
 	}
 	selected := append(slices.Clone(base), "kiro-cli")
-	apply(Request{Schema: 1, Mode: "apply", Selected: append(slices.Clone(selected), "sentinel-skills")})
+	apply(Request{Schema: 1, Mode: "apply", Selected: selected})
 	pin, ok := d.Archives.Pins["tool.kiro"]
 	if !ok {
 		t.Fatal("native runner has no Kiro CLI artifact")
@@ -59,24 +58,7 @@ func exerciseInstalledKiroCLI(t *testing.T, d *NativeDriver, home string, witnes
 	if err != nil || values["app.disableAutoupdates"] != true || values["chat.greeting.enabled"] != false {
 		t.Fatalf("Kiro CLI can still replace its pinned payload or lost a personal setting: %q %v", data, err)
 	}
-	names, err := sentinelSkillNames()
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, name := range names {
-		expected, err := snapshotConfig(filepath.Join(d.SentinelSkills.Repository, "vendor", "sentinel", "skills", name))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := verifyConfigSnapshot(filepath.Join(kiro, "skills", name), expected); err != nil {
-			t.Fatal("Kiro skill is not an exact upstream copy", name, err)
-		}
-	}
-	apply(Request{Schema: 1, Mode: "apply", Selected: selected, RemoveShared: []string{"tool.node"}})
-	if _, err := os.Lstat(filepath.Join(kiro, "skills")); !errors.Is(err, os.ErrNotExist) {
-		t.Fatal("skill removal left the Kiro skills folder setup created", err)
-	}
-	t.Log("installed Kiro CLI: pinned commands run without credentials, self-update off beside personal settings, Sentinel skills copied to and removed from Kiro")
+	t.Log("installed Kiro CLI: pinned commands run without credentials, self-update off beside personal settings")
 	return commands["kiro-cli"]
 }
 

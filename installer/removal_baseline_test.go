@@ -355,7 +355,7 @@ func TestPreservationFailureKeepsCompletedRemovalEvidence(t *testing.T) {
 }
 
 func TestCompletedConfigurationRemovalStaysReleased(t *testing.T) {
-	for _, kind := range []string{"json", "configuration", "sentinel"} {
+	for _, kind := range []string{"json", "configuration"} {
 		t.Run(kind, func(t *testing.T) {
 			var c Controller
 			var path, resource, original string
@@ -363,12 +363,6 @@ func TestCompletedConfigurationRemovalStaysReleased(t *testing.T) {
 			if kind == "json" {
 				c, _, path = jsonSettingsController(t)
 				resource, original = "profile.test", `{"theme":"personal","fontSize":16}`
-			} else if kind == "sentinel" {
-				var d *ProfileDriver
-				c, d = sentinelController(t)
-				path = d.Targets[sentinelResource][0].Path
-				resource, selected = sentinelResource, "sentinel"
-				original = "My prose.\n\n<!-- AGENT-RULES:BEGIN -->\nEarlier personal policy.\n" + sentinelEnd + "\nTrailing prose."
 			} else {
 				c, _, path = nativeConfigFixture(t, "copy")
 				resource, original = "config.test", "personal original configuration"

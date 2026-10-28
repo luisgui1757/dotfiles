@@ -797,12 +797,13 @@ func TestInstalledMigrationPhaseIsExplicit(t *testing.T) {
 
 func TestLegacySentinelPolicyFixtureMatchesPin(t *testing.T) {
 	data, err := os.ReadFile(filepath.Join("testdata", "released-sentinel-0.1.2-policy.md"))
-	if err != nil || legacyHash(data) != legacySentinelPolicySHA256 || !strings.HasPrefix(string(data), sentinelBegin+"\n<!-- version: 0.1.2 ") {
+	if err != nil || legacyHash(data) != legacySentinelPolicySHA256 || !strings.HasPrefix(string(data), "<!-- AGENT-RULES:BEGIN do-not-edit-inside-this-block -->\n<!-- version: 0.1.2 ") {
 		t.Fatal("released Sentinel policy fixture differs from its pin", err)
 	}
 }
 
-// Only exact released bytes are removed; mixed and edited files stay intact.
+// Only exact released bytes are removed; edited files stay intact. OpenCode is
+// a Sentinel host now, so its policy file stays even with the released bytes.
 func TestLegacySentinelPolicyRetirementRemovesOnlyExactReleasedFiles(t *testing.T) {
 	released, err := os.ReadFile(filepath.Join("testdata", "released-sentinel-0.1.2-policy.md"))
 	if err != nil {
@@ -816,18 +817,14 @@ func TestLegacySentinelPolicyRetirementRemovesOnlyExactReleasedFiles(t *testing.
 			if _, err := Execute(ctx, c, linux, "source", home, normalDriver.statePath, approve(t, c, normalDriver, Request{Schema: 1, Mode: "apply", Selected: []string{}}), normalDriver); err != nil {
 				t.Fatal(err)
 			}
+			pi := filepath.Join(home, ".pi", "agent", "AGENTS.md")
 			opencode := filepath.Join(home, ".config", "opencode", "AGENTS.md")
-			plugin := filepath.Join(home, ".config", "opencode", "package.json")
-			mixed := filepath.Join(home, ".pi", "agent", "AGENTS.md")
+			writeConfigFixture(t, pi, string(released))
 			writeConfigFixture(t, opencode, string(released))
-			writeConfigFixture(t, plugin, "{\"personal\":true}\n")
-			writeConfigFixture(t, mixed, "# Personal Pi rules\n"+string(released))
 			scope, err := retirement.driver.inspect(ctx, "retire.sentinel-policy")
-			if err != nil || len(scope.Steps) != 1 || scope.Steps[0].Kind != "discard" || scope.Steps[0].Path != opencode || len(scope.Retained) != 0 ||
-				!slices.ContainsFunc(scope.Detail, func(detail string) bool {
-					return strings.Contains(detail, mixed) && strings.Contains(detail, "other text")
-				}) {
-				t.Fatal("retirement did not separate exact and mixed policy files", scope, err)
+			if err != nil || len(scope.Steps) != 1 || scope.Steps[0].Kind != "discard" || scope.Steps[0].Path != pi || len(scope.Retained) != 0 ||
+				slices.ContainsFunc(scope.Detail, func(detail string) bool { return strings.Contains(detail, opencode) }) {
+				t.Fatal("retirement did not select only the exact Pi policy file", scope, err)
 			}
 			request := Request{Schema: 1, Mode: "apply", Selected: []string{"retire.sentinel-policy"}}
 			preview, err := retirement.Controller.Dispatch(ctx, request)
@@ -835,11 +832,11 @@ func TestLegacySentinelPolicyRetirementRemovesOnlyExactReleasedFiles(t *testing.
 				t.Fatal(preview, err)
 			}
 			if edited {
-				writeConfigFixture(t, opencode, string(released)+"Personal addition.\n")
+				writeConfigFixture(t, pi, string(released)+"Personal addition.\n")
 			}
 			request.ExpectedPlan = preview.Plan.ID
 			result, err := retirement.Controller.Dispatch(ctx, request)
-			_, statErr := os.Stat(opencode)
+			_, statErr := os.Stat(pi)
 			if edited {
 				if result.Status == "ready" || statErr != nil {
 					t.Fatal("an edited policy file was removed", result, err, statErr)
@@ -847,21 +844,35 @@ func TestLegacySentinelPolicyRetirementRemovesOnlyExactReleasedFiles(t *testing.
 			} else if err != nil || result.Status != "ready" || !errors.Is(statErr, os.ErrNotExist) {
 				t.Fatal("the exact released policy file was not removed", result, err, statErr)
 			}
-			if data, err := os.ReadFile(plugin); err != nil || string(data) != "{\"personal\":true}\n" {
-				t.Fatal("another OpenCode file changed", err)
-			}
-			if data, err := os.ReadFile(mixed); err != nil || string(data) != "# Personal Pi rules\n"+string(released) {
-				t.Fatal("a mixed policy file changed", err)
-			}
-			if edited {
-				return
-			}
-			// A kept file for an unsupported agent is not unfinished migration.
-			resource, _ := retirement.Controller.Catalog.Resource("retire.sentinel-policy")
-			if o, err := retirement.driver.Observe(ctx, resource, Receipt{}); err != nil || !o.Healthy || o.ApplyBlocked != "" {
-				t.Fatal("a kept mixed policy file blocked migration", o, err)
+			if data, err := os.ReadFile(opencode); err != nil || string(data) != string(released) {
+				t.Fatal("retirement changed the OpenCode policy file", err)
 			}
 		})
+	}
+}
+
+func TestLegacySentinelPolicyRetirementKeepsMixedPiPolicy(t *testing.T) {
+	released, err := os.ReadFile(filepath.Join("testdata", "released-sentinel-0.1.2-policy.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	retirement, _, home := legacyEngineFixture(t)
+	mixed := filepath.Join(home, ".pi", "agent", "AGENTS.md")
+	writeConfigFixture(t, mixed, "# Personal Pi rules\n"+string(released))
+	scope, err := retirement.driver.inspect(context.Background(), "retire.sentinel-policy")
+	if err != nil || len(scope.Steps) != 0 || len(scope.Retained) != 0 ||
+		!slices.ContainsFunc(scope.Detail, func(detail string) bool {
+			return strings.Contains(detail, mixed) && strings.Contains(detail, "other text")
+		}) {
+		t.Fatal("retirement did not keep and name the mixed policy file", scope, err)
+	}
+	// A kept file for an unsupported agent is not unfinished migration.
+	resource, _ := retirement.Controller.Catalog.Resource("retire.sentinel-policy")
+	if o, err := retirement.driver.Observe(context.Background(), resource, Receipt{}); err != nil || !o.Healthy || o.ApplyBlocked != "" {
+		t.Fatal("a kept mixed policy file blocked migration", o, err)
+	}
+	if data, err := os.ReadFile(mixed); err != nil || string(data) != "# Personal Pi rules\n"+string(released) {
+		t.Fatal("a mixed policy file changed", err)
 	}
 }
 
@@ -869,7 +880,7 @@ func TestLegacySentinelPolicyRetirementKeepsLinksWithoutMislabelling(t *testing.
 	retirement, _, home := legacyEngineFixture(t)
 	personal := filepath.Join(home, "rules.md")
 	writeConfigFixture(t, personal, "# Personal rules without Sentinel\n")
-	link := filepath.Join(home, ".config", "opencode", "AGENTS.md")
+	link := filepath.Join(home, ".pi", "agent", "AGENTS.md")
 	if err := os.MkdirAll(filepath.Dir(link), 0700); err != nil {
 		t.Fatal(err)
 	}

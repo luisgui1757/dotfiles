@@ -115,6 +115,11 @@ jobs:
           DOTFILES_TEST_ARCHIVES: '1'
           DOTFILES_TEST_PUBLIC_WINDOWS: '1'
         run: go test -v -count=1 -timeout 20m -run '^TestNativeArchive' ./...
+      - name: Install, check and remove the pinned Sentinel commit, and hand over from v1.0.0
+        if: ${{ !cancelled() && runner.os == 'Linux' }}
+        env:
+          DOTFILES_TEST_SENTINEL: '1'
+        run: go test -v -count=1 -timeout 20m -run '^TestNativeSentinel' .
       - name: Install, consume, check, update and remove T3 Code and the Claude Code, Codex, Copilot and Kiro CLIs
         if: ${{ !cancelled() }}
         env:

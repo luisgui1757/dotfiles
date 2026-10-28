@@ -316,27 +316,12 @@
     },
     {
       "id": "sentinel",
-      "name": "Sentinel agent policy",
-      "description": "Pinned global policy blocks for coding agents",
+      "name": "Sentinel rules and skills",
+      "description": "The pinned Sentinel installer writes the rules and the core and UI skills for each installed coding agent",
       "capability": true,
       "category": "AI coding",
       "requires": [
-        "integration.sentinel"
-      ],
-      "scope": "user"
-    },
-    {
-      "id": "sentinel-skills",
-      "name": "Sentinel skills",
-      "description": "12 copied coding, design and writing skills for Codex/Copilot, Claude and an installed Kiro; Impeccable engine setup is explicit",
-      "capability": true,
-      "category": "AI coding",
-      "requires": [
-        "skills.sentinel-agents",
-        "skills.sentinel-claude",
-        "skills.sentinel-kiro",
-        "skills.sentinel-copilot",
-        "tool.node"
+        "integration.sentinel-installer"
       ],
       "scope": "user"
     },
@@ -1591,33 +1576,42 @@
       "scope": "user"
     },
     {
-      "id": "integration.sentinel",
-      "name": "Sentinel global policy",
+      "id": "integration.sentinel-installer",
+      "name": "Sentinel installer",
+      "requires": [
+        "tool.git"
+      ],
       "action": "sentinel",
       "scope": "user"
     },
     {
+      "id": "integration.sentinel",
+      "name": "Earlier Sentinel rules from dotfiles 1.0",
+      "action": "sentinel-retired",
+      "scope": "user"
+    },
+    {
       "id": "skills.sentinel-agents",
-      "name": "Sentinel skills for Codex and Copilot",
-      "action": "sentinel-skills",
+      "name": "Earlier Sentinel skills for Codex and Copilot",
+      "action": "sentinel-retired",
       "scope": "user"
     },
     {
       "id": "skills.sentinel-claude",
-      "name": "Sentinel skills for Claude",
-      "action": "sentinel-skills",
+      "name": "Earlier Sentinel skills for Claude",
+      "action": "sentinel-retired",
       "scope": "user"
     },
     {
       "id": "skills.sentinel-kiro",
-      "name": "Sentinel skills for Kiro",
-      "action": "sentinel-skills",
+      "name": "Earlier Sentinel skills for Kiro",
+      "action": "sentinel-retired",
       "scope": "user"
     },
     {
       "id": "skills.sentinel-copilot",
-      "name": "Sentinel skills for Copilot at COPILOT_HOME",
-      "action": "sentinel-skills",
+      "name": "Earlier Sentinel skills for Copilot at COPILOT_HOME",
+      "action": "sentinel-retired",
       "scope": "user"
     },
     {

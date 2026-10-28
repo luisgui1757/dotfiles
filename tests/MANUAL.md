@@ -2,7 +2,7 @@
 
 > Historical Nix/chezmoi release material. Commands below apply only at their
 > recorded revisions; retired launchers are not part of the new installer. Use
-> [the current guide](../README.md) and its linked installer status for this major release.
+> [the current guide](../README.md) for this major release.
 
 The automated suite covers the deterministic surface. Some things only
 make sense to verify by eye — keep this checklist alongside any
@@ -25,8 +25,9 @@ run the printed rollback, then prove rerunning setup resumes or retries safely.
 Also run setup update/upgrade once. Record the old/new tag objects, peeled
 commits, recovery path, provider inventory, and whether any user data changed.
 
-For macOS rows, check [known release issues](../docs/KNOWN-ISSUES.md) before
-choosing the release to validate. Known failures remain failures in the evidence.
+For macOS rows, note that v0.4.4 pins Homebrew 6.0.1. That version cannot
+install the current AeroSpace and Ghostty casks. Known failures remain failures
+in the evidence.
 
 - [ ] **Bare POSIX prerequisite:** use clean Nix-free Apple Silicon macOS and
       Linux VMs at the exact annotated v0.4.4 release. Run only
@@ -213,9 +214,16 @@ choosing the release to validate. Known failures remain failures in the evidence
       matches its archive pin from a fresh terminal, and that
       `~/.kiro/settings/cli.json` (or `$KIRO_HOME/settings/cli.json`) has
       `"app.disableAutoupdates": true` beside your own settings. Sign in with
-      `kiro-cli login` only with your own account. With Sentinel skills selected,
-      Kiro lists the 12 skills (type `/` in chat). Removal restores `cli.json` and
-      keeps `~/.kiro` sign-ins, sessions and steering.
+      `kiro-cli login` only with your own account. With Sentinel rules and
+      skills selected, Kiro lists the 13 Sentinel skills (type `/` in chat).
+      Removal restores `cli.json` and keeps `~/.kiro` sign-ins, sessions and
+      steering.
+- [ ] **Sentinel rules and skills**: select it with at least one agent. Make
+      sure that each agent file has the Sentinel block. Each of the 13 skill
+      folders must have a `.sentinel-owned` file. Change one line in the block,
+      make sure that Check reports it, then Repair. Untick Sentinel. Make sure
+      that the block and the skill folders are gone and that the text outside
+      the block stays.
 - [ ] **Windows Tree-sitter CLI**: `tree-sitter --version` prints exactly
       `0.27.0`. A compatible unmanaged executable remains untouched; after a
       stale unmanaged fixture, the verified dotfiles executable wins PATH.
@@ -361,8 +369,8 @@ choosing the release to validate. Known failures remain failures in the evidence
       On merged `main`, require those same producers (Ubuntu container, public
       Ubuntu, Apple Silicon, Windows), the four setup logical proofs, and the
       two Nix logical proofs to pass before applying the checked-in stable
-      required contexts live. Record that merged-main run here and in
-      `tests/greenfield/LEDGER.md`; a documentation-only descendant does not
+      required contexts live. Record that merged-main run here. A
+      documentation-only descendant does not
       replace the behavior-head run. Then run the no-write safeguard preflight;
       it must identify that exact cache-free E2E dispatch, the Nix/test run
       provenance, GitHub Actions app `15368`, and the exact legacy live posture.

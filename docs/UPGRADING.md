@@ -120,11 +120,14 @@ the actual remaining steps, including when resuming an interrupted retirement.
 
 The released setup also wrote Sentinel 0.1.2 policy for OpenCode
 (`${XDG_CONFIG_HOME:-~/.config}/opencode/AGENTS.md`) and Pi
-(`~/.pi/agent/AGENTS.md`). Neither agent is supported now. The "Remove released
-agent policy for OpenCode and Pi" item deletes such a file only when it holds
-exactly the released policy bytes; other OpenCode and Pi files stay. A file with
-any other text, or a link, keeps everything, including its policy block; the
-preview names it, and migration still completes.
+(`~/.pi/agent/AGENTS.md`). Pi is not supported now. The retirement item for the
+released Pi policy deletes `~/.pi/agent/AGENTS.md` only when it holds exactly
+the released policy bytes. A file with other text, or a link, stays complete.
+The preview names it, and migration still completes.
+
+Migration does not delete the OpenCode file, because OpenCode is now a Sentinel
+host. When you select Sentinel rules and skills, Sentinel replaces the old block
+in that file. Text outside the block stays.
 
 If migration stops at a phase, it names that phase and points to the report it
 already printed instead of repeating it. A check report closes with its screen,
@@ -340,7 +343,7 @@ Windows, PowerShell 7 is added as Copilot's prerequisite.
 
 Kiro CLI is a separate selection on macOS and Linux. It is not offered on Windows,
 where Kiro ships it only as an MSI installer; install it yourself there if you want
-it (Sentinel policy and skills still reach it). If
+it (Sentinel rules and skills also go to it). If
 you installed Kiro CLI yourself, the dotfiles copy takes precedence in configured
 shells and your copy is left alone; remove it with its own uninstaller if you no
 longer want it. Setup sets only `app.disableAutoupdates` in
@@ -350,63 +353,15 @@ adoption first) and restores your file on removal.
 Pi has been removed, including its copied themes/keybindings and Sentinel target.
 Existing released Pi packages and personal data remain outside this installer's
 ownership. Keep an old checkout if a personal Pi configuration still links to it.
-If testing an earlier unreleased native-installer revision, first remove Pi and
-its old Sentinel selection using that exact revision, and finish any pending
-operation there before advancing. Reinstall Sentinel after updating to publish
-its current consumer targets. This also applies to the three-target Sentinel
-selection at `d9a3993`: remove it there before advancing to the current four-target
-recipe. Released OpenCode/Pi policy files are retired by migration (see
-[Retiring the earlier installation](#retiring-the-earlier-installation)); normal
-setup no longer reports them. Never discard state or recovery journals.
-Completed removal can retain restored personal policies and edit evidence.
-Reinstallation requests fresh adoption for those blocks; retained history does
-not grant ownership of the new targets or block that new approval.
+To test an earlier unreleased native-installer revision, first remove Pi and its
+old Sentinel selection with that exact revision. Finish any pending operation
+there before you advance. Migration retires the released Pi policy file
+(see [Retiring the earlier installation](#retiring-the-earlier-installation)).
+Never discard state or recovery journals.
 
-Sentinel policy goes only to agents that are present: Codex, Claude Code, GitHub
-Copilot or Kiro, when the agent's configuration folder exists, its command (or
-a Kiro macOS app) is found, or Codex, Claude Code, Copilot CLI or Kiro CLI is
-selected in the same run. Copilot's folder is `${COPILOT_HOME:-~/.copilot}` and
-Kiro's is `${KIRO_HOME:-~/.kiro}`. Setup never creates an absent agent's folder. A
-policy already installed for Copilot or Kiro keeps its target: if you set
-COPILOT_HOME or KIRO_HOME later, setup refuses to retarget it; run setup with the
-earlier value (unset) to remove it, then select it again. Installed policy keeps the agents
-it was approved for. An agent installed later is noted; deselect Sentinel policy
-and apply, then select it again to add it. If a covered agent's folder disappears,
-setup stops maintaining its policy and never recreates the folder; the other
-agents stay checked. To record the narrower policy, tick the Sentinel policy
-replacement on the next Choose tools confirmation; removal is then ordinary. If
-every covered agent is gone, setup asks you to deselect Sentinel policy, which
-then forgets it without recreating anything.
-Removal also deletes folders that setup created for a file, while they are
-still empty. An unreleased revision that wrote policy for an absent
-agent created that folder; deselect Sentinel policy there or here (removal
-restores the original files), delete the then-empty folder, and select it again.
-
-Sentinel skills are a new, independent selection. They use dotfiles receipts,
-not the upstream `.sentinel-skills.json` registry. First finish removal/recovery
-with whichever installer owns existing skills, and retain personal edits before
-selecting them here. Upstream Sentinel installs remove with its own
-`node tools/skills.mjs --host codex --global --remove` (and `--host claude`),
-which refuses edited folders. It leaves an empty `.sentinel-skills.json` that
-owns nothing; setup accepts it and leaves it in place. Skills installed by `npx skills` are recorded in
-its lock (`~/.agents/.skill-lock.json`, or `$XDG_STATE_HOME/skills/` when set).
-An entry for a bundled name, such as an earlier standalone `impeccable`, blocks
-a new selection until `npx skills remove --global <names>` releases it. If the
-CLI claims a name after dotfiles installed its copies, setup only notes it. That command
-deletes every agent's folder of those names, so run it before dotfiles installs
-its copies. Symlinked former Helix folders and identical unowned copies
-are also protected. Before changing this unreleased 12-skill bundle's folder
-inventory, remove it using its original revision; target-count changes do not
-grant ownership of earlier destinations. Managed skills are copies, so editing
-them never writes back into this checkout. Repair can preserve owned edited
-copies after explicit approval. Impeccable's shared engine cache is retained.
-Kiro receives its own copy in `${KIRO_HOME:-~/.kiro}/skills` only while Kiro is
-installed (the same presence rule as the policy). An existing Sentinel skills
-selection picks Kiro up on the next Choose tools or Update after Kiro is installed.
-If you uninstall Kiro, setup reports it, never recreates its folder, and forgets
-those copies when you deselect Sentinel skills. Copilot reads `~/.agents/skills`
-unless COPILOT_HOME is set; with it set, Copilot reads only `$COPILOT_HOME/skills`,
-so setup copies the skills there as well while Copilot is installed.
+Sentinel rules and skills replace the two v1.0.0 selections, Sentinel policy and
+Sentinel skills. Read [Sentinel rules and skills](#sentinel-rules-and-skills)
+before the first apply after the update.
 
 The POSIX launchers create private cache/staging files under umask `077`, then
 restore the caller's umask before starting the installer. They do not change your
@@ -452,6 +407,43 @@ This application-wide preference can also propagate to other machines through
 [Settings Sync](https://code.visualstudio.com/docs/configure/settings-sync).
 Exclude `update.mode` from sync in Code if those machines should update separately.
 
+
+## Sentinel rules and skills
+
+Dotfiles v1.0.0 had two selections, Sentinel policy and Sentinel skills. It
+copied the Sentinel 0.2.0 files itself. Now one selection, Sentinel rules and
+skills, runs the Sentinel installer at a pinned commit. A saved selection of
+either earlier choice becomes this selection.
+
+Before you update the checkout, finish or abandon an interrupted Sentinel
+operation with v1.0.0. Follow [Interruptions and conflicts](#interruptions-and-conflicts).
+
+The first apply after the update does the handoff:
+
+1. Setup deletes each skill folder that the v1.0.0 receipts list as a dotfiles
+   copy. It deletes a folder only when a hash check against the saved journal
+   proves that the folder holds the bytes that dotfiles copied.
+2. Sentinel installs its own copies of the skills.
+3. Sentinel replaces the old rules block in place. Text outside the block stays.
+4. Setup releases the old receipts.
+
+Setup does not delete a skill folder that changed or that a link now leads to.
+It reports the folder, and Sentinel stops at that folder. Move the folder to a
+different location, then apply again.
+
+If v1.0.0 adopted an earlier rules block, the handoff drops that saved block.
+Removal through dotfiles does not bring it back, and the text outside the block
+stays.
+
+If you untick Sentinel in the first run after the update, the old copies stay.
+To remove them, select Sentinel one time so that the handoff runs. Then untick
+it.
+
+Sentinel puts skills for Codex, Copilot and OpenCode in `~/.agents/skills` and
+Kiro files in `${KIRO_HOME:-~/.kiro}`. Sentinel replaces the old Kiro rules
+block in place there. The handoff also deletes the v1.0.0 copies in
+`$COPILOT_HOME/skills`. Copilot CLI reads `~/.agents/skills` also when you set
+`COPILOT_HOME`.
 
 ## T3 Code
 
@@ -594,7 +586,7 @@ reports that a later tool changed after approval, abandon that remaining plan
 through migration recovery, then review a fresh retirement plan. Completed
 removals and their preserved evidence remain recorded.
 
-Personal shell and Sentinel edits may use different line endings from the managed
+Personal shell edits may use different line endings from the managed
 block without triggering a repair. Existing UTF-16 profiles retain their encoding;
 saved marked blocks remain readable for interrupted recovery even though the
 journal fragment omits the full file's BOM.

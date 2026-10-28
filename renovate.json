@@ -1,6 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "description": "Renovate owns GitHub Actions, runner labels, Go toolchain/modules and CI validator/tool constants. Installer archive/component/wheel pins, linux-code-pins.json, bootstrap-toolchain.tsv and the Mason registry snapshot are manually reviewed with checksums and runtime proof; adjacent CI download hashes also require review after version bumps. The agent CLI archive pins (Claude Code, Codex, Copilot CLI, Kiro CLI) are instead proposed weekly by .github/workflows/agent-cli-pins.yml for the same review and native checks.",
+  "description": "Renovate owns GitHub Actions, runner labels, Go toolchain/modules, CI validator/tool constants and the Sentinel commit in installer/sentinel.go. Installer archive/component/wheel pins, linux-code-pins.json, bootstrap-toolchain.tsv and the Mason registry snapshot are manually reviewed with checksums and runtime proof; adjacent CI download hashes also require review after version bumps. The agent CLI archive pins (Claude Code, Codex, Copilot CLI, Kiro CLI) are instead proposed weekly by .github/workflows/agent-cli-pins.yml for the same review and native checks.",
   "extends": [
     "config:recommended",
     "helpers:pinGitHubActionDigests",
@@ -95,6 +95,20 @@
     },
     {
       "customType": "regex",
+      "description": "Sentinel commit that setup fetches and runs. Renovate proposes the new main digest; the commit hash is the integrity check.",
+      "managerFilePatterns": [
+        "/^installer/sentinel\\.go$/"
+      ],
+      "matchStrings": [
+        "sentinelCommit\\s*=\\s*\"(?<currentDigest>[a-f0-9]{40})\""
+      ],
+      "currentValueTemplate": "main",
+      "depNameTemplate": "luisgui1757/sentinel",
+      "packageNameTemplate": "https://github.com/luisgui1757/sentinel",
+      "datasourceTemplate": "git-refs"
+    },
+    {
+      "customType": "regex",
       "description": "Node runtime version used to run Renovate's schema validator.",
       "managerFilePatterns": [
         "/^scripts/validate-renovate\\.sh$/"
@@ -164,6 +178,19 @@
       "groupName": "pinned CI tool constants",
       "addLabels": [
         "pinned-downloads"
+      ],
+      "automerge": false
+    },
+    {
+      "matchManagers": [
+        "custom.regex"
+      ],
+      "matchDepNames": [
+        "luisgui1757/sentinel"
+      ],
+      "groupName": "sentinel",
+      "addLabels": [
+        "sentinel"
       ],
       "automerge": false
     },

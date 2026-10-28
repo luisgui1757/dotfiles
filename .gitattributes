@@ -31,6 +31,3 @@ lazygit/config.windows.yml text eol=lf
 
 # Mason's reviewed upstream JSON hash is a physical-byte identity.
 nvim/mason-registry/** text eol=lf
-
-# Sentinel skills retain the exact reviewed upstream bytes.
-vendor/sentinel/** -text

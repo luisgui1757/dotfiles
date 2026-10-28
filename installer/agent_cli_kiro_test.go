@@ -139,7 +139,7 @@ func TestKiroCLILinuxArchiveExposesOnlyItsNativeCommands(t *testing.T) {
 	}
 }
 
-func TestKiroCLIBindsSettingsSkillsAndPolicyToKiroHome(t *testing.T) {
+func TestKiroCLIBindsSettingsToKiroHome(t *testing.T) {
 	platform := nativePlatform(t)
 	if platform.OS == "windows" {
 		t.Skip("Kiro CLI is offered on macOS and Linux")
@@ -159,7 +159,7 @@ func TestKiroCLIBindsSettingsSkillsAndPolicyToKiroHome(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	closure, err := c.Catalog.Closure([]string{"kiro-cli", "sentinel", "sentinel-skills"}, platform.Context)
+	closure, err := c.Catalog.Closure([]string{"kiro-cli"}, platform.Context)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -170,19 +170,6 @@ func TestKiroCLIBindsSettingsSkillsAndPolicyToKiroHome(t *testing.T) {
 	driver := bound.(*NativeDriver)
 	if settings := driver.Profiles.Targets[kiroSettingsResource]; len(settings) != 1 || settings[0].Path != filepath.Join(work, "settings", "cli.json") {
 		t.Fatal("Kiro CLI settings ignore KIRO_HOME", settings)
-	}
-	if !slices.ContainsFunc(driver.Profiles.Targets[sentinelResource], func(target ProfileTarget) bool { return target.Path == filepath.Join(work, "steering", "AGENTS.md") }) {
-		t.Fatal("Sentinel policy does not follow the selected Kiro CLI to KIRO_HOME", driver.Profiles.Targets[sentinelResource])
-	}
-	consumer, _, err := driver.SentinelSkills.conditional(sentinelKiroSkills)
-	if err != nil || !consumer.Needed {
-		t.Fatal("selecting Kiro CLI does not make Kiro present for skills", consumer, err)
-	}
-	if _, _, root, err := driver.SentinelSkills.configuration(Resource{ID: sentinelKiroSkills}); err != nil || root != filepath.Join(work, "skills") {
-		t.Fatal("Kiro skills ignore KIRO_HOME", root, err)
-	}
-	if c.Driver.(*NativeDriver).SentinelSkills.Selected != nil {
-		t.Fatal("binding a selection changed the shared skills driver")
 	}
 	if _, err := os.Lstat(work); !os.IsNotExist(err) {
 		t.Fatal("binding created KIRO_HOME", err)

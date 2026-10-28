@@ -28,12 +28,6 @@ type ProfileDriver struct {
 	GitDefaults string
 	GitIssue    string
 	Issues      map[string]string
-	// Sentinel consumers and notes about differences between observed agents
-	// and saved ownership. Notes are disclosures; SentinelBlocked refuses apply
-	// when no saved agent remains. Neither grants mutation authority.
-	SentinelConsumers []sentinelConsumer
-	SentinelNotes     []string
-	SentinelBlocked   string
 }
 
 // A damaged resource-specific path or saved baseline cannot authorize writes,
@@ -145,17 +139,7 @@ func (d *ProfileDriver) validate(id string) error {
 	return nil
 }
 
-// A retired Sentinel target keeps saved ownership of a removed agent's file
-// without wanting a managed block there: it is healthy while it has none, and
-// apply never writes it or creates its folder. Removal restores its baseline.
-func retiredProfileTarget(id string, target ProfileTarget) bool {
-	return id == sentinelResource && target.Script == ""
-}
-
 func (d *ProfileDriver) desiredBlock(data []byte, id string, target ProfileTarget) ([]byte, error) {
-	if retiredProfileTarget(id, target) {
-		return nil, nil
-	}
 	return renderProfileBlock(data, id, target.Script, d.JSONFields[id]...)
 }
 
@@ -266,7 +250,7 @@ func (d *ProfileDriver) inspect(id string) (Observation, error) {
 		return Observation{}, err
 	}
 	want, err := digest(desired)
-	o := Observation{Present: present, Healthy: healthy, Provider: "profile-block", Identity: identity, Fingerprint: fingerprint, Desired: want, Scope: "user", Adoptable: present && (len(d.JSONFields[id]) > 0 || id == sentinelResource)}
+	o := Observation{Present: present, Healthy: healthy, Provider: "profile-block", Identity: identity, Fingerprint: fingerprint, Desired: want, Scope: "user", Adoptable: present && len(d.JSONFields[id]) > 0}
 	if id == gitSettingsResource {
 		_, sourceErr := gitDefaultsSnapshot(d.GitDefaults)
 		if sourceErr != nil {
@@ -276,10 +260,6 @@ func (d *ProfileDriver) inspect(id string) (Observation, error) {
 		if d.GitIssue != "" {
 			o.Healthy, o.ApplyBlocked = false, strings.TrimSpace(o.ApplyBlocked+" "+d.GitIssue)
 		}
-	}
-	if id == sentinelResource {
-		o.Notes = append(sentinelDisclosures(d.Targets[id], d.SentinelConsumers), d.SentinelNotes...)
-		o.ApplyBlocked = d.SentinelBlocked
 	}
 	if id == windowsTerminalResource {
 		o.Inventory, err = digest(blocks)
@@ -416,10 +396,10 @@ func (d *ProfileDriver) Observe(ctx context.Context, r Resource, receipt Receipt
 		return Observation{Unknown: true, Provider: "profile-block", Scope: "user", Pending: err.Error(), Preserved: slices.Clone(receipt.After.Preserved)}, nil
 	}
 	o.Preserved = slices.Clone(receipt.After.Preserved)
-	if (r.ID == gitSettingsResource || r.ID == sentinelResource) && receipt.Ownership == "reused" {
+	if r.ID == gitSettingsResource && receipt.Ownership == "reused" {
 		// Released integrations acquire a fresh baseline on a later selection.
-		// Git's discovered path or Sentinel's consumer targets may have changed;
-		// old history remains preserved, without granting current ownership.
+		// Git's discovered path may have changed; old history remains
+		// preserved, without granting current ownership.
 		return o, nil
 	}
 	j, err := d.readJournal(r.ID, receipt)
@@ -520,7 +500,7 @@ func (d *ProfileDriver) change(ctx context.Context, r Resource, action string, a
 	}
 	baseline, err := d.readBaseline(r.ID, receipt)
 	fresh := errors.Is(err, os.ErrNotExist) && (!receipt.Before.Present && action == "install" ||
-		(len(d.JSONFields[r.ID]) > 0 || r.ID == sentinelResource) && action == "adopt" && receipt.Adopted && receipt.Ownership == "uncertain")
+		len(d.JSONFields[r.ID]) > 0 && action == "adopt" && receipt.Adopted && receipt.Ownership == "uncertain")
 	if fresh {
 		baseline = profileBaseline{Schema: 1, Resource: r.ID, Before: receipt.Before, Fields: slices.Clone(d.JSONFields[r.ID])}
 	} else if err != nil {
@@ -552,7 +532,7 @@ func (d *ProfileDriver) change(ctx context.Context, r Resource, action string, a
 		if original.Path != target.Path {
 			return o, errors.New("profile baseline target moved")
 		}
-		if before.Kind == "absent" && d.Windows && len(d.JSONFields[r.ID]) == 0 && r.ID != sentinelResource && r.ID != gitSettingsResource {
+		if before.Kind == "absent" && d.Windows && len(d.JSONFields[r.ID]) == 0 && r.ID != gitSettingsResource {
 			data = []byte{0xef, 0xbb, 0xbf}
 		}
 		block := original.Block
@@ -584,7 +564,7 @@ func (d *ProfileDriver) change(ctx context.Context, r Resource, action string, a
 				return o, err
 			}
 		}
-		if empty && (action == "remove" && original.Absent || retiredProfileTarget(r.ID, target) && before.Kind == "absent") {
+		if empty && action == "remove" && original.Absent {
 			content = nil
 			after.Kind = "absent"
 		}

@@ -555,21 +555,17 @@ func (d *legacyRetirementDriver) inspectTools(ctx context.Context, scope *legacy
 }
 
 // legacySentinelPolicySHA256 is the exact Sentinel 0.1.2 block, as a whole
-// file, that the released setup wrote for OpenCode and Pi. Current Sentinel
-// and dotfiles support neither consumer. testdata holds the bytes; the opt-in
-// source test reproduces them from the released commit's renderer.
+// file, that the released setup wrote for Pi. dotfiles does not support Pi.
+// testdata holds the bytes. OpenCode is a Sentinel host now: the Sentinel
+// installer replaces its block in place, so retirement leaves its file alone.
 const legacySentinelPolicySHA256 = "efeb284196e99ee049718c1a4cd8a2090cdd41a7ce8be304cb158fc8a4d16801"
 
 // Only a file holding exactly the released policy is removed, using the
-// released installer's default locations. Anything else is kept and named:
-// these agents are unsupported, so a kept file is never unfinished migration
-// work. Personal files are not read beyond a bounded check for the marker.
+// released installer's default location. Anything else is kept and named: Pi
+// is unsupported, so a kept file is never unfinished migration work. Personal
+// files are not read beyond a bounded check for the marker.
 func (d *legacyRetirementDriver) inspectSentinelPolicy(scope *legacyRetirementScope) error {
-	config := d.Platform.Sentinel.ConfigHome
-	if config == "" {
-		config = filepath.Join(d.Folders.Home, ".config")
-	}
-	for _, path := range []string{filepath.Join(config, "opencode", "AGENTS.md"), filepath.Join(d.Folders.Home, ".pi", "agent", "AGENTS.md")} {
+	for _, path := range []string{filepath.Join(d.Folders.Home, ".pi", "agent", "AGENTS.md")} {
 		entries, err := inspectTree(path, maxProfileBytes, 1)
 		if err != nil {
 			scope.Detail = append(scope.Detail, legacyReason(path+" could not be inspected as one policy file and stays unchanged", err))
@@ -594,7 +590,7 @@ func (d *legacyRetirementDriver) inspectSentinelPolicy(scope *legacyRetirementSc
 		scope.Steps = append(scope.Steps, legacyRetirementStep{Kind: "discard", Label: "Remove the released Sentinel policy file: " + path, Path: path, Entries: entries, Absent: []string{path}})
 	}
 	if len(scope.Steps) != 0 {
-		scope.Detail = append(scope.Detail, "Other OpenCode and Pi files stay; uninstall those agents separately if you no longer use them.")
+		scope.Detail = append(scope.Detail, "Other Pi files stay; uninstall Pi separately if you no longer use it.")
 	}
 	return nil
 }
