@@ -154,7 +154,8 @@ func downloadArchiveWithDeb(ctx context.Context, client *http.Client, pin Archiv
 		return err
 	}
 	if client == nil {
-		client = &http.Client{Timeout: 15 * time.Minute}
+		// archiveTransfer bounds the whole download, reconnections included.
+		client = &http.Client{}
 	}
 	// Preserve an injected transport (native tests use TLS) but prohibit redirects
 	// that weaken transport authentication or introduce URL credentials.
@@ -168,17 +169,9 @@ func downloadArchiveWithDeb(ctx context.Context, client *http.Client, pin Archiv
 		}
 		return nil
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, pin.URL, nil)
+	source, err := url.Parse(pin.URL)
 	if err != nil {
 		return err
-	}
-	response, err := safe.Do(req)
-	if err != nil {
-		return err
-	}
-	defer func() { result = errors.Join(result, response.Body.Close()) }()
-	if response.StatusCode != http.StatusOK || response.ContentLength > maxArchiveBytes {
-		return fmt.Errorf("archive download rejected: HTTP %d, length %d", response.StatusCode, response.ContentLength)
 	}
 	file, err := os.CreateTemp(filepath.Dir(destination), ".download-*")
 	if err != nil {
@@ -186,14 +179,10 @@ func downloadArchiveWithDeb(ctx context.Context, client *http.Client, pin Archiv
 	}
 	defer func() { result = errors.Join(result, file.Close(), os.Remove(file.Name())) }()
 	hash := sha256.New()
-	sinks := []io.Writer{file, hash}
-	name := path.Base(req.URL.Path)
+	name := path.Base(source.Path)
 	display := progressOutput(ctx)
-	if display != nil {
-		sinks = append(sinks, &downloadProgress{output: display, name: name, total: response.ContentLength})
-	}
 	started := time.Now()
-	n, err := io.Copy(io.MultiWriter(sinks...), io.LimitReader(response.Body, maxArchiveBytes+1))
+	n, err := defaultArchiveTransfer.fetch(ctx, &safe, pin.URL, file, hash, display, name)
 	if err != nil {
 		return err
 	}

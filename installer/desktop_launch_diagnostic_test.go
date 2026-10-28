@@ -80,7 +80,9 @@ do {
 			catch { report(error as NSError); exit(5) }
 		}
 	}
-	RunLoop.main.run(until: Date(timeIntervalSinceNow: 30))
+	// Zen's first open waits for Gatekeeper and XProtect; degraded hosted
+	// runners took about 50 s for it on 2026-10-28.
+	RunLoop.main.run(until: Date(timeIntervalSinceNow: 120))
 	if let error = consent?.inspection { report(error as NSError) }
 	FileHandle.standardError.write(Data("LaunchServices completion timed out\n".utf8))
 	exit(4)

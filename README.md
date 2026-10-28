@@ -4,7 +4,7 @@ Choose the tools you want. Setup installs their prerequisites, applies the share
 Rose Pine configuration, and records what it owns so update and removal can make
 precise changes.
 
-**v1.0.0** replaces the earlier Nix/chezmoi setup with this installer. Coming
+**v1.0.1** replaces the earlier Nix/chezmoi setup with this installer. Coming
 from v0.4.x? Follow [the migration guide](docs/UPGRADING.md).
 
 ## Supported platforms
