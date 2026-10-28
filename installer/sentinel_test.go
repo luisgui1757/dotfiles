@@ -157,7 +157,8 @@ func TestSentinelInstallerCommandFollowsPlatformAndHosts(t *testing.T) {
 		t.Run(target.OS, func(t *testing.T) {
 			d, processes := sentinelFixture(t, target)
 			config := filepath.Join(d.Home, "xdg")
-			d.Locations = SentinelLocations{CodexHome: filepath.Join(d.Home, "codex home"), ConfigHome: config, KiroHome: "relative kiro", Installed: []string{"claude"}}
+			kiro := filepath.Join(d.Home, "work kiro")
+			d.Locations = SentinelLocations{CodexHome: filepath.Join(d.Home, "codex home"), ConfigHome: config, KiroHome: kiro, Installed: []string{"claude"}}
 			d.Selected = []string{"tool.kiro"}
 			writeConfigFixture(t, filepath.Join(d.Locations.CodexHome, "config.toml"), "")
 			writeConfigFixture(t, filepath.Join(config, "opencode", "opencode.json"), "{}")
@@ -174,14 +175,30 @@ func TestSentinelInstallerCommandFollowsPlatformAndHosts(t *testing.T) {
 			if install.Program != fakeSentinelShell || !slices.Equal(install.Arguments, want) {
 				t.Fatal("unexpected installer command", install)
 			}
-			// The installer gets each folder variable unchanged, even a value
-			// that Kiro itself ignores.
-			for name, value := range map[string]string{"HOME": d.Home, "CODEX_HOME": d.Locations.CodexHome, "XDG_CONFIG_HOME": config, "COPILOT_HOME": "", "CLAUDE_CONFIG_DIR": "", "KIRO_HOME": "relative kiro"} {
+			// The installer gets each folder variable unchanged.
+			for name, value := range map[string]string{"HOME": d.Home, "CODEX_HOME": d.Locations.CodexHome, "XDG_CONFIG_HOME": config, "COPILOT_HOME": "", "CLAUDE_CONFIG_DIR": "", "KIRO_HOME": kiro} {
 				if got := sentinelEnvironment(t, install, name); got != value {
 					t.Fatal("the installer does not get the folder variable unchanged", name, got)
 				}
 			}
 		})
+	}
+}
+
+// The installer writes to KIRO_HOME as it is. Kiro ignores a relative value,
+// a filesystem root and the home folder path, so setup refuses those values.
+func TestSentinelRefusesAKiroHomeThatKiroIgnores(t *testing.T) {
+	for _, value := range []string{"relative kiro", string(filepath.Separator)} {
+		d, processes := sentinelFixture(t, Context{OS: "linux", Arch: "amd64"})
+		d.Locations = SentinelLocations{KiroHome: value}
+		d.Selected = []string{"tool.kiro"}
+		o, err := d.Observe(context.Background(), Resource{ID: sentinelResource}, Receipt{})
+		if err != nil || !strings.Contains(o.ApplyBlocked, "Kiro ignores KIRO_HOME") {
+			t.Fatal("an ignored KIRO_HOME does not block Sentinel", value, o, err)
+		}
+		if _, err := sentinelApply(t, d); err == nil || len(processes.commands) != 0 {
+			t.Fatal("Sentinel ran with an ignored KIRO_HOME", value, err, processes.commands)
+		}
 	}
 }
 

@@ -32,15 +32,18 @@ func TestNativeSentinelInstalledLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Their folders make Codex, Claude Code and OpenCode hosts. PATH holds no
-	// agent command, so no other agent counts.
+	// Their folders make Codex, Claude Code, Kiro and OpenCode hosts. Kiro
+	// uses a custom KIRO_HOME. PATH holds no agent command, so no other agent
+	// counts.
 	codexRules := filepath.Join(home, ".codex", "AGENTS.md")
 	writeConfigFixture(t, codexRules, "# My Codex rules\n")
 	writeConfigFixture(t, filepath.Join(home, ".claude", "settings.json"), "{}\n")
 	writeConfigFixture(t, filepath.Join(home, ".config", "opencode", "opencode.json"), "{}\n")
+	kiro := filepath.Join(home, "work kiro")
+	writeConfigFixture(t, filepath.Join(kiro, "settings", "cli.json"), "{}\n")
 	personal := filepath.Join(home, ".agents", "skills", "my-skill", "SKILL.md")
 	writeConfigFixture(t, personal, "# My skill\n")
-	invoke := installedMachineFixture(t, repository, home, 5*time.Minute, "PATH=/usr/bin:/bin:/usr/sbin:/sbin", "COPILOT_HOME="+filepath.Join(home, ".copilot"))
+	invoke := installedMachineFixture(t, repository, home, 5*time.Minute, "PATH=/usr/bin:/bin:/usr/sbin:/sbin", "COPILOT_HOME="+filepath.Join(home, ".copilot"), "KIRO_HOME="+kiro)
 	approve := func(request Request) Result {
 		t.Helper()
 		preview := invoke(request)
@@ -65,7 +68,8 @@ func TestNativeSentinelInstalledLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ruleFiles := []string{codexRules, filepath.Join(home, ".claude", "CLAUDE.md"), filepath.Join(home, ".config", "opencode", "AGENTS.md")}
+	ruleFiles := []string{codexRules, filepath.Join(home, ".claude", "CLAUDE.md"), filepath.Join(home, ".config", "opencode", "AGENTS.md"), filepath.Join(kiro, "steering", "AGENTS.md")}
+	skillRoots := []string{filepath.Join(home, ".agents", "skills"), filepath.Join(home, ".claude", "skills"), filepath.Join(kiro, "skills")}
 	for _, path := range ruleFiles {
 		data, err := os.ReadFile(path)
 		if err != nil || !bytes.Contains(data, []byte("<!-- AGENT-RULES:BEGIN do-not-edit-inside-this-block -->\n")) || !bytes.Contains(data, rules) {
@@ -83,7 +87,7 @@ func TestNativeSentinelInstalledLifecycle(t *testing.T) {
 	for _, line := range strings.Split(string(profiles), "\n") {
 		if fields := strings.Fields(line); len(fields) == 2 && !strings.HasPrefix(line, "#") {
 			skills = append(skills, fields[1])
-			for _, root := range []string{filepath.Join(home, ".agents", "skills"), filepath.Join(home, ".claude", "skills")} {
+			for _, root := range skillRoots {
 				if _, err := os.Stat(filepath.Join(root, fields[1], ".sentinel-owned")); err != nil {
 					t.Fatal("a Sentinel skill is not installed", root, fields[1], err)
 				}
@@ -93,6 +97,9 @@ func TestNativeSentinelInstalledLifecycle(t *testing.T) {
 	if len(skills) < 10 {
 		t.Fatal("the core and UI profiles installed too few skills", skills)
 	}
+	if _, err := os.Lstat(filepath.Join(home, ".kiro")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("Sentinel wrote Kiro files outside KIRO_HOME", err)
+	}
 	if result := invoke(Request{Schema: 1, Mode: "check"}); result.Status != "ready" {
 		t.Fatal("check after install", result)
 	}
@@ -100,7 +107,7 @@ func TestNativeSentinelInstalledLifecycle(t *testing.T) {
 	agentFiles := func() configSnapshot {
 		t.Helper()
 		snapshots := []configSnapshot{}
-		for _, path := range []string{filepath.Join(home, ".codex"), filepath.Join(home, ".claude"), filepath.Join(home, ".config", "opencode"), filepath.Join(home, ".agents")} {
+		for _, path := range []string{filepath.Join(home, ".codex"), filepath.Join(home, ".claude"), filepath.Join(home, ".config", "opencode"), filepath.Join(home, ".agents"), kiro} {
 			snapshot, err := snapshotConfig(path)
 			if err != nil {
 				t.Fatal(err)
@@ -135,7 +142,7 @@ func TestNativeSentinelInstalledLifecycle(t *testing.T) {
 		}
 	}
 	for _, name := range skills {
-		for _, root := range []string{filepath.Join(home, ".agents", "skills"), filepath.Join(home, ".claude", "skills")} {
+		for _, root := range skillRoots {
 			if _, err := os.Lstat(filepath.Join(root, name)); !errors.Is(err, os.ErrNotExist) {
 				t.Fatal("removal left a Sentinel skill", root, name, err)
 			}
@@ -147,13 +154,8 @@ func TestNativeSentinelInstalledLifecycle(t *testing.T) {
 	if result := invoke(Request{Schema: 1, Mode: "check"}); result.Status != "ready" {
 		t.Fatal("check after removal", result)
 	}
-	t.Logf("pinned Sentinel %s: install for codex, claude and opencode, check, unchanged second run and removal passed", sentinelCommit)
+	t.Logf("pinned Sentinel %s: install for codex, claude, kiro at a custom KIRO_HOME and opencode, check, unchanged second run and removal passed", sentinelCommit)
 }
-
-// sentinelPinKeepsRulesFileMode is false while sentinelCommit rewrites a rules
-// file with a new default mode. Set it to true in the change that moves the pin
-// to a Sentinel commit with the fix that keeps the file mode.
-const sentinelPinKeepsRulesFileMode = false
 
 // A rules file with a non-default mode keeps that mode through install and
 // removal, as other managed files do.
@@ -163,9 +165,6 @@ func TestNativeSentinelKeepsRulesFileMode(t *testing.T) {
 	}
 	if runtime.GOOS == "windows" {
 		t.Skip("HOME does not move the Windows known folders")
-	}
-	if !sentinelPinKeepsRulesFileMode {
-		t.Skip("the pinned Sentinel commit does not keep the mode of a rules file; enable this test with the pin of the Sentinel file-mode fix")
 	}
 	repository, err := filepath.Abs("..")
 	if err != nil {

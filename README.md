@@ -376,7 +376,7 @@ the same selection installs its CLI.
 | Codex | `${CODEX_HOME:-~/.codex}/AGENTS.md` | `~/.agents/skills` |
 | Claude Code | `${CLAUDE_CONFIG_DIR:-~/.claude}/CLAUDE.md` | `${CLAUDE_CONFIG_DIR:-~/.claude}/skills` |
 | GitHub Copilot | `${COPILOT_HOME:-~/.copilot}/copilot-instructions.md` | `~/.agents/skills` |
-| Kiro | `~/.kiro/steering/AGENTS.md` | `~/.kiro/skills` |
+| Kiro | `${KIRO_HOME:-~/.kiro}/steering/AGENTS.md` | `${KIRO_HOME:-~/.kiro}/skills` |
 | OpenCode | `${XDG_CONFIG_HOME:-~/.config}/opencode/AGENTS.md` | `~/.agents/skills` |
 
 The `core` skills are `babysit-pr`, `council`, `file-pr`, `full-stop`,
@@ -384,10 +384,9 @@ The `core` skills are `babysit-pr`, `council`, `file-pr`, `full-stop`,
 `ui` skills are `beast-ui`, `doc-view`, `frontend-design` and `impeccable`.
 The skills are copies, so an edit to a skill never changes this checkout.
 
-Sentinel writes Kiro files only to `~/.kiro` and ignores `KIRO_HOME`. When
-`KIRO_HOME` names another folder, setup shows a note. With `COPILOT_HOME` set,
-Copilot reads skills only from `$COPILOT_HOME/skills`, so it does not see the
-Sentinel skills.
+Kiro ignores a `KIRO_HOME` that is not an absolute folder outside your home
+folder path. Setup does not install Sentinel with such a value. Copilot CLI
+reads `~/.agents/skills` also when you set `COPILOT_HOME`.
 
 Check runs the Sentinel check. When a file changed, Check reports it and
 Repair installs Sentinel again. When you untick Sentinel, setup removes the

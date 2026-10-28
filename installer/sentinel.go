@@ -25,7 +25,7 @@ const (
 
 // sentinelCommit is the only Sentinel pin. Renovate proposes a new value when
 // the Sentinel main branch moves. Change only this line to move the pin.
-const sentinelCommit = "b58922538fb316c33c64a62593d61d214e0122ee"
+const sentinelCommit = "eadd1c5488c0176596659cac8fd5d93174f7b82f"
 
 // sentinelHosts are the agents that the Sentinel installer supports.
 var sentinelHosts = []string{"codex", "claude", "copilot", "kiro", "opencode"}
@@ -191,7 +191,7 @@ func (d *SentinelDriver) hosts(homes sentinelHomes) ([]string, error) {
 		"codex":    {folder(homes.CodexHome, ".codex")},
 		"claude":   {folder(homes.ClaudeHome, ".claude")},
 		"copilot":  {folder(homes.CopilotHome, ".copilot")},
-		"kiro":     {filepath.Join(d.Home, ".kiro"), kiroHome(d.Home, homes.KiroHome)},
+		"kiro":     {kiroHome(d.Home, homes.KiroHome)},
 		"opencode": {filepath.Join(folder(homes.ConfigHome, ".config"), "opencode")},
 	}
 	found := []string{}
@@ -454,10 +454,8 @@ func (d *SentinelDriver) Observe(ctx context.Context, r Resource, receipt Receip
 	if current := d.homes(nil); current != homes {
 		o.Notes = append(o.Notes, "A Sentinel folder variable changed after the install. Setup keeps the recorded values "+sentinelHomesText(homes)+". To move Sentinel, untick it and apply, then select it again.")
 	}
-	// The pinned Sentinel commit ignores KIRO_HOME. Remove this note when the
-	// pin includes the Sentinel fix that writes to ${KIRO_HOME:-~/.kiro}.
-	if slices.Contains(hosts, "kiro") && kiroHome(d.Home, homes.KiroHome) != filepath.Join(d.Home, ".kiro") {
-		o.Notes = append(o.Notes, "Kiro reads "+kiroHome(d.Home, homes.KiroHome)+", but Sentinel writes the Kiro rules and skills to "+filepath.Join(d.Home, ".kiro")+".")
+	if err := sentinelKiroHome(d.Home, homes, hosts); err != nil {
+		o.ApplyBlocked = strings.TrimSpace(o.ApplyBlocked + " " + err.Error())
 	}
 	if record == nil {
 		return o, nil
@@ -517,6 +515,16 @@ func (d *SentinelDriver) Observe(ctx context.Context, r Resource, receipt Receip
 	return o, fmt.Errorf("Sentinel check failed: %w", err)
 }
 
+// sentinelKiroHome refuses a KIRO_HOME that Kiro ignores. The Sentinel
+// installer gets KIRO_HOME unchanged and writes there, but Kiro then reads
+// ~/.kiro (see kiroHome).
+func sentinelKiroHome(home string, homes sentinelHomes, hosts []string) error {
+	if !slices.Contains(hosts, "kiro") || homes.KiroHome == "" || kiroHome(home, homes.KiroHome) == filepath.Clean(homes.KiroHome) {
+		return nil
+	}
+	return fmt.Errorf("Kiro ignores KIRO_HOME=%s and reads %s. Unset KIRO_HOME or set it to an absolute folder outside your home folder path, then apply again.", homes.KiroHome, kiroHome(home, homes.KiroHome))
+}
+
 func sentinelHomesText(homes sentinelHomes) string {
 	values := []string{}
 	for _, item := range []struct{ name, value string }{{"CODEX_HOME", homes.CodexHome}, {"CLAUDE_CONFIG_DIR", homes.ClaudeHome},
@@ -563,6 +571,9 @@ func (d *SentinelDriver) Apply(ctx context.Context, r Resource, op Operation, re
 	}
 	if len(hosts) == 0 {
 		return Observation{}, errors.New("Sentinel found no coding agent")
+	}
+	if err := sentinelKiroHome(d.Home, homes, hosts); err != nil {
+		return Observation{}, err
 	}
 	if _, err := d.handoff(); err != nil {
 		return Observation{}, err

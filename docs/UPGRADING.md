@@ -440,11 +440,10 @@ To remove them, select Sentinel one time so that the handoff runs. Then untick
 it.
 
 Sentinel puts skills for Codex, Copilot and OpenCode in `~/.agents/skills` and
-Kiro files in `~/.kiro`. The handoff also deletes the v1.0.0 copies in
-`$COPILOT_HOME/skills` and in a custom `KIRO_HOME`. With `COPILOT_HOME` set,
-Copilot does not read `~/.agents/skills`. When `KIRO_HOME` names another folder,
-setup shows a note. The old rules block in `$KIRO_HOME/steering/AGENTS.md`
-stays. Remove it by hand if Kiro does not need it.
+Kiro files in `${KIRO_HOME:-~/.kiro}`. Sentinel replaces the old Kiro rules
+block in place there. The handoff also deletes the v1.0.0 copies in
+`$COPILOT_HOME/skills`. Copilot CLI reads `~/.agents/skills` also when you set
+`COPILOT_HOME`.
 
 ## T3 Code
 
