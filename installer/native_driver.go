@@ -14,7 +14,7 @@ type NativeDriver struct {
 	Context            Context
 	Archives           *ArchiveDriver
 	Configurations     *ConfigDriver
-	SentinelSkills     *SentinelSkillsDriver
+	Sentinel           *SentinelDriver
 	Desktop            *DesktopDriver
 	Fonts              *FontDriver
 	Profiles           *ProfileDriver
@@ -41,8 +41,8 @@ type NativeDriver struct {
 }
 
 func (d *NativeDriver) provider(r Resource) (Driver, error) {
-	if d.SentinelSkills != nil && (r.ID == "skills.sentinel-agents" || r.ID == "skills.sentinel-claude" || r.ID == sentinelKiroSkills || r.ID == sentinelCopilotSkills) {
-		return d.SentinelSkills, nil
+	if d.Sentinel != nil && (r.Action == "sentinel" || r.Action == "sentinel-retired") {
+		return d.Sentinel, nil
 	}
 	if r.ID == "tool.font" && d.Fonts != nil {
 		return d.Fonts, nil
@@ -195,12 +195,6 @@ func (d *NativeDriver) restoreProvider(id string, receipt Receipt) (ResourceRest
 	}
 	switch provider {
 	case "configuration":
-		if id == "skills.sentinel-agents" || id == "skills.sentinel-claude" || id == sentinelKiroSkills || id == sentinelCopilotSkills {
-			if d.SentinelSkills != nil {
-				return d.SentinelSkills, nil
-			}
-			return nil, ErrNoResourceRestore
-		}
 		if id == "tool.font" {
 			if d.Fonts != nil {
 				return d.Fonts, nil
@@ -259,7 +253,6 @@ func (d *NativeDriver) ForSelection(wanted []string, state State) (Driver, error
 	if clone.Profiles != nil {
 		profiles := *clone.Profiles
 		profiles.recordIssue(gitSettingsResource, retainGitSettingsTarget(&profiles, state))
-		profiles.recordIssue(sentinelResource, retainSentinelTargets(&profiles, state))
 		profiles.recordIssue(kiroSettingsResource, retainKiroSettingsTarget(&profiles, state))
 		// A scoped successor cannot acquire its baseline while the predecessor
 		// still owns any fields in the same document. Restoration is a separate
@@ -275,11 +268,18 @@ func (d *NativeDriver) ForSelection(wanted []string, state State) (Driver, error
 		}
 		clone.Profiles = &profiles
 	}
-	if d.SentinelSkills != nil {
-		// Kiro and Copilot presence include a CLI installed by this same selection.
-		skills := *d.SentinelSkills
-		skills.Selected = slices.Clone(wanted)
-		clone.SentinelSkills = &skills
+	if d.Sentinel != nil {
+		// A CLI that this selection installs makes its agent a host. The saved
+		// dotfiles 1.0 receipts decide which skill copies Sentinel takes over.
+		sentinel := *d.Sentinel
+		sentinel.Selected = slices.Clone(wanted)
+		sentinel.Earlier = map[string]Receipt{}
+		for _, id := range sentinelEarlierSkills {
+			if receipt, ok := state.Receipts[id]; ok {
+				sentinel.Earlier[id] = receipt
+			}
+		}
+		clone.Sentinel = &sentinel
 	}
 	if d.Brew != nil {
 		brew := *d.Brew

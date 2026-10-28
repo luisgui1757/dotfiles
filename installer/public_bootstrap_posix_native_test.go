@@ -198,22 +198,10 @@ func TestNativePOSIXPublicBootstrapMigrationSetupLifecycle(t *testing.T) {
 	}
 	laterProfile := "# personal replacement after migration\n"
 	writeConfigFixture(t, profile, laterProfile)
-	policy := filepath.Join(home, ".codex", "AGENTS.md")
-	priorPolicy := "# personal instructions\n<!-- AGENT-RULES:BEGIN -->\nOld policy\n<!-- AGENT-RULES:END -->\n"
-	writeConfigFixture(t, policy, priorPolicy)
-	approve("setup", Request{Schema: 1, Mode: "apply", Selected: []string{"sentinel"}, Adopt: []string{sentinelResource}})
-	data, err := os.ReadFile(policy)
-	if err != nil || !strings.HasPrefix(string(data), "# personal instructions\n") || !strings.Contains(string(data), "Operating Contract") {
-		t.Fatal("public setup did not publish policy while preserving personal prose", err)
-	}
+	approve("setup", Request{Schema: 1, Mode: "apply", Selected: []string{}})
 	approve("setup", Request{Schema: 1, Mode: "update"})
 	if result := invoke("setup", Request{Schema: 1, Mode: "check"}); result.Status != "ready" {
-		t.Fatal("public check did not verify installed policy", result)
-	}
-	approve("setup", Request{Schema: 1, Mode: "apply", Selected: []string{}})
-	assertBytes(policy, priorPolicy)
-	if result := invoke("setup", Request{Schema: 1, Mode: "check"}); result.Status != "ready" {
-		t.Fatal("public check did not verify removal", result)
+		t.Fatal("public check did not verify completed setup", result)
 	}
 	if result := invoke("migrate", Request{Schema: 1, Mode: "check"}); result.Status != "ready" {
 		t.Fatal("historical migration conflicted with completed setup", result)
@@ -232,7 +220,7 @@ func TestNativePOSIXPublicBootstrapMigrationSetupLifecycle(t *testing.T) {
 	if err != nil || info.Mode().Perm() != 0700 || hashFile(binary) != executableDigest {
 		t.Fatal("warm public launches changed cache privacy or executable identity", err)
 	}
-	t.Log("public setup/migrate cold and warm lifecycle passed: real pinned Go; exact executable SHA-256 approval; migration backups; policy adoption/update/check/removal; personal restoration; requested caller umask 0027 and private cache")
+	t.Log("public setup/migrate cold and warm lifecycle passed: real pinned Go; exact executable SHA-256 approval; migration backups; setup apply/update/check; personal restoration; requested caller umask 0027 and private cache")
 }
 
 // Go module contents are read-only. Let the executing, pinned host Go remove

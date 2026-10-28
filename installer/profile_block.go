@@ -92,10 +92,6 @@ func profileBlockBounds(data []byte, id string) (start, end int, missing []byte,
 			return 0, 0, nil, err
 		}
 	}
-	if id == sentinelResource {
-		start, end, err = sentinelBlock(data)
-		return start, end, nil, err
-	}
 	if !resourceID.MatchString(id) {
 		return 0, 0, nil, errors.New("invalid profile block identity")
 	}
@@ -147,12 +143,6 @@ func renderProfileBlock(data []byte, id, script string, fields ...string) ([]byt
 	if id == windowsTerminalResource {
 		return renderWindowsTerminal(data, script, fields)
 	}
-	if id == sentinelResource {
-		if len(fields) != 0 {
-			return nil, errors.New("Sentinel policy cannot own JSON fields")
-		}
-		return renderSentinelBlock(data, script)
-	}
 	if len(fields) != 0 {
 		properties, err := jsonProperties([]byte(script))
 		if err != nil || len(properties) != len(fields) {
@@ -186,9 +176,6 @@ func renderProfileBlock(data []byte, id, script string, fields ...string) ([]byt
 func replaceProfileBlock(data []byte, id string, replacement []byte, fields ...string) ([]byte, []byte, error) {
 	if id == windowsTerminalResource {
 		return replaceWindowsTerminal(data, replacement, fields)
-	}
-	if id == sentinelResource && len(fields) != 0 {
-		return nil, nil, errors.New("Sentinel policy cannot own JSON fields")
 	}
 	if len(fields) != 0 {
 		if id == "integration.vscode" || id == vscodeSettingsResource {

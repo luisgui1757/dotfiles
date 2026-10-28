@@ -7,10 +7,8 @@ files=$(find "$REPO_ROOT" -type f \( -name "*.yml" -o -name "*.yaml" \) -not -pa
 [[ -z "$files" ]] && { echo "no yaml files"; exit 0; }
 
 if command -v yamllint >/dev/null 2>&1; then
-    # This immutable upstream file has no final LF. Its exact
-    # bytes are covered by Sentinel provenance; all other YAML rules still run.
     # shellcheck disable=SC2086  # $files is intentionally word-split
-    yamllint -d "{extends: relaxed, rules: {line-length: disable, document-start: disable, new-line-at-end-of-file: {ignore: '**/vendor/sentinel/skills/impeccable/agents/openai.yaml'}}}" $files
+    yamllint -d "{extends: relaxed, rules: {line-length: disable, document-start: disable}}" $files
     echo "OK (yamllint)"
     exit 0
 fi

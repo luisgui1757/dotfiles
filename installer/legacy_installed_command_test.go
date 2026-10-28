@@ -4,7 +4,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"testing"
 	"time"
 )
@@ -12,7 +11,7 @@ import (
 // Prove the production main dispatch, not just separately constructed drivers.
 // Windows known folders cannot be redirected through HOME; the separately gated
 // Windows public migration fixture uses the actual disposable hosted account.
-func TestInstalledMigrationThenSetupKeepsHistoricalDetachmentAndPersonalPolicy(t *testing.T) {
+func TestInstalledMigrationThenSetupKeepsHistoricalDetachment(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("native Windows migration runs in its separately gated hosted fixture")
 	}
@@ -27,9 +26,6 @@ func TestInstalledMigrationThenSetupKeepsHistoricalDetachmentAndPersonalPolicy(t
 	legacy := "# unknown personal commands remain available in the migration backup\nexport PERSONAL=value\n"
 	profile := filepath.Join(home, ".zshrc")
 	writeConfigFixture(t, profile, legacy)
-	policy := filepath.Join(home, ".codex", "AGENTS.md")
-	priorPolicy := "# personal instructions\n<!-- AGENT-RULES:BEGIN -->\nOld policy\n<!-- AGENT-RULES:END -->\n"
-	writeConfigFixture(t, policy, priorPolicy)
 	invoke := installedMachineFixture(t, repository, home, time.Minute)
 	t.Setenv("DOTFILES_ENTRYPOINT", "migrate")
 	request := Request{Schema: 1, Mode: "apply", Selected: []string{"legacy.zshrc"}, Adopt: []string{"legacy.zshrc"}}
@@ -48,29 +44,15 @@ func TestInstalledMigrationThenSetupKeepsHistoricalDetachmentAndPersonalPolicy(t
 	newProfile := "# new shell profile added after migration\n"
 	writeConfigFixture(t, profile, newProfile)
 	t.Setenv("DOTFILES_ENTRYPOINT", "setup")
-	request = Request{Schema: 1, Mode: "apply", Selected: []string{"sentinel"}, Adopt: []string{sentinelResource}}
-	preview = invoke(request)
-	if preview.Status != "preview" || operation(t, preview.Plan, sentinelResource).Action != "adopt" {
-		t.Fatal("main did not route setup and explicit policy adoption", preview)
-	}
-	request.ExpectedPlan = preview.Plan.ID
-	if result := invoke(request); result.Status != "ready" {
-		t.Fatal(result)
-	}
-	data, err = os.ReadFile(policy)
-	if err != nil || !strings.HasPrefix(string(data), "# personal instructions\n") || !strings.Contains(string(data), "Operating Contract") {
-		t.Fatal("setup did not preserve prose and publish actual policy", err)
-	}
-	for _, request := range []Request{{Schema: 1, Mode: "update"}, {Schema: 1, Mode: "apply", Selected: []string{}}} {
+	for _, request := range []Request{{Schema: 1, Mode: "apply", Selected: []string{}}, {Schema: 1, Mode: "update"}} {
 		preview := invoke(request)
+		if preview.Status != "preview" {
+			t.Fatal("main did not route setup", preview)
+		}
 		request.ExpectedPlan = preview.Plan.ID
 		if result := invoke(request); result.Status != "ready" {
 			t.Fatal(result)
 		}
-	}
-	data, err = os.ReadFile(policy)
-	if err != nil || string(data) != priorPolicy {
-		t.Fatal("normal removal failed to restore adopted policy", string(data), err)
 	}
 	t.Setenv("DOTFILES_ENTRYPOINT", "migrate")
 	if result := invoke(Request{Schema: 1, Mode: "check"}); result.Status != "ready" {
