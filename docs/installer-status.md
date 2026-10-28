@@ -2839,3 +2839,9 @@ PR #95 merged as `c9afe16`. Its preparation commit included four
 publish attempt stopped on a missing argument. A second PR from `release/v1.0.0`
 removes the files, ignores Python bytecode, and makes preparation and closure
 commit only their rendered files; publication binds that PR's merge commit.
+
+PR #100 merged as `6d6fbe9` (27/27 on `56c1dd4`). The second publish attempt
+passed the full local gate, then stopped at the release-range Gitleaks scan,
+before the tag: one generic-api-key finding, a Windows Terminal key binding
+(`a64f804`, `windows-terminal/settings.fragment.jsonc` line 50). A third PR from
+`release/v1.0.0` adds `.gitleaksignore` with that exact fingerprint.

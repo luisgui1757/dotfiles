@@ -780,7 +780,10 @@ Release publication follows `docs/RELEASING.md` and the manifest; historical tag
 proof is immutable. Release preparation and closure commit only their rendered
 files (`commit_rendered`): `make ci` writes Python bytecode, which `git add --all`
 put into v1.0.0's preparation. A corrected preparation is a new PR from the same
-`release/<version>` branch, because publication binds the merge of that branch. This overhaul uses one PR. On 2026-10-12 the owner authorized
+`release/<version>` branch, because publication binds the merge of that branch.
+The release-range Gitleaks scan runs only at publication; reviewed false
+positives are exact fingerprints in `.gitleaksignore` (a Windows Terminal
+`"keys"` binding matched generic-api-key, 2026-10-27). This overhaul uses one PR. On 2026-10-12 the owner authorized
 squashing the implementation, smoke fixes and CLI replacement into one commit.
 Merge and release publication remain owner actions unless explicitly delegated.
 

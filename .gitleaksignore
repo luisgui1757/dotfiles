@@ -1,0 +1,7 @@
+# Reviewed Gitleaks false positives, one exact finding per line
+# (commit:file:rule:line). Never add a pattern or path-wide rule here.
+#
+# 2026-10-27: generic-api-key matched a Windows Terminal key binding (the
+# ctrl+shift+down chord for Terminal.SplitPaneDown), not a secret. Quoting the
+# line anywhere in the repository is itself a new finding.
+a64f804952e98df2e486983eaf6ded91033781b1:windows-terminal/settings.fragment.jsonc:generic-api-key:50

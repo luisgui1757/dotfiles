@@ -284,6 +284,14 @@ and **recheck** (what a reviewer or a future change must keep).
 
 ## Hosted CI blind spots and flakes
 
+- **Secret scan only at publication:** Gitleaks runs only in `make
+  release-publish`, so its first v1.0.0 run was the first scan of the whole
+  native-installer history. It flagged the ctrl+shift+down key binding in the
+  Windows Terminal settings as a generic API key (2026-10-27). The exact
+  finding is now in `.gitleaksignore`; quoting that line elsewhere is a new
+  finding, so describe it instead. *Recheck:* a new finding at publication
+  needs review, never a broader rule.
+
 - **No real desktop session:** no session D-Bus/portal on Xvfb, and GitHub's Ubuntu
   images relax `kernel.apparmor_restrict_unprivileged_userns`. Flatpak/Electron
   sandbox problems (Ubuntu 9) are invisible unless a test recreates them.

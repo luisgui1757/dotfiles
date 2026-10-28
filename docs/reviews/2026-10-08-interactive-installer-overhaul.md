@@ -14201,3 +14201,24 @@ a bytecode leftover and a modified tracked file; it failed with the previous
 `git add --all` staging ("ReleaseError not raised") and passes. The correction
 uses the branch name `release/v1.0.0` again, because `verify_preparation_pr`
 accepts only the unique merge of that branch as the release commit.
+
+## 2026-10-27 — v1.0.0 Gitleaks false positive
+
+PR #100 merged as `6d6fbe9` after 27/27 checks on `56c1dd4`. The owner ran the
+publish helper; `make ci` passed (installer suite 549.954 s), then
+`gitleaks git --redact --log-opts=v0.4.4..6d6fbe9` reported one leak and the
+publisher stopped before creating the tag. A redacted JSON report gave rule
+`generic-api-key`, fingerprint
+`a64f804952e98df2e486983eaf6ded91033781b1:windows-terminal/settings.fragment.jsonc:generic-api-key:50`:
+the ctrl+shift+down binding for `Terminal.SplitPaneDown`, a key binding, not a
+credential. Gitleaks runs nowhere else (no workflow uses it), so
+this was the first scan of the native-installer history.
+
+Change: `.gitleaksignore` lists that one fingerprint with its reason and a rule
+against patterns or path-wide entries. The same scan over `v0.4.4..HEAD` in the
+corrected worktree reports no leaks with the file and the one finding without
+it. `gitleaks dir` over `.github/workflows` (the source archived in the
+publication evidence, which the publisher scans later) reports no leaks. A first
+draft of this record quoted the flagged line in three files, and the same scan
+reported each as a new finding; the records now describe the binding instead.
+RELEASING.md and CLAUDE.md describe the rule.
