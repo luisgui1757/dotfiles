@@ -333,8 +333,11 @@ func desktopConsumePublished(t *testing.T, d *DesktopDriver, a *ArchiveDriver, i
 	if _, err := os.Stat(launcher); err != nil {
 		t.Fatal("published desktop launcher missing", launcher, err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
-	defer cancel()
+	// Compiling the launcher and Zen's Gatekeeper preflight have their own bound:
+	// on 2026-10-28 degraded hosted macOS runners spent 64 s on them, which left
+	// a shared 90-second context too little time for the launch itself.
+	prepare, stopPrepare := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer stopPrepare()
 	packageRoot := filepath.Join(a.Directory, "tool."+id)
 	if runtime.GOOS == "linux" && id == "vscode" {
 		packageRoot = "/usr/share/code"
@@ -355,9 +358,9 @@ func desktopConsumePublished(t *testing.T, d *DesktopDriver, a *ArchiveDriver, i
 	case "linux":
 		args = []string{"/usr/bin/gio", "launch", launcher}
 	case "darwin":
-		args = []string{desktopMacLauncher(t, ctx), launcher}
+		args = []string{desktopMacLauncher(t, prepare), launcher}
 		if id == "zen" {
-			desktopMacVerifyZenConsentTarget(t, ctx, launcher)
+			desktopMacVerifyZenConsentTarget(t, prepare, launcher)
 			args = append(args, "--zen-consent")
 		}
 		t.Cleanup(func() {
@@ -376,6 +379,11 @@ func desktopConsumePublished(t *testing.T, d *DesktopDriver, a *ArchiveDriver, i
 		script := `$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$shortcut=(New-Object -ComObject WScript.Shell).CreateShortcut(` + desktopPSQuote(launcher) + `);if($shortcut.TargetPath -cne ` + desktopPSQuote(p.Command) + `){throw 'Published shortcut target differs from managed application'};$app=Start-Process -FilePath ` + desktopPSQuote(launcher) + ` -PassThru;if($app){'ShellExecute started PID '+$app.Id}`
 		args = append([]string{d.PowerShell}, windowsVendorArguments(script)...)
 	}
+	stopPrepare()
+	// The launch context outlasts the macOS launcher's 120-second wait, so a
+	// stalled launch reports the launcher's own diagnostic.
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
 	before, err := desktopOwnedProcesses(ctx, d.PowerShell, packageRoot)
 	if err != nil || len(before) > 0 {
 		t.Fatal("native fixture found an already running private application", before, err)

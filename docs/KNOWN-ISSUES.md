@@ -1,6 +1,12 @@
 # Known release issues
 
-## v1.0.0 (2026-10-25)
+## v1.0.1 (2026-10-28)
+
+Replaces v1.0.0, which was tagged but never published: its certification runs
+failed every macOS Node download on degraded hosted networking. v1.0.1 adds
+resumable archive downloads. The open items listed for v1.0.0 below still apply.
+
+## v1.0.0 (2026-10-25, not published)
 
 On a managed Windows laptop, "Inspecting your system" can take some minutes.
 The cause is not known.

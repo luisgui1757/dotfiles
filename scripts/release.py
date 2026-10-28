@@ -215,9 +215,8 @@ def validate_proof(path: pathlib.Path, manifest: dict[str, Any]) -> dict[str, An
     return proof
 
 
-def validate_manifest(root: pathlib.Path = ROOT) -> dict[str, Any]:
-    path = root / MANIFEST_PATH
-    manifest = load_json(path)
+def validate_manifest(root: pathlib.Path = ROOT, data: Any = None) -> dict[str, Any]:
+    manifest = load_json(root / MANIFEST_PATH) if data is None else data
     if not isinstance(manifest, dict) or manifest.get("schema") not in {1, 2}:
         fail("release manifest schema must be 1 or 2")
     if set(manifest) != {
@@ -369,21 +368,72 @@ def require_exact_main(root: pathlib.Path, manifest: dict[str, Any]) -> str:
     return head
 
 
+def superseded_base(manifest: dict[str, Any], tag: str) -> dict[str, Any]:
+    """Return the published manifest that an active candidate was prepared from."""
+    current = manifest["current"]
+    if current["state"] != "candidate" or current["tag"] != tag:
+        fail(f"only the active candidate can be superseded, not {tag}")
+    base = current
+    # A candidate that superseded another was prepared from that candidate's
+    # commit; follow the chain back to the published release.
+    while True:
+        commit = base["preparation"]["base_commit"]
+        prepared = json.loads(output(["git", "show", f"{commit}:{MANIFEST_PATH.as_posix()}"]))
+        validate_manifest(ROOT, prepared)
+        base = prepared["current"]
+        if base["state"] == "published" or base["previous_tag"] != current["previous_tag"]:
+            break
+    if base["state"] != "published" or base["tag"] != current["previous_tag"]:
+        fail("candidate base does not record its previous published release")
+    return prepared
+
+
+def require_unreleased(manifest: dict[str, Any], tag: str) -> None:
+    # The tags endpoint omits drafts; list every release instead.
+    tags = output(["gh", "api", "--paginate", f"repos/{manifest['repository']}/releases", "--jq", ".[].tag_name"])
+    if tag in tags.splitlines():
+        fail(f"{tag} has a GitHub release (draft or published); it cannot be superseded")
+
+
+def mark_superseded_notes(root: pathlib.Path, tag: str, successor: str) -> str:
+    path = f"docs/releases/{tag}.md"
+    text = (root / path).read_text(encoding="utf-8")
+    title, separator, rest = text.partition("\n")
+    if not title.startswith(f"# {tag} ") or not separator or "Superseded before publication" in text:
+        fail(f"superseded candidate notes are not the unmarked {tag} notes")
+    banner = (
+        f"\n> Superseded before publication by `{successor}`. The `{tag}` tag exists,\n"
+        "> but no GitHub release was published for it.\n"
+    )
+    write_text(root / path, title + "\n" + banner + rest)
+    return path
+
+
 def render_candidate(
     root: pathlib.Path,
     *,
     version: str,
     notes_text: str,
     base_commit: str,
-) -> None:
+    supersede: str | None = None,
+) -> list[str]:
     manifest = validate_manifest(root)
     current = manifest["current"]
-    if current["state"] != "published":
-        fail("cannot prepare a second candidate while one is already active")
-    if semver(version) <= semver(current["tag"]):
+    if supersede is None:
+        if current["state"] != "published":
+            fail("cannot prepare a second candidate while one is already active")
+        current_tag = current["tag"]
+    else:
+        # An unpublished candidate whose tag cannot be certified (its frozen code
+        # fails the gate) is replaced by a newer version; its tag is never moved.
+        if current["state"] != "candidate" or current["tag"] != supersede:
+            fail(f"only the active candidate can be superseded, not {supersede}")
+        if semver(version) <= semver(supersede):
+            fail("candidate version must be newer than the superseded candidate")
+        current_tag = current["previous_tag"]
+    if semver(version) <= semver(current_tag):
         fail("candidate version must be newer than the published release")
     title = validate_notes(notes_text, version, candidate=True)
-    current_tag = current["tag"]
     manifest = {
         "schema": 2,
         "repository": manifest["repository"],
@@ -408,6 +458,10 @@ def render_candidate(
     }
     write_json(root / MANIFEST_PATH, manifest)
     validate_manifest(root)
+    rendered = [f"docs/releases/{version}.md", MANIFEST_PATH.as_posix()]
+    if supersede is not None:
+        rendered.append(mark_superseded_notes(root, supersede, version))
+    return rendered
 
 
 def commit_rendered(worktree: pathlib.Path, paths: list[str], message: str) -> None:
@@ -424,7 +478,11 @@ def commit_rendered(worktree: pathlib.Path, paths: list[str], message: str) -> N
 
 def prepare(args: argparse.Namespace) -> None:
     manifest = validate_manifest(ROOT)
-    check_live(manifest)
+    if args.supersede is None:
+        check_live(manifest)
+    else:
+        check_live(superseded_base(manifest, args.supersede))
+        require_unreleased(manifest, args.supersede)
     base = require_exact_main(ROOT, manifest)
     notes_path = pathlib.Path(args.notes).expanduser().resolve()
     if not notes_path.is_file():
@@ -441,11 +499,16 @@ def prepare(args: argparse.Namespace) -> None:
     if worktree.exists():
         fail(f"release worktree path already exists: {worktree}")
     run(["git", "worktree", "add", "-b", branch, str(worktree), base], capture=False)
-    render_candidate(worktree, version=args.version, notes_text=notes, base_commit=base)
+    rendered = render_candidate(
+        worktree, version=args.version, notes_text=notes, base_commit=base, supersede=args.supersede
+    )
     run(["make", "ci"], cwd=worktree, capture=False)
     run(["git", "diff", "--check"], cwd=worktree)
-    commit_rendered(
-        worktree, [f"docs/releases/{args.version}.md", MANIFEST_PATH.as_posix()], f"chore(release): prepare {args.version}"
+    commit_rendered(worktree, rendered, f"chore(release): prepare {args.version}")
+    superseded = (
+        f"- supersede the unpublished `{args.supersede}` candidate; its tag stays unchanged and unpublished\n"
+        if args.supersede
+        else ""
     )
     run(["git", "push", "-u", "origin", branch], cwd=worktree, capture=False)
     pr_url = output(
@@ -464,6 +527,7 @@ def prepare(args: argparse.Namespace) -> None:
                 "## Summary\n\n"
                 f"- prepare the exact `{args.version}` release identity and native certification matrix\n"
                 "- add reviewed candidate notes and deterministic publication gates\n"
+                f"{superseded}"
                 "- preserve historical publication evidence unchanged\n\n"
                 "## Verification\n\n- `make ci`\n"
             ),
@@ -1242,6 +1306,11 @@ def parse_args() -> argparse.Namespace:
     prepare_parser = subparsers.add_parser("prepare", help="create, verify, push, and open a release-preparation PR")
     prepare_parser.add_argument("--version", required=True)
     prepare_parser.add_argument("--notes", required=True, help="reviewed candidate release-note Markdown")
+    prepare_parser.add_argument(
+        "--supersede",
+        metavar="TAG",
+        help="replace the active candidate TAG, which was never released, with this newer version",
+    )
     publish_parser = subparsers.add_parser("publish", help="certify and publish an exact merged release candidate")
     publish_parser.add_argument("--version", required=True)
     publish_parser.add_argument("--expected-sha", required=True)

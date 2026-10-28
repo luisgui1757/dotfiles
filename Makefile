@@ -65,7 +65,7 @@ release-check:
 release-prepare:
 	@test -n "$(VERSION)" || { echo "FAIL: VERSION=vMAJOR.MINOR.PATCH is required" >&2; exit 2; }
 	@test -n "$(NOTES)" || { echo "FAIL: NOTES=/path/to/reviewed-release-notes.md is required" >&2; exit 2; }
-	@python3 scripts/release.py prepare --version "$(VERSION)" --notes "$(NOTES)"
+	@python3 scripts/release.py prepare --version "$(VERSION)" --notes "$(NOTES)" $(if $(SUPERSEDE),--supersede "$(SUPERSEDE)",)
 
 release-publish:
 	@test -n "$(VERSION)" || { echo "FAIL: VERSION=vMAJOR.MINOR.PATCH is required" >&2; exit 2; }

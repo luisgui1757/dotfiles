@@ -49,6 +49,9 @@ make release-check
 make release-prepare VERSION=v1.0.0 NOTES=/absolute/path/reviewed-notes.md
 ```
 
+Add `SUPERSEDE=<tag>` only to replace an active candidate that can never be
+certified (see Recovery).
+
 Preparation validates the current published proof against the official tag,
 release and workflow; checks clean exact main, version ordering and note shape;
 creates a sibling `release/<version>` worktree; writes schema-2 candidate metadata
@@ -117,6 +120,16 @@ state, archived evidence and the uploaded asset's digest. It is not auto-merged.
 - If publication succeeded but closure failed, the publisher revalidates the
   immutable certification asset and reconstructs closure from live readback
   without republishing.
+- A candidate whose tag exists but whose frozen code cannot pass the exact-tag run
+  is superseded, never retagged. Merge the fix, then run
+  `make release-prepare VERSION=<newer> NOTES=<notes> SUPERSEDE=<old tag>`.
+  Preparation requires the old tag to be the active candidate with no GitHub
+  release (draft or published), and the release it was prepared from to be the
+  live latest release; that release stays `previous_tag`. A candidate that itself
+  superseded another is followed back through that chain. The old notes gain a
+  superseded banner and its tag stays unchanged and unpublished. v1.0.0 was
+  superseded this way by v1.0.1 (2026-10-28): every macOS Node download in its
+  tag runs failed on degraded hosted networking.
 - Branch/worktree collisions fail closed. Preserve unmerged work and establish
   PR/release state before removing a collision.
 

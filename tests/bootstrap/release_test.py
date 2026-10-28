@@ -2,6 +2,7 @@
 import copy
 import hashlib
 import importlib.util
+import json
 import os
 import pathlib
 import shutil
@@ -37,6 +38,11 @@ Exact annotated tag and commit are recorded after verification.
 
 - Local and required hosted checks, native jobs, scan and fresh clone.
 """
+
+
+def bump(tag):
+    major, minor, patch = release.semver(tag)
+    return f"v{major}.{minor}.{patch + 1}"
 
 
 class ReleaseTests(unittest.TestCase):
@@ -129,8 +135,8 @@ class ReleaseTests(unittest.TestCase):
             with self.assertRaisesRegex(release.ReleaseError, "cache"):
                 self.check_evidence(self.seal(document))
 
-    def test_closure_retains_archived_evidence_and_all_historical_proofs(self):
-        proof = {"schema": 2, "kind": "publication-closure", "repository": self.manifest["repository"],
+    def closure_proof(self):
+        return {"schema": 2, "kind": "publication-closure", "repository": self.manifest["repository"],
                  "tag": self.tag, "previous_tag": self.manifest["current"]["previous_tag"],
                  "tag_object": "4" * 40, "commit": "2" * 40, "tree": "5" * 40,
                  "preparation": {"pull_request": 1, "head": "6" * 40},
@@ -138,6 +144,9 @@ class ReleaseTests(unittest.TestCase):
                  "scans": {"release_range": "previous..candidate", "proof_bytes": self.evidence()["size"]},
                  "release": {"id": 1, "published_at": "2026-10-10T00:00:00Z", "immutable": True,
                              "latest": True, "draft": False, "prerelease": False}}
+
+    def test_closure_retains_archived_evidence_and_all_historical_proofs(self):
+        proof = self.closure_proof()
         release.render_closure(self.root, proof, "7" * 64)
         manifest = release.validate_manifest(self.root)
         self.assertEqual(manifest["current"]["state"], "published")
@@ -145,8 +154,64 @@ class ReleaseTests(unittest.TestCase):
         for path, data in self.historical.items():
             if str(path).startswith("release/proofs/"):
                 self.assertEqual((self.root / path).read_bytes(), data)
-        next_tag = self.tag.rsplit(".", 1)[0] + "." + str(int(self.tag.rsplit(".", 1)[1]) + 1)
+        next_tag = bump(self.tag)
         release.render_candidate(self.root, version=next_tag, notes_text=notes(next_tag), base_commit="8" * 40)
+
+    def test_supersede_replaces_only_the_active_candidate(self):
+        release.render_closure(self.root, self.closure_proof(), "7" * 64)
+        published = release.validate_manifest(self.root)
+        first, second = bump(self.tag), bump(bump(self.tag))
+        release.render_candidate(self.root, version=first, notes_text=notes(first), base_commit="8" * 40)
+        candidate = release.validate_manifest(self.root)
+        with mock.patch.object(release, "ROOT", self.root), \
+                mock.patch.object(release, "output", return_value=json.dumps(published)) as git:
+            self.assertEqual(release.superseded_base(candidate, first), published)
+            git.assert_called_once_with(["git", "show", "8" * 40 + ":release/manifest.json"])
+            for label, tag in (("published", self.tag), ("unknown", second)):
+                with self.subTest(label=label), self.assertRaises(release.ReleaseError):
+                    release.superseded_base(candidate, tag)
+        drifted = copy.deepcopy(published)
+        drifted["current"]["previous_tag"] = "v0.0.1"
+        with mock.patch.object(release, "ROOT", self.root), \
+                mock.patch.object(release, "output", return_value=json.dumps(drifted)), \
+                self.assertRaises(release.ReleaseError):
+            release.superseded_base(candidate, first)
+        before = {p: p.read_bytes() for p in self.root.rglob("*") if p.is_file()}
+        for label, version, tag in (("inactive tag", second, self.tag), ("not newer", first, first)):
+            with self.subTest(label=label), self.assertRaises(release.ReleaseError):
+                release.render_candidate(self.root, version=version, notes_text=notes(version),
+                                         base_commit="9" * 40, supersede=tag)
+            self.assertEqual({p: p.read_bytes() for p in self.root.rglob("*") if p.is_file()}, before)
+        rendered = release.render_candidate(self.root, version=second, notes_text=notes(second),
+                                            base_commit="9" * 40, supersede=first)
+        manifest = release.validate_manifest(self.root)
+        self.assertEqual((manifest["current"]["tag"], manifest["current"]["previous_tag"]), (second, self.tag))
+        self.assertEqual(sorted(rendered), sorted([f"docs/releases/{second}.md", "release/manifest.json",
+                                                   f"docs/releases/{first}.md"]))
+        title, rest = notes(first).split("\n", 1)
+        self.assertEqual((self.root / f"docs/releases/{first}.md").read_text(encoding="utf-8"), title + "\n"
+                         f"\n> Superseded before publication by `{second}`. The `{first}` tag exists,\n"
+                         "> but no GitHub release was published for it.\n" + rest)
+        with self.assertRaises(release.ReleaseError):
+            release.mark_superseded_notes(self.root, first, second)
+        # A second supersession follows the first candidate back to the release.
+        chain = {"9" * 40: candidate, "8" * 40: published}
+        def show(argv):
+            return json.dumps(chain[argv[2].split(":")[0]])
+        with mock.patch.object(release, "ROOT", self.root), mock.patch.object(release, "output", side_effect=show):
+            self.assertEqual(release.superseded_base(manifest, second), published)
+            chain["9" * 40] = copy.deepcopy(candidate)
+            chain["9" * 40]["current"]["previous_tag"] = "v0.0.1"
+            with self.assertRaises(release.ReleaseError):
+                release.superseded_base(manifest, second)
+
+    def test_supersede_requires_that_no_release_exists_for_the_tag(self):
+        with mock.patch.object(release, "output", return_value="v0.4.4\nv1.0.0\n") as gh:
+            with self.assertRaisesRegex(release.ReleaseError, "draft or published"):
+                release.require_unreleased(self.manifest, "v1.0.0")
+        self.assertIn("--paginate", gh.call_args.args[0])
+        with mock.patch.object(release, "output", return_value="v0.4.4\nv1.0.10\n"):
+            release.require_unreleased(self.manifest, "v1.0.1")
 
 
 class CommitRenderedTests(unittest.TestCase):

@@ -12,8 +12,9 @@ installer shows a menu of tools. It resolves their dependencies, applies the
 shared Rose Pine configuration and records what it owns. Update, Check, repair
 and removal use these records.
 
-Release v1.0.0 replaced the earlier Nix and chezmoi setup. `migrate.sh` and
-`migrate.ps1` move a v0.4.x installation to the new installer.
+Release v1.0.1 replaced the earlier Nix and chezmoi setup. It superseded
+v1.0.0, which has a tag but no published release. `migrate.sh` and `migrate.ps1`
+move a v0.4.x installation to the new installer.
 
 ## Supported platforms
 
@@ -129,6 +130,10 @@ of each step. All of these checks must pass on the final head.
   worker never reads a password.
 - Verify each archive checksum before extraction. Archive generations use the
   operation ID. Never weaken a payload fingerprint to accept a vendor update.
+- Archive downloads resume with `Range` and `If-Range` after a broken or slow
+  connection, and accept only the exact remaining `Content-Range`. One 15-minute
+  limit covers the whole transfer. The SHA-256 check is the only integrity
+  check.
 - `ConfigDriver` uses live links on POSIX. On Windows it copies files and uses a
   junction for Neovim. `ProfileDriver` owns marked blocks and named JSON fields
   only. Outside edits, BOMs and line endings stay.
@@ -235,6 +240,8 @@ and skills for coding agents.
 - Terminal tests use real PTY and ConPTY sessions.
 - Git fixtures remove inherited `GIT_*` variables.
 - The Go race suite has a 30-minute limit. Do not increase it to hide a hang.
+- The macOS desktop launch has a 3-minute context, and the Swift launcher waits
+  120 seconds. Change these limits only with native timing evidence.
 
 ## Security and releases
 
@@ -244,6 +251,8 @@ and skills for coding agents.
   describes the cutover. A checked-in policy does not prove the live settings.
 - Releases follow `docs/RELEASING.md` and `release/manifest.json`. Release
   preparation commits only its rendered files.
+- When a candidate tag cannot pass certification, a newer version supersedes it
+  (`SUPERSEDE=<tag>`). Never move the tag.
 - `.gitleaksignore` holds reviewed Gitleaks false positives as exact
   fingerprints.
 - Archive and Linux Code DEB pins change only with review and native runtime
