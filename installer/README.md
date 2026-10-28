@@ -93,7 +93,9 @@ Sentinel rules and skills (`sentinel`) needs the hidden
 `integration.sentinel-installer` resource, which needs `tool.git`. That resource
 fetches the commit that `sentinel.go` pins into `<state>/sentinel/checkout`.
 Git runs without system or global configuration. `HEAD` must equal the pin, and
-each file must equal the tree of the pin, independently of Git index flags.
+each file must equal the tree of the pin as raw bytes. Git index flags, local
+filters and replacement objects do not count.
+
 Check, update and removal run Sentinel only from such a checkout. Removal
 fetches the pin again when necessary.
 

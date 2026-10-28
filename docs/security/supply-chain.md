@@ -58,8 +58,9 @@ configuration, so a personal setting cannot change the fetch. Git uses the
 `HTTPS_PROXY` and `https_proxy` variables.
 
 Then setup checks that `git rev-parse HEAD` equals the pin. It compares each
-file with the tree of the pin and refuses an extra file. Git index flags cannot
-hide a change from this comparison. Check, update and removal run Sentinel only
+file with the tree of the pin as raw bytes and refuses an extra file. Git index
+flags, local filters and replacement objects cannot hide a change from this
+comparison. Check, update and removal run Sentinel only
 from a checkout that passes it. The commit hash is the integrity check.
 
 A failed fetch stops the apply.

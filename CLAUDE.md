@@ -152,7 +152,8 @@ and skills for coding agents.
   tracks the Sentinel `main` branch and opens a pull request when it moves.
 - Apply fetches that commit into `<state>/sentinel/checkout`. Git runs without
   system or global configuration. `HEAD` must equal the pin, and each file must
-  equal the tree of the pin. Git index flags do not count.
+  equal the tree of the pin as raw bytes. Git index flags, local filters
+  and replacement objects do not count.
 - Then dotfiles runs the Sentinel installer of that checkout. Dotfiles does not
   copy or edit Sentinel files. Check, update and removal run Sentinel only from
   a verified checkout of the pin. Removal fetches the pin again when necessary.

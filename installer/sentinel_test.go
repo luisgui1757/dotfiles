@@ -256,9 +256,11 @@ func TestSentinelChecksOnlyAVerifiedCheckoutOfThePin(t *testing.T) {
 	}
 }
 
-// Index flags can hide a change from git status. The verification compares the
-// files with the commit tree, so it finds the change. This uses the real git.
-func TestSentinelVerificationIgnoresGitIndexFlags(t *testing.T) {
+// sentinelGitFixture makes a real repository with one commit of files. It
+// returns the repository, the commit and a git helper without caller GIT_*
+// variables.
+func sentinelGitFixture(t *testing.T, files map[string]string) (string, string, func(...string) string) {
+	t.Helper()
 	program, err := exec.LookPath("git")
 	if err != nil {
 		t.Skip("git is not installed")
@@ -275,13 +277,28 @@ func TestSentinelVerificationIgnoresGitIndexFlags(t *testing.T) {
 		return strings.TrimSpace(string(output))
 	}
 	git("init", "--quiet")
-	for _, name := range []string{"assumed.md", "skipped.md"} {
-		writeConfigFixture(t, filepath.Join(repository, name), "# pinned\n")
+	for name, contents := range files {
+		writeConfigFixture(t, filepath.Join(repository, filepath.FromSlash(name)), contents)
 	}
 	git("add", ".")
 	git("commit", "--quiet", "-m", "fixture")
-	commit := git("rev-parse", "HEAD")
-	d := &SentinelDriver{Target: Context{OS: runtime.GOOS, Arch: runtime.GOARCH}, Git: program}
+	return repository, git("rev-parse", "HEAD"), git
+}
+
+func sentinelVerifier(t *testing.T) *SentinelDriver {
+	t.Helper()
+	program, err := exec.LookPath("git")
+	if err != nil {
+		t.Skip("git is not installed")
+	}
+	return &SentinelDriver{Target: Context{OS: runtime.GOOS, Arch: runtime.GOARCH}, Git: program}
+}
+
+// Index flags can hide a change from git status. The verification compares the
+// files with the commit tree, so it finds the change. This uses the real git.
+func TestSentinelVerificationIgnoresGitIndexFlags(t *testing.T) {
+	d := sentinelVerifier(t)
+	repository, commit, git := sentinelGitFixture(t, map[string]string{"assumed.md": "# pinned\n", "skipped.md": "# pinned\n"})
 	if got, err := d.verify(context.Background(), querySentinel, repository); err != nil || got != commit {
 		t.Fatal("a clean checkout does not verify", got, err)
 	}
@@ -300,6 +317,41 @@ func TestSentinelVerificationIgnoresGitIndexFlags(t *testing.T) {
 	writeConfigFixture(t, filepath.Join(repository, "extra.md"), "")
 	if _, err := d.verify(context.Background(), querySentinel, repository); err == nil || !strings.Contains(err.Error(), "extra.md") {
 		t.Fatal("an extra file verified", err)
+	}
+}
+
+// The local configuration of a checkout can add a clean filter that gives an
+// edited file the pinned hash. It can also replace the pinned commit with
+// another object. The verification hashes raw bytes and ignores replacement
+// objects, so it finds both changes. This uses the real git.
+func TestSentinelVerificationIgnoresLocalFiltersAndReplacements(t *testing.T) {
+	d := sentinelVerifier(t)
+	pinned := "#!/bin/sh\necho pinned\n"
+	repository, commit, git := sentinelGitFixture(t, map[string]string{"tools/install": pinned})
+	install := filepath.Join(repository, "tools", "install")
+
+	copy := filepath.Join(t.TempDir(), "pinned")
+	writeConfigFixture(t, copy, pinned)
+	writeConfigFixture(t, filepath.Join(repository, ".git", "info", "attributes"), "tools/install filter=hide\n")
+	git("config", "filter.hide.clean", "cat '"+filepath.ToSlash(copy)+"'")
+	writeConfigFixture(t, install, "#!/bin/sh\necho changed\n")
+	if git("hash-object", "tools/install") != git("rev-parse", commit+":tools/install") {
+		t.Fatal("the fixture filter does not give the edited file the pinned hash")
+	}
+	if _, err := d.verify(context.Background(), querySentinel, repository); err == nil || !strings.Contains(err.Error(), "tools/install") {
+		t.Fatal("a clean filter hid an edited file", err)
+	}
+	git("config", "--unset", "filter.hide.clean")
+
+	writeConfigFixture(t, install, "#!/bin/sh\necho replaced\n")
+	git("commit", "--quiet", "-am", "replacement")
+	git("replace", commit, git("rev-parse", "HEAD"))
+	git("update-ref", "--no-deref", "HEAD", commit)
+	if git("ls-tree", commit, "tools/install") == git("--no-replace-objects", "ls-tree", commit, "tools/install") {
+		t.Fatal("the fixture replacement does not change the pinned tree")
+	}
+	if got, err := d.verify(context.Background(), querySentinel, repository); got != commit || err == nil || !strings.Contains(err.Error(), "tools/install") {
+		t.Fatal("a replacement object hid an edited file", got, err)
 	}
 }
 

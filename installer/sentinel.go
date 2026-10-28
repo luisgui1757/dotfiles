@@ -223,19 +223,22 @@ func sentinelUnion(lists ...[]string) []string {
 }
 
 // git runs inside directory without system or global Git configuration. Proxy
-// variables such as HTTPS_PROXY stay in effect.
+// variables such as HTTPS_PROXY stay in effect. A checkout keeps the bytes of
+// the commit: no line-ending conversion and no replacement objects.
 func (d *SentinelDriver) git(directory string, arguments ...string) nativeCommand {
 	values := []string{"-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor=false", "-c", "credential.helper=", "-c", "init.defaultBranch=main",
-		"-c", "advice.detachedHead=false", "-C", directory}
+		"-c", "advice.detachedHead=false", "-c", "core.autocrlf=false", "-c", "core.eol=lf", "-C", directory}
 	return nativeCommand{Program: d.Git, Arguments: append(values, arguments...), Environment: []string{
-		"GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null", "GIT_OPTIONAL_LOCKS=0", "GIT_TERMINAL_PROMPT=0", "LC_ALL=C",
+		"GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null", "GIT_OPTIONAL_LOCKS=0", "GIT_TERMINAL_PROMPT=0", "GIT_NO_REPLACE_OBJECTS=1", "LC_ALL=C",
 		"GIT_DIR=" + filepath.Join(directory, ".git"), "GIT_WORK_TREE=" + directory, "GIT_INDEX_FILE=" + filepath.Join(directory, ".git", "index")}}
 }
 
-// verify returns the commit of a checkout, or "" when there is none. It does
-// not trust the Git index, because index flags can hide a change. It compares
-// each file with the tree of the commit instead. An extra file, a missing file
-// or a file with other content or another executable bit is an error.
+// verify returns the commit of a checkout, or "" when there is none. The local
+// configuration and the index of a checkout can hide a change, so verify does
+// not trust them. Fsck proves each object against its hash. Each file is then
+// hashed as raw bytes, without clean filters, and compared with the tree of
+// the commit. Replacement objects are off. An extra file, a missing file or a
+// file with other content or another executable bit is an error.
 func (d *SentinelDriver) verify(ctx context.Context, run func(context.Context, nativeCommand) ([]byte, error), directory string) (string, error) {
 	info, err := os.Lstat(directory)
 	if errors.Is(err, os.ErrNotExist) {
@@ -254,6 +257,9 @@ func (d *SentinelDriver) verify(ctx context.Context, run func(context.Context, n
 	}
 	changed := func(err error) (string, error) {
 		return commit, errors.Join(fmt.Errorf("%s differs from commit %s; setup fetches the pinned commit again", directory, commit), err)
+	}
+	if _, err := run(ctx, d.git(directory, "fsck", "--full", "--no-dangling", "--no-progress")); err != nil {
+		return changed(err)
 	}
 	listing, err := run(ctx, d.git(directory, "ls-tree", "-r", "-z", "--full-tree", commit))
 	if err != nil {
@@ -307,7 +313,7 @@ func (d *SentinelDriver) verify(ctx context.Context, run func(context.Context, n
 	if len(paths) != len(expected) {
 		return changed(errors.New("a file of the commit is missing"))
 	}
-	command := d.git(directory, "hash-object", "--stdin-paths")
+	command := d.git(directory, "hash-object", "--no-filters", "--stdin-paths")
 	command.Input = []byte(strings.Join(paths, "\n") + "\n")
 	hashes, err := run(ctx, command)
 	objects := strings.Fields(string(hashes))
