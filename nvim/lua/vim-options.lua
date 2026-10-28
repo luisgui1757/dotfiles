@@ -48,15 +48,12 @@ vim.opt.listchars = { tab = "▸ ", lead = "·", trail = "·", nbsp = "␣" }
 -- Providers follow the active display, terminal or an existing clipboard bridge.
 vim.opt.clipboard = "unnamedplus"
 
--- An installed display helper is not usable without its display session. Warn once
--- on a delayed timer so the message lands AFTER the colorscheme + lualine
--- load (otherwise it gets buried in startup output).
-function M._warn_if_missing_clipboard_provider()
-  -- Escape hatch: a user-defined vim.g.clipboard provider overrides
-  -- nvim's discovery chain. Don't warn in that case.
-  if vim.g.clipboard ~= nil and vim.g.clipboard ~= false then
-    return
-  end
+local function session(name)
+  return vim.env[name] ~= nil and vim.env[name] ~= ""
+end
+
+-- An installed display helper is not usable without its display session.
+function M._has_clipboard_provider()
   local function available(...)
     for _, command in ipairs({ ... }) do
       if vim.fn.executable(command) ~= 1 then
@@ -65,17 +62,55 @@ function M._warn_if_missing_clipboard_provider()
     end
     return true
   end
-  local function session(name)
-    return vim.env[name] ~= nil and vim.env[name] ~= ""
-  end
-  if
-    available("pbcopy", "pbpaste")
+  return available("pbcopy", "pbpaste")
     or available("win32yank.exe")
     or available("clip", "powershell")
     or (session("WAYLAND_DISPLAY") and available("wl-copy", "wl-paste"))
     or (session("DISPLAY") and (available("xclip") or available("xsel")))
     or (session("TMUX") and available("tmux"))
-  then
+end
+
+-- Over SSH without a clipboard tool, copy through the terminal with OSC 52.
+-- Nvim uses OSC 52 by itself only when 'clipboard' is empty. Paste returns the
+-- last copy of this Nvim, so p never asks the terminal to read the clipboard;
+-- the terminal paste key still pastes the local clipboard. This runs at startup,
+-- because Nvim keeps the first provider that it loads.
+function M._use_osc52_over_ssh()
+  if vim.g.clipboard ~= nil or not (session("SSH_TTY") or session("SSH_CONNECTION")) then
+    return
+  end
+  if M._has_clipboard_provider() then
+    return
+  end
+  local osc52 = require("vim.ui.clipboard.osc52")
+  local last = { {}, "v" }
+  local function copy(register)
+    local send = osc52.copy(register)
+    return function(lines, regtype)
+      last = { lines, regtype }
+      send(lines)
+    end
+  end
+  local function paste()
+    return last
+  end
+  vim.g.clipboard = {
+    name = "OSC 52 over SSH",
+    copy = { ["+"] = copy("+"), ["*"] = copy("*") },
+    paste = { ["+"] = paste, ["*"] = paste },
+  }
+end
+M._use_osc52_over_ssh()
+
+-- Warn once on a delayed timer so the message lands AFTER the colorscheme +
+-- lualine load (otherwise it gets buried in startup output).
+function M._warn_if_missing_clipboard_provider()
+  -- Escape hatch: a user-defined vim.g.clipboard provider overrides
+  -- nvim's discovery chain. Don't warn in that case.
+  if vim.g.clipboard ~= nil and vim.g.clipboard ~= false then
+    return
+  end
+  if M._has_clipboard_provider() then
     return
   end
   vim.notify(

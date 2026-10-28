@@ -870,7 +870,8 @@ sessions; installing a display helper does not create a graphical session:
 | Linux X11 | `xclip`, then `xsel` as fallback |
 | Native Windows or an available bridge | `win32yank.exe` |
 | Headless tmux | OSC 52 through the terminal |
-| Headless Neovim | Explicit OSC 52 or custom provider (`:help clipboard-osc52`) |
+| Neovim over SSH, no tool above | OSC 52 copy through the terminal. `p` pastes the last Neovim copy. Use the terminal paste key for the local clipboard. |
+| Other headless Neovim | Explicit OSC 52 or custom provider (`:help clipboard-osc52`) |
 
 The new Neovim selection installs both Linux clipboard helpers automatically.
 Retaining those system helpers or macOS’s built-in clipboard commands does not

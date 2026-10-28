@@ -64,6 +64,55 @@ describe("clipboard provider warning", function()
     assert.are.equal(vim.log.levels.WARN, notifications[1].level)
   end)
 
+  describe("over SSH", function()
+    local original_ssh
+    local original_ui_send
+
+    before_each(function()
+      original_ssh = { SSH_TTY = vim.env.SSH_TTY, SSH_CONNECTION = vim.env.SSH_CONNECTION }
+      original_ui_send = vim.api.nvim_ui_send
+      for _, key in ipairs({ "DISPLAY", "WAYLAND_DISPLAY", "TMUX", "SSH_CONNECTION" }) do
+        vim.env[key] = nil
+      end
+      vim.env.SSH_TTY = "/dev/pts/fixture"
+      vim.g.clipboard = nil
+    end)
+
+    after_each(function()
+      vim.env.SSH_TTY = original_ssh.SSH_TTY
+      vim.env.SSH_CONNECTION = original_ssh.SSH_CONNECTION
+      vim.api.nvim_ui_send = original_ui_send
+    end)
+
+    it("copies through OSC 52 and pastes the last copy without a terminal read", function()
+      vim.fn.executable = function()
+        return 0
+      end
+      local sent = {}
+      vim.api.nvim_ui_send = function(sequence)
+        table.insert(sent, sequence)
+      end
+
+      options._use_osc52_over_ssh()
+      local provider = vim.g.clipboard
+      provider.copy["+"]({ "alpha", "beta" }, "V")
+      local pasted = provider.paste["+"]()
+
+      assert.are.same({ "\027]52;c;" .. vim.base64.encode("alpha\nbeta") .. "\027\\" }, sent)
+      assert.are.same({ { "alpha", "beta" }, "V" }, pasted)
+    end)
+
+    it("keeps an available clipboard tool", function()
+      vim.fn.executable = function(name)
+        return name == "win32yank.exe" and 1 or 0
+      end
+
+      options._use_osc52_over_ssh()
+
+      assert.is_nil(vim.g.clipboard)
+    end)
+  end)
+
   it("honors vim.g.clipboard as an escape hatch", function()
     local executable_calls = 0
     local notified = false
