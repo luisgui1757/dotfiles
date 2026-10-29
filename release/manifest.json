@@ -26,14 +26,11 @@
     "Desktop lifecycle (windows-2025)"
   ],
   "current": {
-    "state": "candidate",
+    "state": "published",
     "tag": "v1.0.1",
     "previous_tag": "v0.4.4",
     "title": "v1.0.1 — Native interactive installer replaces Nix and chezmoi",
     "notes": "docs/releases/v1.0.1.md",
-    "preparation": {
-      "base_commit": "0ba1b7e0fe3a56177f92887a97d24878b80d1bb4",
-      "branch": "release/v1.0.1"
-    }
+    "proof": "release/proofs/v1.0.1.json"
   }
 }
