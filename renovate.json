@@ -24,7 +24,7 @@
     "dependencies"
   ],
   "automerge": false,
-  "rebaseWhen": "behind-base-branch",
+  "rebaseWhen": "conflicted",
   "vulnerabilityAlerts": {
     "enabled": false
   },
