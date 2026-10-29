@@ -15,19 +15,37 @@ concurrency:
 
 jobs:
   core:
-    name: core (${{ matrix.runner }})
+    name: ${{ matrix.check }} (${{ matrix.runner }})
     strategy:
       fail-fast: false
       matrix:
+        # Linux runs all steps in one job. On macOS and Windows, a second job
+        # runs the package, archive, language and migration steps at the same time.
         include:
           - runner: ubuntu-26.04
             target: linux/amd64
+            check: core
+            part: all
           - runner: ubuntu-26.04-arm
             target: linux/arm64
+            check: core
+            part: all
           - runner: macos-26
             target: darwin/arm64
+            check: core
+            part: engine
+          - runner: macos-26
+            target: darwin/arm64
+            check: core packages
+            part: packages
           - runner: windows-2025
             target: windows/amd64
+            check: core
+            part: engine
+          - runner: windows-2025
+            target: windows/amd64
+            check: core packages
+            part: packages
     runs-on: ${{ matrix.runner }}
     # Existing checks, manager fixtures, released migration and vendor retirement.
     timeout-minutes: 150
@@ -51,6 +69,7 @@ jobs:
       # Run before any other installer fixture: Windows uses real known folders,
       # and the keyboard journey requires an actually absent installer state.
       - name: Exercise the public keyboard installation and personal-data journey
+        if: matrix.part != 'packages'
         env:
           DOTFILES_TEST_PUBLIC_UI: '1'
           DOTFILES_TEST_UI_EVIDENCE: ${{ runner.temp }}/dotfiles-public-ui-evidence
@@ -58,7 +77,7 @@ jobs:
           set -euo pipefail
           go test -v -count=1 -timeout 25m -run '^TestNativePublicInteractiveLifecycle$' ./terminal
       - name: Preserve public keyboard acceptance evidence
-        if: ${{ always() }}
+        if: ${{ always() && matrix.part != 'packages' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: public-ui-${{ matrix.runner }}
@@ -84,6 +103,7 @@ jobs:
             HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1 brew install tmux
           fi
       - name: Check formatting and dependencies
+        if: matrix.part != 'packages'
         run: |
           set -euo pipefail
           formatting=$(gofmt -l .)
@@ -94,6 +114,7 @@ jobs:
           go mod tidy
           git diff --exit-code -- go.mod go.sum
       - name: Vet and exercise the engine against the native filesystem
+        if: matrix.part != 'packages'
         run: |
           set -euo pipefail
           go vet ./...
@@ -106,11 +127,12 @@ jobs:
           sudo -n "$RUNNER_TEMP/legacy-process.test" -test.v -test.count=1 -test.timeout=2m \
             -test.run='^TestLegacyLinux(Process|Closed|Kernel|Reader(Reports|Refuses|Handle|Inspects|Worker))'
       - name: Edit a root-owned file through sudoedit and the generated editor
-        if: runner.os != 'Windows'
+        if: runner.os != 'Windows' && matrix.part != 'packages'
         env:
           DOTFILES_TEST_SUDO_EDITOR: '1'
         run: go test -v -count=1 -timeout 2m -run '^TestNativeSudoEditorUsesGeneratedNeovim$' .
       - name: Install, execute, check and remove the real pinned archive
+        if: matrix.part != 'engine'
         env:
           DOTFILES_TEST_ARCHIVES: '1'
           DOTFILES_TEST_PUBLIC_WINDOWS: '1'
@@ -121,7 +143,7 @@ jobs:
           DOTFILES_TEST_SENTINEL: '1'
         run: go test -v -count=1 -timeout 20m -run '^TestNativeSentinel' .
       - name: Install, consume, check, update and remove T3 Code and the Claude Code, Codex, Copilot and Kiro CLIs
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.part != 'packages' }}
         env:
           DOTFILES_TEST_AGENT_CLIS: '1'
         run: go test -v -count=1 -timeout 20m -run '^TestNativeAgentCLIInstalledApplicationLifecycle$' .
@@ -131,7 +153,7 @@ jobs:
           DOTFILES_TEST_NATIVE_PACKAGES: '1'
         run: go test -v -count=1 -timeout 12m -run '^TestNative(APT|LinuxAPT)' .
       - name: Verify native Homebrew transaction and removal contracts
-        if: ${{ !cancelled() && runner.os == 'macOS' }}
+        if: ${{ !cancelled() && runner.os == 'macOS' && matrix.part != 'engine' }}
         env:
           DOTFILES_TEST_NATIVE_PACKAGES: '1'
         run: go test -v -count=1 -timeout 20m -run '^TestNative(Brew|HomebrewIdentitySurvivesVolumeRemount)' .
@@ -142,41 +164,41 @@ jobs:
           DOTFILES_TEST_TAILSCALE: '1'
         run: go test -v -count=1 -timeout 15m -run '^TestNativeTailscalePackageLifecycle$' .
       - name: Verify Windows runtime registration and Microsoft signature
-        if: ${{ !cancelled() && runner.os == 'Windows' }}
+        if: ${{ !cancelled() && runner.os == 'Windows' && matrix.part != 'engine' }}
         env:
           DOTFILES_NATIVE_WINDOWS_VENDOR: '1'
         run: go test -v -count=1 -timeout 8m -run '^TestWindows(VendorNativeRegistrationAndSignature|BuildToolsNativeReuseAndEnvironment)$' .
       - name: Install, use and remove the private language prerequisites
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.part != 'engine' }}
         env:
           DOTFILES_TEST_LANGUAGE_PREPARATION: '1'
         run: go test -v -count=1 -timeout 15m -run '^TestNative((Latex|Rust|Yamllint)Preparation|WindowsPipConfigurationIsolation$|NodeConsumerPreservesPayloadAndRemoval$)' .
       - name: Install, upgrade, use and remove full Windows Git and GNU Make
-        if: ${{ !cancelled() && runner.os == 'Windows' }}
+        if: ${{ !cancelled() && runner.os == 'Windows' && matrix.part != 'engine' }}
         env:
           DOTFILES_NATIVE_WINDOWS_GIT_MAKE: '1'
         run: go test -v -count=1 -timeout 12m -run '^TestNativeWindowsGitAndMakeLifecycle$' .
       - name: Install and remove the locked Neovim runtime
-        if: ${{ !cancelled() && runner.os == 'macOS' }}
+        if: ${{ !cancelled() && runner.os == 'macOS' && matrix.part != 'packages' }}
         env:
           DOTFILES_TEST_NVIM_SYNC_BOOTSTRAP: '1'
         run: go test -v -count=1 -timeout 12m -run '^TestNativeNvimSyncCompleteBootstrap$' .
 
       - name: Verify public POSIX bootstrap and legacy migration lifecycle
-        if: ${{ !cancelled() && runner.os != 'Windows' }}
+        if: ${{ !cancelled() && runner.os != 'Windows' && matrix.part != 'engine' }}
         env:
           DOTFILES_TEST_PUBLIC_POSIX_BOOTSTRAP: '1'
         run: go test -v -count=1 -timeout 12m -run '^TestNativePOSIXPublicBootstrapMigrationSetupLifecycle$' .
 
       - name: Verify public PowerShell bootstrap and legacy migration lifecycle
-        if: ${{ !cancelled() && runner.os == 'Windows' }}
+        if: ${{ !cancelled() && runner.os == 'Windows' && matrix.part != 'engine' }}
         env:
           DOTFILES_TEST_PUBLIC_WINDOWS_MIGRATION: '1'
         run: go test -v -count=1 -timeout 12m -run '^TestNativeWindowsPublicMigrationSetupLifecycle$' .
 
 
       - name: Verify native legacy package-manager retirement
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.part != 'engine' }}
         env:
           DOTFILES_TEST_NATIVE_PACKAGES: '1'
           DOTFILES_TEST_LEGACY_MANAGERS: '1'
@@ -184,7 +206,7 @@ jobs:
         run: go test -v -count=1 -timeout 15m -run '^TestLegacy(Windows|Chocolatey|Winget|Homebrew|WezTerm|MacApplication)' .
 
       - name: Migrate and retire the published POSIX installation
-        if: ${{ !cancelled() && runner.os != 'Windows' }}
+        if: ${{ !cancelled() && runner.os != 'Windows' && matrix.part != 'engine' }}
         env:
           DOTFILES_TEST_NATIVE_PACKAGES: '1'
           DOTFILES_TEST_LEGACY_RETIREMENT: '1'
@@ -198,7 +220,7 @@ jobs:
           fi
 
       - name: Install and retire Determinate through its validated vendor receipt
-        if: ${{ !cancelled() && runner.os != 'Windows' }}
+        if: ${{ !cancelled() && runner.os != 'Windows' && matrix.part != 'engine' }}
         env:
           DOTFILES_TEST_NATIVE_PACKAGES: '1'
           DOTFILES_TEST_LEGACY_DETERMINATE: '1'
