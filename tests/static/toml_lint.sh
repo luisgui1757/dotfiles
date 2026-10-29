@@ -13,7 +13,13 @@ if command -v taplo >/dev/null 2>&1; then
     taplo_panicked=0
     for f in "${files[@]}"; do
         taplo_output=""
-        if ! taplo_output="$(taplo lint "$f" 2>&1)"; then
+        if [[ "$f" == "$REPO_ROOT/starship/starship.toml" ]]; then
+            # Use the pinned local schema, as tests/starship/toml_lint.sh does.
+            lint=(taplo lint --schema "file://$REPO_ROOT/tests/starship/config-schema.json" "$f")
+        else
+            lint=(taplo lint "$f")
+        fi
+        if ! taplo_output="$("${lint[@]}" 2>&1)"; then
             if grep -Eq 'panicked at|Attempted to create a NULL object' <<<"$taplo_output"; then
                 echo "taplo panicked on $f; falling back to python tomllib"
                 printf '%s\n' "$taplo_output"
