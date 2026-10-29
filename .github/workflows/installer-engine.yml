@@ -20,7 +20,7 @@ jobs:
       fail-fast: false
       matrix:
         # Linux runs all steps in one job. On macOS and Windows, a second job
-        # runs the package, archive, language and migration steps at the same time.
+        # runs most package steps and the archive, language and migration steps at the same time.
         include:
           - runner: ubuntu-26.04
             target: linux/amd64
@@ -152,8 +152,10 @@ jobs:
         env:
           DOTFILES_TEST_NATIVE_PACKAGES: '1'
         run: go test -v -count=1 -timeout 12m -run '^TestNative(APT|LinuxAPT)' .
+      # This step stays in the core job, after the same steps as before the split.
+      # In the core packages job, the read-only preview test found a new Library folder in its home.
       - name: Verify native Homebrew transaction and removal contracts
-        if: ${{ !cancelled() && runner.os == 'macOS' && matrix.part != 'engine' }}
+        if: ${{ !cancelled() && runner.os == 'macOS' && matrix.part != 'packages' }}
         env:
           DOTFILES_TEST_NATIVE_PACKAGES: '1'
         run: go test -v -count=1 -timeout 20m -run '^TestNative(Brew|HomebrewIdentitySurvivesVolumeRemount)' .
