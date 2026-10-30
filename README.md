@@ -178,8 +178,7 @@ their own section outside the marked block, or in `~/.gitconfig`;
 `git config --global --add include.path` can edit the managed include section
 and requires review. Removal preserves edited blocks and personal settings.
 As with other live configuration, editing the checkout's defaults takes effect
-immediately. See [Git configuration handover](docs/UPGRADING.md#git-configuration-handover)
-for a previous whole-file installation.
+immediately.
 
 **Lint and benchmark tools** is optional for contributors to this dotfiles
 repository. It supplies ShellCheck, jq, Hyperfine, Taplo, yamllint and
@@ -194,13 +193,7 @@ Chromium's sandbox, because that sandbox needs unprivileged user namespaces,
 which Ubuntu restricts unless an AppArmor profile names the program's path. This
 is disclosed before approval; the installer does not change kernel settings or
 AppArmor policies. Vaults and Obsidian's settings (`~/.config/obsidian`) stay
-personal. Until 2026-10-22, Linux Obsidian was a Flatpak in a private store:
-company AppArmor changes could stop its sandbox, and Electron's helper processes
-ask Flatpak's session service to start them, which cannot see a private store.
-Choose tools removes that earlier Flatpak and keeps its
-`~/.var/app/md.obsidian.Obsidian` data; Update installs the portable build but,
-as always, removes nothing. Obsidian then asks once for your vault: use **Open
-folder as vault**.
+personal.
 OpenWhispr uses its official portable archive on Linux amd64; upstream does not
 publish a Linux arm64 archive or Flatpak. The vendor launcher automatically
 disables Chromium’s sandbox when unprivileged user namespaces are restricted,
@@ -224,8 +217,7 @@ Zen-only installation also requires Homebrew and Apple's command-line tools.
 
 On Linux, Zen uses Mozilla's legacy profile selection to retain the same personal
 profile across managed generations. Its application policy disables self-updates;
-use setup's Update action. See the
-[handover instructions for earlier Mac installations](docs/UPGRADING.md#zen-macos-native-application).
+use setup's Update action.
 
 Tailscale uses its pinned official DEB on Linux, including the vendor's daemon
 service. Run `sudo tailscale up` to sign in. On macOS the existing Homebrew formula
@@ -393,8 +385,7 @@ its Sentinel checkout. Setup records `CODEX_HOME`, `CLAUDE_CONFIG_DIR`,
 and removal use these recorded values, and setup shows a note when they changed.
 
 A Renovate pull request proposes a new Sentinel pin. After you merge and pull
-it, **Update tools** applies it. Coming from dotfiles v1.0.0? Read
-[Sentinel rules and skills](docs/UPGRADING.md#sentinel-rules-and-skills).
+it, **Update tools** applies it.
 
 Authenticated agent execution remains a separate verification step. Notes remain personal: Neovim
 enables the notes integration only when its vault exists; `NOTES_VAULT` can select another existing vault.

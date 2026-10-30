@@ -131,7 +131,6 @@ func operationPrivileged(resource Resource, observed Observation) bool {
 
 // PlanChanges is pure: probes, prompts, IO and provider mutation live outside it.
 func PlanChanges(c *Catalog, ctx Context, state State, request Request, observed map[string]Observation, source string) (Plan, error) {
-	inheritedKeep := request.Keep == nil
 	for id, o := range observed {
 		if o.Unknown && (o.Pending == "" || o.Present || o.CompletedOperation != "" || o.RestoredOperation != "") {
 			return Plan{}, fmt.Errorf("%s has an invalid unknown observation", id)
@@ -196,19 +195,9 @@ func PlanChanges(c *Catalog, ctx Context, state State, request Request, observed
 	}
 	plan.Selected = sortedUnique(request.Selected)
 	plan.Keep = sortedUnique(request.Keep)
-	if inheritedKeep {
-		plan.Keep = slices.DeleteFunc(plan.Keep, func(id string) bool {
-			r, known := c.Resource(id)
-			return known && r.ReplacedBy != ""
-		})
-	}
 	for _, id := range plan.Keep {
-		r, ok := c.Resource(id)
-		if !ok {
+		if _, ok := c.Resource(id); !ok {
 			return plan, fmt.Errorf("unknown retained resource %q", id)
-		}
-		if r.ReplacedBy != "" {
-			return plan, fmt.Errorf("%s is recovery-only and cannot be kept as an installation root", id)
 		}
 		if _, ok := state.Receipts[id]; !ok {
 			return plan, fmt.Errorf("cannot keep unrecorded resource %q", id)
@@ -232,7 +221,7 @@ func PlanChanges(c *Catalog, ctx Context, state State, request Request, observed
 		receipt := state.Receipts[id]
 		completed := request.Retry && recoverCompletion(receipt, o).Ownership == "created"
 		allowedMode := request.Mode == "apply" || (request.Mode == "update" || request.Mode == "repair") && receipt.Ownership == "created"
-		if !allowedMode || !known || !slices.Contains(wanted, id) || r.Retain || r.ReplacedBy != "" || !o.Present || !o.Adoptable && !completed || o.Pending != "" ||
+		if !allowedMode || !known || !slices.Contains(wanted, id) || r.Retain || !o.Present || !o.Adoptable && !completed || o.Pending != "" ||
 			!request.Retry && receipt.Ownership == "created" && sameArtifact(receipt.After, o) {
 			return plan, fmt.Errorf("%s cannot be adopted in this selection or provider state", id)
 		}
@@ -382,29 +371,14 @@ func PlanChanges(c *Catalog, ctx Context, state State, request Request, observed
 		}
 		op := Operation{Resource: id, Action: "remove", Reason: "no remaining selected consumer", Observed: o, Ownership: receipt.Ownership, Privileged: operationPrivileged(r, o)}
 		switch {
-		case r.ReplacedBy != "" && receipt.Ownership == "uncertain" && receipt.OperationID != "" && o.RestoredOperation == receipt.OperationID && o.Pending == "":
-			op.Action, op.Reason = "forget", "saved evidence proves the original publication was cancelled or restored; preserve the personal file"
 		case receipt.After.RemovalDeferred && removalCompleted(receipt, o):
 			op.Action, op.Reason = "forget", "native root already released; retained package remains provider-owned"
 		case completedBaselineRemoval(receipt, o):
 			op.Action, op.Reason = "forget", "previous removal restored this baseline; preserve the personal artifact"
-		case r.ReplacedBy != "" && (slices.Contains(wanted, r.ReplacedBy) || state.Receipts[r.ReplacedBy].Ownership != "") && receipt.Ownership == "reused" && o.Pending == "":
-			op.Action, op.Reason = "forget", "release unowned historical bookkeeping to the selected scoped configuration; preserve the personal file"
 		case request.Mode == "update" || request.Mode == "repair" || request.Mode == "check":
 			op.Action, op.Reason = "retain", "selection changes and removal require a separate apply request"
 		case o.Pending != "":
 			op.Action, op.Reason = "retain", o.Pending
-		// Automatic legacy restoration needs provider proof that the current file
-		// is the receipt's completed publication. A removal rebinds After to the
-		// approved file: only its own interrupted transaction may rely on that;
-		// after abandonment or restoration, the rebinding proves nothing.
-		case r.ReplacedBy != "" && (receipt.Ownership == "created" || receipt.Ownership == "uncertain") && o.Adoptable && (receipt.Ownership == "uncertain" || !sameArtifact(receipt.After, o) ||
-			receipt.Status != "in-progress" && (o.CompletedOperation == "" || o.CompletedOperation != receipt.OperationID)):
-			if slices.Contains(request.RemoveShared, id) {
-				op.Reason = "explicitly preserve the current legacy configuration separately and restore its original uninstall baseline"
-			} else {
-				op.Action, op.Reason = "retain", "review the optional legacy configuration restoration before enabling its replacement"
-			}
 		case !o.Present && receipt.Ownership == "created" && receipt.Adopted && receipt.Before.Present && receipt.After.Provider == o.Provider && receipt.After.Identity == o.Identity:
 			op.Reason = "restore the preserved original configuration even though the installed target was deleted"
 		case r.Action == "retire" && r.Retain:

@@ -22,7 +22,6 @@ type NativeDriver struct {
 	Homebrew           *HomebrewBootstrapDriver
 	HomebrewIssue      string
 	APT                *LinuxAPTDriver
-	Flatpak            *FlatpakDriver
 	KeyboardAccess     *KeyboardAccessDriver
 	APTIssue           string
 	WindowsVendor      *WindowsVendorDriver
@@ -41,7 +40,7 @@ type NativeDriver struct {
 }
 
 func (d *NativeDriver) provider(r Resource) (Driver, error) {
-	if d.Sentinel != nil && (r.Action == "sentinel" || r.Action == "sentinel-retired") {
+	if d.Sentinel != nil && r.Action == "sentinel" {
 		return d.Sentinel, nil
 	}
 	if r.ID == "tool.font" && d.Fonts != nil {
@@ -75,9 +74,6 @@ func (d *NativeDriver) provider(r Resource) (Driver, error) {
 	}
 	if r.ID == "system.keyboard-access" && d.KeyboardAccess != nil {
 		return d.KeyboardAccess, nil
-	}
-	if d.Flatpak != nil && r.Bindings[d.Context.OS].Provider == "flatpak" {
-		return d.Flatpak, nil
 	}
 	if d.APT != nil && r.Bindings[d.Context.OS].Provider == "apt" {
 		return d.APT, nil
@@ -254,31 +250,12 @@ func (d *NativeDriver) ForSelection(wanted []string, state State) (Driver, error
 		profiles := *clone.Profiles
 		profiles.recordIssue(gitSettingsResource, retainGitSettingsTarget(&profiles, state))
 		profiles.recordIssue(kiroSettingsResource, retainKiroSettingsTarget(&profiles, state))
-		// A scoped successor cannot acquire its baseline while the predecessor
-		// still owns any fields in the same document. Restoration is a separate
-		// approved publication; a fresh preview observes the restored file.
-		for _, resource := range d.Catalog.Resources {
-			if resource.ReplacedBy == "" || resource.Action != "profile" {
-				continue
-			}
-			receipt := state.Receipts[resource.ID]
-			if receipt.Ownership == "created" || receipt.Ownership == "uncertain" {
-				profiles.recordIssue(resource.ReplacedBy, fmt.Errorf("restore the earlier %s settings through Choose tools before enabling their replacement; edited settings require the optional restoration choice. Then Resume. If restored personal settings need adoption, use Abandon, then Choose tools to approve the new settings. If the earlier resource reports missing/damaged evidence or a moved settings path, preserve it and restore the matching path and recovery evidence before continuing", resource.Name))
-			}
-		}
 		clone.Profiles = &profiles
 	}
 	if d.Sentinel != nil {
-		// A CLI that this selection installs makes its agent a host. The saved
-		// dotfiles 1.0 receipts decide which files Sentinel takes over.
+		// A CLI that this selection installs makes its agent a host.
 		sentinel := *d.Sentinel
 		sentinel.Selected = slices.Clone(wanted)
-		sentinel.Earlier = map[string]Receipt{}
-		for _, id := range append([]string{sentinelEarlierRules}, sentinelEarlierSkills...) {
-			if receipt, ok := state.Receipts[id]; ok {
-				sentinel.Earlier[id] = receipt
-			}
-		}
 		clone.Sentinel = &sentinel
 	}
 	if d.Brew != nil {

@@ -44,7 +44,7 @@ func gitSettingsFixture(t *testing.T) (Controller, string, string) {
 	}
 	catalog := &Catalog{Schema: 1}
 	for _, resource := range c.Catalog.Resources {
-		if slices.Contains([]string{"git", "config.git", "integration.git"}, resource.ID) {
+		if slices.Contains([]string{"git", "integration.git"}, resource.ID) {
 			if !resource.Capability {
 				resource.Requires = nil
 			}
@@ -107,38 +107,6 @@ func TestGitDefaultsRebasePullAndPruneFetch(t *testing.T) {
 		if got := gitSettingsCommand(t, c.Home, c.Home, "config", "--bool", "--get", key); got != "true" {
 			t.Fatal("missing Git default", key, got)
 		}
-	}
-}
-
-func TestGitLegacyReceiptRequiresRemovalBeforeScopedDefaults(t *testing.T) {
-	c, _, target := gitSettingsFixture(t)
-	original := "[user]\n\tname = Personal baseline\n"
-	writeConfigFixture(t, target, original)
-	old := legacyGitController(c)
-	dispatchApproved(t, old, Request{Schema: 1, Mode: "apply", Selected: []string{"git"}, Adopt: []string{"config.git"}})
-	preview, err := c.Dispatch(context.Background(), Request{Schema: 1, Mode: "apply", Selected: []string{"git"}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	blocked := false
-	for _, operation := range preview.Plan.Operations {
-		if operation.Resource == gitSettingsResource && (operation.Action == "blocked" || operation.Action == "pending") {
-			blocked = true
-		}
-	}
-	if !blocked {
-		t.Fatal("new defaults competed with the previous whole-file owner", preview.Plan)
-	}
-	dispatchApproved(t, c, Request{Schema: 1, Mode: "apply", Selected: []string{}})
-	got, err := os.ReadFile(target)
-	if err != nil || string(got) != original {
-		t.Fatal("legacy removal did not restore the first personal baseline", string(got), err)
-	}
-	dispatchApproved(t, c, Request{Schema: 1, Mode: "apply", Selected: []string{"git"}})
-	dispatchApproved(t, c, Request{Schema: 1, Mode: "apply", Selected: []string{}})
-	got, err = os.ReadFile(target)
-	if err != nil || string(got) != original {
-		t.Fatal("new integration lost the legacy personal baseline", string(got), err)
 	}
 }
 
@@ -443,113 +411,5 @@ func TestGitHistoricalLocksDoNotBlockAfterParentRedirect(t *testing.T) {
 		if _, err := d.FinishTransaction(context.Background(), Plan{Mode: mode}, nil); err != nil {
 			t.Fatal("historical Git journal blocked unrelated finalization", mode, err)
 		}
-	}
-}
-
-func TestGitRetirementPreservesChangedWholeFileAndFirstBaseline(t *testing.T) {
-	for _, ownership := range []string{"created", "uncertain"} {
-		t.Run(ownership, func(t *testing.T) {
-			c, _, target := gitSettingsFixture(t)
-			original := "[user]\n\tname = Original personal baseline\n"
-			writeConfigFixture(t, target, original)
-			old := legacyGitController(c)
-			dispatchApproved(t, old, Request{Schema: 1, Mode: "apply", Selected: []string{"git"}, Adopt: []string{"config.git"}})
-			// Replace the old POSIX link, or edit the Windows copy, as a personal
-			// configuration manager might. Preserve this separately from baseline.
-			if err := os.Remove(target); err != nil {
-				t.Fatal(err)
-			}
-			changed := "[user]\n\temail = later@example.invalid\n"
-			writeConfigFixture(t, target, changed)
-			if ownership == "uncertain" {
-				state, err := LoadState(c.StatePath, c.Home)
-				if err != nil {
-					t.Fatal(err)
-				}
-				receipt := state.Receipts["config.git"]
-				receipt.Ownership, receipt.Status = "uncertain", "needs-action"
-				state.Receipts["config.git"] = receipt
-				if err := SaveState(c.StatePath, state); err != nil {
-					t.Fatal(err)
-				}
-			}
-			request := Request{Schema: 1, Mode: "apply", Selected: []string{}}
-			preview, err := c.Dispatch(context.Background(), request)
-			if err != nil {
-				t.Fatal(err)
-			}
-			for _, op := range preview.Plan.Operations {
-				if op.Resource == "config.git" && op.Action != "retain" {
-					t.Fatal("changed file removed without per-item choice", op)
-				}
-			}
-			request.RemoveShared = []string{"config.git"}
-			var result Result
-			if ownership == "created" {
-				result = runController(t, c, []string{"apply"}, []string{}, []string{"config.git"})
-			} else {
-				result = dispatchApproved(t, c, request)
-			}
-			actual, err := os.ReadFile(target)
-			if err != nil || string(actual) != original {
-				t.Fatal("first baseline was not restored", string(actual), result, err)
-			}
-			state, err := LoadState(c.StatePath, c.Home)
-			if err != nil {
-				t.Fatal(err)
-			}
-			preserved := false
-			for _, path := range state.Receipts["config.git"].After.Preserved {
-				data, err := os.ReadFile(path)
-				if err == nil && string(data) == changed {
-					preserved = true
-				}
-			}
-			if !preserved {
-				t.Fatal("changed file was not preserved separately", state.Receipts["config.git"])
-			}
-			dispatchApproved(t, c, Request{Schema: 1, Mode: "apply", Selected: []string{"git"}})
-			dispatchApproved(t, c, Request{Schema: 1, Mode: "apply", Selected: []string{}})
-			actual, err = os.ReadFile(target)
-			if err != nil || string(actual) != original {
-				t.Fatal("scoped defaults changed original baseline", err)
-			}
-		})
-	}
-}
-
-func TestGitLegacyRetirementResumesBeforeProviderPublication(t *testing.T) {
-	c, _, target := gitSettingsFixture(t)
-	original := "[user]\n\tname = Original baseline\n"
-	writeConfigFixture(t, target, original)
-	old := legacyGitController(c)
-	dispatchApproved(t, old, Request{Schema: 1, Mode: "apply", Selected: []string{"git"}, Adopt: []string{"config.git"}})
-	request := Request{Schema: 1, Mode: "apply", Selected: []string{}}
-	plan, err := c.Preview(context.Background(), request)
-	if err != nil {
-		t.Fatal(err)
-	}
-	id, err := digest(struct{ Plan, Resource, Action string }{plan.ID, "config.git", "remove"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	journal := c.Driver.(*NativeDriver).Configurations.journalPath(id)
-	// A filesystem publication error occurs after durable engine intent, before
-	// any provider journal or target move. Removing the obstacle permits retry.
-	if err := os.Mkdir(journal, 0700); err != nil {
-		t.Fatal(err)
-	}
-	request.ExpectedPlan = plan.ID
-	if _, err := c.Dispatch(context.Background(), request); err == nil {
-		t.Fatal("fixture did not stop publication")
-	}
-	if err := os.Remove(journal); err != nil {
-		t.Fatal(err)
-	}
-	request.ExpectedPlan, request.Retry = "", true
-	result := dispatchApproved(t, c, request)
-	actual, err := os.ReadFile(target)
-	if err != nil || string(actual) != original || result.Status != "ready" {
-		t.Fatal("saved legacy removal could not resume before provider publication", result, string(actual), err)
 	}
 }

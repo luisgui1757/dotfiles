@@ -101,13 +101,7 @@ the same installer with `--check`. Exit 0 is healthy, exit 1 is drift for
 Repair, and any other exit is an error.
 
 Removal runs `--remove` for each host that dotfiles installed for, then deletes
-`<state>/sentinel`. The resources `integration.sentinel`,
-`skills.sentinel-agents`, `skills.sentinel-claude`, `skills.sentinel-kiro` and
-`skills.sentinel-copilot` stay in the catalog only for the v1.0.0 handoff. The
-first apply deletes the skill folders that their receipts list, when a hash
-check against the saved journal proves the copied bytes. Then it releases those
-receipts. The [upgrade guide](../docs/UPGRADING.md#sentinel-rules-and-skills)
-describes the handoff.
+`<state>/sentinel`.
 
 The never-released Go Nix prototype and its dedicated experiments have been
 removed. Previous released installers and their pinned source evidence remain
@@ -135,18 +129,6 @@ available for recovery of their own unfinished transactions.
   the active original, and explains how to retry the saved operation.
 - Git uses a prepended marked include in its regular XDG global configuration,
   preserving personal precedence and ordinary `git config --global` writes.
-  For old whole-file receipts, the existing `remove_shared` per-item machine
-  choice also authorizes legacy settings restoration: preserve current edits
-  separately, restore the first baseline, then select the scoped replacement.
-  Declining this choice never adds the retired mapping to Keep. Retired mappings
-  cannot be kept, adopted or republished and have no runtime dependencies. An
-  inherited Keep entry is omitted from the new plan without touching the file.
-  A cancelled first publication can release uncertain bookkeeping only when its
-  saved journal proves no publication started or verifies completed restoration.
-  Intact recovery evidence is required; this grants no package removal authority.
-  The old whole-file mapping remains for receipt recovery. Its `replaced_by`
-  metadata releases only unowned historical bookkeeping after explicit removal;
-  it never transfers deletion authority or discards an original backup.
 - `NativeDriver` routes each resource to one provider. There is no fallback
   cascade and no Nix or chezmoi resource in the new graph.
 

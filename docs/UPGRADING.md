@@ -37,7 +37,7 @@ Store, Preview and Canary installations remain personal. If that instance still
 contains ambiguous legacy combined actions, launch it once to let Terminal migrate
 its own settings, then retry the reviewed setup.
 
-## Git configuration handover
+## Git configuration
 
 Git defaults now use a marked include in a regular personal XDG Git file.
 `pull.rebase = true` and `fetch.prune = true` are defaults; personal values later
@@ -52,26 +52,6 @@ Personal sync links outside the recognized dotfiles layouts stay unchanged.
 Copied personal values still override the new defaults; the released default file
 has no pull policy, so its migration allows the new rebase default to take effect.
 Unreadable links and non-UTF-8 Git files require explicit repair or conversion.
-
-An earlier build of this unreleased PR may already own the whole `config.git`
-file. First untick **Git** in setup's **Choose tools**. An unchanged owned file restores
-its first personal baseline. For changed files or uncertain ownership with intact
-recovery evidence, select the optional **legacy settings restoration**: it saves
-the current file separately and restores that first baseline. Settings added to
-that copy (including Git identity and credential helpers) become inactive until
-you copy them back from the reported recovery path. Declining keeps the file
-intact and offers restoration again on the next run; it never makes the obsolete
-mapping installable. Saved proof that a first publication was cancelled before
-any move, or explicitly restored, releases its bookkeeping without modifying the
-personal file. Missing recovery evidence blocks only this configuration. Migrate any restored
-legacy link with v1.0.1, then select Git again. Migrate refuses to detach setup's owned
-link. The old unowned receipt is released when the new integration takes over;
-its saved backup remains intact. Do not delete installer state to bypass this
-handover. On Windows this same flow covers the former whole-file copy.
-Retired mappings do not retain Git or managed shell blocks. Any old Keep entry
-for such a mapping is dropped from the next plan while its file stays protected.
-When Git remains selected during handover, resume setup after the old receipt is
-released so the new include can acquire its own baseline.
 
 Git follows `HOME`/`XDG_CONFIG_HOME` on Windows as well as POSIX. An explicit
 `GIT_CONFIG_GLOBAL` bypasses both personal global files; unset it before applying
@@ -204,14 +184,7 @@ adoption first) and restores your file on removal.
 Pi has been removed, including its copied themes/keybindings and Sentinel target.
 Existing released Pi packages and personal data remain outside this installer's
 ownership. Keep an old checkout if a personal Pi configuration still links to it.
-To test an earlier unreleased native-installer revision, first remove Pi and its
-old Sentinel selection with that exact revision. Finish any pending operation
-there before you advance. v1.0.1 migrate retires the released Pi policy file.
-Never discard state or recovery journals.
-
-Sentinel rules and skills replace the two v1.0.0 selections, Sentinel policy and
-Sentinel skills. Read [Sentinel rules and skills](#sentinel-rules-and-skills)
-before the first apply after the update.
+v1.0.1 migrate retires the released Pi policy file.
 
 The POSIX launchers create private cache/staging files under umask `077`, then
 restore the caller's umask before starting the installer. They do not change your
@@ -223,18 +196,9 @@ For historical v0.1.0-to-v0.4.4 procedures, read
 [the immutable former guide](https://github.com/luisgui1757/dotfiles/blob/ae9a6446eb0a837a144d77d2a6345db967c61e4e/docs/UPGRADING.md).
 Those commands belong to their corresponding release, not this installer.
 
-Desktop app additions (2026-10-13 candidate): select each independently through
-setup. Linux Obsidian used a private Flathub stable installation until
-2026-10-22 and now uses the official portable build, started without Chromium's
-sandbox (disclosed before approval). If Obsidian was already selected, **Update
-tools** installs the portable build and repoints your existing launcher; it
-removes nothing, so the earlier Flatpak stays until you next apply **Choose
-tools**, which removes it with your approval. Its `~/.var/app/md.obsidian.Obsidian`
-data and private runtime are kept, and ordinary user/system Flatpak stores are
-not managed. Obsidian then keeps its settings in `~/.config/obsidian` instead of
-`~/.var/app/md.obsidian.Obsidian/config/obsidian`, so it asks once for your vault:
-choose **Open folder as vault**; vaults themselves are untouched.
-Linux OpenWhispr amd64 uses the official portable archive: its upstream launcher
+Desktop apps: select each independently through setup. Linux Obsidian uses the
+official portable build, started without Chromium's sandbox (disclosed before
+approval). Linux OpenWhispr amd64 uses the official portable archive: its upstream launcher
 may disable the Chromium sandbox on restricted-userns systems, disclosed before
 approval. No Flatpak or Linux arm64 build is currently published. Zen Linux
 updates through setup and uses a stable personal profile across package generations.
@@ -243,14 +207,6 @@ removing machine-wide owned packages requires the separate removal choice.
 
 VS Code's supported `update.mode: none` preference keeps the application on the
 reviewed installer version. Theme, font and update settings have one owner.
-An earlier theme-only installation must first restore its saved settings through
-**Choose tools**, then **Resume**. Restoration preserves the earlier file
-separately, including unchanged copies. Modified old settings need the optional
-restoration approval. If restored settings contain a personal theme, font or
-update preference, Resume cannot add that new approval: choose **Abandon**, then
-**Choose tools** and approve adoption. Removal restores those values and
-permissions. Missing or damaged evidence blocks handover; preserve it and restore
-the matching settings path and evidence before continuing.
 A bundle that already self-updated stays protected and requires explicit
 replacement approval; changing the preference does not claim changed bytes.
 This application-wide preference can also propagate to other machines through
@@ -258,52 +214,13 @@ This application-wide preference can also propagate to other machines through
 Exclude `update.mode` from sync in Code if those machines should update separately.
 
 
-## Sentinel rules and skills
-
-Dotfiles v1.0.0 had two selections, Sentinel policy and Sentinel skills. It
-copied the Sentinel 0.2.0 files itself. Now one selection, Sentinel rules and
-skills, runs the Sentinel installer at a pinned commit. A saved selection of
-either earlier choice becomes this selection.
-
-Before you update the checkout, finish or abandon an interrupted Sentinel
-operation with v1.0.0. Follow [Interruptions and conflicts](#interruptions-and-conflicts).
-
-The first apply after the update does the handoff:
-
-1. Setup deletes each skill folder that the v1.0.0 receipts list as a dotfiles
-   copy. It deletes a folder only when a hash check against the saved journal
-   proves that the folder holds the bytes that dotfiles copied.
-2. Sentinel installs its own copies of the skills.
-3. Sentinel replaces the old rules block in place. Text outside the block stays.
-4. Setup releases the old receipts.
-
-Setup does not delete a skill folder that changed or that a link now leads to.
-It reports the folder, and Sentinel stops at that folder. Move the folder to a
-different location, then apply again.
-
-If v1.0.0 adopted an earlier rules block, the handoff drops that saved block.
-Removal through dotfiles does not bring it back, and the text outside the block
-stays.
-
-If you untick Sentinel in the first run after the update, the old copies stay.
-To remove them, select Sentinel one time so that the handoff runs. Then untick
-it.
-
-Sentinel puts skills for Codex, Copilot and OpenCode in `~/.agents/skills` and
-Kiro files in `${KIRO_HOME:-~/.kiro}`. Sentinel replaces the old Kiro rules
-block in place there. The handoff also deletes the v1.0.0 copies in
-`$COPILOT_HOME/skills`. Copilot CLI reads `~/.agents/skills` also when you set
-`COPILOT_HOME`.
-
 ## T3 Code
 
 T3 Code is a new optional selection, never an automatic migration or provider
 replacement. It uses the official standalone package with a browser UI on Apple
 Silicon macOS, Ubuntu/Debian amd64/arm64 and Windows amd64. The fixed stable
-`v0.1.0` pin supplies Orchestrator V2. Finish any pending nightly installation
-with its original checkout first; then stop T3, update the checkout and choose
-**Update tools** to replace the managed nightly with stable. Personal
-T3 state stays outside the package; back it up before running a newer server.
+`v0.1.0` pin supplies Orchestrator V2. Personal T3 state stays outside the
+package; back it up before running a newer server.
 
 Run `t3` in a fresh terminal, then configure a supported provider when ready
 to run agents. Existing Codex/Claude CLI logins are supported; T3's Connect with
@@ -323,75 +240,7 @@ isolated trial. This installer does not perform or verify that upstream migratio
 For dotfiles-managed Codex/Claude, use dotfiles Update, not the provider Update
 or Update all buttons in T3; those can invoke the CLI's own updater.
 
-### Zen macOS native application
-
-The macOS selection now uses Homebrew's official `zen` cask and normal browser
-updates. Existing authentic app bundles are reused without acquiring removal
-rights. Finish an interrupted earlier operation using its original checkout
-before changing revisions; keep all journals and failed generations.
-
-For an earlier private `tool.zen` installation, use **Choose tools** and keep Zen
-selected. Review the new native app and the old launcher/package cleanup together.
-The old launcher is removed before an unchanged private bundle. A bundle that
-already self-updated remains protected; its original ownership checks are not
-relaxed. The old archive pins and preparation revisions remain recovery-only.
-A retained `DotfilesZen.app` still has Zen's bundle ID and may appear in macOS
-application routing. Inspect that retained copy before choosing a default browser.
-
-The new installation does not edit profiles, `profiles.ini`, `installs.ini`,
-preferences or default-browser registration. Zen handles its own profile setup;
-a browser version older than an existing profile can display a downgrade warning.
-Quit all Zen copies before changing the native installation. Remove preserves
-personal profiles and caches and requires per-item approval. It verifies the
-recorded app's signer and bundle ID, but a manual reinstall from the same developer
-at the same path is indistinguishable from a normal browser update. An unverified
-app, changed uninstall recipe or an existing shared `zen` command blocks removal.
-
-### Windows Python preparation correction
-
-An earlier unreleased installer can stop while preparing Python bytecode under
-Windows' default path policy. Keep its transaction and original checkout. Use
-that original installer to review the recovery choices before changing revisions;
-Restore or Abandon is available only when the saved evidence permits it. Do not
-delete the failed generation or journal to bypass recovery.
-
-Once recovery is complete, update the checkout and run setup again. The corrected
-preparation uses extended paths without changing Windows policy or moving package
-directories. Existing completed LaTeX and yamllint environments receive an
-ordinary approved Update for the new preparation revision. Personal Python
-environments and pip settings are outside this change.
-
-### Windows Neovim formatter correction
-
-Windows now uses standalone Gersemi and clang-format archives at the same pinned
-versions as the POSIX Mason tools. An approved Update builds a fresh Neovim
-runtime and installs those automatic prerequisites; no new checkbox is needed.
-
-If Neovim synchronization failed before publishing its runtime, Abandon preserves
-the partial generation and journal so setup can start a fresh operation with the
-corrected checkout. A previously abandoned operation no longer traps Neovim in
-Pending. If publication itself was interrupted, recover that exact operation
-with its original checkout before abandoning or changing source. Never delete
-the journal or partial generation to bypass recovery. Abandonment uses the
-existing provider finalization order: it may finish cleanup of independently
-verified obsolete archive generations before refusing an interrupted Neovim
-publication. That refusal preserves the Neovim publication and recovery evidence.
-If saved evidence is damaged, Check names its location and keeps unrelated tools
-available. An active operation with unreadable publication evidence cannot be
-abandoned safely; preserve it for recovery rather than deleting its journal.
-
-### Windows VC++ registry reconciliation
-
-Build Tools installation can leave differing VC++ version entries across the
-Windows registry views. Setup now accepts the newer entry only when the installed
-bundle, both MSI providers and the runtime DLL versions agree. Older entries are
-preserved and disclosed, and block runtime removal. Other conflicts still fail.
-Completed receipts from the earlier adapter remain readable. Finish an interrupted
-old VC++ operation with its original checkout before updating; its saved command
-cannot be reinterpreted as the new recipe.
-
-
-### Windows legacy profile ownership
+## Windows legacy profile ownership
 
 An earlier elevated setup can leave Git configuration or a PowerShell profile
 owned by `BUILTIN\Administrators`. Windows may let your normal account edit its
@@ -416,32 +265,7 @@ This elevated route applies to `BUILTIN\Administrators`. For another owner, reso
 ownership explicitly outside setup; administrator elevation alone is not a
 general way to preserve an arbitrary owner SID.
 
-### Private Python tools and existing terminal sessions
-
-The managed `latex2text` and `yamllint` commands now use their own command-only
-directories. Their private Python/pip executables no longer enter your shell PATH.
-Update replaces these two tool generations and the shell integration; the selected
-base Python stays unchanged. Existing saved operations retain their approved recipe.
-After Update, open a fresh terminal from the desktop and restart applications that
-launch shells so they inherit the new command paths.
-
-Windows private Python preparation also disables pip configuration
-using Python's exact null-device spelling. This prevents machine or environment
-configuration from changing the pinned installation. For interrupted operations,
-finish recovery with the original checkout before updating.
-
-Windows retirement in v1.0.1 migrate can remove multiple released PATH entries
-in one approved plan while preserving unrelated entries. If an older interrupted
-retirement reports that a later tool changed after approval, abandon that
-remaining plan through v1.0.1 migrate recovery, then review a fresh retirement
-plan. Completed removals and their preserved evidence remain recorded.
-
-Personal shell edits may use different line endings from the managed
-block without triggering a repair. Existing UTF-16 profiles retain their encoding;
-saved marked blocks remain readable for interrupted recovery even though the
-journal fragment omits the full file's BOM.
-
-### Continuing removal after restoring personal settings
+## Continuing removal after restoring personal settings
 
 Restoring an adopted settings file completes removal of that integration even
 when the personal file remains present. A subsequent removal preview releases
@@ -458,40 +282,8 @@ Finish an interrupted operation with its original checkout before changing sourc
 When no resource remains in flight, public Abandon can archive the finished part
 and preserve its receipts, followed by the corrected checkout and a fresh removal
 review. Never edit state or delete recovery journals to bypass this boundary.
-Older unreleased native builds could replace the completed-removal status with
-retained status. Those records remain conservative: explicitly select and adopt
-the affected configuration, then remove it again to establish a new verified
-lifecycle. The released chezmoi/Nix migration uses the separate v1.0.1 migrate workflow.
 
-### Earlier unreleased Mac bootstrap and application images
-
-An earlier build of this unreleased PR recorded fresh Homebrew ownership using a
-device number that macOS changes at reboot. Its schema-1 evidence cannot safely
-establish the new volume identity. Keep that evidence and the working Homebrew,
-CLT and packages; no public recovery command can rebind it. Verify the corrected
-fresh bootstrap in a clean environment. This does not affect the released Nix
-installer or an existing Homebrew reused without a new ownership record.
-
-Update replaces managed DMG application generations using the corrected image
-transport, which avoids adding AppleDouble files that invalidate vendor signatures.
-Finish interrupted operations with their original checkout first. Personal app
-data stays outside the replacement; do not remove quarantine or disable Gatekeeper.
-
-An earlier native-Zen candidate could install the official app but reject its
-Finder metadata, or lose install attribution when `HOMEBREW_NO_EMOJI` was set.
-Preserve the failed app, native receipt and installer journal. If installation
-has finished and the command record proves Zen was absent beforehand, quit Zen,
-remove only that newly installed cask through normal Homebrew uninstall without
-force/zap/autoremove, and verify the original package inventory and personal data.
-Then public Abandon can archive the interrupted plan before a corrected fresh
-preview. Do not use this procedure for a pre-existing or uncertain app. Corrected
-builds preserve Finder metadata and quarantine, verify the vendor signature and
-sealed resources, and bind attribution output settings into the new cask intent.
-
-The same inherited `HOMEBREW_NO_EMOJI` preference also hides formula installation
-markers. New formula and cask operations explicitly retain those markers; earlier
-schema-3 operations keep their original command environment for inspection and
-recovery. Never rewrite an interrupted operation to grant it new attribution.
+## A personal Homebrew Zen without its app
 
 If you installed Zen yourself through Homebrew and then removed only its app,
 restore it with

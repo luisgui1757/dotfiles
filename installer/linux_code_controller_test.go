@@ -7,7 +7,6 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"testing"
 )
@@ -109,68 +108,6 @@ func TestLinuxCodeReusedNativeProgramDoesNotRetainShellAttachment(t *testing.T) 
 	plan, err := PlanChanges(catalog, linux, state, Request{Schema: 1, Mode: "apply", Selected: []string{}}, observed, "fixture")
 	if err != nil || operation(t, plan, "tool.vscode").Action != "retain" || operation(t, plan, "integration.shells").Action != "remove" {
 		t.Fatal("reused native Code retained obsolete shell attachment", plan, err)
-	}
-}
-
-func TestLinuxCodeLegacyVersionFingerprintUsesCompletedOperation(t *testing.T) {
-	for _, changed := range []string{"version", "source", "manual", "forged"} {
-		t.Run(changed, func(t *testing.T) {
-			f, c := linuxCodeControllerFixture(t)
-			dispatchApproved(t, c, Request{Schema: 1, Mode: "apply", Selected: []string{"vscode"}})
-			state, err := LoadState(c.StatePath, c.Home)
-			if err != nil {
-				t.Fatal(err)
-			}
-			receipt := state.Receipts["tool.vscode"]
-			receipt.After.Fingerprint, err = digest(struct{ Native, Version string }{receipt.After.Fingerprint, f.driver.Code.Version})
-			if err != nil {
-				t.Fatal(err)
-			}
-			if changed == "forged" {
-				receipt.After.CompletedOperation = ""
-			}
-			state.Receipts["tool.vscode"] = receipt
-			if err := SaveState(c.StatePath, state); err != nil {
-				t.Fatal(err)
-			}
-			pkg := f.installed["code:amd64"]
-			switch changed {
-			case "version":
-				pkg.Version = "1.142.0-12345"
-			case "source":
-				pkg.Source = "personal-code"
-			case "manual":
-				pkg.Automatic = true
-			}
-			f.installed[pkg.Name] = pkg
-			plan, err := c.Preview(context.Background(), Request{Schema: 1, Mode: "update", Selected: []string{"vscode"}})
-			if err != nil {
-				t.Fatal(err)
-			}
-			op := operation(t, plan, "tool.vscode")
-			if changed != "version" {
-				if op.Action != "pending" {
-					t.Fatal("changed identity was accepted through legacy compatibility", op)
-				}
-				return
-			}
-			if op.Action != "update" || !strings.Contains(op.Reason, "downgrade") || !strings.Contains(op.Reason, pkg.Version) || !strings.Contains(op.Reason, f.driver.Code.Version) {
-				t.Fatal("review omitted exact downgrade", op)
-			}
-			dispatchApproved(t, c, Request{Schema: 1, Mode: "update", Selected: []string{"vscode"}})
-			state, err = LoadState(c.StatePath, c.Home)
-			if err != nil || state.Receipts["tool.vscode"].After.Fingerprint == receipt.After.Fingerprint {
-				t.Fatal("legacy fingerprint did not normalize after actual update", state, err)
-			}
-			intent, err := f.driver.intent(state.Receipts["tool.vscode"].OperationID)
-			if err != nil || !intent.Code.AllowDowngrade || !slices.Contains(intent.Commands[len(intent.Commands)-1].Command.Arguments, "--allow-downgrades") {
-				t.Fatal(intent, err)
-			}
-			if f.installed[pkg.Name].Version != f.driver.Code.Version {
-				t.Fatal("reviewed pin was not reconciled")
-			}
-			dispatchApproved(t, c, Request{Schema: 1, Mode: "apply", Selected: []string{}, RemoveShared: []string{"tool.vscode"}})
-		})
 	}
 }
 

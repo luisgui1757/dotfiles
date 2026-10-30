@@ -479,9 +479,6 @@ func (d *ProfileDriver) Remove(ctx context.Context, r Resource, receipt Receipt)
 }
 
 func (d *ProfileDriver) change(ctx context.Context, r Resource, action string, approved Observation, receipt Receipt) (result Observation, resultErr error) {
-	if r.ReplacedBy != "" && action != "remove" {
-		return Observation{}, errors.New("replaced profile only supports baseline restoration")
-	}
 	if err := d.validate(r.ID); err != nil {
 		return Observation{}, err
 	}
@@ -509,7 +506,7 @@ func (d *ProfileDriver) change(ctx context.Context, r Resource, action string, a
 	if action == "adopt" && !fresh && (receipt.Ownership != "created" || receipt.After.Provider != o.Provider) {
 		return o, errors.New("profile replacement requires its original owned baseline")
 	}
-	j := profileJournal{Schema: 1, Resource: r.ID, Operation: receipt.OperationID, Recovery: receipt.Recovery, Action: action, Fields: slices.Clone(d.JSONFields[r.ID]), PreservePrevious: action == "remove" && r.ReplacedBy != ""}
+	j := profileJournal{Schema: 1, Resource: r.ID, Operation: receipt.OperationID, Recovery: receipt.Recovery, Action: action, Fields: slices.Clone(d.JSONFields[r.ID])}
 	for i, target := range d.Targets[r.ID] {
 		data, before, err := readProfile(target.Path)
 		if err != nil {

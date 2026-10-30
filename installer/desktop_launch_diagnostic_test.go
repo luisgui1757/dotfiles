@@ -156,7 +156,7 @@ func desktopFailureLogs(t *testing.T, folders ConfigFolders, id string) {
 	}
 	profiles := &ProfileDriver{Targets: map[string][]ProfileTarget{}}
 	configureVSCodeSettings(profiles, Context{OS: runtime.GOOS, Arch: runtime.GOARCH}, folders)
-	settings := profiles.Targets["integration.vscode"][0].Path
+	settings := profiles.Targets[vscodeSettingsResource][0].Path
 	paths, err := filepath.Glob(filepath.Join(filepath.Dir(filepath.Dir(settings)), "logs", "*", "main.log"))
 	if err != nil {
 		t.Log("Code startup log discovery:", err)

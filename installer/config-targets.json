@@ -60,12 +60,6 @@
       "path": "gh-dash/config.yml"
     },
     {
-      "resource": "config.git",
-      "source": "git/config",
-      "folder": "config",
-      "path": "git/config"
-    },
-    {
       "resource": "config.starship",
       "source": "starship/starship.toml",
       "folder": "config",

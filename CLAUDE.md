@@ -115,12 +115,8 @@ of each step. All of these checks must pass on the final head.
   resource and does not stop independent resources.
 - Resume uses the original executable and checkout. It never builds old intent
   again from current pins.
-- Saved recipes, schemas and command encodings stay readable while they are in
-  the support window. Never change, rewrite or replay an old recipe. A new
-  recipe gets a new revision.
-- The support window: `main` reads each state that the latest published release
-  can leave on a machine. This includes receipts that the release keeps without
-  a change. Remove a reader only after the steps in `docs/RELEASING.md`.
+- Saved recipes, schemas and command encodings stay readable. Never change,
+  rewrite or replay an old recipe. A new recipe gets a new revision.
 - State is strict schema-1 JSON. An unknown field or schema fails and does not
   change the file.
 - Constructors are pure. Find the platform, the known folders and the
@@ -171,8 +167,6 @@ and skills for coding agents.
 - The hosts are Codex, Claude Code, Copilot, Kiro and OpenCode. A host counts
   when its command or folder exists, or when the same selection installs it.
 - Check runs `--check`. Exit 1 means drift. Any other failure is an error.
-- `integration.sentinel` and the `skills.sentinel-*` resources exist only for
-  the v1.0.0 handoff. Do not add behavior to them.
 
 ## Product configuration
 

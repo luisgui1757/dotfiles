@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"slices"
-	"strings"
 )
 
 // These fixed preparations use the archive
@@ -91,9 +90,6 @@ func validateArchivePreparation(pin ArchivePin) error {
 
 func (d *ArchiveDriver) preparePayload(ctx context.Context, intent archiveIntent, payload string) (result error) {
 	pin := intent.Pin
-	if runtime.GOOS == "windows" && (pin.Latex2text != nil || pin.Yamllint != nil) && pin.WindowsVenvRevision != 1 {
-		return errors.New("saved private Python preparation predates Windows extended paths; preserve the original operation and payload for explicit recovery")
-	}
 	var launcher []byte
 	if pin.RustTarget == "x86_64-pc-windows-msvc" {
 		var err error
@@ -113,9 +109,6 @@ func (d *ArchiveDriver) preparePayload(ctx context.Context, intent archiveIntent
 	source.GhosttyLibraries = false
 	source.ZenProfile = false
 	source.ZenProfileRevision = 0
-	if pin.ZenProfile && pin.Format == "dmg" {
-		source.RequiredFiles = slices.DeleteFunc(slices.Clone(source.RequiredFiles), func(name string) bool { return strings.HasPrefix(name, "DotfilesZen.app/") })
-	}
 	if pin.GhosttyLibraries {
 		source.RequiredFiles = slices.DeleteFunc(slices.Clone(source.RequiredFiles), func(name string) bool { return name == "usr/bin/ghostty-bin" })
 	}

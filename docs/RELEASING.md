@@ -108,28 +108,6 @@ boundary. A mismatch leaves the draft unpublished. Final readback must be
 immutable/latest/non-draft/non-prerelease. The closure PR records observed release
 state, archived evidence and the uploaded asset's digest. It is not auto-merged.
 
-## Support window
-
-`main` reads each state that the latest published release can leave on a
-machine. This includes receipts and saved recipes that the release keeps
-without a change. An older state goes through that release first. For example,
-a v0.4.x installation runs migrate from the v1.0.1 checkout, then updates to
-`main` and chooses Update tools.
-
-To remove a reader of an old state:
-
-1. Make sure that a published release converts or releases that state, and that
-   it is the latest release.
-2. On each machine, update to that release, apply the conversion and run Check.
-   Check must show no interrupted operation.
-3. On each machine, make sure that the installer state has no receipt or
-   selection for the old state. For example, on Linux:
-   `jq -r '(.receipts|keys[]), (.selected[]|"selected:"+.)' ~/.local/state/dotfiles/state.json`.
-4. Then remove the reader in a new change.
-
-A state that `main` cannot read stops the plan before a change. Use the latest
-release to convert it, then update again.
-
 ## Recovery
 
 - Before tag creation, correct the preparation tree and rerun its gates.

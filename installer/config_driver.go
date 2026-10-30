@@ -181,16 +181,6 @@ func (d *ConfigDriver) Observe(ctx context.Context, r Resource, receipt Receipt)
 	o.Preserved = slices.Clone(receipt.After.Preserved)
 	j, err := d.readJournal(r, receipt)
 	if errors.Is(err, errConfigJournalAbsent) {
-		if r.ReplacedBy != "" && receipt.Ownership != "" && receipt.Ownership != "reused" && receipt.Status != "in-progress" {
-			if receipt.Ownership == "created" && d.unstartedLegacyOperation(r, receipt, states) == nil {
-				// The abandoned operation never started; the first publication and
-				// its baseline still govern. No completion proof, so no automatic removal.
-				return o, nil
-			}
-			o.Adoptable = false
-			o.Pending = "legacy configuration recovery evidence is missing; preserve the target and recovery data"
-			return o, nil
-		}
 		if receipt.Ownership == "created" && receipt.Status != "in-progress" && receipt.OperationID != "" {
 			return configObservationProblem(receipt, errors.New("recorded configuration operation is missing; preserve the target and recovery data"))
 		}
@@ -226,28 +216,10 @@ func (d *ConfigDriver) Observe(ctx context.Context, r Resource, receipt Receipt)
 			}
 			o.Preserved = sortedUnique(o.Preserved)
 		}
-		if j.Action != "remove" && !j.Cancelled || (receipt.Ownership == "created" || r.ReplacedBy != "" && receipt.Ownership == "uncertain") && j.Cancelled {
+		if j.Action != "remove" && !j.Cancelled || receipt.Ownership == "created" && j.Cancelled {
 			baseline, err := d.readBaseline(r, receipt)
 			if err != nil {
 				return configObservationProblem(receipt, err)
-			}
-			if r.ReplacedBy != "" && receipt.Ownership == "uncertain" && j.Cancelled && baseline.Operation == j.Operation {
-				if j.Restoring {
-					restored, err := d.ObserveRestore(ctx, r.ID, receipt)
-					if err != nil {
-						return configObservationProblem(receipt, err)
-					}
-					if restored.RestoredOperation != j.Operation || !restored.Healthy && !restoredFirstPublication(j) {
-						o.Adoptable, o.Pending = false, restored.Pending
-						return o, nil
-					}
-				} else if slices.ContainsFunc(j.Entries, func(entry configPublication) bool { return entry.Phase != "" }) {
-					return configObservationProblem(receipt, errors.New("cancelled legacy publication lacks proof that its original target was untouched"))
-				}
-				// The first baseline never left the target, or was restored by
-				// its saved journal. This releases bookkeeping, never the file.
-				o.Adoptable, o.RestoredOperation = false, j.Operation
-				return o, nil
 			}
 			for _, target := range baseline.Targets {
 				if err := verifyConfigSnapshot(target.Backup, target.Original); err != nil {
@@ -290,50 +262,6 @@ func (d *ConfigDriver) Observe(ctx context.Context, r Resource, receipt Receipt)
 	return o, nil
 }
 
-// A missing journal alone proves nothing. Durable engine intent with neither a
-// provider journal nor an operation workspace never moved a file, while the
-// first publication's completed journal and intact baseline still prove what
-// restoration would return. Evidence of any other shape stays Pending.
-func (d *ConfigDriver) unstartedLegacyOperation(r Resource, receipt Receipt, states []configTargetState) error {
-	baseline, err := d.readBaseline(r, receipt)
-	if err != nil {
-		return err
-	}
-	if baseline.Operation == receipt.OperationID || !operationID.MatchString(receipt.OperationID) || len(baseline.Targets) != len(states) {
-		return errors.New("legacy operation evidence is not an unstarted later operation")
-	}
-	first, err := d.readJournal(r, Receipt{Recovery: receipt.Recovery, OperationID: baseline.Operation, Before: receipt.Before})
-	if err != nil || !first.Complete || first.Cancelled || first.Action != "install" && first.Action != "adopt" {
-		return errors.Join(errors.New("first legacy publication is not complete"), err)
-	}
-	for i, target := range baseline.Targets {
-		if states[i].Target.Destination != target.Destination {
-			return errors.New("legacy configuration target changed")
-		}
-		if err := verifyConfigSnapshot(target.Backup, target.Original); err != nil {
-			return err
-		}
-		if _, err := os.Lstat(configWorkspace(target.Destination, receipt.OperationID, i)); !errors.Is(err, os.ErrNotExist) {
-			return errors.Join(errors.New("legacy operation workspace exists without its journal"), err)
-		}
-	}
-	return nil
-}
-
-// Restoration moves the uncertain payload back to its private slot and returns
-// any original. A later personal write at the target cannot revoke that proof;
-// a stranded original or the payload still at the target keeps the bookkeeping.
-func restoredFirstPublication(j configJournal) bool {
-	files := configRecoveryFiles(j)
-	for _, entry := range j.Entries {
-		target, previous, next := files[entry.State.Target.Destination], files[filepath.Join(entry.Workspace, "previous")], files[filepath.Join(entry.Workspace, "next")]
-		if target.Problem != "" || previous.Problem != "" || next.Problem != "" || previous.Snapshot.Kind != "absent" || next.Snapshot != entry.State.Desired || target.Snapshot == entry.State.Desired {
-			return false
-		}
-	}
-	return true
-}
-
 func configObservationProblem(receipt Receipt, problem error) (Observation, error) {
 	return Observation{Unknown: true, Provider: "configuration", Scope: "user", Pending: problem.Error(), Preserved: slices.Clone(receipt.After.Preserved)}, nil
 }
@@ -354,9 +282,6 @@ func (d *ConfigDriver) Remove(ctx context.Context, r Resource, receipt Receipt) 
 }
 
 func (d *ConfigDriver) change(ctx context.Context, r Resource, action string, approved Observation, receipt Receipt) (Observation, error) {
-	if r.ReplacedBy != "" && action != "remove" {
-		return Observation{}, errors.New("retired configuration can only be restored or removed, never republished")
-	}
 	if err := errors.Join(ctx.Err(), d.validate(r, receipt)); err != nil {
 		return Observation{}, err
 	}
@@ -394,7 +319,7 @@ func (d *ConfigDriver) change(ctx context.Context, r Resource, action string, ap
 		return observed, errors.New("configuration mapping changed; explicit migration is required")
 	}
 	j := configJournal{Schema: 1, Resource: r.ID, Operation: receipt.OperationID, Action: action, Recovery: receipt.Recovery, Before: observed}
-	j.PreservePrevious = action == "adopt" && baseline.Operation != j.Operation || action == "remove" && r.ReplacedBy != ""
+	j.PreservePrevious = action == "adopt" && baseline.Operation != j.Operation
 	for i, state := range states {
 		if state.Target.Destination != baseline.Targets[i].Destination {
 			return observed, errors.New("configuration baseline destination changed")
@@ -412,9 +337,6 @@ func (d *ConfigDriver) change(ctx context.Context, r Resource, action string, ap
 }
 
 func (d *ConfigDriver) ResumeResource(ctx context.Context, r Resource, op Operation, receipt Receipt) (Observation, error) {
-	if r.ReplacedBy != "" && op.Action != "remove" {
-		return Observation{}, errors.New("retired configuration cannot resume publication; restore its saved files or abandon unstarted intent")
-	}
 	if err := errors.Join(ctx.Err(), d.validate(r, receipt)); err != nil {
 		return Observation{}, err
 	}

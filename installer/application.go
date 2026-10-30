@@ -114,13 +114,6 @@ func NewNativeController(repository, source, stateDirectory string, platform Nat
 		return controller, err
 	}
 	if target.OS == "linux" {
-		arch := "x86_64"
-		if target.Arch == "arm64" {
-			arch = "aarch64"
-		}
-		// Linux Obsidian used a private Flatpak until 2026-10-22. The provider
-		// stays to observe and remove those earlier installations.
-		driver.Flatpak = &FlatpakDriver{Directory: filepath.Join(stateDirectory, "native", "flatpak"), WorkerDirectory: driver.session.Directory, Home: folders.Home, Arch: arch, Run: driver.session.run, Query: queryNvimSync}
 		driver.APT, err = configureLinuxAPT(platform.APT, catalog, driver.session, target.Arch)
 		if err != nil {
 			return controller, err

@@ -288,7 +288,6 @@ const (
 	ReviewKeep   = "Keep retained resources"
 	ReviewAdopt  = "Replace existing configurations (originals are preserved)"
 	ReviewShared = "Also remove unused shared dependencies"
-	ReviewLegacy = "Optional removals and legacy settings restoration"
 )
 
 func reviewChoiceKey(group, id string) string { return group + "\x00" + id }
@@ -296,7 +295,7 @@ func reviewChoiceKey(group, id string) string { return group + "\x00" + id }
 // propose applies the review's decisions in their dependent order: retained
 // resources shape the plan that offers adoption, and the adopted plan decides
 // which shared dependencies become removable. Unchecked shared dependencies
-// become Keep roots; recovery-only mappings never do.
+// become Keep roots.
 func (s *menuSession) propose(ctx context.Context, base Request, keepChoices bool, checked map[string]bool) (Proposal, Request, error) {
 	request := base
 	choices := []ReviewChoice{}
@@ -312,9 +311,6 @@ func (s *menuSession) propose(ctx context.Context, base Request, keepChoices boo
 			r, ok := s.c.Catalog.Resource(id)
 			if !ok {
 				return Proposal{}, request, fmt.Errorf("retained resource %s requires catalog migration", id)
-			}
-			if r.ReplacedBy != "" {
-				continue // Recovery-only files remain protected without a Keep root.
 			}
 			keep := isChecked(ReviewKeep, id, true)
 			choices = append(choices, ReviewChoice{Group: ReviewKeep, ID: id, Label: r.Name, Detail: "Keep this resource even without a selected tool.", Checked: keep})
@@ -349,23 +345,16 @@ func (s *menuSession) propose(ctx context.Context, base Request, keepChoices boo
 			return Proposal{}, request, err
 		}
 		if len(shared) != 0 {
-			group := ReviewShared
-			for _, choice := range shared {
-				if r, _ := s.c.Catalog.Resource(choice.ID); r.ReplacedBy != "" {
-					group = ReviewLegacy
-				}
-			}
 			request.RemoveShared = []string{}
 			if request.Keep == nil {
 				request.Keep = slices.Clone(s.state.Keep)
 			}
 			for i := range shared {
-				shared[i].Group = group
-				shared[i].Checked = isChecked(group, shared[i].ID, false)
-				r, _ := s.c.Catalog.Resource(shared[i].ID)
+				shared[i].Group = ReviewShared
+				shared[i].Checked = isChecked(ReviewShared, shared[i].ID, false)
 				if shared[i].Checked {
 					request.RemoveShared = append(request.RemoveShared, shared[i].ID)
-				} else if r.ReplacedBy == "" {
+				} else {
 					request.Keep = append(request.Keep, shared[i].ID)
 				}
 			}
@@ -383,7 +372,7 @@ func (s *menuSession) adoptionChoices(request Request, plan Plan) []ReviewChoice
 	for _, op := range plan.Operations {
 		r, _ := s.c.Catalog.Resource(op.Resource)
 		if op.Action != "retain" && op.Action != "remove" && op.Action != "forget" && op.Observed.Present && op.Observed.Adoptable && op.Observed.Pending == "" &&
-			!r.Retain && r.ReplacedBy == "" && r.Scope != "host" && (request.Mode == "apply" || op.Ownership == "created") && (op.Ownership != "created" || !sameArtifact(s.state.Receipts[r.ID].After, op.Observed)) {
+			!r.Retain && r.Scope != "host" && (request.Mode == "apply" || op.Ownership == "created") && (op.Ownership != "created" || !sameArtifact(s.state.Receipts[r.ID].After, op.Observed)) {
 			detail := "Preserve the current configuration as a recoverable baseline, then apply the selected configuration."
 			if op.Ownership == "created" {
 				detail = "Save your edits separately, apply the selected configuration, and keep the original uninstall baseline."
@@ -398,10 +387,6 @@ func (s *menuSession) sharedRemovalChoices(ctx context.Context, request Request,
 	choices := []ReviewChoice{}
 	for _, op := range plan.Operations {
 		r, _ := s.c.Catalog.Resource(op.Resource)
-		if op.Action == "retain" && r.ReplacedBy != "" && op.Observed.Pending == "" && op.Observed.Adoptable && (op.Ownership == "created" || op.Ownership == "uncertain") {
-			choices = append(choices, ReviewChoice{ID: r.ID, Label: r.Name, Detail: "Save the current file in adjacent recovery storage and restore its original baseline. Changes to the earlier managed settings become inactive until you copy them back; the result reports the saved path."})
-			continue
-		}
 		if op.Action != "retain" || r.Retain || op.Observed.Pending != "" || len(op.Observed.Consumers) != 0 || op.Ownership != "created" ||
 			!sameArtifact(s.state.Receipts[r.ID].After, op.Observed) || !(r.Shared || r.Scope == "machine" || op.Observed.Scope == "machine") {
 			continue

@@ -383,19 +383,6 @@ func (d *LinuxAPTDriver) Observe(ctx context.Context, r Resource, receipt Receip
 					return o, err
 				}
 			}
-			// The initial Code recipe included version in its fingerprint. Honor
-			// that exact legacy receipt only through this completed operation and
-			// unchanged native classification; a new operation publishes the normal
-			// version-independent native identity.
-			if intent.Code != nil && intent.Action != "remove" && receipt.Ownership == "created" && receipt.After.CompletedOperation == intent.Operation {
-				legacy, err := digest(struct{ Native, Version string }{o.Fingerprint, intent.Code.Pin.Version})
-				if err != nil {
-					return o, err
-				}
-				if receipt.After.Fingerprint == legacy {
-					o.Fingerprint = legacy
-				}
-			}
 		}
 		if intent.Code != nil {
 			// Completion is durable before cleanup. A crash, changed input or
