@@ -3,7 +3,7 @@
 # tomllib fallback for the known macOS taplo dynamic-store panic.
 set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
-# config-schema.json is .github/config-schema.json of Starship v1.26.0 (ISC, see
+# config-schema.json is .github/config-schema.json of Starship v1.27.0 (ISC, see
 # LICENSES/starship-ISC.txt). Taplo uses it instead of the $schema URL, so the
 # lint does not use the network. Replace it when the Starship pin changes.
 SCHEMA_URL="file://$REPO_ROOT/tests/starship/config-schema.json"

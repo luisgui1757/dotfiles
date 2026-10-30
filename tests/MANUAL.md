@@ -225,7 +225,7 @@ in the evidence.
       that the block and the skill folders are gone and that the text outside
       the block stays.
 - [ ] **Windows Tree-sitter CLI**: `tree-sitter --version` prints exactly
-      `0.27.0`. A compatible unmanaged executable remains untouched; after a
+      `0.27.1`. A compatible unmanaged executable remains untouched; after a
       stale unmanaged fixture, the verified dotfiles executable wins PATH.
       Repeat with `%LOCALAPPDATA%\dotfiles\bin` already present behind the stale
       command; setup must promote it once, preserve every other PATH entry, and

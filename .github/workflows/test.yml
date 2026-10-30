@@ -18,15 +18,15 @@ defaults:
     shell: bash
 
 env:
-  CARGO_BINSTALL_COMMIT: 7bebc2e59eb8820162b7ac8f62a92bfdb2732447
+  CARGO_BINSTALL_COMMIT: 81df5c23b0dc775b009efdfc9895c5965b7a4e40
   CARGO_BINSTALL_INSTALLER_SHA256: d3a93702160e0ec03e2a4e996855db1f01adee801fb84a43add24e0877ef8eae
-  NVIM_LINUX_VERSION: v0.12.5
-  NVIM_LINUX_X86_64_SHA256: bce0f56eda1f1b1db6eee8f4133d7a38813ea07933837dd1777411ca384c6875
+  NVIM_LINUX_VERSION: v0.12.6
+  NVIM_LINUX_X86_64_SHA256: 474430d53e6264f6d6dd18db42d6dc9df3a1b56ca9e88a325bbf860e1a811d87
   PIP_DISABLE_PIP_VERSION_CHECK: "1"
-  STARSHIP_VERSION: v1.26.0
-  STARSHIP_LINUX_X86_64_SHA256: 321f0dd7af8340a5f2e6a8fec6538a04f617486f9ec70d878f91c09cd8deef22
-  TREE_SITTER_CLI_LINUX_VERSION: v0.27.0
-  TREE_SITTER_CLI_LINUX_X86_64_SHA256: e4a3826bcd0fe099ee3a5617767374939cbc23c4a35b5b53f5fc04142525a2c1
+  STARSHIP_VERSION: v1.27.0
+  STARSHIP_LINUX_X86_64_SHA256: 3b94758850901717eb36aa1b53f8492c1322506ec6d41273bc6151e79ed8e4a1
+  TREE_SITTER_CLI_LINUX_VERSION: v0.27.1
+  TREE_SITTER_CLI_LINUX_X86_64_SHA256: c7e686aec16ba17053c2e6fd87600ccb10cf8ba3d055756b17e756d538e11114
 
 jobs:
   ubuntu:
@@ -36,7 +36,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
-      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version: 1.27.1
           cache: ${{ !startsWith(github.ref, 'refs/tags/') }}
@@ -127,7 +127,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
-      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version: 1.27.1
           cache: ${{ !startsWith(github.ref, 'refs/tags/') }}
@@ -150,7 +150,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
-      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version: 1.27.1
           cache-dependency-path: installer/go.sum
