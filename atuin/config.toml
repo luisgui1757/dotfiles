@@ -1,0 +1,29 @@
+# Atuin configuration for dotfiles. Atuin 18.24 reads ~/.atuin/config.toml on
+# macOS, Linux and Windows. Keys that are not here keep the upstream default:
+# https://docs.atuin.sh/configuration/config/
+# History stays on this machine. Atuin never connects to the Atuin cloud.
+
+## Setup pins the Atuin version, so do not ask the network for a newer one.
+update_check = false
+
+## Sync, `atuin register` and `atuin login` use only a server on this machine,
+## never api.atuin.sh. No server runs by default, so history stays local. To
+## sync your machines, run atuin-server yourself and put its address here.
+sync_address = "http://127.0.0.1:8888"
+
+## Enter puts the selected command on the command line, where you can edit it or
+## run it. Atuin never runs a selected command by itself.
+enter_accept = false
+
+## Open the search in the vi mode of the shell line, with the same cursor shapes
+## as the shell: a bar in insert mode and a block in normal mode.
+keymap_mode = "auto"
+keymap_cursor = { emacs = "steady-bar", vim_insert = "steady-bar", vim_normal = "steady-block" }
+
+## The official Rose Pine theme in ~/.atuin/themes/rose-pine.toml.
+[theme]
+name = "rose-pine"
+
+## The AI assistant (`atuin ai`) sends its requests to hub.atuin.sh. Keep it off.
+[ai]
+enabled = false

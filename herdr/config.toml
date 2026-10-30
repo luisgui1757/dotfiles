@@ -18,6 +18,9 @@ switch_workspace = "prefix+ctrl+alt+1..9"
 previous_agent = "prefix+shift+a"
 next_agent = "prefix+a"
 focus_agent = "prefix+ctrl+1..9"
+# The tmux keys also split side by side and detach. Herdr keeps v and q.
+split_vertical = ["prefix+v", "prefix+|"]
+detach = ["prefix+q", "prefix+d"]
 
 [theme]
 name = "rose-pine"

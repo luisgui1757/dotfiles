@@ -1,0 +1,24 @@
+# Rose Pine for Atuin, from the official port:
+# https://github.com/rose-pine/atuin/blob/4680e8a3eda07476bfb73ee040df005d604e65ed/dist/rose-pine.toml (MIT)
+
+[theme]
+name = "rose-pine"
+
+[colors]
+AlertInfo = "#9ccfd8"
+AlertWarn = "#f6c177"
+AlertError = "#eb6f92"
+
+Annotation = "#908caa"
+Base = "#e0def4"
+Guidance = "#908caa"
+Important = "#ebbcba"
+Title = "#c4a7e7"
+Muted = "#6e6a86"
+
+SyntaxCommand = "#31748f"
+SyntaxFlag = "#c4a7e7"
+SyntaxString = "#f6c177"
+SyntaxVariable = "#ebbcba"
+SyntaxOperator = "#908caa"
+SyntaxComment = "#6e6a86"

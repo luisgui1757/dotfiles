@@ -12,6 +12,10 @@ import (
 //go:embed shells/*
 var shellSources embed.FS
 
+// The official Rose Pine colors for fzf, unchanged:
+// https://github.com/rose-pine/fzf/blob/9af300f871df52331c362ca58c73535f69b6fb03/dist/rose-pine.sh (MIT)
+const fzfRosePine = "--color=fg:#908caa,bg:#191724,hl:#ebbcba --color=fg+:#e0def4,bg+:#26233a,hl+:#ebbcba --color=border:#403d52,header:#31748f,gutter:#191724 --color=spinner:#f6c177,info:#9ccfd8 --color=pointer:#c4a7e7,marker:#eb6f92,prompt:#908caa"
+
 // Shell ownership is fixed: one resource attaches the loader to personal
 // profiles. The graph selects fragments in the combined private initialization,
 // never through the continued existence of edited files or installed commands.
@@ -72,7 +76,7 @@ func configureShellProfiles(d *ProfileDriver, target Context, folders ConfigFold
 	}
 }
 ` + interactive + "\nif ($global:DotfilesShellReady) { return }\n" + cache
-		for _, id := range []string{"config.powershell", "integration.starship", "integration.fzf", "integration.lsd", "integration.zoxide"} {
+		for _, id := range []string{"config.powershell", "integration.starship", "integration.fzf", "integration.lsd", "integration.zoxide", "integration.atuin", "integration.superfile"} {
 			if selectedFeature(id) {
 				loader += placeholder(id) + "\n"
 			}
@@ -83,7 +87,7 @@ func configureShellProfiles(d *ProfileDriver, target Context, folders ConfigFold
 		for _, directory := range []string{"PowerShell", "WindowsPowerShell"} {
 			d.Targets["integration.shells"] = append(d.Targets["integration.shells"], ProfileTarget{filepath.Join(folders.Documents, directory, "profile.ps1"), "if (Test-Path -LiteralPath " + powershellLiteral(loaderPath) + " -PathType Leaf) { . " + powershellLiteral(loaderPath) + " }"})
 		}
-		for id, file := range map[string]string{"config.powershell": "powershell-core.ps1", "integration.lsd": "lsd.ps1", "integration.fzf": "fzf.ps1"} {
+		for id, file := range map[string]string{"config.powershell": "powershell-core.ps1", "integration.lsd": "lsd.ps1", "integration.fzf": "fzf.ps1", "integration.superfile": "superfile.ps1"} {
 			script, err := source(file)
 			if err != nil {
 				return err
@@ -93,7 +97,7 @@ func configureShellProfiles(d *ProfileDriver, target Context, folders ConfigFold
 				if err != nil {
 					return err
 				}
-				script = "$script:DotfilesPSFzfPath = " + powershellLiteral(module) + "\n" + script
+				script = "$script:DotfilesPSFzfPath = " + powershellLiteral(module) + "\n$script:RosePineFzfColors = " + powershellLiteral(fzfRosePine) + "\n" + script
 			}
 			add(id, script)
 		}
@@ -173,7 +177,8 @@ fi
 		if selectedFeature("config.zsh") {
 			init += "if [ -n \"${ZSH_VERSION-}\" ]; then\n" + placeholder("config.zsh") + "\nfi\n"
 		}
-		for _, id := range []string{"integration.starship", "integration.fzf", "integration.lsd", "integration.zoxide"} {
+		// Atuin follows fzf so that it takes Ctrl-R from the fzf history picker.
+		for _, id := range []string{"integration.starship", "integration.fzf", "integration.lsd", "integration.zoxide", "integration.atuin", "integration.superfile"} {
 			if selectedFeature(id) {
 				init += placeholder(id) + "\n"
 			}
@@ -219,15 +224,26 @@ fi
 		}
 		add("config.zsh", "__DOTFILES_FZF_TAB="+shellLiteral(fzfTab)+"\n__DOTFILES_AUTOSUGGESTIONS="+shellLiteral(autosuggestions)+"\n"+core)
 		add("integration.lsd", "if command -v lsd >/dev/null 2>&1; then\n    alias ls='lsd' l='lsd -l' la='lsd -a' lla='lsd -la' lt='lsd --tree'\nfi")
+		superfile, err := source("superfile.sh")
+		if err != nil {
+			return err
+		}
+		add("integration.superfile", superfile)
 		if _, available := archives.Pins["tool.fzf"]; available {
 			fzf, err := archives.CommandPath("tool.fzf", "fzf")
 			if err != nil {
 				return err
 			}
-			add("integration.fzf", "if [ -n \"${ZSH_VERSION-}\" ]; then\n    source <("+shellLiteral(fzf)+" --zsh)\n    if whence -w fzf-tab-complete >/dev/null 2>&1; then\n        bindkey '^I' fzf-tab-complete\n        bindkey -M vicmd '^I' fzf-tab-complete\n    fi\nelif [ -n \"${BASH_VERSION-}\" ]; then\n    source <("+shellLiteral(fzf)+" --bash)\nfi")
+			// A value that the user set before stays after the colors, so it wins.
+			// The check keeps nested shells from adding the colors again.
+			colors := "case \" ${FZF_DEFAULT_OPTS-} \" in\n    *\" " + fzfRosePine + " \"*) ;;\n    *) export FZF_DEFAULT_OPTS=\"" + fzfRosePine + "${FZF_DEFAULT_OPTS:+ $FZF_DEFAULT_OPTS}\" ;;\nesac\n"
+			add("integration.fzf", colors+"if [ -n \"${ZSH_VERSION-}\" ]; then\n    source <("+shellLiteral(fzf)+" --zsh)\n    if whence -w fzf-tab-complete >/dev/null 2>&1; then\n        bindkey '^I' fzf-tab-complete\n        bindkey -M vicmd '^I' fzf-tab-complete\n    fi\nelif [ -n \"${BASH_VERSION-}\" ]; then\n    source <("+shellLiteral(fzf)+" --bash)\nfi")
 		}
 	}
-	for _, id := range []string{"starship", "zoxide"} {
+	// Atuin leaves Up and Down to the prefix history search and does not bind
+	// "?". Its zsh init binds Ctrl-R in vi insert mode only, so vi normal mode
+	// gets the same search here.
+	for _, id := range []string{"starship", "zoxide", "atuin"} {
 		pin, ok := archives.Pins["tool."+id]
 		if !ok {
 			continue
@@ -245,18 +261,25 @@ fi
 			if id == "starship" {
 				arguments = "@('init', 'powershell', '--print-full-init')"
 			}
+			if id == "atuin" {
+				arguments = "@('init', 'powershell', '--disable-up-arrow', '--disable-ai')"
+			}
 			cache := filepath.Join(d.Directory, "shell-cache", id+"-"+pin.SHA256+".ps1")
 			add("integration."+id, prefix+". (Get-DotfilesInitScript -Command "+powershellLiteral(command)+" -Arguments "+arguments+" -CachePath "+powershellLiteral(cache)+")")
 		} else {
 			if id == "starship" {
 				prefix = "export STARSHIP_CONFIG=" + shellLiteral(starshipConfig) + "\n"
 			}
-			add("integration."+id, prefix+"if [ -n \"${ZSH_VERSION-}\" ]; then\n    eval \"$("+shellLiteral(command)+" init zsh)\"\nelif [ -n \"${BASH_VERSION-}\" ]; then\n    eval \"$("+shellLiteral(command)+" init bash)\"\nfi")
+			arguments, zsh := "", ""
+			if id == "atuin" {
+				arguments, zsh = " --disable-up-arrow --disable-ai", "\n    bindkey -M vicmd '^R' atuin-search-vicmd"
+			}
+			add("integration."+id, prefix+"if [ -n \"${ZSH_VERSION-}\" ]; then\n    eval \"$("+shellLiteral(command)+" init zsh"+arguments+")\""+zsh+"\nelif [ -n \"${BASH_VERSION-}\" ]; then\n    eval \"$("+shellLiteral(command)+" init bash"+arguments+")\"\nfi")
 		}
 	}
 	for i := range d.Targets["integration.shells"] {
 		entry := &d.Targets["integration.shells"][i]
-		for _, id := range []string{"config.zsh", "config.powershell", "integration.starship", "integration.fzf", "integration.lsd", "integration.zoxide"} {
+		for _, id := range []string{"config.zsh", "config.powershell", "integration.starship", "integration.fzf", "integration.lsd", "integration.zoxide", "integration.atuin", "integration.superfile"} {
 			if strings.Contains(entry.Script, placeholder(id)) {
 				script, ok := features[id]
 				if !ok {

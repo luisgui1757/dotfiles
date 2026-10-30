@@ -59,9 +59,30 @@ func TestNativeBrewApplicationPreviewReadOnly(t *testing.T) {
 	if !found["tool.git"] || !found["infra.homebrew"] {
 		t.Fatal("dashboard did not resolve its native prerequisites", found)
 	}
-	entries, err := os.ReadDir(home)
-	if err != nil || len(entries) != 0 {
-		t.Fatal("preview created installer state or configuration", entries, err)
+	// Homebrew 7.0.11 and later saves its choice of git and curl in its own
+	// cache, ~/Library/Caches/Homebrew, for each brew command, also for
+	// --version. Any other file in the home folder fails.
+	cache := filepath.Join("Library", "Caches", "Homebrew")
+	created := []string{}
+	err = filepath.WalkDir(home, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		relative, err := filepath.Rel(home, path)
+		if err != nil {
+			return err
+		}
+		switch {
+		case entry.IsDir() && relative == cache:
+			return filepath.SkipDir
+		case entry.IsDir() && (relative == "." || relative == "Library" || relative == filepath.Dir(cache)):
+			return nil
+		}
+		created = append(created, relative)
+		return nil
+	})
+	if err != nil || len(created) != 0 {
+		t.Fatal("preview created installer state or configuration", created, err)
 	}
 }
 

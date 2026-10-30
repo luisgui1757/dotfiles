@@ -16,4 +16,18 @@ grep -E 'source <\(.*tool.fzf/current/bin/fzf.* --zsh\)' "$ACTIVE_ZSH" >/dev/nul
 if grep -Eq '^[[:space:]]*source <\(.* --zsh\)' "$ACTIVE_ZSH_CORE"; then
     fail "unselected fzf integration must not initialize from ambient PATH"
 fi
+# Rose Pine colors come first, so a value that the user set before still wins,
+# and a nested shell does not add them again.
+for shell in zsh bash; do
+    command -v "$shell" >/dev/null 2>&1 || continue
+    # shellcheck disable=SC2016 # the probe expands inside the tested shell
+    probe='source "$1" >/dev/null 2>&1; printf "%s" "$FZF_DEFAULT_OPTS"'
+    flags=(-d -f -i -c)
+    [[ "$shell" == bash ]] && flags=(--noprofile --norc -i -c)
+    first="$(HOME="$DOTFILES_SHELL_FIXTURES/posix" FZF_DEFAULT_OPTS='--height 50%' "$shell" "${flags[@]}" "$probe" "$shell" "$ACTIVE_ZSH" 2>/dev/null)"
+    [[ "$first" == '--color=fg:#908caa,'*' --height 50%' ]] \
+        || fail "$shell: Rose Pine fzf colors must come before the user value: $first"
+    nested="$(HOME="$DOTFILES_SHELL_FIXTURES/posix" FZF_DEFAULT_OPTS="$first" "$shell" "${flags[@]}" "$probe" "$shell" "$ACTIVE_ZSH" 2>/dev/null)"
+    [[ "$nested" == "$first" ]] || fail "$shell: a nested shell added the fzf colors again: $nested"
+done
 echo "OK"

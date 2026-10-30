@@ -57,4 +57,20 @@ clipboard-paste-protection = true
 
 # ---- Keybindings -------------------------------------------------------------
 # Avoid clashing with tmux prefix (C-Space) and nvim Alt-h/j/k/l window nav.
-keybind = global:cmd+grave_accent=toggle_quick_terminal
+# Ctrl+Option+` shows the quick terminal from any app, next to the AeroSpace
+# Ctrl+Option keys. Cmd+` stays the macOS key for the next window of the app.
+keybind = global:ctrl+alt+grave_accent=toggle_quick_terminal
+# Option+Left/Right send Esc b / Esc f, the Ghostty default on macOS, also on
+# Linux. zsh, bash, fzf and Atuin move by word on these bytes.
+keybind = alt+arrow_left=esc:b
+keybind = alt+arrow_right=esc:f
+# Linux only: the Mac keyboard shortcuts (xremap) send these keys for Cmd+W and
+# Cmd+Option+arrows, so splits work as on the Mac. Ghostty on Linux has no key
+# to close one split, and GNOME takes its split keys Ctrl+Alt+arrows for
+# workspaces. On macOS these chords (Ctrl+Cmd+W, Ctrl+Cmd+Option+arrows) are
+# extra keys that nothing else uses.
+keybind = ctrl+super+w=close_surface
+keybind = ctrl+super+alt+arrow_up=goto_split:up
+keybind = ctrl+super+alt+arrow_down=goto_split:down
+keybind = ctrl+super+alt+arrow_left=goto_split:left
+keybind = ctrl+super+alt+arrow_right=goto_split:right

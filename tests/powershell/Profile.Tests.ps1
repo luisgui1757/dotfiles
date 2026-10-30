@@ -368,6 +368,67 @@ exit 0
         $psfzfIdx | Should -BeGreaterThan $editModeIdx
     }
 
+    It "puts the Rose Pine fzf colors before a value the user set, one time only" {
+        $scriptBlock = "`$env:FZF_DEFAULT_OPTS = '--height 50%'`n" + $script:InteractiveProfileContext + "`n. '" + $script:Profile.Replace("'", "''") + "'`n" + @'
+$first = $env:FZF_DEFAULT_OPTS
+if (-not $first.StartsWith('--color=fg:#908caa,') -or -not $first.EndsWith(' --height 50%')) { Write-Error "Order: $first"; exit 1 }
+$global:DotfilesShellReady = $false
+'@ + "`n. '" + $script:Profile.Replace("'", "''") + "'`n" + @'
+if ($env:FZF_DEFAULT_OPTS -cne $first) { Write-Error "Second load changed: $env:FZF_DEFAULT_OPTS"; exit 2 }
+exit 0
+'@
+        & (Get-Command pwsh -ErrorAction Stop).Source -NoLogo -NoProfile -Command $scriptBlock
+        $LASTEXITCODE | Should -Be 0
+    }
+
+    It "starts Atuin after PSFzf without its Up Arrow or AI keys" {
+        $scriptBlock = $script:InteractiveProfileContext + "`n. '" + $script:Profile.Replace("'", "''") + "'`n" + @'
+$expected = 'init powershell --disable-up-arrow --disable-ai|Vi,Ctrl+t,Ctrl+r,Alt+c'
+if ($global:DotfilesFixtureAtuin -cne $expected) { Write-Error "Atuin init: $global:DotfilesFixtureAtuin"; exit 1 }
+exit 0
+'@
+        & (Get-Command pwsh -ErrorAction Stop).Source -NoLogo -NoProfile -Command $scriptBlock
+        $LASTEXITCODE | Should -Be 0
+    }
+
+    It "changes to the folder superfile saved on Shift+Q and never runs the saved text" {
+        $root = Join-Path ([IO.Path]::GetTempPath()) ("spf [root] it's " + [Guid]::NewGuid())
+        [void][IO.Directory]::CreateDirectory((Join-Path $root "it's [a] folder"))
+        [void][IO.Directory]::CreateDirectory((Join-Path $root 'start'))
+        $previousRoot = $env:SPF_TEST_ROOT
+        try {
+            $env:SPF_TEST_ROOT = $root
+            $scriptBlock = $script:InteractiveProfileContext + "`n. '" + $script:Profile.Replace("'", "''") + "'`n" + @'
+$root = $env:SPF_TEST_ROOT
+$target = Join-Path $root "it's [a] folder"
+$start = Join-Path $root 'start'
+$env:SPF_TEST_LAST = Join-Path $root 'lastdir'
+# A function named spf.exe takes the place of the application.
+function global:spf.exe {
+    if ($args[0] -eq 'path-list') { return $env:SPF_TEST_LAST }
+    if ($env:SPF_TEST_CONTENT) { [IO.File]::WriteAllText($env:SPF_TEST_LAST, $env:SPF_TEST_CONTENT) }
+}
+Set-Location -LiteralPath $start
+$env:SPF_TEST_CONTENT = "cd '" + $target.Replace("'", "'\''") + "'"
+spf
+if ((Get-Location).ProviderPath -ne $target) { Write-Error "Shift+Q went to $((Get-Location).ProviderPath)"; exit 1 }
+if (Test-Path -LiteralPath $env:SPF_TEST_LAST) { Write-Error 'The saved folder file stayed'; exit 2 }
+Set-Location -LiteralPath $start
+$env:SPF_TEST_CONTENT = "Set-Content -LiteralPath '" + (Join-Path $root 'pwned') + "' -Value x"
+spf
+if ((Get-Location).ProviderPath -ne $start) { Write-Error 'Changed folder for text that is not a cd line'; exit 3 }
+if (Test-Path -LiteralPath (Join-Path $root 'pwned')) { Write-Error 'The saved text ran as code'; exit 4 }
+if (Test-Path -LiteralPath $env:SPF_TEST_LAST) { Write-Error 'The rejected folder file stayed'; exit 5 }
+exit 0
+'@
+            & (Get-Command pwsh -ErrorAction Stop).Source -NoLogo -NoProfile -Command $scriptBlock
+            $LASTEXITCODE | Should -Be 0
+        } finally {
+            $env:SPF_TEST_ROOT = $previousRoot
+            Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
     It "keeps the Rose Pine prediction + colors after enabling vi mode" {
         $src = Get-Content -Raw -LiteralPath $script:Profile
         $src | Should -Match 'PredictionSource HistoryAndPlugin'
