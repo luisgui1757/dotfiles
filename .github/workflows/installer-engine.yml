@@ -343,7 +343,7 @@ jobs:
         if: runner.os == 'Linux'
         env:
           DOTFILES_TEST_GHOSTTY_RELEASES: '1'
-          GHOSTTY_OLDEST_UBUNTU_IMAGE: ubuntu:24.04@sha256:68ee22004a9109b44973313b02ff7b1de250f1de0f5ecb628d73f579aaff33ac
+          GHOSTTY_OLDEST_UBUNTU_IMAGE: ubuntu:24.04@sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852
         run: go test -v -count=1 -timeout 20m -run '^TestNativeGhosttyLoadsOnOldestSupportedUbuntu$' .
 
       # Linux applications run under Ubuntu's stock AppArmor user-namespace
