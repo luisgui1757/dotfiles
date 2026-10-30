@@ -3,9 +3,9 @@
   "resources": {
     "tool.starship": {
       "darwin/arm64": {
-        "version": "1.26.0",
-        "url": "https://github.com/starship/starship/releases/download/v1.26.0/starship-aarch64-apple-darwin.tar.gz",
-        "sha256": "c40b27b11f580411e068f2fa6c1be7830a387c0bc47a94d1d37f32b054c5361d",
+        "version": "1.27.0",
+        "url": "https://github.com/starship/starship/releases/download/v1.27.0/starship-aarch64-apple-darwin.tar.gz",
+        "sha256": "5362da8cb2928f98f3ce0ffda697cf0f8de70081db000dae316d6d3a404f6cf0",
         "format": "tar.gz",
         "commands": {
           "starship": "starship"
@@ -15,9 +15,9 @@
         ]
       },
       "linux/amd64": {
-        "version": "1.26.0",
-        "url": "https://github.com/starship/starship/releases/download/v1.26.0/starship-x86_64-unknown-linux-musl.tar.gz",
-        "sha256": "b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daeaadf3",
+        "version": "1.27.0",
+        "url": "https://github.com/starship/starship/releases/download/v1.27.0/starship-x86_64-unknown-linux-musl.tar.gz",
+        "sha256": "10c8eb4cb3b761d9bf59ea828444c2dab36c900b7d69a69e08814b286969df89",
         "format": "tar.gz",
         "commands": {
           "starship": "starship"
@@ -27,9 +27,9 @@
         ]
       },
       "linux/arm64": {
-        "version": "1.26.0",
-        "url": "https://github.com/starship/starship/releases/download/v1.26.0/starship-aarch64-unknown-linux-musl.tar.gz",
-        "sha256": "dc30189378d2f2e287384e8a692d3f95ad1df64cf0e8c36aa9201516028aed6b",
+        "version": "1.27.0",
+        "url": "https://github.com/starship/starship/releases/download/v1.27.0/starship-aarch64-unknown-linux-musl.tar.gz",
+        "sha256": "341f5cbf24699fa0b27ec88965ad25f862ea09e15d35a543fd6ffdff1d2aa00d",
         "format": "tar.gz",
         "commands": {
           "starship": "starship"
@@ -39,9 +39,9 @@
         ]
       },
       "windows/amd64": {
-        "version": "1.26.0",
-        "url": "https://github.com/starship/starship/releases/download/v1.26.0/starship-x86_64-pc-windows-msvc.zip",
-        "sha256": "690021e22f2bf2c57d5867dc0fababe5e55e714c26942bd909ffddb6c5df42f2",
+        "version": "1.27.0",
+        "url": "https://github.com/starship/starship/releases/download/v1.27.0/starship-x86_64-pc-windows-msvc.zip",
+        "sha256": "7764f861805376af2812dd78c84fadc16b714cf3f346baed9b597bfda8484403",
         "format": "zip",
         "commands": {
           "starship": "starship.exe"
@@ -350,9 +350,9 @@
     },
     "tool.nvim": {
       "linux/amd64": {
-        "version": "0.12.5",
-        "url": "https://github.com/neovim/neovim/releases/download/v0.12.5/nvim-linux-x86_64.tar.gz",
-        "sha256": "bce0f56eda1f1b1db6eee8f4133d7a38813ea07933837dd1777411ca384c6875",
+        "version": "0.12.6",
+        "url": "https://github.com/neovim/neovim/releases/download/v0.12.6/nvim-linux-x86_64.tar.gz",
+        "sha256": "474430d53e6264f6d6dd18db42d6dc9df3a1b56ca9e88a325bbf860e1a811d87",
         "format": "tar.gz",
         "commands": {
           "nvim": "bin/nvim"
@@ -367,9 +367,9 @@
         "libc": "glibc"
       },
       "windows/amd64": {
-        "version": "0.12.5",
-        "url": "https://github.com/neovim/neovim/releases/download/v0.12.5/nvim-win64.zip",
-        "sha256": "de8625ba8cf65ebf40eb80a388ba1ec8e9c15b30218821e2c639119b05920de1",
+        "version": "0.12.6",
+        "url": "https://github.com/neovim/neovim/releases/download/v0.12.6/nvim-win64.zip",
+        "sha256": "4e12b7103b601ffc8f25954b4da100f339faa73dccb69a5b135e897fa3d893ed",
         "format": "zip",
         "commands": {
           "nvim": "bin/nvim.exe"
@@ -383,9 +383,9 @@
         ]
       },
       "linux/arm64": {
-        "version": "0.12.5",
-        "url": "https://github.com/neovim/neovim/releases/download/v0.12.5/nvim-linux-arm64.tar.gz",
-        "sha256": "1aa5ca085249580ae0f91eb14f27ec0919773ff2d99a163d03f3d6c21ac29725",
+        "version": "0.12.6",
+        "url": "https://github.com/neovim/neovim/releases/download/v0.12.6/nvim-linux-arm64.tar.gz",
+        "sha256": "8f1f64a0bdb97247034038c3823c6cbad5bdf9ecd5751b85494b71c3ee04c815",
         "format": "tar.gz",
         "commands": {
           "nvim": "bin/nvim"
@@ -400,9 +400,9 @@
         "libc": "glibc"
       },
       "darwin/arm64": {
-        "version": "0.12.5",
-        "url": "https://github.com/neovim/neovim/releases/download/v0.12.5/nvim-macos-arm64.tar.gz",
-        "sha256": "65fb000099e47ca1b762584c484cc833f40e30851a0ec450d4174e16317c1f9b",
+        "version": "0.12.6",
+        "url": "https://github.com/neovim/neovim/releases/download/v0.12.6/nvim-macos-arm64.tar.gz",
+        "sha256": "1dbd148222b051ba6c307c4d17a318ed083df018a4f6a5a0ce46955ffc9ab87b",
         "format": "tar.gz",
         "commands": {
           "nvim": "bin/nvim"
@@ -630,9 +630,9 @@
     },
     "tool.tree-sitter": {
       "darwin/arm64": {
-        "version": "0.27.0",
-        "url": "https://github.com/tree-sitter/tree-sitter/releases/download/v0.27.0/tree-sitter-macos-arm64.gz",
-        "sha256": "70f7573b2b2e5371a5b58cc5227d2ad981fd5374596b9874e770af486060774e",
+        "version": "0.27.1",
+        "url": "https://github.com/tree-sitter/tree-sitter/releases/download/v0.27.1/tree-sitter-macos-arm64.gz",
+        "sha256": "46cb97d9a2c52c94e22d9a76c2f1116156b8b61f98360e2a9cce05fcb197cd4d",
         "format": "gzip",
         "commands": {
           "tree-sitter": "tree-sitter"
@@ -643,9 +643,9 @@
         "file": "tree-sitter"
       },
       "linux/amd64": {
-        "version": "0.27.0",
-        "url": "https://github.com/tree-sitter/tree-sitter/releases/download/v0.27.0/tree-sitter-linux-x64.gz",
-        "sha256": "20a1f39ec1c45f2211492dcb8881c802b643b554bb196869a29ac3778277fa77",
+        "version": "0.27.1",
+        "url": "https://github.com/tree-sitter/tree-sitter/releases/download/v0.27.1/tree-sitter-linux-x64.gz",
+        "sha256": "d01042f94ba3d6827ddc9788e235f75d8366431be42bdf90ade534d960c98b7d",
         "format": "gzip",
         "commands": {
           "tree-sitter": "tree-sitter"
@@ -657,9 +657,9 @@
         "libc": "glibc"
       },
       "linux/arm64": {
-        "version": "0.27.0",
-        "url": "https://github.com/tree-sitter/tree-sitter/releases/download/v0.27.0/tree-sitter-linux-arm64.gz",
-        "sha256": "3a35a2dd961ad842384e982c75daf792c01d1a67e442fc3914d4de37bd8a59cb",
+        "version": "0.27.1",
+        "url": "https://github.com/tree-sitter/tree-sitter/releases/download/v0.27.1/tree-sitter-linux-arm64.gz",
+        "sha256": "404be5d54a4955571c4067c21d4699660eab3a534cefb0659341b207f7139ec5",
         "format": "gzip",
         "commands": {
           "tree-sitter": "tree-sitter"
@@ -671,9 +671,9 @@
         "libc": "glibc"
       },
       "windows/amd64": {
-        "version": "0.27.0",
-        "url": "https://github.com/tree-sitter/tree-sitter/releases/download/v0.27.0/tree-sitter-windows-x64.gz",
-        "sha256": "2d6c014b4e91d3d302ba7b30b3b625914027c3861ae7817e068a273e3f034550",
+        "version": "0.27.1",
+        "url": "https://github.com/tree-sitter/tree-sitter/releases/download/v0.27.1/tree-sitter-windows-x64.gz",
+        "sha256": "e21184878f908f91c753b78a76a0766e61954e06627b46088d70d66233424531",
         "format": "gzip",
         "commands": {
           "tree-sitter": "tree-sitter.exe"
@@ -2924,23 +2924,6 @@
       }
     },
     "tool.zen": {
-      "darwin/arm64": {
-        "version": "1.23.2b",
-        "url": "https://github.com/zen-browser/desktop/releases/download/1.23.2b/zen.macos-universal.dmg",
-        "sha256": "97548c8123d31c8123f097621b47e6b99cdeb57a8ba3c29b790dd065157f1d9e",
-        "format": "dmg",
-        "commands": {},
-        "bin_dirs": [],
-        "required_files": [
-          "Zen.app/Contents/Info.plist",
-          "Zen.app/Contents/MacOS/zen",
-          "DotfilesZen.app/Contents/Info.plist",
-          "DotfilesZen.app/Contents/MacOS/zen"
-        ],
-        "app_bundle": "Zen.app",
-        "zen_profile": true,
-        "zen_profile_revision": 2
-      },
       "linux/amd64": {
         "version": "1.23.2b",
         "url": "https://github.com/zen-browser/desktop/releases/download/1.23.2b/zen.linux-x86_64.tar.xz",

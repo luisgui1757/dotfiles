@@ -1,27 +1,15 @@
 # Native installer
 
-The public setup and migration entrypoints launch `cmd/dotfiles` through the
+The public setup entrypoints launch `cmd/dotfiles` through the
 verified Go bootstrap. It connects categorized tool selection, native providers,
 private pinned archives, configuration publication and scoped settings to the
 same planner and recoverable executor. The [operator guide](../README.md)
 lists the current capabilities and supported platform combinations.
 
-Migration has two explicit machine phases: `DOTFILES_MIGRATION_PHASE=profiles`
-keeps the released preparation protocol, while `runtime` uses a separate retirement
-catalog, state and saved native outcomes. Interactive migration runs configuration
-preparation, macOS Homebrew conversion, setup, Check, retirement and a final Check.
-Runtime selection binds exact observed scope and the normal setup state. The
-shared normal/native mutation locks protect the replacement check and removal
-interval. Unknown native outcomes are never replayed; completed native results
-are consulted before preconditions on recovery. Unchecked or unproved artifacts
-prevent a complete migration result until the owner explicitly keeps them: when
-every other runtime retirement finished, interactive migrate offers to keep each
-remaining resource. The choice is recorded in `migration/retirement/kept.json`,
-bound to the exact inspected scope; any change makes it unfinished again. Published `v0.4.4` and pre-overhaul main pin
-evidence are checked against their immutable source commits.
-Completed retirement records remain history rather than automatic selections:
-reinstalled artifacts require another explicit choice. Linuxbrew discovery is
-restricted to the retirement adapter; it never changes the normal APT provider.
+Migration from v0.4.x is only in release v1.0.1: run migrate from a v1.0.1
+checkout, then setup from this checkout. Setup reports the marks of an earlier
+installation that migrate did not retire. A Homebrew prefix that nix-homebrew
+still manages is an issue for its resources, so setup never reuses it.
 
 Supported targets are macOS **arm64 only**, Ubuntu/Debian amd64/arm64 and native
 Windows amd64. WSL follows the same Ubuntu/Debian lifecycle. Other Linux
@@ -113,13 +101,7 @@ the same installer with `--check`. Exit 0 is healthy, exit 1 is drift for
 Repair, and any other exit is an error.
 
 Removal runs `--remove` for each host that dotfiles installed for, then deletes
-`<state>/sentinel`. The resources `integration.sentinel`,
-`skills.sentinel-agents`, `skills.sentinel-claude`, `skills.sentinel-kiro` and
-`skills.sentinel-copilot` stay in the catalog only for the v1.0.0 handoff. The
-first apply deletes the skill folders that their receipts list, when a hash
-check against the saved journal proves the copied bytes. Then it releases those
-receipts. The [migration guide](../docs/UPGRADING.md#sentinel-rules-and-skills)
-describes the handoff.
+`<state>/sentinel`.
 
 The never-released Go Nix prototype and its dedicated experiments have been
 removed. Previous released installers and their pinned source evidence remain
@@ -147,18 +129,6 @@ available for recovery of their own unfinished transactions.
   the active original, and explains how to retry the saved operation.
 - Git uses a prepended marked include in its regular XDG global configuration,
   preserving personal precedence and ordinary `git config --global` writes.
-  For old whole-file receipts, the existing `remove_shared` per-item machine
-  choice also authorizes legacy settings restoration: preserve current edits
-  separately, restore the first baseline, then select the scoped replacement.
-  Declining this choice never adds the retired mapping to Keep. Retired mappings
-  cannot be kept, adopted or republished and have no runtime dependencies. An
-  inherited Keep entry is omitted from the new plan without touching the file.
-  A cancelled first publication can release uncertain bookkeeping only when its
-  saved journal proves no publication started or verifies completed restoration.
-  Intact recovery evidence is required; this grants no package removal authority.
-  The old whole-file mapping remains for receipt recovery. Its `replaced_by`
-  metadata releases only unowned historical bookkeeping after explicit removal;
-  it never transfers deletion authority or discards an original backup.
 - `NativeDriver` routes each resource to one provider. There is no fallback
   cascade and no Nix or chezmoi resource in the new graph.
 

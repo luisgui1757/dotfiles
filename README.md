@@ -5,7 +5,7 @@ Rose Pine configuration, and records what it owns so update and removal can make
 precise changes.
 
 **v1.0.1** replaces the earlier Nix/chezmoi setup with this installer. Coming
-from v0.4.x? Follow [the migration guide](docs/UPGRADING.md).
+from v0.4.x? Migrate with v1.0.1 first. Follow [the upgrade guide](docs/UPGRADING.md#from-v04x).
 
 ## Supported platforms
 
@@ -99,13 +99,10 @@ The update menu uses that checkout's reviewed pins; it does not update Git or
 fetch arbitrary latest package versions. Native providers update only the
 selected, proven-owned packages, never the entire machine.
 
-Coming from the Nix/chezmoi release? Run `./migrate.sh` or `.\migrate.ps1` after
-updating the checkout. It detects the earlier installation, preserves its
-configuration, opens the replacement tool menu, and checks the new setup before
-previewing removal of the verified old runtimes and tools, including the Pi CLI
-and the released Sentinel policy file for Pi. On macOS it first
-converts Nix-managed Homebrew while keeping its packages. Read
-[the migration guide](docs/UPGRADING.md) for conflicts and interrupted work.
+Coming from the Nix/chezmoi release (v0.4.x)? Only the `v1.0.1` checkout has
+`./migrate.sh` and `.\migrate.ps1`. Check out `v1.0.1`, run migrate and finish
+all its phases. Then update the checkout, open setup and choose **Update tools**.
+Read [the upgrade guide](docs/UPGRADING.md#from-v04x) for the two steps.
 
 ## Selectable tools
 
@@ -181,8 +178,7 @@ their own section outside the marked block, or in `~/.gitconfig`;
 `git config --global --add include.path` can edit the managed include section
 and requires review. Removal preserves edited blocks and personal settings.
 As with other live configuration, editing the checkout's defaults takes effect
-immediately. See [Git configuration handover](docs/UPGRADING.md#git-configuration-handover)
-for a previous whole-file installation.
+immediately.
 
 **Lint and benchmark tools** is optional for contributors to this dotfiles
 repository. It supplies ShellCheck, jq, Hyperfine, Taplo, yamllint and
@@ -197,13 +193,7 @@ Chromium's sandbox, because that sandbox needs unprivileged user namespaces,
 which Ubuntu restricts unless an AppArmor profile names the program's path. This
 is disclosed before approval; the installer does not change kernel settings or
 AppArmor policies. Vaults and Obsidian's settings (`~/.config/obsidian`) stay
-personal. Until 2026-10-22, Linux Obsidian was a Flatpak in a private store:
-company AppArmor changes could stop its sandbox, and Electron's helper processes
-ask Flatpak's session service to start them, which cannot see a private store.
-Choose tools removes that earlier Flatpak and keeps its
-`~/.var/app/md.obsidian.Obsidian` data; Update installs the portable build but,
-as always, removes nothing. Obsidian then asks once for your vault: use **Open
-folder as vault**.
+personal.
 OpenWhispr uses its official portable archive on Linux amd64; upstream does not
 publish a Linux arm64 archive or Flatpak. The vendor launcher automatically
 disables Chromium’s sandbox when unprivileged user namespaces are restricted,
@@ -227,8 +217,7 @@ Zen-only installation also requires Homebrew and Apple's command-line tools.
 
 On Linux, Zen uses Mozilla's legacy profile selection to retain the same personal
 profile across managed generations. Its application policy disables self-updates;
-use setup's Update action. See the
-[handover instructions for earlier Mac installations](docs/UPGRADING.md#zen-macos-native-application).
+use setup's Update action.
 
 Tailscale uses its pinned official DEB on Linux, including the vendor's daemon
 service. Run `sudo tailscale up` to sign in. On macOS the existing Homebrew formula
@@ -396,8 +385,7 @@ its Sentinel checkout. Setup records `CODEX_HOME`, `CLAUDE_CONFIG_DIR`,
 and removal use these recorded values, and setup shows a note when they changed.
 
 A Renovate pull request proposes a new Sentinel pin. After you merge and pull
-it, **Update tools** applies it. Coming from dotfiles v1.0.0? Read
-[Sentinel rules and skills](docs/UPGRADING.md#sentinel-rules-and-skills).
+it, **Update tools** applies it.
 
 Authenticated agent execution remains a separate verification step. Notes remain personal: Neovim
 enables the notes integration only when its vault exists; `NOTES_VAULT` can select another existing vault.
@@ -923,14 +911,11 @@ successful local checks do not establish current live GitHub settings.
 |---|---|
 | `installer/` | Go CLI, dependency catalog, pinned artifacts, ownership and recovery |
 | `setup.sh`, `setup.ps1` | Public interactive entrypoints |
-| `migrate.sh`, `migrate.ps1` | Explicit migration from the previous release |
 | `scripts/installer-bootstrap.*` | Verified private Go bootstrap |
 | `nvim/`, `tmux/`, `herdr/` | Editor and multiplexer configuration |
 | `installer/shells/` | Active shell integration recipes |
 | `ghostty/`, `windows-terminal/`, `aerospace/`, `xremap/` | Desktop configuration |
 | `git/`, `lazygit/config.yml`, `gh-dash/`, `starship/`, `lsd/` | Tool configuration |
-| `lazygit/config.windows.yml`, `herdr/config.windows.toml` | Passive released Windows live-link sources for migration |
-| `home/`, `shells/`, `windows/chezmoi-*` | Passive released sources needed during migration |
 | `tests/`, `.github/workflows/` | Local and native verification |
 | `docs/` | Upgrade, release and security guides, and release notes |
 
@@ -942,7 +927,7 @@ keep their own licenses.
 
 ## Acceptance coverage
 
-GitHub runs real native installation, migration, application and preservation
+GitHub runs real native installation, application and preservation
 checks on the supported targets. The core jobs begin with keyboard-driven public
 setup, followed through Check, Update, Repair and Remove/Reinstall. Agent checks
 run the installed CLIs without model calls. Desktop checks use the VS Code editor

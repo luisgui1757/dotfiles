@@ -240,9 +240,9 @@ func (d *KeyboardAccessDriver) Observe(ctx context.Context, r Resource, receipt 
 		o.Unknown, o.Pending = true, "cannot inspect "+d.Rules+"; nothing was changed: "+err.Error()
 		return o, nil
 	default:
-		o.Present, o.Fingerprint = true, legacyHash(data)
+		o.Present, o.Fingerprint = true, sha256Hex(data)
 		_, ours := keyboardAccessOwner(data)
-		owner, _, mode, ownerErr := legacyFileOwner(d.Rules)
+		owner, _, mode, ownerErr := fileOwner(d.Rules)
 		o.Healthy = ours && ownerErr == nil && int(owner) == d.Owner && mode == 0644 && info.Mode().Perm() == 0644
 		if !o.Healthy {
 			o.Pending = d.Rules + " exists but is not the exact rule dotfiles installs; dotfiles never replaces or removes it. Inspect it, and remove it yourself to let setup install its rule"
@@ -292,6 +292,10 @@ func (d *KeyboardAccessDriver) ResumeResource(ctx context.Context, r Resource, o
 	return d.change(ctx, r, in.Action, receipt, true)
 }
 
+type keyboardAccessFailure struct{ message string }
+
+func (e *keyboardAccessFailure) Error() string { return e.message }
+
 func (d *KeyboardAccessDriver) result(command nativeCommand) error {
 	var record nativeCommandRecord
 	data, err := readDocument(filepath.Join(d.WorkerDirectory, "commands", command.Operation+".json"))
@@ -309,7 +313,7 @@ func (d *KeyboardAccessDriver) result(command nativeCommand) error {
 		return errors.New("keyboard access command outcome is unknown; inspect " + d.Rules + " before retrying")
 	}
 	if record.Reply.Error != "" || record.Reply.ExitCode == nil || *record.Reply.ExitCode != 0 || record.Reply.Ready {
-		return &flatpakCommandFailure{fmt.Sprintf("keyboard access command failed%s", nativeDiagnostic(record.Reply.Output))}
+		return &keyboardAccessFailure{fmt.Sprintf("keyboard access command failed%s", nativeDiagnostic(record.Reply.Output))}
 	}
 	return nil
 }
@@ -398,7 +402,7 @@ func (d *KeyboardAccessDriver) change(ctx context.Context, r Resource, action st
 func (d *KeyboardAccessDriver) dispatch(ctx context.Context, in *keyboardAccessIntent, index int, resume bool) error {
 	command := in.Commands[index]
 	err := d.result(command)
-	var failed *flatpakCommandFailure
+	var failed *keyboardAccessFailure
 	if errors.As(err, &failed) && resume {
 		if len(in.Attempts) == 0 {
 			in.Attempts = make([]int, len(in.Commands))
@@ -425,7 +429,7 @@ func (d *KeyboardAccessDriver) dispatch(ctx context.Context, in *keyboardAccessI
 		data, _, readErr := d.read(path)
 		if index == 1 && errors.Is(readErr, os.ErrNotExist) {
 			// The moved rule is already gone: nothing is left to delete.
-		} else if readErr != nil || legacyHash(data) != in.Expected {
+		} else if readErr != nil || sha256Hex(data) != in.Expected {
 			return errors.Join(errors.New("the keyboard access rule changed during removal; preserve "+path), readErr)
 		}
 	}

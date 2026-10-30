@@ -66,7 +66,7 @@ type ArchiveReplacement struct {
 }
 
 func (p ArchivePin) Validate() error {
-	if p.DMGRevision < 0 || p.DMGRevision > 1 || p.DMGRevision != 0 && p.Format != "dmg" {
+	if p.Format == "dmg" && p.DMGRevision != 1 || p.Format != "dmg" && p.DMGRevision != 0 {
 		return errors.New("disk-image transport revision requires its supported DMG layout")
 	}
 	if p.PythonStdlib != "" && (!portableArchivePath(p.PythonStdlib) || p.Commands["python"] == "" && p.Commands["python3"] == "") {
@@ -361,7 +361,7 @@ func extractArchive(ctx context.Context, file *os.File, size int64, pin ArchiveP
 			return err
 		}
 	case "dmg":
-		if err := readDMGArchive(ctx, file, pin.AppBundle, pin.DMGRevision, readTar); err != nil {
+		if err := readDMGArchive(ctx, file, pin.AppBundle, readTar); err != nil {
 			return err
 		}
 	case "zip":

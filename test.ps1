@@ -82,7 +82,6 @@ Invoke-Step 'PSScriptAnalyzer' {
     Import-Module PSScriptAnalyzer -Force
     $analyzerPaths = @(
         'setup.ps1',
-        'migrate.ps1',
         'scripts/installer-bootstrap.ps1',
         'test.ps1',
         'installer/shells',
@@ -167,7 +166,7 @@ Invoke-Step 'Installer format, vet and race tests' {
     }
 }
 
-Invoke-Step 'Public launchers and migration evidence' {
+Invoke-Step 'Public launchers and release scripts' {
     & python -m unittest discover -s tests/bootstrap -p '*_test.py'
     if ($LASTEXITCODE -ne 0) { throw 'Bootstrap regression tests failed' }
 }

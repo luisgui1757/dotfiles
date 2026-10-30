@@ -62,8 +62,7 @@ class LauncherTest(unittest.TestCase):
         (self.checkout / "scripts").mkdir(parents=True)
         (self.checkout / "installer").mkdir()
         shutil.copy2(ROOT / "scripts/installer-bootstrap.sh", self.checkout / "scripts")
-        for entrypoint in ["setup", "migrate"]:
-            shutil.copy2(ROOT / f"{entrypoint}.sh", self.checkout)
+        shutil.copy2(ROOT / "setup.sh", self.checkout)
         self.write("installer/go.mod", "module fixture\n\ngo 1.27.1\n")
         self.write("installer/go.sum", "")
         self.write("installer/main.go", "package main\n")
@@ -143,12 +142,11 @@ class LauncherTest(unittest.TestCase):
         personal = self.root / "personal Go cache"
         personal.mkdir()
         (personal / "preserve").write_text("personal module bytes")
-        for entrypoint in ["setup", "migrate"]:
-            self.launch("machine", entrypoint=entrypoint, CHECK_MODULE_CACHE="1", GOMODCACHE=shell_path(personal))
-            self.assertEqual((self.root / "application-module-cache").read_text(encoding="utf-8").strip(), shell_path(personal))
-            self.assertEqual(sorted(p.name for p in personal.iterdir()), ["preserve"])
-            self.assertEqual((personal / "preserve").read_text(), "personal module bytes")
-            self.assertEqual((self.root / "cache/dotfiles/bootstrap/gopath/pkg/mod/compiler-probe").read_text(), "compiler module write\n")
+        self.launch("machine", entrypoint="setup", CHECK_MODULE_CACHE="1", GOMODCACHE=shell_path(personal))
+        self.assertEqual((self.root / "application-module-cache").read_text(encoding="utf-8").strip(), shell_path(personal))
+        self.assertEqual(sorted(p.name for p in personal.iterdir()), ["preserve"])
+        self.assertEqual((personal / "preserve").read_text(), "personal module bytes")
+        self.assertEqual((self.root / "cache/dotfiles/bootstrap/gopath/pkg/mod/compiler-probe").read_text(), "compiler module write\n")
         self.assertEqual(self.events().count("download"), 1)
         self.assertEqual(self.events().count("build"), 1)
 
@@ -171,20 +169,19 @@ class LauncherTest(unittest.TestCase):
         data = (self.root / "go.tar.gz").read_bytes()
         self.write("installer/bootstrap-toolchain.tsv", self.pin.replace(
             f"{self.digest}\t", f"{hashlib.sha256(data).hexdigest()}\t").rsplit("\t", 1)[0] + f"\t{len(data)}\n")
-        for entrypoint in ["setup", "migrate"]:
-            for mask in ["0022", "0002", "0027"]:
-                with self.subTest(entrypoint=entrypoint, mask=mask):
-                    (self.root / "engine-file").unlink(missing_ok=True)
-                    if (self.root / "engine-directory").exists():
-                        (self.root / "engine-directory").rmdir()
-                    self.launch(*([] if mask == "0022" else ["machine"]), entrypoint=entrypoint, CALLER_UMASK=mask)
-                    self.assertEqual((self.root / "engine-umask").read_text().strip(), mask)
-                    if os.name != "nt":
-                        self.assertEqual((self.root / "engine-file").stat().st_mode & 0o777, 0o666 & ~int(mask, 8))
-                        self.assertEqual((self.root / "engine-directory").stat().st_mode & 0o777, 0o777 & ~int(mask, 8))
-                        self.assertEqual((self.root / "cache/dotfiles/bootstrap").stat().st_mode & 0o777, 0o700)
-                    (self.root / "engine-file").unlink()
+        for mask in ["0022", "0002", "0027"]:
+            with self.subTest(mask=mask):
+                (self.root / "engine-file").unlink(missing_ok=True)
+                if (self.root / "engine-directory").exists():
                     (self.root / "engine-directory").rmdir()
+                self.launch(*([] if mask == "0022" else ["machine"]), entrypoint="setup", CALLER_UMASK=mask)
+                self.assertEqual((self.root / "engine-umask").read_text().strip(), mask)
+                if os.name != "nt":
+                    self.assertEqual((self.root / "engine-file").stat().st_mode & 0o777, 0o666 & ~int(mask, 8))
+                    self.assertEqual((self.root / "engine-directory").stat().st_mode & 0o777, 0o777 & ~int(mask, 8))
+                    self.assertEqual((self.root / "cache/dotfiles/bootstrap").stat().st_mode & 0o777, 0o700)
+                (self.root / "engine-file").unlink()
+                (self.root / "engine-directory").rmdir()
         self.assertEqual(self.events().count("download"), 1)
         self.assertEqual(self.events().count("build"), 1)
 

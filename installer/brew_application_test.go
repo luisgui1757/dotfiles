@@ -480,12 +480,6 @@ func TestNativeAppCatalogRetainsOldRecoveryWithoutSelectingIt(t *testing.T) {
 			if !slices.Contains(closure, "app.zen") || !slices.Contains(closure, "infra.homebrew") || slices.Contains(closure, "tool.zen") || slices.Contains(closure, "desktop.zen") {
 				t.Fatal(closure)
 			}
-			for _, id := range []string{"tool.zen", "desktop.zen"} {
-				r, ok := c.Resource(id)
-				if !ok || !r.Available(Context{OS: osname, Arch: "arm64"}) {
-					t.Fatal("old receipt lost recovery", id)
-				}
-			}
 		} else if slices.Contains(closure, "app.zen") || !slices.Contains(closure, "tool.zen") || !slices.Contains(closure, "desktop.zen") {
 			t.Fatal(closure)
 		}

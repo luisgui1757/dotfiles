@@ -64,7 +64,7 @@ func (u *scriptedInteraction) ChooseTools(ctx context.Context, menu ToolMenu) ([
 // Review answers each optional group in the order the controller once asked
 // them as separate menus, revising the proposal after every answer.
 func (u *scriptedInteraction) Review(ctx context.Context, _ *Catalog, proposal Proposal, revise Revise) (bool, error) {
-	for _, group := range []string{ReviewKeep, ReviewAdopt, ReviewShared, ReviewLegacy} {
+	for _, group := range []string{ReviewKeep, ReviewAdopt, ReviewShared} {
 		options, initial := []Choice{}, []string{}
 		for _, choice := range proposal.Choices {
 			if choice.Group == group {

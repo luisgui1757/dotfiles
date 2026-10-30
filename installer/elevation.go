@@ -90,16 +90,3 @@ func (d *NativeDriver) Elevate(ctx context.Context, plan Plan) (func() error, er
 	}
 	return noElevation, nil
 }
-
-// Verified retirement steps declare POSIX sudo authority in Privileged.
-func (d *legacyRetirementDriver) Elevate(ctx context.Context, plan Plan) (func() error, error) {
-	if d.Elevation == nil || d.Environment.Root || d.Authenticate == nil {
-		return noElevation, nil
-	}
-	for _, op := range plan.Operations {
-		if op.Privileged && (mutating(op.Action) || plan.ResourceResume != nil) {
-			return d.Elevation(ctx)
-		}
-	}
-	return noElevation, nil
-}

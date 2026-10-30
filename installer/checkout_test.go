@@ -2,7 +2,6 @@ package installer
 
 import (
 	"bytes"
-	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -32,56 +31,6 @@ func TestCRLFCheckoutPreservesInstallerBytes(t *testing.T) {
 		"installer/resources.json":               []byte("{\n  \"schema\": 1\n}\n"),
 		".github/workflows/installer-engine.yml": []byte("name: test\n"),
 		".github/workflows/nix.yml":              []byte("name: nix\n"),
-	}
-	type releasedFile struct {
-		Source, SHA256 string
-		SourceSHA256   string `json:"source_sha256"`
-	}
-	var inventory struct {
-		Releases []struct{ Targets, Metadata []releasedFile }
-	}
-	data, err := os.ReadFile("legacy-config-targets.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := json.Unmarshal(data, &inventory); err != nil {
-		t.Fatal(err)
-	}
-	releasedHashes := map[string]string{}
-	for _, release := range inventory.Releases {
-		for _, item := range append(release.Targets, release.Metadata...) {
-			hash := item.SHA256
-			if item.SourceSHA256 != "" {
-				hash = item.SourceSHA256
-			}
-			releasedHashes[item.Source] = hash
-		}
-	}
-	// Released Windows LazyGit links bypass the retired home template. Keep
-	// their passive physical destination under the same checkout/hash proof.
-	const lazygitTemplate = "home/.chezmoitemplates/lazygit/config.windows.yml"
-	if releasedHashes[lazygitTemplate] == "" {
-		t.Fatal("released Windows LazyGit evidence is missing")
-	}
-	releasedHashes["lazygit/config.windows.yml"] = releasedHashes[lazygitTemplate]
-	// v0.4.4 Windows Herdr links resolve to this passive physical source.
-	releasedHashes["herdr/config.windows.toml"] = "9e06ed48b2e3ad27b38d2a6642fe91eb428cff1528322e53dc463ddbca30e002"
-	profiles, err := releasedProfileEvidence()
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, profile := range profiles.Profiles {
-		releasedHashes[profile.Source] = profile.SHA256
-	}
-	for path := range releasedHashes {
-		data, err := os.ReadFile(filepath.Join("..", filepath.FromSlash(path)))
-		if os.IsNotExist(err) {
-			continue // Retired activation metadata is not a retained live source.
-		}
-		if err != nil {
-			t.Fatal(err)
-		}
-		files[path] = data
 	}
 	for name, data := range files {
 		path := filepath.Join(dir, filepath.FromSlash(name))
@@ -123,9 +72,6 @@ func TestCRLFCheckoutPreservesInstallerBytes(t *testing.T) {
 		actual, err := os.ReadFile(filepath.Join(dir, filepath.FromSlash(name)))
 		if err != nil || !bytes.Equal(actual, expected) {
 			t.Fatalf("checkout changed %s bytes: %v", name, err)
-		}
-		if hash := releasedHashes[name]; hash != "" && legacyHash(actual) != hash {
-			t.Fatalf("checkout differs from recorded release hash: %s", name)
 		}
 	}
 	protected, err := os.ReadFile(index)

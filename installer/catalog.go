@@ -49,10 +49,6 @@ type Resource struct {
 	Retain                bool                `json:"retain,omitempty"`
 	Shared                bool                `json:"shared,omitempty"`
 	Bindings              map[string]Binding  `json:"bindings,omitempty"`
-	// ReplacedBy releases unowned bookkeeping when its successor is selected.
-	// Owned or uncertain configurations first require baseline restoration;
-	// changed files need explicit per-item approval and separate preservation.
-	ReplacedBy string `json:"replaced_by,omitempty"`
 	// ReplanAfter marks retained bootstrap infrastructure. Its verified creation
 	// can change which provider inventory is observable; later mutations require
 	// a new preview instead of inheriting approval of an unseen inventory.
@@ -132,11 +128,8 @@ func (c *Catalog) Validate() error {
 			if (os != "darwin" && os != "linux" && os != "windows") || !r.Available(Context{OS: os}) || binding.Package == "" || r.Action == "" {
 				return fmt.Errorf("invalid package binding for %s on %s", r.ID, os)
 			}
-			if binding.Provider != "archive" && !isHomebrewPackage(binding.Provider) && binding.Provider != "apt" && binding.Provider != "flatpak" {
+			if binding.Provider != "archive" && !isHomebrewPackage(binding.Provider) && binding.Provider != "apt" {
 				return fmt.Errorf("invalid package provider %q for %s", binding.Provider, r.ID)
-			}
-			if binding.Provider == "flatpak" && (os != "linux" || binding.Package != "md.obsidian.Obsidian" || !slices.Contains(r.Dependencies(Context{OS: os}), "tool.flatpak")) {
-				return fmt.Errorf("invalid Flatpak binding for %s", r.ID)
 			}
 			if binding.Provider == "apt" && (os != "linux" || !aptArgument.MatchString(binding.Package)) {
 				return fmt.Errorf("invalid APT binding for %s", r.ID)
@@ -156,14 +149,6 @@ func (c *Catalog) Validate() error {
 			packageOwners[key] = r.ID
 		}
 		seen[r.ID] = true
-	}
-	for _, r := range c.Resources {
-		if r.ReplacedBy != "" {
-			replacement, ok := c.Resource(r.ReplacedBy)
-			if !ok || r.Capability || (r.Action != "config" && r.Action != "profile") || r.Retain || len(r.Requires) != 0 || len(r.PlatformRequires) != 0 || replacement.Capability || replacement.Action != "profile" || replacement.ReplacedBy != "" {
-				return fmt.Errorf("invalid configuration replacement for %s", r.ID)
-			}
-		}
 	}
 	for _, ctx := range []Context{{OS: "darwin", Arch: "arm64"}, {OS: "linux", Arch: "amd64"}, {OS: "linux", Arch: "arm64"}, {OS: "windows", Arch: "amd64"}} {
 		{
@@ -239,6 +224,11 @@ func (c *Catalog) Closure(roots []string, ctx Context) ([]string, error) {
 		}
 	}
 	return result, nil
+}
+
+func sha256Hex(data []byte) string {
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:])
 }
 
 func digest(value any) (string, error) {

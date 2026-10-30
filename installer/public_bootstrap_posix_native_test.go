@@ -23,8 +23,8 @@ import (
 
 // Unlike installedMachineFixture, every invocation enters the public launcher:
 // a fresh cache must download and verify Go, extract it and build cmd/dotfiles.
-// No native package is selected; all migration/policy writes stay in this home.
-func TestNativePOSIXPublicBootstrapMigrationSetupLifecycle(t *testing.T) {
+// No native package is selected; all writes stay in this home.
+func TestNativePOSIXPublicBootstrapSetupLifecycle(t *testing.T) {
 	if os.Getenv("GITHUB_ACTIONS") != "true" || os.Getenv("RUNNER_ENVIRONMENT") != "github-hosted" || os.Getenv("DOTFILES_TEST_PUBLIC_POSIX_BOOTSTRAP") != "1" {
 		t.Skip("verified public bootstrap requires an explicitly opted-in disposable GitHub-hosted POSIX runner")
 	}
@@ -47,14 +47,6 @@ func TestNativePOSIXPublicBootstrapMigrationSetupLifecycle(t *testing.T) {
 		"CLAUDE_CONFIG_DIR": filepath.Join(home, ".claude"), "ZDOTDIR": home,
 	} {
 		t.Setenv(key, value)
-	}
-	folders, err := DiscoverConfigFolders()
-	if err != nil {
-		t.Fatal(err)
-	}
-	stateDirectory, err := DiscoverStateDirectory(Context{OS: runtime.GOOS, Arch: runtime.GOARCH}, folders)
-	if err != nil {
-		t.Fatal(err)
 	}
 	cache := filepath.Join(home, ".cache", "dotfiles", "bootstrap")
 	t.Cleanup(func() { cleanPublicBootstrapModules(t, cache) })
@@ -164,52 +156,22 @@ func TestNativePOSIXPublicBootstrapMigrationSetupLifecycle(t *testing.T) {
 		}
 		return result
 	}
+	// ripgrep is a private archive with the shared shell integration. It
+	// needs no native package, and its profile block shares the personal file.
 	profile := filepath.Join(home, ".zshrc")
-	legacy := "# personal legacy profile; preserve for review\nexport PERSONAL=value\n"
-	writeConfigFixture(t, profile, legacy)
-	request := Request{Schema: 1, Mode: "apply", Selected: []string{"legacy.zshrc"}, Adopt: []string{"legacy.zshrc"}}
-	preview := invoke("migrate", request)
-	if preview.Status != "preview" || operation(t, preview.Plan, "legacy.zshrc").Action != "adopt" {
-		t.Fatal("public migration did not require explicit adoption", preview)
+	personal := "# personal profile; preserve\nexport PERSONAL=value\n"
+	writeConfigFixture(t, profile, personal)
+	approve("setup", Request{Schema: 1, Mode: "apply", Selected: []string{"ripgrep"}})
+	installed, err := os.ReadFile(profile)
+	if err != nil || !bytes.HasPrefix(installed, []byte(personal)) || !bytes.Contains(installed, []byte("# >>> dotfiles:")) {
+		t.Fatal("public setup did not add its block after the personal profile", string(installed), err)
 	}
-	assertBytes(profile, legacy)
-	request.ExpectedPlan = preview.Plan.ID
-	result := invoke("migrate", request)
-	if result.Status != "ready" {
-		t.Fatal("public migration did not complete", result)
-	}
-	migration, err := LoadState(filepath.Join(stateDirectory, "migration", "state.json"), home)
-	if err != nil {
-		t.Fatal(err)
-	}
-	receipt := migration.Receipts["legacy.zshrc"]
-	if !receipt.Adopted || receipt.Status != "ready" || receipt.Ownership != "created" || len(receipt.After.Preserved) != 2 {
-		t.Fatal("public migration did not retain adopted original/review copies", receipt)
-	}
-	for _, path := range receipt.After.Preserved {
-		assertBytes(path, legacy)
-		if !strings.Contains(result.Message, path) {
-			t.Fatal("public migration did not disclose a recovery path", path)
-		}
-	}
-	detached, err := os.ReadFile(profile)
-	if err != nil || !bytes.Contains(detached, []byte("Legacy dotfiles profile preserved")) || bytes.Contains(detached, []byte("export PERSONAL")) {
-		t.Fatal("public migration copied unknown commands into the detached profile", err)
-	}
-	laterProfile := "# personal replacement after migration\n"
-	writeConfigFixture(t, profile, laterProfile)
-	approve("setup", Request{Schema: 1, Mode: "apply", Selected: []string{}})
 	approve("setup", Request{Schema: 1, Mode: "update"})
 	if result := invoke("setup", Request{Schema: 1, Mode: "check"}); result.Status != "ready" {
 		t.Fatal("public check did not verify completed setup", result)
 	}
-	if result := invoke("migrate", Request{Schema: 1, Mode: "check"}); result.Status != "ready" {
-		t.Fatal("historical migration conflicted with completed setup", result)
-	}
-	assertBytes(profile, laterProfile)
-	for _, path := range receipt.After.Preserved {
-		assertBytes(path, legacy)
-	}
+	approve("setup", Request{Schema: 1, Mode: "apply", Selected: []string{}})
+	assertBytes(profile, personal)
 	for _, pattern := range []string{"lock", ".prepare.*"} {
 		paths, err := filepath.Glob(filepath.Join(cache, pattern))
 		if err != nil || len(paths) != 0 {
@@ -220,7 +182,7 @@ func TestNativePOSIXPublicBootstrapMigrationSetupLifecycle(t *testing.T) {
 	if err != nil || info.Mode().Perm() != 0700 || hashFile(binary) != executableDigest {
 		t.Fatal("warm public launches changed cache privacy or executable identity", err)
 	}
-	t.Log("public setup/migrate cold and warm lifecycle passed: real pinned Go; exact executable SHA-256 approval; migration backups; setup apply/update/check; personal restoration; requested caller umask 0027 and private cache")
+	t.Log("public setup cold and warm lifecycle passed: real pinned Go; exact executable SHA-256 approval; setup apply/update/check/removal; personal restoration; requested caller umask 0027 and private cache")
 }
 
 // Go module contents are read-only. Let the executing, pinned host Go remove

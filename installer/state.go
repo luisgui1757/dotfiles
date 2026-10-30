@@ -9,14 +9,9 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"slices"
 )
 
 var operationID = regexp.MustCompile(`^[0-9a-f]{64}$`)
-
-// retiredCapabilities maps a capability that a later release merged into
-// another one to its successor. A saved selection keeps the same tools.
-var retiredCapabilities = map[string]string{"sentinel-skills": "sentinel"}
 
 type Transaction struct {
 	Plan     Plan              `json:"plan"`
@@ -84,18 +79,6 @@ func LoadState(path, target string) (State, error) {
 	}
 	if state.Receipts == nil {
 		state.Receipts = map[string]Receipt{}
-	}
-	if slices.ContainsFunc(state.Selected, func(id string) bool { return retiredCapabilities[id] != "" }) {
-		selected := []string{}
-		for _, id := range state.Selected {
-			if successor := retiredCapabilities[id]; successor != "" {
-				id = successor
-			}
-			if !slices.Contains(selected, id) {
-				selected = append(selected, id)
-			}
-		}
-		state.Selected = selected
 	}
 	for id, receipt := range state.Receipts {
 		if !resourceID.MatchString(id) {

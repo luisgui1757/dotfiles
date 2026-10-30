@@ -5,7 +5,6 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"testing"
 )
@@ -113,110 +112,6 @@ func TestVSCodeManagedUpdatesPreservePersonalSetting(t *testing.T) {
 	}
 }
 
-func TestVSCodeUpdatePolicyHandsOverOldSettingsReceipt(t *testing.T) {
-	for _, fixture := range []struct {
-		name, personal string
-		changed        bool
-	}{
-		{"unchanged", "", false}, {"edited", "", true},
-		{"adopted-theme", `"workbench.colorTheme":"My original theme",`, false},
-		{"personal-update", `"update.mode":"manual",`, false},
-	} {
-		t.Run(fixture.name, func(t *testing.T) {
-			changed := fixture.changed
-			c, d, path := vscodeSettingsController(t)
-			c.Catalog.Resources[0].Requires = []string{"integration.vscode"}
-			c.Catalog.Resources[1].ID = "integration.vscode"
-			original := "// original personal settings\n{" + fixture.personal + "\"editor.fontSize\":17}\n"
-			writeConfigFixture(t, path, original)
-			if err := os.Chmod(path, 0640); err != nil {
-				t.Fatal(err)
-			}
-			// Windows exposes its native writable/read-only mode, not POSIX 0640.
-			// Preserve the actual original contents and native mode on every OS.
-			baseline, err := snapshotConfig(path)
-			if err != nil {
-				t.Fatal(err)
-			}
-			oldRequest := Request{Schema: 1, Mode: "apply", Selected: []string{"test"}}
-			if fixture.name == "adopted-theme" {
-				oldRequest.Adopt = []string{"integration.vscode"}
-			}
-			dispatchApproved(t, c, oldRequest)
-			old, err := os.ReadFile(path)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if changed {
-				old = bytes.ReplaceAll(old, []byte("Rosé Pine"), []byte("Personal theme"))
-				writeConfigFixture(t, path, string(old))
-			}
-			c.Catalog.Resources[0].Requires = []string{vscodeSettingsResource}
-			c.Catalog.Resources[1].ReplacedBy = vscodeSettingsResource
-			c.Catalog.Resources = append(c.Catalog.Resources, Resource{ID: vscodeSettingsResource, Name: "Managed settings", Action: "profile", Scope: "user"})
-			c.Driver = &NativeDriver{Catalog: c.Catalog, Context: c.Context, Profiles: d, StatePath: c.StatePath}
-			request := Request{Schema: 1, Mode: "apply", Selected: []string{"test"}}
-			preview, err := c.Preview(context.Background(), request)
-			if err != nil || operation(t, preview, vscodeSettingsResource).Action != "pending" {
-				t.Fatal("successor can publish before old baseline restoration", preview, err)
-			}
-			if fixture.personal != "" && (!strings.Contains(operation(t, preview, vscodeSettingsResource).Reason, "Abandon") || !strings.Contains(operation(t, preview, vscodeSettingsResource).Reason, "Choose tools")) {
-				t.Fatal("handover guidance would strand a required new adoption", operation(t, preview, vscodeSettingsResource))
-			}
-			if changed {
-				if operation(t, preview, "integration.vscode").Action != "retain" {
-					t.Fatal("changed settings did not require restoration approval", preview)
-				}
-				request.RemoveShared = []string{"integration.vscode"}
-			}
-			_, result, err := executeApproved(t, c, request)
-			if err != nil || result.Status != "needs-action" {
-				t.Fatal(result, err)
-			}
-			data, err := os.ReadFile(path)
-			if err != nil || string(data) != original {
-				t.Fatal("old baseline was not restored before handover", string(data), err)
-			}
-			if fixture.personal == "" {
-				dispatchApproved(t, c, Request{Schema: 1, Mode: "apply", Retry: true})
-			} else {
-				_, resumed, err := executeApproved(t, c, Request{Schema: 1, Mode: "apply", Retry: true})
-				if err != nil || resumed.Status != "needs-action" {
-					t.Fatal("resume silently approved new personal settings", resumed, err)
-				}
-				dispatchApproved(t, c, Request{Schema: 1, Mode: "abandon"})
-				dispatchApproved(t, c, Request{Schema: 1, Mode: "apply", Selected: []string{"test"}, Adopt: []string{vscodeSettingsResource}})
-			}
-			data, err = os.ReadFile(path)
-			if err != nil || !bytes.Contains(data, []byte(`"update.mode":"none"`)) || !bytes.Contains(data, []byte(`"workbench.colorTheme":"Rosé Pine"`)) {
-				t.Fatal("new single owner did not install both settings", string(data), err)
-			}
-			dispatchApproved(t, c, Request{Schema: 1, Mode: "apply", Selected: []string{}})
-			data, err = os.ReadFile(path)
-			snapshotErr := verifyConfigSnapshot(path, baseline)
-			if err != nil || string(data) != original || snapshotErr != nil {
-				t.Fatalf("handover lost original settings or native mode: got %q, want %q; read: %v; snapshot: %v", data, original, err, snapshotErr)
-			}
-			{
-				state, err := LoadState(c.StatePath, c.Home)
-				if err != nil {
-					t.Fatal(err)
-				}
-				preserved := false
-				for _, saved := range state.Receipts["integration.vscode"].After.Preserved {
-					b, err := os.ReadFile(saved)
-					if err == nil && bytes.Equal(b, old) {
-						preserved = true
-					}
-				}
-				if !preserved {
-					t.Fatal("changed legacy settings were not preserved separately")
-				}
-			}
-		})
-	}
-}
-
 func TestJSONCFieldRemovalPreservesAdjacentComments(t *testing.T) {
 	for _, original := range []string{
 		`{/*before*/"theme":"old"/*after*/,/*next*/"keep":1,/*tail*/}`,
@@ -260,46 +155,5 @@ func TestVSCodeSettingsUseIndependentlyObservedFolders(t *testing.T) {
 		if d.Targets[vscodeSettingsResource][0].Path != want {
 			t.Fatal(target, d.Targets)
 		}
-	}
-}
-
-// These six fields are the persisted identity in the approved d9a3993 build.
-// Pin the historical contract independently of the current settings recipe.
-func TestVSCodeLegacySettingsFieldsRemainCompatible(t *testing.T) {
-	_, d, _ := vscodeSettingsController(t)
-	expected := []string{"workbench.colorTheme", "workbench.preferredDarkColorTheme", "workbench.preferredLightColorTheme", "window.autoDetectColorScheme", "editor.fontFamily", "terminal.integrated.fontFamily"}
-	if !slices.Equal(d.JSONFields["integration.vscode"], expected) {
-		t.Fatal("historical profile field identity changed", d.JSONFields["integration.vscode"])
-	}
-}
-
-func TestVSCodeHandoverMissingEvidencePreservesPersonalSettings(t *testing.T) {
-	c, d, path := vscodeSettingsController(t)
-	c.Catalog.Resources[0].Requires = []string{"integration.vscode"}
-	c.Catalog.Resources[1].ID = "integration.vscode"
-	dispatchApproved(t, c, Request{Schema: 1, Mode: "apply", Selected: []string{"test"}})
-	state, err := LoadState(c.StatePath, c.Home)
-	if err != nil {
-		t.Fatal(err)
-	}
-	before, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	journal := d.journalPath(state.Receipts["integration.vscode"].OperationID)
-	if err := os.Rename(journal, journal+".offline"); err != nil {
-		t.Fatal(err)
-	}
-	c.Catalog.Resources[0].Requires = []string{vscodeSettingsResource}
-	c.Catalog.Resources[1].ReplacedBy = vscodeSettingsResource
-	c.Catalog.Resources = append(c.Catalog.Resources, Resource{ID: vscodeSettingsResource, Name: "Settings", Action: "profile", Scope: "user"})
-	c.Driver = &NativeDriver{Catalog: c.Catalog, Context: c.Context, Profiles: d, StatePath: c.StatePath}
-	plan, result, err := executeApproved(t, c, Request{Schema: 1, Mode: "apply", Selected: []string{"test"}})
-	if err != nil || result.Status != "needs-action" || !strings.Contains(operation(t, plan, "integration.vscode").Reason, "evidence is missing") || !strings.Contains(operation(t, plan, vscodeSettingsResource).Reason, "recovery evidence") {
-		t.Fatal("missing evidence did not fail closed with useful guidance", plan, result, err)
-	}
-	after, err := os.ReadFile(path)
-	if err != nil || !bytes.Equal(before, after) {
-		t.Fatal("missing evidence authorized a profile mutation", err)
 	}
 }

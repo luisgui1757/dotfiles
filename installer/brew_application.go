@@ -382,7 +382,7 @@ func (d *BrewDriver) checkCaskMutation(ctx context.Context, intent brewIntent, s
 	if _, err := os.Lstat(s.Binary); !errors.Is(err, os.ErrNotExist) {
 		return errors.Join(errors.New("preserve the existing native app command"), err)
 	}
-	output, err := d.Query(ctx, false, "/usr/bin/osascript", nil, "-l", "JavaScript", "-e", legacyMacApplicationScript, s.Bundle)
+	output, err := d.Query(ctx, false, "/usr/bin/osascript", nil, "-l", "JavaScript", "-e", macApplicationScript, s.Bundle)
 	if err != nil {
 		return err
 	}
@@ -413,3 +413,18 @@ func (d *BrewDriver) checkCaskMutation(ctx context.Context, intent brewIntent, s
 	}
 	return validateCaskMetadata(doc.Casks[0], s, intent.Package, false)
 }
+
+// Homebrew's own running-application test, with static JXA source. The bundle
+// identifier is data in argv; an application LaunchServices cannot resolve is
+// not running.
+const macApplicationScript = `'use strict';
+ObjC.import('AppKit')
+function run(argv) {
+	const applications = $.NSWorkspace.sharedWorkspace.runningApplications
+	for (let i = 0; i < applications.count; i++) {
+		if (ObjC.unwrap(applications.objectAtIndex(i).bundleIdentifier) === argv[0]) {
+			return 'running'
+		}
+	}
+	return 'not-running'
+}`

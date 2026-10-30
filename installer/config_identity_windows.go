@@ -14,3 +14,8 @@ func configDirectoryIdentity(file *os.File) (string, error) {
 	}
 	return fmt.Sprintf("%d:%d:%d", info.VolumeSerialNumber, info.FileIndexHigh, info.FileIndexLow), nil
 }
+
+// Windows has no POSIX file ownership.
+func fileOwner(path string) (uint32, uint32, uint32, error) {
+	return 0, 0, 0, fmt.Errorf("POSIX ownership is unavailable for %s on Windows", path)
+}

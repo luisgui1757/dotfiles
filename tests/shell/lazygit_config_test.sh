@@ -11,8 +11,7 @@ root = pathlib.Path(sys.argv[1])
 config = root / 'lazygit/config.yml'
 content = '\n'.join(line for line in config.read_text().splitlines() if not line.lstrip().startswith('#'))
 assert json.loads(content) == {}, 'LazyGit must retain upstream defaults on every OS'
-# A passive released Windows source can remain for existing live links.
-# The active target manifest, below, must still select upstream defaults.
+# The active target manifest must select upstream defaults.
 targets = json.loads((root / 'installer/config-targets.json').read_text())['targets']
 lazygit = [target for target in targets if target['resource'] == 'config.lazygit']
 assert {p for target in lazygit for p in target['platforms']} == {'darwin', 'linux', 'windows'}

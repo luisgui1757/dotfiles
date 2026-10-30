@@ -59,11 +59,7 @@ check_absent "no Invoke-Expression/iex in PowerShell profiles (cached dot-source
     "Invoke-Expression|(^|[^[:alnum:]_])iex([^[:alnum:]_]|\$)" \
     installer/shells/*.ps1
 
-# Released overlay destinations and passive source bytes are independently
-# locked by legacy_inventory_test.py and checkout_test.go.
-
-# Only the active configuration carries current terminal behavior. Released
-# home/dot_tmux.conf remains exact migration evidence, checked by the inventory test.
+# Only the active configuration carries current terminal behavior.
 if ! grep -Fx "set -as terminal-features ',*:extkeys'" tmux/tmux.conf >/dev/null; then
     echo "FAIL: tmux/tmux.conf must keep extended-key terminal-features on macOS/Linux"
     fail=1
@@ -241,8 +237,7 @@ fi
 # errors. Save-as-UTF-8-BOM would also work, but ASCII is simpler.
 ps1_files=()
 while IFS= read -r f; do ps1_files+=("$f"); done < <(
-    find . -type f -name '*.ps1' -not -path './.git/*' -not -path './tests/.cache/*' -not -path './home/*'
-    find ./home/.chezmoitemplates -type f -name '*.ps1' 2>/dev/null
+    find . -type f -name '*.ps1' -not -path './.git/*' -not -path './tests/.cache/*'
 )
 find_non_ascii_ps1() {
     [[ "$#" -gt 0 ]] || return 0

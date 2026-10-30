@@ -9,6 +9,6 @@ import (
 	"os"
 )
 
-func readDMGArchive(context.Context, *os.File, string, int, func(io.Reader) error) error {
+func readDMGArchive(context.Context, *os.File, string, func(io.Reader) error) error {
 	return errors.New("disk-image application extraction requires macOS")
 }

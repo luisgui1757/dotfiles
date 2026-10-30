@@ -137,21 +137,3 @@ func TestWindowsGitDiscoveryReportsEveryCause(t *testing.T) {
 		}
 	}
 }
-
-func TestWindowsMigrationHasOneGitTargetAcrossPathCasing(t *testing.T) {
-	home := t.TempDir()
-	folders := ConfigFolders{Home: home, Config: filepath.Join(home, ".config"), Documents: filepath.Join(home, "Documents"), GitConfig: filepath.Join(strings.ToUpper(home), ".config", "git", "config")}
-	m, err := NewLegacyMigration(home, "fixture", filepath.Join(home, "state"), Context{OS: "windows", Arch: "amd64"}, folders)
-	if err != nil {
-		t.Fatal(err)
-	}
-	owners := 0
-	for _, profile := range m.driver.profiles {
-		if strings.EqualFold(m.driver.destination(profile), folders.GitConfig) {
-			owners++
-		}
-	}
-	if owners != 1 {
-		t.Fatal("path casing created multiple migration owners for the same Git file", owners)
-	}
-}
