@@ -16,4 +16,5 @@ fi
 export DOTFILES_SHELL_FIXTURES
 export ACTIVE_ZSH="$DOTFILES_SHELL_FIXTURES/posix/state/shells/init.sh"
 export ACTIVE_ZSH_CORE="$DOTFILES_SHELL_FIXTURES/zsh/state/shells/init.sh"
-[[ -s "$ACTIVE_ZSH" && -s "$ACTIVE_ZSH_CORE" ]] || { echo 'FAIL: active shell generation is incomplete' >&2; exit 1; }
+export ACTIVE_ZSH_ATUIN="$DOTFILES_SHELL_FIXTURES/atuin/state/shells/init.sh"
+[[ -s "$ACTIVE_ZSH" && -s "$ACTIVE_ZSH_CORE" && -s "$ACTIVE_ZSH_ATUIN" ]] || { echo 'FAIL: active shell generation is incomplete' >&2; exit 1; }

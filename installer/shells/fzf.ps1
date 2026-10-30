@@ -1,3 +1,10 @@
+# ---- Rose Pine colors for fzf -------------------------------------------------
+# A value that was set before stays after the colors, so it wins. The check
+# keeps a second profile load from adding the colors again.
+if (-not "$env:FZF_DEFAULT_OPTS".Contains($script:RosePineFzfColors)) {
+    $env:FZF_DEFAULT_OPTS = ($script:RosePineFzfColors + ' ' + $env:FZF_DEFAULT_OPTS).TrimEnd()
+}
+
 # ---- PSFzf: fuzzy history / file / directory pickers -------------------------
 # Unifies the shell fuzzy UX on fzf (the same tool the zsh side uses), wired
 # only when BOTH the PSFzf module and the fzf binary are present so a machine

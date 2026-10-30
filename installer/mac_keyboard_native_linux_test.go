@@ -30,7 +30,7 @@ var linuxKeyCodes = map[string]uint16{
 	"LeftAlt": 56, "Space": 57, "F1": 59, "F2": 60, "F3": 61, "F4": 62, "F5": 63, "F6": 64, "F7": 65, "F8": 66, "F9": 67,
 	"F10": 68, "102nd": 86, "F11": 87, "F12": 88, "RightCtrl": 97, "SysRq": 99, "RightAlt": 100, "Home": 102, "Up": 103,
 	"PageUp": 104, "Left": 105, "Right": 106, "End": 107, "Down": 108, "PageDown": 109, "Insert": 110, "Delete": 111,
-	"LeftMeta": 125, "RightMeta": 126,
+	"LeftMeta": 125, "RightMeta": 126, "F24": 194,
 }
 
 var linuxModifiers = map[uint16]string{29: "Ctrl", 97: "Ctrl", 42: "Shift", 54: "Shift", 56: "Alt", 100: "Alt", 125: "Super", 126: "Super"}
@@ -45,9 +45,12 @@ func linuxKeyName(code uint16) string {
 }
 
 // The physical keys of a Mac-layout keyboard in its Linux mode.
-var macPhysical = map[string]string{"cmd": "LeftAlt", "opt": "LeftMeta", "ctrl": "LeftCtrl", "shift": "LeftShift"}
+var macPhysical = map[string]string{"cmd": "LeftAlt", "opt": "LeftMeta", "ropt": "RightMeta", "ctrl": "LeftCtrl", "shift": "LeftShift"}
 
-type uinputKeyboard struct{ file *os.File }
+type uinputKeyboard struct {
+	file  *os.File
+	delay time.Duration
+}
 
 func newUinputKeyboard(t *testing.T, name string) *uinputKeyboard {
 	t.Helper()
@@ -78,7 +81,7 @@ func newUinputKeyboard(t *testing.T, name string) *uinputKeyboard {
 	if err := unix.IoctlSetInt(fd, uiDevCreate, 0); err != nil {
 		t.Fatal(err)
 	}
-	k := &uinputKeyboard{file: f}
+	k := &uinputKeyboard{file: f, delay: 15 * time.Millisecond}
 	t.Cleanup(func() { _ = unix.IoctlSetInt(fd, 0x5502, 0); _ = f.Close() })
 	return k
 }
@@ -93,7 +96,7 @@ func (k *uinputKeyboard) emit(t *testing.T, code uint16, value int32) {
 	if _, err := k.file.Write(event); err != nil {
 		t.Fatal(err)
 	}
-	time.Sleep(15 * time.Millisecond)
+	time.Sleep(k.delay)
 }
 
 // press holds the given physical keys in order, then releases them in reverse.
@@ -144,10 +147,23 @@ func outputEvents(t *testing.T, path string) <-chan evdevEvent {
 }
 
 // combos turns output key events into the shortcuts an application receives:
-// each non-modifier press with the modifiers then held, and bare Super taps.
+// each non-modifier press with the modifiers then held, and Super taps. A tap
+// names the modifiers held when Super went down: GNOME opens its overview only
+// for a bare tap:Super.
 func combos(events []evdevEvent) ([]string, map[uint16]bool) {
 	held, result := map[uint16]bool{}, []string{}
-	superAlone := false
+	names := func() []string {
+		names := []string{}
+		for _, name := range []string{"Ctrl", "Alt", "Shift", "Super"} {
+			for code := range held {
+				if linuxModifiers[code] == name && !slices.Contains(names, name) {
+					names = append(names, name)
+				}
+			}
+		}
+		return names
+	}
+	tap := ""
 	for _, e := range events {
 		if e.Type != 1 || e.Value == 2 {
 			continue
@@ -155,25 +171,20 @@ func combos(events []evdevEvent) ([]string, map[uint16]bool) {
 		modifier, isModifier := linuxModifiers[e.Code]
 		switch {
 		case isModifier && e.Value == 1:
+			tap = ""
+			if modifier == "Super" {
+				tap = "tap:" + strings.Join(append(names(), "Super"), "+")
+			}
 			held[e.Code] = true
-			superAlone = modifier == "Super"
 		case isModifier:
 			delete(held, e.Code)
-			if modifier == "Super" && superAlone {
-				result = append(result, "tap:Super")
+			if modifier == "Super" && tap != "" {
+				result = append(result, tap)
 			}
-			superAlone = false
+			tap = ""
 		case e.Value == 1:
-			superAlone = false
-			names := []string{}
-			for _, name := range []string{"Ctrl", "Alt", "Shift", "Super"} {
-				for code := range held {
-					if linuxModifiers[code] == name && !slices.Contains(names, name) {
-						names = append(names, name)
-					}
-				}
-			}
-			result = append(result, strings.Join(append(names, linuxKeyName(e.Code)), "+"))
+			tap = ""
+			result = append(result, strings.Join(append(names(), linuxKeyName(e.Code)), "+"))
 		}
 	}
 	return result, held
@@ -302,6 +313,7 @@ func TestNativeMacKeyboardLifecycle(t *testing.T) {
 	focus := map[string]string{}
 	for _, window := range []struct{ instance, class string }{
 		{"ghostty", "com.mitchellh.ghostty"}, {"Navigator", "zen"}, {"org.gnome.Nautilus", "org.gnome.Nautilus"}, {"gnome-text-editor", "org.gnome.TextEditor"},
+		{"gnome-terminal-server", "Gnome-terminal"}, {"obsidian", "obsidian"},
 	} {
 		xterm := exec.CommandContext(ctx, tools["xterm"], "-name", window.instance, "-class", window.class, "-e", "sleep", "900")
 		if err := xterm.Start(); err != nil {
@@ -321,6 +333,21 @@ func TestNativeMacKeyboardLifecycle(t *testing.T) {
 	}
 	focus[""] = string(match[1])
 
+	// The kernel console also reads the remapper's output: Alt+F1...F12 change
+	// the virtual terminal and Ctrl+Alt+Delete restarts the machine. Turn its
+	// keyboard off during the test, as a display server does.
+	if console, err := os.OpenFile("/dev/tty0", os.O_RDWR, 0); err == nil {
+		const kdgkbmode, kdskbmode, keyboardOff = 0x4B44, 0x4B45, 0x04
+		fd := int(console.Fd())
+		mode, err := unix.IoctlGetInt(fd, kdgkbmode)
+		if err == nil {
+			err = unix.IoctlSetInt(fd, kdskbmode, keyboardOff)
+		}
+		if err != nil {
+			t.Fatal("cannot turn off the console keyboard", err)
+		}
+		t.Cleanup(func() { _ = unix.IoctlSetInt(fd, kdskbmode, mode); _ = console.Close() })
+	}
 	keyboard := newUinputKeyboard(t, "dotfiles-test-keyboard")
 	linuxInputEventNode(t, regexp.MustCompile(`^dotfiles-test-keyboard$`), 10*time.Second)
 	// Start xremap exactly as the login session does.
@@ -330,8 +357,16 @@ func TestNativeMacKeyboardLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// A stand-in for Resources, the Ubuntu app that Cmd+Option+Esc opens.
+	apps := t.TempDir()
+	forceQuit := filepath.Join(apps, "force-quit")
+	if err := os.WriteFile(filepath.Join(apps, "resources"), []byte("#!/bin/sh\necho opened >> '"+forceQuit+"'\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	launch := exec.CommandContext(ctx, tools["gio"], "launch", autostart)
-	launch.Env = append(slices.DeleteFunc(os.Environ(), func(v string) bool { return strings.HasPrefix(v, "XDG_SESSION_TYPE=") }), "XDG_SESSION_TYPE=x11")
+	launch.Env = append(slices.DeleteFunc(os.Environ(), func(v string) bool {
+		return strings.HasPrefix(v, "XDG_SESSION_TYPE=") || strings.HasPrefix(v, "PATH=")
+	}), "XDG_SESSION_TYPE=x11", "PATH="+apps+":"+os.Getenv("PATH"))
 	launch.Stdout, launch.Stderr = log, log
 	launchErr := launch.Run()
 	t.Cleanup(func() {
@@ -390,12 +425,26 @@ func TestNativeMacKeyboardLifecycle(t *testing.T) {
 	check(editor, k("opt", "C"), "Alt+C")
 	check(editor, k("cmd", "Space"), "tap:Super")
 	check(editor, k("ctrl", "Up"), "tap:Super")
+	check(editor, k("ctrl", "Down"), "tap:Super")
+	check(terminal, k("ctrl", "Down"), "tap:Super")
+	check(editor, k("ctrl", "cmd", "Space"), "Super+Dot")
 	check(editor, k("ctrl", "Left"), "Super+PageUp")
 	check(editor, k("cmd", "shift", "3"), "Shift+SysRq")
 	check(editor, k("cmd", "shift", "4"), "SysRq")
 	check(editor, k("ctrl", "cmd", "Q"), "Super+L")
 	check(editor, k("cmd", "H"), "Super+H")
-	// Holding Cmd keeps Alt held across Tabs, so GNOME's switcher stays open.
+	check(editor, k("ctrl", "cmd", "F"), "F11")
+	// Option+Space is a space, not the GNOME window menu (Alt+Space).
+	check(editor, k("opt", "Space"), "Space")
+	check(terminal, k("opt", "Space"), "Space")
+	// The right Option key is Option too. As Super, a tap would open the
+	// overview and Right Option+L would lock the screen.
+	check(editor, k("ropt"))
+	check(editor, k("ropt", "L"), "Alt+L")
+	check(editor, k("ropt", "Left"), "Ctrl+Left")
+	check(terminal, k("ropt", "C"), "Alt+C")
+	// Holding Cmd keeps Super held across Tabs, so GNOME's application
+	// switcher (Super+Tab, also in Ubuntu) stays open.
 	cmd, tab := linuxKeyCodes["LeftAlt"], linuxKeyCodes["Tab"]
 	var held []evdevEvent
 	switching := drive(editor, "cmd+tab+tab", func() {
@@ -407,19 +456,36 @@ func TestNativeMacKeyboardLifecycle(t *testing.T) {
 		held = drain(events, 300*time.Millisecond)
 		keyboard.emit(t, cmd, 0)
 	})
-	if pressed, _ := combos(held); !slices.Equal(pressed, []string{"Alt+Tab", "Alt+Tab"}) || len(switching) != 0 {
-		t.Errorf("Cmd+Tab+Tab produced %q then %q, want Alt held across two Tabs", pressed, switching)
+	if pressed, _ := combos(held); !slices.Equal(pressed, []string{"Super+Tab", "Super+Tab"}) || len(switching) != 0 {
+		t.Errorf("Cmd+Tab+Tab produced %q then %q, want Super held across two Tabs", pressed, switching)
 	}
 	for _, e := range held {
-		if e.Type == 1 && e.Code == linuxKeyCodes["LeftAlt"] && e.Value == 0 {
-			t.Error("Alt was released while Cmd was still held")
+		if e.Type == 1 && e.Code == linuxKeyCodes["LeftMeta"] && e.Value == 0 {
+			t.Error("Super was released while Cmd was still held")
 		}
 	}
 	check(editor, k("C"), "C")
 	check(browser, k("cmd", "LeftBrace"), "Alt+Left")
 	check(browser, k("cmd", "opt", "Up"), "Ctrl+PageUp")
 	check(browser, k("cmd", "T"), "Ctrl+T")
+	check(browser, k("cmd", "opt", "I"), "Ctrl+Shift+I")
+	// Browsers: the Ctrl text keys of a Mac text field. Ctrl+Tab and the
+	// Ctrl+Option chords stay. Other apps keep Linux Ctrl.
+	check(browser, k("ctrl", "A"), "Home")
+	check(browser, k("ctrl", "E"), "End")
+	check(browser, k("ctrl", "K"), "Shift+End", "Delete")
+	check(browser, k("ctrl", "N"), "Down")
+	check(browser, k("ctrl", "Tab"), "Ctrl+Tab")
+	check(browser, k("ctrl", "opt", "F"), "Ctrl+Alt+F")
+	check(editor, k("ctrl", "A"), "Ctrl+A")
+	check("obsidian", k("ctrl", "A"), "Home")
+	check("obsidian", k("ctrl", "K"), "Shift+End", "Delete")
+	check("obsidian", k("cmd", "A"), "Ctrl+A")
 	check(files, k("cmd", "Backspace"), "Delete")
+	check(files, k("cmd", "opt", "Backspace"), "Shift+Delete")
+	check(files, k("cmd", "Up"), "Alt+Up")
+	check(files, k("cmd", "LeftBrace"), "Alt+Left")
+	check(files, k("cmd", "shift", "Dot"), "Ctrl+H")
 	// Terminals: Cmd is the terminal's own shortcut; Option is Meta.
 	check(terminal, k("cmd", "C"), "Ctrl+Shift+C")
 	check(terminal, k("cmd", "V"), "Ctrl+Shift+V")
@@ -430,6 +496,25 @@ func TestNativeMacKeyboardLifecycle(t *testing.T) {
 	check(terminal, k("cmd", "K"), "Ctrl+L")
 	check(terminal, k("cmd", "3"), "Alt+3")
 	check(terminal, k("cmd", "shift", "RightBrace"), "Ctrl+PageDown")
+	// Ghostty's Mac keys for splits, prompts, scrolling and full screen.
+	check(terminal, k("cmd", "W"), "Ctrl+Super+W")
+	check(terminal, k("cmd", "opt", "W"), "Ctrl+Shift+W")
+	check(terminal, k("cmd", "shift", "W"), "Alt+F4")
+	check(terminal, k("cmd", "LeftBrace"), "Ctrl+Super+LeftBrace")
+	check(terminal, k("cmd", "opt", "Left"), "Ctrl+Alt+Super+Left")
+	check(terminal, k("ctrl", "cmd", "Left"), "Ctrl+Shift+Super+Left")
+	check(terminal, k("cmd", "Up"), "Ctrl+Shift+PageUp")
+	check(terminal, k("cmd", "Home"), "Shift+Home")
+	check(terminal, k("ctrl", "cmd", "F"), "Ctrl+Enter")
+	// Another terminal does not have these Ghostty keybindings. It would get
+	// Ctrl+Super+W as ^W and Ctrl+Enter as Return, so it keeps safe keys.
+	otherTerminal := "Gnome-terminal"
+	check(otherTerminal, k("cmd", "W"), "Ctrl+Shift+W")
+	check(otherTerminal, k("ctrl", "cmd", "F"), "F11")
+	check(otherTerminal, k("cmd", "Enter"))
+	check(otherTerminal, k("cmd", "D"))
+	check(otherTerminal, k("cmd", "LeftBrace"))
+	check(otherTerminal, k("cmd", "Up"))
 	check(terminal, k("cmd", "Z"))
 	check(terminal, k("opt", "C"), "Alt+C")
 	check(terminal, k("opt", "Left"), "Alt+Left")
@@ -451,15 +536,41 @@ func TestNativeMacKeyboardLifecycle(t *testing.T) {
 	}
 	check(terminal, k("cmd", "1"), "Alt+1")
 	check(editor, k("cmd", "1"), "Ctrl+1")
+	// GNOME keys that do nothing on a Mac do nothing: no closed window, text
+	// console, terminal, log out dialog or workspace change.
+	for _, window := range []string{editor, terminal} {
+		check(window, k("opt", "F4"))
+		check(window, k("opt", "Esc"))
+		check(window, k("ctrl", "opt", "F3"))
+		check(window, k("cmd", "opt", "F3"))
+		check(window, k("ctrl", "opt", "T"))
+		check(window, k("ctrl", "opt", "Delete"))
+		check(window, k("ctrl", "opt", "Left"))
+		check(window, k("ctrl", "shift", "opt", "R"))
+	}
+	// Cmd+Option+Esc opens the app that ends other apps, like Force Quit.
+	check(editor, k("cmd", "opt", "Esc"))
+	for deadline := time.Now().Add(10 * time.Second); ; time.Sleep(100 * time.Millisecond) {
+		if data, _ := os.ReadFile(forceQuit); string(data) == "opened\n" {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Error("Cmd+Option+Esc did not open Resources")
+			break
+		}
+	}
 	// An unidentified window keeps plain Linux keys.
 	check("", k("cmd", "C"), "Alt+C")
 	check("", k("opt", "C"), "Super+C")
+	check("", k("ropt", "C"), "Super+C")
 	check("", k("opt", "1"), "Super+1")
 	check("", k("opt", "shift", "1"), "Shift+Super+1")
 	check("", k("ctrl", "opt", "L"), "Ctrl+Super+L")
 
 	// No Cmd combination may reach a terminal as a bare control character.
-	allowed := []string{"Ctrl+A", "Ctrl+E", "Ctrl+U", "Ctrl+L", "Ctrl+Enter", "Ctrl+Comma", "Ctrl+Equal", "Ctrl+Minus", "Ctrl+0", "Ctrl+PageUp", "Ctrl+PageDown"}
+	// Ctrl+Super chords are Ghostty keybindings.
+	allowed := []string{"Ctrl+A", "Ctrl+E", "Ctrl+U", "Ctrl+L", "Ctrl+Enter", "Ctrl+Comma", "Ctrl+Equal", "Ctrl+Minus", "Ctrl+0", "Ctrl+PageUp", "Ctrl+PageDown",
+		"Ctrl+Super+W", "Ctrl+Super+LeftBrace", "Ctrl+Super+RightBrace"}
 	sweep := []string{"Esc", "Minus", "Equal", "Backspace", "Tab", "LeftBrace", "RightBrace", "Enter", "Semicolon", "Apostrophe", "Grave", "Backslash",
 		"Comma", "Dot", "Slash", "Space", "102nd", "Home", "Up", "PageUp", "Left", "Right", "End", "Down", "PageDown", "Insert", "Delete"}
 	for _, key := range "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789" {
@@ -477,6 +588,104 @@ func TestNativeMacKeyboardLifecycle(t *testing.T) {
 			}
 		}
 	}
+
+	// No Mac chord may reach a GNOME shortcut that the chord does not mean on
+	// the Mac. These are the Ubuntu 26.04 defaults of GNOME 50, its dock and
+	// tiling extensions, and the IBus emoji keys, as combos() names them.
+	gnome := map[string]bool{"tap:Super": true}
+	for _, binding := range strings.Fields(`Alt+Space Alt+F2 Alt+F4 Alt+F5 Alt+F6 Alt+Shift+F6 Alt+F7 Alt+F8 Alt+F10
+		Alt+Esc Alt+Shift+Esc Alt+Tab Alt+Shift+Tab Alt+Grave Alt+Shift+Grave Alt+SysRq SysRq Shift+SysRq
+		Ctrl+Alt+Esc Ctrl+Alt+Shift+Esc Ctrl+Alt+Tab Ctrl+Alt+Shift+Tab Ctrl+Alt+Delete Ctrl+Alt+T Ctrl+Alt+D Ctrl+Alt+Shift+R
+		Ctrl+Alt+Up Ctrl+Alt+Down Ctrl+Alt+Left Ctrl+Alt+Right Ctrl+Alt+Shift+Up Ctrl+Alt+Shift+Down Ctrl+Alt+Shift+Left Ctrl+Alt+Shift+Right
+		Super+Tab Shift+Super+Tab Super+Grave Shift+Super+Grave Super+Space Shift+Super+Space Super+Esc Shift+Super+Esc
+		Super+A Super+D Super+H Super+L Super+M Super+N Super+O Super+P Super+Q Super+S Super+V Super+F1 Super+Dot Super+Semicolon
+		Ctrl+Super+D Ctrl+Super+0 Alt+Super+8 Alt+Super+Equal Alt+Super+Minus Alt+Super+S
+		Super+Up Super+Down Super+Left Super+Right Super+Home Super+End Super+PageUp Super+PageDown
+		Shift+Super+Up Shift+Super+Down Shift+Super+Left Shift+Super+Right Shift+Super+Home Shift+Super+End Shift+Super+PageUp Shift+Super+PageDown
+		Alt+Super+Up Alt+Super+Down Alt+Super+Left Alt+Super+Right Alt+Shift+Super+Left Alt+Shift+Super+Right`) {
+		gnome[binding] = true
+	}
+	intended := map[string]string{
+		"cmd+Tab": "Super+Tab", "cmd+shift+Tab": "Shift+Super+Tab", "cmd+Grave": "Super+Grave", "cmd+shift+Grave": "Shift+Super+Grave",
+		"cmd+Space": "tap:Super", "ctrl+Up": "tap:Super", "ctrl+Down": "tap:Super", "ctrl+Left": "Super+PageUp", "ctrl+Right": "Super+PageDown",
+		"cmd+H": "Super+H", "cmd+M": "Super+H", "ctrl+cmd+Q": "Super+L", "ctrl+cmd+Space": "Super+Dot",
+		"cmd+shift+3": "Shift+SysRq", "cmd+shift+4": "SysRq", "cmd+shift+5": "SysRq", "cmd+shift+W": "Alt+F4",
+		"ctrl+opt+L": "Alt+Esc", "ctrl+opt+H": "Alt+Shift+Esc", "opt+Tab": "Alt+Tab", "opt+shift+Tab": "Alt+Shift+Tab",
+	}
+	for i := 1; i <= 12; i++ {
+		gnome[fmt.Sprintf("Ctrl+Alt+F%d", i)] = true
+	}
+	for i := 1; i <= 9; i++ {
+		for _, binding := range []string{"Super+%d", "Shift+Super+%d", "Ctrl+Super+%d"} {
+			gnome[fmt.Sprintf(binding, i)] = true
+		}
+		intended[fmt.Sprintf("opt+%d", i)] = fmt.Sprintf("Super+%d", i)
+		intended[fmt.Sprintf("opt+shift+%d", i)] = fmt.Sprintf("Shift+Super+%d", i)
+	}
+	chords := [][]string{}
+	for set := 1; set < 16; set++ {
+		modifiers := []string{}
+		for bit, name := range []string{"ctrl", "opt", "cmd", "shift"} {
+			if set&(1<<bit) != 0 {
+				modifiers = append(modifiers, name)
+			}
+		}
+		if set == 8 {
+			continue // Shift alone
+		}
+		for _, key := range sweep {
+			chords = append(chords, append(slices.Clone(modifiers), key))
+		}
+	}
+	// The right Option key gets the same chords as the left one.
+	for _, keys := range slices.Clone(chords) {
+		if i := slices.Index(keys, "opt"); i >= 0 {
+			right := slices.Clone(keys)
+			right[i] = "ropt"
+			chords = append(chords, right)
+		}
+	}
+	// Each chord ends at a pass-through key, so no quiet period is needed.
+	sentinel := linuxKeyCodes["F24"]
+	keyboard.delay = 2 * time.Millisecond
+	for _, window := range []string{editor, browser, files, terminal, otherTerminal} {
+		if output, err := exec.CommandContext(ctx, tools["xdotool"], "windowfocus", "--sync", focus[window]).CombinedOutput(); err != nil {
+			t.Fatal("cannot focus", window, err, nativeDiagnostic(output))
+		}
+		drain(events, 100*time.Millisecond)
+		for _, keys := range chords {
+			keyboard.press(t, keys...)
+			keyboard.emit(t, sentinel, 1)
+			keyboard.emit(t, sentinel, 0)
+			got := []evdevEvent{}
+			for done := false; !done; {
+				select {
+				case e, ok := <-events:
+					if !ok {
+						t.Fatal("the remapper closed its keyboard")
+					}
+					if e.Type == 1 && e.Code == sentinel {
+						done = e.Value == 0
+					} else {
+						got = append(got, e)
+					}
+				case <-time.After(5 * time.Second):
+					t.Fatal(window, keys, "did not reach the sentinel key")
+				}
+			}
+			chord := strings.Join(keys, "+")
+			combos, held := combos(got)
+			if len(held) != 0 {
+				t.Errorf("%s %s left keys held: %v", window, chord, held)
+			}
+			for _, combo := range combos {
+				if gnome[combo] && intended[strings.Replace(chord, "ropt", "opt", 1)] != combo {
+					t.Errorf("%s: %s reaches the GNOME shortcut %s", window, chord, combo)
+				}
+			}
+		}
+	}
+	keyboard.delay = 15 * time.Millisecond
 	if t.Failed() {
 		return
 	}

@@ -119,7 +119,7 @@ selects the rest. Children remain independently selectable. `a` selects all,
 | Category | Tools (where supported) |
 |---|---|
 | Editors | Neovim, VS Code |
-| Shell essentials | zsh on macOS/Linux or PowerShell 7 on Windows; zsh from bash terminals; Starship, lsd, zoxide, fzf, ripgrep, fd |
+| Shell essentials | zsh on macOS/Linux or PowerShell 7 on Windows; zsh from bash terminals; Starship, lsd, zoxide, fzf, ripgrep, fd, Atuin, superfile |
 | Version control | Git, lazygit, GitHub CLI, gh-dash |
 | Terminal apps | Ghostty, Windows Terminal |
 | Terminal sessions | tmux, Herdr |
@@ -147,6 +147,8 @@ required dependencies are still resolved automatically in the preview.
 | fzf | ✓ | ✓ | ✓ |
 | ripgrep | ✓ | ✓ | ✓ |
 | fd | ✓ | ✓ | ✓ |
+| Atuin | ✓ | ✓ | ✓ |
+| superfile | ✓ | ✓ | ✓ |
 | tmux | ✓ | ✓ | — |
 | Ghostty | ✓ | ✓ | — |
 | Windows Terminal | — | — | ✓ |
@@ -454,6 +456,8 @@ change; an already-running shell cannot change into PowerShell 7 retroactively.
 | `Ctrl+B`, then `g` | Open the same full navigator. |
 | `Ctrl+B`, then `p` / `n` | Move to the previous/next tab/window. |
 | `Ctrl+B`, then `1` ... `9` | Switch tabs/windows. |
+| `Ctrl+B`, then `\|` (or `v`) / `-` | Split left/right / top/bottom, as in tmux. |
+| `Ctrl+B`, then `d` (or `q`) | Detach and leave the session running, as in tmux. |
 | `Ctrl+B`, then `,` | Rename the current tab/window. |
 | `Ctrl+B`, then `$` | Rename the current workspace. |
 | `Ctrl+B`, then Up/Down | Move to the previous/next workspace. |
@@ -530,24 +534,25 @@ into the matching GNOME shortcuts. Windows is not changed.
 
 | Keys | macOS | Linux (with Mac keyboard shortcuts) |
 |---|---|---|
-| `Cmd+Tab` | Switch apps (hold Cmd to keep choosing) | GNOME app switcher (hold Cmd to keep choosing) |
-| ``Cmd+` `` | Next window of the app | GNOME switcher for the app's windows |
+| `Cmd+Tab` | Switch apps (hold Cmd to keep choosing) | GNOME app switcher, `Super+Tab` (hold Cmd to keep choosing) |
+| ``Cmd+` `` | Next window of the app | GNOME switcher for the app's windows, ``Super+` `` |
 | `Cmd+Space` | Spotlight | Activities search |
 | `Ctrl+Up` | Mission Control | Activities overview |
+| `Ctrl+Down` | App Exposé: the windows of the app | Activities overview: the windows of all apps |
 | `Ctrl+Left` / `Ctrl+Right` | Previous / next macOS Space | Previous / next workspace |
 | `Cmd+H` / `Cmd+M` | Hide / minimize | Hide the window |
 | `Ctrl+Cmd+Q` | Lock the screen | Lock the screen |
 | `Option+1` ... `Option+9` | Go to workspace 1...9 (AeroSpace) | Go to workspace 1...9 (after the one-time setup below) |
 | `Option+Shift+1` ... `Option+Shift+9` | Send the window to workspace 1...9 | Send the window to workspace 1...9 (same setup) |
-| `Option+Tab` | Back to the previous workspace | `Alt+Tab`: a quick tap returns to the previous app |
+| `Option+Tab` | Back to the previous workspace | `Alt+Tab`: a quick tap returns to the previous window |
 | `Ctrl+Option+L` / `Ctrl+Option+H` | Focus the window on the right / left | Next / previous window (`Alt+Esc` / `Shift+Alt+Esc`) |
 
 Known differences:
 - Without the one-time setup, Linux `Option+1...9` opens Ubuntu Dock app 1...9
   and `Option+Shift+1...9` opens a new window of it: GNOME gives those keys to
   the dock until you move them.
-- `Option+Tab` on Linux goes back to the previous app, not workspace; holding it
-  shows GNOME's switcher.
+- `Option+Tab` on Linux goes back to the previous window, not workspace. Holding
+  it shows a switcher: for windows in Ubuntu, for apps in GNOME.
 - GNOME does not tile windows side by side automatically as AeroSpace does.
 - Pinning an app to a workspace is an AeroSpace feature; on Linux, open the app
   and press `Option+Shift+<digit>`.
@@ -668,23 +673,41 @@ The other keys:
 | Keys (Mac labels) | Result |
 |---|---|
 | `Cmd+C`/`V`/`X`/`Z`/`A`/`S`/`F`/`T`/`W`/`Q`, `Cmd+Shift+Z`/`T`, `Cmd+click` | The app's own copy, paste, undo, save, find, new/close tab, quit... |
-| In a terminal: `Cmd+C`/`V`, `Cmd+T`/`N`/`W`/`Q`, `Cmd+D`, `Cmd+Shift+D`, `Cmd+K`, `Cmd+1...9` | Ghostty's copy, paste, tab/window, splits, clear, go to tab. Other `Cmd` keys do nothing, so `Ctrl+C`, `Ctrl+Z` and `Ctrl+D` stay distinct |
+| In a terminal: `Cmd+C`/`V`, `Cmd+T`/`N`/`W`/`Q`, `Cmd+Shift+W`, `Cmd+K`, `Cmd+1...9` | The terminal's copy, paste, new tab/window, close tab, quit, close window, clear, go to tab. Other `Cmd` keys do nothing, so `Ctrl+C`, `Ctrl+Z` and `Ctrl+D` stay distinct |
+| In Ghostty: `Cmd+D` / `Cmd+Shift+D`, `Cmd+W` / `Cmd+Option+W` | Split right / down, close the split / tab |
+| In Ghostty: `Cmd+[`/`]`, `Cmd+Option+arrows`, `Cmd+Ctrl+arrows` | Previous/next split, split in that direction, resize the split |
+| In Ghostty: `Cmd+Up`/`Down`, `Cmd+Home`/`End`/`PageUp`/`PageDown`, `Cmd+Enter` | Previous/next prompt, scroll, full screen |
 | `Cmd+Option+Up`/`Down` (or `Left`/`Right`), `Cmd+Shift+[`/`]` | Previous / next tab, including Zen |
 | `Cmd+[` / `Cmd+]` in a browser | Back / forward (`Cmd+←/→` stays start/end of line, also in browsers) |
 | `Cmd+Left`/`Right`, `Cmd+Up`/`Down` | Line start/end, document start/end (add `Shift` to select) |
 | `Option+Left`/`Right`, `Option+Backspace` | Previous/next word, delete word |
 | `Cmd+Backspace` | Delete to line start; in a file manager, move to trash |
 | `Cmd+Shift+3` / `Cmd+Shift+4` / `Cmd+Shift+5` | Full screenshot / screenshot tool |
+| `Ctrl+Cmd+F` | Full screen |
+| `Option+Space` | A space. Linux does not open the GNOME window menu |
+| `Ctrl+Cmd+Space` | Emoji and symbols: the IBus emoji picker (`Super+.`) that Ubuntu installs |
+| `Cmd+Option+Esc` | Force Quit: Resources (Ubuntu 26.04) or System Monitor opens, where you end an app |
+| `Option+F2`/`F4`/`F5`/`F6`/`F7`/`F8`/`F10`, `Option+Esc`, ``Option+` ``; `Ctrl+Option` or `Cmd+Option` with `F1`...`F12`, `T`, `D` or `Delete`; `Ctrl+Option` with `Tab`, `Esc` or the arrows; `Ctrl+Shift+Option+R`; `Ctrl+Shift+Left`/`Right` | Nothing, as on the Mac. In GNOME these keys close, move or resize a window, show a text console, open a terminal or the log out dialog, change the workspace or record the screen |
+| In a browser, Obsidian, Slack, Discord, Signal, Thunderbird or LibreOffice: `Ctrl+A`/`E`, `Ctrl+K`, `Ctrl+D`/`H`, `Ctrl+F`/`B`/`N`/`P` | The Mac text keys: line start/end, delete to the line end, delete the next/previous character, move by character or line |
+| In a browser: `Cmd+Option+I` | Developer tools |
+| In a file manager: `Cmd+Up`/`Down`, `Cmd+[`/`]`, `Cmd+Shift+.`, `Cmd+Shift+G`, `Cmd+Option+Backspace` | Parent folder / open, back/forward, hidden files, go to a folder, delete at once (it asks first) |
 
-`Ctrl` keeps its Linux meaning: `Ctrl+C` interrupts a terminal and `Ctrl+Tab`
-changes browser tabs. `Option` is `Alt` in terminals, as Ghostty's
+A native test presses each key with each combination of `Ctrl`, `Option`,
+`Cmd` and `Shift` in a browser, a file manager, Ghostty, another terminal and
+another app. No combination reaches a default Ubuntu 26.04 GNOME shortcut that
+it does not mean on the Mac.
+
+`Ctrl` keeps its Linux meaning outside those text keys: `Ctrl+C`
+interrupts a terminal and `Ctrl+Tab` changes browser tabs. Code editors keep
+Linux `Ctrl` because their built-in terminals need it. `Option` is `Alt` in terminals, as Ghostty's
 `macos-option-as-alt` does on the Mac, so fzf's `Alt+C` and Neovim's `Alt+h/j/k/l`
 stay on the same physical keys. The exceptions are the navigation keys
 `Option+1...9`, `Option+Shift+1...9` and `Ctrl+Option+H/L`, which work the same
 in every identified window; `Cmd+1...9` still selects a Ghostty tab. Rules apply only to windows the remapper can
 identify: in GNOME Wayland sessions that needs xremap's GNOME Shell extension,
-which setup does not install, so keys stay plain there. Right Alt (AltGr) is
-unchanged for typing accented characters.
+which setup does not install, so keys stay plain there. The right `Option` key
+is `Option` too, as on the Mac. Right Alt (AltGr) is unchanged for typing
+accented characters.
 
 Config: `~/.config/xremap/config.yml`, a live link to `xremap/config.yml`. Edits
 and dotfiles updates (`git pull`) reload automatically within half a second.
@@ -778,13 +801,17 @@ zsh on POSIX and PowerShell 7 on Windows use the same basic habits:
 |---|---|
 | Tab | Open the completion menu. Keep typing to narrow it. |
 | Up/Down | Search history using the text already typed as a prefix. |
-| `Ctrl+R` | Fuzzy-search command history. |
+| `Ctrl+R` | Fuzzy-search command history with fzf, or with Atuin when Atuin is selected. |
 | `Ctrl+T` | Fuzzy-pick a file and insert its path. |
 | `Alt+C` | Fuzzy-pick a directory and change into it. |
+| `Cmd+Left` / `Cmd+Right` | zsh: go to the start / end of the line. Insert mode stays on. |
+| `Option+Left` / `Option+Right` | zsh: go one word back / forward. |
+| `Cmd+Backspace` / `Option+Backspace` | zsh: delete to the line start / delete the word before the cursor. |
 | `Esc` | Enter vi normal mode on the command line. |
 | `i` / `a` | Return to vi insert mode. |
 | `z proj` | Jump to the best previously visited directory matching `proj`. |
 | `zi` | Pick a known directory interactively. |
+| `spf` | Open the superfile file manager in the current directory. |
 
 `ls`, `l`, `la`, `lla`, and `lt` use `lsd` for readable icons and colors.
 zsh-only local changes belong in `~/.zshrc.local`; setup does not overwrite that
@@ -814,10 +841,37 @@ to bash.
 
 Useful standalone tools:
 
-- `lazygit`: terminal Git UI with upstream default keybindings on every OS.
+- `lazygit`: terminal Git UI with upstream default keybindings and the Rose Pine
+  theme on every OS.
   Press `?` for keys in the current context; `Esc` closes help and popups.
 - `gh-dash`: dashboard for pull requests and issues. Run `gh auth login` first
   to access your GitHub work; installing the dashboard does not require login.
+  On a pull request, `m` merges it normally. `M` runs `gh pr merge --admin`: the
+  same bypass as the GitHub checkbox "Merge without waiting for requirements to
+  be met". It works only when a ruleset lists your account as a bypass actor, and
+  rules without a bypass, such as required checks, still apply. gh asks for the
+  merge method and a final Submit before it merges.
+- Atuin: when it is selected, `Ctrl+R` opens Atuin's history search instead of
+  fzf, in zsh, bash and PowerShell. It searches every session on the machine and
+  records the directory, duration and exit code of each command. Type to filter.
+  `Ctrl+R` again changes the filter (all history, this host, this session, this
+  directory). `Enter` or `Tab` puts the command on the line without running it.
+  `Esc` enters vi normal mode, where `j`/`k` move; a second `Esc` or `Ctrl+C`
+  closes the search. Up/Down keep the prefix search above. Run
+  `atuin import auto` once to copy your existing shell history. History stays on
+  the machine: Atuin never connects to the Atuin cloud, and its AI assistant is
+  off. Sync, `atuin register` and `atuin login` use only `http://127.0.0.1:8888`,
+  where no server runs by default. To sync your machines, run `atuin-server`
+  yourself and set `sync_address` to it. Config: `~/.atuin/config.toml` on every
+  OS.
+- `spf` (superfile): terminal file manager with vim keys. `h`/`j`/`k`/`l` or the
+  arrows move, `Enter` or `l` opens, `/` searches, `.` shows hidden files, `y`/`x`/`p`
+  copy, cut and paste, `d` moves to the trash, `D` deletes for good, `a` creates,
+  `r` renames, `e` edits in `$EDITOR`, `z` jumps with zoxide, `n` opens another
+  panel and `?` lists all keys. `q` quits; `Shift+Q` quits and changes the shell
+  to the folder you were in. Config: `~/.config/superfile` on Linux,
+  `~/Library/Application Support/superfile` on macOS and
+  `%LOCALAPPDATA%\superfile` on Windows.
 - `t3`: start T3 Code in the current project and open its browser UI.
   `t3 serve` runs without opening a browser; `t3 --help` lists commands.
   Provider authentication is separate. Use dotfiles for package updates/removal.
@@ -840,8 +894,9 @@ Useful standalone tools:
 - **tmux panes:** 50,000 history lines per pane. This is separate from the
   outer terminal's scrollback limit.
 - **Ghostty:** macOS/Linux, dark Rose Pine, 1 GiB lazy scrollback budget per
-  surface, copy-on-select, maximized startup. On macOS, Cmd+grave accent toggles
-  the global quick terminal.
+  surface, copy-on-select, maximized startup. On macOS, ``Ctrl+Option+` `` toggles
+  the global quick terminal. ``Cmd+` `` stays the macOS key for the next window
+  of the app.
 - **Windows Terminal:** native Windows, dark Rose Pine, 32,767 history lines
   per profile. That is Windows Terminal's hard maximum.
 
@@ -915,7 +970,7 @@ successful local checks do not establish current live GitHub settings.
 | `nvim/`, `tmux/`, `herdr/` | Editor and multiplexer configuration |
 | `installer/shells/` | Active shell integration recipes |
 | `ghostty/`, `windows-terminal/`, `aerospace/`, `xremap/` | Desktop configuration |
-| `git/`, `lazygit/config.yml`, `gh-dash/`, `starship/`, `lsd/` | Tool configuration |
+| `git/`, `lazygit/config.yml`, `gh-dash/`, `starship/`, `lsd/`, `atuin/`, `superfile/` | Tool configuration |
 | `tests/`, `.github/workflows/` | Local and native verification |
 | `docs/` | Upgrade, release and security guides, and release notes |
 

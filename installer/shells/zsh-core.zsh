@@ -40,11 +40,12 @@ bindkey -v
 # direct trade-off: too low and any sequence that STARTS with ESC gets split --
 # the Meta/Alt prefix (fzf's Alt-C is ESC c) and the arrow-key sequences
 # (ESC [ A / ESC [ B) would be misread as "ESC, then a normal-mode command"; too
-# high and leaving insert mode feels laggy. 25 (250 ms) keeps Alt/Meta chords and
-# arrow keys reliable while staying responsive. Override by exporting
-# DOTFILES_KEYTIMEOUT before startup, or by setting KEYTIMEOUT in ~/.zshrc.local
-# (sourced last, so it always wins).
-KEYTIMEOUT="${DOTFILES_KEYTIMEOUT:-25}"
+# high and a typed Esc, then b reads as Option+Left (ESC b, bound below), so the
+# shell stays in insert mode. 5 (50 ms) is the Neovim ttimeoutlen default: the
+# terminal writes each key sequence at one time, but a person types Esc, then b
+# more slowly. Override by exporting DOTFILES_KEYTIMEOUT before startup, or by
+# setting KEYTIMEOUT in ~/.zshrc.local (sourced last, so it always wins).
+KEYTIMEOUT="${DOTFILES_KEYTIMEOUT:-5}"
 
 # Cursor shape tracks the mode: steady block in normal (vicmd), steady beam in
 # insert (viins). DECSCUSR (ESC [ N q) is honoured by Ghostty and Windows
@@ -144,6 +145,31 @@ bindkey -M viins '^[[A' up-line-or-beginning-search
 bindkey -M viins '^[[B' down-line-or-beginning-search
 bindkey -M vicmd '^[[A' up-line-or-beginning-search
 bindkey -M vicmd '^[[B' down-line-or-beginning-search
+
+# Mac line editing, on macOS and on Linux with the Mac keyboard shortcuts.
+# Ghostty sends Cmd+Left/Right/Backspace as Ctrl-A/E/U and Option+Left/Right/
+# Backspace/Delete as Esc b, Esc f, Esc DEL and ESC [3;3~. The vi keymaps do not
+# bind them: Ctrl-A types a literal ^A and each Esc key changes to normal mode.
+# Other Linux terminals send Option+Left/Right as ESC [1;3D and ESC [1;3C.
+# Delete (Fn+Backspace), Home and End get their usual meaning too. tmux sends
+# Home and End as ESC [1~ and ESC [4~.
+for _dotfiles_keymap in viins vicmd; do
+  bindkey -M "$_dotfiles_keymap" '^A' beginning-of-line
+  bindkey -M "$_dotfiles_keymap" '^E' end-of-line
+  bindkey -M "$_dotfiles_keymap" '^U' backward-kill-line
+  bindkey -M "$_dotfiles_keymap" '^[b' backward-word
+  bindkey -M "$_dotfiles_keymap" '^[f' emacs-forward-word
+  bindkey -M "$_dotfiles_keymap" '^[[1;3D' backward-word
+  bindkey -M "$_dotfiles_keymap" '^[[1;3C' emacs-forward-word
+  bindkey -M "$_dotfiles_keymap" '^[^?' backward-kill-word
+  bindkey -M "$_dotfiles_keymap" '^[[3;3~' kill-word
+  bindkey -M "$_dotfiles_keymap" '^[[3~' delete-char
+  bindkey -M "$_dotfiles_keymap" '^[[H' beginning-of-line
+  bindkey -M "$_dotfiles_keymap" '^[[1~' beginning-of-line
+  bindkey -M "$_dotfiles_keymap" '^[[F' end-of-line
+  bindkey -M "$_dotfiles_keymap" '^[[4~' end-of-line
+done
+unset _dotfiles_keymap
 
 # Ctrl-R fallback for machines WITHOUT fzf: emacs mode defaulted Ctrl-R to
 # incremental history search, but viins/vicmd default it to redisplay, so bind

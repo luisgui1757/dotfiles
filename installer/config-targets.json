@@ -60,6 +60,99 @@
       "path": "gh-dash/config.yml"
     },
     {
+      "resource": "config.atuin",
+      "source": "atuin/config.toml",
+      "folder": "home",
+      "path": ".atuin/config.toml"
+    },
+    {
+      "resource": "config.atuin",
+      "source": "atuin/themes/rose-pine.toml",
+      "folder": "home",
+      "path": ".atuin/themes/rose-pine.toml"
+    },
+    {
+      "resource": "config.superfile",
+      "source": "superfile/config.toml",
+      "folder": "home",
+      "path": "Library/Application Support/superfile/config.toml",
+      "platforms": [
+        "darwin"
+      ]
+    },
+    {
+      "resource": "config.superfile",
+      "source": "superfile/config.toml",
+      "folder": "config",
+      "path": "superfile/config.toml",
+      "platforms": [
+        "linux"
+      ]
+    },
+    {
+      "resource": "config.superfile",
+      "source": "superfile/config.toml",
+      "folder": "local_app_data",
+      "path": "superfile/config.toml",
+      "platforms": [
+        "windows"
+      ]
+    },
+    {
+      "resource": "config.superfile",
+      "source": "superfile/hotkeys.toml",
+      "folder": "home",
+      "path": "Library/Application Support/superfile/hotkeys.toml",
+      "platforms": [
+        "darwin"
+      ]
+    },
+    {
+      "resource": "config.superfile",
+      "source": "superfile/hotkeys.toml",
+      "folder": "config",
+      "path": "superfile/hotkeys.toml",
+      "platforms": [
+        "linux"
+      ]
+    },
+    {
+      "resource": "config.superfile",
+      "source": "superfile/hotkeys.toml",
+      "folder": "local_app_data",
+      "path": "superfile/hotkeys.toml",
+      "platforms": [
+        "windows"
+      ]
+    },
+    {
+      "resource": "config.superfile",
+      "source": "superfile/theme/rose-pine-dotfiles.toml",
+      "folder": "home",
+      "path": "Library/Application Support/superfile/theme/rose-pine-dotfiles.toml",
+      "platforms": [
+        "darwin"
+      ]
+    },
+    {
+      "resource": "config.superfile",
+      "source": "superfile/theme/rose-pine-dotfiles.toml",
+      "folder": "config",
+      "path": "superfile/theme/rose-pine-dotfiles.toml",
+      "platforms": [
+        "linux"
+      ]
+    },
+    {
+      "resource": "config.superfile",
+      "source": "superfile/theme/rose-pine-dotfiles.toml",
+      "folder": "local_app_data",
+      "path": "superfile/theme/rose-pine-dotfiles.toml",
+      "platforms": [
+        "windows"
+      ]
+    },
+    {
       "resource": "config.starship",
       "source": "starship/starship.toml",
       "folder": "config",

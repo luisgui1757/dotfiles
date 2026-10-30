@@ -26,7 +26,7 @@ func TestWriteActiveShellFixtures(t *testing.T) {
 	}
 	variants := []string{"windows"}
 	if runtime.GOOS != "windows" {
-		variants = append(variants, "zsh", "posix")
+		variants = append(variants, "zsh", "posix", "atuin")
 	}
 	for _, variant := range variants {
 		home := filepath.Join(root, variant)
@@ -50,10 +50,13 @@ func TestWriteActiveShellFixtures(t *testing.T) {
 		selected := []string{"config.zsh", "integration.lsd"}
 		if variant == "windows" {
 			target.OS = "windows"
-			selected = []string{"config.powershell", "integration.starship", "integration.fzf", "integration.lsd", "integration.zoxide"}
+			selected = []string{"config.powershell", "integration.starship", "integration.fzf", "integration.lsd", "integration.zoxide", "integration.atuin", "integration.superfile"}
 			add("tool.starship", "bin/starship.ps1", "starship", "$global:LASTEXITCODE = 0\n'function global:prompt { return \"fixture> \" }'\n")
 			add("tool.zoxide", "bin/zoxide.ps1", "zoxide", "$global:LASTEXITCODE = 0\n'function global:z { }'\n")
 			add("tool.fzf", "bin/fzf.ps1", "fzf", "# External picker fixture; no terminal picker is invoked.\n")
+			// The generated init records its arguments and the PSFzf chords that
+			// were set before it, so a test can prove the flags and the order.
+			add("tool.atuin", "bin/atuin.ps1", "atuin", "$global:LASTEXITCODE = 0\n'$global:DotfilesFixtureAtuin = ''' + ($args -join ' ') + '|'' + ($global:DotfilesFixtureFzf -join '','')'\n")
 			add("powershell.psfzf", "PSFzf.psd1", "", "@{ RootModule = 'PSFzf.psm1'; ModuleVersion = '0.0.1'; FunctionsToExport = @('Set-PsFzfOption') }\n")
 			writeConfigFixture(t, filepath.Join(a.currentLink("powershell.psfzf"), "PSFzf.psm1"), `function Set-PsFzfOption {
 	[CmdletBinding()]
@@ -64,10 +67,10 @@ func TestWriteActiveShellFixtures(t *testing.T) {
 		} else {
 			add("plugin.fzf-tab", "fzf-tab.plugin.zsh", "", "fzf-tab-complete() { zle menu-select }\nzle -N fzf-tab-complete\n")
 			add("plugin.zsh-autosuggestions", "zsh-autosuggestions.zsh", "", "_zsh_autosuggest_start() { :; }\n")
-			if variant == "posix" {
+			if variant == "posix" || variant == "atuin" {
 				// The handoff stays inert in these runners: they start zsh, or bash
 				// only for syntax checks, so both shells parse its generated code.
-				selected = append(selected, "integration.starship", "integration.fzf", "integration.zoxide", "integration.zsh-handoff", "config.nvim")
+				selected = append(selected, "integration.starship", "integration.fzf", "integration.zoxide", "integration.zsh-handoff", "config.nvim", "integration.superfile")
 				add("tool.nvim", "bin/nvim", "nvim", "#!/bin/sh\nexit 0\n")
 				add("tool.starship", "bin/starship", "starship", "#!/bin/sh\nprintf '%s\\n' 'export DOTFILES_FIXTURE_STARSHIP=loaded'\n")
 				add("tool.zoxide", "bin/zoxide", "zoxide", "#!/bin/sh\nprintf '%s\\n' 'z() { :; }'\n")
@@ -81,6 +84,29 @@ zle -N fzf-history-widget
 bindkey -M viins '^R' fzf-history-widget
 bindkey -M vicmd '^R' fzf-history-widget
 ZSH
+`)
+			}
+			if variant == "atuin" {
+				// Like the real init, the fixture takes Up and "?" unless told not
+				// to, and binds Ctrl-R in vi insert mode only.
+				selected = append(selected, "integration.atuin")
+				add("tool.atuin", "bin/atuin", "atuin", `#!/bin/sh
+[ "$1" = init ] && [ "$2" = zsh ] || exit 0
+cat <<'ZSH'
+_atuin_search() { zle history-incremental-search-backward }
+for widget in atuin-search atuin-search-viins atuin-search-vicmd atuin-up-search-viins atuin-up-search-vicmd; do zle -N $widget _atuin_search; done
+bindkey -M emacs '^r' atuin-search
+bindkey -M viins '^r' atuin-search-viins
+bindkey -M vicmd '/' atuin-search
+ZSH
+case " $* " in
+*" --disable-up-arrow "*) ;;
+*) printf '%s\n' "bindkey -M viins '^[[A' atuin-up-search-viins" "bindkey -M vicmd '^[[A' atuin-up-search-vicmd" ;;
+esac
+case " $* " in
+*" --disable-ai "*) ;;
+*) printf '%s\n' "bindkey -M viins '?' atuin-search-viins" ;;
+esac
 `)
 			}
 		}

@@ -259,6 +259,113 @@
         ]
       }
     },
+    "tool.atuin": {
+      "darwin/arm64": {
+        "version": "18.24.3",
+        "url": "https://github.com/atuinsh/atuin/releases/download/v18.24.3/atuin-aarch64-apple-darwin.tar.gz",
+        "sha256": "dd266366b1b00c298d689b0613c1acbe82855f04eb47d3f3f96262b148d8ebb9",
+        "format": "tar.gz",
+        "commands": {
+          "atuin": "atuin"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "strip_components": 1
+      },
+      "linux/amd64": {
+        "version": "18.24.3",
+        "url": "https://github.com/atuinsh/atuin/releases/download/v18.24.3/atuin-x86_64-unknown-linux-musl.tar.gz",
+        "sha256": "7e2ae5dbbced1c40ee9eb20815436253a7fac2363a77024021892880beb0b589",
+        "format": "tar.gz",
+        "commands": {
+          "atuin": "atuin"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "strip_components": 1
+      },
+      "linux/arm64": {
+        "version": "18.24.3",
+        "url": "https://github.com/atuinsh/atuin/releases/download/v18.24.3/atuin-aarch64-unknown-linux-musl.tar.gz",
+        "sha256": "48d7bc0e6821bcaef7e9752abaa4ded541b36889b1620923d8abb17fa34059b3",
+        "format": "tar.gz",
+        "commands": {
+          "atuin": "atuin"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "strip_components": 1
+      },
+      "windows/amd64": {
+        "version": "18.24.3",
+        "url": "https://github.com/atuinsh/atuin/releases/download/v18.24.3/atuin-x86_64-pc-windows-msvc.zip",
+        "sha256": "faa3d3af8f51a676dde3cb6d250c5e65b33a67ff824d7d1092da94585ae8c953",
+        "format": "zip",
+        "commands": {
+          "atuin": "atuin.exe"
+        },
+        "bin_dirs": [
+          "."
+        ]
+      }
+    },
+    "tool.superfile": {
+      "darwin/arm64": {
+        "version": "1.6.0",
+        "url": "https://github.com/yorukot/superfile/releases/download/v1.6.0/superfile-darwin-v1.6.0-arm64.tar.gz",
+        "sha256": "131f654e7f8366fd37dbe9363739f8d82e57ff3f632f45963cd233c049cfad2a",
+        "format": "tar.gz",
+        "commands": {
+          "spf": "spf"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "strip_components": 2
+      },
+      "linux/amd64": {
+        "version": "1.6.0",
+        "url": "https://github.com/yorukot/superfile/releases/download/v1.6.0/superfile-linux-v1.6.0-amd64.tar.gz",
+        "sha256": "d45b0e95072629a6aa7983a84eedca9cd7a98861e67ef91be1415496e3dda309",
+        "format": "tar.gz",
+        "commands": {
+          "spf": "spf"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "strip_components": 2
+      },
+      "linux/arm64": {
+        "version": "1.6.0",
+        "url": "https://github.com/yorukot/superfile/releases/download/v1.6.0/superfile-linux-v1.6.0-arm64.tar.gz",
+        "sha256": "2e8150dab1a139e3a081bd74a9c775155e8d0241c34ae3f8d30817a3df1b8f06",
+        "format": "tar.gz",
+        "commands": {
+          "spf": "spf"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "strip_components": 2
+      },
+      "windows/amd64": {
+        "version": "1.6.0",
+        "url": "https://github.com/yorukot/superfile/releases/download/v1.6.0/superfile-windows-v1.6.0-amd64.zip",
+        "sha256": "4264a84d38c5d13804960a5da9ea8dedb8a00439e2612d6b8a28699836ed0143",
+        "format": "zip",
+        "commands": {
+          "spf": "spf.exe"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "strip_components": 2
+      }
+    },
     "plugin.fzf-tab": {
       "darwin/arm64": {
         "version": "v1.3.0",

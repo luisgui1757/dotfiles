@@ -19,3 +19,44 @@ defaults:
     open: true
     width: 60
   refetchIntervalMinutes: 30
+# Rose Pine (main). gh-dash has no Rose Pine port. These colors transpose the
+# official Catppuccin port, which sets the same keys:
+# https://github.com/catppuccin/gh-dash/blob/ecd62f5a2b6230ba2d8fe080e31d870997c7a738/gh-dash.tera (MIT)
+# Each Catppuccin color becomes the Rose Pine color with the same role in the
+# Rose Pine palette guide (rosepinetheme.com/palette). Catppuccin does not set
+# actor and icon. gh-dash then uses fixed 256-color values outside the
+# palette, so these keys take the Rose Pine color with the same hue.
+theme:
+  colors:
+    text:
+      primary: "#e0def4"    # text      <- text
+      secondary: "#c4a7e7"  # iris      <- accent (mauve)
+      inverted: "#191724"   # base      <- crust
+      faint: "#908caa"      # subtle    <- subtext1
+      warning: "#f6c177"    # gold      <- yellow
+      success: "#31748f"    # pine      <- green
+      error: "#eb6f92"      # love      <- red
+      actor: "#c4a7e7"      # iris      <- default: the secondary text color
+    background:
+      selected: "#26233a"   # overlay   <- surface0
+    border:
+      primary: "#c4a7e7"    # iris      <- accent (mauve)
+      secondary: "#403d52"  # highlight med <- surface1
+      faint: "#26233a"      # overlay   <- surface0
+    icon:
+      newcontributor: "#31748f"  # pine <- default green
+      contributor: "#9ccfd8"     # foam <- default blue
+      collaborator: "#f6c177"    # gold <- default yellow
+      member: "#f6c177"          # gold <- default yellow
+      owner: "#f6c177"           # gold <- default yellow
+      unknownrole: "#f6c177"     # gold <- default yellow
+keybindings:
+  prs:
+    # m keeps the built-in merge. M merges with `gh pr merge --admin`, the same
+    # bypass as the web checkbox "Merge without waiting for requirements to be
+    # met". It works only for an account in a ruleset bypass list, and rules
+    # without a bypass (required checks, for example) still apply. gh asks for
+    # the merge method and a confirmation before it merges.
+    - key: M
+      name: merge (bypass rules)
+      command: gh pr merge --admin --repo {{.RepoName}} {{.PrNumber}}

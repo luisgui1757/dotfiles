@@ -40,7 +40,7 @@ Other distributions, Linuxbrew, musl and Intel macOS are out of scope.
 | `installer/config-targets.json` | The configuration target manifest |
 | `setup.sh`, `setup.ps1` | Interactive entrypoints. They run only from a local clone. |
 | `scripts/installer-bootstrap.*` | The verified private Go bootstrap |
-| `nvim/`, `tmux/`, `herdr/`, `ghostty/`, `windows-terminal/`, `aerospace/`, `xremap/`, `git/`, `lazygit/`, `gh-dash/`, `starship/`, `lsd/` | Tool configuration |
+| `nvim/`, `tmux/`, `herdr/`, `ghostty/`, `windows-terminal/`, `aerospace/`, `xremap/`, `git/`, `lazygit/`, `gh-dash/`, `starship/`, `lsd/`, `atuin/`, `superfile/` | Tool configuration |
 | `release/` | The release manifest and proofs |
 | `tests/` | Tests by area. `tests/static/` holds the repository checks. |
 | `.github/` | Workflows, rulesets and the identities of the checks that must pass |
@@ -182,8 +182,9 @@ and skills for coding agents.
 - Neovim runs from private runtime generations. Mason uses the snapshot in
   `nvim/mason-registry/`. Never resolve the latest version.
 - zsh: Tab opens fzf-tab over compinit, then autosuggestions. Keep Ctrl-R,
-  Ctrl-T, Alt-C and the prefix history search on Up and Down. Enable vi mode
-  before the key bindings. Never bind a bare Escape to `kill-whole-line`.
+  Ctrl-T, Alt-C and the prefix history search on Up and Down. Ctrl-R opens fzf,
+  or Atuin when Atuin is selected; Atuin never takes Up, Down or `?`. Enable vi
+  mode before the key bindings. Never bind a bare Escape to `kill-whole-line`.
 - No global binding uses a bare Alt-h, Alt-j, Alt-k, Alt-l or Alt-c. These
   chords belong to Neovim and fzf. AeroSpace uses Ctrl-Alt chords.
   `tests/aerospace/keymap_test.sh` checks this rule.

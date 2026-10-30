@@ -90,10 +90,12 @@ echo "static: OK"
 
 # ---- Functional (live keymap inspection) -------------------------------------
 # Requires zsh. Sources the real zshrc under `zsh -i` and reads the LIVE keymaps.
-# Run two deterministic legs:
+# Run three deterministic legs:
 #   1. no fzf on PATH -> native menu-select fallback owns Tab.
 #   2. fake fzf + repo-managed fzf-tab widget -> fzf may bind Tab first, then
 #      zshrc must reclaim Tab for fzf-tab in both vi keymaps.
+#   3. the same with Atuin -> Atuin owns Ctrl-R in both vi keymaps, and Up/Down
+#      and "?" keep their shell bindings.
 if ! command -v zsh >/dev/null 2>&1; then
     echo "skipped: zsh not installed (static assertions passed)"
     exit 0
@@ -121,6 +123,15 @@ run_probe() {
         print -r -- "VIINS_TAB=${${(z)$(bindkey -M viins "^I")}[2]}"
         print -r -- "VICMD_TAB=${${(z)$(bindkey -M vicmd "^I")}[2]}"
         print -r -- "VIINS_CR=${${(z)$(bindkey -M viins "^R")}[2]}"
+        print -r -- "VICMD_CR=${${(z)$(bindkey -M vicmd "^R")}[2]}"
+        print -r -- "VIINS_QUESTION=${${(z)$(bindkey -M viins "?")}[2]}"
+        for km in viins vicmd; do
+            line=
+            for key in "^A" "^E" "^U" "^[b" "^[f" "^[[1;3D" "^[[1;3C" "^[^?" "^[[3;3~" "^[[3~" "^[[H" "^[[1~" "^[[F" "^[[4~"; do
+                line+="${${(z)$(bindkey -M $km "$key")}[2]} "
+            done
+            print -r -- "${(U)km}_MAC=$line"
+        done
         print -r -- "CURSOR_WIDGET=${widgets[_dotfiles_vi_cursor_shape]:-MISSING}"
     ' 2>/dev/null
 }
@@ -146,10 +157,16 @@ check_equals() { # check_equals <leg> <probe> <label> <expected>
 common_checks() {
     local leg="$1" probe="$2"
     check_contains "$leg" "$probe" "MAIN" "viins"
-    check_contains "$leg" "$probe" "KEYTIMEOUT" "25"
+    check_equals "$leg" "$probe" "KEYTIMEOUT" "5"
     check_equals "$leg" "$probe" "VIINS_UP" "up-line-or-beginning-search"
     check_equals "$leg" "$probe" "VICMD_UP" "up-line-or-beginning-search"
     check_contains "$leg" "$probe" "CURSOR_WIDGET" "_dotfiles_vi_cursor_shape"
+    # The keys Ghostty and the Mac keyboard shortcuts send for Cmd/Option+Left,
+    # Right, Backspace and Delete, then Delete, Home and End, edit the line in
+    # both vi keymaps. They must not type a control character or leave insert mode.
+    local mac="beginning-of-line end-of-line backward-kill-line backward-word emacs-forward-word backward-word emacs-forward-word backward-kill-word kill-word delete-char beginning-of-line beginning-of-line end-of-line end-of-line "
+    check_equals "$leg" "$probe" "VIINS_MAC" "$mac"
+    check_equals "$leg" "$probe" "VICMD_MAC" "$mac"
 }
 
 NO_FZF_HOME="$TMP_ROOT/no-fzf-home"
@@ -191,6 +208,14 @@ common_checks "with-fzf-tab" "$with_fzf_probe"
 check_equals "with-fzf-tab" "$with_fzf_probe" "VIINS_TAB" "fzf-tab-complete"
 check_equals "with-fzf-tab" "$with_fzf_probe" "VICMD_TAB" "fzf-tab-complete"
 check_equals "with-fzf-tab" "$with_fzf_probe" "VIINS_CR" "fzf-history-widget"
+
+with_atuin_probe="$(run_probe "$FZF_HOME" "$FZF_BIN" "$ACTIVE_ZSH_ATUIN")" \
+    || fail "functional/with-atuin: zshrc failed to source"
+common_checks "with-atuin" "$with_atuin_probe"
+check_equals "with-atuin" "$with_atuin_probe" "VIINS_TAB" "fzf-tab-complete"
+check_equals "with-atuin" "$with_atuin_probe" "VIINS_CR" "atuin-search-viins"
+check_equals "with-atuin" "$with_atuin_probe" "VICMD_CR" "atuin-search-vicmd"
+check_equals "with-atuin" "$with_atuin_probe" "VIINS_QUESTION" "self-insert"
 
 echo "functional: OK"
 echo "OK"

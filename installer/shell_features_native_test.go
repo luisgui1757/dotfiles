@@ -58,7 +58,7 @@ func selectedShellLifecycle(t *testing.T) {
 			t.Fatal("archive fixture requires a healthy pre-existing VC++ runtime; owned vendor installation belongs to the fresh Windows lane", runtimeBefore, err)
 		}
 	}
-	selected := []string{"starship", "fzf", "zoxide", "lsd"}
+	selected := []string{"starship", "fzf", "zoxide", "lsd", "atuin", "superfile"}
 	if runtime.GOOS == "windows" {
 		selected = append(selected, "powershell")
 	}
@@ -76,7 +76,7 @@ func selectedShellLifecycle(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			script := "$global:DotfilesProfileInvocationContext = @{UserInteractive=$true;HostName='ConsoleHost';CommandLineArgs=@('pwsh','-NoExit');InputRedirected=$false;OutputRedirected=$false;ErrorRedirected=$false;CIValue=''}; . " + powershellLiteral(profile) + "; if ((Get-Command starship).Source -ne " + powershellLiteral(command) + ") { throw 'wrong Starship executable' }; starship --version; fzf --version; Get-Command Invoke-Fzf | Select-Object -ExpandProperty Name; "
+			script := "$global:DotfilesProfileInvocationContext = @{UserInteractive=$true;HostName='ConsoleHost';CommandLineArgs=@('pwsh','-NoExit');InputRedirected=$false;OutputRedirected=$false;ErrorRedirected=$false;CIValue=''}; . " + powershellLiteral(profile) + "; if ((Get-Command starship).Source -ne " + powershellLiteral(command) + ") { throw 'wrong Starship executable' }; starship --version; fzf --version; Get-Command Invoke-Fzf | Select-Object -ExpandProperty Name; atuin --version; if ((Get-Command spf).CommandType -ne 'Function') { throw 'superfile wrapper missing' }; spf --version; "
 			if zoxide {
 				script += "Get-Command z | Select-Object -ExpandProperty Name; zoxide --version"
 			} else {
@@ -89,7 +89,7 @@ func selectedShellLifecycle(t *testing.T) {
 			script += "; if ((Get-PSReadLineOption).EditMode -ne 'Vi') { throw 'Active profile lost PSReadLine vi mode' }; $keys=Get-PSReadLineKeyHandler -Bound; foreach ($binding in @(@('Tab','MenuComplete'),@('UpArrow','HistorySearchBackward'),@('DownArrow','HistorySearchForward'))) { if (-not ($keys | Where-Object { $_.Key -eq $binding[0] -and $_.Function -eq $binding[1] })) { throw ('Active PSReadLine binding missing: '+$binding[0]) } }; if ((Get-Command ls).CommandType -ne 'Function' -or $env:LS_COLORS -notmatch 'di=38;2;246;193;119') { throw 'Active lsd profile missing' }"
 			cmd = exec.CommandContext(ctx, program, "-NoLogo", "-NoProfile", "-NonInteractive", "-Command", script)
 		} else {
-			script := "starship --version; fzf --version; alias ls; "
+			script := "starship --version; fzf --version; alias ls; atuin --version; declare -F spf; spf --version; "
 			if zoxide {
 				script += "type z; zoxide --version"
 			} else {
@@ -100,7 +100,8 @@ func selectedShellLifecycle(t *testing.T) {
 		cmd.Dir = home
 		cmd.Env = append(os.Environ(), "HOME="+home, "XDG_CONFIG_HOME="+folders.Config, "ZDOTDIR="+home, "TERM=xterm-256color")
 		output, err := cmd.CombinedOutput()
-		if err != nil || !strings.Contains(string(output), "starship "+d.Archives.Pins["tool.starship"].Version) || !strings.Contains(string(output), d.Archives.Pins["tool.fzf"].Version) || zoxide && !strings.Contains(string(output), "zoxide "+d.Archives.Pins["tool.zoxide"].Version) {
+		if err != nil || !strings.Contains(string(output), "starship "+d.Archives.Pins["tool.starship"].Version) || !strings.Contains(string(output), d.Archives.Pins["tool.fzf"].Version) || zoxide && !strings.Contains(string(output), "zoxide "+d.Archives.Pins["tool.zoxide"].Version) ||
+			!strings.Contains(string(output), "atuin "+d.Archives.Pins["tool.atuin"].Version) || !strings.Contains(string(output), "superfile version v"+d.Archives.Pins["tool.superfile"].Version) {
 			t.Fatalf("selected hooks zoxide=%v: %s %v", zoxide, output, err)
 		}
 		t.Logf("selected hooks zoxide=%v: %s", zoxide, output)
@@ -120,7 +121,7 @@ func selectedShellLifecycle(t *testing.T) {
 	}
 	dispatchApproved(t, c, Request{Schema: 1, Mode: "update"})
 	dispatchApproved(t, c, Request{Schema: 1, Mode: "repair"})
-	selected = []string{"starship", "fzf", "lsd"}
+	selected = []string{"starship", "fzf", "lsd", "atuin", "superfile"}
 	if runtime.GOOS == "windows" {
 		selected = append(selected, "powershell")
 	}
@@ -163,10 +164,13 @@ func selectedShellLifecycle(t *testing.T) {
 		}
 		t.Log("explicit per-item removal released only the owned PowerShell runtime")
 	}
-	for _, id := range []string{"tool.starship", "tool.fzf", "tool.zoxide"} {
+	for _, id := range []string{"tool.starship", "tool.fzf", "tool.zoxide", "tool.atuin", "tool.superfile"} {
 		if _, err := os.Lstat(d.Archives.currentLink(id)); !os.IsNotExist(err) {
 			t.Fatal("private dependency survived full removal", id, err)
 		}
+	}
+	if _, err := os.Lstat(filepath.Join(home, ".atuin", "config.toml")); !os.IsNotExist(err) {
+		t.Fatal("Atuin configuration survived full removal", err)
 	}
 	for _, entry := range d.Profiles.Targets["integration.shells"] {
 		if entry.Path == edited {

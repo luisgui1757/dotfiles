@@ -1,2 +1,52 @@
-# Use upstream LazyGit defaults on macOS, Linux, and Windows.
-{}
+# LazyGit keeps its upstream keybindings on macOS, Linux and Windows. The theme
+# below is the official Rose Pine theme (MIT):
+# https://github.com/rose-pine/lazygit/blob/acc968a6090bd190ab0c49fa36847cb931a39a52/themes/rose-pine.yml
+# Two changes, marked below, follow the Catppuccin theme for LazyGit with Rose
+# Pine colors. The official selected line is pine, the color of the green
+# commit hashes, which then disappear. Without author colors, LazyGit makes
+# colors that are not Rose Pine colors.
+gui:
+  theme:
+    activeBorderColor:
+      - "#31748f"
+      - bold
+
+    inactiveBorderColor:
+      - "#6e6a86"
+
+    searchingActiveBorderColor:
+      - "#ebbcba"
+      - bold
+
+    optionsTextColor:
+      - "#9ccfd8"
+
+    # Changed from pine: overlay, the Rose Pine color for the active list item.
+    selectedLineBgColor:
+      - "#26233a"
+
+    inactiveViewSelectedLineBgColor:
+      - "#26233a"
+      - bold
+
+    cherryPickedCommitFgColor:
+      - "#1f1d2e"
+
+    cherryPickedCommitBgColor:
+      - "#ebbcba"
+
+    markedBaseCommitFgColor:
+      - "#9ccfd8"
+
+    markedBaseCommitBgColor:
+      - "#f6c177"
+
+    unstagedChangesColor:
+      - "#eb6f92"
+
+    defaultFgColor:
+      - "#e0def4"
+
+    # Added: iris for every author, as Catppuccin uses lavender.
+    authorColors:
+      "*": "#c4a7e7"
