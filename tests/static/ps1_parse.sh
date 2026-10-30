@@ -41,8 +41,7 @@ while IFS= read -r f; do
         fail=1
     fi
 done < <(
-    find "$REPO_ROOT" -type f -name "*.ps1" -not -path "*/.git/*" -not -path "*/tests/.cache/*" -not -path "$REPO_ROOT/home/*"
-    find "$REPO_ROOT/home/.chezmoitemplates" -type f -name "*.ps1" 2>/dev/null
+    find "$REPO_ROOT" -type f -name "*.ps1" -not -path "*/.git/*" -not -path "*/tests/.cache/*"
 )
 
 [[ $fail -eq 0 ]] && echo "all ps1 files parse" || exit 1

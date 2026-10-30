@@ -1,3 +1,0 @@
-{{- /* This source state is applied with actual LocalApplicationData as its
-       destination, so the target is exactly the directory Neovim consumes. */ -}}
-{{ .chezmoi.sourceDir | replace "\\" "/" | dir | dir | replace "/" "\\" }}\nvim

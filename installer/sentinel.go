@@ -508,7 +508,7 @@ func (d *SentinelDriver) Observe(ctx context.Context, r Resource, receipt Receip
 		o.Healthy = true
 		return o, nil
 	}
-	if code, ok := legacyExitCode(err); ok && code == 1 {
+	if code, ok := commandExitCode(err); ok && code == 1 {
 		o.HealthIssue = sentinelFindings(output)
 		return o, nil
 	}

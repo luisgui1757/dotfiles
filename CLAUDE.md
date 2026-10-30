@@ -13,8 +13,9 @@ shared Rose Pine configuration and records what it owns. Update, Check, repair
 and removal use these records.
 
 Release v1.0.1 replaced the earlier Nix and chezmoi setup. It superseded
-v1.0.0, which has a tag but no published release. `migrate.sh` and `migrate.ps1`
-move a v0.4.x installation to the new installer.
+v1.0.0, which has a tag but no published release. Only the v1.0.1 checkout has
+`migrate.sh` and `migrate.ps1`. They move a v0.4.x installation to the new
+installer. After that, the user updates the checkout and chooses Update tools.
 
 ## Supported platforms
 
@@ -38,10 +39,8 @@ Other distributions, Linuxbrew, musl and Intel macOS are out of scope.
 | `installer/shells/` | The active shell integration sources |
 | `installer/config-targets.json` | The configuration target manifest |
 | `setup.sh`, `setup.ps1` | Interactive entrypoints. They run only from a local clone. |
-| `migrate.sh`, `migrate.ps1` | Migration from the Nix and chezmoi releases |
 | `scripts/installer-bootstrap.*` | The verified private Go bootstrap |
 | `nvim/`, `tmux/`, `herdr/`, `ghostty/`, `windows-terminal/`, `aerospace/`, `xremap/`, `git/`, `lazygit/`, `gh-dash/`, `starship/`, `lsd/` | Tool configuration |
-| `home/`, `shells/`, `windows/chezmoi-*` | Passive released files for migration. Do not edit them. |
 | `release/` | The release manifest and proofs |
 | `tests/` | Tests by area. `tests/static/` holds the repository checks. |
 | `.github/` | Workflows, rulesets and the identities of the checks that must pass |
@@ -56,7 +55,7 @@ Other distributions, Linuxbrew, musl and Intel macOS are out of scope.
 | `make test` | Static checks, lint, and the Neovim, shell, Starship, tmux, Ghostty and AeroSpace tests |
 | `make test-static` | `tests/static/run_all.sh` |
 | `make test-installer` | `gofmt`, `go vet` and `go test -race -timeout 30m ./...` in `installer/` |
-| `make test-bootstrap` | Python tests for the launchers and the migration evidence |
+| `make test-bootstrap` | Python tests for the launchers and the release scripts |
 | `make validate-renovate` | The Renovate configuration and its extraction inventory |
 | `make release-check`, `release-prepare`, `release-publish` | Release commands. Read `docs/RELEASING.md` first. |
 
@@ -116,8 +115,12 @@ of each step. All of these checks must pass on the final head.
   resource and does not stop independent resources.
 - Resume uses the original executable and checkout. It never builds old intent
   again from current pins.
-- Saved recipes, schemas and command encodings stay readable. Never change,
-  rewrite or replay an old recipe. A new recipe gets a new revision.
+- Saved recipes, schemas and command encodings stay readable while they are in
+  the support window. Never change, rewrite or replay an old recipe. A new
+  recipe gets a new revision.
+- The support window: `main` reads each state that the latest published release
+  can leave on a machine. This includes receipts that the release keeps without
+  a change. Remove a reader only after the steps in `docs/RELEASING.md`.
 - State is strict schema-1 JSON. An unknown field or schema fails and does not
   change the file.
 - Constructors are pure. Find the platform, the known folders and the
@@ -217,8 +220,6 @@ and skills for coding agents.
 - `.gitattributes` keeps all text LF, also Windows scripts.
 - Never edit a generated file. Change its source and run its generator in
   `scripts/`.
-- Passive released files keep their recorded release bytes. Release inventory
-  hashes protect them.
 - A new editor plugin changes its spec and `nvim/lazy-lock.json` together.
 - A new LSP, formatter or parser changes `tests/nvim/language_matrix.lua`, the
   plugin configuration and the strict smoke fixture.
@@ -235,8 +236,7 @@ and skills for coding agents.
 - Prefer process-boundary tests. A native lifecycle on a disposable runner is
   the highest proof. Cross-compilation is not native proof.
 - The Neovim spec runners isolate the XDG data, state and cache folders.
-- Shell tests use the `configureShellProfiles` output, not the frozen `shells/`
-  files.
+- Shell tests use the `configureShellProfiles` output.
 - Terminal tests use real PTY and ConPTY sessions.
 - Git fixtures remove inherited `GIT_*` variables.
 - The Go race suite has a 30-minute limit. Do not increase it to hide a hang.

@@ -131,11 +131,6 @@ func fetchForTest(t *testing.T, policy archiveTransfer, client *http.Client, url
 	return written, nil
 }
 
-func sha256Hex(data []byte) string {
-	sum := sha256.Sum256(data)
-	return hex.EncodeToString(sum[:])
-}
-
 // A reset in the middle of the body (HTTP/2 INTERNAL_ERROR on hosted macOS,
 // 2026-10-28) used to fail the download; it now resumes with the kept bytes.
 func TestArchiveDownloadResumesAfterConnectionLoss(t *testing.T) {

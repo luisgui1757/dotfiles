@@ -52,6 +52,18 @@ type nativeCommandError struct {
 
 func (err *nativeCommandError) Error() string { return err.Message }
 
+func commandExitCode(err error) (int, bool) {
+	var native *nativeCommandError
+	if errors.As(err, &native) && native.ExitCode != nil {
+		return *native.ExitCode, true
+	}
+	var exit *exec.ExitError
+	if errors.As(err, &exit) {
+		return exit.ExitCode(), true
+	}
+	return 0, false
+}
+
 // The message already ends with the output's diagnostic tail.
 func (reply nativeReply) failure() error {
 	return &nativeCommandError{Message: fmt.Sprintf("native command failed: %s%s", reply.Error, nativeDiagnostic(reply.Output)), ExitCode: reply.ExitCode}

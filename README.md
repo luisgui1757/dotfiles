@@ -5,7 +5,7 @@ Rose Pine configuration, and records what it owns so update and removal can make
 precise changes.
 
 **v1.0.1** replaces the earlier Nix/chezmoi setup with this installer. Coming
-from v0.4.x? Follow [the migration guide](docs/UPGRADING.md).
+from v0.4.x? Migrate with v1.0.1 first. Follow [the upgrade guide](docs/UPGRADING.md#from-v04x).
 
 ## Supported platforms
 
@@ -99,13 +99,10 @@ The update menu uses that checkout's reviewed pins; it does not update Git or
 fetch arbitrary latest package versions. Native providers update only the
 selected, proven-owned packages, never the entire machine.
 
-Coming from the Nix/chezmoi release? Run `./migrate.sh` or `.\migrate.ps1` after
-updating the checkout. It detects the earlier installation, preserves its
-configuration, opens the replacement tool menu, and checks the new setup before
-previewing removal of the verified old runtimes and tools, including the Pi CLI
-and the released Sentinel policy file for Pi. On macOS it first
-converts Nix-managed Homebrew while keeping its packages. Read
-[the migration guide](docs/UPGRADING.md) for conflicts and interrupted work.
+Coming from the Nix/chezmoi release (v0.4.x)? Only the `v1.0.1` checkout has
+`./migrate.sh` and `.\migrate.ps1`. Check out `v1.0.1`, run migrate and finish
+all its phases. Then update the checkout, open setup and choose **Update tools**.
+Read [the upgrade guide](docs/UPGRADING.md#from-v04x) for the two steps.
 
 ## Selectable tools
 
@@ -923,14 +920,11 @@ successful local checks do not establish current live GitHub settings.
 |---|---|
 | `installer/` | Go CLI, dependency catalog, pinned artifacts, ownership and recovery |
 | `setup.sh`, `setup.ps1` | Public interactive entrypoints |
-| `migrate.sh`, `migrate.ps1` | Explicit migration from the previous release |
 | `scripts/installer-bootstrap.*` | Verified private Go bootstrap |
 | `nvim/`, `tmux/`, `herdr/` | Editor and multiplexer configuration |
 | `installer/shells/` | Active shell integration recipes |
 | `ghostty/`, `windows-terminal/`, `aerospace/`, `xremap/` | Desktop configuration |
 | `git/`, `lazygit/config.yml`, `gh-dash/`, `starship/`, `lsd/` | Tool configuration |
-| `lazygit/config.windows.yml`, `herdr/config.windows.toml` | Passive released Windows live-link sources for migration |
-| `home/`, `shells/`, `windows/chezmoi-*` | Passive released sources needed during migration |
 | `tests/`, `.github/workflows/` | Local and native verification |
 | `docs/` | Upgrade, release and security guides, and release notes |
 
@@ -942,7 +936,7 @@ keep their own licenses.
 
 ## Acceptance coverage
 
-GitHub runs real native installation, migration, application and preservation
+GitHub runs real native installation, application and preservation
 checks on the supported targets. The core jobs begin with keyboard-driven public
 setup, followed through Check, Update, Repair and Remove/Reinstall. Agent checks
 run the installed CLIs without model calls. Desktop checks use the VS Code editor

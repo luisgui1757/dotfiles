@@ -17,6 +17,4 @@ if git config --file "$CONFIG" --get-regexp '^(user\.|pull\.ff$)' >/dev/null; th
     exit 1
 fi
 
-# home/dot_config/git/config remains immutable released migration evidence.
-# tests/bootstrap/legacy_inventory_test.py verifies its recorded release hash.
 echo "Git rebase and fetch-pruning defaults OK"

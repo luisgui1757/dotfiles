@@ -241,6 +241,11 @@ func (c *Catalog) Closure(roots []string, ctx Context) ([]string, error) {
 	return result, nil
 }
 
+func sha256Hex(data []byte) string {
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:])
+}
+
 func digest(value any) (string, error) {
 	data, err := json.Marshal(value)
 	if err != nil {

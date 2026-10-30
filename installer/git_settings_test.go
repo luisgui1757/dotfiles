@@ -111,7 +111,7 @@ func TestGitDefaultsRebasePullAndPruneFetch(t *testing.T) {
 }
 
 func TestGitLegacyReceiptRequiresRemovalBeforeScopedDefaults(t *testing.T) {
-	c, source, target := gitSettingsFixture(t)
+	c, _, target := gitSettingsFixture(t)
 	original := "[user]\n\tname = Personal baseline\n"
 	writeConfigFixture(t, target, original)
 	old := legacyGitController(c)
@@ -128,17 +128,6 @@ func TestGitLegacyReceiptRequiresRemovalBeforeScopedDefaults(t *testing.T) {
 	}
 	if !blocked {
 		t.Fatal("new defaults competed with the previous whole-file owner", preview.Plan)
-	}
-	if runtime.GOOS != "windows" {
-		m, err := NewLegacyMigration(filepath.Dir(filepath.Dir(source)), "git-settings-fixture", filepath.Dir(c.StatePath), c.Context, ConfigFolders{Home: c.Home, Config: filepath.Dir(filepath.Dir(target))})
-		if err != nil {
-			t.Fatal(err)
-		}
-		r, _ := m.Controller.Catalog.Resource("legacy.git-config")
-		observation, err := m.driver.Observe(context.Background(), r, Receipt{})
-		if err != nil || observation.ApplyBlocked == "" {
-			t.Fatal("legacy migration would detach setup's owned Git link", observation, err)
-		}
 	}
 	dispatchApproved(t, c, Request{Schema: 1, Mode: "apply", Selected: []string{}})
 	got, err := os.ReadFile(target)
@@ -307,82 +296,6 @@ func TestGitPublicationRespectsNativeApplicationLock(t *testing.T) {
 	}
 	if _, err := os.Lstat(target); !os.IsNotExist(err) {
 		t.Fatal("installer published while Git held its lock", err)
-	}
-}
-
-func TestLegacyGitLinkMigrationPreservesIdentityAndCheckout(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("released Windows Git configuration used a copy; POSIX live-link migration")
-	}
-	c, source, target := gitSettingsFixture(t)
-	old := "[user]\n\temail = fixture@example.invalid\n[fetch]\n\tprune = false\n"
-	legacySource := filepath.Join(filepath.Dir(filepath.Dir(source)), "home", "dot_config", "git", "config")
-	writeConfigFixture(t, legacySource, old)
-	if err := os.MkdirAll(filepath.Dir(target), 0700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Symlink(legacySource, target); err != nil {
-		t.Fatal(err)
-	}
-	folders := c.Driver.(*NativeDriver).Configurations.Folders
-	m, err := NewLegacyMigration(filepath.Dir(filepath.Dir(source)), c.Source, filepath.Dir(c.StatePath), c.Context, folders)
-	if err != nil {
-		t.Fatal(err)
-	}
-	result := approveLegacy(t, m, legacyRequest("legacy.git-config"))
-	if result.Status != "ready" {
-		t.Fatal(result)
-	}
-	dispatchApproved(t, c, Request{Schema: 1, Mode: "apply", Selected: []string{"git"}})
-	if got := gitSettingsCommand(t, c.Home, c.Home, "config", "--get", "pull.rebase"); got != "true" {
-		t.Fatal("released defaults shadowed the new rebase default", got)
-	}
-	gitSettingsCommand(t, c.Home, c.Home, "config", "--global", "user.email", "updated@example.invalid")
-	for _, mode := range []string{"check", "update"} {
-		if mode == "check" {
-			result, err = m.Dispatch(context.Background(), Request{Schema: 1, Mode: mode})
-			if err != nil || result.Status != "ready" {
-				t.Fatal("historical migration replayed over new Git settings", result, err)
-			}
-		} else {
-			dispatchApproved(t, c, Request{Schema: 1, Mode: mode})
-		}
-	}
-	dispatchApproved(t, c, Request{Schema: 1, Mode: "apply", Selected: []string{}})
-	if got := gitSettingsCommand(t, c.Home, c.Home, "config", "user.email"); got != "updated@example.invalid" {
-		t.Fatal("migration or removal lost personal identity", got)
-	}
-	data, err := os.ReadFile(legacySource)
-	if err != nil || string(data) != old {
-		t.Fatal("migration changed the old checkout", err)
-	}
-}
-
-func TestLegacyGitMigrationLeavesPersonalSyncLinkAlone(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("POSIX personal symlink fixture")
-	}
-	c, source, target := gitSettingsFixture(t)
-	personal := filepath.Join(c.Home, "personal-sync", "git-config")
-	writeConfigFixture(t, personal, "[user]\n\tname = Personal sync\n")
-	if err := os.MkdirAll(filepath.Dir(target), 0700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Symlink(personal, target); err != nil {
-		t.Fatal(err)
-	}
-	folders := c.Driver.(*NativeDriver).Configurations.Folders
-	m, err := NewLegacyMigration(filepath.Dir(filepath.Dir(source)), c.Source, filepath.Dir(c.StatePath), c.Context, folders)
-	if err != nil {
-		t.Fatal(err)
-	}
-	r, _ := m.Controller.Catalog.Resource("legacy.git-config")
-	o, err := m.driver.Observe(context.Background(), r, Receipt{})
-	if err != nil || o.Present || !o.Healthy {
-		t.Fatal("personal sync link was offered as legacy dotfiles", o, err)
-	}
-	if got, err := os.Readlink(target); err != nil || got != personal {
-		t.Fatal("personal sync link changed", got, err)
 	}
 }
 

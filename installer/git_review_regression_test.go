@@ -165,31 +165,3 @@ func TestGitCancelledFirstPublicationIsNotAMissingBaseline(t *testing.T) {
 		})
 	}
 }
-
-func TestLegacyMigrationUnavailablePathDoesNotAbortOtherItems(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("POSIX dangling directory fixture")
-	}
-	c, source, _ := gitSettingsFixture(t)
-	folders := c.Driver.(*NativeDriver).Configurations.Folders
-	if err := os.MkdirAll(folders.Config, 0700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Symlink(filepath.Join(c.Home, "missing-dashboard"), filepath.Join(folders.Config, "gh-dash")); err != nil {
-		t.Fatal(err)
-	}
-	for _, gitPath := range []string{"", "relative/git/config"} {
-		folders.GitConfig = gitPath
-		m, err := NewLegacyMigration(filepath.Dir(filepath.Dir(source)), c.Source, filepath.Dir(c.StatePath), c.Context, folders)
-		if err != nil {
-			t.Fatal("unavailable item aborted migration construction", err)
-		}
-		check, err := m.Dispatch(context.Background(), Request{Schema: 1, Mode: "check"})
-		if err != nil {
-			t.Fatal("unavailable item aborted migration check", err)
-		}
-		if gitPath != "" && (check.Status != "needs-action" || !strings.Contains(check.Message, "canonical Git")) {
-			t.Fatal("invalid Git path was silently skipped", check)
-		}
-	}
-}

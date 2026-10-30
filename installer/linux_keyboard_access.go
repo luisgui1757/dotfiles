@@ -240,9 +240,9 @@ func (d *KeyboardAccessDriver) Observe(ctx context.Context, r Resource, receipt 
 		o.Unknown, o.Pending = true, "cannot inspect "+d.Rules+"; nothing was changed: "+err.Error()
 		return o, nil
 	default:
-		o.Present, o.Fingerprint = true, legacyHash(data)
+		o.Present, o.Fingerprint = true, sha256Hex(data)
 		_, ours := keyboardAccessOwner(data)
-		owner, _, mode, ownerErr := legacyFileOwner(d.Rules)
+		owner, _, mode, ownerErr := fileOwner(d.Rules)
 		o.Healthy = ours && ownerErr == nil && int(owner) == d.Owner && mode == 0644 && info.Mode().Perm() == 0644
 		if !o.Healthy {
 			o.Pending = d.Rules + " exists but is not the exact rule dotfiles installs; dotfiles never replaces or removes it. Inspect it, and remove it yourself to let setup install its rule"
@@ -425,7 +425,7 @@ func (d *KeyboardAccessDriver) dispatch(ctx context.Context, in *keyboardAccessI
 		data, _, readErr := d.read(path)
 		if index == 1 && errors.Is(readErr, os.ErrNotExist) {
 			// The moved rule is already gone: nothing is left to delete.
-		} else if readErr != nil || legacyHash(data) != in.Expected {
+		} else if readErr != nil || sha256Hex(data) != in.Expected {
 			return errors.Join(errors.New("the keyboard access rule changed during removal; preserve "+path), readErr)
 		}
 	}

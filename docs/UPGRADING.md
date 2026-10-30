@@ -1,46 +1,33 @@
-# Moving to the native installer
+# Upgrading
 
-This major release replaces Nix and chezmoi with the interactive installer.
-There is no old-runtime compatibility mode. Its supported platforms are Apple
-Silicon macOS, Ubuntu/Debian amd64/arm64 and native Windows amd64.
+## From v0.4.x
 
-## Existing installation
+Release v1.0.1 is the last release that has `migrate.sh` and `migrate.ps1`.
+They move a v0.4.x installation (Nix and chezmoi) to this installer. Later
+revisions do not have them. Use two steps:
 
-Preserve local checkout changes first. Update to the reviewed new revision, either
-in the existing checkout or a separate checkout you intend to keep. Retained
-live-link source paths remain passive data so updating the checkout does not
-break those links before migration. Pi's removed sources are the explicit
-exception described below. This retention does not run an old installer.
-
-From the new checkout run:
+1. Preserve your local changes. Check out the `v1.0.1` tag and run its migrate
+   entrypoint. Finish all phases, also the runtime retirement and the final
+   Check. The [v1.0.1 upgrade guide](https://github.com/luisgui1757/dotfiles/blob/v1.0.1/docs/UPGRADING.md)
+   describes each phase.
+2. Update the checkout to the new revision. Open setup and choose
+   **Update tools**.
 
 ```bash
+git checkout v1.0.1
 ./migrate.sh
+git checkout main
+./setup.sh
 ```
 
-```powershell
-.\migrate.ps1
-```
+On Windows, use `.\migrate.ps1` and `.\setup.ps1`.
 
-Migration previews the detected shell profiles. Check each profile you want to
-detach, then approve its exact preview. The original artifact and a readable copy
-are retained at the reported recovery paths. Exact released bytes are recognized
-from pinned evidence; unknown/personal commands are never copied automatically
-into the new shell. Review those saved files and reapply personal settings you
-still need. For the released bash-to-zsh hook, only the exact marked block is
-removed; surrounding bytes stay intact.
+Setup reports the marks of an earlier installation that migrate did not retire.
+It does not use a Homebrew prefix that nix-homebrew still manages. Migrate keeps
+its records and recovery copies in the installer state folder. Use the v1.0.1
+checkout to examine them.
 
-Unselected profiles stay unchanged and migration reports the remaining work.
-The released install's Homebrew block in `.zshrc.local` stays as personal
-configuration. It runs after managed shell setup and can put Homebrew ahead of
-managed tools; review it if you keep duplicate tools or want different PATH
-precedence.
-After successful preparation (and Homebrew conversion on macOS), the normal menu
-opens. Choose tools and explicitly
-adopt existing tool configurations where offered. The installer preserves their
-first baseline and uses that same baseline for later removal. A completed
-migration receipt is historical evidence: rerunning migration cannot replay the
-old detachment over newly installed profile blocks.
+## Windows
 
 The new Windows installer discovers actual known folders independently, including
 redirected Documents and Start Menu Programs. Neovim uses a directory junction;
@@ -57,7 +44,7 @@ Git defaults now use a marked include in a regular personal XDG Git file.
 in that file or in `~/.gitconfig` override them. The include follows the current
 checkout, so edits to its defaults take effect without an installer update.
 
-For a released chezmoi Git symlink, migration preserves the original link and
+For a released chezmoi Git symlink, v1.0.1 migrate preserves the original link and
 copies every readable setting into a regular file. This includes personal name,
 email and other settings that the former `git config --global` write-through
 behavior might have added to the source. It does not rewrite that old checkout.
@@ -77,7 +64,7 @@ intact and offers restoration again on the next run; it never makes the obsolete
 mapping installable. Saved proof that a first publication was cancelled before
 any move, or explicitly restored, releases its bookkeeping without modifying the
 personal file. Missing recovery evidence blocks only this configuration. Migrate any restored
-legacy link, then select Git again. Migration refuses to detach setup's owned
+legacy link with v1.0.1, then select Git again. Migrate refuses to detach setup's owned
 link. The old unowned receipt is released when the new integration takes over;
 its saved backup remains intact. Do not delete installer state to bypass this
 handover. On Windows this same flow covers the former whole-file copy.
@@ -95,152 +82,16 @@ Git targets that resolve inside the checkout are blocked, including redirected
 parent directories. Historical targets that move or go offline cannot block
 independent selections; any uninspectable old lock evidence remains disclosed.
 
-## Retiring the earlier installation
-
-Migration includes a separate retirement phase after the replacement setup
-passes its check. On macOS, Nix-managed Homebrew is converted before setup;
-its installed formulae, casks and taps must remain unchanged during conversion.
-Conversion preserves the old Homebrew source beside its original paths and
-restores the reviewed Homebrew 7.0.9 repository. It reads installation records
-directly, so the old Homebrew need not understand newer cask definitions. It does
-not run a global Homebrew update or migrate packages or taps. Redirected taps,
-submodules, partial clones and executable Git filters require inspection before conversion;
-preview never runs personal tap filter commands, including worktree-specific
-settings. The same protection applies to legacy plugin checkouts. Empty test
-submodules from the released plugin setup are recognized; populated or cached
-submodule data stays. History inspection refuses partial clones instead of
-downloading missing objects.
-The later retirement preview lists the exact old tools, files, services and
-accounts it can remove, including administrator actions and permanent Nix store
-deletion. Check each item you want to retire and review that preview.
-Scroll through the complete scope before confirming: it names native identities,
-remaining steps, preservation paths and anything retained. The summary counts
-these as removals; Homebrew conversion is a change. Administrator counts describe
-the actual remaining steps, including when resuming an interrupted retirement.
-
-The released setup also wrote Sentinel 0.1.2 policy for OpenCode
-(`${XDG_CONFIG_HOME:-~/.config}/opencode/AGENTS.md`) and Pi
-(`~/.pi/agent/AGENTS.md`). Pi is not supported now. The retirement item for the
-released Pi policy deletes `~/.pi/agent/AGENTS.md` only when it holds exactly
-the released policy bytes. A file with other text, or a link, stays complete.
-The preview names it, and migration still completes.
-
-Migration does not delete the OpenCode file, because OpenCode is now a Sentinel
-host. When you select Sentinel rules and skills, Sentinel replaces the old block
-in that file. Text outside the block stays.
-
-If migration stops at a phase, it names that phase and points to the report it
-already printed instead of repeating it. A check report closes with its screen,
-so its stop message repeats it in full.
-
-Nix removal first handles the earlier login shell, Home Manager links and
-nix-darwin system integration. It checks other accounts, garbage-collection roots,
-mounted filesystems and running processes before deleting the store. Close old
-Nix-based terminal sessions and open a fresh login session if processes still use
-it. Packages in the Nix store disappear; the preview calls out replacements you
-did not select. Personal Nix configuration remains, and earlier state/configuration
-is preserved at the listed recovery locations. The store itself is not backed up.
-
-Migration identifies upstream Nix and compatible Determinate installations from
-their on-disk evidence; you do not need to choose the installer type. Determinate
-removal validates the vendor receipt and native account/service/volume identities.
-The uninstaller must be protected and root-owned, or match the reviewed official
-release hash for its exact Mac version. The ordinary Mac installer preserves the
-installing user's ownership; migration authenticates those bytes without running
-them during preview. Root then copies and verifies both the binary and receipt
-in a private directory before execution. The preview identifies that trust source,
-the retained temporary copies, and the system Nix configuration backup.
-Unknown receipt actions or unrelated consumers block removal locally.
-Unreadable Neovim runtime journals also block that resource locally. Deselecting
-it preserves the runtime; other tools remain available. If an active operation's
-prior publication cannot be proved, Abandon refuses and identifies the journal
-that must be recovered or inspected.
-Stale links inside root's private temporary directory are checked read-only with
-existing administrator credentials. If they cannot be inspected, migration stops
-without treating them as absent.
-The same bounded inspection handles vendor configuration and remaining boot-time
-files readable only by root, without changing their permissions. If the preview reports missing administrator
-credentials, run `sudo -v` and retry `migrate`; machine mode never prompts.
-The receipt's Nix services are stopped before the final process check. If an
-outside process still uses Nix, removal stops with the store intact; close that
-process and resume migration. The services remain stopped during this pause.
-On Linux, an incomplete process inspection also stops removal. This includes
-processes changing address space during the check and a main thread exiting
-while workers remain alive. The diagnostic identifies the process and reference;
-finish or close that process before resuming. An unreadable process is never
-assumed to have stopped using the store.
-On Linux, inactive, failed or unloaded units do not block recovery after a
-restart or partial uninstall. Socket and service activation links are recorded
-in the preview and
-removed only when unchanged. This includes systemd links resolved into the Nix
-store; upstream retirement removes those links before their source disappears. Older saved evidence cannot authorize a newly
-observed link; a changed approval requires a fresh preview. If an older unfinished
-stop recipe keeps failing on a missing or failed unit, abandon that operation and review
-migration again; saved commands are not silently rewritten.
-
-If a Nix upgrade changed the profile, or the store was deleted outside migration,
-an old store-resolved activation link may no longer be provable. Migration keeps
-it and names its exact path. After confirming that it belongs to the old Nix
-installation, remove only that link with the displayed `sudo rm -- <path>`
-command, then rerun `migrate`. Do not substitute a store or unit-file path.
-This advice applies only to links in `sockets.target.wants` or
-`multi-user.target.wants`. Primary unit/tmpfiles links and files or directories
-at activation paths stay for manual inspection.
-
-On Linux, retirement switches the earlier Linuxbrew zsh login to setup's selected
-native zsh, or system Bash when zsh is unselected, before removing the formula.
-It can also repair this account's login if that formula was already removed.
-Another account using the formula keeps it installed; migration never changes
-other accounts' login shells.
-
-chezmoi retirement removes the verified executable through its original provider;
-it never runs `purge` or `destroy`. An independent chezmoi source blocks its
-removal. Pi session data, personal configuration, and unrelated packages stay.
-Exact direct-artifact and plugin evidence covers the published `v0.4.4` and the
-pre-overhaul `main` commit `ae9a6446`; a filename alone is not removal authority.
-
-Unchecked or unrecognized items remain visible and keep migration incomplete.
-Changes to the installation after preview require another review. Keep the old
-checkout and recovery files until you have checked your personal data and adopted
-applications. Running setup repeatedly reconciles its saved selection and verified
-resources; it does not run the old installer again.
-
-An earlier completed retirement does not select a later reinstallation for
-removal. Each migration respects the current checkboxes and keeps the previous
-operation history and recovery paths. Linux migration also detects tools that
-the released installer installed through Linuxbrew; new Linux setup uses APT
-and private archives. Shared package-manager infrastructure and unproved or
-externally required dependencies stay installed. Migration never runs Homebrew
-autoremove or removes another application's dependencies. The final report also lists
-intentionally kept components, including shared Windows packages and a native
-font family reused by the selected setup.
-
-Some leftovers can never be proved safe to remove, for example when a managed
-Windows laptop has no winget source or a package was updated outside the released
-installer. Once everything else is retired, interactive migrate asks whether to
-keep the remaining items and finish. Checked items stay exactly as they are; the
-report lists each one with its folder, file or package name under "Kept", so you
-can remove it yourself, and migration completes. Unchecked items, or any later
-change to a kept item, leave migration unfinished and appear in the next run.
-Interrupted, blocked or uninspectable retirements are never offered as kept.
-
-An interrupted upstream Linux store deletion records its approved membership and
-holds a separate deletion lock. If its worker is lost, recovery requires a fresh
-approval of the remaining files after the earlier deletion has stopped. Newly
-added root/store members block recovery. A removed default-profile manifest can
-be recovered only with saved proof that it contained installer runtime packages;
-an older journal without that proof cannot authorize another account's files.
-
 ## Interruptions and conflicts
 
 An unfinished transaction from a released old installer must first be recovered
-with that exact retained release and recovery directory. Migration reports the
-blocking evidence and does not start a second operation over it.
+with that exact retained release and recovery directory. Recover an unfinished
+migrate operation with the v1.0.1 checkout.
 
 For a new installer interruption, finish recovery **before updating the checkout**.
 Resume requires the original installer executable and its matching checkout,
 including the original configuration sources. If neither has changed, reopen the
-same `setup` or `migrate` entrypoint and use its recovery menu. Restoration uses
+same `setup` entrypoint and use its recovery menu. Restoration uses
 saved physical artifacts without overwriting newly created personal files;
 abandonment is offered only when the provider can prove it safe. Neither action
 is a general substitute for resuming with the original executable.
@@ -281,8 +132,8 @@ Get-ChildItem -LiteralPath $cache -Filter 'dotfiles-*.exe' -File |
 ```
 
 Run only the matching executable from your retained trusted cache, explicitly
-binding its original checkout. Use `migrate` instead of `setup` when recovering
-a migration transaction:
+binding its original checkout. For a migrate transaction, use the v1.0.1
+executable and checkout, and `migrate` instead of `setup`:
 
 ```bash
 DOTFILES_CHECKOUT='/absolute/path/to/original-checkout' DOTFILES_ENTRYPOINT=setup \
@@ -329,8 +180,8 @@ Untick tools in **Choose tools** to remove them and review the shared-dependency
 choices on the confirmation. Personal data and pre-existing packages are
 preserved; unchanged owned resources are removed/restored surgically.
 
-Claude Code and Codex CLI are separate selections. Select either or both after
-migration; their standalone binaries do not require Node/npm. Authentication,
+Claude Code and Codex CLI are separate selections. Select either or both;
+their standalone binaries do not require Node/npm. Authentication,
 sessions and personal CLI settings stay local. Claude's managed shell disables
 its own updater; use the setup menu's Update action for reviewed CLI pins.
 
@@ -355,8 +206,7 @@ Existing released Pi packages and personal data remain outside this installer's
 ownership. Keep an old checkout if a personal Pi configuration still links to it.
 To test an earlier unreleased native-installer revision, first remove Pi and its
 old Sentinel selection with that exact revision. Finish any pending operation
-there before you advance. Migration retires the released Pi policy file
-(see [Retiring the earlier installation](#retiring-the-earlier-installation)).
+there before you advance. v1.0.1 migrate retires the released Pi policy file.
 Never discard state or recovery journals.
 
 Sentinel rules and skills replace the two v1.0.0 selections, Sentinel policy and
@@ -580,11 +430,11 @@ using Python's exact null-device spelling. This prevents machine or environment
 configuration from changing the pinned installation. For interrupted operations,
 finish recovery with the original checkout before updating.
 
-Windows retirement can remove multiple released PATH entries in one approved
-plan while preserving unrelated entries. If an older interrupted retirement
-reports that a later tool changed after approval, abandon that remaining plan
-through migration recovery, then review a fresh retirement plan. Completed
-removals and their preserved evidence remain recorded.
+Windows retirement in v1.0.1 migrate can remove multiple released PATH entries
+in one approved plan while preserving unrelated entries. If an older interrupted
+retirement reports that a later tool changed after approval, abandon that
+remaining plan through v1.0.1 migrate recovery, then review a fresh retirement
+plan. Completed removals and their preserved evidence remain recorded.
 
 Personal shell edits may use different line endings from the managed
 block without triggering a repair. Existing UTF-16 profiles retain their encoding;
@@ -611,7 +461,7 @@ review. Never edit state or delete recovery journals to bypass this boundary.
 Older unreleased native builds could replace the completed-removal status with
 retained status. Those records remain conservative: explicitly select and adopt
 the affected configuration, then remove it again to establish a new verified
-lifecycle. The released chezmoi/Nix migration uses its separate handover workflow.
+lifecycle. The released chezmoi/Nix migration uses the separate v1.0.1 migrate workflow.
 
 ### Earlier unreleased Mac bootstrap and application images
 

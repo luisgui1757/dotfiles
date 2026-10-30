@@ -274,7 +274,7 @@ func TestNativeMacKeyboardLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 	data, err := os.ReadFile(keyboardAccessRules)
-	uid, _, mode, ownerErr := legacyFileOwner(keyboardAccessRules)
+	uid, _, mode, ownerErr := fileOwner(keyboardAccessRules)
 	if err != nil || ownerErr != nil || uid != 0 || mode != 0644 || !bytes.Equal(data, keyboardAccessContent(state.Receipts["system.keyboard-access"].OperationID)) {
 		t.Fatal("the keyboard access rule is not the exact root-owned recipe", string(data), uid, mode, err, ownerErr)
 	}

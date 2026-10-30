@@ -7,7 +7,7 @@
 help:
 	@echo "setup: launch the installer menu"
 	@echo "ci / test-required: configuration, bootstrap, Go format/vet/race and Renovate gates"
-	@echo "test: configuration/editor/shell checks; test-bootstrap: public launchers and migration evidence"
+	@echo "test: configuration/editor/shell checks; test-bootstrap: public launchers and release scripts"
 	@echo "test-installer: Go installer behavior and recovery tests"
 	@echo "release-check / release-prepare / release-publish: manifest-bound maintainer release commands"
 

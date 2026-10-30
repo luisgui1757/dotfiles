@@ -98,8 +98,6 @@ Describe 'rose-pine renderer' {
         $actualPath = Join-Path $script:RepoRoot "tmux/rose-pine.$Variant.conf"
         (Test-Path -LiteralPath $actualPath) | Should -BeTrue
         (Get-Content -Raw -LiteralPath $actualPath) | Should -Be $expected
-        # Passive home/ sources retain released bytes, including their old
-        # generator header. legacy_inventory_test.py checks their release hashes.
     }
 
     It "defaults to the main palette for an unknown variant" {
