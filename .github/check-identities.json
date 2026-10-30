@@ -23,6 +23,8 @@
     "core (ubuntu-26.04-arm)",
     "core (macos-26)",
     "core (windows-2025)",
+    "core packages (macos-26)",
+    "core packages (windows-2025)",
     "Fresh Homebrew (macOS arm64)",
     "Fresh Debian APT (amd64)",
     "Fresh Debian APT (arm64)",

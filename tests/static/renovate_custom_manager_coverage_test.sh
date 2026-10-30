@@ -14,8 +14,10 @@ import sys
 with open("renovate.json", encoding="utf-8") as fh:
     config = json.load(fh)
 
-if config.get("rebaseWhen") != "behind-base-branch":
-    raise SystemExit("FAIL: Renovate does not enforce the repository's behind-main policy")
+# Strict branch protection blocks the merge of a pull request that is behind main.
+# Renovate rebases only on a conflict, so a merge to main does not restart all its checks.
+if config.get("rebaseWhen") != "conflicted":
+    raise SystemExit("FAIL: Renovate must rebase only on a conflict")
 
 tracked_files = [pathlib.Path(path) for path in subprocess.check_output(["git", "ls-files"], text=True).splitlines() if pathlib.Path(path).is_file()]
 failures = []

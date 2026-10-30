@@ -3,10 +3,14 @@
 # tomllib fallback for the known macOS taplo dynamic-store panic.
 set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
+# config-schema.json is .github/config-schema.json of Starship v1.26.0 (ISC, see
+# LICENSES/starship-ISC.txt). Taplo uses it instead of the $schema URL, so the
+# lint does not use the network. Replace it when the Starship pin changes.
+SCHEMA_URL="file://$REPO_ROOT/tests/starship/config-schema.json"
 
 if command -v taplo >/dev/null 2>&1; then
     taplo_output=""
-    if ! taplo_output="$(taplo lint "$REPO_ROOT/starship/starship.toml" 2>&1)"; then
+    if ! taplo_output="$(taplo lint --schema "$SCHEMA_URL" "$REPO_ROOT/starship/starship.toml" 2>&1)"; then
         if grep -Eq 'panicked at|Attempted to create a NULL object' <<<"$taplo_output"; then
             echo "taplo panicked on $REPO_ROOT/starship/starship.toml; falling back to python tomllib"
             printf '%s\n' "$taplo_output"

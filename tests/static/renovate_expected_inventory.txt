@@ -23,9 +23,9 @@ gomod|installer/go.mod|go|golang.org/x/term|1
 gomod|installer/go.mod|golang-version|go|1
 regex|.github/workflows/installer-engine.yml|docker|mcr.microsoft.com/dotnet/framework/runtime|1
 regex|.github/workflows/installer-engine.yml|docker|ubuntu|1
-regex|.github/workflows/installer-engine.yml|github-runners|macos|3
+regex|.github/workflows/installer-engine.yml|github-runners|macos|4
 regex|.github/workflows/installer-engine.yml|github-runners|ubuntu|10
-regex|.github/workflows/installer-engine.yml|github-runners|windows|3
+regex|.github/workflows/installer-engine.yml|github-runners|windows|4
 regex|.github/workflows/test.yml|git-refs|cargo-bins/cargo-binstall|1
 regex|.github/workflows/test.yml|github-releases|neovim/neovim|1
 regex|.github/workflows/test.yml|github-releases|starship/starship|1
