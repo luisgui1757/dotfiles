@@ -3,3 +3,6 @@
   prune = true
 [pull]
   rebase = true
+[user]
+  name = luisgui1757
+  email = 139752288+luisgui1757@users.noreply.github.com
