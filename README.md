@@ -353,8 +353,8 @@ skills also go to it.
 skills for coding agents. Setup gets one pinned Sentinel commit with Git and
 runs the Sentinel installer of that commit. That installer writes the rules
 into a managed block in the instruction file of each agent. Text outside the
-block stays. It also copies the `core` and `ui` skills and writes a
-`.sentinel-owned` file into each skill folder. It does not replace a folder
+block stays. It also copies the skills of the `core`, `ui`, `formal` and `ops`
+profiles and writes a `.sentinel-owned` file into each skill folder. It does not replace a folder
 that it did not write. For Claude Code, it also writes the output style
 `${CLAUDE_CONFIG_DIR:-~/.claude}/output-styles/sentinel.md`. Claude Code uses
 it only after you pick it with `/output-style Sentinel` or with
@@ -377,7 +377,11 @@ The `core` skills are `babysit-pr`, `cleanup`, `council`, `enforce`,
 `file-pr`, `full-stop`, `leaving-pr-comments`, `modernize`, `no-comments`,
 `sol-loop`, `takeover`, `technical-writing`, `tldr`, `untangle`, `verify-pr`
 and `why`. The `ui` skills are `beast-ui`, `doc-view`, `frontend-design` and
-`impeccable`.
+`impeccable`. The `formal` skill is `statechart`. The `ops` skills are
+`featuremap` and `patrol`. Setup does not install the `explain` profile
+(`how`). `featuremap` and `patrol` need Node 22 or later when they run.
+`statechart` needs Node 22.18 or later, Bun or Deno. On its first run, it
+installs Java and TLC with mise. It does not run on native Windows.
 The skills are copies, so an edit to a skill never changes this checkout.
 
 Kiro ignores a `KIRO_HOME` that is not an absolute folder outside your home

@@ -166,10 +166,10 @@ func TestSentinelInstallerCommandFollowsPlatformAndHosts(t *testing.T) {
 				t.Fatal(err)
 			}
 			checkout := filepath.Join(d.State, "sentinel", "checkout")
-			want := []string{filepath.Join(checkout, "tools", "install"), "--global", "--hosts", "codex,claude,kiro,opencode", "--skills", "core,ui"}
+			want := []string{filepath.Join(checkout, "tools", "install"), "--global", "--hosts", "codex,claude,kiro,opencode", "--skills", "core,ui,formal,ops"}
 			if target.OS == "windows" {
 				want = []string{"-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", filepath.Join(checkout, "tools", "install.ps1"),
-					"-Global", "-Hosts", "codex,claude,kiro,opencode", "-Skills", "core,ui"}
+					"-Global", "-Hosts", "codex,claude,kiro,opencode", "-Skills", "core,ui,formal,ops"}
 			}
 			install := processes.installers()[0]
 			if install.Program != fakeSentinelShell || !slices.Equal(install.Arguments, want) {
@@ -400,7 +400,7 @@ func TestSentinelRemovesWithTheFoldersOfTheInstall(t *testing.T) {
 		t.Fatal("removal left the Sentinel cache", o, err)
 	}
 	remove := processes.installers()[len(processes.installers())-1]
-	if !slices.Equal(remove.Arguments[1:], []string{"--global", "--hosts", "codex,claude", "--skills", "core,ui", "--remove"}) || sentinelEnvironment(t, remove, "CLAUDE_CONFIG_DIR") != installed {
+	if !slices.Equal(remove.Arguments[1:], []string{"--global", "--hosts", "codex,claude", "--skills", "core,ui,formal,ops", "--remove"}) || sentinelEnvironment(t, remove, "CLAUDE_CONFIG_DIR") != installed {
 		t.Fatal("removal did not reach the hosts and folders of the install", remove)
 	}
 }

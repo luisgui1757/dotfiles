@@ -383,13 +383,13 @@ func (d *SentinelDriver) installer(checkout string, hosts []string, homes sentin
 			return nativeCommand{}, errors.New("Sentinel needs Windows PowerShell, which setup did not find")
 		}
 		arguments := []string{"-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", filepath.Join(checkout, "tools", "install.ps1"),
-			"-Global", "-Hosts", strings.Join(hosts, ","), "-Skills", "core,ui"}
+			"-Global", "-Hosts", strings.Join(hosts, ","), "-Skills", "core,ui,formal,ops"}
 		if mode != "" {
 			arguments = append(arguments, "-"+strings.ToUpper(mode[:1])+mode[1:])
 		}
 		return nativeCommand{Program: d.Shell, Arguments: arguments, Environment: environment}, nil
 	}
-	arguments := []string{filepath.Join(checkout, "tools", "install"), "--global", "--hosts", strings.Join(hosts, ","), "--skills", "core,ui"}
+	arguments := []string{filepath.Join(checkout, "tools", "install"), "--global", "--hosts", strings.Join(hosts, ","), "--skills", "core,ui,formal,ops"}
 	if mode != "" {
 		arguments = append(arguments, "--"+mode)
 	}
