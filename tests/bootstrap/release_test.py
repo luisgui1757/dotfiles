@@ -121,7 +121,7 @@ class ReleaseTests(unittest.TestCase):
                  "publish_draft"]
         # The manifest before this PR had no version field.
         self.assertEqual(self.publish({"schema": 2, "current": {"tag": "v1.1.0"}}), gates)
-        for index, gate in enumerate(gates[:-1]):
+        for gate in gates[:-1]:
             with self.subTest(gate=gate), self.assertRaisesRegex(release.ReleaseError, gate):
                 self.publish(changed, fail_at=gate)
 
