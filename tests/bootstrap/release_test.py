@@ -49,8 +49,8 @@ class ReleaseTests(unittest.TestCase):
         self.manifest = release.validate_manifest(self.root)
 
     def set_version(self, tag, text):
-        (self.root / "release/manifest.json").write_text(json.dumps({"schema": 3, "version": tag}) + "\n")
-        (self.root / f"docs/releases/{tag}.md").write_text(text)
+        (self.root / "release/manifest.json").write_text(json.dumps({"schema": 3, "version": tag}) + "\n", encoding="utf-8")
+        (self.root / f"docs/releases/{tag}.md").write_text(text, encoding="utf-8")
 
     def evidence(self):
         run = {"databaseId": 123, "attempt": 1, "headSha": "2" * 40, "headBranch": self.tag,
@@ -135,7 +135,7 @@ class ReleaseTests(unittest.TestCase):
                             ("not canonical", {"schema": 3, "version": self.tag[1:]}),
                             ("no notes", {"schema": 3, "version": bump(self.tag)})):
             with self.subTest(label=label):
-                manifest.write_text(json.dumps(data))
+                manifest.write_text(json.dumps(data), encoding="utf-8")
                 with self.assertRaises(release.ReleaseError):
                     release.validate_manifest(self.root)
         for label, text in (("other tag", notes(bump(self.tag))),
@@ -169,7 +169,7 @@ class ReleaseTests(unittest.TestCase):
 
     def test_release_commit_must_be_the_checked_squash_merge_of_one_pull_request(self):
         commit, head = "2" * 40, "6" * 40
-        required = json.loads((ROOT / ".github/check-identities.json").read_text())["required"]
+        required = json.loads((ROOT / ".github/check-identities.json").read_text(encoding="utf-8"))["required"]
         replies = {
             f"commits/{commit}/pulls": [{"number": 7, "merged_at": "2026-11-02T00:00:00Z", "merge_commit_sha": commit,
                                          "base": {"ref": "main"}, "head": {"sha": head}}],
