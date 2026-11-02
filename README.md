@@ -358,9 +358,10 @@ profiles and writes a `.sentinel-owned` file into each skill folder. It does
 not replace a folder that it did not write. For Claude Code, it also writes
 the output style `${CLAUDE_CONFIG_DIR:-~/.claude}/output-styles/sentinel.md`.
 Claude Code uses it only after you pick it with `/output-style Sentinel` or
-with `"outputStyle": "Sentinel"` in its `settings.json`. This file has no
-ownership check: install and repair replace a different file at that path, and
-removal deletes it.
+with `"outputStyle": "Sentinel"` in its `settings.json`. The installer writes
+the SHA-256 of this file into `output-styles/.sentinel-owned`. It does not
+replace or remove a `sentinel.md` that it did not write or that somebody
+changed.
 
 Sentinel goes to each agent that setup finds: Codex, Claude Code, GitHub
 Copilot, Kiro and OpenCode. An agent counts when setup finds its command (or
