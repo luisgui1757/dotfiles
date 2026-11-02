@@ -2,14 +2,14 @@
 # current OS; sub-targets skip themselves with a clear message when the
 # tool they depend on isn't installed.
 
-.PHONY: ci test-installer test-bootstrap test-required test test-nvim test-shell test-starship test-tmux test-ghostty test-aerospace test-static validate-renovate lint release-check release-prepare release-publish setup help
+.PHONY: ci test-installer test-bootstrap test-required test test-nvim test-shell test-starship test-tmux test-ghostty test-aerospace test-static validate-renovate lint release-check setup help
 
 help:
 	@echo "setup: launch the installer menu"
 	@echo "ci / test-required: configuration, bootstrap, Go format/vet/race and Renovate gates"
 	@echo "test: configuration/editor/shell checks; test-bootstrap: public launchers and release scripts"
 	@echo "test-installer: Go installer behavior and recovery tests"
-	@echo "release-check / release-prepare / release-publish: manifest-bound maintainer release commands"
+	@echo "release-check: validate the release manifest and its notes"
 
 setup:
 	@bash setup.sh
@@ -61,13 +61,3 @@ lint:
 
 release-check:
 	@python3 scripts/release.py check
-
-release-prepare:
-	@test -n "$(VERSION)" || { echo "FAIL: VERSION=vMAJOR.MINOR.PATCH is required" >&2; exit 2; }
-	@test -n "$(NOTES)" || { echo "FAIL: NOTES=/path/to/reviewed-release-notes.md is required" >&2; exit 2; }
-	@python3 scripts/release.py prepare --version "$(VERSION)" --notes "$(NOTES)" $(if $(SUPERSEDE),--supersede "$(SUPERSEDE)",)
-
-release-publish:
-	@test -n "$(VERSION)" || { echo "FAIL: VERSION=vMAJOR.MINOR.PATCH is required" >&2; exit 2; }
-	@test -n "$(EXPECTED_SHA)" || { echo "FAIL: EXPECTED_SHA=<40-hex-merged-main> is required" >&2; exit 2; }
-	@python3 scripts/release.py publish --version "$(VERSION)" --expected-sha "$(EXPECTED_SHA)" $(if $(RUN_ID),--run-id "$(RUN_ID)",)

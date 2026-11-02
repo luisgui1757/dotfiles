@@ -3,9 +3,9 @@ import copy
 import hashlib
 import importlib.util
 import json
-import os
 import pathlib
 import shutil
+import subprocess
 import tempfile
 import unittest
 from unittest import mock
@@ -19,9 +19,6 @@ SPEC.loader.exec_module(release)
 def notes(tag):
     return f"""# {tag} — Release fixture
 
-> Release candidate notes. Publish these only with the official annotated
-> `{tag}` tag after the deterministic evidence gate below passes.
-
 ## Highlights
 
 - Verify the native installer release.
@@ -29,14 +26,6 @@ def notes(tag):
 ## Compatibility and upgrade
 
 Clone the reviewed tag and use the local launcher.
-
-## Release identity
-
-Exact annotated tag and commit are recorded after verification.
-
-## Evidence required before publication
-
-- Local and required hosted checks, native jobs, scan and fresh clone.
 """
 
 
@@ -54,16 +43,13 @@ class ReleaseTests(unittest.TestCase):
             shutil.copytree(ROOT / name, self.root / name)
         (self.root / ".github").mkdir()
         shutil.copyfile(ROOT / ".github/check-identities.json", self.root / ".github/check-identities.json")
-        self.historical = {p.relative_to(self.root): p.read_bytes() for p in self.root.rglob("*") if p.is_file()}
-        initial = release.validate_manifest(self.root)
-        if initial["current"]["state"] == "candidate":
-            self.tag = initial["current"]["tag"]
-            self.manifest = initial
-        else:
-            major, minor, patch = release.semver(initial["current"]["tag"])
-            self.tag = f"v{major}.{minor}.{patch + 1}"
-            release.render_candidate(self.root, version=self.tag, notes_text=notes(self.tag), base_commit="1" * 40)
-            self.manifest = release.validate_manifest(self.root)
+        self.tag = bump(release.validate_manifest(self.root)["tag"])
+        self.set_version(self.tag, notes(self.tag))
+        self.manifest = release.validate_manifest(self.root)
+
+    def set_version(self, tag, text):
+        (self.root / "release/manifest.json").write_text(json.dumps({"schema": 3, "version": tag}) + "\n")
+        (self.root / f"docs/releases/{tag}.md").write_text(text)
 
     def evidence(self):
         run = {"databaseId": 123, "attempt": 1, "headSha": "2" * 40, "headBranch": self.tag,
@@ -86,24 +72,144 @@ class ReleaseTests(unittest.TestCase):
 
     def test_publication_keeps_irreversible_and_exact_identity_guards(self):
         source = (ROOT / "scripts/release.py").read_text()
-        for required in ('/immutable-releases', '"--log-opts=', '"workflow_dispatch"',
+        for required in ('"--log-opts=', '"workflow_dispatch"',
                          '"GIT_TERMINAL_PROMPT": "0"', '"--draft"',
-                         'PUBLISH IMMUTABLE {tag} @ {expected_sha}', '"--draft=false"',
-                         '"release-proof.json"', 'resume_publication_closure',
+                         '"--draft=false"',
+                         '"release-proof.json"',
                          'live required-check policy differs', 'head_tree != merged_tree'):
             self.assertIn(required, source)
         for forbidden in ('"--clobber"', '"--yes"', 'git push --force', 'tag -d'):
             self.assertNotIn(forbidden, source)
 
-    def test_prepare_preserves_history_and_uses_native_matrix(self):
-        self.assertEqual(self.manifest["schema"], 2)
-        self.assertEqual(self.manifest["workflow"], "installer-engine.yml")
-        for path, data in self.historical.items():
-            if path == pathlib.Path("release/manifest.json"):
-                continue
-            self.assertEqual((self.root / path).read_bytes(), data, str(path))
-        with self.assertRaises(release.ReleaseError):
-            release.render_candidate(self.root, version=self.tag, notes_text=notes(self.tag), base_commit="1" * 40)
+    def test_manifest_names_one_version_with_its_reviewed_notes(self):
+        self.assertEqual((self.manifest["tag"], self.manifest["title"]), (self.tag, f"{self.tag} — Release fixture"))
+        self.assertEqual(self.manifest["workflow_jobs"], release.native_job_names(ROOT))
+        self.assertTrue(release.release_body(notes(self.tag)).startswith("## Highlights\n"))
+        manifest = self.root / "release/manifest.json"
+        for label, data in (("extra field", {"schema": 3, "version": self.tag, "title": "x"}),
+                            ("old schema", {"schema": 2, "version": self.tag}),
+                            ("not canonical", {"schema": 3, "version": self.tag[1:]}),
+                            ("no notes", {"schema": 3, "version": bump(self.tag)})):
+            with self.subTest(label=label):
+                manifest.write_text(json.dumps(data))
+                with self.assertRaises(release.ReleaseError):
+                    release.validate_manifest(self.root)
+        for label, text in (("other tag", notes(bump(self.tag))),
+                            ("placeholder", notes(self.tag) + "\n<reviewed title>\n"),
+                            ("no highlights", notes(self.tag).replace("## Highlights", "## Changes"))):
+            with self.subTest(label=label):
+                self.set_version(self.tag, text)
+                with self.assertRaises(release.ReleaseError):
+                    release.validate_manifest(self.root)
+
+    def test_release_follows_the_latest_immutable_release_and_skips_a_published_version(self):
+        def published(**fields):
+            return subprocess.CompletedProcess([], 0, json.dumps({"tag_name": self.tag, **fields}), "")
+        missing = subprocess.CompletedProcess([], 1, "", "HTTP 404")
+        latest = {"tag_name": "v1.1.0", "immutable": True}
+        with mock.patch.object(release, "run", return_value=published(draft=False, immutable=True)), \
+                mock.patch.object(release, "load_json_from_gh") as gh:
+            self.assertIsNone(release.previous_release(self.manifest))
+        gh.assert_not_called()
+        for reply in (missing, published(draft=True, immutable=False)):
+            with mock.patch.object(release, "run", return_value=reply), \
+                    mock.patch.object(release, "load_json_from_gh", return_value=latest):
+                self.assertEqual(release.previous_release(self.manifest), "v1.1.0")
+        for label, reply, newest in (("mutable published", published(draft=False, immutable=False), latest),
+                                     ("not newer", missing, {"tag_name": self.tag, "immutable": True}),
+                                     ("mutable latest", missing, dict(latest, immutable=False))):
+            with self.subTest(label=label), \
+                    mock.patch.object(release, "run", return_value=reply), \
+                    mock.patch.object(release, "load_json_from_gh", return_value=newest), \
+                    self.assertRaises(release.ReleaseError):
+                release.previous_release(self.manifest)
+
+    def test_release_commit_must_be_the_checked_squash_merge_of_one_pull_request(self):
+        commit, head = "2" * 40, "6" * 40
+        required = json.loads((ROOT / ".github/check-identities.json").read_text())["required"]
+        replies = {
+            f"commits/{commit}/pulls": [{"number": 7, "merged_at": "2026-11-02T00:00:00Z", "merge_commit_sha": commit,
+                                         "base": {"ref": "main"}, "head": {"sha": head}}],
+            "rules/branches/main": [{"type": "pull_request"},
+                                    {"type": "required_status_checks",
+                                     "parameters": {"required_status_checks": [{"context": name} for name in required]}}],
+            f"commits/{head}/check-runs?per_page=100": {"check_runs": [
+                {"name": name, "head_sha": head, "status": "completed", "conclusion": "success", "app": {"id": 15368}}
+                for name in [*required, "Analyze (python)"]]},
+            f"git/commits/{head}": {"tree": {"sha": "5" * 40}},
+            f"git/commits/{commit}": {"tree": {"sha": "5" * 40}},
+        }
+
+        def verify(change=None):
+            answers = copy.deepcopy(replies)
+            if change:
+                change(answers)
+            prefix = f"repos/{self.manifest['repository']}/"
+            with mock.patch.object(release, "load_json_from_gh", side_effect=lambda args: answers[args[0].removeprefix(prefix)]):
+                return release.verify_merged_pr(self.manifest, commit)
+
+        self.assertEqual(verify(), {"number": 7, "head": head, "tree": "5" * 40,
+                                    "checks": sorted([*required, "Analyze (python)"])})
+        checks = f"commits/{head}/check-runs?per_page=100"
+        for label, change in (
+            ("direct push", lambda a: a.update({f"commits/{commit}/pulls": []})),
+            ("open pull request", lambda a: a[f"commits/{commit}/pulls"][0].update(merged_at=None)),
+            ("live policy drift", lambda a: a["rules/branches/main"][1]["parameters"]["required_status_checks"].pop()),
+            ("failed check", lambda a: a[checks]["check_runs"][-1].update(conclusion="failure")),
+            ("missing required check", lambda a: a[checks]["check_runs"].pop(0)),
+            ("other tree", lambda a: a[f"git/commits/{commit}"].update(tree={"sha": "9" * 40})),
+        ):
+            with self.subTest(label=label), self.assertRaises(release.ReleaseError):
+                verify(change)
+
+    def test_rerun_keeps_a_passed_exact_tag_run_and_replaces_a_failed_one(self):
+        commit = "2" * 40
+
+        def tag_run(run_id, status="completed", conclusion="success", attempt=1):
+            return {"databaseId": run_id, "attempt": attempt, "status": status, "conclusion": conclusion,
+                    "headBranch": self.tag, "headSha": commit, "event": "workflow_dispatch",
+                    "workflowName": "installer engine", "url": f"https://example.invalid/{run_id}"}
+
+        def select(listings, watch_code=0):
+            listings = iter(listings)
+            calls = []
+
+            def output(argv, **_):
+                if argv[:3] == ["gh", "run", "list"]:
+                    return json.dumps(next(listings))
+                return json.dumps(tag_run(int(argv[3])))
+
+            def run(argv, **_):
+                calls.append(argv[:3])
+                return subprocess.CompletedProcess(argv, watch_code if argv[:3] == ["gh", "run", "watch"] else 0, "", "")
+
+            with mock.patch.object(release, "output", side_effect=output), \
+                    mock.patch.object(release, "run", side_effect=run), mock.patch.object(release.time, "sleep"):
+                return release.select_release_run(self.manifest, self.tag, commit)["databaseId"], calls
+
+        failed = tag_run(10, conclusion="failure")
+        self.assertEqual(select([[failed, tag_run(11), tag_run(12, attempt=2)]]),
+                         (11, [["gh", "run", "watch"]]))
+        self.assertEqual(select([[failed, tag_run(13, status="in_progress", conclusion="")]]),
+                         (13, [["gh", "run", "watch"]]))
+        self.assertEqual(select([[failed], [failed], [failed, tag_run(14, status="queued", conclusion="")]]),
+                         (14, [["gh", "workflow", "run"], ["gh", "run", "watch"]]))
+        with self.assertRaisesRegex(release.ReleaseError, "Re-run the release workflow"):
+            select([[tag_run(15, status="in_progress", conclusion="")]], watch_code=1)
+
+    def test_publication_requires_exact_immutable_latest_readback(self):
+        draft = {"id": 42}
+        published = {"id": 42, "tag_name": self.tag, "draft": False, "prerelease": False, "immutable": True}
+        with mock.patch.object(release, "run") as gh, \
+                mock.patch.object(release, "load_json_from_gh", side_effect=[published, published]):
+            self.assertEqual(release.publish_draft(self.manifest, draft), published)
+        gh.assert_called_once_with(["gh", "release", "edit", self.tag, "--draft=false", "--latest", "--verify-tag"],
+                                   capture=False)
+        mutable = dict(published, immutable=False)
+        with mock.patch.object(release, "run"), \
+                mock.patch.object(release, "load_json_from_gh", side_effect=[mutable, mutable]):
+            with self.assertRaisesRegex(release.ReleaseError, "immutable/latest"):
+                release.publish_draft(self.manifest, draft)
 
     def test_evidence_binds_archived_bytes_exact_head_attempt_and_every_job(self):
         original = self.evidence()
@@ -134,132 +240,6 @@ class ReleaseTests(unittest.TestCase):
             document["workflow_source"].update(text=text, sha256=hashlib.sha256(text.encode()).hexdigest())
             with self.assertRaisesRegex(release.ReleaseError, "cache"):
                 self.check_evidence(self.seal(document))
-
-    def closure_proof(self):
-        return {"schema": 2, "kind": "publication-closure", "repository": self.manifest["repository"],
-                 "tag": self.tag, "previous_tag": self.manifest["current"]["previous_tag"],
-                 "tag_object": "4" * 40, "commit": "2" * 40, "tree": "5" * 40,
-                 "preparation": {"pull_request": 1, "head": "6" * 40},
-                 "workflow": {"name": "installer-engine.yml", "run_id": 123, "run_attempt": 1, "conclusion": "success"}, "job_evidence": self.evidence(),
-                 "scans": {"release_range": "previous..candidate", "proof_bytes": self.evidence()["size"]},
-                 "release": {"id": 1, "published_at": "2026-10-10T00:00:00Z", "immutable": True,
-                             "latest": True, "draft": False, "prerelease": False}}
-
-    def test_closure_retains_archived_evidence_and_all_historical_proofs(self):
-        proof = self.closure_proof()
-        release.render_closure(self.root, proof, "7" * 64)
-        manifest = release.validate_manifest(self.root)
-        self.assertEqual(manifest["current"]["state"], "published")
-        self.assertEqual(release.validate_proof(self.root / manifest["current"]["proof"], manifest)["job_evidence"], proof["job_evidence"])
-        for path, data in self.historical.items():
-            if str(path).startswith("release/proofs/"):
-                self.assertEqual((self.root / path).read_bytes(), data)
-        next_tag = bump(self.tag)
-        release.render_candidate(self.root, version=next_tag, notes_text=notes(next_tag), base_commit="8" * 40)
-
-    def test_supersede_replaces_only_the_active_candidate(self):
-        release.render_closure(self.root, self.closure_proof(), "7" * 64)
-        published = release.validate_manifest(self.root)
-        first, second = bump(self.tag), bump(bump(self.tag))
-        release.render_candidate(self.root, version=first, notes_text=notes(first), base_commit="8" * 40)
-        candidate = release.validate_manifest(self.root)
-        with mock.patch.object(release, "ROOT", self.root), \
-                mock.patch.object(release, "output", return_value=json.dumps(published)) as git:
-            self.assertEqual(release.superseded_base(candidate, first), published)
-            git.assert_called_once_with(["git", "show", "8" * 40 + ":release/manifest.json"])
-            for label, tag in (("published", self.tag), ("unknown", second)):
-                with self.subTest(label=label), self.assertRaises(release.ReleaseError):
-                    release.superseded_base(candidate, tag)
-        drifted = copy.deepcopy(published)
-        drifted["current"]["previous_tag"] = "v0.0.1"
-        with mock.patch.object(release, "ROOT", self.root), \
-                mock.patch.object(release, "output", return_value=json.dumps(drifted)), \
-                self.assertRaises(release.ReleaseError):
-            release.superseded_base(candidate, first)
-        before = {p: p.read_bytes() for p in self.root.rglob("*") if p.is_file()}
-        for label, version, tag in (("inactive tag", second, self.tag), ("not newer", first, first)):
-            with self.subTest(label=label), self.assertRaises(release.ReleaseError):
-                release.render_candidate(self.root, version=version, notes_text=notes(version),
-                                         base_commit="9" * 40, supersede=tag)
-            self.assertEqual({p: p.read_bytes() for p in self.root.rglob("*") if p.is_file()}, before)
-        rendered = release.render_candidate(self.root, version=second, notes_text=notes(second),
-                                            base_commit="9" * 40, supersede=first)
-        manifest = release.validate_manifest(self.root)
-        self.assertEqual((manifest["current"]["tag"], manifest["current"]["previous_tag"]), (second, self.tag))
-        self.assertEqual(sorted(rendered), sorted([f"docs/releases/{second}.md", "release/manifest.json",
-                                                   f"docs/releases/{first}.md"]))
-        title, rest = notes(first).split("\n", 1)
-        self.assertEqual((self.root / f"docs/releases/{first}.md").read_text(encoding="utf-8"), title + "\n"
-                         f"\n> Superseded before publication by `{second}`. The `{first}` tag exists,\n"
-                         "> but no GitHub release was published for it.\n" + rest)
-        with self.assertRaises(release.ReleaseError):
-            release.mark_superseded_notes(self.root, first, second)
-        # A second supersession follows the first candidate back to the release.
-        chain = {"9" * 40: candidate, "8" * 40: published}
-        def show(argv):
-            return json.dumps(chain[argv[2].split(":")[0]])
-        with mock.patch.object(release, "ROOT", self.root), mock.patch.object(release, "output", side_effect=show):
-            self.assertEqual(release.superseded_base(manifest, second), published)
-            chain["9" * 40] = copy.deepcopy(candidate)
-            chain["9" * 40]["current"]["previous_tag"] = "v0.0.1"
-            with self.assertRaises(release.ReleaseError):
-                release.superseded_base(manifest, second)
-
-    def test_supersede_requires_that_no_release_exists_for_the_tag(self):
-        with mock.patch.object(release, "output", return_value="v0.4.4\nv1.0.0\n") as gh:
-            with self.assertRaisesRegex(release.ReleaseError, "draft or published"):
-                release.require_unreleased(self.manifest, "v1.0.0")
-        self.assertIn("--paginate", gh.call_args.args[0])
-        with mock.patch.object(release, "output", return_value="v0.4.4\nv1.0.10\n"):
-            release.require_unreleased(self.manifest, "v1.0.1")
-
-
-class CommitRenderedTests(unittest.TestCase):
-    """The full gate runs between rendering and committing a release change."""
-
-    def setUp(self):
-        temp = tempfile.TemporaryDirectory()
-        self.addCleanup(temp.cleanup)
-        self.root = pathlib.Path(temp.name)
-        environment = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
-        environment.update(
-            GIT_CONFIG_GLOBAL=os.devnull,
-            GIT_CONFIG_NOSYSTEM="1",
-            GIT_AUTHOR_NAME="Fixture",
-            GIT_AUTHOR_EMAIL="fixture@example.invalid",
-            GIT_COMMITTER_NAME="Fixture",
-            GIT_COMMITTER_EMAIL="fixture@example.invalid",
-        )
-        patcher = mock.patch.dict(os.environ, environment, clear=True)
-        patcher.start()
-        self.addCleanup(patcher.stop)
-        release.run(["git", "init", "-q", "-b", "main"], cwd=self.root)
-        (self.root / "tracked.txt").write_text("before\n")
-        release.run(["git", "add", "tracked.txt"], cwd=self.root)
-        release.run(["git", "commit", "-q", "-m", "initial"], cwd=self.root)
-        (self.root / "release").mkdir()
-        (self.root / "release/manifest.json").write_text("{}\n")
-
-    def committed(self):
-        return release.output(["git", "show", "--name-only", "--format=", "HEAD"], cwd=self.root).splitlines()
-
-    def test_gate_leftovers_are_refused_and_only_rendered_files_are_committed(self):
-        # v1.0.0's preparation committed the gate's Python bytecode.
-        for leftover in ("tests/bootstrap/__pycache__/fixture.cpython-314.pyc", "tracked.txt"):
-            with self.subTest(leftover=leftover):
-                path = self.root / leftover
-                path.parent.mkdir(parents=True, exist_ok=True)
-                original = path.read_bytes() if path.exists() else None
-                path.write_text("gate output\n")
-                with self.assertRaisesRegex(release.ReleaseError, "unexpected change"):
-                    release.commit_rendered(self.root, ["release/manifest.json"], "fixture")
-                self.assertEqual(self.committed(), ["tracked.txt"])
-                if original is None:
-                    path.unlink()
-                else:
-                    path.write_bytes(original)
-        release.commit_rendered(self.root, ["release/manifest.json"], "fixture")
-        self.assertEqual(self.committed(), ["release/manifest.json"])
 
 
 if __name__ == "__main__":

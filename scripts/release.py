@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail-closed preparation and publication of immutable dotfiles releases."""
+"""Fail-closed publication of the immutable dotfiles release that main names."""
 
 from __future__ import annotations
 
@@ -23,6 +23,8 @@ MANIFEST_PATH = pathlib.Path("release/manifest.json")
 HEX40 = re.compile(r"[0-9a-f]{40}\Z")
 SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 SEMVER = re.compile(r"v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\Z")
+REPOSITORY = "luisgui1757/dotfiles"
+OFFICIAL_REMOTE = "https://github.com/luisgui1757/dotfiles.git"
 RESIDUAL_EVIDENCE = [
     "redirected Windows",
     "divergent Windows Terminal targets",
@@ -96,15 +98,6 @@ def write_text(path: pathlib.Path, value: str) -> None:
             os.unlink(temporary)
 
 
-def replace_exact(text: str, old: str, new: str, *, count: int | None = None) -> str:
-    observed = text.count(old)
-    if count is not None and observed != count:
-        fail(f"expected {count} occurrence(s) of {old!r}, found {observed}")
-    if observed == 0:
-        fail(f"required release surface is missing {old!r}")
-    return text.replace(old, new)
-
-
 def semver(tag: str) -> tuple[int, int, int]:
     match = SEMVER.fullmatch(tag)
     if not match:
@@ -112,191 +105,42 @@ def semver(tag: str) -> tuple[int, int, int]:
     return tuple(int(part) for part in match.groups())  # type: ignore[return-value]
 
 
-def validate_notes(text: str, tag: str, *, candidate: bool) -> str:
+def validate_notes(text: str, tag: str) -> str:
     lines = text.splitlines()
     if not lines or not lines[0].startswith(f"# {tag} — "):
         fail(f"release notes must start with '# {tag} — <reviewed title>'")
-    for heading in (
-        "## Highlights",
-        "## Compatibility and upgrade",
-        "## Release identity",
-    ):
+    for heading in ("## Highlights", "## Compatibility and upgrade"):
         if text.count(heading) != 1:
             fail(f"release notes must contain exactly one {heading!r} heading")
-    evidence_heading = "## Evidence required before publication" if candidate else "## Publication evidence"
-    if text.count(evidence_heading) != 1:
-        fail(f"release notes must contain exactly one {evidence_heading!r} heading")
-    if candidate and f"> Release candidate notes. Publish these only with the official annotated\n> `{tag}` tag" not in text:
-        fail("candidate release notes must carry the exact non-publication warning")
-    if "<" in text and re.search(r"<[A-Za-z][^>]*>", text):
+    if re.search(r"<[A-Za-z][^>]*>", text):
         fail("release notes retain an angle-bracket placeholder")
-    if tag not in text:
-        fail("release notes do not name the candidate tag")
     return lines[0][2:]
 
 
 def release_body(notes: str) -> str:
-    start = notes.find("## Highlights")
-    end = notes.find("## Evidence required before publication")
-    if start < 0 or end <= start:
-        fail("cannot extract the reviewed public release body")
-    body = notes[start:end].rstrip() + "\n"
-    if "Release candidate" in body:
-        fail("public release body contains candidate-only language")
-    return body
+    """The public release body is the reviewed notes from their Highlights section on."""
+    return notes[notes.index("## Highlights"):].rstrip() + "\n"
 
 
-def validate_logical_proofs(value: Any) -> list[dict[str, str]]:
-    if not isinstance(value, list) or len(value) != 4:
-        fail("manifest must define exactly four logical proofs")
-    expected_keys = {"artifact", "marker", "logical_context", "legacy_context"}
-    result: list[dict[str, str]] = []
-    for item in value:
-        if not isinstance(item, dict) or set(item) != expected_keys:
-            fail("logical proof entries must use the exact reviewed schema")
-        if not all(isinstance(item[key], str) and item[key] for key in expected_keys):
-            fail("logical proof identities must be nonempty strings")
-        if any("/" in item[key] for key in ("artifact", "marker")):
-            fail("logical proof artifact and marker names must be basenames")
-        result.append(item)
-    if len({item["artifact"] for item in result}) != 4:
-        fail("logical proof artifact names must be unique")
-    return result
-
-
-def validate_proof(path: pathlib.Path, manifest: dict[str, Any]) -> dict[str, Any]:
-    proof = load_json(path)
-    if not isinstance(proof, dict) or proof.get("schema") != manifest["schema"]:
-        fail(f"unsupported release proof schema: {path}")
-    for key in ("tag", "previous_tag"):
-        semver(str(proof.get(key, "")))
-    for key in ("tag_object", "commit", "tree"):
-        if not HEX40.fullmatch(str(proof.get(key, ""))):
-            fail(f"release proof has invalid {key}: {path}")
-    if proof.get("repository") != manifest["repository"]:
-        fail(f"release proof repository mismatch: {path}")
-    release = proof.get("release")
-    if not isinstance(release, dict) or any(
-        release.get(key) is not expected
-        for key, expected in (("immutable", True), ("latest", True), ("draft", False), ("prerelease", False))
-    ):
-        fail(f"release proof does not describe an immutable latest release: {path}")
-    if manifest["schema"] == 1:
-        entries = proof.get("logical_proofs")
-        if not isinstance(entries, list) or len(entries) != 4:
-            fail(f"release proof must contain four logical proof digests: {path}")
-        for entry in entries:
-            if not isinstance(entry, dict) or not SHA256.fullmatch(str(entry.get("sha256", ""))):
-                fail(f"release proof contains an invalid SHA-256: {path}")
-            if not isinstance(entry.get("size"), int) or entry["size"] <= 0:
-                fail(f"release proof contains an invalid marker size: {path}")
-        expected_proofs = [
-            (item["artifact"], item["marker"])
-            for item in validate_logical_proofs(manifest["logical_proofs"])
-        ]
-        observed_proofs = [(item.get("artifact"), item.get("marker")) for item in entries]
-        if observed_proofs != expected_proofs:
-            fail(f"release proof artifact/marker identities drifted from the manifest: {path}")
-    else:
-        validate_job_evidence(proof.get("job_evidence"), manifest, proof["commit"], proof["tag"])
-        record = proof["job_evidence"]["document"]["run"]
-        workflow = proof.get("workflow", {})
-        if (workflow.get("name") != manifest["workflow"] or workflow.get("run_id") != record["databaseId"]
-                or workflow.get("run_attempt") != record["attempt"] or workflow.get("conclusion") != "success"):
-            fail("release proof workflow disagrees with archived native evidence")
-
-    certification_asset = proof.get("certification_asset")
-    if certification_asset is not None and (
-        not isinstance(certification_asset, dict)
-        or certification_asset.get("name") != "release-proof.json"
-        or not SHA256.fullmatch(str(certification_asset.get("sha256", "")))
-    ):
-        fail(f"release proof certification asset identity is invalid: {path}")
-    return proof
-
-
-def validate_manifest(root: pathlib.Path = ROOT, data: Any = None) -> dict[str, Any]:
-    manifest = load_json(root / MANIFEST_PATH) if data is None else data
-    if not isinstance(manifest, dict) or manifest.get("schema") not in {1, 2}:
-        fail("release manifest schema must be 1 or 2")
-    if set(manifest) != {
-        "schema",
-        "repository",
-        "official_remote",
-        "workflow",
-        "current",
-        "logical_proofs" if manifest["schema"] == 1 else "workflow_jobs",
-    }:
-        fail("release manifest contains missing or unknown top-level fields")
-    if manifest.get("repository") != "luisgui1757/dotfiles":
-        fail("release manifest repository is not the reviewed public repository")
-    if manifest.get("official_remote") != "https://github.com/luisgui1757/dotfiles.git":
-        fail("release manifest official remote drifted")
-    expected_workflow = "e2e-install.yml" if manifest["schema"] == 1 else "installer-engine.yml"
-    if manifest.get("workflow") != expected_workflow:
-        fail("release manifest workflow drifted")
-    if manifest["schema"] == 1:
-        if manifest.get("current", {}).get("state") != "published":
-            fail("schema 1 is historical published evidence only")
-        validate_logical_proofs(manifest.get("logical_proofs"))
-    else:
-        validate_workflow_jobs(manifest.get("workflow_jobs"))
-    current = manifest.get("current")
-    if not isinstance(current, dict) or current.get("state") not in {"published", "candidate"}:
-        fail("release manifest current state must be published or candidate")
-    tag = str(current.get("tag", ""))
-    previous = str(current.get("previous_tag", ""))
-    if semver(tag) <= semver(previous):
-        fail("release manifest current tag must be newer than previous_tag")
-    notes = pathlib.PurePosixPath(str(current.get("notes", "")))
-    if notes.is_absolute() or ".." in notes.parts or notes.as_posix() != f"docs/releases/{tag}.md":
-        fail("release manifest notes path is not the versioned in-repo release note")
-    notes_path = root / notes
-    if not notes_path.is_file():
+def validate_manifest(root: pathlib.Path = ROOT) -> dict[str, Any]:
+    """Return the release that the manifest names: its version, notes and native job matrix."""
+    data = load_json(root / MANIFEST_PATH)
+    if not isinstance(data, dict) or set(data) != {"schema", "version"} or data["schema"] != 3:
+        fail("release manifest must hold only schema 3 and version")
+    tag = str(data["version"])
+    semver(tag)
+    notes = f"docs/releases/{tag}.md"
+    if not (root / notes).is_file():
         fail(f"release notes are missing: {notes}")
-    title = validate_notes(
-        notes_path.read_text(encoding="utf-8"),
-        tag,
-        candidate=current["state"] == "candidate",
-    )
-    if title != current.get("title"):
-        fail("release manifest title does not match the release-note H1")
-    if current["state"] == "published":
-        if set(current) != {"state", "tag", "previous_tag", "title", "notes", "proof"}:
-            fail("published release manifest current fields drifted")
-        proof_path = pathlib.PurePosixPath(str(current.get("proof", "")))
-        if proof_path.as_posix() != f"release/proofs/{tag}.json":
-            fail("published release manifest proof path drifted")
-        proof = validate_proof(root / proof_path, manifest)
-        if proof["tag"] != tag or proof["previous_tag"] != previous:
-            fail("published release manifest and proof identities disagree")
-    else:
-        if set(current) != {
-            "state",
-            "tag",
-            "previous_tag",
-            "title",
-            "notes",
-            "preparation",
-        }:
-            fail("candidate release manifest current fields drifted")
-        preparation = current.get("preparation")
-        if not isinstance(preparation, dict) or set(preparation) != {"base_commit", "branch"}:
-            fail("candidate preparation identity is incomplete")
-        if not HEX40.fullmatch(str(preparation.get("base_commit", ""))):
-            fail("candidate base commit is invalid")
-        if preparation.get("branch") != f"release/{tag}":
-            fail("candidate branch does not match the tag")
-    validate_current_surfaces(root, manifest)
-    return manifest
-
-
-def validate_current_surfaces(root: pathlib.Path, manifest: dict[str, Any]) -> None:
-    # Published schema-1 evidence describes the released tree, not today's runtime.
-    # New candidates bind the reviewed native workflow matrix in their manifest.
-    if manifest["schema"] == 2 and manifest["current"]["state"] == "candidate":
-        if manifest["workflow_jobs"] != native_job_names(root):
-            fail("candidate native job identities differ from canonical required checks")
+    return {
+        "repository": REPOSITORY,
+        "official_remote": OFFICIAL_REMOTE,
+        "workflow": "installer-engine.yml",
+        "workflow_jobs": native_job_names(root),
+        "tag": tag,
+        "title": validate_notes((root / notes).read_text(encoding="utf-8"), tag),
+        "notes": notes,
+    }
 
 
 def native_job_names(root: pathlib.Path) -> list[str]:
@@ -353,263 +197,6 @@ def git_clean(root: pathlib.Path) -> None:
         fail(f"worktree is not clean: {root}")
 
 
-def require_exact_main(root: pathlib.Path, manifest: dict[str, Any]) -> str:
-    git_clean(root)
-    if output(["git", "branch", "--show-current"], cwd=root) != "main":
-        fail("release command must start from the main branch")
-    head = output(["git", "rev-parse", "HEAD^{commit}"], cwd=root)
-    remote = output(["git", "remote", "get-url", "origin"], cwd=root)
-    accepted = {manifest["official_remote"], "git@github.com:luisgui1757/dotfiles.git"}
-    if remote not in accepted:
-        fail(f"origin is not the reviewed official remote: {remote}")
-    refs = output(["git", "ls-remote", "--heads", "origin", "refs/heads/main"], cwd=root).splitlines()
-    if refs != [f"{head}\trefs/heads/main"]:
-        fail("local main is not the exact current official main head")
-    return head
-
-
-def superseded_base(manifest: dict[str, Any], tag: str) -> dict[str, Any]:
-    """Return the published manifest that an active candidate was prepared from."""
-    current = manifest["current"]
-    if current["state"] != "candidate" or current["tag"] != tag:
-        fail(f"only the active candidate can be superseded, not {tag}")
-    base = current
-    # A candidate that superseded another was prepared from that candidate's
-    # commit; follow the chain back to the published release.
-    while True:
-        commit = base["preparation"]["base_commit"]
-        prepared = json.loads(output(["git", "show", f"{commit}:{MANIFEST_PATH.as_posix()}"]))
-        validate_manifest(ROOT, prepared)
-        base = prepared["current"]
-        if base["state"] == "published" or base["previous_tag"] != current["previous_tag"]:
-            break
-    if base["state"] != "published" or base["tag"] != current["previous_tag"]:
-        fail("candidate base does not record its previous published release")
-    return prepared
-
-
-def require_unreleased(manifest: dict[str, Any], tag: str) -> None:
-    # The tags endpoint omits drafts; list every release instead.
-    tags = output(["gh", "api", "--paginate", f"repos/{manifest['repository']}/releases", "--jq", ".[].tag_name"])
-    if tag in tags.splitlines():
-        fail(f"{tag} has a GitHub release (draft or published); it cannot be superseded")
-
-
-def mark_superseded_notes(root: pathlib.Path, tag: str, successor: str) -> str:
-    path = f"docs/releases/{tag}.md"
-    text = (root / path).read_text(encoding="utf-8")
-    title, separator, rest = text.partition("\n")
-    if not title.startswith(f"# {tag} ") or not separator or "Superseded before publication" in text:
-        fail(f"superseded candidate notes are not the unmarked {tag} notes")
-    banner = (
-        f"\n> Superseded before publication by `{successor}`. The `{tag}` tag exists,\n"
-        "> but no GitHub release was published for it.\n"
-    )
-    write_text(root / path, title + "\n" + banner + rest)
-    return path
-
-
-def render_candidate(
-    root: pathlib.Path,
-    *,
-    version: str,
-    notes_text: str,
-    base_commit: str,
-    supersede: str | None = None,
-) -> list[str]:
-    manifest = validate_manifest(root)
-    current = manifest["current"]
-    if supersede is None:
-        if current["state"] != "published":
-            fail("cannot prepare a second candidate while one is already active")
-        current_tag = current["tag"]
-    else:
-        # An unpublished candidate whose tag cannot be certified (its frozen code
-        # fails the gate) is replaced by a newer version; its tag is never moved.
-        if current["state"] != "candidate" or current["tag"] != supersede:
-            fail(f"only the active candidate can be superseded, not {supersede}")
-        if semver(version) <= semver(supersede):
-            fail("candidate version must be newer than the superseded candidate")
-        current_tag = current["previous_tag"]
-    if semver(version) <= semver(current_tag):
-        fail("candidate version must be newer than the published release")
-    title = validate_notes(notes_text, version, candidate=True)
-    manifest = {
-        "schema": 2,
-        "repository": manifest["repository"],
-        "official_remote": manifest["official_remote"],
-        "workflow": "installer-engine.yml",
-        "workflow_jobs": native_job_names(root),
-    }
-    note_path = root / f"docs/releases/{version}.md"
-    if note_path.exists():
-        fail(f"candidate release notes already exist: {note_path}")
-    write_text(note_path, notes_text.rstrip() + "\n")
-    manifest["current"] = {
-        "state": "candidate",
-        "tag": version,
-        "previous_tag": current_tag,
-        "title": title,
-        "notes": f"docs/releases/{version}.md",
-        "preparation": {
-            "base_commit": base_commit,
-            "branch": f"release/{version}",
-        },
-    }
-    write_json(root / MANIFEST_PATH, manifest)
-    validate_manifest(root)
-    rendered = [f"docs/releases/{version}.md", MANIFEST_PATH.as_posix()]
-    if supersede is not None:
-        rendered.append(mark_superseded_notes(root, supersede, version))
-    return rendered
-
-
-def commit_rendered(worktree: pathlib.Path, paths: list[str], message: str) -> None:
-    # The full gate runs between rendering and committing and writes its own
-    # files (Python bytecode reached v1.0.0's preparation through `add --all`).
-    # Stage only the rendered files; anything else the gate changed is an error.
-    run(["git", "add", "--", *paths], cwd=worktree)
-    status = run(["git", "status", "--porcelain", "--untracked-files=all"], cwd=worktree).stdout
-    for line in status.splitlines():
-        if line[1] != " " or line[3:] not in paths:
-            fail(f"release gate left an unexpected change: {line}")
-    run(["git", "commit", "-m", message], cwd=worktree, capture=False)
-
-
-def prepare(args: argparse.Namespace) -> None:
-    manifest = validate_manifest(ROOT)
-    if args.supersede is None:
-        check_live(manifest)
-    else:
-        check_live(superseded_base(manifest, args.supersede))
-        require_unreleased(manifest, args.supersede)
-    base = require_exact_main(ROOT, manifest)
-    notes_path = pathlib.Path(args.notes).expanduser().resolve()
-    if not notes_path.is_file():
-        fail(f"reviewed release notes file is missing: {notes_path}")
-    notes = notes_path.read_text(encoding="utf-8")
-    validate_notes(notes, args.version, candidate=True)
-    branch = f"release/{args.version}"
-    if run(["git", "show-ref", "--verify", "--quiet", f"refs/heads/{branch}"], check=False).returncode == 0:
-        fail(f"local release branch already exists: {branch}")
-    remote_branch = output(["git", "ls-remote", "--heads", "origin", f"refs/heads/{branch}"])
-    if remote_branch:
-        fail(f"official release branch already exists: {branch}")
-    worktree = ROOT.parent / f"{ROOT.name}-release-{args.version[1:]}"
-    if worktree.exists():
-        fail(f"release worktree path already exists: {worktree}")
-    run(["git", "worktree", "add", "-b", branch, str(worktree), base], capture=False)
-    rendered = render_candidate(
-        worktree, version=args.version, notes_text=notes, base_commit=base, supersede=args.supersede
-    )
-    run(["make", "ci"], cwd=worktree, capture=False)
-    run(["git", "diff", "--check"], cwd=worktree)
-    commit_rendered(worktree, rendered, f"chore(release): prepare {args.version}")
-    superseded = (
-        f"- supersede the unpublished `{args.supersede}` candidate; its tag stays unchanged and unpublished\n"
-        if args.supersede
-        else ""
-    )
-    run(["git", "push", "-u", "origin", branch], cwd=worktree, capture=False)
-    pr_url = output(
-        [
-            "gh",
-            "pr",
-            "create",
-            "--base",
-            "main",
-            "--head",
-            branch,
-            "--title",
-            f"chore(release): prepare {args.version}",
-            "--body",
-            (
-                "## Summary\n\n"
-                f"- prepare the exact `{args.version}` release identity and native certification matrix\n"
-                "- add reviewed candidate notes and deterministic publication gates\n"
-                f"{superseded}"
-                "- preserve historical publication evidence unchanged\n\n"
-                "## Verification\n\n- `make ci`\n"
-            ),
-        ],
-        cwd=worktree,
-    )
-    print(f"prepared release worktree: {worktree}")
-    print(f"pull request: {pr_url}")
-
-
-def check_live(manifest: dict[str, Any]) -> None:
-    current = manifest["current"]
-    if current["state"] != "published":
-        fail("live check applies only to a published manifest")
-    proof = validate_proof(ROOT / current["proof"], manifest)
-    refs = output(
-        [
-            "git",
-            "ls-remote",
-            "--tags",
-            manifest["official_remote"],
-            f"refs/tags/{current['tag']}",
-            f"refs/tags/{current['tag']}^{{}}",
-        ]
-    ).splitlines()
-    expected = {
-        f"{proof['tag_object']}\trefs/tags/{current['tag']}",
-        f"{proof['commit']}\trefs/tags/{current['tag']}^{{}}",
-    }
-    if set(refs) != expected or len(refs) != 2:
-        fail("published manifest does not match the official annotated tag")
-    release = load_json_from_gh(["repos/{repo}/releases/{release_id}".format(
-        repo=manifest["repository"], release_id=proof["release"]["id"]
-    )])
-    if (
-        release.get("id") != proof["release"]["id"]
-        or release.get("tag_name") != current["tag"]
-        or release.get("name") != current["title"]
-        or release.get("immutable") is not True
-        or release.get("draft") is not False
-        or release.get("prerelease") is not False
-    ):
-        fail("published manifest does not match the immutable GitHub release")
-    latest = load_json_from_gh([f"repos/{manifest['repository']}/releases/latest"])
-    if latest.get("id") != proof["release"]["id"]:
-        fail("published manifest release is no longer latest")
-    workflow = json.loads(
-        output(
-            [
-                "gh",
-                "run",
-                "view",
-                str(proof["workflow"]["run_id"]),
-                "--json",
-                "attempt,conclusion,databaseId,event,headBranch,headSha,status,workflowName",
-            ]
-        )
-    )
-    workflow_expected = {
-        "attempt": proof["workflow"]["run_attempt"],
-        "conclusion": "success",
-        "databaseId": proof["workflow"]["run_id"],
-        "event": "workflow_dispatch",
-        "headBranch": current["tag"],
-        "headSha": proof["commit"],
-        "status": "completed",
-        "workflowName": "e2e-install" if manifest["schema"] == 1 else "installer engine",
-    }
-    if workflow != workflow_expected:
-        fail("published manifest workflow identity no longer matches GitHub")
-    certification_asset = proof.get("certification_asset")
-    if certification_asset is not None:
-        matching = [
-            item for item in release.get("assets", []) if item.get("name") == certification_asset.get("name")
-        ]
-        if (
-            len(matching) != 1
-            or matching[0].get("digest") != f"sha256:{certification_asset.get('sha256')}"
-        ):
-            fail("published certification asset does not match the closure proof")
-
-
 def require_tool(name: str) -> None:
     if shutil.which(name) is None:
         fail(f"required release tool is unavailable: {name}")
@@ -623,83 +210,61 @@ def sha256_file(path: pathlib.Path) -> str:
     return digest.hexdigest()
 
 
-def verify_preparation_pr(manifest: dict[str, Any], expected_sha: str) -> dict[str, Any]:
-    pulls = load_json_from_gh(
-        [
-            f"repos/{manifest['repository']}/commits/{expected_sha}/pulls",
-            "-H",
-            "Accept: application/vnd.github+json",
-        ]
-    )
+def verify_merged_pr(manifest: dict[str, Any], commit: str) -> dict[str, Any]:
+    """Prove that the release commit is the squash merge of one PR whose head passed every check.
+
+    The workflow token can read each of these REST endpoints.
+    """
+    repository = manifest["repository"]
+    pulls = load_json_from_gh([f"repos/{repository}/commits/{commit}/pulls"])
     matching = [
         item
         for item in pulls
-        if item.get("state") == "closed"
-        and item.get("merged_at")
-        and item.get("merge_commit_sha") == expected_sha
+        if item.get("merged_at")
+        and item.get("merge_commit_sha") == commit
         and item.get("base", {}).get("ref") == "main"
-        and item.get("head", {}).get("ref") == manifest["current"]["preparation"]["branch"]
     ]
     if len(matching) != 1:
-        fail("expected SHA is not the unique merge of the manifest-bound preparation PR")
+        fail("the release commit is not the merge of one pull request into main")
     pull = matching[0]
-    checks_raw = output(
-        [
-            "gh",
-            "pr",
-            "checks",
-            str(pull["number"]),
-            "--json",
-            "name,bucket,state,workflow",
-        ]
-    )
-    try:
-        checks = json.loads(checks_raw)
-    except json.JSONDecodeError as exc:
-        fail(f"required PR checks returned invalid JSON: {exc}")
-    if not checks or any(item.get("bucket") != "pass" for item in checks):
-        fail("not every hosted preparation-PR check passed")
-    required_raw = output(
-        [
-            "gh",
-            "pr",
-            "checks",
-            str(pull["number"]),
-            "--required",
-            "--json",
-            "name,bucket,state,workflow",
-        ]
-    )
-    required = json.loads(required_raw)
-    if not required or any(item.get("bucket") != "pass" for item in required):
-        fail("not every required preparation-PR check passed")
     head_sha = pull.get("head", {}).get("sha")
     if not HEX40.fullmatch(str(head_sha or "")):
-        fail("preparation PR head identity is invalid")
+        fail("pull request head identity is invalid")
     canonical_required = load_json(ROOT / ".github/check-identities.json")["required"]
-    if set(item["name"] for item in required) != set(canonical_required):
+    rules = load_json_from_gh([f"repos/{repository}/rules/branches/main"])
+    live_required = [
+        check.get("context")
+        for rule in rules
+        if rule.get("type") == "required_status_checks"
+        for check in rule.get("parameters", {}).get("required_status_checks", [])
+    ]
+    if sorted(live_required) != sorted(canonical_required):
         fail("live required-check policy differs from the reviewed canonical check set")
-    head_checks = load_json_from_gh([f"repos/{manifest['repository']}/commits/{head_sha}/check-runs?per_page=100", "--paginate"])
+    checks = load_json_from_gh([f"repos/{repository}/commits/{head_sha}/check-runs?per_page=100"]).get("check_runs", [])
+    if not checks or any(
+        item.get("status") != "completed" or item.get("conclusion") not in {"success", "neutral", "skipped"}
+        for item in checks
+    ):
+        fail("not every check passed at the pull request head")
     for name in canonical_required:
-        matches = [item for item in head_checks.get("check_runs", []) if item.get("name") == name
-                   and item.get("head_sha") == head_sha and item.get("status") == "completed"
-                   and item.get("conclusion") == "success" and item.get("app", {}).get("id") == 15368]
+        matches = [item for item in checks if item.get("name") == name
+                   and item.get("head_sha") == head_sha and item.get("conclusion") == "success"
+                   and item.get("app", {}).get("id") == 15368]
         if len(matches) != 1:
-            fail(f"required check is not uniquely successful at the reviewed PR head: {name}")
-    head_commit = load_json_from_gh([f"repos/{manifest['repository']}/git/commits/{head_sha}"])
-    merged_commit = load_json_from_gh([f"repos/{manifest['repository']}/git/commits/{expected_sha}"])
+            fail(f"required check is not uniquely successful at the pull request head: {name}")
+    head_commit = load_json_from_gh([f"repos/{repository}/git/commits/{head_sha}"])
+    merged_commit = load_json_from_gh([f"repos/{repository}/git/commits/{commit}"])
     head_tree = str(head_commit.get("tree", {}).get("sha", ""))
     merged_tree = str(merged_commit.get("tree", {}).get("sha", ""))
     if not HEX40.fullmatch(head_tree) or not HEX40.fullmatch(merged_tree):
-        fail("GitHub returned an invalid preparation or merge tree identity")
+        fail("GitHub returned an invalid pull request or merge tree identity")
     if head_tree != merged_tree:
-        fail("squash-merged preparation tree differs from the reviewed PR head tree")
+        fail("squash-merged tree differs from the checked pull request head tree")
     return {
-        "pull_request": pull["number"],
+        "number": pull["number"],
         "head": head_sha,
         "tree": merged_tree,
-        "hosted_checks": sorted(item["name"] for item in checks),
-        "required_checks": sorted(item["name"] for item in required),
+        "checks": sorted(item["name"] for item in checks),
     }
 
 
@@ -751,11 +316,14 @@ def verify_or_publish_tag(manifest: dict[str, Any], tag: str, expected_sha: str)
     return tag_object
 
 
-def select_release_run(
-    manifest: dict[str, Any], tag: str, expected_sha: str, requested_run_id: int | None
-) -> dict[str, Any]:
-    if requested_run_id is None:
-        existing_raw = output(
+def select_release_run(manifest: dict[str, Any], tag: str, expected_sha: str) -> dict[str, Any]:
+    """Wait for a first-attempt exact-tag run of the native workflow and return it after it passes.
+
+    A re-run of the release keeps a run that passed or still runs. It starts a
+    new run only when no such run exists, for example after a failed run.
+    """
+    def tag_runs() -> list[dict[str, Any]]:
+        raw = output(
             [
                 "gh",
                 "run",
@@ -769,70 +337,54 @@ def select_release_run(
                 "--limit",
                 "100",
                 "--json",
-                "databaseId",
+                "attempt,conclusion,createdAt,databaseId,event,headBranch,headSha,status,url,workflowName",
             ]
         )
-        existing = {item["databaseId"] for item in json.loads(existing_raw)}
-        run(
-            ["gh", "workflow", "run", manifest["workflow"], "--ref", tag],
-            capture=False,
-        )
+        return [item for item in json.loads(raw) if item.get("headBranch") == tag and item.get("headSha") == expected_sha]
+
+    existing = tag_runs()
+    usable = [
+        item for item in existing
+        if item.get("attempt") == 1 and (item.get("status") != "completed" or item.get("conclusion") == "success")
+    ]
+    if usable:
+        # A run that passed comes before a run that still runs.
+        run_id = max(usable, key=lambda item: (item.get("status") == "completed", item["databaseId"]))["databaseId"]
+    else:
+        known = {item["databaseId"] for item in existing}
+        run(["gh", "workflow", "run", manifest["workflow"], "--ref", tag], capture=False)
         deadline = time.monotonic() + 180
         selected: list[dict[str, Any]] = []
         while time.monotonic() < deadline:
-            raw = output(
-                [
-                    "gh",
-                    "run",
-                    "list",
-                    "--workflow",
-                    manifest["workflow"],
-                    "--event",
-                    "workflow_dispatch",
-                    "--commit",
-                    expected_sha,
-                    "--limit",
-                    "100",
-                    "--json",
-                    "attempt,conclusion,createdAt,databaseId,event,headBranch,headSha,status,url,workflowName",
-                ]
-            )
-            selected = [
-                item
-                for item in json.loads(raw)
-                if item["databaseId"] not in existing
-                and item.get("headBranch") == tag
-                and item.get("headSha") == expected_sha
-            ]
+            selected = [item for item in tag_runs() if item["databaseId"] not in known]
             if selected:
                 break
             time.sleep(3)
         if len(selected) != 1:
             fail("could not select one new exact-tag workflow_dispatch run")
-        requested_run_id = selected[0]["databaseId"]
-    run(
-        ["gh", "run", "watch", str(requested_run_id), "--exit-status", "--interval", "10"],
-        capture=False,
-    )
+        run_id = selected[0]["databaseId"]
+    watched = run(["gh", "run", "watch", str(run_id), "--exit-status", "--interval", "60"], capture=False, check=False)
+    if watched.returncode != 0:
+        fail(f"exact-tag run {run_id} did not pass. Re-run the release workflow to start a new exact-tag run.")
     raw = output(
         [
             "gh",
             "run",
             "view",
-            str(requested_run_id),
+            str(run_id),
             "--json",
             "attempt,conclusion,databaseId,event,headBranch,headSha,status,url,workflowName",
         ]
     )
     selected_run = json.loads(raw)
     expected = {
-        "databaseId": requested_run_id,
+        "databaseId": run_id,
         "event": "workflow_dispatch",
         "headBranch": tag,
         "headSha": expected_sha,
         "status": "completed",
         "conclusion": "success",
-        "workflowName": "e2e-install" if manifest["schema"] == 1 else "installer engine",
+        "workflowName": "installer engine",
     }
     for key, value in expected.items():
         if selected_run.get(key) != value:
@@ -902,7 +454,7 @@ def verify_public_clone(manifest: dict[str, Any], tag: str, tag_object: str, com
 
 def create_certification(
     manifest: dict[str, Any],
-    preparation: dict[str, Any],
+    pull_request: dict[str, Any],
     tag_object: str,
     commit: str,
     run_record: dict[str, Any],
@@ -910,15 +462,15 @@ def create_certification(
     release_id: int,
 ) -> dict[str, Any]:
     return {
-        "schema": 2,
+        "schema": 3,
         "kind": "pre-publication-certification",
         "repository": manifest["repository"],
-        "tag": manifest["current"]["tag"],
-        "previous_tag": manifest["current"]["previous_tag"],
+        "tag": manifest["tag"],
+        "previous_tag": manifest["previous_tag"],
         "tag_object": tag_object,
         "commit": commit,
-        "tree": preparation["tree"],
-        "preparation": preparation,
+        "tree": pull_request["tree"],
+        "pull_request": pull_request,
         "workflow": {
             "name": manifest["workflow"],
             "run_id": run_record["databaseId"],
@@ -929,7 +481,7 @@ def create_certification(
         "job_evidence": job_evidence,
         "scans": {
             "gitleaks_version": output(["gitleaks", "version"]),
-            "release_range": f"{manifest['current']['previous_tag']}..{manifest['current']['tag']}",
+            "release_range": f"{manifest['previous_tag']}..{manifest['tag']}",
             "proof_bytes": job_evidence["size"],
         },
         "fresh_public_clone": "passed",
@@ -937,7 +489,7 @@ def create_certification(
             "id": release_id,
             "draft": True,
             "immutable": False,
-            "publication": "pending explicit confirmation",
+            "publication": "pending",
         },
         "residual_evidence": RESIDUAL_EVIDENCE,
     }
@@ -946,7 +498,7 @@ def create_certification(
 def ensure_draft_release(
     manifest: dict[str, Any], body: str, certification_base: dict[str, Any], temporary: pathlib.Path
 ) -> tuple[dict[str, Any], pathlib.Path, str]:
-    tag = manifest["current"]["tag"]
+    tag = manifest["tag"]
     existing = run(["gh", "release", "view", tag, "--json", "databaseId"], check=False)
     body_path = temporary / "release-body.md"
     write_text(body_path, body)
@@ -960,7 +512,7 @@ def ensure_draft_release(
                 "--draft",
                 "--verify-tag",
                 "--title",
-                manifest["current"]["title"],
+                manifest["title"],
                 "--notes-file",
                 str(body_path),
             ],
@@ -974,19 +526,19 @@ def ensure_draft_release(
     release = load_json_from_gh([f"repos/{manifest['repository']}/releases/{release_id}"])
     if (
         release.get("tag_name") != tag
-        or release.get("name") != manifest["current"]["title"]
+        or release.get("name") != manifest["title"]
         or release.get("draft") is not True
         or release.get("prerelease") is not False
         or release.get("immutable") is not False
         or str(release.get("body", "")).rstrip() != body.rstrip()
     ):
-        fail("draft release does not exactly match the reviewed candidate")
+        fail("draft release does not exactly match the reviewed notes")
     certification = dict(certification_base)
     certification["release"] = {
         "id": release["id"],
         "draft": True,
         "immutable": False,
-        "publication": "pending explicit confirmation",
+        "publication": "pending",
     }
     proof_path = temporary / "release-proof.json"
     write_json(proof_path, certification)
@@ -1012,14 +564,11 @@ def ensure_draft_release(
     return release, proof_path, proof_hash
 
 
-def publish_draft(manifest: dict[str, Any], expected_sha: str, draft: dict[str, Any]) -> dict[str, Any]:
-    tag = manifest["current"]["tag"]
-    phrase = f"PUBLISH IMMUTABLE {tag} @ {expected_sha}"
-    print("\nEvery deterministic publication gate passed.")
-    print("GitHub release immutability makes the next boundary irreversible.")
-    entered = input(f"Type exactly '{phrase}' to publish: ")
-    if entered != phrase:
-        fail("immutable publication confirmation did not match; the verified draft remains unpublished")
+def publish_draft(manifest: dict[str, Any], draft: dict[str, Any]) -> dict[str, Any]:
+    # The merge that set the version is the approval. The release workflow
+    # publishes only after every gate before this call passed.
+    tag = manifest["tag"]
+    print("\nEvery deterministic publication gate passed. Publishing the immutable release.")
     run(["gh", "release", "edit", tag, "--draft=false", "--latest", "--verify-tag"], capture=False)
     release = load_json_from_gh([f"repos/{manifest['repository']}/releases/{draft['id']}"])
     latest = load_json_from_gh([f"repos/{manifest['repository']}/releases/latest"])
@@ -1035,259 +584,56 @@ def publish_draft(manifest: dict[str, Any], expected_sha: str, draft: dict[str, 
     return release
 
 
-def closure_evidence(proof: dict[str, Any]) -> str:
-    return f"""## Publication evidence
-
-- Reviewed PR #{proof['preparation']['pull_request']} head `{proof['preparation']['head']}`
-  and merged commit `{proof['commit']}` have exact tree `{proof['tree']}`.
-- Full local and required hosted checks passed; redacted scans covered
-  `{proof['scans']['release_range']}` and the archived native-job evidence.
-- First-attempt exact-tag run `{proof['workflow']['run_id']}` passed every reviewed
-  native job at the release commit. The archived workflow source disables tag caches.
-- Canonical job/source evidence is embedded in the proof: {proof['scans']['proof_bytes']}
-  bytes, SHA-256 `{proof['job_evidence']['sha256']}`.
-- A fresh credential-free detached public clone reproduced the annotated tag,
-  peeled commit, and release manifest checks.
-- GitHub release `{proof['release']['id']}` read back immutable/latest, non-draft,
-  non-prerelease, with exact reviewed body and certification asset.
-
-Unexecuted owner-host and manual visual checks remain residual evidence; publication
-never marks them complete. See the proof's `residual_evidence` list.
-"""
-
-
-def render_closure(root: pathlib.Path, proof: dict[str, Any], asset_sha256: str) -> None:
-    manifest = validate_manifest(root)
-    current = manifest["current"]
-    if current["state"] != "candidate" or current["tag"] != proof["tag"]:
-        fail("closure worktree is not the matching release candidate")
-    tag = current["tag"]
-    previous = current["previous_tag"]
-    notes_path = root / current["notes"]
-    notes = notes_path.read_text(encoding="utf-8")
-    first_heading = notes.splitlines()[0]
-    notes = re.sub(
-        r"\A# .*?\n\n> .*?(?=\n\n## Highlights)",
-        (
-            f"{first_heading}\n\n> Published on {proof['release']['published_at'][:10]} as immutable/latest GitHub release\n"
-            f"> [`{proof['release']['id']}`](https://github.com/{proof['repository']}/releases/tag/{tag}).\n"
-            f"> Annotated tag object `{proof['tag_object']}` peels to commit `{proof['commit']}`."
-        ),
-        notes,
-        count=1,
-        flags=re.DOTALL,
-    )
-    evidence_start = notes.find("## Evidence required before publication")
-    if evidence_start < 0:
-        fail("candidate release notes lost the publication evidence gate")
-    notes = notes[:evidence_start] + closure_evidence(proof)
-    write_text(notes_path, notes.rstrip() + "\n")
-
-    proof["certification_asset"] = {
-        "name": "release-proof.json",
-        "sha256": asset_sha256,
-    }
-    proof_path = root / f"release/proofs/{tag}.json"
-    if proof_path.exists():
-        fail(f"release closure proof already exists: {proof_path}")
-    write_json(proof_path, proof)
-    manifest["current"] = {
-        "state": "published",
-        "tag": tag,
-        "previous_tag": previous,
-        "title": current["title"],
-        "notes": current["notes"],
-        "proof": f"release/proofs/{tag}.json",
-    }
-    write_json(root / MANIFEST_PATH, manifest)
-    validate_manifest(root)
-
-
-def open_closure_pr(manifest: dict[str, Any], proof: dict[str, Any], asset_sha256: str) -> str:
-    tag = manifest["current"]["tag"]
-    branch = f"release/{tag}-closure"
-    if run(["git", "show-ref", "--verify", "--quiet", f"refs/heads/{branch}"], check=False).returncode == 0:
-        fail(f"local closure branch already exists: {branch}")
-    if output(["git", "ls-remote", "--heads", "origin", f"refs/heads/{branch}"]):
-        fail(f"official closure branch already exists: {branch}")
-    worktree = ROOT.parent / f"{ROOT.name}-release-{tag[1:]}-closure"
-    if worktree.exists():
-        fail(f"release closure worktree path already exists: {worktree}")
-    run(["git", "worktree", "add", "-b", branch, str(worktree), proof["commit"]], capture=False)
-    render_closure(worktree, proof, asset_sha256)
-    run(["make", "ci"], cwd=worktree, capture=False)
-    run(["git", "diff", "--check"], cwd=worktree)
-    commit_rendered(
-        worktree,
-        [manifest["current"]["notes"], f"release/proofs/{tag}.json", MANIFEST_PATH.as_posix()],
-        f"docs(release): close {tag} publication",
-    )
-    run(["git", "push", "-u", "origin", branch], cwd=worktree, capture=False)
-    return output(
-        [
-            "gh",
-            "pr",
-            "create",
-            "--base",
-            "main",
-            "--head",
-            branch,
-            "--title",
-            f"docs(release): close {tag} publication",
-            "--body",
-            (
-                "## Summary\n\n"
-                "- record observed annotated-tag, exact-run, proof, scan, clone, and immutable-release identities\n"
-                "- bind the uploaded pre-publication certification asset to the final closure proof\n"
-                "- preserve every unexecuted owner-host/manual row as an explicit residual gap\n\n"
-                "## Verification\n\n- `make ci`\n"
-            ),
-        ],
-        cwd=worktree,
-    )
-
-
-def resume_publication_closure(
-    manifest: dict[str, Any], release: dict[str, Any], expected_sha: str, tag_object: str
-) -> str:
-    current = manifest["current"]
+def previous_release(manifest: dict[str, Any]) -> str | None:
+    """Return the latest published tag that the new release follows, or None when the version is out."""
+    tag = manifest["tag"]
+    existing = run(["gh", "api", f"repos/{manifest['repository']}/releases/tags/{tag}"], check=False)
+    if existing.returncode == 0:
+        release = json.loads(existing.stdout)
+        if release.get("draft") is False:
+            if release.get("immutable") is not True:
+                fail(f"{tag} is published but not immutable")
+            return None
     latest = load_json_from_gh([f"repos/{manifest['repository']}/releases/latest"])
-    if (
-        release.get("tag_name") != current["tag"]
-        or release.get("draft") is not False
-        or release.get("prerelease") is not False
-        or release.get("immutable") is not True
-        or latest.get("id") != release.get("id")
-    ):
-        fail("existing published release is not immutable/latest and exact")
-    with tempfile.TemporaryDirectory(prefix="dotfiles-release-resume.") as temporary_name:
-        temporary = pathlib.Path(temporary_name)
-        run(
-            [
-                "gh",
-                "release",
-                "download",
-                current["tag"],
-                "--pattern",
-                "release-proof.json",
-                "--dir",
-                str(temporary),
-            ],
-            capture=False,
-        )
-        asset_path = temporary / "release-proof.json"
-        if not asset_path.is_file() or asset_path.is_symlink():
-            fail("published release certification asset is missing or unsafe")
-        certification = load_json(asset_path)
-        if (
-            not isinstance(certification, dict)
-            or certification.get("schema") != manifest["schema"]
-            or certification.get("kind") != "pre-publication-certification"
-            or certification.get("repository") != manifest["repository"]
-            or certification.get("tag") != current["tag"]
-            or certification.get("previous_tag") != current["previous_tag"]
-            or certification.get("commit") != expected_sha
-            or certification.get("tag_object") != tag_object
-            or certification.get("release", {}).get("id") != release["id"]
-        ):
-            fail("published release certification asset does not bind this candidate")
-        asset_sha256 = sha256_file(asset_path)
-        assets = [item for item in release.get("assets", []) if item.get("name") == "release-proof.json"]
-        if len(assets) != 1 or assets[0].get("digest") != f"sha256:{asset_sha256}":
-            fail("published release certification asset digest does not match its API identity")
-        final_proof = certification
-        final_proof["kind"] = "publication-closure"
-        final_proof["release"] = {
-            "id": release["id"],
-            "published_at": release["published_at"],
-            "immutable": True,
-            "latest": True,
-            "draft": False,
-            "prerelease": False,
-        }
-        return open_closure_pr(manifest, final_proof, asset_sha256)
+    previous = str(latest.get("tag_name", ""))
+    if latest.get("immutable") is not True:
+        fail(f"the latest release {previous} is not immutable")
+    if semver(tag) <= semver(previous):
+        fail(f"{tag} is not newer than the latest release {previous}")
+    return previous
 
 
 def publish(args: argparse.Namespace) -> None:
-    for tool in ("gh", "git", "gitleaks", "make", "python3"):
+    for tool in ("gh", "git", "gitleaks", "python3"):
         require_tool(tool)
+    commit = args.commit
+    if not HEX40.fullmatch(commit):
+        fail("--commit must be a full lowercase commit identity")
+    git_clean(ROOT)
+    if output(["git", "rev-parse", "HEAD^{commit}"]) != commit:
+        fail("the checkout is not the release commit")
     manifest = validate_manifest(ROOT)
-    current = manifest["current"]
-    if current["state"] != "candidate" or current["tag"] != args.version:
-        fail("manifest does not describe the requested release candidate")
-    expected_sha = args.expected_sha
-    if not HEX40.fullmatch(expected_sha):
-        fail("EXPECTED_SHA must be a full lowercase commit identity")
-    head = require_exact_main(ROOT, manifest)
-    if head != expected_sha:
-        fail(f"exact main SHA mismatch: expected {expected_sha}, found {head}")
+    tag = manifest["tag"]
     if output(["gh", "repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"]) != manifest["repository"]:
         fail("GitHub CLI is not bound to the reviewed public repository")
-    immutable = load_json_from_gh([f"repos/{manifest['repository']}/immutable-releases"])
-    if immutable.get("enabled") is not True:
-        fail("GitHub immutable releases are not enabled")
-    existing_release = run(
-        ["gh", "api", f"repos/{manifest['repository']}/releases/tags/{current['tag']}"],
-        check=False,
-    )
-    if existing_release.returncode == 0:
-        release = json.loads(existing_release.stdout)
-        if release.get("draft") is False:
-            tag_object = verify_or_publish_tag(manifest, current["tag"], expected_sha)
-            assets = release.get("assets", [])
-            if len(assets) != 1 or assets[0].get("name") != "release-proof.json":
-                fail("published release does not contain the sole reviewed certification asset")
-            closure_url = resume_publication_closure(manifest, release, expected_sha, tag_object)
-            print(f"immutable release: https://github.com/{manifest['repository']}/releases/tag/{current['tag']}")
-            print(f"publication closure pull request: {closure_url}")
-            return
-    preparation = verify_preparation_pr(manifest, expected_sha)
-    run(["make", "ci"], capture=False)
-    run(
-        [
-            "gitleaks",
-            "git",
-            "--no-banner",
-            "--redact",
-            f"--log-opts={current['previous_tag']}..{expected_sha}",
-            ".",
-        ],
-        capture=False,
-    )
-    tag_object = verify_or_publish_tag(manifest, current["tag"], expected_sha)
-    run_record = select_release_run(manifest, current["tag"], expected_sha, args.run_id)
+    previous = previous_release(manifest)
+    if previous is None:
+        print(f"{tag} is already published. There is nothing to release.")
+        return
+    manifest["previous_tag"] = previous
+    pull_request = verify_merged_pr(manifest, commit)
+    run(["gitleaks", "git", "--no-banner", "--redact", f"--log-opts={previous}..{commit}", "."], capture=False)
+    tag_object = verify_or_publish_tag(manifest, tag, commit)
+    run_record = select_release_run(manifest, tag, commit)
     with tempfile.TemporaryDirectory(prefix="dotfiles-release-publication.") as temporary_name:
         temporary = pathlib.Path(temporary_name)
-        evidence = archive_release_jobs(manifest, run_record, expected_sha, current["tag"], temporary / "proofs")
-        verify_public_clone(manifest, current["tag"], tag_object, expected_sha)
-        notes = (ROOT / current["notes"]).read_text(encoding="utf-8")
-        body = release_body(notes)
-        certification_base = create_certification(
-            manifest,
-            preparation,
-            tag_object,
-            expected_sha,
-            run_record,
-            evidence,
-            0,
-        )
-        draft, _proof_path, asset_sha256 = ensure_draft_release(
-            manifest, body, certification_base, temporary
-        )
-        published = publish_draft(manifest, expected_sha, draft)
-        final_proof = certification_base
-        final_proof["kind"] = "publication-closure"
-        final_proof["release"] = {
-            "id": published["id"],
-            "published_at": published["published_at"],
-            "immutable": True,
-            "latest": True,
-            "draft": False,
-            "prerelease": False,
-        }
-        closure_url = open_closure_pr(manifest, final_proof, asset_sha256)
-    print(f"immutable release: https://github.com/{manifest['repository']}/releases/tag/{current['tag']}")
-    print(f"publication closure pull request: {closure_url}")
+        evidence = archive_release_jobs(manifest, run_record, commit, tag, temporary / "proofs")
+        verify_public_clone(manifest, tag, tag_object, commit)
+        body = release_body((ROOT / manifest["notes"]).read_text(encoding="utf-8"))
+        certification = create_certification(manifest, pull_request, tag_object, commit, run_record, evidence, 0)
+        draft, _proof_path, _asset_sha256 = ensure_draft_release(manifest, body, certification, temporary)
+        publish_draft(manifest, draft)
+    print(f"immutable release: https://github.com/{manifest['repository']}/releases/tag/{tag}")
 
 
 def load_json_from_gh(arguments: list[str]) -> Any:
@@ -1301,24 +647,11 @@ def load_json_from_gh(arguments: list[str]) -> Any:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
-    check_parser = subparsers.add_parser("check", help="validate the release manifest")
-    check_parser.add_argument("--live", action="store_true", help="also compare the published identities with GitHub")
-    prepare_parser = subparsers.add_parser("prepare", help="create, verify, push, and open a release-preparation PR")
-    prepare_parser.add_argument("--version", required=True)
-    prepare_parser.add_argument("--notes", required=True, help="reviewed candidate release-note Markdown")
-    prepare_parser.add_argument(
-        "--supersede",
-        metavar="TAG",
-        help="replace the active candidate TAG, which was never released, with this newer version",
+    subparsers.add_parser("check", help="validate the release manifest and its notes")
+    publish_parser = subparsers.add_parser(
+        "publish", help="certify and publish the manifest version at its merge commit (the release workflow runs this)"
     )
-    publish_parser = subparsers.add_parser("publish", help="certify and publish an exact merged release candidate")
-    publish_parser.add_argument("--version", required=True)
-    publish_parser.add_argument("--expected-sha", required=True)
-    publish_parser.add_argument(
-        "--run-id",
-        type=int,
-        help="resume with one already-observed exact-tag workflow_dispatch run instead of dispatching another",
-    )
+    publish_parser.add_argument("--commit", required=True, help="the merge commit that set the version")
     return parser.parse_args()
 
 
@@ -1326,15 +659,9 @@ def main() -> int:
     args = parse_args()
     try:
         if args.command == "check":
-            manifest = validate_manifest(ROOT)
-            if args.live:
-                check_live(manifest)
-            print("release manifest and proof identities OK")
-        elif args.command == "prepare":
-            semver(args.version)
-            prepare(args)
+            validate_manifest(ROOT)
+            print("release manifest and notes OK")
         elif args.command == "publish":
-            semver(args.version)
             publish(args)
         else:
             fail(f"unsupported command: {args.command}")

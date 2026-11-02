@@ -57,19 +57,21 @@ Other distributions, Linuxbrew, musl and Intel macOS are out of scope.
 | `make test-installer` | `gofmt`, `go vet` and `go test -race -timeout 30m ./...` in `installer/` |
 | `make test-bootstrap` | Python tests for the launchers and the release scripts |
 | `make validate-renovate` | The Renovate configuration and its extraction inventory |
-| `make release-check`, `release-prepare`, `release-publish` | Release commands. Read `docs/RELEASING.md` first. |
+| `make release-check` | Validates the release manifest and its notes. Read `docs/RELEASING.md` first. |
 
 `make ci` runs `test`, `validate-renovate`, `test-bootstrap` and
 `test-installer`. It needs the Go version in `installer/go.mod` and Ruby.
 Linux process tests need `cc` with pthreads. The C++ isolation test needs
 `clang++`. A sub-target skips with a message when its tool is missing.
 
-CI has three workflows:
+CI has four workflows:
 
 - `test.yml` runs the configuration tests on Ubuntu, macOS and Windows.
 - `installer-engine.yml` runs the installer core matrix and the native
   lifecycle jobs on disposable GitHub runners.
 - `agent-cli-pins.yml` proposes agent CLI pin updates each week.
+- `release.yml` publishes the version in `release/manifest.json` when a merge
+  changes it.
 
 `.github/check-identities.json` lists the checks that must pass. CodeQL adds
 its own checks. A native job can continue after a failed step. Read the result
@@ -244,10 +246,10 @@ and skills for coding agents.
   immutable releases.
 - The rulesets are in `.github/rulesets/`. `docs/security/branch-protection.md`
   describes the cutover. A checked-in policy does not prove the live settings.
-- Releases follow `docs/RELEASING.md` and `release/manifest.json`. Release
-  preparation commits only its rendered files.
-- When a candidate tag cannot pass certification, a newer version supersedes it
-  (`SUPERSEDE=<tag>`). Never move the tag.
+- Releases follow `docs/RELEASING.md`. A merge that changes the version in
+  `release/manifest.json` publishes it through `release.yml`.
+- When a version cannot pass certification, a newer version replaces it. Never
+  move the tag.
 - `.gitleaksignore` holds reviewed Gitleaks false positives as exact
   fingerprints.
 - Archive and Linux Code DEB pins change only with review and native runtime
