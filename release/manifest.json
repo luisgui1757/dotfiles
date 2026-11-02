@@ -8,6 +8,8 @@
     "core (ubuntu-26.04-arm)",
     "core (macos-26)",
     "core (windows-2025)",
+    "core packages (macos-26)",
+    "core packages (windows-2025)",
     "Fresh Homebrew (macOS arm64)",
     "Fresh Debian APT (amd64)",
     "Fresh Debian APT (arm64)",
@@ -26,11 +28,14 @@
     "Desktop lifecycle (windows-2025)"
   ],
   "current": {
-    "state": "published",
-    "tag": "v1.0.1",
-    "previous_tag": "v0.4.4",
-    "title": "v1.0.1 — Native interactive installer replaces Nix and chezmoi",
-    "notes": "docs/releases/v1.0.1.md",
-    "proof": "release/proofs/v1.0.1.json"
+    "state": "candidate",
+    "tag": "v1.1.0",
+    "previous_tag": "v1.0.1",
+    "title": "v1.1.0 — superfile, local Atuin, Rose Pine in each tool and new Sentinel skills",
+    "notes": "docs/releases/v1.1.0.md",
+    "preparation": {
+      "base_commit": "7850fbb5b83de40f1e3d983e1ad242814b53154c",
+      "branch": "release/v1.1.0"
+    }
   }
 }
