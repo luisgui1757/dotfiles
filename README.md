@@ -355,7 +355,10 @@ runs the Sentinel installer of that commit. That installer writes the rules
 into a managed block in the instruction file of each agent. Text outside the
 block stays. It also copies the `core` and `ui` skills and writes a
 `.sentinel-owned` file into each skill folder. It does not replace a folder
-that it did not write.
+that it did not write. For Claude Code, it also writes the output style
+`${CLAUDE_CONFIG_DIR:-~/.claude}/output-styles/sentinel.md`. Claude Code uses
+it only after you pick it with `/output-style Sentinel` or with
+`"outputStyle": "Sentinel"` in its `settings.json`.
 
 Sentinel goes to each agent that setup finds: Codex, Claude Code, GitHub
 Copilot, Kiro and OpenCode. An agent counts when setup finds its command (or
@@ -370,10 +373,11 @@ the same selection installs its CLI.
 | Kiro | `${KIRO_HOME:-~/.kiro}/steering/AGENTS.md` | `${KIRO_HOME:-~/.kiro}/skills` |
 | OpenCode | `${XDG_CONFIG_HOME:-~/.config}/opencode/AGENTS.md` | `~/.agents/skills` |
 
-The `core` skills are `babysit-pr`, `cleanup`, `council`, `file-pr`,
-`full-stop`, `leaving-pr-comments`, `modernize`, `no-comments`, `sol-loop`,
-`takeover`, `technical-writing`, `tldr`, `untangle` and `why`. The `ui` skills
-are `beast-ui`, `doc-view`, `frontend-design` and `impeccable`.
+The `core` skills are `babysit-pr`, `cleanup`, `council`, `enforce`,
+`file-pr`, `full-stop`, `leaving-pr-comments`, `modernize`, `no-comments`,
+`sol-loop`, `takeover`, `technical-writing`, `tldr`, `untangle`, `verify-pr`
+and `why`. The `ui` skills are `beast-ui`, `doc-view`, `frontend-design` and
+`impeccable`.
 The skills are copies, so an edit to a skill never changes this checkout.
 
 Kiro ignores a `KIRO_HOME` that is not an absolute folder outside your home
@@ -382,7 +386,7 @@ reads `~/.agents/skills` also when you set `COPILOT_HOME`.
 
 Check runs the Sentinel check. When a file changed, Check reports it and
 Repair installs Sentinel again. When you untick Sentinel, setup removes the
-rules and skills from each agent that it installed them for. Then it deletes
+Sentinel files from each agent that it installed them for. Then it deletes
 its Sentinel checkout. Setup records `CODEX_HOME`, `CLAUDE_CONFIG_DIR`,
 `COPILOT_HOME`, `XDG_CONFIG_HOME` and `KIRO_HOME` at the install. Check, update
 and removal use these recorded values, and setup shows a note when they changed.
