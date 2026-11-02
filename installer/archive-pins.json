@@ -2693,9 +2693,9 @@
     },
     "tool.claude": {
       "darwin/arm64": {
-        "version": "2.1.308",
-        "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-darwin-arm64/-/claude-code-darwin-arm64-2.1.308.tgz",
-        "sha256": "643eef6426295ad0a669237c52baa87a3d9591b2f7d64e4bb1c98d80ea095797",
+        "version": "2.1.309",
+        "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-darwin-arm64/-/claude-code-darwin-arm64-2.1.309.tgz",
+        "sha256": "0e8ce1ddb8566129661bb7698db69db89d904e23b464afc6e85d5bd8879b9a51",
         "format": "tar.gz",
         "commands": {
           "claude": "claude"
@@ -2706,9 +2706,9 @@
         "strip_components": 1
       },
       "linux/amd64": {
-        "version": "2.1.308",
-        "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-linux-x64/-/claude-code-linux-x64-2.1.308.tgz",
-        "sha256": "f329748feb169a1bcddb578f0195af810a1a5287ebf629728464821490b04333",
+        "version": "2.1.309",
+        "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-linux-x64/-/claude-code-linux-x64-2.1.309.tgz",
+        "sha256": "e960c4437f6f99648437784db43e04ad5f12711aecd710864f96876f94c2fc1a",
         "format": "tar.gz",
         "commands": {
           "claude": "claude"
@@ -2720,9 +2720,9 @@
         "strip_components": 1
       },
       "linux/arm64": {
-        "version": "2.1.308",
-        "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-linux-arm64/-/claude-code-linux-arm64-2.1.308.tgz",
-        "sha256": "e939ff4445b9942fe04af0f2892e7052b48c09609b1b340ce7ac47c87db8619f",
+        "version": "2.1.309",
+        "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-linux-arm64/-/claude-code-linux-arm64-2.1.309.tgz",
+        "sha256": "3108f1bf04723cd654cf98269eb861827a15d9256db13ebf88a09d3b497926b2",
         "format": "tar.gz",
         "commands": {
           "claude": "claude"
@@ -2734,9 +2734,9 @@
         "strip_components": 1
       },
       "windows/amd64": {
-        "version": "2.1.308",
-        "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-win32-x64/-/claude-code-win32-x64-2.1.308.tgz",
-        "sha256": "bfb51c874e4697627e16bf5254cdec5761a57f207b346593b7236a2671002c8f",
+        "version": "2.1.309",
+        "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-win32-x64/-/claude-code-win32-x64-2.1.309.tgz",
+        "sha256": "9b8e492ca14fdccb76a58c4cb5353de2434b9644015190748c5c40f3b283d3b6",
         "format": "tar.gz",
         "commands": {
           "claude": "claude.exe"
@@ -2749,9 +2749,9 @@
     },
     "tool.codex": {
       "darwin/arm64": {
-        "version": "0.164.0",
-        "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.164.0-darwin-arm64.tgz",
-        "sha256": "9b5a35be1975ceb332eaf274032f375b017ab644ff0165737ead03277fae77cd",
+        "version": "0.166.0",
+        "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.166.0-darwin-arm64.tgz",
+        "sha256": "181d2eda8addbeca0b689c996df207293947928bdd9c88a097837ae1c7e69ca5",
         "format": "tar.gz",
         "commands": {
           "codex": "vendor/aarch64-apple-darwin/bin/codex",
@@ -2769,9 +2769,9 @@
         "strip_components": 1
       },
       "linux/amd64": {
-        "version": "0.164.0",
-        "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.164.0-linux-x64.tgz",
-        "sha256": "62659fefd9a8efa21a496402fde3c11c025bbeee735a582968f8ffd14cb5f79c",
+        "version": "0.166.0",
+        "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.166.0-linux-x64.tgz",
+        "sha256": "cbc00a26d3d0e2ceefc4be8891f8a81ef1e349b3b175bc0ae308762bc001fd93",
         "format": "tar.gz",
         "commands": {
           "codex": "vendor/x86_64-unknown-linux-musl/bin/codex",
@@ -2790,9 +2790,9 @@
         "strip_components": 1
       },
       "linux/arm64": {
-        "version": "0.164.0",
-        "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.164.0-linux-arm64.tgz",
-        "sha256": "048a62731ce28aa000508efcc032302e58488ca079970dcae06d28df39ae5ce0",
+        "version": "0.166.0",
+        "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.166.0-linux-arm64.tgz",
+        "sha256": "9044e840397864fc6c539d13719b25fb26abb35d5353366cbabf7b4555406acd",
         "format": "tar.gz",
         "commands": {
           "codex": "vendor/aarch64-unknown-linux-musl/bin/codex",
@@ -2811,9 +2811,9 @@
         "strip_components": 1
       },
       "windows/amd64": {
-        "version": "0.164.0",
-        "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.164.0-win32-x64.tgz",
-        "sha256": "4fbd23473a2fc223396cdd8490d3f658d368438134c12a3f1dac9d1e2041a65b",
+        "version": "0.166.0",
+        "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.166.0-win32-x64.tgz",
+        "sha256": "47d74aed875a3c01315f042152329ae09b0bd9d26a3285802d1c85aeadce083e",
         "format": "tar.gz",
         "commands": {
           "codex": "vendor/x86_64-pc-windows-msvc/bin/codex.exe",
@@ -2835,9 +2835,9 @@
     },
     "tool.kiro": {
       "darwin/arm64": {
-        "version": "2.34.0",
-        "url": "https://prod.download.cli.kiro.dev/stable/2.34.0/Kiro%20CLI.dmg",
-        "sha256": "110bb7630571190659d5bf4ad0359c8dee40fcff14ac7501b0d3f68957238765",
+        "version": "2.37.1",
+        "url": "https://prod.download.cli.kiro.dev/stable/2.37.1/Kiro%20CLI.dmg",
+        "sha256": "3477707d09191f52c1d117dd92d79a6e57a793d577868cf5ce89315981314743",
         "format": "dmg",
         "commands": {
           "kiro-cli": "Kiro CLI.app/Contents/MacOS/kiro-cli",
@@ -2853,9 +2853,9 @@
         "app_bundle": "Kiro CLI.app"
       },
       "linux/amd64": {
-        "version": "2.34.0",
-        "url": "https://prod.download.cli.kiro.dev/stable/2.34.0/kirocli-x86_64-linux.zip",
-        "sha256": "877b6fc99182c1a789719141306ff19019c047eaf500d19f2b812f925dd0f913",
+        "version": "2.37.1",
+        "url": "https://prod.download.cli.kiro.dev/stable/2.37.1/kirocli-x86_64-linux.zip",
+        "sha256": "b4049000d5a7b684947306eb9f9a480cab3a3ab2ff42584c293d05bde4d314a1",
         "format": "zip",
         "strip_components": 1,
         "commands": {
@@ -2876,9 +2876,9 @@
         "libc": "glibc"
       },
       "linux/arm64": {
-        "version": "2.34.0",
-        "url": "https://prod.download.cli.kiro.dev/stable/2.34.0/kirocli-aarch64-linux.zip",
-        "sha256": "de9674e9c029a50fae6be2334a35034a71f56a77b133183f19e37094a79e2bb2",
+        "version": "2.37.1",
+        "url": "https://prod.download.cli.kiro.dev/stable/2.37.1/kirocli-aarch64-linux.zip",
+        "sha256": "e589bd8d8b845bb193b9f36f2ee263fe8aef7dbb19aff03ce44c5076ce6ab0c1",
         "format": "zip",
         "strip_components": 1,
         "commands": {
@@ -2901,9 +2901,9 @@
     },
     "tool.copilot": {
       "darwin/arm64": {
-        "version": "1.0.103",
-        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.103/copilot-darwin-arm64.tar.gz",
-        "sha256": "33e6553b23d1e15946685df297cac12e0b3efe98102009d5e7093453ecc6e60b",
+        "version": "1.0.105",
+        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.105/copilot-darwin-arm64.tar.gz",
+        "sha256": "34aacd03fb478d47e4b3cfc5ca045c37278c5d8d86239466521a16ea54ac84aa",
         "format": "tar.gz",
         "commands": {
           "copilot": "copilot"
@@ -2913,9 +2913,9 @@
         ]
       },
       "linux/amd64": {
-        "version": "1.0.103",
-        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.103/copilot-linux-x64.tar.gz",
-        "sha256": "9aeb4430e9ac9523546db07b227c7aba179a4710a55f9ac29ad143b0f9e1b325",
+        "version": "1.0.105",
+        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.105/copilot-linux-x64.tar.gz",
+        "sha256": "aba1f06f27bc0447656647f76e0a4cf58b4b2a341c75ff04a750982b6aeb6bd2",
         "format": "tar.gz",
         "commands": {
           "copilot": "copilot"
@@ -2926,9 +2926,9 @@
         "libc": "glibc"
       },
       "linux/arm64": {
-        "version": "1.0.103",
-        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.103/copilot-linux-arm64.tar.gz",
-        "sha256": "728a91dffb9a02817bd98c5b01bf2f9cb08c4fdac3c0ca8c48d7f1ccbfe282a1",
+        "version": "1.0.105",
+        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.105/copilot-linux-arm64.tar.gz",
+        "sha256": "e7b488cc04ac3e2ed800e1bf0aace33ada42dcf167529b3d2f48a61e1535a847",
         "format": "tar.gz",
         "commands": {
           "copilot": "copilot"
@@ -2939,9 +2939,9 @@
         "libc": "glibc"
       },
       "windows/amd64": {
-        "version": "1.0.103",
-        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.103/copilot-win32-x64.zip",
-        "sha256": "e63b81a1a9e2bfd3d6fbf69b6c58cc51725df30bb38654ded018f5d8a6e80a5f",
+        "version": "1.0.105",
+        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.105/copilot-win32-x64.zip",
+        "sha256": "34e16e9cf47de0e1534920171d6f39fa246638bddbb6ece820870b382bcc061a",
         "format": "zip",
         "commands": {
           "copilot": "copilot.exe"
