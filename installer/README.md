@@ -93,12 +93,12 @@ An interrupted operation resumes: the Sentinel installer runs again. The record
 also keeps the hosts and the folder variables of the install.
 
 Then the resource runs the Sentinel installer of that checkout. On macOS and
-Linux it runs `bash tools/install --global --hosts <hosts> --skills core,ui`.
-On Windows it runs `powershell.exe -NoProfile -ExecutionPolicy Bypass -File
-tools\install.ps1 -Global -Hosts <hosts> -Skills core,ui`. The hosts are the
-present agents among Codex, Claude Code, Copilot, Kiro and OpenCode. Check runs
-the same installer with `--check`. Exit 0 is healthy, exit 1 is drift for
-Repair, and any other exit is an error.
+Linux it runs `bash tools/install --global --hosts <hosts> --skills
+core,ui,formal,ops`. On Windows it runs `powershell.exe -NoProfile
+-ExecutionPolicy Bypass -File tools\install.ps1 -Global -Hosts <hosts> -Skills
+core,ui,formal,ops`. The hosts are the present agents among Codex, Claude Code,
+Copilot, Kiro and OpenCode. Check runs the same installer with `--check`. Exit
+0 is healthy, exit 1 is drift for Repair, and any other exit is an error.
 
 Removal runs `--remove` for each host that dotfiles installed for, then deletes
 `<state>/sentinel`.

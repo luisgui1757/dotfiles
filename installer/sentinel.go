@@ -114,8 +114,9 @@ type sentinelRecord struct {
 }
 
 // SentinelDriver runs the installer of the pinned Sentinel commit. Sentinel
-// decides which files it changes: its managed block in each rules file, and the
-// skill folders that hold its .sentinel-owned marker.
+// decides which files it changes: its managed block in each rules file, the
+// skill folders that hold its .sentinel-owned marker, and the Claude Code
+// output style output-styles/sentinel.md.
 type SentinelDriver struct {
 	Target    Context
 	Home      string

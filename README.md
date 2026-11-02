@@ -354,11 +354,13 @@ skills for coding agents. Setup gets one pinned Sentinel commit with Git and
 runs the Sentinel installer of that commit. That installer writes the rules
 into a managed block in the instruction file of each agent. Text outside the
 block stays. It also copies the skills of the `core`, `ui`, `formal` and `ops`
-profiles and writes a `.sentinel-owned` file into each skill folder. It does not replace a folder
-that it did not write. For Claude Code, it also writes the output style
-`${CLAUDE_CONFIG_DIR:-~/.claude}/output-styles/sentinel.md`. Claude Code uses
-it only after you pick it with `/output-style Sentinel` or with
-`"outputStyle": "Sentinel"` in its `settings.json`.
+profiles and writes a `.sentinel-owned` file into each skill folder. It does
+not replace a folder that it did not write. For Claude Code, it also writes
+the output style `${CLAUDE_CONFIG_DIR:-~/.claude}/output-styles/sentinel.md`.
+Claude Code uses it only after you pick it with `/output-style Sentinel` or
+with `"outputStyle": "Sentinel"` in its `settings.json`. This file has no
+ownership check: install and repair replace a different file at that path, and
+removal deletes it.
 
 Sentinel goes to each agent that setup finds: Codex, Claude Code, GitHub
 Copilot, Kiro and OpenCode. An agent counts when setup finds its command (or
