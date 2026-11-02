@@ -1,0 +1,3451 @@
+{
+  "schema": 2,
+  "kind": "publication-closure",
+  "repository": "luisgui1757/dotfiles",
+  "tag": "v1.1.0",
+  "previous_tag": "v1.0.1",
+  "tag_object": "35453fd3ddbe4e58990e9917b456204d1f80747e",
+  "commit": "41a8b41c45ccfd451d083f2dd5b25b5515231b20",
+  "tree": "4352d5771f9920b7a84702f3a8e4b840fd801b78",
+  "preparation": {
+    "pull_request": 115,
+    "head": "2d8369e34348cefef2f976643a47240f55740cb4",
+    "tree": "4352d5771f9920b7a84702f3a8e4b840fd801b78",
+    "hosted_checks": [
+      "Analyze (actions)",
+      "Analyze (go)",
+      "Analyze (python)",
+      "CodeQL",
+      "Desktop lifecycle (macos-26)",
+      "Desktop lifecycle (ubuntu-26.04)",
+      "Desktop lifecycle (ubuntu-26.04-arm)",
+      "Desktop lifecycle (windows-2025)",
+      "Fresh Debian APT (amd64)",
+      "Fresh Debian APT (arm64)",
+      "Fresh Homebrew (macOS arm64)",
+      "Fresh Ubuntu APT (amd64)",
+      "Fresh Ubuntu APT (arm64)",
+      "Fresh Windows vendor (Build-Tools)",
+      "Fresh Windows vendor (VC-runtime)",
+      "Missing Apple developer tools (macOS arm64)",
+      "Neovim lifecycle (macos-26)",
+      "Neovim lifecycle (ubuntu-26.04)",
+      "Neovim lifecycle (ubuntu-26.04-arm)",
+      "Neovim lifecycle (windows-2025)",
+      "core (macos-26)",
+      "core (ubuntu-26.04)",
+      "core (ubuntu-26.04-arm)",
+      "core (windows-2025)",
+      "core packages (macos-26)",
+      "core packages (windows-2025)",
+      "macos",
+      "ubuntu",
+      "windows"
+    ],
+    "required_checks": [
+      "Desktop lifecycle (macos-26)",
+      "Desktop lifecycle (ubuntu-26.04)",
+      "Desktop lifecycle (ubuntu-26.04-arm)",
+      "Desktop lifecycle (windows-2025)",
+      "Fresh Debian APT (amd64)",
+      "Fresh Debian APT (arm64)",
+      "Fresh Homebrew (macOS arm64)",
+      "Fresh Ubuntu APT (amd64)",
+      "Fresh Ubuntu APT (arm64)",
+      "Fresh Windows vendor (Build-Tools)",
+      "Fresh Windows vendor (VC-runtime)",
+      "Missing Apple developer tools (macOS arm64)",
+      "Neovim lifecycle (macos-26)",
+      "Neovim lifecycle (ubuntu-26.04)",
+      "Neovim lifecycle (ubuntu-26.04-arm)",
+      "Neovim lifecycle (windows-2025)",
+      "core (macos-26)",
+      "core (ubuntu-26.04)",
+      "core (ubuntu-26.04-arm)",
+      "core (windows-2025)",
+      "core packages (macos-26)",
+      "core packages (windows-2025)",
+      "macos",
+      "ubuntu",
+      "windows"
+    ]
+  },
+  "workflow": {
+    "name": "installer-engine.yml",
+    "run_id": 41387471095,
+    "run_attempt": 1,
+    "url": "https://github.com/luisgui1757/dotfiles/actions/runs/41387471095",
+    "conclusion": "success"
+  },
+  "job_evidence": {
+    "sha256": "9764cf0b208e95449461018902f4c8aa5e03ed6d234ab7c534cf7195d54c0809",
+    "size": 120195,
+    "document": {
+      "schema": 1,
+      "run": {
+        "attempt": 1,
+        "conclusion": "success",
+        "databaseId": 41387471095,
+        "event": "workflow_dispatch",
+        "headBranch": "v1.1.0",
+        "headSha": "41a8b41c45ccfd451d083f2dd5b25b5515231b20",
+        "status": "completed",
+        "url": "https://github.com/luisgui1757/dotfiles/actions/runs/41387471095",
+        "workflowName": "installer engine"
+      },
+      "jobs": [
+        {
+          "id": 125091400989,
+          "run_id": 41387471095,
+          "workflow_name": "installer engine",
+          "head_branch": "v1.1.0",
+          "run_url": "https://api.github.com/repos/luisgui1757/dotfiles/actions/runs/41387471095",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOLu4pS88AAAAdIAdNHQ",
+          "head_sha": "41a8b41c45ccfd451d083f2dd5b25b5515231b20",
+          "url": "https://api.github.com/repos/luisgui1757/dotfiles/actions/jobs/125091400989",
+          "html_url": "https://github.com/luisgui1757/dotfiles/actions/runs/41387471095/job/125091400989",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-11-02T04:15:50Z",
+          "started_at": "2026-11-02T04:15:53Z",
+          "completed_at": "2026-11-02T04:31:27Z",
+          "name": "Fresh Debian APT (amd64)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-11-02T04:15:54Z",
+              "completed_at": "2026-11-02T04:15:54Z"
+            },
+            {
+              "name": "Initialize containers",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-11-02T04:15:54Z",
+              "completed_at": "2026-11-02T04:15:56Z"
+            },
+            {
+              "name": "Prepare the disposable Linux test host",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-11-02T04:15:56Z",
+              "completed_at": "2026-11-02T04:16:04Z"
+            },
+            {
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-11-02T04:16:04Z",
+              "completed_at": "2026-11-02T04:16:05Z"
+            },
+            {
+              "name": "Run actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-11-02T04:16:05Z",
+              "completed_at": "2026-11-02T04:16:13Z"
+            },
+            {
+              "name": "Exercise the native provider and installed application as root without sudo",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-11-02T04:16:13Z",
+              "completed_at": "2026-11-02T04:20:17Z"
+            },
+            {
+              "name": "Install, consume, update and remove Neovim from absent Mason prerequisites",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-11-02T04:20:17Z",
+              "completed_at": "2026-11-02T04:31:24Z"
+            },
+            {
+              "name": "Post Run actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 12,
+              "started_at": "2026-11-02T04:31:24Z",
+              "completed_at": "2026-11-02T04:31:24Z"
+            },
+            {
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 13,
+              "started_at": "2026-11-02T04:31:24Z",
+              "completed_at": "2026-11-02T04:31:24Z"
+            },
+            {
+              "name": "Stop containers",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 14,
+              "started_at": "2026-11-02T04:31:24Z",
+              "completed_at": "2026-11-02T04:31:25Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 15,
+              "started_at": "2026-11-02T04:31:25Z",
+              "completed_at": "2026-11-02T04:31:25Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/luisgui1757/dotfiles/check-runs/125091400989",
+          "labels": [
+            "ubuntu-26.04"
+          ],
+          "runner_id": 1000024782,
+          "runner_name": "GitHub Actions 1000024782",
+          "runner_group_id": 0,
+          "runner_group_name": "GitHub Actions"
+        },
+        {
+          "id": 125091401097,
+          "run_id": 41387471095,
+          "workflow_name": "installer engine",
+          "head_branch": "v1.1.0",
+          "run_url": "https://api.github.com/repos/luisgui1757/dotfiles/actions/runs/41387471095",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOLu4pS88AAAAdIAdNiQ",
+          "head_sha": "41a8b41c45ccfd451d083f2dd5b25b5515231b20",
+          "url": "https://api.github.com/repos/luisgui1757/dotfiles/actions/jobs/125091401097",
+          "html_url": "https://github.com/luisgui1757/dotfiles/actions/runs/41387471095/job/125091401097",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-11-02T04:15:50Z",
+          "started_at": "2026-11-02T04:15:53Z",
+          "completed_at": "2026-11-02T04:21:08Z",
+          "name": "Desktop lifecycle (windows-2025)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-11-02T04:15:54Z",
+              "completed_at": "2026-11-02T04:15:54Z"
+            },
+            {
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-11-02T04:15:54Z",
+              "completed_at": "2026-11-02T04:16:00Z"
+            },
+            {
+              "name": "Run actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-11-02T04:16:00Z",
+              "completed_at": "2026-11-02T04:16:20Z"
+            },
+            {
+              "name": "Verify actual native runner target",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-11-02T04:16:20Z",
+              "completed_at": "2026-11-02T04:16:21Z"
+            },
+            {
+              "name": "Prepare disposable Linux display and native font inspection",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 5,
+              "started_at": "2026-11-02T04:16:21Z",
+              "completed_at": "2026-11-02T04:16:21Z"
+            },
+            {
+              "name": "Establish trusted disposable system parent",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 6,
+              "started_at": "2026-11-02T04:16:21Z",
+              "completed_at": "2026-11-02T04:16:21Z"
+            },
+            {
+              "name": "Verify native X window disappearance and query failures",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 7,
+              "started_at": "2026-11-02T04:16:21Z",
+              "completed_at": "2026-11-02T04:16:21Z"
+            },
+            {
+              "name": "Verify pinned Code native ownership and repository preservation",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 8,
+              "started_at": "2026-11-02T04:16:21Z",
+              "completed_at": "2026-11-02T04:16:21Z"
+            },
+            {
+              "name": "Install, render, check and remove native fonts",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-11-02T04:16:21Z",
+              "completed_at": "2026-11-02T04:17:12Z"
+            },
+            {
+              "name": "Consume scoped Windows Terminal settings and verify removal",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-11-02T04:17:12Z",
+              "completed_at": "2026-11-02T04:17:42Z"
+            },
+            {
+              "name": "Remap a Mac keyboard in identified windows, then remove it",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 11,
+              "started_at": "2026-11-02T04:17:42Z",
+              "completed_at": "2026-11-02T04:17:42Z"
+            },
+            {
+              "name": "Load pinned Ghostty against the oldest supported Ubuntu libraries",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 12,
+              "started_at": "2026-11-02T04:17:42Z",
+              "completed_at": "2026-11-02T04:17:42Z"
+            },
+            {
+              "name": "Launch configured desktop applications and verify update/removal",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 13,
+              "started_at": "2026-11-02T04:17:42Z",
+              "completed_at": "2026-11-02T04:21:03Z"
+            },
+            {
+              "name": "Verify Mac disk-image transport and strict vendor signatures",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 14,
+              "started_at": "2026-11-02T04:21:03Z",
+              "completed_at": "2026-11-02T04:21:03Z"
+            },
+            {
+              "name": "Post Run actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 27,
+              "started_at": "2026-11-02T04:21:03Z",
+              "completed_at": "2026-11-02T04:21:03Z"
+            },
+            {
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 28,
+              "started_at": "2026-11-02T04:21:03Z",
+              "completed_at": "2026-11-02T04:21:06Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 29,
+              "started_at": "2026-11-02T04:21:06Z",
+              "completed_at": "2026-11-02T04:21:06Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/luisgui1757/dotfiles/check-runs/125091401097",
+          "labels": [
+            "windows-2025"
+          ],
+          "runner_id": 1000024778,
+          "runner_name": "GitHub Actions 1000024778",
+          "runner_group_id": 0,
+          "runner_group_name": "GitHub Actions"
+        },
+        {
+          "id": 125091401114,
+          "run_id": 41387471095,
+          "workflow_name": "installer engine",
+          "head_branch": "v1.1.0",
+          "run_url": "https://api.github.com/repos/luisgui1757/dotfiles/actions/runs/41387471095",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOLu4pS88AAAAdIAdNmg",
+          "head_sha": "41a8b41c45ccfd451d083f2dd5b25b5515231b20",
+          "url": "https://api.github.com/repos/luisgui1757/dotfiles/actions/jobs/125091401114",
+          "html_url": "https://github.com/luisgui1757/dotfiles/actions/runs/41387471095/job/125091401114",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-11-02T04:15:50Z",
+          "started_at": "2026-11-02T04:15:53Z",
+          "completed_at": "2026-11-02T04:27:51Z",
+          "name": "Desktop lifecycle (ubuntu-26.04)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-11-02T04:15:54Z",
+              "completed_at": "2026-11-02T04:15:56Z"
+            },
+            {
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-11-02T04:15:56Z",
+              "completed_at": "2026-11-02T04:15:57Z"
+            },
+            {
+              "name": "Run actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-11-02T04:15:57Z",
+              "completed_at": "2026-11-02T04:16:03Z"
+            },
+            {
+              "name": "Verify actual native runner target",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-11-02T04:16:03Z",
+              "completed_at": "2026-11-02T04:16:03Z"
+            },
+            {
+              "name": "Prepare disposable Linux display and native font inspection",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-11-02T04:16:03Z",
+              "completed_at": "2026-11-02T04:16:37Z"
+            },
+            {
+              "name": "Establish trusted disposable system parent",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-11-02T04:16:37Z",
+              "completed_at": "2026-11-02T04:16:37Z"
+            },
+            {
+              "name": "Verify native X window disappearance and query failures",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-11-02T04:16:37Z",
+              "completed_at": "2026-11-02T04:16:54Z"
+            },
+            {
+              "name": "Verify pinned Code native ownership and repository preservation",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-11-02T04:16:54Z",
+              "completed_at": "2026-11-02T04:18:57Z"
+            },
+            {
+              "name": "Install, render, check and remove native fonts",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-11-02T04:18:57Z",
+              "completed_at": "2026-11-02T04:19:04Z"
+            },
+            {
+              "name": "Consume scoped Windows Terminal settings and verify removal",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 10,
+              "started_at": "2026-11-02T04:19:04Z",
+              "completed_at": "2026-11-02T04:19:04Z"
+            },
+            {
+              "name": "Remap a Mac keyboard in identified windows, then remove it",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-11-02T04:19:04Z",
+              "completed_at": "2026-11-02T04:23:59Z"
+            },
+            {
+              "name": "Load pinned Ghostty against the oldest supported Ubuntu libraries",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 12,
+              "started_at": "2026-11-02T04:23:59Z",
+              "completed_at": "2026-11-02T04:24:22Z"
+            },
+            {
+              "name": "Launch configured desktop applications and verify update/removal",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 13,
+              "started_at": "2026-11-02T04:24:22Z",
+              "completed_at": "2026-11-02T04:27:49Z"
+            },
+            {
+              "name": "Verify Mac disk-image transport and strict vendor signatures",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 14,
+              "started_at": "2026-11-02T04:27:49Z",
+              "completed_at": "2026-11-02T04:27:49Z"
+            },
+            {
+              "name": "Post Run actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 27,
+              "started_at": "2026-11-02T04:27:49Z",
+              "completed_at": "2026-11-02T04:27:50Z"
+            },
+            {
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 28,
+              "started_at": "2026-11-02T04:27:50Z",
+              "completed_at": "2026-11-02T04:27:50Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 29,
+              "started_at": "2026-11-02T04:27:50Z",
+              "completed_at": "2026-11-02T04:27:50Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/luisgui1757/dotfiles/check-runs/125091401114",
+          "labels": [
+            "ubuntu-26.04"
+          ],
+          "runner_id": 1000024784,
+          "runner_name": "GitHub Actions 1000024784",
+          "runner_group_id": 0,
+          "runner_group_name": "GitHub Actions"
+        },
+        {
+          "id": 125091401115,
+          "run_id": 41387471095,
+          "workflow_name": "installer engine",
+          "head_branch": "v1.1.0",
+          "run_url": "https://api.github.com/repos/luisgui1757/dotfiles/actions/runs/41387471095",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOLu4pS88AAAAdIAdNmw",
+          "head_sha": "41a8b41c45ccfd451d083f2dd5b25b5515231b20",
+          "url": "https://api.github.com/repos/luisgui1757/dotfiles/actions/jobs/125091401115",
+          "html_url": "https://github.com/luisgui1757/dotfiles/actions/runs/41387471095/job/125091401115",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-11-02T04:15:50Z",
+          "started_at": "2026-11-02T04:15:56Z",
+          "completed_at": "2026-11-02T04:32:32Z",
+          "name": "Fresh Debian APT (arm64)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-11-02T04:15:57Z",
+              "completed_at": "2026-11-02T04:15:58Z"
+            },
+            {
+              "name": "Initialize containers",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-11-02T04:15:58Z",
+              "completed_at": "2026-11-02T04:16:02Z"
+            },
+            {
+              "name": "Prepare the disposable Linux test host",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-11-02T04:16:02Z",
+              "completed_at": "2026-11-02T04:16:10Z"
+            },
+            {
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-11-02T04:16:10Z",
+              "completed_at": "2026-11-02T04:16:11Z"
+            },
+            {
+              "name": "Run actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-11-02T04:16:11Z",
+              "completed_at": "2026-11-02T04:16:20Z"
+            },
+            {
+              "name": "Exercise the native provider and installed application as root without sudo",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-11-02T04:16:20Z",
+              "completed_at": "2026-11-02T04:20:32Z"
+            },
+            {
+              "name": "Install, consume, update and remove Neovim from absent Mason prerequisites",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-11-02T04:20:32Z",
+              "completed_at": "2026-11-02T04:32:28Z"
+            },
+            {
+              "name": "Post Run actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 12,
+              "started_at": "2026-11-02T04:32:28Z",
+              "completed_at": "2026-11-02T04:32:28Z"
+            },
+            {
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 13,
+              "started_at": "2026-11-02T04:32:28Z",
+              "completed_at": "2026-11-02T04:32:28Z"
+            },
+            {
+              "name": "Stop containers",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 14,
+              "started_at": "2026-11-02T04:32:28Z",
+              "completed_at": "2026-11-02T04:32:29Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 15,
+              "started_at": "2026-11-02T04:32:29Z",
+              "completed_at": "2026-11-02T04:32:29Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/luisgui1757/dotfiles/check-runs/125091401115",
+          "labels": [
+            "ubuntu-26.04-arm"
+          ],
+          "runner_id": 1000024786,
+          "runner_name": "GitHub Actions 1000024786",
+          "runner_group_id": 0,
+          "runner_group_name": "GitHub Actions"
+        },
+        {
+          "id": 125091401151,
+          "run_id": 41387471095,
+          "workflow_name": "installer engine",
+          "head_branch": "v1.1.0",
+          "run_url": "https://api.github.com/repos/luisgui1757/dotfiles/actions/runs/41387471095",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOLu4pS88AAAAdIAdNvw",
+          "head_sha": "41a8b41c45ccfd451d083f2dd5b25b5515231b20",
+          "url": "https://api.github.com/repos/luisgui1757/dotfiles/actions/jobs/125091401151",
+          "html_url": "https://github.com/luisgui1757/dotfiles/actions/runs/41387471095/job/125091401151",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-11-02T04:15:50Z",
+          "started_at": "2026-11-02T04:15:53Z",
+          "completed_at": "2026-11-02T04:28:45Z",
+          "name": "core (windows-2025)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-11-02T04:15:54Z",
+              "completed_at": "2026-11-02T04:15:54Z"
+            },
+            {
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-11-02T04:15:54Z",
+              "completed_at": "2026-11-02T04:15:59Z"
+            },
+            {
+              "name": "Run actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-11-02T04:15:59Z",
+              "completed_at": "2026-11-02T04:16:12Z"
+            },
+            {
+              "name": "Verify actual native runner target",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-11-02T04:16:12Z",
+              "completed_at": "2026-11-02T04:16:13Z"
+            },
+            {
+              "name": "Exercise the public keyboard installation and personal-data journey",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-11-02T04:16:13Z",
+              "completed_at": "2026-11-02T04:17:19Z"
+            },
+            {
+              "name": "Preserve public keyboard acceptance evidence",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-11-02T04:17:19Z",
+              "completed_at": "2026-11-02T04:17:20Z"
+            },
+            {
+              "name": "Install shell test prerequisites",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 7,
+              "started_at": "2026-11-02T04:17:20Z",
+              "completed_at": "2026-11-02T04:17:20Z"
+            },
+            {
+              "name": "Establish trusted disposable completion directories",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 8,
+              "started_at": "2026-11-02T04:17:20Z",
+              "completed_at": "2026-11-02T04:17:20Z"
+            },
+            {
+              "name": "Install tmux integration test prerequisite",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 9,
+              "started_at": "2026-11-02T04:17:20Z",
+              "completed_at": "2026-11-02T04:17:20Z"
+            },
+            {
+              "name": "Check formatting and dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-11-02T04:17:20Z",
+              "completed_at": "2026-11-02T04:17:21Z"
+            },
+            {
+              "name": "Vet and exercise the engine against the native filesystem",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-11-02T04:17:21Z",
+              "completed_at": "2026-11-02T04:25:50Z"
+            },
+            {
+              "name": "Edit a root-owned file through sudoedit and the generated editor",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 12,
+              "started_at": "2026-11-02T04:25:50Z",
+              "completed_at": "2026-11-02T04:25:50Z"
+            },
+            {
+              "name": "Install, execute, check and remove the real pinned archive",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 13,
+              "started_at": "2026-11-02T04:25:50Z",
+              "completed_at": "2026-11-02T04:25:50Z"
+            },
+            {
+              "name": "Install, check and remove the pinned Sentinel commit",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 14,
+              "started_at": "2026-11-02T04:25:50Z",
+              "completed_at": "2026-11-02T04:25:50Z"
+            },
+            {
+              "name": "Install, consume, check, update and remove T3 Code and the Claude Code, Codex, Copilot and Kiro CLIs",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 15,
+              "started_at": "2026-11-02T04:25:50Z",
+              "completed_at": "2026-11-02T04:28:41Z"
+            },
+            {
+              "name": "Verify native APT transaction and removal contracts",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 16,
+              "started_at": "2026-11-02T04:28:41Z",
+              "completed_at": "2026-11-02T04:28:41Z"
+            },
+            {
+              "name": "Verify native Homebrew transaction and removal contracts",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 17,
+              "started_at": "2026-11-02T04:28:41Z",
+              "completed_at": "2026-11-02T04:28:41Z"
+            },
+            {
+              "name": "Install, contact, update and remove the real Tailscale daemon",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 18,
+              "started_at": "2026-11-02T04:28:41Z",
+              "completed_at": "2026-11-02T04:28:41Z"
+            },
+            {
+              "name": "Verify Windows runtime registration and Microsoft signature",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 19,
+              "started_at": "2026-11-02T04:28:41Z",
+              "completed_at": "2026-11-02T04:28:41Z"
+            },
+            {
+              "name": "Install, use and remove the private language prerequisites",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 20,
+              "started_at": "2026-11-02T04:28:41Z",
+              "completed_at": "2026-11-02T04:28:41Z"
+            },
+            {
+              "name": "Install, upgrade, use and remove full Windows Git and GNU Make",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 21,
+              "started_at": "2026-11-02T04:28:41Z",
+              "completed_at": "2026-11-02T04:28:41Z"
+            },
+            {
+              "name": "Install and remove the locked Neovim runtime",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 22,
+              "started_at": "2026-11-02T04:28:41Z",
+              "completed_at": "2026-11-02T04:28:41Z"
+            },
+            {
+              "name": "Verify the public POSIX bootstrap and setup lifecycle",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 23,
+              "started_at": "2026-11-02T04:28:41Z",
+              "completed_at": "2026-11-02T04:28:41Z"
+            },
+            {
+              "name": "Post Run actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 45,
+              "started_at": "2026-11-02T04:28:41Z",
+              "completed_at": "2026-11-02T04:28:41Z"
+            },
+            {
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 46,
+              "started_at": "2026-11-02T04:28:41Z",
+              "completed_at": "2026-11-02T04:28:43Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 47,
+              "started_at": "2026-11-02T04:28:43Z",
+              "completed_at": "2026-11-02T04:28:43Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/luisgui1757/dotfiles/check-runs/125091401151",
+          "labels": [
+            "windows-2025"
+          ],
+          "runner_id": 1000024779,
+          "runner_name": "GitHub Actions 1000024779",
+          "runner_group_id": 0,
+          "runner_group_name": "GitHub Actions"
+        },
+        {
+          "id": 125091401152,
+          "run_id": 41387471095,
+          "workflow_name": "installer engine",
+          "head_branch": "v1.1.0",
+          "run_url": "https://api.github.com/repos/luisgui1757/dotfiles/actions/runs/41387471095",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOLu4pS88AAAAdIAdNwA",
+          "head_sha": "41a8b41c45ccfd451d083f2dd5b25b5515231b20",
+          "url": "https://api.github.com/repos/luisgui1757/dotfiles/actions/jobs/125091401152",
+          "html_url": "https://github.com/luisgui1757/dotfiles/actions/runs/41387471095/job/125091401152",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-11-02T04:15:50Z",
+          "started_at": "2026-11-02T04:15:53Z",
+          "completed_at": "2026-11-02T04:35:01Z",
+          "name": "Neovim lifecycle (windows-2025)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-11-02T04:15:54Z",
+              "completed_at": "2026-11-02T04:15:54Z"
+            },
+            {
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-11-02T04:15:54Z",
+              "completed_at": "2026-11-02T04:16:00Z"
+            },
+            {
+              "name": "Run actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-11-02T04:16:00Z",
+              "completed_at": "2026-11-02T04:16:21Z"
+            },
+            {
+              "name": "Verify actual native runner target",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-11-02T04:16:21Z",
+              "completed_at": "2026-11-02T04:16:21Z"
+            },
+            {
+              "name": "Install, consume, update and remove the complete Neovim selection",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-11-02T04:16:21Z",
+              "completed_at": "2026-11-02T04:34:56Z"
+            },
+            {
+              "name": "Post Run actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-11-02T04:34:56Z",
+              "completed_at": "2026-11-02T04:34:57Z"
+            },
+            {
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-11-02T04:34:57Z",
+              "completed_at": "2026-11-02T04:34:59Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-11-02T04:34:59Z",
+              "completed_at": "2026-11-02T04:34:59Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/luisgui1757/dotfiles/check-runs/125091401152",
+          "labels": [
+            "windows-2025"
+          ],
+          "runner_id": 1000024780,
+          "runner_name": "GitHub Actions 1000024780",
+          "runner_group_id": 0,
+          "runner_group_name": "GitHub Actions"
+        },
+        {
+          "id": 125091401156,
+          "run_id": 41387471095,
+          "workflow_name": "installer engine",
+          "head_branch": "v1.1.0",
+          "run_url": "https://api.github.com/repos/luisgui1757/dotfiles/actions/runs/41387471095",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOLu4pS88AAAAdIAdNxA",
+          "head_sha": "41a8b41c45ccfd451d083f2dd5b25b5515231b20",
+          "url": "https://api.github.com/repos/luisgui1757/dotfiles/actions/jobs/125091401156",
+          "html_url": "https://github.com/luisgui1757/dotfiles/actions/runs/41387471095/job/125091401156",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-11-02T04:15:50Z",
+          "started_at": "2026-11-02T04:15:55Z",
+          "completed_at": "2026-11-02T04:30:19Z",
+          "name": "core (ubuntu-26.04-arm)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-11-02T04:15:56Z",
+              "completed_at": "2026-11-02T04:15:57Z"
+            },
+            {
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-11-02T04:15:57Z",
+              "completed_at": "2026-11-02T04:15:58Z"
+            },
+            {
+              "name": "Run actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-11-02T04:15:58Z",
+              "completed_at": "2026-11-02T04:16:05Z"
+            },
+            {
+              "name": "Verify actual native runner target",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-11-02T04:16:05Z",
+              "completed_at": "2026-11-02T04:16:05Z"
+            },
+            {
+              "name": "Exercise the public keyboard installation and personal-data journey",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-11-02T04:16:05Z",
+              "completed_at": "2026-11-02T04:16:36Z"
+            },
+            {
+              "name": "Preserve public keyboard acceptance evidence",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-11-02T04:16:36Z",
+              "completed_at": "2026-11-02T04:16:37Z"
+            },
+            {
+              "name": "Install shell test prerequisites",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-11-02T04:16:37Z",
+              "completed_at": "2026-11-02T04:16:47Z"
+            },
+            {
+              "name": "Establish trusted disposable completion directories",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-11-02T04:16:47Z",
+              "completed_at": "2026-11-02T04:16:47Z"
+            },
+            {
+              "name": "Install tmux integration test prerequisite",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 9,
+              "started_at": "2026-11-02T04:16:47Z",
+              "completed_at": "2026-11-02T04:16:47Z"
+            },
+            {
+              "name": "Check formatting and dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-11-02T04:16:47Z",
+              "completed_at": "2026-11-02T04:16:47Z"
+            },
+            {
+              "name": "Vet and exercise the engine against the native filesystem",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-11-02T04:16:47Z",
+              "completed_at": "2026-11-02T04:23:04Z"
+            },
+            {
+              "name": "Edit a root-owned file through sudoedit and the generated editor",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 12,
+              "started_at": "2026-11-02T04:23:04Z",
+              "completed_at": "2026-11-02T04:23:09Z"
+            },
+            {
+              "name": "Install, execute, check and remove the real pinned archive",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 13,
+              "started_at": "2026-11-02T04:23:09Z",
+              "completed_at": "2026-11-02T04:24:14Z"
+            },
+            {
+              "name": "Install, check and remove the pinned Sentinel commit",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 14,
+              "started_at": "2026-11-02T04:24:14Z",
+              "completed_at": "2026-11-02T04:25:52Z"
+            },
+            {
+              "name": "Install, consume, check, update and remove T3 Code and the Claude Code, Codex, Copilot and Kiro CLIs",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 15,
+              "started_at": "2026-11-02T04:25:52Z",
+              "completed_at": "2026-11-02T04:27:14Z"
+            },
+            {
+              "name": "Verify native APT transaction and removal contracts",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 16,
+              "started_at": "2026-11-02T04:27:14Z",
+              "completed_at": "2026-11-02T04:28:40Z"
+            },
+            {
+              "name": "Verify native Homebrew transaction and removal contracts",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 17,
+              "started_at": "2026-11-02T04:28:40Z",
+              "completed_at": "2026-11-02T04:28:40Z"
+            },
+            {
+              "name": "Install, contact, update and remove the real Tailscale daemon",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 18,
+              "started_at": "2026-11-02T04:28:40Z",
+              "completed_at": "2026-11-02T04:28:59Z"
+            },
+            {
+              "name": "Verify Windows runtime registration and Microsoft signature",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 19,
+              "started_at": "2026-11-02T04:28:59Z",
+              "completed_at": "2026-11-02T04:28:59Z"
+            },
+            {
+              "name": "Install, use and remove the private language prerequisites",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 20,
+              "started_at": "2026-11-02T04:28:59Z",
+              "completed_at": "2026-11-02T04:30:02Z"
+            },
+            {
+              "name": "Install, upgrade, use and remove full Windows Git and GNU Make",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 21,
+              "started_at": "2026-11-02T04:30:02Z",
+              "completed_at": "2026-11-02T04:30:02Z"
+            },
+            {
+              "name": "Install and remove the locked Neovim runtime",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 22,
+              "started_at": "2026-11-02T04:30:02Z",
+              "completed_at": "2026-11-02T04:30:02Z"
+            },
+            {
+              "name": "Verify the public POSIX bootstrap and setup lifecycle",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 23,
+              "started_at": "2026-11-02T04:30:02Z",
+              "completed_at": "2026-11-02T04:30:18Z"
+            },
+            {
+              "name": "Post Run actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 45,
+              "started_at": "2026-11-02T04:30:18Z",
+              "completed_at": "2026-11-02T04:30:18Z"
+            },
+            {
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 46,
+              "started_at": "2026-11-02T04:30:18Z",
+              "completed_at": "2026-11-02T04:30:18Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 47,
+              "started_at": "2026-11-02T04:30:18Z",
+              "completed_at": "2026-11-02T04:30:18Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/luisgui1757/dotfiles/check-runs/125091401156",
+          "labels": [
+            "ubuntu-26.04-arm"
+          ],
+          "runner_id": 1000024787,
+          "runner_name": "GitHub Actions 1000024787",
+          "runner_group_id": 0,
+          "runner_group_name": "GitHub Actions"
+        },
+        {
+          "id": 125091401158,
+          "run_id": 41387471095,
+          "workflow_name": "installer engine",
+          "head_branch": "v1.1.0",
+          "run_url": "https://api.github.com/repos/luisgui1757/dotfiles/actions/runs/41387471095",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOLu4pS88AAAAdIAdNxg",
+          "head_sha": "41a8b41c45ccfd451d083f2dd5b25b5515231b20",
+          "url": "https://api.github.com/repos/luisgui1757/dotfiles/actions/jobs/125091401158",
+          "html_url": "https://github.com/luisgui1757/dotfiles/actions/runs/41387471095/job/125091401158",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-11-02T04:15:50Z",
+          "started_at": "2026-11-02T04:15:54Z",
+          "completed_at": "2026-11-02T04:29:59Z",
+          "name": "Fresh Ubuntu APT (amd64)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-11-02T04:15:54Z",
+              "completed_at": "2026-11-02T04:15:55Z"
+            },
+            {
+              "name": "Initialize containers",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-11-02T04:15:55Z",
+              "completed_at": "2026-11-02T04:16:00Z"
+            },
+            {
+              "name": "Prepare the disposable Linux test host",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-11-02T04:16:00Z",
+              "completed_at": "2026-11-02T04:16:09Z"
+            },
+            {
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-11-02T04:16:09Z",
+              "completed_at": "2026-11-02T04:16:10Z"
+            },
+            {
+              "name": "Run actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-11-02T04:16:10Z",
+              "completed_at": "2026-11-02T04:16:16Z"
+            },
+            {
+              "name": "Exercise the native provider and installed application as root without sudo",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-11-02T04:16:16Z",
+              "completed_at": "2026-11-02T04:19:47Z"
+            },
+            {
+              "name": "Install, consume, update and remove Neovim from absent Mason prerequisites",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-11-02T04:19:47Z",
+              "completed_at": "2026-11-02T04:29:55Z"
+            },
+            {
+              "name": "Post Run actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 12,
+              "started_at": "2026-11-02T04:29:55Z",
+              "completed_at": "2026-11-02T04:29:55Z"
+            },
+            {
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 13,
+              "started_at": "2026-11-02T04:29:55Z",
+              "completed_at": "2026-11-02T04:29:55Z"
+            },
+            {
+              "name": "Stop containers",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 14,
+              "started_at": "2026-11-02T04:29:55Z",
+              "completed_at": "2026-11-02T04:29:56Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 15,
+              "started_at": "2026-11-02T04:29:56Z",
+              "completed_at": "2026-11-02T04:29:56Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/luisgui1757/dotfiles/check-runs/125091401158",
+          "labels": [
+            "ubuntu-26.04"
+          ],
+          "runner_id": 1000024788,
+          "runner_name": "GitHub Actions 1000024788",
+          "runner_group_id": 0,
+          "runner_group_name": "GitHub Actions"
+        },
+        {
+          "id": 125091401194,
+          "run_id": 41387471095,
+          "workflow_name": "installer engine",
+          "head_branch": "v1.1.0",
+          "run_url": "https://api.github.com/repos/luisgui1757/dotfiles/actions/runs/41387471095",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOLu4pS88AAAAdIAdN6g",
+          "head_sha": "41a8b41c45ccfd451d083f2dd5b25b5515231b20",
+          "url": "https://api.github.com/repos/luisgui1757/dotfiles/actions/jobs/125091401194",
+          "html_url": "https://github.com/luisgui1757/dotfiles/actions/runs/41387471095/job/125091401194",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-11-02T04:15:50Z",
+          "started_at": "2026-11-02T04:15:53Z",
+          "completed_at": "2026-11-02T04:30:45Z",
+          "name": "Neovim lifecycle (macos-26)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-11-02T04:15:53Z",
+              "completed_at": "2026-11-02T04:15:55Z"
+            },
+            {
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-11-02T04:15:55Z",
+              "completed_at": "2026-11-02T04:15:57Z"
+            },
+            {
+              "name": "Run actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-11-02T04:15:57Z",
+              "completed_at": "2026-11-02T04:16:10Z"
+            },
+            {
+              "name": "Verify actual native runner target",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-11-02T04:16:10Z",
+              "completed_at": "2026-11-02T04:16:10Z"
+            },
+            {
+              "name": "Install, consume, update and remove the complete Neovim selection",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-11-02T04:16:10Z",
+              "completed_at": "2026-11-02T04:30:33Z"
+            },
+            {
+              "name": "Post Run actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-11-02T04:30:33Z",
+              "completed_at": "2026-11-02T04:30:35Z"
+            },
+            {
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-11-02T04:30:35Z",
+              "completed_at": "2026-11-02T04:30:36Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-11-02T04:30:36Z",
+              "completed_at": "2026-11-02T04:30:40Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/luisgui1757/dotfiles/check-runs/125091401194",
+          "labels": [
+            "macos-26"
+          ],
+          "runner_id": 1000024785,
+          "runner_name": "GitHub Actions 1000024785",
+          "runner_group_id": 0,
+          "runner_group_name": "GitHub Actions"
+        },
+        {
+          "id": 125091401197,
+          "run_id": 41387471095,
+          "workflow_name": "installer engine",
+          "head_branch": "v1.1.0",
+          "run_url": "https://api.github.com/repos/luisgui1757/dotfiles/actions/runs/41387471095",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOLu4pS88AAAAdIAdN7Q",
+          "head_sha": "41a8b41c45ccfd451d083f2dd5b25b5515231b20",
+          "url": "https://api.github.com/repos/luisgui1757/dotfiles/actions/jobs/125091401197",
+          "html_url": "https://github.com/luisgui1757/dotfiles/actions/runs/41387471095/job/125091401197",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-11-02T04:15:50Z",
+          "started_at": "2026-11-02T04:15:56Z",
+          "completed_at": "2026-11-02T04:23:48Z",
+          "name": "Neovim lifecycle (ubuntu-26.04-arm)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-11-02T04:15:57Z",
+              "completed_at": "2026-11-02T04:15:58Z"
+            },
+            {
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-11-02T04:15:58Z",
+              "completed_at": "2026-11-02T04:15:59Z"
+            },
+            {
+              "name": "Run actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-11-02T04:15:59Z",
+              "completed_at": "2026-11-02T04:16:06Z"
+            },
+            {
+              "name": "Verify actual native runner target",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-11-02T04:16:06Z",
+              "completed_at": "2026-11-02T04:16:06Z"
+            },
+            {
+              "name": "Install, consume, update and remove the complete Neovim selection",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-11-02T04:16:06Z",
+              "completed_at": "2026-11-02T04:23:45Z"
+            },
+            {
+              "name": "Post Run actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-11-02T04:23:45Z",
+              "completed_at": "2026-11-02T04:23:46Z"
+            },
+            {
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-11-02T04:23:46Z",
+              "completed_at": "2026-11-02T04:23:46Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-11-02T04:23:46Z",
+              "completed_at": "2026-11-02T04:23:46Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/luisgui1757/dotfiles/check-runs/125091401197",
+          "labels": [
+            "ubuntu-26.04-arm"
+          ],
+          "runner_id": 1000024790,
+          "runner_name": "GitHub Actions 1000024790",
+          "runner_group_id": 0,
+          "runner_group_name": "GitHub Actions"
+        },
+        {
+          "id": 125091401205,
+          "run_id": 41387471095,
+          "workflow_name": "installer engine",
+          "head_branch": "v1.1.0",
+          "run_url": "https://api.github.com/repos/luisgui1757/dotfiles/actions/runs/41387471095",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOLu4pS88AAAAdIAdN9Q",
+          "head_sha": "41a8b41c45ccfd451d083f2dd5b25b5515231b20",
+          "url": "https://api.github.com/repos/luisgui1757/dotfiles/actions/jobs/125091401205",
+          "html_url": "https://github.com/luisgui1757/dotfiles/actions/runs/41387471095/job/125091401205",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-11-02T04:15:50Z",
+          "started_at": "2026-11-02T04:15:54Z",
+          "completed_at": "2026-11-02T04:24:36Z",
+          "name": "Neovim lifecycle (ubuntu-26.04)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-11-02T04:15:54Z",
+              "completed_at": "2026-11-02T04:15:55Z"
+            },
+            {
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-11-02T04:15:55Z",
+              "completed_at": "2026-11-02T04:15:56Z"
+            },
+            {
+              "name": "Run actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-11-02T04:15:56Z",
+              "completed_at": "2026-11-02T04:16:04Z"
+            },
+            {
+              "name": "Verify actual native runner target",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-11-02T04:16:04Z",
+              "completed_at": "2026-11-02T04:16:04Z"
+            },
+            {
+              "name": "Install, consume, update and remove the complete Neovim selection",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-11-02T04:16:04Z",
+              "completed_at": "2026-11-02T04:24:34Z"
+            },
+            {
+              "name": "Post Run actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-11-02T04:24:34Z",
+              "completed_at": "2026-11-02T04:24:34Z"
+            },
+            {
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-11-02T04:24:34Z",
+              "completed_at": "2026-11-02T04:24:34Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-11-02T04:24:34Z",
+              "completed_at": "2026-11-02T04:24:34Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/luisgui1757/dotfiles/check-runs/125091401205",
+          "labels": [
+            "ubuntu-26.04"
+          ],
+          "runner_id": 1000024789,
+          "runner_name": "GitHub Actions 1000024789",
+          "runner_group_id": 0,
+          "runner_group_name": "GitHub Actions"
+        },
+        {
+          "id": 125091401215,
+          "run_id": 41387471095,
+          "workflow_name": "installer engine",
+          "head_branch": "v1.1.0",
+          "run_url": "https://api.github.com/repos/luisgui1757/dotfiles/actions/runs/41387471095",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOLu4pS88AAAAdIAdN_w",
+          "head_sha": "41a8b41c45ccfd451d083f2dd5b25b5515231b20",
+          "url": "https://api.github.com/repos/luisgui1757/dotfiles/actions/jobs/125091401215",
+          "html_url": "https://github.com/luisgui1757/dotfiles/actions/runs/41387471095/job/125091401215",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-11-02T04:15:50Z",
+          "started_at": "2026-11-02T04:15:53Z",
+          "completed_at": "2026-11-02T04:31:19Z",
+          "name": "core (ubuntu-26.04)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-11-02T04:15:54Z",
+              "completed_at": "2026-11-02T04:15:55Z"
+            },
+            {
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-11-02T04:15:55Z",
+              "completed_at": "2026-11-02T04:15:56Z"
+            },
+            {
+              "name": "Run actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-11-02T04:15:56Z",
+              "completed_at": "2026-11-02T04:16:04Z"
+            },
+            {
+              "name": "Verify actual native runner target",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-11-02T04:16:04Z",
+              "completed_at": "2026-11-02T04:16:04Z"
+            },
+            {
+              "name": "Exercise the public keyboard installation and personal-data journey",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-11-02T04:16:04Z",
+              "completed_at": "2026-11-02T04:16:51Z"
+            },
+            {
+              "name": "Preserve public keyboard acceptance evidence",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-11-02T04:16:51Z",
+              "completed_at": "2026-11-02T04:16:52Z"
+            },
+            {
+              "name": "Install shell test prerequisites",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-11-02T04:16:52Z",
+              "completed_at": "2026-11-02T04:17:00Z"
+            },
+            {
+              "name": "Establish trusted disposable completion directories",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-11-02T04:17:00Z",
+              "completed_at": "2026-11-02T04:17:00Z"
+            },
+            {
+              "name": "Install tmux integration test prerequisite",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 9,
+              "started_at": "2026-11-02T04:17:00Z",
+              "completed_at": "2026-11-02T04:17:00Z"
+            },
+            {
+              "name": "Check formatting and dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-11-02T04:17:00Z",
+              "completed_at": "2026-11-02T04:17:00Z"
+            },
+            {
+              "name": "Vet and exercise the engine against the native filesystem",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-11-02T04:17:00Z",
+              "completed_at": "2026-11-02T04:23:49Z"
+            },
+            {
+              "name": "Edit a root-owned file through sudoedit and the generated editor",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 12,
+              "started_at": "2026-11-02T04:23:49Z",
+              "completed_at": "2026-11-02T04:23:57Z"
+            },
+            {
+              "name": "Install, execute, check and remove the real pinned archive",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 13,
+              "started_at": "2026-11-02T04:23:57Z",
+              "completed_at": "2026-11-02T04:25:21Z"
+            },
+            {
+              "name": "Install, check and remove the pinned Sentinel commit",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 14,
+              "started_at": "2026-11-02T04:25:21Z",
+              "completed_at": "2026-11-02T04:27:00Z"
+            },
+            {
+              "name": "Install, consume, check, update and remove T3 Code and the Claude Code, Codex, Copilot and Kiro CLIs",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 15,
+              "started_at": "2026-11-02T04:27:00Z",
+              "completed_at": "2026-11-02T04:28:25Z"
+            },
+            {
+              "name": "Verify native APT transaction and removal contracts",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 16,
+              "started_at": "2026-11-02T04:28:25Z",
+              "completed_at": "2026-11-02T04:29:25Z"
+            },
+            {
+              "name": "Verify native Homebrew transaction and removal contracts",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 17,
+              "started_at": "2026-11-02T04:29:25Z",
+              "completed_at": "2026-11-02T04:29:25Z"
+            },
+            {
+              "name": "Install, contact, update and remove the real Tailscale daemon",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 18,
+              "started_at": "2026-11-02T04:29:25Z",
+              "completed_at": "2026-11-02T04:29:43Z"
+            },
+            {
+              "name": "Verify Windows runtime registration and Microsoft signature",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 19,
+              "started_at": "2026-11-02T04:29:43Z",
+              "completed_at": "2026-11-02T04:29:43Z"
+            },
+            {
+              "name": "Install, use and remove the private language prerequisites",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 20,
+              "started_at": "2026-11-02T04:29:43Z",
+              "completed_at": "2026-11-02T04:30:54Z"
+            },
+            {
+              "name": "Install, upgrade, use and remove full Windows Git and GNU Make",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 21,
+              "started_at": "2026-11-02T04:30:54Z",
+              "completed_at": "2026-11-02T04:30:54Z"
+            },
+            {
+              "name": "Install and remove the locked Neovim runtime",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 22,
+              "started_at": "2026-11-02T04:30:54Z",
+              "completed_at": "2026-11-02T04:30:54Z"
+            },
+            {
+              "name": "Verify the public POSIX bootstrap and setup lifecycle",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 23,
+              "started_at": "2026-11-02T04:30:54Z",
+              "completed_at": "2026-11-02T04:31:16Z"
+            },
+            {
+              "name": "Post Run actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 45,
+              "started_at": "2026-11-02T04:31:16Z",
+              "completed_at": "2026-11-02T04:31:16Z"
+            },
+            {
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 46,
+              "started_at": "2026-11-02T04:31:16Z",
+              "completed_at": "2026-11-02T04:31:17Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 47,
+              "started_at": "2026-11-02T04:31:17Z",
+              "completed_at": "2026-11-02T04:31:17Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/luisgui1757/dotfiles/check-runs/125091401215",
+          "labels": [
+            "ubuntu-26.04"
+          ],
+          "runner_id": 1000024783,
+          "runner_name": "GitHub Actions 1000024783",
+          "runner_group_id": 0,
+          "runner_group_name": "GitHub Actions"
+        },
+        {
+          "id": 125091401231,
+          "run_id": 41387471095,
+          "workflow_name": "installer engine",
+          "head_branch": "v1.1.0",
+          "run_url": "https://api.github.com/repos/luisgui1757/dotfiles/actions/runs/41387471095",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOLu4pS88AAAAdIAdODw",
+          "head_sha": "41a8b41c45ccfd451d083f2dd5b25b5515231b20",
+          "url": "https://api.github.com/repos/luisgui1757/dotfiles/actions/jobs/125091401231",
+          "html_url": "https://github.com/luisgui1757/dotfiles/actions/runs/41387471095/job/125091401231",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-11-02T04:15:50Z",
+          "started_at": "2026-11-02T04:15:53Z",
+          "completed_at": "2026-11-02T04:31:52Z",
+          "name": "core packages (windows-2025)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-11-02T04:15:54Z",
+              "completed_at": "2026-11-02T04:15:55Z"
+            },
+            {
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-11-02T04:15:55Z",
+              "completed_at": "2026-11-02T04:16:02Z"
+            },
+            {
+              "name": "Run actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-11-02T04:16:02Z",
+              "completed_at": "2026-11-02T04:16:22Z"
+            },
+            {
+              "name": "Verify actual native runner target",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-11-02T04:16:22Z",
+              "completed_at": "2026-11-02T04:16:22Z"
+            },
+            {
+              "name": "Exercise the public keyboard installation and personal-data journey",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 5,
+              "started_at": "2026-11-02T04:16:22Z",
+              "completed_at": "2026-11-02T04:16:22Z"
+            },
+            {
+              "name": "Preserve public keyboard acceptance evidence",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 6,
+              "started_at": "2026-11-02T04:16:22Z",
+              "completed_at": "2026-11-02T04:16:22Z"
+            },
+            {
+              "name": "Install shell test prerequisites",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 7,
+              "started_at": "2026-11-02T04:16:22Z",
+              "completed_at": "2026-11-02T04:16:22Z"
+            },
+            {
+              "name": "Establish trusted disposable completion directories",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 8,
+              "started_at": "2026-11-02T04:16:22Z",
+              "completed_at": "2026-11-02T04:16:22Z"
+            },
+            {
+              "name": "Install tmux integration test prerequisite",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 9,
+              "started_at": "2026-11-02T04:16:22Z",
+              "completed_at": "2026-11-02T04:16:22Z"
+            },
+            {
+              "name": "Check formatting and dependencies",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 10,
+              "started_at": "2026-11-02T04:16:22Z",
+              "completed_at": "2026-11-02T04:16:22Z"
+            },
+            {
+              "name": "Vet and exercise the engine against the native filesystem",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 11,
+              "started_at": "2026-11-02T04:16:22Z",
+              "completed_at": "2026-11-02T04:16:22Z"
+            },
+            {
+              "name": "Edit a root-owned file through sudoedit and the generated editor",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 12,
+              "started_at": "2026-11-02T04:16:22Z",
+              "completed_at": "2026-11-02T04:16:22Z"
+            },
+            {
+              "name": "Install, execute, check and remove the real pinned archive",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 13,
+              "started_at": "2026-11-02T04:16:22Z",
+              "completed_at": "2026-11-02T04:24:58Z"
+            },
+            {
+              "name": "Install, check and remove the pinned Sentinel commit",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 14,
+              "started_at": "2026-11-02T04:24:58Z",
+              "completed_at": "2026-11-02T04:24:58Z"
+            },
+            {
+              "name": "Install, consume, check, update and remove T3 Code and the Claude Code, Codex, Copilot and Kiro CLIs",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 15,
+              "started_at": "2026-11-02T04:24:58Z",
+              "completed_at": "2026-11-02T04:24:58Z"
+            },
+            {
+              "name": "Verify native APT transaction and removal contracts",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 16,
+              "started_at": "2026-11-02T04:24:58Z",
+              "completed_at": "2026-11-02T04:24:58Z"
+            },
+            {
+              "name": "Verify native Homebrew transaction and removal contracts",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 17,
+              "started_at": "2026-11-02T04:24:58Z",
+              "completed_at": "2026-11-02T04:24:58Z"
+            },
+            {
+              "name": "Install, contact, update and remove the real Tailscale daemon",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 18,
+              "started_at": "2026-11-02T04:24:58Z",
+              "completed_at": "2026-11-02T04:24:58Z"
+            },
+            {
+              "name": "Verify Windows runtime registration and Microsoft signature",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 19,
+              "started_at": "2026-11-02T04:24:58Z",
+              "completed_at": "2026-11-02T04:25:31Z"
+            },
+            {
+              "name": "Install, use and remove the private language prerequisites",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 20,
+              "started_at": "2026-11-02T04:25:31Z",
+              "completed_at": "2026-11-02T04:30:11Z"
+            },
+            {
+              "name": "Install, upgrade, use and remove full Windows Git and GNU Make",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 21,
+              "started_at": "2026-11-02T04:30:11Z",
+              "completed_at": "2026-11-02T04:31:47Z"
+            },
+            {
+              "name": "Install and remove the locked Neovim runtime",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 22,
+              "started_at": "2026-11-02T04:31:47Z",
+              "completed_at": "2026-11-02T04:31:47Z"
+            },
+            {
+              "name": "Verify the public POSIX bootstrap and setup lifecycle",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 23,
+              "started_at": "2026-11-02T04:31:47Z",
+              "completed_at": "2026-11-02T04:31:47Z"
+            },
+            {
+              "name": "Post Run actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 45,
+              "started_at": "2026-11-02T04:31:47Z",
+              "completed_at": "2026-11-02T04:31:47Z"
+            },
+            {
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 46,
+              "started_at": "2026-11-02T04:31:47Z",
+              "completed_at": "2026-11-02T04:31:50Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 47,
+              "started_at": "2026-11-02T04:31:50Z",
+              "completed_at": "2026-11-02T04:31:50Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/luisgui1757/dotfiles/check-runs/125091401231",
+          "labels": [
+            "windows-2025"
+          ],
+          "runner_id": 1000024781,
+          "runner_name": "GitHub Actions 1000024781",
+          "runner_group_id": 0,
+          "runner_group_name": "GitHub Actions"
+        },
+        {
+          "id": 125091401237,
+          "run_id": 41387471095,
+          "workflow_name": "installer engine",
+          "head_branch": "v1.1.0",
+          "run_url": "https://api.github.com/repos/luisgui1757/dotfiles/actions/runs/41387471095",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOLu4pS88AAAAdIAdOFQ",
+          "head_sha": "41a8b41c45ccfd451d083f2dd5b25b5515231b20",
+          "url": "https://api.github.com/repos/luisgui1757/dotfiles/actions/jobs/125091401237",
+          "html_url": "https://github.com/luisgui1757/dotfiles/actions/runs/41387471095/job/125091401237",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-11-02T04:15:50Z",
+          "started_at": "2026-11-02T04:15:56Z",
+          "completed_at": "2026-11-02T04:18:15Z",
+          "name": "Fresh Homebrew (macOS arm64)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-11-02T04:15:57Z",
+              "completed_at": "2026-11-02T04:15:59Z"
+            },
+            {
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-11-02T04:15:59Z",
+              "completed_at": "2026-11-02T04:16:02Z"
+            },
+            {
+              "name": "Run actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-11-02T04:16:02Z",
+              "completed_at": "2026-11-02T04:16:30Z"
+            },
+            {
+              "name": "Prepare an actually absent Homebrew prefix on this disposable runner",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-11-02T04:16:30Z",
+              "completed_at": "2026-11-02T04:17:06Z"
+            },
+            {
+              "name": "Bootstrap and verify retained infrastructure through the production worker",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-11-02T04:17:06Z",
+              "completed_at": "2026-11-02T04:17:38Z"
+            },
+            {
+              "name": "Post Run actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-11-02T04:17:38Z",
+              "completed_at": "2026-11-02T04:17:39Z"
+            },
+            {
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-11-02T04:17:39Z",
+              "completed_at": "2026-11-02T04:17:41Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-11-02T04:17:41Z",
+              "completed_at": "2026-11-02T04:17:43Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/luisgui1757/dotfiles/check-runs/125091401237",
+          "labels": [
+            "macos-26"
+          ],
+          "runner_id": 1000024793,
+          "runner_name": "GitHub Actions 1000024793",
+          "runner_group_id": 0,
+          "runner_group_name": "GitHub Actions"
+        },
+        {
+          "id": 125091401260,
+          "run_id": 41387471095,
+          "workflow_name": "installer engine",
+          "head_branch": "v1.1.0",
+          "run_url": "https://api.github.com/repos/luisgui1757/dotfiles/actions/runs/41387471095",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOLu4pS88AAAAdIAdOLA",
+          "head_sha": "41a8b41c45ccfd451d083f2dd5b25b5515231b20",
+          "url": "https://api.github.com/repos/luisgui1757/dotfiles/actions/jobs/125091401260",
+          "html_url": "https://github.com/luisgui1757/dotfiles/actions/runs/41387471095/job/125091401260",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-11-02T04:15:50Z",
+          "started_at": "2026-11-02T04:15:55Z",
+          "completed_at": "2026-11-02T04:26:31Z",
+          "name": "Desktop lifecycle (macos-26)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-11-02T04:15:56Z",
+              "completed_at": "2026-11-02T04:15:57Z"
+            },
+            {
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-11-02T04:15:57Z",
+              "completed_at": "2026-11-02T04:16:00Z"
+            },
+            {
+              "name": "Run actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-11-02T04:16:00Z",
+              "completed_at": "2026-11-02T04:16:22Z"
+            },
+            {
+              "name": "Verify actual native runner target",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-11-02T04:16:22Z",
+              "completed_at": "2026-11-02T04:16:22Z"
+            },
+            {
+              "name": "Prepare disposable Linux display and native font inspection",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 5,
+              "started_at": "2026-11-02T04:16:22Z",
+              "completed_at": "2026-11-02T04:16:22Z"
+            },
+            {
+              "name": "Establish trusted disposable system parent",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 6,
+              "started_at": "2026-11-02T04:16:22Z",
+              "completed_at": "2026-11-02T04:16:22Z"
+            },
+            {
+              "name": "Verify native X window disappearance and query failures",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 7,
+              "started_at": "2026-11-02T04:16:22Z",
+              "completed_at": "2026-11-02T04:16:22Z"
+            },
+            {
+              "name": "Verify pinned Code native ownership and repository preservation",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 8,
+              "started_at": "2026-11-02T04:16:22Z",
+              "completed_at": "2026-11-02T04:16:22Z"
+            },
+            {
+              "name": "Install, render, check and remove native fonts",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-11-02T04:16:22Z",
+              "completed_at": "2026-11-02T04:16:48Z"
+            },
+            {
+              "name": "Consume scoped Windows Terminal settings and verify removal",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 10,
+              "started_at": "2026-11-02T04:16:48Z",
+              "completed_at": "2026-11-02T04:16:48Z"
+            },
+            {
+              "name": "Remap a Mac keyboard in identified windows, then remove it",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 11,
+              "started_at": "2026-11-02T04:16:48Z",
+              "completed_at": "2026-11-02T04:16:48Z"
+            },
+            {
+              "name": "Load pinned Ghostty against the oldest supported Ubuntu libraries",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 12,
+              "started_at": "2026-11-02T04:16:48Z",
+              "completed_at": "2026-11-02T04:16:48Z"
+            },
+            {
+              "name": "Launch configured desktop applications and verify update/removal",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 13,
+              "started_at": "2026-11-02T04:16:48Z",
+              "completed_at": "2026-11-02T04:25:00Z"
+            },
+            {
+              "name": "Verify Mac disk-image transport and strict vendor signatures",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 14,
+              "started_at": "2026-11-02T04:25:00Z",
+              "completed_at": "2026-11-02T04:26:23Z"
+            },
+            {
+              "name": "Post Run actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 27,
+              "started_at": "2026-11-02T04:26:23Z",
+              "completed_at": "2026-11-02T04:26:23Z"
+            },
+            {
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 28,
+              "started_at": "2026-11-02T04:26:23Z",
+              "completed_at": "2026-11-02T04:26:24Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 29,
+              "started_at": "2026-11-02T04:26:24Z",
+              "completed_at": "2026-11-02T04:26:27Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/luisgui1757/dotfiles/check-runs/125091401260",
+          "labels": [
+            "macos-26"
+          ],
+          "runner_id": 1000024795,
+          "runner_name": "GitHub Actions 1000024795",
+          "runner_group_id": 0,
+          "runner_group_name": "GitHub Actions"
+        },
+        {
+          "id": 125091401274,
+          "run_id": 41387471095,
+          "workflow_name": "installer engine",
+          "head_branch": "v1.1.0",
+          "run_url": "https://api.github.com/repos/luisgui1757/dotfiles/actions/runs/41387471095",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOLu4pS88AAAAdIAdOOg",
+          "head_sha": "41a8b41c45ccfd451d083f2dd5b25b5515231b20",
+          "url": "https://api.github.com/repos/luisgui1757/dotfiles/actions/jobs/125091401274",
+          "html_url": "https://github.com/luisgui1757/dotfiles/actions/runs/41387471095/job/125091401274",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-11-02T04:15:50Z",
+          "started_at": "2026-11-02T04:22:50Z",
+          "completed_at": "2026-11-02T04:27:42Z",
+          "name": "core packages (macos-26)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-11-02T04:22:49Z",
+              "completed_at": "2026-11-02T04:22:51Z"
+            },
+            {
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-11-02T04:22:51Z",
+              "completed_at": "2026-11-02T04:22:53Z"
+            },
+            {
+              "name": "Run actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-11-02T04:22:53Z",
+              "completed_at": "2026-11-02T04:23:07Z"
+            },
+            {
+              "name": "Verify actual native runner target",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-11-02T04:23:07Z",
+              "completed_at": "2026-11-02T04:23:07Z"
+            },
+            {
+              "name": "Exercise the public keyboard installation and personal-data journey",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 5,
+              "started_at": "2026-11-02T04:23:07Z",
+              "completed_at": "2026-11-02T04:23:07Z"
+            },
+            {
+              "name": "Preserve public keyboard acceptance evidence",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 6,
+              "started_at": "2026-11-02T04:23:07Z",
+              "completed_at": "2026-11-02T04:23:07Z"
+            },
+            {
+              "name": "Install shell test prerequisites",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 7,
+              "started_at": "2026-11-02T04:23:07Z",
+              "completed_at": "2026-11-02T04:23:07Z"
+            },
+            {
+              "name": "Establish trusted disposable completion directories",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 8,
+              "started_at": "2026-11-02T04:23:07Z",
+              "completed_at": "2026-11-02T04:23:07Z"
+            },
+            {
+              "name": "Install tmux integration test prerequisite",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-11-02T04:23:07Z",
+              "completed_at": "2026-11-02T04:23:16Z"
+            },
+            {
+              "name": "Check formatting and dependencies",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 10,
+              "started_at": "2026-11-02T04:23:16Z",
+              "completed_at": "2026-11-02T04:23:16Z"
+            },
+            {
+              "name": "Vet and exercise the engine against the native filesystem",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 11,
+              "started_at": "2026-11-02T04:23:16Z",
+              "completed_at": "2026-11-02T04:23:16Z"
+            },
+            {
+              "name": "Edit a root-owned file through sudoedit and the generated editor",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 12,
+              "started_at": "2026-11-02T04:23:16Z",
+              "completed_at": "2026-11-02T04:23:16Z"
+            },
+            {
+              "name": "Install, execute, check and remove the real pinned archive",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 13,
+              "started_at": "2026-11-02T04:23:16Z",
+              "completed_at": "2026-11-02T04:25:05Z"
+            },
+            {
+              "name": "Install, check and remove the pinned Sentinel commit",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 14,
+              "started_at": "2026-11-02T04:25:05Z",
+              "completed_at": "2026-11-02T04:25:05Z"
+            },
+            {
+              "name": "Install, consume, check, update and remove T3 Code and the Claude Code, Codex, Copilot and Kiro CLIs",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 15,
+              "started_at": "2026-11-02T04:25:05Z",
+              "completed_at": "2026-11-02T04:25:05Z"
+            },
+            {
+              "name": "Verify native APT transaction and removal contracts",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 16,
+              "started_at": "2026-11-02T04:25:05Z",
+              "completed_at": "2026-11-02T04:25:05Z"
+            },
+            {
+              "name": "Verify native Homebrew transaction and removal contracts",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 17,
+              "started_at": "2026-11-02T04:25:05Z",
+              "completed_at": "2026-11-02T04:25:05Z"
+            },
+            {
+              "name": "Install, contact, update and remove the real Tailscale daemon",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 18,
+              "started_at": "2026-11-02T04:25:05Z",
+              "completed_at": "2026-11-02T04:25:05Z"
+            },
+            {
+              "name": "Verify Windows runtime registration and Microsoft signature",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 19,
+              "started_at": "2026-11-02T04:25:05Z",
+              "completed_at": "2026-11-02T04:25:05Z"
+            },
+            {
+              "name": "Install, use and remove the private language prerequisites",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 20,
+              "started_at": "2026-11-02T04:25:05Z",
+              "completed_at": "2026-11-02T04:27:05Z"
+            },
+            {
+              "name": "Install, upgrade, use and remove full Windows Git and GNU Make",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 21,
+              "started_at": "2026-11-02T04:27:05Z",
+              "completed_at": "2026-11-02T04:27:05Z"
+            },
+            {
+              "name": "Install and remove the locked Neovim runtime",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 22,
+              "started_at": "2026-11-02T04:27:05Z",
+              "completed_at": "2026-11-02T04:27:05Z"
+            },
+            {
+              "name": "Verify the public POSIX bootstrap and setup lifecycle",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 23,
+              "started_at": "2026-11-02T04:27:05Z",
+              "completed_at": "2026-11-02T04:27:35Z"
+            },
+            {
+              "name": "Post Run actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 45,
+              "started_at": "2026-11-02T04:27:35Z",
+              "completed_at": "2026-11-02T04:27:35Z"
+            },
+            {
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 46,
+              "started_at": "2026-11-02T04:27:35Z",
+              "completed_at": "2026-11-02T04:27:36Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 47,
+              "started_at": "2026-11-02T04:27:36Z",
+              "completed_at": "2026-11-02T04:27:39Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/luisgui1757/dotfiles/check-runs/125091401274",
+          "labels": [
+            "macos-26"
+          ],
+          "runner_id": 1000024799,
+          "runner_name": "GitHub Actions 1000024799",
+          "runner_group_id": 0,
+          "runner_group_name": "GitHub Actions"
+        },
+        {
+          "id": 125091401287,
+          "run_id": 41387471095,
+          "workflow_name": "installer engine",
+          "head_branch": "v1.1.0",
+          "run_url": "https://api.github.com/repos/luisgui1757/dotfiles/actions/runs/41387471095",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOLu4pS88AAAAdIAdORw",
+          "head_sha": "41a8b41c45ccfd451d083f2dd5b25b5515231b20",
+          "url": "https://api.github.com/repos/luisgui1757/dotfiles/actions/jobs/125091401287",
+          "html_url": "https://github.com/luisgui1757/dotfiles/actions/runs/41387471095/job/125091401287",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-11-02T04:15:50Z",
+          "started_at": "2026-11-02T04:15:56Z",
+          "completed_at": "2026-11-02T04:27:07Z",
+          "name": "Desktop lifecycle (ubuntu-26.04-arm)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-11-02T04:15:57Z",
+              "completed_at": "2026-11-02T04:15:57Z"
+            },
+            {
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-11-02T04:15:57Z",
+              "completed_at": "2026-11-02T04:15:58Z"
+            },
+            {
+              "name": "Run actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-11-02T04:15:58Z",
+              "completed_at": "2026-11-02T04:16:05Z"
+            },
+            {
+              "name": "Verify actual native runner target",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-11-02T04:16:05Z",
+              "completed_at": "2026-11-02T04:16:05Z"
+            },
+            {
+              "name": "Prepare disposable Linux display and native font inspection",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-11-02T04:16:05Z",
+              "completed_at": "2026-11-02T04:16:14Z"
+            },
+            {
+              "name": "Establish trusted disposable system parent",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-11-02T04:16:14Z",
+              "completed_at": "2026-11-02T04:16:14Z"
+            },
+            {
+              "name": "Verify native X window disappearance and query failures",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-11-02T04:16:14Z",
+              "completed_at": "2026-11-02T04:16:30Z"
+            },
+            {
+              "name": "Verify pinned Code native ownership and repository preservation",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-11-02T04:16:30Z",
+              "completed_at": "2026-11-02T04:18:13Z"
+            },
+            {
+              "name": "Install, render, check and remove native fonts",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-11-02T04:18:13Z",
+              "completed_at": "2026-11-02T04:18:20Z"
+            },
+            {
+              "name": "Consume scoped Windows Terminal settings and verify removal",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 10,
+              "started_at": "2026-11-02T04:18:20Z",
+              "completed_at": "2026-11-02T04:18:20Z"
+            },
+            {
+              "name": "Remap a Mac keyboard in identified windows, then remove it",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-11-02T04:18:20Z",
+              "completed_at": "2026-11-02T04:23:11Z"
+            },
+            {
+              "name": "Load pinned Ghostty against the oldest supported Ubuntu libraries",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 12,
+              "started_at": "2026-11-02T04:23:11Z",
+              "completed_at": "2026-11-02T04:23:28Z"
+            },
+            {
+              "name": "Launch configured desktop applications and verify update/removal",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 13,
+              "started_at": "2026-11-02T04:23:28Z",
+              "completed_at": "2026-11-02T04:27:05Z"
+            },
+            {
+              "name": "Verify Mac disk-image transport and strict vendor signatures",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 14,
+              "started_at": "2026-11-02T04:27:05Z",
+              "completed_at": "2026-11-02T04:27:05Z"
+            },
+            {
+              "name": "Post Run actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 27,
+              "started_at": "2026-11-02T04:27:05Z",
+              "completed_at": "2026-11-02T04:27:05Z"
+            },
+            {
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 28,
+              "started_at": "2026-11-02T04:27:05Z",
+              "completed_at": "2026-11-02T04:27:05Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 29,
+              "started_at": "2026-11-02T04:27:05Z",
+              "completed_at": "2026-11-02T04:27:05Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/luisgui1757/dotfiles/check-runs/125091401287",
+          "labels": [
+            "ubuntu-26.04-arm"
+          ],
+          "runner_id": 1000024792,
+          "runner_name": "GitHub Actions 1000024792",
+          "runner_group_id": 0,
+          "runner_group_name": "GitHub Actions"
+        },
+        {
+          "id": 125091401316,
+          "run_id": 41387471095,
+          "workflow_name": "installer engine",
+          "head_branch": "v1.1.0",
+          "run_url": "https://api.github.com/repos/luisgui1757/dotfiles/actions/runs/41387471095",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOLu4pS88AAAAdIAdOZA",
+          "head_sha": "41a8b41c45ccfd451d083f2dd5b25b5515231b20",
+          "url": "https://api.github.com/repos/luisgui1757/dotfiles/actions/jobs/125091401316",
+          "html_url": "https://github.com/luisgui1757/dotfiles/actions/runs/41387471095/job/125091401316",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-11-02T04:15:50Z",
+          "started_at": "2026-11-02T04:18:18Z",
+          "completed_at": "2026-11-02T04:24:28Z",
+          "name": "Fresh Windows vendor (VC-runtime)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-11-02T04:18:19Z",
+              "completed_at": "2026-11-02T04:18:21Z"
+            },
+            {
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-11-02T04:18:21Z",
+              "completed_at": "2026-11-02T04:18:26Z"
+            },
+            {
+              "name": "Run actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-11-02T04:18:26Z",
+              "completed_at": "2026-11-02T04:18:45Z"
+            },
+            {
+              "name": "Prepare the disposable Windows container engine",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-11-02T04:18:45Z",
+              "completed_at": "2026-11-02T04:18:49Z"
+            },
+            {
+              "name": "Compile fixture and verify the disposable Windows container engine",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-11-02T04:18:49Z",
+              "completed_at": "2026-11-02T04:19:24Z"
+            },
+            {
+              "name": "Time the first containers after the image pull (diagnostic only)",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-11-02T04:19:24Z",
+              "completed_at": "2026-11-02T04:19:53Z"
+            },
+            {
+              "name": "Verify Python with the default Windows path policy",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-11-02T04:19:53Z",
+              "completed_at": "2026-11-02T04:23:43Z"
+            },
+            {
+              "name": "Verify fresh install, update, repair and exact removal",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-11-02T04:23:43Z",
+              "completed_at": "2026-11-02T04:24:23Z"
+            },
+            {
+              "name": "Post Run actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 15,
+              "started_at": "2026-11-02T04:24:23Z",
+              "completed_at": "2026-11-02T04:24:23Z"
+            },
+            {
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 16,
+              "started_at": "2026-11-02T04:24:23Z",
+              "completed_at": "2026-11-02T04:24:25Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 17,
+              "started_at": "2026-11-02T04:24:25Z",
+              "completed_at": "2026-11-02T04:24:25Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/luisgui1757/dotfiles/check-runs/125091401316",
+          "labels": [
+            "windows-2022"
+          ],
+          "runner_id": 1000024797,
+          "runner_name": "GitHub Actions 1000024797",
+          "runner_group_id": 0,
+          "runner_group_name": "GitHub Actions"
+        },
+        {
+          "id": 125091401327,
+          "run_id": 41387471095,
+          "workflow_name": "installer engine",
+          "head_branch": "v1.1.0",
+          "run_url": "https://api.github.com/repos/luisgui1757/dotfiles/actions/runs/41387471095",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOLu4pS88AAAAdIAdObw",
+          "head_sha": "41a8b41c45ccfd451d083f2dd5b25b5515231b20",
+          "url": "https://api.github.com/repos/luisgui1757/dotfiles/actions/jobs/125091401327",
+          "html_url": "https://github.com/luisgui1757/dotfiles/actions/runs/41387471095/job/125091401327",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-11-02T04:15:50Z",
+          "started_at": "2026-11-02T04:15:55Z",
+          "completed_at": "2026-11-02T04:22:47Z",
+          "name": "Missing Apple developer tools (macOS arm64)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-11-02T04:15:55Z",
+              "completed_at": "2026-11-02T04:15:56Z"
+            },
+            {
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-11-02T04:15:56Z",
+              "completed_at": "2026-11-02T04:15:58Z"
+            },
+            {
+              "name": "Run actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-11-02T04:15:58Z",
+              "completed_at": "2026-11-02T04:16:19Z"
+            },
+            {
+              "name": "Prepare missing Apple tools while retaining Homebrew on this disposable runner",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-11-02T04:16:19Z",
+              "completed_at": "2026-11-02T04:17:04Z"
+            },
+            {
+              "name": "Install the advertised Apple tools and compile an SDK program",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-11-02T04:17:04Z",
+              "completed_at": "2026-11-02T04:20:23Z"
+            },
+            {
+              "name": "Post Run actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-11-02T04:20:23Z",
+              "completed_at": "2026-11-02T04:20:24Z"
+            },
+            {
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-11-02T04:20:24Z",
+              "completed_at": "2026-11-02T04:20:25Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-11-02T04:20:25Z",
+              "completed_at": "2026-11-02T04:20:28Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/luisgui1757/dotfiles/check-runs/125091401327",
+          "labels": [
+            "macos-26"
+          ],
+          "runner_id": 1000024794,
+          "runner_name": "GitHub Actions 1000024794",
+          "runner_group_id": 0,
+          "runner_group_name": "GitHub Actions"
+        },
+        {
+          "id": 125091401343,
+          "run_id": 41387471095,
+          "workflow_name": "installer engine",
+          "head_branch": "v1.1.0",
+          "run_url": "https://api.github.com/repos/luisgui1757/dotfiles/actions/runs/41387471095",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOLu4pS88AAAAdIAdOfw",
+          "head_sha": "41a8b41c45ccfd451d083f2dd5b25b5515231b20",
+          "url": "https://api.github.com/repos/luisgui1757/dotfiles/actions/jobs/125091401343",
+          "html_url": "https://github.com/luisgui1757/dotfiles/actions/runs/41387471095/job/125091401343",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-11-02T04:15:50Z",
+          "started_at": "2026-11-02T04:21:12Z",
+          "completed_at": "2026-11-02T04:33:51Z",
+          "name": "Fresh Windows vendor (Build-Tools)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-11-02T04:21:13Z",
+              "completed_at": "2026-11-02T04:21:14Z"
+            },
+            {
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-11-02T04:21:14Z",
+              "completed_at": "2026-11-02T04:21:22Z"
+            },
+            {
+              "name": "Run actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-11-02T04:21:22Z",
+              "completed_at": "2026-11-02T04:21:42Z"
+            },
+            {
+              "name": "Prepare the disposable Windows container engine",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-11-02T04:21:42Z",
+              "completed_at": "2026-11-02T04:21:46Z"
+            },
+            {
+              "name": "Compile fixture and verify the disposable Windows container engine",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-11-02T04:21:46Z",
+              "completed_at": "2026-11-02T04:22:21Z"
+            },
+            {
+              "name": "Time the first containers after the image pull (diagnostic only)",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-11-02T04:22:21Z",
+              "completed_at": "2026-11-02T04:22:48Z"
+            },
+            {
+              "name": "Verify Python with the default Windows path policy",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 7,
+              "started_at": "2026-11-02T04:22:48Z",
+              "completed_at": "2026-11-02T04:22:48Z"
+            },
+            {
+              "name": "Verify fresh install, update, repair and exact removal",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-11-02T04:22:48Z",
+              "completed_at": "2026-11-02T04:33:46Z"
+            },
+            {
+              "name": "Post Run actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 15,
+              "started_at": "2026-11-02T04:33:46Z",
+              "completed_at": "2026-11-02T04:33:46Z"
+            },
+            {
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 16,
+              "started_at": "2026-11-02T04:33:46Z",
+              "completed_at": "2026-11-02T04:33:48Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 17,
+              "started_at": "2026-11-02T04:33:48Z",
+              "completed_at": "2026-11-02T04:33:49Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/luisgui1757/dotfiles/check-runs/125091401343",
+          "labels": [
+            "windows-2022"
+          ],
+          "runner_id": 1000024798,
+          "runner_name": "GitHub Actions 1000024798",
+          "runner_group_id": 0,
+          "runner_group_name": "GitHub Actions"
+        },
+        {
+          "id": 125091401347,
+          "run_id": 41387471095,
+          "workflow_name": "installer engine",
+          "head_branch": "v1.1.0",
+          "run_url": "https://api.github.com/repos/luisgui1757/dotfiles/actions/runs/41387471095",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOLu4pS88AAAAdIAdOgw",
+          "head_sha": "41a8b41c45ccfd451d083f2dd5b25b5515231b20",
+          "url": "https://api.github.com/repos/luisgui1757/dotfiles/actions/jobs/125091401347",
+          "html_url": "https://github.com/luisgui1757/dotfiles/actions/runs/41387471095/job/125091401347",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-11-02T04:15:50Z",
+          "started_at": "2026-11-02T04:15:54Z",
+          "completed_at": "2026-11-02T04:44:22Z",
+          "name": "core (macos-26)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-11-02T04:15:54Z",
+              "completed_at": "2026-11-02T04:15:56Z"
+            },
+            {
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-11-02T04:15:56Z",
+              "completed_at": "2026-11-02T04:15:58Z"
+            },
+            {
+              "name": "Run actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-11-02T04:15:58Z",
+              "completed_at": "2026-11-02T04:16:17Z"
+            },
+            {
+              "name": "Verify actual native runner target",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-11-02T04:16:17Z",
+              "completed_at": "2026-11-02T04:16:18Z"
+            },
+            {
+              "name": "Exercise the public keyboard installation and personal-data journey",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-11-02T04:16:18Z",
+              "completed_at": "2026-11-02T04:17:11Z"
+            },
+            {
+              "name": "Preserve public keyboard acceptance evidence",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-11-02T04:17:11Z",
+              "completed_at": "2026-11-02T04:17:12Z"
+            },
+            {
+              "name": "Install shell test prerequisites",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 7,
+              "started_at": "2026-11-02T04:17:12Z",
+              "completed_at": "2026-11-02T04:17:12Z"
+            },
+            {
+              "name": "Establish trusted disposable completion directories",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 8,
+              "started_at": "2026-11-02T04:17:12Z",
+              "completed_at": "2026-11-02T04:17:12Z"
+            },
+            {
+              "name": "Install tmux integration test prerequisite",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-11-02T04:17:12Z",
+              "completed_at": "2026-11-02T04:17:22Z"
+            },
+            {
+              "name": "Check formatting and dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-11-02T04:17:22Z",
+              "completed_at": "2026-11-02T04:17:23Z"
+            },
+            {
+              "name": "Vet and exercise the engine against the native filesystem",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-11-02T04:17:23Z",
+              "completed_at": "2026-11-02T04:26:07Z"
+            },
+            {
+              "name": "Edit a root-owned file through sudoedit and the generated editor",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 12,
+              "started_at": "2026-11-02T04:26:07Z",
+              "completed_at": "2026-11-02T04:26:17Z"
+            },
+            {
+              "name": "Install, execute, check and remove the real pinned archive",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 13,
+              "started_at": "2026-11-02T04:26:17Z",
+              "completed_at": "2026-11-02T04:26:17Z"
+            },
+            {
+              "name": "Install, check and remove the pinned Sentinel commit",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 14,
+              "started_at": "2026-11-02T04:26:17Z",
+              "completed_at": "2026-11-02T04:26:17Z"
+            },
+            {
+              "name": "Install, consume, check, update and remove T3 Code and the Claude Code, Codex, Copilot and Kiro CLIs",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 15,
+              "started_at": "2026-11-02T04:26:17Z",
+              "completed_at": "2026-11-02T04:29:02Z"
+            },
+            {
+              "name": "Verify native APT transaction and removal contracts",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 16,
+              "started_at": "2026-11-02T04:29:02Z",
+              "completed_at": "2026-11-02T04:29:02Z"
+            },
+            {
+              "name": "Verify native Homebrew transaction and removal contracts",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 17,
+              "started_at": "2026-11-02T04:29:02Z",
+              "completed_at": "2026-11-02T04:39:51Z"
+            },
+            {
+              "name": "Install, contact, update and remove the real Tailscale daemon",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 18,
+              "started_at": "2026-11-02T04:39:51Z",
+              "completed_at": "2026-11-02T04:39:51Z"
+            },
+            {
+              "name": "Verify Windows runtime registration and Microsoft signature",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 19,
+              "started_at": "2026-11-02T04:39:51Z",
+              "completed_at": "2026-11-02T04:39:51Z"
+            },
+            {
+              "name": "Install, use and remove the private language prerequisites",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 20,
+              "started_at": "2026-11-02T04:39:51Z",
+              "completed_at": "2026-11-02T04:39:51Z"
+            },
+            {
+              "name": "Install, upgrade, use and remove full Windows Git and GNU Make",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 21,
+              "started_at": "2026-11-02T04:39:51Z",
+              "completed_at": "2026-11-02T04:39:51Z"
+            },
+            {
+              "name": "Install and remove the locked Neovim runtime",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 22,
+              "started_at": "2026-11-02T04:39:51Z",
+              "completed_at": "2026-11-02T04:44:17Z"
+            },
+            {
+              "name": "Verify the public POSIX bootstrap and setup lifecycle",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 23,
+              "started_at": "2026-11-02T04:44:17Z",
+              "completed_at": "2026-11-02T04:44:17Z"
+            },
+            {
+              "name": "Post Run actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 45,
+              "started_at": "2026-11-02T04:44:17Z",
+              "completed_at": "2026-11-02T04:44:18Z"
+            },
+            {
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 46,
+              "started_at": "2026-11-02T04:44:18Z",
+              "completed_at": "2026-11-02T04:44:18Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 47,
+              "started_at": "2026-11-02T04:44:18Z",
+              "completed_at": "2026-11-02T04:44:20Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/luisgui1757/dotfiles/check-runs/125091401347",
+          "labels": [
+            "macos-26"
+          ],
+          "runner_id": 1000024796,
+          "runner_name": "GitHub Actions 1000024796",
+          "runner_group_id": 0,
+          "runner_group_name": "GitHub Actions"
+        },
+        {
+          "id": 125091401362,
+          "run_id": 41387471095,
+          "workflow_name": "installer engine",
+          "head_branch": "v1.1.0",
+          "run_url": "https://api.github.com/repos/luisgui1757/dotfiles/actions/runs/41387471095",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOLu4pS88AAAAdIAdOkg",
+          "head_sha": "41a8b41c45ccfd451d083f2dd5b25b5515231b20",
+          "url": "https://api.github.com/repos/luisgui1757/dotfiles/actions/jobs/125091401362",
+          "html_url": "https://github.com/luisgui1757/dotfiles/actions/runs/41387471095/job/125091401362",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-11-02T04:15:50Z",
+          "started_at": "2026-11-02T04:15:56Z",
+          "completed_at": "2026-11-02T04:33:05Z",
+          "name": "Fresh Ubuntu APT (arm64)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-11-02T04:15:57Z",
+              "completed_at": "2026-11-02T04:15:58Z"
+            },
+            {
+              "name": "Initialize containers",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-11-02T04:15:58Z",
+              "completed_at": "2026-11-02T04:16:02Z"
+            },
+            {
+              "name": "Prepare the disposable Linux test host",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-11-02T04:16:02Z",
+              "completed_at": "2026-11-02T04:16:10Z"
+            },
+            {
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-11-02T04:16:10Z",
+              "completed_at": "2026-11-02T04:16:11Z"
+            },
+            {
+              "name": "Run actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-11-02T04:16:11Z",
+              "completed_at": "2026-11-02T04:16:18Z"
+            },
+            {
+              "name": "Exercise the native provider and installed application as root without sudo",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-11-02T04:16:18Z",
+              "completed_at": "2026-11-02T04:21:05Z"
+            },
+            {
+              "name": "Install, consume, update and remove Neovim from absent Mason prerequisites",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-11-02T04:21:05Z",
+              "completed_at": "2026-11-02T04:33:01Z"
+            },
+            {
+              "name": "Post Run actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 12,
+              "started_at": "2026-11-02T04:33:01Z",
+              "completed_at": "2026-11-02T04:33:01Z"
+            },
+            {
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 13,
+              "started_at": "2026-11-02T04:33:01Z",
+              "completed_at": "2026-11-02T04:33:02Z"
+            },
+            {
+              "name": "Stop containers",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 14,
+              "started_at": "2026-11-02T04:33:02Z",
+              "completed_at": "2026-11-02T04:33:02Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 15,
+              "started_at": "2026-11-02T04:33:02Z",
+              "completed_at": "2026-11-02T04:33:02Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/luisgui1757/dotfiles/check-runs/125091401362",
+          "labels": [
+            "ubuntu-26.04-arm"
+          ],
+          "runner_id": 1000024791,
+          "runner_name": "GitHub Actions 1000024791",
+          "runner_group_id": 0,
+          "runner_group_name": "GitHub Actions"
+        }
+      ],
+      "workflow_source": {
+        "commit": "41a8b41c45ccfd451d083f2dd5b25b5515231b20",
+        "path": ".github/workflows/installer-engine.yml",
+        "text": "name: installer engine\n\non:\n  push:\n    branches: [main]\n  pull_request:\n  workflow_dispatch:\n\npermissions:\n  contents: read\n\nconcurrency:\n  group: ${{ github.workflow }}-${{ github.ref }}\n  cancel-in-progress: true\n\njobs:\n  core:\n    name: ${{ matrix.check }} (${{ matrix.runner }})\n    strategy:\n      fail-fast: false\n      matrix:\n        # Linux runs all steps in one job. On macOS and Windows, a second job\n        # runs most package steps and the archive and language steps at the same time.\n        include:\n          - runner: ubuntu-26.04\n            target: linux/amd64\n            check: core\n            part: all\n          - runner: ubuntu-26.04-arm\n            target: linux/arm64\n            check: core\n            part: all\n          - runner: macos-26\n            target: darwin/arm64\n            check: core\n            part: engine\n          - runner: macos-26\n            target: darwin/arm64\n            check: core packages\n            part: packages\n          - runner: windows-2025\n            target: windows/amd64\n            check: core\n            part: engine\n          - runner: windows-2025\n            target: windows/amd64\n            check: core packages\n            part: packages\n    runs-on: ${{ matrix.runner }}\n    # Existing checks, manager fixtures and the native package steps.\n    timeout-minutes: 150\n    defaults:\n      run:\n        working-directory: installer\n        shell: bash\n    env:\n      GOTOOLCHAIN: local\n    steps:\n      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7\n        with:\n          fetch-depth: 0\n      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7\n        with:\n          go-version: 1.27.1\n          cache: ${{ !startsWith(github.ref, 'refs/tags/') }}\n          cache-dependency-path: installer/go.sum\n      - name: Verify actual native runner target\n        run: test \"$(go env GOHOSTOS)/$(go env GOHOSTARCH)\" = '${{ matrix.target }}'\n      # Run before any other installer fixture: Windows uses real known folders,\n      # and the keyboard journey requires an actually absent installer state.\n      - name: Exercise the public keyboard installation and personal-data journey\n        if: matrix.part != 'packages'\n        env:\n          DOTFILES_TEST_PUBLIC_UI: '1'\n          DOTFILES_TEST_UI_EVIDENCE: ${{ runner.temp }}/dotfiles-public-ui-evidence\n        run: |\n          set -euo pipefail\n          go test -v -count=1 -timeout 25m -run '^TestNativePublicInteractiveLifecycle$' ./terminal\n      - name: Preserve public keyboard acceptance evidence\n        if: ${{ always() && matrix.part != 'packages' }}\n        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2\n        with:\n          name: public-ui-${{ matrix.runner }}\n          path: |\n            ${{ runner.temp }}/dotfiles-public-ui-evidence/*.terminal.txt\n            ${{ runner.temp }}/dotfiles-public-ui-evidence/installer-state.tar.gz\n          if-no-files-found: error\n          retention-days: 14\n      - name: Install shell test prerequisites\n        if: runner.os == 'Linux'\n        run: |\n          sudo apt-get update\n          sudo apt-get install --yes --no-install-recommends zsh tmux\n      - name: Establish trusted disposable completion directories\n        if: runner.os == 'Linux'\n        run: bash ../scripts/prepare-disposable-linux-host.sh shell\n      - name: Install tmux integration test prerequisite\n        if: runner.os == 'macOS'\n        run: |\n          # This supplies the fixture executable; native tmux provisioning is\n          # tested separately when its production package provider is connected.\n          if ! command -v tmux >/dev/null; then\n            HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1 brew install tmux\n          fi\n      - name: Check formatting and dependencies\n        if: matrix.part != 'packages'\n        run: |\n          set -euo pipefail\n          formatting=$(gofmt -l .)\n          if [[ -n \"$formatting\" ]]; then\n            printf 'Files requiring gofmt:\\n%s\\n' \"$formatting\"\n            exit 1\n          fi\n          go mod tidy\n          git diff --exit-code -- go.mod go.sum\n      - name: Vet and exercise the engine against the native filesystem\n        if: matrix.part != 'packages'\n        run: |\n          set -euo pipefail\n          go vet ./...\n          go test -race -count=1 -timeout 30m -v ./...\n      - name: Edit a root-owned file through sudoedit and the generated editor\n        if: runner.os != 'Windows' && matrix.part != 'packages'\n        env:\n          DOTFILES_TEST_SUDO_EDITOR: '1'\n        run: go test -v -count=1 -timeout 2m -run '^TestNativeSudoEditorUsesGeneratedNeovim$' .\n      - name: Install, execute, check and remove the real pinned archive\n        if: matrix.part != 'engine'\n        env:\n          DOTFILES_TEST_ARCHIVES: '1'\n          DOTFILES_TEST_PUBLIC_WINDOWS: '1'\n        run: go test -v -count=1 -timeout 20m -run '^TestNativeArchive' ./...\n      - name: Install, check and remove the pinned Sentinel commit\n        if: ${{ !cancelled() && runner.os == 'Linux' }}\n        env:\n          DOTFILES_TEST_SENTINEL: '1'\n        run: go test -v -count=1 -timeout 20m -run '^TestNativeSentinel' .\n      - name: Install, consume, check, update and remove T3 Code and the Claude Code, Codex, Copilot and Kiro CLIs\n        if: ${{ !cancelled() && matrix.part != 'packages' }}\n        env:\n          DOTFILES_TEST_AGENT_CLIS: '1'\n        run: go test -v -count=1 -timeout 20m -run '^TestNativeAgentCLIInstalledApplicationLifecycle$' .\n      - name: Verify native APT transaction and removal contracts\n        if: ${{ !cancelled() && runner.os == 'Linux' }}\n        env:\n          DOTFILES_TEST_NATIVE_PACKAGES: '1'\n        run: go test -v -count=1 -timeout 12m -run '^TestNative(APT|LinuxAPT)' .\n      # This step stays in the core job, after the same steps as before the split.\n      # In the core packages job, the read-only preview test found a new Library folder in its home.\n      - name: Verify native Homebrew transaction and removal contracts\n        if: ${{ !cancelled() && runner.os == 'macOS' && matrix.part != 'packages' }}\n        env:\n          DOTFILES_TEST_NATIVE_PACKAGES: '1'\n        run: go test -v -count=1 -timeout 20m -run '^TestNative(Brew|HomebrewIdentitySurvivesVolumeRemount)' .\n      - name: Install, contact, update and remove the real Tailscale daemon\n        if: ${{ !cancelled() && runner.os == 'Linux' }}\n        env:\n          DOTFILES_TEST_NATIVE_PACKAGES: '1'\n          DOTFILES_TEST_TAILSCALE: '1'\n        run: go test -v -count=1 -timeout 15m -run '^TestNativeTailscalePackageLifecycle$' .\n      - name: Verify Windows runtime registration and Microsoft signature\n        if: ${{ !cancelled() && runner.os == 'Windows' && matrix.part != 'engine' }}\n        env:\n          DOTFILES_NATIVE_WINDOWS_VENDOR: '1'\n        run: go test -v -count=1 -timeout 8m -run '^TestWindows(VendorNativeRegistrationAndSignature|BuildToolsNativeReuseAndEnvironment)$' .\n      - name: Install, use and remove the private language prerequisites\n        if: ${{ !cancelled() && matrix.part != 'engine' }}\n        env:\n          DOTFILES_TEST_LANGUAGE_PREPARATION: '1'\n        run: go test -v -count=1 -timeout 15m -run '^TestNative((Latex|Rust|Yamllint)Preparation|WindowsPipConfigurationIsolation$|NodeConsumerPreservesPayloadAndRemoval$)' .\n      - name: Install, upgrade, use and remove full Windows Git and GNU Make\n        if: ${{ !cancelled() && runner.os == 'Windows' && matrix.part != 'engine' }}\n        env:\n          DOTFILES_NATIVE_WINDOWS_GIT_MAKE: '1'\n        run: go test -v -count=1 -timeout 12m -run '^TestNativeWindowsGitAndMakeLifecycle$' .\n      - name: Install and remove the locked Neovim runtime\n        if: ${{ !cancelled() && runner.os == 'macOS' && matrix.part != 'packages' }}\n        env:\n          DOTFILES_TEST_NVIM_SYNC_BOOTSTRAP: '1'\n        run: go test -v -count=1 -timeout 12m -run '^TestNativeNvimSyncCompleteBootstrap$' .\n\n      - name: Verify the public POSIX bootstrap and setup lifecycle\n        if: ${{ !cancelled() && runner.os != 'Windows' && matrix.part != 'engine' }}\n        env:\n          DOTFILES_TEST_PUBLIC_POSIX_BOOTSTRAP: '1'\n        run: go test -v -count=1 -timeout 12m -run '^TestNativePOSIXPublicBootstrapSetupLifecycle$' .\n\n  neovim-lifecycle:\n    name: Neovim lifecycle (${{ matrix.runner }})\n    strategy:\n      fail-fast: false\n      matrix:\n        include:\n          - runner: ubuntu-26.04\n            target: linux/amd64\n          - runner: ubuntu-26.04-arm\n            target: linux/arm64\n          - runner: macos-26\n            target: darwin/arm64\n          - runner: windows-2025\n            target: windows/amd64\n    runs-on: ${{ matrix.runner }}\n    timeout-minutes: 90\n    defaults:\n      run:\n        working-directory: installer\n        shell: bash\n    env:\n      GOTOOLCHAIN: local\n      DOTFILES_TEST_NVIM_APPLICATION: '1'\n    steps:\n      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7\n      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7\n        with:\n          go-version: 1.27.1\n          cache: ${{ !startsWith(github.ref, 'refs/tags/') }}\n          cache-dependency-path: installer/go.sum\n      - name: Verify actual native runner target\n        run: test \"$(go env GOHOSTOS)/$(go env GOHOSTARCH)\" = '${{ matrix.target }}'\n      - name: Install, consume, update and remove the complete Neovim selection\n        run: go test -v -count=1 -timeout 80m -run '^TestNativeNeovimInstalledApplicationLifecycle$' .\n\n  desktop-lifecycle:\n    name: Desktop lifecycle (${{ matrix.runner }})\n    strategy:\n      fail-fast: false\n      matrix:\n        include:\n          - runner: ubuntu-26.04\n            target: linux/amd64\n          - runner: ubuntu-26.04-arm\n            target: linux/arm64\n          - runner: macos-26\n            target: darwin/arm64\n          - runner: windows-2025\n            target: windows/amd64\n    runs-on: ${{ matrix.runner }}\n    timeout-minutes: 100\n    defaults:\n      run:\n        working-directory: installer\n        shell: bash\n    env:\n      GOTOOLCHAIN: local\n      DOTFILES_NATIVE_DESKTOP_FONTS: 1\n    steps:\n      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7\n      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7\n        with:\n          go-version: 1.27.1\n          cache: ${{ !startsWith(github.ref, 'refs/tags/') }}\n          cache-dependency-path: installer/go.sum\n      - name: Verify actual native runner target\n        run: test \"$(go env GOHOSTOS)/$(go env GOHOSTARCH)\" = '${{ matrix.target }}'\n      - name: Prepare disposable Linux display and native font inspection\n        if: runner.os == 'Linux'\n        run: |\n          sudo apt-get update\n          sudo apt-get install --yes --no-install-recommends xvfb xauth dbus-x11 x11-utils libglib2.0-bin fontconfig pango1.0-tools apt-utils xterm xdotool\n      # The hosted image deliberately chmods /usr/share 0777. A writable\n      # system parent is not an acceptable production installation boundary.\n      - name: Establish trusted disposable system parent\n        if: runner.os == 'Linux'\n        run: bash ../scripts/prepare-disposable-linux-host.sh desktop\n      - name: Verify native X window disappearance and query failures\n        if: runner.os == 'Linux'\n        env:\n          DOTFILES_NATIVE_XWINDOW: '1'\n        run: xvfb-run -a go test -v -count=1 -timeout 1m -run '^TestNativeDesktopXWindowBoundary$' .\n      - name: Verify pinned Code native ownership and repository preservation\n        if: runner.os == 'Linux'\n        env:\n          DOTFILES_TEST_NATIVE_PACKAGES: '1'\n          DOTFILES_TEST_NATIVE_CODE: '1'\n        run: go test -v -count=1 -timeout 15m -run '^TestNativeLinuxCodeDEBLifecycle$' .\n      - name: Install, render, check and remove native fonts\n        run: go test -v -count=1 -timeout 12m -run '^TestNativeFontInstallConsumeRemove$' .\n      - name: Consume scoped Windows Terminal settings and verify removal\n        if: runner.os == 'Windows'\n        env:\n          DOTFILES_TEST_WINDOWS_TERMINAL: '1'\n        run: go test -v -count=1 -timeout 15m -run '^TestNativeWindowsTerminalConsumesScopedSettingsAndExits$' .\n      # Root creates the virtual keyboard, reads xremap's output and installs\n      # the real session rule on this disposable host.\n      - name: Remap a Mac keyboard in identified windows, then remove it\n        if: runner.os == 'Linux'\n        env:\n          DOTFILES_TEST_NATIVE_KEYBOARD: '1'\n        run: |\n          test -c /dev/uinput || sudo modprobe uinput\n          go test -c -o \"$RUNNER_TEMP/installer.test\" .\n          xvfb-run -a sh -c 'sudo --preserve-env=DISPLAY,XAUTHORITY,DOTFILES_TEST_NATIVE_KEYBOARD \"$RUNNER_TEMP/installer.test\" -test.v -test.count=1 -test.timeout=20m -test.run \"^TestNativeMacKeyboardLifecycle$\"'\n      - name: Load pinned Ghostty against the oldest supported Ubuntu libraries\n        if: runner.os == 'Linux'\n        env:\n          DOTFILES_TEST_GHOSTTY_RELEASES: '1'\n          GHOSTTY_OLDEST_UBUNTU_IMAGE: ubuntu:24.04@sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852\n        run: go test -v -count=1 -timeout 20m -run '^TestNativeGhosttyLoadsOnOldestSupportedUbuntu$' .\n\n      # Linux applications run under Ubuntu's stock AppArmor user-namespace\n      # restriction, which the hosted image relaxes (Obsidian report 2026-10-22).\n      - name: Launch configured desktop applications and verify update/removal\n        env:\n          DOTFILES_NATIVE_DESKTOP: '1'\n        run: |\n          if [[ \"${{ runner.os }}\" == Linux ]]; then\n            bash ../scripts/prepare-disposable-linux-host.sh userns\n            dbus-run-session -- xvfb-run -a go test -v -count=1 -timeout 70m -run '^TestNativeDesktopInstalledApplicationLifecycle$' .\n          else\n            go test -v -count=1 -timeout 70m -run '^TestNativeDesktopInstalledApplicationLifecycle$' .\n          fi\n      - name: Verify Mac disk-image transport and strict vendor signatures\n        if: ${{ !cancelled() && runner.os == 'macOS' }}\n        env:\n          DOTFILES_TEST_DESKTOP_ARCHIVES: '1'\n        run: go test -v -count=1 -timeout 20m -run '^Test(NativeDMGPreservesBundleFilesWithoutSyntheticAppleDouble|NativeDesktopArchiveLifecycles)$' .\n\n  fresh-homebrew:\n    name: Fresh Homebrew (macOS arm64)\n    runs-on: macos-26\n    timeout-minutes: 35\n    env:\n      GOTOOLCHAIN: local\n    steps:\n      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7\n      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7\n        with:\n          go-version: 1.27.1\n          cache: ${{ !startsWith(github.ref, 'refs/tags/') }}\n          cache-dependency-path: installer/go.sum\n      - name: Prepare an actually absent Homebrew prefix on this disposable runner\n        shell: bash\n        run: |\n          set -euo pipefail\n          test \"$GITHUB_ACTIONS\" = true\n          test \"$RUNNER_ENVIRONMENT\" = github-hosted\n          test \"$(go env GOHOSTOS)/$(go env GOHOSTARCH)\" = darwin/arm64\n          CGO_ENABLED=0 go -C installer test -c -o \"$RUNNER_TEMP/installer.test\" .\n          if [[ -e /opt/homebrew ]]; then\n            test ! -e \"$RUNNER_TEMP/preinstalled-homebrew\"\n            sudo mv /opt/homebrew \"$RUNNER_TEMP/preinstalled-homebrew\"\n          fi\n          test ! -e /opt/homebrew\n          # This job proves fresh Homebrew with the runner's Apple toolchain.\n          # Fresh Command Line Tools provisioning has a separate fixture.\n      - name: Bootstrap and verify retained infrastructure through the production worker\n        working-directory: installer\n        shell: bash\n        env:\n          DOTFILES_TEST_NATIVE_PACKAGES: '1'\n          DOTFILES_TEST_HOMEBREW_BOOTSTRAP: '1'\n        run: '\"$RUNNER_TEMP/installer.test\" -test.v -test.timeout=30m -test.run=\"^TestNativeHomebrewBootstrapFreshLifecycle$\"'\n\n  fresh-debian-apt:\n    name: Fresh Debian APT (${{ matrix.arch }})\n    strategy:\n      fail-fast: false\n      matrix:\n        include:\n          - runner: ubuntu-26.04\n            arch: amd64\n          - runner: ubuntu-26.04-arm\n            arch: arm64\n    runs-on: ${{ matrix.runner }}\n    container:\n      image: debian:13-slim@sha256:62bd423aeee912639ca8ee681c2b762cb3e25137e0a92b20be455898a9f034ad\n      options: --cap-add SYS_PTRACE\n    # APT and editor acceptance.\n    timeout-minutes: 185\n    env:\n      GOTOOLCHAIN: local\n      DOTFILES_TEST_NATIVE_PACKAGES: '1'\n      DOTFILES_TEST_LINUX_FRESH: '1'\n    steps:\n      - name: Prepare the disposable Linux test host\n        shell: bash\n        run: |\n          set -euo pipefail\n          apt-get -o APT::Update::Error-Mode=any update\n          apt-get install --yes --no-install-recommends ca-certificates gcc libc6-dev\n      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7\n      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7\n        with:\n          go-version: 1.27.1\n          cache: ${{ !startsWith(github.ref, 'refs/tags/') }}\n          cache-dependency-path: installer/go.sum\n      - name: Exercise the native provider and installed application as root without sudo\n        working-directory: installer\n        shell: bash\n        run: |\n          set -euo pipefail\n          test \"$(go env GOHOSTOS)/$(go env GOHOSTARCH)\" = 'linux/${{ matrix.arch }}'\n          test \"$(id -u)\" = 0\n          if command -v sudo >/dev/null; then exit 1; fi\n          go test -race -v -count=1 -timeout 20m -run '^TestNativeLinuxAPT' .\n      - name: Install, consume, update and remove Neovim from absent Mason prerequisites\n        working-directory: installer\n        shell: bash\n        env:\n          DOTFILES_TEST_NVIM_APPLICATION: '1'\n        run: go test -v -count=1 -timeout 80m -run '^TestNativeNeovimInstalledApplicationLifecycle$' .\n\n  fresh-ubuntu-apt:\n    name: Fresh Ubuntu APT (${{ matrix.arch }})\n    strategy:\n      fail-fast: false\n      matrix:\n        include:\n          - runner: ubuntu-26.04\n            arch: amd64\n          - runner: ubuntu-26.04-arm\n            arch: arm64\n    runs-on: ${{ matrix.runner }}\n    container: ubuntu:26.04@sha256:c098726dd9b9733f3e885f8de0ef375206a311b0a317eadc40d347b1115fb944\n    timeout-minutes: 110\n    env:\n      GOTOOLCHAIN: local\n      DOTFILES_TEST_NATIVE_PACKAGES: '1'\n      DOTFILES_TEST_LINUX_FRESH: '1'\n    steps:\n      - name: Prepare the disposable Linux test host\n        shell: bash\n        run: |\n          set -euo pipefail\n          apt-get -o APT::Update::Error-Mode=any update\n          apt-get install --yes --no-install-recommends ca-certificates gcc libc6-dev\n      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7\n      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7\n        with:\n          go-version: 1.27.1\n          cache: ${{ !startsWith(github.ref, 'refs/tags/') }}\n          cache-dependency-path: installer/go.sum\n      - name: Exercise the native provider and installed application as root without sudo\n        working-directory: installer\n        shell: bash\n        run: |\n          set -euo pipefail\n          test \"$(go env GOHOSTOS)/$(go env GOHOSTARCH)\" = 'linux/${{ matrix.arch }}'\n          test \"$(id -u)\" = 0\n          if command -v sudo >/dev/null; then exit 1; fi\n          go test -race -v -count=1 -timeout 20m -run '^TestNativeLinuxAPT' .\n      - name: Install, consume, update and remove Neovim from absent Mason prerequisites\n        working-directory: installer\n        shell: bash\n        env:\n          DOTFILES_TEST_NVIM_APPLICATION: '1'\n        run: go test -v -count=1 -timeout 80m -run '^TestNativeNeovimInstalledApplicationLifecycle$' .\n\n  missing-apple-clt:\n    name: Missing Apple developer tools (macOS arm64)\n    runs-on: macos-26\n    timeout-minutes: 40\n    env:\n      GOTOOLCHAIN: local\n    steps:\n      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7\n      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7\n        with:\n          go-version: 1.27.1\n          cache: ${{ !startsWith(github.ref, 'refs/tags/') }}\n          cache-dependency-path: installer/go.sum\n      - name: Prepare missing Apple tools while retaining Homebrew on this disposable runner\n        shell: bash\n        run: |\n          set -euo pipefail\n          test \"$GITHUB_ACTIONS\" = true\n          test \"$RUNNER_ENVIRONMENT\" = github-hosted\n          test \"$(go env GOHOSTOS)/$(go env GOHOSTARCH)\" = darwin/arm64\n          test -x /opt/homebrew/bin/brew\n          CGO_ENABLED=0 go -C installer test -c -o \"$RUNNER_TEMP/installer.test\" .\n          baseline=\"$RUNNER_TEMP/preinstalled-apple-tools\"\n          DOTFILES_TEST_NATIVE_PACKAGES=1 DOTFILES_TEST_APPLE_CLT=1 \"$RUNNER_TEMP/installer.test\" -test.v -test.timeout=5m -test.run='^TestNativeAppleCLTPreinstalledReuse$'\n          # Inspect payload files, not receipt directory records, before moves.\n          receipts=\"$(pkgutil --pkgs)\"\n          outside=\"$baseline/outside-receipt-paths.txt\"\n          (umask 077; set -C; : > \"$outside\")\n          while IFS= read -r receipt; do\n            case \"$receipt\" in\n              com.apple.pkg.CLTools*)\n                info=\"$(pkgutil --pkg-info \"$receipt\")\"\n                printf '%s\\n' \"$info\"\n                printf '%s\\n' \"$info\" | /usr/bin/awk -F': ' -v package=\"$receipt\" '\n                  $1 == \"package-id\" {if ($2 != package) exit 1; ids++}\n                  $1 == \"volume\" {if ($2 != \"/\") exit 1; volumes++}\n                  $1 == \"location\" {if ($2 != \"/\") exit 1; locations++}\n                  END {if (ids != 1 || volumes != 1 || locations != 1) exit 1}'\n                members=\"$(pkgutil --only-files --files \"$receipt\")\"\n                printf '%s' \"$members\" | /usr/bin/awk -v outside=\"$outside\" '\n                  {\n                    n=split($0, parts, \"/\")\n                    valid=length($0)>0 && length($0)<=4096 && substr($0,1,1)!=\"/\"\n                    for (i=1;i<=n;i++) if (parts[i]==\".\" || parts[i]==\"..\" || parts[i]==\"\") valid=0\n                    if (valid) {\n                      if ($0 !~ /^Library\\/Developer\\/CommandLineTools\\//) print \"/\" $0 >> outside\n                      next\n                    }\n                    invalid++\n                    if (invalid <= 20) printf \"CLT receipt has a noncanonical payload file: %.256s\\n\", $0 > \"/dev/stderr\"\n                  }\n                  END {\n                    if (invalid > 20) printf \"CLT receipt has %d additional invalid payload files\\n\", invalid-20 > \"/dev/stderr\"\n                    if (invalid) exit 1\n                  }\n                '\n                ;;\n            esac\n          done <<< \"$receipts\"\n          DOTFILES_TEST_NATIVE_PACKAGES=1 DOTFILES_TEST_APPLE_CLT=1 \"$RUNNER_TEMP/installer.test\" -test.v -test.timeout=5m -test.run='^TestNativeAppleCLTRecordOutsideReceiptPreservation$'\n          # Historical receipts remain unchanged; only payloads move aside.\n          shopt -s nullglob\n          for application in /Applications/Xcode*.app; do\n            sudo mv \"$application\" \"$baseline/\"\n          done\n          if [[ -e /Library/Developer/CommandLineTools ]]; then\n            sudo mv /Library/Developer/CommandLineTools \"$baseline/\"\n          fi\n          sudo xcode-select --reset\n          unset DEVELOPER_DIR SDKROOT TOOLCHAINS\n          if selected=\"$(LC_ALL=C xcode-select --print-path 2>&1)\"; then exit 1; else status=$?; fi\n          test \"$status\" = 2\n          test \"$selected\" = $'xcode-select: error: Unable to get active developer directory. Use `sudo xcode-select --switch path/to/Xcode.app` to set one (or see `man xcode-select`)'\n      - name: Install the advertised Apple tools and compile an SDK program\n        working-directory: installer\n        shell: bash\n        env:\n          DOTFILES_TEST_NATIVE_PACKAGES: '1'\n          DOTFILES_TEST_APPLE_CLT: '1'\n        run: '\"$RUNNER_TEMP/installer.test\" -test.v -test.timeout=35m -test.run=\"^TestNativeAppleCLTMissingPayloadWithExistingHomebrew$\"'\n\n  fresh-windows-vendor:\n    name: Fresh Windows vendor (${{ matrix.recipe }})\n    runs-on: windows-2022\n    timeout-minutes: 85\n    strategy:\n      fail-fast: false\n      matrix:\n        include:\n          - recipe: VC-runtime\n            test: TestWindowsVendorNativeOwnedLifecycle\n            flag: DOTFILES_NATIVE_WINDOWS_VENDOR_INSTALL\n          - recipe: Build-Tools\n            test: TestWindowsBuildToolsNativeOwnedLifecycle\n            flag: DOTFILES_NATIVE_WINDOWS_BUILDTOOLS_INSTALL\n    env:\n      GOTOOLCHAIN: local\n      # Distinct fresh containers prevent Build Tools from preinstalling the\n      # runtime before its separate fresh/changed-version lifecycle assertion.\n      WINDOWS_TEST_IMAGE: mcr.microsoft.com/dotnet/framework/runtime:4.8-windowsservercore-ltsc2022@sha256:3983348680840ca6e53ad641e314c3c9184ca2fd19f88bc467600f7d9f6e9d73\n    steps:\n      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7\n      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7\n        with:\n          go-version: 1.27.1\n          cache: ${{ !startsWith(github.ref, 'refs/tags/') }}\n          cache-dependency-path: installer/go.sum\n      - name: Prepare the disposable Windows container engine\n        timeout-minutes: 2\n        shell: pwsh\n        run: |\n          $ErrorActionPreference = 'Stop'\n          if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_ENVIRONMENT -ne 'github-hosted') { throw 'Disposable runner required' }\n          if ((go env GOHOSTOS) -ne 'windows' -or (go env GOHOSTARCH) -ne 'amd64') { throw 'Native Windows amd64 required' }\n          Get-CimInstance Win32_Service -Filter \"Name='docker'\" |\n            Select-Object State, StartMode, ProcessId, ExitCode, ServiceSpecificExitCode | Format-List\n          $service = Get-Service -Name docker -ErrorAction Stop\n          $timer = [Diagnostics.Stopwatch]::StartNew()\n          $probeDirectory = Join-Path $env:RUNNER_TEMP ('docker-readiness-' + [Guid]::NewGuid().ToString('N'))\n          New-Item -ItemType Directory -Path $probeDirectory | Out-Null\n          $stdout = Join-Path $probeDirectory 'stdout'\n          $stderr = Join-Path $probeDirectory 'stderr'\n          $lastOutput = 'No Docker API response'\n          try {\n            if ($service.Status -eq 'Stopped') { Start-Service -Name docker -ErrorAction Stop }\n            while ($true) {\n              $service.Refresh()\n              if ($service.Status -notin @('Running', 'StartPending')) { throw \"Docker service stopped or cannot start: $($service.Status)\" }\n              $remaining = 60000 - $timer.ElapsedMilliseconds\n              if ($remaining -le 0) { throw \"Windows Docker API readiness expired: $lastOutput\" }\n              $probe = Start-Process docker -ArgumentList @('--host', 'npipe:////./pipe/docker_engine', 'version', '--format', '{{.Server.Os}}') `\n                -NoNewWindow -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr\n              try {\n                if (-not $probe.WaitForExit([int]$remaining)) {\n                  $probe.Kill()\n                  $probe.WaitForExit()\n                  throw 'Windows Docker API readiness query timed out'\n                }\n                $exitCode = $probe.ExitCode\n                $output = [IO.File]::ReadAllText($stdout).Trim()\n                $lastOutput = [IO.File]::ReadAllText($stderr).Trim()\n              } finally { $probe.Dispose() }\n              if ($exitCode -eq 0) {\n                if ($output -cne 'windows') { throw \"Native Windows container engine required; received '$output'\" }\n                if ($timer.ElapsedMilliseconds -ge 60000) { throw 'Windows Docker API readiness expired' }\n                break\n              }\n              Start-Sleep -Milliseconds 500\n            }\n            Write-Output \"Windows Docker API ready after $($timer.ElapsedMilliseconds) ms\"\n          } catch {\n            Get-CimInstance Win32_Service -Filter \"Name='docker'\" |\n              Select-Object State, StartMode, ProcessId, ExitCode, ServiceSpecificExitCode | Format-List\n            Write-Output \"Last Docker API diagnostic: $lastOutput\"\n            throw\n          }\n      - name: Compile fixture and verify the disposable Windows container engine\n        shell: pwsh\n        run: |\n          $ErrorActionPreference = 'Stop'\n          if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_ENVIRONMENT -ne 'github-hosted') { throw 'Disposable runner required' }\n          if ((go env GOHOSTOS) -ne 'windows' -or (go env GOHOSTARCH) -ne 'amd64') { throw 'Native Windows amd64 required' }\n          if ((docker info --format '{{.OSType}}') -ne 'windows') { throw 'Native Windows container engine required' }\n          $fixture = Join-Path $env:RUNNER_TEMP 'vendor-native'\n          New-Item -ItemType Directory -Path $fixture | Out-Null\n          $env:CGO_ENABLED = '0'\n          go -C installer test -c -o (Join-Path $fixture 'installer.test.exe') .\n          if ($LASTEXITCODE -ne 0) { throw 'Native fixture compilation failed' }\n          docker pull $env:WINDOWS_TEST_IMAGE\n          if ($LASTEXITCODE -ne 0) { throw 'Pinned Windows test image unavailable' }\n      - name: Time the first containers after the image pull (diagnostic only)\n        # Evidence for the intermittent Build Tools first-inspection timeout\n        # (2026-10-23). A separate container timed after the lifecycle was fast\n        # (first WMI query under 0.6 s), so this runs first: the first\n        # PowerShell container after the pull, a bare container, then a second\n        # PowerShell container. It cannot fail the job. The lifecycle then no\n        # longer starts the first container after the pull, as in the\n        # VC-runtime job, whose Python check already runs first.\n        continue-on-error: true\n        timeout-minutes: 5\n        shell: pwsh\n        run: |\n          $nt = Get-ItemProperty 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion'\n          Write-Output \"host: image=$env:ImageVersion build=$($nt.CurrentBuild).$($nt.UBR)\"\n          $probe = @'\n          $timer = [Diagnostics.Stopwatch]::StartNew()\n          $nt = Get-ItemProperty 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion'\n          $registry = $timer.ElapsedMilliseconds\n          $null = Get-CimInstance -ClassName Win32_OperatingSystem\n          $first = $timer.ElapsedMilliseconds - $registry\n          $mark = $timer.ElapsedMilliseconds\n          $null = Get-CimInstance -ClassName Win32_OperatingSystem\n          $second = $timer.ElapsedMilliseconds - $mark\n          $mark = $timer.ElapsedMilliseconds\n          $null = Get-AuthenticodeSignature -LiteralPath (Join-Path ([Environment]::SystemDirectory) 'kernel32.dll')\n          $signature = $timer.ElapsedMilliseconds - $mark\n          \"container: build=$($nt.CurrentBuild).$($nt.UBR) to_registry_ms=$registry cim_first_ms=$first cim_second_ms=$second authenticode_ms=$signature winmgmt=$((Get-Service winmgmt).Status)\"\n          '@\n          $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($probe))\n          $powershell = \"$env:SystemRoot\\System32\\WindowsPowerShell\\v1.0\\powershell.exe\"\n          $timer = [Diagnostics.Stopwatch]::StartNew()\n          docker run --rm --isolation=process --memory 4g $env:WINDOWS_TEST_IMAGE `\n            $powershell -NoLogo -NoProfile -NonInteractive -EncodedCommand $encoded\n          Write-Output \"first PowerShell container total: $($timer.ElapsedMilliseconds) ms (exit $LASTEXITCODE)\"\n          $timer.Restart()\n          docker run --rm --isolation=process $env:WINDOWS_TEST_IMAGE cmd.exe /d /c exit 0\n          Write-Output \"bare container start and exit: $($timer.ElapsedMilliseconds) ms (exit $LASTEXITCODE)\"\n          $timer.Restart()\n          docker run --rm --isolation=process --memory 4g $env:WINDOWS_TEST_IMAGE `\n            $powershell -NoLogo -NoProfile -NonInteractive -EncodedCommand $encoded\n          Write-Output \"second PowerShell container total: $($timer.ElapsedMilliseconds) ms (exit $LASTEXITCODE)\"\n      - name: Verify Python with the default Windows path policy\n        if: matrix.recipe == 'VC-runtime'\n        shell: pwsh\n        run: |\n          $ErrorActionPreference = 'Stop'\n          $fixture = Join-Path $env:RUNNER_TEMP 'vendor-native'\n          docker run --rm --isolation=process --memory 4g --storage-opt size=10G `\n            --mount \"type=bind,source=$fixture,target=C:\\fixtures,readonly\" `\n            --env DOTFILES_TEST_ARCHIVES=1 --env DOTFILES_TEST_LANGUAGE_PREPARATION=1 `\n            --env DOTFILES_TEST_PYTHON_DEFAULT_WINDOWS=1 `\n            --workdir C:\\fixtures --entrypoint C:\\fixtures\\installer.test.exe `\n            $env:WINDOWS_TEST_IMAGE '-test.v' '-test.timeout=15m' '-test.run=^TestNative(ArchiveWindowsPythonDefaultPaths|LatexPreparationLifecycleAndStablePython|YamllintPreparationLifecycleAndStablePython)$'\n          if ($LASTEXITCODE -ne 0) { throw 'Default Windows Python lifecycle failed' }\n      - name: Verify fresh install, update, repair and exact removal\n        shell: pwsh\n        run: |\n          $ErrorActionPreference = 'Stop'\n          $fixture = Join-Path $env:RUNNER_TEMP 'vendor-native'\n          docker run --rm --isolation=process --memory 4g --storage-opt size=60G `\n            --mount \"type=bind,source=$fixture,target=C:\\fixtures,readonly\" `\n            --env GITHUB_ACTIONS=true --env RUNNER_ENVIRONMENT=github-hosted `\n            --env DOTFILES_NATIVE_WINDOWS_VENDOR=1 --env '${{ matrix.flag }}=1' `\n            --workdir C:\\fixtures --entrypoint C:\\fixtures\\installer.test.exe `\n            $env:WINDOWS_TEST_IMAGE '-test.v' '-test.timeout=70m' '-test.run=^${{ matrix.test }}$'\n          if ($LASTEXITCODE -ne 0) { throw 'Native vendor lifecycle failed' }\n",
+        "sha256": "14041868e4082f626817bcad0a52c3bd48fadbf5ec7608e3ef2e64add0bd8182"
+      }
+    }
+  },
+  "scans": {
+    "gitleaks_version": "8.30.1",
+    "release_range": "v1.0.1..v1.1.0",
+    "proof_bytes": 120195
+  },
+  "fresh_public_clone": "passed",
+  "release": {
+    "id": 431079723,
+    "published_at": "2026-11-02T05:23:00Z",
+    "immutable": true,
+    "latest": true,
+    "draft": false,
+    "prerelease": false
+  },
+  "residual_evidence": [
+    "redirected Windows",
+    "divergent Windows Terminal targets",
+    "physical Linux",
+    "Apple Silicon owner host",
+    "manual visual checks"
+  ],
+  "certification_asset": {
+    "name": "release-proof.json",
+    "sha256": "41b9dfdcc115afcaf20c747a892a358a99c29eccf3806d4e985e0e6f796b2731"
+  }
+}

@@ -28,14 +28,11 @@
     "Desktop lifecycle (windows-2025)"
   ],
   "current": {
-    "state": "candidate",
+    "state": "published",
     "tag": "v1.1.0",
     "previous_tag": "v1.0.1",
     "title": "v1.1.0 — superfile, local Atuin, Rose Pine in each tool and new Sentinel skills",
     "notes": "docs/releases/v1.1.0.md",
-    "preparation": {
-      "base_commit": "7850fbb5b83de40f1e3d983e1ad242814b53154c",
-      "branch": "release/v1.1.0"
-    }
+    "proof": "release/proofs/v1.1.0.json"
   }
 }
