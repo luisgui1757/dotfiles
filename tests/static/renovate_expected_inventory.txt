@@ -12,6 +12,8 @@ github-actions|.github/workflows/installer-engine.yml|github-runners|windows|1
 github-actions|.github/workflows/installer-engine.yml|github-tags|actions/checkout|8
 github-actions|.github/workflows/installer-engine.yml|github-tags|actions/setup-go|8
 github-actions|.github/workflows/installer-engine.yml|github-tags|actions/upload-artifact|1
+github-actions|.github/workflows/release.yml|github-runners|ubuntu|1
+github-actions|.github/workflows/release.yml|github-tags|actions/checkout|1
 github-actions|.github/workflows/test.yml|github-releases|go|3
 github-actions|.github/workflows/test.yml|github-runners|macos|1
 github-actions|.github/workflows/test.yml|github-runners|ubuntu|1

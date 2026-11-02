@@ -1,38 +1,4 @@
 {
-  "schema": 2,
-  "repository": "luisgui1757/dotfiles",
-  "official_remote": "https://github.com/luisgui1757/dotfiles.git",
-  "workflow": "installer-engine.yml",
-  "workflow_jobs": [
-    "core (ubuntu-26.04)",
-    "core (ubuntu-26.04-arm)",
-    "core (macos-26)",
-    "core (windows-2025)",
-    "core packages (macos-26)",
-    "core packages (windows-2025)",
-    "Fresh Homebrew (macOS arm64)",
-    "Fresh Debian APT (amd64)",
-    "Fresh Debian APT (arm64)",
-    "Fresh Ubuntu APT (amd64)",
-    "Fresh Ubuntu APT (arm64)",
-    "Missing Apple developer tools (macOS arm64)",
-    "Fresh Windows vendor (VC-runtime)",
-    "Fresh Windows vendor (Build-Tools)",
-    "Neovim lifecycle (ubuntu-26.04)",
-    "Neovim lifecycle (ubuntu-26.04-arm)",
-    "Neovim lifecycle (macos-26)",
-    "Neovim lifecycle (windows-2025)",
-    "Desktop lifecycle (ubuntu-26.04)",
-    "Desktop lifecycle (ubuntu-26.04-arm)",
-    "Desktop lifecycle (macos-26)",
-    "Desktop lifecycle (windows-2025)"
-  ],
-  "current": {
-    "state": "published",
-    "tag": "v1.1.0",
-    "previous_tag": "v1.0.1",
-    "title": "v1.1.0 — superfile, local Atuin, Rose Pine in each tool and new Sentinel skills",
-    "notes": "docs/releases/v1.1.0.md",
-    "proof": "release/proofs/v1.1.0.json"
-  }
+  "schema": 3,
+  "version": "v1.1.0"
 }

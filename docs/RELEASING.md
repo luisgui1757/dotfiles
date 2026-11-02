@@ -1,27 +1,25 @@
 # Releasing dotfiles
 
-`release/manifest.json` is the release identity source. Published schema-1
-manifests and proofs describe historical releases, including
-[v0.4.4](releases/v0.4.4.md); their bytes remain unchanged. New preparation writes
-schema 2, selecting `installer-engine.yml` and the native jobs required by
-`.github/check-identities.json`. The manifest, versioned notes and closure proof
-are the only renderer-managed release artifacts. Historical migration ledgers,
-source files and prior release advisories are not rewritten.
+A merge that changes `version` in `release/manifest.json` publishes that
+version. The [release workflow](../.github/workflows/release.yml) does the
+work. Nobody runs a release command or types a confirmation.
 
-Release commands perform external writes and require an explicit maintainer
-instruction. Preparing a release opens a PR; publishing creates a tag and release.
-Neither command grants permission to merge a PR.
+Releases up to v1.1.0 used candidate and closure pull requests. Their
+manifests, notes and proofs in `release/proofs/` stay unchanged. The proof of a
+later release is its `release-proof.json` asset on GitHub.
 
-## Prepare reviewed notes and a PR
+## Release a version
 
-Start from clean `main` exactly matching official `origin/main`. Supply reviewed
-notes outside the checkout, using the next release version:
+Open one pull request with these changes:
+
+1. Set `version` in `release/manifest.json` to the next `vMAJOR.MINOR.PATCH`.
+2. Add the reviewed notes as `docs/releases/<version>.md`.
+3. Add the code changes of the release, if there are some.
+
+The notes have this shape:
 
 ```markdown
-# v1.0.0 — Reviewed release title
-
-> Release candidate notes. Publish these only with the official annotated
-> `v1.0.0` tag after the deterministic evidence gate below passes.
+# v1.2.0 — Reviewed release title
 
 ## Highlights
 
@@ -30,108 +28,84 @@ notes outside the checkout, using the next release version:
 ## Compatibility and upgrade
 
 State the supported platforms, migration boundary and local-checkout entrypoint.
-
-## Release identity
-
-The exact annotated tag and official remote must agree.
-
-## Evidence required before publication
-
-- Full local and required hosted gates.
-- Exact tag, archived native jobs, scans, fresh clone and immutable release readback.
 ```
 
-Replace the example version and title with the reviewed release. Do not claim
-unexecuted native, owner-host or visual checks passed.
+The H1 text is the title of the GitHub release. The release body is the notes
+from `## Highlights` to the end. Do not claim that unexecuted native,
+owner-host or visual checks passed. `make release-check` validates the
+manifest and the notes, and the required checks of the pull request run it.
 
-```bash
-make release-check
-make release-prepare VERSION=v1.0.0 NOTES=/absolute/path/reviewed-notes.md
-```
+When the pull request merges, the release workflow publishes the version. A
+merge that does not change the version publishes nothing. Merge is an owner
+action, unless the owner gives it to an agent.
 
-Add `SUPERSEDE=<tag>` only to replace an active candidate that can never be
-certified (see Recovery).
+Archive, component and wheel checksums, the bootstrap toolchain, the Gitleaks
+pin in `release.yml` and the
+[Mason registry snapshot](../nvim/mason-registry/README.md) are manually
+reviewed pins. Update them with upstream provenance and runtime evidence.
+Renovate covers the other declared workflow, Go and validator dependencies. It
+does not calculate archive checksums.
 
-Preparation validates the current published proof against the official tag,
-release and workflow; checks clean exact main, version ordering and note shape;
-creates a sibling `release/<version>` worktree; writes schema-2 candidate metadata
-and notes; runs `make ci` and `git diff --check`; then commits, pushes and opens a
-preparation PR. It commits only the rendered manifest and notes (the closure
-commit likewise only its notes, proof and manifest); any other file the gate
-changed or left behind stops the command. The worktree remains for review. No source-version constants or
-old installer registries are generated. Review and merge separately through the
-protected squash-only path.
+## What the release workflow checks
 
-The contributor gate requires the Go version declared in `installer/go.mod`.
-Archive/component/wheel checksums, the bootstrap toolchain and the
-[Mason registry snapshot](../nvim/mason-registry/README.md) are manually reviewed
-pins, updated with upstream provenance and actual runtime evidence.
-Renovate covers the remaining declared workflow, Go and validator dependencies;
-it does not calculate heterogeneous archive checksums.
+The workflow runs `scripts/release.py publish` on the merge commit. It stops
+at the first failure:
 
-## Certify the exact merged commit
+1. If the merge did not change the version, the workflow stops and changes
+   nothing.
+2. If the version already has a published release, the workflow stops. It
+   changes nothing when that release is immutable, and fails when it is not.
+3. The version must be newer than the latest GitHub release, and that release
+   must be immutable. It becomes the previous release.
+4. The merge commit must be the squash merge of one pull request into `main`.
+   Each check on the head of that pull request must be complete, and no check
+   can fail. Each required check must pass one time from GitHub Actions. The
+   live required checks of `main` must equal `.github/check-identities.json`.
+   The merged tree must equal the tree of the pull request head.
+5. Gitleaks scans the commits from the previous release to the merge commit,
+   with redaction. Put a reviewed false positive into `.gitleaksignore` as its
+   exact fingerprint (`commit:file:rule:line`) with the reason. Never add a
+   pattern or a rule for a full path.
+6. The workflow creates the annotated tag on the merge commit.
+7. A `workflow_dispatch` run of `installer-engine.yml` on the tag must pass on
+   its first attempt. Each native job in `.github/check-identities.json` must
+   pass at the exact commit. The proof keeps the API records of the run and its
+   jobs, and the workflow source of the commit, with their size and SHA-256.
+   Each setup-go step must disable the tag cache, and the workflow must have no
+   broad Actions cache step. Gitleaks scans this evidence.
+8. A fresh public clone without credentials must give the same tag object and
+   commit, and pass the release manifest checks.
+9. The workflow creates a draft with the reviewed title and body, and uploads
+   `release-proof.json`. GitHub must report the same size and SHA-256 for the
+   asset.
+10. The workflow publishes the draft as the latest release. GitHub must report
+    it as immutable, latest, not a draft and not a prerelease.
 
-After authorized merge, update local `main` to the exact official head:
-
-```bash
-make release-publish VERSION=v1.0.0 EXPECTED_SHA=<full-40-character-merged-commit>
-```
-
-The publisher verifies the unique merged preparation PR, equality of reviewed
-and merged trees, all hosted checks, the exact canonical required-check policy,
-and successful GitHub Actions checks at the reviewed PR head. A stale live
-required-check policy blocks publication. It also requires immutable releases,
-the complete local gate and a redacted Gitleaks scan of the release range before
-creating the annotated tag. That scan runs only here, not in pull-request CI. A
-finding reviewed as a false positive goes into `.gitleaksignore` as its exact
-fingerprint (`commit:file:rule:line`) with the reason, through a corrected
-preparation PR; never add a pattern or path-wide rule.
-
-A new `workflow_dispatch` run on that exact tag must pass on its first attempt.
-Every manifest-bound native job must complete successfully with the exact commit,
-run ID and attempt. Certification archives canonical API run/job records and the
-exact-commit workflow source inside `release-proof.json`, with bounded byte size
-and SHA-256. URLs alone are not evidence. Every setup-go step must disable tag
-caching and the workflow must contain no broad Actions cache step. Branch Go
-module caches do not establish cache-free release proof.
-
-The archived evidence is scanned. A fresh credential-free detached public clone
-must reproduce the annotated tag object, peeled commit and release-manifest
-checks. Native package/archive fixtures verify actual selected bytes and runtime
-outcomes in the hosted jobs; cross-compilation does not substitute for them.
-
-Only then does the command create a draft with the exact reviewed public body,
-upload the certification and verify GitHub's asset size and digest. The
-certification truthfully records that immutable publication is pending. Type the
-complete printed `PUBLISH IMMUTABLE ...` phrase to cross that irreversible
-boundary. A mismatch leaves the draft unpublished. Final readback must be
-immutable/latest/non-draft/non-prerelease. The closure PR records observed release
-state, archived evidence and the uploaded asset's digest. It is not auto-merged.
+URLs alone are not evidence. Native package and archive fixtures in the hosted
+jobs verify the selected bytes and runtime results. Cross-compilation does not
+replace them.
 
 ## Recovery
 
-- Before tag creation, correct the preparation tree and rerun its gates.
-- An existing official annotated tag is accepted only if its local and remote
-  objects peel to the exact expected commit. Never move or delete a release tag.
-- `RUN_ID=<id>` reuses an observed first-attempt exact-tag run after a local
-  failure; every identity and job is revalidated.
-- A declined confirmation leaves the verified draft and exact proof asset.
-  Reuse the same version, commit and run ID; existing bytes cannot be clobbered.
-- If publication succeeded but closure failed, the publisher revalidates the
-  immutable certification asset and reconstructs closure from live readback
-  without republishing.
-- A candidate whose tag exists but whose frozen code cannot pass the exact-tag run
-  is superseded, never retagged. Merge the fix, then run
-  `make release-prepare VERSION=<newer> NOTES=<notes> SUPERSEDE=<old tag>`.
-  Preparation requires the old tag to be the active candidate with no GitHub
-  release (draft or published), and the release it was prepared from to be the
-  live latest release; that release stays `previous_tag`. A candidate that itself
-  superseded another is followed back through that chain. The old notes gain a
-  superseded banner and its tag stays unchanged and unpublished. v1.0.0 was
-  superseded this way by v1.0.1 (2026-10-28): every macOS Node download in its
-  tag runs failed on degraded hosted networking.
-- Branch/worktree collisions fail closed. Preserve unmerged work and establish
-  PR/release state before removing a collision.
+- Re-run the failed run of the release workflow. A re-run keeps the tag, a
+  first-attempt exact-tag run that passed or still runs, and the draft. It
+  starts a new exact-tag run only when each earlier run failed.
+- Never move or delete a release tag. A tag that exists must peel to the merge
+  commit.
+- When the code of a version cannot pass, merge the fix with a newer version.
+  The old version keeps its notes, and its tag if the workflow made one. It
+  gets no release. v1.0.0 was replaced this way by v1.0.1 (2026-10-28): each
+  macOS Node download in its tag runs failed on degraded hosted networking.
+- The workflow runs one release at a time. While a release runs, GitHub keeps
+  only the newest waiting run. A version that merged between them gets no
+  release.
+- A draft whose `release-proof.json` differs from the new proof stops the
+  workflow. Delete that draft, then re-run.
+- If immutable releases are off, the workflow publishes a mutable release and
+  then fails. Delete that release, turn on immutable releases, then re-run.
+- GitHub can refuse a tag push from the workflow token when the tagged commit
+  changes a workflow file. Then no tag exists and nothing is published. Release
+  that change with a later version change that does not change a workflow.
 
 Unexecuted redirected-Windows, divergent Windows Terminal, physical Linux,
 Apple-Silicon owner-host and visual checks remain explicit residual evidence.
