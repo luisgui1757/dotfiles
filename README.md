@@ -370,9 +370,10 @@ the same selection installs its CLI.
 | Kiro | `${KIRO_HOME:-~/.kiro}/steering/AGENTS.md` | `${KIRO_HOME:-~/.kiro}/skills` |
 | OpenCode | `${XDG_CONFIG_HOME:-~/.config}/opencode/AGENTS.md` | `~/.agents/skills` |
 
-The `core` skills are `babysit-pr`, `council`, `file-pr`, `full-stop`,
-`leaving-pr-comments`, `modernize`, `sol-loop`, `takeover` and `untangle`. The
-`ui` skills are `beast-ui`, `doc-view`, `frontend-design` and `impeccable`.
+The `core` skills are `babysit-pr`, `cleanup`, `council`, `file-pr`,
+`full-stop`, `leaving-pr-comments`, `modernize`, `no-comments`, `sol-loop`,
+`takeover`, `technical-writing`, `tldr`, `untangle` and `why`. The `ui` skills
+are `beast-ui`, `doc-view`, `frontend-design` and `impeccable`.
 The skills are copies, so an edit to a skill never changes this checkout.
 
 Kiro ignores a `KIRO_HOME` that is not an absolute folder outside your home

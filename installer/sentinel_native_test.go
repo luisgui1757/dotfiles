@@ -83,7 +83,7 @@ func TestNativeSentinelInstalledLifecycle(t *testing.T) {
 	}
 	skills := []string{}
 	for _, line := range strings.Split(string(profiles), "\n") {
-		if fields := strings.Fields(line); len(fields) == 2 && !strings.HasPrefix(line, "#") {
+		if fields := strings.Fields(line); len(fields) == 2 && (fields[0] == "core" || fields[0] == "ui") {
 			skills = append(skills, fields[1])
 			for _, root := range skillRoots {
 				if _, err := os.Stat(filepath.Join(root, fields[1], ".sentinel-owned")); err != nil {

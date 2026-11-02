@@ -25,7 +25,7 @@ const (
 
 // sentinelCommit is the only Sentinel pin. Renovate proposes a new value when
 // the Sentinel main branch moves. Change only this line to move the pin.
-const sentinelCommit = "b2f3cb7d44a83809f7d5d99d7d1dcea60c690593"
+const sentinelCommit = "1bb66d56a1f0950093d6d32615461e0fc1d30dc2"
 
 // sentinelHosts are the agents that the Sentinel installer supports.
 var sentinelHosts = []string{"codex", "claude", "copilot", "kiro", "opencode"}
