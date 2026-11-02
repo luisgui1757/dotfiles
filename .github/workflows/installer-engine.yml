@@ -363,7 +363,7 @@ jobs:
             arch: arm64
     runs-on: ${{ matrix.runner }}
     container:
-      image: debian:13-slim@sha256:62bd423aeee912639ca8ee681c2b762cb3e25137e0a92b20be455898a9f034ad
+      image: debian:13-slim@sha256:f6b08b09a05725f9431502d3b5714f5c4576e82c1a84fa1debe0c24a7e0c3ec4
       options: --cap-add SYS_PTRACE
     # APT and editor acceptance.
     timeout-minutes: 185
@@ -411,7 +411,7 @@ jobs:
           - runner: ubuntu-26.04-arm
             arch: arm64
     runs-on: ${{ matrix.runner }}
-    container: ubuntu:26.04@sha256:c098726dd9b9733f3e885f8de0ef375206a311b0a317eadc40d347b1115fb944
+    container: ubuntu:26.04@sha256:6a06111c3b0a8600feadb270aec771dc239bf407b25625f93f44ab00e11f4d3c
     timeout-minutes: 110
     env:
       GOTOOLCHAIN: local
