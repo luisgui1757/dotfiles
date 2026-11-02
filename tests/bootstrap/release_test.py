@@ -1,4 +1,5 @@
 """Release certification boundaries; all GitHub/Git process boundaries are isolated."""
+import argparse
 import copy
 import hashlib
 import importlib.util
@@ -70,16 +71,59 @@ class ReleaseTests(unittest.TestCase):
     def check_evidence(self, evidence):
         release.validate_job_evidence(evidence, self.manifest, "2" * 40, self.tag)
 
-    def test_publication_keeps_irreversible_and_exact_identity_guards(self):
-        source = (ROOT / "scripts/release.py").read_text()
-        for required in ('"--log-opts=', '"workflow_dispatch"',
-                         '"GIT_TERMINAL_PROMPT": "0"', '"--draft"',
-                         '"--draft=false"',
-                         '"release-proof.json"',
-                         'live required-check policy differs', 'head_tree != merged_tree'):
-            self.assertIn(required, source)
-        for forbidden in ('"--clobber"', '"--yes"', 'git push --force', 'tag -d'):
-            self.assertNotIn(forbidden, source)
+    def publish(self, parent, fail_at=None, previous="v1.1.0"):
+        """Run the release with every gate replaced by a step that records its name."""
+        commit = "2" * 40
+        steps = []
+
+        def step(name, result=None):
+            def call(*_args, **_kwargs):
+                steps.append(name)
+                if name == fail_at:
+                    raise release.ReleaseError(name)
+                return result
+            return call
+
+        def output(argv, **_):
+            return {("git", "rev-parse"): commit, ("git", "show"): json.dumps(parent),
+                    ("gh", "repo"): self.manifest["repository"]}[tuple(argv[:2])]
+
+        gates = {
+            "previous_release": previous,
+            "verify_merged_pr": {"tree": "5" * 40},
+            "run": None,
+            "verify_or_publish_tag": "4" * 40,
+            "select_release_run": {"databaseId": 123},
+            "archive_release_jobs": {},
+            "verify_public_clone": None,
+            "create_certification": {},
+            "ensure_draft_release": ({"id": 42}, None, None),
+            "publish_draft": None,
+        }
+        with mock.patch.object(release, "ROOT", self.root), mock.patch.object(release, "require_tool"), \
+                mock.patch.object(release, "git_clean"), mock.patch.object(release, "output", side_effect=output):
+            patches = [mock.patch.object(release, name, side_effect=step(name, result)) for name, result in gates.items()]
+            for patch in patches:
+                patch.start()
+            try:
+                release.publish(argparse.Namespace(commit=commit))
+            finally:
+                for patch in patches:
+                    patch.stop()
+        return steps
+
+    def test_only_a_version_change_publishes_and_only_after_every_gate(self):
+        changed = {"schema": 3, "version": "v1.1.0"}
+        self.assertEqual(self.publish({"schema": 3, "version": self.tag}), [])
+        self.assertEqual(self.publish(changed, previous=None), ["previous_release"])
+        gates = ["previous_release", "verify_merged_pr", "run", "verify_or_publish_tag", "select_release_run",
+                 "archive_release_jobs", "verify_public_clone", "create_certification", "ensure_draft_release",
+                 "publish_draft"]
+        # The manifest before this PR had no version field.
+        self.assertEqual(self.publish({"schema": 2, "current": {"tag": "v1.1.0"}}), gates)
+        for index, gate in enumerate(gates[:-1]):
+            with self.subTest(gate=gate), self.assertRaisesRegex(release.ReleaseError, gate):
+                self.publish(changed, fail_at=gate)
 
     def test_manifest_names_one_version_with_its_reviewed_notes(self):
         self.assertEqual((self.manifest["tag"], self.manifest["title"]), (self.tag, f"{self.tag} — Release fixture"))
@@ -107,15 +151,14 @@ class ReleaseTests(unittest.TestCase):
             return subprocess.CompletedProcess([], 0, json.dumps({"tag_name": self.tag, **fields}), "")
         missing = subprocess.CompletedProcess([], 1, "", "HTTP 404")
         latest = {"tag_name": "v1.1.0", "immutable": True}
-        with mock.patch.object(release, "run", return_value=published(draft=False, immutable=True)), \
+        with mock.patch.object(release, "run", return_value=published(immutable=True)), \
                 mock.patch.object(release, "load_json_from_gh") as gh:
             self.assertIsNone(release.previous_release(self.manifest))
         gh.assert_not_called()
-        for reply in (missing, published(draft=True, immutable=False)):
-            with mock.patch.object(release, "run", return_value=reply), \
-                    mock.patch.object(release, "load_json_from_gh", return_value=latest):
-                self.assertEqual(release.previous_release(self.manifest), "v1.1.0")
-        for label, reply, newest in (("mutable published", published(draft=False, immutable=False), latest),
+        with mock.patch.object(release, "run", return_value=missing), \
+                mock.patch.object(release, "load_json_from_gh", return_value=latest):
+            self.assertEqual(release.previous_release(self.manifest), "v1.1.0")
+        for label, reply, newest in (("mutable published", published(immutable=False), latest),
                                      ("not newer", missing, {"tag_name": self.tag, "immutable": True}),
                                      ("mutable latest", missing, dict(latest, immutable=False))):
             with self.subTest(label=label), \

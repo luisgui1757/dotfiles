@@ -459,7 +459,6 @@ def create_certification(
     commit: str,
     run_record: dict[str, Any],
     job_evidence: dict[str, Any],
-    release_id: int,
 ) -> dict[str, Any]:
     return {
         "schema": 3,
@@ -485,12 +484,6 @@ def create_certification(
             "proof_bytes": job_evidence["size"],
         },
         "fresh_public_clone": "passed",
-        "release": {
-            "id": release_id,
-            "draft": True,
-            "immutable": False,
-            "publication": "pending",
-        },
         "residual_evidence": RESIDUAL_EVIDENCE,
     }
 
@@ -587,13 +580,12 @@ def publish_draft(manifest: dict[str, Any], draft: dict[str, Any]) -> dict[str, 
 def previous_release(manifest: dict[str, Any]) -> str | None:
     """Return the latest published tag that the new release follows, or None when the version is out."""
     tag = manifest["tag"]
+    # This endpoint returns only published releases, never a draft.
     existing = run(["gh", "api", f"repos/{manifest['repository']}/releases/tags/{tag}"], check=False)
     if existing.returncode == 0:
-        release = json.loads(existing.stdout)
-        if release.get("draft") is False:
-            if release.get("immutable") is not True:
-                fail(f"{tag} is published but not immutable")
-            return None
+        if json.loads(existing.stdout).get("immutable") is not True:
+            fail(f"{tag} is published but not immutable")
+        return None
     latest = load_json_from_gh([f"repos/{manifest['repository']}/releases/latest"])
     previous = str(latest.get("tag_name", ""))
     if latest.get("immutable") is not True:
@@ -614,6 +606,10 @@ def publish(args: argparse.Namespace) -> None:
         fail("the checkout is not the release commit")
     manifest = validate_manifest(ROOT)
     tag = manifest["tag"]
+    parent = json.loads(output(["git", "show", f"{commit}^:{MANIFEST_PATH.as_posix()}"]))
+    if parent.get("version") == tag:
+        print(f"This merge did not change the version {tag}. There is nothing to release.")
+        return
     if output(["gh", "repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"]) != manifest["repository"]:
         fail("GitHub CLI is not bound to the reviewed public repository")
     previous = previous_release(manifest)
@@ -630,7 +626,7 @@ def publish(args: argparse.Namespace) -> None:
         evidence = archive_release_jobs(manifest, run_record, commit, tag, temporary / "proofs")
         verify_public_clone(manifest, tag, tag_object, commit)
         body = release_body((ROOT / manifest["notes"]).read_text(encoding="utf-8"))
-        certification = create_certification(manifest, pull_request, tag_object, commit, run_record, evidence, 0)
+        certification = create_certification(manifest, pull_request, tag_object, commit, run_record, evidence)
         draft, _proof_path, _asset_sha256 = ensure_draft_release(manifest, body, certification, temporary)
         publish_draft(manifest, draft)
     print(f"immutable release: https://github.com/{manifest['repository']}/releases/tag/{tag}")

@@ -81,19 +81,6 @@
     },
     {
       "customType": "regex",
-      "description": "Gitleaks Linux x64 release version in the release workflow. The adjacent SHA-256 must be recomputed manually after Renovate bumps this.",
-      "managerFilePatterns": [
-        "/^\\.github/workflows/release\\.yml$/"
-      ],
-      "matchStrings": [
-        "GITLEAKS_VERSION:\\s*(?<currentValue>v[^\\s]+)\\s+GITLEAKS_LINUX_X64_SHA256:\\s*[a-f0-9]{64}"
-      ],
-      "depNameTemplate": "gitleaks/gitleaks",
-      "datasourceTemplate": "github-releases",
-      "versioningTemplate": "semver"
-    },
-    {
-      "customType": "regex",
       "description": "cargo-binstall installer script commit pinned to the current main branch digest. The adjacent installer script SHA-256 must be recomputed manually after Renovate bumps this.",
       "managerFilePatterns": [
         "/^\\.github/workflows/test\\.yml$/"

@@ -24,6 +24,8 @@ defaults:
   run:
     shell: bash
 
+# A manual pin. Only a version change runs this workflow, so no pull request
+# check would find a stale checksum before a release.
 env:
   GITLEAKS_VERSION: v8.30.1
   GITLEAKS_LINUX_X64_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb

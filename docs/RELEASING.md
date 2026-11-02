@@ -39,7 +39,8 @@ When the pull request merges, the release workflow publishes the version. A
 merge that does not change the version publishes nothing. Merge is an owner
 action, unless the owner gives it to an agent.
 
-Archive, component and wheel checksums, the bootstrap toolchain and the
+Archive, component and wheel checksums, the bootstrap toolchain, the Gitleaks
+pin in `release.yml` and the
 [Mason registry snapshot](../nvim/mason-registry/README.md) are manually
 reviewed pins. Update them with upstream provenance and runtime evidence.
 Renovate covers the other declared workflow, Go and validator dependencies. It
@@ -50,33 +51,35 @@ does not calculate archive checksums.
 The workflow runs `scripts/release.py publish` on the merge commit. It stops
 at the first failure:
 
-1. If the version already has an immutable published release, the workflow
-   stops and changes nothing.
-2. The version must be newer than the latest GitHub release, and that release
+1. If the merge did not change the version, the workflow stops and changes
+   nothing.
+2. If the version already has a published release, the workflow stops. It
+   changes nothing when that release is immutable, and fails when it is not.
+3. The version must be newer than the latest GitHub release, and that release
    must be immutable. It becomes the previous release.
-3. The merge commit must be the squash merge of one pull request into `main`.
-   Each check on the head of that pull request must pass, and each required
-   check must pass one time from GitHub Actions. The live required checks of
-   `main` must equal `.github/check-identities.json`. The merged tree must
-   equal the tree of the pull request head.
-4. Gitleaks scans the commits from the previous release to the merge commit,
+4. The merge commit must be the squash merge of one pull request into `main`.
+   Each check on the head of that pull request must be complete, and no check
+   can fail. Each required check must pass one time from GitHub Actions. The
+   live required checks of `main` must equal `.github/check-identities.json`.
+   The merged tree must equal the tree of the pull request head.
+5. Gitleaks scans the commits from the previous release to the merge commit,
    with redaction. Put a reviewed false positive into `.gitleaksignore` as its
    exact fingerprint (`commit:file:rule:line`) with the reason. Never add a
    pattern or a rule for a full path.
-5. The workflow creates the annotated tag on the merge commit.
-6. A `workflow_dispatch` run of `installer-engine.yml` on the tag must pass on
+6. The workflow creates the annotated tag on the merge commit.
+7. A `workflow_dispatch` run of `installer-engine.yml` on the tag must pass on
    its first attempt. Each native job in `.github/check-identities.json` must
    pass at the exact commit. The proof keeps the API records of the run and its
    jobs, and the workflow source of the commit, with their size and SHA-256.
    Each setup-go step must disable the tag cache, and the workflow must have no
    broad Actions cache step. Gitleaks scans this evidence.
-7. A fresh public clone without credentials must give the same tag object and
+8. A fresh public clone without credentials must give the same tag object and
    commit, and pass the release manifest checks.
-8. The workflow creates a draft with the reviewed title and body, and uploads
+9. The workflow creates a draft with the reviewed title and body, and uploads
    `release-proof.json`. GitHub must report the same size and SHA-256 for the
    asset.
-9. The workflow publishes the draft as the latest release. GitHub must report
-   it as immutable, latest, not a draft and not a prerelease.
+10. The workflow publishes the draft as the latest release. GitHub must report
+    it as immutable, latest, not a draft and not a prerelease.
 
 URLs alone are not evidence. Native package and archive fixtures in the hosted
 jobs verify the selected bytes and runtime results. Cross-compilation does not
@@ -98,6 +101,8 @@ replace them.
   release.
 - A draft whose `release-proof.json` differs from the new proof stops the
   workflow. Delete that draft, then re-run.
+- If immutable releases are off, the workflow publishes a mutable release and
+  then fails. Delete that release, turn on immutable releases, then re-run.
 - GitHub can refuse a tag push from the workflow token when the tagged commit
   changes a workflow file. Then no tag exists and nothing is published. Release
   that change with a later version change that does not change a workflow.
