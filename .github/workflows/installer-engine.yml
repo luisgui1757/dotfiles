@@ -529,7 +529,7 @@ jobs:
 
   fresh-windows-vendor:
     name: Fresh Windows vendor (${{ matrix.recipe }})
-    runs-on: windows-2022
+    runs-on: windows-2025
     timeout-minutes: 85
     strategy:
       fail-fast: false
