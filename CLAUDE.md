@@ -154,8 +154,9 @@ and skills for coding agents.
 
 - The `sentinel` capability needs the hidden `integration.sentinel-installer`
   resource. That resource needs `tool.git`.
-- `installer/sentinel.go` holds the only pin, a full commit hash. Renovate
-  tracks the Sentinel `main` branch and opens a pull request when it moves.
+- `installer/sentinel.go` holds the only pin, the full commit hash of a
+  Sentinel release. Renovate opens a pull request when Sentinel publishes a
+  new release tag.
 - Apply fetches that commit into `<state>/sentinel/checkout`. Git runs without
   system or global configuration. `HEAD` must equal the pin, and each file must
   equal the tree of the pin as raw bytes. Git index flags, local filters

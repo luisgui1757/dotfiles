@@ -1,6 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "description": "Renovate owns GitHub Actions, runner labels, Go toolchain/modules, CI validator/tool constants and the Sentinel commit in installer/sentinel.go. Installer archive/component/wheel pins, linux-code-pins.json, bootstrap-toolchain.tsv and the Mason registry snapshot are manually reviewed with checksums and runtime proof; adjacent CI download hashes also require review after version bumps. The agent CLI archive pins (Claude Code, Codex, Copilot CLI, Kiro CLI) are instead proposed weekly by .github/workflows/agent-cli-pins.yml for the same review and native checks.",
+  "description": "Renovate owns GitHub Actions, runner labels, Go toolchain/modules, CI validator/tool constants and the Sentinel release commit in installer/sentinel.go. Installer archive/component/wheel pins, linux-code-pins.json, bootstrap-toolchain.tsv and the Mason registry snapshot are manually reviewed with checksums and runtime proof; adjacent CI download hashes also require review after version bumps. The agent CLI archive pins (Claude Code, Codex, Copilot CLI, Kiro CLI) are instead proposed weekly by .github/workflows/agent-cli-pins.yml for the same review and native checks.",
   "extends": [
     "config:recommended",
     "helpers:pinGitHubActionDigests",
@@ -95,17 +95,15 @@
     },
     {
       "customType": "regex",
-      "description": "Sentinel commit that setup fetches and runs. Renovate proposes the new main digest; the commit hash is the integrity check.",
+      "description": "Sentinel release commit that setup fetches and runs. Renovate proposes the commit of each new release tag; the commit hash is the integrity check.",
       "managerFilePatterns": [
         "/^installer/sentinel\\.go$/"
       ],
       "matchStrings": [
-        "sentinelCommit\\s*=\\s*\"(?<currentDigest>[a-f0-9]{40})\""
+        "sentinelCommit\\s*=\\s*\"(?<currentDigest>[a-f0-9]{40})\"\\s*//\\s*(?<currentValue>v\\d+\\.\\d+\\.\\d+)"
       ],
-      "currentValueTemplate": "main",
       "depNameTemplate": "luisgui1757/sentinel",
-      "packageNameTemplate": "https://github.com/luisgui1757/sentinel",
-      "datasourceTemplate": "git-refs"
+      "datasourceTemplate": "github-tags"
     },
     {
       "customType": "regex",

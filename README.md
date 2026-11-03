@@ -376,15 +376,15 @@ the same selection installs its CLI.
 | Kiro | `${KIRO_HOME:-~/.kiro}/steering/AGENTS.md` | `${KIRO_HOME:-~/.kiro}/skills` |
 | OpenCode | `${XDG_CONFIG_HOME:-~/.config}/opencode/AGENTS.md` | `~/.agents/skills` |
 
-The `core` skills are `babysit-pr`, `cleanup`, `council`, `enforce`,
-`file-pr`, `full-stop`, `leaving-pr-comments`, `modernize`, `no-comments`,
-`sol-loop`, `takeover`, `technical-writing`, `tldr`, `untangle`, `verify-pr`
-and `why`. The `ui` skills are `beast-ui`, `doc-view`, `frontend-design` and
+The `core` skills are `babysit-pr`, `cleanup`, `council`, `file-pr`,
+`full-send`, `full-stop`, `leaving-pr-comments`, `modernize`, `no-comments`,
+`sol-loop`, `technical-writing`, `tldr`, `untangle`, `verify-pr` and `why`.
+The `ui` skills are `beast-ui`, `doc-view`, `frontend-design` and
 `impeccable`. The `formal` skill is `statechart`. The `ops` skills are
-`featuremap` and `patrol`. Setup does not install the `explain` profile
-(`how`). `featuremap` and `patrol` need Node 22 or later when they run.
-`statechart` needs Node 22.18 or later, Bun or Deno. On its first run, it
-installs Java and TLC with mise. It does not run on native Windows.
+`featuremap` and `patrol`. `featuremap` and `patrol` need Node 22 or later
+when they run. `statechart` needs Node 22.18 or later, Bun or Deno. On its
+first run, it installs Java and TLC with mise. It does not run on native
+Windows.
 The skills are copies, so an edit to a skill never changes this checkout.
 
 Kiro ignores a `KIRO_HOME` that is not an absolute folder outside your home
