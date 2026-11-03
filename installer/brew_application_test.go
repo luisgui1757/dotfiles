@@ -435,12 +435,14 @@ func TestNativeAppIntentRejectsRecipeChanges(t *testing.T) {
 
 func TestNativeAppRecipeRejectsScriptsDependenciesAndRedirectedArtifacts(t *testing.T) {
 	s := zenCaskSpec(t.TempDir(), t.TempDir())
-	for _, change := range []string{"valid", "dependency", "no-check", "updater", "script", "app", "wrapper", "tap"} {
+	for _, change := range []string{"valid", "macos", "dependency", "no-check", "updater", "script", "app", "wrapper", "tap"} {
 		t.Run(change, func(t *testing.T) {
 			doc := caskMetadataFixture(s)
 			switch change {
+			case "macos":
+				doc["depends_on"] = map[string]any{"macos": map[string]any{">=": []string{"13"}}}
 			case "dependency":
-				doc["depends_on"] = map[string]any{"formula": []string{"other"}}
+				doc["depends_on"] = map[string]any{"macos": map[string]any{">=": []string{"13"}}, "formula": []string{"other"}}
 			case "no-check":
 				doc["sha256"] = "no_check"
 			case "updater":
@@ -459,7 +461,7 @@ func TestNativeAppRecipeRejectsScriptsDependenciesAndRedirectedArtifacts(t *test
 				t.Fatal(err)
 			}
 			err = validateCaskMetadata(data, s, "zen", false)
-			if (err == nil) != (change == "valid") {
+			if (err == nil) != (change == "valid" || change == "macos") {
 				t.Fatal(change, err)
 			}
 		})
@@ -540,4 +542,20 @@ func TestNativeAppAcceptsHomebrewExpandedMetadataAndCompactReceipt(t *testing.T)
 			t.Fatal("real compact cask receipt rejected", err)
 		}
 	})
+}
+
+func TestCatalogAcceptsOnlyTheReviewedCasks(t *testing.T) {
+	for _, binding := range []struct {
+		id, cask string
+		reviewed bool
+	}{{"app.t3-code", "t3-code", true}, {"app.zen", "zen", true}, {"app.other", "other", false}, {"app.zen", "t3-code", false}, {"app.t3-code", "zen", false}} {
+		c := Catalog{Schema: 1, Resources: []Resource{
+			{ID: "infra.homebrew", Name: "Homebrew", Platforms: []string{"darwin"}, Action: "homebrew"},
+			{ID: binding.id, Name: "App", Platforms: []string{"darwin"}, Action: "package", Requires: []string{"infra.homebrew"}, Bindings: map[string]Binding{"darwin": {Provider: "homebrew-cask", Package: binding.cask}}},
+		}}
+		err := c.Validate()
+		if binding.reviewed && err != nil || !binding.reviewed && (err == nil || !strings.Contains(err.Error(), "unsupported native application")) {
+			t.Fatal(binding, err)
+		}
+	}
 }

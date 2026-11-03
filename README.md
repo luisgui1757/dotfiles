@@ -124,7 +124,7 @@ selects the rest. Children remain independently selectable. `a` selects all,
 | Version control | Git, lazygit, GitHub CLI, gh-dash |
 | Terminal apps | Ghostty, Windows Terminal |
 | Terminal sessions | tmux, Herdr |
-| AI coding | T3 Code, Claude Code CLI, Codex CLI, GitHub Copilot CLI, Kiro CLI, Sentinel rules and skills |
+| AI coding | T3 Code, T3 Code server, Claude Code CLI, Codex CLI, GitHub Copilot CLI, Kiro CLI, Sentinel rules and skills |
 | Desktop apps | OpenWhispr, Obsidian, Tailscale, Zen Browser, AeroSpace, Mac keyboard shortcuts |
 | Dotfiles development | Lint and benchmark tools |
 
@@ -160,7 +160,8 @@ required dependencies are still resolved automatically in the preview.
 | lazygit | ✓ | ✓ | ✓ |
 | GitHub CLI | ✓ | ✓ | ✓ |
 | gh-dash | ✓ | ✓ | ✓ |
-| T3 Code (browser UI) | ✓ | ✓ | ✓ |
+| T3 Code | ✓ | ✓ | — |
+| T3 Code server (browser UI) | ✓ | ✓ | ✓ |
 | Claude Code CLI | ✓ | ✓ | ✓ |
 | Codex CLI | ✓ | ✓ | ✓ |
 | GitHub Copilot CLI | ✓ | glibc | ✓ |
@@ -288,12 +289,32 @@ checkout update changes dependency pins, complete the installer's **Update tools
 before opening Neovim: a Lazy pin mismatch stops configured startup, and a Mason
 registry mismatch disables its language-server/formatter setup until repair succeeds.
 
-T3 Code is an independent selection using its official standalone package on
-all four supported targets. Run `t3` in a project from a fresh terminal to start
-the local server and open the browser UI; keep that terminal running and use
-Ctrl-C to stop. No Node installation, desktop app or background service is added.
-The pinned stable **v0.1.0** includes Orchestrator V2. Updates follow the stable
-release pinned by the reviewed checkout.
+**T3 Code** installs the desktop app, which includes its own server.
+
+- On macOS 13 or later, Homebrew installs the official `t3-code` cask, and T3
+  updates itself.
+- On Ubuntu and Debian, setup unpacks the official v0.1.6 `.deb` privately and
+  does not run its install scripts. Setup adds a start script, which the
+  launcher and T3's own `t3code://` link handler use. The script turns off
+  T3's automatic updates with `T3CODE_DISABLE_AUTO_UPDATE=1`, and **Update
+  tools** moves the app to the reviewed release. The script also starts the
+  app without Chromium's sandbox, because the sandbox needs user namespaces
+  that Ubuntu restricts.
+- On Windows, T3 ships the app only as an installer, and setup never runs a
+  vendor installer. Install the app yourself with
+  `winget install T3Tools.T3Code`. T3 then updates itself.
+
+The app can add its own `t3` command: open **Settings → About** and choose
+**Install** next to **t3 command**.
+
+**T3 Code server** installs the official standalone `t3` package on all four
+supported targets, for a machine without the app. Run `t3` in a project from a
+fresh terminal. It starts the local server and opens the browser UI. Keep that
+terminal open, and press Ctrl-C to stop the server. Setup adds no Node
+installation and no background service.
+
+The pinned stable **v0.1.0** of the server includes Orchestrator V2. Updates
+follow the stable release pinned by the reviewed checkout.
 [Upstream release](https://github.com/pingdotgg/t3code/releases/tag/v0.1.0).
 
 T3 opens without provider credentials; agent work needs at least one configured,

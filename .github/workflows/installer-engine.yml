@@ -151,7 +151,7 @@ jobs:
         if: ${{ !cancelled() && runner.os == 'macOS' && matrix.part != 'packages' }}
         env:
           DOTFILES_TEST_NATIVE_PACKAGES: '1'
-        run: go test -v -count=1 -timeout 20m -run '^TestNative(Brew|HomebrewIdentitySurvivesVolumeRemount)' .
+        run: go test -v -count=1 -timeout 30m -run '^TestNative(Brew|HomebrewIdentitySurvivesVolumeRemount)' .
       - name: Install, contact, update and remove the real Tailscale daemon
         if: ${{ !cancelled() && runner.os == 'Linux' }}
         env:

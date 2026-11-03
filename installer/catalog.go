@@ -146,7 +146,7 @@ func (c *Catalog) Validate() error {
 					return fmt.Errorf("invalid Homebrew formula binding for %s", r.ID)
 				}
 			}
-			if binding.Provider == "homebrew-cask" && (r.ID != "app.zen" || binding.Package != "zen") {
+			if binding.Provider == "homebrew-cask" && map[string]string{"app.zen": "zen", "app.t3-code": "t3-code"}[r.ID] != binding.Package {
 				return fmt.Errorf("unsupported native application %s", r.ID)
 			}
 			key := os + "/" + binding.Provider + "/" + binding.Package

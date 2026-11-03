@@ -20,7 +20,7 @@ func TestAdditionalDesktopChoicesHaveIndependentProviders(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, target := range []Context{{OS: "darwin", Arch: "arm64"}, linux, {OS: "linux", Arch: "arm64"}, {OS: "windows", Arch: "amd64"}} {
-		for _, id := range []string{"openwhispr", "obsidian", "tailscale", "zen"} {
+		for _, id := range []string{"openwhispr", "obsidian", "tailscale", "zen", "t3-code-app"} {
 			available := target.OS == "darwin" || target.OS == "linux" && (id != "openwhispr" || target.Arch == "amd64")
 			closure, err := catalog.Closure([]string{id}, target)
 			if (err == nil) != available {
@@ -32,6 +32,9 @@ func TestAdditionalDesktopChoicesHaveIndependentProviders(t *testing.T) {
 			application := "tool." + id
 			if target.OS == "darwin" && id == "zen" {
 				application = "app.zen"
+			}
+			if target.OS == "darwin" && id == "t3-code-app" {
+				application = "app.t3-code"
 			}
 			// Linux Obsidian is the portable build; its former private Flatpak
 			// only removes earlier installations and is never selected again.
@@ -69,6 +72,9 @@ func TestAdditionalDesktopLaunchersUseDeclaredPayloads(t *testing.T) {
 		}
 		d := DesktopDriver{Target: target, Directory: root, Folders: ConfigFolders{Home: root, Data: filepath.Join(root, "data")}, Archives: &ArchiveDriver{Directory: filepath.Join(root, "packages"), Pins: pins}}
 		ids := []string{"zen", "obsidian", "openwhispr"}
+		if target.OS == "linux" {
+			ids = append(ids, "t3-code")
+		}
 		for _, id := range ids {
 			recipe, err := d.recipe("desktop." + id)
 			if err != nil {
@@ -83,6 +89,10 @@ func TestAdditionalDesktopLaunchersUseDeclaredPayloads(t *testing.T) {
 				}
 				if id == "obsidian" && (recipe.Command != filepath.Join(root, "packages", obsidianPortable, "current", "obsidian") || recipe.Icon != filepath.Join(root, "packages", obsidianPortable, "current", "resources", "icon.png") ||
 					!strings.Contains(recipe.Contents, " --no-sandbox %U\n")) {
+					t.Fatal(recipe)
+				}
+				if id == "t3-code" && (recipe.Command != filepath.Join(root, "packages", "tool.t3-code-app", "current", "t3-code") || !strings.HasSuffix(recipe.Icon, "t3code.png") ||
+					!strings.Contains(recipe.Contents, "\nExec="+desktopExecArgument(recipe.Command)+" %U\n") || !strings.Contains(recipe.Contents, "\nStartupWMClass=t3code\n")) {
 					t.Fatal(recipe)
 				}
 			} else if !strings.HasSuffix(recipe.Destination, ".app") || !strings.Contains(filepath.ToSlash(recipe.Source), "/tool."+id+"/current/") {

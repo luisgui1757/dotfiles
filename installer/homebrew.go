@@ -124,6 +124,8 @@ func configureHomebrew(platform NativePlatform, home string, catalog *Catalog, s
 		switch resource.ID {
 		case "app.zen":
 			d.Casks[resource.ID] = zenCaskSpec(home, location.Prefix)
+		case "app.t3-code":
+			d.Casks[resource.ID] = t3CodeCaskSpec(home, location.Prefix)
 		case "tool.git":
 			d.Checks[resource.ID] = []string{filepath.Join(location.Prefix, "bin", "git"), "--version"}
 		case "tool.tmux":
