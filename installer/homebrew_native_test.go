@@ -230,9 +230,9 @@ func TestNativeBrewT3CodeCaskLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 	invoke := installedMachineFixture(t, repository, home, 15*time.Minute)
-	apply := func(selected []string) {
+	apply := func(selected, removeShared []string) {
 		t.Helper()
-		request := Request{Schema: 1, Mode: "apply", Selected: selected}
+		request := Request{Schema: 1, Mode: "apply", Selected: selected, RemoveShared: removeShared}
 		preview := invoke(request)
 		if preview.Status != "preview" {
 			t.Fatal("no approval plan", preview)
@@ -245,11 +245,11 @@ func TestNativeBrewT3CodeCaskLifecycle(t *testing.T) {
 			t.Fatal("check failed after the operation", result)
 		}
 	}
-	apply([]string{"t3-code-app"})
+	apply([]string{"t3-code-app"}, nil)
 	if _, err := os.Stat(filepath.Join(application, "Contents", "Info.plist")); err != nil {
 		t.Fatal("the cask did not install the app", err)
 	}
-	apply([]string{})
+	apply([]string{}, []string{"app.t3-code"})
 	if _, err := os.Lstat(application); !errors.Is(err, os.ErrNotExist) {
 		t.Fatal("removal kept the app", err)
 	}
