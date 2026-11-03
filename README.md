@@ -353,13 +353,12 @@ The installer does not install their desktop apps or change personal models,
 permissions, credentials or sessions. Sign in from the chosen CLI after setup.
 Claude Code's managed shell environment sets `DISABLE_UPDATES=1`; use the
 installer's Update menu to reconcile reviewed pins for either CLI.
-**Keeping the agent CLIs current:** Claude Code, Codex, Copilot CLI and Kiro CLI
-stay pinned, so Update installs exactly the checkout's versions and changes
-nothing until new pins arrive. A weekly workflow checks each vendor's latest
-stable release, verifies its bytes and opens a "Bump agent CLI pins" pull request.
-Merge it after its native checks pass, then run `git pull` and **Update tools** on
-each machine. Opening that pull request needs a GitHub App; see
-[agent CLI pin proposals](docs/security/supply-chain.md#agent-cli-pin-proposals).
+**Keeping pinned tools current:** Update installs the checkout's versions.
+A weekly workflow proposes verified updates for the four agent CLIs and the
+GitHub tools in its update policy, including T3. It opens one grouped PR and
+holds major releases for review. Merge it after its native checks pass, then
+run `git pull` and **Update tools** on each machine. Some pins still need manual
+updates. See [coverage and exceptions](docs/security/supply-chain.md#archive-pin-proposals).
 **GitHub Copilot CLI** uses the pinned standalone build from its official GitHub
 release (one native executable; no npm, Node or install script). On Windows it
 also installs the shared PowerShell 7 it needs. Copilot ignores its `autoUpdate`

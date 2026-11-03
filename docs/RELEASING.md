@@ -43,8 +43,11 @@ Archive, component and wheel checksums, the bootstrap toolchain, the Gitleaks
 pin in `release.yml` and the
 [Mason registry snapshot](../nvim/mason-registry/README.md) are manually
 reviewed pins. Update them with upstream provenance and runtime evidence.
-Renovate covers the other declared workflow, Go and validator dependencies. It
-does not calculate archive checksums.
+The weekly pin bot proposes verified updates for its explicit archive recipes.
+It groups them into one PR and holds major releases for manual review.
+See [archive pin proposals](security/supply-chain.md#archive-pin-proposals) for
+coverage and exceptions. Renovate covers the other declared workflow, Go and
+validator dependencies. It does not calculate archive checksums.
 
 ## What the release workflow checks
 

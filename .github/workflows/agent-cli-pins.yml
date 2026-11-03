@@ -1,14 +1,5 @@
 name: agent-cli-pins
 
-# Weekly proposal of new Claude Code, Codex, Copilot CLI and Kiro CLI pins.
-# scripts/update-agent-cli-pins.py verifies every pinned byte; the pull
-# request's ordinary required native checks remain the acceptance gate, and
-# only the owner merges. GITHUB_TOKEN cannot open pull requests in this
-# repository and its pushes would not start those checks, so proposing needs a
-# GitHub App installed on this repository with contents and pull-request write
-# access: variable AGENT_PINS_APP_CLIENT_ID and secret AGENT_PINS_APP_PRIVATE_KEY.
-# Without them a run still verifies, reports and uploads the proposed change.
-
 on:
   schedule:
     - cron: '23 5 * * 1'
@@ -27,20 +18,23 @@ defaults:
 
 jobs:
   propose:
-    name: Propose agent CLI pins
+    name: Propose archive pins
     runs-on: ubuntu-26.04
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - name: Verify and pin each CLI's latest stable release
+      - name: Verify and pin stable releases within each major version
         id: bump
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          python3 scripts/update-agent-cli-pins.py --summary "$RUNNER_TEMP/summary.md" --failures "$RUNNER_TEMP/failures.md"
+          status=0
+          python3 scripts/update-agent-cli-pins.py --summary "$RUNNER_TEMP/summary.md" --failures "$RUNNER_TEMP/failures.md" || status=$?
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          test -f "$RUNNER_TEMP/summary.md"
           cat "$RUNNER_TEMP/summary.md" >> "$GITHUB_STEP_SUMMARY"
           if git diff --quiet -- installer/archive-pins.json; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
@@ -71,7 +65,7 @@ jobs:
           git config user.email "${user_id}+${APP_SLUG}[bot]@users.noreply.github.com"
           gh auth setup-git
           {
-            printf 'Bump agent CLI pins\n\n'
+            printf 'Bump verified archive pins\n\n'
             cat "$RUNNER_TEMP/summary.md"
           } > "$RUNNER_TEMP/message.txt"
           {
@@ -83,24 +77,29 @@ jobs:
           git push --force origin "HEAD:refs/heads/$branch"
           number="$(gh pr list --head "$branch" --base "$BASE" --state open --json number --jq '.[0].number // empty')"
           if [ -n "$number" ]; then
-            gh pr edit "$number" --body-file "$RUNNER_TEMP/body.md"
+            gh pr edit "$number" --title "Bump verified archive pins" --body-file "$RUNNER_TEMP/body.md"
           else
-            gh pr create --base "$BASE" --head "$branch" --title "Bump agent CLI pins" --body-file "$RUNNER_TEMP/body.md"
+            gh pr create --base "$BASE" --head "$branch" --title "Bump verified archive pins" --body-file "$RUNNER_TEMP/body.md"
           fi
       - name: Report a proposal without the App
-        if: steps.bump.outputs.changed == 'true' && steps.app.outputs.token == ''
-        run: echo "::notice title=Agent CLI pins::New verified pins are in the agent-cli-pins artifact. Configure AGENT_PINS_APP_CLIENT_ID and AGENT_PINS_APP_PRIVATE_KEY to open pull requests."
+        if: always() && steps.bump.outputs.changed == 'true' && steps.app.outputs.token == ''
+        run: |
+          echo "::error title=Archive pins::Cannot open the update PR. Configure AGENT_PINS_APP_CLIENT_ID and AGENT_PINS_APP_PRIVATE_KEY."
+          exit 1
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: steps.bump.outputs.changed == 'true'
+        if: always() && steps.bump.outputs.changed == 'true'
         with:
           name: agent-cli-pins
           path: |
             ${{ runner.temp }}/agent-cli-pins.patch
             ${{ runner.temp }}/summary.md
       - name: Fail when a release needs manual review
+        if: always()
+        env:
+          BUMP_STATUS: ${{ steps.bump.outputs.status }}
         run: |
           set -euo pipefail
-          if [ -s "$RUNNER_TEMP/failures.md" ]; then
-            cat "$RUNNER_TEMP/failures.md"
+          if [ "$BUMP_STATUS" != 0 ]; then
+            if [ -f "$RUNNER_TEMP/failures.md" ]; then cat "$RUNNER_TEMP/failures.md"; fi
             exit 1
           fi

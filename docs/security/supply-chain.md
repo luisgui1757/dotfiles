@@ -87,28 +87,41 @@ lookup fails, setup keeps the installed release and shows a note, and a first
 install stops. The native tests build the command with the
 `sentinelfixedrelease` tag, so they install the floor release.
 
-## Agent CLI pin proposals
+## Archive pin proposals
 
-The Claude Code, Codex, Copilot CLI and Kiro CLI archive pins are proposed weekly
-by [`agent-cli-pins.yml`](../../.github/workflows/agent-cli-pins.yml), which runs
-[`scripts/update-agent-cli-pins.py`](../../scripts/update-agent-cli-pins.py). It
-pins only each vendor's latest stable release, after the same byte checks used for
-the reviewed pins: Claude's gpg-verified release manifest (key fingerprint
-`31DDDE24DDFAB679F42D7BD2BAA929FF1A7ECACE`) plus npm SHA-512 integrity, Codex npm
-integrity, Copilot's release digest plus `SHA256SUMS.txt`, and Kiro's release
-manifest plus its Linux ZIP layout. A prerelease or changed layout
-fails that tool for manual review. The resulting pull request runs the normal
-required native checks; the bot never merges.
+The weekly [pin workflow](../../.github/workflows/agent-cli-pins.yml) opens one
+grouped PR. It updates the four agent CLIs and the GitHub tools listed in
+[the update policy](../../scripts/archive-pin-updates.json), including T3.
+Each GitHub recipe names the repository, release tag and asset for every target.
+The script verifies each download against the published SHA-256 and checks the
+required archive paths before it changes a pin. A missing asset, missing hash,
+checksum mismatch or changed layout fails that tool and the workflow.
+Other verified updates can still reach the grouped PR.
 
-`GITHUB_TOKEN` cannot open pull requests in this repository, and its pushes would
-not start the required checks. To let the workflow open them, the owner creates a
-GitHub App owned by the account, without administration permission, with
-repository permissions Contents: read and write and Pull requests: read and write,
-installs it on this repository only, then sets repository variable
-`AGENT_PINS_APP_CLIENT_ID` (the App's client ID) and secret
-`AGENT_PINS_APP_PRIVATE_KEY` (a private key it generated). Until then each run
-verifies, writes a job summary and uploads the proposed patch as the
-`agent-cli-pins` artifact. Other archive pins remain manually reviewed.
+The four agent CLIs keep their vendor checks: Claude's signed release manifest
+and npm SHA-512, Codex npm SHA-512, Copilot's digest and `SHA256SUMS.txt`, and
+Kiro's manifest and Linux ZIP layout. The Claude release key fingerprint is
+`31DDDE24DDFAB679F42D7BD2BAA929FF1A7ECACE`.
+
+The bot reports major releases and leaves their pins unchanged. It refuses
+prereleases and downgrades. Current versions need no download.
+The PR must pass the required native checks. The bot never merges.
+
+The policy lists every archive resource as automatic or manual. CI rejects a
+resource without an entry, a stale entry, and a GitHub recipe with missing
+targets. Manual entries include nested components and wheels. The job summary
+lists these exceptions with their reasons. It does not check their latest
+versions. The other pin files, including Go bootstrap, Linux Code, Tailscale,
+Build Tools, VC runtime, Homebrew, Mason and Neovim plugins, still need manual
+review. Renovate continues to own its declared extraction inventory.
+
+The workflow uses the existing GitHub App with Contents and Pull requests write
+permissions. Its settings are `AGENT_PINS_APP_CLIENT_ID` and
+`AGENT_PINS_APP_PRIVATE_KEY`. The App's pushes start the required checks.
+When verified updates exist but the App cannot open their PR, the job fails.
+The job uploads the proposed patch and summary even when PR creation fails.
+The workflow path and automation branch stay the same to preserve the existing
+schedule and open proposal.
 
 Release publication follows [RELEASING.md](../RELEASING.md) and
 `release/manifest.json`. Future release certification uses exact-head native

@@ -53,9 +53,9 @@
     },
     "tool.fzf": {
       "darwin/arm64": {
-        "version": "0.73.1",
-        "url": "https://github.com/junegunn/fzf/releases/download/v0.73.1/fzf-0.73.1-darwin_arm64.tar.gz",
-        "sha256": "d27fd68c04fb9b42f7c73a3f7d38069a74d308e40174f64a072c747213e97286",
+        "version": "0.74.5",
+        "url": "https://github.com/junegunn/fzf/releases/download/v0.74.5/fzf-0.74.5-darwin_arm64.tar.gz",
+        "sha256": "ada808c7401b9949ce8842274ac16a6b6193fd32dcada396884a6a9a89e5985a",
         "format": "tar.gz",
         "commands": {
           "fzf": "fzf"
@@ -65,9 +65,9 @@
         ]
       },
       "windows/amd64": {
-        "version": "0.73.1",
-        "url": "https://github.com/junegunn/fzf/releases/download/v0.73.1/fzf-0.73.1-windows_amd64.zip",
-        "sha256": "521a974dc32e93404265e55bffaf71a59e05e80abdf8ca4afb21a6030dc76f5f",
+        "version": "0.74.5",
+        "url": "https://github.com/junegunn/fzf/releases/download/v0.74.5/fzf-0.74.5-windows_amd64.zip",
+        "sha256": "01f854ec8b9b47c99a7d78023638f7d2056cfb0af56b72dabd112032eed3993e",
         "format": "zip",
         "commands": {
           "fzf": "fzf.exe"
@@ -77,9 +77,9 @@
         ]
       },
       "linux/arm64": {
-        "version": "0.73.1",
-        "url": "https://github.com/junegunn/fzf/releases/download/v0.73.1/fzf-0.73.1-linux_arm64.tar.gz",
-        "sha256": "a408b0b6c08d486307b8f1554f967b8b50ee1b3ea8b4035e3161bab31fdfc28d",
+        "version": "0.74.5",
+        "url": "https://github.com/junegunn/fzf/releases/download/v0.74.5/fzf-0.74.5-linux_arm64.tar.gz",
+        "sha256": "cf058001da21724a469b714a29cf4aab9cbe860d218a0d6c1b5b661efad7784c",
         "format": "tar.gz",
         "commands": {
           "fzf": "fzf"
@@ -89,9 +89,9 @@
         ]
       },
       "linux/amd64": {
-        "version": "0.73.1",
-        "url": "https://github.com/junegunn/fzf/releases/download/v0.73.1/fzf-0.73.1-linux_amd64.tar.gz",
-        "sha256": "f3252c2c366bc1700d3c85781ec8c9695998927ac127870eb049ceea2d540f8a",
+        "version": "0.74.5",
+        "url": "https://github.com/junegunn/fzf/releases/download/v0.74.5/fzf-0.74.5-linux_amd64.tar.gz",
+        "sha256": "d47d7f882972c7d674dbbba998ffa4116e68379616ffac7695d0671e9a722c5f",
         "format": "tar.gz",
         "commands": {
           "fzf": "fzf"
@@ -103,9 +103,9 @@
     },
     "tool.fd": {
       "darwin/arm64": {
-        "version": "10.4.2",
-        "url": "https://github.com/sharkdp/fd/releases/download/v10.4.2/fd-v10.4.2-aarch64-apple-darwin.tar.gz",
-        "sha256": "623dc0afc81b92e4d4606b380d7bc91916ba7b97814263e554d50923a39e480a",
+        "version": "10.5.0",
+        "url": "https://github.com/sharkdp/fd/releases/download/v10.5.0/fd-v10.5.0-aarch64-apple-darwin.tar.gz",
+        "sha256": "b67e1836c468e42e411984b56e52fa7abec08c2bd22c867398e7cc134aac5e12",
         "format": "tar.gz",
         "commands": {
           "fd": "fd"
@@ -116,9 +116,9 @@
         "strip_components": 1
       },
       "linux/arm64": {
-        "version": "10.4.2",
-        "url": "https://github.com/sharkdp/fd/releases/download/v10.4.2/fd-v10.4.2-aarch64-unknown-linux-musl.tar.gz",
-        "sha256": "f32d3657473fba74e2600babc8db0b93420d51169223b7e8143b2ed55d8fd9e8",
+        "version": "10.5.0",
+        "url": "https://github.com/sharkdp/fd/releases/download/v10.5.0/fd-v10.5.0-aarch64-unknown-linux-musl.tar.gz",
+        "sha256": "d76c4317f7d5dba69f8a2a15856c90c777e7f0dd4e85f0de8c76de6992c374d4",
         "format": "tar.gz",
         "commands": {
           "fd": "fd"
@@ -129,9 +129,9 @@
         "strip_components": 1
       },
       "windows/amd64": {
-        "version": "10.4.2",
-        "url": "https://github.com/sharkdp/fd/releases/download/v10.4.2/fd-v10.4.2-x86_64-pc-windows-msvc.zip",
-        "sha256": "b2816e506390a89941c63c9187d58a3cc10e9a55f2ef0685f9ea0eccaf7c98c8",
+        "version": "10.5.0",
+        "url": "https://github.com/sharkdp/fd/releases/download/v10.5.0/fd-v10.5.0-x86_64-pc-windows-msvc.zip",
+        "sha256": "a227701b8551c35a9931d9f6da75503cf86d88e182d71fb849a70864c5d57cd7",
         "format": "zip",
         "commands": {
           "fd": "fd.exe"
@@ -142,9 +142,9 @@
         "strip_components": 1
       },
       "linux/amd64": {
-        "version": "10.4.2",
-        "url": "https://github.com/sharkdp/fd/releases/download/v10.4.2/fd-v10.4.2-x86_64-unknown-linux-musl.tar.gz",
-        "sha256": "e3257d48e29a6be965187dbd24ce9af564e0fe67b3e73c9bdcd180f4ec11bdde",
+        "version": "10.5.0",
+        "url": "https://github.com/sharkdp/fd/releases/download/v10.5.0/fd-v10.5.0-x86_64-unknown-linux-musl.tar.gz",
+        "sha256": "761c72dc8e120d85b22292063be8a796e2eeb20eb3e4f38b8fa2343ccf3514a7",
         "format": "tar.gz",
         "commands": {
           "fd": "fd"
@@ -261,9 +261,9 @@
     },
     "tool.atuin": {
       "darwin/arm64": {
-        "version": "18.24.3",
-        "url": "https://github.com/atuinsh/atuin/releases/download/v18.24.3/atuin-aarch64-apple-darwin.tar.gz",
-        "sha256": "dd266366b1b00c298d689b0613c1acbe82855f04eb47d3f3f96262b148d8ebb9",
+        "version": "18.24.4",
+        "url": "https://github.com/atuinsh/atuin/releases/download/v18.24.4/atuin-aarch64-apple-darwin.tar.gz",
+        "sha256": "edd06294377599bf4d85ca3337abc802256a991262260bdd980d1b649583553d",
         "format": "tar.gz",
         "commands": {
           "atuin": "atuin"
@@ -274,9 +274,9 @@
         "strip_components": 1
       },
       "linux/amd64": {
-        "version": "18.24.3",
-        "url": "https://github.com/atuinsh/atuin/releases/download/v18.24.3/atuin-x86_64-unknown-linux-musl.tar.gz",
-        "sha256": "7e2ae5dbbced1c40ee9eb20815436253a7fac2363a77024021892880beb0b589",
+        "version": "18.24.4",
+        "url": "https://github.com/atuinsh/atuin/releases/download/v18.24.4/atuin-x86_64-unknown-linux-musl.tar.gz",
+        "sha256": "788cff5b3903ca7f1f5bdff3e4b4975c38b3c20385176a49b01ad1bea5b37636",
         "format": "tar.gz",
         "commands": {
           "atuin": "atuin"
@@ -287,9 +287,9 @@
         "strip_components": 1
       },
       "linux/arm64": {
-        "version": "18.24.3",
-        "url": "https://github.com/atuinsh/atuin/releases/download/v18.24.3/atuin-aarch64-unknown-linux-musl.tar.gz",
-        "sha256": "48d7bc0e6821bcaef7e9752abaa4ded541b36889b1620923d8abb17fa34059b3",
+        "version": "18.24.4",
+        "url": "https://github.com/atuinsh/atuin/releases/download/v18.24.4/atuin-aarch64-unknown-linux-musl.tar.gz",
+        "sha256": "7698bd70195bde165bb37ea3133aa6663dd48ff7d6a23042cda2c7be4c22ba78",
         "format": "tar.gz",
         "commands": {
           "atuin": "atuin"
@@ -300,9 +300,9 @@
         "strip_components": 1
       },
       "windows/amd64": {
-        "version": "18.24.3",
-        "url": "https://github.com/atuinsh/atuin/releases/download/v18.24.3/atuin-x86_64-pc-windows-msvc.zip",
-        "sha256": "faa3d3af8f51a676dde3cb6d250c5e65b33a67ff824d7d1092da94585ae8c953",
+        "version": "18.24.4",
+        "url": "https://github.com/atuinsh/atuin/releases/download/v18.24.4/atuin-x86_64-pc-windows-msvc.zip",
+        "sha256": "773cb6a6538ac1f6d563abfe69c9a75e7e0455b5210d9ff071ef2b3f28368f3e",
         "format": "zip",
         "commands": {
           "atuin": "atuin.exe"
@@ -525,9 +525,9 @@
     },
     "tool.rg": {
       "darwin/arm64": {
-        "version": "15.1.0",
-        "url": "https://github.com/BurntSushi/ripgrep/releases/download/15.1.0/ripgrep-15.1.0-aarch64-apple-darwin.tar.gz",
-        "sha256": "378e973289176ca0c6054054ee7f631a065874a352bf43f0fa60ef079b6ba715",
+        "version": "15.2.0",
+        "url": "https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-aarch64-apple-darwin.tar.gz",
+        "sha256": "3750b2e93f37e0c692657da574d7019a101c0084da05a790c83fd335bad973e4",
         "format": "tar.gz",
         "commands": {
           "rg": "rg"
@@ -538,9 +538,9 @@
         "strip_components": 1
       },
       "windows/amd64": {
-        "version": "15.1.0",
-        "url": "https://github.com/BurntSushi/ripgrep/releases/download/15.1.0/ripgrep-15.1.0-x86_64-pc-windows-msvc.zip",
-        "sha256": "124510b94b6baa3380d051fdf4650eaa80a302c876d611e9dba0b2e18d87493a",
+        "version": "15.2.0",
+        "url": "https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-x86_64-pc-windows-msvc.zip",
+        "sha256": "71b2fef860abe467217a538ff31de02f5258807c0129f771846f87bd029aafc5",
         "format": "zip",
         "commands": {
           "rg": "rg.exe"
@@ -551,9 +551,9 @@
         "strip_components": 1
       },
       "linux/amd64": {
-        "version": "15.1.0",
-        "url": "https://github.com/BurntSushi/ripgrep/releases/download/15.1.0/ripgrep-15.1.0-x86_64-unknown-linux-musl.tar.gz",
-        "sha256": "1c9297be4a084eea7ecaedf93eb03d058d6faae29bbc57ecdaf5063921491599",
+        "version": "15.2.0",
+        "url": "https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-x86_64-unknown-linux-musl.tar.gz",
+        "sha256": "33e15bcf1624b25cdd2a55813a47a2f95dbe126268203e76aa6a585d1e7b149c",
         "format": "tar.gz",
         "commands": {
           "rg": "rg"
@@ -564,9 +564,9 @@
         "strip_components": 1
       },
       "linux/arm64": {
-        "version": "15.1.0",
-        "url": "https://github.com/BurntSushi/ripgrep/releases/download/15.1.0/ripgrep-15.1.0-aarch64-unknown-linux-gnu.tar.gz",
-        "sha256": "2b661c6ef508e902f388e9098d9c4c5aca72c87b55922d94abdba830b4dc885e",
+        "version": "15.2.0",
+        "url": "https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-aarch64-unknown-linux-gnu.tar.gz",
+        "sha256": "a740b91c82eaf9914cfedd353572f2791cbe0162c84101ee0951058f4dcbc90d",
         "format": "tar.gz",
         "commands": {
           "rg": "rg"
@@ -580,9 +580,9 @@
     },
     "tool.gh": {
       "darwin/arm64": {
-        "version": "2.96.0",
-        "url": "https://github.com/cli/cli/releases/download/v2.96.0/gh_2.96.0_macOS_arm64.zip",
-        "sha256": "f23a0c37d963aacc3bed703ccbd59b41c5ca22101fab7f00eb2b7cad23aba463",
+        "version": "2.103.3",
+        "url": "https://github.com/cli/cli/releases/download/v2.103.3/gh_2.103.3_macOS_arm64.zip",
+        "sha256": "d700207eae9ae98fe2b89535c2c087c07823d4628c56364695a5a07ef311c062",
         "format": "zip",
         "commands": {
           "gh": "bin/gh"
@@ -593,9 +593,9 @@
         "strip_components": 1
       },
       "linux/arm64": {
-        "version": "2.96.0",
-        "url": "https://github.com/cli/cli/releases/download/v2.96.0/gh_2.96.0_linux_arm64.tar.gz",
-        "sha256": "06f86ec7103d41993b76cd78072f43595c34aaa56506d971d9860e67140bf909",
+        "version": "2.103.3",
+        "url": "https://github.com/cli/cli/releases/download/v2.103.3/gh_2.103.3_linux_arm64.tar.gz",
+        "sha256": "ee32df2323c8847f5fac6cb6b4b69ca75828e9329a8f22f677021f7b3306ce63",
         "format": "tar.gz",
         "commands": {
           "gh": "bin/gh"
@@ -606,9 +606,9 @@
         "strip_components": 1
       },
       "windows/amd64": {
-        "version": "2.96.0",
-        "url": "https://github.com/cli/cli/releases/download/v2.96.0/gh_2.96.0_windows_amd64.zip",
-        "sha256": "c2d6acc935cd2f00e2144d7e036d5cd82e6b6bd5594e8c75aa75ef2a4ed6aac3",
+        "version": "2.103.3",
+        "url": "https://github.com/cli/cli/releases/download/v2.103.3/gh_2.103.3_windows_amd64.zip",
+        "sha256": "98d0cfa794721665d7973dd728c78aff7bd836d58f10f6d7a03568eccb0a22e0",
         "format": "zip",
         "commands": {
           "gh": "bin/gh.exe"
@@ -618,9 +618,9 @@
         ]
       },
       "linux/amd64": {
-        "version": "2.96.0",
-        "url": "https://github.com/cli/cli/releases/download/v2.96.0/gh_2.96.0_linux_amd64.tar.gz",
-        "sha256": "83d5c2ccad5498f58bf6368acb1ab32588cf43ab3a4b1c301bf36328b1c8bd60",
+        "version": "2.103.3",
+        "url": "https://github.com/cli/cli/releases/download/v2.103.3/gh_2.103.3_linux_amd64.tar.gz",
+        "sha256": "4c806978ffce1cec70853302a56d70ac6da4f19bae7adca4e1a8ab00633dd91d",
         "format": "tar.gz",
         "commands": {
           "gh": "bin/gh"
@@ -633,9 +633,9 @@
     },
     "tool.lazygit": {
       "darwin/arm64": {
-        "version": "0.66.0",
-        "url": "https://github.com/jesseduffield/lazygit/releases/download/v0.66.0/lazygit_0.66.0_darwin_arm64.tar.gz",
-        "sha256": "e9fe2fe1f1bbc1b4c3214b33e8e0d57a4d6e3c2276aa9aa713f9bcbdc223e65c",
+        "version": "0.66.2",
+        "url": "https://github.com/jesseduffield/lazygit/releases/download/v0.66.2/lazygit_0.66.2_darwin_arm64.tar.gz",
+        "sha256": "fadda59ae7665ba556fcbaa704c7eade6e40d016d3f3b25d6327dd1f3f906a0c",
         "format": "tar.gz",
         "commands": {
           "lazygit": "lazygit"
@@ -645,9 +645,9 @@
         ]
       },
       "linux/arm64": {
-        "version": "0.66.0",
-        "url": "https://github.com/jesseduffield/lazygit/releases/download/v0.66.0/lazygit_0.66.0_linux_arm64.tar.gz",
-        "sha256": "9a4fc4656897ac9f7877b835473ce1a75620cc267f554c57fc4ff266407f3257",
+        "version": "0.66.2",
+        "url": "https://github.com/jesseduffield/lazygit/releases/download/v0.66.2/lazygit_0.66.2_linux_arm64.tar.gz",
+        "sha256": "79a3161eeb642f0473e23db6341f7baabd4a5933e921a9c1167c5d5c765c41a4",
         "format": "tar.gz",
         "commands": {
           "lazygit": "lazygit"
@@ -657,9 +657,9 @@
         ]
       },
       "linux/amd64": {
-        "version": "0.66.0",
-        "url": "https://github.com/jesseduffield/lazygit/releases/download/v0.66.0/lazygit_0.66.0_linux_x86_64.tar.gz",
-        "sha256": "5b45541155d20bd32bf2cc5ab5b7e3d91c2eebf0fb1242281350edc27d59d2b7",
+        "version": "0.66.2",
+        "url": "https://github.com/jesseduffield/lazygit/releases/download/v0.66.2/lazygit_0.66.2_linux_x86_64.tar.gz",
+        "sha256": "158efc9ddfa1241fab5fb3526bb442c8dc6c4b1904d73213b9e4e93e03c52034",
         "format": "tar.gz",
         "commands": {
           "lazygit": "lazygit"
@@ -669,9 +669,9 @@
         ]
       },
       "windows/amd64": {
-        "version": "0.66.0",
-        "url": "https://github.com/jesseduffield/lazygit/releases/download/v0.66.0/lazygit_0.66.0_windows_x86_64.zip",
-        "sha256": "ed8fab4af7b8bac474084e976214a96569dea841c9f9b293502b83d8c3163e4b",
+        "version": "0.66.2",
+        "url": "https://github.com/jesseduffield/lazygit/releases/download/v0.66.2/lazygit_0.66.2_windows_x86_64.zip",
+        "sha256": "8b1e2194c2d8ac660f0a132cb4384e9d2fe1405217a144e280df16383c18d45c",
         "format": "zip",
         "commands": {
           "lazygit": "lazygit.exe"
@@ -683,9 +683,9 @@
     },
     "tool.jq": {
       "darwin/arm64": {
-        "version": "1.8.1",
-        "url": "https://github.com/jqlang/jq/releases/download/jq-1.8.1/jq-macos-arm64",
-        "sha256": "a9fe3ea2f86dfc72f6728417521ec9067b343277152b114f4e98d8cb0e263603",
+        "version": "1.8.2",
+        "url": "https://github.com/jqlang/jq/releases/download/jq-1.8.2/jq-macos-arm64",
+        "sha256": "2d75340ba57a4b4b4c8708a21c2dc8e958a48aaa8bba13b27f77f6e4c0eca07e",
         "format": "file",
         "commands": {
           "jq": "jq"
@@ -696,9 +696,9 @@
         "file": "jq"
       },
       "linux/amd64": {
-        "version": "1.8.1",
-        "url": "https://github.com/jqlang/jq/releases/download/jq-1.8.1/jq-linux-amd64",
-        "sha256": "020468de7539ce70ef1bceaf7cde2e8c4f2ca6c3afb84642aabc5c97d9fc2a0d",
+        "version": "1.8.2",
+        "url": "https://github.com/jqlang/jq/releases/download/jq-1.8.2/jq-linux-amd64",
+        "sha256": "b1c22172dd303f3be49e935aa56aa48a8b7a46e0bc838b4997d3bb451495870f",
         "format": "file",
         "commands": {
           "jq": "jq"
@@ -709,9 +709,9 @@
         "file": "jq"
       },
       "linux/arm64": {
-        "version": "1.8.1",
-        "url": "https://github.com/jqlang/jq/releases/download/jq-1.8.1/jq-linux-arm64",
-        "sha256": "6bc62f25981328edd3cfcfe6fe51b073f2d7e7710d7ef7fcdac28d4e384fc3d4",
+        "version": "1.8.2",
+        "url": "https://github.com/jqlang/jq/releases/download/jq-1.8.2/jq-linux-arm64",
+        "sha256": "8b85c817833814ddca00a144c33705546355afccf0cf39b188f3cdb48b852309",
         "format": "file",
         "commands": {
           "jq": "jq"
@@ -722,9 +722,9 @@
         "file": "jq"
       },
       "windows/amd64": {
-        "version": "1.8.1",
-        "url": "https://github.com/jqlang/jq/releases/download/jq-1.8.1/jq-windows-amd64.exe",
-        "sha256": "23cb60a1354eed6bcc8d9b9735e8c7b388cd1fdcb75726b93bc299ef22dd9334",
+        "version": "1.8.2",
+        "url": "https://github.com/jqlang/jq/releases/download/jq-1.8.2/jq-windows-amd64.exe",
+        "sha256": "a6fc67fedaf9128a3309a1e2ebb8b986aeccf70122ee46d2cb4849e423f0c627",
         "format": "file",
         "commands": {
           "jq": "jq.exe"
@@ -848,9 +848,9 @@
     },
     "tool.node": {
       "darwin/arm64": {
-        "version": "24.21.0",
-        "url": "https://nodejs.org/dist/v24.21.0/node-v24.21.0-darwin-arm64.tar.gz",
-        "sha256": "bed7eea5325e1108f32ce5228ddd6a5f0f08a499ee42aa7442aea583702f6057",
+        "version": "24.22.2",
+        "url": "https://nodejs.org/dist/v24.22.2/node-v24.22.2-darwin-arm64.tar.gz",
+        "sha256": "aa9549349e47dffaa42dcf95d6e06ade8c4bdafc980979883b88767670df385a",
         "format": "tar.gz",
         "strip_components": 1,
         "commands": {
@@ -873,9 +873,9 @@
         ]
       },
       "linux/amd64": {
-        "version": "24.21.0",
-        "url": "https://nodejs.org/dist/v24.21.0/node-v24.21.0-linux-x64.tar.gz",
-        "sha256": "6e1db87ef58b8819e5d5402eff1536491b18edd8eb7bee5ef7897876e88dc5ff",
+        "version": "24.22.2",
+        "url": "https://nodejs.org/dist/v24.22.2/node-v24.22.2-linux-x64.tar.gz",
+        "sha256": "361718c444e49af2ca5a110c83ba6a8901143f23ab285ebbef0341f391f482a9",
         "format": "tar.gz",
         "strip_components": 1,
         "commands": {
@@ -899,9 +899,9 @@
         ]
       },
       "linux/arm64": {
-        "version": "24.21.0",
-        "url": "https://nodejs.org/dist/v24.21.0/node-v24.21.0-linux-arm64.tar.gz",
-        "sha256": "724282c3b43aec998aa9527380465b45d229e021b58035f5f4f63095eabfe5d5",
+        "version": "24.22.2",
+        "url": "https://nodejs.org/dist/v24.22.2/node-v24.22.2-linux-arm64.tar.gz",
+        "sha256": "95c264150aceb7f3437a29fd6984924f5f8d1511ea3cbd6c508b83f6c555dae2",
         "format": "tar.gz",
         "strip_components": 1,
         "commands": {
@@ -925,9 +925,9 @@
         ]
       },
       "windows/amd64": {
-        "version": "24.21.0",
-        "url": "https://nodejs.org/dist/v24.21.0/node-v24.21.0-win-x64.zip",
-        "sha256": "158f7685b44de51f6c0df1d153526cbcd3e1bc739a8dfc607721cef75de9e541",
+        "version": "24.22.2",
+        "url": "https://nodejs.org/dist/v24.22.2/node-v24.22.2-win-x64.zip",
+        "sha256": "ca1bff5d8ead13c9f2ea404a176db46bd430704d5b5113734049fa365e7799e2",
         "format": "zip",
         "strip_components": 1,
         "commands": {
@@ -952,9 +952,9 @@
     },
     "tool.powershell": {
       "windows/amd64": {
-        "version": "7.6.3",
-        "url": "https://github.com/PowerShell/PowerShell/releases/download/v7.6.3/PowerShell-7.6.3-win-x64.zip",
-        "sha256": "07ddb0d00b660459560ef82a9841da7705b27cd5dcca5a0d7b025a98eca29eca",
+        "version": "7.6.9",
+        "url": "https://github.com/PowerShell/PowerShell/releases/download/v7.6.9/PowerShell-7.6.9-win-x64.zip",
+        "sha256": "ce7484804c0f0ad4dda10c958e71acdaf7eebfb22505c1b480f89e0e9f1da94d",
         "format": "zip",
         "commands": {
           "pwsh": "pwsh.exe"
@@ -970,9 +970,9 @@
     },
     "tool.gh-dash": {
       "darwin/arm64": {
-        "version": "4.26.0",
-        "url": "https://github.com/dlvhdr/gh-dash/releases/download/v4.26.0/gh-dash_v4.26.0_darwin-arm64",
-        "sha256": "3bcb088df5668a1b53f213a7a889b19a0eda59be48d44a3586ec54fc778494d1",
+        "version": "4.26.2",
+        "url": "https://github.com/dlvhdr/gh-dash/releases/download/v4.26.2/gh-dash_v4.26.2_darwin-arm64",
+        "sha256": "591cfe85838c3459b56b4a08bcdf0ce11a5c59a92d466ab312cca0c4ad0d163f",
         "format": "file",
         "commands": {
           "gh-dash": "gh-dash"
@@ -983,9 +983,9 @@
         "file": "gh-dash"
       },
       "linux/amd64": {
-        "version": "4.26.0",
-        "url": "https://github.com/dlvhdr/gh-dash/releases/download/v4.26.0/gh-dash_v4.26.0_linux-amd64",
-        "sha256": "469012a8c607a503a4e873bc3862adedbc2c1c31878c62a396cd9874555f25ac",
+        "version": "4.26.2",
+        "url": "https://github.com/dlvhdr/gh-dash/releases/download/v4.26.2/gh-dash_v4.26.2_linux-amd64",
+        "sha256": "565d7dbfafc568c06441ab49d31c7059b7ade7cbba12490fa7f12f9bb71dc1b5",
         "format": "file",
         "commands": {
           "gh-dash": "gh-dash"
@@ -996,9 +996,9 @@
         "file": "gh-dash"
       },
       "linux/arm64": {
-        "version": "4.26.0",
-        "url": "https://github.com/dlvhdr/gh-dash/releases/download/v4.26.0/gh-dash_v4.26.0_linux-arm64",
-        "sha256": "eb73585f0d873e1039729bd9bc5b2c2dcdfc22ab30b47f96aece51270a5332d4",
+        "version": "4.26.2",
+        "url": "https://github.com/dlvhdr/gh-dash/releases/download/v4.26.2/gh-dash_v4.26.2_linux-arm64",
+        "sha256": "67e55fe550e86dc7555979f8e0d05b88e1ba086b022a6e19e071dfc67369ec50",
         "format": "file",
         "commands": {
           "gh-dash": "gh-dash"
@@ -1009,9 +1009,9 @@
         "file": "gh-dash"
       },
       "windows/amd64": {
-        "version": "4.26.0",
-        "url": "https://github.com/dlvhdr/gh-dash/releases/download/v4.26.0/gh-dash_v4.26.0_windows-amd64.exe",
-        "sha256": "2c9ce2589048ddaf8efb2e4676fa1d39b8b72a9c5785a0eec71c3b485d7c69a6",
+        "version": "4.26.2",
+        "url": "https://github.com/dlvhdr/gh-dash/releases/download/v4.26.2/gh-dash_v4.26.2_windows-amd64.exe",
+        "sha256": "047ad12a4aebaedd4fa6997ae195f0ec791bf57f0caabe71059401c1ad3c5ca0",
         "format": "file",
         "commands": {
           "gh-dash": "gh-dash.exe"
@@ -1131,9 +1131,9 @@
     },
     "tool.cmake": {
       "darwin/arm64": {
-        "version": "4.4.4",
-        "url": "https://github.com/Kitware/CMake/releases/download/v4.4.4/cmake-4.4.4-macos-universal.tar.gz",
-        "sha256": "4b7b73704b1db9b374e5c9ab8e17ac6148b817b6396ee75cd94a852cbac9d305",
+        "version": "4.4.5",
+        "url": "https://github.com/Kitware/CMake/releases/download/v4.4.5/cmake-4.4.5-macos-universal.tar.gz",
+        "sha256": "679e77a96b9ef9484cc6c1445255fc4f84206b48a65420efbedf16bdab55fbff",
         "format": "tar.gz",
         "commands": {
           "cmake": "CMake.app/Contents/bin/cmake",
@@ -1149,9 +1149,9 @@
         ]
       },
       "linux/amd64": {
-        "version": "4.4.4",
-        "url": "https://github.com/Kitware/CMake/releases/download/v4.4.4/cmake-4.4.4-linux-x86_64.tar.gz",
-        "sha256": "e5bb807f7728cb60cd8b27ebc97a2edb469b68655f21e844a600c3575b76f5bb",
+        "version": "4.4.5",
+        "url": "https://github.com/Kitware/CMake/releases/download/v4.4.5/cmake-4.4.5-linux-x86_64.tar.gz",
+        "sha256": "ed85135c5a5135b45e50423cb406dea04ca3338da0b8ef3c9ede963559680be0",
         "format": "tar.gz",
         "commands": {
           "cmake": "bin/cmake",
@@ -1168,9 +1168,9 @@
         "libc": "glibc"
       },
       "linux/arm64": {
-        "version": "4.4.4",
-        "url": "https://github.com/Kitware/CMake/releases/download/v4.4.4/cmake-4.4.4-linux-aarch64.tar.gz",
-        "sha256": "a1b6cc63636a0e55c63257cf3315a8a5f129e42fade25db1afea4ff8ab06f25e",
+        "version": "4.4.5",
+        "url": "https://github.com/Kitware/CMake/releases/download/v4.4.5/cmake-4.4.5-linux-aarch64.tar.gz",
+        "sha256": "301d5063ab259577c1b57ce5490b1aab9ea5c56dc4c822f73499553dab94925f",
         "format": "tar.gz",
         "commands": {
           "cmake": "bin/cmake",
@@ -1187,9 +1187,9 @@
         "libc": "glibc"
       },
       "windows/amd64": {
-        "version": "4.4.4",
-        "url": "https://github.com/Kitware/CMake/releases/download/v4.4.4/cmake-4.4.4-windows-x86_64.zip",
-        "sha256": "bace36e94b31c68ab6fa295f26dfa11219e0701cf7c94b0284a7d1cb13dac536",
+        "version": "4.4.5",
+        "url": "https://github.com/Kitware/CMake/releases/download/v4.4.5/cmake-4.4.5-windows-x86_64.zip",
+        "sha256": "326c826486d46a23cf9d5a1c9ee3a567d427bdd02c4a34071937a2a675cff004",
         "format": "zip",
         "commands": {
           "cmake": "bin/cmake.exe",
@@ -1282,9 +1282,9 @@
     },
     "tool.herdr": {
       "darwin/arm64": {
-        "version": "0.9.3",
-        "url": "https://github.com/herdrdev/herdr/releases/download/v0.9.3/herdr-macos-aarch64",
-        "sha256": "5173a3e0ae42d5d1ab7ebfa5d5e6329f7c3d23f8e1a3677c7ce3231da2884157",
+        "version": "0.9.5",
+        "url": "https://github.com/herdrdev/herdr/releases/download/v0.9.5/herdr-macos-aarch64",
+        "sha256": "fb77c2232a05a8035421382c894392f4174e4e38a18e48af3dd0290157c3a7e2",
         "format": "file",
         "commands": {
           "herdr": "herdr"
@@ -1295,9 +1295,9 @@
         "file": "herdr"
       },
       "linux/amd64": {
-        "version": "0.9.3",
-        "url": "https://github.com/herdrdev/herdr/releases/download/v0.9.3/herdr-linux-x86_64",
-        "sha256": "18a8dc65f1c2fa485884344356dea1cfd911c6f06cf46fa78e193f4087f4dba7",
+        "version": "0.9.5",
+        "url": "https://github.com/herdrdev/herdr/releases/download/v0.9.5/herdr-linux-x86_64",
+        "sha256": "14d9e8bc8b4a9e0118d77c32266f76d461f09b40342eb23752960bd89f59929d",
         "format": "file",
         "commands": {
           "herdr": "herdr"
@@ -1308,9 +1308,9 @@
         "file": "herdr"
       },
       "linux/arm64": {
-        "version": "0.9.3",
-        "url": "https://github.com/herdrdev/herdr/releases/download/v0.9.3/herdr-linux-aarch64",
-        "sha256": "4de7aa3e25678812e92960de64f7c2aaa1bca1f0f80a3c5e559837e231e1f5c0",
+        "version": "0.9.5",
+        "url": "https://github.com/herdrdev/herdr/releases/download/v0.9.5/herdr-linux-aarch64",
+        "sha256": "17d7536f2da50859523680ef279dffcac8e4a235f4e46fe8da6c2ec44141897c",
         "format": "file",
         "commands": {
           "herdr": "herdr"
@@ -1321,9 +1321,9 @@
         "file": "herdr"
       },
       "windows/amd64": {
-        "version": "0.9.3",
-        "url": "https://github.com/herdrdev/herdr/releases/download/v0.9.3/herdr-windows-x86_64.zip",
-        "sha256": "c75b1fa49f7a3ba4b8b11789912a6147e4214a3b6fd3556d0f80076c8887d795",
+        "version": "0.9.5",
+        "url": "https://github.com/herdrdev/herdr/releases/download/v0.9.5/herdr-windows-x86_64.zip",
+        "sha256": "d2c6c9c971c43a0bfdde8c692a9a1a7a45c3e4807cd01ae45662b4734fac1cbf",
         "format": "zip",
         "commands": {
           "herdr": "herdr.exe"
@@ -2552,9 +2552,9 @@
     },
     "tool.vscode": {
       "darwin/arm64": {
-        "version": "1.141.0",
-        "url": "https://vscode.download.prss.microsoft.com/dbazure/download/stable/2a59476c9bfcb90b3ddc372c36762471b7dfad1c/VSCode-darwin-arm64.zip",
-        "sha256": "9b4ae386e3cf738d7ba990237ddf0a18092c924a1bcae465ed4697964745f42d",
+        "version": "1.144.1",
+        "url": "https://vscode.download.prss.microsoft.com/dbazure/download/stable/261c84cb1eddf11235f9e2c921425e9663fbe556/VSCode-darwin-arm64.zip",
+        "sha256": "194e37f905b2bc78708ae8dea43e8045023c326251e2d5487098210a68bd58e4",
         "format": "zip",
         "commands": {
           "code": "Visual Studio Code.app/Contents/Resources/app/bin/code"
@@ -2569,9 +2569,9 @@
         ]
       },
       "windows/amd64": {
-        "version": "1.141.0",
-        "url": "https://vscode.download.prss.microsoft.com/dbazure/download/stable/2a59476c9bfcb90b3ddc372c36762471b7dfad1c/VSCode-win32-x64-1.141.0.zip",
-        "sha256": "30ef5f55c377452af33009d0a8ac29a15cf8f770782bff42fe987c30da272223",
+        "version": "1.144.1",
+        "url": "https://vscode.download.prss.microsoft.com/dbazure/download/stable/261c84cb1eddf11235f9e2c921425e9663fbe556/VSCode-win32-x64-1.144.1.zip",
+        "sha256": "d701cf4dd78875f90fe6f14ad8e11ebb8052b36978dc9926aef1b3a4d46485fe",
         "format": "zip",
         "commands": {
           "code": "bin/code.cmd"
@@ -2581,11 +2581,11 @@
         ],
         "required_files": [
           "Code.exe",
-          "2a59476c9b/resources/app/product.json",
-          "2a59476c9b/resources/app/out/cli.js",
-          "2a59476c9b/ffmpeg.dll",
-          "2a59476c9b/libEGL.dll",
-          "2a59476c9b/icudtl.dat"
+          "261c84cb1e/resources/app/product.json",
+          "261c84cb1e/resources/app/out/cli.js",
+          "261c84cb1e/ffmpeg.dll",
+          "261c84cb1e/libEGL.dll",
+          "261c84cb1e/icudtl.dat"
         ]
       }
     },
@@ -2693,9 +2693,9 @@
     },
     "tool.claude": {
       "darwin/arm64": {
-        "version": "2.1.309",
-        "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-darwin-arm64/-/claude-code-darwin-arm64-2.1.309.tgz",
-        "sha256": "0e8ce1ddb8566129661bb7698db69db89d904e23b464afc6e85d5bd8879b9a51",
+        "version": "2.1.311",
+        "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-darwin-arm64/-/claude-code-darwin-arm64-2.1.311.tgz",
+        "sha256": "8a4a77b93ff0ffe5ebcdf998c7731dbfc2c894f1d8604eb1c060230806930829",
         "format": "tar.gz",
         "commands": {
           "claude": "claude"
@@ -2706,9 +2706,9 @@
         "strip_components": 1
       },
       "linux/amd64": {
-        "version": "2.1.309",
-        "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-linux-x64/-/claude-code-linux-x64-2.1.309.tgz",
-        "sha256": "e960c4437f6f99648437784db43e04ad5f12711aecd710864f96876f94c2fc1a",
+        "version": "2.1.311",
+        "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-linux-x64/-/claude-code-linux-x64-2.1.311.tgz",
+        "sha256": "4353c611f9a33063c5525348a15f1212bdc0085e4a7a81b8370b790003df1b56",
         "format": "tar.gz",
         "commands": {
           "claude": "claude"
@@ -2720,9 +2720,9 @@
         "strip_components": 1
       },
       "linux/arm64": {
-        "version": "2.1.309",
-        "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-linux-arm64/-/claude-code-linux-arm64-2.1.309.tgz",
-        "sha256": "3108f1bf04723cd654cf98269eb861827a15d9256db13ebf88a09d3b497926b2",
+        "version": "2.1.311",
+        "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-linux-arm64/-/claude-code-linux-arm64-2.1.311.tgz",
+        "sha256": "804f385122f395d382cf3dec51e1bec1dd8e5c07078222781a1a251d46d236e5",
         "format": "tar.gz",
         "commands": {
           "claude": "claude"
@@ -2734,9 +2734,9 @@
         "strip_components": 1
       },
       "windows/amd64": {
-        "version": "2.1.309",
-        "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-win32-x64/-/claude-code-win32-x64-2.1.309.tgz",
-        "sha256": "9b8e492ca14fdccb76a58c4cb5353de2434b9644015190748c5c40f3b283d3b6",
+        "version": "2.1.311",
+        "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-win32-x64/-/claude-code-win32-x64-2.1.311.tgz",
+        "sha256": "32a333769981c72843b990f944cdcac53595ec5a98ca73ff75f0f5c417c79ee6",
         "format": "tar.gz",
         "commands": {
           "claude": "claude.exe"
@@ -2953,9 +2953,9 @@
     },
     "tool.openwhispr": {
       "darwin/arm64": {
-        "version": "1.10.3",
-        "url": "https://github.com/OpenWhispr/openwhispr/releases/download/v1.10.3/OpenWhispr-1.10.3-arm64-mac.zip",
-        "sha256": "3b4abc4df8da8b3ca76914d521e4fc408230dc2c5a9521cf12344aa1a69f404a",
+        "version": "1.11.0",
+        "url": "https://github.com/OpenWhispr/openwhispr/releases/download/v1.11.0/OpenWhispr-1.11.0-arm64-mac.zip",
+        "sha256": "77be646b39e0e012ebca9f8b87b8e46fb3a8706c70b0119ab372490e24854b57",
         "format": "zip",
         "commands": {},
         "bin_dirs": [],
@@ -2965,9 +2965,9 @@
         ]
       },
       "linux/amd64": {
-        "version": "1.10.3",
-        "url": "https://github.com/OpenWhispr/openwhispr/releases/download/v1.10.3/OpenWhispr-1.10.3-linux-x64.tar.gz",
-        "sha256": "cb1015ecabd6235c37fb095bfe511f5c7d2cb3389b4d7dfa7ef684f2b8c13905",
+        "version": "1.11.0",
+        "url": "https://github.com/OpenWhispr/openwhispr/releases/download/v1.11.0/OpenWhispr-1.11.0-linux-x64.tar.gz",
+        "sha256": "b238d9d3da3122c303f786590484b7aa627d4e625edd79d8c9f2f42af1ec4435",
         "format": "tar.gz",
         "strip_components": 1,
         "commands": {
@@ -3000,9 +3000,9 @@
     },
     "tool.obsidian-portable": {
       "linux/amd64": {
-        "version": "1.14.4",
-        "url": "https://github.com/obsidianmd/obsidian-releases/releases/download/v1.14.4/obsidian-1.14.4.tar.gz",
-        "sha256": "e70b7cd63787e7f798a84fec453f5c446b91877bd3f612e8fb98e9b76cc81120",
+        "version": "1.15.0",
+        "url": "https://github.com/obsidianmd/obsidian-releases/releases/download/v1.15.0/obsidian-1.15.0.tar.gz",
+        "sha256": "75594ae09914ca0191dde13c0697dee653322287a3a806c15519332d9ada14d3",
         "format": "tar.gz",
         "strip_components": 1,
         "commands": {},
@@ -3015,9 +3015,9 @@
         "libc": "glibc"
       },
       "linux/arm64": {
-        "version": "1.14.4",
-        "url": "https://github.com/obsidianmd/obsidian-releases/releases/download/v1.14.4/obsidian-1.14.4-arm64.tar.gz",
-        "sha256": "fc212804515713ed85fe5ef5bc4b009872bcc01847c4be4fcc14971deee2a42d",
+        "version": "1.15.0",
+        "url": "https://github.com/obsidianmd/obsidian-releases/releases/download/v1.15.0/obsidian-1.15.0-arm64.tar.gz",
+        "sha256": "7e1bdd82fc65dcc3c03de5b8a85a8d79258f94642ba27987c2d1188b9763e903",
         "format": "tar.gz",
         "strip_components": 1,
         "commands": {},
@@ -3127,9 +3127,9 @@
     },
     "tool.xremap": {
       "linux/amd64": {
-        "version": "0.15.15",
-        "url": "https://github.com/xremap/xremap/releases/download/v0.15.15/xremap-linux-x86_64-full.zip",
-        "sha256": "50814398bd0858758dd903be2ea4e5b465e29bb5286e1d5cbcc4508c07cbdda1",
+        "version": "0.15.17",
+        "url": "https://github.com/xremap/xremap/releases/download/v0.15.17/xremap-linux-x86_64-full.zip",
+        "sha256": "820f3cc7c73a234275a1e6e41ac532cb1dfae5a32cd2a5849c3c869f755b123a",
         "format": "zip",
         "commands": {
           "xremap": "xremap"
@@ -3139,9 +3139,9 @@
         ]
       },
       "linux/arm64": {
-        "version": "0.15.15",
-        "url": "https://github.com/xremap/xremap/releases/download/v0.15.15/xremap-linux-aarch64-full.zip",
-        "sha256": "b1240c0e7bbbe525a170893f69514135533bdfb2a371cdd737d54f97382775ea",
+        "version": "0.15.17",
+        "url": "https://github.com/xremap/xremap/releases/download/v0.15.17/xremap-linux-aarch64-full.zip",
+        "sha256": "1f403c06428b023ac786abfdc135d3daa8439835d21fb39ca19d43d1fee0f48a",
         "format": "zip",
         "commands": {
           "xremap": "xremap"

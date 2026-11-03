@@ -2,11 +2,13 @@
 
 import base64
 import copy
+import gzip
 import hashlib
 import importlib.util
 import io
 import json
 import pathlib
+import subprocess
 import sys
 import tarfile
 import tempfile
@@ -141,14 +143,13 @@ class AgentCLIPinBumpTest(unittest.TestCase):
             packages.append({"download": f"{version}/{name}", "sha256": hashlib.sha256(data).hexdigest(), "size": len(data)})
         self.network.texts[pins_script.KIRO_BASE + "latest/manifest.json"] = json.dumps({"version": version, "packages": packages}).encode()
 
-    def run_bump(self, tools=None):
+    def run_bump(self, tools=None, expected_status=0):
         summary = pathlib.Path(self.temporary.name) / "summary.md"
         failures = pathlib.Path(self.temporary.name) / "failures.txt"
         argv = ["--pins", str(self.pins_path), "--summary", str(summary), "--failures", str(failures)]
-        if tools:
-            argv += ["--tools", tools]
+        argv += ["--tools", tools or ",".join(self.versions)]
         with mock.patch("builtins.print"):
-            self.assertEqual(pins_script.main(argv, network=self.network, verify=self.verify), 0)
+            self.assertEqual(pins_script.main(argv, network=self.network, verify=self.verify), expected_status)
         return json.loads(self.pins_path.read_text(encoding="utf-8"))["resources"], summary.read_text(encoding="utf-8"), failures.read_text(encoding="utf-8")
 
     def test_bumps_every_tool_after_its_vendor_verification(self):
@@ -180,7 +181,7 @@ class AgentCLIPinBumpTest(unittest.TestCase):
         self.assertEqual(summary.count("is current"), 4)
 
     def assertOnlyToolFailed(self, tool, message):
-        resources, _, failures = self.run_bump()
+        resources, _, failures = self.run_bump(expected_status=1)
         self.assertIn(f"`{tool}`", failures)
         self.assertIn(message, failures)
         self.assertEqual(resources[tool], self.pins[tool])
@@ -229,6 +230,121 @@ class AgentCLIPinBumpTest(unittest.TestCase):
         url = pins_script.KIRO_BASE + "2.40.0/kirocli-aarch64-linux.zip"
         self.network.files[url] = self.network.files[url] + b"\0"
         self.assertOnlyToolFailed("tool.kiro", "does not match its release manifest")
+
+    def test_major_release_is_reported_without_changing_pins(self):
+        self.versions = {**self.versions, "tool.kiro": "3.0.0"}
+        self.publish_kiro()
+        resources, summary, failures = self.run_bump("tool.kiro")
+        self.assertEqual(resources["tool.kiro"], self.pins["tool.kiro"])
+        self.assertEqual(failures, "")
+        self.assertIn("3.0.0 held", summary)
+
+    def test_failed_verification_returns_a_failure_status(self):
+        self.network.files[pins_script.KIRO_BASE + "2.40.0/kirocli-aarch64-linux.zip"] += b"tampered"
+        with mock.patch("builtins.print"):
+            status = pins_script.main(["--pins", str(self.pins_path), "--tools", "tool.kiro"], network=self.network)
+        self.assertEqual(status, 1)
+
+
+class GitHubPinBumpTest(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.path = pathlib.Path(self.temporary.name) / "archive-pins.json"
+        self.original = (ROOT / "installer/archive-pins.json").read_text()
+        self.path.write_text(self.original)
+        self.pins = json.loads(self.original)["resources"]
+        self.policy = json.loads((ROOT / "scripts/archive-pin-updates.json").read_text())
+        self.network = FakeNetwork()
+
+    def publish(self, tool, version):
+        recipe = self.policy["github"][tool]
+        assets = []
+        for target, pin in self.pins[tool].items():
+            name = recipe["assets"][target].format(version=version)
+            url = f"https://github.com/{recipe['repository']}/releases/download/{recipe['tag'].format(version=version)}/{name}"
+            prefix = "root/" * pin.get("strip_components", 0)
+            files = {prefix + entry: b"binary" for entry in layout(pin)}
+            if pin["format"] == "file":
+                data = b"binary"
+            elif pin["format"] == "gzip":
+                data = gzip.compress(b"binary")
+            elif pin["format"] == "zip":
+                data = zipped(files)
+            else:
+                data = tgz(files)
+            self.network.files[url] = data
+            assets.append({"name": name, "browser_download_url": url, "digest": "sha256:" + hashlib.sha256(data).hexdigest()})
+        api = f"https://api.github.com/repos/{recipe['repository']}/releases/latest"
+        self.release = {"tag_name": recipe['tag'].format(version=version), "draft": False, "prerelease": False, "assets": assets}
+        self.api = api
+        self.network.texts[api] = json.dumps(self.release).encode()
+
+    def run_bump(self, tool, expected=0):
+        summary = self.path.with_suffix(".md")
+        with mock.patch("builtins.print"):
+            result = pins_script.main(["--pins", str(self.path), "--tools", tool, "--summary", str(summary)], network=self.network)
+        self.assertEqual(result, expected)
+        return json.loads(self.path.read_text())["resources"], summary.read_text()
+
+    def test_github_archives_and_single_files_update_all_targets(self):
+        for tool, version in [("tool.fzf", "0.99.0"), ("tool.t3", "0.99.0"), ("tool.jq", "1.99.0"), ("tool.taplo", "0.99.0")]:
+            with self.subTest(tool=tool):
+                self.publish(tool, version)
+                resources, _ = self.run_bump(tool)
+                for target, pin in resources[tool].items():
+                    self.assertEqual(pin["version"], version)
+                    self.assertEqual(pin["sha256"], hashlib.sha256(self.network.files[pin["url"]]).hexdigest())
+                    self.assertEqual({k: v for k, v in pin.items() if k not in ("version", "url", "sha256")},
+                                     {k: v for k, v in self.pins[tool][target].items() if k not in ("version", "url", "sha256")})
+
+    def test_invalid_github_releases_leave_every_target_unchanged(self):
+        for fault in ("missing digest", "bad digest", "missing asset", "layout", "prerelease", "downgrade"):
+            with self.subTest(fault=fault):
+                self.path.write_text(self.original)
+                self.publish("tool.fzf", "0.1.0" if fault == "downgrade" else "0.99.0")
+                asset = self.release["assets"][-1]
+                if fault == "missing digest":
+                    asset.pop("digest")
+                elif fault == "bad digest":
+                    asset["digest"] = "sha256:" + "0" * 64
+                elif fault == "missing asset":
+                    self.release["assets"].pop()
+                elif fault == "layout":
+                    data = tgz({"unexpected": b"x"})
+                    self.network.files[asset["browser_download_url"]] = data
+                    asset["digest"] = "sha256:" + hashlib.sha256(data).hexdigest()
+                elif fault == "prerelease":
+                    self.release["prerelease"] = True
+                self.network.texts[self.api] = json.dumps(self.release).encode()
+                resources, _ = self.run_bump("tool.fzf", expected=1)
+                self.assertEqual(resources, self.pins)
+
+    def test_major_github_release_is_held_before_download(self):
+        self.publish("tool.fzf", "1.0.0")
+        self.network.files.clear()
+        resources, summary = self.run_bump("tool.fzf")
+        self.assertEqual(resources, self.pins)
+        self.assertIn("1.0.0 held", summary)
+
+    def test_coverage_rejects_an_unlisted_resource_and_an_unlisted_target(self):
+        for change in ("resource", "target"):
+            with self.subTest(change=change):
+                document = json.loads(self.original)
+                if change == "resource":
+                    document["resources"]["tool.new"] = copy.deepcopy(self.pins["tool.fzf"])
+                else:
+                    document["resources"]["tool.fzf"]["linux/new"] = copy.deepcopy(self.pins["tool.fzf"]["linux/amd64"])
+                self.path.write_text(json.dumps(document))
+                result = subprocess.run([sys.executable, str(ROOT / "scripts/update-agent-cli-pins.py"),
+                                         "--pins", str(self.path), "--check-coverage"], capture_output=True, text=True)
+                self.assertEqual(result.returncode, 1)
+                self.assertIn("Pin coverage failed", result.stderr)
+
+    def test_checked_in_pin_coverage(self):
+        result = subprocess.run([sys.executable, str(ROOT / "scripts/update-agent-cli-pins.py"), "--check-coverage"],
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
 
 
 class SignatureAndChecksumParsingTest(unittest.TestCase):

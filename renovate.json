@@ -1,6 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "description": "Renovate owns GitHub Actions, runner labels, Go toolchain/modules and CI validator/tool constants. Installer archive/component/wheel pins, linux-code-pins.json, bootstrap-toolchain.tsv and the Mason registry snapshot are manually reviewed with checksums and runtime proof; adjacent CI download hashes also require review after version bumps. The agent CLI archive pins (Claude Code, Codex, Copilot CLI, Kiro CLI) are instead proposed weekly by .github/workflows/agent-cli-pins.yml for the same review and native checks.",
+  "description": "Renovate owns GitHub Actions, runner labels, Go toolchain/modules and CI validator/tool constants. The weekly agent-cli-pins workflow proposes verified archive updates from scripts/archive-pin-updates.json in one PR. Major releases and explicit manual exceptions need manual review. Other installer pin files, nested components and wheels, the bootstrap toolchain, and the Mason snapshot keep their checksum and runtime review.",
   "extends": [
     "config:recommended",
     "helpers:pinGitHubActionDigests",
