@@ -268,8 +268,10 @@ earlier choice becomes this selection.
 Before you update the checkout, finish or abandon an interrupted Sentinel
 operation with v1.0.0. Follow [Interruptions and conflicts](#interruptions-and-conflicts).
 
-The first **Choose tools** run after the update does the handoff. **Update
-tools** keeps the old receipts until then. The handoff has these steps:
+The Sentinel install of **Update tools** or **Choose tools** hands the files
+over. **Update tools** keeps the old receipts. A later **Choose tools** run
+releases them. After a direct update from v1.0.0, this can take two
+**Choose tools** runs. The handoff has these steps:
 
 1. Setup deletes each skill folder that the v1.0.0 receipts list as a dotfiles
    copy. It deletes a folder only when a hash check against the saved journal

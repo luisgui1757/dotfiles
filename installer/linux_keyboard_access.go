@@ -292,6 +292,10 @@ func (d *KeyboardAccessDriver) ResumeResource(ctx context.Context, r Resource, o
 	return d.change(ctx, r, in.Action, receipt, true)
 }
 
+type keyboardAccessFailure struct{ message string }
+
+func (e *keyboardAccessFailure) Error() string { return e.message }
+
 func (d *KeyboardAccessDriver) result(command nativeCommand) error {
 	var record nativeCommandRecord
 	data, err := readDocument(filepath.Join(d.WorkerDirectory, "commands", command.Operation+".json"))
@@ -309,7 +313,7 @@ func (d *KeyboardAccessDriver) result(command nativeCommand) error {
 		return errors.New("keyboard access command outcome is unknown; inspect " + d.Rules + " before retrying")
 	}
 	if record.Reply.Error != "" || record.Reply.ExitCode == nil || *record.Reply.ExitCode != 0 || record.Reply.Ready {
-		return &flatpakCommandFailure{fmt.Sprintf("keyboard access command failed%s", nativeDiagnostic(record.Reply.Output))}
+		return &keyboardAccessFailure{fmt.Sprintf("keyboard access command failed%s", nativeDiagnostic(record.Reply.Output))}
 	}
 	return nil
 }
@@ -398,7 +402,7 @@ func (d *KeyboardAccessDriver) change(ctx context.Context, r Resource, action st
 func (d *KeyboardAccessDriver) dispatch(ctx context.Context, in *keyboardAccessIntent, index int, resume bool) error {
 	command := in.Commands[index]
 	err := d.result(command)
-	var failed *flatpakCommandFailure
+	var failed *keyboardAccessFailure
 	if errors.As(err, &failed) && resume {
 		if len(in.Attempts) == 0 {
 			in.Attempts = make([]int, len(in.Commands))
