@@ -166,7 +166,9 @@ and skills for coding agents.
 - Then dotfiles runs the Sentinel installer of that checkout. Dotfiles does not
   copy or edit Sentinel files. Check, repair, removal and resume run Sentinel
   only from a verified checkout of the recorded commit. Repair, removal and
-  resume fetch it again when necessary.
+  resume fetch it again when necessary. An install older than the floor is a
+  health issue: check does not run its installer, repair installs the target
+  release, and removal uses the floor.
 - `<state>/sentinel/record.json` saves the intent before a change and the
   completion after it. Resume runs the installer again. The record also keeps
   the release tag and commit, the hosts and the five folder variables of the

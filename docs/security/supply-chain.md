@@ -66,7 +66,9 @@ Then setup checks that `git rev-parse HEAD` equals the commit. It compares each
 file with the tree of the commit as raw bytes and refuses an extra file. Git index
 flags, local filters and replacement objects cannot hide a change from this
 comparison. Check, repair, removal and resume use the recorded commit, and run
-Sentinel only from a checkout that passes it. The commit hash is the integrity
+Sentinel only from a checkout that passes it. An install older than the floor
+is the exception: repair installs the latest release or the floor, and removal
+uses the floor. The commit hash is the integrity
 check.
 
 A failed fetch stops the apply.

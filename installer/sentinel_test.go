@@ -715,3 +715,68 @@ func TestSentinelUpdateAfterAWaitingUpdateInstallsTheNewerRelease(t *testing.T) 
 		})
 	}
 }
+
+// sentinelOlderInstall turns the install into one of a commit older than the
+// floor, as setup recorded it before setup kept the release tag. The old
+// installer does not know the current profiles, so its check exits 2.
+func sentinelOlderInstall(t *testing.T, d *SentinelDriver, processes *sentinelProcesses) {
+	t.Helper()
+	old := strings.Repeat("1", 40)
+	record := sentinelRecorded(t, d)
+	record.Commit, record.Tag = old, ""
+	if err := saveDocument(filepath.Join(d.State, "sentinel", "record.json"), record); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(d.State, "sentinel", "checkout", ".git", "commit"), []byte(old), 0600); err != nil {
+		t.Fatal(err)
+	}
+	processes.check = 2
+	processes.install = func(nativeCommand) error { processes.check = 0; return nil }
+}
+
+// An install older than the floor is a health issue. Setup does not run its
+// check. Repair installs the latest release, or the floor when the lookup
+// fails, and removal runs the floor installer.
+func TestSentinelRepairsAndRemovesAnInstallOlderThanTheFloor(t *testing.T) {
+	newer := sentinelRelease{"v0.4.0", strings.Repeat("4", 40)}
+	for name, test := range map[string]struct {
+		lookup func(*sentinelProcesses)
+		want   sentinelRelease
+	}{
+		"latest release": {func(p *sentinelProcesses) { p.latest, p.head = newer, newer.Commit }, newer},
+		"failed lookup":  {func(p *sentinelProcesses) { p.failure = errors.New("no network") }, sentinelFloor},
+	} {
+		t.Run(name, func(t *testing.T) {
+			d, processes := sentinelFixture(t, Context{OS: "linux", Arch: "amd64"})
+			writeConfigFixture(t, filepath.Join(d.Home, ".codex", "config.toml"), "")
+			dispatchApproved(t, sentinelController(d), Request{Schema: 1, Mode: "apply", Selected: []string{"sentinel"}})
+			sentinelOlderInstall(t, d, processes)
+			test.lookup(processes)
+			d = sentinelNextRun(d)
+			o, err := d.Observe(context.Background(), Resource{ID: sentinelResource}, Receipt{})
+			if err != nil || o.Healthy || !strings.Contains(o.HealthIssue, "older than v0.3.0") || o.Desired != test.want.Commit {
+				t.Fatal("an install older than the floor is not a repairable health issue", o, err)
+			}
+			dispatchApproved(t, sentinelController(d), Request{Schema: 1, Mode: "apply", Selected: []string{"sentinel"}})
+			if record := sentinelRecorded(t, d); record.Commit != test.want.Commit || record.Tag != test.want.Tag {
+				t.Fatal("repair did not install the expected release", record)
+			}
+		})
+	}
+
+	d, processes := sentinelFixture(t, Context{OS: "linux", Arch: "amd64"})
+	writeConfigFixture(t, filepath.Join(d.Home, ".codex", "config.toml"), "")
+	if _, err := sentinelApply(t, d); err != nil {
+		t.Fatal(err)
+	}
+	sentinelOlderInstall(t, d, processes)
+	if _, err := sentinelNextRun(d).Remove(context.Background(), Resource{ID: sentinelResource}, Receipt{OperationID: sentinelOperation}); err != nil {
+		t.Fatal(err)
+	}
+	fetched := slices.ContainsFunc(processes.commands, func(c nativeCommand) bool {
+		return slices.Contains(c.Arguments, "fetch") && c.Arguments[len(c.Arguments)-1] == sentinelCommit
+	})
+	if remove := processes.installers()[len(processes.installers())-1]; !fetched || remove.Arguments[len(remove.Arguments)-1] != "--remove" {
+		t.Fatal("removal did not run the floor installer", processes.commands)
+	}
+}
