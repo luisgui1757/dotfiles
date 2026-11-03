@@ -770,10 +770,11 @@ func TestSentinelRepairsAndRemovesAnInstallOlderThanTheFloor(t *testing.T) {
 		t.Fatal(err)
 	}
 	sentinelOlderInstall(t, d, processes)
+	start := len(processes.commands)
 	if _, err := sentinelNextRun(d).Remove(context.Background(), Resource{ID: sentinelResource}, Receipt{OperationID: sentinelOperation}); err != nil {
 		t.Fatal(err)
 	}
-	fetched := slices.ContainsFunc(processes.commands, func(c nativeCommand) bool {
+	fetched := slices.ContainsFunc(processes.commands[start:], func(c nativeCommand) bool {
 		return slices.Contains(c.Arguments, "fetch") && c.Arguments[len(c.Arguments)-1] == sentinelCommit
 	})
 	if remove := processes.installers()[len(processes.installers())-1]; !fetched || remove.Arguments[len(remove.Arguments)-1] != "--remove" {

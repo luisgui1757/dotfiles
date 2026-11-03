@@ -732,10 +732,10 @@ func sentinelFindings(output []byte) string {
 // Apply installs a release for the current hosts. Install and update fetch the
 // approved commit, op.Observed.Desired. Repair and resume fetch the recorded
 // commit, except that repair of an install older than the floor fetches the
-// approved commit. Apply saves its intent first, so an interruption at any later step
-// can resume. Then it fetches the commit and runs the installer. A failed fetch
-// deletes nothing. The result names the installed commit as Desired, so that a
-// later update sees a newer release.
+// approved commit. Apply saves its intent first, so an interruption at any
+// later step can resume. Then it fetches the commit and runs the installer. A
+// failed fetch deletes nothing. The result names the installed commit as
+// Desired, so that a later update sees a newer release.
 func (d *SentinelDriver) Apply(ctx context.Context, r Resource, op Operation, receipt Receipt) (Observation, error) {
 	record, err := d.readRecord()
 	if err != nil {
@@ -804,9 +804,8 @@ func (d *SentinelDriver) Apply(ctx context.Context, r Resource, op Operation, re
 
 // Remove saves its intent, then runs the installer removal from a verified
 // checkout of the recorded commit, or of the floor without a record or for an
-// install older than the floor, for each
-// recorded or current host. It uses the recorded folders. Then it deletes the
-// checkout and the record.
+// install older than the floor, for each recorded or current host. It uses the
+// recorded folders. Then it deletes the checkout and the record.
 func (d *SentinelDriver) Remove(ctx context.Context, r Resource, receipt Receipt) (Observation, error) {
 	record, err := d.readRecord()
 	if err != nil {

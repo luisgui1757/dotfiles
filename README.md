@@ -407,7 +407,8 @@ installed older commit moves only with **Update tools**. When
 setup cannot reach GitHub, Check and Update keep the installed release and show
 a note. A first install then stops. Repair, removal and an interrupted
 operation use the commit of the install. An install older than v0.3.0 fails
-Check, and repair installs the latest release, or v0.3.0 without GitHub.
+Check, and repair installs the latest release, or v0.3.0 when the release
+lookup fails. Repair still needs Git access to GitHub.
 
 Authenticated agent execution remains a separate verification step. Notes remain personal: Neovim
 enables the notes integration only when its vault exists; `NOTES_VAULT` can select another existing vault.
