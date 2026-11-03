@@ -367,7 +367,9 @@ func Execute(ctx context.Context, c *Catalog, target Context, source, home, stat
 			}
 		case "forget":
 			// Recheck restored personal artifacts after the remaining operations.
-			if completedBaselineRemoval(receipt, op.Observed) {
+			// Recovery-only mappings instead hand their path to the declared
+			// successor, which verifies its own scoped publication.
+			if r.ReplacedBy == "" && completedBaselineRemoval(receipt, op.Observed) {
 				removed[r.ID] = receipt
 			}
 			state.Receipts[r.ID] = removedReceipt(receipt, op.Observed)

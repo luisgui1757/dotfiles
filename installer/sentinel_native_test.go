@@ -2,6 +2,7 @@ package installer
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"os"
 	"os/exec"
@@ -188,6 +189,197 @@ func TestNativeSentinelKeepsRulesFileMode(t *testing.T) {
 		info, err := os.Stat(rules)
 		if err != nil || info.Mode().Perm() != 0640 {
 			t.Fatal("Sentinel changed the mode of the rules file", selected, info, err)
+		}
+	}
+}
+
+// A real dotfiles v1.0.0 install, with an adopted earlier rules block, hands
+// over to the pinned Sentinel commit. The block becomes Sentinel's block. The
+// text outside the block stays through the handoff and the removal.
+func TestNativeSentinelHandoffFromV1(t *testing.T) {
+	if os.Getenv("DOTFILES_TEST_SENTINEL") != "1" {
+		t.Skip("set DOTFILES_TEST_SENTINEL=1 to fetch and run the pinned Sentinel commit")
+	}
+	if runtime.GOOS == "windows" {
+		t.Skip("HOME does not move the Windows known folders")
+	}
+	repository, err := filepath.Abs("..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	base, err := resolveConfigPath(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	released, oldBinary := releasedDotfiles(t, repository, base, "v1.0.0")
+	home := filepath.Join(base, "home")
+	rules := filepath.Join(home, ".codex", "AGENTS.md")
+	writeConfigFixture(t, rules, "# My Codex rules\n<!-- AGENT-RULES:BEGIN -->\nEarlier personal policy\n<!-- AGENT-RULES:END -->\n# My later notes\n")
+	writeConfigFixture(t, filepath.Join(home, ".claude", "settings.json"), "{}\n")
+	environment := []string{"PATH=/usr/bin:/bin:/usr/sbin:/sbin", "COPILOT_HOME=" + filepath.Join(home, ".copilot")}
+	approve := func(binary, checkout string, request Request) {
+		t.Helper()
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+		defer cancel()
+		preview, err := installedMachineRequest(ctx, binary, checkout, home, request, environment...)
+		if err != nil || preview.Status != "preview" {
+			t.Fatal("preview", preview, err)
+		}
+		request.ExpectedPlan = preview.Plan.ID
+		if result, err := installedMachineRequest(ctx, binary, checkout, home, request, environment...); err != nil || result.Status != "ready" {
+			t.Fatal("apply", result, err)
+		}
+	}
+	approve(oldBinary, released, Request{Schema: 1, Mode: "apply", Selected: []string{"sentinel", "sentinel-skills"}, Adopt: []string{sentinelEarlierRules}})
+	statePath := filepath.Join(home, ".local", "state", "dotfiles", "state.json")
+	state, err := LoadState(statePath, home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	adopted := state.Receipts[sentinelEarlierRules]
+	if !adopted.Adopted || adopted.Recovery == "" || state.Receipts["skills.sentinel-agents"].Ownership != "created" {
+		t.Fatal("v1.0.0 did not adopt the earlier block and copy the skills", state.Receipts)
+	}
+	baseline := filepath.Join(filepath.Dir(statePath), adopted.Recovery)
+	if _, err := os.Stat(baseline); err != nil {
+		t.Fatal("v1.0.0 saved no baseline", err)
+	}
+
+	newBinary := installedMachineFixture(t, repository, home, 10*time.Minute, environment...)
+	for range 2 {
+		request := Request{Schema: 1, Mode: "apply", Selected: []string{"sentinel"}}
+		request.ExpectedPlan = newBinary(request).Plan.ID
+		if result := newBinary(request); result.Status != "ready" {
+			t.Fatal("handoff", result)
+		}
+	}
+	data, err := os.ReadFile(rules)
+	if err != nil || !strings.HasPrefix(string(data), "# My Codex rules\n<!-- AGENT-RULES:BEGIN do-not-edit-inside-this-block -->\n") ||
+		!strings.HasSuffix(string(data), "<!-- AGENT-RULES:END -->\n# My later notes\n") || strings.Count(string(data), "AGENT-RULES:BEGIN") != 1 || strings.Contains(string(data), "Earlier personal policy") {
+		t.Fatal("the handoff did not replace the adopted block in place", string(data), err)
+	}
+	if _, err := os.Lstat(baseline); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("the handoff kept the adopted baseline", err)
+	}
+	for _, name := range []string{"council", "sol-loop"} {
+		if _, err := os.Stat(filepath.Join(home, ".agents", "skills", name, ".sentinel-owned")); err != nil {
+			t.Fatal("Sentinel did not install its own skill copy", name, err)
+		}
+	}
+	state, err = LoadState(statePath, home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The adoption of v1.0.0 kept a copy of the original file for inspection.
+	// That personal copy stays, and its released receipt only reports it.
+	for _, id := range append([]string{sentinelEarlierRules}, sentinelEarlierSkills...) {
+		if receipt, ok := state.Receipts[id]; ok && (receipt.Status != "removed" || receipt.Ownership != "reused" || len(receipt.After.Preserved) == 0) {
+			t.Fatal("the handoff kept an earlier receipt", id, receipt)
+		}
+	}
+	request := Request{Schema: 1, Mode: "apply", Selected: []string{}}
+	request.ExpectedPlan = newBinary(request).Plan.ID
+	if result := newBinary(request); result.Status != "ready" {
+		t.Fatal("removal", result)
+	}
+	if data, err := os.ReadFile(rules); err != nil || string(data) != "# My Codex rules\n# My later notes\n" {
+		t.Fatal("removal did not keep the text outside the block", string(data), err)
+	}
+}
+
+func releasedDotfiles(t *testing.T, repository, base, tag string) (checkout, binary string) {
+	t.Helper()
+	checkout = filepath.Join(base, tag)
+	if err := os.Mkdir(checkout, 0700); err != nil {
+		t.Fatal(err)
+	}
+	extract := exec.Command("/bin/sh", "-c", `git -C "$1" archive "$2" | tar -x -C "$3"`, "sh", repository, tag, checkout)
+	extract.Env = slices.DeleteFunc(os.Environ(), func(value string) bool { return strings.HasPrefix(value, "GIT_") })
+	if output, err := extract.CombinedOutput(); err != nil {
+		t.Fatal("the "+tag+" tag is required", string(output), err)
+	}
+	binary = filepath.Join(base, "dotfiles-"+tag)
+	build := exec.Command("go", "build", "-trimpath", "-o", binary, "./cmd/dotfiles")
+	build.Dir = filepath.Join(checkout, "installer")
+	if output, err := build.CombinedOutput(); err != nil {
+		t.Fatal(string(output), err)
+	}
+	return checkout, binary
+}
+
+func TestNativeSentinelUpdatesAV100InstallThatV101UpdatedOnce(t *testing.T) {
+	if os.Getenv("DOTFILES_TEST_SENTINEL") != "1" {
+		t.Skip("set DOTFILES_TEST_SENTINEL=1 to fetch and run the Sentinel releases")
+	}
+	if runtime.GOOS == "windows" {
+		t.Skip("HOME does not move the Windows known folders")
+	}
+	repository, err := filepath.Abs("..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	base, err := resolveConfigPath(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	home := filepath.Join(base, "home")
+	writeConfigFixture(t, filepath.Join(home, ".codex", "AGENTS.md"), "# My Codex rules\n<!-- AGENT-RULES:BEGIN -->\nEarlier personal policy\n<!-- AGENT-RULES:END -->\n")
+	writeConfigFixture(t, filepath.Join(home, ".claude", "settings.json"), "{}\n")
+	environment := []string{"PATH=/usr/bin:/bin:/usr/sbin:/sbin", "COPILOT_HOME=" + filepath.Join(home, ".copilot")}
+	for _, step := range []struct {
+		tag     string
+		request Request
+	}{
+		{"v1.0.0", Request{Schema: 1, Mode: "apply", Selected: []string{"sentinel", "sentinel-skills"}, Adopt: []string{"integration.sentinel"}}},
+		{"v1.0.1", Request{Schema: 1, Mode: "update"}},
+	} {
+		checkout, binary := releasedDotfiles(t, repository, base, step.tag)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+		preview, err := installedMachineRequest(ctx, binary, checkout, home, step.request, environment...)
+		if err != nil || preview.Status != "preview" {
+			cancel()
+			t.Fatal(step.tag, "preview", preview, err)
+		}
+		step.request.ExpectedPlan = preview.Plan.ID
+		result, err := installedMachineRequest(ctx, binary, checkout, home, step.request, environment...)
+		cancel()
+		if err != nil || result.Status != "ready" {
+			t.Fatal(step.tag, "apply", result, err)
+		}
+	}
+	statePath := filepath.Join(home, ".local", "state", "dotfiles", "state.json")
+	if state, err := LoadState(statePath, home); err != nil || state.Receipts["integration.sentinel"].Ownership != "created" {
+		t.Fatal("v1.0.1 released the earlier rules in its first update, so this test no longer covers the receipt it leaves", state.Receipts, err)
+	}
+
+	update := installedMachineFixture(t, repository, home, 10*time.Minute, environment...)
+	request := Request{Schema: 1, Mode: "update"}
+	preview := update(request)
+	if preview.Status != "preview" {
+		t.Fatal("preview", preview)
+	}
+	request.ExpectedPlan = preview.Plan.ID
+	if result := update(request); result.Status != "ready" {
+		t.Fatal("update", result)
+	}
+	if check := update(Request{Schema: 1, Mode: "check"}); check.Status != "ready" {
+		t.Fatal("check after the update", check)
+	}
+	state, err := LoadState(statePath, home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request = Request{Schema: 1, Mode: "apply", Selected: state.Selected}
+	request.ExpectedPlan = update(request).Plan.ID
+	if result := update(request); result.Status != "ready" {
+		t.Fatal("choose tools after the update", result)
+	}
+	if state, err = LoadState(statePath, home); err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range append([]string{"integration.sentinel"}, sentinelEarlierSkills...) {
+		if receipt, ok := state.Receipts[id]; ok && receipt.Ownership == "created" {
+			t.Fatal("the update kept an earlier receipt", id, receipt)
 		}
 	}
 }

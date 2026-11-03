@@ -210,6 +210,12 @@ func (d *ProfileDriver) FinishTransaction(ctx context.Context, plan Plan, receip
 		if err == nil && (j.Schema != 1 || !resourceID.MatchString(j.Resource) || j.Operation != name[:64] || j.Sealed && !j.Complete) {
 			err = errors.New("invalid profile journal identity or completion")
 		}
+		// The Sentinel installer now owns the rules block of dotfiles 1.0, and
+		// setup no longer parses it. A sealed journal of that block is history.
+		if err == nil && j.Resource == sentinelEarlierRules && j.Sealed {
+			report[j.Resource] = sortedUnique(append(report[j.Resource], j.Preserved...))
+			continue
+		}
 		if err == nil {
 			j, err = decodeProfileJournal(data, name[:64])
 		}

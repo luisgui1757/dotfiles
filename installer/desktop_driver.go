@@ -11,7 +11,8 @@ import (
 	"strings"
 )
 
-// obsidianPortable is Linux Obsidian's official portable build.
+// obsidianPortable is Linux Obsidian's official portable build. The earlier
+// private Flatpak (tool.obsidian on Linux) remains only to remove old installs.
 const obsidianPortable = "tool.obsidian-portable"
 
 // DesktopDriver publishes only the fixed application integrations below. Files,
@@ -97,7 +98,11 @@ func (d *DesktopDriver) recipe(id string) (desktopRecipe, error) {
 		if p.Package == "tool.windows-terminal" {
 			return p, errors.New("Windows Terminal requires Windows")
 		}
-		entry, e := required(p.Name + ".app/Contents/Info.plist")
+		bundle := p.Name + ".app"
+		if p.Package == "tool.zen" {
+			bundle = "DotfilesZen.app"
+		}
+		entry, e := required(bundle + "/Contents/Info.plist")
 		if e != nil {
 			return p, e
 		}

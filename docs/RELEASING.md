@@ -85,6 +85,17 @@ URLs alone are not evidence. Native package and archive fixtures in the hosted
 jobs verify the selected bytes and runtime results. Cross-compilation does not
 replace them.
 
+## Support window
+
+`main` reads each state that a release tag from v1.0.0 on can leave on a
+machine. This includes receipts and saved recipes that the release keeps
+without a change. A machine can skip releases, so `main` keeps each reader.
+`TestEachResourceOfAReleaseStaysInTheCatalog` fails when a resource of a
+release tag leaves the catalog.
+
+A v0.4.x installation runs migrate from the v1.0.1 checkout first. Then it
+updates to `main` and chooses Update tools.
+
 ## Recovery
 
 - Re-run the failed run of the release workflow. A re-run keeps the tag, a

@@ -151,7 +151,8 @@ type sentinelRecord struct {
 // SentinelDriver runs the installer of a Sentinel release. Sentinel decides
 // which files it changes: its managed block in each rules file, the skill
 // folders that hold its .sentinel-owned marker, and the Claude Code output
-// style output-styles/sentinel.md.
+// style output-styles/sentinel.md. The driver also hands over the files of
+// dotfiles 1.0 (see sentinel_handoff.go).
 type SentinelDriver struct {
 	Target    Context
 	Home      string
@@ -170,8 +171,10 @@ type SentinelDriver struct {
 	// Run changes the system under the controller mutation guard. Query only
 	// reads, and it returns a nativeCommandError with the exit code.
 	Run, Query func(context.Context, nativeCommand) ([]byte, error)
-	// Selected is the bound resource closure. ForSelection sets it.
+	// Selected is the bound resource closure. Earlier holds the saved receipts
+	// of the dotfiles 1.0 Sentinel resources. ForSelection sets both.
 	Selected []string
+	Earlier  map[string]Receipt
 
 	// looked, latest and latestFailure keep the one lookup of a setup run.
 	looked        bool
@@ -596,6 +599,9 @@ func querySentinel(ctx context.Context, command nativeCommand) ([]byte, error) {
 // that installed files differ, and any other exit is an error. An interrupted
 // operation of this receipt offers a resume.
 func (d *SentinelDriver) Observe(ctx context.Context, r Resource, receipt Receipt) (Observation, error) {
+	if r.ID != sentinelResource {
+		return d.observeEarlier(r, receipt), nil
+	}
 	o := Observation{Provider: "sentinel", Identity: d.record(), Scope: "user"}
 	record, err := d.readRecord()
 	if err != nil {
@@ -610,6 +616,9 @@ func (d *SentinelDriver) Observe(ctx context.Context, r Resource, receipt Receip
 	hosts, err := d.hosts(homes)
 	if err != nil {
 		return o, err
+	}
+	if _, err := d.handoff(); err != nil {
+		o.ApplyBlocked = strings.TrimSpace(o.ApplyBlocked + " " + err.Error())
 	}
 	if len(hosts) == 0 {
 		o.ApplyBlocked = strings.TrimSpace(o.ApplyBlocked + " Sentinel found no coding agent. Install Codex, Claude Code, Copilot CLI, Kiro or OpenCode, then apply again.")
@@ -733,10 +742,14 @@ func sentinelFindings(output []byte) string {
 // approved commit, op.Observed.Desired. Repair and resume fetch the recorded
 // commit, except that repair of an install older than the floor fetches the
 // approved commit. Apply saves its intent first, so an interruption at any
-// later step can resume. Then it fetches the commit and runs the installer. A
-// failed fetch deletes nothing. The result names the installed commit as
-// Desired, so that a later update sees a newer release.
+// later step can resume. Then it fetches the commit, hands over the dotfiles
+// 1.0 files and runs the installer. A failed fetch deletes nothing. The result
+// names the installed commit as Desired, so that a later update sees a newer
+// release.
 func (d *SentinelDriver) Apply(ctx context.Context, r Resource, op Operation, receipt Receipt) (Observation, error) {
+	if r.ID != sentinelResource {
+		return Observation{}, fmt.Errorf("%s only hands over earlier files; it cannot be installed", r.Name)
+	}
 	record, err := d.readRecord()
 	if err != nil {
 		return Observation{}, err
@@ -750,6 +763,9 @@ func (d *SentinelDriver) Apply(ctx context.Context, r Resource, op Operation, re
 		return Observation{}, errors.New("Sentinel found no coding agent")
 	}
 	if err := sentinelKiroHome(d.Home, homes, hosts); err != nil {
+		return Observation{}, err
+	}
+	if _, err := d.handoff(); err != nil {
 		return Observation{}, err
 	}
 	action := op.Action
@@ -786,6 +802,9 @@ func (d *SentinelDriver) Apply(ctx context.Context, r Resource, op Operation, re
 	if err != nil {
 		return Observation{}, err
 	}
+	if err := d.handOver(); err != nil {
+		return Observation{}, err
+	}
 	command, err := d.installer(checkout, hosts, homes, "")
 	if err != nil {
 		return Observation{}, err
@@ -807,6 +826,9 @@ func (d *SentinelDriver) Apply(ctx context.Context, r Resource, op Operation, re
 // install older than the floor, for each recorded or current host. It uses the
 // recorded folders. Then it deletes the checkout and the record.
 func (d *SentinelDriver) Remove(ctx context.Context, r Resource, receipt Receipt) (Observation, error) {
+	if r.ID != sentinelResource {
+		return Observation{}, fmt.Errorf("%s has nothing to remove", r.Name)
+	}
 	record, err := d.readRecord()
 	if err != nil {
 		return Observation{}, err
