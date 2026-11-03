@@ -13,12 +13,12 @@ import (
 	"time"
 )
 
-// The installed command fetches the real pinned Sentinel commit and runs its
+// The installed command fetches the real Sentinel floor release and runs its
 // installer in a disposable home: install, check, an unchanged second run and
 // removal. It needs the network, so it runs only on request.
 func TestNativeSentinelInstalledLifecycle(t *testing.T) {
 	if os.Getenv("DOTFILES_TEST_SENTINEL") != "1" {
-		t.Skip("set DOTFILES_TEST_SENTINEL=1 to fetch and run the pinned Sentinel commit")
+		t.Skip("set DOTFILES_TEST_SENTINEL=1 to fetch and run the Sentinel floor release")
 	}
 	if runtime.GOOS == "windows" {
 		t.Skip("HOME does not move the Windows known folders")
@@ -61,7 +61,7 @@ func TestNativeSentinelInstalledLifecycle(t *testing.T) {
 	checkout := filepath.Join(home, ".local", "state", "dotfiles", "sentinel", "checkout")
 	head, err := exec.Command("git", "-C", checkout, "rev-parse", "HEAD").Output()
 	if err != nil || strings.TrimSpace(string(head)) != sentinelCommit {
-		t.Fatal("the cached checkout is not the pinned commit", string(head), err)
+		t.Fatal("the cached checkout is not the floor release", string(head), err)
 	}
 	rules, err := os.ReadFile(filepath.Join(checkout, "rules", "AGENTS.md"))
 	if err != nil {
@@ -153,14 +153,14 @@ func TestNativeSentinelInstalledLifecycle(t *testing.T) {
 	if result := invoke(Request{Schema: 1, Mode: "check"}); result.Status != "ready" {
 		t.Fatal("check after removal", result)
 	}
-	t.Logf("pinned Sentinel %s: install for codex, claude, kiro at a custom KIRO_HOME and opencode, check, unchanged second run and removal passed", sentinelCommit)
+	t.Logf("Sentinel floor release %s: install for codex, claude, kiro at a custom KIRO_HOME and opencode, check, unchanged second run and removal passed", sentinelCommit)
 }
 
 // A rules file with a non-default mode keeps that mode through install and
 // removal, as other managed files do.
 func TestNativeSentinelKeepsRulesFileMode(t *testing.T) {
 	if os.Getenv("DOTFILES_TEST_SENTINEL") != "1" {
-		t.Skip("set DOTFILES_TEST_SENTINEL=1 to fetch and run the pinned Sentinel commit")
+		t.Skip("set DOTFILES_TEST_SENTINEL=1 to fetch and run the Sentinel floor release")
 	}
 	if runtime.GOOS == "windows" {
 		t.Skip("HOME does not move the Windows known folders")

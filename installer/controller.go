@@ -141,10 +141,11 @@ func (c Controller) Run(ctx context.Context, ui Interaction) (result Result, res
 		return result, err
 	}
 	// Choose tools also repairs failed checks and removes unchecked tools;
-	// Update additionally applies this checkout's reviewed versions.
+	// Update additionally applies this checkout's reviewed versions and the
+	// latest Sentinel release.
 	actions := []Choice{
 		{ID: "apply", Label: "Choose tools", Detail: "Install, remove or repair tools; required dependencies are included automatically."},
-		{ID: "update", Label: "Update tools", Detail: "Apply this checkout's reviewed versions and repair failed checks; your selection stays the same."},
+		{ID: "update", Label: "Update tools", Detail: "Apply this checkout's reviewed versions and the latest Sentinel release, and repair failed checks; your selection stays the same."},
 		{ID: "check", Label: "Check installation", Detail: "Inspect health and required actions without changing anything."},
 	}
 	initial := []string{"apply"}

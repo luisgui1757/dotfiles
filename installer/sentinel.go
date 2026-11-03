@@ -163,10 +163,8 @@ type SentinelDriver struct {
 	// API and the oldest release that setup installs.
 	Repository, Releases string
 	Floor                sentinelRelease
-	// Latest returns the latest release. Nil asks Releases and Repository.
+	// Latest returns the latest release. Nil asks Releases.
 	Latest func(context.Context) (sentinelRelease, error)
-	// Client asks Releases. Nil uses a client with a short timeout.
-	Client *http.Client
 	// Git is the git executable. Shell is /bin/bash, or Windows PowerShell.
 	Git, Shell string
 	// Run changes the system under the controller mutation guard. Query only
@@ -305,10 +303,7 @@ func (d *SentinelDriver) resolve(ctx context.Context) (sentinelRelease, error) {
 func (d *SentinelDriver) githubRelease(ctx context.Context) (sentinelRelease, error) {
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
-	client := d.Client
-	if client == nil {
-		client = &http.Client{}
-	}
+	client := &http.Client{}
 	get := func(url, accept string) ([]byte, error) {
 		request, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 		if err != nil {
@@ -635,6 +630,12 @@ func (d *SentinelDriver) Observe(ctx context.Context, r Resource, receipt Receip
 		return o, nil
 	}
 	o.Present, o.CompletedOperation = true, record.Operation
+	// After a resume or a recovered completion, the controller saves this
+	// observation in the receipt. It names the installed commit, so that a later
+	// update still sees a newer release.
+	if receipt.OperationID == record.Operation && receipt.Status != "ready" {
+		o.Desired = record.Commit
+	}
 	commit, err := d.verify(ctx, d.Query, d.checkout())
 	switch {
 	case err != nil:
@@ -743,8 +744,6 @@ func (d *SentinelDriver) Apply(ctx context.Context, r Resource, op Operation, re
 			release = latest
 		} else if record != nil && record.Commit == release.Commit {
 			release = d.installed(record)
-		} else if release.Commit == d.Floor.Commit {
-			release = d.Floor
 		}
 	case record != nil:
 		release = d.installed(record)

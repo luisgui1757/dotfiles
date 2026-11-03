@@ -119,7 +119,7 @@ var sentinelFloor = sentinelRelease{sentinelFloorTag, sentinelCommit}
 // looks up the latest release again.
 func sentinelNextRun(d *SentinelDriver) *SentinelDriver {
 	return &SentinelDriver{Target: d.Target, Home: d.Home, Locations: d.Locations, State: d.State, Repository: d.Repository, Releases: d.Releases, Floor: d.Floor,
-		Latest: d.Latest, Client: d.Client, Git: d.Git, Shell: d.Shell, Run: d.Run, Query: d.Query, Selected: d.Selected}
+		Latest: d.Latest, Git: d.Git, Shell: d.Shell, Run: d.Run, Query: d.Query, Selected: d.Selected}
 }
 
 func sentinelController(d *SentinelDriver) Controller {
@@ -504,6 +504,12 @@ func TestSentinelResumesAnInterruptedInstall(t *testing.T) {
 	if receipt := state.Receipts[sentinelResource]; err != nil || receipt.Ownership != "created" || receipt.Status != "ready" {
 		t.Fatal("the resumed install is not owned", receipt, err)
 	}
+	processes.head = strings.Repeat("4", 40)
+	c.Driver = sentinelNextRun(d)
+	dispatchApproved(t, c, Request{Schema: 1, Mode: "update"})
+	if record := sentinelRecorded(t, d); record.Commit != strings.Repeat("4", 40) || record.Tag != "v0.4.0" {
+		t.Fatal("the update after the resume did not install the newer release", record)
+	}
 	dispatchApproved(t, c, Request{Schema: 1, Mode: "apply", Selected: []string{"sentinel"}})
 	dispatchApproved(t, c, Request{Schema: 1, Mode: "apply", Selected: []string{}})
 	if remove := processes.installers()[len(processes.installers())-1]; remove.Arguments[len(remove.Arguments)-1] != "--remove" {
@@ -598,7 +604,7 @@ func TestSentinelAsksGitHubForAnImmutableRelease(t *testing.T) {
 	} {
 		release = name
 		d, _ := sentinelFixture(t, Context{OS: "linux", Arch: "amd64"})
-		d.Latest, d.Releases, d.Client = nil, server.URL+"/repos/owner/sentinel/releases/latest", server.Client()
+		d.Latest, d.Releases = nil, server.URL+"/repos/owner/sentinel/releases/latest"
 		writeConfigFixture(t, filepath.Join(d.Home, ".codex", "config.toml"), "")
 		o, err := d.Observe(context.Background(), Resource{ID: sentinelResource}, Receipt{})
 		switch {
@@ -636,5 +642,25 @@ func TestSentinelUpdateAfterARepairInstallsTheNewerRelease(t *testing.T) {
 	dispatchApproved(t, sentinelController(d), Request{Schema: 1, Mode: "update"})
 	if record := sentinelRecorded(t, d); record.Commit != newer.Commit || record.Tag != newer.Tag {
 		t.Fatal("the update after the repair did not install the newer release", record)
+	}
+}
+
+// A recovered completion saves the observation that the planner made for the
+// unfinished receipt. That observation names the installed commit, so that the
+// next update still installs a newer release.
+func TestSentinelRecoveryKeepsTheInstalledCommitForTheNextUpdate(t *testing.T) {
+	d, processes := sentinelFixture(t, Context{OS: "linux", Arch: "amd64"})
+	writeConfigFixture(t, filepath.Join(d.Home, ".codex", "config.toml"), "")
+	if _, err := sentinelApply(t, d); err != nil {
+		t.Fatal(err)
+	}
+	processes.latest = sentinelRelease{"v0.4.0", strings.Repeat("4", 40)}
+	d = sentinelNextRun(d)
+	r := Resource{ID: sentinelResource}
+	for status, want := range map[string]string{"in-progress": sentinelCommit, "needs-action": sentinelCommit, "ready": strings.Repeat("4", 40)} {
+		o, err := d.Observe(context.Background(), r, Receipt{OperationID: sentinelOperation, Status: status})
+		if err != nil || !o.Healthy || o.CompletedOperation != sentinelOperation || o.Desired != want {
+			t.Fatal("the observation for the receipt names the wrong commit", status, o, err)
+		}
 	}
 }
