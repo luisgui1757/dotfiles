@@ -72,7 +72,8 @@ Windows PowerShell on Windows. Dotfiles does not change the Sentinel files.
 
 Renovate tracks the Sentinel release tags with a custom regex manager and the
 `github-tags` datasource. When Sentinel publishes a release, Renovate opens a
-pull request that changes the pin and the version comment next to it. All checks that protect `main` must pass on that pull request.
+pull request that changes the pin and the version comment next to it.
+All checks that protect `main` must pass on that pull request.
 After you merge and pull it, **Update tools** applies the new pin.
 
 ## Agent CLI pin proposals
