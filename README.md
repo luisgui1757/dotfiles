@@ -418,7 +418,7 @@ operation use the commit of the install. An install older than v0.3.0 fails
 Check, and repair installs the latest release, or v0.3.0 when the release
 lookup fails. Repair still needs Git access to GitHub.
 
-Coming from dotfiles v1.0.0? Read
+Coming from dotfiles v1.0.0 or v1.0.1? Read
 [Sentinel rules and skills](docs/UPGRADING.md#sentinel-rules-and-skills).
 
 Authenticated agent execution remains a separate verification step. Notes remain personal: Neovim

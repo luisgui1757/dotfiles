@@ -10,7 +10,7 @@ import (
 func TestEachResourceOfAReleaseStaysInTheCatalog(t *testing.T) {
 	tags, err := exec.Command("git", "tag", "--list", "v[1-9]*").Output()
 	if err != nil || len(strings.Fields(string(tags))) == 0 {
-		t.Fatal("the release tags are required", err)
+		t.Fatal("the release tags are required: run git fetch --tags", err)
 	}
 	catalog, err := DefaultCatalog()
 	if err != nil {
