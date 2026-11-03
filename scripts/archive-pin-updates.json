@@ -225,13 +225,6 @@
         "windows/amd64": "t3-{version}-win32-x64.zip"
       }
     },
-    "tool.gersemi": {
-      "repository": "BlankSpruce/gersemi",
-      "tag": "{version}",
-      "assets": {
-        "windows/amd64": "gersemi-windows.exe"
-      }
-    },
     "font.hack": {
       "repository": "ryanoasis/nerd-fonts",
       "tag": "v{version}",
@@ -268,6 +261,7 @@
     "tool.obsidian": "The macOS disk image needs native layout verification.",
     "tool.t3-code-app": "DEB layout verification must account for the generated launcher.",
     "tool.zen": "Beta tags, disk images and generated profile wrappers need a recipe.",
-    "tool.clang-format": "The PyPI wheel contains paths that depend on its version."
+    "tool.clang-format": "The PyPI wheel contains paths that depend on its version.",
+    "tool.gersemi": "The Windows formatter version must match the Mason registry snapshot."
   }
 }

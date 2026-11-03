@@ -221,7 +221,7 @@ def archive_names(path: pathlib.Path, form: str, strip: int) -> set:
         names = [name for name, member in tar_members(path).items() if not member.isdir()]
     stripped = set()
     for name in names:
-        parts = name.split("/")
+        parts = name.removeprefix("./").split("/")
         if len(parts) > strip:
             stripped.add("/".join(parts[strip:]))
     return stripped

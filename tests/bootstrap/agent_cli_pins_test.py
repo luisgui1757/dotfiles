@@ -327,6 +327,29 @@ class GitHubPinBumpTest(unittest.TestCase):
         self.assertEqual(resources, self.pins)
         self.assertIn("1.0.0 held", summary)
 
+    def test_superfile_accepts_the_publishers_dot_slash_archive_prefix(self):
+        self.publish("tool.superfile", "1.99.0")
+        asset = next(asset for asset in self.release["assets"] if asset["name"] == "superfile-linux-v1.99.0-amd64.tar.gz")
+        data = tgz({"./dist/superfile-linux-v1.99.0-amd64/spf": b"binary"})
+        self.network.files[asset["browser_download_url"]] = data
+        asset["digest"] = "sha256:" + hashlib.sha256(data).hexdigest()
+        self.network.texts[self.api] = json.dumps(self.release).encode()
+        resources, _ = self.run_bump("tool.superfile")
+        self.assertEqual({pin["version"] for pin in resources["tool.superfile"].values()}, {"1.99.0"})
+
+    def test_gersemi_cannot_update_without_the_mason_snapshot(self):
+        url = "https://github.com/BlankSpruce/gersemi/releases/download/0.29.3/gersemi-windows.exe"
+        data = b"binary"
+        self.network.files[url] = data
+        self.network.texts["https://api.github.com/repos/BlankSpruce/gersemi/releases/latest"] = json.dumps({
+            "tag_name": "0.29.3", "assets": [{"name": "gersemi-windows.exe", "browser_download_url": url,
+                                             "digest": "sha256:" + hashlib.sha256(data).hexdigest()}]
+        }).encode()
+        with mock.patch("sys.stderr", new=io.StringIO()), mock.patch("builtins.print"), self.assertRaises(SystemExit) as rejected:
+            pins_script.main(["--pins", str(self.path), "--tools", "tool.gersemi"], network=self.network)
+        self.assertEqual(rejected.exception.code, 2)
+        self.assertEqual(self.path.read_text(), self.original)
+
     def test_coverage_rejects_an_unlisted_resource_and_an_unlisted_target(self):
         for change in ("resource", "target"):
             with self.subTest(change=change):
