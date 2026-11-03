@@ -631,9 +631,10 @@ func (d *SentinelDriver) Observe(ctx context.Context, r Resource, receipt Receip
 	}
 	o.Present, o.CompletedOperation = true, record.Operation
 	// After a resume or a recovered completion, the controller saves this
-	// observation in the receipt. It names the installed commit, so that a later
+	// observation in the receipt. While the receipt does not prove the finished
+	// operation yet, the observation names the installed commit, so that a later
 	// update still sees a newer release.
-	if receipt.OperationID == record.Operation && receipt.Status != "ready" {
+	if receipt.OperationID == record.Operation && receipt.Status != "ready" && receipt.After.CompletedOperation != record.Operation {
 		o.Desired = record.Commit
 	}
 	commit, err := d.verify(ctx, d.Query, d.checkout())

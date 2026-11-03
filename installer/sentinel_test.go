@@ -659,8 +659,59 @@ func TestSentinelRecoveryKeepsTheInstalledCommitForTheNextUpdate(t *testing.T) {
 	r := Resource{ID: sentinelResource}
 	for status, want := range map[string]string{"in-progress": sentinelCommit, "needs-action": sentinelCommit, "ready": strings.Repeat("4", 40)} {
 		o, err := d.Observe(context.Background(), r, Receipt{OperationID: sentinelOperation, Status: status})
+		if err != nil || o.Desired != want {
+			t.Fatal("the observation for the receipt names the wrong commit", status, o, err)
+		}
+		// A receipt whose After already proves the operation keeps the latest
+		// release as Desired, so that a normal update installs it.
+		o, err = d.Observe(context.Background(), r, Receipt{OperationID: sentinelOperation, Status: status, After: Observation{CompletedOperation: sentinelOperation}})
+		want = strings.Repeat("4", 40)
 		if err != nil || !o.Healthy || o.CompletedOperation != sentinelOperation || o.Desired != want {
 			t.Fatal("the observation for the receipt names the wrong commit", status, o, err)
 		}
+	}
+}
+
+// An update that waits for a missing host leaves a needs-action receipt that
+// proves the finished install. After an abandon, or in the retry of that
+// update, a newer release installs at once.
+func TestSentinelUpdateAfterAWaitingUpdateInstallsTheNewerRelease(t *testing.T) {
+	for _, recovery := range []string{"abandon", "retry"} {
+		t.Run(recovery, func(t *testing.T) {
+			d, processes := sentinelFixture(t, Context{OS: "linux", Arch: "amd64"})
+			codex := filepath.Join(d.Home, ".codex")
+			writeConfigFixture(t, filepath.Join(codex, "config.toml"), "")
+			c := sentinelController(d)
+			dispatchApproved(t, c, Request{Schema: 1, Mode: "apply", Selected: []string{"sentinel"}})
+			if err := os.RemoveAll(codex); err != nil {
+				t.Fatal(err)
+			}
+			c.Driver = sentinelNextRun(d)
+			request := Request{Schema: 1, Mode: "update"}
+			preview, err := c.Dispatch(context.Background(), request)
+			if err != nil {
+				t.Fatal(err)
+			}
+			request.ExpectedPlan = preview.Plan.ID
+			if _, err := c.Dispatch(context.Background(), request); err != nil {
+				t.Fatal(err)
+			}
+			if state, err := LoadState(c.StatePath, d.Home); err != nil || state.Transaction == nil {
+				t.Fatal("the update did not wait for the missing host", err)
+			}
+			writeConfigFixture(t, filepath.Join(codex, "config.toml"), "")
+			processes.latest, processes.head = sentinelRelease{"v0.4.0", strings.Repeat("4", 40)}, strings.Repeat("4", 40)
+			c.Driver = sentinelNextRun(d)
+			if recovery == "abandon" {
+				dispatchApproved(t, c, Request{Schema: 1, Mode: "abandon"})
+				c.Driver = sentinelNextRun(d)
+				dispatchApproved(t, c, Request{Schema: 1, Mode: "update"})
+			} else {
+				dispatchApproved(t, c, Request{Schema: 1, Mode: "update", Retry: true})
+			}
+			if record := sentinelRecorded(t, d); record.Commit != strings.Repeat("4", 40) {
+				t.Fatal("the first update after the waiting update did not install the newer release", recovery, record)
+			}
+		})
 	}
 }
