@@ -2,6 +2,7 @@ package installer
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -209,5 +210,47 @@ func TestNativeBrewInstalledApplicationLifecycle(t *testing.T) {
 		if _, err := os.Lstat(path); !os.IsNotExist(err) {
 			t.Fatal("owned configuration survived full removal", path, err)
 		}
+	}
+}
+
+func TestNativeBrewT3CodeCaskLifecycle(t *testing.T) {
+	if runtime.GOOS != "darwin" || os.Getenv("GITHUB_ACTIONS") != "true" || os.Getenv("DOTFILES_TEST_NATIVE_PACKAGES") != "1" {
+		t.Skip("requires explicitly enabled disposable GitHub macOS package host")
+	}
+	application := t3CodeCaskSpec("", "").Application
+	if _, err := os.Lstat(application); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("the runner already has T3 Code", err)
+	}
+	repository, err := filepath.Abs("..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	home, err := resolveConfigPath(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	invoke := installedMachineFixture(t, repository, home, 15*time.Minute)
+	apply := func(selected []string) {
+		t.Helper()
+		request := Request{Schema: 1, Mode: "apply", Selected: selected}
+		preview := invoke(request)
+		if preview.Status != "preview" {
+			t.Fatal("no approval plan", preview)
+		}
+		request.ExpectedPlan = preview.Plan.ID
+		if result := invoke(request); result.Status != "ready" {
+			t.Fatal("approved operation did not complete", result)
+		}
+		if result := invoke(Request{Schema: 1, Mode: "check"}); result.Status != "ready" {
+			t.Fatal("check failed after the operation", result)
+		}
+	}
+	apply([]string{"t3-code-app"})
+	if _, err := os.Stat(filepath.Join(application, "Contents", "Info.plist")); err != nil {
+		t.Fatal("the cask did not install the app", err)
+	}
+	apply([]string{})
+	if _, err := os.Lstat(application); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("removal kept the app", err)
 	}
 }
