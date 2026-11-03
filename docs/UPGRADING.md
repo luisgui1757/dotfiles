@@ -266,7 +266,7 @@ skills, runs the installer of a Sentinel release. A saved selection of either
 earlier choice becomes this selection.
 
 Before you update the checkout, finish or abandon an interrupted Sentinel
-operation with v1.0.0. Follow [Interruptions and conflicts](#interruptions-and-conflicts).
+operation with the release that started it. Follow [Interruptions and conflicts](#interruptions-and-conflicts).
 
 The Sentinel install of **Update tools** or **Choose tools** hands the files
 over. **Update tools** keeps the old receipts. A later **Choose tools** run
@@ -495,6 +495,8 @@ The same inherited `HOMEBREW_NO_EMOJI` preference also hides formula installatio
 markers. New formula and cask operations explicitly retain those markers; earlier
 schema-3 operations keep their original command environment for inspection and
 recovery. Never rewrite an interrupted operation to grant it new attribution.
+
+## A personal Homebrew Zen without its app
 
 If you installed Zen yourself through Homebrew and then removed only its app,
 restore it with
