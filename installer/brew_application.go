@@ -15,6 +15,7 @@ import (
 // Only this reviewed app recipe is connected in production. Version and bundle
 // bytes are deliberately not ownership identities: vendor updates replace them.
 type brewCaskSpec struct {
+	Name                                           string
 	Application, UserApplication, Caskroom, Binary string
 	Bundle, Requirement                            string
 }
@@ -25,10 +26,21 @@ func isHomebrewPackage(provider string) bool {
 
 func zenCaskSpec(home, prefix string) brewCaskSpec {
 	return brewCaskSpec{
+		Name:        "Zen",
 		Application: "/Applications/Zen.app", UserApplication: filepath.Join(home, "Applications", "Zen.app"),
 		Caskroom: filepath.Join(prefix, "Caskroom", "zen"), Binary: filepath.Join(prefix, "bin", "zen"),
 		Bundle:      "app.zen-browser.zen",
 		Requirement: `anchor apple generic and identifier "app.zen-browser.zen" and certificate 1[field.1.2.840.113635.100.6.2.6] exists and certificate leaf[field.1.2.840.113635.100.6.1.13] exists and certificate leaf[subject.OU] = "9V5K9TP787"`,
+	}
+}
+
+func t3CodeCaskSpec(home, prefix string) brewCaskSpec {
+	return brewCaskSpec{
+		Name:        "T3 Code",
+		Application: "/Applications/T3 Code (Beta).app", UserApplication: filepath.Join(home, "Applications", "T3 Code (Beta).app"),
+		Caskroom: filepath.Join(prefix, "Caskroom", "t3-code"), Binary: filepath.Join(prefix, "bin", "t3-code"),
+		Bundle:      "com.t3tools.t3code",
+		Requirement: `anchor apple generic and identifier "com.t3tools.t3code" and certificate 1[field.1.2.840.113635.100.6.2.6] exists and certificate leaf[field.1.2.840.113635.100.6.1.13] exists and certificate leaf[subject.OU] = "ARK85ZXQ4Z"`,
 	}
 }
 
@@ -117,8 +129,8 @@ func (d *BrewDriver) caskIdentity(ctx context.Context, s brewCaskSpec, path stri
 func (d *BrewDriver) observeCask(ctx context.Context, r Resource, o Observation, pkg nativePackage, s brewCaskSpec, owned bool) (Observation, error) {
 	o.Provider, o.Identity = "homebrew-cask", s.Application
 	o.Desired = "native-auto-updating-app-v1"
-	o.RemovalDetail = "remove the signed Zen app at its recorded path; personal profiles remain; a manual reinstall from the same developer at that path is indistinguishable from a browser update"
-	o.ApplyDetail = "install the official native app through Homebrew; normal browser updates remain enabled; personal profiles stay untouched"
+	o.RemovalDetail = "remove the signed " + s.Name + " app at its recorded path; personal data remains; a manual reinstall from the same developer at that path is indistinguishable from an app update"
+	o.ApplyDetail = "install the official native app through Homebrew; normal app updates remain enabled; personal data stays untouched"
 	present, healthy, err := d.caskIdentity(ctx, s, s.Application)
 	unknown := func(err error) (Observation, error) {
 		if ctx.Err() != nil {
@@ -158,7 +170,8 @@ func (d *BrewDriver) observeCask(ctx context.Context, r Resource, o Observation,
 		if !present {
 			o.HealthIssue = "the recorded native application is absent"
 			if !owned && o.Pending == "" {
-				o.Pending = "your Homebrew zen record has no app; use HOMEBREW_NO_AUTOREMOVE=1 HOMEBREW_NO_INSTALL_CLEANUP=1 brew reinstall --cask zen to restore it, or HOMEBREW_NO_AUTOREMOVE=1 brew uninstall --cask zen before installing it through setup"
+				token := d.Packages[r.ID]
+				o.Pending = "your Homebrew " + token + " record has no app; use HOMEBREW_NO_AUTOREMOVE=1 HOMEBREW_NO_INSTALL_CLEANUP=1 brew reinstall --cask " + token + " to restore it, or HOMEBREW_NO_AUTOREMOVE=1 brew uninstall --cask " + token + " before installing it through setup"
 			}
 		}
 		if err := d.caskInstalledRecipe(s, d.Packages[r.ID]); owned && err != nil {
@@ -171,7 +184,7 @@ func (d *BrewDriver) observeCask(ctx context.Context, r Resource, o Observation,
 		o.Present, o.Healthy = present, present && healthy
 	}
 	if _, err := os.Lstat(s.Binary); err == nil && (owned || !o.Healthy) {
-		o.Pending = "preserve the existing Zen command at " + s.Binary + "; Homebrew may unlink it during removal"
+		o.Pending = "preserve the existing " + s.Name + " command at " + s.Binary + "; Homebrew may unlink it during removal"
 	} else if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return unknown(err)
 	}
@@ -199,8 +212,14 @@ func validateCaskMetadata(data []byte, s brewCaskSpec, token string, installed b
 	if len(data) > 1<<20 || json.Unmarshal(data, &doc) != nil || doc.Token != token || doc.FullToken != token || doc.Tap != "homebrew/cask" {
 		return errors.New("native app metadata has an unverified source")
 	}
-	if !installed && (!operationID.MatchString(doc.SHA256) || !doc.AutoUpdates || len(doc.DependsOn) != 0) {
-		return errors.New("native app recipe changed its checksum, updater or dependency contract")
+	if !installed {
+		changed := !operationID.MatchString(doc.SHA256) || !doc.AutoUpdates
+		for key := range doc.DependsOn {
+			changed = changed || key != "macos"
+		}
+		if changed {
+			return errors.New("native app recipe changed its checksum, updater or dependency contract")
+		}
 	}
 	return validateCaskArtifacts(doc.Artifacts, s, token)
 }
@@ -387,7 +406,7 @@ func (d *BrewDriver) checkCaskMutation(ctx context.Context, intent brewIntent, s
 		return err
 	}
 	if strings.TrimSpace(string(output)) != "not-running" {
-		return errors.New("quit all copies of Zen before changing its installation")
+		return errors.New("quit all copies of " + s.Name + " before changing its installation")
 	}
 	installed, err := brewInventory(ctx, d.Query)
 	if err != nil {

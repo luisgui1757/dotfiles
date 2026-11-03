@@ -3030,6 +3030,36 @@
         "libc": "glibc"
       }
     },
+    "tool.t3-code-app": {
+      "linux/amd64": {
+        "version": "0.1.6",
+        "url": "https://github.com/pingdotgg/t3code/releases/download/v0.1.6/T3-Code-0.1.6-amd64.deb",
+        "sha256": "6f40901df85910ef345cbf75ea921c5e024c650994ce68d6806a7d0f493e0dd5",
+        "format": "deb",
+        "commands": {},
+        "bin_dirs": [],
+        "required_files": [
+          "opt/T3 Code (Beta)/t3code",
+          "opt/T3 Code (Beta)/resources/app.asar",
+          "usr/share/icons/hicolor/256x256/apps/t3code.png"
+        ],
+        "libc": "glibc"
+      },
+      "linux/arm64": {
+        "version": "0.1.6",
+        "url": "https://github.com/pingdotgg/t3code/releases/download/v0.1.6/T3-Code-0.1.6-arm64.deb",
+        "sha256": "f3709a92a228cab01ce40d2166de124c9100abf0884bde6fd8f82584fdbc3928",
+        "format": "deb",
+        "commands": {},
+        "bin_dirs": [],
+        "required_files": [
+          "opt/T3 Code (Beta)/t3code",
+          "opt/T3 Code (Beta)/resources/app.asar",
+          "usr/share/icons/hicolor/256x256/apps/t3code.png"
+        ],
+        "libc": "glibc"
+      }
+    },
     "tool.zen": {
       "darwin/arm64": {
         "version": "1.23.2b",

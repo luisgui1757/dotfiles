@@ -165,6 +165,9 @@ func (d *ArchiveDriver) observe(id string) (Observation, error) {
 	if id == obsidianPortable {
 		o.ApplyDetail = "official portable build; its launcher starts it without Chromium's sandbox, which needs user namespaces that Ubuntu restricts by default; vaults and settings are retained"
 	}
+	if id == "tool.t3-code-app" {
+		o.ApplyDetail = "official .deb unpacked privately without its install scripts; its launcher starts it without Chromium's sandbox and without automatic updates, and Update tools moves it to the reviewed release; T3 settings and threads are retained"
+	}
 	o.Desired = archiveDesiredID(pin)
 	current, err := d.current(id)
 	if err != nil {

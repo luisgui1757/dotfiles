@@ -99,6 +99,9 @@ func TestNativeDesktopInstalledApplicationLifecycle(t *testing.T) {
 	if runtime.GOOS == "linux" && runtime.GOARCH == "amd64" {
 		selected = append(selected, "openwhispr")
 	}
+	if runtime.GOOS == "linux" {
+		selected = append(selected, "t3-code")
+	}
 	before := map[string]configSnapshot{}
 	for _, id := range selected {
 		desktopID := "desktop." + id
@@ -345,6 +348,9 @@ func desktopConsumePublished(t *testing.T, d *DesktopDriver, a *ArchiveDriver, i
 	if runtime.GOOS == "linux" && id == "obsidian" {
 		packageRoot = filepath.Join(a.Directory, obsidianPortable)
 	}
+	if runtime.GOOS == "linux" && id == "t3-code" {
+		packageRoot = filepath.Join(a.Directory, "tool.t3-code-app")
+	}
 	if runtime.GOOS == "darwin" && p.Package == "app.zen" {
 		packageRoot = p.Source
 	}
@@ -456,7 +462,7 @@ func desktopConsumePublished(t *testing.T, d *DesktopDriver, a *ArchiveDriver, i
 		}
 		_, class, ok := strings.Cut(string(data), "\nStartupWMClass=")
 		class, _, _ = strings.Cut(class, "\n")
-		if (id == "ghostty" || id == "zen" || id == "obsidian" || id == "openwhispr") != ok {
+		if (id == "ghostty" || id == "zen" || id == "obsidian" || id == "openwhispr" || id == "t3-code") != ok {
 			t.Fatalf("%s launcher StartupWMClass presence is wrong:\n%s", id, data)
 		}
 		if ok {
@@ -496,6 +502,23 @@ func desktopConsumePublished(t *testing.T, d *DesktopDriver, a *ArchiveDriver, i
 		}
 		if !unsandboxed {
 			t.Fatal("Obsidian was not started through its --no-sandbox launcher", owned)
+		}
+	case "t3-code":
+		unsandboxed, updatesOff := false, false
+		for _, pid := range owned {
+			command, err := os.ReadFile(fmt.Sprintf("/proc/%d/cmdline", pid))
+			if err != nil && !errors.Is(err, os.ErrNotExist) {
+				t.Fatal(err)
+			}
+			environ, err := os.ReadFile(fmt.Sprintf("/proc/%d/environ", pid))
+			if err != nil && !errors.Is(err, os.ErrNotExist) {
+				t.Fatal(err)
+			}
+			unsandboxed = unsandboxed || slices.Contains(strings.Fields(strings.ReplaceAll(string(command), "\x00", " ")), "--no-sandbox")
+			updatesOff = updatesOff || slices.Contains(strings.Split(string(environ), "\x00"), "T3CODE_DISABLE_AUTO_UPDATE=1")
+		}
+		if !unsandboxed || !updatesOff {
+			t.Fatal("T3 Code was not started through its launcher without the sandbox and the updater", owned)
 		}
 	case "ghostty":
 		cli, err := a.CommandPath("tool.ghostty", "ghostty")

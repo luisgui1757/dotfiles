@@ -26,6 +26,7 @@ Neither a package name nor a version print proves downloaded bytes.
 | Windows vendor tools | Pinned bootstrapper bytes plus valid Microsoft Authenticode and native registration/operation evidence. Build Tools resolves Microsoft's signed servicing packages; its bootstrap hash is not a claim that those changing components are individually pinned. |
 | Windows Terminal | Pinned official unpackaged stable ZIP; scoped settings at the observed LocalAppData path. Store/Preview/Canary are independent. |
 | Ghostty on Linux | One reviewed Debian-family archive per architecture, extracted privately; native APT supplies declared system libraries. No upstream repository-add script or DEB maintainer script executes. |
+| T3 Code app | macOS: the official Homebrew `t3-code` cask. Setup accepts only its reviewed app artifact and a macOS version requirement, and `codesign` must prove the bundle ID `com.t3tools.t3code` and the Developer ID team `ARK85ZXQ4Z`. T3 updates itself. Ubuntu/Debian: the official `.deb` of each architecture with an exact SHA-256, extracted privately. Its maintainer scripts never run, so setup installs no AppArmor profile and no system link. The launcher turns off T3's updater and Chromium's sandbox. Windows is not offered, because T3 ships the app there only as an installer. |
 | Hosted actions and containers | Full action commit SHAs and immutable container digests; native jobs verify their actual OS/architecture. |
 
 Existing packages, foreign files and personal data never acquire deletion

@@ -36,6 +36,9 @@ func TestNativeDesktopArchiveLifecycles(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		cases = append(cases, struct{ ID, Command, Bundle string }{"tool.ghostty", "ghostty", "Ghostty.app"})
 	}
+	if runtime.GOOS == "linux" {
+		cases = append(cases, struct{ ID, Command, Bundle string }{"tool.t3-code-app", "", ""})
+	}
 	if runtime.GOOS == "darwin" {
 		cases = append(cases, struct{ ID, Command, Bundle string }{"tool.aerospace", "aerospace", "AeroSpace.app"})
 		for id, bundle := range map[string]string{"tool.openwhispr": "OpenWhispr.app", "tool.obsidian": "Obsidian.app", "tool.zen": "Zen.app"} {

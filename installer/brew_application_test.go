@@ -435,12 +435,14 @@ func TestNativeAppIntentRejectsRecipeChanges(t *testing.T) {
 
 func TestNativeAppRecipeRejectsScriptsDependenciesAndRedirectedArtifacts(t *testing.T) {
 	s := zenCaskSpec(t.TempDir(), t.TempDir())
-	for _, change := range []string{"valid", "dependency", "no-check", "updater", "script", "app", "wrapper", "tap"} {
+	for _, change := range []string{"valid", "macos", "dependency", "no-check", "updater", "script", "app", "wrapper", "tap"} {
 		t.Run(change, func(t *testing.T) {
 			doc := caskMetadataFixture(s)
 			switch change {
+			case "macos":
+				doc["depends_on"] = map[string]any{"macos": map[string]any{">=": []string{"13"}}}
 			case "dependency":
-				doc["depends_on"] = map[string]any{"formula": []string{"other"}}
+				doc["depends_on"] = map[string]any{"macos": map[string]any{">=": []string{"13"}}, "formula": []string{"other"}}
 			case "no-check":
 				doc["sha256"] = "no_check"
 			case "updater":
@@ -459,7 +461,7 @@ func TestNativeAppRecipeRejectsScriptsDependenciesAndRedirectedArtifacts(t *test
 				t.Fatal(err)
 			}
 			err = validateCaskMetadata(data, s, "zen", false)
-			if (err == nil) != (change == "valid") {
+			if (err == nil) != (change == "valid" || change == "macos") {
 				t.Fatal(change, err)
 			}
 		})

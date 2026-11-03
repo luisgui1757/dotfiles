@@ -49,7 +49,7 @@ func (d *NativeDriver) provider(r Resource) (Driver, error) {
 	}
 	if d.Desktop != nil {
 		switch r.ID {
-		case "desktop.vscode", "desktop.aerospace", "integration.ghostty", "desktop.rose-pine", "desktop.windows-terminal", "desktop.openwhispr", "desktop.obsidian", "desktop.zen", "desktop.xremap":
+		case "desktop.vscode", "desktop.aerospace", "integration.ghostty", "desktop.rose-pine", "desktop.windows-terminal", "desktop.openwhispr", "desktop.obsidian", "desktop.t3-code", "desktop.zen", "desktop.xremap":
 			return d.Desktop, nil
 		}
 	}

@@ -282,7 +282,7 @@
     },
     {
       "id": "t3-code",
-      "name": "T3 Code",
+      "name": "T3 Code server",
       "description": "Stable standalone server + browser UI; configure/authenticate a provider separately",
       "capability": true,
       "category": "AI coding",
@@ -290,6 +290,27 @@
         "tool.t3"
       ],
       "scope": "user"
+    },
+    {
+      "id": "t3-code-app",
+      "name": "T3 Code",
+      "description": "Desktop app with its own server; configure/authenticate a provider separately; on Linux the official .deb runs privately without Chromium's sandbox and without automatic updates",
+      "capability": true,
+      "category": "AI coding",
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "scope": "user",
+      "platform_requires": {
+        "darwin": [
+          "app.t3-code"
+        ],
+        "linux": [
+          "tool.t3-code-app",
+          "desktop.t3-code"
+        ]
+      }
     },
     {
       "id": "claude-code",
@@ -2484,6 +2505,18 @@
       }
     },
     {
+      "id": "desktop.t3-code",
+      "name": "T3 Code launcher",
+      "platforms": [
+        "linux"
+      ],
+      "requires": [
+        "tool.t3-code-app"
+      ],
+      "action": "desktop",
+      "scope": "user"
+    },
+    {
       "id": "tool.obsidian-portable",
       "name": "Obsidian portable build",
       "platforms": [
@@ -2502,6 +2535,28 @@
         "linux": {
           "provider": "archive",
           "package": "tool.obsidian-portable"
+        }
+      }
+    },
+    {
+      "id": "tool.t3-code-app",
+      "name": "T3 Code desktop build",
+      "platforms": [
+        "linux"
+      ],
+      "requires": [
+        "library.libgtk-3-0t64",
+        "library.libasound2t64",
+        "library.libnss3",
+        "library.libgbm1",
+        "library.libstdcxx6"
+      ],
+      "action": "archive",
+      "scope": "user",
+      "bindings": {
+        "linux": {
+          "provider": "archive",
+          "package": "tool.t3-code-app"
         }
       }
     },
@@ -2839,6 +2894,25 @@
         "darwin": {
           "provider": "homebrew-cask",
           "package": "zen"
+        }
+      }
+    },
+    {
+      "id": "app.t3-code",
+      "name": "T3 Code application",
+      "description": "Official native app; normal app updates and personal T3 data remain under your control",
+      "platforms": [
+        "darwin"
+      ],
+      "action": "package",
+      "scope": "machine",
+      "requires": [
+        "infra.homebrew"
+      ],
+      "bindings": {
+        "darwin": {
+          "provider": "homebrew-cask",
+          "package": "t3-code"
         }
       }
     }
