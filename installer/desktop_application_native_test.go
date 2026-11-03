@@ -526,6 +526,10 @@ func desktopConsumePublished(t *testing.T, d *DesktopDriver, a *ArchiveDriver, i
 		if !unsandboxed || !updatesOff {
 			t.Fatal("T3 Code was not started through its launcher without the sandbox and the updater", owned)
 		}
+		handler, err := os.ReadFile(filepath.Join(d.Folders.Data, "applications", "com.t3tools.T3Code.desktop"))
+		if err != nil || !strings.Contains(string(handler), filepath.Join(packageRoot, "current", "t3-code")) {
+			t.Fatalf("the T3 Code link handler does not start the launcher script: %v\n%s", err, handler)
+		}
 	case "ghostty":
 		cli, err := a.CommandPath("tool.ghostty", "ghostty")
 		if err != nil {

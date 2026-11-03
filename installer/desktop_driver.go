@@ -130,7 +130,7 @@ func (d *DesktopDriver) recipe(id string) (desktopRecipe, error) {
 				p.Icon, err = required("resources/icon.png")
 			}
 		case "tool.t3-code-app":
-			p.Command, err = required("opt/T3 Code (Beta)/t3code")
+			p.Command, err = required("t3-code")
 			if err == nil {
 				p.Icon, err = required("usr/share/icons/hicolor/256x256/apps/t3code.png")
 			}
@@ -167,8 +167,8 @@ func (d *DesktopDriver) recipe(id string) (desktopRecipe, error) {
 			p.Contents = strings.Replace(p.Contents, "Categories=Development;", "Categories=Office;\nMimeType=x-scheme-handler/obsidian;", 1)
 		}
 		if p.Package == "tool.t3-code-app" && err == nil {
-			exec := desktopExecArgument(p.Command)
-			p.Contents = strings.Replace(p.Contents, "\nExec="+exec+"\n", "\nExec=/usr/bin/env T3CODE_DISABLE_AUTO_UPDATE=1 "+exec+" --no-sandbox %U\n", 1)
+			exec := "\nExec=" + desktopExecArgument(p.Command)
+			p.Contents = strings.Replace(p.Contents, exec+"\n", exec+" %U\n", 1)
 			p.Contents = strings.Replace(p.Contents, "Categories=Development;", "Categories=Development;\nMimeType=x-scheme-handler/t3code;", 1)
 		}
 	case "windows":

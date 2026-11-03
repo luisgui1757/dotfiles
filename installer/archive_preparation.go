@@ -32,7 +32,7 @@ func validateArchivePreparation(pin ArchivePin) error {
 		return errors.New("PortableGit recipe revision requires its fixed preparation")
 	}
 	preparations := 0
-	for _, enabled := range []bool{len(pin.RustComponents) > 0, pin.Latex2text != nil, pin.Yamllint != nil, pin.PythonStdlib != "", pin.PortableGit, pin.GhosttyLibraries, pin.ZenProfile} {
+	for _, enabled := range []bool{len(pin.RustComponents) > 0, pin.Latex2text != nil, pin.Yamllint != nil, pin.PythonStdlib != "", pin.PortableGit, pin.GhosttyLibraries, pin.ZenProfile, pin.T3CodeLauncher} {
 		if enabled {
 			preparations++
 		}
@@ -57,7 +57,7 @@ func validateArchivePreparation(pin ArchivePin) error {
 		}
 		expected := rustComponentNames(pin.RustTarget)
 		for index, component := range pin.RustComponents {
-			if len(component.RustComponents) != 0 || component.RustTarget != "" || component.Latex2text != nil || component.Yamllint != nil || component.PythonStdlib != "" || component.PortableGit || component.GhosttyLibraries || component.ZenProfile {
+			if len(component.RustComponents) != 0 || component.RustTarget != "" || component.Latex2text != nil || component.Yamllint != nil || component.PythonStdlib != "" || component.PortableGit || component.GhosttyLibraries || component.ZenProfile || component.T3CodeLauncher {
 				return errors.New("nested archive preparations are forbidden")
 			}
 			if component.Version != pin.Version || component.Format != "tar.gz" || component.StripComponents != 1 || len(component.Commands) != 0 || !slices.Equal(component.RequiredFiles, []string{expected[index] + "/manifest.in"}) || len(component.ExcludedFiles) != 0 || len(component.Replacements) != 0 {
@@ -86,6 +86,9 @@ func validateArchivePreparation(pin ArchivePin) error {
 	if pin.GhosttyLibraries {
 		return validateGhosttyLibrariesPin(pin)
 	}
+	if pin.T3CodeLauncher {
+		return validateT3CodeLauncherPin(pin)
+	}
 	return nil
 }
 
@@ -111,6 +114,7 @@ func (d *ArchiveDriver) preparePayload(ctx context.Context, intent archiveIntent
 	source.PortableGit = false
 	source.PortableGitRevision = 0
 	source.GhosttyLibraries = false
+	source.T3CodeLauncher = false
 	source.ZenProfile = false
 	source.ZenProfileRevision = 0
 	if pin.ZenProfile && pin.Format == "dmg" {
@@ -118,6 +122,9 @@ func (d *ArchiveDriver) preparePayload(ctx context.Context, intent archiveIntent
 	}
 	if pin.GhosttyLibraries {
 		source.RequiredFiles = slices.DeleteFunc(slices.Clone(source.RequiredFiles), func(name string) bool { return name == "usr/bin/ghostty-bin" })
+	}
+	if pin.T3CodeLauncher {
+		source.RequiredFiles = slices.DeleteFunc(slices.Clone(source.RequiredFiles), func(name string) bool { return name == "t3-code" })
 	}
 	if len(pin.RustComponents) > 0 {
 		source.Commands = nil
@@ -157,6 +164,10 @@ func (d *ArchiveDriver) preparePayload(ctx context.Context, intent archiveIntent
 		}
 	case pin.GhosttyLibraries:
 		if err := prepareGhosttyLibraries(pin, payload); err != nil {
+			return err
+		}
+	case pin.T3CodeLauncher:
+		if err := prepareT3CodeLauncher(pin, payload); err != nil {
 			return err
 		}
 	default:

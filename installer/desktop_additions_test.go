@@ -91,8 +91,8 @@ func TestAdditionalDesktopLaunchersUseDeclaredPayloads(t *testing.T) {
 					!strings.Contains(recipe.Contents, " --no-sandbox %U\n")) {
 					t.Fatal(recipe)
 				}
-				if id == "t3-code" && (recipe.Command != filepath.Join(root, "packages", "tool.t3-code-app", "current", "opt", "T3 Code (Beta)", "t3code") || !strings.HasSuffix(recipe.Icon, "t3code.png") ||
-					!strings.Contains(recipe.Contents, "\nExec=/usr/bin/env T3CODE_DISABLE_AUTO_UPDATE=1 "+desktopExecArgument(recipe.Command)+" --no-sandbox %U\n") || !strings.Contains(recipe.Contents, "\nStartupWMClass=t3code\n")) {
+				if id == "t3-code" && (recipe.Command != filepath.Join(root, "packages", "tool.t3-code-app", "current", "t3-code") || !strings.HasSuffix(recipe.Icon, "t3code.png") ||
+					!strings.Contains(recipe.Contents, "\nExec="+desktopExecArgument(recipe.Command)+" %U\n") || !strings.Contains(recipe.Contents, "\nStartupWMClass=t3code\n")) {
 					t.Fatal(recipe)
 				}
 			} else if !strings.HasSuffix(recipe.Destination, ".app") || !strings.Contains(filepath.ToSlash(recipe.Source), "/tool."+id+"/current/") {

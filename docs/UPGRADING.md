@@ -306,7 +306,7 @@ now named **T3 Code server**. A saved selection keeps the server and does not
 add the app. To add the app, tick **T3 Code** in **Choose tools**. On Windows,
 install the app with `winget install T3Tools.T3Code`.
 
-T3 Code server is a new optional selection, never an automatic migration or provider
+T3 Code server is the earlier optional selection, never an automatic migration or provider
 replacement. It uses the official standalone package with a browser UI on Apple
 Silicon macOS, Ubuntu/Debian amd64/arm64 and Windows amd64. The fixed stable
 `v0.1.0` pin supplies Orchestrator V2. Finish any pending nightly installation

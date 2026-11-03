@@ -3039,11 +3039,13 @@
         "commands": {},
         "bin_dirs": [],
         "required_files": [
+          "t3-code",
           "opt/T3 Code (Beta)/t3code",
           "opt/T3 Code (Beta)/resources/app.asar",
           "usr/share/icons/hicolor/256x256/apps/t3code.png"
         ],
-        "libc": "glibc"
+        "libc": "glibc",
+        "t3_code_launcher": true
       },
       "linux/arm64": {
         "version": "0.1.6",
@@ -3053,11 +3055,13 @@
         "commands": {},
         "bin_dirs": [],
         "required_files": [
+          "t3-code",
           "opt/T3 Code (Beta)/t3code",
           "opt/T3 Code (Beta)/resources/app.asar",
           "usr/share/icons/hicolor/256x256/apps/t3code.png"
         ],
-        "libc": "glibc"
+        "libc": "glibc",
+        "t3_code_launcher": true
       }
     },
     "tool.zen": {

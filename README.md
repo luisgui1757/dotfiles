@@ -291,14 +291,15 @@ registry mismatch disables its language-server/formatter setup until repair succ
 
 **T3 Code** installs the desktop app, which includes its own server.
 
-- On macOS, Homebrew installs the official `t3-code` cask, and T3 updates
-  itself.
+- On macOS 13 or later, Homebrew installs the official `t3-code` cask, and T3
+  updates itself.
 - On Ubuntu and Debian, setup unpacks the official v0.1.6 `.deb` privately and
-  does not run its install scripts. The launcher turns off T3's automatic
-  updates with `T3CODE_DISABLE_AUTO_UPDATE=1`, and **Update tools** moves the
-  app to the reviewed release. The launcher also starts the app without
-  Chromium's sandbox, because the sandbox needs user namespaces that Ubuntu
-  restricts.
+  does not run its install scripts. Setup adds a start script, which the
+  launcher and T3's own `t3code://` link handler use. The script turns off
+  T3's automatic updates with `T3CODE_DISABLE_AUTO_UPDATE=1`, and **Update
+  tools** moves the app to the reviewed release. The script also starts the
+  app without Chromium's sandbox, because the sandbox needs user namespaces
+  that Ubuntu restricts.
 - On Windows, T3 ships the app only as an installer, and setup never runs a
   vendor installer. Install the app yourself with
   `winget install T3Tools.T3Code`. T3 then updates itself.

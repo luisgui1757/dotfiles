@@ -543,3 +543,19 @@ func TestNativeAppAcceptsHomebrewExpandedMetadataAndCompactReceipt(t *testing.T)
 		}
 	})
 }
+
+func TestCatalogAcceptsOnlyTheReviewedCasks(t *testing.T) {
+	for _, binding := range []struct {
+		id, cask string
+		reviewed bool
+	}{{"app.t3-code", "t3-code", true}, {"app.zen", "zen", true}, {"app.other", "other", false}, {"app.zen", "t3-code", false}, {"app.t3-code", "zen", false}} {
+		c := Catalog{Schema: 1, Resources: []Resource{
+			{ID: "infra.homebrew", Name: "Homebrew", Platforms: []string{"darwin"}, Action: "homebrew"},
+			{ID: binding.id, Name: "App", Platforms: []string{"darwin"}, Action: "package", Requires: []string{"infra.homebrew"}, Bindings: map[string]Binding{"darwin": {Provider: "homebrew-cask", Package: binding.cask}}},
+		}}
+		err := c.Validate()
+		if binding.reviewed && err != nil || !binding.reviewed && (err == nil || !strings.Contains(err.Error(), "unsupported native application")) {
+			t.Fatal(binding, err)
+		}
+	}
+}
