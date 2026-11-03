@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -83,7 +84,7 @@ func TestNativeSentinelInstalledLifecycle(t *testing.T) {
 	}
 	skills := []string{}
 	for _, line := range strings.Split(string(profiles), "\n") {
-		if fields := strings.Fields(line); len(fields) == 2 && (fields[0] == "core" || fields[0] == "ui") {
+		if fields := strings.Fields(line); len(fields) == 2 && slices.Contains([]string{"core", "ui", "formal", "ops"}, fields[0]) {
 			skills = append(skills, fields[1])
 			for _, root := range skillRoots {
 				if _, err := os.Stat(filepath.Join(root, fields[1], ".sentinel-owned")); err != nil {
@@ -93,7 +94,7 @@ func TestNativeSentinelInstalledLifecycle(t *testing.T) {
 		}
 	}
 	if len(skills) < 10 {
-		t.Fatal("the core and UI profiles installed too few skills", skills)
+		t.Fatal("the selected profiles installed too few skills", skills)
 	}
 	if _, err := os.Lstat(filepath.Join(home, ".kiro")); !errors.Is(err, os.ErrNotExist) {
 		t.Fatal("Sentinel wrote Kiro files outside KIRO_HOME", err)

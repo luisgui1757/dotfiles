@@ -215,11 +215,11 @@ in the evidence.
       `~/.kiro/settings/cli.json` (or `$KIRO_HOME/settings/cli.json`) has
       `"app.disableAutoupdates": true` beside your own settings. Sign in with
       `kiro-cli login` only with your own account. With Sentinel rules and
-      skills selected, Kiro lists the 13 Sentinel skills (type `/` in chat).
+      skills selected, Kiro lists the 22 Sentinel skills (type `/` in chat).
       Removal restores `cli.json` and keeps `~/.kiro` sign-ins, sessions and
       steering.
 - [ ] **Sentinel rules and skills**: select it with at least one agent. Make
-      sure that each agent file has the Sentinel block. Each of the 13 skill
+      sure that each agent file has the Sentinel block. Each of the 22 skill
       folders must have a `.sentinel-owned` file. Change one line in the block,
       make sure that Check reports it, then Repair. Untick Sentinel. Make sure
       that the block and the skill folders are gone and that the text outside

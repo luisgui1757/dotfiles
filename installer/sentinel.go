@@ -23,9 +23,10 @@ const (
 	sentinelResource   = "integration.sentinel-installer"
 )
 
-// sentinelCommit is the only Sentinel pin. Renovate proposes a new value when
-// the Sentinel main branch moves. Change only this line to move the pin.
-const sentinelCommit = "1bb66d56a1f0950093d6d32615461e0fc1d30dc2"
+// sentinelCommit is the only Sentinel pin: the commit of the Sentinel release in
+// the comment. Renovate proposes a new value when Sentinel publishes a release
+// tag. Change only this line to move the pin.
+const sentinelCommit = "c8beb70d6e568e0e8fe7ff6ee02675585958afbf" // v0.3.0
 
 // sentinelHosts are the agents that the Sentinel installer supports.
 var sentinelHosts = []string{"codex", "claude", "copilot", "kiro", "opencode"}
@@ -114,8 +115,9 @@ type sentinelRecord struct {
 }
 
 // SentinelDriver runs the installer of the pinned Sentinel commit. Sentinel
-// decides which files it changes: its managed block in each rules file, and the
-// skill folders that hold its .sentinel-owned marker.
+// decides which files it changes: its managed block in each rules file, the
+// skill folders that hold its .sentinel-owned marker, and the Claude Code
+// output style output-styles/sentinel.md.
 type SentinelDriver struct {
 	Target    Context
 	Home      string
@@ -383,13 +385,13 @@ func (d *SentinelDriver) installer(checkout string, hosts []string, homes sentin
 			return nativeCommand{}, errors.New("Sentinel needs Windows PowerShell, which setup did not find")
 		}
 		arguments := []string{"-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", filepath.Join(checkout, "tools", "install.ps1"),
-			"-Global", "-Hosts", strings.Join(hosts, ","), "-Skills", "core,ui"}
+			"-Global", "-Hosts", strings.Join(hosts, ","), "-Skills", "core,ui,formal,ops"}
 		if mode != "" {
 			arguments = append(arguments, "-"+strings.ToUpper(mode[:1])+mode[1:])
 		}
 		return nativeCommand{Program: d.Shell, Arguments: arguments, Environment: environment}, nil
 	}
-	arguments := []string{filepath.Join(checkout, "tools", "install"), "--global", "--hosts", strings.Join(hosts, ","), "--skills", "core,ui"}
+	arguments := []string{filepath.Join(checkout, "tools", "install"), "--global", "--hosts", strings.Join(hosts, ","), "--skills", "core,ui,formal,ops"}
 	if mode != "" {
 		arguments = append(arguments, "--"+mode)
 	}

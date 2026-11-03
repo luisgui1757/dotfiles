@@ -70,9 +70,10 @@ Next, setup runs the Sentinel installer of that checkout. It uses
 `tools/install` with Bash on macOS and Linux, and `tools\install.ps1` with
 Windows PowerShell on Windows. Dotfiles does not change the Sentinel files.
 
-Renovate tracks the Sentinel `main` branch with a custom regex manager and the
-`git-refs` datasource. When `main` moves, Renovate opens a pull request that
-changes the pin. All checks that protect `main` must pass on that pull request.
+Renovate tracks the Sentinel release tags with a custom regex manager and the
+`github-tags` datasource. When Sentinel publishes a release, Renovate opens a
+pull request that changes the pin and the version comment next to it.
+All checks that protect `main` must pass on that pull request.
 After you merge and pull it, **Update tools** applies the new pin.
 
 ## Agent CLI pin proposals
