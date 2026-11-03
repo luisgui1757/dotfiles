@@ -100,13 +100,16 @@ func TestNativeDesktopInstalledApplicationLifecycle(t *testing.T) {
 		selected = append(selected, "openwhispr")
 	}
 	if runtime.GOOS == "linux" {
-		selected = append(selected, "t3-code")
+		selected = append(selected, "t3-code-app")
 	}
 	before := map[string]configSnapshot{}
 	for _, id := range selected {
 		desktopID := "desktop." + id
 		if id == "ghostty" {
 			desktopID = "integration.ghostty"
+		}
+		if id == "t3-code-app" {
+			desktopID = "desktop.t3-code"
 		}
 		recipe, err := desktopNativeRecipe(published, desktopID)
 		if err != nil {
@@ -328,6 +331,9 @@ func desktopConsumePublished(t *testing.T, d *DesktopDriver, a *ArchiveDriver, i
 	if id == "ghostty" {
 		desktopID = "integration.ghostty"
 	}
+	if id == "t3-code-app" {
+		desktopID = "desktop.t3-code"
+	}
 	p, err := desktopNativeRecipe(d, desktopID)
 	if err != nil {
 		t.Fatal(err)
@@ -348,7 +354,7 @@ func desktopConsumePublished(t *testing.T, d *DesktopDriver, a *ArchiveDriver, i
 	if runtime.GOOS == "linux" && id == "obsidian" {
 		packageRoot = filepath.Join(a.Directory, obsidianPortable)
 	}
-	if runtime.GOOS == "linux" && id == "t3-code" {
+	if runtime.GOOS == "linux" && id == "t3-code-app" {
 		packageRoot = filepath.Join(a.Directory, "tool.t3-code-app")
 	}
 	if runtime.GOOS == "darwin" && p.Package == "app.zen" {
@@ -462,7 +468,7 @@ func desktopConsumePublished(t *testing.T, d *DesktopDriver, a *ArchiveDriver, i
 		}
 		_, class, ok := strings.Cut(string(data), "\nStartupWMClass=")
 		class, _, _ = strings.Cut(class, "\n")
-		if (id == "ghostty" || id == "zen" || id == "obsidian" || id == "openwhispr" || id == "t3-code") != ok {
+		if (id == "ghostty" || id == "zen" || id == "obsidian" || id == "openwhispr" || id == "t3-code-app") != ok {
 			t.Fatalf("%s launcher StartupWMClass presence is wrong:\n%s", id, data)
 		}
 		if ok {
@@ -503,7 +509,7 @@ func desktopConsumePublished(t *testing.T, d *DesktopDriver, a *ArchiveDriver, i
 		if !unsandboxed {
 			t.Fatal("Obsidian was not started through its --no-sandbox launcher", owned)
 		}
-	case "t3-code":
+	case "t3-code-app":
 		unsandboxed, updatesOff := false, false
 		for _, pid := range owned {
 			command, err := os.ReadFile(fmt.Sprintf("/proc/%d/cmdline", pid))
