@@ -350,6 +350,14 @@ func (d *SentinelDriver) installed(record *sentinelRecord) sentinelRelease {
 	return sentinelRelease{record.Tag, record.Commit}
 }
 
+// belowFloor reports a record from an install older than the floor. Its
+// installer does not know the current profiles, so setup neither checks nor
+// removes with it.
+func (d *SentinelDriver) belowFloor(record *sentinelRecord) bool {
+	installed := d.installed(record)
+	return installed.Tag == "" || sentinelOlder(installed.Tag, d.Floor.Tag)
+}
+
 func sentinelName(release sentinelRelease) string {
 	if release.Tag != "" {
 		return release.Tag
@@ -370,6 +378,12 @@ func (d *SentinelDriver) target(ctx context.Context, record *sentinelRecord) (se
 		return latest, "", ""
 	}
 	installed := d.installed(record)
+	if d.belowFloor(record) {
+		if err != nil {
+			return d.Floor, "Setup could not check for a newer Sentinel release: " + err.Error() + ". It installs " + d.Floor.Tag + ".", ""
+		}
+		return latest, "", ""
+	}
 	switch {
 	case err != nil:
 	case installed.Tag != "" && latest.Tag == installed.Tag && latest.Commit != installed.Commit:
@@ -630,6 +644,10 @@ func (d *SentinelDriver) Observe(ctx context.Context, r Resource, receipt Receip
 		return o, nil
 	}
 	o.Present, o.CompletedOperation = true, record.Operation
+	if d.belowFloor(record) {
+		o.HealthIssue = "Sentinel " + sentinelName(d.installed(record)) + " is older than " + d.Floor.Tag + ", the oldest release that setup supports; repair installs " + o.Desired
+		return o, nil
+	}
 	// After a resume or a recovered completion, the controller saves this
 	// observation in the receipt. While the receipt does not prove the finished
 	// operation yet, the observation names the installed commit, so that a later
@@ -713,10 +731,11 @@ func sentinelFindings(output []byte) string {
 
 // Apply installs a release for the current hosts. Install and update fetch the
 // approved commit, op.Observed.Desired. Repair and resume fetch the recorded
-// commit. Apply saves its intent first, so an interruption at any later step
-// can resume. Then it fetches the commit and runs the installer. A failed fetch
-// deletes nothing. The result names the installed commit as Desired, so that a
-// later update sees a newer release.
+// commit, except that repair of an install older than the floor fetches the
+// approved commit. Apply saves its intent first, so an interruption at any
+// later step can resume. Then it fetches the commit and runs the installer. A
+// failed fetch deletes nothing. The result names the installed commit as
+// Desired, so that a later update sees a newer release.
 func (d *SentinelDriver) Apply(ctx context.Context, r Resource, op Operation, receipt Receipt) (Observation, error) {
 	record, err := d.readRecord()
 	if err != nil {
@@ -739,12 +758,14 @@ func (d *SentinelDriver) Apply(ctx context.Context, r Resource, op Operation, re
 	}
 	var release sentinelRelease
 	switch {
-	case op.Action != "repair" && op.Observed.Desired != "":
+	case (op.Action != "repair" || record != nil && d.belowFloor(record)) && op.Observed.Desired != "":
 		release.Commit = op.Observed.Desired
 		if latest, err := d.resolve(ctx); err == nil && latest.Commit == release.Commit {
 			release = latest
 		} else if record != nil && record.Commit == release.Commit {
 			release = d.installed(record)
+		} else if release.Commit == d.Floor.Commit {
+			release = d.Floor
 		}
 	case record != nil:
 		release = d.installed(record)
@@ -782,9 +803,9 @@ func (d *SentinelDriver) Apply(ctx context.Context, r Resource, op Operation, re
 }
 
 // Remove saves its intent, then runs the installer removal from a verified
-// checkout of the recorded commit, or of the floor without a record, for each
-// recorded or current host. It uses the recorded folders. Then it deletes the
-// checkout and the record.
+// checkout of the recorded commit, or of the floor without a record or for an
+// install older than the floor, for each recorded or current host. It uses the
+// recorded folders. Then it deletes the checkout and the record.
 func (d *SentinelDriver) Remove(ctx context.Context, r Resource, receipt Receipt) (Observation, error) {
 	record, err := d.readRecord()
 	if err != nil {
@@ -796,7 +817,7 @@ func (d *SentinelDriver) Remove(ctx context.Context, r Resource, receipt Receipt
 		return Observation{}, err
 	}
 	release := d.Floor
-	if record != nil {
+	if record != nil && !d.belowFloor(record) {
 		release = d.installed(record)
 	}
 	intent := sentinelRecord{Schema: 1, Operation: receipt.OperationID, Action: "remove", Commit: release.Commit, Tag: release.Tag, Hosts: current, Homes: homes}

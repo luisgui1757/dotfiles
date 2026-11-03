@@ -92,7 +92,10 @@ A newer release, or a failed lookup, is only a note: Apply keeps a healthy
 installation, and Update installs the newer release. Without a record, a failed
 lookup stops the install. Check, repair, removal and resume use the recorded
 commit and run Sentinel only from a checkout of that commit. Repair, removal
-and resume fetch it again when necessary. The native tests build the command with the
+and resume fetch it again when necessary. The installer of an install older
+than the floor does not know the current profiles. So Check reports such an
+install as a health issue without its installer, repair installs the latest
+release (or the floor when the lookup fails), and removal uses the floor. The native tests build the command with the
 `sentinelfixedrelease` tag, which installs the floor release.
 
 `<state>/sentinel/record.json` saves the
