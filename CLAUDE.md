@@ -143,7 +143,7 @@ of each step. All of these checks must pass on the final head.
   launcher and all files under `installer/` identifies that build. The launcher
   checks the hash of the cached binary before each launch.
 - Update applies the reviewed pins of the checkout. It never gets the latest
-  release.
+  release, except for Sentinel: Update installs the latest Sentinel release.
 - Check only reads. It never installs or repairs.
 - The apply log is a record, not evidence.
 
@@ -154,19 +154,23 @@ and skills for coding agents.
 
 - The `sentinel` capability needs the hidden `integration.sentinel-installer`
   resource. That resource needs `tool.git`.
-- `installer/sentinel.go` holds the only pin, the full commit hash of a
-  Sentinel release. Renovate opens a pull request when Sentinel publishes a
-  new release tag.
-- Apply fetches that commit into `<state>/sentinel/checkout`. Git runs without
-  system or global configuration. `HEAD` must equal the pin, and each file must
-  equal the tree of the pin as raw bytes. Git index flags, local filters
-  and replacement objects do not count.
+- Install and update take the latest Sentinel release from the GitHub API. It
+  must be published, immutable and named `vX.Y.Z`. `installer/sentinel.go`
+  holds the floor release (v0.3.0) and its commit. Update refuses an older
+  release and a tag that names another commit. A newer release or a failed
+  lookup is a note, not a health issue.
+- Apply fetches the commit of that release into `<state>/sentinel/checkout`.
+  Git runs without system or global configuration. `HEAD` must equal the
+  commit, and each file must equal the tree of the commit as raw bytes. Git
+  index flags, local filters and replacement objects do not count.
 - Then dotfiles runs the Sentinel installer of that checkout. Dotfiles does not
-  copy or edit Sentinel files. Check, update and removal run Sentinel only from
-  a verified checkout of the pin. Removal fetches the pin again when necessary.
+  copy or edit Sentinel files. Check, repair, removal and resume run Sentinel
+  only from a verified checkout of the recorded commit. Repair, removal and
+  resume fetch it again when necessary.
 - `<state>/sentinel/record.json` saves the intent before a change and the
   completion after it. Resume runs the installer again. The record also keeps
-  the hosts and the five folder variables of the install for check and removal.
+  the release tag and commit, the hosts and the five folder variables of the
+  install for check and removal.
 - The hosts are Codex, Claude Code, Copilot, Kiro and OpenCode. A host counts
   when its command or folder exists, or when the same selection installs it.
 - Check runs `--check`. Exit 1 means drift. Any other failure is an error.

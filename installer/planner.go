@@ -502,6 +502,11 @@ func recoverCompletion(receipt Receipt, observed Observation) Receipt {
 		(receipt.Ownership != "created" && (receipt.Ownership != "uncertain" || receipt.Before.Present && !receipt.Adopted)) {
 		return receipt
 	}
+	// A receipt that already proves this operation keeps the inputs that the
+	// operation applied.
+	if receipt.After.CompletedOperation == observed.CompletedOperation {
+		observed.Desired = receipt.After.Desired
+	}
 	receipt.Ownership, receipt.After = "created", observed
 	receipt.Status, receipt.Reason = "ready", ""
 	if observed.Pending != "" {

@@ -84,7 +84,8 @@ func NewNativeController(repository, source, stateDirectory string, platform Nat
 	if target.OS == "windows" {
 		shell = platform.WindowsPowerShell
 	}
-	driver.Sentinel = &SentinelDriver{Target: target, Home: folders.Home, Locations: platform.Sentinel, State: stateDirectory, Repository: sentinelRepository, Commit: sentinelCommit,
+	driver.Sentinel = &SentinelDriver{Target: target, Home: folders.Home, Locations: platform.Sentinel, State: stateDirectory, Repository: sentinelRepository,
+		Releases: sentinelReleases, Floor: sentinelRelease{sentinelFloorTag, sentinelCommit},
 		Git: git, Shell: shell, Run: driver.session.run, Query: querySentinel}
 	archives.Run = driver.session.run
 	driver.Desktop = &DesktopDriver{Target: target, Folders: folders, Directory: stateDirectory, Archives: archives, PowerShell: platform.WindowsPowerShell, Run: driver.session.run}

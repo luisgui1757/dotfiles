@@ -78,19 +78,28 @@ only version, URL and SHA-256; the pull request's native checks and the owner's
 merge remain the acceptance boundary.
 
 Sentinel rules and skills (`sentinel`) needs the hidden
-`integration.sentinel-installer` resource, which needs `tool.git`. That resource
-fetches the commit that `sentinel.go` pins into `<state>/sentinel/checkout`.
-Git runs without system or global configuration. `HEAD` must equal the pin, and
-each file must equal the tree of the pin as raw bytes. Git index flags, local
-filters and replacement objects do not count.
+`integration.sentinel-installer` resource, which needs `tool.git`. Install and
+update ask the GitHub API for the latest Sentinel release, which must be
+published, immutable and named `vX.Y.Z`, and for the commit of its tag. They
+refuse a release older than the floor in `sentinel.go` (v0.3.0), an older
+release than the installed one, and a tag that names another commit. The plan
+binds the commit, and apply fetches that commit into `<state>/sentinel/checkout`.
+Git runs without system or global configuration. `HEAD` must equal the commit,
+and each file must equal the tree of the commit as raw bytes. Git index flags,
+local filters and replacement objects do not count.
 
-Check, update and removal run Sentinel only from such a checkout. Removal
-fetches the pin again when necessary.
+A newer release, or a failed lookup, is only a note: Apply keeps a healthy
+installation, and Update installs the newer release. Without a record, a failed
+lookup stops the install. Check, repair, removal and resume use the recorded
+commit and run Sentinel only from a checkout of that commit. Repair, removal
+and resume fetch it again when necessary. The native tests build the command with the
+`sentinelfixedrelease` tag, which installs the floor release.
 
 `<state>/sentinel/record.json` saves the
 intent of each operation before it changes anything, and its completion after.
 An interrupted operation resumes: the Sentinel installer runs again. The record
-also keeps the hosts and the folder variables of the install.
+also keeps the release tag and commit, the hosts and the folder variables of the
+install.
 
 Then the resource runs the Sentinel installer of that checkout. On macOS and
 Linux it runs `bash tools/install --global --hosts <hosts> --skills

@@ -19,7 +19,7 @@ Neither a package name nor a version print proves downloaded bytes.
 | Neovim | Locked plugin sources, reviewed parser/tool recipes and a private generated runtime. Check loads the existing runtime without triggering package repair. |
 | Windows Neovim formatters | Gersemi's official PyInstaller executable and clang-format's native Windows wheel binary have exact SHA-256 pins matching upstream GitHub/PyPI digests. Both are unsigned PE binaries, not Microsoft Authenticode packages. The complete clang-format wheel retains its licenses/metadata and requires the native VC++ runtime. Gersemi bundles Python and runtime libraries; its per-invocation temporary extraction is upstream behavior. Versions match the reviewed POSIX Mason registry, while native formatting proves behavior. |
 | Shell/tmux plugins | Pinned source archives, source corrections restricted to reviewed fresh payloads, and retained upstream license/provenance. No runtime remote-script pipeline. |
-| Sentinel | One full commit hash in `installer/sentinel.go`. Git fetches exactly that commit. `HEAD` must equal the pin, and each file must equal the tree of the pin, before the Sentinel installer runs. The commit hash is the integrity check. See [Sentinel pin](#sentinel-pin). |
+| Sentinel | The latest published and immutable Sentinel release, never older than the floor in `installer/sentinel.go`. Git fetches exactly the commit of its tag. `HEAD` must equal that commit, and each file must equal its tree, before the Sentinel installer runs. The commit hash is the integrity check. See [Sentinel release](#sentinel-release). |
 | Code on Linux | Exact official DEB version/architecture/URL/SHA-256. Existing APT worker, transaction attribution and shared pool own installation/removal. Canonical `/usr/share/code/code` matches the distro sandbox profile. A fixed filtered debconf input preserves personal Microsoft repository/key/answer state. |
 | Ubuntu/Debian native packages | Actual APT/dpkg transactions and metadata; ownership is attributed to the operation, never an inventory difference. Native repositories resolve system packages under their own trust model. |
 | macOS native packages | Actual Homebrew formula transactions and native dependency/linkage checks. Existing infrastructure remains unowned; verified fresh bootstrap is retained infrastructure. Apple CLT uses Apple's advertised signed packages. |
@@ -40,11 +40,16 @@ Update hashes together with extraction/layout and native-consumption evidence.
 Renovate covers only sources in its generated extraction inventory; do not claim
 that it maintains archive hashes that it does not extract.
 
-## Sentinel pin
+## Sentinel release
 
-`installer/sentinel.go` holds one pin: the full commit hash of the
-[Sentinel](https://github.com/luisgui1757/sentinel) repository. Apply runs
-these Git commands in `<state>/sentinel/checkout`:
+Install and update ask the GitHub API for the latest release of the
+[Sentinel](https://github.com/luisgui1757/sentinel) repository. GitHub must
+report it as published and immutable, and its tag must be `vX.Y.Z`. A second
+request gives the commit of that tag. Setup refuses a release older than the
+floor in `installer/sentinel.go` (v0.3.0), an older release than the recorded
+one, and a tag that names another commit than the recorded one. The approved
+plan binds the commit. Apply runs these Git commands in
+`<state>/sentinel/checkout`:
 
 ```sh
 git init
@@ -57,11 +62,12 @@ and `%LOCALAPPDATA%\dotfiles` on Windows. Git runs without system or global
 configuration, so a personal setting cannot change the fetch. Git uses the
 `HTTPS_PROXY` and `https_proxy` variables.
 
-Then setup checks that `git rev-parse HEAD` equals the pin. It compares each
-file with the tree of the pin as raw bytes and refuses an extra file. Git index
+Then setup checks that `git rev-parse HEAD` equals the commit. It compares each
+file with the tree of the commit as raw bytes and refuses an extra file. Git index
 flags, local filters and replacement objects cannot hide a change from this
-comparison. Check, update and removal run Sentinel only
-from a checkout that passes it. The commit hash is the integrity check.
+comparison. Check, repair, removal and resume use the recorded commit, and run
+Sentinel only from a checkout that passes it. The commit hash is the integrity
+check.
 
 A failed fetch stops the apply.
 The report shows the Git output and tells you to check the network or the proxy.
@@ -70,11 +76,13 @@ Next, setup runs the Sentinel installer of that checkout. It uses
 `tools/install` with Bash on macOS and Linux, and `tools\install.ps1` with
 Windows PowerShell on Windows. Dotfiles does not change the Sentinel files.
 
-Renovate tracks the Sentinel release tags with a custom regex manager and the
-`github-tags` datasource. When Sentinel publishes a release, Renovate opens a
-pull request that changes the pin and the version comment next to it.
-All checks that protect `main` must pass on that pull request.
-After you merge and pull it, **Update tools** applies the new pin.
+Trust moves from a reviewed pin to the Sentinel release process. Immutable
+releases keep a published tag on its commit, and a tag ruleset on Sentinel lets
+only its owner create, move or delete a `v*` tag. A new release reaches a
+machine only through **Update tools**. Check shows it as a note. When the
+lookup fails, setup keeps the installed release and shows a note, and a first
+install stops. The native tests build the command with the
+`sentinelfixedrelease` tag, so they install the floor release.
 
 ## Agent CLI pin proposals
 

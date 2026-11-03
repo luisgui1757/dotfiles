@@ -3,30 +3,63 @@ package installer
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 )
 
 // Sentinel (https://github.com/luisgui1757/sentinel) installs its own rules and
-// skills. Setup fetches one pinned commit with git and runs the installer of
-// that commit. The commit hash is the integrity check: git verifies each
-// fetched object against it, and setup compares each checkout file with it.
+// skills. Install and update take the latest Sentinel release: GitHub must
+// report it as published and immutable, and git gives the commit of its tag.
+// Setup fetches that commit with git and runs the installer of that commit.
+// The commit hash is the integrity check: git verifies each fetched object
+// against it, and setup compares each checkout file with it. Check, repair,
+// removal and resume use the commit in the record.
 const (
 	sentinelRepository = "https://github.com/luisgui1757/sentinel.git"
+	sentinelReleases   = "https://api.github.com/repos/luisgui1757/sentinel/releases/latest"
 	sentinelResource   = "integration.sentinel-installer"
 )
 
-// sentinelCommit is the only Sentinel pin: the commit of the Sentinel release in
-// the comment. Renovate proposes a new value when Sentinel publishes a release
-// tag. Change only this line to move the pin.
-const sentinelCommit = "c8beb70d6e568e0e8fe7ff6ee02675585958afbf" // v0.3.0
+// sentinelFloorTag and sentinelCommit are the oldest Sentinel release that setup
+// installs and the commit of its tag. The tests install this release.
+const (
+	sentinelFloorTag = "v0.3.0"
+	sentinelCommit   = "c8beb70d6e568e0e8fe7ff6ee02675585958afbf"
+)
+
+// sentinelFixedRelease makes the latest release the floor. Only the build tag
+// of the native tests sets it.
+var sentinelFixedRelease = false
+
+var sentinelTag = regexp.MustCompile(`^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$`)
+
+// sentinelRelease is a release tag and the commit of that tag.
+type sentinelRelease struct{ Tag, Commit string }
+
+// sentinelOlder reports whether release tag a is older than b.
+func sentinelOlder(a, b string) bool {
+	x, y := sentinelTag.FindStringSubmatch(a), sentinelTag.FindStringSubmatch(b)
+	for i := 1; i < 4 && x != nil && y != nil; i++ {
+		p, _ := strconv.Atoi(x[i])
+		q, _ := strconv.Atoi(y[i])
+		if p != q {
+			return p < q
+		}
+	}
+	return false
+}
 
 // sentinelHosts are the agents that the Sentinel installer supports.
 var sentinelHosts = []string{"codex", "claude", "copilot", "kiro", "opencode"}
@@ -109,15 +142,16 @@ type sentinelRecord struct {
 	Operation string        `json:"operation"`
 	Action    string        `json:"action"`
 	Commit    string        `json:"commit"`
+	Tag       string        `json:"tag,omitempty"`
 	Hosts     []string      `json:"hosts"`
 	Homes     sentinelHomes `json:"homes"`
 	Complete  bool          `json:"complete"`
 }
 
-// SentinelDriver runs the installer of the pinned Sentinel commit. Sentinel
-// decides which files it changes: its managed block in each rules file, the
-// skill folders that hold its .sentinel-owned marker, and the Claude Code
-// output style output-styles/sentinel.md.
+// SentinelDriver runs the installer of a Sentinel release. Sentinel decides
+// which files it changes: its managed block in each rules file, the skill
+// folders that hold its .sentinel-owned marker, and the Claude Code output
+// style output-styles/sentinel.md.
 type SentinelDriver struct {
 	Target    Context
 	Home      string
@@ -125,9 +159,12 @@ type SentinelDriver struct {
 	// State is the installer state folder. The driver keeps its checkout and
 	// its record in State/sentinel.
 	State string
-	// Repository and Commit are the Sentinel source: sentinelRepository and
-	// sentinelCommit, except in tests.
-	Repository, Commit string
+	// Repository, Releases and Floor are the Sentinel source, the latest-release
+	// API and the oldest release that setup installs.
+	Repository, Releases string
+	Floor                sentinelRelease
+	// Latest returns the latest release. Nil asks Releases.
+	Latest func(context.Context) (sentinelRelease, error)
 	// Git is the git executable. Shell is /bin/bash, or Windows PowerShell.
 	Git, Shell string
 	// Run changes the system under the controller mutation guard. Query only
@@ -135,6 +172,11 @@ type SentinelDriver struct {
 	Run, Query func(context.Context, nativeCommand) ([]byte, error)
 	// Selected is the bound resource closure. ForSelection sets it.
 	Selected []string
+
+	// looked, latest and latestFailure keep the one lookup of a setup run.
+	looked        bool
+	latest        sentinelRelease
+	latestFailure error
 }
 
 func (d *SentinelDriver) directory() string { return filepath.Join(d.State, "sentinel") }
@@ -151,7 +193,7 @@ func (d *SentinelDriver) readRecord() (*sentinelRecord, error) {
 	if err == nil {
 		err = Decode(data, &record)
 	}
-	if err == nil && (record.Schema != 1 || !operationID.MatchString(record.Operation) || !gitCommit(record.Commit) ||
+	if err == nil && (record.Schema != 1 || !operationID.MatchString(record.Operation) || !gitCommit(record.Commit) || record.Tag != "" && !sentinelTag.MatchString(record.Tag) ||
 		!slices.Contains([]string{"install", "update", "repair", "remove"}, record.Action)) {
 		err = errors.New("invalid identity")
 	}
@@ -232,6 +274,116 @@ func (d *SentinelDriver) git(directory string, arguments ...string) nativeComman
 		"GIT_DIR=" + filepath.Join(directory, ".git"), "GIT_WORK_TREE=" + directory, "GIT_INDEX_FILE=" + filepath.Join(directory, ".git", "index")}}
 }
 
+// resolve returns the latest release, at most once for each driver, so that
+// approval and apply see the same release. It refuses a release that is older
+// than the floor.
+func (d *SentinelDriver) resolve(ctx context.Context) (sentinelRelease, error) {
+	if !d.looked {
+		d.looked = true
+		switch {
+		case d.Latest != nil:
+			d.latest, d.latestFailure = d.Latest(ctx)
+		case sentinelFixedRelease:
+			d.latest = d.Floor
+		default:
+			d.latest, d.latestFailure = d.githubRelease(ctx)
+		}
+		if d.latestFailure == nil && (!sentinelTag.MatchString(d.latest.Tag) || !gitCommit(d.latest.Commit)) {
+			d.latestFailure = fmt.Errorf("GitHub gave the Sentinel release %q with the commit %q", d.latest.Tag, d.latest.Commit)
+		}
+		if d.latestFailure == nil && sentinelOlder(d.latest.Tag, d.Floor.Tag) {
+			d.latestFailure = fmt.Errorf("the latest Sentinel release %s is older than %s, the oldest release that setup installs", d.latest.Tag, d.Floor.Tag)
+		}
+	}
+	return d.latest, d.latestFailure
+}
+
+// githubRelease asks GitHub for the latest release, which must be published,
+// immutable and named vX.Y.Z, and then for the commit of its tag.
+func (d *SentinelDriver) githubRelease(ctx context.Context) (sentinelRelease, error) {
+	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	defer cancel()
+	client := &http.Client{}
+	get := func(url, accept string) ([]byte, error) {
+		request, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+		if err != nil {
+			return nil, err
+		}
+		request.Header.Set("Accept", accept)
+		request.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+		request.Header.Set("User-Agent", "dotfiles-installer")
+		response, err := client.Do(request)
+		if err != nil {
+			return nil, err
+		}
+		defer response.Body.Close()
+		body, err := io.ReadAll(io.LimitReader(response.Body, 1<<20))
+		if err == nil && response.StatusCode != http.StatusOK {
+			err = fmt.Errorf("%s answered %s", url, response.Status)
+		}
+		return body, err
+	}
+	var release struct {
+		Tag                          string `json:"tag_name"`
+		Draft, Prerelease, Immutable bool
+	}
+	data, err := get(d.Releases, "application/vnd.github+json")
+	if err == nil {
+		err = json.Unmarshal(data, &release)
+	}
+	if err == nil && (release.Draft || release.Prerelease || !release.Immutable || !sentinelTag.MatchString(release.Tag)) {
+		err = fmt.Errorf("the latest Sentinel release %q is not a published and immutable vX.Y.Z release", release.Tag)
+	}
+	if err != nil {
+		return sentinelRelease{}, err
+	}
+	data, err = get(strings.TrimSuffix(d.Releases, "/releases/latest")+"/commits/refs/tags/"+release.Tag, "application/vnd.github.sha")
+	return sentinelRelease{release.Tag, strings.TrimSpace(string(data))}, err
+}
+
+// installed returns the release in a record. A record from before setup kept
+// the tag names only the commit, and the floor commit is the floor release.
+func (d *SentinelDriver) installed(record *sentinelRecord) sentinelRelease {
+	if record.Tag == "" && record.Commit == d.Floor.Commit {
+		return d.Floor
+	}
+	return sentinelRelease{record.Tag, record.Commit}
+}
+
+func sentinelName(release sentinelRelease) string {
+	if release.Tag != "" {
+		return release.Tag
+	}
+	return "commit " + release.Commit
+}
+
+// target returns the release that install and update fetch, a note, and the
+// reason that blocks an install. Without a record, a failed lookup blocks the
+// install. With a record, a failed lookup, a downgrade or a tag that names
+// another commit keeps the installed release and gives a note.
+func (d *SentinelDriver) target(ctx context.Context, record *sentinelRecord) (sentinelRelease, string, string) {
+	latest, err := d.resolve(ctx)
+	if record == nil {
+		if err != nil {
+			return sentinelRelease{}, "", "Setup cannot find the latest Sentinel release: " + err.Error() + ". Check the network and the proxy settings (HTTPS_PROXY), then apply again."
+		}
+		return latest, "", ""
+	}
+	installed := d.installed(record)
+	switch {
+	case err != nil:
+	case installed.Tag != "" && latest.Tag == installed.Tag && latest.Commit != installed.Commit:
+		err = fmt.Errorf("the tag %s now names the commit %s, and setup installed %s; setup refuses it", latest.Tag, latest.Commit, installed.Commit)
+	case installed.Tag != "" && sentinelOlder(latest.Tag, installed.Tag):
+		err = fmt.Errorf("the latest release %s is older than the installed release %s; setup refuses a downgrade", latest.Tag, installed.Tag)
+	case latest.Commit != installed.Commit:
+		return latest, "Sentinel " + latest.Tag + " is available, and " + sentinelName(installed) + " is installed. Update tools installs it.", ""
+	default:
+		return latest, "", ""
+	}
+	return installed, "Setup could not check for a newer Sentinel release: " + err.Error() + ". It keeps " + sentinelName(installed) + ".", ""
+}
+
 // verify returns the commit of a checkout, or "" when there is none. The local
 // configuration and the index of a checkout can hide a change, so verify does
 // not trust them. Fsck proves each object against its hash. Each file is then
@@ -255,7 +407,7 @@ func (d *SentinelDriver) verify(ctx context.Context, run func(context.Context, n
 		return "", errors.Join(fmt.Errorf("cannot read the commit of %s", directory), err)
 	}
 	changed := func(err error) (string, error) {
-		return commit, errors.Join(fmt.Errorf("%s differs from commit %s; setup fetches the pinned commit again", directory, commit), err)
+		return commit, errors.Join(fmt.Errorf("%s differs from commit %s; setup fetches the commit again", directory, commit), err)
 	}
 	if _, err := run(ctx, d.git(directory, "fsck", "--full", "--no-dangling", "--no-progress")); err != nil {
 		return changed(err)
@@ -331,11 +483,11 @@ func gitCommit(value string) bool {
 	return len(value) == 40 && strings.Trim(value, "0123456789abcdef") == ""
 }
 
-// prepare returns a checkout of the pinned commit. It keeps a verified checkout
-// of the pin. Otherwise it fetches only the pin into a new folder, verifies it
+// prepare returns a checkout of commit. It keeps a verified checkout of that
+// commit. Otherwise it fetches only that commit into a new folder, verifies it
 // and replaces the old checkout. It refuses any other commit.
-func (d *SentinelDriver) prepare(ctx context.Context) (_ string, err error) {
-	if commit, err := d.verify(ctx, d.Run, d.checkout()); err == nil && commit == d.Commit {
+func (d *SentinelDriver) prepare(ctx context.Context, want string) (_ string, err error) {
+	if commit, err := d.verify(ctx, d.Run, d.checkout()); err == nil && commit == want {
 		return d.checkout(), nil
 	}
 	if err := os.MkdirAll(d.directory(), 0700); err != nil {
@@ -352,19 +504,19 @@ func (d *SentinelDriver) prepare(ctx context.Context) (_ string, err error) {
 	}()
 	for _, arguments := range [][]string{
 		{"init", "--quiet"},
-		{"fetch", "--quiet", "--depth", "1", "--no-tags", d.Repository, d.Commit},
+		{"fetch", "--quiet", "--depth", "1", "--no-tags", d.Repository, want},
 		{"checkout", "--quiet", "--detach", "FETCH_HEAD"},
 	} {
 		if _, err := d.Run(ctx, d.git(stage, arguments...)); err != nil {
-			return "", fmt.Errorf("cannot fetch Sentinel %s from %s. Check the network and the proxy settings (git uses HTTPS_PROXY), then try again: %w", d.Commit, d.Repository, err)
+			return "", fmt.Errorf("cannot fetch Sentinel %s from %s. Check the network and the proxy settings (git uses HTTPS_PROXY), then try again: %w", want, d.Repository, err)
 		}
 	}
 	commit, err := d.verify(ctx, d.Run, stage)
 	if err != nil {
 		return "", err
 	}
-	if commit != d.Commit {
-		return "", fmt.Errorf("the fetched Sentinel commit %s is not the pinned commit %s; setup refuses it", commit, d.Commit)
+	if commit != want {
+		return "", fmt.Errorf("the fetched Sentinel commit %s is not the expected commit %s; setup refuses it", commit, want)
 	}
 	if err := os.RemoveAll(d.checkout()); err != nil {
 		return "", err
@@ -423,15 +575,22 @@ func querySentinel(ctx context.Context, command nativeCommand) ([]byte, error) {
 }
 
 // Observe reports the installation that the record describes. Present means
-// that a record exists, and CompletedOperation is its finished operation. The
-// check runs only from a checkout that verify proves to be the pin: exit 0 is
-// healthy, exit 1 means that installed files differ, and any other exit is an
-// error. An interrupted operation of this receipt offers a resume.
+// that a record exists, and CompletedOperation is its finished operation.
+// Desired is the commit that install and update fetch. A newer release, or a
+// failed lookup, is only a note. The check runs only from a checkout that
+// verify proves to be the recorded commit: exit 0 is healthy, exit 1 means
+// that installed files differ, and any other exit is an error. An interrupted
+// operation of this receipt offers a resume.
 func (d *SentinelDriver) Observe(ctx context.Context, r Resource, receipt Receipt) (Observation, error) {
-	o := Observation{Provider: "sentinel", Identity: d.record(), Desired: d.Commit, Scope: "user"}
+	o := Observation{Provider: "sentinel", Identity: d.record(), Scope: "user"}
 	record, err := d.readRecord()
 	if err != nil {
 		return Observation{Unknown: true, Provider: "sentinel", Scope: "user", Pending: err.Error()}, nil
+	}
+	release, note, blocked := d.target(ctx, record)
+	o.Desired, o.ApplyBlocked = release.Commit, blocked
+	if note != "" {
+		o.Notes = append(o.Notes, note)
 	}
 	homes := d.homes(record)
 	hosts, err := d.hosts(homes)
@@ -439,7 +598,7 @@ func (d *SentinelDriver) Observe(ctx context.Context, r Resource, receipt Receip
 		return o, err
 	}
 	if len(hosts) == 0 {
-		o.ApplyBlocked = "Sentinel found no coding agent. Install Codex, Claude Code, Copilot CLI, Kiro or OpenCode, then apply again."
+		o.ApplyBlocked = strings.TrimSpace(o.ApplyBlocked + " Sentinel found no coding agent. Install Codex, Claude Code, Copilot CLI, Kiro or OpenCode, then apply again.")
 	}
 	if _, err := d.installer(d.checkout(), hosts, homes, ""); err != nil {
 		o.ApplyBlocked = strings.TrimSpace(o.ApplyBlocked + " " + err.Error() + ".")
@@ -465,22 +624,29 @@ func (d *SentinelDriver) Observe(ctx context.Context, r Resource, receipt Receip
 			return o, err
 		case record.Action != "remove" && receipt.Ownership != "created":
 			// An abandoned first install never finished: apply installs again.
-			return Observation{Provider: "sentinel", Identity: d.record(), Desired: d.Commit, Scope: "user", ApplyBlocked: o.ApplyBlocked, Notes: o.Notes}, nil
+			return Observation{Provider: "sentinel", Identity: d.record(), Desired: o.Desired, Scope: "user", ApplyBlocked: o.ApplyBlocked, Notes: o.Notes}, nil
 		}
 		o.Present, o.HealthIssue = true, "an earlier Sentinel "+record.Action+" did not finish; apply runs the Sentinel installer again"
 		return o, nil
 	}
 	o.Present, o.CompletedOperation = true, record.Operation
+	// After a resume or a recovered completion, the controller saves this
+	// observation in the receipt. While the receipt does not prove the finished
+	// operation yet, the observation names the installed commit, so that a later
+	// update still sees a newer release.
+	if receipt.OperationID == record.Operation && receipt.Status != "ready" && receipt.After.CompletedOperation != record.Operation {
+		o.Desired = record.Commit
+	}
 	commit, err := d.verify(ctx, d.Query, d.checkout())
 	switch {
 	case err != nil:
 		o.HealthIssue = err.Error()
 		return o, nil
 	case commit == "":
-		o.HealthIssue = "the Sentinel checkout is missing; repair fetches the pinned commit again"
+		o.HealthIssue = "the Sentinel checkout is missing; repair fetches the installed commit again"
 		return o, nil
-	case commit != d.Commit || record.Commit != d.Commit:
-		o.HealthIssue = "Sentinel " + record.Commit + " is installed, and the pin is " + d.Commit + "; update installs the pinned commit"
+	case commit != record.Commit:
+		o.HealthIssue = "the Sentinel checkout holds " + commit + ", and setup installed " + record.Commit + "; repair fetches the installed commit again"
 		return o, nil
 	case len(hosts) == 0:
 		o.HealthIssue = "no coding agent to check"
@@ -545,9 +711,12 @@ func sentinelFindings(output []byte) string {
 	return "Sentinel check: " + strings.Join(findings, "; ")
 }
 
-// Apply installs the pinned commit for the current hosts. It saves its intent
-// first, so an interruption at any later step can resume. Then it fetches the
-// pin and runs the installer. A failed fetch deletes nothing.
+// Apply installs a release for the current hosts. Install and update fetch the
+// approved commit, op.Observed.Desired. Repair and resume fetch the recorded
+// commit. Apply saves its intent first, so an interruption at any later step
+// can resume. Then it fetches the commit and runs the installer. A failed fetch
+// deletes nothing. The result names the installed commit as Desired, so that a
+// later update sees a newer release.
 func (d *SentinelDriver) Apply(ctx context.Context, r Resource, op Operation, receipt Receipt) (Observation, error) {
 	record, err := d.readRecord()
 	if err != nil {
@@ -568,14 +737,31 @@ func (d *SentinelDriver) Apply(ctx context.Context, r Resource, op Operation, re
 	if action == "adopt" || action == "" {
 		action = "install"
 	}
-	intent := sentinelRecord{Schema: 1, Operation: receipt.OperationID, Action: action, Commit: d.Commit, Hosts: hosts, Homes: homes}
+	var release sentinelRelease
+	switch {
+	case op.Action != "repair" && op.Observed.Desired != "":
+		release.Commit = op.Observed.Desired
+		if latest, err := d.resolve(ctx); err == nil && latest.Commit == release.Commit {
+			release = latest
+		} else if record != nil && record.Commit == release.Commit {
+			release = d.installed(record)
+		}
+	case record != nil:
+		release = d.installed(record)
+	default:
+		return Observation{}, errors.New("Sentinel has no approved release to install")
+	}
+	if !gitCommit(release.Commit) {
+		return Observation{}, fmt.Errorf("the approved Sentinel commit %q is not a commit", release.Commit)
+	}
+	intent := sentinelRecord{Schema: 1, Operation: receipt.OperationID, Action: action, Commit: release.Commit, Tag: release.Tag, Hosts: hosts, Homes: homes}
 	if record != nil {
 		intent.Hosts = sentinelUnion(record.Hosts, hosts)
 	}
 	if err := saveDocument(d.record(), intent); err != nil {
 		return Observation{}, err
 	}
-	checkout, err := d.prepare(ctx)
+	checkout, err := d.prepare(ctx, release.Commit)
 	if err != nil {
 		return Observation{}, err
 	}
@@ -590,12 +776,15 @@ func (d *SentinelDriver) Apply(ctx context.Context, r Resource, op Operation, re
 	if err := saveDocument(d.record(), intent); err != nil {
 		return Observation{}, err
 	}
-	return d.Observe(ctx, r, receipt)
+	o, err := d.Observe(ctx, r, receipt)
+	o.Desired = release.Commit
+	return o, err
 }
 
 // Remove saves its intent, then runs the installer removal from a verified
-// checkout of the pin for each recorded or current host. It uses the recorded
-// folders. Then it deletes the checkout and the record.
+// checkout of the recorded commit, or of the floor without a record, for each
+// recorded or current host. It uses the recorded folders. Then it deletes the
+// checkout and the record.
 func (d *SentinelDriver) Remove(ctx context.Context, r Resource, receipt Receipt) (Observation, error) {
 	record, err := d.readRecord()
 	if err != nil {
@@ -606,7 +795,11 @@ func (d *SentinelDriver) Remove(ctx context.Context, r Resource, receipt Receipt
 	if err != nil {
 		return Observation{}, err
 	}
-	intent := sentinelRecord{Schema: 1, Operation: receipt.OperationID, Action: "remove", Commit: d.Commit, Hosts: current, Homes: homes}
+	release := d.Floor
+	if record != nil {
+		release = d.installed(record)
+	}
+	intent := sentinelRecord{Schema: 1, Operation: receipt.OperationID, Action: "remove", Commit: release.Commit, Tag: release.Tag, Hosts: current, Homes: homes}
 	if record != nil {
 		intent.Hosts = sentinelUnion(record.Hosts, current)
 	}
@@ -614,7 +807,7 @@ func (d *SentinelDriver) Remove(ctx context.Context, r Resource, receipt Receipt
 		return Observation{}, err
 	}
 	if len(intent.Hosts) != 0 {
-		checkout, err := d.prepare(ctx)
+		checkout, err := d.prepare(ctx, release.Commit)
 		if err != nil {
 			return Observation{}, err
 		}

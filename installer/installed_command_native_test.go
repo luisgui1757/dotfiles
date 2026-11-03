@@ -21,7 +21,7 @@ func installedMachineFixture(t *testing.T, repository, home string, timeout time
 	if runtime.GOOS == "windows" {
 		binary += ".exe"
 	}
-	build := exec.Command("go", "build", "-trimpath", "-o", binary, "./cmd/dotfiles")
+	build := exec.Command("go", "build", "-trimpath", "-tags", "sentinelfixedrelease", "-o", binary, "./cmd/dotfiles")
 	if output, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("build installed entrypoint: %s %v", output, err)
 	}

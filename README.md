@@ -53,8 +53,8 @@ No install flags are needed. The menu offers:
 
 - **Choose tools:** tick the tools you want. Unticking removes a tool, and
   confirming an unchanged selection repairs failed checks.
-- **Update tools:** apply this checkout's reviewed versions and repair failed
-  checks; your selection stays the same.
+- **Update tools:** apply this checkout's reviewed versions and the latest
+  Sentinel release, and repair failed checks; your selection stays the same.
 - **Check installation:** inspect the installation without changing it, then return to the menu.
 
 The cursor starts on the likely action: Update after the checkout changed or
@@ -96,7 +96,8 @@ toolchain. Any change there rebuilds or reverifies as before.
 To move to a newer repository revision, first preserve your local changes, then
 update your checkout (for a branch, `git pull --ff-only`) and open setup again.
 The update menu uses that checkout's reviewed pins; it does not update Git or
-fetch arbitrary latest package versions. Native providers update only the
+fetch arbitrary latest package versions. Sentinel is the one exception: Update
+installs its latest published and immutable release. Native providers update only the
 selected, proven-owned packages, never the entire machine.
 
 Coming from the Nix/chezmoi release (v0.4.x)? Only the `v1.0.1` checkout has
@@ -350,8 +351,8 @@ skills also go to it.
 
 **Sentinel rules and skills** installs
 [Sentinel](https://github.com/luisgui1757/sentinel), the shared rules and
-skills for coding agents. Setup gets one pinned Sentinel commit with Git and
-runs the Sentinel installer of that commit. That installer writes the rules
+skills for coding agents. Setup gets the latest Sentinel release, never one
+older than v0.3.0, and runs the Sentinel installer of that release. That installer writes the rules
 into a managed block in the instruction file of each agent. Text outside the
 block stays. It also copies the skills of the `core`, `ui`, `formal` and `ops`
 profiles and writes a `.sentinel-owned` file into each skill folder. It does
@@ -398,8 +399,14 @@ its Sentinel checkout. Setup records `CODEX_HOME`, `CLAUDE_CONFIG_DIR`,
 `COPILOT_HOME`, `XDG_CONFIG_HOME` and `KIRO_HOME` at the install. Check, update
 and removal use these recorded values, and setup shows a note when they changed.
 
-A Renovate pull request proposes a new Sentinel pin. After you merge and pull
-it, **Update tools** applies it.
+Sentinel releases do not need a dotfiles change. GitHub must report the latest
+release as published and immutable. Apply installs that release once. Check
+shows a note when a newer release exists, and **Update tools** installs it.
+Update refuses an older release and a tag that names another commit. An
+installed older commit moves only with **Update tools**. When
+setup cannot reach GitHub, Check and Update keep the installed release and show
+a note. A first install then stops. Repair, removal and an interrupted
+operation use the commit of the install.
 
 Authenticated agent execution remains a separate verification step. Notes remain personal: Neovim
 enables the notes integration only when its vault exists; `NOTES_VAULT` can select another existing vault.
