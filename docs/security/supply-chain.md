@@ -95,7 +95,8 @@ grouped PR. It updates the four agent CLIs and the GitHub tools listed in
 Each GitHub recipe names the repository, release tag and asset for every target.
 The script verifies each download against the published SHA-256 and checks the
 required archive paths before it changes a pin. A missing asset, missing hash,
-checksum mismatch or changed layout fails that tool and the workflow.
+checksum mismatch, download above 512 MiB or changed layout fails that tool
+and the workflow.
 Other verified updates can still reach the grouped PR.
 
 The four agent CLIs keep their vendor checks: Claude's signed release manifest

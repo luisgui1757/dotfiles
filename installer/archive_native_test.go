@@ -55,9 +55,6 @@ func TestNativeArchiveInstallsExecutesChecksAndRemovesRealStarship(t *testing.T)
 	}
 }
 
-// Exercise each real upstream layout through the same provider and receipt
-// lifecycle. Full capability tests separately cover system prerequisites and
-// tool configuration; an executable on a provisioned runner cannot prove those.
 func TestNativeArchivePinnedCommandLifecycle(t *testing.T) {
 	if os.Getenv("DOTFILES_TEST_ARCHIVES") != "1" {
 		t.Skip("set DOTFILES_TEST_ARCHIVES=1 for verified upstream downloads and real execution")
@@ -112,13 +109,11 @@ func TestNativeArchivePinnedCommandLifecycle(t *testing.T) {
 				}
 				output, err := cmd.CombinedOutput()
 				if err != nil {
-					t.Fatalf("%s %v: %v\n%s", tool, args, err, output)
+					t.Fatalf("%s %v: %v (context: %v)\n%s", tool, args, err, ctx.Err(), output)
 				}
 				return string(output)
 			}
 			if tool == "clipboard" {
-				// win32yank has no version flag. Its verified archive pins the
-				// version; this checks its real purpose on a disposable host.
 				value := "dotfiles clipboard ✓\nsecond line\n"
 				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 				defer cancel()

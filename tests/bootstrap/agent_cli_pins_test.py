@@ -327,6 +327,20 @@ class GitHubPinBumpTest(unittest.TestCase):
         self.assertEqual(resources, self.pins)
         self.assertIn("1.0.0 held", summary)
 
+    def test_github_assets_respect_the_installer_download_limit(self):
+        for size, status in [(536_870_912, 0), (536_870_913, 1), (538_725_004, 1)]:
+            with self.subTest(size=size):
+                self.path.write_text(self.original)
+                self.publish("tool.openwhispr", "1.99.0")
+                self.release["assets"][-1]["size"] = size
+                self.network.texts[self.api] = json.dumps(self.release).encode()
+                resources, summary = self.run_bump("tool.openwhispr", expected=status)
+                if status:
+                    self.assertEqual(resources, self.pins)
+                    self.assertIn("size limit", summary)
+                else:
+                    self.assertEqual({pin["version"] for pin in resources["tool.openwhispr"].values()}, {"1.99.0"})
+
     def test_superfile_accepts_the_publishers_dot_slash_archive_prefix(self):
         self.publish("tool.superfile", "1.99.0")
         asset = next(asset for asset in self.release["assets"] if asset["name"] == "superfile-linux-v1.99.0-amd64.tar.gz")

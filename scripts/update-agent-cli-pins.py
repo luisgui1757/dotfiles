@@ -58,7 +58,7 @@ COPILOT_ASSETS = {"darwin/arm64": "copilot-darwin-arm64.tar.gz", "linux/amd64": 
 KIRO_BASE = "https://prod.download.cli.kiro.dev/stable/"
 KIRO_FILES = {"darwin/arm64": "Kiro CLI.dmg", "linux/amd64": "kirocli-x86_64-linux.zip",
               "linux/arm64": "kirocli-aarch64-linux.zip"}
-MAX_DOWNLOAD = 768 << 20
+MAX_DOWNLOAD = 512 << 20
 
 
 class BumpError(Exception):
@@ -253,6 +253,8 @@ def github_release(network, pins: dict, work: pathlib.Path, tool: str, recipe: d
         url = github_url(recipe, target, version)
         if not asset or asset.get("browser_download_url") != url:
             raise BumpError(f"{tool} release lacks {name}")
+        if asset.get("size", 0) > MAX_DOWNLOAD:
+            raise BumpError(f"{tool} {name} exceeds the download size limit")
         digest = asset.get("digest") or ""
         if not re.fullmatch(r"sha256:[0-9a-f]{64}", digest):
             raise BumpError(f"{tool} {name} lacks a published SHA-256")
