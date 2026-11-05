@@ -27,7 +27,7 @@ func agentCLIEnvironment(home string) []string {
 	for _, entry := range os.Environ() {
 		key, _, _ := strings.Cut(entry, "=")
 		if strings.HasPrefix(key, "T3CODE_") || strings.HasPrefix(key, "ANTHROPIC_") || strings.HasPrefix(key, "CLAUDE_") || strings.HasPrefix(key, "OPENAI_") || strings.HasPrefix(key, "CODEX_") ||
-			strings.HasPrefix(key, "KIRO_") || strings.HasPrefix(key, "Q_") || strings.HasPrefix(key, "COPILOT_") || key == "GH_TOKEN" || key == "GITHUB_TOKEN" {
+			strings.HasPrefix(key, "KIRO_") || strings.HasPrefix(key, "Q_") || strings.HasPrefix(key, "COPILOT_") || strings.HasPrefix(key, "MUSE_") || strings.HasPrefix(key, "META_") || key == "GH_TOKEN" || key == "GITHUB_TOKEN" {
 			continue
 		}
 		environment = append(environment, entry)
@@ -226,10 +226,13 @@ func TestNativeAgentCLIInstalledApplicationLifecycle(t *testing.T) {
 		}
 		exerciseAgentCLI(t, commands[id], product, home)
 	}
-	agents := []string{"tool.t3", "tool.claude", "tool.codex", "tool.copilot"}
+	agents := []string{"tool.t3", "tool.claude", "tool.codex", "tool.copilot", "tool.muse"}
 	selected := []string{"t3-code", "claude-code", "codex", "copilot-cli"}
 	apply(Request{Schema: 1, Mode: "apply", Selected: selected})
-	commands["copilot"] = exerciseInstalledCopilotCLI(t, d, home)
+	commands["copilot"] = exerciseInstalledVersionedCLI(t, d, home, "tool.copilot", "copilot", "Copilot CLI")
+	selected = append(selected, "muse-code")
+	apply(Request{Schema: 1, Mode: "apply", Selected: selected})
+	commands["muse"] = exerciseInstalledVersionedCLI(t, d, home, "tool.muse", "muse", "Muse Code")
 	removeShared := []string{"tool.git"}
 	if platform.OS == "windows" {
 		// Copilot's PowerShell 7 prerequisite is shared; this disposable state

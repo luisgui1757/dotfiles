@@ -125,7 +125,7 @@ selects the rest. Children remain independently selectable. `a` selects all,
 | Cloud | Azure CLI |
 | Terminal apps | Ghostty, Windows Terminal |
 | Terminal sessions | tmux, Herdr |
-| AI coding | T3 Code, T3 Code server, Claude Code CLI, Codex CLI, GitHub Copilot CLI, Kiro CLI, Sentinel rules and skills |
+| AI coding | T3 Code, T3 Code server, Claude Code CLI, Codex CLI, GitHub Copilot CLI, Kiro CLI, Muse Code CLI, Sentinel rules and skills |
 | Desktop apps | OpenWhispr, Obsidian, Tailscale, Zen Browser, AeroSpace, Mac keyboard shortcuts, US International dead keys |
 | Dotfiles development | Lint and benchmark tools |
 
@@ -170,6 +170,7 @@ required dependencies are still resolved automatically in the preview.
 | Codex CLI | ✓ | ✓ | ✓ |
 | GitHub Copilot CLI | ✓ | glibc | ✓ |
 | Kiro CLI | ✓ | glibc | — |
+| Muse Code CLI | ✓ | ✓ | ✓ |
 | Sentinel rules and skills | ✓ | ✓ | ✓ |
 | Lint and benchmark tools | ✓ | ✓ | ✓ |
 
@@ -342,7 +343,7 @@ Use dotfiles Update for its managed Codex/Claude packages too; T3's provider
 **Update** and **Update all** can invoke those CLIs' own updaters outside this
 pinned lifecycle.
 
-Claude Code, Codex, GitHub Copilot and Kiro are independent CLI
+Claude Code, Codex, GitHub Copilot, Kiro and Muse Code are independent CLI
 selections; choose any of them. They use pinned standalone native distributions
 and automatically resolve Git.
 The installer does not install their desktop apps or change personal models,
@@ -350,7 +351,7 @@ permissions, credentials or sessions. Sign in from the chosen CLI after setup.
 Claude Code's managed shell environment sets `DISABLE_UPDATES=1`; use the
 installer's Update menu to reconcile reviewed pins for either CLI.
 **Keeping pinned tools current:** Update installs the checkout's versions.
-A weekly workflow proposes verified updates for the four agent CLIs and the
+A weekly workflow proposes verified updates for the five agent CLIs and the
 GitHub tools in its update policy, including T3. It opens one grouped PR and
 holds major releases for review. Merge it after its native checks pass, then
 run `git pull` and **Update tools** on each machine. Some pins still need manual
@@ -378,6 +379,13 @@ setup does not extract programs from vendor installers. If Kiro publishes a plai
 Windows download (for example a ZIP) someday, it can be added like the other
 platforms. Install Kiro yourself on Windows if you want it. Sentinel rules and
 skills also go to it.
+**Muse Code CLI** uses the pinned binary from Meta's `muse-stable` release
+manifest: one native executable for each platform. Setup does not run Meta's
+`install.sh` and does not install its launcher, which updates itself every hour.
+Use Update for new Muse releases. Sign in with `muse login` (a Meta account,
+for example with a Muse subscription), and `muse usage` shows your allowance.
+T3 Code has its own Muse provider, which starts `muse` from `PATH`. Turn it on
+in the T3 Code provider settings after you sign in.
 
 **Sentinel rules and skills** installs
 [Sentinel](https://github.com/luisgui1757/sentinel), the shared rules and
@@ -982,6 +990,9 @@ Useful standalone tools:
 - `kiro-cli`: Kiro CLI. Run `kiro-cli login` once, then `kiro-cli`
   in a project directory to chat; `kiro-cli --help` lists its commands. See the
   [Kiro CLI docs](https://kiro.dev/docs/cli/).
+- `muse`: Muse Code CLI. Run `muse login` once, then `muse` in a project
+  directory. `muse exec "<prompt>"` runs one prompt without the TUI, and
+  `muse --help` lists its commands. See [Muse Code](https://dev.meta.ai/).
   [Official Codex guide](https://learn.chatgpt.com/docs/codex/cli) and
   [Claude Code guide](https://code.claude.com/docs/en/setup) describe their
   authentication and usage. Neither CLI is required by the other.
