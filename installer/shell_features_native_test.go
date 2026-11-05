@@ -86,7 +86,7 @@ func selectedShellLifecycle(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			script += "; if ((Get-PSReadLineOption).EditMode -ne 'Vi') { throw 'Active profile lost PSReadLine vi mode' }; $keys=Get-PSReadLineKeyHandler -Bound; foreach ($binding in @(@('Tab','MenuComplete'),@('UpArrow','HistorySearchBackward'),@('DownArrow','HistorySearchForward'))) { if (-not ($keys | Where-Object { $_.Key -eq $binding[0] -and $_.Function -eq $binding[1] })) { throw ('Active PSReadLine binding missing: '+$binding[0]) } }; if ((Get-Command ls).CommandType -ne 'Function' -or $env:LS_COLORS -notmatch 'di=38;2;246;193;119') { throw 'Active lsd profile missing' }"
+			script += "; if ((Get-PSReadLineOption).EditMode -ne 'Vi') { throw 'Active profile lost PSReadLine vi mode' }; if ((Get-PSReadLineOption).ViModeIndicator -ne 'Cursor') { throw 'Active profile lost the vi cursor indicator' }; $keys=Get-PSReadLineKeyHandler -Bound; foreach ($binding in @(@('Tab','MenuComplete'),@('UpArrow','HistorySearchBackward'),@('DownArrow','HistorySearchForward'))) { if (-not ($keys | Where-Object { $_.Key -eq $binding[0] -and $_.Function -eq $binding[1] })) { throw ('Active PSReadLine binding missing: '+$binding[0]) } }; if ((Get-Command ls).CommandType -ne 'Function' -or $env:LS_COLORS -notmatch 'di=38;2;246;193;119') { throw 'Active lsd profile missing' }"
 			cmd = exec.CommandContext(ctx, program, "-NoLogo", "-NoProfile", "-NonInteractive", "-Command", script)
 		} else {
 			script := "starship --version; fzf --version; alias ls; atuin --version; declare -F spf; spf --version; "
