@@ -2,7 +2,7 @@
 # current OS; sub-targets skip themselves with a clear message when the
 # tool they depend on isn't installed.
 
-.PHONY: ci test-installer test-bootstrap test-required test test-nvim test-shell test-starship test-tmux test-ghostty test-aerospace test-static validate-renovate lint release-check setup help
+.PHONY: ci test-installer test-bootstrap test-required test test-nvim test-shell test-starship test-tmux test-ghostty test-aerospace test-xcompose test-static validate-renovate lint release-check setup help
 
 help:
 	@echo "setup: launch the installer menu"
@@ -28,7 +28,7 @@ test-installer:
 	@cd installer && go vet ./...
 	@cd installer && go test -race -timeout 30m ./...
 
-test: test-static lint test-nvim test-shell test-starship test-tmux test-ghostty test-aerospace
+test: test-static lint test-nvim test-shell test-starship test-tmux test-ghostty test-aerospace test-xcompose
 	@echo
 	@echo "=== test summary: see individual sub-target output above ==="
 
@@ -49,6 +49,9 @@ test-ghostty:
 
 test-aerospace:
 	@bash tests/aerospace/run_all.sh
+
+test-xcompose:
+	@python3 -m unittest discover -s tests/xcompose -p '*_test.py'
 
 test-static:
 	@bash tests/static/run_all.sh

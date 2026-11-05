@@ -267,6 +267,15 @@
       "platforms": [
         "linux"
       ]
+    },
+    {
+      "resource": "config.xcompose",
+      "source": "xcompose/XCompose",
+      "folder": "home",
+      "path": ".XCompose",
+      "platforms": [
+        "linux"
+      ]
     }
   ]
 }
