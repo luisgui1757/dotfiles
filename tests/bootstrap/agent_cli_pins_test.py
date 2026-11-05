@@ -338,10 +338,10 @@ class GitHubPinBumpTest(unittest.TestCase):
 
     def test_ignored_tag_is_never_proposed(self):
         self.publish("tool.xremap", "0.16.6")
-        self.publish("tool.xremap", "0.15.20")
+        self.publish("tool.xremap", "0.15.99")
         self.publish("tool.xremap", "0.15.10")
         resources, _ = self.run_bump("tool.xremap")
-        self.assertEqual({pin["version"] for pin in resources["tool.xremap"].values()}, {"0.15.20"})
+        self.assertEqual({pin["version"] for pin in resources["tool.xremap"].values()}, {"0.15.99"})
 
     def test_release_below_the_pin_is_never_a_downgrade(self):
         self.publish("tool.fzf", "0.1.0")
@@ -351,15 +351,15 @@ class GitHubPinBumpTest(unittest.TestCase):
 
     def test_older_release_with_a_higher_number_does_not_replace_latest(self):
         self.publish("tool.fzf", "0.99.0")
-        self.publish("tool.fzf", "0.80.0")
+        self.publish("tool.fzf", "0.98.0")
         resources, _ = self.run_bump("tool.fzf")
-        self.assertEqual({pin["version"] for pin in resources["tool.fzf"].values()}, {"0.80.0"})
+        self.assertEqual({pin["version"] for pin in resources["tool.fzf"].values()}, {"0.98.0"})
 
     def test_maintenance_release_below_the_pin_does_not_hide_a_newer_release(self):
-        self.publish("tool.fzf", "0.80.0")
+        self.publish("tool.fzf", "0.99.0")
         self.publish("tool.fzf", "0.74.1")
         resources, _ = self.run_bump("tool.fzf")
-        self.assertEqual({pin["version"] for pin in resources["tool.fzf"].values()}, {"0.80.0"})
+        self.assertEqual({pin["version"] for pin in resources["tool.fzf"].values()}, {"0.99.0"})
 
     def test_held_major_still_lets_the_pinned_major_update(self):
         self.publish("tool.fzf", "0.99.0")

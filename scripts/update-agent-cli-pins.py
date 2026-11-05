@@ -239,9 +239,10 @@ def github_release(network, pins: dict, work: pathlib.Path, tool: str, recipe: d
     pattern = re.escape(recipe["tag"]).replace(re.escape("{version}"), "(.+)")
 
     def stable(release):
+        if release.get("tag_name") in recipe.get("ignore", ()):
+            return None
         match = re.fullmatch(pattern, release.get("tag_name", ""))
-        if release.get("prerelease") or release.get("draft") or not match or not STABLE.fullmatch(match.group(1)) \
-                or release["tag_name"] in recipe.get("ignore", ()):
+        if release.get("prerelease") or release.get("draft") or not match or not STABLE.fullmatch(match.group(1)):
             return None
         return tuple(map(int, match.group(1).split("."))), match.group(1), release
 
