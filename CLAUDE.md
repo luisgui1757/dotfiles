@@ -125,7 +125,8 @@ of each step. All of these checks must pass on the final head.
   that the release keeps without a change. Do not remove a reader.
   `TestEachResourceOfAReleaseStaysInTheCatalog` checks the catalog resources.
   `retiredResources` lists the resources that only older states hold: setup
-  drops a record that it no longer owns and stops on any other one.
+  drops a record that it no longer owns and stops on any other one. A Retained
+  entry (`tool.flatpak`) goes away at each ownership, and its files stay.
 - State is strict schema-1 JSON. An unknown field or schema fails and does not
   change the file.
 - Constructors are pure. Find the platform, the known folders and the

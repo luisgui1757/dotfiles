@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -132,7 +133,8 @@ func LoadState(path, target string) (State, error) {
 			return state, fmt.Errorf("adopted resource %s has no original baseline", id)
 		}
 	}
-	for id, receipt := range state.Receipts {
+	for _, id := range slices.Sorted(maps.Keys(state.Receipts)) {
+		receipt := state.Receipts[id]
 		retired, ok := retiredResources[id]
 		if !ok || retired.OS != "" && retired.OS != state.Context.OS {
 			continue
