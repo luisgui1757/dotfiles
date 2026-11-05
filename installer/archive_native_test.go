@@ -2,6 +2,8 @@ package installer
 
 import (
 	"context"
+	"errors"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -142,6 +144,21 @@ func TestNativeArchivePinnedCommandLifecycle(t *testing.T) {
 			if tool == "az" {
 				if output := execute("account", "list", "--output", "json"); !strings.Contains(output, "[]") {
 					t.Fatal("Azure CLI cannot load its packages without a sign-in", output)
+				}
+				if pin.AzureCLI != nil {
+					payload, err := d.PayloadPath("tool.shared")
+					if err != nil {
+						t.Fatal(err)
+					}
+					err = filepath.WalkDir(filepath.Join(payload, filepath.FromSlash(azureCLIPackages)), func(path string, entry fs.DirEntry, err error) error {
+						if err == nil && entry.Type().IsRegular() && filepath.Ext(path) == ".py" {
+							return errors.New("Azure CLI keeps a module source, so Python compiles it at each run: " + path)
+						}
+						return err
+					})
+					if err != nil {
+						t.Fatal(err)
+					}
 				}
 			}
 			if tool == "python" {

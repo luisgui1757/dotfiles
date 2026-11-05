@@ -165,9 +165,12 @@ longer want it. Setup sets only `app.disableAutoupdates` in
 `${KIRO_HOME:-~/.kiro}/settings/cli.json` (an existing `false` is shown for explicit
 adoption first) and restores your file on removal.
 
-Pi has been removed, including its copied themes/keybindings and Sentinel target.
-Existing released Pi packages and personal data remain outside this installer's
-ownership. Keep an old checkout if a personal Pi configuration still links to it.
+The old Pi setup, with its copied themes, keybindings and Sentinel target, was
+removed in v1.0.0. **Pi coding agent** is a separate selection again. Setup
+installs only the pinned Pi binary and never writes `~/.pi`. A Pi that its own
+installer or a package manager installed stays outside this installer's
+ownership, and so does your personal data. Keep an old checkout if a personal Pi
+configuration still links to it.
 To test an earlier unreleased native-installer revision, first remove Pi and its
 old Sentinel selection with that exact revision. Finish any pending operation
 there before you advance. v1.0.1 migrate retires the released Pi policy file.
