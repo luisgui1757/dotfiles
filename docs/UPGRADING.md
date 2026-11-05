@@ -230,9 +230,9 @@ add the app. To add the app, tick **T3 Code** in **Choose tools**. On Windows,
 install the app with `winget install T3Tools.T3Code`.
 
 Both T3 selections now set some T3 settings and the Rosé Pine Moon theme. The
-README lists them. When `~/.t3/userdata/settings.json` exists, **Update tools**
-shows `integration.t3-code` for adoption. Adopt it to apply the settings. Your
-other settings stay.
+README lists them. When `~/.t3/userdata/settings.json` already has one of these
+fields, **Update tools** shows `integration.t3-code` for adoption. Adopt it to
+apply the settings. Your other settings stay.
 
 T3 Code server is the earlier optional selection, never an automatic migration or provider
 replacement. It uses the official standalone package with a browser UI on Apple

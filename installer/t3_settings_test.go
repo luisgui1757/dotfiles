@@ -78,21 +78,21 @@ func TestT3SettingsOwnTheirFieldsAndWriteARealThemeFile(t *testing.T) {
 			}
 
 			writeConfigFixture(t, settings, `{
-  "storageCleanup": {
-    "worktreeOnMerge": true,
-    "worktreeOnDelete": true
-  },
-  "enableProviderUpdateChecks": false,
-  "projectSettingsFolded": true,
-  "sidebarAutoSettleAfterDays": null,
-  "idleCompaction": "onReturn",
-  "autoResumeLimitedThreads": true,
-  "sidebarAutoSettleOnMerge": false,
-  "defaultThreadEnvMode": "worktree",
-  "branchNamingMode": "semantic",
-  "removeAgentCreditsOnMerge": true,
-  "pullRequestMergeMethod": "squash",
-  "defaultTheme": "rose-pine-moon"
+	"storageCleanup": {
+		"worktreeOnMerge": true,
+		"worktreeOnDelete": true
+	},
+	"enableProviderUpdateChecks": false,
+	"projectSettingsFolded": true,
+	"sidebarAutoSettleAfterDays": null,
+	"idleCompaction": "onReturn",
+	"autoResumeLimitedThreads": true,
+	"sidebarAutoSettleOnMerge": false,
+	"defaultThreadEnvMode": "worktree",
+	"branchNamingMode": "semantic",
+	"removeAgentCreditsOnMerge": true,
+	"pullRequestMergeMethod": "squash",
+	"defaultTheme": "rose-pine-moon"
 }`)
 			check, err := c.Dispatch(context.Background(), Request{Schema: 1, Mode: "check"})
 			if err != nil || check.Status != "ready" {
