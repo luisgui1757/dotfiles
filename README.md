@@ -943,6 +943,11 @@ Useful standalone tools:
 - `lazygit`: terminal Git UI with upstream default keybindings and the Rose Pine
   theme on every OS.
   Press `?` for keys in the current context; `Esc` closes help and popups.
+- `gh`: on macOS and Linux, the managed shell sets `GH_PATH` to the stable
+  `current/bin/gh` link. Thus the Git credential helper that `gh auth login`
+  or `gh auth setup-git` writes still works after an Update. A helper line
+  that an earlier gh wrote stays unchanged. Run `gh auth setup-git` again to
+  correct it.
 - `gh-dash`: dashboard for pull requests and issues. Run `gh auth login` first
   to access your GitHub work; installing the dashboard does not require login.
   On a pull request, `m` merges it normally. `M` runs `gh pr merge --admin`: the
