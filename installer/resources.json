@@ -1816,7 +1816,7 @@
     },
     {
       "id": "integration.t3-code",
-      "name": "T3 Code settings: worktree cleanup, Git, idle threads and the Rosé Pine Moon theme (ten fields and the default theme)",
+      "name": "T3 Code settings and the Rosé Pine Moon theme",
       "requires": [
         "integration.t3-code-theme"
       ],

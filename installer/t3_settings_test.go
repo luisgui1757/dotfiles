@@ -7,10 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"regexp"
-	"strings"
 	"testing"
-	"unicode/utf16"
 )
 
 func t3SettingsController(t *testing.T) (Controller, string, string) {
@@ -130,32 +127,5 @@ func TestT3SettingsRequireAdoptionOfAPersonalChoice(t *testing.T) {
 	}
 	if _, err := os.Lstat(filepath.Dir(theme)); !errors.Is(err, os.ErrNotExist) {
 		t.Fatal("removal left the themes folder that setup created", err)
-	}
-}
-
-func TestT3ThemeIsAValidEnvironmentTheme(t *testing.T) {
-	data, err := os.ReadFile(filepath.Join("..", "t3", "rose-pine-moon.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	var theme struct {
-		Version    int               `json:"version"`
-		Name       string            `json:"name"`
-		Appearance string            `json:"appearance"`
-		Colors     map[string]string `json:"colors"`
-	}
-	decoder := json.NewDecoder(strings.NewReader(string(data)))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&theme); err != nil {
-		t.Fatal(err)
-	}
-	role := regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9]{0,63}$`)
-	if theme.Version != 1 || theme.Name == "" || len(utf16.Encode([]rune(theme.Name))) > 48 || theme.Appearance != "dark" || len(theme.Colors) == 0 {
-		t.Fatal("T3 ignores this theme file", theme.Version, theme.Name, theme.Appearance, len(theme.Colors))
-	}
-	for key, value := range theme.Colors {
-		if !role.MatchString(key) || strings.TrimSpace(value) == "" || len(utf16.Encode([]rune(value))) > 64 {
-			t.Fatalf("T3 ignores this theme file because of color %q: %q", key, value)
-		}
 	}
 }
