@@ -169,9 +169,11 @@ def validate_job_evidence(value: Any, manifest: dict[str, Any], commit: str, tag
     if not isinstance(document, dict) or set(document) != {"schema", "run", "jobs", "workflow_source"} or document["schema"] != 1:
         fail("native job evidence document schema drifted")
     run_record = document["run"]
-    expected = {"headSha": commit, "headBranch": tag, "attempt": 1, "event": "workflow_dispatch", "status": "completed", "conclusion": "success", "workflowName": "installer engine"}
-    if not isinstance(run_record, dict) or any(run_record.get(key) != val for key, val in expected.items()) or not isinstance(run_record.get("databaseId"), int) or run_record["databaseId"] < 1:
-        fail("native job evidence run is not the first successful exact-tag run")
+    expected = {"headSha": commit, "attempt": 1, "status": "completed", "conclusion": "success", "workflowName": "installer engine"}
+    if (not isinstance(run_record, dict) or any(run_record.get(key) != val for key, val in expected.items())
+            or (run_record.get("event"), run_record.get("headBranch")) not in {("push", "main"), ("workflow_dispatch", tag)}
+            or not isinstance(run_record.get("databaseId"), int) or run_record["databaseId"] < 1):
+        fail("native job evidence run is not the first successful run of the release commit on main or its tag")
     jobs = document["jobs"]
     if not isinstance(jobs, list) or len(jobs) != len(manifest["workflow_jobs"]) or any(not isinstance(job, dict) for job in jobs) or {job.get("name") for job in jobs} != set(manifest["workflow_jobs"]):
         fail("native job evidence job set differs from the reviewed matrix")
@@ -184,11 +186,11 @@ def validate_job_evidence(value: Any, manifest: dict[str, Any], commit: str, tag
     if not isinstance(text, str) or hashlib.sha256(text.encode("utf-8")).hexdigest() != source["sha256"]:
         fail("native workflow source digest drifted")
     blocks = re.findall(r"(?ms)^ *- uses: actions/setup-go@[^\n]+\n(.*?)(?=^ *- (?:uses|name):|\Z)", text)
-    cache_setting = "cache: ${{ !startsWith(github.ref, 'refs/tags/') }}"
+    cache_setting = "cache: ${{ github.event_name == 'pull_request' }}"
     if (not blocks or len(blocks) != text.count("uses: actions/setup-go@")
             or any(not re.search(r"(?m)^ +" + re.escape(cache_setting) + r" *$", block) for block in blocks)
             or "actions/cache@" in text):
-        fail("exact-tag workflow source does not disable every Go cache and broad Actions cache")
+        fail("native workflow source does not disable every Go cache outside pull requests and every broad Actions cache")
 
 
 def git_clean(root: pathlib.Path) -> None:
@@ -316,12 +318,13 @@ def verify_or_publish_tag(manifest: dict[str, Any], tag: str, expected_sha: str)
 
 
 def select_release_run(manifest: dict[str, Any], tag: str, expected_sha: str) -> dict[str, Any]:
-    """Wait for a first-attempt exact-tag run of the native workflow and return it after it passes.
+    """Wait for a first-attempt native run of the release commit and return it after it passes.
 
-    A re-run of the release keeps a run that passed or still runs. It starts a
-    new run only when no such run exists, for example after a failed run.
+    The push run on main comes first. When it does not exist or does not pass,
+    an exact-tag run replaces it. A re-run of the release keeps an exact-tag
+    run that passed or still runs, and starts a new one only after a failed one.
     """
-    def tag_runs() -> list[dict[str, Any]]:
+    def runs(event: str, branch: str) -> list[dict[str, Any]]:
         raw = output(
             [
                 "gh",
@@ -330,7 +333,9 @@ def select_release_run(manifest: dict[str, Any], tag: str, expected_sha: str) ->
                 "--workflow",
                 manifest["workflow"],
                 "--event",
-                "workflow_dispatch",
+                event,
+                "--branch",
+                branch,
                 "--commit",
                 expected_sha,
                 "--limit",
@@ -339,32 +344,43 @@ def select_release_run(manifest: dict[str, Any], tag: str, expected_sha: str) ->
                 "attempt,conclusion,createdAt,databaseId,event,headBranch,headSha,status,url,workflowName",
             ]
         )
-        return [item for item in json.loads(raw) if item.get("headBranch") == tag and item.get("headSha") == expected_sha]
+        return [item for item in json.loads(raw) if item.get("headBranch") == branch and item.get("headSha") == expected_sha]
 
-    existing = tag_runs()
-    usable = [
-        item for item in existing
-        if item.get("attempt") == 1 and (item.get("status") != "completed" or item.get("conclusion") == "success")
-    ]
-    if usable:
-        # A run that passed comes before a run that still runs.
-        run_id = max(usable, key=lambda item: (item.get("status") == "completed", item["databaseId"]))["databaseId"]
+    def usable(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        return [
+            item for item in items
+            if item.get("attempt") == 1 and (item.get("status") != "completed" or item.get("conclusion") == "success")
+        ]
+
+    def passes(run_id: int) -> bool:
+        return run(["gh", "run", "watch", str(run_id), "--exit-status", "--interval", "60"], capture=False, check=False).returncode == 0
+
+    pushed = usable(runs("push", "main"))
+    if pushed and passes(pushed[0]["databaseId"]):
+        return verified_release_run(pushed[0]["databaseId"], "push", "main", expected_sha)
+    existing = runs("workflow_dispatch", tag)
+    passed_first = sorted(usable(existing), key=lambda item: (item.get("status") != "completed", -item["databaseId"]))
+    if passed_first:
+        run_id = passed_first[0]["databaseId"]
     else:
         known = {item["databaseId"] for item in existing}
         run(["gh", "workflow", "run", manifest["workflow"], "--ref", tag], capture=False)
         deadline = time.monotonic() + 180
         selected: list[dict[str, Any]] = []
         while time.monotonic() < deadline:
-            selected = [item for item in tag_runs() if item["databaseId"] not in known]
+            selected = [item for item in runs("workflow_dispatch", tag) if item["databaseId"] not in known]
             if selected:
                 break
             time.sleep(3)
         if len(selected) != 1:
             fail("could not select one new exact-tag workflow_dispatch run")
         run_id = selected[0]["databaseId"]
-    watched = run(["gh", "run", "watch", str(run_id), "--exit-status", "--interval", "60"], capture=False, check=False)
-    if watched.returncode != 0:
+    if not passes(run_id):
         fail(f"exact-tag run {run_id} did not pass. Re-run the release workflow to start a new exact-tag run.")
+    return verified_release_run(run_id, "workflow_dispatch", tag, expected_sha)
+
+
+def verified_release_run(run_id: int, event: str, branch: str, expected_sha: str) -> dict[str, Any]:
     raw = output(
         [
             "gh",
@@ -378,8 +394,8 @@ def select_release_run(manifest: dict[str, Any], tag: str, expected_sha: str) ->
     selected_run = json.loads(raw)
     expected = {
         "databaseId": run_id,
-        "event": "workflow_dispatch",
-        "headBranch": tag,
+        "event": event,
+        "headBranch": branch,
         "headSha": expected_sha,
         "status": "completed",
         "conclusion": "success",

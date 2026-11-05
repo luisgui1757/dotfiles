@@ -101,7 +101,8 @@ fails before any write.
 Proof comes from successful push/manual `test.yml` and `installer-engine.yml`
 runs on exact live `main`, with all expected jobs bound to the selected run and
 GitHub Actions app `15368`. This is the main-policy proof boundary. Cache-free
-first-attempt tag evidence is a separate release-certification requirement.
+first-attempt native evidence of the release commit is a separate
+release-certification requirement.
 
 Two complete live captures detect concurrent changes. After the second capture,
 the helper loads policy from exact committed Git objects, verifies matching local

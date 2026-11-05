@@ -1,12 +1,5 @@
 name: release
 
-# A merge that changes the version in release/manifest.json publishes that
-# version. scripts/release.py checks the merged pull request, scans the release
-# range, tags the merge commit, runs the native installer matrix on the tag and
-# publishes the immutable release with its proof asset. A version that is
-# already published changes nothing. Re-run a failed run: it keeps the tag, an
-# exact-tag run that passed or still runs, and the draft.
-
 on:
   push:
     branches: [main]
@@ -34,7 +27,8 @@ jobs:
   publish:
     name: Publish the release
     runs-on: ubuntu-26.04
-    # The exact-tag native run takes about 30 minutes after it leaves the queue.
+    # A native run takes about 40 minutes after it leaves the queue. A push run
+    # that does not pass adds an exact-tag run.
     timeout-minutes: 180
     permissions:
       actions: write

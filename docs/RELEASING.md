@@ -71,12 +71,16 @@ at the first failure:
    exact fingerprint (`commit:file:rule:line`) with the reason. Never add a
    pattern or a rule for a full path.
 6. The workflow creates the annotated tag on the merge commit.
-7. A `workflow_dispatch` run of `installer-engine.yml` on the tag must pass on
-   its first attempt. Each native job in `.github/check-identities.json` must
-   pass at the exact commit. The proof keeps the API records of the run and its
-   jobs, and the workflow source of the commit, with their size and SHA-256.
-   Each setup-go step must disable the tag cache, and the workflow must have no
-   broad Actions cache step. Gitleaks scans this evidence.
+7. A run of `installer-engine.yml` at the merge commit must pass on its first
+   attempt. The workflow uses the push run on `main` that the merge started.
+   When that run does not exist or does not pass, the workflow starts a
+   `workflow_dispatch` run on the tag. A later merge into `main` can cancel the
+   push run, so the release then takes longer. Each native job in
+   `.github/check-identities.json` must pass at the exact commit. The proof keeps
+   the API records of the run and its jobs, and the workflow source of the
+   commit, with their size and SHA-256. Each setup-go step must disable the Go
+   cache outside pull requests, and the workflow must have no broad Actions
+   cache step. Gitleaks scans this evidence.
 8. A fresh public clone without credentials must give the same tag object and
    commit, and pass the release manifest checks.
 9. The workflow creates a draft with the reviewed title and body, and uploads
@@ -105,8 +109,9 @@ chooses Update tools.
 ## Recovery
 
 - Re-run the failed run of the release workflow. A re-run keeps the tag, a
-  first-attempt exact-tag run that passed or still runs, and the draft. It
-  starts a new exact-tag run only when each earlier run failed.
+  first-attempt push or exact-tag run that passed or still runs, and the draft.
+  It starts a new exact-tag run only when each earlier run failed. Do not re-run
+  the push run. The release accepts only a first attempt.
 - Never move or delete a release tag. A tag that exists must peel to the merge
   commit.
 - When the code of a version cannot pass, merge the fix with a newer version.

@@ -55,7 +55,7 @@ class ReleaseTests(unittest.TestCase):
     def evidence(self):
         run = {"databaseId": 123, "attempt": 1, "headSha": "2" * 40, "headBranch": self.tag,
                "event": "workflow_dispatch", "status": "completed", "conclusion": "success", "workflowName": "installer engine"}
-        source = "steps:\n  - uses: actions/setup-go@" + "a" * 40 + "\n    with:\n      cache: ${{ !startsWith(github.ref, 'refs/tags/') }}\n"
+        source = "steps:\n  - uses: actions/setup-go@" + "a" * 40 + "\n    with:\n      cache: ${{ github.event_name == 'pull_request' }}\n"
         document = {"schema": 1, "run": run,
                     "jobs": [{"name": name, "run_id": 123, "run_attempt": 1, "head_sha": "2" * 40,
                               "status": "completed", "conclusion": "success"} for name in self.manifest["workflow_jobs"]],
@@ -205,40 +205,64 @@ class ReleaseTests(unittest.TestCase):
             with self.subTest(label=label), self.assertRaises(release.ReleaseError):
                 verify(change)
 
-    def test_rerun_keeps_a_passed_exact_tag_run_and_replaces_a_failed_one(self):
+    def test_release_reuses_the_push_run_of_main_and_falls_back_to_an_exact_tag_run(self):
         commit = "2" * 40
 
-        def tag_run(run_id, status="completed", conclusion="success", attempt=1):
+        def native_run(run_id, status="completed", conclusion="success", attempt=1, event="workflow_dispatch"):
             return {"databaseId": run_id, "attempt": attempt, "status": status, "conclusion": conclusion,
-                    "headBranch": self.tag, "headSha": commit, "event": "workflow_dispatch",
+                    "headBranch": "main" if event == "push" else self.tag, "headSha": commit, "event": event,
                     "workflowName": "installer engine", "url": f"https://example.invalid/{run_id}"}
 
-        def select(listings, watch_code=0):
+        def push_run(run_id, **fields):
+            return native_run(run_id, event="push", **fields)
+
+        def select(listings, pushes=(), failing_watches=()):
             listings = iter(listings)
+            known = {item["databaseId"]: item for item in pushes}
             calls = []
 
             def output(argv, **_):
                 if argv[:3] == ["gh", "run", "list"]:
-                    return json.dumps(next(listings))
-                return json.dumps(tag_run(int(argv[3])))
+                    if argv[argv.index("--event") + 1] == "push":
+                        return json.dumps(list(pushes))
+                    listing = next(listings)
+                    known.update({item["databaseId"]: item for item in listing})
+                    return json.dumps(listing)
+                return json.dumps(dict(known[int(argv[3])], status="completed", conclusion="success"))
 
             def run(argv, **_):
-                calls.append(argv[:3])
-                return subprocess.CompletedProcess(argv, watch_code if argv[:3] == ["gh", "run", "watch"] else 0, "", "")
+                calls.append(argv[:3] if argv[:3] != ["gh", "run", "watch"] else argv[:4])
+                failed = argv[:3] == ["gh", "run", "watch"] and int(argv[3]) in failing_watches
+                return subprocess.CompletedProcess(argv, 1 if failed else 0, "", "")
 
             with mock.patch.object(release, "output", side_effect=output), \
                     mock.patch.object(release, "run", side_effect=run), mock.patch.object(release.time, "sleep"):
-                return release.select_release_run(self.manifest, self.tag, commit)["databaseId"], calls
+                selected = release.select_release_run(self.manifest, self.tag, commit)
+                return (selected["databaseId"], selected["event"]), calls
 
-        failed = tag_run(10, conclusion="failure")
-        self.assertEqual(select([[failed, tag_run(11), tag_run(12, attempt=2)]]),
-                         (11, [["gh", "run", "watch"]]))
-        self.assertEqual(select([[failed, tag_run(13, status="in_progress", conclusion="")]]),
-                         (13, [["gh", "run", "watch"]]))
-        self.assertEqual(select([[failed], [failed], [failed, tag_run(14, status="queued", conclusion="")]]),
-                         (14, [["gh", "workflow", "run"], ["gh", "run", "watch"]]))
+        self.assertEqual(select([], pushes=[push_run(1)]), ((1, "push"), [["gh", "run", "watch", "1"]]))
+        self.assertEqual(select([], pushes=[push_run(2, status="in_progress", conclusion="")]),
+                         ((2, "push"), [["gh", "run", "watch", "2"]]))
+        self.assertEqual(select([[], [native_run(20, status="queued", conclusion="")]],
+                                pushes=[push_run(3, status="in_progress", conclusion="")], failing_watches={3}),
+                         ((20, "workflow_dispatch"), [["gh", "run", "watch", "3"], ["gh", "workflow", "run"],
+                                                      ["gh", "run", "watch", "20"]]))
+        for label, pushed in (("failed", push_run(4, conclusion="failure")),
+                              ("cancelled", push_run(5, conclusion="cancelled")),
+                              ("re-run", push_run(6, attempt=2))):
+            with self.subTest(label=label):
+                self.assertEqual(select([[native_run(21)]], pushes=[pushed]),
+                                 ((21, "workflow_dispatch"), [["gh", "run", "watch", "21"]]))
+
+        failed = native_run(10, conclusion="failure")
+        self.assertEqual(select([[failed, native_run(11), native_run(12, attempt=2)]]),
+                         ((11, "workflow_dispatch"), [["gh", "run", "watch", "11"]]))
+        self.assertEqual(select([[failed, native_run(13, status="in_progress", conclusion="")]]),
+                         ((13, "workflow_dispatch"), [["gh", "run", "watch", "13"]]))
+        self.assertEqual(select([[failed], [failed], [failed, native_run(14, status="queued", conclusion="")]]),
+                         ((14, "workflow_dispatch"), [["gh", "workflow", "run"], ["gh", "run", "watch", "14"]]))
         with self.assertRaisesRegex(release.ReleaseError, "Re-run the release workflow"):
-            select([[tag_run(15, status="in_progress", conclusion="")]], watch_code=1)
+            select([[native_run(15, status="in_progress", conclusion="")]], failing_watches={15})
 
     def test_publication_requires_exact_immutable_latest_readback(self):
         draft = {"id": 42}
@@ -266,18 +290,26 @@ class ReleaseTests(unittest.TestCase):
             ("missing job", lambda d: d["jobs"].pop()),
             ("duplicate job", lambda d: d["jobs"].append(d["jobs"][0])),
             ("wrong tag", lambda d: d["run"].update(headBranch="main")),
+            ("push run on the tag", lambda d: d["run"].update(event="push")),
+            ("push run on another branch", lambda d: d["run"].update(event="push", headBranch="release/x")),
+            ("pull request run", lambda d: d["run"].update(event="pull_request", headBranch="main")),
         ):
             with self.subTest(label=label):
                 document = copy.deepcopy(original["document"])
                 change(document)
                 with self.assertRaises(release.ReleaseError):
                     self.check_evidence(self.seal(document))
+        pushed = copy.deepcopy(original["document"])
+        pushed["run"].update(event="push", headBranch="main")
+        self.check_evidence(self.seal(pushed))
         original["document"]["jobs"][0]["conclusion"] = "failure"
         with self.assertRaisesRegex(release.ReleaseError, "digest"):
             self.check_evidence(original)
 
-    def test_tag_caches_must_be_disabled_in_archived_source(self):
-        for text in ("steps: []", "  - uses: actions/setup-go@" + "a" * 40 + "\n    with:\n      cache: true\n",
+    def test_caches_outside_pull_requests_must_be_disabled_in_archived_source(self):
+        setup_go = "  - uses: actions/setup-go@" + "a" * 40 + "\n    with:\n      "
+        for text in ("steps: []", setup_go + "cache: true\n",
+                     setup_go + "cache: ${{ !startsWith(github.ref, 'refs/tags/') }}\n",
                      self.evidence()["document"]["workflow_source"]["text"] + "  - uses: actions/cache@" + "a" * 40):
             document = self.evidence()["document"]
             document["workflow_source"].update(text=text, sha256=hashlib.sha256(text.encode()).hexdigest())
