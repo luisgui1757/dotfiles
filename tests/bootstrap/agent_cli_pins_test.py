@@ -286,6 +286,7 @@ class GitHubPinBumpTest(unittest.TestCase):
 
     def sync(self):
         self.network.texts[self.api] = json.dumps(self.releases).encode()
+        self.network.texts[self.api.replace("releases?per_page=100", "releases/latest")] = json.dumps(self.releases[0]).encode()
 
     def run_bump(self, tool, expected=0):
         summary = self.path.with_suffix(".md")
@@ -335,6 +336,12 @@ class GitHubPinBumpTest(unittest.TestCase):
         self.assertEqual(resources, self.pins)
         self.assertIn("1.0.0 held", summary)
 
+    def test_older_release_with_a_higher_number_does_not_replace_latest(self):
+        self.publish("tool.fzf", "0.99.0")
+        self.publish("tool.fzf", "0.80.0")
+        resources, _ = self.run_bump("tool.fzf")
+        self.assertEqual({pin["version"] for pin in resources["tool.fzf"].values()}, {"0.80.0"})
+
     def test_held_major_still_lets_the_pinned_major_update(self):
         self.publish("tool.fzf", "0.99.0")
         self.publish("tool.fzf", "1.0.0")
@@ -347,26 +354,26 @@ class GitHubPinBumpTest(unittest.TestCase):
             with self.subTest(size=size):
                 self.path.write_text(self.original)
                 self.releases.clear()
-                self.publish("tool.openwhispr", "1.99.0")
+                self.publish("tool.t3", "0.99.0")
                 self.release["assets"][-1]["size"] = size
                 self.sync()
-                resources, summary = self.run_bump("tool.openwhispr", expected=status)
+                resources, summary = self.run_bump("tool.t3", expected=status)
                 if status:
                     self.assertEqual(resources, self.pins)
                     self.assertIn("size limit", summary)
                 else:
-                    self.assertEqual({pin["version"] for pin in resources["tool.openwhispr"].values()}, {"1.99.0"})
+                    self.assertEqual({pin["version"] for pin in resources["tool.t3"].values()}, {"0.99.0"})
 
     def test_one_malformed_reply_fails_only_its_tool(self):
-        for fault in ("object reply", "null size", "truncated download"):
+        for fault in ("list reply", "null size", "truncated download"):
             with self.subTest(fault=fault):
                 self.path.write_text(self.original)
                 self.releases = []
                 self.publish("tool.fd", "10.99.0")
                 self.releases = []
                 self.publish("tool.fzf", "0.99.0")
-                if fault == "object reply":
-                    self.network.texts[self.api] = json.dumps({"message": "Not Found"}).encode()
+                if fault == "list reply":
+                    self.network.texts[self.api.replace("releases?per_page=100", "releases/latest")] = json.dumps(self.releases).encode()
                 elif fault == "null size":
                     self.release["assets"][-1]["size"] = None
                     self.sync()

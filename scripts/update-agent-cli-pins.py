@@ -237,22 +237,28 @@ def require_layout(tool: str, target: str, pin: dict, names: set) -> None:
 
 def github_release(network, pins: dict, work: pathlib.Path, tool: str, recipe: dict, held: list):
     pattern = re.escape(recipe["tag"]).replace(re.escape("{version}"), "(.+)")
-    candidates = []
-    for release in network.json(f"https://api.github.com/repos/{recipe['repository']}/releases?per_page=100"):
+
+    def stable(release):
         match = re.fullmatch(pattern, release.get("tag_name", ""))
         if release.get("prerelease") or release.get("draft") or not match or not STABLE.fullmatch(match.group(1)):
-            continue
-        candidates.append((tuple(map(int, match.group(1).split("."))), match.group(1), release))
-    if not candidates:
-        raise BumpError(f"{tool} has no stable release that matches its recipe")
+            return None
+        return tuple(map(int, match.group(1).split("."))), match.group(1), release
+
+    api = f"https://api.github.com/repos/{recipe['repository']}/releases"
     majors = {int(pin["version"].split(".")[0]) for pin in pins[tool].values()}
-    newest = max(candidates, key=lambda candidate: candidate[0])
-    if newest[0][0] not in majors:
-        held.append(f"- `{tool}`: {newest[1]} held for major version review")
-    eligible = [candidate for candidate in candidates if candidate[0][0] in majors]
-    if not eligible:
-        raise UnchangedRelease("no newer release in the pinned major version")
-    _, version, release = max(eligible, key=lambda candidate: candidate[0])
+    latest = stable(network.json(f"{api}/latest"))
+    if latest and latest[0][0] in majors:
+        _, version, release = latest
+    else:
+        if latest:
+            held.append(f"- `{tool}`: {latest[1]} held for major version review")
+        eligible = [candidate for candidate in map(stable, network.json(f"{api}?per_page=100"))
+                    if candidate and candidate[0][0] in majors]
+        if not eligible:
+            if latest:
+                raise UnchangedRelease("no newer release in the pinned major version")
+            raise BumpError(f"{tool} has no stable release that matches its recipe")
+        _, version, release = max(eligible, key=lambda candidate: candidate[0])
     check_version(tool, pins, version)
     assets = {asset["name"]: asset for asset in release.get("assets", [])}
     updates = {}

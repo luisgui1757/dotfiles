@@ -54,6 +54,7 @@ jobs:
           permission-contents: write
           permission-pull-requests: write
       - name: Keep commits from other authors on the proposal branch
+        id: guard
         if: steps.app.outputs.token != ''
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
@@ -61,24 +62,28 @@ jobs:
           BASE: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          if ! gh api "repos/$GITHUB_REPOSITORY/branches/$BRANCH" --silent 2>"$RUNNER_TEMP/branch.err"; then
+          if ! sha="$(gh api "repos/$GITHUB_REPOSITORY/branches/$BRANCH" --jq .commit.sha 2>"$RUNNER_TEMP/branch.err")"; then
             if grep -q 'HTTP 404' "$RUNNER_TEMP/branch.err"; then
+              echo "sha=" >> "$GITHUB_OUTPUT"
               exit 0
             fi
             cat "$RUNNER_TEMP/branch.err" >&2
             exit 1
           fi
-          others="$(gh api "repos/$GITHUB_REPOSITORY/compare/$BASE...$BRANCH" --jq "[.commits[] | select(.author.login != \"${APP_SLUG}[bot]\")] | length")"
+          bot="${APP_SLUG}[bot]"
+          others="$(gh api "repos/$GITHUB_REPOSITORY/compare/$BASE...$sha" --jq "[.commits[] | select(.author.login != \"$bot\" or .committer.login != \"$bot\")] | length")"
           if [ "$others" != 0 ]; then
-            echo "::error title=Archive pins::$BRANCH has $others commits from other authors. Merge or close its pull request, then run this workflow again."
+            echo "::error title=Archive pins::$BRANCH has commits from another author or committer. Merge its pull request, or save the changes and delete the branch. Then run this workflow again."
             exit 1
           fi
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
       - name: Open or update the pull request
         if: steps.app.outputs.token != ''
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
           APP_SLUG: ${{ steps.app.outputs.app-slug }}
           BASE: ${{ github.ref_name }}
+          EXPECTED: ${{ steps.guard.outputs.sha }}
         run: |
           set -euo pipefail
           user_id="$(gh api "/users/${APP_SLUG}%5Bbot%5D" --jq .id)"
@@ -95,7 +100,7 @@ jobs:
           } > "$RUNNER_TEMP/body.md"
           git switch -c "$BRANCH"
           git commit -q -F "$RUNNER_TEMP/message.txt" -- installer/archive-pins.json
-          git push --force origin "HEAD:refs/heads/$BRANCH"
+          git push --force-with-lease="refs/heads/$BRANCH:$EXPECTED" origin "HEAD:refs/heads/$BRANCH"
           number="$(gh pr list --head "$BRANCH" --base "$BASE" --state open --json number --jq '.[0].number // empty')"
           if [ -n "$number" ]; then
             gh pr edit "$number" --title "Bump verified archive pins" --body-file "$RUNNER_TEMP/body.md"

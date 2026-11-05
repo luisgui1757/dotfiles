@@ -106,10 +106,11 @@ The four agent CLIs keep their vendor checks:
 
 The Claude release key fingerprint is `31DDDE24DDFAB679F42D7BD2BAA929FF1A7ECACE`.
 
-For a GitHub recipe, the bot reads the last 100 releases. It proposes the newest
-stable release in the pinned major version. It reports a newer major release
-and leaves that pin unchanged. It refuses prereleases and downgrades. Current
-versions need no download.
+For a GitHub recipe, the bot starts from the latest GitHub release. When that
+release has a newer major version, the bot reports it and leaves the pin in its
+major version. Then it proposes the highest stable release in the pinned major
+version from the last 100 releases. It refuses prereleases and downgrades.
+Current versions need no download.
 
 The PR must pass the native checks that protect `main`. The bot never merges.
 
@@ -131,8 +132,9 @@ updates its recipes. Update the other pins manually. The agent CLIs follow their
 vendor channels in the bot. Renovate has no source for Build Tools, the VC
 runtime and the Neovim plugin lock, so review them manually.
 
-The bot does not overwrite the proposal branch when it holds commits from other
-authors. Merge or close that PR first.
+The bot does not overwrite the proposal branch when another person authored or
+committed a commit on it. Merge that PR, or save your changes and delete the
+branch. The bot pushes only over the branch state that it checked.
 
 The workflow uses the existing GitHub App with Contents and Pull requests write
 permissions. Its settings are `AGENT_PINS_APP_CLIENT_ID` and

@@ -191,14 +191,6 @@
         "windows/amd64": "Microsoft.WindowsTerminal_{version}_x64.zip"
       }
     },
-    "tool.openwhispr": {
-      "repository": "OpenWhispr/openwhispr",
-      "tag": "v{version}",
-      "assets": {
-        "darwin/arm64": "OpenWhispr-{version}-arm64-mac.zip",
-        "linux/amd64": "OpenWhispr-{version}-linux-x64.tar.gz"
-      }
-    },
     "tool.obsidian-portable": {
       "repository": "obsidianmd/obsidian-releases",
       "tag": "v{version}",
@@ -262,6 +254,7 @@
     "tool.t3-code-app": "DEB layout verification must account for the generated launcher.",
     "tool.zen": "Beta tags, disk images and generated profile wrappers need a recipe.",
     "tool.clang-format": "The PyPI wheel contains paths that depend on its version.",
-    "tool.gersemi": "The Windows formatter version must match the Mason registry snapshot."
+    "tool.gersemi": "The Windows formatter version must match the Mason registry snapshot.",
+    "tool.openwhispr": "Releases after 1.10.3 exceed the installer's 512 MiB download limit."
   }
 }

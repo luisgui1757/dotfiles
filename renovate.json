@@ -428,6 +428,16 @@
       ],
       "versioning": "regex:^jq-(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)$",
       "automerge": false
+    },
+    {
+      "matchFileNames": [
+        "installer/archive-pins.json"
+      ],
+      "matchDepNames": [
+        "xremap/xremap"
+      ],
+      "allowedVersions": "!/^v0\\.16\\.6$/",
+      "automerge": false
     }
   ],
   "dependencyDashboardHeader": "Pinned downloads (archive pins, Linux package pins, the bootstrap Go toolchain, the Homebrew script and the Mason snapshot) are listed under Pending Approval as notices. Do not approve them here: Renovate cannot verify their checksums. The weekly agent-cli-pins workflow proposes verified updates, and docs/RELEASING.md describes the manual ones."
