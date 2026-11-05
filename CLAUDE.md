@@ -40,7 +40,7 @@ Other distributions, Linuxbrew, musl and Intel macOS are out of scope.
 | `installer/config-targets.json` | The configuration target manifest |
 | `setup.sh`, `setup.ps1` | Interactive entrypoints. They run only from a local clone. |
 | `scripts/installer-bootstrap.*` | The verified private Go bootstrap |
-| `nvim/`, `tmux/`, `herdr/`, `ghostty/`, `windows-terminal/`, `aerospace/`, `xremap/`, `git/`, `lazygit/`, `gh-dash/`, `starship/`, `lsd/`, `atuin/`, `superfile/` | Tool configuration |
+| `nvim/`, `tmux/`, `herdr/`, `ghostty/`, `windows-terminal/`, `aerospace/`, `xremap/`, `xcompose/`, `git/`, `lazygit/`, `gh-dash/`, `starship/`, `lsd/`, `atuin/`, `superfile/` | Tool configuration |
 | `release/` | The release manifest and proofs |
 | `tests/` | Tests by area. `tests/static/` holds the repository checks. |
 | `.github/` | Workflows, rulesets and the identities of the checks that must pass |
@@ -52,7 +52,7 @@ Other distributions, Linuxbrew, musl and Intel macOS are out of scope.
 |---|---|
 | `make ci` | The full local gate. Run it before a pull request. |
 | `.\test.ps1` | The local gate on Windows. CI also uses it. |
-| `make test` | Static checks, lint, and the Neovim, shell, Starship, tmux, Ghostty and AeroSpace tests |
+| `make test` | Static checks, lint, and the Neovim, shell, Starship, tmux, Ghostty, AeroSpace and XCompose tests |
 | `make test-static` | `tests/static/run_all.sh` |
 | `make test-installer` | `gofmt`, `go vet` and `go test -race -timeout 30m ./...` in `installer/` |
 | `make test-bootstrap` | Python tests for the launchers and the release scripts |

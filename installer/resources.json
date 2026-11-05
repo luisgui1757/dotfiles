@@ -490,6 +490,20 @@
       "scope": "user"
     },
     {
+      "id": "us-intl-keyboard",
+      "name": "US International dead keys",
+      "description": "Linux only: with English (US, intl., with dead keys), ' then s types 's and ' then c types ç, as on Windows",
+      "capability": true,
+      "category": "Desktop apps",
+      "platforms": [
+        "linux"
+      ],
+      "requires": [
+        "config.xcompose"
+      ],
+      "scope": "user"
+    },
+    {
       "id": "development",
       "name": "Lint and benchmark tools",
       "description": "Optional tools for contributing to this dotfiles repository",
@@ -2654,6 +2668,15 @@
       ],
       "requires": [
         "tool.xremap"
+      ],
+      "action": "config",
+      "scope": "user"
+    },
+    {
+      "id": "config.xcompose",
+      "name": "US International Compose rules",
+      "platforms": [
+        "linux"
       ],
       "action": "config",
       "scope": "user"

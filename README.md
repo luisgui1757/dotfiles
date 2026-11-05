@@ -125,7 +125,7 @@ selects the rest. Children remain independently selectable. `a` selects all,
 | Terminal apps | Ghostty, Windows Terminal |
 | Terminal sessions | tmux, Herdr |
 | AI coding | T3 Code, T3 Code server, Claude Code CLI, Codex CLI, GitHub Copilot CLI, Kiro CLI, Sentinel rules and skills |
-| Desktop apps | OpenWhispr, Obsidian, Tailscale, Zen Browser, AeroSpace, Mac keyboard shortcuts |
+| Desktop apps | OpenWhispr, Obsidian, Tailscale, Zen Browser, AeroSpace, Mac keyboard shortcuts, US International dead keys |
 | Dotfiles development | Lint and benchmark tools |
 
 Only tools supported on your platform appear. Categories select tools; their
@@ -155,6 +155,7 @@ required dependencies are still resolved automatically in the preview.
 | Windows Terminal | — | — | ✓ |
 | AeroSpace | ✓ | — | — |
 | Mac keyboard shortcuts | — | X11 sessions | — |
+| US International dead keys | — | ✓ | — |
 | Herdr | ✓ | ✓ | ✓ |
 | Git | ✓ | ✓ | ✓ |
 | lazygit | ✓ | ✓ | ✓ |
@@ -772,6 +773,43 @@ and dotfiles updates (`git pull`) reload automatically within half a second.
 If you set it up before 2026-10-22, run **Update tools** and log out and back in
 once to get this.
 
+### US International dead keys (Linux)
+
+The Linux layout "English (US, intl., with dead keys)" puts an accent on more
+letters than the Windows US-International layout does. For example, `'` then `s`
+types `ś`, not `'s`. This choice makes `'`, `"`, `^`, `` ` `` and `~` type what
+they type on Windows.
+
+Setup does not change your input sources. Select the layout one time in
+Settings → Keyboard → Input Sources: English (United States), then English (US,
+intl., with dead keys). Log out and back in after setup.
+
+| Keys | Result |
+|---|---|
+| `'` then `a`, `e`, `i`, `o`, `u`, `y`, `c` | `á`, `é`, `í`, `ó`, `ú`, `ý`, `ç` |
+| `"` then `a`, `e`, `i`, `o`, `u`, `y` | `ä`, `ë`, `ï`, `ö`, `ü`, `ÿ` |
+| `^` then `a`, `e`, `i`, `o`, `u` | `â`, `ê`, `î`, `ô`, `û` |
+| `` ` `` then `a`, `e`, `i`, `o`, `u` | `à`, `è`, `ì`, `ò`, `ù` |
+| `~` then `a`, `o`, `n` | `ã`, `õ`, `ñ` |
+| The accent key, then Space | The symbol: `'`, `"`, `^`, `` ` `` or `~` |
+| The accent key, then any other printable key, also an accent key | The symbol, then the key: `that's`, `"hello"`, `2^8`, `""` (IBus: see below) |
+| Right Alt (AltGr) with `'`, `"`, `^`, `` ` `` or `~` | The symbol at once, as on the Linux layout |
+
+Capital letters work the same way, but `"` then `Y` types `"Y`, as on Windows.
+The other AltGr accents and the Compose key keep the Linux rules.
+
+GNOME uses IBus to type text. In IBus, `^`, `` ` `` and `~` pressed two times
+type the symbol one time. IBus removes a user rule when its first character is
+the result of its own rule for the same keys. Use AltGr for these symbols, for
+example AltGr+`` ` `` three times for a Markdown code fence.
+
+Config: `~/.XCompose`, a live link to `xcompose/XCompose`. The file includes the
+system rules of your locale and then replaces the dead-key rules. IBus, GTK, X11
+and libxkbcommon apps read it when they start. IBus and GTK read
+`~/.config/ibus/Compose`, `~/.config/gtk-4.0/Compose` or
+`~/.config/gtk-3.0/Compose` before `~/.XCompose`. If you have one of these files,
+its rules apply instead.
+
 ### Neovim
 
 The leader key is Space. For example, `<leader>fg` means press Space, then `f`,
@@ -1027,7 +1065,7 @@ successful local checks do not establish current live GitHub settings.
 | `scripts/installer-bootstrap.*` | Verified private Go bootstrap |
 | `nvim/`, `tmux/`, `herdr/` | Editor and multiplexer configuration |
 | `installer/shells/` | Active shell integration recipes |
-| `ghostty/`, `windows-terminal/`, `aerospace/`, `xremap/` | Desktop configuration |
+| `ghostty/`, `windows-terminal/`, `aerospace/`, `xremap/`, `xcompose/` | Desktop configuration |
 | `git/`, `lazygit/config.yml`, `gh-dash/`, `starship/`, `lsd/`, `atuin/`, `superfile/` | Tool configuration |
 | `tests/`, `.github/workflows/` | Local and native verification |
 | `docs/` | Upgrade, release and security guides, and release notes |
