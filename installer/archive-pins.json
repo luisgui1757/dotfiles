@@ -103,9 +103,9 @@
     },
     "tool.fd": {
       "darwin/arm64": {
-        "version": "10.5.0",
-        "url": "https://github.com/sharkdp/fd/releases/download/v10.5.0/fd-v10.5.0-aarch64-apple-darwin.tar.gz",
-        "sha256": "b67e1836c468e42e411984b56e52fa7abec08c2bd22c867398e7cc134aac5e12",
+        "version": "10.5.1",
+        "url": "https://github.com/sharkdp/fd/releases/download/v10.5.1/fd-v10.5.1-aarch64-apple-darwin.tar.gz",
+        "sha256": "2d336895ed27b14c5cc9fc5eb22df03b3ee842b5dce80060e99d9cdc1b1b9fc7",
         "format": "tar.gz",
         "commands": {
           "fd": "fd"
@@ -116,9 +116,9 @@
         "strip_components": 1
       },
       "linux/arm64": {
-        "version": "10.5.0",
-        "url": "https://github.com/sharkdp/fd/releases/download/v10.5.0/fd-v10.5.0-aarch64-unknown-linux-musl.tar.gz",
-        "sha256": "d76c4317f7d5dba69f8a2a15856c90c777e7f0dd4e85f0de8c76de6992c374d4",
+        "version": "10.5.1",
+        "url": "https://github.com/sharkdp/fd/releases/download/v10.5.1/fd-v10.5.1-aarch64-unknown-linux-musl.tar.gz",
+        "sha256": "64c20b9b154c9d4b36d4b7df3521de771c499c4768b4b5b045ef6b01532117be",
         "format": "tar.gz",
         "commands": {
           "fd": "fd"
@@ -129,9 +129,9 @@
         "strip_components": 1
       },
       "windows/amd64": {
-        "version": "10.5.0",
-        "url": "https://github.com/sharkdp/fd/releases/download/v10.5.0/fd-v10.5.0-x86_64-pc-windows-msvc.zip",
-        "sha256": "a227701b8551c35a9931d9f6da75503cf86d88e182d71fb849a70864c5d57cd7",
+        "version": "10.5.1",
+        "url": "https://github.com/sharkdp/fd/releases/download/v10.5.1/fd-v10.5.1-x86_64-pc-windows-msvc.zip",
+        "sha256": "e52306a600e60b7ba92019c81dc753e6ea6665379d005867d38215ffd14cf5c2",
         "format": "zip",
         "commands": {
           "fd": "fd.exe"
@@ -142,9 +142,9 @@
         "strip_components": 1
       },
       "linux/amd64": {
-        "version": "10.5.0",
-        "url": "https://github.com/sharkdp/fd/releases/download/v10.5.0/fd-v10.5.0-x86_64-unknown-linux-musl.tar.gz",
-        "sha256": "761c72dc8e120d85b22292063be8a796e2eeb20eb3e4f38b8fa2343ccf3514a7",
+        "version": "10.5.1",
+        "url": "https://github.com/sharkdp/fd/releases/download/v10.5.1/fd-v10.5.1-x86_64-unknown-linux-musl.tar.gz",
+        "sha256": "f6c95edb190c241df6fddc815a5bab4051444993ac5d92ddc6eec0e0dc2342c7",
         "format": "tar.gz",
         "commands": {
           "fd": "fd"
@@ -261,9 +261,9 @@
     },
     "tool.atuin": {
       "darwin/arm64": {
-        "version": "18.24.4",
-        "url": "https://github.com/atuinsh/atuin/releases/download/v18.24.4/atuin-aarch64-apple-darwin.tar.gz",
-        "sha256": "edd06294377599bf4d85ca3337abc802256a991262260bdd980d1b649583553d",
+        "version": "18.24.5",
+        "url": "https://github.com/atuinsh/atuin/releases/download/v18.24.5/atuin-aarch64-apple-darwin.tar.gz",
+        "sha256": "644e92d5667e2ebbc00758c71d5974bc907d238eaa6cdc32b24eb73dce7f9a5a",
         "format": "tar.gz",
         "commands": {
           "atuin": "atuin"
@@ -274,9 +274,9 @@
         "strip_components": 1
       },
       "linux/amd64": {
-        "version": "18.24.4",
-        "url": "https://github.com/atuinsh/atuin/releases/download/v18.24.4/atuin-x86_64-unknown-linux-musl.tar.gz",
-        "sha256": "788cff5b3903ca7f1f5bdff3e4b4975c38b3c20385176a49b01ad1bea5b37636",
+        "version": "18.24.5",
+        "url": "https://github.com/atuinsh/atuin/releases/download/v18.24.5/atuin-x86_64-unknown-linux-musl.tar.gz",
+        "sha256": "54182762c9d91a4f779748f622749ff6963956db005feb13e62d037196b05618",
         "format": "tar.gz",
         "commands": {
           "atuin": "atuin"
@@ -287,9 +287,9 @@
         "strip_components": 1
       },
       "linux/arm64": {
-        "version": "18.24.4",
-        "url": "https://github.com/atuinsh/atuin/releases/download/v18.24.4/atuin-aarch64-unknown-linux-musl.tar.gz",
-        "sha256": "7698bd70195bde165bb37ea3133aa6663dd48ff7d6a23042cda2c7be4c22ba78",
+        "version": "18.24.5",
+        "url": "https://github.com/atuinsh/atuin/releases/download/v18.24.5/atuin-aarch64-unknown-linux-musl.tar.gz",
+        "sha256": "b44b3f264652b847b2e524ec397aa498c13076ed75cf213239ed2b9a0de2f99d",
         "format": "tar.gz",
         "commands": {
           "atuin": "atuin"
@@ -300,9 +300,9 @@
         "strip_components": 1
       },
       "windows/amd64": {
-        "version": "18.24.4",
-        "url": "https://github.com/atuinsh/atuin/releases/download/v18.24.4/atuin-x86_64-pc-windows-msvc.zip",
-        "sha256": "773cb6a6538ac1f6d563abfe69c9a75e7e0455b5210d9ff071ef2b3f28368f3e",
+        "version": "18.24.5",
+        "url": "https://github.com/atuinsh/atuin/releases/download/v18.24.5/atuin-x86_64-pc-windows-msvc.zip",
+        "sha256": "8ec5f2519d8019c129d3fb83a6c97eca29aa23391d8802af306d0c6de8cde30e",
         "format": "zip",
         "commands": {
           "atuin": "atuin.exe"
@@ -793,9 +793,9 @@
     },
     "tool.hyperfine": {
       "darwin/arm64": {
-        "version": "1.20.0",
-        "url": "https://github.com/sharkdp/hyperfine/releases/download/v1.20.0/hyperfine-v1.20.0-aarch64-apple-darwin.tar.gz",
-        "sha256": "8ee7067016620447c9d2d6234ec9a4680f958b7ad983549b56334668f63075b5",
+        "version": "1.21.0",
+        "url": "https://github.com/sharkdp/hyperfine/releases/download/v1.21.0/hyperfine-v1.21.0-aarch64-apple-darwin.tar.gz",
+        "sha256": "4a6e8d9fad128557b31c471d81c60dd1576729c5ab2841998c457a3467ce4469",
         "format": "tar.gz",
         "commands": {
           "hyperfine": "hyperfine"
@@ -806,9 +806,9 @@
         "strip_components": 1
       },
       "linux/amd64": {
-        "version": "1.20.0",
-        "url": "https://github.com/sharkdp/hyperfine/releases/download/v1.20.0/hyperfine-v1.20.0-x86_64-unknown-linux-musl.tar.gz",
-        "sha256": "3285ec7959285288137043dd81dce0dde056227018a8277532d9a364b4f03c2b",
+        "version": "1.21.0",
+        "url": "https://github.com/sharkdp/hyperfine/releases/download/v1.21.0/hyperfine-v1.21.0-x86_64-unknown-linux-musl.tar.gz",
+        "sha256": "2c64127c1a0fc3bc58e365060b4d8a09e4632082e4dea843b8e4afb6a7b09f36",
         "format": "tar.gz",
         "commands": {
           "hyperfine": "hyperfine"
@@ -819,9 +819,9 @@
         "strip_components": 1
       },
       "linux/arm64": {
-        "version": "1.20.0",
-        "url": "https://github.com/sharkdp/hyperfine/releases/download/v1.20.0/hyperfine-v1.20.0-aarch64-unknown-linux-gnu.tar.gz",
-        "sha256": "90875cb1db7a1d797c311174d061728361e58fc70e3b62262a00635ac3b1997c",
+        "version": "1.21.0",
+        "url": "https://github.com/sharkdp/hyperfine/releases/download/v1.21.0/hyperfine-v1.21.0-aarch64-unknown-linux-gnu.tar.gz",
+        "sha256": "7c3e7183e4178e5c1bb68ef714fbf2ac1cef04d4d7fc751d645d290ac0041d7a",
         "format": "tar.gz",
         "commands": {
           "hyperfine": "hyperfine"
@@ -833,9 +833,9 @@
         "libc": "glibc"
       },
       "windows/amd64": {
-        "version": "1.20.0",
-        "url": "https://github.com/sharkdp/hyperfine/releases/download/v1.20.0/hyperfine-v1.20.0-x86_64-pc-windows-msvc.zip",
-        "sha256": "2508c549b049b1d4342d08edc1cb42bfac169082b6e3069431b5bab9822dbb32",
+        "version": "1.21.0",
+        "url": "https://github.com/sharkdp/hyperfine/releases/download/v1.21.0/hyperfine-v1.21.0-x86_64-pc-windows-msvc.zip",
+        "sha256": "c6b6d228a86250d355eba41d254585cbbe6ba5c1887e0a8df9ccda2e66836a3d",
         "format": "zip",
         "commands": {
           "hyperfine": "hyperfine.exe"
@@ -3153,9 +3153,9 @@
     },
     "tool.t3": {
       "darwin/arm64": {
-        "version": "0.1.6",
-        "url": "https://github.com/pingdotgg/t3code/releases/download/v0.1.6/t3-0.1.6-darwin-arm64.tar.gz",
-        "sha256": "50c5dfd3e83787c182299a37db3553968346904e7dc7936b2a01061dbfcf90eb",
+        "version": "0.1.7",
+        "url": "https://github.com/pingdotgg/t3code/releases/download/v0.1.7/t3-0.1.7-darwin-arm64.tar.gz",
+        "sha256": "fecfb296ed142942d0cb2dee1c53a6faca54a4012a312a470d4dc6c3215d1ab3",
         "format": "tar.gz",
         "strip_components": 1,
         "commands": {
@@ -3170,9 +3170,9 @@
         ]
       },
       "linux/amd64": {
-        "version": "0.1.6",
-        "url": "https://github.com/pingdotgg/t3code/releases/download/v0.1.6/t3-0.1.6-linux-x64.tar.gz",
-        "sha256": "7cf31da90dee41f524dd5b679ebb6d404637ca5d9dc6fd8bc019511d57bb77e6",
+        "version": "0.1.7",
+        "url": "https://github.com/pingdotgg/t3code/releases/download/v0.1.7/t3-0.1.7-linux-x64.tar.gz",
+        "sha256": "c089892bf7922e2e73c6f44a5d1ea125c99f70e378c18361cbbed2fba1920e6c",
         "format": "tar.gz",
         "strip_components": 1,
         "commands": {
@@ -3188,9 +3188,9 @@
         "libc": "glibc"
       },
       "linux/arm64": {
-        "version": "0.1.6",
-        "url": "https://github.com/pingdotgg/t3code/releases/download/v0.1.6/t3-0.1.6-linux-arm64.tar.gz",
-        "sha256": "b708f059200776f50623a766854841e40eda0bb67614211cf8b6909295ce20da",
+        "version": "0.1.7",
+        "url": "https://github.com/pingdotgg/t3code/releases/download/v0.1.7/t3-0.1.7-linux-arm64.tar.gz",
+        "sha256": "5a528e23af394cc6f359036d3cb8441fda14129d477630fc6c53e4f4a1025bc8",
         "format": "tar.gz",
         "strip_components": 1,
         "commands": {
@@ -3206,9 +3206,9 @@
         "libc": "glibc"
       },
       "windows/amd64": {
-        "version": "0.1.6",
-        "url": "https://github.com/pingdotgg/t3code/releases/download/v0.1.6/t3-0.1.6-win32-x64.zip",
-        "sha256": "486604df780a72273fac94506e21edda6cab762cd4417393007c2953a44e609f",
+        "version": "0.1.7",
+        "url": "https://github.com/pingdotgg/t3code/releases/download/v0.1.7/t3-0.1.7-win32-x64.zip",
+        "sha256": "ebbe1f42b774c1492039f7d3f0b0e9572926b16f887c94574eff4644549cd15a",
         "format": "zip",
         "strip_components": 1,
         "commands": {
