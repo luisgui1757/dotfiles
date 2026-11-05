@@ -21,6 +21,8 @@ jobs:
     name: Propose archive pins
     runs-on: ubuntu-26.04
     timeout-minutes: 45
+    env:
+      BRANCH: automation/agent-cli-pins
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -51,6 +53,26 @@ jobs:
           private-key: ${{ secrets.AGENT_PINS_APP_PRIVATE_KEY }}
           permission-contents: write
           permission-pull-requests: write
+      - name: Keep commits from other authors on the proposal branch
+        if: steps.app.outputs.token != ''
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          APP_SLUG: ${{ steps.app.outputs.app-slug }}
+          BASE: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if ! gh api "repos/$GITHUB_REPOSITORY/branches/$BRANCH" --silent 2>"$RUNNER_TEMP/branch.err"; then
+            if grep -q 'HTTP 404' "$RUNNER_TEMP/branch.err"; then
+              exit 0
+            fi
+            cat "$RUNNER_TEMP/branch.err" >&2
+            exit 1
+          fi
+          others="$(gh api "repos/$GITHUB_REPOSITORY/compare/$BASE...$BRANCH" --jq "[.commits[] | select(.author.login != \"${APP_SLUG}[bot]\")] | length")"
+          if [ "$others" != 0 ]; then
+            echo "::error title=Archive pins::$BRANCH has $others commits from other authors. Merge or close its pull request, then run this workflow again."
+            exit 1
+          fi
       - name: Open or update the pull request
         if: steps.app.outputs.token != ''
         env:
@@ -59,7 +81,6 @@ jobs:
           BASE: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          branch=automation/agent-cli-pins
           user_id="$(gh api "/users/${APP_SLUG}%5Bbot%5D" --jq .id)"
           git config user.name "${APP_SLUG}[bot]"
           git config user.email "${user_id}+${APP_SLUG}[bot]@users.noreply.github.com"
@@ -72,14 +93,14 @@ jobs:
             cat "$RUNNER_TEMP/summary.md"
             printf '\nMerge only after the required native checks pass on this head. Then run `git pull` and **Update tools** on each machine; Update without new pins changes nothing.\n'
           } > "$RUNNER_TEMP/body.md"
-          git switch -c "$branch"
+          git switch -c "$BRANCH"
           git commit -q -F "$RUNNER_TEMP/message.txt" -- installer/archive-pins.json
-          git push --force origin "HEAD:refs/heads/$branch"
-          number="$(gh pr list --head "$branch" --base "$BASE" --state open --json number --jq '.[0].number // empty')"
+          git push --force origin "HEAD:refs/heads/$BRANCH"
+          number="$(gh pr list --head "$BRANCH" --base "$BASE" --state open --json number --jq '.[0].number // empty')"
           if [ -n "$number" ]; then
             gh pr edit "$number" --title "Bump verified archive pins" --body-file "$RUNNER_TEMP/body.md"
           else
-            gh pr create --base "$BASE" --head "$branch" --title "Bump verified archive pins" --body-file "$RUNNER_TEMP/body.md"
+            gh pr create --base "$BASE" --head "$BRANCH" --title "Bump verified archive pins" --body-file "$RUNNER_TEMP/body.md"
           fi
       - name: Report a proposal without the App
         if: always() && steps.bump.outputs.changed == 'true' && steps.app.outputs.token == ''

@@ -256,6 +256,7 @@ class GitHubPinBumpTest(unittest.TestCase):
         self.pins = json.loads(self.original)["resources"]
         self.policy = json.loads((ROOT / "scripts/archive-pin-updates.json").read_text())
         self.network = FakeNetwork()
+        self.releases = []
 
     def publish(self, tool, version):
         recipe = self.policy["github"][tool]
@@ -275,10 +276,13 @@ class GitHubPinBumpTest(unittest.TestCase):
                 data = tgz(files)
             self.network.files[url] = data
             assets.append({"name": name, "browser_download_url": url, "digest": "sha256:" + hashlib.sha256(data).hexdigest()})
-        api = f"https://api.github.com/repos/{recipe['repository']}/releases/latest"
         self.release = {"tag_name": recipe['tag'].format(version=version), "draft": False, "prerelease": False, "assets": assets}
-        self.api = api
-        self.network.texts[api] = json.dumps(self.release).encode()
+        self.releases.insert(0, self.release)
+        self.api = f"https://api.github.com/repos/{recipe['repository']}/releases?per_page=100"
+        self.sync()
+
+    def sync(self):
+        self.network.texts[self.api] = json.dumps(self.releases).encode()
 
     def run_bump(self, tool, expected=0):
         summary = self.path.with_suffix(".md")
@@ -302,6 +306,7 @@ class GitHubPinBumpTest(unittest.TestCase):
         for fault in ("missing digest", "bad digest", "missing asset", "layout", "prerelease", "downgrade"):
             with self.subTest(fault=fault):
                 self.path.write_text(self.original)
+                self.releases.clear()
                 self.publish("tool.fzf", "0.1.0" if fault == "downgrade" else "0.99.0")
                 asset = self.release["assets"][-1]
                 if fault == "missing digest":
@@ -316,7 +321,7 @@ class GitHubPinBumpTest(unittest.TestCase):
                     asset["digest"] = "sha256:" + hashlib.sha256(data).hexdigest()
                 elif fault == "prerelease":
                     self.release["prerelease"] = True
-                self.network.texts[self.api] = json.dumps(self.release).encode()
+                self.sync()
                 resources, _ = self.run_bump("tool.fzf", expected=1)
                 self.assertEqual(resources, self.pins)
 
@@ -327,13 +332,21 @@ class GitHubPinBumpTest(unittest.TestCase):
         self.assertEqual(resources, self.pins)
         self.assertIn("1.0.0 held", summary)
 
+    def test_held_major_still_lets_the_pinned_major_update(self):
+        self.publish("tool.fzf", "0.99.0")
+        self.publish("tool.fzf", "1.0.0")
+        resources, summary = self.run_bump("tool.fzf")
+        self.assertEqual({pin["version"] for pin in resources["tool.fzf"].values()}, {"0.99.0"})
+        self.assertIn("1.0.0 held", summary)
+
     def test_github_assets_respect_the_installer_download_limit(self):
         for size, status in [(536_870_912, 0), (536_870_913, 1), (538_725_004, 1)]:
             with self.subTest(size=size):
                 self.path.write_text(self.original)
+                self.releases.clear()
                 self.publish("tool.openwhispr", "1.99.0")
                 self.release["assets"][-1]["size"] = size
-                self.network.texts[self.api] = json.dumps(self.release).encode()
+                self.sync()
                 resources, summary = self.run_bump("tool.openwhispr", expected=status)
                 if status:
                     self.assertEqual(resources, self.pins)
@@ -347,7 +360,7 @@ class GitHubPinBumpTest(unittest.TestCase):
         data = tgz({"./dist/superfile-linux-v1.99.0-amd64/spf": b"binary"})
         self.network.files[asset["browser_download_url"]] = data
         asset["digest"] = "sha256:" + hashlib.sha256(data).hexdigest()
-        self.network.texts[self.api] = json.dumps(self.release).encode()
+        self.sync()
         resources, _ = self.run_bump("tool.superfile")
         self.assertEqual({pin["version"] for pin in resources["tool.superfile"].values()}, {"1.99.0"})
 

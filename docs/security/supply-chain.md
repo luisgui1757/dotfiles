@@ -35,11 +35,9 @@ current native consumers; it does not run global autoremove. Failed or unknown
 native operations require reconciliation before another mutation.
 
 Archive/bootstrap and Linux Code DEB pin updates remain reviewed maintenance in
-this major release. Neither the former Linux Code archive pins nor their DEB
-replacement is extracted by Renovate.
+this major release. Renovate extracts these pins only to list their new
+releases. It does not change them or their hashes.
 Update hashes together with extraction/layout and native-consumption evidence.
-Renovate covers only sources in its generated extraction inventory; do not claim
-that it maintains archive hashes that it does not extract.
 
 ## Sentinel release
 
@@ -94,31 +92,51 @@ grouped PR. It updates the four agent CLIs and the GitHub tools listed in
 [the update policy](../../scripts/archive-pin-updates.json), including T3.
 Each GitHub recipe names the repository, release tag and asset for every target.
 The script verifies each download against the published SHA-256 and checks the
-required archive paths before it changes a pin. A missing asset, missing hash,
+archive paths that the pin lists before it changes a pin. A missing asset, missing hash,
 checksum mismatch, download above 512 MiB or changed layout fails that tool
 and the workflow.
 Other verified updates can still reach the grouped PR.
 
-The four agent CLIs keep their vendor checks: Claude's signed release manifest
-and npm SHA-512, Codex npm SHA-512, Copilot's digest and `SHA256SUMS.txt`, and
-Kiro's manifest and Linux ZIP layout. The Claude release key fingerprint is
-`31DDDE24DDFAB679F42D7BD2BAA929FF1A7ECACE`.
+The four agent CLIs keep their vendor checks:
 
-The bot reports major releases and leaves their pins unchanged. It refuses
-prereleases and downgrades. Current versions need no download.
-The PR must pass the required native checks. The bot never merges.
+- Claude: the signed release manifest and the npm SHA-512
+- Codex: the npm SHA-512
+- Copilot: the release digest and `SHA256SUMS.txt`
+- Kiro: the release manifest and the Linux ZIP layout
+
+The Claude release key fingerprint is `31DDDE24DDFAB679F42D7BD2BAA929FF1A7ECACE`.
+
+For a GitHub recipe, the bot reads the last 100 releases. It proposes the newest
+stable release in the pinned major version. It reports a newer major release
+and leaves that pin unchanged. It refuses prereleases and downgrades. Current
+versions need no download.
+
+The PR must pass the native checks that protect `main`. The bot never merges.
 
 The policy lists every archive resource as automatic or manual. CI rejects a
 resource without an entry, a stale entry, and a GitHub recipe with missing
 targets. Manual entries include nested components and wheels. The job summary
-lists these exceptions with their reasons. It does not check their latest
-versions. The other pin files, including Go bootstrap, Linux Code, Tailscale,
-Build Tools, VC runtime, Homebrew, Mason and Neovim plugins, still need manual
-review. Renovate continues to own its declared extraction inventory.
+lists these exceptions with their reasons.
+
+Renovate tracks the releases of the pins. Its dashboard lists each new release
+under Pending Approval as a notice:
+
+- every GitHub release download, Ghostty, Python wheels, Node, Rust, VS Code,
+  Rose Pine, PSFzf, GNU Make and the plugin source commits in the archive pins
+- Linux Code, Tailscale, the bootstrap Go toolchain, the Homebrew install script
+  and the Mason snapshot
+
+Do not approve these entries: Renovate cannot verify their checksums. The bot
+updates its recipes. Update the other pins manually. The agent CLIs follow their
+vendor channels in the bot. Renovate has no source for Build Tools, the VC
+runtime and the Neovim plugin lock, so review them manually.
+
+The bot does not overwrite the proposal branch when it holds commits from other
+authors. Merge or close that PR first.
 
 The workflow uses the existing GitHub App with Contents and Pull requests write
 permissions. Its settings are `AGENT_PINS_APP_CLIENT_ID` and
-`AGENT_PINS_APP_PRIVATE_KEY`. The App's pushes start the required checks.
+`AGENT_PINS_APP_PRIVATE_KEY`. The App's pushes start the checks that protect `main`.
 When verified updates exist but the App cannot open their PR, the job fails.
 The job uploads the proposed patch and summary even when PR creation fails.
 The workflow path and automation branch stay the same to preserve the existing

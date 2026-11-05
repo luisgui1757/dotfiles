@@ -234,16 +234,24 @@ def require_layout(tool: str, target: str, pin: dict, names: set) -> None:
         raise BumpError(f"{tool} on {target} changed its layout (missing {', '.join(missing)}); review the pin manually")
 
 
-def github_release(network, pins: dict, work: pathlib.Path, tool: str, recipe: dict):
-    release = network.json(f"https://api.github.com/repos/{recipe['repository']}/releases/latest")
-    if release.get("prerelease") or release.get("draft"):
-        raise BumpError(f"{tool} latest release is not stable")
-    tag = release.get("tag_name", "")
+def github_release(network, pins: dict, work: pathlib.Path, tool: str, recipe: dict, held: list):
     pattern = re.escape(recipe["tag"]).replace(re.escape("{version}"), "(.+)")
-    match = re.fullmatch(pattern, tag)
-    if not match:
-        raise BumpError(f"{tool} release tag {tag!r} does not match its recipe")
-    version = require_stable(tool, match.group(1))
+    candidates = []
+    for release in network.json(f"https://api.github.com/repos/{recipe['repository']}/releases?per_page=100"):
+        match = re.fullmatch(pattern, release.get("tag_name", ""))
+        if release.get("prerelease") or release.get("draft") or not match or not STABLE.fullmatch(match.group(1)):
+            continue
+        candidates.append((tuple(map(int, match.group(1).split("."))), match.group(1), release))
+    if not candidates:
+        raise BumpError(f"{tool} has no stable release that matches its recipe")
+    majors = {int(pin["version"].split(".")[0]) for pin in pins[tool].values()}
+    newest = max(candidates, key=lambda candidate: candidate[0])
+    if newest[0][0] not in majors:
+        held.append(f"- `{tool}`: {newest[1]} held for major version review")
+    eligible = [candidate for candidate in candidates if candidate[0][0] in majors]
+    if not eligible:
+        raise UnchangedRelease("no newer release in the pinned major version")
+    _, version, release = max(eligible, key=lambda candidate: candidate[0])
     check_version(tool, pins, version)
     assets = {asset["name"]: asset for asset in release.get("assets", [])}
     updates = {}
@@ -401,7 +409,7 @@ def main(argv=None, network=None, verify=gpg_verify) -> int:
     if args.check_coverage:
         print(f"Pin coverage passed: {len(document['resources'])} resources")
         return 0
-    lines, failures = [], []
+    lines, failures, held = [], [], []
     selected = args.tools.split(",") if args.tools else [*AGENT_TOOLS, *policy["github"]]
     for tool in selected:
         if tool not in BUMPERS and tool not in policy["github"]:
@@ -413,7 +421,7 @@ def main(argv=None, network=None, verify=gpg_verify) -> int:
                 if tool == "tool.claude":
                     version, updates = claude(network, pins, pathlib.Path(work), verify)
                 elif tool in policy["github"]:
-                    version, updates = github_release(network, pins, pathlib.Path(work), tool, policy["github"][tool])
+                    version, updates = github_release(network, pins, pathlib.Path(work), tool, policy["github"][tool], held)
                 else:
                     version, updates = BUMPERS[tool](network, pins, pathlib.Path(work))
             apply_updates(document, tool, updates)
@@ -425,8 +433,9 @@ def main(argv=None, network=None, verify=gpg_verify) -> int:
             failures.append(f"- `{tool}`: {error}")
     args.pins.write_text(json.dumps(document, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     manual = [f"- `{tool}`: {reason}" for tool, reason in sorted(policy["manual"].items())]
-    summary = "\n".join(["Archive pins:", *lines, *(["", "Failed verification:", *failures] if failures else []),
-                         "", "Manual pins (not checked for new releases):", *manual]) + "\n"
+    summary = "\n".join(["Archive pins:", *lines, *(["", "Held for major version review:", *held] if held else []),
+                         *(["", "Failed verification:", *failures] if failures else []),
+                         "", "Manual pins (the Renovate dashboard lists their new releases):", *manual]) + "\n"
     print(summary, end="")
     if args.summary:
         args.summary.write_text(summary, encoding="utf-8")

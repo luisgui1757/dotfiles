@@ -45,6 +45,7 @@ pin in `release.yml` and the
 reviewed pins. Update them with upstream provenance and runtime evidence.
 The weekly pin bot proposes verified updates for its explicit archive recipes.
 It groups them into one PR and holds major releases for manual review.
+Renovate lists the new releases of all pins on its dashboard as notices.
 See [archive pin proposals](security/supply-chain.md#archive-pin-proposals) for
 coverage and exceptions. Renovate covers the other declared workflow, Go and
 validator dependencies. It does not calculate archive checksums.
