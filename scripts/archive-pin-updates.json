@@ -255,6 +255,6 @@
     "tool.zen": "Beta tags, disk images and generated profile wrappers need a recipe.",
     "tool.clang-format": "The PyPI wheel contains paths that depend on its version.",
     "tool.gersemi": "The Windows formatter version must match the Mason registry snapshot.",
-    "tool.openwhispr": "Releases after 1.10.3 exceed the installer's 512 MiB download limit."
+    "tool.openwhispr": "Its latest release, 1.11.0, exceeds the installer's 512 MiB download limit on Linux."
   }
 }

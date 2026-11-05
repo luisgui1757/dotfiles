@@ -246,11 +246,12 @@ def github_release(network, pins: dict, work: pathlib.Path, tool: str, recipe: d
 
     api = f"https://api.github.com/repos/{recipe['repository']}/releases"
     majors = {int(pin["version"].split(".")[0]) for pin in pins[tool].values()}
+    pinned = max(tuple(map(int, require_stable(tool, pin["version"]).split("."))) for pin in pins[tool].values())
     latest = stable(network.json(f"{api}/latest"))
-    if latest and latest[0][0] in majors:
+    if latest and latest[0][0] in majors and latest[0] >= pinned:
         _, version, release = latest
     else:
-        if latest:
+        if latest and latest[0][0] > max(majors):
             held.append(f"- `{tool}`: {latest[1]} held for major version review")
         eligible = [candidate for candidate in map(stable, network.json(f"{api}?per_page=100"))
                     if candidate and candidate[0][0] in majors]
@@ -258,7 +259,9 @@ def github_release(network, pins: dict, work: pathlib.Path, tool: str, recipe: d
             if latest:
                 raise UnchangedRelease("no newer release in the pinned major version")
             raise BumpError(f"{tool} has no stable release that matches its recipe")
-        _, version, release = max(eligible, key=lambda candidate: candidate[0])
+        best, version, release = max(eligible, key=lambda candidate: candidate[0])
+        if best < pinned:
+            raise UnchangedRelease("no release in the pinned major version is newer than the pin")
     check_version(tool, pins, version)
     assets = {asset["name"]: asset for asset in release.get("assets", [])}
     updates = {}

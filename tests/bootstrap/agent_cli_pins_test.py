@@ -307,11 +307,11 @@ class GitHubPinBumpTest(unittest.TestCase):
                                      {k: v for k, v in self.pins[tool][target].items() if k not in ("version", "url", "sha256")})
 
     def test_invalid_github_releases_leave_every_target_unchanged(self):
-        for fault in ("missing digest", "bad digest", "missing asset", "layout", "prerelease", "downgrade"):
+        for fault in ("missing digest", "bad digest", "missing asset", "layout", "prerelease"):
             with self.subTest(fault=fault):
                 self.path.write_text(self.original)
                 self.releases.clear()
-                self.publish("tool.fzf", "0.1.0" if fault == "downgrade" else "0.99.0")
+                self.publish("tool.fzf", "0.99.0")
                 asset = self.release["assets"][-1]
                 if fault == "missing digest":
                     asset.pop("digest")
@@ -336,9 +336,21 @@ class GitHubPinBumpTest(unittest.TestCase):
         self.assertEqual(resources, self.pins)
         self.assertIn("1.0.0 held", summary)
 
+    def test_release_below_the_pin_is_never_a_downgrade(self):
+        self.publish("tool.fzf", "0.1.0")
+        resources, summary = self.run_bump("tool.fzf")
+        self.assertEqual(resources, self.pins)
+        self.assertIn("no release in the pinned major version is newer than the pin", summary)
+
     def test_older_release_with_a_higher_number_does_not_replace_latest(self):
         self.publish("tool.fzf", "0.99.0")
         self.publish("tool.fzf", "0.80.0")
+        resources, _ = self.run_bump("tool.fzf")
+        self.assertEqual({pin["version"] for pin in resources["tool.fzf"].values()}, {"0.80.0"})
+
+    def test_maintenance_release_below_the_pin_does_not_hide_a_newer_release(self):
+        self.publish("tool.fzf", "0.80.0")
+        self.publish("tool.fzf", "0.74.1")
         resources, _ = self.run_bump("tool.fzf")
         self.assertEqual({pin["version"] for pin in resources["tool.fzf"].values()}, {"0.80.0"})
 

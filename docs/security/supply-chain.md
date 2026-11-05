@@ -106,11 +106,11 @@ The four agent CLIs keep their vendor checks:
 
 The Claude release key fingerprint is `31DDDE24DDFAB679F42D7BD2BAA929FF1A7ECACE`.
 
-For a GitHub recipe, the bot starts from the latest GitHub release. When that
-release has a newer major version, the bot reports it and leaves the pin in its
-major version. Then it proposes the highest stable release in the pinned major
-version from the last 100 releases. It refuses prereleases and downgrades.
-Current versions need no download.
+For a GitHub recipe, the bot starts from the latest GitHub release. It uses that
+release when the release is in the pinned major version and not older than the
+pin. Otherwise it proposes the highest stable release in the pinned major version
+from the last 100 releases. It reports a newer major version and keeps the pin in
+its major version. It never downgrades a pin and refuses prereleases.
 
 The PR must pass the native checks that protect `main`. The bot never merges.
 
