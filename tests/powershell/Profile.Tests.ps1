@@ -450,6 +450,7 @@ $($script:InteractiveProfileContext)
 `$o = Get-PSReadLineOption
 if ((`$global:DotfilesFixtureFzf -join '|') -cne 'Vi|Ctrl+t|Ctrl+r|Alt+c') { throw 'PSFzf did not initialize after actual PSReadLine vi mode' }
 if (`$o.EditMode -ne 'Vi') { Write-Error "EditMode=`$(`$o.EditMode)"; exit 1 }
+if (`$o.ViModeIndicator -ne 'Cursor') { Write-Error "ViModeIndicator=`$(`$o.ViModeIndicator)"; exit 4 }
 `$tab = Get-PSReadLineKeyHandler -Bound | Where-Object { `$_.Key -eq 'Tab' }
 if (-not (`$tab | Where-Object { `$_.Function -eq 'MenuComplete' })) { Write-Error 'Tab not MenuComplete'; exit 2 }
 `$up = Get-PSReadLineKeyHandler -Bound | Where-Object { `$_.Key -eq 'UpArrow' }

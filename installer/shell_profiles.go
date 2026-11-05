@@ -254,8 +254,13 @@ fi
 		}
 		prefix := ""
 		if target.OS == "windows" {
+			suffix := ""
 			if id == "starship" {
 				prefix = "$env:STARSHIP_CONFIG = " + powershellLiteral(starshipConfig) + "\n"
+				if selectedFeature("config.powershell") {
+					prefix += "$dotfilesViModeIndicator = try { (Get-PSReadLineOption).ViModeIndicator } catch { $null }\n"
+					suffix = "\nif ($null -ne $dotfilesViModeIndicator) { Set-PSReadLineOption -ViModeIndicator $dotfilesViModeIndicator }"
+				}
 			}
 			arguments := "@('init', 'powershell')"
 			if id == "starship" {
@@ -265,7 +270,7 @@ fi
 				arguments = "@('init', 'powershell', '--disable-up-arrow', '--disable-ai')"
 			}
 			cache := filepath.Join(d.Directory, "shell-cache", id+"-"+pin.SHA256+".ps1")
-			add("integration."+id, prefix+". (Get-DotfilesInitScript -Command "+powershellLiteral(command)+" -Arguments "+arguments+" -CachePath "+powershellLiteral(cache)+")")
+			add("integration."+id, prefix+". (Get-DotfilesInitScript -Command "+powershellLiteral(command)+" -Arguments "+arguments+" -CachePath "+powershellLiteral(cache)+")"+suffix)
 		} else {
 			if id == "starship" {
 				prefix = "export STARSHIP_CONFIG=" + shellLiteral(starshipConfig) + "\n"
