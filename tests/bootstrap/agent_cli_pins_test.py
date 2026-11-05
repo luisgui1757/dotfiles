@@ -336,6 +336,13 @@ class GitHubPinBumpTest(unittest.TestCase):
         self.assertEqual(resources, self.pins)
         self.assertIn("1.0.0 held", summary)
 
+    def test_ignored_tag_is_never_proposed(self):
+        self.publish("tool.xremap", "0.16.6")
+        self.publish("tool.xremap", "0.15.20")
+        self.publish("tool.xremap", "0.15.10")
+        resources, _ = self.run_bump("tool.xremap")
+        self.assertEqual({pin["version"] for pin in resources["tool.xremap"].values()}, {"0.15.20"})
+
     def test_release_below_the_pin_is_never_a_downgrade(self):
         self.publish("tool.fzf", "0.1.0")
         resources, summary = self.run_bump("tool.fzf")

@@ -240,7 +240,8 @@ def github_release(network, pins: dict, work: pathlib.Path, tool: str, recipe: d
 
     def stable(release):
         match = re.fullmatch(pattern, release.get("tag_name", ""))
-        if release.get("prerelease") or release.get("draft") or not match or not STABLE.fullmatch(match.group(1)):
+        if release.get("prerelease") or release.get("draft") or not match or not STABLE.fullmatch(match.group(1)) \
+                or release["tag_name"] in recipe.get("ignore", ()):
             return None
         return tuple(map(int, match.group(1).split("."))), match.group(1), release
 

@@ -205,7 +205,10 @@
       "assets": {
         "linux/amd64": "xremap-linux-x86_64-full.zip",
         "linux/arm64": "xremap-linux-aarch64-full.zip"
-      }
+      },
+      "ignore": [
+        "v0.16.6"
+      ]
     },
     "tool.t3": {
       "repository": "pingdotgg/t3code",
