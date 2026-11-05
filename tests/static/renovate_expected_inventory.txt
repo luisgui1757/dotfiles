@@ -78,7 +78,7 @@ regex|installer/archive-pins.json|github-releases|tamasfe/taplo|4
 regex|installer/archive-pins.json|github-releases|tree-sitter/tree-sitter|4
 regex|installer/archive-pins.json|github-releases|xremap/xremap|2
 regex|installer/archive-pins.json|github-releases|yorukot/superfile|4
-regex|installer/archive-pins.json|github-releases|zen-browser/desktop|3
+regex|installer/archive-pins.json|github-releases|zen-browser/desktop|2
 regex|installer/archive-pins.json|github-tags|ghostty-org/ghostty|1
 regex|installer/archive-pins.json|node-version|node|4
 regex|installer/archive-pins.json|nuget|PSFzf|1

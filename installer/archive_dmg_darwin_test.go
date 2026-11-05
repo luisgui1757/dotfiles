@@ -2,7 +2,6 @@ package installer
 
 import (
 	"context"
-	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -85,20 +84,5 @@ func TestNativeDMGPreservesBundleFilesWithoutSyntheticAppleDouble(t *testing.T) 
 	if err != nil || before != after {
 		extracted, extractedErr := inspectTree(filepath.Join(destination, "Fixture.app"), maxPackageBytes, maxPackageEntries)
 		t.Fatalf("native disk-image transport changed actual bundle files: before=%+v after=%+v err=%v; original=%+v; extracted=%+v (%v)", before, after, err, original, extracted, extractedErr)
-	}
-	// Saved revision-0 operations retain their original transport, including
-	// Apple's metadata interpretation. Keep this control separate from the
-	// exact revision-1 inventory assertion above.
-	legacy := filepath.Join(root, "legacy")
-	if err := extractArchive(context.Background(), file, info.Size(), ArchivePin{Format: "dmg", AppBundle: "Fixture.app"}, legacy, ""); err != nil {
-		t.Fatal(err)
-	}
-	resources := filepath.Join(legacy, "Fixture.app", "Contents", "Resources")
-	metadata, err := os.ReadFile(filepath.Join(resources, "._note.txt"))
-	if err != nil || len(metadata) == 0 {
-		t.Fatal("revision-0 control no longer reproduces synthetic metadata", err)
-	}
-	if _, err := os.Lstat(filepath.Join(resources, "._actual-file")); !errors.Is(err, os.ErrNotExist) {
-		t.Fatal("revision-0 metadata interpretation unexpectedly changed", err)
 	}
 }

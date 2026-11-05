@@ -173,7 +173,7 @@ func replaceJSONCFields(data []byte, fields []string, replacement []byte) ([]byt
 }
 
 func settingsDocumentEmpty(data []byte, resource string) (bool, error) {
-	if resource == "integration.vscode" || resource == vscodeSettingsResource || resource == windowsTerminalResource {
+	if resource == vscodeSettingsResource || resource == windowsTerminalResource {
 		clean, lexical, err := jsoncMask(data)
 		if err != nil {
 			return false, err

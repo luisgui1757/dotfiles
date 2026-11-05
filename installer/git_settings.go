@@ -61,9 +61,6 @@ func blockGitCheckoutOverlap(d *ProfileDriver, target string) {
 // caller changes HOME/XDG between shells. New publication at another path needs
 // explicit removal of the old integration first.
 func retainGitSettingsTarget(d *ProfileDriver, state State) error {
-	if receipt := state.Receipts["config.git"]; receipt.Ownership == "created" || receipt.Ownership == "uncertain" {
-		d.GitIssue = strings.TrimSpace(d.GitIssue + " An earlier installer records the whole Git file. Setup restores an unchanged owned file automatically; edited files require the optional legacy settings restoration choice. Saved cancellation evidence can release untouched files. Resume setup after that restoration so the new include can take over. If you keep the earlier file, abandon the unfinished setup run, then deselect Git or choose the restoration on a later run. If recovery evidence is missing or damaged, preserve the target and repair that evidence before continuing.")
-	}
 	receipt := state.Receipts[gitSettingsResource]
 	if receipt.Recovery == "" || receipt.Ownership == "reused" {
 		return nil

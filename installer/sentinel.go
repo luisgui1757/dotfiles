@@ -151,8 +151,7 @@ type sentinelRecord struct {
 // SentinelDriver runs the installer of a Sentinel release. Sentinel decides
 // which files it changes: its managed block in each rules file, the skill
 // folders that hold its .sentinel-owned marker, and the Claude Code output
-// style output-styles/sentinel.md. The driver also hands over the files of
-// dotfiles 1.0 (see sentinel_handoff.go).
+// style output-styles/sentinel.md.
 type SentinelDriver struct {
 	Target    Context
 	Home      string
@@ -171,10 +170,8 @@ type SentinelDriver struct {
 	// Run changes the system under the controller mutation guard. Query only
 	// reads, and it returns a nativeCommandError with the exit code.
 	Run, Query func(context.Context, nativeCommand) ([]byte, error)
-	// Selected is the bound resource closure. Earlier holds the saved receipts
-	// of the dotfiles 1.0 Sentinel resources. ForSelection sets both.
+	// Selected is the bound resource closure. ForSelection sets it.
 	Selected []string
-	Earlier  map[string]Receipt
 
 	// looked, latest and latestFailure keep the one lookup of a setup run.
 	looked        bool
@@ -600,7 +597,7 @@ func querySentinel(ctx context.Context, command nativeCommand) ([]byte, error) {
 // operation of this receipt offers a resume.
 func (d *SentinelDriver) Observe(ctx context.Context, r Resource, receipt Receipt) (Observation, error) {
 	if r.ID != sentinelResource {
-		return d.observeEarlier(r, receipt), nil
+		return d.observeEarlier(r, receipt)
 	}
 	o := Observation{Provider: "sentinel", Identity: d.record(), Scope: "user"}
 	record, err := d.readRecord()
@@ -616,9 +613,6 @@ func (d *SentinelDriver) Observe(ctx context.Context, r Resource, receipt Receip
 	hosts, err := d.hosts(homes)
 	if err != nil {
 		return o, err
-	}
-	if _, err := d.handoff(); err != nil {
-		o.ApplyBlocked = strings.TrimSpace(o.ApplyBlocked + " " + err.Error())
 	}
 	if len(hosts) == 0 {
 		o.ApplyBlocked = strings.TrimSpace(o.ApplyBlocked + " Sentinel found no coding agent. Install Codex, Claude Code, Copilot CLI, Kiro or OpenCode, then apply again.")
@@ -765,9 +759,6 @@ func (d *SentinelDriver) Apply(ctx context.Context, r Resource, op Operation, re
 	if err := sentinelKiroHome(d.Home, homes, hosts); err != nil {
 		return Observation{}, err
 	}
-	if _, err := d.handoff(); err != nil {
-		return Observation{}, err
-	}
 	action := op.Action
 	if action == "adopt" || action == "" {
 		action = "install"
@@ -800,9 +791,6 @@ func (d *SentinelDriver) Apply(ctx context.Context, r Resource, op Operation, re
 	}
 	checkout, err := d.prepare(ctx, release.Commit)
 	if err != nil {
-		return Observation{}, err
-	}
-	if err := d.handOver(); err != nil {
 		return Observation{}, err
 	}
 	command, err := d.installer(checkout, hosts, homes, "")

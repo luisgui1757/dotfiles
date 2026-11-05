@@ -12,10 +12,10 @@ installer shows a menu of tools. It resolves their dependencies, applies the
 shared Rose Pine configuration and records what it owns. Update, Check, repair
 and removal use these records.
 
-Release v1.0.1 replaced the earlier Nix and chezmoi setup. It superseded
-v1.0.0, which has a tag but no published release. Only the v1.0.1 checkout has
-`migrate.sh` and `migrate.ps1`. They move a v0.4.x installation to the new
-installer. After that, the user updates the checkout and chooses Update tools.
+Release v1.0.1 replaced the earlier Nix and chezmoi setup. Only the v1.0.1
+checkout has `migrate.sh` and `migrate.ps1`. They move a v0.4.x installation to
+the new installer. Release v2.0.0 reads only the states of v1.2.0 and later, so
+an older machine updates to v1.2.0 first and then chooses Update tools here.
 
 ## Supported platforms
 
@@ -120,10 +120,13 @@ of each step. All of these checks must pass on the final head.
 - Saved recipes, schemas and command encodings stay readable while they are in
   the support window. Never change, rewrite or replay an old recipe. A new
   recipe gets a new revision.
-- The support window: `main` reads each state that a release tag from v1.0.0
-  on can leave on a machine. This includes receipts that the release keeps
-  without a change. Do not remove a reader.
+- The support window: `main` reads each state that a release tag from
+  v1.2.0 (`supportFloor`) on can leave on a machine. This includes receipts
+  that the release keeps without a change. Do not remove a reader.
   `TestEachResourceOfAReleaseStaysInTheCatalog` checks the catalog resources.
+  `retiredResources` lists the resources that only older states hold: setup
+  drops a record that it no longer owns and stops on any other one. A Retained
+  entry (`tool.flatpak`) goes away at each ownership, and its files stay.
 - State is strict schema-1 JSON. An unknown field or schema fails and does not
   change the file.
 - Constructors are pure. Find the platform, the known folders and the
@@ -181,8 +184,8 @@ and skills for coding agents.
 - The hosts are Codex, Claude Code, Copilot, Kiro and OpenCode. A host counts
   when its command or folder exists, or when the same selection installs it.
 - Check runs `--check`. Exit 1 means drift. Any other failure is an error.
-- `integration.sentinel` and the `skills.sentinel-*` resources exist only for
-  the v1.0.0 handoff. Do not add behavior to them.
+- `integration.sentinel` and the `skills.sentinel-*` resources exist only to
+  release the records of dotfiles 1.0. Do not add behavior to them.
 
 ## Product configuration
 

@@ -6,7 +6,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -33,14 +32,6 @@ func TestShellProfilesHaveOneOwnerAcrossAllSelections(t *testing.T) {
 				t.Fatal(err)
 			}
 			d := c.Driver.(*NativeDriver)
-			selected := []string{}
-			for _, capability := range c.Catalog.Capabilities(target) {
-				selected = append(selected, capability.ID)
-			}
-			closure, err := c.Catalog.Closure(selected, target)
-			if err != nil {
-				t.Fatal(err)
-			}
 			owners := map[string]string{}
 			record := func(path, id string) {
 				t.Helper()
@@ -51,28 +42,6 @@ func TestShellProfilesHaveOneOwnerAcrossAllSelections(t *testing.T) {
 			}
 			for _, resource := range c.Catalog.Resources {
 				if !resource.Available(target) {
-					continue
-				}
-				if resource.ReplacedBy != "" {
-					if slices.Contains(closure, resource.ID) {
-						t.Fatal("a recovery-only configuration is reachable from a current selection", resource.ID)
-					}
-					if resource.Action == "profile" {
-						old, current := d.Profiles.Targets[resource.ID], d.Profiles.Targets[resource.ReplacedBy]
-						if len(old) == 0 || len(old) != len(current) {
-							t.Fatal("profile replacement does not own the same targets", resource.ID)
-						}
-						for i, target := range old {
-							if target.Path != current[i].Path {
-								t.Fatal("profile replacement target changed", resource.ID, target.Path)
-							}
-						}
-						for _, field := range d.Profiles.JSONFields[resource.ID] {
-							if !slices.Contains(d.Profiles.JSONFields[resource.ReplacedBy], field) {
-								t.Fatal("profile successor lost a predecessor field", resource.ID, field)
-							}
-						}
-					}
 					continue
 				}
 				if resource.Action == "config" {

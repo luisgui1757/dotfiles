@@ -36,13 +36,8 @@ func TestAdditionalDesktopChoicesHaveIndependentProviders(t *testing.T) {
 			if target.OS == "darwin" && id == "t3-code-app" {
 				application = "app.t3-code"
 			}
-			// Linux Obsidian is the portable build; its former private Flatpak
-			// only removes earlier installations and is never selected again.
 			if target.OS == "linux" && id == "obsidian" {
 				application = obsidianPortable
-				if slices.Contains(closure, "tool.obsidian") || slices.Contains(closure, "tool.flatpak") {
-					t.Fatal("Linux Obsidian still selects the retired Flatpak", closure)
-				}
 			}
 			if !slices.Contains(closure, application) {
 				t.Fatal("missing application", id, closure)
@@ -71,9 +66,9 @@ func TestAdditionalDesktopLaunchersUseDeclaredPayloads(t *testing.T) {
 			t.Fatal(err)
 		}
 		d := DesktopDriver{Target: target, Directory: root, Folders: ConfigFolders{Home: root, Data: filepath.Join(root, "data")}, Archives: &ArchiveDriver{Directory: filepath.Join(root, "packages"), Pins: pins}}
-		ids := []string{"zen", "obsidian", "openwhispr"}
+		ids := []string{"obsidian", "openwhispr"}
 		if target.OS == "linux" {
-			ids = append(ids, "t3-code")
+			ids = append(ids, "zen", "t3-code")
 		}
 		for _, id := range ids {
 			recipe, err := d.recipe("desktop." + id)
@@ -92,7 +87,7 @@ func TestAdditionalDesktopLaunchersUseDeclaredPayloads(t *testing.T) {
 					t.Fatal(recipe)
 				}
 				if id == "t3-code" && (recipe.Command != filepath.Join(root, "packages", "tool.t3-code-app", "current", "t3-code") || !strings.HasSuffix(recipe.Icon, "t3code.png") ||
-					!strings.Contains(recipe.Contents, "\nExec="+desktopExecArgument(recipe.Command)+" %U\n") || !strings.Contains(recipe.Contents, "\nStartupWMClass=t3code\n")) {
+					!strings.Contains(recipe.Contents, "\nExec="+desktopExecArgument(recipe.Command)+" %U\n") || !strings.Contains(recipe.Contents, "\nStartupWMClass=com.t3tools.T3Code\n")) {
 					t.Fatal(recipe)
 				}
 			} else if !strings.HasSuffix(recipe.Destination, ".app") || !strings.Contains(filepath.ToSlash(recipe.Source), "/tool."+id+"/current/") {

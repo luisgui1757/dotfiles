@@ -178,7 +178,7 @@ func replaceProfileBlock(data []byte, id string, replacement []byte, fields ...s
 		return replaceWindowsTerminal(data, replacement, fields)
 	}
 	if len(fields) != 0 {
-		if id == "integration.vscode" || id == vscodeSettingsResource {
+		if id == vscodeSettingsResource {
 			return replaceJSONCFields(data, fields, replacement)
 		}
 		return replaceJSONFields(data, fields, replacement)

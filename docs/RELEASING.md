@@ -91,14 +91,16 @@ replace them.
 
 ## Support window
 
-`main` reads each state that a release tag from v1.0.0 on can leave on a
+`main` reads each state that a release tag from v1.2.0 on can leave on a
 machine. This includes receipts and saved recipes that the release keeps
-without a change. A machine can skip releases, so `main` keeps each reader.
-`TestEachResourceOfAReleaseStaysInTheCatalog` fails when a resource of a
-release tag leaves the catalog.
+without a change. A machine can skip releases from v1.2.0 on, so `main` keeps
+each of their readers. `TestEachResourceOfAReleaseStaysInTheCatalog` fails when
+a resource of such a release tag leaves the catalog and is not in
+`retiredResources`.
 
-A v0.4.x installation runs migrate from the v1.0.1 checkout first. Then it
-updates to `main` and chooses Update tools.
+An older installation updates to v1.2.0 first. A v0.4.x installation runs
+migrate from the v1.0.1 checkout before that. Then it updates to `main` and
+chooses Update tools.
 
 ## Recovery
 

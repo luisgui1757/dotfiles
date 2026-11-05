@@ -3,7 +3,6 @@ package installer
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"io/fs"
 	"net/url"
@@ -63,70 +62,6 @@ func TestWindowsPrivatePythonRequirementURLsRetainExtendedPaths(t *testing.T) {
 		if _, err := os.Stat(filepath.FromSlash(parsed.Path)); err != nil {
 			t.Fatal("local URI does not identify the verified wheel", uri, err)
 		}
-	}
-}
-
-func TestWindowsPrivatePythonLegacyGenerationCanUpdate(t *testing.T) {
-	for _, fixture := range []struct {
-		name   string
-		create func(*testing.T) (*ArchiveDriver, *[]nativeCommand)
-	}{{"latex2text", latexPreparationFixture}, {"yamllint", yamllintPreparationFixture}} {
-		t.Run(fixture.name, func(t *testing.T) {
-			d, commands := fixture.create(t)
-			r := Resource{ID: "tool.shared"}
-			receipt := Receipt{OperationID: strings.Repeat("a", 64)}
-			before, err := d.Observe(context.Background(), r, receipt)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if _, err := d.Apply(context.Background(), r, Operation{Action: "install", Observed: before}, receipt); err != nil {
-				t.Fatal(err)
-			}
-			version, err := d.version(r.ID, receipt.OperationID)
-			if err != nil {
-				t.Fatal(err)
-			}
-			intent, err := d.readIntent(r.ID, receipt.OperationID)
-			if err != nil {
-				t.Fatal(err)
-			}
-			version.Pin.WindowsVenvRevision, intent.Pin.WindowsVenvRevision = 0, 0
-			legacy, err := json.Marshal(version.Pin)
-			if err != nil || strings.Contains(string(legacy), "windows_venv_revision") {
-				t.Fatal("legacy document gained a new field", err)
-			}
-			versionPath := filepath.Join(d.versionDirectory(r.ID, receipt.OperationID), "version.json")
-			if err := saveDocument(versionPath, version); err != nil {
-				t.Fatal(err)
-			}
-			if err := saveDocument(d.intentPath(r.ID, receipt.OperationID), intent); err != nil {
-				t.Fatal(err)
-			}
-			original, err := os.ReadFile(versionPath)
-			if err != nil {
-				t.Fatal(err)
-			}
-			observed, err := d.Observe(context.Background(), r, receipt)
-			if err != nil || !observed.Present || observed.Healthy || observed.Pending != "" || len(*commands) != 6 {
-				t.Fatal("old complete generation cannot receive a read-only update preview", observed, err)
-			}
-			// Incomplete historical preparation cannot silently use the new recipe.
-			stage := t.TempDir()
-			if err := d.preparePayload(context.Background(), intent, stage); err == nil || !strings.Contains(err.Error(), "preserve the original operation") {
-				t.Fatal("historical preparation was replayed", err)
-			}
-			if entries, err := os.ReadDir(stage); err != nil || len(entries) != 0 || len(*commands) != 6 {
-				t.Fatal("historical preparation modified its stage", err)
-			}
-			receipt.After, receipt.Ownership, receipt.OperationID = observed, "created", strings.Repeat("b", 64)
-			after, err := d.Apply(context.Background(), r, Operation{Action: "update", Observed: observed}, receipt)
-			if err != nil || !after.Healthy {
-				t.Fatal("recipe update did not publish", after, err)
-			}
-			if data, err := os.ReadFile(versionPath); err != nil || string(data) != string(original) {
-				t.Fatal("update rewrote historical provenance", err)
-			}
-		})
 	}
 }
 
