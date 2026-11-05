@@ -126,6 +126,7 @@ func (d *ArchiveDriver) preparePayload(ctx context.Context, intent archiveIntent
 	}
 	if pin.AzureCLI != nil {
 		source.Commands = nil
+		source.RequiredFiles = []string{azureCLIMain}
 	}
 	if len(pin.RustComponents) > 0 {
 		source.Commands = nil

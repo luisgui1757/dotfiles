@@ -694,7 +694,7 @@
           "commands"
         ],
         "required_files": [
-          "libexec/lib/python3.14/site-packages/azure/cli/__main__.py"
+          "libexec/lib/python3.14/site-packages/azure/cli/__main__.pyc"
         ],
         "azure_cli": {
           "python": {
@@ -723,7 +723,7 @@
           "commands"
         ],
         "required_files": [
-          "libexec/lib/python3.14/site-packages/azure/cli/__main__.py"
+          "libexec/lib/python3.14/site-packages/azure/cli/__main__.pyc"
         ],
         "libc": "glibc",
         "azure_cli": {
@@ -753,7 +753,7 @@
           "commands"
         ],
         "required_files": [
-          "libexec/lib/python3.14/site-packages/azure/cli/__main__.py"
+          "libexec/lib/python3.14/site-packages/azure/cli/__main__.pyc"
         ],
         "libc": "glibc",
         "azure_cli": {
