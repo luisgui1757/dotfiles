@@ -29,7 +29,7 @@ az_root=$(CDPATH= cd -- "$(/usr/bin/dirname -- "$0")/.." && pwd -P)
 PYTHONPATH=$az_root/` + azureCLIPackages + `
 AZ_INSTALLER=TARBALL
 export PYTHONPATH AZ_INSTALLER
-exec "$az_root/python/` + azureCLIPython + `" -B -s -m azure.cli "$@"
+exec "$az_root/python/` + azureCLIPython + `" -B -s -W ignore::SyntaxWarning -m azure.cli "$@"
 `
 
 func validateAzureCLIPin(pin ArchivePin) error {
@@ -67,9 +67,9 @@ func (d *ArchiveDriver) prepareAzureCLI(ctx context.Context, pin ArchivePin, pay
 	if err := errors.Join(err, file.Sync(), file.Close()); err != nil {
 		return err
 	}
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, filepath.Join(payload, "python", azureCLIPython), "-I", "-B", "-W", "ignore", "-m", "compileall", "-q", "-f", "-j", "1", "--invalidation-mode", "checked-hash", "-o", "0", azureCLIPackages, "python/lib/python3.14")
+	cmd := exec.CommandContext(ctx, filepath.Join(payload, "python", azureCLIPython), "-I", "-B", "-m", "compileall", "-q", "-f", "-j", "1", "--invalidation-mode", "checked-hash", "-o", "0", "python/lib/python3.14")
 	cmd.Dir = payload
 	cmd.WaitDelay = 2 * time.Second
 	var output boundedCommandOutput
