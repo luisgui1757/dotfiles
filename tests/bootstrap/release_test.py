@@ -216,19 +216,23 @@ class ReleaseTests(unittest.TestCase):
         def push_run(run_id, **fields):
             return native_run(run_id, event="push", **fields)
 
-        def select(listings, pushes=(), failing_watches=()):
+        def select(listings, pushes=(), failing_watches=(), viewed=None):
             listings = iter(listings)
             known = {item["databaseId"]: item for item in pushes}
             calls = []
 
             def output(argv, **_):
                 if argv[:3] == ["gh", "run", "list"]:
-                    if argv[argv.index("--event") + 1] == "push":
+                    event = argv[argv.index("--event") + 1]
+                    self.assertEqual(argv[argv.index("--branch") + 1], "main" if event == "push" else self.tag)
+                    self.assertEqual(argv[argv.index("--commit") + 1], commit)
+                    if event == "push":
                         return json.dumps(list(pushes))
                     listing = next(listings)
                     known.update({item["databaseId"]: item for item in listing})
                     return json.dumps(listing)
-                return json.dumps(dict(known[int(argv[3])], status="completed", conclusion="success"))
+                run_id = int(argv[3])
+                return json.dumps((viewed or {}).get(run_id) or dict(known[run_id], status="completed", conclusion="success"))
 
             def run(argv, **_):
                 calls.append(argv[:3] if argv[:3] != ["gh", "run", "watch"] else argv[:4])
@@ -247,6 +251,12 @@ class ReleaseTests(unittest.TestCase):
                                 pushes=[push_run(3, status="in_progress", conclusion="")], failing_watches={3}),
                          ((20, "workflow_dispatch"), [["gh", "run", "watch", "3"], ["gh", "workflow", "run"],
                                                       ["gh", "run", "watch", "20"]]))
+        self.assertEqual(select([[native_run(22)]], pushes=[push_run(7, status="in_progress", conclusion="")],
+                                failing_watches={7}),
+                         ((22, "workflow_dispatch"), [["gh", "run", "watch", "7"], ["gh", "run", "watch", "22"]]))
+        self.assertEqual(select([[native_run(23)]], pushes=[push_run(8, status="in_progress", conclusion="")],
+                                viewed={8: push_run(8, attempt=2)}),
+                         ((23, "workflow_dispatch"), [["gh", "run", "watch", "8"], ["gh", "run", "watch", "23"]]))
         for label, pushed in (("failed", push_run(4, conclusion="failure")),
                               ("cancelled", push_run(5, conclusion="cancelled")),
                               ("re-run", push_run(6, attempt=2))):

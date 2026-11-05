@@ -320,9 +320,9 @@ def verify_or_publish_tag(manifest: dict[str, Any], tag: str, expected_sha: str)
 def select_release_run(manifest: dict[str, Any], tag: str, expected_sha: str) -> dict[str, Any]:
     """Wait for a first-attempt native run of the release commit and return it after it passes.
 
-    The push run on main comes first. When it does not exist or does not pass,
-    an exact-tag run replaces it. A re-run of the release keeps an exact-tag
-    run that passed or still runs, and starts a new one only after a failed one.
+    The push run on main comes first. When it does not exist, does not pass or
+    gets a new attempt, an exact-tag run replaces it. The release keeps an
+    exact-tag run that passed or still runs, and starts a new one otherwise.
     """
     def runs(event: str, branch: str) -> list[dict[str, Any]]:
         raw = output(
@@ -346,22 +346,37 @@ def select_release_run(manifest: dict[str, Any], tag: str, expected_sha: str) ->
         )
         return [item for item in json.loads(raw) if item.get("headBranch") == branch and item.get("headSha") == expected_sha]
 
-    def usable(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        return [
+    def passed_or_running(items: list[dict[str, Any]]) -> dict[str, Any] | None:
+        usable = [
             item for item in items
             if item.get("attempt") == 1 and (item.get("status") != "completed" or item.get("conclusion") == "success")
         ]
+        return max(usable, key=lambda item: (item.get("status") == "completed", item["databaseId"]), default=None)
 
     def passes(run_id: int) -> bool:
         return run(["gh", "run", "watch", str(run_id), "--exit-status", "--interval", "60"], capture=False, check=False).returncode == 0
 
-    pushed = usable(runs("push", "main"))
-    if pushed and passes(pushed[0]["databaseId"]):
-        return verified_release_run(pushed[0]["databaseId"], "push", "main", expected_sha)
+    def view(run_id: int) -> dict[str, Any]:
+        return json.loads(output(
+            [
+                "gh",
+                "run",
+                "view",
+                str(run_id),
+                "--json",
+                "attempt,conclusion,databaseId,event,headBranch,headSha,status,url,workflowName",
+            ]
+        ))
+
+    pushed = passed_or_running(runs("push", "main"))
+    if pushed and passes(pushed["databaseId"]):
+        record = view(pushed["databaseId"])
+        if record.get("attempt") == 1 and record.get("conclusion") == "success":
+            return verified_release_run(record, pushed["databaseId"], "push", "main", expected_sha)
     existing = runs("workflow_dispatch", tag)
-    passed_first = sorted(usable(existing), key=lambda item: (item.get("status") != "completed", -item["databaseId"]))
-    if passed_first:
-        run_id = passed_first[0]["databaseId"]
+    reused = passed_or_running(existing)
+    if reused:
+        run_id = reused["databaseId"]
     else:
         known = {item["databaseId"] for item in existing}
         run(["gh", "workflow", "run", manifest["workflow"], "--ref", tag], capture=False)
@@ -377,21 +392,10 @@ def select_release_run(manifest: dict[str, Any], tag: str, expected_sha: str) ->
         run_id = selected[0]["databaseId"]
     if not passes(run_id):
         fail(f"exact-tag run {run_id} did not pass. Re-run the release workflow to start a new exact-tag run.")
-    return verified_release_run(run_id, "workflow_dispatch", tag, expected_sha)
+    return verified_release_run(view(run_id), run_id, "workflow_dispatch", tag, expected_sha)
 
 
-def verified_release_run(run_id: int, event: str, branch: str, expected_sha: str) -> dict[str, Any]:
-    raw = output(
-        [
-            "gh",
-            "run",
-            "view",
-            str(run_id),
-            "--json",
-            "attempt,conclusion,databaseId,event,headBranch,headSha,status,url,workflowName",
-        ]
-    )
-    selected_run = json.loads(raw)
+def verified_release_run(selected_run: dict[str, Any], run_id: int, event: str, branch: str, expected_sha: str) -> dict[str, Any]:
     expected = {
         "databaseId": run_id,
         "event": event,
