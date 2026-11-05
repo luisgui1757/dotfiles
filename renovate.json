@@ -169,6 +169,18 @@
     },
     {
       "customType": "regex",
+      "description": "GitLab CLI release in the archive pins. Renovate only reports it.",
+      "managerFilePatterns": [
+        "/^installer/archive-pins\\.json$/"
+      ],
+      "matchStrings": [
+        "\"url\":\\s*\"https://gitlab\\.com/(?<depName>gitlab-org/cli)/-/releases/(?<currentValue>v[^/\"]+)/downloads/"
+      ],
+      "datasourceTemplate": "gitlab-releases",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
       "description": "Ghostty macOS release in the archive pins. Renovate only reports it.",
       "managerFilePatterns": [
         "/^installer/archive-pins\\.json$/"

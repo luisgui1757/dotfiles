@@ -32,7 +32,7 @@ func validateArchivePreparation(pin ArchivePin) error {
 		return errors.New("PortableGit recipe revision requires its fixed preparation")
 	}
 	preparations := 0
-	for _, enabled := range []bool{len(pin.RustComponents) > 0, pin.Latex2text != nil, pin.Yamllint != nil, pin.PythonStdlib != "", pin.PortableGit, pin.GhosttyLibraries, pin.ZenProfile, pin.T3CodeLauncher} {
+	for _, enabled := range []bool{len(pin.RustComponents) > 0, pin.Latex2text != nil, pin.Yamllint != nil, pin.PythonStdlib != "", pin.PortableGit, pin.GhosttyLibraries, pin.ZenProfile, pin.T3CodeLauncher, pin.AzureCLI != nil} {
 		if enabled {
 			preparations++
 		}
@@ -57,7 +57,7 @@ func validateArchivePreparation(pin ArchivePin) error {
 		}
 		expected := rustComponentNames(pin.RustTarget)
 		for index, component := range pin.RustComponents {
-			if len(component.RustComponents) != 0 || component.RustTarget != "" || component.Latex2text != nil || component.Yamllint != nil || component.PythonStdlib != "" || component.PortableGit || component.GhosttyLibraries || component.ZenProfile || component.T3CodeLauncher {
+			if len(component.RustComponents) != 0 || component.RustTarget != "" || component.Latex2text != nil || component.Yamllint != nil || component.PythonStdlib != "" || component.PortableGit || component.GhosttyLibraries || component.ZenProfile || component.T3CodeLauncher || component.AzureCLI != nil {
 				return errors.New("nested archive preparations are forbidden")
 			}
 			if component.Version != pin.Version || component.Format != "tar.gz" || component.StripComponents != 1 || len(component.Commands) != 0 || !slices.Equal(component.RequiredFiles, []string{expected[index] + "/manifest.in"}) || len(component.ExcludedFiles) != 0 || len(component.Replacements) != 0 {
@@ -89,6 +89,9 @@ func validateArchivePreparation(pin ArchivePin) error {
 	if pin.T3CodeLauncher {
 		return validateT3CodeLauncherPin(pin)
 	}
+	if pin.AzureCLI != nil {
+		return validateAzureCLIPin(pin)
+	}
 	return nil
 }
 
@@ -114,11 +117,16 @@ func (d *ArchiveDriver) preparePayload(ctx context.Context, intent archiveIntent
 	source.T3CodeLauncher = false
 	source.ZenProfile = false
 	source.ZenProfileRevision = 0
+	source.AzureCLI = nil
 	if pin.GhosttyLibraries {
 		source.RequiredFiles = slices.DeleteFunc(slices.Clone(source.RequiredFiles), func(name string) bool { return name == "usr/bin/ghostty-bin" })
 	}
 	if pin.T3CodeLauncher {
 		source.RequiredFiles = slices.DeleteFunc(slices.Clone(source.RequiredFiles), func(name string) bool { return name == "t3-code" })
+	}
+	if pin.AzureCLI != nil {
+		source.Commands = nil
+		source.RequiredFiles = []string{azureCLIMain}
 	}
 	if len(pin.RustComponents) > 0 {
 		source.Commands = nil
@@ -162,6 +170,10 @@ func (d *ArchiveDriver) preparePayload(ctx context.Context, intent archiveIntent
 		}
 	case pin.T3CodeLauncher:
 		if err := prepareT3CodeLauncher(pin, payload); err != nil {
+			return err
+		}
+	case pin.AzureCLI != nil:
+		if err := d.prepareAzureCLI(ctx, pin, payload); err != nil {
 			return err
 		}
 	default:

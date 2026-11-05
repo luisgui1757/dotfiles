@@ -236,6 +236,19 @@ func TestSentinelInstallerCommandFollowsPlatformAndHosts(t *testing.T) {
 	}
 }
 
+func TestSentinelCountsTheOpenCodeThatTheSelectionInstalls(t *testing.T) {
+	d, processes := sentinelFixture(t, Context{OS: "linux", Arch: "amd64"})
+	d.Selected = []string{"tool.opencode"}
+	if _, err := sentinelApply(t, d); err != nil {
+		t.Fatal(err)
+	}
+	install := processes.installers()[0]
+	hosts := slices.Index(install.Arguments, "--hosts")
+	if hosts < 0 || hosts+1 >= len(install.Arguments) || install.Arguments[hosts+1] != "opencode" {
+		t.Fatal("a selected OpenCode is not a Sentinel host", install.Arguments)
+	}
+}
+
 // The installer writes to KIRO_HOME as it is. Kiro ignores a relative value,
 // a filesystem root and the home folder path, so setup refuses those values.
 func TestSentinelRefusesAKiroHomeThatKiroIgnores(t *testing.T) {

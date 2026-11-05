@@ -55,6 +55,7 @@ type ArchivePin struct {
 	ZenProfile          bool                    `json:"zen_profile,omitempty"`
 	GhosttyLibraries    bool                    `json:"ghostty_libraries,omitempty"`
 	T3CodeLauncher      bool                    `json:"t3_code_launcher,omitempty"`
+	AzureCLI            *AzureCLIPin            `json:"azure_cli,omitempty"`
 }
 
 // Corrections are reviewed data in the pin, never commands. Apply only to the

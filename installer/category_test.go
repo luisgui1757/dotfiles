@@ -31,7 +31,7 @@ func TestCapabilityCategoriesFollowPlatformAvailability(t *testing.T) {
 					categories = append(categories, choice.Category)
 				}
 			}
-			wantCategories := []string{"Editors", "Shell essentials", "Version control", "Terminal apps", "Terminal sessions", "AI coding", "Desktop apps", "Dotfiles development"}
+			wantCategories := []string{"Editors", "Shell essentials", "Version control", "Cloud", "Terminal apps", "Terminal sessions", "AI coding", "Desktop apps", "Dotfiles development"}
 			if target.OS == "windows" {
 				wantCategories = slices.DeleteFunc(wantCategories, func(category string) bool { return category == "Desktop apps" })
 			}

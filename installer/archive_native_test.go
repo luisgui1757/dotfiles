@@ -2,6 +2,8 @@ package installer
 
 import (
 	"context"
+	"errors"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -63,7 +65,7 @@ func TestNativeArchivePinnedCommandLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, tool := range []string{"nvim", "rg", "gh", "lazygit", "jq", "tree-sitter", "hyperfine", "node", "shellcheck", "taplo", "gh-dash", "powershell", "cmake", "python", "herdr", "editorconfig", "clipboard", "atuin", "superfile"} {
+	for _, tool := range []string{"nvim", "rg", "gh", "lazygit", "jq", "tree-sitter", "hyperfine", "node", "shellcheck", "taplo", "gh-dash", "powershell", "cmake", "python", "herdr", "editorconfig", "clipboard", "atuin", "superfile", "glab", "az"} {
 		t.Run(tool, func(t *testing.T) {
 			pin, ok := pins["tool."+tool]
 			if !ok && (tool == "powershell" || tool == "clipboard") && runtime.GOOS != "windows" {
@@ -107,6 +109,12 @@ func TestNativeArchivePinnedCommandLifecycle(t *testing.T) {
 				if tool == "gh-dash" {
 					cmd.Env = append(cmd.Env, "GH_CONFIG_DIR="+filepath.Join(c.Home, "gh"), "GH_TOKEN=", "GITHUB_TOKEN=", "GH_ENTERPRISE_TOKEN=", "GITHUB_ENTERPRISE_TOKEN=")
 				}
+				if tool == "glab" {
+					cmd.Env = append(cmd.Env, "GLAB_CONFIG_DIR="+filepath.Join(c.Home, "glab"), "GITLAB_TOKEN=", "GITLAB_ACCESS_TOKEN=", "OAUTH_TOKEN=")
+				}
+				if tool == "az" {
+					cmd.Env = append(cmd.Env, "AZURE_CONFIG_DIR="+filepath.Join(c.Home, "azure"), "AZURE_CORE_COLLECT_TELEMETRY=no")
+				}
 				output, err := cmd.CombinedOutput()
 				if err != nil {
 					t.Fatalf("%s %v: %v (context: %v)\n%s", tool, args, err, ctx.Err(), output)
@@ -131,6 +139,26 @@ func TestNativeArchivePinnedCommandLifecycle(t *testing.T) {
 			if tool == "gh-dash" {
 				if output := execute("--help"); !strings.Contains(output, "--config") {
 					t.Fatal("standalone dashboard help is unavailable without authentication", output)
+				}
+			}
+			if tool == "az" {
+				if output := execute("account", "list", "--output", "json"); !strings.Contains(output, "[]") {
+					t.Fatal("Azure CLI cannot load its packages without a sign-in", output)
+				}
+				if pin.AzureCLI != nil {
+					payload, err := d.PayloadPath("tool.shared")
+					if err != nil {
+						t.Fatal(err)
+					}
+					err = filepath.WalkDir(filepath.Join(payload, filepath.FromSlash(azureCLIPackages)), func(path string, entry fs.DirEntry, err error) error {
+						if err == nil && entry.Type().IsRegular() && filepath.Ext(path) == ".py" {
+							return errors.New("Azure CLI keeps a module source, so Python compiles it at each run: " + path)
+						}
+						return err
+					})
+					if err != nil {
+						t.Fatal(err)
+					}
 				}
 			}
 			if tool == "python" {

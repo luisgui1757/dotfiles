@@ -70,7 +70,7 @@ class FakeNetwork:
 
 
 class AgentCLIPinBumpTest(unittest.TestCase):
-    versions = {"tool.claude": "2.1.400", "tool.codex": "0.200.0", "tool.copilot": "1.1.0", "tool.kiro": "2.40.0"}
+    versions = {"tool.claude": "2.1.400", "tool.codex": "0.200.0", "tool.copilot": "1.1.0", "tool.kiro": "2.40.0", "tool.muse": "1.4.20-R8000.1"}
 
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
@@ -85,6 +85,7 @@ class AgentCLIPinBumpTest(unittest.TestCase):
         self.publish_codex()
         self.publish_copilot()
         self.publish_kiro()
+        self.publish_muse()
 
     def verify(self, manifest, signature, key):
         self.verified.append((manifest, signature, key))
@@ -146,6 +147,18 @@ class AgentCLIPinBumpTest(unittest.TestCase):
             packages.append({"download": f"{version}/{name}", "sha256": hashlib.sha256(data).hexdigest(), "size": len(data)})
         self.network.texts[pins_script.KIRO_BASE + "latest/manifest.json"] = json.dumps({"version": version, "packages": packages}).encode()
 
+    def publish_muse(self):
+        version = self.versions["tool.muse"]
+        artifacts = {}
+        for platform, name in pins_script.MUSE_FILES.values():
+            data = f"{name} {version}".encode()
+            url = pins_script.MUSE_BASE.format(version=version, file=name)
+            self.network.files[url] = data
+            artifacts[platform] = {"url": url, "checksum": hashlib.sha256(data).hexdigest(), "size": len(data)}
+        manifest = pins_script.MUSE_BASE.format(version=version, file="manifest.json")
+        self.network.texts[manifest] = json.dumps({"version": version, "checksum_algorithm": "sha256", "artifacts": artifacts}).encode()
+        self.network.texts[pins_script.MUSE_CHANNEL] = json.dumps({"channel": "muse-stable", "version": version, "manifest_url": manifest, "state": "public"}).encode()
+
     def run_bump(self, tools=None, expected_status=0):
         summary = pathlib.Path(self.temporary.name) / "summary.md"
         failures = pathlib.Path(self.temporary.name) / "failures.txt"
@@ -178,10 +191,11 @@ class AgentCLIPinBumpTest(unittest.TestCase):
         self.publish_codex()
         self.publish_copilot()
         self.publish_kiro()
+        self.publish_muse()
         _, summary, failures = self.run_bump()
         self.assertEqual(failures, "")
         self.assertEqual(self.pins_path.read_text(encoding="utf-8"), self.original)
-        self.assertEqual(summary.count("is current"), 4)
+        self.assertEqual(summary.count("is current"), 5)
 
     def assertOnlyToolFailed(self, tool, message):
         resources, _, failures = self.run_bump(expected_status=1)
@@ -233,6 +247,11 @@ class AgentCLIPinBumpTest(unittest.TestCase):
         url = pins_script.KIRO_BASE + "2.40.0/kirocli-aarch64-linux.zip"
         self.network.files[url] = self.network.files[url] + b"\0"
         self.assertOnlyToolFailed("tool.kiro", "does not match its release manifest")
+
+    def test_muse_files_must_match_their_release_manifest(self):
+        url = pins_script.MUSE_BASE.format(version="1.4.20-R8000.1", file="muse-x86-linux")
+        self.network.files[url] += b"tampered"
+        self.assertOnlyToolFailed("tool.muse", "does not match its release manifest")
 
     def test_major_release_is_reported_without_changing_pins(self):
         self.versions = {**self.versions, "tool.kiro": "3.0.0"}

@@ -631,6 +631,162 @@
         "strip_components": 1
       }
     },
+    "tool.glab": {
+      "darwin/arm64": {
+        "version": "1.128.0",
+        "url": "https://gitlab.com/gitlab-org/cli/-/releases/v1.128.0/downloads/glab_1.128.0_darwin_arm64.tar.gz",
+        "sha256": "541cdde6a0f706b4b69fed9fb558b421a361f63408d072d78ffdf304aee04248",
+        "format": "tar.gz",
+        "commands": {
+          "glab": "bin/glab"
+        },
+        "bin_dirs": [
+          "bin"
+        ]
+      },
+      "linux/amd64": {
+        "version": "1.128.0",
+        "url": "https://gitlab.com/gitlab-org/cli/-/releases/v1.128.0/downloads/glab_1.128.0_linux_amd64.tar.gz",
+        "sha256": "bc024819e7598b19429a199cd87f640d98b2b67416d8ad796f19e4260b57a7c7",
+        "format": "tar.gz",
+        "commands": {
+          "glab": "bin/glab"
+        },
+        "bin_dirs": [
+          "bin"
+        ]
+      },
+      "linux/arm64": {
+        "version": "1.128.0",
+        "url": "https://gitlab.com/gitlab-org/cli/-/releases/v1.128.0/downloads/glab_1.128.0_linux_arm64.tar.gz",
+        "sha256": "60d0512085a8c1be7c5ef51aa7e4ee28213444cea0376b3260707d90489199ea",
+        "format": "tar.gz",
+        "commands": {
+          "glab": "bin/glab"
+        },
+        "bin_dirs": [
+          "bin"
+        ]
+      },
+      "windows/amd64": {
+        "version": "1.128.0",
+        "url": "https://gitlab.com/gitlab-org/cli/-/releases/v1.128.0/downloads/glab_1.128.0_windows_amd64.zip",
+        "sha256": "641d86af5d72c17a7d79154a6436e9c68a54c69db2172020cc4036e0776a4832",
+        "format": "zip",
+        "commands": {
+          "glab": "bin/glab.exe"
+        },
+        "bin_dirs": [
+          "bin"
+        ]
+      }
+    },
+    "tool.az": {
+      "darwin/arm64": {
+        "version": "2.92.0",
+        "url": "https://github.com/Azure/azure-cli/releases/download/azure-cli-2.92.0/azure-cli-2.92.0-macos-arm64.tar.gz",
+        "sha256": "6fb7d8d6d3db65098e259d5d1d6364359b4b54b5aef4ea6b18bddddd9468407a",
+        "format": "tar.gz",
+        "commands": {
+          "az": "commands/az"
+        },
+        "bin_dirs": [
+          "commands"
+        ],
+        "required_files": [
+          "libexec/lib/python3.14/site-packages/azure/cli/__main__.pyc"
+        ],
+        "azure_cli": {
+          "python": {
+            "version": "3.14.8",
+            "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261009/cpython-3.14.8%2B20261009-aarch64-apple-darwin-install_only_stripped.tar.gz",
+            "sha256": "936217c0e6893f51af939474bee18ecf5e6fe47b986d2c163f19b57c682e4a83",
+            "format": "tar.gz",
+            "strip_components": 1,
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "bin/python3.14"
+            ]
+          }
+        }
+      },
+      "linux/amd64": {
+        "version": "2.92.0",
+        "url": "https://github.com/Azure/azure-cli/releases/download/azure-cli-2.92.0/azure-cli-2.92.0-linux-x86_64.tar.gz",
+        "sha256": "b90a489e0447b83e9d265b6d14f8b9306cd96b830c7f93e60bbcdf18cd2532af",
+        "format": "tar.gz",
+        "commands": {
+          "az": "commands/az"
+        },
+        "bin_dirs": [
+          "commands"
+        ],
+        "required_files": [
+          "libexec/lib/python3.14/site-packages/azure/cli/__main__.pyc"
+        ],
+        "libc": "glibc",
+        "azure_cli": {
+          "python": {
+            "version": "3.14.8",
+            "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261009/cpython-3.14.8%2B20261009-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz",
+            "sha256": "ddc902fd26460f728758c67d80417c1031edf97589f1f162c4ba3aa158a35998",
+            "format": "tar.gz",
+            "strip_components": 1,
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "bin/python3.14"
+            ]
+          }
+        }
+      },
+      "linux/arm64": {
+        "version": "2.92.0",
+        "url": "https://github.com/Azure/azure-cli/releases/download/azure-cli-2.92.0/azure-cli-2.92.0-linux-arm64.tar.gz",
+        "sha256": "ef78aad855168a61eb372c1624406b97a94f1b23935b9391d131565337acc703",
+        "format": "tar.gz",
+        "commands": {
+          "az": "commands/az"
+        },
+        "bin_dirs": [
+          "commands"
+        ],
+        "required_files": [
+          "libexec/lib/python3.14/site-packages/azure/cli/__main__.pyc"
+        ],
+        "libc": "glibc",
+        "azure_cli": {
+          "python": {
+            "version": "3.14.8",
+            "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261009/cpython-3.14.8%2B20261009-aarch64-unknown-linux-gnu-install_only_stripped.tar.gz",
+            "sha256": "54f9cd13b97add6bbd077175b6d89f974cc582ece1c40ace1893067582edaf0e",
+            "format": "tar.gz",
+            "strip_components": 1,
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "bin/python3.14"
+            ]
+          }
+        }
+      },
+      "windows/amd64": {
+        "version": "2.92.0",
+        "url": "https://github.com/Azure/azure-cli/releases/download/azure-cli-2.92.0/azure-cli-2.92.0-x64.zip",
+        "sha256": "2cbd2c10e4b2ec4de2ab98eaa69f51fa4c9dfc4922b5116ada88091663d92af2",
+        "format": "zip",
+        "commands": {
+          "az": "bin/az.cmd"
+        },
+        "bin_dirs": [
+          "bin"
+        ],
+        "required_files": [
+          "python.exe"
+        ]
+      }
+    },
     "tool.lazygit": {
       "darwin/arm64": {
         "version": "0.66.2",
@@ -2897,6 +3053,167 @@
           "bin/qchat"
         ],
         "libc": "glibc"
+      }
+    },
+    "tool.muse": {
+      "darwin/arm64": {
+        "version": "1.4.14-R7309.1",
+        "url": "https://lookaside.facebook.com/lookaside/muse/download/?channel=muse&version=1.4.14-R7309.1&file=muse-aarch64-macos",
+        "sha256": "1c96114408acbeade9a8fb79e3b4425e5b64d50425938568aef01bdc04ce2e03",
+        "format": "file",
+        "commands": {
+          "muse": "muse"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "file": "muse"
+      },
+      "linux/amd64": {
+        "version": "1.4.14-R7309.1",
+        "url": "https://lookaside.facebook.com/lookaside/muse/download/?channel=muse&version=1.4.14-R7309.1&file=muse-x86-linux",
+        "sha256": "0809aac7cb58d18f5022b6d05e02aa1974683c0ec430e5f04d25b60ed17de2da",
+        "format": "file",
+        "commands": {
+          "muse": "muse"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "file": "muse"
+      },
+      "linux/arm64": {
+        "version": "1.4.14-R7309.1",
+        "url": "https://lookaside.facebook.com/lookaside/muse/download/?channel=muse&version=1.4.14-R7309.1&file=muse-aarch64-linux",
+        "sha256": "3dc39b8fa26f9963cc2038f2966c0932ed5a39f0f9efb39cc0266a261cbbcf76",
+        "format": "file",
+        "commands": {
+          "muse": "muse"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "file": "muse"
+      },
+      "windows/amd64": {
+        "version": "1.4.14-R7309.1",
+        "url": "https://lookaside.facebook.com/lookaside/muse/download/?channel=muse&version=1.4.14-R7309.1&file=muse-x86-windows.exe",
+        "sha256": "20d18c426cc26e9e4b3cc07008ec07ec97e12e466a2be8cd2797b2e0e2018382",
+        "format": "file",
+        "commands": {
+          "muse": "muse.exe"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "file": "muse.exe"
+      }
+    },
+    "tool.opencode": {
+      "darwin/arm64": {
+        "version": "2.2.5",
+        "url": "https://github.com/anomalyco/opencode/releases/download/v2.2.5/opencode-darwin-arm64.zip",
+        "sha256": "25ba9908979fa7d764792c82589b4b5768ab1511154e0317d98aa77d216ce767",
+        "format": "zip",
+        "commands": {
+          "opencode": "opencode"
+        },
+        "bin_dirs": [
+          "."
+        ]
+      },
+      "linux/amd64": {
+        "version": "2.2.5",
+        "url": "https://github.com/anomalyco/opencode/releases/download/v2.2.5/opencode-linux-x64-baseline.tar.gz",
+        "sha256": "09f44302c10fd036912f59c81fd1aef5df45dd06f649197f9dfc9bbe2a79614e",
+        "format": "tar.gz",
+        "commands": {
+          "opencode": "opencode"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "libc": "glibc"
+      },
+      "linux/arm64": {
+        "version": "2.2.5",
+        "url": "https://github.com/anomalyco/opencode/releases/download/v2.2.5/opencode-linux-arm64.tar.gz",
+        "sha256": "5a528f42caf576c6cdece6a191eb273d3db54effa5518e0402684d8f8026aeb6",
+        "format": "tar.gz",
+        "commands": {
+          "opencode": "opencode"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "libc": "glibc"
+      },
+      "windows/amd64": {
+        "version": "2.2.5",
+        "url": "https://github.com/anomalyco/opencode/releases/download/v2.2.5/opencode-windows-x64-baseline.zip",
+        "sha256": "3acca208ad79add59aed13d07b7e08ddf24e0adbbb7f44a9131408d7b3ca67cd",
+        "format": "zip",
+        "commands": {
+          "opencode": "opencode.exe"
+        },
+        "bin_dirs": [
+          "."
+        ]
+      }
+    },
+    "tool.pi": {
+      "darwin/arm64": {
+        "version": "1.5.0",
+        "url": "https://github.com/earendil-works/pi/releases/download/v1.5.0/pi-darwin-arm64.tar.gz",
+        "sha256": "a9bf0d82d58d2a7d337f4ae4171b5fc9ebffe42509527a831364c4b65adf2cdf",
+        "format": "tar.gz",
+        "commands": {
+          "pi": "pi"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "strip_components": 1
+      },
+      "linux/amd64": {
+        "version": "1.5.0",
+        "url": "https://github.com/earendil-works/pi/releases/download/v1.5.0/pi-linux-x64.tar.gz",
+        "sha256": "df870ba0e344cb7b3358d8d8f19397b8b8d225a8669784736ad68a5c2169d53b",
+        "format": "tar.gz",
+        "commands": {
+          "pi": "pi"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "strip_components": 1,
+        "libc": "glibc"
+      },
+      "linux/arm64": {
+        "version": "1.5.0",
+        "url": "https://github.com/earendil-works/pi/releases/download/v1.5.0/pi-linux-arm64.tar.gz",
+        "sha256": "5d5711b48600756473682e86360b026b11abf7591e5d112eb411d4da2c100d9a",
+        "format": "tar.gz",
+        "commands": {
+          "pi": "pi"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "strip_components": 1,
+        "libc": "glibc"
+      },
+      "windows/amd64": {
+        "version": "1.5.0",
+        "url": "https://github.com/earendil-works/pi/releases/download/v1.5.0/pi-windows-x64.zip",
+        "sha256": "12d58a70e80b16ba9f764950b7a42bdeb07959495c0db68396cf2988c0b71af3",
+        "format": "zip",
+        "commands": {
+          "pi": "pi.exe"
+        },
+        "bin_dirs": [
+          "."
+        ]
       }
     },
     "tool.copilot": {

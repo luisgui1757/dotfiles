@@ -223,6 +223,28 @@
       "scope": "user"
     },
     {
+      "id": "gitlab",
+      "name": "GitLab CLI",
+      "description": "Merge request, issue and pipeline commands; sign in with glab auth login",
+      "capability": true,
+      "category": "Version control",
+      "requires": [
+        "tool.glab"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "azure",
+      "name": "Azure CLI",
+      "description": "Azure resource commands; sign in with az login",
+      "capability": true,
+      "category": "Cloud",
+      "requires": [
+        "tool.az"
+      ],
+      "scope": "user"
+    },
+    {
       "id": "ghostty",
       "name": "Ghostty",
       "description": "Terminal with the shared configuration and desktop launcher",
@@ -358,6 +380,39 @@
       "category": "AI coding",
       "requires": [
         "tool.copilot"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "muse-code",
+      "name": "Muse Code CLI",
+      "description": "Standalone terminal coding agent from Meta; sign in after installation; setup installs the pinned binary without Meta's self-updating launcher, so Update applies the reviewed version",
+      "capability": true,
+      "category": "AI coding",
+      "requires": [
+        "tool.muse"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "opencode",
+      "name": "OpenCode CLI",
+      "description": "Standalone terminal coding agent; sign in after installation; managed shells keep its self-update off so Update applies the reviewed version",
+      "capability": true,
+      "category": "AI coding",
+      "requires": [
+        "tool.opencode"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "pi",
+      "name": "Pi coding agent",
+      "description": "Standalone terminal coding agent; sign in after installation; setup installs the pinned release binary, which does not update itself",
+      "capability": true,
+      "category": "AI coding",
+      "requires": [
+        "tool.pi"
       ],
       "scope": "user"
     },
@@ -1244,6 +1299,53 @@
       }
     },
     {
+      "id": "tool.glab",
+      "name": "GitLab CLI",
+      "requires": [
+        "tool.git",
+        "integration.shells"
+      ],
+      "action": "archive",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.glab"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.glab"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.glab"
+        }
+      }
+    },
+    {
+      "id": "tool.az",
+      "name": "Azure CLI",
+      "requires": [
+        "integration.shells"
+      ],
+      "action": "archive",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.az"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.az"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.az"
+        }
+      }
+    },
+    {
       "id": "tool.t3",
       "name": "T3 Code",
       "description": "Official standalone package; no provider authentication or background service setup",
@@ -1372,6 +1474,78 @@
         "windows": [
           "tool.powershell"
         ]
+      }
+    },
+    {
+      "id": "tool.muse",
+      "name": "Muse Code CLI",
+      "requires": [
+        "tool.git",
+        "integration.shells"
+      ],
+      "action": "archive",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.muse"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.muse"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.muse"
+        }
+      }
+    },
+    {
+      "id": "tool.opencode",
+      "name": "OpenCode CLI",
+      "requires": [
+        "tool.git",
+        "integration.shells"
+      ],
+      "action": "archive",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.opencode"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.opencode"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.opencode"
+        }
+      }
+    },
+    {
+      "id": "tool.pi",
+      "name": "Pi coding agent",
+      "requires": [
+        "tool.git",
+        "integration.shells"
+      ],
+      "action": "archive",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.pi"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.pi"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.pi"
+        }
       }
     },
     {

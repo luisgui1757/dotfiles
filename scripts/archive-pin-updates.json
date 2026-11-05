@@ -229,6 +229,26 @@
         "linux/arm64": "Hack.zip",
         "windows/amd64": "Hack.zip"
       }
+    },
+    "tool.opencode": {
+      "repository": "anomalyco/opencode",
+      "tag": "v{version}",
+      "assets": {
+        "darwin/arm64": "opencode-darwin-arm64.zip",
+        "linux/amd64": "opencode-linux-x64-baseline.tar.gz",
+        "linux/arm64": "opencode-linux-arm64.tar.gz",
+        "windows/amd64": "opencode-windows-x64-baseline.zip"
+      }
+    },
+    "tool.pi": {
+      "repository": "earendil-works/pi",
+      "tag": "v{version}",
+      "assets": {
+        "darwin/arm64": "pi-darwin-arm64.tar.gz",
+        "linux/amd64": "pi-linux-x64.tar.gz",
+        "linux/arm64": "pi-linux-arm64.tar.gz",
+        "windows/amd64": "pi-windows-x64.zip"
+      }
     }
   },
   "manual": {
@@ -258,6 +278,8 @@
     "tool.zen": "Beta tags, disk images and generated profile wrappers need a recipe.",
     "tool.clang-format": "The PyPI wheel contains paths that depend on its version.",
     "tool.gersemi": "The Windows formatter version must match the Mason registry snapshot.",
-    "tool.openwhispr": "Its latest release, 1.11.0, exceeds the installer's 512 MiB download limit on Linux."
+    "tool.openwhispr": "Its latest release, 1.11.0, exceeds the installer's 512 MiB download limit on Linux.",
+    "tool.glab": "GitLab releases need a release recipe.",
+    "tool.az": "The nested Python archive must match the Python ABI of the packages."
   }
 }

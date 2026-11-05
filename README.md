@@ -121,10 +121,11 @@ selects the rest. Children remain independently selectable. `a` selects all,
 |---|---|
 | Editors | Neovim, VS Code |
 | Shell essentials | zsh on macOS/Linux or PowerShell 7 on Windows; zsh from bash terminals; Starship, lsd, zoxide, fzf, ripgrep, fd, Atuin, superfile |
-| Version control | Git, lazygit, GitHub CLI, gh-dash |
+| Version control | Git, lazygit, GitHub CLI, gh-dash, GitLab CLI |
+| Cloud | Azure CLI |
 | Terminal apps | Ghostty, Windows Terminal |
 | Terminal sessions | tmux, Herdr |
-| AI coding | T3 Code, T3 Code server, Claude Code CLI, Codex CLI, GitHub Copilot CLI, Kiro CLI, Sentinel rules and skills |
+| AI coding | T3 Code, T3 Code server, Claude Code CLI, Codex CLI, GitHub Copilot CLI, Kiro CLI, Muse Code CLI, OpenCode CLI, Pi coding agent, Sentinel rules and skills |
 | Desktop apps | OpenWhispr, Obsidian, Tailscale, Zen Browser, AeroSpace, Mac keyboard shortcuts, US International dead keys |
 | Dotfiles development | Lint and benchmark tools |
 
@@ -161,12 +162,17 @@ required dependencies are still resolved automatically in the preview.
 | lazygit | ✓ | ✓ | ✓ |
 | GitHub CLI | ✓ | ✓ | ✓ |
 | gh-dash | ✓ | ✓ | ✓ |
+| GitLab CLI | ✓ | ✓ | ✓ |
+| Azure CLI | ✓ | glibc | ✓ |
 | T3 Code | ✓ | ✓ | — |
 | T3 Code server (browser UI) | ✓ | ✓ | ✓ |
 | Claude Code CLI | ✓ | ✓ | ✓ |
 | Codex CLI | ✓ | ✓ | ✓ |
 | GitHub Copilot CLI | ✓ | glibc | ✓ |
 | Kiro CLI | ✓ | glibc | — |
+| Muse Code CLI | ✓ | ✓ | ✓ |
+| OpenCode CLI | ✓ | glibc | ✓ |
+| Pi coding agent | ✓ | glibc | ✓ |
 | Sentinel rules and skills | ✓ | ✓ | ✓ |
 | Lint and benchmark tools | ✓ | ✓ | ✓ |
 
@@ -339,15 +345,15 @@ Use dotfiles Update for its managed Codex/Claude packages too; T3's provider
 **Update** and **Update all** can invoke those CLIs' own updaters outside this
 pinned lifecycle.
 
-Claude Code, Codex, GitHub Copilot and Kiro are independent CLI
-selections; choose any of them. They use pinned standalone native distributions
+Claude Code, Codex, GitHub Copilot, Kiro, Muse Code, OpenCode and Pi are
+independent CLI selections; choose any of them. They use pinned standalone native distributions
 and automatically resolve Git.
 The installer does not install their desktop apps or change personal models,
 permissions, credentials or sessions. Sign in from the chosen CLI after setup.
 Claude Code's managed shell environment sets `DISABLE_UPDATES=1`; use the
 installer's Update menu to reconcile reviewed pins for either CLI.
 **Keeping pinned tools current:** Update installs the checkout's versions.
-A weekly workflow proposes verified updates for the four agent CLIs and the
+A weekly workflow proposes verified updates for the five agent CLIs and the
 GitHub tools in its update policy, including T3. It opens one grouped PR and
 holds major releases for review. Merge it after its native checks pass, then
 run `git pull` and **Update tools** on each machine. Some pins still need manual
@@ -375,6 +381,26 @@ setup does not extract programs from vendor installers. If Kiro publishes a plai
 Windows download (for example a ZIP) someday, it can be added like the other
 platforms. Install Kiro yourself on Windows if you want it. Sentinel rules and
 skills also go to it.
+**Muse Code CLI** uses the pinned binary from Meta's `muse-stable` release
+manifest: one native executable for each platform. Setup does not run Meta's
+`install.sh` and does not install its launcher, which updates itself every hour.
+Use Update for new Muse releases. Sign in with `muse login` (a Meta account,
+for example with a Muse subscription), and `muse usage` shows your allowance.
+T3 Code has its own Muse provider, which starts `muse` from `PATH`. Turn it on
+in the T3 Code provider settings after you sign in.
+**OpenCode CLI** uses the pinned native build from its official GitHub release:
+one executable for each platform, with no npm or install script. OpenCode
+otherwise updates itself, so the managed shell environment sets
+`OPENCODE_DISABLE_AUTOUPDATE=1` while it is selected. Setup writes nothing to
+`~/.config/opencode`. OpenCode starts a background server when you use it. Run
+`opencode service stop` before Update or removal, so that the old version does
+not stay in use. Sign in with `opencode auth login`.
+**Pi coding agent** uses the pinned build from its official GitHub release: one
+native executable with its support files for each platform. Setup does not run
+Pi's install script. A release build only reports a new version and does not
+update itself, so use Update for new Pi releases. Sign in with `/login` inside
+`pi`, or set the API key of your provider. Setup writes nothing to `~/.pi`.
+T3 Code has its own Pi provider, which starts `pi` from `PATH`.
 
 **Sentinel rules and skills** installs
 [Sentinel](https://github.com/luisgui1757/sentinel), the shared rules and
@@ -932,6 +958,11 @@ Useful standalone tools:
 - `lazygit`: terminal Git UI with upstream default keybindings and the Rose Pine
   theme on every OS.
   Press `?` for keys in the current context; `Esc` closes help and popups.
+- `gh`: on macOS and Linux, the managed shell sets `GH_PATH` to the stable
+  `current/bin/gh` link. Thus the Git credential helper that `gh auth login`
+  or `gh auth setup-git` writes still works after an Update. A helper line
+  that an earlier gh wrote stays unchanged. Run `gh auth setup-git` again to
+  correct it.
 - `gh-dash`: dashboard for pull requests and issues. Run `gh auth login` first
   to access your GitHub work; installing the dashboard does not require login.
   On a pull request, `m` merges it normally. `M` runs `gh pr merge --admin`: the
@@ -939,6 +970,12 @@ Useful standalone tools:
   be met". It works only when a ruleset lists your account as a bypass actor, and
   rules without a bypass, such as required checks, still apply. gh asks for the
   merge method and a final Submit before it merges.
+- `glab`: GitLab CLI for merge requests, issues and pipelines. Run
+  `glab auth login` to sign in. Setup does not sign you in.
+- `az`: Azure CLI. Run `az login` to sign in. Setup does not sign you in. On
+  macOS and Linux it runs with its own pinned Python 3.14, and Update changes
+  both together. Extensions that you add with `az extension add` stay in
+  `~/.azure`.
 - Atuin: when it is selected, `Ctrl+R` opens Atuin's history search instead of
   fzf, in zsh, bash and PowerShell. It searches every session on the machine and
   records the directory, duration and exit code of each command. Type to filter.
@@ -976,6 +1013,16 @@ Useful standalone tools:
   [Official Codex guide](https://learn.chatgpt.com/docs/codex/cli) and
   [Claude Code guide](https://code.claude.com/docs/en/setup) describe their
   authentication and usage. Neither CLI is required by the other.
+- `muse`: Muse Code CLI. Run `muse login` once, then `muse` in a project
+  directory. `muse exec "<prompt>"` runs one prompt without the TUI, and
+  `muse --help` lists its commands. See [Muse Code](https://dev.meta.ai/).
+- `opencode`: OpenCode CLI. Run `opencode auth login` once to connect a model
+  provider, then `opencode` in a project directory. `opencode run "<prompt>"`
+  runs one prompt without the TUI, and `opencode --help` lists its commands.
+  See the [OpenCode docs](https://opencode.ai/docs/).
+- `pi`: Pi coding agent. Start it in a project directory and type `/login`
+  once. `pi -p "<prompt>"` runs one prompt without the TUI, and `pi --help`
+  lists its commands. See [Pi](https://pi.dev/).
 
 ### Terminals and scrollback
 

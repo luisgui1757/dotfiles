@@ -69,6 +69,9 @@ func configureShellProfiles(d *ProfileDriver, target Context, folders ConfigFold
 		if selectedFeature("tool.copilot") {
 			agentEnvironment += "$env:COPILOT_AUTO_UPDATE = 'false'\n"
 		}
+		if selectedFeature("tool.opencode") {
+			agentEnvironment += "$env:OPENCODE_DISABLE_AUTOUPDATE = '1'\n"
+		}
 		loader := agentEnvironment + "$dotfilesPaths = @(" + strings.Join(quoted, ", ") + ")\n" + `foreach ($directory in $dotfilesPaths) {
 	if ((Test-Path -LiteralPath $directory -PathType Container) -and
 		$directory -notin ($env:PATH -split [regex]::Escape([IO.Path]::PathSeparator))) {
@@ -143,6 +146,16 @@ fi
 		// replacing or re-executing over the pinned binary.
 		if selectedFeature("tool.copilot") {
 			environment += "export COPILOT_AUTO_UPDATE=false\n"
+		}
+		if selectedFeature("tool.opencode") {
+			environment += "export OPENCODE_DISABLE_AUTOUPDATE=1\n"
+		}
+		if selectedFeature("tool.gh") {
+			gh, err := archives.CommandPath("tool.gh", "gh")
+			if err != nil {
+				return err
+			}
+			environment += "export GH_PATH=" + shellLiteral(gh) + "\n"
 		}
 		// sudoedit ignores PATH (sudo's secure_path, sudo-rs), so SUDO_EDITOR
 		// names the managed nvim through its stable current link. sudo splits it

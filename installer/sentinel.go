@@ -65,7 +65,7 @@ func sentinelOlder(a, b string) bool {
 var sentinelHosts = []string{"codex", "claude", "copilot", "kiro", "opencode"}
 
 // sentinelCLIs are the catalog CLIs that make their agent a host.
-var sentinelCLIs = map[string]string{"codex": "tool.codex", "claude": "tool.claude", "copilot": "tool.copilot", "kiro": "tool.kiro"}
+var sentinelCLIs = map[string]string{"codex": "tool.codex", "claude": "tool.claude", "copilot": "tool.copilot", "kiro": "tool.kiro", "opencode": "tool.opencode"}
 
 // SentinelLocations holds the agent folders that the process environment sets.
 // An empty field means the default folder under Home. KiroHome is the raw
