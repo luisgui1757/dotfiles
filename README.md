@@ -125,7 +125,7 @@ selects the rest. Children remain independently selectable. `a` selects all,
 | Cloud | Azure CLI |
 | Terminal apps | Ghostty, Windows Terminal |
 | Terminal sessions | tmux, Herdr |
-| AI coding | T3 Code, T3 Code server, Claude Code CLI, Codex CLI, GitHub Copilot CLI, Kiro CLI, Muse Code CLI, Sentinel rules and skills |
+| AI coding | T3 Code, T3 Code server, Claude Code CLI, Codex CLI, GitHub Copilot CLI, Kiro CLI, Muse Code CLI, OpenCode CLI, Sentinel rules and skills |
 | Desktop apps | OpenWhispr, Obsidian, Tailscale, Zen Browser, AeroSpace, Mac keyboard shortcuts, US International dead keys |
 | Dotfiles development | Lint and benchmark tools |
 
@@ -171,6 +171,7 @@ required dependencies are still resolved automatically in the preview.
 | GitHub Copilot CLI | ✓ | glibc | ✓ |
 | Kiro CLI | ✓ | glibc | — |
 | Muse Code CLI | ✓ | ✓ | ✓ |
+| OpenCode CLI | ✓ | glibc | ✓ |
 | Sentinel rules and skills | ✓ | ✓ | ✓ |
 | Lint and benchmark tools | ✓ | ✓ | ✓ |
 
@@ -343,8 +344,8 @@ Use dotfiles Update for its managed Codex/Claude packages too; T3's provider
 **Update** and **Update all** can invoke those CLIs' own updaters outside this
 pinned lifecycle.
 
-Claude Code, Codex, GitHub Copilot, Kiro and Muse Code are independent CLI
-selections; choose any of them. They use pinned standalone native distributions
+Claude Code, Codex, GitHub Copilot, Kiro, Muse Code and OpenCode are
+independent CLI selections; choose any of them. They use pinned standalone native distributions
 and automatically resolve Git.
 The installer does not install their desktop apps or change personal models,
 permissions, credentials or sessions. Sign in from the chosen CLI after setup.
@@ -386,6 +387,13 @@ Use Update for new Muse releases. Sign in with `muse login` (a Meta account,
 for example with a Muse subscription), and `muse usage` shows your allowance.
 T3 Code has its own Muse provider, which starts `muse` from `PATH`. Turn it on
 in the T3 Code provider settings after you sign in.
+**OpenCode CLI** uses the pinned native build from its official GitHub release:
+one executable for each platform, with no npm or install script. OpenCode
+otherwise updates itself, so the managed shell environment sets
+`OPENCODE_DISABLE_AUTOUPDATE=1` while it is selected. Setup writes nothing to
+`~/.config/opencode`. OpenCode starts a background server when you use it. Run
+`opencode service stop` before Update or removal, so that the old version does
+not stay in use. Sign in with `opencode auth login`.
 
 **Sentinel rules and skills** installs
 [Sentinel](https://github.com/luisgui1757/sentinel), the shared rules and
@@ -1001,6 +1009,10 @@ Useful standalone tools:
 - `muse`: Muse Code CLI. Run `muse login` once, then `muse` in a project
   directory. `muse exec "<prompt>"` runs one prompt without the TUI, and
   `muse --help` lists its commands. See [Muse Code](https://dev.meta.ai/).
+- `opencode`: OpenCode CLI. Run `opencode auth login` once to connect a model
+  provider, then `opencode` in a project directory. `opencode run "<prompt>"`
+  runs one prompt without the TUI, and `opencode --help` lists its commands.
+  See the [OpenCode docs](https://opencode.ai/docs/).
 
 ### Terminals and scrollback
 

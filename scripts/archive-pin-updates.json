@@ -229,6 +229,16 @@
         "linux/arm64": "Hack.zip",
         "windows/amd64": "Hack.zip"
       }
+    },
+    "tool.opencode": {
+      "repository": "anomalyco/opencode",
+      "tag": "v{version}",
+      "assets": {
+        "darwin/arm64": "opencode-darwin-arm64.zip",
+        "linux/amd64": "opencode-linux-x64.tar.gz",
+        "linux/arm64": "opencode-linux-arm64.tar.gz",
+        "windows/amd64": "opencode-windows-x64.zip"
+      }
     }
   },
   "manual": {

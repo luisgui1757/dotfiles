@@ -48,6 +48,7 @@ regex|installer/archive-pins.json|github-releases|Kitware/CMake|4
 regex|installer/archive-pins.json|github-releases|OpenWhispr/openwhispr|2
 regex|installer/archive-pins.json|github-releases|PowerShell/PowerShell|1
 regex|installer/archive-pins.json|github-releases|ajeetdsouza/zoxide|4
+regex|installer/archive-pins.json|github-releases|anomalyco/opencode|4
 regex|installer/archive-pins.json|github-releases|astral-sh/python-build-standalone|7
 regex|installer/archive-pins.json|github-releases|atuinsh/atuin|4
 regex|installer/archive-pins.json|github-releases|cli/cli|4

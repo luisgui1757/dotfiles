@@ -222,6 +222,11 @@ in the evidence.
       archive pin from a fresh terminal. Sign in with `muse login` only with
       your own account. Check stays ready after use. Removal keeps the Muse
       sign-in and sessions.
+- [ ] **OpenCode CLI**: select it and confirm `opencode --version` matches its
+      archive pin from a fresh terminal, where `OPENCODE_DISABLE_AUTOUPDATE`
+      is `1`. Sign in with `opencode auth login` only with your own account.
+      Run `opencode service stop`, then Check stays ready. Removal keeps
+      `~/.config/opencode` and the OpenCode sessions.
 - [ ] **Sentinel rules and skills**: select it with at least one agent. Make
       sure that each agent file has the Sentinel block. Each of the 22 skill
       folders must have a `.sentinel-owned` file. Change one line in the block,

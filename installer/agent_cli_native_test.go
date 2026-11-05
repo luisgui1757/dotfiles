@@ -27,7 +27,7 @@ func agentCLIEnvironment(home string) []string {
 	for _, entry := range os.Environ() {
 		key, _, _ := strings.Cut(entry, "=")
 		if strings.HasPrefix(key, "T3CODE_") || strings.HasPrefix(key, "ANTHROPIC_") || strings.HasPrefix(key, "CLAUDE_") || strings.HasPrefix(key, "OPENAI_") || strings.HasPrefix(key, "CODEX_") ||
-			strings.HasPrefix(key, "KIRO_") || strings.HasPrefix(key, "Q_") || strings.HasPrefix(key, "COPILOT_") || strings.HasPrefix(key, "MUSE_") || strings.HasPrefix(key, "META_") || key == "GH_TOKEN" || key == "GITHUB_TOKEN" {
+			strings.HasPrefix(key, "KIRO_") || strings.HasPrefix(key, "Q_") || strings.HasPrefix(key, "COPILOT_") || strings.HasPrefix(key, "MUSE_") || strings.HasPrefix(key, "META_") || strings.HasPrefix(key, "OPENCODE_") || key == "GH_TOKEN" || key == "GITHUB_TOKEN" {
 			continue
 		}
 		environment = append(environment, entry)
@@ -36,7 +36,7 @@ func agentCLIEnvironment(home string) []string {
 	return append(environment, "HOME="+home, "USERPROFILE="+home,
 		"CODEX_HOME="+filepath.Join(home, ".codex"), "CLAUDE_CONFIG_DIR="+filepath.Join(home, ".claude"),
 		"XDG_CONFIG_HOME="+filepath.Join(home, ".config"), "XDG_DATA_HOME="+filepath.Join(home, ".local", "share"),
-		"XDG_STATE_HOME="+filepath.Join(home, ".local", "state"), "DISABLE_UPDATES=1", "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1", "COPILOT_AUTO_UPDATE=false")
+		"XDG_STATE_HOME="+filepath.Join(home, ".local", "state"), "DISABLE_UPDATES=1", "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1", "COPILOT_AUTO_UPDATE=false", "OPENCODE_DISABLE_AUTOUPDATE=1")
 }
 
 func exerciseAgentCLI(t *testing.T, command, product, home string) {
@@ -226,13 +226,16 @@ func TestNativeAgentCLIInstalledApplicationLifecycle(t *testing.T) {
 		}
 		exerciseAgentCLI(t, commands[id], product, home)
 	}
-	agents := []string{"tool.t3", "tool.claude", "tool.codex", "tool.copilot", "tool.muse"}
+	agents := []string{"tool.t3", "tool.claude", "tool.codex", "tool.copilot", "tool.muse", "tool.opencode"}
 	selected := []string{"t3-code", "claude-code", "codex", "copilot-cli"}
 	apply(Request{Schema: 1, Mode: "apply", Selected: selected})
 	commands["copilot"] = exerciseInstalledVersionedCLI(t, d, home, "tool.copilot", "copilot", "Copilot CLI")
 	selected = append(selected, "muse-code")
 	apply(Request{Schema: 1, Mode: "apply", Selected: selected})
 	commands["muse"] = exerciseInstalledVersionedCLI(t, d, home, "tool.muse", "muse", "Muse Code")
+	selected = append(selected, "opencode")
+	apply(Request{Schema: 1, Mode: "apply", Selected: selected})
+	commands["opencode"] = exerciseInstalledVersionedCLI(t, d, home, "tool.opencode", "opencode", "OpenCode")
 	removeShared := []string{"tool.git"}
 	if platform.OS == "windows" {
 		// Copilot's PowerShell 7 prerequisite is shared; this disposable state

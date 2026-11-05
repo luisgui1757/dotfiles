@@ -395,6 +395,17 @@
       "scope": "user"
     },
     {
+      "id": "opencode",
+      "name": "OpenCode CLI",
+      "description": "Standalone terminal coding agent; sign in after installation; managed shells keep its self-update off so Update applies the reviewed version",
+      "capability": true,
+      "category": "AI coding",
+      "requires": [
+        "tool.opencode"
+      ],
+      "scope": "user"
+    },
+    {
       "id": "sentinel",
       "name": "Sentinel rules and skills",
       "description": "The installer of the latest Sentinel release writes the rules and the core, UI, formal and ops skills for each installed coding agent",
@@ -1475,6 +1486,30 @@
         "windows": {
           "provider": "archive",
           "package": "tool.muse"
+        }
+      }
+    },
+    {
+      "id": "tool.opencode",
+      "name": "OpenCode CLI",
+      "requires": [
+        "tool.git",
+        "integration.shells"
+      ],
+      "action": "archive",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.opencode"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.opencode"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.opencode"
         }
       }
     },
