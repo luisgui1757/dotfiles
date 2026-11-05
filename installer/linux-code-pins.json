@@ -2,17 +2,17 @@
   "schema": 1,
   "pins": {
     "amd64": {
-      "version": "1.141.0-1791276758",
-      "url": "https://vscode.download.prss.microsoft.com/dbazure/download/stable/2a59476c9bfcb90b3ddc372c36762471b7dfad1c/code_1.141.0-1791276758_amd64.deb",
-      "sha256": "d0ff4f7702957d897d2e06956f8d42a08250c5df8339de3bec8190e56f726277",
-      "size": 249220234,
+      "version": "1.141.2-1791980535",
+      "url": "https://vscode.download.prss.microsoft.com/dbazure/download/stable/16507d91be0dc1ce4f94c04d4d0430210b8685d9/code_1.141.2-1791980535_amd64.deb",
+      "sha256": "d09b25a39b41b35e514b276ec551f73df4fea9197a14b4f365ca72fb139211cc",
+      "size": 249187782,
       "architecture": "amd64"
     },
     "arm64": {
-      "version": "1.141.0-1791276699",
-      "url": "https://vscode.download.prss.microsoft.com/dbazure/download/stable/2a59476c9bfcb90b3ddc372c36762471b7dfad1c/code_1.141.0-1791276699_arm64.deb",
-      "sha256": "873d5dac55b7cdb4f0af7172187ae3cc1709f6250331524ad41f1136589e62f2",
-      "size": 230777686,
+      "version": "1.141.2-1791980485",
+      "url": "https://vscode.download.prss.microsoft.com/dbazure/download/stable/16507d91be0dc1ce4f94c04d4d0430210b8685d9/code_1.141.2-1791980485_arm64.deb",
+      "sha256": "12b0b8064f85a90772fa4daa62515f3ac0c7e3a19ab0ba37bfb8fea45f8be147",
+      "size": 230795222,
       "architecture": "arm64"
     }
   }

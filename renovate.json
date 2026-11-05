@@ -1,6 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "description": "Renovate owns GitHub Actions, runner labels, Go toolchain/modules and CI validator/tool constants. Installer archive/component/wheel pins, linux-code-pins.json, bootstrap-toolchain.tsv and the Mason registry snapshot are manually reviewed with checksums and runtime proof; adjacent CI download hashes also require review after version bumps. The agent CLI archive pins (Claude Code, Codex, Copilot CLI, Kiro CLI) are instead proposed weekly by .github/workflows/agent-cli-pins.yml for the same review and native checks.",
+  "description": "Renovate owns GitHub Actions, runner labels, Go toolchain/modules and CI validator/tool constants. It also lists new releases of the installer pins, the bootstrap toolchain, the Homebrew script and the Mason snapshot on the dashboard, but never changes them: they need checksum and runtime review. The weekly agent-cli-pins workflow proposes verified archive updates from scripts/archive-pin-updates.json in one PR. Major releases and explicit manual exceptions need manual review.",
   "extends": [
     "config:recommended",
     "helpers:pinGitHubActionDigests",
@@ -154,6 +154,184 @@
       ],
       "datasourceTemplate": "docker",
       "versioningTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "description": "Release tag of each GitHub release download in the archive pins. Renovate only reports it; the weekly pin workflow or a manual PR changes the pin and its checksum.",
+      "managerFilePatterns": [
+        "/^installer/archive-pins\\.json$/"
+      ],
+      "matchStrings": [
+        "\"url\":\\s*\"https://github\\.com/(?<depName>[^/\"]+/[^/\"]+)/releases/download/(?<currentValue>[^/\"]+)/"
+      ],
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "loose"
+    },
+    {
+      "customType": "regex",
+      "description": "Ghostty macOS release in the archive pins. Renovate only reports it.",
+      "managerFilePatterns": [
+        "/^installer/archive-pins\\.json$/"
+      ],
+      "matchStrings": [
+        "release\\.files\\.ghostty\\.org/(?<currentValue>[^/\"]+)/"
+      ],
+      "datasourceTemplate": "github-tags",
+      "depNameTemplate": "ghostty-org/ghostty",
+      "extractVersionTemplate": "^v(?<version>.+)$"
+    },
+    {
+      "customType": "regex",
+      "description": "Python wheel and source package versions in the archive pins. Renovate only reports them.",
+      "managerFilePatterns": [
+        "/^installer/archive-pins\\.json$/"
+      ],
+      "matchStrings": [
+        "files\\.pythonhosted\\.org/packages/[0-9a-f/]+/(?<depName>[A-Za-z0-9_.]+)-(?<currentValue>[0-9][^-\"]*)-[^\"]+\\.whl\"",
+        "files\\.pythonhosted\\.org/packages/[0-9a-f/]+/(?<depName>[A-Za-z0-9_.]+)-(?<currentValue>[0-9][^\"]*)\\.tar\\.gz\""
+      ],
+      "datasourceTemplate": "pypi"
+    },
+    {
+      "customType": "regex",
+      "description": "Node.js release in the archive pins. Renovate only reports it.",
+      "managerFilePatterns": [
+        "/^installer/archive-pins\\.json$/"
+      ],
+      "matchStrings": [
+        "nodejs\\.org/dist/v(?<currentValue>[0-9.]+)/"
+      ],
+      "datasourceTemplate": "node-version",
+      "depNameTemplate": "node",
+      "versioningTemplate": "node"
+    },
+    {
+      "customType": "regex",
+      "description": "Rust compiler release in the archive pins. Renovate only reports it; the components change with it.",
+      "managerFilePatterns": [
+        "/^installer/archive-pins\\.json$/"
+      ],
+      "matchStrings": [
+        "static\\.rust-lang\\.org/dist/[0-9-]+/rustc-(?<currentValue>[0-9.]+)-"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "rust-lang/rust"
+    },
+    {
+      "customType": "regex",
+      "description": "VS Code release in the archive pins and the Linux Code pins. Renovate only reports it.",
+      "managerFilePatterns": [
+        "/^installer/archive-pins\\.json$/",
+        "/^installer/linux-code-pins\\.json$/"
+      ],
+      "matchStrings": [
+        "\"version\":\\s*\"(?<currentValue>[0-9]+\\.[0-9]+\\.[0-9]+)(?:-[0-9]+)?\",\\s*\"url\":\\s*\"https://vscode\\.download\\.prss\\.microsoft\\.com/"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "microsoft/vscode"
+    },
+    {
+      "customType": "regex",
+      "description": "Rose Pine VS Code extension in the archive pins. Renovate only reports it.",
+      "managerFilePatterns": [
+        "/^installer/archive-pins\\.json$/"
+      ],
+      "matchStrings": [
+        "publishers/mvllow/vsextensions/rose-pine/(?<currentValue>[0-9.]+)/vspackage"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "rose-pine/vscode",
+      "extractVersionTemplate": "^v(?<version>.+)$"
+    },
+    {
+      "customType": "regex",
+      "description": "PowerShell Gallery modules in the archive pins. Renovate only reports them.",
+      "managerFilePatterns": [
+        "/^installer/archive-pins\\.json$/"
+      ],
+      "matchStrings": [
+        "www\\.powershellgallery\\.com/api/v2/package/(?<depName>[^/\"]+)/(?<currentValue>[^/\"]+)\""
+      ],
+      "datasourceTemplate": "nuget",
+      "registryUrlTemplate": "https://www.powershellgallery.com/api/v2/"
+    },
+    {
+      "customType": "regex",
+      "description": "GNU Make release that the Windows make build packages. Renovate only reports it.",
+      "managerFilePatterns": [
+        "/^installer/archive-pins\\.json$/"
+      ],
+      "matchStrings": [
+        "ezwinports/make-(?<currentValue>[0-9.]+)-without-guile"
+      ],
+      "datasourceTemplate": "git-tags",
+      "depNameTemplate": "gnu-make",
+      "packageNameTemplate": "https://git.savannah.gnu.org/git/make.git"
+    },
+    {
+      "customType": "regex",
+      "description": "Source commits of the shell and tmux plugin archives. Renovate only reports a newer commit.",
+      "managerFilePatterns": [
+        "/^installer/archive-pins\\.json$/"
+      ],
+      "matchStrings": [
+        "codeload\\.github\\.com/(?<depName>[^/\"]+/[^/\"]+)/tar\\.gz/(?<currentDigest>[0-9a-f]{40})"
+      ],
+      "datasourceTemplate": "git-refs",
+      "currentValueTemplate": "master",
+      "packageNameTemplate": "https://github.com/{{depName}}"
+    },
+    {
+      "customType": "regex",
+      "description": "Tailscale Linux package. Renovate only reports it.",
+      "managerFilePatterns": [
+        "/^installer/linux-package-pins\\.json$/"
+      ],
+      "matchStrings": [
+        "pkgs\\.tailscale\\.com/stable/tailscale_(?<currentValue>[0-9.]+)_"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "tailscale/tailscale",
+      "extractVersionTemplate": "^v(?<version>.+)$"
+    },
+    {
+      "customType": "regex",
+      "description": "Go toolchain that the bootstrap verifies. Renovate only reports it; go.mod and the workflows change with it.",
+      "managerFilePatterns": [
+        "/^installer/bootstrap-toolchain\\.tsv$/"
+      ],
+      "matchStrings": [
+        "(?:^|\\n)go(?<currentValue>[0-9]+\\.[0-9]+\\.[0-9]+)\\t"
+      ],
+      "datasourceTemplate": "golang-version",
+      "depNameTemplate": "go"
+    },
+    {
+      "customType": "regex",
+      "description": "Homebrew install script commit of the macOS bootstrap. Renovate only reports a newer commit.",
+      "managerFilePatterns": [
+        "/^installer/homebrew_bootstrap\\.go$/"
+      ],
+      "matchStrings": [
+        "homebrewBootstrapCommit = \"(?<currentDigest>[0-9a-f]{40})\""
+      ],
+      "datasourceTemplate": "git-refs",
+      "depNameTemplate": "Homebrew/install",
+      "currentValueTemplate": "main",
+      "packageNameTemplate": "https://github.com/Homebrew/install"
+    },
+    {
+      "customType": "regex",
+      "description": "Mason registry snapshot. Renovate only reports a newer registry release.",
+      "managerFilePatterns": [
+        "/^nvim/mason-registry/lock\\.json$/"
+      ],
+      "matchStrings": [
+        "\"version\":\\s*\"(?<currentValue>[^\"]+)\""
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "mason-org/mason-registry",
+      "versioningTemplate": "loose"
     }
   ],
   "packageRules": [
@@ -165,7 +343,11 @@
       "addLabels": [
         "pinned-downloads"
       ],
-      "automerge": false
+      "automerge": false,
+      "matchFileNames": [
+        ".github/workflows/**",
+        "scripts/validate-renovate.sh"
+      ]
     },
     {
       "matchManagers": [
@@ -221,6 +403,42 @@
       ],
       "enabled": false,
       "automerge": false
+    },
+    {
+      "matchFileNames": [
+        "installer/archive-pins.json",
+        "installer/linux-code-pins.json",
+        "installer/linux-package-pins.json",
+        "installer/bootstrap-toolchain.tsv",
+        "installer/homebrew_bootstrap.go",
+        "nvim/mason-registry/lock.json"
+      ],
+      "dependencyDashboardApproval": true,
+      "addLabels": [
+        "pinned-downloads"
+      ],
+      "automerge": false
+    },
+    {
+      "matchFileNames": [
+        "installer/archive-pins.json"
+      ],
+      "matchDepNames": [
+        "jqlang/jq"
+      ],
+      "versioning": "regex:^jq-(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)$",
+      "automerge": false
+    },
+    {
+      "matchFileNames": [
+        "installer/archive-pins.json"
+      ],
+      "matchDepNames": [
+        "xremap/xremap"
+      ],
+      "allowedVersions": "!/^v0\\.16\\.6$/",
+      "automerge": false
     }
-  ]
+  ],
+  "dependencyDashboardHeader": "Pinned downloads (archive pins, Linux package pins, the bootstrap Go toolchain, the Homebrew script and the Mason snapshot) are listed under Pending Approval as notices. Do not approve them here: Renovate cannot verify their checksums. The weekly agent-cli-pins workflow proposes verified updates, and docs/RELEASING.md describes the manual ones."
 }

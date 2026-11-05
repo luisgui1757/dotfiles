@@ -69,7 +69,7 @@ CI has four workflows:
 - `test.yml` runs the configuration tests on Ubuntu, macOS and Windows.
 - `installer-engine.yml` runs the installer core matrix and the native
   lifecycle jobs on disposable GitHub runners.
-- `agent-cli-pins.yml` proposes agent CLI pin updates each week.
+- `agent-cli-pins.yml` proposes verified archive pin updates each week.
 - `release.yml` publishes the version in `release/manifest.json` when a merge
   changes it.
 
@@ -268,5 +268,5 @@ and skills for coding agents.
   fingerprints.
 - Archive and Linux Code DEB pins change only with review and native runtime
   proof. Renovate covers exactly its extraction inventory.
-- The agent CLI pin workflow never merges. Its pull request must pass the
+- The archive pin workflow never merges. Its pull request must pass the
   native checks.

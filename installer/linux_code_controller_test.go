@@ -12,9 +12,6 @@ import (
 	"testing"
 )
 
-// Exercise the real planner, APT driver and desktop/profile publication. Only
-// the native package process and download boundaries use fixtures. Theme/font
-// resources are excluded so this test cannot register a workstation font.
 func linuxCodeControllerFixture(t *testing.T) (*linuxAPTFixture, Controller) {
 	t.Helper()
 	f, _ := linuxCodeFixture(t)
@@ -66,7 +63,6 @@ func TestLinuxCodeControllerUsesPackageDesktopWithoutPrivateLauncher(t *testing.
 
 func TestLinuxCodeVersionChangeDoesNotStrandOwnedRemoval(t *testing.T) {
 	f, c := linuxCodeControllerFixture(t)
-	// Isolate package ownership from the independently tested launcher graph.
 	for i := range c.Catalog.Resources {
 		r := &c.Catalog.Resources[i]
 		if r.ID == "vscode" {
@@ -77,7 +73,7 @@ func TestLinuxCodeVersionChangeDoesNotStrandOwnedRemoval(t *testing.T) {
 	}
 	dispatchApproved(t, c, Request{Schema: 1, Mode: "apply", Selected: []string{"vscode"}})
 	pkg := f.installed["code:amd64"]
-	pkg.Version = "1.142.0-12345"
+	pkg.Version = f.driver.Code.Version + "1"
 	f.installed[pkg.Name] = pkg
 	plan, err := c.Preview(context.Background(), Request{Schema: 1, Mode: "update", Selected: []string{"vscode"}})
 	if err != nil || operation(t, plan, "tool.vscode").Action != "update" {
@@ -136,7 +132,7 @@ func TestLinuxCodeLegacyVersionFingerprintUsesCompletedOperation(t *testing.T) {
 			pkg := f.installed["code:amd64"]
 			switch changed {
 			case "version":
-				pkg.Version = "1.142.0-12345"
+				pkg.Version = f.driver.Code.Version + "1"
 			case "source":
 				pkg.Source = "personal-code"
 			case "manual":

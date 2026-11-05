@@ -269,9 +269,10 @@ Before you update the checkout, finish or abandon an interrupted Sentinel
 operation with the release that started it. Follow [Interruptions and conflicts](#interruptions-and-conflicts).
 
 The Sentinel install of **Update tools** or **Choose tools** hands the files
-over. **Update tools** keeps the old receipts. A later **Choose tools** run
-releases them. After a direct update from v1.0.0, this can take two
-**Choose tools** runs. The handoff has these steps:
+over. After **Update tools**, Check reports the machine as ready. **Update tools**
+keeps the old receipts as records, and a later **Choose tools** run releases
+them. You do not need to start that run. After a direct update from v1.0.0, the
+release can take two **Choose tools** runs. The handoff has these steps:
 
 1. Setup deletes each skill folder that the v1.0.0 receipts list as a dotfiles
    copy. It deletes a folder only when a hash check against the saved journal
@@ -309,7 +310,7 @@ install the app with `winget install T3Tools.T3Code`.
 T3 Code server is the earlier optional selection, never an automatic migration or provider
 replacement. It uses the official standalone package with a browser UI on Apple
 Silicon macOS, Ubuntu/Debian amd64/arm64 and Windows amd64. The fixed stable
-`v0.1.0` pin supplies Orchestrator V2. Finish any pending nightly installation
+`v0.1.6` pin supplies Orchestrator V2. Finish any pending nightly installation
 with its original checkout first; then stop T3, update the checkout and choose
 **Update tools** to replace the managed nightly with stable. Personal
 T3 state stays outside the package; back it up before running a newer server.

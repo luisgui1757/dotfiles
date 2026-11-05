@@ -307,15 +307,21 @@ registry mismatch disables its language-server/formatter setup until repair succ
 The app can add its own `t3` command: open **Settings → About** and choose
 **Install** next to **t3 command**.
 
+Only one T3 server can use a T3 home at a time. The default T3 home is `~/.t3`.
+While `t3` or T3's background service uses the same home, the app shows
+"This T3 home is unavailable" and stops.
+Stop that server first. To remove the background service, run
+`t3 service uninstall`.
+
 **T3 Code server** installs the official standalone `t3` package on all four
 supported targets, for a machine without the app. Run `t3` in a project from a
 fresh terminal. It starts the local server and opens the browser UI. Keep that
 terminal open, and press Ctrl-C to stop the server. Setup adds no Node
 installation and no background service.
 
-The pinned stable **v0.1.0** of the server includes Orchestrator V2. Updates
+The pinned stable **v0.1.6** of the server includes Orchestrator V2. Updates
 follow the stable release pinned by the reviewed checkout.
-[Upstream release](https://github.com/pingdotgg/t3code/releases/tag/v0.1.0).
+[Upstream release](https://github.com/pingdotgg/t3code/releases/tag/v0.1.6).
 
 T3 opens without provider credentials; agent work needs at least one configured,
 authenticated provider. For existing CLI logins, install Codex or Claude Code,
@@ -347,13 +353,12 @@ The installer does not install their desktop apps or change personal models,
 permissions, credentials or sessions. Sign in from the chosen CLI after setup.
 Claude Code's managed shell environment sets `DISABLE_UPDATES=1`; use the
 installer's Update menu to reconcile reviewed pins for either CLI.
-**Keeping the agent CLIs current:** Claude Code, Codex, Copilot CLI and Kiro CLI
-stay pinned, so Update installs exactly the checkout's versions and changes
-nothing until new pins arrive. A weekly workflow checks each vendor's latest
-stable release, verifies its bytes and opens a "Bump agent CLI pins" pull request.
-Merge it after its native checks pass, then run `git pull` and **Update tools** on
-each machine. Opening that pull request needs a GitHub App; see
-[agent CLI pin proposals](docs/security/supply-chain.md#agent-cli-pin-proposals).
+**Keeping pinned tools current:** Update installs the checkout's versions.
+A weekly workflow proposes verified updates for the four agent CLIs and the
+GitHub tools in its update policy, including T3. It opens one grouped PR and
+holds major releases for review. Merge it after its native checks pass, then
+run `git pull` and **Update tools** on each machine. Some pins still need manual
+updates. See [coverage and exceptions](docs/security/supply-chain.md#archive-pin-proposals).
 **GitHub Copilot CLI** uses the pinned standalone build from its official GitHub
 release (one native executable; no npm, Node or install script). On Windows it
 also installs the shared PowerShell 7 it needs. Copilot ignores its `autoUpdate`

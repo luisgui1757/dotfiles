@@ -1,0 +1,263 @@
+{
+  "github": {
+    "tool.fzf": {
+      "repository": "junegunn/fzf",
+      "tag": "v{version}",
+      "assets": {
+        "darwin/arm64": "fzf-{version}-darwin_arm64.tar.gz",
+        "windows/amd64": "fzf-{version}-windows_amd64.zip",
+        "linux/arm64": "fzf-{version}-linux_arm64.tar.gz",
+        "linux/amd64": "fzf-{version}-linux_amd64.tar.gz"
+      }
+    },
+    "tool.fd": {
+      "repository": "sharkdp/fd",
+      "tag": "v{version}",
+      "assets": {
+        "darwin/arm64": "fd-v{version}-aarch64-apple-darwin.tar.gz",
+        "linux/arm64": "fd-v{version}-aarch64-unknown-linux-musl.tar.gz",
+        "windows/amd64": "fd-v{version}-x86_64-pc-windows-msvc.zip",
+        "linux/amd64": "fd-v{version}-x86_64-unknown-linux-musl.tar.gz"
+      }
+    },
+    "tool.lsd": {
+      "repository": "lsd-rs/lsd",
+      "tag": "v{version}",
+      "assets": {
+        "darwin/arm64": "lsd-v{version}-aarch64-apple-darwin.tar.gz",
+        "linux/arm64": "lsd-v{version}-aarch64-unknown-linux-musl.tar.gz",
+        "windows/amd64": "lsd-v{version}-x86_64-pc-windows-msvc.zip",
+        "linux/amd64": "lsd-v{version}-x86_64-unknown-linux-musl.tar.gz"
+      }
+    },
+    "tool.zoxide": {
+      "repository": "ajeetdsouza/zoxide",
+      "tag": "v{version}",
+      "assets": {
+        "darwin/arm64": "zoxide-{version}-aarch64-apple-darwin.tar.gz",
+        "linux/arm64": "zoxide-{version}-aarch64-unknown-linux-musl.tar.gz",
+        "windows/amd64": "zoxide-{version}-x86_64-pc-windows-msvc.zip",
+        "linux/amd64": "zoxide-{version}-x86_64-unknown-linux-musl.tar.gz"
+      }
+    },
+    "tool.atuin": {
+      "repository": "atuinsh/atuin",
+      "tag": "v{version}",
+      "assets": {
+        "darwin/arm64": "atuin-aarch64-apple-darwin.tar.gz",
+        "linux/amd64": "atuin-x86_64-unknown-linux-musl.tar.gz",
+        "linux/arm64": "atuin-aarch64-unknown-linux-musl.tar.gz",
+        "windows/amd64": "atuin-x86_64-pc-windows-msvc.zip"
+      }
+    },
+    "tool.superfile": {
+      "repository": "yorukot/superfile",
+      "tag": "v{version}",
+      "assets": {
+        "darwin/arm64": "superfile-darwin-v{version}-arm64.tar.gz",
+        "linux/amd64": "superfile-linux-v{version}-amd64.tar.gz",
+        "linux/arm64": "superfile-linux-v{version}-arm64.tar.gz",
+        "windows/amd64": "superfile-windows-v{version}-amd64.zip"
+      }
+    },
+    "tool.rg": {
+      "repository": "BurntSushi/ripgrep",
+      "tag": "{version}",
+      "assets": {
+        "darwin/arm64": "ripgrep-{version}-aarch64-apple-darwin.tar.gz",
+        "windows/amd64": "ripgrep-{version}-x86_64-pc-windows-msvc.zip",
+        "linux/amd64": "ripgrep-{version}-x86_64-unknown-linux-musl.tar.gz",
+        "linux/arm64": "ripgrep-{version}-aarch64-unknown-linux-gnu.tar.gz"
+      }
+    },
+    "tool.gh": {
+      "repository": "cli/cli",
+      "tag": "v{version}",
+      "assets": {
+        "darwin/arm64": "gh_{version}_macOS_arm64.zip",
+        "linux/arm64": "gh_{version}_linux_arm64.tar.gz",
+        "windows/amd64": "gh_{version}_windows_amd64.zip",
+        "linux/amd64": "gh_{version}_linux_amd64.tar.gz"
+      }
+    },
+    "tool.lazygit": {
+      "repository": "jesseduffield/lazygit",
+      "tag": "v{version}",
+      "assets": {
+        "darwin/arm64": "lazygit_{version}_darwin_arm64.tar.gz",
+        "linux/arm64": "lazygit_{version}_linux_arm64.tar.gz",
+        "linux/amd64": "lazygit_{version}_linux_x86_64.tar.gz",
+        "windows/amd64": "lazygit_{version}_windows_x86_64.zip"
+      }
+    },
+    "tool.jq": {
+      "repository": "jqlang/jq",
+      "tag": "jq-{version}",
+      "assets": {
+        "darwin/arm64": "jq-macos-arm64",
+        "linux/amd64": "jq-linux-amd64",
+        "linux/arm64": "jq-linux-arm64",
+        "windows/amd64": "jq-windows-amd64.exe"
+      }
+    },
+    "tool.hyperfine": {
+      "repository": "sharkdp/hyperfine",
+      "tag": "v{version}",
+      "assets": {
+        "darwin/arm64": "hyperfine-v{version}-aarch64-apple-darwin.tar.gz",
+        "linux/amd64": "hyperfine-v{version}-x86_64-unknown-linux-musl.tar.gz",
+        "linux/arm64": "hyperfine-v{version}-aarch64-unknown-linux-gnu.tar.gz",
+        "windows/amd64": "hyperfine-v{version}-x86_64-pc-windows-msvc.zip"
+      }
+    },
+    "tool.powershell": {
+      "repository": "PowerShell/PowerShell",
+      "tag": "v{version}",
+      "assets": {
+        "windows/amd64": "PowerShell-{version}-win-x64.zip"
+      }
+    },
+    "tool.gh-dash": {
+      "repository": "dlvhdr/gh-dash",
+      "tag": "v{version}",
+      "assets": {
+        "darwin/arm64": "gh-dash_v{version}_darwin-arm64",
+        "linux/amd64": "gh-dash_v{version}_linux-amd64",
+        "linux/arm64": "gh-dash_v{version}_linux-arm64",
+        "windows/amd64": "gh-dash_v{version}_windows-amd64.exe"
+      }
+    },
+    "tool.shellcheck": {
+      "repository": "koalaman/shellcheck",
+      "tag": "v{version}",
+      "assets": {
+        "darwin/arm64": "shellcheck-v{version}.darwin.aarch64.tar.gz",
+        "linux/amd64": "shellcheck-v{version}.linux.x86_64.tar.gz",
+        "linux/arm64": "shellcheck-v{version}.linux.aarch64.tar.gz",
+        "windows/amd64": "shellcheck-v{version}.zip"
+      }
+    },
+    "tool.taplo": {
+      "repository": "tamasfe/taplo",
+      "tag": "{version}",
+      "assets": {
+        "darwin/arm64": "taplo-darwin-aarch64.gz",
+        "linux/amd64": "taplo-linux-x86_64.gz",
+        "linux/arm64": "taplo-linux-aarch64.gz",
+        "windows/amd64": "taplo-windows-x86_64.gz"
+      }
+    },
+    "tool.cmake": {
+      "repository": "Kitware/CMake",
+      "tag": "v{version}",
+      "assets": {
+        "darwin/arm64": "cmake-{version}-macos-universal.tar.gz",
+        "linux/amd64": "cmake-{version}-linux-x86_64.tar.gz",
+        "linux/arm64": "cmake-{version}-linux-aarch64.tar.gz",
+        "windows/amd64": "cmake-{version}-windows-x86_64.zip"
+      }
+    },
+    "tool.herdr": {
+      "repository": "herdrdev/herdr",
+      "tag": "v{version}",
+      "assets": {
+        "darwin/arm64": "herdr-macos-aarch64",
+        "linux/amd64": "herdr-linux-x86_64",
+        "linux/arm64": "herdr-linux-aarch64",
+        "windows/amd64": "herdr-windows-x86_64.zip"
+      }
+    },
+    "tool.editorconfig": {
+      "repository": "editorconfig-checker/editorconfig-checker",
+      "tag": "v{version}",
+      "assets": {
+        "darwin/arm64": "editorconfig-checker-darwin-all.tar.gz",
+        "linux/amd64": "editorconfig-checker-linux-amd64.tar.gz",
+        "linux/arm64": "editorconfig-checker-linux-arm64.tar.gz",
+        "windows/amd64": "editorconfig-checker-windows-amd64.zip"
+      }
+    },
+    "tool.clipboard": {
+      "repository": "equalsraf/win32yank",
+      "tag": "v{version}",
+      "assets": {
+        "windows/amd64": "win32yank-x64.zip"
+      }
+    },
+    "tool.windows-terminal": {
+      "repository": "microsoft/terminal",
+      "tag": "v{version}",
+      "assets": {
+        "windows/amd64": "Microsoft.WindowsTerminal_{version}_x64.zip"
+      }
+    },
+    "tool.obsidian-portable": {
+      "repository": "obsidianmd/obsidian-releases",
+      "tag": "v{version}",
+      "assets": {
+        "linux/amd64": "obsidian-{version}.tar.gz",
+        "linux/arm64": "obsidian-{version}-arm64.tar.gz"
+      }
+    },
+    "tool.xremap": {
+      "repository": "xremap/xremap",
+      "tag": "v{version}",
+      "assets": {
+        "linux/amd64": "xremap-linux-x86_64-full.zip",
+        "linux/arm64": "xremap-linux-aarch64-full.zip"
+      },
+      "ignore": [
+        "v0.16.6"
+      ]
+    },
+    "tool.t3": {
+      "repository": "pingdotgg/t3code",
+      "tag": "v{version}",
+      "assets": {
+        "darwin/arm64": "t3-{version}-darwin-arm64.tar.gz",
+        "linux/amd64": "t3-{version}-linux-x64.tar.gz",
+        "linux/arm64": "t3-{version}-linux-arm64.tar.gz",
+        "windows/amd64": "t3-{version}-win32-x64.zip"
+      }
+    },
+    "font.hack": {
+      "repository": "ryanoasis/nerd-fonts",
+      "tag": "v{version}",
+      "assets": {
+        "darwin/arm64": "Hack.zip",
+        "linux/amd64": "Hack.zip",
+        "linux/arm64": "Hack.zip",
+        "windows/amd64": "Hack.zip"
+      }
+    }
+  },
+  "manual": {
+    "tool.starship": "Its CI version and checksum must change with the archive pins.",
+    "tool.nvim": "Its CI version and checksum must change with the archive pins.",
+    "tool.tree-sitter": "Its CI version and checksum must change with the archive pins.",
+    "plugin.fzf-tab": "Commit archives need a source revision review.",
+    "plugin.zsh-autosuggestions": "Commit archives need a source revision review.",
+    "tmux.sensible": "Commit archives need a source revision review.",
+    "tmux.yank": "Commit archives need a source revision review.",
+    "tmux.resurrect": "Commit archives need a source revision review.",
+    "tmux.continuum": "Commit archives need a source revision review.",
+    "powershell.psfzf": "PowerShell Gallery needs a package verification recipe.",
+    "tool.node": "Node release checksums and the npm source replacement need review.",
+    "tool.python": "Build dates and Python ABI wheel pins must change together.",
+    "tool.rust": "The compiler, nested components and source archives must change together.",
+    "tool.latex2text": "The source package and nested build backend need a PyPI recipe.",
+    "tool.git": "The Windows self-extracting archive needs a release and layout recipe.",
+    "tool.make": "SourceForge needs a publisher checksum recipe.",
+    "tool.yamllint": "The package and nested Python wheels need a PyPI recipe.",
+    "tool.ghostty": "macOS and Linux use different publishers and archive layouts.",
+    "tool.aerospace": "The publisher uses beta release tags.",
+    "tool.vscode": "Windows paths include the build commit; Linux DEBs must change too.",
+    "vscode.rose-pine": "The Marketplace extension needs a package verification recipe.",
+    "tool.obsidian": "The macOS disk image needs native layout verification.",
+    "tool.t3-code-app": "DEB layout verification must account for the generated launcher.",
+    "tool.zen": "Beta tags, disk images and generated profile wrappers need a recipe.",
+    "tool.clang-format": "The PyPI wheel contains paths that depend on its version.",
+    "tool.gersemi": "The Windows formatter version must match the Mason registry snapshot.",
+    "tool.openwhispr": "Its latest release, 1.11.0, exceeds the installer's 512 MiB download limit on Linux."
+  }
+}
