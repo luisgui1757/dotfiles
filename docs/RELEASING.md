@@ -111,8 +111,8 @@ chooses Update tools.
 
 - Re-run the failed run of the release workflow. A re-run keeps the tag, a
   first-attempt push or exact-tag run that passed or still runs, and the draft.
-  It starts a new exact-tag run only when no such run exists. Do not re-run the
-  push run. The release accepts only a first attempt.
+  It starts a new exact-tag run only when no such run exists. A re-run push run
+  does not count, so the release then starts an exact-tag run.
 - Never move or delete a release tag. A tag that exists must peel to the merge
   commit.
 - When the code of a version cannot pass, merge the fix with a newer version.

@@ -369,10 +369,13 @@ def select_release_run(manifest: dict[str, Any], tag: str, expected_sha: str) ->
         ))
 
     pushed = passed_or_running(runs("push", "main"))
-    if pushed and passes(pushed["databaseId"]):
+    if pushed:
+        watched = passes(pushed["databaseId"])
         record = view(pushed["databaseId"])
-        if record.get("attempt") == 1 and record.get("conclusion") == "success":
+        if record.get("attempt") == 1 and watched:
             return verified_release_run(record, pushed["databaseId"], "push", "main", expected_sha)
+        if record.get("attempt") == 1 and record.get("status") != "completed":
+            fail(f"the watch of push run {pushed['databaseId']} stopped while the run still runs. Re-run the release workflow.")
     existing = runs("workflow_dispatch", tag)
     reused = passed_or_running(existing)
     if reused:

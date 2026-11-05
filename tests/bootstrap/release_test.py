@@ -248,12 +248,16 @@ class ReleaseTests(unittest.TestCase):
         self.assertEqual(select([], pushes=[push_run(2, status="in_progress", conclusion="")]),
                          ((2, "push"), [["gh", "run", "watch", "2"]]))
         self.assertEqual(select([[], [native_run(20, status="queued", conclusion="")]],
-                                pushes=[push_run(3, status="in_progress", conclusion="")], failing_watches={3}),
+                                pushes=[push_run(3, status="in_progress", conclusion="")], failing_watches={3},
+                                viewed={3: push_run(3, conclusion="cancelled")}),
                          ((20, "workflow_dispatch"), [["gh", "run", "watch", "3"], ["gh", "workflow", "run"],
                                                       ["gh", "run", "watch", "20"]]))
         self.assertEqual(select([[native_run(22)]], pushes=[push_run(7, status="in_progress", conclusion="")],
-                                failing_watches={7}),
+                                failing_watches={7}, viewed={7: push_run(7, conclusion="failure")}),
                          ((22, "workflow_dispatch"), [["gh", "run", "watch", "7"], ["gh", "run", "watch", "22"]]))
+        with self.assertRaisesRegex(release.ReleaseError, "Re-run the release workflow"):
+            select([], pushes=[push_run(9, status="in_progress", conclusion="")], failing_watches={9},
+                   viewed={9: push_run(9, status="in_progress", conclusion="")})
         self.assertEqual(select([[native_run(23)]], pushes=[push_run(8, status="in_progress", conclusion="")],
                                 viewed={8: push_run(8, attempt=2)}),
                          ((23, "workflow_dispatch"), [["gh", "run", "watch", "8"], ["gh", "run", "watch", "23"]]))
