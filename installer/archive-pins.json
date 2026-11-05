@@ -2899,6 +2899,60 @@
         "libc": "glibc"
       }
     },
+    "tool.muse": {
+      "darwin/arm64": {
+        "version": "1.4.14-R7309.1",
+        "url": "https://lookaside.facebook.com/lookaside/muse/download/?channel=muse&version=1.4.14-R7309.1&file=muse-aarch64-macos",
+        "sha256": "1c96114408acbeade9a8fb79e3b4425e5b64d50425938568aef01bdc04ce2e03",
+        "format": "file",
+        "commands": {
+          "muse": "muse"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "file": "muse"
+      },
+      "linux/amd64": {
+        "version": "1.4.14-R7309.1",
+        "url": "https://lookaside.facebook.com/lookaside/muse/download/?channel=muse&version=1.4.14-R7309.1&file=muse-x86-linux",
+        "sha256": "0809aac7cb58d18f5022b6d05e02aa1974683c0ec430e5f04d25b60ed17de2da",
+        "format": "file",
+        "commands": {
+          "muse": "muse"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "file": "muse"
+      },
+      "linux/arm64": {
+        "version": "1.4.14-R7309.1",
+        "url": "https://lookaside.facebook.com/lookaside/muse/download/?channel=muse&version=1.4.14-R7309.1&file=muse-aarch64-linux",
+        "sha256": "3dc39b8fa26f9963cc2038f2966c0932ed5a39f0f9efb39cc0266a261cbbcf76",
+        "format": "file",
+        "commands": {
+          "muse": "muse"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "file": "muse"
+      },
+      "windows/amd64": {
+        "version": "1.4.14-R7309.1",
+        "url": "https://lookaside.facebook.com/lookaside/muse/download/?channel=muse&version=1.4.14-R7309.1&file=muse-x86-windows.exe",
+        "sha256": "20d18c426cc26e9e4b3cc07008ec07ec97e12e466a2be8cd2797b2e0e2018382",
+        "format": "file",
+        "commands": {
+          "muse": "muse.exe"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "file": "muse.exe"
+      }
+    },
     "tool.copilot": {
       "darwin/arm64": {
         "version": "1.0.105",

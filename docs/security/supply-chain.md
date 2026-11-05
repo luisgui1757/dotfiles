@@ -88,7 +88,7 @@ install stops. The native tests build the command with the
 ## Archive pin proposals
 
 The weekly [pin workflow](../../.github/workflows/agent-cli-pins.yml) opens one
-grouped PR. It updates the four agent CLIs and the GitHub tools listed in
+grouped PR. It updates the five agent CLIs and the GitHub tools listed in
 [the update policy](../../scripts/archive-pin-updates.json), including T3.
 Each GitHub recipe names the repository, release tag and asset for every target.
 The script verifies each download against the published SHA-256 and checks the
@@ -97,12 +97,14 @@ checksum mismatch, download above 512 MiB or changed layout fails that tool
 and the workflow.
 Other verified updates can still reach the grouped PR.
 
-The four agent CLIs keep their vendor checks:
+The five agent CLIs keep their vendor checks:
 
 - Claude: the signed release manifest and the npm SHA-512
 - Codex: the npm SHA-512
 - Copilot: the release digest and `SHA256SUMS.txt`
 - Kiro: the release manifest and the Linux ZIP layout
+- Muse Code: the `muse-stable` channel and the size and SHA-256 in its release
+  manifest
 
 The Claude release key fingerprint is `31DDDE24DDFAB679F42D7BD2BAA929FF1A7ECACE`.
 

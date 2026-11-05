@@ -62,16 +62,16 @@ func exerciseInstalledKiroCLI(t *testing.T, d *NativeDriver, home string, witnes
 	return commands["kiro-cli"]
 }
 
-// exerciseInstalledCopilotCLI runs the pinned Copilot CLI without credentials,
-// with the managed shell's COPILOT_AUTO_UPDATE=false, and returns its
-// entrypoint. The caller's Check proves the payload unchanged after use.
-func exerciseInstalledCopilotCLI(t *testing.T, d *NativeDriver, home string) string {
+// exerciseInstalledVersionedCLI runs a pinned agent CLI without credentials,
+// with the managed shell environment, and returns its entrypoint. The
+// caller's Check proves the payload unchanged after use.
+func exerciseInstalledVersionedCLI(t *testing.T, d *NativeDriver, home, resource, name, product string) string {
 	t.Helper()
-	pin, ok := d.Archives.Pins["tool.copilot"]
+	pin, ok := d.Archives.Pins[resource]
 	if !ok {
-		t.Fatal("native runner has no Copilot CLI artifact")
+		t.Fatal("native runner has no artifact for", product)
 	}
-	command, err := d.Archives.CommandPath("tool.copilot", "copilot")
+	command, err := d.Archives.CommandPath(resource, name)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,7 +81,7 @@ func exerciseInstalledCopilotCLI(t *testing.T, d *NativeDriver, home string) str
 	cmd.Dir, cmd.Env, cmd.WaitDelay = home, agentCLIEnvironment(home), 2*time.Second
 	output, err := agentCLIOutput(ctx, cmd)
 	if err != nil || !strings.Contains(string(output), pin.Version) {
-		t.Fatalf("pinned Copilot CLI did not run from its private payload: %v\n%s", err, output)
+		t.Fatalf("pinned %s did not run from its private payload: %v\n%s", product, err, output)
 	}
 	return command
 }

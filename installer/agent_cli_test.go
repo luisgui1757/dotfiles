@@ -90,7 +90,7 @@ func TestAgentCLIsAreIndependentNativeSelections(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, target := range []Context{{OS: "darwin", Arch: "arm64"}, linux, {OS: "linux", Arch: "arm64"}, {OS: "windows", Arch: "amd64"}} {
-		for capability, command := range map[string]string{"t3-code": "t3", "claude-code": "claude", "codex": "codex"} {
+		for capability, command := range map[string]string{"t3-code": "t3", "claude-code": "claude", "codex": "codex", "muse-code": "muse"} {
 			t.Run(target.OS+"/"+target.Arch+"/"+capability, func(t *testing.T) {
 				closure, err := catalog.Closure([]string{capability}, target)
 				if err != nil {

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Propose verified archive pin updates without major version changes.
 
-Claude Code, Codex, GitHub Copilot CLI and Kiro CLI move quickly, so a weekly
+Claude Code, Codex, GitHub Copilot CLI, Kiro CLI and Muse Code move quickly, so a weekly
 workflow runs this script and proposes the result as a pull request. Every
 pinned byte is verified the same way the reviewed pins were prepared:
 
@@ -17,6 +17,9 @@ pinned byte is verified the same way the reviewed pins were prepared:
   release manifest (no versioned manifest exists, so the current one is read at
   bump time and the pin records the fixed-version URL). Linux ZIPs keep their
   layout.
+- Muse Code: the muse-stable channel names a version and its manifest. Each
+  file must match the size and SHA-256 in that manifest. The manifest and the
+  files use fixed-version URLs, so the pin records them directly.
 
 Only version, URL and SHA-256 change; any other layout change fails that tool
 for manual review.
@@ -46,7 +49,7 @@ import zipfile
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 PINS = ROOT / "installer" / "archive-pins.json"
-AGENT_TOOLS = ("tool.claude", "tool.codex", "tool.copilot", "tool.kiro")
+AGENT_TOOLS = ("tool.claude", "tool.codex", "tool.copilot", "tool.kiro", "tool.muse")
 POLICY = ROOT / "scripts" / "archive-pin-updates.json"
 STABLE = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+(?:\.[0-9]+)?")
 CLAUDE_RELEASES = "https://downloads.claude.ai/claude-code-releases"
@@ -59,6 +62,11 @@ COPILOT_ASSETS = {"darwin/arm64": "copilot-darwin-arm64.tar.gz", "linux/amd64": 
 KIRO_BASE = "https://prod.download.cli.kiro.dev/stable/"
 KIRO_FILES = {"darwin/arm64": "Kiro CLI.dmg", "linux/amd64": "kirocli-x86_64-linux.zip",
               "linux/arm64": "kirocli-aarch64-linux.zip"}
+MUSE_CHANNEL = "https://api.meta.ai/muse-code/channels/muse-stable"
+MUSE_BASE = "https://lookaside.facebook.com/lookaside/muse/download/?channel=muse&version={version}&file={file}"
+MUSE_VERSION = re.compile(r"([0-9]+)\.([0-9]+)\.([0-9]+)-R([0-9]+)\.([0-9]+)")
+MUSE_FILES = {"darwin/arm64": ("aarch64_macos", "muse-aarch64-macos"), "linux/amd64": ("x86_linux", "muse-x86-linux"),
+              "linux/arm64": ("aarch64_linux", "muse-aarch64-linux"), "windows/amd64": ("x86_windows", "muse-x86-windows.exe")}
 MAX_DOWNLOAD = 512 << 20
 
 
@@ -117,10 +125,19 @@ def require_stable(tool: str, version: str) -> str:
     return version
 
 
+def release_key(tool: str, version: str) -> tuple:
+    if tool == "tool.muse":
+        match = MUSE_VERSION.fullmatch(version or "")
+        if not match:
+            raise BumpError(f"{tool} latest stable version {version!r} is not a Muse release version")
+        return tuple(map(int, match.groups()))
+    return tuple(map(int, require_stable(tool, version).split(".")))
+
+
 def check_version(tool: str, pins: dict, version: str) -> None:
-    proposed = tuple(map(int, require_stable(tool, version).split(".")))
+    proposed = release_key(tool, version)
     current = {pin["version"] for pin in pins[tool].values()}
-    previous = [tuple(map(int, require_stable(tool, item).split("."))) for item in current]
+    previous = [release_key(tool, item) for item in current]
     if any(proposed < item for item in previous):
         raise BumpError(f"{version} would downgrade a pinned target")
     if any(proposed[0] != item[0] for item in previous):
@@ -391,7 +408,31 @@ def kiro(network, pins: dict, work: pathlib.Path):
     return version, updates
 
 
-BUMPERS = {"tool.claude": claude, "tool.codex": codex, "tool.copilot": copilot, "tool.kiro": kiro}
+def muse(network, pins: dict, work: pathlib.Path):
+    channel = network.json(MUSE_CHANNEL)
+    if channel.get("channel") != "muse-stable" or channel.get("state") != "public":
+        raise BumpError("Muse Code channel is not the public muse-stable channel")
+    version = channel.get("version", "")
+    check_version("tool.muse", pins, version)
+    if channel.get("manifest_url") != MUSE_BASE.format(version=version, file="manifest.json"):
+        raise BumpError("Muse Code channel names an unexpected manifest URL")
+    manifest = network.json(channel["manifest_url"])
+    if manifest.get("version") != version or manifest.get("checksum_algorithm") != "sha256":
+        raise BumpError("Muse Code manifest names another version or checksum")
+    updates = {}
+    for target, (platform, name) in MUSE_FILES.items():
+        artifact = manifest.get("artifacts", {}).get(platform) or {}
+        url = MUSE_BASE.format(version=version, file=name)
+        if artifact.get("url") != url or not re.fullmatch(r"[0-9a-f]{64}", artifact.get("checksum", "")):
+            raise BumpError(f"Muse Code {name} is missing from the {version} manifest")
+        result = network.download(url, work / name)
+        if result["sha256"] != artifact["checksum"] or result["size"] != artifact.get("size"):
+            raise BumpError(f"Muse Code {name} does not match its release manifest")
+        updates[target] = {"version": version, "url": url, "sha256": result["sha256"]}
+    return version, updates
+
+
+BUMPERS = {"tool.claude": claude, "tool.codex": codex, "tool.copilot": copilot, "tool.kiro": kiro, "tool.muse": muse}
 
 
 def apply_updates(pins: dict, tool: str, updates: dict) -> None:
