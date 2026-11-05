@@ -229,6 +229,11 @@ now named **T3 Code server**. A saved selection keeps the server and does not
 add the app. To add the app, tick **T3 Code** in **Choose tools**. On Windows,
 install the app with `winget install T3Tools.T3Code`.
 
+Both T3 selections now set some T3 settings and the Rosé Pine Moon theme. The
+README lists them. When `~/.t3/userdata/settings.json` exists, **Update tools**
+shows `integration.t3-code` for adoption. Adopt it to apply the settings. Your
+other settings stay.
+
 T3 Code server is the earlier optional selection, never an automatic migration or provider
 replacement. It uses the official standalone package with a browser UI on Apple
 Silicon macOS, Ubuntu/Debian amd64/arm64 and Windows amd64. The fixed stable
@@ -242,7 +247,8 @@ to run agents. Existing Codex/Claude CLI logins are supported; T3's Connect with
 ChatGPT can instead install its own managed Codex runtime. Codex and Claude Code
 remain independent installer choices. Stop T3 before Update, Repair or Remove. No service or authentication is
 configured. Existing binaries and personal `~/.t3`/`T3CODE_HOME`, conversations,
-settings, credentials and project data are not adopted or removed. Use the
+credentials, project data and the settings that setup does not own are not
+adopted or removed. Use the
 installer's lifecycle for its private package; T3's own install/update/uninstall
 commands manage a different installation layout.
 

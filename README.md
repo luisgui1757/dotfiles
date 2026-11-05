@@ -322,6 +322,34 @@ The pinned stable **v0.1.7** of the server includes Orchestrator V2. Updates
 follow the stable release pinned by the reviewed checkout.
 [Upstream release](https://github.com/pingdotgg/t3code/releases/tag/v0.1.7).
 
+Both T3 selections set these fields in `~/.t3/userdata/settings.json`. Setup
+uses `~/.t3` also when `T3CODE_HOME` names another folder.
+
+| Setting in T3 | Field | Value |
+|---|---|---|
+| Worktrees → Delete worktrees with deleted threads and Delete merged worktrees | `storageCleanup` | on |
+| Threads → Workspace | `defaultThreadEnvMode` | New worktree |
+| Worktrees → Worktree branch naming | `branchNamingMode` | Semantic prefix |
+| Source control → Default merge method | `pullRequestMergeMethod` | Squash and merge |
+| Source control → Remove agent credits when merging | `removeAgentCreditsOnMerge` | on |
+| Threads → Auto-settle merged threads and inactive threads | `sidebarAutoSettleOnMerge`, `sidebarAutoSettleAfterDays` | off |
+| Threads → Resume after usage limits | `autoResumeLimitedThreads` | on |
+| Idle thread compaction | `idleCompaction` | on return |
+| Provider update checks | `enableProviderUpdateChecks` | off |
+| Environment theme | `defaultTheme` | `rose-pine-moon` |
+
+Setup also writes the Rosé Pine Moon theme to
+`~/.t3/userdata/themes/rose-pine-moon.json`. Each T3 client changes to it one
+time. A theme that you select later in a client stays. The theme comes from the
+`mvllow.rose-pine` 2.15.2 extension, under the
+[MIT license](LICENSES/rose-pine-vscode-MIT.txt).
+
+Setup owns only these fields. Models, favorites, providers, credentials and all
+other settings stay personal. When an owned field has another value, setup shows
+it for explicit adoption, and removal restores it. When you change an owned
+setting in T3, Check reports it, and Update does not change it. Adopt it again to
+restore the value of dotfiles.
+
 T3 opens without provider credentials; agent work needs at least one configured,
 authenticated provider. For existing CLI logins, install Codex or Claude Code,
 authenticate it yourself and enable it in **Settings → Providers**. Both are
@@ -333,8 +361,9 @@ Codex here. The installer does not configure authentication. See
 T3 owns provider discovery and orchestration. Use the installer's **Update tools**
 and **Choose tools** for the managed package. Stop T3 before changing its installation.
 An unchanged pin stays unchanged; a no-op update is not a version upgrade.
-Existing T3 installations and `~/.t3` (or your `T3CODE_HOME`), settings, credentials,
-conversations and project files remain personal and survive removal. The managed
+Existing T3 installations and `~/.t3` (or your `T3CODE_HOME`), credentials,
+conversations, project files and the settings that setup does not own remain
+personal and survive removal. The managed
 command takes precedence in configured shells without deleting outside copies.
 Before first V2 use with an existing T3 home, stop T3 and back up `~/.t3/userdata`
 (or your custom home). T3 copies V1 history once into its V2 database; later
@@ -1105,14 +1134,14 @@ successful local checks do not establish current live GitHub settings.
 | `nvim/`, `tmux/`, `herdr/` | Editor and multiplexer configuration |
 | `installer/shells/` | Active shell integration recipes |
 | `ghostty/`, `windows-terminal/`, `aerospace/`, `xremap/`, `xcompose/` | Desktop configuration |
-| `git/`, `lazygit/config.yml`, `gh-dash/`, `starship/`, `lsd/`, `atuin/`, `superfile/` | Tool configuration |
+| `git/`, `lazygit/config.yml`, `gh-dash/`, `starship/`, `lsd/`, `atuin/`, `superfile/`, `t3/` | Tool configuration |
 | `tests/`, `.github/workflows/` | Local and native verification |
 | `docs/` | Upgrade, release and security guides, and release notes |
 
 ## License
 
-See [LICENSE](LICENSE). Pinned tool artifacts and the Mason registry snapshot
-keep their own licenses.
+See [LICENSE](LICENSE). Pinned tool artifacts, the Mason registry snapshot and
+the Rosé Pine Moon theme for T3 keep their own licenses.
 
 
 ## Acceptance coverage
