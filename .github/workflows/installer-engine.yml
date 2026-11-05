@@ -130,7 +130,7 @@ jobs:
           DOTFILES_TEST_ARCHIVES: '1'
           DOTFILES_TEST_PUBLIC_WINDOWS: '1'
         run: go test -v -count=1 -timeout 20m -run '^TestNativeArchive' ./...
-      - name: Install, check and remove the pinned Sentinel commit, and hand over from v1.0.0
+      - name: Install, check and remove the pinned Sentinel commit
         if: ${{ !cancelled() && runner.os == 'Linux' }}
         env:
           DOTFILES_TEST_SENTINEL: '1'
@@ -275,12 +275,6 @@ jobs:
         run: go test -v -count=1 -timeout 15m -run '^TestNativeLinuxCodeDEBLifecycle$' .
       - name: Install, render, check and remove native fonts
         run: go test -v -count=1 -timeout 12m -run '^TestNativeFontInstallConsumeRemove$' .
-      - name: Remove an earlier private Obsidian Flatpak and move to the portable build
-        if: runner.os == 'Linux'
-        env:
-          DOTFILES_TEST_NATIVE_PACKAGES: '1'
-          DOTFILES_TEST_FLATPAK: '1'
-        run: dbus-run-session -- go test -v -count=1 -timeout 25m -run '^TestNativeFlatpakApplicationLifecycle$' .
       - name: Consume scoped Windows Terminal settings and verify removal
         if: runner.os == 'Windows'
         env:

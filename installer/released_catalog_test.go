@@ -16,7 +16,12 @@ func TestEachResourceOfAReleaseStaysInTheCatalog(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	floor := false
 	for _, tag := range strings.Fields(string(tags)) {
+		floor = floor || tag == supportFloor
+		if sentinelOlder(tag, supportFloor) {
+			continue
+		}
 		data, err := exec.Command("git", "show", tag+":installer/resources.json").Output()
 		if err != nil {
 			t.Fatal(tag, err)
@@ -30,9 +35,14 @@ func TestEachResourceOfAReleaseStaysInTheCatalog(t *testing.T) {
 			t.Fatal(tag, err)
 		}
 		for _, r := range released.Resources {
-			if _, known := catalog.Resource(r.ID); !known && retiredCapabilities[r.ID] == "" {
-				t.Errorf("%s can record %s, and this catalog does not know it", tag, r.ID)
+			if _, retired := retiredResources[r.ID]; !retired && retiredCapabilities[r.ID] == "" {
+				if _, known := catalog.Resource(r.ID); !known {
+					t.Errorf("%s can record %s, and this catalog does not know it", tag, r.ID)
+				}
 			}
 		}
+	}
+	if !floor {
+		t.Fatal("the release tag", supportFloor, "is required: run git fetch --tags")
 	}
 }

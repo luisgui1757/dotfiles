@@ -112,8 +112,6 @@ func configureLinuxAPT(location *LinuxAPTLocation, catalog *Catalog, session *na
 				return nil, fmt.Errorf("%s lacks its reviewed native package", resource.ID)
 			}
 			check = []string{location.Dpkg, "--verify", binding.Package}
-		case "flatpak":
-			check = []string{"/usr/bin/flatpak", "--version"}
 		case "xz-utils":
 			check = []string{"/usr/bin/xz", "--version"}
 		case "code":

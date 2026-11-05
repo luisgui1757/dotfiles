@@ -1625,13 +1625,6 @@
       ]
     },
     {
-      "id": "integration.vscode",
-      "name": "Earlier VS Code theme/settings (recovery only)",
-      "action": "profile",
-      "scope": "user",
-      "replaced_by": "integration.vscode-managed"
-    },
-    {
       "id": "integration.vscode-managed",
       "name": "VS Code theme, fonts and update policy (may sync to other machines)",
       "requires": [
@@ -1832,14 +1825,6 @@
       ],
       "action": "profile",
       "scope": "user"
-    },
-    {
-      "id": "config.git",
-      "replaced_by": "integration.git",
-      "name": "Legacy whole-file Git configuration (recovery only)",
-      "action": "config",
-      "scope": "user",
-      "description": "Historical whole-file mapping retained for recovery. Remove an owned Git selection through setup before migration; new selections use scoped defaults."
     },
     {
       "id": "config.lazygit",
@@ -2479,8 +2464,7 @@
       "id": "tool.obsidian",
       "name": "Obsidian",
       "platforms": [
-        "darwin",
-        "linux"
+        "darwin"
       ],
       "action": "obsidian",
       "scope": "user",
@@ -2488,16 +2472,7 @@
         "darwin": {
           "provider": "archive",
           "package": "tool.obsidian"
-        },
-        "linux": {
-          "provider": "flatpak",
-          "package": "md.obsidian.Obsidian"
         }
-      },
-      "platform_requires": {
-        "linux": [
-          "tool.flatpak"
-        ]
       }
     },
     {
@@ -2604,16 +2579,11 @@
       "id": "tool.zen",
       "name": "Zen Browser",
       "platforms": [
-        "darwin",
         "linux"
       ],
       "action": "zen",
       "scope": "user",
       "bindings": {
-        "darwin": {
-          "provider": "archive",
-          "package": "tool.zen"
-        },
         "linux": {
           "provider": "archive",
           "package": "tool.zen"
@@ -2636,7 +2606,6 @@
       "id": "desktop.zen",
       "name": "Zen Browser launcher",
       "platforms": [
-        "darwin",
         "linux"
       ],
       "requires": [
@@ -2812,23 +2781,6 @@
         "linux": {
           "provider": "apt",
           "package": "libstdc++6"
-        }
-      }
-    },
-    {
-      "id": "tool.flatpak",
-      "name": "Flatpak infrastructure",
-      "description": "Native Flatpak and its runtimes are retained; existing installations are untouched.",
-      "platforms": [
-        "linux"
-      ],
-      "action": "package",
-      "scope": "machine",
-      "retain": true,
-      "bindings": {
-        "linux": {
-          "provider": "apt",
-          "package": "flatpak"
         }
       }
     },

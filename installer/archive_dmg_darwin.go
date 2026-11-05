@@ -12,7 +12,7 @@ import (
 
 // Mount only the checksum-verified private input, read one declared application
 // through the bounded tar extractor, and detach the exact private mount point.
-func readDMGArchive(ctx context.Context, file *os.File, bundle string, revision int, readTar func(io.Reader) error) (result error) {
+func readDMGArchive(ctx context.Context, file *os.File, bundle string, readTar func(io.Reader) error) (result error) {
 	mount, err := os.MkdirTemp(filepath.Dir(file.Name()), ".dmg-mount-")
 	if err != nil {
 		return err
@@ -45,12 +45,7 @@ func readDMGArchive(ctx context.Context, file *os.File, bundle string, revision 
 	}
 	// tar never extracts here. It streams the mounted bundle into the same
 	// checked reader used by ZIP/DEB, without executing application code.
-	arguments := []string{"-cf", "-"}
-	if revision == 1 {
-		// Apple tar otherwise creates extra ._ files from filesystem metadata.
-		// They are not vendor files and invalidate signed resource envelopes.
-		// Keep revision 0 byte-compatible for saved-operation recovery.
-		arguments = append(arguments, "--no-mac-metadata")
-	}
-	return readNativeTar(ctx, file, "/usr/bin/tar", append(arguments, "-C", mount, bundle), readTar)
+	// Apple tar otherwise creates extra ._ files from filesystem metadata.
+	// They are not vendor files and invalidate signed resource envelopes.
+	return readNativeTar(ctx, file, "/usr/bin/tar", []string{"-cf", "-", "--no-mac-metadata", "-C", mount, bundle}, readTar)
 }

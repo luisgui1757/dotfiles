@@ -18,6 +18,21 @@ var operationID = regexp.MustCompile(`^[0-9a-f]{64}$`)
 // another one to its successor. A saved selection keeps the same tools.
 var retiredCapabilities = map[string]string{"sentinel-skills": "sentinel"}
 
+const supportFloor = "v1.2.0"
+
+const floorPackageStep = "this private package generation is older than " + supportFloor + ". Check out " + supportFloor + ", open setup, choose Update tools and then Choose tools with the same selection. Then update this checkout and choose Update tools"
+
+type retiredResource struct{ OS, Step string }
+
+var retiredResources = map[string]retiredResource{
+	"config.git":         {Step: "untick Git in Choose tools, accept the legacy settings restoration, then select Git again"},
+	"integration.vscode": {Step: "untick VS Code in Choose tools, accept the legacy settings restoration, then select VS Code again"},
+	"tool.flatpak":       {Step: "choose Choose tools and approve the removal of the earlier Obsidian Flatpak and of Flatpak"},
+	"tool.obsidian":      {OS: "linux", Step: "choose Choose tools and approve the removal of the earlier Obsidian Flatpak"},
+	"tool.zen":           {OS: "darwin", Step: "keep Zen selected in Choose tools and approve the removal of the earlier private Zen bundle and launcher"},
+	"desktop.zen":        {OS: "darwin", Step: "keep Zen selected in Choose tools and approve the removal of the earlier private Zen bundle and launcher"},
+}
+
 type Transaction struct {
 	Plan     Plan              `json:"plan"`
 	Next     int               `json:"next"`
@@ -114,6 +129,20 @@ func LoadState(path, target string) (State, error) {
 			return state, fmt.Errorf("adopted resource %s has no original baseline", id)
 		}
 	}
+	for id, receipt := range state.Receipts {
+		retired, ok := retiredResources[id]
+		if !ok || retired.OS != "" && retired.OS != state.Context.OS {
+			continue
+		}
+		if receipt.Ownership != "reused" {
+			return state, fmt.Errorf("the installer state records %s, which this installer no longer reads. Check out %s, open setup and %s. Then update this checkout and choose Update tools", id, supportFloor, retired.Step)
+		}
+		delete(state.Receipts, id)
+	}
+	state.Keep = slices.DeleteFunc(state.Keep, func(id string) bool {
+		retired, ok := retiredResources[id]
+		return ok && (retired.OS == "" || retired.OS == state.Context.OS)
+	})
 	for _, archive := range state.PastTransactions {
 		if !filepath.IsLocal(archive) || filepath.Dir(archive) != "transactions" || len(filepath.Base(archive)) != 69 || filepath.Ext(archive) != ".json" {
 			return state, errors.New("invalid transaction archive reference")

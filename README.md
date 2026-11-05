@@ -4,8 +4,8 @@ Choose the tools you want. Setup installs their prerequisites, applies the share
 Rose Pine configuration, and records what it owns so update and removal can make
 precise changes.
 
-**v1.0.1** replaces the earlier Nix/chezmoi setup with this installer. Coming
-from v0.4.x? Migrate with v1.0.1 first. Follow [the upgrade guide](docs/UPGRADING.md#from-v04x).
+**v2.0.0** reads the installer states of v1.2.0 and later. Coming from an older
+release? Update to v1.2.0 first. Follow [the upgrade guide](docs/UPGRADING.md#from-a-release-before-v120).
 
 ## Supported platforms
 
@@ -100,10 +100,10 @@ fetch arbitrary latest package versions. Sentinel is the one exception: Update
 installs its latest published and immutable release. Native providers update only the
 selected, proven-owned packages, never the entire machine.
 
-Coming from the Nix/chezmoi release (v0.4.x)? Only the `v1.0.1` checkout has
-`./migrate.sh` and `.\migrate.ps1`. Check out `v1.0.1`, run migrate and finish
-all its phases. Then update the checkout, open setup and choose **Update tools**.
-Read [the upgrade guide](docs/UPGRADING.md#from-v04x) for the two steps.
+Coming from a release before v1.2.0? Check out `v1.2.0`, open setup and choose
+**Update tools**. Then update to `main` and choose **Update tools** again. A
+v0.4.x installation first runs migrate from the `v1.0.1` checkout. Read
+[the upgrade guide](docs/UPGRADING.md#from-a-release-before-v120) for the steps.
 
 ## Selectable tools
 
@@ -183,8 +183,7 @@ their own section outside the marked block, or in `~/.gitconfig`;
 `git config --global --add include.path` can edit the managed include section
 and requires review. Removal preserves edited blocks and personal settings.
 As with other live configuration, editing the checkout's defaults takes effect
-immediately. See [Git configuration handover](docs/UPGRADING.md#git-configuration-handover)
-for a previous whole-file installation.
+immediately.
 
 **Lint and benchmark tools** is optional for contributors to this dotfiles
 repository. It supplies ShellCheck, jq, Hyperfine, Taplo, yamllint and
@@ -199,13 +198,7 @@ Chromium's sandbox, because that sandbox needs unprivileged user namespaces,
 which Ubuntu restricts unless an AppArmor profile names the program's path. This
 is disclosed before approval; the installer does not change kernel settings or
 AppArmor policies. Vaults and Obsidian's settings (`~/.config/obsidian`) stay
-personal. Until 2026-10-22, Linux Obsidian was a Flatpak in a private store:
-company AppArmor changes could stop its sandbox, and Electron's helper processes
-ask Flatpak's session service to start them, which cannot see a private store.
-Choose tools removes that earlier Flatpak and keeps its
-`~/.var/app/md.obsidian.Obsidian` data; Update installs the portable build but,
-as always, removes nothing. Obsidian then asks once for your vault: use **Open
-folder as vault**.
+personal.
 OpenWhispr uses its official portable archive on Linux amd64; upstream does not
 publish a Linux arm64 archive or Flatpak. The vendor launcher automatically
 disables Chromium’s sandbox when unprivileged user namespaces are restricted,

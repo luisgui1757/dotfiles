@@ -126,8 +126,15 @@ func TestPrivatePythonWindowsRecipeIdentityAndLegacyShape(t *testing.T) {
 				t.Fatal("legacy serialized shape changed", err)
 			}
 			var restored ArchivePin
-			if err := Decode(data, &restored); err != nil || restored.Validate() != nil || archivePinID(restored) != archivePinID(pin) {
-				t.Fatal("legacy pin no longer reads with its original identity", err)
+			if err := Decode(data, &restored); err != nil {
+				t.Fatal(err)
+			}
+			if target.OS == "windows" {
+				if err := restored.Validate(); err == nil || !strings.Contains(err.Error(), "Check out "+supportFloor) {
+					t.Fatal("a legacy Windows generation was accepted without the floor release step", err)
+				}
+			} else if restored.Validate() != nil || archivePinID(restored) != archivePinID(pin) {
+				t.Fatal("legacy pin no longer reads with its original identity")
 			}
 			if archivePinID(restored) == current {
 				t.Fatal("isolated commands require a new desired identity", target, name)
