@@ -51,7 +51,7 @@ func TestWriteActiveShellFixtures(t *testing.T) {
 		if variant == "windows" {
 			target.OS = "windows"
 			selected = []string{"config.powershell", "integration.starship", "integration.fzf", "integration.lsd", "integration.zoxide", "integration.atuin", "integration.superfile"}
-			add("tool.starship", "bin/starship.ps1", "starship", "$global:LASTEXITCODE = 0\n'function global:prompt { return \"fixture> \" }'\n")
+			add("tool.starship", "bin/starship.ps1", "starship", "$global:LASTEXITCODE = 0\n'function global:prompt { return \"fixture> \" }'\n'Set-PSReadLineOption -ViModeIndicator script -ViModeChangeHandler { [Microsoft.PowerShell.PSConsoleReadLine]::InvokePrompt() }'\n")
 			add("tool.zoxide", "bin/zoxide.ps1", "zoxide", "$global:LASTEXITCODE = 0\n'function global:z { }'\n")
 			add("tool.fzf", "bin/fzf.ps1", "fzf", "# External picker fixture; no terminal picker is invoked.\n")
 			// The generated init records its arguments and the PSFzf chords that
