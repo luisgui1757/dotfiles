@@ -4,6 +4,7 @@ import base64
 import copy
 import gzip
 import hashlib
+import http.client
 import importlib.util
 import io
 import json
@@ -62,6 +63,8 @@ class FakeNetwork:
 
     def download(self, url, destination):
         data = self.files[url]
+        if isinstance(data, Exception):
+            raise data
         destination.write_bytes(data)
         return {"sha256": hashlib.sha256(data).hexdigest(), "sha512": hashlib.sha512(data).digest(), "size": len(data)}
 
@@ -353,6 +356,26 @@ class GitHubPinBumpTest(unittest.TestCase):
                     self.assertIn("size limit", summary)
                 else:
                     self.assertEqual({pin["version"] for pin in resources["tool.openwhispr"].values()}, {"1.99.0"})
+
+    def test_one_malformed_reply_fails_only_its_tool(self):
+        for fault in ("object reply", "null size", "truncated download"):
+            with self.subTest(fault=fault):
+                self.path.write_text(self.original)
+                self.releases = []
+                self.publish("tool.fd", "10.99.0")
+                self.releases = []
+                self.publish("tool.fzf", "0.99.0")
+                if fault == "object reply":
+                    self.network.texts[self.api] = json.dumps({"message": "Not Found"}).encode()
+                elif fault == "null size":
+                    self.release["assets"][-1]["size"] = None
+                    self.sync()
+                else:
+                    self.network.files[self.release["assets"][-1]["browser_download_url"]] = http.client.IncompleteRead(b"")
+                resources, summary = self.run_bump("tool.fd,tool.fzf", expected=1)
+                self.assertEqual({pin["version"] for pin in resources["tool.fd"].values()}, {"10.99.0"})
+                self.assertEqual(resources["tool.fzf"], self.pins["tool.fzf"])
+                self.assertIn("Failed verification:\n- `tool.fzf`", summary)
 
     def test_superfile_accepts_the_publishers_dot_slash_archive_prefix(self):
         self.publish("tool.superfile", "1.99.0")

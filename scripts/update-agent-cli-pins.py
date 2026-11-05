@@ -31,6 +31,7 @@ import argparse
 import base64
 import gzip
 import hashlib
+import http.client
 import json
 import os
 import pathlib
@@ -429,7 +430,8 @@ def main(argv=None, network=None, verify=gpg_verify) -> int:
             lines += [f"  - {target}: `{fields['sha256']}`" for target, fields in sorted(updates.items())]
         except UnchangedRelease as reason:
             lines.append(f"- `{tool}`: {reason}")
-        except (BumpError, KeyError, ValueError, OSError, EOFError, tarfile.TarError, zipfile.BadZipFile, subprocess.CalledProcessError) as error:
+        except (BumpError, KeyError, ValueError, TypeError, AttributeError, OSError, EOFError, http.client.HTTPException,
+                tarfile.TarError, zipfile.BadZipFile, subprocess.CalledProcessError) as error:
             failures.append(f"- `{tool}`: {error}")
     args.pins.write_text(json.dumps(document, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     manual = [f"- `{tool}`: {reason}" for tool, reason in sorted(policy["manual"].items())]
