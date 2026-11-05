@@ -4,7 +4,7 @@ Choose the tools you want. Setup installs their prerequisites, applies the share
 Rose Pine configuration, and records what it owns so update and removal can make
 precise changes.
 
-**v2.0.0** reads the installer states of v1.2.0 and later. Coming from an older
+**v2.1.0** reads the installer states of v1.2.0 and later. Coming from an older
 release? Update to v1.2.0 first. Follow [the upgrade guide](docs/UPGRADING.md#from-a-release-before-v120).
 
 ## Supported platforms
