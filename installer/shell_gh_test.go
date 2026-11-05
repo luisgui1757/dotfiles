@@ -6,7 +6,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
-	"strings"
 	"testing"
 )
 
@@ -14,10 +13,6 @@ func TestManagedGhNamesItsStableCommandPath(t *testing.T) {
 	zsh, err := exec.LookPath("zsh")
 	if err != nil {
 		t.Fatal("zsh shell tests require zsh to be provisioned:", err)
-	}
-	pins, err := DefaultArchivePins(nativePlatform(t))
-	if err != nil {
-		t.Fatal(err)
 	}
 	for _, test := range []struct {
 		name     string
@@ -34,14 +29,7 @@ func TestManagedGhNamesItsStableCommandPath(t *testing.T) {
 			env, _ := editorShellEnvironment(t, home, test.selected)
 			want := "personal"
 			if slices.Contains(test.selected, "tool.gh") {
-				gh, err := (&ArchiveDriver{Directory: filepath.Join(home, "packages"), Pins: pins}).CommandPath("tool.gh", "gh")
-				if err != nil {
-					t.Fatal(err)
-				}
-				if !strings.Contains(gh, string(filepath.Separator)+"current"+string(filepath.Separator)) {
-					t.Fatal("managed gh path is not the stable current link", gh)
-				}
-				want = gh
+				want = filepath.Join(home, "packages", "tool.gh", "current", "bin", "gh")
 			}
 			script := ". " + shellLiteral(env) + `; printf '%s' "${GH_PATH-unset}"`
 			for _, shell := range [][]string{{"bash", "--noprofile", "--norc", "-c"}, {zsh, "-f", "-c"}} {
