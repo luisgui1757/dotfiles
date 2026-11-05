@@ -218,6 +218,10 @@ in the evidence.
       skills selected, Kiro lists the 22 Sentinel skills (type `/` in chat).
       Removal restores `cli.json` and keeps `~/.kiro` sign-ins, sessions and
       steering.
+- [ ] **Muse Code CLI**: select it and confirm `muse --version` matches its
+      archive pin from a fresh terminal. Sign in with `muse login` only with
+      your own account. Check stays ready after use. Removal keeps the Muse
+      sign-in and sessions.
 - [ ] **Sentinel rules and skills**: select it with at least one agent. Make
       sure that each agent file has the Sentinel block. Each of the 22 skill
       folders must have a `.sentinel-owned` file. Change one line in the block,

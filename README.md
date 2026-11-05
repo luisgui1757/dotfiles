@@ -981,12 +981,12 @@ Useful standalone tools:
 - `kiro-cli`: Kiro CLI. Run `kiro-cli login` once, then `kiro-cli`
   in a project directory to chat; `kiro-cli --help` lists its commands. See the
   [Kiro CLI docs](https://kiro.dev/docs/cli/).
-- `muse`: Muse Code CLI. Run `muse login` once, then `muse` in a project
-  directory. `muse exec "<prompt>"` runs one prompt without the TUI, and
-  `muse --help` lists its commands. See [Muse Code](https://dev.meta.ai/).
   [Official Codex guide](https://learn.chatgpt.com/docs/codex/cli) and
   [Claude Code guide](https://code.claude.com/docs/en/setup) describe their
   authentication and usage. Neither CLI is required by the other.
+- `muse`: Muse Code CLI. Run `muse login` once, then `muse` in a project
+  directory. `muse exec "<prompt>"` runs one prompt without the TUI, and
+  `muse --help` lists its commands. See [Muse Code](https://dev.meta.ai/).
 
 ### Terminals and scrollback
 
