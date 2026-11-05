@@ -222,8 +222,7 @@ Zen-only installation also requires Homebrew and Apple's command-line tools.
 
 On Linux, Zen uses Mozilla's legacy profile selection to retain the same personal
 profile across managed generations. Its application policy disables self-updates;
-use setup's Update action. See the
-[handover instructions for earlier Mac installations](docs/UPGRADING.md#zen-macos-native-application).
+use setup's Update action. See [the Zen macOS section](docs/UPGRADING.md#zen-macos-native-application).
 
 Tailscale uses its pinned official DEB on Linux, including the vendor's daemon
 service. Run `sudo tailscale up` to sign in. On macOS the existing Homebrew formula

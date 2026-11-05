@@ -28,8 +28,8 @@ type retiredResource struct {
 }
 
 var retiredResources = map[string]retiredResource{
-	"config.git":         {Step: "untick Git in Choose tools, accept the legacy settings restoration, then select Git again"},
-	"integration.vscode": {Step: "untick VS Code in Choose tools, accept the legacy settings restoration, then select VS Code again"},
+	"config.git":         {Step: "choose Choose tools with Git selected, and accept the legacy settings restoration on the confirmation"},
+	"integration.vscode": {Step: "choose Choose tools with VS Code selected, and accept the legacy settings restoration on the confirmation"},
 	"tool.flatpak":       {Retained: true},
 	"tool.obsidian":      {OS: "linux", Step: "choose Choose tools and approve the removal of the earlier Obsidian Flatpak"},
 	"tool.zen":           {OS: "darwin", Step: "keep Zen selected in Choose tools and approve the removal of the earlier private Zen bundle and launcher"},
