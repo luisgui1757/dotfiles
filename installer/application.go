@@ -61,6 +61,7 @@ func NewNativeController(repository, source, stateDirectory string, platform Nat
 	}
 	configureVSCodeSettings(profiles, target, folders)
 	configureKiroSettings(profiles, target, folders, platform.Sentinel)
+	configureT3Settings(profiles, folders, repository)
 	profiles.recordIssue(gitSettingsResource, configureGitSettings(profiles, folders, repository))
 	windowsPowerShell := ""
 	if target.OS == "windows" {
@@ -148,6 +149,7 @@ func NewNativeController(repository, source, stateDirectory string, platform Nat
 		}
 		configureVSCodeSettings(bound, target, folders)
 		configureKiroSettings(bound, target, folders, platform.Sentinel)
+		configureT3Settings(bound, folders, repository)
 		if err == nil {
 			bound.recordIssue(gitSettingsResource, configureGitSettings(bound, folders, repository))
 		}

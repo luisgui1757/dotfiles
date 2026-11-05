@@ -309,7 +309,8 @@
       "capability": true,
       "category": "AI coding",
       "requires": [
-        "tool.t3"
+        "tool.t3",
+        "integration.t3-code"
       ],
       "scope": "user"
     },
@@ -322,6 +323,9 @@
       "platforms": [
         "darwin",
         "linux"
+      ],
+      "requires": [
+        "integration.t3-code"
       ],
       "scope": "user",
       "platform_requires": {
@@ -1807,6 +1811,21 @@
         "vscode.rose-pine",
         "desktop.rose-pine"
       ],
+      "action": "profile",
+      "scope": "user"
+    },
+    {
+      "id": "integration.t3-code",
+      "name": "T3 Code settings and the Rosé Pine Moon theme",
+      "requires": [
+        "integration.t3-code-theme"
+      ],
+      "action": "profile",
+      "scope": "user"
+    },
+    {
+      "id": "integration.t3-code-theme",
+      "name": "T3 Code Rosé Pine Moon theme file",
       "action": "profile",
       "scope": "user"
     },
