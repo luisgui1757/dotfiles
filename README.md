@@ -121,7 +121,8 @@ selects the rest. Children remain independently selectable. `a` selects all,
 |---|---|
 | Editors | Neovim, VS Code |
 | Shell essentials | zsh on macOS/Linux or PowerShell 7 on Windows; zsh from bash terminals; Starship, lsd, zoxide, fzf, ripgrep, fd, Atuin, superfile |
-| Version control | Git, lazygit, GitHub CLI, gh-dash |
+| Version control | Git, lazygit, GitHub CLI, gh-dash, GitLab CLI |
+| Cloud | Azure CLI |
 | Terminal apps | Ghostty, Windows Terminal |
 | Terminal sessions | tmux, Herdr |
 | AI coding | T3 Code, T3 Code server, Claude Code CLI, Codex CLI, GitHub Copilot CLI, Kiro CLI, Sentinel rules and skills |
@@ -161,6 +162,8 @@ required dependencies are still resolved automatically in the preview.
 | lazygit | ✓ | ✓ | ✓ |
 | GitHub CLI | ✓ | ✓ | ✓ |
 | gh-dash | ✓ | ✓ | ✓ |
+| GitLab CLI | ✓ | ✓ | ✓ |
+| Azure CLI | ✓ | glibc | ✓ |
 | T3 Code | ✓ | ✓ | — |
 | T3 Code server (browser UI) | ✓ | ✓ | ✓ |
 | Claude Code CLI | ✓ | ✓ | ✓ |
@@ -939,6 +942,12 @@ Useful standalone tools:
   be met". It works only when a ruleset lists your account as a bypass actor, and
   rules without a bypass, such as required checks, still apply. gh asks for the
   merge method and a final Submit before it merges.
+- `glab`: GitLab CLI for merge requests, issues and pipelines. Run
+  `glab auth login` to sign in. Setup does not sign you in.
+- `az`: Azure CLI. Run `az login` to sign in. Setup does not sign you in. On
+  macOS and Linux it runs with its own pinned Python 3.14, and Update changes
+  both together. Extensions that you add with `az extension add` stay in
+  `~/.azure`.
 - Atuin: when it is selected, `Ctrl+R` opens Atuin's history search instead of
   fzf, in zsh, bash and PowerShell. It searches every session on the machine and
   records the directory, duration and exit code of each command. Type to filter.

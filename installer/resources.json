@@ -223,6 +223,28 @@
       "scope": "user"
     },
     {
+      "id": "gitlab",
+      "name": "GitLab CLI",
+      "description": "Merge request, issue and pipeline commands; sign in with glab auth login",
+      "capability": true,
+      "category": "Version control",
+      "requires": [
+        "tool.glab"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "azure",
+      "name": "Azure CLI",
+      "description": "Azure resource commands; sign in with az login",
+      "capability": true,
+      "category": "Cloud",
+      "requires": [
+        "tool.az"
+      ],
+      "scope": "user"
+    },
+    {
       "id": "ghostty",
       "name": "Ghostty",
       "description": "Terminal with the shared configuration and desktop launcher",
@@ -1240,6 +1262,53 @@
         "windows": {
           "provider": "archive",
           "package": "tool.gh"
+        }
+      }
+    },
+    {
+      "id": "tool.glab",
+      "name": "GitLab CLI",
+      "requires": [
+        "tool.git",
+        "integration.shells"
+      ],
+      "action": "archive",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.glab"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.glab"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.glab"
+        }
+      }
+    },
+    {
+      "id": "tool.az",
+      "name": "Azure CLI",
+      "requires": [
+        "integration.shells"
+      ],
+      "action": "archive",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.az"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.az"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.az"
         }
       }
     },

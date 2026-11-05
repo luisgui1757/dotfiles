@@ -258,6 +258,8 @@
     "tool.zen": "Beta tags, disk images and generated profile wrappers need a recipe.",
     "tool.clang-format": "The PyPI wheel contains paths that depend on its version.",
     "tool.gersemi": "The Windows formatter version must match the Mason registry snapshot.",
-    "tool.openwhispr": "Its latest release, 1.11.0, exceeds the installer's 512 MiB download limit on Linux."
+    "tool.openwhispr": "Its latest release, 1.11.0, exceeds the installer's 512 MiB download limit on Linux.",
+    "tool.glab": "GitLab releases need a release recipe.",
+    "tool.az": "The nested Python archive must match the Python ABI of the packages."
   }
 }

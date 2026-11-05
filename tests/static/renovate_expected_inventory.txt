@@ -41,13 +41,14 @@ regex|installer/archive-pins.json|git-refs|tmux-plugins/tmux-sensible|3
 regex|installer/archive-pins.json|git-refs|tmux-plugins/tmux-yank|3
 regex|installer/archive-pins.json|git-refs|zsh-users/zsh-autosuggestions|3
 regex|installer/archive-pins.json|git-tags|gnu-make|1
+regex|installer/archive-pins.json|github-releases|Azure/azure-cli|4
 regex|installer/archive-pins.json|github-releases|BlankSpruce/gersemi|1
 regex|installer/archive-pins.json|github-releases|BurntSushi/ripgrep|4
 regex|installer/archive-pins.json|github-releases|Kitware/CMake|4
 regex|installer/archive-pins.json|github-releases|OpenWhispr/openwhispr|2
 regex|installer/archive-pins.json|github-releases|PowerShell/PowerShell|1
 regex|installer/archive-pins.json|github-releases|ajeetdsouza/zoxide|4
-regex|installer/archive-pins.json|github-releases|astral-sh/python-build-standalone|4
+regex|installer/archive-pins.json|github-releases|astral-sh/python-build-standalone|7
 regex|installer/archive-pins.json|github-releases|atuinsh/atuin|4
 regex|installer/archive-pins.json|github-releases|cli/cli|4
 regex|installer/archive-pins.json|github-releases|dlvhdr/gh-dash|4
@@ -80,6 +81,7 @@ regex|installer/archive-pins.json|github-releases|xremap/xremap|2
 regex|installer/archive-pins.json|github-releases|yorukot/superfile|4
 regex|installer/archive-pins.json|github-releases|zen-browser/desktop|2
 regex|installer/archive-pins.json|github-tags|ghostty-org/ghostty|1
+regex|installer/archive-pins.json|gitlab-releases|gitlab-org/cli|4
 regex|installer/archive-pins.json|node-version|node|4
 regex|installer/archive-pins.json|nuget|PSFzf|1
 regex|installer/archive-pins.json|pypi|clang_format|1
