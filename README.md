@@ -287,7 +287,7 @@ registry mismatch disables its language-server/formatter setup until repair succ
 
 - On macOS 13 or later, Homebrew installs the official `t3-code` cask, and T3
   updates itself.
-- On Ubuntu and Debian, setup unpacks the official v0.1.6 `.deb` privately and
+- On Ubuntu and Debian, setup unpacks the official v0.1.7 `.deb` privately and
   does not run its install scripts. Setup adds a start script, which the
   launcher and T3's own `t3code://` link handler use. The script turns off
   T3's automatic updates with `T3CODE_DISABLE_AUTO_UPDATE=1`, and **Update
@@ -313,9 +313,9 @@ fresh terminal. It starts the local server and opens the browser UI. Keep that
 terminal open, and press Ctrl-C to stop the server. Setup adds no Node
 installation and no background service.
 
-The pinned stable **v0.1.6** of the server includes Orchestrator V2. Updates
+The pinned stable **v0.1.7** of the server includes Orchestrator V2. Updates
 follow the stable release pinned by the reviewed checkout.
-[Upstream release](https://github.com/pingdotgg/t3code/releases/tag/v0.1.6).
+[Upstream release](https://github.com/pingdotgg/t3code/releases/tag/v0.1.7).
 
 T3 opens without provider credentials; agent work needs at least one configured,
 authenticated provider. For existing CLI logins, install Codex or Claude Code,

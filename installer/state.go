@@ -22,12 +22,15 @@ const supportFloor = "v1.2.0"
 
 const floorPackageStep = "this private package generation is older than " + supportFloor + ". Check out " + supportFloor + ", open setup, choose Update tools and then Choose tools with the same selection. Then update this checkout and choose Update tools"
 
-type retiredResource struct{ OS, Step string }
+type retiredResource struct {
+	OS, Step string
+	Retained bool
+}
 
 var retiredResources = map[string]retiredResource{
 	"config.git":         {Step: "untick Git in Choose tools, accept the legacy settings restoration, then select Git again"},
 	"integration.vscode": {Step: "untick VS Code in Choose tools, accept the legacy settings restoration, then select VS Code again"},
-	"tool.flatpak":       {Step: "choose Choose tools and approve the removal of the earlier Obsidian Flatpak and of Flatpak"},
+	"tool.flatpak":       {Retained: true},
 	"tool.obsidian":      {OS: "linux", Step: "choose Choose tools and approve the removal of the earlier Obsidian Flatpak"},
 	"tool.zen":           {OS: "darwin", Step: "keep Zen selected in Choose tools and approve the removal of the earlier private Zen bundle and launcher"},
 	"desktop.zen":        {OS: "darwin", Step: "keep Zen selected in Choose tools and approve the removal of the earlier private Zen bundle and launcher"},
@@ -134,7 +137,7 @@ func LoadState(path, target string) (State, error) {
 		if !ok || retired.OS != "" && retired.OS != state.Context.OS {
 			continue
 		}
-		if receipt.Ownership != "reused" {
+		if receipt.Ownership != "reused" && !retired.Retained {
 			return state, fmt.Errorf("the installer state records %s, which this installer no longer reads. Check out %s, open setup and %s. Then update this checkout and choose Update tools", id, supportFloor, retired.Step)
 		}
 		delete(state.Receipts, id)

@@ -23,7 +23,7 @@ func TestLoadStateReleasesARetiredRecordThatSetupNoLongerOwns(t *testing.T) {
 		os       string
 		receipts map[string]Receipt
 	}{
-		{"linux", map[string]Receipt{"config.git": removed, "integration.vscode": removed, "tool.flatpak": reused, "tool.obsidian": removed, "tool.fzf": reused}},
+		{"linux", map[string]Receipt{"config.git": removed, "integration.vscode": removed, "tool.flatpak": {Ownership: "created", Status: "ready", After: Observation{Present: true}}, "tool.obsidian": removed, "tool.fzf": reused}},
 		{"darwin", map[string]Receipt{"tool.zen": removed, "desktop.zen": removed, "tool.fzf": reused}},
 	} {
 		path := saveRetiredFixture(t, fixture.os, []string{"tool.flatpak", "tool.fzf"}, fixture.receipts)
@@ -43,7 +43,6 @@ func TestLoadStateStopsOnARetiredRecordThatSetupStillOwns(t *testing.T) {
 	}{
 		{"linux", "config.git", "created", "Git"},
 		{"linux", "integration.vscode", "uncertain", "VS Code"},
-		{"linux", "tool.flatpak", "created", "Flatpak"},
 		{"linux", "tool.obsidian", "created", "Obsidian"},
 		{"darwin", "tool.zen", "created", "Zen"},
 		{"darwin", "desktop.zen", "created", "Zen"},

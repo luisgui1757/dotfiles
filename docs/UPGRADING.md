@@ -23,9 +23,13 @@ From v0.4.x (Nix and chezmoi):
 2. Continue with step 2 above.
 
 Some records need a step that only v1.2.0 can do: the Sentinel files that
-dotfiles 1.0 copied, and the records of unreleased builds. When setup finds such
-a record, it stops before any change. The message names the resource and the
-step. Do that step with the `v1.2.0` checkout, then update to `main` again.
+dotfiles 1.0 copied, and the records of unreleased builds. Setup does not change
+such a record. It shows the resource and the v1.2.0 step. For most of these
+records, the whole request stops before any change. An old package generation
+and an unticked Sentinel only make their own resource wait. Do the step with the
+`v1.2.0` checkout, then update to `main` again.
+
+Setup releases its record of Flatpak, and Flatpak stays installed.
 
 Setup reports the marks of an earlier installation that migrate did not retire.
 It does not use a Homebrew prefix that nix-homebrew still manages. Migrate keeps
@@ -225,7 +229,7 @@ install the app with `winget install T3Tools.T3Code`.
 T3 Code server is the earlier optional selection, never an automatic migration or provider
 replacement. It uses the official standalone package with a browser UI on Apple
 Silicon macOS, Ubuntu/Debian amd64/arm64 and Windows amd64. The fixed stable
-`v0.1.6` pin supplies Orchestrator V2. Finish any pending nightly installation
+`v0.1.7` pin supplies Orchestrator V2. Finish any pending nightly installation
 with its original checkout first; then stop T3, update the checkout and choose
 **Update tools** to replace the managed nightly with stable. Personal
 T3 state stays outside the package; back it up before running a newer server.
