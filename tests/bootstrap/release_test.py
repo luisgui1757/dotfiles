@@ -255,6 +255,8 @@ class ReleaseTests(unittest.TestCase):
         self.assertEqual(select([[native_run(22)]], pushes=[push_run(7, status="in_progress", conclusion="")],
                                 failing_watches={7}, viewed={7: push_run(7, conclusion="failure")}),
                          ((22, "workflow_dispatch"), [["gh", "run", "watch", "7"], ["gh", "run", "watch", "22"]]))
+        self.assertEqual(select([], pushes=[push_run(10, status="in_progress", conclusion="")], failing_watches={10}),
+                         ((10, "push"), [["gh", "run", "watch", "10"]]))
         with self.assertRaisesRegex(release.ReleaseError, "Re-run the release workflow"):
             select([], pushes=[push_run(9, status="in_progress", conclusion="")], failing_watches={9},
                    viewed={9: push_run(9, status="in_progress", conclusion="")})

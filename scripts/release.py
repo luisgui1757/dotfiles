@@ -353,7 +353,7 @@ def select_release_run(manifest: dict[str, Any], tag: str, expected_sha: str) ->
         ]
         return max(usable, key=lambda item: (item.get("status") == "completed", item["databaseId"]), default=None)
 
-    def passes(run_id: int) -> bool:
+    def watch(run_id: int) -> bool:
         return run(["gh", "run", "watch", str(run_id), "--exit-status", "--interval", "60"], capture=False, check=False).returncode == 0
 
     def view(run_id: int) -> dict[str, Any]:
@@ -370,12 +370,12 @@ def select_release_run(manifest: dict[str, Any], tag: str, expected_sha: str) ->
 
     pushed = passed_or_running(runs("push", "main"))
     if pushed:
-        watched = passes(pushed["databaseId"])
+        watch(pushed["databaseId"])
         record = view(pushed["databaseId"])
-        if record.get("attempt") == 1 and watched:
-            return verified_release_run(record, pushed["databaseId"], "push", "main", expected_sha)
         if record.get("attempt") == 1 and record.get("status") != "completed":
             fail(f"the watch of push run {pushed['databaseId']} stopped while the run still runs. Re-run the release workflow.")
+        if record.get("attempt") == 1 and record.get("conclusion") == "success":
+            return verified_release_run(record, pushed["databaseId"], "push", "main", expected_sha)
     existing = runs("workflow_dispatch", tag)
     reused = passed_or_running(existing)
     if reused:
@@ -393,7 +393,7 @@ def select_release_run(manifest: dict[str, Any], tag: str, expected_sha: str) ->
         if len(selected) != 1:
             fail("could not select one new exact-tag workflow_dispatch run")
         run_id = selected[0]["databaseId"]
-    if not passes(run_id):
+    if not watch(run_id):
         fail(f"exact-tag run {run_id} did not pass. Re-run the release workflow to start a new exact-tag run.")
     return verified_release_run(view(run_id), run_id, "workflow_dispatch", tag, expected_sha)
 
