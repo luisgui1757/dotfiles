@@ -4,7 +4,7 @@ Choose the tools you want. Setup installs their prerequisites, applies the share
 Rose Pine configuration, and records what it owns so update and removal can make
 precise changes.
 
-**v2.0.0** reads the installer states of v1.2.0 and later. Coming from an older
+**v2.1.0** reads the installer states of v1.2.0 and later. Coming from an older
 release? Update to v1.2.0 first. Follow [the upgrade guide](docs/UPGRADING.md#from-a-release-before-v120).
 
 ## Supported platforms
@@ -961,8 +961,8 @@ Useful standalone tools:
 - `gh`: on macOS and Linux, the managed shell sets `GH_PATH` to the stable
   `current/bin/gh` link. Thus the Git credential helper that `gh auth login`
   or `gh auth setup-git` writes still works after an Update. A helper line
-  that an earlier gh wrote stays unchanged. Run `gh auth setup-git` again to
-  correct it.
+  that an earlier gh wrote stays unchanged. To correct it, open a new terminal
+  after Update, and then run `gh auth setup-git` again.
 - `gh-dash`: dashboard for pull requests and issues. Run `gh auth login` first
   to access your GitHub work; installing the dashboard does not require login.
   On a pull request, `m` merges it normally. `M` runs `gh pr merge --admin`: the
