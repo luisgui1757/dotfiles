@@ -152,7 +152,7 @@ func (d *DesktopDriver) recipe(id string) (desktopRecipe, error) {
 		// Zen's remoting name and Obsidian's desktop name, as in their upstream
 		// desktop entries. OpenWhispr sets its Electron desktop name to
 		// open-whispr.desktop, which Electron uses for WM_CLASS.
-		class := map[string]string{"tool.ghostty": "com.mitchellh.ghostty", "tool.zen": "zen", obsidianPortable: "md.obsidian.Obsidian", "tool.openwhispr": "open-whispr", "tool.t3-code-app": "t3code"}[p.Package]
+		class := map[string]string{"tool.ghostty": "com.mitchellh.ghostty", "tool.zen": "zen", obsidianPortable: "md.obsidian.Obsidian", "tool.openwhispr": "open-whispr", "tool.t3-code-app": "com.t3tools.T3Code"}[p.Package]
 		p.Contents, err = desktopEntry(p.Name, p.Command, p.Icon, class, p.Package == "tool.zen")
 		if p.Package == obsidianPortable && err == nil {
 			// Chromium's sandbox needs unprivileged user namespaces, which Ubuntu

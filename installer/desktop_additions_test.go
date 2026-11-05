@@ -87,7 +87,7 @@ func TestAdditionalDesktopLaunchersUseDeclaredPayloads(t *testing.T) {
 					t.Fatal(recipe)
 				}
 				if id == "t3-code" && (recipe.Command != filepath.Join(root, "packages", "tool.t3-code-app", "current", "t3-code") || !strings.HasSuffix(recipe.Icon, "t3code.png") ||
-					!strings.Contains(recipe.Contents, "\nExec="+desktopExecArgument(recipe.Command)+" %U\n") || !strings.Contains(recipe.Contents, "\nStartupWMClass=t3code\n")) {
+					!strings.Contains(recipe.Contents, "\nExec="+desktopExecArgument(recipe.Command)+" %U\n") || !strings.Contains(recipe.Contents, "\nStartupWMClass=com.t3tools.T3Code\n")) {
 					t.Fatal(recipe)
 				}
 			} else if !strings.HasSuffix(recipe.Destination, ".app") || !strings.Contains(filepath.ToSlash(recipe.Source), "/tool."+id+"/current/") {
