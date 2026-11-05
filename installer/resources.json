@@ -406,6 +406,17 @@
       "scope": "user"
     },
     {
+      "id": "pi",
+      "name": "Pi coding agent",
+      "description": "Standalone terminal coding agent; sign in after installation; setup installs the pinned release binary, which does not update itself",
+      "capability": true,
+      "category": "AI coding",
+      "requires": [
+        "tool.pi"
+      ],
+      "scope": "user"
+    },
+    {
       "id": "sentinel",
       "name": "Sentinel rules and skills",
       "description": "The installer of the latest Sentinel release writes the rules and the core, UI, formal and ops skills for each installed coding agent",
@@ -1510,6 +1521,30 @@
         "windows": {
           "provider": "archive",
           "package": "tool.opencode"
+        }
+      }
+    },
+    {
+      "id": "tool.pi",
+      "name": "Pi coding agent",
+      "requires": [
+        "tool.git",
+        "integration.shells"
+      ],
+      "action": "archive",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.pi"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.pi"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.pi"
         }
       }
     },

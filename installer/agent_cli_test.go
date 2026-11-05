@@ -90,7 +90,7 @@ func TestAgentCLIsAreIndependentNativeSelections(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, target := range []Context{{OS: "darwin", Arch: "arm64"}, linux, {OS: "linux", Arch: "arm64"}, {OS: "windows", Arch: "amd64"}} {
-		for capability, command := range map[string]string{"t3-code": "t3", "claude-code": "claude", "codex": "codex", "muse-code": "muse", "opencode": "opencode"} {
+		for capability, command := range map[string]string{"t3-code": "t3", "claude-code": "claude", "codex": "codex", "muse-code": "muse", "opencode": "opencode", "pi": "pi"} {
 			t.Run(target.OS+"/"+target.Arch+"/"+capability, func(t *testing.T) {
 				closure, err := catalog.Closure([]string{capability}, target)
 				if err != nil {
@@ -116,15 +116,10 @@ func TestAgentCLIsAreIndependentNativeSelections(t *testing.T) {
 	}
 }
 
-func TestPiHasNoActiveInstallerRoute(t *testing.T) {
+func TestPiConfigurationIsNotManaged(t *testing.T) {
 	catalog, err := DefaultCatalog()
 	if err != nil {
 		t.Fatal(err)
-	}
-	for _, resource := range catalog.Resources {
-		if resource.ID == "pi" || strings.HasSuffix(resource.ID, ".pi") {
-			t.Fatal("retired agent remains in the active catalog", resource.ID)
-		}
 	}
 	manifest, err := DefaultConfigManifest(catalog)
 	if err != nil {
@@ -132,7 +127,7 @@ func TestPiHasNoActiveInstallerRoute(t *testing.T) {
 	}
 	for _, target := range manifest.Targets {
 		if strings.HasPrefix(target.Source, "pi/") || strings.HasPrefix(target.Path, ".pi/") {
-			t.Fatal("retired agent configuration remains managed", target)
+			t.Fatal("personal Pi configuration is managed", target)
 		}
 	}
 }

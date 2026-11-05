@@ -125,7 +125,7 @@ selects the rest. Children remain independently selectable. `a` selects all,
 | Cloud | Azure CLI |
 | Terminal apps | Ghostty, Windows Terminal |
 | Terminal sessions | tmux, Herdr |
-| AI coding | T3 Code, T3 Code server, Claude Code CLI, Codex CLI, GitHub Copilot CLI, Kiro CLI, Muse Code CLI, OpenCode CLI, Sentinel rules and skills |
+| AI coding | T3 Code, T3 Code server, Claude Code CLI, Codex CLI, GitHub Copilot CLI, Kiro CLI, Muse Code CLI, OpenCode CLI, Pi coding agent, Sentinel rules and skills |
 | Desktop apps | OpenWhispr, Obsidian, Tailscale, Zen Browser, AeroSpace, Mac keyboard shortcuts, US International dead keys |
 | Dotfiles development | Lint and benchmark tools |
 
@@ -172,6 +172,7 @@ required dependencies are still resolved automatically in the preview.
 | Kiro CLI | ✓ | glibc | — |
 | Muse Code CLI | ✓ | ✓ | ✓ |
 | OpenCode CLI | ✓ | glibc | ✓ |
+| Pi coding agent | ✓ | glibc | ✓ |
 | Sentinel rules and skills | ✓ | ✓ | ✓ |
 | Lint and benchmark tools | ✓ | ✓ | ✓ |
 
@@ -344,7 +345,7 @@ Use dotfiles Update for its managed Codex/Claude packages too; T3's provider
 **Update** and **Update all** can invoke those CLIs' own updaters outside this
 pinned lifecycle.
 
-Claude Code, Codex, GitHub Copilot, Kiro, Muse Code and OpenCode are
+Claude Code, Codex, GitHub Copilot, Kiro, Muse Code, OpenCode and Pi are
 independent CLI selections; choose any of them. They use pinned standalone native distributions
 and automatically resolve Git.
 The installer does not install their desktop apps or change personal models,
@@ -394,6 +395,12 @@ otherwise updates itself, so the managed shell environment sets
 `~/.config/opencode`. OpenCode starts a background server when you use it. Run
 `opencode service stop` before Update or removal, so that the old version does
 not stay in use. Sign in with `opencode auth login`.
+**Pi coding agent** uses the pinned build from its official GitHub release: one
+native executable with its support files for each platform. Setup does not run
+Pi's install script. A release build only reports a new version and does not
+update itself, so use Update for new Pi releases. Sign in with `/login` inside
+`pi`, or set the API key of your provider. Setup writes nothing to `~/.pi`.
+T3 Code has its own Pi provider, which starts `pi` from `PATH`.
 
 **Sentinel rules and skills** installs
 [Sentinel](https://github.com/luisgui1757/sentinel), the shared rules and
@@ -1013,6 +1020,9 @@ Useful standalone tools:
   provider, then `opencode` in a project directory. `opencode run "<prompt>"`
   runs one prompt without the TUI, and `opencode --help` lists its commands.
   See the [OpenCode docs](https://opencode.ai/docs/).
+- `pi`: Pi coding agent. Start it in a project directory and type `/login`
+  once. `pi -p "<prompt>"` runs one prompt without the TUI, and `pi --help`
+  lists its commands. See [Pi](https://pi.dev/).
 
 ### Terminals and scrollback
 

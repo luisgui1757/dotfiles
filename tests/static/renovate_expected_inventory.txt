@@ -53,6 +53,7 @@ regex|installer/archive-pins.json|github-releases|astral-sh/python-build-standal
 regex|installer/archive-pins.json|github-releases|atuinsh/atuin|4
 regex|installer/archive-pins.json|github-releases|cli/cli|4
 regex|installer/archive-pins.json|github-releases|dlvhdr/gh-dash|4
+regex|installer/archive-pins.json|github-releases|earendil-works/pi|4
 regex|installer/archive-pins.json|github-releases|editorconfig-checker/editorconfig-checker|4
 regex|installer/archive-pins.json|github-releases|equalsraf/win32yank|1
 regex|installer/archive-pins.json|github-releases|git-for-windows/git|1

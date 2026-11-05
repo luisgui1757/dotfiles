@@ -27,7 +27,7 @@ func agentCLIEnvironment(home string) []string {
 	for _, entry := range os.Environ() {
 		key, _, _ := strings.Cut(entry, "=")
 		if strings.HasPrefix(key, "T3CODE_") || strings.HasPrefix(key, "ANTHROPIC_") || strings.HasPrefix(key, "CLAUDE_") || strings.HasPrefix(key, "OPENAI_") || strings.HasPrefix(key, "CODEX_") ||
-			strings.HasPrefix(key, "KIRO_") || strings.HasPrefix(key, "Q_") || strings.HasPrefix(key, "COPILOT_") || strings.HasPrefix(key, "MUSE_") || strings.HasPrefix(key, "META_") || strings.HasPrefix(key, "OPENCODE_") || key == "GH_TOKEN" || key == "GITHUB_TOKEN" {
+			strings.HasPrefix(key, "KIRO_") || strings.HasPrefix(key, "Q_") || strings.HasPrefix(key, "COPILOT_") || strings.HasPrefix(key, "MUSE_") || strings.HasPrefix(key, "META_") || strings.HasPrefix(key, "OPENCODE_") || strings.HasPrefix(key, "PI_") || key == "GH_TOKEN" || key == "GITHUB_TOKEN" {
 			continue
 		}
 		environment = append(environment, entry)
@@ -226,7 +226,7 @@ func TestNativeAgentCLIInstalledApplicationLifecycle(t *testing.T) {
 		}
 		exerciseAgentCLI(t, commands[id], product, home)
 	}
-	agents := []string{"tool.t3", "tool.claude", "tool.codex", "tool.copilot", "tool.muse", "tool.opencode"}
+	agents := []string{"tool.t3", "tool.claude", "tool.codex", "tool.copilot", "tool.muse", "tool.opencode", "tool.pi"}
 	selected := []string{"t3-code", "claude-code", "codex", "copilot-cli"}
 	apply(Request{Schema: 1, Mode: "apply", Selected: selected})
 	commands["copilot"] = exerciseInstalledVersionedCLI(t, d, home, "tool.copilot", "copilot", "Copilot CLI")
@@ -236,6 +236,9 @@ func TestNativeAgentCLIInstalledApplicationLifecycle(t *testing.T) {
 	selected = append(selected, "opencode")
 	apply(Request{Schema: 1, Mode: "apply", Selected: selected})
 	commands["opencode"] = exerciseInstalledVersionedCLI(t, d, home, "tool.opencode", "opencode", "OpenCode")
+	selected = append(selected, "pi")
+	apply(Request{Schema: 1, Mode: "apply", Selected: selected})
+	commands["pi"] = exerciseInstalledVersionedCLI(t, d, home, "tool.pi", "pi", "Pi")
 	removeShared := []string{"tool.git"}
 	if platform.OS == "windows" {
 		// Copilot's PowerShell 7 prerequisite is shared; this disposable state
